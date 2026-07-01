@@ -358,6 +358,7 @@
           "run": "Selected-image loop",
           "luminanceChannel": "Luminance / channel",
           "deltaHelp": "mean delta / max delta",
+          "exportReceipt": "",
           "compareLineage": "Compare lineage",
           "compareRecipes": "Compare recipes",
           "previewRender": "Preview render",

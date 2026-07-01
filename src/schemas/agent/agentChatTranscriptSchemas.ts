@@ -552,6 +552,15 @@ export const agentSelectedImagePreviewLoopReviewSchema = z
             toolName: z.literal('rawengine.agent.history.rollback'),
           })
           .strict(),
+        exportReviewed: z
+          .object({
+            label: z.string().min(1),
+            reason: z.string().min(1),
+            state: agentSelectedImagePreviewLoopControlStateSchema,
+            toolName: z.literal('rawengine.agent.export.final'),
+          })
+          .strict()
+          .optional(),
       })
       .strict(),
     editCount: z.number().int().min(1),

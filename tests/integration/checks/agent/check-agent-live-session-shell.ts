@@ -381,9 +381,42 @@ async function validateRenderedSelectedImageLoopFromPanel(renderedTranscript: Ag
   assertData(
     selectedLoop,
     'rollbackReceiptGraphRevision',
-    'history_0',
-    'panel selected-image loop did not expose rollback-after-review receipt.',
+    '',
+    'panel selected-image export review should keep the reviewed graph current instead of rollback-after-review.',
   );
+  const exportReviewed = getByTestId<HTMLButtonElement>(
+    rendered.container,
+    'agent-selected-image-preview-loop-export-reviewed',
+    'panel selected-image reviewed export control did not render.',
+  );
+  assertData(
+    exportReviewed,
+    'dispatchPath',
+    'rawengine.agent.export.final',
+    'panel selected-image reviewed export did not bind to final export dispatch.',
+  );
+  assertData(exportReviewed, 'exportEvidenceReady', 'true', 'panel selected-image export evidence was not ready.');
+  if (exportReviewed.disabled) failures.push('panel selected-image reviewed export should enable after review.');
+  await act(async () => {
+    exportReviewed.click();
+  });
+  await waitForCondition('selected-image reviewed export receipt did not render.', () => {
+    return (
+      rendered.container.querySelector('[data-testid="agent-selected-image-preview-loop-export-receipt"]') !== null
+    );
+  });
+  const exportReceipt = getByTestId(
+    rendered.container,
+    'agent-selected-image-preview-loop-export-receipt',
+    'selected-image reviewed export receipt did not render.',
+  );
+  assertData(
+    exportReceipt,
+    'noOverwritePolicy',
+    'never_overwrite_original',
+    'selected-image reviewed export receipt did not expose no-overwrite policy.',
+  );
+  assertData(exportReceipt, 'rollbackStatus', 'available', 'selected-image reviewed export rollback status missing.');
   const acceptApply = getByTestId<HTMLButtonElement>(
     rendered.container,
     'agent-selected-image-preview-loop-accept-apply',

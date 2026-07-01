@@ -830,7 +830,7 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
       inputSchemaNames: [AGENT_FINAL_EXPORT_INPUT_SCHEMA_NAME],
       modes: [RawEngineAppServerRouteMode.ApplyDryRunPlan],
       outputSchemaNames: [AGENT_FINAL_EXPORT_OUTPUT_SCHEMA_NAME],
-      runtimeCheckScripts: ['check:agent-export-proof'],
+      runtimeCheckScripts: ['check:agent-export-proof', 'check:agent-selected-image-export-output'],
       toolNames: [AGENT_FINAL_EXPORT_TOOL_NAME],
     }),
   );
@@ -1044,6 +1044,7 @@ const APPROVED_AGENT_APP_SERVER_TOOL_NAMES = new Set<string>([
   AGENT_CURVE_LEVELS_APPLY_TOOL_NAME,
   AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME,
   AGENT_EXPORT_PROOF_TOOL_NAME,
+  AGENT_FINAL_EXPORT_TOOL_NAME,
   AGENT_GEOMETRY_APPLY_TOOL_NAME,
   AGENT_HISTORY_ROLLBACK_TOOL_NAME,
   AGENT_LAYER_CREATE_TOOL_NAME,

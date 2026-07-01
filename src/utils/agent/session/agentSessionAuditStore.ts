@@ -70,9 +70,64 @@ export const agentSessionAuditStoreSchema = z
   })
   .strict();
 
+export const agentSelectedImageExportReceiptSchema = z
+  .object({
+    approvalId: z.string().trim().min(1),
+    beforePreviewArtifact: z
+      .object({
+        artifactId: z.string().trim().min(1),
+        contentHash: z.string().trim().min(1),
+        graphRevision: z.string().trim().min(1),
+        previewRef: z.string().trim().min(1),
+        recipeHash: z.string().trim().min(1),
+        renderHash: z.string().trim().min(1),
+      })
+      .strict(),
+    currentPreviewArtifact: z
+      .object({
+        artifactId: z.string().trim().min(1),
+        contentHash: z.string().trim().min(1),
+        graphRevision: z.string().trim().min(1),
+        previewRef: z.string().trim().min(1),
+        recipeHash: z.string().trim().min(1),
+        renderHash: z.string().trim().min(1),
+      })
+      .strict(),
+    exportSettings: z
+      .object({
+        colorProfile: z.string().trim().min(1),
+        fileFormat: z.enum(['jpeg', 'png']),
+        jpegQuality: z.number().int().min(50).max(95),
+        longEdgePx: z.number().int().min(512).max(8192),
+        renderingIntent: z.string().trim().min(1),
+      })
+      .strict(),
+    finalGraphRevision: z.string().trim().min(1),
+    finalRecipeHash: z.string().trim().min(1),
+    initialGraphRevision: z.string().trim().min(1),
+    initialRecipeHash: z.string().trim().min(1),
+    noOverwritePolicy: z.literal('never_overwrite_original'),
+    outputHash: z.string().trim().min(1),
+    outputPath: z.string().trim().min(1),
+    prompt: z.string().trim().min(1),
+    requestId: z.string().trim().min(1),
+    rollback: z
+      .object({
+        checkpointGraphRevision: z.string().trim().min(1),
+        receiptGraphRevision: z.string().trim().min(1).optional(),
+        status: z.enum(['available', 'restored']),
+      })
+      .strict(),
+    selectedRawPath: z.string().trim().min(1),
+    sessionId: z.string().trim().min(1),
+    toolName: z.literal('rawengine.agent.export.final'),
+  })
+  .strict();
+
 export type AgentSessionAuditRecord = z.infer<typeof agentSessionAuditRecordSchema>;
 export type AgentSessionAuditStore = z.infer<typeof agentSessionAuditStoreSchema>;
 export type AgentSessionTraceEvent = z.infer<typeof agentSessionTraceEventSchema>;
+export type AgentSelectedImageExportReceipt = z.infer<typeof agentSelectedImageExportReceiptSchema>;
 
 export interface AgentSessionAuditStorageAdapter {
   readText: () => string | null;
@@ -132,6 +187,22 @@ export const appendAgentSessionAuditRecord = (
   });
   adapter.writeText(JSON.stringify(nextStore));
   return nextStore;
+};
+
+export const appendAgentSelectedImageExportReceipt = (
+  adapter: AgentSessionAuditStorageAdapter,
+  receipt: AgentSelectedImageExportReceipt,
+): AgentSelectedImageExportReceipt => {
+  const parsedReceipt = agentSelectedImageExportReceiptSchema.parse(receipt);
+  const shareableText = redactAgentTraceText(JSON.stringify(parsedReceipt));
+  const shareableReceipt = agentSelectedImageExportReceiptSchema.parse(JSON.parse(shareableText));
+  if (privatePathPattern.test(JSON.stringify(shareableReceipt))) {
+    throw new Error('Agent selected-image export receipt contains an unredacted local path.');
+  }
+  const existing = adapter.readText();
+  const receipts = existing === null ? [] : z.array(agentSelectedImageExportReceiptSchema).parse(JSON.parse(existing));
+  adapter.writeText(JSON.stringify([...receipts, shareableReceipt]));
+  return shareableReceipt;
 };
 
 export const verifyAgentSessionArtifactLineage = (record: AgentSessionAuditRecord): void => {
