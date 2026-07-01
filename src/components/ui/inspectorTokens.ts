@@ -14,6 +14,42 @@ export const inspectorSectionTokens = {
   visibilitySlot: 'w-5 h-5 flex items-center justify-center shrink-0',
 } as const;
 
+export const professionalInspectorDensityTokens = {
+  actionButton: {
+    active: 'bg-accent text-button-text',
+    base: 'inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded px-2 text-[11px] font-medium leading-none transition-colors',
+    icon: 'w-6 px-0',
+    inactive: 'bg-bg-secondary text-text-secondary hover:bg-surface hover:text-text-primary',
+    quiet: 'bg-surface text-text-secondary hover:bg-bg-secondary hover:text-text-primary',
+    selectedQuiet: 'bg-bg-secondary text-text-primary',
+  },
+  card: {
+    panel: 'rounded-md bg-bg-tertiary p-1.5',
+    nested: 'rounded border border-border bg-bg-secondary px-2 py-1',
+    nestedBare: 'rounded bg-bg-secondary px-2 py-1',
+    nestedPanel: 'rounded-md border border-border bg-bg-tertiary p-1.5',
+    surface: 'rounded-md border border-surface bg-bg-primary',
+  },
+  gutter: {
+    panel: 'space-y-2',
+    section: 'space-y-1.5',
+  },
+  row: {
+    label: 'text-[10px] font-medium leading-3 text-text-tertiary',
+    value: 'text-right font-mono text-[11px] leading-3 tabular-nums text-text-secondary',
+    valueSlot: 'min-w-0 shrink-0 text-right',
+  },
+  scrollPadding: 'scroll-px-2 scroll-py-2',
+  sectionHeader: {
+    badge:
+      'shrink-0 rounded bg-bg-secondary px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-4 tracking-normal text-text-secondary',
+    root: 'mb-2 flex min-h-6 items-center justify-between gap-2',
+    rootLoose: 'mb-2 flex items-start justify-between gap-2',
+    summary: 'mt-0.5 block text-[11px] leading-4 text-text-secondary',
+    title: 'text-[12px] font-semibold leading-4 text-text-primary',
+  },
+} as const;
+
 export const inspectorSliderTokens = {
   fill: 'absolute top-1/2 h-1 -translate-y-1/2 rounded-full pointer-events-none bg-accent/30',
   header: 'mb-0.5 flex items-center justify-between gap-3',

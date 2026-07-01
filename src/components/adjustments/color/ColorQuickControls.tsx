@@ -1,7 +1,9 @@
+import cx from 'clsx';
 import { Pipette } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { TextVariants } from '../../../types/typography';
 import { ColorAdjustment } from '../../../utils/adjustments';
+import { professionalInspectorDensityTokens } from '../../ui/inspectorTokens';
 import UiText from '../../ui/primitives/Text';
 import AdjustmentSlider from '../AdjustmentSlider';
 import type { ColorPanelGroupProps } from './types';
@@ -23,37 +25,43 @@ export const ColorQuickControls = ({
   toggleWbPicker,
 }: ColorQuickControlsProps) => {
   const { t } = useTranslation();
+  const density = professionalInspectorDensityTokens;
 
   const handleGlobalChange = (key: ColorAdjustment, value: number) => {
     setAdjustments((prev) => ({ ...prev, [key]: value }));
   };
 
   return (
-    <div className="space-y-3" data-testid="quick-color-controls">
-      <div className="p-2 bg-bg-tertiary rounded-md" data-testid="color-quick-white-balance">
-        <div className="flex justify-between items-center mb-2">
-          <UiText variant={TextVariants.heading}>{t('adjustments.color.whiteBalance')}</UiText>
+    <div className={cx(density.gutter.panel, density.scrollPadding)} data-testid="quick-color-controls">
+      <div className={density.card.panel} data-testid="color-quick-white-balance">
+        <div className={density.sectionHeader.root}>
+          <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
+            {t('adjustments.color.whiteBalance')}
+          </UiText>
           {!isForMask && toggleWbPicker && (
             <button
               onClick={toggleWbPicker}
               disabled={isWgpuEnabled}
-              className={`p-1.5 rounded-md transition-colors ${
+              className={cx(
+                density.actionButton.base,
+                density.actionButton.icon,
                 isWgpuEnabled
                   ? 'cursor-not-allowed text-text-secondary hover:bg-transparent'
                   : isWbPickerActive
-                    ? 'bg-accent text-button-text'
-                    : 'hover:bg-bg-secondary text-text-secondary'
-              }`}
+                    ? density.actionButton.active
+                    : density.actionButton.quiet,
+              )}
               data-tooltip={
                 isWgpuEnabled ? t('adjustments.color.wbPickerWgpuDisabled') : t('adjustments.color.wbPickerTooltip')
               }
               type="button"
             >
-              <Pipette size={16} />
+              <Pipette size={14} />
             </button>
           )}
         </div>
         <AdjustmentSlider
+          density="compact"
           label={t('adjustments.color.temperature')}
           max={100}
           min={-100}
@@ -66,6 +74,7 @@ export const ColorQuickControls = ({
           onDragStateChange={onDragStateChange}
         />
         <AdjustmentSlider
+          density="compact"
           label={t('adjustments.color.tint')}
           max={100}
           min={-100}
@@ -79,11 +88,12 @@ export const ColorQuickControls = ({
         />
       </div>
 
-      <div className="p-2 bg-bg-tertiary rounded-md" data-testid="color-quick-presence">
-        <UiText variant={TextVariants.heading} className="mb-2">
+      <div className={density.card.panel} data-testid="color-quick-presence">
+        <UiText variant={TextVariants.heading} className={cx(density.sectionHeader.title, 'mb-2 block')}>
           {t('adjustments.color.presence')}
         </UiText>
         <AdjustmentSlider
+          density="compact"
           label={t('adjustments.color.vibrance')}
           max={100}
           min={-100}
@@ -95,6 +105,7 @@ export const ColorQuickControls = ({
           onDragStateChange={onDragStateChange}
         />
         <AdjustmentSlider
+          density="compact"
           label={t('adjustments.color.saturation')}
           max={100}
           min={-100}
@@ -106,6 +117,7 @@ export const ColorQuickControls = ({
           onDragStateChange={onDragStateChange}
         />
         <AdjustmentSlider
+          density="compact"
           label={isForMask ? t('adjustments.color.localHue') : t('adjustments.color.hue')}
           max={180}
           min={-180}

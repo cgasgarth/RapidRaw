@@ -1,3 +1,4 @@
+import cx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronDown, Sliders } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -5,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { TextVariants } from '../../../types/typography';
 import { ColorGrading, type HueSatLum, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
 import { COLOR_GRADING_PRESETS } from '../../../utils/colorGradingPresets';
+import { professionalInspectorDensityTokens } from '../../ui/inspectorTokens';
 import UiText from '../../ui/primitives/Text';
 import AdjustmentSlider from '../AdjustmentSlider';
 import ColorWheel from '../ColorWheel';
@@ -33,6 +35,7 @@ const isColorGradingPresetApplied = (
 
 export const ColorGradingControls = ({ adjustments, setAdjustments, onDragStateChange }: ColorPanelGroupProps) => {
   const { t } = useTranslation();
+  const density = professionalInspectorDensityTokens;
   const [activeTab, setActiveTab] = useState<'3way' | 'global'>('3way');
   const [isExpanded, setIsExpanded] = useState(false);
   const [isPresetDrawerOpen, setIsPresetDrawerOpen] = useState(false);
@@ -103,12 +106,12 @@ export const ColorGradingControls = ({ adjustments, setAdjustments, onDragStateC
   );
 
   return (
-    <div className="p-2 bg-bg-tertiary rounded-md">
-      <UiText variant={TextVariants.heading} className="mb-3">
+    <div className={density.card.panel}>
+      <UiText variant={TextVariants.heading} className={cx(density.sectionHeader.title, 'mb-2 block')}>
         {t('adjustments.color.colorGrading')}
       </UiText>
       <div>
-        <div className="flex items-center justify-start gap-2 mb-2 mt-2">
+        <div className="mb-2 flex items-center justify-start gap-1.5">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
             return (
@@ -122,7 +125,7 @@ export const ColorGradingControls = ({ adjustments, setAdjustments, onDragStateC
                 onClick={() => {
                   setActiveTab(tab.id as '3way' | 'global');
                 }}
-                className={`w-7 h-7 rounded-full flex items-center justify-center transition-all focus:outline-none
+                className={`flex h-6 w-6 items-center justify-center rounded-full transition-all focus:outline-none
                   ${
                     isActive
                       ? 'ring-2 ring-offset-2 ring-offset-surface ring-accent text-text-primary'
@@ -135,13 +138,13 @@ export const ColorGradingControls = ({ adjustments, setAdjustments, onDragStateC
             );
           })}
 
-          <div className="w-px h-5 bg-text-secondary/20 mx-1" />
+          <div className="mx-1 h-5 w-px bg-text-secondary/20" />
 
           <button
             onClick={() => {
               setIsExpanded(!isExpanded);
             }}
-            className={`w-7 h-7 rounded-full flex items-center justify-center transition-all focus:outline-none
+            className={`flex h-6 w-6 items-center justify-center rounded-full transition-all focus:outline-none
               ${
                 isExpanded
                   ? 'bg-accent text-button-text'
@@ -154,10 +157,10 @@ export const ColorGradingControls = ({ adjustments, setAdjustments, onDragStateC
           </button>
         </div>
 
-        <div className="mb-3 rounded-md border border-surface bg-bg-primary text-xs">
+        <div className={cx('mb-2 text-xs', density.card.surface)}>
           <button
             aria-expanded={isPresetDrawerOpen}
-            className="flex h-8 w-full items-center justify-between gap-2 px-2 text-left text-text-secondary transition-colors hover:text-text-primary"
+            className="flex h-7 w-full items-center justify-between gap-2 px-2 text-left text-text-secondary transition-colors hover:text-text-primary"
             onClick={() => {
               setIsPresetDrawerOpen((isOpen) => !isOpen);
             }}
@@ -177,7 +180,7 @@ export const ColorGradingControls = ({ adjustments, setAdjustments, onDragStateC
             {isPresetDrawerOpen && (
               <motion.div
                 animate={{ height: 'auto', opacity: 1 }}
-                className="grid gap-1 border-t border-surface p-2"
+                className="grid gap-1 border-t border-surface p-1.5"
                 exit={{ height: 0, opacity: 0, overflow: 'hidden' }}
                 initial={{ height: 0, opacity: 0 }}
                 transition={{ duration: 0.18 }}
@@ -195,7 +198,7 @@ export const ColorGradingControls = ({ adjustments, setAdjustments, onDragStateC
                         name: preset.name,
                       })}
                       aria-pressed={isActivePreset}
-                      className={`grid grid-cols-[1fr_auto] items-center gap-2 rounded border px-2 py-1 text-left text-xs transition-colors hover:border-accent hover:text-text-primary ${
+                      className={`grid grid-cols-[1fr_auto] items-center gap-x-2 gap-y-1 rounded border px-2 py-1 text-left text-[11px] transition-colors hover:border-accent hover:text-text-primary ${
                         isActivePreset
                           ? 'border-accent bg-accent/10 text-text-primary ring-1 ring-accent/40'
                           : 'border-border bg-bg-secondary text-text-secondary hover:bg-surface'
@@ -236,7 +239,7 @@ export const ColorGradingControls = ({ adjustments, setAdjustments, onDragStateC
           </AnimatePresence>
         </div>
 
-        <div className="relative w-full mb-3">
+        <div className="relative mb-2 w-full">
           <AnimatePresence mode="wait">
             {activeTab === '3way' ? (
               <motion.div
@@ -247,7 +250,7 @@ export const ColorGradingControls = ({ adjustments, setAdjustments, onDragStateC
                 transition={{ duration: 0.2 }}
                 className="w-full"
               >
-                <div className="flex justify-center mb-3">
+                <div className="mb-2 flex justify-center">
                   <div className="w-[calc(50%-0.5rem)] min-w-0">
                     <ColorWheel
                       defaultValue={INITIAL_ADJUSTMENTS.colorGrading.midtones}
@@ -261,7 +264,7 @@ export const ColorGradingControls = ({ adjustments, setAdjustments, onDragStateC
                     />
                   </div>
                 </div>
-                <div className="flex justify-between mb-1 gap-3">
+                <div className="mb-1 flex justify-between gap-2">
                   <div className="w-full flex-1 min-w-0">
                     <ColorWheel
                       defaultValue={INITIAL_ADJUSTMENTS.colorGrading.shadows}
@@ -316,6 +319,7 @@ export const ColorGradingControls = ({ adjustments, setAdjustments, onDragStateC
 
         <div>
           <AdjustmentSlider
+            density="compact"
             defaultValue={50}
             label={t('adjustments.color.grading.blending')}
             max={100}
@@ -328,6 +332,7 @@ export const ColorGradingControls = ({ adjustments, setAdjustments, onDragStateC
             onDragStateChange={onDragStateChange}
           />
           <AdjustmentSlider
+            density="compact"
             defaultValue={0}
             label={t('adjustments.color.grading.balance')}
             max={100}

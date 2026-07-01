@@ -1,3 +1,4 @@
+import cx from 'clsx';
 import { RotateCcw } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -12,6 +13,7 @@ import {
   renderSelectiveColorMaskPreviewPixel,
 } from '../../../utils/color/selective/selectiveColorRuntime';
 import { getSelectiveColorRange, SELECTIVE_COLOR_RANGES } from '../../../utils/selectiveColorRanges';
+import { professionalInspectorDensityTokens } from '../../ui/inspectorTokens';
 import UiText from '../../ui/primitives/Text';
 import AdjustmentSlider from '../AdjustmentSlider';
 import { ColorSwatch } from './ColorSwatch';
@@ -65,6 +67,7 @@ export const ColorMixerControls = ({
   setAdjustments,
 }: ColorMixerControlsProps) => {
   const { t } = useTranslation();
+  const density = professionalInspectorDensityTokens;
   const [selectiveColorPreviewMode, setSelectiveColorPreviewMode] = useState<SelectiveColorPreviewMode>('adjusted');
 
   const HSL_COLORS = useMemo<Array<ColorProps>>(
@@ -357,14 +360,17 @@ export const ColorMixerControls = ({
   return (
     <>
       {!isForMask && adjustmentVisibility[ColorAdjustment.BlackWhiteMixer] !== false && (
-        <div className="p-2 bg-bg-tertiary rounded-md">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <UiText variant={TextVariants.heading}>{t('adjustments.color.blackWhiteMixer.title')}</UiText>
+        <div className={density.card.panel}>
+          <div className={density.sectionHeader.root}>
+            <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
+              {t('adjustments.color.blackWhiteMixer.title')}
+            </UiText>
             <button
               aria-pressed={blackWhiteMixer.enabled}
-              className={`rounded px-2 py-1 text-xs font-medium ${
-                blackWhiteMixer.enabled ? 'bg-accent text-button-text' : 'bg-bg-secondary text-text-secondary'
-              }`}
+              className={cx(
+                density.actionButton.base,
+                blackWhiteMixer.enabled ? density.actionButton.active : density.actionButton.inactive,
+              )}
               data-testid="black-white-mixer-toggle"
               onClick={handleBlackWhiteToggle}
               type="button"
@@ -374,7 +380,7 @@ export const ColorMixerControls = ({
                 : t('adjustments.color.blackWhiteMixer.disabled')}
             </button>
           </div>
-          <div className="mb-2 grid grid-cols-6 gap-1 px-1">
+          <div className="mb-1.5 grid grid-cols-6 gap-1 px-1">
             {HSL_COLORS.map(({ name, color, label }) => (
               <ColorSwatch
                 ariaLabel={t('adjustments.color.blackWhiteMixer.ariaSelectChannel', { name: label })}
@@ -389,6 +395,7 @@ export const ColorMixerControls = ({
             ))}
           </div>
           <AdjustmentSlider
+            density="compact"
             label={t('adjustments.color.blackWhiteMixer.contribution', {
               name: t(getSelectiveColorRange(activeColor).labelKey),
             })}
@@ -405,17 +412,18 @@ export const ColorMixerControls = ({
       )}
 
       {!isForMask && adjustmentVisibility[ColorAdjustment.ColorBalanceRgb] !== false && (
-        <div className="p-2 bg-bg-tertiary rounded-md">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <UiText variant={TextVariants.heading}>{t('adjustments.color.colorBalanceRgb.title')}</UiText>
+        <div className={density.card.panel}>
+          <div className={density.sectionHeader.root}>
+            <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
+              {t('adjustments.color.colorBalanceRgb.title')}
+            </UiText>
             <div className="flex gap-1">
               <button
                 aria-pressed={colorBalanceRgb.preserveLuminance}
-                className={`rounded px-2 py-1 text-xs font-medium ${
-                  colorBalanceRgb.preserveLuminance
-                    ? 'bg-bg-secondary text-text-primary'
-                    : 'bg-surface text-text-secondary'
-                }`}
+                className={cx(
+                  density.actionButton.base,
+                  colorBalanceRgb.preserveLuminance ? density.actionButton.selectedQuiet : density.actionButton.quiet,
+                )}
                 onClick={handleColorBalancePreserveLuminance}
                 type="button"
               >
@@ -424,9 +432,10 @@ export const ColorMixerControls = ({
               <button
                 aria-pressed={colorBalanceRgb.enabled}
                 data-testid="color-balance-toggle"
-                className={`rounded px-2 py-1 text-xs font-medium ${
-                  colorBalanceRgb.enabled ? 'bg-accent text-button-text' : 'bg-bg-secondary text-text-secondary'
-                }`}
+                className={cx(
+                  density.actionButton.base,
+                  colorBalanceRgb.enabled ? density.actionButton.active : density.actionButton.inactive,
+                )}
                 onClick={handleColorBalanceToggle}
                 type="button"
               >
@@ -436,15 +445,15 @@ export const ColorMixerControls = ({
               </button>
             </div>
           </div>
-          <div className="mb-3 grid grid-cols-3 gap-1">
+          <div className="mb-2 grid grid-cols-3 gap-1">
             {colorBalanceRanges.map((range) => (
               <button
                 aria-pressed={activeColorBalanceRange === range.key}
-                className={`rounded px-2 py-1 text-xs font-medium ${
-                  activeColorBalanceRange === range.key
-                    ? 'bg-accent text-button-text'
-                    : 'bg-bg-secondary text-text-secondary'
-                }`}
+                className={cx(
+                  density.actionButton.base,
+                  'w-full',
+                  activeColorBalanceRange === range.key ? density.actionButton.active : density.actionButton.inactive,
+                )}
                 key={range.key}
                 onClick={() => {
                   setActiveColorBalanceRange(range.key);
@@ -457,6 +466,7 @@ export const ColorMixerControls = ({
           </div>
           {colorBalanceChannels.map((channel) => (
             <AdjustmentSlider
+              density="compact"
               key={channel.key}
               label={channel.label}
               max={100}
@@ -473,17 +483,18 @@ export const ColorMixerControls = ({
       )}
 
       {!isForMask && adjustmentVisibility[ColorAdjustment.ChannelMixer] !== false && (
-        <div className="p-2 bg-bg-tertiary rounded-md">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <UiText variant={TextVariants.heading}>{t('adjustments.color.channelMixer.title')}</UiText>
+        <div className={density.card.panel}>
+          <div className={density.sectionHeader.root}>
+            <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
+              {t('adjustments.color.channelMixer.title')}
+            </UiText>
             <div className="flex gap-1">
               <button
                 aria-pressed={channelMixer.preserveLuminance}
-                className={`rounded px-2 py-1 text-xs font-medium ${
-                  channelMixer.preserveLuminance
-                    ? 'bg-bg-secondary text-text-primary'
-                    : 'bg-surface text-text-secondary'
-                }`}
+                className={cx(
+                  density.actionButton.base,
+                  channelMixer.preserveLuminance ? density.actionButton.selectedQuiet : density.actionButton.quiet,
+                )}
                 onClick={handleChannelMixerPreserveLuminance}
                 type="button"
               >
@@ -492,9 +503,10 @@ export const ColorMixerControls = ({
               <button
                 aria-pressed={channelMixer.enabled}
                 data-testid="channel-mixer-toggle"
-                className={`rounded px-2 py-1 text-xs font-medium ${
-                  channelMixer.enabled ? 'bg-accent text-button-text' : 'bg-bg-secondary text-text-secondary'
-                }`}
+                className={cx(
+                  density.actionButton.base,
+                  channelMixer.enabled ? density.actionButton.active : density.actionButton.inactive,
+                )}
                 onClick={handleChannelMixerToggle}
                 type="button"
               >
@@ -504,15 +516,15 @@ export const ColorMixerControls = ({
               </button>
             </div>
           </div>
-          <div className="mb-3 grid grid-cols-3 gap-1">
+          <div className="mb-2 grid grid-cols-3 gap-1">
             {channelMixerOutputs.map((output) => (
               <button
                 aria-pressed={activeChannelMixerOutput === output.key}
-                className={`rounded px-2 py-1 text-xs font-medium ${
-                  activeChannelMixerOutput === output.key
-                    ? 'bg-accent text-button-text'
-                    : 'bg-bg-secondary text-text-secondary'
-                }`}
+                className={cx(
+                  density.actionButton.base,
+                  'w-full',
+                  activeChannelMixerOutput === output.key ? density.actionButton.active : density.actionButton.inactive,
+                )}
                 key={output.key}
                 onClick={() => {
                   setActiveChannelMixerOutput(output.key);
@@ -525,6 +537,7 @@ export const ColorMixerControls = ({
           </div>
           {channelMixerSources.map((source) => (
             <AdjustmentSlider
+              density="compact"
               key={source.key}
               label={source.label}
               max={source.key === 'constant' ? 100 : 200}
@@ -541,7 +554,7 @@ export const ColorMixerControls = ({
       )}
 
       <div
-        className="p-2 bg-bg-tertiary rounded-md"
+        className={density.card.panel}
         data-active-range={activeColor}
         data-apply-output-rgb={formatSelectiveColorProofRgb(activeSelectiveColorAppliedPreview.outputRgb)}
         data-command-type="toneColor.adjustHsl"
@@ -557,10 +570,10 @@ export const ColorMixerControls = ({
         )}
         data-testid="selective-color-range-controls"
       >
-        <UiText variant={TextVariants.heading} className="mb-3">
+        <UiText variant={TextVariants.heading} className={cx(density.sectionHeader.title, 'mb-2 block')}>
           {t('adjustments.color.colorMixer')}
         </UiText>
-        <div className="mb-2 grid grid-cols-6 gap-1 px-1">
+        <div className="mb-1.5 grid grid-cols-6 gap-1 px-1">
           {HSL_COLORS.map(({ name, color, label }) => (
             <ColorSwatch
               color={color}
@@ -576,13 +589,16 @@ export const ColorMixerControls = ({
           ))}
         </div>
         <div
-          className="mb-2 grid grid-cols-[1fr_auto] items-center gap-2 rounded-md border border-surface bg-bg-primary px-2 py-1.5 text-xs"
+          className={cx(
+            'mb-2 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 px-2 py-1.5 text-xs',
+            density.card.surface,
+          )}
           data-testid="selective-color-range-summary"
         >
           <span className="truncate font-semibold text-text-primary" data-testid="selective-color-range-summary-label">
             {activeSelectiveColorRangeLabel}
           </span>
-          <span className="flex items-center justify-end gap-2 text-text-tertiary">
+          <span className={cx('flex items-center justify-end gap-1.5', density.row.valueSlot)}>
             <span className="tabular-nums text-text-secondary" data-testid="selective-color-range-summary-center">
               {activeSelectiveColorRangeCenter}
             </span>
@@ -591,32 +607,31 @@ export const ColorMixerControls = ({
               {activeSelectiveColorRangeWidth}
             </span>
           </span>
-          <span className="text-text-tertiary">{t('adjustments.color.activeRangeDeltas')}</span>
-          <span className="text-right tabular-nums text-text-secondary" data-testid="selective-color-hsl-deltas">
+          <span className={density.row.label}>{t('adjustments.color.activeRangeDeltas')}</span>
+          <span className={density.row.value} data-testid="selective-color-hsl-deltas">
             {activeSelectiveColorDeltaSummary}
           </span>
-          <span className="text-text-tertiary">{t('adjustments.color.activeRangeAdjustedHue')}</span>
-          <span className="text-right tabular-nums text-text-secondary" data-testid="selective-color-adjusted-hue">
+          <span className={density.row.label}>{t('adjustments.color.activeRangeAdjustedHue')}</span>
+          <span className={density.row.value} data-testid="selective-color-adjusted-hue">
             {activeSelectiveColorAdjustedHue}
           </span>
-          <span className="text-text-tertiary">{t('adjustments.color.previewMode')}</span>
-          <span className="text-right tabular-nums text-text-secondary" data-testid="selective-color-preview-mode">
+          <span className={density.row.label}>{t('adjustments.color.previewMode')}</span>
+          <span className={density.row.value} data-testid="selective-color-preview-mode">
             {selectiveColorPreviewSummary}
           </span>
-          <span className="text-text-tertiary">{t('adjustments.color.falloffSmoothness')}</span>
-          <span
-            className="text-right tabular-nums text-text-secondary"
-            data-testid="selective-color-range-summary-falloff"
-          >
+          <span className={density.row.label}>{t('adjustments.color.falloffSmoothness')}</span>
+          <span className={density.row.value} data-testid="selective-color-range-summary-falloff">
             {activeSelectiveColorRangeFalloff}
           </span>
           <button
             aria-pressed={selectiveColorPreviewMode === 'mask'}
-            className={`inline-flex h-7 items-center justify-center rounded-md border px-2 text-xs font-medium transition-colors ${
+            className={cx(
+              density.actionButton.base,
+              'border',
               selectiveColorPreviewMode === 'mask'
                 ? 'border-accent bg-accent/10 text-text-primary'
-                : 'border-surface bg-bg-secondary text-text-secondary hover:border-accent hover:text-text-primary'
-            }`}
+                : 'border-surface bg-bg-secondary text-text-secondary hover:border-accent hover:text-text-primary',
+            )}
             data-testid="selective-color-mask-preview-toggle"
             onClick={toggleSelectiveColorPreviewMode}
             type="button"
@@ -625,7 +640,10 @@ export const ColorMixerControls = ({
           </button>
           <button
             aria-label={t('adjustments.color.resetActiveRange')}
-            className="inline-flex h-7 items-center justify-center gap-1 rounded-md border border-surface bg-bg-secondary px-2 text-xs font-medium text-text-secondary transition-colors hover:border-accent hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+            className={cx(
+              density.actionButton.base,
+              'gap-1 border border-surface bg-bg-secondary text-text-secondary hover:border-accent hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50',
+            )}
             data-testid="selective-color-reset-active-range"
             disabled={!isActiveSelectiveColorAdjusted}
             onClick={resetActiveSelectiveColorRange}
@@ -635,15 +653,19 @@ export const ColorMixerControls = ({
             <span>{t('adjustments.color.resetActiveRange')}</span>
           </button>
         </div>
-        <details className="mb-2 rounded-md border border-surface bg-bg-primary text-xs">
+        <details className={cx('mb-2 text-xs', density.card.surface)}>
           <summary className="flex cursor-pointer items-center justify-between gap-2 px-2 py-1.5 font-medium text-text-secondary">
             <span>{t('adjustments.color.rangeCenter')}</span>
             <span className="tabular-nums text-text-tertiary">
               {activeSelectiveColorRangeCenter} / {activeSelectiveColorRangeWidth}
             </span>
           </summary>
-          <div className="grid gap-2 border-t border-surface p-2" data-testid="selective-color-range-shape-controls">
+          <div
+            className="grid gap-1.5 border-t border-surface p-1.5"
+            data-testid="selective-color-range-shape-controls"
+          >
             <AdjustmentSlider
+              density="compact"
               defaultValue={Math.round(activeSelectiveColorRange.centerHueDegrees)}
               label={t('adjustments.color.rangeCenter')}
               max={359}
@@ -657,6 +679,7 @@ export const ColorMixerControls = ({
               value={Math.round(activeSelectiveColorRangeControl.centerHueDegrees)}
             />
             <AdjustmentSlider
+              density="compact"
               defaultValue={Math.round(activeSelectiveColorRange.widthDegrees)}
               label={t('adjustments.color.rangeWidth')}
               max={180}
@@ -670,6 +693,7 @@ export const ColorMixerControls = ({
               value={Math.round(activeSelectiveColorRangeControl.widthDegrees)}
             />
             <AdjustmentSlider
+              density="compact"
               defaultValue={15}
               label={t('adjustments.color.falloffSmoothness')}
               max={40}
@@ -707,6 +731,7 @@ export const ColorMixerControls = ({
           </div>
         </details>
         <AdjustmentSlider
+          density="compact"
           label={t('adjustments.color.hue')}
           max={100}
           min={-100}
@@ -719,6 +744,7 @@ export const ColorMixerControls = ({
           onDragStateChange={onDragStateChange}
         />
         <AdjustmentSlider
+          density="compact"
           label={t('adjustments.color.saturation')}
           max={100}
           min={-100}
@@ -731,6 +757,7 @@ export const ColorMixerControls = ({
           onDragStateChange={onDragStateChange}
         />
         <AdjustmentSlider
+          density="compact"
           label={t('adjustments.color.luminance')}
           max={100}
           min={-100}

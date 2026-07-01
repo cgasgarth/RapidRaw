@@ -2150,6 +2150,36 @@ async function prepareScenario(page, mode) {
 
   if (mode === 'color-workflow') {
     const colorPanel = page.locator('[data-visual-smoke-section="color-workflow-panel"]');
+    const assertCompactRangeDensity = async (slider: Locator, proofLabel: string) => {
+      const selectedSliderCount = await slider.count();
+      if (selectedSliderCount !== 1) {
+        throw new Error(`Expected one compact density proof slider for ${proofLabel}, found ${selectedSliderCount}.`);
+      }
+      await slider.evaluate((element, label) => {
+        const trackWrap = element.parentElement;
+        const root = trackWrap?.parentElement;
+        if (!trackWrap || !root) {
+          throw new Error(`Compact density proof for ${label} could not find slider root.`);
+        }
+        const rootStyle = getComputedStyle(root);
+        const trackStyle = getComputedStyle(trackWrap);
+        const gridColumnCount = rootStyle.gridTemplateColumns.split(' ').filter(Boolean).length;
+        if (rootStyle.display !== 'grid' || gridColumnCount < 3) {
+          throw new Error(`Compact density proof for ${label} expected a three-column grid slider row.`);
+        }
+        if (Number.parseFloat(rootStyle.minHeight) > 28 || Number.parseFloat(trackStyle.height) > 24) {
+          throw new Error(`Compact density proof for ${label} exceeded compact slider row geometry.`);
+        }
+      }, proofLabel);
+    };
+    const assertCompactSliderDensity = async (scope: Locator, label: string, proofLabel: string, index = 0) => {
+      const sliders = scope.locator(`input[type="range"][aria-label="${label}"]`);
+      const sliderCount = await sliders.count();
+      if (sliderCount <= index) {
+        throw new Error(`Expected ${label} compact density proof slider at ${index}, found ${sliderCount}.`);
+      }
+      await assertCompactRangeDensity(sliders.nth(index), proofLabel);
+    };
     const setRangeInput = async (scope: Locator, label: string, value: number, index = 0) => {
       const sliders = scope.locator(`input[type="range"][aria-label="${label}"]`);
       const sliderCount = await sliders.count();
@@ -2172,7 +2202,10 @@ async function prepareScenario(page, mode) {
     await colorPanel.getByTestId('color-runtime-status-rail').getByText('Preview/export', { exact: true }).waitFor({
       timeout: 10_000,
     });
-    await colorPanel.getByTestId('color-proofing-diagnostics-disclosure').locator('summary').click();
+    const proofingDisclosure = colorPanel.getByTestId('color-proofing-diagnostics-disclosure');
+    if (!(await proofingDisclosure.evaluate((element) => (element as HTMLDetailsElement).open))) {
+      await proofingDisclosure.locator('summary').click();
+    }
     const gamutWarningControls = colorPanel.getByTestId('gamut-warning-controls');
     await gamutWarningControls.getByText('sRGB gamut warning', { exact: true }).waitFor({ timeout: 10_000 });
     await gamutWarningControls.getByText('sRGB gamut · Clear', { exact: true }).waitFor({ timeout: 10_000 });
@@ -2182,7 +2215,10 @@ async function prepareScenario(page, mode) {
     await gamutWarningControls.getByText('On', { exact: true }).waitFor({ timeout: 10_000 });
     await gamutWarningToggle.click();
     await gamutWarningControls.getByText('Off', { exact: true }).waitFor({ timeout: 10_000 });
-    await colorPanel.getByTestId('professional-color-recipes-disclosure').locator('summary').click();
+    const recipesDisclosure = colorPanel.getByTestId('professional-color-recipes-disclosure');
+    if (!(await recipesDisclosure.evaluate((element) => (element as HTMLDetailsElement).open))) {
+      await recipesDisclosure.locator('summary').click();
+    }
     const recipe = colorPanel.getByTestId('professional-color-recipe-cleanPortrait');
     await recipe.click();
     await page.waitForFunction(
@@ -2206,11 +2242,22 @@ async function prepareScenario(page, mode) {
       timeout: 10_000,
     });
     await recipe.getByText('WB +6 / +3').waitFor({ timeout: 10_000 });
+    await assertCompactSliderDensity(
+      colorPanel.getByTestId('quick-color-controls'),
+      'Temperature',
+      'quick temperature',
+    );
+    await assertCompactSliderDensity(colorPanel, 'Blending', 'color grading blending');
     await setRangeInput(colorPanel, 'Temperature', 12);
     await setRangeInput(colorPanel, 'Saturation', 18);
     await colorPanel.getByTestId('black-white-mixer-toggle').click();
     const selectiveControls = colorPanel.getByTestId('selective-color-range-controls');
     await selectiveControls.getByTestId('selective-color-range-oranges').click();
+    await assertCompactSliderDensity(selectiveControls, 'Hue', 'selective hue');
+    await assertCompactRangeDensity(
+      colorPanel.getByTestId('skin-tone-uniformity-controls').locator('input[type="range"]').first(),
+      'skin tone uniformity',
+    );
     await setRangeInput(selectiveControls, 'Hue', 8);
     await setRangeInput(selectiveControls, 'Saturation', 22);
     await setRangeInput(selectiveControls, 'Luminance', -11);
