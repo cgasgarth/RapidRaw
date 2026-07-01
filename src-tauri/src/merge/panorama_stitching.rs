@@ -650,9 +650,18 @@ pub async fn save_panorama(
 
     let output_path = next_available_panorama_output_path(parent_dir, &output_filename);
 
+    let temp_output_path = temporary_panorama_output_path(&output_path);
     image_to_save
-        .save(&output_path)
+        .save(&temp_output_path)
         .map_err(|e| format!("Failed to save panorama image: {}", e))?;
+    if let Err(e) = fs::rename(&temp_output_path, &output_path) {
+        let _ = fs::remove_file(&temp_output_path);
+        return Err(format!(
+            "Failed to atomically publish panorama image {}: {}",
+            output_path.display(),
+            e
+        ));
+    }
 
     let (real_path, _) = crate::file_management::parse_virtual_path(&first_path_str);
     crate::exif_processing::write_rrexif_sidecar(&real_path.to_string_lossy(), &output_path)?;
@@ -1199,18 +1208,42 @@ fn next_available_panorama_output_path(parent_dir: &Path, output_filename: &str)
     unreachable!("unbounded panorama output filename search should always return")
 }
 
-fn write_panorama_output_sidecar(
-    output_path: &Path,
-    metadata: &PanoramaRenderMetadata,
-    source_refs: &[PendingPanoramaSourceRef],
-) -> Result<(), String> {
-    let sidecar_path = output_path.with_file_name(format!(
+fn temporary_panorama_output_path(output_path: &Path) -> PathBuf {
+    let stem = output_path
+        .file_stem()
+        .unwrap_or_default()
+        .to_string_lossy();
+    let extension = output_path
+        .extension()
+        .unwrap_or_default()
+        .to_string_lossy();
+    if extension.is_empty() {
+        return output_path.with_file_name(format!(".{}.{}.tmp", stem, Uuid::new_v4().simple()));
+    }
+    output_path.with_file_name(format!(
+        ".{}.{}.{}",
+        stem,
+        Uuid::new_v4().simple(),
+        extension
+    ))
+}
+
+fn panorama_sidecar_path(output_path: &Path) -> PathBuf {
+    output_path.with_file_name(format!(
         "{}.rrdata",
         output_path
             .file_name()
             .unwrap_or_default()
             .to_string_lossy()
-    ));
+    ))
+}
+
+fn write_panorama_output_sidecar(
+    output_path: &Path,
+    metadata: &PanoramaRenderMetadata,
+    source_refs: &[PendingPanoramaSourceRef],
+) -> Result<(), String> {
+    let sidecar_path = panorama_sidecar_path(output_path);
     let mut sidecar = crate::exif_processing::load_sidecar(&sidecar_path);
     upsert_panorama_artifact_metadata(&mut sidecar, output_path, metadata, source_refs)?;
     let json = serde_json::to_string_pretty(&sidecar)
@@ -1254,6 +1287,17 @@ fn upsert_panorama_artifact_metadata(
         })
         .collect();
     let output_hash = hash_file_for_artifact(output_path)?;
+    let source_state = source_refs
+        .iter()
+        .map(|source| {
+            let content_hash = hash_panorama_source_ref(source)?;
+            Ok(json!({
+                "contentHash": content_hash,
+                "graphRevision": panorama_source_graph_revision(source),
+                "sourceIndex": source.source_index,
+            }))
+        })
+        .collect::<Result<Vec<_>, String>>()?;
 
     let exposure_normalization = panorama_exposure_normalization_metadata(metadata);
     let exposure_normalization_applied = !metadata
@@ -1269,9 +1313,15 @@ fn upsert_panorama_artifact_metadata(
     }));
     let provenance_sources = source_refs
         .iter()
-        .map(|source| DerivedOutputProvenanceSource {
-            content_hash: format!("path:{}", source.image_path),
-            graph_revision: "panorama_runtime_v1",
+        .zip(source_state.iter())
+        .map(|(source, state)| DerivedOutputProvenanceSource {
+            content_hash: state["contentHash"]
+                .as_str()
+                .unwrap_or_default()
+                .to_string(),
+            graph_revision: state["graphRevision"]
+                .as_str()
+                .unwrap_or("panorama_runtime_v1"),
             path: &source.image_path,
         })
         .collect::<Vec<_>>();
@@ -1397,7 +1447,13 @@ fn upsert_panorama_artifact_metadata(
             "sourceIndex": source.source_index,
             "virtualCopyId": source.virtual_copy_id.clone(),
         })).collect::<Vec<_>>(),
+        "sourceState": source_state,
         "sourceContribution": panorama_source_contribution_metadata(metadata),
+        "staleState": {
+            "checkedAt": Utc::now().to_rfc3339(),
+            "invalidationReasons": [],
+            "state": "current",
+        },
         "validationMetrics": {
             "estimatedPeakMemoryBytes": metadata.estimated_peak_memory_bytes,
             "excludedSourceCount": metadata.excluded_source_indices.len(),
@@ -1544,6 +1600,26 @@ fn hash_file_for_artifact(path: &Path) -> Result<String, String> {
     let bytes = fs::read(path)
         .map_err(|e| format!("Failed to read panorama output for artifact hash: {}", e))?;
     Ok(format!("blake3:{}", blake3::hash(&bytes).to_hex()))
+}
+
+fn hash_panorama_source_ref(source: &PendingPanoramaSourceRef) -> Result<String, String> {
+    let bytes = fs::read(&source.image_path).map_err(|e| {
+        format!(
+            "Failed to read panorama source {} for derived artifact hash: {}",
+            source.image_path, e
+        )
+    })?;
+    Ok(format!("blake3:{}", blake3::hash(&bytes).to_hex()))
+}
+
+fn panorama_source_graph_revision(source: &PendingPanoramaSourceRef) -> String {
+    match source.virtual_copy_id.as_deref() {
+        Some(virtual_copy_id) => format!(
+            "panorama_source_{}_vc_{}_runtime_v1",
+            source.source_index, virtual_copy_id
+        ),
+        None => format!("panorama_source_{}_runtime_v1", source.source_index),
+    }
 }
 
 pub fn refresh_panorama_stale_artifacts(metadata: &mut ImageMetadata) -> bool {
@@ -2357,6 +2433,27 @@ mod tests {
     }
 
     #[test]
+    fn temporary_panorama_output_path_preserves_encoder_extension() {
+        let output_path = Path::new("/tmp/IMG_0001_Pano.tiff");
+        let temporary_path = temporary_panorama_output_path(output_path);
+
+        assert_eq!(
+            temporary_path
+                .extension()
+                .and_then(|extension| extension.to_str()),
+            Some("tiff")
+        );
+        assert_ne!(temporary_path, output_path);
+        assert!(
+            temporary_path
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .starts_with(".IMG_0001_Pano.")
+        );
+    }
+
+    #[test]
     fn write_panorama_output_sidecar_records_editable_artifact_provenance() {
         let temp_dir = tempfile::tempdir().expect("temp dir should be created");
         let output_path = temp_dir.path().join("IMG_0001_Pano.tiff");
@@ -2384,6 +2481,13 @@ mod tests {
                 virtual_copy_id: None,
             },
         ];
+        for source in &source_refs {
+            fs::write(
+                &source.image_path,
+                format!("source-{}", source.source_index),
+            )
+            .expect("source file should be written");
+        }
 
         write_panorama_output_sidecar(&output_path, &metadata, &source_refs)
             .expect("sidecar should be written");
@@ -2418,6 +2522,21 @@ mod tests {
         assert_eq!(artifact["sourceImageRefs"][0]["virtualCopyId"], "abc123");
         assert_eq!(artifact["sourceImageRefs"][0]["sourceIndex"], 0);
         assert_eq!(artifact["sourceImageRefs"][1]["sourceIndex"], 1);
+        assert_eq!(artifact["sourceState"].as_array().unwrap().len(), 2);
+        assert!(
+            artifact["sourceState"][0]["contentHash"]
+                .as_str()
+                .unwrap()
+                .starts_with("blake3:")
+        );
+        assert_eq!(
+            artifact["sourceState"][0]["graphRevision"],
+            "panorama_source_0_vc_abc123_runtime_v1"
+        );
+        assert_eq!(
+            artifacts.derived_output_provenance_sidecars[0]["sourceState"][0]["contentHash"],
+            artifact["sourceState"][0]["contentHash"]
+        );
         assert_eq!(artifact["validationMetrics"]["sourceCount"], 2);
         assert_eq!(artifact["validationMetrics"]["stitchedSourceCount"], 2);
         assert_eq!(
@@ -2479,6 +2598,13 @@ mod tests {
                 virtual_copy_id: None,
             },
         ];
+        for source in &source_refs {
+            fs::write(
+                &source.image_path,
+                format!("source-{}", source.source_index),
+            )
+            .expect("source file should be written");
+        }
 
         write_panorama_output_sidecar(&output_path, &metadata, &source_refs)
             .expect("sidecar should be written");

@@ -2445,12 +2445,16 @@ async function prepareScenario(page, mode) {
     return;
   }
 
-  if (mode === VISUAL_SMOKE_SCENARIO_IDS.PanoramaSavedReview) {
+  if (
+    mode === VISUAL_SMOKE_SCENARIO_IDS.PanoramaSavedReview ||
+    mode === VISUAL_SMOKE_SCENARIO_IDS.ComputationalPanoramaOutputReview
+  ) {
     await page.getByRole('button', { name: 'Save' }).click();
     await page.getByTestId('merge-saved-output-detail').waitFor({ timeout: 10_000 });
     panoramaSavedReviewProofSchema.parse(
       await page.getByTestId('panorama-saved-review-summary').evaluate((element) => ({ ...element.dataset })),
     );
+    await page.getByTestId('panorama-derived-output-receipt-store-entry').waitFor({ timeout: 10_000 });
     await page.getByTestId('merge-open-saved-output').click();
     const proof = await page
       .getByTestId('panorama-saved-review-open-proof')
