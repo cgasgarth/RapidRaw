@@ -232,7 +232,7 @@ mod tests {
 
     #[test]
     fn denoise_cpu_reference_matches_synthetic_fixture_contract() {
-        let manifest_path = repo_root().join("fixtures/detail/denoise-fixtures.json");
+        let manifest_path = repo_root().join("fixtures/detail/denoise/denoise-fixtures.json");
         let manifest: Manifest =
             serde_json::from_str(&fs::read_to_string(manifest_path).unwrap()).unwrap();
         let settings = DenoiseCpuReferenceSettings::from_intensity(0.62);
@@ -336,14 +336,10 @@ mod tests {
     }
 
     fn repo_root() -> PathBuf {
-        let current = std::env::current_dir().unwrap();
-        if current
-            .join("fixtures/detail/denoise-fixtures.json")
-            .exists()
-        {
-            return current;
-        }
-        current.parent().unwrap().to_path_buf()
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("src-tauri has a repo parent")
+            .to_path_buf()
     }
 
     fn report_path() -> PathBuf {

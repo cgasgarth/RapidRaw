@@ -382,7 +382,7 @@ mod tests {
 
     #[test]
     fn deblur_cpu_reference_improves_accepted_synthetic_fixtures() {
-        let manifest_path = repo_root().join("fixtures/detail/deblur-fixtures.json");
+        let manifest_path = repo_root().join("fixtures/detail/deblur/deblur-fixtures.json");
         let manifest: Manifest =
             serde_json::from_str(&fs::read_to_string(manifest_path).unwrap()).unwrap();
         let mut reports = Vec::new();
@@ -447,6 +447,7 @@ mod tests {
         }
 
         if let Ok(report_path) = std::env::var("RAWENGINE_DEBLUR_CPU_REPORT") {
+            let report_path = PathBuf::from(report_path);
             let report = json!({
                 "issue": 1180,
                 "runtimeStatus": "cpu_reference_only",
@@ -455,13 +456,16 @@ mod tests {
                 "fixtures": reports,
                 "skippedFixtures": rejected_fixture_reports(&manifest),
             });
+            if let Some(parent) = report_path.parent() {
+                fs::create_dir_all(parent).unwrap();
+            }
             fs::write(report_path, serde_json::to_vec_pretty(&report).unwrap()).unwrap();
         }
     }
 
     #[test]
     fn deblur_cpu_reference_skips_rejected_synthetic_fixtures() {
-        let manifest_path = repo_root().join("fixtures/detail/deblur-fixtures.json");
+        let manifest_path = repo_root().join("fixtures/detail/deblur/deblur-fixtures.json");
         let manifest: Manifest =
             serde_json::from_str(&fs::read_to_string(manifest_path).unwrap()).unwrap();
 
