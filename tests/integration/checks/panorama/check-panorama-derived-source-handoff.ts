@@ -296,6 +296,7 @@ function buildReview(outputPath: string) {
     projection: settings.projection,
     seamReview: {
       contributionMapArtifactId: applied.apply.provenance.seamReview.contributionMapArtifact.artifactId,
+      overlapConfidence: applied.apply.provenance.seamReview.overlapConfidence,
       policy: 'adaptive_dp_feather_v1' as const,
       reviewStatus: 'ready' as const,
       seamCount: applied.apply.provenance.seamReview.overlapEdgeCount,
@@ -307,6 +308,7 @@ function buildReview(outputPath: string) {
         p95ErrorPx: 0.25,
         toSourceIndex: edge.toSourceIndex,
       })),
+      seamWarningState: applied.apply.provenance.seamReview.seamWarningState,
     },
     sourceContribution: {
       excludedSourceCount: 0,

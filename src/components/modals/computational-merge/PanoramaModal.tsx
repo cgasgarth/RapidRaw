@@ -149,7 +149,20 @@ export default function PanoramaModal({
     policy: 'adaptive_dp_feather_v1' as const,
     reviewStatus: 'requires_review' as const,
     seamCount: Math.max(0, (imageCount ?? 0) - 1),
+    overlapConfidence: {
+      edgeCount: 0,
+      level: 'blocked' as const,
+      meanConfidenceScore: 0,
+      minimumConfidenceScore: 0,
+      minimumOverlapRatio: 0,
+      weakEdgeCount: 0,
+    },
     seams: [],
+    seamWarningState: {
+      parallaxRisk: 'low' as const,
+      state: 'clear' as const,
+      warningCodes: [],
+    },
   };
   const sourceContributionSummary = renderedReview?.sourceContribution ?? {
     excludedSourceCount: 0,
@@ -183,6 +196,7 @@ export default function PanoramaModal({
     seamReviewSummary.seams.length === 0 ? 0 : Math.max(...seamReviewSummary.seams.map((seam) => seam.p95ErrorPx));
   const lowConfidenceSeamCount = seamReviewSummary.seams.filter((seam) => seam.confidence === 'low').length;
   const inlierEdgeCount = seamReviewSummary.seams.filter((seam) => seam.confidence !== 'low').length;
+  const overlapConfidencePercent = Math.round(seamReviewSummary.overlapConfidence.minimumConfidenceScore * 100);
   const cropCoveragePercent =
     renderedReview === null
       ? null
@@ -792,9 +806,15 @@ export default function PanoramaModal({
             data-exposure-median-log-luminance-delta-before={exposureSummary.medianLogLuminanceDeltaBefore ?? ''}
             data-inlier-edge-count={inlierEdgeCount}
             data-low-confidence-seam-count={lowConfidenceSeamCount}
+            data-overlap-confidence-level={seamReviewSummary.overlapConfidence.level}
+            data-overlap-confidence-percent={overlapConfidencePercent}
+            data-overlap-minimum-ratio={seamReviewSummary.overlapConfidence.minimumOverlapRatio}
+            data-parallax-risk={seamReviewSummary.seamWarningState.parallaxRisk}
             data-seam-count={seamReviewSummary.seamCount}
             data-seam-max-p95-error-px={seamMaxP95ErrorPx}
             data-seam-review-status={seamReviewSummary.reviewStatus}
+            data-seam-warning-codes={seamReviewSummary.seamWarningState.warningCodes.join(',')}
+            data-seam-warning-state={seamReviewSummary.seamWarningState.state}
             data-stitched-source-count={sourceContributionSummary.stitchedSourceCount}
             data-testid="panorama-quality-diagnostics"
             data-warning-codes={renderedReview?.warningCodes.join(',') ?? ''}
@@ -818,6 +838,14 @@ export default function PanoramaModal({
                   excluded: sourceContributionSummary.excludedSourceCount,
                   stitched: sourceContributionSummary.stitchedSourceCount,
                 }),
+              },
+              {
+                label: t('modals.panorama.review.overlapConfidence'),
+                value: t('modals.panorama.review.overlapConfidenceValue', { value: overlapConfidencePercent }),
+              },
+              {
+                label: t('modals.panorama.review.seamWarningState'),
+                value: t(`modals.panorama.review.warningState.${seamReviewSummary.seamWarningState.state}`),
               },
               {
                 label: t('modals.panorama.review.exposureGains'),

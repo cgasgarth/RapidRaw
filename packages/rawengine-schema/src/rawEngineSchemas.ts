@@ -2147,6 +2147,8 @@ export const panoramaWarningCodeSchema = z.enum([
   'insufficient_features',
   'ambiguous_matches',
   'weak_alignment',
+  'low_overlap_confidence',
+  'parallax_seam_warning',
   'low_inlier_count',
   'high_memory_estimate',
   'memory_budget_exceeded',

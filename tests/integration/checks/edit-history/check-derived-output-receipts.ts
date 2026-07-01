@@ -113,6 +113,14 @@ const panoramaReview = {
   projection: DEFAULT_PANORAMA_UI_SETTINGS.projection,
   seamReview: {
     contributionMapArtifactId: 'artifact_panorama_contribution_map',
+    overlapConfidence: {
+      edgeCount: 2,
+      level: 'high',
+      meanConfidenceScore: 0.88,
+      minimumConfidenceScore: 0.8,
+      minimumOverlapRatio: 0.28,
+      weakEdgeCount: 0,
+    },
     policy: 'adaptive_dp_feather_v1',
     reviewStatus: 'ready',
     seamCount: 2,
@@ -121,6 +129,11 @@ const panoramaReview = {
       { confidence: 'high', featherWidthPx: 48, fromSourceIndex: 0, p95ErrorPx: 0.6, toSourceIndex: 1 },
       { confidence: 'medium', featherWidthPx: 56, fromSourceIndex: 1, p95ErrorPx: 1.2, toSourceIndex: 2 },
     ],
+    seamWarningState: {
+      parallaxRisk: 'low',
+      state: 'clear',
+      warningCodes: [],
+    },
   },
   sourceContribution: {
     excludedSourceCount: 0,

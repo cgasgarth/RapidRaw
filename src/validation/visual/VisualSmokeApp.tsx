@@ -4346,6 +4346,14 @@ const panoramaRenderedReviewFixture: PanoramaRenderedReview = {
   projection: { effective: 'cylindrical', requested: 'cylindrical' },
   seamReview: {
     contributionMapArtifactId: 'artifact_visual_panorama_contribution_map',
+    overlapConfidence: {
+      edgeCount: 4,
+      level: 'medium',
+      meanConfidenceScore: 0.72,
+      minimumConfidenceScore: 0.58,
+      minimumOverlapRatio: 0.24,
+      weakEdgeCount: 0,
+    },
     policy: 'adaptive_dp_feather_v1',
     reviewStatus: 'requires_review',
     seamCount: 4,
@@ -4356,6 +4364,11 @@ const panoramaRenderedReviewFixture: PanoramaRenderedReview = {
       { confidence: 'medium', featherWidthPx: 100, fromSourceIndex: 2, p95ErrorPx: 3.1, toSourceIndex: 3 },
       { confidence: 'high', featherWidthPx: 100, fromSourceIndex: 3, p95ErrorPx: 1.6, toSourceIndex: 4 },
     ],
+    seamWarningState: {
+      parallaxRisk: 'medium',
+      state: 'warning',
+      warningCodes: ['geometry_estimate_low_confidence'],
+    },
   },
   sources: {
     excludedSourceIndices: [],

@@ -18,6 +18,10 @@ const panoramaSeamReviewTranscriptSchema = z
     contributionMapArtifactId: z.string().trim().min(1),
     disconnectedSourceIndices: z.array(z.number().int().nonnegative()),
     mutates: z.literal(false),
+    overlapConfidenceLevel: z.enum(['high', 'medium', 'low', 'blocked']),
+    overlapConfidencePercent: z.number().int().min(0).max(100),
+    overlapMinimumRatio: z.number().min(0).max(1),
+    parallaxRisk: z.enum(['low', 'medium', 'high']),
     reviewStatus: z.enum(['apply_ready', 'blocked', 'review_required']),
     scenario: z.enum([
       'blocked_apply',
@@ -29,6 +33,7 @@ const panoramaSeamReviewTranscriptSchema = z
     ]),
     seamMaskArtifactId: z.string().trim().min(1),
     seamRisk: z.enum(['low', 'medium', 'high']),
+    seamWarningState: z.enum(['clear', 'warning', 'blocked']),
     sourceGeometryLayout: z.enum(['multi_row_candidate', 'single_row', 'unknown']),
     sourceGeometrySupport: z.enum(['blocked_requires_multi_row_solver', 'implemented_current_engine', 'unverified']),
     sourceRowCountEstimate: z.number().int().positive(),
@@ -95,6 +100,9 @@ if (
   supportedTranscript.seamRisk !== 'low' ||
   supportedTranscript.sourceGeometryLayout !== 'single_row' ||
   supportedTranscript.sourceGeometrySupport !== 'implemented_current_engine' ||
+  supportedTranscript.overlapConfidenceLevel !== 'high' ||
+  supportedTranscript.seamWarningState !== 'clear' ||
+  supportedTranscript.parallaxRisk !== 'low' ||
   supportedTranscript.blockedReasons.length !== 0
 ) {
   throw new Error(`Unexpected supported panorama seam-review transcript: ${JSON.stringify(supportedTranscript)}.`);
@@ -123,6 +131,11 @@ const weakOverlapTranscript = buildSeamReviewTranscript('weak_overlap_warning', 
 if (
   weakOverlapTranscript.reviewStatus !== 'review_required' ||
   weakOverlapTranscript.seamRisk !== 'medium' ||
+  weakOverlapTranscript.overlapConfidenceLevel !== 'low' ||
+  weakOverlapTranscript.overlapConfidencePercent >= supportedTranscript.overlapConfidencePercent ||
+  weakOverlapTranscript.seamWarningState !== 'warning' ||
+  weakOverlapTranscript.parallaxRisk !== 'low' ||
+  !weakOverlapTranscript.warnings.includes('low_overlap_confidence') ||
   !weakOverlapTranscript.warnings.includes('weak_alignment') ||
   weakOverlapTranscript.weakOverlapEdgeCount < 1
 ) {
@@ -144,6 +157,10 @@ const sourceMismatchTranscript = buildSeamReviewTranscript('source_mismatch_bloc
 if (
   sourceMismatchTranscript.reviewStatus !== 'blocked' ||
   !sourceMismatchTranscript.blockedReasons.includes('source_selection_incomplete') ||
+  sourceMismatchTranscript.overlapConfidenceLevel !== 'blocked' ||
+  sourceMismatchTranscript.seamWarningState !== 'blocked' ||
+  sourceMismatchTranscript.parallaxRisk !== 'high' ||
+  !sourceMismatchTranscript.warnings.includes('parallax_seam_warning') ||
   !sourceMismatchTranscript.warnings.includes('source_excluded')
 ) {
   throw new Error(`Unexpected blocked panorama seam-review transcript: ${JSON.stringify(sourceMismatchTranscript)}.`);
@@ -191,6 +208,8 @@ if (
   multiRowTranscript.sourceRowCountEstimate !== 2 ||
   !multiRowTranscript.blockedReasons.includes('multi_row_panorama_not_supported') ||
   !multiRowTranscript.warnings.includes('multi_row_runtime_deferred') ||
+  !multiRowTranscript.warnings.includes('parallax_seam_warning') ||
+  multiRowTranscript.seamWarningState !== 'blocked' ||
   multiRowDryRun.dryRun.dryRunResult.mergePlan.preflight.status !== 'blocked_plan_only'
 ) {
   throw new Error(`Unexpected multi-row panorama transcript: ${JSON.stringify(multiRowTranscript)}.`);
@@ -367,10 +386,15 @@ function buildSeamReviewTranscript(scenario, toolResult) {
     contributionMapArtifactId: seamReview.contributionMapArtifact.artifactId,
     disconnectedSourceIndices: seamReview.disconnectedSourceIndices,
     mutates: toolResult.dryRun.dryRunResult.mutates,
+    overlapConfidenceLevel: seamReview.overlapConfidence.level,
+    overlapConfidencePercent: Math.round(seamReview.overlapConfidence.minimumConfidenceScore * 100),
+    overlapMinimumRatio: seamReview.overlapConfidence.minimumOverlapRatio,
+    parallaxRisk: seamReview.seamWarningState.parallaxRisk,
     reviewStatus: seamReview.reviewStatus,
     scenario,
     seamMaskArtifactId: seamReview.seamMaskArtifact.artifactId,
     seamRisk: seamReview.seamRisk,
+    seamWarningState: seamReview.seamWarningState.state,
     sourceGeometryLayout: toolResult.dryRun.provenance.sourceGeometry.layout,
     sourceGeometrySupport: toolResult.dryRun.provenance.sourceGeometry.support,
     sourceRowCountEstimate: toolResult.dryRun.provenance.sourceGeometry.rowCountEstimate,
