@@ -807,7 +807,8 @@
         "shutterSpeed": "셔터 속도",
         "undo": "실행 취소 ({{shortcut}}) 또는 기록 (우클릭)"
       },
-      "vc": "VC"
+      "vc": "VC",
+      "compare": {}
     },
     "layers": {
       "actions": {
@@ -828,6 +829,9 @@
         "summaryTitle": "",
         "title": ""
       }
+    },
+    "canvas": {
+      "compare": {}
     }
   },
   "export": {

@@ -202,6 +202,7 @@ export function useAppNavigation({ clearThumbnailQueue, requestThumbnails, refs 
       setLibrary({ multiSelectedPaths: [path], libraryActivePath: null, selectionAnchorPath: path });
 
       setEditor({
+        compareMode: 'off',
         showOriginal: false,
         activeMaskId: null,
         activeMaskContainerId: null,

@@ -120,6 +120,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   const isExportSoftProofEnabled = useEditorStore((s) => s.isExportSoftProofEnabled);
   const exportSoftProofRecipeId = useEditorStore((s) => s.exportSoftProofRecipeId);
   const exportSoftProofTransform = useEditorStore((s) => s.exportSoftProofTransform);
+  const compareMode = useEditorStore((s) => s.compareMode);
   const showOriginal = useEditorStore((s) => s.showOriginal);
   const isSliderDragging = useEditorStore((s) => s.isSliderDragging);
   const targetZoom = useEditorStore((s) => s.zoom);
@@ -199,7 +200,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   const prevViewportSnapshotRef = useRef<ViewportSnapshot | null>(null);
   const prevViewportContextKeyRef = useRef<string | null>(null);
   const toggleShowOriginal = useCallback(() => {
-    setEditor((state) => ({ showOriginal: !state.showOriginal }));
+    setEditor((state) => ({ compareMode: state.compareMode === 'hold-original' ? 'off' : 'hold-original' }));
   }, [setEditor]);
 
   const handleToggleFullScreen = useCallback(() => {
@@ -776,16 +777,16 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       return;
     }
 
-    if (!showOriginal) return;
+    if (compareMode !== 'hold-original' && !showOriginal) return;
 
     const syncTimer = setTimeout(() => {
-      setEditor({ showOriginal: false });
+      setEditor({ compareMode: 'off' });
     }, 0);
 
     return () => {
       clearTimeout(syncTimer);
     };
-  }, [adjustments, setEditor, showOriginal]);
+  }, [adjustments, compareMode, setEditor, showOriginal]);
 
   useEffect(() => {
     if (isMasking || isAiEditing) return;
@@ -1508,6 +1509,10 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
           onToggleShowOriginal={toggleShowOriginal}
           onUndo={undo}
           selectedImage={selectedImage}
+          compareMode={compareMode}
+          onCompareModeChange={(mode) => {
+            setEditor({ compareMode: mode });
+          }}
           showOriginal={showOriginal}
           showDateView={showExifDateView}
           onToggleDateView={() => {
@@ -1618,6 +1623,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
               setCrop={handleCropChange}
               setIsMaskHovered={setIsMaskHovered}
               setIsMaskTouchInteracting={setIsMaskTouchInteracting}
+              compareMode={compareMode}
               showOriginal={showOriginal}
               transformedOriginalUrl={transformedOriginalUrl}
               uncroppedAdjustedPreviewUrl={uncroppedAdjustedPreviewUrl}
