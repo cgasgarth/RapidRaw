@@ -1,0 +1,23 @@
+{
+  "acceptanceCriteria": [
+    "Selects one local private Alaska RAW in the editor and library stores before retouch apply.",
+    "Dispatches rawengine.agent.retouch.apply through the app-server host path for clone and remove operations.",
+    "Requires editable retouch layer provenance for both clone and remove layers.",
+    "Requires mask-aware non-no-op output deltas and preview/apply parity receipts.",
+    "Hashes the private source RAW before and after apply and requires no overwrite.",
+    "Writes only bounded local proof summaries under the ignored private artifact root."
+  ],
+  "doesNotProve": [
+    "Does not commit or publish private Alaska image pixels, RAW hashes, or per-file metadata.",
+    "Does not prove Capture One or Lightroom quality equivalence.",
+    "Does not change or certify retouch algorithm quality beyond the existing runtime output proof."
+  ],
+  "fixtureId": "agent.retouch-apply.private-alaska.v1",
+  "issue": 4595,
+  "privateArtifactDir": "private-artifacts/validation/agent-retouch-apply",
+  "privateSourceDefault": "/Users/cgas/Pictures/Capture One/Alaska",
+  "proofStatus": "public_contract_private_runtime_required",
+  "schemaVersion": 1,
+  "validationCommand": "RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-agent-retouch-apply-proof RAWENGINE_PRIVATE_RAW_SOURCE=\"/Users/cgas/Pictures/Capture One/Alaska\" bun run check:agent-retouch-apply-private-raw -- --require-assets",
+  "validationMode": "agent_retouch_apply_private_raw"
+}
