@@ -1,0 +1,33 @@
+{
+  "app": {
+    "bundleIdentifier": "io.github.CyberTimon.RapidRAW",
+    "bundleVersion": "1.5.8",
+    "launchObserved": true,
+    "launchedProcessName": "RapidRAW",
+    "path": "/Applications/RapidRAW.app"
+  },
+  "checks": {
+    "capabilitiesToolCount": 4,
+    "healthStatus": "ok",
+    "readOnlyDispatch": {
+      "requestId": "bundle_qa_negative_lab_inspect",
+      "status": "completed",
+      "toolName": "negativelab.inspect_readonly"
+    },
+    "routeCatalog": {
+      "agentRouteCount": 20,
+      "computationalMergeRouteCount": 4,
+      "computationalMergeUnderlyingManifestRouteCount": 12,
+      "routeCount": 60,
+      "selectedRuntimeCheckScripts": [
+        "check:hdr-app-server-runtime",
+        "check:panorama-app-server-runtime",
+        "check:focus-app-server-runtime",
+        "check:sr-app-server-runtime"
+      ]
+    }
+  },
+  "generatedAt": "2026-07-01T00:00:00.000Z",
+  "schemaVersion": 1,
+  "transport": "stdio_jsonl"
+}
