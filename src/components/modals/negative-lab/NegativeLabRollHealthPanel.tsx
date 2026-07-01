@@ -1,6 +1,6 @@
 import cx from 'clsx';
 import type { TFunction } from 'i18next';
-import { Copy, RotateCcw, WandSparkles } from 'lucide-react';
+import { Copy, Images, RotateCcw, WandSparkles } from 'lucide-react';
 import type { Dispatch, SetStateAction } from 'react';
 import type {
   NegativeLabBatchDryRunSummary,
@@ -12,6 +12,7 @@ import type { NegativeLabFrameRgbBalanceOffset } from '../../../schemas/negative
 import type { NegativeLabPresetParams } from '../../../schemas/negative-lab/negativeLabPresetCatalogSchemas';
 import type { NegativeLabRollNormalizationPlan } from '../../../schemas/negative-lab/negativeLabRollNormalizationSchemas';
 import { TextVariants } from '../../../types/typography';
+import type { NegativeLabBatchApplyReceipt } from '../../../utils/negative-lab/negativeLabBatchApplyReceipt';
 import { snapNegativeLabFrameExposureOffset } from '../../../utils/negative-lab/negativeLabFrameExposureOverrides';
 import {
   negativeLabFrameRgbBalanceOffsetIsZero,
@@ -50,6 +51,7 @@ interface NegativeLabRollHealthPanelProps {
   frameHealthSort: NegativeLabFrameHealthSort;
   frameRgbBalanceOffsetByFrameId: Record<string, NegativeLabFrameRgbBalanceOffset>;
   handleAcceptBatchPlan: () => void;
+  handleApplyBatchPlan: () => void;
   handleApplyRollNormalizationPlan: () => void;
   handleCopyBatchPlan: () => void | Promise<void>;
   handleRestoreRollNormalizationPlan: () => void;
@@ -57,6 +59,7 @@ interface NegativeLabRollHealthPanelProps {
   handleSetQcDecision: (frameId: string, decision: NegativeLabQcDecision) => void;
   handleSetVisibleQcDecision: (decision: NegativeLabQcDecision) => void;
   isBatchPlanAccepted: boolean;
+  batchApplyReceipt: NegativeLabBatchApplyReceipt | null;
   isBatchPlanCopied: boolean;
   isRollNormalizationPlanAccepted: boolean;
   isSaving: boolean;
@@ -87,6 +90,7 @@ export function NegativeLabRollHealthPanel({
   frameHealthSort,
   frameRgbBalanceOffsetByFrameId,
   handleAcceptBatchPlan,
+  handleApplyBatchPlan,
   handleApplyRollNormalizationPlan,
   handleCopyBatchPlan,
   handleRestoreRollNormalizationPlan,
@@ -94,6 +98,7 @@ export function NegativeLabRollHealthPanel({
   handleSetQcDecision,
   handleSetVisibleQcDecision,
   isBatchPlanAccepted,
+  batchApplyReceipt,
   isBatchPlanCopied,
   isRollNormalizationPlanAccepted,
   isSaving,
@@ -280,6 +285,41 @@ export function NegativeLabRollHealthPanel({
             ? t('modals.negativeConversion.batchPlanAccepted')
             : t('modals.negativeConversion.acceptBatchPlan')}
         </button>
+        <button
+          type="button"
+          aria-label={t('modals.negativeConversion.applyBatchPlan')}
+          className="col-span-3 inline-flex items-center justify-center gap-1 rounded bg-bg-secondary px-1.5 py-0.5 text-text-secondary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
+          data-testid="negative-lab-apply-batch-plan"
+          disabled={!isBatchPlanAccepted}
+          onClick={handleApplyBatchPlan}
+        >
+          <Images size={11} />
+          {t('modals.negativeConversion.applyBatchPlan')}
+        </button>
+        {batchApplyReceipt !== null && (
+          <span
+            className="col-span-3 rounded border border-accent/30 bg-accent/10 px-1.5 py-0.5 text-text-secondary"
+            data-accepted-dry-run-plan-hash={batchApplyReceipt.acceptedDryRunPlanHash}
+            data-accepted-dry-run-plan-id={batchApplyReceipt.acceptedDryRunPlanId}
+            data-applied-positive-count={batchApplyReceipt.appliedPositiveCount}
+            data-contact-sheet-artifact-id={batchApplyReceipt.contactSheetArtifactId}
+            data-editor-handoff-open={String(batchApplyReceipt.editorHandoff.openInEditor)}
+            data-generated-proof-id={batchApplyReceipt.generatedProofId}
+            data-planned-apply-count={batchApplyReceipt.plannedApplyCount}
+            data-proof-warning-count={batchApplyReceipt.proofWarningCount}
+            data-queued-frame-count={batchApplyReceipt.queuedFrameCount}
+            data-review-frame-count={batchApplyReceipt.reviewFrameCount}
+            data-saved-path-count={batchApplyReceipt.savedPaths.length}
+            data-skipped-frame-count={batchApplyReceipt.skippedFrameCount}
+            data-testid="negative-lab-batch-apply-receipt"
+          >
+            {t('modals.negativeConversion.batchApplyReceipt', {
+              applyCount: batchApplyReceipt.appliedPositiveCount,
+              planId: batchApplyReceipt.acceptedDryRunPlanId,
+              savedCount: batchApplyReceipt.savedPaths.length,
+            })}
+          </span>
+        )}
       </div>
       <div
         className="grid grid-cols-2 gap-2 rounded-sm bg-bg-secondary p-2 text-[11px]"
