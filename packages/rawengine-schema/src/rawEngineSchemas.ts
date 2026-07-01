@@ -1561,6 +1561,110 @@ export const detailDenoiseDryRunResultV1Schema = z
   })
   .strict();
 
+export const detailEffectsPatchV1Schema = z
+  .object({
+    chromaticAberrationBlueYellow: z.number().min(-100).max(100).optional(),
+    chromaticAberrationRedCyan: z.number().min(-100).max(100).optional(),
+    clarity: z.number().min(-100).max(100).optional(),
+    colorNoiseReduction: z.number().min(0).max(100).optional(),
+    deblurEnabled: z.boolean().optional(),
+    deblurSigmaPx: z.number().min(0.45).max(1.35).optional(),
+    deblurStrength: z.number().min(0).max(100).optional(),
+    dehaze: z.number().min(-100).max(100).optional(),
+    dustSpotMinRadiusPx: z.number().int().min(1).max(12).optional(),
+    dustSpotOverlayEnabled: z.boolean().optional(),
+    dustSpotSensitivity: z.number().int().min(0).max(100).optional(),
+    flareAmount: z.number().min(0).max(100).optional(),
+    glowAmount: z.number().min(0).max(100).optional(),
+    grainAmount: z.number().min(0).max(100).optional(),
+    grainRoughness: z.number().min(0).max(100).optional(),
+    grainSize: z.number().min(0).max(100).optional(),
+    halationAmount: z.number().min(0).max(100).optional(),
+    localContrastHaloGuard: z.number().min(0).max(100).optional(),
+    localContrastMidtoneMask: z.number().min(0).max(100).optional(),
+    localContrastRadiusPx: z.number().min(4).max(96).optional(),
+    lumaNoiseReduction: z.number().min(0).max(100).optional(),
+    sharpness: z.number().min(-100).max(100).optional(),
+    sharpnessThreshold: z.number().min(0).max(80).optional(),
+    structure: z.number().min(-100).max(100).optional(),
+    vignetteAmount: z.number().min(-100).max(100).optional(),
+    vignetteFeather: z.number().min(0).max(100).optional(),
+    vignetteMidpoint: z.number().min(0).max(100).optional(),
+    vignetteRoundness: z.number().min(-100).max(100).optional(),
+  })
+  .strict()
+  .refine((patch) => Object.keys(patch).length > 0, {
+    message: 'At least one detail/effects adjustment is required.',
+  });
+
+const detailEffectsApplyPatchV1Schema = detailEffectsPatchV1Schema.extend({
+  acceptedDryRunPlanHash: z.string().trim().min(1),
+  acceptedDryRunPlanId: z.string().trim().min(1),
+});
+
+export const detailEffectsCommandTypeV1Schema = z.enum([
+  'detailEffects.dryRunAdjustments',
+  'detailEffects.applyAdjustments',
+]);
+
+export const detailEffectsCommandEnvelopeV1Schema = z
+  .discriminatedUnion('commandType', [
+    detailImageCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('detailEffects.dryRunAdjustments'),
+        dryRun: z.literal(true),
+        parameters: detailEffectsPatchV1Schema,
+      })
+      .strict(),
+    detailImageCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('detailEffects.applyAdjustments'),
+        dryRun: z.literal(false),
+        parameters: detailEffectsApplyPatchV1Schema,
+      })
+      .strict(),
+  ])
+  .superRefine((command, context) => {
+    refinePreviewApplyApproval(command, context, 'detail/effects');
+  });
+
+export const detailEffectsDryRunResultV1Schema = z
+  .object({
+    commandId: z.string().trim().min(1),
+    commandType: z.literal('detailEffects.dryRunAdjustments'),
+    correlationId: z.string().trim().min(1),
+    dryRun: z.literal(true),
+    dryRunPlanHash: z.string().trim().min(1),
+    dryRunPlanId: z.string().trim().min(1),
+    mutates: z.literal(false),
+    parameterDiff: z.array(editGraphParameterDiffV1Schema).min(1),
+    predictedGraphRevision: z.string().trim().min(1),
+    previewArtifacts: z.array(artifactHandleV1Schema).length(0),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    sourceGraphRevision: z.string().trim().min(1),
+    warnings: z.array(z.string().trim().min(1)),
+  })
+  .strict();
+
+export const detailEffectsMutationResultV1Schema = z
+  .object({
+    appliedGraphRevision: z.string().trim().min(1),
+    changedNodeIds: z.array(z.string().trim().min(1)).min(1),
+    commandId: z.string().trim().min(1),
+    commandType: z.literal('detailEffects.applyAdjustments'),
+    correlationId: z.string().trim().min(1),
+    dryRun: z.literal(false),
+    dryRunPlanHash: z.string().trim().min(1),
+    dryRunPlanId: z.string().trim().min(1),
+    mutates: z.literal(true),
+    provenanceEntryIds: z.array(z.string().trim().min(1)).min(1),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    sourceGraphRevision: z.string().trim().min(1),
+    undoRevision: z.string().trim().min(1),
+    warnings: z.array(z.string().trim().min(1)),
+  })
+  .strict();
+
 export const {
   toneColorBalanceRgbRangeV1Schema,
   toneColorBlackWhiteMixerWeightsV1Schema,
@@ -9332,6 +9436,7 @@ const rawEngineAppServerKnownInputSchemas = {
   ComputationalMergeDerivedSourceOpenRequestV1: computationalMergeDerivedSourceOpenRequestV1Schema,
   DetailDeblurCommandEnvelopeV1: detailDeblurCommandEnvelopeV1Schema,
   DetailDenoiseCommandEnvelopeV1: detailDenoiseCommandEnvelopeV1Schema,
+  DetailEffectsCommandEnvelopeV1: detailEffectsCommandEnvelopeV1Schema,
   EditGraphCommandEnvelopeV1: editGraphCommandEnvelopeV1Schema,
   EditGraphSnapshotQueryV1: editGraphSnapshotQueryV1Schema,
   ExportCommandEnvelopeV1: exportCommandEnvelopeV1Schema,
@@ -10424,6 +10529,11 @@ export type DetailDenoiseRuntimeStateV1 = z.infer<typeof detailDenoiseRuntimeSta
 export type DetailDenoiseRuntimeStatusV1 = z.infer<typeof detailDenoiseRuntimeStatusV1Schema>;
 export type DetailDenoiseSkipReasonV1 = z.infer<typeof detailDenoiseSkipReasonV1Schema>;
 export type DetailDenoiseUiControlsV1 = z.infer<typeof detailDenoiseUiControlsV1Schema>;
+export type DetailEffectsCommandEnvelopeV1 = z.infer<typeof detailEffectsCommandEnvelopeV1Schema>;
+export type DetailEffectsCommandTypeV1 = z.infer<typeof detailEffectsCommandTypeV1Schema>;
+export type DetailEffectsDryRunResultV1 = z.infer<typeof detailEffectsDryRunResultV1Schema>;
+export type DetailEffectsMutationResultV1 = z.infer<typeof detailEffectsMutationResultV1Schema>;
+export type DetailEffectsPatchV1 = z.infer<typeof detailEffectsPatchV1Schema>;
 export type ExportApplyResultV1 = z.infer<typeof exportApplyResultV1Schema>;
 export type ExportColorSpaceV1 = z.infer<typeof exportColorSpaceV1Schema>;
 export type ExportCommandEnvelopeV1 = z.infer<typeof exportCommandEnvelopeV1Schema>;

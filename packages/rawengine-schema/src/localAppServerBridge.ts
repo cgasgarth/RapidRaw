@@ -20,6 +20,11 @@ import {
   type ComputationalMergeFamilyV1,
   computationalMergeCommandEnvelopeV1Schema,
   computationalMergeDerivedSourceOpenRequestV1Schema,
+  type DetailEffectsCommandEnvelopeV1,
+  type DetailEffectsPatchV1,
+  detailEffectsCommandEnvelopeV1Schema,
+  detailEffectsDryRunResultV1Schema,
+  detailEffectsMutationResultV1Schema,
   type LayerMaskCommandEnvelopeV1,
   layerMaskCommandEnvelopeV1Schema,
   type ProjectLibrarySnapshotV1,
@@ -335,6 +340,12 @@ export type RawEngineLocalAppServerComputationalMergeDerivedSourceOpenRequestV1 
   typeof rawEngineLocalAppServerComputationalMergeDerivedSourceOpenRequestV1Schema
 >;
 
+export const rawEngineLocalAppServerDetailEffectsCommandV1Schema = detailEffectsCommandEnvelopeV1Schema;
+
+export type RawEngineLocalAppServerDetailEffectsCommandV1 = z.infer<
+  typeof rawEngineLocalAppServerDetailEffectsCommandV1Schema
+>;
+
 export const rawEngineLocalAppServerLayerMaskCommandV1Schema = layerMaskCommandEnvelopeV1Schema.superRefine(
   (command, context) => {
     if (
@@ -384,6 +395,8 @@ const AI_COMMAND_TYPE_TO_APP_SERVER_TOOL_NAME = {
   'ai.enhancement.dryRun': 'ai.enhancement.dry_run_command',
   'ai.mask.applySubject': 'ai.mask.apply_subject',
   'ai.mask.generateSubject': 'ai.mask.dry_run_subject',
+  'detailEffects.applyAdjustments': 'detail.effects.apply_command',
+  'detailEffects.dryRunAdjustments': 'detail.effects.dry_run_command',
   [RawEngineLocalAppServerCommandType.EditorStateQuery]: 'agent.editor_state.query',
   [RawEngineLocalAppServerCommandType.ImageMetadataQuery]: 'agent.image_metadata.query',
   [RawEngineLocalAppServerCommandType.ProjectMetadataQuery]: 'agent.project_metadata.query',
@@ -415,6 +428,8 @@ const RAW_ENGINE_LOCAL_APP_SERVER_EXECUTABLE_TOOL_NAMES = new Set([
   'computationalmerge.super_resolution.apply_command',
   'computationalmerge.super_resolution.dry_run_command',
   'computationalmerge.super_resolution.open_derived_source',
+  'detail.effects.apply_command',
+  'detail.effects.dry_run_command',
   'layermask.apply_command',
   'layermask.dry_run_command',
   'tonecolor.apply_command',
@@ -559,6 +574,111 @@ const stableBasicToneHash = (value: string): string => {
 
   return (hash >>> 0).toString(16).padStart(8, '0');
 };
+
+const DETAIL_EFFECTS_PATCH_KEYS = [
+  'chromaticAberrationBlueYellow',
+  'chromaticAberrationRedCyan',
+  'clarity',
+  'colorNoiseReduction',
+  'deblurEnabled',
+  'deblurSigmaPx',
+  'deblurStrength',
+  'dehaze',
+  'dustSpotMinRadiusPx',
+  'dustSpotOverlayEnabled',
+  'dustSpotSensitivity',
+  'flareAmount',
+  'glowAmount',
+  'grainAmount',
+  'grainRoughness',
+  'grainSize',
+  'halationAmount',
+  'localContrastHaloGuard',
+  'localContrastMidtoneMask',
+  'localContrastRadiusPx',
+  'lumaNoiseReduction',
+  'sharpness',
+  'sharpnessThreshold',
+  'structure',
+  'vignetteAmount',
+  'vignetteFeather',
+  'vignetteMidpoint',
+  'vignetteRoundness',
+] as const satisfies ReadonlyArray<keyof DetailEffectsPatchV1>;
+
+type DetailEffectsCommandV1 = Extract<
+  DetailEffectsCommandEnvelopeV1,
+  { commandType: 'detailEffects.dryRunAdjustments' | 'detailEffects.applyAdjustments' }
+>;
+
+const buildDetailEffectsPlanPatch = (command: DetailEffectsCommandV1): Partial<DetailEffectsPatchV1> =>
+  Object.fromEntries(
+    DETAIL_EFFECTS_PATCH_KEYS.flatMap((key) =>
+      command.parameters[key] === undefined ? [] : [[key, command.parameters[key]]],
+    ),
+  );
+
+const buildDetailEffectsPlanKey = (command: DetailEffectsCommandV1): string =>
+  JSON.stringify([command.expectedGraphRevision, command.target, buildDetailEffectsPlanPatch(command)]);
+
+const buildDetailEffectsPlanId = (command: DetailEffectsCommandV1): string =>
+  `dryrun_detail_effects_${stableBasicToneHash(buildDetailEffectsPlanKey(command))}`;
+
+const buildDetailEffectsPlanHash = (command: DetailEffectsCommandV1): string =>
+  `sha256:detail-effects:${stableBasicToneHash(
+    `${buildDetailEffectsPlanId(command)}:${buildDetailEffectsPlanKey(command)}`,
+  )}`;
+
+const buildDetailEffectsDryRunResult = (
+  command: Extract<DetailEffectsCommandEnvelopeV1, { commandType: 'detailEffects.dryRunAdjustments' }>,
+): z.infer<typeof detailEffectsDryRunResultV1Schema> =>
+  detailEffectsDryRunResultV1Schema.parse({
+    commandId: command.commandId,
+    commandType: command.commandType,
+    correlationId: command.correlationId,
+    dryRun: true,
+    dryRunPlanHash: buildDetailEffectsPlanHash(command),
+    dryRunPlanId: buildDetailEffectsPlanId(command),
+    mutates: false,
+    parameterDiff: DETAIL_EFFECTS_PATCH_KEYS.flatMap((key) =>
+      command.parameters[key] === undefined
+        ? []
+        : [
+            {
+              nodeId: null,
+              path: `/parameters/${key}`,
+              value: command.parameters[key],
+            },
+          ],
+    ),
+    predictedGraphRevision: `${command.expectedGraphRevision}:preview:${command.commandId}`,
+    previewArtifacts: [],
+    schemaVersion: command.schemaVersion,
+    sourceGraphRevision: command.expectedGraphRevision,
+    warnings: [],
+  });
+
+const buildDetailEffectsMutationResult = (
+  command: Extract<DetailEffectsCommandEnvelopeV1, { commandType: 'detailEffects.applyAdjustments' }>,
+): z.infer<typeof detailEffectsMutationResultV1Schema> =>
+  detailEffectsMutationResultV1Schema.parse({
+    appliedGraphRevision: `${command.expectedGraphRevision}:detail_effects:${command.commandId}`,
+    changedNodeIds: DETAIL_EFFECTS_PATCH_KEYS.flatMap((key) =>
+      command.parameters[key] === undefined ? [] : [`detail_effects:${key}:${command.target.kind}`],
+    ),
+    commandId: command.commandId,
+    commandType: command.commandType,
+    correlationId: command.correlationId,
+    dryRun: false,
+    dryRunPlanHash: command.parameters.acceptedDryRunPlanHash,
+    dryRunPlanId: command.parameters.acceptedDryRunPlanId,
+    mutates: true,
+    provenanceEntryIds: [`prov_detail_effects_${command.commandId}`],
+    schemaVersion: command.schemaVersion,
+    sourceGraphRevision: command.expectedGraphRevision,
+    undoRevision: command.expectedGraphRevision,
+    warnings: [],
+  });
 
 const buildBasicTonePlanId = (command: BasicToneCommandV1): string =>
   `dryrun_basic_tone_${stableBasicToneHash(buildBasicTonePlanKey(command))}`;
@@ -1385,6 +1505,7 @@ export class RawEngineLocalAppServerBridge {
   readonly #acceptedAiEnhancementDryRunPlanKeys: Map<string, { planHash: string; planId: string }> = new Map();
   readonly #acceptedAiToolDryRunPlanKeys: Map<string, { planHash: string; planId: string }> = new Map();
   readonly #acceptedBasicToneDryRunPlanKeys: Map<string, { planHash: string; planId: string }> = new Map();
+  readonly #acceptedDetailEffectsDryRunPlanKeys: Map<string, { planHash: string; planId: string }> = new Map();
   readonly #acceptedHslDryRunPlanKeys: Set<string> = new Set<string>();
   readonly #acceptedSkinToneUniformityDryRunPlanKeys: Set<string> = new Set<string>();
   readonly #auditEvents: Array<RawEngineLocalAppServerAuditEventV1> = [];
@@ -1646,6 +1767,46 @@ export class RawEngineLocalAppServerBridge {
         return buildSkinToneUniformityMutationResult(parsedCommand);
       },
       schema: rawEngineLocalAppServerSkinToneUniformityCommandV1Schema,
+    });
+
+    this.#commandBus.register({
+      commandType: 'detailEffects.dryRunAdjustments',
+      execute: (command) => {
+        const parsedCommand = rawEngineLocalAppServerDetailEffectsCommandV1Schema.parse(command);
+        if (parsedCommand.commandType !== 'detailEffects.dryRunAdjustments') {
+          throw new Error('Local app-server bridge expected a detail/effects dry-run command.');
+        }
+
+        const dryRunResult = buildDetailEffectsDryRunResult(parsedCommand);
+        this.#acceptedDetailEffectsDryRunPlanKeys.set(buildDetailEffectsPlanKey(parsedCommand), {
+          planHash: dryRunResult.dryRunPlanHash,
+          planId: dryRunResult.dryRunPlanId,
+        });
+        return dryRunResult;
+      },
+      schema: rawEngineLocalAppServerDetailEffectsCommandV1Schema,
+    });
+
+    this.#commandBus.register({
+      commandType: 'detailEffects.applyAdjustments',
+      execute: (command) => {
+        const parsedCommand = rawEngineLocalAppServerDetailEffectsCommandV1Schema.parse(command);
+        if (parsedCommand.commandType !== 'detailEffects.applyAdjustments') {
+          throw new Error('Local app-server bridge expected a detail/effects apply command.');
+        }
+
+        const plan = this.#acceptedDetailEffectsDryRunPlanKeys.get(buildDetailEffectsPlanKey(parsedCommand));
+        if (
+          plan === undefined ||
+          plan.planHash !== parsedCommand.parameters.acceptedDryRunPlanHash ||
+          plan.planId !== parsedCommand.parameters.acceptedDryRunPlanId
+        ) {
+          throw new Error('Local app-server bridge rejected detail/effects apply without a matching accepted dry-run.');
+        }
+
+        return buildDetailEffectsMutationResult(parsedCommand);
+      },
+      schema: rawEngineLocalAppServerDetailEffectsCommandV1Schema,
     });
 
     this.#commandBus.register({
