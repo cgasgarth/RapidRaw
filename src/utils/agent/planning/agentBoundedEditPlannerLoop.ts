@@ -1,10 +1,10 @@
 import { z } from 'zod';
-import { useEditorStore } from '../../../store/useEditorStore';
-import { buildAgentBasicToneDryRunPreviewArtifacts } from '../context/agentDryRunPreviewArtifacts';
+import type { AgentArtifactReview, AgentChatDryRunReview } from '../../../schemas/agent/agentChatTranscriptSchemas';
 import type { AgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
 import { type AgentInitialPromptContext, buildAgentInitialPromptContext } from '../context/agentInitialPromptContext';
+import { buildAgentToneColorDryRunExpertEdit } from '../context/agentToneColorDryRunExpertEdit';
 import type { AgentCoreEditCommandBundleStep } from './agentCoreEditCommandBundle';
-import { classifyAgentEditIntent } from './agentEditIntentClassifier';
+import { planAgentEditRecipe } from './agentEditRecipePlanner';
 
 export type AgentPlannerLoopStopState = 'approval_ready' | 'blocked' | 'max_steps_reached';
 export type AgentPlannerLoopStage = 'inspect' | 'plan' | 'dry_run' | 'apply' | 'observe';
@@ -19,7 +19,9 @@ export interface AgentPlannerLoopOptions {
 export interface AgentPlannerLoopResult {
   dryRunAfterHash: string;
   dryRunBeforeHash: string;
+  dryRunReview: AgentChatDryRunReview;
   finalGraphRevision: string;
+  artifactReview: AgentArtifactReview;
   initialGraphRevision: string;
   initialPromptContext: AgentInitialPromptContext;
   inspected: AgentImageContextSnapshot;
@@ -32,7 +34,9 @@ const agentPlannerLoopResultProofSchema = z
   .object({
     dryRunAfterHash: z.string().trim().min(1),
     dryRunBeforeHash: z.string().trim().min(1),
+    dryRunReviewTargetCount: z.number().int().positive(),
     finalGraphRevision: z.string().trim().min(1),
+    artifactReviewCount: z.number().int().positive(),
     initialGraphRevision: z.string().trim().min(1),
     initialPreviewArtifactId: z.string().trim().min(1),
     initialPreviewRecipeHash: z.string().trim().min(1),
@@ -41,42 +45,6 @@ const agentPlannerLoopResultProofSchema = z
     transcriptLength: z.number().int().positive().max(6),
   })
   .strict();
-
-const classifyPrompt = (prompt: string): readonly AgentCoreEditCommandBundleStep[] => {
-  const intent = classifyAgentEditIntent(prompt);
-  const landscape = intent.recipeKind === 'cool_landscape_detail';
-
-  return [
-    {
-      kind: 'basic_tone',
-      payload: {
-        ...useEditorStore.getState().adjustments,
-        blacks: landscape ? -8 : intent.contrastIntent ? -6 : -3,
-        brightness: useEditorStore.getState().adjustments.brightness,
-        clarity: landscape ? 18 : intent.contrastIntent ? 12 : 6,
-        contrast: intent.contrastIntent ? 20 : 10,
-        exposure: intent.brightenIntent ? 0.32 : 0.12,
-        highlights: intent.brightenIntent ? -14 : -8,
-        saturation: intent.warmToneIntent ? 8 : 4,
-        shadows: intent.brightenIntent ? 10 : 5,
-        whites: intent.contrastIntent ? 5 : 2,
-      },
-    },
-    {
-      kind: 'selective_color',
-      payload: {
-        adjustment: landscape
-          ? { hue: -2, luminance: 4, saturation: 10 }
-          : {
-              hue: intent.warmToneIntent ? -4 : 0,
-              luminance: intent.warmToneIntent ? 5 : 2,
-              saturation: intent.warmToneIntent ? 12 : 4,
-            },
-        rangeKey: landscape ? 'blues' : intent.warmToneIntent ? 'oranges' : 'blues',
-      },
-    },
-  ];
-};
 
 export const runAgentBoundedEditPlannerLoop = async ({
   maxSteps,
@@ -94,39 +62,27 @@ export const runAgentBoundedEditPlannerLoop = async ({
     stage: 'inspect',
   });
 
-  const plannedSteps = classifyPrompt(prompt);
+  const plannedSteps = planAgentEditRecipe(prompt).steps;
   transcript.push({ detail: `planned ${plannedSteps.length} command steps`, stage: 'plan' });
 
-  const basicToneStep = plannedSteps.find((step) => step.kind === 'basic_tone');
-  if (basicToneStep?.kind !== 'basic_tone') {
-    transcript.push({ detail: 'no previewable basic-tone step', stage: 'observe' });
-    return {
-      dryRunAfterHash: '',
-      dryRunBeforeHash: '',
-      finalGraphRevision: inspected.graphRevision,
-      initialGraphRevision: inspected.graphRevision,
-      initialPromptContext,
-      inspected,
-      plannedSteps,
-      stopState: 'blocked',
-      transcript,
-    };
-  }
-
-  const preview = await buildAgentBasicToneDryRunPreviewArtifacts({
+  const preview = await buildAgentToneColorDryRunExpertEdit({
+    expectedGraphRevision: inspected.graphRevision,
+    expectedRecipeHash: inspected.initialPreview.recipeHash,
     operationId: `${operationId}_preview`,
-    requestedAdjustments: basicToneStep.payload,
+    prompt,
     sessionId,
   });
   transcript.push({ detail: `dry-run preview ${preview.afterArtifact.artifactId}`, stage: 'dry_run' });
 
-  const finalGraphRevision = `history_${useEditorStore.getState().historyIndex}`;
+  const finalGraphRevision = preview.graphRevisionAfter;
   transcript.push({ detail: `observed non-mutating ${finalGraphRevision}`, stage: 'observe' });
 
   const result: AgentPlannerLoopResult = {
     dryRunAfterHash: preview.afterPreviewHash,
     dryRunBeforeHash: preview.beforePreviewHash,
+    dryRunReview: preview.dryRunReview,
     finalGraphRevision,
+    artifactReview: preview.artifactReview,
     initialGraphRevision: inspected.graphRevision,
     initialPromptContext,
     inspected,
@@ -138,7 +94,9 @@ export const runAgentBoundedEditPlannerLoop = async ({
   agentPlannerLoopResultProofSchema.parse({
     dryRunAfterHash: result.dryRunAfterHash,
     dryRunBeforeHash: result.dryRunBeforeHash,
+    dryRunReviewTargetCount: result.dryRunReview.affectedTargets.length,
     finalGraphRevision: result.finalGraphRevision,
+    artifactReviewCount: result.artifactReview.previewArtifacts.length,
     initialGraphRevision: result.initialGraphRevision,
     initialPreviewArtifactId: result.initialPromptContext.preview.artifactId,
     initialPreviewRecipeHash: result.initialPromptContext.preview.recipeHash,
