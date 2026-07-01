@@ -55,6 +55,7 @@ import {
   hdrPrivateRawReviewProofSchema,
   hdrReviewWorkspaceProofSchema,
   hdrUiSettingsProofSchema,
+  layerBrushLocalAdjustmentProofSchema,
   layerMaskPrivateRawReviewProofSchema,
   layerStackExportParityProofSchema,
   layerStackWorkflowProofSchema,
@@ -2390,6 +2391,13 @@ async function prepareScenario(page, mode) {
     await page.getByRole('button', { name: 'Compare preview/export' }).click();
     layerStackExportParityProofSchema.parse(
       await page.getByTestId('layer-stack-export-parity-proof').evaluate((element) => ({ ...element.dataset })),
+    );
+    return;
+  }
+
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.LayerBrushLocalAdjustment) {
+    layerBrushLocalAdjustmentProofSchema.parse(
+      await page.getByTestId('layer-brush-local-adjustment-proof').evaluate((element) => ({ ...element.dataset })),
     );
     return;
   }

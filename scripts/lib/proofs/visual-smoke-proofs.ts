@@ -593,6 +593,28 @@ export const layerStackWorkflowProofSchema = z.object({
 export const layerStackExportParityProofSchema = z.object({
   exportParity: z.literal('ready'),
 });
+export const layerBrushLocalAdjustmentProofSchema = z
+  .object({
+    afterPreviewHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+    beforePreviewHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+    brushCommandType: z.literal('layerMask.createBrushMask'),
+    brushContentHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+    changedPixelCount: z.string().regex(/^[1-9][0-9]*$/u),
+    coordinateSpace: z.literal('normalized_image'),
+    layerCommandType: z.literal('layerMask.createLayer'),
+    maskId: z.literal('layer_brush_local_adjustment_mask'),
+    previewExportParity: z.literal('matched'),
+    receiptVersion: z.literal('1'),
+    rollbackGraphRevision: z.literal('layer_brush_local_initial'),
+    runtimeStatus: z.literal('runtime_apply_capable'),
+    strokeCount: z.literal('2'),
+    toneCommandType: z.literal('layerMask.applyLayerAdjustment'),
+  })
+  .superRefine((proof, context) => {
+    if (proof.beforePreviewHash === proof.afterPreviewHash) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'Brush local adjustment preview hash must change.' });
+    }
+  });
 export const layerMaskPrivateRawReviewProofSchema = z.object({
   brushCommandType: z.literal('layerMask.createBrushMask').optional(),
   exportArtifact: z.string().endsWith('/alaska-layer-mask-v1-refined-export.tiff'),
