@@ -1292,6 +1292,8 @@
       "settings": {
         "aiModelDownloading": "AI 模型下载中：",
         "applyPreset": "应用预设",
+        "blendModeRuntimeSupport": "",
+        "blendModeUnsupported": "",
         "brushLocalAdjustmentReceiptSummary": "",
         "brushLocalAdjustmentReceiptSummary_one": "",
         "brushLocalAdjustmentReceiptSummary_few": "",
@@ -1300,7 +1302,9 @@
         "brushLocalAdjustmentReceiptTitle": "",
         "colorRangeLocalAdjustmentReceiptSummary": "{{range}} range · {{ratio}}% proposal coverage",
         "colorRangeLocalAdjustmentReceiptTitle": "Color range local adjustment receipt",
+        "componentOpacity": "",
         "componentPropertiesTitle": "{{name}} 属性",
+        "containerOpacity": "",
         "copySectionSettings": "复制 {{section}} 设置",
         "invertComponent": "反转组件",
         "invertMask": "反转蒙版",

@@ -1223,6 +1223,8 @@
       "settings": {
         "aiModelDownloading": "AIモデルをダウンロード中: ",
         "applyPreset": "プリセットを適用",
+        "blendModeRuntimeSupport": "",
+        "blendModeUnsupported": "",
         "brushLocalAdjustmentReceiptSummary": "",
         "brushLocalAdjustmentReceiptSummary_one": "",
         "brushLocalAdjustmentReceiptSummary_few": "",
@@ -1231,7 +1233,9 @@
         "brushLocalAdjustmentReceiptTitle": "",
         "colorRangeLocalAdjustmentReceiptSummary": "{{range}} range · {{ratio}}% proposal coverage",
         "colorRangeLocalAdjustmentReceiptTitle": "Color range local adjustment receipt",
+        "componentOpacity": "",
         "componentPropertiesTitle": "{{name}} のプロパティ",
+        "containerOpacity": "",
         "copySectionSettings": "{{section}}設定をコピー",
         "invertComponent": "コンポーネントを反転",
         "invertMask": "マスクを反転",

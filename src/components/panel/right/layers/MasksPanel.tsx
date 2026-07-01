@@ -67,10 +67,12 @@ import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../..
 import {
   ADJUSTMENT_SECTIONS,
   type Adjustments,
+  DEFAULT_LAYER_BLEND_MODE,
   hasAdjustmentValueChanges,
   INITIAL_ADJUSTMENTS,
   INITIAL_MASK_ADJUSTMENTS,
   INITIAL_MASK_CONTAINER,
+  type LayerBlendMode,
   type MaskContainer,
 } from '../../../../utils/adjustments';
 import { createEditorSubMaskFallback, createEditorSubMaskForImage } from '../../../../utils/editorSubMaskFactory';
@@ -154,6 +156,9 @@ import {
 import {
   getMaskLikeContainerDropClass,
   getMaskLikeSubMaskDropClass,
+  getRuntimeMaskContainerBlendMode,
+  isLayerBlendMode,
+  isMaskContainerRuntimeBlendMode,
   isMaskLikeContainerDrag,
   type MaskLikeDragData,
   useDelayedHover,
@@ -246,7 +251,7 @@ type BrushSettingsUpdater = BrushSettings | ((settings: BrushSettings | null) =>
 type CollapsibleState = Record<string, boolean>;
 type MaskContainerPatch = Partial<MaskContainer>;
 type SubMaskPatch = Partial<SubMask>;
-type MaskPropertyValue = boolean | number | string;
+type MaskPropertyValue = boolean | LayerBlendMode | number;
 type MaskAdjustmentPatch = Partial<Adjustments>;
 type MaskAdjustmentUpdater = MaskAdjustmentPatch | ((adjustments: Adjustments) => Adjustments);
 type AdjustmentsUpdater = (updater: (adjustments: Adjustments) => Adjustments) => void;
@@ -551,6 +556,23 @@ const maskProvenanceBadgeClassNames: Record<LayerMaskProvenanceView['status'], s
   needs_reapply: 'border-amber-500/40 bg-amber-500/10 text-amber-200',
   stale_source: 'border-orange-500/40 bg-orange-500/10 text-orange-200',
 };
+
+const maskContainerBlendModes = (
+  [
+    { labelKey: 'editor.layers.blendModes.normal', value: 'normal' },
+    { labelKey: 'editor.layers.blendModes.multiply', value: 'multiply' },
+    { labelKey: 'editor.layers.blendModes.screen', value: 'screen' },
+    { labelKey: 'editor.layers.blendModes.overlay', value: 'overlay' },
+    { labelKey: 'editor.layers.blendModes.softLight', value: 'soft_light' },
+    { labelKey: 'editor.layers.blendModes.hue', value: 'hue' },
+    { labelKey: 'editor.layers.blendModes.saturation', value: 'saturation' },
+    { labelKey: 'editor.layers.blendModes.color', value: 'color' },
+    { labelKey: 'editor.layers.blendModes.luminosity', value: 'luminosity' },
+  ] as const
+).map((blendMode) => ({
+  ...blendMode,
+  supported: isMaskContainerRuntimeBlendMode(blendMode.value),
+}));
 
 function MaskProvenanceBadge({ view }: { view: LayerMaskProvenanceView }) {
   const { t } = useTranslation();
@@ -1796,13 +1818,15 @@ export function MasksPanel() {
   const updateContainer = (id: string, data: MaskContainerPatch) => {
     if (
       data.opacity !== undefined ||
+      data.blendMode !== undefined ||
       data.invert !== undefined ||
       data.visible !== undefined ||
       data.adjustments !== undefined
     ) {
-      markMaskPanelProvenanceStale(data.adjustments === undefined ? 'mask_alpha_changed' : 'source_state_changed', [
-        id,
-      ]);
+      markMaskPanelProvenanceStale(
+        data.adjustments === undefined && data.blendMode === undefined ? 'mask_alpha_changed' : 'source_state_changed',
+        [id],
+      );
     }
     setAdjustments((prev: Adjustments) => ({
       ...prev,
@@ -3392,9 +3416,22 @@ function SettingsPanel({
     }
   };
 
-  const handleMaskPropertyChange = (key: keyof Pick<MaskContainer, 'invert' | 'opacity'>, value: MaskPropertyValue) => {
+  const handleMaskPropertyChange = (
+    key: keyof Pick<MaskContainer, 'blendMode' | 'invert' | 'opacity'>,
+    value: MaskPropertyValue,
+  ) => {
     if (!isActive) return;
-    updateContainer(container.id, { [key]: value });
+    if (key === 'blendMode' && typeof value === 'string' && isLayerBlendMode(value)) {
+      updateContainer(container.id, { blendMode: value });
+      return;
+    }
+    if (key === 'invert' && typeof value === 'boolean') {
+      updateContainer(container.id, { invert: value });
+      return;
+    }
+    if (key === 'opacity' && typeof value === 'number') {
+      updateContainer(container.id, { opacity: value });
+    }
   };
 
   const handleSubMaskParametersChange = (changes: NumericMaskParameterPatch<PanelMaskParameterKey>) => {
@@ -3741,9 +3778,56 @@ function SettingsPanel({
             </div>
           )}
 
+          {!isComponentMode && (
+            <div
+              className="grid grid-cols-[minmax(0,1fr)_120px] items-center gap-3"
+              data-active-mask-blend-mode={getRuntimeMaskContainerBlendMode(displayContainer.blendMode)}
+              data-testid="mask-container-blend-mode-control"
+            >
+              <div className="min-w-0">
+                <UiText
+                  variant={TextVariants.label}
+                  className="block truncate text-[11px] uppercase text-text-secondary"
+                >
+                  {t('editor.layers.blend')}
+                </UiText>
+                <UiText variant={TextVariants.small} className="block truncate text-[10px] text-text-tertiary">
+                  {t('editor.masks.settings.blendModeRuntimeSupport')}
+                </UiText>
+              </div>
+              <select
+                className={`${maskPanelInputClassName} w-full`}
+                data-testid="mask-container-blend-mode-select"
+                onChange={(event) => {
+                  const blendMode = event.currentTarget.value;
+                  if (isMaskContainerRuntimeBlendMode(blendMode)) {
+                    handleMaskPropertyChange('blendMode', blendMode);
+                  }
+                }}
+                value={getRuntimeMaskContainerBlendMode(displayContainer.blendMode)}
+              >
+                {maskContainerBlendModes.map((blendMode) => (
+                  <option
+                    disabled={!blendMode.supported}
+                    key={blendMode.value}
+                    value={blendMode.value}
+                    data-runtime-supported={String(blendMode.supported)}
+                  >
+                    {t(blendMode.labelKey)}
+                    {blendMode.supported ? '' : ` (${t('editor.masks.settings.blendModeUnsupported')})`}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <AdjustmentSlider
             defaultValue={100}
-            label={t('editor.masks.settings.opacity')}
+            label={
+              isComponentMode
+                ? t('editor.masks.settings.componentOpacity')
+                : t('editor.masks.settings.containerOpacity')
+            }
             max={100}
             min={0}
             value={isComponentMode ? activeSubMask.opacity : displayContainer.opacity}

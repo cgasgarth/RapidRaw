@@ -3,7 +3,10 @@ import { expect, test } from 'bun:test';
 import {
   getMaskLikeContainerDropClass,
   getMaskLikeSubMaskDropClass,
+  getRuntimeMaskContainerBlendMode,
+  isMaskContainerRuntimeBlendMode,
   isMaskLikeContainerDrag,
+  MASK_CONTAINER_RUNTIME_BLEND_MODES,
 } from '../../../src/components/panel/right/layers/maskPanelRowHelpers.ts';
 
 test('container drop class distinguishes container reorder from cross-container drops', () => {
@@ -37,4 +40,12 @@ test('submask drop class disables insert target while dragging containers', () =
   expect(getMaskLikeSubMaskDropClass({ type: 'Container' }, true)).toBe('');
   expect(getMaskLikeSubMaskDropClass({ type: 'SubMask' }, true)).toBe('border-t-2 border-editor-primary-active');
   expect(getMaskLikeSubMaskDropClass({ type: 'Creation' }, false)).toBe('');
+});
+
+test('runtime blend helper gates unsupported mask container blend modes', () => {
+  expect(MASK_CONTAINER_RUNTIME_BLEND_MODES).toEqual(['normal', 'multiply', 'screen']);
+  expect(isMaskContainerRuntimeBlendMode('multiply')).toBe(true);
+  expect(isMaskContainerRuntimeBlendMode('overlay')).toBe(false);
+  expect(getRuntimeMaskContainerBlendMode('screen')).toBe('screen');
+  expect(getRuntimeMaskContainerBlendMode('overlay')).toBe('normal');
 });

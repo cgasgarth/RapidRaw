@@ -3035,12 +3035,17 @@ mod tests {
             "retouchCloneSource": {
                 "alignmentErrorPx": 0,
                 "candidateProvenance": {
+                    "algorithmId": "local_heal_v1",
                     "candidateId": "dust_candidate_001",
                     "candidateKind": "dust_spot",
+                    "changedPixelCount": 257,
                     "confidence": 0.92,
                     "confidenceSemantics": "ranking_score_v1",
                     "origin": "negative_lab_dust_candidate",
+                    "outputHash": "fnv1a32:9e2d410f",
+                    "outputSampleHash": "fnv1a32:63ac0172",
                     "sourceFrameId": "negative-lab-frame-001",
+                    "sourceSampleHash": "fnv1a32:34f64dd7",
                     "statusAtAcceptance": "acknowledged",
                 },
                 "featherRadiusPx": 3.5,

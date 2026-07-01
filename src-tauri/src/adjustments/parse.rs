@@ -549,9 +549,20 @@ fn mask_curve_points(value: &JsonValue, curves: &JsonValue, name: &str) -> Vec<J
     }
 }
 
-fn get_mask_adjustments_from_json(adj: &JsonValue) -> MaskAdjustments {
+fn blend_mode_to_runtime_id(blend_mode: &str) -> f32 {
+    match blend_mode {
+        "multiply" => 1.0,
+        "screen" => 2.0,
+        _ => 0.0,
+    }
+}
+
+fn get_mask_adjustments_from_json(adj: &JsonValue, blend_mode: &str) -> MaskAdjustments {
     if adj.is_null() {
-        return MaskAdjustments::default();
+        return MaskAdjustments {
+            blend_mode: blend_mode_to_runtime_id(blend_mode),
+            ..Default::default()
+        };
     }
 
     let get_val = |section: &str, key: &str, scale: f32| -> f32 {
@@ -592,7 +603,7 @@ fn get_mask_adjustments_from_json(adj: &JsonValue) -> MaskAdjustments {
         flare_amount: get_val("effects", "flareAmount", SCALES.flares),
         sharpness_threshold: get_val("details", "sharpnessThreshold", SCALES.sharpness_threshold),
         hue: get_val("color", "hue", 1.0),
-        _pad_cg1: 0.0,
+        blend_mode: blend_mode_to_runtime_id(blend_mode),
         _pad_cg2: 0.0,
         color_grading_shadows: if section_is_visible(adj, "color") {
             parse_color_grade_settings(&cg_obj["shadows"])
@@ -666,7 +677,8 @@ pub fn get_all_adjustments_from_json(
         .enumerate()
         .take(MAX_MASKS)
     {
-        mask_adjustments[i] = get_mask_adjustments_from_json(&mask_def.adjustments);
+        mask_adjustments[i] =
+            get_mask_adjustments_from_json(&mask_def.adjustments, &mask_def.blend_mode);
         mask_count += 1;
     }
 
@@ -677,5 +689,66 @@ pub fn get_all_adjustments_from_json(
         tile_offset_x: 0,
         tile_offset_y: 0,
         mask_atlas_cols: 1,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::get_all_adjustments_from_json;
+    use serde_json::json;
+
+    #[test]
+    fn parses_supported_mask_container_blend_modes() {
+        let adjustments = json!({
+            "masks": [
+                {
+                    "id": "mask-normal",
+                    "name": "Normal",
+                    "visible": true,
+                    "invert": false,
+                    "opacity": 100,
+                    "adjustments": {},
+                    "subMasks": []
+                },
+                {
+                    "id": "mask-multiply",
+                    "name": "Multiply",
+                    "visible": true,
+                    "invert": false,
+                    "blendMode": "multiply",
+                    "opacity": 100,
+                    "adjustments": {},
+                    "subMasks": []
+                },
+                {
+                    "id": "mask-screen",
+                    "name": "Screen",
+                    "visible": true,
+                    "invert": false,
+                    "blendMode": "screen",
+                    "opacity": 100,
+                    "adjustments": {},
+                    "subMasks": []
+                },
+                {
+                    "id": "mask-overlay",
+                    "name": "Overlay",
+                    "visible": true,
+                    "invert": false,
+                    "blendMode": "overlay",
+                    "opacity": 100,
+                    "adjustments": {},
+                    "subMasks": []
+                }
+            ]
+        });
+
+        let parsed = get_all_adjustments_from_json(&adjustments, true, None);
+
+        assert_eq!(parsed.mask_count, 4);
+        assert_eq!(parsed.mask_adjustments[0].blend_mode, 0.0);
+        assert_eq!(parsed.mask_adjustments[1].blend_mode, 1.0);
+        assert_eq!(parsed.mask_adjustments[2].blend_mode, 2.0);
+        assert_eq!(parsed.mask_adjustments[3].blend_mode, 0.0);
     }
 }

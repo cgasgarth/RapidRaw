@@ -156,6 +156,9 @@ fn run_private_layer_mask_real_raw_proof(
     let unrefined_adjustments = layer_mask_adjustments(mask_refinement(false, 0.0), &base_image);
     let edge_refined_adjustments = layer_mask_adjustments(mask_refinement(true, 0.0), &base_image);
     let refined_adjustments = layer_mask_adjustments(mask_refinement(true, 1.0), &base_image);
+    let opacity_adjustments = local_adjustment_variant(&refined_adjustments, Some(45.0), None);
+    let screen_blend_adjustments =
+        local_adjustment_variant(&refined_adjustments, None, Some("screen"));
     let range_adjustments = range_mask_adjustments(&base_image);
     let _range_warped_image = crate::get_cached_full_warped_image(&state, &range_adjustments)?;
 
@@ -209,6 +212,26 @@ fn run_private_layer_mask_real_raw_proof(
         "layer_mask_real_raw_refined_export",
         tm_override,
     )?;
+    let opacity_preview = render_with_masks(
+        &source_path_string,
+        &base_image,
+        &opacity_adjustments,
+        &context,
+        &state,
+        is_raw,
+        "layer_mask_real_raw_opacity_preview",
+        tm_override,
+    )?;
+    let screen_blend_preview = render_with_masks(
+        &source_path_string,
+        &base_image,
+        &screen_blend_adjustments,
+        &context,
+        &state,
+        is_raw,
+        "layer_mask_real_raw_screen_blend_preview",
+        tm_override,
+    )?;
     let range_preview = render_with_masks(
         &source_path_string,
         &base_image,
@@ -254,6 +277,9 @@ fn run_private_layer_mask_real_raw_proof(
     let masked_changed_pixel_ratio = changed_pixel_ratio(&unmasked_preview, &refined_preview);
     let refinement_changed_pixel_ratio = changed_pixel_ratio(&unrefined_preview, &refined_preview);
     let preview_export_mean_abs_delta = mean_abs_delta(&refined_preview, &refined_export);
+    let opacity_changed_pixel_ratio = changed_pixel_ratio(&refined_preview, &opacity_preview);
+    let screen_blend_changed_pixel_ratio =
+        changed_pixel_ratio(&refined_preview, &screen_blend_preview);
     let range_changed_pixel_ratio = changed_pixel_ratio(&unmasked_preview, &range_preview);
     let range_preview_export_mean_abs_delta = mean_abs_delta(&range_preview, &range_export);
     let source_hash_after = sha256_file(&source_path)?;
@@ -292,6 +318,16 @@ fn run_private_layer_mask_real_raw_proof(
         &refined_export,
         &output_dir.join(format!("{PROOF_SLUG}-refined-export.tiff")),
         ImageFormat::Tiff,
+    )?;
+    write_image(
+        &opacity_preview,
+        &output_dir.join(format!("{PROOF_SLUG}-opacity-45-preview.png")),
+        ImageFormat::Png,
+    )?;
+    write_image(
+        &screen_blend_preview,
+        &output_dir.join(format!("{PROOF_SLUG}-screen-blend-preview.png")),
+        ImageFormat::Png,
     )?;
     write_gray_image(
         &range_mask,
@@ -347,6 +383,16 @@ fn run_private_layer_mask_real_raw_proof(
         )?,
         hashed_artifact(
             private_root,
+            "opacity_45_preview_private",
+            &format!("{ARTIFACT_DIR}/{PROOF_SLUG}-opacity-45-preview.png"),
+        )?,
+        hashed_artifact(
+            private_root,
+            "screen_blend_preview_private",
+            &format!("{ARTIFACT_DIR}/{PROOF_SLUG}-screen-blend-preview.png"),
+        )?,
+        hashed_artifact(
+            private_root,
             "range_mask_alpha_private",
             &format!("{ARTIFACT_DIR}/{PROOF_SLUG}-range-mask-alpha.png"),
         )?,
@@ -375,6 +421,18 @@ fn run_private_layer_mask_real_raw_proof(
             masked_changed_pixel_ratio,
             0.01,
             masked_changed_pixel_ratio > 0.01,
+        ),
+        metric(
+            "opacityChangedPixelRatio",
+            opacity_changed_pixel_ratio,
+            0.0001,
+            opacity_changed_pixel_ratio > 0.0001,
+        ),
+        metric(
+            "screenBlendChangedPixelRatio",
+            screen_blend_changed_pixel_ratio,
+            0.0001,
+            screen_blend_changed_pixel_ratio > 0.0001,
         ),
         metric(
             "rangeMaskCoverageRatio",
@@ -466,7 +524,7 @@ fn run_private_layer_mask_real_raw_proof(
         export_parity_receipt,
         fixture_id: FIXTURE_ID.to_string(),
         generated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
-        issue: 3251,
+        issue: 4697,
         metrics,
         proof_claims: proof_claims(),
         report_id: REPORT_ID.to_string(),
@@ -476,7 +534,7 @@ fn run_private_layer_mask_real_raw_proof(
             mask_path: "prepare_export_masks + generate_mask_bitmap".to_string(),
             output_artifact_count,
             preview_export_parity_metric:
-                "previewExportMeanAbsDelta + rangePreviewExportMeanAbsDelta".to_string(),
+                "previewExportMeanAbsDelta + rangePreviewExportMeanAbsDelta + opacityChangedPixelRatio + screenBlendChangedPixelRatio".to_string(),
             raw_decode_path: "load_base_image_from_bytes".to_string(),
             render_path: "process_image_for_export_pipeline_with_tonemapper_override".to_string(),
         },
@@ -584,7 +642,7 @@ fn build_export_parity_receipt(
         source_path: source.path.clone(),
         stale_reasons: Vec::new(),
         stale_state: "current".to_string(),
-        tracking_issue: 4558,
+        tracking_issue: 4697,
         unmasked_preview_hash: unmasked.hash.clone(),
         unrefined_preview_hash: unrefined.hash.clone(),
     })
@@ -620,11 +678,34 @@ fn layer_mask_adjustments(refinement: Value, base_image: &DynamicImage) -> Value
                 "name": "Local brighten proof",
                 "visible": true,
                 "invert": false,
+                "blendMode": "normal",
                 "opacity": 100,
                 "adjustments": {
                     "exposure": 1.8,
                     "contrast": 32,
-                    "saturation": 18
+                    "saturation": 18,
+                    "sectionVisibility": {
+                        "curves": true
+                    },
+                    "curves": {
+                        "luma": [
+                            { "x": 0, "y": 0 },
+                            { "x": 128, "y": 190 },
+                            { "x": 255, "y": 255 }
+                        ],
+                        "red": [
+                            { "x": 0, "y": 0 },
+                            { "x": 255, "y": 255 }
+                        ],
+                        "green": [
+                            { "x": 0, "y": 0 },
+                            { "x": 255, "y": 255 }
+                        ],
+                        "blue": [
+                            { "x": 0, "y": 0 },
+                            { "x": 255, "y": 255 }
+                        ]
+                    }
                 },
                 "subMasks": [
                     {
@@ -653,6 +734,28 @@ fn layer_mask_adjustments(refinement: Value, base_image: &DynamicImage) -> Value
             }
         ]
     })
+}
+
+fn local_adjustment_variant(
+    adjustments: &Value,
+    opacity: Option<f64>,
+    blend_mode: Option<&str>,
+) -> Value {
+    let mut variant = adjustments.clone();
+    if let Some(mask) = variant
+        .get_mut("masks")
+        .and_then(Value::as_array_mut)
+        .and_then(|masks| masks.first_mut())
+        .and_then(Value::as_object_mut)
+    {
+        if let Some(opacity_value) = opacity {
+            mask.insert("opacity".to_string(), json!(opacity_value));
+        }
+        if let Some(blend_mode_value) = blend_mode {
+            mask.insert("blendMode".to_string(), json!(blend_mode_value));
+        }
+    }
+    variant
 }
 
 fn range_mask_adjustments(base_image: &DynamicImage) -> Value {
@@ -747,6 +850,8 @@ fn proof_claims() -> LayerMaskProofClaims {
             "private_real_raw_decode".to_string(),
             "layer_mask_generation".to_string(),
             "masked_adjustment_changes_pixels".to_string(),
+            "mask_container_opacity_changes_pixels".to_string(),
+            "screen_blend_mode_changes_pixels".to_string(),
             "mask_refinement_changes_pixels".to_string(),
             "image_evidence_guided_refinement".to_string(),
             "hair_detail_chroma_edge_refinement".to_string(),
