@@ -669,10 +669,6 @@
           "path": "docs/validation/harnesses/performance-smoke-2026-06-13.md"
         },
         {
-          "title": "Goal review page",
-          "path": "docs/validation/reports/goal-review-2026-06-11.html"
-        },
-        {
           "title": "Local macOS app E2E report template",
           "path": "docs/validation/reports/local-macos-app-e2e-report.template.md"
         }
