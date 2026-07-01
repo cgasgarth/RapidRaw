@@ -2,13 +2,17 @@ import { z } from 'zod';
 import {
   applyFilmGrainProvenanceToSidecar,
   buildFilmGrainSidecarProvenance,
+  filmGrainControlsV1Schema,
   readFilmGrainProvenanceFromSidecar,
 } from '../../packages/rawengine-schema/src/filmGrainProvenance';
 import {
   applyFilmGrainRuntime,
   type FilmGrainRuntimePixelV1,
 } from '../../packages/rawengine-schema/src/filmGrainRuntime';
-import { applyFilmHalationRuntime } from '../../packages/rawengine-schema/src/filmHalationRuntime';
+import {
+  applyFilmHalationRuntime,
+  filmHalationControlsV1Schema,
+} from '../../packages/rawengine-schema/src/filmHalationRuntime';
 import { sampleFilmGrainModelV1 } from '../../packages/rawengine-schema/src/samplePayloads';
 import {
   buildFilmLookAppliedAdjustmentPatch,
@@ -108,7 +112,24 @@ export const governedFilmLookRuntimeResultSchema = z
       .object({
         claimBoundary: z.literal('governed_creative_look_not_measured_stock_emulation'),
         colorDomain: z.literal('working_linear_rgb'),
+        coordinatePolicy: z.literal('variant_pixel_stable_v1'),
+        grain: z
+          .object({
+            controls: filmGrainControlsV1Schema,
+            provenanceId: z.string().trim().min(1),
+            renderStage: z.literal('creative_final_after_glow'),
+            seed: z.number().int().nonnegative(),
+            seedPolicy: z.enum(['stable_per_image', 'stable_per_variant', 'explicit_seed', 'random_per_render']),
+          })
+          .strict(),
         grainProvenanceId: z.string().trim().min(1),
+        halation: z
+          .object({
+            claimBoundary: z.literal('rgb_creative_approximation_not_physical_film_halation'),
+            controls: filmHalationControlsV1Schema,
+            renderStage: z.literal('late_working_linear_before_output_transform'),
+          })
+          .strict(),
         halationClaimBoundary: z.literal('rgb_creative_approximation_not_physical_film_halation'),
         lookId: z.string().trim().min(1),
         recipeId: z.string().trim().min(1),
@@ -117,6 +138,8 @@ export const governedFilmLookRuntimeResultSchema = z
           z.literal('late_working_linear_before_output_transform'),
           z.literal('creative_final_after_glow'),
         ]),
+        sourceContentHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+        variantId: z.string().trim().min(1),
       })
       .strict(),
     runtimeStatus: z.literal('synthetic_runtime_apply_capable'),
@@ -282,12 +305,32 @@ export function applyGovernedFilmLookRuntime({
     sourceImageId: parsedCommand.target.imageId,
     variantId: parsedCommand.parameters.variantId,
   });
+  const beforeHash = hashFilmLookColorPipelinePixels(sourcePixels);
+  const afterHash = hashFilmLookColorPipelinePixels(grain.outputPixels);
   const sidecar = applyFilmGrainProvenanceToSidecar(
     {
       rawEngine: {
         governedFilmLook: {
           commandId: parsedCommand.commandId,
           lookId: look.id,
+          outputEffects: {
+            afterHash,
+            colorDomain: 'working_linear_rgb',
+            controls: {
+              grain: recipe.grain,
+              halation: recipe.halation,
+            },
+            coordinatePolicy: 'variant_pixel_stable_v1',
+            grainHash: grain.afterHash,
+            halationHash: halation.afterHash,
+            renderStages: [
+              'look_adjustment_patch',
+              'late_working_linear_before_output_transform',
+              'creative_final_after_glow',
+            ],
+            sourceContentHash: parsedCommand.parameters.sourceContentHash,
+            variantId: parsedCommand.parameters.variantId,
+          },
           recipeId: recipe.recipeId,
           strength: recipe.strength,
         },
@@ -299,9 +342,6 @@ export function applyGovernedFilmLookRuntime({
   if (reloadedGrainProvenance?.provenanceId !== grainProvenance.provenanceId) {
     throw new Error('Governed film look sidecar did not roundtrip grain provenance.');
   }
-
-  const beforeHash = hashFilmLookColorPipelinePixels(sourcePixels);
-  const afterHash = hashFilmLookColorPipelinePixels(grain.outputPixels);
 
   return governedFilmLookRuntimeResultSchema.parse({
     adjustmentPatch: buildFilmLookAppliedAdjustmentPatch(look, recipe.strength),
@@ -316,7 +356,20 @@ export function applyGovernedFilmLookRuntime({
     provenance: {
       claimBoundary: 'governed_creative_look_not_measured_stock_emulation',
       colorDomain: 'working_linear_rgb',
+      coordinatePolicy: 'variant_pixel_stable_v1',
+      grain: {
+        controls: recipe.grain,
+        provenanceId: grainProvenance.provenanceId,
+        renderStage: grain.provenance.renderStage,
+        seed: grain.provenance.seed,
+        seedPolicy: grain.provenance.seedPolicy,
+      },
       grainProvenanceId: grainProvenance.provenanceId,
+      halation: {
+        claimBoundary: halation.claimBoundary,
+        controls: recipe.halation,
+        renderStage: halation.provenance.renderStage,
+      },
       halationClaimBoundary: halation.claimBoundary,
       lookId: look.id,
       recipeId: recipe.recipeId,
@@ -325,6 +378,8 @@ export function applyGovernedFilmLookRuntime({
         'late_working_linear_before_output_transform',
         'creative_final_after_glow',
       ],
+      sourceContentHash: parsedCommand.parameters.sourceContentHash,
+      variantId: parsedCommand.parameters.variantId,
     },
     runtimeStatus: 'synthetic_runtime_apply_capable',
     sidecar,

@@ -32,7 +32,38 @@ const resultSummarySchema = z
       .object({
         claimBoundary: z.literal('governed_creative_look_not_measured_stock_emulation'),
         colorDomain: z.literal('working_linear_rgb'),
+        coordinatePolicy: z.literal('variant_pixel_stable_v1'),
+        grain: z
+          .object({
+            controls: z
+              .object({
+                amount: z.number().min(0).max(100),
+                roughness: z.number().min(0).max(100),
+                size: z.number().min(0).max(100),
+              })
+              .strict(),
+            provenanceId: z.string().trim().min(1),
+            renderStage: z.literal('creative_final_after_glow'),
+            seed: z.number().int().nonnegative(),
+            seedPolicy: z.enum(['stable_per_image', 'stable_per_variant', 'explicit_seed', 'random_per_render']),
+          })
+          .strict(),
         grainProvenanceId: z.string().trim().min(1),
+        halation: z
+          .object({
+            claimBoundary: z.literal('rgb_creative_approximation_not_physical_film_halation'),
+            controls: z
+              .object({
+                amount: z.number().min(0).max(100),
+                enabled: z.boolean(),
+                highlightThresholdEv: z.number().min(0.5).max(6),
+                sigmaShortEdgeFraction: z.number().min(0).max(0.01),
+                warmth: z.number().min(0).max(0.75),
+              })
+              .strict(),
+            renderStage: z.literal('late_working_linear_before_output_transform'),
+          })
+          .strict(),
         halationClaimBoundary: z.literal('rgb_creative_approximation_not_physical_film_halation'),
         lookId: z.literal(PROOF_LOOK_ID),
         recipeId: z.literal('film_look.governed.warm_print_grain_halation.v1'),
@@ -41,6 +72,8 @@ const resultSummarySchema = z
           z.literal('late_working_linear_before_output_transform'),
           z.literal('creative_final_after_glow'),
         ]),
+        sourceContentHash: z.literal(SOURCE_CONTENT_HASH),
+        variantId: z.literal('preview-export-shared-governed-look'),
       })
       .strict(),
     runtimeStatus: z.literal('synthetic_runtime_apply_capable'),
@@ -63,6 +96,15 @@ const proofSchema = z
     proofId: z.literal('film.look.governed.runtime.synthetic.v1'),
     result: resultSummarySchema,
     schemaVersion: z.literal(1),
+    sensitivity: z
+      .object({
+        grainAmountAfterHash: z.string().trim().min(1),
+        grainAmountGrainHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+        halationAmountAfterHash: z.string().trim().min(1),
+        halationAmountHalationHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+        repeatAfterHash: z.string().trim().min(1),
+      })
+      .strict(),
   })
   .strict()
   .superRefine((proof, context) => {
@@ -80,6 +122,24 @@ const proofSchema = z
         context.addIssue({ code: 'custom', message: `Governed film look proof missing ${warning}.` });
       }
     }
+
+    if (proof.sensitivity.repeatAfterHash !== proof.result.afterHash) {
+      context.addIssue({ code: 'custom', message: 'Governed film look repeat run changed the output hash.' });
+    }
+
+    if (
+      proof.sensitivity.grainAmountAfterHash === proof.result.afterHash ||
+      proof.sensitivity.grainAmountGrainHash === proof.result.grainHash
+    ) {
+      context.addIssue({ code: 'custom', message: 'Governed film look grain control did not change output.' });
+    }
+
+    if (
+      proof.sensitivity.halationAmountAfterHash === proof.result.afterHash ||
+      proof.sensitivity.halationAmountHalationHash === proof.result.halationHash
+    ) {
+      context.addIssue({ code: 'custom', message: 'Governed film look halation control did not change output.' });
+    }
   });
 
 const look = FILM_LOOK_BROWSER_ITEMS.find((item) => item.id === PROOF_LOOK_ID);
@@ -87,21 +147,23 @@ if (look === undefined) {
   throw new Error(`Missing governed film look proof source: ${PROOF_LOOK_ID}`);
 }
 
-const command = buildGovernedFilmLookCommand({
-  imageId: 'governed-film-look-runtime-proof',
-  imagePath: '/synthetic/film/governed-film-look-runtime-proof.dng',
-  look,
-  operationId: 'proof_001',
-  sessionId: 'governed-film-look-runtime-session',
-  sourceContentHash: SOURCE_CONTENT_HASH,
-  strength: 70,
-  variantId: 'preview-export-shared-governed-look',
-});
-const runtime = applyGovernedFilmLookRuntime({
-  command,
-  look,
-  sourcePixels: makeSyntheticScene(),
-});
+const command = buildProofCommand();
+const runtime = applyProofRuntime(command);
+const repeatRuntime = applyProofRuntime(command);
+const grainAmountRuntime = applyProofRuntime(
+  buildProofCommand({
+    grain: {
+      amount: 44,
+    },
+  }),
+);
+const halationAmountRuntime = applyProofRuntime(
+  buildProofCommand({
+    halation: {
+      amount: 12,
+    },
+  }),
+);
 const { outputPixels: _outputPixels, sidecar: _sidecar, ...resultSummary } = runtime;
 const proof = proofSchema.parse({
   commandType: command.commandType,
@@ -115,6 +177,13 @@ const proof = proofSchema.parse({
   proofId: 'film.look.governed.runtime.synthetic.v1',
   result: resultSummary,
   schemaVersion: 1,
+  sensitivity: {
+    grainAmountAfterHash: grainAmountRuntime.afterHash,
+    grainAmountGrainHash: grainAmountRuntime.grainHash,
+    halationAmountAfterHash: halationAmountRuntime.afterHash,
+    halationAmountHalationHash: halationAmountRuntime.halationHash,
+    repeatAfterHash: repeatRuntime.afterHash,
+  },
 });
 const expectedJson = `${JSON.stringify(proof, null, 2)}\n`;
 
@@ -131,6 +200,28 @@ if (JSON.stringify(currentProof) !== JSON.stringify(proof)) {
 }
 
 console.log(`governed film look runtime ok (${currentProof.result.changedPixelRatio} changed)`);
+
+function buildProofCommand(recipe?: Parameters<typeof buildGovernedFilmLookCommand>[0]['recipe']) {
+  return buildGovernedFilmLookCommand({
+    imageId: 'governed-film-look-runtime-proof',
+    imagePath: '/synthetic/film/governed-film-look-runtime-proof.dng',
+    look,
+    operationId: 'proof_001',
+    recipe,
+    sessionId: 'governed-film-look-runtime-session',
+    sourceContentHash: SOURCE_CONTENT_HASH,
+    strength: 70,
+    variantId: 'preview-export-shared-governed-look',
+  });
+}
+
+function applyProofRuntime(commandValue: ReturnType<typeof buildGovernedFilmLookCommand>) {
+  return applyGovernedFilmLookRuntime({
+    command: commandValue,
+    look,
+    sourcePixels: makeSyntheticScene(),
+  });
+}
 
 function makeSyntheticScene(): Array<GovernedFilmLookPixel> {
   const pixels: Array<GovernedFilmLookPixel> = [];
