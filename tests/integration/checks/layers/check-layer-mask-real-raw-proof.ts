@@ -6,6 +6,8 @@ import { join, resolve } from 'node:path';
 
 import { z } from 'zod';
 
+import { layerMaskExportParityReceiptSchema } from '../../../../src/utils/layers/layerMaskExportParityReceipt.ts';
+
 const REPORT_PATH = 'docs/validation/proofs/layers-masks/layer-mask-real-raw-proof-2026-06-18.json';
 const PRIVATE_REPORT_PATH = 'private-artifacts/validation/layer-mask-real-raw/alaska-layer-mask-v1-report.json';
 const FIXTURE_ID = 'validation.layer-mask-real-raw.alaska-local-adjustment.v1';
@@ -152,6 +154,7 @@ const runtimeProofSchema = z
 const reportSchema = z
   .object({
     artifacts: z.array(artifactSchema).min(9),
+    exportParityReceipt: layerMaskExportParityReceiptSchema,
     fixtureId: z.literal(FIXTURE_ID),
     generatedAt: z.iso.datetime(),
     issue: z.literal(3251),
@@ -217,6 +220,34 @@ const reportSchema = z
     }
     if ((metric.get('previewExportMeanAbsDelta')?.value ?? Number.POSITIVE_INFINITY) > 0.015) {
       context.addIssue({ code: 'custom', message: 'preview/export parity exceeded threshold', path: ['metrics'] });
+    }
+    if (report.exportParityReceipt.refinedPreviewHash === report.exportParityReceipt.finalExportHash) {
+      context.addIssue({
+        code: 'custom',
+        message: 'preview and export hashes must be separately recorded even when pixel parity matches',
+        path: ['exportParityReceipt'],
+      });
+    }
+    if (report.exportParityReceipt.changedPixelRatio !== metric.get('maskedChangedPixelRatio')?.value) {
+      context.addIssue({
+        code: 'custom',
+        message: 'export parity receipt must carry the measured masked changed-pixel ratio',
+        path: ['exportParityReceipt', 'changedPixelRatio'],
+      });
+    }
+    if (report.exportParityReceipt.metricCount !== report.metrics.length) {
+      context.addIssue({
+        code: 'custom',
+        message: 'export parity receipt metric count must match the runtime report',
+        path: ['exportParityReceipt', 'metricCount'],
+      });
+    }
+    if (report.exportParityReceipt.parityStatus !== 'matched') {
+      context.addIssue({
+        code: 'custom',
+        message: 'private RAW refined mask export parity must be matched for acceptance',
+        path: ['exportParityReceipt', 'parityStatus'],
+      });
     }
     if (report.proofClaims.proves.includes('luminance_and_color_range_mask_generation')) {
       if ((metric.get('rangeMaskCoverageRatio')?.value ?? 0) <= 0.01) {

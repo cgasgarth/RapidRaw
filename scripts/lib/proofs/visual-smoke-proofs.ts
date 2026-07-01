@@ -615,17 +615,43 @@ export const layerBrushLocalAdjustmentProofSchema = z
       context.addIssue({ code: z.ZodIssueCode.custom, message: 'Brush local adjustment preview hash must change.' });
     }
   });
-export const layerMaskPrivateRawReviewProofSchema = z.object({
-  brushCommandType: z.literal('layerMask.createBrushMask').optional(),
-  exportArtifact: z.string().endsWith('/alaska-layer-mask-v1-refined-export.tiff'),
-  fixtureId: z.literal('validation.layer-mask-real-raw.alaska-local-adjustment.v1'),
-  metricCount: z.literal('5'),
-  refineCommandType: z.literal('layerMask.refineMask').optional(),
-  refinedPreviewArtifact: z.string().endsWith('/alaska-layer-mask-v1-refined-preview.png'),
-  runtimeStatus: z.literal('private_raw_tauri_runtime_proof'),
-  unmaskedPreviewArtifact: z.string().endsWith('/alaska-layer-mask-v1-unmasked-preview.png'),
-  unrefinedPreviewArtifact: z.string().endsWith('/alaska-layer-mask-v1-unrefined-preview.png'),
-});
+export const layerMaskPrivateRawReviewProofSchema = z
+  .object({
+    brushCommandType: z.literal('layerMask.createBrushMask').optional(),
+    changedPixelRatio: z.string().regex(/^0\.[0-9]+$/u),
+    exportArtifact: z.string().endsWith('/alaska-layer-mask-v1-refined-export.tiff'),
+    finalExportHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    fixtureId: z.literal('validation.layer-mask-real-raw.alaska-local-adjustment.v1'),
+    maskContentHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    metricCount: z.string().regex(/^[1-9][0-9]*$/u),
+    parityReceiptId: z.string().regex(/^layer_mask_export_parity_/u),
+    parityStatus: z.literal('matched'),
+    refineCommandType: z.literal('layerMask.refineMask').optional(),
+    refinedPreviewArtifact: z.string().endsWith('/alaska-layer-mask-v1-refined-preview.png'),
+    refinedPreviewHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    runtimeStatus: z.literal('private_raw_tauri_runtime_proof'),
+    sourceGraphRevision: z.string().regex(/^layer_mask_graph_/u),
+    staleParityStatus: z.literal('stale_blocked'),
+    staleReasons: z.string().regex(/source_graph_revision_changed|mask_alpha_changed/u),
+    unmaskedPreviewArtifact: z.string().endsWith('/alaska-layer-mask-v1-unmasked-preview.png'),
+    unmaskedPreviewHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    unrefinedPreviewArtifact: z.string().endsWith('/alaska-layer-mask-v1-unrefined-preview.png'),
+    unrefinedPreviewHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+  })
+  .superRefine((proof, context) => {
+    if (proof.unmaskedPreviewHash === proof.unrefinedPreviewHash) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'Unrefined mask preview hash must change.' });
+    }
+    if (proof.unrefinedPreviewHash === proof.refinedPreviewHash) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'Refined mask preview hash must change.' });
+    }
+    if (proof.refinedPreviewHash === proof.finalExportHash) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Preview and export artifacts must carry separate content hashes.',
+      });
+    }
+  });
 export const maskOverlayRawProofSchema = z.object({
   edgeThreshold: z.literal('0.64'),
   hiddenToggled: z.literal('true'),
