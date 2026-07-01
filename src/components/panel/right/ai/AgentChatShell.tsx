@@ -55,7 +55,9 @@ import { runAgentBoundedEditPlannerLoop } from '../../../../utils/agent/planning
 import { planAgentEditRecipe } from '../../../../utils/agent/planning/agentEditRecipePlanner';
 import {
   AGENT_EXPORT_PROOF_TOOL_NAME,
+  AGENT_FINAL_EXPORT_TOOL_NAME,
   agentExportProofResponseSchema,
+  agentFinalExportResponseSchema,
 } from '../../../../utils/agent/safety/agentExportProofTool';
 import {
   type AgentSafetyPolicyDecision,
@@ -69,8 +71,10 @@ import {
   runAgentMultiTurnAppServerSession,
 } from '../../../../utils/agent/session/agentMultiTurnAppServerSession';
 import {
+  type AgentSelectedImageExportReceipt,
   type AgentSessionAuditRecord,
   type AgentSessionAuditStorageAdapter,
+  appendAgentSelectedImageExportReceipt,
   appendAgentSessionAuditRecord,
 } from '../../../../utils/agent/session/agentSessionAuditStore';
 import { AGENT_HISTORY_ROLLBACK_TOOL_NAME } from '../../../../utils/agent/session/agentSessionHistory';
@@ -525,6 +529,12 @@ const buildSelectedImageLoopReview = ({
       state: result.rollbackReceipt === undefined ? 'available' : 'dispatched',
       toolName: AGENT_HISTORY_ROLLBACK_TOOL_NAME,
     },
+    exportReviewed: {
+      label: 'Export reviewed edit',
+      reason: 'Exports only after selected-image preview-loop review evidence is available.',
+      state: result.reviewStatus === 'needs_user_review' ? 'available' : 'disabled',
+      toolName: AGENT_FINAL_EXPORT_TOOL_NAME,
+    },
   },
   editCount: result.editCount,
   finalGraphRevision: result.finalGraphRevision,
@@ -591,6 +601,7 @@ const createLiveSessionEvent = (role: AgentChatMessage['role'], body: string, su
 });
 
 const LIVE_AGENT_AUDIT_STORE_KEY = 'rawengine.agent.liveSessionAudit.v1';
+const LIVE_AGENT_SELECTED_IMAGE_EXPORT_RECEIPTS_KEY = 'rawengine.agent.selectedImageExportReceipts.v1';
 
 const createLocalAgentAuditStorageAdapter = (): AgentSessionAuditStorageAdapter | null => {
   if (typeof globalThis.localStorage === 'undefined') return null;
@@ -599,6 +610,17 @@ const createLocalAgentAuditStorageAdapter = (): AgentSessionAuditStorageAdapter 
     readText: () => globalThis.localStorage.getItem(LIVE_AGENT_AUDIT_STORE_KEY),
     writeText: (value) => {
       globalThis.localStorage.setItem(LIVE_AGENT_AUDIT_STORE_KEY, value);
+    },
+  };
+};
+
+const createLocalAgentSelectedImageExportReceiptStorageAdapter = (): AgentSessionAuditStorageAdapter | null => {
+  if (typeof globalThis.localStorage === 'undefined') return null;
+
+  return {
+    readText: () => globalThis.localStorage.getItem(LIVE_AGENT_SELECTED_IMAGE_EXPORT_RECEIPTS_KEY),
+    writeText: (value) => {
+      globalThis.localStorage.setItem(LIVE_AGENT_SELECTED_IMAGE_EXPORT_RECEIPTS_KEY, value);
     },
   };
 };
@@ -891,6 +913,10 @@ type SelectedImageLoopRuntimeState =
       status: 'rejected';
     }
   | {
+      exportReceipt: AgentSelectedImageExportReceipt;
+      status: 'exported';
+    }
+  | {
       result: AgentCurrentImagePreviewLoopResult | unknown;
       status: 'accepted' | 'revised' | 'rolled_back';
     }
@@ -912,9 +938,24 @@ function SelectedImagePreviewLoopReviewPanel({ review }: { review: AgentSelected
   const displayedReceipt = latestApplyReceipt ?? baseReceipt;
   const changedFields = Array.from(new Set(review.applyReceipts.flatMap((receipt) => receipt.adjustedFields)));
   const disabledReason = review.blockers[0] ?? '';
+  const exportControl = review.controls.exportReviewed ?? {
+    label: 'Export reviewed edit',
+    reason: 'Exports only after selected-image preview-loop review evidence is available.',
+    state: 'disabled' as const,
+    toolName: AGENT_FINAL_EXPORT_TOOL_NAME,
+  };
   const acceptEnabled = review.controls.acceptApply.state === 'available' && runtimeState.status !== 'pending';
   const reviseEnabled = review.controls.reviseWithFeedback.state === 'available' && runtimeState.status !== 'pending';
   const rollbackEnabled = review.controls.rollback.state === 'available' && runtimeState.status !== 'pending';
+  const exportReceipt = runtimeState.status === 'exported' ? runtimeState.exportReceipt : undefined;
+  const hasExportEvidence =
+    compareArtifacts.beforeEvidence !== undefined && compareArtifacts.currentEvidence !== undefined;
+  const exportEnabled =
+    exportControl.state === 'available' &&
+    review.reviewStatus === 'needs_user_review' &&
+    hasExportEvidence &&
+    runtimeState.status !== 'pending' &&
+    runtimeState.status !== 'rejected';
   const formatCrop = (crop: (typeof previewLineage)[number]['crop']) =>
     crop === undefined || crop === null
       ? 'full-frame'
@@ -957,6 +998,94 @@ function SelectedImagePreviewLoopReviewPanel({ review }: { review: AgentSelected
         runtimeToolName: AGENT_HISTORY_ROLLBACK_TOOL_NAME,
       });
       setRuntimeState({ result, status: 'rolled_back' });
+    } catch (error) {
+      setRuntimeState({
+        error: error instanceof Error ? error.message : t('editor.ai.agent.composer.unknownError'),
+        status: 'rejected',
+      });
+    }
+  };
+
+  const exportReviewedEdit = async () => {
+    if (
+      !exportEnabled ||
+      compareArtifacts.beforeEvidence === undefined ||
+      compareArtifacts.currentEvidence === undefined
+    ) {
+      return;
+    }
+    setRuntimeState({ status: 'pending' });
+    try {
+      const snapshot = buildAgentImageContextSnapshot();
+      if (snapshot.activeImagePath !== review.selectedImage.path) {
+        throw new Error('Selected-image reviewed export rejected a different selected image.');
+      }
+      if (
+        snapshot.graphRevision !== review.finalGraphRevision ||
+        snapshot.initialPreview.recipeHash !== review.finalRecipeHash
+      ) {
+        throw new Error('Selected-image reviewed export requires the reviewed graph revision to be current.');
+      }
+      const requestId = `${review.command.requestId}-export-reviewed`;
+      const finalExport = agentFinalExportResponseSchema.parse(
+        await dispatchAgentLiveEditorTool({
+          args: {
+            approval: {
+              approvalId: `approval_selected_image_export_${review.command.requestId}`,
+              approvedGraphRevision: snapshot.graphRevision,
+              approvedRecipeHash: snapshot.initialPreview.recipeHash,
+              approvedSelectedImagePath: snapshot.activeImagePath,
+              approvedSessionId: review.command.sessionId,
+              status: 'approved',
+            },
+            colorProfile: 'srgb',
+            destinationPolicy: 'local_private_artifact',
+            dryRun: false,
+            expectedRecipeHash: snapshot.initialPreview.recipeHash,
+            fileFormat: 'jpeg',
+            jpegQuality: 90,
+            longEdgePx: 4096,
+            operationId: `${review.command.operationId}-export-reviewed`,
+            renderingIntent: 'relativeColorimetric',
+            requestId,
+            sessionId: review.command.sessionId,
+          },
+          requestId,
+          runtimeToolName: AGENT_FINAL_EXPORT_TOOL_NAME,
+        }),
+      );
+      const receipt: AgentSelectedImageExportReceipt = {
+        approvalId: finalExport.receipt.approvalId,
+        beforePreviewArtifact: {
+          artifactId: compareArtifacts.beforeArtifactId,
+          ...compareArtifacts.beforeEvidence,
+        },
+        currentPreviewArtifact: {
+          artifactId: compareArtifacts.currentArtifactId,
+          ...compareArtifacts.currentEvidence,
+        },
+        exportSettings: finalExport.receipt.exportSettings,
+        finalGraphRevision: review.finalGraphRevision,
+        finalRecipeHash: review.finalRecipeHash,
+        initialGraphRevision: review.initialGraphRevision,
+        initialRecipeHash: review.initialRecipeHash,
+        noOverwritePolicy: finalExport.receipt.noOverwritePolicy,
+        outputHash: finalExport.receipt.outputHash,
+        outputPath: finalExport.receipt.outputPath,
+        prompt: review.prompt,
+        requestId: finalExport.requestId,
+        rollback: {
+          checkpointGraphRevision: review.rollbackCheckpoint.graphRevision,
+          receiptGraphRevision: review.rollbackReceipt?.graphRevision,
+          status: review.rollbackReceipt === undefined ? 'available' : 'restored',
+        },
+        selectedRawPath: review.selectedImage.path,
+        sessionId: review.command.sessionId,
+        toolName: finalExport.toolName,
+      };
+      const adapter = createLocalAgentSelectedImageExportReceiptStorageAdapter();
+      const persistedReceipt = adapter === null ? receipt : appendAgentSelectedImageExportReceipt(adapter, receipt);
+      setRuntimeState({ exportReceipt: persistedReceipt, status: 'exported' });
     } catch (error) {
       setRuntimeState({
         error: error instanceof Error ? error.message : t('editor.ai.agent.composer.unknownError'),
@@ -1272,7 +1401,7 @@ function SelectedImagePreviewLoopReviewPanel({ review }: { review: AgentSelected
       </div>
 
       <div
-        className="grid gap-2 md:grid-cols-3"
+        className="grid gap-2 md:grid-cols-4"
         data-disabled-reason={disabledReason}
         data-testid="agent-selected-image-preview-loop-controls"
       >
@@ -1319,7 +1448,42 @@ function SelectedImagePreviewLoopReviewPanel({ review }: { review: AgentSelected
           <span className="block font-semibold">{review.controls.rollback.label}</span>
           <span className="mt-1 block leading-4 opacity-80">{review.controls.rollback.reason}</span>
         </button>
+        <button
+          className={`rounded-md border px-2 py-1.5 text-left text-[11px] ${selectedImageLoopControlStyles[exportControl.state]}`}
+          data-control-state={exportControl.state}
+          data-dispatch-path={exportControl.toolName}
+          data-export-evidence-ready={String(hasExportEvidence)}
+          data-testid="agent-selected-image-preview-loop-export-reviewed"
+          disabled={!exportEnabled}
+          onClick={() => {
+            void exportReviewedEdit();
+          }}
+          type="button"
+        >
+          <span className="block font-semibold">{exportControl.label}</span>
+          <span className="mt-1 block leading-4 opacity-80">{exportControl.reason}</span>
+        </button>
       </div>
+
+      {exportReceipt === undefined ? null : (
+        <div
+          className="grid gap-1 rounded border border-teal-500/25 bg-teal-500/10 p-2 text-[11px]"
+          data-before-artifact-id={exportReceipt.beforePreviewArtifact.artifactId}
+          data-current-artifact-id={exportReceipt.currentPreviewArtifact.artifactId}
+          data-final-graph-revision={exportReceipt.finalGraphRevision}
+          data-final-recipe-hash={exportReceipt.finalRecipeHash}
+          data-no-overwrite-policy={exportReceipt.noOverwritePolicy}
+          data-output-hash={exportReceipt.outputHash}
+          data-output-path={exportReceipt.outputPath}
+          data-rollback-status={exportReceipt.rollback.status}
+          data-selected-raw-path={exportReceipt.selectedRawPath}
+          data-testid="agent-selected-image-preview-loop-export-receipt"
+        >
+          <div className="font-semibold text-teal-100">{t('editor.ai.agent.selectedImageLoop.exportReceipt')}</div>
+          <div className="truncate font-mono text-teal-100">{exportReceipt.outputHash}</div>
+          <div className="truncate font-mono text-text-secondary">{exportReceipt.outputPath}</div>
+        </div>
+      )}
 
       {runtimeState.status === 'rejected' ? (
         <div
@@ -1921,7 +2085,7 @@ function LivePromptComposer({
         operationId,
         prompt: acceptedPrompt,
         requestId,
-        rollbackAfterReview: true,
+        rollbackAfterReview: false,
         selectedImagePath: initialSnapshot.activeImagePath,
         sessionId,
         steps,

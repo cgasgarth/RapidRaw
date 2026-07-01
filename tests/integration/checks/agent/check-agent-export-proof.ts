@@ -139,6 +139,14 @@ if (proof.receipt.previewRenderHash !== snapshot.initialPreview.renderHash) {
 if (proof.receipt.approvalId !== 'approval_export_accepted_3163') {
   throw new Error('agent.export.proof receipt must bind to the backend approval id.');
 }
+if (
+  proof.receipt.noOverwritePolicy !== 'never_overwrite_original' ||
+  proof.receipt.outputHash !== proof.exportHash ||
+  !proof.receipt.outputPath.includes('DSC_3163') ||
+  proof.receipt.exportSettings.longEdgePx !== 1536
+) {
+  throw new Error('agent.export.proof receipt did not bind no-overwrite output metadata and export settings.');
+}
 if (proof.output.width !== 1536 || proof.output.height !== 1024 || proof.output.mediaType !== 'image/jpeg') {
   throw new Error('agent.export.proof did not return bounded JPEG output metadata.');
 }
@@ -214,6 +222,10 @@ if (
 if (
   finalExport.receipt.approvalId !== 'approval_export_final_3163' ||
   finalExport.receipt.recipeHash !== snapshot.initialPreview.recipeHash ||
+  finalExport.receipt.outputHash !== finalExport.exportHash ||
+  finalExport.receipt.noOverwritePolicy !== 'never_overwrite_original' ||
+  !finalExport.receipt.outputPath.endsWith('.png') ||
+  finalExport.receipt.exportSettings.fileFormat !== 'png' ||
   finalExport.output.width !== 2048 ||
   finalExport.output.height !== 1365
 ) {

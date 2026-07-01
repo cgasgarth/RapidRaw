@@ -738,6 +738,7 @@
           "compareRecipes": "Compare recipes",
           "current": "Current",
           "deltaHelp": "mean delta / max delta",
+          "exportReceipt": "",
           "graphRevision": "Graph revision",
           "luminanceChannel": "Luminance / channel",
           "maxPixelCountValue": "{{pixelCount}} px max",

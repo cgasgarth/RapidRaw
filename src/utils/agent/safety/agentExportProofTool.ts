@@ -24,6 +24,22 @@ const stableHash = (value: string): string => {
   return `fnv1a32:${(hash >>> 0).toString(16).padStart(8, '0')}`;
 };
 
+const buildAgentExportOutputPath = ({
+  activeImagePath,
+  exportHash,
+  fileFormat,
+}: {
+  activeImagePath: string;
+  exportHash: string;
+  fileFormat: 'jpeg' | 'png';
+}): string => {
+  const sourceName = activeImagePath.split(/[\\/]/u).pop() ?? 'selected-image';
+  const baseName = sourceName.replace(/\.[^.\\/]+$/u, '') || 'selected-image';
+  const extension = fileFormat === 'png' ? 'png' : 'jpg';
+  const hashSlug = exportHash.replace(/[^a-z0-9]+/giu, '_').toLowerCase();
+  return `/tmp/rawengine-agent-export-proof/${baseName}-${hashSlug}.${extension}`;
+};
+
 export const agentExportProofRequestSchema = z
   .object({
     approval: agentApprovalStateSchema,
@@ -32,7 +48,7 @@ export const agentExportProofRequestSchema = z
     expectedRecipeHash: z.string().trim().min(1),
     fileFormat: exportRecipeFileFormatV1Schema.extract(['jpeg', 'png']).default('jpeg'),
     jpegQuality: z.number().int().min(50).max(95).default(86),
-    longEdgePx: z.number().int().min(256).max(2048).default(1536),
+    longEdgePx: z.number().int().min(256).max(8192).default(1536),
     operationId: z.string().trim().min(1),
     renderingIntent: exportRecipeRenderingIntentV1Schema.default('relativeColorimetric'),
     requestId: z.string().trim().min(1),
@@ -61,8 +77,20 @@ export const agentExportProofResponseSchema = z
       .object({
         activeImagePath: z.string().trim().min(1),
         approvalId: z.string().trim().min(1),
+        exportSettings: z
+          .object({
+            colorProfile: exportRecipeColorProfileV1Schema,
+            fileFormat: exportRecipeFileFormatV1Schema.extract(['jpeg', 'png']),
+            jpegQuality: z.number().int().min(50).max(95),
+            longEdgePx: z.number().int().min(256).max(8192),
+            renderingIntent: exportRecipeRenderingIntentV1Schema,
+          })
+          .strict(),
         graphRevision: z.string().trim().min(1),
+        noOverwritePolicy: z.literal('never_overwrite_original'),
         operationId: z.string().trim().min(1),
+        outputHash: z.string().trim().min(1),
+        outputPath: z.string().trim().min(1),
         previewRenderHash: z.string().trim().min(1),
         recipeHash: z.string().trim().min(1),
         requestId: z.string().trim().min(1),
@@ -167,8 +195,22 @@ export const buildAgentExportProof = (request: AgentExportProofRequest): AgentEx
     receipt: {
       activeImagePath: snapshot.activeImagePath,
       approvalId: approval.approvalId,
+      exportSettings: {
+        colorProfile: parsedRequest.colorProfile,
+        fileFormat: parsedRequest.fileFormat,
+        jpegQuality: parsedRequest.jpegQuality,
+        longEdgePx: parsedRequest.longEdgePx,
+        renderingIntent: parsedRequest.renderingIntent,
+      },
       graphRevision: snapshot.graphRevision,
+      noOverwritePolicy: 'never_overwrite_original',
       operationId: parsedRequest.operationId,
+      outputHash: exportHash,
+      outputPath: buildAgentExportOutputPath({
+        activeImagePath: snapshot.activeImagePath,
+        exportHash,
+        fileFormat: parsedRequest.fileFormat,
+      }),
       previewRenderHash: snapshot.initialPreview.renderHash,
       recipeHash: snapshot.initialPreview.recipeHash,
       requestId: parsedRequest.requestId,
