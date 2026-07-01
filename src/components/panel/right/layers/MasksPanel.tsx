@@ -34,9 +34,11 @@ import {
   Trash2,
 } from 'lucide-react';
 import {
+  lazy,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
+  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -135,8 +137,6 @@ import Switch from '../../../ui/primitives/Switch';
 import UiText from '../../../ui/primitives/Text';
 import Resizer from '../../../ui/Resizer';
 import Waveform from '../../editor/Waveform';
-import { AiPeoplePartPickerStatus } from '../ai/AiPeoplePartPickerStatus';
-import LayerStackPanel from './LayerStackPanel';
 import { MaskOverlayReviewControls } from './MaskOverlayReviewControls';
 import {
   formatMaskTypeName,
@@ -158,13 +158,51 @@ import {
   type MaskLikeDragData,
   useDelayedHover,
 } from './maskPanelRowHelpers';
-import { ObjectPromptControls } from './ObjectPromptControls';
+
+const AiPeoplePartPickerStatus = lazy(() =>
+  import('../ai/AiPeoplePartPickerStatus.js').then((module) => ({ default: module.AiPeoplePartPickerStatus })),
+);
+const LayerStackPanel = lazy(() =>
+  import('./LayerStackPanel.js').then((module) => ({ default: module.LayerStackPanel })),
+);
+const ObjectPromptControls = lazy(() =>
+  import('./ObjectPromptControls.js').then((module) => ({ default: module.ObjectPromptControls })),
+);
 
 const maskPanelIconButtonClassName = `${professionalInspectorDensityTokens.actionButton.base} ${professionalInspectorDensityTokens.actionButton.icon} ${professionalInspectorDensityTokens.actionButton.quiet}`;
 const maskPanelRowActionClassName =
   'flex h-6 w-6 items-center justify-center rounded text-text-secondary transition-colors hover:bg-editor-selected-quiet hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:opacity-45';
 const maskPanelCardClassName = professionalInspectorDensityTokens.card.nestedPanel;
 const maskPanelInputClassName = `${editorChromeTokens.input.base} ${editorChromeTokens.input.compact}`;
+
+function LazyMaskPanelFallback({ testId = 'mask-panel-lazy-fallback' }: { testId?: string }) {
+  return (
+    <div className={`${maskPanelCardClassName} space-y-2`} aria-busy="true" data-testid={testId}>
+      <div className="h-3 w-24 rounded bg-editor-panel-raised" />
+      <div className="h-7 rounded bg-editor-panel-well" />
+    </div>
+  );
+}
+
+function LayerStackPanelFallback() {
+  return (
+    <section
+      className="shrink-0 border-b border-editor-border bg-editor-panel p-2"
+      aria-busy="true"
+      data-testid="layer-stack-panel-lazy-fallback"
+    >
+      <div className="flex items-center justify-between">
+        <div className="h-4 w-24 rounded bg-editor-panel-raised" />
+        <div className="flex gap-1">
+          <div className="h-6 w-6 rounded bg-editor-panel-raised" />
+          <div className="h-6 w-6 rounded bg-editor-panel-raised" />
+          <div className="h-6 w-6 rounded bg-editor-panel-raised" />
+        </div>
+      </div>
+      <div className="mt-2 h-14 rounded-md border border-editor-border bg-editor-panel-well" />
+    </section>
+  );
+}
 
 type NumericMaskParameterPatch<TKey extends string> = Partial<Record<TKey, number>>;
 type SubMaskControlParameterKey = 'feather' | 'flow' | 'grow' | 'tolerance';
@@ -2081,14 +2119,16 @@ export function MasksPanel() {
           </div>
         </div>
 
-        <LayerStackPanel
-          activeMaskContainerId={activeMaskContainerId}
-          masks={adjustments.masks}
-          onSelectMaskContainer={onSelectContainer}
-          onSetMaskContainers={(masks) => {
-            setAdjustments((prev: Adjustments) => ({ ...prev, masks }));
-          }}
-        />
+        <Suspense fallback={<LayerStackPanelFallback />}>
+          <LayerStackPanel
+            activeMaskContainerId={activeMaskContainerId}
+            masks={adjustments.masks}
+            onSelectMaskContainer={onSelectContainer}
+            onSetMaskContainers={(nextMasks: Array<MaskContainer>) => {
+              setAdjustments((prev: Adjustments) => ({ ...prev, masks: nextMasks }));
+            }}
+          />
+        </Suspense>
 
         <div className="shrink-0 border-b border-editor-border p-2">
           <MaskOverlayReviewControls
@@ -3808,26 +3848,30 @@ function SettingsPanel({
 
               {activeSubMask.type === Mask.AiPerson && (
                 <>
-                  <AiPeoplePartPickerStatus />
+                  <Suspense fallback={<LazyMaskPanelFallback testId="ai-people-part-picker-lazy-fallback" />}>
+                    <AiPeoplePartPickerStatus />
+                  </Suspense>
                   <AiPersonMaskProvenance parameters={activeSubMask.parameters} />
                 </>
               )}
 
               {objectPromptState !== null && (
-                <ObjectPromptControls
-                  commandInput={objectPromptCommandInput}
-                  isGenerating={isGeneratingObjectProposal}
-                  onClear={handleClearObjectPrompts}
-                  onGenerate={() => {
-                    void handleGenerateObjectProposal();
-                  }}
-                  onModeChange={handleObjectPromptModeChange}
-                  providerStatusText={objectPromptProviderStatusText}
-                  replayReceipt={objectPromptReplayReceipt}
-                  selectedImagePath={selectedImage?.path}
-                  state={objectPromptState}
-                  t={t}
-                />
+                <Suspense fallback={<LazyMaskPanelFallback testId="object-prompt-controls-lazy-fallback" />}>
+                  <ObjectPromptControls
+                    commandInput={objectPromptCommandInput}
+                    isGenerating={isGeneratingObjectProposal}
+                    onClear={handleClearObjectPrompts}
+                    onGenerate={() => {
+                      void handleGenerateObjectProposal();
+                    }}
+                    onModeChange={handleObjectPromptModeChange}
+                    providerStatusText={objectPromptProviderStatusText}
+                    replayReceipt={objectPromptReplayReceipt}
+                    selectedImagePath={selectedImage?.path}
+                    state={objectPromptState}
+                    t={t}
+                  />
+                </Suspense>
               )}
 
               {activeSubMask.type === Mask.Linear && (

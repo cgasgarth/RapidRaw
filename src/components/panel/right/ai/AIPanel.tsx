@@ -33,9 +33,11 @@ import {
 import {
   type ChangeEvent,
   type Dispatch,
+  lazy,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type SetStateAction,
+  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -109,7 +111,23 @@ import {
   useDelayedHover,
 } from '../layers/maskPanelRowHelpers';
 import AgentChatShell from './AgentChatShell';
-import { AiPeoplePartPickerStatus } from './AiPeoplePartPickerStatus';
+
+const AiPeoplePartPickerStatus = lazy(() =>
+  import('./AiPeoplePartPickerStatus.js').then((module) => ({ default: module.AiPeoplePartPickerStatus })),
+);
+
+function AiPanelLazyFallback() {
+  return (
+    <div
+      className="rounded-md border border-surface bg-bg-primary p-2"
+      aria-busy="true"
+      data-testid="ai-panel-lazy-fallback"
+    >
+      <div className="h-3 w-28 rounded bg-editor-panel-raised" />
+      <div className="mt-2 h-7 rounded bg-editor-panel-well" />
+    </div>
+  );
+}
 
 interface DragData extends MaskLikeDragData {
   type: 'Container' | 'SubMask' | 'Creation';
@@ -2183,7 +2201,11 @@ function SettingsPanel({
             </UiText>
           )}
 
-          {activeSubMask?.type === Mask.AiPerson && <AiPeoplePartPickerStatus />}
+          {activeSubMask?.type === Mask.AiPerson && (
+            <Suspense fallback={<AiPanelLazyFallback />}>
+              <AiPeoplePartPickerStatus />
+            </Suspense>
+          )}
 
           <UiText variant={TextVariants.small}>
             {isQuickErasePatch
