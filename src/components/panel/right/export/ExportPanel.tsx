@@ -2179,6 +2179,11 @@ export default function ExportPanel({
             data-color-stack-parity-mismatches={colorStackParityReceipt?.mismatches.join(',') ?? ''}
             data-color-stack-parity-profile={colorStackParityReceipt?.export.effectiveColorProfile ?? ''}
             data-color-stack-parity-range-count={colorStackParityReceipt?.components.selectiveColorRangeCount ?? 0}
+            data-color-stack-parity-runtime-delta={colorStackParityReceipt?.runtimeProof?.maxRgb8MeanAbsDelta ?? ''}
+            data-color-stack-parity-runtime-export-hash={colorStackParityReceipt?.runtimeProof?.exportHash ?? ''}
+            data-color-stack-parity-runtime-preview-hash={colorStackParityReceipt?.runtimeProof?.previewHash ?? ''}
+            data-color-stack-parity-runtime-source-hash={colorStackParityReceipt?.runtimeProof?.sourceHash ?? ''}
+            data-color-stack-parity-runtime-status={colorStackParityReceipt?.runtimeProof?.status ?? ''}
             data-color-stack-parity-status={colorStackParityReceipt?.status ?? ''}
             data-color-stack-parity-tone-curve={colorStackParityReceipt?.components.toneCurve ?? ''}
             data-testid="export-success-receipt"

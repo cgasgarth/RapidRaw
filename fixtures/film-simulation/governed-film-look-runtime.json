@@ -1,6 +1,11 @@
 {
   "commandType": "filmLook.applyGovernedRecipe",
-  "doesNotProve": ["real_raw_quality", "measured_film_stock_emulation", "photochemical_density_domain", "gpu_parity"],
+  "doesNotProve": [
+    "real_raw_quality",
+    "measured_film_stock_emulation",
+    "photochemical_density_domain",
+    "gpu_parity"
+  ],
   "fixtureInput": {
     "colorSpace": "working-linear-rgb-d65",
     "kind": "synthetic-governed-film-look-runtime-proof",
@@ -30,7 +35,30 @@
     "provenance": {
       "claimBoundary": "governed_creative_look_not_measured_stock_emulation",
       "colorDomain": "working_linear_rgb",
+      "coordinatePolicy": "variant_pixel_stable_v1",
+      "grain": {
+        "controls": {
+          "amount": 28,
+          "roughness": 52,
+          "size": 34
+        },
+        "provenanceId": "film_grain_provenance_2b3848d6",
+        "renderStage": "creative_final_after_glow",
+        "seed": 3150349699,
+        "seedPolicy": "stable_per_variant"
+      },
       "grainProvenanceId": "film_grain_provenance_2b3848d6",
+      "halation": {
+        "claimBoundary": "rgb_creative_approximation_not_physical_film_halation",
+        "controls": {
+          "amount": 26,
+          "enabled": true,
+          "highlightThresholdEv": 2.4,
+          "sigmaShortEdgeFraction": 0.0012,
+          "warmth": 0.45
+        },
+        "renderStage": "late_working_linear_before_output_transform"
+      },
       "halationClaimBoundary": "rgb_creative_approximation_not_physical_film_halation",
       "lookId": "film_look.generic.warm_print.v1",
       "recipeId": "film_look.governed.warm_print_grain_halation.v1",
@@ -38,7 +66,9 @@
         "look_adjustment_patch",
         "late_working_linear_before_output_transform",
         "creative_final_after_glow"
-      ]
+      ],
+      "sourceContentHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "variantId": "preview-export-shared-governed-look"
     },
     "runtimeStatus": "synthetic_runtime_apply_capable",
     "warnings": [
@@ -48,5 +78,12 @@
       "real_raw_review_required"
     ]
   },
-  "schemaVersion": 1
+  "schemaVersion": 1,
+  "sensitivity": {
+    "grainAmountAfterHash": "rawengine-pixel-hash:b5de0ac6c1dfa359",
+    "grainAmountGrainHash": "fnv1a32:411b494b",
+    "halationAmountAfterHash": "rawengine-pixel-hash:d05e8b9d72ce5f80",
+    "halationAmountHalationHash": "fnv1a32:4c1693e3",
+    "repeatAfterHash": "rawengine-pixel-hash:3f1cebffa1edac45"
+  }
 }

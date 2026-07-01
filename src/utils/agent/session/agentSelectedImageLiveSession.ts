@@ -36,6 +36,8 @@ export type AgentSelectedImageLiveSessionApprovalDecision = 'approved' | 'cancel
 export type AgentSelectedImageLiveSessionStaleReason =
   | 'graph_revision_changed'
   | 'image_changed'
+  | 'preview_dimensions_changed'
+  | 'preview_identity_changed'
   | 'recipe_hash_changed';
 export type AgentSelectedImageLiveSessionCancellationOutcome =
   | 'cancelled_before_apply'
@@ -73,7 +75,15 @@ const selectedImageLiveSessionAuditEventSchema = z
       'rolled_back',
       'failed',
     ]),
-    staleReason: z.enum(['graph_revision_changed', 'image_changed', 'recipe_hash_changed']).optional(),
+    staleReason: z
+      .enum([
+        'graph_revision_changed',
+        'image_changed',
+        'preview_dimensions_changed',
+        'preview_identity_changed',
+        'recipe_hash_changed',
+      ])
+      .optional(),
     toolCallId: z.string().trim().min(1).optional(),
     toolName: z.string().trim().min(1).optional(),
   })
@@ -107,7 +117,15 @@ export const agentSelectedImageLiveSessionReceiptSchema = z
       'rolled_back',
       'failed',
     ]),
-    staleReason: z.enum(['graph_revision_changed', 'image_changed', 'recipe_hash_changed']).optional(),
+    staleReason: z
+      .enum([
+        'graph_revision_changed',
+        'image_changed',
+        'preview_dimensions_changed',
+        'preview_identity_changed',
+        'recipe_hash_changed',
+      ])
+      .optional(),
     toolCalls: z
       .array(
         z
@@ -196,6 +214,10 @@ export const getAgentSelectedImageLiveSessionStaleReason = (
 ): AgentSelectedImageLiveSessionStaleReason | null => {
   const current = buildSnapshot();
   if (current.selectedImagePath !== draft.snapshot.selectedImagePath) return 'image_changed';
+  if (current.previewIdentity !== draft.snapshot.previewIdentity) return 'preview_identity_changed';
+  if (current.previewWidth !== draft.snapshot.previewWidth || current.previewHeight !== draft.snapshot.previewHeight) {
+    return 'preview_dimensions_changed';
+  }
   if (current.graphRevision !== draft.snapshot.graphRevision) return 'graph_revision_changed';
   if (current.recipeHash !== draft.snapshot.recipeHash) return 'recipe_hash_changed';
   return null;
