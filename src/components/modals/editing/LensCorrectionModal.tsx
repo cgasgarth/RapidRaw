@@ -23,6 +23,7 @@ import { usePreviewViewport } from '../../../hooks/viewport/usePreviewViewport';
 import { Invokes } from '../../../tauri/commands';
 import { TextColors, TextVariants } from '../../../types/typography';
 import type { Adjustments } from '../../../utils/adjustments';
+import { parseExifMetadataNumber } from '../../../utils/metadataPanelContracts';
 import { throttle } from '../../../utils/timing';
 import type { SelectedImage } from '../../ui/AppProperties';
 import Button from '../../ui/primitives/Button';
@@ -115,24 +116,18 @@ const DEFAULT_PARAMS: LensParams = {
 };
 
 const parseFocalLength = (exif: ExifData | null | undefined): number | null => {
-  const focalLength = exif?.['FocalLength'];
-  if (!focalLength) return null;
-  const val = parseFloat(String(focalLength));
-  return isNaN(val) ? null : val;
+  const parsed = parseExifMetadataNumber(exif?.['FocalLength'] ?? exif?.['FocalLengthIn35mmFilm']);
+  return parsed.status === 'valid' ? parsed.value : null;
 };
 
 const parseAperture = (exif: ExifData | null | undefined): number | null => {
-  const fNumber = exif?.['FNumber'];
-  if (!fNumber) return null;
-  const val = parseFloat(String(fNumber));
-  return isNaN(val) ? null : val;
+  const parsed = parseExifMetadataNumber(exif?.['FNumber'] ?? exif?.['ApertureValue']);
+  return parsed.status === 'valid' ? parsed.value : null;
 };
 
 const parseDistance = (exif: ExifData | null | undefined): number | null => {
-  const subjectDistance = exif?.['SubjectDistance'];
-  if (!subjectDistance) return null;
-  const val = parseFloat(String(subjectDistance));
-  return isNaN(val) ? null : val;
+  const parsed = parseExifMetadataNumber(exif?.['SubjectDistance']);
+  return parsed.status === 'valid' ? parsed.value : null;
 };
 
 const SLIDER_DIVISOR = 100.0;

@@ -28,6 +28,10 @@ import { useSettingsStore } from '../../../store/useSettingsStore';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { COLOR_LABELS, type Color } from '../../../utils/adjustments';
 import type { LibraryAutoStackDisplay, LibraryAutoStackItem } from '../../../utils/libraryAutoStacks';
+import {
+  formatExifApertureFromMetadata,
+  formatExifFocalLengthFromMetadata,
+} from '../../../utils/metadataPanelContracts';
 import { buildRawQualityBadges, formatRawQualityBadgeTooltip } from '../../../utils/rawQualityBadges';
 import { ExifOverlay, type ImageFile, ThumbnailAspectRatio } from '../../ui/AppProperties';
 import UiText from '../../ui/primitives/Text';
@@ -117,15 +121,11 @@ export interface LibraryRowProps {
 }
 
 const getExifOverlayValues = (exif: ImageFile['exif']) => {
-  const fNumberValue = exif?.['FNumber'] ?? '';
-  let fNumber = fNumberValue || '';
-  if (fNumber && !fNumber.toLowerCase().startsWith('f')) fNumber = `f/${fNumber}`;
-
   return {
     shutter: exif?.['ExposureTime'] ?? '',
-    fNumber,
+    fNumber: formatExifApertureFromMetadata(exif) ?? '',
     iso: exif?.['PhotographicSensitivity'] ?? exif?.['ISOSpeedRatings'] ?? '',
-    focal: exif?.['FocalLengthIn35mmFilm'] ?? exif?.['FocalLength'] ?? '',
+    focal: formatExifFocalLengthFromMetadata(exif) ?? '',
   };
 };
 
@@ -506,7 +506,7 @@ const ThumbnailComponent = ({
               <div className="flex items-center gap-1">
                 <IconFocalLength className="w-2.5 h-2.5" />
                 <UiText variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
-                  {focal ? (focal.endsWith('mm') ? focal : `${focal}mm`) : '-'}
+                  {focal || '-'}
                 </UiText>
               </div>
             </div>
@@ -601,7 +601,7 @@ const ThumbnailComponent = ({
               >
                 <IconFocalLength className="w-2.5 h-2.5" />
                 <UiText variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
-                  {focal ? (focal.endsWith('mm') ? focal : `${focal}mm`) : '-'}
+                  {focal || '-'}
                 </UiText>
               </div>
             </div>
@@ -900,7 +900,7 @@ const ListItemComponent = ({
           </div>
           <div style={{ width: getW('focal') }} className="flex items-center px-3 h-full overflow-hidden">
             <UiText variant={TextVariants.small} color={TextColors.secondary} className="truncate">
-              {focal ? (focal.endsWith('mm') ? focal : `${focal}mm`) : ''}
+              {focal}
             </UiText>
           </div>
         </>
