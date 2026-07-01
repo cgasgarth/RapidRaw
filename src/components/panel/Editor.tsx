@@ -1457,25 +1457,23 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   return (
     <div
       className={cx(
-        'flex-1 flex flex-col relative overflow-hidden min-h-0',
+        'flex-1 flex flex-col relative overflow-hidden min-h-0 bg-editor-matte',
         !isInstantTransition && 'transition-all duration-300 ease-in-out',
-        isFullScreen
-          ? 'rounded-none p-0 gap-0'
-          : cx('rounded-lg p-2 gap-2', appSettings?.useWgpuRenderer !== false ? 'bg-transparent' : 'bg-bg-secondary'),
+        isFullScreen ? 'rounded-none p-0 gap-0' : 'rounded-lg gap-2',
       )}
     >
       {isFullScreen && (
         <div className="pointer-events-none absolute inset-x-0 top-3 z-20 flex justify-center px-3">
           <div
             aria-live="polite"
-            className="pointer-events-auto flex max-w-full items-center gap-3 rounded-md border border-surface bg-bg-secondary/95 px-3 py-2 shadow-lg shadow-black/20"
+            className="pointer-events-auto flex max-w-full items-center gap-3 rounded-md border border-editor-border bg-editor-panel/95 px-3 py-2 shadow-[0_14px_34px_var(--editor-overlay-shadow)]"
             data-testid="editor-preview-exit-banner"
           >
             <UiText as="span" className="whitespace-nowrap text-xs">
               {previewOnlyLabel}
             </UiText>
             <button
-              className="inline-flex items-center gap-1.5 rounded-md bg-surface px-3 py-1.5 text-sm text-text-primary transition-colors hover:bg-card-active"
+              className="inline-flex items-center gap-1.5 rounded-md bg-editor-selected-quiet px-3 py-1.5 text-sm text-text-primary transition-colors hover:bg-editor-panel-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring"
               data-testid="editor-preview-exit-button"
               onClick={handleToggleFullScreen}
               type="button"
@@ -1488,9 +1486,9 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       )}
       <div
         className={cx(
-          'shrink-0 relative z-10',
+          'shrink-0 relative z-10 rounded-lg border border-editor-border bg-editor-panel',
           !isInstantTransition && 'transition-all duration-300 ease-in-out',
-          isFullScreen ? 'max-h-0 opacity-0 m-0' : 'max-h-25 opacity-100',
+          isFullScreen ? 'max-h-0 opacity-0 m-0 border-transparent' : 'max-h-25 opacity-100',
           toolbarOverflowVisible ? 'overflow-visible' : 'overflow-hidden',
         )}
         aria-hidden={isFullScreen}
@@ -1521,7 +1519,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
         />
         {selectedImage.isOfflineSmartPreview === true && (
           <div
-            className="mx-1 mb-2 rounded-md border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-100"
+            className="mx-2 mb-2 rounded-md border border-editor-warning/40 bg-editor-warning-surface px-3 py-2 text-xs text-editor-warning"
             data-testid="offline-smart-preview-editor-warning"
           >
             {t('editor.offlineSmartPreview.warning')}
@@ -1531,15 +1529,17 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
 
       <div
         aria-label={t('editor.accessibility.imagePreview')}
-        className={cx('flex-1 min-h-0', isFullScreen ? 'rounded-none' : 'rounded-lg')}
+        className={cx(
+          'flex-1 min-h-0 overflow-hidden bg-editor-panel-well',
+          isFullScreen ? 'rounded-none' : 'rounded-lg border border-editor-border p-2',
+        )}
         role="region"
       >
         <div
           className={cx(
-            'relative h-full overflow-hidden touch-none',
+            'relative h-full overflow-hidden touch-none bg-editor-panel-well',
             isFullScreen ? 'rounded-none' : 'rounded-lg',
-            appSettings?.useWgpuRenderer !== false && !isFullScreen && 'ring-[9999px] ring-bg-secondary',
-            !isWgpuActive && 'bg-bg-secondary',
+            !isWgpuActive && 'bg-editor-panel-well',
           )}
           style={{ cursor: cursorStyle }}
           role="presentation"
@@ -1556,11 +1556,13 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
           {showSpinner && (
             <div
               className={cx(
-                'absolute inset-0 bg-bg-secondary/80 flex items-center justify-center z-50 transition-opacity duration-300',
+                'absolute inset-0 z-50 flex items-center justify-center bg-editor-panel-well/90 transition-opacity duration-300',
                 isLoaderVisible ? 'opacity-100' : 'opacity-0 pointer-events-none',
               )}
             >
-              <Loader2 size={48} className="animate-spin text-accent" />
+              <div className="flex h-full w-full items-center justify-center rounded-lg border border-editor-border bg-[linear-gradient(135deg,var(--editor-panel-well),var(--editor-panel)_48%,var(--editor-panel-well))]">
+                <Loader2 size={42} className="animate-spin text-editor-primary-active" />
+              </div>
             </div>
           )}
 

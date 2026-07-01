@@ -157,6 +157,7 @@ export default function BottomBar({
   const total = totalImages ?? 0;
   const showSelectionCounter = numSelected > 1;
   const visibleFilmstripHeight = filmstripHeight ?? 0;
+  const isCompactEditorBar = !isLibraryView && !showFilmstrip;
   const [isFilterExpanded, setIsFilterExpanded] = useState(false);
   const { filterCriteria, setFilterCriteria } = useLibraryStore(
     useShallow((state) => ({
@@ -241,7 +242,7 @@ export default function BottomBar({
 
   const handlePercentSubmit = () => {
     const value = parseFloat(percentInputValue);
-    if (!isNaN(value)) {
+    if (!Number.isNaN(value)) {
       const originalPercent = value / 100;
       const clampedPercent = Math.max(0.1, Math.min(2.0, originalPercent));
       onZoomChange(clampedPercent);
@@ -260,7 +261,12 @@ export default function BottomBar({
   };
 
   return (
-    <div className="shrink-0 bg-bg-secondary rounded-lg flex flex-col">
+    <div
+      className={cx(
+        'shrink-0 flex flex-col overflow-hidden rounded-lg border border-editor-border bg-editor-panel',
+        isCompactEditorBar && 'rounded-none border-0',
+      )}
+    >
       {!isLibraryView && showFilmstrip && (
         <div
           className={cx('overflow-hidden', !isResizing && 'transition-all duration-300 ease-in-out')}
@@ -286,17 +292,18 @@ export default function BottomBar({
 
       <div
         className={cx(
-          'shrink-0 h-10 flex items-center justify-between px-3',
+          'shrink-0 flex items-center justify-between gap-2 px-3',
+          isCompactEditorBar ? 'min-h-12 py-1.5' : 'h-10',
           !isLibraryView && 'border-t',
-          !isLibraryView && showFilmstrip && isFilmstripVisible ? 'border-surface' : 'border-transparent',
+          !isLibraryView && showFilmstrip && isFilmstripVisible ? 'border-editor-border' : 'border-transparent',
         )}
       >
-        <div className="flex items-center gap-4">
+        <div className={cx('flex min-w-0 items-center', isCompactEditorBar ? 'gap-2 overflow-x-auto' : 'gap-4')}>
           <StarRating rating={rating} onRate={onRate} disabled={isRatingDisabled} />
-          <div className="h-5 w-px bg-surface"></div>
+          <div className={cx('h-5 w-px bg-editor-border', isCompactEditorBar && 'hidden')}></div>
           <div className="flex items-center gap-2">
             <button
-              className="relative w-8 h-8 flex items-center justify-center rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+              className="relative w-8 h-8 flex items-center justify-center rounded-md text-text-secondary hover:bg-editor-selected-quiet hover:text-text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"
               disabled={isCopyDisabled}
               onClick={onCopy}
               data-tooltip={t('ui.bottomBar.tooltips.copySettings')}
@@ -329,7 +336,7 @@ export default function BottomBar({
             </button>
 
             <button
-              className="relative w-8 h-8 flex items-center justify-center rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+              className="relative w-8 h-8 flex items-center justify-center rounded-md text-text-secondary hover:bg-editor-selected-quiet hover:text-text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"
               disabled={isPasteDisabled}
               onClick={onPaste}
               data-tooltip={t('ui.bottomBar.tooltips.pasteSettings')}
@@ -362,111 +369,117 @@ export default function BottomBar({
             </button>
 
             <button
-              className="w-8 h-8 flex items-center justify-center rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors"
+              className="w-8 h-8 flex items-center justify-center rounded-md text-text-secondary hover:bg-editor-selected-quiet hover:text-text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring"
               onClick={onOpenCopyPasteSettings}
               data-tooltip={t('ui.bottomBar.tooltips.copyPasteSettings')}
             >
               <Settings size={18} />
             </button>
           </div>
-          <div className="h-5 w-px bg-surface mx-4"></div>
-          <div
-            className={cx(
-              'flex items-center transition-all duration-300',
-              isFilterExpanded ? 'bg-surface rounded-md' : 'bg-transparent',
-            )}
-          >
-            <button
-              className={cx(
-                'relative w-8 h-8 flex items-center justify-center rounded-md transition-colors shrink-0',
-                isFilterExpanded ? 'text-text-primary' : 'text-text-secondary hover:bg-surface hover:text-text-primary',
-              )}
-              onClick={() => {
-                setIsFilterExpanded((value) => !value);
-              }}
-              data-tooltip={t('ui.bottomBar.tooltips.quickFilter')}
-            >
-              <Filter size={18} />
-            </button>
-            <div
-              className={cx(
-                'flex items-center transition-all duration-300 ease-in-out overflow-hidden',
-                isFilterExpanded ? 'max-w-100 opacity-100 pr-2 ml-1' : 'max-w-0 opacity-0 pr-0 ml-0',
-              )}
-            >
-              <div className="flex items-center gap-3 whitespace-nowrap">
-                <div className="flex items-center gap-0.5">
-                  {[1, 2, 3, 4, 5].map((starValue) => {
-                    const isFilled = filterCriteria.rating > 0 && starValue <= filterCriteria.rating;
-                    return (
-                      <button
-                        key={`qf-star-${starValue}`}
-                        aria-label={t('library.header.viewOptions.filterByRating', { rating: starValue })}
-                        onClick={() => {
-                          setFilterCriteria((prev) => ({
-                            ...prev,
-                            rating: prev.rating === starValue ? 0 : starValue,
-                          }));
-                        }}
-                        className="p-0.5 focus:outline-none"
-                      >
-                        <Star
-                          size={16}
-                          className={cx(
-                            'transition-colors duration-150',
-                            isFilled ? 'text-accent fill-accent' : 'text-text-secondary hover:text-accent',
-                          )}
-                        />
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="h-4 w-px bg-border-color"></div>
-                <div className="flex items-center gap-1.5">
-                  {allColors.map((color) => {
-                    const isSelected = filterCriteria.colors.includes(color.name);
-                    const tooltipTitle =
-                      color.name === 'none'
-                        ? t('library.header.viewOptions.noLabel')
-                        : t(`contextMenus.colors.${color.name}`, {
-                            defaultValue: color.name.charAt(0).toUpperCase() + color.name.slice(1),
-                          });
+          {!isCompactEditorBar && (
+            <>
+              <div className="h-5 w-px bg-editor-border mx-4"></div>
+              <div
+                className={cx(
+                  'flex items-center transition-all duration-300',
+                  isFilterExpanded ? 'bg-editor-selected-quiet rounded-md' : 'bg-transparent',
+                )}
+              >
+                <button
+                  className={cx(
+                    'relative w-8 h-8 flex items-center justify-center rounded-md transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring',
+                    isFilterExpanded
+                      ? 'text-text-primary'
+                      : 'text-text-secondary hover:bg-editor-selected-quiet hover:text-text-primary',
+                  )}
+                  onClick={() => {
+                    setIsFilterExpanded((value) => !value);
+                  }}
+                  data-tooltip={t('ui.bottomBar.tooltips.quickFilter')}
+                >
+                  <Filter size={18} />
+                </button>
+                <div
+                  className={cx(
+                    'flex items-center transition-all duration-300 ease-in-out overflow-hidden',
+                    isFilterExpanded ? 'max-w-100 opacity-100 pr-2 ml-1' : 'max-w-0 opacity-0 pr-0 ml-0',
+                  )}
+                >
+                  <div className="flex items-center gap-3 whitespace-nowrap">
+                    <div className="flex items-center gap-0.5">
+                      {[1, 2, 3, 4, 5].map((starValue) => {
+                        const isFilled = filterCriteria.rating > 0 && starValue <= filterCriteria.rating;
+                        return (
+                          <button
+                            key={`qf-star-${starValue}`}
+                            aria-label={t('library.header.viewOptions.filterByRating', { rating: starValue })}
+                            onClick={() => {
+                              setFilterCriteria((prev) => ({
+                                ...prev,
+                                rating: prev.rating === starValue ? 0 : starValue,
+                              }));
+                            }}
+                            className="p-0.5 focus:outline-none"
+                          >
+                            <Star
+                              size={16}
+                              className={cx(
+                                'transition-colors duration-150',
+                                isFilled ? 'text-accent fill-accent' : 'text-text-secondary hover:text-accent',
+                              )}
+                            />
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="h-4 w-px bg-editor-border"></div>
+                    <div className="flex items-center gap-1.5">
+                      {allColors.map((color) => {
+                        const isSelected = filterCriteria.colors.includes(color.name);
+                        const tooltipTitle =
+                          color.name === 'none'
+                            ? t('library.header.viewOptions.noLabel')
+                            : t(`contextMenus.colors.${color.name}`, {
+                                defaultValue: color.name.charAt(0).toUpperCase() + color.name.slice(1),
+                              });
 
-                    return (
-                      <button
-                        key={`qf-color-${color.name}`}
-                        aria-label={t('library.header.viewOptions.filterByColorLabel', {
-                          color: tooltipTitle,
-                        })}
-                        onClick={() => {
-                          const currentColors = filterCriteria.colors;
-                          const nextColors = currentColors.includes(color.name)
-                            ? currentColors.filter((name) => name !== color.name)
-                            : [...currentColors, color.name];
-                          setFilterCriteria((prev) => ({ ...prev, colors: nextColors }));
-                        }}
-                        className={cx(
-                          'w-4 h-4 rounded-full transition-transform hover:scale-105 flex items-center justify-center focus:outline-none',
-                          isSelected ? 'ring-2 ring-accent ring-offset-1 ring-offset-bg-primary' : '',
-                        )}
-                        style={{ backgroundColor: color.color }}
-                        data-tooltip={tooltipTitle}
-                      >
-                        {isSelected && <Check size={10} className="text-white drop-shadow-md" />}
-                      </button>
-                    );
-                  })}
+                        return (
+                          <button
+                            key={`qf-color-${color.name}`}
+                            aria-label={t('library.header.viewOptions.filterByColorLabel', {
+                              color: tooltipTitle,
+                            })}
+                            onClick={() => {
+                              const currentColors = filterCriteria.colors;
+                              const nextColors = currentColors.includes(color.name)
+                                ? currentColors.filter((name) => name !== color.name)
+                                : [...currentColors, color.name];
+                              setFilterCriteria((prev) => ({ ...prev, colors: nextColors }));
+                            }}
+                            className={cx(
+                              'w-4 h-4 rounded-full transition-transform hover:scale-105 flex items-center justify-center focus:outline-none',
+                              isSelected ? 'ring-2 ring-accent ring-offset-1 ring-offset-editor-panel' : '',
+                            )}
+                            style={{ backgroundColor: color.color }}
+                            data-tooltip={tooltipTitle}
+                          >
+                            {isSelected && <Check size={10} className="text-white drop-shadow-md" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
+            </>
+          )}
           <div
             className={cx(
               'flex items-center transition-all duration-300 ease-out overflow-hidden',
               showSelectionCounter ? 'max-w-xs opacity-100' : 'max-w-0 opacity-0',
             )}
           >
-            <div className="h-5 w-px bg-surface mr-4"></div>
+            <div className="h-5 w-px bg-editor-border mr-4"></div>
             <UiText as="span" className="whitespace-nowrap">
               {t('ui.bottomBar.imagesSelected', { current: numSelected, total })}
             </UiText>
@@ -476,7 +489,7 @@ export default function BottomBar({
         {isLibraryView ? (
           <div className="flex items-center gap-2">
             <button
-              className="w-8 h-8 flex items-center justify-center rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+              className="w-8 h-8 flex items-center justify-center rounded-md text-text-secondary hover:bg-editor-selected-quiet hover:text-text-primary transition-colors disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"
               disabled={isExportDisabled}
               onClick={onExportClick}
               data-tooltip={t('ui.bottomBar.tooltips.export')}
@@ -485,8 +498,8 @@ export default function BottomBar({
             </button>
           </div>
         ) : showZoomControls ? (
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 w-56">
+          <div className={cx('flex shrink-0 items-center', isCompactEditorBar ? 'gap-2' : 'gap-4')}>
+            <div className={cx('flex items-center gap-2', isCompactEditorBar ? 'w-36' : 'w-56')}>
               <button
                 type="button"
                 className="relative w-12 h-full flex items-center justify-end cursor-pointer bg-transparent p-0 text-left"
@@ -505,7 +518,7 @@ export default function BottomBar({
               </button>
 
               <div className="relative flex-1 h-5">
-                <div className="absolute top-1/2 left-0 w-full h-1.5 -translate-y-1/2 bg-surface rounded-full pointer-events-none" />
+                <div className="absolute top-1/2 left-0 w-full h-1.5 -translate-y-1/2 bg-editor-panel-raised rounded-full pointer-events-none" />
                 <input
                   type="range"
                   min={0.1}
@@ -536,7 +549,7 @@ export default function BottomBar({
                     }}
                     onKeyDown={handlePercentKeyDown}
                     onBlur={handlePercentSubmit}
-                    className="w-full text-xs text-text-primary bg-bg-primary border border-border-color rounded-sm px-1 text-right"
+                    className="w-full text-xs text-text-primary bg-editor-panel-raised border border-editor-border rounded-sm px-1 text-right"
                     style={{ fontSize: '12px', height: '18px' }}
                   />
                 ) : (
@@ -553,9 +566,9 @@ export default function BottomBar({
             </div>
             {showFilmstrip && (
               <>
-                <div className="h-5 w-px bg-surface"></div>
+                <div className="h-5 w-px bg-editor-border"></div>
                 <button
-                  className="p-1.5 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors"
+                  className="p-1.5 rounded-md text-text-secondary hover:bg-editor-selected-quiet hover:text-text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring"
                   onClick={() => setIsFilmstripVisible?.(!isFilmstripVisible)}
                   data-tooltip={
                     isFilmstripVisible

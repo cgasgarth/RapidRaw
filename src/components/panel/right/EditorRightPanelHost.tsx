@@ -17,16 +17,16 @@ const panelVariants: Variants = {
   animate: (direction: number) => ({
     opacity: 1,
     y: 0,
-    transition: { duration: direction === 0 ? 0 : 0.2, ease: 'circOut' },
+    transition: { duration: direction === 0 ? 0 : 0.18, ease: 'circOut' },
   }),
   exit: (direction: number) => ({
     opacity: direction === 0 ? 1 : 0.2,
-    y: direction === 0 ? 0 : direction > 0 ? -20 : 20,
+    y: direction === 0 ? 0 : direction > 0 ? -12 : 12,
     transition: { duration: direction === 0 ? 0 : 0.1, ease: 'circIn' },
   }),
   initial: (direction: number) => ({
     opacity: direction === 0 ? 1 : 0.2,
-    y: direction === 0 ? 0 : direction > 0 ? 20 : -20,
+    y: direction === 0 ? 0 : direction > 0 ? 12 : -12,
   }),
 };
 
@@ -88,6 +88,27 @@ const rightPanelRegistry: Record<Panel, RightPanelRenderer> = {
   ),
 };
 
+function EditorRightPanelSkeleton() {
+  return (
+    <div
+      className="flex h-full w-full flex-col bg-editor-panel"
+      aria-busy="true"
+      data-testid="editor-right-panel-skeleton"
+    >
+      <div className="flex min-h-11 shrink-0 items-center justify-between border-b border-editor-border px-3">
+        <div className="h-3 w-28 rounded bg-editor-panel-raised" />
+        <div className="h-5 w-12 rounded bg-editor-panel-raised" />
+      </div>
+      <div className="space-y-3 p-3">
+        <div className="h-20 rounded-md border border-editor-border bg-editor-panel-well" />
+        <div className="h-7 rounded bg-editor-panel-raised" />
+        <div className="h-7 rounded bg-editor-panel-raised" />
+        <div className="h-32 rounded-md border border-editor-border bg-editor-panel-well" />
+      </div>
+    </div>
+  );
+}
+
 export function EditorRightPanelHost(props: EditorRightPanelHostProps) {
   const { activeRightPanel, renderedRightPanel, slideDirection } = props;
   const renderPanel = renderedRightPanel === null ? null : rightPanelRegistry[renderedRightPanel];
@@ -97,16 +118,14 @@ export function EditorRightPanelHost(props: EditorRightPanelHostProps) {
       {activeRightPanel && (
         <motion.div
           animate="animate"
-          className="h-full w-full"
+          className="h-full w-full overflow-hidden bg-editor-panel text-text-primary"
           custom={slideDirection}
           exit="exit"
           initial="initial"
           key={renderedRightPanel}
           variants={panelVariants}
         >
-          <Suspense fallback={<div className="h-full w-full bg-bg-secondary" aria-busy="true" />}>
-            {renderPanel?.(props)}
-          </Suspense>
+          <Suspense fallback={<EditorRightPanelSkeleton />}>{renderPanel?.(props)}</Suspense>
         </motion.div>
       )}
     </AnimatePresence>

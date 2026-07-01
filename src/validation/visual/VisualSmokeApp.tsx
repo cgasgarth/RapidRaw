@@ -1,3 +1,4 @@
+import cx from 'clsx';
 import { Camera, CircleGauge, FolderOpen, Layers3, RotateCcw, SlidersHorizontal, Sparkles } from 'lucide-react';
 import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -12,6 +13,7 @@ import SuperResolutionModal from '../../components/modals/computational-merge/Su
 import CullingModal from '../../components/modals/editing/CullingModal';
 import CommandPaletteModal from '../../components/modals/navigation/CommandPaletteModal';
 import { NegativeConversionModal } from '../../components/modals/negative-lab/NegativeConversionModal';
+import BottomBar from '../../components/panel/BottomBar';
 import ImageCanvas from '../../components/panel/editor/ImageCanvas';
 import AgentChatShell from '../../components/panel/right/ai/AgentChatShell';
 import { TetherPanel } from '../../components/panel/right/capture/TetherPanel';
@@ -24,10 +26,12 @@ import RightPanelSwitcher from '../../components/panel/right/RightPanelSwitcher'
 import {
   type BrushSettings,
   type CullingSuggestions,
+  type ImageFile,
   Panel,
   RawStatus,
   type SelectedImage,
   SortDirection,
+  ThumbnailAspectRatio,
 } from '../../components/ui/AppProperties';
 import { Status } from '../../components/ui/ExportImportProperties';
 import { editorChromeStatusChipClassName, editorChromeTokens } from '../../components/ui/editorChromeTokens';
@@ -459,6 +463,263 @@ function ProfessionalEditorTokensVisualSmoke() {
   );
 }
 
+const professionalEditorShellImage: SelectedImage = {
+  ...adjustmentsPanelRetuneRawImage,
+  height: 3648,
+  path: '/visual-smoke/professional-editor-shell.ARW',
+  width: 5472,
+};
+
+const professionalEditorShellImageList: ImageFile[] = [
+  {
+    exif: null,
+    is_edited: true,
+    is_virtual_copy: false,
+    modified: 1_772_333_000,
+    path: professionalEditorShellImage.path,
+    rating: 4,
+    tags: ['shell'],
+  },
+];
+
+function useProfessionalEditorSmokeState() {
+  useEffect(() => {
+    const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
+    useEditorStore.setState({
+      adjustments,
+      displaySize: { height: 540, width: 810 },
+      histogram: null,
+      history: [adjustments],
+      historyIndex: 0,
+      isWaveformVisible: false,
+      originalSize: { height: professionalEditorShellImage.height, width: professionalEditorShellImage.width },
+      previewScopeStatus: null,
+      selectedImage: professionalEditorShellImage,
+      waveform: null,
+      waveformHeight: PANEL_SCOPES_HEIGHT.default,
+    });
+    useUIStore.setState({
+      collapsibleSectionsState: { ...DEFAULT_COLLAPSIBLE_SECTIONS_STATE },
+    });
+  }, []);
+}
+
+function ProfessionalEditorCanvasWell({ portrait = false }: { portrait?: boolean }) {
+  return (
+    <div
+      className="grid h-full min-h-0 place-items-center overflow-hidden rounded-lg border border-editor-border bg-editor-panel-well p-3"
+      data-testid={portrait ? 'professional-editor-compact-canvas' : 'professional-editor-shell-canvas'}
+      data-visual-smoke-section="professional-editor-canvas"
+    >
+      <div
+        className={cx(
+          'relative overflow-hidden rounded-md border border-editor-overlay-stroke shadow-[0_24px_52px_var(--editor-overlay-shadow)]',
+          portrait ? 'aspect-[3/4] h-full max-h-[360px]' : 'aspect-[4/3] w-full max-w-5xl',
+        )}
+      >
+        <div className="absolute inset-0 bg-[linear-gradient(135deg,#18232b_0%,#3f5960_36%,#968762_64%,#ebd5aa_100%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_36%_28%,rgba(255,246,208,0.56),transparent_18%),linear-gradient(170deg,transparent_52%,rgba(12,16,20,0.68)_53%)]" />
+        <div className="absolute bottom-3 left-3 rounded border border-editor-overlay-stroke bg-editor-panel/80 px-2 py-1 text-[11px] text-text-secondary">
+          {copy.professionalEditorPreviewReady}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProfessionalEditorBottomBar() {
+  return (
+    <BottomBar
+      filmstripHeight={96}
+      imageList={professionalEditorShellImageList}
+      imageRatings={{ [professionalEditorShellImage.path]: 4 }}
+      isCopied={false}
+      isCopyDisabled={false}
+      isFilmstripVisible={false}
+      isLoading={false}
+      isPasted={false}
+      isPasteDisabled={false}
+      isRatingDisabled={false}
+      isResizing={false}
+      multiSelectedPaths={[professionalEditorShellImage.path]}
+      onClearSelection={() => {}}
+      onCopy={() => {}}
+      onImageSelect={() => {}}
+      onOpenCopyPasteSettings={() => {}}
+      onPaste={() => {}}
+      onRate={() => {}}
+      onRequestThumbnails={() => {}}
+      onZoomChange={() => {}}
+      rating={4}
+      selectedImage={professionalEditorShellImage}
+      setIsFilmstripVisible={() => {}}
+      showFilmstrip={false}
+      showZoomControls={true}
+      thumbnailAspectRatio={ThumbnailAspectRatio.Cover}
+      totalImages={1}
+    />
+  );
+}
+
+function ProfessionalEditorPanelHost({
+  activePanel,
+  onPanelSelect,
+  slideDirection = 0,
+}: {
+  activePanel: Panel | null;
+  onPanelSelect: (panel: Panel) => void;
+  slideDirection?: number;
+}) {
+  const exportState = { errorMessage: '', progress: { current: 0, total: 0 }, status: Status.Idle };
+
+  return (
+    <>
+      <div data-visual-smoke-section="professional-editor-rail">
+        <RightPanelSwitcher activePanel={activePanel} isInstantTransition={true} onPanelSelect={onPanelSelect} />
+      </div>
+      <div
+        className="min-h-0 min-w-0 overflow-hidden border-l border-editor-border"
+        data-visual-smoke-section="professional-editor-panel"
+      >
+        <ContextMenuProvider>
+          <EditorRightPanelHost
+            activeRightPanel={activePanel}
+            appSettings={null}
+            exportState={exportState}
+            handleSettingsChange={() => {}}
+            multiSelectedPaths={[professionalEditorShellImage.path]}
+            onLinkedVariantImported={() => {}}
+            onNavigateToCommunity={() => {}}
+            onOpenTetherCapture={() => {}}
+            renderedRightPanel={activePanel}
+            rootPaths={[]}
+            selectedImage={professionalEditorShellImage}
+            setExportState={() => {}}
+            slideDirection={slideDirection}
+          />
+        </ContextMenuProvider>
+      </div>
+    </>
+  );
+}
+
+function ProfessionalEditorShellVisualSmoke() {
+  const [activePanel, setActivePanel] = useState<Panel | null>(Panel.Adjustments);
+  useProfessionalEditorSmokeState();
+
+  return (
+    <main
+      className="h-full min-h-screen bg-editor-matte p-3 font-sans text-text-primary"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorShell}
+    >
+      <div className="flex h-[calc(100vh-24px)] min-h-0 gap-2 overflow-hidden">
+        <section className="flex min-w-0 flex-1 flex-col gap-2">
+          <div
+            className="flex min-h-11 shrink-0 items-center justify-between rounded-lg border border-editor-border bg-editor-panel px-3"
+            data-visual-smoke-section="professional-editor-toolbar"
+            data-testid="professional-editor-shell-toolbar"
+          >
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="truncate text-sm font-semibold">{copy.professionalEditorShell}</span>
+              <span className={editorChromeStatusChipClassName('success')}>{copy.professionalEditorReady}</span>
+            </div>
+            <span className={editorChromeStatusChipClassName('warning')}>{copy.professionalEditorSoftProof}</span>
+          </div>
+          <ProfessionalEditorCanvasWell />
+          <div
+            data-visual-smoke-section="professional-editor-bottom-bar"
+            data-testid="professional-editor-shell-bottom-bar"
+          >
+            <ProfessionalEditorBottomBar />
+          </div>
+        </section>
+
+        <div className="w-2 shrink-0 rounded bg-editor-matte" data-testid="professional-editor-shell-resizer" />
+
+        <aside
+          className="grid h-full min-w-0 overflow-hidden rounded-lg border border-editor-border bg-editor-panel"
+          data-testid="professional-editor-shell-right-panel"
+          style={{ gridTemplateColumns: '42px minmax(0, 360px)' }}
+        >
+          <ProfessionalEditorPanelHost activePanel={activePanel} onPanelSelect={setActivePanel} />
+        </aside>
+      </div>
+    </main>
+  );
+}
+
+function ProfessionalEditorCompactPortraitVisualSmoke() {
+  const [activePanel, setActivePanel] = useState<Panel | null>(Panel.Color);
+  useProfessionalEditorSmokeState();
+
+  return (
+    <main
+      className="h-full min-h-screen bg-editor-matte p-2 font-sans text-text-primary"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorCompactPortrait}
+    >
+      <div className="flex h-[calc(100vh-16px)] min-h-0 flex-col gap-2 overflow-hidden">
+        <div
+          className="flex min-h-10 shrink-0 items-center justify-between rounded-lg border border-editor-border bg-editor-panel px-2"
+          data-visual-smoke-section="professional-editor-compact-toolbar"
+          data-testid="professional-editor-compact-toolbar"
+        >
+          <span className="truncate text-sm font-semibold">{copy.professionalEditorCompactPortrait}</span>
+          <span className={editorChromeStatusChipClassName('info')}>{copy.professionalEditorCompact}</span>
+        </div>
+
+        <div className="min-h-[250px] flex-1 overflow-hidden">
+          <ProfessionalEditorCanvasWell portrait />
+        </div>
+
+        <section
+          className="flex min-h-[360px] shrink-0 flex-col overflow-hidden rounded-lg border border-editor-border bg-editor-panel"
+          data-testid="professional-editor-compact-panel-shell"
+        >
+          <div className="min-h-0 flex-1 overflow-hidden" data-visual-smoke-section="professional-editor-compact-panel">
+            <ContextMenuProvider>
+              <EditorRightPanelHost
+                activeRightPanel={activePanel}
+                appSettings={null}
+                exportState={{ errorMessage: '', progress: { current: 0, total: 0 }, status: Status.Idle }}
+                handleSettingsChange={() => {}}
+                multiSelectedPaths={[professionalEditorShellImage.path]}
+                onLinkedVariantImported={() => {}}
+                onNavigateToCommunity={() => {}}
+                onOpenTetherCapture={() => {}}
+                renderedRightPanel={activePanel}
+                rootPaths={[]}
+                selectedImage={professionalEditorShellImage}
+                setExportState={() => {}}
+                slideDirection={0}
+              />
+            </ContextMenuProvider>
+          </div>
+          <div
+            className="shrink-0 border-t border-editor-border"
+            data-visual-smoke-section="professional-editor-compact-switcher"
+          >
+            <RightPanelSwitcher
+              activePanel={activePanel}
+              isInstantTransition={true}
+              layout="horizontal"
+              onPanelSelect={setActivePanel}
+            />
+          </div>
+          <div
+            className="shrink-0 border-t border-editor-border"
+            data-visual-smoke-section="professional-editor-compact-bottom-bar"
+            data-testid="professional-editor-compact-bottom-bar"
+          >
+            <ProfessionalEditorBottomBar />
+          </div>
+        </section>
+      </div>
+    </main>
+  );
+}
+
 const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.AdjustmentsPanelRetune]: AdjustmentsPanelRetuneVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.AgentChatUi]: AgentChatVisualSmoke,
@@ -491,6 +752,8 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.PanoramaProcessingCommand]: PanoramaProcessingCommandVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.PanoramaSavedReview]: PanoramaSavedReviewVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.PanoramaUi]: PanoramaVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorCompactPortrait]: ProfessionalEditorCompactPortraitVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorShell]: ProfessionalEditorShellVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorTokens]: ProfessionalEditorTokensVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawModalReview]: SuperResolutionPrivateRawModalReviewSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawUi]: SuperResolutionPrivateRawVisualSmoke,
@@ -1485,6 +1748,8 @@ const copy = {
   colorRangeReceiptTitle: 'Range mask receipt',
   colorRangeReplayReady: 'Replay ready',
   professionalEditorTokens: 'Professional editor tokens',
+  professionalEditorShell: 'Professional editor shell',
+  professionalEditorCompactPortrait: 'Professional editor compact portrait',
   professionalEditorMatte: 'matte',
   professionalEditorModeRail: 'Editor mode rail',
   professionalEditorAdjust: 'Adjust',
@@ -1493,13 +1758,16 @@ const copy = {
   professionalEditorHover: 'Hover',
   professionalEditorActive: 'Active',
   professionalEditorControlStates: 'Control states',
+  professionalEditorCompact: 'compact',
   professionalEditorFocus: 'focus',
+  professionalEditorPreviewReady: 'RAW preview ready',
   professionalEditorReset: 'Reset',
   professionalEditorDisabled: 'Disabled',
   professionalEditorLoading: 'Loading',
   professionalEditorCompactRow: 'Compact inspector row',
   professionalEditorReady: 'ready',
   professionalEditorRailSize: '42 px rail',
+  professionalEditorSoftProof: 'soft proof',
   focusStackSmoke: 'Focus Stack Smoke',
   focusReview: 'Focus review',
   focusDryRunPreview: 'Dry-run preview',
