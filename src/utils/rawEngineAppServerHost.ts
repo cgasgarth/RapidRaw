@@ -3,7 +3,12 @@ import {
   createRawEngineLocalAppServerBridge,
   RawEngineLocalAppServerCommandType,
 } from '../../packages/rawengine-schema/src/localAppServerBridge';
-import { rawEngineToolRegistryV1Schema } from '../../packages/rawengine-schema/src/rawEngineSchemas';
+import {
+  type RawEngineToolRegistryV1,
+  rawEngineAppServerToolCallValidationV1Schema,
+  rawEngineToolRegistryV1Schema,
+} from '../../packages/rawengine-schema/src/rawEngineSchemas';
+import { rawEngineDefaultToolRegistryV1 } from '../../packages/rawengine-schema/src/toolRegistry';
 import {
   AgentRuntimeId,
   type RawEngineAppServerAuditEntry,
@@ -1016,6 +1021,77 @@ const getDryRunFlag = (command: unknown): boolean | undefined => {
   return typeof command.dryRun === 'boolean' ? command.dryRun : undefined;
 };
 
+const getApprovalRequirement = (command: unknown): unknown => {
+  if (typeof command !== 'object' || command === null || !('approval' in command)) return undefined;
+  return command.approval;
+};
+
+const mergeRawEngineToolRegistries = (...registries: RawEngineToolRegistryV1[]): RawEngineToolRegistryV1 =>
+  rawEngineToolRegistryV1Schema.parse({
+    schemaVersion: 1,
+    tools: [...new Map(registries.flatMap((registry) => registry.tools).map((tool) => [tool.toolName, tool])).values()],
+  });
+
+const buildRawEngineAppServerToolCallValidationRejection = ({
+  activeRegistry,
+  request,
+}: {
+  activeRegistry: RawEngineToolRegistryV1;
+  request: RawEngineAppServerToolDispatchRequest;
+}): RawEngineAppServerToolDispatchResponse | null => {
+  const declaredToolName = request.toolCall?.toolName ?? request.runtimeToolName;
+  const toolDefinition = activeRegistry.tools.find((tool) => tool.toolName === declaredToolName);
+  if (
+    toolDefinition === undefined &&
+    request.toolCall === undefined &&
+    isApprovedAgentAppServerToolName(declaredToolName)
+  ) {
+    return null;
+  }
+
+  const fallbackApproval = {
+    approvalClass: toolDefinition?.approvalClass ?? 'safe_read',
+    reason: 'Host validation fallback for malformed app-server command arguments.',
+    state: toolDefinition?.mutates ? 'pending' : 'not_required',
+  };
+  const validation = rawEngineAppServerToolCallValidationV1Schema.safeParse({
+    registry: activeRegistry,
+    schemaVersion: 1,
+    toolCall: {
+      approval: request.toolCall?.approval ?? getApprovalRequirement(request.arguments) ?? fallbackApproval,
+      arguments: request.arguments,
+      dryRun: request.toolCall?.dryRun ?? getDryRunFlag(request.arguments) ?? Boolean(toolDefinition?.requiresDryRun),
+      inputSchemaName: request.toolCall?.inputSchemaName ?? toolDefinition?.inputSchemaName ?? 'CommandEnvelopeV1',
+      ...(request.toolCall?.itemId === undefined ? {} : { itemId: request.toolCall.itemId }),
+      jsonRpcRequestId: request.toolCall?.jsonRpcRequestId ?? request.requestId,
+      protocol: 'codex_app_server_json_rpc',
+      schemaVersion: 1,
+      threadId: request.toolCall?.threadId ?? `thread_${request.requestId}`,
+      toolKind: request.toolCall?.toolKind ?? toolDefinition?.toolKind ?? 'apply',
+      toolName: declaredToolName,
+      transport: 'stdio',
+      turnId: request.toolCall?.turnId ?? `turn_${request.requestId}`,
+    },
+  });
+
+  if (validation.success) return null;
+
+  return rawEngineAppServerToolDispatchResponseSchema.parse({
+    commandType: getCommandType(request.arguments) ?? request.runtimeToolName,
+    dispatchStatus: 'rejected',
+    message: `App-server tool call validation rejected ${request.runtimeToolName}.`,
+    requestId: request.requestId,
+    runtime: AgentRuntimeId.AppServer,
+    runtimeToolName: request.runtimeToolName,
+    schemaIssues: validation.error.issues.map((issue) => ({
+      message: issue.message,
+      path: issue.path.map((part) => String(part)),
+    })),
+    status: RawEngineAppServerResponseStatus.Ok,
+    transport: RAW_ENGINE_APP_SERVER_HOST_MANIFEST.transport,
+  });
+};
+
 const rejectToolDispatch = ({
   commandType,
   message,
@@ -1221,6 +1297,17 @@ export const buildRawEngineAppServerToolDispatchResponse = async (
     });
   }
 
+  const bridge = createRawEngineLocalAppServerBridge();
+  const registryResult = await bridge.dispatch(buildRawEngineLocalAppServerToolRegistryQuery(request.requestId));
+  const activeRegistry = registryResult.ok
+    ? mergeRawEngineToolRegistries(
+        rawEngineDefaultToolRegistryV1,
+        rawEngineToolRegistryV1Schema.parse(registryResult.result),
+      )
+    : rawEngineDefaultToolRegistryV1;
+  const validationRejection = buildRawEngineAppServerToolCallValidationRejection({ activeRegistry, request });
+  if (validationRejection !== null) return validationRejection;
+
   try {
     const agentToolResponse = await dispatchAgentAppServerTool(request);
     if (agentToolResponse !== null) return agentToolResponse;
@@ -1237,8 +1324,6 @@ export const buildRawEngineAppServerToolDispatchResponse = async (
     });
   }
 
-  const bridge = createRawEngineLocalAppServerBridge();
-  const registryResult = await bridge.dispatch(buildRawEngineLocalAppServerToolRegistryQuery(request.requestId));
   if (!registryResult.ok) {
     return rawEngineAppServerToolDispatchResponseSchema.parse({
       dispatchStatus: 'rejected',
@@ -1360,21 +1445,27 @@ export const buildRawEngineAppServerHostResponseEnvelopeAsync = async (
 };
 
 export const buildRawEngineAppServerAuditEntry = ({
+  mutates = false,
+  outcome = RawEngineAppServerAuditOutcome.Success,
   requestId,
   timestampIso,
+  toolKind = RawEngineAppServerToolKind.Read,
   toolName,
 }: {
+  mutates?: boolean;
+  outcome?: RawEngineAppServerAuditEntry['outcome'];
   requestId: string;
   timestampIso: string;
-  toolName: RawEngineAppServerHostManifest['tools'][number]['toolName'];
+  toolKind?: RawEngineAppServerAuditEntry['toolKind'];
+  toolName: RawEngineAppServerHostManifest['tools'][number]['toolName'] | string;
 }): RawEngineAppServerAuditEntry =>
   rawEngineAppServerAuditEntrySchema.parse({
     affectedArtifactIds: [],
-    mutates: false,
-    outcome: RawEngineAppServerAuditOutcome.Success,
+    mutates,
+    outcome,
     requestId,
     timestampIso,
-    toolKind: RawEngineAppServerToolKind.Read,
+    toolKind,
     toolName,
     transport: RAW_ENGINE_APP_SERVER_HOST_MANIFEST.transport,
   });
