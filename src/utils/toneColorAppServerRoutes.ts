@@ -22,6 +22,9 @@ const applyRoute = {
 const executableCommandTypes = new Set<ToneColorAppServerCommandType>([
   'toneColor.adjustHsl',
   'toneColor.adjustSkinToneUniformity',
+  'toneColor.setChannelMixer',
+  'toneColor.setColorBalanceRgb',
+  'toneColor.setColorGrading',
   'toneColor.setBasicTone',
 ]);
 

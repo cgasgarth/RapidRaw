@@ -288,6 +288,31 @@ export const rawEngineLocalAppServerSkinToneUniformityCommandV1Schema = toneColo
   },
 );
 
+const RAW_ENGINE_LOCAL_APP_SERVER_COLOR_ADJUSTMENT_COMMAND_TYPES = new Set([
+  'toneColor.setChannelMixer',
+  'toneColor.setColorBalanceRgb',
+  'toneColor.setColorGrading',
+] as const);
+
+const isRawEngineLocalAppServerColorAdjustmentCommand = (
+  command: ToneColorCommandEnvelopeV1,
+): command is ColorAdjustmentCommandV1 =>
+  RAW_ENGINE_LOCAL_APP_SERVER_COLOR_ADJUSTMENT_COMMAND_TYPES.has(
+    command.commandType as ColorAdjustmentCommandV1['commandType'],
+  );
+
+export const rawEngineLocalAppServerColorAdjustmentCommandV1Schema = toneColorCommandEnvelopeV1Schema.superRefine(
+  (command, context) => {
+    if (!isRawEngineLocalAppServerColorAdjustmentCommand(command)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Local app-server bridge expected a color grading, channel mixer, or RGB color balance command.',
+        path: ['commandType'],
+      });
+    }
+  },
+);
+
 export type RawEngineLocalAppServerToolRegistryQueryV1 = z.infer<
   typeof rawEngineLocalAppServerToolRegistryQueryV1Schema
 >;
@@ -320,6 +345,9 @@ export type RawEngineLocalAppServerBasicToneCommandV1 = z.infer<typeof rawEngine
 export type RawEngineLocalAppServerHslCommandV1 = z.infer<typeof rawEngineLocalAppServerHslCommandV1Schema>;
 export type RawEngineLocalAppServerSkinToneUniformityCommandV1 = z.infer<
   typeof rawEngineLocalAppServerSkinToneUniformityCommandV1Schema
+>;
+export type RawEngineLocalAppServerColorAdjustmentCommandV1 = z.infer<
+  typeof rawEngineLocalAppServerColorAdjustmentCommandV1Schema
 >;
 
 export const rawEngineLocalAppServerAiToolCommandV1Schema = aiToolCommandEnvelopeV1Schema;
@@ -378,6 +406,10 @@ type BasicToneCommandV1 = Extract<ToneColorCommandEnvelopeV1, { commandType: 'to
 type BasicToneAdjustmentParameterKeyV1 = Exclude<
   keyof BasicToneCommandV1['parameters'],
   'acceptedDryRunPlanHash' | 'acceptedDryRunPlanId'
+>;
+type ColorAdjustmentCommandV1 = Extract<
+  ToneColorCommandEnvelopeV1,
+  { commandType: 'toneColor.setChannelMixer' | 'toneColor.setColorBalanceRgb' | 'toneColor.setColorGrading' }
 >;
 
 const rawEngineLocalAppServerAuditCommandProbeV1Schema = z.looseObject({
@@ -988,6 +1020,103 @@ const buildSkinToneUniformityMutationResult = (
     undoRevision: command.expectedGraphRevision,
     warnings: [...SKIN_TONE_UNIFORMITY_WARNINGS],
   });
+
+const COLOR_ADJUSTMENT_COMMAND_METADATA = {
+  'toneColor.setChannelMixer': {
+    changedNodePrefix: 'tone_color_channel_mixer',
+    module: 'channel_mixer',
+    planSlug: 'channel_mixer',
+  },
+  'toneColor.setColorBalanceRgb': {
+    changedNodePrefix: 'tone_color_color_balance_rgb',
+    module: 'color_balance_rgb',
+    planSlug: 'color_balance_rgb',
+  },
+  'toneColor.setColorGrading': {
+    changedNodePrefix: 'tone_color_color_grading',
+    module: 'color_grading',
+    planSlug: 'color_grading',
+  },
+} as const satisfies Record<
+  ColorAdjustmentCommandV1['commandType'],
+  { changedNodePrefix: string; module: ToneColorDryRunResultV1['parameterDiff'][number]['module']; planSlug: string }
+>;
+
+const buildColorAdjustmentPlanKey = (command: ColorAdjustmentCommandV1): string =>
+  JSON.stringify([command.expectedGraphRevision, command.target, command.commandType, command.parameters]);
+
+const buildColorAdjustmentPlanId = (command: ColorAdjustmentCommandV1): string =>
+  `dryrun_${COLOR_ADJUSTMENT_COMMAND_METADATA[command.commandType].planSlug}_${stableBasicToneHash(
+    buildColorAdjustmentPlanKey(command),
+  )}`;
+
+const buildColorAdjustmentPlanHash = (command: ColorAdjustmentCommandV1): string =>
+  `sha256:${COLOR_ADJUSTMENT_COMMAND_METADATA[command.commandType].planSlug}:${stableBasicToneHash(
+    `${buildColorAdjustmentPlanId(command)}:${buildColorAdjustmentPlanKey(command)}`,
+  )}`;
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const buildColorAdjustmentParameterDiffs = (
+  command: ColorAdjustmentCommandV1,
+): ToneColorDryRunResultV1['parameterDiff'] => {
+  const metadata = COLOR_ADJUSTMENT_COMMAND_METADATA[command.commandType];
+  const diffs: ToneColorDryRunResultV1['parameterDiff'] = [];
+  const visit = (value: unknown, path: string): void => {
+    if (isRecord(value)) {
+      for (const [key, nestedValue] of Object.entries(value)) {
+        visit(nestedValue, `${path}/${key}`);
+      }
+      return;
+    }
+
+    diffs.push({
+      module: metadata.module,
+      path,
+      value,
+    });
+  };
+
+  visit(command.parameters, '/parameters');
+  return diffs;
+};
+
+const buildColorAdjustmentDryRunResult = (command: ColorAdjustmentCommandV1): ToneColorDryRunResultV1 =>
+  toneColorDryRunResultV1Schema.parse({
+    colorPipeline: command.colorPipeline,
+    commandId: command.commandId,
+    commandType: command.commandType,
+    correlationId: command.correlationId,
+    dryRun: true,
+    dryRunPlanHash: buildColorAdjustmentPlanHash(command),
+    dryRunPlanId: buildColorAdjustmentPlanId(command),
+    mutates: false,
+    parameterDiff: buildColorAdjustmentParameterDiffs(command),
+    predictedGraphRevision: `${command.expectedGraphRevision}:preview:${command.commandId}`,
+    previewArtifacts: [],
+    schemaVersion: command.schemaVersion,
+    sourceGraphRevision: command.expectedGraphRevision,
+    warnings: [],
+  });
+
+const buildColorAdjustmentMutationResult = (command: ColorAdjustmentCommandV1): ToneColorMutationResultV1 => {
+  const metadata = COLOR_ADJUSTMENT_COMMAND_METADATA[command.commandType];
+  return toneColorMutationResultV1Schema.parse({
+    appliedGraphRevision: `${command.expectedGraphRevision}:apply:${command.commandId}`,
+    changedNodeIds: [`${metadata.changedNodePrefix}:${command.target.kind}`],
+    colorPipeline: command.colorPipeline,
+    commandId: command.commandId,
+    commandType: command.commandType,
+    correlationId: command.correlationId,
+    dryRun: false,
+    mutates: true,
+    schemaVersion: command.schemaVersion,
+    sourceGraphRevision: command.expectedGraphRevision,
+    undoRevision: command.expectedGraphRevision,
+    warnings: [],
+  });
+};
 
 const buildAiToolPlanId = (command: RawEngineLocalAppServerAiToolCommandV1): string =>
   `dryrun_${command.parameters.capability}_${command.commandId}`;
@@ -1609,6 +1738,7 @@ export class RawEngineLocalAppServerBridge {
   readonly #acceptedBasicToneDryRunPlanKeys: Map<string, { planHash: string; planId: string }> = new Map();
   readonly #acceptedDetailEffectsDryRunPlanKeys: Map<string, { planHash: string; planId: string }> = new Map();
   readonly #acceptedLensProfileDryRunPlanKeys: Map<string, { planHash: string; planId: string }> = new Map();
+  readonly #acceptedColorAdjustmentDryRunPlanKeys: Set<string> = new Set<string>();
   readonly #acceptedHslDryRunPlanKeys: Set<string> = new Set<string>();
   readonly #acceptedSkinToneUniformityDryRunPlanKeys: Set<string> = new Set<string>();
   readonly #auditEvents: Array<RawEngineLocalAppServerAuditEventV1> = [];
@@ -1872,6 +2002,31 @@ export class RawEngineLocalAppServerBridge {
       schema: rawEngineLocalAppServerSkinToneUniformityCommandV1Schema,
     });
 
+    for (const commandType of RAW_ENGINE_LOCAL_APP_SERVER_COLOR_ADJUSTMENT_COMMAND_TYPES) {
+      this.#commandBus.register({
+        commandType,
+        execute: (command) => {
+          const parsedCommand = rawEngineLocalAppServerColorAdjustmentCommandV1Schema.parse(command);
+          if (!isRawEngineLocalAppServerColorAdjustmentCommand(parsedCommand)) {
+            throw new Error('Local app-server bridge expected a supported color adjustment command.');
+          }
+          if (parsedCommand.dryRun) {
+            const dryRunResult = buildColorAdjustmentDryRunResult(parsedCommand);
+            this.#acceptedColorAdjustmentDryRunPlanKeys.add(buildColorAdjustmentPlanKey(parsedCommand));
+            return dryRunResult;
+          }
+
+          const planKey = buildColorAdjustmentPlanKey(parsedCommand);
+          if (!this.#acceptedColorAdjustmentDryRunPlanKeys.has(planKey)) {
+            throw new Error('Local app-server bridge rejected color adjustment apply without a matching dry-run.');
+          }
+
+          return buildColorAdjustmentMutationResult(parsedCommand);
+        },
+        schema: rawEngineLocalAppServerColorAdjustmentCommandV1Schema,
+      });
+    }
+
     this.#commandBus.register({
       commandType: 'detailEffects.dryRunAdjustments',
       execute: (command) => {
@@ -2080,7 +2235,7 @@ export const buildRawEngineLocalAppServerBridgeCapabilities = (
 ): {
   commandTypes: string[];
   mutatingCommands: boolean;
-  runtimeStatus: 'basic_tone_hsl_skin_tone_ai_mask_and_ai_enhancement_dry_run_apply';
+  runtimeStatus: 'basic_tone_hsl_skin_tone_color_adjustments_ai_mask_and_ai_enhancement_dry_run_apply';
 } => {
   const commandTypes = bridge.listCommandTypes().sort((left, right) => left.localeCompare(right));
 
@@ -2091,8 +2246,11 @@ export const buildRawEngineLocalAppServerBridgeCapabilities = (
       commandTypes.includes('ai.mask.applySubject') ||
       commandTypes.includes('toneColor.adjustHsl') ||
       commandTypes.includes('toneColor.adjustSkinToneUniformity') ||
+      commandTypes.includes('toneColor.setChannelMixer') ||
+      commandTypes.includes('toneColor.setColorBalanceRgb') ||
+      commandTypes.includes('toneColor.setColorGrading') ||
       commandTypes.includes('toneColor.setBasicTone'),
-    runtimeStatus: 'basic_tone_hsl_skin_tone_ai_mask_and_ai_enhancement_dry_run_apply',
+    runtimeStatus: 'basic_tone_hsl_skin_tone_color_adjustments_ai_mask_and_ai_enhancement_dry_run_apply',
   };
 };
 
