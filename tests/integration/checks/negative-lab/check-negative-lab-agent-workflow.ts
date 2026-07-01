@@ -74,6 +74,19 @@ const runtimeDryRun = runtimeBus.execute({
 if (runtimeDryRun.kind !== 'dry_run') {
   throw new Error('Negative Lab runtime bus did not return a dry-run result.');
 }
+if (runtimeDryRun.dryRun.changeSet.createdPositiveVariantIds.length !== 0) {
+  throw new Error('Negative Lab runtime dry-run must not create positive variants.');
+}
+if (
+  runtimeDryRun.dryRun.proof?.runtimePreview.renderedPositivePreview !== true ||
+  runtimeDryRun.dryRun.proof.runtimePreview.dryRunMode !== 'runtime_preview_non_mutating' ||
+  runtimeDryRun.dryRun.proof.runtimePreview.previewRenderer !== 'rawengine_density_preview_runtime' ||
+  runtimeDryRun.dryRun.proof.runtimePreview.previewArtifactHandle.storage !== 'temp_cache' ||
+  runtimeDryRun.dryRun.proof.runtimePreview.baseFogSampleSummary.sampleCount <= 0 ||
+  !runtimeDryRun.dryRun.proof.runtimePreview.planHash.startsWith('sha256:')
+) {
+  throw new Error('Negative Lab runtime dry-run did not expose rendered preview/base-fog/provenance proof.');
+}
 const runtimeApplyRequest = negativeLabApplyPlanRequestV1Schema.parse({
   ...sampleNegativeLabApplyPlanRequestV1,
   acceptedDryRunPlanHash: runtimeDryRun.acceptedDryRunPlanHash,
@@ -161,6 +174,9 @@ if (
   runtimeV2DryRun.dryRun.proof.acceptedSuggestionSummary.state !== 'suggested_only' ||
   runtimeV2DryRun.dryRun.proof.acceptedSuggestionSummary.acceptedFrameCount !== 0 ||
   runtimeV2DryRun.dryRun.proof.selectedCrosstalkProvenance.provenance !== 'rawengine_process_profile' ||
+  runtimeV2DryRun.dryRun.proof.runtimePreview.densityCurveSummary.outputTag !== 'export_linear' ||
+  runtimeV2DryRun.dryRun.proof.runtimePreview.previewArtifactHandle.storage !== 'temp_cache' ||
+  runtimeV2DryRun.dryRun.proof.runtimePreview.sourceImageIdentity.frameIds.join('|') !== 'frame_0001|frame_0002' ||
   runtimeV2DryRun.dryRun.proof.previewExportArtifactParity.previewArtifactIds.length !== 1 ||
   runtimeV2DryRun.dryRun.proof.warningCodes[0] !== 'low_acquisition_confidence'
 ) {
@@ -172,6 +188,7 @@ if (
   runtimeV2Apply.apply.proof?.algorithm.algorithmId !== 'negative_density_print_v2' ||
   runtimeV2Apply.apply.proof.acceptedSuggestionSummary.state !== 'accepted_into_plan' ||
   runtimeV2Apply.apply.proof.acceptedSuggestionSummary.acceptedFrameCount !== 2 ||
+  runtimeV2Apply.apply.proof.runtimePreview.renderedPositivePreview !== true ||
   runtimeV2Apply.apply.proof.previewExportArtifactParity.exportArtifactIds[0] !==
     runtimeV2Apply.apply.changeSet.artifactHandles[0]?.artifactId ||
   !runtimeV2Apply.apply.proof.previewExportArtifactParity.dimensionsMatch ||
@@ -326,7 +343,7 @@ const fixture = rawEngineAgentReplayFixtureV1Schema.parse({
           toolKind: 'dry_run',
           toolName: 'negativelab.preview_conversion',
         },
-        warnings: ['runtime_bus_synthetic_no_real_scan_quality_claim'],
+        warnings: ['runtime_preview_non_mutating_no_export_written'],
       },
       approval: {
         approvalClass: 'preview_only',
@@ -347,7 +364,7 @@ const fixture = rawEngineAgentReplayFixtureV1Schema.parse({
       stepId: 'negative_lab_agent_preview',
       toolKind: 'dry_run',
       toolName: 'negativelab.preview_conversion',
-      warnings: ['runtime_bus_synthetic_no_real_scan_quality_claim'],
+      warnings: ['runtime_preview_non_mutating_no_export_written'],
     },
     {
       auditLog: {
@@ -369,7 +386,7 @@ const fixture = rawEngineAgentReplayFixtureV1Schema.parse({
           toolKind: 'apply',
           toolName: 'negativelab.apply_planned_command',
         },
-        warnings: ['runtime_bus_synthetic_no_real_scan_quality_claim'],
+        warnings: ['runtime_preview_non_mutating_no_export_written'],
       },
       approval: {
         approvalClass: 'edit_apply',
@@ -391,12 +408,12 @@ const fixture = rawEngineAgentReplayFixtureV1Schema.parse({
       stepId: 'negative_lab_agent_apply',
       toolKind: 'apply',
       toolName: 'negativelab.apply_planned_command',
-      warnings: ['runtime_bus_synthetic_no_real_scan_quality_claim'],
+      warnings: ['runtime_preview_non_mutating_no_export_written'],
     },
   ],
   target,
   validationProfile: 'golden_replay',
-  warnings: ['runtime_bus_synthetic_no_real_scan_quality_claim'],
+  warnings: ['runtime_preview_non_mutating_no_export_written'],
 });
 
 if (fixture.steps.length !== 2 || fixture.finalGraphRevision !== runtimeApply.apply.appliedGraphRevision) {
