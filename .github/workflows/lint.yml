@@ -208,7 +208,7 @@ jobs:
           echo "args=" >> "$GITHUB_OUTPUT"
 
       - name: Run schema contract checks when relevant
-        run: bun tests/integration/checks/check-schema-contract-gate.ts ${{ steps.schema-contract-files.outputs.args }}
+        run: bun scripts/checks/ci/check-schema-contract-gate.ts ${{ steps.schema-contract-files.outputs.args }}
 
   macos-smoke-decision:
     name: 'ci: macOS smoke decision'
@@ -240,7 +240,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          bun tests/integration/checks/check-ci-classify-macos-smoke.ts ${{ steps.macos-smoke-files.outputs.args }} > .macos-smoke.outputs
+          bun scripts/checks/ci/check-ci-classify-macos-smoke.ts ${{ steps.macos-smoke-files.outputs.args }} > .macos-smoke.outputs
           cat .macos-smoke.outputs >> "$GITHUB_OUTPUT"
           cat .macos-smoke.outputs
 

@@ -20,9 +20,13 @@ const CHECKS = z
       .strict(),
   )
   .parse([
-    { args: ['run', 'check:hdr-alignment-smoke'], budgetMs: 1_000, id: 'alignment-smoke' },
-    { args: ['run', 'check:hdr-deghosting-smoke'], budgetMs: 1_000, id: 'deghosting-smoke' },
-    { args: ['run', 'check:hdr-merge-weighting-smoke'], budgetMs: 1_000, id: 'merge-weighting-smoke' },
+    { args: ['tests/integration/checks/hdr/check-hdr-alignment-smoke.ts'], budgetMs: 1_000, id: 'alignment-smoke' },
+    { args: ['tests/integration/checks/hdr/check-hdr-deghosting-smoke.ts'], budgetMs: 1_000, id: 'deghosting-smoke' },
+    {
+      args: ['tests/integration/checks/hdr/check-hdr-merge-weighting-smoke.ts'],
+      budgetMs: 1_000,
+      id: 'merge-weighting-smoke',
+    },
   ]);
 
 const outputDir = resolve('artifacts/performance-smoke');

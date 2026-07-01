@@ -243,7 +243,9 @@ async function writePgm(filePath, pixels, width, height) {
 }
 
 const startedAt = performance.now();
-const sharpnessCheck = spawnSync('bun', ['run', 'check:focus-sharpness-map-smoke'], { encoding: 'utf8' });
+const sharpnessCheck = spawnSync('bun', ['tests/integration/checks/focus/check-focus-sharpness-map-smoke.ts'], {
+  encoding: 'utf8',
+});
 if (sharpnessCheck.status !== 0) {
   writeBoundedOutput('stdout', sharpnessCheck.stdout);
   writeBoundedOutput('stderr', sharpnessCheck.stderr);
