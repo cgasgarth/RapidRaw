@@ -25,6 +25,12 @@ const reportSchema = z
     paintMaskHash: z.string().min(1),
     paintScreenshot: z.literal(PAINT_SCREENSHOT_PATH),
     pointCounts: z.array(z.number().int().min(2)).length(2),
+    pressureApplyMaskHash: z.string().min(1),
+    pressureCoverage: z.number().positive(),
+    pressureDryRunMaskHash: z.string().min(1),
+    pressureMaskHash: z.string().min(1),
+    pressurePointCount: z.number().int().min(1),
+    pressureUsed: z.literal(true),
     refineBrushFeather: z.literal(64),
     refineBrushSize: z.literal(96),
     schemaVersion: z.literal(1),
@@ -41,6 +47,17 @@ if (report.finalCoverage >= report.paintCoverage) {
 }
 if (report.finalMaskHash === report.paintMaskHash) {
   throw new Error('Expected final mask hash to differ from paint-only hash.');
+}
+if (report.pressureCoverage >= report.paintCoverage) {
+  throw new Error(
+    `Expected pressure replay to reduce alpha coverage: ${report.paintCoverage} -> ${report.pressureCoverage}`,
+  );
+}
+if (report.pressureDryRunMaskHash !== report.pressureApplyMaskHash) {
+  throw new Error('Expected pressure dry-run/apply mask hashes to match.');
+}
+if (report.pressureMaskHash !== report.pressureDryRunMaskHash) {
+  throw new Error('Expected pressure render hash to match dry-run artifact hash.');
 }
 
 pngDimensionsSchema.parse(await readPngDimensions(FINAL_SCREENSHOT_PATH));

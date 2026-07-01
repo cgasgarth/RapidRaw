@@ -82,6 +82,58 @@ const buildCommand = (mode: 'paint' | 'erase', dryRun: boolean) =>
     },
   });
 
+const buildPressureCommand = (dryRun: boolean, pressure: boolean) =>
+  layerMaskCommandEnvelopeV1Schema.parse({
+    actor: {
+      id: 'codex-app-server',
+      kind: ActorKind.Agent,
+      sessionId: 'session_brush_mask_pressure_command',
+    },
+    approval: {
+      approvalClass: dryRun ? ApprovalClass.PreviewOnly : ApprovalClass.EditApply,
+      reason: dryRun
+        ? 'Preview pressure-aware brush stroke alpha before mutating the edit graph.'
+        : 'Apply the accepted pressure-aware brush mask.',
+      state: dryRun ? 'not_required' : 'approved',
+    },
+    commandId: dryRun
+      ? `command_brush_mask_pressure_${pressure ? 'pen' : 'mouse'}_preview`
+      : `command_brush_mask_pressure_${pressure ? 'pen' : 'mouse'}_apply`,
+    commandType: 'layerMask.createBrushMask',
+    correlationId: `corr_brush_mask_pressure_${pressure ? 'pen' : 'mouse'}`,
+    dryRun,
+    expectedGraphRevision: 'graph_rev_brush_mask_pressure_source',
+    idempotencyKey: dryRun
+      ? `idem_brush_mask_pressure_${pressure ? 'pen' : 'mouse'}_preview`
+      : `idem_brush_mask_pressure_${pressure ? 'pen' : 'mouse'}_apply`,
+    parameters: {
+      maskName: `pressure ${pressure ? 'pen' : 'mouse'} brush proof`,
+      strokes: [
+        {
+          flow: 1,
+          hardness: 1,
+          mode: 'paint',
+          points: pressure
+            ? [
+                { pressure: 0.25, x: 0, y: 0.5 },
+                { pressure: 0.5, x: 1, y: 0.5 },
+              ]
+            : [
+                { x: 0, y: 0.5 },
+                { x: 1, y: 0.5 },
+              ],
+          radiusPx: 0.49,
+          strokeId: `stroke_pressure_${pressure ? 'pen' : 'mouse'}_horizontal`,
+        },
+      ],
+    },
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    target: {
+      imagePath: '/photos/session/IMG_0001.CR3',
+      kind: 'image',
+    },
+  });
+
 const failures: Array<string> = [];
 const nearlyEqual = (left: number, right: number): boolean => Math.abs(left - right) <= 0.000001;
 const alphaMatches = (actual: ReadonlyArray<number>, expected: ReadonlyArray<number>): boolean =>
@@ -119,6 +171,54 @@ for (const mode of ['paint', 'erase'] as const) {
   if (!applyResult.mutates || applyResult.changedMaskIds[0] !== render.maskId) {
     failures.push(`${mode}: apply must mutate the accepted brush mask id.`);
   }
+  if (applyResult.maskArtifacts?.[0]?.contentHash !== render.contentHash) {
+    failures.push(`${mode}: apply must expose the same mask content hash as dry-run/render.`);
+  }
+  if (applyResult.maskProvenance?.contentHash !== render.contentHash) {
+    failures.push(`${mode}: apply must preserve deterministic mask provenance.`);
+  }
+}
+
+const mousePressureCommand = buildPressureCommand(true, false);
+const penPressureCommand = buildPressureCommand(true, true);
+const mousePressureRender = renderBrushMask({
+  command: mousePressureCommand,
+  height: fixture.height,
+  width: fixture.width,
+});
+const penPressureRender = renderBrushMask({
+  command: penPressureCommand,
+  height: fixture.height,
+  width: fixture.width,
+});
+
+if (mousePressureRender.contentHash === penPressureRender.contentHash) {
+  failures.push(
+    'Pressure-aware brush replay must change the rendered mask hash versus the same stroke without pressure.',
+  );
+}
+if (penPressureRender.coverageSum >= mousePressureRender.coverageSum) {
+  failures.push('Lower pen pressure should reduce deterministic brush coverage.');
+}
+if (!penPressureRender.provenance.pressureUsed || penPressureRender.provenance.pressurePointCount !== 2) {
+  failures.push('Pressure-aware brush replay must record pressure provenance.');
+}
+if (mousePressureRender.provenance.pressureUsed || mousePressureRender.provenance.pressurePointCount !== 0) {
+  failures.push('Mouse brush replay must not record synthetic pressure provenance.');
+}
+
+const pressureRuntime = new BrushMaskCommandRuntime();
+const pressureDryRun = layerMaskDryRunResultV1Schema.parse(
+  pressureRuntime.dispatch(penPressureCommand, { height: fixture.height, width: fixture.width }),
+);
+const pressureApply = layerMaskMutationResultV1Schema.parse(
+  pressureRuntime.dispatch(buildPressureCommand(false, true), { height: fixture.height, width: fixture.width }),
+);
+if (pressureDryRun.maskArtifacts[0]?.contentHash !== pressureApply.maskArtifacts?.[0]?.contentHash) {
+  failures.push('Pressure dry-run/apply replay must expose matching mask content hashes.');
+}
+if (pressureApply.maskProvenance?.coverageSum !== penPressureRender.coverageSum) {
+  failures.push('Pressure apply provenance must preserve deterministic coverage sum.');
 }
 
 try {

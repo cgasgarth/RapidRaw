@@ -2065,6 +2065,18 @@ export const layerMaskMutationResultV1Schema = z
     commandType: layerMaskCommandTypeV1Schema,
     correlationId: z.string().trim().min(1),
     dryRun: z.literal(false),
+    maskArtifacts: z.array(artifactHandleV1Schema).optional(),
+    maskProvenance: z
+      .object({
+        baseMaskHash: z.string().trim().min(1),
+        contentHash: z.string().trim().min(1),
+        coverageSum: z.number().min(0),
+        pressurePointCount: z.number().int().min(0),
+        pressureUsed: z.boolean(),
+        strokeCount: z.number().int().min(1),
+      })
+      .strict()
+      .optional(),
     mutates: z.literal(true),
     schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
     sourceGraphRevision: z.string().trim().min(1),

@@ -32,6 +32,9 @@ const reportSchema = z
     coordinateSpace: z.literal(BRUSH_MASK_COMMAND_COORDINATE_SPACE),
     dryRunMaskHash: z.string().min(1),
     issue: z.literal(2888),
+    pressureApplyMaskHash: z.string().min(1),
+    pressureCommandHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    pressureDryRunMaskHash: z.string().min(1),
     renderMaskHash: z.string().min(1),
     schemaVersion: z.literal(1),
     strokeCount: z.literal(1),
@@ -125,6 +128,7 @@ for (const marker of [
   'updateRetouchHandlePoint(layerId, handle, point)',
   'recordBrushMaskCommandCapture(activeId, activeSubMask, nextParameters)',
   'buildBrushMaskCommandFromParameters(',
+  'withPointerPressure',
 ]) {
   if (!sourcePanel.includes(marker)) {
     throw new Error(`Brush command capture UI missing marker: ${marker}`);
@@ -174,6 +178,35 @@ if ('pressure' in (stroke.points[0] ?? {})) {
   throw new Error('Mouse brush capture must omit pressure when the input does not provide genuine pen pressure.');
 }
 
+const pressureParameters = {
+  lines: [
+    {
+      brushSize: 80,
+      feather: 0.35,
+      flow: 75,
+      points: [
+        { pressure: 0.25, x: 256, y: 384 },
+        { pressure: 0.5, x: 768, y: 384 },
+      ],
+      tool: 'brush',
+    },
+  ],
+};
+const pressureContext = {
+  ...context,
+  operationId: 'capture_pressure_001',
+};
+const pressureDryRunCommand = buildBrushMaskCommandFromParameters(pressureParameters, pressureContext, {
+  dryRun: true,
+});
+const pressureApplyCommand = buildBrushMaskCommandFromParameters(pressureParameters, pressureContext, {
+  dryRun: false,
+});
+const pressureStroke = pressureDryRunCommand.parameters.strokes[0];
+if (pressureStroke?.points[0]?.pressure !== 0.25 || pressureStroke.points[1]?.pressure !== 0.5) {
+  throw new Error('Pen brush capture must preserve normalized pressure values.');
+}
+
 const runtime = new BrushMaskCommandRuntime();
 const baseMask = {
   alpha: new Array<number>(15).fill(0),
@@ -185,6 +218,17 @@ const renderRequest = { baseMask, height: 3, width: 5 };
 const render = renderBrushMask({ ...renderRequest, command: dryRunCommand });
 const dryRunResult = layerMaskDryRunResultV1Schema.parse(runtime.dispatch(dryRunCommand, renderRequest));
 const applyResult = layerMaskMutationResultV1Schema.parse(runtime.dispatch(applyCommand, renderRequest));
+const pressureRender = renderBrushMask({ ...renderRequest, command: pressureDryRunCommand });
+if (pressureRender.contentHash === render.contentHash || pressureRender.coverageSum >= render.coverageSum) {
+  throw new Error('Pressure-aware brush capture must affect deterministic runtime coverage.');
+}
+const pressureRuntime = new BrushMaskCommandRuntime();
+const pressureDryRunResult = layerMaskDryRunResultV1Schema.parse(
+  pressureRuntime.dispatch(pressureDryRunCommand, renderRequest),
+);
+const pressureApplyResult = layerMaskMutationResultV1Schema.parse(
+  pressureRuntime.dispatch(pressureApplyCommand, renderRequest),
+);
 
 const report = reportSchema.parse({
   appliedGraphRevision: applyResult.appliedGraphRevision,
@@ -194,11 +238,15 @@ const report = reportSchema.parse({
     'captured points normalize into image-relative command coordinates',
     'paint/erase mode, feather-derived hardness, radius, and flow are command fields',
     'mouse capture omits pressure unless real pen pressure is supplied',
+    'pen capture preserves pressure and changes deterministic replay coverage',
     'dry-run must precede apply',
   ],
   coordinateSpace: BRUSH_MASK_COMMAND_COORDINATE_SPACE,
   dryRunMaskHash: dryRunResult.maskArtifacts[0]?.contentHash,
   issue: 2888,
+  pressureApplyMaskHash: pressureApplyResult.maskArtifacts?.[0]?.contentHash,
+  pressureCommandHash: hashJson(pressureDryRunCommand),
+  pressureDryRunMaskHash: pressureDryRunResult.maskArtifacts[0]?.contentHash,
   renderMaskHash: render.contentHash,
   schemaVersion: 1,
   strokeCount: dryRunCommand.parameters.strokes.length,
@@ -208,6 +256,12 @@ const report = reportSchema.parse({
 
 if (report.dryRunMaskHash !== report.renderMaskHash) {
   throw new Error('Brush dry-run artifact hash does not match rendered mask hash.');
+}
+if (report.pressureDryRunMaskHash !== pressureRender.contentHash) {
+  throw new Error('Pressure brush dry-run artifact hash does not match rendered mask hash.');
+}
+if (report.pressureApplyMaskHash !== report.pressureDryRunMaskHash) {
+  throw new Error('Pressure brush apply artifact hash does not match dry-run mask hash.');
 }
 if (!applyResult.changedMaskIds.includes(render.maskId)) {
   throw new Error('Brush apply did not mutate the rendered mask id.');

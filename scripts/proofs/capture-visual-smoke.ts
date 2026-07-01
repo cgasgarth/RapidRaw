@@ -455,7 +455,9 @@ const strokeLineSchema = z
     brushSize: z.number().positive(),
     feather: z.number().min(0).max(1).optional(),
     flow: z.number().min(0).max(100).optional(),
-    points: z.array(z.object({ x: z.number(), y: z.number() }).strict()).min(2),
+    points: z
+      .array(z.object({ pressure: z.number().min(0).max(1).optional(), x: z.number(), y: z.number() }).strict())
+      .min(2),
     tool: z.enum(['brush', 'eraser']),
   })
   .strict();
@@ -487,6 +489,22 @@ async function writeBrushMaskCanvasProof(page): Promise<void> {
   const paintCommand = buildBrushMaskCommandFromParameters({ lines: [lines[0]] }, context, { dryRun: true });
   const dryRunCommand = buildBrushMaskCommandFromParameters({ lines }, context, { dryRun: true });
   const applyCommand = buildBrushMaskCommandFromParameters({ lines }, context, { dryRun: false });
+  const pressureLines = [
+    {
+      ...lines[0],
+      points:
+        lines[0]?.points.map((point, index) => ({
+          ...point,
+          pressure: index === 0 ? 0.25 : 0.5,
+        })) ?? [],
+    },
+  ];
+  const pressureDryRunCommand = buildBrushMaskCommandFromParameters({ lines: pressureLines }, context, {
+    dryRun: true,
+  });
+  const pressureApplyCommand = buildBrushMaskCommandFromParameters({ lines: pressureLines }, context, {
+    dryRun: false,
+  });
   const renderRequest = {
     baseMask: {
       alpha: new Array<number>(64 * 36).fill(0),
@@ -502,8 +520,17 @@ async function writeBrushMaskCanvasProof(page): Promise<void> {
   const runtime = new BrushMaskCommandRuntime();
   const dryRunResult = layerMaskDryRunResultV1Schema.parse(runtime.dispatch(dryRunCommand, renderRequest));
   const applyResult = layerMaskMutationResultV1Schema.parse(runtime.dispatch(applyCommand, renderRequest));
+  const pressureRender = renderBrushMask({ ...renderRequest, command: pressureDryRunCommand });
+  const pressureRuntime = new BrushMaskCommandRuntime();
+  const pressureDryRunResult = layerMaskDryRunResultV1Schema.parse(
+    pressureRuntime.dispatch(pressureDryRunCommand, renderRequest),
+  );
+  const pressureApplyResult = layerMaskMutationResultV1Schema.parse(
+    pressureRuntime.dispatch(pressureApplyCommand, renderRequest),
+  );
   const paintCoverage = alphaSum(paintRender.alpha);
   const finalCoverage = alphaSum(finalRender.alpha);
+  const pressureCoverage = alphaSum(pressureRender.alpha);
 
   if (lines[0]?.tool !== 'brush' || lines[1]?.tool !== 'eraser') {
     throw new Error(`Expected brush,eraser stroke order; got ${proofDataset.toolOrder}`);
@@ -513,6 +540,12 @@ async function writeBrushMaskCanvasProof(page): Promise<void> {
   }
   if (paintRender.contentHash === finalRender.contentHash) {
     throw new Error('Paint and final brush mask hashes should differ after eraser stroke.');
+  }
+  if (pressureRender.contentHash === paintRender.contentHash || pressureCoverage >= paintCoverage) {
+    throw new Error('Pressure replay should reduce paint coverage and change the mask hash.');
+  }
+  if (pressureDryRunResult.maskArtifacts[0]?.contentHash !== pressureApplyResult.maskArtifacts?.[0]?.contentHash) {
+    throw new Error('Pressure replay dry-run/apply mask hashes must match.');
   }
   if (lines[0]?.brushSize !== Number(proofDataset.refineBrushSize) || lines[0]?.feather !== 0.64) {
     throw new Error('Brush refine controls did not update the live canvas stroke parameters.');
@@ -538,6 +571,12 @@ async function writeBrushMaskCanvasProof(page): Promise<void> {
       paintMaskHash: paintRender.contentHash,
       paintScreenshot: brushMaskCanvasPaintReportPath,
       pointCounts: proofDataset.pointCounts.split(',').map(Number),
+      pressureApplyMaskHash: pressureApplyResult.maskArtifacts?.[0]?.contentHash,
+      pressureCoverage,
+      pressureDryRunMaskHash: pressureDryRunResult.maskArtifacts[0]?.contentHash,
+      pressureMaskHash: pressureRender.contentHash,
+      pressurePointCount: pressureRender.provenance.pressurePointCount,
+      pressureUsed: pressureRender.provenance.pressureUsed,
       refineBrushFeather: Number(proofDataset.refineBrushFeather),
       refineBrushSize: Number(proofDataset.refineBrushSize),
       schemaVersion: 1,

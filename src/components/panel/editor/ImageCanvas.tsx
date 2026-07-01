@@ -66,11 +66,15 @@ interface CursorPreview {
   y: number;
 }
 
+interface BrushPoint extends Coord {
+  pressure?: number;
+}
+
 interface DrawnLine {
   brushSize: number;
   feather?: number;
   flow?: number;
-  points: Array<Coord>;
+  points: Array<BrushPoint>;
   tool: ToolType;
 }
 
@@ -1445,6 +1449,17 @@ const ImageCanvas = memo(
     const effectiveZoomScale = transformState.scale > 0 ? transformState.scale : 1;
     const brushStageSize = (brushSettings?.size ?? 0) / effectiveZoomScale;
     const brushImageSpaceSize = brushStageSize / (imageRenderSize.scale || 1);
+    const withPointerPressure = useCallback((point: Coord, event: unknown): BrushPoint => {
+      const pointerEvent = event as { pointerType?: unknown; pressure?: unknown };
+      if (pointerEvent.pointerType === 'mouse' || typeof pointerEvent.pressure !== 'number') {
+        return point;
+      }
+
+      return {
+        ...point,
+        pressure: Math.max(0, Math.min(1, pointerEvent.pressure)),
+      };
+    }, []);
 
     const isBrushActive =
       (isMasking || isAiEditing) && (activeSubMask?.type === Mask.Brush || activeSubMask?.type === Mask.Flow);
@@ -1454,10 +1469,11 @@ const ImageCanvas = memo(
     );
     const activeLineFlow = activeSubMask?.type === Mask.Flow ? (activeSubMaskParameters?.flow ?? 10) : undefined;
     const getImageSpacePoint = useCallback(
-      (point: Coord): Coord => {
+      (point: BrushPoint): BrushPoint => {
         const { scale } = imageRenderSize;
 
         return {
+          ...(point.pressure === undefined ? {} : { pressure: point.pressure }),
           x: point.x / scale + imageCropOffset.x,
           y: point.y / scale + imageCropOffset.y,
         };
@@ -1847,10 +1863,15 @@ const ImageCanvas = memo(
             const dy = endImageSpace.y - startImageSpace.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
             const steps = Math.max(Math.ceil(distance), 2);
-            const interpolatedPoints: Coord[] = [];
+            const endPressure =
+              'pointerType' in e.evt && e.evt.pointerType !== 'mouse' && typeof e.evt.pressure === 'number'
+                ? Math.max(0, Math.min(1, e.evt.pressure))
+                : undefined;
+            const interpolatedPoints: BrushPoint[] = [];
             for (let i = 0; i <= steps; i++) {
               const t = i / steps;
               interpolatedPoints.push({
+                ...(endPressure === undefined ? {} : { pressure: endPressure }),
                 x: startImageSpace.x + dx * t,
                 y: startImageSpace.y + dy * t,
               });
@@ -1886,10 +1907,11 @@ const ImageCanvas = memo(
 
           isDrawing.current = true;
           drawingStageRef.current = stage;
+          const brushPoint = withPointerPressure(pos, e.evt);
 
           const newLine: DrawnLine = {
             brushSize: isBrushActive && brushSettings?.size ? brushStageSize : 2,
-            points: [pos],
+            points: [brushPoint],
             tool: effectiveTool,
           };
           currentLine.current = newLine;
@@ -1897,7 +1919,7 @@ const ImageCanvas = memo(
             setLiveBrushLine({
               brushSize: brushImageSpaceSize,
               feather: brushSettings?.feather ? brushSettings.feather / 100 : 0,
-              points: [getImageSpacePoint(pos)],
+              points: [getImageSpacePoint(brushPoint)],
               tool: effectiveTool,
               ...(activeLineFlow !== undefined ? { flow: activeLineFlow } : {}),
             });
@@ -1941,6 +1963,7 @@ const ImageCanvas = memo(
         baseTool,
         getCanvasPointer,
         getImageSpacePoint,
+        withPointerPressure,
       ],
     );
 
@@ -2069,9 +2092,10 @@ const ImageCanvas = memo(
             }
           }
 
+          const brushPoint = withPointerPressure(pos, isKonvaEvent(e) ? e.evt : e);
           const updatedLine = {
             ...currentLine.current,
-            points: [...currentLine.current.points, pos],
+            points: [...currentLine.current.points, brushPoint],
           };
           currentLine.current = updatedLine;
 
@@ -2142,6 +2166,7 @@ const ImageCanvas = memo(
         baseTool,
         getCanvasPointer,
         getImageSpacePoint,
+        withPointerPressure,
       ],
     );
 
@@ -2255,7 +2280,8 @@ const ImageCanvas = memo(
         const imageSpaceLine: DrawnLine = {
           brushSize: brushImageSpaceSize,
           feather: brushSettings?.feather ? brushSettings.feather / 100 : 0,
-          points: line.points.map((p: Coord) => ({
+          points: line.points.map((p: BrushPoint) => ({
+            ...(p.pressure === undefined ? {} : { pressure: p.pressure }),
             x: p.x / scale + cropX,
             y: p.y / scale + cropY,
           })),
