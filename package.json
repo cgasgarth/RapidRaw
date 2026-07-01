@@ -40,6 +40,7 @@
     "check:negative-lab-entrypoints": "bun tests/integration/checks/negative-lab/check-negative-lab-entrypoint-readiness.ts && bun tests/integration/checks/negative-lab/check-negative-lab-toolbar-entry.ts && bun tests/integration/checks/negative-lab/check-negative-lab-context-menu-keyboard.ts && bun tests/integration/checks/ui/keyboard/check-command-palette-behavior.ts",
     "check:negative-lab-patch-sampler-apply": "bun tests/integration/checks/negative-lab/check-negative-lab-patch-sampler-apply.ts",
     "check:agent-retouch-apply": "bun tests/integration/checks/agent/check-agent-retouch-apply.ts",
+    "check:agent-object-selection-apply": "bun tests/integration/checks/agent/check-agent-object-selection-apply.ts",
     "check:retouch-remove-runtime-output": "bun tests/integration/checks/retouch/check-retouch-remove-runtime-output.ts",
     "check:agent-selected-image-preview-loop": "bun tests/integration/checks/agent/check-agent-selected-image-preview-loop.ts",
     "check:agent-selected-image-export-output": "bun tests/integration/checks/agent/check-agent-selected-image-export-output.ts",
