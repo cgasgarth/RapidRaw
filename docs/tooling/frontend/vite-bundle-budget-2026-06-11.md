@@ -31,7 +31,7 @@ owner, reason, and expiration condition.
 | Asset class              | Raw warning     | Gzip warning  | Raw failure     | Gzip failure  |
 | ------------------------ | --------------- | ------------- | --------------- | ------------- |
 | Largest JavaScript asset | 2,764,800 bytes | 810,000 bytes | 3,072,000 bytes | 900,000 bytes |
-| Largest CSS asset        | 147,456 bytes   | 23,962 bytes  | 163,840 bytes   | 26,624 bytes  |
+| Largest CSS asset        | 154,829 bytes   | 23,962 bytes  | 172,032 bytes   | 26,624 bytes  |
 
 | Aggregate               | Raw warning     | Gzip warning  | Raw failure     | Gzip failure  |
 | ----------------------- | --------------- | ------------- | --------------- | ------------- |
