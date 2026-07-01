@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { type Adjustments, BasicAdjustment } from '../../utils/adjustments';
 import type { AppSettings } from '../ui/AppProperties';
+import { professionalInspectorDensityTokens } from '../ui/inspectorTokens';
 import AdjustmentSlider from './AdjustmentSlider';
 
 interface BasicAdjustmentsProps {
@@ -34,6 +35,7 @@ const ToneMapperSwitch = ({
   onDragStateChange,
 }: ToneMapperSwitchProps) => {
   const { t } = useTranslation();
+  const density = professionalInspectorDensityTokens;
   const [bubbleStyle, setBubbleStyle] = useState({});
   const isInitialAnimation = useRef(true);
   const [isLabelHovered, setIsLabelHovered] = useState(false);
@@ -89,11 +91,11 @@ const ToneMapperSwitch = ({
   }, [selectedMapper, toneMapperOptions]);
 
   return (
-    <div className="group mb-2">
-      <div className="mb-1 flex items-center justify-between">
+    <div className={density.toneMapper.root}>
+      <div className={density.toneMapper.titleRow}>
         <button
           type="button"
-          className="grid cursor-pointer bg-transparent border-0 p-0 font-inherit text-left"
+          className="grid cursor-pointer border-0 bg-transparent p-0 text-left font-inherit"
           onClick={handleReset}
           onDoubleClick={handleReset}
           onMouseEnter={() => {
@@ -105,27 +107,23 @@ const ToneMapperSwitch = ({
         >
           <span
             aria-hidden={isLabelHovered}
-            className={`col-start-1 row-start-1 text-[12px] font-medium leading-4 text-text-secondary select-none transition-opacity duration-200 ease-in-out ${
-              isLabelHovered ? 'opacity-0' : 'opacity-100'
-            }`}
+            className={cx(density.toneMapper.label, isLabelHovered ? 'opacity-0' : 'opacity-100')}
           >
             {t('adjustments.basic.toneMapper')}
           </span>
           <span
             aria-hidden={!isLabelHovered}
-            className={`col-start-1 row-start-1 text-[12px] font-medium leading-4 text-text-primary select-none transition-opacity duration-200 ease-in-out pointer-events-none ${
-              isLabelHovered ? 'opacity-100' : 'opacity-0'
-            }`}
+            className={cx(density.toneMapper.resetLabel, isLabelHovered ? 'opacity-100' : 'opacity-0')}
           >
             {t('adjustments.basic.reset')}
           </span>
         </button>
       </div>
-      <div className="w-full rounded-md bg-card-active p-1.5 pb-1">
+      <div className={density.toneMapper.card}>
         <div className="relative flex w-full">
           <motion.div
             className="absolute top-0 bottom-0 z-0 bg-accent"
-            style={{ borderRadius: 6 }}
+            style={{ borderRadius: 4 }}
             animate={bubbleStyle}
             transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
           />
@@ -136,20 +134,17 @@ const ToneMapperSwitch = ({
               onClick={() => {
                 onMapperChange(mapper.id);
               }}
-              className={cx(
-                'relative flex-1 flex items-center justify-center gap-2 rounded-md px-2 py-1 text-[12px] font-medium leading-4 transition-colors',
-                {
-                  'text-text-primary hover:bg-surface': selectedMapper !== mapper.id,
-                  'text-button-text': selectedMapper === mapper.id,
-                },
-              )}
+              className={cx(density.toneMapper.option, {
+                'text-text-primary hover:bg-surface': selectedMapper !== mapper.id,
+                'text-button-text': selectedMapper === mapper.id,
+              })}
               style={{ WebkitTapHighlightColor: 'transparent' }}
             >
               <span className="relative z-10 flex items-center">{mapper.label}</span>
             </button>
           ))}
         </div>
-        <div className="mt-1.5 px-0.5">
+        <div className={density.toneMapper.sliderWrap}>
           <AdjustmentSlider
             density="compact"
             label={t('adjustments.basic.evShift')}
@@ -190,7 +185,7 @@ export default function BasicAdjustments({
   const hideTonemapper = isForMask || appSettings?.tonemapperOverrideEnabled;
 
   return (
-    <div>
+    <div className="space-y-px">
       {hideTonemapper ? (
         <AdjustmentSlider
           density="compact"
@@ -217,7 +212,9 @@ export default function BasicAdjustments({
       )}
       <AdjustmentSlider
         density="compact"
-        label={t('adjustments.basic.exposure')}
+        label={t('adjustments.basic.brightness', {
+          defaultValue: t('adjustments.basic.exposure'),
+        })}
         max={5}
         min={-5}
         onValueChange={(value) => {

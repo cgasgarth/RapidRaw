@@ -42,6 +42,7 @@ import DetailsPanel from '../../../adjustments/Details';
 import EffectsPanel from '../../../adjustments/Effects';
 import { OPTION_SEPARATOR, type Option } from '../../../ui/AppProperties';
 import CollapsibleSection, { type CollapsibleSectionHeaderAction } from '../../../ui/CollapsibleSection';
+import { professionalInspectorDensityTokens } from '../../../ui/inspectorTokens';
 import Dropdown, { type OptionItem } from '../../../ui/primitives/Dropdown';
 import UiText from '../../../ui/primitives/Text';
 import PanelScopesStrip from '../inspector/PanelScopesStrip';
@@ -64,9 +65,7 @@ const ADJUSTMENT_SECTION_LABEL_FALLBACKS: Record<AdjustmentSectionName, string> 
   effects: 'Effects & Looks',
 };
 const RAW_RECONSTRUCTION_COMPARISON_CROP_SIZE = 256;
-const PANEL_ACTION_BUTTON_CLASS =
-  'inline-flex h-7 w-7 items-center justify-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50';
-const PANEL_ACTION_ICON_SIZE = 15;
+const PANEL_ACTION_ICON_SIZE = 14;
 
 const formatBytes = (value: number): string => {
   if (value >= 1024 * 1024) return `${(value / (1024 * 1024)).toFixed(1)} MB`;
@@ -114,6 +113,7 @@ const toHeaderAction = (option: Option, testId: string): CollapsibleSectionHeade
 
 export default function Controls() {
   const { t } = useTranslation();
+  const density = professionalInspectorDensityTokens;
   const { showContextMenu } = useContextMenu();
   const { onToggleWaveform } = useWaveformControls();
   const { setAdjustments, handleAutoAdjustments, handleLutSelect } = useEditorActions();
@@ -425,13 +425,13 @@ export default function Controls() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex min-h-11 shrink-0 items-center justify-between border-b border-surface px-3 py-2">
-        <UiText as="h2" variant={TextVariants.heading} className="truncate">
+      <div className={density.panelHeader.root}>
+        <UiText as="h2" variant={TextVariants.heading} className={density.panelHeader.title}>
           {t('editor.adjustments.title')}
         </UiText>
         <div className="flex items-center gap-1">
           <button
-            className={cx(PANEL_ACTION_BUTTON_CLASS, 'hover:bg-surface')}
+            className={density.panelHeader.actionButton}
             disabled={!selectedImage?.isReady}
             onClick={() => {
               void handleAutoAdjustments();
@@ -443,8 +443,8 @@ export default function Controls() {
           </button>
           <button
             className={cx(
-              PANEL_ACTION_BUTTON_CLASS,
-              isWaveformVisible ? 'bg-surface hover:bg-card-active' : 'hover:bg-surface',
+              density.panelHeader.actionButton,
+              isWaveformVisible && density.panelHeader.actionButtonActive,
             )}
             onClick={onToggleWaveform}
             data-testid="adjustments-panel-scopes-toggle"
@@ -454,7 +454,7 @@ export default function Controls() {
             <ChartArea size={PANEL_ACTION_ICON_SIZE} />
           </button>
           <button
-            className={cx(PANEL_ACTION_BUTTON_CLASS, 'hover:bg-surface')}
+            className={density.panelHeader.actionButton}
             disabled={!selectedImage}
             onClick={() => {
               handleResetAdjustments();
@@ -469,23 +469,23 @@ export default function Controls() {
 
       {selectedImage?.isRaw && (
         <div
-          className="shrink-0 border-b border-surface px-3 py-1.5"
+          className={density.rawProcessing.root}
           data-attention={isRawProcessingStatusAttentionRequired}
           data-testid="raw-processing-mode-override-control"
         >
           <button
             aria-expanded={isRawProcessingControlsOpen}
-            className="flex min-h-7 w-full items-center justify-between gap-3 rounded-sm text-left transition-colors hover:text-text-primary"
+            className={density.rawProcessing.disclosure}
             onClick={() => {
               setIsRawProcessingControlsOpen((previous) => !previous);
             }}
             type="button"
           >
-            <span className="flex min-w-0 items-baseline gap-2">
-              <UiText as="span" variant={TextVariants.small} className="shrink-0 font-medium text-text-primary">
+            <span className="flex min-w-0 items-baseline gap-1.5">
+              <UiText as="span" variant={TextVariants.small} className={density.rawProcessing.label}>
                 {t('editor.adjustments.rawProcessingModeOverride.label')}
               </UiText>
-              <UiText as="span" variant={TextVariants.small} className="truncate text-[11px] text-text-secondary">
+              <UiText as="span" variant={TextVariants.small} className={density.rawProcessing.statusValue}>
                 {t('editor.adjustments.rawProcessingModeOverride.currentValue', {
                   mode: rawProcessingModeDisplay,
                 })}
@@ -500,13 +500,13 @@ export default function Controls() {
           </button>
 
           {isRawProcessingControlsOpen && (
-            <div className="space-y-2 pt-2">
+            <div className={density.rawProcessing.body}>
               <div className="flex items-start justify-between gap-2">
-                <UiText as="div" variant={TextVariants.small} className="min-w-0 text-[11px] text-text-secondary">
+                <UiText as="div" variant={TextVariants.small} className={density.rawProcessing.description}>
                   {t('editor.adjustments.rawProcessingModeOverride.description')}
                 </UiText>
                 <Dropdown
-                  className="w-40 shrink-0"
+                  className="w-36 shrink-0"
                   onChange={(mode) => {
                     void handleRawProcessingModeOverrideChange(mode);
                   }}
@@ -516,7 +516,7 @@ export default function Controls() {
               </div>
               <div className="flex items-center justify-end">
                 <button
-                  className="inline-flex items-center gap-1.5 text-[11px] font-medium text-text-secondary transition-colors hover:text-text-primary"
+                  className={density.rawProcessing.provenanceButton}
                   onClick={() => {
                     setIsRawProcessingModeProvenanceVisible((previous) => !previous);
                   }}
@@ -529,14 +529,14 @@ export default function Controls() {
                 </button>
               </div>
               {isRawProcessingModeProvenanceVisible ? (
-                <UiText as="div" variant={TextVariants.small} className="font-mono text-[11px] text-text-secondary">
+                <UiText as="div" variant={TextVariants.small} className={density.rawProcessing.provenanceValue}>
                   {getRawProcessingModeProvenance(
                     adjustments.rawProcessingModeOverride ?? normalizeRawProcessingMode(appSettings?.rawProcessingMode),
                   )}
                 </UiText>
               ) : null}
               <button
-                className="flex min-h-8 w-full items-center justify-center gap-2 rounded-md bg-surface px-2.5 py-1.5 text-xs font-medium hover:bg-card-active disabled:cursor-not-allowed disabled:opacity-60"
+                className={density.rawProcessing.compareButton}
                 data-testid="raw-reconstruction-comparison-run"
                 disabled={isComparingRawReconstruction || !selectedImage.isReady}
                 onClick={() => {

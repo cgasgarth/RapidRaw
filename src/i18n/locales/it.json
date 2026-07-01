@@ -2,6 +2,7 @@
   "adjustments": {
     "basic": {
       "blacks": "Neri",
+      "brightness": "Luminosità",
       "contrast": "Contrasto",
       "evShift": "Compensazione EV",
       "exposure": "Esposizione",
