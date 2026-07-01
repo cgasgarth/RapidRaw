@@ -9,10 +9,21 @@ import { useEditorStore } from '../../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
 import { buildAgentImageContextSnapshot } from '../../../../src/utils/agent/context/agentImageContextSnapshot.ts';
 import {
+  AGENT_PREVIEW_RENDER_TOOL_NAME,
+  agentPreviewRenderResponseSchema,
+} from '../../../../src/utils/agent/context/agentReadOnlyAppServerTools.ts';
+import {
+  agentIterativeEditAuditTimelineSchema,
+  buildAgentToneAdjustmentAuditTimeline,
+  stableAgentTimelineReplayHash,
+} from '../../../../src/utils/agent/session/agentIterativeEditAuditTimeline.ts';
+import {
   AGENT_TONE_ADJUSTMENT_APPLY_TOOL_NAME,
   AGENT_TONE_ADJUSTMENT_DRY_RUN_TOOL_NAME,
   agentToneAdjustmentApplyRequestSchema,
+  agentToneAdjustmentApplyResponseSchema,
   agentToneAdjustmentDryRunRequestSchema,
+  agentToneAdjustmentDryRunResponseSchema,
   applyAgentToneAdjustment,
   dryRunAgentToneAdjustment,
 } from '../../../../src/utils/agent/tools/agentToneAdjustmentTool.ts';
@@ -230,6 +241,23 @@ useEditorStore.setState({
   uncroppedAdjustedPreviewUrl: 'blob:rawengine-stale-uncropped',
 });
 const dispatchSnapshot = buildAgentImageContextSnapshot();
+const dispatchInitialPreview = await buildRawEngineAppServerToolDispatchResponse({
+  arguments: {
+    expectedRecipeHash: dispatchSnapshot.initialPreview.recipeHash,
+    purpose: 'initial_context',
+    requestId: 'agent-tone-dispatch-preview-before-3161',
+  },
+  requestId: 'agent-tone-dispatch-preview-before-3161',
+  runtimeToolName: AGENT_PREVIEW_RENDER_TOOL_NAME,
+  toolName: 'rawengine.app_server.dispatch_tool',
+});
+const dispatchInitialPreviewPayload =
+  dispatchInitialPreview.dispatchStatus === 'completed'
+    ? agentPreviewRenderResponseSchema.parse(dispatchInitialPreview.result)
+    : undefined;
+if (dispatchInitialPreviewPayload === undefined) {
+  failures.push('agent tone app-server proof did not render the initial preview event.');
+}
 const dispatchDryRun = await buildRawEngineAppServerToolDispatchResponse({
   arguments: {
     adjustments: { exposure: 0.3, contrast: 12 },
@@ -243,6 +271,10 @@ const dispatchDryRun = await buildRawEngineAppServerToolDispatchResponse({
   runtimeToolName: AGENT_TONE_ADJUSTMENT_DRY_RUN_TOOL_NAME,
   toolName: 'rawengine.app_server.dispatch_tool',
 });
+const dispatchDryRunPayload =
+  dispatchDryRun.dispatchStatus === 'completed'
+    ? agentToneAdjustmentDryRunResponseSchema.parse(dispatchDryRun.result)
+    : undefined;
 if (
   dispatchDryRun.status !== RawEngineAppServerResponseStatus.Ok ||
   !('dispatchStatus' in dispatchDryRun) ||
@@ -250,6 +282,114 @@ if (
   dispatchDryRun.runtimeToolName !== AGENT_TONE_ADJUSTMENT_DRY_RUN_TOOL_NAME
 ) {
   failures.push('agent tone dry-run did not dispatch through the app-server host.');
+}
+
+const dispatchApply =
+  dispatchDryRunPayload === undefined
+    ? undefined
+    : await buildRawEngineAppServerToolDispatchResponse({
+        arguments: {
+          acceptedPlanHash: dispatchDryRunPayload.dryRunPlanHash,
+          acceptedPlanId: dispatchDryRunPayload.dryRunPlanId,
+          adjustments: { exposure: 0.3, contrast: 12 },
+          expectedGraphRevision: dispatchDryRunPayload.sourceGraphRevision,
+          expectedRecipeHash: dispatchSnapshot.initialPreview.recipeHash,
+          operationId: 'agent_tone_dispatch_3161',
+          requestId: 'agent-tone-dispatch-apply-3161',
+          sessionId: 'agent-tone-dispatch-3161',
+        },
+        requestId: 'agent-tone-dispatch-apply-3161',
+        runtimeToolName: AGENT_TONE_ADJUSTMENT_APPLY_TOOL_NAME,
+        toolName: 'rawengine.app_server.dispatch_tool',
+      });
+const dispatchApplyPayload =
+  dispatchApply?.dispatchStatus === 'completed'
+    ? agentToneAdjustmentApplyResponseSchema.parse(dispatchApply.result)
+    : undefined;
+if (
+  dispatchApply === undefined ||
+  dispatchApply.dispatchStatus !== 'completed' ||
+  dispatchApply.runtimeToolName !== AGENT_TONE_ADJUSTMENT_APPLY_TOOL_NAME ||
+  dispatchApplyPayload?.appliedGraphRevision !== 'history_1'
+) {
+  failures.push('agent tone apply did not dispatch through the app-server host after dry-run.');
+}
+
+const postDispatchSnapshot = buildAgentImageContextSnapshot();
+const dispatchPreviewAfter = await buildRawEngineAppServerToolDispatchResponse({
+  arguments: {
+    expectedRecipeHash: postDispatchSnapshot.initialPreview.recipeHash,
+    purpose: 'refresh',
+    requestId: 'agent-tone-dispatch-preview-after-3161',
+  },
+  requestId: 'agent-tone-dispatch-preview-after-3161',
+  runtimeToolName: AGENT_PREVIEW_RENDER_TOOL_NAME,
+  toolName: 'rawengine.app_server.dispatch_tool',
+});
+const dispatchPreviewAfterPayload =
+  dispatchPreviewAfter.dispatchStatus === 'completed'
+    ? agentPreviewRenderResponseSchema.parse(dispatchPreviewAfter.result)
+    : undefined;
+if (
+  dispatchPreviewAfterPayload === undefined ||
+  dispatchPreviewAfterPayload.preview.purpose !== 'refresh' ||
+  dispatchPreviewAfterPayload.preview.recipeHash === dispatchSnapshot.initialPreview.recipeHash
+) {
+  failures.push('agent tone app-server proof did not render preview-after from the applied edit.');
+}
+
+if (
+  dispatchInitialPreviewPayload !== undefined &&
+  dispatchDryRunPayload !== undefined &&
+  dispatchApplyPayload !== undefined &&
+  dispatchPreviewAfterPayload !== undefined
+) {
+  const timeline = buildAgentToneAdjustmentAuditTimeline({
+    apply: dispatchApplyPayload,
+    dryRun: dispatchDryRunPayload,
+    initialPreview: dispatchInitialPreviewPayload,
+    operationId: 'agent_tone_dispatch_3161',
+    previewAfter: dispatchPreviewAfterPayload,
+    sessionId: 'agent-tone-dispatch-3161',
+  });
+  const phases = timeline.events.map((event) => event.phase).join('>');
+  if (phases !== 'preview>dry_run>apply>preview_after') {
+    failures.push(`agent tone timeline has incorrect ordering: ${phases}`);
+  }
+  if (
+    timeline.events[1]?.linked.dryRunPlanId !== dispatchDryRunPayload.dryRunPlanId ||
+    timeline.events[2]?.acceptedPlanHash !== dispatchDryRunPayload.dryRunPlanHash ||
+    timeline.events[3]?.linked.previewArtifactId !== dispatchPreviewAfterPayload.preview.artifactId
+  ) {
+    failures.push('agent tone timeline did not link dry-run, apply, and preview-after artifacts.');
+  }
+  if (
+    timeline.events[1]?.warnings.length !== dispatchDryRunPayload.warnings.length ||
+    timeline.events[2]?.warnings.length !== dispatchApplyPayload.warnings.length
+  ) {
+    failures.push('agent tone timeline did not preserve warning arrays from tool results.');
+  }
+  if (
+    buildAgentToneAdjustmentAuditTimeline({
+      apply: dispatchApplyPayload,
+      dryRun: dispatchDryRunPayload,
+      initialPreview: dispatchInitialPreviewPayload,
+      operationId: 'agent_tone_dispatch_3161',
+      previewAfter: dispatchPreviewAfterPayload,
+      sessionId: 'agent-tone-dispatch-3161',
+    }).deterministicReplayHash !== timeline.deterministicReplayHash
+  ) {
+    failures.push('agent tone timeline replay hash is not stable for identical input.');
+  }
+  if (
+    agentIterativeEditAuditTimelineSchema.safeParse({
+      ...timeline,
+      deterministicReplayHash: stableAgentTimelineReplayHash({ intentionally: 'unchanged-for-schema-check' }),
+      events: [timeline.events[1], timeline.events[0], timeline.events[2], timeline.events[3]],
+    }).success
+  ) {
+    failures.push('agent tone timeline schema accepted out-of-order events.');
+  }
 }
 
 if (failures.length > 0) {
