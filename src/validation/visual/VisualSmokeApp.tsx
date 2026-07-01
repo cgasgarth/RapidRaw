@@ -82,6 +82,7 @@ import { handleNegativeConversionEditorHandoff } from '../../utils/negative-lab/
 import { applySkinToneUniformityToRgbPixel } from '../../utils/skinToneUniformity';
 import { buildSuperResolutionOutputReviewWorkflow } from '../../utils/superResolutionOutputReview';
 import type { SuperResolutionSourcePreflightMetadata } from '../../utils/superResolutionSourcePreflight';
+import { PANEL_SCOPES_HEIGHT } from '../../utils/waveformSizing';
 import { VISUAL_SMOKE_PROOF_TEST_IDS, VISUAL_SMOKE_SCENARIO_IDS, type VisualSmokeMode } from './visualSmokeScenarios';
 
 interface VisualSmokeAppProps {
@@ -746,7 +747,7 @@ function WorkflowRailVisualSmoke() {
       previewScopeStatus: null,
       selectedImage: adjustmentsPanelRetuneRawImage,
       waveform: null,
-      waveformHeight: 220,
+      waveformHeight: PANEL_SCOPES_HEIGHT.default,
     });
     useUIStore.setState({
       collapsibleSectionsState: { ...DEFAULT_COLLAPSIBLE_SECTIONS_STATE },
