@@ -902,6 +902,15 @@
       }
     },
     "canvas": {
+      "compare": {
+        "after": "After",
+        "before": "Before",
+        "loadingOriginal": "Preparing original preview",
+        "overlayDisabled": "Interactive overlays are disabled in compare preview",
+        "sideBySideRegion": "Side-by-side before and after preview",
+        "splitWipeDivider": "Before and after split divider",
+        "splitWipeLabel": "Before / After"
+      },
       "cropPreviewAlt": "Crop preview",
       "gamutWarningCoverage": "sRGB gamut · {{value}}",
       "gamutWarningOverlay": "sRGB gamut warning overlay",
@@ -1660,6 +1669,17 @@
       "unknown": "Unknown"
     },
     "toolbar": {
+      "compare": {
+        "mode": {
+          "hold-original": "Original",
+          "off": "Edited",
+          "side-by-side": "Side by side",
+          "split-wipe": "Split"
+        },
+        "sideBySide": "Compare side by side",
+        "splitWipe": "Compare split wipe",
+        "unavailable": "Compare uses preview-only before/after rendering"
+      },
       "exportSoftProofActive": "Proofing",
       "exportSoftProofDetails": "{{profile}} / {{intent}} preview",
       "exportSoftProofUnavailable": "No export recipe available",
@@ -1675,8 +1695,8 @@
         "history": "Show History Stack",
         "iso": "ISO",
         "redo": "Redo ({{shortcut}}) or History (Right-click)",
-        "showEdited": "Show Edited (B)",
-        "showOriginal": "Show Original (B)",
+        "showEdited": "Show edited (B)",
+        "showOriginal": "Hold original (B)",
         "shutterSpeed": "Shutter Speed",
         "undo": "Undo ({{shortcut}}) or History (Right-click)"
       },

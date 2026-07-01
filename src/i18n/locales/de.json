@@ -899,6 +899,15 @@
       }
     },
     "canvas": {
+      "compare": {
+        "after": "",
+        "before": "",
+        "loadingOriginal": "",
+        "overlayDisabled": "Interactive overlays are disabled in compare preview",
+        "sideBySideRegion": "Side-by-side before and after preview",
+        "splitWipeDivider": "Before and after split divider",
+        "splitWipeLabel": "Before / After"
+      },
       "cropPreviewAlt": "Zuschnittvorschau",
       "gamutWarningCoverage": "",
       "gamutWarningOverlay": "",
@@ -1646,6 +1655,11 @@
       "unknown": "Unknown"
     },
     "toolbar": {
+      "compare": {
+        "sideBySide": "Compare side by side",
+        "splitWipe": "Compare split wipe",
+        "unavailable": "Compare uses preview-only before/after rendering"
+      },
       "exportSoftProofActive": "Proofing",
       "exportSoftProofDetails": "{{profile}} / {{intent}} preview",
       "exportSoftProofUnavailable": "No export recipe available",
