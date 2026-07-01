@@ -27,6 +27,7 @@ interface SliderProps {
   fillOrigin?: 'min' | 'default';
   suffix?: string;
   density?: 'default' | 'compact';
+  testId?: string;
 }
 
 const DOUBLE_CLICK_THRESHOLD_MS = 300;
@@ -50,6 +51,7 @@ const Slider = ({
   fillOrigin = 'default',
   suffix = '',
   density = 'default',
+  testId,
 }: SliderProps) => {
   const { t } = useTranslation();
   const [displayValue, setDisplayValue] = useState<number>(value);
@@ -57,6 +59,8 @@ const Slider = ({
   const [isDragging, setIsDragging] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState<string>(String(value));
+  const editStartValueRef = useRef<number>(value);
+  const skipNextBlurCommitRef = useRef(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const rangeInputRef = useRef<HTMLInputElement | null>(null);
   const [isLabelHovered, setIsLabelHovered] = useState(false);
@@ -135,10 +139,7 @@ const Slider = ({
 
       event.preventDefault();
       const direction = -Math.sign(event.deltaY || event.deltaX);
-      const newValue = value + direction * step;
-      const roundedNewValue = parseFloat(newValue.toFixed(decimalPlaces));
-
-      const clampedValue = Math.max(min, Math.min(max, roundedNewValue));
+      const clampedValue = snapToStep(displayValueRef.current + direction * step);
 
       if (clampedValue !== value && !Number.isNaN(clampedValue)) {
         setIsWheelActive(true);
@@ -165,7 +166,7 @@ const Slider = ({
     return () => {
       sliderElement.removeEventListener('wheel', handleWheel);
     };
-  }, [value, min, max, step, onChange, decimalPlaces]);
+  }, [value, min, max, step, onChange, snapToStep]);
 
   // Handle Dragging
   useEffect(() => {
@@ -379,6 +380,7 @@ const Slider = ({
       return;
     }
 
+    editStartValueRef.current = value;
     setInputValue(String(value));
     setIsEditing(true);
   };
@@ -389,20 +391,11 @@ const Slider = ({
       return;
     }
     setInputValue(textVal);
-    const parseableText = textVal.replace(',', '.');
-    const parsedValue = parseFloat(parseableText);
-    if (!Number.isNaN(parsedValue)) {
-      const clampedValue = Math.max(min, Math.min(max, parsedValue));
-      onChange({
-        target: {
-          value: clampedValue,
-        },
-      });
-    }
   };
 
   const handleInputCommit = () => {
-    let newValue = parseFloat(inputValue.replace(',', '.'));
+    const committedText = inputRef.current?.value ?? inputValue;
+    let newValue = parseFloat(committedText.replace(',', '.'));
     if (Number.isNaN(newValue)) {
       newValue = value;
     } else {
@@ -417,12 +410,30 @@ const Slider = ({
     setIsEditing(false);
   };
 
+  const handleInputBlur = () => {
+    if (skipNextBlurCommitRef.current) {
+      skipNextBlurCommitRef.current = false;
+      return;
+    }
+    handleInputCommit();
+  };
+
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    e.stopPropagation();
+
     if (e.key === 'Enter') {
+      skipNextBlurCommitRef.current = true;
       handleInputCommit();
       e.currentTarget.blur();
     } else if (e.key === 'Escape') {
-      setInputValue(String(value));
+      skipNextBlurCommitRef.current = true;
+      const startingValue = editStartValueRef.current;
+      setInputValue(String(startingValue));
+      onChange({
+        target: {
+          value: startingValue,
+        },
+      });
       setIsEditing(false);
       e.currentTarget.blur();
     } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
@@ -478,6 +489,7 @@ const Slider = ({
   const labelControl = canResetFromLabel ? (
     <button
       className={tokens.labelButton}
+      data-testid={testId ? `${testId}-label` : undefined}
       onClick={handleReset}
       onDoubleClick={handleReset}
       onMouseEnter={() => {
@@ -491,18 +503,22 @@ const Slider = ({
       {labelContent}
     </button>
   ) : (
-    <div className={tokens.labelStatic}>{labelContent}</div>
+    <div className={tokens.labelStatic} data-testid={testId ? `${testId}-label` : undefined}>
+      {labelContent}
+    </div>
   );
 
   const valueControl = (
     <div className={tokens.valueSlot}>
       {isEditing ? (
         <input
+          aria-label={typeof label === 'string' ? `${label} value` : undefined}
           className={tokens.valueInput}
+          data-testid={testId ? `${testId}-input` : undefined}
           disabled={disabled}
           max={max}
           min={min}
-          onBlur={handleInputCommit}
+          onBlur={handleInputBlur}
           onChange={handleInputChange}
           onKeyDown={handleInputKeyDown}
           ref={inputRef}
@@ -512,7 +528,9 @@ const Slider = ({
         />
       ) : (
         <button
+          aria-label={typeof label === 'string' ? `${label} value` : undefined}
           className={cx(tokens.valueButton, !disabled && 'cursor-text')}
+          data-testid={testId ? `${testId}-value` : undefined}
           disabled={disabled}
           onClick={handleValueClick}
           onDoubleClick={handleReset}
@@ -545,6 +563,7 @@ const Slider = ({
           isDragging && 'slider-thumb-active',
         )}
         disabled={disabled}
+        data-testid={testId ? `${testId}-range` : undefined}
         style={{ margin: 0, touchAction: isDragging ? 'none' : 'pan-y' }}
         max={String(max)}
         min={String(min)}
@@ -565,7 +584,7 @@ const Slider = ({
 
   if (density === 'compact') {
     return (
-      <div className={tokens.root} ref={containerRef}>
+      <div className={tokens.root} data-testid={testId} ref={containerRef}>
         {labelControl}
         {trackControl}
         {valueControl}
@@ -574,7 +593,7 @@ const Slider = ({
   }
 
   return (
-    <div className={tokens.root} ref={containerRef}>
+    <div className={tokens.root} data-testid={testId} ref={containerRef}>
       <div className={inspectorSliderTokens.header}>
         {labelControl}
         {valueControl}

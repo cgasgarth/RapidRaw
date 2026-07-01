@@ -117,7 +117,7 @@ export const compactInspectorSliderTokens = {
   labelStatic: 'grid min-w-0 border-0 bg-transparent p-0 text-left cursor-default',
   resetLabel:
     'col-start-1 row-start-1 truncate text-[12px] font-medium leading-4 text-text-primary select-none transition-opacity duration-200 ease-in-out pointer-events-none',
-  root: 'group grid min-h-6 grid-cols-[minmax(4.75rem,0.78fr)_minmax(5.5rem,1fr)_2.625rem] items-center gap-1.5 py-px',
+  root: 'group grid min-h-6 grid-cols-[minmax(4.5rem,0.74fr)_minmax(5.25rem,1fr)_3.25rem] items-center gap-1.5 py-px',
   suffix: 'text-[10px] align-top inline-block mt-0.5 ml-0.5',
   track: 'absolute top-1/2 left-0 h-1 w-full -translate-y-1/2 rounded-full pointer-events-none',
   trackWrap: 'relative h-5 min-w-0',
@@ -125,5 +125,5 @@ export const compactInspectorSliderTokens = {
     'h-5 border-0 bg-transparent p-0 font-mono text-[12px] leading-5 tabular-nums text-text-primary w-full text-right select-none',
   valueInput:
     'h-5 w-full rounded-sm border border-gray-500 bg-card-active px-1 py-0 text-right font-mono text-[12px] leading-5 tabular-nums text-text-primary outline-none focus:ring-1 focus:ring-blue-500',
-  valueSlot: 'w-10 shrink-0 text-right',
+  valueSlot: 'w-[3.25rem] shrink-0 text-right',
 } as const;
