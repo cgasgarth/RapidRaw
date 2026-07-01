@@ -212,8 +212,8 @@ fn private_runtime_generates_mask_refinement_full_image_output_report_when_enabl
         .expect("private mask refinement full-image output proof runs");
 }
 
-fn run_synthetic_mask_refinement_full_image_output_proof(
-) -> Result<MaskRefinementFullImageOutputReport, String> {
+fn run_synthetic_mask_refinement_full_image_output_proof()
+-> Result<MaskRefinementFullImageOutputReport, String> {
     let base_image = build_synthetic_fixture();
     let source_hash = sha256_dynamic_image(&base_image);
     let report = run_mask_refinement_full_image_output_proof(
@@ -301,20 +301,24 @@ fn run_mask_refinement_full_image_output_proof(
     let mut private_artifacts = Vec::new();
 
     if let (Some(root), Some(dir)) = (private_root, output_dir) {
-        let unmasked_relative = format!(
-            "{PRIVATE_ARTIFACT_DIR}/{PRIVATE_PROOF_SLUG}-unmasked-preview.png"
-        );
+        let unmasked_relative =
+            format!("{PRIVATE_ARTIFACT_DIR}/{PRIVATE_PROOF_SLUG}-unmasked-preview.png");
         write_image(
             &unmasked_output,
             &dir.join(format!("{PRIVATE_PROOF_SLUG}-unmasked-preview.png")),
             ImageFormat::Png,
         )?;
-        private_artifacts.push(hashed_artifact(root, "unmasked_preview_private", &unmasked_relative)?);
+        private_artifacts.push(hashed_artifact(
+            root,
+            "unmasked_preview_private",
+            &unmasked_relative,
+        )?);
     }
 
     let variant_specs = variant_specs(base_image);
     for variant_spec in variant_specs.iter() {
-        let adjustments = build_mask_adjustments(variant_spec.mask_kind, variant_spec.refinement, base_image);
+        let adjustments =
+            build_mask_adjustments(variant_spec.mask_kind, variant_spec.refinement, base_image);
         let rendered_output = render_with_masks(
             source_path,
             base_image,
@@ -345,7 +349,11 @@ fn run_mask_refinement_full_image_output_proof(
         if let (Some(root), Some(dir)) = (private_root, output_dir) {
             let output_file_name = format!("{PRIVATE_PROOF_SLUG}-{}.png", variant_spec.id);
             let relative_path = format!("{PRIVATE_ARTIFACT_DIR}/{output_file_name}");
-            write_image(&rendered_output, &dir.join(&output_file_name), ImageFormat::Png)?;
+            write_image(
+                &rendered_output,
+                &dir.join(&output_file_name),
+                ImageFormat::Png,
+            )?;
             private_artifacts.push(hashed_artifact(
                 root,
                 &format!("{}_preview_private", variant_spec.id),
@@ -369,7 +377,11 @@ fn run_mask_refinement_full_image_output_proof(
         }
     };
 
-    let summary = build_summary(&baseline_unmasked_output_hash, &variants, source_hash_before == source_hash_after)?;
+    let summary = build_summary(
+        &baseline_unmasked_output_hash,
+        &variants,
+        source_hash_before == source_hash_after,
+    )?;
     let source = ProofSource {
         hash: source_hash_before,
         is_raw,
@@ -391,8 +403,12 @@ fn run_mask_refinement_full_image_output_proof(
         ProofSourceKind::PrivateRaw => PRIVATE_REPORT_ID.to_string(),
     };
     let validation_mode = match source_kind {
-        ProofSourceKind::Synthetic => "synthetic_mask_refinement_full_image_output_runtime_proof".to_string(),
-        ProofSourceKind::PrivateRaw => "private_raw_mask_refinement_full_image_output_runtime_proof".to_string(),
+        ProofSourceKind::Synthetic => {
+            "synthetic_mask_refinement_full_image_output_runtime_proof".to_string()
+        }
+        ProofSourceKind::PrivateRaw => {
+            "private_raw_mask_refinement_full_image_output_runtime_proof".to_string()
+        }
     };
     let proof_claims = match source_kind {
         ProofSourceKind::Synthetic => ProofClaims {
@@ -486,7 +502,8 @@ fn build_summary(
     let contrast = variant_by_id(variants, "brush-edge-contrast")?;
 
     let feather_gain = feather.edge_spread - baseline_brush.edge_spread;
-    let density_ratio = density.output_mean_abs_delta / baseline_brush.output_mean_abs_delta.max(0.000001);
+    let density_ratio =
+        density.output_mean_abs_delta / baseline_brush.output_mean_abs_delta.max(0.000001);
     let smoothness_gain = smooth.alpha_decisiveness - baseline_brush.alpha_decisiveness;
     let edge_contrast_gain = baseline_brush.edge_spread - contrast.edge_spread;
     let expand_delta = expand.mask_coverage_ratio - baseline_brush.mask_coverage_ratio;
@@ -710,7 +727,11 @@ fn build_synthetic_fixture() -> DynamicImage {
     DynamicImage::ImageRgba8(image)
 }
 
-fn build_mask_adjustments(mask_kind: ProofMaskKind, refinement: MaskRefinementParameters, base_image: &DynamicImage) -> Value {
+fn build_mask_adjustments(
+    mask_kind: ProofMaskKind,
+    refinement: MaskRefinementParameters,
+    base_image: &DynamicImage,
+) -> Value {
     let refinement_value =
         serde_json::to_value(refinement).expect("serialize mask refinement parameters");
     match mask_kind {
@@ -951,7 +972,11 @@ fn resolve_private_raw_source_path(private_root: &Path) -> Result<PathBuf, Strin
 
     candidates
         .into_iter()
-        .find(|path| !path.components().any(|component| component.as_os_str() == "Trash"))
+        .find(|path| {
+            !path
+                .components()
+                .any(|component| component.as_os_str() == "Trash")
+        })
         .or_else(|| {
             WalkDir::new(private_root)
                 .into_iter()
@@ -961,7 +986,12 @@ fn resolve_private_raw_source_path(private_root: &Path) -> Result<PathBuf, Strin
                 .filter(|path| is_private_raw_candidate(path))
                 .min()
         })
-        .ok_or_else(|| format!("no supported RAW files found under {}", private_root.display()))
+        .ok_or_else(|| {
+            format!(
+                "no supported RAW files found under {}",
+                private_root.display()
+            )
+        })
 }
 
 fn is_private_raw_candidate(path: &Path) -> bool {
