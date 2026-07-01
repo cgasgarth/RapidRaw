@@ -45,7 +45,10 @@ const expectedQcProofCommandName = NegativeLabAppServerCommandName.QcProof;
 const expectedStockMetadataCommandName = NegativeLabAppServerCommandName.StockMetadata;
 const expectedStockFamilyConversionCommandName = NegativeLabAppServerCommandName.StockFamilyConversion;
 const expectedStockRegistryCommandName = NegativeLabAppServerCommandName.StockRegistry;
-const runtimeCheckScripts = ['check:negative-lab-agent-workflow', 'check:negative-lab-measured-render-proof'];
+const runtimeCheckCommands = [
+  ['bun', 'tests/integration/checks/negative-lab/check-negative-lab-agent-workflow.ts'],
+  ['bun', 'tests/integration/checks/negative-lab/check-negative-lab-measured-render-proof.ts'],
+] as const;
 const failures = [];
 const selectedProfileSnapshot = buildNegativeLabRuntimeSelectedProfileSnapshot(
   resolveNegativeLabRuntimeProfile('negative_lab.generic.c41.neutral.v1'),
@@ -458,6 +461,25 @@ if (
 ) {
   throw new Error('Negative Lab app-server accepted apply route did not replay profile-bound dry-run evidence.');
 }
+const positiveOutputReceipts = acceptedBatchApplyResult.apply.positiveOutputs.exportedPositives;
+if (
+  positiveOutputReceipts.length !== acceptedBatchApplyResult.dryRunSummary.affectedFrameIds.length ||
+  acceptedBatchApplyResult.apply.positiveOutputs.rejectedFrames.length !== 0 ||
+  positiveOutputReceipts.some((receipt) => receipt.outputArtifact.storage !== 'export_path') ||
+  positiveOutputReceipts.some((receipt) => receipt.outputArtifact.kind !== 'export') ||
+  positiveOutputReceipts.some((receipt) => !receipt.outputArtifact.contentHash.startsWith('sha256:')) ||
+  positiveOutputReceipts.some((receipt) => !receipt.sidecarContentHash.startsWith('sha256:')) ||
+  positiveOutputReceipts.some((receipt) => !receipt.conversionBundleContentHash.startsWith('sha256:')) ||
+  positiveOutputReceipts.some((receipt) => receipt.outputPath === receipt.sourcePath) ||
+  positiveOutputReceipts.some(
+    (receipt) => receipt.outputPath.split('/').at(-1) === receipt.sourcePath.split('/').at(-1),
+  ) ||
+  positiveOutputReceipts[0]?.outputPath !== '/roll/001-Positive.jpg' ||
+  positiveOutputReceipts[0]?.acceptedDryRunPlanHash !== acceptedBatchPlanResult.acceptedDryRunPlanHash ||
+  positiveOutputReceipts[0]?.profileProvenanceHash !== acceptedBatchApplyResult.conversionPlan.profileProvenanceHash
+) {
+  throw new Error('Negative Lab app-server accepted apply route did not produce real positive output receipts.');
+}
 if (
   acceptedUserProfileApplyResult.selectedProfileSnapshot.presetId !== 'negative_lab.user.c41.local_warm_proof.v1' ||
   acceptedUserProfileApplyResult.selectedProfileSnapshot.profileStatus !== 'user_supplied' ||
@@ -725,8 +747,8 @@ for (const filePath of [
   }
 }
 
-for (const runtimeCheckScript of runtimeCheckScripts) {
-  runPackageScript(runtimeCheckScript);
+for (const runtimeCheckCommand of runtimeCheckCommands) {
+  runCheckCommand(runtimeCheckCommand);
 }
 
 if (failures.length > 0) {
@@ -739,8 +761,8 @@ console.log(
   `negative lab app-server routes ok (${NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets.length} presets, ${NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST.routes.length} routes)`,
 );
 
-function runPackageScript(scriptName: string): void {
-  const result = Bun.spawnSync(['bun', 'run', scriptName], {
+function runCheckCommand(command: readonly string[]): void {
+  const result = Bun.spawnSync([...command], {
     stderr: 'pipe',
     stdout: 'pipe',
   });
@@ -753,5 +775,5 @@ function runPackageScript(scriptName: string): void {
     .filter(Boolean)
     .slice(-20)
     .join('\n');
-  failures.push(`${scriptName} failed:\n${output}`);
+  failures.push(`${command.join(' ')} failed:\n${output}`);
 }

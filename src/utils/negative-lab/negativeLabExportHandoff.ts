@@ -1,3 +1,5 @@
+import type { NegativeLabConversionPlanResult } from '../../schemas/negative-lab/negativeLabAppServerSchemas';
+import type { NegativeLabBatchDryRunSummary } from '../../schemas/negative-lab/negativeLabFrameHealthSchemas';
 import {
   NEGATIVE_LAB_WORKSPACE_SCHEMA_VERSION,
   type NegativeLabDustScratchReviewReport,
@@ -28,6 +30,208 @@ export interface NegativeLabExportReadiness {
 }
 
 export type NegativeLabPositiveVariant = NegativeLabQcContactSheetArtifact['positiveVariants'][number];
+
+export interface NegativeLabAcceptedBatchPlanIdentity {
+  acceptedDryRunPlanHash: string;
+  acceptedDryRunPlanId: string;
+}
+
+export interface NegativeLabPositiveOutputReceipt {
+  acceptedDryRunPlanHash: string;
+  acceptedDryRunPlanId: string;
+  conversionBundleContentHash: string;
+  conversionBundlePath: string;
+  frameId: string;
+  outputArtifact: {
+    artifactId: string;
+    contentHash: string;
+    dimensions: { height: number; width: number };
+    kind: 'export';
+    storage: 'export_path';
+  };
+  outputFileName: string;
+  outputFormat: NegativeLabConversionPlanResult['outputFormat'];
+  outputPath: string;
+  positiveVariantId: string;
+  profileProvenanceHash: string;
+  provenanceEntryIds: string[];
+  sidecarContentHash: string;
+  sidecarPath: string;
+  sourceContentHash: string;
+  sourcePath: string;
+}
+
+export interface NegativeLabPositiveOutputRejectedFrame {
+  frameId: string;
+  reason: 'missing_positive_variant' | 'source_overwrite_guard' | 'unsupported_output_format';
+  sourcePath: string;
+}
+
+export interface NegativeLabPositiveOutputBuildResult {
+  exportedPositives: NegativeLabPositiveOutputReceipt[];
+  rejectedFrames: NegativeLabPositiveOutputRejectedFrame[];
+}
+
+const fnv1a32 = (value: string): string => {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, '0');
+};
+
+const stableSha256LikeHash = (namespace: string, payload: unknown): string => {
+  const serialized = JSON.stringify({ namespace, payload });
+  const digest = Array.from({ length: 8 }, (_, index) => fnv1a32(`${index}:${serialized}`)).join('');
+  return `sha256:${digest}`;
+};
+
+const splitOutputPath = (sourcePath: string): { baseName: string; directory: string; extension: string } => {
+  const separatorIndex = Math.max(sourcePath.lastIndexOf('/'), sourcePath.lastIndexOf('\\'));
+  const directory = separatorIndex >= 0 ? sourcePath.slice(0, separatorIndex) : '';
+  const fileName = separatorIndex >= 0 ? sourcePath.slice(separatorIndex + 1) : sourcePath;
+  const extensionIndex = fileName.lastIndexOf('.');
+  if (extensionIndex <= 0) return { baseName: fileName, directory, extension: '' };
+  return {
+    baseName: fileName.slice(0, extensionIndex),
+    directory,
+    extension: fileName.slice(extensionIndex),
+  };
+};
+
+const joinOutputPath = (directory: string, fileName: string): string =>
+  directory.length === 0 ? fileName : `${directory}/${fileName}`;
+
+const outputExtensionForFormat = (outputFormat: NegativeLabConversionPlanResult['outputFormat']): string | null => {
+  if (outputFormat === 'jpeg_proof') return '.jpg';
+  if (outputFormat === 'tiff16') return '.tif';
+  return null;
+};
+
+const buildPositiveOutputFileName = ({
+  outputFormat,
+  sourcePath,
+  suffix,
+}: {
+  outputFormat: NegativeLabConversionPlanResult['outputFormat'];
+  sourcePath: string;
+  suffix: string;
+}): string | null => {
+  const extension = outputExtensionForFormat(outputFormat);
+  if (extension === null) return null;
+  const { baseName } = splitOutputPath(sourcePath);
+  return `${baseName}-${suffix}${extension}`;
+};
+
+const basenameOf = (path: string): string => {
+  const separatorIndex = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+  return separatorIndex >= 0 ? path.slice(separatorIndex + 1) : path;
+};
+
+export const buildNegativeLabPositiveOutputReceipts = ({
+  acceptedPlanIdentity,
+  conversionPlan,
+  dryRunSummary,
+  positiveVariants,
+}: {
+  acceptedPlanIdentity: NegativeLabAcceptedBatchPlanIdentity;
+  conversionPlan: NegativeLabConversionPlanResult;
+  dryRunSummary: NegativeLabBatchDryRunSummary;
+  positiveVariants: readonly NegativeLabPositiveVariant[];
+}): NegativeLabPositiveOutputBuildResult => {
+  const positiveByFrameId = new Map(positiveVariants.map((positive) => [positive.frameId, positive] as const));
+  const rejectedFrames: NegativeLabPositiveOutputRejectedFrame[] = [];
+  const exportedPositives: NegativeLabPositiveOutputReceipt[] = [];
+
+  for (const frame of dryRunSummary.frameHealthReport.frames) {
+    if (!dryRunSummary.affectedFrameIds.includes(frame.frameId)) continue;
+
+    const positive = positiveByFrameId.get(frame.frameId);
+    if (positive === undefined) {
+      rejectedFrames.push({ frameId: frame.frameId, reason: 'missing_positive_variant', sourcePath: frame.sourcePath });
+      continue;
+    }
+
+    const outputFileName = buildPositiveOutputFileName({
+      outputFormat: conversionPlan.outputFormat,
+      sourcePath: frame.sourcePath,
+      suffix: conversionPlan.suffix,
+    });
+    if (outputFileName === null) {
+      rejectedFrames.push({
+        frameId: frame.frameId,
+        reason: 'unsupported_output_format',
+        sourcePath: frame.sourcePath,
+      });
+      continue;
+    }
+
+    const outputPath = joinOutputPath(splitOutputPath(frame.sourcePath).directory, outputFileName);
+    if (outputPath === frame.sourcePath || basenameOf(outputPath) === basenameOf(frame.sourcePath)) {
+      rejectedFrames.push({ frameId: frame.frameId, reason: 'source_overwrite_guard', sourcePath: frame.sourcePath });
+      continue;
+    }
+
+    const positiveVariantId = `positive_variant_${frame.frameId}`;
+    const sidecarPath = `${outputPath}.rawengine-negative-lab.json`;
+    const conversionBundlePath = `${outputPath}.negative-lab-bundle.json`;
+    const provenanceEntryIds = [
+      `prov_${acceptedPlanIdentity.acceptedDryRunPlanId}_${frame.frameId}`,
+      `prov_${positive.operationId}`,
+    ];
+    const outputPayload = {
+      acceptedDryRunPlanHash: acceptedPlanIdentity.acceptedDryRunPlanHash,
+      acceptedDryRunPlanId: acceptedPlanIdentity.acceptedDryRunPlanId,
+      frameId: frame.frameId,
+      outputFormat: conversionPlan.outputFormat,
+      positiveVariantId,
+      profileProvenanceHash: conversionPlan.profileProvenanceHash,
+      sourceContentHash: positive.sourceContentHash,
+      sourcePath: frame.sourcePath,
+    };
+    const outputContentHash = stableSha256LikeHash('negative-lab-positive-output', outputPayload);
+    const sidecarContentHash = stableSha256LikeHash('negative-lab-positive-sidecar', {
+      ...outputPayload,
+      outputContentHash,
+      outputPath,
+      provenanceEntryIds,
+    });
+    const conversionBundleContentHash = stableSha256LikeHash('negative-lab-conversion-bundle', {
+      ...outputPayload,
+      conversionParams: conversionPlan.params,
+      outputContentHash,
+      outputPath,
+      sidecarContentHash,
+    });
+
+    exportedPositives.push({
+      ...acceptedPlanIdentity,
+      conversionBundleContentHash,
+      conversionBundlePath,
+      frameId: frame.frameId,
+      outputArtifact: {
+        artifactId: `artifact_${positiveVariantId}_export`,
+        contentHash: outputContentHash,
+        dimensions: positive.outputArtifact.dimensions,
+        kind: 'export',
+        storage: 'export_path',
+      },
+      outputFileName,
+      outputFormat: conversionPlan.outputFormat,
+      outputPath,
+      positiveVariantId,
+      profileProvenanceHash: conversionPlan.profileProvenanceHash,
+      provenanceEntryIds,
+      sidecarContentHash,
+      sidecarPath,
+      sourceContentHash: positive.sourceContentHash,
+      sourcePath: frame.sourcePath,
+    });
+  }
+
+  return { exportedPositives, rejectedFrames };
+};
 
 export const buildNegativeLabCanSave = ({
   baseReady,

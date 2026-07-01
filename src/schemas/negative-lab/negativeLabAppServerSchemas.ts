@@ -272,7 +272,7 @@ interface NegativeLabRouteDescriptor {
 export const negativeLabAcceptedBatchApplyRouteDescriptor = {
   commandName: NegativeLabAppServerCommandName.AcceptedBatchApply,
   inputSchemaName: 'NegativeLabAcceptedBatchApplyAppServerCommandV1',
-  outputSchemaName: 'NegativeLabAcceptedBatchApplyPlanV1',
+  outputSchemaName: 'NegativeLabAcceptedBatchApplyResultV1',
   reason: 'Negative Lab app-server apply calls must replay an accepted dry-run plan identity.',
 } as const satisfies NegativeLabRouteDescriptor;
 export const negativeLabAcceptBatchPlanRouteDescriptor = {
@@ -467,6 +467,62 @@ export const negativeLabAcceptedBatchPlanSchema = z
     }
   });
 
+export const negativeLabPositiveOutputReceiptSchema = z
+  .object({
+    acceptedDryRunPlanHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+    acceptedDryRunPlanId: z.string().regex(/^negative_lab_batch_plan_[a-f0-9]{8}$/u),
+    conversionBundleContentHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    conversionBundlePath: z.string().trim().min(1),
+    frameId: z.string().trim().min(1),
+    outputArtifact: z
+      .object({
+        artifactId: z.string().trim().min(1),
+        contentHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+        dimensions: z.object({ height: z.number().int().positive(), width: z.number().int().positive() }).strict(),
+        kind: z.literal('export'),
+        storage: z.literal('export_path'),
+      })
+      .strict(),
+    outputFileName: z.string().trim().min(1),
+    outputFormat: negativeLabAppServerOutputFormatSchema,
+    outputPath: z.string().trim().min(1),
+    positiveVariantId: z.string().trim().min(1),
+    profileProvenanceHash: negativeLabProfileProvenanceHashSchema,
+    provenanceEntryIds: z.array(z.string().trim().min(1)).min(1),
+    sidecarContentHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    sidecarPath: z.string().trim().min(1),
+    sourceContentHash: z.string().trim().min(1),
+    sourcePath: z.string().trim().min(1),
+  })
+  .strict()
+  .superRefine((receipt, context) => {
+    const outputName = receipt.outputPath.split(/[\\/]/u).at(-1);
+    const sourceName = receipt.sourcePath.split(/[\\/]/u).at(-1);
+    if (receipt.outputPath === receipt.sourcePath || outputName === sourceName) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Negative Lab positive output receipt must not overwrite the source negative.',
+        path: ['outputPath'],
+      });
+    }
+
+    if (receipt.acceptedDryRunPlanId !== `negative_lab_batch_plan_${receipt.acceptedDryRunPlanHash.slice(8)}`) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Positive output receipt accepted plan id must match accepted plan hash.',
+        path: ['acceptedDryRunPlanId'],
+      });
+    }
+  });
+
+export const negativeLabPositiveOutputRejectedFrameSchema = z
+  .object({
+    frameId: z.string().trim().min(1),
+    reason: z.enum(['missing_positive_variant', 'source_overwrite_guard', 'unsupported_output_format']),
+    sourcePath: z.string().trim().min(1),
+  })
+  .strict();
+
 export const negativeLabAcceptedBatchApplyPlanSchema = z
   .object({
     acceptedDryRunPlanHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
@@ -485,6 +541,12 @@ export const negativeLabAcceptedBatchApplyPlanSchema = z
           .strict(),
         params: negativeLabPresetParamsSchema,
         paths: z.array(z.string().trim().min(1)).min(1),
+        positiveOutputs: z
+          .object({
+            exportedPositives: z.array(negativeLabPositiveOutputReceiptSchema).min(1),
+            rejectedFrames: z.array(negativeLabPositiveOutputRejectedFrameSchema),
+          })
+          .strict(),
         receipt: negativeLabRuntimeProfileApplyProofSchema,
       })
       .strict(),
@@ -509,6 +571,40 @@ export const negativeLabAcceptedBatchApplyPlanSchema = z
 
     if (plan.acceptedDryRunPlanId !== plan.apply.options.acceptedDryRunPlanId) {
       context.addIssue({ code: 'custom', message: 'Apply options must preserve accepted dry-run id.' });
+    }
+
+    for (const [index, receipt] of plan.apply.positiveOutputs.exportedPositives.entries()) {
+      if (receipt.acceptedDryRunPlanHash !== plan.acceptedDryRunPlanHash) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Positive output receipt must preserve accepted dry-run hash.',
+          path: ['apply', 'positiveOutputs', 'exportedPositives', index, 'acceptedDryRunPlanHash'],
+        });
+      }
+
+      if (receipt.acceptedDryRunPlanId !== plan.acceptedDryRunPlanId) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Positive output receipt must preserve accepted dry-run id.',
+          path: ['apply', 'positiveOutputs', 'exportedPositives', index, 'acceptedDryRunPlanId'],
+        });
+      }
+
+      if (receipt.profileProvenanceHash !== plan.conversionPlan.profileProvenanceHash) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Positive output receipt must preserve selected profile provenance hash.',
+          path: ['apply', 'positiveOutputs', 'exportedPositives', index, 'profileProvenanceHash'],
+        });
+      }
+
+      if (!plan.dryRunSummary.affectedFrameIds.includes(receipt.frameId)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Positive output receipt frame must be part of the accepted apply plan.',
+          path: ['apply', 'positiveOutputs', 'exportedPositives', index, 'frameId'],
+        });
+      }
     }
 
     if (plan.apply.options.profileProvenanceHash !== plan.conversionPlan.profileProvenanceHash) {
