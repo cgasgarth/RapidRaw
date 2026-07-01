@@ -95,6 +95,45 @@ const healExport = renderLayerExportStack({
   width: 7,
 });
 const removePreview = renderRetouch('remove');
+const removeDisabledPreview = renderLayerPreviewStack({
+  basePixels,
+  height: 7,
+  layers: [
+    {
+      blendMode: 'normal',
+      id: 'retouch-remove-runtime',
+      maskAlpha: removeTargetMask,
+      name: 'Retouch remove runtime',
+      opacity: 1,
+      retouchRemoveSource: {
+        featherRadiusPx: 2,
+        generator: 'local_patch_fill_v1',
+        generatorVersion: 1,
+        provenance: {
+          algorithmId: 'local_patch_fill_v1',
+          changedPixelCount: 1,
+          editableLayer: true,
+          featherRadiusPx: 2,
+          maskAlphaHash: 'fnv1a32:00000000',
+          mode: 'remove',
+          outputHash: 'fnv1a32:00000000',
+          proofSource: 'mask_aware_retouch_runtime_fixture_v1',
+          provenanceVersion: 1,
+          radiusPx: 1,
+          targetMaskId: 'retouch-remove-mask',
+          targetPoint: { x: 0.5, y: 0.5 },
+        },
+        radiusPx: 1,
+        searchRadiusMultiplier: 2,
+        seed: 1,
+        status: 'ready',
+        targetMaskId: 'retouch-remove-mask',
+      },
+      visible: false,
+    },
+  ],
+  width: 7,
+});
 const healDelta = healPreview.outputDeltaByLayer[0];
 const healApplyDelta = healExport.outputDeltaByLayer[0];
 const removeDelta = removePreview.outputDeltaByLayer[0];
@@ -120,6 +159,12 @@ if (
   removeSource.resolvedSourcePoint === undefined
 ) {
   throw new Error('Remove preview did not record changed output and resolved mask-aware source provenance.');
+}
+if (
+  removeDisabledPreview.outputDeltaByLayer.length !== 0 ||
+  JSON.stringify(removeDisabledPreview.pixels) !== JSON.stringify(basePixels)
+) {
+  throw new Error('Disabling editable retouch remove layer did not revert runtime output to the base pixels.');
 }
 
 const noOpPreview = renderLayerPreviewStack({
