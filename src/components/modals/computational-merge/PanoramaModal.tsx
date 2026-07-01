@@ -283,10 +283,18 @@ export default function PanoramaModal({
   };
 
   const handleOpen = () => {
-    if (savedPath) {
-      onOpenFile(savedPath);
+    const openPath = visibleDerivedOutputReceipt?.openInEditorAction.path ?? savedPath;
+    if (openPath) {
+      onOpenFile(openPath);
       handleClose();
     }
+  };
+
+  const handleRun = () => {
+    setSavedPath(null);
+    setSavedReviewSummary(null);
+    setSavedDerivedOutputReceiptId(null);
+    onStitch();
   };
 
   const renderContent = () => {
@@ -425,7 +433,13 @@ export default function PanoramaModal({
             </section>
           )}
           {visibleDerivedOutputReceipt ? (
-            <div className="mx-auto mt-4 max-w-2xl text-left">
+            <div
+              className="mx-auto mt-4 max-w-2xl text-left"
+              data-derived-output-receipt-id={visibleDerivedOutputReceipt.receiptId}
+              data-panorama-derived-source-open-path={visibleDerivedOutputReceipt.openInEditorAction.path ?? ''}
+              data-panorama-derived-source-state={visibleDerivedOutputReceipt.openInEditorAction.state}
+              data-testid="panorama-derived-output-receipt-store-entry"
+            >
               <DerivedOutputReceiptPanel
                 receipt={visibleDerivedOutputReceipt}
                 onOpenOutput={onOpenFile}
@@ -1154,7 +1168,7 @@ export default function PanoramaModal({
         }}
         onClose={handleClose}
         onOpen={handleOpen}
-        onRun={onStitch}
+        onRun={handleRun}
         onSave={() => {
           void handleSave();
         }}
