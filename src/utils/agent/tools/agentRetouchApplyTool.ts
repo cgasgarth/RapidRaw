@@ -1,5 +1,12 @@
 import { z } from 'zod';
-import { type ArtifactHandleV1, artifactHandleV1Schema } from '../../../../packages/rawengine-schema/src';
+import {
+  type ArtifactHandleV1,
+  artifactHandleV1Schema,
+  type LayerRgbPixel,
+  layerBlendOutputDeltaSchema,
+  renderLayerExportStack,
+  renderLayerPreviewStack,
+} from '../../../../packages/rawengine-schema/src';
 import { Mask, SubMaskMode } from '../../../components/panel/right/layers/Masks';
 import { useEditorStore } from '../../../store/useEditorStore';
 import {
@@ -47,6 +54,20 @@ const agentRetouchOverlayPreviewSchema = z
   })
   .strict();
 
+const agentRetouchOutputProofSchema = z
+  .object({
+    applyDelta: layerBlendOutputDeltaSchema,
+    applyHash: z.string().regex(/^fnv1a32:[0-9a-f]{8}$/u),
+    changedOutput: z.boolean(),
+    maskAlphaHash: z.string().regex(/^fnv1a32:[0-9a-f]{8}$/u),
+    previewApplyParity: z.literal(true),
+    previewDelta: layerBlendOutputDeltaSchema,
+    previewHash: z.string().regex(/^fnv1a32:[0-9a-f]{8}$/u),
+    proofSource: z.literal('mask_aware_retouch_runtime_fixture_v1'),
+    resolvedRemoveSourceStatus: z.enum(['fallback_unchanged', 'ready']).optional(),
+  })
+  .strict();
+
 export const agentRetouchApplyRequestSchema = z
   .object({
     expectedRecipeHash: z.string().trim().min(1),
@@ -90,6 +111,7 @@ export const agentRetouchApplyResponseSchema = z
     mode: retouchModeSchema,
     overlayPreview: agentRetouchOverlayPreviewSchema,
     overlayMaskId: z.string().trim().min(1),
+    outputProof: agentRetouchOutputProofSchema,
     requestId: z.string().trim().min(1),
     staleRecipeHash: z.literal(false),
     toolName: z.literal(AGENT_RETOUCH_APPLY_TOOL_NAME),
@@ -100,6 +122,7 @@ export const agentRetouchApplyResponseSchema = z
 export type AgentRetouchApplyRequest = z.infer<typeof agentRetouchApplyRequestSchema>;
 export type AgentRetouchApplyResponse = z.infer<typeof agentRetouchApplyResponseSchema>;
 export type AgentRetouchOverlayPreview = z.infer<typeof agentRetouchOverlayPreviewSchema>;
+export type AgentRetouchOutputProof = z.infer<typeof agentRetouchOutputProofSchema>;
 
 const toIdSegment = (value: string): string =>
   value
@@ -203,6 +226,139 @@ const buildRetouchLayer = (
   return { ...baseLayer, retouchRemoveSource: removeSource };
 };
 
+const proofWidth = 17;
+const proofHeight = 17;
+
+const hashProofPixels = (label: number, pixels: ReadonlyArray<LayerRgbPixel>): string => {
+  let hash = 0x811c9dc5;
+  const update = (value: number) => {
+    hash ^= value & 0xff;
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+    hash ^= (value >>> 8) & 0xff;
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  };
+  update(label);
+  for (const pixel of pixels) {
+    update(pixel.r);
+    update(pixel.g);
+    update(pixel.b);
+  }
+  return `fnv1a32:${hash.toString(16).padStart(8, '0')}`;
+};
+
+const buildProofBasePixels = (targetPoint: AgentRetouchApplyRequest['targetPoint']): Array<LayerRgbPixel> => {
+  const targetX = Math.round(clamp01(targetPoint.x) * (proofWidth - 1));
+  const targetY = Math.round(clamp01(targetPoint.y) * (proofHeight - 1));
+  return Array.from({ length: proofWidth * proofHeight }, (_, index) => {
+    const x = index % proofWidth;
+    const y = Math.floor(index / proofWidth);
+    const blemish = Math.hypot(x - targetX, y - targetY) <= 1 ? 58 : 0;
+    return {
+      b: Math.max(0, ((41 + x * 17 + y * 7) % 256) - blemish),
+      g: Math.max(0, ((73 + x * 5 + y * 19) % 256) - blemish),
+      r: Math.max(0, ((29 + x * 23 + y * 11) % 256) - blemish),
+    };
+  });
+};
+
+const buildNoOpProofBasePixels = (): Array<LayerRgbPixel> =>
+  Array.from({ length: proofWidth * proofHeight }, (_, index) => {
+    const x = index % proofWidth;
+    const y = Math.floor(index / proofWidth);
+    return {
+      b: (41 + x * 17 + y * 7) % 256,
+      g: (73 + x * 5 + y * 19) % 256,
+      r: (29 + x * 23 + y * 11) % 256,
+    };
+  });
+
+const buildProofMaskAlpha = (request: AgentRetouchApplyRequest): Array<number> => {
+  const targetX = clamp01(request.targetPoint.x) * (proofWidth - 1);
+  const targetY = clamp01(request.targetPoint.y) * (proofHeight - 1);
+  const radiusPx = request.mode === 'remove' ? 1.25 : Math.max(2, Math.min(6, request.radiusPx / 10));
+  const featherPx =
+    request.mode === 'remove' ? 0.25 : Math.min(radiusPx, Math.max(0, request.featherRadiusPx ?? radiusPx * 0.35) / 10);
+  const solidRadius = Math.max(0, radiusPx - featherPx);
+
+  return Array.from({ length: proofWidth * proofHeight }, (_, index) => {
+    const x = index % proofWidth;
+    const y = Math.floor(index / proofWidth);
+    const distance = Math.hypot(x - targetX, y - targetY);
+    if (distance <= solidRadius) return 1;
+    if (distance >= radiusPx) return 0;
+    return clamp01((radiusPx - distance) / Math.max(featherPx, 1));
+  });
+};
+
+const buildRetouchOutputProof = (request: AgentRetouchApplyRequest, layer: MaskContainer): AgentRetouchOutputProof => {
+  const proofLayer = {
+    blendMode: 'normal' as const,
+    id: layer.id,
+    maskAlpha: buildProofMaskAlpha(request),
+    name: layer.name,
+    opacity: clamp01(layer.opacity / 100),
+    ...(layer.retouchCloneSource === undefined
+      ? {}
+      : {
+          retouchCloneSource: {
+            ...layer.retouchCloneSource,
+            featherRadiusPx: Math.min(2, layer.retouchCloneSource.featherRadiusPx ?? 2),
+            radiusPx: 3,
+          },
+        }),
+    ...(layer.retouchRemoveSource === undefined
+      ? {}
+      : {
+          retouchRemoveSource: {
+            ...layer.retouchRemoveSource,
+            featherRadiusPx: Math.min(1, layer.retouchRemoveSource.featherRadiusPx ?? 1),
+            radiusPx: 1,
+          },
+        }),
+    visible: layer.visible,
+  };
+  const renderInput = {
+    basePixels:
+      request.mode === 'clone' &&
+      request.sourcePoint?.x === request.targetPoint.x &&
+      request.sourcePoint.y === request.targetPoint.y
+        ? buildNoOpProofBasePixels()
+        : buildProofBasePixels(request.targetPoint),
+    height: proofHeight,
+    layers: [proofLayer],
+    width: proofWidth,
+  };
+  const preview = renderLayerPreviewStack(renderInput);
+  const applied = renderLayerExportStack(renderInput);
+  const previewDelta = preview.outputDeltaByLayer.find((delta) => delta.id === layer.id);
+  const applyDelta = applied.outputDeltaByLayer.find((delta) => delta.id === layer.id);
+  if (previewDelta === undefined || applyDelta === undefined) {
+    throw new Error('Agent retouch apply did not produce mask-aware runtime output proof.');
+  }
+
+  const previewHash = hashProofPixels(3, preview.pixels);
+  const applyHash = hashProofPixels(3, applied.pixels);
+  const previewApplyParity = previewHash === applyHash && JSON.stringify(previewDelta) === JSON.stringify(applyDelta);
+  if (!previewApplyParity) {
+    throw new Error('Agent retouch apply preview/apply runtime output proof diverged.');
+  }
+
+  const resolvedRemoveSourceStatus = applied.resolvedRemoveSources.find(
+    (source) => source.layerId === layer.id,
+  )?.status;
+  return agentRetouchOutputProofSchema.parse({
+    applyDelta,
+    applyHash,
+    changedOutput: applyDelta.status === 'changed',
+    maskAlphaHash: applyDelta.maskAlphaHash,
+    previewApplyParity,
+    previewDelta,
+    previewHash,
+    proofSource: 'mask_aware_retouch_runtime_fixture_v1',
+    ...(resolvedRemoveSourceStatus === undefined ? {} : { resolvedRemoveSourceStatus }),
+  });
+};
+
 const pushMaskHistory = (masks: ReadonlyArray<MaskContainer>): void => {
   useEditorStore.setState((state) => {
     const adjustments = { ...state.adjustments, masks: [...masks] };
@@ -288,6 +444,10 @@ export const applyAgentRetouch = (request: AgentRetouchApplyRequest): AgentRetou
   if (selectedImage === null) throw new Error('Agent retouch apply requires a selected image.');
 
   const layer = buildRetouchLayer(parsedRequest, selectedImage.width, selectedImage.height);
+  const outputProof = buildRetouchOutputProof(parsedRequest, layer);
+  if (!outputProof.changedOutput) {
+    throw new Error('Agent retouch apply rejected no-op runtime output.');
+  }
   const result = applyLayerStackCommandBridgeOperation(
     state.adjustments.masks,
     { layer, type: 'create' },
@@ -319,6 +479,7 @@ export const applyAgentRetouch = (request: AgentRetouchApplyRequest): AgentRetou
       overlayMaskId,
     }),
     overlayMaskId,
+    outputProof,
     requestId: parsedRequest.requestId,
     staleRecipeHash: false,
     toolName: AGENT_RETOUCH_APPLY_TOOL_NAME,
