@@ -56,7 +56,7 @@ struct ComputationalMergePrivateRunReport {
     preview_export_parity: QualityMetric,
     quality_metrics: Vec<QualityMetric>,
     report_id: String,
-    run_id: Option<String>,
+    run_id: String,
     runtime_result_ids: CommandIds,
     screenshot_artifacts: Vec<ScreenshotArtifact>,
     source_hashes: Vec<SourceHash>,
@@ -291,7 +291,7 @@ fn run_private_hdr_real_raw_proof(private_root: &Path) -> Result<(), String> {
         preview_export_parity,
         quality_metrics: metrics,
         report_id: REPORT_ID.to_string(),
-        run_id: std::env::var("RAWENGINE_COMPUTATIONAL_PRIVATE_RUN_ID").ok(),
+        run_id: private_run_id(),
         runtime_result_ids: CommandIds {
             apply: "runtime_hdr_private_raw_apply_v1".to_string(),
             dry_run: "runtime_hdr_private_raw_dry_run_v1".to_string(),
@@ -369,6 +369,13 @@ fn build_runtime_sample(
 
 fn exposure_product(source: &LoadedHdrSource) -> f64 {
     source.exposure.as_secs_f64() * source.iso as f64
+}
+
+fn private_run_id() -> String {
+    std::env::var("RAWENGINE_COMPUTATIONAL_PRIVATE_RUN_ID")
+        .ok()
+        .filter(|run_id| !run_id.trim().is_empty())
+        .unwrap_or_else(|| "manual-hdr-private-run-v1".to_string())
 }
 
 fn sample_luma_pixels(image: &DynamicImage, width: u32, height: u32) -> Vec<f64> {
