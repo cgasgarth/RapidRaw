@@ -1,8 +1,18 @@
 import { z } from 'zod';
+import {
+  ActorKind,
+  ApprovalClass,
+  type DetailEffectsCommandEnvelopeV1,
+  type DetailEffectsMutationResultV1,
+  detailEffectsDryRunResultV1Schema,
+  detailEffectsMutationResultV1Schema,
+  RAW_ENGINE_SCHEMA_VERSION,
+} from '../../../../packages/rawengine-schema/src/rawEngineSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
 import type { Adjustments } from '../../adjustments';
 import { pushEditHistoryEntry } from '../../editHistory';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
+import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorState';
 
 export const AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME = 'rawengine.agent.detail_effects.apply';
 export const AGENT_DETAIL_EFFECTS_APPLY_INPUT_SCHEMA_NAME = 'AgentDetailEffectsApplyRequestV1';
@@ -67,6 +77,18 @@ export const agentDetailEffectsApplyResponseSchema = z
         appliedGraphRevision: z.string().trim().min(1),
         operationId: z.string().trim().min(1),
         sessionId: z.string().trim().min(1),
+        typedCommand: z
+          .object({
+            appliedGraphRevision: z.string().trim().min(1),
+            changedNodeIds: z.array(z.string().trim().min(1)).min(1),
+            commandId: z.string().trim().min(1),
+            commandType: z.literal('detailEffects.applyAdjustments'),
+            dryRunPlanHash: z.string().trim().min(1),
+            dryRunPlanId: z.string().trim().min(1),
+            provenanceEntryIds: z.array(z.string().trim().min(1)).min(1),
+            sourceGraphRevision: z.string().trim().min(1),
+          })
+          .strict(),
         undoGraphRevision: z.string().trim().min(1),
       })
       .strict(),
@@ -162,7 +184,108 @@ const estimateChangedPixels = ({
   return Math.max(1, Math.round((imageArea / 512) * Math.max(1, changedFieldCount)));
 };
 
-export const applyAgentDetailEffects = (request: AgentDetailEffectsApplyRequest): AgentDetailEffectsApplyResponse => {
+const buildAgentDetailEffectsCommand = ({
+  approval,
+  commandId,
+  commandType,
+  dryRun,
+  expectedGraphRevision,
+  imagePath,
+  parameters,
+  request,
+}: {
+  approval:
+    | { approvalClass: typeof ApprovalClass.PreviewOnly; reason: string; state: 'not_required' }
+    | { approvalClass: typeof ApprovalClass.EditApply; reason: string; state: 'approved' };
+  commandId: string;
+  commandType: 'detailEffects.dryRunAdjustments' | 'detailEffects.applyAdjustments';
+  dryRun: boolean;
+  expectedGraphRevision: string;
+  imagePath: string;
+  parameters: AgentDetailEffectsPatch & {
+    acceptedDryRunPlanHash?: string;
+    acceptedDryRunPlanId?: string;
+  };
+  request: AgentDetailEffectsApplyRequest;
+}): DetailEffectsCommandEnvelopeV1 =>
+  ({
+    actor: {
+      id: 'rawengine-agent',
+      kind: ActorKind.Agent,
+      sessionId: request.sessionId,
+    },
+    approval,
+    commandId,
+    commandType,
+    correlationId: `corr_${request.operationId}`,
+    dryRun,
+    expectedGraphRevision,
+    idempotencyKey: `${request.operationId}:${commandType}`,
+    parameters,
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    target: {
+      imagePath,
+      kind: 'image',
+    },
+  }) as DetailEffectsCommandEnvelopeV1;
+
+const dispatchTypedDetailEffectsApply = async ({
+  expectedGraphRevision,
+  imagePath,
+  request,
+}: {
+  expectedGraphRevision: string;
+  imagePath: string;
+  request: AgentDetailEffectsApplyRequest;
+}): Promise<DetailEffectsMutationResultV1> => {
+  const bridge = createLiveEditorAppServerBridge();
+  const dryRunCommand = buildAgentDetailEffectsCommand({
+    approval: {
+      approvalClass: ApprovalClass.PreviewOnly,
+      reason: 'Preview agent detail/effects patch through typed command dispatch.',
+      state: 'not_required',
+    },
+    commandId: `${request.operationId}_dry_run`,
+    commandType: 'detailEffects.dryRunAdjustments',
+    dryRun: true,
+    expectedGraphRevision,
+    imagePath,
+    parameters: request.detailEffects,
+    request,
+  });
+  const dryRun = await bridge.dispatch(dryRunCommand, { requestId: request.requestId, now: () => new Date() });
+  if (!dryRun.ok) throw new Error(`Agent detail/effects typed dry-run failed: ${dryRun.message}`);
+  const dryRunResult = detailEffectsDryRunResultV1Schema.parse(dryRun.result);
+  if (dryRunResult.sourceGraphRevision !== expectedGraphRevision) {
+    throw new Error('Agent detail/effects typed dry-run receipt did not match the editor graph revision.');
+  }
+
+  const applyCommand = buildAgentDetailEffectsCommand({
+    approval: {
+      approvalClass: ApprovalClass.EditApply,
+      reason: 'Apply accepted agent detail/effects dry-run plan through typed command dispatch.',
+      state: 'approved',
+    },
+    commandId: `${request.operationId}_apply`,
+    commandType: 'detailEffects.applyAdjustments',
+    dryRun: false,
+    expectedGraphRevision,
+    imagePath,
+    parameters: {
+      ...request.detailEffects,
+      acceptedDryRunPlanHash: dryRunResult.dryRunPlanHash,
+      acceptedDryRunPlanId: dryRunResult.dryRunPlanId,
+    },
+    request,
+  });
+  const apply = await bridge.dispatch(applyCommand, { requestId: request.requestId, now: () => new Date() });
+  if (!apply.ok) throw new Error(`Agent detail/effects typed apply failed: ${apply.message}`);
+  return detailEffectsMutationResultV1Schema.parse(apply.result);
+};
+
+export const applyAgentDetailEffects = async (
+  request: AgentDetailEffectsApplyRequest,
+): Promise<AgentDetailEffectsApplyResponse> => {
   const parsedRequest = agentDetailEffectsApplyRequestSchema.parse(request);
   const snapshot = buildAgentImageContextSnapshot();
   if (parsedRequest.expectedRecipeHash !== snapshot.initialPreview.recipeHash) {
@@ -174,6 +297,11 @@ export const applyAgentDetailEffects = (request: AgentDetailEffectsApplyRequest)
   if (selectedImage === null) throw new Error('Agent detail/effects apply requires a selected image.');
 
   const undoGraphRevision = `history_${state.historyIndex}`;
+  const typedMutation = await dispatchTypedDetailEffectsApply({
+    expectedGraphRevision: undoGraphRevision,
+    imagePath: selectedImage.path,
+    request: parsedRequest,
+  });
   const nextAdjustments = applyDetailEffectsPatchToAdjustments(state.adjustments, parsedRequest.detailEffects);
   const history = pushEditHistoryEntry(state.history, state.historyIndex, nextAdjustments);
   useEditorStore.setState({
@@ -202,6 +330,16 @@ export const applyAgentDetailEffects = (request: AgentDetailEffectsApplyRequest)
       appliedGraphRevision,
       operationId: parsedRequest.operationId,
       sessionId: parsedRequest.sessionId,
+      typedCommand: {
+        appliedGraphRevision: typedMutation.appliedGraphRevision,
+        changedNodeIds: typedMutation.changedNodeIds,
+        commandId: typedMutation.commandId,
+        commandType: typedMutation.commandType,
+        dryRunPlanHash: typedMutation.dryRunPlanHash,
+        dryRunPlanId: typedMutation.dryRunPlanId,
+        provenanceEntryIds: typedMutation.provenanceEntryIds,
+        sourceGraphRevision: typedMutation.sourceGraphRevision,
+      },
       undoGraphRevision,
     },
     requestId: parsedRequest.requestId,
