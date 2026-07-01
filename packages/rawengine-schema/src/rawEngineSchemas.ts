@@ -1665,6 +1665,106 @@ export const detailEffectsMutationResultV1Schema = z
   })
   .strict();
 
+export const lensProfileDistortionParamsV1Schema = z
+  .object({
+    k1: z.number().min(-10).max(10),
+    k2: z.number().min(-10).max(10),
+    k3: z.number().min(-10).max(10),
+    model: z.number().int().min(0).max(10),
+    tca_vb: z.number().min(-10).max(10),
+    tca_vr: z.number().min(-10).max(10),
+    vig_k1: z.number().min(-10).max(10),
+    vig_k2: z.number().min(-10).max(10),
+    vig_k3: z.number().min(-10).max(10),
+  })
+  .strict();
+
+export const lensProfilePatchV1Schema = z
+  .object({
+    lensCorrectionMode: z.enum(['auto', 'manual']).optional(),
+    lensDistortionAmount: z.number().int().min(0).max(200).optional(),
+    lensDistortionEnabled: z.boolean().optional(),
+    lensDistortionParams: lensProfileDistortionParamsV1Schema.nullable().optional(),
+    lensMaker: z.string().trim().min(1).max(160).nullable().optional(),
+    lensModel: z.string().trim().min(1).max(240).nullable().optional(),
+    lensTcaAmount: z.number().int().min(0).max(200).optional(),
+    lensTcaEnabled: z.boolean().optional(),
+    lensVignetteAmount: z.number().int().min(0).max(200).optional(),
+    lensVignetteEnabled: z.boolean().optional(),
+  })
+  .strict()
+  .refine((patch) => Object.keys(patch).length > 0, {
+    message: 'At least one lens/profile adjustment is required.',
+  })
+  .refine((patch) => patch.lensModel === undefined || patch.lensMaker !== null, {
+    message: 'Lens model cannot be set while lens maker is explicitly cleared.',
+  });
+
+const lensProfileApplyPatchV1Schema = lensProfilePatchV1Schema.extend({
+  acceptedDryRunPlanHash: z.string().trim().min(1),
+  acceptedDryRunPlanId: z.string().trim().min(1),
+});
+
+export const lensProfileCommandTypeV1Schema = z.enum(['lensProfile.dryRunCorrection', 'lensProfile.applyCorrection']);
+
+export const lensProfileCommandEnvelopeV1Schema = z
+  .discriminatedUnion('commandType', [
+    detailImageCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('lensProfile.dryRunCorrection'),
+        dryRun: z.literal(true),
+        parameters: lensProfilePatchV1Schema,
+      })
+      .strict(),
+    detailImageCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('lensProfile.applyCorrection'),
+        dryRun: z.literal(false),
+        parameters: lensProfileApplyPatchV1Schema,
+      })
+      .strict(),
+  ])
+  .superRefine((command, context) => {
+    refinePreviewApplyApproval(command, context, 'lens/profile');
+  });
+
+export const lensProfileDryRunResultV1Schema = z
+  .object({
+    commandId: z.string().trim().min(1),
+    commandType: z.literal('lensProfile.dryRunCorrection'),
+    correlationId: z.string().trim().min(1),
+    dryRun: z.literal(true),
+    dryRunPlanHash: z.string().trim().min(1),
+    dryRunPlanId: z.string().trim().min(1),
+    mutates: z.literal(false),
+    parameterDiff: z.array(editGraphParameterDiffV1Schema).min(1),
+    predictedGraphRevision: z.string().trim().min(1),
+    previewArtifacts: z.array(artifactHandleV1Schema).length(0),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    sourceGraphRevision: z.string().trim().min(1),
+    warnings: z.array(z.string().trim().min(1)),
+  })
+  .strict();
+
+export const lensProfileMutationResultV1Schema = z
+  .object({
+    appliedGraphRevision: z.string().trim().min(1),
+    changedNodeIds: z.array(z.string().trim().min(1)).min(1),
+    commandId: z.string().trim().min(1),
+    commandType: z.literal('lensProfile.applyCorrection'),
+    correlationId: z.string().trim().min(1),
+    dryRun: z.literal(false),
+    dryRunPlanHash: z.string().trim().min(1),
+    dryRunPlanId: z.string().trim().min(1),
+    mutates: z.literal(true),
+    provenanceEntryIds: z.array(z.string().trim().min(1)).min(1),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    sourceGraphRevision: z.string().trim().min(1),
+    undoRevision: z.string().trim().min(1),
+    warnings: z.array(z.string().trim().min(1)),
+  })
+  .strict();
+
 export const {
   toneColorBalanceRgbRangeV1Schema,
   toneColorBlackWhiteMixerWeightsV1Schema,
@@ -9437,6 +9537,7 @@ const rawEngineAppServerKnownInputSchemas = {
   DetailDeblurCommandEnvelopeV1: detailDeblurCommandEnvelopeV1Schema,
   DetailDenoiseCommandEnvelopeV1: detailDenoiseCommandEnvelopeV1Schema,
   DetailEffectsCommandEnvelopeV1: detailEffectsCommandEnvelopeV1Schema,
+  LensProfileCommandEnvelopeV1: lensProfileCommandEnvelopeV1Schema,
   EditGraphCommandEnvelopeV1: editGraphCommandEnvelopeV1Schema,
   EditGraphSnapshotQueryV1: editGraphSnapshotQueryV1Schema,
   ExportCommandEnvelopeV1: exportCommandEnvelopeV1Schema,
@@ -10534,6 +10635,11 @@ export type DetailEffectsCommandTypeV1 = z.infer<typeof detailEffectsCommandType
 export type DetailEffectsDryRunResultV1 = z.infer<typeof detailEffectsDryRunResultV1Schema>;
 export type DetailEffectsMutationResultV1 = z.infer<typeof detailEffectsMutationResultV1Schema>;
 export type DetailEffectsPatchV1 = z.infer<typeof detailEffectsPatchV1Schema>;
+export type LensProfileCommandEnvelopeV1 = z.infer<typeof lensProfileCommandEnvelopeV1Schema>;
+export type LensProfileCommandTypeV1 = z.infer<typeof lensProfileCommandTypeV1Schema>;
+export type LensProfileDryRunResultV1 = z.infer<typeof lensProfileDryRunResultV1Schema>;
+export type LensProfileMutationResultV1 = z.infer<typeof lensProfileMutationResultV1Schema>;
+export type LensProfilePatchV1 = z.infer<typeof lensProfilePatchV1Schema>;
 export type ExportApplyResultV1 = z.infer<typeof exportApplyResultV1Schema>;
 export type ExportColorSpaceV1 = z.infer<typeof exportColorSpaceV1Schema>;
 export type ExportCommandEnvelopeV1 = z.infer<typeof exportCommandEnvelopeV1Schema>;
