@@ -29,6 +29,7 @@
     "check:docs": "bun scripts/ci/run-compact-command.ts --label docs:format -- biome ci --linter-enabled=false --assist-enabled=false docs && bun tests/integration/checks/check-markdown-links.ts",
     "check:security": "bun scripts/ci/run-compact-command.ts --label security:js -- bun audit --audit-level moderate && bun tests/integration/checks/check-rust-advisory-waivers.ts && bun scripts/ci/run-compact-command.ts --label security:rust --cwd src-tauri -- cargo audit --ignore RUSTSEC-2024-0429",
     "check:actions": "bun scripts/ci/run-compact-command.ts --label actionlint -- go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 .github/workflows/*.yml",
+    "check:colorchecker-deltae-gate": "bun test --reporter=dot tests/pure-ts/color/colorchecker-deltae-gate.test.ts",
     "check:color-preview-export-parity": "bun tests/integration/checks/color/check-color-stack-preview-export-parity.ts",
     "check:export-footer-workflow": "bun tests/integration/checks/export/check-export-footer-workflow.ts",
     "check:export-soft-proof-profile-compare": "bun tests/integration/checks/export/check-export-soft-proof-profile-compare.ts",
