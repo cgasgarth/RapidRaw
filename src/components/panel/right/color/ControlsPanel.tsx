@@ -43,9 +43,11 @@ import {
   Effect,
   hasAdjustmentValueChanges,
   INITIAL_ADJUSTMENTS,
+  LensAdjustment,
   type ParametricCurve,
   type ParametricCurveSettings,
   pickAdjustmentValues,
+  TransformAdjustment,
 } from '../../../../utils/adjustments';
 import { formatUnknownError } from '../../../../utils/errorFormatting';
 import {
@@ -56,11 +58,13 @@ import {
   type RawProcessingMode,
 } from '../../../../utils/rawProcessingModes';
 import { invokeWithSchema } from '../../../../utils/tauriSchemaInvoke';
+import { getLensCorrectionAvailability } from '../../../../utils/transformLensControls';
 import AdjustmentSlider from '../../../adjustments/AdjustmentSlider';
 import BasicAdjustments from '../../../adjustments/Basic';
 import CurveGraph from '../../../adjustments/Curves';
 import DetailsPanel from '../../../adjustments/Details';
 import EffectsPanel from '../../../adjustments/Effects';
+import TransformLens from '../../../adjustments/TransformLens';
 import { OPTION_SEPARATOR, type Option } from '../../../ui/AppProperties';
 import CollapsibleSection, { type CollapsibleSectionHeaderAction } from '../../../ui/CollapsibleSection';
 import { editorChromeStatusChipClassName } from '../../../ui/editorChromeTokens';
@@ -71,7 +75,7 @@ import Switch from '../../../ui/primitives/Switch';
 import UiText from '../../../ui/primitives/Text';
 import PanelScopesStrip from '../inspector/PanelScopesStrip';
 
-const ADJUSTMENT_SECTION_NAMES = ['basic', 'curves', 'details', 'effects'] as const;
+const ADJUSTMENT_SECTION_NAMES = ['basic', 'curves', 'transformLens', 'details', 'effects'] as const;
 type AdjustmentSectionName = (typeof ADJUSTMENT_SECTION_NAMES)[number];
 type RawProcessingModeOverrideOption = RawProcessingMode | 'inherit';
 type CollapsibleSectionsUpdater =
@@ -99,6 +103,19 @@ const ADJUSTMENT_SECTION_LABEL_FALLBACKS: Record<AdjustmentSectionName, string> 
   curves: 'Tone Curves',
   details: 'Detail',
   effects: 'Effects & Looks',
+  transformLens: 'Transform & Lens',
+};
+const TRANSFORM_LENS_CONTROL_LABELS = {
+  correctionAmount: 'Correction amount',
+  distortionAmount: 'Distortion amount',
+  horizontal: 'Horizontal perspective',
+  opticalDistortion: 'Optical distortion',
+  rotation: 'Rotation',
+  scale: 'Scale',
+  vertical: 'Vertical perspective',
+  vignetteAmount: 'Vignette amount',
+  xOffset: 'X offset',
+  yOffset: 'Y offset',
 };
 const RAW_RECONSTRUCTION_COMPARISON_CROP_SIZE = 256;
 const PANEL_ACTION_ICON_SIZE = 14;
@@ -109,7 +126,7 @@ const normalizeDevelopPanelSearchText = (value: string) =>
   value.trim().toLowerCase().replace(DEVELOP_PANEL_SEARCH_NORMALIZER, ' ');
 
 const getLumaParametricCurve = (adjustments: Adjustments): ParametricCurveSettings =>
-  (adjustments.parametricCurve ?? INITIAL_ADJUSTMENTS.parametricCurve ?? {})[ActiveChannel.Luma] ?? {
+  (adjustments.parametricCurve ?? INITIAL_ADJUSTMENTS.parametricCurve)?.[ActiveChannel.Luma] ?? {
     blackLevel: 0,
     darks: 0,
     highlights: 0,
@@ -144,12 +161,28 @@ const hasRawProcessingStatusRequiringAttention = (report: RawDevelopmentReport |
   );
 };
 
-const getAdjustmentSectionLabel = (t: TFunction, sectionName: AdjustmentSectionName): string =>
-  String(
-    t(`editor.adjustments.scopedSections.${sectionName}`, {
-      defaultValue: ADJUSTMENT_SECTION_LABEL_FALLBACKS[sectionName],
-    }),
-  );
+const getAdjustmentSectionLabel = (t: TFunction, sectionName: AdjustmentSectionName): string => {
+  switch (sectionName) {
+    case 'basic':
+      return String(
+        t('editor.adjustments.scopedSections.basic', { defaultValue: ADJUSTMENT_SECTION_LABEL_FALLBACKS.basic }),
+      );
+    case 'curves':
+      return String(
+        t('editor.adjustments.scopedSections.curves', { defaultValue: ADJUSTMENT_SECTION_LABEL_FALLBACKS.curves }),
+      );
+    case 'details':
+      return String(
+        t('editor.adjustments.scopedSections.details', { defaultValue: ADJUSTMENT_SECTION_LABEL_FALLBACKS.details }),
+      );
+    case 'effects':
+      return String(
+        t('editor.adjustments.scopedSections.effects', { defaultValue: ADJUSTMENT_SECTION_LABEL_FALLBACKS.effects }),
+      );
+    case 'transformLens':
+      return ADJUSTMENT_SECTION_LABEL_FALLBACKS.transformLens;
+  }
+};
 
 const toHeaderAction = (option: Option, testId: string): CollapsibleSectionHeaderAction | null => {
   if (option.type === OPTION_SEPARATOR || !option.icon || !option.label || !option.onClick) {
@@ -494,6 +527,130 @@ export default function Controls() {
       }),
     ];
 
+    const lensAvailability = getLensCorrectionAvailability(adjustments.lensDistortionParams);
+    const transformLensControls: DevelopPanelControl[] = [
+      sliderControl({
+        aliases: ['keystone', 'perspective'],
+        id: TransformAdjustment.TransformVertical,
+        key: TransformAdjustment.TransformVertical,
+        label: TRANSFORM_LENS_CONTROL_LABELS.vertical,
+        max: 100,
+        min: -100,
+        sectionName: 'transformLens',
+        step: 1,
+        truncate: true,
+      }),
+      sliderControl({
+        aliases: ['keystone', 'perspective'],
+        id: TransformAdjustment.TransformHorizontal,
+        key: TransformAdjustment.TransformHorizontal,
+        label: TRANSFORM_LENS_CONTROL_LABELS.horizontal,
+        max: 100,
+        min: -100,
+        sectionName: 'transformLens',
+        step: 1,
+        truncate: true,
+      }),
+      sliderControl({
+        aliases: ['angle'],
+        id: TransformAdjustment.TransformRotate,
+        key: TransformAdjustment.TransformRotate,
+        label: TRANSFORM_LENS_CONTROL_LABELS.rotation,
+        max: 45,
+        min: -45,
+        sectionName: 'transformLens',
+        step: 0.1,
+        suffix: '°',
+      }),
+      sliderControl({
+        fillOrigin: 'min',
+        id: TransformAdjustment.TransformScale,
+        key: TransformAdjustment.TransformScale,
+        label: TRANSFORM_LENS_CONTROL_LABELS.scale,
+        max: 150,
+        min: 50,
+        sectionName: 'transformLens',
+        step: 1,
+        suffix: '%',
+        truncate: true,
+      }),
+      sliderControl({
+        aliases: ['shift'],
+        id: TransformAdjustment.TransformXOffset,
+        key: TransformAdjustment.TransformXOffset,
+        label: TRANSFORM_LENS_CONTROL_LABELS.xOffset,
+        max: 100,
+        min: -100,
+        sectionName: 'transformLens',
+        step: 1,
+        truncate: true,
+      }),
+      sliderControl({
+        aliases: ['shift'],
+        id: TransformAdjustment.TransformYOffset,
+        key: TransformAdjustment.TransformYOffset,
+        label: TRANSFORM_LENS_CONTROL_LABELS.yOffset,
+        max: 100,
+        min: -100,
+        sectionName: 'transformLens',
+        step: 1,
+        truncate: true,
+      }),
+      sliderControl({
+        aliases: ['optical', 'warp'],
+        id: TransformAdjustment.TransformDistortion,
+        key: TransformAdjustment.TransformDistortion,
+        label: TRANSFORM_LENS_CONTROL_LABELS.opticalDistortion,
+        max: 100,
+        min: -100,
+        sectionName: 'transformLens',
+        step: 1,
+        truncate: true,
+      }),
+      sliderControl({
+        aliases: ['lens', 'profile'],
+        disabled: !lensAvailability.distortion || !adjustments.lensDistortionEnabled,
+        fillOrigin: 'min',
+        id: LensAdjustment.LensDistortionAmount,
+        key: LensAdjustment.LensDistortionAmount,
+        label: TRANSFORM_LENS_CONTROL_LABELS.distortionAmount,
+        max: 200,
+        min: 0,
+        sectionName: 'transformLens',
+        step: 1,
+        suffix: '%',
+        truncate: true,
+      }),
+      sliderControl({
+        aliases: ['lens', 'ca', 'chromatic aberration'],
+        disabled: !lensAvailability.tca || !adjustments.lensTcaEnabled,
+        fillOrigin: 'min',
+        id: LensAdjustment.LensTcaAmount,
+        key: LensAdjustment.LensTcaAmount,
+        label: TRANSFORM_LENS_CONTROL_LABELS.correctionAmount,
+        max: 200,
+        min: 0,
+        sectionName: 'transformLens',
+        step: 1,
+        suffix: '%',
+        truncate: true,
+      }),
+      sliderControl({
+        aliases: ['lens', 'vignette'],
+        disabled: !lensAvailability.vignetting || !adjustments.lensVignetteEnabled,
+        fillOrigin: 'min',
+        id: LensAdjustment.LensVignetteAmount,
+        key: LensAdjustment.LensVignetteAmount,
+        label: TRANSFORM_LENS_CONTROL_LABELS.vignetteAmount,
+        max: 200,
+        min: 0,
+        sectionName: 'transformLens',
+        step: 1,
+        suffix: '%',
+        truncate: true,
+      }),
+    ];
+
     const detailControls: DevelopPanelControl[] = [
       {
         id: DetailsAdjustment.DeblurEnabled,
@@ -715,7 +872,7 @@ export default function Controls() {
       }),
     ];
 
-    return [...basicControls, ...curveControls, ...detailControls, ...effectControls];
+    return [...basicControls, ...curveControls, ...transformLensControls, ...detailControls, ...effectControls];
   }, [adjustments, onDragStateChange, setAdjustments, t]);
 
   const normalizedDevelopPanelSearchQuery = useMemo(
@@ -982,6 +1139,15 @@ export default function Controls() {
             setAdjustments={setAdjustments}
             histogram={histogram}
             theme={theme}
+            onDragStateChange={onDragStateChange}
+          />
+        );
+      case 'transformLens':
+        return (
+          <TransformLens
+            adjustments={adjustments}
+            selectedImage={selectedImage}
+            setAdjustments={setAdjustments}
             onDragStateChange={onDragStateChange}
           />
         );
@@ -1359,14 +1525,17 @@ export default function Controls() {
           const title = getAdjustmentSectionLabel(t, sectionName);
           const sectionVisibility = adjustments.sectionVisibility;
           const sectionActions = buildSectionActions(sectionName);
+          const canToggleVisibility = sectionName !== 'transformLens';
+          const isContentVisible = canToggleVisibility ? sectionVisibility[sectionName] : true;
 
           return (
             <div className="shrink-0 group" data-testid={`adjustments-section-${sectionName}`} key={sectionName}>
               <CollapsibleSection
                 actionsMenuLabel={sectionActions.headerActions.map((action) => action.label).join(', ')}
                 actionsMenuTestId={`adjustments-section-${sectionName}-actions-menu`}
+                canToggleVisibility={canToggleVisibility}
                 headerActions={sectionActions.headerActions}
-                isContentVisible={sectionVisibility[sectionName]}
+                isContentVisible={isContentVisible}
                 isDirty={hasAdjustmentValueChanges(ADJUSTMENT_SECTIONS[sectionName], adjustments)}
                 isOpen={collapsibleSectionsState[sectionName]}
                 onContextMenu={(event: MouseEvent<HTMLDivElement>) => {
@@ -1379,7 +1548,9 @@ export default function Controls() {
                   showContextMenu(x, y, sectionActions.menuOptions);
                 }}
                 onToggleVisibility={() => {
-                  handleToggleVisibility(sectionName);
+                  if (canToggleVisibility) {
+                    handleToggleVisibility(sectionName);
+                  }
                 }}
                 title={title}
               >

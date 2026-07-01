@@ -46,6 +46,7 @@ describe('adjustment section state', () => {
       curves: true,
       details: false,
       effects: false,
+      transformLens: false,
     });
   });
 });
