@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { hdrRuntimeSidecarReceiptV1Schema } from '../../../packages/rawengine-schema/src/rawEngineSchemas';
 
 export const hdrMergeAlignmentModeSchema = z.enum(['auto', 'translation', 'homography', 'optical_flow', 'none']);
 export const hdrMergeBracketValidationSchema = z.enum(['required', 'warn', 'disabled']);
@@ -82,6 +83,7 @@ export const hdrEditableHandoffSummarySchema = z
     previewExportMeanAbsDelta: z.literal(0),
     previewExportParityStatus: z.literal('matched_editor_display_path'),
     previewToneMapped: z.boolean(),
+    runtimeSidecarReceipt: hdrRuntimeSidecarReceiptV1Schema.optional(),
     sceneMergeColorState: z.literal('legacy_display_referred_merge_after_linear_to_srgb'),
     sourceCount: z.number().int().nonnegative(),
     sourceRefs: z.array(hdrEditableSourceRefSchema),
