@@ -154,6 +154,13 @@ export const ColorMixerControls = ({
     `S ${formatSignedInteger(currentHsl.saturation)}`,
     `L ${formatSignedInteger(currentHsl.luminance)}`,
   ].join(' / ');
+  const activeBlackWhiteSummary = `${activeSelectiveColorRangeLabel} ${formatSignedInteger(currentBlackWhiteWeight)}`;
+  const activeColorBalanceSummary = colorBalanceChannels
+    .map((channel) => `${channel.label.charAt(0)} ${formatSignedInteger(activeColorBalance[channel.key])}`)
+    .join(' / ');
+  const activeChannelMixerSummary = channelMixerSources
+    .map((source) => `${source.label.charAt(0)} ${formatSignedInteger(activeChannelMixerRow[source.key])}`)
+    .join(' / ');
   const selectiveColorPreviewSummary =
     selectiveColorPreviewMode === 'mask'
       ? t('adjustments.color.maskPreviewEnabled')
@@ -171,6 +178,9 @@ export const ColorMixerControls = ({
   const hue_slider = `hue-slider-${activeColor}`;
   const saturation_slider = `sat-slider-${activeColor}`;
   const luminance_slider = `lum-slider-${activeColor}`;
+  const activeChipClass =
+    'shrink-0 rounded bg-bg-secondary px-1.5 py-0.5 text-[10px] font-medium leading-4 text-text-secondary';
+  const summaryRowClass = cx('mb-1.5 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2', density.card.nestedBare);
 
   useEffect(() => {
     const normalizedHue = ((effectiveHue % 360) + 360) % 360;
@@ -361,10 +371,13 @@ export const ColorMixerControls = ({
     <>
       {!isForMask && adjustmentVisibility[ColorAdjustment.BlackWhiteMixer] !== false && (
         <div className={density.card.panel}>
-          <div className={density.sectionHeader.root}>
-            <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
-              {t('adjustments.color.blackWhiteMixer.title')}
-            </UiText>
+          <div className={density.sectionHeader.rootLoose}>
+            <div className="min-w-0">
+              <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
+                {t('adjustments.color.blackWhiteMixer.title')}
+              </UiText>
+              <span className={density.sectionHeader.summary}>{activeBlackWhiteSummary}</span>
+            </div>
             <button
               aria-pressed={blackWhiteMixer.enabled}
               className={cx(
@@ -380,7 +393,13 @@ export const ColorMixerControls = ({
                 : t('adjustments.color.blackWhiteMixer.disabled')}
             </button>
           </div>
-          <div className="mb-1.5 grid grid-cols-6 gap-1 px-1">
+          <div className={summaryRowClass}>
+            <span className="truncate text-[11px] leading-4 text-text-secondary">{activeSelectiveColorRangeLabel}</span>
+            <span className={density.row.value} data-testid="black-white-mixer-active-summary">
+              {formatSignedInteger(currentBlackWhiteWeight)}
+            </span>
+          </div>
+          <div className="mb-1.5 grid grid-cols-6 gap-1">
             {HSL_COLORS.map(({ name, color, label }) => (
               <ColorSwatch
                 ariaLabel={t('adjustments.color.blackWhiteMixer.ariaSelectChannel', { name: label })}
@@ -413,11 +432,14 @@ export const ColorMixerControls = ({
 
       {!isForMask && adjustmentVisibility[ColorAdjustment.ColorBalanceRgb] !== false && (
         <div className={density.card.panel}>
-          <div className={density.sectionHeader.root}>
-            <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
-              {t('adjustments.color.colorBalanceRgb.title')}
-            </UiText>
-            <div className="flex gap-1">
+          <div className={density.sectionHeader.rootLoose}>
+            <div className="min-w-0">
+              <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
+                {t('adjustments.color.colorBalanceRgb.title')}
+              </UiText>
+              <span className={density.sectionHeader.summary}>{activeColorBalanceSummary}</span>
+            </div>
+            <div className="flex flex-wrap justify-end gap-1">
               <button
                 aria-pressed={colorBalanceRgb.preserveLuminance}
                 className={cx(
@@ -444,6 +466,14 @@ export const ColorMixerControls = ({
                   : t('adjustments.color.colorBalanceRgb.disabled')}
               </button>
             </div>
+          </div>
+          <div className={summaryRowClass}>
+            <span className="truncate text-[11px] leading-4 text-text-secondary">
+              {colorBalanceRanges.find((range) => range.key === activeColorBalanceRange)?.label}
+            </span>
+            <span className={density.row.value} data-testid="color-balance-active-summary">
+              {activeColorBalanceSummary}
+            </span>
           </div>
           <div className="mb-2 grid grid-cols-3 gap-1">
             {colorBalanceRanges.map((range) => (
@@ -484,11 +514,14 @@ export const ColorMixerControls = ({
 
       {!isForMask && adjustmentVisibility[ColorAdjustment.ChannelMixer] !== false && (
         <div className={density.card.panel}>
-          <div className={density.sectionHeader.root}>
-            <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
-              {t('adjustments.color.channelMixer.title')}
-            </UiText>
-            <div className="flex gap-1">
+          <div className={density.sectionHeader.rootLoose}>
+            <div className="min-w-0">
+              <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
+                {t('adjustments.color.channelMixer.title')}
+              </UiText>
+              <span className={density.sectionHeader.summary}>{activeChannelMixerSummary}</span>
+            </div>
+            <div className="flex flex-wrap justify-end gap-1">
               <button
                 aria-pressed={channelMixer.preserveLuminance}
                 className={cx(
@@ -515,6 +548,14 @@ export const ColorMixerControls = ({
                   : t('adjustments.color.channelMixer.disabled')}
               </button>
             </div>
+          </div>
+          <div className={summaryRowClass}>
+            <span className="truncate text-[11px] leading-4 text-text-secondary">
+              {channelMixerOutputs.find((output) => output.key === activeChannelMixerOutput)?.label}
+            </span>
+            <span className={density.row.value} data-testid="channel-mixer-active-summary">
+              {activeChannelMixerSummary}
+            </span>
           </div>
           <div className="mb-2 grid grid-cols-3 gap-1">
             {channelMixerOutputs.map((output) => (
@@ -570,10 +611,18 @@ export const ColorMixerControls = ({
         )}
         data-testid="selective-color-range-controls"
       >
-        <UiText variant={TextVariants.heading} className={cx(density.sectionHeader.title, 'mb-2 block')}>
-          {t('adjustments.color.colorMixer')}
-        </UiText>
-        <div className="mb-1.5 grid grid-cols-6 gap-1 px-1">
+        <div className={density.sectionHeader.rootLoose}>
+          <div className="min-w-0">
+            <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
+              {t('adjustments.color.colorMixer')}
+            </UiText>
+            <span className={density.sectionHeader.summary}>{activeSelectiveColorDeltaSummary}</span>
+          </div>
+          <span className={activeChipClass} data-testid="selective-color-active-range-chip">
+            {activeSelectiveColorRangeLabel}
+          </span>
+        </div>
+        <div className="mb-1.5 grid grid-cols-6 gap-1">
           {HSL_COLORS.map(({ name, color, label }) => (
             <ColorSwatch
               color={color}
@@ -590,8 +639,8 @@ export const ColorMixerControls = ({
         </div>
         <div
           className={cx(
-            'mb-2 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 px-2 py-1.5 text-xs',
-            density.card.surface,
+            'mb-2 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 text-xs',
+            density.card.nested,
           )}
           data-testid="selective-color-range-summary"
         >
@@ -616,7 +665,7 @@ export const ColorMixerControls = ({
             {activeSelectiveColorAdjustedHue}
           </span>
           <span className={density.row.label}>{t('adjustments.color.previewMode')}</span>
-          <span className={density.row.value} data-testid="selective-color-preview-mode">
+          <span className={cx(density.row.value, 'min-w-0 truncate')} data-testid="selective-color-preview-mode">
             {selectiveColorPreviewSummary}
           </span>
           <span className={density.row.label}>{t('adjustments.color.falloffSmoothness')}</span>
@@ -627,7 +676,7 @@ export const ColorMixerControls = ({
             aria-pressed={selectiveColorPreviewMode === 'mask'}
             className={cx(
               density.actionButton.base,
-              'border',
+              'gap-1 border',
               selectiveColorPreviewMode === 'mask'
                 ? 'border-accent bg-accent/10 text-text-primary'
                 : 'border-surface bg-bg-secondary text-text-secondary hover:border-accent hover:text-text-primary',

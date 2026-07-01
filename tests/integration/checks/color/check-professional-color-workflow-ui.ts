@@ -114,6 +114,7 @@ await validateLocaleContract();
 const rendered = await renderColorPanel();
 await validateFoundationalColorControlOrder(rendered.container);
 await validatePresentationGrouping(rendered.container);
+await validateColorWorkspaceTabKeyboard(rendered.container);
 await openDisclosure(rendered.container, 'color-proofing-diagnostics-disclosure');
 await validateRenderedWorkspaceCoverage(rendered.container);
 await validateGamutWarningCoverage(rendered.container);
@@ -121,6 +122,7 @@ await validateProfileToneAndReadiness(rendered.container);
 await validateRecipeApplication(rendered.container);
 await validateSkinToneUniformityCoverage(rendered.container);
 rendered.unmount();
+await validateColorWorkspaceTabPersistence();
 
 if (failures.length > 0) {
   console.error('professional color workflow rendered coverage failed');
@@ -226,6 +228,50 @@ async function validatePresentationGrouping(container: Element) {
     'May affect other orange-range colors; not skin detection or Capture One equivalence.',
     'proofing warning summary did not keep skin-tone status visible.',
   );
+}
+
+async function validateColorWorkspaceTabKeyboard(container: Element) {
+  const tablist = getByTestId(container, 'color-workspace-tabs');
+  assertData(tablist, 'sticky', 'true', 'color workspace tabs should expose sticky placement for visual proof.');
+
+  const quick = getByTestId<HTMLButtonElement>(container, 'color-workspace-tab-quick');
+  const editor = getByTestId<HTMLButtonElement>(container, 'color-workspace-tab-editor');
+  const grading = getByTestId<HTMLButtonElement>(container, 'color-workspace-tab-grading');
+  const output = getByTestId<HTMLButtonElement>(container, 'color-workspace-tab-output');
+  const advanced = getByTestId<HTMLButtonElement>(container, 'color-workspace-tab-advanced');
+
+  assertSelectedTab(quick, 'Quick should start selected.');
+  await dispatchTabKey(tablist, 'ArrowRight');
+  assertSelectedTab(editor, 'ArrowRight should select Editor.');
+  assertFocused(editor, 'ArrowRight should focus Editor.');
+  await dispatchTabKey(tablist, 'ArrowDown');
+  assertSelectedTab(grading, 'ArrowDown should select Grading.');
+  await dispatchTabKey(tablist, 'End');
+  assertSelectedTab(advanced, 'End should select Advanced.');
+  await dispatchTabKey(tablist, 'ArrowLeft');
+  assertSelectedTab(output, 'ArrowLeft should select Output from Advanced.');
+  await dispatchTabKey(tablist, 'Home');
+  assertSelectedTab(quick, 'Home should return to Quick.');
+}
+
+async function validateColorWorkspaceTabPersistence() {
+  const firstRender = await renderColorPanel();
+  const editor = getByTestId<HTMLButtonElement>(firstRender.container, 'color-workspace-tab-editor');
+  await act(async () => {
+    editor.click();
+    await flushPromises();
+  });
+  assertSelectedTab(editor, 'Editor should be selected before remount persistence proof.');
+  firstRender.unmount();
+
+  const secondRender = await renderColorPanel();
+  const restoredEditor = getByTestId<HTMLButtonElement>(secondRender.container, 'color-workspace-tab-editor');
+  assertSelectedTab(restoredEditor, 'Editor tab should restore after Color panel remount.');
+  await act(async () => {
+    getByTestId<HTMLButtonElement>(secondRender.container, 'color-workspace-tab-quick').click();
+    await flushPromises();
+  });
+  secondRender.unmount();
 }
 
 async function renderColorPanel(): Promise<RenderedPanel> {
@@ -541,6 +587,7 @@ async function createTestI18n() {
 
 function installDom() {
   const window = new Window({ url: 'http://localhost/professional-color-workflow-coverage' });
+  window.sessionStorage.clear();
   Object.defineProperty(globalThis, 'window', { configurable: true, value: window });
   Object.defineProperty(globalThis, 'document', { configurable: true, value: window.document });
   Object.defineProperty(globalThis, 'navigator', { configurable: true, value: window.navigator });
@@ -554,6 +601,11 @@ function installDom() {
   Object.defineProperty(globalThis, 'Node', { configurable: true, value: window.Node });
   Object.defineProperty(globalThis, 'MutationObserver', { configurable: true, value: window.MutationObserver });
   Object.defineProperty(globalThis, 'PointerEvent', { configurable: true, value: window.PointerEvent ?? window.Event });
+  Object.defineProperty(globalThis, 'KeyboardEvent', { configurable: true, value: window.KeyboardEvent });
+  Object.defineProperty(globalThis, 'requestAnimationFrame', {
+    configurable: true,
+    value: (callback: FrameRequestCallback) => window.setTimeout(() => callback(Date.now()), 0),
+  });
   Object.defineProperty(globalThis, 'ResizeObserver', {
     configurable: true,
     value: class ResizeObserver {
@@ -562,6 +614,22 @@ function installDom() {
       unobserve() {}
     },
   });
+}
+
+async function dispatchTabKey(tablist: HTMLElement, key: string) {
+  await act(async () => {
+    tablist.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key }));
+    await flushPromises();
+    await flushPromises();
+  });
+}
+
+function assertSelectedTab(tab: HTMLButtonElement, message: string) {
+  if (tab.getAttribute('aria-selected') !== 'true' || tab.tabIndex !== 0) failures.push(message);
+}
+
+function assertFocused(tab: HTMLButtonElement, message: string) {
+  if (document.activeElement !== tab) failures.push(message);
 }
 
 function getByTestId<T extends HTMLElement = HTMLElement>(container: Element, testId: string): T {
