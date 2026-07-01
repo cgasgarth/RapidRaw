@@ -8,6 +8,7 @@ import {
 import { agentHistoryRollbackResponseSchema } from '../session/agentSessionHistory';
 import { buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
 import { buildAgentInitialPromptContext } from './agentInitialPromptContext';
+import { agentMediumPreviewArtifactSchema } from './agentPreviewEnvelope';
 
 export const AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME = 'rawengine.agent.selected_image.preview_loop';
 export const AGENT_CURRENT_IMAGE_PREVIEW_LOOP_APPLY_REVIEW_TOOL_NAME =
@@ -333,14 +334,7 @@ export const agentCurrentImagePreviewLoopResultSchema = z
           })
           .strict()
           .optional(),
-        mediumPreview: z
-          .object({
-            longEdgePx: z.number().int().min(256).max(2048),
-            maxPixelCount: z.number().int().min(65_536).max(4_194_304),
-            quality: z.number().min(0.5).max(0.95),
-          })
-          .strict()
-          .optional(),
+        mediumPreview: agentMediumPreviewArtifactSchema.optional(),
       })
       .strict(),
     editCount: z.number().int().min(1),

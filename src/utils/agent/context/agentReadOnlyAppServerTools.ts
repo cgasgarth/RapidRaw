@@ -403,9 +403,20 @@ export const renderAgentPreviewCompare = (request: AgentPreviewCompareRequest): 
         staleRecipeHash,
       },
       mediumPreview: {
+        artifactId: currentArtifact.artifactId,
+        contentHash: currentArtifact.contentHash,
+        dimensions: {
+          height: currentArtifact.preview.height,
+          width: currentArtifact.preview.width,
+        },
+        graphRevision: currentArtifact.graphRevision,
         longEdgePx: parsedRequest.longEdgePx,
         maxPixelCount: parsedRequest.maxPixelCount,
+        previewRef: currentArtifact.preview.previewRef,
         quality: parsedRequest.quality,
+        recipeHash: currentArtifact.recipeHash,
+        renderHash: currentArtifact.renderHash,
+        staleRecipeHash,
       },
       scopeSummary: {
         clipping: snapshot.clipping,

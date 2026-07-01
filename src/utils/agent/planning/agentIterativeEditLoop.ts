@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { agentPreviewEnvelopeSchema } from '../context/agentPreviewEnvelope';
+import { agentMediumPreviewArtifactSchema, agentPreviewEnvelopeSchema } from '../context/agentPreviewEnvelope';
 import {
   AGENT_MEDIUM_PREVIEW_LONG_EDGE_PX,
   AGENT_MEDIUM_PREVIEW_QUALITY,
@@ -159,13 +159,7 @@ export const agentIterativeEditLoopResultSchema = z
             staleRecipeHash: z.boolean(),
           })
           .strict(),
-        mediumPreview: z
-          .object({
-            longEdgePx: z.number().int().min(256).max(2048),
-            maxPixelCount: z.number().int().min(65_536).max(4_194_304),
-            quality: z.number().min(0.5).max(0.95),
-          })
-          .strict(),
+        mediumPreview: agentMediumPreviewArtifactSchema,
         toolName: z.literal(AGENT_PREVIEW_COMPARE_TOOL_NAME),
       })
       .strict(),

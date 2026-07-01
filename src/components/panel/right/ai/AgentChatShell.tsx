@@ -1325,9 +1325,18 @@ function SelectedImagePreviewLoopReviewPanel({ review }: { review: AgentSelected
         className="grid gap-2 rounded border border-white/10 bg-black/15 p-2 text-[11px] md:grid-cols-3"
         data-before-graph-revision={compareArtifacts.lineage?.beforeGraphRevision ?? ''}
         data-current-graph-revision={compareArtifacts.lineage?.currentGraphRevision ?? ''}
+        data-medium-preview-artifact-id={compareArtifacts.mediumPreview?.artifactId ?? ''}
+        data-medium-preview-content-hash={compareArtifacts.mediumPreview?.contentHash ?? ''}
+        data-medium-preview-graph-revision={compareArtifacts.mediumPreview?.graphRevision ?? ''}
+        data-medium-preview-height={compareArtifacts.mediumPreview?.dimensions.height ?? ''}
         data-long-edge-px={compareArtifacts.mediumPreview?.longEdgePx ?? ''}
         data-max-pixel-count={compareArtifacts.mediumPreview?.maxPixelCount ?? ''}
+        data-medium-preview-url={compareArtifacts.mediumPreview?.previewRef ?? ''}
         data-quality={compareArtifacts.mediumPreview?.quality ?? ''}
+        data-medium-preview-recipe-hash={compareArtifacts.mediumPreview?.recipeHash ?? ''}
+        data-medium-preview-render-hash={compareArtifacts.mediumPreview?.renderHash ?? ''}
+        data-medium-preview-stale={compareArtifacts.mediumPreview?.staleRecipeHash ?? ''}
+        data-medium-preview-width={compareArtifacts.mediumPreview?.dimensions.width ?? ''}
         data-stale-recipe-hash={compareArtifacts.lineage?.staleRecipeHash ?? ''}
         data-testid="agent-selected-image-preview-loop-compare-lineage"
       >
@@ -3056,7 +3065,13 @@ function AgentProposedEditCard({
       data-after-artifact-id={afterArtifact?.id ?? reviewHandoff?.afterArtifactId ?? ''}
       data-audit-record-count={auditCount}
       data-before-artifact-id={beforeArtifact?.id ?? reviewHandoff?.beforeArtifactId ?? ''}
+      data-medium-preview-artifact-id={mediumPreview?.artifactId ?? ''}
+      data-medium-preview-content-hash={mediumPreview?.contentHash ?? ''}
+      data-medium-preview-graph-revision={mediumPreview?.graphRevision ?? ''}
+      data-medium-preview-height={mediumPreview?.dimensions.height ?? ''}
       data-medium-preview-long-edge={mediumPreview?.longEdgePx ?? ''}
+      data-medium-preview-stale={mediumPreview?.staleRecipeHash ?? ''}
+      data-medium-preview-width={mediumPreview?.dimensions.width ?? ''}
       data-testid="agent-proposed-edit-card"
     >
       <div className="flex items-start justify-between gap-3">
