@@ -14,6 +14,7 @@ import CullingModal from '../../components/modals/editing/CullingModal';
 import CommandPaletteModal from '../../components/modals/navigation/CommandPaletteModal';
 import { NegativeConversionModal } from '../../components/modals/negative-lab/NegativeConversionModal';
 import BottomBar from '../../components/panel/BottomBar';
+import EditorToolbar from '../../components/panel/editor/EditorToolbar';
 import ImageCanvas from '../../components/panel/editor/ImageCanvas';
 import AgentChatShell from '../../components/panel/right/ai/AgentChatShell';
 import { TetherPanel } from '../../components/panel/right/capture/TetherPanel';
@@ -31,9 +32,10 @@ import {
   RawStatus,
   type SelectedImage,
   SortDirection,
+  Theme,
   ThumbnailAspectRatio,
 } from '../../components/ui/AppProperties';
-import { Status } from '../../components/ui/ExportImportProperties';
+import { ExportColorProfile, ExportRenderingIntent, Status } from '../../components/ui/ExportImportProperties';
 import { editorChromeStatusChipClassName, editorChromeTokens } from '../../components/ui/editorChromeTokens';
 import Button from '../../components/ui/primitives/Button';
 import Dropdown from '../../components/ui/primitives/Dropdown';
@@ -68,6 +70,7 @@ import type {
 } from '../../schemas/tetheringSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
+import { useSettingsStore } from '../../store/useSettingsStore';
 import { DEFAULT_COLLAPSIBLE_SECTIONS_STATE, useUIStore } from '../../store/useUIStore';
 import {
   type Adjustments,
@@ -470,6 +473,18 @@ const professionalEditorShellImage: SelectedImage = {
   width: 5472,
 };
 
+const professionalEditorToolbarImage: SelectedImage = {
+  ...professionalEditorShellImage,
+  exif: {
+    DateTimeOriginal: '2026:06:17 19:24:31',
+    ExposureTime: '1/250',
+    FNumber: '5.6',
+    FocalLengthIn35mmFilm: '35',
+    ISO: '200',
+  },
+  path: '/visual-smoke/professional-editor-toolbar.NEF?vc=7',
+};
+
 const professionalEditorShellImageList: ImageFile[] = [
   {
     exif: null,
@@ -481,6 +496,81 @@ const professionalEditorShellImageList: ImageFile[] = [
     tags: ['shell'],
   },
 ];
+
+function useProfessionalEditorToolbarSmokeState() {
+  useEffect(() => {
+    const initial = structuredClone(INITIAL_ADJUSTMENTS);
+    const exposure = { ...initial, exposure: 0.42 };
+    const crop = { ...exposure, crop: { x: 0.06, y: 0.08, width: 0.88, height: 0.78 } };
+    const masks = {
+      ...crop,
+      masks: [
+        {
+          adjustments: { ...INITIAL_MASK_ADJUSTMENTS, clarity: 14, exposure: 0.2 },
+          id: 'visual-smoke-mask-1',
+          invert: false,
+          name: 'Face dodge',
+          opacity: 78,
+          subMasks: [] as SubMask[],
+          visible: true,
+        },
+      ] as MaskContainer[],
+    };
+
+    useSettingsStore.setState({
+      appSettings: {
+        exportPresets: [
+          {
+            blackPointCompensation: true,
+            colorProfile: ExportColorProfile.DisplayP3,
+            dontEnlarge: true,
+            enableResize: false,
+            enableWatermark: false,
+            fileFormat: 'jpeg',
+            filenameTemplate: '{original_filename}_proof',
+            id: 'visual-smoke-display-p3',
+            jpegQuality: 92,
+            keepMetadata: true,
+            name: 'Display P3 proof',
+            preserveTimestamps: true,
+            renderingIntent: ExportRenderingIntent.RelativeColorimetric,
+            resizeMode: 'longEdge',
+            resizeValue: 2048,
+            stripGps: true,
+            watermarkAnchor: 'bottomRight',
+            watermarkOpacity: 75,
+            watermarkPath: null,
+            watermarkScale: 10,
+            watermarkSpacing: 5,
+          },
+        ],
+        lastRootPath: null,
+        theme: Theme.Dark,
+      },
+      osPlatform: 'macos',
+    });
+    useEditorStore.setState({
+      adjustments: masks,
+      exportSoftProofRecipeId: 'visual-smoke-display-p3',
+      exportSoftProofTransform: {
+        blackPointCompensation: 'enabled',
+        colorManagedTransform: 'display-p3-preview',
+        effectiveColorProfile: ExportColorProfile.DisplayP3,
+        effectiveRenderingIntent: ExportRenderingIntent.RelativeColorimetric,
+        policyStatus: 'applied',
+        policyVersion: 'visual-smoke-v1',
+        sourcePrecisionPath: 'raw-linear-f32',
+        transformApplied: true,
+        transformPolicyFingerprint: 'sha256:professional-editor-toolbar-smoke',
+      },
+      history: [initial, exposure, crop, masks],
+      historyIndex: 2,
+      isExportSoftProofEnabled: true,
+      selectedImage: professionalEditorToolbarImage,
+      showOriginal: true,
+    });
+  }, []);
+}
 
 function useProfessionalEditorSmokeState() {
   useEffect(() => {
@@ -502,6 +592,160 @@ function useProfessionalEditorSmokeState() {
       collapsibleSectionsState: { ...DEFAULT_COLLAPSIBLE_SECTIONS_STATE },
     });
   }, []);
+}
+
+function ProfessionalEditorToolbarVisualSmoke() {
+  const [historyIndex, setHistoryIndex] = useState(2);
+  const [showDateView, setShowDateView] = useState(false);
+  const [showOriginal, setShowOriginal] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [history] = useState(() => {
+    const initial = structuredClone(INITIAL_ADJUSTMENTS);
+    const exposure = { ...initial, exposure: 0.42 };
+    const crop = { ...exposure, crop: { x: 0.06, y: 0.08, width: 0.88, height: 0.78 } };
+    const masks = {
+      ...crop,
+      masks: [
+        {
+          adjustments: { ...INITIAL_MASK_ADJUSTMENTS, clarity: 14, exposure: 0.2 },
+          id: 'visual-smoke-mask-1',
+          invert: false,
+          name: 'Face dodge',
+          opacity: 78,
+          subMasks: [] as SubMask[],
+          visible: true,
+        },
+      ] as MaskContainer[],
+    };
+    return [initial, exposure, crop, masks];
+  });
+
+  useProfessionalEditorToolbarSmokeState();
+
+  return (
+    <main
+      className="min-h-screen bg-editor-matte p-4 font-sans text-text-primary max-[700px]:p-2"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorToolbar}
+      data-visual-smoke-ready="true"
+    >
+      <div className="mx-auto flex h-[calc(100vh-32px)] max-w-6xl flex-col gap-3 overflow-hidden max-[700px]:h-[calc(100vh-16px)]">
+        <header className="flex min-h-9 shrink-0 items-center justify-between">
+          <h1 className={editorChromeTokens.typography.panelTitle}>{copy.professionalEditorToolbar}</h1>
+          <div className="flex gap-1.5">
+            <span className={editorChromeStatusChipClassName('success')}>{copy.professionalEditorReady}</span>
+            <span className={editorChromeStatusChipClassName('warning')}>{copy.professionalEditorSoftProof}</span>
+          </div>
+        </header>
+
+        <section
+          className="rounded-lg border border-editor-border bg-editor-panel"
+          data-visual-smoke-section="professional-editor-toolbar-primary"
+        >
+          <EditorToolbar
+            adjustmentsHistory={history}
+            adjustmentsHistoryIndex={historyIndex}
+            canRedo={historyIndex < history.length - 1}
+            canUndo={historyIndex > 0}
+            goToAdjustmentsHistoryIndex={setHistoryIndex}
+            isAndroid={false}
+            isFullScreen={isFullscreen}
+            isLoading={true}
+            negativeLabDisabledReason="Unsupported source for this handoff"
+            onBackToLibrary={() => {}}
+            onOpenNegativeLab={() => {}}
+            onRedo={() => setHistoryIndex((index) => Math.min(index + 1, history.length - 1))}
+            onToggleDateView={() => setShowDateView((value) => !value)}
+            onToggleFullScreen={() => setIsFullscreen((value) => !value)}
+            onToggleShowOriginal={() => setShowOriginal((value) => !value)}
+            onUndo={() => setHistoryIndex((index) => Math.max(index - 1, 0))}
+            osPlatform="macos"
+            selectedImage={professionalEditorToolbarImage}
+            showDateView={showDateView}
+            showOriginal={showOriginal}
+          />
+        </section>
+
+        <section
+          className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_320px] gap-3 overflow-hidden max-[700px]:grid-cols-1"
+          data-visual-smoke-section="professional-editor-toolbar-workspace"
+        >
+          <div className="grid min-h-0 place-items-center overflow-hidden rounded-lg border border-editor-border bg-editor-panel-well p-4">
+            <div className="aspect-[4/3] w-full max-w-4xl overflow-hidden rounded-md border border-editor-overlay-stroke bg-[linear-gradient(135deg,#162129,#435d62_38%,#a39062_64%,#ead7ab)] shadow-[0_24px_52px_var(--editor-overlay-shadow)]">
+              <div className="h-full w-full bg-[radial-gradient(circle_at_36%_30%,rgba(255,247,213,0.56),transparent_18%),linear-gradient(168deg,transparent_52%,rgba(12,16,20,0.7)_53%)]" />
+            </div>
+          </div>
+
+          <aside
+            className="min-h-0 overflow-hidden rounded-lg border border-editor-border bg-editor-panel p-3"
+            data-visual-smoke-section="professional-editor-toolbar-state-matrix"
+          >
+            <div className="space-y-2">
+              <div className="flex items-center justify-between rounded-md border border-editor-border bg-editor-panel-raised p-2">
+                <span className={editorChromeTokens.typography.compactRowLabel}>
+                  {copy.professionalEditorToolbarHistory}
+                </span>
+                <span className={editorChromeStatusChipClassName('info')}>
+                  {historyIndex + 1}/{history.length}
+                </span>
+              </div>
+              <div className="flex items-center justify-between rounded-md border border-editor-border bg-editor-panel-raised p-2">
+                <span className={editorChromeTokens.typography.compactRowLabel}>
+                  {copy.professionalEditorToolbarOriginalCompare}
+                </span>
+                <span className={editorChromeStatusChipClassName(showOriginal ? 'warning' : 'neutral')}>
+                  {showOriginal ? 'original' : 'edited'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between rounded-md border border-editor-border bg-editor-panel-raised p-2">
+                <span className={editorChromeTokens.typography.compactRowLabel}>
+                  {copy.professionalEditorToolbarNegativeLab}
+                </span>
+                <span className={editorChromeStatusChipClassName('danger')}>
+                  {copy.professionalEditorToolbarDisabled}
+                </span>
+              </div>
+              <div className="flex items-center justify-between rounded-md border border-editor-border bg-editor-panel-raised p-2">
+                <span className={editorChromeTokens.typography.compactRowLabel}>
+                  {copy.professionalEditorToolbarFullscreen}
+                </span>
+                <span className={editorChromeStatusChipClassName(isFullscreen ? 'success' : 'neutral')}>
+                  {isFullscreen ? 'active' : 'ready'}
+                </span>
+              </div>
+            </div>
+          </aside>
+        </section>
+
+        <section
+          className="rounded-lg border border-editor-border bg-editor-panel"
+          data-visual-smoke-section="professional-editor-toolbar-fullscreen-state"
+        >
+          <EditorToolbar
+            adjustmentsHistory={history}
+            adjustmentsHistoryIndex={history.length - 1}
+            canRedo={false}
+            canUndo={true}
+            goToAdjustmentsHistoryIndex={() => {}}
+            isAndroid={false}
+            isFullScreen={true}
+            isLoading={false}
+            negativeLabDisabledReason={null}
+            onBackToLibrary={() => {}}
+            onOpenNegativeLab={() => {}}
+            onRedo={() => {}}
+            onToggleDateView={() => setShowDateView((value) => !value)}
+            onToggleFullScreen={() => {}}
+            onToggleShowOriginal={() => {}}
+            onUndo={() => {}}
+            osPlatform="macos"
+            selectedImage={professionalEditorToolbarImage}
+            showDateView={true}
+            showOriginal={false}
+          />
+        </section>
+      </div>
+    </main>
+  );
 }
 
 function ProfessionalEditorCanvasWell({ portrait = false }: { portrait?: boolean }) {
@@ -754,6 +998,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.PanoramaUi]: PanoramaVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorCompactPortrait]: ProfessionalEditorCompactPortraitVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorShell]: ProfessionalEditorShellVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorToolbar]: ProfessionalEditorToolbarVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorTokens]: ProfessionalEditorTokensVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawModalReview]: SuperResolutionPrivateRawModalReviewSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawUi]: SuperResolutionPrivateRawVisualSmoke,
@@ -1749,6 +1994,12 @@ const copy = {
   colorRangeReplayReady: 'Replay ready',
   professionalEditorTokens: 'Professional editor tokens',
   professionalEditorShell: 'Professional editor shell',
+  professionalEditorToolbar: 'Professional editor toolbar',
+  professionalEditorToolbarDisabled: 'disabled',
+  professionalEditorToolbarFullscreen: 'Fullscreen',
+  professionalEditorToolbarHistory: 'History',
+  professionalEditorToolbarNegativeLab: 'Negative Lab',
+  professionalEditorToolbarOriginalCompare: 'Original compare',
   professionalEditorCompactPortrait: 'Professional editor compact portrait',
   professionalEditorMatte: 'matte',
   professionalEditorModeRail: 'Editor mode rail',
