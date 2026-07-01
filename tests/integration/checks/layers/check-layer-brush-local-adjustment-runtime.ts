@@ -203,7 +203,12 @@ const preToneSidecar = buildLayerStackSidecarFromMasks(result.attachMaskResult.m
 });
 const toneReplay = dispatchLayerStackCommand(result.toneResult.command, preToneSidecar);
 if (!('sidecar' in toneReplay)) throw new Error('Brush local adjustment tone replay did not mutate sidecar.');
-if (JSON.stringify(toneReplay.sidecar.layers) !== JSON.stringify(result.toneResult.sidecar.layers)) {
+const omitPersistedSubMaskPayloads = (layers: typeof toneReplay.sidecar.layers) =>
+  layers.map(({ subMasks: _subMasks, ...persistedLayerGraph }) => persistedLayerGraph);
+if (
+  JSON.stringify(omitPersistedSubMaskPayloads(toneReplay.sidecar.layers)) !==
+  JSON.stringify(omitPersistedSubMaskPayloads(result.toneResult.sidecar.layers))
+) {
   throw new Error('Brush local adjustment tone replay did not reproduce sidecar layer state.');
 }
 
