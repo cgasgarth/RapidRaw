@@ -604,6 +604,7 @@ interface LivePromptComposerProps {
   isContextReady: boolean;
   onResultChange?: (result: LivePromptResult) => void;
   onSessionEvent?: (event: LiveSessionEvent) => void;
+  runtimeStatus: AgentChatTranscript['runtimeStatus'];
 }
 
 interface LiveSessionEvent {
@@ -1574,6 +1575,7 @@ function LivePromptComposer({
   isContextReady,
   onResultChange,
   onSessionEvent,
+  runtimeStatus,
 }: LivePromptComposerProps) {
   const { t } = useTranslation();
   const promptInputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -1582,6 +1584,8 @@ function LivePromptComposer({
   const [acceptedPrompt, setAcceptedPrompt] = useState('');
   const [activityEntries, setActivityEntries] = useState<LiveActivityEntry[]>([]);
   const [auditArtifact, setAuditArtifact] = useState<LiveAuditArtifactState | null>(null);
+  const [expertArtifactReview, setExpertArtifactReview] = useState<AgentArtifactReview | null>(null);
+  const [expertDryRunReview, setExpertDryRunReview] = useState<AgentChatDryRunReview | null>(null);
   const [result, setResult] = useState<LivePromptResult>({ status: 'idle' });
   const [rollbackSnapshot, setRollbackSnapshot] = useState<AgentRollbackSnapshot | null>(null);
   const [selectedImageLoopReview, setSelectedImageLoopReview] = useState<AgentSelectedImagePreviewLoopReview | null>(
@@ -1676,6 +1680,8 @@ function LivePromptComposer({
     if (!isContextReady || requestedPrompt.length === 0) return;
 
     try {
+      setExpertArtifactReview(null);
+      setExpertDryRunReview(null);
       if (initialPromptPreviewContext !== undefined) {
         pushActivityEntry({
           body: `${initialPromptPreviewContext.purpose} ${initialPromptPreviewContext.artifactId}`,
@@ -1705,6 +1711,8 @@ function LivePromptComposer({
         prompt: requestedPrompt,
         sessionId: 'agent-chat-shell',
       });
+      setExpertArtifactReview(preview.artifactReview);
+      setExpertDryRunReview(preview.dryRunReview);
       pushActivityEntry({
         body: plan.summary,
         kind: 'preview',
@@ -2718,6 +2726,17 @@ function LivePromptComposer({
       <LiveActivityTimeline entries={activityEntries} />
       <LiveSessionReviewPanel review={effectiveSessionReview} />
       <LiveAuditArtifactPanel artifact={auditArtifact} />
+      {expertArtifactReview === null || expertDryRunReview === null ? null : (
+        <div
+          className="space-y-2 rounded-md border border-sky-500/20 bg-black/10 p-2"
+          data-after-artifact-id={expertArtifactReview.previewArtifacts[1]?.id ?? ''}
+          data-before-artifact-id={expertArtifactReview.previewArtifacts[0]?.id ?? ''}
+          data-testid="agent-live-tone-color-dry-run-review"
+        >
+          <DryRunReviewPanel review={expertDryRunReview} runtimeStatus={runtimeStatus} />
+          <ArtifactReviewPanel review={expertArtifactReview} />
+        </div>
+      )}
       {selectedImageLoopReview === null ? null : (
         <SelectedImagePreviewLoopReviewPanel review={selectedImageLoopReview} />
       )}
@@ -4261,6 +4280,7 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
         onSessionEvent={(event) => {
           setLiveSessionEvents((events) => [...events, event]);
         }}
+        runtimeStatus={transcript.runtimeStatus}
       />
 
       {transcript.initialPromptPreviewContext ? (
