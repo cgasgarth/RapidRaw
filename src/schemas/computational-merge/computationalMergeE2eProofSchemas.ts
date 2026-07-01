@@ -47,7 +47,7 @@ const featureIssues = {
     uiIssue: 171,
   },
   panorama_stitch: {
-    implementationIssue: 1508,
+    implementationIssue: 4493,
     uiIssue: 1333,
   },
   super_resolution: {

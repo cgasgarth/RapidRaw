@@ -157,7 +157,7 @@
       ],
       "featureFamily": "panorama_stitch",
       "fixtureId": "validation.computational-merge.panorama-project-owned-overlap.v2",
-      "implementationIssue": 1508,
+      "implementationIssue": 4493,
       "localSourceRelativePaths": [
         "private-fixtures/panorama/project-owned-overlap-v2/frame-01.raf",
         "private-fixtures/panorama/project-owned-overlap-v2/frame-02.raf",
@@ -242,7 +242,7 @@
       ],
       "featureFamily": "panorama_stitch",
       "fixtureId": "validation.computational-merge.panorama-overlap.v1",
-      "implementationIssue": 1508,
+      "implementationIssue": 4493,
       "localSourceRelativePaths": [
         "private-fixtures/panorama/overlap-stitch-v1/frame-01.arw",
         "private-fixtures/panorama/overlap-stitch-v1/frame-02.arw",
