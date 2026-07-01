@@ -15,6 +15,7 @@ export interface AdjustmentSliderProps {
   density?: 'default' | 'compact';
   fillOrigin?: 'default' | 'min';
   suffix?: string;
+  testId?: string;
   trackClassName?: string;
 }
 
