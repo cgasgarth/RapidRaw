@@ -12,7 +12,7 @@ const samplePlan = panoramaRuntimePlanSchema.parse({
   output_dimensions: { height: 3200, width: 9600 },
   preflight: {
     blocked_reasons: [],
-    execution_mode: 'full_frame_legacy',
+    execution_mode: 'tile_backed_render',
     memory_budget_bytes: 6_442_450_944,
     memory_budget_ratio: 0.42,
     memory_components: {
@@ -34,14 +34,18 @@ const samplePlan = panoramaRuntimePlanSchema.parse({
       warning_codes: ['multi_row_runtime_deferred'],
     },
     status: 'blocked_plan_only',
-    tile_count: 1,
+    tile_count: 12,
     warning_codes: ['geometry_estimate_low_confidence'],
   },
   source_image_refs: [{ image_path: '/synthetic/panorama/source-0.dng', source_index: 0 }],
   warnings: ['dry-run estimate'],
 });
 
-if (samplePlan.preflight.memory_components.total_estimated_peak_bytes !== 952_332_000) {
+if (
+  samplePlan.preflight.execution_mode !== 'tile_backed_render' ||
+  samplePlan.preflight.tile_count !== 12 ||
+  samplePlan.preflight.memory_components.total_estimated_peak_bytes !== 952_332_000
+) {
   failures.push('Panorama runtime plan schema did not preserve memory estimate.');
 }
 
@@ -64,12 +68,14 @@ for (const marker of [
   'runtimePlan: PanoramaRuntimePlan | null',
   'panorama-runtime-plan-summary',
   'data-runtime-plan-ready={String(runtimePlan !== null)}',
-  'data-plan-scope="geometry_memory_only"',
+  'data-plan-scope="tile_runtime_output"',
+  "data-tile-count={runtimePlanTileCount ?? ''}",
   "data-plan-status={runtimePlan?.preflight.status ?? 'pending'}",
   "data-source-geometry-layout={runtimePlanSourceGeometry?.layout ?? 'pending'}",
   "data-source-geometry-support={runtimePlanSourceGeometry?.support ?? 'pending'}",
   "data-source-row-count-estimate={runtimePlanSourceGeometry?.row_count_estimate ?? ''}",
   'runtimePlan.preflight.memory_components.total_estimated_peak_bytes',
+  'runtimePlan?.preflight.tile_count',
 ]) {
   if (!modalSource.includes(marker)) {
     failures.push(`Panorama modal missing runtime plan marker: ${marker}`);
@@ -98,7 +104,7 @@ if (!modalStateSource.includes('runtimePlan: null')) {
 const visualSmokeSource = readFileSync('scripts/proofs/capture-visual-smoke.ts', 'utf8');
 for (const marker of [
   'panorama-runtime-plan-summary',
-  "runtimePlanProof.planScope !== 'geometry_memory_only'",
+  "runtimePlanProof.planScope !== 'tile_runtime_output'",
   "runtimePlanProof.planStatus !== 'accepted'",
   "runtimePlanProof.sourceGeometryLayout !== 'single_row'",
   "runtimePlanProof.sourceGeometrySupport !== 'implemented_current_engine'",

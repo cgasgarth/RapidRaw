@@ -150,6 +150,18 @@ if (applied.apply.provenance.projectionSettings.support !== 'implemented_current
 if (applied.apply.provenance.boundaryMode !== 'auto_crop') {
   throw new Error('Panorama UI runtime bridge must preserve auto-crop boundary mode.');
 }
+if (
+  applied.apply.provenance.tileRender.tileBackedRender !== true ||
+  applied.apply.provenance.tileRender.tileCount < 2
+) {
+  throw new Error('Panorama UI runtime bridge must report tile-backed runtime output metadata.');
+}
+if (dryRun.dryRun.dryRunResult.mergePlan.preflight.executionMode !== 'tile_backed_render') {
+  throw new Error('Panorama UI runtime bridge must report tile-backed dry-run preflight.');
+}
+if (dryRun.dryRun.dryRunResult.warnings.includes('legacy_full_frame_render')) {
+  throw new Error('Panorama UI runtime bridge must not surface legacy full-frame warning for tiled runtime.');
+}
 
 expectThrows('mismatched accepted panorama UI runtime plan', () =>
   bus.execute({
@@ -172,6 +184,7 @@ const result = {
   outputSha256: hashPixels(applied.apply.outputPixels),
   planId: dryRun.dryRun.dryRunResult.mergePlan.planId,
   reducedCompensationHash,
+  tileRender: applied.apply.provenance.tileRender,
 };
 if (process.argv.includes('--verbose')) {
   console.log(JSON.stringify(result, null, 2));
