@@ -1065,6 +1065,17 @@
         "ungroupBlocked": "",
         "ungroupReady": ""
       },
+      "provenance": {
+        "command": "",
+        "layer": "",
+        "maskHash": "",
+        "preview": "",
+        "reason": "",
+        "sourceGraph": "",
+        "summary": "",
+        "summaryTitle": "",
+        "title": ""
+      },
       "removeRowSummary": "{{blendMode}} - {{opacity}}% - remove {{source}} - {{maskCount}}",
       "removeSource": {
         "canvasStatus": "",
@@ -1252,6 +1263,15 @@
         "copySectionSettings": "Copiar Configurações de {{section}}",
         "invertComponent": "Inverter Componente",
         "invertMask": "Inverter Máscara",
+        "layerMaskProvenanceCommand": "",
+        "layerMaskProvenanceLayer": "",
+        "layerMaskProvenanceMaskHash": "",
+        "layerMaskProvenancePreviewTooltip": "",
+        "layerMaskProvenanceReason": "",
+        "layerMaskProvenanceSourceGraph": "",
+        "layerMaskProvenanceSummary": "",
+        "layerMaskProvenanceSummaryTitle": "",
+        "layerMaskProvenanceTitle": "",
         "maskPropertiesTitle": "Propriedades da Máscara",
         "noPresetsFound": "Nenhuma predefinição encontrada",
         "opacity": "Opacidade",

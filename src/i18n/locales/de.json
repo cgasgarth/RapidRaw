@@ -1092,6 +1092,17 @@
         "ungroupBlocked": "Ungroup blocked",
         "ungroupReady": "Ungroup ready"
       },
+      "provenance": {
+        "command": "",
+        "layer": "",
+        "maskHash": "",
+        "preview": "",
+        "reason": "",
+        "sourceGraph": "",
+        "summary": "",
+        "summaryTitle": "",
+        "title": ""
+      },
       "removeRowSummary": "{{blendMode}} - {{opacity}}% - remove {{source}} - {{maskCount}}",
       "removeSource": {
         "canvasStatus": "{{status}} - Search {{searchMultiplier}}x - Seed {{seedValue}}",
@@ -1277,6 +1288,15 @@
         "copySectionSettings": "{{section}}-Einstellungen kopieren",
         "invertComponent": "Komponente umkehren",
         "invertMask": "Maske umkehren",
+        "layerMaskProvenanceCommand": "",
+        "layerMaskProvenanceLayer": "",
+        "layerMaskProvenanceMaskHash": "",
+        "layerMaskProvenancePreviewTooltip": "",
+        "layerMaskProvenanceReason": "",
+        "layerMaskProvenanceSourceGraph": "",
+        "layerMaskProvenanceSummary": "",
+        "layerMaskProvenanceSummaryTitle": "",
+        "layerMaskProvenanceTitle": "",
         "maskPropertiesTitle": "Maskeneigenschaften",
         "noPresetsFound": "Keine Vorgaben gefunden",
         "opacity": "Deckkraft",

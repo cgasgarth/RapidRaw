@@ -15,10 +15,11 @@ import {
   Sparkles,
   Trash2,
 } from 'lucide-react';
-import { type KeyboardEvent, useMemo, useState } from 'react';
+import { type KeyboardEvent, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { debouncedSave } from '../../../../hooks/editor/useEditorActions';
 import { useEditorStore } from '../../../../store/useEditorStore';
+import { useUIStore } from '../../../../store/useUIStore';
 import { TextColors, TextVariants, TextWeights } from '../../../../types/typography';
 import {
   DEFAULT_LAYER_BLEND_MODE,
@@ -34,6 +35,10 @@ import {
   applyBrushLocalAdjustmentLayerFlow,
   createBrushLocalAdjustmentLayerDraft,
 } from '../../../../utils/layers/brushLocalAdjustmentCommandFlow';
+import {
+  deriveLayerMaskProvenanceView,
+  type LayerMaskProvenanceView,
+} from '../../../../utils/layers/layerMaskProvenance';
 import {
   buildLayerExportReadinessSummary,
   buildLayerGroupSummaries,
@@ -119,6 +124,11 @@ const layerNestedCardClassName = professionalInspectorDensityTokens.card.nested;
 const layerInputClassName = `${editorChromeTokens.input.base} ${editorChromeTokens.input.compact}`;
 const layerNumericInputClassName = `${layerInputClassName} ${editorChromeTokens.input.numeric}`;
 const layerSecondaryActionClassName = `${professionalInspectorDensityTokens.actionButton.base} ${professionalInspectorDensityTokens.actionButton.inactive}`;
+const layerProvenanceBadgeClassNames: Record<LayerMaskProvenanceView['status'], string> = {
+  current: 'border-emerald-500/35 bg-emerald-500/10 text-emerald-200',
+  needs_reapply: 'border-amber-500/40 bg-amber-500/10 text-amber-200',
+  stale_source: 'border-orange-500/40 bg-orange-500/10 text-orange-200',
+};
 
 const buildInitialBrushLocalAdjustmentParameters = (imageDimensions: {
   height: number;
@@ -296,6 +306,65 @@ function getCandidateStatusLabelKey(status: RetouchCandidateProvenance['statusAt
   }
 }
 
+function LayerMaskProvenanceBadge({ view }: { view: LayerMaskProvenanceView }) {
+  const { t } = useTranslation();
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <span className="relative inline-flex">
+      <button
+        className={`max-w-24 truncate rounded border px-1.5 py-0.5 text-[10px] font-medium leading-4 tabular-nums ${layerProvenanceBadgeClassNames[view.status]}`}
+        data-invalidation-reason={view.invalidationReason}
+        data-layer-id={view.receipt.layerId}
+        data-layer-order-hash={view.receipt.layerOrderHash}
+        data-mask-content-hash={view.receipt.maskContentHash}
+        data-receipt-id={view.receipt.receiptId}
+        data-source-graph-revision={view.receipt.sourceGraphRevision}
+        data-testid={`layer-mask-provenance-badge-${view.receipt.layerId}`}
+        onClick={(event) => {
+          event.stopPropagation();
+          setIsOpen((current) => !current);
+        }}
+        type="button"
+      >
+        {view.badgeLabel}
+      </button>
+      {isOpen && (
+        <span
+          className="absolute right-0 top-6 z-20 grid w-64 gap-1 rounded-md border border-editor-border bg-editor-panel-raised p-2 text-[11px] leading-4 text-text-secondary shadow-xl"
+          data-applied-command-id={view.receipt.appliedCommandId}
+          data-invalidation-reason={view.invalidationReason}
+          data-layer-id={view.receipt.layerId}
+          data-layer-order-hash={view.receipt.layerOrderHash}
+          data-mask-content-hash={view.receipt.maskContentHash}
+          data-receipt-id={view.receipt.receiptId}
+          data-source-graph-revision={view.receipt.sourceGraphRevision}
+          data-testid={`layer-mask-provenance-popover-${view.receipt.layerId}`}
+          onClick={(event) => {
+            event.stopPropagation();
+          }}
+          onKeyDown={(event) => {
+            event.stopPropagation();
+          }}
+        >
+          <span className="font-medium text-text-primary">{t('editor.layers.provenance.title')}</span>
+          <span className="truncate">
+            {t('editor.layers.provenance.sourceGraph', { value: view.receipt.sourceGraphRevision })}
+          </span>
+          <span className="truncate">
+            {t('editor.layers.provenance.maskHash', { value: view.receipt.maskContentHash })}
+          </span>
+          <span className="truncate">
+            {t('editor.layers.provenance.command', { value: view.receipt.appliedCommandId })}
+          </span>
+          <span className="truncate">{t('editor.layers.provenance.layer', { value: view.receipt.layerId })}</span>
+          <span className="truncate">{t('editor.layers.provenance.reason', { value: view.invalidationReason })}</span>
+        </span>
+      )}
+    </span>
+  );
+}
+
 function getLayerRows(masks: Array<MaskContainer>, collapsedGroupIds: Set<string>): Array<LayerRowModel> {
   const groupSummaries = buildLayerGroupSummaries(masks);
   const rows: Array<LayerRowModel> = [];
@@ -414,6 +483,10 @@ export default function LayerStackPanel({
   const [lastCommandType, setLastCommandType] = useState('none');
   const [lastChangedLayerCount, setLastChangedLayerCount] = useState(0);
   const [lastBrushLocalReceiptId, setLastBrushLocalReceiptId] = useState('');
+  const layerMaskProvenanceReceipts = useUIStore((state) => state.layerMaskProvenanceReceipts);
+  const layerMaskSourceGraphRevision = useUIStore((state) => state.layerMaskSourceGraphRevision);
+  const markLayerMaskProvenanceStale = useUIStore((state) => state.markLayerMaskProvenanceStale);
+  const recordLayerMaskPreviewReceipt = useUIStore((state) => state.recordLayerMaskPreviewReceipt);
   const selectedLayerId = activeMaskContainerId ?? localSelectedLayerId;
   const visibleLayerCount = masks.filter((mask) => mask.visible).length;
   const hiddenLayerCount = masks.length - visibleLayerCount;
@@ -468,6 +541,26 @@ export default function LayerStackPanel({
       (mask) =>
         mask.visible === (activeRow.isGroupHeader ? mask.layerGroupId === activeRow.groupId : mask.id === activeRow.id),
     );
+  const layerMaskProvenanceViews = useMemo(
+    () =>
+      Object.fromEntries(
+        masks.map((mask) => [
+          mask.id,
+          deriveLayerMaskProvenanceView({
+            layerId: mask.id,
+            masks,
+            receipt: layerMaskProvenanceReceipts[mask.id],
+            sourceGraphRevision: layerMaskSourceGraphRevision,
+          }),
+        ]),
+      ),
+    [layerMaskProvenanceReceipts, layerMaskSourceGraphRevision, masks],
+  );
+
+  useEffect(() => {
+    if (masks.length === 0 || Object.keys(layerMaskProvenanceReceipts).length > 0) return;
+    recordLayerMaskPreviewReceipt({ appliedCommandId: 'initial_layer_stack_preview', masks });
+  }, [layerMaskProvenanceReceipts, masks, recordLayerMaskPreviewReceipt]);
 
   const selectRow = (row: LayerRowModel) => {
     setLocalSelectedLayerId(row.id);
@@ -512,6 +605,26 @@ export default function LayerStackPanel({
       operationId: crypto.randomUUID(),
       sessionId: 'rapidraw-layer-stack-panel',
     });
+    const staleLayerIds =
+      operation.type === 'move' ||
+      operation.type === 'create' ||
+      operation.type === 'duplicate' ||
+      operation.type === 'delete'
+        ? undefined
+        : [operation.layerId];
+    markLayerMaskProvenanceStale({
+      ...(staleLayerIds === undefined ? {} : { layerIds: staleLayerIds }),
+      reason:
+        operation.type === 'move' || operation.type === 'create' || operation.type === 'duplicate'
+          ? 'layer_order_changed'
+          : operation.type === 'delete'
+            ? 'layer_deleted'
+            : operation.type === 'setOpacity' ||
+                operation.type === 'updateRetouchSource' ||
+                operation.type === 'updateRetouchRemoveSource'
+              ? 'mask_alpha_changed'
+              : 'source_state_changed',
+    });
     const nextMasks = materializeMasks(result.masks);
     const currentState = useEditorStore.getState();
     const nextAdjustments = persistLayerStackSidecarInAdjustments(
@@ -536,12 +649,17 @@ export default function LayerStackPanel({
   };
   const updateGroupVisibility = (groupId: string, visible: boolean) => {
     const nextMasks = masks.map((mask) => (mask.layerGroupId === groupId ? { ...mask, visible } : mask));
+    markLayerMaskProvenanceStale({
+      layerIds: nextMasks.filter((mask) => mask.layerGroupId === groupId).map((mask) => mask.id),
+      reason: 'source_state_changed',
+    });
     applyLayerStack(nextMasks, `group:${groupId}`);
   };
   const updateLayerOpacity = (layerId: string, opacity: number) => {
     applyLayerStackCommand({ layerId, opacity, type: 'setOpacity' }, layerId);
   };
   const updateLayerBlendMode = (layerId: string, blendMode: LayerBlendMode) => {
+    markLayerMaskProvenanceStale({ layerIds: [layerId], reason: 'source_state_changed' });
     applyLayerStack(setLayerBlendMode(masks, layerId, blendMode), layerId);
   };
   const updateLayerRetouchSource = (
@@ -663,6 +781,10 @@ export default function LayerStackPanel({
   const updateActiveOpacity = (opacity: number) => {
     if (!activeRow || activeRow.isBase) return;
     if (activeRow.isGroupHeader && activeRow.groupId) {
+      markLayerMaskProvenanceStale({
+        layerIds: masks.filter((mask) => mask.layerGroupId === activeRow.groupId).map((mask) => mask.id),
+        reason: 'source_state_changed',
+      });
       updateGroupOpacity(activeRow.groupId, opacity);
       return;
     }
@@ -673,6 +795,10 @@ export default function LayerStackPanel({
     const nextName = name.trim();
     if (nextName.length === 0) return;
     if (activeRow.isGroupHeader && activeRow.groupId) {
+      markLayerMaskProvenanceStale({
+        layerIds: masks.filter((mask) => mask.layerGroupId === activeRow.groupId).map((mask) => mask.id),
+        reason: 'source_state_changed',
+      });
       applyLayerStack(setLayerGroupName(masks, activeRow.groupId, nextName), activeRow.id);
       return;
     }
@@ -746,6 +872,7 @@ export default function LayerStackPanel({
         result.toneResult.commandResult.changedLayerIds.length,
     );
     setLastBrushLocalReceiptId(result.receipt.replayKey);
+    markLayerMaskProvenanceStale({ reason: 'source_state_changed' });
     setEditor({
       activeMaskContainerId: layerId,
       activeMaskId: maskId,
@@ -892,6 +1019,7 @@ export default function LayerStackPanel({
   const moveActiveLayer = (direction: 'down' | 'up') => {
     if (!activeRow || activeRow.isBase) return;
     if (activeRow.isGroupHeader && activeRow.groupId) {
+      markLayerMaskProvenanceStale({ reason: 'layer_order_changed' });
       applyLayerStack(moveLayerGroup(masks, activeRow.groupId, direction), activeRow.id);
       return;
     }
@@ -901,6 +1029,7 @@ export default function LayerStackPanel({
   const groupActiveLayer = () => {
     if (!activeRow || activeRow.isBase || activeRow.isGroupHeader || !canGroupActiveLayer) return;
     const groupId = crypto.randomUUID();
+    markLayerMaskProvenanceStale({ reason: 'layer_order_changed' });
     applyLayerStack(
       groupLayerWithNext(masks, activeRow.id, groupId, t('editor.layers.defaultGroupName')),
       `group:${groupId}`,
@@ -908,17 +1037,21 @@ export default function LayerStackPanel({
   };
   const ungroupActiveLayer = () => {
     if (!activeGroupId) return;
+    markLayerMaskProvenanceStale({ reason: 'layer_order_changed' });
     applyLayerStack(ungroupLayerGroup(masks, activeGroupId), BASE_LAYER_ID);
   };
   const soloActiveLayer = () => {
     if (!activeRow || activeRow.isBase) return;
     if (activeRow.isGroupHeader && activeRow.groupId) {
+      markLayerMaskProvenanceStale({ reason: 'source_state_changed' });
       applyLayerStack(soloLayerGroup(masks, activeRow.groupId), activeRow.id);
       return;
     }
+    markLayerMaskProvenanceStale({ layerIds: [activeRow.id], reason: 'source_state_changed' });
     applyLayerStack(soloLayer(masks, activeRow.id), activeRow.id);
   };
   const showAllActiveLayers = () => {
+    markLayerMaskProvenanceStale({ reason: 'source_state_changed' });
     applyLayerStack(showAllLayers(masks), selectedLayerId);
   };
   const duplicateActiveLayer = () => {
@@ -926,6 +1059,7 @@ export default function LayerStackPanel({
     if (activeRow.isGroupHeader && activeRow.groupId) {
       const newGroupId = crypto.randomUUID();
       const groupLayers = masks.filter((mask) => mask.layerGroupId === activeRow.groupId);
+      markLayerMaskProvenanceStale({ reason: 'layer_order_changed' });
       applyLayerStack(
         duplicateLayerGroup(
           masks,
@@ -956,6 +1090,7 @@ export default function LayerStackPanel({
   const deleteActiveLayer = () => {
     if (!activeRow || activeRow.isBase) return;
     if (activeRow.isGroupHeader && activeRow.groupId) {
+      markLayerMaskProvenanceStale({ reason: 'layer_deleted' });
       applyLayerStack(deleteLayerGroup(masks, activeRow.groupId), BASE_LAYER_ID);
       return;
     }
@@ -1106,6 +1241,7 @@ export default function LayerStackPanel({
         data-layer-stack-last-brush-local-receipt-id={lastBrushLocalReceiptId}
         data-layer-stack-last-changed-layer-count={lastChangedLayerCount}
         data-layer-stack-last-command-type={lastCommandType}
+        data-layer-mask-source-graph-revision={layerMaskSourceGraphRevision}
         data-testid="layer-operation-readiness-summary"
       >
         <UiText
@@ -1140,9 +1276,43 @@ export default function LayerStackPanel({
         </UiText>
       </div>
 
+      <div
+        className="mx-2 mt-1.5 flex items-center justify-between gap-2 rounded-md border border-editor-border bg-editor-panel-well px-2 py-1.5"
+        data-current-receipt-count={
+          Object.values(layerMaskProvenanceViews).filter((view) => view.status === 'current').length
+        }
+        data-stale-receipt-count={
+          Object.values(layerMaskProvenanceViews).filter((view) => view.status !== 'current').length
+        }
+        data-testid="layer-mask-provenance-summary"
+      >
+        <span className="min-w-0">
+          <UiText variant={TextVariants.small} weight={TextWeights.medium} className="block text-text-primary">
+            {t('editor.layers.provenance.summaryTitle')}
+          </UiText>
+          <UiText variant={TextVariants.small} className="block truncate text-text-tertiary">
+            {t('editor.layers.provenance.summary')}
+          </UiText>
+        </span>
+        <button
+          className={layerSecondaryActionClassName}
+          data-testid="layer-mask-preview-receipts-record"
+          onClick={() => {
+            recordLayerMaskPreviewReceipt({
+              appliedCommandId: `layer_stack_preview_${layerMaskSourceGraphRevision}`,
+              masks,
+            });
+          }}
+          type="button"
+        >
+          {t('editor.layers.provenance.preview')}
+        </button>
+      </div>
+
       <div className="space-y-1 px-2 py-2">
         {rows.map((row) => {
           const isSelected = selectedLayerId === row.id;
+          const provenanceView = row.isBase || row.isGroupHeader ? undefined : layerMaskProvenanceViews[row.id];
 
           return (
             <div
@@ -1298,6 +1468,11 @@ export default function LayerStackPanel({
                       status: t(getRemoveStatusLabelKey(row.retouchRemoveSource.status)),
                     })}
                   </UiText>
+                )}
+                {provenanceView !== undefined && (
+                  <span className="mt-1 block">
+                    <LayerMaskProvenanceBadge view={provenanceView} />
+                  </span>
                 )}
               </span>
               <span className="flex items-center gap-1">

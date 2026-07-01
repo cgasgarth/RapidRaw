@@ -1098,6 +1098,17 @@
         "ungroupBlocked": "",
         "ungroupReady": ""
       },
+      "provenance": {
+        "command": "",
+        "layer": "",
+        "maskHash": "",
+        "preview": "",
+        "reason": "",
+        "sourceGraph": "",
+        "summary": "",
+        "summaryTitle": "",
+        "title": ""
+      },
       "removeRowSummary": "{{blendMode}} - {{opacity}}% - remove {{source}} - {{maskCount}}",
       "removeSource": {
         "canvasStatus": "",
@@ -1288,6 +1299,15 @@
         "copySectionSettings": "Копировать настройки раздела {{section}}",
         "invertComponent": "Инвертировать компонент",
         "invertMask": "Инвертировать маску",
+        "layerMaskProvenanceCommand": "",
+        "layerMaskProvenanceLayer": "",
+        "layerMaskProvenanceMaskHash": "",
+        "layerMaskProvenancePreviewTooltip": "",
+        "layerMaskProvenanceReason": "",
+        "layerMaskProvenanceSourceGraph": "",
+        "layerMaskProvenanceSummary": "",
+        "layerMaskProvenanceSummaryTitle": "",
+        "layerMaskProvenanceTitle": "",
         "maskPropertiesTitle": "Свойства маски",
         "noPresetsFound": "Пресеты не найдены",
         "opacity": "Непрозрачность",

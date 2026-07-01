@@ -39,6 +39,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -73,6 +74,11 @@ import {
 import { createEditorSubMaskFallback, createEditorSubMaskForImage } from '../../../../utils/editorSubMaskFactory';
 import { readBrushLocalAdjustmentReceipt } from '../../../../utils/layers/brushLocalAdjustmentCommandFlow';
 import { readColorRangeLocalAdjustmentReceipt } from '../../../../utils/layers/colorRangeLocalAdjustmentCommandFlow';
+import {
+  deriveLayerMaskProvenanceView,
+  type LayerMaskProvenanceInvalidationReason,
+  type LayerMaskProvenanceView,
+} from '../../../../utils/layers/layerMaskProvenance';
 import {
   cloneMaskContainerForPaste,
   cloneSubMaskForPaste,
@@ -341,6 +347,7 @@ interface ContainerRowProps {
   hasActiveChild: boolean;
   isExpanded: boolean;
   isSelected: boolean;
+  layerMaskProvenanceView: LayerMaskProvenanceView | undefined;
   onAddComponent: (event: ReactMouseEvent<HTMLElement>) => void;
   onSelect: () => void;
   onSelectContainer: (containerId: string | null) => void;
@@ -377,6 +384,7 @@ interface MaskListProps {
   handlePasteMask: (containerId?: string) => void;
   handlePasteSubMask: (containerId: string, insertIndex?: number) => void;
   isRootOver: boolean;
+  layerMaskProvenanceViews: Record<string, LayerMaskProvenanceView>;
   onAddComponent: (
     event: ReactMouseEvent<HTMLElement> | ReactKeyboardEvent<HTMLElement>,
     containerId: string | null,
@@ -434,6 +442,7 @@ interface SettingsPanelProps {
   histogram: ChannelConfig | null;
   isGeneratingAiMask: boolean;
   isSettingsSectionOpen: boolean;
+  layerMaskProvenanceView: LayerMaskProvenanceView | null;
   onDragStateChange?: ((isDragging: boolean) => void) | undefined;
   presets: Array<PresetMenuItem>;
   setBrushSettings: (updater: BrushSettingsUpdater) => void;
@@ -509,6 +518,81 @@ const SUB_MASK_CONFIG: Record<Mask, SubMaskConfig> = {
   },
   [Mask.QuickEraser]: { parameters: [] },
 };
+
+const maskProvenanceBadgeClassNames: Record<LayerMaskProvenanceView['status'], string> = {
+  current: 'border-emerald-500/35 bg-emerald-500/10 text-emerald-200',
+  needs_reapply: 'border-amber-500/40 bg-amber-500/10 text-amber-200',
+  stale_source: 'border-orange-500/40 bg-orange-500/10 text-orange-200',
+};
+
+function MaskProvenanceBadge({ view }: { view: LayerMaskProvenanceView }) {
+  const { t } = useTranslation();
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <span className="relative inline-flex">
+      <button
+        className={`max-w-24 truncate rounded border px-1.5 py-0.5 text-[10px] font-medium leading-4 tabular-nums ${maskProvenanceBadgeClassNames[view.status]}`}
+        data-invalidation-reason={view.invalidationReason}
+        data-layer-id={view.receipt.layerId}
+        data-layer-order-hash={view.receipt.layerOrderHash}
+        data-mask-content-hash={view.receipt.maskContentHash}
+        data-receipt-id={view.receipt.receiptId}
+        data-source-graph-revision={view.receipt.sourceGraphRevision}
+        data-testid={`mask-panel-provenance-badge-${view.receipt.layerId}`}
+        onClick={(event) => {
+          event.stopPropagation();
+          setIsOpen((current) => !current);
+        }}
+        type="button"
+      >
+        {view.badgeLabel}
+      </button>
+      {isOpen && (
+        <span
+          className="absolute right-0 top-6 z-20 grid w-64 gap-1 rounded-md border border-editor-border bg-editor-panel-raised p-2 text-[11px] leading-4 text-text-secondary shadow-xl"
+          data-applied-command-id={view.receipt.appliedCommandId}
+          data-invalidation-reason={view.invalidationReason}
+          data-layer-id={view.receipt.layerId}
+          data-layer-order-hash={view.receipt.layerOrderHash}
+          data-mask-content-hash={view.receipt.maskContentHash}
+          data-receipt-id={view.receipt.receiptId}
+          data-source-graph-revision={view.receipt.sourceGraphRevision}
+          data-testid={`mask-panel-provenance-popover-${view.receipt.layerId}`}
+          onClick={(event) => {
+            event.stopPropagation();
+          }}
+          onKeyDown={(event) => {
+            event.stopPropagation();
+          }}
+        >
+          <span className="font-medium text-text-primary">{t('editor.masks.settings.layerMaskProvenanceTitle')}</span>
+          <span className="truncate">
+            {t('editor.masks.settings.layerMaskProvenanceSourceGraph', {
+              value: view.receipt.sourceGraphRevision,
+            })}
+          </span>
+          <span className="truncate">
+            {t('editor.masks.settings.layerMaskProvenanceMaskHash', {
+              value: view.receipt.maskContentHash,
+            })}
+          </span>
+          <span className="truncate">
+            {t('editor.masks.settings.layerMaskProvenanceCommand', {
+              value: view.receipt.appliedCommandId,
+            })}
+          </span>
+          <span className="truncate">
+            {t('editor.masks.settings.layerMaskProvenanceLayer', { value: view.receipt.layerId })}
+          </span>
+          <span className="truncate">
+            {t('editor.masks.settings.layerMaskProvenanceReason', { value: view.invalidationReason })}
+          </span>
+        </span>
+      )}
+    </span>
+  );
+}
 
 const parameterLabelFallback = (key: string) =>
   key.replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase());
@@ -1216,6 +1300,10 @@ export function MasksPanel() {
     handleGenerateAiWholePersonMask,
   } = useAiMasking();
   const setCustomEscapeHandler = useUIStore((s) => s.setCustomEscapeHandler);
+  const layerMaskProvenanceReceipts = useUIStore((s) => s.layerMaskProvenanceReceipts);
+  const layerMaskSourceGraphRevision = useUIStore((s) => s.layerMaskSourceGraphRevision);
+  const markLayerMaskProvenanceStale = useUIStore((s) => s.markLayerMaskProvenanceStale);
+  const recordLayerMaskPreviewReceipt = useUIStore((s) => s.recordLayerMaskPreviewReceipt);
   const { appSettings } = useSettingsStore(
     useShallow((state) => ({
       appSettings: state.appSettings,
@@ -1375,6 +1463,29 @@ export function MasksPanel() {
 
   const activeContainer = adjustments.masks.find((m) => m.id === activeMaskContainerId);
   const activeSubMaskData = activeContainer?.subMasks.find((sm) => sm.id === activeMaskId);
+  const layerMaskProvenanceViews = useMemo(
+    () =>
+      Object.fromEntries(
+        adjustments.masks.map((mask) => [
+          mask.id,
+          deriveLayerMaskProvenanceView({
+            layerId: mask.id,
+            masks: adjustments.masks,
+            receipt: layerMaskProvenanceReceipts[mask.id],
+            sourceGraphRevision: layerMaskSourceGraphRevision,
+          }),
+        ]),
+      ),
+    [adjustments.masks, layerMaskProvenanceReceipts, layerMaskSourceGraphRevision],
+  );
+  const activeLayerMaskProvenanceView =
+    activeContainer === undefined ? null : (layerMaskProvenanceViews[activeContainer.id] ?? null);
+  const markMaskPanelProvenanceStale = useCallback(
+    (reason: LayerMaskProvenanceInvalidationReason, layerIds?: string[]) => {
+      markLayerMaskProvenanceStale({ ...(layerIds === undefined ? {} : { layerIds }), reason });
+    },
+    [markLayerMaskProvenanceStale],
+  );
   const activeMaskHasBrush = activeContainer?.subMasks.some((subMask) => subMask.type === Mask.Brush) ?? false;
   const activeMaskHasGradient =
     activeContainer?.subMasks.some((subMask) => subMask.type === Mask.Linear || subMask.type === Mask.Radial) ?? false;
@@ -1657,12 +1768,33 @@ export function MasksPanel() {
   };
 
   const updateContainer = (id: string, data: MaskContainerPatch) => {
+    if (
+      data.opacity !== undefined ||
+      data.invert !== undefined ||
+      data.visible !== undefined ||
+      data.adjustments !== undefined
+    ) {
+      markMaskPanelProvenanceStale(data.adjustments === undefined ? 'mask_alpha_changed' : 'source_state_changed', [
+        id,
+      ]);
+    }
     setAdjustments((prev: Adjustments) => ({
       ...prev,
       masks: prev.masks.map((m) => (m.id === id ? { ...m, ...data } : m)),
     }));
   };
   const updateSubMask = (id: string, data: SubMaskPatch) => {
+    if (
+      data.opacity !== undefined ||
+      data.invert !== undefined ||
+      data.visible !== undefined ||
+      data.parameters !== undefined ||
+      data.mode !== undefined ||
+      data.type !== undefined
+    ) {
+      const parentLayerId = adjustments.masks.find((mask) => mask.subMasks.some((subMask) => subMask.id === id))?.id;
+      markMaskPanelProvenanceStale('mask_alpha_changed', parentLayerId === undefined ? undefined : [parentLayerId]);
+    }
     setAdjustments((prev: Adjustments) => ({
       ...prev,
       masks: prev.masks.map((m) => ({
@@ -1674,11 +1806,13 @@ export function MasksPanel() {
 
   const handleDeleteContainer = (id: string) => {
     if (activeMaskContainerId === id) handleDeselect();
+    markMaskPanelProvenanceStale('layer_deleted');
     setAdjustments((prev: Adjustments) => ({ ...prev, masks: prev.masks.filter((m) => m.id !== id) }));
   };
 
   const handleDeleteSubMask = (containerId: string, subMaskId: string) => {
     if (activeMaskId === subMaskId) onSelectMask(null);
+    markMaskPanelProvenanceStale('mask_alpha_changed', [containerId]);
     setAdjustments((prev: Adjustments) => ({
       ...prev,
       masks: prev.masks.map((m) =>
@@ -1713,6 +1847,7 @@ export function MasksPanel() {
   };
 
   const insertMaskContainer = (container: MaskContainer, insertIndex?: number) => {
+    markMaskPanelProvenanceStale('layer_order_changed');
     setAdjustments((prev: Adjustments) => {
       return { ...prev, masks: insertMaskContainerAt(prev.masks, container, insertIndex) };
     });
@@ -1723,6 +1858,7 @@ export function MasksPanel() {
   };
 
   const insertSubMaskIntoContainer = (containerId: string, subMask: SubMask, insertIndex?: number) => {
+    markMaskPanelProvenanceStale('mask_alpha_changed', [containerId]);
     setAdjustments((prev: Adjustments) => ({
       ...prev,
       masks: prev.masks.map((container) => {
@@ -1827,6 +1963,9 @@ export function MasksPanel() {
         }
 
         const reorderedMasks = reorderMaskListContainers(prev.masks, draggedItem.id, prev.masks[newIndex]?.id ?? '');
+        if (reorderedMasks) {
+          markMaskPanelProvenanceStale('layer_order_changed');
+        }
         return reorderedMasks ? { ...prev, masks: reorderedMasks } : prev;
       });
       return;
@@ -1853,6 +1992,7 @@ export function MasksPanel() {
             }),
           );
           if (!result) return prev;
+          markMaskPanelProvenanceStale('layer_order_changed');
 
           const { container: newContainer, containers: newMasks, subMask: movedSubMask } = result;
           setTimeout(() => {
@@ -1883,6 +2023,7 @@ export function MasksPanel() {
             overData?.type === 'SubMask' ? String(over.id) : undefined,
           );
           if (!newMasks) return prev;
+          markMaskPanelProvenanceStale('mask_alpha_changed', [sourceContainerId, expandedTargetContainerId]);
 
           if (sourceContainerId !== targetContainerId) {
             setExpandedContainers((p) => new Set(p).add(expandedTargetContainerId));
@@ -2066,6 +2207,7 @@ export function MasksPanel() {
                 handlePasteMask={handlePasteMask}
                 handlePasteSubMask={handlePasteSubMask}
                 isRootOver={isRootOver}
+                layerMaskProvenanceViews={layerMaskProvenanceViews}
                 onAddComponent={handleAddMaskContextMenu}
                 onExitComplete={() => {
                   if (pendingAction) {
@@ -2151,6 +2293,37 @@ export function MasksPanel() {
                       </div>
                     </div>
                     <div
+                      className="flex items-center justify-between gap-2 rounded-md border border-editor-border bg-editor-panel-well px-2 py-1.5"
+                      data-testid="mask-panel-provenance-summary"
+                    >
+                      <span className="min-w-0">
+                        <UiText
+                          variant={TextVariants.small}
+                          weight={TextWeights.medium}
+                          className="block text-text-primary"
+                        >
+                          {t('editor.masks.settings.layerMaskProvenanceSummaryTitle')}
+                        </UiText>
+                        <UiText variant={TextVariants.small} className="block truncate text-text-tertiary">
+                          {t('editor.masks.settings.layerMaskProvenanceSummary')}
+                        </UiText>
+                      </span>
+                      <button
+                        className={maskPanelRowActionClassName}
+                        data-testid="mask-panel-preview-receipts-record"
+                        data-tooltip={t('editor.masks.settings.layerMaskProvenancePreviewTooltip')}
+                        onClick={() => {
+                          recordLayerMaskPreviewReceipt({
+                            appliedCommandId: `mask_panel_preview_${layerMaskSourceGraphRevision}`,
+                            masks: adjustments.masks,
+                          });
+                        }}
+                        type="button"
+                      >
+                        <Eye size={15} />
+                      </button>
+                    </div>
+                    <div
                       className="grid grid-cols-3 gap-1.5 rounded-md border border-editor-border bg-editor-panel-well p-1.5"
                       data-testid="mask-component-quick-add"
                     >
@@ -2203,6 +2376,7 @@ export function MasksPanel() {
                   histogram={histogram}
                   appSettings={appSettings}
                   isGeneratingAiMask={isGeneratingAiMask}
+                  layerMaskProvenanceView={activeLayerMaskProvenanceView}
                   setIsMaskControlHovered={setIsMaskControlHovered}
                   collapsibleState={collapsibleState}
                   setCollapsibleState={setCollapsibleState}
@@ -2379,6 +2553,7 @@ function MaskList({
   handlePasteMask,
   handlePasteSubMask,
   isRootOver,
+  layerMaskProvenanceViews,
   onAddComponent,
   onExitComplete,
   onRootClick,
@@ -2421,6 +2596,7 @@ function MaskList({
             isSelected={activeMaskContainerId === container.id && activeMaskId === null}
             hasActiveChild={activeMaskContainerId === container.id && activeMaskId !== null}
             isExpanded={expandedContainers.has(container.id)}
+            layerMaskProvenanceView={layerMaskProvenanceViews[container.id]}
             onToggle={() => {
               onToggleContainer(container.id);
             }}
@@ -2494,6 +2670,7 @@ function ContainerRow({
   isSelected,
   hasActiveChild,
   isExpanded,
+  layerMaskProvenanceView,
   onToggle,
   onSelect,
   renamingId,
@@ -2727,9 +2904,20 @@ function ContainerRow({
               ref={renameInputRef}
             />
           ) : (
-            <UiText color={TextColors.primary} weight={TextWeights.medium} className="truncate text-[12px] select-none">
-              {container.name}
-            </UiText>
+            <div className="min-w-0">
+              <UiText
+                color={TextColors.primary}
+                weight={TextWeights.medium}
+                className="truncate text-[12px] select-none"
+              >
+                {container.name}
+              </UiText>
+              {layerMaskProvenanceView !== undefined && (
+                <div className="mt-1">
+                  <MaskProvenanceBadge view={layerMaskProvenanceView} />
+                </div>
+              )}
+            </div>
           )}
         </div>
         <div className="flex opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
@@ -3100,6 +3288,7 @@ function SettingsPanel({
   histogram,
   appSettings,
   isGeneratingAiMask: _isGeneratingAiMask,
+  layerMaskProvenanceView,
   setIsMaskControlHovered,
   collapsibleState,
   setCollapsibleState,
@@ -3474,6 +3663,28 @@ function SettingsPanel({
         isContentVisible={true}
       >
         <div className="space-y-2 pt-1.5">
+          {layerMaskProvenanceView !== null && (
+            <div
+              className={`${maskPanelCardClassName} grid gap-1 text-[11px]`}
+              data-applied-command-id={layerMaskProvenanceView.receipt.appliedCommandId}
+              data-invalidation-reason={layerMaskProvenanceView.invalidationReason}
+              data-layer-id={layerMaskProvenanceView.receipt.layerId}
+              data-layer-order-hash={layerMaskProvenanceView.receipt.layerOrderHash}
+              data-mask-content-hash={layerMaskProvenanceView.receipt.maskContentHash}
+              data-receipt-id={layerMaskProvenanceView.receipt.receiptId}
+              data-source-graph-revision={layerMaskProvenanceView.receipt.sourceGraphRevision}
+              data-testid="mask-settings-provenance-card"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <UiText variant={TextVariants.small} color={TextColors.secondary} className="font-medium">
+                  {t('editor.masks.settings.layerMaskProvenanceTitle')}
+                </UiText>
+                <MaskProvenanceBadge view={layerMaskProvenanceView} />
+              </div>
+              <span className="truncate text-text-tertiary">{layerMaskProvenanceView.receipt.maskContentHash}</span>
+            </div>
+          )}
+
           <Switch
             checked={isComponentMode ? activeSubMask.invert : displayContainer.invert}
             label={isComponentMode ? t('editor.masks.settings.invertComponent') : t('editor.masks.settings.invertMask')}

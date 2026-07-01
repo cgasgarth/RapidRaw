@@ -1065,6 +1065,17 @@
         "ungroupBlocked": "",
         "ungroupReady": ""
       },
+      "provenance": {
+        "command": "",
+        "layer": "",
+        "maskHash": "",
+        "preview": "",
+        "reason": "",
+        "sourceGraph": "",
+        "summary": "",
+        "summaryTitle": "",
+        "title": ""
+      },
       "removeRowSummary": "{{blendMode}} - {{opacity}}% - remove {{source}} - {{maskCount}}",
       "removeSource": {
         "canvasStatus": "",
@@ -1252,6 +1263,15 @@
         "copySectionSettings": "Copier les paramètres de la section {{section}}",
         "invertComponent": "Inverser le composant",
         "invertMask": "Inverser le masque",
+        "layerMaskProvenanceCommand": "",
+        "layerMaskProvenanceLayer": "",
+        "layerMaskProvenanceMaskHash": "",
+        "layerMaskProvenancePreviewTooltip": "",
+        "layerMaskProvenanceReason": "",
+        "layerMaskProvenanceSourceGraph": "",
+        "layerMaskProvenanceSummary": "",
+        "layerMaskProvenanceSummaryTitle": "",
+        "layerMaskProvenanceTitle": "",
         "maskPropertiesTitle": "Propriétés du masque",
         "noPresetsFound": "Aucun paramètre prédéfini trouvé",
         "opacity": "Opacité",
