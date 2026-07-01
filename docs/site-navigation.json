@@ -456,6 +456,10 @@
           "path": "docs/validation/harnesses/runtime-proof-completion-states-2026-06-17.md"
         },
         {
+          "title": "Local macOS app E2E checklist",
+          "path": "docs/tooling/local-checks/local-macos-app-e2e-checklist-2026-07-01.md"
+        },
+        {
           "title": "Unused vars severity",
           "path": "docs/validation/harnesses/unused-vars-error-2026-06-15.md"
         },
@@ -667,6 +671,10 @@
         {
           "title": "Goal review page",
           "path": "docs/validation/reports/goal-review-2026-06-11.html"
+        },
+        {
+          "title": "Local macOS app E2E report template",
+          "path": "docs/validation/reports/local-macos-app-e2e-report.template.md"
         }
       ]
     },
