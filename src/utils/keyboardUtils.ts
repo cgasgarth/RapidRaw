@@ -164,6 +164,12 @@ export const KEYBIND_DEFINITIONS: KeybindDefinition[] = [
     section: 'panels',
   },
   {
+    action: 'toggle_color',
+    description: 'settings.keybinds.actions.toggle_color',
+    defaultCombo: ['KeyC'],
+    section: 'panels',
+  },
+  {
     action: 'toggle_crop_panel',
     description: 'settings.keybinds.actions.toggle_crop_panel',
     defaultCombo: ['KeyR'],
@@ -191,6 +197,12 @@ export const KEYBIND_DEFINITIONS: KeybindDefinition[] = [
     action: 'toggle_metadata',
     description: 'settings.keybinds.actions.toggle_metadata',
     defaultCombo: ['KeyI'],
+    section: 'panels',
+  },
+  {
+    action: 'toggle_tether',
+    description: 'settings.keybinds.actions.toggle_tether',
+    defaultCombo: ['KeyT'],
     section: 'panels',
   },
   {
