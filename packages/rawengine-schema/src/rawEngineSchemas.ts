@@ -9530,6 +9530,13 @@ export const aiToolApplyResultV1Schema = z
   })
   .strict();
 
+export const rawEngineImageGetPreviewRequestV1Schema = z
+  .object({
+    expectedRecipeHash: z.string().trim().min(1).optional(),
+    requestId: z.string().trim().min(1),
+  })
+  .strict();
+
 const rawEngineAppServerKnownInputSchemas = {
   AiEnhancementCommandEnvelopeV1: aiEnhancementCommandEnvelopeV1Schema,
   AiToolCommandEnvelopeV1: aiToolCommandEnvelopeV1Schema,
@@ -9550,6 +9557,7 @@ const rawEngineAppServerKnownInputSchemas = {
   ProjectLibraryCommandEnvelopeV1: projectLibraryCommandEnvelopeV1Schema,
   ProjectLibrarySnapshotQueryV1: projectLibrarySnapshotQueryV1Schema,
   QueryEnvelopeV1: queryEnvelopeV1Schema,
+  RawEngineImageGetPreviewRequestV1: rawEngineImageGetPreviewRequestV1Schema,
   ToneColorCommandEnvelopeV1: toneColorCommandEnvelopeV1Schema,
 } as const;
 

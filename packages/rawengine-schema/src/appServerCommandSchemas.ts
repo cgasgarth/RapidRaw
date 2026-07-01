@@ -20,6 +20,7 @@ const rawEngineAppServerInputSchemaNamesV1 = [
   'ProjectLibraryCommandEnvelopeV1',
   'ProjectLibrarySnapshotQueryV1',
   'QueryEnvelopeV1',
+  'RawEngineImageGetPreviewRequestV1',
   'ToneColorCommandEnvelopeV1',
 ] as const;
 
