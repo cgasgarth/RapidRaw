@@ -20,7 +20,10 @@ import {
   resetHdrStateForSettingsChange,
   resetPanoramaStateForSettingsChange,
 } from '../../utils/computational-merge/computationalMergeModalState';
-import { buildFocusStackOutputReviewWorkflow } from '../../utils/focusStackOutputReview';
+import {
+  buildFocusStackOutputReviewWorkflow,
+  markFocusStackOutputReviewApplyReady,
+} from '../../utils/focusStackOutputReview';
 import { handleNegativeConversionEditorHandoff } from '../../utils/negative-lab/negativeLabEditorHandoff';
 import { buildSuperResolutionOutputReviewWorkflow } from '../../utils/superResolutionOutputReview';
 import type { AlbumItem, AppSettings } from '../ui/AppProperties';
@@ -447,17 +450,7 @@ export default function AppModals(props: AppModalsProps) {
                     sources: focusStackModalState.sourcePaths.length,
                     toolName: routePair.applyToolName,
                   },
-                  outputReview: {
-                    ...focusStackModalState.outputReview,
-                    editableHandoff: {
-                      ...focusStackModalState.outputReview.editableHandoff,
-                      status: 'ready',
-                    },
-                    haloReview: {
-                      ...focusStackModalState.outputReview.haloReview,
-                      reviewStatus: 'apply_ready',
-                    },
-                  },
+                  outputReview: markFocusStackOutputReviewApplyReady(focusStackModalState.outputReview),
                 },
               });
             }}

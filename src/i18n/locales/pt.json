@@ -2564,6 +2564,8 @@
         }
       },
       "review": {
+        "applyReceipt": "",
+        "artifactHandle": "",
         "editableArtifact": "",
         "exportHandoff": "",
         "haloReviewStatus": {
@@ -2597,9 +2599,13 @@
         "overlayTitle": "Sharpness overlay review",
         "overlayValue": "{{mode}} at {{value}}%",
         "percentValue": "",
+        "previewDimensions": "",
+        "previewDimensionsValue": "",
         "privateRawPending": "Private RAW review pending",
         "proofStatus": "App-server bridge ready",
         "provenance": "",
+        "qualitySummaryUnavailable": "",
+        "qualitySummaryValue": "",
         "retouchedExportParity": "",
         "retouchedExportParityPending": "",
         "retouchLayer": "Retouch layer",

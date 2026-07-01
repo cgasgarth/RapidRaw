@@ -152,10 +152,10 @@ if (!appModalsSource.includes('lastApplyCommand')) {
 if (!appModalsSource.includes('lastApplyCommand={focusStackModalState.lastApplyCommand}')) {
   failures.push('AppModals must pass focus-stack apply command metadata into FocusStackModal.');
 }
-if (!appModalsSource.includes("reviewStatus: 'apply_ready'")) {
+if (!appModalsSource.includes('markFocusStackOutputReviewApplyReady')) {
   failures.push('Focus stack apply-plan action must update review status to apply_ready.');
 }
-if (!appModalsSource.includes("status: 'ready'")) {
+if (!appModalsSource.includes('markFocusStackOutputReviewApplyReady')) {
   failures.push('Focus stack apply-plan action must update editable handoff status to ready.');
 }
 if (!appModalsSource.includes('outputReview: buildFocusStackOutputReviewWorkflow')) {

@@ -20,7 +20,10 @@ import {
   buildSuperResolutionDerivedOutputReceipt,
   deriveDerivedOutputReceiptState,
 } from '../../../../src/utils/derivedOutputReceipt.ts';
-import { buildFocusStackOutputReviewWorkflow } from '../../../../src/utils/focusStackOutputReview.ts';
+import {
+  buildFocusStackOutputReviewWorkflow,
+  markFocusStackOutputReviewApplyReady,
+} from '../../../../src/utils/focusStackOutputReview.ts';
 import { buildPanoramaReopenedDerivedOutputReceipt } from '../../../../src/utils/hdrDerivedSourceReopen.ts';
 import { buildHdrEditableHandoffSummary } from '../../../../src/utils/hdrEditableHandoff.ts';
 import { buildSuperResolutionOutputReviewWorkflow } from '../../../../src/utils/superResolutionOutputReview.ts';
@@ -192,32 +195,14 @@ const focusReceipt = buildFocusStackDerivedOutputReceipt({
   settings: DEFAULT_FOCUS_STACK_UI_SETTINGS,
 });
 
-const acceptedFocusReview = {
-  ...buildFocusStackOutputReviewWorkflow({
+const acceptedFocusReview = markFocusStackOutputReviewApplyReady(
+  buildFocusStackOutputReviewWorkflow({
     artifactPath: '/tmp/rawengine-focus-accepted-output.tif',
     settings: DEFAULT_FOCUS_STACK_UI_SETTINGS,
     sourceCount: 3,
     sourcePaths: ['/tmp/focus-accepted-0.dng', '/tmp/focus-accepted-1.dng', '/tmp/focus-accepted-2.dng'],
   }),
-  editableHandoff: {
-    ...buildFocusStackOutputReviewWorkflow({
-      artifactPath: '/tmp/rawengine-focus-accepted-output.tif',
-      settings: DEFAULT_FOCUS_STACK_UI_SETTINGS,
-      sourceCount: 3,
-      sourcePaths: ['/tmp/focus-accepted-0.dng', '/tmp/focus-accepted-1.dng', '/tmp/focus-accepted-2.dng'],
-    }).editableHandoff,
-    status: 'ready',
-  },
-  haloReview: {
-    ...buildFocusStackOutputReviewWorkflow({
-      artifactPath: '/tmp/rawengine-focus-accepted-output.tif',
-      settings: DEFAULT_FOCUS_STACK_UI_SETTINGS,
-      sourceCount: 3,
-      sourcePaths: ['/tmp/focus-accepted-0.dng', '/tmp/focus-accepted-1.dng', '/tmp/focus-accepted-2.dng'],
-    }).haloReview,
-    reviewStatus: 'apply_ready',
-  },
-} satisfies ReturnType<typeof buildFocusStackOutputReviewWorkflow>;
+);
 
 const acceptedFocusReceipt = buildFocusStackDerivedOutputReceipt({
   review: acceptedFocusReview,
@@ -279,7 +264,11 @@ expect(
 );
 expect(
   focusReceipt.openInEditorAction.path === undefined,
-  'Focus stack deferred receipt must not fake an output path.',
+  'Focus stack unaccepted receipt must not fake an output path.',
+);
+expect(
+  acceptedFocusReceipt.openInEditorAction.state === 'available',
+  'Accepted focus stack receipt must expose available editor handoff.',
 );
 expect(
   superResolutionReceipt.openInEditorAction.path === undefined,
