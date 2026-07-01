@@ -4386,10 +4386,12 @@ export const focusStackArtifactV1Schema = z
     outputArtifact: artifactHandleV1Schema,
     outputColorSpace: z.string().trim().min(1),
     previewArtifacts: z.array(artifactHandleV1Schema),
+    haloMapArtifact: artifactHandleV1Schema.optional(),
     retouchedExportParity: focusStackRetouchedExportParityV1Schema.optional(),
     haloReview: z
       .object({
         artifactId: z.string().trim().min(1),
+        artifactHash: z.string().trim().min(1).optional(),
         editableHandoffStatus: z.enum(['blocked', 'ready', 'review_required']),
         haloRiskCellRatio: z.number().min(0).max(1),
         lowConfidenceCellRatio: z.number().min(0).max(1),

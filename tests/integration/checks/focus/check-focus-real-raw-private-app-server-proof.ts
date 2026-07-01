@@ -176,6 +176,7 @@ function buildRequest(sample: RuntimeSample, command: ReturnType<typeof buildFoc
       translationY: frame.translationY,
       width: sample.width,
     })),
+    haloMapArtifactId: 'artifact_focus_private_raw_halo_map',
     outputArtifactId: 'artifact_focus_private_raw_output',
     previewArtifactId: 'artifact_focus_private_raw_preview',
     retouchLayerArtifactId: 'artifact_focus_private_raw_retouch',

@@ -103,6 +103,14 @@ if (sourceHashes.includes(outputHash))
 if (applied.apply.sidecarArtifact.haloReview === undefined) {
   throw new Error('Focus sidecar artifact must persist halo review metadata.');
 }
+if (applied.apply.sidecarArtifact.haloMapArtifact?.artifactId !== 'artifact_focus_ui_runtime_halo_map') {
+  throw new Error('Focus sidecar artifact must persist halo map artifact metadata.');
+}
+if (
+  applied.apply.sidecarArtifact.haloReview.artifactHash !== applied.apply.sidecarArtifact.haloMapArtifact.contentHash
+) {
+  throw new Error('Focus sidecar artifact must preserve halo map hash in halo review.');
+}
 if (applied.apply.sidecarArtifact.haloReview.reviewStatus !== 'review_required') {
   throw new Error(
     `Expected review_required halo status, got ${applied.apply.sidecarArtifact.haloReview.reviewStatus}.`,
@@ -126,6 +134,9 @@ if (
 }
 if (outputReview.editableHandoff.retouchedExportParity?.parityProofHash === undefined) {
   throw new Error('Focus output review did not expose retouched export parity proof hash.');
+}
+if (outputReview.haloReview.artifactHash !== applied.apply.sidecarArtifact.haloMapArtifact.contentHash) {
+  throw new Error('Focus output review did not expose halo map hash.');
 }
 if (outputReview.haloReview.transitionRiskRegions.length !== cells.length) {
   throw new Error(
@@ -183,6 +194,7 @@ function buildRequest(command) {
     command,
     depthConfidenceArtifactId: 'artifact_focus_ui_runtime_depth_confidence',
     frames,
+    haloMapArtifactId: 'artifact_focus_ui_runtime_halo_map',
     outputArtifactId: 'artifact_focus_ui_runtime_output',
     previewArtifactId: 'artifact_focus_ui_runtime_preview',
     retouchLayerArtifactId: 'artifact_focus_ui_runtime_retouch',

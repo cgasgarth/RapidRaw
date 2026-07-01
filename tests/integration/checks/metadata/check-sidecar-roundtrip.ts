@@ -407,6 +407,12 @@ assertEqual(computationalMergeArtifacts.superResolutionArtifacts.length, 1, 'sup
 const [focusStackArtifact] = computationalMergeArtifacts.focusStackArtifacts;
 assertEqual(focusStackArtifact.family, 'focus_stack', 'focus stack artifact family');
 assertEqual(focusStackArtifact.outputArtifact.storage, 'sidecar_artifact', 'focus stack output storage');
+assertEqual(focusStackArtifact.haloMapArtifact?.storage, 'sidecar_artifact', 'focus stack halo map storage');
+assertEqual(
+  focusStackArtifact.haloReview?.artifactHash,
+  focusStackArtifact.haloMapArtifact?.contentHash,
+  'focus stack halo map review hash',
+);
 assertEqual(focusStackArtifact.sharpnessMapArtifact?.storage, 'sidecar_artifact', 'focus stack sharpness map storage');
 assertEqual(focusStackArtifact.sharpnessSettings.cellCount, 3, 'focus stack sharpness cell count');
 assertEqual(focusStackArtifact.sharpnessSettings.weightPower, 5, 'focus stack sharpness weight power');

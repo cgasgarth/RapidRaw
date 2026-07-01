@@ -59,6 +59,7 @@ export const focusStackOutputReviewWorkflowSchema = z
     haloRiskCellRatio: z.number().min(0).max(1),
     haloReview: z
       .object({
+        artifactHash: z.string().trim().min(1).optional(),
         artifactId: z.string().trim().min(1),
         reviewStatus: focusStackHaloReviewStatusSchema,
         transitionRiskRegions: z
