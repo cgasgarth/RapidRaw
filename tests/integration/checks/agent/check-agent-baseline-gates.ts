@@ -21,6 +21,7 @@ import { AGENT_HISTORY_ROLLBACK_TOOL_NAME } from '../../../../src/utils/agent/se
 import {
   AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
   AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
+  buildAgentAdjustmentsApplyApproval,
 } from '../../../../src/utils/agent/tools/agentAdjustmentApplyTool.ts';
 import { AGENT_COLOR_APPLY_TOOL_NAME } from '../../../../src/utils/agent/tools/agentColorApplyTool.ts';
 import { AGENT_CURVE_LEVELS_APPLY_TOOL_NAME } from '../../../../src/utils/agent/tools/agentCurveLevelsApplyTool.ts';
@@ -221,6 +222,12 @@ const apply = await dispatch(
     acceptedPlanHash: dryRunPayload.dryRunPlanHash,
     acceptedPlanId: dryRunPayload.dryRunPlanId,
     adjustments: { exposure: 0.4 },
+    approval: buildAgentAdjustmentsApplyApproval({
+      approvalId: 'approval-agent-baseline-apply',
+      dryRun: dryRunPayload,
+      expectedRecipeHash: statePayload.snapshot.initialPreview.recipeHash,
+      sessionId: 'agent-baseline',
+    }),
     expectedGraphRevision: dryRunPayload.sourceGraphRevision,
     expectedRecipeHash: statePayload.snapshot.initialPreview.recipeHash,
     operationId: 'agent_baseline_apply',
@@ -237,6 +244,12 @@ assertRejected(
       acceptedPlanHash: dryRunPayload.dryRunPlanHash,
       acceptedPlanId: dryRunPayload.dryRunPlanId,
       adjustments: { exposure: 0.5 },
+      approval: buildAgentAdjustmentsApplyApproval({
+        approvalId: 'approval-agent-baseline-stale-apply',
+        dryRun: dryRunPayload,
+        expectedRecipeHash: statePayload.snapshot.initialPreview.recipeHash,
+        sessionId: 'agent-baseline',
+      }),
       expectedGraphRevision: dryRunPayload.sourceGraphRevision,
       expectedRecipeHash: statePayload.snapshot.initialPreview.recipeHash,
       operationId: 'agent_baseline_stale_apply',

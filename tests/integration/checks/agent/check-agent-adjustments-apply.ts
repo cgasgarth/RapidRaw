@@ -131,10 +131,51 @@ if (
   throw new Error('agent.adjustments.dry_run did not produce a bound receipt.');
 }
 
+let rejectedApprovalMismatch = false;
+try {
+  await applyAgentGlobalAdjustments({
+    acceptedPlanHash: dryRun.dryRunPlanHash,
+    acceptedPlanId: dryRun.dryRunPlanId,
+    adjustments,
+    approval: {
+      approvalId: 'approval-agent-adjustments-mismatch',
+      approvedGraphRevision: dryRun.sourceGraphRevision,
+      approvedPlanHash: 'sha256:wrong-approved-plan',
+      approvedPlanId: dryRun.dryRunPlanId,
+      approvedRecipeHash: initialSnapshot.initialPreview.recipeHash,
+      approvedSessionId: 'agent-adjustments-apply-3161',
+      status: 'approved',
+    },
+    expectedGraphRevision: dryRun.sourceGraphRevision,
+    expectedRecipeHash: initialSnapshot.initialPreview.recipeHash,
+    operationId: 'agent_adjustments_apply_3161',
+    requestId: 'agent-adjustments-apply-rejected-approval',
+    sessionId: 'agent-adjustments-apply-3161',
+  });
+} catch (error) {
+  if (error instanceof Error && error.message.includes('mismatched approval receipt')) {
+    rejectedApprovalMismatch = true;
+  } else {
+    throw error;
+  }
+}
+if (!rejectedApprovalMismatch) {
+  throw new Error('agent.adjustments.apply accepted a mismatched approval receipt.');
+}
+
 const result = await applyAgentGlobalAdjustments({
   acceptedPlanHash: dryRun.dryRunPlanHash,
   acceptedPlanId: dryRun.dryRunPlanId,
   adjustments,
+  approval: {
+    approvalId: 'approval-agent-adjustments-3161',
+    approvedGraphRevision: dryRun.sourceGraphRevision,
+    approvedPlanHash: dryRun.dryRunPlanHash,
+    approvedPlanId: dryRun.dryRunPlanId,
+    approvedRecipeHash: initialSnapshot.initialPreview.recipeHash,
+    approvedSessionId: 'agent-adjustments-apply-3161',
+    status: 'approved',
+  },
   expectedGraphRevision: dryRun.sourceGraphRevision,
   expectedRecipeHash: initialSnapshot.initialPreview.recipeHash,
   operationId: 'agent_adjustments_apply_3161',
@@ -165,6 +206,8 @@ if (
   result.receipt.sessionId !== 'agent-adjustments-apply-3161' ||
   result.receipt.operationId !== 'agent_adjustments_apply_3161' ||
   result.receipt.acceptedPlanHash !== dryRun.dryRunPlanHash ||
+  result.receipt.approvalId !== 'approval-agent-adjustments-3161' ||
+  result.receipt.approvalState !== 'approved' ||
   result.receipt.expectedGraphRevision !== dryRun.sourceGraphRevision ||
   result.receipt.undoGraphRevision !== result.undoGraphRevision ||
   result.receipt.appliedGraphRevision !== result.appliedGraphRevision ||

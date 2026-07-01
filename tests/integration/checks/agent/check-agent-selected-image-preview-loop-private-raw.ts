@@ -19,6 +19,7 @@ import {
 import { buildAgentImageContextSnapshot } from '../../../../src/utils/agent/context/agentImageContextSnapshot.ts';
 import {
   applyAgentGlobalAdjustments,
+  buildAgentAdjustmentsApplyApproval,
   dryRunAgentGlobalAdjustments,
 } from '../../../../src/utils/agent/tools/agentAdjustmentApplyTool.ts';
 import { handleRawEngineAppServerHostRequestAsync } from '../../../../src/utils/rawEngineAppServerHost.ts';
@@ -367,6 +368,12 @@ async function buildAcceptedDryRunApprovals() {
       acceptedPlanHash: dryRun.dryRunPlanHash,
       acceptedPlanId: dryRun.dryRunPlanId,
       adjustments,
+      approval: buildAgentAdjustmentsApplyApproval({
+        approvalId: `approval_agent_private_preview_loop_apply_${index + 1}`,
+        dryRun,
+        expectedRecipeHash: snapshot.initialPreview.recipeHash,
+        sessionId: 'agent-private-preview-loop',
+      }),
       expectedGraphRevision: dryRun.sourceGraphRevision,
       expectedRecipeHash: snapshot.initialPreview.recipeHash,
       operationId,

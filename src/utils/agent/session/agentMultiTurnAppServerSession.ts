@@ -19,6 +19,7 @@ import {
   AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
   agentAdjustmentsApplyResponseSchema,
   agentAdjustmentsDryRunResponseSchema,
+  buildAgentAdjustmentsApplyApproval,
 } from '../tools/agentAdjustmentApplyTool';
 import { AGENT_COLOR_APPLY_TOOL_NAME, agentColorApplyResponseSchema } from '../tools/agentColorApplyTool';
 import {
@@ -354,6 +355,12 @@ export const runAgentMultiTurnAppServerSession = async (
             acceptedPlanHash: dryRunResult.dryRunPlanHash,
             acceptedPlanId: dryRunResult.dryRunPlanId,
             adjustments: turn.adjustment,
+            approval: buildAgentAdjustmentsApplyApproval({
+              approvalId: `approval_${applyToolCallId}`,
+              dryRun: dryRunResult,
+              expectedRecipeHash: recipeHash,
+              sessionId: parsedRequest.sessionId,
+            }),
             expectedGraphRevision: dryRunResult.sourceGraphRevision,
             expectedRecipeHash: recipeHash,
             operationId: `${parsedRequest.operationId}-${turnNumber}`,

@@ -38,11 +38,24 @@ const agentGlobalAdjustmentPatchSchema = z
   .strict()
   .refine((patch) => Object.keys(patch).length > 0, { message: 'At least one global adjustment is required.' });
 
+const agentAdjustmentsApplyApprovalSchema = z
+  .object({
+    approvalId: z.string().trim().min(1),
+    approvedGraphRevision: z.string().trim().min(1),
+    approvedPlanHash: z.string().trim().min(1),
+    approvedPlanId: z.string().trim().min(1),
+    approvedRecipeHash: z.string().trim().min(1),
+    approvedSessionId: z.string().trim().min(1),
+    status: z.literal('approved'),
+  })
+  .strict();
+
 export const agentAdjustmentsApplyRequestSchema = z
   .object({
     acceptedPlanHash: z.string().trim().min(1),
     acceptedPlanId: z.string().trim().min(1),
     adjustments: agentGlobalAdjustmentPatchSchema,
+    approval: agentAdjustmentsApplyApprovalSchema,
     expectedGraphRevision: z.string().trim().min(1),
     expectedRecipeHash: z.string().trim().min(1),
     operationId: z.string().trim().min(1),
@@ -107,6 +120,8 @@ export const agentAdjustmentsApplyResponseSchema = z
         adjustedFields: z.array(z.string().trim().min(1)).min(1),
         afterPreviewHash: z.string().trim().min(1),
         appliedGraphRevision: z.string().trim().min(1),
+        approvalId: z.string().trim().min(1),
+        approvalState: z.literal('approved'),
         beforePreviewHash: z.string().trim().min(1),
         expectedGraphRevision: z.string().trim().min(1),
         operationId: z.string().trim().min(1),
@@ -126,6 +141,7 @@ export type AgentAdjustmentsApplyRequest = z.infer<typeof agentAdjustmentsApplyR
 export type AgentAdjustmentsApplyResponse = z.infer<typeof agentAdjustmentsApplyResponseSchema>;
 export type AgentAdjustmentsDryRunRequest = z.infer<typeof agentAdjustmentsDryRunRequestSchema>;
 export type AgentAdjustmentsDryRunResponse = z.infer<typeof agentAdjustmentsDryRunResponseSchema>;
+export type AgentAdjustmentsApplyApproval = z.infer<typeof agentAdjustmentsApplyApprovalSchema>;
 
 const EXTRA_ADJUSTMENT_KEYS = ['temperature', 'tint', 'vibrance'] as const satisfies ReadonlyArray<keyof Adjustments>;
 
@@ -222,6 +238,27 @@ const buildDryRunReceiptKey = ({
   planHash: string;
   planId: string;
 }) => `${expectedGraphRevision}:${planId}:${planHash}`;
+
+export const buildAgentAdjustmentsApplyApproval = ({
+  approvalId,
+  dryRun,
+  expectedRecipeHash,
+  sessionId,
+}: {
+  approvalId: string;
+  dryRun: Pick<AgentAdjustmentsDryRunResponse, 'dryRunPlanHash' | 'dryRunPlanId' | 'sourceGraphRevision'>;
+  expectedRecipeHash: string;
+  sessionId: string;
+}): AgentAdjustmentsApplyApproval =>
+  agentAdjustmentsApplyApprovalSchema.parse({
+    approvalId,
+    approvedGraphRevision: dryRun.sourceGraphRevision,
+    approvedPlanHash: dryRun.dryRunPlanHash,
+    approvedPlanId: dryRun.dryRunPlanId,
+    approvedRecipeHash: expectedRecipeHash,
+    approvedSessionId: sessionId,
+    status: 'approved',
+  });
 
 export const dryRunAgentGlobalAdjustments = async (
   request: AgentAdjustmentsDryRunRequest,
@@ -322,6 +359,15 @@ export const applyAgentGlobalAdjustments = async (
     throw new Error('Agent adjustment apply rejected missing dry-run receipt.');
   }
   if (
+    parsedRequest.approval.approvedPlanHash !== parsedRequest.acceptedPlanHash ||
+    parsedRequest.approval.approvedPlanId !== parsedRequest.acceptedPlanId ||
+    parsedRequest.approval.approvedGraphRevision !== parsedRequest.expectedGraphRevision ||
+    parsedRequest.approval.approvedRecipeHash !== parsedRequest.expectedRecipeHash ||
+    parsedRequest.approval.approvedSessionId !== parsedRequest.sessionId
+  ) {
+    throw new Error('Agent adjustment apply rejected mismatched approval receipt.');
+  }
+  if (
     acceptedReceipt.operationId !== parsedRequest.operationId ||
     acceptedReceipt.sessionId !== parsedRequest.sessionId ||
     JSON.stringify(acceptedReceipt.adjustments) !== JSON.stringify(parsedRequest.adjustments)
@@ -379,6 +425,8 @@ export const applyAgentGlobalAdjustments = async (
       adjustedFields,
       afterPreviewHash: basicToneResult.afterPreviewHash,
       appliedGraphRevision,
+      approvalId: parsedRequest.approval.approvalId,
+      approvalState: parsedRequest.approval.status,
       beforePreviewHash: basicToneResult.beforePreviewHash,
       expectedGraphRevision: parsedRequest.expectedGraphRevision,
       operationId: parsedRequest.operationId,
