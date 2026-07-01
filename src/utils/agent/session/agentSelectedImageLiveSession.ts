@@ -61,6 +61,7 @@ const selectedImageLiveSessionSnapshotSchema = z
 const selectedImageLiveSessionAuditEventSchema = z
   .object({
     approvalDecision: z.enum(['approved', 'cancelled', 'pending', 'rejected']).optional(),
+    approvalId: z.string().trim().min(1).optional(),
     cancellationOutcome: z.enum(['cancelled_before_apply', 'late_result_blocked', 'not_cancelled']).optional(),
     graphRevision: z.string().trim().min(1).optional(),
     id: z.string().trim().min(1),
@@ -126,6 +127,7 @@ const selectedImageLiveSessionApplyGuardSchema = z
 const selectedImageLiveSessionTranscriptEntrySchema = z
   .object({
     acceptedPreviewArtifactId: z.string().trim().min(1).optional(),
+    approvalId: z.string().trim().min(1).optional(),
     argumentsHash: z.string().trim().min(1).optional(),
     graphRevision: z.string().trim().min(1).optional(),
     id: z.string().trim().min(1),
@@ -155,6 +157,7 @@ export const agentSelectedImageLiveSessionReceiptSchema = z
     acceptedPreviewArtifactId: z.string().trim().min(1),
     afterPreviewHash: z.string().trim().min(1).optional(),
     approvalDecision: z.enum(['approved', 'cancelled', 'pending', 'rejected']),
+    approvalId: z.string().trim().min(1).optional(),
     applyGuard: selectedImageLiveSessionApplyGuardSchema.optional(),
     beforePreviewHash: z.string().trim().min(1),
     cancellationOutcome: z.enum(['cancelled_before_apply', 'late_result_blocked', 'not_cancelled']),
@@ -224,6 +227,7 @@ export type AgentSelectedImageLiveSessionTranscriptEntry = z.infer<
 
 export interface AgentSelectedImageLiveSessionDraft {
   adjustments: AgentAdjustmentsApplyRequest['adjustments'];
+  approvalId?: string;
   auditEvents: AgentSelectedImageLiveSessionAuditEvent[];
   checkpoint: AgentSessionCheckpoint;
   dryRun: AgentAdjustmentsDryRunResponse;
@@ -393,9 +397,14 @@ export const approveAgentSelectedImageLiveSession = (
   draft: AgentSelectedImageLiveSessionDraft,
 ): AgentSelectedImageLiveSessionDraft => {
   if (draft.state !== 'approval_required') throw new Error('Selected-image live session is not awaiting approval.');
+  draft.approvalId = `approval_${draft.sessionId}_${draft.requestId}_${draft.dryRun.dryRunPlanId}`.replaceAll(
+    /[^A-Za-z0-9_-]/gu,
+    '_',
+  );
   draft.state = 'dry_run_ready';
   pushEvent(draft, {
     approvalDecision: 'approved',
+    approvalId: draft.approvalId,
     graphRevision: draft.snapshot.graphRevision,
     message: 'Dry-run approval recorded.',
     previewHash: draft.snapshot.previewRenderHash,
@@ -403,6 +412,30 @@ export const approveAgentSelectedImageLiveSession = (
     state: 'dry_run_ready',
   });
   return draft;
+};
+
+export const rejectAgentSelectedImageLiveSession = (
+  draft: AgentSelectedImageLiveSessionDraft,
+): AgentSelectedImageLiveSessionAuditRecord => {
+  if (draft.state !== 'approval_required') throw new Error('Selected-image live session is not awaiting approval.');
+  draft.state = 'failed';
+  pushEvent(draft, {
+    approvalDecision: 'rejected',
+    graphRevision: draft.snapshot.graphRevision,
+    message: 'Dry-run approval was rejected before apply.',
+    previewHash: draft.snapshot.previewRenderHash,
+    recipeHash: draft.snapshot.recipeHash,
+    state: 'failed',
+  });
+  return buildAgentSelectedImageLiveSessionAuditRecord(draft, {
+    approvalDecision: 'rejected',
+    cancellationOutcome: 'not_cancelled',
+    state: 'failed',
+    toolCalls: [
+      { id: `${draft.requestId}-dry-run`, name: AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME, status: 'succeeded' },
+      { id: `${draft.requestId}-approval-rejected`, name: AGENT_ADJUSTMENTS_APPLY_TOOL_NAME, status: 'blocked' },
+    ],
+  });
 };
 
 export const cancelAgentSelectedImageLiveSession = (
@@ -465,6 +498,7 @@ export const applyAgentSelectedImageLiveSession = async (
   draft: AgentSelectedImageLiveSessionDraft,
 ): Promise<AgentSelectedImageLiveSessionApplyResult> => {
   if (draft.state !== 'dry_run_ready') throw new Error('Selected-image live session apply requires approval.');
+  if (draft.approvalId === undefined) throw new Error('Selected-image live session apply requires approval id.');
   const currentBeforeApply = buildSnapshot();
   const applyGuard = buildApplyGuard(draft, currentBeforeApply);
   const staleReason = applyGuard.staleReason ?? null;
@@ -499,6 +533,15 @@ export const applyAgentSelectedImageLiveSession = async (
         acceptedPlanHash: draft.dryRun.dryRunPlanHash,
         acceptedPlanId: draft.dryRun.dryRunPlanId,
         adjustments: draft.adjustments,
+        approval: {
+          approvalId: draft.approvalId,
+          approvedGraphRevision: draft.dryRun.sourceGraphRevision,
+          approvedPlanHash: draft.dryRun.dryRunPlanHash,
+          approvedPlanId: draft.dryRun.dryRunPlanId,
+          approvedRecipeHash: draft.snapshot.recipeHash,
+          approvedSessionId: draft.sessionId,
+          status: 'approved',
+        },
         expectedGraphRevision: draft.dryRun.sourceGraphRevision,
         expectedRecipeHash: draft.snapshot.recipeHash,
         operationId: draft.operationId,
@@ -682,6 +725,7 @@ export const buildAgentSelectedImageLiveSessionAuditRecord = (
       acceptedPreviewArtifactId: draft.snapshot.previewArtifactId,
       afterPreviewHash: receiptPatch.afterPreviewHash,
       approvalDecision: receiptPatch.approvalDecision,
+      approvalId: draft.approvalId,
       applyGuard: receiptPatch.applyGuard,
       beforePreviewHash: draft.snapshot.previewRenderHash,
       cancellationOutcome: receiptPatch.cancellationOutcome,
@@ -725,6 +769,7 @@ const buildAgentSelectedImageLiveSessionTranscript = (
         acceptedPlanHash: toolCall.name === AGENT_ADJUSTMENTS_APPLY_TOOL_NAME ? draft.dryRun.dryRunPlanHash : undefined,
         acceptedPlanId: toolCall.name === AGENT_ADJUSTMENTS_APPLY_TOOL_NAME ? draft.dryRun.dryRunPlanId : undefined,
         adjustments: toolCall.name.includes('adjustments') ? draft.adjustments : undefined,
+        approvalId: toolCall.name === AGENT_ADJUSTMENTS_APPLY_TOOL_NAME ? draft.approvalId : undefined,
         expectedGraphRevision: draft.snapshot.graphRevision,
         expectedRecipeHash: draft.snapshot.recipeHash,
         operationId: draft.operationId,
@@ -732,6 +777,7 @@ const buildAgentSelectedImageLiveSessionTranscript = (
         selectedImagePath: draft.snapshot.selectedImagePath,
         sessionId: draft.sessionId,
       }),
+      approvalId: toolCall.name === AGENT_ADJUSTMENTS_APPLY_TOOL_NAME ? draft.approvalId : undefined,
       graphRevision: draft.snapshot.graphRevision,
       id: `${toolCall.id}-call`,
       kind: 'tool_call',
@@ -763,6 +809,7 @@ const buildAgentSelectedImageLiveSessionTranscript = (
   return [
     {
       acceptedPreviewArtifactId: draft.snapshot.previewArtifactId,
+      approvalId: draft.approvalId,
       graphRevision: draft.snapshot.graphRevision,
       id: `${draft.requestId}-accepted-preview`,
       kind: 'preview',
@@ -794,6 +841,7 @@ const buildAgentSelectedImageLiveSessionTranscript = (
     },
     {
       acceptedPreviewArtifactId: draft.snapshot.previewArtifactId,
+      approvalId: draft.approvalId,
       graphRevision: receiptPatch.finalGraphRevision ?? draft.snapshot.graphRevision,
       id: `${draft.requestId}-apply-decision`,
       kind: 'apply_decision',
@@ -837,6 +885,9 @@ export const replayAgentSelectedImageLiveSessionAudit = (
     throw new Error('Selected-image live session audit replay rejected missing dry-run tool receipt.');
   }
   if (receipt.state === 'applied') {
+    if (receipt.approvalId === undefined) {
+      throw new Error('Selected-image live session audit replay rejected applied receipt without approval id.');
+    }
     if (receipt.applyGuard === undefined) {
       throw new Error('Selected-image live session audit replay rejected applied receipt without apply guard.');
     }
@@ -878,5 +929,8 @@ const verifyAgentSelectedImageLiveSessionTranscript = (audit: AgentSelectedImage
   }
   if (audit.receipt.state === 'applied' && applyDecision.status !== 'succeeded') {
     throw new Error('Selected-image live session audit replay rejected unapplied apply decision status.');
+  }
+  if (audit.receipt.state === 'applied' && applyDecision.approvalId !== audit.receipt.approvalId) {
+    throw new Error('Selected-image live session audit replay rejected mismatched apply approval id.');
   }
 };

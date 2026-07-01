@@ -95,6 +95,7 @@ import {
   type AgentAdjustmentsApplyRequest,
   agentAdjustmentsApplyResponseSchema,
   agentAdjustmentsDryRunResponseSchema,
+  buildAgentAdjustmentsApplyApproval,
 } from '../../../../utils/agent/tools/agentAdjustmentApplyTool';
 import { AGENT_COLOR_APPLY_TOOL_NAME } from '../../../../utils/agent/tools/agentColorApplyTool';
 import { AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME } from '../../../../utils/agent/tools/agentDetailEffectsApplyTool';
@@ -2260,6 +2261,12 @@ function LivePromptComposer({
                 acceptedPlanHash: dryRun.dryRunPlanHash,
                 acceptedPlanId: dryRun.dryRunPlanId,
                 adjustments: adjustments as AgentAdjustmentsApplyRequest['adjustments'],
+                approval: buildAgentAdjustmentsApplyApproval({
+                  approvalId: `approval_${applyRequestId}`,
+                  dryRun,
+                  expectedRecipeHash: snapshot.initialPreview.recipeHash,
+                  sessionId,
+                }),
                 expectedGraphRevision: dryRun.sourceGraphRevision,
                 expectedRecipeHash: snapshot.initialPreview.recipeHash,
                 operationId: turnOperationId,

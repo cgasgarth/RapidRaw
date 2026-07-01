@@ -22,6 +22,7 @@ import {
   AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
   agentAdjustmentsApplyResponseSchema,
   agentAdjustmentsDryRunResponseSchema,
+  buildAgentAdjustmentsApplyApproval,
 } from '../tools/agentAdjustmentApplyTool';
 import { agentEditQualityReviewSchema, buildAgentEditQualityReview } from './agentEditQualityReview';
 
@@ -421,6 +422,16 @@ export const runAgentIterativeEditLoop = async (
           acceptedPlanHash: dryRunPlan.planHash,
           acceptedPlanId: dryRunPlan.planId,
           adjustments: agentLoopAdjustmentPatchSchema.parse(adjustmentPatch),
+          approval: buildAgentAdjustmentsApplyApproval({
+            approvalId: `approval_${applyRequestId}`,
+            dryRun: {
+              dryRunPlanHash: dryRunPlan.planHash,
+              dryRunPlanId: dryRunPlan.planId,
+              sourceGraphRevision: dryRunPlan.expectedGraphRevision,
+            },
+            expectedRecipeHash: recipeHash,
+            sessionId: parsedRequest.sessionId,
+          }),
           expectedGraphRevision: dryRunPlan.expectedGraphRevision,
           expectedRecipeHash: recipeHash,
           operationId: `${parsedRequest.operationId}-${index + 1}`,

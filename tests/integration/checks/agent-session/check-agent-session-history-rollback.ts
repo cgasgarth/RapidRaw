@@ -12,6 +12,7 @@ import {
 } from '../../../../src/utils/agent/session/agentSessionHistory.ts';
 import {
   applyAgentGlobalAdjustments,
+  buildAgentAdjustmentsApplyApproval,
   dryRunAgentGlobalAdjustments,
 } from '../../../../src/utils/agent/tools/agentAdjustmentApplyTool.ts';
 import { buildRawEngineAppServerRouteCatalog } from '../../../../src/utils/rawEngineAppServerHost.ts';
@@ -61,6 +62,12 @@ const applyReceipt = await applyAgentGlobalAdjustments({
   acceptedPlanHash: dryRun.dryRunPlanHash,
   acceptedPlanId: dryRun.dryRunPlanId,
   adjustments: { exposure: 0.35, shadows: 20 },
+  approval: buildAgentAdjustmentsApplyApproval({
+    approvalId: 'approval-agent-history-apply-3163',
+    dryRun,
+    expectedRecipeHash: beforeRecipeHash,
+    sessionId: 'agent-history-3163',
+  }),
   expectedGraphRevision: dryRun.sourceGraphRevision,
   expectedRecipeHash: beforeRecipeHash,
   operationId: 'agent_history_apply_3163',

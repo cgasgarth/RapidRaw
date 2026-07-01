@@ -10,6 +10,7 @@ import {
   cancelAgentSelectedImageLiveSession,
   getAgentSelectedImageLiveSessionStaleReason,
   recordAgentSelectedImageLiveSessionLateResult,
+  rejectAgentSelectedImageLiveSession,
   replayAgentSelectedImageLiveSessionAudit,
   rollbackAgentSelectedImageLiveSession,
   startAgentSelectedImageLiveSessionDryRun,
@@ -72,6 +73,19 @@ if (
   throw new Error('live session cancel audit did not replay cancellation boundary.');
 }
 
+seedEditor();
+const rejectedDraft = await startDraft('agent-live-session-rejected');
+const rejectedAudit = rejectAgentSelectedImageLiveSession(rejectedDraft);
+const rejectedReplay = replayAgentSelectedImageLiveSessionAudit(rejectedAudit);
+if (
+  rejectedReplay.approvalDecision !== 'rejected' ||
+  rejectedReplay.state !== 'failed' ||
+  rejectedReplay.toolCalls.at(-1)?.status !== 'blocked'
+) {
+  throw new Error('live session rejected approval audit did not replay blocked apply state.');
+}
+await expectRejects(() => applyAgentSelectedImageLiveSession(rejectedDraft), 'requires approval');
+
 const fakeLateApply = agentAdjustmentsApplyResponseSchema.parse({
   adjustedFields: ['exposure'],
   afterPreviewHash: 'preview:late-after',
@@ -87,6 +101,8 @@ const fakeLateApply = agentAdjustmentsApplyResponseSchema.parse({
     adjustedFields: ['exposure'],
     afterPreviewHash: 'preview:late-after',
     appliedGraphRevision: 'history_99',
+    approvalId: 'approval-late-cancelled',
+    approvalState: 'approved',
     beforePreviewHash: cancelDraft.snapshot.previewRenderHash,
     expectedGraphRevision: cancelDraft.dryRun.sourceGraphRevision,
     operationId: cancelDraft.operationId,
@@ -128,6 +144,7 @@ const applyResult = await applyAgentSelectedImageLiveSession(applyDraft);
 const appliedReceipt = replayAgentSelectedImageLiveSessionAudit(applyResult.audit);
 if (
   appliedReceipt.approvalDecision !== 'approved' ||
+  appliedReceipt.approvalId !== applyDraft.approvalId ||
   appliedReceipt.acceptedPreviewArtifactId !== applyDraft.snapshot.previewArtifactId ||
   appliedReceipt.applyGuard?.status !== 'passed' ||
   appliedReceipt.state !== 'applied' ||
@@ -154,6 +171,25 @@ if (
   throw new Error('live session transcript did not persist accepted apply decision metadata.');
 }
 
+await expectReplayRejects(
+  {
+    ...applyResult.audit,
+    receipt: {
+      ...applyResult.audit.receipt,
+      approvalId: undefined,
+    },
+  },
+  'approval id',
+);
+await expectReplayRejects(
+  {
+    ...applyResult.audit,
+    transcript: applyResult.audit.transcript.map((entry) =>
+      entry.kind === 'apply_decision' ? { ...entry, approvalId: 'approval-stale' } : entry,
+    ),
+  },
+  'apply approval id',
+);
 await expectReplayRejects(
   {
     ...applyResult.audit,

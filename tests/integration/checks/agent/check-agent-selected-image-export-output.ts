@@ -14,6 +14,7 @@ import {
 } from '../../../../src/utils/agent/session/agentSessionAuditStore.ts';
 import {
   applyAgentGlobalAdjustments,
+  buildAgentAdjustmentsApplyApproval,
   dryRunAgentGlobalAdjustments,
 } from '../../../../src/utils/agent/tools/agentAdjustmentApplyTool.ts';
 import {
@@ -122,6 +123,12 @@ const buildAcceptedDryRunApprovals = async () => {
       acceptedPlanHash: dryRun.dryRunPlanHash,
       acceptedPlanId: dryRun.dryRunPlanId,
       adjustments,
+      approval: buildAgentAdjustmentsApplyApproval({
+        approvalId: `approval_${baseLoopRequest.requestId}_apply_${index + 1}`,
+        dryRun,
+        expectedRecipeHash: snapshot.initialPreview.recipeHash,
+        sessionId: baseLoopRequest.sessionId,
+      }),
       expectedGraphRevision: dryRun.sourceGraphRevision,
       expectedRecipeHash: snapshot.initialPreview.recipeHash,
       operationId,
