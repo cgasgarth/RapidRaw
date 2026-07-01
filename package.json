@@ -70,6 +70,8 @@
     "check:sr-app-server-runtime": "bun tests/integration/checks/super-resolution/check-super-resolution-app-server-runtime.ts",
     "prepare:panorama-real-raw-private-root": "bun scripts/private-raw/prepare/prepare-panorama-real-raw-private-root.ts",
     "run:panorama-real-raw-private-proof": "bun scripts/private-raw/proofs/computational/run-panorama-real-raw-private-proof.ts",
+    "generate:local-feature-review": "bun scripts/proofs/generate-local-feature-review.ts --update",
+    "check:local-feature-review": "bun scripts/proofs/generate-local-feature-review.ts",
     "lint": "bun scripts/checks/check-folder-file-counts.ts && bun scripts/ci/run-compact-command.ts --label lint -- biome ci --formatter-enabled=false --assist-enabled=false .",
     "lint:fix": "bun scripts/ci/run-compact-command.ts --label lint:fix -- biome check --write .",
     "format": "bun scripts/ci/run-compact-command.ts --label format -- biome format --write .",
