@@ -4,7 +4,8 @@
   "snapshotDate": "2026-06-11",
   "issue": 67,
   "policy": "docs/validation/fixtures/fixture-download-policy-2026-06-11.md",
-  "entries": [
+  "activeEntries": [],
+  "plannedEntries": [
     {
       "fixtureId": "synthetic.color-ramp.v0",
       "class": "synthetic",
@@ -13,7 +14,7 @@
       "generator": "planned synthetic color ramp generator",
       "sourceLicense": "project-generated",
       "redistributionAllowed": true,
-      "publicCiAllowed": true,
+      "publicCiAllowed": false,
       "privateCiOnly": false,
       "localOnly": false,
       "expectedSha256": null,
@@ -39,7 +40,7 @@
       "generator": "planned synthetic negative step wedge generator",
       "sourceLicense": "project-generated",
       "redistributionAllowed": true,
-      "publicCiAllowed": true,
+      "publicCiAllowed": false,
       "privateCiOnly": false,
       "localOnly": false,
       "expectedSha256": null,
@@ -65,7 +66,7 @@
       "generator": "planned synthetic high-ISO flat shadow noise generator",
       "sourceLicense": "project-generated",
       "redistributionAllowed": true,
-      "publicCiAllowed": true,
+      "publicCiAllowed": false,
       "privateCiOnly": false,
       "localOnly": false,
       "expectedSha256": null,
@@ -91,7 +92,7 @@
       "generator": "planned synthetic chroma-noise edge generator",
       "sourceLicense": "project-generated",
       "redistributionAllowed": true,
-      "publicCiAllowed": true,
+      "publicCiAllowed": false,
       "privateCiOnly": false,
       "localOnly": false,
       "expectedSha256": null,
@@ -117,7 +118,7 @@
       "generator": "planned synthetic fine texture plus high-ISO noise generator",
       "sourceLicense": "project-generated",
       "redistributionAllowed": true,
-      "publicCiAllowed": true,
+      "publicCiAllowed": false,
       "privateCiOnly": false,
       "localOnly": false,
       "expectedSha256": null,
@@ -169,7 +170,7 @@
       "generator": "planned synthetic slanted-edge MTF chart generator",
       "sourceLicense": "project-generated",
       "redistributionAllowed": true,
-      "publicCiAllowed": true,
+      "publicCiAllowed": false,
       "privateCiOnly": false,
       "localOnly": false,
       "expectedSha256": null,
@@ -195,7 +196,7 @@
       "generator": "planned synthetic Siemens star or radial zone plate generator",
       "sourceLicense": "project-generated",
       "redistributionAllowed": true,
-      "publicCiAllowed": true,
+      "publicCiAllowed": false,
       "privateCiOnly": false,
       "localOnly": false,
       "expectedSha256": null,
@@ -221,7 +222,7 @@
       "generator": "planned synthetic line-pair and checkerboard near-Nyquist generator",
       "sourceLicense": "project-generated",
       "redistributionAllowed": true,
-      "publicCiAllowed": true,
+      "publicCiAllowed": false,
       "privateCiOnly": false,
       "localOnly": false,
       "expectedSha256": null,
@@ -247,7 +248,7 @@
       "generator": "planned synthetic flat/noise patch generator",
       "sourceLicense": "project-generated",
       "redistributionAllowed": true,
-      "publicCiAllowed": true,
+      "publicCiAllowed": false,
       "privateCiOnly": false,
       "localOnly": false,
       "expectedSha256": null,
@@ -785,5 +786,6 @@
       "reviewDate": "2026-06-18",
       "notes": "Super-resolution tripod corpus placeholder for #1900. Full real RAW SR proof remains tracked by #1506."
     }
-  ]
+  ],
+  "retiredEntries": []
 }
