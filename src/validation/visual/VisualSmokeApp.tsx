@@ -23,7 +23,7 @@ import RightPanelSwitcher from '../../components/panel/right/RightPanelSwitcher'
 import {
   type BrushSettings,
   type CullingSuggestions,
-  type Panel,
+  Panel,
   RawStatus,
   type SelectedImage,
   SortDirection,
@@ -731,7 +731,8 @@ function BrushMaskCanvasVisualSmoke() {
 }
 
 function WorkflowRailVisualSmoke() {
-  const [activePanel, setActivePanel] = useState<Panel | null>(null);
+  const [activePanel, setActivePanel] = useState<Panel | null>(Panel.Adjustments);
+  const [compactActivePanel, setCompactActivePanel] = useState<Panel | null>(Panel.Adjustments);
   const exportState = { errorMessage: '', progress: { current: 0, total: 0 }, status: Status.Idle };
 
   useEffect(() => {
@@ -758,57 +759,128 @@ function WorkflowRailVisualSmoke() {
       data-visual-smoke-ready="true"
       data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.WorkflowRail}
     >
-      <div className="grid h-screen grid-cols-[1fr_360px] bg-[#0f1114]" data-visual-smoke-section="workflow-shell">
-        <section className="flex min-w-0 items-center justify-center border-r border-white/10 bg-[#121518] p-10">
-          <div className="aspect-[4/3] w-full max-w-4xl rounded-md border border-white/10 bg-gradient-to-br from-[#29333b] via-[#677565] to-[#d7b078] shadow-2xl" />
-        </section>
+      <div className="grid h-screen overflow-hidden bg-[#0f1114]" style={{ gridTemplateRows: '620px 340px' }}>
+        <div
+          className="grid min-h-0"
+          data-testid="workflow-rail-desktop-shell"
+          data-visual-smoke-section="workflow-shell"
+          style={{ gridTemplateColumns: 'minmax(0, 1fr) 8px 402px' }}
+        >
+          <section
+            className="flex min-w-0 items-center justify-center border-r border-white/10 bg-[#121518] p-10"
+            data-testid="workflow-rail-desktop-preview"
+          >
+            <div className="aspect-[4/3] w-full max-w-4xl rounded-md border border-white/10 bg-gradient-to-br from-[#29333b] via-[#677565] to-[#d7b078] shadow-2xl" />
+          </section>
 
-        <aside className="grid grid-cols-[42px_1fr] bg-[#171a1f]" data-visual-smoke-section="workflow-rail">
-          <RightPanelSwitcher activePanel={activePanel} isInstantTransition={true} onPanelSelect={setActivePanel} />
-          <div className="min-h-0 border-l border-white/10">
-            <div className="mb-3 flex items-center justify-between">
-              <span className="text-sm font-semibold">{workflowRailDensityTitle}</span>
-              <span className="rounded border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-[#aab2bd]">
-                {workflowRailRuntime}
-              </span>
+          <div className="bg-transparent" data-testid="workflow-rail-desktop-resizer" />
+
+          <aside
+            className="grid min-w-0 overflow-hidden bg-[#171a1f]"
+            data-testid="workflow-rail-desktop-inspector"
+            data-visual-smoke-section="workflow-rail"
+            style={{ gridTemplateColumns: '42px minmax(0, 360px)' }}
+          >
+            <div data-testid="workflow-rail-desktop-rail">
+              <RightPanelSwitcher activePanel={activePanel} isInstantTransition={true} onPanelSelect={setActivePanel} />
             </div>
-            <div className="space-y-2 text-xs text-[#aab2bd]">
-              <div className="rounded-md border border-white/10 bg-white/5 p-3">{workflowRailTargetProof}</div>
-              <div className="rounded-md border border-white/10 bg-white/5 p-3">
-                {workflowRailActivePanelLabel}: {activePanel ?? workflowRailNoPanelLabel}
+            <div
+              className="flex min-h-0 min-w-0 flex-col border-l border-white/10"
+              data-testid="workflow-rail-desktop-panel"
+            >
+              <div className="shrink-0 border-b border-white/10 p-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold">{workflowRailDensityTitle}</span>
+                  <span className="rounded border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-[#aab2bd]">
+                    {workflowRailRuntime}
+                  </span>
+                </div>
+              </div>
+              <div className="space-y-2 p-3 text-xs text-[#aab2bd]">
+                <div className="rounded-md border border-white/10 bg-white/5 p-3">{workflowRailTargetProof}</div>
+                <div className="rounded-md border border-white/10 bg-white/5 p-3">
+                  {workflowRailActivePanelLabel}: {activePanel ?? workflowRailNoPanelLabel}
+                </div>
+              </div>
+
+              <div className="min-h-0 flex-1 border-t border-white/10">
+                <ContextMenuProvider>
+                  <EditorRightPanelHost
+                    activeRightPanel={activePanel}
+                    appSettings={null}
+                    exportState={exportState}
+                    handleSettingsChange={() => {}}
+                    multiSelectedPaths={[]}
+                    onLinkedVariantImported={() => {}}
+                    onNavigateToCommunity={() => {}}
+                    onOpenTetherCapture={() => {}}
+                    renderedRightPanel={activePanel}
+                    rootPaths={[]}
+                    selectedImage={null}
+                    setExportState={() => {}}
+                    slideDirection={0}
+                  />
+                </ContextMenuProvider>
               </div>
             </div>
+          </aside>
+        </div>
 
-            <div className="h-[calc(100%-118px)] min-h-0 border-t border-white/10">
-              <ContextMenuProvider>
-                <EditorRightPanelHost
-                  activeRightPanel={activePanel}
-                  appSettings={null}
-                  exportState={exportState}
-                  handleSettingsChange={() => {}}
-                  multiSelectedPaths={[]}
-                  onLinkedVariantImported={() => {}}
-                  onNavigateToCommunity={() => {}}
-                  onOpenTetherCapture={() => {}}
-                  renderedRightPanel={activePanel}
-                  rootPaths={[]}
-                  selectedImage={null}
-                  setExportState={() => {}}
-                  slideDirection={0}
-                />
-              </ContextMenuProvider>
-            </div>
-
-            <div className="border-t border-white/10 p-4">
-              <RightPanelSwitcher
-                activePanel={activePanel}
-                isInstantTransition={true}
-                layout="horizontal"
-                onPanelSelect={setActivePanel}
+        <section
+          className="grid min-h-0 border-t border-white/10 bg-[#101317]"
+          data-testid="workflow-rail-compact-portrait"
+          data-visual-smoke-section="compact-portrait"
+          style={{ gridTemplateColumns: 'minmax(0, 1fr) 320px' }}
+        >
+          <div
+            className="grid min-h-0"
+            data-testid="workflow-rail-compact-preview-stack"
+            style={{ gridTemplateRows: 'minmax(0, 1fr) 92px' }}
+          >
+            <div
+              className="grid min-h-0 place-items-center border-r border-white/10 bg-[#121518] p-5"
+              data-testid="workflow-rail-compact-preview"
+            >
+              <div
+                className="aspect-[3/4] h-full rounded-md border border-white/10 bg-gradient-to-br from-[#26343a] via-[#5c6d68] to-[#cfa66f] shadow-xl"
+                style={{ maxHeight: 220 }}
               />
             </div>
+            <div
+              className="grid grid-cols-4 gap-2 border-r border-t border-white/10 bg-[#181b1f] p-3"
+              data-testid="workflow-rail-compact-filmstrip"
+            >
+              {filmstripFrames.slice(0, 4).map((frame) => (
+                <div
+                  className="flex min-w-0 items-center gap-2 rounded border border-white/10 bg-[#20252b] p-2"
+                  key={frame.name}
+                >
+                  <div className={`h-10 w-12 shrink-0 rounded bg-gradient-to-br ${frame.tone}`} />
+                  <span className="truncate text-xs text-[#dce4ea]">{frame.name}</span>
+                </div>
+              ))}
+            </div>
           </div>
-        </aside>
+
+          <aside className="flex min-h-0 flex-col bg-[#171a1f]" data-testid="workflow-rail-compact-panel">
+            <div className="min-h-0 flex-1 overflow-hidden p-3">
+              <div className="h-full rounded-md border border-white/10 bg-white/5 p-3">
+                <div className="mb-2 text-sm font-semibold">{workflowRailActivePanelLabel}</div>
+                <div className="text-xs text-[#aab2bd]" data-testid="workflow-rail-compact-active-panel">
+                  {compactActivePanel ?? workflowRailNoPanelLabel}
+                </div>
+              </div>
+            </div>
+            <div className="shrink-0 border-t border-white/10" data-testid="workflow-rail-compact-switcher">
+              <RightPanelSwitcher
+                activePanel={compactActivePanel}
+                isInstantTransition={true}
+                layout="horizontal"
+                onPanelSelect={setCompactActivePanel}
+              />
+            </div>
+          </aside>
+        </section>
       </div>
     </main>
   );

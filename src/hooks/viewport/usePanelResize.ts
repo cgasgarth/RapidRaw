@@ -10,7 +10,7 @@ export type CreateResizeHandler = (
 export const PANEL_RESIZE_LIMITS = {
   bottom: { max: 400, min: 100 },
   left: { max: 500, min: 200 },
-  right: { max: 600, min: 280 },
+  right: { max: 600, min: 320 },
 } as const;
 
 interface UsePanelResizeOptions {
