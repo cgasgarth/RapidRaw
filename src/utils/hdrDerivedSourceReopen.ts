@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import {
+  type DerivedOutputProvenanceSidecar,
   type DerivedOutputReceipt,
   derivedOutputProvenanceSidecarSchema,
   derivedOutputReceiptSchema,
@@ -33,10 +34,87 @@ const hdrSidecarArtifactSchema = z
   })
   .passthrough();
 
+const panoramaCropSchema = z
+  .object({
+    height: z.number().int().positive(),
+    mode: z.string().trim().min(1),
+    preCropHeight: z.number().int().positive(),
+    preCropWidth: z.number().int().positive(),
+    width: z.number().int().positive(),
+    x: z.number().int().nonnegative(),
+    y: z.number().int().nonnegative(),
+  })
+  .strict();
+
 const rawEngineArtifactsWithHdrProvenanceSchema = z
   .object({
     derivedOutputProvenanceSidecars: z.array(derivedOutputProvenanceSidecarSchema).default([]),
     hdrMergeArtifacts: z.array(hdrSidecarArtifactSchema).default([]),
+    panoramaArtifacts: z
+      .array(
+        z
+          .object({
+            artifactId: z.string().trim().min(1).optional(),
+            boundarySettings: z
+              .object({
+                crop: panoramaCropSchema.optional(),
+                effectiveMode: z.enum(['auto_crop', 'manual_crop', 'transparent']).optional(),
+                requestedMode: z.enum(['auto_crop', 'manual_crop', 'transparent']).optional(),
+              })
+              .passthrough()
+              .optional(),
+            family: z.literal('panorama').optional(),
+            outputArtifacts: z
+              .array(
+                z
+                  .object({
+                    artifactId: z.string().trim().min(1).optional(),
+                    contentHash: z.string().trim().min(1).optional(),
+                    dimensions: z
+                      .object({
+                        height: z.number().int().positive(),
+                        width: z.number().int().positive(),
+                      })
+                      .passthrough()
+                      .optional(),
+                  })
+                  .passthrough(),
+              )
+              .default([]),
+            previewArtifacts: z
+              .array(
+                z
+                  .object({
+                    dimensions: z
+                      .object({
+                        height: z.number().int().positive(),
+                        width: z.number().int().positive(),
+                      })
+                      .passthrough()
+                      .optional(),
+                  })
+                  .passthrough(),
+              )
+              .default([]),
+            projectionSettings: z
+              .object({
+                effectiveProjection: z.enum(['rectilinear', 'cylindrical', 'spherical']).optional(),
+                requestedProjection: z.enum(['rectilinear', 'cylindrical', 'spherical']).optional(),
+              })
+              .passthrough()
+              .optional(),
+            staleState: z
+              .object({
+                invalidationReasons: z.array(z.string()).default([]),
+                state: z.enum(['current', 'stale', 'unknown']),
+              })
+              .passthrough()
+              .optional(),
+            warnings: z.array(z.string().trim().min(1)).default([]),
+          })
+          .passthrough(),
+      )
+      .default([]),
     schemaVersion: z.literal(1),
   })
   .passthrough();
@@ -100,6 +178,99 @@ export const buildHdrReopenedDerivedOutputReceipt = ({
   });
 };
 
+export const buildPanoramaReopenedDerivedOutputReceipt = ({
+  imagePath,
+  metadata,
+}: {
+  imagePath: string;
+  metadata: unknown;
+}): DerivedOutputReceipt | null => {
+  const parsedMetadata = metadataWithRawEngineArtifactsSchema.safeParse(metadata);
+  if (!parsedMetadata.success) return null;
+
+  const rawEngineArtifacts = parsedMetadata.data.rawEngineArtifacts;
+  const provenance = rawEngineArtifacts?.derivedOutputProvenanceSidecars.find(
+    (sidecar) => sidecar.receipt.family === 'panorama' && sidecar.output.path === imagePath,
+  );
+  if (provenance === undefined || provenance.sourceState.length < 2) return null;
+
+  const matchingArtifact = rawEngineArtifacts?.panoramaArtifacts.find((artifact) =>
+    artifact.outputArtifacts.some(
+      (output) =>
+        output.contentHash === provenance.output.contentHash ||
+        output.artifactId === provenance.acceptedApplyId ||
+        output.artifactId === provenance.receipt.receiptId,
+    ),
+  );
+  const matchingOutputArtifact = matchingArtifact?.outputArtifacts.find(
+    (output) => output.contentHash === provenance.output.contentHash,
+  );
+  const outputArtifactId =
+    matchingOutputArtifact?.artifactId ??
+    provenance.acceptedApplyId ??
+    matchingArtifact?.artifactId ??
+    provenance.receipt.receiptId;
+  const previewDimensions = normalizeDimensions(
+    provenance.panorama?.previewDimensions ?? matchingArtifact?.previewArtifacts[0]?.dimensions,
+  );
+  const panorama =
+    provenance.panorama ??
+    buildPanoramaReceiptMetadataFromArtifact({
+      artifact: matchingArtifact,
+      previewDimensions,
+      sourceState: provenance.sourceState,
+    });
+  const sourcePaths = provenance.sourceState.map((source) => source.path);
+  const staleReasons =
+    matchingArtifact?.staleState?.state === 'stale'
+      ? matchingArtifact.staleState.invalidationReasons.flatMap((reason) =>
+          isDerivedOutputStaleReason(reason) ? [reason] : [],
+        )
+      : undefined;
+  const staleState =
+    staleReasons !== undefined && staleReasons.length > 0
+      ? 'stale'
+      : matchingArtifact?.staleState?.state === 'current'
+        ? 'current'
+        : 'unknown';
+
+  return derivedOutputReceiptSchema.parse({
+    acceptedDryRunPlanId: provenance.acceptedDryRunId,
+    family: 'panorama',
+    openInEditorAction: {
+      label: 'Open panorama output',
+      path: imagePath,
+      state: 'available',
+    },
+    outputArtifactId,
+    outputContentHash: provenance.output.contentHash,
+    outputPath: imagePath,
+    ...(panorama === undefined ? {} : { panorama }),
+    ...(previewDimensions === undefined ? {} : { previewDimensions }),
+    provenanceSidecar: provenance,
+    receiptId: provenance.receipt.receiptId,
+    settingsHash: provenance.settingsHash,
+    sourceContentHashes: provenance.sourceState.map((source) => source.contentHash),
+    sourceCount: provenance.sourceState.length,
+    sourceGraphRevisions: provenance.sourceState.map((source) => source.graphRevision),
+    ...(sourcePaths.every((path): path is string => path !== undefined) ? { sourcePaths } : {}),
+    ...(staleReasons === undefined || staleReasons.length === 0 ? {} : { staleReasons }),
+    staleState,
+    storagePolicy: 'export_path',
+    warningCodes: matchingArtifact?.warnings ?? provenance.warnings,
+  });
+};
+
+export const buildReopenedDerivedOutputReceipt = ({
+  imagePath,
+  metadata,
+}: {
+  imagePath: string;
+  metadata: unknown;
+}): DerivedOutputReceipt | null =>
+  buildHdrReopenedDerivedOutputReceipt({ imagePath, metadata }) ??
+  buildPanoramaReopenedDerivedOutputReceipt({ imagePath, metadata });
+
 export const upsertHdrReopenedDerivedOutputReceipt = ({
   imagePath,
   metadata,
@@ -112,4 +283,84 @@ export const upsertHdrReopenedDerivedOutputReceipt = ({
   const receipt = buildHdrReopenedDerivedOutputReceipt({ imagePath, metadata });
   if (receipt !== null) upsert(receipt);
   return receipt;
+};
+
+export const upsertReopenedDerivedOutputReceipt = ({
+  imagePath,
+  metadata,
+  upsert,
+}: {
+  imagePath: string;
+  metadata: unknown;
+  upsert: (receipt: DerivedOutputReceipt) => void;
+}): DerivedOutputReceipt | null => {
+  const receipt = buildReopenedDerivedOutputReceipt({ imagePath, metadata });
+  if (receipt !== null) upsert(receipt);
+  return receipt;
+};
+
+const derivedOutputStaleReasons = new Set([
+  'accepted_dry_run_plan_changed',
+  'output_artifact_changed',
+  'recipe_hash_changed',
+  'settings_hash_changed',
+  'source_content_hash_changed',
+  'source_graph_revision_changed',
+  'source_order_changed',
+  'source_set_changed',
+]);
+
+const isDerivedOutputStaleReason = (
+  value: string,
+): value is NonNullable<DerivedOutputReceipt['staleReasons']>[number] => derivedOutputStaleReasons.has(value);
+
+const normalizeDimensions = (
+  dimensions: { height: number; width: number } | undefined,
+): DerivedOutputReceipt['previewDimensions'] =>
+  dimensions === undefined
+    ? undefined
+    : {
+        height: dimensions.height,
+        width: dimensions.width,
+      };
+
+const buildPanoramaReceiptMetadataFromArtifact = ({
+  artifact,
+  previewDimensions,
+  sourceState,
+}: {
+  artifact: z.infer<typeof rawEngineArtifactsWithHdrProvenanceSchema>['panoramaArtifacts'][number] | undefined;
+  previewDimensions: DerivedOutputReceipt['previewDimensions'];
+  sourceState: DerivedOutputProvenanceSidecar['sourceState'];
+}): DerivedOutputReceipt['panorama'] => {
+  const crop = artifact?.boundarySettings?.crop;
+  const effectiveMode = artifact?.boundarySettings?.effectiveMode;
+  const requestedMode = artifact?.boundarySettings?.requestedMode;
+  const effectiveProjection = artifact?.projectionSettings?.effectiveProjection;
+  const requestedProjection = artifact?.projectionSettings?.requestedProjection;
+  if (
+    artifact === undefined ||
+    crop === undefined ||
+    effectiveMode === undefined ||
+    requestedMode === undefined ||
+    effectiveProjection === undefined ||
+    requestedProjection === undefined ||
+    previewDimensions === undefined
+  ) {
+    return undefined;
+  }
+
+  return {
+    boundary: {
+      crop,
+      effectiveMode,
+      requestedMode,
+    },
+    previewDimensions,
+    projection: {
+      effective: effectiveProjection,
+      requested: requestedProjection,
+    },
+    sourceSetHash: `sidecar:${sourceState.map((source) => `${source.order}:${source.contentHash}`).join('|')}`,
+  };
 };
