@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { z } from 'zod';
-
+import { rawEngineDefaultToolRegistryV1 } from '../../../../packages/rawengine-schema/src/toolRegistry.ts';
 import { ToolType } from '../../../../src/components/panel/right/layers/Masks.tsx';
 import { RawEngineAppServerRouteMode } from '../../../../src/schemas/agent/agentRuntimeSchemas.ts';
 import { useEditorStore } from '../../../../src/store/useEditorStore.ts';
@@ -13,9 +13,16 @@ import {
   agentPreviewRenderRequestSchema,
   agentStateGetRequestSchema,
   getAgentReadOnlyState,
+  getRawEngineImagePreview,
+  RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
+  rawEngineImageGetPreviewRequestSchema,
+  rawEngineImageGetPreviewResponseSchema,
   renderAgentReadOnlyPreview,
 } from '../../../../src/utils/agent/context/agentReadOnlyAppServerTools.ts';
-import { buildRawEngineAppServerRouteCatalog } from '../../../../src/utils/rawEngineAppServerHost.ts';
+import {
+  buildRawEngineAppServerAuditEntry,
+  buildRawEngineAppServerRouteCatalog,
+} from '../../../../src/utils/rawEngineAppServerHost.ts';
 
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3160.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 12 : 1));
@@ -95,6 +102,9 @@ if (agentStateGetRequestSchema.safeParse({ requestId: 'state-1', unknown: true }
 }
 if (agentPreviewRenderRequestSchema.safeParse({ longEdgePx: 8192, requestId: 'preview-1' }).success) {
   throw new Error('agent.preview.render request schema accepted an out-of-range preview size.');
+}
+if (rawEngineImageGetPreviewRequestSchema.safeParse({ requestId: 'image-preview-1', unknown: true }).success) {
+  throw new Error('rawengine.image.get_preview request schema accepted an unknown field.');
 }
 if (
   agentPreviewRenderRequestSchema.safeParse({
@@ -195,8 +205,63 @@ if (previewPayload.previewRef === 'blob:rawengine-original-3160' || previewPaylo
   throw new Error('agent.preview.render must not return the original RAW by default.');
 }
 
+const imagePreview = getRawEngineImagePreview({ expectedRecipeHash: recipeHash, requestId: 'image-preview-1' });
+const imagePreviewPayload = rawEngineImageGetPreviewResponseSchema.parse(imagePreview);
+if (
+  imagePreviewPayload.toolName !== RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME ||
+  imagePreviewPayload.staleRecipeHash ||
+  imagePreviewPayload.preview.purpose !== 'initial_context' ||
+  imagePreviewPayload.preview.longEdgePx !== 1536 ||
+  imagePreviewPayload.preview.quality !== 0.86 ||
+  imagePreviewPayload.preview.includesOriginalRaw ||
+  imagePreviewPayload.preview.previewRef === 'blob:rawengine-original-3160' ||
+  imagePreviewPayload.dimensions.width !== imagePreviewPayload.preview.width ||
+  imagePreviewPayload.dimensions.height !== imagePreviewPayload.preview.height ||
+  imagePreviewPayload.dimensions.sourceWidth !== 6000 ||
+  imagePreviewPayload.dimensions.sourceHeight !== 4000 ||
+  imagePreviewPayload.editRevision.graphRevision !== 'history_1' ||
+  imagePreviewPayload.editRevision.recipeHash !== imagePreviewPayload.preview.recipeHash ||
+  imagePreviewPayload.editRevision.renderHash !== imagePreviewPayload.preview.renderHash ||
+  imagePreviewPayload.color.encodedProfile !== 'srgb-preview' ||
+  !imagePreviewPayload.color.note.includes('not the original RAW')
+) {
+  throw new Error('rawengine.image.get_preview did not return bounded medium preview metadata.');
+}
+const staleImagePreview = getRawEngineImagePreview({
+  expectedRecipeHash: 'recipe:stale',
+  requestId: 'image-preview-stale',
+});
+if (!staleImagePreview.staleRecipeHash) {
+  throw new Error('rawengine.image.get_preview did not flag stale expected recipe hash.');
+}
+const imagePreviewRegistryEntry = rawEngineDefaultToolRegistryV1.tools.find(
+  (tool) => tool.toolName === RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
+);
+if (
+  imagePreviewRegistryEntry === undefined ||
+  imagePreviewRegistryEntry.mutates ||
+  imagePreviewRegistryEntry.toolKind !== 'read' ||
+  imagePreviewRegistryEntry.approvalClass !== 'safe_read' ||
+  imagePreviewRegistryEntry.requiresDryRun ||
+  !imagePreviewRegistryEntry.returnsArtifactHandles
+) {
+  throw new Error('rawengine.image.get_preview is not registered as a safe read-only artifact-handle tool.');
+}
+const imagePreviewAudit = buildRawEngineAppServerAuditEntry({
+  requestId: 'image-preview-audit-1',
+  timestampIso: '2026-07-01T00:00:00.000Z',
+  toolName: RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
+});
+if (imagePreviewAudit.mutates || imagePreviewAudit.toolKind !== 'read') {
+  throw new Error('rawengine.image.get_preview audit entry must replay as read-only.');
+}
+
 const catalog = buildRawEngineAppServerRouteCatalog();
-for (const toolName of [AGENT_STATE_GET_TOOL_NAME, AGENT_PREVIEW_RENDER_TOOL_NAME]) {
+for (const toolName of [
+  AGENT_STATE_GET_TOOL_NAME,
+  AGENT_PREVIEW_RENDER_TOOL_NAME,
+  RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
+]) {
   const route = catalog.find((candidate) => candidate.commandName === toolName);
   if (route === undefined || route.family !== 'agent' || !route.modes.includes(RawEngineAppServerRouteMode.Read)) {
     throw new Error(`${toolName} is missing from the read-only agent route catalog.`);

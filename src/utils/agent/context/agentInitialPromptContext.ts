@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { type AgentImageContextSnapshot, buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
+import { RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME } from './agentReadOnlyAppServerTools';
 
 export const agentInitialPromptContextSchema = z
   .object({
@@ -25,6 +26,7 @@ export const agentInitialPromptContextSchema = z
             quality: z.literal(0.86),
             recipeHash: z.string().trim().min(1),
             renderHash: z.string().trim().min(1),
+            toolName: z.literal(RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME),
             width: z.number().int().positive(),
           })
           .strict(),
@@ -53,6 +55,7 @@ export const agentInitialPromptContextSchema = z
         quality: z.literal(0.86),
         recipeHash: z.string().trim().min(1),
         renderHash: z.string().trim().min(1),
+        toolName: z.literal(RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME),
       })
       .strict(),
     prompt: z.string().trim().min(1),
@@ -94,6 +97,7 @@ export const buildAgentInitialPromptContext = ({
         quality: snapshot.initialPreview.quality,
         recipeHash: snapshot.initialPreview.recipeHash,
         renderHash: snapshot.initialPreview.renderHash,
+        toolName: RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
         width: snapshot.initialPreview.width,
       },
       promptText: prompt,
@@ -117,6 +121,7 @@ export const buildAgentInitialPromptContext = ({
       quality: snapshot.initialPreview.quality,
       recipeHash: snapshot.initialPreview.recipeHash,
       renderHash: snapshot.initialPreview.renderHash,
+      toolName: RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
     },
     prompt,
     schemaVersion: 1,

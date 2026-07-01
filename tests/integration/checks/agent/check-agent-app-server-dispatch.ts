@@ -13,6 +13,7 @@ import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjust
 import {
   AGENT_PREVIEW_RENDER_TOOL_NAME,
   AGENT_STATE_GET_TOOL_NAME,
+  RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
 } from '../../../../src/utils/agent/context/agentReadOnlyAppServerTools.ts';
 import {
   buildBasicToneCommandEnvelope,
@@ -197,6 +198,40 @@ const initialPreview = await dispatch(
 if (initialPreview.dispatchStatus !== 'completed') throw new Error('agent.preview.render dispatch did not complete.');
 if (previewResultSchema.parse(initialPreview.result).preview.purpose !== 'initial_context') {
   throw new Error('agent.preview.render dispatch did not preserve preview purpose.');
+}
+
+const imagePreview = await dispatch(
+  RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
+  { expectedRecipeHash: initialRecipeHash, requestId: 'agent-dispatch-image-preview-1' },
+  'dispatch-image-preview-1',
+);
+if (imagePreview.dispatchStatus !== 'completed') {
+  throw new Error('rawengine.image.get_preview dispatch did not complete.');
+}
+const imagePreviewResult = z
+  .object({
+    dimensions: z
+      .object({
+        height: z.number().int().positive(),
+        longEdgePx: z.literal(1536),
+        width: z.number().int().positive(),
+      })
+      .passthrough(),
+    editRevision: z.object({ graphRevision: z.string().min(1), recipeHash: z.string().min(1) }).passthrough(),
+    preview: z.object({ includesOriginalRaw: z.literal(false), purpose: z.literal('initial_context') }).passthrough(),
+    staleRecipeHash: z.boolean(),
+    toolName: z.literal(RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME),
+  })
+  .passthrough()
+  .parse(imagePreview.result);
+if (
+  imagePreviewResult.staleRecipeHash ||
+  imagePreviewResult.editRevision.graphRevision !== initialState.snapshot.graphRevision ||
+  imagePreviewResult.editRevision.recipeHash !== initialRecipeHash ||
+  imagePreviewResult.dimensions.width <= 0 ||
+  imagePreviewResult.dimensions.height <= 0
+) {
+  throw new Error('rawengine.image.get_preview dispatch did not return current bounded preview metadata.');
 }
 
 const dryRun = await dispatch(

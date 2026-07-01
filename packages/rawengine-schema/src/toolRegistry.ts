@@ -102,6 +102,16 @@ export const rawEngineDefaultToolRegistryV1: RawEngineToolRegistryV1 = rawEngine
       toolName: 'agent.editor_state.query',
     },
     {
+      approvalClass: ApprovalClass.SafeRead,
+      inputSchemaName: 'RawEngineImageGetPreviewRequestV1',
+      mutates: false,
+      outputSchemaName: 'RawEngineImageGetPreviewResponseV1',
+      requiresDryRun: false,
+      returnsArtifactHandles: true,
+      toolKind: 'read',
+      toolName: 'rawengine.image.get_preview',
+    },
+    {
       approvalClass: ApprovalClass.PreviewOnly,
       inputSchemaName: 'CommandEnvelopeV1',
       mutates: false,

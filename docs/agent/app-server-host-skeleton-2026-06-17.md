@@ -48,6 +48,19 @@ supervision without requiring a local Codex login during CI.
 - `rawengine.host.capabilities`: read-only capability discovery returning the typed host tool list before an agent selects image-editing tools.
 - `rawengine.host.route_catalog`: read-only mapped-route discovery for tone/color, computational merge, film look, Negative Lab, and AI routes.
 
+The agent route catalog also exposes `rawengine.image.get_preview` as a safe
+read-only image tool. It returns the current bounded medium preview handle and
+metadata: ephemeral JPEG preview ref, width/height, source dimensions, edit
+graph revision, recipe/render hashes, and an sRGB display-preview color note.
+The response is metadata/handle only, never the original RAW payload, and the
+tool is registered with `mutates: false`, `toolKind: read`, and
+`approvalClass: safe_read`.
+
+Initial prompt context now points at the same medium preview contract with
+`toolName: rawengine.image.get_preview`, so app-server sessions can start with a
+bounded 1536px-long-edge JPEG preview and later refresh or inspect it through a
+typed read-only tool instead of raw Tauri invokes.
+
 ## Replay Evidence
 
 `buildRawEngineAppServerHealthReplay`, `buildRawEngineAppServerCapabilitiesReplay`, and `buildRawEngineAppServerRouteCatalogReplay` record typed requests, responses, manifests, and audit log entries. The replay proof keeps host discovery read-only and auditable before mutation-capable feature tools are added.
