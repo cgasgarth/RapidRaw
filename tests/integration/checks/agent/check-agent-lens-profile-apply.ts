@@ -41,6 +41,18 @@ const lensProfileResultSchema = z
         adjustedFields: z.array(z.string()).min(1),
         operationId: z.literal('agent_lens_profile_3169'),
         sessionId: z.literal('agent-lens-profile-3169'),
+        typedCommand: z
+          .object({
+            appliedGraphRevision: z.string().min(1),
+            changedNodeIds: z.array(z.string()).min(1),
+            commandId: z.literal('agent_lens_profile_3169_apply'),
+            commandType: z.literal('lensProfile.applyCorrection'),
+            dryRunPlanHash: z.string().startsWith('sha256:lens-profile:'),
+            dryRunPlanId: z.string().startsWith('dryrun_lens_profile_'),
+            provenanceEntryIds: z.array(z.string()).min(1),
+            sourceGraphRevision: z.literal('history_0'),
+          })
+          .strict(),
         undoGraphRevision: z.literal('history_0'),
       })
       .passthrough(),
@@ -113,7 +125,7 @@ if (
 const initialSnapshot = buildAgentImageContextSnapshot();
 let staleRejected = false;
 try {
-  applyAgentLensProfile({
+  await applyAgentLensProfile({
     expectedRecipeHash: 'recipe:stale',
     lensProfile: { lensDistortionAmount: 90 },
     operationId: 'agent_lens_profile_stale',
@@ -125,7 +137,7 @@ try {
 }
 if (!staleRejected) throw new Error('agent.lens_profile.apply did not reject stale recipe hash.');
 
-const result = applyAgentLensProfile({
+const result = await applyAgentLensProfile({
   expectedRecipeHash: initialSnapshot.initialPreview.recipeHash,
   lensProfile: {
     lensCorrectionMode: 'manual',
@@ -173,6 +185,9 @@ if (state.historyIndex !== 1 || state.history.length !== 2 || state.uncroppedAdj
 }
 if (parsedResult.beforePreviewHash === parsedResult.afterPreviewHash) {
   throw new Error('agent.lens_profile.apply did not update preview render identity.');
+}
+if (parsedResult.receipt.typedCommand.changedNodeIds.length !== parsedResult.adjustedFields.length) {
+  throw new Error('agent.lens_profile.apply typed command receipt did not cover every adjusted field.');
 }
 if (afterSnapshot.initialPreview.recipeHash === initialSnapshot.initialPreview.recipeHash) {
   throw new Error('agent lens/profile recipe hash did not change after apply.');
