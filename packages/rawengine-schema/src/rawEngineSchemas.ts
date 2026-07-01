@@ -3934,6 +3934,80 @@ const validateHdrSourceState = (
   });
 };
 
+export const hdrRuntimeSidecarReceiptV1Schema = z
+  .object({
+    alignment: z
+      .object({
+        confidence: z.number().min(0).max(1),
+        maxRmsError: z.number().nonnegative(),
+        mode: computationalMergeAlignmentModeV1Schema,
+        transformCount: z.number().int().positive(),
+      })
+      .strict(),
+    bracket: z
+      .object({
+        accepted: z.boolean(),
+        detectionConfidence: z.number().min(0).max(1),
+        exposureSpreadEv: z.number().nonnegative(),
+        referenceSourceIndex: z.number().int().nonnegative(),
+        sourceCount: z.number().int().min(2),
+        sourceRoles: z
+          .array(
+            z
+              .object({
+                exposureEv: z.number(),
+                role: z.enum(['over_exposed', 'reference', 'under_exposed']),
+                sourceIndex: z.number().int().nonnegative(),
+              })
+              .strict(),
+          )
+          .min(2),
+      })
+      .strict(),
+    deghost: z
+      .object({
+        averageConfidence: z.number().min(0).max(1),
+        maxConfidence: z.number().min(0).max(1),
+        motionCoverageRatio: z.number().min(0).max(1),
+        motionPixelCount: z.number().int().nonnegative(),
+        regionIntensityPercent: z.number().int().min(0).max(100),
+        requestedDeghosting: hdrDeghostingModeV1Schema,
+      })
+      .strict(),
+    handoff: z
+      .object({
+        editableDerivedAssetId: z.string().trim().min(1),
+        openInEditorPath: z.string().trim().min(1).optional(),
+        route: z.literal('computational_merge_derived_source'),
+      })
+      .strict(),
+    measurementSource: z.literal('hdr_runtime_apply'),
+    output: z
+      .object({
+        artifactId: z.string().trim().min(1),
+        contentHash: z.string().trim().min(1),
+        dimensions: z
+          .object({
+            height: z.number().int().positive(),
+            width: z.number().int().positive(),
+          })
+          .strict(),
+      })
+      .strict(),
+    receiptKind: z.literal('hdr_runtime_sidecar_receipt'),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+  })
+  .strict()
+  .superRefine((receipt, context) => {
+    if (receipt.bracket.sourceRoles.length !== receipt.bracket.sourceCount) {
+      context.addIssue({
+        code: 'custom',
+        message: 'HDR runtime sidecar receipt source role count must match bracket source count.',
+        path: ['bracket', 'sourceRoles'],
+      });
+    }
+  });
+
 export const hdrMergeArtifactV1Schema = z
   .object({
     alignment: hdrAlignmentSummaryV1Schema,
@@ -3966,6 +4040,7 @@ export const hdrMergeArtifactV1Schema = z
     outputName: z.string().trim().min(1),
     previewArtifacts: z.array(artifactHandleV1Schema),
     previewToneMapped: z.boolean(),
+    runtimeSidecarReceipt: hdrRuntimeSidecarReceiptV1Schema.optional(),
     schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
     sourceImageRefs: z.array(computationalMergeSourceImageRefV1Schema).min(2),
     sourceState: z.array(hdrSourceStateV1Schema).min(2),
@@ -10251,6 +10326,7 @@ export type HdrMergeInvalidationReasonV1 = z.infer<typeof hdrMergeInvalidationRe
 export type HdrMergeStaleStateV1 = z.infer<typeof hdrMergeStaleStateV1Schema>;
 export type HdrMergeWarningCodeV1 = z.infer<typeof hdrMergeWarningCodeV1Schema>;
 export type HdrMotionRiskV1 = z.infer<typeof hdrMotionRiskV1Schema>;
+export type HdrRuntimeSidecarReceiptV1 = z.infer<typeof hdrRuntimeSidecarReceiptV1Schema>;
 export type NegativeLabDensityRgbV1 = z.infer<typeof negativeLabDensityRgbV1Schema>;
 export type NegativeLabRollFrameRoleV1 = z.infer<typeof negativeLabRollFrameRoleV1Schema>;
 export type NegativeLabRollSessionArtifactV1 = z.infer<typeof negativeLabRollSessionArtifactV1Schema>;

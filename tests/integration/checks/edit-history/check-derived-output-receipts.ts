@@ -97,14 +97,26 @@ const panoramaReview = {
   boundaryMode: DEFAULT_PANORAMA_UI_SETTINGS.boundaryMode,
   capabilityLevel: 'runtime_apply_capable',
   crop: { height: 1440, mode: 'auto_crop', preCropHeight: 1500, preCropWidth: 2600, width: 2400, x: 100, y: 20 },
-  exposureNormalizationSummary: { appliedGainCount: 2, mode: 'scalar_overlap_luminance_gain_v1' },
+  exposureNormalizationSummary: {
+    appliedGainCount: 2,
+    appliedLuminanceGains: [
+      { gain: 0.95, sourceIndex: 1 },
+      { gain: 1.05, sourceIndex: 2 },
+    ],
+    compensationStrengthPercent: 100,
+    medianLogLuminanceDeltaAfter: 0.02,
+    medianLogLuminanceDeltaBefore: 0.18,
+    mode: 'scalar_overlap_luminance_gain_v1',
+  },
   outputDimensions: { height: 1440, width: 2400 },
   outputPath: '/tmp/rawengine-panorama-output.tif',
   projection: DEFAULT_PANORAMA_UI_SETTINGS.projection,
   seamReview: {
+    contributionMapArtifactId: 'artifact_panorama_contribution_map',
     policy: 'adaptive_dp_feather_v1',
     reviewStatus: 'ready',
     seamCount: 2,
+    seamMaskArtifactId: 'artifact_panorama_seam_mask',
     seams: [
       { confidence: 'high', featherWidthPx: 48, fromSourceIndex: 0, p95ErrorPx: 0.6, toSourceIndex: 1 },
       { confidence: 'medium', featherWidthPx: 56, fromSourceIndex: 1, p95ErrorPx: 1.2, toSourceIndex: 2 },

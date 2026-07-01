@@ -8,7 +8,10 @@ import {
   RAW_ENGINE_SCHEMA_VERSION,
 } from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import { sampleComputationalMergeAppServerToolManifestV1 } from '../../../../packages/rawengine-schema/src/samplePayloads.ts';
+import { DEFAULT_HDR_MERGE_UI_SETTINGS } from '../../../../src/schemas/computational-merge/hdrMergeUiSchemas.ts';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../../../src/utils/computational-merge/computationalMergeAppServerRoutePairs.ts';
+import { buildHdrDerivedOutputReceipt } from '../../../../src/utils/derivedOutputReceipt.ts';
+import { buildHdrEditableHandoffSummary } from '../../../../src/utils/hdrEditableHandoff.ts';
 
 const hdrRoutePair = getComputationalMergeAppServerRoutePairSummary('hdr');
 const hdrDerivedSourceDryRunTranscriptSchema = z
@@ -172,7 +175,71 @@ if (applied.kind !== 'apply') throw new Error('Expected HDR apply dispatch resul
 if (applied.apply.provenance.alignmentConfidence < 0.99) {
   throw new Error(`Expected alignment confidence >= 0.99, got ${applied.apply.provenance.alignmentConfidence}.`);
 }
-const derivedSourceReceipt = buildDerivedSourceReceiptIdentity(applyCommand, applied.apply.mutationResult);
+const runtimeReceipt = applied.apply.sidecarArtifact.runtimeSidecarReceipt;
+if (runtimeReceipt === undefined) throw new Error('HDR apply sidecar artifact did not include a runtime receipt.');
+if (runtimeReceipt.measurementSource !== 'hdr_runtime_apply') {
+  throw new Error('HDR runtime sidecar receipt must identify runtime apply as the measurement source.');
+}
+if (runtimeReceipt.bracket.sourceCount !== BRACKETS.length || runtimeReceipt.bracket.exposureSpreadEv !== 4) {
+  throw new Error(`HDR runtime sidecar receipt lost bracket measurements: ${JSON.stringify(runtimeReceipt.bracket)}.`);
+}
+if (runtimeReceipt.alignment.transformCount !== BRACKETS.length || runtimeReceipt.alignment.confidence < 0.99) {
+  throw new Error(
+    `HDR runtime sidecar receipt lost alignment measurements: ${JSON.stringify(runtimeReceipt.alignment)}.`,
+  );
+}
+if (runtimeReceipt.deghost.motionPixelCount <= 0 || runtimeReceipt.deghost.motionCoverageRatio <= 0) {
+  throw new Error(`HDR runtime sidecar receipt lost deghost measurements: ${JSON.stringify(runtimeReceipt.deghost)}.`);
+}
+const appliedOutputArtifact = applied.apply.mutationResult.outputArtifacts[0];
+if (appliedOutputArtifact === undefined) throw new Error('Expected HDR apply to return an output artifact.');
+if (runtimeReceipt.output.contentHash !== appliedOutputArtifact.contentHash) {
+  throw new Error('HDR runtime sidecar output hash must match the applied output artifact.');
+}
+const measuredHandoff = buildHdrEditableHandoffSummary({
+  deghostReviewAccepted: true,
+  deghostReviewRequired: true,
+  outputPath: `/synthetic/hdr/${applied.apply.mutationResult.derivedAssetId}.dng`,
+  runtimeSidecarReceipt: runtimeReceipt,
+  settings: {
+    ...DEFAULT_HDR_MERGE_UI_SETTINGS,
+    alignmentMode: applyCommand.parameters.alignmentMode,
+    bracketValidation: applyCommand.parameters.bracketValidation,
+    deghosting: applyCommand.parameters.deghosting,
+    mergeStrategy: applyCommand.parameters.mergeStrategy,
+    toneMapPreview: applyCommand.parameters.toneMapPreview,
+  },
+  sourceMetadata: applyCommand.parameters.sources.map((source) => {
+    const frame = frames.find((candidate) => candidate.sourceIndex === source.sourceIndex);
+    if (frame === undefined) throw new Error(`Missing frame for source ${source.sourceIndex}.`);
+    return {
+      contentHash: frame.contentHash,
+      graphRevision: frame.graphRevision,
+      path: source.imagePath,
+    };
+  }),
+  sourcePaths: applyCommand.parameters.sources.map((source) => source.imagePath),
+});
+const measuredDerivedOutputReceipt = buildHdrDerivedOutputReceipt({
+  acceptedDryRunPlanHash: applyCommand.parameters.acceptedDryRunPlanHash,
+  acceptedDryRunPlanId: applyCommand.parameters.acceptedDryRunPlanId,
+  handoff: measuredHandoff,
+  settings: {
+    ...DEFAULT_HDR_MERGE_UI_SETTINGS,
+    alignmentMode: applyCommand.parameters.alignmentMode,
+    bracketValidation: applyCommand.parameters.bracketValidation,
+    deghosting: applyCommand.parameters.deghosting,
+    mergeStrategy: applyCommand.parameters.mergeStrategy,
+    toneMapPreview: applyCommand.parameters.toneMapPreview,
+  },
+});
+if (measuredDerivedOutputReceipt.outputArtifactId !== applied.apply.mutationResult.derivedAssetId) {
+  throw new Error('HDR measured handoff receipt must target the applied derived asset id.');
+}
+if (measuredDerivedOutputReceipt.outputContentHash !== runtimeReceipt.output.contentHash) {
+  throw new Error('HDR measured handoff receipt must preserve the runtime sidecar output hash.');
+}
+const derivedSourceReceipt = buildDerivedSourceReceiptIdentity(measuredDerivedOutputReceipt);
 const openedDerivedSource = openComputationalMergeDerivedSourceV1({
   actor: applyCommand.actor,
   approval: applyCommand.approval,
@@ -257,8 +324,10 @@ hdrDerivedSourceDryRunTranscriptSchema.parse({
 console.log(
   JSON.stringify({
     alignmentConfidence: applied.apply.provenance.alignmentConfidence,
+    bracketExposureSpreadEv: runtimeReceipt.bracket.exposureSpreadEv,
     fixture: 'synthetic_hdr_app_server_runtime_v1',
     motionCoverageRatio: applied.apply.provenance.motionCoverageRatio,
+    motionPixelCount: runtimeReceipt.deghost.motionPixelCount,
     openedDerivedSourceId: openedDerivedSource.derivedSourceId,
     outputSha256: new Bun.CryptoHasher('sha256')
       .update(new Uint8Array(applied.apply.mergedPixels.buffer))
@@ -309,25 +378,23 @@ function assertPreviewArtifactHandle(toolResult, artifactId) {
   }
 }
 
-function buildDerivedSourceReceiptIdentity(command, mutationResult) {
-  const outputArtifact = mutationResult.outputArtifacts[0];
-  if (outputArtifact === undefined) throw new Error('Expected HDR apply to return an output artifact.');
+function buildDerivedSourceReceiptIdentity(receipt) {
   return {
-    acceptedDryRunPlanHash: command.parameters.acceptedDryRunPlanHash,
-    acceptedDryRunPlanId: command.parameters.acceptedDryRunPlanId,
-    family: 'hdr',
+    acceptedDryRunPlanHash: receipt.acceptedDryRunPlanHash,
+    acceptedDryRunPlanId: receipt.acceptedDryRunPlanId,
+    family: receipt.family,
     openInEditorAction: {
-      path: `/synthetic/hdr/${mutationResult.derivedAssetId}.dng`,
-      state: 'available',
+      path: receipt.openInEditorAction.path,
+      state: receipt.openInEditorAction.state,
     },
-    outputArtifactId: mutationResult.derivedAssetId,
-    outputContentHash: outputArtifact.contentHash,
-    outputPath: `/synthetic/hdr/${mutationResult.derivedAssetId}.dng`,
-    provenanceSidecarPath: `/synthetic/hdr/${mutationResult.derivedAssetId}.dng.rrdata`,
-    receiptId: `derived_output_hdr_${mutationResult.derivedAssetId}`,
-    settingsHash: 'fnv1a32:hdr-app-server-runtime-settings',
-    sourceGraphRevisions: command.parameters.sources.map(() => command.expectedGraphRevision),
-    staleState: 'current',
+    outputArtifactId: receipt.outputArtifactId,
+    outputContentHash: receipt.outputContentHash,
+    outputPath: receipt.outputPath,
+    provenanceSidecarPath: receipt.provenanceSidecar?.sidecarPath,
+    receiptId: receipt.receiptId,
+    settingsHash: receipt.settingsHash,
+    sourceGraphRevisions: receipt.sourceGraphRevisions,
+    staleState: receipt.staleState,
   };
 }
 

@@ -10,7 +10,9 @@ import {
   computationalMergeMutationResultV1Schema,
   type HdrBracketDetectionResultV1,
   type HdrMergeArtifactV1,
+  type HdrRuntimeSidecarReceiptV1,
   hdrMergeArtifactV1Schema,
+  hdrRuntimeSidecarReceiptV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
 } from '../rawEngineSchemas.js';
 import { estimateHdrAlignmentTransformsV1 } from './hdrAlignmentRuntime.js';
@@ -337,6 +339,12 @@ const buildHdrRuntimeSidecarArtifact = ({
       };
     }),
   });
+  const runtimeSidecarReceipt = buildHdrRuntimeSidecarReceipt({
+    bracketDetection,
+    command,
+    outputArtifact,
+    provenance,
+  });
 
   return hdrMergeArtifactV1Schema.parse({
     alignment: {
@@ -396,6 +404,7 @@ const buildHdrRuntimeSidecarArtifact = ({
     outputName: command.parameters.outputName,
     previewArtifacts: [],
     previewToneMapped: provenance.toneMapPreview,
+    runtimeSidecarReceipt,
     schemaVersion: command.schemaVersion,
     sourceImageRefs: command.parameters.sources,
     sourceState: provenance.sourceState,
@@ -406,6 +415,68 @@ const buildHdrRuntimeSidecarArtifact = ({
     },
     warningCodes,
     workingColorSpace: 'scene_linear_camera_rgb',
+  });
+};
+
+const buildHdrRuntimeSidecarReceipt = ({
+  bracketDetection,
+  command,
+  outputArtifact,
+  provenance,
+}: {
+  bracketDetection: HdrBracketDetectionResultV1;
+  command: HdrRuntimeCommandV1;
+  outputArtifact: ArtifactHandleV1;
+  provenance: HdrRuntimeProvenanceV1;
+}): HdrRuntimeSidecarReceiptV1 => {
+  const maxRmsError = provenance.alignmentTransforms.reduce(
+    (maxError, transform) => Math.max(maxError, transform.rmsError),
+    0,
+  );
+  const dimensions = outputArtifact.dimensions;
+  if (dimensions === undefined) {
+    throw new Error('HDR runtime sidecar receipt requires measured output dimensions.');
+  }
+
+  return hdrRuntimeSidecarReceiptV1Schema.parse({
+    alignment: {
+      confidence: provenance.alignmentConfidence,
+      maxRmsError,
+      mode: provenance.alignmentMode,
+      transformCount: provenance.alignmentTransforms.length,
+    },
+    bracket: {
+      accepted: bracketDetection.accepted,
+      detectionConfidence: bracketDetection.detectionConfidence,
+      exposureSpreadEv: bracketDetection.bracketSpanEv,
+      referenceSourceIndex: bracketDetection.referenceSourceIndex,
+      sourceCount: bracketDetection.sourceMetadata.length,
+      sourceRoles: bracketDetection.sourceMetadata.map((source) => ({
+        exposureEv: source.resolvedExposureEv,
+        role: source.resolvedBracketRole,
+        sourceIndex: source.sourceIndex,
+      })),
+    },
+    deghost: {
+      averageConfidence: provenance.deghostConfidenceMap.averageConfidence,
+      maxConfidence: provenance.deghostConfidenceMap.maxConfidence,
+      motionCoverageRatio: provenance.motionCoverageRatio,
+      motionPixelCount: provenance.qualityMetrics.motionPixelCount,
+      regionIntensityPercent: provenance.deghostRegionIntensityPercent,
+      requestedDeghosting: provenance.deghosting,
+    },
+    handoff: {
+      editableDerivedAssetId: `derived_${command.commandId}`,
+      route: 'computational_merge_derived_source',
+    },
+    measurementSource: 'hdr_runtime_apply',
+    output: {
+      artifactId: outputArtifact.artifactId,
+      contentHash: outputArtifact.contentHash,
+      dimensions,
+    },
+    receiptKind: 'hdr_runtime_sidecar_receipt',
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
   });
 };
 

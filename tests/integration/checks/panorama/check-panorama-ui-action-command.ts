@@ -22,7 +22,7 @@ mock.module('react-i18next', () => ({
   }),
 }));
 
-const PanoramaModal = (await import('../../../src/components/modals/computational-merge/PanoramaModal.tsx')).default;
+const PanoramaModal = (await import('../../../../src/components/modals/computational-merge/PanoramaModal.tsx')).default;
 
 const failures: string[] = [];
 const routePair = getComputationalMergeAppServerRoutePairSummary('panorama');
@@ -99,14 +99,33 @@ const staleState: PanoramaModalState = {
   progressMessage: 'stale progress',
   renderedReview: {
     boundary: {
-      crop: { height: 90, left: 0, preCropHeight: 100, preCropWidth: 200, top: 0, width: 180 },
-      transparentPixelRatio: 0.01,
+      crop: { height: 90, mode: 'auto', preCropHeight: 100, preCropWidth: 200, width: 180, x: 0, y: 0 },
+      effective: 'auto_crop',
+      requested: 'auto_crop',
     },
+    capabilityLevel: 'runtime_apply_capable',
+    exposureNormalizationSummary: {
+      appliedGainCount: 1,
+      appliedLuminanceGains: [{ gain: 0.95, sourceIndex: 1 }],
+      compensationStrengthPercent: 100,
+      medianLogLuminanceDeltaAfter: 0.02,
+      medianLogLuminanceDeltaBefore: 0.12,
+      mode: 'scalar_overlap_luminance_gain_v1',
+    },
+    outputDimensions: { height: 90, width: 180 },
+    projection: { effective: settings.projection, requested: settings.projection },
     seamReview: {
+      contributionMapArtifactId: 'artifact_panorama_ui_action_contribution_map',
       policy: 'adaptive_dp_feather_v1',
-      reviewStatus: 'passed',
+      reviewStatus: 'ready',
       seamCount: 2,
+      seamMaskArtifactId: 'artifact_panorama_ui_action_seam_mask',
       seams: [],
+    },
+    sources: {
+      excludedSourceIndices: [],
+      stitchedSourceIndices: [0, 1, 2],
+      totalCount: 3,
     },
     sourceContribution: {
       excludedSourceCount: 0,
@@ -119,18 +138,29 @@ const staleState: PanoramaModalState = {
     },
   },
   runtimePlan: {
+    dry_run: true,
+    family: 'panorama',
     output_dimensions: { height: 90, width: 180 },
     preflight: {
       blocked_reasons: [],
+      execution_mode: 'full_frame_legacy',
+      memory_budget_bytes: 256_000_000,
+      memory_budget_ratio: 0.01,
       memory_components: { total_estimated_peak_bytes: 123_456 },
       source_geometry: {
-        columns: 3,
-        rows: 1,
+        blocked_reasons: [],
+        layout: 'single_row',
+        row_count_estimate: 1,
+        support: 'implemented_current_engine',
+        vertical_span_px: 0,
         warning_codes: [],
       },
-      status: 'ready',
-      warnings: [],
+      status: 'accepted',
+      tile_count: 1,
+      warning_codes: [],
     },
+    source_image_refs: sourcePaths.map((image_path, source_index) => ({ image_path, source_index })),
+    warnings: [],
   },
 };
 const resetState = resetPanoramaStateForSettingsChange(staleState, {

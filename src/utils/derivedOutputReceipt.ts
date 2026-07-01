@@ -198,8 +198,11 @@ export const buildHdrDerivedOutputReceipt = ({
   acceptedDryRunPlanId?: string | undefined;
   handoff: HdrEditableHandoffSummary;
   settings: HdrMergeUiSettings;
-}): DerivedOutputReceipt =>
-  buildDerivedOutputReceipt({
+}): DerivedOutputReceipt => {
+  const outputContentHash =
+    handoff.runtimeSidecarReceipt?.output.contentHash ?? handoff.previewExportParity.parityProofHash;
+
+  return buildDerivedOutputReceipt({
     acceptedDryRunPlanHash,
     acceptedDryRunPlanId,
     family: 'hdr',
@@ -209,7 +212,7 @@ export const buildHdrDerivedOutputReceipt = ({
       state: 'available',
     },
     outputArtifactId: handoff.editableDerivedAssetId,
-    outputContentHash: handoff.previewExportParity.parityProofHash,
+    outputContentHash,
     outputPath: handoff.outputPath,
     provenanceSidecar: {
       acceptedApplyId: handoff.editableDerivedAssetId,
@@ -225,6 +228,7 @@ export const buildHdrDerivedOutputReceipt = ({
     staleState: 'current',
     storagePolicy: 'export_path',
   });
+};
 
 export const buildPanoramaDerivedOutputReceipt = ({
   acceptedDryRunPlanHash,
@@ -253,7 +257,9 @@ export const buildPanoramaDerivedOutputReceipt = ({
       outputDimensions: review.outputDimensions,
       outputPath: review.outputPath,
       projection: review.projection,
+      exposureNormalizationSummary: review.exposureNormalizationSummary,
       seamReview: review.seamReview,
+      sourceContribution: review.sourceContribution,
     }),
     outputPath: review.outputPath,
     provenanceSidecar: {

@@ -295,15 +295,23 @@ function buildReview(sample: PanoramaPrivateRuntimeSample, applied: PanoramaAppl
     },
     exposureNormalizationSummary: {
       appliedGainCount: applied.apply.provenance.exposureNormalizationResult.appliedGainCount ?? 0,
+      appliedLuminanceGains: applied.apply.provenance.exposureNormalizationResult.appliedLuminanceGains ?? [],
+      compensationStrengthPercent: applied.apply.provenance.exposureNormalizationResult.compensationStrengthPercent,
+      medianLogLuminanceDeltaAfter:
+        applied.apply.provenance.exposureNormalizationResult.overlapMetrics?.medianLogLuminanceDeltaAfter,
+      medianLogLuminanceDeltaBefore:
+        applied.apply.provenance.exposureNormalizationResult.overlapMetrics?.medianLogLuminanceDeltaBefore,
       mode: applied.apply.provenance.exposureNormalizationResult.mode,
     },
     outputDimensions: outputArtifact.dimensions,
     outputPath: DERIVED_PANORAMA_OUTPUT_PATH,
     projection: applied.apply.provenance.projectionSettings.effectiveProjection,
     seamReview: {
+      contributionMapArtifactId: applied.apply.provenance.seamReview.contributionMapArtifact.artifactId,
       policy: 'adaptive_dp_feather_v1' as const,
       reviewStatus: 'ready' as const,
       seamCount: applied.apply.provenance.seamReview.overlapEdgeCount,
+      seamMaskArtifactId: applied.apply.provenance.seamReview.seamMaskArtifact.artifactId,
       seams: applied.apply.provenance.alignment.graph.selectedEdges.map((edge) => ({
         confidence: 'high' as const,
         featherWidthPx: 100,

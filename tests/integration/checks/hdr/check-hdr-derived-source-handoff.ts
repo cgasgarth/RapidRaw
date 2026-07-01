@@ -3,6 +3,7 @@
 import { openComputationalMergeDerivedSourceV1 } from '../../../../packages/rawengine-schema/src/computational-merge/computationalMergeDerivedSourceRuntime.ts';
 import {
   ApprovalClass,
+  hdrRuntimeSidecarReceiptV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
 } from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import { DEFAULT_HDR_MERGE_UI_SETTINGS } from '../../../../src/schemas/computational-merge/hdrMergeUiSchemas.ts';
@@ -30,10 +31,53 @@ const settings = {
   toneMapPreview: true,
 } as const;
 
+const runtimeSidecarReceipt = hdrRuntimeSidecarReceiptV1Schema.parse({
+  alignment: {
+    confidence: 0.997,
+    maxRmsError: 0.2,
+    mode: 'translation',
+    transformCount: 3,
+  },
+  bracket: {
+    accepted: true,
+    detectionConfidence: 0.99,
+    exposureSpreadEv: 4,
+    referenceSourceIndex: 1,
+    sourceCount: 3,
+    sourceRoles: [
+      { exposureEv: -2, role: 'under_exposed', sourceIndex: 0 },
+      { exposureEv: 0, role: 'reference', sourceIndex: 1 },
+      { exposureEv: 2, role: 'over_exposed', sourceIndex: 2 },
+    ],
+  },
+  deghost: {
+    averageConfidence: 0.94,
+    maxConfidence: 1,
+    motionCoverageRatio: 0.018,
+    motionPixelCount: 27648,
+    regionIntensityPercent: 65,
+    requestedDeghosting: 'medium',
+  },
+  handoff: {
+    editableDerivedAssetId: 'derived_command_hdr_4492_apply',
+    openInEditorPath: '/proof/hdr/4492/derived/HDR_4492_editable.tiff',
+    route: 'computational_merge_derived_source',
+  },
+  measurementSource: 'hdr_runtime_apply',
+  output: {
+    artifactId: 'artifact_hdr_4492_apply_output',
+    contentHash: 'sha256:hdr-4492-runtime-output',
+    dimensions: { height: 3200, width: 4800 },
+  },
+  receiptKind: 'hdr_runtime_sidecar_receipt',
+  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+});
+
 const handoff = buildHdrEditableHandoffSummary({
   deghostReviewAccepted: true,
   deghostReviewRequired: true,
   outputPath: '/proof/hdr/4492/derived/HDR_4492_editable.tiff',
+  runtimeSidecarReceipt,
   settings,
   sourceMetadata,
   sourcePaths,
@@ -56,6 +100,15 @@ if (receipt.sourceContentHashes.join(',') !== sourceMetadata.map((source) => sou
 }
 if (receipt.provenanceSidecar?.sourceState[0]?.contentHash !== sourceMetadata[0]?.contentHash) {
   throw new Error('HDR provenance sidecar must carry source content hashes.');
+}
+if (receipt.outputArtifactId !== runtimeSidecarReceipt.handoff.editableDerivedAssetId) {
+  throw new Error('HDR derived output receipt must use the measured runtime editable derived asset id.');
+}
+if (receipt.outputContentHash !== runtimeSidecarReceipt.output.contentHash) {
+  throw new Error('HDR derived output receipt must preserve the measured runtime output hash.');
+}
+if (handoff.runtimeSidecarReceipt?.deghost.motionPixelCount !== runtimeSidecarReceipt.deghost.motionPixelCount) {
+  throw new Error('HDR editable handoff must preserve measured deghost sidecar metrics.');
 }
 
 const command = {
@@ -106,9 +159,9 @@ const mutationResult = {
   mutates: true,
   outputArtifacts: [
     {
-      artifactId: receipt.outputArtifactId,
+      artifactId: runtimeSidecarReceipt.output.artifactId,
       contentHash: receipt.outputContentHash,
-      dimensions: { height: 3200, width: 4800 },
+      dimensions: runtimeSidecarReceipt.output.dimensions,
       kind: 'merge_output',
       storage: 'export_path',
     },
