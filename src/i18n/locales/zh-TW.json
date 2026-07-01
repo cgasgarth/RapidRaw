@@ -1349,6 +1349,7 @@
     "switcher": {
       "tooltips": {
         "adjust": "調整",
+        "color": "顏色",
         "crop": "裁剪",
         "export": "匯出",
         "info": "資訊",

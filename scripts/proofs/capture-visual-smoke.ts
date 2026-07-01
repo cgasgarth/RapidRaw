@@ -2139,6 +2139,15 @@ async function prepareScenario(page, mode) {
     return;
   }
 
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.WorkflowRail) {
+    await page.getByRole('button', { name: 'Color' }).first().click();
+    await page.getByTestId('color-workspace-panel').getByRole('heading', { exact: true, name: 'Color' }).waitFor({
+      timeout: 10_000,
+    });
+    await page.getByText('Active panel: color', { exact: true }).waitFor({ timeout: 10_000 });
+    return;
+  }
+
   if (mode === 'color-workflow') {
     const colorPanel = page.locator('[data-visual-smoke-section="color-workflow-panel"]');
     const setRangeInput = async (scope: Locator, label: string, value: number, index = 0) => {
@@ -2163,6 +2172,7 @@ async function prepareScenario(page, mode) {
     await colorPanel.getByTestId('color-runtime-status-rail').getByText('Preview/export', { exact: true }).waitFor({
       timeout: 10_000,
     });
+    await colorPanel.getByTestId('color-proofing-diagnostics-disclosure').locator('summary').click();
     const gamutWarningControls = colorPanel.getByTestId('gamut-warning-controls');
     await gamutWarningControls.getByText('sRGB gamut warning', { exact: true }).waitFor({ timeout: 10_000 });
     await gamutWarningControls.getByText('sRGB gamut · Clear', { exact: true }).waitFor({ timeout: 10_000 });
@@ -2172,6 +2182,7 @@ async function prepareScenario(page, mode) {
     await gamutWarningControls.getByText('On', { exact: true }).waitFor({ timeout: 10_000 });
     await gamutWarningToggle.click();
     await gamutWarningControls.getByText('Off', { exact: true }).waitFor({ timeout: 10_000 });
+    await colorPanel.getByTestId('professional-color-recipes-disclosure').locator('summary').click();
     const recipe = colorPanel.getByTestId('professional-color-recipe-cleanPortrait');
     await recipe.click();
     await page.waitForFunction(

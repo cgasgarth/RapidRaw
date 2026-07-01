@@ -2,6 +2,7 @@ import { AnimatePresence, motion, type Variants } from 'framer-motion';
 import { lazy, type ReactNode, Suspense } from 'react';
 import { type AppSettings, Panel, type SelectedImage } from '../../ui/AppProperties';
 import type { ExportState } from '../../ui/ExportImportProperties';
+import ColorWorkspacePanel from './color/ColorWorkspacePanel';
 import Controls from './color/ControlsPanel';
 import CropPanel from './color/CropPanel';
 import ExportPanel from './export/ExportPanel';
@@ -50,6 +51,7 @@ type RightPanelRenderer = (props: EditorRightPanelHostProps) => ReactNode;
 const rightPanelRegistry: Record<Panel, RightPanelRenderer> = {
   [Panel.Adjustments]: () => <Controls />,
   [Panel.Ai]: () => <AIPanel />,
+  [Panel.Color]: () => <ColorWorkspacePanel />,
   [Panel.Crop]: () => <CropPanel />,
   [Panel.Export]: ({
     appSettings,

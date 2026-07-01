@@ -13,6 +13,7 @@ import { NegativeConversionModal } from '../../components/modals/negative-lab/Ne
 import ImageCanvas from '../../components/panel/editor/ImageCanvas';
 import AgentChatShell from '../../components/panel/right/ai/AgentChatShell';
 import { TetherPanel } from '../../components/panel/right/capture/TetherPanel';
+import { EditorRightPanelHost } from '../../components/panel/right/EditorRightPanelHost';
 import { MaskOverlayReviewControls } from '../../components/panel/right/layers/MaskOverlayReviewControls';
 import { Mask, type SubMask, SubMaskMode, ToolType } from '../../components/panel/right/layers/Masks';
 import { ObjectPromptControls } from '../../components/panel/right/layers/ObjectPromptControls';
@@ -20,11 +21,12 @@ import RightPanelSwitcher from '../../components/panel/right/RightPanelSwitcher'
 import {
   type BrushSettings,
   type CullingSuggestions,
-  Panel,
+  type Panel,
   RawStatus,
   type SelectedImage,
   SortDirection,
 } from '../../components/ui/AppProperties';
+import { Status } from '../../components/ui/ExportImportProperties';
 import {
   DEFAULT_HDR_MERGE_UI_SETTINGS,
   type HdrMergeUiSettings,
@@ -648,7 +650,8 @@ function BrushMaskCanvasVisualSmoke() {
 }
 
 function WorkflowRailVisualSmoke() {
-  const [activePanel, setActivePanel] = useState<Panel | null>(Panel.Adjustments);
+  const [activePanel, setActivePanel] = useState<Panel | null>(null);
+  const exportState = { errorMessage: '', progress: { current: 0, total: 0 }, status: Status.Idle };
 
   return (
     <main
@@ -663,7 +666,7 @@ function WorkflowRailVisualSmoke() {
 
         <aside className="grid grid-cols-[42px_1fr] bg-[#171a1f]" data-visual-smoke-section="workflow-rail">
           <RightPanelSwitcher activePanel={activePanel} isInstantTransition={true} onPanelSelect={setActivePanel} />
-          <div className="border-l border-white/10 p-4">
+          <div className="min-h-0 border-l border-white/10">
             <div className="mb-3 flex items-center justify-between">
               <span className="text-sm font-semibold">{workflowRailDensityTitle}</span>
               <span className="rounded border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-[#aab2bd]">
@@ -677,7 +680,25 @@ function WorkflowRailVisualSmoke() {
               </div>
             </div>
 
-            <div className="mt-5 border-t border-white/10 pt-4">
+            <div className="h-[calc(100%-118px)] min-h-0 border-t border-white/10">
+              <EditorRightPanelHost
+                activeRightPanel={activePanel}
+                appSettings={null}
+                exportState={exportState}
+                handleSettingsChange={() => {}}
+                multiSelectedPaths={[]}
+                onLinkedVariantImported={() => {}}
+                onNavigateToCommunity={() => {}}
+                onOpenTetherCapture={() => {}}
+                renderedRightPanel={activePanel}
+                rootPaths={[]}
+                selectedImage={null}
+                setExportState={() => {}}
+                slideDirection={0}
+              />
+            </div>
+
+            <div className="border-t border-white/10 p-4">
               <RightPanelSwitcher
                 activePanel={activePanel}
                 isInstantTransition={true}

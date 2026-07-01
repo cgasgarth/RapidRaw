@@ -1474,6 +1474,7 @@
     "switcher": {
       "tooltips": {
         "adjust": "Коррекция",
+        "color": "Цвет",
         "crop": "Обрезка",
         "export": "Экспорт",
         "info": "Инфо",

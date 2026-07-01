@@ -1440,6 +1440,7 @@
     "switcher": {
       "tooltips": {
         "adjust": "调整",
+        "color": "颜色",
         "crop": "裁剪",
         "export": "导出",
         "info": "信息",

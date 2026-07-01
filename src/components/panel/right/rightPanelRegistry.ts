@@ -1,5 +1,15 @@
 import type { LucideIcon } from 'lucide-react';
-import { Camera, Crop, FileInput, Info, Layers, Paintbrush, SlidersHorizontal, SwatchBook } from 'lucide-react';
+import {
+  Camera,
+  Crop,
+  FileInput,
+  Info,
+  Layers,
+  Paintbrush,
+  Palette,
+  SlidersHorizontal,
+  SwatchBook,
+} from 'lucide-react';
 import { Panel } from '../../ui/AppProperties';
 
 export interface RightPanelRegistryEntry {
@@ -18,6 +28,7 @@ export const RIGHT_PANEL_GROUPS = [
       id: Panel.Adjustments,
       tooltipKey: 'editor.switcher.tooltips.adjust',
     },
+    { fallbackLabel: 'Color', icon: Palette, id: Panel.Color, tooltipKey: 'editor.switcher.tooltips.color' },
     { fallbackLabel: 'Crop', icon: Crop, id: Panel.Crop, tooltipKey: 'editor.switcher.tooltips.crop' },
     { fallbackLabel: 'Masks', icon: Layers, id: Panel.Masks, tooltipKey: 'editor.switcher.tooltips.masks' },
     { fallbackLabel: 'Inpaint', icon: Paintbrush, id: Panel.Ai, tooltipKey: 'editor.switcher.tooltips.inpaint' },
