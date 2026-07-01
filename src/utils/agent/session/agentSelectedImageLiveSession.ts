@@ -36,6 +36,7 @@ export type AgentSelectedImageLiveSessionApprovalDecision = 'approved' | 'cancel
 export type AgentSelectedImageLiveSessionStaleReason =
   | 'graph_revision_changed'
   | 'image_changed'
+  | 'preview_artifact_changed'
   | 'preview_dimensions_changed'
   | 'preview_identity_changed'
   | 'recipe_hash_changed';
@@ -47,6 +48,7 @@ export type AgentSelectedImageLiveSessionCancellationOutcome =
 const selectedImageLiveSessionSnapshotSchema = z
   .object({
     graphRevision: z.string().trim().min(1),
+    previewArtifactId: z.string().trim().min(1),
     previewHeight: z.number().int().positive(),
     previewIdentity: z.string().trim().min(1).nullable(),
     previewRenderHash: z.string().trim().min(1),
@@ -79,6 +81,7 @@ const selectedImageLiveSessionAuditEventSchema = z
       .enum([
         'graph_revision_changed',
         'image_changed',
+        'preview_artifact_changed',
         'preview_dimensions_changed',
         'preview_identity_changed',
         'recipe_hash_changed',
@@ -89,10 +92,70 @@ const selectedImageLiveSessionAuditEventSchema = z
   })
   .strict();
 
+const selectedImageLiveSessionApplyGuardSchema = z
+  .object({
+    acceptedPreviewArtifactId: z.string().trim().min(1),
+    currentGraphRevision: z.string().trim().min(1),
+    currentPreviewArtifactId: z.string().trim().min(1),
+    currentPreviewHeight: z.number().int().positive(),
+    currentPreviewIdentity: z.string().trim().min(1).nullable(),
+    currentPreviewWidth: z.number().int().positive(),
+    currentRecipeHash: z.string().trim().min(1),
+    currentSelectedImagePath: z.string().trim().min(1),
+    expectedGraphRevision: z.string().trim().min(1),
+    expectedPreviewArtifactId: z.string().trim().min(1),
+    expectedPreviewHeight: z.number().int().positive(),
+    expectedPreviewIdentity: z.string().trim().min(1).nullable(),
+    expectedPreviewWidth: z.number().int().positive(),
+    expectedRecipeHash: z.string().trim().min(1),
+    expectedSelectedImagePath: z.string().trim().min(1),
+    staleReason: z
+      .enum([
+        'graph_revision_changed',
+        'image_changed',
+        'preview_artifact_changed',
+        'preview_dimensions_changed',
+        'preview_identity_changed',
+        'recipe_hash_changed',
+      ])
+      .optional(),
+    status: z.enum(['passed', 'rejected']),
+  })
+  .strict();
+
+const selectedImageLiveSessionTranscriptEntrySchema = z
+  .object({
+    acceptedPreviewArtifactId: z.string().trim().min(1).optional(),
+    argumentsHash: z.string().trim().min(1).optional(),
+    graphRevision: z.string().trim().min(1).optional(),
+    id: z.string().trim().min(1),
+    kind: z.enum(['apply_decision', 'approval', 'error', 'preview', 'rollback', 'tool_call', 'tool_result']),
+    previewArtifactId: z.string().trim().min(1).optional(),
+    recipeHash: z.string().trim().min(1).optional(),
+    resultHash: z.string().trim().min(1).optional(),
+    rollbackGraphRevision: z.string().trim().min(1).optional(),
+    staleReason: z
+      .enum([
+        'graph_revision_changed',
+        'image_changed',
+        'preview_artifact_changed',
+        'preview_dimensions_changed',
+        'preview_identity_changed',
+        'recipe_hash_changed',
+      ])
+      .optional(),
+    status: z.enum(['blocked', 'cancelled', 'failed', 'pending', 'rejected', 'succeeded']),
+    toolCallId: z.string().trim().min(1).optional(),
+    toolName: z.string().trim().min(1).optional(),
+  })
+  .strict();
+
 export const agentSelectedImageLiveSessionReceiptSchema = z
   .object({
+    acceptedPreviewArtifactId: z.string().trim().min(1),
     afterPreviewHash: z.string().trim().min(1).optional(),
     approvalDecision: z.enum(['approved', 'cancelled', 'pending', 'rejected']),
+    applyGuard: selectedImageLiveSessionApplyGuardSchema.optional(),
     beforePreviewHash: z.string().trim().min(1),
     cancellationOutcome: z.enum(['cancelled_before_apply', 'late_result_blocked', 'not_cancelled']),
     dryRunPlanHash: z.string().trim().min(1),
@@ -121,6 +184,7 @@ export const agentSelectedImageLiveSessionReceiptSchema = z
       .enum([
         'graph_revision_changed',
         'image_changed',
+        'preview_artifact_changed',
         'preview_dimensions_changed',
         'preview_identity_changed',
         'recipe_hash_changed',
@@ -146,12 +210,17 @@ export const agentSelectedImageLiveSessionAuditRecordSchema = z
     receipt: agentSelectedImageLiveSessionReceiptSchema,
     replayState: z.enum(['replayable']),
     schemaVersion: z.literal(1),
+    transcript: z.array(selectedImageLiveSessionTranscriptEntrySchema).min(2),
   })
   .strict();
 
 export type AgentSelectedImageLiveSessionAuditEvent = z.infer<typeof selectedImageLiveSessionAuditEventSchema>;
 export type AgentSelectedImageLiveSessionAuditRecord = z.infer<typeof agentSelectedImageLiveSessionAuditRecordSchema>;
+export type AgentSelectedImageLiveSessionApplyGuard = z.infer<typeof selectedImageLiveSessionApplyGuardSchema>;
 export type AgentSelectedImageLiveSessionReceipt = z.infer<typeof agentSelectedImageLiveSessionReceiptSchema>;
+export type AgentSelectedImageLiveSessionTranscriptEntry = z.infer<
+  typeof selectedImageLiveSessionTranscriptEntrySchema
+>;
 
 export interface AgentSelectedImageLiveSessionDraft {
   adjustments: AgentAdjustmentsApplyRequest['adjustments'];
@@ -177,6 +246,7 @@ const buildSnapshot = (): z.infer<typeof selectedImageLiveSessionSnapshotSchema>
   const snapshot = buildAgentImageContextSnapshot();
   return selectedImageLiveSessionSnapshotSchema.parse({
     graphRevision: snapshot.graphRevision,
+    previewArtifactId: snapshot.initialPreview.artifactId,
     previewHeight: snapshot.initialPreview.height,
     previewIdentity: snapshot.previewIdentity,
     previewRenderHash: snapshot.initialPreview.renderHash,
@@ -209,11 +279,48 @@ const pushEvent = (
   return parsedEvent;
 };
 
-export const getAgentSelectedImageLiveSessionStaleReason = (
+const stableTranscriptHash = (value: unknown): string => {
+  const input = JSON.stringify(value);
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return `sha256:${(hash >>> 0).toString(16).padStart(16, '0')}`;
+};
+
+const buildApplyGuard = (
   draft: AgentSelectedImageLiveSessionDraft,
+  current: z.infer<typeof selectedImageLiveSessionSnapshotSchema>,
+): AgentSelectedImageLiveSessionApplyGuard => {
+  const staleReason = getAgentSelectedImageLiveSessionStaleReasonForSnapshot(draft, current);
+  return selectedImageLiveSessionApplyGuardSchema.parse({
+    acceptedPreviewArtifactId: draft.snapshot.previewArtifactId,
+    currentGraphRevision: current.graphRevision,
+    currentPreviewArtifactId: current.previewArtifactId,
+    currentPreviewHeight: current.previewHeight,
+    currentPreviewIdentity: current.previewIdentity,
+    currentPreviewWidth: current.previewWidth,
+    currentRecipeHash: current.recipeHash,
+    currentSelectedImagePath: current.selectedImagePath,
+    expectedGraphRevision: draft.snapshot.graphRevision,
+    expectedPreviewArtifactId: draft.snapshot.previewArtifactId,
+    expectedPreviewHeight: draft.snapshot.previewHeight,
+    expectedPreviewIdentity: draft.snapshot.previewIdentity,
+    expectedPreviewWidth: draft.snapshot.previewWidth,
+    expectedRecipeHash: draft.snapshot.recipeHash,
+    expectedSelectedImagePath: draft.snapshot.selectedImagePath,
+    staleReason: staleReason ?? undefined,
+    status: staleReason === null ? 'passed' : 'rejected',
+  });
+};
+
+const getAgentSelectedImageLiveSessionStaleReasonForSnapshot = (
+  draft: AgentSelectedImageLiveSessionDraft,
+  current: z.infer<typeof selectedImageLiveSessionSnapshotSchema>,
 ): AgentSelectedImageLiveSessionStaleReason | null => {
-  const current = buildSnapshot();
   if (current.selectedImagePath !== draft.snapshot.selectedImagePath) return 'image_changed';
+  if (current.previewArtifactId !== draft.snapshot.previewArtifactId) return 'preview_artifact_changed';
   if (current.previewIdentity !== draft.snapshot.previewIdentity) return 'preview_identity_changed';
   if (current.previewWidth !== draft.snapshot.previewWidth || current.previewHeight !== draft.snapshot.previewHeight) {
     return 'preview_dimensions_changed';
@@ -221,6 +328,12 @@ export const getAgentSelectedImageLiveSessionStaleReason = (
   if (current.graphRevision !== draft.snapshot.graphRevision) return 'graph_revision_changed';
   if (current.recipeHash !== draft.snapshot.recipeHash) return 'recipe_hash_changed';
   return null;
+};
+
+export const getAgentSelectedImageLiveSessionStaleReason = (
+  draft: AgentSelectedImageLiveSessionDraft,
+): AgentSelectedImageLiveSessionStaleReason | null => {
+  return getAgentSelectedImageLiveSessionStaleReasonForSnapshot(draft, buildSnapshot());
 };
 
 export const startAgentSelectedImageLiveSessionDryRun = async ({
@@ -352,14 +465,16 @@ export const applyAgentSelectedImageLiveSession = async (
   draft: AgentSelectedImageLiveSessionDraft,
 ): Promise<AgentSelectedImageLiveSessionApplyResult> => {
   if (draft.state !== 'dry_run_ready') throw new Error('Selected-image live session apply requires approval.');
-  const staleReason = getAgentSelectedImageLiveSessionStaleReason(draft);
+  const currentBeforeApply = buildSnapshot();
+  const applyGuard = buildApplyGuard(draft, currentBeforeApply);
+  const staleReason = applyGuard.staleReason ?? null;
   if (staleReason !== null) {
     draft.state = 'failed';
     pushEvent(draft, {
       approvalDecision: 'approved',
-      graphRevision: buildSnapshot().graphRevision,
+      graphRevision: currentBeforeApply.graphRevision,
       message: `Selected-image live session rejected stale ${staleReason}.`,
-      recipeHash: buildSnapshot().recipeHash,
+      recipeHash: currentBeforeApply.recipeHash,
       staleReason,
       state: 'failed',
       toolName: AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
@@ -425,6 +540,7 @@ export const applyAgentSelectedImageLiveSession = async (
     audit: buildAgentSelectedImageLiveSessionAuditRecord(draft, {
       afterPreviewHash: apply.afterPreviewHash,
       approvalDecision: 'approved',
+      applyGuard,
       cancellationOutcome: 'not_cancelled',
       finalGraphRevision: apply.appliedGraphRevision,
       finalRecipeHash: afterPreview.preview.recipeHash,
@@ -500,6 +616,49 @@ export const rollbackAgentSelectedImageLiveSession = async ({
         { id: `${receipt.requestId}-rollback`, name: AGENT_HISTORY_ROLLBACK_TOOL_NAME, status: 'succeeded' },
       ],
     },
+    transcript: [
+      ...parsedAudit.transcript,
+      {
+        argumentsHash: stableTranscriptHash({
+          expectedCurrentGraphRevision: current.graphRevision,
+          expectedCurrentPreviewRecipeHash: current.recipeHash,
+          expectedSelectedImagePath: current.selectedImagePath,
+          rollbackGraphRevision: checkpoint.graphRevision,
+          sessionId: receipt.sessionId,
+        }),
+        graphRevision: current.graphRevision,
+        id: `${receipt.requestId}-rollback-call`,
+        kind: 'tool_call',
+        previewArtifactId: receipt.acceptedPreviewArtifactId,
+        recipeHash: current.recipeHash,
+        status: 'succeeded',
+        toolCallId: `${receipt.requestId}-rollback`,
+        toolName: AGENT_HISTORY_ROLLBACK_TOOL_NAME,
+      },
+      {
+        graphRevision: rollbackReceipt.graphRevision,
+        id: `${receipt.requestId}-rollback-result`,
+        kind: 'tool_result',
+        previewArtifactId: receipt.acceptedPreviewArtifactId,
+        recipeHash: rollbackReceipt.previewRecipeHash,
+        resultHash: stableTranscriptHash(rollbackReceipt),
+        rollbackGraphRevision: rollbackReceipt.graphRevision,
+        status: 'succeeded',
+        toolCallId: `${receipt.requestId}-rollback`,
+        toolName: AGENT_HISTORY_ROLLBACK_TOOL_NAME,
+      },
+      {
+        graphRevision: rollbackReceipt.graphRevision,
+        id: `${receipt.requestId}-rollback-decision`,
+        kind: 'rollback',
+        previewArtifactId: receipt.acceptedPreviewArtifactId,
+        recipeHash: rollbackReceipt.previewRecipeHash,
+        rollbackGraphRevision: rollbackReceipt.graphRevision,
+        status: 'succeeded',
+        toolCallId: `${receipt.requestId}-rollback`,
+        toolName: AGENT_HISTORY_ROLLBACK_TOOL_NAME,
+      },
+    ],
   });
 };
 
@@ -508,6 +667,7 @@ export const buildAgentSelectedImageLiveSessionAuditRecord = (
   receiptPatch: {
     afterPreviewHash?: string;
     approvalDecision: AgentSelectedImageLiveSessionApprovalDecision;
+    applyGuard?: AgentSelectedImageLiveSessionApplyGuard;
     cancellationOutcome: AgentSelectedImageLiveSessionCancellationOutcome;
     finalGraphRevision?: string;
     finalRecipeHash?: string;
@@ -519,8 +679,10 @@ export const buildAgentSelectedImageLiveSessionAuditRecord = (
   agentSelectedImageLiveSessionAuditRecordSchema.parse({
     auditEvents: draft.auditEvents,
     receipt: {
+      acceptedPreviewArtifactId: draft.snapshot.previewArtifactId,
       afterPreviewHash: receiptPatch.afterPreviewHash,
       approvalDecision: receiptPatch.approvalDecision,
+      applyGuard: receiptPatch.applyGuard,
       beforePreviewHash: draft.snapshot.previewRenderHash,
       cancellationOutcome: receiptPatch.cancellationOutcome,
       dryRunPlanHash: draft.dryRun.dryRunPlanHash,
@@ -540,13 +702,127 @@ export const buildAgentSelectedImageLiveSessionAuditRecord = (
     },
     replayState: 'replayable',
     schemaVersion: 1,
+    transcript: buildAgentSelectedImageLiveSessionTranscript(draft, receiptPatch),
   });
+
+const buildAgentSelectedImageLiveSessionTranscript = (
+  draft: AgentSelectedImageLiveSessionDraft,
+  receiptPatch: {
+    afterPreviewHash?: string;
+    approvalDecision: AgentSelectedImageLiveSessionApprovalDecision;
+    applyGuard?: AgentSelectedImageLiveSessionApplyGuard;
+    cancellationOutcome: AgentSelectedImageLiveSessionCancellationOutcome;
+    finalGraphRevision?: string;
+    finalRecipeHash?: string;
+    state: AgentSelectedImageLiveSessionState;
+    staleReason?: AgentSelectedImageLiveSessionStaleReason;
+    toolCalls: AgentSelectedImageLiveSessionReceipt['toolCalls'];
+  },
+): AgentSelectedImageLiveSessionTranscriptEntry[] => {
+  const toolEntries = receiptPatch.toolCalls.flatMap((toolCall): AgentSelectedImageLiveSessionTranscriptEntry[] => [
+    {
+      argumentsHash: stableTranscriptHash({
+        acceptedPlanHash: toolCall.name === AGENT_ADJUSTMENTS_APPLY_TOOL_NAME ? draft.dryRun.dryRunPlanHash : undefined,
+        acceptedPlanId: toolCall.name === AGENT_ADJUSTMENTS_APPLY_TOOL_NAME ? draft.dryRun.dryRunPlanId : undefined,
+        adjustments: toolCall.name.includes('adjustments') ? draft.adjustments : undefined,
+        expectedGraphRevision: draft.snapshot.graphRevision,
+        expectedRecipeHash: draft.snapshot.recipeHash,
+        operationId: draft.operationId,
+        previewArtifactId: draft.snapshot.previewArtifactId,
+        selectedImagePath: draft.snapshot.selectedImagePath,
+        sessionId: draft.sessionId,
+      }),
+      graphRevision: draft.snapshot.graphRevision,
+      id: `${toolCall.id}-call`,
+      kind: 'tool_call',
+      previewArtifactId: draft.snapshot.previewArtifactId,
+      recipeHash: draft.snapshot.recipeHash,
+      status: toolCall.status === 'blocked' ? 'blocked' : toolCall.status,
+      toolCallId: toolCall.id,
+      toolName: toolCall.name,
+    },
+    {
+      graphRevision: receiptPatch.finalGraphRevision ?? draft.snapshot.graphRevision,
+      id: `${toolCall.id}-result`,
+      kind: 'tool_result',
+      previewArtifactId: draft.snapshot.previewArtifactId,
+      recipeHash: receiptPatch.finalRecipeHash ?? draft.snapshot.recipeHash,
+      resultHash: stableTranscriptHash({
+        afterPreviewHash: receiptPatch.afterPreviewHash,
+        cancellationOutcome: receiptPatch.cancellationOutcome,
+        finalGraphRevision: receiptPatch.finalGraphRevision,
+        finalRecipeHash: receiptPatch.finalRecipeHash,
+        status: toolCall.status,
+      }),
+      status: toolCall.status === 'blocked' ? 'blocked' : toolCall.status,
+      toolCallId: toolCall.id,
+      toolName: toolCall.name,
+    },
+  ]);
+
+  return [
+    {
+      acceptedPreviewArtifactId: draft.snapshot.previewArtifactId,
+      graphRevision: draft.snapshot.graphRevision,
+      id: `${draft.requestId}-accepted-preview`,
+      kind: 'preview',
+      previewArtifactId: draft.snapshot.previewArtifactId,
+      recipeHash: draft.snapshot.recipeHash,
+      resultHash: stableTranscriptHash({
+        previewArtifactId: draft.snapshot.previewArtifactId,
+        previewRenderHash: draft.snapshot.previewRenderHash,
+      }),
+      status: 'succeeded',
+    },
+    ...toolEntries,
+    {
+      acceptedPreviewArtifactId: draft.snapshot.previewArtifactId,
+      graphRevision: draft.snapshot.graphRevision,
+      id: `${draft.requestId}-approval-decision`,
+      kind: 'approval',
+      previewArtifactId: draft.snapshot.previewArtifactId,
+      recipeHash: draft.snapshot.recipeHash,
+      resultHash: stableTranscriptHash(receiptPatch.approvalDecision),
+      status:
+        receiptPatch.approvalDecision === 'approved'
+          ? 'succeeded'
+          : receiptPatch.approvalDecision === 'cancelled'
+            ? 'cancelled'
+            : receiptPatch.approvalDecision === 'pending'
+              ? 'pending'
+              : 'rejected',
+    },
+    {
+      acceptedPreviewArtifactId: draft.snapshot.previewArtifactId,
+      graphRevision: receiptPatch.finalGraphRevision ?? draft.snapshot.graphRevision,
+      id: `${draft.requestId}-apply-decision`,
+      kind: 'apply_decision',
+      previewArtifactId: draft.snapshot.previewArtifactId,
+      recipeHash: receiptPatch.finalRecipeHash ?? draft.snapshot.recipeHash,
+      resultHash: stableTranscriptHash(receiptPatch.applyGuard ?? receiptPatch.cancellationOutcome),
+      staleReason: receiptPatch.staleReason ?? receiptPatch.applyGuard?.staleReason,
+      status:
+        receiptPatch.applyGuard?.status === 'rejected'
+          ? 'rejected'
+          : receiptPatch.state === 'applied'
+            ? 'succeeded'
+            : receiptPatch.state === 'cancelling'
+              ? 'cancelled'
+              : receiptPatch.state === 'failed'
+                ? 'failed'
+                : 'pending',
+      toolCallId: receiptPatch.toolCalls.find((toolCall) => toolCall.name === AGENT_ADJUSTMENTS_APPLY_TOOL_NAME)?.id,
+      toolName: AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
+    },
+  ];
+};
 
 export const replayAgentSelectedImageLiveSessionAudit = (
   audit: AgentSelectedImageLiveSessionAuditRecord,
 ): AgentSelectedImageLiveSessionReceipt => {
   const parsedAudit = agentSelectedImageLiveSessionAuditRecordSchema.parse(audit);
   const { receipt } = parsedAudit;
+  verifyAgentSelectedImageLiveSessionTranscript(parsedAudit);
   if (
     receipt.approvalDecision === 'approved' &&
     receipt.state === 'applied' &&
@@ -560,5 +836,47 @@ export const replayAgentSelectedImageLiveSessionAudit = (
   if (!receipt.toolCalls.some((toolCall) => toolCall.name === AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME)) {
     throw new Error('Selected-image live session audit replay rejected missing dry-run tool receipt.');
   }
+  if (receipt.state === 'applied') {
+    if (receipt.applyGuard === undefined) {
+      throw new Error('Selected-image live session audit replay rejected applied receipt without apply guard.');
+    }
+    if (receipt.applyGuard.status !== 'passed') {
+      throw new Error('Selected-image live session audit replay rejected failed apply guard.');
+    }
+    if (receipt.applyGuard.acceptedPreviewArtifactId !== receipt.acceptedPreviewArtifactId) {
+      throw new Error('Selected-image live session audit replay rejected mismatched accepted preview artifact.');
+    }
+  }
   return receipt;
+};
+
+const verifyAgentSelectedImageLiveSessionTranscript = (audit: AgentSelectedImageLiveSessionAuditRecord): void => {
+  const toolCallIds = new Set(audit.receipt.toolCalls.map((toolCall) => toolCall.id));
+  const transcriptToolCallIds = new Set(
+    audit.transcript
+      .filter((entry) => entry.kind === 'tool_call')
+      .map((entry) => entry.toolCallId)
+      .filter((id): id is string => id !== undefined),
+  );
+  for (const toolCallId of toolCallIds) {
+    if (!transcriptToolCallIds.has(toolCallId)) {
+      throw new Error(`Selected-image live session audit replay rejected missing transcript call ${toolCallId}.`);
+    }
+  }
+
+  const acceptedPreview = audit.transcript.find((entry) => entry.kind === 'preview');
+  if (acceptedPreview?.previewArtifactId !== audit.receipt.acceptedPreviewArtifactId) {
+    throw new Error('Selected-image live session audit replay rejected missing accepted preview transcript.');
+  }
+
+  const applyDecision = audit.transcript.find((entry) => entry.kind === 'apply_decision');
+  if (applyDecision === undefined) {
+    throw new Error('Selected-image live session audit replay rejected missing apply decision transcript.');
+  }
+  if (applyDecision.acceptedPreviewArtifactId !== audit.receipt.acceptedPreviewArtifactId) {
+    throw new Error('Selected-image live session audit replay rejected stale apply decision preview artifact.');
+  }
+  if (audit.receipt.state === 'applied' && applyDecision.status !== 'succeeded') {
+    throw new Error('Selected-image live session audit replay rejected unapplied apply decision status.');
+  }
 };
