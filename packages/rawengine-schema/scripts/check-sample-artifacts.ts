@@ -783,7 +783,9 @@ const checkArtifacts = async (): Promise<void> => {
 
   if (failures.length > 0) {
     console.error('RawEngine schema sample artifact check failed.');
-    console.error('Refresh intentional changes with: bun run schema:samples:update');
+    console.error(
+      'Refresh intentional changes with: bun packages/rawengine-schema/scripts/check-sample-artifacts.ts --update',
+    );
     console.error(failures.join('\n'));
     process.exit(1);
   }
