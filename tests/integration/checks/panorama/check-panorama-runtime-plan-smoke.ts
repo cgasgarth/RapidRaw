@@ -65,7 +65,7 @@ const dryRunCommand = {
     qualityPreference: 'balanced',
     sources: sourceFrames.map((frame) => ({
       colorSpaceHint: 'camera_rgb',
-      exposureEv: 0,
+      exposureEv: frame.sourceIndex === 1 ? 0.45 : frame.sourceIndex === 2 ? -0.35 : 0,
       imageId: `img_panorama_runtime_${frame.sourceIndex}`,
       imagePath: `/synthetic/panorama/runtime-${frame.sourceIndex}.dng`,
       rawDefaultsApplied: true,
@@ -168,6 +168,40 @@ assertEqual(
 if (dryRun.dryRunResult.warnings.includes('legacy_full_frame_render')) {
   throw new Error('Tile-backed panorama runtime must not report legacy_full_frame_render.');
 }
+assertEqual(
+  dryRun.provenance.exposureNormalizationResult.mode,
+  'scalar_overlap_luminance_gain_v1',
+  'exposure normalization mode',
+);
+if ((dryRun.provenance.exposureNormalizationResult.appliedGainCount ?? 0) < 1) {
+  throw new Error('Expected panorama dry-run to expose at least one applied exposure gain.');
+}
+for (const gain of dryRun.provenance.exposureNormalizationResult.appliedLuminanceGains ?? []) {
+  if (gain.gain < 0.5 || gain.gain > 2) {
+    throw new Error(`Expected exposure gain ${gain.gain} to stay inside the safe [0.5, 2.0] range.`);
+  }
+}
+const exposureMetrics = dryRun.provenance.exposureNormalizationResult.overlapMetrics;
+if (
+  exposureMetrics?.medianLogLuminanceDeltaBefore === undefined ||
+  exposureMetrics.medianLogLuminanceDeltaAfter === undefined ||
+  exposureMetrics.medianLogLuminanceDeltaAfter > exposureMetrics.medianLogLuminanceDeltaBefore
+) {
+  throw new Error(
+    `Expected exposure compensation to improve overlap luminance deltas: ${JSON.stringify(exposureMetrics)}.`,
+  );
+}
+const dryRunContributionMapArtifact = artifactById(
+  dryRun.dryRunResult.previewArtifacts,
+  dryRun.provenance.seamReview.contributionMapArtifact.artifactId,
+);
+const dryRunSeamMaskArtifact = artifactById(
+  dryRun.dryRunResult.previewArtifacts,
+  dryRun.provenance.seamReview.seamMaskArtifact.artifactId,
+);
+if (!dryRunContributionMapArtifact.contentHash || !dryRunSeamMaskArtifact.contentHash) {
+  throw new Error('Expected dry-run seam contribution artifacts to carry deterministic content hashes.');
+}
 assertEqual(applied.provenance.runtimeStatus, 'apply_rendered', 'apply runtime status');
 assertEqual(applied.provenance.acceptedDryRunPlanId, dryRun.dryRunResult.mergePlan.planId, 'accepted plan id');
 const [outputArtifact] = applied.mutationResult.outputArtifacts;
@@ -184,6 +218,30 @@ assertEqual(
   'apply sidecar graph revision',
 );
 assertEqual(applied.sidecarArtifact.outputArtifacts[0]?.artifactId, outputArtifact.artifactId, 'apply sidecar output');
+assertEqual(
+  applied.sidecarArtifact.previewArtifacts.some(
+    (artifact) => artifact.artifactId === applied.provenance.seamReview.contributionMapArtifact.artifactId,
+  ),
+  true,
+  'apply sidecar contribution map artifact',
+);
+assertEqual(
+  applied.sidecarArtifact.previewArtifacts.some(
+    (artifact) => artifact.artifactId === applied.provenance.seamReview.seamMaskArtifact.artifactId,
+  ),
+  true,
+  'apply sidecar seam mask artifact',
+);
+assertEqual(
+  applied.sidecarArtifact.exposureNormalization.mode,
+  'scalar_overlap_luminance_gain_v1',
+  'apply sidecar exposure mode',
+);
+assertEqual(
+  applied.sidecarArtifact.exposureNormalization.appliedGainCount,
+  applied.provenance.exposureNormalizationResult.appliedGainCount,
+  'apply sidecar exposure gain count',
+);
 assertEqual(applied.sidecarArtifact.sourceImageRefs.length, sourceFrames.length, 'apply sidecar source refs');
 assertEqual(applied.sidecarArtifact.sourceState.length, sourceFrames.length, 'apply sidecar source state');
 assertEqual(applied.sidecarArtifact.projection, 'cylindrical', 'apply sidecar effective projection');
@@ -262,9 +320,14 @@ console.log(
       outputSha256: new Bun.CryptoHasher('sha256').update(applied.outputPixels).digest('hex'),
       provenance: {
         exposureNormalization: applied.provenance.exposureNormalization,
+        exposureNormalizationResult: applied.provenance.exposureNormalizationResult,
         lensCorrectionPolicy: applied.provenance.lensCorrectionPolicy,
         qualityMetrics: applied.provenance.qualityMetrics,
         seamBlend: applied.provenance.seamBlend,
+        seamReview: {
+          contributionMapContentHash: dryRunContributionMapArtifact.contentHash,
+          seamMaskContentHash: dryRunSeamMaskArtifact.contentHash,
+        },
         tileRender: applied.provenance.tileRender,
       },
       warnings: dryRun.dryRunResult.warnings,
@@ -278,4 +341,10 @@ function assertEqual(actual, expected, label) {
   if (actual !== expected) {
     throw new Error(`${label}: expected ${expected}, got ${actual}.`);
   }
+}
+
+function artifactById(artifacts, artifactId) {
+  const artifact = artifacts.find((candidate) => candidate.artifactId === artifactId);
+  if (artifact === undefined) throw new Error(`Missing panorama artifact ${artifactId}.`);
+  return artifact;
 }

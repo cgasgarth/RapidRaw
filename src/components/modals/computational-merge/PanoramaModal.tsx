@@ -160,6 +160,25 @@ export default function PanoramaModal({
     })),
     stitchedSourceCount: imageCount ?? 0,
   };
+  const exposureSummary = renderedReview?.exposureNormalizationSummary ?? {
+    appliedGainCount: 0,
+    appliedLuminanceGains: [],
+    mode: 'none' as const,
+  };
+  const exposureDeltaLabel =
+    exposureSummary.medianLogLuminanceDeltaBefore === undefined ||
+    exposureSummary.medianLogLuminanceDeltaAfter === undefined
+      ? t('modals.panorama.summaryBlocked')
+      : t('modals.panorama.review.exposureDeltaValue', {
+          after: exposureSummary.medianLogLuminanceDeltaAfter.toFixed(3),
+          before: exposureSummary.medianLogLuminanceDeltaBefore.toFixed(3),
+        });
+  const exposureGainLabel =
+    exposureSummary.appliedLuminanceGains.length === 0
+      ? t('modals.panorama.review.exposureGainCount', { count: exposureSummary.appliedGainCount })
+      : exposureSummary.appliedLuminanceGains
+          .map((gain) => `S${gain.sourceIndex + 1} ${gain.gain.toFixed(3)}x`)
+          .join(' / ');
   const seamMaxP95ErrorPx =
     seamReviewSummary.seams.length === 0 ? 0 : Math.max(...seamReviewSummary.seams.map((seam) => seam.p95ErrorPx));
   const lowConfidenceSeamCount = seamReviewSummary.seams.filter((seam) => seam.confidence === 'low').length;
@@ -367,7 +386,19 @@ export default function PanoramaModal({
                   : Math.max(...savedReviewSummary.seamReview.seams.map((seam) => seam.p95ErrorPx))
               }
               data-seam-count={savedReviewSummary.seamReview.seamCount}
+              data-seam-contribution-map-artifact-id={savedReviewSummary.seamReview.contributionMapArtifactId ?? ''}
+              data-seam-mask-artifact-id={savedReviewSummary.seamReview.seamMaskArtifactId ?? ''}
               data-seam-review-status={savedReviewSummary.seamReview.reviewStatus}
+              data-exposure-applied-gain-count={savedReviewSummary.exposureNormalizationSummary.appliedGainCount}
+              data-exposure-gains={savedReviewSummary.exposureNormalizationSummary.appliedLuminanceGains
+                .map((gain) => `${gain.sourceIndex}:${gain.gain}`)
+                .join(',')}
+              data-exposure-median-log-luminance-delta-after={
+                savedReviewSummary.exposureNormalizationSummary.medianLogLuminanceDeltaAfter ?? ''
+              }
+              data-exposure-median-log-luminance-delta-before={
+                savedReviewSummary.exposureNormalizationSummary.medianLogLuminanceDeltaBefore ?? ''
+              }
               data-source-contribution-regions={savedReviewSummary.sourceContribution.regions.length}
               data-source-excluded-count={savedReviewSummary.sourceContribution.excludedSourceCount}
               data-source-count={savedReviewSummary.sourceCount}
@@ -411,9 +442,14 @@ export default function PanoramaModal({
                 },
                 {
                   label: t('modals.panorama.summaryExposure'),
-                  value: t('modals.panorama.review.exposureGainCount', {
-                    count: savedReviewSummary.exposureNormalizationSummary.appliedGainCount,
-                  }),
+                  value:
+                    savedReviewSummary.exposureNormalizationSummary.appliedLuminanceGains.length === 0
+                      ? t('modals.panorama.review.exposureGainCount', {
+                          count: savedReviewSummary.exposureNormalizationSummary.appliedGainCount,
+                        })
+                      : savedReviewSummary.exposureNormalizationSummary.appliedLuminanceGains
+                          .map((gain) => `S${gain.sourceIndex + 1} ${gain.gain.toFixed(3)}x`)
+                          .join(' / '),
                 },
               ].map((item) => (
                 <div className="min-w-0 rounded border border-border-color bg-surface px-2 py-1.5" key={item.label}>
@@ -748,6 +784,12 @@ export default function PanoramaModal({
             className="mb-5 grid grid-cols-4 gap-2 rounded-md border border-border-color bg-surface p-3 text-xs"
             data-crop-coverage-percent={cropCoveragePercent ?? ''}
             data-excluded-source-count={sourceContributionSummary.excludedSourceCount}
+            data-exposure-applied-gain-count={exposureSummary.appliedGainCount}
+            data-exposure-gains={exposureSummary.appliedLuminanceGains
+              .map((gain) => `${gain.sourceIndex}:${gain.gain}`)
+              .join(',')}
+            data-exposure-median-log-luminance-delta-after={exposureSummary.medianLogLuminanceDeltaAfter ?? ''}
+            data-exposure-median-log-luminance-delta-before={exposureSummary.medianLogLuminanceDeltaBefore ?? ''}
             data-inlier-edge-count={inlierEdgeCount}
             data-low-confidence-seam-count={lowConfidenceSeamCount}
             data-seam-count={seamReviewSummary.seamCount}
@@ -776,6 +818,14 @@ export default function PanoramaModal({
                   excluded: sourceContributionSummary.excludedSourceCount,
                   stitched: sourceContributionSummary.stitchedSourceCount,
                 }),
+              },
+              {
+                label: t('modals.panorama.review.exposureGains'),
+                value: exposureGainLabel,
+              },
+              {
+                label: t('modals.panorama.review.exposureDelta'),
+                value: exposureDeltaLabel,
               },
             ].map((item) => (
               <div className="rounded border border-border-color bg-bg-primary px-2 py-1.5" key={item.label}>
@@ -1079,6 +1129,11 @@ export default function PanoramaModal({
                   }),
                 },
                 {
+                  label: t('modals.panorama.review.exposureGains'),
+                  status: exposureSummary.mode === 'none' ? 'review' : 'ready',
+                  value: exposureGainLabel,
+                },
+                {
                   label: t('modals.panorama.review.projectionCrop'),
                   status: isEngineApplyReady ? 'ready' : 'review',
                   value: isEngineApplyReady
@@ -1130,6 +1185,14 @@ export default function PanoramaModal({
                       value: t('modals.panorama.review.sourceContributionCount', {
                         count: sourceContributionSummary.regions.length,
                       }),
+                    },
+                    {
+                      label: t('modals.panorama.review.exposureGains'),
+                      value: exposureGainLabel,
+                    },
+                    {
+                      label: t('modals.panorama.review.exposureDelta'),
+                      value: exposureDeltaLabel,
                     },
                     {
                       label: t('modals.panorama.review.projectionCrop'),

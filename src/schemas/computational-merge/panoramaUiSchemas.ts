@@ -123,9 +123,11 @@ const panoramaRenderedReviewSourcesSchema = z
 
 const panoramaSeamReviewSchema = z
   .object({
+    contributionMapArtifactId: z.string().trim().min(1).optional(),
     policy: z.literal('adaptive_dp_feather_v1'),
     reviewStatus: z.enum(['ready', 'requires_review']),
     seamCount: z.number().int().nonnegative(),
+    seamMaskArtifactId: z.string().trim().min(1).optional(),
     seams: z.array(
       z
         .object({
@@ -159,6 +161,19 @@ const panoramaSourceContributionSchema = z
 const panoramaExposureNormalizationSummarySchema = z
   .object({
     appliedGainCount: z.number().int().nonnegative(),
+    appliedLuminanceGains: z
+      .array(
+        z
+          .object({
+            gain: z.number().positive(),
+            sourceIndex: z.number().int().nonnegative(),
+          })
+          .strict(),
+      )
+      .default([]),
+    compensationStrengthPercent: z.number().int().min(0).max(100).optional(),
+    medianLogLuminanceDeltaAfter: z.number().nonnegative().optional(),
+    medianLogLuminanceDeltaBefore: z.number().nonnegative().optional(),
     mode: z.enum(['scalar_overlap_luminance_gain_v1', 'none']),
   })
   .strict();

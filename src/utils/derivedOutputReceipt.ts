@@ -250,7 +250,9 @@ export const buildPanoramaDerivedOutputReceipt = ({
       outputDimensions: review.outputDimensions,
       outputPath: review.outputPath,
       projection: review.projection,
+      exposureNormalizationSummary: review.exposureNormalizationSummary,
       seamReview: review.seamReview,
+      sourceContribution: review.sourceContribution,
     }),
     outputPath: review.outputPath,
     provenanceSidecar: {
