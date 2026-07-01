@@ -44,6 +44,7 @@ export const focusStackRuntimePlanRequestV1Schema = z
     command: computationalMergeCommandEnvelopeV1Schema,
     depthConfidenceArtifactId: z.string().trim().min(1),
     frames: z.array(focusStackRuntimePlanFrameV1Schema).min(2),
+    haloMapArtifactId: z.string().trim().min(1).optional(),
     lowConfidenceWeightFloor: z.number().min(0).max(1).default(0.12),
     outputArtifactId: z.string().trim().min(1),
     previewArtifactId: z.string().trim().min(1),
@@ -84,6 +85,7 @@ export const focusStackRuntimeProvenanceV1Schema = z
     haloReview: z
       .object({
         artifactId: z.string().trim().min(1),
+        artifactHash: z.string().trim().min(1).optional(),
         editableHandoffStatus: z.enum(['blocked', 'ready', 'review_required']),
         haloRiskCellRatio: z.number().min(0).max(1),
         lowConfidenceCellRatio: z.number().min(0).max(1),
@@ -276,6 +278,20 @@ export const applyFocusStackRuntimePlanV1 = (requestValue: unknown): FocusStackR
       width: runtime.width,
     }),
   ];
+  if (request.haloMapArtifactId !== undefined && request.haloMapArtifactId !== request.depthConfidenceArtifactId) {
+    outputArtifacts.push(
+      buildComputationalMergeArtifactHandleV1({
+        artifactId: request.haloMapArtifactId,
+        contentHash: `sha256:${stableFocusRuntimeHash(
+          `${acceptedDryRunPlanHash}:${request.haloMapArtifactId}:${renderedContentHash}`,
+        )}`,
+        height: runtime.height,
+        kind: 'mask',
+        storage: 'sidecar_artifact',
+        width: runtime.width,
+      }),
+    );
+  }
   if (request.command.parameters.retouchLayerPolicy === 'generate_retouch_layer') {
     if (request.retouchLayerArtifactId === undefined) {
       throw new Error('Focus stack runtime retouch layer policy requires retouchLayerArtifactId.');
@@ -342,6 +358,18 @@ export const buildFocusStackRuntimeArtifactV1 = ({
   const retouchLayerArtifact = mutationResult.outputArtifacts.find(
     (artifact) => artifact.artifactId.includes('retouch') && artifact.kind === 'mask',
   );
+  const haloMapArtifact =
+    mutationResult.outputArtifacts.find(
+      (artifact) => artifact.artifactId.includes('halo') && artifact.kind === 'mask',
+    ) ?? depthConfidenceMapArtifact;
+  const haloReview =
+    provenance.haloReview === undefined || haloMapArtifact?.contentHash === undefined
+      ? provenance.haloReview
+      : {
+          ...provenance.haloReview,
+          artifactHash: haloMapArtifact.contentHash,
+          artifactId: haloMapArtifact.artifactId,
+        };
 
   return focusStackArtifactV1Schema.parse({
     artifactId: `artifact_${mutationResult.derivedAssetId}`,
@@ -361,12 +389,13 @@ export const buildFocusStackRuntimeArtifactV1 = ({
     outputArtifact,
     outputColorSpace: 'linear_rec2020_d65_v1',
     previewArtifacts,
+    haloMapArtifact,
     retouchedExportParity: buildFocusStackRetouchedExportParityReceipt({
       outputArtifact,
       provenance,
       retouchLayerArtifact,
     }),
-    haloReview: provenance.haloReview,
+    haloReview,
     qualityPreference: command.parameters.qualityPreference,
     requestedAlignmentMode: provenance.requestedAlignmentMode,
     resolvedAlignmentMode: provenance.resolvedAlignmentMode,
@@ -623,7 +652,7 @@ const buildFocusHaloReview = (
       : 'apply_ready';
 
   return {
-    artifactId: request.depthConfidenceArtifactId,
+    artifactId: request.haloMapArtifactId ?? request.depthConfidenceArtifactId,
     editableHandoffStatus: reviewStatus === 'apply_ready' ? 'ready' : 'review_required',
     haloRiskCellRatio,
     lowConfidenceCellRatio,

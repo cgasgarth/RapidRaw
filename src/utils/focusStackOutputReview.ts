@@ -122,6 +122,7 @@ export const buildFocusStackOutputReviewFromArtifact = (
     },
     haloRiskCellRatio: artifact.haloReview?.haloRiskCellRatio ?? haloRiskCellRatio,
     haloReview: {
+      artifactHash: artifact.haloMapArtifact?.contentHash ?? artifact.haloReview?.artifactHash,
       artifactId: artifact.haloReview?.artifactId ?? `${artifact.outputArtifact.artifactId}:halo-review`,
       reviewStatus: artifact.haloReview?.reviewStatus ?? 'review_required',
       transitionRiskRegions:

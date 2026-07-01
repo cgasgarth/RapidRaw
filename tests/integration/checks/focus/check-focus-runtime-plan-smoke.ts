@@ -82,6 +82,7 @@ const dryRun = buildFocusStackRuntimeDryRunV1({
   command: dryRunCommand,
   depthConfidenceArtifactId: 'artifact_focus_runtime_depth_confidence',
   frames,
+  haloMapArtifactId: 'artifact_focus_runtime_halo_map',
   outputArtifactId: 'artifact_focus_runtime_output',
   previewArtifactId: 'artifact_focus_runtime_preview',
   retouchLayerArtifactId: 'artifact_focus_runtime_retouch',
@@ -111,6 +112,7 @@ const applied = applyFocusStackRuntimePlanV1({
   command: applyCommand,
   depthConfidenceArtifactId: 'artifact_focus_runtime_depth_confidence',
   frames,
+  haloMapArtifactId: 'artifact_focus_runtime_halo_map',
   outputArtifactId: 'artifact_focus_runtime_output',
   previewArtifactId: 'artifact_focus_runtime_preview',
   retouchLayerArtifactId: 'artifact_focus_runtime_retouch',
@@ -123,6 +125,7 @@ try {
     command: applyCommand,
     depthConfidenceArtifactId: 'artifact_focus_runtime_depth_confidence',
     frames,
+    haloMapArtifactId: 'artifact_focus_runtime_halo_map',
     outputArtifactId: 'artifact_focus_runtime_output',
     previewArtifactId: 'artifact_focus_runtime_preview',
     retouchLayerArtifactId: 'artifact_focus_runtime_retouch',
@@ -158,6 +161,7 @@ assertDeepEqual(
   artifactIds,
   [
     'artifact_focus_runtime_depth_confidence',
+    'artifact_focus_runtime_halo_map',
     'artifact_focus_runtime_output',
     'artifact_focus_runtime_retouch',
     'artifact_focus_runtime_sharpness',
@@ -172,6 +176,12 @@ for (const artifact of applied.mutationResult.outputArtifacts) {
 assertEqual(applied.sidecarArtifact.family, 'focus_stack', 'sidecar family');
 assertEqual(applied.sidecarArtifact.createdAt, '2026-06-17T20:10:00.000Z', 'sidecar created at');
 assertEqual(applied.sidecarArtifact.outputArtifact.artifactId, 'artifact_focus_runtime_output', 'sidecar output');
+assertEqual(applied.sidecarArtifact.haloMapArtifact?.artifactId, 'artifact_focus_runtime_halo_map', 'sidecar halo map');
+assertEqual(
+  applied.sidecarArtifact.haloReview?.artifactHash,
+  applied.sidecarArtifact.haloMapArtifact?.contentHash,
+  'sidecar halo review hash',
+);
 assertEqual(applied.sidecarArtifact.sharpnessMapArtifact?.storage, 'sidecar_artifact', 'sidecar sharpness storage');
 assertEqual(applied.sidecarArtifact.depthConfidenceMapArtifact?.storage, 'sidecar_artifact', 'sidecar depth storage');
 assertEqual(applied.sidecarArtifact.retouchLayerArtifact?.storage, 'sidecar_artifact', 'sidecar retouch storage');

@@ -8,6 +8,8 @@ import {
 import { sampleComputationalMergeAppServerToolManifestV1 } from '../../../../packages/rawengine-schema/src/samplePayloads.ts';
 import { COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES } from '../../../../scripts/lib/computational/proof-budgets.ts';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../../../src/utils/computational-merge/computationalMergeAppServerRoutePairs.ts';
+import { buildFocusStackDerivedOutputReceipt } from '../../../../src/utils/derivedOutputReceipt.ts';
+import { buildFocusStackOutputReviewFromArtifact } from '../../../../src/utils/focusStackOutputReview.ts';
 
 const focusRoutePair = getComputationalMergeAppServerRoutePairSummary('focus_stack');
 const WIDTH = 72;
@@ -108,8 +110,45 @@ if (applied.apply.sidecarArtifact.sourceImageRefs.length !== frames.length) {
 if (applied.apply.sidecarArtifact.outputArtifact.artifactId !== 'artifact_focus_app_server_runtime_output') {
   throw new Error('Expected focus app-server apply to return sidecar output artifact.');
 }
+if (applied.apply.sidecarArtifact.haloMapArtifact?.artifactId !== 'artifact_focus_app_server_runtime_halo_map') {
+  throw new Error('Expected focus app-server apply to return sidecar halo map artifact.');
+}
+if (
+  applied.apply.sidecarArtifact.haloReview?.artifactHash !== applied.apply.sidecarArtifact.haloMapArtifact.contentHash
+) {
+  throw new Error('Expected focus app-server halo review to preserve halo map hash.');
+}
 if (applied.apply.sidecarArtifact.createdAt !== '2026-06-17T20:15:00.000Z') {
   throw new Error('Expected focus app-server apply to preserve sidecar artifact timestamp.');
+}
+const outputReview = buildFocusStackOutputReviewFromArtifact(applied.apply.sidecarArtifact);
+if (outputReview.haloReview.artifactHash !== applied.apply.sidecarArtifact.haloMapArtifact.contentHash) {
+  throw new Error('Expected focus output review to expose halo map hash.');
+}
+if (outputReview.editableHandoff.status !== 'ready') {
+  throw new Error(`Expected focus app-server output review ready handoff, got ${outputReview.editableHandoff.status}.`);
+}
+const derivedReceipt = buildFocusStackDerivedOutputReceipt({
+  acceptedDryRunPlanHash: applied.apply.provenance.acceptedDryRunPlanHash,
+  acceptedDryRunPlanId: applied.apply.provenance.acceptedDryRunPlanId,
+  review: outputReview,
+  settings: {
+    alignmentMode: 'translation',
+    blendMethod: 'weighted_sharpness',
+    haloSuppressionStrengthPercent: 80,
+    maxPreviewDimensionPx: 1200,
+    qualityPreference: 'best',
+    retouchLayerPolicy: 'generate_retouch_layer',
+    reviewOverlayMode: 'halo_risk',
+    reviewOverlayOpacityPercent: 70,
+    sourceMode: 'focus_bracket',
+  },
+});
+if (derivedReceipt.openInEditorAction.state !== 'deferred') {
+  throw new Error('Expected focus stack derived receipt to expose typed deferred editor handoff.');
+}
+if (derivedReceipt.provenanceSidecar?.acceptedDryRunId !== outputReview.editableHandoff.exportReviewArtifactId) {
+  throw new Error('Expected focus stack derived receipt to preserve export-review handoff metadata.');
 }
 
 const outputHash = new Bun.CryptoHasher('sha256')
@@ -147,6 +186,7 @@ function buildRequest(command) {
     command,
     depthConfidenceArtifactId: 'artifact_focus_app_server_runtime_depth_confidence',
     frames,
+    haloMapArtifactId: 'artifact_focus_app_server_runtime_halo_map',
     outputArtifactId: 'artifact_focus_app_server_runtime_output',
     previewArtifactId: 'artifact_focus_app_server_runtime_preview',
     retouchLayerArtifactId: 'artifact_focus_app_server_runtime_retouch',
