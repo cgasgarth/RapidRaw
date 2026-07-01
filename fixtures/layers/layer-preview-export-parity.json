@@ -5,14 +5,16 @@
       "id": "layers.synthetic.preview-export-parity.v1",
       "width": 3,
       "height": 2,
-      "expectedPreviewExportHash": "sha256:aae4d7fadbaa98a49f0506e9ef76dcb4dd848d92e3e0a774bb1a1023121f07bf",
+      "expectedPreviewExportHash": "sha256:d8b0eff888f0af3fc4f196e9cb4043b1656cb7956d6c270977d5a8b86e5d5792",
       "expectedCoverageByLayer": [
         { "id": "tone-normal", "opacity": 0.25, "touchedPixels": 6 },
         { "id": "shadow-multiply", "opacity": 0.55, "touchedPixels": 5 },
         { "id": "retouch-clone-source", "opacity": 1, "touchedPixels": 2 },
         { "id": "highlight-screen", "opacity": 0.35, "touchedPixels": 5 },
         { "id": "contrast-overlay", "opacity": 0.4, "touchedPixels": 6 },
-        { "id": "skin-soft-light", "opacity": 0.3, "touchedPixels": 6 }
+        { "id": "skin-soft-light", "opacity": 0.3, "touchedPixels": 6 },
+        { "id": "hue-grade", "opacity": 0.45, "touchedPixels": 6 },
+        { "id": "saturation-polish", "opacity": 0.5, "touchedPixels": 6 }
       ],
       "basePixels": [
         { "r": 64, "g": 72, "b": 80 },
@@ -126,6 +128,36 @@
             { "r": 196, "g": 166, "b": 136 },
             { "r": 212, "g": 178, "b": 144 }
           ]
+        },
+        {
+          "id": "hue-grade",
+          "name": "Hue grade",
+          "blendMode": "hue",
+          "opacity": 0.45,
+          "visible": true,
+          "pixels": [
+            { "r": 218, "g": 92, "b": 72 },
+            { "r": 210, "g": 120, "b": 76 },
+            { "r": 78, "g": 128, "b": 224 },
+            { "r": 56, "g": 156, "b": 112 },
+            { "r": 224, "g": 178, "b": 72 },
+            { "r": 176, "g": 96, "b": 218 }
+          ]
+        },
+        {
+          "id": "saturation-polish",
+          "name": "Saturation polish",
+          "blendMode": "saturation",
+          "opacity": 0.5,
+          "visible": true,
+          "pixels": [
+            { "r": 232, "g": 84, "b": 48 },
+            { "r": 188, "g": 136, "b": 88 },
+            { "r": 96, "g": 150, "b": 238 },
+            { "r": 92, "g": 184, "b": 126 },
+            { "r": 232, "g": 188, "b": 70 },
+            { "r": 164, "g": 78, "b": 228 }
+          ]
         }
       ],
       "sidecarLayerStack": {
@@ -168,6 +200,14 @@
             "id": "skin-soft-light",
             "blendMode": "soft_light",
             "opacity": 0.3,
+            "visible": true,
+            "maskPersisted": false
+          },
+          { "id": "hue-grade", "blendMode": "hue", "opacity": 0.45, "visible": true, "maskPersisted": false },
+          {
+            "id": "saturation-polish",
+            "blendMode": "saturation",
+            "opacity": 0.5,
             "visible": true,
             "maskPersisted": false
           }

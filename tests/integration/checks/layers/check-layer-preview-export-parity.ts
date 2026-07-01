@@ -16,7 +16,7 @@ import {
 
 const FIXTURE_PATH = 'fixtures/layers/layer-preview-export-parity.json';
 const OUTPUT_DIR = 'artifacts/layers/preview-export-parity';
-const REQUIRED_BLEND_MODES = new Set(['multiply', 'normal', 'overlay', 'screen', 'soft_light']);
+const REQUIRED_BLEND_MODES = new Set(['hue', 'multiply', 'normal', 'overlay', 'saturation', 'screen', 'soft_light']);
 
 const pixelSchema = z
   .object({
@@ -83,7 +83,15 @@ const retouchRemoveSourceSchema = z
 
 const layerSchema = z
   .object({
-    blendMode: layerMaskBlendModeV1Schema.extract(['multiply', 'normal', 'overlay', 'screen', 'soft_light']),
+    blendMode: layerMaskBlendModeV1Schema.extract([
+      'hue',
+      'multiply',
+      'normal',
+      'overlay',
+      'saturation',
+      'screen',
+      'soft_light',
+    ]),
     id: z.string().trim().min(1),
     maskAlpha: z.array(z.number().min(0).max(1)).optional(),
     name: z.string().trim().min(1),
@@ -97,7 +105,15 @@ const layerSchema = z
 
 const sidecarLayerSchema = z
   .object({
-    blendMode: layerMaskBlendModeV1Schema.extract(['multiply', 'normal', 'overlay', 'screen', 'soft_light']),
+    blendMode: layerMaskBlendModeV1Schema.extract([
+      'hue',
+      'multiply',
+      'normal',
+      'overlay',
+      'saturation',
+      'screen',
+      'soft_light',
+    ]),
     id: z.string().trim().min(1),
     maskPersisted: z.boolean(),
     opacity: z.number().min(0).max(1),

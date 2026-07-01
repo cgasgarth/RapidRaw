@@ -3,7 +3,7 @@ import {
   resolveRemoveSamplingPlan,
 } from '../../../packages/rawengine-schema/src/retouchRemoveRuntime';
 
-export type LayerBlendMode = 'multiply' | 'normal' | 'overlay' | 'screen' | 'soft_light';
+export type LayerBlendMode = 'hue' | 'multiply' | 'normal' | 'overlay' | 'saturation' | 'screen' | 'soft_light';
 
 export interface LayerRgbPixel {
   b: number;
@@ -96,6 +96,65 @@ const hashRemoveSample = (label: 'output' | 'source', index: number, pixel: Laye
   return `fnv1a32:${hash.toString(16).padStart(8, '0')}`;
 };
 
+interface LayerHslPixel {
+  h: number;
+  l: number;
+  s: number;
+}
+
+const rgbToHsl = (pixel: LayerRgbPixel): LayerHslPixel => {
+  const r = clampByte(pixel.r) / 255;
+  const g = clampByte(pixel.g) / 255;
+  const b = clampByte(pixel.b) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  const delta = max - min;
+
+  if (delta === 0) return { h: 0, l, s: 0 };
+
+  const s = delta / (1 - Math.abs(2 * l - 1));
+  const hue = max === r ? ((g - b) / delta) % 6 : max === g ? (b - r) / delta + 2 : (r - g) / delta + 4;
+  const h = ((hue * 60 + 360) % 360) / 360;
+  return { h, l, s };
+};
+
+const hueToRgb = (p: number, q: number, inputHue: number): number => {
+  let hue = inputHue;
+  if (hue < 0) hue += 1;
+  if (hue > 1) hue -= 1;
+  if (hue < 1 / 6) return p + (q - p) * 6 * hue;
+  if (hue < 1 / 2) return q;
+  if (hue < 2 / 3) return p + (q - p) * (2 / 3 - hue) * 6;
+  return p;
+};
+
+const hslToRgb = ({ h, l, s }: LayerHslPixel): LayerRgbPixel => {
+  const saturation = clamp01(s);
+  const lightness = clamp01(l);
+  if (saturation === 0) {
+    const channel = clampByte(lightness * 255);
+    return { b: channel, g: channel, r: channel };
+  }
+
+  const q = lightness < 0.5 ? lightness * (1 + saturation) : lightness + saturation - lightness * saturation;
+  const p = 2 * lightness - q;
+  return {
+    b: clampByte(hueToRgb(p, q, h - 1 / 3) * 255),
+    g: clampByte(hueToRgb(p, q, h) * 255),
+    r: clampByte(hueToRgb(p, q, h + 1 / 3) * 255),
+  };
+};
+
+const blendHslPixel = (base: LayerRgbPixel, source: LayerRgbPixel, mode: LayerBlendMode): LayerRgbPixel | null => {
+  if (mode !== 'hue' && mode !== 'saturation') return null;
+
+  const baseHsl = rgbToHsl(base);
+  const sourceHsl = rgbToHsl(source);
+  if (mode === 'hue') return hslToRgb({ h: sourceHsl.h, l: baseHsl.l, s: baseHsl.s });
+  return hslToRgb({ h: baseHsl.h, l: baseHsl.l, s: sourceHsl.s });
+};
+
 const blendChannel = (base: number, source: number, mode: LayerBlendMode): number => {
   const baseUnit = clampByte(base) / 255;
   const sourceUnit = clampByte(source) / 255;
@@ -118,6 +177,15 @@ const blendChannel = (base: number, source: number, mode: LayerBlendMode): numbe
 };
 
 const blendPixel = (base: LayerRgbPixel, source: LayerRgbPixel, mode: LayerBlendMode, alpha: number): LayerRgbPixel => {
+  const hslBlend = blendHslPixel(base, source, mode);
+  if (hslBlend !== null) {
+    return {
+      b: clampByte(base.b * (1 - alpha) + hslBlend.b * alpha),
+      g: clampByte(base.g * (1 - alpha) + hslBlend.g * alpha),
+      r: clampByte(base.r * (1 - alpha) + hslBlend.r * alpha),
+    };
+  }
+
   const blend = (baseChannel: number, sourceChannel: number) =>
     clampByte(baseChannel * (1 - alpha) + blendChannel(baseChannel, sourceChannel, mode) * alpha);
 
