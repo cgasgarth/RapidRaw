@@ -63,8 +63,17 @@ export type BrushMaskRenderRequest = z.infer<typeof brushMaskRenderRequestSchema
 export interface BrushMaskRenderResult {
   alpha: Array<number>;
   contentHash: string;
+  coverageSum: number;
   height: number;
   maskId: string;
+  provenance: {
+    baseMaskHash: string;
+    contentHash: string;
+    coverageSum: number;
+    pressurePointCount: number;
+    pressureUsed: boolean;
+    strokeCount: number;
+  };
   width: number;
 }
 
@@ -79,6 +88,8 @@ const stableAlphaHash = (alpha: ReadonlyArray<number>): string => {
   }
   return `fnv1a32:${hash.toString(16).padStart(8, '0')}`;
 };
+
+const roundMetric = (value: number): number => Number(value.toFixed(6));
 
 const toMaskIdSegment = (value: string): string => value.toLocaleLowerCase('en-US').replace(/[^a-z0-9]+/gu, '_');
 
@@ -101,21 +112,33 @@ const pixelX = (x: number, width: number): number => (width === 1 ? 0 : x / (wid
 const pixelY = (y: number, height: number): number => (height === 1 ? 0 : y / (height - 1));
 const pixelDistanceScale = (width: number, height: number): number => Math.max(width - 1, height - 1, 1);
 
-const distanceToSegment = (
+const segmentDistance = (
   x: number,
   y: number,
   start: { x: number; y: number },
   end: { x: number; y: number },
-): number => {
+): { distance: number; t: number } => {
   const dx = end.x - start.x;
   const dy = end.y - start.y;
   const lengthSquared = dx * dx + dy * dy;
   if (lengthSquared <= Number.EPSILON) {
-    return Math.hypot(x - start.x, y - start.y);
+    return { distance: Math.hypot(x - start.x, y - start.y), t: 0 };
   }
 
   const t = clamp01(((x - start.x) * dx + (y - start.y) * dy) / lengthSquared);
-  return Math.hypot(x - (start.x + dx * t), y - (start.y + dy * t));
+  return { distance: Math.hypot(x - (start.x + dx * t), y - (start.y + dy * t)), t };
+};
+
+const pointPressure = (point: { pressure?: number | undefined }): number => point.pressure ?? 1;
+
+const segmentPressure = (
+  start: { pressure?: number | undefined },
+  end: { pressure?: number | undefined },
+  t: number,
+): number => {
+  const startPressure = pointPressure(start);
+  const endPressure = pointPressure(end);
+  return clamp01(startPressure + (endPressure - startPressure) * t);
 };
 
 const strokeCoverage = (
@@ -127,20 +150,33 @@ const strokeCoverage = (
 ): number => {
   const radius = stroke.radiusPx / pixelDistanceScale(width, height);
   const innerRadius = radius * stroke.hardness;
-  let minDistance = Number.POSITIVE_INFINITY;
+  let maxCoverage = 0;
 
   for (let index = 0; index < stroke.points.length - 1; index += 1) {
     const start = stroke.points[index];
     const end = stroke.points[index + 1];
     if (start === undefined || end === undefined) continue;
-    minDistance = Math.min(minDistance, distanceToSegment(x, y, start, end));
+    const { distance, t } = segmentDistance(x, y, start, end);
+    if (!Number.isFinite(distance) || distance > radius) continue;
+
+    const edgeWidth = Math.max(radius - innerRadius, Number.EPSILON);
+    const softCoverage = distance <= innerRadius ? 1 : 1 - (distance - innerRadius) / edgeWidth;
+    maxCoverage = Math.max(maxCoverage, clamp01(softCoverage) * stroke.flow * segmentPressure(start, end, t));
   }
 
-  if (!Number.isFinite(minDistance) || minDistance > radius) return 0;
-  const edgeWidth = Math.max(radius - innerRadius, Number.EPSILON);
-  const softCoverage = minDistance <= innerRadius ? 1 : 1 - (minDistance - innerRadius) / edgeWidth;
-  return clamp01(softCoverage) * stroke.flow;
+  return clamp01(maxCoverage);
 };
+
+const buildMaskArtifact = (render: BrushMaskRenderResult) => ({
+  artifactId: `artifact_${render.maskId}`,
+  contentHash: render.contentHash,
+  dimensions: {
+    height: render.height,
+    width: render.width,
+  },
+  kind: 'mask' as const,
+  storage: 'temp_cache' as const,
+});
 
 export const renderBrushMask = (request: BrushMaskRenderRequest): BrushMaskRenderResult => {
   const parsedRequest = brushMaskRenderRequestSchema.parse(request);
@@ -174,11 +210,28 @@ export const renderBrushMask = (request: BrushMaskRenderRequest): BrushMaskRende
     }
   }
 
+  const contentHash = stableAlphaHash(alpha);
+  const coverageSum = roundMetric(alpha.reduce((sum, value) => sum + value, 0));
+  const pressurePointCount = command.parameters.strokes.reduce(
+    (sum, stroke) => sum + stroke.points.filter((point) => point.pressure !== undefined).length,
+    0,
+  );
+  const provenance = {
+    baseMaskHash: normalizedBaseHash(parsedRequest.baseMask),
+    contentHash,
+    coverageSum,
+    pressurePointCount,
+    pressureUsed: pressurePointCount > 0,
+    strokeCount: command.parameters.strokes.length,
+  };
+
   return {
     alpha,
-    contentHash: stableAlphaHash(alpha),
+    contentHash,
+    coverageSum,
     height: parsedRequest.height,
     maskId: buildMaskId(command),
+    provenance,
     width: parsedRequest.width,
   };
 };
@@ -220,18 +273,7 @@ export const buildBrushMaskDryRunResult = (
     commandType: command.commandType,
     correlationId: command.correlationId,
     dryRun: true,
-    maskArtifacts: [
-      {
-        artifactId: `artifact_${render.maskId}`,
-        contentHash: render.contentHash,
-        dimensions: {
-          height: render.height,
-          width: render.width,
-        },
-        kind: 'mask',
-        storage: 'temp_cache',
-      },
-    ],
+    maskArtifacts: [buildMaskArtifact(render)],
     mutates: false,
     parameterDiff: [
       {
@@ -241,6 +283,7 @@ export const buildBrushMaskDryRunResult = (
         value: {
           maskId: render.maskId,
           maskName: command.parameters.maskName,
+          provenance: render.provenance,
           strokeCount: command.parameters.strokes.length,
         },
       },
@@ -265,6 +308,8 @@ export const buildBrushMaskMutationResult = (
     commandType: command.commandType,
     correlationId: command.correlationId,
     dryRun: false,
+    maskArtifacts: [buildMaskArtifact(render)],
+    maskProvenance: render.provenance,
     mutates: true,
     schemaVersion: command.schemaVersion,
     sourceGraphRevision: command.expectedGraphRevision,
