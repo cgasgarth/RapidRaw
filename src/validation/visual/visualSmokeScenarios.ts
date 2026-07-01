@@ -1,6 +1,7 @@
 export const VISUAL_SMOKE_SCENARIO_IDS = {
   AdjustmentsPanelRetune: 'adjustments-panel-retune',
   AgentChatUi: 'agent-chat-ui',
+  AgentSelectedImageLiveSession: 'agent-selected-image-live-session',
   BrushMaskCanvasUi: 'brush-mask-canvas-ui',
   ColorWorkflow: 'color-workflow',
   CommandPaletteWorkflows: 'command-palette-workflows',
@@ -91,6 +92,13 @@ export const VISUAL_SMOKE_SCENARIOS = [
     marker: 'Agent chat UI smoke',
     mode: VISUAL_SMOKE_SCENARIO_IDS.AgentChatUi,
     outputFile: 'agent-chat-ui.png',
+    sectionMinimum: 1,
+  },
+  {
+    appMode: VISUAL_SMOKE_SCENARIO_IDS.AgentChatUi,
+    marker: 'Agent chat UI smoke',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.AgentSelectedImageLiveSession,
+    outputFile: 'agent-selected-image-live-session.png',
     sectionMinimum: 1,
   },
   {

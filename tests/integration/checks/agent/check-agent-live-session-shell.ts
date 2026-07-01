@@ -260,11 +260,15 @@ async function validateRenderedShellBehavior(
   }
 
   const lineage = rendered.container.querySelectorAll('[data-testid="agent-live-session-preview-lineage-entry"]');
-  if (lineage.length !== 3) failures.push(`expected three rendered preview lineage entries, got ${lineage.length}.`);
+  if (lineage.length !== 2)
+    failures.push(`expected two rendered selected-image preview lineage entries, got ${lineage.length}.`);
   const lineagePurposes = Array.from(lineage).map((entry) => (entry as HTMLElement).dataset.purpose);
-  if (lineagePurposes.join(',') !== 'initial_context,refresh,detail_review') {
+  if (lineagePurposes.join(',') !== 'initial_context,refresh') {
     failures.push(`rendered preview lineage order was wrong: ${lineagePurposes.join(',')}.`);
   }
+  const cancelButton = getButtonByName(rendered.container, 'Cancel', 'cancel button was not queryable after apply.');
+  if (!cancelButton.disabled)
+    failures.push('cancel button should be disabled after the selected-image session completes.');
 
   const audit = await waitForTestId(
     rendered.container,

@@ -1,5 +1,8 @@
 import { z } from 'zod';
-import { RawEngineAppServerHostToolName } from '../../../schemas/agent/agentRuntimeSchemas';
+import {
+  RawEngineAppServerHostToolName,
+  type RawEngineAppServerToolDispatchRequest,
+} from '../../../schemas/agent/agentRuntimeSchemas';
 import { handleRawEngineAppServerHostRequestAsync } from '../../rawEngineAppServerHost';
 
 const agentLiveToolDispatchResultSchema = z.looseObject({
@@ -10,16 +13,19 @@ const agentLiveToolDispatchResultSchema = z.looseObject({
 
 export const dispatchAgentLiveEditorTool = async ({
   args,
+  draftSession,
   requestId,
   runtimeToolName,
 }: {
   args: unknown;
+  draftSession?: RawEngineAppServerToolDispatchRequest['draftSession'];
   requestId: string;
   runtimeToolName: string;
 }): Promise<unknown> => {
   const response = agentLiveToolDispatchResultSchema.parse(
     await handleRawEngineAppServerHostRequestAsync({
       arguments: args,
+      draftSession,
       requestId,
       runtimeToolName,
       toolName: RawEngineAppServerHostToolName.DispatchTool,

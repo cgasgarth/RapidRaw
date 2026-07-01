@@ -1338,7 +1338,10 @@ async function prepareScenario(page, mode) {
     return;
   }
 
-  if (mode === 'agent-chat-ui') {
+  if (
+    mode === VISUAL_SMOKE_SCENARIO_IDS.AgentChatUi ||
+    mode === VISUAL_SMOKE_SCENARIO_IDS.AgentSelectedImageLiveSession
+  ) {
     const shell = page.getByTestId('agent-chat-shell');
     await shell.waitFor({ timeout: 10_000 });
     agentChatProofDatasetSchema.parse(await shell.evaluate((element) => ({ ...element.dataset })));
