@@ -155,6 +155,17 @@ assertEqual(
   'detail source pixels',
 );
 assertEqual(applied.provenance.frameRegistrations.length, sourceFrameDefs.length, 'frame registration count');
+for (const [index, registration] of applied.provenance.frameRegistrations.entries()) {
+  const expectedFrame = sourceFrameDefs[index];
+  if (expectedFrame === undefined) throw new Error(`Missing expected frame ${index}.`);
+  assertEqual(registration.shiftX, expectedFrame.shiftX, `registration declared shiftX ${index}`);
+  assertEqual(registration.shiftY, expectedFrame.shiftY, `registration declared shiftY ${index}`);
+  assertEqual(registration.measuredShiftX, expectedFrame.shiftX / SCALE, `registration measured shiftX ${index}`);
+  assertEqual(registration.measuredShiftY, expectedFrame.shiftY / SCALE, `registration measured shiftY ${index}`);
+  assertEqual(registration.registrationResidualPx, 0, `registration residual px ${index}`);
+  assertEqual(registration.lumaResidualMae, 0, `registration luma residual ${index}`);
+  assertEqual(registration.confidence, 1, `registration measured confidence ${index}`);
+}
 const artifactIds = applied.mutationResult.outputArtifacts.map((artifact) => artifact.artifactId).sort();
 assertDeepEqual(artifactIds, ['artifact_sr_runtime_confidence', 'artifact_sr_runtime_output'], 'SR output artifacts');
 const [outputArtifact] = applied.mutationResult.outputArtifacts;
@@ -176,6 +187,14 @@ const result = {
   artifactCount: applied.mutationResult.outputArtifacts.length,
   fixture: 'synthetic_sr_runtime_plan_v1',
   frameRegistrations: applied.provenance.frameRegistrations,
+  measuredRegistration: {
+    maxResidualPx: Math.max(
+      ...applied.provenance.frameRegistrations.map((registration) => registration.registrationResidualPx),
+    ),
+    subpixelFrames: applied.provenance.frameRegistrations.filter(
+      (registration) => registration.measuredShiftX !== 0 || registration.measuredShiftY !== 0,
+    ).length,
+  },
   quality: {
     confidenceMap: applied.provenance.confidenceMap,
     detailQuality: applied.provenance.detailQuality,

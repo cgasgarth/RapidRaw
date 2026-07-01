@@ -82,6 +82,10 @@ export const superResolutionRuntimeProvenanceV1Schema = z
         z
           .object({
             confidence: z.number().min(0).max(1),
+            lumaResidualMae: z.number().min(0),
+            measuredShiftX: z.number().min(0),
+            measuredShiftY: z.number().min(0),
+            registrationResidualPx: z.number().min(0),
             shiftX: z.number().int().nonnegative(),
             shiftY: z.number().int().nonnegative(),
             sourceIndex: z.number().int().nonnegative(),
@@ -319,6 +323,7 @@ const renderSuperResolutionRuntime = (request: ParsedSuperResolutionRuntimePlanR
     result.outputHeight,
     result.outputScale,
   );
+  const frameRegistrations = measureSrFrameRegistrations(request['frames'], result.outputPixels, result.outputScale);
 
   return {
     height: result.outputHeight,
@@ -337,12 +342,7 @@ const renderSuperResolutionRuntime = (request: ParsedSuperResolutionRuntimePlanR
       effectiveOutputScale: result.outputScale,
       engineId: SR_RUNTIME_ENGINE_ID,
       engineVersion: SR_RUNTIME_ENGINE_VERSION,
-      frameRegistrations: request['frames'].map((frame) => ({
-        confidence: alignmentDiagnostics.confidence,
-        shiftX: frame.shiftX,
-        shiftY: frame.shiftY,
-        sourceIndex: frame.sourceIndex,
-      })),
+      frameRegistrations,
       mode: request.command.parameters.mode,
       reconstructionMode: request.command.parameters.reconstructionMode,
       requestedAlignmentMode: request.command.parameters.alignmentMode,
@@ -386,6 +386,7 @@ const renderDegradedSuperResolutionDryRun = (
     sampleCounts,
   });
   const warnings = ['support_map_blocked', ...deriveSrWarnings(0, request.command.parameters.detailPolicy)].sort();
+  const frameRegistrations = measureSrFrameRegistrations(request['frames'], outputPixels, scale);
 
   return {
     height: outputHeight,
@@ -399,12 +400,7 @@ const renderDegradedSuperResolutionDryRun = (
       effectiveOutputScale: scale,
       engineId: SR_RUNTIME_ENGINE_ID,
       engineVersion: SR_RUNTIME_ENGINE_VERSION,
-      frameRegistrations: request['frames'].map((frame) => ({
-        confidence: alignmentDiagnostics.confidence,
-        shiftX: frame.shiftX,
-        shiftY: frame.shiftY,
-        sourceIndex: frame.sourceIndex,
-      })),
+      frameRegistrations,
       mode: request.command.parameters.mode,
       reconstructionMode: request.command.parameters.reconstructionMode,
       requestedAlignmentMode: request.command.parameters.alignmentMode,
@@ -608,6 +604,99 @@ const buildSrDetailQuality = (
     sourcePixelCount,
     sourceToOutputPixelRatio: roundSrMetric(sourcePixelCount / outputPixelCount),
   };
+};
+
+const measureSrFrameRegistrations = (
+  frames: SuperResolutionRuntimeFrameV1[],
+  outputPixels: Float32Array,
+  outputScale: number,
+): SuperResolutionRuntimeProvenanceV1['frameRegistrations'] => {
+  const referenceFrame = frames[0];
+  if (referenceFrame === undefined) return [];
+  const outputWidth = referenceFrame.width * outputScale;
+  const outputHeight = referenceFrame.height * outputScale;
+  if (outputPixels.length !== outputWidth * outputHeight) {
+    throw new Error('Super-resolution registration measurement requires output pixels matching source geometry.');
+  }
+
+  return frames
+    .map((frame) => {
+      validateMeasurementFrame(frame, referenceFrame);
+      const declaredMae = measureFramePhaseMae(
+        frame,
+        outputPixels,
+        outputWidth,
+        outputScale,
+        frame.shiftX,
+        frame.shiftY,
+      );
+      let bestShiftX = frame.shiftX;
+      let bestShiftY = frame.shiftY;
+      let bestMae = declaredMae;
+      let secondBestMae = Number.POSITIVE_INFINITY;
+
+      for (let shiftY = 0; shiftY < outputScale; shiftY += 1) {
+        for (let shiftX = 0; shiftX < outputScale; shiftX += 1) {
+          const mae = measureFramePhaseMae(frame, outputPixels, outputWidth, outputScale, shiftX, shiftY);
+          if (mae < bestMae) {
+            secondBestMae = bestMae;
+            bestMae = mae;
+            bestShiftX = shiftX;
+            bestShiftY = shiftY;
+          } else if (shiftX !== bestShiftX || shiftY !== bestShiftY) {
+            secondBestMae = Math.min(secondBestMae, mae);
+          }
+        }
+      }
+
+      const phaseResidualPx =
+        Math.hypot(bestShiftX - frame.shiftX, bestShiftY - frame.shiftY) / Math.max(1, outputScale);
+      const residualPenalty = Math.min(1, bestMae * 8);
+      const phasePenalty = Math.min(1, phaseResidualPx);
+      const separation =
+        Number.isFinite(secondBestMae) && secondBestMae > 0 ? Math.max(0, secondBestMae - bestMae) / secondBestMae : 1;
+      const confidence = roundSrMetric(Math.max(0, Math.min(1, 1 - residualPenalty - phasePenalty + separation * 0.1)));
+
+      return {
+        confidence,
+        lumaResidualMae: roundSrMetric(bestMae),
+        measuredShiftX: roundSrMetric(bestShiftX / outputScale),
+        measuredShiftY: roundSrMetric(bestShiftY / outputScale),
+        registrationResidualPx: roundSrMetric(phaseResidualPx),
+        shiftX: frame.shiftX,
+        shiftY: frame.shiftY,
+        sourceIndex: frame.sourceIndex,
+      };
+    })
+    .sort((left, right) => left.sourceIndex - right.sourceIndex);
+};
+
+const measureFramePhaseMae = (
+  frame: SuperResolutionRuntimeFrameV1,
+  outputPixels: Float32Array,
+  outputWidth: number,
+  outputScale: number,
+  shiftX: number,
+  shiftY: number,
+): number => {
+  let total = 0;
+  for (let y = 0; y < frame.height; y += 1) {
+    for (let x = 0; x < frame.width; x += 1) {
+      const sourceValue = frame.pixels[y * frame.width + x] ?? 0;
+      const outputValue = outputPixels[(y * outputScale + shiftY) * outputWidth + x * outputScale + shiftX] ?? 0;
+      total += Math.abs(sourceValue - outputValue);
+    }
+  }
+  return total / Math.max(1, frame.width * frame.height);
+};
+
+const validateMeasurementFrame = (
+  frame: SuperResolutionRuntimeFrameV1,
+  referenceFrame: SuperResolutionRuntimeFrameV1,
+): void => {
+  if (frame.width !== referenceFrame.width || frame.height !== referenceFrame.height) {
+    throw new Error('Super-resolution registration measurement requires matching frame dimensions.');
+  }
 };
 
 const stableSrRuntimeHash = (input: string): string => {

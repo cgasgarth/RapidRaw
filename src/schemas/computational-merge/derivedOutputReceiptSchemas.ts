@@ -50,6 +50,30 @@ export const derivedOutputProvenanceSidecarSchema = z
     settingsHash: z.string().trim().min(1),
     sidecarPath: z.string().trim().min(1),
     sourceState: z.array(derivedOutputProvenanceSourceSchema).min(1),
+    superResolution: z
+      .object({
+        registrationMetrics: z
+          .object({
+            algorithmId: z.literal('output_lattice_phase_residual_v1'),
+            averageConfidence: z.number().min(0).max(1),
+            averageResidualPx: z.number().min(0),
+            maxResidualPx: z.number().min(0),
+            measuredSubpixelFrameCount: z.number().int().nonnegative(),
+          })
+          .strict(),
+        supportMap: z
+          .object({
+            artifactId: z.string().trim().min(1),
+            coverageRatio: z.number().min(0).max(1),
+            effectiveScale: z.number().min(1).max(4),
+            requestedScale: z.number().min(1.1).max(4),
+            reviewStatus: z.enum(['apply_ready', 'blocked', 'review_required']),
+            weakSupportRatio: z.number().min(0).max(1),
+          })
+          .strict(),
+      })
+      .strict()
+      .optional(),
     warnings: z.array(z.string().trim().min(1)),
   })
   .strict()

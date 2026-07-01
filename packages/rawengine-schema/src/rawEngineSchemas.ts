@@ -4640,6 +4640,16 @@ export const superResolutionArtifactV1Schema = z
         falseDetailRisk: z.enum(['unknown', 'low', 'medium', 'high']),
         humanReviewStatus: superResolutionReviewStatusV1Schema,
         overlapCoverageRatio: z.number().min(0).max(1).optional(),
+        registrationMetrics: z
+          .object({
+            algorithmId: z.literal('output_lattice_phase_residual_v1'),
+            averageConfidence: z.number().min(0).max(1),
+            averageResidualPx: z.number().min(0),
+            maxResidualPx: z.number().min(0),
+            measuredSubpixelFrameCount: z.number().int().nonnegative(),
+          })
+          .strict()
+          .optional(),
         sourceCount: z.number().int().positive(),
       })
       .strict(),

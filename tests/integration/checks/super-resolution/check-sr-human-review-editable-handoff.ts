@@ -16,6 +16,7 @@ import {
   markSuperResolutionArtifactHumanReviewPassed,
   markSuperResolutionArtifactStaleState,
 } from '../../../../packages/rawengine-schema/src/super-resolution/superResolutionSidecarProvenance.ts';
+import { buildSuperResolutionDerivedOutputReceipt } from '../../../../src/utils/derivedOutputReceipt.ts';
 import { buildSuperResolutionOutputReviewFromArtifact } from '../../../../src/utils/superResolutionOutputReview.ts';
 
 const SCALE = 2;
@@ -142,6 +143,47 @@ if (reviewedOutputReview.warningCodes.includes('human_review_required')) {
 if (reviewedOutputReview.reviewArtifacts.length !== pendingReview.reviewArtifacts.length) {
   throw new Error('Passed human review must preserve SR review artifact metadata.');
 }
+if (reviewedOutputReview.registrationMetrics?.algorithmId !== 'output_lattice_phase_residual_v1') {
+  throw new Error('Passed human review must preserve measured SR registration metadata.');
+}
+if (reviewedOutputReview.registrationMetrics.maxResidualPx !== 0) {
+  throw new Error(
+    `Expected measured registration residual 0, got ${reviewedOutputReview.registrationMetrics.maxResidualPx}.`,
+  );
+}
+if (reviewedOutputReview.registrationMetrics.measuredSubpixelFrameCount !== 3) {
+  throw new Error(
+    `Expected three non-reference subpixel registrations, got ${reviewedOutputReview.registrationMetrics.measuredSubpixelFrameCount}.`,
+  );
+}
+
+const receipt = buildSuperResolutionDerivedOutputReceipt({
+  acceptedDryRunPlanHash: applied.provenance.acceptedDryRunPlanHash,
+  acceptedDryRunPlanId: applied.provenance.acceptedDryRunPlanId,
+  review: reviewedOutputReview,
+  settings: {
+    alignmentMode: 'translation',
+    detailPolicy: 'conservative',
+    maxPreviewDimensionPx: 1200,
+    outputScale: SCALE,
+    qualityPreference: 'best',
+    reconstructionMode: 'model_detail',
+    sourceMode: 'multi_image',
+  },
+});
+if (receipt.openInEditorAction.state !== 'available') {
+  throw new Error(`Reviewed SR receipt must be available for editor handoff, got ${receipt.openInEditorAction.state}.`);
+}
+const receiptSuperResolution = receipt.provenanceSidecar?.superResolution;
+if (receiptSuperResolution === undefined) {
+  throw new Error('SR derived output receipt sidecar must include measured super-resolution metadata.');
+}
+if (receiptSuperResolution.registrationMetrics.maxResidualPx !== 0) {
+  throw new Error('SR derived output receipt sidecar must preserve measured registration residual metadata.');
+}
+if (receiptSuperResolution.supportMap.effectiveScale !== SCALE) {
+  throw new Error('SR derived output receipt sidecar must preserve support-map effective scale.');
+}
 
 const staleArtifact = markSuperResolutionArtifactStaleState(
   reviewedArtifact,
@@ -165,6 +207,8 @@ const proof = {
   editableGateAfterReview: reviewedOutputReview.editableGate,
   outputHash: reviewedOutputReview.outputArtifactHash,
   outputPixelHash: `sha256:${createHash('sha256').update(new Uint8Array(applied.outputPixels.buffer)).digest('hex')}`,
+  receiptId: receipt.receiptId,
+  receiptRegistrationMetrics: receipt.provenanceSidecar?.superResolution?.registrationMetrics,
   staleGateAfterInvalidation: staleReview.editableGate,
 };
 
