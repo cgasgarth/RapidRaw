@@ -178,6 +178,27 @@ export function FocusStackModal({
   const editableHandoffStatusLabel = t(
     `modals.focusStack.review.editableHandoffStatus.${outputReview.editableHandoff.status}`,
   );
+  const applyReceiptStatusLabel = t(`modals.focusStack.review.applyReceiptStatus.${outputReview.applyReceipt.status}`);
+  const applyReceiptAlignmentStatusLabel = t(
+    `modals.focusStack.review.alignmentStatus.${outputReview.applyReceipt.alignment.status}`,
+  );
+  const applyReceiptPreviewDimensionsLabel =
+    outputReview.applyReceipt.outputPreviewDimensions === undefined
+      ? t('modals.focusStack.preflight.pending')
+      : t('modals.focusStack.review.previewDimensionsValue', {
+          height: outputReview.applyReceipt.outputPreviewDimensions.height,
+          width: outputReview.applyReceipt.outputPreviewDimensions.width,
+        });
+  const applyReceiptSharpnessSummaryLabel =
+    outputReview.applyReceipt.sharpnessQualitySummary === undefined
+      ? t('modals.focusStack.review.qualitySummaryUnavailable')
+      : t('modals.focusStack.review.qualitySummaryValue', {
+          low: Math.round((outputReview.applyReceipt.sharpnessQualitySummary.lowConfidenceCellRatio ?? 0) * 100),
+          quality: t(
+            `modals.focusStack.quality.${outputReview.applyReceipt.sharpnessQualitySummary.qualityPreference}`,
+          ),
+          sharpness: Math.round((outputReview.applyReceipt.sharpnessQualitySummary.sharpnessCoverageRatio ?? 0) * 100),
+        });
   const sourceContributionLabel = outputReview.reviewOverlay.sourceContributionSummary
     .map((source) =>
       t('modals.focusStack.review.sourceContributionValue', {
@@ -296,6 +317,10 @@ export function FocusStackModal({
         />
         <ComputationalSetupStatusLine label={t('modals.focusStack.workflowTitle')} value={stackReadinessLabel} />
         <ComputationalSetupStatusLine label={t('modals.focusStack.previewPlanStatus')} value={previewPlanStatusLabel} />
+        <ComputationalSetupStatusLine
+          label={t('modals.focusStack.review.applyReceipt')}
+          value={applyReceiptStatusLabel}
+        />
       </section>
 
       <section
@@ -379,7 +404,7 @@ export function FocusStackModal({
             },
             {
               label: t('modals.focusStack.previewPlanStatus'),
-              value: t('modals.focusStack.review.haloReviewStatus.apply_ready'),
+              value: applyReceiptStatusLabel,
             },
             {
               label: t('modals.focusStack.review.editableArtifact'),
@@ -695,7 +720,17 @@ export function FocusStackModal({
           {
             label: t('modals.focusStack.review.sharpnessMap'),
             status: 'ready',
-            value: t('modals.focusStack.review.runtimeBridge'),
+            value: applyReceiptSharpnessSummaryLabel,
+          },
+          {
+            label: t('modals.focusStack.review.applyReceipt'),
+            status: outputReview.applyReceipt.status === 'apply_ready' ? 'ready' : 'review',
+            value: `${applyReceiptStatusLabel} - ${outputReview.applyReceipt.receiptId}`,
+          },
+          {
+            label: t('modals.focusStack.review.previewDimensions'),
+            status: outputReview.applyReceipt.outputPreviewDimensions === undefined ? 'pending' : 'ready',
+            value: applyReceiptPreviewDimensionsLabel,
           },
           {
             label: t('modals.focusStack.review.editableArtifact'),
@@ -738,7 +773,7 @@ export function FocusStackModal({
               },
               {
                 label: t('modals.focusStack.preflight.alignment'),
-                value: t(`modals.focusStack.alignment.${settings.alignmentMode}`),
+                value: `${t(`modals.focusStack.alignment.${outputReview.applyReceipt.alignment.mode}`)} - ${applyReceiptAlignmentStatusLabel}`,
               },
               {
                 label: t('modals.focusStack.qualityLabel'),
@@ -774,6 +809,18 @@ export function FocusStackModal({
               {
                 label: t('modals.focusStack.review.editableArtifact'),
                 value: `${outputReviewDecisionLabel} - ${outputReview.editableHandoff.artifactId}`,
+              },
+              {
+                label: t('modals.focusStack.review.applyReceipt'),
+                value: `${applyReceiptStatusLabel} - ${outputReview.applyReceipt.receiptId}`,
+              },
+              {
+                label: t('modals.focusStack.review.previewDimensions'),
+                value: applyReceiptPreviewDimensionsLabel,
+              },
+              {
+                label: t('modals.focusStack.review.artifactHandle'),
+                value: outputReview.applyReceipt.artifactHandle.artifactId,
               },
               {
                 label: t('modals.focusStack.preflight.retouch'),
@@ -834,6 +881,13 @@ export function FocusStackModal({
         data-editable-artifact-hash={outputReview.editableHandoff.artifactHash}
         data-editable-artifact-id={outputReview.editableHandoff.artifactId}
         data-editable-handoff-status={outputReview.editableHandoff.status}
+        data-focus-apply-receipt-artifact-handle={outputReview.applyReceipt.artifactHandle.artifactId}
+        data-focus-apply-receipt-artifact-path={outputReview.applyReceipt.artifactPath}
+        data-focus-apply-receipt-id={outputReview.applyReceipt.receiptId}
+        data-focus-apply-receipt-status={outputReview.applyReceipt.status}
+        data-focus-apply-receipt-warning-count={outputReview.applyReceipt.warnings.length}
+        data-focus-output-preview-height={outputReview.applyReceipt.outputPreviewDimensions?.height ?? ''}
+        data-focus-output-preview-width={outputReview.applyReceipt.outputPreviewDimensions?.width ?? ''}
         data-export-review-artifact-id={outputReview.editableHandoff.exportReviewArtifactId}
         data-retouched-export-parity-export-receipt-hash={
           outputReview.editableHandoff.retouchedExportParity?.exportReceiptHash ?? ''

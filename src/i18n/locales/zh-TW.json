@@ -2388,6 +2388,8 @@
       "refreshPreviewPlan": "",
       "retouchLabel": "",
       "review": {
+        "applyReceipt": "",
+        "artifactHandle": "",
         "editableArtifact": "",
         "exportHandoff": "",
         "haloReviewStatus": {
@@ -2421,8 +2423,12 @@
         "overlayTitle": "",
         "overlayValue": "",
         "percentValue": "",
+        "previewDimensions": "",
+        "previewDimensionsValue": "",
         "proofStatus": "",
         "provenance": "",
+        "qualitySummaryUnavailable": "",
+        "qualitySummaryValue": "",
         "retouchedExportParity": "",
         "retouchedExportParityPending": "",
         "runtimeBridge": "",

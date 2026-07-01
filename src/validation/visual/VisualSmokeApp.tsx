@@ -5390,6 +5390,36 @@ function FocusPrivateRawModalReviewSmoke() {
   const outputReview: FocusStackOutputReviewWorkflow = {
     alignmentMode: settings.alignmentMode,
     artifactPath: proof.stackPath,
+    applyReceipt: {
+      alignment: {
+        mode: settings.alignmentMode,
+        status: settings.alignmentMode === 'none' ? 'not_requested' : 'planned',
+      },
+      artifactHandle: {
+        artifactId: proof.stackPath,
+        contentHash: proof.stackHash,
+        dimensions: {
+          height: settings.maxPreviewDimensionPx,
+          width: settings.maxPreviewDimensionPx,
+        },
+        kind: 'merge_output',
+        storage: 'sidecar_artifact',
+      },
+      artifactPath: proof.stackPath,
+      outputPreviewDimensions: {
+        height: settings.maxPreviewDimensionPx,
+        width: settings.maxPreviewDimensionPx,
+      },
+      receiptId: `focus_stack_apply_visual_${sourceCount}`,
+      sharpnessQualitySummary: {
+        lowConfidenceCellRatio: 0.12,
+        qualityPreference: settings.qualityPreference,
+        sharpnessCoverageRatio: 0.91,
+      },
+      sourceCount,
+      status: 'review_required',
+      warnings: ['human_review_required', 'synthetic_runtime_only', 'transition_halo_risk', 'retouch_layer_deferred'],
+    },
     blendMethod: settings.blendMethod,
     decision: 'editable_review_required',
     editableHandoff: {
