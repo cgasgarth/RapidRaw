@@ -40,6 +40,7 @@ export enum ExifOverlay {
 export enum Panel {
   Adjustments = 'adjustments',
   Ai = 'ai',
+  Color = 'color',
   Crop = 'crop',
   Export = 'export',
   Masks = 'masks',

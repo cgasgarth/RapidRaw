@@ -1469,6 +1469,7 @@
     "switcher": {
       "tooltips": {
         "adjust": "Adjust",
+        "color": "Color",
         "crop": "Crop",
         "export": "Export",
         "info": "Info",

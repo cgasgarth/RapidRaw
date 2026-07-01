@@ -1366,6 +1366,7 @@
     "switcher": {
       "tooltips": {
         "adjust": "補正",
+        "color": "カラー",
         "crop": "切り抜き",
         "export": "書き出し",
         "info": "情報",

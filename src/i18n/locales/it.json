@@ -1431,6 +1431,7 @@
     "switcher": {
       "tooltips": {
         "adjust": "Regola",
+        "color": "Colore",
         "crop": "Ritaglio",
         "export": "Esporta",
         "info": "Info",
