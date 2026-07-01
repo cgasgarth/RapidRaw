@@ -8,6 +8,7 @@ import {
   negativeLabAcquisitionWarningCodeSchema,
 } from './negativeLabFrameHealthSchemas';
 import { negativeLabFrameRgbBalanceOverridePayloadSchema } from './negativeLabFrameRgbBalanceOverrideSchemas';
+import { negativeLabPatchSamplerCorrectionPayloadSchema } from './negativeLabPatchSamplerCorrectionSchemas';
 import { negativeLabPresetParamsSchema } from './negativeLabPresetCatalogSchemas';
 import { negativeLabSelectedProfileSnapshotSchema } from './negativeLabProfileComparisonSchemas';
 
@@ -61,6 +62,10 @@ export const negativeLabConversionBundleSchema = z
           schemaVersion: 1,
         }),
         outputFormat: negativeLabOutputFormatIdSchema,
+        patchSamplerCorrections: negativeLabPatchSamplerCorrectionPayloadSchema.default({
+          corrections: [],
+          schemaVersion: 1,
+        }),
         params: negativeLabPresetParamsSchema,
         profileProvenanceHash: negativeLabProfileProvenanceHashSchema.nullable(),
         selectedProfile: negativeLabSelectedProfileSnapshotSchema.nullable(),
