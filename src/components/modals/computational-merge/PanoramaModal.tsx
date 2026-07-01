@@ -48,7 +48,7 @@ interface PanoramaModalProps {
   sourcePaths?: string[];
 }
 
-export default function PanoramaModal({
+export function PanoramaModal({
   error,
   finalImageBase64,
   imageCount,
@@ -1306,3 +1306,5 @@ export default function PanoramaModal({
     </div>
   );
 }
+
+export default PanoramaModal;

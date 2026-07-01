@@ -60,7 +60,7 @@ const reviewArtifactPath = '/tmp/rawengine-super-resolution-smoke.tif';
 const getArtifactFileName = (path: string): string => path.split('/').at(-1) ?? path;
 const getShortHash = (hash: string): string => `${hash.slice(0, 18)}...`;
 
-export default function SuperResolutionModal({
+export function SuperResolutionModal({
   isOpen,
   lastApplyCommand,
   lastDryRunCommand,
@@ -1092,3 +1092,5 @@ export default function SuperResolutionModal({
     </ComputationalSetupModalShell>
   );
 }
+
+export default SuperResolutionModal;

@@ -49,7 +49,7 @@ interface HdrModalProps {
   sourcePaths?: string[];
 }
 
-export default function HdrModal({
+export function HdrModal({
   error,
   finalImageBase64,
   imageCount,
@@ -1300,3 +1300,5 @@ export default function HdrModal({
     </div>
   );
 }
+
+export default HdrModal;
