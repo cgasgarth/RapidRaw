@@ -1392,7 +1392,11 @@
       "v2ShoulderStrength": "",
       "v2ToeStrength": "",
       "zoomInTooltip": "확대",
-      "zoomOutTooltip": "축소"
+      "zoomOutTooltip": "축소",
+      "stockProfileStatusHeuristic": "Heuristic",
+      "stockProfileStatusMeasured": "Measured",
+      "stockProfileStatusNeedsFixture": "Needs fixture",
+      "stockProfileStatusPlaceholder": "Placeholder"
     },
     "panorama": {
       "cancel": "취소",
