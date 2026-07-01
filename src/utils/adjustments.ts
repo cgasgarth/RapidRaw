@@ -508,10 +508,46 @@ export interface RetouchCandidateProvenance {
   statusAtAcceptance: 'acknowledged' | 'ignored' | 'pending';
 }
 
+export interface RetouchLayerRuntimeProvenance {
+  algorithmId: 'local_clone_v1' | 'local_heal_v1' | 'local_patch_fill_v1';
+  changedPixelCount: number;
+  editableLayer: true;
+  featherRadiusPx?: number | undefined;
+  maskAlphaHash: string;
+  mode: 'clone' | 'heal' | 'remove';
+  outputHash: string;
+  outputSampleHash?: string | undefined;
+  proofSource: 'mask_aware_retouch_runtime_fixture_v1';
+  provenanceVersion: 1;
+  radiusPx?: number | undefined;
+  resolvedSourcePoint?:
+    | {
+        pressure?: number | undefined;
+        x: number;
+        y: number;
+      }
+    | undefined;
+  sourcePoint?:
+    | {
+        pressure?: number | undefined;
+        x: number;
+        y: number;
+      }
+    | undefined;
+  sourceSampleHash?: string | undefined;
+  targetMaskId?: string | undefined;
+  targetPoint: {
+    pressure?: number | undefined;
+    x: number;
+    y: number;
+  };
+}
+
 export interface RetouchCloneSource {
   alignmentErrorPx?: number | undefined;
   candidateProvenance?: RetouchCandidateProvenance | undefined;
   featherRadiusPx?: number | undefined;
+  provenance?: RetouchLayerRuntimeProvenance | undefined;
   radiusPx?: number | undefined;
   retouchMode?: 'clone' | 'heal' | undefined;
   rotationDegrees: number;
@@ -530,6 +566,7 @@ export interface RetouchRemoveSource {
   featherRadiusPx?: number | undefined;
   generator: 'local_patch_fill_v1';
   generatorVersion: 1;
+  provenance?: RetouchLayerRuntimeProvenance | undefined;
   radiusPx?: number | undefined;
   resolvedSourcePoint?:
     | {

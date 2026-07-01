@@ -1712,6 +1712,33 @@ export const layerMaskRefinementParametersV1Schema = z
   })
   .strict();
 
+const retouchLayerRuntimeProvenanceV1Schema = z
+  .object({
+    algorithmId: z.enum(['local_clone_v1', 'local_heal_v1', 'local_patch_fill_v1']),
+    changedPixelCount: z.number().int().nonnegative(),
+    editableLayer: z.literal(true),
+    featherRadiusPx: z.number().min(0).max(4096).optional(),
+    maskAlphaHash: z.string().regex(/^fnv1a32:[0-9a-f]{8}$/u),
+    mode: z.enum(['clone', 'heal', 'remove']),
+    outputHash: z.string().regex(/^fnv1a32:[0-9a-f]{8}$/u),
+    outputSampleHash: z
+      .string()
+      .regex(/^fnv1a32:[0-9a-f]{8}$/u)
+      .optional(),
+    proofSource: z.literal('mask_aware_retouch_runtime_fixture_v1'),
+    provenanceVersion: z.literal(1),
+    radiusPx: z.number().positive().max(4096).optional(),
+    resolvedSourcePoint: layerMaskPointV1Schema.optional(),
+    sourcePoint: layerMaskPointV1Schema.optional(),
+    sourceSampleHash: z
+      .string()
+      .regex(/^fnv1a32:[0-9a-f]{8}$/u)
+      .optional(),
+    targetMaskId: z.string().trim().min(1).optional(),
+    targetPoint: layerMaskPointV1Schema,
+  })
+  .strict();
+
 export const layerMaskCloneSourceV1Schema = z
   .object({
     alignmentErrorPx: z.number().min(0).optional(),
@@ -1728,6 +1755,7 @@ export const layerMaskCloneSourceV1Schema = z
       .strict()
       .optional(),
     featherRadiusPx: z.number().min(0).max(4096).optional(),
+    provenance: retouchLayerRuntimeProvenanceV1Schema.optional(),
     radiusPx: z.number().positive().max(4096).optional(),
     retouchMode: z.enum(['clone', 'heal']).optional(),
     rotationDegrees: z.number().min(-180).max(180),
@@ -1742,6 +1770,7 @@ export const layerMaskRemoveSourceV1Schema = z
     featherRadiusPx: z.number().min(0).max(4096).optional(),
     generator: z.literal('local_patch_fill_v1'),
     generatorVersion: z.literal(1),
+    provenance: retouchLayerRuntimeProvenanceV1Schema.optional(),
     radiusPx: z.number().positive().max(4096).optional(),
     resolvedSourcePoint: layerMaskPointV1Schema.optional(),
     searchRadiusMultiplier: z.number().min(1).max(12),
