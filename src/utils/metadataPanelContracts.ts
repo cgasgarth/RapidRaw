@@ -8,6 +8,14 @@ import type {
 export type MetadataValue = string | number | null | undefined;
 export type MetadataExifData = Record<string, MetadataValue>;
 
+export type MetadataNumberParseStatus = 'invalid' | 'missing' | 'valid' | 'zero';
+
+export interface MetadataNumberParseResult {
+  source: MetadataValue;
+  status: MetadataNumberParseStatus;
+  value: number | null;
+}
+
 export const METADATA_CAMERA_GRID_KEYS = [
   'ExposureTime',
   'FNumber',
@@ -31,6 +39,68 @@ export interface MetadataReadinessSummary {
 
 export const hasMetadataValue = (value: MetadataValue) => value !== undefined && value !== null && value !== '';
 
+const formatFiniteMetadataNumber = (value: number, fractionDigits = 1): string => {
+  const rounded = Number(value.toFixed(fractionDigits));
+  return Number.isInteger(rounded) ? String(rounded) : String(rounded);
+};
+
+export const parseExifMetadataNumber = (value: MetadataValue): MetadataNumberParseResult => {
+  if (!hasMetadataValue(value)) return { source: value, status: 'missing', value: null };
+
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return { source: value, status: 'invalid', value: null };
+    return { source: value, status: value === 0 ? 'zero' : 'valid', value };
+  }
+
+  const raw = String(value).trim();
+  if (raw.length === 0) return { source: value, status: 'missing', value: null };
+
+  const normalized = raw
+    .replace(/^f\s*\/\s*/iu, '')
+    .replace(/\b(?:mm|millimeters?|seconds?|secs?|sec|s|ev)\b/giu, '')
+    .replace(/[",']/gu, '')
+    .trim();
+
+  const rationalMatch = /^([-+]?\d+(?:\.\d+)?)\s*\/\s*([-+]?\d+(?:\.\d+)?)/u.exec(normalized);
+  const parsed = rationalMatch
+    ? Number(rationalMatch[1]) / Number(rationalMatch[2])
+    : Number.parseFloat(normalized.replace(/,/gu, ''));
+
+  if (!Number.isFinite(parsed)) return { source: value, status: 'invalid', value: null };
+  return { source: value, status: parsed === 0 ? 'zero' : 'valid', value: parsed };
+};
+
+export const formatExifAperture = (value: MetadataValue): string | undefined => {
+  const parsed = parseExifMetadataNumber(value);
+  if (parsed.status === 'missing' || parsed.status === 'invalid') return undefined;
+  if (parsed.status === 'zero') return 'f/0 !';
+  return `f/${formatFiniteMetadataNumber(parsed.value ?? 0, 2)}`;
+};
+
+export const formatExifFocalLength = (value: MetadataValue): string | undefined => {
+  const parsed = parseExifMetadataNumber(value);
+  if (parsed.status === 'missing' || parsed.status === 'invalid') return undefined;
+  if (parsed.status === 'zero') return '0 mm !';
+  return `${formatFiniteMetadataNumber(parsed.value ?? 0)} mm`;
+};
+
+export const readExifMetadataValue = (
+  exif: MetadataExifData | null | undefined,
+  keys: readonly string[],
+): MetadataValue => {
+  for (const key of keys) {
+    const value = exif?.[key];
+    if (hasMetadataValue(value)) return value;
+  }
+  return undefined;
+};
+
+export const formatExifApertureFromMetadata = (exif: MetadataExifData | null | undefined): string | undefined =>
+  formatExifAperture(readExifMetadataValue(exif, ['FNumber', 'ApertureValue']));
+
+export const formatExifFocalLengthFromMetadata = (exif: MetadataExifData | null | undefined): string | undefined =>
+  formatExifFocalLength(readExifMetadataValue(exif, ['FocalLength', 'FocalLengthIn35mmFilm']));
+
 export const buildMetadataReadinessSummary = ({
   exif,
   gpsCoordinates,
@@ -40,7 +110,12 @@ export const buildMetadataReadinessSummary = ({
   gpsCoordinates: { lat: number; lon: number } | null;
   selectionCount: number;
 }): MetadataReadinessSummary => ({
-  cameraFieldCount: METADATA_CAMERA_GRID_KEYS.filter((key) => hasMetadataValue(exif[key])).length,
+  cameraFieldCount: [
+    hasMetadataValue(exif['ExposureTime']),
+    formatExifApertureFromMetadata(exif) !== undefined,
+    hasMetadataValue(exif['PhotographicSensitivity']),
+    formatExifFocalLengthFromMetadata(exif) !== undefined,
+  ].filter(Boolean).length,
   editableFieldCount: METADATA_EDITABLE_FIELDS.length,
   gpsReady: gpsCoordinates !== null,
   selectionCount,
