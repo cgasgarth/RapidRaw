@@ -259,14 +259,29 @@ const adjustmentsPanelRetuneRawImage: SelectedImage = {
   width: 6048,
 };
 
-function AdjustmentsPanelRetuneVisualSmoke() {
-  const { t } = useTranslation();
-
-  useEffect(() => {
-    const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
+function useAdjustmentPanelSmokeState() {
+  const [isReady] = useState(() => {
+    const adjustments: Adjustments = {
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      brightness: 0.42,
+      clarity: 18,
+      contrast: 12,
+      glowAmount: 16,
+      sectionVisibility: {
+        ...INITIAL_ADJUSTMENTS.sectionVisibility,
+        effects: false,
+      },
+    };
     useEditorStore.setState({
       adjustments,
-      copiedSectionAdjustments: null,
+      copiedSectionAdjustments: {
+        section: 'basic',
+        values: {
+          brightness: adjustments.brightness,
+          contrast: adjustments.contrast,
+          exposure: adjustments.exposure,
+        },
+      },
       histogram: null,
       history: [adjustments],
       historyIndex: 0,
@@ -276,17 +291,58 @@ function AdjustmentsPanelRetuneVisualSmoke() {
       waveform: null,
     });
     useUIStore.setState({
-      collapsibleSectionsState: { ...DEFAULT_COLLAPSIBLE_SECTIONS_STATE },
+      collapsibleSectionsState: {
+        ...DEFAULT_COLLAPSIBLE_SECTIONS_STATE,
+        basic: true,
+        curves: false,
+        details: true,
+        effects: false,
+      },
     });
-  }, []);
+    return true;
+  });
+
+  return isReady;
+}
+
+function AdjustmentsPanelRetuneVisualSmoke() {
+  const { t } = useTranslation();
+  const isReady = useAdjustmentPanelSmokeState();
 
   return (
     <main
       className="grid h-full min-h-screen place-items-center bg-[#111316] text-[#f3f4f1] font-sans"
       data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.AdjustmentsPanelRetune}
-      data-visual-smoke-ready="true"
+      data-visual-smoke-ready={String(isReady)}
     >
       <section className="h-[880px] w-[360px] overflow-hidden border border-white/10 bg-[#15181c]">
+        <div
+          className="border-b border-white/10 px-3 py-2 text-sm font-semibold"
+          data-testid="adjustments-panel-retune-heading"
+        >
+          {t('editor.adjustments.scopedSections.basic')}
+        </div>
+        <div className="h-[calc(100%-37px)]" data-visual-smoke-section="adjustments-panel-retune">
+          <ContextMenuProvider>
+            <ControlsPanel />
+          </ContextMenuProvider>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function ProfessionalAdjustmentsCompactVisualSmoke() {
+  const { t } = useTranslation();
+  const isReady = useAdjustmentPanelSmokeState();
+
+  return (
+    <main
+      className="grid min-h-screen place-items-center bg-[#111316] text-[#f3f4f1] font-sans"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.ProfessionalAdjustmentsCompact}
+      data-visual-smoke-ready={String(isReady)}
+    >
+      <section className="h-screen w-screen overflow-hidden bg-[#15181c]">
         <div
           className="border-b border-white/10 px-3 py-2 text-sm font-semibold"
           data-testid="adjustments-panel-retune-heading"
@@ -996,6 +1052,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.PanoramaProcessingCommand]: PanoramaProcessingCommandVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.PanoramaSavedReview]: PanoramaSavedReviewVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.PanoramaUi]: PanoramaVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalAdjustmentsCompact]: ProfessionalAdjustmentsCompactVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorCompactPortrait]: ProfessionalEditorCompactPortraitVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorShell]: ProfessionalEditorShellVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorToolbar]: ProfessionalEditorToolbarVisualSmoke,

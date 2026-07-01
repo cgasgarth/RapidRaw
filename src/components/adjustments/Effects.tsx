@@ -13,6 +13,8 @@ import {
 } from '../../utils/film-look/filmLookBrowser';
 import { buildFilmGrainPresetAdjustmentPatch, FILM_GRAIN_UI_PRESETS } from '../../utils/filmGrainControls';
 import type { AppSettings, Preset } from '../ui/AppProperties';
+import { editorChromeStatusChipClassName } from '../ui/editorChromeTokens';
+import { professionalInspectorDensityTokens } from '../ui/inspectorTokens';
 import UiText from '../ui/primitives/Text';
 import AdjustmentSlider from './AdjustmentSlider';
 import LUTControl from './LUTControl';
@@ -137,11 +139,12 @@ export default function EffectsPanel({
   };
 
   const adjustmentVisibility = appSettings?.adjustmentVisibility || {};
+  const density = professionalInspectorDensityTokens;
 
   return (
-    <div className="space-y-2">
-      <div className="rounded-md bg-bg-tertiary p-1.5">
-        <UiText variant={TextVariants.heading} className="mb-1">
+    <div className={density.gutter.section}>
+      <div className={density.card.nestedPanel}>
+        <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
           {t('adjustments.effects.creative')}
         </UiText>
 
@@ -188,8 +191,8 @@ export default function EffectsPanel({
       </div>
 
       {!isForMask && (
-        <div className="space-y-2">
-          <div className="rounded-md bg-bg-tertiary p-1.5">
+        <div className={density.gutter.section}>
+          <div className={density.card.nestedPanel}>
             <Suspense fallback={null}>
               <FilmLookBrowser
                 activeLookId={adjustments.filmLookId}
@@ -202,7 +205,7 @@ export default function EffectsPanel({
             {filmLookPresetStatus !== null && (
               <UiText
                 aria-live="polite"
-                className="mt-1.5 rounded-md border border-surface bg-bg-secondary px-2 py-1.5 text-text-secondary"
+                className="mt-1.5 rounded border border-editor-border bg-editor-panel px-2 py-1 text-[11px] leading-4 text-text-secondary"
                 data-testid="film-look-preset-status"
                 variant={TextVariants.small}
               >
@@ -211,8 +214,8 @@ export default function EffectsPanel({
             )}
           </div>
 
-          <div className="rounded-md bg-bg-tertiary p-1.5">
-            <UiText variant={TextVariants.heading} className="mb-1">
+          <div className={density.card.nestedPanel}>
+            <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
               {t('adjustments.effects.lut')}
             </UiText>
             <LUTControl
@@ -226,8 +229,8 @@ export default function EffectsPanel({
           </div>
 
           {adjustmentVisibility['vignette'] !== false && (
-            <div className="rounded-md bg-bg-tertiary p-1.5">
-              <UiText variant={TextVariants.heading} className="mb-1">
+            <div className={density.card.nestedPanel}>
+              <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
                 {t('adjustments.effects.vignette')}
               </UiText>
               <AdjustmentSlider
@@ -286,20 +289,19 @@ export default function EffectsPanel({
           )}
 
           {adjustmentVisibility['grain'] !== false && (
-            <div className="rounded-md bg-bg-tertiary p-1.5" data-testid="film-grain-ui-controls">
-              <div className="mb-1.5 flex items-center justify-between gap-2">
-                <UiText variant={TextVariants.heading}>{t('adjustments.effects.grain')}</UiText>
-                <span
-                  className="rounded border border-surface bg-bg-secondary px-1.5 py-0.5 text-[10px] leading-4 text-text-secondary"
-                  data-testid="film-grain-renderer-status"
-                >
+            <div className={density.card.nestedPanel} data-testid="film-grain-ui-controls">
+              <div className={density.sectionHeader.root}>
+                <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
+                  {t('adjustments.effects.grain')}
+                </UiText>
+                <span className={editorChromeStatusChipClassName('neutral')} data-testid="film-grain-renderer-status">
                   {t('adjustments.effects.grainRendererStatus')}
                 </span>
               </div>
-              <div className="mb-1.5 grid grid-cols-3 gap-1.5" data-testid="film-grain-preset-shortcuts">
+              <div className="mb-1 grid grid-cols-3 gap-1" data-testid="film-grain-preset-shortcuts">
                 {FILM_GRAIN_UI_PRESETS.map((preset) => (
                   <button
-                    className="rounded border border-surface bg-bg-secondary px-1.5 py-1 text-[11px] leading-4 text-text-primary transition-colors hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent"
+                    className="min-h-6 rounded border border-editor-border bg-editor-panel px-1.5 py-0.5 text-[11px] font-medium leading-4 text-text-primary transition-colors hover:border-editor-focus-ring hover:bg-editor-selected-quiet focus:outline-none focus:ring-2 focus:ring-editor-focus-ring"
                     data-testid={`film-grain-preset-${preset.id}`}
                     key={preset.id}
                     onClick={() => {
@@ -352,7 +354,7 @@ export default function EffectsPanel({
                 fillOrigin="min"
               />
               <div
-                className="mt-2 rounded border border-surface bg-bg-secondary px-2 py-1.5 text-xs text-text-secondary"
+                className="mt-1.5 rounded border border-editor-border bg-editor-panel px-2 py-1 text-[11px] leading-4 text-text-secondary"
                 data-testid="film-grain-chroma-planned"
               >
                 {t('adjustments.effects.grainChromaPlanned')}

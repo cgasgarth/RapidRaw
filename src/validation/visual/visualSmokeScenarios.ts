@@ -34,6 +34,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   PanoramaProcessingCommand: 'panorama-processing-command',
   PanoramaSavedReview: 'panorama-saved-review',
   PanoramaUi: 'panorama-ui',
+  ProfessionalAdjustmentsCompact: 'professional-adjustments-compact',
   ProfessionalEditorCompactPortrait: 'professional-editor-compact-portrait',
   ProfessionalEditorShell: 'professional-editor-shell',
   ProfessionalEditorToolbar: 'professional-editor-toolbar',
@@ -68,7 +69,14 @@ export const VISUAL_SMOKE_SCENARIOS = [
   {
     marker: 'Adjustments',
     mode: VISUAL_SMOKE_SCENARIO_IDS.AdjustmentsPanelRetune,
+    compactOutputFile: 'adjustments-panel-retune-compact.png',
     outputFile: 'adjustments-panel-retune.png',
+    sectionMinimum: 1,
+  },
+  {
+    marker: 'Adjustments',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.ProfessionalAdjustmentsCompact,
+    outputFile: 'professional-adjustments-compact.png',
     sectionMinimum: 1,
   },
   {

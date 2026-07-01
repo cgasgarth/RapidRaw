@@ -471,14 +471,22 @@ const Slider = ({
     <>
       <span
         aria-hidden={isLabelHovered && typeof label === 'string'}
-        className={cx(tokens.label, isLabelHovered && typeof label === 'string' ? 'opacity-0' : 'opacity-100')}
+        className={cx(
+          tokens.label,
+          disabled && 'text-text-tertiary',
+          isLabelHovered && typeof label === 'string' ? 'opacity-0' : 'opacity-100',
+        )}
       >
         {label}
       </span>
       {typeof label === 'string' && (
         <span
           aria-hidden={!isLabelHovered}
-          className={cx(tokens.resetLabel, isLabelHovered ? 'opacity-100' : 'opacity-0')}
+          className={cx(
+            tokens.resetLabel,
+            disabled && 'text-text-tertiary',
+            isLabelHovered ? 'opacity-100' : 'opacity-0',
+          )}
         >
           {t('ui.slider.reset')}
         </span>
@@ -529,7 +537,7 @@ const Slider = ({
       ) : (
         <button
           aria-label={typeof label === 'string' ? `${label} value` : undefined}
-          className={cx(tokens.valueButton, !disabled && 'cursor-text')}
+          className={cx(tokens.valueButton, disabled ? 'text-text-tertiary' : 'cursor-text')}
           data-testid={testId ? `${testId}-value` : undefined}
           disabled={disabled}
           onClick={handleValueClick}
@@ -546,9 +554,9 @@ const Slider = ({
 
   const trackControl = (
     <div className={tokens.trackWrap}>
-      <div className={cx(tokens.track, trackClassName || 'bg-editor-panel-raised')} />
+      <div className={cx(tokens.track, trackClassName || 'bg-editor-panel-raised', disabled && 'opacity-70')} />
       <div
-        className={tokens.fill}
+        className={cx(tokens.fill, disabled && 'opacity-40')}
         style={{
           left: formatPercent(Math.min(fillPercentage, originPercentage)),
           width: formatPercent(Math.abs(fillPercentage - originPercentage)),
@@ -584,7 +592,7 @@ const Slider = ({
 
   if (density === 'compact') {
     return (
-      <div className={tokens.root} data-testid={testId} ref={containerRef}>
+      <div className={cx(tokens.root, disabled && 'opacity-65')} data-testid={testId} ref={containerRef}>
         {labelControl}
         {trackControl}
         {valueControl}
@@ -593,7 +601,7 @@ const Slider = ({
   }
 
   return (
-    <div className={tokens.root} data-testid={testId} ref={containerRef}>
+    <div className={cx(tokens.root, disabled && 'opacity-65')} data-testid={testId} ref={containerRef}>
       <div className={inspectorSliderTokens.header}>
         {labelControl}
         {valueControl}

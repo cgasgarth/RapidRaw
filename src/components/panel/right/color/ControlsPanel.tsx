@@ -512,13 +512,13 @@ export default function Controls() {
 
           {isRawProcessingControlsOpen && (
             <div className={density.rawProcessing.body}>
-              <div className="flex items-start justify-between gap-2">
+              <div className="grid grid-cols-[minmax(0,1fr)_9rem] items-start gap-2 max-[380px]:grid-cols-1">
                 <UiText as="div" variant={TextVariants.small} className={density.rawProcessing.description}>
                   {t('editor.adjustments.rawProcessingModeOverride.description')}
                 </UiText>
                 <Dropdown
                   chrome="editor"
-                  className="w-36 shrink-0"
+                  className="w-full shrink-0"
                   onChange={(mode) => {
                     void handleRawProcessingModeOverrideChange(mode);
                   }}
@@ -564,7 +564,7 @@ export default function Controls() {
               </button>
               {rawReconstructionComparison !== null && (
                 <div
-                  className="space-y-2 rounded-md border border-editor-border bg-editor-panel-well p-2"
+                  className={density.rawProcessing.resultCard}
                   data-crop-size={rawReconstructionComparison.cropSize}
                   data-testid="raw-reconstruction-comparison-result"
                 >
@@ -581,7 +581,7 @@ export default function Controls() {
                   <div className="grid grid-cols-3 gap-1.5">
                     {rawReconstructionComparison.modes.map((mode) => (
                       <div
-                        className="min-w-0 space-y-1"
+                        className={density.rawProcessing.resultMetric}
                         data-crop-hash={mode.cropHash}
                         data-decode-ms={mode.decodeElapsedMs}
                         data-mode={mode.mode}
@@ -592,13 +592,21 @@ export default function Controls() {
                           alt={t('editor.adjustments.rawReconstructionComparison.cropAlt', {
                             mode: t(`settings.processing.rawModes.${mode.mode}.label`),
                           })}
-                          className="aspect-square w-full rounded border border-surface object-cover"
+                          className="aspect-square w-full rounded border border-editor-border object-cover"
                           src={mode.cropDataUrl}
                         />
-                        <UiText as="div" variant={TextVariants.small} className="truncate font-medium">
+                        <UiText
+                          as="div"
+                          variant={TextVariants.small}
+                          className="truncate text-[11px] font-medium leading-4"
+                        >
                           {t(`settings.processing.rawModes.${mode.mode}.label`)}
                         </UiText>
-                        <UiText as="div" variant={TextVariants.small} className="font-mono text-text-secondary">
+                        <UiText
+                          as="div"
+                          variant={TextVariants.small}
+                          className="font-mono text-[10px] leading-3 text-text-secondary"
+                        >
                           {t('editor.adjustments.rawReconstructionComparison.decodeMsLabel', {
                             ms: mode.decodeElapsedMs,
                           })}
@@ -606,7 +614,7 @@ export default function Controls() {
                         <UiText
                           as="div"
                           variant={TextVariants.small}
-                          className="truncate font-mono text-text-secondary"
+                          className="truncate font-mono text-[10px] leading-3 text-text-secondary"
                         >
                           {formatBytes(mode.estimatedMemoryBytes)}
                         </UiText>
@@ -625,7 +633,7 @@ export default function Controls() {
 
       <PanelScopesStrip testId="adjustments-panel-scopes-strip" />
 
-      <div className="grow overflow-y-auto px-3 py-2 flex flex-col gap-1.5">
+      <div className="grow overflow-y-auto px-2 py-1.5 flex flex-col gap-1">
         {ADJUSTMENT_SECTION_NAMES.map((sectionName) => {
           const title = getAdjustmentSectionLabel(t, sectionName);
           const sectionVisibility = adjustments.sectionVisibility;
