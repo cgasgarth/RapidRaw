@@ -67,7 +67,7 @@ const dryRunCommand = {
     seamExposureCompensationPercent: settings.seamExposureCompensationPercent,
     sources: sourceFrames.map((frame) => ({
       colorSpaceHint: 'camera_rgb',
-      exposureEv: 0,
+      exposureEv: frame.sourceIndex === 1 ? 0.35 : frame.sourceIndex === 2 ? -0.2 : 0,
       imageId: `img_panorama_4493_${frame.sourceIndex}`,
       imagePath: sourcePathForIndex(frame.sourceIndex),
       rawDefaultsApplied: true,
@@ -283,15 +283,23 @@ function buildReview(outputPath: string) {
     },
     exposureNormalizationSummary: {
       appliedGainCount: applied.apply.provenance.exposureNormalizationResult.appliedGainCount ?? 0,
+      appliedLuminanceGains: applied.apply.provenance.exposureNormalizationResult.appliedLuminanceGains ?? [],
+      compensationStrengthPercent: applied.apply.provenance.exposureNormalizationResult.compensationStrengthPercent,
+      medianLogLuminanceDeltaAfter:
+        applied.apply.provenance.exposureNormalizationResult.overlapMetrics?.medianLogLuminanceDeltaAfter,
+      medianLogLuminanceDeltaBefore:
+        applied.apply.provenance.exposureNormalizationResult.overlapMetrics?.medianLogLuminanceDeltaBefore,
       mode: applied.apply.provenance.exposureNormalizationResult.mode,
     },
     outputDimensions: outputArtifact().dimensions,
     outputPath,
     projection: settings.projection,
     seamReview: {
+      contributionMapArtifactId: applied.apply.provenance.seamReview.contributionMapArtifact.artifactId,
       policy: 'adaptive_dp_feather_v1' as const,
       reviewStatus: 'ready' as const,
       seamCount: applied.apply.provenance.seamReview.overlapEdgeCount,
+      seamMaskArtifactId: applied.apply.provenance.seamReview.seamMaskArtifact.artifactId,
       seams: applied.apply.provenance.alignment.graph.selectedEdges.map((edge) => ({
         confidence: 'high' as const,
         featherWidthPx: settings.overlapFeatherPx,

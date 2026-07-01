@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { EditCommandBus, type EditCommandBusContext, type EditCommandDispatchResult } from './editCommandBus.js';
+import { LinearGradientMaskCommandRuntime } from './linearGradientMaskCommandRuntime.js';
 import {
   ApprovalClass,
   aiEnhancementApplyResultV1Schema,
@@ -9,6 +10,8 @@ import {
   aiToolApplyResultV1Schema,
   aiToolCommandEnvelopeV1Schema,
   aiToolDryRunResultV1Schema,
+  type LayerMaskCommandEnvelopeV1,
+  layerMaskCommandEnvelopeV1Schema,
   type ProjectLibrarySnapshotV1,
   projectLibrarySnapshotV1Schema,
   type RawEngineToolRegistryV1,
@@ -308,6 +311,23 @@ export type RawEngineLocalAppServerAiEnhancementCommandV1 = z.infer<
   typeof rawEngineLocalAppServerAiEnhancementCommandV1Schema
 >;
 
+export const rawEngineLocalAppServerLayerMaskCommandV1Schema = layerMaskCommandEnvelopeV1Schema.superRefine(
+  (command, context) => {
+    if (
+      command.commandType !== 'layerMask.createGradientMask' ||
+      command.parameters.gradient.gradientKind !== 'linear'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Local app-server bridge currently supports linear gradient layer-mask commands only.',
+        path: ['commandType'],
+      });
+    }
+  },
+);
+
+export type RawEngineLocalAppServerLayerMaskCommandV1 = z.infer<typeof rawEngineLocalAppServerLayerMaskCommandV1Schema>;
+
 type BasicToneCommandV1 = Extract<ToneColorCommandEnvelopeV1, { commandType: 'toneColor.setBasicTone' }>;
 type BasicToneAdjustmentParameterKeyV1 = Exclude<
   keyof BasicToneCommandV1['parameters'],
@@ -359,6 +379,8 @@ const RAW_ENGINE_LOCAL_APP_SERVER_EXECUTABLE_TOOL_NAMES = new Set([
   'ai.enhancement.dry_run_command',
   'ai.mask.apply_subject',
   'ai.mask.dry_run_subject',
+  'layermask.apply_command',
+  'layermask.dry_run_command',
   'tonecolor.apply_command',
   'tonecolor.dry_run_command',
 ]);
@@ -1013,6 +1035,7 @@ export class RawEngineLocalAppServerBridge {
   readonly #auditEvents: Array<RawEngineLocalAppServerAuditEventV1> = [];
   readonly #availableAiProviderIds: ReadonlySet<string>;
   readonly #commandBus: EditCommandBus;
+  readonly #linearGradientMaskRuntime = new LinearGradientMaskCommandRuntime({ height: 512, width: 768 });
   readonly #projectLibrarySnapshot: ProjectLibrarySnapshotV1;
   readonly #toolRegistry: RawEngineToolRegistryV1;
 
@@ -1296,6 +1319,22 @@ export class RawEngineLocalAppServerBridge {
         return buildAiToolMutationResult(parsedCommand);
       },
       schema: rawEngineLocalAppServerAiToolCommandV1Schema,
+    });
+
+    this.#commandBus.register({
+      commandType: 'layerMask.createGradientMask',
+      execute: (command) => {
+        const parsedCommand = rawEngineLocalAppServerLayerMaskCommandV1Schema.parse(command);
+        if (
+          parsedCommand.commandType !== 'layerMask.createGradientMask' ||
+          parsedCommand.parameters.gradient.gradientKind !== 'linear'
+        ) {
+          throw new Error('Local app-server bridge expected a linear gradient layer-mask command.');
+        }
+
+        return this.#linearGradientMaskRuntime.dispatch(parsedCommand satisfies LayerMaskCommandEnvelopeV1);
+      },
+      schema: rawEngineLocalAppServerLayerMaskCommandV1Schema,
     });
 
     this.#commandBus.register({

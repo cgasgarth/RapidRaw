@@ -71,7 +71,7 @@ const dryRunCommand = {
     qualityPreference: 'balanced',
     sources: sourceFrames.map((frame) => ({
       colorSpaceHint: 'camera_rgb',
-      exposureEv: 0,
+      exposureEv: frame.sourceIndex === 1 ? 0.4 : frame.sourceIndex === 2 ? -0.25 : 0,
       imageId: `img_panorama_app_server_runtime_${frame.sourceIndex}`,
       imagePath: `/synthetic/panorama/app-server-runtime-${frame.sourceIndex}.dng`,
       rawDefaultsApplied: true,
@@ -247,6 +247,25 @@ if (applied.apply.sidecarArtifact.outputArtifacts[0]?.artifactId !== 'artifact_p
 if (applied.apply.sidecarArtifact.createdAt !== '2026-06-17T19:30:00.000Z') {
   throw new Error('Expected panorama app-server apply to preserve sidecar artifact timestamp.');
 }
+const exposureResult = applied.apply.provenance.exposureNormalizationResult;
+if (exposureResult.mode !== 'scalar_overlap_luminance_gain_v1' || (exposureResult.appliedGainCount ?? 0) < 1) {
+  throw new Error(`Expected panorama app-server apply to expose exposure gains: ${JSON.stringify(exposureResult)}.`);
+}
+if (
+  exposureResult.overlapMetrics?.medianLogLuminanceDeltaBefore === undefined ||
+  exposureResult.overlapMetrics.medianLogLuminanceDeltaAfter === undefined ||
+  exposureResult.overlapMetrics.medianLogLuminanceDeltaAfter >
+    exposureResult.overlapMetrics.medianLogLuminanceDeltaBefore
+) {
+  throw new Error(`Expected panorama app-server exposure compensation to improve overlap metrics.`);
+}
+for (const gain of exposureResult.appliedLuminanceGains ?? []) {
+  if (gain.gain < 0.5 || gain.gain > 2) {
+    throw new Error(`Expected panorama app-server exposure gain ${gain.gain} to stay inside [0.5, 2.0].`);
+  }
+}
+assertSidecarPreviewArtifact(applied, applied.apply.provenance.seamReview.contributionMapArtifact.artifactId);
+assertSidecarPreviewArtifact(applied, applied.apply.provenance.seamReview.seamMaskArtifact.artifactId);
 
 expectThrows('unaccepted panorama apply plan', () =>
   new PanoramaAppServerRuntimeToolBusV1(sampleComputationalMergeAppServerToolManifestV1).execute({
@@ -364,6 +383,16 @@ function assertPreviewArtifactHandle(toolResult, artifactId) {
   if (toolResult.kind !== 'dry_run') throw new Error('Expected dry-run artifact handle source.');
   if (!toolResult.dryRun.dryRunResult.previewArtifacts.some((artifact) => artifact.artifactId === artifactId)) {
     throw new Error(`Expected panorama dry-run preview artifacts to include ${artifactId}.`);
+  }
+}
+
+function assertSidecarPreviewArtifact(toolResult, artifactId) {
+  if (toolResult.kind !== 'apply') throw new Error('Expected apply artifact handle source.');
+  const artifact = toolResult.apply.sidecarArtifact.previewArtifacts.find(
+    (candidate) => candidate.artifactId === artifactId,
+  );
+  if (artifact === undefined || artifact.contentHash === undefined) {
+    throw new Error(`Expected panorama apply sidecar preview artifacts to include hashed ${artifactId}.`);
   }
 }
 

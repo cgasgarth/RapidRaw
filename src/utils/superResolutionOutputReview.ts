@@ -45,6 +45,7 @@ type SuperResolutionArtifactReviewInput = {
     falseDetailRisk?: SuperResolutionOutputReviewWorkflow['falseDetailRisk'];
     humanReviewStatus: SuperResolutionOutputReviewWorkflow['humanReviewStatus'];
     overlapCoverageRatio?: number;
+    registrationMetrics?: NonNullable<SuperResolutionOutputReviewWorkflow['registrationMetrics']>;
     sourceCount: number;
   };
   warningCodes: SuperResolutionOutputReviewWorkflow['warningCodes'];
@@ -131,6 +132,7 @@ export const buildSuperResolutionOutputReviewFromArtifact = (
     proofLevel: 'synthetic_runtime',
     qualityPreference: artifactValue.qualityPreference,
     reconstructionMode: artifactValue.reconstructionMode ?? 'model_detail',
+    registrationMetrics: artifactValue.validationSummary.registrationMetrics ?? null,
     reviewArtifacts: superResolutionSyntheticReviewArtifacts,
     reviewCropCount,
     reviewPacketPath,
@@ -205,6 +207,7 @@ export const buildSuperResolutionOutputReviewWorkflow = ({
     proofLevel: 'synthetic_runtime',
     qualityPreference: settings.qualityPreference,
     reconstructionMode: settings.reconstructionMode,
+    registrationMetrics: null,
     reviewArtifacts: superResolutionSyntheticReviewArtifacts,
     reviewCropCount,
     reviewPacketPath,

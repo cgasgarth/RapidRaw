@@ -1004,6 +1004,12 @@ const localBridgeToolMatchesCommand = ({
   if (runtimeToolName === 'tonecolor.apply_command') {
     return commandType?.startsWith('toneColor.') === true && dryRun === false;
   }
+  if (runtimeToolName === 'layermask.dry_run_command') {
+    return commandType?.startsWith('layerMask.') === true && dryRun === true;
+  }
+  if (runtimeToolName === 'layermask.apply_command') {
+    return commandType?.startsWith('layerMask.') === true && dryRun === false;
+  }
   if (runtimeToolName === 'ai.mask.dry_run_subject')
     return commandType === 'ai.mask.generateSubject' && dryRun === true;
   if (runtimeToolName === 'ai.mask.apply_subject') return commandType === 'ai.mask.applySubject' && dryRun === false;
@@ -1152,6 +1158,8 @@ const hasAgentSessionIntent = ({
 export const isApprovedAgentAppServerToolName = (runtimeToolName: string): boolean =>
   APPROVED_AGENT_APP_SERVER_TOOL_NAMES.has(runtimeToolName);
 
+const rawEngineAppServerLocalBridge = createRawEngineLocalAppServerBridge();
+
 const validateDraftSessionForDispatch = (request: RawEngineAppServerToolDispatchRequest): string | null => {
   const draftSession = request.draftSession;
   if (draftSession === undefined) return null;
@@ -1297,7 +1305,7 @@ export const buildRawEngineAppServerToolDispatchResponse = async (
     });
   }
 
-  const bridge = createRawEngineLocalAppServerBridge();
+  const bridge = rawEngineAppServerLocalBridge;
   const registryResult = await bridge.dispatch(buildRawEngineLocalAppServerToolRegistryQuery(request.requestId));
   const activeRegistry = registryResult.ok
     ? mergeRawEngineToolRegistries(
