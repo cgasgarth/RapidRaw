@@ -1291,7 +1291,7 @@ const dispatchAgentAppServerTool = async (
       result = applyAgentCurveLevels(agentCurveLevelsApplyRequestSchema.parse(request.arguments));
       break;
     case AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME:
-      result = applyAgentDetailEffects(agentDetailEffectsApplyRequestSchema.parse(request.arguments));
+      result = await applyAgentDetailEffects(agentDetailEffectsApplyRequestSchema.parse(request.arguments));
       break;
     case AGENT_EXPORT_PROOF_TOOL_NAME:
       result = buildAgentExportProof(agentExportProofRequestSchema.parse(request.arguments));
