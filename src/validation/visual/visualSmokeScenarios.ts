@@ -44,6 +44,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   ProfessionalEditorShell: 'professional-editor-shell',
   ProfessionalEditorToolbar: 'professional-editor-toolbar',
   ProfessionalEditorTokens: 'professional-editor-tokens',
+  ProfessionalAgentReview: 'professional-agent-review',
   SrPrivateRawModalReview: 'sr-private-raw-modal-review',
   SrPrivateRawUi: 'sr-private-raw-ui',
   SrUi: 'sr-ui',
@@ -120,6 +121,12 @@ export const VISUAL_SMOKE_SCENARIOS = [
     mode: VISUAL_SMOKE_SCENARIO_IDS.AgentSelectedImageLiveSession,
     outputFile: 'agent-selected-image-live-session.png',
     sectionMinimum: 1,
+  },
+  {
+    marker: 'Professional agent review',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.ProfessionalAgentReview,
+    outputFile: 'professional-agent-review.png',
+    sectionMinimum: 2,
   },
   {
     marker: 'Brush mask canvas UI',

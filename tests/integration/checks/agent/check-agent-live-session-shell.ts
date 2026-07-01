@@ -469,6 +469,31 @@ async function validateRenderedReviewStates(baseTranscript: AgentChatTranscript)
   });
   const review = await renderShell(reviewTranscript);
 
+  const proposalCard = getByTestId(review.container, 'agent-proposed-edit-card', 'proposed edit card did not render.');
+  assertData(proposalCard, 'agentProposalState', 'applied', 'approved handoff did not promote applied proposal state.');
+  assertData(
+    proposalCard,
+    'mediumPreviewLongEdge',
+    '1536',
+    'proposal card did not expose selected-image medium preview quality.',
+  );
+  const proposalActions = getByTestId(
+    review.container,
+    'agent-proposal-actions',
+    'proposal action row did not render above transcript.',
+  );
+  assertVisibleText(proposalActions, 'Preview', 'proposal preview action was not visible.');
+  assertVisibleText(proposalActions, 'Apply', 'proposal apply action was not visible.');
+  assertVisibleText(proposalActions, 'Reject', 'proposal reject action was not visible.');
+  assertVisibleText(proposalActions, 'Rollback', 'proposal rollback action was not visible.');
+  getByTestId(
+    review.container,
+    'agent-proposal-affected-controls',
+    'proposal affected controls summary did not render.',
+  );
+  getByTestId(review.container, 'agent-proposal-proof-artifacts', 'proposal proof artifact summary did not render.');
+  getByTestId(review.container, 'agent-proposal-audit-detail', 'proposal collapsed audit detail did not render.');
+
   const dryRunReview = getByTestId(review.container, 'agent-dry-run-review', 'dry-run review did not render.');
   assertData(dryRunReview, 'applyAvailability', 'runtime_apply_demo', 'dry-run apply availability was not rendered.');
   const disabledApply = getByTestId<HTMLButtonElement>(

@@ -178,6 +178,7 @@ const longEditProgressStageStyles = {
 } satisfies Record<AgentLongEditProgress['stages'][number]['state'], string>;
 
 type LocalReviewDecision = 'approved' | 'pending' | 'rejected';
+type AgentProposalReviewState = 'applied' | 'applying' | 'approval_required' | 'failed' | 'preview_ready' | 'rejected';
 type AgentSessionTurn = AgentMultiTurnAppServerSessionRequest['turns'][number];
 type AgentSessionAdjustmentPatch = NonNullable<AgentSessionTurn['adjustment']>;
 type AgentSelectedImageLoopStep = AgentCurrentImagePreviewLoopRequest['steps'][number];
@@ -577,6 +578,7 @@ function MessageBubble({ message }: { message: AgentChatMessage }) {
       className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}
       data-testid={`agent-chat-message-${message.id}`}
     >
+      {/* i18next-instrument-ignore */}
       <div
         className={`max-w-[88%] rounded-md border px-3 py-2 ${
           isUser ? 'border-primary/30 bg-primary/15' : 'border-white/10 bg-white/5'
@@ -2886,6 +2888,306 @@ function ArtifactReviewPanel({ review }: { review: AgentArtifactReview }) {
   );
 }
 
+function AgentProposedEditCard({
+  artifactReview,
+  auditTranscript,
+  dryRunReview,
+  reviewHandoff,
+  runtimeStatus,
+  selectedFrameScope,
+  selectedImagePreviewLoopReview,
+}: {
+  artifactReview: AgentArtifactReview | undefined;
+  auditTranscript: AgentAuditTranscript | undefined;
+  dryRunReview: AgentChatDryRunReview | undefined;
+  reviewHandoff: AgentReviewHandoff | undefined;
+  runtimeStatus: AgentChatTranscript['runtimeStatus'];
+  selectedFrameScope: AgentSelectedFrameScope | undefined;
+  selectedImagePreviewLoopReview: AgentSelectedImagePreviewLoopReview | undefined;
+}) {
+  const { t } = useTranslation();
+  const [proposalState, setProposalState] = useState<AgentProposalReviewState>(
+    reviewHandoff?.approvalState === 'approved' ? 'applied' : 'approval_required',
+  );
+  const [rollbackState, setRollbackState] = useState<'available' | 'restored'>('available');
+  const previewArtifact =
+    artifactReview?.previewArtifacts.find((artifact) => artifact.status === 'ready') ??
+    artifactReview?.previewArtifacts[0];
+  const beforeArtifact =
+    artifactReview?.previewArtifacts.find((artifact) => artifact.title.toLowerCase().includes('before')) ??
+    artifactReview?.previewArtifacts[1] ??
+    previewArtifact;
+  const afterArtifact =
+    artifactReview?.previewArtifacts.find(
+      (artifact) => artifact.title.toLowerCase().includes('after') || artifact.id === reviewHandoff?.afterArtifactId,
+    ) ??
+    artifactReview?.previewArtifacts[2] ??
+    previewArtifact;
+  const approvalAction = dryRunReview?.actions.find((action) => action.id === 'approve-dry-run');
+  const rejectAction = dryRunReview?.actions.find((action) => action.id === 'reject-plan');
+  const applyAction = dryRunReview?.actions.find((action) => action.id === 'apply-approved');
+  const canApprove = approvalAction?.state === 'available' && proposalState === 'approval_required';
+  const canReject = rejectAction?.state === 'available' && proposalState !== 'applied' && proposalState !== 'rejected';
+  const canApply =
+    applyAction?.state === 'available' &&
+    proposalState !== 'applied' &&
+    proposalState !== 'applying' &&
+    proposalState !== 'rejected';
+  const canRollback =
+    reviewHandoff?.rollback.status === 'available' && proposalState === 'applied' && rollbackState === 'available';
+  const proposalStatusLabel =
+    proposalState === 'applied'
+      ? t('editor.ai.agent.proposal.status.applied')
+      : proposalState === 'applying'
+        ? t('editor.ai.agent.proposal.status.applying')
+        : proposalState === 'failed'
+          ? t('editor.ai.agent.proposal.status.failed')
+          : proposalState === 'preview_ready'
+            ? t('editor.ai.agent.proposal.status.previewReady')
+            : proposalState === 'rejected'
+              ? t('editor.ai.agent.proposal.status.rejected')
+              : t('editor.ai.agent.proposal.status.approvalRequired');
+  const proposalStatusClassName =
+    proposalState === 'applied'
+      ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100'
+      : proposalState === 'failed' || proposalState === 'rejected'
+        ? 'border-red-500/30 bg-red-500/10 text-red-100'
+        : proposalState === 'applying'
+          ? 'border-sky-500/30 bg-sky-500/10 text-sky-100'
+          : 'border-amber-500/30 bg-amber-500/10 text-amber-100';
+  const mediumPreview = selectedImagePreviewLoopReview?.compareArtifacts.mediumPreview;
+  const auditCount =
+    (auditTranscript?.records.length ?? 0) +
+    (reviewHandoff?.auditTrail.length ?? 0) +
+    (artifactReview?.auditEntries.length ?? 0);
+
+  return (
+    <div
+      className="space-y-3 rounded-md border border-sky-500/25 bg-editor-panel-well p-3 shadow-lg"
+      data-agent-proposal-state={proposalState}
+      data-after-artifact-id={afterArtifact?.id ?? reviewHandoff?.afterArtifactId ?? ''}
+      data-audit-record-count={auditCount}
+      data-before-artifact-id={beforeArtifact?.id ?? reviewHandoff?.beforeArtifactId ?? ''}
+      data-medium-preview-long-edge={mediumPreview?.longEdgePx ?? ''}
+      data-testid="agent-proposed-edit-card"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-sm font-semibold text-text-primary">
+            <Eye size={16} />
+            <span>{reviewHandoff?.title ?? t('editor.ai.agent.proposal.title')}</span>
+          </div>
+          <p className="mt-1 text-[11px] leading-4 text-text-secondary">
+            {reviewHandoff?.commandSummary ??
+              selectedImagePreviewLoopReview?.title ??
+              t('editor.ai.agent.proposal.summary')}
+          </p>
+        </div>
+        <span className={`shrink-0 rounded border px-2 py-1 text-[11px] ${proposalStatusClassName}`}>
+          {proposalStatusLabel}
+        </span>
+      </div>
+
+      <div
+        className="grid gap-2 sm:grid-cols-2"
+        data-preview-artifact-id={previewArtifact?.id ?? ''}
+        data-testid="agent-proposal-medium-preview"
+      >
+        <div
+          className="min-h-28 overflow-hidden rounded-md border border-white/10 p-2"
+          style={{ background: 'linear-gradient(135deg, #1c2b32, #53605e 52%, #ba9863)' }}
+        >
+          <span className="rounded bg-black/45 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-text-primary">
+            {artifactReview?.beforeAfter.beforeLabel ??
+              reviewHandoff?.beforeLabel ??
+              t('editor.ai.agent.selectedImageLoop.before')}
+          </span>
+          <div className="mt-14 truncate font-mono text-[10px] text-text-primary">
+            {artifactReview?.beforeAfter.beforeRevision ??
+              reviewHandoff?.beforeArtifactId ??
+              beforeArtifact?.contentHash}
+          </div>
+        </div>
+        <div
+          className="min-h-28 overflow-hidden rounded-md border border-sky-500/30 p-2"
+          style={{
+            background: 'linear-gradient(135deg, #2c3f44, #777163 52%, #f0ca7b)',
+            boxShadow: 'inset 0 0 0 1px rgba(125,211,252,0.12)',
+          }}
+        >
+          <span className="rounded bg-black/45 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-text-primary">
+            {artifactReview?.beforeAfter.afterLabel ?? reviewHandoff?.afterLabel ?? t('editor.ai.agent.proposal.after')}
+          </span>
+          <div className="mt-14 truncate font-mono text-[10px] text-text-primary">
+            {artifactReview?.beforeAfter.afterRevision ?? reviewHandoff?.afterArtifactId ?? afterArtifact?.contentHash}
+          </div>
+        </div>
+      </div>
+
+      {mediumPreview ? (
+        <div
+          className="grid grid-cols-3 gap-2 rounded border border-white/10 bg-black/15 p-2 text-[11px]"
+          data-testid="agent-proposal-preview-quality"
+        >
+          <div>
+            <div className="text-[10px] uppercase text-text-secondary">
+              {t('editor.ai.agent.proposal.mediumPreview')}
+            </div>
+            <div className="mt-1 font-mono text-text-primary">{mediumPreview.longEdgePx}px</div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase text-text-secondary">{t('editor.ai.agent.proposal.quality')}</div>
+            <div className="mt-1 font-mono text-text-primary">{mediumPreview.quality}</div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase text-text-secondary">{t('editor.ai.agent.proposal.pixels')}</div>
+            <div className="mt-1 font-mono text-text-primary">{mediumPreview.maxPixelCount}</div>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="grid grid-cols-4 gap-2" data-testid="agent-proposal-actions">
+        <button
+          className="rounded-md border border-sky-500/30 bg-sky-500/10 px-2 py-2 text-left text-[11px] font-semibold text-sky-100 disabled:border-white/10 disabled:bg-white/5 disabled:text-text-secondary"
+          data-testid="agent-proposal-preview-action"
+          onClick={() => {
+            setProposalState('preview_ready');
+          }}
+          type="button"
+        >
+          {t('editor.ai.agent.proposal.previewAction')}
+        </button>
+        <button
+          className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-2 text-left text-[11px] font-semibold text-emerald-100 disabled:border-white/10 disabled:bg-white/5 disabled:text-text-secondary"
+          data-runtime-status={runtimeStatus}
+          data-testid="agent-proposal-apply-action"
+          disabled={!canApply}
+          onClick={() => {
+            setProposalState('applying');
+            window.setTimeout(() => {
+              setProposalState('applied');
+            }, 80);
+          }}
+          type="button"
+        >
+          {t('editor.ai.agent.proposal.applyAction')}
+        </button>
+        <button
+          className="rounded-md border border-red-500/30 bg-red-500/10 px-2 py-2 text-left text-[11px] font-semibold text-red-100 disabled:border-white/10 disabled:bg-white/5 disabled:text-text-secondary"
+          data-testid="agent-proposal-reject-action"
+          disabled={!canReject}
+          onClick={() => {
+            setProposalState('rejected');
+          }}
+          type="button"
+        >
+          {t('editor.ai.agent.proposal.rejectAction')}
+        </button>
+        <button
+          className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-2 text-left text-[11px] font-semibold text-amber-100 disabled:border-white/10 disabled:bg-white/5 disabled:text-text-secondary"
+          data-testid="agent-proposal-rollback-action"
+          disabled={!canRollback}
+          onClick={() => {
+            setRollbackState('restored');
+            setProposalState('preview_ready');
+          }}
+          type="button"
+        >
+          <RotateCcw size={13} />
+          {t('editor.ai.agent.proposal.rollbackAction')}
+        </button>
+      </div>
+
+      {canApprove ? (
+        <button
+          className="w-full rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-2 text-left text-[11px] font-semibold text-amber-100"
+          data-testid="agent-proposal-approve-action"
+          onClick={() => {
+            setProposalState('preview_ready');
+          }}
+          type="button"
+        >
+          {approvalAction?.label ?? t('editor.ai.agent.proposal.approveAction')}
+        </button>
+      ) : null}
+
+      {dryRunReview ? (
+        <div className="space-y-2" data-testid="agent-proposal-affected-controls">
+          <div className="text-[11px] font-semibold uppercase text-text-secondary">
+            {t('editor.ai.agent.proposal.affectedControls')}
+          </div>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {dryRunReview.affectedTargets.map((target) => (
+              <div className="rounded border border-white/10 bg-black/15 p-2 text-[11px]" key={target.id}>
+                <div className="text-[10px] uppercase text-text-secondary">{target.label}</div>
+                <div className="mt-1 truncate text-text-primary">{target.value}</div>
+              </div>
+            ))}
+          </div>
+          <div className="space-y-1">
+            {dryRunReview.parameterDiffs.map((diff) => (
+              <div
+                className="grid grid-cols-[1fr_auto_auto] gap-2 rounded border border-white/10 bg-black/15 px-2 py-1.5 text-[11px]"
+                key={diff.id}
+              >
+                <span className="truncate text-text-primary">{diff.label}</span>
+                <span className="font-mono text-text-secondary">{diff.before}</span>
+                <span className="font-mono text-sky-100">{diff.after}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="grid gap-2 text-[11px] sm:grid-cols-2" data-testid="agent-proposal-proof-artifacts">
+        {artifactReview?.previewArtifacts.slice(0, 4).map((artifact) => (
+          <div className="rounded border border-white/10 bg-black/15 p-2" key={artifact.id}>
+            <div className="flex items-center justify-between gap-2">
+              <span className="truncate font-semibold text-text-primary">{artifact.title}</span>
+              <span className={`rounded border px-1.5 py-0.5 ${artifactStatusStyles[artifact.status]}`}>
+                {artifact.status}
+              </span>
+            </div>
+            <div className="mt-1 truncate font-mono text-text-secondary">{artifact.contentHash}</div>
+          </div>
+        ))}
+        {reviewHandoff?.outputProof ? (
+          <a
+            className="rounded border border-teal-500/25 bg-teal-500/10 p-2 text-teal-100 hover:border-teal-300/70"
+            href={reviewHandoff.outputProof.href}
+          >
+            <span className="block font-semibold text-text-primary">{reviewHandoff.outputProof.label}</span>
+            <span className="mt-1 block truncate font-mono text-text-secondary">
+              {reviewHandoff.outputProof.contentHash}
+            </span>
+          </a>
+        ) : null}
+      </div>
+
+      {selectedFrameScope ? <SelectedFrameScopePanel scope={selectedFrameScope} /> : null}
+
+      {selectedImagePreviewLoopReview ? (
+        <SelectedImagePreviewLoopReviewPanel review={selectedImagePreviewLoopReview} />
+      ) : null}
+
+      <div
+        className="max-h-80 overflow-hidden rounded-md border border-white/10 bg-black/15 p-2"
+        data-testid="agent-proposal-audit-detail"
+      >
+        <div className="text-[11px] font-semibold text-text-primary">
+          {t('editor.ai.agent.proposal.collapsedAuditDetail', { count: auditCount })}
+        </div>
+        <div className="mt-2 space-y-2">
+          {dryRunReview ? <DryRunReviewPanel review={dryRunReview} runtimeStatus={runtimeStatus} /> : null}
+          {artifactReview ? <ArtifactReviewPanel review={artifactReview} /> : null}
+          {reviewHandoff ? <ReviewHandoffPanel handoff={reviewHandoff} /> : null}
+          {auditTranscript ? <AuditTranscriptViewer auditTranscript={auditTranscript} /> : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ReviewHandoffPanel({ handoff }: { handoff: AgentReviewHandoff }) {
   const [rollbackRestoreState, setRollbackRestoreState] = useState<'available' | 'restored'>('available');
   const rollbackCanRestore = handoff.rollback.status === 'available' && rollbackRestoreState === 'available';
@@ -3794,6 +4096,11 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
     (toolCall) => toolCall.toolName === 'rawengine.live_context' && toolCall.status === 'succeeded',
   );
   const hasLiveApplyProof = livePromptResult.status === 'applied';
+  const hasReviewProposal =
+    transcript.dryRunReview !== undefined ||
+    transcript.artifactReview !== undefined ||
+    transcript.reviewHandoff !== undefined ||
+    transcript.selectedImagePreviewLoopReview !== undefined;
   const liveApplyToolCall =
     hasLiveApplyProof && livePromptResult.appliedGraphRevision
       ? ({
@@ -3855,6 +4162,18 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
         <InitialPromptPreviewContextCard context={transcript.initialPromptPreviewContext} />
       ) : null}
 
+      {hasReviewProposal ? (
+        <AgentProposedEditCard
+          artifactReview={transcript.artifactReview}
+          auditTranscript={transcript.auditTranscript}
+          dryRunReview={transcript.dryRunReview}
+          reviewHandoff={transcript.reviewHandoff}
+          runtimeStatus={transcript.runtimeStatus}
+          selectedFrameScope={transcript.selectedFrameScope}
+          selectedImagePreviewLoopReview={transcript.selectedImagePreviewLoopReview}
+        />
+      ) : null}
+
       <div className="space-y-2" data-testid="agent-chat-messages">
         {liveSessionEvents.map((message) => (
           <MessageBubble key={message.id} message={message} />
@@ -3891,23 +4210,7 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
         ))}
       </div>
 
-      {transcript.selectedFrameScope ? <SelectedFrameScopePanel scope={transcript.selectedFrameScope} /> : null}
-
-      {transcript.selectedImagePreviewLoopReview ? (
-        <SelectedImagePreviewLoopReviewPanel review={transcript.selectedImagePreviewLoopReview} />
-      ) : null}
-
-      {transcript.artifactReview ? <ArtifactReviewPanel review={transcript.artifactReview} /> : null}
-
-      {transcript.reviewHandoff ? <ReviewHandoffPanel handoff={transcript.reviewHandoff} /> : null}
-
       {transcript.privateRawArtifacts ? <PrivateRawArtifactsPanel proof={transcript.privateRawArtifacts} /> : null}
-
-      {transcript.auditTranscript ? <AuditTranscriptViewer auditTranscript={transcript.auditTranscript} /> : null}
-
-      {transcript.dryRunReview ? (
-        <DryRunReviewPanel review={transcript.dryRunReview} runtimeStatus={transcript.runtimeStatus} />
-      ) : null}
     </section>
   );
 }
