@@ -4087,6 +4087,7 @@ mod tests {
             ref_h as usize,
             params.base_fog_sample,
         );
+        let base_fog_estimate = estimate_base_fog_from_image(&bounds_ref, params.base_fog_sample);
         let rendered = run_pipeline(&input, &params, Some(bounds));
         let input_rgb = input.to_rgb32f();
         let rendered_rgb = rendered.to_rgb32f();
@@ -4120,8 +4121,10 @@ mod tests {
         fs::write(&output_path, buf.into_inner()).expect("write private RAW positive JPEG");
 
         let save_options = NegativeConversionSaveOptions {
-            accepted_dry_run_plan_hash: Some("fnv1a32:3028e2e1".to_string()),
-            accepted_dry_run_plan_id: Some("negative_lab_private_raw_plan_3028e2e1".to_string()),
+            accepted_dry_run_plan_hash: Some("fnv1a32:4527e2e1".to_string()),
+            accepted_dry_run_plan_id: Some(
+                "negative_lab_private_raw_plan_4527_density_v1".to_string(),
+            ),
             output_format: NegativeConversionOutputFormat::JpegProof,
             write_conversion_bundle: true,
             acquisition_warning_codes: vec!["raw_source_not_verified_negative_scan".to_string()],
@@ -4222,11 +4225,72 @@ mod tests {
                 "source_is_actual_film_negative"
             ],
             "fixtureId": "validation.negative-lab-real-raw.alaska.v1",
-            "issue": 3028,
+            "issue": 4527,
+            "colorManagement": {
+                "acquisitionProfileId": "camera_raw_linear_v1",
+                "channelBasis": "linear_raw_rgb",
+                "decodePath": "load_base_image_from_bytes",
+                "outputIntent": "jpeg_proof_review",
+                "previewOutputTransfer": "gamma_2_2_display_proof"
+            },
+            "densityDomainInversion": {
+                "algorithm": "density_rgb_v1",
+                "baseSample": {
+                    "estimatedBaseDensity": base_fog_estimate.base_density,
+                    "estimatedBaseRgb": base_fog_estimate.base_rgb,
+                    "height": params.base_fog_sample.expect("sample").height,
+                    "source": "manual_real_raw_border_sample",
+                    "width": params.base_fog_sample.expect("sample").width,
+                    "x": params.base_fog_sample.expect("sample").x,
+                    "y": params.base_fog_sample.expect("sample").y
+                },
+                "densityAssumptions": {
+                    "baseFogStrength": params.base_fog_strength,
+                    "channelBounds": {
+                        "blue": {
+                            "max": bounds[2].max,
+                            "min": bounds[2].min
+                        },
+                        "green": {
+                            "max": bounds[1].max,
+                            "min": bounds[1].min
+                        },
+                        "red": {
+                            "max": bounds[0].max,
+                            "min": bounds[0].min
+                        }
+                    },
+                    "densityTransform": "-log10(clamp(linear_rgb, 1e-6, 1.0))",
+                    "epsilonPolicy": "clamp_linear_rgb_min_1e-6",
+                    "normalization": "subtract_sampled_base_density_then_divide_by_density_range",
+                    "printCurve": "sigmoid_density_curve_gamma_2_2_preview",
+                    "referenceDownscaleMaxEdge": 1080
+                },
+                "neutralBalance": {
+                    "blueWeight": params.blue_weight,
+                    "greenWeight": params.green_weight,
+                    "redWeight": params.red_weight
+                },
+                "positiveOutput": {
+                    "contentHash": sha256_negative_lab_file(&output_path).expect("hash private output"),
+                    "dimensions": {
+                        "height": rendered.height(),
+                        "width": rendered.width()
+                    },
+                    "format": "jpeg_proof",
+                    "path": "private-artifacts/validation/negative-lab-real-raw/alaska-negative-lab-v1-Positive.jpg"
+                }
+            },
             "localRawRuntime": {
                 "decodePath": "load_base_image_from_bytes",
                 "execution": "tauri_test_negative_lab_private_raw_export",
                 "outputFormat": "jpeg_proof",
+                "proofContext": {
+                    "acceptedDryRunPlanHash": save_options.accepted_dry_run_plan_hash,
+                    "acceptedDryRunPlanId": save_options.accepted_dry_run_plan_id,
+                    "conversionBundleWritten": bundle_path.exists(),
+                    "sidecarWritten": sidecar_path.exists()
+                },
                 "sourceHashUnchanged": source_hash_before == source_hash_after,
                 "sourceIsRaw": true
             },
