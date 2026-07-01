@@ -129,6 +129,19 @@ const cloneLayer = cloneState.adjustments.masks.find((mask) => mask.id === 'agen
 if (cloneLayer?.retouchCloneSource?.retouchMode !== 'clone') {
   throw new Error('agent.retouch.apply did not create a clone retouch layer.');
 }
+const cloneProvenance = cloneLayer.retouchCloneSource.provenance;
+if (
+  cloneProvenance?.editableLayer !== true ||
+  cloneProvenance.algorithmId !== 'local_clone_v1' ||
+  cloneProvenance.mode !== 'clone' ||
+  cloneProvenance.outputHash !== cloneResult.outputProof.applyHash ||
+  cloneProvenance.maskAlphaHash !== cloneResult.outputProof.maskAlphaHash ||
+  cloneProvenance.sourcePoint?.x !== 0.24 ||
+  cloneProvenance.targetPoint.x !== 0.54 ||
+  cloneProvenance.changedPixelCount !== cloneResult.outputProof.applyDelta.changedPixelCount
+) {
+  throw new Error('agent.retouch.apply did not persist editable clone layer provenance.');
+}
 if (cloneLayer.subMasks[0]?.type !== 'radial' || cloneLayer.subMasks[0].id !== cloneResult.overlayMaskId) {
   throw new Error('agent.retouch.apply did not create a target overlay mask.');
 }
@@ -184,9 +197,25 @@ const removeLayer = useEditorStore.getState().adjustments.masks.find((mask) => m
 if (
   removeLayer?.retouchRemoveSource?.generator !== 'local_patch_fill_v1' ||
   removeLayer.retouchRemoveSource.targetMaskId !== removeResult.overlayMaskId ||
-  removeLayer.retouchRemoveSource.seed !== 7
+  removeLayer.retouchRemoveSource.seed !== 7 ||
+  removeLayer.retouchRemoveSource.status !== 'ready' ||
+  removeLayer.retouchRemoveSource.resolvedSourcePoint === undefined
 ) {
   throw new Error('agent.retouch.apply did not create a bounded remove retouch layer.');
+}
+const removeProvenance = removeLayer.retouchRemoveSource.provenance;
+if (
+  removeProvenance?.editableLayer !== true ||
+  removeProvenance.algorithmId !== 'local_patch_fill_v1' ||
+  removeProvenance.mode !== 'remove' ||
+  removeProvenance.outputHash !== removeResult.outputProof.applyHash ||
+  removeProvenance.outputSampleHash !== removeResult.outputProof.resolvedRemoveSourceOutputSampleHash ||
+  removeProvenance.sourceSampleHash !== removeResult.outputProof.resolvedRemoveSourceSampleHash ||
+  removeProvenance.resolvedSourcePoint === undefined ||
+  removeProvenance.targetMaskId !== removeResult.overlayMaskId ||
+  removeProvenance.changedPixelCount !== removeResult.outputProof.applyDelta.changedPixelCount
+) {
+  throw new Error('agent.retouch.apply did not persist editable remove layer provenance.');
 }
 if (
   removeResult.overlayPreview.artifact.kind !== 'preview' ||

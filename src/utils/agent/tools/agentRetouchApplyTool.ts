@@ -14,6 +14,7 @@ import {
   INITIAL_MASK_ADJUSTMENTS,
   type MaskContainer,
   type RetouchCloneSource,
+  type RetouchLayerRuntimeProvenance,
   type RetouchRemoveSource,
 } from '../../adjustments';
 import { pushEditHistoryEntry } from '../../editHistory';
@@ -64,6 +65,15 @@ const agentRetouchOutputProofSchema = z
     previewDelta: layerBlendOutputDeltaSchema,
     previewHash: z.string().regex(/^fnv1a32:[0-9a-f]{8}$/u),
     proofSource: z.literal('mask_aware_retouch_runtime_fixture_v1'),
+    resolvedRemoveSourcePoint: normalizedPointSchema.optional(),
+    resolvedRemoveSourceOutputSampleHash: z
+      .string()
+      .regex(/^fnv1a32:[0-9a-f]{8}$/u)
+      .optional(),
+    resolvedRemoveSourceSampleHash: z
+      .string()
+      .regex(/^fnv1a32:[0-9a-f]{8}$/u)
+      .optional(),
     resolvedRemoveSourceStatus: z.enum(['fallback_unchanged', 'ready']).optional(),
   })
   .strict();
@@ -343,9 +353,7 @@ const buildRetouchOutputProof = (request: AgentRetouchApplyRequest, layer: MaskC
     throw new Error('Agent retouch apply preview/apply runtime output proof diverged.');
   }
 
-  const resolvedRemoveSourceStatus = applied.resolvedRemoveSources.find(
-    (source) => source.layerId === layer.id,
-  )?.status;
+  const resolvedRemoveSource = applied.resolvedRemoveSources.find((source) => source.layerId === layer.id);
   return agentRetouchOutputProofSchema.parse({
     applyDelta,
     applyHash,
@@ -355,8 +363,73 @@ const buildRetouchOutputProof = (request: AgentRetouchApplyRequest, layer: MaskC
     previewDelta,
     previewHash,
     proofSource: 'mask_aware_retouch_runtime_fixture_v1',
-    ...(resolvedRemoveSourceStatus === undefined ? {} : { resolvedRemoveSourceStatus }),
+    ...(resolvedRemoveSource?.resolvedSourcePoint === undefined
+      ? {}
+      : { resolvedRemoveSourcePoint: resolvedRemoveSource.resolvedSourcePoint }),
+    ...(resolvedRemoveSource?.outputSampleHash === undefined
+      ? {}
+      : { resolvedRemoveSourceOutputSampleHash: resolvedRemoveSource.outputSampleHash }),
+    ...(resolvedRemoveSource?.sourceSampleHash === undefined
+      ? {}
+      : { resolvedRemoveSourceSampleHash: resolvedRemoveSource.sourceSampleHash }),
+    ...(resolvedRemoveSource?.status === undefined ? {} : { resolvedRemoveSourceStatus: resolvedRemoveSource.status }),
   });
+};
+
+const buildRetouchLayerRuntimeProvenance = (
+  request: AgentRetouchApplyRequest,
+  layer: MaskContainer,
+  outputProof: AgentRetouchOutputProof,
+): RetouchLayerRuntimeProvenance => {
+  const overlayMaskId = layer.subMasks[0]?.id;
+  const mode = request.mode;
+  return {
+    algorithmId: mode === 'remove' ? 'local_patch_fill_v1' : mode === 'heal' ? 'local_heal_v1' : 'local_clone_v1',
+    changedPixelCount: outputProof.applyDelta.changedPixelCount,
+    editableLayer: true,
+    ...(request.featherRadiusPx === undefined ? {} : { featherRadiusPx: request.featherRadiusPx }),
+    maskAlphaHash: outputProof.maskAlphaHash,
+    mode,
+    outputHash: outputProof.applyHash,
+    ...(outputProof.resolvedRemoveSourceOutputSampleHash === undefined
+      ? {}
+      : { outputSampleHash: outputProof.resolvedRemoveSourceOutputSampleHash }),
+    proofSource: outputProof.proofSource,
+    provenanceVersion: 1,
+    radiusPx: request.radiusPx,
+    ...(outputProof.resolvedRemoveSourcePoint === undefined
+      ? {}
+      : { resolvedSourcePoint: outputProof.resolvedRemoveSourcePoint }),
+    ...(request.sourcePoint === undefined ? {} : { sourcePoint: request.sourcePoint }),
+    ...(outputProof.resolvedRemoveSourceSampleHash === undefined
+      ? {}
+      : { sourceSampleHash: outputProof.resolvedRemoveSourceSampleHash }),
+    ...(overlayMaskId === undefined ? {} : { targetMaskId: overlayMaskId }),
+    targetPoint: request.targetPoint,
+  };
+};
+
+const attachRuntimeProvenanceToRetouchLayer = (
+  layer: MaskContainer,
+  provenance: RetouchLayerRuntimeProvenance,
+): MaskContainer => {
+  if (layer.retouchCloneSource !== undefined) {
+    return { ...layer, retouchCloneSource: { ...layer.retouchCloneSource, provenance } };
+  }
+  if (layer.retouchRemoveSource !== undefined) {
+    return {
+      ...layer,
+      retouchRemoveSource: {
+        ...layer.retouchRemoveSource,
+        ...(provenance.resolvedSourcePoint === undefined
+          ? {}
+          : { resolvedSourcePoint: provenance.resolvedSourcePoint }),
+        provenance,
+        status: provenance.resolvedSourcePoint === undefined ? layer.retouchRemoveSource.status : 'ready',
+      },
+    };
+  }
+  return layer;
 };
 
 const pushMaskHistory = (masks: ReadonlyArray<MaskContainer>): void => {
@@ -443,11 +516,15 @@ export const applyAgentRetouch = (request: AgentRetouchApplyRequest): AgentRetou
   const selectedImage = state.selectedImage;
   if (selectedImage === null) throw new Error('Agent retouch apply requires a selected image.');
 
-  const layer = buildRetouchLayer(parsedRequest, selectedImage.width, selectedImage.height);
-  const outputProof = buildRetouchOutputProof(parsedRequest, layer);
+  const draftLayer = buildRetouchLayer(parsedRequest, selectedImage.width, selectedImage.height);
+  const outputProof = buildRetouchOutputProof(parsedRequest, draftLayer);
   if (!outputProof.changedOutput) {
     throw new Error('Agent retouch apply rejected no-op runtime output.');
   }
+  const layer = attachRuntimeProvenanceToRetouchLayer(
+    draftLayer,
+    buildRetouchLayerRuntimeProvenance(parsedRequest, draftLayer, outputProof),
+  );
   const result = applyLayerStackCommandBridgeOperation(
     state.adjustments.masks,
     { layer, type: 'create' },
