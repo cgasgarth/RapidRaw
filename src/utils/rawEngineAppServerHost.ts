@@ -1,7 +1,9 @@
 import {
   buildRawEngineLocalAppServerToolRegistryQuery,
   createRawEngineLocalAppServerBridge,
+  dispatchRawEngineLocalAppServerComputationalMergeDerivedSourceOpen,
   RawEngineLocalAppServerCommandType,
+  rawEngineLocalAppServerComputationalMergeDerivedSourceOpenRequestV1Schema,
 } from '../../packages/rawengine-schema/src/localAppServerBridge';
 import {
   type RawEngineToolRegistryV1,
@@ -885,7 +887,10 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
         inputSchemaNames: routes.map((route) => route.inputSchemaName),
         modes: routes.map((route) => route.executionMode),
         outputSchemaNames: routes.map((route) => route.outputSchemaName),
-        runtimeCheckScripts: routes.map((route) => route.runtimeCheckScript),
+        runtimeCheckScripts: [
+          ...routes.map((route) => route.runtimeCheckScript),
+          'check:computational-merge-route-e2e',
+        ],
         toolNames: routes.map((route) => route.toolName),
       }),
     );
@@ -986,10 +991,24 @@ export const buildRawEngineAppServerRouteCatalogResponse = ({
   });
 
 const getCommandType = (command: unknown): string | undefined => {
-  if (typeof command !== 'object' || command === null || !('commandType' in command)) return undefined;
-  const commandType = command.commandType;
+  if (typeof command !== 'object' || command === null) return undefined;
+  const record = command as Record<string, unknown>;
+  const nestedCommand = record['command'];
+  const commandType =
+    typeof record['commandType'] === 'string'
+      ? record['commandType']
+      : typeof nestedCommand === 'object' && nestedCommand !== null
+        ? (nestedCommand as Record<string, unknown>)['commandType']
+        : undefined;
   return typeof commandType === 'string' && commandType.trim().length > 0 ? commandType : undefined;
 };
+
+const COMPUTATIONAL_MERGE_COMMAND_TYPE_TO_FAMILY = new Map<string, string>([
+  ['computationalMerge.createFocusStack', 'focus_stack'],
+  ['computationalMerge.createHdr', 'hdr'],
+  ['computationalMerge.createPanorama', 'panorama'],
+  ['computationalMerge.createSuperResolution', 'super_resolution'],
+]);
 
 const localBridgeToolMatchesCommand = ({
   commandType,
@@ -1033,12 +1052,27 @@ const localBridgeToolMatchesCommand = ({
   if (runtimeToolName === 'ai.enhancement.apply_command') {
     return commandType === 'ai.enhancement.apply' && dryRun === false;
   }
+  if (runtimeToolName.startsWith('computationalmerge.')) {
+    const family = commandType === undefined ? undefined : COMPUTATIONAL_MERGE_COMMAND_TYPE_TO_FAMILY.get(commandType);
+    if (family === undefined || !runtimeToolName.startsWith(`computationalmerge.${family}.`)) return false;
+    if (runtimeToolName.endsWith('.dry_run_command')) return dryRun === true;
+    if (runtimeToolName.endsWith('.apply_command')) return dryRun === false;
+    if (runtimeToolName.endsWith('.open_derived_source')) return dryRun === false;
+  }
   return false;
 };
 
 const getDryRunFlag = (command: unknown): boolean | undefined => {
-  if (typeof command !== 'object' || command === null || !('dryRun' in command)) return undefined;
-  return typeof command.dryRun === 'boolean' ? command.dryRun : undefined;
+  if (typeof command !== 'object' || command === null) return undefined;
+  const record = command as Record<string, unknown>;
+  const nestedCommand = record['command'];
+  const dryRun =
+    typeof record['dryRun'] === 'boolean'
+      ? record['dryRun']
+      : typeof nestedCommand === 'object' && nestedCommand !== null
+        ? (nestedCommand as Record<string, unknown>)['dryRun']
+        : undefined;
+  return typeof dryRun === 'boolean' ? dryRun : undefined;
 };
 
 const getApprovalRequirement = (command: unknown): unknown => {
@@ -1397,6 +1431,35 @@ export const buildRawEngineAppServerToolDispatchResponse = async (
       status: RawEngineAppServerResponseStatus.Ok,
       transport: RAW_ENGINE_APP_SERVER_HOST_MANIFEST.transport,
     });
+  }
+
+  if (request.runtimeToolName.endsWith('.open_derived_source')) {
+    try {
+      const result = dispatchRawEngineLocalAppServerComputationalMergeDerivedSourceOpen(
+        rawEngineLocalAppServerComputationalMergeDerivedSourceOpenRequestV1Schema.parse(request.arguments),
+      );
+      return rawEngineAppServerToolDispatchResponseSchema.parse({
+        commandType,
+        dispatchStatus: 'completed',
+        requestId: request.requestId,
+        result,
+        runtime: AgentRuntimeId.AppServer,
+        runtimeToolName: request.runtimeToolName,
+        status: RawEngineAppServerResponseStatus.Ok,
+        transport: RAW_ENGINE_APP_SERVER_HOST_MANIFEST.transport,
+      });
+    } catch (error) {
+      return rawEngineAppServerToolDispatchResponseSchema.parse({
+        commandType,
+        dispatchStatus: 'rejected',
+        message: error instanceof Error ? error.message : 'Computational derived-source open failed.',
+        requestId: request.requestId,
+        runtime: AgentRuntimeId.AppServer,
+        runtimeToolName: request.runtimeToolName,
+        status: RawEngineAppServerResponseStatus.Ok,
+        transport: RAW_ENGINE_APP_SERVER_HOST_MANIFEST.transport,
+      });
+    }
   }
 
   const result = await bridge.dispatch(request.arguments, {

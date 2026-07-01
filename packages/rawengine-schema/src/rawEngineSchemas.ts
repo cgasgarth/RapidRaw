@@ -9327,6 +9327,7 @@ const rawEngineAppServerKnownInputSchemas = {
   AiToolCommandEnvelopeV1: aiToolCommandEnvelopeV1Schema,
   CommandEnvelopeV1: commandEnvelopeV1Schema,
   ComputationalMergeCommandEnvelopeV1: computationalMergeCommandEnvelopeV1Schema,
+  ComputationalMergeDerivedSourceOpenRequestV1: computationalMergeDerivedSourceOpenRequestV1Schema,
   DetailDeblurCommandEnvelopeV1: detailDeblurCommandEnvelopeV1Schema,
   DetailDenoiseCommandEnvelopeV1: detailDenoiseCommandEnvelopeV1Schema,
   EditGraphCommandEnvelopeV1: editGraphCommandEnvelopeV1Schema,

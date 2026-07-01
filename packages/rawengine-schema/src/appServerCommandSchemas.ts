@@ -5,6 +5,7 @@ const rawEngineAppServerInputSchemaNamesV1 = [
   'AiToolCommandEnvelopeV1',
   'CommandEnvelopeV1',
   'ComputationalMergeCommandEnvelopeV1',
+  'ComputationalMergeDerivedSourceOpenRequestV1',
   'DetailDeblurCommandEnvelopeV1',
   'DetailDenoiseCommandEnvelopeV1',
   'EditGraphCommandEnvelopeV1',
