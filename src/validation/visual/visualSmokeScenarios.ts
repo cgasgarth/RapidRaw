@@ -1,4 +1,5 @@
 export const VISUAL_SMOKE_SCENARIO_IDS = {
+  AdjustmentsPanelRetune: 'adjustments-panel-retune',
   AgentChatUi: 'agent-chat-ui',
   BrushMaskCanvasUi: 'brush-mask-canvas-ui',
   ColorWorkflow: 'color-workflow',
@@ -56,6 +57,12 @@ export const VISUAL_SMOKE_PROOF_TEST_IDS = {
 } as const;
 
 export const VISUAL_SMOKE_SCENARIOS = [
+  {
+    marker: 'Adjustments panel retune',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.AdjustmentsPanelRetune,
+    outputFile: 'adjustments-panel-retune.png',
+    sectionMinimum: 1,
+  },
   {
     marker: 'Editor Preview',
     mode: VISUAL_SMOKE_SCENARIO_IDS.EmptyLibrary,

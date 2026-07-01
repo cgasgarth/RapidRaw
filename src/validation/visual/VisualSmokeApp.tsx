@@ -1,5 +1,6 @@
 import { Camera, CircleGauge, FolderOpen, Layers3, SlidersHorizontal, Sparkles } from 'lucide-react';
-import { type ReactElement, useState } from 'react';
+import { type ReactElement, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import ColorPanel from '../../components/adjustments/Color';
 import DetailsPanel from '../../components/adjustments/Details';
 import EffectsPanel from '../../components/adjustments/Effects';
@@ -13,6 +14,7 @@ import { NegativeConversionModal } from '../../components/modals/negative-lab/Ne
 import ImageCanvas from '../../components/panel/editor/ImageCanvas';
 import AgentChatShell from '../../components/panel/right/ai/AgentChatShell';
 import { TetherPanel } from '../../components/panel/right/capture/TetherPanel';
+import ControlsPanel from '../../components/panel/right/color/ControlsPanel';
 import { EditorRightPanelHost } from '../../components/panel/right/EditorRightPanelHost';
 import { MaskOverlayReviewControls } from '../../components/panel/right/layers/MaskOverlayReviewControls';
 import { Mask, type SubMask, SubMaskMode, ToolType } from '../../components/panel/right/layers/Masks';
@@ -27,6 +29,7 @@ import {
   SortDirection,
 } from '../../components/ui/AppProperties';
 import { Status } from '../../components/ui/ExportImportProperties';
+import { ContextMenuProvider } from '../../context/ContextMenuContext';
 import {
   DEFAULT_HDR_MERGE_UI_SETTINGS,
   type HdrMergeUiSettings,
@@ -55,7 +58,7 @@ import type {
 } from '../../schemas/tetheringSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
-import { useUIStore } from '../../store/useUIStore';
+import { DEFAULT_COLLAPSIBLE_SECTIONS_STATE, useUIStore } from '../../store/useUIStore';
 import {
   type Adjustments,
   INITIAL_ADJUSTMENTS,
@@ -209,7 +212,85 @@ declare global {
   }
 }
 
+const adjustmentsPanelRetuneRawImage: SelectedImage = {
+  exif: null,
+  height: 4024,
+  isRaw: true,
+  isReady: true,
+  originalUrl: null,
+  path: '/visual-smoke/adjustments-panel-retune.ARW',
+  rawDevelopmentReport: {
+    cameraProfile: {
+      algorithmId: 'visual-smoke-camera-profile-v1',
+      candidateCount: 1,
+      colorCheckerGate: {
+        status: 'gated_pass',
+      },
+      illuminantEstimateConfidence: 'high',
+      illuminantEstimateMethod: 'as_shot_white_xy',
+      status: 'single_illuminant',
+      warningCodes: [],
+    },
+    demosaicAlgorithmId: 'visual-smoke-demosaic-v1',
+    demosaicPath: 'standard',
+    processingProfile: 'balanced',
+    runtime: {
+      cacheHit: true,
+      decodeElapsedMs: 12,
+      outputDimensions: [6048, 4024],
+      previewElapsedMs: 6,
+    },
+  },
+  thumbnailUrl: '',
+  width: 6048,
+};
+
+function AdjustmentsPanelRetuneVisualSmoke() {
+  const { t } = useTranslation();
+
+  useEffect(() => {
+    const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
+    useEditorStore.setState({
+      adjustments,
+      copiedSectionAdjustments: null,
+      histogram: null,
+      history: [adjustments],
+      historyIndex: 0,
+      isWaveformVisible: false,
+      previewScopeStatus: null,
+      selectedImage: adjustmentsPanelRetuneRawImage,
+      waveform: null,
+    });
+    useUIStore.setState({
+      collapsibleSectionsState: { ...DEFAULT_COLLAPSIBLE_SECTIONS_STATE },
+    });
+  }, []);
+
+  return (
+    <main
+      className="grid h-full min-h-screen place-items-center bg-[#111316] text-[#f3f4f1] font-sans"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.AdjustmentsPanelRetune}
+      data-visual-smoke-ready="true"
+    >
+      <section className="h-[880px] w-[360px] overflow-hidden border border-white/10 bg-[#15181c]">
+        <div
+          className="border-b border-white/10 px-3 py-2 text-sm font-semibold"
+          data-testid="adjustments-panel-retune-heading"
+        >
+          {t('editor.adjustments.scopedSections.basic')}
+        </div>
+        <div className="h-[calc(100%-37px)]" data-visual-smoke-section="adjustments-panel-retune">
+          <ContextMenuProvider>
+            <ControlsPanel />
+          </ContextMenuProvider>
+        </div>
+      </section>
+    </main>
+  );
+}
+
 const visualSmokeComponents = {
+  [VISUAL_SMOKE_SCENARIO_IDS.AdjustmentsPanelRetune]: AdjustmentsPanelRetuneVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.AgentChatUi]: AgentChatVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.BrushMaskCanvasUi]: BrushMaskCanvasVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ColorWorkflow]: ColorWorkflowVisualSmoke,

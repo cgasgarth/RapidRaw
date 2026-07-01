@@ -551,6 +551,12 @@
         "running": "Comparing crops...",
         "title": "100% RAW crop comparison"
       },
+      "scopedSections": {
+        "basic": "Basic Tone",
+        "curves": "Tone Curves",
+        "details": "Detail",
+        "effects": "Effects & Looks"
+      },
       "sections": {
         "basic": "Base",
         "color": "Colore",

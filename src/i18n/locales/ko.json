@@ -330,6 +330,12 @@
         "autoAdjust": "이미지 자동 조정",
         "resetAdjustments": "조정값 초기화",
         "toggleAnalytics": "분석 표시 전환"
+      },
+      "scopedSections": {
+        "basic": "Basic Tone",
+        "curves": "Tone Curves",
+        "details": "Detail",
+        "effects": "Effects & Looks"
       }
     },
     "ai": {
