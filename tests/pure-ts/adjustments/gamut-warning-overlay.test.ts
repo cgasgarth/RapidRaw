@@ -8,6 +8,8 @@ import {
 import { useEditorStore } from '../../../src/store/useEditorStore';
 import {
   formatGamutWarningCoverage,
+  getPreviewScopeFreshnessStatus,
+  getRenderedPreviewWarningStatus,
   isCurrentExportSoftProofGamutWarningOverlay,
   resolveGamutWarningProofDimensions,
 } from '../../../src/utils/color/runtime/gamutWarningDisplay.ts';
@@ -134,6 +136,77 @@ describe('gamut warning overlay defaults', () => {
       ),
     ).toBe(false);
     expect(formatGamutWarningCoverage(currentOverlay)).toBe('12.5%');
+  });
+
+  test('classifies rendered preview warning state and labels output profiles', () => {
+    expect(
+      getRenderedPreviewWarningStatus(currentOverlay, {
+        exportSoftProofRecipeId: recipeId,
+        exportSoftProofTransform: transform,
+        isExportSoftProofEnabled: true,
+        selectedImagePath: imagePath,
+      }),
+    ).toMatchObject({
+      coverageLabel: '12.5%',
+      displayProfileLabel: 'Display P3',
+      exportProfileLabel: 'Display P3',
+      renderTargetLabel: 'Export preview -> Display P3',
+      state: 'current',
+    });
+
+    expect(
+      getRenderedPreviewWarningStatus(
+        { ...currentOverlay, source_image_path: '/validation/stale.ARW' },
+        {
+          exportSoftProofRecipeId: recipeId,
+          exportSoftProofTransform: transform,
+          isExportSoftProofEnabled: true,
+          selectedImagePath: imagePath,
+        },
+      ).state,
+    ).toBe('stale');
+
+    expect(
+      getRenderedPreviewWarningStatus(null, {
+        exportSoftProofRecipeId: recipeId,
+        exportSoftProofTransform: null,
+        isExportSoftProofEnabled: true,
+        selectedImagePath: imagePath,
+      }).state,
+    ).toBe('unavailable');
+
+    expect(
+      getRenderedPreviewWarningStatus(currentOverlay, {
+        exportSoftProofRecipeId: recipeId,
+        exportSoftProofTransform: { ...transform, transformApplied: false },
+        isExportSoftProofEnabled: true,
+        selectedImagePath: imagePath,
+      }).state,
+    ).toBe('unsupported');
+  });
+
+  test('classifies histogram and scope freshness against the rendered preview path', () => {
+    const currentScope = {
+      histogramReady: true,
+      path: imagePath,
+      renderBasis: 'export_preview',
+      softProofTransformApplied: true,
+      waveformReady: true,
+    };
+
+    expect(getPreviewScopeFreshnessStatus(currentScope, imagePath)).toEqual({
+      state: 'current',
+      statusLabel: 'Scopes current',
+    });
+    expect(getPreviewScopeFreshnessStatus({ ...currentScope, path: '/validation/stale.ARW' }, imagePath).state).toBe(
+      'stale',
+    );
+    expect(getPreviewScopeFreshnessStatus({ ...currentScope, histogramReady: false }, imagePath).state).toBe(
+      'unavailable',
+    );
+    expect(getPreviewScopeFreshnessStatus({ ...currentScope, softProofTransformApplied: false }, imagePath).state).toBe(
+      'unsupported',
+    );
   });
 
   test('falls back to loaded RAW proof dimensions when the overlay is not ready yet', () => {

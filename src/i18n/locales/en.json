@@ -912,7 +912,7 @@
         "splitWipeLabel": "Before / After"
       },
       "cropPreviewAlt": "Crop preview",
-      "gamutWarningCoverage": "sRGB gamut · {{value}}",
+      "gamutWarningCoverage": "{{profile}} gamut · {{value}}",
       "gamutWarningOverlay": "sRGB gamut warning overlay",
       "maskOverlayAlt": "Mask Overlay",
       "originalAlt": "Original"
