@@ -424,42 +424,47 @@ const EditorToolbar = memo(
     const effectiveOsPlatform = osPlatform ?? osPlatformFromStore;
     const undoShortcutLabel = formatShortcutLabel(['ctrl', 'KeyZ'], effectiveOsPlatform);
     const redoShortcutLabel = formatShortcutLabel(['ctrl', 'KeyY'], effectiveOsPlatform);
+    const iconButtonClass =
+      'flex h-8 w-8 items-center justify-center rounded-md bg-surface text-text-primary transition-colors hover:bg-card-active disabled:cursor-not-allowed disabled:opacity-50';
+    const activeIconButtonClass =
+      'flex h-8 w-8 items-center justify-center rounded-md bg-accent text-button-text transition-colors hover:bg-accent/90 hover:text-button-text';
 
     return (
-      <div className="relative shrink-0 flex items-center justify-between px-4 h-14 gap-4 z-40">
-        <div className="flex items-center gap-2 shrink-0 z-40">
+      <div className="relative z-40 flex h-11 shrink-0 items-center justify-between gap-3 px-3">
+        <div className="z-40 flex shrink-0 items-center gap-1.5">
           <button
-            className="bg-surface text-text-primary p-2 rounded-full hover:bg-card-active transition-colors shrink-0"
+            aria-label={t('editor.toolbar.tooltips.backToLibrary')}
+            className={`${iconButtonClass} shrink-0`}
             onClick={onBackToLibrary}
             onKeyDown={handleButtonKeyDown}
             data-tooltip={t('editor.toolbar.tooltips.backToLibrary')}
           >
-            <ArrowLeft size={20} />
+            <ArrowLeft size={16} />
           </button>
 
-          <div className="hidden 2xl:flex items-center gap-2" aria-hidden="true">
-            <div className="p-2 invisible pointer-events-none">
-              <Undo size={20} />
+          <div className="hidden items-center gap-1.5 2xl:flex" aria-hidden="true">
+            <div className="invisible flex h-8 w-8 items-center justify-center pointer-events-none">
+              <Undo size={16} />
             </div>
-            <div className="p-2 invisible pointer-events-none">
-              <Undo size={20} />
+            <div className="invisible flex h-8 w-8 items-center justify-center pointer-events-none">
+              <Undo size={16} />
             </div>
-            <div className="p-2 invisible pointer-events-none">
-              <Undo size={20} />
+            <div className="invisible flex h-8 w-8 items-center justify-center pointer-events-none">
+              <Undo size={16} />
             </div>
-            <div className="p-2 invisible pointer-events-none">
-              <Undo size={20} />
+            <div className="invisible flex h-8 w-8 items-center justify-center pointer-events-none">
+              <Undo size={16} />
             </div>
           </div>
         </div>
 
-        <div className="flex-1 flex justify-center min-w-0 relative h-full">
+        <div className="relative flex h-full min-w-0 flex-1 justify-center">
           <div
             className={cx(
-              'bg-surface flex flex-col items-center overflow-hidden transition-all duration-200 ease-out pt-2',
+              'flex flex-col items-center overflow-hidden bg-surface pt-1.5 transition-all duration-200 ease-out',
               isExpanded
-                ? 'h-18 px-8 rounded-2xl absolute min-w-[340px] whitespace-nowrap shadow-2xl shadow-black/50'
-                : 'h-9 px-4 rounded-[18px] absolute min-w-0 w-auto max-w-full shadow-none',
+                ? 'absolute h-16 min-w-[320px] whitespace-nowrap rounded-lg px-6 shadow-2xl shadow-black/50'
+                : 'absolute h-8 min-w-0 w-auto max-w-full rounded-md px-3 shadow-none',
             )}
             onMouseEnter={() => {
               setIsInfoHovered(true);
@@ -468,7 +473,7 @@ const EditorToolbar = memo(
               setIsInfoHovered(false);
             }}
             style={{
-              top: '10px',
+              top: '6px',
               transform: 'translateX(-50%)',
               left: '50%',
               zIndex: isExpanded ? 50 : 0,
@@ -555,7 +560,7 @@ const EditorToolbar = memo(
             <button
               type="button"
               className={cx(
-                'relative mt-2 w-full grow justify-center border-t border-text-secondary/10 pt-2 transition-opacity duration-200 bg-transparent p-0 text-left',
+                'relative mt-1.5 w-full grow justify-center border-t border-text-secondary/10 bg-transparent p-0 pt-1.5 text-left transition-opacity duration-200',
                 isExpanded ? 'opacity-100 delay-75' : 'opacity-0 hidden',
                 hasExif && 'cursor-pointer',
               )}
@@ -568,7 +573,7 @@ const EditorToolbar = memo(
             >
               <div
                 className={cx(
-                  'absolute inset-0 flex items-center justify-center gap-6 transition-opacity duration-200',
+                  'absolute inset-0 flex items-center justify-center gap-5 transition-opacity duration-200',
                   showDateView ? 'opacity-0 pointer-events-none' : 'opacity-100',
                 )}
               >
@@ -636,7 +641,7 @@ const EditorToolbar = memo(
 
               <div
                 className={cx(
-                  'absolute inset-0 flex items-center justify-center gap-6 transition-opacity duration-200',
+                  'absolute inset-0 flex items-center justify-center gap-5 transition-opacity duration-200',
                   showDateView ? 'opacity-100' : 'opacity-0 pointer-events-none',
                 )}
               >
@@ -675,10 +680,10 @@ const EditorToolbar = memo(
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0 z-40">
-          <div className="relative flex items-center gap-2" ref={historyButtonRef}>
+        <div className="z-40 flex shrink-0 items-center gap-1.5">
+          <div className="relative flex items-center gap-1.5" ref={historyButtonRef}>
             <button
-              className="bg-surface text-text-primary p-2 rounded-full hover:bg-card-active transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className={iconButtonClass}
               disabled={!canUndo}
               onClick={onUndo}
               onKeyDown={handleButtonKeyDown}
@@ -689,10 +694,10 @@ const EditorToolbar = memo(
               aria-label={t('editor.toolbar.tooltips.undo')}
               data-tooltip={t('editor.toolbar.tooltips.undo', { shortcut: undoShortcutLabel })}
             >
-              <Undo size={20} />
+              <Undo size={16} />
             </button>
             <button
-              className="bg-surface text-text-primary p-2 rounded-full hover:bg-card-active transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className={iconButtonClass}
               disabled={!canRedo}
               onClick={onRedo}
               onKeyDown={handleButtonKeyDown}
@@ -703,10 +708,11 @@ const EditorToolbar = memo(
               aria-label={t('editor.toolbar.tooltips.redo')}
               data-tooltip={t('editor.toolbar.tooltips.redo', { shortcut: redoShortcutLabel })}
             >
-              <Redo size={20} />
+              <Redo size={16} />
             </button>
             <button
-              className="h-9 rounded-full bg-surface px-2.5 text-text-primary hover:bg-card-active transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label={historyDepthLabel}
+              className="h-8 rounded-md bg-surface px-2 text-text-primary transition-colors hover:bg-card-active disabled:cursor-not-allowed disabled:opacity-50"
               disabled={adjustmentsHistory.length <= 1}
               onClick={() => {
                 setIsHistoryVisible((prev) => !prev);
@@ -785,7 +791,7 @@ const EditorToolbar = memo(
               negativeLabDisabledReason ? `${negativeLabLabel}: ${negativeLabDisabledReason}` : negativeLabLabel
             }
             className={cx(
-              'bg-surface text-text-primary p-2 rounded-full transition-colors shrink-0',
+              'flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-surface text-text-primary transition-colors',
               negativeLabDisabledReason ? 'opacity-50 cursor-not-allowed' : 'hover:bg-card-active',
             )}
             data-testid="editor-toolbar-negative-lab"
@@ -795,11 +801,11 @@ const EditorToolbar = memo(
             onKeyDown={handleButtonKeyDown}
             type="button"
           >
-            <Film size={20} />
+            <Film size={16} />
           </button>
 
           <div
-            className="hidden xl:flex items-center gap-2"
+            className="hidden items-center gap-1.5 xl:flex"
             data-export-soft-proof-enabled={String(isExportSoftProofEnabled)}
             data-export-soft-proof-fingerprint={exportSoftProofTransform?.transformPolicyFingerprint ?? ''}
             data-export-soft-proof-recipe-id={selectedExportProofRecipeId ?? ''}
@@ -811,7 +817,7 @@ const EditorToolbar = memo(
           >
             <button
               className={cx(
-                'relative p-2 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
+                'relative flex h-8 w-8 items-center justify-center rounded-md transition-colors disabled:cursor-not-allowed disabled:opacity-50',
                 isExportSoftProofEnabled
                   ? 'bg-accent text-button-text hover:bg-accent/90 hover:text-button-text'
                   : 'bg-surface hover:bg-card-active text-text-primary',
@@ -829,7 +835,7 @@ const EditorToolbar = memo(
               data-tooltip={t('editor.toolbar.tooltips.exportSoftProof')}
               type="button"
             >
-              <Palette size={20} />
+              <Palette size={16} />
               {isExportSoftProofEnabled && (
                 <span
                   className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border border-bg-primary bg-warning"
@@ -838,7 +844,7 @@ const EditorToolbar = memo(
               )}
             </button>
             {isExportSoftProofEnabled && (
-              <div className="w-64" data-testid="export-soft-proof-recipe-details">
+              <div className="w-56" data-testid="export-soft-proof-recipe-details">
                 <Dropdown
                   className="w-full"
                   disabled={!canSoftProof}
@@ -847,11 +853,11 @@ const EditorToolbar = memo(
                   onChange={(value) => {
                     setEditor({ exportSoftProofRecipeId: value });
                   }}
-                  triggerClassName="h-9 rounded-full bg-surface px-3 text-xs"
+                  triggerClassName="h-8 rounded-md bg-surface px-2.5 text-xs"
                 />
                 {selectedExportProofRecipe && (
                   <div
-                    className="mt-1 flex items-center justify-center gap-1.5 rounded-full border border-warning/40 bg-warning/10 px-2 py-1"
+                    className="mt-1 flex items-center justify-center gap-1.5 rounded-md border border-warning/40 bg-warning/10 px-2 py-0.5"
                     data-export-soft-proof-color-profile={selectedExportProofProfile}
                     data-export-soft-proof-black-point-compensation={
                       exportSoftProofTransform?.blackPointCompensation ?? ''
@@ -884,22 +890,21 @@ const EditorToolbar = memo(
           </div>
 
           <button
-            className={cx(
-              'p-2 rounded-full transition-colors',
-              showOriginal
-                ? 'bg-accent text-button-text hover:bg-accent/90 hover:text-button-text'
-                : 'bg-surface hover:bg-card-active text-text-primary',
-            )}
+            aria-label={
+              showOriginal ? t('editor.toolbar.tooltips.showEdited') : t('editor.toolbar.tooltips.showOriginal')
+            }
+            aria-pressed={showOriginal}
+            className={cx(showOriginal ? activeIconButtonClass : iconButtonClass)}
             onClick={onToggleShowOriginal}
             onKeyDown={handleButtonKeyDown}
             data-tooltip={
               showOriginal ? t('editor.toolbar.tooltips.showEdited') : t('editor.toolbar.tooltips.showOriginal')
             }
           >
-            {showOriginal ? <EyeOff size={20} /> : <Eye size={20} />}
+            {showOriginal ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
           <button
-            className="bg-surface text-text-primary p-2 rounded-full hover:bg-card-active transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative"
+            className={`${iconButtonClass} relative`}
             onClick={onToggleFullScreen}
             onKeyDown={handleButtonKeyDown}
             aria-label={fullscreenTooltip}
@@ -907,8 +912,8 @@ const EditorToolbar = memo(
             data-testid="editor-fullscreen-toggle"
             data-tooltip={fullscreenTooltip}
           >
-            <div className="relative w-5 h-5 flex items-center justify-center">
-              {isFullScreen ? <Minimize2 size={20} /> : <Maximize size={20} />}
+            <div className="relative flex h-4 w-4 items-center justify-center">
+              {isFullScreen ? <Minimize2 size={16} /> : <Maximize size={16} />}
             </div>
           </button>
         </div>
