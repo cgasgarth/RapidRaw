@@ -201,6 +201,18 @@ import {
   agentRetouchApplyRequestSchema,
   applyAgentRetouch,
 } from './agent/tools/agentRetouchApplyTool';
+import {
+  AGENT_TONE_ADJUSTMENT_APPLY_INPUT_SCHEMA_NAME,
+  AGENT_TONE_ADJUSTMENT_APPLY_OUTPUT_SCHEMA_NAME,
+  AGENT_TONE_ADJUSTMENT_APPLY_TOOL_NAME,
+  AGENT_TONE_ADJUSTMENT_DRY_RUN_INPUT_SCHEMA_NAME,
+  AGENT_TONE_ADJUSTMENT_DRY_RUN_OUTPUT_SCHEMA_NAME,
+  AGENT_TONE_ADJUSTMENT_DRY_RUN_TOOL_NAME,
+  agentToneAdjustmentApplyRequestSchema,
+  agentToneAdjustmentDryRunRequestSchema,
+  applyAgentToneAdjustment,
+  dryRunAgentToneAdjustment,
+} from './agent/tools/agentToneAdjustmentTool';
 import { AI_APP_SERVER_TOOL_ROUTES } from './ai/aiAppServerToolRoutes';
 import { COMPUTATIONAL_MERGE_APP_SERVER_ROUTES } from './computational-merge/computationalMergeAppServerRoutes';
 import { DETAIL_APP_SERVER_ROUTES } from './detail/detailAppServerRoutes';
@@ -659,6 +671,24 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
       outputSchemaNames: [AGENT_ADJUSTMENTS_APPLY_OUTPUT_SCHEMA_NAME],
       runtimeCheckScripts: ['check:agent-adjustments-apply'],
       toolNames: [AGENT_ADJUSTMENTS_APPLY_TOOL_NAME],
+    }),
+    buildRouteCatalogEntry({
+      commandName: AGENT_TONE_ADJUSTMENT_DRY_RUN_TOOL_NAME,
+      family: 'agent',
+      inputSchemaNames: [AGENT_TONE_ADJUSTMENT_DRY_RUN_INPUT_SCHEMA_NAME],
+      modes: [RawEngineAppServerRouteMode.DryRunCommand],
+      outputSchemaNames: [AGENT_TONE_ADJUSTMENT_DRY_RUN_OUTPUT_SCHEMA_NAME],
+      runtimeCheckScripts: ['check:agent-tone-adjustment-tool'],
+      toolNames: [AGENT_TONE_ADJUSTMENT_DRY_RUN_TOOL_NAME],
+    }),
+    buildRouteCatalogEntry({
+      commandName: AGENT_TONE_ADJUSTMENT_APPLY_TOOL_NAME,
+      family: 'agent',
+      inputSchemaNames: [AGENT_TONE_ADJUSTMENT_APPLY_INPUT_SCHEMA_NAME],
+      modes: [RawEngineAppServerRouteMode.ApplyDryRunPlan],
+      outputSchemaNames: [AGENT_TONE_ADJUSTMENT_APPLY_OUTPUT_SCHEMA_NAME],
+      runtimeCheckScripts: ['check:agent-tone-adjustment-tool'],
+      toolNames: [AGENT_TONE_ADJUSTMENT_APPLY_TOOL_NAME],
     }),
     buildRouteCatalogEntry({
       commandName: AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME,
@@ -1188,6 +1218,8 @@ const rejectToolDispatch = ({
 const APPROVED_AGENT_APP_SERVER_TOOL_NAMES = new Set<string>([
   AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
   AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
+  AGENT_TONE_ADJUSTMENT_APPLY_TOOL_NAME,
+  AGENT_TONE_ADJUSTMENT_DRY_RUN_TOOL_NAME,
   AGENT_CURRENT_IMAGE_PREVIEW_LOOP_APPLY_REVIEW_TOOL_NAME,
   AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME,
   AGENT_COLOR_APPLY_TOOL_NAME,
@@ -1288,6 +1320,12 @@ const dispatchAgentAppServerTool = async (
       break;
     case AGENT_ADJUSTMENTS_APPLY_TOOL_NAME:
       result = await applyAgentGlobalAdjustments(agentAdjustmentsApplyRequestSchema.parse(request.arguments));
+      break;
+    case AGENT_TONE_ADJUSTMENT_DRY_RUN_TOOL_NAME:
+      result = await dryRunAgentToneAdjustment(agentToneAdjustmentDryRunRequestSchema.parse(request.arguments));
+      break;
+    case AGENT_TONE_ADJUSTMENT_APPLY_TOOL_NAME:
+      result = await applyAgentToneAdjustment(agentToneAdjustmentApplyRequestSchema.parse(request.arguments));
       break;
     case AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME:
       result = await runAgentCurrentImagePreviewLoop(
