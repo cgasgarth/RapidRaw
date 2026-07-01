@@ -248,6 +248,9 @@ async function runSelfTest(): Promise<void> {
     if (report?.acceptanceStatus !== 'runtime_apply_capable') {
       throw new Error('Expected self-test report to be upgraded to runtime_apply_capable.');
     }
+    if (typeof report.runId !== 'string' || report.runId.trim().length === 0) {
+      throw new Error('Expected self-test report to keep a non-empty runId.');
+    }
   } finally {
     await rm(rootPath, { force: true, recursive: true });
   }
@@ -312,6 +315,7 @@ function samplePrivateReportCollection(): ComputationalMergePrivateRunReportColl
           previewExportParity,
         ],
         reportId: 'computational-merge-run.hdr-bracket-alignment.v1',
+        runId: 'self-test-hdr-private-run-v1',
         runtimeResultIds: { apply: 'runtime_hdr_apply', dryRun: 'runtime_hdr_dry_run' },
         screenshotArtifacts: [
           { ...asset(`${ARTIFACT_ROOT}/hdr-bracket-modal-before.png`), label: 'modal_before_apply' },
