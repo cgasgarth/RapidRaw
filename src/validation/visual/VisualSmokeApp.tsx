@@ -97,6 +97,10 @@ import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/comp
 import { DETAIL_OUTPUT_COMPARISON_VISUAL_PROOF } from '../../utils/detail/detailOutputComparisonProof';
 import { buildFocusStackOutputReviewWorkflow } from '../../utils/focusStackOutputReview';
 import { buildHdrBracketPreflight, type HdrBracketPreflightSourceMetadata } from '../../utils/hdrBracketPreflight';
+import {
+  deriveLayerMaskExportParityReceiptState,
+  type LayerMaskExportParityReceipt,
+} from '../../utils/layers/layerMaskExportParityReceipt';
 import { applyLayerStackCommandBridgeOperation } from '../../utils/layers/layerStackCommandBridge';
 import { handleNegativeConversionEditorHandoff } from '../../utils/negative-lab/negativeLabEditorHandoff';
 import { applySkinToneUniformityToRgbPixel } from '../../utils/skinToneUniformity';
@@ -177,16 +181,24 @@ interface PanoramaPrivateRawVisualProof {
 
 interface LayerMaskPrivateRawVisualProof {
   brushCommandType?: string;
+  changedPixelRatio: string;
   exportArtifact: string;
+  exportParityReceipt: LayerMaskExportParityReceipt;
+  finalExportHash: string;
   fixtureId: string;
   metricCount: string;
   refineCommandType?: string;
+  refinedMaskContentHash: string;
   refinedPreviewArtifact: string;
   refinedPreviewDataUrl: string;
+  refinedPreviewHash: string;
+  sourceGraphRevision: string;
   unmaskedPreviewArtifact: string;
   unmaskedPreviewDataUrl: string;
+  unmaskedPreviewHash: string;
   unrefinedPreviewArtifact: string;
   unrefinedPreviewDataUrl: string;
+  unrefinedPreviewHash: string;
 }
 
 interface NegativeLabPublicExportVisualProof {
@@ -3191,7 +3203,9 @@ const copy = {
   layerMaskPrivateRawUnrefined: 'Unrefined mask preview',
   layerMaskPrivateRawRefined: 'Refined mask preview',
   layerMaskPrivateRawExport: 'TIFF export handoff',
+  layerMaskPrivateRawChangedPixels: 'Changed pixels',
   layerMaskPrivateRawMetricCount: (count: string) => `${count} metrics`,
+  layerMaskPrivateRawStaleInvalidation: 'Stale invalidation',
   objectPromptBoxReady: 'Box ready',
   objectPromptClear: 'Clear',
   objectPromptControlsTitle: 'Object prompt masks',
@@ -4839,6 +4853,17 @@ function FocusStackVisualSmoke() {
 
 function LayerMaskPrivateRawVisualSmoke() {
   const proof = window.__RAWENGINE_LAYER_MASK_PRIVATE_RAW_PROOF__;
+  const staleParityReceipt =
+    proof === undefined
+      ? null
+      : deriveLayerMaskExportParityReceiptState({
+          current: {
+            ...proof.exportParityReceipt,
+            refinedMaskContentHash: `${proof.exportParityReceipt.refinedMaskContentHash.slice(0, -1)}0`,
+            sourceGraphRevision: `${proof.exportParityReceipt.sourceGraphRevision}_stale`,
+          },
+          receipt: proof.exportParityReceipt,
+        });
 
   if (!proof) {
     return (
@@ -4905,16 +4930,27 @@ function LayerMaskPrivateRawVisualSmoke() {
           </div>
           <div
             className="sr-only"
+            data-changed-pixel-ratio={proof.changedPixelRatio}
             data-export-artifact={proof.exportArtifact}
+            data-final-export-hash={proof.finalExportHash}
             data-fixture-id={proof.fixtureId}
             data-brush-command-type={proof.brushCommandType ?? 'layerMask.createBrushMask'}
+            data-mask-content-hash={proof.refinedMaskContentHash}
             data-metric-count={proof.metricCount}
+            data-parity-receipt-id={proof.exportParityReceipt.receiptId}
+            data-parity-status={proof.exportParityReceipt.parityStatus}
             data-refine-command-type={proof.refineCommandType ?? 'layerMask.refineMask'}
             data-refined-preview-artifact={proof.refinedPreviewArtifact}
+            data-refined-preview-hash={proof.refinedPreviewHash}
             data-runtime-status="private_raw_tauri_runtime_proof"
+            data-source-graph-revision={proof.sourceGraphRevision}
+            data-stale-parity-status={staleParityReceipt?.parityStatus ?? ''}
+            data-stale-reasons={staleParityReceipt?.staleReasons.join(',') ?? ''}
             data-testid="layer-mask-private-raw-review-proof"
             data-unmasked-preview-artifact={proof.unmaskedPreviewArtifact}
+            data-unmasked-preview-hash={proof.unmaskedPreviewHash}
             data-unrefined-preview-artifact={proof.unrefinedPreviewArtifact}
+            data-unrefined-preview-hash={proof.unrefinedPreviewHash}
           />
           <div className="space-y-2">
             <div className="rounded border border-white/10 bg-white/5 p-2">
@@ -4922,8 +4958,16 @@ function LayerMaskPrivateRawVisualSmoke() {
               <p>{proof.fixtureId}</p>
             </div>
             <div className="rounded border border-white/10 bg-white/5 p-2">
+              <p className="text-xs text-[#aab2bd]">{copy.previewExportParity}</p>
+              <p>{proof.exportParityReceipt.parityStatus}</p>
+              <p className="break-all text-xs text-[#aab2bd]">{proof.exportParityReceipt.receiptId}</p>
+            </div>
+            <div className="rounded border border-white/10 bg-white/5 p-2">
               <p className="text-xs text-[#aab2bd]">{copy.layerRuntimeEvidence}</p>
               <p>{copy.layerMaskPrivateRawMetricCount(proof.metricCount)}</p>
+              <p className="text-xs text-[#aab2bd]">
+                {copy.layerMaskPrivateRawChangedPixels} {proof.changedPixelRatio}
+              </p>
             </div>
             <div
               className="rounded border border-white/10 bg-white/5 p-2"
@@ -4931,6 +4975,11 @@ function LayerMaskPrivateRawVisualSmoke() {
             >
               <p className="text-xs text-[#aab2bd]">{copy.layerMaskPrivateRawExport}</p>
               <p className="break-all">{proof.exportArtifact}</p>
+              <p className="break-all text-xs text-[#aab2bd]">{proof.finalExportHash}</p>
+            </div>
+            <div className="rounded border border-white/10 bg-white/5 p-2">
+              <p className="text-xs text-[#aab2bd]">{copy.layerMaskPrivateRawStaleInvalidation}</p>
+              <p>{staleParityReceipt?.parityStatus}</p>
             </div>
           </div>
         </aside>
