@@ -17,6 +17,7 @@ export const buildPanoramaSavedReviewSummary = ({
   sourcePaths: string[];
 }): PanoramaSavedReviewSummary =>
   panoramaSavedReviewSummarySchema.parse({
+    boundaryFillColor: renderedReview.boundary.fillColor,
     boundaryMode: settings.boundaryMode,
     capabilityLevel: 'runtime_apply_capable',
     crop: renderedReview.boundary.crop,
