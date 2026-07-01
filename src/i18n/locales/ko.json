@@ -18,6 +18,10 @@
       "whites": "화이트"
     },
     "color": {
+      "advanced": {
+        "summary": "Levels, primary calibration, and shadows tint.",
+        "title": "Advanced Color"
+      },
       "ariaSelectColor": "{{name}} 색상 선택",
       "calibration": {
         "colors": {
@@ -25,14 +29,15 @@
           "green": "초록",
           "red": "빨강"
         },
+        "disclosureSummary": "Primary calibration and shadows tint.",
         "hue": "색조",
         "primaries": "주요 색상",
         "saturation": "채도",
         "shadows": "섀도우",
         "tint": "틴트",
-        "title": "색상 보정",
-        "disclosureSummary": "Primary calibration and shadows tint."
+        "title": "색상 보정"
       },
+      "collapsed": "Collapsed",
       "colorGrading": "컬러 그레이딩",
       "colorMixer": "컬러 믹서",
       "grading": {
@@ -57,6 +62,10 @@
         "yellows": "옐로우"
       },
       "presence": "외관",
+      "proofingDiagnostics": {
+        "summary": "{{warningCount}} warning/status item(s) · {{coverage}} gamut coverage",
+        "title": "Proofing / Diagnostics"
+      },
       "saturation": "채도",
       "temperature": "색온도",
       "tint": "틴트",
@@ -64,16 +73,7 @@
       "vibrance": "생동감",
       "wbPickerTooltip": "화이트 밸런스 피커",
       "wbPickerWgpuDisabled": "WB 피커: 설정에서 WGPU를 비활성화하세요.",
-      "whiteBalance": "화이트 밸런스",
-      "collapsed": "Collapsed",
-      "proofingDiagnostics": {
-        "summary": "{{warningCount}} warning/status item(s) · {{coverage}} gamut coverage",
-        "title": "Proofing / Diagnostics"
-      },
-      "advanced": {
-        "title": "Advanced Color",
-        "summary": "Levels, primary calibration, and shadows tint."
-      }
+      "whiteBalance": "화이트 밸런스"
     },
     "curves": {
       "channelTitle": "{{channel}} 채널",
@@ -189,6 +189,8 @@
       "cullImage": "이미지 선별",
       "denoise": "이미지 노이즈 제거",
       "editImage": "이미지 편집",
+      "enterPreview": "Enter preview mode",
+      "exitPreview": "Exit preview mode",
       "exportImage": "이미지 내보내기",
       "frameImage": "이미지 프레임",
       "mergeHdr": "HDR로 병합",
@@ -203,9 +205,7 @@
       "resetAdjustments": "조정값 초기화",
       "stitchPanorama": "파노라마 스티칭",
       "tagging": "태그 지정",
-      "undo": "실행 취소",
-      "enterPreview": "Enter preview mode",
-      "exitPreview": "Exit preview mode"
+      "undo": "실행 취소"
     },
     "folders": {
       "changeIcon": "아이콘 변경",
@@ -291,6 +291,9 @@
     }
   },
   "editor": {
+    "accessibility": {
+      "previewOnlyRegion": "Preview-only editor workspace"
+    },
     "adjustments": {
       "actions": {
         "copySectionSettings": "{{section}} 설정 복사",
@@ -349,21 +352,21 @@
         "selectedImageLoop": {
           "audit": "Audit summary",
           "before": "Before",
-          "changedPixels": "Changed pixels",
           "changedPixelSummary": "{{percent}}% / {{sampled}}",
-          "current": "Current",
-          "graphRevision": "Graph revision",
-          "recipeHash": "Recipe hash",
-          "rollback": "Rollback receipt",
-          "run": "Selected-image loop",
-          "luminanceChannel": "Luminance / channel",
-          "deltaHelp": "mean delta / max delta",
-          "exportReceipt": "",
+          "changedPixels": "Changed pixels",
           "compareLineage": "Compare lineage",
           "compareRecipes": "Compare recipes",
+          "current": "Current",
+          "deltaHelp": "mean delta / max delta",
+          "exportReceipt": "",
+          "graphRevision": "Graph revision",
+          "luminanceChannel": "Luminance / channel",
+          "maxPixelCountValue": "{{pixelCount}} px max",
           "previewRender": "Preview render",
           "previewRenderValue": "{{longEdge}}px / {{quality}}",
-          "maxPixelCountValue": "{{pixelCount}} px max"
+          "recipeHash": "Recipe hash",
+          "rollback": "Rollback receipt",
+          "run": "Selected-image loop"
         }
       },
       "brush": {
@@ -725,6 +728,11 @@
         "tool": "도구"
       }
     },
+    "previewOnly": {
+      "enter": "Enter preview mode",
+      "exit": "Exit preview mode",
+      "label": "Preview only"
+    },
     "switcher": {
       "tooltips": {
         "adjust": "조정",
@@ -740,6 +748,7 @@
       "tooltips": {
         "aperture": "조리개",
         "backToLibrary": "라이브러리로 돌아가기",
+        "exitPreview": "Exit preview mode (F)",
         "focalLength": "초점 거리",
         "fullscreen": "전체 화면 전환 (F)",
         "iso": "ISO",
@@ -747,18 +756,9 @@
         "showEdited": "편집본 표시 (B)",
         "showOriginal": "원본 표시 (B)",
         "shutterSpeed": "셔터 속도",
-        "undo": "실행 취소 ({{shortcut}}) 또는 기록 (우클릭)",
-        "exitPreview": "Exit preview mode (F)"
+        "undo": "실행 취소 ({{shortcut}}) 또는 기록 (우클릭)"
       },
       "vc": "VC"
-    },
-    "accessibility": {
-      "previewOnlyRegion": "Preview-only editor workspace"
-    },
-    "previewOnly": {
-      "enter": "Enter preview mode",
-      "exit": "Exit preview mode",
-      "label": "Preview only"
     }
   },
   "export": {
@@ -817,10 +817,10 @@
     "status": {
       "cancelExport": "내보내기 취소",
       "cancelled": "내보내기가 취소되었습니다",
+      "estimatePending": "",
       "estimatedAverageSize": " ({{size}} 평균)",
       "estimatedSize": "예상 파일 크기: ~{{size}}",
       "estimatedTotalSize": "예상 총 크기: ~{{size}}",
-      "estimatePending": "",
       "estimatingSize": "크기 추정 중...",
       "exportMultiple": "{{label}} {{count}}개 내보내기",
       "exportMultiple_one": "{{label}} {{count}}개 내보내기",
@@ -1309,6 +1309,13 @@
       "zoomOutTooltip": "축소"
     },
     "negativeConversion": {
+      "baseSampleAccepted": "Base sample accepted",
+      "baseSampleRequired": "Base sample required",
+      "baseSamplingCtaAcceptHint": "Export is blocked until the measured base sample is accepted.",
+      "baseSamplingCtaEstimateHint": "Export is blocked because the negative base has not been sampled yet. Estimate the base from the active scan or sample a visible film border.",
+      "baseSamplingCtaReadyHint": "Base sampling is accepted and the positive preview can be saved when the remaining workflow gates are ready.",
+      "baseSamplingCtaReadyTitle": "Base sample ready",
+      "baseSamplingCtaTitle": "Sample the film base before saving",
       "blueWeight": "파랑 (노랑)",
       "cancel": "취소",
       "colorTiming": "컬러 타이밍",
@@ -1320,6 +1327,7 @@
       "convertAndSaveAll_other": "모두 변환 및 저장 ({{count}})",
       "converting": "변환 중",
       "convertingProgress": "변환 중 {{current}}/{{total}}",
+      "estimateBaseSample": "Estimate base sample",
       "exposure": "노출",
       "greenWeight": "초록 (마젠타)",
       "noticeText": "반전 로직은 marcinz606이 제작한 <0>NegPy</0>(<1>GPL-3.0</1>)에서 영감을 받았습니다.",
@@ -1330,6 +1338,7 @@
       "resetViewTooltip": "보기 초기화",
       "restoreRollNormalizationPlan": "Restore roll normalization",
       "rollNormalizationRestoreReceipt": "Restored {{frameCount}} frames from {{planId}} · revision {{revision}}",
+      "saveBlockedByReason": "Save blocked: {{reason}}",
       "title": "네거티브 변환",
       "v2AlgorithmDisabled": "",
       "v2AlgorithmEnabled": "",
@@ -1344,16 +1353,7 @@
       "v2ShoulderStrength": "",
       "v2ToeStrength": "",
       "zoomInTooltip": "확대",
-      "zoomOutTooltip": "축소",
-      "baseSampleAccepted": "Base sample accepted",
-      "baseSampleRequired": "Base sample required",
-      "baseSamplingCtaAcceptHint": "Export is blocked until the measured base sample is accepted.",
-      "baseSamplingCtaEstimateHint": "Export is blocked because the negative base has not been sampled yet. Estimate the base from the active scan or sample a visible film border.",
-      "baseSamplingCtaReadyHint": "Base sampling is accepted and the positive preview can be saved when the remaining workflow gates are ready.",
-      "baseSamplingCtaReadyTitle": "Base sample ready",
-      "baseSamplingCtaTitle": "Sample the film base before saving",
-      "estimateBaseSample": "Estimate base sample",
-      "saveBlockedByReason": "Save blocked: {{reason}}"
+      "zoomOutTooltip": "축소"
     },
     "panorama": {
       "cancel": "취소",
@@ -1809,8 +1809,8 @@
     },
     "collapsibleSection": {
       "dirtyBadge": "편집됨",
-      "disabledBadge": "꺼짐",
       "disableSection": "섹션 비활성화",
+      "disabledBadge": "꺼짐",
       "enableSection": "섹션 활성화"
     },
     "colorWheel": {
