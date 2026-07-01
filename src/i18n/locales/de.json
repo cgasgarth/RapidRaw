@@ -1033,10 +1033,12 @@
       "blend": "Blend",
       "blendModes": {
         "color": "Color",
+        "hue": "Hue",
         "luminosity": "Luminosity",
         "multiply": "Multiply",
         "normal": "Normal",
         "overlay": "Overlay",
+        "saturation": "Saturation",
         "screen": "Screen",
         "softLight": "Soft Light"
       },

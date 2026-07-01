@@ -107,7 +107,17 @@ export const maskRenderOperationSchema = z
 
 export const maskRenderLayerSchema = z
   .object({
-    blendMode: z.enum(['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'luminosity', 'color']),
+    blendMode: z.enum([
+      'normal',
+      'multiply',
+      'screen',
+      'overlay',
+      'soft_light',
+      'hue',
+      'saturation',
+      'luminosity',
+      'color',
+    ]),
     id: maskIdSchema,
     maskOperationIds: z.array(maskIdSchema).min(1),
     name: z.string().trim().min(1),

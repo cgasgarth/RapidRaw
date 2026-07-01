@@ -4,6 +4,15 @@ import {
   renderLayerExportStack,
   renderLayerPreviewStack,
 } from '../../../../packages/rawengine-schema/src/layerBlendRuntime.ts';
+import {
+  INITIAL_MASK_ADJUSTMENTS,
+  type MaskContainer,
+  type RetouchRemoveSource,
+} from '../../../../src/utils/adjustments.ts';
+import {
+  applyLayerStackCommandBridgeOperation,
+  applyResolvedRemoveSourcesToLayerStack,
+} from '../../../../src/utils/layers/layerStackCommandBridge.ts';
 
 const pixelCount = 49;
 const hashPattern = /^fnv1a32:[0-9a-f]{8}$/u;
@@ -27,6 +36,16 @@ const targetMask = Array.from({ length: pixelCount }, (_, index) => {
   return 2 - distance;
 });
 const removeTargetMask = Array.from({ length: pixelCount }, (_, index) => (index === 24 || index === 25 ? 1 : 0));
+const initialRemoveSource = {
+  featherRadiusPx: 2,
+  generator: 'local_patch_fill_v1',
+  generatorVersion: 1,
+  radiusPx: 1,
+  searchRadiusMultiplier: 2,
+  seed: 1,
+  status: 'needs_regeneration',
+  targetMaskId: 'retouch-remove-mask',
+} satisfies RetouchRemoveSource;
 
 const renderRetouch = (mode: 'heal' | 'remove') =>
   renderLayerPreviewStack({
@@ -52,16 +71,7 @@ const renderRetouch = (mode: 'heal' | 'remove') =>
               },
             }
           : {
-              retouchRemoveSource: {
-                featherRadiusPx: 2,
-                generator: 'local_patch_fill_v1' as const,
-                generatorVersion: 1 as const,
-                radiusPx: 1,
-                searchRadiusMultiplier: 2,
-                seed: 1,
-                status: 'needs_regeneration' as const,
-                targetMaskId: 'retouch-remove-mask',
-              },
+              retouchRemoveSource: initialRemoveSource,
             }),
         visible: true,
       },
@@ -196,6 +206,112 @@ if (noOpDelta?.status !== 'no_op' || noOpDelta.changedPixelCount !== 0 || noOpDe
   throw new Error('Retouch runtime did not distinguish no-op output from touched mask coverage.');
 }
 
+const removeLayerMask = {
+  adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
+  blendMode: 'normal',
+  id: 'retouch-remove-runtime',
+  invert: false,
+  name: 'Retouch remove runtime',
+  opacity: 100,
+  retouchRemoveSource: initialRemoveSource,
+  subMasks: [],
+  visible: true,
+} satisfies MaskContainer;
+const bridgeContext = {
+  graphRevision: 'retouch_remove_runtime_initial',
+  imagePath: '/private/proof/retouch-remove-runtime.CR3',
+  operationId: 'create_remove_layer',
+  sessionId: 'retouch-remove-runtime-proof',
+};
+const createdRemoveLayer = applyLayerStackCommandBridgeOperation(
+  [],
+  { layer: removeLayerMask, type: 'create' },
+  bridgeContext,
+);
+const readyRemoveSource = {
+  ...initialRemoveSource,
+  resolvedSourcePoint: removeSource?.resolvedSourcePoint,
+  status: 'ready',
+} satisfies RetouchRemoveSource;
+if (readyRemoveSource.resolvedSourcePoint === undefined) {
+  throw new Error('Remove runtime did not expose a resolved source point for stale regeneration proof.');
+}
+const persistedReadyRemove = applyResolvedRemoveSourcesToLayerStack(
+  createdRemoveLayer.masks,
+  [
+    {
+      layerId: 'retouch-remove-runtime',
+      resolvedSourcePoint: readyRemoveSource.resolvedSourcePoint,
+      status: 'ready',
+      targetMaskId: 'retouch-remove-mask',
+    },
+  ],
+  { ...bridgeContext, graphRevision: createdRemoveLayer.graphRevision, operationId: 'persist_ready_remove_source' },
+);
+const staleRemoveSource = {
+  ...readyRemoveSource,
+  radiusPx: 2,
+  seed: readyRemoveSource.seed + 1,
+  status: 'needs_regeneration',
+} satisfies RetouchRemoveSource;
+delete staleRemoveSource.resolvedSourcePoint;
+const staleRemoveLayer = applyLayerStackCommandBridgeOperation(
+  persistedReadyRemove.masks,
+  {
+    layerId: 'retouch-remove-runtime',
+    retouchRemoveSource: staleRemoveSource,
+    type: 'updateRetouchRemoveSource',
+  },
+  {
+    ...bridgeContext,
+    graphRevision: persistedReadyRemove.graphRevision,
+    operationId: 'mark_remove_stale_for_regeneration',
+  },
+);
+const staleTrackedSource = staleRemoveLayer.masks[0]?.retouchRemoveSource;
+if (staleTrackedSource?.status !== 'needs_regeneration' || staleTrackedSource.resolvedSourcePoint !== undefined) {
+  throw new Error('Remove source edit did not track stale regeneration by clearing persisted source output.');
+}
+const regeneratedRemovePreview = renderLayerPreviewStack({
+  basePixels,
+  height: 7,
+  layers: [
+    {
+      blendMode: 'normal',
+      id: 'retouch-remove-runtime',
+      maskAlpha: removeTargetMask,
+      name: 'Retouch remove runtime',
+      opacity: 1,
+      retouchRemoveSource: staleTrackedSource,
+      visible: true,
+    },
+  ],
+  width: 7,
+});
+const regeneratedSource = regeneratedRemovePreview.resolvedRemoveSources[0];
+const regeneratedDelta = regeneratedRemovePreview.outputDeltaByLayer[0];
+if (
+  regeneratedSource?.status !== 'ready' ||
+  regeneratedSource.resolvedSourcePoint === undefined ||
+  regeneratedDelta?.status !== 'changed' ||
+  regeneratedDelta.changedPixelCount <= 0 ||
+  regeneratedDelta.afterHash === removeDelta.afterHash
+) {
+  throw new Error('Stale remove layer did not regenerate a distinct ready runtime output.');
+}
+const persistedRegeneratedRemove = applyResolvedRemoveSourcesToLayerStack(staleRemoveLayer.masks, [regeneratedSource], {
+  ...bridgeContext,
+  graphRevision: staleRemoveLayer.graphRevision,
+  operationId: 'persist_regenerated_remove_source',
+});
+if (
+  persistedRegeneratedRemove.appliedLayerIds[0] !== 'retouch-remove-runtime' ||
+  persistedRegeneratedRemove.masks[0]?.retouchRemoveSource?.status !== 'ready' ||
+  persistedRegeneratedRemove.masks[0]?.retouchRemoveSource?.resolvedSourcePoint === undefined
+) {
+  throw new Error('Regenerated remove source was not persisted as ready layer metadata.');
+}
+
 console.log(
-  `retouch remove runtime output ok (heal changed=${healDelta.changedPixelCount}, remove changed=${removeDelta.changedPixelCount})`,
+  `retouch remove runtime output ok (heal changed=${healDelta.changedPixelCount}, remove changed=${removeDelta.changedPixelCount}, regenerated changed=${regeneratedDelta.changedPixelCount})`,
 );

@@ -24,7 +24,7 @@ const FIXTURE_PATH = 'fixtures/layers/layer-preview-export-parity.json';
 
 const sidecarLayerSchema = z
   .object({
-    blendMode: z.enum(['multiply', 'normal', 'overlay', 'screen', 'soft_light']),
+    blendMode: z.enum(['hue', 'multiply', 'normal', 'overlay', 'saturation', 'screen', 'soft_light']),
     id: z.string().trim().min(1),
     maskPersisted: z.boolean(),
     opacity: z.number().min(0).max(1),
@@ -76,7 +76,7 @@ const manifestSchema = z
   .strict();
 
 const manifest = manifestSchema.parse(JSON.parse(await readFile(FIXTURE_PATH, 'utf8')));
-const requiredBlendModes = new Set(['multiply', 'normal', 'overlay', 'screen', 'soft_light']);
+const requiredBlendModes = new Set(['hue', 'multiply', 'normal', 'overlay', 'saturation', 'screen', 'soft_light']);
 
 const hashPixels = (pixels: ReadonlyArray<LayerRgbPixel>): string => {
   const hash = createHash('sha256');
