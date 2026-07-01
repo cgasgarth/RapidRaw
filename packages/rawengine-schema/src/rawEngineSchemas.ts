@@ -9135,9 +9135,73 @@ export const negativeLabRuntimeProofV1Schema = z
         strength: z.number().min(0).max(1),
       })
       .strict(),
+    runtimePreview: z
+      .object({
+        baseFogSampleSummary: z
+          .object({
+            confidence: z.number().min(0).max(1),
+            densityRgb: negativeLabDensityRgbV1Schema,
+            sampleCount: z.number().int().positive(),
+            sampleRect: negativeLabSampleRectV1Schema.nullable(),
+            source: z.enum(['runtime_estimate_negative_base_fog', 'recipe_default_base_fog']),
+          })
+          .strict(),
+        densityCurveSummary: z
+          .object({
+            curveFamily: z.enum(['process_profile_monotonic_v1', 'parametric_monotonic_v1']),
+            densityMax: z.number().positive(),
+            normalizationProfileId: z.string().trim().min(1).nullable(),
+            outputTag: z.enum(['preview_display', 'export_linear']),
+            processProfileId: z.string().trim().min(1).nullable(),
+          })
+          .strict(),
+        dryRunMode: z.literal('runtime_preview_non_mutating'),
+        planHash: z.string().regex(/^sha256:[A-Za-z0-9:_-]+$/u),
+        previewArtifactHandle: artifactHandleV1Schema,
+        previewContentHash: z.string().regex(/^sha256:[A-Za-z0-9:_-]+$/u),
+        previewRenderer: z.enum(['tauri_preview_negative_conversion', 'rawengine_density_preview_runtime']),
+        renderedPositivePreview: z.literal(true),
+        sourceImageIdentity: z
+          .object({
+            frameIds: z.array(z.string().trim().min(1)).min(1),
+            imagePath: z.string().trim().min(1),
+            sessionId: z.string().trim().min(1),
+          })
+          .strict(),
+      })
+      .strict(),
     warningCodes: z.array(negativeWarningCodeSchema),
   })
-  .strict();
+  .strict()
+  .superRefine((proof, context) => {
+    if (
+      !proof.previewExportArtifactParity.previewArtifactIds.includes(
+        proof.runtimePreview.previewArtifactHandle.artifactId,
+      )
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Negative Lab runtime preview proof must reference a declared preview artifact.',
+        path: ['runtimePreview', 'previewArtifactHandle'],
+      });
+    }
+
+    if (proof.runtimePreview.previewArtifactHandle.kind !== 'preview') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Negative Lab runtime preview proof requires a preview artifact handle.',
+        path: ['runtimePreview', 'previewArtifactHandle', 'kind'],
+      });
+    }
+
+    if (proof.runtimePreview.previewArtifactHandle.storage !== 'temp_cache') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Negative Lab dry-run preview artifacts must stay in temp cache.',
+        path: ['runtimePreview', 'previewArtifactHandle', 'storage'],
+      });
+    }
+  });
 
 export const negativeLabDryRunResultV1Schema = z
   .object({

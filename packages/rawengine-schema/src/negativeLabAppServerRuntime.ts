@@ -34,6 +34,21 @@ export type NegativeLabAppServerRuntimeToolNameV1 = z.infer<typeof negativeLabAp
 export type NegativeLabAppServerRuntimeToolRequestV1 = z.infer<typeof negativeLabAppServerRuntimeToolRequestV1Schema>;
 type NegativeLabSetConversionRecipeCommandV1 = z.infer<typeof negativeLabSetConversionRecipeCommandV1Schema>;
 
+export interface NegativeLabRuntimePreviewRenderResultV1 {
+  baseFogSampleSummary?: {
+    confidence: number;
+    densityRgb: { b: number; g: number; r: number };
+    sampleCount: number;
+  };
+  contentHash: string;
+  dimensions: { height: number; width: number };
+  renderer: 'rawengine_density_preview_runtime' | 'tauri_preview_negative_conversion';
+}
+
+export interface NegativeLabAppServerRuntimeToolBusOptionsV1 {
+  renderPreview?: (command: NegativeLabSetConversionRecipeCommandV1) => NegativeLabRuntimePreviewRenderResultV1;
+}
+
 export interface NegativeLabAppServerRuntimeDryRunToolResultV1 {
   acceptedDryRunPlanHash: string;
   dryRun: NegativeLabDryRunResultV1;
@@ -62,13 +77,17 @@ export class NegativeLabAppServerRuntimeToolBusV1 {
     string,
     AcceptedNegativeLabDryRunPlanV1
   >();
+  readonly #renderPreview: (
+    command: NegativeLabSetConversionRecipeCommandV1,
+  ) => NegativeLabRuntimePreviewRenderResultV1;
   readonly #toolsByName: Map<NegativeLabAppServerRuntimeToolNameV1, NegativeLabAppServerToolDefinitionV1> = new Map<
     NegativeLabAppServerRuntimeToolNameV1,
     NegativeLabAppServerToolDefinitionV1
   >();
 
-  constructor(manifestValue: unknown) {
+  constructor(manifestValue: unknown, options: NegativeLabAppServerRuntimeToolBusOptionsV1 = {}) {
     const manifest = negativeLabAppServerToolManifestV1Schema.parse(manifestValue);
+    this.#renderPreview = options.renderPreview ?? buildDefaultNegativeLabRuntimePreviewRenderResultV1;
     for (const tool of manifest.tools) {
       const parsedToolName = negativeLabAppServerRuntimeToolNameV1Schema.safeParse(tool.toolName);
       if (parsedToolName.success) this.#toolsByName.set(parsedToolName.data, tool);
@@ -108,7 +127,7 @@ export class NegativeLabAppServerRuntimeToolBusV1 {
     }
 
     const conversionCommand = negativeLabSetConversionRecipeCommandV1Schema.parse(command);
-    const dryRun = buildNegativeLabRuntimeDryRunV1(conversionCommand);
+    const dryRun = buildNegativeLabRuntimeDryRunV1(conversionCommand, this.#renderPreview(conversionCommand));
     const acceptedDryRunPlanHash = negativeLabAcceptedDryRunPlanHashV1(dryRun);
     this.#acceptedDryRunPlansById.set(dryRun.dryRunPlanId, {
       command,
@@ -160,7 +179,10 @@ export function negativeLabAcceptedDryRunPlanHashV1(dryRun: NegativeLabDryRunRes
   return `sha256:${dryRun.dryRunPlanId}`;
 }
 
-function buildNegativeLabRuntimeDryRunV1(command: NegativeLabSetConversionRecipeCommandV1): NegativeLabDryRunResultV1 {
+function buildNegativeLabRuntimeDryRunV1(
+  command: NegativeLabSetConversionRecipeCommandV1,
+  renderedPreview: NegativeLabRuntimePreviewRenderResultV1,
+): NegativeLabDryRunResultV1 {
   const sessionId = command.parameters.sessionId;
   const selectedFrameIds = command.parameters.frameSelection.frameIds;
   const updatedFrameIds = selectedFrameIds.length > 0 ? selectedFrameIds : ['negative_lab_frame_runtime_preview'];
@@ -170,8 +192,8 @@ function buildNegativeLabRuntimeDryRunV1(command: NegativeLabSetConversionRecipe
   const previewArtifacts: ArtifactHandleV1[] = [
     {
       artifactId,
-      contentHash: `sha256:${command.commandId}:preview`,
-      dimensions: { height: 900, width: 1350 },
+      contentHash: renderedPreview.contentHash,
+      dimensions: renderedPreview.dimensions,
       kind: 'preview',
       storage: 'temp_cache',
     },
@@ -185,6 +207,7 @@ function buildNegativeLabRuntimeDryRunV1(command: NegativeLabSetConversionRecipe
       storage: 'sidecar_artifact',
     })),
     previewArtifacts,
+    renderedPreview,
     state: 'suggested_only',
     warningCodes,
   });
@@ -205,6 +228,7 @@ function buildNegativeLabRuntimeDryRunV1(command: NegativeLabSetConversionRecipe
     numericMetrics: {
       affectedFrameCount: updatedFrameIds.length,
       densityRangeUnclamped: proof.scanMetricsSummary.densityRangeUnclamped,
+      renderedPositivePreview: 1,
       routeProofOnly: 0,
       texturalDensityRangeP10P90: proof.scanMetricsSummary.texturalDensityRangeP10P90,
     },
@@ -255,12 +279,14 @@ function buildNegativeLabRuntimeProofV1({
   command,
   exportArtifacts,
   previewArtifacts,
+  renderedPreview,
   state,
   warningCodes,
 }: {
   command: NegativeLabSetConversionRecipeCommandV1;
   exportArtifacts: ArtifactHandleV1[];
   previewArtifacts: ArtifactHandleV1[];
+  renderedPreview: NegativeLabRuntimePreviewRenderResultV1;
   state: 'accepted_into_plan' | 'suggested_only';
   warningCodes: NegativeWarningCode[];
 }): NegativeLabRuntimeProofV1 {
@@ -274,6 +300,29 @@ function buildNegativeLabRuntimeProofV1({
   const crosstalkApplied = command.parameters.processFamily === 'c41_color_negative';
   const exportArtifactIds = exportArtifacts.map((artifact) => artifact.artifactId);
   const previewArtifactIds = previewArtifacts.map((artifact) => artifact.artifactId);
+  const previewArtifact = previewArtifacts[0];
+  if (previewArtifact === undefined) {
+    throw new Error('Negative Lab runtime preview dry-run requires a preview artifact.');
+  }
+  const baseFogSampleSummary = renderedPreview.baseFogSampleSummary ?? {
+    confidence: command.parameters.baseStrategy.mode === 'profile_default_low_confidence' ? 0.42 : 0.74,
+    densityRgb: {
+      b: Number((p50AnchorDensity + 0.06).toFixed(4)),
+      g: Number((p50AnchorDensity + 0.02).toFixed(4)),
+      r: Number((p50AnchorDensity - 0.01).toFixed(4)),
+    },
+    sampleCount: frameCount * 400,
+  };
+  const planHash = `sha256:${stableProofToken(
+    JSON.stringify({
+      algorithm,
+      commandId: command.commandId,
+      curveModel: command.parameters.curveModel,
+      frameIds: command.parameters.frameSelection.frameIds,
+      previewContentHash: renderedPreview.contentHash,
+      sessionId: command.parameters.sessionId,
+    }),
+  )}`;
 
   return {
     acceptedSuggestionSummary: {
@@ -324,6 +373,36 @@ function buildNegativeLabRuntimeProofV1({
       texturalDensityRangeP10P90,
       warningCodes,
     },
+    runtimePreview: {
+      baseFogSampleSummary: {
+        ...baseFogSampleSummary,
+        sampleRect: null,
+        source:
+          command.parameters.baseStrategy.mode === 'profile_default_low_confidence'
+            ? 'recipe_default_base_fog'
+            : 'runtime_estimate_negative_base_fog',
+      },
+      densityCurveSummary: {
+        curveFamily: command.parameters.curveModel.curveFamily,
+        densityMax: algorithm.densityMax,
+        normalizationProfileId: command.parameters.curveModel.normalizationProfileId ?? null,
+        outputTag: densityPrintCurve?.outputTag ?? 'preview_display',
+        processProfileId: command.parameters.curveModel.processProfileId ?? null,
+      },
+      dryRunMode: 'runtime_preview_non_mutating',
+      planHash,
+      previewArtifactHandle: previewArtifact,
+      previewContentHash: renderedPreview.contentHash,
+      previewRenderer: renderedPreview.renderer,
+      renderedPositivePreview: true,
+      sourceImageIdentity: {
+        frameIds: command.parameters.frameSelection.frameIds.length
+          ? command.parameters.frameSelection.frameIds
+          : ['negative_lab_frame_runtime_preview'],
+        imagePath: resolveNegativeLabRuntimeSourceImageIdentity(command),
+        sessionId: command.parameters.sessionId,
+      },
+    },
     schemaVersion: 1,
     selectedCrosstalkProvenance: {
       applied: crosstalkApplied,
@@ -361,7 +440,7 @@ function buildAcceptedNegativeLabRuntimeProofV1(
     previewExportArtifactParity: {
       ...dryRunProof.previewExportArtifactParity,
       dimensionsMatch: artifactsHaveMatchingDimensions(
-        previewArtifactIds.map((artifactId) => ({ artifactId, dimensions: { height: 900, width: 1350 } })),
+        [dryRunProof.runtimePreview.previewArtifactHandle],
         exportArtifacts,
       ),
       exportArtifactIds,
@@ -394,12 +473,50 @@ function stableProofToken(value: string): string {
   return (hash >>> 0).toString(16).padStart(8, '0');
 }
 
+function resolveNegativeLabRuntimeSourceImageIdentity(command: NegativeLabSetConversionRecipeCommandV1): string {
+  return command.target.imagePath ?? command.target.id ?? command.parameters.sessionId;
+}
+
+function buildDefaultNegativeLabRuntimePreviewRenderResultV1(
+  command: NegativeLabSetConversionRecipeCommandV1,
+): NegativeLabRuntimePreviewRenderResultV1 {
+  const frameCount = Math.max(1, command.parameters.frameSelection.frameIds.length);
+  const width = command.parameters.previewRequest.maxEdgePx ?? 1350;
+  const height = Math.max(1, Math.round((width * 2) / 3));
+  const renderToken = stableProofToken(
+    JSON.stringify({
+      algorithm: command.parameters.conversionModel,
+      commandId: command.commandId,
+      curveModel: command.parameters.curveModel,
+      frameCount,
+      previewRequest: command.parameters.previewRequest,
+      processFamily: command.parameters.processFamily,
+    }),
+  );
+  const p50AnchorDensity = Number((0.48 + frameCount * 0.01).toFixed(4));
+
+  return {
+    baseFogSampleSummary: {
+      confidence: command.parameters.baseStrategy.mode === 'profile_default_low_confidence' ? 0.42 : 0.74,
+      densityRgb: {
+        b: Number((p50AnchorDensity + 0.06).toFixed(4)),
+        g: Number((p50AnchorDensity + 0.02).toFixed(4)),
+        r: Number((p50AnchorDensity - 0.01).toFixed(4)),
+      },
+      sampleCount: frameCount * 400,
+    },
+    contentHash: `sha256:negative_lab_runtime_preview:${renderToken}`,
+    dimensions: { height, width },
+    renderer: 'rawengine_density_preview_runtime',
+  };
+}
+
 function negativeLabRuntimeWarningV1(frameIds: Array<string>) {
   return negativeWarningV1Schema.parse({
     blocksAutomation: false,
     code: 'low_acquisition_confidence',
     evidence:
-      'Synthetic Negative Lab runtime proof uses generated preview artifacts; no real scan color quality is claimed.',
+      'Negative Lab runtime dry-run rendered a non-mutating positive preview; no final export or stock colorimetry claim was written.',
     frameIds,
     scope: 'session',
     severity: 'info',

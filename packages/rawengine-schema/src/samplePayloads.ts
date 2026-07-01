@@ -3393,17 +3393,22 @@ export const sampleNegativeLabApplyFrameCropCommandEnvelopeV1: NegativeLabComman
     },
   });
 
-const sampleNegativeLabChangeSet = {
+const sampleNegativeLabDryRunChangeSet = {
   artifactHandles: [sampleArtifactHandleV1],
-  createdPositiveVariantIds: ['positive_variant_frame_0001'],
+  createdPositiveVariantIds: [],
   provenanceEntryIds: ['prov_negative_convert_frames_sample'],
   updatedFrameIds: ['frame_0001'],
   updatedSessionId: sampleNegativeRollSessionV1.sessionId,
   warningCodes: ['lossy_input', 'low_acquisition_confidence'],
 };
 
+const sampleNegativeLabApplyChangeSet = {
+  ...sampleNegativeLabDryRunChangeSet,
+  createdPositiveVariantIds: ['positive_variant_frame_0001'],
+};
+
 export const sampleNegativeLabDryRunResultV1: NegativeLabDryRunResultV1 = negativeLabDryRunResultV1Schema.parse({
-  changeSet: sampleNegativeLabChangeSet,
+  changeSet: sampleNegativeLabDryRunChangeSet,
   commandId: sampleNegativeLabCommandEnvelopeV1.commandId,
   commandType: sampleNegativeLabCommandEnvelopeV1.commandType,
   correlationId: sampleNegativeLabCommandEnvelopeV1.correlationId,
@@ -3411,6 +3416,84 @@ export const sampleNegativeLabDryRunResultV1: NegativeLabDryRunResultV1 = negati
   numericMetrics: {
     estimatedBaseClippingScore: 0.04,
     previewDeltaEWarningScore: 0.8,
+    renderedPositivePreview: 1,
+  },
+  proof: {
+    acceptedSuggestionSummary: {
+      acceptedFrameCount: 0,
+      confidenceThreshold: 0.58,
+      exposureOffsetEvRange: {
+        max: 0,
+        min: 0,
+      },
+      source: 'rawengine_runtime_preview_summary_v1',
+      state: 'suggested_only',
+      warningCodes: ['low_acquisition_confidence'],
+    },
+    algorithm: {
+      algorithmId: 'density_rgb_v1',
+      algorithmVersion: 1,
+      densityMax: 3.2,
+      epsilonPolicyId: 'density_epsilon_v1',
+      negativeDensityTolerance: 0.015,
+    },
+    previewExportArtifactParity: {
+      dimensionsMatch: true,
+      exportArtifactIds: [],
+      parityHash: 'sha256:negative_lab_sample_preview_parity',
+      previewArtifactIds: [sampleArtifactHandleV1.artifactId],
+      storageTransition: 'temp_cache_to_sidecar_artifact',
+      warningCodes: ['low_acquisition_confidence'],
+    },
+    printCurveParams: null,
+    runtimePreview: {
+      baseFogSampleSummary: {
+        confidence: 0.74,
+        densityRgb: {
+          b: 0.55,
+          g: 0.51,
+          r: 0.48,
+        },
+        sampleCount: 400,
+        sampleRect: null,
+        source: 'runtime_estimate_negative_base_fog',
+      },
+      densityCurveSummary: {
+        curveFamily: 'process_profile_monotonic_v1',
+        densityMax: 3.2,
+        normalizationProfileId: null,
+        outputTag: 'preview_display',
+        processProfileId: 'rawengine_c41_default_process_profile',
+      },
+      dryRunMode: 'runtime_preview_non_mutating',
+      planHash: 'sha256:negative_lab_sample_runtime_preview_plan',
+      previewArtifactHandle: sampleArtifactHandleV1,
+      previewContentHash: sampleArtifactHandleV1.contentHash,
+      previewRenderer: 'rawengine_density_preview_runtime',
+      renderedPositivePreview: true,
+      sourceImageIdentity: {
+        frameIds: ['frame_0001'],
+        imagePath: '/roll/001.CR3',
+        sessionId: sampleNegativeRollSessionV1.sessionId,
+      },
+    },
+    scanMetricsSummary: {
+      densityRangeUnclamped: 0.715,
+      frameCount: 1,
+      p50AnchorDensity: 0.49,
+      sampleCount: 400,
+      texturalDensityRangeP10P90: 0.295,
+      warningCodes: ['low_acquisition_confidence'],
+    },
+    schemaVersion: 1,
+    selectedCrosstalkProvenance: {
+      applied: true,
+      profileId: 'rawengine_c41_default_process_profile:crosstalk',
+      provenance: 'rawengine_process_profile',
+      provenanceHash: 'fnv1a32:2f8bbf62',
+      strength: 0.35,
+    },
+    warningCodes: ['low_acquisition_confidence'],
   },
   previewArtifacts: [sampleArtifactHandleV1],
   schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
@@ -3432,7 +3515,7 @@ export const sampleNegativeLabApplyPlanRequestV1: NegativeLabApplyPlanRequestV1 
 
 export const sampleNegativeLabApplyResultV1: NegativeLabApplyResultV1 = negativeLabApplyResultV1Schema.parse({
   appliedGraphRevision: 'graph_rev_negative_8',
-  changeSet: sampleNegativeLabChangeSet,
+  changeSet: sampleNegativeLabApplyChangeSet,
   commandId: 'command_negative_convert_frames_apply_sample',
   commandType: sampleNegativeLabCommandEnvelopeV1.commandType,
   correlationId: sampleNegativeLabCommandEnvelopeV1.correlationId,
