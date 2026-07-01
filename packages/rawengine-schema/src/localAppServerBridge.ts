@@ -148,6 +148,58 @@ export const rawEngineAgentInitialPreviewReceiptV1Schema = z
 
 export type RawEngineAgentInitialPreviewReceiptV1 = z.infer<typeof rawEngineAgentInitialPreviewReceiptV1Schema>;
 
+export const rawEngineAgentPreviewRefreshReceiptV1Schema = z
+  .object({
+    colorPipeline: z
+      .object({
+        encodedProfile: z.literal('srgb-preview'),
+        outputProfile: z.literal('srgb'),
+        previewTransform: z.literal('editor-preview-to-srgb-jpeg'),
+        workingSpace: z.literal('rawengine-scene-linear'),
+      })
+      .strict(),
+    contentHash: z.string().regex(/^sha256:[a-f0-9]{16,64}$/u),
+    graphRevision: z.string().trim().min(1),
+    imagePath: z.string().trim().min(1),
+    preview: z
+      .object({
+        accessScope: z.literal('local_private'),
+        artifactId: z.string().trim().min(1),
+        encodedFormat: z.literal('jpeg'),
+        height: z.number().int().positive(),
+        includesOriginalRaw: z.literal(false),
+        longEdgePx: z.number().int().min(256).max(2048),
+        mediaType: z.literal('image/jpeg'),
+        previewRef: z.string().trim().min(1),
+        purpose: z.enum(['detail_review', 'refresh']),
+        quality: z.number().min(0.5).max(0.95),
+        recipeHash: z.string().trim().min(1),
+        renderHash: z.string().trim().min(1),
+        width: z.number().int().positive(),
+      })
+      .strict(),
+    proofContext: z
+      .object({
+        expectedRecipeHash: z.string().trim().min(1),
+        sourceToolName: z.string().trim().min(1),
+        stale: z.boolean(),
+        transport: z.literal('codex_app_server'),
+      })
+      .strict(),
+    requestId: z.string().trim().min(1),
+    schemaVersion: z.literal(1),
+    sessionId: z.string().trim().min(1),
+    toolName: z.literal('rawengine.agent.preview.render'),
+    turn: z.number().int().positive(),
+  })
+  .strict()
+  .refine((receipt) => receipt.proofContext.expectedRecipeHash === receipt.preview.recipeHash, {
+    message: 'Refresh receipt expected recipe hash must match the preview recipe hash.',
+    path: ['proofContext', 'expectedRecipeHash'],
+  });
+
+export type RawEngineAgentPreviewRefreshReceiptV1 = z.infer<typeof rawEngineAgentPreviewRefreshReceiptV1Schema>;
+
 export const rawEngineLocalAppServerBasicToneDryRunCommandV1Schema = toneColorCommandEnvelopeV1Schema.superRefine(
   (command, context) => {
     if (command.commandType !== 'toneColor.setBasicTone') {
