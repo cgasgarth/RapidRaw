@@ -13,7 +13,15 @@ import {
 import type { LayerScopedToneAdjustmentV1 } from './layerScopedToneSchemas.js';
 import { layerStackSidecarV1Schema } from './layerStackCommandRuntime.js';
 
-const renderableBlendModeSchema = z.enum(['multiply', 'normal', 'overlay', 'screen', 'soft_light']);
+const renderableBlendModeSchema = z.enum([
+  'hue',
+  'multiply',
+  'normal',
+  'overlay',
+  'saturation',
+  'screen',
+  'soft_light',
+]);
 
 export const layerScopedToneRenderInputV1Schema = z
   .object({

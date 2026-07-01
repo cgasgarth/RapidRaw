@@ -241,6 +241,8 @@ const blendModes = [
   { labelKey: 'editor.layers.blendModes.screen', value: 'screen' },
   { labelKey: 'editor.layers.blendModes.overlay', value: 'overlay' },
   { labelKey: 'editor.layers.blendModes.softLight', value: 'soft_light' },
+  { labelKey: 'editor.layers.blendModes.hue', value: 'hue' },
+  { labelKey: 'editor.layers.blendModes.saturation', value: 'saturation' },
   { labelKey: 'editor.layers.blendModes.color', value: 'color' },
   { labelKey: 'editor.layers.blendModes.luminosity', value: 'luminosity' },
 ] as const;

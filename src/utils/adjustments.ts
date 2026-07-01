@@ -477,6 +477,8 @@ export const LAYER_BLEND_MODES = [
   'screen',
   'overlay',
   'soft_light',
+  'hue',
+  'saturation',
   'luminosity',
   'color',
 ] as const;
