@@ -647,6 +647,9 @@
           "finalRevision": "",
           "html": "",
           "initialRevision": "",
+          "replayBlocked": "Replay blocked: {{reason}}",
+          "replayCheck": "Check replay lineage",
+          "replayReady": "Replay lineage ready: {{hash}}",
           "target": "",
           "title": "",
           "uiOnly": ""
