@@ -263,10 +263,13 @@ export const agentObjectSelectionApplyResponseSchema = z
     beforePreviewHash: z.string().trim().min(1),
     layerId: z.string().trim().min(1),
     maskId: z.string().trim().min(1),
+    mutates: z.boolean(),
     objectPromptHash: z.string().trim().min(1),
     overlayPreview: agentLayerMaskOverlayPreviewSchema,
     providerStatus: z.enum(['local_sam_proposal_v1', 'prompt_proxy_mask_v1']),
+    receipt: agentLayerMaskApplyReceiptSchema,
     requestId: z.string().trim().min(1),
+    rollbackTarget: agentLayerMaskRollbackTargetSchema,
     staleRecipeHash: z.literal(false),
     toolName: z.literal(AGENT_OBJECT_SELECTION_APPLY_TOOL_NAME),
     undoGraphRevision: z.string().trim().min(1),
@@ -922,13 +925,40 @@ export const applyAgentObjectSelection = (
   const strokes = buildObjectSelectionStrokes(parsedRequest, selectedImage.width, selectedImage.height);
   const providerStatus: ObjectSelectionProviderStatus =
     parsedRequest.proposal === undefined ? 'prompt_proxy_mask_v1' : 'local_sam_proposal_v1';
+  const alphaHash = stableAgentPreviewHash(
+    JSON.stringify({
+      maskDataBase64: parsedRequest.proposal?.maskDataBase64 ?? null,
+      strokes,
+    }),
+  );
+  const objectPromptHash = stableAgentPreviewHash(
+    JSON.stringify({
+      boxPrompt: parsedRequest.boxPrompt ?? null,
+      pointPrompts: parsedRequest.pointPrompts,
+      proposal: parsedRequest.proposal ?? null,
+      providerStatus,
+      strokes,
+    }),
+  );
+  const maskDimensions = {
+    height: parsedRequest.proposal?.imageHeight ?? selectedImage.height,
+    width: parsedRequest.proposal?.imageWidth ?? selectedImage.width,
+  };
+  const commandId = `layer_stack_${parsedRequest.operationId}`;
   const objectParameters = {
+    alphaHash: `sha256:${alphaHash}`,
     boxPrompt: parsedRequest.boxPrompt ?? null,
+    commandId,
     generatedPreviewStrokes: strokes,
+    graphRevision: beforeSnapshot.graphRevision,
     maskDataBase64: parsedRequest.proposal?.maskDataBase64 ?? null,
+    maskDimensions,
+    objectPromptHash: `sha256:${objectPromptHash}`,
     pointPrompts: parsedRequest.pointPrompts,
+    promptTextHash: `sha256:${objectPromptHash}`,
     proposal: parsedRequest.proposal ?? null,
     providerStatus,
+    sourceImagePath: selectedImage.path,
   };
   const layer: MaskContainer = {
     adjustments: toMaskAdjustments(parsedRequest.adjustments),
@@ -963,20 +993,12 @@ export const applyAgentObjectSelection = (
     },
   );
   const undoGraphRevision = beforeSnapshot.graphRevision;
+  const rollbackTarget = buildRollbackTarget(undoGraphRevision, state);
   pushMaskHistory(result.masks);
   useEditorStore.setState({ activeMaskContainerId: layerId, activeMaskId: maskId });
   const afterSnapshot = buildAgentImageContextSnapshot();
   const overlayLayer = result.masks.find((mask) => mask.id === layerId);
   if (overlayLayer === undefined) throw new Error('Agent object selection could not build an overlay preview.');
-  const objectPromptHash = stableAgentPreviewHash(
-    JSON.stringify({
-      boxPrompt: parsedRequest.boxPrompt ?? null,
-      pointPrompts: parsedRequest.pointPrompts,
-      proposal: parsedRequest.proposal ?? null,
-      providerStatus,
-      strokes,
-    }),
-  );
 
   return agentObjectSelectionApplyResponseSchema.parse({
     afterPreviewHash: afterSnapshot.initialPreview.renderHash,
@@ -984,16 +1006,32 @@ export const applyAgentObjectSelection = (
     beforePreviewHash: beforeSnapshot.initialPreview.renderHash,
     layerId,
     maskId,
+    mutates: true,
     objectPromptHash: `sha256:${objectPromptHash}`,
     overlayPreview: buildOverlayPreview({
       afterSnapshot,
-      contentSeed: { maskId, objectPromptHash, operationId: parsedRequest.operationId, strokes },
+      contentSeed: { alphaHash, maskId, objectPromptHash, operationId: parsedRequest.operationId, strokes },
       layer: overlayLayer,
       maskId,
       operationId: parsedRequest.operationId,
     }),
     providerStatus,
+    receipt: buildApplyReceipt({
+      appliedGraphRevision: afterSnapshot.graphRevision,
+      commandId: result.command.commandId,
+      commandType: result.command.commandType,
+      dryRunPlanId: buildDryRunPlanId(parsedRequest.operationId, {
+        alphaHash,
+        maskId,
+        objectPromptHash,
+        toolName: AGENT_OBJECT_SELECTION_APPLY_TOOL_NAME,
+      }),
+      operationId: parsedRequest.operationId,
+      rollbackGraphRevision: undoGraphRevision,
+      sessionId: parsedRequest.sessionId,
+    }),
     requestId: parsedRequest.requestId,
+    rollbackTarget,
     staleRecipeHash: false,
     toolName: AGENT_OBJECT_SELECTION_APPLY_TOOL_NAME,
     undoGraphRevision,

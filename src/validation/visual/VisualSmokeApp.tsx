@@ -3195,11 +3195,13 @@ const copy = {
   objectPromptBoxReady: 'Box ready',
   objectPromptClear: 'Clear',
   objectPromptControlsTitle: 'Object prompt masks',
+  objectPromptEditableLayer: 'Editable mask layer',
   objectPromptGenerate: 'Generate mask',
   objectPromptModeBackground: 'Background',
   objectPromptModeBox: 'Box',
   objectPromptModeForeground: 'Foreground',
   objectPromptProposal: 'SAM proposal',
+  objectPromptOverlayOpacityPercent: '72%',
   objectPromptVisualProof: 'Object prompt visual proof',
   professionalLayersActiveCount: '4 active',
   professionalLayersAdjustmentLabels: ['Exposure +0.35', 'Contrast +14', 'Color range ready'],
@@ -5038,6 +5040,7 @@ function ObjectPromptVisualSmoke() {
     startPoint: [2040, 960] as [number, number],
   };
   const receipt = {
+    alphaHash: 'sha256:object-prompt-alpha-visual-smoke-v1',
     boxHeight: boxPrompt.height,
     boxReady: true,
     boxWidth: boxPrompt.width,
@@ -5054,6 +5057,15 @@ function ObjectPromptVisualSmoke() {
     providerId: 'rapidraw-sam-vit-b-onnx-v1',
     providerStatus: 'local_sam_proposal_v1',
     receiptVersion: 1 as const,
+    sourceImagePath: '/private-fixtures/layers/alaska-layer-mask-v1.arw',
+  };
+  const editableLayerProof = {
+    commandId: 'layer_stack_visual_object_prompt',
+    graphRevision: 'visual-smoke-object-prompt-graph-v1',
+    layerId: 'visual_object_prompt_layer',
+    maskId: 'visual_object_prompt_mask',
+    objectPromptHash: 'sha256:object-prompt-visual-smoke-v1',
+    overlayOpacity: 72,
   };
   const t = ((key: string, options?: Record<string, unknown>) => {
     const optionText = (name: string, fallback: string): string => {
@@ -5115,6 +5127,20 @@ function ObjectPromptVisualSmoke() {
                 width: `${boxPrompt.width * 100}%`,
               }}
             />
+            <span
+              className="absolute rounded-[42%] border border-fuchsia-200/80 bg-fuchsia-400/35 shadow-[0_0_34px_rgba(232,121,249,0.42)]"
+              data-alpha-hash={receipt.alphaHash}
+              data-layer-id={editableLayerProof.layerId}
+              data-mask-id={editableLayerProof.maskId}
+              data-overlay-opacity-percent={editableLayerProof.overlayOpacity}
+              data-testid="object-prompt-editable-mask-overlay"
+              style={{
+                height: '31%',
+                left: '37%',
+                top: '27%',
+                width: '23%',
+              }}
+            />
           </div>
         </section>
         <aside className="border-l border-white/10 bg-[#171a1f] p-4" data-visual-smoke-section="object-prompt-controls">
@@ -5135,14 +5161,47 @@ function ObjectPromptVisualSmoke() {
             t={t}
           />
           <div
+            className="mt-3 rounded border border-fuchsia-300/40 bg-fuchsia-400/10 p-2 text-xs"
+            data-alpha-hash={receipt.alphaHash}
+            data-command-id={editableLayerProof.commandId}
+            data-graph-revision={editableLayerProof.graphRevision}
+            data-layer-id={editableLayerProof.layerId}
+            data-mask-dimensions="6000x4000"
+            data-mask-editable="true"
+            data-mask-id={editableLayerProof.maskId}
+            data-object-prompt-hash={editableLayerProof.objectPromptHash}
+            data-overlay-opacity-percent={editableLayerProof.overlayOpacity}
+            data-source-image-path={receipt.sourceImagePath}
+            data-testid="object-prompt-editable-layer-receipt"
+          >
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <span className="font-semibold">{copy.objectPromptEditableLayer}</span>
+              <span className="rounded bg-fuchsia-300/20 px-1.5 py-0.5">{copy.objectPromptOverlayOpacityPercent}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="h-8 w-12 rounded border border-white/20 bg-[radial-gradient(circle_at_48%_45%,rgba(232,121,249,0.9)_0_38%,rgba(232,121,249,0.28)_39_62%,transparent_63%)]" />
+              <span className="min-w-0 truncate">{editableLayerProof.maskId}</span>
+            </div>
+          </div>
+          <div
             className="sr-only"
+            data-alpha-hash={receipt.alphaHash}
             data-box-ready="true"
+            data-command-id={editableLayerProof.commandId}
             data-fixture-id="validation.object-prompt.alaska-local-selection.v1"
+            data-graph-revision={editableLayerProof.graphRevision}
             data-has-raster="true"
+            data-layer-id={editableLayerProof.layerId}
+            data-mask-dimensions="6000x4000"
+            data-mask-editable="true"
+            data-mask-id={editableLayerProof.maskId}
             data-model-id={receipt.modelId}
+            data-object-prompt-hash={editableLayerProof.objectPromptHash}
+            data-overlay-opacity-percent={editableLayerProof.overlayOpacity}
             data-point-count={pointPrompts.length}
             data-prompt-kind={commandInput.promptKind}
             data-provider-status={receipt.providerStatus}
+            data-source-image-path={receipt.sourceImagePath}
             data-testid="object-prompt-visual-proof"
           />
         </aside>

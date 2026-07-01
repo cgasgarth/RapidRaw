@@ -1763,10 +1763,14 @@ async function prepareScenario(page, mode) {
     if (
       proof.boxReady !== 'true' ||
       proof.hasRaster !== 'true' ||
+      proof.maskEditable !== 'true' ||
       proof.modelId !== 'sam_vit_b_01ec64' ||
+      proof.objectPromptHash !== 'sha256:object-prompt-visual-smoke-v1' ||
+      proof.overlayOpacityPercent !== '72' ||
       proof.pointCount !== '3' ||
       proof.promptKind !== 'box' ||
-      proof.providerStatus !== 'local_sam_proposal_v1'
+      proof.providerStatus !== 'local_sam_proposal_v1' ||
+      proof.sourceImagePath !== '/private-fixtures/layers/alaska-layer-mask-v1.arw'
     ) {
       throw new Error(`Object prompt visual proof failed: ${JSON.stringify(proof)}`);
     }
@@ -1774,6 +1778,20 @@ async function prepareScenario(page, mode) {
     await page.getByTestId('object-prompt-generate-proposal').waitFor({ timeout: 10_000 });
     await page.getByTestId('object-prompt-replay-receipt').waitFor({ timeout: 10_000 });
     await page.getByTestId('object-prompt-proof-box').waitFor({ timeout: 10_000 });
+    await page.getByTestId('object-prompt-editable-mask-overlay').waitFor({ timeout: 10_000 });
+    const layerReceipt = await page
+      .getByTestId('object-prompt-editable-layer-receipt')
+      .evaluate((element) => ({ ...element.dataset }));
+    if (
+      layerReceipt.alphaHash !== 'sha256:object-prompt-alpha-visual-smoke-v1' ||
+      layerReceipt.commandId !== 'layer_stack_visual_object_prompt' ||
+      layerReceipt.layerId !== 'visual_object_prompt_layer' ||
+      layerReceipt.maskDimensions !== '6000x4000' ||
+      layerReceipt.maskEditable !== 'true' ||
+      layerReceipt.maskId !== 'visual_object_prompt_mask'
+    ) {
+      throw new Error(`Object prompt editable layer receipt failed: ${JSON.stringify(layerReceipt)}`);
+    }
     return;
   }
 
