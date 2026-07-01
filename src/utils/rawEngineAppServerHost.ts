@@ -1331,7 +1331,7 @@ const dispatchAgentAppServerTool = async (
       result = applyAgentGeometry(agentGeometryApplyRequestSchema.parse(request.arguments));
       break;
     case AGENT_LENS_PROFILE_APPLY_TOOL_NAME:
-      result = applyAgentLensProfile(agentLensProfileApplyRequestSchema.parse(request.arguments));
+      result = await applyAgentLensProfile(agentLensProfileApplyRequestSchema.parse(request.arguments));
       break;
     case AGENT_LAYER_CREATE_TOOL_NAME:
       result = applyAgentLayerCreate(agentLayerCreateRequestSchema.parse(request.arguments));
