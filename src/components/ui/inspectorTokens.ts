@@ -39,6 +39,27 @@ export const professionalInspectorDensityTokens = {
     panel: 'space-y-2',
     section: 'space-y-1.5',
   },
+  panelHeader: {
+    actionButton:
+      'inline-flex h-6 w-6 items-center justify-center rounded text-text-secondary transition-colors hover:bg-surface hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50',
+    actionButtonActive: 'bg-surface text-text-primary hover:bg-card-active',
+    root: 'flex min-h-9 shrink-0 items-center justify-between border-b border-surface px-3 py-1.5',
+    title: 'truncate text-[13px] font-semibold leading-4 text-text-primary',
+  },
+  rawProcessing: {
+    body: 'space-y-1.5 pt-1.5',
+    compareButton:
+      'flex min-h-7 w-full items-center justify-center gap-2 rounded bg-surface px-2 py-1 text-[11px] font-medium leading-4 transition-colors hover:bg-card-active disabled:cursor-not-allowed disabled:opacity-60',
+    description: 'min-w-0 text-[11px] leading-4 text-text-secondary',
+    disclosure:
+      'flex min-h-7 w-full items-center justify-between gap-2 rounded-sm text-left transition-colors hover:text-text-primary',
+    label: 'shrink-0 text-[11px] font-semibold uppercase leading-4 tracking-normal text-text-secondary',
+    provenanceButton:
+      'inline-flex items-center gap-1.5 text-[11px] font-medium leading-4 text-text-secondary transition-colors hover:text-text-primary',
+    provenanceValue: 'break-all font-mono text-[11px] leading-4 text-text-secondary',
+    root: 'shrink-0 border-b border-surface px-3 py-1',
+    statusValue: 'truncate text-[11px] leading-4 text-text-primary',
+  },
   row: {
     label: 'text-[10px] font-medium leading-3 text-text-tertiary',
     value: 'text-right font-mono text-[11px] leading-3 tabular-nums text-text-secondary',
@@ -52,6 +73,18 @@ export const professionalInspectorDensityTokens = {
     rootLoose: 'mb-2 flex items-start justify-between gap-2',
     summary: 'mt-0.5 block text-[11px] leading-4 text-text-secondary',
     title: 'text-[12px] font-semibold leading-4 text-text-primary',
+  },
+  toneMapper: {
+    card: 'w-full rounded bg-card-active p-1',
+    label:
+      'col-start-1 row-start-1 text-[11px] font-semibold uppercase leading-4 tracking-normal text-text-secondary select-none transition-opacity duration-200 ease-in-out',
+    option:
+      'relative flex min-h-6 flex-1 items-center justify-center gap-1.5 rounded px-2 py-0.5 text-[11px] font-semibold leading-4 transition-colors',
+    resetLabel:
+      'col-start-1 row-start-1 text-[11px] font-semibold uppercase leading-4 tracking-normal text-text-primary select-none transition-opacity duration-200 ease-in-out pointer-events-none',
+    root: 'group mb-1.5',
+    sliderWrap: 'mt-1 px-0.5',
+    titleRow: 'mb-0.5 flex items-center justify-between',
   },
 } as const;
 
@@ -84,7 +117,7 @@ export const compactInspectorSliderTokens = {
   labelStatic: 'grid min-w-0 border-0 bg-transparent p-0 text-left cursor-default',
   resetLabel:
     'col-start-1 row-start-1 truncate text-[12px] font-medium leading-4 text-text-primary select-none transition-opacity duration-200 ease-in-out pointer-events-none',
-  root: 'group grid min-h-6 grid-cols-[minmax(5rem,0.85fr)_minmax(5rem,1fr)_2.75rem] items-center gap-2 py-0.5',
+  root: 'group grid min-h-6 grid-cols-[minmax(4.75rem,0.78fr)_minmax(5.5rem,1fr)_2.625rem] items-center gap-1.5 py-px',
   suffix: 'text-[10px] align-top inline-block mt-0.5 ml-0.5',
   track: 'absolute top-1/2 left-0 h-1 w-full -translate-y-1/2 rounded-full pointer-events-none',
   trackWrap: 'relative h-5 min-w-0',
@@ -92,5 +125,5 @@ export const compactInspectorSliderTokens = {
     'h-5 border-0 bg-transparent p-0 font-mono text-[12px] leading-5 tabular-nums text-text-primary w-full text-right select-none',
   valueInput:
     'h-5 w-full rounded-sm border border-gray-500 bg-card-active px-1 py-0 text-right font-mono text-[12px] leading-5 tabular-nums text-text-primary outline-none focus:ring-1 focus:ring-blue-500',
-  valueSlot: 'w-11 shrink-0 text-right',
+  valueSlot: 'w-10 shrink-0 text-right',
 } as const;

@@ -2,6 +2,7 @@
   "adjustments": {
     "basic": {
       "blacks": "Blacks",
+      "brightness": "Brightness",
       "contrast": "Contrast",
       "evShift": "EV Shift",
       "exposure": "Exposure",

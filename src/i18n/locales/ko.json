@@ -2,6 +2,7 @@
   "adjustments": {
     "basic": {
       "blacks": "블랙",
+      "brightness": "밝기",
       "contrast": "대비",
       "evShift": "EV 시프트",
       "exposure": "노출",
