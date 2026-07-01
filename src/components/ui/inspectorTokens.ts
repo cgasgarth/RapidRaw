@@ -4,7 +4,12 @@ export const inspectorSectionTokens = {
   chevron: 'text-text-secondary transition-transform duration-200',
   dirtyBadge: 'bg-accent/15 text-accent',
   header:
-    'min-h-8 w-full px-3 py-1 flex items-center justify-between gap-2 text-left hover:bg-card-active transition-colors duration-150',
+    'group min-h-8 w-full px-3 py-1 flex items-center justify-between gap-2 text-left hover:bg-card-active transition-colors duration-150',
+  actionsMenuSlot: 'h-5 w-5 shrink-0',
+  headerActionButton:
+    'z-10 flex h-5 w-5 items-center justify-center rounded text-text-secondary transition-colors duration-150 hover:bg-bg-primary hover:text-text-primary focus-visible:bg-bg-primary focus-visible:text-text-primary',
+  headerActions:
+    'flex h-5 shrink-0 items-center gap-0.5 opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto',
   hiddenBadge: 'bg-surface text-text-secondary',
   shell: 'bg-surface overflow-hidden shrink-0 border-b border-surface/70',
   title: 'truncate text-[13px] leading-4 tracking-normal text-text-primary',

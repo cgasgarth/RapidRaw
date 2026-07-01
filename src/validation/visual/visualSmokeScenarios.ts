@@ -58,7 +58,7 @@ export const VISUAL_SMOKE_PROOF_TEST_IDS = {
 
 export const VISUAL_SMOKE_SCENARIOS = [
   {
-    marker: 'Adjustments panel retune',
+    marker: 'Adjustments',
     mode: VISUAL_SMOKE_SCENARIO_IDS.AdjustmentsPanelRetune,
     outputFile: 'adjustments-panel-retune.png',
     sectionMinimum: 1,
