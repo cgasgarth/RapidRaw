@@ -104,13 +104,18 @@ const runtimeResultIdsSchema = z
 const superResolutionRealPhotoQualityReadoutSchema = z
   .object({
     artifactScore: z.number().min(0),
+    downscaleReconstructionError: z.number().min(0).optional(),
     detailGainRatio: z.number().min(0),
+    effectiveScale: z.number().min(1).max(4).optional(),
+    falseDetailRisk: z.enum(['unknown', 'low', 'medium', 'high']).optional(),
+    falseDetailRiskScore: z.number().min(0).max(1).optional(),
     outputArtifactHash: sha256Schema,
     outputArtifactPath: privatePathSchema,
     outputPixelCount: z.number().int().positive(),
     registrationResidualPx: z.number().min(0),
     sourceCount: z.number().int().min(2),
     sourceCoverageRatio: z.number().min(0).max(1),
+    weakSupportRatio: z.number().min(0).max(1).optional(),
   })
   .strict();
 

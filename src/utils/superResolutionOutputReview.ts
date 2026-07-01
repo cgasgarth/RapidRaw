@@ -6,6 +6,13 @@ import { getSuperResolutionModeForDetailPolicy } from '../schemas/computational-
 type SuperResolutionArtifactReviewInput = {
   decisionStatus: 'blocked' | 'downgraded' | 'eligible_for_apply' | 'preview_only';
   detailPolicy: SuperResolutionUiSettings['detailPolicy'];
+  measuredReview?: {
+    detailGainRatio: number;
+    detailReviewRegions: SuperResolutionOutputReviewWorkflow['detailReview']['regions'];
+    downscaleReconstructionError: number;
+    falseDetailRisk: Exclude<SuperResolutionOutputReviewWorkflow['falseDetailRisk'], 'unknown'>;
+    falseDetailRiskScore: number;
+  };
   outputArtifact: {
     artifactId: string;
     contentHash?: string;
@@ -41,7 +48,9 @@ type SuperResolutionArtifactReviewInput = {
   };
   validationSummary: {
     alignmentConfidence?: number;
+    downscaleReconstructionError?: number;
     expectedDetailGainRatio?: number;
+    falseDetailRiskScore?: number;
     falseDetailRisk?: SuperResolutionOutputReviewWorkflow['falseDetailRisk'];
     humanReviewStatus: SuperResolutionOutputReviewWorkflow['humanReviewStatus'];
     overlapCoverageRatio?: number;
@@ -109,17 +118,34 @@ export const buildSuperResolutionOutputReviewFromArtifact = (
       overlapCoverageRatio: artifactValue.validationSummary.overlapCoverageRatio ?? null,
       reviewCropCount,
     },
+    downscaleReconstructionError:
+      artifactValue.measuredReview?.downscaleReconstructionError ??
+      artifactValue.validationSummary.downscaleReconstructionError ??
+      null,
     decision: deriveDecision(artifactValue),
-    detailGainRatio: artifactValue.validationSummary.expectedDetailGainRatio ?? null,
+    detailGainRatio:
+      artifactValue.measuredReview?.detailGainRatio ?? artifactValue.validationSummary.expectedDetailGainRatio ?? null,
     detailPolicy: artifactValue.detailPolicy,
     detailReview: buildDetailReview({
       baselineArtifactId: 'artifacts/validation/sr-synthetic-output-artifact/sr-x2-baseline-crop-center.pgm',
-      detailGainRatio: artifactValue.validationSummary.expectedDetailGainRatio ?? null,
-      falseDetailRisk: artifactValue.validationSummary.falseDetailRisk ?? 'unknown',
+      detailGainRatio:
+        artifactValue.measuredReview?.detailGainRatio ??
+        artifactValue.validationSummary.expectedDetailGainRatio ??
+        null,
+      falseDetailRisk:
+        artifactValue.measuredReview?.falseDetailRisk ?? artifactValue.validationSummary.falseDetailRisk ?? 'unknown',
+      ...(artifactValue.measuredReview?.detailReviewRegions === undefined
+        ? {}
+        : { measuredRegions: artifactValue.measuredReview.detailReviewRegions }),
       outputArtifactId: artifactValue.outputArtifact.artifactId,
     }),
     editableGate: deriveEditableGate(artifactValue),
-    falseDetailRisk: artifactValue.validationSummary.falseDetailRisk ?? 'unknown',
+    falseDetailRisk:
+      artifactValue.measuredReview?.falseDetailRisk ?? artifactValue.validationSummary.falseDetailRisk ?? 'unknown',
+    falseDetailRiskScore:
+      artifactValue.measuredReview?.falseDetailRiskScore ??
+      artifactValue.validationSummary.falseDetailRiskScore ??
+      null,
     humanReviewStatus: artifactValue.validationSummary.humanReviewStatus,
     mode: getSuperResolutionModeForDetailPolicy(artifactValue.detailPolicy),
     modePolicyVersion: 1,
@@ -154,8 +180,13 @@ export const buildSuperResolutionOutputReviewFromArtifact = (
             artifactId: artifactValue.supportMap.artifactId,
             coverageRatio: artifactValue.supportMap.coverageRatio,
             detailPolicy: artifactValue.detailPolicy,
+            ...(artifactValue.supportMap.downgradeReason === undefined
+              ? {}
+              : { downgradeReason: artifactValue.supportMap.downgradeReason }),
             effectiveScale: artifactValue.supportMap.effectiveScale,
+            reviewStatus: artifactValue.supportMap.reviewStatus,
             requestedScale: artifactValue.supportMap.requestedScale,
+            weakSupportRatio: artifactValue.supportMap.weakSupportRatio,
             warningCodes: artifactValue.warningCodes,
           }),
     warningCodes: artifactValue.warningCodes,
@@ -184,6 +215,7 @@ export const buildSuperResolutionOutputReviewWorkflow = ({
       overlapCoverageRatio: null,
       reviewCropCount,
     },
+    downscaleReconstructionError: null,
     decision,
     detailPolicy: settings.detailPolicy,
     detailGainRatio: null,
@@ -195,6 +227,7 @@ export const buildSuperResolutionOutputReviewWorkflow = ({
     }),
     editableGate: 'blocked_review_required',
     falseDetailRisk: settings.detailPolicy === 'aggressive_preview_only' ? 'high' : 'unknown',
+    falseDetailRiskScore: null,
     humanReviewStatus: 'pending',
     mode: getSuperResolutionModeForDetailPolicy(settings.detailPolicy),
     modePolicyVersion: 1,
@@ -265,13 +298,42 @@ const buildDetailReview = ({
   baselineArtifactId,
   detailGainRatio,
   falseDetailRisk,
+  measuredRegions,
   outputArtifactId,
 }: {
   baselineArtifactId: string;
   detailGainRatio: number | null;
   falseDetailRisk: SuperResolutionOutputReviewWorkflow['falseDetailRisk'];
+  measuredRegions?: SuperResolutionOutputReviewWorkflow['detailReview']['regions'];
   outputArtifactId: string;
 }): SuperResolutionOutputReviewWorkflow['detailReview'] => {
+  if (measuredRegions !== undefined) {
+    const improvementHighlightCount = measuredRegions.filter((region) => region.improvementRatio > 1).length;
+    const meanImprovementRatio =
+      measuredRegions.length === 0
+        ? 1
+        : Number(
+            (
+              measuredRegions.reduce((sum, region) => sum + region.improvementRatio, 0) / measuredRegions.length
+            ).toFixed(3),
+          );
+    const reviewStatus = measuredRegions.some((region) => region.reviewStatus === 'rejected')
+      ? 'rejected'
+      : measuredRegions.some((region) => region.reviewStatus === 'needs_review')
+        ? 'needs_review'
+        : 'accepted';
+
+    return {
+      artifactId: `${outputArtifactId}:detail-review`,
+      baselineArtifactId,
+      improvementHighlightCount,
+      meanImprovementRatio,
+      reconstructedArtifactId: outputArtifactId,
+      regions: measuredRegions,
+      reviewStatus,
+    };
+  }
+
   const meanImprovementRatio = Number((detailGainRatio ?? 1.18).toFixed(3));
   const reviewStatus =
     falseDetailRisk === 'high' ? 'needs_review' : meanImprovementRatio >= 1.08 ? 'accepted' : 'needs_review';
@@ -319,29 +381,37 @@ const buildSupportMapReview = ({
   artifactId,
   coverageRatio,
   detailPolicy,
+  downgradeReason,
   effectiveScale,
+  reviewStatus,
   requestedScale,
+  weakSupportRatio,
   warningCodes,
 }: {
   artifactId: string;
   coverageRatio: number | null;
   detailPolicy: SuperResolutionUiSettings['detailPolicy'];
+  downgradeReason?: SuperResolutionOutputReviewWorkflow['supportMap']['downgradeReason'];
   effectiveScale: number;
+  reviewStatus?: SuperResolutionOutputReviewWorkflow['supportMap']['reviewStatus'];
   requestedScale: number;
+  weakSupportRatio?: number;
   warningCodes: SuperResolutionOutputReviewWorkflow['warningCodes'];
 }): SuperResolutionOutputReviewWorkflow['supportMap'] => {
   const resolvedCoverageRatio = coverageRatio ?? (detailPolicy === 'conservative' ? 0.75 : 0.58);
-  const weakSupportRatio = Number(Math.max(0, 1 - resolvedCoverageRatio).toFixed(3));
-  const downgradeReason = warningCodes.includes('effective_scale_downgraded') ? 'effective_scale_downgraded' : null;
-  const reviewStatus =
-    warningCodes.includes('texture_risk') || weakSupportRatio > 0.25 || downgradeReason !== null
+  const resolvedWeakSupportRatio = Number((weakSupportRatio ?? Math.max(0, 1 - resolvedCoverageRatio)).toFixed(3));
+  const resolvedDowngradeReason =
+    downgradeReason ?? (warningCodes.includes('effective_scale_downgraded') ? 'effective_scale_downgraded' : null);
+  const finalReviewStatus =
+    reviewStatus ??
+    (warningCodes.includes('texture_risk') || resolvedWeakSupportRatio > 0.25 || resolvedDowngradeReason !== null
       ? 'review_required'
-      : 'apply_ready';
+      : 'apply_ready');
 
   return {
     artifactId,
     coverageRatio: Number(resolvedCoverageRatio.toFixed(3)),
-    downgradeReason,
+    downgradeReason: resolvedDowngradeReason,
     effectiveScale,
     regions: [
       {
@@ -354,7 +424,7 @@ const buildSupportMapReview = ({
         coverageRatio: Number(Math.max(0, resolvedCoverageRatio - 0.22).toFixed(3)),
         label: 'high frequency edge',
         regionId: 'high-frequency-edge',
-        risk: weakSupportRatio > 0.2 ? 'weak_support' : 'supported',
+        risk: resolvedWeakSupportRatio > 0.2 ? 'weak_support' : 'supported',
       },
       {
         coverageRatio: Number(Math.max(0, resolvedCoverageRatio - 0.36).toFixed(3)),
@@ -370,16 +440,23 @@ const buildSupportMapReview = ({
       },
     ],
     requestedScale,
-    reviewStatus,
-    weakSupportRatio,
+    reviewStatus: finalReviewStatus,
+    weakSupportRatio: resolvedWeakSupportRatio,
   };
 };
 
 const deriveDecision = (
   artifact: SuperResolutionArtifactReviewInput,
 ): SuperResolutionOutputReviewWorkflow['decision'] => {
+  const maxRegistrationResidualPx = artifact.validationSummary.registrationMetrics?.maxResidualPx ?? 0;
+  const falseDetailRisk = artifact.measuredReview?.falseDetailRisk ?? artifact.validationSummary.falseDetailRisk;
+  const supportReviewStatus = artifact.supportMap?.reviewStatus;
+
   if (artifact.decisionStatus === 'preview_only' || artifact.detailPolicy === 'aggressive_preview_only') {
     return 'preview_only';
+  }
+  if (supportReviewStatus === 'blocked' || maxRegistrationResidualPx > 0.75 || falseDetailRisk === 'high') {
+    return 'blocked';
   }
   if (artifact.validationSummary.humanReviewStatus === 'failed' || artifact.staleState.state !== 'current') {
     return 'blocked';

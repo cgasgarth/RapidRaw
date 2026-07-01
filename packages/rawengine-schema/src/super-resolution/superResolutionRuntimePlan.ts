@@ -18,6 +18,10 @@ import {
   buildSuperResolutionAlignmentDiagnosticsV1,
   superResolutionAlignmentDiagnosticsV1Schema,
 } from './superResolutionAlignmentDiagnostics.js';
+import {
+  measureSuperResolutionDetailFidelityV1,
+  superResolutionMeasuredReviewMetricsV1Schema,
+} from './superResolutionDetailFidelity.js';
 import { applyPixelShiftSuperResolutionV1, createNearestNeighborBaselineV1 } from './superResolutionPixelShift.js';
 import {
   buildSuperResolutionReconstructionDiagnosticsV1,
@@ -93,6 +97,7 @@ export const superResolutionRuntimeProvenanceV1Schema = z
           .strict(),
       )
       .min(2),
+    measuredReview: superResolutionMeasuredReviewMetricsV1Schema,
     mode: z.enum(['single_image', 'multi_image']),
     reconstructionMode: z.enum(['model_detail', 'optical_flow']),
     requestedAlignmentMode: z.enum(['auto', 'translation', 'homography', 'optical_flow', 'none']),
@@ -316,7 +321,6 @@ const renderSuperResolutionRuntime = (request: ParsedSuperResolutionRuntimePlanR
     scale,
     width: firstFrame.width,
   });
-  const warnings = deriveSrWarnings(result.changedPixelRatioAgainstNearest, request.command.parameters.detailPolicy);
   const confidenceMap = buildSrConfidenceMap(
     request['frames'],
     result.outputWidth,
@@ -324,6 +328,19 @@ const renderSuperResolutionRuntime = (request: ParsedSuperResolutionRuntimePlanR
     result.outputScale,
   );
   const frameRegistrations = measureSrFrameRegistrations(request['frames'], result.outputPixels, result.outputScale);
+  const measuredReview = measureSuperResolutionDetailFidelityV1({
+    frames: request['frames'],
+    outputHeight: result.outputHeight,
+    outputPixels: result.outputPixels,
+    outputScale: result.outputScale,
+    outputWidth: result.outputWidth,
+    registrationResidualPx: frameRegistrations.reduce(
+      (maxResidual, registration) => Math.max(maxResidual, registration.registrationResidualPx),
+      0,
+    ),
+    weakSupportRatio: Math.max(0, 1 - confidenceMap.completeSampleRatio),
+  });
+  const warnings = deriveSrWarnings(measuredReview.falseDetailRisk, request.command.parameters.detailPolicy);
 
   return {
     height: result.outputHeight,
@@ -343,6 +360,7 @@ const renderSuperResolutionRuntime = (request: ParsedSuperResolutionRuntimePlanR
       engineId: SR_RUNTIME_ENGINE_ID,
       engineVersion: SR_RUNTIME_ENGINE_VERSION,
       frameRegistrations,
+      measuredReview,
       mode: request.command.parameters.mode,
       reconstructionMode: request.command.parameters.reconstructionMode,
       requestedAlignmentMode: request.command.parameters.alignmentMode,
@@ -385,8 +403,23 @@ const renderDegradedSuperResolutionDryRun = (
     outputScale: scale,
     sampleCounts,
   });
-  const warnings = ['support_map_blocked', ...deriveSrWarnings(0, request.command.parameters.detailPolicy)].sort();
   const frameRegistrations = measureSrFrameRegistrations(request['frames'], outputPixels, scale);
+  const measuredReview = measureSuperResolutionDetailFidelityV1({
+    frames: request['frames'],
+    outputHeight,
+    outputPixels,
+    outputScale: scale,
+    outputWidth,
+    registrationResidualPx: frameRegistrations.reduce(
+      (maxResidual, registration) => Math.max(maxResidual, registration.registrationResidualPx),
+      0,
+    ),
+    weakSupportRatio: Math.max(0, 1 - confidenceMap.completeSampleRatio),
+  });
+  const warnings = [
+    'support_map_blocked',
+    ...deriveSrWarnings(measuredReview.falseDetailRisk, request.command.parameters.detailPolicy),
+  ].sort();
 
   return {
     height: outputHeight,
@@ -401,6 +434,7 @@ const renderDegradedSuperResolutionDryRun = (
       engineId: SR_RUNTIME_ENGINE_ID,
       engineVersion: SR_RUNTIME_ENGINE_VERSION,
       frameRegistrations,
+      measuredReview,
       mode: request.command.parameters.mode,
       reconstructionMode: request.command.parameters.reconstructionMode,
       requestedAlignmentMode: request.command.parameters.alignmentMode,
@@ -541,11 +575,11 @@ const buildSrPreflightEstimate = (
 };
 
 const deriveSrWarnings = (
-  changedPixelRatioAgainstNearest: number,
+  falseDetailRisk: SuperResolutionRuntimeProvenanceV1['measuredReview']['falseDetailRisk'],
   detailPolicy: SuperResolutionRuntimeProvenanceV1['detailPolicy'],
 ): string[] => {
   const warnings = new Set<string>();
-  if (changedPixelRatioAgainstNearest < 0.2) warnings.add('texture_risk');
+  if (falseDetailRisk !== 'low') warnings.add('texture_risk');
   if (detailPolicy === 'aggressive_preview_only') warnings.add('aggressive_preview_only');
   return [...warnings].sort();
 };

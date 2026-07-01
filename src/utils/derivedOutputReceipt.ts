@@ -265,6 +265,7 @@ export const buildPanoramaDerivedOutputReceipt = ({
     },
     outputArtifactId: `artifact_panorama_${hashStableJson(review.outputPath).replace(':', '_')}`,
     outputContentHash: hashStableJson({
+      boundaryFillColor: review.boundaryFillColor,
       boundaryMode: review.boundaryMode,
       crop: review.crop,
       outputDimensions: review.outputDimensions,
@@ -304,6 +305,7 @@ const buildPanoramaReceiptMetadata = ({
   boundary: {
     crop: review.crop,
     effectiveMode: review.boundaryMode,
+    ...(review.boundaryFillColor === undefined ? {} : { fillColor: review.boundaryFillColor }),
     manualCropInsetsPercent: settings.manualCropInsetsPercent,
     overlapFeatherPx: settings.overlapFeatherPx,
     requestedMode: settings.boundaryMode,

@@ -84,6 +84,7 @@ export const superResolutionOutputReviewWorkflowSchema = z
         reviewCropCount: z.number().int().nonnegative(),
       })
       .strict(),
+    downscaleReconstructionError: z.number().min(0).nullable(),
     editableGate: superResolutionOutputReviewEditableGateSchema,
     decision: superResolutionOutputReviewDecisionSchema,
     detailGainRatio: z.number().positive().nullable(),
@@ -100,6 +101,7 @@ export const superResolutionOutputReviewWorkflowSchema = z
       })
       .strict(),
     falseDetailRisk: superResolutionFalseDetailRiskSchema,
+    falseDetailRiskScore: z.number().min(0).max(1).nullable(),
     humanReviewStatus: z.enum(['failed', 'not_required', 'passed', 'pending']),
     mode: superResolutionModeSchema,
     modePolicyVersion: z.literal(1),
