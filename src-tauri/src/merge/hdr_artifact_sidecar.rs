@@ -187,7 +187,7 @@ fn upsert_hdr_artifact_metadata(
         .iter()
         .map(|source| {
             serde_json::json!({
-                "contentHash": format!("path:{}", source.image_path),
+                "contentHash": source.content_hash,
                 "graphRevision": HDR_GRAPH_REVISION,
                 "resolvedExposureEv": source.exposure_time_seconds.log2(),
                 "sourceIndex": source.source_index,
@@ -206,7 +206,7 @@ fn upsert_hdr_artifact_metadata(
     let provenance_sources = source_refs
         .iter()
         .map(|source| DerivedOutputProvenanceSource {
-            content_hash: format!("path:{}", source.image_path),
+            content_hash: source.content_hash.clone(),
             graph_revision: HDR_GRAPH_REVISION,
             path: &source.image_path,
         })
@@ -337,6 +337,7 @@ mod tests {
         exposure_time_seconds: f32,
     ) -> PendingHdrSourceRef {
         PendingHdrSourceRef {
+            content_hash: format!("blake3:source-hash-{}", source_index),
             image_path: path,
             width: 64,
             height: 48,
@@ -415,6 +416,10 @@ mod tests {
             .expect("HDR sidecar should be written");
 
         let sidecar_path = output_path.with_file_name("IMG_0001_Hdr.png.rrdata");
+        let serialized_sidecar: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&sidecar_path).expect("HDR sidecar JSON should be readable"),
+        )
+        .expect("HDR sidecar JSON should parse");
         let sidecar = crate::exif_processing::load_sidecar(&sidecar_path);
         let artifacts = sidecar
             .raw_engine_artifacts
@@ -467,5 +472,18 @@ mod tests {
         );
         assert_eq!(artifact["previewExportParity"]["meanAbsDelta"], 0.0);
         assert_eq!(artifact["sourceImageRefs"].as_array().unwrap().len(), 2);
+        assert_eq!(
+            serialized_sidecar["rawEngineArtifacts"]["hdrMergeArtifacts"][0]["sourceState"][0]["contentHash"],
+            "blake3:source-hash-0"
+        );
+        assert_eq!(
+            serialized_sidecar["rawEngineArtifacts"]["derivedOutputProvenanceSidecars"][0]["sourceState"]
+                [0]["contentHash"],
+            "blake3:source-hash-0"
+        );
+        assert_ne!(
+            serialized_sidecar["rawEngineArtifacts"]["hdrMergeArtifacts"][0]["sourceState"][0]["contentHash"],
+            format!("path:{}", source_refs[0].image_path)
+        );
     }
 }

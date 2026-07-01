@@ -246,6 +246,7 @@ export default function HdrModal({
         deghostReviewRequired: isDeghostReviewRequired,
         outputPath: handoffSummary.outputPath,
         settings,
+        ...(sourceMetadata === undefined ? {} : { sourceMetadata }),
         sourcePaths,
       }),
       settings,
@@ -257,6 +258,7 @@ export default function HdrModal({
     lastApplyCommand?.acceptedDryRunPlanHash,
     lastApplyCommand?.acceptedDryRunPlanId,
     settings,
+    sourceMetadata,
     sourcePaths,
   ]);
   const visibleDerivedOutputReceipt =
@@ -307,6 +309,7 @@ export default function HdrModal({
         deghostReviewRequired: isDeghostReviewRequired,
         outputPath: path,
         settings,
+        ...(sourceMetadata === undefined ? {} : { sourceMetadata }),
         sourcePaths,
       });
       const receipt = buildHdrDerivedOutputReceipt({

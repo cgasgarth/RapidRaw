@@ -4,6 +4,7 @@ import {
   hdrEditableHandoffSummarySchema,
 } from '../schemas/computational-merge/hdrMergeUiSchemas';
 import { getDisplayFileName } from './displayFilePath';
+import type { HdrBracketPreflightSourceMetadata } from './hdrBracketPreflight';
 
 const HDR_GRAPH_REVISION = 'hdr_legacy_runtime_v1';
 const HDR_PREVIEW_EXPORT_PARITY_FIELDS = [
@@ -31,18 +32,22 @@ export const buildHdrEditableHandoffSummary = ({
   deghostReviewRequired,
   outputPath,
   settings,
+  sourceMetadata,
   sourcePaths,
 }: {
   deghostReviewAccepted?: boolean;
   deghostReviewRequired?: boolean;
   outputPath: string;
   settings: HdrMergeUiSettings;
+  sourceMetadata?: HdrBracketPreflightSourceMetadata[];
   sourcePaths: string[];
 }): HdrEditableHandoffSummary => {
+  const metadataByPath = new Map((sourceMetadata ?? []).map((source) => [source.path, source]));
   const sourceRefs = sourcePaths.map((path, sourceIndex) => ({
+    contentHash: metadataByPath.get(path)?.contentHash ?? hashStableJson({ path, sourceIndex }),
     contentState: `path:${path}`,
     displayName: getDisplayFileName(path),
-    graphRevision: HDR_GRAPH_REVISION,
+    graphRevision: metadataByPath.get(path)?.graphRevision ?? HDR_GRAPH_REVISION,
     sourceIndex,
   }));
   const previewStateHash = hashStableJson({

@@ -39,10 +39,11 @@ for (const marker of [
   'data-scene-merge-color-state={handoffSummary.sceneMergeColorState}',
   'data-testid="hdr-editable-handoff-provenance"',
   'data-testid="hdr-derived-output-receipt-store-entry"',
-  "data-hdr-derived-source-open-path={storedDerivedOutputReceipt.openInEditorAction.path ?? ''}",
-  'const receipt = buildHdrDerivedOutputReceipt({ handoff, settings });',
+  "data-hdr-derived-source-open-path={visibleDerivedOutputReceipt.openInEditorAction.path ?? ''}",
+  'sourceMetadata,',
+  'const receipt = buildHdrDerivedOutputReceipt({',
   'upsertDerivedOutputReceipt(receipt);',
-  'const openPath = storedDerivedOutputReceipt?.openInEditorAction.path ?? savedPath;',
+  'const openPath = visibleDerivedOutputReceipt?.openInEditorAction.path ?? savedPath;',
   "openInEditor: t('modals.hdr.openInEditor')",
   'savedPath={savedPath}',
 ]) {
@@ -101,6 +102,23 @@ const handoffSummary = buildHdrEditableHandoffSummary({
     '/private-fixtures/hdr/bracket-alignment-v1/frame-02-mid.arw',
     '/private-fixtures/hdr/bracket-alignment-v1/frame-03-over.arw',
   ],
+  sourceMetadata: [
+    {
+      contentHash: 'blake3:hdr-source-under',
+      graphRevision: 'graph_hdr_under_edited',
+      path: '/private-fixtures/hdr/bracket-alignment-v1/frame-01-under.arw',
+    },
+    {
+      contentHash: 'blake3:hdr-source-mid',
+      graphRevision: 'graph_hdr_mid_edited',
+      path: '/private-fixtures/hdr/bracket-alignment-v1/frame-02-mid.arw',
+    },
+    {
+      contentHash: 'blake3:hdr-source-over',
+      graphRevision: 'graph_hdr_over_edited',
+      path: '/private-fixtures/hdr/bracket-alignment-v1/frame-03-over.arw',
+    },
+  ],
 });
 
 if (handoffSummary.previewExportParity.status !== handoffSummary.previewExportParityStatus) {
@@ -123,6 +141,12 @@ if (handoffSummary.previewExportParity.previewStateHash === handoffSummary.previ
 }
 if (!handoffSummary.previewExportParity.comparedFields.includes('outputPath')) {
   throw new Error('HDR preview/export parity must link the export output path.');
+}
+if (handoffSummary.sourceRefs[0]?.contentHash !== 'blake3:hdr-source-under') {
+  throw new Error('HDR handoff must preserve source content hashes for derived artifact provenance.');
+}
+if (handoffSummary.sourceRefs[0]?.graphRevision !== 'graph_hdr_under_edited') {
+  throw new Error('HDR handoff must preserve source graph revisions for stale-source detection.');
 }
 
 console.log('hdr editable handoff ok');

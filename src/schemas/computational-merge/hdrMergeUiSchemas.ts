@@ -34,9 +34,10 @@ export const hdrMergeUiSettingsSchema = z
 
 export const hdrEditableSourceRefSchema = z
   .object({
+    contentHash: z.string().min(1),
     contentState: z.string().min(1),
     displayName: z.string().min(1),
-    graphRevision: z.literal('hdr_legacy_runtime_v1'),
+    graphRevision: z.string().min(1),
     sourceIndex: z.number().int().nonnegative(),
   })
   .strict();
