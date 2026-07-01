@@ -1194,6 +1194,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorToolbar]: ProfessionalEditorToolbarVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorTokens]: ProfessionalEditorTokensVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalExportProofFooter]: ProfessionalExportProofFooterVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalAgentReview]: ProfessionalAgentReviewVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalLayersCompact]: ProfessionalLayersCompactVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawModalReview]: SuperResolutionPrivateRawModalReviewSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawUi]: SuperResolutionPrivateRawVisualSmoke,
@@ -2395,6 +2396,83 @@ function AgentChatVisualSmoke() {
   );
 }
 
+const professionalAgentReviewStates = [
+  'context blocked',
+  'preview ready',
+  'approval required',
+  'applying',
+  'applied',
+  'rollback available',
+  'failed',
+  'export proof available',
+] as const;
+
+function ProfessionalAgentReviewVisualSmoke() {
+  return (
+    <main
+      className="h-full min-h-screen bg-editor-matte text-text-primary font-sans"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.ProfessionalAgentReview}
+    >
+      <div className="flex min-h-screen bg-editor-matte">
+        <section
+          className="flex flex-1 items-center justify-center border-r border-white/10 bg-editor-panel p-6"
+          data-visual-smoke-section="professional-agent-review-preview"
+        >
+          <div className="w-full max-w-4xl">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase text-text-secondary">
+                  {copy.professionalAgentReview}
+                </p>
+                <h1 className="text-lg font-semibold">{copy.professionalAgentReviewProposal}</h1>
+              </div>
+              <span className="rounded border border-emerald-500/25 bg-emerald-500/10 px-2 py-1 text-[11px] text-emerald-100">
+                {copy.professionalAgentReviewMediumPreview}
+              </span>
+            </div>
+            <div
+              className="aspect-[4/3] overflow-hidden rounded-md border border-white/10 shadow-2xl"
+              style={{ background: 'linear-gradient(135deg, #1d3036, #6d725f 48%, #f1c778)' }}
+            >
+              <div className="grid h-full grid-cols-2">
+                <div className="border-r border-white/10 bg-black/10 p-3">
+                  <span className="rounded bg-black/45 px-2 py-1 text-[11px] font-semibold uppercase">
+                    {copy.professionalAgentReviewBefore}
+                  </span>
+                </div>
+                <div className="bg-white/10 p-3">
+                  <span className="rounded bg-black/45 px-2 py-1 text-[11px] font-semibold uppercase">
+                    {copy.professionalAgentReviewAfter}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2 text-[11px]" data-testid="professional-agent-review-state-matrix">
+              {professionalAgentReviewStates.map((state) => (
+                <span
+                  className="rounded border border-white/10 bg-white/5 px-2 py-1 text-text-secondary"
+                  data-review-state={state}
+                  key={state}
+                >
+                  {state}
+                </span>
+              ))}
+            </div>
+          </div>
+        </section>
+        <aside
+          className="max-h-screen overflow-y-auto border-l border-white/10 bg-editor-panel p-4"
+          data-visual-smoke-section="professional-agent-review-panel"
+          style={{ width: '24rem' }}
+        >
+          <AgentChatShell transcript={agentChatTranscriptFixture} />
+        </aside>
+      </div>
+    </main>
+  );
+}
+
 const filmstripFrames = [
   { name: 'DSC_1042.ARW', tone: 'from-emerald-400 to-cyan-500', rating: '5' },
   { name: 'DSC_1043.ARW', tone: 'from-amber-300 to-rose-500', rating: '4' },
@@ -2704,6 +2782,11 @@ const copy = {
   professionalEditorToolbar: 'Professional editor toolbar',
   professionalEditorToolbarDisabled: 'disabled',
   professionalExportProofFooter: 'Export proof footer',
+  professionalAgentReview: 'Professional agent review',
+  professionalAgentReviewAfter: 'After',
+  professionalAgentReviewBefore: 'Before',
+  professionalAgentReviewMediumPreview: 'medium preview',
+  professionalAgentReviewProposal: 'Reviewable edit proposal',
   exportFooterIdle: 'idle',
   exportFooterRunning: 'running',
   exportFooterRetry: 'retry',

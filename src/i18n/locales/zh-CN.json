@@ -719,6 +719,29 @@
           "local": "",
           "stagesComplete": ""
         },
+        "proposal": {
+          "affectedControls": "",
+          "after": "",
+          "applyAction": "",
+          "approveAction": "",
+          "collapsedAuditDetail_other": "",
+          "mediumPreview": "",
+          "pixels": "",
+          "previewAction": "",
+          "quality": "",
+          "rejectAction": "",
+          "rollbackAction": "",
+          "status": {
+            "applied": "",
+            "applying": "",
+            "approvalRequired": "",
+            "failed": "",
+            "previewReady": "",
+            "rejected": ""
+          },
+          "summary": "",
+          "title": ""
+        },
         "readiness": {
           "applies": "",
           "appServer": "",

@@ -723,6 +723,30 @@
           "local": "local",
           "stagesComplete": "{{completed}}/{{total}} stages complete"
         },
+        "proposal": {
+          "affectedControls": "Affected controls and layers",
+          "after": "After",
+          "applyAction": "Apply",
+          "approveAction": "Approve plan",
+          "collapsedAuditDetail_one": "Collapsed audit detail · {{count}} record",
+          "collapsedAuditDetail_other": "Collapsed audit detail · {{count}} records",
+          "mediumPreview": "Medium preview",
+          "pixels": "Pixels",
+          "previewAction": "Preview",
+          "quality": "Quality",
+          "rejectAction": "Reject",
+          "rollbackAction": "Rollback",
+          "status": {
+            "applied": "Applied",
+            "applying": "Applying",
+            "approvalRequired": "Approval required",
+            "failed": "Failed",
+            "previewReady": "Preview ready",
+            "rejected": "Rejected"
+          },
+          "summary": "Review the proposed image edit before applying it.",
+          "title": "Proposed edit"
+        },
         "readiness": {
           "applies": "Applies",
           "appServer": "App-server",
