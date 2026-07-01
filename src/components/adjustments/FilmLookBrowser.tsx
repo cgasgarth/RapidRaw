@@ -38,6 +38,8 @@ const FILM_LOOK_COMPARE_SLOTS: Array<FilmLookComparisonSlot> = ['a', 'b'];
 const FILM_LOOK_FAVORITES_STORAGE_KEY = 'rapidraw.filmLookFavorites.v1';
 const FILM_LOOK_SORT_MODES: Array<FilmLookSortMode> = ['catalog', 'name_asc', 'strength_desc', 'adjustment_count_desc'];
 const FILM_LOOK_STRENGTH_PRESETS = [25, 50, 75, 100] as const;
+const GOVERNED_FILM_LOOK_RUNTIME_LOOK_ID = 'film_look.generic.warm_print.v1';
+const GOVERNED_FILM_LOOK_RUNTIME_RECIPE_ID = 'film_look.governed.warm_print_grain_halation.v1';
 const filmLookButtonClassName =
   'rounded border border-editor-border bg-editor-panel px-2 py-1 text-xs text-text-secondary transition-colors hover:bg-editor-panel-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:opacity-45';
 const filmLookChoiceClassName = (isActive: boolean) =>
@@ -208,6 +210,7 @@ export function FilmLookBrowser({
   const selectedLookAdjustmentSummaries =
     selectedLook === undefined ? [] : getFilmLookAdjustmentSummaries(selectedLook);
   const selectedLookRuntimeReady = selectedLook?.runtimeSupport === 'adjustment_patch_preview_export';
+  const selectedLookGovernedRuntimeReady = selectedLook?.id === GOVERNED_FILM_LOOK_RUNTIME_LOOK_ID;
   const comparisonReadyCount = FILM_LOOK_COMPARE_SLOTS.filter((slot) => comparisonSelection[slot] !== null).length;
   const isComparisonReady = comparisonReadyCount === FILM_LOOK_COMPARE_SLOTS.length;
 
@@ -630,6 +633,10 @@ export function FilmLookBrowser({
       {selectedLook !== undefined && (
         <section
           className="space-y-2 rounded-md border border-editor-border bg-editor-panel p-3"
+          data-governed-output-effects-ready={String(selectedLookGovernedRuntimeReady)}
+          data-governed-output-effects-recipe-id={
+            selectedLookGovernedRuntimeReady ? GOVERNED_FILM_LOOK_RUNTIME_RECIPE_ID : undefined
+          }
           data-runtime-support={selectedLook.runtimeSupport}
           data-testid="film-look-provenance-inspector"
         >
@@ -680,6 +687,7 @@ export function FilmLookBrowser({
           <div
             className="grid grid-cols-3 gap-2 rounded-md border border-editor-border bg-editor-panel-well p-2 text-[11px]"
             data-claim-level={selectedLook.provenance.claimLevel}
+            data-governed-output-effects-ready={String(selectedLookGovernedRuntimeReady)}
             data-look-family={selectedLook.category}
             data-preview-export-ready={String(selectedLookRuntimeReady)}
             data-testid="film-look-readiness-summary"
