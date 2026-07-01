@@ -57,6 +57,8 @@ import {
   type LayerStackCommandBridgeOperation,
 } from '../../../../utils/layers/layerStackCommandBridge';
 import { persistLayerStackSidecarInAdjustments } from '../../../../utils/layers/layerStackSidecarAdjustments';
+import { editorChromeStatusChipClassName, editorChromeTokens } from '../../../ui/editorChromeTokens';
+import { professionalInspectorDensityTokens } from '../../../ui/inspectorTokens';
 import Slider, { type SliderChangeEvent } from '../../../ui/primitives/Slider';
 import UiText from '../../../ui/primitives/Text';
 import { Mask, SubMaskMode, ToolType } from './Masks';
@@ -110,6 +112,13 @@ type RetouchRemoveControlField =
 
 const BASE_LAYER_ID = 'base-raw-layer';
 const LAYER_OPACITY_PRESETS = [0, 25, 50, 75, 100] as const;
+const layerPanelButtonClassName = `${professionalInspectorDensityTokens.actionButton.base} ${professionalInspectorDensityTokens.actionButton.icon} ${professionalInspectorDensityTokens.actionButton.quiet}`;
+const layerCompactButtonClassName = `${professionalInspectorDensityTokens.actionButton.base} ${professionalInspectorDensityTokens.actionButton.icon} ${professionalInspectorDensityTokens.actionButton.quiet}`;
+const layerInspectorCardClassName = professionalInspectorDensityTokens.card.nestedPanel;
+const layerNestedCardClassName = professionalInspectorDensityTokens.card.nested;
+const layerInputClassName = `${editorChromeTokens.input.base} ${editorChromeTokens.input.compact}`;
+const layerNumericInputClassName = `${layerInputClassName} ${editorChromeTokens.input.numeric}`;
+const layerSecondaryActionClassName = `${professionalInspectorDensityTokens.actionButton.base} ${professionalInspectorDensityTokens.actionButton.inactive}`;
 
 const buildInitialBrushLocalAdjustmentParameters = (imageDimensions: {
   height: number;
@@ -266,13 +275,13 @@ function getRemoveStatusGuidanceKey(status: RetouchRemoveSource['status']) {
 function getRemoveStatusTone(status: RetouchRemoveSource['status']): string {
   switch (status) {
     case 'ready':
-      return 'border-green-500/30 bg-green-500/10 text-green-200';
+      return editorChromeStatusChipClassName('success');
     case 'fallback_unchanged':
     case 'stale':
-      return 'border-amber-500/30 bg-amber-500/10 text-amber-200';
+      return editorChromeStatusChipClassName('warning');
     case 'needs_regeneration':
     case undefined:
-      return 'border-blue-500/30 bg-blue-500/10 text-blue-200';
+      return editorChromeStatusChipClassName('info');
   }
 }
 
@@ -954,12 +963,12 @@ export default function LayerStackPanel({
   };
 
   return (
-    <section className="shrink-0 border-b border-surface bg-bg-primary">
-      <div className="px-4 pt-4 pb-3 flex items-center justify-between">
+    <section className="shrink-0 border-b border-editor-border bg-editor-panel">
+      <div className={professionalInspectorDensityTokens.panelHeader.root}>
         <div className="flex min-w-0 items-center gap-2">
           <Layers3 size={18} className="shrink-0 text-text-secondary" />
           <span className="min-w-0">
-            <UiText variant={TextVariants.heading} className="block truncate">
+            <UiText variant={TextVariants.heading} className={professionalInspectorDensityTokens.panelHeader.title}>
               {t('editor.layers.title')}
             </UiText>
             <UiText
@@ -973,7 +982,7 @@ export default function LayerStackPanel({
         </div>
         <div className="flex items-center gap-1">
           <button
-            className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
+            className={layerPanelButtonClassName}
             data-tooltip={t('editor.layers.actions.groupWithNext')}
             disabled={!canGroupActiveLayer}
             onClick={groupActiveLayer}
@@ -982,7 +991,7 @@ export default function LayerStackPanel({
             <Layers3 size={17} className="mx-auto" />
           </button>
           <button
-            className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
+            className={layerPanelButtonClassName}
             data-tooltip={t('editor.layers.actions.createAdjustmentLayer')}
             onClick={createActiveAdjustmentLayer}
             type="button"
@@ -990,7 +999,7 @@ export default function LayerStackPanel({
             <Plus size={17} className="mx-auto" />
           </button>
           <button
-            className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
+            className={layerPanelButtonClassName}
             data-tooltip={t('editor.layers.actions.createBrushLocalAdjustmentLayer')}
             data-testid="layer-create-brush-local-adjustment"
             onClick={createBrushLocalAdjustmentLayer}
@@ -999,7 +1008,7 @@ export default function LayerStackPanel({
             <Brush size={17} className="mx-auto" />
           </button>
           <button
-            className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
+            className={layerPanelButtonClassName}
             data-tooltip={t('editor.layers.actions.createCloneLayer')}
             data-testid="layer-create-clone-layer"
             onClick={createCloneLayer}
@@ -1008,7 +1017,7 @@ export default function LayerStackPanel({
             <Copy size={17} className="mx-auto" />
           </button>
           <button
-            className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
+            className={layerPanelButtonClassName}
             data-tooltip={t('editor.layers.actions.createHealLayer')}
             data-testid="layer-create-heal-layer"
             onClick={createHealLayer}
@@ -1017,7 +1026,7 @@ export default function LayerStackPanel({
             <Sparkles size={17} className="mx-auto" />
           </button>
           <button
-            className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
+            className={layerPanelButtonClassName}
             data-tooltip={t('editor.layers.actions.createRemoveLayer')}
             data-testid="layer-create-remove-layer"
             onClick={createRemoveLayer}
@@ -1029,7 +1038,7 @@ export default function LayerStackPanel({
       </div>
 
       <div
-        className="mx-3 mb-3 grid grid-cols-1 gap-1.5 rounded-md border border-surface bg-bg-secondary/70 p-2"
+        className="mx-2 mt-2 grid grid-cols-3 gap-1 rounded-md border border-editor-border bg-editor-panel-well p-1.5"
         data-collapsed-group-count={groupWorkflowProof.collapsedGroupCount}
         data-collapsed-group-ids={groupWorkflowProof.collapsedGroupIds.join(',')}
         data-group-count={groupCount}
@@ -1045,7 +1054,7 @@ export default function LayerStackPanel({
         <UiText
           variant={TextVariants.small}
           weight={TextWeights.medium}
-          className="truncate rounded bg-bg-primary px-2 py-1 text-center tabular-nums text-text-secondary"
+          className="truncate rounded bg-editor-panel px-1.5 py-1 text-center text-[11px] tabular-nums text-text-secondary"
           data-testid="layer-visible-count"
         >
           {t('editor.layers.visibleLayerCount', { count: visibleLayerCount })}
@@ -1053,7 +1062,7 @@ export default function LayerStackPanel({
         <UiText
           variant={TextVariants.small}
           weight={TextWeights.medium}
-          className="truncate rounded bg-bg-primary px-2 py-1 text-center tabular-nums text-text-secondary"
+          className="truncate rounded bg-editor-panel px-1.5 py-1 text-center text-[11px] tabular-nums text-text-secondary"
           data-testid="layer-hidden-count"
         >
           {t('editor.layers.hiddenLayerCount', { count: hiddenLayerCount })}
@@ -1061,7 +1070,7 @@ export default function LayerStackPanel({
         <UiText
           variant={TextVariants.small}
           weight={TextWeights.medium}
-          className="truncate rounded bg-bg-primary px-2 py-1 text-center tabular-nums text-text-secondary"
+          className="truncate rounded bg-editor-panel px-1.5 py-1 text-center text-[11px] tabular-nums text-text-secondary"
           data-testid="layer-stack-count-summary"
         >
           {t('editor.layers.groupSummaryCount', { count: groupCount })}
@@ -1069,7 +1078,7 @@ export default function LayerStackPanel({
       </div>
 
       <div
-        className="mx-3 mb-3 rounded-md border border-surface bg-bg-secondary/70 p-2"
+        className="mx-2 mt-1.5 rounded-md border border-editor-border bg-editor-panel-well px-2 py-1.5"
         data-exportable-layer-count={exportReadiness.exportableLayerCount}
         data-hidden-layer-count={exportReadiness.hiddenLayerCount}
         data-masked-layer-count={exportReadiness.maskedLayerCount}
@@ -1089,7 +1098,7 @@ export default function LayerStackPanel({
       </div>
 
       <div
-        className="mx-3 mb-3 grid grid-cols-3 gap-2 rounded-md border border-surface bg-bg-secondary/70 p-2"
+        className="mx-2 mt-1.5 grid grid-cols-3 gap-1 rounded-md border border-editor-border bg-editor-panel-well p-1.5"
         data-can-group-active-layer={String(canGroupActiveLayer)}
         data-can-move-active-layer={String(canMoveActiveLayerUp || canMoveActiveLayerDown)}
         data-can-ungroup-active-layer={String(canUngroupActiveLayer)}
@@ -1102,7 +1111,7 @@ export default function LayerStackPanel({
         <UiText
           variant={TextVariants.small}
           weight={TextWeights.medium}
-          className="rounded bg-bg-primary px-2 py-1 text-left leading-4 text-text-secondary"
+          className="rounded bg-editor-panel px-1.5 py-1 text-left text-[11px] leading-4 text-text-secondary"
           data-testid="layer-operation-move-ready"
         >
           {canMoveActiveLayerUp || canMoveActiveLayerDown
@@ -1112,7 +1121,7 @@ export default function LayerStackPanel({
         <UiText
           variant={TextVariants.small}
           weight={TextWeights.medium}
-          className="rounded bg-bg-primary px-2 py-1 text-left leading-4 text-text-secondary"
+          className="rounded bg-editor-panel px-1.5 py-1 text-left text-[11px] leading-4 text-text-secondary"
           data-testid="layer-operation-group-ready"
         >
           {canGroupActiveLayer
@@ -1122,7 +1131,7 @@ export default function LayerStackPanel({
         <UiText
           variant={TextVariants.small}
           weight={TextWeights.medium}
-          className="rounded bg-bg-primary px-2 py-1 text-left leading-4 text-text-secondary"
+          className="rounded bg-editor-panel px-1.5 py-1 text-left text-[11px] leading-4 text-text-secondary"
           data-testid="layer-operation-ungroup-ready"
         >
           {canUngroupActiveLayer
@@ -1131,7 +1140,7 @@ export default function LayerStackPanel({
         </UiText>
       </div>
 
-      <div className="px-3 pb-3 space-y-1">
+      <div className="space-y-1 px-2 py-2">
         {rows.map((row) => {
           const isSelected = selectedLayerId === row.id;
 
@@ -1139,11 +1148,12 @@ export default function LayerStackPanel({
             <div
               key={row.id}
               className={cx(
-                'group grid w-full grid-cols-[18px_28px_minmax(0,1fr)_auto] items-center gap-2 rounded-md px-2 py-2 text-left transition-colors',
+                'group grid min-h-9 w-full grid-cols-[18px_24px_minmax(0,1fr)_auto] items-center gap-1.5 rounded px-1.5 py-1 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring',
                 isSelected
-                  ? 'bg-surface text-text-primary'
-                  : 'text-text-secondary hover:bg-surface/70 hover:text-text-primary',
-                row.isGroupedLayer && 'ml-6 w-[calc(100%-1.5rem)] border-l border-surface/80 pl-3',
+                  ? 'bg-editor-selected-quiet text-editor-selected-quiet-text'
+                  : 'text-text-secondary hover:bg-editor-panel-raised hover:text-text-primary',
+                row.isGroupHeader && 'border border-editor-border bg-editor-panel-well',
+                row.isGroupedLayer && 'ml-5 w-[calc(100%-1.25rem)] border-l border-editor-border pl-2.5',
               )}
               onClick={() => {
                 selectRow(row);
@@ -1181,7 +1191,7 @@ export default function LayerStackPanel({
                           ? t('editor.layers.actions.expandGroup')
                           : t('editor.layers.actions.collapseGroup')
                       }
-                      className="h-6 w-6 rounded text-text-secondary hover:bg-card-active hover:text-text-primary"
+                      className={layerCompactButtonClassName}
                       data-tooltip={
                         row.isGroupCollapsed
                           ? t('editor.layers.actions.expandGroup')
@@ -1207,14 +1217,24 @@ export default function LayerStackPanel({
                   className={row.isBase || row.isGroupedLayer ? 'text-transparent' : 'text-text-secondary'}
                 />
               )}
-              <span className="flex h-7 w-7 items-center justify-center rounded bg-bg-primary text-text-secondary ring-1 ring-surface">
+              <span className="flex h-6 w-6 items-center justify-center rounded bg-editor-panel text-text-secondary ring-1 ring-editor-border">
                 <Layers3 size={15} />
               </span>
               <span className="min-w-0">
-                <UiText as="span" variant={TextVariants.body} weight={TextWeights.medium} className="block truncate">
+                <UiText
+                  as="span"
+                  variant={TextVariants.body}
+                  weight={TextWeights.medium}
+                  className="block truncate text-[12px] leading-4"
+                >
                   {row.name}
                 </UiText>
-                <UiText as="span" variant={TextVariants.small} color={TextColors.secondary} className="block truncate">
+                <UiText
+                  as="span"
+                  variant={TextVariants.small}
+                  color={TextColors.secondary}
+                  className="block truncate text-[11px] leading-4"
+                >
                   {row.retouchCloneSourceLabel !== null
                     ? t(row.retouchMode === 'heal' ? 'editor.layers.healRowSummary' : 'editor.layers.cloneRowSummary', {
                         blendMode:
@@ -1255,7 +1275,7 @@ export default function LayerStackPanel({
                     as="span"
                     variant={TextVariants.small}
                     color={TextColors.secondary}
-                    className="block truncate tabular-nums"
+                    className="block truncate text-[11px] leading-4 tabular-nums"
                     data-testid="layer-retouch-transform-summary"
                   >
                     {`scale ${row.retouchCloneSource.scale.toFixed(2)} | rotate ${row.retouchCloneSource.rotationDegrees.toFixed(1)} deg`}
@@ -1266,7 +1286,7 @@ export default function LayerStackPanel({
                     as="span"
                     variant={TextVariants.small}
                     color={TextColors.secondary}
-                    className="block truncate tabular-nums"
+                    className="block truncate text-[11px] leading-4 tabular-nums"
                     data-remove-row-search-radius-multiplier={row.retouchRemoveSource.searchRadiusMultiplier}
                     data-remove-row-seed={row.retouchRemoveSource.seed}
                     data-remove-row-status={row.retouchRemoveSource.status ?? 'needs_regeneration'}
@@ -1282,7 +1302,7 @@ export default function LayerStackPanel({
               </span>
               <span className="flex items-center gap-1">
                 <button
-                  className="h-7 w-7 rounded-md text-text-secondary hover:bg-card-active hover:text-text-primary transition-colors"
+                  className={layerCompactButtonClassName}
                   data-tooltip={row.visible ? t('editor.layers.actions.hide') : t('editor.layers.actions.show')}
                   onClick={(event) => {
                     event.stopPropagation();
@@ -1297,11 +1317,7 @@ export default function LayerStackPanel({
                   disabled={row.isBase}
                   type="button"
                 >
-                  {row.visible ? (
-                    <Eye size={15} className="mx-auto mt-1.5" />
-                  ) : (
-                    <EyeOff size={15} className="mx-auto mt-1.5" />
-                  )}
+                  {row.visible ? <Eye size={15} className="mx-auto" /> : <EyeOff size={15} className="mx-auto" />}
                 </button>
               </span>
             </div>
@@ -1310,14 +1326,14 @@ export default function LayerStackPanel({
       </div>
 
       {activeRow && (
-        <div className="border-t border-surface px-4 py-3 space-y-3">
+        <div className="space-y-2 border-t border-editor-border bg-editor-matte px-2 py-2">
           <div className="grid grid-cols-[minmax(0,1fr)_160px] items-center gap-3">
-            <UiText variant={TextVariants.label} className="truncate">
+            <UiText variant={TextVariants.label} className="truncate text-[11px] uppercase text-text-secondary">
               {t('editor.layers.name')}
             </UiText>
             <input
               aria-label={t('editor.layers.name')}
-              className="h-8 w-full rounded-md bg-surface px-2 text-sm text-text-primary outline-none disabled:opacity-60"
+              className={layerInputClassName}
               defaultValue={activeRow.name}
               disabled={isBaseSelected}
               key={activeRow.id}
@@ -1333,12 +1349,12 @@ export default function LayerStackPanel({
             />
           </div>
           <div className="grid grid-cols-[minmax(0,1fr)_96px] items-center gap-3">
-            <UiText variant={TextVariants.label} className="truncate">
+            <UiText variant={TextVariants.label} className="truncate text-[11px] uppercase text-text-secondary">
               {t('editor.layers.blend')}
             </UiText>
             <div className="relative">
               <select
-                className="h-8 w-full appearance-none rounded-md bg-surface px-2 pr-7 text-sm text-text-primary outline-none disabled:opacity-60"
+                className={`${layerInputClassName} appearance-none pr-7`}
                 data-testid="layer-blend-mode-select"
                 disabled={isBaseSelected || isGroupHeaderSelected}
                 onChange={(event) => {
@@ -1360,6 +1376,7 @@ export default function LayerStackPanel({
           </div>
 
           <Slider
+            density="compact"
             defaultValue={100}
             disabled={isBaseSelected}
             fillOrigin="min"
@@ -1373,7 +1390,7 @@ export default function LayerStackPanel({
             value={activeRow.opacity}
           />
           <div
-            className="rounded-md border border-surface bg-bg-secondary p-2"
+            className={layerInspectorCardClassName}
             data-active-layer-adjustment-count={activeRow.adjustmentKeys.length}
             data-active-layer-adjustment-keys={activeRow.adjustmentKeys.join(',')}
             data-active-layer-id={activeRow.id}
@@ -1396,7 +1413,7 @@ export default function LayerStackPanel({
           </div>
           {activeRow.retouchCloneSource !== null && (
             <div
-              className="rounded-md border border-surface bg-bg-secondary p-2"
+              className={layerInspectorCardClassName}
               data-retouch-candidate-confidence={activeRow.retouchCloneSource.candidateProvenance?.confidence ?? ''}
               data-retouch-candidate-id={activeRow.retouchCloneSource.candidateProvenance?.candidateId ?? ''}
               data-retouch-candidate-kind={activeRow.retouchCloneSource.candidateProvenance?.candidateKind ?? ''}
@@ -1431,10 +1448,7 @@ export default function LayerStackPanel({
               </UiText>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 <button
-                  className={cx(
-                    'rounded-md border border-surface bg-surface px-2 py-1 text-xs text-text-secondary',
-                    'hover:bg-card-active hover:text-text-primary',
-                  )}
+                  className={layerSecondaryActionClassName}
                   data-retouch-swap-source-x={activeRow.retouchCloneSource.sourcePoint.x}
                   data-retouch-swap-target-x={activeRow.retouchCloneSource.targetPoint.x}
                   data-testid="layer-retouch-swap-source-target"
@@ -1444,10 +1458,7 @@ export default function LayerStackPanel({
                   {t('editor.layers.retouchSource.swapSourceTarget')}
                 </button>
                 <button
-                  className={cx(
-                    'rounded-md border border-surface bg-surface px-2 py-1 text-xs text-text-secondary',
-                    'hover:bg-card-active hover:text-text-primary',
-                  )}
+                  className={layerSecondaryActionClassName}
                   data-retouch-reset-rotation-degrees={activeRow.retouchCloneSource.rotationDegrees}
                   data-retouch-reset-scale={activeRow.retouchCloneSource.scale}
                   data-testid="layer-retouch-reset-transform"
@@ -1461,7 +1472,7 @@ export default function LayerStackPanel({
                 <div
                   data-retouch-candidate-source-label={`${activeRow.retouchCloneSource.sourcePoint.x.toFixed(3)},${activeRow.retouchCloneSource.sourcePoint.y.toFixed(3)}`}
                   data-retouch-candidate-target-label={`${activeRow.retouchCloneSource.targetPoint.x.toFixed(3)},${activeRow.retouchCloneSource.targetPoint.y.toFixed(3)}`}
-                  className="mt-2 rounded-md border border-surface bg-surface/60 px-2 py-1.5"
+                  className={`mt-2 ${layerNestedCardClassName}`}
                   data-testid="layer-retouch-candidate-provenance"
                 >
                   <UiText variant={TextVariants.small} className="block truncate text-text-tertiary">
@@ -1497,7 +1508,7 @@ export default function LayerStackPanel({
                   </UiText>
                 </div>
               )}
-              <div className="mt-2 grid grid-cols-2 gap-2">
+              <div className="mt-2 grid grid-cols-2 gap-1.5">
                 {(
                   [
                     {
@@ -1558,11 +1569,11 @@ export default function LayerStackPanel({
                   }>
                 ).map((control) => (
                   <label className="min-w-0" key={control.field}>
-                    <UiText variant={TextVariants.small} className="block truncate text-text-tertiary">
+                    <UiText variant={TextVariants.small} className="block truncate text-[11px] text-text-tertiary">
                       {control.label}
                     </UiText>
                     <input
-                      className="mt-1 h-8 w-full rounded-md bg-surface px-2 text-sm tabular-nums text-text-primary outline-none"
+                      className={`mt-1 w-full ${layerNumericInputClassName}`}
                       data-testid={`layer-retouch-control-${control.field}`}
                       defaultValue={control.value}
                       max={control.max}
@@ -1594,11 +1605,11 @@ export default function LayerStackPanel({
                     ] satisfies Array<{ field: RetouchControlField; label: string; value: number }>
                   ).map((control) => (
                     <label className="min-w-0" key={control.field}>
-                      <UiText variant={TextVariants.small} className="block truncate text-text-tertiary">
+                      <UiText variant={TextVariants.small} className="block truncate text-[11px] text-text-tertiary">
                         {control.label}
                       </UiText>
                       <input
-                        className="mt-1 h-8 w-full rounded-md bg-surface px-2 text-sm tabular-nums text-text-primary outline-none"
+                        className={`mt-1 w-full ${layerNumericInputClassName}`}
                         data-testid={`layer-retouch-control-${control.field}`}
                         defaultValue={control.value}
                         min={control.field === 'radiusPx' ? 0.01 : 0}
@@ -1618,7 +1629,7 @@ export default function LayerStackPanel({
           )}
           {activeRow.retouchRemoveSource !== null && (
             <div
-              className="rounded-md border border-surface bg-bg-secondary p-2"
+              className={layerInspectorCardClassName}
               data-remove-generator={activeRow.retouchRemoveSource.generator}
               data-remove-generator-version={activeRow.retouchRemoveSource.generatorVersion}
               data-remove-search-radius-multiplier={activeRow.retouchRemoveSource.searchRadiusMultiplier}
@@ -1645,10 +1656,7 @@ export default function LayerStackPanel({
                 </span>
                 <span className="flex shrink-0 flex-wrap justify-end gap-1.5">
                   <button
-                    className={cx(
-                      'rounded-md border border-surface bg-surface px-2 py-1 text-xs text-text-secondary',
-                      'hover:bg-card-active hover:text-text-primary',
-                    )}
+                    className={layerSecondaryActionClassName}
                     data-remove-reset-radius-px={activeRow.retouchRemoveSource.radiusPx ?? 48}
                     data-remove-reset-search-radius-multiplier={activeRow.retouchRemoveSource.searchRadiusMultiplier}
                     data-remove-reset-seed={activeRow.retouchRemoveSource.seed}
@@ -1659,10 +1667,7 @@ export default function LayerStackPanel({
                     {t('editor.layers.removeSource.resetRegion')}
                   </button>
                   <button
-                    className={cx(
-                      'rounded-md border border-surface bg-surface px-2 py-1 text-xs text-text-secondary',
-                      'hover:bg-card-active hover:text-text-primary',
-                    )}
+                    className={layerSecondaryActionClassName}
                     data-remove-revert-radius-px={activeRow.retouchRemoveSource.radiusPx ?? 48}
                     data-remove-revert-search-radius-multiplier={activeRow.retouchRemoveSource.searchRadiusMultiplier}
                     data-remove-revert-seed={activeRow.retouchRemoveSource.seed}
@@ -1673,10 +1678,7 @@ export default function LayerStackPanel({
                     {t('editor.layers.removeSource.revertOriginal')}
                   </button>
                   <button
-                    className={cx(
-                      'rounded-md border border-surface bg-surface px-2 py-1 text-xs text-text-secondary',
-                      'hover:bg-card-active hover:text-text-primary',
-                    )}
+                    className={layerSecondaryActionClassName}
                     data-testid="layer-retouch-remove-regenerate"
                     onClick={regenerateActiveRemoveLayer}
                     type="button"
@@ -1686,15 +1688,12 @@ export default function LayerStackPanel({
                 </span>
               </div>
               <div
-                className="mt-2 grid grid-cols-1 gap-2 rounded-md border border-surface bg-surface/60 p-2"
+                className={`mt-2 grid grid-cols-1 gap-1.5 ${layerNestedCardClassName}`}
                 data-testid="layer-retouch-remove-status-card"
               >
                 <div className="flex flex-wrap items-center gap-2">
                   <span
-                    className={cx(
-                      'inline-flex rounded-full border px-2 py-0.5 text-xs font-medium',
-                      getRemoveStatusTone(activeRow.retouchRemoveSource.status),
-                    )}
+                    className={getRemoveStatusTone(activeRow.retouchRemoveSource.status)}
                     data-testid="layer-retouch-remove-status-pill"
                   >
                     {t(getRemoveStatusLabelKey(activeRow.retouchRemoveSource.status))}
@@ -1719,7 +1718,7 @@ export default function LayerStackPanel({
               </div>
               {activeRow.retouchRemoveSource.resolvedSourcePoint !== undefined && (
                 <div
-                  className="mt-2 grid grid-cols-2 gap-2 rounded-md border border-surface bg-surface/60 p-2"
+                  className={`mt-2 grid grid-cols-2 gap-2 ${layerNestedCardClassName}`}
                   data-testid="layer-retouch-remove-resolved-source"
                 >
                   <span className="min-w-0">
@@ -1740,7 +1739,7 @@ export default function LayerStackPanel({
                   </span>
                 </div>
               )}
-              <div className="mt-2 grid grid-cols-2 gap-2">
+              <div className="mt-2 grid grid-cols-2 gap-1.5">
                 {(
                   [
                     {
@@ -1801,11 +1800,11 @@ export default function LayerStackPanel({
                   }>
                 ).map((control) => (
                   <label className="min-w-0" key={control.field}>
-                    <UiText variant={TextVariants.small} className="block truncate text-text-tertiary">
+                    <UiText variant={TextVariants.small} className="block truncate text-[11px] text-text-tertiary">
                       {control.label}
                     </UiText>
                     <input
-                      className="mt-1 h-8 w-full rounded-md bg-surface px-2 text-sm tabular-nums text-text-primary outline-none"
+                      className={`mt-1 w-full ${layerNumericInputClassName}`}
                       data-testid={`layer-retouch-remove-control-${control.field}`}
                       defaultValue={control.value}
                       max={control.max}
@@ -1833,10 +1832,10 @@ export default function LayerStackPanel({
                   aria-label={t('editor.layers.opacityPreset', { opacity: `${presetOpacity}%` })}
                   aria-pressed={isActiveOpacity}
                   className={cx(
-                    'rounded border px-2 py-1 text-xs tabular-nums transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+                    'rounded px-2 py-1 text-[11px] tabular-nums transition-colors disabled:cursor-not-allowed disabled:opacity-50',
                     isActiveOpacity
-                      ? 'border-accent bg-accent/10 text-text-primary'
-                      : 'border-surface bg-surface text-text-secondary hover:bg-card-active',
+                      ? 'bg-editor-primary-active text-editor-primary-active-text'
+                      : 'bg-editor-panel text-text-secondary hover:bg-editor-panel-raised hover:text-text-primary',
                   )}
                   data-testid={`layer-opacity-preset-${presetOpacity}`}
                   disabled={isBaseSelected}
@@ -1853,7 +1852,7 @@ export default function LayerStackPanel({
           </div>
 
           <div
-            className="grid grid-cols-2 gap-2 rounded-md border border-surface bg-bg-secondary p-2"
+            className="grid grid-cols-2 gap-1.5 rounded-md border border-editor-border bg-editor-panel-well p-1.5"
             data-hidden-layer-count={hiddenLayerCount}
             data-solo-active={String(isActiveLayerSoloed)}
             data-testid="layer-active-action-strip"
@@ -1862,8 +1861,8 @@ export default function LayerStackPanel({
               className={cx(
                 'flex min-w-0 items-center justify-center gap-1 rounded-md border px-2 py-1.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50',
                 isActiveLayerSoloed
-                  ? 'border-accent bg-accent/10 text-text-primary'
-                  : 'border-surface bg-surface text-text-secondary hover:bg-card-active',
+                  ? 'border-editor-primary-active bg-editor-primary-active text-editor-primary-active-text'
+                  : 'border-editor-border bg-editor-panel text-text-secondary hover:bg-editor-panel-raised hover:text-text-primary',
               )}
               data-testid="layer-active-solo"
               disabled={isBaseSelected}
@@ -1874,7 +1873,7 @@ export default function LayerStackPanel({
               <span className="truncate">{t('editor.layers.actions.soloActive')}</span>
             </button>
             <button
-              className="flex min-w-0 items-center justify-center gap-1 rounded-md border border-surface bg-surface px-2 py-1.5 text-xs text-text-secondary transition-colors hover:bg-card-active disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex min-w-0 items-center justify-center gap-1 rounded-md border border-editor-border bg-editor-panel px-2 py-1.5 text-xs text-text-secondary transition-colors hover:bg-editor-panel-raised hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
               data-testid="layer-show-all-hidden"
               disabled={!canShowAllLayers}
               onClick={showAllActiveLayers}
@@ -1887,7 +1886,7 @@ export default function LayerStackPanel({
 
           <div className="flex items-center justify-end gap-1" data-testid="layer-icon-action-row">
             <button
-              className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
+              className={layerPanelButtonClassName}
               data-tooltip={t('editor.layers.actions.moveUp')}
               disabled={!canMoveActiveLayerUp}
               onClick={() => {
@@ -1898,7 +1897,7 @@ export default function LayerStackPanel({
               <ArrowUp size={16} className="mx-auto" />
             </button>
             <button
-              className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
+              className={layerPanelButtonClassName}
               data-tooltip={t('editor.layers.actions.moveDown')}
               disabled={!canMoveActiveLayerDown}
               onClick={() => {
@@ -1909,7 +1908,7 @@ export default function LayerStackPanel({
               <ArrowDown size={16} className="mx-auto" />
             </button>
             <button
-              className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
+              className={layerPanelButtonClassName}
               data-tooltip={t('editor.layers.actions.duplicate')}
               disabled={isBaseSelected}
               onClick={duplicateActiveLayer}
@@ -1918,7 +1917,7 @@ export default function LayerStackPanel({
               <Copy size={16} className="mx-auto" />
             </button>
             <button
-              className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
+              className={layerPanelButtonClassName}
               data-tooltip={t('editor.layers.actions.ungroup')}
               disabled={!canUngroupActiveLayer}
               onClick={ungroupActiveLayer}
@@ -1927,7 +1926,7 @@ export default function LayerStackPanel({
               <Layers3 size={16} className="mx-auto" />
             </button>
             <button
-              className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
+              className={layerPanelButtonClassName}
               data-tooltip={t('editor.layers.actions.delete')}
               disabled={isBaseSelected}
               onClick={deleteActiveLayer}

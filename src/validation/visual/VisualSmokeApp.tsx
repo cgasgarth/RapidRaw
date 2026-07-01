@@ -1194,6 +1194,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorToolbar]: ProfessionalEditorToolbarVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorTokens]: ProfessionalEditorTokensVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalExportProofFooter]: ProfessionalExportProofFooterVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalLayersCompact]: ProfessionalLayersCompactVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawModalReview]: SuperResolutionPrivateRawModalReviewSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawUi]: SuperResolutionPrivateRawVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.SrUi]: SuperResolutionVisualSmoke,
@@ -2843,6 +2844,19 @@ const copy = {
   objectPromptModeForeground: 'Foreground',
   objectPromptProposal: 'SAM proposal',
   objectPromptVisualProof: 'Object prompt visual proof',
+  professionalLayersActiveCount: '4 active',
+  professionalLayersAdjustmentLabels: ['Exposure +0.35', 'Contrast +14', 'Color range ready'],
+  professionalLayersAssistedMaskStates: 'Assisted mask states',
+  professionalLayersCompact: 'Professional layers compact',
+  professionalLayersDisabled: 'disabled',
+  professionalLayersDustRemove: 'Dust remove',
+  professionalLayersError: 'error',
+  professionalLayersLoading: 'loading',
+  professionalLayersLocalAdjustment: 'Local adjustment',
+  professionalLayersMaskComponents: 'Mask components',
+  professionalLayersReady: 'ready',
+  professionalLayersStale: 'stale',
+  professionalLayersTitle: 'Layers',
   selectedLayer: 'Selected layer',
   maskBlendOpacity: 'Mask / blend / opacity',
   comparePreviewExport: 'Compare preview/export',
@@ -3349,6 +3363,175 @@ function LibraryWorkflowVisualSmoke() {
             >
               <p className="text-xs text-[#9ba6b2]">{copy.exportQueue}</p>
               <p>{exportQueued ? copy.exportQueueSummary : copy.pending}</p>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </main>
+  );
+}
+
+function ProfessionalLayersCompactVisualSmoke() {
+  const hierarchyRows = [
+    {
+      count: '2 masks',
+      name: 'Local polish',
+      state: 'mixed',
+      summary: 'group / 2 layers / 78%',
+      tone: 'border-editor-warning bg-editor-warning-surface',
+    },
+    {
+      count: 'Brush + range',
+      name: 'Sky recovery',
+      state: 'selected',
+      summary: 'screen / 64% / visible',
+      tone: 'border-editor-focus-ring bg-editor-selected-quiet',
+    },
+    {
+      count: 'Radial target',
+      name: 'Heal highlight',
+      state: 'ready',
+      summary: 'normal / clone ready / visible',
+      tone: 'border-editor-border bg-editor-panel',
+    },
+    {
+      count: 'Remove region',
+      name: 'Dust remove',
+      state: 'stale',
+      summary: 'needs regeneration / seed 42',
+      tone: 'border-editor-warning bg-editor-warning-surface',
+    },
+  ];
+  const subMasks = [
+    { mode: '+', name: 'Subject brush', state: 'ready' },
+    { mode: '-', name: 'Window subtract', state: 'disabled' },
+    { mode: 'x', name: 'Warm skin range', state: 'loading' },
+  ];
+
+  return (
+    <main
+      className="min-h-screen bg-editor-matte p-4 text-text-primary font-sans"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.ProfessionalLayersCompact}
+    >
+      <h1 className="sr-only">{copy.professionalLayersCompact}</h1>
+      <div className="mx-auto flex h-screen max-w-6xl overflow-hidden rounded-md border border-editor-border bg-editor-panel shadow-2xl">
+        <aside
+          className="w-80 border-r border-editor-border bg-editor-panel"
+          data-visual-smoke-section="compact-layer-stack"
+        >
+          <div className="flex min-h-9 items-center justify-between border-b border-editor-border px-3">
+            <span className="flex min-w-0 items-center gap-2">
+              <Layers3 size={16} className="text-editor-warning" />
+              <span className="truncate text-sm font-semibold">{copy.professionalLayersTitle}</span>
+            </span>
+            <span className={editorChromeStatusChipClassName('neutral')}>{copy.professionalLayersActiveCount}</span>
+          </div>
+          <div className="space-y-1 p-2" data-testid="professional-layers-stack-proof">
+            {hierarchyRows.map((row) => (
+              <button
+                className={`grid min-h-10 w-full grid-cols-[18px_minmax(0,1fr)_auto] items-center gap-2 rounded border px-2 py-1 text-left transition-colors ${row.tone}`}
+                data-layer-state={row.state}
+                key={row.name}
+                type="button"
+              >
+                <span className="h-2 w-2 rounded-full bg-editor-primary-active" />
+                <span className="min-w-0">
+                  <span className="block truncate text-[12px] font-medium leading-4">{row.name}</span>
+                  <span className="block truncate text-[11px] leading-4 text-text-secondary">{row.summary}</span>
+                </span>
+                <span className="truncate rounded bg-editor-panel-well px-1.5 py-0.5 text-[10px] uppercase text-text-secondary">
+                  {row.count}
+                </span>
+              </button>
+            ))}
+          </div>
+          <div className="border-t border-editor-border p-2" data-visual-smoke-section="compact-submask-hierarchy">
+            <p className="mb-1 text-[11px] font-semibold uppercase text-text-secondary">
+              {copy.professionalLayersMaskComponents}
+            </p>
+            <div className="space-y-1 border-l border-editor-border pl-2" data-testid="professional-submask-row-proof">
+              {subMasks.map((subMask) => (
+                <div
+                  className="grid min-h-8 grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-2 rounded bg-editor-panel-well px-2 py-1"
+                  data-submask-state={subMask.state}
+                  key={subMask.name}
+                >
+                  <span className="text-center text-[11px] text-editor-primary-active">{subMask.mode}</span>
+                  <span className="truncate text-[12px]">{subMask.name}</span>
+                  <span className={editorChromeStatusChipClassName(subMask.state === 'ready' ? 'success' : 'warning')}>
+                    {subMask.state}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </aside>
+
+        <section className="relative flex-1 bg-editor-matte p-5" data-visual-smoke-section="compact-preview">
+          <div className="grid h-full place-items-center rounded-md border border-editor-border bg-editor-panel">
+            <div
+              className="relative h-3/4 w-3/4 overflow-hidden rounded-md border border-editor-border"
+              data-testid="professional-layers-nonblank-preview"
+              style={{ background: 'linear-gradient(135deg, #27465a, #3c3445 48%, #756344)' }}
+            >
+              <div className="absolute inset-x-0 top-0 h-28 bg-editor-info-surface mix-blend-screen" />
+              <div className="absolute bottom-8 left-12 h-24 w-48 rounded-full bg-editor-warning-surface blur-xl" />
+              <div className="absolute right-12 bottom-12 h-28 w-36 rounded-md border border-editor-border bg-editor-matte" />
+            </div>
+          </div>
+        </section>
+
+        <aside
+          className="w-80 border-l border-editor-border bg-editor-panel p-2"
+          data-visual-smoke-section="compact-mask-inspector"
+        >
+          <div
+            className="rounded-md border border-editor-border bg-editor-panel-well p-2"
+            data-testid="professional-mask-status-proof"
+          >
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <span className="truncate text-[12px] font-semibold">{copy.professionalLayersDustRemove}</span>
+              <span className={editorChromeStatusChipClassName('warning')}>{copy.professionalLayersStale}</span>
+            </div>
+            <div className="grid grid-cols-3 gap-1 text-[11px]">
+              <span className="rounded bg-editor-panel px-1.5 py-1 text-text-secondary">
+                {copy.professionalLayersReady}
+              </span>
+              <span className="rounded bg-editor-panel px-1.5 py-1 text-text-secondary">
+                {copy.professionalLayersLoading}
+              </span>
+              <span className="rounded bg-editor-panel px-1.5 py-1 text-text-secondary">
+                {copy.professionalLayersDisabled}
+              </span>
+            </div>
+          </div>
+          <div
+            className="mt-2 rounded-md border border-editor-border bg-editor-panel-well p-2"
+            data-testid="professional-local-adjustment-proof"
+          >
+            <p className="text-[11px] font-semibold uppercase text-text-secondary">
+              {copy.professionalLayersLocalAdjustment}
+            </p>
+            {copy.professionalLayersAdjustmentLabels.map((label) => (
+              <div className="mt-1 grid grid-cols-[minmax(0,1fr)_84px] items-center gap-2" key={label}>
+                <span className="truncate text-[12px] text-text-secondary">{label}</span>
+                <span className="h-1 rounded bg-editor-primary-active" />
+              </div>
+            ))}
+          </div>
+          <div
+            className="mt-2 rounded-md border border-editor-border bg-editor-panel-well p-2"
+            data-testid="professional-assisted-mask-proof"
+          >
+            <p className="mb-1 text-[11px] font-semibold uppercase text-text-secondary">
+              {copy.professionalLayersAssistedMaskStates}
+            </p>
+            <div className="grid grid-cols-2 gap-1">
+              <span className={editorChromeStatusChipClassName('success')}>{copy.professionalLayersReady}</span>
+              <span className={editorChromeStatusChipClassName('info')}>{copy.professionalLayersLoading}</span>
+              <span className={editorChromeStatusChipClassName('warning')}>{copy.professionalLayersStale}</span>
+              <span className={editorChromeStatusChipClassName('danger')}>{copy.professionalLayersError}</span>
             </div>
           </div>
         </aside>

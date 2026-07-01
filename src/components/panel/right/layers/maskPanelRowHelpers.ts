@@ -19,18 +19,18 @@ export function getMaskLikeContainerDropClass({
   isOver: boolean;
 }): string {
   if (!isOver) return '';
-  if (activeDragItem?.type === 'Container') return 'border-t-2 border-accent';
+  if (activeDragItem?.type === 'Container') return 'border-t-2 border-editor-primary-active';
   if (
     (activeDragItem?.type === 'SubMask' && activeDragItem.parentId !== containerId) ||
     activeDragItem?.type === 'Creation'
   ) {
-    return 'bg-card-active border border-accent/50';
+    return 'border border-editor-primary-active/50 bg-editor-selected-quiet';
   }
   return '';
 }
 
 export function getMaskLikeSubMaskDropClass(activeDragItem: MaskLikeDragData | null, isOver: boolean): string {
-  return isOver && !isMaskLikeContainerDrag(activeDragItem) ? 'border-t-2 border-accent' : '';
+  return isOver && !isMaskLikeContainerDrag(activeDragItem) ? 'border-t-2 border-editor-primary-active' : '';
 }
 
 export function useDelayedHover(delayMs = 1000) {
