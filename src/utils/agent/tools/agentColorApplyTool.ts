@@ -1,4 +1,9 @@
 import { z } from 'zod';
+import {
+  type ToneColorMutationResultV1,
+  toneColorDryRunResultV1Schema,
+  toneColorMutationResultV1Schema,
+} from '../../../../packages/rawengine-schema/src/rawEngineSchemas';
 import { blackWhiteMixerSettingsSchema } from '../../../schemas/color/blackWhiteMixerSchemas';
 import { channelMixerSettingsSchema } from '../../../schemas/color/channelMixerSchemas';
 import { colorBalanceRgbSettingsSchema } from '../../../schemas/color/colorBalanceRgbSchemas';
@@ -8,7 +13,15 @@ import type { Adjustments } from '../../adjustments';
 import { getDefaultParametricCurve } from '../../adjustments';
 import { pushEditHistoryEntry } from '../../editHistory';
 import { TONE_CURVE_PARAMETRIC_PRESETS } from '../../profileTonePresets';
+import {
+  applySelectiveColorCommandEnvelopeToAdjustments,
+  buildSelectiveColorCommandEnvelope,
+  buildSelectiveColorImageCommandContext,
+  type SelectiveColorAdjustmentPayload,
+  type SelectiveColorCommandColorPipeline,
+} from '../../selectiveColorCommandBridge';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
+import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorState';
 
 export const AGENT_COLOR_APPLY_TOOL_NAME = 'rawengine.agent.color.apply';
 export const AGENT_COLOR_APPLY_INPUT_SCHEMA_NAME = 'AgentColorApplyRequestV1';
@@ -151,6 +164,19 @@ export const agentColorApplyResponseSchema = z
         appliedGraphRevision: z.string().trim().min(1),
         operationId: z.string().trim().min(1),
         sessionId: z.string().trim().min(1),
+        typedCommands: z
+          .array(
+            z
+              .object({
+                appliedGraphRevision: z.string().trim().min(1),
+                changedNodeIds: z.array(z.string().trim().min(1)).min(1),
+                commandId: z.string().trim().min(1),
+                commandType: z.literal('toneColor.adjustHsl'),
+                sourceGraphRevision: z.string().trim().min(1),
+              })
+              .strict(),
+          )
+          .optional(),
         undoGraphRevision: z.string().trim().min(1),
       })
       .strict(),
@@ -183,7 +209,32 @@ const COLOR_PATCH_KEYS = [
   'vibrance',
 ] as const satisfies ReadonlyArray<keyof AgentColorPatch>;
 
-const applyColorPatchToAdjustments = (base: Adjustments, patch: AgentColorPatch): Adjustments => {
+const AGENT_COLOR_PIPELINE = {
+  chromaticAdaptation: {
+    method: 'bradford_v1',
+    sourceWhitePoint: { x: 0.3457, y: 0.3585 },
+    status: 'math_validated',
+    targetWhitePoint: { x: 0.32168, y: 0.33767 },
+    warnings: [],
+  },
+  inputDomain: 'camera_linear_rgb',
+  operationDomain: 'acescg_linear_v1',
+  renderTarget: {
+    bitDepth: 8,
+    embedIcc: true,
+    intent: 'relative_colorimetric',
+    outputProfile: 'display_p3',
+    viewTransform: 'rawengine_agx_v1',
+  },
+  sceneToDisplayTransform: 'rawengine_agx_v1',
+  workingSpace: 'acescg_linear_v1',
+} as const satisfies SelectiveColorCommandColorPipeline;
+
+const applyColorPatchToAdjustments = (
+  base: Adjustments,
+  patch: AgentColorPatch,
+  { includeSelectiveColor }: { includeSelectiveColor: boolean } = { includeSelectiveColor: true },
+): Adjustments => {
   const next: Adjustments = { ...base };
   if (patch.temperature !== undefined) next.temperature = patch.temperature;
   if (patch.tint !== undefined) next.tint = patch.tint;
@@ -230,14 +281,14 @@ const applyColorPatchToAdjustments = (base: Adjustments, patch: AgentColorPatch)
     };
   }
   if (patch.skinToneUniformity !== undefined) next.skinToneUniformity = { ...patch.skinToneUniformity };
-  if (patch.hsl !== undefined) {
+  if (includeSelectiveColor && patch.hsl !== undefined) {
     next.hsl = { ...base.hsl };
     for (const rangeKey of SELECTIVE_COLOR_RANGE_KEYS) {
       const adjustment = patch.hsl[rangeKey];
       if (adjustment !== undefined) next.hsl[rangeKey] = { ...adjustment };
     }
   }
-  if (patch.selectiveColorRangeControls !== undefined) {
+  if (includeSelectiveColor && patch.selectiveColorRangeControls !== undefined) {
     next.selectiveColorRangeControls = { ...base.selectiveColorRangeControls };
     for (const rangeKey of SELECTIVE_COLOR_RANGE_KEYS) {
       const rangeControl = patch.selectiveColorRangeControls[rangeKey];
@@ -262,7 +313,61 @@ const estimateChangedPixels = ({
   return Math.max(1, Math.round((imageArea / 384) * Math.max(1, changedFieldCount)));
 };
 
-export const applyAgentColor = (request: AgentColorApplyRequest): AgentColorApplyResponse => {
+const buildSelectiveColorPayloads = (base: Adjustments, patch: AgentColorPatch): SelectiveColorAdjustmentPayload[] => {
+  const payloads: SelectiveColorAdjustmentPayload[] = [];
+  for (const rangeKey of SELECTIVE_COLOR_RANGE_KEYS) {
+    const adjustment = patch.hsl?.[rangeKey] ?? base.hsl[rangeKey];
+    const rangeControl = patch.selectiveColorRangeControls?.[rangeKey];
+    if (patch.hsl?.[rangeKey] === undefined && rangeControl === undefined) continue;
+
+    payloads.push({
+      adjustment,
+      ...(rangeControl === undefined ? {} : { rangeControl }),
+      rangeKey,
+    });
+  }
+  return payloads;
+};
+
+const dispatchSelectiveColorPayloads = async ({
+  expectedGraphRevision,
+  imagePath,
+  operationId,
+  payloads,
+  sessionId,
+}: {
+  expectedGraphRevision: string;
+  imagePath: string;
+  operationId: string;
+  payloads: readonly SelectiveColorAdjustmentPayload[];
+  sessionId: string;
+}): Promise<ToneColorMutationResultV1[]> => {
+  const bridge = createLiveEditorAppServerBridge();
+  const mutations: ToneColorMutationResultV1[] = [];
+
+  for (const [index, payload] of payloads.entries()) {
+    const context = buildSelectiveColorImageCommandContext({
+      colorPipeline: AGENT_COLOR_PIPELINE,
+      expectedGraphRevision,
+      imagePath,
+      operationId: `${operationId}_${payload.rangeKey}_${index}`,
+      sessionId,
+    });
+    const dryRunCommand = buildSelectiveColorCommandEnvelope(payload, context, { dryRun: true });
+    const dryRun = await bridge.dispatch(dryRunCommand);
+    if (!dryRun.ok) throw new Error(`Agent color typed HSL dry-run failed: ${dryRun.message}`);
+    toneColorDryRunResultV1Schema.parse(dryRun.result);
+
+    const applyCommand = buildSelectiveColorCommandEnvelope(payload, context, { dryRun: false });
+    const apply = await bridge.dispatch(applyCommand);
+    if (!apply.ok) throw new Error(`Agent color typed HSL apply failed: ${apply.message}`);
+    mutations.push(toneColorMutationResultV1Schema.parse(apply.result));
+  }
+
+  return mutations;
+};
+
+export const applyAgentColor = async (request: AgentColorApplyRequest): Promise<AgentColorApplyResponse> => {
   const parsedRequest = agentColorApplyRequestSchema.parse(request);
   const snapshot = buildAgentImageContextSnapshot();
   if (parsedRequest.expectedRecipeHash !== snapshot.initialPreview.recipeHash) {
@@ -274,7 +379,28 @@ export const applyAgentColor = (request: AgentColorApplyRequest): AgentColorAppl
   if (selectedImage === null) throw new Error('Agent color apply requires a selected image.');
 
   const undoGraphRevision = `history_${state.historyIndex}`;
-  const nextAdjustments = applyColorPatchToAdjustments(state.adjustments, parsedRequest.color);
+  const selectiveColorPayloads = buildSelectiveColorPayloads(state.adjustments, parsedRequest.color);
+  const typedMutations = await dispatchSelectiveColorPayloads({
+    expectedGraphRevision: undoGraphRevision,
+    imagePath: selectedImage.path,
+    operationId: parsedRequest.operationId,
+    payloads: selectiveColorPayloads,
+    sessionId: parsedRequest.sessionId,
+  });
+  const typedAdjustments = selectiveColorPayloads.reduce((adjustments, payload, index) => {
+    const context = buildSelectiveColorImageCommandContext({
+      colorPipeline: AGENT_COLOR_PIPELINE,
+      expectedGraphRevision: undoGraphRevision,
+      imagePath: selectedImage.path,
+      operationId: `${parsedRequest.operationId}_${payload.rangeKey}_${index}`,
+      sessionId: parsedRequest.sessionId,
+    });
+    const applyCommand = buildSelectiveColorCommandEnvelope(payload, context, { dryRun: false });
+    return applySelectiveColorCommandEnvelopeToAdjustments(adjustments, applyCommand);
+  }, state.adjustments);
+  const nextAdjustments = applyColorPatchToAdjustments(typedAdjustments, parsedRequest.color, {
+    includeSelectiveColor: false,
+  });
   const history = pushEditHistoryEntry(state.history, state.historyIndex, nextAdjustments);
   useEditorStore.setState({
     adjustments: nextAdjustments,
@@ -302,6 +428,17 @@ export const applyAgentColor = (request: AgentColorApplyRequest): AgentColorAppl
       appliedGraphRevision,
       operationId: parsedRequest.operationId,
       sessionId: parsedRequest.sessionId,
+      ...(typedMutations.length === 0
+        ? {}
+        : {
+            typedCommands: typedMutations.map((mutation) => ({
+              appliedGraphRevision: mutation.appliedGraphRevision,
+              changedNodeIds: mutation.changedNodeIds,
+              commandId: mutation.commandId,
+              commandType: 'toneColor.adjustHsl',
+              sourceGraphRevision: mutation.sourceGraphRevision,
+            })),
+          }),
       undoGraphRevision,
     },
     requestId: parsedRequest.requestId,
