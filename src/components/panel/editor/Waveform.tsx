@@ -15,6 +15,7 @@ interface WaveformProps {
   showClipping?: boolean;
   onToggleClipping?: () => void;
   previewScopeStatus?: PreviewScopeStatus | null;
+  showInlineControls?: boolean;
   theme?: string;
 }
 
@@ -145,7 +146,7 @@ const HistogramView = ({ histogram }: { histogram: ChannelConfig | null | undefi
   };
 
   const getLine = (data: number[]) => {
-    return 'M' + data.map((val, i) => `${(i / 255) * 255},${255 - (val / globalMax) * 255}`).join(' L');
+    return `M${data.map((val, i) => `${(i / 255) * 255},${255 - (val / globalMax) * 255}`).join(' L')}`;
   };
 
   const channels: Array<HistogramChannel> = [
@@ -559,6 +560,7 @@ export default function Waveform({
   showClipping,
   onToggleClipping,
   previewScopeStatus,
+  showInlineControls = true,
   theme,
 }: WaveformProps) {
   const { t } = useTranslation();
@@ -568,7 +570,7 @@ export default function Waveform({
   const isLightTheme = theme ? ['light', 'snow', 'arctic'].includes(theme) : false;
   const isHistogram = displayMode === DisplayMode.Histogram;
   const isVectorscope = displayMode === DisplayMode.Vectorscope;
-  const isReady = isHistogram ? !!(histogram && histogram.red) : !!waveformData;
+  const isReady = isHistogram ? !!histogram?.red : !!waveformData;
   const [hadDataOnMount] = useState(isReady);
   const width = waveformData?.width || 256;
   const height = waveformData?.height || 256;
@@ -622,7 +624,7 @@ export default function Waveform({
       ? scopeUpdatedAt.toLocaleTimeString()
       : t('ui.waveform.scopeStatus.pending');
   const scopeReadinessLabel =
-    previewScopeStatus && previewScopeStatus.histogramReady && previewScopeStatus.waveformReady
+    previewScopeStatus?.histogramReady && previewScopeStatus.waveformReady
       ? t('ui.waveform.scopeStatus.ready')
       : t('ui.waveform.scopeStatus.updating');
   const transformPathLabel = previewScopeStatus
@@ -707,7 +709,7 @@ export default function Waveform({
       </div>
 
       <AnimatePresence>
-        {isHovered && (
+        {showInlineControls && isHovered && (
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}

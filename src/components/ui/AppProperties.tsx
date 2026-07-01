@@ -133,6 +133,7 @@ export interface AppSettings {
   isWaveformVisible?: boolean;
   waveformHeight?: number;
   activeWaveformChannel?: string;
+  panelScopesLayout?: string;
   useWgpuRenderer?: boolean;
   canvasInputMode?: 'mouse' | 'trackpad';
   zoomSpeedMultiplier?: number;

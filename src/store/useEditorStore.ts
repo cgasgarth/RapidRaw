@@ -53,6 +53,8 @@ export interface PreviewScopeStatus {
   warningCodes: string[];
 }
 
+export type PanelScopesLayout = 'overlay' | 'stacked';
+
 interface EditorState {
   // Core Image & Adjustments
   selectedImage: SelectedImage | null;
@@ -82,6 +84,7 @@ interface EditorState {
   isWaveformVisible: boolean;
   activeWaveformChannel: DisplayMode;
   waveformHeight: number;
+  panelScopesLayout: PanelScopesLayout;
 
   // Interaction State
   isSliderDragging: boolean;
@@ -155,6 +158,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   isWaveformVisible: false,
   activeWaveformChannel: DisplayMode.Luma,
   waveformHeight: PANEL_SCOPES_HEIGHT.default,
+  panelScopesLayout: 'stacked',
 
   isSliderDragging: false,
   interactivePatch: null,
