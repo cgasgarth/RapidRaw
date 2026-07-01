@@ -1298,9 +1298,9 @@ async fn save_temp_file(bytes: Vec<u8>) -> Result<String, String> {
     Ok(path.to_string_lossy().to_string())
 }
 
-fn validate_hdr_merge_dimensions(
-    loaded_items: &[(String, String, DynamicImage, Duration, f32)],
-) -> Result<(), String> {
+type LoadedHdrMergeItem = (String, String, DynamicImage, Duration, f32);
+
+fn validate_hdr_merge_dimensions(loaded_items: &[LoadedHdrMergeItem]) -> Result<(), String> {
     if let Some((first_path, _, first_img, _, _)) = loaded_items.first() {
         let (width, height) = (first_img.width(), first_img.height());
 
@@ -1332,7 +1332,7 @@ fn load_hdr_merge_items(
     paths: &[String],
     app_handle: &tauri::AppHandle,
     emit_progress: bool,
-) -> Result<Vec<(String, String, DynamicImage, Duration, f32)>, String> {
+) -> Result<Vec<LoadedHdrMergeItem>, String> {
     let settings = load_settings_or_default(app_handle);
 
     paths
@@ -1378,7 +1378,7 @@ fn load_hdr_merge_items(
 }
 
 fn build_hdr_source_refs(
-    loaded_items: &[(String, String, DynamicImage, Duration, f32)],
+    loaded_items: &[LoadedHdrMergeItem],
 ) -> Vec<app_state::PendingHdrSourceRef> {
     loaded_items
         .iter()
@@ -1464,12 +1464,10 @@ async fn merge_hdr(
     if let (Some(accepted_plan_hash), Some(accepted_plan_id)) = (
         accepted_dry_run_plan_hash.as_ref(),
         accepted_dry_run_plan_id.as_ref(),
-    ) {
-        if accepted_plan_hash != &runtime_plan.accepted_dry_run_plan_hash
-            || accepted_plan_id != &runtime_plan.accepted_dry_run_plan_id
-        {
-            return Err("Accepted HDR dry-run plan does not match current sources.".to_string());
-        }
+    ) && (accepted_plan_hash != &runtime_plan.accepted_dry_run_plan_hash
+        || accepted_plan_id != &runtime_plan.accepted_dry_run_plan_id)
+    {
+        return Err("Accepted HDR dry-run plan does not match current sources.".to_string());
     }
     let receipt = HdrApplyReceipt {
         accepted_dry_run_plan_hash: runtime_plan.accepted_dry_run_plan_hash.clone(),
