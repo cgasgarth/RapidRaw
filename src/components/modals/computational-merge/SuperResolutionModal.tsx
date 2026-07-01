@@ -333,7 +333,7 @@ export default function SuperResolutionModal({
           >
             {t('modals.superResolution.close')}
           </button>
-          <Button onClick={onPreviewPlan} disabled={!isSourceCountValid}>
+          <Button onClick={onPreviewPlan} disabled={!isSourceCountValid} data-testid="sr-preview-plan-button">
             <Layers3 className="w-4 h-4" />
             {hasRuntimeOutputReview
               ? t('modals.superResolution.refreshPreviewPlan')
