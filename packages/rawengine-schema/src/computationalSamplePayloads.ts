@@ -335,6 +335,62 @@ export const sampleHdrMergeArtifactV1: HdrMergeArtifactV1 = hdrMergeArtifactV1Sc
     },
   ],
   previewToneMapped: true,
+  runtimeSidecarReceipt: {
+    alignment: {
+      confidence: 0.96,
+      maxRmsError: 0.42,
+      mode: 'auto',
+      transformCount: 3,
+    },
+    bracket: {
+      accepted: true,
+      detectionConfidence: 0.98,
+      exposureSpreadEv: 4,
+      referenceSourceIndex: 1,
+      sourceCount: 3,
+      sourceRoles: [
+        {
+          exposureEv: -2,
+          role: 'under_exposed',
+          sourceIndex: 0,
+        },
+        {
+          exposureEv: 0,
+          role: 'reference',
+          sourceIndex: 1,
+        },
+        {
+          exposureEv: 2,
+          role: 'over_exposed',
+          sourceIndex: 2,
+        },
+      ],
+    },
+    deghost: {
+      averageConfidence: 0.92,
+      maxConfidence: 1,
+      motionCoverageRatio: 0.03,
+      motionPixelCount: 720_000,
+      regionIntensityPercent: 65,
+      requestedDeghosting: 'medium',
+    },
+    handoff: {
+      editableDerivedAssetId: 'derived_hdr_window_light',
+      openInEditorPath: '/photos/session/derived/HDR_window_light.tif',
+      route: 'computational_merge_derived_source',
+    },
+    measurementSource: 'hdr_runtime_apply',
+    output: {
+      artifactId: 'artifact_hdr_window_light_0001_output',
+      contentHash: 'sha256:sample-hdr-output',
+      dimensions: {
+        height: 4000,
+        width: 6000,
+      },
+    },
+    receiptKind: 'hdr_runtime_sidecar_receipt',
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+  },
   schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
   sourceImageRefs: sampleComputationalMergeHdrCommandEnvelopeV1.parameters.sources,
   sourceState: [

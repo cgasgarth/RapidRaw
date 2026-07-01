@@ -1,3 +1,4 @@
+import type { HdrRuntimeSidecarReceiptV1 } from '../../packages/rawengine-schema/src/rawEngineSchemas';
 import {
   type HdrEditableHandoffSummary,
   type HdrMergeUiSettings,
@@ -31,6 +32,7 @@ export const buildHdrEditableHandoffSummary = ({
   deghostReviewAccepted,
   deghostReviewRequired,
   outputPath,
+  runtimeSidecarReceipt,
   settings,
   sourceMetadata,
   sourcePaths,
@@ -38,6 +40,7 @@ export const buildHdrEditableHandoffSummary = ({
   deghostReviewAccepted?: boolean;
   deghostReviewRequired?: boolean;
   outputPath: string;
+  runtimeSidecarReceipt?: HdrRuntimeSidecarReceiptV1;
   settings: HdrMergeUiSettings;
   sourceMetadata?: HdrBracketPreflightSourceMetadata[];
   sourcePaths: string[];
@@ -83,7 +86,7 @@ export const buildHdrEditableHandoffSummary = ({
     deghostReviewAccepted: deghostReviewAccepted ?? false,
     deghostReviewRequired: deghostReviewRequired ?? false,
     displayPreviewColorState: 'tone_mapped_srgb_preview',
-    editableDerivedAssetId: normalizeAssetId(outputPath),
+    editableDerivedAssetId: runtimeSidecarReceipt?.handoff.editableDerivedAssetId ?? normalizeAssetId(outputPath),
     exportColorState: 'saved_display_referred_srgb_output',
     mergeStrategy: settings.mergeStrategy,
     outputColorSpace: 'srgb_display_referred_v1',
@@ -93,6 +96,7 @@ export const buildHdrEditableHandoffSummary = ({
     previewExportMeanAbsDelta: 0,
     previewExportParityStatus: 'matched_editor_display_path',
     previewToneMapped: settings.toneMapPreview,
+    ...(runtimeSidecarReceipt === undefined ? {} : { runtimeSidecarReceipt }),
     sceneMergeColorState: 'legacy_display_referred_merge_after_linear_to_srgb',
     sourceCount: sourcePaths.length,
     sourceRefs,
