@@ -83,7 +83,7 @@ export function useImageProcessing(
   const displaySize = useEditorStore((state) => state.displaySize);
   const baseRenderSize = useEditorStore((state) => state.baseRenderSize);
   const originalSize = useEditorStore((state) => state.originalSize);
-  const showOriginal = useEditorStore((state) => state.showOriginal);
+  const compareMode = useEditorStore((state) => state.compareMode);
   const isSliderDragging = useEditorStore((state) => state.isSliderDragging);
   const isExportSoftProofEnabled = useEditorStore((state) => state.isExportSoftProofEnabled);
   const exportSoftProofRecipeId = useEditorStore((state) => state.exportSoftProofRecipeId);
@@ -592,7 +592,7 @@ export function useImageProcessing(
   }, [geometricAdjustmentsKey, selectedImage?.path, setEditor]);
 
   useEffect(() => {
-    if (showOriginal && selectedImage?.isReady && displaySize.width > 0 && !isSliderDragging) {
+    if (compareMode !== 'off' && selectedImage?.isReady && displaySize.width > 0 && !isSliderDragging) {
       const targetRes = calculateTargetRes();
       if (targetRes > currentOriginalResRef.current) {
         requestHiFiOriginalZoom(adjustments, targetRes);
@@ -602,7 +602,7 @@ export function useImageProcessing(
       requestHiFiOriginalZoom.cancel();
     };
   }, [
-    showOriginal,
+    compareMode,
     displaySize.width,
     displaySize.height,
     calculateTargetRes,
@@ -616,7 +616,7 @@ export function useImageProcessing(
   useEffect(() => {
     let isEffectActive = true;
     const generate = async () => {
-      if (showOriginal && selectedImage?.path && !transformedOriginalUrl) {
+      if (compareMode !== 'off' && selectedImage?.path && !transformedOriginalUrl) {
         try {
           const targetRes = calculateTargetRes();
           const base64Data = await invokeWithSchema(
@@ -634,7 +634,7 @@ export function useImageProcessing(
         } catch (e) {
           if (isEffectActive) {
             console.error('Failed to generate original preview:', e);
-            setEditor({ showOriginal: false });
+            setEditor({ compareMode: 'off' });
           }
         }
       }
@@ -643,7 +643,7 @@ export function useImageProcessing(
     return () => {
       isEffectActive = false;
     };
-  }, [showOriginal, selectedImage?.path, adjustments, transformedOriginalUrl, calculateTargetRes, setEditor]);
+  }, [compareMode, selectedImage?.path, adjustments, transformedOriginalUrl, calculateTargetRes, setEditor]);
 
   return {
     applyAdjustments,

@@ -96,6 +96,27 @@ try {
   await page.getByRole('main', { name: 'Editor workspace' }).waitFor({ timeout: 10_000 });
   await page.getByRole('region', { name: 'Editor preview' }).waitFor({ timeout: 10_000 });
   await page.getByRole('region', { name: 'Image preview' }).waitFor({ timeout: 10_000 });
+  const imageCanvas = page.getByTestId('image-canvas');
+  await imageCanvas.waitFor({ timeout: 10_000 });
+  const splitCompareButton = page.getByRole('button', { name: /Compare split wipe/u });
+  const sideBySideCompareButton = page.getByRole('button', { name: /Compare side by side/u });
+  await splitCompareButton.waitFor({ timeout: 10_000 });
+  await sideBySideCompareButton.waitFor({ timeout: 10_000 });
+  await splitCompareButton.click();
+  await imageCanvas.waitFor({ timeout: 10_000 });
+  if ((await imageCanvas.getAttribute('data-editor-compare-mode')) !== 'split-wipe') {
+    throw new Error('Split-wipe compare mode did not activate on the image canvas.');
+  }
+  await page.getByTestId('editor-compare-split-divider').waitFor({ timeout: 10_000 });
+  await sideBySideCompareButton.click();
+  if ((await imageCanvas.getAttribute('data-editor-compare-mode')) !== 'side-by-side') {
+    throw new Error('Side-by-side compare mode did not activate on the image canvas.');
+  }
+  await page.getByTestId('editor-compare-side-by-side-preview').waitFor({ timeout: 10_000 });
+  await sideBySideCompareButton.click();
+  if ((await imageCanvas.getAttribute('data-editor-compare-mode')) !== 'off') {
+    throw new Error('Compare mode did not return to off after toggling side-by-side.');
+  }
   await page.getByRole('complementary', { name: 'Editor tools' }).waitFor({ timeout: 10_000 });
   await page.getByRole('heading', { name: 'Adjustments' }).waitFor({ timeout: 10_000 });
   await page.getByText(/1024 × 768/u).waitFor({ timeout: 10_000 });
@@ -170,6 +191,7 @@ try {
     'load_metadata',
     'load_image',
     'apply_adjustments',
+    'generate_original_transformed_preview',
   ]) {
     if (!harnessProof.calls.includes(requiredCommand)) {
       throw new Error(`Browser Tauri harness did not record ${requiredCommand}.`);
