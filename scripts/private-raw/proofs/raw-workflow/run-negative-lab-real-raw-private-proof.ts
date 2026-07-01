@@ -40,8 +40,7 @@ const args = argsSchema.parse({
 
 await runRequired('negative lab committed private RAW summary', [
   'bun',
-  'run',
-  'check:negative-lab-real-raw-private-proof-summary',
+  'tests/integration/checks/negative-lab/check-negative-lab-real-raw-private-proof-summary.ts',
 ]);
 
 if (args.privateRoot === undefined) {
@@ -90,8 +89,7 @@ await runRequired(
   'negative lab private RAW artifact validation',
   [
     'bun',
-    'run',
-    'check:negative-lab-real-raw-private-proof-summary',
+    'tests/integration/checks/negative-lab/check-negative-lab-real-raw-private-proof-summary.ts',
     '--require-assets',
     ...(usesPlainSourceRoot ? ['--allow-fresh-hashes'] : []),
   ],

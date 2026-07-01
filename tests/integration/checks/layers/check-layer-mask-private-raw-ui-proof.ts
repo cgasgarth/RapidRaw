@@ -69,9 +69,9 @@ const proofReportSchema = z
     validationCommands: z
       .array(
         z.enum([
-          'RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-private-root bun run check:layer-mask-real-raw-proof -- --require-assets',
-          'RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-private-root bun run check:layer-mask-private-raw-ui-smoke',
-          'bun run check:layer-mask-private-raw-ui-proof',
+          'RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-private-root bun tests/integration/checks/layers/check-layer-mask-real-raw-proof.ts -- --require-assets',
+          'RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-private-root bun scripts/proofs/capture-visual-smoke.ts --scenario layer-mask-private-raw-ui',
+          'bun tests/integration/checks/layers/check-layer-mask-private-raw-ui-proof.ts',
         ]),
       )
       .length(3),
@@ -172,9 +172,9 @@ const expectedReport = proofReportSchema.parse({
     staleState: staleReceipt.staleState,
   },
   validationCommands: [
-    'RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-private-root bun run check:layer-mask-real-raw-proof -- --require-assets',
-    'RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-private-root bun run check:layer-mask-private-raw-ui-smoke',
-    'bun run check:layer-mask-private-raw-ui-proof',
+    'RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-private-root bun tests/integration/checks/layers/check-layer-mask-real-raw-proof.ts -- --require-assets',
+    'RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-private-root bun scripts/proofs/capture-visual-smoke.ts --scenario layer-mask-private-raw-ui',
+    'bun tests/integration/checks/layers/check-layer-mask-private-raw-ui-proof.ts',
   ],
   visualReview: {
     dimensions: screenshotAvailable

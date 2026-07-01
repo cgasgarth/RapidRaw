@@ -298,7 +298,9 @@ if (UPDATE) {
 } else {
   const expectedReport = parityReportSchema.parse(JSON.parse(await readFile(REPORT_PATH, 'utf8')));
   if (JSON.stringify(expectedReport) !== JSON.stringify(report)) {
-    failures.push(`${REPORT_PATH} is stale; run bun run check:color-preview-export-parity --update`);
+    failures.push(
+      `${REPORT_PATH} is stale; run bun tests/integration/checks/color/check-color-stack-preview-export-parity.ts --update`,
+    );
   }
 }
 
