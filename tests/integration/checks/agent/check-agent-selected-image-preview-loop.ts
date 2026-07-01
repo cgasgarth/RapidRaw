@@ -4,7 +4,10 @@ import { ToolType } from '../../../../src/components/panel/right/layers/Masks.ts
 import { RawEngineAppServerHostToolName } from '../../../../src/schemas/agent/agentRuntimeSchemas.ts';
 import { useEditorStore } from '../../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
-import { AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME } from '../../../../src/utils/agent/context/agentCurrentImagePreviewLoop.ts';
+import {
+  AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME,
+  applyAgentCurrentImagePreviewLoopReviewedEdit,
+} from '../../../../src/utils/agent/context/agentCurrentImagePreviewLoop.ts';
 import { buildAgentImageContextSnapshot } from '../../../../src/utils/agent/context/agentImageContextSnapshot.ts';
 import {
   applyAgentGlobalAdjustments,
@@ -309,4 +312,43 @@ if (state.historyIndex !== 0 || state.adjustments.exposure !== INITIAL_ADJUSTMEN
   throw new Error('selected-image preview loop did not expose rollback evidence while restoring session state.');
 }
 
+const staleAcceptedPreview = result.previewLineage[0]?.previewArtifactId;
+const latestAcceptedPreview = result.previewLineage.at(-1)?.previewArtifactId;
+if (staleAcceptedPreview === undefined || latestAcceptedPreview === undefined) {
+  throw new Error('selected-image preview loop did not expose preview artifacts for apply review.');
+}
+await expectRejects(
+  () =>
+    applyAgentCurrentImagePreviewLoopReviewedEdit({
+      acceptedPreviewArtifactId: staleAcceptedPreview,
+      request: commandRequest,
+      review: result,
+    }),
+  'stale preview artifact',
+);
+
+const acceptedApply = await applyAgentCurrentImagePreviewLoopReviewedEdit({
+  acceptedPreviewArtifactId: latestAcceptedPreview,
+  request: commandRequest,
+  review: result,
+});
+if (
+  acceptedApply.previewRefreshCount !== 2 ||
+  acceptedApply.finalGraphRevision !== 'history_2' ||
+  acceptedApply.rollbackReceipt !== undefined ||
+  useEditorStore.getState().historyIndex !== 2
+) {
+  throw new Error('selected-image preview loop accepted apply did not replay the reviewed edit after two previews.');
+}
+
 console.log('agent selected-image preview loop ok');
+
+async function expectRejects(action: () => Promise<unknown>, expectedMessage: string) {
+  try {
+    await action();
+  } catch (error) {
+    if (error instanceof Error && error.message.includes(expectedMessage)) return;
+    throw error;
+  }
+  throw new Error(`expected rejection containing ${expectedMessage}.`);
+}
