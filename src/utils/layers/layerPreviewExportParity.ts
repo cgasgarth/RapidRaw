@@ -26,12 +26,17 @@ export interface LayerBlendStackLayer {
 export interface LayerRetouchCloneSource {
   alignmentErrorPx?: number;
   candidateProvenance?: {
+    algorithmId: 'local_heal_v1';
     candidateId: string;
     candidateKind: 'dust_spot' | 'emulsion_scratch';
+    changedPixelCount: number;
     confidence: number;
     confidenceSemantics: 'ranking_score_v1';
     origin: 'negative_lab_dust_candidate';
+    outputHash: string;
+    outputSampleHash: string;
     sourceFrameId: string;
+    sourceSampleHash: string;
     statusAtAcceptance: 'acknowledged' | 'ignored' | 'pending';
   };
   featherRadiusPx?: number;

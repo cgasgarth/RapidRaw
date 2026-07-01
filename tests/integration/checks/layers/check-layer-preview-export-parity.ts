@@ -31,12 +31,17 @@ const retouchSourceSchema = z
     alignmentErrorPx: z.number().min(0).optional(),
     candidateProvenance: z
       .object({
+        algorithmId: z.literal('local_heal_v1'),
         candidateId: z.string().trim().min(1),
         candidateKind: z.enum(['dust_spot', 'emulsion_scratch']),
+        changedPixelCount: z.number().int().positive(),
         confidence: z.number().min(0).max(1),
         confidenceSemantics: z.literal('ranking_score_v1'),
         origin: z.literal('negative_lab_dust_candidate'),
+        outputHash: z.string().regex(/^fnv1a32:[0-9a-f]{8}$/u),
+        outputSampleHash: z.string().regex(/^fnv1a32:[0-9a-f]{8}$/u),
         sourceFrameId: z.string().trim().min(1),
+        sourceSampleHash: z.string().regex(/^fnv1a32:[0-9a-f]{8}$/u),
         statusAtAcceptance: z.enum(['acknowledged', 'ignored', 'pending']),
       })
       .strict()
@@ -297,6 +302,13 @@ for (const fixture of manifest.cases) {
   }
   if (dustCandidateProvenance.statusAtAcceptance !== 'acknowledged') {
     fail(`${fixture.id}: persisted dust heal acceptance state missing`);
+  }
+  if (
+    dustCandidateProvenance.algorithmId !== 'local_heal_v1' ||
+    dustCandidateProvenance.changedPixelCount <= 0 ||
+    dustCandidateProvenance.outputHash === dustCandidateProvenance.sourceSampleHash
+  ) {
+    fail(`${fixture.id}: persisted dust heal provenance runtime hashes missing`);
   }
 
   const sidecarLayerIds = fixture.sidecarLayerStack.layers.map((layer) => layer.id);

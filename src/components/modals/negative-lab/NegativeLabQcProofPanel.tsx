@@ -10,6 +10,8 @@ import UiText from '../../ui/primitives/Text';
 import type { NegativeLabQcDecision } from './NegativeLabRollHealthModel';
 
 type NegativeLabQcOverlayKey = keyof NegativeLabQcOverlayVisibility;
+type NegativeLabQcCandidate = NegativeLabQcProofReport['frames'][number]['candidates'][number];
+type NegativeLabQcCandidateDecision = 'accepted' | 'pending' | 'rejected';
 
 const NEGATIVE_LAB_QC_OVERLAY_OPTIONS = [
   {
@@ -33,6 +35,11 @@ const NEGATIVE_LAB_QC_OVERLAY_OPTIONS = [
   testId: string;
 }>;
 
+const QC_CANDIDATE_KIND_LABEL_KEYS = {
+  dust_spot: 'modals.negativeConversion.dustCandidate.dustSpot',
+  emulsion_scratch: 'modals.negativeConversion.dustCandidate.emulsionScratch',
+} as const satisfies Record<NegativeLabQcCandidate['kind'], `modals.negativeConversion.${string}`>;
+
 const OBJECTIVE_QC_FINDING_CODES = new Set([
   'acquisition_review_required',
   'base_fog_only_review',
@@ -44,6 +51,9 @@ const getQcFindingDomain = (findingCodes: readonly string[]): 'objective' | 'cre
   findingCodes.some((code) => OBJECTIVE_QC_FINDING_CODES.has(code)) ? 'objective' : 'creative';
 
 interface NegativeLabQcProofPanelProps {
+  dustCandidateDecisionById: Record<string, Exclude<NegativeLabQcCandidateDecision, 'pending'>>;
+  onAcceptDustCandidate: (frameId: string, candidate: NegativeLabQcCandidate) => void;
+  onRejectDustCandidate: (candidate: NegativeLabQcCandidate) => void;
   onToggleQcOverlay: (key: NegativeLabQcOverlayKey) => void;
   qcDecisionByFrameId: Record<string, NegativeLabQcDecision>;
   qcOverlayVisibility: NegativeLabQcOverlayVisibility;
@@ -52,6 +62,9 @@ interface NegativeLabQcProofPanelProps {
 }
 
 export function NegativeLabQcProofPanel({
+  dustCandidateDecisionById,
+  onAcceptDustCandidate,
+  onRejectDustCandidate,
   onToggleQcOverlay,
   qcDecisionByFrameId,
   qcOverlayVisibility,
@@ -244,6 +257,54 @@ export function NegativeLabQcProofPanel({
                     intent: positiveVariant.outputIntent,
                   })}
                 </span>
+              )}
+              {frame.candidates.length > 0 && (
+                <div
+                  className="col-span-3 grid gap-1"
+                  data-qc-candidate-count={frame.candidates.length}
+                  data-testid={`negative-lab-qc-proof-candidates-${frame.contactSheetSlot - 1}`}
+                >
+                  {frame.candidates.map((candidate) => {
+                    const candidateDecision = dustCandidateDecisionById[candidate.candidateId] ?? 'pending';
+                    const canAccept = candidate.kind === 'dust_spot';
+
+                    return (
+                      <div
+                        className="grid grid-cols-[1fr_auto_auto] items-center gap-1 rounded border border-yellow-300/30 bg-yellow-300/10 px-1.5 py-1 text-[11px] text-yellow-100"
+                        data-candidate-confidence={candidate.confidence.toFixed(2)}
+                        data-candidate-decision={candidateDecision}
+                        data-candidate-id={candidate.candidateId}
+                        data-candidate-kind={candidate.kind}
+                        data-testid={`negative-lab-qc-proof-candidate-${candidate.candidateId}`}
+                        key={candidate.candidateId}
+                      >
+                        <span className="min-w-0 truncate">{t(QC_CANDIDATE_KIND_LABEL_KEYS[candidate.kind])}</span>
+                        <button
+                          className="rounded bg-yellow-200 px-1.5 py-0.5 font-medium text-black disabled:cursor-not-allowed disabled:opacity-40"
+                          data-testid={`negative-lab-qc-proof-accept-candidate-${candidate.candidateId}`}
+                          disabled={!canAccept || candidateDecision === 'accepted'}
+                          onClick={() => {
+                            onAcceptDustCandidate(frame.frameId, candidate);
+                          }}
+                          type="button"
+                        >
+                          {t('modals.negativeConversion.acceptDustCandidate')}
+                        </button>
+                        <button
+                          className="rounded border border-yellow-200/40 px-1.5 py-0.5 text-yellow-100 disabled:cursor-not-allowed disabled:opacity-40"
+                          data-testid={`negative-lab-qc-proof-reject-candidate-${candidate.candidateId}`}
+                          disabled={candidateDecision === 'rejected'}
+                          onClick={() => {
+                            onRejectDustCandidate(candidate);
+                          }}
+                          type="button"
+                        >
+                          {t('modals.negativeConversion.rejectDustCandidate')}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
           );
