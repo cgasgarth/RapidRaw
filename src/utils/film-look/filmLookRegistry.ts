@@ -32,13 +32,6 @@ const GENERIC_FILM_LOOK_PROVENANCE = {
   measurementSource: 'generic_engineered_starting_point',
 } satisfies FilmLookBrowserItemProvenance;
 
-const STOCK_REFERENCE_FILM_LOOK_PROVENANCE = {
-  claimLevel: 'stock_family_reference_metadata',
-  legalNamingStatus: 'descriptive_stock_family',
-  legalNote: 'Creative stock-inspired approximation; not official, endorsed, measured, or an exact film match.',
-  measurementSource: 'research_reference_metadata_only',
-} satisfies FilmLookBrowserItemProvenance;
-
 const GENERIC_FILM_LOOK_RUNTIME_SUPPORT = 'adjustment_patch_preview_export' satisfies FilmLookRuntimeSupportState;
 
 const makeGenericFilmLook = (
@@ -49,15 +42,7 @@ const makeGenericFilmLook = (
   runtimeSupport: GENERIC_FILM_LOOK_RUNTIME_SUPPORT,
 });
 
-const makeStockReferenceFilmLook = (
-  look: Omit<FilmLookBrowserItem, 'provenance' | 'runtimeSupport'>,
-): FilmLookBrowserItem => ({
-  ...look,
-  provenance: STOCK_REFERENCE_FILM_LOOK_PROVENANCE,
-  runtimeSupport: GENERIC_FILM_LOOK_RUNTIME_SUPPORT,
-});
-
-type StockReferenceFilmLookDefinition = readonly [
+type GenericFilmLookDefinition = readonly [
   id: string,
   displayName: string,
   category: FilmLookCategory,
@@ -66,50 +51,50 @@ type StockReferenceFilmLookDefinition = readonly [
   adjustmentPatch: FilmLookAdjustmentPatch,
 ];
 
-const STOCK_REFERENCE_FILM_LOOK_DEFINITIONS: Array<StockReferenceFilmLookDefinition> = [
+const EXTRA_GENERIC_FILM_LOOK_DEFINITIONS: Array<GenericFilmLookDefinition> = [
   [
-    'film_look.stock_reference.portra_400_portrait.v1',
-    'Portra 400 Inspired Portrait',
+    'film_look.generic.soft_portrait_color.v1',
+    'Soft Portrait Color',
     'color_warm',
-    'Warm portrait color negative with restrained contrast.',
+    'Warm restrained color with gentle contrast for people-focused edits.',
     70,
     { contrast: 8, highlights: -8, saturation: 6, temperature: 4 },
   ],
   [
-    'film_look.stock_reference.gold_200_warmth.v1',
-    'Gold 200 Inspired Warmth',
+    'film_look.generic.sunlit_warmth.v1',
+    'Sunlit Warmth',
     'color_warm',
-    'Golden consumer color negative with soft highlights.',
+    'Sunny warm color with lifted blacks and soft highlight rolloff.',
     68,
     { blacks: 4, contrast: -4, highlights: -6, saturation: 10, temperature: 9 },
   ],
   [
-    'film_look.stock_reference.velvia_50_chrome.v1',
-    'Velvia 50 Inspired Chrome',
+    'film_look.generic.deep_chroma.v1',
+    'Deep Chroma',
     'color_contrast',
-    'Dense saturated slide color for landscape contrast.',
+    'Dense saturated color with stronger separation for scenic contrast.',
     58,
     { blacks: -6, contrast: 26, highlights: -4, saturation: 28 },
   ],
   [
-    'film_look.stock_reference.tri_x_400_mono.v1',
-    'Tri-X 400 Inspired Mono',
+    'film_look.generic.bold_mono_grain.v1',
+    'Bold Mono Grain',
     'black_and_white',
-    'Bold high-speed black-and-white with visible grain.',
+    'High-contrast monochrome with visible synthetic texture.',
     72,
     { blacks: -8, contrast: 30, grainAmount: 32, grainSize: 48, saturation: -100 },
   ],
 ];
 
-const makeStockReferenceFilmLookFromDefinition = ([
+const makeGenericFilmLookFromDefinition = ([
   id,
   displayName,
   category,
   description,
   strengthDefault,
   adjustmentPatch,
-]: StockReferenceFilmLookDefinition): FilmLookBrowserItem =>
-  makeStockReferenceFilmLook({
+]: GenericFilmLookDefinition): FilmLookBrowserItem =>
+  makeGenericFilmLook({
     adjustmentPatch,
     category,
     description,
@@ -192,7 +177,7 @@ export const FILM_LOOK_BROWSER_ITEMS: Array<FilmLookBrowserItem> = [
     id: 'film_look.generic.punch_color.v1',
     strengthDefault: 60,
   }),
-  ...STOCK_REFERENCE_FILM_LOOK_DEFINITIONS.map(makeStockReferenceFilmLookFromDefinition),
+  ...EXTRA_GENERIC_FILM_LOOK_DEFINITIONS.map(makeGenericFilmLookFromDefinition),
 ];
 
 export const getFilmLookBrowserGroups = (): Array<FilmLookBrowserGroup> =>

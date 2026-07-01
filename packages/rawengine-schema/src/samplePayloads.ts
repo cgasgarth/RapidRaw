@@ -3825,18 +3825,7 @@ const genericFilmLookProvenance = {
   sourceProfileIds: [],
 } as const;
 
-const stockReferenceFilmLookProvenance = {
-  claimLevel: 'stock_family_reference_metadata',
-  fixtureIds: [],
-  legalNamingStatus: 'descriptive_stock_family',
-  legalNote: 'Creative stock-inspired approximation; not official, endorsed, measured, or an exact film match.',
-  licenseRecordIds: [],
-  measurementSource: 'research_reference_metadata_only',
-  sourceCitationIds: ['film_stock_public_reference_metadata.v1'],
-  sourceProfileIds: [],
-} as const;
-
-type SampleStockReferenceFilmLookCategory =
+type SampleGenericFilmLookCategory =
   | 'black_and_white'
   | 'color_clean'
   | 'color_contrast'
@@ -3844,8 +3833,8 @@ type SampleStockReferenceFilmLookCategory =
   | 'color_fade'
   | 'color_warm';
 
-interface SampleStockReferenceFilmLookInput {
-  category: SampleStockReferenceFilmLookCategory;
+interface SampleGenericFilmLookInput {
+  category: SampleGenericFilmLookCategory;
   description: string;
   displayName: string;
   lookId: string;
@@ -3858,14 +3847,14 @@ interface SampleStockReferenceFilmLookInput {
   strengthDefault: number;
 }
 
-const makeSampleStockReferenceFilmLook = ({
+const makeSampleGenericFilmLook = ({
   category,
   description,
   displayName,
   lookId,
   nodes,
   strengthDefault,
-}: SampleStockReferenceFilmLookInput) => ({
+}: SampleGenericFilmLookInput) => ({
   category,
   description,
   displayName,
@@ -3876,28 +3865,28 @@ const makeSampleStockReferenceFilmLook = ({
     ...node,
     enabledByDefault: true,
   })),
-  provenance: stockReferenceFilmLookProvenance,
+  provenance: genericFilmLookProvenance,
   renderDomain: 'working_rgb',
-  requiredWarnings: ['creative_not_exact_emulation', 'requires_user_review'],
+  requiredWarnings: ['creative_not_exact_emulation'],
   schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
   strengthDefault,
 });
 
-const sampleStockReferenceFilmLookRecipesV1 = [
-  makeSampleStockReferenceFilmLook({
+const sampleExtraGenericFilmLookRecipesV1 = [
+  makeSampleGenericFilmLook({
     category: 'color_warm',
-    description: 'Warm portrait color negative with restrained contrast.',
-    displayName: 'Portra 400 Inspired Portrait',
-    lookId: 'film_look.stock_reference.portra_400_portrait.v1',
+    description: 'Warm restrained color with gentle contrast for people-focused edits.',
+    displayName: 'Soft Portrait Color',
+    lookId: 'film_look.generic.soft_portrait_color.v1',
     nodes: [
       {
-        nodeId: 'tone.portrait_soft_contrast',
+        nodeId: 'tone.soft_portrait_contrast',
         nodeKind: 'tone_curve',
         parameters: { contrast: 0.08, shoulder: 0.08 },
         renderStage: 'creative_color_rendering',
       },
       {
-        nodeId: 'color.warm_skin_bias',
+        nodeId: 'color.soft_portrait_warmth',
         nodeKind: 'color_matrix',
         parameters: { saturation: 1.06, warmth: 0.04 },
         renderStage: 'creative_color_rendering',
@@ -3905,20 +3894,20 @@ const sampleStockReferenceFilmLookRecipesV1 = [
     ],
     strengthDefault: 70,
   }),
-  makeSampleStockReferenceFilmLook({
+  makeSampleGenericFilmLook({
     category: 'color_warm',
-    description: 'Golden consumer color negative with soft highlights.',
-    displayName: 'Gold 200 Inspired Warmth',
-    lookId: 'film_look.stock_reference.gold_200_warmth.v1',
+    description: 'Sunny warm color with lifted blacks and soft highlight rolloff.',
+    displayName: 'Sunlit Warmth',
+    lookId: 'film_look.generic.sunlit_warmth.v1',
     nodes: [
       {
-        nodeId: 'tone.consumer_warm_rolloff',
+        nodeId: 'tone.sunlit_rolloff',
         nodeKind: 'tone_curve',
         parameters: { blackLift: 0.04, contrast: -0.04, shoulder: 0.08 },
         renderStage: 'creative_color_rendering',
       },
       {
-        nodeId: 'color.golden_warmth',
+        nodeId: 'color.sunlit_warmth',
         nodeKind: 'color_matrix',
         parameters: { saturation: 1.1, warmth: 0.09 },
         renderStage: 'creative_color_rendering',
@@ -3926,20 +3915,20 @@ const sampleStockReferenceFilmLookRecipesV1 = [
     ],
     strengthDefault: 68,
   }),
-  makeSampleStockReferenceFilmLook({
+  makeSampleGenericFilmLook({
     category: 'color_contrast',
-    description: 'Dense saturated slide color for landscape contrast.',
-    displayName: 'Velvia 50 Inspired Chrome',
-    lookId: 'film_look.stock_reference.velvia_50_chrome.v1',
+    description: 'Dense saturated color with stronger separation for scenic contrast.',
+    displayName: 'Deep Chroma',
+    lookId: 'film_look.generic.deep_chroma.v1',
     nodes: [
       {
-        nodeId: 'tone.slide_dense_curve',
+        nodeId: 'tone.deep_chroma_curve',
         nodeKind: 'tone_curve',
         parameters: { blackLift: -0.06, contrast: 0.26, shoulder: 0.04 },
         renderStage: 'creative_color_rendering',
       },
       {
-        nodeId: 'color.chrome_saturation',
+        nodeId: 'color.deep_chroma_saturation',
         nodeKind: 'color_matrix',
         parameters: { saturation: 1.28 },
         renderStage: 'creative_color_rendering',
@@ -3947,20 +3936,20 @@ const sampleStockReferenceFilmLookRecipesV1 = [
     ],
     strengthDefault: 58,
   }),
-  makeSampleStockReferenceFilmLook({
+  makeSampleGenericFilmLook({
     category: 'black_and_white',
-    description: 'Bold high-speed black-and-white with visible grain.',
-    displayName: 'Tri-X 400 Inspired Mono',
-    lookId: 'film_look.stock_reference.tri_x_400_mono.v1',
+    description: 'High-contrast monochrome with visible synthetic texture.',
+    displayName: 'Bold Mono Grain',
+    lookId: 'film_look.generic.bold_mono_grain.v1',
     nodes: [
       {
-        nodeId: 'mono.classic_high_speed_mix',
+        nodeId: 'mono.bold_grain_mix',
         nodeKind: 'black_and_white_mixer',
         parameters: { blue: 0.18, green: 0.54, red: 0.28 },
         renderStage: 'creative_color_rendering',
       },
       {
-        nodeId: 'texture.bold_high_speed_grain',
+        nodeId: 'texture.bold_mono_grain',
         nodeKind: 'grain',
         parameters: { amount: 0.32, size: 0.48 },
         renderStage: 'texture_rendering',
@@ -4188,7 +4177,7 @@ export const sampleFilmLookCatalogV1: FilmLookCatalogV1 = filmLookCatalogV1Schem
       schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
       strengthDefault: 60,
     },
-    ...sampleStockReferenceFilmLookRecipesV1,
+    ...sampleExtraGenericFilmLookRecipesV1,
   ],
   schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
 });

@@ -44,9 +44,9 @@ for (let index = 1; index < controlCountSorted.length; index += 1) {
 }
 
 assertOrder('name_asc', [
+  'film_look.generic.bold_mono_grain.v1',
   'film_look.generic.clean_color.v1',
   'film_look.generic.cool_contrast.v1',
-  'film_look.stock_reference.gold_200_warmth.v1',
 ]);
 
 console.log(`film look sort ok (${FILM_LOOK_BROWSER_ITEMS.length} looks)`);

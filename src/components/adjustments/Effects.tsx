@@ -10,6 +10,7 @@ import {
   buildFilmLookPresetDraft,
   type FilmLookBrowserItem,
   formatFilmLookPresetName,
+  getFilmLookControlledAdjustmentKeys,
 } from '../../utils/film-look/filmLookBrowser';
 import { buildFilmGrainPresetAdjustmentPatch, FILM_GRAIN_UI_PRESETS } from '../../utils/filmGrainControls';
 import type { AppSettings, Preset } from '../ui/AppProperties';
@@ -40,6 +41,11 @@ const FILM_LOOK_PRESET_FILE_EXTENSION = 'rrpreset';
 const FILM_LOOK_PRESET_FILE_TYPE = 'RapidRaw Preset';
 const FILM_LOOK_SAVE_FAILED = 'Film look preset save failed.';
 const FILM_LOOK_SHARE_FAILED = 'Film look preset export failed.';
+const FILM_LOOK_CONTROLLED_ADJUSTMENT_KEYS = new Set<string>([
+  ...getFilmLookControlledAdjustmentKeys(),
+  CreativeAdjustment.HalationAmount,
+  Effect.GrainRoughness,
+]);
 const formatFilmLookSavedStatus = (look: FilmLookBrowserItem, strength: number) =>
   `Saved ${formatFilmLookPresetName(look, strength)}`;
 const formatFilmLookSharedStatus = (look: FilmLookBrowserItem, strength: number) =>
@@ -63,7 +69,11 @@ export default function EffectsPanel({
   const [filmLookPresetStatus, setFilmLookPresetStatus] = useState<string | null>(null);
 
   const handleAdjustmentChange = (key: string, value: number) => {
-    setAdjustments((prev: Adjustments) => ({ ...prev, [key]: Math.trunc(value) }));
+    setAdjustments((prev: Adjustments) => ({
+      ...prev,
+      [key]: Math.trunc(value),
+      ...(FILM_LOOK_CONTROLLED_ADJUSTMENT_KEYS.has(key) ? { filmLookId: null, filmLookStrength: 100 } : {}),
+    }));
   };
 
   const handleLutIntensityChange = (intensity: number) => {

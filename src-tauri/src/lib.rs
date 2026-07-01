@@ -85,6 +85,7 @@ use crate::cache_utils::{
 };
 use crate::exif_processing::{read_exposure_time_secs, read_iso};
 use crate::file_management::{parse_virtual_path, read_file_mapped};
+use crate::film_look_render::normalize_film_look_adjustments_for_render;
 use crate::formats::is_raw_file;
 use crate::image_loader::{
     composite_patches_on_image, load_and_composite, load_base_image_from_bytes,
@@ -606,18 +607,24 @@ fn render_processed_export_soft_proof_preview(
         adjustments,
         &mask_bitmaps,
     );
+    let render_adjustments = normalize_film_look_adjustments_for_render(adjustments);
     let tm_override = resolve_tonemapper_override_from_handle(app_handle, loaded_image.is_raw);
-    let final_adjustments =
-        get_all_adjustments_from_json(adjustments, loaded_image.is_raw, tm_override);
-    let lut: Option<Arc<Lut>> = adjustments["lutPath"]
+    let final_adjustments = get_all_adjustments_from_json(
+        render_adjustments.as_ref(),
+        loaded_image.is_raw,
+        tm_override,
+    );
+    let lut: Option<Arc<Lut>> = render_adjustments["lutPath"]
         .as_str()
         .and_then(|path| get_or_load_lut(state, path).ok());
+    let render_hash = calculate_full_job_hash(&loaded_image.path, render_adjustments.as_ref())
+        .wrapping_add(detail_stage.render_hash);
 
     process_and_get_dynamic_image(
         &context,
         state,
         retouched_image.as_ref(),
-        detail_stage.render_hash,
+        render_hash,
         RenderRequest {
             adjustments: final_adjustments,
             mask_bitmaps: &mask_bitmaps,
@@ -725,16 +732,19 @@ fn generate_uncropped_preview(
             .collect();
 
         let tm_override = resolve_tonemapper_override_from_handle(&app_handle, is_raw);
+        let render_adjustments = normalize_film_look_adjustments_for_render(&adjustments_clone);
         let uncropped_adjustments =
-            get_all_adjustments_from_json(&adjustments_clone, is_raw, tm_override);
-        let lut_path = adjustments_clone["lutPath"].as_str();
+            get_all_adjustments_from_json(render_adjustments.as_ref(), is_raw, tm_override);
+        let lut_path = render_adjustments["lutPath"].as_str();
         let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
+        let render_hash = calculate_full_job_hash(&loaded_image.path, render_adjustments.as_ref())
+            .wrapping_add(unique_hash);
 
         if let Ok(processed_image) = process_and_get_dynamic_image(
             &context,
             &state,
             &processing_base,
-            unique_hash,
+            render_hash,
             RenderRequest {
                 adjustments: uncropped_adjustments,
                 mask_bitmaps: &mask_bitmaps,
@@ -1070,15 +1080,19 @@ fn generate_preset_preview(
         .collect();
 
     let tm_override = resolve_tonemapper_override_from_handle(&app_handle, is_raw);
-    let all_adjustments = get_all_adjustments_from_json(&js_adjustments, is_raw, tm_override);
-    let lut_path = js_adjustments["lutPath"].as_str();
+    let render_adjustments = normalize_film_look_adjustments_for_render(&js_adjustments);
+    let all_adjustments =
+        get_all_adjustments_from_json(render_adjustments.as_ref(), is_raw, tm_override);
+    let lut_path = render_adjustments["lutPath"].as_str();
     let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
+    let render_hash = calculate_full_job_hash(&loaded_image.path, render_adjustments.as_ref())
+        .wrapping_add(unique_hash);
 
     let processed_image = process_and_get_dynamic_image(
         &context,
         &state,
         &preview_image,
-        unique_hash,
+        render_hash,
         RenderRequest {
             adjustments: all_adjustments,
             mask_bitmaps: &mask_bitmaps,
@@ -1211,12 +1225,16 @@ async fn generate_all_community_previews(
                 .collect();
 
             let tm_override = resolve_tonemapper_override_from_handle(&app_handle, *is_raw);
+            let render_adjustments =
+                normalize_film_look_adjustments_for_render(&scaled_adjustments);
             let all_adjustments =
-                get_all_adjustments_from_json(&scaled_adjustments, *is_raw, tm_override);
-            let lut_path = js_adjustments["lutPath"].as_str();
+                get_all_adjustments_from_json(render_adjustments.as_ref(), *is_raw, tm_override);
+            let lut_path = render_adjustments["lutPath"].as_str();
             let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
 
-            let unique_hash = preset_hash.wrapping_add(i as u64);
+            let unique_hash = calculate_full_job_hash(&preset.name, render_adjustments.as_ref())
+                .wrapping_add(preset_hash)
+                .wrapping_add(i as u64);
 
             let processed_image_dynamic = crate::image_processing::process_and_get_dynamic_image(
                 &context,
@@ -1659,14 +1677,16 @@ fn generate_preview_for_path(
         .collect();
 
     let tm_override = resolve_tonemapper_override(&settings, is_raw);
-    let all_adjustments = get_all_adjustments_from_json(&js_adjustments, is_raw, tm_override);
-    let lut_path = js_adjustments["lutPath"].as_str();
+    let render_adjustments = normalize_film_look_adjustments_for_render(&js_adjustments);
+    let all_adjustments =
+        get_all_adjustments_from_json(render_adjustments.as_ref(), is_raw, tm_override);
+    let lut_path = render_adjustments["lutPath"].as_str();
     let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
-    let unique_hash = calculate_full_job_hash(&source_path_str, &js_adjustments);
+    let unique_hash = calculate_full_job_hash(&source_path_str, render_adjustments.as_ref());
     let detail_stage = render_pipeline::apply_pre_gpu_detail_stages(
         transformed_image.as_ref(),
         unique_hash,
-        &js_adjustments,
+        render_adjustments.as_ref(),
     );
     let final_image = process_and_get_dynamic_image(
         &context,
