@@ -95,7 +95,7 @@ const ToneMapperSwitch = ({
       <div className={density.toneMapper.titleRow}>
         <button
           type="button"
-          className="grid cursor-pointer border-0 bg-transparent p-0 text-left font-inherit"
+          className="grid cursor-pointer rounded border-0 bg-transparent p-0 text-left font-inherit focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring"
           onClick={handleReset}
           onDoubleClick={handleReset}
           onMouseEnter={() => {
@@ -122,7 +122,7 @@ const ToneMapperSwitch = ({
       <div className={density.toneMapper.card}>
         <div className="relative flex w-full">
           <motion.div
-            className="absolute top-0 bottom-0 z-0 bg-accent"
+            className="absolute top-0 bottom-0 z-0 bg-editor-primary-active"
             style={{ borderRadius: 4 }}
             animate={bubbleStyle}
             transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
@@ -135,8 +135,8 @@ const ToneMapperSwitch = ({
                 onMapperChange(mapper.id);
               }}
               className={cx(density.toneMapper.option, {
-                'text-text-primary hover:bg-surface': selectedMapper !== mapper.id,
-                'text-button-text': selectedMapper === mapper.id,
+                'text-text-primary hover:bg-editor-selected-quiet': selectedMapper !== mapper.id,
+                'text-editor-primary-active-text': selectedMapper === mapper.id,
               })}
               style={{ WebkitTapHighlightColor: 'transparent' }}
             >
@@ -153,7 +153,7 @@ const ToneMapperSwitch = ({
             onValueChange={onEvShiftChange}
             step={0.01}
             value={evShiftValue}
-            trackClassName="bg-surface"
+            trackClassName="bg-editor-panel"
             onDragStateChange={onDragStateChange}
           />
         </div>

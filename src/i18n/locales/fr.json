@@ -538,6 +538,7 @@
         "resetSectionSettings": "Réinitialiser les paramètres de la section {{section}}"
       },
       "rawProcessingModeOverride": {
+        "attention": "Check",
         "currentValue": "",
         "description": "",
         "error": "",

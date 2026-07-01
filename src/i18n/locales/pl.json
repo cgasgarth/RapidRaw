@@ -585,6 +585,7 @@
         "resetSectionSettings": "Resetuj ustawienia sekcji {{section}}"
       },
       "rawProcessingModeOverride": {
+        "attention": "Check",
         "currentValue": "",
         "description": "Nadpisz globalny tryb jakosci RAW dla tego obrazu.",
         "error": "Nie udalo sie zastosowac nadpisania trybu RAW: {{error}}",

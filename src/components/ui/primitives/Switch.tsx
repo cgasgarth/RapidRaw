@@ -5,6 +5,7 @@ import UiText from './Text';
 
 interface SwitchProps {
   checked: boolean;
+  chrome?: 'app' | 'editor';
   className?: string;
   disabled?: boolean;
   id?: string;
@@ -26,14 +27,16 @@ interface SwitchProps {
  */
 const Switch = ({
   checked,
+  chrome = 'app',
   className = '',
   disabled = false,
+  id,
   label,
   onChange,
   tooltip,
   trackClassName,
 }: SwitchProps) => {
-  const uniqueId = `switch-${label.replace(/\s+/g, '-').toLowerCase()}`;
+  const uniqueId = id ?? `switch-${label.replace(/\s+/g, '-').toLowerCase()}`;
 
   return (
     <label
@@ -45,13 +48,16 @@ const Switch = ({
       htmlFor={uniqueId}
       data-tooltip={tooltip}
     >
-      <UiText variant={TextVariants.label} className="select-none">
+      <UiText
+        variant={TextVariants.label}
+        className={cx('select-none', chrome === 'editor' && 'text-[12px] leading-4 text-text-secondary')}
+      >
         {label}
       </UiText>
-      <div className="relative w-10 h-5">
+      <div className={cx('relative', chrome === 'editor' ? 'h-4 w-8' : 'w-10 h-5')}>
         <input
           checked={checked}
-          className="sr-only"
+          className="peer sr-only"
           disabled={disabled}
           id={uniqueId}
           onChange={(e: ChangeEvent<HTMLInputElement>) => {
@@ -61,13 +67,30 @@ const Switch = ({
           }}
           type="checkbox"
         />
-        <div className={cx('w-full h-full bg-card-active/50 rounded-full shadow-inner', trackClassName)}></div>
         <div
-          className={cx('absolute top-0.5 left-0.5 w-4 h-4 rounded-full transition-[background-color,transform]', {
-            'bg-accent': checked,
-            'bg-text-secondary/80': !checked,
-          })}
-          style={{ transform: `translateX(${checked ? 20 : 0}px)` }}
+          className={cx(
+            'h-full w-full rounded-full shadow-inner transition-colors',
+            chrome === 'editor'
+              ? [
+                  'bg-editor-panel-raised peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-editor-focus-ring peer-focus-visible:ring-offset-1 peer-focus-visible:ring-offset-editor-matte',
+                  checked && 'bg-editor-selected-quiet',
+                ]
+              : 'bg-card-active/50',
+            trackClassName,
+          )}
+        ></div>
+        <div
+          className={cx(
+            'absolute rounded-full transition-[background-color,transform]',
+            chrome === 'editor' ? 'left-0.5 top-0.5 h-3 w-3' : 'top-0.5 left-0.5 w-4 h-4',
+            {
+              'bg-accent': checked && chrome !== 'editor',
+              'bg-editor-primary-active': checked && chrome === 'editor',
+              'bg-text-secondary/80': !checked && chrome !== 'editor',
+              'bg-editor-disabled': !checked && chrome === 'editor',
+            },
+          )}
+          style={{ transform: `translateX(${checked ? (chrome === 'editor' ? 16 : 20) : 0}px)` }}
         />
       </div>
     </label>

@@ -42,6 +42,7 @@ import DetailsPanel from '../../../adjustments/Details';
 import EffectsPanel from '../../../adjustments/Effects';
 import { OPTION_SEPARATOR, type Option } from '../../../ui/AppProperties';
 import CollapsibleSection, { type CollapsibleSectionHeaderAction } from '../../../ui/CollapsibleSection';
+import { editorChromeStatusChipClassName } from '../../../ui/editorChromeTokens';
 import { professionalInspectorDensityTokens } from '../../../ui/inspectorTokens';
 import Dropdown, { type OptionItem } from '../../../ui/primitives/Dropdown';
 import UiText from '../../../ui/primitives/Text';
@@ -424,13 +425,14 @@ export default function Controls() {
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full flex-col bg-editor-panel text-text-primary">
       <div className={density.panelHeader.root}>
         <UiText as="h2" variant={TextVariants.heading} className={density.panelHeader.title}>
           {t('editor.adjustments.title')}
         </UiText>
         <div className="flex items-center gap-1">
           <button
+            aria-label={t('editor.adjustments.tooltips.autoAdjust')}
             className={density.panelHeader.actionButton}
             disabled={!selectedImage?.isReady}
             onClick={() => {
@@ -457,6 +459,7 @@ export default function Controls() {
             <ChartArea size={PANEL_ACTION_ICON_SIZE} />
           </button>
           <button
+            aria-label={t('editor.adjustments.tooltips.resetAdjustments')}
             className={density.panelHeader.actionButton}
             disabled={!selectedImage}
             onClick={() => {
@@ -493,6 +496,11 @@ export default function Controls() {
                   mode: rawProcessingModeDisplay,
                 })}
               </UiText>
+              {isRawProcessingStatusAttentionRequired && (
+                <span className={editorChromeStatusChipClassName('warning')}>
+                  {t('editor.adjustments.rawProcessingModeOverride.attention', { defaultValue: 'Check' })}
+                </span>
+              )}
             </span>
             <ChevronDown
               className={cx('shrink-0 text-accent/90 transition-transform duration-200', {
@@ -509,6 +517,7 @@ export default function Controls() {
                   {t('editor.adjustments.rawProcessingModeOverride.description')}
                 </UiText>
                 <Dropdown
+                  chrome="editor"
                   className="w-36 shrink-0"
                   onChange={(mode) => {
                     void handleRawProcessingModeOverrideChange(mode);
@@ -542,6 +551,7 @@ export default function Controls() {
                 className={density.rawProcessing.compareButton}
                 data-testid="raw-reconstruction-comparison-run"
                 disabled={isComparingRawReconstruction || !selectedImage.isReady}
+                aria-busy={isComparingRawReconstruction}
                 onClick={() => {
                   void handleCompareRawReconstructionModes();
                 }}
@@ -554,7 +564,7 @@ export default function Controls() {
               </button>
               {rawReconstructionComparison !== null && (
                 <div
-                  className="space-y-2 rounded-md border border-surface bg-background/50 p-2"
+                  className="space-y-2 rounded-md border border-editor-border bg-editor-panel-well p-2"
                   data-crop-size={rawReconstructionComparison.cropSize}
                   data-testid="raw-reconstruction-comparison-result"
                 >

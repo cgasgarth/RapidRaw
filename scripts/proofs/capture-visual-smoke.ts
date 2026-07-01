@@ -80,10 +80,12 @@ const port = 1420;
 const baseUrl = `http://${host}:${port}`;
 const outputDir = resolve('artifacts/visual-smoke');
 const viewport = { width: 1440, height: 960 };
+const compactPortraitViewport = { width: 390, height: 844 };
 const scenarioArgIndex = process.argv.indexOf('--scenario');
 const requestedScenario = scenarioArgIndex >= 0 ? process.argv[scenarioArgIndex + 1] : null;
 const scenarios = VISUAL_SMOKE_SCENARIOS.map((scenario) => ({
   ...scenario,
+  compactOutputPath: 'compactOutputFile' in scenario ? resolve(outputDir, scenario.compactOutputFile) : undefined,
   outputPath: resolve(outputDir, scenario.outputFile),
 }));
 
@@ -3864,6 +3866,27 @@ async function main() {
         throw new Error(
           `${scenario.mode} dimensions mismatch: expected ${viewport.width}x${viewport.height}, got ${dimensions.width}x${dimensions.height}`,
         );
+      }
+      if (scenario.compactOutputPath !== undefined) {
+        await page.setViewportSize(compactPortraitViewport);
+        await page.goto(`${baseUrl}/visual-smoke.html?scenario=${scenario.appMode ?? scenario.mode}`, {
+          waitUntil: 'networkidle',
+        });
+        await page.locator('[data-visual-smoke-ready="true"]').waitFor({ timeout: 10_000 });
+        await page.getByText(scenario.marker, { exact: true }).waitFor({ timeout: 10_000 });
+        await assertSectionCount(page, scenario.sectionMinimum);
+        await prepareScenario(page, scenario.mode);
+        await page.screenshot({ path: scenario.compactOutputPath, fullPage: false });
+        const compactDimensions = await readPngDimensions(scenario.compactOutputPath);
+        if (
+          compactDimensions.width !== compactPortraitViewport.width ||
+          compactDimensions.height !== compactPortraitViewport.height
+        ) {
+          throw new Error(
+            `${scenario.mode} compact dimensions mismatch: expected ${compactPortraitViewport.width}x${compactPortraitViewport.height}, got ${compactDimensions.width}x${compactDimensions.height}`,
+          );
+        }
+        await page.setViewportSize(viewport);
       }
       if (scenario.mode === VISUAL_SMOKE_SCENARIO_IDS.EmptyLibrary) {
         await page.goto(`${baseUrl}/visual-smoke.html?scenario=${VISUAL_SMOKE_SCENARIO_IDS.AdjustmentsPanelRetune}`, {

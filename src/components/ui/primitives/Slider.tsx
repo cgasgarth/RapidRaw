@@ -546,7 +546,7 @@ const Slider = ({
 
   const trackControl = (
     <div className={tokens.trackWrap}>
-      <div className={cx(tokens.track, trackClassName || 'bg-card-active')} />
+      <div className={cx(tokens.track, trackClassName || 'bg-editor-panel-raised')} />
       <div
         className={tokens.fill}
         style={{

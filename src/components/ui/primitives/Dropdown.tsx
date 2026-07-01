@@ -4,6 +4,7 @@ import { Check, ChevronDown } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useManagedFocus } from '../../../hooks/ui/useManagedFocus';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
+import { editorChromeTokens } from '../editorChromeTokens';
 import Input from './Input';
 import UiText from './Text';
 
@@ -20,6 +21,7 @@ interface DropdownProps<T extends React.Key> {
   placeholder?: string;
   searchPlaceholder?: string;
   value: T | null;
+  chrome?: 'app' | 'editor';
   disabled?: boolean;
   triggerClassName?: string;
 }
@@ -32,6 +34,7 @@ const Dropdown = <T extends React.Key>({
   placeholder = 'Select an option',
   searchPlaceholder = 'Filter options...',
   value,
+  chrome = 'app',
   disabled = false,
   triggerClassName = '',
 }: DropdownProps<T>) => {
@@ -113,9 +116,17 @@ const Dropdown = <T extends React.Key>({
         aria-haspopup="listbox"
         disabled={disabled}
         className={cx(
-          'w-full border border-border-color rounded-md px-3 mr-4 py-2 flex justify-between items-center text-left disabled:opacity-50 disabled:cursor-not-allowed',
-          'focus:ring-accent focus:border-accent focus:outline-hidden focus:ring-2',
-          triggerClassName || 'bg-surface',
+          chrome === 'editor'
+            ? [
+                'flex h-7 w-full items-center justify-between gap-2 rounded border border-editor-border bg-editor-panel-raised px-2 text-left text-[12px] leading-4 text-text-primary transition-colors hover:bg-editor-selected-quiet disabled:cursor-not-allowed disabled:opacity-45',
+                editorChromeTokens.focusRing,
+              ]
+            : [
+                'w-full border border-border-color rounded-md px-3 mr-4 py-2 flex justify-between items-center text-left disabled:opacity-50 disabled:cursor-not-allowed',
+                'focus:ring-accent focus:border-accent focus:outline-hidden focus:ring-2',
+                triggerClassName || 'bg-surface',
+              ],
+          chrome === 'editor' ? triggerClassName : '',
         )}
         onClick={() => {
           if (isOpen) {
@@ -128,7 +139,7 @@ const Dropdown = <T extends React.Key>({
         onKeyDown={handleContainerKeyDown}
         type="button"
       >
-        <UiText as="span" variant={TextVariants.label} color={TextColors.primary}>
+        <UiText as="span" variant={TextVariants.label} color={TextColors.primary} className="truncate">
           {selectedOption ? selectedOption.label : placeholder}
         </UiText>
         <ChevronDown
@@ -151,11 +162,18 @@ const Dropdown = <T extends React.Key>({
           >
             <div
               aria-orientation="vertical"
-              className="bg-surface/95 backdrop-blur-md rounded-lg shadow-xl p-2 max-h-80 overflow-y-auto"
+              className={cx(
+                'max-h-80 overflow-y-auto backdrop-blur-md',
+                chrome === 'editor'
+                  ? 'rounded-md border border-editor-border bg-editor-panel/95 p-1 shadow-[0_14px_34px_var(--editor-overlay-shadow)]'
+                  : 'bg-surface/95 rounded-lg shadow-xl p-2',
+              )}
               role="listbox"
             >
               {showSearch && (
                 <Input
+                  chrome={chrome}
+                  density={chrome === 'editor' ? 'compact' : 'default'}
                   ref={searchInputRef}
                   value={searchTerm}
                   onChange={(e) => {
@@ -177,10 +195,13 @@ const Dropdown = <T extends React.Key>({
                     }}
                     onKeyDown={handleContainerKeyDown}
                     className={cx(
-                      'w-full text-left px-3 py-2 rounded-md flex items-center justify-between',
-                      'transition-colors duration-150 hover:bg-bg-primary',
+                      'w-full text-left rounded-md flex items-center justify-between',
+                      chrome === 'editor'
+                        ? 'min-h-7 px-2 py-1 text-[12px] leading-4 transition-colors duration-150 hover:bg-editor-selected-quiet focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring'
+                        : 'px-3 py-2 transition-colors duration-150 hover:bg-bg-primary',
                       {
-                        'bg-bg-primary': isSelected,
+                        'bg-bg-primary': isSelected && chrome !== 'editor',
+                        'bg-editor-selected-quiet text-editor-selected-quiet-text': isSelected && chrome === 'editor',
                       },
                     )}
                     role="option"

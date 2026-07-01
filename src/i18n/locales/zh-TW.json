@@ -514,6 +514,7 @@
         "resetSectionSettings": "重置 {{section}} 設定"
       },
       "rawProcessingModeOverride": {
+        "attention": "Check",
         "currentValue": "",
         "description": "",
         "error": "",

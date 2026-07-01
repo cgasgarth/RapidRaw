@@ -538,6 +538,7 @@
         "resetSectionSettings": "Restablecer ajustes de {{section}}"
       },
       "rawProcessingModeOverride": {
+        "attention": "Check",
         "currentValue": "",
         "description": "",
         "error": "",
