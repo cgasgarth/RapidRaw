@@ -9,6 +9,8 @@ import { useEditorStore } from '../../store/useEditorStore';
 import { type Adjustments, ColorAdjustment } from '../../utils/adjustments';
 import {
   formatGamutWarningCoverage,
+  getPreviewScopeFreshnessStatus,
+  getRenderedPreviewWarningStatus,
   isCurrentExportSoftProofGamutWarningOverlay,
   resolveGamutWarningProofDimensions,
 } from '../../utils/color/runtime/gamutWarningDisplay';
@@ -144,6 +146,7 @@ export default function ColorPanel({
   const [activeColorBalanceRange, setActiveColorBalanceRange] = useState<ColorBalanceRgbRange>('midtones');
   const [activeChannelMixerOutput, setActiveChannelMixerOutput] = useState<ChannelMixerOutput>('red');
   const gamutWarningOverlay = useEditorStore((state) => state.gamutWarningOverlay);
+  const previewScopeStatus = useEditorStore((state) => state.previewScopeStatus);
   const selectedImage = useEditorStore((state) => state.selectedImage);
   const selectedImagePath = useEditorStore((state) => state.selectedImage?.path ?? null);
   const exportSoftProofRecipeId = useEditorStore((state) => state.exportSoftProofRecipeId);
@@ -166,6 +169,13 @@ export default function ColorPanel({
   const currentGamutWarningOverlay = isCurrentGamutWarningOverlay ? gamutWarningOverlay : null;
   const proofDimensions = resolveGamutWarningProofDimensions(gamutWarningOverlay, selectedImage);
   const gamutWarningCoverage = formatGamutWarningCoverage(currentGamutWarningOverlay);
+  const renderedPreviewWarningStatus = getRenderedPreviewWarningStatus(gamutWarningOverlay, {
+    exportSoftProofRecipeId,
+    exportSoftProofTransform,
+    isExportSoftProofEnabled,
+    selectedImagePath,
+  });
+  const previewScopeFreshnessStatus = getPreviewScopeFreshnessStatus(previewScopeStatus, selectedImagePath);
   const levels = adjustments.levels;
   const levelsClippingWarnings = [
     levels.inputBlack > 0 ? t('adjustments.color.levels.warnings.shadowClipping') : null,
@@ -173,7 +183,13 @@ export default function ColorPanel({
     levels.outputBlack > 0 || levels.outputWhite < 1 ? t('adjustments.color.levels.warnings.outputCompression') : null,
   ].filter((warning): warning is string => warning !== null);
   const colorWorkspaceWarningChips = [
-    gamutWarningOverlay !== null ? t('adjustments.color.gamutWarning.coverage', { value: gamutWarningCoverage }) : null,
+    renderedPreviewWarningStatus.state === 'current'
+      ? t('editor.canvas.gamutWarningCoverage', {
+          profile: renderedPreviewWarningStatus.displayProfileLabel,
+          value: renderedPreviewWarningStatus.coverageLabel,
+        })
+      : renderedPreviewWarningStatus.statusLabel,
+    previewScopeFreshnessStatus.statusLabel,
     ...levelsClippingWarnings,
     adjustments.skinToneUniformity.enabled ? t('adjustments.color.skinToneUniformity.warning') : null,
   ].filter((warning): warning is string => warning !== null);
@@ -359,7 +375,9 @@ export default function ColorPanel({
             gamutWarningCoverage={gamutWarningCoverage}
             isGamutWarningOverlayVisible={isGamutWarningOverlayVisible}
             onDragStateChange={onDragStateChange}
+            previewScopeFreshnessStatus={previewScopeFreshnessStatus}
             proofDimensions={proofDimensions}
+            renderedPreviewWarningStatus={renderedPreviewWarningStatus}
             setAdjustments={setAdjustments}
             setEditor={setEditor}
             skinToneInspectorAfterDistance={skinToneInspectorAfterDistance}
@@ -413,7 +431,9 @@ export default function ColorPanel({
     isWgpuEnabled,
     levelsClippingWarnings,
     onDragStateChange,
+    previewScopeFreshnessStatus,
     proofDimensions,
+    renderedPreviewWarningStatus,
     setAdjustments,
     setEditor,
     skinToneInspectorAfterDistance,
