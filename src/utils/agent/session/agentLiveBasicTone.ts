@@ -1,5 +1,10 @@
+import { z } from 'zod';
+
 import {
   ApprovalClass,
+  rawEngineActorSchema,
+  rawEngineColorPipelineContextV1Schema,
+  rawEngineTargetSchema,
   type ToneColorCommandEnvelopeV1,
   type ToneColorDryRunResultV1,
   type ToneColorMutationResultV1,
@@ -10,6 +15,8 @@ import { useEditorStore } from '../../../store/useEditorStore';
 import {
   applyBasicToneCommandEnvelopeToAdjustments,
   type BasicToneCommandEnvelope,
+  type BasicToneCommandContextActor,
+  type BasicToneCommandContextTarget,
   buildBasicToneCommandEnvelope,
   buildBasicToneImageCommandContext,
   type LegacyBasicToneAdjustmentPayload,
@@ -129,7 +136,48 @@ export const hashBasicTonePreviewPixels = (pixels: readonly AgentLiveBasicTonePi
     .reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) >>> 0, 0)
     .toString(16);
 
-type TypedBasicToneCommand = Extract<ToneColorCommandEnvelopeV1, { commandType: 'toneColor.setBasicTone' }>;
+const liveBasicToneApprovalSchema = z
+  .object({
+    approvalClass: z.enum([ApprovalClass.PreviewOnly, ApprovalClass.EditApply]),
+    reason: z.string().trim().min(1),
+    state: z.enum(['not_required', 'approved']),
+  })
+  .strict();
+
+const liveBasicToneCommandSchema = z
+  .object({
+    actor: rawEngineActorSchema,
+    approval: liveBasicToneApprovalSchema,
+    colorPipeline: rawEngineColorPipelineContextV1Schema,
+    commandId: z.string().trim().min(1),
+    commandType: z.literal('toneColor.setBasicTone'),
+    correlationId: z.string().trim().min(1),
+    dryRun: z.boolean(),
+    expectedGraphRevision: z.string().trim().min(1),
+    idempotencyKey: z.string().trim().min(1).optional(),
+    parameters: z
+      .object({
+        acceptedDryRunPlanHash: z.string().trim().min(1).optional(),
+        acceptedDryRunPlanId: z.string().trim().min(1).optional(),
+        blackPoint: z.number().min(-100).max(100),
+        clarity: z.number().min(-100).max(100),
+        contrast: z.number().min(-100).max(100),
+        exposureEv: z.number().min(-10).max(10),
+        highlights: z.number().min(-100).max(100),
+        saturation: z.number().min(-100).max(100),
+        shadows: z.number().min(-100).max(100),
+        whitePoint: z.number().min(-100).max(100),
+      })
+      .strict(),
+    schemaVersion: z.literal(1),
+    target: rawEngineTargetSchema.safeExtend({ kind: z.enum(['image', 'virtual_copy']) }).strict(),
+  })
+  .strict();
+
+type TypedBasicToneCommand = z.infer<typeof liveBasicToneCommandSchema>;
+
+const parseLiveBasicToneCommand = (command: ToneColorCommandEnvelopeV1): TypedBasicToneCommand =>
+  liveBasicToneCommandSchema.parse(command);
 
 const buildTypedBasicToneDryRunCommand = (command: TypedBasicToneCommand): TypedBasicToneCommand => {
   const {
@@ -147,12 +195,71 @@ const buildTypedBasicToneDryRunCommand = (command: TypedBasicToneCommand): Typed
     },
     dryRun: true,
     parameters,
-  } as unknown as TypedBasicToneCommand;
+  };
+};
+
+const copyObjectRecord = (value: object): Record<string, unknown> => {
+  const record: Record<string, unknown> = {};
+  for (const [key, recordValue] of Object.entries(value)) record[key] = recordValue;
+  return record;
+};
+
+const buildLegacyBasicToneCommandEnvelope = (command: TypedBasicToneCommand): BasicToneCommandEnvelope => {
+  const actor: BasicToneCommandContextActor = {
+    id: command.actor.id,
+    kind: command.actor.kind,
+  };
+  if (command.actor.sessionId !== undefined) actor['sessionId'] = command.actor.sessionId;
+
+  const target: BasicToneCommandContextTarget = {
+    kind: command.target.kind,
+  };
+  if (command.target.id !== undefined) target['id'] = command.target.id;
+  if (command.target.imagePath !== undefined) target['imagePath'] = command.target.imagePath;
+  if (command.target.virtualCopyId !== undefined) target['virtualCopyId'] = command.target.virtualCopyId;
+
+  const parameters: BasicToneCommandEnvelope['parameters'] = {
+    blackPoint: command.parameters.blackPoint,
+    clarity: command.parameters.clarity,
+    contrast: command.parameters.contrast,
+    exposureEv: command.parameters.exposureEv,
+    highlights: command.parameters.highlights,
+    saturation: command.parameters.saturation,
+    shadows: command.parameters.shadows,
+    whitePoint: command.parameters.whitePoint,
+  };
+  if (command.parameters.acceptedDryRunPlanHash !== undefined) {
+    parameters.acceptedDryRunPlanHash = command.parameters.acceptedDryRunPlanHash;
+  }
+  if (command.parameters.acceptedDryRunPlanId !== undefined) {
+    parameters.acceptedDryRunPlanId = command.parameters.acceptedDryRunPlanId;
+  }
+
+  const envelope: BasicToneCommandEnvelope = {
+    actor,
+    approval: {
+      approvalClass: command.approval.approvalClass,
+      reason: command.approval.reason,
+      state: command.approval.state,
+    },
+    colorPipeline: copyObjectRecord(command.colorPipeline),
+    commandId: command.commandId,
+    commandType: command.commandType,
+    correlationId: command.correlationId,
+    dryRun: command.dryRun,
+    expectedGraphRevision: command.expectedGraphRevision,
+    parameters,
+    schemaVersion: command.schemaVersion,
+    target,
+  };
+  if (command.idempotencyKey !== undefined) envelope.idempotencyKey = command.idempotencyKey;
+  return envelope;
 };
 
 export const dryRunBasicToneCommandInLiveEditor = async (
-  command: TypedBasicToneCommand,
+  commandInput: ToneColorCommandEnvelopeV1,
 ): Promise<ToneColorDryRunResultV1> => {
+  const command = parseLiveBasicToneCommand(commandInput);
   if (!command.dryRun) throw new Error('Live editor typed basic-tone dry-run requires dryRun=true.');
   if (command.expectedGraphRevision !== `history_${useEditorStore.getState().historyIndex}`) {
     throw new Error('Live editor typed basic-tone dry-run rejected stale graph revision.');
@@ -165,8 +272,9 @@ export const dryRunBasicToneCommandInLiveEditor = async (
 };
 
 export const applyBasicToneCommandToLiveEditor = async (
-  command: TypedBasicToneCommand,
+  commandInput: ToneColorCommandEnvelopeV1,
 ): Promise<ToneColorMutationResultV1> => {
+  const command = parseLiveBasicToneCommand(commandInput);
   if (command.dryRun) throw new Error('Live editor typed basic-tone apply requires dryRun=false.');
   if (command.expectedGraphRevision !== `history_${useEditorStore.getState().historyIndex}`) {
     throw new Error('Live editor typed basic-tone apply rejected stale graph revision.');
@@ -192,7 +300,7 @@ export const applyBasicToneCommandToLiveEditor = async (
   const apply = await bridge.dispatch(command);
   if (!apply.ok) throw new Error(`Typed basic-tone apply failed: ${apply.message}`);
   const mutation = toneColorMutationResultV1Schema.parse(apply.result);
-  const basicToneCommand = command as unknown as BasicToneCommandEnvelope;
+  const basicToneCommand = buildLegacyBasicToneCommandEnvelope(command);
 
   useEditorStore.setState((state) => {
     const adjustments = applyBasicToneCommandEnvelopeToAdjustments(state.adjustments, basicToneCommand);
