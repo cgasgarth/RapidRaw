@@ -1,5 +1,12 @@
 import { z } from 'zod';
 
+import {
+  type RawEngineAgentInitialPreviewReceiptV1,
+  type RawEngineAgentPreviewRefreshReceiptV1,
+  rawEngineAgentInitialPreviewReceiptV1Schema,
+  rawEngineAgentPreviewRefreshReceiptV1Schema,
+} from '../../../../packages/rawengine-schema/src/localAppServerBridge';
+import { rawEngineAgentPreviewRenderRequestV1Schema } from '../../../../packages/rawengine-schema/src/rawEngineSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
 import {
@@ -33,46 +40,30 @@ export const agentStateGetRequestSchema = z
   })
   .strict();
 
-export const agentPreviewRenderRequestSchema = z
-  .object({
-    crop: z
-      .object({
-        height: z.number().positive().max(1),
-        width: z.number().positive().max(1),
-        x: z.number().min(0).max(1),
-        y: z.number().min(0).max(1),
-      })
-      .strict()
-      .refine((crop) => crop.x + crop.width <= 1, {
-        message: 'Crop x + width must stay within normalized image bounds.',
-        path: ['width'],
-      })
-      .refine((crop) => crop.y + crop.height <= 1, {
-        message: 'Crop y + height must stay within normalized image bounds.',
-        path: ['height'],
-      })
-      .optional(),
-    expectedRecipeHash: z.string().trim().min(1).optional(),
-    longEdgePx: z.number().int().min(256).max(2048).default(AGENT_MEDIUM_PREVIEW_LONG_EDGE_PX),
-    maxPixelCount: z
-      .number()
-      .int()
-      .min(65_536)
-      .max(AGENT_PREVIEW_MAX_PIXEL_COUNT)
-      .default(AGENT_PREVIEW_MAX_PIXEL_COUNT),
-    purpose: z.enum(['detail_review', 'initial_context', 'refresh']).default('refresh'),
-    quality: z.number().min(0.5).max(0.95).default(AGENT_MEDIUM_PREVIEW_QUALITY),
-    requestId: z.string().trim().min(1),
-    zoom: z
-      .object({
-        centerX: z.number().min(0).max(1),
-        centerY: z.number().min(0).max(1),
-        scale: z.number().min(1).max(8),
-      })
-      .strict()
-      .optional(),
-  })
-  .strict();
+export const agentPreviewRenderRequestSchema = z.intersection(
+  rawEngineAgentPreviewRenderRequestV1Schema,
+  z
+    .object({
+      crop: z
+        .object({
+          height: z.number().positive().max(1),
+          width: z.number().positive().max(1),
+          x: z.number().min(0).max(1),
+          y: z.number().min(0).max(1),
+        })
+        .strict()
+        .refine((crop) => crop.x + crop.width <= 1, {
+          message: 'Crop x + width must stay within normalized image bounds.',
+          path: ['width'],
+        })
+        .refine((crop) => crop.y + crop.height <= 1, {
+          message: 'Crop y + height must stay within normalized image bounds.',
+          path: ['height'],
+        })
+        .optional(),
+    })
+    .passthrough(),
+);
 
 export const agentPreviewCompareRequestSchema = z
   .object({
@@ -110,6 +101,7 @@ export const agentStateGetResponseSchema = z
 export const agentPreviewRenderResponseSchema = z
   .object({
     preview: agentPreviewEnvelopeSchema,
+    receipt: rawEngineAgentPreviewRefreshReceiptV1Schema.optional(),
     requestId: z.string().trim().min(1),
     staleRecipeHash: z.boolean(),
     toolName: z.literal(AGENT_PREVIEW_RENDER_TOOL_NAME),
@@ -150,6 +142,7 @@ export const rawEngineImageGetPreviewResponseSchema = z
       })
       .strict(),
     preview: agentPreviewEnvelopeSchema,
+    receipt: rawEngineAgentInitialPreviewReceiptV1Schema,
     requestId: z.string().trim().min(1),
     staleRecipeHash: z.boolean(),
     toolName: z.literal(RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME),
@@ -178,6 +171,10 @@ export const rawEngineImageGetPreviewResponseSchema = z
   .refine((response) => response.preview.renderHash === response.editRevision.renderHash, {
     message: 'Preview render hash must match edit revision metadata.',
     path: ['editRevision', 'renderHash'],
+  })
+  .refine((response) => response.receipt.preview.artifactId === response.preview.artifactId, {
+    message: 'Initial preview receipt artifact must match preview metadata.',
+    path: ['receipt', 'preview', 'artifactId'],
   });
 
 export type AgentStateGetRequest = z.infer<typeof agentStateGetRequestSchema>;
@@ -188,6 +185,141 @@ export type AgentStateGetResponse = z.infer<typeof agentStateGetResponseSchema>;
 export type AgentPreviewRenderResponse = z.infer<typeof agentPreviewRenderResponseSchema>;
 export type AgentPreviewCompareResponse = z.infer<typeof agentPreviewCompareResponseSchema>;
 export type RawEngineImageGetPreviewResponse = z.infer<typeof rawEngineImageGetPreviewResponseSchema>;
+
+const buildPreviewReceiptContentHash = (receiptSeed: {
+  artifactId: string;
+  graphRevision: string;
+  imagePath: string;
+  previewRef: string;
+  renderHash: string;
+  requestId: string;
+}): string => {
+  const seed = JSON.stringify(receiptSeed);
+  const first = stableAgentPreviewHash(seed);
+  const second = stableAgentPreviewHash(`${first}:${seed}`);
+  return `sha256:${first}${second}`;
+};
+
+const buildInitialPreviewReceipt = ({
+  graphRevision,
+  imagePath,
+  preview,
+  requestId,
+  sessionId,
+  stale,
+}: {
+  graphRevision: string;
+  imagePath: string;
+  preview: RawEngineImageGetPreviewResponse['preview'];
+  requestId: string;
+  sessionId: string;
+  stale: boolean;
+}): RawEngineAgentInitialPreviewReceiptV1 =>
+  rawEngineAgentInitialPreviewReceiptV1Schema.parse({
+    colorPipeline: {
+      encodedProfile: 'srgb-preview',
+      outputProfile: 'srgb',
+      previewTransform: 'editor-preview-to-srgb-jpeg',
+      workingSpace: 'rawengine-scene-linear',
+    },
+    contentHash: buildPreviewReceiptContentHash({
+      artifactId: preview.artifactId,
+      graphRevision,
+      imagePath,
+      previewRef: preview.previewRef,
+      renderHash: preview.renderHash,
+      requestId,
+    }),
+    graphRevision,
+    imagePath,
+    preview: {
+      accessScope: preview.accessScope,
+      artifactId: preview.artifactId,
+      encodedFormat: preview.encodedFormat,
+      height: preview.height,
+      includesOriginalRaw: preview.includesOriginalRaw,
+      longEdgePx: preview.longEdgePx,
+      mediaType: preview.mediaType,
+      previewRef: preview.previewRef,
+      purpose: 'initial_context',
+      quality: preview.quality,
+      recipeHash: preview.recipeHash,
+      renderHash: preview.renderHash,
+      width: preview.width,
+    },
+    proofContext: {
+      stale,
+      transport: 'codex_app_server',
+    },
+    requestId,
+    schemaVersion: 1,
+    sessionId,
+    toolName: RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
+  });
+
+const buildPreviewRefreshReceipt = ({
+  graphRevision,
+  imagePath,
+  preview,
+  requestId,
+  sessionId,
+  sourceToolName,
+  stale,
+  turn,
+}: {
+  graphRevision: string;
+  imagePath: string;
+  preview: AgentPreviewRenderResponse['preview'];
+  requestId: string;
+  sessionId: string;
+  sourceToolName: string;
+  stale: boolean;
+  turn: number;
+}): RawEngineAgentPreviewRefreshReceiptV1 =>
+  rawEngineAgentPreviewRefreshReceiptV1Schema.parse({
+    colorPipeline: {
+      encodedProfile: 'srgb-preview',
+      outputProfile: 'srgb',
+      previewTransform: 'editor-preview-to-srgb-jpeg',
+      workingSpace: 'rawengine-scene-linear',
+    },
+    contentHash: buildPreviewReceiptContentHash({
+      artifactId: preview.artifactId,
+      graphRevision,
+      imagePath,
+      previewRef: preview.previewRef,
+      renderHash: preview.renderHash,
+      requestId,
+    }),
+    graphRevision,
+    imagePath,
+    preview: {
+      accessScope: preview.accessScope,
+      artifactId: preview.artifactId,
+      encodedFormat: preview.encodedFormat,
+      height: preview.height,
+      includesOriginalRaw: preview.includesOriginalRaw,
+      longEdgePx: preview.longEdgePx,
+      mediaType: preview.mediaType,
+      previewRef: preview.previewRef,
+      purpose: z.enum(['detail_review', 'refresh']).parse(preview.purpose),
+      quality: preview.quality,
+      recipeHash: preview.recipeHash,
+      renderHash: preview.renderHash,
+      width: preview.width,
+    },
+    proofContext: {
+      expectedRecipeHash: preview.recipeHash,
+      sourceToolName,
+      stale,
+      transport: 'codex_app_server',
+    },
+    requestId,
+    schemaVersion: 1,
+    sessionId,
+    toolName: AGENT_PREVIEW_RENDER_TOOL_NAME,
+    turn,
+  });
 
 export const getAgentReadOnlyState = (request: AgentStateGetRequest): AgentStateGetResponse => {
   const parsedRequest = agentStateGetRequestSchema.parse(request);
@@ -227,13 +359,28 @@ export const renderAgentReadOnlyPreview = (request: AgentPreviewRenderRequest): 
     width: snapshot.initialPreview.width,
     zoom: parsedRequest.zoom ?? null,
   });
+  const staleRecipeHash =
+    parsedRequest.expectedRecipeHash !== undefined &&
+    parsedRequest.expectedRecipeHash !== snapshot.initialPreview.recipeHash;
+  const receipt =
+    preview.purpose === 'initial_context'
+      ? undefined
+      : buildPreviewRefreshReceipt({
+          graphRevision: snapshot.graphRevision,
+          imagePath: snapshot.activeImagePath,
+          preview,
+          requestId: parsedRequest.requestId,
+          sessionId: 'agent-readonly-preview',
+          sourceToolName: parsedRequest.sourceToolName,
+          stale: staleRecipeHash,
+          turn: parsedRequest.turn,
+        });
 
   return agentPreviewRenderResponseSchema.parse({
     preview,
+    ...(receipt === undefined ? {} : { receipt }),
     requestId: parsedRequest.requestId,
-    staleRecipeHash:
-      parsedRequest.expectedRecipeHash !== undefined &&
-      parsedRequest.expectedRecipeHash !== snapshot.initialPreview.recipeHash,
+    staleRecipeHash,
     toolName: AGENT_PREVIEW_RENDER_TOOL_NAME,
   });
 };
@@ -261,6 +408,17 @@ export const getRawEngineImagePreview = (
     width: snapshot.initialPreview.width,
     zoom: snapshot.initialPreview.zoom,
   });
+  const staleRecipeHash =
+    parsedRequest.expectedRecipeHash !== undefined &&
+    parsedRequest.expectedRecipeHash !== snapshot.initialPreview.recipeHash;
+  const receipt = buildInitialPreviewReceipt({
+    graphRevision: snapshot.graphRevision,
+    imagePath: snapshot.activeImagePath,
+    preview,
+    requestId: parsedRequest.requestId,
+    sessionId: 'agent-readonly-preview',
+    stale: staleRecipeHash,
+  });
 
   return rawEngineImageGetPreviewResponseSchema.parse({
     color: {
@@ -284,10 +442,9 @@ export const getRawEngineImagePreview = (
       renderHash: preview.renderHash,
     },
     preview,
+    receipt,
     requestId: parsedRequest.requestId,
-    staleRecipeHash:
-      parsedRequest.expectedRecipeHash !== undefined &&
-      parsedRequest.expectedRecipeHash !== snapshot.initialPreview.recipeHash,
+    staleRecipeHash,
     toolName: RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
   });
 };
