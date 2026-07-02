@@ -2784,6 +2784,11 @@
         "protectHighlights": ""
       },
       "failed": "Échec de la fusion HDR",
+      "handoffBracketCompareLimited": "",
+      "handoffBracketCompareReady": "",
+      "handoffBracketCompareReview": "",
+      "handoffBracketCompareSkipped": "",
+      "handoffBracketCompareUsed": "",
       "handoffColorSpace": "Color space",
       "handoffColorStates": "Color states",
       "handoffColorStatesValue": "Scene merge -> display preview -> exported sRGB output",

@@ -2875,6 +2875,11 @@ export default interface Resources {
         handoffColorStatesValue: 'Scene merge -> display preview -> exported sRGB output';
         handoffDisplayReferredSrgb: 'Display-referred sRGB';
         handoffEditableAsset: 'Editable asset';
+        handoffBracketCompareLimited: 'Limited';
+        handoffBracketCompareReady: 'Ready';
+        handoffBracketCompareReview: 'Bracket compare review';
+        handoffBracketCompareSkipped: 'Skipped';
+        handoffBracketCompareUsed: 'Used';
         handoffNoSourceRefs: 'No source refs recorded';
         handoffPreviewExportMatched: 'Preview/export matched';
         handoffPreviewExportParity: 'Preview/export parity';

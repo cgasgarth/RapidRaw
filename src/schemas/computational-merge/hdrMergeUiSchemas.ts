@@ -104,6 +104,33 @@ export const hdrEditableSourceRefSchema = z
   })
   .strict();
 
+export const hdrBracketCompareSourceSchema = z
+  .object({
+    contentHash: z.string().min(1),
+    displayName: z.string().min(1),
+    exposureEv: z.number(),
+    exposureWeightMultiplier: z.number().positive(),
+    graphRevision: z.string().min(1),
+    selected: z.boolean(),
+    sourceIndex: z.number().int().nonnegative(),
+    sourceRole: z.enum(['over_exposed', 'reference', 'under_exposed', 'unknown']),
+  })
+  .strict();
+
+export const hdrBracketCompareReviewSummarySchema = z
+  .object({
+    accepted: z.boolean().nullable(),
+    detectionConfidence: z.number().min(0).max(1).nullable(),
+    evidenceSource: z.enum(['runtime_sidecar', 'ui_bracket_preflight', 'source_refs_only']),
+    exposureSpreadEv: z.number().nonnegative().nullable(),
+    referenceSourceIndex: z.number().int().nonnegative().nullable(),
+    reviewStatus: z.enum(['ready', 'limited']),
+    selectedSourceCount: z.number().int().nonnegative(),
+    sourceCount: z.number().int().nonnegative(),
+    sources: z.array(hdrBracketCompareSourceSchema),
+  })
+  .strict();
+
 const hdrParityHashSchema = z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u);
 
 export const hdrPreviewExportParitySummarySchema = z
@@ -144,6 +171,7 @@ export const hdrEditableHandoffSummarySchema = z
     previewExportMeanAbsDelta: z.literal(0),
     previewExportParityStatus: z.literal('matched_editor_display_path'),
     previewToneMapped: z.boolean(),
+    bracketCompareReview: hdrBracketCompareReviewSummarySchema,
     runtimeSidecarReceipt: hdrRuntimeSidecarReceiptV1Schema.optional(),
     sceneMergeColorState: z.literal('legacy_display_referred_merge_after_linear_to_srgb'),
     sourceCount: z.number().int().nonnegative(),
@@ -163,6 +191,7 @@ export type HdrMergeStrategy = z.infer<typeof hdrMergeStrategySchema>;
 export type HdrMergeQualityPreference = z.infer<typeof hdrMergeQualityPreferenceSchema>;
 export type HdrToneMappingPreset = z.infer<typeof hdrToneMappingPresetSchema>;
 export type HdrEditableHandoffSummary = z.infer<typeof hdrEditableHandoffSummarySchema>;
+export type HdrBracketCompareReviewSummary = z.infer<typeof hdrBracketCompareReviewSummarySchema>;
 
 type HdrToneMappingPresetPatch = Pick<
   HdrMergeUiSettings,

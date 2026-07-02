@@ -2868,6 +2868,11 @@
         "protectHighlights": "Protect highlights"
       },
       "failed": "HDR Merge Failed",
+      "handoffBracketCompareLimited": "Limited",
+      "handoffBracketCompareReady": "Ready",
+      "handoffBracketCompareReview": "Bracket compare review",
+      "handoffBracketCompareSkipped": "Skipped",
+      "handoffBracketCompareUsed": "Used",
       "handoffColorSpace": "Color space",
       "handoffColorStates": "Color states",
       "handoffColorStatesValue": "Scene merge -> display preview -> exported sRGB output",

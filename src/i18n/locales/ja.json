@@ -2662,6 +2662,11 @@
         "protectHighlights": ""
       },
       "failed": "HDR統合に失敗しました",
+      "handoffBracketCompareLimited": "",
+      "handoffBracketCompareReady": "",
+      "handoffBracketCompareReview": "",
+      "handoffBracketCompareSkipped": "",
+      "handoffBracketCompareUsed": "",
       "handoffColorSpace": "Color space",
       "handoffColorStates": "Color states",
       "handoffColorStatesValue": "Scene merge -> display preview -> exported sRGB output",
