@@ -318,47 +318,46 @@ const fixture = {
     approval: {
       label: 'Approved dry-run',
       state: 'approved',
-      summary: 'The dry-run was accepted before apply; the apply step targets only the virtual-copy edit graph.',
+      summary: 'The typed basic-tone dry-run was accepted before apply and the preview was refreshed after mutation.',
     },
     id: 'agent-live-prompt-walkthrough-runtime-2844',
     planSummary:
-      'Inspect local tools, build tone/color and layer/mask dry-runs, wait for approval, then apply the accepted plan.',
+      'Inspect the available tools, run a typed basic-tone dry-run, accept the plan, apply it, and refresh the preview.',
     prompt:
-      'Inspect DSC_2844.NEF, warm the scene, lift shadows, protect highlights, preview it, then apply if approved.',
+      'Brighten DSC_2844.NEF, add contrast, recover highlights, lift shadows, and apply the typed basic-tone edit if approved.',
     stages: [
       {
         id: 'prompt',
         label: 'Prompt received',
         state: 'completed',
-        summary: 'The user request is captured as the session intent for the selected RAW frame.',
+        summary: 'The user request is captured as the live-chat intent for the selected RAW frame.',
       },
       {
         id: 'inspect',
         label: 'Inspect tools and frame',
         state: 'completed',
-        summary: 'The app-server route catalog and selected-frame scope are inspected before planning.',
+        summary: 'The selected frame and typed basic-tone surface are inspected before planning.',
         toolCallId: 'tool-1',
       },
       {
         id: 'dry-run',
-        label: 'Stage dry-run',
+        label: 'Typed dry-run',
         state: 'completed',
-        summary: 'Non-mutating tone/color and layer/mask dry-runs are prepared with before/after artifacts.',
+        summary: 'A non-mutating basic-tone dry-run produces typed app-server receipts and preview evidence.',
         toolCallId: 'tool-2',
       },
       {
         id: 'approval',
         label: 'Approval accepted',
         state: 'completed',
-        summary: 'The review gate accepts the exact dry-run before any edit graph mutation.',
+        summary: 'The accepted dry-run identity gates the typed apply path before any edit graph mutation.',
         toolCallId: 'tool-2',
       },
       {
         id: 'apply',
         label: 'Apply accepted plan',
         state: 'completed',
-        summary:
-          'The approved tone/color and layer/mask commands are applied to the virtual-copy edit graph and linked to audit evidence.',
+        summary: 'The approved typed basic-tone command mutates the editor state and refreshes the preview receipt.',
         toolCallId: 'tool-3',
       },
     ],

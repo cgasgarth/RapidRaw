@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { RawEngineAgentPreviewRefreshReceiptV1 } from '../../../../../packages/rawengine-schema/src/localAppServerBridge';
 import type {
   AgentArtifactReview,
   AgentAuditTranscript,
@@ -48,24 +49,20 @@ import {
   getAgentReadOnlyState,
   RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
   rawEngineImageGetPreviewResponseSchema,
+  renderAgentReadOnlyPreview,
 } from '../../../../utils/agent/context/agentReadOnlyAppServerTools';
 import {
   AGENT_LAYER_CREATE_TOOL_NAME,
   AGENT_LAYER_SCOPED_ADJUST_TOOL_NAME,
   AGENT_MASK_CREATE_OR_UPDATE_TOOL_NAME,
 } from '../../../../utils/agent/layers/agentLayerMaskTools';
-import { runAgentBoundedEditPlannerLoop } from '../../../../utils/agent/planning/agentBoundedEditPlannerLoop';
 import { planAgentEditRecipe } from '../../../../utils/agent/planning/agentEditRecipePlanner';
 import {
   AGENT_EXPORT_PROOF_TOOL_NAME,
   AGENT_FINAL_EXPORT_TOOL_NAME,
   buildAgentExportPresetSettings,
 } from '../../../../utils/agent/safety/agentExportProofTool';
-import {
-  type AgentSafetyPolicyDecision,
-  evaluateAgentSafetyPolicy,
-  inferAgentSafetyOperationKind,
-} from '../../../../utils/agent/safety/agentSafetyPolicy';
+import type { AgentSafetyPolicyDecision } from '../../../../utils/agent/safety/agentSafetyPolicy';
 import {
   dispatchAgentExportReviewTool,
   dispatchAgentFinalExportTool,
@@ -104,6 +101,16 @@ import {
 } from '../../../../utils/agent/tools/agentAdjustmentApplyTool';
 import { AGENT_COLOR_APPLY_TOOL_NAME } from '../../../../utils/agent/tools/agentColorApplyTool';
 import { AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME } from '../../../../utils/agent/tools/agentDetailEffectsApplyTool';
+import {
+  AGENT_TONE_ADJUSTMENT_APPLY_TOOL_NAME,
+  AGENT_TONE_ADJUSTMENT_DRY_RUN_TOOL_NAME,
+  type AgentToneAdjustmentApplyResponse,
+  type AgentToneAdjustmentDryRunResponse,
+  type AgentToneAdjustmentPromptDraft,
+  applyAgentToneAdjustment,
+  buildAgentToneAdjustmentPromptDraft,
+  dryRunAgentToneAdjustment,
+} from '../../../../utils/agent/tools/agentToneAdjustmentTool';
 
 interface AgentChatShellProps {
   transcript: AgentChatTranscript;
@@ -202,8 +209,10 @@ type LivePromptStatus =
 
 interface LivePromptResult {
   appliedGraphRevision?: string;
+  applyReceipt?: AgentToneAdjustmentApplyResponse['receipt'];
   changedPixelCount?: number;
   changedPixelPercent?: number;
+  dryRunReceipt?: AgentToneAdjustmentDryRunResponse['receipt'];
   error?: string;
   exportHash?: string;
   exportHeight?: number;
@@ -219,8 +228,10 @@ interface LivePromptResult {
   meanLuminanceDelta?: number;
   previewAfterHash?: string;
   previewBeforeHash?: string;
+  previewRefreshReceipt?: RawEngineAgentPreviewRefreshReceiptV1;
   previewStaleRecipeHash?: boolean;
   recipeName?: string;
+  toneAdjustmentDraft?: AgentToneAdjustmentPromptDraft;
   safetyDecision?: AgentSafetyPolicyDecision;
   sampledPixelCount?: number;
   stateAdjustmentCount?: number;
@@ -1617,6 +1628,7 @@ function LivePromptComposer({
   const [expertArtifactReview, setExpertArtifactReview] = useState<AgentArtifactReview | null>(null);
   const [expertDryRunReview, setExpertDryRunReview] = useState<AgentChatDryRunReview | null>(null);
   const [result, setResult] = useState<LivePromptResult>({ status: 'idle' });
+  const [toneAdjustmentDraft, setToneAdjustmentDraft] = useState<AgentToneAdjustmentPromptDraft | null>(null);
   const [rollbackSnapshot, setRollbackSnapshot] = useState<AgentRollbackSnapshot | null>(null);
   const [selectedImageLoopReview, setSelectedImageLoopReview] = useState<AgentSelectedImagePreviewLoopReview | null>(
     null,
@@ -1640,7 +1652,7 @@ function LivePromptComposer({
       ? { ...sessionReview, rollbackState: 'invalidated' as const }
       : sessionReview;
   const canRun = isContextReady && result.status !== 'applying' && result.status !== 'cancelling';
-  const canApply = isContextReady && acceptedPrompt.length > 0 && result.status === 'dry_run_ready';
+  const canApply = isContextReady && toneAdjustmentDraft?.supported === true && result.status === 'dry_run_ready';
   const canRunSelectedImageLoop = canApply;
   const canCancel = result.status === 'applying' && activeOperationRef.current !== null;
   const canRequestDetailPreview = isContextReady && result.status !== 'applying' && result.status !== 'cancelling';
@@ -1737,6 +1749,7 @@ function LivePromptComposer({
     try {
       setExpertArtifactReview(null);
       setExpertDryRunReview(null);
+      setToneAdjustmentDraft(null);
       if (initialPromptPreviewContext !== undefined) {
         const observeRequestId = `agent-live-initial-preview-${Date.now()}`;
         const observedPreview = rawEngineImageGetPreviewResponseSchema.parse(
@@ -1771,57 +1784,70 @@ function LivePromptComposer({
         toolName: 'rawengine.agent.session.prompt',
       });
       onSessionEvent?.(createLiveSessionEvent('user', requestedPrompt, 'prompt'));
-      const plan = planAgentEditRecipe(requestedPrompt);
-      const safetyDecision = evaluateAgentSafetyPolicy({
-        operationKind: inferAgentSafetyOperationKind(requestedPrompt),
-        prompt: requestedPrompt,
-      });
-      const preview = await runAgentBoundedEditPlannerLoop({
-        maxSteps: 5,
-        operationId: `agent_chat_${Date.now()}`,
-        prompt: requestedPrompt,
+      const snapshot = buildAgentImageContextSnapshot();
+      const draft = buildAgentToneAdjustmentPromptDraft(requestedPrompt, useEditorStore.getState().adjustments);
+      if (!draft.supported) {
+        pushActivityEntry({
+          body: draft.reason,
+          kind: 'error',
+          status: 'blocked',
+          toolName: AGENT_TONE_ADJUSTMENT_DRY_RUN_TOOL_NAME,
+        });
+        setAcceptedPrompt('');
+        const nextResult = {
+          error: draft.reason,
+          status: 'blocked',
+          summary: draft.summary,
+          toneAdjustmentDraft: draft,
+        } satisfies LivePromptResult;
+        setResult(nextResult);
+        onResultChange?.(nextResult);
+        onSessionEvent?.(createLiveSessionEvent('assistant', draft.summary, 'dry-run-blocked'));
+        return;
+      }
+
+      const operationId = `agent_chat_basic_tone_${Date.now()}`;
+      const requestId = `agent-live-basic-tone-${Date.now()}`;
+      const dryRun = await dryRunAgentToneAdjustment({
+        adjustments: draft.requestedAdjustments,
+        expectedGraphRevision: snapshot.graphRevision,
+        expectedRecipeHash: snapshot.initialPreview.recipeHash,
+        operationId,
+        requestId,
         sessionId: 'agent-chat-shell',
       });
-      setExpertArtifactReview(preview.artifactReview);
-      setExpertDryRunReview(preview.dryRunReview);
-      pushActivityEntry({
-        body: plan.summary,
-        kind: 'preview',
-        previewAfterHash: preview.dryRunAfterHash,
-        previewBeforeHash: preview.dryRunBeforeHash,
-        recipeHash: plan.recipeName,
-        status: 'completed',
-        toolName: 'rawengine.agent.preview.render',
-      });
-      if (safetyDecision.blocked || safetyDecision.approvalRequired) {
-        pushActivityEntry({
-          approvalId: safetyDecision.decisionId,
-          body: safetyDecision.reason,
-          kind: 'approval',
-          recipeHash: safetyDecision.decisionId,
-          status: safetyDecision.blocked ? 'blocked' : 'pending',
-          toolName: 'rawengine.agent.safety_policy',
-        });
-      }
+      setExpertArtifactReview(null);
+      setExpertDryRunReview(null);
       setAcceptedPrompt(requestedPrompt);
+      setToneAdjustmentDraft(draft);
+      pushActivityEntry({
+        body: draft.summary,
+        graphRevision: dryRun.sourceGraphRevision,
+        kind: 'tool_call',
+        previewAfterHash: dryRun.receipt.previewAfter.renderHash,
+        previewBeforeHash: snapshot.initialPreview.renderHash,
+        previewHashIdentity: dryRun.receipt.previewAfter.previewRef,
+        recipeHash: dryRun.receipt.dryRunPlanHash,
+        requestId: dryRun.requestId,
+        status: 'completed',
+        toolName: AGENT_TONE_ADJUSTMENT_DRY_RUN_TOOL_NAME,
+      });
       const nextResult = {
-        previewAfterHash: preview.dryRunAfterHash,
-        previewBeforeHash: preview.dryRunBeforeHash,
-        recipeName: plan.recipeName,
-        safetyDecision,
-        status: safetyDecision.blocked
-          ? 'blocked'
-          : safetyDecision.approvalRequired
-            ? 'approval_required'
-            : 'dry_run_ready',
-        summary: plan.summary,
+        dryRunReceipt: dryRun.receipt,
+        previewAfterHash: dryRun.receipt.previewAfter.renderHash,
+        previewBeforeHash: snapshot.initialPreview.renderHash,
+        previewStaleRecipeHash: dryRun.stale.staleRecipeHash,
+        recipeName: dryRun.receipt.dryRunPlanHash,
+        status: 'dry_run_ready',
+        summary: draft.summary,
+        toneAdjustmentDraft: draft,
       } satisfies LivePromptResult;
       setResult(nextResult);
       onResultChange?.(nextResult);
       onSessionEvent?.(
         createLiveSessionEvent(
           'assistant',
-          `${t('editor.ai.agent.composer.status.dry_run_ready')}: ${plan.summary}`,
+          `${t('editor.ai.agent.composer.status.dry_run_ready')}: ${draft.summary}`,
           'dry-run-ready',
         ),
       );
@@ -2060,7 +2086,7 @@ function LivePromptComposer({
   };
 
   const applyDryRun = async () => {
-    if (!canApply) return;
+    if (!canApply || toneAdjustmentDraft?.supported !== true) return;
 
     const operation = { cancelled: false, id: `agent-chat-apply-${Date.now()}` };
     activeOperationRef.current = operation;
@@ -2073,185 +2099,89 @@ function LivePromptComposer({
         previewBeforeHash: result.previewBeforeHash,
         recipeHash: result.recipeName,
         status: 'pending',
-        toolName: 'rawengine.live_basic_tone.apply',
+        toolName: AGENT_TONE_ADJUSTMENT_APPLY_TOOL_NAME,
       });
       const applyingResult = { ...result, status: 'applying' } satisfies LivePromptResult;
       setResult(applyingResult);
       onResultChange?.(applyingResult);
       onSessionEvent?.(createLiveSessionEvent('assistant', t('editor.ai.agent.composer.status.applying'), 'applying'));
-      const plan = planAgentEditRecipe(acceptedPrompt);
       const requestId = operation.id;
-      const sessionRequest = buildLiveMultiTurnSessionRequest({
-        operationId: `agent_chat_apply_${Date.now()}`,
-        plan,
-        prompt: acceptedPrompt,
+      const snapshot = buildAgentImageContextSnapshot();
+      const dryRunReceipt = result.dryRunReceipt;
+      if (dryRunReceipt === undefined) throw new Error('Typed basic-tone apply requires a prior dry-run receipt.');
+      const applyResult = await applyAgentToneAdjustment({
+        acceptedPlanHash: dryRunReceipt.dryRunPlanHash,
+        acceptedPlanId: dryRunReceipt.dryRunPlanId,
+        adjustments: toneAdjustmentDraft.requestedAdjustments,
+        expectedGraphRevision: dryRunReceipt.sourceGraphRevision,
+        expectedRecipeHash: snapshot.initialPreview.recipeHash,
+        operationId: dryRunReceipt.operationId,
         requestId,
         sessionId: 'agent-chat-shell',
       });
-      const firstTurnAdjustment = sessionRequest.turns[0]?.adjustment;
-      if (firstTurnAdjustment === undefined) throw new Error(t('editor.ai.agent.composer.noApplyStep'));
-      const selectedImageDraft = approveAgentSelectedImageLiveSession(
-        await startAgentSelectedImageLiveSessionDryRun({
-          adjustments: firstTurnAdjustment,
-          operationId: sessionRequest.operationId,
-          prompt: acceptedPrompt,
-          requestId,
-          sessionId: sessionRequest.sessionId,
-        }),
-      );
-      const selectedImageApply = await applyAgentSelectedImageLiveSession(selectedImageDraft);
-      const selectedImageReceipt = replayAgentSelectedImageLiveSessionAudit(selectedImageApply.audit);
-      const selectedImageFinalRecipeHash =
-        selectedImageReceipt.finalRecipeHash ?? selectedImageDraft.snapshot.recipeHash;
+      pushActivityEntry({
+        body: `${applyResult.receipt.acceptedPlanId} applied to ${applyResult.appliedGraphRevision}.`,
+        graphRevision: applyResult.appliedGraphRevision,
+        kind: 'tool_call',
+        previewAfterHash: applyResult.afterPreviewHash,
+        previewBeforeHash: applyResult.beforePreviewHash,
+        recipeHash: applyResult.receipt.acceptedPlanHash,
+        status: 'completed',
+        toolName: AGENT_TONE_ADJUSTMENT_APPLY_TOOL_NAME,
+      });
+      const afterSnapshot = buildAgentImageContextSnapshot();
+      const previewRequestId = `${requestId}-preview-refresh`;
+      const previewRefresh = renderAgentReadOnlyPreview({
+        expectedRecipeHash: afterSnapshot.initialPreview.recipeHash,
+        purpose: 'refresh',
+        requestId: previewRequestId,
+        sourceToolName: AGENT_TONE_ADJUSTMENT_APPLY_TOOL_NAME,
+        turn: useEditorStore.getState().historyIndex,
+      });
+      const previewRefreshReceipt = previewRefresh.receipt;
+      if (previewRefreshReceipt === undefined) {
+        throw new Error('Typed basic-tone apply requires a preview refresh receipt.');
+      }
       if (operation.cancelled || activeOperationRef.current?.id !== operation.id) {
         pushActivityEntry({
-          body: `Late apply result ${selectedImageReceipt.finalGraphRevision ?? selectedImageDraft.snapshot.graphRevision} blocked after cancellation.`,
-          graphRevision: selectedImageReceipt.finalGraphRevision,
+          body: `Late apply result ${applyResult.appliedGraphRevision} blocked after cancellation.`,
+          graphRevision: applyResult.appliedGraphRevision,
           kind: 'error',
-          recipeHash: selectedImageReceipt.finalRecipeHash,
+          recipeHash: afterSnapshot.initialPreview.recipeHash,
           status: 'blocked',
           toolName: 'rawengine.agent.session.cancel',
         });
         return;
       }
 
+      pushActivityEntry({
+        body: `${previewRefresh.preview.artifactId} refreshed after apply.`,
+        graphRevision: previewRefresh.receipt?.graphRevision ?? afterSnapshot.graphRevision,
+        kind: 'preview',
+        previewAfterHash: previewRefresh.preview.renderHash,
+        previewHashIdentity: previewRefresh.receipt?.contentHash,
+        previewPurpose: previewRefresh.preview.purpose,
+        previewStale: previewRefresh.receipt?.proofContext.stale ?? previewRefresh.staleRecipeHash,
+        recipeHash: previewRefresh.preview.recipeHash,
+        requestId: previewRefresh.requestId,
+        status: 'completed',
+        toolName: AGENT_PREVIEW_RENDER_TOOL_NAME,
+        turnId: `turn-${useEditorStore.getState().historyIndex}`,
+      });
       const nextResult = {
         ...applyingResult,
-        appliedGraphRevision: selectedImageApply.apply.appliedGraphRevision,
-        changedPixelCount: selectedImageApply.apply.changedPixelCount,
-        changedPixelPercent: selectedImageApply.apply.changedPixelPercent,
-        maxChannelDelta: selectedImageApply.apply.maxChannelDelta,
-        meanLuminanceDelta: selectedImageApply.apply.meanLuminanceDelta,
-        previewAfterHash: selectedImageApply.previewAfterHash,
-        previewBeforeHash: selectedImageApply.previewBeforeHash,
-        recipeName: selectedImageFinalRecipeHash,
-        sampledPixelCount: selectedImageApply.apply.sampledPixelCount,
+        appliedGraphRevision: applyResult.appliedGraphRevision,
+        applyReceipt: applyResult.receipt,
+        dryRunReceipt,
+        previewAfterHash: previewRefresh.preview.renderHash,
+        previewBeforeHash: applyResult.beforePreviewHash,
+        previewRefreshReceipt,
+        previewStaleRecipeHash: previewRefresh.staleRecipeHash,
+        recipeName: previewRefresh.preview.recipeHash,
         status: 'applied',
+        summary: `${toneAdjustmentDraft.summary} Preview refreshed as ${previewRefresh.preview.artifactId}.`,
+        toneAdjustmentDraft,
       } satisfies LivePromptResult;
-      const previewLineage: AgentMultiTurnAppServerSessionResult['previewLineage'] = [
-        {
-          artifactId: initialPromptPreviewContext?.artifactId ?? `${requestId}-before-preview`,
-          graphRevision: selectedImageReceipt.initialGraphRevision,
-          purpose: 'initial_context',
-          recipeHash: selectedImageReceipt.initialRecipeHash,
-          renderHash: selectedImageReceipt.beforePreviewHash,
-          toolCallId: `${requestId}-dry-run`,
-          turn: 0,
-        },
-        {
-          artifactId: `${requestId}-after-preview`,
-          graphRevision: selectedImageReceipt.finalGraphRevision ?? selectedImageApply.apply.appliedGraphRevision,
-          purpose: 'refresh',
-          recipeHash: selectedImageFinalRecipeHash,
-          renderHash: selectedImageReceipt.afterPreviewHash ?? selectedImageApply.previewAfterHash,
-          toolCallId: `${requestId}-after-preview`,
-          turn: 1,
-        },
-      ];
-      const initialPreviewReceipt =
-        initialPromptPreviewContext === undefined
-          ? undefined
-          : ({
-              colorPipeline: {
-                encodedProfile: 'srgb-preview',
-                outputProfile: 'srgb',
-                previewTransform: 'editor-preview-to-srgb-jpeg',
-                workingSpace: 'rawengine-scene-linear',
-              },
-              contentHash: `sha256:${initialPromptPreviewContext.renderHash
-                .replace(/^render:/u, '')
-                .padEnd(16, '0')
-                .slice(0, 64)}`,
-              graphRevision: selectedImageReceipt.initialGraphRevision,
-              imagePath: selectedImageReceipt.selectedImagePath,
-              preview: {
-                accessScope: initialPromptPreviewContext.accessScope,
-                artifactId: initialPromptPreviewContext.artifactId,
-                encodedFormat: initialPromptPreviewContext.encodedFormat,
-                height: initialPromptPreviewContext.height,
-                includesOriginalRaw: initialPromptPreviewContext.includesOriginalRaw,
-                longEdgePx: initialPromptPreviewContext.longEdgePx,
-                mediaType: initialPromptPreviewContext.mediaType,
-                previewRef: initialPromptPreviewContext.previewRef,
-                purpose: initialPromptPreviewContext.purpose,
-                quality: initialPromptPreviewContext.quality,
-                recipeHash: initialPromptPreviewContext.recipeHash,
-                renderHash: initialPromptPreviewContext.renderHash,
-                width: initialPromptPreviewContext.width,
-              },
-              proofContext: {
-                stale: initialPromptPreviewContext.recipeHash !== selectedImageReceipt.initialRecipeHash,
-                transport: initialPromptPreviewContext.transport,
-              },
-              requestId: `${requestId}-initial-preview`,
-              schemaVersion: 1,
-              sessionId: selectedImageReceipt.sessionId,
-              toolName: RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
-            } satisfies AgentMultiTurnAppServerSessionResult['initialPreviewReceipt']);
-      setSessionReview({
-        applyState: 'applied',
-        finalGraphRevision: selectedImageApply.apply.appliedGraphRevision,
-        finalRecipeHash: selectedImageFinalRecipeHash,
-        ...(initialPreviewReceipt === undefined ? {} : { initialPreviewReceipt }),
-        previewLineage,
-        rollbackGraphRevision: selectedImageReceipt.rollbackGraphRevision,
-        rollbackState: 'available',
-        toolCallCount: selectedImageReceipt.toolCalls.length,
-      });
-      const selectedImageAuditAdapter = createLocalAgentSelectedImageLiveSessionAuditStorageAdapter();
-      const persistedSelectedImageAuditCount =
-        selectedImageAuditAdapter === null
-          ? 1
-          : appendAgentSelectedImageLiveSessionAuditRecord(selectedImageAuditAdapter, selectedImageApply.audit).records
-              .length;
-      setAuditReplay(null);
-      setAuditArtifact({
-        artifactId: `agent-selected-image-live-audit-${selectedImageReceipt.sessionId}`,
-        finalGraphRevision: selectedImageApply.apply.appliedGraphRevision,
-        persistedRecordCount: persistedSelectedImageAuditCount,
-        previewCount: previewLineage.length,
-        rollbackGraphRevision: selectedImageReceipt.rollbackGraphRevision,
-        sessionId: selectedImageReceipt.sessionId,
-        toolCallCount: selectedImageReceipt.toolCalls.length,
-      });
-      pushActivityEntry({
-        acceptedPreviewArtifactId: selectedImageReceipt.acceptedPreviewArtifactId,
-        body: `Approved selected-image dry-run ${selectedImageReceipt.dryRunPlanId}.`,
-        graphRevision: selectedImageApply.apply.appliedGraphRevision,
-        kind: 'tool_call',
-        previewAfterHash: selectedImageApply.previewAfterHash,
-        previewBeforeHash: selectedImageApply.previewBeforeHash,
-        recipeHash: selectedImageFinalRecipeHash,
-        status: 'completed',
-        toolName: AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
-      });
-      for (const preview of previewLineage) {
-        pushActivityEntry({
-          body: `${preview.purpose} ${preview.artifactId}`,
-          graphRevision: preview.graphRevision,
-          kind: 'preview',
-          previewAfterHash: preview.renderHash,
-          recipeHash: preview.recipeHash,
-          status: 'completed',
-          toolName: 'rawengine.agent.preview.render',
-        });
-      }
-      pushActivityEntry({
-        body: `${selectedImageReceipt.toolCalls.length} typed tool calls completed.`,
-        graphRevision: selectedImageApply.apply.appliedGraphRevision,
-        kind: 'tool_call',
-        recipeHash: selectedImageFinalRecipeHash,
-        status: 'completed',
-        toolName: 'rawengine.agent.selected_image.live_session',
-      });
-      pushActivityEntry({
-        body: `Replayable selected-image audit receipt ${selectedImageReceipt.sessionId}.`,
-        graphRevision: selectedImageApply.apply.appliedGraphRevision,
-        kind: 'tool_call',
-        recipeHash: selectedImageFinalRecipeHash,
-        status: 'completed',
-        toolName: 'rawengine.agent.audit.persist',
-      });
       setResult(nextResult);
       onResultChange?.(nextResult);
       onSessionEvent?.(
@@ -2268,7 +2198,7 @@ function LivePromptComposer({
         kind: 'error',
         recipeHash: result.recipeName,
         status: 'blocked',
-        toolName: 'rawengine.agent.session.multiturn',
+        toolName: AGENT_TONE_ADJUSTMENT_APPLY_TOOL_NAME,
       });
       const nextResult = {
         ...result,
@@ -2861,13 +2791,16 @@ function LivePromptComposer({
 
       <div
         className="rounded border border-white/10 bg-black/15 p-2 text-[11px]"
+        data-apply-plan-hash={result.applyReceipt?.acceptedPlanHash ?? ''}
         data-applied-graph-revision={result.appliedGraphRevision ?? ''}
+        data-dry-run-plan-hash={result.dryRunReceipt?.dryRunPlanHash ?? ''}
         data-changed-pixel-count={result.changedPixelCount?.toString() ?? ''}
         data-changed-pixel-percent={result.changedPixelPercent?.toString() ?? ''}
         data-max-channel-delta={result.maxChannelDelta?.toString() ?? ''}
         data-mean-luminance-delta={result.meanLuminanceDelta?.toString() ?? ''}
         data-preview-after-hash={result.previewAfterHash ?? ''}
         data-preview-before-hash={result.previewBeforeHash ?? ''}
+        data-preview-refresh-graph-revision={result.previewRefreshReceipt?.graphRevision ?? ''}
         data-preview-refresh-policy="native-renderer-handoff"
         data-sampled-pixel-count={result.sampledPixelCount?.toString() ?? ''}
         data-testid="agent-live-prompt-result"
@@ -2877,6 +2810,84 @@ function LivePromptComposer({
           {result.recipeName ? <span className="font-mono text-text-secondary">{result.recipeName}</span> : null}
         </div>
         {result.summary ? <p className="mt-1 leading-4 text-text-secondary">{result.summary}</p> : null}
+        {result.dryRunReceipt ? (
+          <div
+            className="mt-2 grid gap-1.5 rounded border border-sky-500/20 bg-sky-500/10 p-2 text-[10px]"
+            data-dry-run-plan-hash={result.dryRunReceipt.dryRunPlanHash}
+            data-dry-run-plan-id={result.dryRunReceipt.dryRunPlanId}
+            data-preview-after-hash={result.dryRunReceipt.previewAfter.renderHash}
+            data-preview-after-ref={result.dryRunReceipt.previewAfter.previewRef}
+            data-preview-before-hash={result.previewBeforeHash ?? ''}
+            data-source-graph-revision={result.dryRunReceipt.sourceGraphRevision}
+            data-testid="agent-live-prompt-dry-run-receipt"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-semibold text-sky-100">{t('editor.ai.agent.composer.dryRun')}</span>
+              <span className="font-mono text-text-secondary">{result.dryRunReceipt.dryRunPlanId}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              <span className="truncate font-mono text-sky-100">{result.dryRunReceipt.dryRunPlanHash}</span>
+              <span className="truncate font-mono text-text-secondary">
+                {result.dryRunReceipt.previewAfter.graphRevision}
+              </span>
+              <span className="truncate font-mono text-text-secondary">{result.dryRunReceipt.sourceGraphRevision}</span>
+              <span className="truncate font-mono text-text-secondary">
+                {result.dryRunReceipt.previewAfter.renderHash}
+              </span>
+            </div>
+          </div>
+        ) : null}
+        {result.applyReceipt ? (
+          <div
+            className="mt-2 grid gap-1.5 rounded border border-emerald-500/25 bg-emerald-500/10 p-2 text-[10px]"
+            data-accepted-plan-hash={result.applyReceipt.acceptedPlanHash}
+            data-accepted-plan-id={result.applyReceipt.acceptedPlanId}
+            data-applied-graph-revision={result.applyReceipt.appliedGraphRevision}
+            data-preview-after-hash={result.applyReceipt.afterPreviewHash}
+            data-preview-before-hash={result.applyReceipt.beforePreviewHash}
+            data-testid="agent-live-prompt-apply-receipt"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-semibold text-emerald-100">{t('editor.ai.agent.composer.applyReceipt')}</span>
+              <span className="font-mono text-text-secondary">{result.applyReceipt.acceptedPlanId}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              <span className="truncate font-mono text-emerald-100">{result.applyReceipt.acceptedPlanHash}</span>
+              <span className="truncate font-mono text-text-secondary">{result.applyReceipt.appliedGraphRevision}</span>
+              <span className="truncate font-mono text-text-secondary">{result.applyReceipt.beforePreviewHash}</span>
+              <span className="truncate font-mono text-text-secondary">{result.applyReceipt.afterPreviewHash}</span>
+            </div>
+          </div>
+        ) : null}
+        {result.previewRefreshReceipt ? (
+          <div
+            className="mt-2 grid gap-1.5 rounded border border-violet-500/25 bg-violet-500/10 p-2 text-[10px]"
+            data-content-hash={result.previewRefreshReceipt.contentHash}
+            data-graph-revision={result.previewRefreshReceipt.graphRevision}
+            data-preview-artifact-id={result.previewRefreshReceipt.preview.artifactId}
+            data-preview-render-hash={result.previewRefreshReceipt.preview.renderHash}
+            data-preview-recipe-hash={result.previewRefreshReceipt.preview.recipeHash}
+            data-preview-stale={String(result.previewRefreshReceipt.proofContext.stale)}
+            data-testid="agent-live-prompt-preview-refresh-receipt"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-semibold text-violet-100">{t('editor.ai.agent.composer.refreshPreview')}</span>
+              <span className="font-mono text-text-secondary">{result.previewRefreshReceipt.preview.artifactId}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              <span className="truncate font-mono text-violet-100">{result.previewRefreshReceipt.contentHash}</span>
+              <span className="truncate font-mono text-text-secondary">
+                {result.previewRefreshReceipt.graphRevision}
+              </span>
+              <span className="truncate font-mono text-text-secondary">
+                {result.previewRefreshReceipt.preview.recipeHash}
+              </span>
+              <span className="truncate font-mono text-text-secondary">
+                {result.previewRefreshReceipt.preview.renderHash}
+              </span>
+            </div>
+          </div>
+        ) : null}
         {result.previewStaleRecipeHash || result.stateStaleRecipeHash ? (
           <p
             className="mt-1 rounded border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-[10px] font-semibold text-amber-100"
@@ -2901,38 +2912,6 @@ function LivePromptComposer({
           >
             <div className="truncate text-emerald-100">{result.stateGraphRevision}</div>
             <div className="truncate">{result.stateImagePath}</div>
-          </div>
-        ) : null}
-        {result.status === 'applied' && result.appliedGraphRevision ? (
-          <div
-            className="mt-2 grid gap-1.5 rounded border border-emerald-500/25 bg-emerald-500/10 p-2 text-[10px]"
-            data-applied-graph-revision={result.appliedGraphRevision}
-            data-changed-pixel-count={result.changedPixelCount?.toString() ?? ''}
-            data-final-recipe-hash={result.recipeName ?? ''}
-            data-policy-decision-id={result.safetyDecision?.decisionId ?? ''}
-            data-preview-after-hash={result.previewAfterHash ?? ''}
-            data-preview-before-hash={result.previewBeforeHash ?? ''}
-            data-sampled-pixel-count={result.sampledPixelCount?.toString() ?? ''}
-            data-testid="agent-live-apply-receipt"
-            data-tool-call-count={sessionReview?.toolCallCount.toString() ?? ''}
-          >
-            <div className="flex items-center justify-between gap-2">
-              <span className="font-semibold text-emerald-100">{t('editor.ai.agent.composer.applyReceipt')}</span>
-              <span className="font-mono text-text-secondary">{sessionReview?.toolCallCount ?? 0}</span>
-            </div>
-            <div className="grid grid-cols-2 gap-1.5">
-              <span className="truncate font-mono text-text-secondary">{result.appliedGraphRevision}</span>
-              <span className="truncate font-mono text-text-secondary">{result.recipeName}</span>
-              <span className="truncate font-mono text-sky-100">{result.previewBeforeHash}</span>
-              <span className="truncate font-mono text-sky-100">{result.previewAfterHash}</span>
-            </div>
-            <div className="font-mono text-emerald-100">
-              {t('editor.ai.agent.composer.applyReceiptPixels', {
-                changed: result.changedPixelCount,
-                percent: result.changedPixelPercent,
-                sampled: result.sampledPixelCount,
-              })}
-            </div>
           </div>
         ) : null}
         {result.exportHash ? (
