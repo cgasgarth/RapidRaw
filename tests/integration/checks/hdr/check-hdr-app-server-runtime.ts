@@ -191,6 +191,26 @@ if (runtimeReceipt.alignment.transformCount !== BRACKETS.length || runtimeReceip
 if (runtimeReceipt.deghost.motionPixelCount <= 0 || runtimeReceipt.deghost.motionCoverageRatio <= 0) {
   throw new Error(`HDR runtime sidecar receipt lost deghost measurements: ${JSON.stringify(runtimeReceipt.deghost)}.`);
 }
+const deghostMaskArtifacts = runtimeReceipt.deghost.maskArtifacts ?? [];
+if (deghostMaskArtifacts.length !== 2) {
+  throw new Error(
+    `HDR runtime receipt must persist deghost mask artifact handles, got ${deghostMaskArtifacts.length}.`,
+  );
+}
+if (!deghostMaskArtifacts.some((artifact) => artifact.kind === 'deghost_selection')) {
+  throw new Error('HDR runtime receipt must include a deghost selection mask artifact.');
+}
+if (!deghostMaskArtifacts.some((artifact) => artifact.kind === 'motion_probability')) {
+  throw new Error('HDR runtime receipt must include a motion probability mask artifact.');
+}
+for (const maskArtifact of deghostMaskArtifacts) {
+  if (maskArtifact.artifact.storage !== 'sidecar_artifact' || maskArtifact.artifact.kind !== 'mask') {
+    throw new Error(`HDR deghost mask artifact must be sidecar mask storage: ${JSON.stringify(maskArtifact)}.`);
+  }
+  if (maskArtifact.width !== WIDTH || maskArtifact.height !== HEIGHT) {
+    throw new Error('HDR deghost mask artifact dimensions must match runtime output dimensions.');
+  }
+}
 const appliedOutputArtifact = applied.apply.mutationResult.outputArtifacts[0];
 if (appliedOutputArtifact === undefined) throw new Error('Expected HDR apply to return an output artifact.');
 if (runtimeReceipt.output.contentHash !== appliedOutputArtifact.contentHash) {
@@ -238,6 +258,15 @@ if (measuredDerivedOutputReceipt.outputArtifactId !== applied.apply.mutationResu
 }
 if (measuredDerivedOutputReceipt.outputContentHash !== runtimeReceipt.output.contentHash) {
   throw new Error('HDR measured handoff receipt must preserve the runtime sidecar output hash.');
+}
+if (measuredDerivedOutputReceipt.hdr?.deghostMaskArtifactCount !== deghostMaskArtifacts.length) {
+  throw new Error('HDR derived output receipt must expose runtime deghost mask artifact count.');
+}
+if (
+  measuredDerivedOutputReceipt.provenanceSidecar?.hdr?.deghostMaskArtifacts[0]?.artifact.contentHash !==
+  deghostMaskArtifacts[0]?.artifact.contentHash
+) {
+  throw new Error('HDR provenance sidecar must preserve runtime deghost mask artifact handles.');
 }
 const derivedSourceReceipt = buildDerivedSourceReceiptIdentity(measuredDerivedOutputReceipt);
 const openedDerivedSource = openComputationalMergeDerivedSourceV1({

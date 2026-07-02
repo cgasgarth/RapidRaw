@@ -1,5 +1,9 @@
 import { z } from 'zod';
 
+import {
+  hdrDeghostingModeV1Schema,
+  hdrMaskArtifactV1Schema,
+} from '../../../packages/rawengine-schema/src/rawEngineSchemas';
 import { focusStackRetouchSeedSchema } from '../focus-stack/focusStackOutputReviewSchemas';
 
 export const derivedOutputFamilySchema = z.enum(['focus_stack', 'hdr', 'panorama', 'super_resolution']);
@@ -82,6 +86,24 @@ const derivedOutputPanoramaMetadataSchema = z
   })
   .strict();
 
+const derivedOutputHdrMetadataSchema = z
+  .object({
+    deghostMaskArtifactCount: z.number().int().nonnegative(),
+    deghostMaskArtifacts: z.array(hdrMaskArtifactV1Schema),
+    motionCoverageRatio: z.number().min(0).max(1),
+    requestedDeghosting: hdrDeghostingModeV1Schema,
+  })
+  .strict()
+  .superRefine((metadata, context) => {
+    if (metadata.deghostMaskArtifactCount !== metadata.deghostMaskArtifacts.length) {
+      context.addIssue({
+        code: 'custom',
+        message: 'HDR deghost mask artifact count must match artifact handles.',
+        path: ['deghostMaskArtifactCount'],
+      });
+    }
+  });
+
 export const derivedOutputProvenanceSidecarSchema = z
   .object({
     acceptedApplyId: z.string().trim().min(1).optional(),
@@ -115,6 +137,7 @@ export const derivedOutputProvenanceSidecarSchema = z
       })
       .strict()
       .optional(),
+    hdr: derivedOutputHdrMetadataSchema.optional(),
     panorama: derivedOutputPanoramaMetadataSchema.optional(),
     superResolution: z
       .object({
@@ -185,6 +208,7 @@ export const derivedOutputReceiptSchema = z
       })
       .strict()
       .optional(),
+    hdr: derivedOutputHdrMetadataSchema.optional(),
     panorama: derivedOutputPanoramaMetadataSchema.optional(),
     previewDimensions: derivedOutputDimensionsSchema.optional(),
     recipeHash: z.string().trim().min(1).optional(),
@@ -313,6 +337,17 @@ export const derivedOutputReceiptSchema = z
             code: 'custom',
             message: 'Derived output focus stack sidecar metadata must match receipt.',
             path: ['provenanceSidecar', 'focusStack'],
+          });
+        }
+      }
+      if (receipt.hdr !== undefined && receipt.provenanceSidecar.hdr !== undefined) {
+        const receiptHdr = JSON.stringify(receipt.hdr);
+        const sidecarHdr = JSON.stringify(receipt.provenanceSidecar.hdr);
+        if (receiptHdr !== sidecarHdr) {
+          context.addIssue({
+            code: 'custom',
+            message: 'Derived output HDR sidecar metadata must match receipt.',
+            path: ['provenanceSidecar', 'hdr'],
           });
         }
       }

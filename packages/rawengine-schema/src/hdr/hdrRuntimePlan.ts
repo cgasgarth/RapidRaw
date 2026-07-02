@@ -298,6 +298,8 @@ export const applyHdrRuntimePlanV1 = (requestValue: unknown): HdrRuntimeApplyRes
       command: request.command,
       createdAt: new Date().toISOString(),
       frames: request.frames,
+      motionConfidenceMap: runtime.motionConfidenceMap,
+      motionMask: runtime.motionMask,
       outputArtifact,
       provenance,
       warningCodes: runtime.warnings,
@@ -309,6 +311,8 @@ const buildHdrRuntimeSidecarArtifact = ({
   command,
   createdAt,
   frames,
+  motionConfidenceMap,
+  motionMask,
   outputArtifact,
   provenance,
   warningCodes,
@@ -316,6 +320,8 @@ const buildHdrRuntimeSidecarArtifact = ({
   command: HdrRuntimeCommandV1;
   createdAt: string;
   frames: HdrRuntimeFrameV1[];
+  motionConfidenceMap: Float64Array;
+  motionMask: Uint8Array;
   outputArtifact: ArtifactHandleV1;
   provenance: HdrRuntimeProvenanceV1;
   warningCodes: string[];
@@ -340,9 +346,16 @@ const buildHdrRuntimeSidecarArtifact = ({
       };
     }),
   });
+  const maskArtifacts = buildHdrRuntimeDeghostMaskArtifacts({
+    motionConfidenceMap,
+    motionMask,
+    outputArtifact,
+    provenance,
+  });
   const runtimeSidecarReceipt = buildHdrRuntimeSidecarReceipt({
     bracketDetection,
     command,
+    maskArtifacts,
     outputArtifact,
     provenance,
     warningCodes,
@@ -368,7 +381,7 @@ const buildHdrRuntimeSidecarArtifact = ({
     createdAt,
     deghosting: {
       confidenceMapVisible: provenance.deghostConfidenceMap.visible,
-      masks: [],
+      masks: maskArtifacts,
       motionCoverageRatio: provenance.motionCoverageRatio,
       motionRisk: motionRiskForCoverage(provenance.motionCoverageRatio),
       referenceSourceIndex: provenance.referenceSourceIndex,
@@ -420,15 +433,71 @@ const buildHdrRuntimeSidecarArtifact = ({
   });
 };
 
+const buildHdrRuntimeDeghostMaskArtifacts = ({
+  motionConfidenceMap,
+  motionMask,
+  outputArtifact,
+  provenance,
+}: {
+  motionConfidenceMap: Float64Array;
+  motionMask: Uint8Array;
+  outputArtifact: ArtifactHandleV1;
+  provenance: HdrRuntimeProvenanceV1;
+}): HdrMergeArtifactV1['deghosting']['masks'] => {
+  const dimensions = outputArtifact.dimensions;
+  if (dimensions === undefined) {
+    throw new Error('HDR deghost mask artifacts require measured output dimensions.');
+  }
+  if (provenance.deghosting === 'off' || provenance.qualityMetrics.motionPixelCount === 0) return [];
+
+  const sourceIndexes = provenance.sourceState.map((source) => source.sourceIndex);
+  return [
+    {
+      artifact: {
+        artifactId: `${outputArtifact.artifactId}:deghost-selection-mask`,
+        contentHash: `sha256:${stableHdrRuntimeHash(
+          `${outputArtifact.contentHash}:deghost-selection:${hashHdrRuntimeBytes(motionMask)}`,
+        )}`,
+        dimensions,
+        kind: 'mask',
+        storage: 'sidecar_artifact',
+      },
+      encodedMeaning: 'u8_binary',
+      height: dimensions.height,
+      kind: 'deghost_selection',
+      sourceIndexes,
+      width: dimensions.width,
+    },
+    {
+      artifact: {
+        artifactId: `${outputArtifact.artifactId}:deghost-motion-probability`,
+        contentHash: `sha256:${stableHdrRuntimeHash(
+          `${outputArtifact.contentHash}:motion-probability:${hashHdrRuntimePixels(motionConfidenceMap)}`,
+        )}`,
+        dimensions,
+        kind: 'mask',
+        storage: 'sidecar_artifact',
+      },
+      encodedMeaning: 'f32_probability',
+      height: dimensions.height,
+      kind: 'motion_probability',
+      sourceIndexes,
+      width: dimensions.width,
+    },
+  ];
+};
+
 const buildHdrRuntimeSidecarReceipt = ({
   bracketDetection,
   command,
+  maskArtifacts,
   outputArtifact,
   provenance,
   warningCodes,
 }: {
   bracketDetection: HdrBracketDetectionResultV1;
   command: HdrRuntimeCommandV1;
+  maskArtifacts: HdrMergeArtifactV1['deghosting']['masks'];
   outputArtifact: ArtifactHandleV1;
   provenance: HdrRuntimeProvenanceV1;
   warningCodes: string[];
@@ -465,6 +534,7 @@ const buildHdrRuntimeSidecarReceipt = ({
     },
     deghost: {
       averageConfidence: provenance.deghostConfidenceMap.averageConfidence,
+      ...(maskArtifacts.length === 0 ? {} : { maskArtifacts }),
       maxConfidence: provenance.deghostConfidenceMap.maxConfidence,
       motionCoverageRatio: provenance.motionCoverageRatio,
       motionPixelCount: provenance.qualityMetrics.motionPixelCount,
@@ -917,6 +987,15 @@ const hashHdrRuntimePixels = (pixels: Float64Array): string => {
   let value = 2166136261;
   for (const pixel of pixels) {
     value ^= Math.round(pixel * 1_000_000);
+    value = Math.imul(value, 16777619) >>> 0;
+  }
+  return value.toString(16).padStart(8, '0');
+};
+
+const hashHdrRuntimeBytes = (bytes: Uint8Array): string => {
+  let value = 2166136261;
+  for (const byte of bytes) {
+    value ^= byte;
     value = Math.imul(value, 16777619) >>> 0;
   }
   return value.toString(16).padStart(8, '0');

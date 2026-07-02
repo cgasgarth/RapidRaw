@@ -21,6 +21,7 @@ type BuildReceiptInput = Omit<
     acceptedApplyId?: string;
     acceptedDryRunId?: string;
     focusStack?: DerivedOutputProvenanceSidecar['focusStack'];
+    hdr?: DerivedOutputProvenanceSidecar['hdr'];
     panorama?: DerivedOutputProvenanceSidecar['panorama'];
     superResolution?: DerivedOutputProvenanceSidecar['superResolution'];
     warnings: string[];
@@ -84,6 +85,7 @@ export const buildDerivedOutputReceipt = (input: BuildReceiptInput): DerivedOutp
             ...(input.provenanceSidecar?.focusStack === undefined
               ? {}
               : { focusStack: input.provenanceSidecar.focusStack }),
+            ...(input.provenanceSidecar?.hdr === undefined ? {} : { hdr: input.provenanceSidecar.hdr }),
             ...(input.provenanceSidecar?.superResolution === undefined
               ? {}
               : { superResolution: input.provenanceSidecar.superResolution }),
@@ -161,11 +163,13 @@ export const buildDerivedOutputProvenanceSidecar = ({
   superResolution,
   warnings,
   focusStack,
+  hdr,
 }: {
   acceptedApplyId?: string;
   acceptedDryRunId?: string;
   focusStack?: DerivedOutputProvenanceSidecar['focusStack'];
   family: DerivedOutputReceipt['family'];
+  hdr?: DerivedOutputProvenanceSidecar['hdr'];
   outputContentHash: string;
   outputPath: string;
   receiptId: string;
@@ -203,6 +207,7 @@ export const buildDerivedOutputProvenanceSidecar = ({
       ...(sourcePaths[order] === undefined || sourcePaths[order] === '' ? {} : { path: sourcePaths[order] }),
     })),
     ...(focusStack === undefined ? {} : { focusStack }),
+    ...(hdr === undefined ? {} : { hdr }),
     ...(panorama === undefined ? {} : { panorama }),
     ...(superResolution === undefined ? {} : { superResolution }),
     warnings: [...new Set(warnings)].sort(),
@@ -221,6 +226,15 @@ export const buildHdrDerivedOutputReceipt = ({
 }): DerivedOutputReceipt => {
   const outputContentHash =
     handoff.runtimeSidecarReceipt?.output.contentHash ?? handoff.previewExportParity.parityProofHash;
+  const hdrMetadata =
+    handoff.runtimeSidecarReceipt === undefined
+      ? undefined
+      : {
+          deghostMaskArtifactCount: handoff.runtimeSidecarReceipt.deghost.maskArtifacts?.length ?? 0,
+          deghostMaskArtifacts: handoff.runtimeSidecarReceipt.deghost.maskArtifacts ?? [],
+          motionCoverageRatio: handoff.runtimeSidecarReceipt.deghost.motionCoverageRatio,
+          requestedDeghosting: handoff.runtimeSidecarReceipt.deghost.requestedDeghosting,
+        };
 
   return buildDerivedOutputReceipt({
     acceptedDryRunPlanHash,
@@ -234,9 +248,11 @@ export const buildHdrDerivedOutputReceipt = ({
     outputArtifactId: handoff.editableDerivedAssetId,
     outputContentHash,
     outputPath: handoff.outputPath,
+    ...(hdrMetadata === undefined ? {} : { hdr: hdrMetadata }),
     provenanceSidecar: {
       acceptedApplyId: handoff.editableDerivedAssetId,
       acceptedDryRunId: handoff.previewExportParity.exportReceiptHash,
+      ...(hdrMetadata === undefined ? {} : { hdr: hdrMetadata }),
       warnings: handoff.warningCodes,
     },
     settings,

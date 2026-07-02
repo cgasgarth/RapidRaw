@@ -4223,6 +4223,7 @@ export const hdrRuntimeSidecarReceiptV1Schema = z
     deghost: z
       .object({
         averageConfidence: z.number().min(0).max(1),
+        maskArtifacts: z.array(hdrMaskArtifactV1Schema).optional(),
         maxConfidence: z.number().min(0).max(1),
         motionCoverageRatio: z.number().min(0).max(1),
         motionPixelCount: z.number().int().nonnegative(),
