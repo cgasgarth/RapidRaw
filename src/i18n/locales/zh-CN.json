@@ -1428,6 +1428,26 @@
         "longitude": "经度",
         "title": "GPS 位置"
       },
+      "negativeLabPositive": {
+        "currentTooltip": "",
+        "reasons": {
+          "outputArtifactChanged": "",
+          "outputArtifactMissing": "",
+          "persistedStaleArtifactId": "",
+          "recipeHashChanged": "",
+          "sourceContentHashChanged": "",
+          "sourceFileStateChanged": "",
+          "sourceMissing": ""
+        },
+        "staleTooltip": "",
+        "state": {
+          "current": "",
+          "missing": "",
+          "stale": ""
+        },
+        "unknownReason": "",
+        "warning": ""
+      },
       "organization": {
         "addTagPlaceholder": "添加标签...",
         "colorLabel": "颜色标签",

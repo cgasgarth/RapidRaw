@@ -76,7 +76,7 @@ const SAFE_FRONTEND_EXTENSIONS = new Set([
 ]);
 
 const SAFE_SCHEMA_PACKAGE_EXTENSIONS = new Set(['.json', '.md', '.ts', '.ts']);
-const SAFE_PURE_TEST_EXTENSIONS = new Set(['.js', '.ts', '.ts']);
+const SAFE_PURE_TEST_EXTENSIONS = new Set(['.js', '.ts', '.tsx']);
 const SAFE_VALIDATION_SCRIPT_FILES = new Set(['scripts/tsconfig.json']);
 
 const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
@@ -1008,6 +1008,11 @@ function runSelfTest() {
     SMOKE_MODES.NONE,
   );
   assertClassification('pure TS tests can skip smoke', ['tests/pure-ts/edit-command-bus.test.ts'], SMOKE_MODES.NONE);
+  assertClassification(
+    'pure TSX tests can skip smoke',
+    ['tests/pure-ts/negative-lab/negative-lab-positive-status-badge-ui.test.tsx'],
+    SMOKE_MODES.NONE,
+  );
   assertClassification('lint config changes can skip smoke', ['biome.json'], SMOKE_MODES.NONE);
   assertClassification('unused-code config changes can skip smoke', ['knip.jsonc'], SMOKE_MODES.NONE);
   assertClassification(

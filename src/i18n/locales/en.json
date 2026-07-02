@@ -1450,6 +1450,26 @@
         "longitude": "Longitude",
         "title": "GPS Location"
       },
+      "negativeLabPositive": {
+        "currentTooltip": "Negative Lab positive artifact matches persisted provenance.",
+        "reasons": {
+          "outputArtifactChanged": "output artifact changed",
+          "outputArtifactMissing": "output artifact missing",
+          "persistedStaleArtifactId": "persisted stale artifact ID",
+          "recipeHashChanged": "accepted dry-run plan changed",
+          "sourceContentHashChanged": "source negative hash changed",
+          "sourceFileStateChanged": "source negative file state changed",
+          "sourceMissing": "source negative missing"
+        },
+        "staleTooltip": "Negative Lab positive artifact is not current: {{reasons}}.",
+        "state": {
+          "current": "NL Current",
+          "missing": "NL Missing",
+          "stale": "NL Stale"
+        },
+        "unknownReason": "unknown persisted artifact mismatch",
+        "warning": "Negative Lab artifact status: {{reasons}}"
+      },
       "organization": {
         "addTagPlaceholder": "Add tag...",
         "colorLabel": "Color Label",

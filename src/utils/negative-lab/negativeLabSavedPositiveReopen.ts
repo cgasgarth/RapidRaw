@@ -23,7 +23,7 @@ const negativeLabReopenArtifactSchema = z
         z
           .object({
             artifactId: z.string().trim().min(1),
-            contentHash: z.string().trim().min(1),
+            contentHash: z.string().trim().min(1).optional(),
             dimensions: z.object({ height: z.number().int().positive(), width: z.number().int().positive() }).strict(),
             outputIntent: z.literal('editable_positive').optional(),
             path: z.string().trim().min(1).optional(),
@@ -47,6 +47,13 @@ const negativeLabReopenArtifactSchema = z
           .passthrough(),
       )
       .min(1),
+    staleState: z
+      .object({
+        invalidationReasons: z.array(z.string().trim().min(1)).default([]),
+        state: z.enum(['current', 'stale']).default('current'),
+      })
+      .passthrough()
+      .optional(),
   })
   .passthrough();
 
@@ -55,11 +62,83 @@ const negativeLabReopenMetadataSchema = z
     rawEngineArtifacts: z
       .object({
         negativeLabArtifacts: z.array(negativeLabReopenArtifactSchema).default([]),
+        staleArtifactIds: z.array(z.string().trim().min(1)).default([]),
+        stale_artifact_ids: z.array(z.string().trim().min(1)).default([]),
       })
       .passthrough()
       .optional(),
   })
   .passthrough();
+
+export type NegativeLabReopenedPositiveArtifactState = 'current' | 'missing' | 'stale';
+
+export interface NegativeLabReopenedPositiveArtifactStatus {
+  artifactId: string;
+  invalidationReasons: string[];
+  outputArtifactId: string | null;
+  outputPath: string;
+  positiveVariantId: string | null;
+  sourceImageRef: string;
+  state: NegativeLabReopenedPositiveArtifactState;
+}
+
+const toUniqueSortedReasons = (reasons: readonly string[]): string[] =>
+  Array.from(new Set(reasons.filter((reason) => reason.trim().length > 0))).sort((a, b) => a.localeCompare(b));
+
+export const buildNegativeLabReopenedSavedPositiveArtifactStatus = ({
+  imagePath,
+  metadata,
+}: {
+  imagePath: string;
+  metadata: unknown;
+}): NegativeLabReopenedPositiveArtifactStatus | null => {
+  const parsedMetadata = negativeLabReopenMetadataSchema.safeParse(metadata);
+  if (!parsedMetadata.success) return null;
+
+  const rawEngineArtifacts = parsedMetadata.data.rawEngineArtifacts;
+  if (rawEngineArtifacts === undefined) return null;
+
+  const persistedStaleArtifactIds = new Set([
+    ...rawEngineArtifacts.staleArtifactIds,
+    ...rawEngineArtifacts.stale_artifact_ids,
+  ]);
+
+  for (const artifact of rawEngineArtifacts.negativeLabArtifacts) {
+    const outputArtifact =
+      artifact.outputArtifacts.find(
+        (output) => output.path === imagePath && output.outputIntent === 'editable_positive',
+      ) ??
+      artifact.outputArtifacts.find((output) => output.path === imagePath) ??
+      null;
+    const sourceImageRef = artifact.sourceImageRefs[0]?.imagePath;
+    if (outputArtifact === null || sourceImageRef === undefined) continue;
+
+    const persistedReasons = artifact.staleState?.invalidationReasons ?? [];
+    const isPersistedStale =
+      artifact.staleState?.state === 'stale' ||
+      persistedStaleArtifactIds.has(artifact.artifactId) ||
+      persistedStaleArtifactIds.has(outputArtifact.artifactId);
+    const reasons = toUniqueSortedReasons(
+      isPersistedStale && persistedReasons.length === 0 ? ['persisted_stale_artifact_id'] : persistedReasons,
+    );
+    const isMissing =
+      reasons.includes('output_artifact_missing') ||
+      reasons.includes('source_missing') ||
+      outputArtifact.contentHash === undefined;
+
+    return {
+      artifactId: artifact.artifactId,
+      invalidationReasons: reasons,
+      outputArtifactId: outputArtifact.artifactId,
+      outputPath: outputArtifact.path ?? imagePath,
+      positiveVariantId: outputArtifact.positiveVariantId,
+      sourceImageRef,
+      state: isMissing ? 'missing' : isPersistedStale ? 'stale' : 'current',
+    };
+  }
+
+  return null;
+};
 
 export const buildNegativeLabReopenedSavedPositiveHandoff = ({
   imagePath,
@@ -68,6 +147,9 @@ export const buildNegativeLabReopenedSavedPositiveHandoff = ({
   imagePath: string;
   metadata: unknown;
 }): NegativeLabSavedPositiveHandoff | null => {
+  const status = buildNegativeLabReopenedSavedPositiveArtifactStatus({ imagePath, metadata });
+  if (status !== null && status.state !== 'current') return null;
+
   const parsedMetadata = negativeLabReopenMetadataSchema.safeParse(metadata);
   if (!parsedMetadata.success) return null;
 
@@ -115,10 +197,14 @@ export const metadataWithNegativeLabReopenedSavedPositiveHandoff = ({
   metadata: unknown;
 }): unknown => {
   const handoff = buildNegativeLabReopenedSavedPositiveHandoff({ imagePath, metadata });
-  if (handoff === null || typeof metadata !== 'object' || metadata === null || Array.isArray(metadata)) return metadata;
+  const artifactStatus = buildNegativeLabReopenedSavedPositiveArtifactStatus({ imagePath, metadata });
+  if (artifactStatus === null || typeof metadata !== 'object' || metadata === null || Array.isArray(metadata)) {
+    return metadata;
+  }
 
   return {
     ...metadata,
-    rawEngineNegativeLabHandoff: handoff,
+    ...(handoff === null ? {} : { rawEngineNegativeLabHandoff: handoff }),
+    rawEngineNegativeLabPositiveStatus: artifactStatus,
   };
 };

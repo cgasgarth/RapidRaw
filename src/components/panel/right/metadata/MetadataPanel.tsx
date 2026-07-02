@@ -39,6 +39,10 @@ import {
   type MetadataExifData,
   type MetadataValue,
 } from '../../../../utils/metadataPanelContracts';
+import {
+  buildNegativeLabReopenedSavedPositiveArtifactStatus,
+  type NegativeLabReopenedPositiveArtifactStatus,
+} from '../../../../utils/negative-lab/negativeLabSavedPositiveReopen';
 import { buildRawWarningChips } from '../../../../utils/rawWarningReceipts';
 import { invokeWithSchema } from '../../../../utils/tauriSchemaInvoke';
 import UiText from '../../../ui/primitives/Text';
@@ -111,6 +115,57 @@ function formatRawReceiptToken(value: string) {
     .split('_')
     .map((part) => (part.length <= 3 ? part.toUpperCase() : `${part[0]?.toUpperCase() ?? ''}${part.slice(1)}`))
     .join(' ');
+}
+
+function formatNegativeLabPositiveReason(value: string, t: TFunction) {
+  const reasonLabels: Record<string, string> = {
+    output_artifact_changed: t('editor.metadata.negativeLabPositive.reasons.outputArtifactChanged'),
+    output_artifact_missing: t('editor.metadata.negativeLabPositive.reasons.outputArtifactMissing'),
+    persisted_stale_artifact_id: t('editor.metadata.negativeLabPositive.reasons.persistedStaleArtifactId'),
+    recipe_hash_changed: t('editor.metadata.negativeLabPositive.reasons.recipeHashChanged'),
+    source_content_hash_changed: t('editor.metadata.negativeLabPositive.reasons.sourceContentHashChanged'),
+    source_file_state_changed: t('editor.metadata.negativeLabPositive.reasons.sourceFileStateChanged'),
+    source_missing: t('editor.metadata.negativeLabPositive.reasons.sourceMissing'),
+  };
+  return reasonLabels[value] ?? formatRawReceiptToken(value);
+}
+
+function formatNegativeLabPositiveState(value: NegativeLabReopenedPositiveArtifactStatus['state'], t: TFunction) {
+  if (value === 'current') return t('editor.metadata.negativeLabPositive.state.current');
+  if (value === 'missing') return t('editor.metadata.negativeLabPositive.state.missing');
+  return t('editor.metadata.negativeLabPositive.state.stale');
+}
+
+export function NegativeLabPositiveStatusBadge({ status }: { status: NegativeLabReopenedPositiveArtifactStatus }) {
+  const { t } = useTranslation();
+  const reasonLabel = status.invalidationReasons.map((reason) => formatNegativeLabPositiveReason(reason, t)).join(', ');
+
+  return (
+    <div
+      className={cx(
+        'bg-bg-primary/80 backdrop-blur-md font-bold text-[10px] rounded-md px-2 py-1 tracking-wider uppercase shadow-sm border',
+        status.state === 'current'
+          ? 'border-green-500/40 text-green-300'
+          : status.state === 'missing'
+            ? 'border-red-500/50 text-red-300'
+            : 'border-yellow-500/50 text-yellow-300',
+      )}
+      data-negative-lab-artifact-id={status.artifactId}
+      data-negative-lab-output-artifact-id={status.outputArtifactId ?? ''}
+      data-negative-lab-positive-reasons={status.invalidationReasons.join(',')}
+      data-negative-lab-positive-state={status.state}
+      data-testid="metadata-negative-lab-positive-status"
+      data-tooltip={
+        status.state === 'current'
+          ? t('editor.metadata.negativeLabPositive.currentTooltip')
+          : t('editor.metadata.negativeLabPositive.staleTooltip', {
+              reasons: reasonLabel || t('editor.metadata.negativeLabPositive.unknownReason'),
+            })
+      }
+    >
+      {formatNegativeLabPositiveState(status.state, t)}
+    </div>
+  );
 }
 
 function parseDms(dmsString: string) {
@@ -483,6 +538,19 @@ export default function MetadataPanel() {
   const cameraProfileReport = rawDevelopmentReport?.cameraProfile ?? null;
   const cameraProfileReceipt =
     rawDevelopmentReport === null ? null : buildCameraProfileProvenanceReceipt(rawDevelopmentReport);
+  const negativeLabPositiveStatus = useMemo(
+    () =>
+      selectedImage
+        ? buildNegativeLabReopenedSavedPositiveArtifactStatus({
+            imagePath: selectedImage.path,
+            metadata: selectedImage.metadata,
+          })
+        : null,
+    [selectedImage],
+  );
+  const negativeLabPositiveReasonLabel = negativeLabPositiveStatus?.invalidationReasons
+    .map((reason) => formatNegativeLabPositiveReason(reason, t))
+    .join(', ');
   const rawWarningChips = useMemo(
     () =>
       buildRawWarningChips(
@@ -1126,6 +1194,9 @@ export default function MetadataPanel() {
                     {fileName || '-'}
                   </UiText>
                   <div className="flex items-center gap-1.5 shrink-0">
+                    {negativeLabPositiveStatus !== null && (
+                      <NegativeLabPositiveStatusBadge status={negativeLabPositiveStatus} />
+                    )}
                     {isVirtualCopy && (
                       <div
                         className="bg-bg-primary/80 backdrop-blur-md text-text-secondary font-bold text-[10px] rounded-md px-2 py-1 tracking-wider uppercase shadow-sm border border-surface/50"
@@ -1153,6 +1224,20 @@ export default function MetadataPanel() {
                   <UiText variant={TextVariants.small} color={TextColors.secondary} className="truncate drop-shadow-sm">
                     {selectedImage.exif?.DateTimeOriginal || '-'}
                   </UiText>
+                  {negativeLabPositiveStatus !== null && negativeLabPositiveStatus.state !== 'current' && (
+                    <UiText
+                      variant={TextVariants.small}
+                      color={TextColors.secondary}
+                      className="truncate drop-shadow-sm"
+                      data-testid="metadata-negative-lab-positive-warning"
+                      data-tooltip={negativeLabPositiveReasonLabel}
+                    >
+                      {t('editor.metadata.negativeLabPositive.warning', {
+                        reasons:
+                          negativeLabPositiveReasonLabel || t('editor.metadata.negativeLabPositive.unknownReason'),
+                      })}
+                    </UiText>
+                  )}
                 </div>
               </div>
             </div>

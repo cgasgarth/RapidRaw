@@ -1510,6 +1510,26 @@
         "longitude": "Długość geograficzna",
         "title": "Lokalizacja GPS"
       },
+      "negativeLabPositive": {
+        "currentTooltip": "",
+        "reasons": {
+          "outputArtifactChanged": "",
+          "outputArtifactMissing": "",
+          "persistedStaleArtifactId": "",
+          "recipeHashChanged": "",
+          "sourceContentHashChanged": "",
+          "sourceFileStateChanged": "",
+          "sourceMissing": ""
+        },
+        "staleTooltip": "",
+        "state": {
+          "current": "",
+          "missing": "",
+          "stale": ""
+        },
+        "unknownReason": "",
+        "warning": ""
+      },
       "organization": {
         "addTagPlaceholder": "Dodaj tag...",
         "colorLabel": "Etykieta koloru",
