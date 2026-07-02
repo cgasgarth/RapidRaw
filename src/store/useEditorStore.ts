@@ -20,6 +20,7 @@ import {
 } from '../utils/editHistory';
 import { loadMaskOverlaySettingsPreference } from '../utils/mask/maskOverlayPreferences';
 import { PANEL_SCOPES_HEIGHT } from '../utils/waveformSizing';
+import type { WhiteBalancePickerRuntimeReceipt } from '../utils/whiteBalancePicker';
 
 export interface InteractivePatch {
   url: string;
@@ -112,6 +113,7 @@ interface EditorState {
   maskOverlaySettings: MaskOverlaySettings;
   isStraightenActive: boolean;
   isWbPickerActive: boolean;
+  lastWhiteBalancePickerReceipt: WhiteBalancePickerRuntimeReceipt | null;
   liveRotation: number | null;
   brushSettings: BrushSettings | null;
 
@@ -210,6 +212,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   transformedOriginalUrl: null,
   isStraightenActive: false,
   isWbPickerActive: false,
+  lastWhiteBalancePickerReceipt: null,
   liveRotation: null,
 
   copiedSectionAdjustments: null,

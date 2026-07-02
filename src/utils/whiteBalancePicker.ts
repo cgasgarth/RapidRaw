@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { Adjustments } from './adjustments';
 
 const sliderMinimum = -100;
 const sliderMaximum = 100;
@@ -26,6 +27,36 @@ export interface WhiteBalancePickerResult {
   deltaTint: number;
   temperature: number;
   tint: number;
+}
+
+export interface WhiteBalancePickerSampleCoordinates {
+  imageX: number;
+  imageY: number;
+  previewPixelX: number;
+  previewPixelY: number;
+}
+
+export interface WhiteBalancePickerRuntimeReceipt {
+  averageRgb: z.infer<typeof whiteBalancePickerSampleSchema>;
+  coordinates: WhiteBalancePickerSampleCoordinates;
+  previewIdentity: string;
+  resultingTemperature: number;
+  resultingTint: number;
+  selectedImagePath: string;
+}
+
+export interface WhiteBalancePickerAdjustmentCommand {
+  adjustment: WhiteBalancePickerResult;
+  nextAdjustments: Adjustments;
+  receipt: WhiteBalancePickerRuntimeReceipt;
+}
+
+export interface WhiteBalancePickerAdjustmentCommandInput {
+  averageRgb: z.infer<typeof whiteBalancePickerSampleSchema>;
+  coordinates: WhiteBalancePickerSampleCoordinates;
+  currentAdjustments: Adjustments;
+  previewIdentity: string;
+  selectedImagePath: string;
 }
 
 export interface RgbPixel {
@@ -63,6 +94,64 @@ export const calculateWhiteBalancePickerAdjustment = (input: WhiteBalancePickerI
     deltaTint,
     temperature: clampSlider(parsed.currentTemperature + deltaTemperature),
     tint: clampSlider(parsed.currentTint + deltaTint),
+  };
+};
+
+export const averageWhiteBalancePickerRgbaSample = (
+  data: Uint8ClampedArray | ArrayLike<number>,
+): z.infer<typeof whiteBalancePickerSampleSchema> | null => {
+  if (data.length < 4) return null;
+
+  let redTotal = 0;
+  let greenTotal = 0;
+  let blueTotal = 0;
+  let count = 0;
+
+  for (let i = 0; i < data.length; i += 4) {
+    redTotal += data[i] ?? 0;
+    greenTotal += data[i + 1] ?? 0;
+    blueTotal += data[i + 2] ?? 0;
+    count += 1;
+  }
+
+  if (count === 0) return null;
+
+  return whiteBalancePickerSampleSchema.parse({
+    red: redTotal / count,
+    green: greenTotal / count,
+    blue: blueTotal / count,
+  });
+};
+
+export const buildWhiteBalancePickerAdjustmentCommand = ({
+  averageRgb,
+  coordinates,
+  currentAdjustments,
+  previewIdentity,
+  selectedImagePath,
+}: WhiteBalancePickerAdjustmentCommandInput): WhiteBalancePickerAdjustmentCommand => {
+  const adjustment = calculateWhiteBalancePickerAdjustment({
+    currentTemperature: currentAdjustments.temperature,
+    currentTint: currentAdjustments.tint,
+    sample: averageRgb,
+  });
+  const nextAdjustments = {
+    ...currentAdjustments,
+    temperature: adjustment.temperature,
+    tint: adjustment.tint,
+  };
+
+  return {
+    adjustment,
+    nextAdjustments,
+    receipt: {
+      averageRgb: whiteBalancePickerSampleSchema.parse(averageRgb),
+      coordinates,
+      previewIdentity,
+      resultingTemperature: adjustment.temperature,
+      resultingTint: adjustment.tint,
+      selectedImagePath,
+    },
   };
 };
 
