@@ -1145,9 +1145,8 @@ const buildRawEngineAppServerToolCallValidationRejection = ({
   const declaredToolName = request.toolCall?.toolName ?? request.runtimeToolName;
   const toolDefinition = activeRegistry.tools.find((tool) => tool.toolName === declaredToolName);
   if (
-    toolDefinition === undefined &&
     request.toolCall === undefined &&
-    isApprovedAgentAppServerToolName(declaredToolName)
+    (declaredToolName.startsWith('rawengine.agent.') || declaredToolName === RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME)
   ) {
     return null;
   }
