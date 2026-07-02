@@ -1,8 +1,8 @@
 import type { SelectedImage } from '../components/ui/AppProperties';
 
-export function shouldClearSelectedImageAfterLoadError(
+export function isSelectedImageLoadErrorCurrent(
   currentSelectedImage: SelectedImage | null,
   failedImagePath: string,
 ): boolean {
-  return currentSelectedImage?.path === failedImagePath && !currentSelectedImage.isReady;
+  return currentSelectedImage?.path === failedImagePath;
 }
