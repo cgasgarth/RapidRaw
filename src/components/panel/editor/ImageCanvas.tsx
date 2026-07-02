@@ -38,7 +38,8 @@ import {
 import { resolveEditorOverlayBlocker, resolveEditorOverlayVisibility } from '../../../utils/editorOverlayVisibility';
 import {
   BRUSH_MASK_COMMAND_COORDINATE_SPACE,
-  buildBrushMaskCommandFromParameters,
+  type BrushMaskCommandReceipt,
+  buildBrushMaskCommandReceiptFromParameters,
 } from '../../../utils/mask/brushMaskCommandBridge';
 import {
   normalizeLinearGradientParameters,
@@ -87,14 +88,23 @@ interface DrawnLine {
 interface BrushMaskCommandCaptureSummary {
   commandId: string;
   commandType: 'layerMask.createBrushMask';
+  commandHash: string;
   coordinateSpace: typeof BRUSH_MASK_COMMAND_COORDINATE_SPACE;
+  expectedGraphRevision: string;
+  imagePath: string;
   lastPointCount: number;
   lastStrokeMode: 'erase' | 'paint';
+  maskId: string;
+  operationId: string;
+  pressurePointCount: number;
+  receiptVersion: BrushMaskCommandReceipt['receiptVersion'];
+  schemaVersion: BrushMaskCommandReceipt['schemaVersion'];
   strokeCount: number;
+  validationStatus: BrushMaskCommandReceipt['validationStatus'];
 }
 
 interface MaskParameters {
-  [key: string]: boolean | number | Array<DrawnLine> | undefined;
+  [key: string]: boolean | number | Array<DrawnLine> | Record<string, unknown> | undefined;
   centerX: number;
   centerY: number;
   endX: number;
@@ -1500,14 +1510,16 @@ const ImageCanvas = memo(
     );
     const recordBrushMaskCommandCapture = useCallback(
       (subMaskId: string | null, subMask: SubMask | null, parameters: MaskParameters) => {
-        if (!subMaskId || !subMask || (subMask.type !== Mask.Brush && subMask.type !== Mask.Flow)) return;
+        if (!subMaskId || !subMask || (subMask.type !== Mask.Brush && subMask.type !== Mask.Flow)) return null;
         const strokeCount = parameters.lines?.length ?? 0;
-        if (strokeCount === 0) return;
+        if (strokeCount === 0) return null;
+        const operationId = `${subMaskId}_${String(strokeCount)}`;
+        const expectedGraphRevision = `brush-mask:${selectedImage.path}:${subMaskId}:${String(strokeCount)}:${String(effectiveImageDimensions.width)}x${String(effectiveImageDimensions.height)}`;
 
-        const command = buildBrushMaskCommandFromParameters(
+        const receipt = buildBrushMaskCommandReceiptFromParameters(
           parameters,
           {
-            expectedGraphRevision: 'ui_brush_capture_preview',
+            expectedGraphRevision,
             imagePath: selectedImage.path,
             imageSize: {
               height: effectiveImageDimensions.height,
@@ -1515,22 +1527,53 @@ const ImageCanvas = memo(
             },
             maskId: subMaskId,
             maskName: subMask.name?.trim() || subMask.type,
-            operationId: `${subMaskId}_${String(strokeCount)}`,
+            operationId,
             sessionId: 'brush-mask-canvas-capture',
           },
           { dryRun: true },
         );
 
         setLastBrushCommandCapture({
-          commandId: command.commandId,
-          commandType: command.commandType,
+          commandHash: receipt.commandHash,
+          commandId: receipt.commandId,
+          commandType: receipt.commandType,
           coordinateSpace: BRUSH_MASK_COMMAND_COORDINATE_SPACE,
-          lastPointCount: command.parameters.strokes.at(-1)?.points.length ?? 0,
-          lastStrokeMode: command.parameters.strokes.at(-1)?.mode ?? 'paint',
-          strokeCount: command.parameters.strokes.length,
+          expectedGraphRevision: receipt.expectedGraphRevision,
+          imagePath: receipt.imagePath,
+          lastPointCount: receipt.lastPointCount,
+          lastStrokeMode: receipt.lastStrokeMode,
+          maskId: receipt.maskId,
+          operationId: receipt.operationId,
+          pressurePointCount: receipt.pressurePointCount,
+          receiptVersion: receipt.receiptVersion,
+          schemaVersion: receipt.schemaVersion,
+          strokeCount: receipt.strokeCount,
+          validationStatus: receipt.validationStatus,
         });
+
+        return receipt;
       },
       [effectiveImageDimensions.height, effectiveImageDimensions.width, selectedImage.path],
+    );
+    const withBrushCommandReceipt = useCallback(
+      (parameters: MaskParameters, receipt: BrushMaskCommandReceipt | null): MaskParameters => {
+        if (receipt === null) return parameters;
+        const existingRawEngine =
+          typeof parameters['rawEngine'] === 'object' &&
+          parameters['rawEngine'] !== null &&
+          !Array.isArray(parameters['rawEngine'])
+            ? parameters['rawEngine']
+            : {};
+
+        return {
+          ...parameters,
+          rawEngine: {
+            ...existingRawEngine,
+            brushMaskCommandReceipt: receipt,
+          },
+        };
+      },
+      [],
     );
     const brushCursorPreview = useMemo(() => {
       const radius = Math.max(0.1, brushStageSize / 2);
@@ -1895,11 +1938,11 @@ const ImageCanvas = memo(
               ...activeSubMaskParameters,
               lines: [...existingLines, imageSpaceLine],
             };
+            const receipt = recordBrushMaskCommandCapture(activeId, activeSubMask, nextParameters);
 
             updateSubMask(activeId, {
-              parameters: nextParameters,
+              parameters: withBrushCommandReceipt(nextParameters, receipt),
             });
-            recordBrushMaskCommandCapture(activeId, activeSubMask, nextParameters);
 
             lastBrushPoint.current = endImageSpace;
             isDrawing.current = false;
@@ -2298,11 +2341,11 @@ const ImageCanvas = memo(
           ...activeSubMaskParameters,
           lines: [...existingLines, imageSpaceLine],
         };
+        const receipt = recordBrushMaskCommandCapture(activeId, activeSubMask, nextParameters);
 
         updateSubMask(activeId, {
-          parameters: nextParameters,
+          parameters: withBrushCommandReceipt(nextParameters, receipt),
         });
-        recordBrushMaskCommandCapture(activeId, activeSubMask, nextParameters);
 
         const lastPoint = line.points[line.points.length - 1];
         if (lastPoint) {
@@ -2327,6 +2370,7 @@ const ImageCanvas = memo(
       onQuickErase,
       updateSubMask,
       recordBrushMaskCommandCapture,
+      withBrushCommandReceipt,
       effectiveImageDimensions,
       localInitialDrawParams,
       brushImageSpaceSize,
@@ -3630,12 +3674,21 @@ const ImageCanvas = memo(
 
           {showInteractiveToolOverlayStage && (
             <div
+              data-brush-command-expected-graph-revision={lastBrushCommandCapture?.expectedGraphRevision ?? ''}
+              data-brush-command-hash={lastBrushCommandCapture?.commandHash ?? ''}
+              data-brush-command-image-path={lastBrushCommandCapture?.imagePath ?? ''}
+              data-brush-command-mask-id={lastBrushCommandCapture?.maskId ?? ''}
+              data-brush-command-operation-id={lastBrushCommandCapture?.operationId ?? ''}
+              data-brush-command-pressure-point-count={lastBrushCommandCapture?.pressurePointCount ?? 0}
+              data-brush-command-receipt-version={lastBrushCommandCapture?.receiptVersion ?? 0}
+              data-brush-command-schema-version={lastBrushCommandCapture?.schemaVersion ?? 0}
               data-brush-command-coordinate-space={lastBrushCommandCapture?.coordinateSpace ?? ''}
               data-brush-command-id={lastBrushCommandCapture?.commandId ?? ''}
               data-brush-command-last-mode={lastBrushCommandCapture?.lastStrokeMode ?? ''}
               data-brush-command-last-point-count={lastBrushCommandCapture?.lastPointCount ?? 0}
               data-brush-command-stroke-count={lastBrushCommandCapture?.strokeCount ?? 0}
               data-brush-command-type={lastBrushCommandCapture?.commandType ?? ''}
+              data-brush-command-validation-status={lastBrushCommandCapture?.validationStatus ?? ''}
               data-brush-live-preview-mode={liveBrushLine?.tool ?? ''}
               data-brush-live-preview-point-count={liveBrushLine?.points.length ?? 0}
               data-brush-live-preview-visible={String(liveBrushLine !== null)}
