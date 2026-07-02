@@ -1,69 +1,19 @@
 import { z } from 'zod';
 
+import {
+  type LayerMaskCommandEnvelopeV1,
+  layerMaskCommandEnvelopeV1Schema,
+  RAW_ENGINE_SCHEMA_VERSION,
+} from '../../../packages/rawengine-schema/src';
 import { brushMaskParametersSchema, flowBrushMaskParametersSchema } from '../../schemas/masks/maskParameterSchemas';
 
-export const BRUSH_MASK_COMMAND_SCHEMA_VERSION = 1;
+export const BRUSH_MASK_COMMAND_SCHEMA_VERSION = RAW_ENGINE_SCHEMA_VERSION;
 export const BRUSH_MASK_COMMAND_COORDINATE_SPACE = 'normalized_image' as const;
 
-const brushMaskPointCommandSchema = z
-  .object({
-    pressure: z.number().min(0).max(1).optional(),
-    x: z.number().min(0).max(1),
-    y: z.number().min(0).max(1),
-  })
-  .strict();
-
-const brushMaskStrokeCommandSchema = z
-  .object({
-    flow: z.number().min(0).max(1),
-    hardness: z.number().min(0).max(1),
-    mode: z.enum(['paint', 'erase']),
-    points: z.array(brushMaskPointCommandSchema).min(2).max(4096),
-    radiusPx: z.number().positive().max(2000),
-    strokeId: z.string().trim().min(1),
-  })
-  .strict();
-
-export const brushMaskCommandEnvelopeSchema = z
-  .object({
-    actor: z
-      .object({
-        id: z.string().trim().min(1),
-        kind: z.literal('ui'),
-        sessionId: z.string().trim().min(1).optional(),
-      })
-      .strict(),
-    approval: z
-      .object({
-        approvalClass: z.enum(['edit_apply', 'preview_only']),
-        reason: z.string().trim().min(1),
-        state: z.enum(['approved', 'not_required']),
-      })
-      .strict(),
-    commandId: z.string().trim().min(1),
-    commandType: z.literal('layerMask.createBrushMask'),
-    correlationId: z.string().trim().min(1),
-    dryRun: z.boolean(),
-    expectedGraphRevision: z.string().trim().min(1),
-    idempotencyKey: z.string().trim().min(1).optional(),
-    parameters: z
-      .object({
-        baseMaskId: z.string().trim().min(1).optional(),
-        maskName: z.string().trim().min(1),
-        strokes: z.array(brushMaskStrokeCommandSchema).min(1),
-      })
-      .strict(),
-    schemaVersion: z.literal(BRUSH_MASK_COMMAND_SCHEMA_VERSION),
-    target: z
-      .object({
-        imagePath: z.string().trim().min(1),
-        kind: z.literal('image'),
-      })
-      .strict(),
-  })
-  .strict();
-
-export type BrushMaskCommandEnvelope = z.infer<typeof brushMaskCommandEnvelopeSchema>;
+export type BrushMaskCommandEnvelope = Extract<
+  LayerMaskCommandEnvelopeV1,
+  { commandType: 'layerMask.createBrushMask' }
+>;
 
 const capturedBrushPointSchema = z
   .object({
@@ -116,6 +66,26 @@ export interface BrushMaskCommandContext {
   sessionId: string;
 }
 
+export interface BrushMaskCommandReceipt {
+  command: BrushMaskCommandEnvelope;
+  commandHash: string;
+  commandId: string;
+  commandType: BrushMaskCommandEnvelope['commandType'];
+  coordinateSpace: typeof BRUSH_MASK_COMMAND_COORDINATE_SPACE;
+  dryRun: boolean;
+  expectedGraphRevision: string;
+  imagePath: string;
+  lastPointCount: number;
+  lastStrokeMode: BrushMaskCommandEnvelope['parameters']['strokes'][number]['mode'];
+  maskId: string;
+  operationId: string;
+  pressurePointCount: number;
+  receiptVersion: 1;
+  schemaVersion: typeof RAW_ENGINE_SCHEMA_VERSION;
+  strokeCount: number;
+  validationStatus: 'shared-schema-valid';
+}
+
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 const normalizeCoordinate = (value: number, extent: number): number => clamp(value / Math.max(1, extent), 0, 1);
 const roundMetric = (value: number): number => Number(value.toFixed(6));
@@ -126,7 +96,7 @@ export function buildBrushMaskCommandFromParameters(
   options: { dryRun: boolean },
 ): BrushMaskCommandEnvelope {
   const parsedParameters = parseBrushParameters(parameters);
-  const envelope: BrushMaskCommandEnvelope = {
+  const envelope = {
     actor: {
       id: 'rapidraw-ui',
       kind: 'ui',
@@ -155,7 +125,44 @@ export function buildBrushMaskCommandFromParameters(
     },
   };
 
-  return brushMaskCommandEnvelopeSchema.parse(envelope);
+  const parsedEnvelope = layerMaskCommandEnvelopeV1Schema.parse(envelope);
+  if (parsedEnvelope.commandType !== 'layerMask.createBrushMask') {
+    throw new Error('Brush mask command bridge built an unexpected command type.');
+  }
+  return parsedEnvelope;
+}
+
+export function buildBrushMaskCommandReceiptFromParameters(
+  parameters: unknown,
+  context: BrushMaskCommandContext,
+  options: { dryRun: boolean },
+): BrushMaskCommandReceipt {
+  const command = buildBrushMaskCommandFromParameters(parameters, context, options);
+  const lastStroke = command.parameters.strokes.at(-1);
+  const pressurePointCount = command.parameters.strokes.reduce(
+    (count, stroke) => count + stroke.points.filter((point) => point.pressure !== undefined).length,
+    0,
+  );
+
+  return {
+    command,
+    commandHash: hashStableJson(command),
+    commandId: command.commandId,
+    commandType: command.commandType,
+    coordinateSpace: BRUSH_MASK_COMMAND_COORDINATE_SPACE,
+    dryRun: command.dryRun,
+    expectedGraphRevision: command.expectedGraphRevision,
+    imagePath: context.imagePath,
+    lastPointCount: lastStroke?.points.length ?? 0,
+    lastStrokeMode: lastStroke?.mode ?? 'paint',
+    maskId: context.maskId,
+    operationId: context.operationId,
+    pressurePointCount,
+    receiptVersion: 1,
+    schemaVersion: command.schemaVersion,
+    strokeCount: command.parameters.strokes.length,
+    validationStatus: 'shared-schema-valid',
+  };
 }
 
 function parseBrushParameters(parameters: unknown): CapturedBrushParameters {
@@ -193,4 +200,17 @@ function lineToCommandStroke(
     radiusPx: roundMetric(radiusPx),
     strokeId: `${context.maskId}_stroke_${index + 1}`,
   };
+}
+
+function hashStableJson(value: unknown): string {
+  return `fnv1a32:${fnv1a32(JSON.stringify(value))}`;
+}
+
+function fnv1a32(value: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
 }

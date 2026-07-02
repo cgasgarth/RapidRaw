@@ -24,6 +24,7 @@ export const brushMaskParametersSchema = z
     lines: z.array(brushLineSchema).max(1024),
     rawEngine: z
       .object({
+        brushMaskCommandReceipt: z.unknown().optional(),
         brushLocalAdjustmentReceipt: z.unknown().optional(),
         commandId: z.string().trim().min(1).optional(),
         contentHash: z.string().trim().min(1).optional(),
