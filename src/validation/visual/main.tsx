@@ -121,6 +121,30 @@ window.__TAURI_INTERNALS__ = {
       window.__RAWENGINE_NEGATIVE_LAB_PREVIEW_RETURNS__?.push(generatedPreviewDataUrl);
       return Promise.resolve({
         artifactId: 'artifact_negative_lab_runtime_preview_visual_smoke',
+        baseFogSampleSummary: {
+          clippedFraction: 0,
+          confidence: 0.81,
+          densityRange: 0.07,
+          densityRgb: {
+            b: 0.55,
+            g: 0.51,
+            r: 0.48,
+          },
+          meanRgb: {
+            b: 0.2818,
+            g: 0.309,
+            r: 0.3311,
+          },
+          sampleCount: 400,
+          sampleRect: {
+            height: 0.6,
+            width: 0.12,
+            x: 0.02,
+            y: 0.2,
+          },
+          source: 'deterministic_edge_safe_default_rect',
+          warningCodes: [],
+        },
         contentHash: 'sha256:f7f9bf94f7a57bc7639643ede0d4b28a142ab5d8a5221032833fd09883dcf99b',
         dimensions: {
           height: 1,

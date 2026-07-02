@@ -1577,15 +1577,29 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             });
             if (previewRequestSequence !== previewRequestSequenceRef.current) return;
 
+            const runtimeBaseFogSummary = result.runtimeDryRun.dryRun.proof?.runtimePreview.baseFogSampleSummary;
             setPreviewUrl(result.displayPreviewUrl);
             setRuntimePreviewDryRunResult(result.runtimeDryRun);
             if (baseSampleProofContext !== null) {
+              if (runtimeBaseFogSummary !== undefined) {
+                setBaseFogConfidence(runtimeBaseFogSummary.confidence);
+                setBaseFogEstimate({
+                  ...baseSampleProofContext.estimate,
+                  confidence: runtimeBaseFogSummary.confidence,
+                });
+              }
               setBaseFogPreviewProof(
                 buildNegativeLabBaseSamplePreviewProof(
                   baseSampleProofContext,
                   result.displayPreviewUrl,
                   buildNegativeBaseFogDensitometerReadout(baseSampleProofContext.estimate),
                   previewRevision,
+                  runtimeBaseFogSummary === undefined
+                    ? undefined
+                    : {
+                        confidence: runtimeBaseFogSummary.confidence,
+                        warningCodes: runtimeBaseFogSummary.warningCodes as NegativeLabBaseSampleWarningCode[],
+                      },
                 ),
               );
             }

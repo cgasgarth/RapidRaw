@@ -16,6 +16,30 @@ import {
 export const negativeLabDryRunPreviewArtifactSchema = z
   .object({
     artifactId: z.string().trim().min(1),
+    baseFogSampleSummary: z
+      .object({
+        clippedFraction: z.number().min(0).max(1),
+        confidence: z.number().min(0).max(1),
+        densityRange: z.number().min(0),
+        densityRgb: z.object({ b: z.number().min(0), g: z.number().min(0), r: z.number().min(0) }).strict(),
+        meanRgb: z
+          .object({ b: z.number().min(0).max(1), g: z.number().min(0).max(1), r: z.number().min(0).max(1) })
+          .strict(),
+        sampleCount: z.number().int().positive(),
+        sampleRect: z
+          .object({
+            height: z.number().min(0.02).max(1),
+            width: z.number().min(0.02).max(1),
+            x: z.number().min(0).max(0.98),
+            y: z.number().min(0).max(0.98),
+          })
+          .strict(),
+        source: z.enum(['requested_base_fog_sample_rect', 'deterministic_edge_safe_default_rect']),
+        warningCodes: z.array(
+          z.enum(['clipped_base_channel', 'low_acquisition_confidence', 'missing_visible_base', 'uneven_illumination']),
+        ),
+      })
+      .strict(),
     contentHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
     dimensions: z
       .object({
@@ -41,6 +65,7 @@ const toRuntimePreviewRenderResult = (
   artifact: NegativeLabDryRunPreviewArtifact,
 ): NegativeLabRuntimePreviewRenderResultV1 => ({
   artifactId: artifact.artifactId,
+  baseFogSampleSummary: artifact.baseFogSampleSummary,
   contentHash: artifact.contentHash,
   dimensions: artifact.dimensions,
   renderer: artifact.renderer,

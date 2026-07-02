@@ -20,6 +20,30 @@ const invokeMock = mock((command: string) => {
 
   return Promise.resolve({
     artifactId: 'artifact_negative_lab_runtime_preview_adapter',
+    baseFogSampleSummary: {
+      clippedFraction: 0,
+      confidence: 0.81,
+      densityRange: 0.07,
+      densityRgb: {
+        b: 0.55,
+        g: 0.51,
+        r: 0.48,
+      },
+      meanRgb: {
+        b: 0.2818,
+        g: 0.309,
+        r: 0.3311,
+      },
+      sampleCount: 400,
+      sampleRect: {
+        height: 0.6,
+        width: 0.12,
+        x: 0.02,
+        y: 0.2,
+      },
+      source: 'deterministic_edge_safe_default_rect',
+      warningCodes: [],
+    },
     contentHash: 'sha256:4b05ce465b138a4232a9cf196884b41c6dd3b9a1a3f2f2916e4e3e78328701dd',
     dimensions: {
       height: 480,
@@ -151,6 +175,11 @@ describe('renderNegativeLabRuntimeDryRunPreview', () => {
     expect(result.runtimeDryRun.dryRun.proof?.runtimePreview.previewRenderer).toBe(
       'rawengine_negative_lab_runtime_preview_v1',
     );
+    expect(result.runtimeDryRun.dryRun.proof?.runtimePreview.baseFogSampleSummary).toMatchObject({
+      confidence: 0.81,
+      sampleCount: 400,
+      source: 'deterministic_edge_safe_default_rect',
+    });
     expect(result.runtimeDryRun.dryRun.changeSet.createdPositiveVariantIds).toEqual([]);
     expect(NEGATIVE_LAB_AGENT_TOOL_MANIFEST.tools[0]?.toolName).toBe(NEGATIVE_LAB_AGENT_PREVIEW_TOOL_NAME);
   });
