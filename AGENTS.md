@@ -19,6 +19,7 @@ North star: `RAW_EDITOR_PLAN.md` drives a macOS-first, Capture One/Lightroom-cla
 - Before push/PR, stage intended files and commit so precommit runs; bypass only if user paused local validation, then say CI is the source. If GHA finds a deterministic repo failure, add the cheapest local gate unless already covered. Keep success tiny, failure actionable, and preserve evidence: commands, blockers, runtime proof, consult decisions.
 - Match proof to claim: plan-only, schema-only, API-only, dry-run-only, UI-only, and runtime-capable are distinct. Do not call features complete without runtime, preview/export, E2E/equivalent proof, screenshots/artifacts, and tracked gaps.
 - Image features require app execution on RAWs and output validation, preferably `/Users/cgas/Pictures/Capture One/Alaska`. Never commit private RAWs/artifacts; use one private-root/report pattern. Use Computer Use for visible UI claims and `bun run install:computer-use` for the app bundle.
+- README/docs marketing media must use current UI captures without people in images, GIFs, filmstrips, thumbnails, previews, or generated assets; use landscapes, objects, synthetic fixtures, or clearly licensed/repo-owned assets instead.
 
 ## Issues, Consult, CI
 
