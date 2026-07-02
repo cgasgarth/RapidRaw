@@ -987,6 +987,31 @@ const SUPPORTED_HSL_BANDS = new Set<ToneColorHslBandV1>([
 const buildHslWarnings = (band: ToneColorHslBandV1): string[] =>
   SUPPORTED_HSL_BANDS.has(band) ? [] : [`Unsupported HSL/selective-color band: ${band}.`];
 
+const buildHslPlanParameters = (
+  command: Extract<ToneColorCommandEnvelopeV1, { commandType: 'toneColor.adjustHsl' }>,
+): Omit<
+  Extract<ToneColorCommandEnvelopeV1, { commandType: 'toneColor.adjustHsl' }>['parameters'],
+  'acceptedDryRunPlanHash' | 'acceptedDryRunPlanId'
+> => {
+  const {
+    acceptedDryRunPlanHash: _acceptedDryRunPlanHash,
+    acceptedDryRunPlanId: _acceptedDryRunPlanId,
+    ...parameters
+  } = command.parameters;
+  return parameters;
+};
+
+const buildHslPlanKey = (
+  command: Extract<ToneColorCommandEnvelopeV1, { commandType: 'toneColor.adjustHsl' }>,
+): string => JSON.stringify([command.expectedGraphRevision, command.target, buildHslPlanParameters(command)]);
+
+const buildHslPlanId = (command: Extract<ToneColorCommandEnvelopeV1, { commandType: 'toneColor.adjustHsl' }>): string =>
+  `dryrun_tone_color_hsl_${stableBasicToneHash(buildHslPlanKey(command))}`;
+
+const buildHslPlanHash = (
+  command: Extract<ToneColorCommandEnvelopeV1, { commandType: 'toneColor.adjustHsl' }>,
+): string => `sha256:tone-color-hsl:${stableBasicToneHash(`${buildHslPlanId(command)}:${buildHslPlanKey(command)}`)}`;
+
 const buildHslDryRunResult = (
   command: Extract<ToneColorCommandEnvelopeV1, { commandType: 'toneColor.adjustHsl' }>,
 ): ToneColorDryRunResultV1 =>
@@ -996,6 +1021,8 @@ const buildHslDryRunResult = (
     commandType: command.commandType,
     correlationId: command.correlationId,
     dryRun: true,
+    dryRunPlanHash: buildHslPlanHash(command),
+    dryRunPlanId: buildHslPlanId(command),
     mutates: false,
     parameterDiff: [
       ...HSL_PARAMETER_DIFF_PATHS.map(([key, path]) => ({
@@ -1019,10 +1046,6 @@ const buildHslDryRunResult = (
     sourceGraphRevision: command.expectedGraphRevision,
     warnings: buildHslWarnings(command.parameters.band),
   });
-
-const buildHslPlanKey = (
-  command: Extract<ToneColorCommandEnvelopeV1, { commandType: 'toneColor.adjustHsl' }>,
-): string => JSON.stringify([command.expectedGraphRevision, command.target, command.parameters]);
 
 const buildHslMutationResult = (
   command: Extract<ToneColorCommandEnvelopeV1, { commandType: 'toneColor.adjustHsl' }>,
@@ -1822,7 +1845,7 @@ export class RawEngineLocalAppServerBridge {
   readonly #acceptedEditGraphDryRunPlanKeys: Set<string> = new Set<string>();
   readonly #acceptedLensProfileDryRunPlanKeys: Map<string, { planHash: string; planId: string }> = new Map();
   readonly #acceptedColorAdjustmentDryRunPlanKeys: Set<string> = new Set<string>();
-  readonly #acceptedHslDryRunPlanKeys: Set<string> = new Set<string>();
+  readonly #acceptedHslDryRunPlanKeys: Map<string, { planHash: string; planId: string }> = new Map();
   readonly #acceptedSkinToneUniformityDryRunPlanKeys: Set<string> = new Set<string>();
   readonly #auditEvents: Array<RawEngineLocalAppServerAuditEventV1> = [];
   readonly #availableAiProviderIds: ReadonlySet<string>;
@@ -2042,13 +2065,28 @@ export class RawEngineLocalAppServerBridge {
         }
         if (parsedCommand.dryRun) {
           const dryRunResult = buildHslDryRunResult(parsedCommand);
-          this.#acceptedHslDryRunPlanKeys.add(buildHslPlanKey(parsedCommand));
+          const acceptedDryRunPlanHash = dryRunResult.dryRunPlanHash;
+          const acceptedDryRunPlanId = dryRunResult.dryRunPlanId;
+          if (acceptedDryRunPlanHash === undefined || acceptedDryRunPlanId === undefined) {
+            throw new Error('Local app-server bridge HSL dry-run did not produce a plan identity.');
+          }
+          this.#acceptedHslDryRunPlanKeys.set(buildHslPlanKey(parsedCommand), {
+            planHash: acceptedDryRunPlanHash,
+            planId: acceptedDryRunPlanId,
+          });
           return dryRunResult;
         }
 
         const planKey = buildHslPlanKey(parsedCommand);
-        if (!this.#acceptedHslDryRunPlanKeys.has(planKey)) {
-          throw new Error('Local app-server bridge rejected HSL/selective-color apply without a matching dry-run.');
+        const plan = this.#acceptedHslDryRunPlanKeys.get(planKey);
+        if (
+          plan === undefined ||
+          plan.planHash !== parsedCommand.parameters.acceptedDryRunPlanHash ||
+          plan.planId !== parsedCommand.parameters.acceptedDryRunPlanId
+        ) {
+          throw new Error(
+            'Local app-server bridge rejected HSL/selective-color apply without a matching accepted dry-run.',
+          );
         }
 
         return buildHslMutationResult(parsedCommand);

@@ -129,23 +129,6 @@ toneColorCommandEnvelopeV1Schema.parse(dryRunCommand);
 selectiveColorCommandEnvelopeSchema.parse(dryRunCommand);
 rawEngineColorPipelineContextV1Schema.parse(dryRunCommand.colorPipeline);
 
-const applyCommand = buildSelectiveColorCommandEnvelope(
-  { adjustment, rangeControl, rangeKey: 'oranges' },
-  {
-    ...commandContext,
-    commandId: 'command_selective_color_orange_apply_001',
-    correlationId: 'corr_selective_color_orange_apply_001',
-    idempotencyKey: 'idem_selective_color_orange_apply_001',
-  },
-  {
-    dryRun: false,
-    reason: 'Apply accepted orange selective color adjustment to the edit graph sidecar.',
-  },
-);
-
-toneColorCommandEnvelopeV1Schema.parse(applyCommand);
-parseSelectiveColorCommandEnvelope(applyCommand);
-
 const runtimeContext = buildSelectiveColorImageCommandContext({
   colorPipeline: dryRunCommand.colorPipeline,
   expectedGraphRevision: 'graph_rev_context_probe',
@@ -178,8 +161,26 @@ if (malformedEnvelope.success) {
   throw new Error('Selective color command schema must reject malformed HSL envelopes.');
 }
 
+const rejectedApplyCommand = buildSelectiveColorCommandEnvelope(
+  { adjustment, rangeControl, rangeKey: 'oranges' },
+  {
+    ...commandContext,
+    commandId: 'command_selective_color_orange_apply_001',
+    correlationId: 'corr_selective_color_orange_apply_001',
+    idempotencyKey: 'idem_selective_color_orange_apply_001',
+  },
+  {
+    acceptedDryRunPlanHash: 'sha256:selective-color:rejected',
+    acceptedDryRunPlanId: 'dryrun_tone_color_hsl_rejected',
+    dryRun: false,
+    reason: 'Apply accepted orange selective color adjustment to the edit graph sidecar.',
+  },
+);
+delete rejectedApplyCommand.parameters.acceptedDryRunPlanHash;
+delete rejectedApplyCommand.parameters.acceptedDryRunPlanId;
+
 const bridge = createRawEngineLocalAppServerBridge();
-const rejectedApply = await createRawEngineLocalAppServerBridge().dispatch(applyCommand);
+const rejectedApply = await createRawEngineLocalAppServerBridge().dispatch(rejectedApplyCommand);
 if (rejectedApply.ok || rejectedApply.reason !== 'handler_failed') {
   throw new Error('Selective color apply must be rejected before a matching dry-run.');
 }
@@ -191,12 +192,36 @@ if (!rawEngineLocalAppServerBridgeCapabilities.commandTypes.includes('toneColor.
 const dryRunResult = await bridge.dispatch(dryRunCommand);
 if (!dryRunResult.ok) throw new Error(`Selective color dry-run failed: ${dryRunResult.message}`);
 const parsedDryRunResult = toneColorDryRunResultV1Schema.parse(dryRunResult.result);
+if (parsedDryRunResult.dryRunPlanHash === undefined || parsedDryRunResult.dryRunPlanId === undefined) {
+  throw new Error('Selective color dry-run must return a stable accepted plan identity.');
+}
 if (!parsedDryRunResult.parameterDiff.some((diff) => diff.path === '/parameters/orange/saturation')) {
   throw new Error('Selective color dry-run must include an orange saturation diff.');
 }
 if (!parsedDryRunResult.parameterDiff.some((diff) => diff.path === '/parameters/orange/rangeControl/widthDegrees')) {
   throw new Error('Selective color dry-run must include orange range-control diffs.');
 }
+const acceptedDryRunPlanHash = parsedDryRunResult.dryRunPlanHash;
+const acceptedDryRunPlanId = parsedDryRunResult.dryRunPlanId;
+if (acceptedDryRunPlanHash === undefined || acceptedDryRunPlanId === undefined) {
+  throw new Error('Selective color dry-run must return a stable accepted plan identity.');
+}
+
+const applyCommand = buildSelectiveColorCommandEnvelope(
+  { adjustment, rangeControl, rangeKey: 'oranges' },
+  {
+    ...commandContext,
+    commandId: 'command_selective_color_orange_apply_001',
+    correlationId: 'corr_selective_color_orange_apply_001',
+    idempotencyKey: 'idem_selective_color_orange_apply_001',
+  },
+  {
+    acceptedDryRunPlanHash,
+    acceptedDryRunPlanId,
+    dryRun: false,
+    reason: 'Apply accepted orange selective color adjustment to the edit graph sidecar.',
+  },
+);
 
 const applyResult = await bridge.dispatch(applyCommand);
 if (!applyResult.ok) throw new Error(`Selective color apply failed after matching dry-run: ${applyResult.message}`);

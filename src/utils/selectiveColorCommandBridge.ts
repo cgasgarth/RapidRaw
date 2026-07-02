@@ -70,6 +70,8 @@ export const selectiveColorCommandEnvelopeSchema = z
     parameters: z
       .object({
         band: z.enum(TONE_COLOR_HSL_BANDS),
+        acceptedDryRunPlanHash: z.string().trim().min(1).optional(),
+        acceptedDryRunPlanId: z.string().trim().min(1).optional(),
         hueShiftDegrees: z.number().min(-180).max(180),
         luminance: z.number().min(-100).max(100),
         rangeControl: z
@@ -136,6 +138,8 @@ export interface SelectiveColorImageCommandContextOptions {
 }
 
 export interface SelectiveColorCommandBridgeOptions {
+  acceptedDryRunPlanHash?: string;
+  acceptedDryRunPlanId?: string;
   dryRun: boolean;
   reason?: string;
 }
@@ -213,6 +217,12 @@ export const buildSelectiveColorCommandEnvelope = (
     expectedGraphRevision: context.expectedGraphRevision,
     parameters: {
       band: COMMAND_RANGE_TO_HSL_BAND[parsedPayload.rangeKey],
+      ...(options.dryRun
+        ? {}
+        : {
+            acceptedDryRunPlanHash: options.acceptedDryRunPlanHash,
+            acceptedDryRunPlanId: options.acceptedDryRunPlanId,
+          }),
       hueShiftDegrees: parsedPayload.adjustment.hue,
       luminance: parsedPayload.adjustment.luminance,
       ...(parsedPayload.rangeControl !== undefined ? { rangeControl: parsedPayload.rangeControl } : {}),
@@ -221,6 +231,12 @@ export const buildSelectiveColorCommandEnvelope = (
     schemaVersion: SELECTIVE_COLOR_COMMAND_SCHEMA_VERSION,
     target: context.target,
   };
+
+  if (!options.dryRun) {
+    if (options.acceptedDryRunPlanHash === undefined || options.acceptedDryRunPlanId === undefined) {
+      throw new Error('Selective color apply commands require accepted dry-run plan identity.');
+    }
+  }
 
   if (context.idempotencyKey !== undefined) {
     envelope.idempotencyKey = context.idempotencyKey;
