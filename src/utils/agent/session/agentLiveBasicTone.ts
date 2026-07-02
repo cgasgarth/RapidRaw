@@ -12,8 +12,8 @@ import {
   toneColorMutationResultV1Schema,
 } from '../../../../packages/rawengine-schema/src/rawEngineSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
+import type { Adjustments } from '../../adjustments';
 import {
-  applyBasicToneCommandEnvelopeToAdjustments,
   type BasicToneCommandContextActor,
   type BasicToneCommandContextTarget,
   type BasicToneCommandEnvelope,
@@ -27,9 +27,9 @@ import { createLiveEditorAppServerBridge } from './agentLiveEditorState';
 export type AgentLiveBasicTonePixel = readonly [number, number, number];
 
 export interface AgentLiveBasicToneApplyOptions {
-  acceptedPlanHash: string;
-  acceptedPlanId: string;
-  expectedGraphRevision: string;
+  acceptedPlanHash?: string;
+  acceptedPlanId?: string;
+  expectedGraphRevision?: string;
   operationId: string;
   requestedAdjustments: LegacyBasicToneAdjustmentPayload;
   sessionId: string;
@@ -256,6 +256,18 @@ const buildLegacyBasicToneCommandEnvelope = (command: TypedBasicToneCommand): Ba
   return envelope;
 };
 
+const applyTypedBasicToneCommandToAdjustments = (base: Adjustments, command: TypedBasicToneCommand): Adjustments => ({
+  ...base,
+  blacks: command.parameters.blackPoint,
+  clarity: command.parameters.clarity,
+  contrast: command.parameters.contrast,
+  exposure: command.parameters.exposureEv,
+  highlights: command.parameters.highlights,
+  saturation: command.parameters.saturation,
+  shadows: command.parameters.shadows,
+  whites: command.parameters.whitePoint,
+});
+
 export const dryRunBasicToneCommandInLiveEditor = async (
   commandInput: ToneColorCommandEnvelopeV1,
 ): Promise<ToneColorDryRunResultV1> => {
@@ -276,6 +288,9 @@ export const applyBasicToneCommandToLiveEditor = async (
 ): Promise<ToneColorMutationResultV1> => {
   const command = parseLiveBasicToneCommand(commandInput);
   if (command.dryRun) throw new Error('Live editor typed basic-tone apply requires dryRun=false.');
+  if (command.approval.approvalClass !== ApprovalClass.EditApply || command.approval.state !== 'approved') {
+    throw new Error('Live editor typed basic-tone apply requires approved edit-apply approval.');
+  }
   if (command.expectedGraphRevision !== `history_${useEditorStore.getState().historyIndex}`) {
     throw new Error('Live editor typed basic-tone apply rejected stale graph revision.');
   }
@@ -303,7 +318,7 @@ export const applyBasicToneCommandToLiveEditor = async (
   const basicToneCommand = buildLegacyBasicToneCommandEnvelope(command);
 
   useEditorStore.setState((state) => {
-    const adjustments = applyBasicToneCommandEnvelopeToAdjustments(state.adjustments, basicToneCommand);
+    const adjustments = applyTypedBasicToneCommandToAdjustments(state.adjustments, command);
     const history = pushEditHistoryEntry(state.history, state.historyIndex, adjustments);
     return {
       adjustments,
@@ -320,7 +335,7 @@ export const applyBasicToneCommandToLiveEditor = async (
 export const applyBasicToneToLiveEditor = async ({
   acceptedPlanHash,
   acceptedPlanId,
-  expectedGraphRevision,
+  expectedGraphRevision: requestedExpectedGraphRevision,
   operationId,
   requestedAdjustments,
   sessionId,
@@ -329,6 +344,7 @@ export const applyBasicToneToLiveEditor = async ({
   const imagePath = initialState.selectedImage?.path;
   if (imagePath === undefined) throw new Error('Cannot apply agent basic tone without a selected image.');
 
+  const expectedGraphRevision = requestedExpectedGraphRevision ?? `history_${initialState.historyIndex}`;
   const context = buildBasicToneImageCommandContext({ expectedGraphRevision, imagePath, operationId, sessionId });
   const dryRunCommand = buildBasicToneCommandEnvelope(requestedAdjustments, context, { dryRun: true });
   const bridge = createLiveEditorAppServerBridge();
@@ -339,13 +355,18 @@ export const applyBasicToneToLiveEditor = async ({
   if (dryRunResult.dryRunPlanHash === undefined || dryRunResult.dryRunPlanId === undefined) {
     throw new Error('Agent basic-tone dry-run did not return an accepted plan identity.');
   }
-  if (dryRunResult.dryRunPlanHash !== acceptedPlanHash || dryRunResult.dryRunPlanId !== acceptedPlanId) {
+  const resolvedAcceptedPlanHash = acceptedPlanHash ?? dryRunResult.dryRunPlanHash;
+  const resolvedAcceptedPlanId = acceptedPlanId ?? dryRunResult.dryRunPlanId;
+  if (
+    dryRunResult.dryRunPlanHash !== resolvedAcceptedPlanHash ||
+    dryRunResult.dryRunPlanId !== resolvedAcceptedPlanId
+  ) {
     throw new Error('Agent basic-tone apply rejected a plan identity that does not match the dry-run receipt.');
   }
 
   const applyCommand = buildBasicToneCommandEnvelope(requestedAdjustments, context, {
-    acceptedDryRunPlanHash: acceptedPlanHash,
-    acceptedDryRunPlanId: acceptedPlanId,
+    acceptedDryRunPlanHash: resolvedAcceptedPlanHash,
+    acceptedDryRunPlanId: resolvedAcceptedPlanId,
     dryRun: false,
   });
   const apply = await bridge.dispatch(applyCommand);
@@ -362,7 +383,8 @@ export const applyBasicToneToLiveEditor = async ({
   }
 
   useEditorStore.setState((state) => {
-    const adjustments = applyBasicToneCommandEnvelopeToAdjustments(state.adjustments, applyCommand);
+    const typedApplyCommand = parseLiveBasicToneCommand(applyCommand);
+    const adjustments = applyTypedBasicToneCommandToAdjustments(state.adjustments, typedApplyCommand);
     const history = pushEditHistoryEntry(state.history, state.historyIndex, adjustments);
     return {
       adjustments,
