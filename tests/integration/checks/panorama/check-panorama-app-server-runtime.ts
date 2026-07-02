@@ -79,6 +79,7 @@ const dryRunCommand = {
   dryRun: true,
   expectedGraphRevision: 'graph_rev_panorama_app_server_runtime',
   parameters: {
+    backendPreference: 'opencv_stitching_spike',
     boundaryMode: 'auto_crop',
     exposureNormalization: 'auto',
     lensCorrectionPolicy: 'required_before_stitch',
@@ -107,6 +108,12 @@ const dryRun = bus.execute({
   toolName: panoramaRoutePair.dryRunToolName,
 });
 if (dryRun.kind !== 'dry_run') throw new Error('Expected panorama dry-run dispatch result.');
+assertBackendSelectionReceipt(dryRun.dryRun.provenance.backendSelection, {
+  fallbackReason: 'requested_backend_unavailable',
+  requestedBackendId: 'opencv_stitching_spike',
+  selectedBackendId: 'rapidraw_homography_seam_v0',
+  selectionStatus: 'fallback',
+});
 const supportedTranscript = buildSeamReviewTranscript('supported', dryRun);
 if (
   supportedTranscript.reviewStatus !== 'apply_ready' ||
@@ -301,6 +308,15 @@ const applied = bus.execute({
   toolName: panoramaRoutePair.applyToolName,
 });
 if (applied.kind !== 'apply') throw new Error('Expected panorama apply dispatch result.');
+assertBackendSelectionReceipt(applied.apply.provenance.backendSelection, {
+  fallbackReason: 'requested_backend_unavailable',
+  requestedBackendId: 'opencv_stitching_spike',
+  selectedBackendId: 'rapidraw_homography_seam_v0',
+  selectionStatus: 'fallback',
+});
+if (applied.apply.sidecarArtifact.engine.engineId !== applied.apply.provenance.backendSelection.selectedBackendId) {
+  throw new Error('Expected panorama sidecar engine to match selected backend receipt.');
+}
 if (applied.apply.outputPixels.length <= sourceFrames[0].width * sourceFrames[0].height * 3) {
   throw new Error('Expected panorama runtime output to be wider than one source frame.');
 }
@@ -419,6 +435,7 @@ console.log(
     output: dryRun.dryRun.dryRunResult.mergePlan.outputDimensions,
     outputSha256: new Bun.CryptoHasher('sha256').update(applied.apply.outputPixels).digest('hex'),
     planId: dryRun.dryRun.dryRunResult.mergePlan.planId,
+    backendSelection: applied.apply.provenance.backendSelection,
     tileRender: applied.apply.provenance.tileRender,
     seamReviewScenarios: [
       supportedTranscript.scenario,
@@ -490,6 +507,35 @@ function assertSidecarPreviewArtifact(toolResult, artifactId) {
   );
   if (artifact === undefined || artifact.contentHash === undefined) {
     throw new Error(`Expected panorama apply sidecar preview artifacts to include hashed ${artifactId}.`);
+  }
+}
+
+function assertBackendSelectionReceipt(receipt, expected) {
+  if (receipt.requestedBackendId !== expected.requestedBackendId) {
+    throw new Error(`Expected requested backend ${expected.requestedBackendId}, got ${receipt.requestedBackendId}.`);
+  }
+  if (receipt.selectedBackendId !== expected.selectedBackendId) {
+    throw new Error(`Expected selected backend ${expected.selectedBackendId}, got ${receipt.selectedBackendId}.`);
+  }
+  if (receipt.fallbackReason !== expected.fallbackReason) {
+    throw new Error(`Expected fallback reason ${expected.fallbackReason}, got ${receipt.fallbackReason}.`);
+  }
+  if (receipt.selectionStatus !== expected.selectionStatus) {
+    throw new Error(`Expected backend selection status ${expected.selectionStatus}, got ${receipt.selectionStatus}.`);
+  }
+  if (receipt.capabilityEvidence.selectedBackendCapabilities.tiledRender !== true) {
+    throw new Error('Expected selected panorama backend capability evidence to report tiled render support.');
+  }
+  const requestedEvidence = receipt.capabilityEvidence.consideredBackends.find(
+    (backend) => backend.backendId === expected.requestedBackendId,
+  );
+  if (
+    requestedEvidence === undefined ||
+    requestedEvidence.status !== 'optional_spike' ||
+    requestedEvidence.requiredCiBlockerCount < 1 ||
+    !requestedEvidence.warnings.includes('packaging_unproven')
+  ) {
+    throw new Error(`Expected requested backend diagnostic evidence, got ${JSON.stringify(requestedEvidence)}.`);
   }
 }
 

@@ -3482,6 +3482,7 @@ export const computationalMergeCommandEnvelopeV1Schema = z
         parameters: z
           .object({
             ...computationalMergeAcceptedDryRunSchema.shape,
+            backendPreference: z.union([z.literal('auto'), panoramaBackendIdV1Schema]).default('auto'),
             blendMode: z.enum(['feather', 'multi_band']).optional(),
             boundaryMode: panoramaBoundaryModeSchema,
             exposureNormalization: z.enum(['none', 'auto']),

@@ -456,6 +456,7 @@
       "parameters": {
         "acceptedDryRunPlanHash": "sha256:sample-merge-panorama-plan",
         "acceptedDryRunPlanId": "merge_plan_panorama_001",
+        "backendPreference": "auto",
         "boundaryMode": "auto_crop",
         "exposureNormalization": "auto",
         "lensCorrectionPolicy": "required_before_stitch",

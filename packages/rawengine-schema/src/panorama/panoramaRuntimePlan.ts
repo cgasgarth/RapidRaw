@@ -9,7 +9,12 @@ import {
   computationalMergeDryRunResultV1Schema,
   computationalMergeMutationResultV1Schema,
   type PanoramaArtifactV1,
+  type PanoramaBackendCapabilityReportV1,
+  type PanoramaBackendIdV1,
   panoramaArtifactV1Schema,
+  panoramaBackendCapabilityReportV1Schema,
+  panoramaBackendIdV1Schema,
+  panoramaEngineCapabilitiesV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
 } from '../rawEngineSchemas.js';
 import {
@@ -21,9 +26,183 @@ import { type PanoramaSyntheticSourceFrameV1, renderSyntheticPanoramaStitchV1 } 
 
 const PANORAMA_RUNTIME_ENGINE_ID = 'rawengine_panorama_synthetic_v1';
 const PANORAMA_RUNTIME_ENGINE_VERSION = '0.1.0';
+const PANORAMA_DEFAULT_BACKEND_ID: PanoramaBackendIdV1 = 'rapidraw_homography_seam_v0';
 const PANORAMA_CYCLE_RESIDUAL_THRESHOLD_PX = 2;
 const PANORAMA_TILE_BYTES_PER_RGB_PIXEL = 3;
 const PANORAMA_TILE_BYTES_PER_RGBA_PIXEL = 4;
+const panoramaBackendCapabilityReportsV1 = [
+  panoramaBackendCapabilityReportV1Schema.parse({
+    backendId: 'rapidraw_homography_seam_v0',
+    backendVersion: PANORAMA_RUNTIME_ENGINE_VERSION,
+    capabilities: {
+      adaptiveSeamFeather: true,
+      autoCrop: true,
+      bundleAdjustment: false,
+      cylindricalProjection: true,
+      exposureNormalization: true,
+      planarHomography: true,
+      tiledRender: true,
+    },
+    ciPolicy: {
+      defaultRequiredCiAllowed: true,
+      requiredCiBlockers: [],
+      suggestedCiTier: 'required_pr',
+    },
+    limits: {
+      maxRecommendedOutputPixels: 36_000_000,
+      maxRecommendedPeakMemoryBytes: 2_400_000_000,
+      maxRecommendedSourceCount: 6,
+    },
+    macosPackagingStatus: 'not_required',
+    qualityTier: 'validated_planar_v1',
+    runtimeRequirements: {
+      externalLibraries: [],
+      requiresExternalLibraries: false,
+      requiresNetworkAtRuntime: false,
+    },
+    schemaBoundary: {
+      backendTypesLeakIntoArtifacts: false,
+      rawEngineCapabilityNamesOnly: true,
+    },
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    status: 'default_enabled',
+    supportedBlendModes: ['feather', 'multi_band'],
+    supportedBoundaryModes: ['auto_crop', 'transparent', 'manual_crop'],
+    supportedExposureModes: ['none', 'gain_offset_v1'],
+    supportedProjections: ['rectilinear', 'planar', 'cylindrical'],
+    supportedSeamMethods: ['adaptive_dp_feather_v1'],
+    warnings: [],
+  }),
+  panoramaBackendCapabilityReportV1Schema.parse({
+    backendId: 'opencv_stitching_spike',
+    backendVersion: 'spike-unbundled',
+    capabilities: {
+      adaptiveSeamFeather: true,
+      autoCrop: true,
+      bundleAdjustment: true,
+      cylindricalProjection: true,
+      exposureNormalization: true,
+      planarHomography: true,
+      tiledRender: false,
+    },
+    ciPolicy: {
+      defaultRequiredCiAllowed: false,
+      requiredCiBlockers: ['opencv_packaging_not_promoted'],
+      suggestedCiTier: 'manual_spike',
+    },
+    limits: {
+      maxRecommendedOutputPixels: 24_000_000,
+      maxRecommendedPeakMemoryBytes: 3_200_000_000,
+      maxRecommendedSourceCount: 8,
+    },
+    macosPackagingStatus: 'unproven',
+    qualityTier: 'optional_spike',
+    runtimeRequirements: {
+      externalLibraries: ['opencv'],
+      requiresExternalLibraries: true,
+      requiresNetworkAtRuntime: false,
+    },
+    schemaBoundary: {
+      backendTypesLeakIntoArtifacts: false,
+      rawEngineCapabilityNamesOnly: true,
+    },
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    status: 'optional_spike',
+    supportedBlendModes: ['feather', 'multi_band'],
+    supportedBoundaryModes: ['auto_crop', 'transparent'],
+    supportedExposureModes: ['none', 'opencv_gain', 'opencv_gain_blocks'],
+    supportedProjections: ['rectilinear', 'planar', 'cylindrical', 'spherical'],
+    supportedSeamMethods: ['opencv_graph_cut_color', 'opencv_dp_color', 'opencv_voronoi'],
+    warnings: ['external_dependency', 'packaging_unproven', 'required_ci_not_ready'],
+  }),
+  panoramaBackendCapabilityReportV1Schema.parse({
+    backendId: 'hugin_reference_tool',
+    backendVersion: 'reference-only',
+    capabilities: {
+      adaptiveSeamFeather: false,
+      autoCrop: true,
+      bundleAdjustment: true,
+      cylindricalProjection: true,
+      exposureNormalization: true,
+      planarHomography: true,
+      tiledRender: false,
+    },
+    ciPolicy: {
+      defaultRequiredCiAllowed: false,
+      requiredCiBlockers: ['reference_tool_not_packaged'],
+      suggestedCiTier: 'manual_spike',
+    },
+    limits: {
+      maxRecommendedOutputPixels: 24_000_000,
+      maxRecommendedPeakMemoryBytes: 3_200_000_000,
+      maxRecommendedSourceCount: 8,
+    },
+    macosPackagingStatus: 'unproven',
+    qualityTier: 'reference_only',
+    runtimeRequirements: {
+      externalLibraries: ['hugin'],
+      requiresExternalLibraries: true,
+      requiresNetworkAtRuntime: false,
+    },
+    schemaBoundary: {
+      backendTypesLeakIntoArtifacts: false,
+      rawEngineCapabilityNamesOnly: true,
+    },
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    status: 'reference_only',
+    supportedBlendModes: ['feather'],
+    supportedBoundaryModes: ['auto_crop', 'transparent'],
+    supportedExposureModes: ['none', 'planned'],
+    supportedProjections: ['rectilinear', 'planar', 'cylindrical', 'spherical'],
+    supportedSeamMethods: ['overwrite_fallback'],
+    warnings: ['external_dependency', 'packaging_unproven', 'required_ci_not_ready'],
+  }),
+] satisfies PanoramaBackendCapabilityReportV1[];
+
+const panoramaBackendSelectionReceiptV1Schema = z
+  .object({
+    capabilityEvidence: z
+      .object({
+        consideredBackends: z.array(
+          z
+            .object({
+              backendId: panoramaBackendIdV1Schema,
+              qualityTier: z.enum(['legacy_local_preview', 'validated_planar_v1', 'optional_spike', 'reference_only']),
+              requiredCiBlockerCount: z.number().int().nonnegative(),
+              status: z.enum(['default_enabled', 'optional_spike', 'reference_only', 'disabled']),
+              warnings: z.array(
+                z.enum([
+                  'backend_types_must_not_escape',
+                  'external_dependency',
+                  'packaging_unproven',
+                  'required_ci_not_ready',
+                ]),
+              ),
+            })
+            .strict(),
+        ),
+        requestedBackendStatus: z
+          .enum(['default_enabled', 'optional_spike', 'reference_only', 'disabled', 'not_requested'])
+          .optional(),
+        requestedRequiresExternalLibraries: z.boolean().nullable(),
+        selectedBackendCapabilities: panoramaEngineCapabilitiesV1Schema,
+        selectedBackendQualityTier: z.enum([
+          'legacy_local_preview',
+          'validated_planar_v1',
+          'optional_spike',
+          'reference_only',
+        ]),
+        selectedBackendStatus: z.enum(['default_enabled', 'optional_spike', 'reference_only', 'disabled']),
+        selectedSupportedBlendModes: z.array(z.enum(['overwrite', 'feather', 'multi_band'])).min(1),
+        selectedSupportedProjections: z.array(z.enum(['rectilinear', 'cylindrical', 'spherical', 'planar'])).min(1),
+      })
+      .strict(),
+    fallbackReason: z.enum(['requested_backend_unavailable']).nullable(),
+    requestedBackendId: z.union([z.literal('auto'), panoramaBackendIdV1Schema]),
+    selectedBackendId: panoramaBackendIdV1Schema,
+    selectionStatus: z.enum(['auto_default', 'requested_available', 'fallback']),
+  })
+  .strict();
 
 export const panoramaRuntimeSourceFrameV1Schema = z
   .object({
@@ -130,6 +309,7 @@ export const panoramaRuntimeProvenanceV1Schema = z
         ),
       })
       .strict(),
+    backendSelection: panoramaBackendSelectionReceiptV1Schema,
     boundaryMode: z.enum(['auto_crop', 'transparent', 'manual_crop', 'deferred_fill']),
     crop: z
       .object({
@@ -345,6 +525,7 @@ export const buildPanoramaRuntimeDryRunV1 = (requestValue: unknown): PanoramaRun
     [
       planId,
       runtime.provenance.resolvedProjection,
+      JSON.stringify(runtime.provenance.backendSelection),
       request.command.parameters.seamExposureCompensationPercent,
       request.command.parameters.overlapFeatherPx ?? 64,
       JSON.stringify(runtime.provenance.crop),
@@ -506,8 +687,8 @@ export const buildPanoramaRuntimeArtifactV1 = ({
         planarHomography: true,
         tiledRender: provenance.tileRender.tileBackedRender,
       },
-      engineId: 'rapidraw_homography_seam_v0',
-      qualityTier: 'validated_planar_v1',
+      engineId: provenance.backendSelection.selectedBackendId,
+      qualityTier: provenance.backendSelection.capabilityEvidence.selectedBackendQualityTier,
     },
     exposureNormalization: exposureNormalizationForPanoramaRuntimeArtifact(provenance),
     lensCorrectionPolicy: provenance.lensCorrectionPolicy,
@@ -578,6 +759,7 @@ const renderPanoramaRuntime = (request: ParsedPanoramaRuntimePlanRequestV1) => {
     request.connectedSourceIndices,
     request.candidateTransformOverrides,
   );
+  const backendSelection = buildPanoramaBackendSelectionReceipt(request.command.parameters.backendPreference);
   const sourceGeometry = classifyPanoramaSourceGeometry(request.sourceFrames, request.connectedSourceIndices);
   const stitched = renderSyntheticPanoramaStitchV1({
     connectedSourceIndices: request.connectedSourceIndices,
@@ -609,6 +791,7 @@ const renderPanoramaRuntime = (request: ParsedPanoramaRuntimePlanRequestV1) => {
     outputPixels: croppedOutput,
     provenance: panoramaRuntimeProvenanceV1Schema.parse({
       alignment,
+      backendSelection,
       boundaryMode: request.command.parameters.boundaryMode,
       crop,
       engineId: PANORAMA_RUNTIME_ENGINE_ID,
@@ -654,6 +837,50 @@ const renderPanoramaRuntime = (request: ParsedPanoramaRuntimePlanRequestV1) => {
     warnings,
     width: crop.width,
   };
+};
+
+const buildPanoramaBackendSelectionReceipt = (
+  requestedBackendId: PanoramaRuntimeCommandV1['parameters']['backendPreference'],
+) => {
+  const selectedBackend = getPanoramaBackendCapabilityReport(PANORAMA_DEFAULT_BACKEND_ID);
+  const requestedBackend =
+    requestedBackendId === 'auto' ? undefined : getPanoramaBackendCapabilityReport(requestedBackendId);
+  const requestedAvailable =
+    requestedBackendId === 'auto' ||
+    (requestedBackend?.status === 'default_enabled' &&
+      requestedBackend.ciPolicy.defaultRequiredCiAllowed &&
+      requestedBackend.runtimeRequirements.requiresExternalLibraries === false);
+  const selectionStatus =
+    requestedBackendId === 'auto' ? 'auto_default' : requestedAvailable ? 'requested_available' : 'fallback';
+
+  return panoramaBackendSelectionReceiptV1Schema.parse({
+    capabilityEvidence: {
+      consideredBackends: panoramaBackendCapabilityReportsV1.map((report) => ({
+        backendId: report.backendId,
+        qualityTier: report.qualityTier,
+        requiredCiBlockerCount: report.ciPolicy.requiredCiBlockers.length,
+        status: report.status,
+        warnings: report.warnings,
+      })),
+      requestedBackendStatus: requestedBackend?.status ?? (requestedBackendId === 'auto' ? 'not_requested' : undefined),
+      requestedRequiresExternalLibraries: requestedBackend?.runtimeRequirements.requiresExternalLibraries ?? null,
+      selectedBackendCapabilities: selectedBackend.capabilities,
+      selectedBackendQualityTier: selectedBackend.qualityTier,
+      selectedBackendStatus: selectedBackend.status,
+      selectedSupportedBlendModes: selectedBackend.supportedBlendModes,
+      selectedSupportedProjections: selectedBackend.supportedProjections,
+    },
+    fallbackReason: selectionStatus === 'fallback' ? 'requested_backend_unavailable' : null,
+    requestedBackendId,
+    selectedBackendId: selectedBackend.backendId,
+    selectionStatus,
+  });
+};
+
+const getPanoramaBackendCapabilityReport = (backendId: PanoramaBackendIdV1): PanoramaBackendCapabilityReportV1 => {
+  const report = panoramaBackendCapabilityReportsV1.find((candidate) => candidate.backendId === backendId);
+  if (report === undefined) throw new Error(`Missing panorama backend capability report for ${backendId}.`);
+  return report;
 };
 
 const buildPanoramaPreflightEstimate = (request: ParsedPanoramaRuntimePlanRequestV1, width: number, height: number) => {
