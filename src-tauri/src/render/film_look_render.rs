@@ -29,7 +29,18 @@ const FILM_LOOK_PATCHES: &[FilmLookPatch] = &[
     },
     FilmLookPatch {
         id: "film_look.generic.warm_print.v1",
-        patch: &[("contrast", 8), ("highlights", -10), ("temperature", 8)],
+        patch: &[
+            ("blacks", -4),
+            ("contrast", 10),
+            ("grainAmount", 10),
+            ("grainRoughness", 58),
+            ("grainSize", 32),
+            ("halationAmount", 8),
+            ("highlights", -12),
+            ("saturation", 4),
+            ("shadows", 4),
+            ("temperature", 8),
+        ],
     },
     FilmLookPatch {
         id: "film_look.generic.cool_contrast.v1",
@@ -131,11 +142,7 @@ pub(crate) fn normalize_film_look_adjustments_for_render(adjustments: &Value) ->
     }
 
     for (field, value) in look.patch {
-        set_number(
-            &mut normalized,
-            field,
-            ((*value as f32) * strength).round() as i32,
-        );
+        set_number(&mut normalized, field, scale_film_look_value(field, *value, strength));
     }
 
     set_number(
@@ -152,6 +159,16 @@ fn clamp_strength(value: f64) -> f32 {
 
 fn set_number(target: &mut Map<String, Value>, key: &str, value: i32) {
     target.insert(key.to_string(), Value::Number(Number::from(value)));
+}
+
+fn scale_film_look_value(field: &str, value: i32, strength: f32) -> i32 {
+    let default_value = match field {
+        "grainRoughness" => 50,
+        "grainSize" => 25,
+        _ => 0,
+    } as f32;
+
+    (default_value + ((value as f32) - default_value) * strength).round() as i32
 }
 
 #[cfg(test)]
@@ -186,9 +203,12 @@ mod tests {
         let normalized = normalize_film_look_adjustments_for_render(&adjustments).into_owned();
 
         assert_eq!(normalized["filmLookStrength"], 100);
-        assert_eq!(normalized["contrast"], 8);
-        assert_eq!(normalized["highlights"], -10);
+        assert_eq!(normalized["contrast"], 10);
+        assert_eq!(normalized["highlights"], -12);
         assert_eq!(normalized["temperature"], 8);
+        assert_eq!(normalized["grainRoughness"], 58);
+        assert_eq!(normalized["grainSize"], 32);
+        assert_eq!(normalized["grainAmount"], 10);
     }
 
     #[test]
@@ -226,8 +246,57 @@ mod tests {
         assert_eq!(preview, export);
         assert_eq!(preview["saturation"], -72);
         assert_eq!(preview["grainAmount"], 23);
-        assert_eq!(preview["grainRoughness"], 49);
-        assert_eq!(preview["grainSize"], 35);
+        assert_eq!(preview["grainRoughness"], 63);
+        assert_eq!(preview["grainSize"], 42);
+    }
+
+    #[test]
+    fn warm_print_default_aware_scaling_matches_browser_targets() {
+        let twenty_five = normalize_film_look_adjustments_for_render(&json!({
+            "filmLookId": "film_look.generic.warm_print.v1",
+            "filmLookStrength": 25
+        }))
+        .into_owned();
+        let sixty_five = normalize_film_look_adjustments_for_render(&json!({
+            "filmLookId": "film_look.generic.warm_print.v1",
+            "filmLookStrength": 65
+        }))
+        .into_owned();
+        let full = normalize_film_look_adjustments_for_render(&json!({
+            "filmLookId": "film_look.generic.warm_print.v1",
+            "filmLookStrength": 100
+        }))
+        .into_owned();
+
+        assert_eq!(twenty_five["contrast"], 3);
+        assert_eq!(twenty_five["highlights"], -3);
+        assert_eq!(twenty_five["shadows"], 1);
+        assert_eq!(twenty_five["blacks"], -1);
+        assert_eq!(twenty_five["saturation"], 1);
+        assert_eq!(twenty_five["grainAmount"], 3);
+        assert_eq!(twenty_five["grainRoughness"], 52);
+        assert_eq!(twenty_five["grainSize"], 27);
+        assert_eq!(twenty_five["halationAmount"], 2);
+
+        assert_eq!(sixty_five["contrast"], 7);
+        assert_eq!(sixty_five["highlights"], -8);
+        assert_eq!(sixty_five["shadows"], 3);
+        assert_eq!(sixty_five["blacks"], -3);
+        assert_eq!(sixty_five["saturation"], 3);
+        assert_eq!(sixty_five["grainAmount"], 7);
+        assert_eq!(sixty_five["grainRoughness"], 55);
+        assert_eq!(sixty_five["grainSize"], 30);
+        assert_eq!(sixty_five["halationAmount"], 5);
+
+        assert_eq!(full["contrast"], 10);
+        assert_eq!(full["highlights"], -12);
+        assert_eq!(full["shadows"], 4);
+        assert_eq!(full["blacks"], -4);
+        assert_eq!(full["saturation"], 4);
+        assert_eq!(full["grainAmount"], 10);
+        assert_eq!(full["grainRoughness"], 58);
+        assert_eq!(full["grainSize"], 32);
+        assert_eq!(full["halationAmount"], 8);
     }
 
     #[test]
@@ -244,6 +313,6 @@ mod tests {
         .into_owned();
 
         assert_eq!(halation["halationAmount"], 9);
-        assert_eq!(grain["grainRoughness"], 32);
+        assert_eq!(grain["grainRoughness"], 57);
     }
 }

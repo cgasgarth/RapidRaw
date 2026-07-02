@@ -87,5 +87,62 @@
     "halationAmountAfterHash": "rawengine-pixel-hash:9ad0dceb62923b71",
     "halationAmountHalationHash": "fnv1a32:563d0ecd",
     "repeatAfterHash": "rawengine-pixel-hash:c7720bdcc0500f15"
-  }
+  },
+  "proofLevel": "synthetic_runtime_output_with_normalized_payload_cases",
+  "proofLimits": [
+    "real_raw_quality",
+    "measured_film_stock_emulation",
+    "photochemical_density_domain",
+    "gpu_parity"
+  ],
+  "normalizedStrengthCases": [
+    {
+      "adjustmentPatch": {
+        "temperature": 2,
+        "contrast": 3,
+        "highlights": -3,
+        "shadows": 1,
+        "blacks": -1,
+        "saturation": 1,
+        "glowAmount": 0,
+        "grainAmount": 3,
+        "grainRoughness": 52,
+        "grainSize": 27,
+        "halationAmount": 2
+      },
+      "strength": 25
+    },
+    {
+      "adjustmentPatch": {
+        "temperature": 5,
+        "contrast": 7,
+        "highlights": -8,
+        "shadows": 3,
+        "blacks": -3,
+        "saturation": 3,
+        "glowAmount": 0,
+        "grainAmount": 7,
+        "grainRoughness": 55,
+        "grainSize": 30,
+        "halationAmount": 5
+      },
+      "strength": 65
+    },
+    {
+      "adjustmentPatch": {
+        "temperature": 8,
+        "contrast": 10,
+        "highlights": -12,
+        "shadows": 4,
+        "blacks": -4,
+        "saturation": 4,
+        "glowAmount": 0,
+        "grainAmount": 10,
+        "grainRoughness": 58,
+        "grainSize": 32,
+        "halationAmount": 8
+      },
+      "strength": 100
+    }
+  ]
 }

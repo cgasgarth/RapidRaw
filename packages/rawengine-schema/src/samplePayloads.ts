@@ -4041,7 +4041,7 @@ export const sampleFilmLookCatalogV1: FilmLookCatalogV1 = filmLookCatalogV1Schem
     },
     {
       category: 'color_warm',
-      description: 'Warm print-style color with gentle highlight compression.',
+      description: 'Warm print-style color with gentle highlight compression and restrained texture.',
       displayName: 'Warm Print',
       intendedInputModes: ['raw_photo', 'rendered_photo', 'negative_lab_positive'],
       lookId: 'film_look.generic.warm_print.v1',

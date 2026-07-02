@@ -91,7 +91,7 @@
       }
     },
     {
-      "adjustmentFingerprint": "d13a52724cebba02bfde10373967d04c51d47ebc776620f5d405f10cc6e1458f",
+      "adjustmentFingerprint": "25cea0fe58d6dfbd004b7518d815ea13eca691ef0528e19b0c1b09ce0e203e91",
       "adjustmentSummaries": [
         {
           "label": "Temp",
@@ -99,15 +99,43 @@
         },
         {
           "label": "Contrast",
-          "value": 8
+          "value": 10
         },
         {
           "label": "Highlights",
-          "value": -10
+          "value": -12
+        },
+        {
+          "label": "Shadows",
+          "value": 4
+        },
+        {
+          "label": "Blacks",
+          "value": -4
+        },
+        {
+          "label": "Saturation",
+          "value": 4
+        },
+        {
+          "label": "Grain",
+          "value": 10
+        },
+        {
+          "label": "Grain Roughness",
+          "value": 58
+        },
+        {
+          "label": "Grain Size",
+          "value": 32
+        },
+        {
+          "label": "Halation",
+          "value": 8
         }
       ],
       "category": "color_warm",
-      "description": "Warm print-style color with gentle highlight compression.",
+      "description": "Warm print-style color with gentle highlight compression and restrained texture.",
       "displayName": "Warm Print",
       "id": "film_look.generic.warm_print.v1",
       "provenance": {
@@ -121,39 +149,67 @@
       "strengthPreviews": {
         "appliedFull": {
           "temperature": 8,
-          "contrast": 8,
-          "highlights": -10,
-          "shadows": 0,
-          "blacks": 0,
-          "saturation": 0,
+          "contrast": 10,
+          "highlights": -12,
+          "shadows": 4,
+          "blacks": -4,
+          "saturation": 4,
           "glowAmount": 0,
-          "grainAmount": 0,
-          "grainRoughness": 50,
-          "grainSize": 25,
-          "halationAmount": 0
+          "grainAmount": 10,
+          "grainRoughness": 58,
+          "grainSize": 32,
+          "halationAmount": 8
         },
         "default": {
           "temperature": 5,
-          "contrast": 5,
-          "highlights": -6
+          "contrast": 7,
+          "highlights": -8,
+          "shadows": 3,
+          "blacks": -3,
+          "saturation": 3,
+          "grainAmount": 7,
+          "grainRoughness": 55,
+          "grainSize": 30,
+          "halationAmount": 5
         },
         "half": {
           "temperature": 4,
-          "contrast": 4,
-          "highlights": -5
+          "contrast": 5,
+          "highlights": -6,
+          "shadows": 2,
+          "blacks": -2,
+          "saturation": 2,
+          "grainAmount": 5,
+          "grainRoughness": 54,
+          "grainSize": 29,
+          "halationAmount": 4
         },
         "full": {
           "temperature": 8,
-          "contrast": 8,
-          "highlights": -10
+          "contrast": 10,
+          "highlights": -12,
+          "shadows": 4,
+          "blacks": -4,
+          "saturation": 4,
+          "grainAmount": 10,
+          "grainRoughness": 58,
+          "grainSize": 32,
+          "halationAmount": 8
         }
       },
       "presetDrafts": {
         "default": {
           "adjustments": {
             "temperature": 5,
-            "contrast": 5,
-            "highlights": -6
+            "contrast": 7,
+            "highlights": -8,
+            "shadows": 3,
+            "blacks": -3,
+            "saturation": 3,
+            "grainAmount": 7,
+            "grainRoughness": 55,
+            "grainSize": 30,
+            "halationAmount": 5
           },
           "includeCropTransform": false,
           "includeMasks": false,
@@ -163,8 +219,15 @@
         "half": {
           "adjustments": {
             "temperature": 4,
-            "contrast": 4,
-            "highlights": -5
+            "contrast": 5,
+            "highlights": -6,
+            "shadows": 2,
+            "blacks": -2,
+            "saturation": 2,
+            "grainAmount": 5,
+            "grainRoughness": 54,
+            "grainSize": 29,
+            "halationAmount": 4
           },
           "includeCropTransform": false,
           "includeMasks": false,
@@ -174,8 +237,15 @@
         "full": {
           "adjustments": {
             "temperature": 8,
-            "contrast": 8,
-            "highlights": -10
+            "contrast": 10,
+            "highlights": -12,
+            "shadows": 4,
+            "blacks": -4,
+            "saturation": 4,
+            "grainAmount": 10,
+            "grainRoughness": 58,
+            "grainSize": 32,
+            "halationAmount": 8
           },
           "includeCropTransform": false,
           "includeMasks": false,
@@ -436,15 +506,15 @@
           "contrast": 9,
           "saturation": -75,
           "grainAmount": 17,
-          "grainRoughness": 48,
-          "grainSize": 32
+          "grainRoughness": 61,
+          "grainSize": 38
         },
         "half": {
           "contrast": 6,
           "saturation": -50,
           "grainAmount": 11,
-          "grainRoughness": 32,
-          "grainSize": 21
+          "grainRoughness": 57,
+          "grainSize": 34
         },
         "full": {
           "contrast": 12,
@@ -460,8 +530,8 @@
             "contrast": 9,
             "saturation": -75,
             "grainAmount": 17,
-            "grainRoughness": 48,
-            "grainSize": 32
+            "grainRoughness": 61,
+            "grainSize": 38
           },
           "includeCropTransform": false,
           "includeMasks": false,
@@ -473,8 +543,8 @@
             "contrast": 6,
             "saturation": -50,
             "grainAmount": 11,
-            "grainRoughness": 32,
-            "grainSize": 21
+            "grainRoughness": 57,
+            "grainSize": 34
           },
           "includeCropTransform": false,
           "includeMasks": false,
@@ -981,16 +1051,16 @@
           "blacks": -6,
           "saturation": -72,
           "grainAmount": 23,
-          "grainRoughness": 49,
-          "grainSize": 35
+          "grainRoughness": 63,
+          "grainSize": 42
         },
         "half": {
           "contrast": 15,
           "blacks": -4,
           "saturation": -50,
           "grainAmount": 16,
-          "grainRoughness": 34,
-          "grainSize": 24
+          "grainRoughness": 59,
+          "grainSize": 37
         },
         "full": {
           "contrast": 30,
@@ -1008,8 +1078,8 @@
             "blacks": -6,
             "saturation": -72,
             "grainAmount": 23,
-            "grainRoughness": 49,
-            "grainSize": 35
+            "grainRoughness": 63,
+            "grainSize": 42
           },
           "includeCropTransform": false,
           "includeMasks": false,
@@ -1022,8 +1092,8 @@
             "blacks": -4,
             "saturation": -50,
             "grainAmount": 16,
-            "grainRoughness": 34,
-            "grainSize": 24
+            "grainRoughness": 59,
+            "grainSize": 37
           },
           "includeCropTransform": false,
           "includeMasks": false,

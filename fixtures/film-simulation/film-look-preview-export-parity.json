@@ -1,14 +1,14 @@
 {
   "cases": [
     {
-      "baselinePreviewMaxDelta": 0.04,
+      "baselinePreviewMaxDelta": 0.053986,
       "caseId": "film.look.preview_export.film-look.generic.warm-print.v1",
       "displayName": "Warm Print",
-      "exportHash": "ce1b5b9dfc974109",
+      "exportHash": "9a605fdfa6fd53a9",
       "lookId": "film_look.generic.warm_print.v1",
       "maxAllowedPreviewExportDelta": 0,
       "previewExportMaxDelta": 0,
-      "previewHash": "ce1b5b9dfc974109",
+      "previewHash": "9a605fdfa6fd53a9",
       "strength": 100
     },
     {
