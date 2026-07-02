@@ -65,10 +65,12 @@ const buildStatus = ({
 async function renderBadge(status: NegativeLabReopenedPositiveArtifactStatus) {
   if (!globalThis.window) {
     const window = new Window();
-    globalThis.window = window as unknown as Window & typeof globalThis;
-    globalThis.document = window.document as unknown as Document;
-    globalThis.HTMLElement = window.HTMLElement;
-    globalThis.HTMLDivElement = window.HTMLDivElement;
+    Object.assign(globalThis, {
+      document: window.document,
+      HTMLDivElement: window.HTMLDivElement,
+      HTMLElement: window.HTMLElement,
+      window,
+    });
   }
 
   if (renderedRoot !== null) {
