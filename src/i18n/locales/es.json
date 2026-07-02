@@ -1406,6 +1406,26 @@
         "longitude": "Longitud",
         "title": "Ubicación GPS"
       },
+      "negativeLabPositive": {
+        "currentTooltip": "",
+        "reasons": {
+          "outputArtifactChanged": "",
+          "outputArtifactMissing": "",
+          "persistedStaleArtifactId": "",
+          "recipeHashChanged": "",
+          "sourceContentHashChanged": "",
+          "sourceFileStateChanged": "",
+          "sourceMissing": ""
+        },
+        "staleTooltip": "",
+        "state": {
+          "current": "",
+          "missing": "",
+          "stale": ""
+        },
+        "unknownReason": "",
+        "warning": ""
+      },
       "organization": {
         "addTagPlaceholder": "Añadir etiqueta...",
         "colorLabel": "Etiqueta de color",

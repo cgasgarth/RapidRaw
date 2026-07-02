@@ -1356,6 +1356,26 @@
         "longitude": "経度",
         "title": "GPS位置情報"
       },
+      "negativeLabPositive": {
+        "currentTooltip": "",
+        "reasons": {
+          "outputArtifactChanged": "",
+          "outputArtifactMissing": "",
+          "persistedStaleArtifactId": "",
+          "recipeHashChanged": "",
+          "sourceContentHashChanged": "",
+          "sourceFileStateChanged": "",
+          "sourceMissing": ""
+        },
+        "staleTooltip": "",
+        "state": {
+          "current": "",
+          "missing": "",
+          "stale": ""
+        },
+        "unknownReason": "",
+        "warning": ""
+      },
       "organization": {
         "addTagPlaceholder": "タグを追加...",
         "colorLabel": "カラーラベル",
