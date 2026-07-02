@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
 
-use image::{DynamicImage, GenericImageView, ImageBuffer, Luma};
+use image::{DynamicImage, GenericImageView, ImageBuffer, Luma, RgbaImage};
 use imgref::ImgRef;
 use mozjpeg_rs::{Encoder, Preset};
 use rgb::{FromSlice, RGBA8};
@@ -286,11 +286,7 @@ fn encode_preview_response(
     jpeg_quality: u8,
     fn_start: std::time::Instant,
 ) -> Result<Vec<u8>, String> {
-    let final_processed_image = Arc::new(final_processed_image);
-    let final_rgba_image = match &*final_processed_image {
-        DynamicImage::ImageRgba8(img) => img,
-        _ => return Err("Expected Rgba8 image from GPU for encoding".to_string()),
-    };
+    let final_rgba_image = Arc::new(to_preview_rgba8(final_processed_image));
 
     let raw_bytes: &[u8] = final_rgba_image.as_raw();
     let rgba8_pixels: &[RGBA8] = raw_bytes.as_rgba();
@@ -341,6 +337,13 @@ fn encode_preview_response(
     }
 }
 
+fn to_preview_rgba8(image: DynamicImage) -> RgbaImage {
+    match image {
+        DynamicImage::ImageRgba8(image) => image,
+        image => image.to_rgba8(),
+    }
+}
+
 pub(crate) fn start_preview_worker(app_handle: tauri::AppHandle) {
     let state = app_handle.state::<AppState>();
     let (tx, rx): (Sender<PreviewJob>, Receiver<PreviewJob>) = mpsc::channel();
@@ -374,4 +377,24 @@ pub(crate) fn start_preview_worker(app_handle: tauri::AppHandle) {
             }
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use image::{ImageBuffer, Rgba};
+
+    #[test]
+    fn preview_encoder_accepts_rgba32f_raw_pipeline_output() {
+        let image = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(2, 2, |x, y| {
+            Rgba([x as f32 / 2.0, y as f32 / 2.0, 0.25 + x as f32 * 0.1, 1.0])
+        }));
+
+        let encoded =
+            encode_preview_response(image, false, None, 2, 2, 82, std::time::Instant::now())
+                .expect("RGBA32F preview should encode through RGBA8 boundary");
+
+        assert!(encoded.starts_with(&[0xff, 0xd8]));
+        assert!(encoded.len() > 16);
+    }
 }
