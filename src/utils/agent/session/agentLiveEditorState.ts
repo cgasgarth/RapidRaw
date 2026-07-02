@@ -105,4 +105,4 @@ export const buildLiveEditorProjectLibrarySnapshot = (): ProjectLibrarySnapshotV
 };
 
 export const createLiveEditorAppServerBridge = () =>
-  createRawEngineLocalAppServerBridge({ projectLibrarySnapshot: buildLiveEditorProjectLibrarySnapshot() });
+  createRawEngineLocalAppServerBridge({ getProjectLibrarySnapshot: buildLiveEditorProjectLibrarySnapshot });

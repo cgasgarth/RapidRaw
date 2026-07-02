@@ -420,6 +420,16 @@ export const rawEngineLocalAppServerLayerMaskCommandV1Schema = layerMaskCommandE
 
 export type RawEngineLocalAppServerLayerMaskCommandV1 = z.infer<typeof rawEngineLocalAppServerLayerMaskCommandV1Schema>;
 
+export type RawEngineLocalAppServerProjectLibrarySnapshotProvider = () => ProjectLibrarySnapshotV1;
+
+export interface RawEngineLocalAppServerBridgeOptions {
+  availableAiProviderIds?: readonly string[];
+  commandBus?: EditCommandBus;
+  getProjectLibrarySnapshot?: RawEngineLocalAppServerProjectLibrarySnapshotProvider;
+  projectLibrarySnapshot?: ProjectLibrarySnapshotV1;
+  toolRegistry?: RawEngineToolRegistryV1;
+}
+
 type BasicToneCommandV1 = Extract<ToneColorCommandEnvelopeV1, { commandType: 'toneColor.setBasicTone' }>;
 type BasicToneAdjustmentParameterKeyV1 = Exclude<
   keyof BasicToneCommandV1['parameters'],
@@ -1820,22 +1830,16 @@ export class RawEngineLocalAppServerBridge {
     super_resolution: new SuperResolutionAppServerRuntimeToolBusV1(localComputationalMergeRuntimeManifest),
   };
   readonly #linearGradientMaskRuntime = new LinearGradientMaskCommandRuntime({ height: 512, width: 768 });
-  readonly #projectLibrarySnapshot: ProjectLibrarySnapshotV1;
+  readonly #getProjectLibrarySnapshot: RawEngineLocalAppServerProjectLibrarySnapshotProvider;
   readonly #toolRegistry: RawEngineToolRegistryV1;
 
-  constructor(
-    options: {
-      availableAiProviderIds?: readonly string[];
-      commandBus?: EditCommandBus;
-      projectLibrarySnapshot?: ProjectLibrarySnapshotV1;
-      toolRegistry?: RawEngineToolRegistryV1;
-    } = {},
-  ) {
+  constructor(options: RawEngineLocalAppServerBridgeOptions = {}) {
     this.#availableAiProviderIds = new Set(options.availableAiProviderIds ?? ['rawengine-local-ai']);
     this.#commandBus = options.commandBus ?? new EditCommandBus();
-    this.#projectLibrarySnapshot = projectLibrarySnapshotV1Schema.parse(
-      options.projectLibrarySnapshot ?? DEFAULT_LOCAL_PROJECT_LIBRARY_SNAPSHOT,
-    );
+    this.#getProjectLibrarySnapshot =
+      options.getProjectLibrarySnapshot ??
+      (() =>
+        projectLibrarySnapshotV1Schema.parse(options.projectLibrarySnapshot ?? DEFAULT_LOCAL_PROJECT_LIBRARY_SNAPSHOT));
     this.#toolRegistry = filterRawEngineLocalAppServerExecutableToolRegistry(
       options.toolRegistry ?? rawEngineDefaultToolRegistryV1,
     );
@@ -1969,25 +1973,25 @@ export class RawEngineLocalAppServerBridge {
 
     this.#commandBus.register({
       commandType: RawEngineLocalAppServerCommandType.ProjectMetadataQuery,
-      execute: () => buildProjectMetadataResult(this.#projectLibrarySnapshot),
+      execute: () => buildProjectMetadataResult(this.#getProjectLibrarySnapshot()),
       schema: rawEngineLocalAppServerProjectMetadataQueryV1Schema,
     });
 
     this.#commandBus.register({
       commandType: RawEngineLocalAppServerCommandType.SelectedImagesQuery,
-      execute: () => buildSelectedImagesResult(this.#projectLibrarySnapshot),
+      execute: () => buildSelectedImagesResult(this.#getProjectLibrarySnapshot()),
       schema: rawEngineLocalAppServerSelectedImagesQueryV1Schema,
     });
 
     this.#commandBus.register({
       commandType: RawEngineLocalAppServerCommandType.ImageMetadataQuery,
-      execute: (command) => buildImageMetadataResult(this.#projectLibrarySnapshot, command.imagePath),
+      execute: (command) => buildImageMetadataResult(this.#getProjectLibrarySnapshot(), command.imagePath),
       schema: rawEngineLocalAppServerImageMetadataQueryV1Schema,
     });
 
     this.#commandBus.register({
       commandType: RawEngineLocalAppServerCommandType.EditorStateQuery,
-      execute: () => buildEditorStateResult(this.#projectLibrarySnapshot),
+      execute: () => buildEditorStateResult(this.#getProjectLibrarySnapshot()),
       schema: rawEngineLocalAppServerEditorStateQueryV1Schema,
     });
 
@@ -2320,7 +2324,7 @@ export const dispatchRawEngineLocalAppServerComputationalMergeDerivedSourceOpen 
 ): unknown => openComputationalMergeDerivedSourceV1(request);
 
 export const createRawEngineLocalAppServerBridge = (
-  options: { availableAiProviderIds?: readonly string[]; projectLibrarySnapshot?: ProjectLibrarySnapshotV1 } = {},
+  options: RawEngineLocalAppServerBridgeOptions = {},
 ): RawEngineLocalAppServerBridge => new RawEngineLocalAppServerBridge(options);
 
 export const buildRawEngineLocalAppServerBridgeCapabilities = (
