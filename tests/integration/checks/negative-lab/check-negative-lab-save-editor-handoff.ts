@@ -3,11 +3,8 @@
 import { readFileSync } from 'node:fs';
 import { negativeLabSavedPositiveHandoffSchema } from '../../../../src/schemas/negative-lab/negativeLabPresetCatalogSchemas.ts';
 import { useEditorStore } from '../../../../src/store/useEditorStore.ts';
-import {
-  INITIAL_ADJUSTMENTS,
-  INITIAL_MASK_ADJUSTMENTS,
-  type MaskContainer,
-} from '../../../../src/utils/adjustments.ts';
+import { INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
+import { buildDustCandidateHealLayer } from '../../../../src/utils/dustCandidateHealLayer.ts';
 import {
   consumePendingNegativeConversionDustHealLayers,
   consumePendingNegativeConversionSavedPositiveHandoff,
@@ -55,16 +52,26 @@ const savedPositiveHandoff = negativeLabSavedPositiveHandoffSchema.parse({
   sourcePath,
 });
 
-const dustHealLayer: MaskContainer = {
-  adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
-  blendMode: 'normal',
-  id: 'negative-lab-dust-heal-001',
-  invert: false,
-  name: 'Dust heal 001',
-  opacity: 100,
-  subMasks: [],
-  visible: true,
-};
+const acceptedDustHealLayer = buildDustCandidateHealLayer({
+  candidate: {
+    candidateId: 'negative_lab_dust_frame_001_1',
+    confidence: 0.86,
+    geometry: {
+      coordinateSpace: 'normalized_frame',
+      height: 0.04,
+      kind: 'rect',
+      width: 0.04,
+      x: 0.48,
+      y: 0.48,
+    },
+    kind: 'dust_spot',
+    status: 'pending',
+  },
+  frameId: 'negative-lab-frame-001',
+  imageHeight: savedPositiveHandoff.dimensions.height,
+  imageWidth: savedPositiveHandoff.dimensions.width,
+  layerId: 'negative-lab-dust-heal-001',
+});
 
 useEditorStore.getState().setEditor({
   adjustments: INITIAL_ADJUSTMENTS,
@@ -90,8 +97,8 @@ await handleNegativeConversionEditorHandoff({
     });
   },
   handoff: {
-    acceptedDustHealLayers: [dustHealLayer],
-    acceptedDustHealLayersBySavedPath: { [savedPath]: [dustHealLayer] },
+    acceptedDustHealLayers: [acceptedDustHealLayer],
+    acceptedDustHealLayersBySavedPath: { [savedPath]: [acceptedDustHealLayer] },
     activePositivePath: savedPath,
     openInEditor: true,
     savedPositiveHandoffs: [savedPositiveHandoff],
@@ -118,6 +125,29 @@ if (consumePendingNegativeConversionSavedPositiveHandoff(savedPath) !== null) {
 }
 if (!consumePendingNegativeConversionDustHealLayers(savedPath)) {
   throw new Error('Negative Lab saved positive dust-heal layers were not consumed for the opened positive.');
+}
+const openedPositive = useEditorStore.getState().selectedImage;
+const openedMetadata =
+  typeof openedPositive?.metadata === 'object' &&
+  openedPositive.metadata !== null &&
+  !Array.isArray(openedPositive.metadata)
+    ? openedPositive.metadata
+    : null;
+const healedSidecars =
+  openedMetadata !== null &&
+  typeof openedMetadata.rawEngineArtifacts === 'object' &&
+  openedMetadata.rawEngineArtifacts !== null &&
+  !Array.isArray(openedMetadata.rawEngineArtifacts) &&
+  Array.isArray(openedMetadata.rawEngineArtifacts.layerStackSidecars)
+    ? openedMetadata.rawEngineArtifacts.layerStackSidecars
+    : null;
+if (!Array.isArray(healedSidecars) || healedSidecars.length !== 1) {
+  throw new Error('Negative Lab saved positive did not persist the accepted heal layer into metadata.');
+}
+if (
+  healedSidecars[0]?.layers[0]?.retouchCloneSource?.provenance?.proofSource !== 'negative_lab_candidate_acceptance_v1'
+) {
+  throw new Error('Negative Lab saved positive heal layer metadata is missing editable-layer provenance.');
 }
 
 const modalSource = readFileSync('src/components/modals/negative-lab/NegativeConversionModal.tsx', 'utf8');
