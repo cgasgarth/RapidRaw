@@ -181,6 +181,8 @@ export function createToneColorSchemasV1(dependencies: ToneColorSchemaDependenci
           parameters: z
             .object({
               band: toneColorHslBandV1Schema,
+              acceptedDryRunPlanHash: z.string().trim().min(1).optional(),
+              acceptedDryRunPlanId: z.string().trim().min(1).optional(),
               hueShiftDegrees: z.number().min(-180).max(180),
               luminance: z.number().min(-100).max(100),
               rangeControl: toneColorSelectiveColorRangeControlV1Schema.optional(),

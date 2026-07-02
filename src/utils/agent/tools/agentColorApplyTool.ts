@@ -19,6 +19,7 @@ import {
   buildSelectiveColorImageCommandContext,
   type SelectiveColorAdjustmentPayload,
   type SelectiveColorCommandColorPipeline,
+  type SelectiveColorCommandEnvelope,
 } from '../../selectiveColorCommandBridge';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
 import { renderAgentReadOnlyPreview } from '../context/agentReadOnlyAppServerTools';
@@ -350,9 +351,10 @@ const dispatchSelectiveColorPayloads = async ({
   operationId: string;
   payloads: readonly SelectiveColorAdjustmentPayload[];
   sessionId: string;
-}): Promise<ToneColorMutationResultV1[]> => {
+}): Promise<{ applyCommands: SelectiveColorCommandEnvelope[]; mutations: ToneColorMutationResultV1[] }> => {
   const bridge = createLiveEditorAppServerBridge();
   const mutations: ToneColorMutationResultV1[] = [];
+  const applyCommands: SelectiveColorCommandEnvelope[] = [];
 
   for (const [index, payload] of payloads.entries()) {
     const context = buildSelectiveColorImageCommandContext({
@@ -365,15 +367,25 @@ const dispatchSelectiveColorPayloads = async ({
     const dryRunCommand = buildSelectiveColorCommandEnvelope(payload, context, { dryRun: true });
     const dryRun = await bridge.dispatch(dryRunCommand);
     if (!dryRun.ok) throw new Error(`Agent color typed HSL dry-run failed: ${dryRun.message}`);
-    toneColorDryRunResultV1Schema.parse(dryRun.result);
+    const dryRunResult = toneColorDryRunResultV1Schema.parse(dryRun.result);
+    const acceptedDryRunPlanHash = dryRunResult.dryRunPlanHash;
+    const acceptedDryRunPlanId = dryRunResult.dryRunPlanId;
+    if (acceptedDryRunPlanHash === undefined || acceptedDryRunPlanId === undefined) {
+      throw new Error('Agent color typed HSL dry-run did not return a plan identity.');
+    }
 
-    const applyCommand = buildSelectiveColorCommandEnvelope(payload, context, { dryRun: false });
+    const applyCommand = buildSelectiveColorCommandEnvelope(payload, context, {
+      acceptedDryRunPlanHash,
+      acceptedDryRunPlanId,
+      dryRun: false,
+    });
     const apply = await bridge.dispatch(applyCommand);
     if (!apply.ok) throw new Error(`Agent color typed HSL apply failed: ${apply.message}`);
     mutations.push(toneColorMutationResultV1Schema.parse(apply.result));
+    applyCommands.push(applyCommand);
   }
 
-  return mutations;
+  return { applyCommands, mutations };
 };
 
 export const applyAgentColor = async (request: AgentColorApplyRequest): Promise<AgentColorApplyResponse> => {
@@ -389,24 +401,17 @@ export const applyAgentColor = async (request: AgentColorApplyRequest): Promise<
 
   const undoGraphRevision = `history_${state.historyIndex}`;
   const selectiveColorPayloads = buildSelectiveColorPayloads(state.adjustments, parsedRequest.color);
-  const typedMutations = await dispatchSelectiveColorPayloads({
+  const { applyCommands, mutations: typedMutations } = await dispatchSelectiveColorPayloads({
     expectedGraphRevision: undoGraphRevision,
     imagePath: selectedImage.path,
     operationId: parsedRequest.operationId,
     payloads: selectiveColorPayloads,
     sessionId: parsedRequest.sessionId,
   });
-  const typedAdjustments = selectiveColorPayloads.reduce((adjustments, payload, index) => {
-    const context = buildSelectiveColorImageCommandContext({
-      colorPipeline: AGENT_COLOR_PIPELINE,
-      expectedGraphRevision: undoGraphRevision,
-      imagePath: selectedImage.path,
-      operationId: `${parsedRequest.operationId}_${payload.rangeKey}_${index}`,
-      sessionId: parsedRequest.sessionId,
-    });
-    const applyCommand = buildSelectiveColorCommandEnvelope(payload, context, { dryRun: false });
-    return applySelectiveColorCommandEnvelopeToAdjustments(adjustments, applyCommand);
-  }, state.adjustments);
+  const typedAdjustments = applyCommands.reduce(
+    (adjustments, applyCommand) => applySelectiveColorCommandEnvelopeToAdjustments(adjustments, applyCommand),
+    state.adjustments,
+  );
   const nextAdjustments = applyColorPatchToAdjustments(typedAdjustments, parsedRequest.color, {
     includeSelectiveColor: false,
   });

@@ -210,7 +210,8 @@ const selectiveColorDryRunCommand = buildSelectiveColorCommandEnvelope(
   },
   { dryRun: true },
 );
-const selectiveColorApplyCommand = buildSelectiveColorCommandEnvelope(
+
+const rejectedSelectiveColorApplyCommand = buildSelectiveColorCommandEnvelope(
   { adjustment: { hue: 6, luminance: -8, saturation: 14 }, rangeKey: 'oranges' },
   {
     ...selectiveColorContext,
@@ -218,11 +219,17 @@ const selectiveColorApplyCommand = buildSelectiveColorCommandEnvelope(
     correlationId: 'corr_local_bridge_selective_color_apply',
     idempotencyKey: 'idem_local_bridge_selective_color_apply',
   },
-  { dryRun: false },
+  {
+    acceptedDryRunPlanHash: 'sha256:local-bridge:rejected',
+    acceptedDryRunPlanId: 'dryrun_tone_color_hsl_rejected',
+    dryRun: false,
+  },
 );
+delete rejectedSelectiveColorApplyCommand.parameters.acceptedDryRunPlanHash;
+delete rejectedSelectiveColorApplyCommand.parameters.acceptedDryRunPlanId;
 
 const unmatchedSelectiveApplyBridge = createRawEngineLocalAppServerBridge();
-const rejectedSelectiveApply = await unmatchedSelectiveApplyBridge.dispatch(selectiveColorApplyCommand);
+const rejectedSelectiveApply = await unmatchedSelectiveApplyBridge.dispatch(rejectedSelectiveColorApplyCommand);
 if (rejectedSelectiveApply.ok || rejectedSelectiveApply.reason !== 'handler_failed') {
   failures.push('Local app-server bridge must reject selective color apply before a matching dry-run.');
 }
@@ -232,18 +239,47 @@ if (!selectiveDryRun.ok) {
   failures.push(`Selective color dry-run failed: ${selectiveDryRun.message}`);
 } else {
   const parsedSelectiveDryRun = toneColorDryRunResultV1Schema.parse(selectiveDryRun.result);
+  const acceptedDryRunPlanHash = parsedSelectiveDryRun.dryRunPlanHash;
+  const acceptedDryRunPlanId = parsedSelectiveDryRun.dryRunPlanId;
+  if (acceptedDryRunPlanHash === undefined || acceptedDryRunPlanId === undefined) {
+    failures.push('Selective color dry-run result must include an accepted plan identity.');
+  }
   if (!parsedSelectiveDryRun.parameterDiff.some((diff) => diff.path === '/parameters/orange/hueShiftDegrees')) {
     failures.push('Selective color dry-run result did not include orange hue diff.');
   }
 }
 
-const selectiveApplied = await bridge.dispatch(selectiveColorApplyCommand);
-if (!selectiveApplied.ok) {
-  failures.push(`Selective color apply failed after accepted dry-run: ${selectiveApplied.message}`);
-} else {
-  const parsedSelectiveApply = toneColorMutationResultV1Schema.parse(selectiveApplied.result);
-  if (!parsedSelectiveApply.changedNodeIds.includes('tone_color_hsl:orange:image')) {
-    failures.push('Selective color apply result did not report the orange HSL node.');
+if (selectiveDryRun.ok) {
+  const parsedSelectiveDryRun = toneColorDryRunResultV1Schema.parse(selectiveDryRun.result);
+  const acceptedDryRunPlanHash = parsedSelectiveDryRun.dryRunPlanHash;
+  const acceptedDryRunPlanId = parsedSelectiveDryRun.dryRunPlanId;
+  if (acceptedDryRunPlanHash === undefined || acceptedDryRunPlanId === undefined) {
+    failures.push('Selective color dry-run result must include an accepted plan identity.');
+  } else {
+    const selectiveColorApplyCommand = buildSelectiveColorCommandEnvelope(
+      { adjustment: { hue: 6, luminance: -8, saturation: 14 }, rangeKey: 'oranges' },
+      {
+        ...selectiveColorContext,
+        commandId: 'command_local_bridge_selective_color_apply',
+        correlationId: 'corr_local_bridge_selective_color_apply',
+        idempotencyKey: 'idem_local_bridge_selective_color_apply',
+      },
+      {
+        acceptedDryRunPlanHash,
+        acceptedDryRunPlanId,
+        dryRun: false,
+      },
+    );
+
+    const selectiveApplied = await bridge.dispatch(selectiveColorApplyCommand);
+    if (!selectiveApplied.ok) {
+      failures.push(`Selective color apply failed after accepted dry-run: ${selectiveApplied.message}`);
+    } else {
+      const parsedSelectiveApply = toneColorMutationResultV1Schema.parse(selectiveApplied.result);
+      if (!parsedSelectiveApply.changedNodeIds.includes('tone_color_hsl:orange:image')) {
+        failures.push('Selective color apply result did not report the orange HSL node.');
+      }
+    }
   }
 }
 

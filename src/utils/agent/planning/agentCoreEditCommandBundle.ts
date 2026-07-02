@@ -101,13 +101,15 @@ export const runAgentCoreEditCommandBundle = async ({
       const dryRunDispatch = await bridge.dispatch(dryRunCommand);
       if (!dryRunDispatch.ok) throw new Error(`Agent basic-tone bundle dry-run failed: ${dryRunDispatch.message}`);
       const dryRun = toneColorDryRunResultV1Schema.parse(dryRunDispatch.result);
-      if (dryRun.dryRunPlanHash === undefined || dryRun.dryRunPlanId === undefined) {
+      const acceptedDryRunPlanHash = dryRun.dryRunPlanHash;
+      const acceptedDryRunPlanId = dryRun.dryRunPlanId;
+      if (acceptedDryRunPlanHash === undefined || acceptedDryRunPlanId === undefined) {
         throw new Error('Agent basic-tone bundle dry-run did not return a plan identity.');
       }
 
       const applyCommand = buildBasicToneCommandEnvelope(step.payload, context, {
-        acceptedDryRunPlanHash: dryRun.dryRunPlanHash,
-        acceptedDryRunPlanId: dryRun.dryRunPlanId,
+        acceptedDryRunPlanHash,
+        acceptedDryRunPlanId,
         dryRun: false,
       });
       const applyDispatch = await bridge.dispatch(applyCommand);
@@ -133,8 +135,17 @@ export const runAgentCoreEditCommandBundle = async ({
     const dryRunDispatch = await bridge.dispatch(dryRunCommand);
     if (!dryRunDispatch.ok) throw new Error(`Agent selective-color bundle dry-run failed: ${dryRunDispatch.message}`);
     const dryRun = toneColorDryRunResultV1Schema.parse(dryRunDispatch.result);
+    const acceptedDryRunPlanHash = dryRun.dryRunPlanHash;
+    const acceptedDryRunPlanId = dryRun.dryRunPlanId;
+    if (acceptedDryRunPlanHash === undefined || acceptedDryRunPlanId === undefined) {
+      throw new Error('Agent selective-color bundle dry-run did not return a plan identity.');
+    }
 
-    const applyCommand = buildSelectiveColorCommandEnvelope(step.payload, context, { dryRun: false });
+    const applyCommand = buildSelectiveColorCommandEnvelope(step.payload, context, {
+      acceptedDryRunPlanHash,
+      acceptedDryRunPlanId,
+      dryRun: false,
+    });
     const applyDispatch = await bridge.dispatch(applyCommand);
     if (!applyDispatch.ok) throw new Error(`Agent selective-color bundle apply failed: ${applyDispatch.message}`);
     const mutation = toneColorMutationResultV1Schema.parse(applyDispatch.result);
