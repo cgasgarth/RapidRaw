@@ -595,7 +595,9 @@ fn build_panorama_render_review(metadata: &PanoramaRenderMetadata) -> serde_json
     })
 }
 
-fn panorama_source_geometry_metadata_json(metadata: &PanoramaSourceGeometryMetadata) -> serde_json::Value {
+fn panorama_source_geometry_metadata_json(
+    metadata: &PanoramaSourceGeometryMetadata,
+) -> serde_json::Value {
     json!({
         "blockedReasons": &metadata.blocked_reasons,
         "columnCountEstimate": metadata.column_count_estimate,
@@ -644,7 +646,11 @@ fn build_panorama_source_geometry_metadata(
                 && selected_match_edge_count >= connected_source_count.saturating_sub(1),
         },
         horizontal_span_px: 0,
-        layout: if connected_source_count > 1 { "single_row".to_string() } else { "unknown".to_string() },
+        layout: if connected_source_count > 1 {
+            "single_row".to_string()
+        } else {
+            "unknown".to_string()
+        },
         layout_confidence: PanoramaSourceGeometryConfidenceMetadata {
             column_confidence: if connected_source_count > 1 { 1.0 } else { 0.0 },
             overall_confidence: if connected_source_count > 1 && disconnected_source_count == 0 {
@@ -665,7 +671,9 @@ fn build_panorama_source_geometry_metadata(
             "unverified".to_string()
         },
         vertical_span_px: 0,
-        warning_codes: if disconnected_source_count > 0 || selected_match_edge_count < total_source_count.saturating_sub(1) {
+        warning_codes: if disconnected_source_count > 0
+            || selected_match_edge_count < total_source_count.saturating_sub(1)
+        {
             vec![
                 "geometry_overclaim_guardrail".to_string(),
                 "graph_disconnected".to_string(),
