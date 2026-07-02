@@ -44,7 +44,11 @@ import {
   normalizeRadialGradientParameters,
 } from '../../../utils/mask/gradientMaskParameters';
 import { resolveWgpuPreviewVisibility } from '../../../utils/wgpuPreviewHealth';
-import { calculateWhiteBalancePickerAdjustment } from '../../../utils/whiteBalancePicker';
+import {
+  averageWhiteBalancePickerRgbaSample,
+  buildWhiteBalancePickerAdjustmentCommand,
+  type WhiteBalancePickerRuntimeReceipt,
+} from '../../../utils/whiteBalancePicker';
 import type { AppSettings, BrushSettings, SelectedImage } from '../../ui/AppProperties';
 import type { OverlayMode } from '../right/color/CropPanel';
 import { Mask, type SubMask, SubMaskMode, ToolType } from '../right/layers/Masks';
@@ -259,7 +263,8 @@ interface ImageCanvasProps {
   updateSubMask: (id: string | null, subMask: Partial<SubMask>) => void;
   interactivePatch?: { url: string; normX: number; normY: number; normW: number; normH: number } | null;
   isWbPickerActive?: boolean;
-  onWbPicked?: () => void;
+  lastWhiteBalancePickerReceipt?: WhiteBalancePickerRuntimeReceipt | null;
+  onWbPicked?: (receipt: WhiteBalancePickerRuntimeReceipt, nextAdjustments: Adjustments) => void;
   setAdjustments: (fn: (prev: Adjustments) => Adjustments) => void;
   overlayMode?: OverlayMode;
   overlayRotation?: number;
@@ -1213,6 +1218,7 @@ const ImageCanvas = memo(
     uncroppedAdjustedPreviewUrl,
     updateSubMask,
     isWbPickerActive = false,
+    lastWhiteBalancePickerReceipt,
     onWbPicked,
     setAdjustments,
     overlayRotation,
@@ -1697,49 +1703,34 @@ const ImageCanvas = memo(
 
           ctx.drawImage(img, startX, startY, sw, sh, 0, 0, sw, sh);
 
-          const imageData = ctx.getImageData(0, 0, sw, sh);
-          const data = imageData.data;
+          const averageRgb = averageWhiteBalancePickerRgbaSample(ctx.getImageData(0, 0, sw, sh).data);
+          if (!averageRgb) return;
 
-          let rTotal = 0,
-            gTotal = 0,
-            bTotal = 0;
-          let count = 0;
-
-          for (let i = 0; i < data.length; i += 4) {
-            rTotal += data[i] ?? 0;
-            gTotal += data[i + 1] ?? 0;
-            bTotal += data[i + 2] ?? 0;
-            count++;
-          }
-
-          if (count === 0) return;
-
-          const avgR = rTotal / count;
-          const avgG = gTotal / count;
-          const avgB = bTotal / count;
-
-          setAdjustments((prev: Adjustments) => {
-            const whiteBalance = calculateWhiteBalancePickerAdjustment({
-              currentTemperature: prev.temperature,
-              currentTint: prev.tint,
-              sample: {
-                red: avgR,
-                green: avgG,
-                blue: avgB,
-              },
-            });
-
-            return {
-              ...prev,
-              temperature: whiteBalance.temperature,
-              tint: whiteBalance.tint,
-            };
+          const command = buildWhiteBalancePickerAdjustmentCommand({
+            averageRgb,
+            coordinates: {
+              imageX: x,
+              imageY: y,
+              previewPixelX: srcX,
+              previewPixelY: srcY,
+            },
+            currentAdjustments: adjustments,
+            previewIdentity: finalPreviewUrl,
+            selectedImagePath: selectedImage.path,
           });
 
-          onWbPicked();
+          onWbPicked(command.receipt, command.nextAdjustments);
         };
       },
-      [isWbPickerActive, finalPreviewUrl, imageRenderSize, onWbPicked, setAdjustments, getCanvasPointer],
+      [
+        adjustments,
+        finalPreviewUrl,
+        imageRenderSize,
+        isWbPickerActive,
+        onWbPicked,
+        selectedImage.path,
+        getCanvasPointer,
+      ],
     );
 
     const handleStart = useCallback(
@@ -2815,6 +2806,29 @@ const ImageCanvas = memo(
         data-editor-compare-mode={compareMode}
         data-editor-compare-original-ready={String(canShowOriginalCompare)}
         data-preview-backend={wgpuPreviewVisibility.previewBackend}
+        data-wb-picker-image-path={lastWhiteBalancePickerReceipt?.selectedImagePath ?? undefined}
+        data-wb-picker-preview-identity={lastWhiteBalancePickerReceipt?.previewIdentity ?? undefined}
+        data-wb-picker-result-temperature={
+          lastWhiteBalancePickerReceipt ? String(lastWhiteBalancePickerReceipt.resultingTemperature) : undefined
+        }
+        data-wb-picker-result-tint={
+          lastWhiteBalancePickerReceipt ? String(lastWhiteBalancePickerReceipt.resultingTint) : undefined
+        }
+        data-wb-picker-sample-blue={
+          lastWhiteBalancePickerReceipt ? String(lastWhiteBalancePickerReceipt.averageRgb.blue) : undefined
+        }
+        data-wb-picker-sample-green={
+          lastWhiteBalancePickerReceipt ? String(lastWhiteBalancePickerReceipt.averageRgb.green) : undefined
+        }
+        data-wb-picker-sample-preview-x={
+          lastWhiteBalancePickerReceipt ? String(lastWhiteBalancePickerReceipt.coordinates.previewPixelX) : undefined
+        }
+        data-wb-picker-sample-preview-y={
+          lastWhiteBalancePickerReceipt ? String(lastWhiteBalancePickerReceipt.coordinates.previewPixelY) : undefined
+        }
+        data-wb-picker-sample-red={
+          lastWhiteBalancePickerReceipt ? String(lastWhiteBalancePickerReceipt.averageRgb.red) : undefined
+        }
         data-wgpu-frame-health={wgpuPreviewVisibility.health}
         data-testid="image-canvas"
         style={{ width: '100%', height: '100%', cursor: effectiveCursor }}
