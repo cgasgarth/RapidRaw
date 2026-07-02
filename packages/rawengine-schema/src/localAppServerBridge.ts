@@ -476,6 +476,8 @@ const RAW_ENGINE_LOCAL_APP_SERVER_EXECUTABLE_TOOL_NAMES = new Set([
   'agent.image_metadata.query',
   'agent.project_metadata.query',
   'agent.selected_images.query',
+  'rawengine.agent.preview.render',
+  'rawengine.image.get_preview',
   'ai.enhancement.apply_command',
   'ai.enhancement.dry_run_command',
   'ai.mask.apply_subject',

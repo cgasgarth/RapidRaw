@@ -44,9 +44,10 @@ import {
 import {
   AGENT_PREVIEW_RENDER_TOOL_NAME,
   AGENT_STATE_GET_TOOL_NAME,
+  agentPreviewRenderResponseSchema,
   getAgentReadOnlyState,
   RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
-  renderAgentReadOnlyPreview,
+  rawEngineImageGetPreviewResponseSchema,
 } from '../../../../utils/agent/context/agentReadOnlyAppServerTools';
 import {
   AGENT_LAYER_CREATE_TOOL_NAME,
@@ -269,11 +270,16 @@ interface LiveActivityEntry {
   graphRevision?: string;
   id: string;
   kind: LiveActivityKind;
+  previewHashIdentity?: string;
   previewAfterHash?: string;
   previewBeforeHash?: string;
+  previewPurpose?: 'detail_review' | 'initial_context' | 'refresh';
+  previewStale?: boolean;
   recipeHash?: string;
+  requestId?: string;
   status: 'blocked' | 'completed' | 'pending' | 'rolled_back';
   toolName?: string;
+  turnId?: string;
 }
 
 type LiveActivityEntryInput = Omit<
@@ -283,19 +289,29 @@ type LiveActivityEntryInput = Omit<
   | 'exportArtifactId'
   | 'graphRevision'
   | 'id'
+  | 'previewHashIdentity'
   | 'previewAfterHash'
   | 'previewBeforeHash'
+  | 'previewPurpose'
+  | 'previewStale'
   | 'recipeHash'
+  | 'requestId'
   | 'toolName'
+  | 'turnId'
 > & {
   acceptedPreviewArtifactId?: string | undefined;
   approvalId?: string | undefined;
   exportArtifactId?: string | undefined;
   graphRevision?: string | undefined;
+  previewHashIdentity?: string | undefined;
   previewAfterHash?: string | undefined;
   previewBeforeHash?: string | undefined;
+  previewPurpose?: 'detail_review' | 'initial_context' | 'refresh' | undefined;
+  previewStale?: boolean | undefined;
   recipeHash?: string | undefined;
+  requestId?: string | undefined;
   toolName?: string | undefined;
+  turnId?: string | undefined;
 };
 
 const createAgentRollbackSnapshot = () => {
@@ -1680,10 +1696,15 @@ function LivePromptComposer({
       if (entry.graphRevision !== undefined) nextEntry.graphRevision = entry.graphRevision;
       if (entry.approvalId !== undefined) nextEntry.approvalId = entry.approvalId;
       if (entry.exportArtifactId !== undefined) nextEntry.exportArtifactId = entry.exportArtifactId;
+      if (entry.previewHashIdentity !== undefined) nextEntry.previewHashIdentity = entry.previewHashIdentity;
       if (entry.previewAfterHash !== undefined) nextEntry.previewAfterHash = entry.previewAfterHash;
       if (entry.previewBeforeHash !== undefined) nextEntry.previewBeforeHash = entry.previewBeforeHash;
+      if (entry.previewPurpose !== undefined) nextEntry.previewPurpose = entry.previewPurpose;
+      if (entry.previewStale !== undefined) nextEntry.previewStale = entry.previewStale;
       if (entry.recipeHash !== undefined) nextEntry.recipeHash = entry.recipeHash;
+      if (entry.requestId !== undefined) nextEntry.requestId = entry.requestId;
       if (entry.toolName !== undefined) nextEntry.toolName = entry.toolName;
+      if (entry.turnId !== undefined) nextEntry.turnId = entry.turnId;
 
       return [...entries, nextEntry];
     });
@@ -1717,14 +1738,30 @@ function LivePromptComposer({
       setExpertArtifactReview(null);
       setExpertDryRunReview(null);
       if (initialPromptPreviewContext !== undefined) {
+        const observeRequestId = `agent-live-initial-preview-${Date.now()}`;
+        const observedPreview = rawEngineImageGetPreviewResponseSchema.parse(
+          await dispatchAgentLiveEditorTool({
+            args: {
+              expectedRecipeHash: initialPromptPreviewContext.recipeHash,
+              requestId: observeRequestId,
+            },
+            requestId: observeRequestId,
+            runtimeToolName: RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
+          }),
+        );
         pushActivityEntry({
-          body: `${initialPromptPreviewContext.purpose} ${initialPromptPreviewContext.artifactId}`,
-          graphRevision: initialPromptPreviewContext.graphRevision,
+          body: `${observedPreview.receipt.preview.purpose} ${observedPreview.receipt.preview.artifactId}`,
+          graphRevision: observedPreview.receipt.graphRevision,
           kind: 'preview',
-          previewAfterHash: initialPromptPreviewContext.renderHash,
-          recipeHash: initialPromptPreviewContext.recipeHash,
-          status: 'completed',
+          previewAfterHash: observedPreview.receipt.preview.renderHash,
+          previewHashIdentity: observedPreview.receipt.contentHash,
+          previewPurpose: observedPreview.receipt.preview.purpose,
+          previewStale: observedPreview.receipt.proofContext.stale,
+          recipeHash: observedPreview.receipt.preview.recipeHash,
+          requestId: observedPreview.receipt.requestId,
+          status: observedPreview.receipt.proofContext.stale ? 'pending' : 'completed',
           toolName: RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
+          turnId: 'turn-0',
         });
       }
       pushActivityEntry({
@@ -1877,25 +1914,40 @@ function LivePromptComposer({
     }
   };
 
-  const refreshPreview = () => {
+  const refreshPreview = async () => {
     if (!canRefreshPreview) return;
 
     try {
-      const previewResult = renderAgentReadOnlyPreview({
-        expectedRecipeHash: result.recipeName ?? initialPromptPreviewContext?.recipeHash,
-        longEdgePx: initialPromptPreviewContext?.longEdgePx ?? 1536,
-        purpose: 'refresh',
-        quality: initialPromptPreviewContext?.quality ?? 0.86,
-        requestId: `agent-live-preview-refresh-${Date.now()}`,
-      });
+      const previewRequestId = `agent-live-preview-refresh-${Date.now()}`;
+      const previewResult = agentPreviewRenderResponseSchema.parse(
+        await dispatchAgentLiveEditorTool({
+          args: {
+            expectedRecipeHash: result.recipeName ?? initialPromptPreviewContext?.recipeHash,
+            longEdgePx: initialPromptPreviewContext?.longEdgePx ?? 1536,
+            purpose: 'refresh',
+            quality: initialPromptPreviewContext?.quality ?? 0.86,
+            requestId: previewRequestId,
+            sourceToolName: AGENT_PREVIEW_RENDER_TOOL_NAME,
+            turn: 1,
+          },
+          requestId: previewRequestId,
+          runtimeToolName: AGENT_PREVIEW_RENDER_TOOL_NAME,
+        }),
+      );
+      const receipt = previewResult.receipt;
       pushActivityEntry({
         body: `${previewResult.preview.purpose} ${previewResult.preview.artifactId}`,
-        graphRevision: initialPromptPreviewContext?.graphRevision,
+        graphRevision: receipt?.graphRevision ?? initialPromptPreviewContext?.graphRevision,
         kind: 'preview',
         previewAfterHash: previewResult.preview.renderHash,
+        previewHashIdentity: receipt?.contentHash,
+        previewPurpose: previewResult.preview.purpose,
+        previewStale: receipt?.proofContext.stale ?? previewResult.staleRecipeHash,
         recipeHash: previewResult.preview.recipeHash,
+        requestId: previewResult.requestId,
         status: previewResult.staleRecipeHash ? 'pending' : 'completed',
         toolName: AGENT_PREVIEW_RENDER_TOOL_NAME,
+        turnId: 'turn-1',
       });
       const nextResult = {
         ...result,
@@ -1923,31 +1975,46 @@ function LivePromptComposer({
     }
   };
 
-  const requestDetailPreview = () => {
+  const requestDetailPreview = async () => {
     if (!canRequestDetailPreview) return;
 
     try {
-      const previewResult = renderAgentReadOnlyPreview({
-        expectedRecipeHash: result.recipeName ?? initialPromptPreviewContext?.recipeHash,
-        longEdgePx: initialPromptPreviewContext?.longEdgePx ?? 1536,
-        purpose: 'detail_review',
-        quality: initialPromptPreviewContext?.quality ?? 0.86,
-        requestId: `agent-live-detail-preview-${Date.now()}`,
-        zoom: {
-          centerX: 0.5,
-          centerY: 0.5,
-          scale: 2,
-        },
-      });
+      const previewRequestId = `agent-live-detail-preview-${Date.now()}`;
+      const previewResult = agentPreviewRenderResponseSchema.parse(
+        await dispatchAgentLiveEditorTool({
+          args: {
+            expectedRecipeHash: result.recipeName ?? initialPromptPreviewContext?.recipeHash,
+            longEdgePx: initialPromptPreviewContext?.longEdgePx ?? 1536,
+            purpose: 'detail_review',
+            quality: initialPromptPreviewContext?.quality ?? 0.86,
+            requestId: previewRequestId,
+            sourceToolName: AGENT_PREVIEW_RENDER_TOOL_NAME,
+            turn: 1,
+            zoom: {
+              centerX: 0.5,
+              centerY: 0.5,
+              scale: 2,
+            },
+          },
+          requestId: previewRequestId,
+          runtimeToolName: AGENT_PREVIEW_RENDER_TOOL_NAME,
+        }),
+      );
+      const receipt = previewResult.receipt;
       pushActivityEntry({
         body: `${previewResult.preview.purpose} ${previewResult.preview.artifactId}`,
-        graphRevision: initialPromptPreviewContext?.graphRevision,
+        graphRevision: receipt?.graphRevision ?? initialPromptPreviewContext?.graphRevision,
         kind: 'preview',
         previewAfterHash: previewResult.preview.renderHash,
         previewBeforeHash: result.previewAfterHash,
+        previewHashIdentity: receipt?.contentHash,
+        previewPurpose: previewResult.preview.purpose,
+        previewStale: receipt?.proofContext.stale ?? previewResult.staleRecipeHash,
         recipeHash: previewResult.preview.recipeHash,
+        requestId: previewResult.requestId,
         status: previewResult.staleRecipeHash ? 'pending' : 'completed',
         toolName: AGENT_PREVIEW_RENDER_TOOL_NAME,
+        turnId: 'turn-1',
       });
       const nextResult = {
         ...result,

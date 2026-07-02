@@ -9633,7 +9633,38 @@ export const rawEngineImageGetPreviewRequestV1Schema = z
   })
   .strict();
 
+export const rawEngineAgentPreviewRenderRequestV1Schema = z
+  .object({
+    crop: z
+      .object({
+        height: z.number().positive().max(1),
+        width: z.number().positive().max(1),
+        x: z.number().min(0).max(1),
+        y: z.number().min(0).max(1),
+      })
+      .strict()
+      .optional(),
+    expectedRecipeHash: z.string().trim().min(1).optional(),
+    longEdgePx: z.number().int().min(256).max(2048).default(1536),
+    maxPixelCount: z.number().int().min(65_536).max(4_194_304).default(4_194_304),
+    purpose: z.enum(['detail_review', 'initial_context', 'refresh']).default('refresh'),
+    quality: z.number().min(0.5).max(0.95).default(0.86),
+    requestId: z.string().trim().min(1),
+    sourceToolName: z.string().trim().min(1).default('rawengine.agent.preview.render'),
+    turn: z.number().int().positive().default(1),
+    zoom: z
+      .object({
+        centerX: z.number().min(0).max(1),
+        centerY: z.number().min(0).max(1),
+        scale: z.number().min(1).max(8),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
 const rawEngineAppServerKnownInputSchemas = {
+  AgentPreviewRenderRequestV1: rawEngineAgentPreviewRenderRequestV1Schema,
   AiEnhancementCommandEnvelopeV1: aiEnhancementCommandEnvelopeV1Schema,
   AiToolCommandEnvelopeV1: aiToolCommandEnvelopeV1Schema,
   CommandEnvelopeV1: commandEnvelopeV1Schema,
@@ -10960,6 +10991,7 @@ export type PreviewScopeKindV1 = z.infer<typeof previewScopeKindV1Schema>;
 export type PreviewScopeQueryV1 = z.infer<typeof previewScopeQueryV1Schema>;
 export type PreviewScopeRenderBasisV1 = z.infer<typeof previewScopeRenderBasisV1Schema>;
 export type PreviewScopeResultV1 = z.infer<typeof previewScopeResultV1Schema>;
+export type RawEngineAgentPreviewRenderRequestV1 = z.infer<typeof rawEngineAgentPreviewRenderRequestV1Schema>;
 export type ProjectLibraryCommandEnvelopeV1 = z.infer<typeof projectLibraryCommandEnvelopeV1Schema>;
 export type ProjectLibraryCommandTypeV1 = z.infer<typeof projectLibraryCommandTypeV1Schema>;
 export type ProjectLibraryFilterCriteriaV1 = z.infer<typeof projectLibraryFilterCriteriaV1Schema>;

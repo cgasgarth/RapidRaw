@@ -16,6 +16,7 @@ const rawEngineAppServerInputSchemaNamesV1 = [
   'LensProfileCommandEnvelopeV1',
   'NegativeLabApplyPlanRequestV1',
   'NegativeLabCommandEnvelopeV1',
+  'AgentPreviewRenderRequestV1',
   'PreviewScopeQueryV1',
   'ProjectLibraryCommandEnvelopeV1',
   'ProjectLibrarySnapshotQueryV1',

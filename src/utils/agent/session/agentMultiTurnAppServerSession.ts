@@ -181,71 +181,6 @@ const refreshRecipeHash = async (requestId: string): Promise<string> =>
     }),
   );
 
-const buildInitialPreviewContentHash = (receiptSeed: {
-  artifactId: string;
-  imagePath: string;
-  renderHash: string;
-  sessionId: string;
-}): string => {
-  const hashSeed = JSON.stringify(receiptSeed);
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < hashSeed.length; index += 1) {
-    hash ^= hashSeed.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-
-  return `sha256:${(hash >>> 0).toString(16).padStart(16, '0')}`;
-};
-
-const buildInitialPreviewReceipt = ({
-  initialContext,
-  previewResult,
-  requestId,
-}: {
-  initialContext: ReturnType<typeof buildAgentInitialPromptContext>;
-  previewResult: z.infer<typeof rawEngineImageGetPreviewResponseSchema>;
-  requestId: string;
-}): RawEngineAgentInitialPreviewReceiptV1 =>
-  rawEngineAgentInitialPreviewReceiptV1Schema.parse({
-    colorPipeline: {
-      encodedProfile: 'srgb-preview',
-      outputProfile: 'srgb',
-      previewTransform: 'editor-preview-to-srgb-jpeg',
-      workingSpace: 'rawengine-scene-linear',
-    },
-    contentHash: buildInitialPreviewContentHash({
-      artifactId: previewResult.preview.artifactId,
-      imagePath: initialContext.modelInput.activeImagePath,
-      renderHash: previewResult.preview.renderHash,
-      sessionId: initialContext.sessionId,
-    }),
-    graphRevision: previewResult.editRevision.graphRevision,
-    imagePath: initialContext.modelInput.activeImagePath,
-    preview: {
-      accessScope: previewResult.preview.accessScope,
-      artifactId: previewResult.preview.artifactId,
-      encodedFormat: previewResult.preview.encodedFormat,
-      height: previewResult.preview.height,
-      includesOriginalRaw: previewResult.preview.includesOriginalRaw,
-      longEdgePx: previewResult.preview.longEdgePx,
-      mediaType: previewResult.preview.mediaType,
-      previewRef: previewResult.preview.previewRef,
-      purpose: previewResult.preview.purpose,
-      quality: previewResult.preview.quality,
-      recipeHash: previewResult.preview.recipeHash,
-      renderHash: previewResult.preview.renderHash,
-      width: previewResult.preview.width,
-    },
-    proofContext: {
-      stale: previewResult.staleRecipeHash,
-      transport: initialContext.modelInput.transport,
-    },
-    requestId,
-    schemaVersion: 1,
-    sessionId: initialContext.sessionId,
-    toolName: previewResult.toolName,
-  });
-
 export const runAgentMultiTurnAppServerSession = async (
   request: AgentMultiTurnAppServerSessionRequest,
 ): Promise<AgentMultiTurnAppServerSessionResult> => {
@@ -267,11 +202,7 @@ export const runAgentMultiTurnAppServerSession = async (
       runtimeToolName: RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
     }),
   );
-  const initialPreviewReceipt = buildInitialPreviewReceipt({
-    initialContext,
-    previewResult: initialPreviewResult,
-    requestId: initialPreviewToolCallId,
-  });
+  const initialPreviewReceipt = initialPreviewResult.receipt;
   const messages: AgentMultiTurnAppServerSessionResult['messages'] = [
     {
       content: `${parsedRequest.prompt}\n\nInitial medium preview ${initialPreviewReceipt.preview.artifactId} (${initialPreviewReceipt.contentHash}) is attached.`,
