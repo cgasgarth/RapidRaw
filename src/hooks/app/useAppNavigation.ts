@@ -21,6 +21,7 @@ import {
   consumePendingNegativeConversionDustHealLayers,
   consumePendingNegativeConversionSavedPositiveHandoff,
 } from '../../utils/negative-lab/negativeLabEditorHandoff';
+import { metadataWithNegativeLabReopenedSavedPositiveHandoff } from '../../utils/negative-lab/negativeLabSavedPositiveReopen';
 import { debouncedSave, debouncedSetHistory } from '../editor/useEditorActions';
 import { reconcileSelectedFolderRefresh } from '../library/selectedFolderRefreshReconciliation';
 
@@ -263,9 +264,13 @@ export function useAppNavigation({ clearThumbnailQueue, requestThumbnails, refs 
         invoke<LoadImageResult>(Invokes.LoadImage, { path })
           .then((result) => {
             if (selectedImagePathRef.current !== path) return;
-            upsertReopenedDerivedOutputReceipt({
+            const loadedMetadata = metadataWithNegativeLabReopenedSavedPositiveHandoff({
               imagePath: path,
               metadata: result.metadata,
+            });
+            upsertReopenedDerivedOutputReceipt({
+              imagePath: path,
+              metadata: loadedMetadata,
               upsert: useUIStore.getState().upsertDerivedOutputReceipt,
             });
             isBackendReadyRef.current = true;
@@ -280,7 +285,7 @@ export function useAppNavigation({ clearThumbnailQueue, requestThumbnails, refs 
                       height: result.height,
                       isOfflineSmartPreview: result.is_offline_smart_preview === true,
                       isRaw: result.is_raw,
-                      metadata: result.metadata ?? state.selectedImage.metadata,
+                      metadata: loadedMetadata ?? state.selectedImage.metadata,
                       rawDevelopmentReport: result.raw_development_report ?? null,
                       width: result.width,
                     }

@@ -18,6 +18,7 @@ import {
   consumePendingNegativeConversionDustHealLayers,
   consumePendingNegativeConversionSavedPositiveHandoff,
 } from '../../utils/negative-lab/negativeLabEditorHandoff';
+import { metadataWithNegativeLabReopenedSavedPositiveHandoff } from '../../utils/negative-lab/negativeLabSavedPositiveReopen';
 
 export function useImageLoader(cachedEditStateRef: RefObject<ImageCacheEntry | null>) {
   const selectedImage = useEditorStore((s) => s.selectedImage);
@@ -77,11 +78,15 @@ export function useImageLoader(cachedEditStateRef: RefObject<ImageCacheEntry | n
             await invoke<unknown>(Invokes.LoadImage, { path: selectedImagePath }),
           );
           if (!isEffectActive) return;
+          const loadedMetadata = metadataWithNegativeLabReopenedSavedPositiveHandoff({
+            imagePath: selectedImagePath,
+            metadata: loadImageResult.metadata,
+          });
 
           const { width, height } = loadImageResult;
           upsertReopenedDerivedOutputReceipt({
             imagePath: selectedImagePath,
-            metadata: loadImageResult.metadata,
+            metadata: loadedMetadata,
             upsert: useUIStore.getState().upsertDerivedOutputReceipt,
           });
           setEditor({ originalSize: { width, height } });
@@ -113,7 +118,7 @@ export function useImageLoader(cachedEditStateRef: RefObject<ImageCacheEntry | n
                   isOfflineSmartPreview: loadImageResult.is_offline_smart_preview === true,
                   isRaw: loadImageResult.is_raw,
                   isReady: true,
-                  metadata: loadImageResult.metadata,
+                  metadata: loadedMetadata,
                   originalUrl: null,
                   rawDevelopmentReport: loadImageResult.raw_development_report ?? null,
                   width: loadImageResult.width,
