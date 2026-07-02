@@ -1263,12 +1263,14 @@ const ImageCanvas = memo(
     const [straightenLine, setStraightenLine] = useState<StraightenLine | null>(null);
     const isStraightening = useRef(false);
 
+    const previewSource = resolveEditorPreviewSource({
+      finalPreviewUrl,
+      isReady: selectedImage.isReady,
+      thumbnailUrl: selectedImage.thumbnailUrl,
+    });
+
     const [displayState, setDisplayState] = useState({
-      base: resolveEditorPreviewSource({
-        finalPreviewUrl,
-        isReady: selectedImage.isReady,
-        thumbnailUrl: selectedImage.thumbnailUrl,
-      }),
+      base: previewSource,
       fade: null as string | null,
     });
     const [isFadingIn, setIsFadingIn] = useState(false);
@@ -1330,11 +1332,7 @@ const ImageCanvas = memo(
     }, [interactivePatch]);
 
     useEffect(() => {
-      const newSrc = resolveEditorPreviewSource({
-        finalPreviewUrl,
-        isReady: selectedImage.isReady,
-        thumbnailUrl: selectedImage.thumbnailUrl,
-      });
+      const newSrc = previewSource;
       const isNewImage = prevImageIdentityRef.current !== selectedImage.path;
 
       if (isNewImage) {
@@ -1377,7 +1375,7 @@ const ImageCanvas = memo(
       }
       return undefined;
     }, [
-      finalPreviewUrl,
+      previewSource,
       selectedImage.isReady,
       selectedImage.path,
       selectedImage.thumbnailUrl,
@@ -2748,7 +2746,7 @@ const ImageCanvas = memo(
       };
     }, [originalSrc]);
 
-    const currentTarget = finalPreviewUrl || selectedImage.thumbnailUrl;
+    const currentTarget = previewSource;
     const baseIsReady = displayState.base === currentTarget && !displayState.fade;
 
     const visiblePatch = interactivePatch ?? (baseIsReady ? null : retainedPatchRef.current);
@@ -3068,7 +3066,7 @@ const ImageCanvas = memo(
                     },
                     {
                       label: t('editor.canvas.compare.after'),
-                      src: finalPreviewUrl || selectedImage.thumbnailUrl,
+                      src: previewSource,
                     },
                   ].map((pane) => (
                     <div
