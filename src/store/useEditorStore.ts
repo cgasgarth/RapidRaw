@@ -7,7 +7,11 @@ import type { BaseRenderSize, ImageDimensions } from '../hooks/viewport/useImage
 import type { MaskOverlaySettings } from '../schemas/masks/maskOverlaySchemas';
 import type { GamutWarningOverlayPayload } from '../schemas/tauriEventSchemas';
 import { type Adjustments, DisplayMode, INITIAL_ADJUSTMENTS, type MaskContainer } from '../utils/adjustments';
-import type { BasicToneCommandEnvelope } from '../utils/basicToneCommandBridge';
+import {
+  applyBasicToneCommandEnvelopeToAdjustments,
+  BasicToneApprovalClass,
+  type BasicToneCommandEnvelope,
+} from '../utils/basicToneCommandBridge';
 import { isPendingExportSoftProofGamutWarningOverlay } from '../utils/color/runtime/gamutWarningDisplay';
 import {
   createEditHistoryCheckpoint,
@@ -137,6 +141,7 @@ interface EditorState {
   // Actions
   setEditor: (updater: Partial<EditorState> | ((state: EditorState) => Partial<EditorState>)) => void;
   createHistoryCheckpoint: (label: string) => void;
+  applyBasicToneCommand: (command: BasicToneCommandEnvelope) => void;
   pushHistory: (newAdjustments: Adjustments) => void;
   renameHistoryCheckpoint: (checkpointId: string, label: string) => void;
   undo: () => void;
@@ -166,6 +171,27 @@ const historyNavigationPreviewInvalidation = {
   transformedOriginalUrl: null,
   uncroppedAdjustedPreviewUrl: null,
 } satisfies Partial<EditorState>;
+
+const assertApprovedBasicToneCommand = (command: BasicToneCommandEnvelope, state: EditorState): void => {
+  if (command.commandType !== 'toneColor.setBasicTone') {
+    throw new Error('Editor basic-tone apply expected toneColor.setBasicTone command.');
+  }
+  if (command.dryRun) {
+    throw new Error('Editor basic-tone apply requires dryRun=false.');
+  }
+  if (command.approval.approvalClass !== BasicToneApprovalClass.EditApply || command.approval.state !== 'approved') {
+    throw new Error('Editor basic-tone apply requires approved edit-apply approval.');
+  }
+  if (
+    command.parameters.acceptedDryRunPlanHash === undefined ||
+    command.parameters.acceptedDryRunPlanId === undefined
+  ) {
+    throw new Error('Editor basic-tone apply requires accepted dry-run plan identity.');
+  }
+  if (command.expectedGraphRevision !== `history_${state.historyIndex}`) {
+    throw new Error('Editor basic-tone apply rejected stale graph revision.');
+  }
+};
 
 export const useEditorStore = create<EditorState>((set) => ({
   selectedImage: null,
@@ -269,6 +295,28 @@ export const useEditorStore = create<EditorState>((set) => ({
         new Date().toISOString(),
       ),
     }));
+  },
+
+  applyBasicToneCommand: (command) => {
+    set((state) => {
+      assertApprovedBasicToneCommand(command, state);
+      const adjustments = applyBasicToneCommandEnvelopeToAdjustments(state.adjustments, command);
+      const nextHistory = pushEditHistoryEntryWithCheckpoints(
+        state.history,
+        state.historyIndex,
+        adjustments,
+        state.historyCheckpoints,
+      );
+
+      return {
+        ...historyNavigationPreviewInvalidation,
+        adjustments,
+        history: nextHistory.history,
+        historyCheckpoints: nextHistory.checkpoints,
+        historyIndex: nextHistory.historyIndex,
+        lastBasicToneCommand: command,
+      };
+    });
   },
 
   pushHistory: (newAdj) => {
