@@ -4324,7 +4324,25 @@ const panoramaRuntimePlanFixture: PanoramaRuntimePlan = {
     },
     source_geometry: {
       blocked_reasons: [],
+      column_count_estimate: 5,
+      connected_component_count: 1,
+      graph_connectivity: {
+        connected_source_count: 5,
+        disconnected_source_count: 0,
+        edge_count: 4,
+        is_connected: true,
+      },
+      horizontal_span_px: 480,
       layout: 'single_row',
+      layout_confidence: {
+        column_confidence: 0.88,
+        overall_confidence: 0.91,
+        row_confidence: 0.95,
+      },
+      selected_component: {
+        source_count: 5,
+        source_indices: [0, 1, 2, 3, 4],
+      },
       row_count_estimate: 1,
       support: 'implemented_current_engine',
       vertical_span_px: 3,
@@ -4386,6 +4404,32 @@ const panoramaRenderedReviewFixture: PanoramaRenderedReview = {
       state: 'warning',
       warningCodes: ['geometry_estimate_low_confidence'],
     },
+  },
+  sourceGeometry: {
+    blockedReasons: [],
+    columnCountEstimate: 5,
+    connectedComponentCount: 1,
+    graphConnectivity: {
+      connectedSourceCount: 5,
+      disconnectedSourceCount: 0,
+      edgeCount: 4,
+      isConnected: true,
+    },
+    horizontalSpanPx: 480,
+    layout: 'single_row',
+    layoutConfidence: {
+      columnConfidence: 0.88,
+      overallConfidence: 0.91,
+      rowConfidence: 0.95,
+    },
+    selectedComponent: {
+      sourceCount: 5,
+      sourceIndices: [0, 1, 2, 3, 4],
+    },
+    rowCountEstimate: 1,
+    support: 'implemented_current_engine',
+    verticalSpanPx: 3,
+    warningCodes: [],
   },
   sources: {
     excludedSourceIndices: [],
@@ -6142,7 +6186,18 @@ function PanoramaVisualSmoke() {
           data-plan-width={panoramaRuntimePlanFixture.output_dimensions.width}
           data-projection={settings.projection}
           data-quality-preference={settings.qualityPreference}
+          data-source-geometry-column-count-estimate={
+            panoramaRuntimePlanFixture.preflight.source_geometry?.column_count_estimate
+          }
+          data-source-geometry-connected-label={
+            panoramaRuntimePlanFixture.preflight.source_geometry?.graph_connectivity.is_connected
+              ? 'connected'
+              : 'disconnected'
+          }
           data-source-geometry-layout={panoramaRuntimePlanFixture.preflight.source_geometry?.layout}
+          data-source-geometry-row-confidence={
+            panoramaRuntimePlanFixture.preflight.source_geometry?.layout_confidence.row_confidence
+          }
           data-source-geometry-support={panoramaRuntimePlanFixture.preflight.source_geometry?.support}
           data-source-row-count-estimate={panoramaRuntimePlanFixture.preflight.source_geometry?.row_count_estimate}
           data-runtime-status="dry_run_preview"

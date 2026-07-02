@@ -27,7 +27,25 @@ const samplePlan = panoramaRuntimePlanSchema.parse({
     },
     source_geometry: {
       blocked_reasons: ['multi_row_panorama_not_supported'],
+      column_count_estimate: 3,
+      connected_component_count: 1,
+      graph_connectivity: {
+        connected_source_count: 3,
+        disconnected_source_count: 0,
+        edge_count: 2,
+        is_connected: true,
+      },
+      horizontal_span_px: 480,
       layout: 'multi_row_candidate',
+      layout_confidence: {
+        column_confidence: 0.48,
+        overall_confidence: 0.53,
+        row_confidence: 0.57,
+      },
+      selected_component: {
+        source_count: 3,
+        source_indices: [0, 1, 2],
+      },
       row_count_estimate: 2,
       support: 'blocked_requires_multi_row_solver',
       vertical_span_px: 480,
@@ -71,8 +89,12 @@ for (const marker of [
   'data-plan-scope="tile_runtime_output"',
   "data-tile-count={runtimePlanTileCount ?? ''}",
   "data-plan-status={runtimePlan?.preflight.status ?? 'pending'}",
+  "data-source-geometry-column-count-estimate={runtimePlanSourceGeometry?.column_count_estimate ?? ''}",
+  'data-source-geometry-connected-label={runtimePlanSourceGeometryConnectedLabel}',
   "data-source-geometry-layout={runtimePlanSourceGeometry?.layout ?? 'pending'}",
+  "data-source-geometry-row-confidence={runtimePlanSourceGeometryConfidence?.row_confidence ?? ''}",
   "data-source-geometry-support={runtimePlanSourceGeometry?.support ?? 'pending'}",
+  "data-source-geometry-warning-codes={runtimePlanSourceGeometry?.warning_codes.join(',') ?? ''}",
   "data-source-row-count-estimate={runtimePlanSourceGeometry?.row_count_estimate ?? ''}",
   'runtimePlan.preflight.memory_components.total_estimated_peak_bytes',
   'runtimePlan?.preflight.tile_count',
@@ -101,7 +123,7 @@ if (!modalStateSource.includes('runtimePlan: null')) {
   failures.push('Panorama settings changes must clear stale runtimePlan.');
 }
 
-const visualSmokeSource = readFileSync('scripts/proofs/capture-visual-smoke.ts', 'utf8');
+const visualSmokeSource = readFileSync('scripts/lib/proofs/visual-smoke/scenario-assertions.ts', 'utf8');
 for (const marker of [
   'panorama-runtime-plan-summary',
   "runtimePlanProof.planScope !== 'tile_runtime_output'",

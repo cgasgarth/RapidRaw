@@ -4,6 +4,7 @@ import {
   type ComputationalMergeCommandEnvelopeV1,
   type ComputationalMergeDryRunResultV1,
   type ComputationalMergeMutationResultV1,
+  type ComputationalMergePreflightWarningCodeV1,
   computationalMergeCommandEnvelopeV1Schema,
   computationalMergeDryRunResultV1Schema,
   computationalMergeMutationResultV1Schema,
@@ -242,11 +243,44 @@ export const panoramaRuntimeProvenanceV1Schema = z
     sourceGeometry: z
       .object({
         blockedReasons: z.array(z.string().trim().min(1)),
-        layout: z.enum(['multi_row_candidate', 'single_row', 'unknown']),
+        columnCountEstimate: z.number().int().positive(),
+        connectedComponentCount: z.number().int().positive(),
+        graphConnectivity: z
+          .object({
+            connectedSourceCount: z.number().int().nonnegative(),
+            disconnectedSourceCount: z.number().int().nonnegative(),
+            edgeCount: z.number().int().nonnegative(),
+            isConnected: z.boolean(),
+          })
+          .strict(),
+        layout: z.enum(['grid_like', 'multi_row_candidate', 'single_row', 'unknown']),
+        layoutConfidence: z
+          .object({
+            columnConfidence: z.number().min(0).max(1),
+            overallConfidence: z.number().min(0).max(1),
+            rowConfidence: z.number().min(0).max(1),
+          })
+          .strict(),
+        selectedComponent: z
+          .object({
+            sourceCount: z.number().int().positive(),
+            sourceIndices: z.array(z.number().int().nonnegative()),
+          })
+          .strict(),
         rowCountEstimate: z.number().int().positive(),
         support: z.enum(['blocked_requires_multi_row_solver', 'implemented_current_engine', 'unverified']),
         verticalSpanPx: z.number().int().nonnegative(),
-        warningCodes: z.array(z.enum(['multi_row_runtime_deferred', 'source_geometry_unverified'])),
+        horizontalSpanPx: z.number().int().nonnegative(),
+        warningCodes: z.array(
+          z.enum([
+            'geometry_overclaim_guardrail',
+            'graph_disconnected',
+            'grid_like_geometry_unverified',
+            'multi_row_runtime_deferred',
+            'single_row_geometry_low_confidence',
+            'source_geometry_unverified',
+          ]),
+        ),
       })
       .strict(),
     sourceState: z.array(
@@ -655,7 +689,7 @@ const buildPanoramaPreflightEstimate = (request: ParsedPanoramaRuntimePlanReques
   };
   const memoryBudgetBytes =
     request.command.parameters.memoryBudgetBytes ?? Math.max(memoryComponents.totalEstimatedPeakBytes * 2, 1);
-  const warningCodes = [...new Set(sourceGeometry.warningCodes)].sort();
+  const warningCodes: ComputationalMergePreflightWarningCodeV1[] = [...new Set(sourceGeometry.warningCodes)].sort();
   return {
     blockedReasons: sourceGeometry.blockedReasons,
     engineCapabilities: {
@@ -680,7 +714,8 @@ const buildPanoramaPreflightEstimate = (request: ParsedPanoramaRuntimePlanReques
     memoryBudgetRatio: memoryComponents.totalEstimatedPeakBytes / memoryBudgetBytes,
     memoryComponents,
     sourceGeometry,
-    status: sourceGeometry.blockedReasons.length > 0 ? 'blocked_plan_only' : 'accepted',
+    status:
+      sourceGeometry.blockedReasons.length > 0 ? 'blocked_plan_only' : warningCodes.length > 0 ? 'warning' : 'accepted',
     tileCount: tilePlan.tileCount,
     warningCodes,
   };
@@ -846,6 +881,15 @@ const buildPanoramaRuntimeAlignment = (
 };
 
 type PanoramaSourceGeometry = PanoramaRuntimeProvenanceV1['sourceGeometry'];
+type PanoramaSourceGeometryWarningCode = Extract<
+  ComputationalMergePreflightWarningCodeV1,
+  | 'geometry_overclaim_guardrail'
+  | 'graph_disconnected'
+  | 'grid_like_geometry_unverified'
+  | 'multi_row_runtime_deferred'
+  | 'single_row_geometry_low_confidence'
+  | 'source_geometry_unverified'
+>;
 
 const classifyPanoramaSourceGeometry = (
   sourceFrames: PanoramaRuntimeSourceFrameV1[],
@@ -853,22 +897,46 @@ const classifyPanoramaSourceGeometry = (
 ): PanoramaSourceGeometry => {
   const connected = new Set(connectedSourceIndices);
   const connectedFrames = sourceFrames.filter((frame) => connected.has(frame.sourceIndex));
-  if (connectedFrames.some((frame) => frame.expectedOffsetY === null)) {
+  if (connectedFrames.some((frame) => frame.expectedOffsetY === null || frame.expectedOffsetX === null)) {
     return {
       blockedReasons: [],
+      columnCountEstimate: 1,
+      connectedComponentCount: 1,
+      graphConnectivity: {
+        connectedSourceCount: connectedFrames.length,
+        disconnectedSourceCount: sourceFrames.length - connectedFrames.length,
+        edgeCount: 0,
+        isConnected: false,
+      },
       layout: 'unknown',
+      layoutConfidence: {
+        columnConfidence: 0,
+        overallConfidence: 0,
+        rowConfidence: 0,
+      },
+      selectedComponent: {
+        sourceCount: connectedFrames.length,
+        sourceIndices: connectedFrames.map((frame) => frame.sourceIndex),
+      },
       rowCountEstimate: 1,
       support: 'unverified',
       verticalSpanPx: 0,
+      horizontalSpanPx: 0,
       warningCodes: ['source_geometry_unverified'],
     };
   }
 
+  const connectedSourceIndicesSorted = connectedFrames.map((frame) => frame.sourceIndex);
   const heights = connectedFrames.map((frame) => frame.height).toSorted((left, right) => left - right);
   const medianHeight = heights[Math.floor(heights.length / 2)] ?? 1;
+  const widths = connectedFrames.map((frame) => frame.width).toSorted((left, right) => left - right);
+  const medianWidth = widths[Math.floor(widths.length / 2)] ?? 1;
   const rowBreakThresholdPx = Math.max(12, Math.round(medianHeight * 0.35));
+  const columnBreakThresholdPx = Math.max(12, Math.round(medianWidth * 0.35));
   const yOffsets = connectedFrames.map((frame) => frame.expectedOffsetY ?? 0).toSorted((left, right) => left - right);
+  const xOffsets = connectedFrames.map((frame) => frame.expectedOffsetX ?? 0).toSorted((left, right) => left - right);
   const verticalSpanPx = Math.max(...yOffsets) - Math.min(...yOffsets);
+  const horizontalSpanPx = Math.max(...xOffsets) - Math.min(...xOffsets);
   const rows = yOffsets.reduce<number[]>((rowStarts, yOffset) => {
     const previousRowStart = rowStarts.at(-1);
     if (previousRowStart === undefined || Math.abs(yOffset - previousRowStart) > rowBreakThresholdPx) {
@@ -876,16 +944,77 @@ const classifyPanoramaSourceGeometry = (
     }
     return rowStarts;
   }, []);
+  const columns = xOffsets.reduce<number[]>((columnStarts, xOffset) => {
+    const previousColumnStart = columnStarts.at(-1);
+    if (previousColumnStart === undefined || Math.abs(xOffset - previousColumnStart) > columnBreakThresholdPx) {
+      columnStarts.push(xOffset);
+    }
+    return columnStarts;
+  }, []);
   const rowCountEstimate = Math.max(1, rows.length);
-  const isMultiRowCandidate = rowCountEstimate > 1 || verticalSpanPx > rowBreakThresholdPx;
+  const columnCountEstimate = Math.max(1, columns.length);
+  const isGridLike = rowCountEstimate > 1 && columnCountEstimate > 1;
+  const isMultiRowCandidate = !isGridLike && (rowCountEstimate > 1 || verticalSpanPx > rowBreakThresholdPx);
+  const graphConnected = connectedFrames.length === sourceFrames.length;
+  const coverageRatio = connectedFrames.length / Math.max(1, sourceFrames.length);
+  const rowConfidence =
+    connectedFrames.length <= 1
+      ? 0
+      : roundPanoramaRuntimeMetric(
+          Math.max(0, Math.min(1, 1 - verticalSpanPx / Math.max(1, rowBreakThresholdPx * 3))) * coverageRatio,
+        );
+  const columnConfidence =
+    connectedFrames.length <= 1
+      ? 0
+      : roundPanoramaRuntimeMetric(
+          Math.max(
+            0,
+            Math.min(
+              1,
+              horizontalSpanPx / Math.max(1, columnBreakThresholdPx * Math.max(1, connectedFrames.length - 1)),
+            ),
+          ) * coverageRatio,
+        );
+  const overallConfidence = roundPanoramaRuntimeMetric(Math.min(coverageRatio, rowConfidence, columnConfidence));
+  const support = isMultiRowCandidate
+    ? 'blocked_requires_multi_row_solver'
+    : graphConnected && !isGridLike && overallConfidence >= 0.6
+      ? 'implemented_current_engine'
+      : 'unverified';
+  const warningCodes: PanoramaSourceGeometryWarningCode[] = [];
+  if (!graphConnected) warningCodes.push('graph_disconnected');
+  if (isGridLike) warningCodes.push('grid_like_geometry_unverified');
+  if (!isGridLike && support === 'unverified' && rowCountEstimate === 1 && overallConfidence < 0.6) {
+    warningCodes.push('single_row_geometry_low_confidence');
+  }
+  if (support !== 'implemented_current_engine') warningCodes.push('geometry_overclaim_guardrail');
+  if (isMultiRowCandidate) warningCodes.push('multi_row_runtime_deferred');
 
   return {
     blockedReasons: isMultiRowCandidate ? ['multi_row_panorama_not_supported'] : [],
-    layout: isMultiRowCandidate ? 'multi_row_candidate' : 'single_row',
+    columnCountEstimate,
+    connectedComponentCount: graphConnected ? 1 : 2,
+    graphConnectivity: {
+      connectedSourceCount: connectedFrames.length,
+      disconnectedSourceCount: sourceFrames.length - connectedFrames.length,
+      edgeCount: Math.max(0, connectedFrames.length - 1),
+      isConnected: graphConnected,
+    },
+    layout: isGridLike ? 'grid_like' : isMultiRowCandidate ? 'multi_row_candidate' : 'single_row',
+    layoutConfidence: {
+      columnConfidence,
+      overallConfidence,
+      rowConfidence,
+    },
+    selectedComponent: {
+      sourceCount: connectedFrames.length,
+      sourceIndices: connectedSourceIndicesSorted,
+    },
     rowCountEstimate,
-    support: isMultiRowCandidate ? 'blocked_requires_multi_row_solver' : 'implemented_current_engine',
+    support,
     verticalSpanPx,
-    warningCodes: isMultiRowCandidate ? ['multi_row_runtime_deferred'] : [],
+    horizontalSpanPx,
+    warningCodes: [...new Set(warningCodes)].sort(),
   };
 };
 

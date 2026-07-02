@@ -139,6 +139,21 @@ export function PanoramaModal({
         ? t('modals.panorama.summaryBlocked')
         : t('modals.panorama.summaryReady');
   const runtimePlanSourceGeometry = runtimePlan?.preflight.source_geometry;
+  const runtimePlanSourceGeometryConfidence = runtimePlanSourceGeometry?.layout_confidence;
+  const runtimePlanSourceGeometryConnectivity = runtimePlanSourceGeometry?.graph_connectivity;
+  const runtimePlanSourceGeometrySelection = runtimePlanSourceGeometry?.selected_component;
+  const runtimePlanSourceGeometryConnectedLabel =
+    runtimePlanSourceGeometryConnectivity === undefined
+      ? t('modals.panorama.summaryBlocked')
+      : runtimePlanSourceGeometryConnectivity.is_connected
+        ? 'connected'
+        : 'disconnected';
+  const runtimePlanSourceGeometryConfidenceLabel =
+    runtimePlanSourceGeometryConfidence === undefined
+      ? t('modals.panorama.summaryBlocked')
+      : `row ${Math.round(runtimePlanSourceGeometryConfidence.row_confidence * 100)}% / col ${Math.round(
+          runtimePlanSourceGeometryConfidence.column_confidence * 100,
+        )}% / all ${Math.round(runtimePlanSourceGeometryConfidence.overall_confidence * 100)}%`;
   const sourceReadinessLabel = `${t('modals.panorama.summarySourceCount', { count: imageCount ?? 0 })} - ${
     isSourceCountValid ? t('modals.panorama.summaryReady') : t('modals.panorama.summaryBlocked')
   }`;
@@ -404,6 +419,31 @@ export function PanoramaModal({
               data-output-path={savedReviewSummary.outputPath}
               data-overlap-feather-px={settings.overlapFeatherPx}
               data-projection={savedReviewSummary.projection}
+              data-source-geometry-column-count-estimate={savedReviewSummary.sourceGeometry.columnCountEstimate}
+              data-source-geometry-connected-component-count={savedReviewSummary.sourceGeometry.connectedComponentCount}
+              data-source-geometry-connected-count={
+                savedReviewSummary.sourceGeometry.graphConnectivity.connectedSourceCount
+              }
+              data-source-geometry-connected-label={
+                savedReviewSummary.sourceGeometry.graphConnectivity.isConnected ? 'connected' : 'disconnected'
+              }
+              data-source-geometry-column-confidence={
+                savedReviewSummary.sourceGeometry.layoutConfidence.columnConfidence
+              }
+              data-source-geometry-overall-confidence={
+                savedReviewSummary.sourceGeometry.layoutConfidence.overallConfidence
+              }
+              data-source-geometry-row-confidence={savedReviewSummary.sourceGeometry.layoutConfidence.rowConfidence}
+              data-source-geometry-selected-count={savedReviewSummary.sourceGeometry.selectedComponent.sourceCount}
+              data-source-geometry-selected-indices={savedReviewSummary.sourceGeometry.selectedComponent.sourceIndices.join(
+                ',',
+              )}
+              data-source-geometry-excluded-count={
+                savedReviewSummary.sourceGeometry.graphConnectivity.disconnectedSourceCount
+              }
+              data-source-geometry-horizontal-span-px={savedReviewSummary.sourceGeometry.horizontalSpanPx}
+              data-source-geometry-layout={savedReviewSummary.sourceGeometry.layout}
+              data-source-geometry-warning-codes={savedReviewSummary.sourceGeometry.warningCodes.join(',')}
               data-seam-max-p95-error-px={
                 savedReviewSummary.seamReview.seams.length === 0
                   ? 0
@@ -474,6 +514,20 @@ export function PanoramaModal({
                       : savedReviewSummary.exposureNormalizationSummary.appliedLuminanceGains
                           .map((gain) => `S${gain.sourceIndex + 1} ${gain.gain.toFixed(3)}x`)
                           .join(' / '),
+                },
+                {
+                  label: 'Layout',
+                  value: savedReviewSummary.sourceGeometry.layout,
+                },
+                {
+                  label: 'Component',
+                  value: `${savedReviewSummary.sourceGeometry.selectedComponent.sourceCount} selected / ${savedReviewSummary.sourceGeometry.graphConnectivity.disconnectedSourceCount} excluded`,
+                },
+                {
+                  label: 'Confidence',
+                  value: `row ${Math.round(savedReviewSummary.sourceGeometry.layoutConfidence.rowConfidence * 100)}% / col ${Math.round(
+                    savedReviewSummary.sourceGeometry.layoutConfidence.columnConfidence * 100,
+                  )}% / all ${Math.round(savedReviewSummary.sourceGeometry.layoutConfidence.overallConfidence * 100)}%`,
                 },
               ].map((item) => (
                 <div className="min-w-0 rounded border border-border-color bg-surface px-2 py-1.5" key={item.label}>
@@ -767,10 +821,23 @@ export function PanoramaModal({
             data-runtime-plan-ready={String(runtimePlan !== null)}
             data-source-geometry-layout={runtimePlanSourceGeometry?.layout ?? 'pending'}
             data-source-geometry-support={runtimePlanSourceGeometry?.support ?? 'pending'}
+            data-source-geometry-column-count-estimate={runtimePlanSourceGeometry?.column_count_estimate ?? ''}
+            data-source-geometry-connected-component-count={runtimePlanSourceGeometry?.connected_component_count ?? ''}
+            data-source-geometry-connected-count={runtimePlanSourceGeometryConnectivity?.connected_source_count ?? ''}
+            data-source-geometry-connected-label={runtimePlanSourceGeometryConnectedLabel}
+            data-source-geometry-column-confidence={runtimePlanSourceGeometryConfidence?.column_confidence ?? ''}
+            data-source-geometry-overall-confidence={runtimePlanSourceGeometryConfidence?.overall_confidence ?? ''}
+            data-source-geometry-row-confidence={runtimePlanSourceGeometryConfidence?.row_confidence ?? ''}
+            data-source-geometry-selected-count={runtimePlanSourceGeometrySelection?.source_count ?? ''}
+            data-source-geometry-selected-indices={runtimePlanSourceGeometrySelection?.source_indices.join(',') ?? ''}
+            data-source-geometry-excluded-count={runtimePlanSourceGeometryConnectivity?.disconnected_source_count ?? ''}
+            data-source-geometry-horizontal-span-px={runtimePlanSourceGeometry?.horizontal_span_px ?? ''}
+            data-source-geometry-warning-codes={runtimePlanSourceGeometry?.warning_codes.join(',') ?? ''}
             data-source-row-count-estimate={runtimePlanSourceGeometry?.row_count_estimate ?? ''}
             data-source-vertical-span-px={runtimePlanSourceGeometry?.vertical_span_px ?? ''}
             data-testid="panorama-runtime-plan-summary"
             data-tile-count={runtimePlanTileCount ?? ''}
+            data-warning-codes={runtimePlanSourceGeometry?.warning_codes.join(',') ?? ''}
           >
             {[
               {
@@ -787,6 +854,21 @@ export function PanoramaModal({
                   runtimePlanMemoryMb === null
                     ? t('modals.panorama.summaryBlocked')
                     : t('modals.panorama.previewMemory', { value: runtimePlanMemoryMb }),
+              },
+              {
+                label: 'Layout',
+                value: runtimePlanSourceGeometry?.layout ?? t('modals.panorama.summaryBlocked'),
+              },
+              {
+                label: 'Component',
+                value:
+                  runtimePlanSourceGeometrySelection === undefined
+                    ? t('modals.panorama.summaryBlocked')
+                    : `${runtimePlanSourceGeometrySelection.source_count} selected / ${runtimePlanSourceGeometryConnectivity?.disconnected_source_count ?? 0} excluded`,
+              },
+              {
+                label: 'Confidence',
+                value: runtimePlanSourceGeometryConfidenceLabel,
               },
             ].map((item) => (
               <div

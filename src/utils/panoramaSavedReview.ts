@@ -26,6 +26,7 @@ export const buildPanoramaSavedReviewSummary = ({
     outputPath,
     projection: settings.projection,
     seamReview: renderedReview.seamReview,
+    sourceGeometry: renderedReview.sourceGeometry,
     sourceCount: renderedReview.sources.stitchedSourceIndices.length,
     sourceContribution: renderedReview.sourceContribution,
     sourceRefs: renderedReview.sources.stitchedSourceIndices.map((sourceIndex) => {

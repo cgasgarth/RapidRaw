@@ -3168,10 +3168,14 @@ export const computationalMergeExecutionModeV1Schema = z.enum(['full_frame_legac
 
 export const computationalMergePreflightWarningCodeV1Schema = z.enum([
   'geometry_estimate_low_confidence',
+  'geometry_overclaim_guardrail',
   'high_memory_estimate',
   'legacy_full_frame_render',
+  'graph_disconnected',
   'memory_budget_exceeded',
   'multi_row_runtime_deferred',
+  'grid_like_geometry_unverified',
+  'single_row_geometry_low_confidence',
   'source_geometry_unverified',
   'tile_runtime_deferred',
   'tiled_render_required',
@@ -3247,10 +3251,34 @@ export const computationalMergePreflightEstimateV1Schema = z
     sourceGeometry: z
       .object({
         blockedReasons: z.array(z.string().trim().min(1)),
-        layout: z.enum(['multi_row_candidate', 'single_row', 'unknown']),
+        columnCountEstimate: z.number().int().positive(),
+        connectedComponentCount: z.number().int().positive(),
+        graphConnectivity: z
+          .object({
+            connectedSourceCount: z.number().int().nonnegative(),
+            disconnectedSourceCount: z.number().int().nonnegative(),
+            edgeCount: z.number().int().nonnegative(),
+            isConnected: z.boolean(),
+          })
+          .strict(),
+        layout: z.enum(['grid_like', 'multi_row_candidate', 'single_row', 'unknown']),
+        layoutConfidence: z
+          .object({
+            columnConfidence: z.number().min(0).max(1),
+            overallConfidence: z.number().min(0).max(1),
+            rowConfidence: z.number().min(0).max(1),
+          })
+          .strict(),
+        selectedComponent: z
+          .object({
+            sourceCount: z.number().int().positive(),
+            sourceIndices: z.array(z.number().int().nonnegative()),
+          })
+          .strict(),
         rowCountEstimate: z.number().int().positive(),
         support: z.enum(['blocked_requires_multi_row_solver', 'implemented_current_engine', 'unverified']),
         verticalSpanPx: z.number().int().nonnegative(),
+        horizontalSpanPx: z.number().int().nonnegative(),
         warningCodes: z.array(computationalMergePreflightWarningCodeV1Schema),
       })
       .strict()
