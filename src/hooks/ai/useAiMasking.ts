@@ -12,7 +12,7 @@ import type { Adjustments, AiPatch, Coord, MaskContainer } from '../../utils/adj
 import { getAiPeopleMaskPartCapability } from '../../utils/ai/aiPeopleMaskContracts';
 import {
   type AiSubjectMaskToolAppliedResult,
-  runAiSubjectMaskAppServerTool,
+  prepareAiSubjectMaskAppServerTool,
 } from '../../utils/ai/aiSubjectMaskAppServerTool';
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { mergeMaskParameters } from '../../utils/mask/maskParameterAccess';
@@ -267,7 +267,7 @@ export function useAiMasking() {
     setEditor({ isGeneratingAiMask: true });
 
     try {
-      const subjectMaskToolResult = await runAiSubjectMaskAppServerTool({
+      const subjectMaskToolSession = await prepareAiSubjectMaskAppServerTool({
         maskName: 'Subject mask',
         operationId: `ai-subject-mask-${subMaskId}`,
         providerClass:
@@ -281,8 +281,8 @@ export function useAiMasking() {
         selectedImagePath: selectedImage.path,
       });
 
-      if (subjectMaskToolResult.status === 'blocked') {
-        toast.error(`AI Subject Mask unavailable: ${subjectMaskToolResult.userVisibleMessage}`);
+      if (subjectMaskToolSession.status === 'blocked') {
+        toast.error(`AI Subject Mask unavailable: ${subjectMaskToolSession.userVisibleMessage}`);
         return;
       }
 
@@ -297,6 +297,12 @@ export function useAiMasking() {
         rotation: adjustments.rotation,
         startPoint: [startPoint.x, startPoint.y],
       });
+
+      const subjectMaskToolResult = await subjectMaskToolSession.apply();
+      if (subjectMaskToolResult.status === 'blocked') {
+        toast.error(`AI Mask Failed: ${subjectMaskToolResult.userVisibleMessage}`);
+        return;
+      }
 
       const subMask = adjustments.aiPatches
         .flatMap((p: AiPatch) => p.subMasks)

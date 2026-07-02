@@ -5,7 +5,7 @@ import { useEditorStore } from '../../../src/store/useEditorStore';
 import { AI_APP_SERVER_TOOL_ROUTES } from '../../../src/utils/ai/aiAppServerToolRoutes';
 import {
   type AiSubjectMaskToolAppliedResult,
-  runAiSubjectMaskAppServerTool,
+  prepareAiSubjectMaskAppServerTool,
 } from '../../../src/utils/ai/aiSubjectMaskAppServerTool';
 
 const TEST_IMAGE: SelectedImage = {
@@ -27,7 +27,7 @@ beforeEach(() => {
 
 describe('ai subject mask app-server tool routing', () => {
   test('routes subject-mask dry-run and apply through typed app-server tools', async () => {
-    const result = await runAiSubjectMaskAppServerTool({
+    const prepared = await prepareAiSubjectMaskAppServerTool({
       maskName: 'Subject mask',
       operationId: 'subject-mask-test',
       providerClass: 'local_model',
@@ -36,10 +36,13 @@ describe('ai subject mask app-server tool routing', () => {
       selectedImagePath: TEST_IMAGE.path,
     });
 
+    expect(prepared.status).toBe('prepared');
+    expect(prepared.dryRunResult.commandType).toBe('ai.mask.generateSubject');
+
+    const result = await prepared.apply();
     expect(result.status).toBe('applied');
 
     const appliedResult: AiSubjectMaskToolAppliedResult = result;
-    expect(appliedResult.dryRunResult.commandType).toBe('ai.mask.generateSubject');
     expect(appliedResult.applyResult.commandType).toBe('ai.mask.applySubject');
     expect(appliedResult.applyResult.dryRunPlanHash).toBe(appliedResult.dryRunResult.dryRunPlanHash);
     expect(appliedResult.applyResult.dryRunPlanId).toBe(appliedResult.dryRunResult.dryRunPlanId);
@@ -51,7 +54,7 @@ describe('ai subject mask app-server tool routing', () => {
   });
 
   test('records an audited fallback when the selected provider is unavailable', async () => {
-    const result = await runAiSubjectMaskAppServerTool({
+    const result = await prepareAiSubjectMaskAppServerTool({
       maskName: 'Subject mask',
       operationId: 'subject-mask-blocked-test',
       providerClass: 'cloud_service',

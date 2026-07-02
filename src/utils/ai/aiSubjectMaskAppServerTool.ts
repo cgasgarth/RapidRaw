@@ -67,6 +67,12 @@ export type AiSubjectMaskToolBlockedResult = z.infer<typeof aiSubjectMaskToolBlo
 export type AiSubjectMaskToolAppliedResult = z.infer<typeof aiSubjectMaskToolAppliedResultSchema>;
 export type AiSubjectMaskToolResult = z.infer<typeof aiSubjectMaskToolResultSchema>;
 export type AiSubjectMaskToolRequest = z.infer<typeof aiSubjectMaskToolRequestSchema>;
+export type AiSubjectMaskToolPreparedResult = {
+  apply: () => Promise<AiSubjectMaskToolResult>;
+  dryRunResult: AiToolDryRunResultV1;
+  provider: z.infer<typeof aiSubjectMaskToolProviderSchema>;
+  status: 'prepared';
+};
 
 const buildAiSubjectMaskCommand = ({
   approval,
@@ -180,9 +186,9 @@ const dispatchAiSubjectMaskCommand = async ({
   return { ok: true, result: aiToolApplyResultV1Schema.parse(dispatchResult.result) };
 };
 
-export const runAiSubjectMaskAppServerTool = async (
+export const prepareAiSubjectMaskAppServerTool = async (
   request: AiSubjectMaskToolRequest,
-): Promise<AiSubjectMaskToolResult> => {
+): Promise<AiSubjectMaskToolBlockedResult | AiSubjectMaskToolPreparedResult> => {
   const parsedRequest = aiSubjectMaskToolRequestSchema.parse(request);
   const { availableProviderIds, provider, snapshot, sourceContentHash } =
     buildAiSubjectMaskCommandContext(parsedRequest);
@@ -220,47 +226,55 @@ export const runAiSubjectMaskAppServerTool = async (
   }
 
   const dryRunResult = aiToolDryRunResultV1Schema.parse(dryRunDispatch.result);
-  const applyCommand = buildAiSubjectMaskCommand({
-    approval: {
-      approvalClass: ApprovalClass.GenerativeEdit,
-      reason: 'Apply the accepted AI subject-mask dry-run plan through the typed app-server tool.',
-      state: 'approved',
-    },
-    commandId: `${parsedRequest.operationId}_apply`,
-    commandType: 'ai.mask.applySubject',
-    dryRun: false,
-    expectedGraphRevision: snapshot.graphRevision,
-    parameters: {
-      ...buildCommandParameters({
-        maskName: parsedRequest.maskName,
-        providerClass: parsedRequest.providerClass,
-        providerId: parsedRequest.providerId,
-        sourceContentHash,
-      }),
-      acceptedDryRunPlanHash: dryRunResult.dryRunPlanHash,
-      acceptedDryRunPlanId: dryRunResult.dryRunPlanId,
-    },
-    request: parsedRequest,
-  });
-  const applyDispatch = await dispatchAiSubjectMaskCommand({
-    bridge,
-    command: applyCommand,
-    requestId: parsedRequest.requestId,
-  });
-  if (!applyDispatch.ok) {
-    return aiSubjectMaskToolBlockedResultSchema.parse({
-      auditEvents: buildAuditEventSummary(bridge.listAuditEvents()),
-      provider,
-      status: 'blocked',
-      userVisibleMessage: applyDispatch.message,
-    });
-  }
 
-  return aiSubjectMaskToolAppliedResultSchema.parse({
-    applyResult: applyDispatch.result,
-    auditEvents: buildAuditEventSummary(bridge.listAuditEvents()),
+  return {
+    apply: async (): Promise<AiSubjectMaskToolResult> => {
+      const applyCommand = buildAiSubjectMaskCommand({
+        approval: {
+          approvalClass: ApprovalClass.GenerativeEdit,
+          reason: 'Apply the accepted AI subject-mask dry-run plan through the typed app-server tool.',
+          state: 'approved',
+        },
+        commandId: `${parsedRequest.operationId}_apply`,
+        commandType: 'ai.mask.applySubject',
+        dryRun: false,
+        expectedGraphRevision: snapshot.graphRevision,
+        parameters: {
+          ...buildCommandParameters({
+            maskName: parsedRequest.maskName,
+            providerClass: parsedRequest.providerClass,
+            providerId: parsedRequest.providerId,
+            sourceContentHash,
+          }),
+          acceptedDryRunPlanHash: dryRunResult.dryRunPlanHash,
+          acceptedDryRunPlanId: dryRunResult.dryRunPlanId,
+        },
+        request: parsedRequest,
+      });
+      const applyDispatch = await dispatchAiSubjectMaskCommand({
+        bridge,
+        command: applyCommand,
+        requestId: parsedRequest.requestId,
+      });
+      if (!applyDispatch.ok) {
+        return aiSubjectMaskToolBlockedResultSchema.parse({
+          auditEvents: buildAuditEventSummary(bridge.listAuditEvents()),
+          provider,
+          status: 'blocked',
+          userVisibleMessage: applyDispatch.message,
+        });
+      }
+
+      return aiSubjectMaskToolAppliedResultSchema.parse({
+        applyResult: applyDispatch.result,
+        auditEvents: buildAuditEventSummary(bridge.listAuditEvents()),
+        dryRunResult,
+        provider,
+        status: 'applied',
+      });
+    },
     dryRunResult,
     provider,
-    status: 'applied',
-  });
+    status: 'prepared',
+  };
 };
