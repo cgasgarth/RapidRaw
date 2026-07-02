@@ -1,3 +1,7 @@
+import { emptyTauriResponseSchema } from '../schemas/tauriResponseSchemas';
+import { Invokes } from '../tauri/commands';
+import { invokeWithSchema } from './tauriSchemaInvoke';
+
 export type AppEventLogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 export interface AppEventErrorDetails {
@@ -50,6 +54,8 @@ export interface BeginAppOperationInput {
   readonly traceId?: string | undefined;
 }
 
+type AppEventNativeLogForwarder = (level: AppEventLogLevel, line: string) => void;
+
 const APP_EVENT_PREFIX = '[app-event]';
 const MAX_STRING_LENGTH = 320;
 const MAX_ERROR_MESSAGE_LENGTH = 500;
@@ -59,6 +65,12 @@ const MAX_DETAIL_DEPTH = 3;
 const DATA_URL_PATTERN = /data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=]+/gi;
 const POSIX_PATH_PATTERN = /(?:\/[^/\s"'`{}[\]]+){2,}/g;
 const WINDOWS_PATH_PATTERN = /[A-Za-z]:\\(?:[^\\\s"'`{}[\]]+\\)+[^\\\s"'`{}[\]]+/g;
+
+let testNativeLogForwarder: AppEventNativeLogForwarder | null = null;
+
+export function setAppEventNativeLogForwarderForTest(forwarder: AppEventNativeLogForwarder | null): void {
+  testNativeLogForwarder = forwarder;
+}
 
 const generateId = (prefix: string): string => {
   const randomId =
@@ -182,11 +194,34 @@ export const buildAppEventLogEntry = (input: AppEventLogInput): AppEventLogEntry
 export const formatAppEventLogLine = (entry: AppEventLogEntry): string =>
   `${APP_EVENT_PREFIX} ${JSON.stringify(entry)}`;
 
+function forwardAppEventToNativeLog(level: AppEventLogLevel, line: string): void {
+  if (testNativeLogForwarder) {
+    testNativeLogForwarder(level, line);
+    return;
+  }
+
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  void invokeWithSchema(
+    Invokes.FrontendLog,
+    {
+      level,
+      message: line,
+    },
+    emptyTauriResponseSchema,
+  ).catch(() => {
+    // Keep logging best-effort so missing native APIs cannot break editor actions.
+  });
+}
+
 export function logAppEvent(input: AppEventLogInput): AppEventLogEntry {
   const entry = buildAppEventLogEntry(input);
   const line = formatAppEventLogLine(entry);
   const writer = entry.level === 'error' ? console.error : entry.level === 'warn' ? console.warn : console.info;
   writer(line);
+  forwardAppEventToNativeLog(entry.level, line);
   return entry;
 }
 
