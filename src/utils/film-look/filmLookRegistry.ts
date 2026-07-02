@@ -82,7 +82,7 @@ const EXTRA_GENERIC_FILM_LOOK_DEFINITIONS: Array<GenericFilmLookDefinition> = [
     'black_and_white',
     'High-contrast monochrome with visible synthetic texture.',
     72,
-    { blacks: -8, contrast: 30, grainAmount: 32, grainSize: 48, saturation: -100 },
+    { blacks: -8, contrast: 30, grainAmount: 32, grainRoughness: 68, grainSize: 48, saturation: -100 },
   ],
 ];
 
@@ -156,6 +156,7 @@ export const FILM_LOOK_BROWSER_ITEMS: Array<FilmLookBrowserItem> = [
     adjustmentPatch: {
       contrast: 12,
       grainAmount: 22,
+      grainRoughness: 64,
       grainSize: 42,
       saturation: -100,
     },
@@ -170,6 +171,7 @@ export const FILM_LOOK_BROWSER_ITEMS: Array<FilmLookBrowserItem> = [
       blacks: -3,
       contrast: 24,
       glowAmount: 8,
+      halationAmount: 18,
     },
     category: 'color_contrast',
     description: 'Punchy color with stronger curve separation and subtle glow defaults.',

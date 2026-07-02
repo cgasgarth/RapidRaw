@@ -149,6 +149,10 @@ export function applyFilmLookToColorPipelinePixels(
   const blacks = (patch.blacks ?? 0) / 100;
   const saturation = (patch.saturation ?? 0) / 100;
   const glow = (patch.glowAmount ?? 0) / 100;
+  const grainAmount = (patch.grainAmount ?? 0) / 100;
+  const grainRoughness = (patch.grainRoughness ?? 50) / 100;
+  const grainSize = patch.grainSize ?? 25;
+  const halation = (patch.halationAmount ?? 0) / 100;
 
   return sourcePixels.map((pixel) => {
     let r = pixel.r + temperature * 0.08;
@@ -165,11 +169,23 @@ export function applyFilmLookToColorPipelinePixels(
 
     const saturatedLuma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
     const glowBoost = glow * highlightMask * 0.08;
+    const halationBoost = halation * highlightMask * (0.035 + highlightMask * 0.025);
+    const grainCell = Math.max(1, Math.round(grainSize / 12));
+    const coarseNoise = hashCoordinate(
+      look.id,
+      Math.floor(pixel.x / grainCell),
+      Math.floor(pixel.y / grainCell),
+      'coarse',
+    );
+    const fineNoise = hashCoordinate(look.id, pixel.x, pixel.y, 'fine');
+    const grainNoise = (coarseNoise * (1 - grainRoughness) + fineNoise * grainRoughness) * grainAmount * 0.035;
 
     return {
-      b: roundChannel(saturatedLuma + (b - saturatedLuma) * (1 + saturation) + glowBoost),
-      g: roundChannel(saturatedLuma + (g - saturatedLuma) * (1 + saturation) + glowBoost),
-      r: roundChannel(saturatedLuma + (r - saturatedLuma) * (1 + saturation) + glowBoost),
+      b: roundChannel(saturatedLuma + (b - saturatedLuma) * (1 + saturation) + glowBoost + grainNoise),
+      g: roundChannel(
+        saturatedLuma + (g - saturatedLuma) * (1 + saturation) + glowBoost + halationBoost * 0.38 + grainNoise,
+      ),
+      r: roundChannel(saturatedLuma + (r - saturatedLuma) * (1 + saturation) + glowBoost + halationBoost + grainNoise),
       x: pixel.x,
       y: pixel.y,
     };
@@ -194,6 +210,12 @@ function hashStableString(value: string): string {
   const highHex = (high >>> 0).toString(16).padStart(8, '0');
   const lowHex = (low >>> 0).toString(16).padStart(8, '0');
   return `${highHex}${lowHex}`;
+}
+
+function hashCoordinate(lookId: string, x: number, y: number, variant: string): number {
+  const hash = hashStableString(`${lookId}:${variant}:${x}:${y}`);
+  const normalized = Number.parseInt(hash.slice(0, 8), 16) / 0xffffffff;
+  return normalized * 2 - 1;
 }
 
 export function buildFilmLookAbSlot(

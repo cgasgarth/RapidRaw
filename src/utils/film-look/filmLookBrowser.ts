@@ -13,8 +13,10 @@ type FilmLookAdjustmentKey =
   | 'contrast'
   | 'glowAmount'
   | 'grainAmount'
+  | 'grainRoughness'
   | 'grainSize'
   | 'highlights'
+  | 'halationAmount'
   | 'saturation'
   | 'shadows'
   | 'temperature';
@@ -72,7 +74,9 @@ const FILM_LOOK_ADJUSTMENT_KEYS = [
   'saturation',
   'glowAmount',
   'grainAmount',
+  'grainRoughness',
   'grainSize',
+  'halationAmount',
 ] satisfies Array<FilmLookAdjustmentKey>;
 
 const FILM_LOOK_ADJUSTMENT_LABELS: Record<FilmLookAdjustmentKey, string> = {
@@ -80,7 +84,9 @@ const FILM_LOOK_ADJUSTMENT_LABELS: Record<FilmLookAdjustmentKey, string> = {
   contrast: 'Contrast',
   glowAmount: 'Glow',
   grainAmount: 'Grain',
+  grainRoughness: 'Grain Roughness',
   grainSize: 'Grain Size',
+  halationAmount: 'Halation',
   highlights: 'Highlights',
   saturation: 'Saturation',
   shadows: 'Shadows',

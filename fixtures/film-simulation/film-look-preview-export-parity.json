@@ -12,25 +12,25 @@
       "strength": 100
     },
     {
-      "baselinePreviewMaxDelta": 0.248547,
+      "baselinePreviewMaxDelta": 0.252837,
       "caseId": "film.look.preview_export.film-look.generic.mono-silver.v1",
       "displayName": "Mono Silver",
-      "exportHash": "7e4b525fd7be754b",
+      "exportHash": "e4b17d60f3d77241",
       "lookId": "film_look.generic.mono_silver.v1",
       "maxAllowedPreviewExportDelta": 0,
       "previewExportMaxDelta": 0,
-      "previewHash": "7e4b525fd7be754b",
+      "previewHash": "e4b17d60f3d77241",
       "strength": 100
     },
     {
-      "baselinePreviewMaxDelta": 0.096471,
+      "baselinePreviewMaxDelta": 0.103482,
       "caseId": "film.look.preview_export.film-look.generic.punch-color.v1",
       "displayName": "Punch Color",
-      "exportHash": "942aa1199eb4a1d3",
+      "exportHash": "b40f12193b15d57d",
       "lookId": "film_look.generic.punch_color.v1",
       "maxAllowedPreviewExportDelta": 0,
       "previewExportMaxDelta": 0,
-      "previewHash": "942aa1199eb4a1d3",
+      "previewHash": "b40f12193b15d57d",
       "strength": 100
     }
   ],

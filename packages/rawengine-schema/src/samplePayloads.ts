@@ -4131,6 +4131,7 @@ export const sampleFilmLookCatalogV1: FilmLookCatalogV1 = filmLookCatalogV1Schem
           nodeKind: 'grain',
           parameters: {
             amount: 0.22,
+            roughness: 0.64,
             size: 0.42,
           },
           renderStage: 'texture_rendering',
@@ -4167,6 +4168,16 @@ export const sampleFilmLookCatalogV1: FilmLookCatalogV1 = filmLookCatalogV1Schem
           parameters: {
             amount: 0.08,
             threshold: 0.82,
+          },
+          renderStage: 'texture_rendering',
+        },
+        {
+          enabledByDefault: true,
+          nodeId: 'halation.warm_edge',
+          nodeKind: 'halation',
+          parameters: {
+            amount: 0.18,
+            warmth: 0.45,
           },
           renderStage: 'texture_rendering',
         },
