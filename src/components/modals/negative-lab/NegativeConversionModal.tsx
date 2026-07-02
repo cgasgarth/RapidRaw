@@ -19,10 +19,18 @@ import {
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
-import { type PointerEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { type PointerEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { z } from 'zod';
-import type { LayerStackSidecarLayerV1 } from '../../../../packages/rawengine-schema/src';
+import {
+  ActorKind,
+  ApprovalClass,
+  type LayerStackSidecarLayerV1,
+  type NegativeLabAppServerRuntimeDryRunToolResultV1,
+  type NegativeLabCommandEnvelopeV1,
+  negativeLabCommandEnvelopeV1Schema,
+  RAW_ENGINE_SCHEMA_VERSION,
+} from '../../../../packages/rawengine-schema/src';
 import {
   isNegativeLabProfileSort,
   NEGATIVE_LAB_PROFILE_BROWSER_ROW_BY_ID,
@@ -86,6 +94,7 @@ import {
 } from '../../../utils/negative-lab/negativeLabAcquisitionProfiles';
 import {
   buildNegativeLabBaseSampleDecisionProof,
+  buildNegativeLabBaseSampleHash,
   buildNegativeLabBaseSamplePreviewProof,
   type NegativeLabBaseSamplePreviewProof,
   type NegativeLabBaseSamplePreviewProofContext,
@@ -172,6 +181,7 @@ import {
   restoreNegativeLabRollNormalizationOverrides,
 } from '../../../utils/negative-lab/negativeLabRollNormalizationApply';
 import { buildNegativeLabRollNormalizationPlan } from '../../../utils/negative-lab/negativeLabRollNormalizationPlan';
+import { renderNegativeLabRuntimeDryRunPreview } from '../../../utils/negative-lab/negativeLabRuntimeDryRunAdapter';
 import {
   buildNegativeLabStockMetadataCounts,
   NEGATIVE_LAB_STOCK_METADATA_CATALOG,
@@ -466,6 +476,8 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const [params, setParams] = useState<NegativeParams>(DEFAULT_PARAMS);
   const [selectedPresetId, setSelectedPresetId] = useState<string>(DEFAULT_NEGATIVE_LAB_UI_PRESET.presetId);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [runtimePreviewDryRunResult, setRuntimePreviewDryRunResult] =
+    useState<NegativeLabAppServerRuntimeDryRunToolResultV1 | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isEstimatingBaseFog, setIsEstimatingBaseFog] = useState(false);
@@ -559,6 +571,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   } = usePreviewViewport({ maxZoom: 8, minZoom: 0.1, zoomStep: 0.25 });
   const [originalUrl, setOriginalUrl] = useState<string | null>(null);
   const previewImageRef = useRef<HTMLImageElement | null>(null);
+  const previewRequestSequenceRef = useRef(0);
   const previewImageUrl = isCompareActive && originalUrl !== null ? originalUrl : previewUrl;
   const effectiveActivePathIndex = targetPaths[activePathIndex] === undefined ? 0 : activePathIndex;
   const selectedImagePath = targetPaths[effectiveActivePathIndex] ?? null;
@@ -678,6 +691,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     selectedProfile?.runtimeStatus === 'runtime_parameter_applied'
       ? t('modals.negativeConversion.presetRuntimeApplied')
       : t('modals.negativeConversion.presetRuntimeCatalogOnly');
+  const previewReadyForWorkspace = previewUrl !== null && runtimePreviewDryRunResult !== null;
   const frameHealthReport = useMemo(
     () =>
       buildNegativeLabFrameHealthReport({
@@ -686,7 +700,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         baseScope: baseFogScope,
         cropStatusByFrameId,
         includedPathSet,
-        previewReady: previewUrl !== null,
+        previewReady: previewReadyForWorkspace,
         targetPaths,
       }),
     [
@@ -695,7 +709,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       cropStatusByFrameId,
       effectiveActivePathIndex,
       includedPathSet,
-      previewUrl,
+      previewReadyForWorkspace,
       targetPaths,
     ],
   );
@@ -845,8 +859,8 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const batchReviewFrameCount = batchDryRunSummary.dispositionCounts.review;
   const batchSkippedFrameCount = batchDryRunSummary.dispositionCounts.skip;
   const dustScratchReviewReport = useMemo(
-    () => buildNegativeLabDustScratchReviewReport(frameHealthReport, previewUrl !== null),
-    [frameHealthReport, previewUrl],
+    () => buildNegativeLabDustScratchReviewReport(frameHealthReport, previewReadyForWorkspace),
+    [frameHealthReport, previewReadyForWorkspace],
   );
   const dustCandidateFilterCounts = useMemo(() => {
     const counts: Record<NegativeLabDustCandidateFilter, number> = { accepted: 0, all: 0, pending: 0, rejected: 0 };
@@ -1114,7 +1128,8 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     ? acceptedBatchPlanIdentity.acceptedDryRunPlanId
     : 'accept_dry_run_plan_first';
   const requiresAcceptedBatchPlan = pathsToConvert.length > 0;
-  const runtimePreviewArtifactStatus = previewUrl === null ? 'pending_render' : 'rendered_positive_preview';
+  const hasCurrentRuntimePreview = previewReadyForWorkspace;
+  const runtimePreviewArtifactStatus = hasCurrentRuntimePreview ? 'rendered_positive_preview' : 'pending_render';
   const runtimePreviewBaseFogStatus = baseFogEstimate === null ? 'pending_base_fog' : 'base_fog_estimated';
   const runtimePreviewDensityStatus =
     selectedProfile?.params.print_curve_algorithm === undefined ? 'density_curve_pending' : 'density_curve_selected';
@@ -1124,13 +1139,13 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     isLoading,
     isSaving,
     pathCount: pathsToConvert.length,
-    previewReady: previewUrl !== null,
+    previewReady: hasCurrentRuntimePreview,
     requiresAcceptedBatchPlan,
   };
   const canSave = buildNegativeLabCanSave(exportReadinessInput);
   const saveBlockedReasonKey = buildNegativeLabSaveBlockedReason({ ...exportReadinessInput, canSave });
   const baseReady = baseFogEstimate !== null;
-  const positivePreviewReady = previewUrl !== null && baseReady;
+  const positivePreviewReady = hasCurrentRuntimePreview && baseReady;
   const baseSamplingActionLabelKey =
     baseFogConfidence === null
       ? 'modals.negativeConversion.estimateBaseSample'
@@ -1139,7 +1154,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         : 'modals.negativeConversion.acceptBaseSample';
   const previewReadinessLabel = positivePreviewReady
     ? t('modals.negativeConversion.previewReady')
-    : previewUrl === null
+    : !hasCurrentRuntimePreview
       ? t('modals.negativeConversion.previewPending')
       : t('modals.negativeConversion.baseSampleRequired');
   const qcProofReport = useMemo(() => {
@@ -1149,23 +1164,23 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       isLoading,
       isSaving,
       pathCount: pathsToConvert.length,
-      previewReady: previewUrl !== null,
+      previewReady: hasCurrentRuntimePreview,
       requiresAcceptedBatchPlan,
     });
 
     return buildNegativeLabQcProofReport(
       dustScratchReviewReport,
-      previewUrl !== null,
+      hasCurrentRuntimePreview,
       exportReady && pathsToConvert.length === targetPaths.length,
     );
   }, [
     baseFogEstimate,
     dustScratchReviewReport,
+    hasCurrentRuntimePreview,
     isBatchPlanAccepted,
     isLoading,
     isSaving,
     pathsToConvert.length,
-    previewUrl,
     requiresAcceptedBatchPlan,
     targetPaths.length,
   ]);
@@ -1200,13 +1215,13 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       isLoading,
       isSaving,
       pathCount: pathsToConvert.length,
-      previewReady: previewUrl !== null,
+      previewReady: hasCurrentRuntimePreview,
       requiresAcceptedBatchPlan,
     });
 
     return buildNegativeLabWorkspaceProof({
       canSave: exportReady,
-      previewReady: previewUrl !== null,
+      previewReady: hasCurrentRuntimePreview,
       queuedCount: pathsToConvert.length,
       reviewReport: dustScratchReviewReport,
       targetCount: targetPaths.length,
@@ -1214,11 +1229,11 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   }, [
     baseFogEstimate,
     dustScratchReviewReport,
+    hasCurrentRuntimePreview,
     isBatchPlanAccepted,
     isLoading,
     isSaving,
     pathsToConvert.length,
-    previewUrl,
     requiresAcceptedBatchPlan,
     targetPaths.length,
   ]);
@@ -1387,6 +1402,149 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     window.localStorage.setItem(NEGATIVE_LAB_QC_OVERLAY_STORAGE_KEY, JSON.stringify(qcOverlayVisibility));
   }, [qcOverlayVisibility]);
 
+  const buildNegativeLabRuntimePreviewCommand = useCallback(
+    (currentParams: NegativeParams): NegativeLabCommandEnvelopeV1 | null => {
+      if (selectedImagePath === null) return null;
+
+      const previewFrameId = `negative_lab_frame_${String(effectiveActivePathIndex + 1).padStart(4, '0')}`;
+      const sampleRect = currentParams.base_fog_sample;
+      const sampleHash = buildNegativeLabBaseSampleHash(
+        JSON.stringify({
+          imagePath: selectedImagePath,
+          rect: sampleRect,
+          scope: baseFogScope,
+        }),
+      ).slice('fnv1a32:'.length);
+      const sampleIds = baseFogEstimate === null ? [] : [`base_sample_${sampleHash}`];
+      const usingPrintCurveV2 = currentParams.print_curve_algorithm === 'negative_density_print_v2';
+      const sessionId = `negative_lab_modal_session_${buildNegativeLabPlanHash(targetPaths.join('|'))}`;
+      const manualBalanceActive =
+        currentParams.red_weight !== 1 || currentParams.green_weight !== 1 || currentParams.blue_weight !== 1;
+
+      return negativeLabCommandEnvelopeV1Schema.parse({
+        actor: {
+          id: 'negative-lab-ui',
+          kind: ActorKind.Ui,
+          sessionId,
+        },
+        approval: {
+          approvalClass: ApprovalClass.PreviewOnly,
+          reason: 'Negative Lab modal dry-run renders a non-mutating runtime preview artifact before apply.',
+          state: 'not_required',
+        },
+        commandId: `command_negative_lab_runtime_preview_${buildNegativeLabPlanHash(
+          JSON.stringify({
+            imagePath: selectedImagePath,
+            params: currentParams,
+            presetId: selectedPresetId,
+          }),
+        )}`,
+        commandType: 'negativeLab.setConversionRecipe',
+        correlationId: `corr_negative_lab_runtime_preview_${buildNegativeLabPlanHash(
+          `${selectedImagePath}:${selectedPresetId}`,
+        )}`,
+        dryRun: true,
+        expectedGraphRevision: `graph_rev_negative_lab_preview_${buildNegativeLabPlanHash(
+          `${selectedImagePath}:${effectiveActivePathIndex}`,
+        )}`,
+        idempotencyKey: `idem_negative_lab_runtime_preview_${buildNegativeLabPlanHash(
+          JSON.stringify({
+            acquisitionProfile: selectedAcquisitionProfileId,
+            imagePath: selectedImagePath,
+            params: currentParams,
+          }),
+        )}`,
+        parameters: {
+          baseStrategy: {
+            baseSampleIds: sampleIds,
+            mode:
+              sampleIds.length === 0
+                ? 'profile_default_low_confidence'
+                : baseFogScope === 'roll'
+                  ? 'roll_shared'
+                  : 'manual_samples',
+          },
+          conversionModel: {
+            algorithmId: usingPrintCurveV2 ? 'negative_density_print_v2' : 'density_rgb_v1',
+            algorithmVersion: usingPrintCurveV2 ? 2 : 1,
+            densityMax: 4,
+            epsilonPolicyId: 'density_epsilon_v1',
+            negativeDensityTolerance: 0.02,
+          },
+          ...(usingPrintCurveV2 && currentParams.print_curve_v2 !== null
+            ? {
+                densityPrintCurve: {
+                  contrastGrade: currentParams.print_curve_v2.contrast_grade,
+                  densityOffset: currentParams.print_curve_v2.density_offset,
+                  midtoneShape: currentParams.print_curve_v2.midtone_shape,
+                  outputTag: currentParams.print_curve_output_tag ?? 'preview_display',
+                  schemaVersion: currentParams.print_curve_v2.schema_version,
+                  shoulderStrength: currentParams.print_curve_v2.shoulder_strength,
+                  targetBlackDensity: currentParams.print_curve_v2.target_black_density,
+                  targetWhiteDensity: currentParams.print_curve_v2.target_white_density,
+                  toeStrength: currentParams.print_curve_v2.toe_strength,
+                },
+              }
+            : {}),
+          curveModel: {
+            curveFamily: selectedProfile === null ? 'parametric_monotonic_v1' : 'process_profile_monotonic_v1',
+          },
+          frameSelection: {
+            excludeFrameIds: [],
+            frameIds: [previewFrameId],
+            mode: 'selected',
+            qcStatuses: [],
+            warningCodes: [],
+          },
+          inputCharacterization: {
+            channelBasis: selectedAcquisitionProfile.channelBasis,
+            confidence:
+              selectedAcquisitionProfile.channelBasis === 'rendered_rgb'
+                ? 'approximate_rendered_rgb'
+                : 'profiled_acquisition',
+            pixelBasis: 'linear_scan_rgb',
+          },
+          neutralization: {
+            mode: sampleIds.length > 0 ? 'neutral_sample' : manualBalanceActive ? 'manual_rgb_balance' : 'none',
+            sampleIds,
+          },
+          outputIntent: 'proof_preview',
+          outputTransformRef: {
+            chromaticAdaptation: 'bradford',
+            renderingIntent: 'scene_referred',
+            transformId: 'rawengine_scene_linear_v1',
+          },
+          previewRequest: {
+            artifactPurposes: ['objective_positive_preview', 'warning_report', 'parameter_diff'],
+            includePreview: true,
+            maxEdgePx: 1080,
+          },
+          processFamily:
+            selectedProfile?.filmClass === 'black_and_white_silver'
+              ? 'black_and_white_silver_negative'
+              : 'c41_color_negative',
+          sessionId,
+        },
+        schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+        target: {
+          imagePath: selectedImagePath,
+          kind: 'image',
+        },
+      });
+    },
+    [
+      baseFogEstimate,
+      baseFogScope,
+      effectiveActivePathIndex,
+      selectedAcquisitionProfile,
+      selectedAcquisitionProfileId,
+      selectedImagePath,
+      selectedPresetId,
+      selectedProfile,
+      targetPaths,
+    ],
+  );
+
   const updatePreview = useMemo(
     () =>
       throttle(
@@ -1396,36 +1554,53 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           baseSampleProofContext: NegativeLabBaseSamplePreviewProofContext | null = null,
         ) => {
           if (!selectedImagePath) return;
+          const previewRequestSequence = ++previewRequestSequenceRef.current;
           const previewRevision = 1;
+          const runtimePreviewCommand = buildNegativeLabRuntimePreviewCommand(currentParams);
+          if (runtimePreviewCommand === null) {
+            setPreviewUrl(null);
+            setRuntimePreviewDryRunResult(null);
+            if (baseSampleProofContext === null) setBaseFogPreviewProof(null);
+            setIsLoading(false);
+            return;
+          }
+
+          setIsLoading(true);
+          setPreviewUrl(null);
+          setRuntimePreviewDryRunResult(null);
+          if (baseSampleProofContext === null) setBaseFogPreviewProof(null);
           try {
-            const result: string = await invoke(Invokes.PreviewNegativeConversion, {
+            const result = await renderNegativeLabRuntimeDryRunPreview({
+              command: runtimePreviewCommand,
               path: selectedImagePath,
-              params: currentParams,
+              recipeParams: currentParams,
             });
-            setPreviewUrl(result);
+            if (previewRequestSequence !== previewRequestSequenceRef.current) return;
+
+            setPreviewUrl(result.displayPreviewUrl);
+            setRuntimePreviewDryRunResult(result.runtimeDryRun);
             if (baseSampleProofContext !== null) {
               setBaseFogPreviewProof(
                 buildNegativeLabBaseSamplePreviewProof(
                   baseSampleProofContext,
-                  result,
+                  result.displayPreviewUrl,
                   buildNegativeBaseFogDensitometerReadout(baseSampleProofContext.estimate),
                   previewRevision,
                 ),
               );
             }
-            if (isInitialLoad) {
-              setIsLoading(false);
-            }
+            setIsLoading(false);
           } catch (e) {
+            if (previewRequestSequence !== previewRequestSequenceRef.current) return;
             console.error('Negative preview failed', e);
-            if (isInitialLoad) {
-              setIsLoading(false);
-            }
+            setPreviewUrl(null);
+            setRuntimePreviewDryRunResult(null);
+            setIsLoading(false);
           }
         },
         100,
       ),
-    [selectedImagePath],
+    [buildNegativeLabRuntimePreviewCommand, selectedImagePath],
   );
 
   useEffect(() => {
@@ -1452,7 +1627,9 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     }
 
     const timer = window.setTimeout(() => {
+      previewRequestSequenceRef.current += 1;
       setPreviewUrl(null);
+      setRuntimePreviewDryRunResult(null);
       setOriginalUrl(null);
       setParams(DEFAULT_PARAMS);
       setSelectedPresetId(DEFAULT_NEGATIVE_LAB_UI_PRESET.presetId);
@@ -2559,7 +2736,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           className="pointer-events-auto rounded-md border border-white/10 bg-black/70 p-2 shadow-xl backdrop-blur-md"
           aria-label={t('modals.negativeConversion.frameHealth')}
           data-active-frame-id={frameHealthReport.activeFrameId ?? ''}
-          data-preview-ready={String(previewUrl !== null)}
+          data-preview-ready={String(hasCurrentRuntimePreview)}
           data-testid="negative-lab-roll-frame-navigator"
           role="region"
         >
@@ -2567,7 +2744,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             className="sr-only"
             data-active-frame-id={frameHealthReport.activeFrameId ?? ''}
             data-frame-count={frameHealthReport.frames.length}
-            data-preview-ready={String(previewUrl !== null)}
+            data-preview-ready={String(hasCurrentRuntimePreview)}
             data-runtime-status="runtime_state_backed"
             data-testid="negative-lab-roll-frame-navigator-proof"
           />
@@ -2653,7 +2830,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
               role="group"
             >
               {frameHealthReport.frames.map((frame, index) => {
-                const framePreviewReady = frame.active && previewUrl !== null;
+                const framePreviewReady = frame.active && hasCurrentRuntimePreview;
 
                 return (
                   <button
@@ -3296,7 +3473,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       data-runtime-dry-run-mode="runtime_preview_non_mutating"
       data-runtime-dry-run-mutates="false"
       data-runtime-preview-plan-hash={agentProofHash}
-      data-runtime-preview-rendered={String(previewUrl !== null)}
+      data-runtime-preview-rendered={String(hasCurrentRuntimePreview)}
       data-testid="negative-lab-agent-activity"
       data-warning-count={rollWarningCount}
       role="status"

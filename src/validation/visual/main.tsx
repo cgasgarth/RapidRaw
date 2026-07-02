@@ -78,8 +78,12 @@ const generatedPreviewBytes = [
   196, 0, 20, 16, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 218, 0, 12, 3, 1, 0, 2, 17, 3, 17, 0, 63, 0,
   191, 255, 217,
 ];
+const generatedPreviewBase64 =
+  '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoMDAsKCwsNDhIQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/wAARCAABAAEDASIAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAAAAAH/8QAFBABAAAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AL//2Q==';
+const generatedPreviewDataUrl = `data:image/jpeg;base64,${generatedPreviewBase64}`;
 
 const previewNegativeConversionCommand: string = Invokes.PreviewNegativeConversion;
+const renderNegativeLabDryRunPreviewArtifactCommand: string = Invokes.RenderNegativeLabDryRunPreviewArtifact;
 const generatePreviewForPathCommand: string = Invokes.GeneratePreviewForPath;
 const estimateNegativeBaseFogCommand: string = Invokes.EstimateNegativeBaseFog;
 const suggestNegativeLabHighlightPatchCommand: string = Invokes.SuggestNegativeLabHighlightPatchExposure;
@@ -112,6 +116,20 @@ window.__TAURI_INTERNALS__ = {
       const previewUrl = buildNegativeLabPreviewUrl(args);
       window.__RAWENGINE_NEGATIVE_LAB_PREVIEW_RETURNS__?.push(previewUrl);
       return Promise.resolve(previewUrl);
+    }
+    if (command === renderNegativeLabDryRunPreviewArtifactCommand) {
+      window.__RAWENGINE_NEGATIVE_LAB_PREVIEW_RETURNS__?.push(generatedPreviewDataUrl);
+      return Promise.resolve({
+        artifactId: 'artifact_negative_lab_runtime_preview_visual_smoke',
+        contentHash: 'sha256:f7f9bf94f7a57bc7639643ede0d4b28a142ab5d8a5221032833fd09883dcf99b',
+        dimensions: {
+          height: 1,
+          width: 1,
+        },
+        previewDataUrl: generatedPreviewDataUrl,
+        renderer: 'rawengine_negative_lab_runtime_preview_v1',
+        storage: 'temp_cache',
+      });
     }
     if (command === generatePreviewForPathCommand) return Promise.resolve(generatedPreviewBytes);
     if (command === estimateNegativeBaseFogCommand) {

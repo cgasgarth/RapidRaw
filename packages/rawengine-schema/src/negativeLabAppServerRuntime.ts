@@ -35,6 +35,7 @@ export type NegativeLabAppServerRuntimeToolRequestV1 = z.infer<typeof negativeLa
 type NegativeLabSetConversionRecipeCommandV1 = z.infer<typeof negativeLabSetConversionRecipeCommandV1Schema>;
 
 export interface NegativeLabRuntimePreviewRenderResultV1 {
+  artifactId: string;
   baseFogSampleSummary?: {
     confidence: number;
     densityRgb: { b: number; g: number; r: number };
@@ -42,7 +43,11 @@ export interface NegativeLabRuntimePreviewRenderResultV1 {
   };
   contentHash: string;
   dimensions: { height: number; width: number };
-  renderer: 'rawengine_density_preview_runtime' | 'tauri_preview_negative_conversion';
+  renderer:
+    | 'rawengine_density_preview_runtime'
+    | 'rawengine_negative_lab_runtime_preview_v1'
+    | 'tauri_preview_negative_conversion';
+  storage: 'temp_cache';
 }
 
 export interface NegativeLabAppServerRuntimeToolBusOptionsV1 {
@@ -188,14 +193,13 @@ function buildNegativeLabRuntimeDryRunV1(
   const updatedFrameIds = selectedFrameIds.length > 0 ? selectedFrameIds : ['negative_lab_frame_runtime_preview'];
   const warnings = [negativeLabRuntimeWarningV1(updatedFrameIds)];
   const warningCodes = warnings.map((warning) => warning.code);
-  const artifactId = `artifact_${command.commandId}_preview`;
   const previewArtifacts: ArtifactHandleV1[] = [
     {
-      artifactId,
+      artifactId: renderedPreview.artifactId,
       contentHash: renderedPreview.contentHash,
       dimensions: renderedPreview.dimensions,
       kind: 'preview',
-      storage: 'temp_cache',
+      storage: renderedPreview.storage,
     },
   ];
   const proof = buildNegativeLabRuntimeProofV1({
@@ -496,6 +500,7 @@ function buildDefaultNegativeLabRuntimePreviewRenderResultV1(
   const p50AnchorDensity = Number((0.48 + frameCount * 0.01).toFixed(4));
 
   return {
+    artifactId: `artifact_${command.commandId}_preview`,
     baseFogSampleSummary: {
       confidence: command.parameters.baseStrategy.mode === 'profile_default_low_confidence' ? 0.42 : 0.74,
       densityRgb: {
@@ -508,6 +513,7 @@ function buildDefaultNegativeLabRuntimePreviewRenderResultV1(
     contentHash: `sha256:negative_lab_runtime_preview:${renderToken}`,
     dimensions: { height, width },
     renderer: 'rawengine_density_preview_runtime',
+    storage: 'temp_cache',
   };
 }
 

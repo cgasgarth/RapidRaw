@@ -68,6 +68,7 @@ const commandNames: Record<
   | 'loadMetadata'
   | 'loadSettings'
   | 'previewNegativeConversion'
+  | 'renderNegativeLabDryRunPreviewArtifact'
   | 'readExifForPaths'
   | 'saveSettings'
   | 'saveMetadataAndUpdateThumbnail'
@@ -98,6 +99,7 @@ const commandNames: Record<
   loadMetadata: Invokes.LoadMetadata,
   loadSettings: Invokes.LoadSettings,
   previewNegativeConversion: Invokes.PreviewNegativeConversion,
+  renderNegativeLabDryRunPreviewArtifact: Invokes.RenderNegativeLabDryRunPreviewArtifact,
   readExifForPaths: Invokes.ReadExifForPaths,
   saveSettings: Invokes.SaveSettings,
   saveMetadataAndUpdateThumbnail: Invokes.SaveMetadataAndUpdateThumbnail,
@@ -197,6 +199,18 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
       return Promise.resolve(Array.from(new Uint8Array(decodeBase64ToArrayBuffer(harnessPreviewJpegBase64))));
     case commandNames.previewNegativeConversion:
       return Promise.resolve(`data:image/jpeg;base64,${harnessPreviewJpegBase64}`);
+    case commandNames.renderNegativeLabDryRunPreviewArtifact:
+      return Promise.resolve({
+        artifactId: 'artifact_negative_lab_runtime_preview_browser_harness',
+        contentHash: 'sha256:d20f6ffd523b78a86cd2f916fa34af5d1918d75f7b142237c752ad6b254213ab',
+        dimensions: {
+          height: 1,
+          width: 1,
+        },
+        previewDataUrl: `data:image/jpeg;base64,${harnessPreviewJpegBase64}`,
+        renderer: 'rawengine_negative_lab_runtime_preview_v1',
+        storage: 'temp_cache',
+      });
     case commandNames.checkAiConnectorStatus:
       return Promise.resolve({ connected: false });
     case commandNames.getSupportedFileTypes:

@@ -11,7 +11,7 @@ import {
 export const NEGATIVE_LAB_AGENT_PREVIEW_TOOL_NAME = 'negativelab.preview_conversion';
 export const NEGATIVE_LAB_AGENT_APPLY_TOOL_NAME = 'negativelab.apply_planned_command';
 
-const NEGATIVE_LAB_AGENT_TOOL_MANIFEST: NegativeLabAppServerToolManifestV1 = {
+export const NEGATIVE_LAB_AGENT_TOOL_MANIFEST: NegativeLabAppServerToolManifestV1 = {
   schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
   serverRuntime: 'openai_app_server',
   tools: [

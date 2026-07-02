@@ -13,6 +13,16 @@ import { Invokes } from '../../../../src/tauri/commands.ts';
 mock.module('@tauri-apps/api/core', () => ({
   invoke: mock((command: string) => {
     if (command === Invokes.GeneratePreviewForPath) return Promise.resolve(new Uint8Array([1, 2, 3]));
+    if (command === Invokes.RenderNegativeLabDryRunPreviewArtifact) {
+      return Promise.resolve({
+        artifactId: 'artifact_negative_lab_runtime_preview_test',
+        contentHash: 'sha256:8a5edab282632443219e051e301c8f382f0f0f8b80636cae5f0204f20795d880',
+        dimensions: { height: 1, width: 1 },
+        previewDataUrl: 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2Q==',
+        renderer: 'rawengine_negative_lab_runtime_preview_v1',
+        storage: 'temp_cache',
+      });
+    }
     if (command === Invokes.PreviewNegativeConversion) {
       return Promise.resolve('data:image/png;base64,iVBORw0KGgo=');
     }

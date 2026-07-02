@@ -48,6 +48,7 @@ export enum Invokes {
   GenerateExportSoftProofPreview = 'generate_export_soft_proof_preview',
   ResolveExportSoftProofTransformMetadata = 'resolve_export_soft_proof_transform_metadata',
   GeneratePreviewForPath = 'generate_preview_for_path',
+  RenderNegativeLabDryRunPreviewArtifact = 'render_negative_lab_dry_run_preview_artifact',
   GenerateMaskOverlay = 'generate_mask_overlay',
   GeneratePresetPreview = 'generate_preset_preview',
   GenerateUncroppedPreview = 'generate_uncropped_preview',

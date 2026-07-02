@@ -9164,7 +9164,11 @@ export const negativeLabRuntimeProofV1Schema = z
         planHash: z.string().regex(/^sha256:[A-Za-z0-9:_-]+$/u),
         previewArtifactHandle: artifactHandleV1Schema,
         previewContentHash: z.string().regex(/^sha256:[A-Za-z0-9:_-]+$/u),
-        previewRenderer: z.enum(['tauri_preview_negative_conversion', 'rawengine_density_preview_runtime']),
+        previewRenderer: z.enum([
+          'tauri_preview_negative_conversion',
+          'rawengine_density_preview_runtime',
+          'rawengine_negative_lab_runtime_preview_v1',
+        ]),
         renderedPositivePreview: z.literal(true),
         sourceImageIdentity: z
           .object({
