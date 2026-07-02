@@ -68,6 +68,7 @@ import {
   getNegativeLabSourceReadiness,
 } from '../../utils/negative-lab/negativeLabSourceReadiness';
 import { debounce } from '../../utils/timing';
+import type { WhiteBalancePickerRuntimeReceipt } from '../../utils/whiteBalancePicker';
 import { Panel } from '../ui/AppProperties';
 import UiText from '../ui/primitives/Text';
 import EditorToolbar from './editor/EditorToolbar';
@@ -131,6 +132,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   const maskOverlaySettings = useEditorStore((s) => s.maskOverlaySettings);
   const isStraightenActive = useEditorStore((s) => s.isStraightenActive);
   const isWbPickerActive = useEditorStore((s) => s.isWbPickerActive);
+  const lastWhiteBalancePickerReceipt = useEditorStore((s) => s.lastWhiteBalancePickerReceipt);
   const liveRotation = useEditorStore((s) => s.liveRotation);
   const brushSettings = useEditorStore((s) => s.brushSettings);
   const activeMaskContainerId = useEditorStore((s) => s.activeMaskContainerId);
@@ -282,7 +284,24 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
     [setAdjustments],
   );
 
-  const handleWbPicked = useCallback(() => {}, []);
+  const handleWbPicked = useCallback(
+    (receipt: WhiteBalancePickerRuntimeReceipt, nextAdjustments: Adjustments) => {
+      setEditor({
+        adjustments: nextAdjustments,
+        exportSoftProofTransform: null,
+        finalPreviewUrl: null,
+        gamutWarningOverlay: null,
+        interactivePatch: null,
+        isWbPickerActive: false,
+        lastWhiteBalancePickerReceipt: receipt,
+        previewScopeStatus: null,
+        transformedOriginalUrl: null,
+        uncroppedAdjustedPreviewUrl: null,
+      });
+      pushHistory(nextAdjustments);
+    },
+    [pushHistory, setEditor],
+  );
 
   useEffect(() => {
     const timer = setTimeout(
@@ -1635,6 +1654,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
               uncroppedAdjustedPreviewUrl={uncroppedAdjustedPreviewUrl}
               updateSubMask={updateSubMaskLocal}
               isWbPickerActive={isWbPickerActive}
+              lastWhiteBalancePickerReceipt={lastWhiteBalancePickerReceipt}
               onWbPicked={handleWbPicked}
               setAdjustments={setAdjustments}
               overlayRotation={overlayRotation}
