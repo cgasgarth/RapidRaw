@@ -13,6 +13,32 @@
       "reviewDate": "2026-09-15",
       "expiryDate": "2026-12-15",
       "issue": 262
+    },
+    {
+      "advisoryId": "RUSTSEC-2026-0194",
+      "ghsaId": "none",
+      "crate": "quick-xml",
+      "currentVersion": "0.37.5 / 0.39.4",
+      "patchedVersion": ">=0.41.0",
+      "reason": "Direct quick-xml usage is patched to 0.41.0; remaining vulnerable versions are pinned transitively by little_exif 0.6.23 and plist 1.9.0, which currently have no narrow compatible cargo update path.",
+      "owner": "@cgasgarth",
+      "introducedDate": "2026-07-02",
+      "reviewDate": "2026-08-15",
+      "expiryDate": "2026-10-15",
+      "issue": 4773
+    },
+    {
+      "advisoryId": "RUSTSEC-2026-0195",
+      "ghsaId": "none",
+      "crate": "quick-xml",
+      "currentVersion": "0.37.5 / 0.39.4",
+      "patchedVersion": ">=0.41.0",
+      "reason": "Direct quick-xml usage is patched to 0.41.0; remaining vulnerable versions are pinned transitively by little_exif 0.6.23 and plist 1.9.0, which currently have no narrow compatible cargo update path.",
+      "owner": "@cgasgarth",
+      "introducedDate": "2026-07-02",
+      "reviewDate": "2026-08-15",
+      "expiryDate": "2026-10-15",
+      "issue": 4773
     }
   ]
 }

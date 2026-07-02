@@ -74,3 +74,47 @@ cargo update -p tauri -p tauri-build -p tauri-plugin-dialog -p tauri-plugin-fs -
 ```
 
 If the Tauri/wry dry-run requires broad unrelated Linux stack churn, keep this blocked until Linux support is in scope.
+
+## RUSTSEC-2026-0194 / RUSTSEC-2026-0195: `quick-xml` parser denial of service
+
+Status: partially remediated / deferred
+Canonical issue: #4773
+Manifest: `src-tauri/Cargo.lock`
+Current vulnerable packages: `quick-xml 0.37.5`, `quick-xml 0.39.4`
+Patched version: `quick-xml >= 0.41.0`
+Current audit handling: `bun run check:security` validates
+`docs/security/rust-advisory-waivers.json`, then ignores only the ledger-backed
+`RUSTSEC-2026-0194` and `RUSTSEC-2026-0195` entries while keeping new RustSec
+vulnerability advisories blocking.
+
+### Reason For Deferral
+
+Direct RawEngine `quick-xml` usage is updated to `0.41.0`. The remaining
+vulnerable versions are transitive:
+
+- `quick-xml 0.37.5` through `little_exif 0.6.23`
+- `quick-xml 0.39.4` through `plist 1.9.0`, reached by Tauri packages
+
+Current narrow update checks show no compatible cargo update path:
+
+```sh
+cd src-tauri
+cargo update -p little_exif --dry-run
+cargo update -p plist --dry-run
+cargo update -p quick-xml@0.37.5 --precise 0.41.0 --dry-run
+```
+
+The `quick-xml@0.37.5` precise update fails because `little_exif 0.6.23`
+requires `quick-xml = "^0.37.5"`. `little_exif` and `plist` are already at their
+latest compatible versions in this lockfile.
+
+### Exit Criteria
+
+This advisory pair is remediated only when all of the following are true:
+
+- `cargo audit --ignore RUSTSEC-2024-0429` passes without ignoring
+  `RUSTSEC-2026-0194` or `RUSTSEC-2026-0195`.
+- `cargo tree -i quick-xml@0.37.5` and `cargo tree -i quick-xml@0.39.4` no
+  longer show vulnerable dependency paths, or those paths use `quick-xml >= 0.41.0`.
+- Product-critical macOS Rust checks pass.
+- The remediation reaches `main`.
