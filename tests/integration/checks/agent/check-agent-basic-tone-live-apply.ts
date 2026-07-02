@@ -1,10 +1,17 @@
 #!/usr/bin/env bun
 
+import {
+  ApprovalClass,
+  toneColorCommandEnvelopeV1Schema,
+} from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import { RawStatus, SortDirection } from '../../../../src/components/ui/AppProperties.tsx';
 import { useEditorStore } from '../../../../src/store/useEditorStore.ts';
 import { useLibraryStore } from '../../../../src/store/useLibraryStore.ts';
 import { INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
-import { applyBasicToneToLiveEditor } from '../../../../src/utils/agent/session/agentLiveBasicTone.ts';
+import {
+  applyBasicToneCommandToLiveEditor,
+  applyBasicToneToLiveEditor,
+} from '../../../../src/utils/agent/session/agentLiveBasicTone.ts';
 
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3155.ARW';
 
@@ -109,6 +116,32 @@ if (
 }
 if (result.mutation.appliedGraphRevision !== result.appliedGraphRevision) {
   throw new Error('Agent basic-tone result did not preserve mutation graph revision.');
+}
+
+let unapprovedApplyRejected = false;
+try {
+  await applyBasicToneCommandToLiveEditor(
+    toneColorCommandEnvelopeV1Schema.parse({
+      ...result.command,
+      approval: {
+        approvalClass: ApprovalClass.PreviewOnly,
+        reason: 'Regression check: preview-only approval cannot mutate.',
+        state: 'not_required',
+      },
+      commandId: 'basic_tone_unapproved_apply_regression',
+      correlationId: 'basic_tone_unapproved_apply_regression_corr',
+      expectedGraphRevision: 'history_1',
+      idempotencyKey: 'basic_tone_unapproved_apply_regression_idem',
+    }),
+  );
+} catch (error) {
+  unapprovedApplyRejected = error instanceof Error;
+}
+if (!unapprovedApplyRejected) {
+  throw new Error('Typed basic-tone apply accepted a preview-only approval.');
+}
+if (useEditorStore.getState().historyIndex !== 1) {
+  throw new Error('Rejected typed basic-tone apply must not advance editor history.');
 }
 
 console.log('agent basic tone live apply ok (store+history+renderer handoff)');
