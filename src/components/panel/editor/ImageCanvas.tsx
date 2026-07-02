@@ -43,6 +43,7 @@ import {
   normalizeLinearGradientParameters,
   normalizeRadialGradientParameters,
 } from '../../../utils/mask/gradientMaskParameters';
+import { resolveWgpuPreviewVisibility } from '../../../utils/wgpuPreviewHealth';
 import { calculateWhiteBalancePickerAdjustment } from '../../../utils/whiteBalancePicker';
 import type { AppSettings, BrushSettings, SelectedImage } from '../../ui/AppProperties';
 import type { OverlayMode } from '../right/color/CropPanel';
@@ -1254,7 +1255,13 @@ const ImageCanvas = memo(
     const [lastBrushCommandCapture, setLastBrushCommandCapture] = useState<BrushMaskCommandCaptureSummary | null>(null);
     const retainedPatchRef = useRef<typeof interactivePatch>(null);
 
-    const isWgpuActive = appSettings?.useWgpuRenderer !== false && selectedImage.isReady && hasRenderedFirstFrame;
+    const wgpuPreviewVisibility = resolveWgpuPreviewVisibility({
+      hasRenderedFirstFrame,
+      previewSource: displayState.base,
+      selectedImageIsReady: selectedImage.isReady,
+      useWgpuRenderer: appSettings?.useWgpuRenderer,
+    });
+    const isWgpuActive = wgpuPreviewVisibility.shouldHideCpuPreview;
     const paddingX = imageRenderSize.width * 0.5;
     const paddingY = imageRenderSize.height * 0.5;
 
@@ -2807,6 +2814,8 @@ const ImageCanvas = memo(
         data-canvas-overlay-tool={activeCanvasOverlayTool}
         data-editor-compare-mode={compareMode}
         data-editor-compare-original-ready={String(canShowOriginalCompare)}
+        data-preview-backend={wgpuPreviewVisibility.previewBackend}
+        data-wgpu-frame-health={wgpuPreviewVisibility.health}
         data-testid="image-canvas"
         style={{ width: '100%', height: '100%', cursor: effectiveCursor }}
       >
