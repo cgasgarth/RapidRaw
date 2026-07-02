@@ -25,8 +25,17 @@ export const layerStackSidecarPersistenceEnvelopeV1Schema = z.looseObject({
 
 export type LayerStackSidecarPersistenceEnvelopeV1 = z.infer<typeof layerStackSidecarPersistenceEnvelopeV1Schema>;
 
+const parseLayerStackSidecarPersistenceEnvelope = (sidecar: unknown): LayerStackSidecarPersistenceEnvelopeV1 => {
+  const parsed = layerStackSidecarPersistenceEnvelopeV1Schema.safeParse(sidecar);
+  if (!parsed.success) {
+    throw new Error('Invalid layer stack sidecar metadata.');
+  }
+
+  return parsed.data;
+};
+
 export const readLayerStackSidecarsFromSidecar = (sidecar: unknown): LayerStackSidecarV1[] => {
-  const parsed = layerStackSidecarPersistenceEnvelopeV1Schema.parse(sidecar);
+  const parsed = parseLayerStackSidecarPersistenceEnvelope(sidecar);
   return parsed.rawEngineArtifacts?.layerStackSidecars ?? [];
 };
 
@@ -34,19 +43,23 @@ export const upsertLayerStackSidecarInSidecar = (
   sidecar: Record<string, unknown>,
   layerStackSidecar: LayerStackSidecarV1,
 ): LayerStackSidecarPersistenceEnvelopeV1 => {
-  const parsedLayerStack = layerStackSidecarV1Schema.parse(layerStackSidecar);
-  const parsedSidecar = layerStackSidecarPersistenceEnvelopeV1Schema.parse(sidecar);
+  const parsedLayerStack = layerStackSidecarV1Schema.safeParse(layerStackSidecar);
+  const parsedSidecar = layerStackSidecarPersistenceEnvelopeV1Schema.safeParse(sidecar);
+  if (!parsedLayerStack.success || !parsedSidecar.success) {
+    throw new Error('Invalid layer stack sidecar metadata.');
+  }
+
   const rawEngineArtifacts = rawEngineArtifactsWithLayerStacksV1Schema.parse(
-    parsedSidecar.rawEngineArtifacts ?? { schemaVersion: RAW_ENGINE_SCHEMA_VERSION },
+    parsedSidecar.data.rawEngineArtifacts ?? { schemaVersion: RAW_ENGINE_SCHEMA_VERSION },
   );
   const existingLayerStacks: LayerStackSidecarV1[] = rawEngineArtifacts.layerStackSidecars;
   const layerStackSidecars = [
-    ...existingLayerStacks.filter((existing) => existing.sourceImagePath !== parsedLayerStack.sourceImagePath),
-    parsedLayerStack,
+    ...existingLayerStacks.filter((existing) => existing.sourceImagePath !== parsedLayerStack.data.sourceImagePath),
+    parsedLayerStack.data,
   ];
 
   return layerStackSidecarPersistenceEnvelopeV1Schema.parse({
-    ...parsedSidecar,
+    ...parsedSidecar.data,
     rawEngineArtifacts: {
       ...rawEngineArtifacts,
       layerStackSidecars,

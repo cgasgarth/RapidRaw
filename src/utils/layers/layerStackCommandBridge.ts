@@ -478,8 +478,14 @@ export function materializeMasksFromLayerStackSidecar(
   sidecar: LayerStackSidecarV1,
   previousMasks: ReadonlyArray<MaskContainer> = [],
 ): Array<MaskContainer> {
-  const parsedSidecar = layerStackSidecarV1Schema.parse(sidecar);
-  return materializeMasksFromSidecar(parsedSidecar.layers, previousMasks, { type: 'delete', layerId: '__reload__' });
+  const parsedSidecar = layerStackSidecarV1Schema.safeParse(sidecar);
+  if (!parsedSidecar.success) {
+    throw new Error('Invalid layer stack sidecar data.');
+  }
+  return materializeMasksFromSidecar(parsedSidecar.data.layers, previousMasks, {
+    type: 'delete',
+    layerId: '__reload__',
+  });
 }
 
 function cloneSourceForOperation(

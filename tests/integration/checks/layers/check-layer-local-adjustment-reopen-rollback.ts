@@ -133,17 +133,31 @@ const invalidLayerStack = {
     return layerWithoutName;
   }),
 };
+const warnings: unknown[] = [];
+const originalWarn = console.warn;
+let invalidHydration = { ...INITIAL_ADJUSTMENTS, masks: [] };
+console.warn = (...args: unknown[]) => {
+  warnings.push(args);
+};
 try {
-  hydrateLayerStackMasksFromMetadata(
+  invalidHydration = hydrateLayerStackMasksFromMetadata(
     { ...INITIAL_ADJUSTMENTS, masks: [] },
     { rawEngineArtifacts: { layerStackSidecars: [invalidLayerStack], schemaVersion: 1 } },
     imagePath,
   );
-  throw new Error('Invalid layer graph metadata was accepted.');
-} catch (error) {
-  if (error instanceof Error && error.message === 'Invalid layer graph metadata was accepted.') {
-    throw error;
-  }
+} finally {
+  console.warn = originalWarn;
+}
+if (invalidHydration.masks.length !== 0) {
+  throw new Error('Invalid layer graph metadata should be skipped without materializing masks.');
+}
+if (
+  warnings.length === 0 ||
+  !warnings.some((entry) =>
+    entry.some((value) => typeof value === 'string' && value.includes('Skipping invalid layer stack sidecar metadata')),
+  )
+) {
+  throw new Error('Invalid layer graph metadata should emit a stable warning.');
 }
 
 console.log(`layer local adjustment reopen/rollback ok (${layerId} ${localAdjustment.receipt.graphRevision})`);

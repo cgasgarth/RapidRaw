@@ -13,10 +13,6 @@ type PersistedLayerStackArtifacts = {
   [key: string]: unknown;
 };
 
-type LayerStackPersistedAdjustments = Adjustments & {
-  rawEngineArtifacts?: PersistedLayerStackArtifacts;
-};
-
 type LayerStackMetadataEnvelope = {
   adjustments?: unknown;
   rawEngineArtifacts?: PersistedLayerStackArtifacts;
@@ -42,12 +38,11 @@ function readLayerStackSidecarsFromMetadata(metadata: LayerStackMetadataEnvelope
 }
 
 export function persistLayerStackSidecarInAdjustments(
-  adjustments: Adjustments,
+  adjustments: Adjustments & { rawEngineArtifacts?: PersistedLayerStackArtifacts },
   layerStackSidecar: LayerStackSidecarV1,
 ): Adjustments {
-  const persistedAdjustments = adjustments as LayerStackPersistedAdjustments;
   const envelope = upsertLayerStackSidecarInSidecar(
-    { rawEngineArtifacts: persistedAdjustments.rawEngineArtifacts },
+    { rawEngineArtifacts: adjustments.rawEngineArtifacts },
     layerStackSidecar,
   );
 
@@ -62,16 +57,21 @@ export function hydrateLayerStackMasksFromMetadata(
   metadata: LayerStackMetadataEnvelope,
   imagePath: string,
 ): Adjustments {
-  const layerStackSidecar = readLayerStackSidecarsFromMetadata(metadata).find(
-    (sidecar) => sidecar.sourceImagePath === imagePath,
-  );
-  if (layerStackSidecar === undefined) return adjustments;
+  try {
+    const layerStackSidecar = readLayerStackSidecarsFromMetadata(metadata).find(
+      (sidecar) => sidecar.sourceImagePath === imagePath,
+    );
+    if (layerStackSidecar === undefined) return adjustments;
 
-  return persistLayerStackSidecarInAdjustments(
-    {
-      ...adjustments,
-      masks: materializeMasksFromLayerStackSidecar(layerStackSidecar, adjustments.masks),
-    },
-    layerStackSidecar,
-  );
+    return persistLayerStackSidecarInAdjustments(
+      {
+        ...adjustments,
+        masks: materializeMasksFromLayerStackSidecar(layerStackSidecar, adjustments.masks),
+      },
+      layerStackSidecar,
+    );
+  } catch (error) {
+    console.warn('Skipping invalid layer stack sidecar metadata while hydrating layer masks.', error);
+    return adjustments;
+  }
 }
