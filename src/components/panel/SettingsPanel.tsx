@@ -177,7 +177,7 @@ type NumericChangeEvent = ChangeEvent<HTMLInputElement> | { target: { value: num
 const getNumericEventValue = (event: NumericChangeEvent): number => Number(event.target.value);
 const getIntegerEventValue = (event: NumericChangeEvent): number => parseInt(String(event.target.value), 10);
 const formatUnknownError = (error: unknown): string => (error instanceof Error ? error.message : String(error));
-const shouldDefaultWgpuRenderer = (osPlatform: string): boolean => osPlatform !== 'linux' && osPlatform !== 'android';
+const shouldDefaultWgpuRenderer = (_osPlatform: string): boolean => false;
 const buildProcessingSettings = (appSettings: AppSettings, osPlatform: string): ProcessingSettings => ({
   applyPreprocessingToNonRaws: appSettings.applyPreprocessingToNonRaws ?? false,
   editorPreviewResolution: appSettings.editorPreviewResolution || 1920,
