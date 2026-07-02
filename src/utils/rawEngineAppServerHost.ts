@@ -1278,6 +1278,7 @@ const hasAgentSessionIntent = ({
       actor.sessionId.trim().length > 0) ||
     (actor !== null &&
       actor.kind === 'agent' &&
+      actor.id === 'rawengine-agent' &&
       typeof actor.sessionId === 'string' &&
       actor.sessionId.trim().length > 0)
   );
