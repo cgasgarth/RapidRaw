@@ -4565,6 +4565,52 @@ export const focusStackInvalidationReasonV1Schema = z.enum([
 
 export const focusStackStaleStateV1Schema = z.enum(['current', 'stale', 'unknown']);
 
+const focusStackRetouchSeedReasonCodeV1Schema = z.enum([
+  'focus_coverage_low',
+  'halo_risk',
+  'low_confidence',
+  'retouch_layer_required',
+  'retouch_recommended',
+]);
+
+const focusStackRetouchSeedStateV1Schema = z.enum(['current', 'stale', 'unknown']);
+
+const focusStackRetouchSeedMaskRegionV1Schema = z
+  .object({
+    cellCount: z.number().int().positive(),
+    regionId: z.string().trim().min(1),
+    risk: z.enum(['halo_risk', 'low_confidence', 'retouch_recommended']),
+    sourceIndex: z.number().int().nonnegative(),
+  })
+  .strict();
+
+const focusStackRetouchSeedSourceCandidateV1Schema = z
+  .object({
+    contentHash: z.string().trim().min(1),
+    coverageCellCount: z.number().int().positive(),
+    graphRevision: z.string().trim().min(1),
+    path: z.string().trim().min(1),
+    regionIds: z.array(z.string().trim().min(1)).min(1),
+    sourceIndex: z.number().int().nonnegative(),
+  })
+  .strict();
+
+const focusStackRetouchSeedV1Schema = z
+  .object({
+    acceptedDryRunPlanHash: z.string().trim().min(1),
+    acceptedDryRunPlanId: z.string().trim().min(1),
+    artifactId: z.string().trim().min(1),
+    availability: z.enum(['available', 'unavailable']),
+    maskRegions: z.array(focusStackRetouchSeedMaskRegionV1Schema).min(1),
+    outputContentHash: z.string().trim().min(1),
+    previewContentHash: z.string().trim().min(1),
+    reasonCodes: z.array(focusStackRetouchSeedReasonCodeV1Schema).min(1),
+    sourceCandidates: z.array(focusStackRetouchSeedSourceCandidateV1Schema).min(1),
+    staleReasons: z.array(focusStackRetouchSeedReasonCodeV1Schema),
+    staleState: focusStackRetouchSeedStateV1Schema,
+  })
+  .strict();
+
 const focusStackSourceStateV1Schema = z
   .object({
     contentHash: z.string().trim().min(1),
@@ -4647,6 +4693,7 @@ export const focusStackArtifactV1Schema = z
     previewArtifacts: z.array(artifactHandleV1Schema),
     haloMapArtifact: artifactHandleV1Schema.optional(),
     retouchedExportParity: focusStackRetouchedExportParityV1Schema.optional(),
+    retouchSeed: focusStackRetouchSeedV1Schema.optional(),
     haloReview: z
       .object({
         artifactId: z.string().trim().min(1),

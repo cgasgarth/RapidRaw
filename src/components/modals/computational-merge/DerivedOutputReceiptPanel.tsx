@@ -30,6 +30,8 @@ export default function DerivedOutputReceiptPanel({
   const canOpen = receipt.openInEditorAction.state === 'available' && receipt.openInEditorAction.path !== undefined;
   const canExport = receipt.outputPath !== undefined && onExportOutput !== undefined;
   const isStale = receipt.staleState === 'stale';
+  const focusStack = receipt.focusStack ?? receipt.provenanceSidecar?.focusStack;
+  const focusRetouchSeed = focusStack?.retouchSeed;
   const warningSummary = warnings.join(' | ');
   const lineageSummary =
     sourceLineageSummary ??
@@ -59,6 +61,30 @@ export default function DerivedOutputReceiptPanel({
       label: t('modals.derivedOutput.storage'),
       value: t(`modals.derivedOutput.storageValue.${receipt.storagePolicy}`),
     },
+    ...(focusRetouchSeed === undefined
+      ? []
+      : [
+          {
+            label: 'Retouch seed availability',
+            value: focusRetouchSeed.availability,
+          },
+          {
+            label: 'Retouch seed state',
+            value: focusRetouchSeed.staleState,
+          },
+          {
+            label: 'Accepted plan',
+            value: focusRetouchSeed.acceptedDryRunPlanId,
+          },
+          {
+            label: 'Mask regions',
+            value: String(focusRetouchSeed.maskRegions.length),
+          },
+          {
+            label: 'Reason codes',
+            value: focusRetouchSeed.reasonCodes.join(', '),
+          },
+        ]),
   ];
 
   return (
@@ -75,6 +101,13 @@ export default function DerivedOutputReceiptPanel({
       data-output-artifact-id={receipt.outputArtifactId}
       data-output-content-hash={receipt.outputContentHash}
       data-output-path={receipt.outputPath ?? ''}
+      data-focus-retouch-seed-availability={focusRetouchSeed?.availability ?? ''}
+      data-focus-retouch-seed-state={focusRetouchSeed?.staleState ?? ''}
+      data-focus-retouch-seed-plan-id={focusRetouchSeed?.acceptedDryRunPlanId ?? ''}
+      data-focus-retouch-seed-region-count={focusRetouchSeed?.maskRegions.length ?? ''}
+      data-focus-retouch-seed-reason-codes={focusRetouchSeed?.reasonCodes.join(',') ?? ''}
+      data-focus-retouch-seed-output-hash={focusRetouchSeed?.outputContentHash ?? ''}
+      data-focus-retouch-seed-preview-hash={focusRetouchSeed?.previewContentHash ?? ''}
       data-panorama-boundary-crop={
         receipt.panorama === undefined
           ? ''

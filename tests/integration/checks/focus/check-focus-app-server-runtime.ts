@@ -118,6 +118,12 @@ if (
 ) {
   throw new Error('Expected focus app-server halo review to preserve halo map hash.');
 }
+if (applied.apply.sidecarArtifact.retouchSeed?.availability !== 'available') {
+  throw new Error('Expected focus app-server apply to persist available retouch seed metadata.');
+}
+if (applied.apply.sidecarArtifact.retouchSeed?.staleState !== 'current') {
+  throw new Error('Expected focus app-server apply to persist current retouch seed state.');
+}
 if (applied.apply.sidecarArtifact.createdAt !== '2026-06-17T20:15:00.000Z') {
   throw new Error('Expected focus app-server apply to preserve sidecar artifact timestamp.');
 }
@@ -177,6 +183,9 @@ if (derivedReceipt.openInEditorAction.path !== outputReview.artifactPath) {
 }
 if (derivedReceipt.provenanceSidecar?.acceptedDryRunId !== outputReview.editableHandoff.exportReviewArtifactId) {
   throw new Error('Expected focus stack derived receipt to preserve export-review handoff metadata.');
+}
+if (derivedReceipt.focusStack?.retouchSeed.acceptedDryRunPlanId !== applied.apply.provenance.acceptedDryRunPlanId) {
+  throw new Error('Expected focus stack derived receipt to persist the accepted retouch seed plan id.');
 }
 
 const outputHash = new Bun.CryptoHasher('sha256')

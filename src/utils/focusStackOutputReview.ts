@@ -219,6 +219,7 @@ export const buildFocusStackOutputReviewFromArtifact = (
     proofLevel: 'synthetic_runtime',
     qualityPreference: artifact.qualityPreference,
     retouchLayerPolicy: artifact.retouchLayerPolicy,
+    retouchSeed: artifact.retouchSeed,
     reviewOverlay: {
       confidenceMarginThreshold: 0.12,
       mode: 'halo_risk',
