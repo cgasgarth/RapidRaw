@@ -1,0 +1,61 @@
+{
+  "generatedAt": "2026-07-02T00:00:00.000Z",
+  "issue": 4794,
+  "liveAfterBridgeConstruction": {
+    "initialActivePath": "/Users/cgas/Pictures/Capture One/Alaska/DSC_3154.ARW?vc=agent-live-state",
+    "refreshedActivePath": "/Users/cgas/Pictures/Capture One/Alaska/DSC_3155.ARW",
+    "refreshedIso": "1250",
+    "reusedBridgeInstance": true
+  },
+  "notFoundValidation": {
+    "imagePath": "/Users/cgas/Pictures/Capture One/Alaska/MISSING_4794.ARW",
+    "message": "Local app-server bridge has no image metadata for /Users/cgas/Pictures/Capture One/Alaska/MISSING_4794.ARW.",
+    "reason": "handler_failed"
+  },
+  "proofHash": "sha256:6dc80446ba68ae6d0f2c395a4a1e9720c3bffbdcff0dbd17ba7ec8bad4d1d59e",
+  "readOnlySafety": {
+    "adjustmentsHashAfter": "sha256:567f1f0b8117c3d8403627411a133eb9b76f9c5767f51e2ee8990138cb3c31d1",
+    "adjustmentsHashBefore": "sha256:567f1f0b8117c3d8403627411a133eb9b76f9c5767f51e2ee8990138cb3c31d1",
+    "historyHashAfter": "sha256:7da330042a6974949a86509f9eedbe22785313db38d146527cb812038e191fad",
+    "historyHashBefore": "sha256:7da330042a6974949a86509f9eedbe22785313db38d146527cb812038e191fad",
+    "historyIndexAfter": 1,
+    "historyIndexBefore": 1,
+    "mutates": false
+  },
+  "schemaVersion": 1,
+  "supportedReads": [
+    {
+      "result": {
+        "imageCount": 1,
+        "selectedCount": 1
+      },
+      "toolName": "agent.project_metadata.query"
+    },
+    {
+      "result": {
+        "selectedPaths": [
+          "/Users/cgas/Pictures/Capture One/Alaska/DSC_3154.ARW?vc=agent-live-state"
+        ]
+      },
+      "toolName": "agent.selected_images.query"
+    },
+    {
+      "result": {
+        "imagePath": "/Users/cgas/Pictures/Capture One/Alaska/DSC_3154.ARW?vc=agent-live-state",
+        "rating": 5
+      },
+      "toolName": "agent.image_metadata.query"
+    },
+    {
+      "result": {
+        "activeImagePath": "/Users/cgas/Pictures/Capture One/Alaska/DSC_3154.ARW?vc=agent-live-state",
+        "selectedImagePaths": [
+          "/Users/cgas/Pictures/Capture One/Alaska/DSC_3154.ARW?vc=agent-live-state"
+        ],
+        "visibleImageCount": 1
+      },
+      "toolName": "agent.editor_state.query"
+    }
+  ],
+  "validationMode": "agent_live_app_server_read_queries"
+}
