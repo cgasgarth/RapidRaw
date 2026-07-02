@@ -60,7 +60,7 @@ regex = "1.12.3"
 memmap2 = "0.9.10"
 half = { version = "2.7.1", features = ["bytemuck"] }
 glam = "0.33"
-quick-xml = { version = "0.40", features = ["serialize"] }
+quick-xml = { version = "0.41", features = ["serialize"] }
 fuzzy-matcher = "0.3.7"
 image-hdr = { version = "0.6.0", default-features = false }
 moxcms = "0.8.1"
