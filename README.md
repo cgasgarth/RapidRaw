@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/assets/.github/assets/editor.png" alt="RapidRAW Editor">
+  <img src="docs/media/readme/editor-shell.png" alt="RapidRAW editor showing a synthetic image preview with adjustment controls">
 </p>
 
 <div align="center">
@@ -357,53 +357,40 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 
 ## Demo & Screenshots
 
-Here's RapidRAW in action.
+Current RapidRAW UI captures generated from public synthetic visual-smoke fixtures.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/assets/.github/assets/editor.gif" alt="The main editor interface in action"></img><br>
-  <em>The main editor interface in action.</em>
+  <img src="docs/media/readme/editor-shell.png" alt="RapidRAW editor shell with a synthetic preview and adjustment controls" style="max-width: 100%;">
+  <br>
+  <em>Main editor shell with synthetic preview, ratings, soft-proof status, and adjustment controls.</em>
 </p>
 <br>
 <table width="100%">
   <tr>
     <td width="50%" align="center">
-      <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/assets/.github/assets/batch.gif" alt="Powerful batch operations and export" style="max-width: 100%;">
+      <img src="docs/media/readme/filmstrip-context.png" alt="RapidRAW filmstrip with synthetic thumbnails, ratings, labels, and warning badges" style="max-width: 100%;">
       <br>
-      <em>Powerful batch operations and export.</em>
+      <em>Filmstrip navigation with synthetic thumbnails, ratings, labels, and status badges.</em>
     </td>
     <td width="50%" align="center">
-      <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/assets/.github/assets/customization.gif" alt="Customizable editor layout and panels" style="max-width: 100%;">
+      <img src="docs/media/readme/library-workflow.png" alt="RapidRAW culling workflow with synthetic comparison cards and selection state" style="max-width: 100%;">
       <br>
-      <em>Customizable editor layout and panels.</em>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" align="center">
-      <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/assets/.github/assets/masks.gif" alt="Advanced masking to speedup workflow" style="max-width: 100%;">
-      <br>
-      <em>Advanced masking to speedup workflow.</em>
-    </td>
-    <td width="50%" align="center">
-      <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/assets/.github/assets/ai.gif" alt="Experimental generative AI features" style="max-width: 100%;">
-      <br>
-      <em>Experimental generative AI features.</em>
+      <em>Library culling workflow with compare, virtual-copy, and export queue state.</em>
     </td>
   </tr>
   <tr>
     <td width="50%" align="center">
-      <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/assets/.github/assets/library.gif" alt="Library navigation and folder management" style="max-width: 100%;">
+      <img src="docs/media/readme/brush-local-adjustment.png" alt="RapidRAW brush local adjustment proof with synthetic mask strokes and receipt panel" style="max-width: 100%;">
       <br>
-      <em>Library navigation and folder management.</em>
+      <em>Brush local adjustment proof with synthetic mask strokes and replay receipt.</em>
     </td>
     <td width="50%" align="center">
-      <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/assets/.github/assets/themes.gif" alt="Beautiful themes and UI customization" style="max-width: 100%;">
+      <img src="docs/media/readme/editor-shell.png" alt="RapidRAW adjustment panel with synthetic preview and tone curve controls" style="max-width: 100%;">
       <br>
-      <em>Beautiful themes and UI customization.</em>
+      <em>Adjustment controls, tone curves, tool rail, and soft-proof status in the current editor.</em>
     </td>
   </tr>
 </table>
-
-> If you like the theme images and want to see more of my own images, checkout my Instagram: [**@timonkaech.photography**](https://www.instagram.com/timonkaech.photography/)
 
 ## The Idea
 
@@ -470,11 +457,9 @@ This is purely a **convenience service**. It provides the **same high-quality re
 <details>
 <summary><strong>Click to see the Generative AI features in action</strong></summary>
 <br>
-<p align="center">
-  <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/assets/.github/assets/ai.gif" alt="Experimental generative AI features" style="max-width: 100%;">
-  <br>
-  <em>Generative Replace, which can be powered by either a local ComfyUI backend or the upcoming optional cloud service.</em>
-</p>
+
+Generative Replace can be powered by either a local ComfyUI backend or the upcoming optional cloud service. The previous animated demo was removed because README media is now limited to repo-owned, current captures.
+
 </details>
 
 ## Initial Development Log
