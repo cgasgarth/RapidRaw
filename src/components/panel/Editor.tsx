@@ -53,7 +53,9 @@ import { getEditorPreviewDimensions } from '../../utils/editorPreviewDimensions'
 import { reconcileViewportTransform, type ViewportSnapshot } from '../../utils/editorViewportBounds';
 import {
   buildMaskOverlayInvokePayload,
+  buildMaskOverlayRequestIdentity,
   buildMaskOverlayTriggerHash,
+  isMaskOverlayResponseCurrent,
   type MaskPreviewDefinition,
 } from '../../utils/mask/maskOverlayRequest';
 import { toMaskParameterRecord } from '../../utils/mask/maskParameterAccess';
@@ -87,9 +89,15 @@ interface DisplaySizeUpdate extends BaseRenderSize {
 }
 
 interface MaskOverlayRequest {
+  identity: string;
   jsAdjustments: Adjustments;
   maskDef: MaskPreviewDefinition;
   renderSize: RenderSize;
+}
+
+interface MaskOverlayRuntimeState {
+  identity: string | null;
+  status: 'current' | 'none' | 'stale-ignored';
 }
 
 interface EditorProps {
@@ -183,6 +191,10 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   const [isLoaderVisible, setIsLoaderVisible] = useState(false);
   const [showExifDateView, setShowExifDateView] = useState(false);
   const [maskOverlayUrl, setMaskOverlayUrl] = useState<string | null>(null);
+  const [maskOverlayRuntimeState, setMaskOverlayRuntimeState] = useState<MaskOverlayRuntimeState>({
+    identity: null,
+    status: 'none',
+  });
 
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -194,6 +206,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   const [toolbarOverflowVisible, setToolbarOverflowVisible] = useState(!isFullScreen);
   const isGeneratingOverlayRef = useRef(false);
   const pendingOverlayRequestRef = useRef<MaskOverlayRequest | null>(null);
+  const latestOverlayRequestIdentityRef = useRef<string | null>(null);
   const processOverlayQueueRef = useRef<() => Promise<void>>(async () => {});
   const activePointers = useRef<Map<number, { x: number; y: number }>>(new Map());
   const lastPanPos = useRef<{ x: number; y: number } | null>(null);
@@ -884,7 +897,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   const processOverlayQueue = useCallback(async () => {
     if (isGeneratingOverlayRef.current || !pendingOverlayRequestRef.current) return;
 
-    const { maskDef, renderSize, jsAdjustments } = pendingOverlayRequestRef.current;
+    const { identity, maskDef, renderSize, jsAdjustments } = pendingOverlayRequestRef.current;
     pendingOverlayRequestRef.current = null;
 
     const { maskOverlaySettings, patchesSentToBackend } = useEditorStore.getState();
@@ -898,21 +911,29 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
 
     if (overlayPayload === null) {
       setMaskOverlayUrl(null);
+      setMaskOverlayRuntimeState({ identity, status: 'none' });
       return;
     }
 
     isGeneratingOverlayRef.current = true;
     try {
       const dataUrl: string = await invoke(Invokes.GenerateMaskOverlay, { ...overlayPayload });
+      if (!isMaskOverlayResponseCurrent(latestOverlayRequestIdentityRef.current, identity)) {
+        setMaskOverlayRuntimeState({ identity, status: 'stale-ignored' });
+        return;
+      }
 
       if (dataUrl) {
         setMaskOverlayUrl(dataUrl);
+        setMaskOverlayRuntimeState({ identity, status: 'current' });
       } else {
         setMaskOverlayUrl(null);
+        setMaskOverlayRuntimeState({ identity, status: 'none' });
       }
     } catch (e) {
       console.error('Failed to generate live mask overlay:', e);
       setMaskOverlayUrl(null);
+      setMaskOverlayRuntimeState({ identity, status: 'none' });
     } finally {
       isGeneratingOverlayRef.current = false;
       requestAnimationFrame(() => {
@@ -928,10 +949,23 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
 
   const requestMaskOverlay = useCallback(
     (maskDef: MaskPreviewDefinition, renderSize: RenderSize, currentAdjustments: Adjustments) => {
-      pendingOverlayRequestRef.current = { maskDef, renderSize, jsAdjustments: currentAdjustments };
+      const { maskOverlaySettings: currentMaskOverlaySettings } = useEditorStore.getState();
+      const triggerHash = buildMaskOverlayTriggerHash({
+        activeMaskDef: maskDef as AiPatch | MaskContainer,
+        adjustments: currentAdjustments,
+        imageRenderSize: { height: renderSize.height, width: renderSize.width },
+        maskOverlaySettings: currentMaskOverlaySettings,
+      });
+      const identity = buildMaskOverlayRequestIdentity({
+        renderSize,
+        selectedImagePath: selectedImage?.path,
+        triggerHash,
+      });
+      latestOverlayRequestIdentityRef.current = identity;
+      pendingOverlayRequestRef.current = { identity, maskDef, renderSize, jsAdjustments: currentAdjustments };
       void processOverlayQueue();
     },
-    [processOverlayQueue],
+    [processOverlayQueue, selectedImage?.path],
   );
 
   const handleLiveMaskPreview = useCallback(
@@ -1629,6 +1663,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
               isSliderDragging={isSliderDragging}
               isGamutWarningOverlayVisible={isGamutWarningOverlayVisible}
               maskOverlayUrl={maskOverlayUrl}
+              maskOverlayRuntimeState={maskOverlayRuntimeState}
               onGenerateAiMask={(id, start, end) => {
                 if (!id) return;
                 void handleGenerateAiMask(id, start, end);

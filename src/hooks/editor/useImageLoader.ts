@@ -9,6 +9,7 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
 import { INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../../utils/adjustments';
+import { shouldClearSelectedImageAfterLoadError } from '../../utils/editorImageLoadError';
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { upsertReopenedDerivedOutputReceipt } from '../../utils/hdrDerivedSourceReopen';
 import type { ImageCacheEntry } from '../../utils/ImageLRUCache';
@@ -154,7 +155,10 @@ export function useImageLoader(cachedEditStateRef: RefObject<ImageCacheEntry | n
           if (isEffectActive) {
             console.error('Failed to load image:', err);
             toast.error(`Failed to load image: ${formatUnknownError(err)}`);
-            setEditor({ selectedImage: null });
+            const currentSelectedImage = useEditorStore.getState().selectedImage;
+            if (shouldClearSelectedImageAfterLoadError(currentSelectedImage, selectedImagePath)) {
+              setEditor({ selectedImage: null });
+            }
           }
         } finally {
           if (isEffectActive) {
