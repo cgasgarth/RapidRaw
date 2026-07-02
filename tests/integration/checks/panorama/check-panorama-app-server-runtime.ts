@@ -25,6 +25,7 @@ const panoramaSeamReviewTranscriptSchema = z
     reviewStatus: z.enum(['apply_ready', 'blocked', 'review_required']),
     scenario: z.enum([
       'blocked_apply',
+      'grid_like_warning',
       'multi_row_blocked',
       'multi_row_blocked_apply',
       'source_mismatch_blocked',
@@ -34,9 +35,21 @@ const panoramaSeamReviewTranscriptSchema = z
     seamMaskArtifactId: z.string().trim().min(1),
     seamRisk: z.enum(['low', 'medium', 'high']),
     seamWarningState: z.enum(['clear', 'warning', 'blocked']),
-    sourceGeometryLayout: z.enum(['multi_row_candidate', 'single_row', 'unknown']),
+    sourceGeometryColumnCountEstimate: z.number().int().positive(),
+    sourceGeometryConnectedComponentCount: z.number().int().positive(),
+    sourceGeometryGraphConnected: z.boolean(),
+    sourceGeometryHorizontalSpanPx: z.number().int().nonnegative(),
+    sourceGeometryLayout: z.enum(['grid_like', 'multi_row_candidate', 'single_row', 'unknown']),
+    sourceGeometryLayoutConfidence: z.object({
+      columnConfidence: z.number().min(0).max(1),
+      overallConfidence: z.number().min(0).max(1),
+      rowConfidence: z.number().min(0).max(1),
+    }),
     sourceGeometrySupport: z.enum(['blocked_requires_multi_row_solver', 'implemented_current_engine', 'unverified']),
+    sourceGeometrySelectedComponentCount: z.number().int().positive(),
+    sourceGeometrySelectedComponentIndices: z.array(z.number().int().nonnegative()),
     sourceRowCountEstimate: z.number().int().positive(),
+    sourceGeometryWarningCodes: z.array(z.string().trim().min(1)),
     warnings: z.array(z.string().trim().min(1)),
     weakOverlapEdgeCount: z.number().int().nonnegative(),
   })
@@ -100,6 +113,7 @@ if (
   supportedTranscript.seamRisk !== 'low' ||
   supportedTranscript.sourceGeometryLayout !== 'single_row' ||
   supportedTranscript.sourceGeometrySupport !== 'implemented_current_engine' ||
+  supportedTranscript.sourceGeometryGraphConnected !== true ||
   supportedTranscript.overlapConfidenceLevel !== 'high' ||
   supportedTranscript.seamWarningState !== 'clear' ||
   supportedTranscript.parallaxRisk !== 'low' ||
@@ -161,16 +175,66 @@ if (
   sourceMismatchTranscript.seamWarningState !== 'blocked' ||
   sourceMismatchTranscript.parallaxRisk !== 'high' ||
   !sourceMismatchTranscript.warnings.includes('parallax_seam_warning') ||
-  !sourceMismatchTranscript.warnings.includes('source_excluded')
+  !sourceMismatchTranscript.warnings.includes('source_excluded') ||
+  sourceMismatchTranscript.sourceGeometrySupport !== 'unverified' ||
+  sourceMismatchTranscript.sourceGeometryGraphConnected !== false ||
+  !sourceMismatchTranscript.sourceGeometryWarningCodes.includes('geometry_overclaim_guardrail') ||
+  !sourceMismatchTranscript.sourceGeometryWarningCodes.includes('graph_disconnected')
 ) {
   throw new Error(`Unexpected blocked panorama seam-review transcript: ${JSON.stringify(sourceMismatchTranscript)}.`);
 }
 
+const gridLikeFrames = [
+  { expectedOffsetX: 0, expectedOffsetY: 0, sourceIndex: 0 },
+  { expectedOffsetX: 48, expectedOffsetY: 0, sourceIndex: 1 },
+  { expectedOffsetX: 0, expectedOffsetY: 40, sourceIndex: 2 },
+  { expectedOffsetX: 48, expectedOffsetY: 40, sourceIndex: 3 },
+].map((frame) => ({
+  ...frame,
+  contentHash: `sha256:panorama-app-server-runtime-grid-like-${frame.sourceIndex}`,
+  graphRevision: 'graph_rev_panorama_app_server_runtime_grid_like_source',
+  height: 48,
+  width: 72,
+}));
+const gridLikeCommand = {
+  ...dryRunCommand,
+  commandId: 'command_panorama_app_server_runtime_grid_like',
+  correlationId: 'corr_panorama_app_server_runtime_grid_like',
+  parameters: {
+    ...dryRunCommand.parameters,
+    sources: gridLikeFrames.map((frame) => ({
+      colorSpaceHint: 'camera_rgb',
+      exposureEv: 0,
+      imageId: `img_panorama_app_server_runtime_grid_like_${frame.sourceIndex}`,
+      imagePath: `/synthetic/panorama/app-server-runtime-grid-like-${frame.sourceIndex}.dng`,
+      rawDefaultsApplied: true,
+      role: 'panorama_tile',
+      sourceIndex: frame.sourceIndex,
+    })),
+  },
+};
+const gridLikeDryRun = bus.execute({
+  request: buildRequest(gridLikeCommand, gridLikeFrames, [0, 1, 2, 3]),
+  toolName: panoramaRoutePair.dryRunToolName,
+});
+if (gridLikeDryRun.kind !== 'dry_run') throw new Error('Expected grid-like panorama dry-run.');
+const gridLikeTranscript = buildSeamReviewTranscript('grid_like_warning', gridLikeDryRun);
+if (
+  gridLikeTranscript.sourceGeometryLayout !== 'grid_like' ||
+  gridLikeTranscript.sourceGeometrySupport !== 'unverified' ||
+  gridLikeTranscript.sourceGeometryGraphConnected !== true ||
+  gridLikeTranscript.sourceGeometrySelectedComponentCount !== 4 ||
+  !gridLikeTranscript.sourceGeometryWarningCodes.includes('geometry_overclaim_guardrail') ||
+  !gridLikeTranscript.sourceGeometryWarningCodes.includes('grid_like_geometry_unverified')
+) {
+  throw new Error(`Unexpected grid-like panorama transcript: ${JSON.stringify(gridLikeTranscript)}.`);
+}
+
 const multiRowFrames = [
   { expectedOffsetX: 0, expectedOffsetY: 0, sourceIndex: 0 },
-  { expectedOffsetX: 48, expectedOffsetY: 2, sourceIndex: 1 },
+  { expectedOffsetX: 0, expectedOffsetY: 2, sourceIndex: 1 },
   { expectedOffsetX: 0, expectedOffsetY: 40, sourceIndex: 2 },
-  { expectedOffsetX: 48, expectedOffsetY: 42, sourceIndex: 3 },
+  { expectedOffsetX: 0, expectedOffsetY: 42, sourceIndex: 3 },
 ].map((frame) => ({
   ...frame,
   contentHash: `sha256:panorama-app-server-runtime-multi-row-${frame.sourceIndex}`,
@@ -206,6 +270,7 @@ if (
   multiRowTranscript.sourceGeometryLayout !== 'multi_row_candidate' ||
   multiRowTranscript.sourceGeometrySupport !== 'blocked_requires_multi_row_solver' ||
   multiRowTranscript.sourceRowCountEstimate !== 2 ||
+  multiRowTranscript.sourceGeometryGraphConnected !== true ||
   !multiRowTranscript.blockedReasons.includes('multi_row_panorama_not_supported') ||
   !multiRowTranscript.warnings.includes('multi_row_runtime_deferred') ||
   !multiRowTranscript.warnings.includes('parallax_seam_warning') ||
@@ -395,9 +460,17 @@ function buildSeamReviewTranscript(scenario, toolResult) {
     seamMaskArtifactId: seamReview.seamMaskArtifact.artifactId,
     seamRisk: seamReview.seamRisk,
     seamWarningState: seamReview.seamWarningState.state,
+    sourceGeometryColumnCountEstimate: toolResult.dryRun.provenance.sourceGeometry.columnCountEstimate,
+    sourceGeometryConnectedComponentCount: toolResult.dryRun.provenance.sourceGeometry.connectedComponentCount,
+    sourceGeometryGraphConnected: toolResult.dryRun.provenance.sourceGeometry.graphConnectivity.isConnected,
+    sourceGeometryHorizontalSpanPx: toolResult.dryRun.provenance.sourceGeometry.horizontalSpanPx,
     sourceGeometryLayout: toolResult.dryRun.provenance.sourceGeometry.layout,
+    sourceGeometryLayoutConfidence: toolResult.dryRun.provenance.sourceGeometry.layoutConfidence,
     sourceGeometrySupport: toolResult.dryRun.provenance.sourceGeometry.support,
+    sourceGeometrySelectedComponentCount: toolResult.dryRun.provenance.sourceGeometry.selectedComponent.sourceCount,
+    sourceGeometrySelectedComponentIndices: toolResult.dryRun.provenance.sourceGeometry.selectedComponent.sourceIndices,
     sourceRowCountEstimate: toolResult.dryRun.provenance.sourceGeometry.rowCountEstimate,
+    sourceGeometryWarningCodes: toolResult.dryRun.provenance.sourceGeometry.warningCodes,
     warnings: toolResult.dryRun.dryRunResult.warnings,
     weakOverlapEdgeCount: seamReview.weakOverlapEdgeCount,
   });

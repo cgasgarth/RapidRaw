@@ -162,7 +162,25 @@ const staleState: PanoramaModalState = {
       memory_components: { total_estimated_peak_bytes: 123_456 },
       source_geometry: {
         blocked_reasons: [],
+        column_count_estimate: 2,
+        connected_component_count: 1,
+        graph_connectivity: {
+          connected_source_count: 2,
+          disconnected_source_count: 0,
+          edge_count: 1,
+          is_connected: true,
+        },
+        horizontal_span_px: 0,
         layout: 'single_row',
+        layout_confidence: {
+          column_confidence: 1,
+          overall_confidence: 1,
+          row_confidence: 1,
+        },
+        selected_component: {
+          source_count: 2,
+          source_indices: [0, 1],
+        },
         row_count_estimate: 1,
         support: 'implemented_current_engine',
         vertical_span_px: 0,

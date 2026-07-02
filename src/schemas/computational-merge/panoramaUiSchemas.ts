@@ -7,6 +7,71 @@ export const panoramaUiExposureModeSchema = z.enum(['gain_compensation', 'none']
 export const panoramaUiQualityPreferenceSchema = z.enum(['preview', 'balanced', 'best']);
 export const panoramaRuntimePlanStatusSchema = z.enum(['accepted', 'warning', 'blocked_plan_only']);
 
+const panoramaSourceGeometryConnectivitySchema = z
+  .object({
+    connectedSourceCount: z.number().int().nonnegative(),
+    disconnectedSourceCount: z.number().int().nonnegative(),
+    edgeCount: z.number().int().nonnegative(),
+    isConnected: z.boolean(),
+  })
+  .strict();
+
+const panoramaRuntimeSourceGeometryConnectivitySchema = z
+  .object({
+    connected_source_count: z.number().int().nonnegative(),
+    disconnected_source_count: z.number().int().nonnegative(),
+    edge_count: z.number().int().nonnegative(),
+    is_connected: z.boolean(),
+  })
+  .strict();
+
+const panoramaSourceGeometryConfidenceSchema = z
+  .object({
+    columnConfidence: z.number().min(0).max(1),
+    overallConfidence: z.number().min(0).max(1),
+    rowConfidence: z.number().min(0).max(1),
+  })
+  .strict();
+
+const panoramaRuntimeSourceGeometryConfidenceSchema = z
+  .object({
+    column_confidence: z.number().min(0).max(1),
+    overall_confidence: z.number().min(0).max(1),
+    row_confidence: z.number().min(0).max(1),
+  })
+  .strict();
+
+const panoramaSourceGeometrySelectionSchema = z
+  .object({
+    sourceCount: z.number().int().positive(),
+    sourceIndices: z.array(z.number().int().nonnegative()),
+  })
+  .strict();
+
+const panoramaRuntimeSourceGeometrySelectionSchema = z
+  .object({
+    source_count: z.number().int().positive(),
+    source_indices: z.array(z.number().int().nonnegative()),
+  })
+  .strict();
+
+const panoramaRenderedReviewSourceGeometrySchema = z
+  .object({
+    blockedReasons: z.array(z.string().trim().min(1)),
+    columnCountEstimate: z.number().int().positive(),
+    connectedComponentCount: z.number().int().positive(),
+    graphConnectivity: panoramaSourceGeometryConnectivitySchema,
+    horizontalSpanPx: z.number().int().nonnegative(),
+    layout: z.enum(['grid_like', 'multi_row_candidate', 'single_row', 'unknown']),
+    layoutConfidence: panoramaSourceGeometryConfidenceSchema,
+    selectedComponent: panoramaSourceGeometrySelectionSchema,
+    rowCountEstimate: z.number().int().positive(),
+    support: z.enum(['blocked_requires_multi_row_solver', 'implemented_current_engine', 'unverified']),
+    verticalSpanPx: z.number().int().nonnegative(),
+    warningCodes: z.array(z.string().trim().min(1)),
+  })
+  .strict();
+
 const panoramaManualCropInsetsSchema = z
   .object({
     bottom: z.number().min(0).max(40),
@@ -90,7 +155,13 @@ export const panoramaRuntimePlanSchema = z
         source_geometry: z
           .object({
             blocked_reasons: z.array(z.string()),
-            layout: z.enum(['multi_row_candidate', 'single_row', 'unknown']),
+            column_count_estimate: z.number().int().positive(),
+            connected_component_count: z.number().int().positive(),
+            graph_connectivity: panoramaRuntimeSourceGeometryConnectivitySchema,
+            horizontal_span_px: z.number().int().nonnegative(),
+            layout: z.enum(['grid_like', 'multi_row_candidate', 'single_row', 'unknown']),
+            layout_confidence: panoramaRuntimeSourceGeometryConfidenceSchema,
+            selected_component: panoramaRuntimeSourceGeometrySelectionSchema,
             row_count_estimate: z.number().int().positive(),
             support: z.enum(['blocked_requires_multi_row_solver', 'implemented_current_engine', 'unverified']),
             vertical_span_px: z.number().int().nonnegative(),
@@ -232,6 +303,7 @@ export const panoramaRenderedReviewSchema = z
       })
       .strict(),
     seamReview: panoramaSeamReviewSchema,
+    sourceGeometry: panoramaRenderedReviewSourceGeometrySchema,
     sources: panoramaRenderedReviewSourcesSchema,
     sourceContribution: panoramaSourceContributionSchema,
     exposureNormalizationSummary: panoramaExposureNormalizationSummarySchema,
@@ -252,6 +324,7 @@ export const panoramaSavedReviewSummarySchema = z
     outputPath: z.string().min(1),
     projection: panoramaUiProjectionSchema,
     seamReview: panoramaSeamReviewSchema,
+    sourceGeometry: panoramaRenderedReviewSourceGeometrySchema,
     sourceCount: z.number().int().nonnegative(),
     sourceContribution: panoramaSourceContributionSchema,
     sourceRefs: z.array(panoramaSavedReviewSourceRefSchema),

@@ -216,8 +216,46 @@ pub struct PanoramaRenderMetadata {
     pub requested_projection: PanoramaProjectionOption,
     pub selected_match_edges: Vec<PanoramaSelectedMatchEdgeMetadata>,
     pub max_transform_chain_length: usize,
+    pub source_geometry: PanoramaSourceGeometryMetadata,
     pub sources: Vec<PanoramaSourceMetadata>,
     pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PanoramaSourceGeometryMetadata {
+    pub blocked_reasons: Vec<String>,
+    pub column_count_estimate: usize,
+    pub connected_component_count: usize,
+    pub graph_connectivity: PanoramaSourceGeometryConnectivityMetadata,
+    pub horizontal_span_px: u32,
+    pub layout: String,
+    pub layout_confidence: PanoramaSourceGeometryConfidenceMetadata,
+    pub selected_component: PanoramaSourceGeometrySelectionMetadata,
+    pub row_count_estimate: usize,
+    pub support: String,
+    pub vertical_span_px: u32,
+    pub warning_codes: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PanoramaSourceGeometryConnectivityMetadata {
+    pub connected_source_count: usize,
+    pub disconnected_source_count: usize,
+    pub edge_count: usize,
+    pub is_connected: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PanoramaSourceGeometryConfidenceMetadata {
+    pub column_confidence: f64,
+    pub overall_confidence: f64,
+    pub row_confidence: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PanoramaSourceGeometrySelectionMetadata {
+    pub source_count: usize,
+    pub source_indices: Vec<usize>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -545,6 +583,7 @@ fn build_panorama_render_review(metadata: &PanoramaRenderMetadata) -> serde_json
             "requested": metadata.requested_projection.as_str(),
         },
         "seamReview": panorama_seam_review_metadata(metadata),
+        "sourceGeometry": panorama_source_geometry_metadata_json(&metadata.source_geometry),
         "sources": {
             "excludedSourceIndices": &metadata.excluded_source_indices,
             "stitchedSourceIndices": &metadata.connected_source_indices,
@@ -554,6 +593,96 @@ fn build_panorama_render_review(metadata: &PanoramaRenderMetadata) -> serde_json
         "exposureNormalizationSummary": panorama_exposure_normalization_summary(metadata),
         "warningCodes": &metadata.warnings,
     })
+}
+
+fn panorama_source_geometry_metadata_json(
+    metadata: &PanoramaSourceGeometryMetadata,
+) -> serde_json::Value {
+    json!({
+        "blockedReasons": &metadata.blocked_reasons,
+        "columnCountEstimate": metadata.column_count_estimate,
+        "connectedComponentCount": metadata.connected_component_count,
+        "graphConnectivity": {
+            "connectedSourceCount": metadata.graph_connectivity.connected_source_count,
+            "disconnectedSourceCount": metadata.graph_connectivity.disconnected_source_count,
+            "edgeCount": metadata.graph_connectivity.edge_count,
+            "isConnected": metadata.graph_connectivity.is_connected,
+        },
+        "horizontalSpanPx": metadata.horizontal_span_px,
+        "layout": metadata.layout,
+        "layoutConfidence": {
+            "columnConfidence": metadata.layout_confidence.column_confidence,
+            "overallConfidence": metadata.layout_confidence.overall_confidence,
+            "rowConfidence": metadata.layout_confidence.row_confidence,
+        },
+        "selectedComponent": {
+            "sourceCount": metadata.selected_component.source_count,
+            "sourceIndices": &metadata.selected_component.source_indices,
+        },
+        "rowCountEstimate": metadata.row_count_estimate,
+        "support": metadata.support,
+        "verticalSpanPx": metadata.vertical_span_px,
+        "warningCodes": &metadata.warning_codes,
+    })
+}
+
+fn build_panorama_source_geometry_metadata(
+    connected_source_indices: &[usize],
+    excluded_source_indices: &[usize],
+    selected_match_edge_count: usize,
+    total_source_count: usize,
+) -> PanoramaSourceGeometryMetadata {
+    let connected_source_count = connected_source_indices.len();
+    let disconnected_source_count = excluded_source_indices.len();
+    PanoramaSourceGeometryMetadata {
+        blocked_reasons: Vec::new(),
+        column_count_estimate: connected_source_count.max(1),
+        connected_component_count: if disconnected_source_count > 0 { 2 } else { 1 },
+        graph_connectivity: PanoramaSourceGeometryConnectivityMetadata {
+            connected_source_count,
+            disconnected_source_count,
+            edge_count: selected_match_edge_count,
+            is_connected: disconnected_source_count == 0
+                && selected_match_edge_count >= connected_source_count.saturating_sub(1),
+        },
+        horizontal_span_px: 0,
+        layout: if connected_source_count > 1 {
+            "single_row".to_string()
+        } else {
+            "unknown".to_string()
+        },
+        layout_confidence: PanoramaSourceGeometryConfidenceMetadata {
+            column_confidence: if connected_source_count > 1 { 1.0 } else { 0.0 },
+            overall_confidence: if connected_source_count > 1 && disconnected_source_count == 0 {
+                1.0
+            } else {
+                0.0
+            },
+            row_confidence: if connected_source_count > 1 { 1.0 } else { 0.0 },
+        },
+        selected_component: PanoramaSourceGeometrySelectionMetadata {
+            source_count: connected_source_count,
+            source_indices: connected_source_indices.to_vec(),
+        },
+        row_count_estimate: 1,
+        support: if connected_source_count > 1 && disconnected_source_count == 0 {
+            "implemented_current_engine".to_string()
+        } else {
+            "unverified".to_string()
+        },
+        vertical_span_px: 0,
+        warning_codes: if disconnected_source_count > 0
+            || selected_match_edge_count < total_source_count.saturating_sub(1)
+        {
+            vec![
+                "geometry_overclaim_guardrail".to_string(),
+                "graph_disconnected".to_string(),
+                "source_geometry_unverified".to_string(),
+            ]
+        } else {
+            Vec::new()
+        },
+    }
 }
 
 fn load_panorama_source_metadata_for_plan(
@@ -990,6 +1119,12 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
         .map(|info| info.id)
         .filter(|index| !connected_source_set.contains(index))
         .collect();
+    let source_geometry = build_panorama_source_geometry_metadata(
+        &connected_source_indices,
+        &excluded_source_indices,
+        stitching_order.selected_match_edges.len(),
+        image_data.len(),
+    );
     let estimated_peak_memory_bytes =
         estimate_legacy_panorama_peak_memory_bytes(&source_metadata, output_width, output_height);
     let metadata = PanoramaRenderMetadata {
@@ -1008,6 +1143,7 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
         requested_projection: options.projection,
         selected_match_edges: stitching_order.selected_match_edges,
         max_transform_chain_length: stitching_order.max_transform_chain_length,
+        source_geometry,
         sources: source_metadata,
         warnings,
     };
@@ -3098,6 +3234,32 @@ mod tests {
                 tree_depth: 1,
             }],
             max_transform_chain_length: 1,
+            source_geometry: PanoramaSourceGeometryMetadata {
+                blocked_reasons: Vec::new(),
+                column_count_estimate: 2,
+                connected_component_count: 1,
+                graph_connectivity: PanoramaSourceGeometryConnectivityMetadata {
+                    connected_source_count: 2,
+                    disconnected_source_count: 0,
+                    edge_count: 1,
+                    is_connected: true,
+                },
+                horizontal_span_px: 0,
+                layout: "single_row".to_string(),
+                layout_confidence: PanoramaSourceGeometryConfidenceMetadata {
+                    column_confidence: 1.0,
+                    overall_confidence: 1.0,
+                    row_confidence: 1.0,
+                },
+                selected_component: PanoramaSourceGeometrySelectionMetadata {
+                    source_count: 2,
+                    source_indices: vec![0, 1],
+                },
+                row_count_estimate: 1,
+                support: "implemented_current_engine".to_string(),
+                vertical_span_px: 0,
+                warning_codes: Vec::new(),
+            },
             sources: sample_plan_sources(),
             warnings: Vec::new(),
         }
