@@ -4190,6 +4190,8 @@ const validateHdrSourceState = (
 
 export const hdrRuntimeSidecarReceiptV1Schema = z
   .object({
+    acceptedDryRunPlanHash: z.string().trim().min(1).optional(),
+    acceptedDryRunPlanId: z.string().trim().min(1).optional(),
     alignment: z
       .object({
         confidence: z.number().min(0).max(1),
@@ -4235,6 +4237,8 @@ export const hdrRuntimeSidecarReceiptV1Schema = z
         route: z.literal('computational_merge_derived_source'),
       })
       .strict(),
+    mergeMethod: z.string().trim().min(1).optional(),
+    mergeVersion: z.string().trim().min(1).optional(),
     measurementSource: z.literal('hdr_runtime_apply'),
     output: z
       .object({
@@ -4250,6 +4254,7 @@ export const hdrRuntimeSidecarReceiptV1Schema = z
       .strict(),
     receiptKind: z.literal('hdr_runtime_sidecar_receipt'),
     schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    warningCodes: z.array(hdrMergeWarningCodeV1Schema).optional(),
   })
   .strict()
   .superRefine((receipt, context) => {

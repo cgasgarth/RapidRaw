@@ -152,9 +152,22 @@ struct ImageDimensions {
 struct HdrApplyReceipt {
     accepted_dry_run_plan_hash: String,
     accepted_dry_run_plan_id: String,
+    merge_method: String,
+    merge_version: String,
     output_handle: String,
+    output_content_hash: String,
     preview_dimensions: ImageDimensions,
+    source_roles: Vec<HdrApplySourceRole>,
     source_paths: Vec<String>,
+    warning_codes: Vec<String>,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct HdrApplySourceRole {
+    exposure_ev: f32,
+    role: String,
+    source_index: usize,
 }
 
 #[derive(serde::Deserialize)]
@@ -1477,6 +1490,7 @@ async fn merge_hdr(
     log::info!("HDR merge completed");
 
     let final_base64 = encode_png_data_url(&DynamicImage::ImageRgb8(hdr_merged.to_rgb8()))?;
+    let output_content_hash = hash_hdr_apply_output(&hdr_merged);
     let runtime_plan =
         build_hdr_runtime_plan(&source_refs, hdr_merged.width(), hdr_merged.height());
     if let (Some(accepted_plan_hash), Some(accepted_plan_id)) = (
@@ -1490,15 +1504,20 @@ async fn merge_hdr(
     let receipt = HdrApplyReceipt {
         accepted_dry_run_plan_hash: runtime_plan.accepted_dry_run_plan_hash.clone(),
         accepted_dry_run_plan_id: runtime_plan.accepted_dry_run_plan_id.clone(),
+        merge_method: "exposure_weighted_radiance".to_string(),
+        merge_version: "0.1.0".to_string(),
+        output_content_hash,
         output_handle: "memory:hdr_result".to_string(),
         preview_dimensions: ImageDimensions {
             height: hdr_merged.height(),
             width: hdr_merged.width(),
         },
+        source_roles: build_hdr_apply_source_roles(&source_refs),
         source_paths: source_refs
             .iter()
             .map(|source| source.image_path.clone())
             .collect(),
+        warning_codes: vec!["tone_mapped_preview_only".to_string()],
     };
 
     let _ = app_handle.emit(crate::events::HDR_PROGRESS, "Creating preview...");
@@ -1515,6 +1534,31 @@ async fn merge_hdr(
         }),
     );
     Ok(())
+}
+
+fn build_hdr_apply_source_roles(
+    source_refs: &[app_state::PendingHdrSourceRef],
+) -> Vec<HdrApplySourceRole> {
+    let reference_index = source_refs.len() / 2;
+    source_refs
+        .iter()
+        .map(|source| HdrApplySourceRole {
+            exposure_ev: source.exposure_time_seconds.log2(),
+            role: if source.source_index == reference_index {
+                "reference".to_string()
+            } else if source.source_index < reference_index {
+                "under_exposed".to_string()
+            } else {
+                "over_exposed".to_string()
+            },
+            source_index: source.source_index,
+        })
+        .collect::<Vec<_>>()
+}
+
+fn hash_hdr_apply_output(hdr_image: &DynamicImage) -> String {
+    let rgb = hdr_image.to_rgb8();
+    format!("blake3:{}", blake3::hash(rgb.as_raw()).to_hex())
 }
 
 #[tauri::command]

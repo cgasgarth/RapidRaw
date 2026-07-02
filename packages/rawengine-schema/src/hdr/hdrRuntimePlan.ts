@@ -27,6 +27,7 @@ import { mergeExposureWeightedRadianceV1 } from './hdrMergeWeightingRuntime.js';
 
 const HDR_RUNTIME_ENGINE_ID = 'rawengine_hdr_runtime_v1';
 const HDR_RUNTIME_ENGINE_VERSION = '0.1.0';
+const HDR_RUNTIME_MERGE_METHOD = 'exposure_weighted_radiance';
 
 export const hdrRuntimeFrameV1Schema = z
   .object({
@@ -344,6 +345,7 @@ const buildHdrRuntimeSidecarArtifact = ({
     command,
     outputArtifact,
     provenance,
+    warningCodes,
   });
 
   return hdrMergeArtifactV1Schema.parse({
@@ -423,11 +425,13 @@ const buildHdrRuntimeSidecarReceipt = ({
   command,
   outputArtifact,
   provenance,
+  warningCodes,
 }: {
   bracketDetection: HdrBracketDetectionResultV1;
   command: HdrRuntimeCommandV1;
   outputArtifact: ArtifactHandleV1;
   provenance: HdrRuntimeProvenanceV1;
+  warningCodes: string[];
 }): HdrRuntimeSidecarReceiptV1 => {
   const maxRmsError = provenance.alignmentTransforms.reduce(
     (maxError, transform) => Math.max(maxError, transform.rmsError),
@@ -439,6 +443,8 @@ const buildHdrRuntimeSidecarReceipt = ({
   }
 
   return hdrRuntimeSidecarReceiptV1Schema.parse({
+    acceptedDryRunPlanHash: provenance.acceptedDryRunPlanHash,
+    acceptedDryRunPlanId: provenance.acceptedDryRunPlanId,
     alignment: {
       confidence: provenance.alignmentConfidence,
       maxRmsError,
@@ -469,6 +475,8 @@ const buildHdrRuntimeSidecarReceipt = ({
       editableDerivedAssetId: `derived_${command.commandId}`,
       route: 'computational_merge_derived_source',
     },
+    mergeMethod: HDR_RUNTIME_MERGE_METHOD,
+    mergeVersion: HDR_RUNTIME_ENGINE_VERSION,
     measurementSource: 'hdr_runtime_apply',
     output: {
       artifactId: outputArtifact.artifactId,
@@ -477,6 +485,7 @@ const buildHdrRuntimeSidecarReceipt = ({
     },
     receiptKind: 'hdr_runtime_sidecar_receipt',
     schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    warningCodes,
   });
 };
 

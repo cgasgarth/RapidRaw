@@ -16,7 +16,9 @@ const HDR_ENGINE_ID: &str = "rapidraw_image_hdr_legacy_v1";
 const HDR_ENGINE_BACKEND_TYPE: &str = "legacy_image_hdr";
 const HDR_ENGINE_VERSION: &str = "0.1.0";
 const HDR_GRAPH_REVISION: &str = "hdr_legacy_runtime_v1";
+const HDR_MERGE_METHOD: &str = "exposure_weighted_radiance";
 const HDR_MERGE_STRATEGY: &str = "exposure_fusion_preview";
+const HDR_MERGE_VERSION: &str = "0.1.0";
 const HDR_WORKING_COLOR_SPACE: &str = "srgb_display_referred_v1";
 const HDR_WARNING_TONE_MAPPED_PREVIEW_ONLY: &str = "tone_mapped_preview_only";
 
@@ -488,6 +490,8 @@ fn upsert_hdr_artifact_metadata(
             "resolvedDeghosting": "off",
         },
         "displayPreviewColorState": "tone_mapped_srgb_preview",
+        "mergeMethod": HDR_MERGE_METHOD,
+        "mergeVersion": HDR_MERGE_VERSION,
         "dryRun": {
             "acceptedDryRunPlanHash": runtime_plan.accepted_dry_run_plan_hash,
             "acceptedDryRunPlanId": runtime_plan.accepted_dry_run_plan_id,
@@ -700,6 +704,8 @@ mod tests {
             artifact["engine"]["capabilityLevel"],
             "runtime_apply_capable"
         );
+        assert_eq!(artifact["mergeMethod"], HDR_MERGE_METHOD);
+        assert_eq!(artifact["mergeVersion"], HDR_MERGE_VERSION);
         assert_eq!(
             artifact["dryRun"]["acceptedDryRunPlanId"],
             runtime_plan.accepted_dry_run_plan_id

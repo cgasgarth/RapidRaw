@@ -70,12 +70,20 @@ test('HDR apply receipt parser feeds accepted runtime plan identity into command
     receipt: {
       acceptedDryRunPlanHash: 'blake3:accepted-plan',
       acceptedDryRunPlanId: 'hdr_runtime_plan_1234',
+      mergeMethod: 'exposure_weighted_radiance',
+      mergeVersion: '0.1.0',
+      outputContentHash: 'blake3:hdr-runtime-output',
       outputHandle: 'memory:hdr_result',
       previewDimensions: {
         height: 1200,
         width: 1600,
       },
+      sourceRoles: [
+        { exposureEv: -1, role: 'under_exposed', sourceIndex: 0 },
+        { exposureEv: 0, role: 'reference', sourceIndex: 1 },
+      ],
       sourcePaths: ['/tmp/bracket_-1ev.tif', '/tmp/bracket_0ev.tif'],
+      warningCodes: ['legacy_full_frame_render'],
     },
   });
   const applyState = buildHdrApplyCommandState({
