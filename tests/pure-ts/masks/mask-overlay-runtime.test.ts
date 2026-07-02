@@ -6,7 +6,12 @@ import {
   nextMaskOverlayHotkeySettings,
   saveMaskOverlaySettingsPreference,
 } from '../../../src/utils/mask/maskOverlayPreferences';
-import { buildMaskOverlayInvokePayload, buildMaskOverlayTriggerHash } from '../../../src/utils/mask/maskOverlayRequest';
+import {
+  buildMaskOverlayInvokePayload,
+  buildMaskOverlayRequestIdentity,
+  buildMaskOverlayTriggerHash,
+  isMaskOverlayResponseCurrent,
+} from '../../../src/utils/mask/maskOverlayRequest';
 
 const originalLocalStorageDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
 
@@ -140,4 +145,36 @@ test('mask overlay invoke payload carries normalized overlay settings and refine
 
   expect(triggerHash).toContain('"maskOverlaySettings":{"edgeThreshold":0.65,"mode":"white","opacity":0.4}');
   expect(triggerHash).toContain('"featherPx":12');
+});
+
+test('mask overlay request identity tracks selected image, render size, and trigger hash', () => {
+  const identity = buildMaskOverlayRequestIdentity({
+    renderSize: { height: 240.4, scale: 0.3333333, width: 319.6 },
+    selectedImagePath: '/photos/_DSC7505.ARW',
+    triggerHash: 'mask-trigger-a',
+  });
+
+  expect(identity).toBe(
+    JSON.stringify({
+      renderSize: { h: 240, scale: 0.3333, w: 320 },
+      selectedImagePath: '/photos/_DSC7505.ARW',
+      triggerHash: 'mask-trigger-a',
+    }),
+  );
+});
+
+test('mask overlay stale responses are rejected when a newer request is active', () => {
+  const first = buildMaskOverlayRequestIdentity({
+    renderSize: { height: 240, scale: 0.5, width: 320 },
+    selectedImagePath: '/photos/_DSC7505.ARW',
+    triggerHash: 'mask-trigger-a',
+  });
+  const latest = buildMaskOverlayRequestIdentity({
+    renderSize: { height: 240, scale: 0.5, width: 320 },
+    selectedImagePath: '/photos/_DSC7505.ARW',
+    triggerHash: 'mask-trigger-b',
+  });
+
+  expect(isMaskOverlayResponseCurrent(latest, first)).toBe(false);
+  expect(isMaskOverlayResponseCurrent(latest, latest)).toBe(true);
 });

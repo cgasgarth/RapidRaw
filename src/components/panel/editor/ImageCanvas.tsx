@@ -242,6 +242,7 @@ interface ImageCanvasProps {
   isStraightenActive: boolean;
   isRotationActive?: boolean;
   maskOverlayUrl: string | null;
+  maskOverlayRuntimeState?: { identity: string | null; status: 'current' | 'none' | 'stale-ignored' };
   onGenerateAiMask: (id: string | null, start: Coord, end: Coord) => void;
   onLiveMaskPreview?: (previewMaskDef: MaskContainer | AiPatch) => void;
   onQuickErase: (subMaskId: string | null, startPoint: Coord, endpoint: Coord) => void;
@@ -1197,6 +1198,7 @@ const ImageCanvas = memo(
     isStraightenActive,
     isRotationActive,
     maskOverlayUrl,
+    maskOverlayRuntimeState,
     onGenerateAiMask,
     onLiveMaskPreview,
     onQuickErase,
@@ -2814,6 +2816,8 @@ const ImageCanvas = memo(
         data-canvas-overlay-tool={activeCanvasOverlayTool}
         data-editor-compare-mode={compareMode}
         data-editor-compare-original-ready={String(canShowOriginalCompare)}
+        data-mask-overlay-identity={maskOverlayRuntimeState?.identity ?? ''}
+        data-mask-overlay-status={maskOverlayRuntimeState?.status ?? 'none'}
         data-preview-backend={wgpuPreviewVisibility.previewBackend}
         data-wgpu-frame-health={wgpuPreviewVisibility.health}
         data-testid="image-canvas"

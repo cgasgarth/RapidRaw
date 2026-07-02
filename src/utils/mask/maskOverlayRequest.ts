@@ -39,6 +39,12 @@ export interface BuildMaskOverlayTriggerHashParams {
   maskOverlaySettings: MaskOverlaySettings;
 }
 
+export interface BuildMaskOverlayRequestIdentityParams {
+  renderSize: Pick<RenderSize, 'height' | 'scale' | 'width'>;
+  selectedImagePath: string | null | undefined;
+  triggerHash: string | null;
+}
+
 const MASK_OVERLAY_GEOMETRY_KEYS = [
   'crop',
   'rotation',
@@ -181,3 +187,21 @@ export const buildMaskOverlayTriggerHash = ({
     subMasks,
   });
 };
+
+export const buildMaskOverlayRequestIdentity = ({
+  renderSize,
+  selectedImagePath,
+  triggerHash,
+}: BuildMaskOverlayRequestIdentityParams): string =>
+  JSON.stringify({
+    renderSize: {
+      h: Math.round(renderSize.height),
+      scale: Number(renderSize.scale.toFixed(4)),
+      w: Math.round(renderSize.width),
+    },
+    selectedImagePath: selectedImagePath ?? null,
+    triggerHash,
+  });
+
+export const isMaskOverlayResponseCurrent = (latestRequestIdentity: string | null, responseIdentity: string): boolean =>
+  latestRequestIdentity === responseIdentity;
