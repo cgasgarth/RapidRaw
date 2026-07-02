@@ -8,12 +8,14 @@ import { rawEngineDefaultToolRegistryV1 } from '../../../packages/rawengine-sche
 import { ToolType } from '../../../src/components/panel/right/layers/Masks';
 import { useEditorStore } from '../../../src/store/useEditorStore';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { buildAgentImageContextSnapshot } from '../../../src/utils/agent/context/agentImageContextSnapshot';
 import {
   AGENT_PREVIEW_RENDER_TOOL_NAME,
   getRawEngineImagePreview,
   RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
   renderAgentReadOnlyPreview,
 } from '../../../src/utils/agent/context/agentReadOnlyAppServerTools';
+import { applyBasicToneToLiveEditor } from '../../../src/utils/agent/session/agentLiveBasicTone';
 
 const selectedPath = '/fixtures/agent-preview-receipts/DSC_4749.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 6 : 3));
@@ -96,6 +98,7 @@ describe('agent selected-image preview receipts', () => {
       requestId: 'issue-4749-stale-refresh',
       turn: 3,
     });
+    expect(staleRefresh.receipt?.proofContext.expectedRecipeHash).toBe('recipe:stale');
     expect(staleRefresh.receipt?.proofContext.stale).toBe(true);
   });
 
@@ -113,11 +116,68 @@ describe('agent selected-image preview receipts', () => {
         proofContext: {
           ...receipt.proofContext,
           expectedRecipeHash: 'recipe:stale',
+          stale: false,
         },
       }),
-    ).toThrow('expected recipe hash');
+    ).toThrow('stale flag');
 
     expect(receipt.contentHash === `sha256:${receipt.preview.renderHash}`).toBe(false);
+  });
+
+  test('refreshes a receipt from live editor state after typed basic-tone apply', async () => {
+    const before = getRawEngineImagePreview({ requestId: 'issue-4795-before-apply' });
+
+    const apply = await applyBasicToneToLiveEditor({
+      expectedGraphRevision: before.receipt.graphRevision,
+      operationId: 'issue_4795_basic_tone_apply',
+      requestedAdjustments: {
+        blacks: -8,
+        brightness: INITIAL_ADJUSTMENTS.brightness,
+        clarity: 12,
+        contrast: 18,
+        exposure: 0.35,
+        highlights: -24,
+        saturation: 9,
+        shadows: 15,
+        whites: 10,
+      },
+      sessionId: 'issue-4795-preview-refresh-receipts',
+    });
+    const afterSnapshot = buildAgentImageContextSnapshot();
+    const refresh = renderAgentReadOnlyPreview({
+      expectedRecipeHash: afterSnapshot.initialPreview.recipeHash,
+      purpose: 'refresh',
+      requestId: 'issue-4795-after-apply-refresh',
+      sourceToolName: 'rawengine.agent.adjustments.apply',
+      turn: useEditorStore.getState().historyIndex,
+    });
+    const receipt = rawEngineAgentPreviewRefreshReceiptV1Schema.parse(refresh.receipt);
+
+    expect(apply.afterPreviewHash).not.toBe(apply.beforePreviewHash);
+    expect(receipt.graphRevision).toBe(afterSnapshot.graphRevision);
+    expect(receipt.imagePath).toBe(selectedPath);
+    expect(receipt.preview.previewRef).toBe(afterSnapshot.initialPreview.previewRef);
+    expect(receipt.preview.recipeHash).toBe(afterSnapshot.initialPreview.recipeHash);
+    expect(receipt.preview.recipeHash).not.toBe(before.receipt.preview.recipeHash);
+    expect(receipt.preview.renderHash).toBe(refresh.preview.renderHash);
+    expect(receipt.proofContext).toEqual({
+      expectedRecipeHash: afterSnapshot.initialPreview.recipeHash,
+      sourceToolName: 'rawengine.agent.adjustments.apply',
+      stale: false,
+      transport: 'codex_app_server',
+    });
+
+    const staleRefresh = renderAgentReadOnlyPreview({
+      expectedRecipeHash: before.receipt.preview.recipeHash,
+      purpose: 'refresh',
+      requestId: 'issue-4795-after-apply-stale-refresh',
+      sourceToolName: 'rawengine.agent.adjustments.apply',
+      turn: useEditorStore.getState().historyIndex + 1,
+    });
+    expect(staleRefresh.receipt?.proofContext).toMatchObject({
+      expectedRecipeHash: before.receipt.preview.recipeHash,
+      stale: true,
+    });
   });
 
   test('registers observe and refresh preview tools as safe read artifact-handle tools', () => {

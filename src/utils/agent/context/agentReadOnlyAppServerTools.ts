@@ -258,6 +258,7 @@ const buildInitialPreviewReceipt = ({
   });
 
 const buildPreviewRefreshReceipt = ({
+  expectedRecipeHash,
   graphRevision,
   imagePath,
   preview,
@@ -267,6 +268,7 @@ const buildPreviewRefreshReceipt = ({
   stale,
   turn,
 }: {
+  expectedRecipeHash: string;
   graphRevision: string;
   imagePath: string;
   preview: AgentPreviewRenderResponse['preview'];
@@ -309,7 +311,7 @@ const buildPreviewRefreshReceipt = ({
       width: preview.width,
     },
     proofContext: {
-      expectedRecipeHash: preview.recipeHash,
+      expectedRecipeHash,
       sourceToolName,
       stale,
       transport: 'codex_app_server',
@@ -366,6 +368,7 @@ export const renderAgentReadOnlyPreview = (request: AgentPreviewRenderRequest): 
     preview.purpose === 'initial_context'
       ? undefined
       : buildPreviewRefreshReceipt({
+          expectedRecipeHash: parsedRequest.expectedRecipeHash ?? snapshot.initialPreview.recipeHash,
           graphRevision: snapshot.graphRevision,
           imagePath: snapshot.activeImagePath,
           preview,

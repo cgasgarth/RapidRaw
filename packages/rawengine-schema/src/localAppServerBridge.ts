@@ -221,10 +221,14 @@ export const rawEngineAgentPreviewRefreshReceiptV1Schema = z
     turn: z.number().int().positive(),
   })
   .strict()
-  .refine((receipt) => receipt.proofContext.expectedRecipeHash === receipt.preview.recipeHash, {
-    message: 'Refresh receipt expected recipe hash must match the preview recipe hash.',
-    path: ['proofContext', 'expectedRecipeHash'],
-  });
+  .refine(
+    (receipt) =>
+      receipt.proofContext.stale === (receipt.proofContext.expectedRecipeHash !== receipt.preview.recipeHash),
+    {
+      message: 'Refresh receipt stale flag must reflect the expected/current recipe hash comparison.',
+      path: ['proofContext', 'stale'],
+    },
+  );
 
 export type RawEngineAgentPreviewRefreshReceiptV1 = z.infer<typeof rawEngineAgentPreviewRefreshReceiptV1Schema>;
 
