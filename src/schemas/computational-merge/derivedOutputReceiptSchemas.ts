@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { focusStackRetouchSeedSchema } from '../focus-stack/focusStackOutputReviewSchemas';
+
 export const derivedOutputFamilySchema = z.enum(['focus_stack', 'hdr', 'panorama', 'super_resolution']);
 export const derivedOutputStoragePolicySchema = z.enum(['export_path', 'sidecar_artifact', 'temp_cache']);
 export const derivedOutputOpenActionStateSchema = z.enum(['available', 'deferred', 'unavailable']);
@@ -107,6 +109,12 @@ export const derivedOutputProvenanceSidecarSchema = z
     settingsHash: z.string().trim().min(1),
     sidecarPath: z.string().trim().min(1),
     sourceState: z.array(derivedOutputProvenanceSourceSchema).min(1),
+    focusStack: z
+      .object({
+        retouchSeed: focusStackRetouchSeedSchema,
+      })
+      .strict()
+      .optional(),
     panorama: derivedOutputPanoramaMetadataSchema.optional(),
     superResolution: z
       .object({
@@ -171,6 +179,12 @@ export const derivedOutputReceiptSchema = z
     outputArtifactId: z.string().trim().min(1),
     outputContentHash: z.string().trim().min(1),
     outputPath: z.string().trim().min(1).optional(),
+    focusStack: z
+      .object({
+        retouchSeed: focusStackRetouchSeedSchema,
+      })
+      .strict()
+      .optional(),
     panorama: derivedOutputPanoramaMetadataSchema.optional(),
     previewDimensions: derivedOutputDimensionsSchema.optional(),
     recipeHash: z.string().trim().min(1).optional(),
@@ -288,6 +302,17 @@ export const derivedOutputReceiptSchema = z
             code: 'custom',
             message: 'Derived output panorama sidecar metadata must match receipt.',
             path: ['provenanceSidecar', 'panorama'],
+          });
+        }
+      }
+      if (receipt.focusStack !== undefined && receipt.provenanceSidecar.focusStack !== undefined) {
+        const receiptFocusStack = JSON.stringify(receipt.focusStack);
+        const sidecarFocusStack = JSON.stringify(receipt.provenanceSidecar.focusStack);
+        if (receiptFocusStack !== sidecarFocusStack) {
+          context.addIssue({
+            code: 'custom',
+            message: 'Derived output focus stack sidecar metadata must match receipt.',
+            path: ['provenanceSidecar', 'focusStack'],
           });
         }
       }

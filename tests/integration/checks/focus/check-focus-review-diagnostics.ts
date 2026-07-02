@@ -35,6 +35,13 @@ for (const marker of [
   'modals.focusStack.review.retouchedExportParity',
   'data-retouched-export-parity-status={outputReview.editableHandoff.retouchedExportParity?.status ??',
   'data-retouched-export-parity-proof-hash=',
+  'data-focus-retouch-seed-availability=',
+  'data-focus-retouch-seed-state=',
+  'data-focus-retouch-seed-plan-id=',
+  'data-focus-retouch-seed-region-count=',
+  'data-focus-retouch-seed-reason-codes=',
+  'data-focus-retouch-seed-output-hash=',
+  'data-focus-retouch-seed-preview-hash=',
   'modals.focusStack.review.haloRegionRisk',
   'modals.focusStack.review.haloReviewStatus',
   'modals.focusStack.review.haloReviewTitle',
@@ -54,6 +61,7 @@ for (const marker of [
   'data-editable-artifact-id={outputReview.editableHandoff.artifactId}',
   'data-export-review-artifact-id={outputReview.editableHandoff.exportReviewArtifactId}',
   'data-halo-review-status={outputReview.haloReview.reviewStatus}',
+  'retouchSeed',
   'focus-sharpness-overlay-controls',
   'focus-halo-suppression-controls',
   'settings.haloSuppressionStrengthPercent',
@@ -81,6 +89,18 @@ for (const marker of [
 for (const marker of ['ComputationalMergeReviewSection', 'sections?:', 'data-testid={testId}']) {
   if (!panelSource.includes(marker)) {
     failures.push(`Shared review panel missing ${marker}.`);
+  }
+}
+
+for (const marker of [
+  'Retouch seed availability',
+  'Retouch seed state',
+  'Mask regions',
+  'data-focus-retouch-seed-availability=',
+  'data-focus-retouch-seed-state=',
+]) {
+  if (!panelSource.includes(marker)) {
+    failures.push(`Derived output receipt panel missing ${marker}.`);
   }
 }
 

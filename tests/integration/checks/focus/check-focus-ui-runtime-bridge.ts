@@ -119,6 +119,9 @@ if (applied.apply.sidecarArtifact.haloReview.reviewStatus !== 'review_required')
 if (applied.apply.sidecarArtifact.retouchedExportParity?.status !== 'matched_retouched_sidecar_output') {
   throw new Error('Focus sidecar artifact must persist retouched export parity receipt.');
 }
+if (applied.apply.sidecarArtifact.retouchSeed?.availability !== 'available') {
+  throw new Error('Focus sidecar artifact must persist available retouch seed metadata.');
+}
 if (applied.apply.sidecarArtifact.retouchedExportParity.meanAbsDelta !== 0) {
   throw new Error('Focus retouched export parity receipt must report zero preview/export delta.');
 }
@@ -134,6 +137,9 @@ if (
 }
 if (outputReview.editableHandoff.retouchedExportParity?.parityProofHash === undefined) {
   throw new Error('Focus output review did not expose retouched export parity proof hash.');
+}
+if (outputReview.retouchSeed?.acceptedDryRunPlanHash !== applied.apply.provenance.acceptedDryRunPlanHash) {
+  throw new Error('Focus output review did not expose retouch seed plan provenance.');
 }
 if (outputReview.haloReview.artifactHash !== applied.apply.sidecarArtifact.haloMapArtifact.contentHash) {
   throw new Error('Focus output review did not expose halo map hash.');

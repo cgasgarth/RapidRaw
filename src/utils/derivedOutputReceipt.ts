@@ -20,6 +20,7 @@ type BuildReceiptInput = Omit<
   provenanceSidecar?: {
     acceptedApplyId?: string;
     acceptedDryRunId?: string;
+    focusStack?: DerivedOutputProvenanceSidecar['focusStack'];
     panorama?: DerivedOutputProvenanceSidecar['panorama'];
     superResolution?: DerivedOutputProvenanceSidecar['superResolution'];
     warnings: string[];
@@ -80,6 +81,9 @@ export const buildDerivedOutputReceipt = (input: BuildReceiptInput): DerivedOutp
             ...(input.provenanceSidecar?.acceptedDryRunId === undefined
               ? {}
               : { acceptedDryRunId: input.provenanceSidecar.acceptedDryRunId }),
+            ...(input.provenanceSidecar?.focusStack === undefined
+              ? {}
+              : { focusStack: input.provenanceSidecar.focusStack }),
             ...(input.provenanceSidecar?.superResolution === undefined
               ? {}
               : { superResolution: input.provenanceSidecar.superResolution }),
@@ -156,9 +160,11 @@ export const buildDerivedOutputProvenanceSidecar = ({
   sourcePaths = [],
   superResolution,
   warnings,
+  focusStack,
 }: {
   acceptedApplyId?: string;
   acceptedDryRunId?: string;
+  focusStack?: DerivedOutputProvenanceSidecar['focusStack'];
   family: DerivedOutputReceipt['family'];
   outputContentHash: string;
   outputPath: string;
@@ -196,6 +202,7 @@ export const buildDerivedOutputProvenanceSidecar = ({
       order,
       ...(sourcePaths[order] === undefined || sourcePaths[order] === '' ? {} : { path: sourcePaths[order] }),
     })),
+    ...(focusStack === undefined ? {} : { focusStack }),
     ...(panorama === undefined ? {} : { panorama }),
     ...(superResolution === undefined ? {} : { superResolution }),
     warnings: [...new Set(warnings)].sort(),
@@ -359,12 +366,14 @@ export const buildFocusStackDerivedOutputReceipt = ({
     },
     outputArtifactId: review.editableHandoff.artifactId,
     outputContentHash: review.editableHandoff.artifactHash,
+    ...(review.retouchSeed === undefined ? {} : { focusStack: { retouchSeed: review.retouchSeed } }),
     ...(review.applyReceipt.status === 'apply_ready'
       ? {
           outputPath: review.artifactPath,
           provenanceSidecar: {
             acceptedApplyId: review.editableHandoff.artifactId,
             acceptedDryRunId: review.editableHandoff.exportReviewArtifactId,
+            ...(review.retouchSeed === undefined ? {} : { focusStack: { retouchSeed: review.retouchSeed } }),
             warnings: review.warningCodes,
           },
         }

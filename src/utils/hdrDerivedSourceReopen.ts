@@ -6,6 +6,7 @@ import {
   derivedOutputProvenanceSidecarSchema,
   derivedOutputReceiptSchema,
 } from '../schemas/computational-merge/derivedOutputReceiptSchemas';
+import { focusStackRetouchSeedSchema } from '../schemas/focus-stack/focusStackOutputReviewSchemas';
 
 const hdrSidecarArtifactSchema = z
   .object({
@@ -49,6 +50,47 @@ const panoramaCropSchema = z
 const rawEngineArtifactsWithHdrProvenanceSchema = z
   .object({
     derivedOutputProvenanceSidecars: z.array(derivedOutputProvenanceSidecarSchema).default([]),
+    focusStackArtifacts: z
+      .array(
+        z
+          .object({
+            artifactId: z.string().trim().min(1).optional(),
+            family: z.literal('focus_stack').optional(),
+            outputArtifact: z
+              .object({
+                artifactId: z.string().trim().min(1).optional(),
+                contentHash: z.string().trim().min(1).optional(),
+              })
+              .passthrough()
+              .optional(),
+            retouchSeed: z
+              .object({
+                acceptedDryRunPlanHash: z.string().trim().min(1).optional(),
+                acceptedDryRunPlanId: z.string().trim().min(1).optional(),
+                artifactId: z.string().trim().min(1).optional(),
+                availability: z.enum(['available', 'unavailable']).optional(),
+                maskRegions: z.array(z.unknown()).default([]),
+                outputContentHash: z.string().trim().min(1).optional(),
+                previewContentHash: z.string().trim().min(1).optional(),
+                reasonCodes: z.array(z.string().trim().min(1)).default([]),
+                sourceCandidates: z.array(z.unknown()).default([]),
+                staleReasons: z.array(z.string().trim().min(1)).default([]),
+                staleState: z.enum(['current', 'stale', 'unknown']).optional(),
+              })
+              .passthrough()
+              .optional(),
+            staleState: z
+              .object({
+                invalidationReasons: z.array(z.string()).default([]),
+                state: z.enum(['current', 'stale', 'unknown']),
+              })
+              .passthrough()
+              .optional(),
+            warnings: z.array(z.string().trim().min(1)).default([]),
+          })
+          .passthrough(),
+      )
+      .default([]),
     hdrMergeArtifacts: z.array(hdrSidecarArtifactSchema).default([]),
     panoramaArtifacts: z
       .array(
@@ -268,8 +310,76 @@ export const buildReopenedDerivedOutputReceipt = ({
   imagePath: string;
   metadata: unknown;
 }): DerivedOutputReceipt | null =>
+  buildFocusStackReopenedDerivedOutputReceipt({ imagePath, metadata }) ??
   buildHdrReopenedDerivedOutputReceipt({ imagePath, metadata }) ??
   buildPanoramaReopenedDerivedOutputReceipt({ imagePath, metadata });
+
+export const buildFocusStackReopenedDerivedOutputReceipt = ({
+  imagePath,
+  metadata,
+}: {
+  imagePath: string;
+  metadata: unknown;
+}): DerivedOutputReceipt | null => {
+  const parsedMetadata = metadataWithRawEngineArtifactsSchema.safeParse(metadata);
+  if (!parsedMetadata.success) return null;
+
+  const rawEngineArtifacts = parsedMetadata.data.rawEngineArtifacts;
+  const provenance = rawEngineArtifacts?.derivedOutputProvenanceSidecars.find(
+    (sidecar) => sidecar.receipt.family === 'focus_stack' && sidecar.output.path === imagePath,
+  );
+  if (provenance === undefined || provenance.sourceState.length < 2) return null;
+
+  const matchingArtifact = rawEngineArtifacts?.focusStackArtifacts.find(
+    (artifact) =>
+      artifact.family === 'focus_stack' &&
+      (artifact.outputArtifact?.contentHash === provenance.output.contentHash ||
+        artifact.outputArtifact?.artifactId === provenance.acceptedApplyId ||
+        artifact.artifactId === provenance.receipt.receiptId),
+  );
+  const outputArtifactId =
+    matchingArtifact?.outputArtifact?.artifactId ?? provenance.acceptedApplyId ?? provenance.receipt.receiptId;
+  const focusStack = provenance.focusStack ?? buildFocusStackReceiptMetadataFromArtifact(matchingArtifact);
+  const staleState =
+    matchingArtifact?.staleState?.state === 'stale'
+      ? 'stale'
+      : matchingArtifact?.staleState?.state === 'current'
+        ? 'current'
+        : (focusStack?.retouchSeed.staleState ?? 'unknown');
+
+  return derivedOutputReceiptSchema.parse({
+    acceptedDryRunPlanHash: focusStack?.retouchSeed.acceptedDryRunPlanHash,
+    acceptedDryRunPlanId: focusStack?.retouchSeed.acceptedDryRunPlanId,
+    family: 'focus_stack',
+    focusStack,
+    openInEditorAction: {
+      label: 'Open focus stack output',
+      path: imagePath,
+      state: 'available',
+    },
+    outputArtifactId,
+    outputContentHash: provenance.output.contentHash,
+    outputPath: imagePath,
+    provenanceSidecar: provenance,
+    receiptId: provenance.receipt.receiptId,
+    settingsHash: provenance.settingsHash,
+    sourceContentHashes: provenance.sourceState.map((source) => source.contentHash),
+    sourceCount: provenance.sourceState.length,
+    sourceGraphRevisions: provenance.sourceState.map((source) => source.graphRevision),
+    ...(provenance.sourceState.every((source) => source.path !== undefined)
+      ? { sourcePaths: provenance.sourceState.map((source) => source.path as string) }
+      : {}),
+    staleReasons:
+      matchingArtifact?.staleState?.state === 'stale'
+        ? matchingArtifact.staleState.invalidationReasons.flatMap((reason) =>
+            isDerivedOutputStaleReason(reason) ? [reason] : [],
+          )
+        : undefined,
+    staleState,
+    storagePolicy: 'sidecar_artifact',
+    warningCodes: matchingArtifact?.warnings ?? provenance.warnings,
+  });
+};
 
 export const upsertHdrReopenedDerivedOutputReceipt = ({
   imagePath,
@@ -298,6 +408,16 @@ export const upsertReopenedDerivedOutputReceipt = ({
   if (receipt !== null) upsert(receipt);
   return receipt;
 };
+
+function buildFocusStackReceiptMetadataFromArtifact(
+  artifact: z.infer<typeof rawEngineArtifactsWithHdrProvenanceSchema>['focusStackArtifacts'][number] | undefined,
+): DerivedOutputReceipt['focusStack'] {
+  if (artifact?.retouchSeed === undefined) return undefined;
+  const parsedRetouchSeed = focusStackRetouchSeedSchema.safeParse(artifact.retouchSeed);
+  if (!parsedRetouchSeed.success) return undefined;
+
+  return { retouchSeed: parsedRetouchSeed.data };
+}
 
 const derivedOutputStaleReasons = new Set([
   'accepted_dry_run_plan_changed',

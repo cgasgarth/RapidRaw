@@ -246,6 +246,16 @@ export const applyFocusStackRuntimePlanV1 = (requestValue: unknown): FocusStackR
   }
 
   const renderedContentHash = hashFocusRuntimePixels(runtime.outputPixels);
+  const previewArtifact = buildComputationalMergeArtifactHandleV1({
+    artifactId: request.previewArtifactId,
+    contentHash: `sha256:${stableFocusRuntimeHash(
+      `${acceptedDryRunPlanHash}:${request.previewArtifactId}:${renderedContentHash}`,
+    )}`,
+    height: runtime.height,
+    kind: 'preview',
+    storage: 'temp_cache',
+    width: runtime.width,
+  });
   const outputArtifacts: ArtifactHandleV1[] = [
     buildComputationalMergeArtifactHandleV1({
       artifactId: request.outputArtifactId,
@@ -337,6 +347,7 @@ export const applyFocusStackRuntimePlanV1 = (requestValue: unknown): FocusStackR
       },
       command: request.command,
       createdAt: request.artifactCreatedAt ?? new Date(0).toISOString(),
+      previewArtifacts: [previewArtifact],
     }),
   };
 };
@@ -370,6 +381,15 @@ export const buildFocusStackRuntimeArtifactV1 = ({
           artifactHash: haloMapArtifact.contentHash,
           artifactId: haloMapArtifact.artifactId,
         };
+  const retouchSeed = buildFocusStackRetouchSeed({
+    acceptedDryRunPlanHash: provenance.acceptedDryRunPlanHash,
+    acceptedDryRunPlanId: provenance.acceptedDryRunPlanId,
+    outputArtifact,
+    previewArtifact: previewArtifacts[0],
+    provenance,
+    sourceImageRefs: command.parameters.sources,
+    retouchLayerArtifact,
+  });
 
   return focusStackArtifactV1Schema.parse({
     artifactId: `artifact_${mutationResult.derivedAssetId}`,
@@ -390,6 +410,7 @@ export const buildFocusStackRuntimeArtifactV1 = ({
     outputColorSpace: 'linear_rec2020_d65_v1',
     previewArtifacts,
     haloMapArtifact,
+    retouchSeed,
     retouchedExportParity: buildFocusStackRetouchedExportParityReceipt({
       outputArtifact,
       provenance,
@@ -426,6 +447,94 @@ export const buildFocusStackRuntimeArtifactV1 = ({
     },
     warningCodes: mutationResult.warnings.filter(isFocusStackArtifactWarning),
   });
+};
+
+const buildFocusStackRetouchSeed = ({
+  acceptedDryRunPlanHash,
+  acceptedDryRunPlanId,
+  outputArtifact,
+  previewArtifact,
+  provenance,
+  sourceImageRefs,
+  retouchLayerArtifact,
+}: {
+  acceptedDryRunPlanHash: string | undefined;
+  acceptedDryRunPlanId: string | undefined;
+  outputArtifact: ArtifactHandleV1;
+  previewArtifact: ArtifactHandleV1 | undefined;
+  provenance: FocusStackRuntimeProvenanceV1;
+  sourceImageRefs: FocusStackRuntimeCommandV1['parameters']['sources'];
+  retouchLayerArtifact: ArtifactHandleV1 | undefined;
+}) => {
+  if (
+    acceptedDryRunPlanHash === undefined ||
+    acceptedDryRunPlanId === undefined ||
+    previewArtifact === undefined ||
+    retouchLayerArtifact === undefined
+  ) {
+    return undefined;
+  }
+
+  const maskRegions = provenance.haloReview.transitionRiskRegions.filter((region) => region.risk !== 'stable');
+  const reasonCodes = new Set<string>();
+  const sourceCandidates = new Map<
+    number,
+    {
+      contentHash: string;
+      coverageCellCount: number;
+      graphRevision: string;
+      path: string;
+      regionIds: string[];
+      sourceIndex: number;
+    }
+  >();
+
+  for (const region of maskRegions) {
+    reasonCodes.add(region.risk);
+    const source = provenance.sourceState.find((candidate) => candidate.sourceIndex === region.sourceIndex);
+    const sourceRef = sourceImageRefs.find((candidate) => candidate.sourceIndex === region.sourceIndex);
+    const existing = sourceCandidates.get(region.sourceIndex) ?? {
+      contentHash: source?.contentHash ?? `missing_source_hash_${region.sourceIndex}`,
+      coverageCellCount: 0,
+      graphRevision: source?.graphRevision ?? `missing_source_revision_${region.sourceIndex}`,
+      path: sourceRef?.imagePath ?? `focus-stack-source-${region.sourceIndex}`,
+      regionIds: [],
+      sourceIndex: region.sourceIndex,
+    };
+    existing.coverageCellCount += region.cellCount;
+    existing.regionIds.push(region.regionId);
+    sourceCandidates.set(region.sourceIndex, existing);
+  }
+
+  if (provenance.focusCoverageRatio < 0.95) reasonCodes.add('focus_coverage_low');
+  if (provenance.retouchLayerPolicy === 'generate_retouch_layer') reasonCodes.add('retouch_layer_required');
+
+  const candidateList = [...sourceCandidates.values()].map((candidate) => {
+    const source = provenance.sourceState.find((entry) => entry.sourceIndex === candidate.sourceIndex);
+    const sourceRef = sourceImageRefs.find((entry) => entry.sourceIndex === candidate.sourceIndex);
+    return {
+      contentHash: source?.contentHash ?? candidate.contentHash,
+      coverageCellCount: Math.max(1, candidate.coverageCellCount),
+      graphRevision: source?.graphRevision ?? candidate.graphRevision,
+      path: sourceRef?.imagePath ?? candidate.path,
+      regionIds: candidate.regionIds,
+      sourceIndex: candidate.sourceIndex,
+    };
+  });
+
+  return {
+    acceptedDryRunPlanHash,
+    acceptedDryRunPlanId,
+    artifactId: retouchLayerArtifact.artifactId,
+    availability: 'available' as const,
+    maskRegions,
+    outputContentHash: outputArtifact.contentHash,
+    previewContentHash: previewArtifact.contentHash,
+    reasonCodes: [...reasonCodes].sort(),
+    sourceCandidates: candidateList.sort((left, right) => left.sourceIndex - right.sourceIndex),
+    staleReasons: [],
+    staleState: 'current' as const,
+  };
 };
 
 const buildFocusStackRetouchedExportParityReceipt = ({

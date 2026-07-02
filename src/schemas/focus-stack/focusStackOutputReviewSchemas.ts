@@ -34,6 +34,51 @@ export const focusStackEditableHandoffStatusSchema = z.enum(['blocked', 'ready',
 export const focusStackHaloReviewStatusSchema = z.enum(['apply_ready', 'blocked', 'review_required']);
 export const focusStackApplyReceiptStatusSchema = z.enum(['apply_ready', 'blocked', 'preview_only', 'review_required']);
 export const focusStackAlignmentReviewStatusSchema = z.enum(['applied', 'not_requested', 'planned', 'review_required']);
+export const focusStackRetouchSeedReasonCodeSchema = z.enum([
+  'focus_coverage_low',
+  'halo_risk',
+  'low_confidence',
+  'retouch_layer_required',
+  'retouch_recommended',
+]);
+export const focusStackRetouchSeedAvailabilitySchema = z.enum(['available', 'unavailable']);
+export const focusStackRetouchSeedStateSchema = z.enum(['current', 'stale', 'unknown']);
+
+export const focusStackRetouchSeedMaskRegionSchema = z
+  .object({
+    cellCount: z.number().int().positive(),
+    regionId: z.string().trim().min(1),
+    risk: z.enum(['halo_risk', 'low_confidence', 'retouch_recommended']),
+    sourceIndex: z.number().int().nonnegative(),
+  })
+  .strict();
+
+export const focusStackRetouchSeedSourceCandidateSchema = z
+  .object({
+    contentHash: z.string().trim().min(1),
+    coverageCellCount: z.number().int().positive(),
+    graphRevision: z.string().trim().min(1),
+    path: z.string().trim().min(1),
+    regionIds: z.array(z.string().trim().min(1)).min(1),
+    sourceIndex: z.number().int().nonnegative(),
+  })
+  .strict();
+
+export const focusStackRetouchSeedSchema = z
+  .object({
+    acceptedDryRunPlanHash: z.string().trim().min(1),
+    acceptedDryRunPlanId: z.string().trim().min(1),
+    artifactId: z.string().trim().min(1),
+    availability: focusStackRetouchSeedAvailabilitySchema,
+    maskRegions: z.array(focusStackRetouchSeedMaskRegionSchema).min(1),
+    outputContentHash: z.string().trim().min(1),
+    previewContentHash: z.string().trim().min(1),
+    reasonCodes: z.array(focusStackRetouchSeedReasonCodeSchema).min(1),
+    sourceCandidates: z.array(focusStackRetouchSeedSourceCandidateSchema).min(1),
+    staleReasons: z.array(focusStackRetouchSeedReasonCodeSchema),
+    staleState: focusStackRetouchSeedStateSchema,
+  })
+  .strict();
 
 const focusStackSourceRefSchema = z
   .object({
@@ -157,6 +202,7 @@ export const focusStackOutputReviewWorkflowSchema = z
           .min(2),
       })
       .strict(),
+    retouchSeed: focusStackRetouchSeedSchema.optional(),
     sharpnessCoverageRatio: z.number().min(0).max(1),
     sourceCount: z.number().int().min(2),
     sourceRefs: z.array(focusStackSourceRefSchema).min(2),
