@@ -6,6 +6,7 @@ import {
   rawEngineLocalAppServerComputationalMergeDerivedSourceOpenRequestV1Schema,
 } from '../../packages/rawengine-schema/src/localAppServerBridge';
 import {
+  editGraphCommandEnvelopeV1Schema,
   type RawEngineToolRegistryV1,
   rawEngineAppServerToolCallValidationV1Schema,
   rawEngineToolRegistryV1Schema,
@@ -140,6 +141,10 @@ import {
   applyBasicToneCommandToLiveEditor,
   dryRunBasicToneCommandInLiveEditor,
 } from './agent/session/agentLiveBasicTone';
+import {
+  applyEditGraphCommandToLiveEditor,
+  dryRunEditGraphCommandInLiveEditor,
+} from './agent/session/agentLiveEditGraph';
 import {
   AGENT_HISTORY_ROLLBACK_INPUT_SCHEMA_NAME,
   AGENT_HISTORY_ROLLBACK_OUTPUT_SCHEMA_NAME,
@@ -1041,13 +1046,13 @@ export const buildRawEngineAppServerRouteCatalogResponse = ({
 
 const getCommandType = (command: unknown): string | undefined => {
   if (typeof command !== 'object' || command === null) return undefined;
-  const record = command as Record<string, unknown>;
-  const nestedCommand = record['command'];
+  const record = command as { command?: unknown; commandType?: unknown };
+  const nestedCommand = record.command;
   const commandType =
-    typeof record['commandType'] === 'string'
-      ? record['commandType']
+    typeof record.commandType === 'string'
+      ? record.commandType
       : typeof nestedCommand === 'object' && nestedCommand !== null
-        ? (nestedCommand as Record<string, unknown>)['commandType']
+        ? (nestedCommand as { commandType?: unknown }).commandType
         : undefined;
   return typeof commandType === 'string' && commandType.trim().length > 0 ? commandType : undefined;
 };
@@ -1101,6 +1106,12 @@ const localBridgeToolMatchesCommand = ({
   if (runtimeToolName === 'ai.enhancement.apply_command') {
     return commandType === 'ai.enhancement.apply' && dryRun === false;
   }
+  if (runtimeToolName === 'editgraph.dry_run_command') {
+    return commandType === 'editGraph.applyParameterPatch' && dryRun === true;
+  }
+  if (runtimeToolName === 'editgraph.apply_command') {
+    return commandType === 'editGraph.applyParameterPatch' && dryRun === false;
+  }
   if (runtimeToolName.startsWith('computationalmerge.')) {
     const family = commandType === undefined ? undefined : COMPUTATIONAL_MERGE_COMMAND_TYPE_TO_FAMILY.get(commandType);
     if (family === undefined || !runtimeToolName.startsWith(`computationalmerge.${family}.`)) return false;
@@ -1113,13 +1124,13 @@ const localBridgeToolMatchesCommand = ({
 
 const getDryRunFlag = (command: unknown): boolean | undefined => {
   if (typeof command !== 'object' || command === null) return undefined;
-  const record = command as Record<string, unknown>;
-  const nestedCommand = record['command'];
+  const record = command as { command?: unknown; dryRun?: unknown };
+  const nestedCommand = record.command;
   const dryRun =
-    typeof record['dryRun'] === 'boolean'
-      ? record['dryRun']
+    typeof record.dryRun === 'boolean'
+      ? record.dryRun
       : typeof nestedCommand === 'object' && nestedCommand !== null
-        ? (nestedCommand as Record<string, unknown>)['dryRun']
+        ? (nestedCommand as { dryRun?: unknown }).dryRun
         : undefined;
   return typeof dryRun === 'boolean' ? dryRun : undefined;
 };
@@ -1243,6 +1254,8 @@ const APPROVED_AGENT_APP_SERVER_TOOL_NAMES = new Set<string>([
   NEGATIVE_LAB_AGENT_PREVIEW_TOOL_NAME,
   ToneColorAppServerToolName.ApplyCommand,
   ToneColorAppServerToolName.DryRunCommand,
+  'editgraph.apply_command',
+  'editgraph.dry_run_command',
 ]);
 
 const hasAgentSessionIntent = ({
@@ -1253,16 +1266,21 @@ const hasAgentSessionIntent = ({
   if (typeof args !== 'object' || args === null) return false;
   const actor =
     'actor' in args && typeof args.actor === 'object' && args.actor !== null
-      ? (args.actor as Record<string, unknown>)
+      ? (args.actor as { id?: unknown; kind?: unknown; sessionId?: unknown })
       : null;
   return (
     ('sessionId' in args && typeof args.sessionId === 'string' && args.sessionId.trim().length > 0) ||
     ('operationId' in args && typeof args.operationId === 'string' && args.operationId.trim().length > 0) ||
     (actor !== null &&
-      actor['id'] === 'rapidraw-ui' &&
-      actor['kind'] === 'ui' &&
-      typeof actor['sessionId'] === 'string' &&
-      actor['sessionId'].trim().length > 0)
+      actor.id === 'rapidraw-ui' &&
+      actor.kind === 'ui' &&
+      typeof actor.sessionId === 'string' &&
+      actor.sessionId.trim().length > 0) ||
+    (actor !== null &&
+      actor.kind === 'agent' &&
+      actor.id === 'rawengine-agent' &&
+      typeof actor.sessionId === 'string' &&
+      actor.sessionId.trim().length > 0)
   );
 };
 
@@ -1312,6 +1330,20 @@ const dispatchAgentAppServerTool = async (
       const command = toneColorCommandEnvelopeV1Schema.parse(request.arguments);
       if (command.commandType !== 'toneColor.setBasicTone') return null;
       result = await applyBasicToneCommandToLiveEditor(command);
+      break;
+    }
+    case 'editgraph.dry_run_command': {
+      if (!hasAgentSessionIntent(request)) return null;
+      const command = editGraphCommandEnvelopeV1Schema.parse(request.arguments);
+      if (command.commandType !== 'editGraph.applyParameterPatch') return null;
+      result = await dryRunEditGraphCommandInLiveEditor(command, rawEngineAppServerLocalBridge, request.requestId);
+      break;
+    }
+    case 'editgraph.apply_command': {
+      if (!hasAgentSessionIntent(request)) return null;
+      const command = editGraphCommandEnvelopeV1Schema.parse(request.arguments);
+      if (command.commandType !== 'editGraph.applyParameterPatch') return null;
+      result = await applyEditGraphCommandToLiveEditor(command, rawEngineAppServerLocalBridge, request.requestId);
       break;
     }
     case AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME:
