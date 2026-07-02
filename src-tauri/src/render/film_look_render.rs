@@ -17,7 +17,9 @@ const CONTROLLED_FIELDS: &[(&str, i32)] = &[
     ("saturation", 0),
     ("glowAmount", 0),
     ("grainAmount", 0),
+    ("grainRoughness", 50),
     ("grainSize", 25),
+    ("halationAmount", 0),
 ];
 
 const FILM_LOOK_PATCHES: &[FilmLookPatch] = &[
@@ -47,13 +49,19 @@ const FILM_LOOK_PATCHES: &[FilmLookPatch] = &[
         patch: &[
             ("contrast", 12),
             ("grainAmount", 22),
+            ("grainRoughness", 64),
             ("grainSize", 42),
             ("saturation", -100),
         ],
     },
     FilmLookPatch {
         id: "film_look.generic.punch_color.v1",
-        patch: &[("blacks", -3), ("contrast", 24), ("glowAmount", 8)],
+        patch: &[
+            ("blacks", -3),
+            ("contrast", 24),
+            ("glowAmount", 8),
+            ("halationAmount", 18),
+        ],
     },
     FilmLookPatch {
         id: "film_look.generic.soft_portrait_color.v1",
@@ -89,6 +97,7 @@ const FILM_LOOK_PATCHES: &[FilmLookPatch] = &[
             ("blacks", -8),
             ("contrast", 30),
             ("grainAmount", 32),
+            ("grainRoughness", 68),
             ("grainSize", 48),
             ("saturation", -100),
         ],
@@ -188,16 +197,20 @@ mod tests {
             "filmLookId": "film_look.generic.clean_color.v1",
             "filmLookStrength": 50,
             "grainAmount": 80,
+            "grainRoughness": 5,
             "grainSize": 90,
-            "glowAmount": 20
+            "glowAmount": 20,
+            "halationAmount": 99
         });
         let normalized = normalize_film_look_adjustments_for_render(&adjustments).into_owned();
 
         assert_eq!(normalized["contrast"], 6);
         assert_eq!(normalized["saturation"], 2);
         assert_eq!(normalized["grainAmount"], 0);
+        assert_eq!(normalized["grainRoughness"], 50);
         assert_eq!(normalized["grainSize"], 25);
         assert_eq!(normalized["glowAmount"], 0);
+        assert_eq!(normalized["halationAmount"], 0);
     }
 
     #[test]
@@ -213,6 +226,24 @@ mod tests {
         assert_eq!(preview, export);
         assert_eq!(preview["saturation"], -72);
         assert_eq!(preview["grainAmount"], 23);
+        assert_eq!(preview["grainRoughness"], 49);
         assert_eq!(preview["grainSize"], 35);
+    }
+
+    #[test]
+    fn includes_runtime_halation_and_grain_roughness_controls() {
+        let halation = normalize_film_look_adjustments_for_render(&json!({
+            "filmLookId": "film_look.generic.punch_color.v1",
+            "filmLookStrength": 50
+        }))
+        .into_owned();
+        let grain = normalize_film_look_adjustments_for_render(&json!({
+            "filmLookId": "film_look.generic.mono_silver.v1",
+            "filmLookStrength": 50
+        }))
+        .into_owned();
+
+        assert_eq!(halation["halationAmount"], 9);
+        assert_eq!(grain["grainRoughness"], 32);
     }
 }

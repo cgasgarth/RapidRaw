@@ -99,7 +99,9 @@ const applySyntheticFilmLook = (sourcePixels, lookId, patch) =>
     const saturation = (patch.saturation ?? 0) / 100;
     const glow = (patch.glowAmount ?? 0) / 100;
     const grainAmount = (patch.grainAmount ?? 0) / 100;
+    const grainRoughness = (patch.grainRoughness ?? 50) / 100;
     const grainSize = patch.grainSize ?? 25;
+    const halation = (patch.halationAmount ?? 0) / 100;
     let r = pixel.r + temperature * 0.08;
     let g = pixel.g + temperature * 0.015;
     let b = pixel.b - temperature * 0.07;
@@ -132,12 +134,15 @@ const applySyntheticFilmLook = (sourcePixels, lookId, patch) =>
     b = saturatedLuma + (b - saturatedLuma) * (1 + saturation);
 
     const glowBoost = glow * highlightMask * 0.08;
-    const grain = deterministicNoise(lookId, pixel.x, pixel.y, grainSize) * grainAmount * 0.035;
+    const halationBoost = halation * highlightMask * (0.035 + highlightMask * 0.025);
+    const coarseGrain = deterministicNoise(lookId, pixel.x, pixel.y, grainSize);
+    const fineGrain = deterministicNoise(`${lookId}:fine`, pixel.x, pixel.y, Math.max(1, Math.round(grainSize / 2)));
+    const grain = (coarseGrain * (1 - grainRoughness) + fineGrain * grainRoughness) * grainAmount * 0.035;
 
     return {
       b: clamp01(b + glowBoost + grain),
-      g: clamp01(g + glowBoost + grain),
-      r: clamp01(r + glowBoost + grain),
+      g: clamp01(g + glowBoost + halationBoost * 0.38 + grain),
+      r: clamp01(r + glowBoost + halationBoost + grain),
       x: pixel.x,
       y: pixel.y,
     };
