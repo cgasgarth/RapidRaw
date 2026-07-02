@@ -546,10 +546,7 @@ impl Default for AppSettings {
             waveform_height: Some(220),
             active_waveform_channel: Some("luma".to_string()),
             panel_scopes_layout: Some("stacked".to_string()),
-            #[cfg(any(target_os = "linux", target_os = "android"))]
             use_wgpu_renderer: Some(false),
-            #[cfg(not(any(target_os = "linux", target_os = "android")))]
-            use_wgpu_renderer: Some(true),
             canvas_input_mode: Some("mouse".to_string()),
             zoom_speed_multiplier: Some(1.0),
             keybinds: HashMap::new(),
