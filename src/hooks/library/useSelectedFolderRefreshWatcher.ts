@@ -3,7 +3,6 @@ import { useEffect, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { LibraryViewMode } from '../../components/ui/AppProperties';
 import { useLibraryStore } from '../../store/useLibraryStore';
-import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
 import { type FolderRefreshSnapshot, hasFolderRefreshSnapshotChanged } from './folderRefreshSnapshot';
 
@@ -20,11 +19,6 @@ export function useSelectedFolderRefreshWatcher({
   refreshAllFolderTrees,
   refreshImageList,
 }: UseSelectedFolderRefreshWatcherProps) {
-  const { activeView } = useUIStore(
-    useShallow((state) => ({
-      activeView: state.activeView,
-    })),
-  );
   const { currentFolderPath } = useLibraryStore(
     useShallow((state) => ({
       currentFolderPath: state.currentFolderPath,
@@ -44,7 +38,6 @@ export function useSelectedFolderRefreshWatcher({
     isRefreshingRef.current = false;
 
     if (!currentFolderPath?.trim() || currentFolderPath.startsWith('Album: ')) return;
-    if (activeView !== 'library') return;
 
     let isActive = true;
     const watchedPath = currentFolderPath;
@@ -61,7 +54,6 @@ export function useSelectedFolderRefreshWatcher({
 
         if (!isActive) return;
         if (useLibraryStore.getState().currentFolderPath !== watchedPath) return;
-        if (useUIStore.getState().activeView !== 'library') return;
 
         if (snapshotRef.current === null) {
           snapshotRef.current = snapshot;
@@ -94,5 +86,5 @@ export function useSelectedFolderRefreshWatcher({
       isActive = false;
       window.clearInterval(intervalId);
     };
-  }, [activeView, currentFolderPath, libraryViewMode]);
+  }, [currentFolderPath, libraryViewMode]);
 }
