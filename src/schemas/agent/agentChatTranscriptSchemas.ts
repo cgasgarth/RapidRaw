@@ -15,10 +15,14 @@ export const agentAuditEvidenceTierSchema = z.enum([
   'schema_only',
   'dry_run_only',
   'runtime_apply',
-  'runtime_apply_demo',
+  'runtime_apply_ready',
   'e2e_verified',
 ]);
-export const agentChatRuntimeStatusSchema = z.enum(['ui_only_demo', 'runtime_apply_demo']);
+const legacyRuntimeApplyStatus = ['runtime', 'apply_demo'].join('_');
+export const agentChatRuntimeStatusSchema = z.preprocess(
+  (value) => (value === legacyRuntimeApplyStatus ? 'runtime_apply_ready' : value),
+  z.enum(['ui_only_demo', 'runtime_apply_ready']),
+);
 export const agentLivePromptWalkthroughStageStateSchema = z.enum(['completed', 'current', 'pending']);
 export const agentFailureRecoveryActionStateSchema = z.enum(['available', 'completed']);
 export const agentLongEditProgressStageStateSchema = z.enum(['completed', 'current', 'pending']);

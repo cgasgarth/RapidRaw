@@ -199,7 +199,7 @@ const reportWithoutEvidence = {
     deterministicProvider: true,
     userPrompt,
   },
-  proofStatus: 'runtime_apply_demo',
+  proofStatus: 'runtime_apply_ready',
   runtimeWorkflow: {
     api: 'runAgentColorEditWorkflowV1',
     applyAuditEventId: workflow.audit.applyEventId,

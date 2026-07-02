@@ -780,8 +780,8 @@
           "title": "Dry-run review",
           "uiOnly": "Approval controls are visible for review only; apply stays disabled until runtime replay proof exists."
         },
-        "runtimeApplyDemo": "Runtime apply demo",
         "runtimeApplyProof": "Runtime apply proof",
+        "runtimeApplyReady": "Runtime apply ready",
         "selectedImageLoop": {
           "audit": "Audit summary",
           "before": "Before",

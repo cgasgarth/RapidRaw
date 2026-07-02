@@ -739,8 +739,8 @@
           "title": "",
           "uiOnly": ""
         },
-        "runtimeApplyDemo": "",
         "runtimeApplyProof": "",
+        "runtimeApplyReady": "",
         "selectedImageLoop": {
           "audit": "Audit summary",
           "before": "Before",

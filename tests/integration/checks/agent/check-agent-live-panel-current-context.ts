@@ -2,22 +2,21 @@
 
 import { readFileSync } from 'node:fs';
 
-const aiPanelSource = readFileSync('src/components/panel/right/ai/AIPanel.tsx', 'utf8');
+const aiPanelSource = readFileSync('src/components/panel/right/ai/AgentPanel.tsx', 'utf8');
 const shellSource = readFileSync('src/components/panel/right/ai/AgentChatShell.tsx', 'utf8');
 const schemaSource = readFileSync('src/schemas/agent/agentChatTranscriptSchemas.ts', 'utf8');
 const visualSmokeSource = readFileSync('src/validation/visual/VisualSmokeApp.tsx', 'utf8');
 
 const requiredLivePanelMarkers = [
-  'selectedImagePath={selectedImage?.path}',
-  'buildLiveAgentTranscript(selectedImagePath, liveAgentInitialPromptContext)',
+  'buildLiveAgentTranscript(selectedImage?.path, initialPromptContext)',
   'buildAgentInitialPromptContext({',
-  'liveAgentInitialPromptContext',
+  'initialPromptContext',
   'rawengine.image.get_preview',
   'agentInitialPromptContext.v1',
-  'initialPromptPreviewContext:',
+  'initialPromptContext === null',
   'getImageLabelFromPath',
   'Current image:',
-  "runtimeStatus: 'runtime_apply_demo'",
+  "runtimeStatus: 'runtime_apply_ready'",
   'rawengine.live_context',
 ];
 

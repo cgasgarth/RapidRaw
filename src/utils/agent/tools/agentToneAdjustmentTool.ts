@@ -7,6 +7,7 @@ import {
 import { useEditorStore } from '../../../store/useEditorStore';
 import type { Adjustments } from '../../adjustments';
 import {
+  BASIC_TONE_ADJUSTMENT_KEYS,
   buildBasicToneCommandEnvelope,
   buildBasicToneImageCommandContext,
   type LegacyBasicToneAdjustmentPayload,
@@ -40,6 +41,21 @@ const agentToneAdjustmentPatchSchema = z
   })
   .strict()
   .refine((patch) => Object.keys(patch).length > 0, { message: 'At least one tone adjustment is required.' });
+
+export type AgentToneAdjustmentPatch = z.infer<typeof agentToneAdjustmentPatchSchema>;
+
+export type AgentToneAdjustmentPromptDraft =
+  | {
+      adjustedFields: readonly (keyof AgentToneAdjustmentPatch)[];
+      requestedAdjustments: AgentToneAdjustmentPatch;
+      supported: true;
+      summary: string;
+    }
+  | {
+      reason: string;
+      supported: false;
+      summary: string;
+    };
 
 const baseToneAdjustmentRequestSchema = z
   .object({
@@ -198,8 +214,83 @@ const buildRequestedBasicTone = (
   whites: patch.whites ?? base.whites,
 });
 
+const BASIC_TONE_ADJUSTMENT_PATCH_KEYS = [
+  'blacks',
+  'clarity',
+  'contrast',
+  'exposure',
+  'highlights',
+  'saturation',
+  'shadows',
+  'whites',
+] as const satisfies readonly (keyof AgentToneAdjustmentPatch)[];
+
 const getAdjustedFields = (adjustments: z.infer<typeof agentToneAdjustmentPatchSchema>) =>
-  Object.keys(adjustments).sort((left, right) => left.localeCompare(right));
+  BASIC_TONE_ADJUSTMENT_PATCH_KEYS.filter((key) => adjustments[key] !== undefined);
+
+const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
+
+const includesAny = (normalizedPrompt: string, patterns: readonly string[]): boolean =>
+  patterns.some((pattern) => normalizedPrompt.includes(pattern));
+
+export const buildAgentToneAdjustmentPromptDraft = (
+  prompt: string,
+  baseAdjustments: Adjustments,
+): AgentToneAdjustmentPromptDraft => {
+  const normalizedPrompt = prompt.toLowerCase();
+  const brightenRequested = includesAny(normalizedPrompt, [
+    'brighten',
+    'brighter',
+    'lighten',
+    'lift exposure',
+    'too dark',
+  ]);
+  const contrastRequested = includesAny(normalizedPrompt, ['contrast', 'punch', 'pop', 'more depth']);
+  const highlightRequested = includesAny(normalizedPrompt, [
+    'highlight',
+    'highlights',
+    'recover highlights',
+    'save highlights',
+  ]);
+  const shadowRequested = includesAny(normalizedPrompt, ['shadow', 'shadows', 'lift shadows', 'open shadows']);
+  const basicToneRequested = includesAny(normalizedPrompt, ['basic tone']) || brightenRequested || contrastRequested;
+
+  if (!brightenRequested && !contrastRequested && !highlightRequested && !shadowRequested && !basicToneRequested) {
+    return {
+      reason: 'Only basic tone prompts like brighten, contrast, lift shadows, or recover highlights are supported.',
+      supported: false,
+      summary: 'Unsupported live chat prompt. No editor state was mutated.',
+    };
+  }
+
+  const requestedAdjustments: AgentToneAdjustmentPatch = {};
+  if (brightenRequested || basicToneRequested) {
+    requestedAdjustments.exposure = clamp(baseAdjustments.exposure + 0.32, -10, 10);
+  }
+  if (contrastRequested || basicToneRequested) {
+    requestedAdjustments.clarity = clamp(baseAdjustments.clarity + 10, -100, 100);
+    requestedAdjustments.contrast = clamp(baseAdjustments.contrast + 16, -100, 100);
+  }
+  if (highlightRequested || basicToneRequested) {
+    requestedAdjustments.highlights = clamp(baseAdjustments.highlights - 18, -100, 100);
+    requestedAdjustments.whites = clamp(baseAdjustments.whites + 6, -100, 100);
+  }
+  if (shadowRequested || basicToneRequested) {
+    requestedAdjustments.blacks = clamp(baseAdjustments.blacks - 4, -100, 100);
+    requestedAdjustments.shadows = clamp(baseAdjustments.shadows + 14, -100, 100);
+  }
+  if (basicToneRequested) {
+    requestedAdjustments.saturation = clamp(baseAdjustments.saturation + 3, -100, 100);
+  }
+
+  const adjustedFields = getAdjustedFields(requestedAdjustments);
+  return {
+    adjustedFields,
+    requestedAdjustments,
+    supported: true,
+    summary: `Typed basic tone dry-run ready for ${adjustedFields.join(', ')}.`,
+  };
+};
 
 const setPatchedToneAdjustments = (
   base: Adjustments,
@@ -207,7 +298,7 @@ const setPatchedToneAdjustments = (
 ): Adjustments => {
   const adjustments = { ...base };
   for (const [key, value] of Object.entries(patch)) {
-    if (value !== undefined) adjustments[key as keyof z.infer<typeof agentToneAdjustmentPatchSchema>] = value;
+    if (value !== undefined) adjustments[key as keyof Adjustments] = value as Adjustments[keyof Adjustments];
   }
   return adjustments;
 };

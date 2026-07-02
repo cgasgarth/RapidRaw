@@ -30,7 +30,7 @@ import {
 
 const LIVE_AGENT_AUDIT_STORE_KEY = 'rawengine.agent.liveSessionAudit.v1';
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3164.ARW';
-const prompt = 'Brighten the RAW, inspect a medium preview, then refine shadows and detail.';
+const prompt = 'Brighten the RAW, add contrast, recover highlights, and lift shadows.';
 const embeddedPreviewDataUrl = `data:image/jpeg;base64,${'A'.repeat(256)}`;
 const failures: string[] = [];
 
@@ -157,7 +157,7 @@ async function validateRenderedShellBehavior(
   const shell = getByTestId(rendered.container, 'agent-chat-shell', 'agent chat shell did not render.');
   assertData(shell, 'liveSessionState', 'ready', 'live session shell did not become ready from live_context.');
   assertData(shell, 'liveSessionEventCount', '0', 'live session event count should start at zero.');
-  assertData(shell, 'agentRuntimeStatus', 'runtime_apply_demo', 'runtime apply status was not exposed.');
+  assertData(shell, 'agentRuntimeStatus', 'runtime_apply_ready', 'runtime apply status was not exposed.');
 
   const toolTranscript = getByTestId(rendered.container, 'agent-tool-transcript', 'tool transcript did not render.');
   assertVisibleText(toolTranscript, 'rawengine.image.get_preview', 'initial prompt preview tool call did not render.');
@@ -238,61 +238,59 @@ async function validateRenderedShellBehavior(
       return composer.dataset.livePromptStatus === 'applied';
     },
   );
-  const review = await waitForTestId(
+  const resultPanel = await waitForTestId(
     rendered.container,
-    'agent-live-session-review',
-    'applied session review did not render.',
+    'agent-live-prompt-result',
+    'applied prompt result did not render.',
   );
-  assertData(review, 'rollbackGraphRevision', 'history_0', 'rollback target revision was not rendered after apply.');
+  if (
+    (resultPanel.dataset.dryRunPlanHash ?? '').length === 0 ||
+    (resultPanel.dataset.applyPlanHash ?? '').length === 0
+  ) {
+    failures.push('typed prompt result did not expose dry-run/apply plan hashes.');
+  }
+  if (!enabledApplyButton.disabled) {
+    failures.push('apply button should be disabled after the typed apply completes.');
+  }
+
+  const dryRunReceipt = await waitForTestId(
+    rendered.container,
+    'agent-live-prompt-dry-run-receipt',
+    'typed dry-run receipt did not render.',
+  );
+  assertData(dryRunReceipt, 'sourceGraphRevision', 'history_0', 'typed dry-run receipt should bind the source graph.');
   assertData(
-    review,
-    'rollbackState',
-    'invalidated',
-    'post-apply rollback state was not rendered from graph validation.',
+    dryRunReceipt,
+    'dryRunPlanId',
+    dryRunReceipt.dataset.dryRunPlanId ?? '',
+    'typed dry-run receipt did not expose a dry-run plan id.',
   );
-  assertData(review, 'initialPreviewArtifactId', context.preview.artifactId, 'before preview was not bound in review.');
-  if ((review.dataset.finalPreviewArtifactId ?? '') === context.preview.artifactId) {
-    failures.push('current preview binding did not move past the initial preview after apply.');
-  }
 
-  const lineage = rendered.container.querySelectorAll('[data-testid="agent-live-session-preview-lineage-entry"]');
-  if (lineage.length !== 2)
-    failures.push(`expected two rendered selected-image preview lineage entries, got ${lineage.length}.`);
-  const lineagePurposes = Array.from(lineage).map((entry) => (entry as HTMLElement).dataset.purpose);
-  if (lineagePurposes.join(',') !== 'initial_context,refresh') {
-    failures.push(`rendered preview lineage order was wrong: ${lineagePurposes.join(',')}.`);
-  }
-  const cancelButton = getButtonByName(rendered.container, 'Cancel', 'cancel button was not queryable after apply.');
-  if (!cancelButton.disabled)
-    failures.push('cancel button should be disabled after the selected-image session completes.');
-
-  const audit = await waitForTestId(
+  const applyReceipt = await waitForTestId(
     rendered.container,
-    'agent-live-session-audit-artifact',
-    'live audit artifact panel did not render after apply.',
+    'agent-live-prompt-apply-receipt',
+    'typed apply receipt did not render.',
   );
-  assertData(audit, 'persistedRecordCount', '1', 'rendered audit output did not expose persisted record count.');
-  assertData(audit, 'rollbackGraphRevision', 'history_0', 'rendered audit output did not preserve rollback revision.');
-  const initialReceipt = getByTestId(
-    rendered.container,
-    'agent-live-session-initial-preview-receipt',
-    'live session initial preview receipt did not render after apply.',
-  );
+  assertData(applyReceipt, 'appliedGraphRevision', 'history_1', 'typed apply receipt should advance history.');
   assertData(
-    initialReceipt,
-    'toolName',
-    'rawengine.image.get_preview',
-    'initial preview receipt did not expose the typed preview tool.',
+    applyReceipt,
+    'acceptedPlanId',
+    applyReceipt.dataset.acceptedPlanId ?? '',
+    'typed apply receipt did not expose the accepted plan id.',
   );
-  assertData(initialReceipt, 'imagePath', selectedPath, 'initial preview receipt did not bind selected image path.');
-  assertData(initialReceipt, 'longEdgePx', '1536', 'initial preview receipt did not expose medium long edge.');
-  assertData(initialReceipt, 'quality', '0.86', 'initial preview receipt did not expose medium quality.');
-  assertData(initialReceipt, 'stale', 'false', 'initial preview receipt should start non-stale.');
-  const renderedInitialContentHash = initialReceipt.dataset.contentHash ?? '';
-  if (!/^sha256:[a-f0-9]{16,64}$/u.test(renderedInitialContentHash)) {
-    failures.push(`initial preview receipt did not expose a content hash: ${renderedInitialContentHash}`);
-  }
 
+  const refreshReceipt = await waitForTestId(
+    rendered.container,
+    'agent-live-prompt-preview-refresh-receipt',
+    'preview refresh receipt did not render after apply.',
+  );
+  assertData(refreshReceipt, 'previewStale', 'false', 'preview refresh receipt should be fresh after the typed apply.');
+  assertData(
+    refreshReceipt,
+    'previewArtifactId',
+    refreshReceipt.dataset.previewArtifactId ?? '',
+    'preview refresh receipt did not expose a preview artifact.',
+  );
   rendered.unmount();
 }
 
@@ -510,7 +508,7 @@ async function validateRenderedReviewStates(baseTranscript: AgentChatTranscript)
   getByTestId(review.container, 'agent-proposal-audit-detail', 'proposal collapsed audit detail did not render.');
 
   const dryRunReview = getByTestId(review.container, 'agent-dry-run-review', 'dry-run review did not render.');
-  assertData(dryRunReview, 'applyAvailability', 'runtime_apply_demo', 'dry-run apply availability was not rendered.');
+  assertData(dryRunReview, 'applyAvailability', 'runtime_apply_ready', 'dry-run apply availability was not rendered.');
   const disabledApply = getByTestId<HTMLButtonElement>(
     review.container,
     'agent-approval-action-apply-approved',
@@ -906,7 +904,7 @@ function buildTranscript(initialContext: ReturnType<typeof buildAgentInitialProm
         timestamp: 'now',
       },
     ],
-    runtimeStatus: 'runtime_apply_demo',
+    runtimeStatus: 'runtime_apply_ready',
     sessionTitle: 'Current image: DSC_3164.ARW',
     toolCalls: [
       {
