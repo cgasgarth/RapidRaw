@@ -3,11 +3,17 @@ import { invoke } from '@tauri-apps/api/core';
 import { useCallback, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { Mask, type SubMask } from '../../components/panel/right/layers/Masks';
+import { AiProviderId, normalizeAiProviderId } from '../../schemas/ai/aiProviderSchemas';
 import { type AiPeopleMaskPart, parseAiPatchDataJson } from '../../schemas/masks/aiMaskingSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
+import { useSettingsStore } from '../../store/useSettingsStore';
 import { Invokes } from '../../tauri/commands';
 import type { Adjustments, AiPatch, Coord, MaskContainer } from '../../utils/adjustments';
 import { getAiPeopleMaskPartCapability } from '../../utils/ai/aiPeopleMaskContracts';
+import {
+  type AiSubjectMaskToolAppliedResult,
+  prepareAiSubjectMaskAppServerTool,
+} from '../../utils/ai/aiSubjectMaskAppServerTool';
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { mergeMaskParameters } from '../../utils/mask/maskParameterAccess';
 import { useEditorActions } from '../editor/useEditorActions';
@@ -48,6 +54,7 @@ export function useAiMasking() {
   const activeMaskId = useEditorStore((state) => state.activeMaskId);
   const activeAiSubMaskId = useEditorStore((state) => state.activeAiSubMaskId);
   const selectedImagePath = useEditorStore((state) => state.selectedImage?.path);
+  const aiProvider = useSettingsStore((state) => normalizeAiProviderId(state.appSettings?.aiProvider));
   const { getToken } = useAuth();
 
   const updateSubMask = useCallback(
@@ -105,7 +112,7 @@ export function useAiMasking() {
                   ...p,
                   patchData: newPatchData,
                   isLoading: false,
-                  name: useFastInpaint ? 'Inpaint' : prompt && prompt.trim() ? prompt.trim() : p.name,
+                  name: useFastInpaint ? 'Inpaint' : prompt?.trim() ? prompt.trim() : p.name,
                 }
               : p,
           ),
@@ -260,6 +267,25 @@ export function useAiMasking() {
     setEditor({ isGeneratingAiMask: true });
 
     try {
+      const subjectMaskToolSession = await prepareAiSubjectMaskAppServerTool({
+        maskName: 'Subject mask',
+        operationId: `ai-subject-mask-${subMaskId}`,
+        providerClass:
+          aiProvider === AiProviderId.Local
+            ? 'local_model'
+            : aiProvider === AiProviderId.Connector
+              ? 'self_hosted_connector'
+              : 'cloud_service',
+        providerId: aiProvider === AiProviderId.Local ? 'rawengine-local-ai' : aiProvider,
+        requestId: `ai-subject-mask-${subMaskId}-request`,
+        selectedImagePath: selectedImage.path,
+      });
+
+      if (subjectMaskToolSession.status === 'blocked') {
+        toast.error(`AI Subject Mask unavailable: ${subjectMaskToolSession.userVisibleMessage}`);
+        return;
+      }
+
       const transformAdjustments = getTransformAdjustments(adjustments);
       const newParameters = await invoke<Record<string, unknown>>(Invokes.GenerateAiSubjectMask, {
         jsAdjustments: transformAdjustments,
@@ -272,10 +298,39 @@ export function useAiMasking() {
         startPoint: [startPoint.x, startPoint.y],
       });
 
+      const subjectMaskToolResult = await subjectMaskToolSession.apply();
+      if (subjectMaskToolResult.status === 'blocked') {
+        toast.error(`AI Mask Failed: ${subjectMaskToolResult.userVisibleMessage}`);
+        return;
+      }
+
       const subMask = adjustments.aiPatches
         .flatMap((p: AiPatch) => p.subMasks)
         .find((sm: SubMask) => sm.id === subMaskId);
-      const mergedParameters = mergeMaskParameters(subMask?.parameters, newParameters);
+      const applyResult: AiSubjectMaskToolAppliedResult = subjectMaskToolResult;
+      const mergedParameters = mergeMaskParameters(subMask?.parameters, {
+        ...newParameters,
+        rawEngine: {
+          acceptedDryRunPlanHash: applyResult.applyResult.dryRunPlanHash,
+          acceptedDryRunPlanId: applyResult.applyResult.dryRunPlanId,
+          appliedGraphRevision: applyResult.applyResult.appliedGraphRevision,
+          auditEventId: applyResult.auditEvents.at(-1)?.eventId ?? null,
+          commandId: applyResult.applyResult.commandId,
+          dryRunPlanHash: applyResult.applyResult.dryRunPlanHash,
+          dryRunPlanId: applyResult.applyResult.dryRunPlanId,
+          maskArtifactId: applyResult.dryRunResult.maskArtifacts[0]?.artifactId ?? null,
+          maskContentHash: applyResult.dryRunResult.maskArtifacts[0]?.contentHash ?? null,
+          maskCoverageRatio: applyResult.dryRunResult.maskCoverageRatio,
+          outputArtifactId: applyResult.applyResult.outputArtifacts[0]?.artifactId ?? null,
+          outputContentHash: applyResult.applyResult.outputArtifacts[0]?.contentHash ?? null,
+          previewArtifactId: applyResult.dryRunResult.previewArtifacts[0]?.artifactId ?? null,
+          providerFallback: applyResult.auditEvents.at(-1)?.providerFallback ?? null,
+          provenanceEntryIds: applyResult.applyResult.provenanceEntryIds,
+          sourceGraphRevision: applyResult.applyResult.sourceGraphRevision,
+          toolName: 'ai.mask.apply_subject',
+          warnings: applyResult.applyResult.warnings,
+        },
+      });
       patchesSentToBackend.delete(subMaskId);
       updateSubMask(subMaskId, { parameters: mergedParameters });
     } catch (error) {

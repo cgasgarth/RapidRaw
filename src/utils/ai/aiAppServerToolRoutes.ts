@@ -42,14 +42,14 @@ export const AI_APP_SERVER_TOOL_ROUTE_MANIFEST = aiAppServerToolRouteManifestSch
   routes: [
     {
       ...aiMaskDryRun,
-      reason: 'Subject-mask generation is represented by the typed AI mask dry-run tool.',
+      reason: 'Subject-mask generation is represented by the typed AI mask dry-run app-server tool.',
       ...mappedTauriInvoke,
       sourceOperation: 'generate_ai_subject_mask',
       toolCapability: AiAppServerToolCapability.SubjectMask,
     },
     {
       ...aiMaskDryRun,
-      reason: 'Subject-mask precompute feeds the same dry-run tool surface before UI apply.',
+      reason: 'Subject-mask precompute feeds the same typed dry-run app-server tool before UI apply.',
       ...mappedTauriInvoke,
       sourceOperation: 'precompute_ai_subject_mask',
       toolCapability: AiAppServerToolCapability.SubjectMask,
@@ -102,7 +102,7 @@ export const AI_APP_SERVER_TOOL_ROUTE_MANIFEST = aiAppServerToolRouteManifestSch
       commandSchemaName: AiAppServerToolSchemaName.ToolCommandEnvelope,
       executionMode: AiAppServerToolRouteExecutionMode.ApplyDryRunPlan,
       outputSchemaName: AiAppServerToolSchemaName.ToolApplyResult,
-      reason: 'Accepted AI mask dry-run plans apply through the typed app-server tool surface.',
+      reason: 'Accepted AI subject-mask dry-run plans apply through the typed app-server tool surface.',
       ...mappedAppServerTool,
       sourceOperation: AiAppServerToolName.MaskApplySubject,
       toolCapability: AiAppServerToolCapability.SubjectMask,
