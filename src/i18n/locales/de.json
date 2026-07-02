@@ -1558,6 +1558,7 @@
     "switcher": {
       "tooltips": {
         "adjust": "Anpassen",
+        "agent": "Agent Edit",
         "color": "Farbe",
         "crop": "Zuschnitt",
         "export": "Exportieren",
@@ -2211,7 +2212,8 @@
         "lensCorrection": "Open lens correction",
         "negativeLab": "Open negative lab",
         "panelAdjustments": "Show adjustments",
-        "panelAi": "Show AI tools",
+        "panelAgent": "Show agent editor",
+        "panelAi": "Show inpaint tools",
         "panelColor": "Show color tools",
         "panelCrop": "Show crop tools",
         "panelExport": "Show export",

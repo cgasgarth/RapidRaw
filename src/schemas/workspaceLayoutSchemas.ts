@@ -6,6 +6,7 @@ export const workspaceSurfaceSchema = z.enum(['library', 'editor', 'negative_lab
 export const workspaceDensitySchema = z.enum(['compact', 'comfortable', 'dense']);
 export const workspacePanelIdSchema = z.enum([
   'adjustments',
+  'agent',
   'ai',
   'crop',
   'export',

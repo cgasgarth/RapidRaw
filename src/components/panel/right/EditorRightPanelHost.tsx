@@ -9,6 +9,7 @@ import ExportPanel from './export/ExportPanel';
 import MetadataPanel from './metadata/MetadataPanel';
 
 const AIPanel = lazy(() => import('./ai/AIPanel.js').then((module) => ({ default: module.AIPanel })));
+const AgentPanel = lazy(() => import('./ai/AgentPanel.js').then((module) => ({ default: module.AgentPanel })));
 const MasksPanel = lazy(() => import('./layers/MasksPanel.js').then((module) => ({ default: module.MasksPanel })));
 const PresetsPanel = lazy(() => import('./color/PresetsPanel.js').then((module) => ({ default: module.PresetsPanel })));
 const TetherPanel = lazy(() => import('./capture/TetherPanel.js').then((module) => ({ default: module.TetherPanel })));
@@ -50,6 +51,7 @@ type RightPanelRenderer = (props: EditorRightPanelHostProps) => ReactNode;
 
 const rightPanelRegistry: Record<Panel, RightPanelRenderer> = {
   [Panel.Adjustments]: () => <Controls />,
+  [Panel.Agent]: () => <AgentPanel />,
   [Panel.Ai]: () => <AIPanel />,
   [Panel.Color]: () => <ColorWorkspacePanel />,
   [Panel.Crop]: () => <CropPanel />,

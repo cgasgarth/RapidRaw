@@ -1468,6 +1468,7 @@
     "switcher": {
       "tooltips": {
         "adjust": "補正",
+        "agent": "Agent Edit",
         "color": "カラー",
         "crop": "切り抜き",
         "export": "書き出し",
@@ -2111,6 +2112,7 @@
         "lensCorrection": "",
         "negativeLab": "",
         "panelAdjustments": "",
+        "panelAgent": "",
         "panelAi": "",
         "panelColor": "",
         "panelCrop": "",

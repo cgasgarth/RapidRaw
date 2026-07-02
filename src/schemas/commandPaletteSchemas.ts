@@ -13,6 +13,7 @@ export const commandPaletteCommandIdSchema = z.enum([
   'negativeLab',
   'panorama',
   'panelAdjustments',
+  'panelAgent',
   'panelAi',
   'panelColor',
   'panelCrop',

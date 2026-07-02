@@ -1581,6 +1581,7 @@
     "switcher": {
       "tooltips": {
         "adjust": "Коррекция",
+        "agent": "Agent Edit",
         "color": "Цвет",
         "crop": "Обрезка",
         "export": "Экспорт",
@@ -2260,6 +2261,7 @@
         "lensCorrection": "",
         "negativeLab": "",
         "panelAdjustments": "",
+        "panelAgent": "",
         "panelAi": "",
         "panelColor": "",
         "panelCrop": "",

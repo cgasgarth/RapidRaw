@@ -2,6 +2,7 @@ import cx from 'clsx';
 import {
   Aperture,
   ArrowLeft,
+  BotMessageSquare,
   Camera,
   Command,
   Images,
@@ -74,6 +75,8 @@ const getCommandIcon = (command: CommandPaletteCommand) => {
     case 'panelMetadata':
     case 'panelPresets':
       return PanelRight;
+    case 'panelAgent':
+      return BotMessageSquare;
     case 'panelColor':
       return Palette;
     case 'panelTether':
