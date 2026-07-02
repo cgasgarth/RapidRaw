@@ -1,0 +1,53 @@
+{
+  "artifactId": "layer-sidecar-opacity-output-proof-2026-07-02",
+  "doesNotProve": ["all_blend_modes", "real_raw_render_quality", "gpu_renderer_parity"],
+  "issue": 4798,
+  "proofLevel": "synthetic_runtime",
+  "runtimePath": {
+    "bridge": "src/utils/layers/layerStackCommandBridge.ts",
+    "renderer": "src/utils/layers/layerSidecarPreviewExportRuntime.ts",
+    "stateSource": "MaskContainer.blendMode and MaskContainer.opacity from src/utils/adjustments.ts"
+  },
+  "scenario": {
+    "basePixels": [
+      { "b": 160, "g": 140, "r": 120 },
+      { "b": 80, "g": 64, "r": 48 }
+    ],
+    "blendMode": "multiply",
+    "height": 1,
+    "layerId": "sidecar-opacity-layer",
+    "layerPixels": [
+      { "b": 64, "g": 96, "r": 200 },
+      { "b": 200, "g": 192, "r": 128 }
+    ],
+    "width": 2
+  },
+  "sidecarState": {
+    "afterOpacity": 0.5,
+    "beforeOpacity": 1,
+    "graphRevision": "graph-issue-4798",
+    "sourceImagePath": "/proof/issue-4798-sidecar-opacity.raw"
+  },
+  "syntheticPixelAssertion": {
+    "afterPixels": [
+      { "b": 100, "g": 96, "r": 107 },
+      { "b": 71, "g": 56, "r": 36 }
+    ],
+    "beforePixels": [
+      { "b": 40, "g": 53, "r": 94 },
+      { "b": 63, "g": 48, "r": 24 }
+    ],
+    "changedPixelCount": 2,
+    "previewExportParity": "same_sidecar_input_produces_identical_preview_and_export_pixels"
+  },
+  "unsupportedBlendGate": {
+    "mode": "overlay",
+    "result": "skipped_with_warning_and_base_pixels_unchanged",
+    "warningCode": "unsupported_blend_mode"
+  },
+  "validation": [
+    "bun test --reporter=dot tests/pure-ts/masks/layer-sidecar-output-runtime.test.ts",
+    "bun test --reporter=dot tests/pure-ts",
+    "bun run check:schema"
+  ]
+}
