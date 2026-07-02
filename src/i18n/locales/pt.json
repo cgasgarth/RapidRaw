@@ -1536,6 +1536,7 @@
     "switcher": {
       "tooltips": {
         "adjust": "Ajustar",
+        "agent": "Agent Edit",
         "color": "Cor",
         "crop": "Cortar",
         "export": "Exportar",
@@ -2202,6 +2203,7 @@
         "lensCorrection": "",
         "negativeLab": "",
         "panelAdjustments": "",
+        "panelAgent": "",
         "panelAi": "",
         "panelColor": "",
         "panelCrop": "",

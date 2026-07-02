@@ -160,6 +160,7 @@ function assertPanelActionsRouteThroughRightRailPanels() {
     panelColor: Panel.Color,
     panelCrop: Panel.Crop,
     panelMasks: Panel.Masks,
+    panelAgent: Panel.Agent,
     panelAi: Panel.Ai,
     panelPresets: Panel.Presets,
     panelTether: Panel.Tether,

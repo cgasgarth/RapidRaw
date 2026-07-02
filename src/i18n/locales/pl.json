@@ -1650,6 +1650,7 @@
     "switcher": {
       "tooltips": {
         "adjust": "Dopasuj",
+        "agent": "Agent Edit",
         "color": "Kolor",
         "crop": "Kadruj",
         "export": "Eksportuj",
@@ -2329,7 +2330,8 @@
         "lensCorrection": "Open lens correction",
         "negativeLab": "Open negative lab",
         "panelAdjustments": "Show adjustments",
-        "panelAi": "Show AI tools",
+        "panelAgent": "Show agent editor",
+        "panelAi": "Show inpaint tools",
         "panelColor": "Show color tools",
         "panelCrop": "Show crop tools",
         "panelExport": "Show export",

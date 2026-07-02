@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
 import {
+  BotMessageSquare,
   Camera,
   Crop,
   FileInput,
@@ -49,6 +50,13 @@ export const RIGHT_PANEL_GROUPS = [
       id: Panel.Masks,
       priority: 'primary',
       tooltipKey: 'editor.switcher.tooltips.masks',
+    },
+    {
+      fallbackLabel: 'Agent Edit',
+      icon: BotMessageSquare,
+      id: Panel.Agent,
+      priority: 'primary',
+      tooltipKey: 'editor.switcher.tooltips.agent',
     },
     {
       fallbackLabel: 'Inpaint',

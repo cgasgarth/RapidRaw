@@ -55,9 +55,15 @@ export const commandPaletteCommands = commandPaletteCommandSchema.array().parse(
   },
   {
     category: 'panels',
+    id: 'panelAgent',
+    requiresEditorImage: true,
+    searchTokens: ['agent', 'assistant', 'chat', 'edit'],
+  },
+  {
+    category: 'panels',
     id: 'panelAi',
     requiresEditorImage: true,
-    searchTokens: ['ai', 'agent', 'assistant'],
+    searchTokens: ['ai', 'inpaint', 'generative', 'erase'],
   },
   {
     category: 'panels',
@@ -155,6 +161,7 @@ export const commandLabelKeys = {
   negativeLab: 'modals.commandPalette.commands.negativeLab',
   panorama: 'modals.commandPalette.commands.panorama',
   panelAdjustments: 'modals.commandPalette.commands.panelAdjustments',
+  panelAgent: 'modals.commandPalette.commands.panelAgent',
   panelAi: 'modals.commandPalette.commands.panelAi',
   panelColor: 'modals.commandPalette.commands.panelColor',
   panelCrop: 'modals.commandPalette.commands.panelCrop',
@@ -180,6 +187,7 @@ export const commandPanelMap = {
   panelColor: Panel.Color,
   panelCrop: Panel.Crop,
   panelMasks: Panel.Masks,
+  panelAgent: Panel.Agent,
   panelAi: Panel.Ai,
   panelPresets: Panel.Presets,
   panelTether: Panel.Tether,

@@ -784,6 +784,7 @@
     "switcher": {
       "tooltips": {
         "adjust": "조정",
+        "agent": "Agent Edit",
         "color": "색상",
         "crop": "자르기",
         "export": "내보내기",

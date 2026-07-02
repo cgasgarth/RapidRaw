@@ -40,7 +40,6 @@ import {
   Suspense,
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -49,7 +48,6 @@ import { useContextMenu } from '../../../../context/ContextMenuContext';
 import { useAiMasking } from '../../../../hooks/ai/useAiMasking';
 import { useEditorActions } from '../../../../hooks/editor/useEditorActions';
 import { useManagedFocus } from '../../../../hooks/ui/useManagedFocus';
-import type { AgentChatTranscript } from '../../../../schemas/agent/agentChatTranscriptSchemas';
 import {
   AiProviderId,
   type AiProviderId as AiProviderIdType,
@@ -64,10 +62,6 @@ import { useSettingsStore } from '../../../../store/useSettingsStore';
 import { useUIStore } from '../../../../store/useUIStore';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../../types/typography';
 import type { Adjustments, AiPatch } from '../../../../utils/adjustments';
-import {
-  type AgentInitialPromptContext,
-  buildAgentInitialPromptContext,
-} from '../../../../utils/agent/context/agentInitialPromptContext';
 import {
   cloneMaskLikeContainerForPaste,
   cloneSubMaskForPaste,
@@ -110,7 +104,6 @@ import {
   type MaskLikeDragData,
   useDelayedHover,
 } from '../layers/maskPanelRowHelpers';
-import AgentChatShell from './AgentChatShell';
 
 const AiPeoplePartPickerStatus = lazy(() =>
   import('./AiPeoplePartPickerStatus.js').then((module) => ({ default: module.AiPeoplePartPickerStatus })),
@@ -162,96 +155,6 @@ interface AiPanelCollapsibleState {
 
 const DEFAULT_BRUSH_SETTINGS: BrushSettings = { size: 50, feather: 50, tool: ToolType.Brush };
 const getNumericEventValue = (event: NumericChangeEvent): number => Number(event.target.value);
-const getImageLabelFromPath = (path: string): string => {
-  const cleanPath = path.split('?')[0] ?? path;
-  return cleanPath.split(/[\\/]/u).pop() || cleanPath || 'selected RAW';
-};
-
-const buildLiveAgentTranscript = (
-  selectedImagePath: string | undefined,
-  initialPromptContext: AgentInitialPromptContext | null,
-): AgentChatTranscript => {
-  const targetLabel = selectedImagePath ? getImageLabelFromPath(selectedImagePath) : 'No image selected';
-  const targetSummary = selectedImagePath
-    ? `Ready to plan a local app-server edit for ${targetLabel}.`
-    : 'Select an image before asking the agent to plan or apply edits.';
-  const previewSummary =
-    initialPromptContext === null
-      ? null
-      : `Initial prompt includes ${initialPromptContext.preview.encodedFormat.toUpperCase()} preview ${initialPromptContext.preview.artifactId}.`;
-
-  return {
-    id: selectedImagePath ? `live-agent-${targetLabel}` : 'live-agent-no-selection',
-    initialPromptPreviewContext:
-      initialPromptContext === null
-        ? undefined
-        : {
-            accessScope: initialPromptContext.preview.accessScope,
-            artifactId: initialPromptContext.preview.artifactId,
-            colorProfile: initialPromptContext.modelInput.initialPreview.colorProfile,
-            encodedFormat: initialPromptContext.preview.encodedFormat,
-            graphRevision: initialPromptContext.modelInput.graphRevision,
-            height: initialPromptContext.modelInput.initialPreview.height,
-            includesOriginalRaw: initialPromptContext.modelInput.initialPreview.includesOriginalRaw,
-            longEdgePx: initialPromptContext.preview.longEdgePx,
-            mediaType: initialPromptContext.preview.mediaType,
-            previewRef: initialPromptContext.preview.previewRef,
-            purpose: initialPromptContext.preview.purpose,
-            quality: initialPromptContext.preview.quality,
-            recipeHash: initialPromptContext.preview.recipeHash,
-            renderHash: initialPromptContext.preview.renderHash,
-            toolName: initialPromptContext.preview.toolName,
-            transport: initialPromptContext.modelInput.transport,
-            width: initialPromptContext.modelInput.initialPreview.width,
-          },
-    messages: [
-      {
-        body: previewSummary === null ? targetSummary : `${targetSummary} ${previewSummary}`,
-        id: 'live-agent-current-context',
-        role: 'system',
-        timestamp: 'now',
-      },
-    ],
-    runtimeStatus: 'runtime_apply_demo',
-    sessionTitle: selectedImagePath ? `Current image: ${targetLabel}` : 'No image selected',
-    toolCalls: [
-      {
-        approvalState: 'not_required',
-        id: 'live-agent-current-context-readiness',
-        mode: 'read',
-        provenance: {
-          requestHash: 'sha256:0000000000000000',
-          runtime: 'codex_app_server',
-          schema: 'liveAgentCurrentContext.v1',
-        },
-        status: selectedImagePath ? 'succeeded' : 'blocked',
-        summary: targetSummary,
-        timestamp: 'now',
-        title: selectedImagePath ? 'Current image context' : 'Waiting for image selection',
-        toolName: 'rawengine.live_context',
-      },
-      ...(initialPromptContext === null
-        ? []
-        : [
-            {
-              approvalState: 'not_required',
-              id: 'live-agent-initial-preview-context',
-              mode: 'read',
-              provenance: {
-                requestHash: `sha256:${initialPromptContext.preview.renderHash.replace('render:', '').repeat(8)}`,
-                runtime: 'codex_app_server',
-                schema: 'agentInitialPromptContext.v1',
-              },
-              status: 'succeeded',
-              summary: previewSummary ?? targetSummary,
-              timestamp: 'now',
-              title: 'Selected image preview',
-              toolName: 'rawengine.image.get_preview',
-            } satisfies AgentChatTranscript['toolCalls'][number],
-          ]),
-    ],
-  };
-};
 
 const PLACEHOLDER_PATCH: AiPatch = {
   id: 'placeholder',
@@ -520,15 +423,6 @@ export function AIPanel() {
     isSignedIn: isSignedIn ?? false,
   });
   const isGenerativeAvailable = aiProviderRuntimeState.generativeEditAvailable;
-  const liveAgentInitialPromptContext = useMemo(() => {
-    if (selectedImage === null) return null;
-
-    return buildAgentInitialPromptContext({
-      operationId: `live-agent-initial-context-${selectedImage.path}`,
-      prompt: `Inspect ${getImageLabelFromPath(selectedImage.path)} before planning edits.`,
-      sessionId: `live-agent-${selectedImage.path}`,
-    });
-  }, [selectedImage]);
 
   useEffect(() => {
     if (aiProvider !== AiProviderId.Cloud || !isSignedIn || !isPro) return;
@@ -1334,8 +1228,6 @@ export function AIPanel() {
                   collapsibleState={collapsibleState}
                   setCollapsibleState={setCollapsibleState}
                   isGenerativeAvailable={isGenerativeAvailable}
-                  liveAgentInitialPromptContext={liveAgentInitialPromptContext}
-                  selectedImagePath={selectedImage?.path}
                 />
               </motion.div>
             )}
@@ -2055,10 +1947,8 @@ interface AiSettingsPanelProps {
   isGeneratingAi: boolean;
   isGeneratingAiMask: boolean;
   isGenerativeAvailable: boolean;
-  liveAgentInitialPromptContext: AgentInitialPromptContext | null;
   aiProvider: AiProviderIdType;
   onGenerativeReplace: (containerId: string, prompt: string, useFastInpaint: boolean) => void | Promise<void>;
-  selectedImagePath?: string | undefined;
   setBrushSettings: (updater: BrushSettingsUpdater) => void;
   setCollapsibleState: Dispatch<SetStateAction<AiPanelCollapsibleState>>;
   updateContainer: UpdatePatch;
@@ -2079,9 +1969,7 @@ function SettingsPanel({
   collapsibleState,
   setCollapsibleState,
   isGenerativeAvailable,
-  liveAgentInitialPromptContext,
   aiProvider,
-  selectedImagePath,
 }: AiSettingsPanelProps) {
   const { t } = useTranslation();
   const setUI = useUIStore((state) => state.setUI);
@@ -2174,8 +2062,6 @@ function SettingsPanel({
         e.stopPropagation();
       }}
     >
-      <AgentChatShell transcript={buildLiveAgentTranscript(selectedImagePath, liveAgentInitialPromptContext)} />
-
       <CollapsibleSection
         title={t('editor.ai.settings.generativeReplaceTitle')}
         isOpen={collapsibleState.generative}
