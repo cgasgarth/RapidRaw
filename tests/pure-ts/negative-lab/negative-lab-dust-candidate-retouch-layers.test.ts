@@ -138,10 +138,19 @@ describe('negative lab dust candidate retouch layers', () => {
       imagePath,
     );
     const reopenedLayer = reopened.masks.find((mask) => mask.id === healLayer.id);
+    const reopenedCandidateProvenance = reopenedLayer?.retouchCloneSource?.candidateProvenance;
+    const reopenedRuntimeProvenance = reopenedLayer?.retouchCloneSource?.provenance;
     expect(reopened.masks).toHaveLength(1);
-    expect(reopenedLayer?.retouchCloneSource?.candidateProvenance?.candidateId).toBe(dustCandidate.candidateId);
-    expect(reopenedLayer?.retouchCloneSource?.provenance?.proofSource).toBe('negative_lab_candidate_acceptance_v1');
-    expect(reopenedLayer?.retouchCloneSource?.provenance?.editableLayer).toBe(true);
+    expect(reopenedCandidateProvenance).toMatchObject({
+      candidateId: dustCandidate.candidateId,
+      changedPixelCount: healLayer.retouchCloneSource?.candidateProvenance?.changedPixelCount,
+      sourceFrameId: reviewFrame.frameId,
+    });
+    expect(reopenedRuntimeProvenance).toMatchObject({
+      editableLayer: true,
+      proofSource: 'negative_lab_candidate_acceptance_v1',
+      targetMaskId: healLayer.retouchCloneSource?.provenance?.targetMaskId,
+    });
   });
 
   test('keeps scratch candidates review-only when accept is requested', () => {
