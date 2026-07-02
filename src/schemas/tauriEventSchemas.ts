@@ -84,14 +84,27 @@ export const hdrCompletePayloadSchema = z
       .object({
         acceptedDryRunPlanHash: z.string().trim().min(1),
         acceptedDryRunPlanId: z.string().trim().min(1),
+        mergeMethod: z.string().trim().min(1),
+        mergeVersion: z.string().trim().min(1),
         outputHandle: z.string().trim().min(1),
+        outputContentHash: z.string().trim().min(1),
         previewDimensions: z
           .object({
             height: z.number().int().nonnegative(),
             width: z.number().int().nonnegative(),
           })
           .strict(),
+        sourceRoles: z.array(
+          z
+            .object({
+              exposureEv: z.number(),
+              role: z.enum(['over_exposed', 'reference', 'under_exposed']),
+              sourceIndex: z.number().int().nonnegative(),
+            })
+            .strict(),
+        ),
         sourcePaths: z.array(z.string().trim().min(1)),
+        warningCodes: z.array(z.string().trim().min(1)),
       })
       .strict(),
   })

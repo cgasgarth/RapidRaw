@@ -418,6 +418,12 @@ export function HdrModal({
               data-output-color-space={handoffSummary.outputColorSpace}
               data-output-encoding={handoffSummary.outputEncoding}
               data-output-path={handoffSummary.outputPath}
+              data-runtime-accepted-dry-run-plan-hash={
+                handoffSummary.runtimeSidecarReceipt?.acceptedDryRunPlanHash ?? ''
+              }
+              data-runtime-accepted-dry-run-plan-id={handoffSummary.runtimeSidecarReceipt?.acceptedDryRunPlanId ?? ''}
+              data-runtime-merge-method={handoffSummary.runtimeSidecarReceipt?.mergeMethod ?? ''}
+              data-runtime-merge-version={handoffSummary.runtimeSidecarReceipt?.mergeVersion ?? ''}
               data-preview-export-compared-fields={handoffSummary.previewExportParity.comparedFields.join(',')}
               data-preview-export-export-receipt-hash={handoffSummary.previewExportParity.exportReceiptHash}
               data-preview-export-mean-abs-delta={handoffSummary.previewExportMeanAbsDelta}
@@ -428,6 +434,7 @@ export function HdrModal({
               data-scene-merge-color-state={handoffSummary.sceneMergeColorState}
               data-source-count={handoffSummary.sourceCount}
               data-testid="hdr-editable-handoff-provenance"
+              data-runtime-warning-codes={handoffSummary.runtimeSidecarReceipt?.warningCodes?.join(',') ?? ''}
               data-warning-codes={handoffSummary.warningCodes.join(',')}
               data-working-color-space={handoffSummary.workingColorSpace}
             >

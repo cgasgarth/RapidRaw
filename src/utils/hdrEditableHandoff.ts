@@ -85,6 +85,7 @@ export const buildHdrEditableHandoffSummary = ({
     ...new Set([
       ...bracketWarnings,
       ...((runtimeSidecarReceipt?.deghost.motionCoverageRatio ?? 0) > 0 ? ['motion_detected'] : []),
+      ...(runtimeSidecarReceipt?.warningCodes ?? []),
       ...(settings.toneMapPreview ? ['tone_mapped_preview_only'] : []),
     ]),
   ];
