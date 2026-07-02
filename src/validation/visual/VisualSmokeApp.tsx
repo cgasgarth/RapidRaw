@@ -2785,7 +2785,7 @@ const filmLookParityProofCases = [
   {
     displayName: 'Warm Print',
     maxDelta: '0',
-    previewHash: 'ce1b5b9dfc974109',
+    previewHash: '9a605fdfa6fd53a9',
   },
   {
     displayName: 'Mono Silver',

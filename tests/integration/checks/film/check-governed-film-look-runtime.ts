@@ -4,6 +4,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 
 import { z } from 'zod';
+import { buildFilmLookAppliedAdjustmentPatch } from '../../../../src/utils/film-look/filmLookBrowser.ts';
 import { FILM_LOOK_BROWSER_ITEMS } from '../../../../src/utils/film-look/filmLookRegistry.ts';
 import {
   applyGovernedFilmLookRuntime,
@@ -12,6 +13,9 @@ import {
 } from '../../../../src/utils/governedFilmLookRuntime.ts';
 
 const FIXTURE_PATH = resolve('fixtures/film-simulation/governed-film-look-runtime.json');
+const DOCS_PROOF_PATH = resolve(
+  'docs/validation/proofs/film-look/governed-film-look-runtime-preview-export-2026-07-02.json',
+);
 const updateFixture = process.argv.includes('--update');
 const WIDTH = 18;
 const HEIGHT = 10;
@@ -185,11 +189,23 @@ const proof = proofSchema.parse({
     repeatAfterHash: repeatRuntime.afterHash,
   },
 });
+const docsProof = {
+  ...proof,
+  proofLevel: 'synthetic_runtime_output_with_normalized_payload_cases',
+  proofLimits: proof.doesNotProve,
+  normalizedStrengthCases: [25, 65, 100].map((strength) => ({
+    adjustmentPatch: buildFilmLookAppliedAdjustmentPatch(look, strength),
+    strength,
+  })),
+};
 const expectedJson = `${JSON.stringify(proof, null, 2)}\n`;
+const expectedDocsJson = `${JSON.stringify(docsProof, null, 2)}\n`;
 
 if (updateFixture) {
   await mkdir(dirname(FIXTURE_PATH), { recursive: true });
+  await mkdir(dirname(DOCS_PROOF_PATH), { recursive: true });
   await writeFile(FIXTURE_PATH, expectedJson);
+  await writeFile(DOCS_PROOF_PATH, expectedDocsJson);
   console.log('governed film look runtime proof updated');
   process.exit(0);
 }
@@ -197,6 +213,11 @@ if (updateFixture) {
 const currentProof = proofSchema.parse(JSON.parse(await readFile(FIXTURE_PATH, 'utf8')));
 if (JSON.stringify(currentProof) !== JSON.stringify(proof)) {
   throw new Error('Governed film look runtime proof is stale. Run bun run check:governed-film-look-runtime:update.');
+}
+
+const currentDocsProof = JSON.parse(await readFile(DOCS_PROOF_PATH, 'utf8'));
+if (JSON.stringify(currentDocsProof) !== JSON.stringify(docsProof)) {
+  throw new Error('Governed film look docs proof is stale. Run bun run check:governed-film-look-runtime:update.');
 }
 
 console.log(`governed film look runtime ok (${currentProof.result.changedPixelRatio} changed)`);

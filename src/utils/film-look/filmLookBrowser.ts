@@ -93,6 +93,16 @@ const FILM_LOOK_ADJUSTMENT_LABELS: Record<FilmLookAdjustmentKey, string> = {
   temperature: 'Temp',
 };
 
+const DEFAULT_AWARE_FILM_LOOK_ADJUSTMENT_DEFAULTS: Partial<Record<FilmLookAdjustmentKey, number>> = {
+  grainRoughness: INITIAL_ADJUSTMENTS.grainRoughness,
+  grainSize: INITIAL_ADJUSTMENTS.grainSize,
+};
+
+const scaleFilmLookAdjustmentValue = (key: FilmLookAdjustmentKey, value: number, scale: number): number => {
+  const defaultValue = DEFAULT_AWARE_FILM_LOOK_ADJUSTMENT_DEFAULTS[key] ?? 0;
+  return Math.round(defaultValue + (value - defaultValue) * scale);
+};
+
 export const getFilmLookAdjustmentSummaries = (look: FilmLookBrowserItem): Array<FilmLookAdjustmentSummary> =>
   FILM_LOOK_ADJUSTMENT_KEYS.flatMap((key) => {
     const value = look.adjustmentPatch[key];
@@ -155,7 +165,7 @@ export const scaleFilmLookAdjustmentPatch = (look: FilmLookBrowserItem, strength
     const value = look.adjustmentPatch[key];
 
     if (typeof value === 'number') {
-      scaledPatch[key] = Math.round(value * scale);
+      scaledPatch[key] = scaleFilmLookAdjustmentValue(key, value, scale);
     }
   }
 
