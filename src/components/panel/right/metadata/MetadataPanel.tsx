@@ -41,7 +41,9 @@ import {
 } from '../../../../utils/metadataPanelContracts';
 import {
   buildNegativeLabReopenedSavedPositiveArtifactStatus,
+  buildNegativeLabReopenedSavedPositiveProvenance,
   type NegativeLabReopenedPositiveArtifactStatus,
+  type NegativeLabReopenedPositiveProvenance,
 } from '../../../../utils/negative-lab/negativeLabSavedPositiveReopen';
 import { buildRawWarningChips } from '../../../../utils/rawWarningReceipts';
 import { invokeWithSchema } from '../../../../utils/tauriSchemaInvoke';
@@ -134,6 +136,146 @@ function formatNegativeLabPositiveState(value: NegativeLabReopenedPositiveArtifa
   if (value === 'current') return t('editor.metadata.negativeLabPositive.state.current');
   if (value === 'missing') return t('editor.metadata.negativeLabPositive.state.missing');
   return t('editor.metadata.negativeLabPositive.state.stale');
+}
+
+export function NegativeLabPositiveProvenanceSurface({
+  provenance,
+  status,
+}: {
+  provenance: NegativeLabReopenedPositiveProvenance | null;
+  status: NegativeLabReopenedPositiveArtifactStatus | null;
+}) {
+  const { t } = useTranslation();
+
+  if (provenance === null) return null;
+
+  const state = status?.state ?? provenance.state;
+  const reasonLabel = provenance.invalidationReasons
+    .map((reason) => formatNegativeLabPositiveReason(reason, t))
+    .join(', ');
+
+  return (
+    <section
+      className="rounded-md border border-surface bg-bg-secondary/70 p-3 text-xs"
+      data-negative-lab-artifact-id={provenance.artifactId}
+      data-negative-lab-bundle-path={provenance.conversionBundlePath ?? ''}
+      data-negative-lab-output-artifact-id={provenance.outputArtifactId}
+      data-negative-lab-output-format={provenance.outputFormat}
+      data-negative-lab-output-hash={provenance.outputHash ?? ''}
+      data-negative-lab-output-path={provenance.outputPath}
+      data-negative-lab-positive-state={state}
+      data-negative-lab-profile-provenance-hash={provenance.profileProvenanceHash ?? ''}
+      data-negative-lab-replay-plan-hash={provenance.replayPlanHash}
+      data-negative-lab-sidecar-path={provenance.sidecarPath ?? ''}
+      data-negative-lab-source-path={provenance.sourcePath}
+      data-negative-lab-warning-reasons={provenance.invalidationReasons.join(',')}
+      data-testid="metadata-negative-lab-positive-provenance"
+    >
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <UiText variant={TextVariants.heading}>{t('editor.metadata.negativeLabPositive.provenance.title')}</UiText>
+        <NegativeLabPositiveStatusBadge
+          status={
+            status ?? {
+              artifactId: provenance.artifactId,
+              invalidationReasons: provenance.invalidationReasons,
+              outputArtifactId: provenance.outputArtifactId,
+              outputPath: provenance.outputPath,
+              positiveVariantId: provenance.positiveVariantId,
+              sourceImageRef: provenance.sourcePath,
+              state,
+            }
+          }
+        />
+      </div>
+
+      {state !== 'current' && (
+        <UiText
+          variant={TextVariants.small}
+          color={TextColors.secondary}
+          className="mb-2 truncate"
+          data-testid="metadata-negative-lab-positive-warning"
+          data-tooltip={reasonLabel}
+        >
+          {t('editor.metadata.negativeLabPositive.warning', {
+            reasons: reasonLabel || t('editor.metadata.negativeLabPositive.unknownReason'),
+          })}
+        </UiText>
+      )}
+
+      <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+        <UiText variant={TextVariants.small} color={TextColors.secondary}>
+          {t('editor.metadata.negativeLabPositive.provenance.sourcePath')}
+        </UiText>
+        <UiText variant={TextVariants.small} color={TextColors.primary} className="truncate text-right font-mono">
+          {provenance.sourcePath}
+        </UiText>
+        <UiText variant={TextVariants.small} color={TextColors.secondary}>
+          {t('editor.metadata.negativeLabPositive.provenance.outputPath')}
+        </UiText>
+        <UiText variant={TextVariants.small} color={TextColors.primary} className="truncate text-right font-mono">
+          {provenance.outputPath}
+        </UiText>
+        <UiText variant={TextVariants.small} color={TextColors.secondary}>
+          {t('editor.metadata.negativeLabPositive.provenance.outputArtifactId')}
+        </UiText>
+        <UiText variant={TextVariants.small} color={TextColors.primary} className="truncate text-right font-mono">
+          {provenance.outputArtifactId}
+        </UiText>
+        <UiText variant={TextVariants.small} color={TextColors.secondary}>
+          {t('editor.metadata.negativeLabPositive.provenance.outputHash')}
+        </UiText>
+        <UiText variant={TextVariants.small} color={TextColors.primary} className="truncate text-right font-mono">
+          {provenance.outputHash ?? '-'}
+        </UiText>
+        <UiText variant={TextVariants.small} color={TextColors.secondary}>
+          {t('editor.metadata.negativeLabPositive.provenance.replayPlanHash')}
+        </UiText>
+        <UiText variant={TextVariants.small} color={TextColors.primary} className="truncate text-right font-mono">
+          {provenance.replayPlanHash}
+        </UiText>
+        <UiText variant={TextVariants.small} color={TextColors.secondary}>
+          {t('editor.metadata.negativeLabPositive.provenance.profileProvenanceHash')}
+        </UiText>
+        <UiText variant={TextVariants.small} color={TextColors.primary} className="truncate text-right font-mono">
+          {provenance.profileProvenanceHash ?? '-'}
+        </UiText>
+        <UiText variant={TextVariants.small} color={TextColors.secondary}>
+          {t('editor.metadata.negativeLabPositive.provenance.outputFormat')}
+        </UiText>
+        <UiText variant={TextVariants.small} color={TextColors.primary} className="truncate text-right">
+          {provenance.outputFormat}
+        </UiText>
+        <UiText variant={TextVariants.small} color={TextColors.secondary}>
+          {t('editor.metadata.negativeLabPositive.provenance.bundlePath')}
+        </UiText>
+        <UiText variant={TextVariants.small} color={TextColors.primary} className="truncate text-right font-mono">
+          {provenance.conversionBundlePath ?? '-'}
+        </UiText>
+        <UiText variant={TextVariants.small} color={TextColors.secondary}>
+          {t('editor.metadata.negativeLabPositive.provenance.sidecarPath')}
+        </UiText>
+        <UiText variant={TextVariants.small} color={TextColors.primary} className="truncate text-right font-mono">
+          {provenance.sidecarPath ?? '-'}
+        </UiText>
+        <UiText variant={TextVariants.small} color={TextColors.secondary}>
+          {t('editor.metadata.negativeLabPositive.provenance.state')}
+        </UiText>
+        <UiText variant={TextVariants.small} color={TextColors.primary} className="truncate text-right">
+          {formatNegativeLabPositiveState(state, t)}
+        </UiText>
+        {provenance.invalidationReasons.length > 0 && (
+          <>
+            <UiText variant={TextVariants.small} color={TextColors.secondary}>
+              {t('editor.metadata.negativeLabPositive.provenance.warning')}
+            </UiText>
+            <UiText variant={TextVariants.small} color={TextColors.primary} className="truncate text-right">
+              {reasonLabel || t('editor.metadata.negativeLabPositive.unknownReason')}
+            </UiText>
+          </>
+        )}
+      </div>
+    </section>
+  );
 }
 
 export function NegativeLabPositiveStatusBadge({ status }: { status: NegativeLabReopenedPositiveArtifactStatus }) {
@@ -548,9 +690,16 @@ export default function MetadataPanel() {
         : null,
     [selectedImage],
   );
-  const negativeLabPositiveReasonLabel = negativeLabPositiveStatus?.invalidationReasons
-    .map((reason) => formatNegativeLabPositiveReason(reason, t))
-    .join(', ');
+  const negativeLabPositiveProvenance = useMemo(
+    () =>
+      selectedImage
+        ? buildNegativeLabReopenedSavedPositiveProvenance({
+            imagePath: selectedImage.path,
+            metadata: selectedImage.metadata,
+          })
+        : null,
+    [selectedImage],
+  );
   const rawWarningChips = useMemo(
     () =>
       buildRawWarningChips(
@@ -1224,23 +1373,14 @@ export default function MetadataPanel() {
                   <UiText variant={TextVariants.small} color={TextColors.secondary} className="truncate drop-shadow-sm">
                     {selectedImage.exif?.DateTimeOriginal || '-'}
                   </UiText>
-                  {negativeLabPositiveStatus !== null && negativeLabPositiveStatus.state !== 'current' && (
-                    <UiText
-                      variant={TextVariants.small}
-                      color={TextColors.secondary}
-                      className="truncate drop-shadow-sm"
-                      data-testid="metadata-negative-lab-positive-warning"
-                      data-tooltip={negativeLabPositiveReasonLabel}
-                    >
-                      {t('editor.metadata.negativeLabPositive.warning', {
-                        reasons:
-                          negativeLabPositiveReasonLabel || t('editor.metadata.negativeLabPositive.unknownReason'),
-                      })}
-                    </UiText>
-                  )}
                 </div>
               </div>
             </div>
+
+            <NegativeLabPositiveProvenanceSurface
+              provenance={negativeLabPositiveProvenance}
+              status={negativeLabPositiveStatus}
+            />
 
             <div>
               <UiText variant={TextVariants.heading} className="mb-3">

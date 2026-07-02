@@ -1341,6 +1341,20 @@
       },
       "negativeLabPositive": {
         "currentTooltip": "",
+        "provenance": {
+          "bundlePath": "",
+          "outputArtifactId": "",
+          "outputFormat": "",
+          "outputHash": "",
+          "outputPath": "",
+          "profileProvenanceHash": "",
+          "replayPlanHash": "",
+          "sidecarPath": "",
+          "sourcePath": "",
+          "state": "",
+          "title": "",
+          "warning": ""
+        },
         "reasons": {
           "outputArtifactChanged": "",
           "outputArtifactMissing": "",

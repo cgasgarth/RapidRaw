@@ -84,16 +84,37 @@ export interface NegativeLabReopenedPositiveArtifactStatus {
   state: NegativeLabReopenedPositiveArtifactState;
 }
 
+export interface NegativeLabReopenedPositiveProvenance {
+  artifactId: string;
+  conversionBundlePath: string | null;
+  invalidationReasons: string[];
+  outputArtifactId: string;
+  outputFormat: 'jpeg_proof' | 'tiff16';
+  outputHash: string | null;
+  outputPath: string;
+  positiveVariantId: string;
+  profileProvenanceHash: string | null;
+  replayPlanHash: string;
+  sidecarPath: string | null;
+  sourcePath: string;
+  state: NegativeLabReopenedPositiveArtifactState;
+}
+
 const toUniqueSortedReasons = (reasons: readonly string[]): string[] =>
   Array.from(new Set(reasons.filter((reason) => reason.trim().length > 0))).sort((a, b) => a.localeCompare(b));
 
-export const buildNegativeLabReopenedSavedPositiveArtifactStatus = ({
-  imagePath,
-  metadata,
-}: {
-  imagePath: string;
-  metadata: unknown;
-}): NegativeLabReopenedPositiveArtifactStatus | null => {
+interface NegativeLabReopenArtifactMatch {
+  artifact: z.infer<typeof negativeLabReopenArtifactSchema>;
+  outputArtifact: z.infer<typeof negativeLabReopenArtifactSchema>['outputArtifacts'][number];
+  sourceImageRef: string;
+  state: NegativeLabReopenedPositiveArtifactState;
+  invalidationReasons: string[];
+}
+
+const findNegativeLabReopenArtifactMatch = (
+  imagePath: string,
+  metadata: unknown,
+): NegativeLabReopenArtifactMatch | null => {
   const parsedMetadata = negativeLabReopenMetadataSchema.safeParse(metadata);
   if (!parsedMetadata.success) return null;
 
@@ -129,17 +150,89 @@ export const buildNegativeLabReopenedSavedPositiveArtifactStatus = ({
       outputArtifact.contentHash === undefined;
 
     return {
-      artifactId: artifact.artifactId,
+      artifact,
       invalidationReasons: reasons,
-      outputArtifactId: outputArtifact.artifactId,
-      outputPath: outputArtifact.path ?? imagePath,
-      positiveVariantId: outputArtifact.positiveVariantId,
+      outputArtifact,
       sourceImageRef,
       state: isMissing ? 'missing' : isPersistedStale ? 'stale' : 'current',
     };
   }
 
   return null;
+};
+
+export const buildNegativeLabReopenedSavedPositiveArtifactStatus = ({
+  imagePath,
+  metadata,
+}: {
+  imagePath: string;
+  metadata: unknown;
+}): NegativeLabReopenedPositiveArtifactStatus | null => {
+  const match = findNegativeLabReopenArtifactMatch(imagePath, metadata);
+  if (match === null) return null;
+
+  return {
+    artifactId: match.artifact.artifactId,
+    invalidationReasons: match.invalidationReasons,
+    outputArtifactId: match.outputArtifact.artifactId,
+    outputPath: match.outputArtifact.path ?? imagePath,
+    positiveVariantId: match.outputArtifact.positiveVariantId,
+    sourceImageRef: match.sourceImageRef,
+    state: match.state,
+  };
+};
+
+export const buildNegativeLabReopenedSavedPositiveProvenance = ({
+  imagePath,
+  metadata,
+}: {
+  imagePath: string;
+  metadata: unknown;
+}): NegativeLabReopenedPositiveProvenance | null => {
+  if (typeof metadata !== 'object' || metadata === null || Array.isArray(metadata)) return null;
+
+  const rawHandoffValue = (metadata as Record<string, unknown>)['rawEngineNegativeLabHandoff'];
+  const parsedHandoff = negativeLabSavedPositiveHandoffSchema.safeParse(rawHandoffValue);
+  if (parsedHandoff.success && parsedHandoff.data.path === imagePath) {
+    return {
+      artifactId: parsedHandoff.data.artifactId,
+      conversionBundlePath: parsedHandoff.data.conversionBundlePath,
+      invalidationReasons: [],
+      outputArtifactId: parsedHandoff.data.outputArtifactId,
+      outputFormat: parsedHandoff.data.outputFormat,
+      outputHash: parsedHandoff.data.outputHash,
+      outputPath: parsedHandoff.data.outputPath,
+      positiveVariantId: parsedHandoff.data.positiveVariantId,
+      profileProvenanceHash: parsedHandoff.data.profileProvenanceHash,
+      replayPlanHash: parsedHandoff.data.replayPlanHash,
+      sidecarPath: parsedHandoff.data.sidecarPath,
+      sourcePath: parsedHandoff.data.sourcePath,
+      state: 'current',
+    };
+  }
+
+  const match = findNegativeLabReopenArtifactMatch(imagePath, metadata);
+  if (match === null) return null;
+
+  const conversionBundlePath =
+    match.artifact.conversionBundlePath ?? match.artifact.conversion.conversionBundlePath ?? null;
+  const sidecarPath = match.artifact.sidecarPath ?? null;
+
+  return {
+    artifactId: match.artifact.artifactId,
+    conversionBundlePath,
+    invalidationReasons: match.invalidationReasons,
+    outputArtifactId: match.outputArtifact.artifactId,
+    outputFormat: match.artifact.conversion.outputFormat,
+    outputHash: match.outputArtifact.contentHash ?? null,
+    outputPath: match.outputArtifact.path ?? imagePath,
+    positiveVariantId: match.outputArtifact.positiveVariantId,
+    profileProvenanceHash: match.artifact.conversion.profileProvenanceHash ?? null,
+    replayPlanHash: match.artifact.replay.identityHash,
+    sidecarPath,
+    sourcePath: match.sourceImageRef,
+    state: match.state,
+  };
 };
 
 export const buildNegativeLabReopenedSavedPositiveHandoff = ({

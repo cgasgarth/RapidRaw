@@ -1452,6 +1452,20 @@
       },
       "negativeLabPositive": {
         "currentTooltip": "Negative Lab positive artifact matches persisted provenance.",
+        "provenance": {
+          "bundlePath": "Conversion bundle",
+          "outputArtifactId": "Output artifact ID",
+          "outputFormat": "Output format",
+          "outputHash": "Output hash",
+          "outputPath": "Positive output path",
+          "profileProvenanceHash": "Profile provenance hash",
+          "replayPlanHash": "Replay plan hash",
+          "sidecarPath": "Sidecar path",
+          "sourcePath": "Source negative path",
+          "state": "Persisted state",
+          "title": "Negative Lab provenance",
+          "warning": "Persisted warning"
+        },
         "reasons": {
           "outputArtifactChanged": "output artifact changed",
           "outputArtifactMissing": "output artifact missing",
