@@ -21,6 +21,7 @@ use uuid::Uuid;
 use crate::AppState;
 use crate::image_processing::downscale_f32_image;
 use crate::load_settings_or_default;
+use sha2::{Digest, Sha256};
 use tauri::Emitter;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -48,6 +49,24 @@ pub struct NegativeBaseFogSampleRect {
     pub y: f32,
     pub width: f32,
     pub height: f32,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabPreviewArtifactDimensions {
+    pub height: u32,
+    pub width: u32,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabDryRunPreviewArtifact {
+    pub artifact_id: String,
+    pub content_hash: String,
+    pub dimensions: NegativeLabPreviewArtifactDimensions,
+    pub preview_data_url: String,
+    pub renderer: String,
+    pub storage: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Default)]
@@ -258,6 +277,8 @@ const MAX_BLACK_POINT: f32 = 0.95;
 const MIN_WHITE_POINT: f32 = 0.05;
 const MAX_WHITE_POINT: f32 = 1.0;
 const MIN_ENDPOINT_SEPARATION: f32 = 0.05;
+const NEGATIVE_LAB_RUNTIME_PREVIEW_RENDERER: &str = "rawengine_negative_lab_runtime_preview_v1";
+const NEGATIVE_LAB_RUNTIME_PREVIEW_STORAGE: &str = "temp_cache";
 const DEFAULT_OUTPUT_SUFFIX: &str = "Positive";
 const JPEG_PROOF_QUALITY: u8 = 92;
 const NEGATIVE_LAB_CONVERSION_BUNDLE_SCHEMA_VERSION: u8 = 1;
@@ -1732,6 +1753,109 @@ fn run_pipeline(
     DynamicImage::ImageRgb32F(out_img)
 }
 
+fn build_negative_lab_preview_cache_key(source_path: &str) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    source_path.hash(&mut hasher);
+    "negative_preview_base".hash(&mut hasher);
+    hasher.finish()
+}
+
+fn load_negative_lab_preview_processing_image(
+    source_path_str: &str,
+    state: &tauri::State<'_, AppState>,
+    app_handle: &AppHandle,
+) -> Result<DynamicImage, String> {
+    let cache_key = build_negative_lab_preview_cache_key(source_path_str);
+    let mut cache = state.geometry_cache.lock().unwrap();
+
+    if let Some(cached_img) = cache.get(&cache_key) {
+        return Ok(cached_img.clone());
+    }
+
+    let image_to_downscale = {
+        let original_lock = state.original_image.lock().unwrap();
+        if let Some(loaded) = original_lock.as_ref() {
+            if loaded.path == source_path_str {
+                loaded.image.clone().as_ref().clone()
+            } else {
+                drop(original_lock);
+                let settings = load_settings_or_default(app_handle);
+
+                match read_file_mapped(Path::new(source_path_str)) {
+                    Ok(mmap) => {
+                        load_base_image_from_bytes(&mmap, source_path_str, false, &settings, None)
+                    }
+                    Err(_) => {
+                        let bytes =
+                            fs::read(source_path_str).map_err(|io_err| io_err.to_string())?;
+                        load_base_image_from_bytes(&bytes, source_path_str, false, &settings, None)
+                    }
+                }
+                .map_err(|error| error.to_string())?
+            }
+        } else {
+            drop(original_lock);
+            let settings = load_settings_or_default(app_handle);
+
+            match read_file_mapped(Path::new(source_path_str)) {
+                Ok(mmap) => {
+                    load_base_image_from_bytes(&mmap, source_path_str, false, &settings, None)
+                }
+                Err(_) => {
+                    let bytes = fs::read(source_path_str).map_err(|io_err| io_err.to_string())?;
+                    load_base_image_from_bytes(&bytes, source_path_str, false, &settings, None)
+                }
+            }
+            .map_err(|error| error.to_string())?
+        }
+    };
+
+    let downscaled = downscale_f32_image(&image_to_downscale, 1080, 1080);
+    cache.insert(cache_key, downscaled.clone());
+    Ok(downscaled)
+}
+
+fn render_negative_lab_preview_image(
+    source_path_str: &str,
+    params: &NegativeConversionParams,
+    state: &tauri::State<'_, AppState>,
+    app_handle: &AppHandle,
+) -> Result<DynamicImage, String> {
+    let base_image_for_processing =
+        load_negative_lab_preview_processing_image(source_path_str, state, app_handle)?;
+    Ok(run_pipeline(&base_image_for_processing, params, None))
+}
+
+fn build_negative_lab_dry_run_preview_artifact(
+    rendered_preview: &DynamicImage,
+) -> Result<NegativeLabDryRunPreviewArtifact, String> {
+    let rgb8 = rendered_preview.to_rgb8();
+    let dimensions = NegativeLabPreviewArtifactDimensions {
+        height: rgb8.height(),
+        width: rgb8.width(),
+    };
+    let content_hash = format!("sha256:{}", hex::encode(Sha256::digest(rgb8.as_raw())));
+    let content_hash_suffix = content_hash.trim_start_matches("sha256:");
+    let artifact_id = format!(
+        "artifact_negative_lab_runtime_preview_{}",
+        &content_hash_suffix[..content_hash_suffix.len().min(12)]
+    );
+    let mut buf = Cursor::new(Vec::new());
+    DynamicImage::ImageRgb8(rgb8)
+        .write_with_encoder(JpegEncoder::new_with_quality(&mut buf, 80))
+        .map_err(|error| error.to_string())?;
+
+    let base64_str = general_purpose::STANDARD.encode(buf.get_ref());
+    Ok(NegativeLabDryRunPreviewArtifact {
+        artifact_id,
+        content_hash,
+        dimensions,
+        preview_data_url: jpeg_data_url(base64_str),
+        renderer: NEGATIVE_LAB_RUNTIME_PREVIEW_RENDERER.to_string(),
+        storage: NEGATIVE_LAB_RUNTIME_PREVIEW_STORAGE.to_string(),
+    })
+}
+
 #[tauri::command]
 pub async fn preview_negative_conversion(
     path: String,
@@ -1741,96 +1865,23 @@ pub async fn preview_negative_conversion(
 ) -> Result<String, String> {
     let (source_path, _) = parse_virtual_path(&path);
     let source_path_str = source_path.to_string_lossy().to_string();
+    let rendered_preview =
+        render_negative_lab_preview_image(&source_path_str, &params, &state, &app_handle)?;
+    Ok(build_negative_lab_dry_run_preview_artifact(&rendered_preview)?.preview_data_url)
+}
 
-    let mut hasher = DefaultHasher::new();
-    source_path_str.hash(&mut hasher);
-    "negative_preview_base".hash(&mut hasher);
-    let cache_key = hasher.finish();
-
-    let base_image_for_processing = {
-        let mut cache = state.geometry_cache.lock().unwrap();
-
-        if let Some(cached_img) = cache.get(&cache_key) {
-            cached_img.clone()
-        } else {
-            let image_to_downscale = {
-                let original_lock = state.original_image.lock().unwrap();
-                if let Some(loaded) = original_lock.as_ref() {
-                    if loaded.path == source_path_str {
-                        loaded.image.clone().as_ref().clone()
-                    } else {
-                        drop(original_lock);
-                        let settings = load_settings_or_default(&app_handle);
-
-                        match read_file_mapped(Path::new(&source_path_str)) {
-                            Ok(mmap) => load_base_image_from_bytes(
-                                &mmap,
-                                &source_path_str,
-                                false,
-                                &settings,
-                                None,
-                            )
-                            .map_err(|e| e.to_string())?,
-                            Err(_e) => {
-                                let bytes = fs::read(&source_path_str)
-                                    .map_err(|io_err| io_err.to_string())?;
-                                load_base_image_from_bytes(
-                                    &bytes,
-                                    &source_path_str,
-                                    false,
-                                    &settings,
-                                    None,
-                                )
-                                .map_err(|e| e.to_string())?
-                            }
-                        }
-                    }
-                } else {
-                    drop(original_lock);
-                    let settings = load_settings_or_default(&app_handle);
-
-                    match read_file_mapped(Path::new(&source_path_str)) {
-                        Ok(mmap) => load_base_image_from_bytes(
-                            &mmap,
-                            &source_path_str,
-                            false,
-                            &settings,
-                            None,
-                        )
-                        .map_err(|e| e.to_string())?,
-                        Err(_e) => {
-                            let bytes =
-                                fs::read(&source_path_str).map_err(|io_err| io_err.to_string())?;
-                            load_base_image_from_bytes(
-                                &bytes,
-                                &source_path_str,
-                                false,
-                                &settings,
-                                None,
-                            )
-                            .map_err(|e| e.to_string())?
-                        }
-                    }
-                }
-            };
-
-            let downscaled = downscale_f32_image(&image_to_downscale, 1080, 1080);
-
-            cache.insert(cache_key, downscaled.clone());
-            downscaled
-        }
-    };
-
-    let processed = run_pipeline(&base_image_for_processing, &params, None);
-
-    let mut buf = Cursor::new(Vec::new());
-    processed
-        .to_rgb8()
-        .write_with_encoder(JpegEncoder::new_with_quality(&mut buf, 80))
-        .map_err(|e| e.to_string())?;
-
-    let base64_str = general_purpose::STANDARD.encode(buf.get_ref());
-    Ok(jpeg_data_url(base64_str))
+#[tauri::command]
+pub async fn render_negative_lab_dry_run_preview_artifact(
+    path: String,
+    params: NegativeConversionParams,
+    state: tauri::State<'_, AppState>,
+    app_handle: AppHandle,
+) -> Result<NegativeLabDryRunPreviewArtifact, String> {
+    let (source_path, _) = parse_virtual_path(&path);
+    let source_path_str = source_path.to_string_lossy().to_string();
+    let rendered_preview =
+        render_negative_lab_preview_image(&source_path_str, &params, &state, &app_handle)?;
+    build_negative_lab_dry_run_preview_artifact(&rendered_preview)
 }
 
 #[tauri::command]
@@ -4316,6 +4367,36 @@ mod tests {
         let bytes =
             fs::read(path).map_err(|error| format!("read {}: {}", path.display(), error))?;
         Ok(format!("sha256:{}", hex::encode(Sha256::digest(&bytes))))
+    }
+
+    #[test]
+    fn dry_run_preview_artifact_uses_rendered_rgb_hash_and_dimensions() {
+        let rendered_preview = DynamicImage::ImageRgb32F(
+            Rgb32FImage::from_vec(2, 1, vec![0.12, 0.34, 0.56, 0.78, 0.52, 0.21]).unwrap(),
+        );
+
+        let artifact = build_negative_lab_dry_run_preview_artifact(&rendered_preview)
+            .expect("build preview artifact");
+        let rgb8 = rendered_preview.to_rgb8();
+        let expected_hash = format!("sha256:{}", hex::encode(Sha256::digest(rgb8.as_raw())));
+
+        assert_eq!(artifact.content_hash, expected_hash);
+        assert_eq!(artifact.dimensions.width, 2);
+        assert_eq!(artifact.dimensions.height, 1);
+        assert_eq!(artifact.renderer, NEGATIVE_LAB_RUNTIME_PREVIEW_RENDERER);
+        assert_eq!(artifact.storage, NEGATIVE_LAB_RUNTIME_PREVIEW_STORAGE);
+        assert_eq!(
+            artifact.artifact_id,
+            format!(
+                "artifact_negative_lab_runtime_preview_{}",
+                &expected_hash.trim_start_matches("sha256:")[..12]
+            )
+        );
+        assert!(
+            artifact
+                .preview_data_url
+                .starts_with("data:image/jpeg;base64,")
+        );
     }
 
     #[test]

@@ -2398,6 +2398,7 @@ pub fn run() {
             lens_correction::autodetect_lens,
             lens_correction::get_lens_distortion_params,
             negative_conversion::preview_negative_conversion,
+            negative_conversion::render_negative_lab_dry_run_preview_artifact,
             negative_conversion::estimate_negative_base_fog,
             negative_conversion::suggest_negative_lab_neutral_patch_rgb_balance,
             negative_conversion::suggest_negative_lab_highlight_patch_exposure,
