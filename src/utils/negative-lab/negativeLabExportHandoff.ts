@@ -30,6 +30,14 @@ export interface NegativeLabExportReadiness {
 }
 
 export type NegativeLabPositiveVariant = NegativeLabQcContactSheetArtifact['positiveVariants'][number];
+type NegativeLabPositiveOutputFormat = NegativeLabConversionPlanResult['outputFormat'];
+
+interface NegativeLabPositiveOutputConversionPlan {
+  outputFormat: string;
+  params: NegativeLabConversionPlanResult['params'];
+  profileProvenanceHash: NegativeLabConversionPlanResult['profileProvenanceHash'];
+  suffix: NegativeLabConversionPlanResult['suffix'];
+}
 
 export interface NegativeLabAcceptedBatchPlanIdentity {
   acceptedDryRunPlanHash: string;
@@ -103,7 +111,10 @@ const splitOutputPath = (sourcePath: string): { baseName: string; directory: str
 const joinOutputPath = (directory: string, fileName: string): string =>
   directory.length === 0 ? fileName : `${directory}/${fileName}`;
 
-const outputExtensionForFormat = (outputFormat: NegativeLabConversionPlanResult['outputFormat']): string | null => {
+const isNegativeLabPositiveOutputFormat = (outputFormat: string): outputFormat is NegativeLabPositiveOutputFormat =>
+  outputFormat === 'jpeg_proof' || outputFormat === 'tiff16';
+
+const outputExtensionForFormat = (outputFormat: string): string | null => {
   if (outputFormat === 'jpeg_proof') return '.jpg';
   if (outputFormat === 'tiff16') return '.tif';
   return null;
@@ -114,7 +125,7 @@ const buildPositiveOutputFileName = ({
   sourcePath,
   suffix,
 }: {
-  outputFormat: NegativeLabConversionPlanResult['outputFormat'];
+  outputFormat: string;
   sourcePath: string;
   suffix: string;
 }): string | null => {
@@ -136,7 +147,7 @@ export const buildNegativeLabPositiveOutputReceipts = ({
   positiveVariants,
 }: {
   acceptedPlanIdentity: NegativeLabAcceptedBatchPlanIdentity;
-  conversionPlan: NegativeLabConversionPlanResult;
+  conversionPlan: NegativeLabPositiveOutputConversionPlan;
   dryRunSummary: NegativeLabBatchDryRunSummary;
   positiveVariants: readonly NegativeLabPositiveVariant[];
 }): NegativeLabPositiveOutputBuildResult => {
@@ -159,6 +170,14 @@ export const buildNegativeLabPositiveOutputReceipts = ({
       suffix: conversionPlan.suffix,
     });
     if (outputFileName === null) {
+      rejectedFrames.push({
+        frameId: frame.frameId,
+        reason: 'unsupported_output_format',
+        sourcePath: frame.sourcePath,
+      });
+      continue;
+    }
+    if (!isNegativeLabPositiveOutputFormat(conversionPlan.outputFormat)) {
       rejectedFrames.push({
         frameId: frame.frameId,
         reason: 'unsupported_output_format',

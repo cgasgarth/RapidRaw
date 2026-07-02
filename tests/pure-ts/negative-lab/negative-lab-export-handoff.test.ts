@@ -103,7 +103,7 @@ describe('negative lab export handoff', () => {
       conversionPlan: {
         ...fixture.conversionPlan,
         outputFormat: 'png_preview',
-      } as unknown as NegativeLabConversionPlanResult,
+      },
     });
 
     expect(result.exportedPositives).toEqual([]);
