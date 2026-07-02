@@ -9242,6 +9242,52 @@ export const negativeLabDryRunResultV1Schema = z
   })
   .strict();
 
+export const negativeLabPositiveOutputReceiptV1Schema = z
+  .object({
+    acceptedDryRunPlanHash: z.string().regex(/^sha256:[A-Za-z0-9:_-]+$/u),
+    acceptedDryRunPlanId: z.string().trim().min(1),
+    conversionBundleContentHash: z.string().regex(/^sha256:[A-Za-z0-9:_-]+$/u),
+    conversionBundlePath: z.string().trim().min(1),
+    dimensions: z.object({ height: z.number().int().positive(), width: z.number().int().positive() }).strict(),
+    outputArtifact: artifactHandleV1Schema,
+    outputPath: z.string().trim().min(1),
+    path: z.string().trim().min(1),
+    positiveVariantId: z.string().trim().min(1),
+    provenanceEntryIds: z.array(z.string().trim().min(1)).min(1),
+    replayPlanHash: z.string().regex(/^sha256:[A-Za-z0-9:_-]+$/u),
+    sidecarPath: z.string().trim().min(1),
+    sourceImageRef: z.string().trim().min(1),
+    sourcePath: z.string().trim().min(1),
+  })
+  .strict()
+  .superRefine((receipt, context) => {
+    const outputName = receipt.outputPath.split(/[\\/]/u).at(-1);
+    const sourceName = receipt.sourcePath.split(/[\\/]/u).at(-1);
+    if (receipt.outputPath === receipt.sourcePath || outputName === sourceName) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Negative Lab positive output receipt must not overwrite the source negative.',
+        path: ['outputPath'],
+      });
+    }
+
+    if (receipt.path !== receipt.outputPath) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Negative Lab positive output receipt editor path must match output path.',
+        path: ['path'],
+      });
+    }
+
+    if (receipt.outputArtifact.kind !== 'export') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Negative Lab positive output receipt must reference an export artifact.',
+        path: ['outputArtifact', 'kind'],
+      });
+    }
+  });
+
 export const negativeLabApplyResultV1Schema = z
   .object({
     appliedGraphRevision: z.string().trim().min(1),
@@ -9251,6 +9297,7 @@ export const negativeLabApplyResultV1Schema = z
     correlationId: z.string().trim().min(1),
     dryRunCommandId: z.string().trim().min(1).optional(),
     noOverwritePolicy: z.literal('never_overwrite_original'),
+    positiveOutputReceipts: z.array(negativeLabPositiveOutputReceiptV1Schema).min(1),
     proof: negativeLabRuntimeProofV1Schema.optional(),
     schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
     sessionId: z.string().trim().min(1),
@@ -10871,6 +10918,7 @@ export type RawEngineAppServerTransportV1 = z.infer<typeof rawEngineAppServerTra
 export type NegativeLabApplyFrameCropParametersV1 = z.infer<typeof negativeLabApplyFrameCropParametersV1Schema>;
 export type NegativeLabApplyResultV1 = z.infer<typeof negativeLabApplyResultV1Schema>;
 export type NegativeLabApplyPlanRequestV1 = z.infer<typeof negativeLabApplyPlanRequestV1Schema>;
+export type NegativeLabPositiveOutputReceiptV1 = z.infer<typeof negativeLabPositiveOutputReceiptV1Schema>;
 export type NegativeLabBaseFogEstimateV1 = z.infer<typeof negativeLabBaseFogEstimateV1Schema>;
 export type NegativeLabBaseSampleChannelStatsV1 = z.infer<typeof negativeLabBaseSampleChannelStatsV1Schema>;
 export type NegativeLabBaseSampleRecordV1 = z.infer<typeof negativeLabBaseSampleRecordV1Schema>;

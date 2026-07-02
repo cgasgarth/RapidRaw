@@ -8,6 +8,7 @@ import {
   type NegativeLabAppServerToolDefinitionV1,
   type NegativeLabCommandEnvelopeV1,
   type NegativeLabDryRunResultV1,
+  type NegativeLabPositiveOutputReceiptV1,
   type NegativeLabRuntimeProofV1,
   type NegativeWarningCode,
   negativeLabApplyPlanRequestV1Schema,
@@ -296,22 +297,26 @@ function buildNegativeLabRuntimeApplyV1(
   request: NegativeLabApplyPlanRequestV1,
   acceptedPlan: AcceptedNegativeLabDryRunPlanV1,
 ): NegativeLabApplyResultV1 {
-  const exportArtifacts: ArtifactHandleV1[] = acceptedPlan.dryRun.previewArtifacts.map((artifact) => ({
-    ...artifact,
-    artifactId: `${artifact.artifactId}_accepted`,
-    kind: 'export',
-    storage: 'sidecar_artifact',
-  }));
+  const positiveVariantIds = acceptedPlan.dryRun.changeSet.updatedFrameIds.map(
+    (frameId) => `positive_variant_${frameId}`,
+  );
+  const exportArtifacts = buildNegativeLabRuntimePositiveExportArtifactsV1(acceptedPlan, positiveVariantIds);
+  const provenanceEntryIds = [`prov_${request.commandId}_apply`];
+  const positiveOutputReceipts = buildNegativeLabRuntimePositiveOutputReceiptsV1({
+    acceptedPlan,
+    exportArtifacts,
+    positiveVariantIds,
+    provenanceEntryIds,
+    request,
+  });
   const proof = buildAcceptedNegativeLabRuntimeProofV1(acceptedPlan.dryRun.proof, exportArtifacts);
 
   return {
     appliedGraphRevision: `${request.expectedSessionRevision}:negative_lab_applied`,
     changeSet: {
       artifactHandles: exportArtifacts,
-      createdPositiveVariantIds: acceptedPlan.dryRun.changeSet.updatedFrameIds.map(
-        (frameId) => `positive_variant_${frameId}`,
-      ),
-      provenanceEntryIds: [`prov_${request.commandId}_apply`],
+      createdPositiveVariantIds: positiveVariantIds,
+      provenanceEntryIds,
       updatedFrameIds: acceptedPlan.dryRun.changeSet.updatedFrameIds,
       updatedSessionId: request.sessionId,
       warningCodes: acceptedPlan.dryRun.changeSet.warningCodes,
@@ -321,11 +326,90 @@ function buildNegativeLabRuntimeApplyV1(
     correlationId: acceptedPlan.command.correlationId,
     dryRunCommandId: acceptedPlan.command.commandId,
     noOverwritePolicy: 'never_overwrite_original',
+    positiveOutputReceipts,
     proof,
     schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
     sessionId: request.sessionId,
     warnings: acceptedPlan.dryRun.warnings,
   };
+}
+
+function buildNegativeLabRuntimePositiveExportArtifactsV1(
+  acceptedPlan: AcceptedNegativeLabDryRunPlanV1,
+  positiveVariantIds: string[],
+): ArtifactHandleV1[] {
+  const previewArtifact = acceptedPlan.dryRun.previewArtifacts[0];
+  if (previewArtifact === undefined) {
+    throw new Error('Negative Lab apply requires an accepted preview artifact before creating a positive variant.');
+  }
+
+  return positiveVariantIds.map((positiveVariantId, index) => ({
+    artifactId: `artifact_${positiveVariantId}_export`,
+    contentHash: `sha256:negative_lab_positive:${stableProofToken(
+      JSON.stringify({
+        commandId: acceptedPlan.command.commandId,
+        index,
+        positiveVariantId,
+        previewContentHash: previewArtifact.contentHash,
+      }),
+    )}`,
+    dimensions: previewArtifact.dimensions,
+    kind: 'export',
+    storage: 'sidecar_artifact',
+  }));
+}
+
+function buildNegativeLabRuntimePositiveOutputReceiptsV1({
+  acceptedPlan,
+  exportArtifacts,
+  positiveVariantIds,
+  provenanceEntryIds,
+  request,
+}: {
+  acceptedPlan: AcceptedNegativeLabDryRunPlanV1;
+  exportArtifacts: ArtifactHandleV1[];
+  positiveVariantIds: string[];
+  provenanceEntryIds: string[];
+  request: NegativeLabApplyPlanRequestV1;
+}): NegativeLabPositiveOutputReceiptV1[] {
+  return positiveVariantIds.map((positiveVariantId, index) => {
+    const frameId = acceptedPlan.dryRun.changeSet.updatedFrameIds[index] ?? positiveVariantId;
+    const artifact = exportArtifacts[index];
+    if (artifact === undefined || artifact.dimensions === undefined) {
+      throw new Error('Negative Lab positive output receipts require export artifact dimensions.');
+    }
+
+    const sourcePath = resolveNegativeLabRuntimeSourceImageIdentity(acceptedPlan.command);
+    const outputPath = buildNegativeLabRuntimePositiveOutputPath(sourcePath, frameId);
+    const receiptPayload = {
+      acceptedDryRunPlanHash: request.acceptedDryRunPlanHash,
+      commandId: request.commandId,
+      dryRunPlanId: request.dryRunPlanId,
+      frameId,
+      outputPath,
+      positiveVariantId,
+      sourcePath,
+    };
+
+    return {
+      acceptedDryRunPlanHash: request.acceptedDryRunPlanHash,
+      acceptedDryRunPlanId: request.dryRunPlanId,
+      conversionBundleContentHash: `sha256:${stableProofToken(
+        JSON.stringify({ ...receiptPayload, kind: 'conversion_bundle' }),
+      )}`,
+      conversionBundlePath: `${outputPath}.negative-lab-bundle.json`,
+      dimensions: artifact.dimensions,
+      outputArtifact: artifact,
+      outputPath,
+      path: outputPath,
+      positiveVariantId,
+      provenanceEntryIds,
+      replayPlanHash: request.acceptedDryRunPlanHash,
+      sidecarPath: `${outputPath}.rawengine-negative-lab.json`,
+      sourceImageRef: sourcePath,
+      sourcePath,
+    };
+  });
 }
 
 function buildNegativeLabRuntimeProofV1({
@@ -503,15 +587,28 @@ function artifactsHaveMatchingDimensions(
   previewArtifacts: Array<Pick<ArtifactHandleV1, 'dimensions'>>,
   exportArtifacts: Array<Pick<ArtifactHandleV1, 'dimensions'>>,
 ): boolean {
-  if (previewArtifacts.length !== exportArtifacts.length) return false;
-  return previewArtifacts.every((artifact, index) => {
-    const exportArtifact = exportArtifacts[index];
-    if (artifact.dimensions === undefined || exportArtifact?.dimensions === undefined) return false;
+  const previewArtifact = previewArtifacts[0];
+  const previewDimensions = previewArtifact?.dimensions;
+  if (previewDimensions === undefined || exportArtifacts.length === 0) return false;
+
+  return exportArtifacts.every((exportArtifact) => {
+    if (exportArtifact.dimensions === undefined) return false;
     return (
-      artifact.dimensions.height === exportArtifact.dimensions.height &&
-      artifact.dimensions.width === exportArtifact.dimensions.width
+      previewDimensions.height === exportArtifact.dimensions.height &&
+      previewDimensions.width === exportArtifact.dimensions.width
     );
   });
+}
+
+function buildNegativeLabRuntimePositiveOutputPath(sourcePath: string, frameId: string): string {
+  const separatorIndex = Math.max(sourcePath.lastIndexOf('/'), sourcePath.lastIndexOf('\\'));
+  const directory = separatorIndex >= 0 ? sourcePath.slice(0, separatorIndex) : '';
+  const fileName = separatorIndex >= 0 ? sourcePath.slice(separatorIndex + 1) : sourcePath;
+  const extensionIndex = fileName.lastIndexOf('.');
+  const baseName = extensionIndex > 0 ? fileName.slice(0, extensionIndex) : fileName;
+  const safeFrameId = frameId.replace(/[^A-Za-z0-9_-]+/gu, '_');
+  const outputFileName = `${baseName}-positive-${safeFrameId}.tif`;
+  return directory.length === 0 ? outputFileName : `${directory}/${outputFileName}`;
 }
 
 function stableProofToken(value: string): string {

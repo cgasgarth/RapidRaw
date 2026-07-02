@@ -108,6 +108,20 @@ if (runtimeApply.apply.dryRunCommandId !== runtimeDryRun.dryRun.commandId) {
 if (runtimeApply.apply.changeSet.artifactHandles.length === 0) {
   throw new Error('Negative Lab runtime bus apply did not emit artifact handles.');
 }
+if (
+  runtimeApply.apply.positiveOutputReceipts.length !== runtimeApply.apply.changeSet.createdPositiveVariantIds.length ||
+  runtimeApply.apply.positiveOutputReceipts[0]?.positiveVariantId !==
+    runtimeApply.apply.changeSet.createdPositiveVariantIds[0] ||
+  runtimeApply.apply.positiveOutputReceipts[0]?.outputArtifact.artifactId !==
+    runtimeApply.apply.changeSet.artifactHandles[0]?.artifactId ||
+  runtimeApply.apply.positiveOutputReceipts.some((receipt) => receipt.outputPath === receipt.sourcePath) ||
+  runtimeApply.apply.positiveOutputReceipts.some((receipt) => receipt.path !== receipt.outputPath) ||
+  runtimeApply.apply.positiveOutputReceipts.some(
+    (receipt) => receipt.acceptedDryRunPlanHash !== runtimeDryRun.acceptedDryRunPlanHash,
+  )
+) {
+  throw new Error('Negative Lab runtime apply did not register non-destructive positive output receipts.');
+}
 const runtimeV2Command = {
   ...sampleNegativeLabCommandEnvelopeV1,
   commandId: 'command_negative_set_conversion_recipe_v2_app_server_proof',
@@ -196,7 +210,12 @@ if (
   runtimeV2Apply.apply.proof.previewExportArtifactParity.exportArtifactIds[0] !==
     runtimeV2Apply.apply.changeSet.artifactHandles[0]?.artifactId ||
   !runtimeV2Apply.apply.proof.previewExportArtifactParity.dimensionsMatch ||
-  runtimeV2Apply.apply.changeSet.warningCodes[0] !== 'low_acquisition_confidence'
+  runtimeV2Apply.apply.changeSet.warningCodes[0] !== 'low_acquisition_confidence' ||
+  runtimeV2Apply.apply.positiveOutputReceipts.length !== 2 ||
+  runtimeV2Apply.apply.positiveOutputReceipts.some((receipt) => receipt.outputPath === receipt.sourcePath) ||
+  runtimeV2Apply.apply.positiveOutputReceipts.some(
+    (receipt, index) => receipt.positiveVariantId !== runtimeV2Apply.apply.changeSet.createdPositiveVariantIds[index],
+  )
 ) {
   throw new Error('Negative Lab v2 apply proof did not preserve accepted proof and preview/export parity metadata.');
 }
@@ -426,6 +445,10 @@ if (fixture.steps.length !== 2 || fixture.finalGraphRevision !== runtimeApply.ap
 
 if (runtimeApply.apply.changeSet.artifactHandles.length === 0) {
   throw new Error('Negative Lab agent apply fixture did not include an edited artifact handle.');
+}
+
+if (runtimeApply.apply.positiveOutputReceipts.length === 0) {
+  throw new Error('Negative Lab agent apply fixture did not include positive output receipts for editor reload.');
 }
 
 const routeRows = requiredRouteNames

@@ -24,6 +24,36 @@
   "correlationId": "corr_negative_set_conversion_recipe_sample",
   "dryRunCommandId": "command_negative_set_conversion_recipe_sample",
   "noOverwritePolicy": "never_overwrite_original",
+  "positiveOutputReceipts": [
+    {
+      "acceptedDryRunPlanHash": "sha256:dry_run_plan_negative_conversion_sample",
+      "acceptedDryRunPlanId": "dry_run_plan_negative_conversion_sample",
+      "conversionBundleContentHash": "sha256:negative_lab_sample_conversion_bundle_hash",
+      "conversionBundlePath": "/roll/001-positive-frame_0001.tif.negative-lab-bundle.json",
+      "dimensions": {
+        "height": 1080,
+        "width": 1620
+      },
+      "outputArtifact": {
+        "artifactId": "artifact_positive_variant_frame_0001_export",
+        "contentHash": "sha256:negative_lab_sample_positive_output_hash",
+        "dimensions": {
+          "height": 1080,
+          "width": 1620
+        },
+        "kind": "export",
+        "storage": "sidecar_artifact"
+      },
+      "outputPath": "/roll/001-positive-frame_0001.tif",
+      "path": "/roll/001-positive-frame_0001.tif",
+      "positiveVariantId": "positive_variant_frame_0001",
+      "provenanceEntryIds": ["prov_command_negative_convert_frames_apply_sample_apply"],
+      "replayPlanHash": "sha256:dry_run_plan_negative_conversion_sample",
+      "sidecarPath": "/roll/001-positive-frame_0001.tif.rawengine-negative-lab.json",
+      "sourceImageRef": "/roll/001.CR3",
+      "sourcePath": "/roll/001.CR3"
+    }
+  ],
   "schemaVersion": 1,
   "sessionId": "negative_roll_session_sample",
   "warnings": [
