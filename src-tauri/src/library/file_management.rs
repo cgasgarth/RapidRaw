@@ -2479,6 +2479,9 @@ pub fn load_metadata(path: String, app_handle: AppHandle) -> Result<ImageMetadat
     if crate::panorama_stitching::refresh_panorama_stale_artifacts(&mut metadata) {
         should_save_sidecar = true;
     }
+    if crate::negative_conversion::refresh_negative_lab_stale_artifacts(&mut metadata) {
+        should_save_sidecar = true;
+    }
 
     if should_save_sidecar && let Ok(json) = serde_json::to_string_pretty(&metadata) {
         let _ = fs::write(&sidecar_path, json);

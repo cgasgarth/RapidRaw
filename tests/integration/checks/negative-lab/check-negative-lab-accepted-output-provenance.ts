@@ -21,6 +21,7 @@ import {
   isNegativeLabAcceptedApplyPlanCurrent,
 } from '../../../../src/utils/negative-lab/negativeLabPlanIdentity.ts';
 import { DEFAULT_NEGATIVE_LAB_UI_PRESET } from '../../../../src/utils/negative-lab/negativeLabPresetCatalog.ts';
+import { buildNegativeLabReopenedSavedPositiveHandoff } from '../../../../src/utils/negative-lab/negativeLabSavedPositiveReopen.ts';
 
 const targetPaths = ['/proof-roll/negative-lab/frame_001.CR3', '/proof-roll/negative-lab/frame_002.CR3'];
 const frameHealthReport = buildNegativeLabFrameHealthReport({
@@ -212,9 +213,61 @@ for (const receipt of outputs.exportedPositives) {
   }
 }
 
+const reopenedSavedPositive = buildNegativeLabReopenedSavedPositiveHandoff({
+  imagePath: '/proof-roll/negative-lab/frame_001-Positive.jpg',
+  metadata: {
+    rawEngineArtifacts: {
+      negativeLabArtifacts: [
+        {
+          artifactId: 'artifact_negative_lab_reopen_001',
+          conversion: {
+            frameExposureOverrides: { overrides: [], schemaVersion: 1 },
+            frameRgbBalanceOverrides: { overrides: [], schemaVersion: 1 },
+            noOverwritePolicy: 'never_overwrite_original',
+            outputFormat: 'jpeg_proof',
+            profileProvenanceHash: 'fnv1a32:abcdef12',
+            selectedAcquisitionProfile: { id: 'camera_raw_linear_v1' },
+            selectedProfile: null,
+          },
+          outputArtifacts: [
+            {
+              artifactId: 'artifact_negative_lab_reopen_001_output',
+              contentHash: 'fnv1a64:0123456789abcdef',
+              dimensions: { height: 1200, width: 1800 },
+              outputIntent: 'editable_positive',
+              path: '/proof-roll/negative-lab/frame_001-Positive.jpg',
+              positiveVariantId: 'positive_variant_reopen_001',
+            },
+          ],
+          replay: {
+            identityHash: acceptedPlanIdentity.acceptedDryRunPlanHash,
+          },
+          sidecarPath: '/proof-roll/negative-lab/frame_001-Positive.jpg.rrdata',
+          sourceImageRefs: [
+            {
+              contentHash: 'fnv1a64:fedcba9876543210',
+              imagePath: targetPaths[0] ?? '',
+            },
+          ],
+        },
+      ],
+      schemaVersion: 1,
+    },
+  },
+});
+
+if (reopenedSavedPositive?.sourcePath !== (targetPaths[0] ?? '')) {
+  throw new Error('Reopened Negative Lab positive did not hydrate source provenance from sidecar artifacts.');
+}
+if (reopenedSavedPositive.outputHash !== 'fnv1a64:0123456789abcdef') {
+  throw new Error('Reopened Negative Lab positive did not hydrate output provenance from sidecar artifacts.');
+}
+
 const modalSource = readFileSync('src/components/modals/negative-lab/NegativeConversionModal.tsx', 'utf8');
 const rollHealthPanelSource = readFileSync('src/components/modals/negative-lab/NegativeLabRollHealthPanel.tsx', 'utf8');
 const handoffSource = readFileSync('src/utils/negative-lab/negativeLabEditorHandoff.ts', 'utf8');
+const reopenSource = readFileSync('src/utils/negative-lab/negativeLabSavedPositiveReopen.ts', 'utf8');
+const loaderSource = readFileSync('src/hooks/editor/useImageLoader.ts', 'utf8');
 
 for (const [label, source, marker] of [
   ['modal fingerprints accepted apply plan', modalSource, 'buildNegativeLabAcceptedApplyPlanFingerprint'],
@@ -228,6 +281,8 @@ for (const [label, source, marker] of [
   ['roll health shows per-frame receipts', rollHealthPanelSource, 'negative-lab-batch-per-frame-receipts'],
   ['editor handoff refreshes before select', handoffSource, 'await refreshImageList();'],
   ['editor handoff requests thumbnails', handoffSource, 'requestThumbnails?.([firstSavedPath]);'],
+  ['reopen builds saved positive handoff', reopenSource, 'buildNegativeLabReopenedSavedPositiveHandoff'],
+  ['loader hydrates reopened positive handoff', loaderSource, 'metadataWithNegativeLabReopenedSavedPositiveHandoff'],
 ] as const) {
   if (!source.includes(marker)) {
     throw new Error(`Negative Lab accepted output provenance marker missing: ${label}`);

@@ -15,6 +15,7 @@ use std::fs;
 use std::hash::{Hash, Hasher};
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
+use std::time::UNIX_EPOCH;
 use tauri::AppHandle;
 use uuid::Uuid;
 
@@ -1199,6 +1200,23 @@ fn hash_negative_lab_output_file(output_path: &Path) -> Result<String, String> {
     hash_negative_lab_file(output_path, "output")
 }
 
+fn negative_lab_file_state(path: &Path, label: &str) -> Result<serde_json::Value, String> {
+    let metadata = fs::metadata(path)
+        .map_err(|e| format!("Failed to read Negative Lab {label} metadata: {}", e))?;
+    let modified_unix_ms = metadata
+        .modified()
+        .ok()
+        .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
+        .map(|duration| duration.as_millis() as u64);
+    Ok(serde_json::json!({
+        "contentHash": hash_negative_lab_file(path, label)?,
+        "filename": negative_lab_path_filename(path),
+        "modifiedUnixMs": modified_unix_ms,
+        "path": path.to_string_lossy(),
+        "sizeBytes": metadata.len(),
+    }))
+}
+
 #[derive(Debug, Clone)]
 struct NegativeLabConversionBundleOutputRef {
     source_path: PathBuf,
@@ -1385,6 +1403,8 @@ fn write_negative_lab_output_sidecar(
     let output_artifact_id = format!("{}_output", artifact_id);
     let positive_variant_id = format!("positive_variant_{}", Uuid::new_v4().simple());
     let content_hash = hash_negative_lab_output_file(output_path)?;
+    let source_state = negative_lab_file_state(source_path, "source")?;
+    let output_state = negative_lab_file_state(output_path, "output")?;
     let output_format = match save_options.output_format {
         NegativeConversionOutputFormat::JpegProof => "jpeg_proof",
         NegativeConversionOutputFormat::Tiff16 => "tiff16",
@@ -1393,17 +1413,30 @@ fn write_negative_lab_output_sidecar(
     let artifact = serde_json::json!({
         "artifactId": artifact_id,
         "createdAt": Utc::now().to_rfc3339(),
+        "sidecarPath": sidecar_path.to_string_lossy(),
         "conversion": {
             "acceptedDryRunPlanHash": save_options.accepted_dry_run_plan_hash,
             "acceptedDryRunPlanId": save_options.accepted_dry_run_plan_id,
+            "acceptedDryRunIdentity": {
+                "planHash": save_options.accepted_dry_run_plan_hash,
+                "planId": save_options.accepted_dry_run_plan_id,
+                "replayPlanHash": replay_plan_hash,
+            },
             "frameExposureOverrides": save_options.frame_exposure_overrides.clone(),
             "frameRgbBalanceOverrides": save_options.frame_rgb_balance_overrides.clone(),
+            "noOverwritePolicy": "never_overwrite_original",
             "outputFormat": output_format,
             "patchSamplerCorrections": save_options.patch_sampler_corrections.clone(),
             "params": params,
             "profileProvenanceHash": save_options.profile_provenance_hash,
+            "recipeHash": replay_plan_hash,
             "selectedProfile": save_options.selected_profile.clone(),
             "selectedAcquisitionProfile": save_options.selected_acquisition_profile.clone(),
+        },
+        "acquisition": {
+            "selectedProfile": save_options.selected_acquisition_profile.clone(),
+            "sourceFamilies": save_options.acquisition_source_families.clone(),
+            "warningCodes": save_options.acquisition_warning_codes.clone(),
         },
         "operationId": "negative_lab.convert",
         "operationVersion": 1,
@@ -1414,17 +1447,23 @@ fn write_negative_lab_output_sidecar(
                 "height": dimensions.height,
                 "width": dimensions.width,
             },
+            "fileState": output_state,
+            "format": output_format,
             "kind": "negative_lab_positive",
+            "path": output_path.to_string_lossy(),
             "outputIntent": "editable_positive",
             "positiveVariantId": positive_variant_id,
             "storage": "sidecar_artifact",
         }],
         "provenance": {
             "commandId": "command_negative_lab_convert",
+            "noOverwritePolicy": "never_overwrite_original",
+            "proofState": "runtime_rendered_positive",
             "profileProvenanceHash": save_options.profile_provenance_hash,
             "selectedAcquisitionProfile": save_options.selected_acquisition_profile.clone(),
             "selectedProfile": save_options.selected_profile.clone(),
             "runtimeStatus": "rendered",
+            "warningCodes": save_options.acquisition_warning_codes.clone(),
         },
         "replay": {
             "appServerCommand": "negative.lab.conversion_plan",
@@ -1432,10 +1471,16 @@ fn write_negative_lab_output_sidecar(
             "requiresSourceFiles": true,
         },
         "schemaVersion": 1,
+        "staleState": {
+            "invalidationReasons": [],
+            "state": "current",
+        },
         "sourceImageRefs": [{
+            "contentHash": source_state.get("contentHash").cloned().unwrap_or(serde_json::Value::Null),
+            "fileState": source_state,
             "imagePath": source_path.to_string_lossy(),
         }],
-        "warnings": [],
+        "warnings": save_options.acquisition_warning_codes.clone(),
     });
 
     let artifacts = sidecar
@@ -1470,6 +1515,178 @@ fn write_negative_lab_output_sidecar(
         replay_plan_hash: replay_plan_hash.to_string(),
         sidecar_path,
     })
+}
+
+pub(crate) fn refresh_negative_lab_stale_artifacts(
+    metadata: &mut crate::image_processing::ImageMetadata,
+) -> bool {
+    let Some(artifacts) = metadata.raw_engine_artifacts.as_mut() else {
+        return false;
+    };
+
+    let mut changed = false;
+    let mut negative_stale_ids = Vec::new();
+    for artifact in &mut artifacts.negative_lab_artifacts {
+        let Some(artifact_id) = artifact
+            .get("artifactId")
+            .and_then(|value| value.as_str())
+            .map(|value| value.to_string())
+        else {
+            continue;
+        };
+        let reasons = negative_lab_artifact_stale_reasons(artifact);
+        let stale_state = if reasons.is_empty() {
+            "current"
+        } else {
+            "stale"
+        };
+        if !reasons.is_empty() {
+            negative_stale_ids.push(artifact_id.clone());
+        }
+        let next_stale_state = serde_json::json!({
+            "invalidationReasons": reasons,
+            "state": stale_state,
+        });
+        if artifact.get("staleState") != Some(&next_stale_state) {
+            if let Some(object) = artifact.as_object_mut() {
+                object.insert("staleState".to_string(), next_stale_state);
+                changed = true;
+            }
+        }
+    }
+
+    let negative_artifact_ids = artifacts
+        .negative_lab_artifacts
+        .iter()
+        .filter_map(|artifact| artifact.get("artifactId").and_then(|value| value.as_str()))
+        .collect::<std::collections::HashSet<_>>();
+    let mut stale_artifact_ids = artifacts
+        .stale_artifact_ids
+        .iter()
+        .filter(|artifact_id| !negative_artifact_ids.contains(artifact_id.as_str()))
+        .cloned()
+        .collect::<Vec<_>>();
+    stale_artifact_ids.extend(negative_stale_ids);
+    stale_artifact_ids.retain(|id| !id.is_empty());
+
+    if artifacts.stale_artifact_ids != stale_artifact_ids {
+        artifacts.stale_artifact_ids = stale_artifact_ids;
+        changed = true;
+    }
+
+    changed
+}
+
+fn negative_lab_artifact_stale_reasons(artifact: &serde_json::Value) -> Vec<&'static str> {
+    let mut reasons = Vec::new();
+    let output = artifact
+        .get("outputArtifacts")
+        .and_then(|value| value.as_array())
+        .and_then(|outputs| outputs.first());
+    let output_path = output
+        .and_then(|value| value.get("path"))
+        .and_then(|value| value.as_str());
+    match output_path {
+        Some(path) if Path::new(path).exists() => {
+            if let Some(expected_hash) = output
+                .and_then(|value| value.get("contentHash"))
+                .and_then(|value| value.as_str())
+                && hash_negative_lab_output_file(Path::new(path))
+                    .ok()
+                    .as_deref()
+                    != Some(expected_hash)
+            {
+                reasons.push("output_artifact_changed");
+            }
+            negative_lab_push_file_state_reasons(
+                &mut reasons,
+                output.and_then(|value| value.get("fileState")),
+                Path::new(path),
+                "output_artifact_changed",
+            );
+        }
+        _ => reasons.push("output_artifact_missing"),
+    }
+
+    let source = artifact
+        .get("sourceImageRefs")
+        .and_then(|value| value.as_array())
+        .and_then(|sources| sources.first());
+    let source_path = source
+        .and_then(|value| value.get("imagePath"))
+        .and_then(|value| value.as_str());
+    match source_path {
+        Some(path) if Path::new(path).exists() => {
+            if let Some(expected_hash) = source
+                .and_then(|value| value.get("contentHash"))
+                .and_then(|value| value.as_str())
+                && hash_negative_lab_file(Path::new(path), "source")
+                    .ok()
+                    .as_deref()
+                    != Some(expected_hash)
+            {
+                reasons.push("source_content_hash_changed");
+            }
+            negative_lab_push_file_state_reasons(
+                &mut reasons,
+                source.and_then(|value| value.get("fileState")),
+                Path::new(path),
+                "source_file_state_changed",
+            );
+        }
+        _ => reasons.push("source_missing"),
+    }
+
+    let replay_hash = artifact
+        .get("replay")
+        .and_then(|value| value.get("identityHash"))
+        .and_then(|value| value.as_str());
+    let recipe_hash = artifact
+        .get("conversion")
+        .and_then(|value| value.get("recipeHash"))
+        .and_then(|value| value.as_str());
+    if replay_hash.is_none() || recipe_hash.is_none() || replay_hash != recipe_hash {
+        reasons.push("recipe_hash_changed");
+    }
+
+    reasons.sort_unstable();
+    reasons.dedup();
+    reasons
+}
+
+fn negative_lab_push_file_state_reasons(
+    reasons: &mut Vec<&'static str>,
+    file_state: Option<&serde_json::Value>,
+    path: &Path,
+    reason: &'static str,
+) {
+    let Some(file_state) = file_state else {
+        reasons.push(reason);
+        return;
+    };
+    let metadata = match fs::metadata(path) {
+        Ok(metadata) => metadata,
+        Err(_) => {
+            reasons.push(reason);
+            return;
+        }
+    };
+    if file_state.get("sizeBytes").and_then(|value| value.as_u64()) != Some(metadata.len()) {
+        reasons.push(reason);
+        return;
+    }
+    let modified_unix_ms = metadata
+        .modified()
+        .ok()
+        .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
+        .map(|duration| duration.as_millis() as u64);
+    if file_state
+        .get("modifiedUnixMs")
+        .and_then(|value| value.as_u64())
+        != modified_unix_ms
+    {
+        reasons.push(reason);
+    }
 }
 
 fn upsert_negative_lab_layer_stack_sidecar(
@@ -3343,12 +3560,30 @@ mod tests {
             artifact["conversion"]["acceptedDryRunPlanId"],
             "negative_lab_batch_plan_2f4a91bc"
         );
+        assert_eq!(
+            artifact["conversion"]["acceptedDryRunIdentity"]["planHash"],
+            "fnv1a32:2f4a91bc"
+        );
+        assert_eq!(
+            artifact["conversion"]["noOverwritePolicy"],
+            "never_overwrite_original"
+        );
+        assert_eq!(artifact["conversion"]["recipeHash"], "fnv1a32:2f4a91bc");
+        assert_eq!(
+            artifact["acquisition"]["selectedProfile"]["id"],
+            "camera_raw_linear_v1"
+        );
         assert_eq!(artifact["outputArtifacts"][0]["dimensions"]["width"], 12);
         assert_eq!(artifact["outputArtifacts"][0]["dimensions"]["height"], 8);
         assert_eq!(
             artifact["outputArtifacts"][0]["kind"],
             "negative_lab_positive"
         );
+        assert_eq!(
+            artifact["outputArtifacts"][0]["path"],
+            output_path.to_string_lossy().to_string()
+        );
+        assert_eq!(artifact["outputArtifacts"][0]["format"], "tiff16");
         assert_eq!(
             artifact["outputArtifacts"][0]["storage"],
             "sidecar_artifact"
@@ -3369,6 +3604,19 @@ mod tests {
                 .unwrap_or_default()
                 .starts_with("fnv1a64:")
         );
+        assert_eq!(
+            artifact["outputArtifacts"][0]["fileState"]["path"],
+            output_path.to_string_lossy().to_string()
+        );
+        assert_eq!(
+            artifact["sourceImageRefs"][0]["imagePath"],
+            source_path.to_string_lossy().to_string()
+        );
+        assert_eq!(
+            artifact["sourceImageRefs"][0]["fileState"]["path"],
+            source_path.to_string_lossy().to_string()
+        );
+        assert_eq!(artifact["staleState"]["state"], "current");
         assert_eq!(artifacts.layer_stack_sidecars.len(), 1);
         let layer_stack = &artifacts.layer_stack_sidecars[0];
         assert_eq!(
@@ -3390,6 +3638,84 @@ mod tests {
                 .as_str()
                 .unwrap_or_default()
                 .starts_with("graph_negative_lab_positive_variant_")
+        );
+    }
+
+    #[test]
+    fn negative_lab_refresh_marks_changed_positive_artifact_stale() {
+        let temp_dir = tempfile::tempdir().expect("temp dir should be created");
+        let source_path = temp_dir.path().join("frame_001.tif");
+        let output_path = temp_dir.path().join("frame_001_Positive.tiff");
+        fs::write(&source_path, b"negative-source").expect("source should be written");
+        fs::write(&output_path, b"positive-output").expect("output should be written");
+        let params = NegativeConversionParams {
+            red_weight: 1.0,
+            green_weight: 1.0,
+            blue_weight: 1.0,
+            base_fog_strength: 1.0,
+            base_fog_sample: None,
+            exposure: 0.0,
+            contrast: 1.0,
+            black_point: 0.0,
+            white_point: 1.0,
+        };
+        let save_options = NegativeConversionSaveOptions {
+            accepted_dry_run_plan_hash: Some("fnv1a32:2f4a91bc".to_string()),
+            accepted_dry_run_plan_id: Some("negative_lab_batch_plan_2f4a91bc".to_string()),
+            profile_provenance_hash: Some("fnv1a32:aaaaaaaa".to_string()),
+            output_format: NegativeConversionOutputFormat::Tiff16,
+            write_conversion_bundle: default_write_conversion_bundle(),
+            acquisition_warning_codes: vec!["scanner_input_profile_unverified".to_string()],
+            acquisition_source_families: vec!["camera_raw".to_string()],
+            selected_acquisition_profile: default_negative_lab_acquisition_profile(),
+            selected_profile: None,
+            frame_exposure_overrides: NegativeLabFrameExposureOverridePayload::default(),
+            frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload::default(),
+            patch_sampler_corrections: default_patch_sampler_corrections(),
+            accepted_dust_heal_layers_by_source_path: HashMap::new(),
+            suffix: DEFAULT_OUTPUT_SUFFIX.to_string(),
+        };
+
+        write_negative_lab_output_sidecar(
+            &output_path,
+            &source_path,
+            &params,
+            &save_options,
+            &[],
+            "fnv1a32:2f4a91bc",
+            NegativeLabSavedPositiveDimensions {
+                height: 8,
+                width: 12,
+            },
+        )
+        .expect("sidecar should be written");
+
+        let sidecar_path = negative_lab_output_sidecar_path(&output_path);
+        let mut sidecar = crate::exif_processing::load_sidecar(&sidecar_path);
+        assert!(!refresh_negative_lab_stale_artifacts(&mut sidecar));
+
+        fs::write(&output_path, b"changed-positive-output").expect("output should be changed");
+        assert!(refresh_negative_lab_stale_artifacts(&mut sidecar));
+        let artifacts = sidecar
+            .raw_engine_artifacts
+            .expect("rawEngineArtifacts should be present");
+        let artifact = artifacts
+            .negative_lab_artifacts
+            .first()
+            .expect("Negative Lab artifact should be present");
+        let artifact_id = artifact["artifactId"].as_str().unwrap_or_default();
+        assert!(
+            artifacts
+                .stale_artifact_ids
+                .contains(&artifact_id.to_string())
+        );
+        assert_eq!(artifact["staleState"]["state"], "stale");
+        assert!(
+            artifact["staleState"]["invalidationReasons"]
+                .as_array()
+                .expect("stale reasons should be an array")
+                .iter()
+                .any(|reason| reason == "output_artifact_changed")
         );
     }
 
