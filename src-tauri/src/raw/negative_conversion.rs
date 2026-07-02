@@ -1388,6 +1388,78 @@ fn write_negative_lab_conversion_bundle(
     })
 }
 
+fn attach_negative_lab_conversion_bundle_path_to_output_sidecars(
+    bundle_path: &Path,
+    outputs: &[NegativeLabConversionBundleOutputRef],
+) -> Result<(), String> {
+    let bundle_path_value = serde_json::Value::String(bundle_path.to_string_lossy().to_string());
+
+    for output in outputs {
+        let mut sidecar = crate::exif_processing::load_sidecar(&output.sidecar_path);
+        let Some(artifacts) = sidecar.raw_engine_artifacts.as_mut() else {
+            continue;
+        };
+        let output_path = output.output_path.to_string_lossy().to_string();
+        let mut changed = false;
+
+        for artifact in &mut artifacts.negative_lab_artifacts {
+            let matches_output = artifact
+                .get("outputArtifacts")
+                .and_then(|value| value.as_array())
+                .map(|outputs| {
+                    outputs.iter().any(|candidate| {
+                        candidate.get("path").and_then(|value| value.as_str())
+                            == Some(output_path.as_str())
+                    })
+                })
+                .unwrap_or(false);
+
+            if !matches_output {
+                continue;
+            }
+
+            if let Some(object) = artifact.as_object_mut() {
+                if object.get("conversionBundlePath") != Some(&bundle_path_value) {
+                    object.insert(
+                        "conversionBundlePath".to_string(),
+                        bundle_path_value.clone(),
+                    );
+                    changed = true;
+                }
+                if let Some(conversion) = object
+                    .get_mut("conversion")
+                    .and_then(|value| value.as_object_mut())
+                    && conversion.get("conversionBundlePath") != Some(&bundle_path_value)
+                {
+                    conversion.insert(
+                        "conversionBundlePath".to_string(),
+                        bundle_path_value.clone(),
+                    );
+                    changed = true;
+                }
+            }
+        }
+
+        if changed {
+            let json = serde_json::to_string_pretty(&sidecar).map_err(|e| {
+                format!(
+                    "Failed to serialize Negative Lab sidecar with conversion bundle path: {}",
+                    e
+                )
+            })?;
+            fs::write(&output.sidecar_path, json).map_err(|e| {
+                format!(
+                    "Failed to update Negative Lab sidecar {} with conversion bundle path: {}",
+                    output.sidecar_path.display(),
+                    e
+                )
+            })?;
+        }
+    }
+
+    Ok(())
+}
+
 fn write_negative_lab_output_sidecar(
     output_path: &Path,
     source_path: &Path,
@@ -2592,6 +2664,10 @@ pub async fn convert_negatives(
                 &save_options,
                 &bundle_outputs,
             )?;
+            attach_negative_lab_conversion_bundle_path_to_output_sidecars(
+                &conversion_bundle_path,
+                &bundle_outputs,
+            )?;
             let conversion_bundle_path = conversion_bundle_path.to_string_lossy().to_string();
             for result in &mut results {
                 result.conversion_bundle_path = Some(conversion_bundle_path.clone());
@@ -3638,6 +3714,36 @@ mod tests {
                 .as_str()
                 .unwrap_or_default()
                 .starts_with("graph_negative_lab_positive_variant_")
+        );
+
+        let bundle_path = negative_lab_conversion_bundle_path(&output_path);
+        fs::write(&bundle_path, b"{}").expect("bundle should be written");
+        attach_negative_lab_conversion_bundle_path_to_output_sidecars(
+            &bundle_path,
+            &[NegativeLabConversionBundleOutputRef {
+                output_height: 8,
+                output_path,
+                output_width: 12,
+                sidecar_path: sidecar_path.clone(),
+                source_path,
+            }],
+        )
+        .expect("sidecar should record conversion bundle path");
+        let sidecar = crate::exif_processing::load_sidecar(&sidecar_path);
+        let artifact = sidecar
+            .raw_engine_artifacts
+            .expect("rawEngineArtifacts should be present")
+            .negative_lab_artifacts
+            .into_iter()
+            .last()
+            .expect("Negative Lab artifact should be present");
+        assert_eq!(
+            artifact["conversionBundlePath"],
+            bundle_path.to_string_lossy().to_string()
+        );
+        assert_eq!(
+            artifact["conversion"]["conversionBundlePath"],
+            bundle_path.to_string_lossy().to_string()
         );
     }
 

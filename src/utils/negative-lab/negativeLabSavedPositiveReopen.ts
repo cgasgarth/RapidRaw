@@ -8,8 +8,10 @@ import {
 const negativeLabReopenArtifactSchema = z
   .object({
     artifactId: z.string().trim().min(1),
+    conversionBundlePath: z.string().trim().min(1).optional(),
     conversion: z
       .object({
+        conversionBundlePath: z.string().trim().min(1).optional(),
         frameExposureOverrides: z.unknown().optional(),
         frameRgbBalanceOverrides: z.unknown().optional(),
         outputFormat: z.enum(['jpeg_proof', 'tiff16']),
@@ -162,10 +164,11 @@ export const buildNegativeLabReopenedSavedPositiveHandoff = ({
       null;
     const sourceImageRef = artifact.sourceImageRefs[0]?.imagePath;
     if (outputArtifact === null || sourceImageRef === undefined) continue;
+    const conversionBundlePath = artifact.conversionBundlePath ?? artifact.conversion.conversionBundlePath ?? null;
 
     const parsedHandoff = negativeLabSavedPositiveHandoffSchema.safeParse({
       artifactId: artifact.artifactId,
-      conversionBundlePath: null,
+      conversionBundlePath,
       dimensions: outputArtifact.dimensions,
       frameExposureOverrides: artifact.conversion.frameExposureOverrides ?? { overrides: [], schemaVersion: 1 },
       frameRgbBalanceOverrides: artifact.conversion.frameRgbBalanceOverrides ?? { overrides: [], schemaVersion: 1 },
