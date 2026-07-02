@@ -83,6 +83,9 @@ if (
   runtimeDryRun.dryRun.proof.runtimePreview.previewRenderer !== 'rawengine_density_preview_runtime' ||
   runtimeDryRun.dryRun.proof.runtimePreview.previewArtifactHandle.storage !== 'temp_cache' ||
   runtimeDryRun.dryRun.proof.runtimePreview.baseFogSampleSummary.sampleCount <= 0 ||
+  runtimeDryRun.dryRun.proof.runtimePreview.baseFogSampleSummary.sampleRect.width <= 0 ||
+  runtimeDryRun.dryRun.proof.runtimePreview.baseFogSampleSummary.meanRgb.r <= 0 ||
+  runtimeDryRun.dryRun.proof.runtimePreview.baseFogSampleSummary.source !== 'runtime_estimate_negative_base_fog' ||
   !runtimeDryRun.dryRun.proof.runtimePreview.planHash.startsWith('sha256:')
 ) {
   throw new Error('Negative Lab runtime dry-run did not expose rendered preview/base-fog/provenance proof.');
@@ -176,6 +179,7 @@ if (
   runtimeV2DryRun.dryRun.proof.selectedCrosstalkProvenance.provenance !== 'rawengine_process_profile' ||
   runtimeV2DryRun.dryRun.proof.runtimePreview.densityCurveSummary.outputTag !== 'export_linear' ||
   runtimeV2DryRun.dryRun.proof.runtimePreview.previewArtifactHandle.storage !== 'temp_cache' ||
+  runtimeV2DryRun.dryRun.proof.runtimePreview.baseFogSampleSummary.warningCodes.length !== 0 ||
   runtimeV2DryRun.dryRun.proof.runtimePreview.sourceImageIdentity.frameIds.join('|') !== 'frame_0001|frame_0002' ||
   runtimeV2DryRun.dryRun.proof.previewExportArtifactParity.previewArtifactIds.length !== 1 ||
   runtimeV2DryRun.dryRun.proof.warningCodes[0] !== 'low_acquisition_confidence'

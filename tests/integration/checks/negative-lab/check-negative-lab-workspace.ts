@@ -431,6 +431,8 @@ for (const marker of [
   'negative-lab-base-sample-comparison',
   'negative-lab-accept-base-sample',
   'negative-lab-reject-base-sample',
+  'runtimeBaseFogSummary.confidence',
+  'runtimeBaseFogSummary.warningCodes',
   'negative-lab-roll-frame-disposition-',
   'negative-lab-roll-selected-disposition',
   'batchDisposition: batchDryRunSummary.dispositionCounts',

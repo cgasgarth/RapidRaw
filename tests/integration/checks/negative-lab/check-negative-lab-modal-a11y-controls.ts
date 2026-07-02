@@ -16,6 +16,30 @@ mock.module('@tauri-apps/api/core', () => ({
     if (command === Invokes.RenderNegativeLabDryRunPreviewArtifact) {
       return Promise.resolve({
         artifactId: 'artifact_negative_lab_runtime_preview_test',
+        baseFogSampleSummary: {
+          clippedFraction: 0,
+          confidence: 0.81,
+          densityRange: 0.07,
+          densityRgb: {
+            b: 0.55,
+            g: 0.51,
+            r: 0.48,
+          },
+          meanRgb: {
+            b: 0.2818,
+            g: 0.309,
+            r: 0.3311,
+          },
+          sampleCount: 400,
+          sampleRect: {
+            height: 0.6,
+            width: 0.12,
+            x: 0.02,
+            y: 0.2,
+          },
+          source: 'deterministic_edge_safe_default_rect',
+          warningCodes: [],
+        },
         contentHash: 'sha256:8a5edab282632443219e051e301c8f382f0f0f8b80636cae5f0204f20795d880',
         dimensions: { height: 1, width: 1 },
         previewDataUrl: 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2Q==',

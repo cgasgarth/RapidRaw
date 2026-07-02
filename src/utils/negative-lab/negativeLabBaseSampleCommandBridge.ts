@@ -341,16 +341,27 @@ export const buildNegativeLabBaseSamplePreviewProof = (
   previewAfterUrl: string,
   densitometerReadout: NegativeBaseFogDensitometerReadout | null,
   previewRevision: number,
+  runtimeSummary?: {
+    confidence: number;
+    warningCodes: NegativeLabBaseSampleWarningCode[];
+  },
 ): NegativeLabBaseSamplePreviewProof => {
-  const warningCodes = buildNegativeLabBaseSampleWarningCodes(context.estimate, densitometerReadout);
-  const command = buildNegativeLabUpdateBaseSamplesCommand(context, warningCodes, new Date(0).toISOString());
+  const effectiveEstimate =
+    runtimeSummary === undefined ? context.estimate : { ...context.estimate, confidence: runtimeSummary.confidence };
+  const warningCodes =
+    runtimeSummary?.warningCodes ?? buildNegativeLabBaseSampleWarningCodes(effectiveEstimate, densitometerReadout);
+  const command = buildNegativeLabUpdateBaseSamplesCommand(
+    { ...context, estimate: effectiveEstimate },
+    warningCodes,
+    new Date(0).toISOString(),
+  );
   const previewBeforeHash =
     context.previewBeforeUrl === null ? null : buildNegativeLabBaseSampleHash(context.previewBeforeUrl);
   const previewAfterHash = buildNegativeLabBaseSampleHash(previewAfterUrl);
 
   return {
     command,
-    confidence: classifyNegativeLabBaseSampleConfidence(context.estimate),
+    confidence: classifyNegativeLabBaseSampleConfidence(effectiveEstimate),
     previewAfterHash,
     previewBeforeHash,
     previewChanged: previewBeforeHash !== previewAfterHash,

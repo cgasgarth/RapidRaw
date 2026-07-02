@@ -73,15 +73,28 @@
     },
     "runtimePreview": {
       "baseFogSampleSummary": {
+        "clippedFraction": 0,
         "confidence": 0.74,
+        "densityRange": 0.07,
         "densityRgb": {
           "b": 0.55,
           "g": 0.51,
           "r": 0.48
         },
+        "meanRgb": {
+          "b": 0.2818,
+          "g": 0.309,
+          "r": 0.3311
+        },
         "sampleCount": 400,
-        "sampleRect": null,
-        "source": "runtime_estimate_negative_base_fog"
+        "sampleRect": {
+          "height": 0.6,
+          "width": 0.12,
+          "x": 0.02,
+          "y": 0.2
+        },
+        "source": "runtime_estimate_negative_base_fog",
+        "warningCodes": []
       },
       "densityCurveSummary": {
         "curveFamily": "process_profile_monotonic_v1",

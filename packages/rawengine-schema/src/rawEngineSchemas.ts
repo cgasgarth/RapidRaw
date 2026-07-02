@@ -9144,11 +9144,26 @@ export const negativeLabRuntimeProofV1Schema = z
       .object({
         baseFogSampleSummary: z
           .object({
+            clippedFraction: z.number().min(0).max(1),
             confidence: z.number().min(0).max(1),
+            densityRange: z.number().min(0),
             densityRgb: negativeLabDensityRgbV1Schema,
+            meanRgb: z
+              .object({
+                b: z.number().min(0).max(1),
+                g: z.number().min(0).max(1),
+                r: z.number().min(0).max(1),
+              })
+              .strict(),
             sampleCount: z.number().int().positive(),
-            sampleRect: negativeLabSampleRectV1Schema.nullable(),
-            source: z.enum(['runtime_estimate_negative_base_fog', 'recipe_default_base_fog']),
+            sampleRect: negativeLabSampleRectV1Schema,
+            source: z.enum([
+              'runtime_estimate_negative_base_fog',
+              'recipe_default_base_fog',
+              'requested_base_fog_sample_rect',
+              'deterministic_edge_safe_default_rect',
+            ]),
+            warningCodes: z.array(negativeWarningCodeSchema),
           })
           .strict(),
         densityCurveSummary: z

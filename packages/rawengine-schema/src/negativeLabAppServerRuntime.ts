@@ -37,9 +37,19 @@ type NegativeLabSetConversionRecipeCommandV1 = z.infer<typeof negativeLabSetConv
 export interface NegativeLabRuntimePreviewRenderResultV1 {
   artifactId: string;
   baseFogSampleSummary?: {
+    clippedFraction: number;
     confidence: number;
+    densityRange: number;
     densityRgb: { b: number; g: number; r: number };
+    meanRgb: { b: number; g: number; r: number };
     sampleCount: number;
+    sampleRect: { height: number; width: number; x: number; y: number };
+    source:
+      | 'runtime_estimate_negative_base_fog'
+      | 'recipe_default_base_fog'
+      | 'requested_base_fog_sample_rect'
+      | 'deterministic_edge_safe_default_rect';
+    warningCodes: NegativeWarningCode[];
   };
   contentHash: string;
   dimensions: { height: number; width: number };
@@ -184,6 +194,41 @@ export function negativeLabAcceptedDryRunPlanHashV1(dryRun: NegativeLabDryRunRes
   return `sha256:${dryRun.dryRunPlanId}`;
 }
 
+function buildDefaultBaseFogSampleSummary(
+  confidence: number,
+  p50AnchorDensity: number,
+  sampleCount: number,
+  source:
+    | 'runtime_estimate_negative_base_fog'
+    | 'recipe_default_base_fog'
+    | 'requested_base_fog_sample_rect'
+    | 'deterministic_edge_safe_default_rect',
+  warningCodes: NegativeWarningCode[],
+): NonNullable<NegativeLabRuntimePreviewRenderResultV1['baseFogSampleSummary']> {
+  const densityRgb = {
+    b: Number((p50AnchorDensity + 0.06).toFixed(4)),
+    g: Number((p50AnchorDensity + 0.02).toFixed(4)),
+    r: Number((p50AnchorDensity - 0.01).toFixed(4)),
+  };
+  const densityValues = Object.values(densityRgb);
+
+  return {
+    clippedFraction: 0,
+    confidence,
+    densityRange: Number((Math.max(...densityValues) - Math.min(...densityValues)).toFixed(4)),
+    densityRgb,
+    meanRgb: {
+      b: Number((10 ** -densityRgb.b).toFixed(4)),
+      g: Number((10 ** -densityRgb.g).toFixed(4)),
+      r: Number((10 ** -densityRgb.r).toFixed(4)),
+    },
+    sampleCount,
+    sampleRect: { height: 0.6, width: 0.12, x: 0.02, y: 0.2 },
+    source,
+    warningCodes,
+  };
+}
+
 function buildNegativeLabRuntimeDryRunV1(
   command: NegativeLabSetConversionRecipeCommandV1,
   renderedPreview: NegativeLabRuntimePreviewRenderResultV1,
@@ -191,7 +236,11 @@ function buildNegativeLabRuntimeDryRunV1(
   const sessionId = command.parameters.sessionId;
   const selectedFrameIds = command.parameters.frameSelection.frameIds;
   const updatedFrameIds = selectedFrameIds.length > 0 ? selectedFrameIds : ['negative_lab_frame_runtime_preview'];
-  const warnings = [negativeLabRuntimeWarningV1(updatedFrameIds)];
+  const baseFogWarningCodes = renderedPreview.baseFogSampleSummary?.warningCodes ?? [];
+  const warnings = [
+    negativeLabRuntimeWarningV1(updatedFrameIds),
+    ...baseFogWarningCodes.map((warningCode) => negativeLabRuntimeBaseFogWarningV1(warningCode, updatedFrameIds)),
+  ];
   const warningCodes = warnings.map((warning) => warning.code);
   const previewArtifacts: ArtifactHandleV1[] = [
     {
@@ -308,15 +357,17 @@ function buildNegativeLabRuntimeProofV1({
   if (previewArtifact === undefined) {
     throw new Error('Negative Lab runtime preview dry-run requires a preview artifact.');
   }
-  const baseFogSampleSummary = renderedPreview.baseFogSampleSummary ?? {
-    confidence: command.parameters.baseStrategy.mode === 'profile_default_low_confidence' ? 0.42 : 0.74,
-    densityRgb: {
-      b: Number((p50AnchorDensity + 0.06).toFixed(4)),
-      g: Number((p50AnchorDensity + 0.02).toFixed(4)),
-      r: Number((p50AnchorDensity - 0.01).toFixed(4)),
-    },
-    sampleCount: frameCount * 400,
-  };
+  const baseFogSampleSummary =
+    renderedPreview.baseFogSampleSummary ??
+    buildDefaultBaseFogSampleSummary(
+      command.parameters.baseStrategy.mode === 'profile_default_low_confidence' ? 0.42 : 0.74,
+      p50AnchorDensity,
+      frameCount * 400,
+      command.parameters.baseStrategy.mode === 'profile_default_low_confidence'
+        ? 'recipe_default_base_fog'
+        : 'runtime_estimate_negative_base_fog',
+      command.parameters.baseStrategy.mode === 'profile_default_low_confidence' ? ['low_acquisition_confidence'] : [],
+    );
   const planHash = `sha256:${stableProofToken(
     JSON.stringify({
       algorithm,
@@ -380,11 +431,6 @@ function buildNegativeLabRuntimeProofV1({
     runtimePreview: {
       baseFogSampleSummary: {
         ...baseFogSampleSummary,
-        sampleRect: null,
-        source:
-          command.parameters.baseStrategy.mode === 'profile_default_low_confidence'
-            ? 'recipe_default_base_fog'
-            : 'runtime_estimate_negative_base_fog',
       },
       densityCurveSummary: {
         curveFamily: command.parameters.curveModel.curveFamily,
@@ -501,15 +547,15 @@ function buildDefaultNegativeLabRuntimePreviewRenderResultV1(
 
   return {
     artifactId: `artifact_${command.commandId}_preview`,
-    baseFogSampleSummary: {
-      confidence: command.parameters.baseStrategy.mode === 'profile_default_low_confidence' ? 0.42 : 0.74,
-      densityRgb: {
-        b: Number((p50AnchorDensity + 0.06).toFixed(4)),
-        g: Number((p50AnchorDensity + 0.02).toFixed(4)),
-        r: Number((p50AnchorDensity - 0.01).toFixed(4)),
-      },
-      sampleCount: frameCount * 400,
-    },
+    baseFogSampleSummary: buildDefaultBaseFogSampleSummary(
+      command.parameters.baseStrategy.mode === 'profile_default_low_confidence' ? 0.42 : 0.74,
+      p50AnchorDensity,
+      frameCount * 400,
+      command.parameters.baseStrategy.mode === 'profile_default_low_confidence'
+        ? 'recipe_default_base_fog'
+        : 'runtime_estimate_negative_base_fog',
+      command.parameters.baseStrategy.mode === 'profile_default_low_confidence' ? ['low_acquisition_confidence'] : [],
+    ),
     contentHash: `sha256:negative_lab_runtime_preview:${renderToken}`,
     dimensions: { height, width },
     renderer: 'rawengine_density_preview_runtime',
@@ -526,5 +572,21 @@ function negativeLabRuntimeWarningV1(frameIds: Array<string>) {
     frameIds,
     scope: 'session',
     severity: 'info',
+  });
+}
+
+function negativeLabRuntimeBaseFogWarningV1(warningCode: NegativeWarningCode, frameIds: Array<string>) {
+  return negativeWarningV1Schema.parse({
+    blocksAutomation: false,
+    code: warningCode,
+    evidence: `Negative Lab runtime base-fog sample emitted ${warningCode} from measured preview pixels.`,
+    frameIds,
+    scope: 'frame',
+    severity:
+      warningCode === 'missing_visible_base'
+        ? 'warning'
+        : warningCode === 'clipped_base_channel' || warningCode === 'uneven_illumination'
+          ? 'warning'
+          : 'info',
   });
 }

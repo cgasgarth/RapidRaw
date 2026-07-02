@@ -54,6 +54,30 @@ await rerenderNegativeLabModal(rendered.root, ['/roll/scan-b.dng']);
 
 deferredPreviewA.resolve({
   artifactId: 'artifact_negative_lab_runtime_preview_a',
+  baseFogSampleSummary: {
+    clippedFraction: 0,
+    confidence: 0.81,
+    densityRange: 0.07,
+    densityRgb: {
+      b: 0.55,
+      g: 0.51,
+      r: 0.48,
+    },
+    meanRgb: {
+      b: 0.2818,
+      g: 0.309,
+      r: 0.3311,
+    },
+    sampleCount: 400,
+    sampleRect: {
+      height: 0.6,
+      width: 0.12,
+      x: 0.02,
+      y: 0.2,
+    },
+    source: 'deterministic_edge_safe_default_rect',
+    warningCodes: [],
+  },
   contentHash: 'sha256:29eb2bf9f0d4f4f98fb8617d6e6aa0964085d8fa8f11d8d3c7d5ef0cfb2b6d4a',
   dimensions: { height: 1, width: 1 },
   previewDataUrl: 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2Q==',
@@ -68,6 +92,30 @@ assertWorkspacePreviewReady(rendered.container, 'false', 'Stale preview A must n
 
 deferredPreviewB.resolve({
   artifactId: 'artifact_negative_lab_runtime_preview_b',
+  baseFogSampleSummary: {
+    clippedFraction: 0,
+    confidence: 0.81,
+    densityRange: 0.07,
+    densityRgb: {
+      b: 0.55,
+      g: 0.51,
+      r: 0.48,
+    },
+    meanRgb: {
+      b: 0.2818,
+      g: 0.309,
+      r: 0.3311,
+    },
+    sampleCount: 400,
+    sampleRect: {
+      height: 0.6,
+      width: 0.12,
+      x: 0.02,
+      y: 0.2,
+    },
+    source: 'deterministic_edge_safe_default_rect',
+    warningCodes: [],
+  },
   contentHash: 'sha256:8688d24999f6cad886e3f7ddac4ff622df5455070a89cfc8f873867bad07c735',
   dimensions: { height: 1, width: 1 },
   previewDataUrl: 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2Q==',

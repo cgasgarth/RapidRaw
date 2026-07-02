@@ -58,10 +58,33 @@ pub struct NegativeLabPreviewArtifactDimensions {
     pub width: u32,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabRuntimeBaseFogRgbTriplet {
+    pub r: f32,
+    pub g: f32,
+    pub b: f32,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabRuntimeBaseFogSampleSummary {
+    pub clipped_fraction: f32,
+    pub confidence: f32,
+    pub density_range: f32,
+    pub density_rgb: NegativeLabRuntimeBaseFogRgbTriplet,
+    pub mean_rgb: NegativeLabRuntimeBaseFogRgbTriplet,
+    pub sample_count: u32,
+    pub sample_rect: NegativeBaseFogSampleRect,
+    pub source: String,
+    pub warning_codes: Vec<String>,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct NegativeLabDryRunPreviewArtifact {
     pub artifact_id: String,
+    pub base_fog_sample_summary: NegativeLabRuntimeBaseFogSampleSummary,
     pub content_hash: String,
     pub dimensions: NegativeLabPreviewArtifactDimensions,
     pub preview_data_url: String,
@@ -279,6 +302,12 @@ const MAX_WHITE_POINT: f32 = 1.0;
 const MIN_ENDPOINT_SEPARATION: f32 = 0.05;
 const NEGATIVE_LAB_RUNTIME_PREVIEW_RENDERER: &str = "rawengine_negative_lab_runtime_preview_v1";
 const NEGATIVE_LAB_RUNTIME_PREVIEW_STORAGE: &str = "temp_cache";
+const NEGATIVE_LAB_BASE_FOG_SOURCE_REQUESTED_RECT: &str = "requested_base_fog_sample_rect";
+const NEGATIVE_LAB_BASE_FOG_SOURCE_DEFAULT_RECT: &str = "deterministic_edge_safe_default_rect";
+const NEGATIVE_LAB_BASE_FOG_WARNING_CLIPPED_CHANNEL: &str = "clipped_base_channel";
+const NEGATIVE_LAB_BASE_FOG_WARNING_LOW_CONFIDENCE: &str = "low_acquisition_confidence";
+const NEGATIVE_LAB_BASE_FOG_WARNING_MISSING_VISIBLE_BASE: &str = "missing_visible_base";
+const NEGATIVE_LAB_BASE_FOG_WARNING_UNEVEN_ILLUMINATION: &str = "uneven_illumination";
 const DEFAULT_OUTPUT_SUFFIX: &str = "Positive";
 const JPEG_PROOF_QUALITY: u8 = 92;
 const NEGATIVE_LAB_CONVERSION_BUNDLE_SCHEMA_VERSION: u8 = 1;
@@ -1815,19 +1844,126 @@ fn load_negative_lab_preview_processing_image(
     Ok(downscaled)
 }
 
-fn render_negative_lab_preview_image(
-    source_path_str: &str,
-    params: &NegativeConversionParams,
-    state: &tauri::State<'_, AppState>,
-    app_handle: &AppHandle,
-) -> Result<DynamicImage, String> {
-    let base_image_for_processing =
-        load_negative_lab_preview_processing_image(source_path_str, state, app_handle)?;
-    Ok(run_pipeline(&base_image_for_processing, params, None))
+fn default_negative_lab_runtime_base_fog_sample_rect() -> NegativeBaseFogSampleRect {
+    NegativeBaseFogSampleRect {
+        x: 0.02,
+        y: 0.2,
+        width: 0.12,
+        height: 0.6,
+    }
+}
+
+fn negative_lab_runtime_base_fog_density_range(sample_density: [f32; 3]) -> f32 {
+    let min_density = sample_density.iter().copied().fold(f32::INFINITY, f32::min);
+    let max_density = sample_density
+        .iter()
+        .copied()
+        .fold(f32::NEG_INFINITY, f32::max);
+    (max_density - min_density).max(0.0)
+}
+
+fn build_negative_lab_runtime_base_fog_rgb_triplet(
+    rgb: [f32; 3],
+) -> NegativeLabRuntimeBaseFogRgbTriplet {
+    NegativeLabRuntimeBaseFogRgbTriplet {
+        r: rgb[0],
+        g: rgb[1],
+        b: rgb[2],
+    }
+}
+
+fn negative_lab_runtime_base_fog_warning_codes(
+    estimate: &NegativeBaseFogEstimate,
+    clipped_fraction: f32,
+    density_range: f32,
+) -> Vec<String> {
+    let mut warning_codes = Vec::new();
+    if estimate.confidence < 0.6 {
+        warning_codes.push(NEGATIVE_LAB_BASE_FOG_WARNING_LOW_CONFIDENCE.to_string());
+    }
+    if clipped_fraction > 0.0
+        || estimate
+            .base_rgb
+            .iter()
+            .any(|&channel| channel <= 0.01 || channel >= 0.99)
+    {
+        warning_codes.push(NEGATIVE_LAB_BASE_FOG_WARNING_CLIPPED_CHANNEL.to_string());
+    }
+    if density_range > 0.18 {
+        warning_codes.push(NEGATIVE_LAB_BASE_FOG_WARNING_UNEVEN_ILLUMINATION.to_string());
+    }
+    if estimate.confidence < 0.12 {
+        warning_codes.push(NEGATIVE_LAB_BASE_FOG_WARNING_MISSING_VISIBLE_BASE.to_string());
+    }
+    warning_codes.sort();
+    warning_codes.dedup();
+    warning_codes
+}
+
+fn build_negative_lab_runtime_base_fog_sample_summary(
+    input: &DynamicImage,
+    requested_sample_rect: Option<NegativeBaseFogSampleRect>,
+) -> NegativeLabRuntimeBaseFogSampleSummary {
+    let sample_rect = requested_sample_rect
+        .and_then(sanitize_sample_rect)
+        .unwrap_or_else(default_negative_lab_runtime_base_fog_sample_rect);
+    let estimate = estimate_base_fog_from_image(input, Some(sample_rect));
+    let rgb = input.to_rgb32f();
+    let (width, height) = rgb.dimensions();
+    let (start_x, end_x, start_y, end_y) = sample_rect_pixel_bounds(sample_rect, width, height);
+    let mut sample_rgb_sum = [0.0_f32; 3];
+    let mut sample_count = 0_usize;
+    let mut clipped_count = 0_usize;
+
+    for y in start_y..end_y {
+        for x in start_x..end_x {
+            let channels = rgb.get_pixel(x, y).0;
+            sample_rgb_sum[0] += channels[0];
+            sample_rgb_sum[1] += channels[1];
+            sample_rgb_sum[2] += channels[2];
+            sample_count += 1;
+            if channels[0] <= 0.01
+                || channels[1] <= 0.01
+                || channels[2] <= 0.01
+                || channels[0] >= 0.99
+                || channels[1] >= 0.99
+                || channels[2] >= 0.99
+            {
+                clipped_count += 1;
+            }
+        }
+    }
+
+    let safe_sample_count = sample_count.max(1) as f32;
+    let mean_rgb = sample_rgb_sum.map(|value| value / safe_sample_count);
+    let clipped_fraction = clipped_count as f32 / safe_sample_count;
+    let density_range = negative_lab_runtime_base_fog_density_range(estimate.base_density);
+    let warning_codes =
+        negative_lab_runtime_base_fog_warning_codes(&estimate, clipped_fraction, density_range);
+
+    NegativeLabRuntimeBaseFogSampleSummary {
+        clipped_fraction,
+        confidence: estimate.confidence,
+        density_range,
+        density_rgb: build_negative_lab_runtime_base_fog_rgb_triplet(estimate.base_density),
+        mean_rgb: build_negative_lab_runtime_base_fog_rgb_triplet(mean_rgb),
+        sample_count: sample_count.max(1) as u32,
+        sample_rect,
+        source: if requested_sample_rect
+            .and_then(sanitize_sample_rect)
+            .is_some()
+        {
+            NEGATIVE_LAB_BASE_FOG_SOURCE_REQUESTED_RECT.to_string()
+        } else {
+            NEGATIVE_LAB_BASE_FOG_SOURCE_DEFAULT_RECT.to_string()
+        },
+        warning_codes,
+    }
 }
 
 fn build_negative_lab_dry_run_preview_artifact(
     rendered_preview: &DynamicImage,
+    base_fog_sample_summary: NegativeLabRuntimeBaseFogSampleSummary,
 ) -> Result<NegativeLabDryRunPreviewArtifact, String> {
     let rgb8 = rendered_preview.to_rgb8();
     let dimensions = NegativeLabPreviewArtifactDimensions {
@@ -1848,6 +1984,7 @@ fn build_negative_lab_dry_run_preview_artifact(
     let base64_str = general_purpose::STANDARD.encode(buf.get_ref());
     Ok(NegativeLabDryRunPreviewArtifact {
         artifact_id,
+        base_fog_sample_summary,
         content_hash,
         dimensions,
         preview_data_url: jpeg_data_url(base64_str),
@@ -1865,9 +2002,17 @@ pub async fn preview_negative_conversion(
 ) -> Result<String, String> {
     let (source_path, _) = parse_virtual_path(&path);
     let source_path_str = source_path.to_string_lossy().to_string();
-    let rendered_preview =
-        render_negative_lab_preview_image(&source_path_str, &params, &state, &app_handle)?;
-    Ok(build_negative_lab_dry_run_preview_artifact(&rendered_preview)?.preview_data_url)
+    let base_image_for_processing =
+        load_negative_lab_preview_processing_image(&source_path_str, &state, &app_handle)?;
+    let rendered_preview = run_pipeline(&base_image_for_processing, &params, None);
+    let base_fog_sample_summary = build_negative_lab_runtime_base_fog_sample_summary(
+        &base_image_for_processing,
+        params.base_fog_sample,
+    );
+    Ok(
+        build_negative_lab_dry_run_preview_artifact(&rendered_preview, base_fog_sample_summary)?
+            .preview_data_url,
+    )
 }
 
 #[tauri::command]
@@ -1879,9 +2024,14 @@ pub async fn render_negative_lab_dry_run_preview_artifact(
 ) -> Result<NegativeLabDryRunPreviewArtifact, String> {
     let (source_path, _) = parse_virtual_path(&path);
     let source_path_str = source_path.to_string_lossy().to_string();
-    let rendered_preview =
-        render_negative_lab_preview_image(&source_path_str, &params, &state, &app_handle)?;
-    build_negative_lab_dry_run_preview_artifact(&rendered_preview)
+    let base_image_for_processing =
+        load_negative_lab_preview_processing_image(&source_path_str, &state, &app_handle)?;
+    let rendered_preview = run_pipeline(&base_image_for_processing, &params, None);
+    let base_fog_sample_summary = build_negative_lab_runtime_base_fog_sample_summary(
+        &base_image_for_processing,
+        params.base_fog_sample,
+    );
+    build_negative_lab_dry_run_preview_artifact(&rendered_preview, base_fog_sample_summary)
 }
 
 #[tauri::command]
@@ -4374,9 +4524,11 @@ mod tests {
         let rendered_preview = DynamicImage::ImageRgb32F(
             Rgb32FImage::from_vec(2, 1, vec![0.12, 0.34, 0.56, 0.78, 0.52, 0.21]).unwrap(),
         );
+        let summary = build_negative_lab_runtime_base_fog_sample_summary(&rendered_preview, None);
 
-        let artifact = build_negative_lab_dry_run_preview_artifact(&rendered_preview)
-            .expect("build preview artifact");
+        let artifact =
+            build_negative_lab_dry_run_preview_artifact(&rendered_preview, summary.clone())
+                .expect("build preview artifact");
         let rgb8 = rendered_preview.to_rgb8();
         let expected_hash = format!("sha256:{}", hex::encode(Sha256::digest(rgb8.as_raw())));
 
@@ -4397,6 +4549,48 @@ mod tests {
                 .preview_data_url
                 .starts_with("data:image/jpeg;base64,")
         );
+        assert_eq!(
+            artifact.base_fog_sample_summary.source,
+            NEGATIVE_LAB_BASE_FOG_SOURCE_DEFAULT_RECT
+        );
+        assert!(artifact.base_fog_sample_summary.sample_count > 0);
+        assert_eq!(
+            artifact.base_fog_sample_summary.sample_rect.width,
+            summary.sample_rect.width
+        );
+    }
+
+    #[test]
+    fn runtime_base_fog_sample_summary_preserves_requested_rect_and_warning_codes() {
+        let input = DynamicImage::ImageRgb32F(
+            Rgb32FImage::from_vec(
+                4,
+                1,
+                vec![
+                    1.0, 0.82, 0.45, 0.99, 0.80, 0.44, 0.18, 0.12, 0.09, 0.16, 0.11, 0.08,
+                ],
+            )
+            .unwrap(),
+        );
+        let sample_rect = NegativeBaseFogSampleRect {
+            x: 0.0,
+            y: 0.0,
+            width: 0.5,
+            height: 1.0,
+        };
+
+        let summary = build_negative_lab_runtime_base_fog_sample_summary(&input, Some(sample_rect));
+
+        assert_eq!(summary.sample_rect.x, sample_rect.x);
+        assert_eq!(summary.sample_rect.width, sample_rect.width);
+        assert_eq!(summary.source, NEGATIVE_LAB_BASE_FOG_SOURCE_REQUESTED_RECT);
+        assert!(summary.sample_count >= 2);
+        assert!(
+            summary
+                .warning_codes
+                .contains(&NEGATIVE_LAB_BASE_FOG_WARNING_CLIPPED_CHANNEL.to_string())
+        );
+        assert!(summary.confidence >= 0.0 && summary.confidence <= 1.0);
     }
 
     #[test]

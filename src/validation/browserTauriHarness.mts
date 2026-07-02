@@ -202,6 +202,30 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
     case commandNames.renderNegativeLabDryRunPreviewArtifact:
       return Promise.resolve({
         artifactId: 'artifact_negative_lab_runtime_preview_browser_harness',
+        baseFogSampleSummary: {
+          clippedFraction: 0,
+          confidence: 0.81,
+          densityRange: 0.07,
+          densityRgb: {
+            b: 0.55,
+            g: 0.51,
+            r: 0.48,
+          },
+          meanRgb: {
+            b: 0.2818,
+            g: 0.309,
+            r: 0.3311,
+          },
+          sampleCount: 400,
+          sampleRect: {
+            height: 0.6,
+            width: 0.12,
+            x: 0.02,
+            y: 0.2,
+          },
+          source: 'deterministic_edge_safe_default_rect',
+          warningCodes: [],
+        },
         contentHash: 'sha256:d20f6ffd523b78a86cd2f916fa34af5d1918d75f7b142237c752ad6b254213ab',
         dimensions: {
           height: 1,
