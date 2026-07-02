@@ -35,6 +35,7 @@ import {
   getRenderedPreviewWarningStatus,
   isCurrentExportSoftProofGamutWarningOverlay,
 } from '../../../utils/color/runtime/gamutWarningDisplay';
+import { resolveEditorOverlayBlocker, resolveEditorOverlayVisibility } from '../../../utils/editorOverlayVisibility';
 import {
   BRUSH_MASK_COMMAND_COORDINATE_SPACE,
   buildBrushMaskCommandFromParameters,
@@ -2615,20 +2616,7 @@ const ImageCanvas = memo(
 
     const cropPreviewUrl = uncroppedAdjustedPreviewUrl || selectedImage.thumbnailUrl;
     const originalSrc = transformedOriginalUrl;
-    const isHoldOriginalCompare = compareMode === 'hold-original' || showOriginal;
-    const isSplitCompare = compareMode === 'split-wipe';
-    const isSideBySideCompare = compareMode === 'side-by-side';
-    const isCompareModeActive = compareMode !== 'off';
     const canShowOriginalCompare = !!originalSrc && originalLoaded;
-    const isShowingOriginal = isHoldOriginalCompare && !!originalSrc;
-    const compareOverlayDisabled =
-      (isSplitCompare || isSideBySideCompare) &&
-      (isCropping ||
-        isMasking ||
-        isAiEditing ||
-        isWbPickerActive ||
-        activeRetouchSource !== null ||
-        activeRemoveSource !== null);
     const renderedPreviewWarningStatus = getRenderedPreviewWarningStatus(gamutWarningOverlay, {
       exportSoftProofRecipeId,
       exportSoftProofTransform,
@@ -2641,12 +2629,41 @@ const ImageCanvas = memo(
       isExportSoftProofEnabled,
       selectedImagePath: selectedImage.path,
     });
-    const showGamutWarningOverlay =
-      isGamutWarningOverlayVisible &&
-      !isShowingOriginal &&
-      !isSideBySideCompare &&
-      !isCropping &&
-      isCurrentGamutWarningOverlay;
+    const overlayBlocker = resolveEditorOverlayBlocker({
+      hasActiveRemoveSource: activeRemoveSource !== null,
+      hasActiveRetouchSource: activeRetouchSource !== null,
+      isAiEditing,
+      isCropping,
+      isMasking,
+      isWbPickerActive: Boolean(isWbPickerActive),
+    });
+    const overlayVisibility = resolveEditorOverlayVisibility({
+      blocker: overlayBlocker,
+      canShowOriginalCompare,
+      compareMode,
+      hasDisplayedMask: Boolean(displayedMaskUrl),
+      isCurrentGamutWarningOverlay,
+      isExportSoftProofEnabled,
+      isGamutWarningOverlayVisible,
+      isMaskControlHovered,
+      isMaskInteractionActive,
+      isSliderDragging,
+      showOriginal,
+    });
+    const {
+      compareOverlayDisabled,
+      compareOverlayDisabledReason,
+      isCompareModeActive,
+      isShowingOriginal,
+      isSideBySideCompare,
+      showGamutWarningOverlay,
+      showOriginalCompare,
+      showRetouchRemoveHandles,
+      showSideBySideCompare,
+      showSplitCompare,
+    } = overlayVisibility;
+    const showInteractiveToolOverlayStage =
+      (isMasking || isAiEditing || Boolean(isWbPickerActive)) && !isCompareModeActive && !showGamutWarningOverlay;
 
     useEffect(() => {
       if (!originalSrc) {
@@ -2805,8 +2822,12 @@ const ImageCanvas = memo(
         className="canvas-overlay relative"
         data-canvas-overlay-status={activeCanvasOverlayStatus}
         data-canvas-overlay-tool={activeCanvasOverlayTool}
+        data-editor-compare-overlay-disabled-reason={compareOverlayDisabledReason}
         data-editor-compare-mode={compareMode}
         data-editor-compare-original-ready={String(canShowOriginalCompare)}
+        data-editor-gamut-overlay-visible={String(showGamutWarningOverlay)}
+        data-editor-mask-overlay-visible={String(overlayVisibility.showMaskOverlay)}
+        data-editor-overlay-blocker={overlayBlocker}
         data-mask-overlay-identity={maskOverlayRuntimeState?.identity ?? ''}
         data-mask-overlay-status={maskOverlayRuntimeState?.status ?? 'none'}
         data-preview-backend={wgpuPreviewVisibility.previewBackend}
@@ -2931,25 +2952,25 @@ const ImageCanvas = memo(
                           top: cssPx(imageRenderSize.offsetY),
                           width: cssPx(imageRenderSize.width),
                           height: cssPx(imageRenderSize.height),
-                          clipPath: isSplitCompare ? 'inset(0 50% 0 0)' : undefined,
+                          clipPath: showSplitCompare ? 'inset(0 50% 0 0)' : undefined,
                           imageRendering: isMaxZoom ? 'pixelated' : 'auto',
                           opacity:
-                            (isShowingOriginal || isSplitCompare) && originalLoaded && !isSideBySideCompare ? 1 : 0,
+                            (showOriginalCompare || showSplitCompare) && originalLoaded && !isSideBySideCompare ? 1 : 0,
                           transition: originalLoaded ? 'opacity 150ms ease-in-out' : 'none',
                           zIndex: 2,
                         }
                       : {
-                          clipPath: isSplitCompare ? 'inset(0 50% 0 0)' : undefined,
+                          clipPath: showSplitCompare ? 'inset(0 50% 0 0)' : undefined,
                           imageRendering: isMaxZoom ? 'pixelated' : 'auto',
                           opacity:
-                            (isShowingOriginal || isSplitCompare) && originalLoaded && !isSideBySideCompare ? 1 : 0,
+                            (showOriginalCompare || showSplitCompare) && originalLoaded && !isSideBySideCompare ? 1 : 0,
                           transition: originalLoaded ? 'opacity 150ms ease-in-out' : 'none',
                           zIndex: 2,
                         }
                   }
                 />
               )}
-              {isSplitCompare && (
+              {showSplitCompare && (
                 <div
                   aria-label={t('editor.canvas.compare.splitWipeDivider')}
                   className="pointer-events-none absolute top-0 h-full"
@@ -2973,7 +2994,7 @@ const ImageCanvas = memo(
                   </span>
                 </div>
               )}
-              {isSideBySideCompare && (
+              {showSideBySideCompare && (
                 <div
                   aria-label={t('editor.canvas.compare.sideBySideRegion')}
                   className="absolute inset-0 grid grid-cols-2 gap-2 bg-editor-panel-well/95 p-2"
@@ -3014,7 +3035,7 @@ const ImageCanvas = memo(
                   ))}
                 </div>
               )}
-              {isCompareModeActive && !canShowOriginalCompare && (
+              {isCompareModeActive && !compareOverlayDisabled && !canShowOriginalCompare && (
                 <div
                   className="pointer-events-none absolute bottom-3 left-3 rounded-md border border-editor-warning/50 bg-editor-warning-surface px-3 py-2 text-xs font-medium text-editor-warning"
                   data-testid="editor-compare-loading-reason"
@@ -3040,14 +3061,7 @@ const ImageCanvas = memo(
                   style={{
                     height: cssPx(imageRenderSize.height),
                     left: cssPx(imageRenderSize.offsetX),
-                    opacity:
-                      isShowingOriginal ||
-                      compareOverlayDisabled ||
-                      isMaskControlHovered ||
-                      isSliderDragging ||
-                      isMaskInteractionActive
-                        ? 0
-                        : 1,
+                    opacity: overlayVisibility.showMaskOverlay ? 1 : 0,
                     top: cssPx(imageRenderSize.offsetY),
                     transition: 'opacity 300ms ease-in-out',
                     width: cssPx(imageRenderSize.width),
@@ -3113,8 +3127,7 @@ const ImageCanvas = memo(
 
           {activeRetouchLayer &&
             activeRetouchSource &&
-            !compareOverlayDisabled &&
-            !isCropping &&
+            showRetouchRemoveHandles &&
             imageRenderSize.width > 0 &&
             imageRenderSize.height > 0 &&
             (() => {
@@ -3169,8 +3182,8 @@ const ImageCanvas = memo(
                   style={{
                     height: stageHeight * maxSafeScale,
                     left: stageLeft,
-                    opacity: isShowingOriginal ? 0 : 1,
-                    pointerEvents: isShowingOriginal ? 'none' : 'auto',
+                    opacity: showRetouchRemoveHandles ? 1 : 0,
+                    pointerEvents: showRetouchRemoveHandles ? 'auto' : 'none',
                     top: stageTop,
                     touchAction: 'none',
                     transform: `scale(${svgNumber(1 / maxSafeScale)})`,
@@ -3377,8 +3390,7 @@ const ImageCanvas = memo(
           {activeRemoveLayer &&
             activeRemoveSource &&
             activeRemoveTargetSubMask &&
-            !compareOverlayDisabled &&
-            !isCropping &&
+            showRetouchRemoveHandles &&
             imageRenderSize.width > 0 &&
             imageRenderSize.height > 0 &&
             (() => {
@@ -3437,8 +3449,8 @@ const ImageCanvas = memo(
                   style={{
                     height: stageHeight * maxSafeScale,
                     left: stageLeft,
-                    opacity: isShowingOriginal ? 0 : 1,
-                    pointerEvents: isShowingOriginal ? 'none' : 'auto',
+                    opacity: showRetouchRemoveHandles ? 1 : 0,
+                    pointerEvents: showRetouchRemoveHandles ? 'auto' : 'none',
                     top: stageTop,
                     touchAction: 'none',
                     transform: `scale(${svgNumber(1 / maxSafeScale)})`,
@@ -3616,7 +3628,7 @@ const ImageCanvas = memo(
               );
             })()}
 
-          {(isMasking || isAiEditing || isWbPickerActive) && !compareOverlayDisabled && (
+          {showInteractiveToolOverlayStage && (
             <div
               data-brush-command-coordinate-space={lastBrushCommandCapture?.coordinateSpace ?? ''}
               data-brush-command-id={lastBrushCommandCapture?.commandId ?? ''}
@@ -3639,7 +3651,7 @@ const ImageCanvas = memo(
                 zIndex: 4,
                 touchAction: 'none',
                 userSelect: 'none',
-                opacity: isShowingOriginal ? 0 : 1,
+                opacity: showInteractiveToolOverlayStage ? 1 : 0,
                 transition: 'opacity 150ms ease-in-out',
                 ...getEdgeFadeStyle(128),
               }}
@@ -3656,7 +3668,7 @@ const ImageCanvas = memo(
                 onMouseUp={handleUp}
                 onTouchEnd={handleUp}
               >
-                <Layer listening={!isShowingOriginal}>
+                <Layer listening={showInteractiveToolOverlayStage}>
                   <Group scaleX={maxSafeScale} scaleY={maxSafeScale}>
                     <Group x={groupOffsetX} y={groupOffsetY}>
                       {(isMasking || isAiEditing) &&
