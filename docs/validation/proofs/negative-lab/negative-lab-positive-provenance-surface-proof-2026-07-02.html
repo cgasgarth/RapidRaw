@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Negative Lab positive provenance surface proof</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b1220;
+        --panel: #121b2e;
+        --border: rgba(255, 255, 255, 0.09);
+        --text: #e5ebf8;
+        --muted: #9eacc8;
+        --accent: #8dd3ff;
+        --warning: #ffd27a;
+      }
+      body {
+        margin: 0;
+        background: linear-gradient(180deg, #07111f 0%, #0b1220 100%);
+        color: var(--text);
+        font: 13px/1.45 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      main {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+      h1,
+      h2 {
+        margin: 0 0 12px;
+        font-weight: 700;
+      }
+      h1 {
+        font-size: 18px;
+      }
+      h2 {
+        font-size: 14px;
+      }
+      .panel {
+        border: 1px solid var(--border);
+        background: rgba(18, 27, 46, 0.92);
+        border-radius: 8px;
+        padding: 14px;
+        margin: 14px 0;
+      }
+      .summary {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+      .badge {
+        border: 1px solid rgba(141, 211, 255, 0.35);
+        border-radius: 6px;
+        padding: 4px 8px;
+        color: var(--accent);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-size: 10px;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+      .badge.stale {
+        border-color: rgba(255, 210, 122, 0.35);
+        color: var(--warning);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 180px minmax(0, 1fr);
+        gap: 6px 12px;
+      }
+      .label {
+        color: var(--muted);
+      }
+      .value {
+        margin: 0;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        word-break: break-word;
+        text-align: right;
+      }
+      .warning {
+        margin: 0 0 12px;
+        color: var(--warning);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Negative Lab positive provenance surface proof</h1>
+      <p>
+        Supporting artifact for the metadata-panel provenance surface added for reloaded Negative Lab positives.
+      </p>
+
+      <section class="panel" aria-label="Current provenance">
+        <div class="summary">
+          <h2>Current persisted handoff</h2>
+          <div class="badge">NL Current</div>
+        </div>
+        <div class="grid">
+          <div class="label">Source negative path</div>
+          <p class="value">/roll/frame-001-negative.dng</p>
+          <div class="label">Positive output path</div>
+          <p class="value">/roll/frame-001-positive.tif</p>
+          <div class="label">Output artifact ID</div>
+          <p class="value">artifact_negative_lab_frame_001_output</p>
+          <div class="label">Output hash</div>
+          <p class="value">fnv1a64:0123456789abcdef</p>
+          <div class="label">Replay plan hash</div>
+          <p class="value">fnv1a32:abcdef12</p>
+          <div class="label">Profile provenance hash</div>
+          <p class="value">fnv1a32:12345678</p>
+          <div class="label">Output format</div>
+          <p class="value">tiff16</p>
+          <div class="label">Conversion bundle</div>
+          <p class="value">/roll/frame-001-positive.tif.negative-lab-bundle.json</p>
+          <div class="label">Sidecar path</div>
+          <p class="value">/roll/frame-001-positive.tif.rrdata</p>
+          <div class="label">Persisted state</div>
+          <p class="value">Current</p>
+        </div>
+      </section>
+
+      <section class="panel" aria-label="Stale provenance">
+        <div class="summary">
+          <h2>Stale persisted artifact</h2>
+          <div class="badge stale">NL Stale</div>
+        </div>
+        <p class="warning">Negative Lab artifact status: accepted dry-run plan changed.</p>
+        <div class="grid">
+          <div class="label">Source negative path</div>
+          <p class="value">/roll/frame-001-negative.dng</p>
+          <div class="label">Positive output path</div>
+          <p class="value">/roll/frame-001-positive.tif</p>
+          <div class="label">Output artifact ID</div>
+          <p class="value">artifact_negative_lab_frame_001_output</p>
+          <div class="label">Replay plan hash</div>
+          <p class="value">fnv1a32:abcdef12</p>
+          <div class="label">Persisted state</div>
+          <p class="value">Stale</p>
+          <div class="label">Persisted warning</div>
+          <p class="value">recipe_hash_changed</p>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
