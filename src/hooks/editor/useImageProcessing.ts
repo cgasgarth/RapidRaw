@@ -19,6 +19,7 @@ import {
   logAppOperationSuccess,
 } from '../../utils/appEventLogger';
 import { globalImageCache } from '../../utils/ImageLRUCache';
+import { parseInteractivePreviewPatchPayload } from '../../utils/interactivePreviewPatch';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import { debounce } from '../../utils/timing';
 import { debouncedSave } from './useEditorActions';
@@ -292,16 +293,28 @@ export function useImageProcessing(
           }
 
           if (dragging) {
-            const view = new DataView(buffer);
-            const patchX = view.getUint32(0, true);
-            const patchY = view.getUint32(4, true);
-            const patchW = view.getUint32(8, true);
-            const patchH = view.getUint32(12, true);
-            const fullW = view.getUint32(16, true);
-            const fullH = view.getUint32(20, true);
+            const patch = parseInteractivePreviewPatchPayload(buffer);
+            if (!patch.ok) {
+              setEditor((state) => {
+                const previousPatchUrl = state.interactivePatch?.url;
+                if (previousPatchUrl) {
+                  setTimeout(() => {
+                    URL.revokeObjectURL(previousPatchUrl);
+                  }, 100);
+                }
+                return { interactivePatch: null };
+              });
+              if (operation) {
+                logAppOperationSuccess(operation, {
+                  byteLength: buffer.byteLength,
+                  droppedReason: patch.reason,
+                  jobId,
+                });
+              }
+              return;
+            }
 
-            const imageBuffer = buffer.slice(24);
-            const blob = new Blob([imageBuffer], { type: 'image/jpeg' });
+            const blob = new Blob([patch.imageBuffer], { type: 'image/jpeg' });
             const url = URL.createObjectURL(blob);
 
             setEditor((state) => {
@@ -313,10 +326,10 @@ export function useImageProcessing(
               return {
                 interactivePatch: {
                   url,
-                  normX: patchX / fullW,
-                  normY: patchY / fullH,
-                  normW: patchW / fullW,
-                  normH: patchH / fullH,
+                  normX: patch.normX,
+                  normY: patch.normY,
+                  normW: patch.normW,
+                  normH: patch.normH,
                 },
               };
             });
