@@ -37,6 +37,12 @@ import { Invokes } from '../../../../tauri/commands';
 import { TextColors, TextVariants, TextWeights } from '../../../../types/typography';
 import type { Adjustments } from '../../../../utils/adjustments';
 import {
+  type AppOperationContext,
+  beginAppOperation,
+  logAppOperationFailure,
+  logAppOperationSuccess,
+} from '../../../../utils/appEventLogger';
+import {
   formatGamutWarningCoverage,
   isCurrentExportSoftProofGamutWarningOverlay,
 } from '../../../../utils/color/runtime/gamutWarningDisplay';
@@ -1136,6 +1142,23 @@ export default function ExportPanel({
     };
 
     const lastExportPath = appSettings?.exportPresets?.find((p) => p.id === EXPORT_LAST_USED_PRESET_ID)?.lastExportPath;
+    const operation: AppOperationContext = beginAppOperation({
+      action: 'export_images',
+      component: 'export.panel',
+      details: {
+        colorProfile,
+        count: numImages,
+        exportMasks: exportSettings.exportMasks ?? false,
+        fileFormat,
+        hasCurrentEdit: Boolean(selectedImage?.path),
+        preserveFolders,
+        resizeEnabled: Boolean(exportSettings.resize),
+        watermarkEnabled: Boolean(exportSettings.watermark),
+      },
+      domain: 'export',
+      operationId: `export_${Date.now().toString(36)}`,
+      traceId: selectedImage?.path ? 'export_current_edit' : 'export_library_selection',
+    });
 
     try {
       const selectedFormat = FILE_FORMATS.find((f) => f.id === fileFormat);
@@ -1203,8 +1226,19 @@ export default function ExportPanel({
           currentEditPath: selectedImage?.path || null,
           currentEditAdjustments: adjustments,
         });
+        logAppOperationSuccess(operation, {
+          count: numImages,
+          outputTarget: isAndroid ? 'android_default' : numImages === 1 ? 'single_file' : 'folder',
+          outputFormat: selectedFormat.extensions[0] ?? fileFormat,
+        });
+      } else {
+        logAppOperationSuccess(operation, {
+          count: numImages,
+          droppedReason: 'user_cancelled_output_picker',
+        });
       }
     } catch (error) {
+      logAppOperationFailure(operation, error);
       setExportState({
         errorMessage: typeof error === 'string' ? error : t('export.status.failed'),
         progress,
