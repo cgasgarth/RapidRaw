@@ -21,6 +21,7 @@ import {
   type SelectiveColorCommandColorPipeline,
 } from '../../selectiveColorCommandBridge';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
+import { renderAgentReadOnlyPreview } from '../context/agentReadOnlyAppServerTools';
 import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorState';
 
 export const AGENT_COLOR_APPLY_TOOL_NAME = 'rawengine.agent.color.apply';
@@ -158,6 +159,14 @@ export const agentColorApplyResponseSchema = z
     appliedGraphRevision: z.string().trim().min(1),
     beforePreviewHash: z.string().trim().min(1),
     changedPixelCount: z.number().int().positive(),
+    previewAfter: z
+      .object({
+        artifactId: z.string().trim().min(1),
+        purpose: z.enum(['detail_review', 'initial_context', 'refresh']),
+        recipeHash: z.string().trim().min(1),
+        renderHash: z.string().trim().min(1),
+      })
+      .strict(),
     receipt: z
       .object({
         adjustedFields: z.array(z.string().trim().min(1)).min(1),
@@ -410,12 +419,19 @@ export const applyAgentColor = async (request: AgentColorApplyRequest): Promise<
   });
 
   const afterSnapshot = buildAgentImageContextSnapshot();
+  const previewRefresh = renderAgentReadOnlyPreview({
+    expectedRecipeHash: afterSnapshot.initialPreview.recipeHash,
+    purpose: 'refresh',
+    requestId: `${parsedRequest.requestId}:preview_refresh`,
+    sourceToolName: AGENT_COLOR_APPLY_TOOL_NAME,
+    turn: useEditorStore.getState().historyIndex,
+  });
   const adjustedFields = COLOR_PATCH_KEYS.filter((key) => parsedRequest.color[key] !== undefined);
   const appliedGraphRevision = `history_${useEditorStore.getState().historyIndex}`;
 
   return agentColorApplyResponseSchema.parse({
     adjustedFields,
-    afterPreviewHash: afterSnapshot.initialPreview.renderHash,
+    afterPreviewHash: previewRefresh.preview.renderHash,
     appliedGraphRevision,
     beforePreviewHash: snapshot.initialPreview.renderHash,
     changedPixelCount: estimateChangedPixels({
@@ -423,6 +439,12 @@ export const applyAgentColor = async (request: AgentColorApplyRequest): Promise<
       before: state.adjustments,
       imageArea: selectedImage.width * selectedImage.height,
     }),
+    previewAfter: {
+      artifactId: previewRefresh.preview.artifactId,
+      purpose: previewRefresh.preview.purpose,
+      recipeHash: previewRefresh.preview.recipeHash,
+      renderHash: previewRefresh.preview.renderHash,
+    },
     receipt: {
       adjustedFields,
       appliedGraphRevision,

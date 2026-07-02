@@ -42,6 +42,14 @@ const colorResultSchema = z
     appliedGraphRevision: z.string().min(1),
     beforePreviewHash: z.string().min(1),
     changedPixelCount: z.number().int().positive(),
+    previewAfter: z
+      .object({
+        artifactId: z.string().min(1),
+        purpose: z.literal('refresh'),
+        recipeHash: z.string().min(1),
+        renderHash: z.string().min(1),
+      })
+      .strict(),
     receipt: z
       .object({
         adjustedFields: z.array(z.string()).min(1),
@@ -357,6 +365,13 @@ if (
 }
 if (parsedResult.beforePreviewHash === parsedResult.afterPreviewHash) {
   throw new Error('agent.color.apply did not update preview render identity.');
+}
+if (
+  parsedResult.previewAfter.purpose !== 'refresh' ||
+  parsedResult.previewAfter.renderHash !== parsedResult.afterPreviewHash ||
+  parsedResult.previewAfter.recipeHash !== afterSnapshot.initialPreview.recipeHash
+) {
+  throw new Error('agent.color.apply did not return a refreshed preview artifact.');
 }
 if (afterSnapshot.initialPreview.recipeHash === initialSnapshot.initialPreview.recipeHash) {
   throw new Error('agent color recipe hash did not change after apply.');
