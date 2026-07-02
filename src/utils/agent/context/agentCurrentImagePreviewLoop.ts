@@ -241,6 +241,7 @@ const buildSelectedImageInitialPreviewReceipt = ({
 };
 
 const buildSelectedImagePreviewRefreshReceipt = ({
+  expectedRecipeHash,
   graphRevision,
   imagePath,
   preview,
@@ -249,6 +250,7 @@ const buildSelectedImagePreviewRefreshReceipt = ({
   sourceToolName,
   turn,
 }: {
+  expectedRecipeHash: string;
   graphRevision: string;
   imagePath: string;
   preview: {
@@ -290,9 +292,9 @@ const buildSelectedImagePreviewRefreshReceipt = ({
     imagePath,
     preview,
     proofContext: {
-      expectedRecipeHash: preview.recipeHash,
+      expectedRecipeHash,
       sourceToolName,
-      stale: false,
+      stale: expectedRecipeHash !== preview.recipeHash,
       transport: 'codex_app_server',
     },
     requestId,
@@ -434,6 +436,7 @@ export const runAgentCurrentImagePreviewLoop = async (
       throw new Error('Agent selected-image preview loop missing refresh preview for lineage receipt.');
     }
     return buildSelectedImagePreviewRefreshReceipt({
+      expectedRecipeHash: preview.recipeHash,
       graphRevision: lineage.appliedGraphRevision,
       imagePath: initialSnapshot.activeImagePath,
       preview: {
