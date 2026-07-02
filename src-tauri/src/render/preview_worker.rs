@@ -344,26 +344,6 @@ fn to_preview_rgba8(image: DynamicImage) -> RgbaImage {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use image::{ImageBuffer, Rgba};
-
-    #[test]
-    fn preview_encoder_accepts_rgba32f_raw_pipeline_output() {
-        let image = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(2, 2, |x, y| {
-            Rgba([x as f32 / 2.0, y as f32 / 2.0, 0.25 + x as f32 * 0.1, 1.0])
-        }));
-
-        let encoded =
-            encode_preview_response(image, false, None, 2, 2, 82, std::time::Instant::now())
-                .expect("RGBA32F preview should encode through RGBA8 boundary");
-
-        assert!(encoded.starts_with(&[0xff, 0xd8]));
-        assert!(encoded.len() > 16);
-    }
-}
-
 pub(crate) fn start_preview_worker(app_handle: tauri::AppHandle) {
     let state = app_handle.state::<AppState>();
     let (tx, rx): (Sender<PreviewJob>, Receiver<PreviewJob>) = mpsc::channel();
@@ -397,4 +377,24 @@ pub(crate) fn start_preview_worker(app_handle: tauri::AppHandle) {
             }
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use image::{ImageBuffer, Rgba};
+
+    #[test]
+    fn preview_encoder_accepts_rgba32f_raw_pipeline_output() {
+        let image = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(2, 2, |x, y| {
+            Rgba([x as f32 / 2.0, y as f32 / 2.0, 0.25 + x as f32 * 0.1, 1.0])
+        }));
+
+        let encoded =
+            encode_preview_response(image, false, None, 2, 2, 82, std::time::Instant::now())
+                .expect("RGBA32F preview should encode through RGBA8 boundary");
+
+        assert!(encoded.starts_with(&[0xff, 0xd8]));
+        assert!(encoded.len() > 16);
+    }
 }
