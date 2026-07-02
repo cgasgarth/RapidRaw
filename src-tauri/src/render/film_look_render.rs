@@ -142,7 +142,11 @@ pub(crate) fn normalize_film_look_adjustments_for_render(adjustments: &Value) ->
     }
 
     for (field, value) in look.patch {
-        set_number(&mut normalized, field, scale_film_look_value(field, *value, strength));
+        set_number(
+            &mut normalized,
+            field,
+            scale_film_look_value(field, *value, strength),
+        );
     }
 
     set_number(
