@@ -1,14 +1,19 @@
 import { describe, expect, test } from 'bun:test';
-
 import {
   type NegativeLabDustScratchReviewReport,
   negativeLabDustScratchReviewReportSchema,
 } from '../../../src/schemas/negative-lab/negativeLabWorkspaceSchemas.ts';
+import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 import {
   applyDustCandidateDecisionTransition,
   buildDustCandidateHealLayer,
   buildDustHealCorrectionMetrics,
 } from '../../../src/utils/dustCandidateHealLayer.ts';
+import { buildLayerStackSidecarFromMasks } from '../../../src/utils/layers/layerStackCommandBridge.ts';
+import {
+  hydrateLayerStackMasksFromMetadata,
+  persistLayerStackSidecarInAdjustments,
+} from '../../../src/utils/layers/layerStackSidecarAdjustments.ts';
 
 type DustReviewFrame = NegativeLabDustScratchReviewReport['frames'][number];
 type DustReviewCandidate = DustReviewFrame['candidates'][number];
@@ -79,6 +84,7 @@ describe('negative lab dust candidate retouch layers', () => {
     expect(healLayer?.retouchCloneSource?.retouchMode).toBe('heal');
     expect(healLayer?.subMasks).toHaveLength(1);
     expect(healLayer?.retouchCloneSource?.candidateProvenance?.sourceFrameId).toBe(reviewFrame.frameId);
+    expect(healLayer?.retouchCloneSource?.provenance?.editableLayer).toBe(true);
 
     const rejected = applyDustCandidateDecisionTransition({
       candidate: dustCandidate,
@@ -91,6 +97,51 @@ describe('negative lab dust candidate retouch layers', () => {
 
     expect(rejected.decisionByCandidateId[dustCandidate.candidateId]).toBe('rejected');
     expect(rejected.healLayerByCandidateId[dustCandidate.candidateId]).toBeUndefined();
+  });
+
+  test('persists accepted heal layers into layer stack sidecars and reloads them once', () => {
+    const accepted = applyDustCandidateDecisionTransition({
+      candidate: dustCandidate,
+      decision: 'accepted',
+      frameId: reviewFrame.frameId,
+      imageHeight: 800,
+      imageWidth: 1200,
+      state: {
+        decisionByCandidateId: {},
+        healLayerByCandidateId: {},
+      },
+    });
+    const healLayer = accepted.healLayerByCandidateId[dustCandidate.candidateId];
+    if (healLayer === undefined) throw new Error('Expected accepted heal layer for persistence proof.');
+
+    const imagePath = '/roll/frame-001-positive.tif';
+    const sidecar = buildLayerStackSidecarFromMasks([healLayer], {
+      graphRevision: 'layer_stack_dust_heal_initial',
+      imagePath,
+      operationId: 'layer_stack_dust_heal_initial',
+      sessionId: 'negative-lab-dust-candidate-retouch-layers',
+    });
+    const persistedAdjustments = persistLayerStackSidecarInAdjustments(
+      { ...INITIAL_ADJUSTMENTS, masks: [healLayer] },
+      sidecar,
+    );
+    const persistedArtifacts = persistedAdjustments.rawEngineArtifacts;
+    expect(persistedArtifacts?.layerStackSidecars).toHaveLength(1);
+    expect(persistedArtifacts?.layerStackSidecars[0]?.sourceImagePath).toBe(imagePath);
+
+    const reupserted = persistLayerStackSidecarInAdjustments(persistedAdjustments, structuredClone(sidecar));
+    expect(reupserted.rawEngineArtifacts?.layerStackSidecars).toHaveLength(1);
+
+    const reopened = hydrateLayerStackMasksFromMetadata(
+      { ...INITIAL_ADJUSTMENTS, masks: [] },
+      { rawEngineArtifacts: persistedArtifacts },
+      imagePath,
+    );
+    const reopenedLayer = reopened.masks.find((mask) => mask.id === healLayer.id);
+    expect(reopened.masks).toHaveLength(1);
+    expect(reopenedLayer?.retouchCloneSource?.candidateProvenance?.candidateId).toBe(dustCandidate.candidateId);
+    expect(reopenedLayer?.retouchCloneSource?.provenance?.proofSource).toBe('negative_lab_candidate_acceptance_v1');
+    expect(reopenedLayer?.retouchCloneSource?.provenance?.editableLayer).toBe(true);
   });
 
   test('keeps scratch candidates review-only when accept is requested', () => {
