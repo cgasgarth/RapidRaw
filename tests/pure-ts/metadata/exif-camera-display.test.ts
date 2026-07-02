@@ -25,6 +25,7 @@ test('normalizes focal length display across decimal, unit, and rational RAW EXI
 test('prefers actual focal length and falls back to 35mm equivalent metadata', () => {
   expect(formatExifFocalLengthFromMetadata({ FocalLength: '240/10', FocalLengthIn35mmFilm: '35' })).toBe('24 mm');
   expect(formatExifFocalLengthFromMetadata({ FocalLengthIn35mmFilm: '35' })).toBe('35 mm');
+  expect(formatExifFocalLengthFromMetadata({ FocalLength: '0', FocalLengthIn35mmFilm: '35' })).toBe('35 mm');
 });
 
 test('distinguishes missing, invalid, zero, and valid camera metadata parses', () => {
@@ -34,11 +35,14 @@ test('distinguishes missing, invalid, zero, and valid camera metadata parses', (
   expect(parseExifMetadataNumber('8/1')).toMatchObject({ status: 'valid', value: 8 });
 });
 
-test('does not silently display f/0 or 0mm without warning semantics', () => {
-  expect(formatExifAperture('0')).toBe('f/0 !');
-  expect(formatExifFocalLength('0')).toBe('0 mm !');
+test('does not display zero or lens id placeholders as camera metadata', () => {
+  expect(formatExifAperture('0')).toBeUndefined();
+  expect(formatExifFocalLength('0')).toBeUndefined();
+  expect(formatExifAperture('f/0')).toBeUndefined();
+  expect(formatExifFocalLength('0:0')).toBeUndefined();
   expect(formatExifAperture('unknown')).toBeUndefined();
   expect(formatExifFocalLength('unknown mm')).toBeUndefined();
+  expect(formatExifApertureFromMetadata({ FNumber: 'f/0', ApertureValue: '8' })).toBe('f/8');
 });
 
 test('metadata readiness counts normalized camera values instead of bad raw placeholders', () => {
@@ -50,12 +54,12 @@ test('metadata readiness counts normalized camera values instead of bad raw plac
   };
 
   expect(formatExifApertureFromMetadata(exif)).toBeUndefined();
-  expect(formatExifFocalLengthFromMetadata(exif)).toBe('0 mm !');
+  expect(formatExifFocalLengthFromMetadata(exif)).toBeUndefined();
   expect(
     buildMetadataReadinessSummary({
       exif,
       gpsCoordinates: null,
       selectionCount: 1,
     }).cameraFieldCount,
-  ).toBe(3);
+  ).toBe(2);
 });

@@ -57,14 +57,17 @@ export const parseExifMetadataNumber = (value: MetadataValue): MetadataNumberPar
 
   const normalized = raw
     .replace(/^f\s*\/\s*/iu, '')
-    .replace(/\b(?:mm|millimeters?|seconds?|secs?|sec|s|ev)\b/giu, '')
     .replace(/[",']/gu, '')
+    .replace(/\s*(?:mm|millimeters?|seconds?|secs?|sec|s|ev)\s*$/iu, '')
     .trim();
 
-  const rationalMatch = /^([-+]?\d+(?:\.\d+)?)\s*\/\s*([-+]?\d+(?:\.\d+)?)/u.exec(normalized);
+  const decimalSource = normalized.replace(/,/gu, '');
+  const rationalMatch = /^([-+]?(?:\d+(?:\.\d+)?|\.\d+))\s*\/\s*([-+]?(?:\d+(?:\.\d+)?|\.\d+))$/u.exec(decimalSource);
   const parsed = rationalMatch
     ? Number(rationalMatch[1]) / Number(rationalMatch[2])
-    : Number.parseFloat(normalized.replace(/,/gu, ''));
+    : /^[-+]?(?:\d+(?:\.\d+)?|\.\d+)$/u.test(decimalSource)
+      ? Number.parseFloat(decimalSource)
+      : Number.NaN;
 
   if (!Number.isFinite(parsed)) return { source: value, status: 'invalid', value: null };
   return { source: value, status: parsed === 0 ? 'zero' : 'valid', value: parsed };
@@ -72,16 +75,14 @@ export const parseExifMetadataNumber = (value: MetadataValue): MetadataNumberPar
 
 export const formatExifAperture = (value: MetadataValue): string | undefined => {
   const parsed = parseExifMetadataNumber(value);
-  if (parsed.status === 'missing' || parsed.status === 'invalid') return undefined;
-  if (parsed.status === 'zero') return 'f/0 !';
-  return `f/${formatFiniteMetadataNumber(parsed.value ?? 0, 2)}`;
+  if (parsed.status !== 'valid' || parsed.value === null || parsed.value <= 0) return undefined;
+  return `f/${formatFiniteMetadataNumber(parsed.value, 2)}`;
 };
 
 export const formatExifFocalLength = (value: MetadataValue): string | undefined => {
   const parsed = parseExifMetadataNumber(value);
-  if (parsed.status === 'missing' || parsed.status === 'invalid') return undefined;
-  if (parsed.status === 'zero') return '0 mm !';
-  return `${formatFiniteMetadataNumber(parsed.value ?? 0)} mm`;
+  if (parsed.status !== 'valid' || parsed.value === null || parsed.value <= 0) return undefined;
+  return `${formatFiniteMetadataNumber(parsed.value)} mm`;
 };
 
 export const readExifMetadataValue = (
@@ -95,11 +96,26 @@ export const readExifMetadataValue = (
   return undefined;
 };
 
+const readFormattedExifMetadataValue = (
+  exif: MetadataExifData | null | undefined,
+  keys: readonly string[],
+  format: (value: MetadataValue) => string | undefined,
+): string | undefined => {
+  for (const key of keys) {
+    const value = exif?.[key];
+    if (!hasMetadataValue(value)) continue;
+
+    const formatted = format(value);
+    if (formatted !== undefined) return formatted;
+  }
+  return undefined;
+};
+
 export const formatExifApertureFromMetadata = (exif: MetadataExifData | null | undefined): string | undefined =>
-  formatExifAperture(readExifMetadataValue(exif, ['FNumber', 'ApertureValue']));
+  readFormattedExifMetadataValue(exif, ['FNumber', 'ApertureValue'], formatExifAperture);
 
 export const formatExifFocalLengthFromMetadata = (exif: MetadataExifData | null | undefined): string | undefined =>
-  formatExifFocalLength(readExifMetadataValue(exif, ['FocalLength', 'FocalLengthIn35mmFilm']));
+  readFormattedExifMetadataValue(exif, ['FocalLength', 'FocalLengthIn35mmFilm'], formatExifFocalLength);
 
 export const buildMetadataReadinessSummary = ({
   exif,
