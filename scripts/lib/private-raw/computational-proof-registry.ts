@@ -93,6 +93,7 @@ export const computationalPrivateProofConfigs = {
     },
     proofChecks: [
       ['bun', 'tests/integration/checks/panorama/check-panorama-runtime-plan-smoke.ts'],
+      ['bun', 'tests/integration/checks/panorama/check-panorama-cylindrical-bounded-runtime.ts'],
       ['bun', 'tests/integration/checks/panorama/check-panorama-app-server-runtime.ts'],
       ['bun', 'tests/integration/checks/panorama/check-panorama-ui-runtime-bridge.ts'],
     ],
