@@ -1806,6 +1806,7 @@ fn frontend_log(level: String, message: String) -> Result<(), String> {
     let log_line = |line: &str| match level.to_lowercase().as_str() {
         "error" => log::error!("[frontend] {}", line),
         "warn" => log::warn!("[frontend] {}", line),
+        "info" if line.starts_with("[app-event]") => log::warn!("[frontend] {}", line),
         "debug" => log::debug!("[frontend] {}", line),
         "trace" => log::trace!("[frontend] {}", line),
         _ => log::info!("[frontend] {}", line),

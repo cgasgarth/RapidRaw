@@ -127,6 +127,10 @@ function extractViteDetails(args: unknown[]): string | null {
 }
 
 function shouldIgnoreMessage(message: string): boolean {
+  if (message.trimStart().startsWith('[app-event]')) {
+    return true;
+  }
+
   const normalized = message.toLowerCase();
   if (normalized.includes('[vite] failed to reload') && normalized.includes('see errors above')) {
     return true;
