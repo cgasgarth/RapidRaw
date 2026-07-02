@@ -1547,11 +1547,11 @@ pub(crate) fn refresh_negative_lab_stale_artifacts(
             "invalidationReasons": reasons,
             "state": stale_state,
         });
-        if artifact.get("staleState") != Some(&next_stale_state) {
-            if let Some(object) = artifact.as_object_mut() {
-                object.insert("staleState".to_string(), next_stale_state);
-                changed = true;
-            }
+        if artifact.get("staleState") != Some(&next_stale_state)
+            && let Some(object) = artifact.as_object_mut()
+        {
+            object.insert("staleState".to_string(), next_stale_state);
+            changed = true;
         }
     }
 
