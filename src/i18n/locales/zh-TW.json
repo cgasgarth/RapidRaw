@@ -2592,6 +2592,11 @@
         "protectHighlights": ""
       },
       "failed": "HDR 合併失敗",
+      "handoffBracketCompareLimited": "",
+      "handoffBracketCompareReady": "",
+      "handoffBracketCompareReview": "",
+      "handoffBracketCompareSkipped": "",
+      "handoffBracketCompareUsed": "",
       "handoffColorSpace": "",
       "handoffColorStates": "",
       "handoffColorStatesValue": "",

@@ -1,5 +1,6 @@
 import type { HdrRuntimeSidecarReceiptV1 } from '../../packages/rawengine-schema/src/rawEngineSchemas';
 import {
+  type HdrBracketCompareReviewSummary,
   type HdrEditableHandoffSummary,
   type HdrMergeUiSettings,
   hdrEditableHandoffSummarySchema,
@@ -28,6 +29,108 @@ const normalizeAssetId = (path: string): string =>
       .replace(/^_+|_+$/gu, '')
       .toLowerCase() || 'output'
   }`;
+
+const getSourceWeightMultiplier = (
+  sourceRole: HdrBracketCompareReviewSummary['sources'][number]['sourceRole'],
+  settings: HdrMergeUiSettings,
+): number => {
+  if (settings.exposureWeightingMode === 'protect_highlights' && sourceRole === 'under_exposed') return 1.35;
+  if (settings.exposureWeightingMode === 'lift_shadows' && sourceRole === 'over_exposed') return 1.35;
+  return 1;
+};
+
+const buildBracketCompareReview = ({
+  runtimeSidecarReceipt,
+  settings,
+  sourceMetadata,
+  sourceRefs,
+}: {
+  runtimeSidecarReceipt?: HdrRuntimeSidecarReceiptV1;
+  settings: HdrMergeUiSettings;
+  sourceMetadata?: HdrBracketPreflightSourceMetadata[];
+  sourceRefs: HdrEditableHandoffSummary['sourceRefs'];
+}): HdrBracketCompareReviewSummary => {
+  const selectedSourceIndexes = new Set(settings.selectedSourceIndexes);
+  const sourceRefsByIndex = new Map(sourceRefs.map((sourceRef) => [sourceRef.sourceIndex, sourceRef]));
+
+  if (runtimeSidecarReceipt !== undefined) {
+    return {
+      accepted: runtimeSidecarReceipt.bracket.accepted,
+      detectionConfidence: runtimeSidecarReceipt.bracket.detectionConfidence,
+      evidenceSource: 'runtime_sidecar',
+      exposureSpreadEv: runtimeSidecarReceipt.bracket.exposureSpreadEv,
+      referenceSourceIndex: runtimeSidecarReceipt.bracket.referenceSourceIndex,
+      reviewStatus: 'ready',
+      selectedSourceCount: runtimeSidecarReceipt.bracket.sourceRoles.filter((source) =>
+        selectedSourceIndexes.has(source.sourceIndex),
+      ).length,
+      sourceCount: runtimeSidecarReceipt.bracket.sourceCount,
+      sources: runtimeSidecarReceipt.bracket.sourceRoles.map((source) => {
+        const sourceRef = sourceRefsByIndex.get(source.sourceIndex);
+        return {
+          contentHash: sourceRef?.contentHash ?? hashStableJson({ sourceIndex: source.sourceIndex }),
+          displayName: sourceRef?.displayName ?? `Source ${source.sourceIndex + 1}`,
+          exposureEv: source.exposureEv,
+          exposureWeightMultiplier: getSourceWeightMultiplier(source.role, settings),
+          graphRevision: sourceRef?.graphRevision ?? HDR_GRAPH_REVISION,
+          selected: selectedSourceIndexes.has(source.sourceIndex),
+          sourceIndex: source.sourceIndex,
+          sourceRole: source.role,
+        };
+      }),
+    };
+  }
+
+  const bracketPreflight = buildHdrBracketPreflight(sourceMetadata);
+  if (bracketPreflight !== null) {
+    return {
+      accepted: bracketPreflight.accepted,
+      detectionConfidence: bracketPreflight.detectionConfidence,
+      evidenceSource: 'ui_bracket_preflight',
+      exposureSpreadEv: bracketPreflight.bracketSpanEv,
+      referenceSourceIndex: bracketPreflight.referenceSourceIndex,
+      reviewStatus: 'ready',
+      selectedSourceCount: bracketPreflight.sourceMetadata.filter((source) =>
+        selectedSourceIndexes.has(source.sourceIndex),
+      ).length,
+      sourceCount: bracketPreflight.sourceMetadata.length,
+      sources: bracketPreflight.sourceMetadata.map((source) => {
+        const sourceRef = sourceRefsByIndex.get(source.sourceIndex);
+        return {
+          contentHash: sourceRef?.contentHash ?? hashStableJson({ sourceIndex: source.sourceIndex }),
+          displayName: sourceRef?.displayName ?? getDisplayFileName(source.imagePath),
+          exposureEv: source.resolvedExposureEv,
+          exposureWeightMultiplier: getSourceWeightMultiplier(source.resolvedBracketRole, settings),
+          graphRevision: sourceRef?.graphRevision ?? HDR_GRAPH_REVISION,
+          selected: selectedSourceIndexes.has(source.sourceIndex),
+          sourceIndex: source.sourceIndex,
+          sourceRole: source.resolvedBracketRole,
+        };
+      }),
+    };
+  }
+
+  return {
+    accepted: null,
+    detectionConfidence: null,
+    evidenceSource: 'source_refs_only',
+    exposureSpreadEv: null,
+    referenceSourceIndex: null,
+    reviewStatus: 'limited',
+    selectedSourceCount: sourceRefs.filter((source) => selectedSourceIndexes.has(source.sourceIndex)).length,
+    sourceCount: sourceRefs.length,
+    sources: sourceRefs.map((sourceRef) => ({
+      contentHash: sourceRef.contentHash,
+      displayName: sourceRef.displayName,
+      exposureEv: 0,
+      exposureWeightMultiplier: 1,
+      graphRevision: sourceRef.graphRevision,
+      selected: selectedSourceIndexes.has(sourceRef.sourceIndex),
+      sourceIndex: sourceRef.sourceIndex,
+      sourceRole: 'unknown',
+    })),
+  };
+};
 
 export const buildHdrEditableHandoffSummary = ({
   deghostReviewAccepted,
@@ -89,8 +192,15 @@ export const buildHdrEditableHandoffSummary = ({
       ...(settings.toneMapPreview ? ['tone_mapped_preview_only'] : []),
     ]),
   ];
+  const bracketCompareReview = buildBracketCompareReview({
+    ...(runtimeSidecarReceipt === undefined ? {} : { runtimeSidecarReceipt }),
+    settings,
+    ...(sourceMetadata === undefined ? {} : { sourceMetadata }),
+    sourceRefs,
+  });
 
   return hdrEditableHandoffSummarySchema.parse({
+    bracketCompareReview,
     capabilityLevel: 'runtime_apply_capable',
     deghosting: settings.deghosting,
     deghostReviewAccepted: deghostReviewAccepted ?? false,

@@ -38,6 +38,10 @@ for (const marker of [
   'data-preview-export-proof-hash={handoffSummary.previewExportParity.parityProofHash}',
   'data-preview-export-preview-state-hash={handoffSummary.previewExportParity.previewStateHash}',
   'data-preview-export-parity-status={handoffSummary.previewExportParityStatus}',
+  'data-bracket-compare-evidence-source={handoffSummary.bracketCompareReview.evidenceSource}',
+  'data-bracket-compare-review-status={handoffSummary.bracketCompareReview.reviewStatus}',
+  'data-testid="hdr-bracket-compare-review"',
+  'data-testid="hdr-bracket-compare-source-row"',
   'data-scene-merge-color-state={handoffSummary.sceneMergeColorState}',
   'data-testid="hdr-editable-handoff-provenance"',
   'data-testid="hdr-derived-output-receipt-store-entry"',
@@ -52,6 +56,12 @@ for (const marker of [
   if (!hdrModalSource.includes(marker)) {
     throw new Error(`HDR modal editable handoff marker missing: ${marker}`);
   }
+}
+if (
+  hdrModalSource.indexOf('data-testid="hdr-bracket-compare-review"') >
+  hdrModalSource.indexOf('data-testid="hdr-derived-output-receipt-store-entry"')
+) {
+  throw new Error('HDR bracket compare review must appear before the editable derived receipt handoff.');
 }
 
 for (const marker of ['props.handleImageSelect(path);', 'onSave={props.handleSaveHdr}']) {
@@ -80,6 +90,7 @@ for (const marker of [
   'hdr-artifact-handoff',
   'hdr-editable-handoff-provenance',
   'displayPreviewColorState',
+  'hdr-bracket-compare-review',
   '/tmp/rawengine-hdr-smoke.tif',
   'hdr-private-raw-artifact-handoff',
   'previewExportParityStatus',
@@ -172,9 +183,56 @@ const handoffSummary = buildHdrEditableHandoffSummary({
     },
   ],
 });
+const preflightHandoffSummary = buildHdrEditableHandoffSummary({
+  deghostReviewAccepted: false,
+  deghostReviewRequired: false,
+  outputPath: '/tmp/rawengine-hdr-smoke.tif',
+  settings: {
+    ...DEFAULT_HDR_MERGE_UI_SETTINGS,
+    exposureWeightingMode: 'lift_shadows',
+    selectedSourceIndexes: [0, 2],
+  },
+  sourcePaths: [
+    '/private-fixtures/hdr/bracket-alignment-v1/frame-01-under.arw',
+    '/private-fixtures/hdr/bracket-alignment-v1/frame-02-mid.arw',
+    '/private-fixtures/hdr/bracket-alignment-v1/frame-03-over.arw',
+  ],
+  sourceMetadata: [
+    {
+      contentHash: 'blake3:hdr-source-under',
+      exif: { ExposureTime: '1/60', FNumber: '5.6', ISO: '100' },
+      graphRevision: 'graph_hdr_under_edited',
+      path: '/private-fixtures/hdr/bracket-alignment-v1/frame-01-under.arw',
+    },
+    {
+      contentHash: 'blake3:hdr-source-mid',
+      exif: { ExposureTime: '1/250', FNumber: '5.6', ISO: '100' },
+      graphRevision: 'graph_hdr_mid_edited',
+      path: '/private-fixtures/hdr/bracket-alignment-v1/frame-02-mid.arw',
+    },
+    {
+      contentHash: 'blake3:hdr-source-over',
+      exif: { ExposureTime: '1/15', FNumber: '5.6', ISO: '100' },
+      graphRevision: 'graph_hdr_over_edited',
+      path: '/private-fixtures/hdr/bracket-alignment-v1/frame-03-over.arw',
+    },
+  ],
+});
 
 if (handoffSummary.previewExportParity.status !== handoffSummary.previewExportParityStatus) {
   throw new Error('HDR preview/export parity status must match handoff status.');
+}
+if (preflightHandoffSummary.bracketCompareReview.evidenceSource !== 'ui_bracket_preflight') {
+  throw new Error('HDR bracket compare review should fall back to UI bracket preflight before editable handoff.');
+}
+if (preflightHandoffSummary.bracketCompareReview.selectedSourceCount !== 2) {
+  throw new Error('HDR bracket compare review must expose the selected bracket subset before editable handoff.');
+}
+const liftedShadowSource = preflightHandoffSummary.bracketCompareReview.sources.find(
+  (source) => source.sourceIndex === 2,
+);
+if (liftedShadowSource === undefined || liftedShadowSource.exposureWeightMultiplier !== 1.35) {
+  throw new Error('HDR bracket compare review must expose source contribution weighting before editable handoff.');
 }
 if (handoffSummary.previewExportParity.meanAbsDelta !== handoffSummary.previewExportMeanAbsDelta) {
   throw new Error('HDR preview/export parity delta must match handoff delta.');
@@ -193,6 +251,31 @@ if (handoffSummary.previewExportParity.previewStateHash === handoffSummary.previ
 }
 if (!handoffSummary.previewExportParity.comparedFields.includes('outputPath')) {
   throw new Error('HDR preview/export parity must link the export output path.');
+}
+if (handoffSummary.bracketCompareReview.evidenceSource !== 'runtime_sidecar') {
+  throw new Error('HDR bracket compare review should prefer runtime sidecar evidence before editable handoff.');
+}
+if (handoffSummary.bracketCompareReview.reviewStatus !== 'ready') {
+  throw new Error('HDR bracket compare review should be ready when runtime sidecar evidence is present.');
+}
+if (handoffSummary.bracketCompareReview.sourceCount !== 3) {
+  throw new Error('HDR bracket compare review must preserve bracket source count.');
+}
+if (handoffSummary.bracketCompareReview.selectedSourceCount !== 3) {
+  throw new Error('HDR bracket compare review must preserve selected source count.');
+}
+const underCompareSource = handoffSummary.bracketCompareReview.sources.find((source) => source.sourceIndex === 0);
+if (underCompareSource === undefined || underCompareSource.sourceRole !== 'under_exposed') {
+  throw new Error('HDR bracket compare review must preserve source contribution roles.');
+}
+if (underCompareSource.exposureEv !== -1.8) {
+  throw new Error('HDR bracket compare review must preserve source exposure evidence.');
+}
+if (underCompareSource.contentHash !== 'blake3:hdr-source-under') {
+  throw new Error('HDR bracket compare review must link source content hash evidence.');
+}
+if (underCompareSource.graphRevision !== 'graph_hdr_under_edited') {
+  throw new Error('HDR bracket compare review must link source graph revision evidence.');
 }
 if (handoffSummary.sourceRefs[0]?.contentHash !== 'blake3:hdr-source-under') {
   throw new Error('HDR handoff must preserve source content hashes for derived artifact provenance.');

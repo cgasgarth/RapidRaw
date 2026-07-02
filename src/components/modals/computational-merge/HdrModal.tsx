@@ -248,6 +248,9 @@ export function HdrModal({
         deghostReviewAccepted: isDeghostReviewApproved,
         deghostReviewRequired: isDeghostReviewRequired,
         outputPath: handoffSummary.outputPath,
+        ...(handoffSummary.runtimeSidecarReceipt === undefined
+          ? {}
+          : { runtimeSidecarReceipt: handoffSummary.runtimeSidecarReceipt }),
         settings,
         ...(sourceMetadata === undefined ? {} : { sourceMetadata }),
         sourcePaths,
@@ -431,6 +434,16 @@ export function HdrModal({
               data-preview-export-proof-hash={handoffSummary.previewExportParity.parityProofHash}
               data-preview-export-preview-state-hash={handoffSummary.previewExportParity.previewStateHash}
               data-preview-tone-mapped={String(handoffSummary.previewToneMapped)}
+              data-bracket-compare-accepted={String(handoffSummary.bracketCompareReview.accepted)}
+              data-bracket-compare-detection-confidence={handoffSummary.bracketCompareReview.detectionConfidence ?? ''}
+              data-bracket-compare-evidence-source={handoffSummary.bracketCompareReview.evidenceSource}
+              data-bracket-compare-exposure-spread-ev={handoffSummary.bracketCompareReview.exposureSpreadEv ?? ''}
+              data-bracket-compare-reference-source-index={
+                handoffSummary.bracketCompareReview.referenceSourceIndex ?? ''
+              }
+              data-bracket-compare-review-status={handoffSummary.bracketCompareReview.reviewStatus}
+              data-bracket-compare-selected-source-count={handoffSummary.bracketCompareReview.selectedSourceCount}
+              data-bracket-compare-source-count={handoffSummary.bracketCompareReview.sourceCount}
               data-scene-merge-color-state={handoffSummary.sceneMergeColorState}
               data-source-count={handoffSummary.sourceCount}
               data-testid="hdr-editable-handoff-provenance"
@@ -485,6 +498,56 @@ export function HdrModal({
                   {handoffSummary.sourceRefs.map((source) => source.displayName).join(', ') ||
                     t('modals.hdr.handoffNoSourceRefs')}
                 </UiText>
+              </div>
+              <div
+                className="col-span-3 rounded border border-border-color bg-surface px-2 py-1.5"
+                data-testid="hdr-bracket-compare-review"
+              >
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <UiText as="span" variant={TextVariants.small} className="block text-text-tertiary">
+                    {t('modals.hdr.handoffBracketCompareReview')}
+                  </UiText>
+                  <UiText
+                    as="span"
+                    variant={TextVariants.small}
+                    className="rounded bg-bg-primary px-2 py-0.5 text-text-primary"
+                    data-testid="hdr-bracket-compare-review-status"
+                  >
+                    {handoffSummary.bracketCompareReview.reviewStatus === 'ready'
+                      ? t('modals.hdr.handoffBracketCompareReady')
+                      : t('modals.hdr.handoffBracketCompareLimited')}
+                  </UiText>
+                </div>
+                <div className="grid gap-1.5">
+                  {handoffSummary.bracketCompareReview.sources.map((source) => (
+                    <div
+                      className="grid grid-cols-[44px_74px_92px_72px_1fr] gap-2 rounded border border-border-color bg-bg-primary px-2 py-1.5 text-xs"
+                      data-bracket-compare-content-hash={source.contentHash}
+                      data-bracket-compare-exposure-ev={source.exposureEv}
+                      data-bracket-compare-graph-revision={source.graphRevision}
+                      data-bracket-compare-role={source.sourceRole}
+                      data-bracket-compare-selected={String(source.selected)}
+                      data-bracket-compare-source-index={source.sourceIndex}
+                      data-bracket-compare-weight-multiplier={source.exposureWeightMultiplier}
+                      data-testid="hdr-bracket-compare-source-row"
+                      key={`${source.sourceIndex}-${source.contentHash}`}
+                    >
+                      <span className="text-text-tertiary">#{source.sourceIndex + 1}</span>
+                      <span className="text-text-primary">
+                        {t('modals.hdr.bracketPreflightSourceEv', { value: source.exposureEv.toFixed(1) })}
+                      </span>
+                      <span className="truncate rounded bg-surface px-1.5 py-0.5 text-center text-text-primary">
+                        {getBracketRoleLabel(source.sourceRole)}
+                      </span>
+                      <span className="text-text-secondary">
+                        {source.selected
+                          ? t('modals.hdr.handoffBracketCompareUsed')
+                          : t('modals.hdr.handoffBracketCompareSkipped')}
+                      </span>
+                      <span className="truncate text-text-secondary">{source.displayName}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
               <UiText
                 as="p"

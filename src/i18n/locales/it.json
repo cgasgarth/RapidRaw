@@ -2783,6 +2783,11 @@
         "protectHighlights": ""
       },
       "failed": "Unione HDR Fallita",
+      "handoffBracketCompareLimited": "",
+      "handoffBracketCompareReady": "",
+      "handoffBracketCompareReview": "",
+      "handoffBracketCompareSkipped": "",
+      "handoffBracketCompareUsed": "",
       "handoffColorSpace": "Color space",
       "handoffColorStates": "Color states",
       "handoffColorStatesValue": "Scene merge -> display preview -> exported sRGB output",
