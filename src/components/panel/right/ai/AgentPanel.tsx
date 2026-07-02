@@ -57,7 +57,7 @@ const buildLiveAgentTranscript = (
         timestamp: 'now',
       },
     ],
-    runtimeStatus: 'runtime_apply_demo',
+    runtimeStatus: 'runtime_apply_ready',
     sessionTitle: selectedImagePath ? `Current image: ${targetLabel}` : 'No image selected',
     toolCalls: [
       {

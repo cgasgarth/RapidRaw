@@ -14,7 +14,9 @@
     "mutates": true,
     "status": "completed",
     "toolName": "tonecolor.apply_command",
-    "changedNodeIds": ["tone_color_basic:image"],
+    "changedNodeIds": [
+      "tone_color_basic:image"
+    ],
     "undoRevision": "graph_rev_agent_expert_edit_demo_initial_2844"
   },
   "audit": {
@@ -75,14 +77,14 @@
   },
   "evidence": {
     "htmlPath": "docs/validation/proofs/agent/agent-expert-edit-demo-workflow-2026-06-21.html",
-    "reportHash": "sha256:c3ee55da1ad5c2245eede64b5a772eb5b2348c122f6cac4384fae1198644a1bb",
+    "reportHash": "sha256:13253be875599c751c7b322d2d6fa1f04997936bb8641776cdc66ada3c00f526",
     "reportPath": "docs/validation/proofs/agent/agent-expert-edit-demo-workflow-2026-06-21.json"
   },
   "inspect": {
     "imagePath": "/photos/agent-demo/DSC_2844.NEF",
     "projectTool": "rawengine.local.toolRegistry.query",
     "rawFamily": "nikon_nef_private_style_fixture",
-    "toolCount": 10,
+    "toolCount": 32,
     "virtualCopyId": "vc_agent_expert_edit_demo_2844"
   },
   "issue": 3022,
@@ -96,12 +98,15 @@
     "deterministicProvider": true,
     "userPrompt": "Inspect DSC_2844.NEF, warm the scene slightly, lift shadows, protect highlights, preview it, then apply to a virtual copy if approved."
   },
-  "proofStatus": "runtime_apply_demo",
+  "proofStatus": "runtime_apply_ready",
   "runtimeWorkflow": {
     "api": "runAgentColorEditWorkflowV1",
     "applyAuditEventId": "audit_2_command_agent_expert_edit_demo_apply_2844",
     "dryRunAuditEventId": "audit_1_command_agent_expert_edit_demo_dry_run_2844"
   },
-  "refs": ["#2983", "#3022"],
+  "refs": [
+    "#2983",
+    "#3022"
+  ],
   "validationMode": "agent_expert_edit_demo_workflow"
 }

@@ -396,13 +396,16 @@ const validateAgentRollbackSnapshot = (snapshot: AgentRollbackSnapshot): AgentRo
 const formatRouteFamily = (family: string): string => family.replaceAll('_', ' ');
 
 const agentRuntimeBadge = {
-  runtime_apply_demo: {
+  runtime_apply_ready: {
     className: 'border-emerald-500/25 bg-emerald-500/10 text-emerald-100',
   },
   ui_only_demo: {
     className: 'border-amber-500/25 bg-amber-500/10 text-amber-100',
   },
 } satisfies Record<AgentChatTranscript['runtimeStatus'], { className: string }>;
+
+const normalizeRuntimeStatus = (runtimeStatus: AgentChatTranscript['runtimeStatus']) =>
+  runtimeStatus === 'ui_only_demo' ? 'ui_only_demo' : 'runtime_apply_ready';
 
 const pickSessionAdjustments = (
   source: AgentSessionAdjustmentPatch,
@@ -3795,17 +3798,18 @@ function DryRunReviewPanel({
 }) {
   const { t } = useTranslation();
   const [localDecision, setLocalDecision] = useState<LocalReviewDecision>('pending');
+  const normalizedRuntimeStatus = normalizeRuntimeStatus(runtimeStatus);
   const applyUnavailableReason =
-    runtimeStatus === 'runtime_apply_demo'
+    normalizedRuntimeStatus === 'runtime_apply_ready'
       ? t('editor.ai.agent.review.runtimeReplayApply')
       : localDecision === 'approved'
         ? t('editor.ai.agent.review.noReplayApply')
         : localDecision === 'rejected'
           ? t('editor.ai.agent.review.rejectedApply')
           : t('editor.ai.agent.review.pendingApply');
-  const applyAvailability = runtimeStatus === 'runtime_apply_demo' ? 'runtime_apply_demo' : 'unavailable';
+  const applyAvailability = normalizedRuntimeStatus === 'runtime_apply_ready' ? 'runtime_apply_ready' : 'unavailable';
   const applyLabel =
-    runtimeStatus === 'runtime_apply_demo'
+    normalizedRuntimeStatus === 'runtime_apply_ready'
       ? t('editor.ai.agent.runtimeApplyProof')
       : t('editor.ai.agent.review.applyUnavailable');
 
@@ -4317,7 +4321,8 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
   const { t } = useTranslation();
   const [livePromptResult, setLivePromptResult] = useState<LivePromptResult>({ status: 'idle' });
   const [liveSessionEvents, setLiveSessionEvents] = useState<LiveSessionEvent[]>([]);
-  const runtimeBadge = agentRuntimeBadge[transcript.runtimeStatus];
+  const runtimeStatus = normalizeRuntimeStatus(transcript.runtimeStatus);
+  const runtimeBadge = agentRuntimeBadge[runtimeStatus];
   const isContextReady = transcript.toolCalls.some(
     (toolCall) => toolCall.toolName === 'rawengine.live_context' && toolCall.status === 'succeeded',
   );
@@ -4369,8 +4374,8 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
           <p className="mt-1 text-xs text-text-secondary">{transcript.sessionTitle}</p>
         </div>
         <span className={`rounded border px-2 py-1 text-[11px] ${runtimeBadge.className}`}>
-          {transcript.runtimeStatus === 'runtime_apply_demo'
-            ? t('editor.ai.agent.runtimeApplyDemo')
+          {runtimeStatus === 'runtime_apply_ready'
+            ? t('editor.ai.agent.runtimeApplyProof')
             : t('editor.ai.agent.uiOnly')}
         </span>
       </div>
@@ -4426,7 +4431,7 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
         <div className="flex items-center justify-between text-xs">
           <span className="font-semibold text-text-primary">{t('editor.ai.agent.transcript')}</span>
           <span className="text-text-secondary">
-            {hasLiveApplyProof || transcript.runtimeStatus === 'runtime_apply_demo'
+            {hasLiveApplyProof || runtimeStatus === 'runtime_apply_ready'
               ? t('editor.ai.agent.runtimeApplyProof')
               : t('editor.ai.agent.noAppliedEdits')}
           </span>

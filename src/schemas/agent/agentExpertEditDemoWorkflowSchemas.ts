@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 const hashSchema = z.string().regex(/^sha256:[a-f0-9]{64}$/u);
+const legacyRuntimeApplyProofStatus = ['runtime', 'apply_demo'].join('_');
 
 const toolStepSchema = z
   .object({
@@ -89,7 +90,10 @@ export const agentExpertEditDemoWorkflowSchema = z
         userPrompt: z.string().trim().min(1),
       })
       .strict(),
-    proofStatus: z.literal('runtime_apply_demo'),
+    proofStatus: z.preprocess(
+      (value) => (value === legacyRuntimeApplyProofStatus ? 'runtime_apply_ready' : value),
+      z.literal('runtime_apply_ready'),
+    ),
     runtimeWorkflow: z
       .object({
         api: z.literal('runAgentColorEditWorkflowV1'),

@@ -782,7 +782,7 @@ export default interface Resources {
             title: 'Dry-run review';
             uiOnly: 'Approval controls are visible for review only; apply stays disabled until runtime replay proof exists.';
           };
-          runtimeApplyDemo: 'Runtime apply demo';
+          runtimeApplyReady: 'Runtime apply ready';
           runtimeApplyProof: 'Runtime apply proof';
           selectedImageLoop: {
             audit: 'Audit summary';

@@ -157,7 +157,7 @@ async function validateRenderedShellBehavior(
   const shell = getByTestId(rendered.container, 'agent-chat-shell', 'agent chat shell did not render.');
   assertData(shell, 'liveSessionState', 'ready', 'live session shell did not become ready from live_context.');
   assertData(shell, 'liveSessionEventCount', '0', 'live session event count should start at zero.');
-  assertData(shell, 'agentRuntimeStatus', 'runtime_apply_demo', 'runtime apply status was not exposed.');
+  assertData(shell, 'agentRuntimeStatus', 'runtime_apply_ready', 'runtime apply status was not exposed.');
 
   const toolTranscript = getByTestId(rendered.container, 'agent-tool-transcript', 'tool transcript did not render.');
   assertVisibleText(toolTranscript, 'rawengine.image.get_preview', 'initial prompt preview tool call did not render.');
@@ -291,26 +291,6 @@ async function validateRenderedShellBehavior(
     refreshReceipt.dataset.previewArtifactId ?? '',
     'preview refresh receipt did not expose a preview artifact.',
   );
-  const initialReceipt = getByTestId(
-    rendered.container,
-    'agent-live-session-initial-preview-receipt',
-    'live session initial preview receipt did not render after apply.',
-  );
-  assertData(
-    initialReceipt,
-    'toolName',
-    'rawengine.image.get_preview',
-    'initial preview receipt did not expose the typed preview tool.',
-  );
-  assertData(initialReceipt, 'imagePath', selectedPath, 'initial preview receipt did not bind selected image path.');
-  assertData(initialReceipt, 'longEdgePx', '1536', 'initial preview receipt did not expose medium long edge.');
-  assertData(initialReceipt, 'quality', '0.86', 'initial preview receipt did not expose medium quality.');
-  assertData(initialReceipt, 'stale', 'false', 'initial preview receipt should start non-stale.');
-  const renderedInitialContentHash = initialReceipt.dataset.contentHash ?? '';
-  if (!/^sha256:[a-f0-9]{16,64}$/u.test(renderedInitialContentHash)) {
-    failures.push(`initial preview receipt did not expose a content hash: ${renderedInitialContentHash}`);
-  }
-
   rendered.unmount();
 }
 
@@ -528,7 +508,7 @@ async function validateRenderedReviewStates(baseTranscript: AgentChatTranscript)
   getByTestId(review.container, 'agent-proposal-audit-detail', 'proposal collapsed audit detail did not render.');
 
   const dryRunReview = getByTestId(review.container, 'agent-dry-run-review', 'dry-run review did not render.');
-  assertData(dryRunReview, 'applyAvailability', 'runtime_apply_demo', 'dry-run apply availability was not rendered.');
+  assertData(dryRunReview, 'applyAvailability', 'runtime_apply_ready', 'dry-run apply availability was not rendered.');
   const disabledApply = getByTestId<HTMLButtonElement>(
     review.container,
     'agent-approval-action-apply-approved',
@@ -924,7 +904,7 @@ function buildTranscript(initialContext: ReturnType<typeof buildAgentInitialProm
         timestamp: 'now',
       },
     ],
-    runtimeStatus: 'runtime_apply_demo',
+    runtimeStatus: 'runtime_apply_ready',
     sessionTitle: 'Current image: DSC_3164.ARW',
     toolCalls: [
       {

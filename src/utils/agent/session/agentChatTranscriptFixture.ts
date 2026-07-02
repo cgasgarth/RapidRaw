@@ -99,7 +99,7 @@ const fixture = {
     ],
   },
   auditTranscript: {
-    evidenceTier: 'runtime_apply_demo',
+    evidenceTier: 'runtime_apply_ready',
     finalRevision: 'graph_rev_agent_expert_edit_demo_initial_2844:apply:command_agent_expert_edit_demo_apply_2844',
     initialRevision: 'graph_rev_agent_expert_edit_demo_initial_2844',
     records: [
@@ -714,7 +714,7 @@ const fixture = {
     },
     title: 'Before/after handoff',
   },
-  runtimeStatus: 'runtime_apply_demo',
+  runtimeStatus: 'ui_only_demo',
   selectedFrameScope: {
     approvalLabel: 'Approval required before apply',
     approvalState: 'required',
