@@ -454,6 +454,7 @@
       },
       "commandType": "computationalMerge.createPanorama",
       "parameters": {
+        "backendPreference": "auto",
         "boundaryMode": "auto_crop",
         "exposureNormalization": "auto",
         "lensCorrectionPolicy": "required_before_stitch",
