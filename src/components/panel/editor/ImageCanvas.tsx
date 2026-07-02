@@ -35,6 +35,7 @@ import {
   getRenderedPreviewWarningStatus,
   isCurrentExportSoftProofGamutWarningOverlay,
 } from '../../../utils/color/runtime/gamutWarningDisplay';
+import { resolveEditorPreviewSource } from '../../../utils/editorImagePreviewSource';
 import { resolveEditorOverlayBlocker, resolveEditorOverlayVisibility } from '../../../utils/editorOverlayVisibility';
 import {
   BRUSH_MASK_COMMAND_COORDINATE_SPACE,
@@ -1253,11 +1254,15 @@ const ImageCanvas = memo(
     const isStraightening = useRef(false);
 
     const [displayState, setDisplayState] = useState({
-      base: finalPreviewUrl || selectedImage.thumbnailUrl,
+      base: resolveEditorPreviewSource({
+        finalPreviewUrl,
+        isReady: selectedImage.isReady,
+        thumbnailUrl: selectedImage.thumbnailUrl,
+      }),
       fade: null as string | null,
     });
     const [isFadingIn, setIsFadingIn] = useState(false);
-    const prevImageIdentityRef = useRef(selectedImage.thumbnailUrl);
+    const prevImageIdentityRef = useRef(selectedImage.path);
 
     const [baseTool, setBaseTool] = useState<ToolType>(brushSettings?.tool ?? ToolType.Brush);
     const [isAltPressed, setIsAltPressed] = useState(false);
@@ -1315,11 +1320,15 @@ const ImageCanvas = memo(
     }, [interactivePatch]);
 
     useEffect(() => {
-      const newSrc = finalPreviewUrl || selectedImage.thumbnailUrl;
-      const isNewImage = prevImageIdentityRef.current !== selectedImage.thumbnailUrl;
+      const newSrc = resolveEditorPreviewSource({
+        finalPreviewUrl,
+        isReady: selectedImage.isReady,
+        thumbnailUrl: selectedImage.thumbnailUrl,
+      });
+      const isNewImage = prevImageIdentityRef.current !== selectedImage.path;
 
       if (isNewImage) {
-        prevImageIdentityRef.current = selectedImage.thumbnailUrl;
+        prevImageIdentityRef.current = selectedImage.path;
         setDisplayState({ base: newSrc, fade: null });
         setIsFadingIn(false);
         return undefined;
@@ -1357,7 +1366,14 @@ const ImageCanvas = memo(
         }
       }
       return undefined;
-    }, [finalPreviewUrl, selectedImage.thumbnailUrl, isSliderDragging, displayState.base]);
+    }, [
+      finalPreviewUrl,
+      selectedImage.isReady,
+      selectedImage.path,
+      selectedImage.thumbnailUrl,
+      isSliderDragging,
+      displayState.base,
+    ]);
 
     useEffect(() => {
       setBaseTool(brushSettings?.tool ?? ToolType.Brush);
