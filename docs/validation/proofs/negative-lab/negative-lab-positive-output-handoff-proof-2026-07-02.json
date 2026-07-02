@@ -1,0 +1,123 @@
+{
+  "schemaVersion": 1,
+  "generatedFrom": "src/utils/negative-lab/negativeLabExportHandoff.ts",
+  "sourcePaths": [
+    "/proof-roll/negative-lab/frame_001.CR3",
+    "/proof-roll/negative-lab/frame_002.jpg"
+  ],
+  "formats": {
+    "tiff16": [
+      {
+        "frameId": "negative-lab-frame-1",
+        "sourcePath": "/proof-roll/negative-lab/frame_001.CR3",
+        "outputPath": "/proof-roll/negative-lab/frame_001-Positive.tif",
+        "outputFileName": "frame_001-Positive.tif",
+        "outputFormat": "tiff16",
+        "sidecarPath": "/proof-roll/negative-lab/frame_001-Positive.tif.rawengine-negative-lab.json",
+        "conversionBundlePath": "/proof-roll/negative-lab/frame_001-Positive.tif.negative-lab-bundle.json",
+        "acceptedDryRunPlanHash": "fnv1a32:3f9e340f",
+        "acceptedDryRunPlanId": "negative_lab_batch_plan_3f9e340f",
+        "profileProvenanceHash": "fnv1a32:abcdef12",
+        "positiveVariantId": "positive_variant_negative-lab-frame-1",
+        "outputArtifact": {
+          "artifactId": "artifact_positive_variant_negative-lab-frame-1_export",
+          "contentHash": "sha256:03a842dfb0dbd40c84ca762567971d8af9212b3be79de0286d68f5d140eee8e6",
+          "dimensions": {
+            "height": 1200,
+            "width": 1800
+          },
+          "kind": "export",
+          "storage": "export_path"
+        },
+        "provenanceEntryIds": [
+          "prov_negative_lab_batch_plan_3f9e340f_negative-lab-frame-1",
+          "prov_op_negative_lab_output_1"
+        ]
+      },
+      {
+        "frameId": "negative-lab-frame-2",
+        "sourcePath": "/proof-roll/negative-lab/frame_002.jpg",
+        "outputPath": "/proof-roll/negative-lab/frame_002-Positive.tif",
+        "outputFileName": "frame_002-Positive.tif",
+        "outputFormat": "tiff16",
+        "sidecarPath": "/proof-roll/negative-lab/frame_002-Positive.tif.rawengine-negative-lab.json",
+        "conversionBundlePath": "/proof-roll/negative-lab/frame_002-Positive.tif.negative-lab-bundle.json",
+        "acceptedDryRunPlanHash": "fnv1a32:3f9e340f",
+        "acceptedDryRunPlanId": "negative_lab_batch_plan_3f9e340f",
+        "profileProvenanceHash": "fnv1a32:abcdef12",
+        "positiveVariantId": "positive_variant_negative-lab-frame-2",
+        "outputArtifact": {
+          "artifactId": "artifact_positive_variant_negative-lab-frame-2_export",
+          "contentHash": "sha256:c2f0bdf3bd3c5bfcfd1764f989baf53a414cb197d7a16080ae85e33d72bc6c4e",
+          "dimensions": {
+            "height": 1201,
+            "width": 1801
+          },
+          "kind": "export",
+          "storage": "export_path"
+        },
+        "provenanceEntryIds": [
+          "prov_negative_lab_batch_plan_3f9e340f_negative-lab-frame-2",
+          "prov_op_negative_lab_output_2"
+        ]
+      }
+    ],
+    "jpeg_proof": [
+      {
+        "frameId": "negative-lab-frame-1",
+        "sourcePath": "/proof-roll/negative-lab/frame_001.CR3",
+        "outputPath": "/proof-roll/negative-lab/frame_001-Positive.jpg",
+        "outputFileName": "frame_001-Positive.jpg",
+        "outputFormat": "jpeg_proof",
+        "sidecarPath": "/proof-roll/negative-lab/frame_001-Positive.jpg.rawengine-negative-lab.json",
+        "conversionBundlePath": "/proof-roll/negative-lab/frame_001-Positive.jpg.negative-lab-bundle.json",
+        "acceptedDryRunPlanHash": "fnv1a32:8880fe34",
+        "acceptedDryRunPlanId": "negative_lab_batch_plan_8880fe34",
+        "profileProvenanceHash": "fnv1a32:abcdef12",
+        "positiveVariantId": "positive_variant_negative-lab-frame-1",
+        "outputArtifact": {
+          "artifactId": "artifact_positive_variant_negative-lab-frame-1_export",
+          "contentHash": "sha256:d910736222350595f2079e30d13919cba158448ed702292191a7ec2cdbed5427",
+          "dimensions": {
+            "height": 1200,
+            "width": 1800
+          },
+          "kind": "export",
+          "storage": "export_path"
+        },
+        "provenanceEntryIds": [
+          "prov_negative_lab_batch_plan_8880fe34_negative-lab-frame-1",
+          "prov_op_negative_lab_output_1"
+        ]
+      },
+      {
+        "frameId": "negative-lab-frame-2",
+        "sourcePath": "/proof-roll/negative-lab/frame_002.jpg",
+        "outputPath": "/proof-roll/negative-lab/frame_002-Positive.jpg",
+        "outputFileName": "frame_002-Positive.jpg",
+        "outputFormat": "jpeg_proof",
+        "sidecarPath": "/proof-roll/negative-lab/frame_002-Positive.jpg.rawengine-negative-lab.json",
+        "conversionBundlePath": "/proof-roll/negative-lab/frame_002-Positive.jpg.negative-lab-bundle.json",
+        "acceptedDryRunPlanHash": "fnv1a32:8880fe34",
+        "acceptedDryRunPlanId": "negative_lab_batch_plan_8880fe34",
+        "profileProvenanceHash": "fnv1a32:abcdef12",
+        "positiveVariantId": "positive_variant_negative-lab-frame-2",
+        "outputArtifact": {
+          "artifactId": "artifact_positive_variant_negative-lab-frame-2_export",
+          "contentHash": "sha256:795bf3ee74afc69dffd5b9243e8a915bc1917ae27ef523115b4a98b89dae338f",
+          "dimensions": {
+            "height": 1201,
+            "width": 1801
+          },
+          "kind": "export",
+          "storage": "export_path"
+        },
+        "provenanceEntryIds": [
+          "prov_negative_lab_batch_plan_8880fe34_negative-lab-frame-2",
+          "prov_op_negative_lab_output_2"
+        ]
+      }
+    ]
+  },
+  "unsupportedRejectedReason": "unsupported_output_format"
+}
