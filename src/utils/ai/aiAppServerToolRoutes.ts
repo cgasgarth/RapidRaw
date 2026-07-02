@@ -43,8 +43,8 @@ export const AI_APP_SERVER_TOOL_ROUTE_MANIFEST = aiAppServerToolRouteManifestSch
     {
       ...aiMaskDryRun,
       reason: 'Subject-mask generation is represented by the typed AI mask dry-run app-server tool.',
-      ...mappedAppServerTool,
-      sourceOperation: AiAppServerToolName.MaskDryRunSubject,
+      ...mappedTauriInvoke,
+      sourceOperation: 'generate_ai_subject_mask',
       toolCapability: AiAppServerToolCapability.SubjectMask,
     },
     {

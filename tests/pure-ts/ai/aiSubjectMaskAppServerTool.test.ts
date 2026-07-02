@@ -80,11 +80,12 @@ describe('ai subject mask app-server tool routing', () => {
   });
 
   test('advertises the typed app-server route for subject-mask dry-run and apply', () => {
-    const dryRunRoute = AI_APP_SERVER_TOOL_ROUTES.find((route) => route.sourceOperation === 'ai.mask.dry_run_subject');
+    const dryRunRoute = AI_APP_SERVER_TOOL_ROUTES.find((route) => route.sourceOperation === 'generate_ai_subject_mask');
     const applyRoute = AI_APP_SERVER_TOOL_ROUTES.find((route) => route.sourceOperation === 'ai.mask.apply_subject');
 
     expect(dryRunRoute).toMatchObject({
-      sourceKind: 'app_server_tool',
+      appServerToolName: 'ai.mask.dry_run_subject',
+      sourceKind: 'tauri_invoke',
       status: 'mapped',
     });
     expect(applyRoute).toMatchObject({
