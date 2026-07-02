@@ -130,6 +130,12 @@ if (runtimeReceipt.output.contentHash !== applied.apply.mutationResult.outputArt
 if (runtimeReceipt.output.dimensions.width !== WIDTH || runtimeReceipt.output.dimensions.height !== HEIGHT) {
   throw new Error('HDR runtime receipt must record the output dimensions.');
 }
+if ((runtimeReceipt.deghost.maskArtifacts?.length ?? 0) !== 2) {
+  throw new Error('HDR runtime receipt must record deghost mask artifact handles from apply output.');
+}
+if (runtimeReceipt.deghost.maskArtifacts?.[0]?.artifact.contentHash === runtimeReceipt.output.contentHash) {
+  throw new Error('HDR deghost mask artifact hash must be distinct from the merged output hash.');
+}
 if (runtimeReceipt.bracket.sourceRoles.length !== BRACKETS.length) {
   throw new Error('HDR runtime receipt must record all source roles.');
 }
@@ -152,6 +158,10 @@ console.log(
       acceptedDryRunPlanHash: runtimeReceipt.acceptedDryRunPlanHash,
       acceptedDryRunPlanId: runtimeReceipt.acceptedDryRunPlanId,
       outputHash,
+      deghostMaskArtifacts: runtimeReceipt.deghost.maskArtifacts?.map((artifact) => ({
+        artifactId: artifact.artifact.artifactId,
+        kind: artifact.kind,
+      })),
       sourceHashes,
       warningCodes: runtimeReceipt.warningCodes,
     },
