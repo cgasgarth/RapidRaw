@@ -1332,6 +1332,10 @@ const ImageCanvas = memo(
     }, [interactivePatch]);
 
     useEffect(() => {
+      retainedPatchRef.current = null;
+    }, [selectedImage.path]);
+
+    useEffect(() => {
       const newSrc = previewSource;
       const isNewImage = prevImageIdentityRef.current !== selectedImage.path;
 
