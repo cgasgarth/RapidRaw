@@ -12,7 +12,6 @@ import {
   toneColorMutationResultV1Schema,
 } from '../../../../packages/rawengine-schema/src/rawEngineSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
-import type { Adjustments } from '../../adjustments';
 import {
   type BasicToneCommandContextActor,
   type BasicToneCommandContextTarget,
@@ -21,7 +20,6 @@ import {
   buildBasicToneImageCommandContext,
   type LegacyBasicToneAdjustmentPayload,
 } from '../../basicToneCommandBridge';
-import { pushEditHistoryEntry } from '../../editHistory';
 import { createLiveEditorAppServerBridge } from './agentLiveEditorState';
 
 export type AgentLiveBasicTonePixel = readonly [number, number, number];
@@ -256,18 +254,6 @@ const buildLegacyBasicToneCommandEnvelope = (command: TypedBasicToneCommand): Ba
   return envelope;
 };
 
-const applyTypedBasicToneCommandToAdjustments = (base: Adjustments, command: TypedBasicToneCommand): Adjustments => ({
-  ...base,
-  blacks: command.parameters.blackPoint,
-  clarity: command.parameters.clarity,
-  contrast: command.parameters.contrast,
-  exposure: command.parameters.exposureEv,
-  highlights: command.parameters.highlights,
-  saturation: command.parameters.saturation,
-  shadows: command.parameters.shadows,
-  whites: command.parameters.whitePoint,
-});
-
 export const dryRunBasicToneCommandInLiveEditor = async (
   commandInput: ToneColorCommandEnvelopeV1,
 ): Promise<ToneColorDryRunResultV1> => {
@@ -317,17 +303,7 @@ export const applyBasicToneCommandToLiveEditor = async (
   const mutation = toneColorMutationResultV1Schema.parse(apply.result);
   const basicToneCommand = buildLegacyBasicToneCommandEnvelope(command);
 
-  useEditorStore.setState((state) => {
-    const adjustments = applyTypedBasicToneCommandToAdjustments(state.adjustments, command);
-    const history = pushEditHistoryEntry(state.history, state.historyIndex, adjustments);
-    return {
-      adjustments,
-      history: history.history,
-      historyIndex: history.historyIndex,
-      lastBasicToneCommand: basicToneCommand,
-      uncroppedAdjustedPreviewUrl: null,
-    };
-  });
+  useEditorStore.getState().applyBasicToneCommand(basicToneCommand);
 
   return mutation;
 };
@@ -382,18 +358,7 @@ export const applyBasicToneToLiveEditor = async ({
     throw new Error('Agent basic-tone apply did not change rendered preview pixels.');
   }
 
-  useEditorStore.setState((state) => {
-    const typedApplyCommand = parseLiveBasicToneCommand(applyCommand);
-    const adjustments = applyTypedBasicToneCommandToAdjustments(state.adjustments, typedApplyCommand);
-    const history = pushEditHistoryEntry(state.history, state.historyIndex, adjustments);
-    return {
-      adjustments,
-      history: history.history,
-      historyIndex: history.historyIndex,
-      lastBasicToneCommand: applyCommand,
-      uncroppedAdjustedPreviewUrl: null,
-    };
-  });
+  useEditorStore.getState().applyBasicToneCommand(applyCommand);
 
   return {
     afterPreviewHash,
