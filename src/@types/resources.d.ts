@@ -172,8 +172,15 @@ export default interface Resources {
           };
         };
         proofingDiagnostics: {
+          displayProfile: 'Display';
+          outputProfile: 'Output';
+          previewLut: 'Preview LUT';
+          proofState: 'Proof state';
+          renderingIntent: 'Intent';
           summary: '{{warningCount}} warning/status item(s) · {{coverage}} gamut coverage';
           title: 'Proofing / Diagnostics';
+          transform: 'Transform';
+          workingSpace: 'Working';
         };
         rangeCenter: 'Range center';
         rangeWidth: 'Range width';
@@ -294,6 +301,13 @@ export default interface Resources {
         threshold: 'Threshold';
       };
       effects: {
+        activeSummary: 'Active effects';
+        activeSummaryCount_few: '';
+        activeSummaryCount_many: '';
+        activeSummaryCount_one: '{{count}} active';
+        activeSummaryCount_other: '{{count}} active';
+        activeSummaryEmpty: 'None active';
+        activeSummaryNoScroll: 'Creative, LUT, vignette, and grain controls are currently neutral.';
         amount: 'Amount';
         creative: 'Creative';
         feather: 'Feather';
@@ -782,8 +796,8 @@ export default interface Resources {
             title: 'Dry-run review';
             uiOnly: 'Approval controls are visible for review only; apply stays disabled until runtime replay proof exists.';
           };
-          runtimeApplyReady: 'Runtime apply ready';
           runtimeApplyProof: 'Runtime apply proof';
+          runtimeApplyReady: 'Runtime apply ready';
           selectedImageLoop: {
             audit: 'Audit summary';
             before: 'Before';
@@ -795,6 +809,7 @@ export default interface Resources {
             deltaHelp: 'mean delta / max delta';
             exportReceipt: 'Reviewed export receipt';
             graphRevision: 'Graph revision';
+            iterations: 'Review iterations';
             luminanceChannel: 'Luminance / channel';
             maxPixelCountValue: '{{pixelCount}} px max';
             previewRender: 'Preview render';
@@ -831,6 +846,24 @@ export default interface Resources {
             plan: 'Plan';
             target: 'Target';
             title: 'Live prompt walkthrough';
+          };
+          workspace: {
+            audit: 'Audit';
+            blocked: 'Blocked';
+            noImage: 'No image selected';
+            previewReady: 'Preview ready';
+            previewReceipt: 'Preview receipt';
+            reviewReady: 'Review ready';
+            states: {
+              applied: 'Applied';
+              'approval-required': 'Approval required';
+              'audit-persisted': 'Audit persisted';
+              blocked: 'Blocked';
+              'dry-run-ready': 'Dry-run ready';
+              'no-selection': 'No selection';
+              'preview-ready': 'Preview ready';
+            };
+            title: 'Agent Review';
           };
         };
         approval: {
@@ -912,12 +945,24 @@ export default interface Resources {
           sideBySideRegion: 'Side-by-side before and after preview';
           splitWipeDivider: 'Before and after split divider';
           splitWipeLabel: 'Before / After';
+          stripMode: {
+            'hold-original': 'Before';
+            'side-by-side': 'Side';
+            'split-wipe': 'Split';
+          };
+          stripOff: 'Off';
+          stripTitle: 'Compare';
         };
         cropPreviewAlt: 'Crop preview';
         gamutWarningCoverage: '{{profile}} gamut · {{value}}';
         gamutWarningOverlay: 'sRGB gamut warning overlay';
         maskOverlayAlt: 'Mask Overlay';
         originalAlt: 'Original';
+      };
+      chromeStatus: {
+        accessibilityLabel: 'Editor image-quality status';
+        visualSmokeSummary: 'clipping/gamut/scope';
+        visualSmokeTitle: 'Editor chrome status chips';
       };
       crop: {
         aspectRatioHeading: 'Aspect Ratio';
@@ -1883,6 +1928,28 @@ export default interface Resources {
         unavailable: 'One or more proofs could not be generated.';
         unavailableNoImage: 'No ready image is loaded for soft-proof comparison.';
       };
+      softProofResolver: {
+        blackPointCompensation: 'BPC {{value}}';
+        consistent: 'Preview and export are using the same proof profile, intent, and black point compensation.';
+        currentExportPresetName: 'Current export settings proof';
+        description: 'Proof is {{proofProfile}} / {{proofIntent}}; export is {{exportProfile}} / {{exportIntent}}.';
+        missingAppSettings: 'Export settings are still loading; resolver actions will unlock when settings are available.';
+        missingProofPreset: 'No active soft-proof recipe is selected. Preview current export settings to create one.';
+        parity: {
+          matched: 'Matched';
+          mismatch: 'Mismatch';
+          pending: 'Pending';
+          unsupported: 'Unsupported';
+        };
+        previewCurrentExport: 'Preview current export settings';
+        renderingIntent: 'Intent {{intent}}';
+        resultingProfile: 'Profile {{profile}}';
+        title: 'Resolve preview/export mismatch';
+        transformFingerprint: 'Transform {{fingerprint}}';
+        unsupportedProfileFormat: '{{format}} cannot export {{profile}} with the color-managed transform path.';
+        unsupportedRenderingIntent: 'The active proof rendering intent is not supported for this export profile.';
+        useCurrentSoftProof: 'Use current soft proof for export';
+      };
       softProofWarnings: {
         gamutClipping: 'Gamut warning overlay is active: {{coverage}} of the preview is flagged before export.';
         intentMismatch: 'Soft proof intent is {{proofIntent}}, while export is set to {{exportIntent}}.';
@@ -1891,6 +1958,7 @@ export default interface Resources {
         title: 'Soft-proof export warnings';
       };
       status: {
+        blocked: 'Blocked';
         cancelExport: 'Cancel Export';
         cancelled: 'Export cancelled';
         chooseExternalEditor: 'Choose Editor...';
@@ -1944,8 +2012,18 @@ export default interface Resources {
         offlineSmartPreviewBlocked: 'Reconnect the original file before full-resolution export. You can keep editing the smart preview.';
         openInEditor: 'Open in Editor';
         parityUnknown: 'unknown';
+        ready: 'Ready';
         resolvingOriginalFile: 'Checking the original file before full-resolution export…';
         retryExport: 'Retry Export';
+        reviewParityPending: 'Color-stack parity will appear after the next receipt.';
+        reviewReceipt: 'Latest receipt: {{path}} · {{hash}}';
+        reviewReceiptUnavailable: 'Latest receipt: none yet';
+        reviewSelected: '{{count}} selected';
+        reviewSelected_one: '{{count}} selected';
+        reviewSelected_other: '{{count}} selected';
+        reviewSmartPreviewBlocked: 'Original required';
+        reviewSmartPreviewReady: 'Original available';
+        reviewSmartPreviewResolving: 'Checking original';
         showInFinder: 'Show in Finder';
         success: 'Export successful!';
         transformApplied: 'Transform applied';
@@ -2870,16 +2948,16 @@ export default interface Resources {
           protectHighlights: 'Protect highlights';
         };
         failed: 'HDR Merge Failed';
-        handoffColorSpace: 'Color space';
-        handoffColorStates: 'Color states';
-        handoffColorStatesValue: 'Scene merge -> display preview -> exported sRGB output';
-        handoffDisplayReferredSrgb: 'Display-referred sRGB';
-        handoffEditableAsset: 'Editable asset';
         handoffBracketCompareLimited: 'Limited';
         handoffBracketCompareReady: 'Ready';
         handoffBracketCompareReview: 'Bracket compare review';
         handoffBracketCompareSkipped: 'Skipped';
         handoffBracketCompareUsed: 'Used';
+        handoffColorSpace: 'Color space';
+        handoffColorStates: 'Color states';
+        handoffColorStatesValue: 'Scene merge -> display preview -> exported sRGB output';
+        handoffDisplayReferredSrgb: 'Display-referred sRGB';
+        handoffEditableAsset: 'Editable asset';
         handoffNoSourceRefs: 'No source refs recorded';
         handoffPreviewExportMatched: 'Preview/export matched';
         handoffPreviewExportParity: 'Preview/export parity';
@@ -3120,6 +3198,11 @@ export default interface Resources {
         batchPlanStaleReasons: 'Accepted plan is stale: {{reasons}}';
         batchReadiness: 'Batch readiness';
         batchWorkloadSummary: '{{applyCount}} apply / {{skippedCount}} skip / {{reviewCount}} review';
+        beforeAfterGeneratedPositive: 'Generated positive';
+        beforeAfterPlanAccepted: 'Plan accepted';
+        beforeAfterPlanPending: 'Accept plan before apply';
+        beforeAfterReview: 'Before/after proof';
+        beforeAfterSourceNegative: 'Source negative';
         blackPoint: 'Black point';
         blueWeight: 'Blue (Yellow)';
         cancel: 'Cancel';
@@ -3284,6 +3367,7 @@ export default interface Resources {
           medium: 'Medium';
         };
         nextFrameTooltip: 'Next frame';
+        noWarnings: 'No warnings';
         noticeText: 'Inversion logic inspired by <0>NegPy</0> created by marcinz606 (<1>GPL-3.0</1>).';
         originalLabel: 'Original Negative';
         outputFormats: {
@@ -3421,8 +3505,8 @@ export default interface Resources {
         stockRegistry: 'Stock families';
         stockRegistrySummary: '{{runtimeSafeCount}} runtime-safe / {{referenceOnlyCount}} reference-only';
         stockRegistryVersion: 'v{{version}}';
-        suggestedDelta: 'Suggested delta';
         suggestNeutralPatchRgb: 'Suggest neutral RGB';
+        suggestedDelta: 'Suggested delta';
         title: 'Negative Conversion';
         v2AlgorithmDisabled: 'V2 print curve off';
         v2AlgorithmEnabled: 'V2 print curve on';

@@ -110,6 +110,16 @@ for (const marker of [
   'data-testid="export-success-color-managed-transform"',
   'data-testid="export-success-color-policy"',
   'data-testid="export-soft-proof-warnings"',
+  'data-testid="export-soft-proof-resolver"',
+  'data-testid="export-soft-proof-resolver-use-proof"',
+  'data-testid="export-soft-proof-resolver-preview-export"',
+  'data-export-soft-proof-resolver-proof-profile',
+  'data-export-soft-proof-resolver-proof-intent',
+  'data-export-soft-proof-resolver-black-point-compensation',
+  'data-export-soft-proof-resolver-fingerprint',
+  'data-export-soft-proof-resolver-parity-status',
+  'getExportSoftProofResolverStatus',
+  'upsertExportSoftProofResolverPreset',
   'data-export-soft-proof-warning-codes',
   'data-export-soft-proof-warning-count',
   'soft-proof-preview-off',
@@ -193,6 +203,12 @@ if (typeof locale.export?.status?.colorManagedTransform !== 'string') {
 for (const key of ['title', 'previewOff', 'profileMismatch', 'intentMismatch', 'gamutClipping']) {
   if (typeof locale.export?.softProofWarnings?.[key] !== 'string') {
     failures.push(`Missing export soft-proof warning locale: ${key}`);
+  }
+}
+
+for (const key of ['title', 'useCurrentSoftProof', 'previewCurrentExport', 'resultingProfile', 'renderingIntent']) {
+  if (typeof locale.export?.softProofResolver?.[key] !== 'string') {
+    failures.push(`Missing export soft-proof resolver locale: ${key}`);
   }
 }
 

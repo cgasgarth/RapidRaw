@@ -1817,6 +1817,22 @@
       "unavailable": "",
       "unavailableNoImage": ""
     },
+    "softProofResolver": {
+      "blackPointCompensation": "",
+      "consistent": "",
+      "currentExportPresetName": "",
+      "description": "",
+      "missingAppSettings": "",
+      "missingProofPreset": "",
+      "previewCurrentExport": "",
+      "renderingIntent": "",
+      "resultingProfile": "",
+      "title": "",
+      "transformFingerprint": "",
+      "unsupportedProfileFormat": "",
+      "unsupportedRenderingIntent": "",
+      "useCurrentSoftProof": ""
+    },
     "softProofWarnings": {
       "gamutClipping": "",
       "intentMismatch": "",

@@ -5,6 +5,7 @@ import { useManagedFocus } from '../../../../hooks/ui/useManagedFocus';
 import { EXPORT_LAST_USED_PRESET_ID } from '../../../../schemas/export/exportRecipeIds';
 import { buildExportRecipeUiRows } from '../../../../schemas/export/exportRecipeUiSchemas';
 import { TextVariants } from '../../../../types/typography';
+import { EXPORT_SOFT_PROOF_RESOLVER_PRESET_ID } from '../../../../utils/export/exportSoftProofProfileCompare';
 import type { AppSettings } from '../../../ui/AppProperties';
 import type { ExportPreset } from '../../../ui/ExportImportProperties';
 import Dropdown from '../../../ui/primitives/Dropdown';
@@ -98,7 +99,7 @@ export default function ExportPresetsList({
   };
 
   const dropdownOptions = presets
-    .filter((preset) => preset.id !== EXPORT_LAST_USED_PRESET_ID)
+    .filter((preset) => preset.id !== EXPORT_LAST_USED_PRESET_ID && preset.id !== EXPORT_SOFT_PROOF_RESOLVER_PRESET_ID)
     .map((preset) => ({
       label: preset.name,
       value: preset.id,

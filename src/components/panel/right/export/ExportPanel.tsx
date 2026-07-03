@@ -68,10 +68,13 @@ import {
   buildSoftProofProfileCompareUnavailableState,
   createInitialSoftProofProfileCompareState,
   EXPORT_SOFT_PROOF_PROFILE_COMPARE_TARGET_RESOLUTION,
+  EXPORT_SOFT_PROOF_RESOLVER_PRESET_ID,
   type ExportSoftProofProfileCompareSideId,
   type ExportSoftProofProfileCompareSideState,
   exportSoftProofTransformResponseSchema,
+  getExportSoftProofResolverStatus,
   getSoftProofProfileCompareStatus,
+  upsertExportSoftProofResolverPreset,
 } from '../../../../utils/export/exportSoftProofProfileCompare';
 import { buildRawWarningChips } from '../../../../utils/rawWarningReceipts';
 import { invokeWithSchema } from '../../../../utils/tauriSchemaInvoke';
@@ -381,6 +384,7 @@ export default function ExportPanel({
     isExportSoftProofEnabled,
     isGamutWarningOverlayVisible,
     selectedImagePath,
+    setEditor,
   } = useEditorStore(
     useShallow((state) => ({
       adjustments: state.adjustments,
@@ -390,6 +394,7 @@ export default function ExportPanel({
       isExportSoftProofEnabled: state.isExportSoftProofEnabled,
       isGamutWarningOverlayVisible: state.isGamutWarningOverlayVisible,
       selectedImagePath: state.selectedImage?.path ?? null,
+      setEditor: state.setEditor,
     })),
   );
   const thumbnailSmartPreviews = useProcessStore((state) => state.thumbnailSmartPreviews);
@@ -842,6 +847,93 @@ export default function ExportPanel({
     fileFormat,
     renderingIntent,
   });
+  const currentSoftProofPreset = useMemo(
+    () => (appSettings?.exportPresets ?? []).find((preset) => preset.id === exportSoftProofRecipeId) ?? null,
+    [appSettings?.exportPresets, exportSoftProofRecipeId],
+  );
+  const softProofResolverStatus = useMemo(
+    () =>
+      getExportSoftProofResolverStatus({
+        appSettingsAvailable: appSettings !== null,
+        catalog: exportColorCapabilityCatalog,
+        currentExportBlackPointCompensation: blackPointCompensation,
+        currentExportColorProfile: colorProfile,
+        currentExportRenderingIntent: renderingIntent,
+        exportSoftProofRecipeId,
+        exportSoftProofTransform,
+        fileFormat,
+        isExportSoftProofEnabled,
+        proofPreset: currentSoftProofPreset,
+      }),
+    [
+      appSettings,
+      blackPointCompensation,
+      colorProfile,
+      currentSoftProofPreset,
+      exportColorCapabilityCatalog,
+      exportSoftProofRecipeId,
+      exportSoftProofTransform,
+      fileFormat,
+      isExportSoftProofEnabled,
+      renderingIntent,
+    ],
+  );
+  const softProofResolverProofProfile =
+    currentSoftProofPreset?.colorProfile ?? exportSoftProofTransform?.effectiveColorProfile ?? '';
+  const softProofResolverProofIntent =
+    currentSoftProofPreset?.renderingIntent ?? exportSoftProofTransform?.effectiveRenderingIntent ?? '';
+  const softProofResolverBlackPointCompensation =
+    exportSoftProofTransform?.blackPointCompensation ??
+    (currentSoftProofPreset ? String(currentSoftProofPreset.blackPointCompensation ?? false) : '');
+  const softProofResolverFingerprint = exportSoftProofTransform?.transformPolicyFingerprint ?? '';
+  const softProofResolverUnsupportedMessage =
+    softProofResolverStatus.unsupportedReason === 'unsupported-profile-format'
+      ? t('export.softProofResolver.unsupportedProfileFormat', {
+          format: fileFormat.toUpperCase(),
+          profile:
+            currentSoftProofPreset?.colorProfile === ExportColorProfile.DisplayP3
+              ? t('export.colorProfiles.displayP3')
+              : currentSoftProofPreset?.colorProfile === ExportColorProfile.AdobeRgb1998
+                ? t('export.colorProfiles.adobeRgb1998')
+                : currentSoftProofPreset?.colorProfile === ExportColorProfile.ProPhotoRgb
+                  ? t('export.colorProfiles.proPhotoRgb')
+                  : t('export.colorProfiles.srgb'),
+        })
+      : softProofResolverStatus.unsupportedReason === 'unsupported-rendering-intent'
+        ? t('export.softProofResolver.unsupportedRenderingIntent')
+        : softProofResolverStatus.unsupportedReason === 'missing-proof-preset'
+          ? t('export.softProofResolver.missingProofPreset')
+          : softProofResolverStatus.unsupportedReason === 'missing-app-settings'
+            ? t('export.softProofResolver.missingAppSettings')
+            : null;
+
+  const handlePreviewCurrentExportSettings = useCallback(() => {
+    if (!appSettings) return;
+    const updatedPresets = upsertExportSoftProofResolverPreset({
+      currentSettings: currentSettingsObject,
+      name: t('export.softProofResolver.currentExportPresetName'),
+      presets: appSettings.exportPresets ?? [],
+    });
+    onSettingsChange({ ...appSettings, exportPresets: updatedPresets });
+    setEditor({
+      exportSoftProofRecipeId: EXPORT_SOFT_PROOF_RESOLVER_PRESET_ID,
+      exportSoftProofTransform: null,
+      isExportSoftProofEnabled: true,
+    });
+  }, [appSettings, currentSettingsObject, onSettingsChange, setEditor, t]);
+
+  const handleUseCurrentSoftProofForExport = useCallback(() => {
+    if (!currentSoftProofPreset || !softProofResolverStatus.canUseCurrentSoftProofForExport) return;
+    setBlackPointCompensation(currentSoftProofPreset.blackPointCompensation ?? false);
+    setColorProfile(currentSoftProofPreset.colorProfile ?? ExportColorProfile.Srgb);
+    setRenderingIntent(currentSoftProofPreset.renderingIntent ?? ExportRenderingIntent.RelativeColorimetric);
+  }, [
+    currentSoftProofPreset,
+    setBlackPointCompensation,
+    setColorProfile,
+    setRenderingIntent,
+    softProofResolverStatus.canUseCurrentSoftProofForExport,
+  ]);
 
   useEffect(() => {
     if (!isVisible) return;
@@ -1499,6 +1591,9 @@ export default function ExportPanel({
       : colorStackParityReceipt?.status === 'warning' || softProofWarningItems.length > 0
         ? 'warning'
         : 'success';
+  const shouldShowSoftProofResolver =
+    fileFormat !== FileFormats.Cube &&
+    (softProofWarningItems.length > 0 || !softProofResolverStatus.isCurrentProofExportConsistent);
   const renderSoftProofProfileCompareSide = (sideId: ExportSoftProofProfileCompareSideId) => {
     const sideState = softProofProfileCompareState[sideId];
     const proof = sideState.status === 'ready' ? sideState.proof : null;
@@ -2183,6 +2278,105 @@ export default function ExportPanel({
                 </div>
               </div>
             </div>
+            {shouldShowSoftProofResolver ? (
+              <div
+                className="rounded-md border border-yellow-500/40 bg-yellow-500/10 px-3 py-2"
+                data-export-soft-proof-resolver-black-point-compensation={softProofResolverBlackPointCompensation}
+                data-export-soft-proof-resolver-can-preview={String(
+                  softProofResolverStatus.canPreviewCurrentExportSettings,
+                )}
+                data-export-soft-proof-resolver-can-use-proof={String(
+                  softProofResolverStatus.canUseCurrentSoftProofForExport,
+                )}
+                data-export-soft-proof-resolver-export-intent={renderingIntent}
+                data-export-soft-proof-resolver-export-profile={colorProfile}
+                data-export-soft-proof-resolver-fingerprint={softProofResolverFingerprint}
+                data-export-soft-proof-resolver-parity-status={softProofResolverStatus.parityStatus}
+                data-export-soft-proof-resolver-proof-intent={softProofResolverProofIntent}
+                data-export-soft-proof-resolver-proof-profile={softProofResolverProofProfile}
+                data-export-soft-proof-resolver-unsupported-reason={softProofResolverStatus.unsupportedReason ?? ''}
+                data-testid="export-soft-proof-resolver"
+              >
+                <div className="flex min-w-0 items-start gap-2">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-yellow-400" />
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <div className="flex min-w-0 items-center justify-between gap-2">
+                      <UiText className="text-yellow-200" variant={TextVariants.small} weight={TextWeights.semibold}>
+                        {t('export.softProofResolver.title')}
+                      </UiText>
+                      <span className={editorChromeStatusChipClassName(exportFooterParityTone)}>
+                        {t(`export.softProofResolver.parity.${softProofResolverStatus.parityStatus}`)}
+                      </span>
+                    </div>
+                    <UiText as="p" color={TextColors.secondary} variant={TextVariants.small}>
+                      {softProofResolverStatus.isCurrentProofExportConsistent
+                        ? t('export.softProofResolver.consistent')
+                        : t('export.softProofResolver.description', {
+                            exportIntent: selectedRenderingIntentLabel,
+                            exportProfile: selectedColorProfileLabel,
+                            proofIntent: softProofResolverProofIntent || t('export.status.parityUnknown'),
+                            proofProfile: softProofResolverProofProfile || t('export.status.parityUnknown'),
+                          })}
+                    </UiText>
+                    <div className="grid min-w-0 grid-cols-2 gap-x-3 gap-y-1">
+                      <UiText className="truncate" color={TextColors.secondary} variant={TextVariants.small}>
+                        {t('export.softProofResolver.resultingProfile', {
+                          profile: softProofResolverProofProfile || selectedColorProfileLabel,
+                        })}
+                      </UiText>
+                      <UiText className="truncate" color={TextColors.secondary} variant={TextVariants.small}>
+                        {t('export.softProofResolver.renderingIntent', {
+                          intent: softProofResolverProofIntent || selectedRenderingIntentLabel,
+                        })}
+                      </UiText>
+                      <UiText className="truncate" color={TextColors.secondary} variant={TextVariants.small}>
+                        {t('export.softProofResolver.blackPointCompensation', {
+                          value: softProofResolverBlackPointCompensation || String(blackPointCompensation),
+                        })}
+                      </UiText>
+                      <UiText className="truncate" color={TextColors.secondary} variant={TextVariants.small}>
+                        {t('export.softProofResolver.transformFingerprint', {
+                          fingerprint: softProofResolverFingerprint || t('export.status.parityUnknown'),
+                        })}
+                      </UiText>
+                    </div>
+                    {softProofResolverUnsupportedMessage ? (
+                      <UiText as="p" className="text-yellow-200" variant={TextVariants.small}>
+                        {softProofResolverUnsupportedMessage}
+                      </UiText>
+                    ) : null}
+                    <div className="flex min-w-0 flex-wrap gap-1.5">
+                      <button
+                        className="rounded border border-yellow-500/40 px-2 py-1 text-xs font-medium text-yellow-200 transition-colors hover:bg-card-active disabled:opacity-50"
+                        data-testid="export-soft-proof-resolver-use-proof"
+                        disabled={
+                          isExporting ||
+                          !softProofResolverStatus.canUseCurrentSoftProofForExport ||
+                          softProofResolverStatus.unsupportedReason !== null
+                        }
+                        onClick={handleUseCurrentSoftProofForExport}
+                        type="button"
+                      >
+                        {t('export.softProofResolver.useCurrentSoftProof')}
+                      </button>
+                      <button
+                        className="rounded border border-yellow-500/40 px-2 py-1 text-xs font-medium text-yellow-200 transition-colors hover:bg-card-active disabled:opacity-50"
+                        data-testid="export-soft-proof-resolver-preview-export"
+                        disabled={
+                          isExporting ||
+                          !softProofResolverStatus.canPreviewCurrentExportSettings ||
+                          !isSupportedColorProfileForFormat(fileFormat, colorProfile)
+                        }
+                        onClick={handlePreviewCurrentExportSettings}
+                        type="button"
+                      >
+                        {t('export.softProofResolver.previewCurrentExport')}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
             {softProofWarningItems.length > 0 ? (
               <details
                 className="rounded-md border border-yellow-500/40 bg-yellow-500/10 px-3 py-2"
