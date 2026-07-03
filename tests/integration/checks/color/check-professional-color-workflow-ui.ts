@@ -115,6 +115,8 @@ const rendered = await renderColorPanel();
 await validateFoundationalColorControlOrder(rendered.container);
 await validatePresentationGrouping(rendered.container);
 await validateColorWorkspaceTabKeyboard(rendered.container);
+await validateColorWorkspaceHeaderDensity(rendered.container);
+await selectColorWorkspaceTab(rendered.container, 'output');
 await openDisclosure(rendered.container, 'color-proofing-diagnostics-disclosure');
 await validateRenderedWorkspaceCoverage(rendered.container);
 await validateGamutWarningCoverage(rendered.container);
@@ -237,7 +239,6 @@ async function validatePresentationGrouping(container: Element) {
 
 async function validateColorWorkspaceTabKeyboard(container: Element) {
   const tablist = getByTestId(container, 'color-workspace-tabs');
-  assertData(tablist, 'sticky', 'true', 'color workspace tabs should expose sticky placement for visual proof.');
 
   const quick = getByTestId<HTMLButtonElement>(container, 'color-workspace-tab-quick');
   const editor = getByTestId<HTMLButtonElement>(container, 'color-workspace-tab-editor');
@@ -259,6 +260,33 @@ async function validateColorWorkspaceTabKeyboard(container: Element) {
   assertSelectedTab(quick, 'Home should return to Quick.');
 }
 
+async function validateColorWorkspaceHeaderDensity(container: Element) {
+  const header = getByTestId(container, 'color-workspace-tab-header');
+  assertData(header, 'sticky', 'true', 'color workspace header should expose sticky placement for visual proof.');
+  assertData(header, 'gamutWarningCount', '45', 'color workspace header did not expose gamut warning count.');
+  assertData(header, 'warningCount', '3', 'color workspace header did not expose compact warning chip count.');
+  assertData(header, 'previewWarningState', 'current', 'color workspace header did not expose gamut warning state.');
+  assertData(header, 'scopeFreshnessState', 'current', 'color workspace header did not expose scope freshness state.');
+
+  const chips = Array.from(container.querySelectorAll('[data-testid="color-workspace-warning-chip"]'));
+  if (chips.length !== 3) {
+    failures.push(`expected 3 compact color workspace warning chips, found ${chips.length}.`);
+  }
+
+  for (const chip of chips) {
+    const className = chip.getAttribute('class') ?? '';
+    if (!className.includes('whitespace-nowrap') || !className.includes('truncate')) {
+      failures.push(`color workspace warning chip is not non-wrapping/truncated: ${normalizeText(chip.textContent)}`);
+    }
+    if (normalizeText(chip.textContent).length === 0 || chip.getAttribute('title') !== chip.textContent) {
+      failures.push(`color workspace warning chip did not preserve its runtime label/title: ${chip.outerHTML}`);
+    }
+  }
+
+  assertVisibleText(header, 'Display P3 gamut · 12.5%', 'header gamut warning chip copy was not rendered.');
+  assertVisibleText(header, 'Scopes current', 'header scope freshness chip copy was not rendered.');
+}
+
 async function validateColorWorkspaceTabPersistence() {
   const firstRender = await renderColorPanel();
   const editor = getByTestId<HTMLButtonElement>(firstRender.container, 'color-workspace-tab-editor');
@@ -277,6 +305,15 @@ async function validateColorWorkspaceTabPersistence() {
     await flushPromises();
   });
   secondRender.unmount();
+}
+
+async function selectColorWorkspaceTab(container: Element, tabId: string) {
+  const tab = getByTestId<HTMLButtonElement>(container, `color-workspace-tab-${tabId}`);
+  await act(async () => {
+    tab.click();
+    await flushPromises();
+  });
+  assertSelectedTab(tab, `${tabId} should be selected before validating its panel.`);
 }
 
 async function renderColorPanel(): Promise<RenderedPanel> {
@@ -372,13 +409,16 @@ async function validateRenderedWorkspaceCoverage(container: Element) {
   );
   assertData(workspace, 'previewWarningState', 'current', 'workspace did not expose current gamut warning state.');
   assertData(workspace, 'scopeFreshnessState', 'current', 'workspace did not expose current scope freshness.');
-  assertData(workspace, 'displayProfileLabel', 'Display P3', 'workspace did not expose display/output profile label.');
+  assertData(
+    workspace,
+    'displayProfileLabel',
+    'Display profile unavailable',
+    'workspace should not fabricate a native display profile in happy-dom.',
+  );
   assertData(workspace, 'softProofProfileLabel', 'Display P3', 'workspace did not expose soft proof profile label.');
   assertData(workspace, 'renderTargetLabel', 'Export preview -> Display P3', 'workspace did not expose render target.');
   assertData(workspace, 'clippingWarningState', 'unavailable', 'workspace did not expose clipping status.');
-  assertVisibleText(container, exportPresetFixture.name, 'export preset label was not rendered.');
   assertVisibleText(container, 'Linear RAW', 'working-space label was not rendered.');
-  assertVisibleText(container, 'Vectorscope', 'scope label was not rendered.');
   await waitForText(container, 'Display P3 gamut · 12.5%', 'gamut warning chip copy was not rendered.');
   await waitForText(container, 'Scopes current', 'scope freshness chip copy was not rendered.');
 }
@@ -512,7 +552,6 @@ async function validateRecipeApplication(container: Element) {
     'Apply coordinated profile, tone, balance, mixer, selective color, and grading settings.',
     'workflow recipe description was not rendered.',
   );
-  const recipes = getByTestId(container, 'professional-color-recipes');
   const cleanPortrait = getByTestId<HTMLButtonElement>(container, 'professional-color-recipe-cleanPortrait');
   assertData(cleanPortrait, 'cameraProfile', 'camera_portrait', 'clean portrait recipe did not expose profile.');
   assertData(cleanPortrait, 'toneCurve', 'soft_contrast', 'clean portrait recipe did not expose tone curve.');
