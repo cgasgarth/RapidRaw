@@ -73,6 +73,26 @@
         "toolName": "rawengine.agent.preview.render"
       },
       {
+        "approvalClass": "edit_apply",
+        "inputSchemaName": "AgentCurrentImagePreviewLoopRequestV1",
+        "mutates": true,
+        "outputSchemaName": "AgentCurrentImagePreviewLoopResponseV1",
+        "requiresDryRun": true,
+        "returnsArtifactHandles": true,
+        "toolKind": "apply",
+        "toolName": "rawengine.agent.selected_image.preview_loop"
+      },
+      {
+        "approvalClass": "edit_apply",
+        "inputSchemaName": "AgentCurrentImagePreviewLoopApplyReviewRequestV1",
+        "mutates": true,
+        "outputSchemaName": "AgentCurrentImagePreviewLoopResponseV1",
+        "requiresDryRun": true,
+        "returnsArtifactHandles": true,
+        "toolKind": "apply",
+        "toolName": "rawengine.agent.selected_image.preview_loop.apply_review"
+      },
+      {
         "approvalClass": "preview_only",
         "inputSchemaName": "CommandEnvelopeV1",
         "mutates": false,

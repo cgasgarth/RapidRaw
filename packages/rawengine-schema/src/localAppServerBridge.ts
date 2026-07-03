@@ -52,6 +52,8 @@ import { SuperResolutionAppServerRuntimeToolBusV1 } from './super-resolution/sup
 import { rawEngineDefaultToolRegistryV1 } from './toolRegistry.js';
 
 export const RawEngineLocalAppServerCommandType = {
+  AgentSelectedImagePreviewLoop: 'rawengine.agent.selected_image.preview_loop',
+  AgentSelectedImagePreviewLoopApplyReview: 'rawengine.agent.selected_image.preview_loop.apply_review',
   EditorStateQuery: 'rawengine.local.editorState.query',
   ImageMetadataQuery: 'rawengine.local.imageMetadata.query',
   ProjectMetadataQuery: 'rawengine.local.projectMetadata.query',
@@ -94,6 +96,146 @@ export const rawEngineLocalAppServerImageMetadataQueryV1Schema = rawEngineLocalA
 export const rawEngineLocalAppServerEditorStateQueryV1Schema = rawEngineLocalAppServerReadQueryBaseV1Schema.extend({
   commandType: z.literal(RawEngineLocalAppServerCommandType.EditorStateQuery),
 });
+
+const rawEngineLocalAppServerSelectedImagePreviewLoopStepPatchV1Schema = z
+  .object({
+    exposure: z.number().min(-2).max(2).optional(),
+    highlights: z.number().min(-100).max(100).optional(),
+    shadows: z.number().min(-100).max(100).optional(),
+  })
+  .strict()
+  .refine((patch) => Object.keys(patch).length > 0, {
+    message: 'Selected-image preview-loop step requires at least one adjustment.',
+  });
+
+const rawEngineLocalAppServerSelectedImagePreviewLoopPreviewRequestV1Schema = z
+  .object({
+    crop: z
+      .object({
+        height: z.number().positive().max(1),
+        width: z.number().positive().max(1),
+        x: z.number().min(0).max(1),
+        y: z.number().min(0).max(1),
+      })
+      .strict()
+      .optional(),
+    longEdgePx: z.number().int().min(256).max(2048).optional(),
+    maxPixelCount: z.number().int().min(65_536).max(4_194_304).optional(),
+    purpose: z.enum(['detail_review', 'refresh']).optional(),
+    quality: z.number().min(0.5).max(0.95).optional(),
+    zoom: z
+      .object({
+        centerX: z.number().min(0).max(1),
+        centerY: z.number().min(0).max(1),
+        scale: z.number().min(1).max(8),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
+const rawEngineLocalAppServerSelectedImagePreviewLoopStepV1Schema =
+  rawEngineLocalAppServerSelectedImagePreviewLoopStepPatchV1Schema.safeExtend({
+    assistantRationale: z.string().trim().min(1).optional(),
+    preview: rawEngineLocalAppServerSelectedImagePreviewLoopPreviewRequestV1Schema.optional(),
+    userFollowUp: z.string().trim().min(1).optional(),
+  });
+
+const rawEngineLocalAppServerSelectedImagePreviewLoopDryRunApprovalV1Schema = z
+  .object({
+    acceptedPlanHash: z.string().trim().min(1),
+    acceptedPlanId: z.string().trim().min(1),
+    approvalState: z.literal('approved'),
+    expectedGraphRevision: z.string().trim().min(1),
+    turn: z.number().int().min(2),
+  })
+  .strict();
+
+const rawEngineLocalAppServerSelectedImagePreviewLoopCommandBaseV1Schema = z
+  .object({
+    commandType: z.literal(RawEngineLocalAppServerCommandType.AgentSelectedImagePreviewLoop),
+    dryRunApprovals: z.array(rawEngineLocalAppServerSelectedImagePreviewLoopDryRunApprovalV1Schema).min(1),
+    expectedGraphRevision: z.string().trim().min(1),
+    expectedPreviewHeight: z.number().int().positive(),
+    expectedPreviewIdentity: z.string().trim().min(1).nullable(),
+    expectedPreviewWidth: z.number().int().positive(),
+    expectedRecipeHash: z.string().trim().min(1),
+    maxIterations: z.number().int().min(2).max(6).default(4),
+    operationId: z.string().trim().min(1),
+    prompt: z.string().trim().min(1),
+    requestId: z.string().trim().min(1),
+    rollbackAfterReview: z.boolean().default(false),
+    selectedImagePath: z.string().trim().min(1),
+    sessionId: z.string().trim().min(1),
+    steps: z.array(rawEngineLocalAppServerSelectedImagePreviewLoopStepV1Schema).min(2).max(6),
+  })
+  .strict();
+
+export const rawEngineLocalAppServerSelectedImagePreviewLoopCommandV1Schema =
+  rawEngineLocalAppServerSelectedImagePreviewLoopCommandBaseV1Schema.superRefine((command, context) => {
+    const approvedTurns = new Set(command.dryRunApprovals.map((approval) => approval.turn));
+    const missingApprovalTurn = command.steps.findIndex((_step, index) => !approvedTurns.has(index + 2));
+    if (missingApprovalTurn !== -1) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Selected-image preview loop requires an accepted dry-run approval for every mutation step.',
+        path: ['dryRunApprovals'],
+      });
+    }
+  });
+
+const rawEngineLocalAppServerPreviewLoopReviewV1Schema = z
+  .object({
+    finalGraphRevision: z.string().trim().min(1),
+    finalRecipeHash: z.string().trim().min(1),
+    previewLineage: z
+      .array(
+        z
+          .object({
+            previewArtifactId: z.string().trim().min(1),
+          })
+          .loose(),
+      )
+      .min(1),
+    previewRefreshCount: z.number().int().min(1),
+    previewRefreshReceipts: z
+      .array(
+        z
+          .object({
+            contentHash: z.string().regex(/^sha256:[a-f0-9]{16,64}$/u),
+          })
+          .loose(),
+      )
+      .min(1),
+    rollbackCheckpoint: z
+      .object({
+        graphRevision: z.string().trim().min(1),
+        previewRecipeHash: z.string().trim().min(1),
+        sessionId: z.string().trim().min(1),
+      })
+      .loose(),
+    selectedImage: z
+      .object({
+        height: z.number().int().positive(),
+        path: z.string().trim().min(1),
+        previewIdentity: z.string().trim().min(1).nullable(),
+        width: z.number().int().positive(),
+      })
+      .loose(),
+    selectedImagePath: z.string().trim().min(1),
+    toolName: z.literal(RawEngineLocalAppServerCommandType.AgentSelectedImagePreviewLoop),
+  })
+  .loose();
+
+export const rawEngineLocalAppServerSelectedImagePreviewLoopApplyReviewCommandV1Schema = z
+  .object({
+    acceptedPreviewArtifactId: z.string().trim().min(1),
+    acceptedPreviewReceiptHash: z.string().regex(/^sha256:[a-f0-9]{16,64}$/u),
+    commandType: z.literal(RawEngineLocalAppServerCommandType.AgentSelectedImagePreviewLoopApplyReview),
+    request: rawEngineLocalAppServerSelectedImagePreviewLoopCommandBaseV1Schema.omit({ commandType: true }),
+    review: rawEngineLocalAppServerPreviewLoopReviewV1Schema,
+  })
+  .strict();
 
 export const rawEngineLocalAppServerProjectMetadataResultV1Schema = z
   .object({
@@ -334,6 +476,12 @@ export type RawEngineLocalAppServerImageMetadataQueryV1 = z.infer<
   typeof rawEngineLocalAppServerImageMetadataQueryV1Schema
 >;
 export type RawEngineLocalAppServerEditorStateQueryV1 = z.infer<typeof rawEngineLocalAppServerEditorStateQueryV1Schema>;
+export type RawEngineLocalAppServerSelectedImagePreviewLoopCommandV1 = z.infer<
+  typeof rawEngineLocalAppServerSelectedImagePreviewLoopCommandV1Schema
+>;
+export type RawEngineLocalAppServerSelectedImagePreviewLoopApplyReviewCommandV1 = z.infer<
+  typeof rawEngineLocalAppServerSelectedImagePreviewLoopApplyReviewCommandV1Schema
+>;
 export type RawEngineLocalAppServerProjectMetadataResultV1 = z.infer<
   typeof rawEngineLocalAppServerProjectMetadataResultV1Schema
 >;
@@ -431,6 +579,12 @@ export interface RawEngineLocalAppServerBridgeOptions {
   commandBus?: EditCommandBus;
   getProjectLibrarySnapshot?: RawEngineLocalAppServerProjectLibrarySnapshotProvider;
   projectLibrarySnapshot?: ProjectLibrarySnapshotV1;
+  runSelectedImagePreviewLoop?: (
+    command: RawEngineLocalAppServerSelectedImagePreviewLoopCommandV1,
+  ) => Promise<unknown> | unknown;
+  runSelectedImagePreviewLoopApplyReview?: (
+    command: RawEngineLocalAppServerSelectedImagePreviewLoopApplyReviewCommandV1,
+  ) => Promise<unknown> | unknown;
   toolRegistry?: RawEngineToolRegistryV1;
 }
 
@@ -491,6 +645,8 @@ const RAW_ENGINE_LOCAL_APP_SERVER_EXECUTABLE_TOOL_NAMES = new Set([
   'agent.project_metadata.query',
   'agent.selected_images.query',
   'rawengine.agent.preview.render',
+  'rawengine.agent.selected_image.preview_loop',
+  'rawengine.agent.selected_image.preview_loop.apply_review',
   'rawengine.image.get_preview',
   'ai.enhancement.apply_command',
   'ai.enhancement.dry_run_command',
@@ -1858,6 +2014,12 @@ export class RawEngineLocalAppServerBridge {
   };
   readonly #linearGradientMaskRuntime = new LinearGradientMaskCommandRuntime({ height: 512, width: 768 });
   readonly #getProjectLibrarySnapshot: RawEngineLocalAppServerProjectLibrarySnapshotProvider;
+  readonly #runSelectedImagePreviewLoop:
+    | RawEngineLocalAppServerBridgeOptions['runSelectedImagePreviewLoop']
+    | undefined;
+  readonly #runSelectedImagePreviewLoopApplyReview:
+    | RawEngineLocalAppServerBridgeOptions['runSelectedImagePreviewLoopApplyReview']
+    | undefined;
   readonly #toolRegistry: RawEngineToolRegistryV1;
 
   constructor(options: RawEngineLocalAppServerBridgeOptions = {}) {
@@ -1867,6 +2029,8 @@ export class RawEngineLocalAppServerBridge {
       options.getProjectLibrarySnapshot ??
       (() =>
         projectLibrarySnapshotV1Schema.parse(options.projectLibrarySnapshot ?? DEFAULT_LOCAL_PROJECT_LIBRARY_SNAPSHOT));
+    this.#runSelectedImagePreviewLoop = options.runSelectedImagePreviewLoop;
+    this.#runSelectedImagePreviewLoopApplyReview = options.runSelectedImagePreviewLoopApplyReview;
     this.#toolRegistry = filterRawEngineLocalAppServerExecutableToolRegistry(
       options.toolRegistry ?? rawEngineDefaultToolRegistryV1,
     );
@@ -2020,6 +2184,32 @@ export class RawEngineLocalAppServerBridge {
       commandType: RawEngineLocalAppServerCommandType.EditorStateQuery,
       execute: () => buildEditorStateResult(this.#getProjectLibrarySnapshot()),
       schema: rawEngineLocalAppServerEditorStateQueryV1Schema,
+    });
+
+    this.#commandBus.register({
+      commandType: RawEngineLocalAppServerCommandType.AgentSelectedImagePreviewLoop,
+      execute: (command) => {
+        const parsedCommand = rawEngineLocalAppServerSelectedImagePreviewLoopCommandV1Schema.parse(command);
+        if (this.#runSelectedImagePreviewLoop === undefined) {
+          throw new Error('Local app-server bridge has no selected-image preview-loop executor.');
+        }
+
+        return this.#runSelectedImagePreviewLoop(parsedCommand);
+      },
+      schema: rawEngineLocalAppServerSelectedImagePreviewLoopCommandV1Schema,
+    });
+
+    this.#commandBus.register({
+      commandType: RawEngineLocalAppServerCommandType.AgentSelectedImagePreviewLoopApplyReview,
+      execute: (command) => {
+        const parsedCommand = rawEngineLocalAppServerSelectedImagePreviewLoopApplyReviewCommandV1Schema.parse(command);
+        if (this.#runSelectedImagePreviewLoopApplyReview === undefined) {
+          throw new Error('Local app-server bridge has no selected-image preview-loop apply-review executor.');
+        }
+
+        return this.#runSelectedImagePreviewLoopApplyReview(parsedCommand);
+      },
+      schema: rawEngineLocalAppServerSelectedImagePreviewLoopApplyReviewCommandV1Schema,
     });
 
     this.#commandBus.register({

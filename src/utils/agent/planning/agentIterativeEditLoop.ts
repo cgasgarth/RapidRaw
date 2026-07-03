@@ -503,14 +503,14 @@ export const runAgentIterativeEditLoop = async (
     const preview = agentPreviewRenderResponseSchema.parse(
       await dispatchAgentLiveEditorTool({
         args: {
-          crop: previewRequest?.crop,
           expectedRecipeHash: recipeHash,
           longEdgePx: previewRequest?.longEdgePx ?? AGENT_MEDIUM_PREVIEW_LONG_EDGE_PX,
-          maxPixelCount: previewRequest?.maxPixelCount,
+          ...(previewRequest?.crop === undefined ? {} : { crop: previewRequest.crop }),
+          ...(previewRequest?.maxPixelCount === undefined ? {} : { maxPixelCount: previewRequest.maxPixelCount }),
           purpose: previewRequest?.purpose ?? 'refresh',
           quality: previewRequest?.quality ?? AGENT_MEDIUM_PREVIEW_QUALITY,
           requestId: previewRequestId,
-          zoom: previewRequest?.zoom,
+          ...(previewRequest?.zoom === undefined ? {} : { zoom: previewRequest.zoom }),
         },
         requestId: previewRequestId,
         runtimeToolName: AGENT_PREVIEW_RENDER_TOOL_NAME,
