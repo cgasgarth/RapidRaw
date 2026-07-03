@@ -106,6 +106,14 @@ const proofReportSchema = z
               sourceHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
             }),
             doesNotProve: z.array(z.string().min(1)).min(5),
+            finalFile: z.object({
+              bitDepth: z.literal(16),
+              gpsStripped: z.literal(true),
+              metadataRetained: z.literal(true),
+              outputProfile: z.enum(['display_p3', 'srgb']),
+              timestampsPreserved: z.literal(true),
+              transformApplied: z.boolean(),
+            }),
             fixtureId: z.string().min(1),
             metrics: z.object({
               changedPixelRatio: z.number().positive(),
@@ -210,6 +218,15 @@ for (const runReport of reportCollection.reports) {
   if (sourceHashUnchanged !== 1) {
     failures.push(`${runReport.fixtureId}: sourceHashUnchanged must be 1.`);
   }
+  if (!runReport.finalFile.metadataRetained) {
+    failures.push(`${runReport.fixtureId}: finalFile.metadataRetained must be true.`);
+  }
+  if (!runReport.finalFile.timestampsPreserved) {
+    failures.push(`${runReport.fixtureId}: finalFile.timestampsPreserved must be true.`);
+  }
+  if (!runReport.finalFile.gpsStripped) {
+    failures.push(`${runReport.fixtureId}: finalFile.gpsStripped must be true.`);
+  }
   if (
     request.editCommand.colorPipeline.renderTarget.intent === 'perceptual' &&
     colorManagement.observedColorPipeline.gamutMapping !== 'rawengine.gamut.srgb-oklab-chroma-reduce.v4'
@@ -250,6 +267,14 @@ for (const runReport of reportCollection.reports) {
       sourceHash: colorManagement.decoderTrace.sourceHash,
     },
     doesNotProve: colorManagement.doesNotProve,
+    finalFile: {
+      bitDepth: runReport.finalFile.bitDepth,
+      gpsStripped: runReport.finalFile.gpsStripped,
+      metadataRetained: runReport.finalFile.metadataRetained,
+      outputProfile: runReport.finalFile.outputProfile,
+      timestampsPreserved: runReport.finalFile.timestampsPreserved,
+      transformApplied: runReport.finalFile.transformApplied,
+    },
     fixtureId: runReport.fixtureId,
     metrics: {
       changedPixelRatio,
