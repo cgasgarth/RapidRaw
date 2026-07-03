@@ -334,7 +334,14 @@
         "decodeMsLabel": "{{ms}}ms",
         "error": "Failed to compare RAW reconstruction modes: {{error}}",
         "running": "Comparing crops...",
-        "title": "100% RAW crop comparison"
+        "title": "100% RAW crop comparison",
+        "applied": "Applied",
+        "appliedReceiptTitle": "Applied {{mode}} to this image",
+        "applying": "Applying...",
+        "applyMode": "Use this mode",
+        "receiptCropHash": "Crop hash",
+        "receiptDecodeMs": "Decode",
+        "receiptSavedOverride": "Saved override"
       },
       "sections": {
         "basic": "기본",
