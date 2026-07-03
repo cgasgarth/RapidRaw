@@ -1329,6 +1329,10 @@ function ProfessionalEditorPanelHost({
 function ProfessionalEditorShellVisualSmoke() {
   const [activePanel, setActivePanel] = useState<Panel | null>(Panel.Adjustments);
   useProfessionalEditorSmokeState();
+  const handlePanelSelect = (panel: Panel) => {
+    useUIStore.getState().recordRecentRightPanel(panel);
+    setActivePanel(panel);
+  };
 
   return (
     <main
@@ -1365,7 +1369,7 @@ function ProfessionalEditorShellVisualSmoke() {
           data-testid="professional-editor-shell-right-panel"
           style={{ gridTemplateColumns: '42px minmax(0, 360px)' }}
         >
-          <ProfessionalEditorPanelHost activePanel={activePanel} onPanelSelect={setActivePanel} />
+          <ProfessionalEditorPanelHost activePanel={activePanel} onPanelSelect={handlePanelSelect} />
         </aside>
       </div>
     </main>
@@ -1503,6 +1507,10 @@ function ProfessionalExportProofFooterVisualSmoke() {
 function ProfessionalEditorCompactPortraitVisualSmoke() {
   const [activePanel, setActivePanel] = useState<Panel | null>(Panel.Color);
   useProfessionalEditorSmokeState();
+  const handlePanelSelect = (panel: Panel) => {
+    useUIStore.getState().recordRecentRightPanel(panel);
+    setActivePanel(panel);
+  };
 
   return (
     <main
@@ -1555,7 +1563,7 @@ function ProfessionalEditorCompactPortraitVisualSmoke() {
               activePanel={activePanel}
               isInstantTransition={true}
               layout="horizontal"
-              onPanelSelect={setActivePanel}
+              onPanelSelect={handlePanelSelect}
             />
           </div>
           <div
@@ -2539,6 +2547,14 @@ function WorkflowRailVisualSmoke() {
   const [activePanel, setActivePanel] = useState<Panel | null>(Panel.Adjustments);
   const [compactActivePanel, setCompactActivePanel] = useState<Panel | null>(Panel.Adjustments);
   const exportState = { errorMessage: '', progress: { current: 0, total: 0 }, status: Status.Idle };
+  const handleDesktopPanelSelect = (panel: Panel) => {
+    useUIStore.getState().recordRecentRightPanel(panel);
+    setActivePanel(panel);
+  };
+  const handleCompactPanelSelect = (panel: Panel) => {
+    useUIStore.getState().recordRecentRightPanel(panel);
+    setCompactActivePanel(panel);
+  };
 
   useEffect(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
@@ -2555,6 +2571,7 @@ function WorkflowRailVisualSmoke() {
     });
     useUIStore.setState({
       collapsibleSectionsState: { ...DEFAULT_COLLAPSIBLE_SECTIONS_STATE },
+      recentRightPanels: [Panel.Adjustments],
     });
   }, []);
 
@@ -2587,7 +2604,11 @@ function WorkflowRailVisualSmoke() {
             style={{ gridTemplateColumns: '42px minmax(0, 360px)' }}
           >
             <div data-testid="workflow-rail-desktop-rail">
-              <RightPanelSwitcher activePanel={activePanel} isInstantTransition={true} onPanelSelect={setActivePanel} />
+              <RightPanelSwitcher
+                activePanel={activePanel}
+                isInstantTransition={true}
+                onPanelSelect={handleDesktopPanelSelect}
+              />
             </div>
             <div
               className="flex min-h-0 min-w-0 flex-col border-l border-white/10"
@@ -2681,7 +2702,7 @@ function WorkflowRailVisualSmoke() {
                 activePanel={compactActivePanel}
                 isInstantTransition={true}
                 layout="horizontal"
-                onPanelSelect={setCompactActivePanel}
+                onPanelSelect={handleCompactPanelSelect}
               />
             </div>
           </aside>

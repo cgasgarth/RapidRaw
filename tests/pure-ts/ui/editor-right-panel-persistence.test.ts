@@ -3,12 +3,16 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import {
   DEFAULT_EDITOR_RIGHT_PANEL,
   EDITING_RIGHT_PANELS,
+  getRightPanelEntry,
   isEditingRightPanel,
   RIGHT_PANEL_ORDER,
+  searchRightPanels,
 } from '../../../src/components/panel/right/rightPanelRegistry';
 import { Panel } from '../../../src/components/ui/AppProperties';
 import {
+  createRecentRightPanels,
   LAST_EDITING_RIGHT_PANEL_STORAGE_KEY,
+  MAX_RECENT_RIGHT_PANELS,
   readLastEditingRightPanel,
   useUIStore,
 } from '../../../src/store/useUIStore';
@@ -56,6 +60,7 @@ function resetRightPanelState(panel: Panel | null = DEFAULT_EDITOR_RIGHT_PANEL) 
   useUIStore.setState({
     activeRightPanel: panel,
     renderedRightPanel: panel,
+    recentRightPanels: panel === null ? [] : [panel],
     slideDirection: 1,
   });
 }
@@ -131,6 +136,34 @@ describe('editor right panel persistence', () => {
     expect(useUIStore.getState().slideDirection).toBe(-1);
   });
 
+  test('records typed recent right panels from real panel selections', () => {
+    installMemoryStorage();
+    resetRightPanelState(Panel.Color);
+
+    useUIStore.getState().setRightPanel(Panel.Masks);
+    useUIStore.getState().setRightPanel(Panel.Export);
+    useUIStore.getState().setRightPanel(Panel.Agent);
+
+    expect(useUIStore.getState().recentRightPanels).toEqual([Panel.Agent, Panel.Export, Panel.Masks, Panel.Color]);
+
+    useUIStore.getState().setRightPanel(Panel.Export);
+    expect(useUIStore.getState().recentRightPanels).toEqual([Panel.Export, Panel.Agent, Panel.Masks, Panel.Color]);
+  });
+
+  test('bounds recent panel history while preserving most recent order', () => {
+    expect(
+      createRecentRightPanels(Panel.Tether, [
+        Panel.Export,
+        Panel.Agent,
+        Panel.Masks,
+        Panel.Crop,
+        Panel.Adjustments,
+        Panel.Color,
+      ]),
+    ).toEqual([Panel.Tether, Panel.Export, Panel.Agent, Panel.Masks, Panel.Crop]);
+    expect(MAX_RECENT_RIGHT_PANELS).toBe(5);
+  });
+
   test('collapses the active panel without replacing the rendered or persisted editing rail', () => {
     const storage = installMemoryStorage();
     resetRightPanelState(Panel.Masks);
@@ -155,5 +188,27 @@ describe('editor right panel persistence', () => {
     for (const panel of [Panel.Export, Panel.Tether, Panel.Presets, Panel.Metadata]) {
       expect(isEditingRightPanel(panel)).toBe(false);
     }
+  });
+
+  test('searches right panel registry labels and keywords', () => {
+    expect(searchRightPanels('agent').map(({ id }) => id)).toContain(Panel.Agent);
+    expect(searchRightPanels('output').map(({ id }) => id)).toEqual([Panel.Export]);
+    expect(searchRightPanels('retouch').map(({ id }) => id)).toContain(Panel.Ai);
+    expect(searchRightPanels('camera').map(({ id }) => id)).toEqual([Panel.Metadata, Panel.Tether]);
+  });
+
+  test('registry exposes compact labels for every panel in rail order', () => {
+    expect(RIGHT_PANEL_ORDER.map((panel) => getRightPanelEntry(panel).shortLabel)).toEqual([
+      'Color',
+      'Adjust',
+      'Crop',
+      'Masks',
+      'Agent',
+      'Inpaint',
+      'Info',
+      'Presets',
+      'Tether',
+      'Export',
+    ]);
   });
 });
