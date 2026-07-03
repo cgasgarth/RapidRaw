@@ -277,11 +277,35 @@ export interface AgentSelectedImageLiveSessionDraft {
   state: AgentSelectedImageLiveSessionState;
 }
 
-export interface AgentSelectedImageLiveSessionApplyResult {
+export interface AgentSelectedImageLiveSessionAppliedResult {
+  status: 'applied';
   apply: AgentAdjustmentsApplyResponse;
   audit: AgentSelectedImageLiveSessionAuditRecord;
   previewAfterHash: string;
   previewBeforeHash: string;
+}
+
+export interface AgentSelectedImageLiveSessionBlockedResult {
+  status: 'blocked';
+  applyGuard: AgentSelectedImageLiveSessionApplyGuard;
+  audit: AgentSelectedImageLiveSessionAuditRecord;
+  refresh: AgentSelectedImageLiveSessionContextRefresh;
+  staleReason: AgentSelectedImageLiveSessionStaleReason;
+}
+
+export type AgentSelectedImageLiveSessionApplyResult =
+  | AgentSelectedImageLiveSessionAppliedResult
+  | AgentSelectedImageLiveSessionBlockedResult;
+
+export interface AgentSelectedImageLiveSessionContextRefresh {
+  applyGuard: AgentSelectedImageLiveSessionApplyGuard;
+  currentGraphRevision: string;
+  currentPreviewArtifactId: string;
+  currentPreviewIdentity: string | null;
+  currentRecipeHash: string;
+  currentSelectedImagePath: string;
+  status: 'ready' | 'stale';
+  staleReason?: AgentSelectedImageLiveSessionStaleReason;
 }
 
 export interface AgentSelectedImageLiveSessionAuditStorageAdapter {
@@ -367,13 +391,13 @@ const getAgentSelectedImageLiveSessionStaleReasonForSnapshot = (
   current: z.infer<typeof selectedImageLiveSessionSnapshotSchema>,
 ): AgentSelectedImageLiveSessionStaleReason | null => {
   if (current.selectedImagePath !== draft.snapshot.selectedImagePath) return 'image_changed';
-  if (current.previewArtifactId !== draft.snapshot.previewArtifactId) return 'preview_artifact_changed';
+  if (current.graphRevision !== draft.snapshot.graphRevision) return 'graph_revision_changed';
+  if (current.recipeHash !== draft.snapshot.recipeHash) return 'recipe_hash_changed';
   if (current.previewIdentity !== draft.snapshot.previewIdentity) return 'preview_identity_changed';
   if (current.previewWidth !== draft.snapshot.previewWidth || current.previewHeight !== draft.snapshot.previewHeight) {
     return 'preview_dimensions_changed';
   }
-  if (current.graphRevision !== draft.snapshot.graphRevision) return 'graph_revision_changed';
-  if (current.recipeHash !== draft.snapshot.recipeHash) return 'recipe_hash_changed';
+  if (current.previewArtifactId !== draft.snapshot.previewArtifactId) return 'preview_artifact_changed';
   return null;
 };
 
@@ -381,6 +405,25 @@ export const getAgentSelectedImageLiveSessionStaleReason = (
   draft: AgentSelectedImageLiveSessionDraft,
 ): AgentSelectedImageLiveSessionStaleReason | null => {
   return getAgentSelectedImageLiveSessionStaleReasonForSnapshot(draft, buildSnapshot());
+};
+
+export const refreshAgentSelectedImageLiveSessionContext = (
+  draft: AgentSelectedImageLiveSessionDraft,
+): AgentSelectedImageLiveSessionContextRefresh => {
+  const current = buildSnapshot();
+  const applyGuard = buildApplyGuard(draft, current);
+  const staleReason = applyGuard.staleReason;
+  const refresh: AgentSelectedImageLiveSessionContextRefresh = {
+    applyGuard,
+    currentGraphRevision: current.graphRevision,
+    currentPreviewArtifactId: current.previewArtifactId,
+    currentPreviewIdentity: current.previewIdentity,
+    currentRecipeHash: current.recipeHash,
+    currentSelectedImagePath: current.selectedImagePath,
+    status: staleReason === undefined ? 'ready' : 'stale',
+  };
+  if (staleReason !== undefined) refresh.staleReason = staleReason;
+  return refresh;
 };
 
 export const parseAgentSelectedImageLiveSessionAuditStore = (
@@ -599,7 +642,24 @@ export const applyAgentSelectedImageLiveSession = async (
       state: 'failed',
       toolName: AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
     });
-    throw new Error(`Selected-image live session rejected ${staleReason}.`);
+    const audit = buildAgentSelectedImageLiveSessionAuditRecord(draft, {
+      approvalDecision: 'approved',
+      applyGuard,
+      cancellationOutcome: 'not_cancelled',
+      state: 'failed',
+      staleReason,
+      toolCalls: [
+        { id: `${draft.requestId}-dry-run`, name: AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME, status: 'succeeded' },
+        { id: `${draft.requestId}-apply`, name: AGENT_ADJUSTMENTS_APPLY_TOOL_NAME, status: 'blocked' },
+      ],
+    });
+    return {
+      applyGuard,
+      audit,
+      refresh: refreshAgentSelectedImageLiveSessionContext(draft),
+      staleReason,
+      status: 'blocked',
+    };
   }
 
   draft.state = 'applying';
@@ -682,6 +742,7 @@ export const applyAgentSelectedImageLiveSession = async (
     }),
     previewAfterHash: apply.afterPreviewHash,
     previewBeforeHash: apply.beforePreviewHash,
+    status: 'applied',
   };
 };
 

@@ -128,19 +128,29 @@ useEditorStore.setState((state) => ({
 if (getAgentSelectedImageLiveSessionStaleReason(staleDraft) !== 'image_changed') {
   throw new Error('live session stale guard did not detect selected-image change.');
 }
-await expectRejects(() => applyAgentSelectedImageLiveSession(staleDraft), 'image_changed');
+const staleApplyResult = await applyAgentSelectedImageLiveSession(staleDraft);
+if (staleApplyResult.status !== 'blocked' || staleApplyResult.staleReason !== 'image_changed') {
+  throw new Error('live session stale apply did not return a blocked selected-image result.');
+}
 
 seedEditor();
 const stalePreviewDraft = approveAgentSelectedImageLiveSession(await startDraft('agent-live-session-stale-preview'));
 useEditorStore.setState({ finalPreviewUrl: 'blob:rawengine-agent-live-session-refreshed-preview' });
-if (getAgentSelectedImageLiveSessionStaleReason(stalePreviewDraft) !== 'preview_artifact_changed') {
+if (getAgentSelectedImageLiveSessionStaleReason(stalePreviewDraft) !== 'preview_identity_changed') {
   throw new Error('live session stale guard did not detect selected preview artifact change.');
 }
-await expectRejects(() => applyAgentSelectedImageLiveSession(stalePreviewDraft), 'preview_artifact_changed');
+const stalePreviewApplyResult = await applyAgentSelectedImageLiveSession(stalePreviewDraft);
+if (
+  stalePreviewApplyResult.status !== 'blocked' ||
+  stalePreviewApplyResult.staleReason !== 'preview_identity_changed'
+) {
+  throw new Error('live session stale preview apply did not return a blocked preview result.');
+}
 
 seedEditor();
 const applyDraft = approveAgentSelectedImageLiveSession(await startDraft('agent-live-session-apply'));
 const applyResult = await applyAgentSelectedImageLiveSession(applyDraft);
+if (applyResult.status !== 'applied') throw new Error('live session apply did not return an applied result.');
 const appliedReceipt = replayAgentSelectedImageLiveSessionAudit(applyResult.audit);
 if (
   appliedReceipt.approvalDecision !== 'approved' ||
