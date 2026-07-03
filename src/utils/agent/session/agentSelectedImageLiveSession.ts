@@ -318,7 +318,72 @@ export const agentSelectedImageLiveSessionReplayPreflightSchema = z
   })
   .strict();
 
+export const agentSelectedImageLiveSessionAuditExportReceiptSchema = z
+  .object({
+    auditRecord: agentSelectedImageLiveSessionAuditRecordSchema,
+    exportedAt: z.string().trim().min(1),
+    graphRevisions: z
+      .object({
+        final: z.string().trim().min(1).optional(),
+        initial: z.string().trim().min(1),
+        rollbackCheckpoint: z.string().trim().min(1),
+        rollbackReceipt: z.string().trim().min(1).optional(),
+      })
+      .strict(),
+    kind: z.literal('agent.selectedImageLiveSession.auditReceipt'),
+    previewHashes: z
+      .object({
+        after: z.string().trim().min(1).optional(),
+        before: z.string().trim().min(1),
+        lineage: z
+          .array(
+            z
+              .object({
+                graphRevision: z.string().trim().min(1),
+                previewArtifactId: z.string().trim().min(1),
+                purpose: z.enum(['accepted_preview', 'detail_review', 'refresh']),
+                renderHash: z.string().trim().min(1).optional(),
+              })
+              .strict(),
+          )
+          .optional(),
+      })
+      .strict(),
+    replayPreflight: agentSelectedImageLiveSessionReplayPreflightSchema,
+    requestIds: z.array(z.string().trim().min(1)).min(1),
+    rollbackState: z
+      .object({
+        checkpointGraphRevision: z.string().trim().min(1),
+        receiptGraphRevision: z.string().trim().min(1).optional(),
+        state: z.enum([
+          'idle',
+          'dry_run_ready',
+          'approval_required',
+          'applying',
+          'cancelling',
+          'applied',
+          'rolled_back',
+          'failed',
+        ]),
+        status: z.enum(['available', 'restored', 'unavailable']),
+      })
+      .strict(),
+    schemaVersion: z.literal(1),
+    selectedImage: z
+      .object({
+        basename: z.string().trim().min(1),
+        stableHash: z.string().trim().min(1),
+      })
+      .strict(),
+    sessionId: z.string().trim().min(1),
+    toolNames: z.array(z.string().trim().min(1)).min(1),
+  })
+  .strict();
+
 export type AgentSelectedImageLiveSessionAuditEvent = z.infer<typeof selectedImageLiveSessionAuditEventSchema>;
+export type AgentSelectedImageLiveSessionAuditExportReceipt = z.infer<
+  typeof agentSelectedImageLiveSessionAuditExportReceiptSchema
+>;
 export type AgentSelectedImageLiveSessionAuditRecord = z.infer<typeof agentSelectedImageLiveSessionAuditRecordSchema>;
 export type AgentSelectedImageLiveSessionAuditStore = z.infer<typeof agentSelectedImageLiveSessionAuditStoreSchema>;
 export type AgentSelectedImageLiveSessionApplyGuard = z.infer<typeof selectedImageLiveSessionApplyGuardSchema>;
@@ -449,6 +514,11 @@ const stableTranscriptHash = (value: unknown): string => {
     hash = Math.imul(hash, 0x01000193);
   }
   return `sha256:${(hash >>> 0).toString(16).padStart(16, '0')}`;
+};
+
+const getPathBasename = (path: string): string => {
+  const cleanPath = path.split('?')[0] ?? path;
+  return cleanPath.split(/[\\/]/u).pop() || cleanPath || 'selected-image';
 };
 
 export const buildAgentSelectedImageLiveSessionAuditStorageKey = ({
@@ -1580,6 +1650,108 @@ export const preflightAgentSelectedImageLiveSessionAuditReplay = (
     staleReason: staleReason ?? undefined,
     status: staleReason === null ? 'ready' : 'stale',
     toolCallCount: receipt.toolCalls.length,
+  });
+};
+
+export const buildAgentSelectedImageLiveSessionAuditExportReceipt = ({
+  audit,
+  exportedAt = new Date().toISOString(),
+  replayPreflight,
+}: {
+  audit: AgentSelectedImageLiveSessionAuditRecord;
+  exportedAt?: string;
+  replayPreflight: AgentSelectedImageLiveSessionReplayPreflight;
+}): AgentSelectedImageLiveSessionAuditExportReceipt => {
+  const parsedAudit = agentSelectedImageLiveSessionAuditRecordSchema.parse(audit);
+  const receipt = parsedAudit.receipt;
+  const selectedImageStableHash = stableTranscriptHash(receipt.selectedImagePath);
+  const selectedImageToken = `hash:${selectedImageStableHash}`;
+  const currentPreviewIdentityToken =
+    receipt.applyGuard?.currentPreviewIdentity === undefined || receipt.applyGuard.currentPreviewIdentity === null
+      ? null
+      : `hash:${stableTranscriptHash(receipt.applyGuard.currentPreviewIdentity)}`;
+  const expectedPreviewIdentityToken =
+    receipt.applyGuard?.expectedPreviewIdentity === undefined || receipt.applyGuard.expectedPreviewIdentity === null
+      ? null
+      : `hash:${stableTranscriptHash(receipt.applyGuard.expectedPreviewIdentity)}`;
+  const sanitizedReplayPreflight = agentSelectedImageLiveSessionReplayPreflightSchema.parse({
+    ...replayPreflight,
+    currentSelectedImagePath: selectedImageToken,
+    expectedSelectedImagePath: selectedImageToken,
+  });
+  const sanitizedReceipt = agentSelectedImageLiveSessionReceiptSchema.parse({
+    ...receipt,
+    applyGuard:
+      receipt.applyGuard === undefined
+        ? undefined
+        : {
+            ...receipt.applyGuard,
+            currentSelectedImagePath: selectedImageToken,
+            currentPreviewIdentity: currentPreviewIdentityToken,
+            expectedPreviewIdentity: expectedPreviewIdentityToken,
+            expectedSelectedImagePath: selectedImageToken,
+          },
+    previewLineage: receipt.previewLineage?.map(({ previewRef: _previewRef, ...lineage }) => lineage),
+    selectedImagePath: selectedImageToken,
+    storageKey: buildAgentSelectedImageLiveSessionAuditStorageKey({
+      selectedImagePath: selectedImageToken,
+      sessionId: receipt.sessionId,
+    }),
+  });
+  const sanitizedAudit = agentSelectedImageLiveSessionAuditRecordSchema.parse({
+    ...parsedAudit,
+    receipt: sanitizedReceipt,
+  });
+  const requestIds = Array.from(
+    new Set([
+      receipt.requestId,
+      ...receipt.toolCalls.map((toolCall) => toolCall.id),
+      ...parsedAudit.auditEvents.map((event) => event.toolCallId).filter((id): id is string => id !== undefined),
+    ]),
+  );
+  const toolNames = Array.from(new Set(receipt.toolCalls.map((toolCall) => toolCall.name)));
+  const rollbackReceipt = receipt.rollbackReceiptGraphRevision;
+
+  return agentSelectedImageLiveSessionAuditExportReceiptSchema.parse({
+    auditRecord: sanitizedAudit,
+    exportedAt,
+    graphRevisions: {
+      final: receipt.finalGraphRevision,
+      initial: receipt.initialGraphRevision,
+      rollbackCheckpoint: receipt.rollbackGraphRevision,
+      rollbackReceipt,
+    },
+    kind: 'agent.selectedImageLiveSession.auditReceipt',
+    previewHashes: {
+      after: receipt.afterPreviewHash,
+      before: receipt.beforePreviewHash,
+      lineage: receipt.previewLineage?.map((lineage) => ({
+        graphRevision: lineage.graphRevision,
+        previewArtifactId: lineage.previewArtifactId,
+        purpose: lineage.purpose,
+        renderHash: lineage.renderHash,
+      })),
+    },
+    replayPreflight: sanitizedReplayPreflight,
+    requestIds,
+    rollbackState: {
+      checkpointGraphRevision: receipt.rollbackGraphRevision,
+      receiptGraphRevision: rollbackReceipt,
+      state: receipt.state,
+      status:
+        receipt.state === 'rolled_back'
+          ? 'restored'
+          : receipt.rollbackCheckpoint === undefined
+            ? 'unavailable'
+            : 'available',
+    },
+    schemaVersion: 1,
+    selectedImage: {
+      basename: getPathBasename(receipt.selectedImagePath),
+      stableHash: selectedImageStableHash,
+    },
+    sessionId: receipt.sessionId,
+    toolNames,
   });
 };
 
