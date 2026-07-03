@@ -17,6 +17,7 @@ import en from '../../../src/i18n/locales/en.json';
 import { useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { useSettingsStore } from '../../../src/store/useSettingsStore';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
+import { agentSelectedImageLiveSessionAuditStoreSchema } from '../../../src/utils/agent/session/agentSelectedImageLiveSession';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -132,6 +133,9 @@ describe('agent panel preview-review workspace', () => {
     expect(required(container, 'agent-review-state-applied').dataset.state).toBe('inactive');
     expect(required(container, 'agent-review-state-audit-persisted').dataset.state).toBe('inactive');
     expect(required(container, 'agent-tool-readiness-chip-row').textContent).toContain('Dry-runs');
+    expect(required(container, 'agent-reviewed-command-composer').dataset.commandId).toBe('highlight_recovery');
+    expect(required(container, 'agent-reviewed-command-diff-highlights').dataset.delta).toBe('-18');
+    expect(required(container, 'agent-reviewed-command-diff-whites').dataset.delta).toBe('-6');
     expect(required(container, 'agent-dry-run-apply-review-controls').dataset.approvalRequired).toBe('false');
     expect(required(container, 'agent-dry-run-apply-review-controls').dataset.liveActionStatus).toBe('idle');
     expect((required(container, 'agent-review-control-dry-run') as HTMLButtonElement).disabled).toBe(false);
@@ -168,6 +172,12 @@ describe('agent panel preview-review workspace', () => {
 
     const { container } = await renderAgentPanel();
 
+    await clickAndFlush(container, 'agent-reviewed-command-option-shadow_lift');
+
+    expect(required(container, 'agent-reviewed-command-composer').dataset.commandId).toBe('shadow_lift');
+    expect(required(container, 'agent-reviewed-command-diff-shadows').dataset.delta).toBe('18');
+    expect(required(container, 'agent-reviewed-command-diff-blacks').dataset.delta).toBe('4');
+
     await act(async () => {
       (required(container, 'agent-review-control-dry-run') as HTMLButtonElement).click();
       await new Promise((resolve) => setTimeout(resolve, 0));
@@ -192,12 +202,15 @@ describe('agent panel preview-review workspace', () => {
 
     const { container } = await renderAgentPanel();
 
+    await clickAndFlush(container, 'agent-reviewed-command-option-gentle_exposure_lift');
     await clickAndFlush(container, 'agent-review-control-dry-run');
     await clickAndFlush(container, 'agent-review-control-apply');
 
     expect(required(container, 'agent-dry-run-apply-review-controls').dataset.liveActionStatus).toBe('applied');
     expect(required(container, 'agent-review-state-audit-persisted').dataset.state).toBe('active');
     expect(required(container, 'agent-review-state-applied').dataset.state).toBe('active');
+    expect(useEditorStore.getState().adjustments.exposure).toBe(0.25);
+    expect(readLatestAuditCommandId()).toBe('gentle_exposure_lift');
     await act(async () => {
       useSettingsStore.setState({ appSettings });
       await new Promise((resolve) => setTimeout(resolve, 0));
@@ -285,4 +298,23 @@ function resetEditorStore() {
     selectedImage: null,
     uncroppedAdjustedPreviewUrl: null,
   });
+}
+
+function readLatestAuditCommandId() {
+  if (typeof globalThis.localStorage === 'undefined') throw new Error('Expected localStorage.');
+  const storageKeys = Array.from({ length: globalThis.localStorage.length }, (_value, index) =>
+    globalThis.localStorage.key(index),
+  ).filter((key): key is string => key !== null);
+  const key = storageKeys.find((candidate) =>
+    candidate.startsWith('rawengine.agent.selectedImageLiveSessionAudit.v1.'),
+  );
+  if (key === undefined) throw new Error('Expected selected-image audit storage.');
+  const value = globalThis.localStorage.getItem(key);
+  const parsedJson: unknown = value === null ? null : JSON.parse(value);
+  const store = agentSelectedImageLiveSessionAuditStoreSchema.parse(parsedJson);
+  const latestRecord = store.records.at(-1);
+  if (latestRecord === undefined || latestRecord.receipt.reviewedCommand === undefined) {
+    throw new Error('Expected reviewed command audit receipt.');
+  }
+  return latestRecord.receipt.reviewedCommand.commandId;
 }

@@ -1,5 +1,11 @@
 import { z } from 'zod';
+import { agentReviewedAdjustmentCommandReceiptSchema } from '../../../schemas/agent/agentReviewedCommandSchemas';
 import type { RawEngineAppServerToolDispatchRequest } from '../../../schemas/agent/agentRuntimeSchemas';
+import { useEditorStore } from '../../../store/useEditorStore';
+import {
+  buildAgentReviewedAdjustmentCommandPlan,
+  DEFAULT_AGENT_REVIEWED_ADJUSTMENT_COMMAND_ID,
+} from '../agentReviewedAdjustmentCommands';
 import type {
   AgentCurrentImagePreviewLoopRequest,
   AgentCurrentImagePreviewLoopResult,
@@ -233,6 +239,7 @@ export const agentSelectedImageLiveSessionReceiptSchema = z
     previewLineage: z.array(selectedImageLiveSessionPreviewLineageSchema).optional(),
     promptSummary: z.string().trim().min(1).default('Selected-image edit'),
     requestId: z.string().trim().min(1),
+    reviewedCommand: agentReviewedAdjustmentCommandReceiptSchema.optional(),
     rollbackCheckpoint: selectedImageLiveSessionRollbackCheckpointSchema.optional(),
     rollbackGraphRevision: z.string().trim().min(1),
     rollbackReceiptGraphRevision: z.string().trim().min(1).optional(),
@@ -412,6 +419,7 @@ export interface AgentSelectedImageLiveSessionDraft {
   operationId: string;
   prompt: string;
   requestId: string;
+  reviewedCommand: z.infer<typeof agentReviewedAdjustmentCommandReceiptSchema>;
   sessionId: string;
   snapshot: z.infer<typeof selectedImageLiveSessionSnapshotSchema>;
   state: AgentSelectedImageLiveSessionState;
@@ -790,12 +798,14 @@ export const startAgentSelectedImageLiveSessionDryRun = async ({
   operationId,
   prompt,
   requestId,
+  reviewedCommand,
   sessionId,
 }: {
   adjustments: AgentAdjustmentsApplyRequest['adjustments'];
   operationId: string;
   prompt: string;
   requestId: string;
+  reviewedCommand: z.infer<typeof agentReviewedAdjustmentCommandReceiptSchema>;
   sessionId: string;
 }): Promise<AgentSelectedImageLiveSessionDraft> => {
   const snapshot = buildSnapshot();
@@ -821,6 +831,13 @@ export const startAgentSelectedImageLiveSessionDryRun = async ({
     operationId,
     prompt,
     requestId,
+    reviewedCommand: agentReviewedAdjustmentCommandReceiptSchema.parse(
+      reviewedCommand ??
+        buildAgentReviewedAdjustmentCommandPlan({
+          commandId: DEFAULT_AGENT_REVIEWED_ADJUSTMENT_COMMAND_ID,
+          sourceAdjustments: useEditorStore.getState().adjustments,
+        }).receipt,
+    ),
     sessionId,
     snapshot,
     state: 'approval_required',
@@ -1252,6 +1269,7 @@ export const buildAgentSelectedImageLiveSessionAuditRecord = (
       ],
       promptSummary: summarizePrompt(draft.prompt),
       requestId: draft.requestId,
+      reviewedCommand: draft.reviewedCommand,
       rollbackCheckpoint: {
         graphRevision: draft.checkpoint.graphRevision,
         previewRecipeHash: draft.checkpoint.previewRecipeHash,
@@ -1294,6 +1312,7 @@ const buildAgentSelectedImageLiveSessionTranscript = (
         acceptedPlanId: toolCall.name === AGENT_ADJUSTMENTS_APPLY_TOOL_NAME ? draft.dryRun.dryRunPlanId : undefined,
         adjustments: toolCall.name.includes('adjustments') ? draft.adjustments : undefined,
         approvalId: toolCall.name === AGENT_ADJUSTMENTS_APPLY_TOOL_NAME ? draft.approvalId : undefined,
+        reviewedCommand: toolCall.name.includes('adjustments') ? draft.reviewedCommand : undefined,
         expectedGraphRevision: draft.snapshot.graphRevision,
         expectedRecipeHash: draft.snapshot.recipeHash,
         operationId: draft.operationId,

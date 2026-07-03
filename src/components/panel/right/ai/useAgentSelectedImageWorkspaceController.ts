@@ -1,5 +1,13 @@
 import { useCallback, useMemo, useState } from 'react';
+import type { AgentReviewedAdjustmentCommandId } from '../../../../schemas/agent/agentReviewedCommandSchemas';
 import { useEditorStore } from '../../../../store/useEditorStore';
+import {
+  AGENT_REVIEWED_ADJUSTMENT_COMMAND_OPTIONS,
+  type AgentReviewedAdjustmentCommandOption,
+  type AgentReviewedAdjustmentCommandPlan,
+  buildAgentReviewedAdjustmentCommandPlan,
+  DEFAULT_AGENT_REVIEWED_ADJUSTMENT_COMMAND_ID,
+} from '../../../../utils/agent/agentReviewedAdjustmentCommands';
 import {
   type AgentSelectedImageLiveSessionAuditRecord,
   type AgentSelectedImageLiveSessionDraft,
@@ -17,7 +25,6 @@ import {
   AGENT_HISTORY_ROLLBACK_TOOL_NAME,
   type AgentSessionCheckpoint,
 } from '../../../../utils/agent/session/agentSessionHistory';
-import type { AgentAdjustmentsApplyRequest } from '../../../../utils/agent/tools/agentAdjustmentApplyTool';
 import type { SelectedImage } from '../../../ui/AppProperties';
 
 const LIVE_AGENT_SELECTED_IMAGE_SESSION_AUDIT_KEY = 'rawengine.agent.selectedImageLiveSessionAudit.v1';
@@ -59,6 +66,7 @@ export interface AgentSelectedImageWorkspaceController {
     dryRun: () => Promise<void>;
     exportAudit: () => Promise<void>;
     rollback: () => Promise<void>;
+    selectCommand: (commandId: AgentReviewedAdjustmentCommandId) => void;
   };
   activityEntries: AgentSelectedImageWorkspaceActivityEntry[];
   auditRecord: AgentSelectedImageLiveSessionAuditRecord | null;
@@ -70,6 +78,9 @@ export interface AgentSelectedImageWorkspaceController {
   error: string | null;
   latestRequestId: string | null;
   latestToolName: string | null;
+  reviewedCommandOptions: AgentReviewedAdjustmentCommandOption[];
+  selectedCommandId: AgentReviewedAdjustmentCommandId;
+  selectedCommandPlan: AgentReviewedAdjustmentCommandPlan;
   status: AgentSelectedImageWorkspaceActionStatus;
 }
 
@@ -93,18 +104,6 @@ const createLocalAgentSelectedImageLiveSessionAuditStorageAdapter = ({
     writeText: (value) => {
       globalThis.localStorage.setItem(storageKey, value);
     },
-  };
-};
-
-const clamp = (value: number, minimum: number, maximum: number): number => Math.min(maximum, Math.max(minimum, value));
-
-const buildWorkspaceAdjustmentPatch = (): AgentAdjustmentsApplyRequest['adjustments'] => {
-  const currentAdjustments = useEditorStore.getState().adjustments;
-  return {
-    contrast: clamp(currentAdjustments.contrast + 4, -100, 100),
-    exposure: clamp(currentAdjustments.exposure + 0.1, -2, 2),
-    highlights: clamp(currentAdjustments.highlights - 6, -100, 100),
-    shadows: clamp(currentAdjustments.shadows + 8, -100, 100),
   };
 };
 
@@ -167,7 +166,19 @@ export const useAgentSelectedImageWorkspaceController = ({
   const [draft, setDraft] = useState<AgentSelectedImageLiveSessionDraft | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [rollbackCheckpoint, setRollbackCheckpoint] = useState<AgentSessionCheckpoint | null>(null);
+  const [selectedCommandId, setSelectedCommandId] = useState<AgentReviewedAdjustmentCommandId>(
+    DEFAULT_AGENT_REVIEWED_ADJUSTMENT_COMMAND_ID,
+  );
   const [status, setStatus] = useState<AgentSelectedImageWorkspaceActionStatus>('idle');
+  const currentAdjustments = useEditorStore((state) => state.adjustments);
+  const selectedCommandPlan = useMemo(
+    () =>
+      buildAgentReviewedAdjustmentCommandPlan({
+        commandId: selectedCommandId,
+        sourceAdjustments: currentAdjustments,
+      }),
+    [currentAdjustments, selectedCommandId],
+  );
 
   const selectedImageReady = selectedImage !== null && selectedImage.isReady;
   const operationPending = status === 'applying' || status === 'exporting' || status === 'rolling_back';
@@ -201,26 +212,35 @@ export const useAgentSelectedImageWorkspaceController = ({
     setAuditRecord(record);
   }, []);
 
+  const selectCommand = useCallback((commandId: AgentReviewedAdjustmentCommandId) => {
+    setSelectedCommandId(commandId);
+    setDraft(null);
+    setError(null);
+    setRollbackCheckpoint(null);
+    setStatus('idle');
+  }, []);
+
   const dryRun = useCallback(async () => {
     if (!canDryRun) return;
     setError(null);
     const stamp = Date.now();
     const operationId = `agent_workspace_selected_image_${stamp}`;
     const requestId = `agent-workspace-selected-image-${stamp}`;
-    const prompt = 'Apply a conservative selected-image review adjustment and keep rollback available.';
+    const prompt = `Apply reviewed command: ${selectedCommandPlan.receipt.label}.`;
     try {
       const sessionDraft = await startAgentSelectedImageLiveSessionDryRun({
-        adjustments: buildWorkspaceAdjustmentPatch(),
+        adjustments: selectedCommandPlan.adjustments,
         operationId,
         prompt,
         requestId,
+        reviewedCommand: selectedCommandPlan.receipt,
         sessionId: WORKSPACE_SESSION_ID,
       });
       setDraft(sessionDraft);
       setRollbackCheckpoint(sessionDraft.checkpoint);
       setStatus('approval_required');
       pushActivityEntry({
-        body: sessionDraft.dryRun.dryRunPlanHash,
+        body: `${sessionDraft.reviewedCommand.label}: ${sessionDraft.dryRun.dryRunPlanHash}`,
         graphRevision: sessionDraft.dryRun.sourceGraphRevision,
         kind: 'tool_call',
         previewBeforeHash: sessionDraft.snapshot.previewRenderHash,
@@ -241,7 +261,7 @@ export const useAgentSelectedImageWorkspaceController = ({
         toolName: 'rawengine.agent.adjustments.dry_run',
       });
     }
-  }, [canDryRun, pushActivityEntry]);
+  }, [canDryRun, pushActivityEntry, selectedCommandPlan]);
 
   const apply = useCallback(async () => {
     if (!canApply || draft === null) return;
@@ -385,6 +405,7 @@ export const useAgentSelectedImageWorkspaceController = ({
       dryRun,
       exportAudit,
       rollback,
+      selectCommand,
     },
     activityEntries,
     auditRecord,
@@ -396,6 +417,9 @@ export const useAgentSelectedImageWorkspaceController = ({
     error,
     latestRequestId: latestActivity?.requestId ?? null,
     latestToolName: latestActivity?.toolName ?? null,
+    reviewedCommandOptions: AGENT_REVIEWED_ADJUSTMENT_COMMAND_OPTIONS,
+    selectedCommandId,
+    selectedCommandPlan,
     status,
   };
 };

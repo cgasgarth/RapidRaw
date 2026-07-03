@@ -128,6 +128,9 @@ session, not hand-authored JSON.
 The user-facing demo should feel like an expert editing assistant, not a generic
 chatbot:
 
+- selected-image live actions present reviewed command choices before dry-run,
+  including bounded adjustment diffs and the current adjustment snapshot used to
+  derive them;
 - keep the image and preview result visible while the agent explains changes;
 - show concrete parameter changes, not vague prose;
 - show before/after preview handles before approval;
@@ -136,6 +139,13 @@ chatbot:
 - make approval explicit for any persistent sidecar or graph mutation;
 - provide a one-click undo path using the returned undo revision;
 - avoid dumping JSON unless the user opens a developer details panel.
+
+For the current selected-image runtime slice, the reviewed command id,
+intensity, source adjustment snapshot, bounded parameter diffs, accepted dry-run
+plan hash, and apply result are persisted in the selected-image live-session
+audit receipt. Apply still flows through the typed adjustment dry-run/apply tool
+boundary; the command selector only composes the reviewed patch that is passed to
+that existing runtime path.
 
 ## Validation Loop
 
