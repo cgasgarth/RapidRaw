@@ -28,6 +28,7 @@ import {
   type LayerStackSidecarLayerV1,
   type NegativeLabAppServerRuntimeDryRunToolResultV1,
   type NegativeLabCommandEnvelopeV1,
+  type NegativeLabRuntimeProofV1,
   negativeLabCommandEnvelopeV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
 } from '../../../../packages/rawengine-schema/src';
@@ -339,6 +340,55 @@ const formatPercentValue = (value: number) => `${Math.round(value)}%`;
 const formatDensityValue = (value: number) => value.toFixed(3);
 const formatRgbValue = (value: number) => `${Math.round(value * 255)}`;
 const formatSignedRecipeValue = (value: number) => (value > 0 ? `+${value.toFixed(2)}` : value.toFixed(2));
+type NegativeLabBeforeAfterPreviewProof = NonNullable<
+  NegativeLabRuntimeProofV1['runtimePreview']['beforeAfterPreviewProof']
+>;
+export interface NegativeLabBeforeAfterReviewModel {
+  acceptedDryRunPlanHash: string;
+  acceptedDryRunPlanId: string;
+  baseFogConfidence: number;
+  claimLevel: NegativeLabBeforeAfterPreviewProof['claimLevel'];
+  generatedPositiveArtifactId: string;
+  generatedPositiveContentHash: string;
+  generatedPositiveDimensions: { height: number; width: number };
+  isAcceptedPlanCurrent: boolean;
+  sourceNegativeArtifactId: string;
+  sourceNegativeContentHash: string;
+  sourceNegativeDimensions: { height: number; width: number };
+  sourceNegativePath: string;
+  warningCodes: string[];
+}
+
+export const buildNegativeLabBeforeAfterReviewModel = ({
+  acceptedDryRunPlanHash,
+  acceptedDryRunPlanId,
+  proof,
+}: {
+  acceptedDryRunPlanHash: string | null;
+  acceptedDryRunPlanId: string | null;
+  proof: NegativeLabBeforeAfterPreviewProof | null | undefined;
+}): NegativeLabBeforeAfterReviewModel | null => {
+  if (proof === null || proof === undefined) return null;
+  const requirement = proof.acceptedDryRunPlanRequirement;
+
+  return {
+    acceptedDryRunPlanHash: requirement.acceptedDryRunPlanHash,
+    acceptedDryRunPlanId: requirement.dryRunPlanId,
+    baseFogConfidence: proof.baseFogSampleSummary.confidence,
+    claimLevel: proof.claimLevel,
+    generatedPositiveArtifactId: proof.generatedPositiveDryRunArtifact.artifactId,
+    generatedPositiveContentHash: proof.generatedPositiveDryRunArtifact.contentHash ?? 'sha256:missing',
+    generatedPositiveDimensions: proof.generatedPositiveDryRunArtifact.dimensions ?? { height: 1, width: 1 },
+    isAcceptedPlanCurrent:
+      acceptedDryRunPlanHash === requirement.acceptedDryRunPlanHash &&
+      acceptedDryRunPlanId === requirement.dryRunPlanId,
+    sourceNegativeArtifactId: proof.sourceNegativeArtifact.artifactId,
+    sourceNegativeContentHash: proof.sourceNegativeArtifact.contentHash,
+    sourceNegativeDimensions: proof.sourceNegativeArtifact.dimensions,
+    sourceNegativePath: proof.sourceNegativeArtifact.imagePath,
+    warningCodes: proof.warningCodes,
+  };
+};
 const NEGATIVE_LAB_STOCK_REGISTRY_COUNTS = buildNegativeLabStockRegistryCounts(NEGATIVE_LAB_STOCK_REGISTRY);
 const NEGATIVE_LAB_STOCK_METADATA_COUNTS = buildNegativeLabStockMetadataCounts(NEGATIVE_LAB_STOCK_METADATA_CATALOG);
 const formatStockRegistryToken = (value: string) => value.split('_').join(' ');
@@ -1133,6 +1183,11 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const runtimePreviewBaseFogStatus = baseFogEstimate === null ? 'pending_base_fog' : 'base_fog_estimated';
   const runtimePreviewDensityStatus =
     selectedProfile?.params.print_curve_algorithm === undefined ? 'density_curve_pending' : 'density_curve_selected';
+  const beforeAfterReview = buildNegativeLabBeforeAfterReviewModel({
+    acceptedDryRunPlanHash: runtimePreviewDryRunResult?.acceptedDryRunPlanHash ?? null,
+    acceptedDryRunPlanId: runtimePreviewDryRunResult?.dryRun.dryRunPlanId ?? null,
+    proof: runtimePreviewDryRunResult?.dryRun.proof?.runtimePreview.beforeAfterPreviewProof,
+  });
   const exportReadinessInput = {
     baseReady: baseFogEstimate !== null,
     batchPlanAccepted: isBatchPlanAccepted,
@@ -3560,6 +3615,88 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           {runtimePreviewArtifactStatus}
         </span>
       </div>
+      {beforeAfterReview !== null && (
+        <div
+          className="mt-2 space-y-2 rounded border border-accent/25 bg-accent/5 p-2"
+          data-accepted-dry-run-current={String(beforeAfterReview.isAcceptedPlanCurrent && isBatchPlanAccepted)}
+          data-accepted-dry-run-hash={beforeAfterReview.acceptedDryRunPlanHash}
+          data-accepted-dry-run-plan-id={beforeAfterReview.acceptedDryRunPlanId}
+          data-base-fog-confidence={beforeAfterReview.baseFogConfidence.toFixed(2)}
+          data-claim-level={beforeAfterReview.claimLevel}
+          data-generated-positive-artifact-id={beforeAfterReview.generatedPositiveArtifactId}
+          data-generated-positive-content-hash={beforeAfterReview.generatedPositiveContentHash}
+          data-source-negative-artifact-id={beforeAfterReview.sourceNegativeArtifactId}
+          data-source-negative-content-hash={beforeAfterReview.sourceNegativeContentHash}
+          data-testid="negative-lab-before-after-review"
+          data-warning-codes={beforeAfterReview.warningCodes.join('|')}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-medium text-text-primary">{t('modals.negativeConversion.beforeAfterReview')}</span>
+            <span
+              className={cx(
+                'rounded px-1.5 py-0.5',
+                beforeAfterReview.isAcceptedPlanCurrent && isBatchPlanAccepted
+                  ? 'bg-accent/20 text-text-primary'
+                  : 'bg-bg-secondary text-text-tertiary',
+              )}
+              data-testid="negative-lab-before-after-plan-state"
+            >
+              {beforeAfterReview.isAcceptedPlanCurrent && isBatchPlanAccepted
+                ? t('modals.negativeConversion.beforeAfterPlanAccepted')
+                : t('modals.negativeConversion.beforeAfterPlanPending')}
+            </span>
+          </div>
+          <div className="grid gap-1 sm:grid-cols-2">
+            <div className="rounded bg-bg-secondary p-1.5" data-testid="negative-lab-before-source-negative">
+              <div className="text-[10px] uppercase tracking-wide text-text-tertiary">
+                {t('modals.negativeConversion.beforeAfterSourceNegative')}
+              </div>
+              <div className="truncate text-text-secondary" title={beforeAfterReview.sourceNegativePath}>
+                {beforeAfterReview.sourceNegativePath}
+              </div>
+              <div className="mt-1 font-mono text-[10px] text-text-tertiary">
+                {beforeAfterReview.sourceNegativeDimensions.width}x{beforeAfterReview.sourceNegativeDimensions.height}
+              </div>
+              <div className="truncate font-mono text-[10px] text-text-tertiary">
+                {beforeAfterReview.sourceNegativeContentHash}
+              </div>
+            </div>
+            <div className="rounded bg-bg-secondary p-1.5" data-testid="negative-lab-after-generated-positive">
+              <div className="text-[10px] uppercase tracking-wide text-text-tertiary">
+                {t('modals.negativeConversion.beforeAfterGeneratedPositive')}
+              </div>
+              <div className="truncate text-text-secondary" title={beforeAfterReview.generatedPositiveArtifactId}>
+                {beforeAfterReview.generatedPositiveArtifactId}
+              </div>
+              <div className="mt-1 font-mono text-[10px] text-text-tertiary">
+                {beforeAfterReview.generatedPositiveDimensions.width}x
+                {beforeAfterReview.generatedPositiveDimensions.height}
+              </div>
+              <div className="truncate font-mono text-[10px] text-text-tertiary">
+                {beforeAfterReview.generatedPositiveContentHash}
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-1 text-[10px] text-text-tertiary sm:grid-cols-4">
+            <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-before-after-base-fog">
+              {t('modals.negativeConversion.baseFogConfidence', {
+                confidence: Math.round(beforeAfterReview.baseFogConfidence * 100),
+              })}
+            </span>
+            <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-before-after-claim">
+              {beforeAfterReview.claimLevel}
+            </span>
+            <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-before-after-plan-id">
+              {beforeAfterReview.acceptedDryRunPlanId}
+            </span>
+            <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-before-after-warnings">
+              {beforeAfterReview.warningCodes.length === 0
+                ? t('modals.negativeConversion.noWarnings')
+                : beforeAfterReview.warningCodes.join(', ')}
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 
