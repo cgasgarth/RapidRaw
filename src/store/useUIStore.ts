@@ -1,7 +1,11 @@
 import { create } from 'zustand';
 
-import { RIGHT_PANEL_ORDER } from '../components/panel/right/rightPanelRegistry';
-import { type CullingSuggestions, type ImageFile, Panel, type UiVisibility } from '../components/ui/AppProperties';
+import {
+  DEFAULT_EDITOR_RIGHT_PANEL,
+  isEditingRightPanel,
+  RIGHT_PANEL_ORDER,
+} from '../components/panel/right/rightPanelRegistry';
+import type { CullingSuggestions, ImageFile, Panel, UiVisibility } from '../components/ui/AppProperties';
 import type { DerivedOutputReceipt } from '../schemas/computational-merge/derivedOutputReceiptSchemas';
 import {
   DEFAULT_HDR_MERGE_UI_SETTINGS,
@@ -45,6 +49,25 @@ export interface CollapsibleSectionsState {
 }
 
 const DEVELOP_PANEL_PINNED_CONTROL_IDS_STORAGE_KEY = 'rapidraw.developPanelPinnedControlIds.v1';
+export const LAST_EDITING_RIGHT_PANEL_STORAGE_KEY = 'rapidraw.lastEditingRightPanel.v1';
+
+export const readLastEditingRightPanel = (): Panel => {
+  if (typeof globalThis.localStorage === 'undefined') return DEFAULT_EDITOR_RIGHT_PANEL;
+
+  try {
+    const stored = globalThis.localStorage.getItem(LAST_EDITING_RIGHT_PANEL_STORAGE_KEY);
+    if (stored === null) return DEFAULT_EDITOR_RIGHT_PANEL;
+    return isEditingRightPanel(stored) ? stored : DEFAULT_EDITOR_RIGHT_PANEL;
+  } catch {
+    return DEFAULT_EDITOR_RIGHT_PANEL;
+  }
+};
+
+const persistLastEditingRightPanel = (panel: Panel) => {
+  if (typeof globalThis.localStorage === 'undefined' || !isEditingRightPanel(panel)) return;
+
+  globalThis.localStorage.setItem(LAST_EDITING_RIGHT_PANEL_STORAGE_KEY, panel);
+};
 
 const readDevelopPanelPinnedControlIds = (): string[] => {
   if (typeof globalThis.localStorage === 'undefined') return [];
@@ -356,141 +379,150 @@ export interface UIState {
   setCustomEscapeHandler: (handler: (() => void) | null) => void;
 }
 
-export const useUIStore = create<UIState>((set, get) => ({
-  activeView: 'library',
-  isFullScreen: false,
-  isWindowFullScreen: false,
-  isInstantTransition: false,
-  isLayoutReady: false,
-  uiVisibility: { folderTree: true, filmstrip: true },
-  isLibraryExportPanelVisible: false,
+export const useUIStore = create<UIState>((set, get) => {
+  const initialRightPanel = readLastEditingRightPanel();
 
-  leftPanelWidth: 256,
-  rightPanelWidth: 360,
-  bottomPanelHeight: 144,
-  compactEditorPanelHeightOverride: null,
+  return {
+    activeView: 'library',
+    isFullScreen: false,
+    isWindowFullScreen: false,
+    isInstantTransition: false,
+    isLayoutReady: false,
+    uiVisibility: { folderTree: true, filmstrip: true },
+    isLibraryExportPanelVisible: false,
 
-  activeRightPanel: Panel.Adjustments,
-  renderedRightPanel: Panel.Adjustments,
-  slideDirection: 1,
-  collapsibleSectionsState: { ...DEFAULT_COLLAPSIBLE_SECTIONS_STATE },
-  developPanelPinnedControlIds: readDevelopPanelPinnedControlIds(),
+    leftPanelWidth: 256,
+    rightPanelWidth: 360,
+    bottomPanelHeight: 144,
+    compactEditorPanelHeightOverride: null,
 
-  isCreateFolderModalOpen: false,
-  isRenameFolderModalOpen: false,
-  isRenameFileModalOpen: false,
-  renameTargetPaths: [],
-  isImportModalOpen: false,
-  isCopyPasteSettingsModalOpen: false,
-  isCommandPaletteOpen: false,
-  isLensCorrectionModalOpen: false,
-  isTransformModalOpen: false,
-  importTargetFolder: null,
-  importSourcePaths: [],
-  folderActionTarget: null,
+    activeRightPanel: initialRightPanel,
+    renderedRightPanel: initialRightPanel,
+    slideDirection: 1,
+    collapsibleSectionsState: { ...DEFAULT_COLLAPSIBLE_SECTIONS_STATE },
+    developPanelPinnedControlIds: readDevelopPanelPinnedControlIds(),
 
-  isCreateAlbumModalOpen: false,
-  isCreateAlbumGroupModalOpen: false,
-  isRenameAlbumModalOpen: false,
-  albumActionTarget: null,
+    isCreateFolderModalOpen: false,
+    isRenameFolderModalOpen: false,
+    isRenameFileModalOpen: false,
+    renameTargetPaths: [],
+    isImportModalOpen: false,
+    isCopyPasteSettingsModalOpen: false,
+    isCommandPaletteOpen: false,
+    isLensCorrectionModalOpen: false,
+    isTransformModalOpen: false,
+    importTargetFolder: null,
+    importSourcePaths: [],
+    folderActionTarget: null,
 
-  confirmModalState: { isOpen: false },
-  panoramaModalState: createDefaultPanoramaModalState(),
-  hdrModalState: createDefaultHdrModalState(),
-  superResolutionModalState: createDefaultSuperResolutionModalState(),
-  focusStackModalState: createDefaultFocusStackModalState(),
-  negativeModalState: { isOpen: false, targetPaths: [] },
-  denoiseModalState: {
-    isOpen: false,
-    isProcessing: false,
-    previewBase64: null,
-    error: null,
-    targetPaths: [],
-    progressMessage: null,
-    isRaw: false,
-  },
-  cullingModalState: createDefaultCullingModalState(),
-  collageModalState: createDefaultCollageModalState(),
-  derivedOutputReceipts: {},
-  layerMaskProvenanceReceipts: {},
-  layerMaskSourceGraphRevision: DEFAULT_LAYER_MASK_SOURCE_GRAPH_REVISION,
-  layerMaskSourceGraphRevisionCounter: 0,
+    isCreateAlbumModalOpen: false,
+    isCreateAlbumGroupModalOpen: false,
+    isRenameAlbumModalOpen: false,
+    albumActionTarget: null,
 
-  clearDerivedOutputReceipts: () => {
-    set({ derivedOutputReceipts: {} });
-  },
+    confirmModalState: { isOpen: false },
+    panoramaModalState: createDefaultPanoramaModalState(),
+    hdrModalState: createDefaultHdrModalState(),
+    superResolutionModalState: createDefaultSuperResolutionModalState(),
+    focusStackModalState: createDefaultFocusStackModalState(),
+    negativeModalState: { isOpen: false, targetPaths: [] },
+    denoiseModalState: {
+      isOpen: false,
+      isProcessing: false,
+      previewBase64: null,
+      error: null,
+      targetPaths: [],
+      progressMessage: null,
+      isRaw: false,
+    },
+    cullingModalState: createDefaultCullingModalState(),
+    collageModalState: createDefaultCollageModalState(),
+    derivedOutputReceipts: {},
+    layerMaskProvenanceReceipts: {},
+    layerMaskSourceGraphRevision: DEFAULT_LAYER_MASK_SOURCE_GRAPH_REVISION,
+    layerMaskSourceGraphRevisionCounter: 0,
 
-  markLayerMaskProvenanceStale: ({ layerIds, reason }) => {
-    set((state) => {
-      const nextRevisionCounter = state.layerMaskSourceGraphRevisionCounter + 1;
-      return {
-        layerMaskProvenanceReceipts: markLayerMaskReceiptsStale({
-          ...(layerIds === undefined ? {} : { layerIds }),
-          reason,
-          receipts: state.layerMaskProvenanceReceipts,
-        }),
-        layerMaskSourceGraphRevision: buildLayerMaskSourceGraphRevision({
-          previousRevision: state.layerMaskSourceGraphRevision,
-          reason,
-          revisionIndex: nextRevisionCounter,
-        }),
-        layerMaskSourceGraphRevisionCounter: nextRevisionCounter,
-      };
-    });
-  },
+    clearDerivedOutputReceipts: () => {
+      set({ derivedOutputReceipts: {} });
+    },
 
-  recordLayerMaskPreviewReceipt: ({ appliedCommandId, masks }) => {
-    set((state) => ({
-      layerMaskProvenanceReceipts: buildLayerMaskProvenanceReceipts({
-        appliedCommandId,
-        masks,
-        sourceGraphRevision: state.layerMaskSourceGraphRevision,
-      }),
-    }));
-  },
-
-  setDevelopPanelPinnedControlIds: (controlIds) => {
-    const normalizedControlIds = [...new Set(controlIds)].filter((controlId) => controlId.trim().length > 0);
-    persistDevelopPanelPinnedControlIds(normalizedControlIds);
-    set({ developPanelPinnedControlIds: normalizedControlIds });
-  },
-
-  setUI: (updater) => {
-    set((state) => (typeof updater === 'function' ? updater(state) : updater));
-  },
-
-  setRightPanel: (panelId) => {
-    const current = get().activeRightPanel;
-    if (panelId === current) {
-      set({ activeRightPanel: null });
-    } else {
-      const currentIndex = current ? RIGHT_PANEL_ORDER.indexOf(current) : -1;
-      const newIndex = panelId ? RIGHT_PANEL_ORDER.indexOf(panelId) : -1;
-      set({
-        slideDirection: newIndex > currentIndex ? 1 : -1,
-        activeRightPanel: panelId,
-        renderedRightPanel: panelId,
+    markLayerMaskProvenanceStale: ({ layerIds, reason }) => {
+      set((state) => {
+        const nextRevisionCounter = state.layerMaskSourceGraphRevisionCounter + 1;
+        return {
+          layerMaskProvenanceReceipts: markLayerMaskReceiptsStale({
+            ...(layerIds === undefined ? {} : { layerIds }),
+            reason,
+            receipts: state.layerMaskProvenanceReceipts,
+          }),
+          layerMaskSourceGraphRevision: buildLayerMaskSourceGraphRevision({
+            previousRevision: state.layerMaskSourceGraphRevision,
+            reason,
+            revisionIndex: nextRevisionCounter,
+          }),
+          layerMaskSourceGraphRevisionCounter: nextRevisionCounter,
+        };
       });
-    }
-  },
+    },
 
-  upsertDerivedOutputReceipt: (receipt) => {
-    set((state) => {
-      const existing = state.derivedOutputReceipts[receipt.receiptId];
-      if (existing !== undefined && JSON.stringify(existing) === JSON.stringify(receipt)) {
-        return state;
+    recordLayerMaskPreviewReceipt: ({ appliedCommandId, masks }) => {
+      set((state) => ({
+        layerMaskProvenanceReceipts: buildLayerMaskProvenanceReceipts({
+          appliedCommandId,
+          masks,
+          sourceGraphRevision: state.layerMaskSourceGraphRevision,
+        }),
+      }));
+    },
+
+    setDevelopPanelPinnedControlIds: (controlIds) => {
+      const normalizedControlIds = [...new Set(controlIds)].filter((controlId) => controlId.trim().length > 0);
+      persistDevelopPanelPinnedControlIds(normalizedControlIds);
+      set({ developPanelPinnedControlIds: normalizedControlIds });
+    },
+
+    setUI: (updater) => {
+      set((state) => (typeof updater === 'function' ? updater(state) : updater));
+    },
+
+    setRightPanel: (panelId) => {
+      const current = get().activeRightPanel;
+      if (panelId === current) {
+        set({ activeRightPanel: null });
+      } else {
+        const rendered = get().renderedRightPanel;
+        const previousPanel = current ?? rendered;
+        const currentIndex = previousPanel ? RIGHT_PANEL_ORDER.indexOf(previousPanel) : -1;
+        const newIndex = panelId ? RIGHT_PANEL_ORDER.indexOf(panelId) : -1;
+        if (panelId && isEditingRightPanel(panelId)) {
+          persistLastEditingRightPanel(panelId);
+        }
+        set({
+          slideDirection: newIndex === currentIndex ? 0 : newIndex > currentIndex ? 1 : -1,
+          activeRightPanel: panelId,
+          renderedRightPanel: panelId,
+        });
       }
-      return {
-        derivedOutputReceipts: {
-          ...state.derivedOutputReceipts,
-          [receipt.receiptId]: receipt,
-        },
-      };
-    });
-  },
+    },
 
-  customEscapeHandler: null,
-  setCustomEscapeHandler: (handler) => {
-    set({ customEscapeHandler: handler });
-  },
-}));
+    upsertDerivedOutputReceipt: (receipt) => {
+      set((state) => {
+        const existing = state.derivedOutputReceipts[receipt.receiptId];
+        if (existing !== undefined && JSON.stringify(existing) === JSON.stringify(receipt)) {
+          return state;
+        }
+        return {
+          derivedOutputReceipts: {
+            ...state.derivedOutputReceipts,
+            [receipt.receiptId]: receipt,
+          },
+        };
+      });
+    },
+
+    customEscapeHandler: null,
+    setCustomEscapeHandler: (handler) => {
+      set({ customEscapeHandler: handler });
+    },
+  };
+});
