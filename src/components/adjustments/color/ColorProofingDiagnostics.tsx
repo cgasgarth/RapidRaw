@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { TextColors, TextVariants } from '../../../types/typography';
 import type { Adjustments } from '../../../utils/adjustments';
 import type {
+  ColorOutputProofingDiagnosticsSummary,
   PreviewScopeFreshnessStatus,
   RenderedPreviewWarningStatus,
 } from '../../../utils/color/runtime/gamutWarningDisplay';
@@ -95,6 +96,7 @@ interface ColorProofingDiagnosticsProps extends ColorPanelGroupProps {
   activeExportPresetName: string | null;
   activeToneCurveLabel: string;
   colorWorkspaceWarningChips: Array<string>;
+  colorOutputProofingDiagnostics: ColorOutputProofingDiagnosticsSummary;
   currentGamutWarningOverlay: {
     coverage_ratio?: number;
     effective_color_profile?: string;
@@ -125,6 +127,7 @@ export const ColorProofingDiagnostics = ({
   activeToneCurveLabel,
   adjustments,
   colorWorkspaceWarningChips,
+  colorOutputProofingDiagnostics,
   currentGamutWarningOverlay,
   gamutWarningCoverage,
   isGamutWarningOverlayVisible,
@@ -146,6 +149,7 @@ export const ColorProofingDiagnostics = ({
   const clippingStatusLabel = adjustments.showClipping
     ? 'Preview clipping overlay current'
     : 'Preview clipping overlay off';
+  const diagnosticCodeList = colorOutputProofingDiagnostics.codes.join(',');
   const gamutCoverageLabel =
     renderedPreviewWarningStatus.state === 'current'
       ? t('editor.canvas.gamutWarningCoverage', {
@@ -219,21 +223,26 @@ export const ColorProofingDiagnostics = ({
             data-active-tone-curve={adjustments.toneCurve}
             data-clipping-status-label={clippingStatusLabel}
             data-clipping-warning-state={clippingWarningState}
+            data-diagnostic-codes={diagnosticCodeList}
             data-clipping-visible={String(adjustments.showClipping ?? false)}
-            data-display-profile-label={renderedPreviewWarningStatus.displayProfileLabel}
+            data-display-profile-label={colorOutputProofingDiagnostics.displayProfileLabel}
+            data-display-profile-state={colorOutputProofingDiagnostics.displayProfileState}
             data-export-transform-label={activeExportPresetName ?? ''}
             data-gamut-warning-count={currentGamutWarningOverlay?.warning_pixel_count ?? 0}
             data-histogram-hook="histogram"
+            data-lut-state={colorOutputProofingDiagnostics.lutState}
             data-preview-warning-state={renderedPreviewWarningStatus.state}
             data-render-target-label={renderedPreviewWarningStatus.renderTargetLabel}
             data-scope-freshness-state={previewScopeFreshnessStatus.state}
             data-scope-status-label={previewScopeFreshnessStatus.statusLabel}
-            data-soft-proof-profile-label={renderedPreviewWarningStatus.exportProfileLabel ?? ''}
+            data-soft-proof-profile-label={colorOutputProofingDiagnostics.outputProfileLabel}
+            data-soft-proof-transform-applied={String(colorOutputProofingDiagnostics.transformApplied)}
+            data-soft-proof-transform-fingerprint={colorOutputProofingDiagnostics.transformPolicyFingerprint ?? ''}
             data-testid="professional-color-workspace-panel"
             data-vectorscope-hook="vectorscope"
             data-warning-count={colorWorkspaceWarningChips.length}
             data-waveform-hook="waveform"
-            data-working-space-label="linear-raw-to-working-rgb"
+            data-working-space-label={colorOutputProofingDiagnostics.workingSpaceLabel}
           >
             <div className={density.sectionHeader.rootLoose}>
               <div className="min-w-0">
@@ -258,23 +267,59 @@ export const ColorProofingDiagnostics = ({
                 className="min-w-0 rounded bg-editor-panel-raised px-1.5 py-1"
                 data-testid="color-workspace-working-label"
               >
-                {t(runtimeStatusKey('apiLabel'))}: {t('adjustments.color.profileTone.cameraProfiles.linear_raw')}
+                {t('adjustments.color.proofingDiagnostics.workingSpace')}:{' '}
+                {colorOutputProofingDiagnostics.workingSpaceLabel}
               </span>
               <span
                 className="min-w-0 rounded bg-editor-panel-raised px-1.5 py-1"
                 data-testid="color-workspace-export-label"
               >
-                {t(runtimeStatusKey('uiLabel'))}: {activeExportPresetName ?? t(runtimeStatusKey('previewExport'))}
+                {t('adjustments.color.proofingDiagnostics.outputProfile')}:{' '}
+                {colorOutputProofingDiagnostics.outputProfileLabel}
               </span>
               <span
                 className="min-w-0 rounded bg-editor-panel-raised px-1.5 py-1"
                 data-testid="color-workspace-scope-label"
               >
-                {t(runtimeStatusKey('gpuLabel'))}: {t('ui.waveform.tooltips.vectorscope')}
+                {t('adjustments.color.proofingDiagnostics.proofState')}:{' '}
+                {colorOutputProofingDiagnostics.previewProofStatusLabel}
+              </span>
+            </div>
+            <div
+              className="mt-1 grid grid-cols-2 gap-1 text-[10px] font-medium text-text-secondary"
+              data-display-profile-hash={colorOutputProofingDiagnostics.displayProfileHash ?? ''}
+              data-display-profile-source={colorOutputProofingDiagnostics.displayProfileSource ?? ''}
+              data-lut-sample-count={colorOutputProofingDiagnostics.lutSampleCount}
+              data-lut-size={colorOutputProofingDiagnostics.lutSize}
+              data-testid="color-output-transform-diagnostics"
+            >
+              <span
+                className="min-w-0 rounded bg-editor-panel-raised px-1.5 py-1"
+                data-testid="color-output-display-profile"
+              >
+                {t('adjustments.color.proofingDiagnostics.displayProfile')}:{' '}
+                {colorOutputProofingDiagnostics.displayProfileLabel}
+              </span>
+              <span className="min-w-0 rounded bg-editor-panel-raised px-1.5 py-1" data-testid="color-output-lut">
+                {t('adjustments.color.proofingDiagnostics.previewLut')}: {colorOutputProofingDiagnostics.lutStatusLabel}
+              </span>
+              <span
+                className="min-w-0 rounded bg-editor-panel-raised px-1.5 py-1"
+                data-testid="color-output-rendering-intent"
+              >
+                {t('adjustments.color.proofingDiagnostics.renderingIntent')}:{' '}
+                {colorOutputProofingDiagnostics.renderingIntentLabel}
+              </span>
+              <span
+                className="min-w-0 rounded bg-editor-panel-raised px-1.5 py-1"
+                data-testid="color-output-transform-policy"
+              >
+                {t('adjustments.color.proofingDiagnostics.transform')}: {colorOutputProofingDiagnostics.transformLabel}
               </span>
             </div>
             <div
               className="mt-2 flex flex-wrap gap-1 text-[10px] font-medium text-text-secondary"
+              data-diagnostic-codes={diagnosticCodeList}
               data-testid="professional-color-workspace-warning-chips"
             >
               {(colorWorkspaceWarningChips.length > 0
@@ -300,6 +345,8 @@ export const ColorProofingDiagnostics = ({
             data-effective-color-profile={currentGamutWarningOverlay?.effective_color_profile ?? ''}
             data-effective-rendering-intent={currentGamutWarningOverlay?.effective_rendering_intent ?? ''}
             data-export-soft-proof-recipe-id={currentGamutWarningOverlay?.export_soft_proof_recipe_id ?? ''}
+            data-gamut-coverage-label={colorOutputProofingDiagnostics.gamutCoverageLabel}
+            data-gamut-warning-codes={diagnosticCodeList}
             data-preview-basis={currentGamutWarningOverlay?.preview_basis ?? ''}
             data-preview-warning-state={renderedPreviewWarningStatus.state}
             data-proof-mask-height={proofDimensions.height}

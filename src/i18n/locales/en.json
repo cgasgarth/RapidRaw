@@ -170,8 +170,15 @@
         }
       },
       "proofingDiagnostics": {
+        "displayProfile": "Display",
+        "outputProfile": "Output",
+        "previewLut": "Preview LUT",
+        "proofState": "Proof state",
+        "renderingIntent": "Intent",
         "summary": "{{warningCount}} warning/status item(s) · {{coverage}} gamut coverage",
-        "title": "Proofing / Diagnostics"
+        "title": "Proofing / Diagnostics",
+        "transform": "Transform",
+        "workingSpace": "Working"
       },
       "rangeCenter": "Range center",
       "rangeWidth": "Range width",
