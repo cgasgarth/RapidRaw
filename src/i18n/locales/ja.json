@@ -587,6 +587,11 @@
       },
       "addNewEdit": "新しい編集を追加",
       "agent": {
+        "actions": {
+          "approveApply": "",
+          "exportAudit": "",
+          "revert": ""
+        },
         "approval": {
           "approved": "",
           "notRequired": "",
@@ -777,6 +782,15 @@
         "walkthrough": {
           "plan": "",
           "target": "",
+          "title": ""
+        },
+        "workspace": {
+          "audit": "",
+          "blocked": "",
+          "noImage": "",
+          "previewReady": "",
+          "previewReceipt": "",
+          "reviewReady": "",
           "title": ""
         }
       },

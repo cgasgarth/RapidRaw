@@ -92,6 +92,19 @@ export const professionalInspectorDensityTokens = {
   },
 } as const;
 
+export const agentReviewWorkspaceTokens = {
+  actionButton:
+    'inline-flex h-7 min-w-0 flex-1 items-center justify-center gap-1.5 rounded border px-2 text-[11px] font-semibold leading-4 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:border-editor-border disabled:bg-editor-panel disabled:text-text-tertiary',
+  card: 'rounded border border-editor-border bg-editor-panel-well p-2',
+  chip: 'inline-flex min-h-5 min-w-0 items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-medium leading-3',
+  label: 'text-[10px] font-semibold uppercase leading-3 tracking-normal text-text-tertiary',
+  metaValue: 'truncate font-mono text-[10px] leading-3 text-text-secondary',
+  sectionTitle: 'text-[11px] font-semibold uppercase leading-4 tracking-normal text-text-secondary',
+  stateActive: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100',
+  stateBlocked: 'border-amber-500/30 bg-amber-500/10 text-amber-100',
+  stateInactive: 'border-editor-border bg-editor-panel text-text-tertiary',
+} as const;
+
 export const inspectorSliderTokens = {
   fill: 'absolute top-1/2 h-1 -translate-y-1/2 rounded-full pointer-events-none bg-editor-primary-active/45',
   header: 'mb-0.5 flex items-center justify-between gap-3',

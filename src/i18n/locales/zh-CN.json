@@ -822,6 +822,15 @@
           "plan": "",
           "target": "",
           "title": ""
+        },
+        "workspace": {
+          "audit": "",
+          "blocked": "",
+          "noImage": "",
+          "previewReady": "",
+          "previewReceipt": "",
+          "reviewReady": "",
+          "title": ""
         }
       },
       "approval": {

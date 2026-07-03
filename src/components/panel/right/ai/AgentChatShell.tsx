@@ -4359,21 +4359,21 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
 
   return (
     <section
-      className="space-y-3 rounded-md border border-white/10 bg-card/40 p-3"
+      className="space-y-2 border-t border-editor-border bg-transparent pt-2"
       data-agent-runtime-status={transcript.runtimeStatus}
       data-live-session-event-count={liveSessionEvents.length}
       data-live-session-state={isContextReady ? 'ready' : 'blocked'}
       data-testid="agent-chat-shell"
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-2">
         <div>
-          <div className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-            <Sparkles size={16} />
+          <div className="flex items-center gap-1.5 text-[12px] font-semibold leading-4 text-text-primary">
+            <Sparkles size={14} />
             <span>{t('editor.ai.agent.title')}</span>
           </div>
-          <p className="mt-1 text-xs text-text-secondary">{transcript.sessionTitle}</p>
+          <p className="mt-0.5 truncate text-[11px] leading-4 text-text-secondary">{transcript.sessionTitle}</p>
         </div>
-        <span className={`rounded border px-2 py-1 text-[11px] ${runtimeBadge.className}`}>
+        <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] ${runtimeBadge.className}`}>
           {runtimeStatus === 'runtime_apply_ready'
             ? t('editor.ai.agent.runtimeApplyProof')
             : t('editor.ai.agent.uiOnly')}
@@ -4406,6 +4406,8 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
         />
       ) : null}
 
+      <AppServerToolReadinessSummary />
+
       <div className="space-y-2" data-testid="agent-chat-messages">
         {liveSessionEvents.map((message) => (
           <MessageBubble key={message.id} message={message} />
@@ -4414,8 +4416,6 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
           <MessageBubble key={message.id} message={message} />
         ))}
       </div>
-
-      <AppServerToolReadinessSummary />
 
       {transcript.livePromptWalkthrough ? (
         <LivePromptWalkthroughPanel walkthrough={transcript.livePromptWalkthrough} />
