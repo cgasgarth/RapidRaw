@@ -210,7 +210,7 @@ describe('agent panel preview-review workspace', () => {
 
     expect(required(container, 'agent-dry-run-apply-review-controls').dataset.liveActionStatus).toBe('exported');
     expect(required(container, 'agent-dry-run-apply-review-controls').dataset.liveActionToolName).toBe(
-      'rawengine.agent.export.proof',
+      'rawengine.agent.audit.export',
     );
     expect((required(container, 'agent-review-control-rollback') as HTMLButtonElement).disabled).toBe(false);
 
