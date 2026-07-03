@@ -9,8 +9,10 @@ import {
 import { rawEngineAgentPreviewRenderRequestV1Schema } from '../../../../packages/rawengine-schema/src/rawEngineSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
+import { buildAgentMediumPreviewArtifact } from './agentMediumPreviewArtifactRuntime';
 import {
   AGENT_PREVIEW_MAX_PIXEL_COUNT,
+  agentMediumPreviewArtifactSchema,
   agentPreviewCompareArtifactResultSchema,
   agentPreviewCompareColorMetadataSchema,
   agentPreviewEnvelopeSchema,
@@ -100,13 +102,25 @@ export const agentStateGetResponseSchema = z
 
 export const agentPreviewRenderResponseSchema = z
   .object({
+    artifact: agentMediumPreviewArtifactSchema,
     preview: agentPreviewEnvelopeSchema,
     receipt: rawEngineAgentPreviewRefreshReceiptV1Schema.optional(),
     requestId: z.string().trim().min(1),
     staleRecipeHash: z.boolean(),
     toolName: z.literal(AGENT_PREVIEW_RENDER_TOOL_NAME),
   })
-  .strict();
+  .strict()
+  .refine((response) => response.artifact.artifactId === response.preview.artifactId, {
+    message: 'Preview render artifact must match preview id.',
+    path: ['artifact', 'artifactId'],
+  })
+  .refine(
+    (response) => response.receipt === undefined || response.receipt.contentHash === response.artifact.contentHash,
+    {
+      message: 'Preview render receipt hash must be backed by the encoded artifact.',
+      path: ['receipt', 'contentHash'],
+    },
+  );
 
 export const agentPreviewCompareResponseSchema = z
   .object({
@@ -141,6 +155,7 @@ export const rawEngineImageGetPreviewResponseSchema = z
         renderHash: z.string().trim().min(1),
       })
       .strict(),
+    mediumPreview: agentMediumPreviewArtifactSchema,
     preview: agentPreviewEnvelopeSchema,
     receipt: rawEngineAgentInitialPreviewReceiptV1Schema,
     requestId: z.string().trim().min(1),
@@ -175,6 +190,14 @@ export const rawEngineImageGetPreviewResponseSchema = z
   .refine((response) => response.receipt.preview.artifactId === response.preview.artifactId, {
     message: 'Initial preview receipt artifact must match preview metadata.',
     path: ['receipt', 'preview', 'artifactId'],
+  })
+  .refine((response) => response.mediumPreview.artifactId === response.preview.artifactId, {
+    message: 'Initial medium preview artifact must match preview metadata.',
+    path: ['mediumPreview', 'artifactId'],
+  })
+  .refine((response) => response.receipt.contentHash === response.mediumPreview.contentHash, {
+    message: 'Initial preview receipt hash must be backed by the encoded artifact.',
+    path: ['receipt', 'contentHash'],
   });
 
 export type AgentStateGetRequest = z.infer<typeof agentStateGetRequestSchema>;
@@ -186,21 +209,8 @@ export type AgentPreviewRenderResponse = z.infer<typeof agentPreviewRenderRespon
 export type AgentPreviewCompareResponse = z.infer<typeof agentPreviewCompareResponseSchema>;
 export type RawEngineImageGetPreviewResponse = z.infer<typeof rawEngineImageGetPreviewResponseSchema>;
 
-const buildPreviewReceiptContentHash = (receiptSeed: {
-  artifactId: string;
-  graphRevision: string;
-  imagePath: string;
-  previewRef: string;
-  renderHash: string;
-  requestId: string;
-}): string => {
-  const seed = JSON.stringify(receiptSeed);
-  const first = stableAgentPreviewHash(seed);
-  const second = stableAgentPreviewHash(`${first}:${seed}`);
-  return `sha256:${first}${second}`;
-};
-
 const buildInitialPreviewReceipt = ({
+  contentHash,
   graphRevision,
   imagePath,
   preview,
@@ -208,6 +218,7 @@ const buildInitialPreviewReceipt = ({
   sessionId,
   stale,
 }: {
+  contentHash: string;
   graphRevision: string;
   imagePath: string;
   preview: RawEngineImageGetPreviewResponse['preview'];
@@ -222,14 +233,7 @@ const buildInitialPreviewReceipt = ({
       previewTransform: 'editor-preview-to-srgb-jpeg',
       workingSpace: 'rawengine-scene-linear',
     },
-    contentHash: buildPreviewReceiptContentHash({
-      artifactId: preview.artifactId,
-      graphRevision,
-      imagePath,
-      previewRef: preview.previewRef,
-      renderHash: preview.renderHash,
-      requestId,
-    }),
+    contentHash,
     graphRevision,
     imagePath,
     preview: {
@@ -258,6 +262,7 @@ const buildInitialPreviewReceipt = ({
   });
 
 const buildPreviewRefreshReceipt = ({
+  contentHash,
   expectedRecipeHash,
   graphRevision,
   imagePath,
@@ -268,6 +273,7 @@ const buildPreviewRefreshReceipt = ({
   stale,
   turn,
 }: {
+  contentHash: string;
   expectedRecipeHash: string;
   graphRevision: string;
   imagePath: string;
@@ -285,14 +291,7 @@ const buildPreviewRefreshReceipt = ({
       previewTransform: 'editor-preview-to-srgb-jpeg',
       workingSpace: 'rawengine-scene-linear',
     },
-    contentHash: buildPreviewReceiptContentHash({
-      artifactId: preview.artifactId,
-      graphRevision,
-      imagePath,
-      previewRef: preview.previewRef,
-      renderHash: preview.renderHash,
-      requestId,
-    }),
+    contentHash,
     graphRevision,
     imagePath,
     preview: {
@@ -364,10 +363,17 @@ export const renderAgentReadOnlyPreview = (request: AgentPreviewRenderRequest): 
   const staleRecipeHash =
     parsedRequest.expectedRecipeHash !== undefined &&
     parsedRequest.expectedRecipeHash !== snapshot.initialPreview.recipeHash;
+  const artifact = buildAgentMediumPreviewArtifact({
+    graphRevision: snapshot.graphRevision,
+    imagePath: snapshot.activeImagePath,
+    preview,
+    staleRecipeHash,
+  });
   const receipt =
     preview.purpose === 'initial_context'
       ? undefined
       : buildPreviewRefreshReceipt({
+          contentHash: artifact.contentHash,
           expectedRecipeHash: parsedRequest.expectedRecipeHash ?? snapshot.initialPreview.recipeHash,
           graphRevision: snapshot.graphRevision,
           imagePath: snapshot.activeImagePath,
@@ -380,6 +386,7 @@ export const renderAgentReadOnlyPreview = (request: AgentPreviewRenderRequest): 
         });
 
   return agentPreviewRenderResponseSchema.parse({
+    artifact,
     preview,
     ...(receipt === undefined ? {} : { receipt }),
     requestId: parsedRequest.requestId,
@@ -414,7 +421,14 @@ export const getRawEngineImagePreview = (
   const staleRecipeHash =
     parsedRequest.expectedRecipeHash !== undefined &&
     parsedRequest.expectedRecipeHash !== snapshot.initialPreview.recipeHash;
+  const mediumPreview = buildAgentMediumPreviewArtifact({
+    graphRevision: snapshot.graphRevision,
+    imagePath: snapshot.activeImagePath,
+    preview,
+    staleRecipeHash,
+  });
   const receipt = buildInitialPreviewReceipt({
+    contentHash: mediumPreview.contentHash,
     graphRevision: snapshot.graphRevision,
     imagePath: snapshot.activeImagePath,
     preview,
@@ -444,6 +458,7 @@ export const getRawEngineImagePreview = (
       recipeHash: preview.recipeHash,
       renderHash: preview.renderHash,
     },
+    mediumPreview,
     preview,
     receipt,
     requestId: parsedRequest.requestId,
@@ -489,20 +504,16 @@ const buildCompareArtifact = ({
     width: snapshot.initialPreview.width,
     zoom: snapshot.initialPreview.zoom,
   });
-
-  const contentHashSeed = stableAgentPreviewHash(
-    JSON.stringify({
-      graphRevision,
-      previewRef,
-      recipeHash: preview.recipeHash,
-      renderHash: preview.renderHash,
-      role,
-    }),
-  );
+  const artifact = buildAgentMediumPreviewArtifact({
+    graphRevision,
+    imagePath: snapshot.activeImagePath,
+    preview,
+    staleRecipeHash: false,
+  });
 
   return {
     artifactId: preview.artifactId,
-    contentHash: `sha256:${contentHashSeed}${stableAgentPreviewHash(`${contentHashSeed}:${role}`)}`,
+    contentHash: artifact.contentHash,
     graphRevision,
     preview,
     recipeHash: preview.recipeHash,

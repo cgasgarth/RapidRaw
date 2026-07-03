@@ -8,7 +8,8 @@ import {
 import { agentHistoryRollbackResponseSchema } from '../session/agentSessionHistory';
 import { buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
 import { buildAgentInitialPromptContext } from './agentInitialPromptContext';
-import { agentMediumPreviewArtifactSchema } from './agentPreviewEnvelope';
+import { buildAgentMediumPreviewArtifact } from './agentMediumPreviewArtifactRuntime';
+import { type AgentPreviewEnvelope, agentMediumPreviewArtifactSchema } from './agentPreviewEnvelope';
 import { RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME } from './agentReadOnlyAppServerTools';
 
 export const AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME = 'rawengine.agent.selected_image.preview_loop';
@@ -166,24 +167,6 @@ const rollbackCheckpointSchema = z
   })
   .strict();
 
-const buildPreviewReceiptContentHash = (receiptSeed: {
-  artifactId: string;
-  graphRevision: string;
-  imagePath: string;
-  renderHash: string;
-  requestId: string;
-  sessionId: string;
-}): string => {
-  const hashSeed = JSON.stringify(receiptSeed);
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < hashSeed.length; index += 1) {
-    hash ^= hashSeed.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-
-  return `sha256:${(hash >>> 0).toString(16).padStart(16, '0')}`;
-};
-
 const buildSelectedImageInitialPreviewReceipt = ({
   operationId,
   prompt,
@@ -196,6 +179,13 @@ const buildSelectedImageInitialPreviewReceipt = ({
   sessionId: string;
 }): RawEngineAgentInitialPreviewReceiptV1 => {
   const initialContext = buildAgentInitialPromptContext({ operationId, prompt, sessionId });
+  const stale = initialContext.imageContext.initialPreview.recipeHash !== initialContext.preview.recipeHash;
+  const artifact = buildAgentMediumPreviewArtifact({
+    graphRevision: initialContext.modelInput.graphRevision,
+    imagePath: initialContext.modelInput.activeImagePath,
+    preview: initialContext.imageContext.initialPreview,
+    staleRecipeHash: stale,
+  });
 
   return rawEngineAgentInitialPreviewReceiptV1Schema.parse({
     colorPipeline: {
@@ -204,14 +194,7 @@ const buildSelectedImageInitialPreviewReceipt = ({
       previewTransform: 'editor-preview-to-srgb-jpeg',
       workingSpace: 'rawengine-scene-linear',
     },
-    contentHash: buildPreviewReceiptContentHash({
-      artifactId: initialContext.preview.artifactId,
-      graphRevision: initialContext.modelInput.graphRevision,
-      imagePath: initialContext.modelInput.activeImagePath,
-      renderHash: initialContext.preview.renderHash,
-      requestId,
-      sessionId,
-    }),
+    contentHash: artifact.contentHash,
     graphRevision: initialContext.modelInput.graphRevision,
     imagePath: initialContext.modelInput.activeImagePath,
     preview: {
@@ -230,7 +213,7 @@ const buildSelectedImageInitialPreviewReceipt = ({
       width: initialContext.modelInput.initialPreview.width,
     },
     proofContext: {
-      stale: initialContext.imageContext.initialPreview.recipeHash !== initialContext.preview.recipeHash,
+      stale,
       transport: initialContext.modelInput.transport,
     },
     requestId,
@@ -253,21 +236,7 @@ const buildSelectedImagePreviewRefreshReceipt = ({
   expectedRecipeHash: string;
   graphRevision: string;
   imagePath: string;
-  preview: {
-    accessScope: 'local_private';
-    artifactId: string;
-    encodedFormat: 'jpeg';
-    height: number;
-    includesOriginalRaw: false;
-    longEdgePx: number;
-    mediaType: 'image/jpeg';
-    previewRef: string;
-    purpose: 'detail_review' | 'refresh';
-    quality: number;
-    recipeHash: string;
-    renderHash: string;
-    width: number;
-  };
+  preview: AgentPreviewEnvelope & { purpose: 'detail_review' | 'refresh' };
   requestId: string;
   sessionId: string;
   sourceToolName: string;
@@ -280,17 +249,29 @@ const buildSelectedImagePreviewRefreshReceipt = ({
       previewTransform: 'editor-preview-to-srgb-jpeg',
       workingSpace: 'rawengine-scene-linear',
     },
-    contentHash: buildPreviewReceiptContentHash({
-      artifactId: preview.artifactId,
+    contentHash: buildAgentMediumPreviewArtifact({
       graphRevision,
       imagePath,
-      renderHash: preview.renderHash,
-      requestId,
-      sessionId,
-    }),
+      preview,
+      staleRecipeHash: expectedRecipeHash !== preview.recipeHash,
+    }).contentHash,
     graphRevision,
     imagePath,
-    preview,
+    preview: {
+      accessScope: preview.accessScope,
+      artifactId: preview.artifactId,
+      encodedFormat: preview.encodedFormat,
+      height: preview.height,
+      includesOriginalRaw: preview.includesOriginalRaw,
+      longEdgePx: preview.longEdgePx,
+      mediaType: preview.mediaType,
+      previewRef: preview.previewRef,
+      purpose: preview.purpose,
+      quality: preview.quality,
+      recipeHash: preview.recipeHash,
+      renderHash: preview.renderHash,
+      width: preview.width,
+    },
     proofContext: {
       expectedRecipeHash,
       sourceToolName,
@@ -439,21 +420,7 @@ export const runAgentCurrentImagePreviewLoop = async (
       expectedRecipeHash: preview.recipeHash,
       graphRevision: lineage.appliedGraphRevision,
       imagePath: initialSnapshot.activeImagePath,
-      preview: {
-        accessScope: preview.accessScope,
-        artifactId: preview.artifactId,
-        encodedFormat: preview.encodedFormat,
-        height: preview.height,
-        includesOriginalRaw: preview.includesOriginalRaw,
-        longEdgePx: preview.longEdgePx,
-        mediaType: preview.mediaType,
-        previewRef: preview.previewRef,
-        purpose: lineage.previewPurpose,
-        quality: preview.quality,
-        recipeHash: preview.recipeHash,
-        renderHash: preview.renderHash,
-        width: preview.width,
-      },
+      preview: { ...preview, purpose: lineage.previewPurpose },
       requestId: `${parsedRequest.requestId}-preview-${index + 1}`,
       sessionId: parsedRequest.sessionId,
       sourceToolName: lineage.sourceToolName,
