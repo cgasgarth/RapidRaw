@@ -12,6 +12,7 @@ import type { SuperResolutionOutputReviewWorkflow } from '../schemas/computation
 import type { SuperResolutionUiSettings } from '../schemas/computational-merge/superResolutionUiSchemas';
 import type { FocusStackOutputReviewWorkflow } from '../schemas/focus-stack/focusStackOutputReviewSchemas';
 import type { FocusStackUiSettings } from '../schemas/focus-stack/focusStackUiSchemas';
+import { hasAcceptedSuperResolutionCropReview } from './superResolutionOutputReview';
 
 type BuildReceiptInput = Omit<
   DerivedOutputReceipt,
@@ -430,19 +431,21 @@ export const buildSuperResolutionDerivedOutputReceipt = ({
   acceptedDryRunPlanId?: string | undefined;
   review: SuperResolutionOutputReviewWorkflow;
   settings: SuperResolutionUiSettings;
-}): DerivedOutputReceipt =>
-  buildDerivedOutputReceipt({
+}): DerivedOutputReceipt => {
+  const isEditableHandoffAvailable = review.editableGate === 'ready' && hasAcceptedSuperResolutionCropReview(review);
+
+  return buildDerivedOutputReceipt({
     acceptedDryRunPlanHash,
     acceptedDryRunPlanId,
     family: 'super_resolution',
     openInEditorAction: {
       label: 'Open super-resolution output',
-      state: review.editableGate === 'ready' ? 'available' : 'unavailable',
-      ...(review.editableGate === 'ready' ? { path: review.artifactPath } : {}),
+      state: isEditableHandoffAvailable ? 'available' : 'unavailable',
+      ...(isEditableHandoffAvailable ? { path: review.artifactPath } : {}),
     },
     outputArtifactId: review.outputArtifactId,
     outputContentHash: review.outputArtifactHash,
-    ...(review.editableGate === 'ready'
+    ...(isEditableHandoffAvailable
       ? {
           outputPath: review.artifactPath,
           provenanceSidecar: {
@@ -476,6 +479,7 @@ export const buildSuperResolutionDerivedOutputReceipt = ({
     staleState: review.staleState,
     storagePolicy: 'sidecar_artifact',
   });
+};
 
 export const hashStableJson = (value: unknown): string => `fnv1a32:${fnv1a32(stableJson(value))}`;
 

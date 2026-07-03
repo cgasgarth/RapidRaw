@@ -69,6 +69,12 @@ interface BuildSuperResolutionOutputReviewOptions {
 
 const reviewCropCount = 4;
 const reviewPacketPath = 'docs/validation/proofs/super-resolution/sr-synthetic-output-artifact-proof-2026-06-20.json';
+const requiredCropReviewArtifactKinds = [
+  'baseline_review_crop',
+  'crop_review_sheet',
+  'reconstruction_review_crop',
+] as const satisfies ReadonlyArray<SuperResolutionOutputReviewWorkflow['reviewArtifacts'][number]['kind']>;
+
 export const superResolutionSyntheticReviewArtifacts: SuperResolutionOutputReviewWorkflow['reviewArtifacts'] = [
   {
     contentHash: 'sha256:8ae4f09c9c12e8cccd3731f8a04a0fc75ec8ae0aab8bf999f79f2f3855053a74',
@@ -95,6 +101,18 @@ export const superResolutionSyntheticReviewArtifacts: SuperResolutionOutputRevie
     publicRepoAllowed: false,
   },
 ];
+
+export const hasSuperResolutionCropReviewEvidence = (review: SuperResolutionOutputReviewWorkflow): boolean => {
+  if (review.reviewCropCount <= 0 || review.cropMetrics.reviewCropCount < review.reviewCropCount) return false;
+
+  const artifactKinds = new Set(review.reviewArtifacts.map((artifact) => artifact.kind));
+  return requiredCropReviewArtifactKinds.every((kind) => artifactKinds.has(kind));
+};
+
+export const hasAcceptedSuperResolutionCropReview = (review: SuperResolutionOutputReviewWorkflow): boolean =>
+  review.humanReviewStatus === 'passed' &&
+  review.detailReview.reviewStatus === 'accepted' &&
+  hasSuperResolutionCropReviewEvidence(review);
 
 export const buildSuperResolutionOutputReviewFromArtifact = (
   artifactValue: SuperResolutionArtifactReviewInput,

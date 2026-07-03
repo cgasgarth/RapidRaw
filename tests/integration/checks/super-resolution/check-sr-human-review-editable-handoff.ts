@@ -16,8 +16,13 @@ import {
   markSuperResolutionArtifactHumanReviewPassed,
   markSuperResolutionArtifactStaleState,
 } from '../../../../packages/rawengine-schema/src/super-resolution/superResolutionSidecarProvenance.ts';
+import { superResolutionOutputReviewWorkflowSchema } from '../../../../src/schemas/computational-merge/superResolutionOutputReviewSchemas.ts';
 import { buildSuperResolutionDerivedOutputReceipt } from '../../../../src/utils/derivedOutputReceipt.ts';
-import { buildSuperResolutionOutputReviewFromArtifact } from '../../../../src/utils/superResolutionOutputReview.ts';
+import {
+  buildSuperResolutionOutputReviewFromArtifact,
+  hasAcceptedSuperResolutionCropReview,
+  hasSuperResolutionCropReviewEvidence,
+} from '../../../../src/utils/superResolutionOutputReview.ts';
 
 const SCALE = 2;
 const LOW_WIDTH = 16;
@@ -156,6 +161,12 @@ if (reviewedOutputReview.registrationMetrics.measuredSubpixelFrameCount !== 3) {
     `Expected three non-reference subpixel registrations, got ${reviewedOutputReview.registrationMetrics.measuredSubpixelFrameCount}.`,
   );
 }
+if (!hasSuperResolutionCropReviewEvidence(reviewedOutputReview)) {
+  throw new Error('Passed SR review must include crop review evidence before editable handoff.');
+}
+if (!hasAcceptedSuperResolutionCropReview(reviewedOutputReview)) {
+  throw new Error('Passed SR review must mark crop review evidence accepted before editable handoff.');
+}
 
 const receipt = buildSuperResolutionDerivedOutputReceipt({
   acceptedDryRunPlanHash: applied.provenance.acceptedDryRunPlanHash,
@@ -185,6 +196,38 @@ if (receiptSuperResolution.supportMap.effectiveScale !== SCALE) {
   throw new Error('SR derived output receipt sidecar must preserve support-map effective scale.');
 }
 
+const missingCropReview = superResolutionOutputReviewWorkflowSchema.parse({
+  ...reviewedOutputReview,
+  reviewArtifacts: reviewedOutputReview.reviewArtifacts.filter(
+    (artifact) => artifact.kind === 'reconstruction_preview',
+  ),
+});
+if (hasSuperResolutionCropReviewEvidence(missingCropReview)) {
+  throw new Error('SR crop review evidence must fail when crop artifacts are missing.');
+}
+const missingCropReviewReceipt = buildSuperResolutionDerivedOutputReceipt({
+  acceptedDryRunPlanHash: applied.provenance.acceptedDryRunPlanHash,
+  acceptedDryRunPlanId: applied.provenance.acceptedDryRunPlanId,
+  review: missingCropReview,
+  settings: {
+    alignmentMode: 'translation',
+    detailPolicy: 'conservative',
+    maxPreviewDimensionPx: 1200,
+    outputScale: SCALE,
+    qualityPreference: 'best',
+    reconstructionMode: 'model_detail',
+    sourceMode: 'multi_image',
+  },
+});
+if (missingCropReviewReceipt.openInEditorAction.state !== 'unavailable') {
+  throw new Error(
+    `Missing crop review evidence must block editor handoff, got ${missingCropReviewReceipt.openInEditorAction.state}.`,
+  );
+}
+if (missingCropReviewReceipt.provenanceSidecar !== undefined) {
+  throw new Error('Missing crop review evidence must not emit an editable handoff sidecar receipt.');
+}
+
 const staleArtifact = markSuperResolutionArtifactStaleState(
   reviewedArtifact,
   {
@@ -204,6 +247,8 @@ if (staleReview.editableGate !== 'blocked_stale') {
 }
 
 const proof = {
+  cropReviewEvidenceAfterReview: 'accepted',
+  cropReviewGateWithoutEvidence: missingCropReviewReceipt.openInEditorAction.state,
   editableGateAfterReview: reviewedOutputReview.editableGate,
   outputHash: reviewedOutputReview.outputArtifactHash,
   outputPixelHash: `sha256:${createHash('sha256').update(new Uint8Array(applied.outputPixels.buffer)).digest('hex')}`,
