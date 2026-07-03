@@ -119,11 +119,11 @@ export const VISUAL_SMOKE_SCENARIOS = [
     sectionMinimum: 1,
   },
   {
-    appMode: VISUAL_SMOKE_SCENARIO_IDS.AgentChatUi,
-    marker: 'Agent chat UI smoke',
+    appMode: VISUAL_SMOKE_SCENARIO_IDS.ProfessionalAgentReviewWorkspace,
+    marker: 'Professional agent review workspace',
     mode: VISUAL_SMOKE_SCENARIO_IDS.AgentSelectedImageLiveSession,
     outputFile: 'agent-selected-image-live-session.png',
-    sectionMinimum: 1,
+    sectionMinimum: 2,
   },
   {
     marker: 'Professional agent review',

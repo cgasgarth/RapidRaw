@@ -795,7 +795,7 @@ export const cameraProfileInputTransformPreviewProofSchema = z
     }
   });
 export const agentChatProofDatasetSchema = z.object({
-  agentRuntimeStatus: z.literal('runtime_apply_demo'),
+  agentRuntimeStatus: z.literal('runtime_apply_ready'),
 });
 export const agentLivePromptComposerProofDatasetSchema = z.object({
   livePromptStatus: z.enum(['idle', 'dry_run_ready', 'applied']),

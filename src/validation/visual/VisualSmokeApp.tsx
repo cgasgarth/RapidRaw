@@ -82,6 +82,7 @@ import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { DEFAULT_COLLAPSIBLE_SECTIONS_STATE, useUIStore } from '../../store/useUIStore';
 import {
+  ActiveChannel,
   type Adjustments,
   INITIAL_ADJUSTMENTS,
   INITIAL_MASK_ADJUSTMENTS,
@@ -1621,6 +1622,7 @@ const isVisualSmokeComponentMode = (mode: string): mode is VisualSmokeComponentM
 
 const agentChatSmokeTitle = 'Agent chat UI smoke';
 const agentChatSmokeRuntime = 'UI-only';
+const agentVisualSmokeHistogramBins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 9 : 3));
 const workflowRailDensityTitle = 'Workflow rail density';
 const workflowRailRuntime = 'UI polish';
 const workflowRailTargetProof = 'Fixed 36px icon targets keep the rail compact without changing panel order.';
@@ -2768,6 +2770,12 @@ function AgentChatVisualSmoke() {
       adjustments: INITIAL_ADJUSTMENTS,
       finalPreviewUrl: 'blob:rawengine-agent-visual-smoke-before',
       hasRenderedFirstFrame: true,
+      histogram: {
+        [ActiveChannel.Blue]: { color: '#4D96FF', data: agentVisualSmokeHistogramBins },
+        [ActiveChannel.Green]: { color: '#6BCB77', data: agentVisualSmokeHistogramBins },
+        [ActiveChannel.Luma]: { color: '#FFFFFF', data: agentVisualSmokeHistogramBins },
+        [ActiveChannel.Red]: { color: '#FF6B6B', data: agentVisualSmokeHistogramBins },
+      },
       history: [INITIAL_ADJUSTMENTS],
       historyIndex: 0,
       selectedImage: {
@@ -2892,6 +2900,12 @@ function ProfessionalAgentReviewWorkspaceVisualSmoke() {
       adjustments: INITIAL_ADJUSTMENTS,
       finalPreviewUrl: 'data:image/jpeg;base64,BBBB',
       hasRenderedFirstFrame: true,
+      histogram: {
+        [ActiveChannel.Blue]: { color: '#4D96FF', data: agentVisualSmokeHistogramBins },
+        [ActiveChannel.Green]: { color: '#6BCB77', data: agentVisualSmokeHistogramBins },
+        [ActiveChannel.Luma]: { color: '#FFFFFF', data: agentVisualSmokeHistogramBins },
+        [ActiveChannel.Red]: { color: '#FF6B6B', data: agentVisualSmokeHistogramBins },
+      },
       history: [INITIAL_ADJUSTMENTS, { ...INITIAL_ADJUSTMENTS, exposure: 0.35 }],
       historyIndex: 1,
       lastBasicToneCommand: null,
