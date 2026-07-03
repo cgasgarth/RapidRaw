@@ -15,6 +15,7 @@ import CullingModal from '../../components/modals/editing/CullingModal';
 import CommandPaletteModal from '../../components/modals/navigation/CommandPaletteModal';
 import { NegativeConversionModal } from '../../components/modals/negative-lab/NegativeConversionModal';
 import BottomBar from '../../components/panel/BottomBar';
+import EditorChromeStatusStrip from '../../components/panel/editor/EditorChromeStatusStrip';
 import EditorToolbar from '../../components/panel/editor/EditorToolbar';
 import ImageCanvas from '../../components/panel/editor/ImageCanvas';
 import AgentChatShell from '../../components/panel/right/ai/AgentChatShell';
@@ -988,6 +989,120 @@ function ProfessionalEditorCanvasWell({ portrait = false }: { portrait?: boolean
   );
 }
 
+function useProfessionalEditorStatusChipsSmokeState() {
+  useEffect(() => {
+    const adjustments = {
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      levels: {
+        ...INITIAL_ADJUSTMENTS.levels,
+        inputBlack: 0.06,
+        inputWhite: 0.92,
+      },
+    };
+    const exportSoftProofTransform = {
+      blackPointCompensation: 'enabled',
+      colorManagedTransform: 'display-p3-preview',
+      effectiveColorProfile: ExportColorProfile.DisplayP3,
+      effectiveRenderingIntent: ExportRenderingIntent.RelativeColorimetric,
+      policyStatus: 'applied',
+      policyVersion: 'visual-smoke-v1',
+      sourcePrecisionPath: 'raw-linear-f32',
+      transformApplied: true,
+      transformPolicyFingerprint: 'sha256:professional-editor-status-chips',
+    };
+    const gamutWarningOverlay: GamutWarningOverlayPayload = {
+      black_point_compensation: exportSoftProofTransform.blackPointCompensation,
+      color_managed_transform: exportSoftProofTransform.colorManagedTransform,
+      coverage_ratio: 0.125,
+      effective_color_profile: exportSoftProofTransform.effectiveColorProfile,
+      effective_rendering_intent: exportSoftProofTransform.effectiveRenderingIntent,
+      export_soft_proof_recipe_id: 'visual-smoke-display-p3',
+      height: 180,
+      mask_data_url: 'data:image/png;base64,AAAA',
+      max_channel_value: 255,
+      min_channel_value: 0,
+      pixel_count: 360,
+      policy_status: exportSoftProofTransform.policyStatus,
+      policy_version: exportSoftProofTransform.policyVersion,
+      preview_basis: 'export_preview',
+      source_image_path: professionalEditorShellImage.path,
+      source_precision_path: exportSoftProofTransform.sourcePrecisionPath,
+      transform_applied: exportSoftProofTransform.transformApplied,
+      transform_policy_fingerprint: exportSoftProofTransform.transformPolicyFingerprint,
+      warning_pixel_count: 45,
+      width: 240,
+    };
+
+    useEditorStore.setState({
+      adjustments,
+      exportSoftProofRecipeId: 'visual-smoke-display-p3',
+      exportSoftProofTransform,
+      gamutWarningOverlay,
+      isExportSoftProofEnabled: true,
+      previewScopeStatus: {
+        displayTransformLabel: 'Display P3',
+        exportProfileLabel: 'Display P3',
+        exportRenderingIntentLabel: 'Relative Colorimetric',
+        histogramReady: true,
+        path: professionalEditorShellImage.path,
+        renderBasis: 'export_preview',
+        softProofTransformApplied: true,
+        sourceLabel: 'Export preview',
+        updatedAt: '2026-07-02T16:00:00.000Z',
+        waveformReady: true,
+        workingTransformLabel: 'Working RGB',
+        warningCodes: [],
+      },
+      selectedImage: professionalEditorShellImage,
+    });
+  }, []);
+}
+
+function ProfessionalEditorStatusChipsVisualSmoke() {
+  const { t } = useTranslation();
+  useProfessionalEditorStatusChipsSmokeState();
+
+  return (
+    <main
+      className="min-h-screen bg-editor-matte p-4 font-sans text-text-primary"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorStatusChips}
+      data-visual-smoke-ready="true"
+    >
+      <div className="mx-auto grid h-[calc(100vh-32px)] max-w-6xl grid-rows-[auto_minmax(0,1fr)] gap-3 overflow-hidden">
+        <header className="flex min-h-9 shrink-0 items-center justify-between">
+          <h1 className={editorChromeTokens.typography.panelTitle}>{t('editor.chromeStatus.visualSmokeTitle')}</h1>
+          <span className={editorChromeStatusChipClassName('warning')}>
+            {t('editor.chromeStatus.visualSmokeSummary')}
+          </span>
+        </header>
+        <section className="grid min-h-0 grid-cols-[minmax(0,1fr)_320px] gap-3" data-visual-smoke-section="normal">
+          <div className="relative min-h-0 overflow-hidden rounded-lg border border-editor-border bg-editor-panel-well p-2">
+            <div className="relative h-full overflow-hidden rounded-lg bg-editor-panel-well">
+              <EditorChromeStatusStrip isFullScreen={false} />
+              <div className="grid h-full place-items-center">
+                <div className="aspect-[4/3] w-[82%] overflow-hidden rounded-md border border-editor-overlay-stroke bg-[linear-gradient(135deg,#18232b_0%,#3f5960_36%,#968762_64%,#ebd5aa_100%)] shadow-[0_24px_52px_var(--editor-overlay-shadow)]">
+                  <div className="h-full w-full bg-[radial-gradient(circle_at_36%_28%,rgba(255,246,208,0.56),transparent_18%),linear-gradient(170deg,transparent_52%,rgba(12,16,20,0.68)_53%)]" />
+                </div>
+              </div>
+            </div>
+          </div>
+          <aside
+            className="min-h-0 overflow-hidden rounded-lg border border-editor-border bg-editor-panel p-3"
+            data-visual-smoke-section="fullscreen"
+          >
+            <div className="relative h-full overflow-hidden rounded-lg border border-editor-border bg-editor-panel-well">
+              <EditorChromeStatusStrip isFullScreen={true} />
+              <div className="grid h-full place-items-center">
+                <div className="aspect-[3/4] h-[78%] rounded-md border border-editor-overlay-stroke bg-[linear-gradient(160deg,#1b2630,#6d856f_52%,#d6c28c)] shadow-[0_18px_42px_var(--editor-overlay-shadow)]" />
+              </div>
+            </div>
+          </aside>
+        </section>
+      </div>
+    </main>
+  );
+}
+
 function ProfessionalEditorBottomBar() {
   return (
     <BottomBar
@@ -1484,6 +1599,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalCanvasOverlays]: ProfessionalCanvasOverlaysVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalCropTransformWorkspace]: ProfessionalCropTransformWorkspaceVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorCompactPortrait]: ProfessionalEditorCompactPortraitVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorStatusChips]: ProfessionalEditorStatusChipsVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalFilmstripContext]: ProfessionalFilmstripContextVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorShell]: ProfessionalEditorShellVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorToolbar]: ProfessionalEditorToolbarVisualSmoke,

@@ -37,6 +37,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   PanoramaUi: 'panorama-ui',
   ProfessionalAdjustmentsCompact: 'professional-adjustments-compact',
   ProfessionalEditorCompactPortrait: 'professional-editor-compact-portrait',
+  ProfessionalEditorStatusChips: 'professional-editor-status-chips',
   ProfessionalCanvasOverlays: 'professional-canvas-overlays',
   ProfessionalCropTransformWorkspace: 'professional-crop-transform-workspace',
   ProfessionalFilmstripContext: 'professional-filmstrip-context',
@@ -323,6 +324,12 @@ export const VISUAL_SMOKE_SCENARIOS = [
     mode: VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorCompactPortrait,
     outputFile: 'professional-editor-compact-portrait.png',
     sectionMinimum: 5,
+  },
+  {
+    marker: 'Editor chrome status chips',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorStatusChips,
+    outputFile: 'professional-editor-status-chips.png',
+    sectionMinimum: 2,
   },
   {
     compactOutputFile: 'professional-filmstrip-context-compact.png',

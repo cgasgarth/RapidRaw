@@ -866,6 +866,11 @@
       "maskOverlayAlt": "",
       "originalAlt": ""
     },
+    "chromeStatus": {
+      "accessibilityLabel": "",
+      "visualSmokeSummary": "",
+      "visualSmokeTitle": ""
+    },
     "crop": {
       "aspectRatioHeading": "アスペクト比",
       "custom": {

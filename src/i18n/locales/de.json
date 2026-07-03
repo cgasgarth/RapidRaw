@@ -914,6 +914,11 @@
       "maskOverlayAlt": "Maskenuberlagerung",
       "originalAlt": "Original"
     },
+    "chromeStatus": {
+      "accessibilityLabel": "",
+      "visualSmokeSummary": "",
+      "visualSmokeTitle": ""
+    },
     "crop": {
       "aspectRatioHeading": "Seitenverhältnis",
       "custom": {

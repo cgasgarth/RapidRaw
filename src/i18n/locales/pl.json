@@ -962,6 +962,11 @@
       "maskOverlayAlt": "Nakladka maski",
       "originalAlt": "Oryginal"
     },
+    "chromeStatus": {
+      "accessibilityLabel": "",
+      "visualSmokeSummary": "",
+      "visualSmokeTitle": ""
+    },
     "crop": {
       "aspectRatioHeading": "Proporcje",
       "custom": {

@@ -1,5 +1,6 @@
 import type { SelectedImage } from '../../../components/ui/AppProperties';
 import type { GamutWarningOverlayPayload } from '../../../schemas/tauriEventSchemas';
+import type { Adjustments } from '../../adjustments';
 
 export interface ProofDimensions {
   height: number;
@@ -47,6 +48,24 @@ export interface PreviewScopeFreshnessInput {
 export interface PreviewScopeFreshnessStatus {
   state: PreviewBoundWarningState;
   statusLabel: string;
+}
+
+export type EditorChromeStatusChipTone = 'neutral' | 'success' | 'warning' | 'danger' | 'info';
+export type EditorChromeStatusChipId =
+  | 'shadow-clipping'
+  | 'highlight-clipping'
+  | 'gamut-warning'
+  | 'soft-proof'
+  | 'preview-scopes';
+
+export interface EditorChromeStatusChip {
+  active: boolean;
+  detail: string;
+  id: EditorChromeStatusChipId;
+  label: string;
+  state: PreviewBoundWarningState;
+  tone: EditorChromeStatusChipTone;
+  value: string;
 }
 
 export const formatGamutWarningCoverage = (overlay: GamutWarningOverlayPayload | null): string => {
@@ -206,4 +225,100 @@ export const getPreviewScopeFreshnessStatus = (
   }
 
   return { state: 'current', statusLabel: 'Scopes current' };
+};
+
+const previewStateToTone = (state: PreviewBoundWarningState): EditorChromeStatusChipTone => {
+  switch (state) {
+    case 'current':
+      return 'success';
+    case 'stale':
+      return 'warning';
+    case 'unsupported':
+      return 'neutral';
+    case 'unavailable':
+      return 'info';
+  }
+};
+
+const softProofStateToTone = (state: RenderedPreviewWarningStatus['state']): EditorChromeStatusChipTone => {
+  if (state === 'current') return 'success';
+  if (state === 'stale') return 'warning';
+  if (state === 'unsupported') return 'neutral';
+  return 'info';
+};
+
+export const getEditorChromeStatusChips = ({
+  adjustments,
+  gamutWarningOverlay,
+  previewScopeStatus,
+  proofContext,
+}: {
+  adjustments: Pick<Adjustments, 'levels'>;
+  gamutWarningOverlay: GamutWarningOverlayPayload | null;
+  previewScopeStatus: PreviewScopeFreshnessInput | null;
+  proofContext: ExportSoftProofOverlayContext;
+}): EditorChromeStatusChip[] => {
+  const renderedPreviewWarningStatus = getRenderedPreviewWarningStatus(gamutWarningOverlay, proofContext);
+  const previewScopeFreshnessStatus = getPreviewScopeFreshnessStatus(
+    previewScopeStatus,
+    proofContext.selectedImagePath,
+  );
+  const levels = adjustments.levels;
+  const isShadowClipping = levels.inputBlack > 0;
+  const isHighlightClipping = levels.inputWhite < 1;
+  const hasCurrentGamutWarning =
+    renderedPreviewWarningStatus.state === 'current' &&
+    gamutWarningOverlay !== null &&
+    gamutWarningOverlay.warning_pixel_count > 0;
+
+  return [
+    {
+      active: isShadowClipping,
+      detail: isShadowClipping ? `Input black ${Math.round(levels.inputBlack * 100)}%` : 'Input black at 0%',
+      id: 'shadow-clipping',
+      label: 'Shadows',
+      state: isShadowClipping ? 'current' : 'unavailable',
+      tone: isShadowClipping ? 'danger' : 'neutral',
+      value: isShadowClipping ? 'Clipping' : 'Clean',
+    },
+    {
+      active: isHighlightClipping,
+      detail: isHighlightClipping ? `Input white ${Math.round(levels.inputWhite * 100)}%` : 'Input white at 100%',
+      id: 'highlight-clipping',
+      label: 'Highlights',
+      state: isHighlightClipping ? 'current' : 'unavailable',
+      tone: isHighlightClipping ? 'danger' : 'neutral',
+      value: isHighlightClipping ? 'Clipping' : 'Clean',
+    },
+    {
+      active: hasCurrentGamutWarning,
+      detail: renderedPreviewWarningStatus.renderTargetLabel,
+      id: 'gamut-warning',
+      label: 'Gamut',
+      state: renderedPreviewWarningStatus.state,
+      tone: hasCurrentGamutWarning ? 'warning' : softProofStateToTone(renderedPreviewWarningStatus.state),
+      value:
+        renderedPreviewWarningStatus.state === 'current'
+          ? renderedPreviewWarningStatus.coverageLabel
+          : renderedPreviewWarningStatus.statusLabel,
+    },
+    {
+      active: proofContext.isExportSoftProofEnabled,
+      detail: renderedPreviewWarningStatus.renderTargetLabel,
+      id: 'soft-proof',
+      label: 'Soft proof',
+      state: renderedPreviewWarningStatus.state,
+      tone: softProofStateToTone(renderedPreviewWarningStatus.state),
+      value: proofContext.isExportSoftProofEnabled ? renderedPreviewWarningStatus.statusLabel : 'Off',
+    },
+    {
+      active: previewScopeFreshnessStatus.state === 'current',
+      detail: previewScopeStatus?.renderBasis ?? 'Scopes pending',
+      id: 'preview-scopes',
+      label: 'Scopes',
+      state: previewScopeFreshnessStatus.state,
+      tone: previewStateToTone(previewScopeFreshnessStatus.state),
+      value: previewScopeFreshnessStatus.statusLabel.replace(/^Scopes\s+/u, ''),
+    },
+  ];
 };

@@ -73,6 +73,7 @@ import { debounce } from '../../utils/timing';
 import type { WhiteBalancePickerRuntimeReceipt } from '../../utils/whiteBalancePicker';
 import { Panel } from '../ui/AppProperties';
 import UiText from '../ui/primitives/Text';
+import EditorChromeStatusStrip from './editor/EditorChromeStatusStrip';
 import EditorToolbar from './editor/EditorToolbar';
 import ImageCanvas from './editor/ImageCanvas';
 import { Mask, type SubMask } from './right/layers/Masks';
@@ -1617,6 +1618,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
           onDoubleClick={handleDoubleClick}
           data-fullscreen-preview={String(isFullScreen)}
         >
+          <EditorChromeStatusStrip isFullScreen={isFullScreen} />
           {showSpinner && (
             <div
               className={cx(

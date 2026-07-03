@@ -917,6 +917,11 @@
       "maskOverlayAlt": "",
       "originalAlt": ""
     },
+    "chromeStatus": {
+      "accessibilityLabel": "",
+      "visualSmokeSummary": "",
+      "visualSmokeTitle": ""
+    },
     "crop": {
       "aspectRatioHeading": "Соотношение сторон",
       "custom": {
