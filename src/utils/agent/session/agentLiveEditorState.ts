@@ -8,6 +8,11 @@ import type { FolderTree } from '../../../components/panel/FolderTree';
 import type { AlbumItem, ImageFile, RawStatus, SortDirection } from '../../../components/ui/AppProperties';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useLibraryStore } from '../../../store/useLibraryStore';
+import {
+  agentCurrentImagePreviewLoopApplyReviewRequestSchema,
+  applyAgentCurrentImagePreviewLoopReviewedEdit,
+  runAgentCurrentImagePreviewLoop,
+} from '../context/agentCurrentImagePreviewLoop';
 
 const mapFolder = (folder: FolderTree): ProjectLibrarySnapshotV1['folders'][number] => ({
   children: folder.children.map(mapFolder),
@@ -105,4 +110,19 @@ export const buildLiveEditorProjectLibrarySnapshot = (): ProjectLibrarySnapshotV
 };
 
 export const createLiveEditorAppServerBridge = () =>
-  createRawEngineLocalAppServerBridge({ getProjectLibrarySnapshot: buildLiveEditorProjectLibrarySnapshot });
+  createRawEngineLocalAppServerBridge({
+    getProjectLibrarySnapshot: buildLiveEditorProjectLibrarySnapshot,
+    runSelectedImagePreviewLoop: (command) => {
+      const { commandType: _commandType, ...request } = command;
+      return runAgentCurrentImagePreviewLoop(request);
+    },
+    runSelectedImagePreviewLoopApplyReview: (command) => {
+      const { commandType: _commandType, request, ...reviewRequest } = command;
+      return applyAgentCurrentImagePreviewLoopReviewedEdit(
+        agentCurrentImagePreviewLoopApplyReviewRequestSchema.parse({
+          ...reviewRequest,
+          request,
+        }),
+      );
+    },
+  });
