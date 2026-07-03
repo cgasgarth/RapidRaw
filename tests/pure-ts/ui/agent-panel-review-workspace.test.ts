@@ -5,10 +5,17 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
-import { AgentPanel, resolveAgentReviewWorkspaceState } from '../../../src/components/panel/right/ai/AgentPanel.tsx';
-import type { SelectedImage } from '../../../src/components/ui/AppProperties.tsx';
+import { AgentPanel, resolveAgentReviewWorkspaceState } from '../../../src/components/panel/right/ai/AgentPanel';
+import { type AppSettings, type SelectedImage, Theme } from '../../../src/components/ui/AppProperties';
+import {
+  ExportColorProfile,
+  type ExportPreset,
+  ExportRenderingIntent,
+  WatermarkAnchor,
+} from '../../../src/components/ui/ExportImportProperties';
 import en from '../../../src/i18n/locales/en.json';
 import { useEditorStore } from '../../../src/store/useEditorStore.ts';
+import { useSettingsStore } from '../../../src/store/useSettingsStore';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -28,6 +35,35 @@ const selectedImage: SelectedImage = {
   width: 4500,
 };
 
+const exportPreset: ExportPreset = {
+  colorProfile: ExportColorProfile.Srgb,
+  dontEnlarge: true,
+  enableResize: true,
+  enableWatermark: false,
+  fileFormat: 'jpeg',
+  filenameTemplate: '{original_filename}-agent',
+  id: 'agent-workspace-jpeg',
+  jpegQuality: 86,
+  keepMetadata: true,
+  name: 'Agent workspace JPEG',
+  preserveTimestamps: true,
+  renderingIntent: ExportRenderingIntent.RelativeColorimetric,
+  resizeMode: 'longEdge',
+  resizeValue: 1536,
+  stripGps: false,
+  watermarkAnchor: WatermarkAnchor.BottomRight,
+  watermarkOpacity: 50,
+  watermarkPath: null,
+  watermarkScale: 20,
+  watermarkSpacing: 2,
+};
+
+const appSettings: AppSettings = {
+  exportPresets: [exportPreset],
+  lastRootPath: null,
+  theme: Theme.Dark,
+};
+
 afterEach(() => {
   if (renderedRoot !== null) {
     act(() => {
@@ -36,7 +72,9 @@ afterEach(() => {
     renderedRoot.container.remove();
     renderedRoot = null;
   }
+  globalThis.localStorage?.clear();
   resetEditorStore();
+  useSettingsStore.setState({ appSettings: null });
 });
 
 describe('agent panel preview-review workspace', () => {
@@ -90,12 +128,16 @@ describe('agent panel preview-review workspace', () => {
     expect(required(container, 'agent-review-state-no-selection').dataset.state).toBe('inactive');
     expect(required(container, 'agent-review-state-preview-ready').dataset.state).toBe('active');
     expect(required(container, 'agent-review-state-dry-run-ready').dataset.state).toBe('active');
-    expect(required(container, 'agent-review-state-approval-required').dataset.state).toBe('active');
-    expect(required(container, 'agent-review-state-applied').dataset.state).toBe('active');
-    expect(required(container, 'agent-review-state-audit-persisted').dataset.state).toBe('active');
+    expect(required(container, 'agent-review-state-approval-required').dataset.state).toBe('inactive');
+    expect(required(container, 'agent-review-state-applied').dataset.state).toBe('inactive');
+    expect(required(container, 'agent-review-state-audit-persisted').dataset.state).toBe('inactive');
     expect(required(container, 'agent-tool-readiness-chip-row').textContent).toContain('Dry-runs');
-    expect(required(container, 'agent-dry-run-apply-review-controls').dataset.approvalRequired).toBe('true');
-    expect((required(container, 'agent-review-control-apply') as HTMLButtonElement).disabled).toBe(false);
+    expect(required(container, 'agent-dry-run-apply-review-controls').dataset.approvalRequired).toBe('false');
+    expect(required(container, 'agent-dry-run-apply-review-controls').dataset.liveActionStatus).toBe('idle');
+    expect((required(container, 'agent-review-control-dry-run') as HTMLButtonElement).disabled).toBe(false);
+    expect((required(container, 'agent-review-control-apply') as HTMLButtonElement).disabled).toBe(true);
+    expect((required(container, 'agent-review-control-export') as HTMLButtonElement).disabled).toBe(true);
+    expect((required(container, 'agent-review-control-rollback') as HTMLButtonElement).disabled).toBe(true);
     expect(required(container, 'agent-review-live-activity-timeline').textContent).toContain('Current image context');
 
     const workspace = required(container, 'agent-review-workspace');
@@ -114,6 +156,70 @@ describe('agent panel preview-review workspace', () => {
     expect((required(container, 'agent-review-control-apply') as HTMLButtonElement).disabled).toBe(true);
     expect(required(container, 'agent-preview-receipt-card').dataset.previewReady).toBe('false');
   });
+
+  test('wires the top dry-run control to a selected-image live-session receipt', async () => {
+    resetEditorStore();
+    useSettingsStore.getState().setAppSettings(appSettings);
+    useSettingsStore.setState({ appSettings });
+    useEditorStore.getState().setEditor({
+      finalPreviewUrl: 'data:image/jpeg;base64,BBBB',
+      selectedImage,
+    });
+
+    const { container } = await renderAgentPanel();
+
+    await act(async () => {
+      (required(container, 'agent-review-control-dry-run') as HTMLButtonElement).click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(required(container, 'agent-dry-run-apply-review-controls').dataset.liveActionStatus).toBe(
+      'approval_required',
+    );
+    expect(required(container, 'agent-dry-run-apply-review-controls').dataset.liveActionToolName).toBe(
+      'rawengine.agent.adjustments.dry_run',
+    );
+    expect(required(container, 'agent-review-state-approval-required').dataset.state).toBe('active');
+    expect((required(container, 'agent-review-control-apply') as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  test('applies and rolls back through the top selected-image live-session controls', async () => {
+    resetEditorStore();
+    useEditorStore.getState().setEditor({
+      finalPreviewUrl: 'data:image/jpeg;base64,BBBB',
+      selectedImage,
+    });
+
+    const { container } = await renderAgentPanel();
+
+    await clickAndFlush(container, 'agent-review-control-dry-run');
+    await clickAndFlush(container, 'agent-review-control-apply');
+
+    expect(required(container, 'agent-dry-run-apply-review-controls').dataset.liveActionStatus).toBe('applied');
+    expect(required(container, 'agent-review-state-audit-persisted').dataset.state).toBe('active');
+    expect(required(container, 'agent-review-state-applied').dataset.state).toBe('active');
+    await act(async () => {
+      useSettingsStore.setState({ appSettings });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect((required(container, 'agent-review-control-export') as HTMLButtonElement).disabled).toBe(false);
+    expect((required(container, 'agent-review-control-rollback') as HTMLButtonElement).disabled).toBe(false);
+    expect(required(container, 'agent-review-live-activity-timeline').textContent).toContain('history_1');
+
+    await clickAndFlush(container, 'agent-review-control-export');
+
+    expect(required(container, 'agent-dry-run-apply-review-controls').dataset.liveActionStatus).toBe('exported');
+    expect(required(container, 'agent-dry-run-apply-review-controls').dataset.liveActionToolName).toBe(
+      'rawengine.agent.export.proof',
+    );
+    expect((required(container, 'agent-review-control-rollback') as HTMLButtonElement).disabled).toBe(false);
+
+    await clickAndFlush(container, 'agent-review-control-rollback');
+
+    expect(required(container, 'agent-dry-run-apply-review-controls').dataset.liveActionStatus).toBe('rolled_back');
+    expect(required(container, 'agent-review-live-activity-timeline').dataset).toBeDefined();
+    expect(useEditorStore.getState().historyIndex).toBe(0);
+  });
 });
 
 async function renderAgentPanel() {
@@ -125,6 +231,7 @@ async function renderAgentPanel() {
       HTMLDivElement: window.HTMLDivElement,
       HTMLElement: window.HTMLElement,
       HTMLTextAreaElement: window.HTMLTextAreaElement,
+      localStorage: window.localStorage,
       window,
     });
   }
@@ -140,6 +247,14 @@ async function renderAgentPanel() {
   });
 
   return { container, root };
+}
+
+async function clickAndFlush(container: HTMLElement, testId: string) {
+  await act(async () => {
+    (required(container, testId) as HTMLButtonElement).click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
 }
 
 async function createTestI18n() {

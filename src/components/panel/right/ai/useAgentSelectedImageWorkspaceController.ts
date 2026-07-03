@@ -1,0 +1,388 @@
+import { useCallback, useMemo, useState } from 'react';
+import { useEditorStore } from '../../../../store/useEditorStore';
+import { useSettingsStore } from '../../../../store/useSettingsStore';
+import { buildAgentImageContextSnapshot } from '../../../../utils/agent/context/agentImageContextSnapshot';
+import {
+  AGENT_EXPORT_PROOF_TOOL_NAME,
+  buildAgentExportPresetSettings,
+} from '../../../../utils/agent/safety/agentExportProofTool';
+import { dispatchAgentExportReviewTool } from '../../../../utils/agent/session/agentLiveToolDispatch';
+import {
+  type AgentSelectedImageLiveSessionAuditRecord,
+  type AgentSelectedImageLiveSessionDraft,
+  appendAgentSelectedImageLiveSessionAuditRecord,
+  applyAgentSelectedImageLiveSession,
+  approveAgentSelectedImageLiveSession,
+  buildAgentSelectedImageLiveSessionAuditStorageKey,
+  rollbackAgentSelectedImageLiveSession,
+  startAgentSelectedImageLiveSessionDryRun,
+} from '../../../../utils/agent/session/agentSelectedImageLiveSession';
+import type { AgentSessionAuditStorageAdapter } from '../../../../utils/agent/session/agentSessionAuditStore';
+import {
+  AGENT_HISTORY_ROLLBACK_TOOL_NAME,
+  type AgentSessionCheckpoint,
+} from '../../../../utils/agent/session/agentSessionHistory';
+import type { AgentAdjustmentsApplyRequest } from '../../../../utils/agent/tools/agentAdjustmentApplyTool';
+import type { SelectedImage } from '../../../ui/AppProperties';
+
+const LIVE_AGENT_SELECTED_IMAGE_SESSION_AUDIT_KEY = 'rawengine.agent.selectedImageLiveSessionAudit.v1';
+const WORKSPACE_SESSION_ID = 'agent-workspace-selected-image';
+
+export type AgentSelectedImageWorkspaceActionStatus =
+  | 'applied'
+  | 'applying'
+  | 'approval_required'
+  | 'blocked'
+  | 'dry_run_ready'
+  | 'exported'
+  | 'exporting'
+  | 'idle'
+  | 'rolled_back'
+  | 'rolling_back';
+
+export interface AgentSelectedImageWorkspaceActivityEntry {
+  body: string;
+  graphRevision?: string;
+  id: string;
+  kind: 'approval' | 'error' | 'export' | 'preview' | 'rollback' | 'tool_call';
+  previewAfterHash?: string;
+  previewBeforeHash?: string;
+  recipeHash?: string;
+  requestId?: string;
+  status: 'blocked' | 'completed' | 'pending' | 'rolled_back';
+  toolName?: string;
+}
+
+interface AgentSelectedImageWorkspaceControllerInput {
+  selectedImage: Pick<SelectedImage, 'isReady' | 'path'> | null;
+}
+
+export interface AgentSelectedImageWorkspaceController {
+  actions: {
+    apply: () => Promise<void>;
+    dryRun: () => Promise<void>;
+    exportAudit: () => Promise<void>;
+    rollback: () => Promise<void>;
+  };
+  activityEntries: AgentSelectedImageWorkspaceActivityEntry[];
+  auditRecord: AgentSelectedImageLiveSessionAuditRecord | null;
+  canApply: boolean;
+  canDryRun: boolean;
+  canExportAudit: boolean;
+  canRollback: boolean;
+  disabledReason: string;
+  error: string | null;
+  latestRequestId: string | null;
+  latestToolName: string | null;
+  status: AgentSelectedImageWorkspaceActionStatus;
+}
+
+const createLocalAgentSelectedImageLiveSessionAuditStorageAdapter = ({
+  selectedImagePath,
+  sessionId,
+}: {
+  selectedImagePath: string;
+  sessionId: string;
+}): AgentSessionAuditStorageAdapter | null => {
+  if (typeof globalThis.localStorage === 'undefined') return null;
+
+  const storageKey = buildAgentSelectedImageLiveSessionAuditStorageKey({
+    namespace: LIVE_AGENT_SELECTED_IMAGE_SESSION_AUDIT_KEY,
+    selectedImagePath,
+    sessionId,
+  });
+
+  return {
+    readText: () => globalThis.localStorage.getItem(storageKey),
+    writeText: (value) => {
+      globalThis.localStorage.setItem(storageKey, value);
+    },
+  };
+};
+
+const clamp = (value: number, minimum: number, maximum: number): number => Math.min(maximum, Math.max(minimum, value));
+
+const buildWorkspaceAdjustmentPatch = (): AgentAdjustmentsApplyRequest['adjustments'] => {
+  const currentAdjustments = useEditorStore.getState().adjustments;
+  return {
+    contrast: clamp(currentAdjustments.contrast + 4, -100, 100),
+    exposure: clamp(currentAdjustments.exposure + 0.1, -2, 2),
+    highlights: clamp(currentAdjustments.highlights - 6, -100, 100),
+    shadows: clamp(currentAdjustments.shadows + 8, -100, 100),
+  };
+};
+
+const buildActivityEntry = (
+  index: number,
+  entry: Omit<AgentSelectedImageWorkspaceActivityEntry, 'id'>,
+): AgentSelectedImageWorkspaceActivityEntry => ({
+  ...entry,
+  id: `agent-workspace-live-action-${Date.now()}-${index}`,
+});
+
+export const useAgentSelectedImageWorkspaceController = ({
+  selectedImage,
+}: AgentSelectedImageWorkspaceControllerInput): AgentSelectedImageWorkspaceController => {
+  const [activityEntries, setActivityEntries] = useState<AgentSelectedImageWorkspaceActivityEntry[]>([]);
+  const [auditRecord, setAuditRecord] = useState<AgentSelectedImageLiveSessionAuditRecord | null>(null);
+  const [draft, setDraft] = useState<AgentSelectedImageLiveSessionDraft | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [rollbackCheckpoint, setRollbackCheckpoint] = useState<AgentSessionCheckpoint | null>(null);
+  const [status, setStatus] = useState<AgentSelectedImageWorkspaceActionStatus>('idle');
+  const exportPresetCount = useSettingsStore((state) => state.appSettings?.exportPresets?.length ?? 0);
+
+  const selectedImageReady = selectedImage !== null && selectedImage.isReady;
+  const operationPending = status === 'applying' || status === 'exporting' || status === 'rolling_back';
+  const canDryRun = selectedImageReady && !operationPending;
+  const canApply = selectedImageReady && draft !== null && draft.state === 'approval_required' && !operationPending;
+  const canExportAudit =
+    selectedImageReady && auditRecord !== null && status === 'applied' && exportPresetCount > 0 && !operationPending;
+  const canRollback =
+    selectedImageReady &&
+    auditRecord !== null &&
+    rollbackCheckpoint !== null &&
+    (status === 'applied' || status === 'exported') &&
+    !operationPending;
+  const disabledReason = useMemo(() => {
+    if (selectedImage === null) return 'Select an image before running selected-image live actions.';
+    if (!selectedImage.isReady) return 'Selected image is still loading.';
+    if (operationPending) return 'Selected-image live action is already running.';
+    if (auditRecord !== null && status === 'applied' && exportPresetCount === 0) {
+      return 'Create or load an export preset before exporting the selected-image audit proof.';
+    }
+    if (status === 'blocked' && error !== null) return error;
+    return '';
+  }, [auditRecord, error, exportPresetCount, operationPending, selectedImage, status]);
+
+  const pushActivityEntry = useCallback((entry: Omit<AgentSelectedImageWorkspaceActivityEntry, 'id'>) => {
+    setActivityEntries((entries) => [...entries, buildActivityEntry(entries.length, entry)]);
+  }, []);
+
+  const persistAuditRecord = useCallback((record: AgentSelectedImageLiveSessionAuditRecord) => {
+    const adapter = createLocalAgentSelectedImageLiveSessionAuditStorageAdapter({
+      selectedImagePath: record.receipt.selectedImagePath,
+      sessionId: record.receipt.sessionId,
+    });
+    if (adapter !== null) appendAgentSelectedImageLiveSessionAuditRecord(adapter, record);
+    setAuditRecord(record);
+  }, []);
+
+  const dryRun = useCallback(async () => {
+    if (!canDryRun) return;
+    setError(null);
+    const stamp = Date.now();
+    const operationId = `agent_workspace_selected_image_${stamp}`;
+    const requestId = `agent-workspace-selected-image-${stamp}`;
+    const prompt = 'Apply a conservative selected-image review adjustment and keep rollback available.';
+    try {
+      const sessionDraft = await startAgentSelectedImageLiveSessionDryRun({
+        adjustments: buildWorkspaceAdjustmentPatch(),
+        operationId,
+        prompt,
+        requestId,
+        sessionId: WORKSPACE_SESSION_ID,
+      });
+      setDraft(sessionDraft);
+      setRollbackCheckpoint(sessionDraft.checkpoint);
+      setStatus('approval_required');
+      pushActivityEntry({
+        body: sessionDraft.dryRun.dryRunPlanHash,
+        graphRevision: sessionDraft.dryRun.sourceGraphRevision,
+        kind: 'tool_call',
+        previewBeforeHash: sessionDraft.snapshot.previewRenderHash,
+        recipeHash: sessionDraft.snapshot.recipeHash,
+        requestId: `${requestId}-dry-run`,
+        status: 'completed',
+        toolName: sessionDraft.dryRun.toolName,
+      });
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : 'Selected-image dry-run failed.';
+      setError(message);
+      setStatus('blocked');
+      pushActivityEntry({
+        body: message,
+        kind: 'error',
+        requestId,
+        status: 'blocked',
+        toolName: 'rawengine.agent.adjustments.dry_run',
+      });
+    }
+  }, [canDryRun, pushActivityEntry]);
+
+  const apply = useCallback(async () => {
+    if (!canApply || draft === null) return;
+    setError(null);
+    setStatus('applying');
+    try {
+      const approvedDraft = approveAgentSelectedImageLiveSession(draft);
+      setDraft(approvedDraft);
+      pushActivityEntry({
+        body: approvedDraft.approvalId ?? 'approved',
+        graphRevision: approvedDraft.snapshot.graphRevision,
+        kind: 'approval',
+        previewBeforeHash: approvedDraft.snapshot.previewRenderHash,
+        recipeHash: approvedDraft.snapshot.recipeHash,
+        requestId: approvedDraft.requestId,
+        status: 'completed',
+        toolName: 'rawengine.agent.session.approval',
+      });
+      const result = await applyAgentSelectedImageLiveSession(approvedDraft);
+      persistAuditRecord(result.audit);
+      if (result.status === 'blocked') {
+        const message = `Selected-image live session blocked: ${result.staleReason}.`;
+        setError(message);
+        setStatus('blocked');
+        pushActivityEntry({
+          body: message,
+          graphRevision: result.applyGuard.currentGraphRevision,
+          kind: 'error',
+          recipeHash: result.applyGuard.currentRecipeHash,
+          requestId: approvedDraft.requestId,
+          status: 'blocked',
+          toolName: 'rawengine.agent.adjustments.apply',
+        });
+        return;
+      }
+      setStatus('applied');
+      pushActivityEntry({
+        body: result.apply.appliedGraphRevision,
+        graphRevision: result.apply.appliedGraphRevision,
+        kind: 'tool_call',
+        previewAfterHash: result.previewAfterHash,
+        previewBeforeHash: result.previewBeforeHash,
+        recipeHash: result.audit.receipt.finalRecipeHash ?? result.audit.receipt.initialRecipeHash,
+        requestId: result.apply.requestId,
+        status: 'completed',
+        toolName: result.apply.toolName,
+      });
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : 'Selected-image apply failed.';
+      setError(message);
+      setStatus('blocked');
+      pushActivityEntry({
+        body: message,
+        kind: 'error',
+        requestId: draft.requestId,
+        status: 'blocked',
+        toolName: 'rawengine.agent.adjustments.apply',
+      });
+    }
+  }, [canApply, draft, persistAuditRecord, pushActivityEntry]);
+
+  const exportAudit = useCallback(async () => {
+    if (!canExportAudit || auditRecord === null) return;
+    setError(null);
+    setStatus('exporting');
+    const requestId = `${auditRecord.receipt.requestId}-workspace-export-proof`;
+    try {
+      const snapshot = buildAgentImageContextSnapshot();
+      if (snapshot.activeImagePath !== auditRecord.receipt.selectedImagePath) {
+        throw new Error('Selected-image audit export rejected a different selected image.');
+      }
+      if (snapshot.graphRevision !== auditRecord.receipt.finalGraphRevision) {
+        throw new Error('Selected-image audit export requires the applied graph revision to be current.');
+      }
+      const exportPresetSettings = buildAgentExportPresetSettings({
+        presets: useSettingsStore.getState().appSettings?.exportPresets ?? [],
+      });
+      const exportProof = await dispatchAgentExportReviewTool({
+        request: {
+          approval: {
+            approvalId: `approval_workspace_export_${auditRecord.receipt.requestId}`,
+            approvedGraphRevision: snapshot.graphRevision,
+            approvedRecipeHash: snapshot.initialPreview.recipeHash,
+            approvedSelectedImagePath: snapshot.activeImagePath,
+            approvedSessionId: auditRecord.receipt.sessionId,
+            status: 'pending',
+          },
+          dryRun: true,
+          expectedRecipeHash: snapshot.initialPreview.recipeHash,
+          operationId: `${auditRecord.receipt.operationId}-workspace-export-proof`,
+          requestId,
+          sessionId: auditRecord.receipt.sessionId,
+          ...exportPresetSettings,
+        },
+        requestId,
+      });
+      setStatus('exported');
+      pushActivityEntry({
+        body: exportProof.exportHash,
+        graphRevision: exportProof.receipt.graphRevision,
+        kind: 'export',
+        previewAfterHash: exportProof.receipt.previewRenderHash,
+        recipeHash: exportProof.receipt.recipeHash,
+        requestId,
+        status: 'completed',
+        toolName: AGENT_EXPORT_PROOF_TOOL_NAME,
+      });
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : 'Selected-image audit export failed.';
+      setError(message);
+      setStatus('blocked');
+      pushActivityEntry({
+        body: message,
+        kind: 'error',
+        requestId,
+        status: 'blocked',
+        toolName: AGENT_EXPORT_PROOF_TOOL_NAME,
+      });
+    }
+  }, [auditRecord, canExportAudit, pushActivityEntry]);
+
+  const rollback = useCallback(async () => {
+    if (!canRollback || auditRecord === null || rollbackCheckpoint === null) return;
+    setError(null);
+    setStatus('rolling_back');
+    try {
+      const rollbackAudit = await rollbackAgentSelectedImageLiveSession({
+        audit: auditRecord,
+        checkpoint: rollbackCheckpoint,
+      });
+      persistAuditRecord(rollbackAudit);
+      setStatus('rolled_back');
+      pushActivityEntry({
+        body: rollbackAudit.receipt.rollbackReceiptGraphRevision ?? rollbackAudit.receipt.rollbackGraphRevision,
+        graphRevision:
+          rollbackAudit.receipt.rollbackReceiptGraphRevision ?? rollbackAudit.receipt.rollbackGraphRevision,
+        kind: 'rollback',
+        recipeHash: rollbackAudit.receipt.initialRecipeHash,
+        requestId: `${rollbackAudit.receipt.requestId}-rollback`,
+        status: 'rolled_back',
+        toolName: AGENT_HISTORY_ROLLBACK_TOOL_NAME,
+      });
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : 'Selected-image rollback failed.';
+      setError(message);
+      setStatus('blocked');
+      pushActivityEntry({
+        body: message,
+        kind: 'error',
+        requestId: auditRecord.receipt.requestId,
+        status: 'blocked',
+        toolName: AGENT_HISTORY_ROLLBACK_TOOL_NAME,
+      });
+    }
+  }, [auditRecord, canRollback, persistAuditRecord, pushActivityEntry, rollbackCheckpoint]);
+
+  const latestActivity = activityEntries.at(-1);
+
+  return {
+    actions: {
+      apply,
+      dryRun,
+      exportAudit,
+      rollback,
+    },
+    activityEntries,
+    auditRecord,
+    canApply,
+    canDryRun,
+    canExportAudit,
+    canRollback,
+    disabledReason,
+    error,
+    latestRequestId: latestActivity?.requestId ?? null,
+    latestToolName: latestActivity?.toolName ?? null,
+    status,
+  };
+};

@@ -11,6 +11,7 @@ import {
 import type { SelectedImage } from '../../../ui/AppProperties';
 import { agentReviewWorkspaceTokens } from '../../../ui/inspectorTokens';
 import AgentChatShell from './AgentChatShell';
+import { useAgentSelectedImageWorkspaceController } from './useAgentSelectedImageWorkspaceController';
 
 type AgentReviewWorkspaceStateId =
   | 'applied'
@@ -24,23 +25,33 @@ type AgentReviewWorkspaceStateId =
 export type AgentReviewWorkspaceState = Record<AgentReviewWorkspaceStateId, boolean>;
 
 export const resolveAgentReviewWorkspaceState = ({
+  canApply,
+  canDryRun,
+  canRollback,
   hasAppliedEdit,
+  hasAuditRecord,
   hasPreviewReceipt,
+  liveActionBlocked,
   selectedImage,
 }: {
+  canApply?: boolean;
+  canDryRun?: boolean;
+  canRollback?: boolean;
   hasAppliedEdit: boolean;
+  hasAuditRecord?: boolean;
   hasPreviewReceipt: boolean;
+  liveActionBlocked?: boolean;
   selectedImage: Pick<SelectedImage, 'isReady' | 'path'> | null;
 }): AgentReviewWorkspaceState => {
   const hasSelection = selectedImage !== null;
   const selectionReady = hasSelection && selectedImage.isReady;
 
   return {
-    applied: hasAppliedEdit,
-    'approval-required': selectionReady && hasPreviewReceipt,
-    'audit-persisted': hasPreviewReceipt,
-    blocked: !selectionReady,
-    'dry-run-ready': selectionReady && hasPreviewReceipt,
+    applied: canRollback ?? hasAppliedEdit,
+    'approval-required': canApply ?? (selectionReady && hasPreviewReceipt),
+    'audit-persisted': hasAuditRecord ?? hasPreviewReceipt,
+    blocked: !selectionReady || liveActionBlocked === true,
+    'dry-run-ready': canDryRun ?? (selectionReady && hasPreviewReceipt),
     'no-selection': !hasSelection,
     'preview-ready': selectionReady && hasPreviewReceipt,
   };
@@ -156,9 +167,15 @@ export function AgentPanel() {
     [initialPromptContext, selectedImage?.path],
   );
   const readiness = useMemo(() => buildAgentAppServerToolReadinessSummary(), []);
+  const liveWorkspaceController = useAgentSelectedImageWorkspaceController({ selectedImage });
   const reviewState = resolveAgentReviewWorkspaceState({
+    canApply: liveWorkspaceController.canApply,
+    canDryRun: liveWorkspaceController.canDryRun,
+    canRollback: liveWorkspaceController.canRollback,
     hasAppliedEdit: lastBasicToneCommand !== null || historyIndex > 0,
+    hasAuditRecord: liveWorkspaceController.auditRecord !== null,
     hasPreviewReceipt: initialPromptContext !== null,
+    liveActionBlocked: liveWorkspaceController.status === 'blocked',
     selectedImage,
   });
   const targetLabel = selectedImage
@@ -303,6 +320,10 @@ export function AgentPanel() {
         <section
           className={agentReviewWorkspaceTokens.card}
           data-approval-required={String(reviewState['approval-required'])}
+          data-disabled-reason={liveWorkspaceController.disabledReason}
+          data-live-action-request-id={liveWorkspaceController.latestRequestId ?? ''}
+          data-live-action-status={liveWorkspaceController.status}
+          data-live-action-tool-name={liveWorkspaceController.latestToolName ?? ''}
           data-testid="agent-dry-run-apply-review-controls"
         >
           <div className="grid grid-cols-2 gap-1">
@@ -310,6 +331,9 @@ export function AgentPanel() {
               className={`${agentReviewWorkspaceTokens.actionButton} border-sky-500/30 bg-sky-500/10 text-sky-100`}
               data-testid="agent-review-control-dry-run"
               disabled={!reviewState['dry-run-ready']}
+              onClick={() => {
+                void liveWorkspaceController.actions.dryRun();
+              }}
               type="button"
             >
               <Eye size={13} />
@@ -319,6 +343,9 @@ export function AgentPanel() {
               className={`${agentReviewWorkspaceTokens.actionButton} border-amber-500/30 bg-amber-500/10 text-amber-100`}
               data-testid="agent-review-control-apply"
               disabled={!reviewState['approval-required']}
+              onClick={() => {
+                void liveWorkspaceController.actions.apply();
+              }}
               type="button"
             >
               <CheckCircle2 size={13} />
@@ -327,7 +354,10 @@ export function AgentPanel() {
             <button
               className={`${agentReviewWorkspaceTokens.actionButton} border-teal-500/30 bg-teal-500/10 text-teal-100`}
               data-testid="agent-review-control-export"
-              disabled={!reviewState['audit-persisted']}
+              disabled={!liveWorkspaceController.canExportAudit}
+              onClick={() => {
+                void liveWorkspaceController.actions.exportAudit();
+              }}
               type="button"
             >
               <FileCheck2 size={13} />
@@ -337,6 +367,9 @@ export function AgentPanel() {
               className={`${agentReviewWorkspaceTokens.actionButton} border-red-500/30 bg-red-500/10 text-red-100`}
               data-testid="agent-review-control-rollback"
               disabled={!reviewState.applied}
+              onClick={() => {
+                void liveWorkspaceController.actions.rollback();
+              }}
               type="button"
             >
               <RotateCcw size={13} />
@@ -351,22 +384,44 @@ export function AgentPanel() {
             <span className="font-mono text-[10px] text-text-tertiary">{transcript.toolCalls.length}</span>
           </div>
           <div className="space-y-1">
-            {transcript.toolCalls.slice(0, 3).map((toolCall) => (
+            {liveWorkspaceController.activityEntries.slice(-3).map((entry) => (
               <div
                 className="grid grid-cols-[0.5rem_minmax(0,1fr)_auto] items-center gap-1 text-[11px] leading-4"
-                data-status={toolCall.status}
-                data-testid={`agent-review-live-activity-${toolCall.id}`}
-                key={toolCall.id}
+                data-graph-revision={entry.graphRevision ?? ''}
+                data-recipe-hash={entry.recipeHash ?? ''}
+                data-request-id={entry.requestId ?? ''}
+                data-status={entry.status}
+                data-testid={`agent-review-live-activity-${entry.id}`}
+                data-tool-name={entry.toolName ?? ''}
+                key={entry.id}
               >
                 <span
                   className={`h-1.5 w-1.5 rounded-full ${
-                    toolCall.status === 'succeeded' ? 'bg-emerald-300' : 'bg-amber-300'
+                    entry.status === 'completed' || entry.status === 'rolled_back' ? 'bg-emerald-300' : 'bg-amber-300'
                   }`}
                 />
-                <span className="truncate text-text-primary">{toolCall.title}</span>
-                <span className="font-mono text-[10px] text-text-tertiary">{toolCall.mode}</span>
+                <span className="truncate text-text-primary">{entry.body}</span>
+                <span className="font-mono text-[10px] text-text-tertiary">{entry.kind}</span>
               </div>
             ))}
+            {liveWorkspaceController.activityEntries.length === 0
+              ? transcript.toolCalls.slice(0, 3).map((toolCall) => (
+                  <div
+                    className="grid grid-cols-[0.5rem_minmax(0,1fr)_auto] items-center gap-1 text-[11px] leading-4"
+                    data-status={toolCall.status}
+                    data-testid={`agent-review-live-activity-${toolCall.id}`}
+                    key={toolCall.id}
+                  >
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        toolCall.status === 'succeeded' ? 'bg-emerald-300' : 'bg-amber-300'
+                      }`}
+                    />
+                    <span className="truncate text-text-primary">{toolCall.title}</span>
+                    <span className="font-mono text-[10px] text-text-tertiary">{toolCall.mode}</span>
+                  </div>
+                ))
+              : null}
           </div>
         </section>
 
