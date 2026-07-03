@@ -33,6 +33,7 @@ import { getSelectiveColorRange } from '../../utils/selectiveColorRanges';
 import { applySkinToneUniformity, type SkinToneUniformityInput } from '../../utils/skinToneUniformity';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import type { AppSettings } from '../ui/AppProperties';
+import { editorChromeStatusChipClassName } from '../ui/editorChromeTokens';
 import { ColorAdvancedControls } from './color/ColorAdvancedControls';
 import { ColorGradingControls } from './color/ColorGradingControls';
 import { ColorMixerControls } from './color/ColorMixerControls';
@@ -66,6 +67,14 @@ const COLOR_WORKSPACE_TAB_BASE_CLASS =
 const COLOR_WORKSPACE_TAB_ACTIVE_CLASS = 'bg-editor-primary-active text-editor-primary-active-text shadow-sm';
 const COLOR_WORKSPACE_TAB_INACTIVE_CLASS =
   'bg-transparent text-text-secondary hover:bg-editor-selected-quiet hover:text-text-primary';
+const COLOR_WORKSPACE_CHIP_CLASS = cx(
+  editorChromeStatusChipClassName('warning'),
+  'max-w-[8.25rem] shrink-0 truncate whitespace-nowrap normal-case',
+);
+const COLOR_WORKSPACE_NEUTRAL_CHIP_CLASS = cx(
+  editorChromeStatusChipClassName('neutral'),
+  'max-w-[8.25rem] shrink-0 truncate whitespace-nowrap normal-case',
+);
 
 interface ColorWorkspaceTab {
   id: ColorWorkspaceTabId;
@@ -227,6 +236,8 @@ export default function ColorPanel({
     ...levelsClippingWarnings,
     adjustments.skinToneUniformity.enabled ? t('adjustments.color.skinToneUniformity.warning') : null,
   ].filter((warning): warning is string => warning !== null);
+  const colorWorkspaceHeaderChips =
+    colorWorkspaceWarningChips.length > 0 ? colorWorkspaceWarningChips : [t('adjustments.color.gamutWarning.off')];
   const skinTonePreview = skinTonePreviewHsl(adjustments.skinToneUniformity);
   const skinToneInspectorOutput = applySkinToneUniformity(skinToneInspectorSample, adjustments.skinToneUniformity);
   const skinToneInspectorBeforeDistance = skinToneTargetDistance(
@@ -575,39 +586,69 @@ export default function ColorPanel({
   return (
     <div className="space-y-1.5">
       <div
-        aria-label={t('adjustments.color.workspaceTabs.label')}
-        className="sticky top-0 z-20 -mx-3 flex gap-1 overflow-x-auto border-b border-editor-border bg-editor-panel px-3 py-1 shadow-sm"
-        data-testid="color-workspace-tabs"
+        className="sticky top-0 z-20 -mx-3 border-b border-editor-border bg-editor-panel px-3 py-1 shadow-sm"
+        data-gamut-warning-count={currentGamutWarningOverlay?.warning_pixel_count ?? 0}
+        data-preview-warning-state={renderedPreviewWarningStatus.state}
+        data-scope-freshness-state={previewScopeFreshnessStatus.state}
         data-sticky="true"
-        onKeyDown={handleWorkspaceTabKeyDown}
-        role="tablist"
+        data-testid="color-workspace-tab-header"
+        data-warning-count={colorWorkspaceWarningChips.length}
       >
-        {workspaceTabs.map((tab) => {
-          const isActive = activeWorkspaceTab === tab.id;
+        <div
+          aria-label={t('adjustments.color.workspaceTabs.label')}
+          className="flex min-w-0 gap-1 overflow-x-auto"
+          data-testid="color-workspace-tabs"
+          onKeyDown={handleWorkspaceTabKeyDown}
+          role="tablist"
+        >
+          {workspaceTabs.map((tab) => {
+            const isActive = activeWorkspaceTab === tab.id;
 
-          return (
-            <button
-              aria-controls={`${tablistId}-${tab.id}-panel`}
-              aria-selected={isActive}
-              className={cx(
-                COLOR_WORKSPACE_TAB_BASE_CLASS,
-                isActive ? COLOR_WORKSPACE_TAB_ACTIVE_CLASS : COLOR_WORKSPACE_TAB_INACTIVE_CLASS,
-              )}
-              data-active={String(isActive)}
-              data-testid={`color-workspace-tab-${tab.id}`}
-              id={`${tablistId}-${tab.id}-tab`}
-              key={tab.id}
-              onClick={() => {
-                selectWorkspaceTab(tab.id);
-              }}
-              role="tab"
-              tabIndex={isActive ? 0 : -1}
-              type="button"
+            return (
+              <button
+                aria-controls={`${tablistId}-${tab.id}-panel`}
+                aria-selected={isActive}
+                className={cx(
+                  COLOR_WORKSPACE_TAB_BASE_CLASS,
+                  isActive ? COLOR_WORKSPACE_TAB_ACTIVE_CLASS : COLOR_WORKSPACE_TAB_INACTIVE_CLASS,
+                )}
+                data-active={String(isActive)}
+                data-testid={`color-workspace-tab-${tab.id}`}
+                id={`${tablistId}-${tab.id}-tab`}
+                key={tab.id}
+                onClick={() => {
+                  selectWorkspaceTab(tab.id);
+                }}
+                role="tab"
+                tabIndex={isActive ? 0 : -1}
+                type="button"
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+        <div
+          aria-label={t('adjustments.color.proofingDiagnostics.summary', {
+            coverage: gamutWarningCoverage,
+            warningCount: colorWorkspaceWarningChips.length,
+          })}
+          className="mt-1 flex min-w-0 gap-1 overflow-hidden"
+          data-testid="color-workspace-warning-chips"
+        >
+          {colorWorkspaceHeaderChips.map((warning) => (
+            <span
+              className={
+                colorWorkspaceWarningChips.length > 0 ? COLOR_WORKSPACE_CHIP_CLASS : COLOR_WORKSPACE_NEUTRAL_CHIP_CLASS
+              }
+              data-testid="color-workspace-warning-chip"
+              key={warning}
+              title={warning}
             >
-              {tab.label}
-            </button>
-          );
-        })}
+              {warning}
+            </span>
+          ))}
+        </div>
       </div>
 
       {workspaceTabs.map((tab) => (
