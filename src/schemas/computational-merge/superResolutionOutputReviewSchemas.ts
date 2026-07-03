@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
 import {
+  type SuperResolutionTiledApplyReceipt,
+  superResolutionTiledApplyReceiptSchema,
+} from './derivedOutputReceiptSchemas';
+import {
   superResolutionAlignmentModeSchema,
   superResolutionDetailPolicySchema,
   superResolutionModeSchema,
@@ -142,6 +146,7 @@ export const superResolutionOutputReviewWorkflowSchema = z
         weakSupportRatio: z.number().min(0).max(1),
       })
       .strict(),
+    tiledApplyReceipt: superResolutionTiledApplyReceiptSchema.optional(),
     warningCodes: z.array(superResolutionOutputReviewWarningSchema),
   })
   .strict()
@@ -156,3 +161,4 @@ export const superResolutionOutputReviewWorkflowSchema = z
   });
 
 export type SuperResolutionOutputReviewWorkflow = z.infer<typeof superResolutionOutputReviewWorkflowSchema>;
+export type { SuperResolutionTiledApplyReceipt };

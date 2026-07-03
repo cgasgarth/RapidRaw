@@ -11,6 +11,7 @@ import {
   buildSuperResolutionUiDryRunCommandV1,
 } from '../../../../packages/rawengine-schema/src/super-resolution/superResolutionUiControls.ts';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../../../src/utils/computational-merge/computationalMergeAppServerRoutePairs.ts';
+import { buildSuperResolutionDerivedOutputReceipt } from '../../../../src/utils/derivedOutputReceipt.ts';
 import { buildSuperResolutionOutputReviewFromArtifact } from '../../../../src/utils/superResolutionOutputReview.ts';
 
 const superResolutionRoutePair = getComputationalMergeAppServerRoutePairSummary('super_resolution');
@@ -86,9 +87,40 @@ if (applied.kind !== 'apply') throw new Error('Expected SR UI runtime bridge app
 if (applied.apply.provenance.acceptedDryRunPlanId !== dryRun.dryRun.dryRunResult.mergePlan.planId) {
   throw new Error('SR UI runtime bridge did not preserve accepted dry-run plan ID.');
 }
-const outputReview = buildSuperResolutionOutputReviewFromArtifact(applied.apply.sidecarArtifact);
+const tiledApplyReceipt = buildTiledApplyReceipt({
+  outputHeight: HIGH_HEIGHT,
+  outputPixels: applied.apply.outputPixels.length,
+  outputWidth: HIGH_WIDTH,
+  runtimeArtifactId: applied.apply.mutationResult.derivedAssetId,
+  scale: SCALE,
+});
+const outputReview = buildSuperResolutionOutputReviewFromArtifact({
+  ...applied.apply.sidecarArtifact,
+  tiledApplyReceipt,
+});
 if (outputReview.editableGate !== 'blocked_review_required') {
   throw new Error(`Expected SR output review to block editable handoff, got ${outputReview.editableGate}.`);
+}
+if (outputReview.tiledApplyReceipt?.runtimeArtifactId !== applied.apply.mutationResult.derivedAssetId) {
+  throw new Error('SR output review did not preserve tiled apply runtime artifact id.');
+}
+if (outputReview.tiledApplyReceipt.tileGrid.tileCount !== 4) {
+  throw new Error(`Expected 4 tiled apply tiles, got ${outputReview.tiledApplyReceipt.tileGrid.tileCount}.`);
+}
+if (outputReview.tiledApplyReceipt.observedPerformance.outputMegapixels <= 0) {
+  throw new Error('SR tiled apply receipt must record positive output megapixels.');
+}
+const derivedReceipt = buildSuperResolutionDerivedOutputReceipt({
+  acceptedDryRunPlanHash: dryRun.acceptedDryRunPlanHash,
+  acceptedDryRunPlanId: dryRun.dryRun.dryRunResult.mergePlan.planId,
+  review: outputReview,
+  settings: controls,
+});
+if (derivedReceipt.superResolution?.tiledApplyReceipt?.runtimeStatus !== 'apply_rendered') {
+  throw new Error('SR derived output receipt did not persist tiled apply metadata.');
+}
+if (derivedReceipt.superResolution.tiledApplyReceipt.tileGrid.tileCount !== tiledApplyReceipt.tileGrid.tileCount) {
+  throw new Error('SR derived output receipt changed tiled apply tile count.');
 }
 if (outputReview.humanReviewStatus !== 'pending') {
   throw new Error(`Expected pending human review, got ${outputReview.humanReviewStatus}.`);
@@ -288,6 +320,58 @@ function buildRequest(command) {
     outputArtifactId: 'artifact_sr_ui_runtime_output',
     previewArtifactId: 'artifact_sr_ui_runtime_preview',
   };
+}
+
+function buildTiledApplyReceipt({
+  outputHeight,
+  outputPixels,
+  outputWidth,
+  runtimeArtifactId,
+  scale,
+}: {
+  outputHeight: number;
+  outputPixels: number;
+  outputWidth: number;
+  runtimeArtifactId: string;
+  scale: number;
+}) {
+  const outputMegapixels = Number((outputPixels / 1_000_000).toFixed(6));
+  const tileWidth = Math.ceil(outputWidth / scale);
+  const tileHeight = Math.ceil(outputHeight / scale);
+  const tileCount = scale * scale;
+  const estimatedPeakMemoryBytes = outputPixels * Float32Array.BYTES_PER_ELEMENT;
+
+  return {
+    applyMode: 'tiled_conservative',
+    conservativeLimits: {
+      enhancementMode: 'bounded_pixel_shift_interleave',
+      fullResolutionEnhancement: false,
+      maxOutputMegapixels: Number(Math.max(outputMegapixels, 0.1).toFixed(6)),
+      maxPeakMemoryBytes: estimatedPeakMemoryBytes * 2,
+      previewExportParityClaimed: false,
+    },
+    observedPerformance: {
+      estimatedPeakMemoryBytes,
+      observedApplyMs: Number(Math.max(1, outputPixels / 10_000).toFixed(3)),
+      observedMegapixelsPerSecond: Number(Math.max(0.001, outputMegapixels * 10).toFixed(6)),
+      outputMegapixels,
+    },
+    outputDimensions: {
+      height: outputHeight,
+      width: outputWidth,
+    },
+    receiptVersion: 1,
+    runtimeArtifactId,
+    runtimeStatus: 'apply_rendered',
+    tileGrid: {
+      overlapPx: 1,
+      tileCount,
+      tileHeight,
+      tileWidth,
+      tilesX: scale,
+      tilesY: scale,
+    },
+  } as const;
 }
 
 function createTruth() {

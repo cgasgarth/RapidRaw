@@ -433,6 +433,7 @@ export const buildSuperResolutionDerivedOutputReceipt = ({
   settings: SuperResolutionUiSettings;
 }): DerivedOutputReceipt => {
   const isEditableHandoffAvailable = review.editableGate === 'ready' && hasAcceptedSuperResolutionCropReview(review);
+  const superResolutionMetadata = buildSuperResolutionReceiptMetadata(review);
 
   return buildDerivedOutputReceipt({
     acceptedDryRunPlanHash,
@@ -445,27 +446,14 @@ export const buildSuperResolutionDerivedOutputReceipt = ({
     },
     outputArtifactId: review.outputArtifactId,
     outputContentHash: review.outputArtifactHash,
+    ...(superResolutionMetadata === undefined ? {} : { superResolution: superResolutionMetadata }),
     ...(isEditableHandoffAvailable
       ? {
           outputPath: review.artifactPath,
           provenanceSidecar: {
             acceptedApplyId: review.outputArtifactId,
             acceptedDryRunId: review.supportMap.artifactId,
-            ...(review.registrationMetrics === null
-              ? {}
-              : {
-                  superResolution: {
-                    registrationMetrics: review.registrationMetrics,
-                    supportMap: {
-                      artifactId: review.supportMap.artifactId,
-                      coverageRatio: review.supportMap.coverageRatio,
-                      effectiveScale: review.supportMap.effectiveScale,
-                      requestedScale: review.supportMap.requestedScale,
-                      reviewStatus: review.supportMap.reviewStatus,
-                      weakSupportRatio: review.supportMap.weakSupportRatio,
-                    },
-                  },
-                }),
+            ...(superResolutionMetadata === undefined ? {} : { superResolution: superResolutionMetadata }),
             warnings: review.warningCodes,
           },
         }
@@ -479,6 +467,25 @@ export const buildSuperResolutionDerivedOutputReceipt = ({
     staleState: review.staleState,
     storagePolicy: 'sidecar_artifact',
   });
+};
+
+const buildSuperResolutionReceiptMetadata = (
+  review: SuperResolutionOutputReviewWorkflow,
+): DerivedOutputReceipt['superResolution'] => {
+  if (review.registrationMetrics === null) return undefined;
+
+  return {
+    registrationMetrics: review.registrationMetrics,
+    supportMap: {
+      artifactId: review.supportMap.artifactId,
+      coverageRatio: review.supportMap.coverageRatio,
+      effectiveScale: review.supportMap.effectiveScale,
+      requestedScale: review.supportMap.requestedScale,
+      reviewStatus: review.supportMap.reviewStatus,
+      weakSupportRatio: review.supportMap.weakSupportRatio,
+    },
+    ...(review.tiledApplyReceipt === undefined ? {} : { tiledApplyReceipt: review.tiledApplyReceipt }),
+  };
 };
 
 export const hashStableJson = (value: unknown): string => `fnv1a32:${fnv1a32(stableJson(value))}`;
