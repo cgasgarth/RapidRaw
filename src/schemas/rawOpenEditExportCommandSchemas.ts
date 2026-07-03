@@ -16,11 +16,19 @@ const hashedPathSchema = z
   })
   .strict();
 
+const dimensionsSchema = z
+  .object({
+    height: z.number().int().positive(),
+    width: z.number().int().positive(),
+  })
+  .strict();
+
 const artifactKindSchema = z.enum([
   'source_raw_private',
   'preview_before_private',
   'preview_after_private',
   'export_after_private',
+  'soft_proof_after_private',
   'sidecar_after_private',
   'workflow_report_private',
 ]);
@@ -301,6 +309,23 @@ export const rawOpenEditExportProofReportSchema = z
     colorManagement: colorManagementProofSchema,
     editCommandId: z.string().trim().min(1),
     editGraphRevision: z.string().regex(/^graph-rev\.[a-z0-9.-]+\.v[0-9]+$/u),
+    finalFile: z
+      .object({
+        bitDepth: z.literal(16),
+        blackPointCompensation: z.string().trim().min(1),
+        cmm: z.string().trim().min(1),
+        embeddedIccProfileHash: sha256Schema,
+        expectedOutputProfileHash: sha256Schema,
+        finalFileFormat: z.literal('tiff'),
+        outputProfile: outputProfileSchema,
+        pixelMaxAbsDelta: z.number().min(0),
+        pixelMeanAbsDelta: z.number().min(0),
+        reopenedDimensions: dimensionsSchema,
+        transformApplied: z.boolean(),
+        transformPolicyFingerprint: z.string().trim().min(1),
+        writerId: z.string().trim().min(1),
+      })
+      .strict(),
     fixtureId: z.string().regex(/^validation\.raw-open-edit-export\.[a-z0-9.-]+\.v[0-9]+$/u),
     generatedAt: z.iso.datetime(),
     metrics: z.array(
@@ -317,6 +342,13 @@ export const rawOpenEditExportProofReportSchema = z
             'finalFileSoftProofRgb8MaxAbsDelta',
             'finalFileSoftProofRgb8MeanAbsDelta',
             'finalFileTransformApplied',
+            'gamutMapperChangedPixelRatio',
+            'gamutMapperInputPixelRatio',
+            'gamutPostMapOutOfGamutPixelRatio',
+            'gamutPreMapMaxLinearRgb',
+            'gamutPreMapMinLinearRgb',
+            'gamutPreMapOutOfGamutChannelRatio',
+            'gamutPreMapOutOfGamutPixelRatio',
             'softProofExportRgb8MeanAbsDelta',
             'sidecarReloadRevisionMatch',
             'sourceHashUnchanged',
@@ -324,12 +356,23 @@ export const rawOpenEditExportProofReportSchema = z
           passed: z.boolean(),
           source: z.literal('private_raw_report'),
           threshold: z.number().min(0),
-          value: z.number().min(0),
+          value: z.number(),
         })
         .strict(),
     ),
     previewAfter: hashedPathSchema,
     previewBefore: hashedPathSchema,
+    renderPaths: z
+      .object({
+        exportAfterFormat: z.literal('tiff'),
+        exportAfterWriterId: z.string().trim().min(1),
+        previewAfterFormat: z.literal('png'),
+        previewAfterWriterId: z.string().trim().min(1),
+        previewBeforeWriterId: z.string().trim().min(1),
+        softProofAfterFormat: z.literal('png'),
+        softProofAfterWriterId: z.string().trim().min(1),
+      })
+      .strict(),
     reportId: z.string().regex(/^raw-open-edit-export-run\.[a-z0-9.-]+\.v[0-9]+$/u),
     sidecarAfter: hashedPathSchema,
     sourceRaw: hashedPathSchema,

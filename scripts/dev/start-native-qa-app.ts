@@ -10,6 +10,7 @@ const qaBundleIdentifier = 'dev.rawengine.RapidRAW.qa-current';
 const args = process.argv.slice(2);
 const shouldBuild = !args.includes('--no-build');
 const shouldLaunch = !args.includes('--no-launch');
+const buildFeatures = args.includes('--validation-harness') ? 'required-ci,validation-harness' : 'required-ci';
 
 async function run(command: string, commandArgs: string[], label: string, allowedExitCodes = [0]): Promise<void> {
   const proc = Bun.spawn([command, ...commandArgs], {
@@ -34,7 +35,7 @@ async function run(command: string, commandArgs: string[], label: string, allowe
 if (shouldBuild) {
   await run(
     'bun',
-    ['tauri', 'build', '--debug', '--ci', '--bundles', 'app', '--features', 'required-ci'],
+    ['tauri', 'build', '--debug', '--ci', '--bundles', 'app', '--features', buildFeatures],
     'native qa app build',
   );
 }
