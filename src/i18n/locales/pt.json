@@ -1876,6 +1876,7 @@
       "title": ""
     },
     "status": {
+      "blocked": "",
       "cancelExport": "Cancelar Exportação",
       "cancelled": "Exportação cancelada",
       "chooseExternalEditor": "Escolher editor...",
@@ -1930,8 +1931,18 @@
       "offlineSmartPreviewBlocked": "",
       "openInEditor": "Abrir no Editor",
       "parityUnknown": "",
+      "ready": "",
       "resolvingOriginalFile": "",
       "retryExport": "",
+      "reviewParityPending": "",
+      "reviewReceipt": "",
+      "reviewReceiptUnavailable": "",
+      "reviewSelected_one": "",
+      "reviewSelected_many": "",
+      "reviewSelected_other": "",
+      "reviewSmartPreviewBlocked": "",
+      "reviewSmartPreviewReady": "",
+      "reviewSmartPreviewResolving": "",
       "showInFinder": "",
       "success": "Exportação concluída com sucesso!",
       "transformApplied": ""

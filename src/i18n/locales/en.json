@@ -1919,6 +1919,7 @@
       "title": "Soft-proof export warnings"
     },
     "status": {
+      "blocked": "Blocked",
       "cancelExport": "Cancel Export",
       "cancelled": "Export cancelled",
       "chooseExternalEditor": "Choose Editor...",
@@ -1972,8 +1973,18 @@
       "offlineSmartPreviewBlocked": "Reconnect the original file before full-resolution export. You can keep editing the smart preview.",
       "openInEditor": "Open in Editor",
       "parityUnknown": "unknown",
+      "ready": "Ready",
       "resolvingOriginalFile": "Checking the original file before full-resolution export…",
       "retryExport": "Retry Export",
+      "reviewParityPending": "Color-stack parity will appear after the next receipt.",
+      "reviewReceipt": "Latest receipt: {{path}} · {{hash}}",
+      "reviewReceiptUnavailable": "Latest receipt: none yet",
+      "reviewSelected": "{{count}} selected",
+      "reviewSelected_one": "{{count}} selected",
+      "reviewSelected_other": "{{count}} selected",
+      "reviewSmartPreviewBlocked": "Original required",
+      "reviewSmartPreviewReady": "Original available",
+      "reviewSmartPreviewResolving": "Checking original",
       "showInFinder": "Show in Finder",
       "success": "Export successful!",
       "transformApplied": "Transform applied"

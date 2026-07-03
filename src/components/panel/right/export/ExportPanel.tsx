@@ -1344,6 +1344,35 @@ export default function ExportPanel({
     t('export.renderingIntents.relativeColorimetric');
   const selectedResizeModeLabel =
     resizeModeOptions.find((option) => option.value === resizeMode)?.label ?? t('export.resize.modes.longEdge');
+  const exportFooterFormatProfileText =
+    fileFormat === FileFormats.Cube
+      ? `${selectedFileFormat?.name ?? fileFormat.toUpperCase()} · ${t('export.readiness.lutProfile')}`
+      : `${selectedFileFormat?.name ?? fileFormat.toUpperCase()} · ${selectedColorProfileLabel}`;
+  const exportFooterResizeText = enableResize
+    ? t('export.readiness.resizeEnabled', { mode: selectedResizeModeLabel, value: resizeValue })
+    : t('export.readiness.resizeOff');
+  const exportFooterSmartPreviewText = isLibrarySmartPreviewResolving
+    ? t('export.status.reviewSmartPreviewResolving')
+    : isSmartPreviewExportBlocked
+      ? t('export.status.reviewSmartPreviewBlocked')
+      : t('export.status.reviewSmartPreviewReady');
+  const exportFooterSmartPreviewTone = isLibrarySmartPreviewResolving
+    ? 'warning'
+    : isSmartPreviewExportBlocked
+      ? 'danger'
+      : 'success';
+  const latestReceiptOutputPath = firstReceiptOutput?.outputPath ?? '';
+  const latestReceiptHash =
+    firstReceiptOutput?.transformPolicyFingerprint ??
+    firstReceiptOutput?.sourceIccProfileHash ??
+    colorStackParityReceipt?.activeColorStackHash ??
+    '';
+  const latestReceiptText = latestReceiptOutputPath
+    ? t('export.status.reviewReceipt', {
+        hash: latestReceiptHash || t('export.status.parityUnknown'),
+        path: latestReceiptOutputPath,
+      })
+    : t('export.status.reviewReceiptUnavailable');
   const exportReadinessItems = [
     t('export.readiness.format', {
       count: numImages,
@@ -1456,6 +1485,20 @@ export default function ExportPanel({
         : softProofProfileCompareStatus === 'loading'
           ? t('export.softProofCompare.loading')
           : t('export.softProofCompare.idle');
+  const exportFooterParityText =
+    colorStackParityReceipt && colorStackParitySummary
+      ? colorStackParitySummary
+      : canShowReceipt
+        ? t('export.status.reviewParityPending')
+        : softProofWarningItems.length > 0
+          ? t('export.softProofWarnings.title')
+          : softProofProfileCompareSummary;
+  const exportFooterParityTone =
+    colorStackParityReceipt?.status === 'failed'
+      ? 'danger'
+      : colorStackParityReceipt?.status === 'warning' || softProofWarningItems.length > 0
+        ? 'warning'
+        : 'success';
   const renderSoftProofProfileCompareSide = (sideId: ExportSoftProofProfileCompareSideId) => {
     const sideState = softProofProfileCompareState[sideId];
     const proof = sideState.status === 'ready' ? sideState.proof : null;
@@ -2060,7 +2103,7 @@ export default function ExportPanel({
         )}
       </div>
 
-      <div className="shrink-0 space-y-3 border-t border-surface bg-bg-secondary p-3">
+      <div className="sticky bottom-0 z-10 shrink-0 space-y-3 border-t border-surface bg-bg-secondary p-3">
         {canExport && !firstReceiptOutput ? (
           <div className="space-y-2" data-testid="export-proof-footer-proof-state">
             {isSoftProofProfileCompareUnavailable ? (
@@ -2168,24 +2211,94 @@ export default function ExportPanel({
           </div>
         ) : null}
         <div
-          className="flex min-w-0 items-center gap-2 rounded-md border border-editor-border bg-editor-panel px-2.5 py-2"
+          className="min-w-0 rounded-md border border-editor-border bg-editor-panel px-2.5 py-2"
+          data-export-footer-color-stack-parity={colorStackParityReceipt?.status ?? 'pending'}
+          data-export-footer-format-profile={exportFooterFormatProfileText}
+          data-export-footer-latest-receipt-hash={latestReceiptHash}
+          data-export-footer-latest-receipt-path={latestReceiptOutputPath}
           data-export-footer-workflow-state={exportFooterWorkflowState}
           data-export-footer-progress-current={progressCurrent}
           data-export-footer-progress-total={progress.total}
+          data-export-footer-resize-state={enableResize ? `${resizeMode}:${resizeValue}` : 'off'}
+          data-export-footer-selected-count={numImages}
+          data-export-footer-smart-preview-state={
+            isLibrarySmartPreviewResolving ? 'resolving' : isSmartPreviewExportBlocked ? 'blocked' : 'ready'
+          }
           data-export-footer-can-cancel={String(isExporting)}
           data-export-footer-can-retry={String((status === Status.Error || status === Status.Cancelled) && canExport)}
           data-export-footer-can-open={String(canUseReceiptActions && canOpenReceiptInEditor)}
           data-export-footer-can-import-linked-variant={String(canImportLinkedVariant)}
           data-testid="export-footer-workflow-state"
         >
-          <span className={editorChromeStatusChipClassName(exportFooterStatusTone)}>{exportFooterWorkflowState}</span>
+          <div className="flex min-w-0 items-center gap-2">
+            <span className={editorChromeStatusChipClassName(exportFooterStatusTone)}>{exportFooterWorkflowState}</span>
+            <UiText
+              as="p"
+              className="min-w-0 flex-1 truncate"
+              color={exportFooterWorkflowState === 'failed' ? TextColors.error : TextColors.secondary}
+              variant={TextVariants.small}
+            >
+              {exportFooterStatusText}
+            </UiText>
+          </div>
+          <div className="mt-2 grid min-w-0 grid-cols-2 gap-x-3 gap-y-1.5">
+            <UiText
+              as="p"
+              className="min-w-0 truncate"
+              color={TextColors.secondary}
+              data-testid="export-footer-review-selected"
+              variant={TextVariants.small}
+            >
+              {t('export.status.reviewSelected', { count: numImages })}
+            </UiText>
+            <UiText
+              as="p"
+              className="min-w-0 truncate"
+              color={TextColors.secondary}
+              data-testid="export-footer-review-format-profile"
+              variant={TextVariants.small}
+            >
+              {exportFooterFormatProfileText}
+            </UiText>
+            <UiText
+              as="p"
+              className="min-w-0 truncate"
+              color={TextColors.secondary}
+              data-testid="export-footer-review-resize"
+              variant={TextVariants.small}
+            >
+              {exportFooterResizeText}
+            </UiText>
+            <div className="flex min-w-0 items-center gap-1.5" data-testid="export-footer-review-smart-preview">
+              <span className={editorChromeStatusChipClassName(exportFooterSmartPreviewTone)}>
+                {isSmartPreviewExportBlocked ? t('export.status.blocked') : t('export.status.ready')}
+              </span>
+              <UiText as="p" className="min-w-0 truncate" color={TextColors.secondary} variant={TextVariants.small}>
+                {exportFooterSmartPreviewText}
+              </UiText>
+            </div>
+          </div>
+          <div className="mt-1.5 flex min-w-0 items-center gap-1.5" data-testid="export-footer-review-parity">
+            <span className={editorChromeStatusChipClassName(exportFooterParityTone)}>
+              {t('export.status.colorStackParityTitle')}
+            </span>
+            <UiText
+              as="p"
+              className="min-w-0 flex-1 truncate"
+              color={exportFooterParityTone === 'danger' ? TextColors.error : TextColors.secondary}
+              variant={TextVariants.small}
+            >
+              {exportFooterParityText}
+            </UiText>
+          </div>
           <UiText
             as="p"
-            className="min-w-0 flex-1 truncate"
-            color={exportFooterWorkflowState === 'failed' ? TextColors.error : TextColors.secondary}
+            className="mt-1 min-w-0 truncate"
+            color={TextColors.secondary}
+            data-testid="export-footer-review-receipt"
             variant={TextVariants.small}
           >
-            {exportFooterStatusText}
+            {latestReceiptText}
           </UiText>
         </div>
         {canShowReceipt && firstReceiptOutput && (

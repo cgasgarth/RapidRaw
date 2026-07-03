@@ -1876,6 +1876,7 @@
       "title": ""
     },
     "status": {
+      "blocked": "",
       "cancelExport": "Cancelar exportación",
       "cancelled": "Exportación cancelada",
       "chooseExternalEditor": "Elegir editor...",
@@ -1930,8 +1931,18 @@
       "offlineSmartPreviewBlocked": "",
       "openInEditor": "Abrir en el editor",
       "parityUnknown": "",
+      "ready": "",
       "resolvingOriginalFile": "",
       "retryExport": "",
+      "reviewParityPending": "",
+      "reviewReceipt": "",
+      "reviewReceiptUnavailable": "",
+      "reviewSelected_one": "",
+      "reviewSelected_many": "",
+      "reviewSelected_other": "",
+      "reviewSmartPreviewBlocked": "",
+      "reviewSmartPreviewReady": "",
+      "reviewSmartPreviewResolving": "",
       "showInFinder": "Mostrar en Finder",
       "success": "¡Exportación exitosa!",
       "transformApplied": ""
