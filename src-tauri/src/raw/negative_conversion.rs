@@ -3120,6 +3120,68 @@ mod tests {
     }
 
     #[test]
+    fn negative_lab_patch_suggestions_cover_neutral_highlight_and_shadow_roles() {
+        let sample_rect = NegativeBaseFogSampleRect {
+            x: 0.0,
+            y: 0.0,
+            width: 0.5,
+            height: 1.0,
+        };
+        let neutral = build_negative_lab_neutral_patch_suggestion(
+            NegativeConversionParams {
+                red_weight: 1.07,
+                green_weight: 0.96,
+                blue_weight: 1.18,
+                ..NegativeConversionParams::default()
+            },
+            sample_rect,
+            NegativeBaseFogEstimate {
+                red_weight: 1.14,
+                green_weight: 0.94,
+                blue_weight: 1.16,
+                base_rgb: [0.72, 0.58, 0.44],
+                base_density: [0.14, 0.24, 0.36],
+                confidence: 0.82,
+            },
+        );
+        let input = DynamicImage::ImageRgb32F(
+            Rgb32FImage::from_vec(
+                4,
+                2,
+                vec![
+                    0.004, 0.004, 0.004, 0.006, 0.006, 0.006, 0.72, 0.72, 0.72, 0.99, 0.99, 0.99,
+                    0.004, 0.004, 0.004, 0.006, 0.006, 0.006, 0.72, 0.72, 0.72, 0.99, 0.99, 0.99,
+                ],
+            )
+            .unwrap(),
+        );
+        let highlight = build_negative_lab_highlight_patch_exposure_suggestion(
+            &input,
+            NegativeConversionParams {
+                exposure: 2.0,
+                ..NegativeConversionParams::default()
+            },
+            0.0,
+            sample_rect,
+        );
+        let shadow = build_negative_lab_shadow_patch_black_point_suggestion(
+            &input,
+            NegativeConversionParams::default(),
+            sample_rect,
+        );
+
+        assert_near(neutral.sample_rect.x, sample_rect.x);
+        assert_near(neutral.sample_rect.y, sample_rect.y);
+        assert_near(neutral.sample_rect.width, sample_rect.width);
+        assert_near(neutral.sample_rect.height, sample_rect.height);
+        assert_eq!(highlight.role, "highlight");
+        assert_eq!(shadow.role, "shadow");
+        assert!(neutral.confidence > 0.0);
+        assert!(highlight.suggested_exposure_delta_ev <= 0.0);
+        assert!(shadow.suggested_black_point_delta >= 0.0);
+    }
+
+    #[test]
     fn negative_conversion_params_clamp_to_supported_api_range() {
         let sanitized = NegativeConversionParams {
             red_weight: f32::NAN,

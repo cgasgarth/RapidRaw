@@ -3127,6 +3127,7 @@ export default interface Resources {
         clearAcceptedDustCandidates: 'Clear accepted heals';
         colorTiming: 'Color Timing';
         compareTooltip: 'Hold to View Original';
+        confidence: 'Confidence';
         contrast: 'Contrast (Grade)';
         conversionBundle: 'Conversion bundle';
         conversionBundleDisabled: 'Off';
@@ -3145,6 +3146,7 @@ export default interface Resources {
         copyBatchPlan: 'Copy batch plan JSON';
         copyReadout: 'Copy readout JSON';
         correctionMagnitude: 'Correction magnitude';
+        currentProjectedRgb: 'Current / projected RGB';
         customBaseSample: 'Custom base sample';
         customBaseSampleHint: 'Measure a normalized base/fog rectangle, then explicitly apply it to conversion.';
         customBaseSampleOverlayLabel: 'Custom base sample overlay';
@@ -3293,6 +3295,7 @@ export default interface Resources {
         patchRole: {
           highlight: 'Highlight';
           neutral: 'Neutral';
+          shadow: 'Shadow';
         };
         patchSampleOverlayLabel: 'Densitometer patch sample';
         patchSampler: 'Patch sampler';
@@ -3418,6 +3421,7 @@ export default interface Resources {
         stockRegistry: 'Stock families';
         stockRegistrySummary: '{{runtimeSafeCount}} runtime-safe / {{referenceOnlyCount}} reference-only';
         stockRegistryVersion: 'v{{version}}';
+        suggestedDelta: 'Suggested delta';
         suggestNeutralPatchRgb: 'Suggest neutral RGB';
         title: 'Negative Conversion';
         v2AlgorithmDisabled: 'V2 print curve off';

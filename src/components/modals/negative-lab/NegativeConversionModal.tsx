@@ -155,6 +155,14 @@ import {
   removeNegativeLabPatchSamplerCorrections,
 } from '../../../utils/negative-lab/negativeLabPatchSamplerCorrections';
 import {
+  buildNegativeLabPatchProbeOverlayModels,
+  type DensitometerPatchLabelKey,
+  formatNegativeLabSampleRectAttribute,
+  getNegativeLabDensitometerLabelKeyForPatchRole,
+  getNegativeLabPatchRoleForLabelKey,
+  type NegativeLabPatchRole,
+} from '../../../utils/negative-lab/negativeLabPatchSamplerUi';
+import {
   buildNegativeLabAcceptedApplyPlanFingerprint,
   buildNegativeLabAcceptedPlanIdentity,
   buildNegativeLabPlanHash,
@@ -196,11 +204,7 @@ import { throttle } from '../../../utils/timing';
 import Button from '../../ui/primitives/Button';
 import Slider from '../../ui/primitives/Slider';
 import UiText from '../../ui/primitives/Text';
-import {
-  type DensitometerPatchLabelKey,
-  type NegativeLabPatchRole,
-  NegativeLabPatchSamplerPanel,
-} from './NegativeLabPatchSamplerPanel';
+import { NegativeLabPatchSamplerPanel } from './NegativeLabPatchSamplerPanel';
 import {
   NegativeLabProfileComparisonGrid,
   type NegativeLabRenderedProfileCandidatePreview,
@@ -520,6 +524,14 @@ interface BaseFogSampleUndoEntry {
   selectedPresetId: string;
 }
 
+interface NegativeLabPatchProbeState {
+  estimate: NegativeBaseFogEstimate;
+  label: string;
+  rect: NegativeLabBaseFogSampleRect;
+}
+
+type NegativeLabPatchProbeByRole = Partial<Record<NegativeLabPatchRole, NegativeLabPatchProbeState>>;
+
 export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }: NegativeConversionModalProps) {
   const { t } = useTranslation();
   const selectedEditorImage = useEditorStore((state) => state.selectedImage);
@@ -538,10 +550,8 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const [baseSampleStudioDecision, setBaseSampleStudioDecision] =
     useState<NegativeLabBaseSampleStudioDecision>('candidate');
   const [rejectedBaseSampleLabel, setRejectedBaseSampleLabel] = useState<string | null>(null);
-  const [patchProbeEstimate, setPatchProbeEstimate] = useState<NegativeBaseFogEstimate | null>(null);
-  const [patchProbeRect, setPatchProbeRect] = useState<NegativeLabBaseFogSampleRect | null>(null);
-  const [patchProbeLabel, setPatchProbeLabel] = useState<string | null>(null);
   const [patchRole, setPatchRole] = useState<NegativeLabPatchRole>('neutral');
+  const [patchProbeByRole, setPatchProbeByRole] = useState<NegativeLabPatchProbeByRole>({});
   const [isPickingPatch, setIsPickingPatch] = useState(false);
   const [patchDragStart, setPatchDragStart] = useState<NegativeLabPatchPickerPoint | null>(null);
   const [draftPatchRect, setDraftPatchRect] = useState<NegativeLabBaseFogSampleRect | null>(null);
@@ -623,6 +633,10 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const previewImageRef = useRef<HTMLImageElement | null>(null);
   const previewRequestSequenceRef = useRef(0);
   const previewImageUrl = isCompareActive && originalUrl !== null ? originalUrl : previewUrl;
+  const activePatchProbe = patchProbeByRole[patchRole] ?? null;
+  const patchProbeEstimate = activePatchProbe?.estimate ?? null;
+  const patchProbeRect = activePatchProbe?.rect ?? null;
+  const patchProbeLabel = activePatchProbe?.label ?? null;
   const effectiveActivePathIndex = targetPaths[activePathIndex] === undefined ? 0 : activePathIndex;
   const selectedImagePath = targetPaths[effectiveActivePathIndex] ?? null;
   const hasMultipleScans = targetPaths.length > 1;
@@ -1605,7 +1619,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       throttle(
         async (
           currentParams: NegativeParams,
-          isInitialLoad: boolean = false,
+          _isInitialLoad: boolean = false,
           baseSampleProofContext: NegativeLabBaseSamplePreviewProofContext | null = null,
         ) => {
           if (!selectedImagePath) return;
@@ -1713,6 +1727,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       setShadowPatchBlackPointSuggestion(null);
       setHighlightPatchExposureSuggestion(null);
       setPatchRole('neutral');
+      setPatchProbeByRole({});
       setIsPickingPatch(false);
       setPatchDragStart(null);
       setDraftPatchRect(null);
@@ -2245,6 +2260,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     sampleRect: NegativeLabBaseFogSampleRect,
   ) => {
     if (!selectedImagePath) return;
+    const nextPatchRole = getNegativeLabPatchRoleForLabelKey(labelKey);
     setIsSamplingPatchProbe(true);
     try {
       const estimate = await invokeWithSchema(
@@ -2255,10 +2271,15 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         },
         negativeBaseFogEstimateSchema,
       );
-      setPatchProbeEstimate(estimate);
-      setPatchProbeRect(sampleRect);
-      setPatchProbeLabel(t(labelKey));
-      setPatchRole(labelKey === 'modals.negativeConversion.sampleHighlightPatch' ? 'highlight' : 'neutral');
+      setPatchProbeByRole((current) => ({
+        ...current,
+        [nextPatchRole]: {
+          estimate,
+          label: t(labelKey),
+          rect: sampleRect,
+        },
+      }));
+      setPatchRole(nextPatchRole);
       setNeutralPatchSuggestion(null);
       setHighlightPatchExposureSuggestion(null);
       setShadowPatchBlackPointSuggestion(null);
@@ -2303,12 +2324,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     setPatchDragStart(null);
     setDraftPatchRect(null);
     if (nextRect !== null) {
-      void handleSamplePatchProbe(
-        patchRole === 'highlight'
-          ? 'modals.negativeConversion.sampleHighlightPatch'
-          : 'modals.negativeConversion.sampleCenterPatch',
-        nextRect,
-      );
+      void handleSamplePatchProbe(getNegativeLabDensitometerLabelKeyForPatchRole(patchRole), nextRect);
     }
   };
 
@@ -2316,10 +2332,11 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     if (selectedImagePath === null || patchProbeRect === null) return;
     setIsSuggestingNeutralPatchRgb(true);
     try {
+      const effectiveParams = buildParamsWithFrameOverrides(params);
       const suggestion = await invokeWithSchema(
         Invokes.SuggestNegativeLabNeutralPatchRgbBalance,
         {
-          params,
+          params: effectiveParams,
           path: selectedImagePath,
           sampleRect: patchProbeRect,
         },
@@ -2340,11 +2357,12 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     if (selectedImagePath === null || patchProbeRect === null) return;
     setIsSuggestingHighlightPatchExposure(true);
     try {
+      const effectiveParams = buildParamsWithFrameOverrides(params);
       const suggestion = await invokeWithSchema(
         Invokes.SuggestNegativeLabHighlightPatchExposure,
         {
           currentFrameExposureOffset: activeFrameExposureOffset,
-          params,
+          params: effectiveParams,
           path: selectedImagePath,
           sampleRect: patchProbeRect,
         },
@@ -2365,10 +2383,11 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     if (selectedImagePath === null || patchProbeRect === null) return;
     setIsSuggestingShadowPatchBlackPoint(true);
     try {
+      const effectiveParams = buildParamsWithFrameOverrides(params);
       const suggestion = await invokeWithSchema(
         Invokes.SuggestNegativeLabShadowPatchBlackPoint,
         {
-          params,
+          params: effectiveParams,
           path: selectedImagePath,
           sampleRect: patchProbeRect,
         },
@@ -2783,6 +2802,10 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     if (targetPaths[frameIndex] === undefined) return;
     const nextFrameId = frameHealthReport.frames.find((frame) => frame.pathIndex === frameIndex)?.frameId ?? null;
     setActivePathIndex(frameIndex);
+    setPatchProbeByRole({});
+    setNeutralPatchSuggestion(null);
+    setHighlightPatchExposureSuggestion(null);
+    setShadowPatchBlackPointSuggestion(null);
     updatePreview(buildParamsWithFrameOverrides(params, nextFrameId));
     resetViewport();
   };
@@ -5717,27 +5740,50 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     );
   };
 
-  const renderPatchProbeOverlay = () => {
-    if (patchProbeRect === null) return null;
+  const renderPatchProbeOverlays = () =>
+    buildNegativeLabPatchProbeOverlayModels(patchProbeByRole).map((overlay) => {
+      const patchProbe = patchProbeByRole[overlay.role];
+      if (patchProbe === undefined) return null;
 
-    return (
-      <div
-        aria-label={t('modals.negativeConversion.patchSampleOverlayLabel')}
-        className="absolute border-2 border-yellow-300 bg-yellow-300/10 shadow-[0_0_0_1px_rgba(0,0,0,0.8)]"
-        data-testid="negative-lab-patch-probe-overlay"
-        style={{
-          height: `${patchProbeRect.height * 100}%`,
-          left: `${patchProbeRect.x * 100}%`,
-          top: `${patchProbeRect.y * 100}%`,
-          width: `${patchProbeRect.width * 100}%`,
-        }}
-      >
-        <span className="absolute bottom-0 left-0 translate-y-full rounded-sm bg-yellow-300 px-1.5 py-0.5 text-[10px] font-medium text-black shadow">
-          {patchProbeLabel ?? t('modals.negativeConversion.patchSampler')}
-        </span>
-      </div>
-    );
-  };
+      const roleClassName =
+        overlay.role === 'highlight'
+          ? 'border-yellow-200 bg-yellow-200/10'
+          : overlay.role === 'shadow'
+            ? 'border-violet-300 bg-violet-300/10'
+            : 'border-emerald-300 bg-emerald-300/10';
+      const labelClassName =
+        overlay.role === 'highlight'
+          ? 'bg-yellow-200 text-black'
+          : overlay.role === 'shadow'
+            ? 'bg-violet-300 text-black'
+            : 'bg-emerald-300 text-black';
+
+      return (
+        <div
+          key={overlay.role}
+          aria-label={t('modals.negativeConversion.patchSampleOverlayLabel')}
+          className={cx('absolute border-2 shadow-[0_0_0_1px_rgba(0,0,0,0.8)]', roleClassName)}
+          data-patch-role={overlay.role}
+          data-sample-rect={overlay.sampleRectAttribute}
+          data-testid={overlay.testId}
+          style={{
+            height: `${patchProbe.rect.height * 100}%`,
+            left: `${patchProbe.rect.x * 100}%`,
+            top: `${patchProbe.rect.y * 100}%`,
+            width: `${patchProbe.rect.width * 100}%`,
+          }}
+        >
+          <span
+            className={cx(
+              'absolute bottom-0 left-0 translate-y-full rounded-sm px-1.5 py-0.5 text-[10px] font-medium shadow',
+              labelClassName,
+            )}
+          >
+            {overlay.label}
+          </span>
+        </div>
+      );
+    });
 
   const renderDraftPatchOverlay = () => {
     if (draftPatchRect === null) return null;
@@ -5746,6 +5792,8 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       <div
         aria-label={t('modals.negativeConversion.patchPickDraftOverlayLabel')}
         className="absolute border-2 border-dashed border-yellow-200 bg-yellow-200/10 shadow-[0_0_0_1px_rgba(0,0,0,0.8)]"
+        data-patch-role={patchRole}
+        data-sample-rect={formatNegativeLabSampleRectAttribute(draftPatchRect)}
         data-testid="negative-lab-patch-pick-draft-overlay"
         style={{
           height: `${draftPatchRect.height * 100}%`,
@@ -5835,7 +5883,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                   />
                   {renderCustomBaseSampleOverlay()}
                   {renderBaseFogSampleOverlay()}
-                  {renderPatchProbeOverlay()}
+                  {renderPatchProbeOverlays()}
                   {renderDraftPatchOverlay()}
                   {isCompareActive && originalUrl !== null && (
                     <UiText
