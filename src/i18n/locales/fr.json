@@ -278,6 +278,13 @@
       "threshold": "Seuil"
     },
     "effects": {
+      "activeSummary": "",
+      "activeSummaryCount_one": "",
+      "activeSummaryCount_few": "",
+      "activeSummaryCount_many": "",
+      "activeSummaryCount_other": "",
+      "activeSummaryEmpty": "",
+      "activeSummaryNoScroll": "",
       "amount": "Quantité",
       "creative": "Créatif",
       "feather": "Contour progressif",

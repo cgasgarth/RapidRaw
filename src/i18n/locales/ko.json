@@ -141,6 +141,13 @@
     },
     "effects": {
       "amount": "양",
+      "activeSummary": "",
+      "activeSummaryCount_few": "",
+      "activeSummaryCount_many": "",
+      "activeSummaryCount_one": "",
+      "activeSummaryCount_other": "",
+      "activeSummaryEmpty": "",
+      "activeSummaryNoScroll": "",
       "creative": "크리에이티브",
       "feather": "페더",
       "glow": "글로우",

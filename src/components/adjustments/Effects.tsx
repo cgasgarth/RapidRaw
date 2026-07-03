@@ -50,12 +50,23 @@ const formatFilmLookSavedStatus = (look: FilmLookBrowserItem, strength: number) 
   `Saved ${formatFilmLookPresetName(look, strength)}`;
 const formatFilmLookSharedStatus = (look: FilmLookBrowserItem, strength: number) =>
   `Exported ${formatFilmLookPresetName(look, strength)}`;
+const formatEffectSummaryValue = (value: number) => (value > 0 ? `+${value}` : `${value}`);
+const formatEffectSummaryPercent = (value: number) => `${value}%`;
 const sanitizeFilmLookPresetFileName = (look: FilmLookBrowserItem, strength: number) =>
   `${formatFilmLookPresetName(look, strength)}.rrpreset`.replace(/[<>:"/\\|?*]/g, '_');
 const createFilmLookPreset = (look: FilmLookBrowserItem, strength: number): Preset => ({
   ...buildFilmLookPresetDraft(look, strength),
   id: crypto.randomUUID(),
 });
+const summaryChipClassName =
+  'inline-flex min-h-5 max-w-full items-center gap-1 rounded border border-editor-border bg-editor-panel px-1.5 py-0.5 text-[10px] font-medium leading-3 text-text-secondary';
+const summaryChipLabelClassName = 'truncate text-text-tertiary';
+const summaryChipValueClassName = 'shrink-0 font-mono tabular-nums text-text-primary';
+
+interface EffectSummaryChip {
+  label: string;
+  value: string;
+}
 
 export default function EffectsPanel({
   adjustments,
@@ -150,10 +161,93 @@ export default function EffectsPanel({
 
   const adjustmentVisibility = appSettings?.adjustmentVisibility || {};
   const density = professionalInspectorDensityTokens;
+  const activeLutName =
+    typeof adjustments.lutName === 'string' && adjustments.lutName.length > 0 ? adjustments.lutName : null;
+  const activeLutIntensity = adjustments.lutIntensity ?? 100;
+  const activeEffectSummaryChips: Array<EffectSummaryChip> = [
+    ...(adjustments.filmLookId !== null
+      ? [
+          {
+            label: t('adjustments.effects.filmLookBrowser.activeLook'),
+            value: formatEffectSummaryPercent(adjustments.filmLookStrength),
+          },
+        ]
+      : []),
+    ...(activeLutName !== null
+      ? [
+          {
+            label: t('adjustments.effects.lut'),
+            value:
+              activeLutIntensity === 100
+                ? activeLutName
+                : `${activeLutName} ${formatEffectSummaryPercent(activeLutIntensity)}`,
+          },
+        ]
+      : []),
+    ...(adjustments.glowAmount > 0
+      ? [{ label: t('adjustments.effects.glow'), value: formatEffectSummaryValue(adjustments.glowAmount) }]
+      : []),
+    ...(adjustments.halationAmount > 0
+      ? [{ label: t('adjustments.effects.halation'), value: formatEffectSummaryValue(adjustments.halationAmount) }]
+      : []),
+    ...(!isForMask && adjustments.flareAmount > 0
+      ? [{ label: t('adjustments.effects.lightFlares'), value: formatEffectSummaryValue(adjustments.flareAmount) }]
+      : []),
+    ...(!isForMask && adjustmentVisibility['vignette'] !== false && adjustments.vignetteAmount !== 0
+      ? [{ label: t('adjustments.effects.vignette'), value: formatEffectSummaryValue(adjustments.vignetteAmount) }]
+      : []),
+    ...(!isForMask && adjustmentVisibility['grain'] !== false && adjustments.grainAmount > 0
+      ? [
+          {
+            label: t('adjustments.effects.grain'),
+            value: `${formatEffectSummaryValue(adjustments.grainAmount)} / ${adjustments.grainSize}`,
+          },
+        ]
+      : []),
+  ];
 
   return (
     <div className={density.gutter.section}>
-      <div className={density.card.nestedPanel}>
+      <section
+        aria-label={t('adjustments.effects.activeSummary', { defaultValue: 'Active effects summary' })}
+        className="rounded border border-editor-border bg-editor-panel-well px-1.5 py-1"
+        data-active-effect-count={activeEffectSummaryChips.length}
+        data-testid="effects-active-summary"
+      >
+        <div className="mb-1 flex items-center justify-between gap-2">
+          <UiText className={density.sectionHeader.title} variant={TextVariants.heading}>
+            {t('adjustments.effects.activeSummary', { defaultValue: 'Active effects' })}
+          </UiText>
+          <span
+            className={editorChromeStatusChipClassName(activeEffectSummaryChips.length > 0 ? 'success' : 'neutral')}
+          >
+            {activeEffectSummaryChips.length > 0
+              ? t('adjustments.effects.activeSummaryCount', {
+                  count: activeEffectSummaryChips.length,
+                  defaultValue: '{{count}} active',
+                })
+              : t('adjustments.effects.activeSummaryEmpty', { defaultValue: 'None active' })}
+          </span>
+        </div>
+        {activeEffectSummaryChips.length > 0 ? (
+          <div className="flex flex-wrap gap-1">
+            {activeEffectSummaryChips.map((summary) => (
+              <span className={summaryChipClassName} key={`${summary.label}:${summary.value}`}>
+                <span className={summaryChipLabelClassName}>{summary.label}</span>
+                <span className={summaryChipValueClassName}>{summary.value}</span>
+              </span>
+            ))}
+          </div>
+        ) : (
+          <UiText className="block text-[11px] leading-4 text-text-secondary" variant={TextVariants.small}>
+            {t('adjustments.effects.activeSummaryNoScroll', {
+              defaultValue: 'Creative, LUT, vignette, and grain controls are currently neutral.',
+            })}
+          </UiText>
+        )}
+      </section>
+
+      <div className="rounded border border-editor-border bg-editor-panel-well px-1.5 py-1">
         <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
           {t('adjustments.effects.creative')}
         </UiText>
@@ -202,7 +296,7 @@ export default function EffectsPanel({
 
       {!isForMask && (
         <div className={density.gutter.section}>
-          <div className={density.card.nestedPanel}>
+          <div className="rounded border border-editor-border bg-editor-panel-well px-1.5 py-1">
             <Suspense fallback={null}>
               <FilmLookBrowser
                 activeLookId={adjustments.filmLookId}
@@ -224,7 +318,7 @@ export default function EffectsPanel({
             )}
           </div>
 
-          <div className={density.card.nestedPanel}>
+          <div className="rounded border border-editor-border bg-editor-panel-well px-1.5 py-1">
             <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
               {t('adjustments.effects.lut')}
             </UiText>
@@ -239,7 +333,7 @@ export default function EffectsPanel({
           </div>
 
           {adjustmentVisibility['vignette'] !== false && (
-            <div className={density.card.nestedPanel}>
+            <div className="rounded border border-editor-border bg-editor-panel-well px-1.5 py-1">
               <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
                 {t('adjustments.effects.vignette')}
               </UiText>
@@ -299,7 +393,10 @@ export default function EffectsPanel({
           )}
 
           {adjustmentVisibility['grain'] !== false && (
-            <div className={density.card.nestedPanel} data-testid="film-grain-ui-controls">
+            <div
+              className="rounded border border-editor-border bg-editor-panel-well px-1.5 py-1"
+              data-testid="film-grain-ui-controls"
+            >
               <div className={density.sectionHeader.root}>
                 <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
                   {t('adjustments.effects.grain')}
@@ -308,10 +405,10 @@ export default function EffectsPanel({
                   {t('adjustments.effects.grainRendererStatus')}
                 </span>
               </div>
-              <div className="mb-1 grid grid-cols-3 gap-1" data-testid="film-grain-preset-shortcuts">
+              <div className="mb-0.5 grid grid-cols-3 gap-1" data-testid="film-grain-preset-shortcuts">
                 {FILM_GRAIN_UI_PRESETS.map((preset) => (
                   <button
-                    className="min-h-6 rounded border border-editor-border bg-editor-panel px-1.5 py-0.5 text-[11px] font-medium leading-4 text-text-primary transition-colors hover:border-editor-focus-ring hover:bg-editor-selected-quiet focus:outline-none focus:ring-2 focus:ring-editor-focus-ring"
+                    className="min-h-5 rounded border border-editor-border bg-editor-panel px-1 py-px text-[10px] font-medium leading-4 text-text-primary transition-colors hover:border-editor-focus-ring hover:bg-editor-selected-quiet focus:outline-none focus:ring-2 focus:ring-editor-focus-ring"
                     data-testid={`film-grain-preset-${preset.id}`}
                     key={preset.id}
                     onClick={() => {
@@ -364,7 +461,7 @@ export default function EffectsPanel({
                 fillOrigin="min"
               />
               <div
-                className="mt-1.5 rounded border border-editor-border bg-editor-panel px-2 py-1 text-[11px] leading-4 text-text-secondary"
+                className="mt-1 rounded border border-editor-border bg-editor-panel px-1.5 py-0.5 text-[10px] leading-4 text-text-secondary"
                 data-testid="film-grain-chroma-planned"
               >
                 {t('adjustments.effects.grainChromaPlanned')}

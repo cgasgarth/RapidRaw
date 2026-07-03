@@ -14,8 +14,8 @@ const filmLookPresetBaseSchema = z
   .passthrough();
 const warmPrintPresetSchema = filmLookPresetBaseSchema.extend({
   adjustments: z.object({
-    contrast: z.literal(8),
-    highlights: z.literal(-10),
+    contrast: z.literal(10),
+    highlights: z.literal(-12),
     temperature: z.literal(8),
   }),
   name: z.literal('Warm Print 100%'),

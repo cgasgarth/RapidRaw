@@ -299,6 +299,13 @@
       "threshold": "Schwellenwert"
     },
     "effects": {
+      "activeSummary": "",
+      "activeSummaryCount_one": "",
+      "activeSummaryCount_few": "",
+      "activeSummaryCount_many": "",
+      "activeSummaryCount_other": "",
+      "activeSummaryEmpty": "",
+      "activeSummaryNoScroll": "",
       "amount": "Betrag",
       "creative": "Kreativ",
       "feather": "Weiche Kante",
