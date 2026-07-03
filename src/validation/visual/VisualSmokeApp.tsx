@@ -19,6 +19,7 @@ import EditorChromeStatusStrip from '../../components/panel/editor/EditorChromeS
 import EditorToolbar from '../../components/panel/editor/EditorToolbar';
 import ImageCanvas from '../../components/panel/editor/ImageCanvas';
 import AgentChatShell from '../../components/panel/right/ai/AgentChatShell';
+import { AgentPanel } from '../../components/panel/right/ai/AgentPanel';
 import { TetherPanel } from '../../components/panel/right/capture/TetherPanel';
 import ControlsPanel from '../../components/panel/right/color/ControlsPanel';
 import CropPanel from '../../components/panel/right/color/CropPanel';
@@ -1606,6 +1607,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorTokens]: ProfessionalEditorTokensVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalExportProofFooter]: ProfessionalExportProofFooterVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalAgentReview]: ProfessionalAgentReviewVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalAgentReviewWorkspace]: ProfessionalAgentReviewWorkspaceVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalLayersCompact]: ProfessionalLayersCompactVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawModalReview]: SuperResolutionPrivateRawModalReviewSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawUi]: SuperResolutionPrivateRawVisualSmoke,
@@ -2884,6 +2886,85 @@ function ProfessionalAgentReviewVisualSmoke() {
   );
 }
 
+function ProfessionalAgentReviewWorkspaceVisualSmoke() {
+  useEffect(() => {
+    useEditorStore.getState().setEditor({
+      adjustments: INITIAL_ADJUSTMENTS,
+      finalPreviewUrl: 'data:image/jpeg;base64,BBBB',
+      hasRenderedFirstFrame: true,
+      history: [INITIAL_ADJUSTMENTS, { ...INITIAL_ADJUSTMENTS, exposure: 0.35 }],
+      historyIndex: 1,
+      lastBasicToneCommand: null,
+      selectedImage: {
+        exif: { ISO: '200', LensModel: 'FE 35mm F1.4 GM' },
+        height: 3000,
+        isRaw: true,
+        isReady: true,
+        metadata: null,
+        originalUrl: 'blob:rawengine-agent-review-workspace-original',
+        path: '/Users/cgas/Pictures/Capture One/DSC_4850.ARW',
+        rawDevelopmentReport: null,
+        thumbnailUrl: 'data:image/jpeg;base64,AAAA',
+        width: 4500,
+      },
+      uncroppedAdjustedPreviewUrl: null,
+    });
+  }, []);
+
+  return (
+    <main
+      className="h-full min-h-screen bg-editor-matte text-text-primary font-sans"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.ProfessionalAgentReviewWorkspace}
+    >
+      <div className="flex min-h-screen bg-editor-matte">
+        <section
+          className="flex flex-1 items-center justify-center border-r border-editor-border bg-editor-panel p-6"
+          data-visual-smoke-section="professional-agent-review-workspace-preview"
+        >
+          <div className="w-full max-w-4xl">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase text-text-secondary">
+                  {copy.professionalAgentReviewWorkspace}
+                </p>
+                <h1 className="text-lg font-semibold">{copy.professionalAgentReviewProposal}</h1>
+              </div>
+              <span className="rounded border border-emerald-500/25 bg-emerald-500/10 px-2 py-1 text-[11px] text-emerald-100">
+                {copy.professionalAgentReviewMediumPreview}
+              </span>
+            </div>
+            <div
+              className="aspect-[4/3] overflow-hidden rounded border border-editor-border shadow-2xl"
+              style={{ background: 'linear-gradient(135deg, #17252b, #597064 48%, #e5b665)' }}
+            >
+              <div className="grid h-full grid-cols-2">
+                <div className="border-r border-white/10 bg-black/10 p-3">
+                  <span className="rounded bg-black/45 px-2 py-1 text-[11px] font-semibold uppercase">
+                    {copy.professionalAgentReviewBefore}
+                  </span>
+                </div>
+                <div className="bg-white/10 p-3">
+                  <span className="rounded bg-black/45 px-2 py-1 text-[11px] font-semibold uppercase">
+                    {copy.professionalAgentReviewAfter}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+        <aside
+          className="h-screen overflow-hidden border-l border-editor-border bg-editor-panel"
+          data-visual-smoke-section="professional-agent-review-workspace-panel"
+          style={{ width: '360px' }}
+        >
+          <AgentPanel />
+        </aside>
+      </div>
+    </main>
+  );
+}
+
 const filmstripFrames = [
   { name: 'DSC_1042.ARW', tone: 'from-emerald-400 to-cyan-500', rating: '5' },
   { name: 'DSC_1043.ARW', tone: 'from-amber-300 to-rose-500', rating: '4' },
@@ -3206,6 +3287,7 @@ const copy = {
   professionalAgentReviewBefore: 'Before',
   professionalAgentReviewMediumPreview: 'medium preview',
   professionalAgentReviewProposal: 'Reviewable edit proposal',
+  professionalAgentReviewWorkspace: 'Professional agent review workspace',
   exportFooterIdle: 'idle',
   exportFooterRunning: 'running',
   exportFooterRetry: 'retry',

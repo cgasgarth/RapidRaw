@@ -829,6 +829,24 @@
           "plan": "Plan",
           "target": "Target",
           "title": "Live prompt walkthrough"
+        },
+        "workspace": {
+          "audit": "Audit",
+          "blocked": "Blocked",
+          "noImage": "No image selected",
+          "previewReady": "Preview ready",
+          "previewReceipt": "Preview receipt",
+          "reviewReady": "Review ready",
+          "states": {
+            "applied": "Applied",
+            "approval-required": "Approval required",
+            "audit-persisted": "Audit persisted",
+            "blocked": "Blocked",
+            "dry-run-ready": "Dry-run ready",
+            "no-selection": "No selection",
+            "preview-ready": "Preview ready"
+          },
+          "title": "Agent Review"
         }
       },
       "approval": {

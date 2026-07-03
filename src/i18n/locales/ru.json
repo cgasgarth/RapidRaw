@@ -631,6 +631,11 @@
       },
       "addNewEdit": "Добавить изменения",
       "agent": {
+        "actions": {
+          "approveApply": "",
+          "exportAudit": "",
+          "revert": ""
+        },
         "approval": {
           "approved": "",
           "notRequired": "",
@@ -824,6 +829,15 @@
         "walkthrough": {
           "plan": "",
           "target": "",
+          "title": ""
+        },
+        "workspace": {
+          "audit": "",
+          "blocked": "",
+          "noImage": "",
+          "previewReady": "",
+          "previewReceipt": "",
+          "reviewReady": "",
           "title": ""
         }
       },

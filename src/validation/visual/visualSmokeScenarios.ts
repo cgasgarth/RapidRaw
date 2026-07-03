@@ -47,6 +47,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   ProfessionalEditorToolbar: 'professional-editor-toolbar',
   ProfessionalEditorTokens: 'professional-editor-tokens',
   ProfessionalAgentReview: 'professional-agent-review',
+  ProfessionalAgentReviewWorkspace: 'professional-agent-review-workspace',
   SrPrivateRawModalReview: 'sr-private-raw-modal-review',
   SrPrivateRawUi: 'sr-private-raw-ui',
   SrUi: 'sr-ui',
@@ -128,6 +129,12 @@ export const VISUAL_SMOKE_SCENARIOS = [
     marker: 'Professional agent review',
     mode: VISUAL_SMOKE_SCENARIO_IDS.ProfessionalAgentReview,
     outputFile: 'professional-agent-review.png',
+    sectionMinimum: 2,
+  },
+  {
+    marker: 'Professional agent review workspace',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.ProfessionalAgentReviewWorkspace,
+    outputFile: 'professional-agent-review-workspace.png',
     sectionMinimum: 2,
   },
   {
