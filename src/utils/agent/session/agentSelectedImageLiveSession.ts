@@ -15,6 +15,7 @@ import {
   type AgentAdjustmentsApplyRequest,
   type AgentAdjustmentsApplyResponse,
   type AgentAdjustmentsDryRunResponse,
+  agentAdjustmentsApplyRequestSchema,
   agentAdjustmentsApplyResponseSchema,
   agentAdjustmentsDryRunResponseSchema,
 } from '../tools/agentAdjustmentApplyTool';
@@ -44,6 +45,13 @@ export type AgentSelectedImageLiveSessionStaleReason =
   | 'preview_dimensions_changed'
   | 'preview_identity_changed'
   | 'recipe_hash_changed';
+export type AgentSelectedImageLiveSessionEnvelopeBlockedReason =
+  | AgentSelectedImageLiveSessionStaleReason
+  | 'approval_mismatch'
+  | 'invalid_arguments'
+  | 'missing_approval'
+  | 'request_id_mismatch'
+  | 'runtime_tool_mismatch';
 export type AgentSelectedImageLiveSessionCancellationOutcome =
   | 'cancelled_before_apply'
   | 'late_result_blocked'
@@ -356,8 +364,10 @@ export interface AgentSelectedImageLiveSessionBlockedResult {
   status: 'blocked';
   applyGuard: AgentSelectedImageLiveSessionApplyGuard;
   audit: AgentSelectedImageLiveSessionAuditRecord;
+  message: string;
+  reason: AgentSelectedImageLiveSessionEnvelopeBlockedReason;
   refresh: AgentSelectedImageLiveSessionContextRefresh;
-  staleReason: AgentSelectedImageLiveSessionStaleReason;
+  staleReason?: AgentSelectedImageLiveSessionStaleReason;
 }
 
 export type AgentSelectedImageLiveSessionApplyResult =
@@ -379,6 +389,20 @@ export interface AgentSelectedImageLiveSessionAuditStorageAdapter {
   readText: () => string | null;
   writeText: (value: string) => void;
 }
+
+export type AgentSelectedImageApplyEnvelopeValidation =
+  | {
+      applyGuard: AgentSelectedImageLiveSessionApplyGuard;
+      parsedRequest: AgentAdjustmentsApplyRequest;
+      status: 'passed';
+    }
+  | {
+      applyGuard: AgentSelectedImageLiveSessionApplyGuard;
+      message: string;
+      reason: AgentSelectedImageLiveSessionEnvelopeBlockedReason;
+      staleReason?: AgentSelectedImageLiveSessionStaleReason;
+      status: 'blocked';
+    };
 
 const buildSnapshot = (): z.infer<typeof selectedImageLiveSessionSnapshotSchema> => {
   const snapshot = buildAgentImageContextSnapshot();
@@ -507,6 +531,110 @@ export const refreshAgentSelectedImageLiveSessionContext = (
   };
   if (staleReason !== undefined) refresh.staleReason = staleReason;
   return refresh;
+};
+
+const buildBlockedApplyValidation = ({
+  applyGuard,
+  message,
+  reason,
+}: {
+  applyGuard: AgentSelectedImageLiveSessionApplyGuard;
+  message: string;
+  reason: AgentSelectedImageLiveSessionEnvelopeBlockedReason;
+}): AgentSelectedImageApplyEnvelopeValidation => {
+  const validation: AgentSelectedImageApplyEnvelopeValidation = {
+    applyGuard,
+    message,
+    reason,
+    status: 'blocked',
+  };
+  if (applyGuard.staleReason !== undefined) validation.staleReason = applyGuard.staleReason;
+  return validation;
+};
+
+export const validateAgentSelectedImageApplyToolEnvelope = ({
+  args,
+  draft,
+  requestId,
+  runtimeToolName,
+}: {
+  args: unknown;
+  draft: AgentSelectedImageLiveSessionDraft;
+  requestId: string;
+  runtimeToolName: string;
+}): AgentSelectedImageApplyEnvelopeValidation => {
+  const current = buildSnapshot();
+  const applyGuard = buildApplyGuard(draft, current);
+
+  if (runtimeToolName !== AGENT_ADJUSTMENTS_APPLY_TOOL_NAME) {
+    return buildBlockedApplyValidation({
+      applyGuard,
+      message: `Selected-image live session rejected unexpected tool ${runtimeToolName}.`,
+      reason: 'runtime_tool_mismatch',
+    });
+  }
+
+  if (requestId !== `${draft.requestId}-apply`) {
+    return buildBlockedApplyValidation({
+      applyGuard,
+      message: 'Selected-image live session rejected mismatched apply request id.',
+      reason: 'request_id_mismatch',
+    });
+  }
+
+  if (draft.state !== 'dry_run_ready' || draft.approvalId === undefined) {
+    return buildBlockedApplyValidation({
+      applyGuard,
+      message: 'Selected-image live session apply requires an approved dry-run.',
+      reason: 'missing_approval',
+    });
+  }
+
+  const parsedRequest = agentAdjustmentsApplyRequestSchema.safeParse(args);
+  if (!parsedRequest.success) {
+    return buildBlockedApplyValidation({
+      applyGuard,
+      message: 'Selected-image live session rejected invalid apply arguments.',
+      reason: 'invalid_arguments',
+    });
+  }
+
+  const request = parsedRequest.data;
+  if (
+    request.acceptedPlanHash !== draft.dryRun.dryRunPlanHash ||
+    request.acceptedPlanId !== draft.dryRun.dryRunPlanId ||
+    request.approval.approvalId !== draft.approvalId ||
+    request.approval.approvedGraphRevision !== draft.dryRun.sourceGraphRevision ||
+    request.approval.approvedPlanHash !== draft.dryRun.dryRunPlanHash ||
+    request.approval.approvedPlanId !== draft.dryRun.dryRunPlanId ||
+    request.approval.approvedRecipeHash !== draft.snapshot.recipeHash ||
+    request.approval.approvedSessionId !== draft.sessionId ||
+    request.expectedGraphRevision !== draft.dryRun.sourceGraphRevision ||
+    request.expectedRecipeHash !== draft.snapshot.recipeHash ||
+    request.operationId !== draft.operationId ||
+    request.requestId !== requestId ||
+    request.sessionId !== draft.sessionId
+  ) {
+    return buildBlockedApplyValidation({
+      applyGuard,
+      message: 'Selected-image live session rejected mismatched approval or dry-run envelope.',
+      reason: 'approval_mismatch',
+    });
+  }
+
+  if (applyGuard.staleReason !== undefined) {
+    return buildBlockedApplyValidation({
+      applyGuard,
+      message: `Selected-image live session rejected stale ${applyGuard.staleReason}.`,
+      reason: applyGuard.staleReason,
+    });
+  }
+
+  return {
+    applyGuard,
+    parsedRequest: request,
+    status: 'passed',
+  };
 };
 
 export const parseAgentSelectedImageLiveSessionAuditStore = (
@@ -744,40 +872,63 @@ export const recordAgentSelectedImageLiveSessionLateResult = (
 export const applyAgentSelectedImageLiveSession = async (
   draft: AgentSelectedImageLiveSessionDraft,
 ): Promise<AgentSelectedImageLiveSessionApplyResult> => {
-  if (draft.state !== 'dry_run_ready') throw new Error('Selected-image live session apply requires approval.');
-  if (draft.approvalId === undefined) throw new Error('Selected-image live session apply requires approval id.');
-  const currentBeforeApply = buildSnapshot();
-  const applyGuard = buildApplyGuard(draft, currentBeforeApply);
-  const staleReason = applyGuard.staleReason ?? null;
-  if (staleReason !== null) {
+  const applyRequest = {
+    acceptedPlanHash: draft.dryRun.dryRunPlanHash,
+    acceptedPlanId: draft.dryRun.dryRunPlanId,
+    adjustments: draft.adjustments,
+    approval: {
+      approvalId: draft.approvalId ?? '',
+      approvedGraphRevision: draft.dryRun.sourceGraphRevision,
+      approvedPlanHash: draft.dryRun.dryRunPlanHash,
+      approvedPlanId: draft.dryRun.dryRunPlanId,
+      approvedRecipeHash: draft.snapshot.recipeHash,
+      approvedSessionId: draft.sessionId,
+      status: 'approved',
+    },
+    expectedGraphRevision: draft.dryRun.sourceGraphRevision,
+    expectedRecipeHash: draft.snapshot.recipeHash,
+    operationId: draft.operationId,
+    requestId: `${draft.requestId}-apply`,
+    sessionId: draft.sessionId,
+  };
+  const envelopeValidation = validateAgentSelectedImageApplyToolEnvelope({
+    args: applyRequest,
+    draft,
+    requestId: `${draft.requestId}-apply`,
+    runtimeToolName: AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
+  });
+  if (envelopeValidation.status === 'blocked') {
     draft.state = 'failed';
     pushEvent(draft, {
       approvalDecision: 'approved',
-      graphRevision: currentBeforeApply.graphRevision,
-      message: `Selected-image live session rejected stale ${staleReason}.`,
-      recipeHash: currentBeforeApply.recipeHash,
-      staleReason,
+      graphRevision: envelopeValidation.applyGuard.currentGraphRevision,
+      message: envelopeValidation.message,
+      recipeHash: envelopeValidation.applyGuard.currentRecipeHash,
+      ...(envelopeValidation.staleReason === undefined ? {} : { staleReason: envelopeValidation.staleReason }),
       state: 'failed',
       toolName: AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
     });
     const audit = buildAgentSelectedImageLiveSessionAuditRecord(draft, {
       approvalDecision: 'approved',
-      applyGuard,
+      applyGuard: envelopeValidation.applyGuard,
       cancellationOutcome: 'not_cancelled',
       state: 'failed',
-      staleReason,
+      ...(envelopeValidation.staleReason === undefined ? {} : { staleReason: envelopeValidation.staleReason }),
       toolCalls: [
         { id: `${draft.requestId}-dry-run`, name: AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME, status: 'succeeded' },
         { id: `${draft.requestId}-apply`, name: AGENT_ADJUSTMENTS_APPLY_TOOL_NAME, status: 'blocked' },
       ],
     });
-    return {
-      applyGuard,
+    const result: AgentSelectedImageLiveSessionBlockedResult = {
+      applyGuard: envelopeValidation.applyGuard,
       audit,
+      message: envelopeValidation.message,
+      reason: envelopeValidation.reason,
       refresh: refreshAgentSelectedImageLiveSessionContext(draft),
-      staleReason,
       status: 'blocked',
     };
+    if (envelopeValidation.staleReason !== undefined) result.staleReason = envelopeValidation.staleReason;
+    return result;
   }
 
   draft.state = 'applying';
@@ -793,25 +944,7 @@ export const applyAgentSelectedImageLiveSession = async (
 
   const apply = agentAdjustmentsApplyResponseSchema.parse(
     await dispatchAgentLiveEditorTool({
-      args: {
-        acceptedPlanHash: draft.dryRun.dryRunPlanHash,
-        acceptedPlanId: draft.dryRun.dryRunPlanId,
-        adjustments: draft.adjustments,
-        approval: {
-          approvalId: draft.approvalId,
-          approvedGraphRevision: draft.dryRun.sourceGraphRevision,
-          approvedPlanHash: draft.dryRun.dryRunPlanHash,
-          approvedPlanId: draft.dryRun.dryRunPlanId,
-          approvedRecipeHash: draft.snapshot.recipeHash,
-          approvedSessionId: draft.sessionId,
-          status: 'approved',
-        },
-        expectedGraphRevision: draft.dryRun.sourceGraphRevision,
-        expectedRecipeHash: draft.snapshot.recipeHash,
-        operationId: draft.operationId,
-        requestId: `${draft.requestId}-apply`,
-        sessionId: draft.sessionId,
-      },
+      args: envelopeValidation.parsedRequest,
       draftSession: buildDraftSession(draft, 'active'),
       requestId: `${draft.requestId}-apply`,
       runtimeToolName: AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
@@ -847,7 +980,7 @@ export const applyAgentSelectedImageLiveSession = async (
     audit: buildAgentSelectedImageLiveSessionAuditRecord(draft, {
       afterPreviewHash: apply.afterPreviewHash,
       approvalDecision: 'approved',
-      applyGuard,
+      applyGuard: envelopeValidation.applyGuard,
       cancellationOutcome: 'not_cancelled',
       finalGraphRevision: apply.appliedGraphRevision,
       finalRecipeHash: afterPreview.preview.recipeHash,
