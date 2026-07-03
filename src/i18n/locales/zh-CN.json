@@ -1612,6 +1612,15 @@
       "label": "Preview only"
     },
     "switcher": {
+      "search": {
+        "close": "Close panel search",
+        "empty": "No panels found",
+        "inputLabel": "Search right panels",
+        "open": "Search panels",
+        "placeholder": "Find a panel",
+        "recent": "Recent",
+        "results": "Results"
+      },
       "tooltips": {
         "adjust": "调整",
         "agent": "Agent Edit",

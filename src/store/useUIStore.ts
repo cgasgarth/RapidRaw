@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import {
   DEFAULT_EDITOR_RIGHT_PANEL,
   isEditingRightPanel,
+  isRightPanel,
   RIGHT_PANEL_ORDER,
 } from '../components/panel/right/rightPanelRegistry';
 import type { CullingSuggestions, ImageFile, Panel, UiVisibility } from '../components/ui/AppProperties';
@@ -50,6 +51,7 @@ export interface CollapsibleSectionsState {
 
 const DEVELOP_PANEL_PINNED_CONTROL_IDS_STORAGE_KEY = 'rapidraw.developPanelPinnedControlIds.v1';
 export const LAST_EDITING_RIGHT_PANEL_STORAGE_KEY = 'rapidraw.lastEditingRightPanel.v1';
+export const MAX_RECENT_RIGHT_PANELS = 5;
 
 export const readLastEditingRightPanel = (): Panel => {
   if (typeof globalThis.localStorage === 'undefined') return DEFAULT_EDITOR_RIGHT_PANEL;
@@ -87,6 +89,12 @@ const persistDevelopPanelPinnedControlIds = (controlIds: string[]) => {
 
   globalThis.localStorage.setItem(DEVELOP_PANEL_PINNED_CONTROL_IDS_STORAGE_KEY, JSON.stringify(controlIds));
 };
+
+export const createRecentRightPanels = (selectedPanel: Panel, currentPanels: readonly Panel[]): Panel[] =>
+  [selectedPanel, ...currentPanels.filter((panel) => panel !== selectedPanel && isRightPanel(panel))].slice(
+    0,
+    MAX_RECENT_RIGHT_PANELS,
+  );
 
 export const DEFAULT_COLLAPSIBLE_SECTIONS_STATE: CollapsibleSectionsState = {
   basic: true,
@@ -328,6 +336,7 @@ export interface UIState {
   // Right Panel
   activeRightPanel: Panel | null;
   renderedRightPanel: Panel | null;
+  recentRightPanels: Panel[];
   slideDirection: number;
   collapsibleSectionsState: CollapsibleSectionsState;
   developPanelPinnedControlIds: string[];
@@ -372,6 +381,7 @@ export interface UIState {
   markLayerMaskProvenanceStale: (input: { layerIds?: string[]; reason: LayerMaskProvenanceInvalidationReason }) => void;
   recordLayerMaskPreviewReceipt: (input: { appliedCommandId: string; masks: Array<MaskContainer> }) => void;
   setDevelopPanelPinnedControlIds: (controlIds: string[]) => void;
+  recordRecentRightPanel: (panel: Panel) => void;
   setUI: (updater: Partial<UIState> | ((state: UIState) => Partial<UIState>)) => void;
   setRightPanel: (panel: Panel | null) => void;
   upsertDerivedOutputReceipt: (receipt: DerivedOutputReceipt) => void;
@@ -398,6 +408,7 @@ export const useUIStore = create<UIState>((set, get) => {
 
     activeRightPanel: initialRightPanel,
     renderedRightPanel: initialRightPanel,
+    recentRightPanels: [initialRightPanel],
     slideDirection: 1,
     collapsibleSectionsState: { ...DEFAULT_COLLAPSIBLE_SECTIONS_STATE },
     developPanelPinnedControlIds: readDevelopPanelPinnedControlIds(),
@@ -481,6 +492,10 @@ export const useUIStore = create<UIState>((set, get) => {
       set({ developPanelPinnedControlIds: normalizedControlIds });
     },
 
+    recordRecentRightPanel: (panel) => {
+      set((state) => ({ recentRightPanels: createRecentRightPanels(panel, state.recentRightPanels) }));
+    },
+
     setUI: (updater) => {
       set((state) => (typeof updater === 'function' ? updater(state) : updater));
     },
@@ -501,6 +516,7 @@ export const useUIStore = create<UIState>((set, get) => {
           slideDirection: newIndex === currentIndex ? 0 : newIndex > currentIndex ? 1 : -1,
           activeRightPanel: panelId,
           renderedRightPanel: panelId,
+          ...(panelId === null ? {} : { recentRightPanels: createRecentRightPanels(panelId, get().recentRightPanels) }),
         });
       }
     },
