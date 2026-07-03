@@ -1608,6 +1608,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
           'flex-1 min-h-0 overflow-hidden bg-editor-panel-well',
           isFullScreen ? 'rounded-none' : 'rounded-lg border border-editor-border p-2',
         )}
+        data-testid="editor-image-preview-region"
         role="region"
       >
         <div
@@ -1627,6 +1628,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
           onClick={handleClick}
           onDoubleClick={handleDoubleClick}
           data-fullscreen-preview={String(isFullScreen)}
+          data-testid="editor-image-preview-panel"
         >
           <EditorChromeStatusStrip isFullScreen={isFullScreen} />
           {showSpinner && (
@@ -1645,6 +1647,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
           <div
             ref={contentRef}
             className="relative w-full h-full flex items-center justify-center origin-top-left"
+            data-testid="editor-image-preview-content"
             style={{
               transform: `translate(${transformState.positionX}px, ${transformState.positionY}px) scale(${transformState.scale})`,
             }}
