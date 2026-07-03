@@ -179,6 +179,19 @@ describe('agent panel preview-review workspace', () => {
     expect(required(container, 'agent-dry-run-apply-review-controls').dataset.liveActionToolName).toBe(
       'rawengine.agent.adjustments.dry_run',
     );
+    const receipt = required(container, 'agent-before-after-preview-receipt');
+    expect(receipt.dataset.receiptKind).toBe('dry_run');
+    expect(receipt.dataset.receiptState).toBe('current');
+    expect(receipt.dataset.receiptRequestId).toMatch(/^agent-workspace-selected-image-\d+-dry-run$/u);
+    expect(receipt.dataset.toolName).toBe('rawengine.agent.adjustments.dry_run');
+    expect(receipt.dataset.beforeGraphRevision).toBe('history_0');
+    expect(receipt.dataset.afterGraphRevision).toContain('basic_tone');
+    expect(receipt.dataset.beforeRenderHash).toMatch(/^render:/u);
+    expect(receipt.dataset.afterRenderHash).toMatch(/^sha256:agent-adjustments:/u);
+    expect(required(container, 'agent-before-after-preview-receipt-before').dataset.previewRef).toBe(
+      'data:image/jpeg;base64,BBBB',
+    );
+    expect(required(container, 'agent-before-after-preview-receipt-after').dataset.previewRef).toBe('');
     expect(required(container, 'agent-review-state-approval-required').dataset.state).toBe('active');
     expect((required(container, 'agent-review-control-apply') as HTMLButtonElement).disabled).toBe(false);
   });
@@ -198,6 +211,23 @@ describe('agent panel preview-review workspace', () => {
     expect(required(container, 'agent-dry-run-apply-review-controls').dataset.liveActionStatus).toBe('applied');
     expect(required(container, 'agent-review-state-audit-persisted').dataset.state).toBe('active');
     expect(required(container, 'agent-review-state-applied').dataset.state).toBe('active');
+    const applyReceipt = required(container, 'agent-before-after-preview-receipt');
+    expect(applyReceipt.dataset.receiptKind).toBe('apply');
+    expect(applyReceipt.dataset.receiptState).toBe('current');
+    expect(applyReceipt.dataset.toolName).toBe('rawengine.agent.adjustments.apply');
+    expect(applyReceipt.dataset.receiptRequestId).toMatch(/^agent-workspace-selected-image-\d+-apply$/u);
+    expect(applyReceipt.dataset.beforeGraphRevision).toBe('history_0');
+    expect(applyReceipt.dataset.afterGraphRevision).toBe('history_1');
+    expect(applyReceipt.dataset.beforeRenderHash).toBeTruthy();
+    expect(applyReceipt.dataset.afterRenderHash).toBeTruthy();
+    expect(applyReceipt.dataset.beforeRenderHash).not.toBe(applyReceipt.dataset.afterRenderHash);
+    expect(required(container, 'agent-before-after-preview-receipt-before').dataset.previewRef).toBe(
+      'data:image/jpeg;base64,BBBB',
+    );
+    expect(required(container, 'agent-before-after-preview-receipt-after').dataset.previewRef).toBeTruthy();
+    expect(required(container, 'agent-before-after-preview-receipt-after').dataset.previewRef).not.toBe(
+      required(container, 'agent-before-after-preview-receipt-before').dataset.previewRef,
+    );
     await act(async () => {
       useSettingsStore.setState({ appSettings });
       await new Promise((resolve) => setTimeout(resolve, 0));
@@ -217,6 +247,10 @@ describe('agent panel preview-review workspace', () => {
     await clickAndFlush(container, 'agent-review-control-rollback');
 
     expect(required(container, 'agent-dry-run-apply-review-controls').dataset.liveActionStatus).toBe('rolled_back');
+    expect(required(container, 'agent-before-after-preview-receipt').dataset.receiptState).toBe('stale');
+    expect(required(container, 'agent-before-after-preview-receipt').dataset.staleReason).toBe(
+      'graph_revision_changed',
+    );
     expect(required(container, 'agent-review-live-activity-timeline').dataset).toBeDefined();
     expect(useEditorStore.getState().historyIndex).toBe(0);
   });
