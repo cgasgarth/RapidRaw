@@ -832,7 +832,8 @@
         "noActiveAdjustment": "No active adjustment",
         "renameCheckpoint": "Rename checkpoint",
         "saveCheckpointLabel": "Save checkpoint label",
-        "updateCheckpoint": "Edit checkpoint"
+        "updateCheckpoint": "Edit checkpoint",
+        "review": "Review"
       }
     },
     "layers": {

@@ -1737,6 +1737,7 @@
         "editCheckpointLabel": "Checkpoint label",
         "noActiveAdjustment": "No active adjustment",
         "renameCheckpoint": "Rename checkpoint",
+        "review": "Review",
         "saveCheckpointLabel": "Save checkpoint label",
         "updateCheckpoint": "Edit checkpoint"
       },

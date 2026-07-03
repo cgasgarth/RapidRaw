@@ -306,6 +306,8 @@ const EditorToolbar = memo(
     });
     const activeHistoryItem = historyItems[adjustmentsHistoryIndex] ?? null;
     const activeCheckpoint = activeHistoryItem?.checkpoint ?? null;
+    const activeHistoryLabel =
+      activeCheckpoint?.label.trim() || activeHistoryItem?.label || t('editor.toolbar.history.noActiveAdjustment');
     const canCreateCheckpoint = adjustmentsHistory.length > 0;
     const effectiveOsPlatform = osPlatform ?? osPlatformFromStore;
     const undoShortcutLabel = formatShortcutLabel(['ctrl', 'KeyZ'], effectiveOsPlatform);
@@ -326,7 +328,10 @@ const EditorToolbar = memo(
 
     return (
       <div
-        className="relative z-40 flex h-11 shrink-0 items-center justify-between gap-3 px-3"
+        className={cx(
+          'relative flex h-11 shrink-0 items-center justify-between gap-3 px-3',
+          isHistoryVisible ? 'z-[100]' : 'z-40',
+        )}
         data-toolbar-history={isHistoryVisible ? 'open' : 'closed'}
         data-toolbar-loading={isLoaderVisible ? 'true' : 'false'}
         data-toolbar-negative-lab={negativeLabDisabledReason ? 'disabled' : 'available'}
@@ -335,7 +340,7 @@ const EditorToolbar = memo(
         data-toolbar-soft-proof={isExportSoftProofEnabled ? 'active' : canSoftProof ? 'available' : 'unavailable'}
         data-toolbar-fullscreen={isFullScreen ? 'active' : 'inactive'}
       >
-        <div className="z-40 flex shrink-0 items-center gap-1.5">
+        <div className={cx('flex shrink-0 items-center gap-1.5', isHistoryVisible ? 'z-[100]' : 'z-40')}>
           <div className={commandGroupClass} data-testid="editor-toolbar-back-group">
             <button
               aria-label={t('editor.toolbar.tooltips.backToLibrary')}
@@ -592,7 +597,7 @@ const EditorToolbar = memo(
           </div>
         </div>
 
-        <div className="z-40 flex shrink-0 items-center gap-1.5">
+        <div className={cx('flex shrink-0 items-center gap-1.5', isHistoryVisible ? 'z-[100]' : 'z-40')}>
           <div className={cx(commandGroupClass, 'relative')} ref={historyButtonRef}>
             <button
               className={iconButtonClass}
@@ -629,8 +634,9 @@ const EditorToolbar = memo(
               aria-label={historyDepthLabel}
               aria-expanded={isHistoryVisible}
               aria-haspopup="menu"
-              className={`${token.button.base} ${token.button.quiet} ${token.button.disabled} ${token.focusRing} h-8 px-2`}
-              disabled={adjustmentsHistory.length <= 1}
+              className={`${token.button.base} ${token.button.quiet} ${token.button.disabled} ${token.focusRing} h-8 max-w-56 gap-2 px-2.5`}
+              data-history-popover-state={isHistoryVisible ? 'open' : 'closed'}
+              disabled={adjustmentsHistory.length === 0}
               onClick={() => {
                 setIsHistoryVisible((prev) => !prev);
               }}
@@ -639,20 +645,38 @@ const EditorToolbar = memo(
               data-tooltip={t('editor.toolbar.tooltips.history')}
               type="button"
             >
-              <UiText as="span" variant={TextVariants.small} weight={TextWeights.medium}>
+              <Bookmark
+                size={13}
+                className={cx('shrink-0', activeCheckpoint ? 'text-editor-info' : 'text-text-secondary')}
+              />
+              <span className="flex min-w-0 max-w-36 flex-col items-start leading-none">
+                <UiText
+                  as="span"
+                  variant={TextVariants.small}
+                  weight={TextWeights.medium}
+                  className="block max-w-full truncate"
+                  data-testid="editor-history-active-label"
+                >
+                  {activeHistoryLabel}
+                </UiText>
+                <UiText as="span" variant={TextVariants.small} color={TextColors.secondary} className="block">
+                  {t('editor.toolbar.history.review')}
+                </UiText>
+              </span>
+              <UiText as="span" variant={TextVariants.small} color={TextColors.secondary} weight={TextWeights.medium}>
                 {historyDepthLabel}
               </UiText>
             </button>
 
             <AnimatePresence>
-              {isHistoryVisible && adjustmentsHistory.length > 1 && (
+              {isHistoryVisible && adjustmentsHistory.length > 0 && (
                 <motion.div
                   ref={historyContainerRef}
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.15, ease: 'easeOut' }}
-                  className="absolute right-0 top-full z-50 mt-3 flex max-h-80 w-72 flex-col overflow-y-auto rounded-lg border border-editor-overlay-stroke bg-editor-panel/95 px-0.5 py-1.5 shadow-[0_14px_34px_var(--editor-overlay-shadow)] backdrop-blur-md custom-scrollbar"
+                  className="absolute right-0 top-full z-[110] mt-3 flex max-h-80 w-72 flex-col overflow-y-auto rounded-lg border border-editor-overlay-stroke bg-editor-panel/95 px-0.5 py-1.5 shadow-[0_14px_34px_var(--editor-overlay-shadow)] backdrop-blur-md custom-scrollbar"
                   data-testid="editor-history-popover"
                   role="menu"
                 >
@@ -714,7 +738,7 @@ const EditorToolbar = memo(
                         key={i}
                         data-active={isCurrent}
                         data-history-checkpoint={item.isCheckpoint ? 'true' : 'false'}
-                        data-testid={isCurrent && item.isCheckpoint ? 'editor-history-active-checkpoint' : undefined}
+                        data-testid={isCurrent ? 'editor-history-active-row' : undefined}
                         className={cx(
                           'mx-1 my-0.5 flex items-center gap-1 rounded-md px-2 py-1.5 transition-colors',
                           isCurrent
@@ -753,6 +777,7 @@ const EditorToolbar = memo(
                             />
                           ) : (
                             <button
+                              data-testid="editor-history-jump-action"
                               className="min-w-0 flex-1 text-left focus-visible:outline-none"
                               onClick={() => {
                                 goToAdjustmentsHistoryIndex(i);
