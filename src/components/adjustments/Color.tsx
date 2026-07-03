@@ -5,9 +5,17 @@ import { debouncedSave } from '../../hooks/editor/useEditorActions';
 import type { BlackWhiteMixerChannel } from '../../schemas/color/blackWhiteMixerSchemas';
 import type { ChannelMixerOutput } from '../../schemas/color/channelMixerSchemas';
 import type { ColorBalanceRgbRange } from '../../schemas/color/colorBalanceRgbSchemas';
+import {
+  type ActiveDisplayProfile,
+  activeDisplayProfileSchema,
+  type DisplayPreviewLutStatus,
+  displayPreviewLutStatusSchema,
+} from '../../schemas/displayProfileSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
+import { Invokes } from '../../tauri/commands';
 import { type Adjustments, ColorAdjustment } from '../../utils/adjustments';
 import {
+  buildColorOutputProofingDiagnostics,
   formatGamutWarningCoverage,
   getPreviewScopeFreshnessStatus,
   getRenderedPreviewWarningStatus,
@@ -23,6 +31,7 @@ import { persistLayerStackSidecarInAdjustments } from '../../utils/layers/layerS
 import { createColorRangeMaskParameters } from '../../utils/mask/colorRangeMaskParameters';
 import { getSelectiveColorRange } from '../../utils/selectiveColorRanges';
 import { applySkinToneUniformity, type SkinToneUniformityInput } from '../../utils/skinToneUniformity';
+import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import type { AppSettings } from '../ui/AppProperties';
 import { ColorAdvancedControls } from './color/ColorAdvancedControls';
 import { ColorGradingControls } from './color/ColorGradingControls';
@@ -62,6 +71,13 @@ interface ColorWorkspaceTab {
   id: ColorWorkspaceTabId;
   label: string;
   panel: ReactNode;
+}
+
+interface ColorOutputDisplayDiagnosticsState {
+  error: string | null;
+  loading: boolean;
+  lut: DisplayPreviewLutStatus | null;
+  profile: ActiveDisplayProfile | null;
 }
 
 const getNextColorWorkspaceTabId = (
@@ -145,6 +161,12 @@ export default function ColorPanel({
   const [activeColor, setActiveColor] = useState<BlackWhiteMixerChannel>('reds');
   const [activeColorBalanceRange, setActiveColorBalanceRange] = useState<ColorBalanceRgbRange>('midtones');
   const [activeChannelMixerOutput, setActiveChannelMixerOutput] = useState<ChannelMixerOutput>('red');
+  const [displayDiagnosticsState, setDisplayDiagnosticsState] = useState<ColorOutputDisplayDiagnosticsState>({
+    error: null,
+    loading: true,
+    lut: null,
+    profile: null,
+  });
   const gamutWarningOverlay = useEditorStore((state) => state.gamutWarningOverlay);
   const previewScopeStatus = useEditorStore((state) => state.previewScopeStatus);
   const selectedImage = useEditorStore((state) => state.selectedImage);
@@ -176,6 +198,18 @@ export default function ColorPanel({
     selectedImagePath,
   });
   const previewScopeFreshnessStatus = getPreviewScopeFreshnessStatus(previewScopeStatus, selectedImagePath);
+  const colorOutputProofingDiagnostics = buildColorOutputProofingDiagnostics({
+    activeDisplayProfile: displayDiagnosticsState.profile,
+    currentGamutWarningOverlay,
+    displayProfileError: displayDiagnosticsState.error,
+    displayProfileLoading: displayDiagnosticsState.loading,
+    displayPreviewLutStatus: displayDiagnosticsState.lut,
+    exportSoftProofRecipeId,
+    exportSoftProofTransform,
+    previewScopeFreshnessStatus,
+    previewScopeWarningCodes: previewScopeStatus?.warningCodes ?? [],
+    renderedPreviewWarningStatus,
+  });
   const levels = adjustments.levels;
   const levelsClippingWarnings = [
     levels.inputBlack > 0 ? t('adjustments.color.levels.warnings.shadowClipping') : null,
@@ -371,6 +405,7 @@ export default function ColorPanel({
             adjustments={adjustments}
             appSettings={appSettings}
             colorWorkspaceWarningChips={colorWorkspaceWarningChips}
+            colorOutputProofingDiagnostics={colorOutputProofingDiagnostics}
             currentGamutWarningOverlay={currentGamutWarningOverlay}
             gamutWarningCoverage={gamutWarningCoverage}
             isGamutWarningOverlayVisible={isGamutWarningOverlayVisible}
@@ -421,6 +456,7 @@ export default function ColorPanel({
     adjustments,
     appSettings,
     colorWorkspaceWarningChips,
+    colorOutputProofingDiagnostics,
     currentGamutWarningOverlay,
     gamutWarningCoverage,
     isColorCalibrationVisible,
@@ -445,6 +481,39 @@ export default function ColorPanel({
     t,
     toggleWbPicker,
   ]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const loadDisplayDiagnostics = async () => {
+      setDisplayDiagnosticsState((state) => ({ ...state, error: null, loading: true }));
+      try {
+        const [profile, lut] = await Promise.all([
+          invokeWithSchema(Invokes.GetActiveDisplayProfile, {}, activeDisplayProfileSchema),
+          invokeWithSchema(Invokes.GetDisplayPreviewLutStatus, {}, displayPreviewLutStatusSchema),
+        ]);
+
+        if (isActive) {
+          setDisplayDiagnosticsState({ error: null, loading: false, lut, profile });
+        }
+      } catch (error) {
+        if (isActive) {
+          setDisplayDiagnosticsState({
+            error: error instanceof Error ? error.message : String(error),
+            loading: false,
+            lut: null,
+            profile: null,
+          });
+        }
+      }
+    };
+
+    void loadDisplayDiagnostics();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!workspaceTabs.some((tab) => tab.id === activeWorkspaceTab)) {

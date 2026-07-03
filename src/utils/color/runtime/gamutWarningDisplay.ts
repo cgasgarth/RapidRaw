@@ -1,4 +1,5 @@
 import type { SelectedImage } from '../../../components/ui/AppProperties';
+import type { ActiveDisplayProfile, DisplayPreviewLutStatus } from '../../../schemas/displayProfileSchemas';
 import type { GamutWarningOverlayPayload } from '../../../schemas/tauriEventSchemas';
 import type { Adjustments } from '../../adjustments';
 
@@ -48,6 +49,34 @@ export interface PreviewScopeFreshnessInput {
 export interface PreviewScopeFreshnessStatus {
   state: PreviewBoundWarningState;
   statusLabel: string;
+}
+
+export type ColorOutputDiagnosticState = PreviewBoundWarningState | 'loading' | 'error';
+
+export interface ColorOutputProofingDiagnosticsSummary {
+  codes: string[];
+  displayProfileHash: string | null;
+  displayProfileLabel: string;
+  displayProfileSource: string | null;
+  displayProfileState: ColorOutputDiagnosticState;
+  gamutCoverageLabel: string;
+  gamutCoverageRatio: number;
+  gamutWarningPixelCount: number;
+  lutSampleCount: number;
+  lutSize: number;
+  lutState: ColorOutputDiagnosticState;
+  lutStatusLabel: string;
+  outputProfileLabel: string;
+  previewProofState: PreviewBoundWarningState;
+  previewProofStatusLabel: string;
+  previewScopeState: PreviewBoundWarningState;
+  previewScopeStatusLabel: string;
+  renderingIntentLabel: string;
+  softProofRecipeId: string | null;
+  transformApplied: boolean | null;
+  transformLabel: string;
+  transformPolicyFingerprint: string | null;
+  workingSpaceLabel: string;
 }
 
 export type EditorChromeStatusChipTone = 'neutral' | 'success' | 'warning' | 'danger' | 'info';
@@ -225,6 +254,178 @@ export const getPreviewScopeFreshnessStatus = (
   }
 
   return { state: 'current', statusLabel: 'Scopes current' };
+};
+
+const shortHash = (value: string | null | undefined): string | null => {
+  if (!value) return null;
+  const match = /^sha256:([a-f0-9]{64})$/u.exec(value);
+  return match ? `sha256:${match[1]!.slice(0, 12)}` : value;
+};
+
+const activeDisplayProfileStatusLabel = (status: ActiveDisplayProfile['status']): string => {
+  switch (status) {
+    case 'active_profile_loaded':
+      return 'ColorSync active display profile';
+    case 'fallback_no_active_profile':
+      return 'sRGB fallback display profile';
+    case 'unsupported_platform':
+      return 'Display profile unsupported';
+  }
+};
+
+const displayProfileState = (status: ActiveDisplayProfile['status']): PreviewBoundWarningState => {
+  switch (status) {
+    case 'active_profile_loaded':
+      return 'current';
+    case 'fallback_no_active_profile':
+      return 'stale';
+    case 'unsupported_platform':
+      return 'unsupported';
+  }
+};
+
+const displayPreviewLutStatusLabel = (status: DisplayPreviewLutStatus['status']): string => {
+  switch (status) {
+    case 'active_display_transform':
+      return 'Active display LUT';
+    case 'srgb_fallback_transform':
+      return 'sRGB fallback LUT';
+    case 'unsupported_platform':
+      return 'Display LUT unsupported';
+  }
+};
+
+const displayPreviewLutState = (status: DisplayPreviewLutStatus['status']): PreviewBoundWarningState => {
+  switch (status) {
+    case 'active_display_transform':
+      return 'current';
+    case 'srgb_fallback_transform':
+      return 'stale';
+    case 'unsupported_platform':
+      return 'unsupported';
+  }
+};
+
+const proofStateCode = (state: PreviewBoundWarningState): string => {
+  switch (state) {
+    case 'current':
+      return 'preview_proof_current';
+    case 'stale':
+      return 'preview_proof_stale';
+    case 'unsupported':
+      return 'preview_proof_unsupported';
+    case 'unavailable':
+      return 'preview_proof_unavailable';
+  }
+};
+
+export const buildColorOutputProofingDiagnostics = ({
+  activeDisplayProfile,
+  currentGamutWarningOverlay,
+  displayProfileError,
+  displayProfileLoading,
+  displayPreviewLutStatus,
+  exportSoftProofRecipeId,
+  exportSoftProofTransform,
+  previewScopeFreshnessStatus,
+  previewScopeWarningCodes = [],
+  renderedPreviewWarningStatus,
+}: {
+  activeDisplayProfile: ActiveDisplayProfile | null;
+  currentGamutWarningOverlay: GamutWarningOverlayPayload | null;
+  displayProfileError: string | null;
+  displayProfileLoading: boolean;
+  displayPreviewLutStatus: DisplayPreviewLutStatus | null;
+  exportSoftProofRecipeId: string | null;
+  exportSoftProofTransform: ExportSoftProofTransformForGamutWarning | null;
+  previewScopeFreshnessStatus: PreviewScopeFreshnessStatus;
+  previewScopeWarningCodes?: string[];
+  renderedPreviewWarningStatus: RenderedPreviewWarningStatus;
+}): ColorOutputProofingDiagnosticsSummary => {
+  const displayProfile = activeDisplayProfile ?? displayPreviewLutStatus?.profile ?? null;
+  const displayHash = shortHash(displayProfile?.iccSha256);
+  const displayProfileLabel =
+    displayProfileError !== null
+      ? 'Display profile unavailable'
+      : displayProfileLoading
+        ? 'Display profile loading'
+        : displayProfile
+          ? activeDisplayProfileStatusLabel(displayProfile.status)
+          : 'Display profile unavailable';
+  const resolvedDisplayProfileState: ColorOutputDiagnosticState =
+    displayProfileError !== null
+      ? 'error'
+      : displayProfileLoading
+        ? 'loading'
+        : displayProfile
+          ? displayProfileState(displayProfile.status)
+          : 'unavailable';
+  const lutStatusLabel =
+    displayProfileError !== null
+      ? 'Display LUT unavailable'
+      : displayProfileLoading
+        ? 'Display LUT loading'
+        : displayPreviewLutStatus
+          ? displayPreviewLutStatusLabel(displayPreviewLutStatus.status)
+          : 'Display LUT unavailable';
+  const resolvedLutState: ColorOutputDiagnosticState =
+    displayProfileError !== null
+      ? 'error'
+      : displayProfileLoading
+        ? 'loading'
+        : displayPreviewLutStatus
+          ? displayPreviewLutState(displayPreviewLutStatus.status)
+          : 'unavailable';
+  const outputProfileLabel =
+    exportSoftProofTransform?.effectiveColorProfile ??
+    renderedPreviewWarningStatus.exportProfileLabel ??
+    renderedPreviewWarningStatus.displayProfileLabel;
+  const renderingIntentLabel = exportSoftProofTransform?.effectiveRenderingIntent ?? 'Preview intent unavailable';
+  const transformLabel =
+    exportSoftProofTransform?.colorManagedTransform ?? renderedPreviewWarningStatus.renderTargetLabel;
+  const coverageRatio = currentGamutWarningOverlay?.coverage_ratio ?? 0;
+  const warningPixelCount = currentGamutWarningOverlay?.warning_pixel_count ?? 0;
+  const codes = new Set<string>([
+    proofStateCode(renderedPreviewWarningStatus.state),
+    `preview_scope_${previewScopeFreshnessStatus.state}`,
+    `display_profile_${resolvedDisplayProfileState}`,
+    `display_lut_${resolvedLutState}`,
+    warningPixelCount > 0 ? 'gamut_warning_present' : 'gamut_warning_clear',
+    exportSoftProofTransform?.transformApplied === true
+      ? 'soft_proof_transform_applied'
+      : 'soft_proof_transform_pending',
+    ...previewScopeWarningCodes,
+  ]);
+
+  if (displayProfile?.status) codes.add(`display_profile_${displayProfile.status}`);
+  if (displayPreviewLutStatus?.status) codes.add(`display_lut_${displayPreviewLutStatus.status}`);
+  if (currentGamutWarningOverlay?.transform_policy_fingerprint) codes.add('gamut_warning_transform_matched');
+
+  return {
+    codes: [...codes].sort(),
+    displayProfileHash: displayHash,
+    displayProfileLabel,
+    displayProfileSource: displayProfile?.source ?? null,
+    displayProfileState: resolvedDisplayProfileState,
+    gamutCoverageLabel: formatGamutWarningCoverage(currentGamutWarningOverlay),
+    gamutCoverageRatio: coverageRatio,
+    gamutWarningPixelCount: warningPixelCount,
+    lutSampleCount: displayPreviewLutStatus?.sampleCount ?? 0,
+    lutSize: displayPreviewLutStatus?.size ?? 0,
+    lutState: resolvedLutState,
+    lutStatusLabel,
+    outputProfileLabel,
+    previewProofState: renderedPreviewWarningStatus.state,
+    previewProofStatusLabel: renderedPreviewWarningStatus.statusLabel,
+    previewScopeState: previewScopeFreshnessStatus.state,
+    previewScopeStatusLabel: previewScopeFreshnessStatus.statusLabel,
+    renderingIntentLabel,
+    softProofRecipeId: exportSoftProofRecipeId,
+    transformApplied: exportSoftProofTransform?.transformApplied ?? null,
+    transformLabel,
+    transformPolicyFingerprint: exportSoftProofTransform?.transformPolicyFingerprint ?? null,
+    workingSpaceLabel: 'linear-raw-to-working-rgb',
+  };
 };
 
 const previewStateToTone = (state: PreviewBoundWarningState): EditorChromeStatusChipTone => {
