@@ -917,6 +917,11 @@
       "maskOverlayAlt": "Mask Overlay",
       "originalAlt": "Original"
     },
+    "chromeStatus": {
+      "accessibilityLabel": "Editor image-quality status",
+      "visualSmokeSummary": "clipping/gamut/scope",
+      "visualSmokeTitle": "Editor chrome status chips"
+    },
     "crop": {
       "aspectRatioHeading": "Aspect Ratio",
       "custom": {

@@ -910,6 +910,11 @@
       "maskOverlayAlt": "蒙版叠加",
       "originalAlt": "原始图像"
     },
+    "chromeStatus": {
+      "accessibilityLabel": "",
+      "visualSmokeSummary": "",
+      "visualSmokeTitle": ""
+    },
     "crop": {
       "aspectRatioHeading": "宽高比",
       "custom": {
