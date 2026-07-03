@@ -24,18 +24,18 @@ export interface RightPanelRegistryEntry {
 export const RIGHT_PANEL_GROUPS = [
   [
     {
-      fallbackLabel: 'Adjust',
-      icon: SlidersHorizontal,
-      id: Panel.Adjustments,
-      priority: 'primary',
-      tooltipKey: 'editor.switcher.tooltips.adjust',
-    },
-    {
       fallbackLabel: 'Color',
       icon: Palette,
       id: Panel.Color,
       priority: 'primary',
       tooltipKey: 'editor.switcher.tooltips.color',
+    },
+    {
+      fallbackLabel: 'Adjust',
+      icon: SlidersHorizontal,
+      id: Panel.Adjustments,
+      priority: 'primary',
+      tooltipKey: 'editor.switcher.tooltips.adjust',
     },
     {
       fallbackLabel: 'Crop',
@@ -99,3 +99,19 @@ export const RIGHT_PANEL_GROUPS = [
 ] as const satisfies ReadonlyArray<ReadonlyArray<RightPanelRegistryEntry>>;
 
 export const RIGHT_PANEL_ORDER: Panel[] = RIGHT_PANEL_GROUPS.flatMap((group) => group.map(({ id }) => id));
+
+export const DEFAULT_EDITOR_RIGHT_PANEL = Panel.Color;
+
+export const EDITING_RIGHT_PANELS = [
+  Panel.Color,
+  Panel.Adjustments,
+  Panel.Crop,
+  Panel.Masks,
+  Panel.Agent,
+  Panel.Ai,
+] as const satisfies ReadonlyArray<Panel>;
+
+const EDITING_RIGHT_PANEL_IDS = new Set<string>(EDITING_RIGHT_PANELS);
+
+export const isEditingRightPanel = (panel: string | null): panel is (typeof EDITING_RIGHT_PANELS)[number] =>
+  panel !== null && EDITING_RIGHT_PANEL_IDS.has(panel);
