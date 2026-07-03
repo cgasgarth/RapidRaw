@@ -72,9 +72,9 @@ export const resolveEditorOverlayVisibility = ({
   showOriginal,
 }: ResolveEditorOverlayVisibilityInput): EditorOverlayVisibility => {
   const isHoldOriginalCompare = compareMode === 'hold-original' || showOriginal;
-  const isSplitCompare = compareMode === 'split-wipe';
-  const isSideBySideCompare = compareMode === 'side-by-side';
-  const isCompareModeActive = compareMode !== 'off';
+  const isSplitCompare = !isHoldOriginalCompare && compareMode === 'split-wipe';
+  const isSideBySideCompare = !isHoldOriginalCompare && compareMode === 'side-by-side';
+  const isCompareModeActive = compareMode !== 'off' || showOriginal;
   const compareOverlayDisabled = isCompareModeActive && blocker !== 'none';
   const showOriginalCompare = isHoldOriginalCompare && canShowOriginalCompare && !compareOverlayDisabled;
   const showSplitCompare = isSplitCompare && !compareOverlayDisabled;

@@ -50,6 +50,7 @@ interface EditorToolbarProps {
   onOpenNegativeLab: () => void;
   onRedo: () => void;
   onCompareModeChange?: (mode: EditorCompareMode) => void;
+  onShowOriginalChange?: (showOriginal: boolean) => void;
   onToggleFullScreen: () => void;
   onToggleShowOriginal: () => void;
   onUndo: () => void;
@@ -79,6 +80,7 @@ const EditorToolbar = memo(
     onOpenNegativeLab,
     onRedo,
     onCompareModeChange = () => undefined,
+    onShowOriginalChange = () => undefined,
     onToggleFullScreen,
     onToggleShowOriginal,
     onUndo,
@@ -145,6 +147,7 @@ const EditorToolbar = memo(
     const negativeLabTooltip = negativeLabDisabledReason ?? negativeLabLabel;
     const compareNeedsOriginal = compareMode !== 'off';
     const compareUnavailableReason = t('editor.toolbar.compare.unavailable');
+    const holdOriginalButtonHandledRef = useRef(false);
 
     const showResolution = !isAndroid && selectedImage.width > 0 && selectedImage.height > 0;
     const [displayedResolution, setDisplayedResolution] = useState('');
@@ -944,8 +947,43 @@ const EditorToolbar = memo(
               }
               aria-pressed={showOriginal}
               className={cx(showOriginal ? activeIconButtonClass : iconButtonClass)}
-              onClick={onToggleShowOriginal}
-              onKeyDown={handleButtonKeyDown}
+              onClick={() => {
+                if (holdOriginalButtonHandledRef.current) {
+                  holdOriginalButtonHandledRef.current = false;
+                  return;
+                }
+                onToggleShowOriginal();
+              }}
+              onKeyDown={(event) => {
+                if (event.key === ' ' || event.key === 'Enter') {
+                  event.preventDefault();
+                  holdOriginalButtonHandledRef.current = true;
+                  onShowOriginalChange(true);
+                  return;
+                }
+                handleButtonKeyDown(event);
+              }}
+              onKeyUp={(event) => {
+                if (event.key === ' ' || event.key === 'Enter') {
+                  onShowOriginalChange(false);
+                }
+              }}
+              onPointerCancel={() => {
+                holdOriginalButtonHandledRef.current = true;
+                onShowOriginalChange(false);
+              }}
+              onPointerDown={(event) => {
+                if (event.button !== 0) return;
+                holdOriginalButtonHandledRef.current = true;
+                onShowOriginalChange(true);
+              }}
+              onPointerLeave={(event) => {
+                if (event.buttons !== 1) return;
+                onShowOriginalChange(false);
+              }}
+              onPointerUp={() => {
+                onShowOriginalChange(false);
+              }}
               data-tooltip={
                 showOriginal ? t('editor.toolbar.tooltips.showEdited') : t('editor.toolbar.tooltips.showOriginal')
               }
