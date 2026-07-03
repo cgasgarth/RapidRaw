@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { panoramaTilePerformanceV1Schema } from '../../../packages/rawengine-schema/src/rawEngineSchemas';
+
 export const panoramaUiProjectionSchema = z.enum(['rectilinear', 'cylindrical', 'spherical']);
 export const panoramaUiBoundaryModeSchema = z.enum(['auto_crop', 'transparent', 'manual_crop']);
 export const panoramaUiBlendModeSchema = z.enum(['feather', 'multi_band']);
@@ -328,6 +330,7 @@ export const panoramaSavedReviewSummarySchema = z
     sourceCount: z.number().int().nonnegative(),
     sourceContribution: panoramaSourceContributionSchema,
     sourceRefs: z.array(panoramaSavedReviewSourceRefSchema),
+    tilePerformance: panoramaTilePerformanceV1Schema.optional(),
     warningCodes: z.array(z.string()),
   })
   .strict()

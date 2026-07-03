@@ -15,6 +15,7 @@ import {
   panoramaBackendCapabilityReportV1Schema,
   panoramaBackendIdV1Schema,
   panoramaEngineCapabilitiesV1Schema,
+  panoramaTilePerformanceV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
 } from '../rawEngineSchemas.js';
 import {
@@ -483,6 +484,7 @@ export const panoramaRuntimeProvenanceV1Schema = z
         tileSizePx: z.number().int().positive(),
       })
       .strict(),
+    tilePerformance: panoramaTilePerformanceV1Schema,
   })
   .strict();
 
@@ -717,6 +719,7 @@ export const buildPanoramaRuntimeArtifactV1 = ({
       invalidationReasons: [],
       state: 'current',
     },
+    tilePerformance: provenance.tilePerformance,
     validationMetrics: {
       excludedSourceCount: excludedSources.length,
       overlapCoverageRatio: provenance.qualityMetrics.stitchedSourceRatio,
@@ -829,6 +832,7 @@ const renderPanoramaRuntime = (request: ParsedPanoramaRuntimePlanRequestV1) => {
         sourceIndex: frame.sourceIndex,
       })),
       stitchedSourceCount: stitched.stitchedSourceCount,
+      tilePerformance: stitched.tilePerformance,
       tileRender: {
         ...stitched.tilePlan,
         tileBackedRender: true,

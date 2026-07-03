@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   hdrDeghostingModeV1Schema,
   hdrMaskArtifactV1Schema,
+  panoramaTilePerformanceV1Schema,
 } from '../../../packages/rawengine-schema/src/rawEngineSchemas';
 import {
   focusStackBreathingCompensationSchema,
@@ -86,6 +87,7 @@ const derivedOutputPanoramaMetadataSchema = z
       .strict(),
     seamExposureCompensationPercent: z.number().int().min(0).max(100).optional(),
     sourceSetHash: z.string().trim().min(1),
+    tilePerformance: panoramaTilePerformanceV1Schema.optional(),
   })
   .strict();
 

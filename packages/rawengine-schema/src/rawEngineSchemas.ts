@@ -2841,6 +2841,32 @@ export const panoramaValidationMetricsV1Schema = z
   })
   .strict();
 
+export const panoramaTilePerformanceV1Schema = z
+  .object({
+    largestTilePixels: z.number().int().nonnegative(),
+    observedOutputPixels: z.number().int().nonnegative(),
+    observedTileBufferBytes: z.number().int().nonnegative(),
+    observedTileCount: z.number().int().nonnegative(),
+    timingMode: z.literal('synthetic_deterministic_tile_iterations'),
+  })
+  .strict()
+  .superRefine((performance, context) => {
+    if (performance.observedTileCount > 0 && performance.largestTilePixels === 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Observed panorama tile performance requires a non-zero largest tile size.',
+        path: ['largestTilePixels'],
+      });
+    }
+    if (performance.observedTileCount === 0 && performance.observedOutputPixels > 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Observed panorama output pixels require at least one observed tile.',
+        path: ['observedTileCount'],
+      });
+    }
+  });
+
 export const panoramaArtifactV1Schema = z
   .object({
     alignment: panoramaAlignmentV1Schema,
@@ -2887,6 +2913,7 @@ export const panoramaArtifactV1Schema = z
         state: panoramaStaleStateV1Schema,
       })
       .strict(),
+    tilePerformance: panoramaTilePerformanceV1Schema.optional(),
     validationMetrics: panoramaValidationMetricsV1Schema,
     warnings: z.array(panoramaWarningCodeSchema),
   })

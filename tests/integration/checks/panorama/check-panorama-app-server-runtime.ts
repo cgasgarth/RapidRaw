@@ -332,6 +332,20 @@ if (
 ) {
   throw new Error('Expected panorama app-server apply to report tile-backed output metadata.');
 }
+assertTilePerformanceReceipt({
+  cropHeight: applied.apply.provenance.crop.height,
+  cropWidth: applied.apply.provenance.crop.width,
+  label: 'app-server apply provenance',
+  performance: applied.apply.provenance.tilePerformance,
+  tileCount: applied.apply.provenance.tileRender.tileCount,
+});
+assertTilePerformanceReceipt({
+  cropHeight: applied.apply.sidecarArtifact.crop.height,
+  cropWidth: applied.apply.sidecarArtifact.crop.width,
+  label: 'app-server apply sidecar',
+  performance: applied.apply.sidecarArtifact.tilePerformance,
+  tileCount: applied.apply.sidecarArtifact.validationMetrics.tileCount ?? 0,
+});
 if (dryRun.dryRun.dryRunResult.mergePlan.preflight.executionMode !== 'tile_backed_render') {
   throw new Error('Expected panorama app-server dry-run to report tile-backed preflight execution.');
 }
@@ -437,6 +451,7 @@ console.log(
     planId: dryRun.dryRun.dryRunResult.mergePlan.planId,
     backendSelection: applied.apply.provenance.backendSelection,
     tileRender: applied.apply.provenance.tileRender,
+    tilePerformance: applied.apply.sidecarArtifact.tilePerformance,
     seamReviewScenarios: [
       supportedTranscript.scenario,
       weakOverlapTranscript.scenario,
@@ -536,6 +551,27 @@ function assertBackendSelectionReceipt(receipt, expected) {
     !requestedEvidence.warnings.includes('packaging_unproven')
   ) {
     throw new Error(`Expected requested backend diagnostic evidence, got ${JSON.stringify(requestedEvidence)}.`);
+  }
+}
+
+function assertTilePerformanceReceipt({ cropHeight, cropWidth, label, performance, tileCount }) {
+  if (performance === undefined) {
+    throw new Error(`Expected ${label} to include observed tile performance metadata.`);
+  }
+  if (performance.timingMode !== 'synthetic_deterministic_tile_iterations') {
+    throw new Error(`Expected ${label} to use deterministic tile timing mode.`);
+  }
+  if (performance.observedTileCount !== tileCount) {
+    throw new Error(`Expected ${label} observed tile count ${performance.observedTileCount} to equal ${tileCount}.`);
+  }
+  if (performance.observedOutputPixels !== cropWidth * cropHeight) {
+    throw new Error(`Expected ${label} observed output pixels to match output dimensions.`);
+  }
+  if (performance.largestTilePixels <= 0 || performance.largestTilePixels > performance.observedOutputPixels) {
+    throw new Error(`Expected ${label} largest tile pixels to be sane: ${JSON.stringify(performance)}.`);
+  }
+  if (performance.observedTileBufferBytes < performance.observedOutputPixels * 4) {
+    throw new Error(`Expected ${label} buffer bytes to cover RGB plus mask tile buffers.`);
   }
 }
 
