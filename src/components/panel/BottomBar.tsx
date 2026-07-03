@@ -556,6 +556,7 @@ export default function BottomBar({
                   max={2.0}
                   step="0.05"
                   aria-label={t('ui.bottomBar.tooltips.customZoom')}
+                  data-testid="editor-bottom-bar-zoom-slider"
                   disabled={!isZoomReady}
                   value={latchedSliderValue}
                   onChange={handleSliderChange}
