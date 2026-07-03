@@ -161,6 +161,7 @@ if (missingOperationReadinessKeys.length > 0) {
 }
 
 const source = readFileSync('src/components/panel/right/layers/LayerStackPanel.tsx', 'utf8');
+const maskPanelSource = readFileSync('src/components/panel/right/layers/MasksPanel.tsx', 'utf8');
 for (const marker of [
   'data-testid="layer-stack-composition-summary"',
   'data-testid="layer-stack-count-summary"',
@@ -337,6 +338,33 @@ for (const marker of [
 ]) {
   if (!source.includes(marker)) {
     console.error(`Layer stack panel missing count summary marker: ${marker}`);
+    process.exit(1);
+  }
+}
+
+for (const marker of [
+  '<motion.button',
+  'data-mask-creation-disabled={String(maskType.disabled)}',
+  'disabled={maskType.disabled}',
+  'aria-disabled={maskType.disabled}',
+  'aria-label={tooltip}',
+  "aria-label={t('editor.masks.addNewMask')}",
+  'aria-expanded={isExpanded}',
+  'aria-pressed={isSelected}',
+  "aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${container.name}`}",
+  'aria-pressed={container.visible}',
+  "aria-label={t('editor.masks.actions.deleteMask')}",
+  "aria-label={t('editor.masks.actions.addNewComponent')}",
+  'const handleSubMaskKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) =>',
+  'aria-pressed={isActive}',
+  'tabIndex={isDraggingContainer ? -1 : 0}',
+  'aria-pressed={subMask.mode !== SubMaskMode.Additive}',
+  'aria-pressed={subMask.visible}',
+  "aria-label={t('editor.masks.actions.deleteComponent')}",
+  'group-focus-within:opacity-100',
+]) {
+  if (!maskPanelSource.includes(marker)) {
+    console.error(`Mask panel missing row accessibility marker: ${marker}`);
     process.exit(1);
   }
 }
