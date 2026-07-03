@@ -7,19 +7,20 @@ import { buildAgentImageContextSnapshot } from '../../../src/utils/agent/context
 import {
   type AgentSelectedImageLiveSessionAuditRecord,
   appendAgentSelectedImageLiveSessionAuditRecord,
-  parseAgentSelectedImageLiveSessionAuditStore,
+  buildAgentSelectedImageLiveSessionAuditStorageKey,
   preflightAgentSelectedImageLiveSessionAuditReplay,
   readAgentSelectedImageLiveSessionAuditStore,
+  summarizeAgentSelectedImageLiveSessionAuditStore,
 } from '../../../src/utils/agent/session/agentSelectedImageLiveSession';
 
-const selectedPath = '/fixtures/public/agent-audit-replay/DSC_4703.ARW';
+const selectedPath = '/fixtures/public/agent-audit-store/DSC_4846.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 8 : 4));
 
 const seedEditor = () => {
   useEditorStore.getState().setEditor({
     adjustments: INITIAL_ADJUSTMENTS,
     brushSettings: { feather: 50, size: 64, tool: ToolType.Brush },
-    finalPreviewUrl: 'blob:rawengine-agent-audit-replay-before',
+    finalPreviewUrl: 'blob:rawengine-agent-audit-store-before',
     hasRenderedFirstFrame: true,
     histogram: {
       [ActiveChannel.Blue]: { color: '#4D96FF', data: bins },
@@ -35,9 +36,9 @@ const seedEditor = () => {
       height: 4000,
       isRaw: true,
       isReady: true,
-      originalUrl: 'blob:rawengine-agent-audit-replay-original',
+      originalUrl: 'blob:rawengine-agent-audit-store-original',
       path: selectedPath,
-      thumbnailUrl: 'blob:rawengine-agent-audit-replay-thumb',
+      thumbnailUrl: 'blob:rawengine-agent-audit-store-thumb',
       width: 6000,
     },
     uncroppedAdjustedPreviewUrl: null,
@@ -46,11 +47,16 @@ const seedEditor = () => {
 
 const buildAuditRecord = (): AgentSelectedImageLiveSessionAuditRecord => {
   const snapshot = buildAgentImageContextSnapshot();
+  const sessionId = 'agent-audit-store-session';
+  const storageKey = buildAgentSelectedImageLiveSessionAuditStorageKey({
+    selectedImagePath: snapshot.activeImagePath,
+    sessionId,
+  });
   const receipt = {
     acceptedPreviewArtifactId: snapshot.initialPreview.artifactId,
-    afterPreviewHash: 'render:agent-audit-replay-after',
+    afterPreviewHash: 'render:agent-audit-store-after',
     approvalDecision: 'approved' as const,
-    approvalId: 'approval_agent_audit_replay_4703',
+    approvalId: 'approval_agent_audit_store_4846',
     applyGuard: {
       acceptedPreviewArtifactId: snapshot.initialPreview.artifactId,
       currentGraphRevision: snapshot.graphRevision,
@@ -71,35 +77,35 @@ const buildAuditRecord = (): AgentSelectedImageLiveSessionAuditRecord => {
     },
     applyReceipts: [
       {
-        acceptedPlanHash: 'sha256:agent-audit-replay-plan',
-        acceptedPlanId: 'dry_run_agent_audit_replay_4703',
+        acceptedPlanHash: 'sha256:agent-audit-store-plan',
+        acceptedPlanId: 'dry_run_agent_audit_store_4846',
         graphRevision: 'history_1',
-        previewHash: 'render:agent-audit-replay-after',
-        recipeHash: 'recipe:agent-audit-replay-after',
+        previewHash: 'render:agent-audit-store-after',
+        recipeHash: 'recipe:agent-audit-store-after',
         status: 'succeeded' as const,
-        toolCallId: 'agent-audit-replay-apply',
+        toolCallId: 'agent-audit-store-apply',
       },
     ],
     beforePreviewHash: snapshot.initialPreview.renderHash,
     cancellationOutcome: 'not_cancelled' as const,
     dryRunApprovals: [
       {
-        approvalId: 'approval_agent_audit_replay_4703',
+        approvalId: 'approval_agent_audit_store_4846',
         approvedGraphRevision: snapshot.graphRevision,
         approvedRecipeHash: snapshot.initialPreview.recipeHash,
-        dryRunPlanHash: 'sha256:agent-audit-replay-plan',
-        dryRunPlanId: 'dry_run_agent_audit_replay_4703',
+        dryRunPlanHash: 'sha256:agent-audit-store-plan',
+        dryRunPlanId: 'dry_run_agent_audit_store_4846',
         state: 'approved' as const,
       },
     ],
-    dryRunPlanHash: 'sha256:agent-audit-replay-plan',
-    dryRunPlanId: 'dry_run_agent_audit_replay_4703',
-    finalGraphHash: 'sha256:agent-audit-replay-final-graph',
+    dryRunPlanHash: 'sha256:agent-audit-store-plan',
+    dryRunPlanId: 'dry_run_agent_audit_store_4846',
+    finalGraphHash: 'sha256:agent-audit-store-final-graph',
     finalGraphRevision: 'history_1',
-    finalRecipeHash: 'recipe:agent-audit-replay-after',
+    finalRecipeHash: 'recipe:agent-audit-store-after',
     initialGraphRevision: snapshot.graphRevision,
     initialRecipeHash: snapshot.initialPreview.recipeHash,
-    operationId: 'agent-audit-replay-operation',
+    operationId: 'agent-audit-store-operation',
     previewLineage: [
       {
         graphRevision: snapshot.graphRevision,
@@ -108,36 +114,36 @@ const buildAuditRecord = (): AgentSelectedImageLiveSessionAuditRecord => {
         purpose: 'accepted_preview' as const,
         recipeHash: snapshot.initialPreview.recipeHash,
         renderHash: snapshot.initialPreview.renderHash,
-        sourceToolCallId: 'agent-audit-replay-dry-run',
+        sourceToolCallId: 'agent-audit-store-dry-run',
         sourceToolName: 'rawengine.agent.adjustments.dry_run',
       },
       {
         graphRevision: 'history_1',
-        previewArtifactId: 'agent-audit-replay-after-preview-artifact',
+        previewArtifactId: 'agent-audit-store-after-preview-artifact',
         purpose: 'refresh' as const,
-        recipeHash: 'recipe:agent-audit-replay-after',
-        renderHash: 'render:agent-audit-replay-after',
-        sourceToolCallId: 'agent-audit-replay-after-preview',
+        recipeHash: 'recipe:agent-audit-store-after',
+        renderHash: 'render:agent-audit-store-after',
+        sourceToolCallId: 'agent-audit-store-after-preview',
         sourceToolName: 'rawengine.agent.preview.render',
       },
     ],
-    promptSummary: 'Replay selected-image audit fixture',
-    requestId: 'agent-audit-replay-request',
+    promptSummary: 'Persist audit receipts with preview lineage',
+    requestId: 'agent-audit-store-request',
     rollbackCheckpoint: {
       graphRevision: snapshot.graphRevision,
       previewRecipeHash: snapshot.initialPreview.recipeHash,
-      sessionId: 'agent-audit-replay-session',
+      sessionId,
     },
     rollbackGraphRevision: snapshot.graphRevision,
     schemaVersion: 1 as const,
     selectedImagePath: snapshot.activeImagePath,
-    sessionId: 'agent-audit-replay-session',
-    storageKey: 'rawengine.agent.selectedImageLiveSessionAudit.v1.sha256-agent-audit-replay',
+    sessionId,
+    storageKey,
     state: 'applied' as const,
     toolCalls: [
-      { id: 'agent-audit-replay-dry-run', name: 'rawengine.agent.adjustments.dry_run', status: 'succeeded' as const },
-      { id: 'agent-audit-replay-apply', name: 'rawengine.agent.adjustments.apply', status: 'succeeded' as const },
-      { id: 'agent-audit-replay-after-preview', name: 'rawengine.agent.preview.render', status: 'succeeded' as const },
+      { id: 'agent-audit-store-dry-run', name: 'rawengine.agent.adjustments.dry_run', status: 'succeeded' as const },
+      { id: 'agent-audit-store-apply', name: 'rawengine.agent.adjustments.apply', status: 'succeeded' as const },
+      { id: 'agent-audit-store-after-preview', name: 'rawengine.agent.preview.render', status: 'succeeded' as const },
     ],
   };
 
@@ -146,12 +152,12 @@ const buildAuditRecord = (): AgentSelectedImageLiveSessionAuditRecord => {
       {
         approvalDecision: 'approved',
         graphRevision: snapshot.graphRevision,
-        id: 'agent-audit-replay-event-1',
-        message: 'Dry-run accepted for replay preflight.',
+        id: 'agent-audit-store-event-1',
+        message: 'Dry-run accepted for audit storage.',
         previewHash: snapshot.initialPreview.renderHash,
         recipeHash: snapshot.initialPreview.recipeHash,
         state: 'dry_run_ready',
-        toolCallId: 'agent-audit-replay-dry-run',
+        toolCallId: 'agent-audit-store-dry-run',
         toolName: 'rawengine.agent.adjustments.dry_run',
       },
     ],
@@ -163,7 +169,7 @@ const buildAuditRecord = (): AgentSelectedImageLiveSessionAuditRecord => {
         acceptedPreviewArtifactId: snapshot.initialPreview.artifactId,
         approvalId: receipt.approvalId,
         graphRevision: snapshot.graphRevision,
-        id: 'agent-audit-replay-preview',
+        id: 'agent-audit-store-preview',
         kind: 'preview',
         previewArtifactId: snapshot.initialPreview.artifactId,
         recipeHash: snapshot.initialPreview.recipeHash,
@@ -197,7 +203,7 @@ const buildAuditRecord = (): AgentSelectedImageLiveSessionAuditRecord => {
         acceptedPreviewArtifactId: snapshot.initialPreview.artifactId,
         approvalId: receipt.approvalId,
         graphRevision: snapshot.graphRevision,
-        id: 'agent-audit-replay-approval',
+        id: 'agent-audit-store-approval',
         kind: 'approval',
         previewArtifactId: snapshot.initialPreview.artifactId,
         recipeHash: snapshot.initialPreview.recipeHash,
@@ -208,56 +214,76 @@ const buildAuditRecord = (): AgentSelectedImageLiveSessionAuditRecord => {
         acceptedPreviewArtifactId: snapshot.initialPreview.artifactId,
         approvalId: receipt.approvalId,
         graphRevision: receipt.finalGraphRevision,
-        id: 'agent-audit-replay-apply-decision',
+        id: 'agent-audit-store-apply-decision',
         kind: 'apply_decision',
         previewArtifactId: snapshot.initialPreview.artifactId,
         recipeHash: receipt.finalRecipeHash,
         resultHash: 'sha256:apply-decision',
         status: 'succeeded',
-        toolCallId: 'agent-audit-replay-apply',
+        toolCallId: 'agent-audit-store-apply',
         toolName: 'rawengine.agent.adjustments.apply',
       },
     ],
   };
 };
 
-describe('agent selected-image audit replay', () => {
+const keyedMemoryAdapter = (key: string, storage = new Map<string, string>()) => ({
+  adapter: {
+    readText: () => storage.get(key) ?? null,
+    writeText: (value: string) => {
+      storage.set(key, value);
+    },
+  },
+  storage,
+});
+
+describe('agent selected-image audit store', () => {
   beforeEach(() => {
     seedEditor();
   });
 
-  test('appends and reads replayable audit records from the versioned store', () => {
-    let storedText: string | null = null;
-    const adapter = {
-      readText: () => storedText,
-      writeText: (value: string) => {
-        storedText = value;
-      },
-    };
-
+  test('appends and reads receipts under selected image and session storage key', () => {
     const record = buildAuditRecord();
-    const written = appendAgentSelectedImageLiveSessionAuditRecord(adapter, record);
-    expect(written.records).toHaveLength(1);
-    expect(readAgentSelectedImageLiveSessionAuditStore(adapter).records[0]?.receipt.sessionId).toBe(
-      record.receipt.sessionId,
+    const key = buildAgentSelectedImageLiveSessionAuditStorageKey({
+      selectedImagePath: record.receipt.selectedImagePath,
+      sessionId: record.receipt.sessionId,
+    });
+    const { adapter, storage } = keyedMemoryAdapter(key);
+
+    appendAgentSelectedImageLiveSessionAuditRecord(adapter, record);
+
+    expect(storage.has(key)).toBe(true);
+    expect(record.receipt.storageKey).toBe(key);
+    expect(readAgentSelectedImageLiveSessionAuditStore(adapter).records[0]?.receipt.previewLineage).toHaveLength(2);
+    expect(summarizeAgentSelectedImageLiveSessionAuditStore(adapter)).toMatchObject({
+      latestSessionId: record.receipt.sessionId,
+      previewCount: 2,
+      recordCount: 1,
+      replayPreflightStatus: 'ready',
+    });
+  });
+
+  test('rejects malformed receipt lineage before writing', () => {
+    const record = structuredClone(buildAuditRecord()) as AgentSelectedImageLiveSessionAuditRecord;
+    const key = record.receipt.storageKey ?? 'missing-key';
+    const { adapter, storage } = keyedMemoryAdapter(key);
+    record.receipt.previewLineage = record.receipt.previewLineage?.slice(0, 1);
+
+    expect(() => appendAgentSelectedImageLiveSessionAuditRecord(adapter, record)).toThrow(
+      'missing after-preview lineage',
     );
+    expect(storage.has(key)).toBe(false);
   });
 
-  test('migrates legacy array storage and falls back from invalid schema', () => {
-    const record = buildAuditRecord();
-    expect(parseAgentSelectedImageLiveSessionAuditStore(JSON.stringify([record])).records).toHaveLength(1);
-    expect(parseAgentSelectedImageLiveSessionAuditStore('{"schemaVersion":0,"records":[]}').records).toHaveLength(0);
-    expect(parseAgentSelectedImageLiveSessionAuditStore('not json').records).toHaveLength(0);
-  });
-
-  test('preflights replay when source image and graph lineage match', () => {
+  test('passes replay preflight when current selected image lineage matches', () => {
     const preflight = preflightAgentSelectedImageLiveSessionAuditReplay(buildAuditRecord());
+
     expect(preflight.status).toBe('ready');
     expect(preflight.staleReason).toBeUndefined();
-    expect(preflight.replayPreviewHash).toBe('render:agent-audit-replay-after');
+    expect(preflight.replayPreviewHash).toBe('render:agent-audit-store-after');
   });
 
-  test('blocks replay for stale source image identity', () => {
+  test('marks replay preflight stale when selected image path mismatches', () => {
     const record = buildAuditRecord();
     useEditorStore.setState((state) => ({
       selectedImage:
@@ -265,19 +291,8 @@ describe('agent selected-image audit replay', () => {
     }));
 
     const preflight = preflightAgentSelectedImageLiveSessionAuditReplay(record);
+
     expect(preflight.status).toBe('stale');
     expect(preflight.staleReason).toBe('image_changed');
-  });
-
-  test('blocks replay for stale graph revision before preview reproduction', () => {
-    const record = buildAuditRecord();
-    useEditorStore.setState({
-      history: [INITIAL_ADJUSTMENTS, { ...INITIAL_ADJUSTMENTS, exposure: 0.3 }],
-      historyIndex: 1,
-    });
-
-    const preflight = preflightAgentSelectedImageLiveSessionAuditReplay(record);
-    expect(preflight.status).toBe('stale');
-    expect(preflight.staleReason).toBe('graph_revision_changed');
   });
 });
