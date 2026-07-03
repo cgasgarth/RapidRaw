@@ -7,9 +7,11 @@ import { buildAgentImageContextSnapshot } from '../../../src/utils/agent/context
 import {
   type AgentSelectedImageLiveSessionAuditRecord,
   appendAgentSelectedImageLiveSessionAuditRecord,
+  buildAgentSelectedImageLiveSessionAuditExportReceipt,
   buildAgentSelectedImageLiveSessionAuditStorageKey,
   preflightAgentSelectedImageLiveSessionAuditReplay,
   readAgentSelectedImageLiveSessionAuditStore,
+  replayAgentSelectedImageLiveSessionAudit,
   summarizeAgentSelectedImageLiveSessionAuditStore,
 } from '../../../src/utils/agent/session/agentSelectedImageLiveSession';
 
@@ -281,6 +283,44 @@ describe('agent selected-image audit store', () => {
     expect(preflight.status).toBe('ready');
     expect(preflight.staleReason).toBeUndefined();
     expect(preflight.replayPreviewHash).toBe('render:agent-audit-store-after');
+  });
+
+  test('builds a shareable audit export receipt without image bytes or private paths', () => {
+    const record = buildAuditRecord();
+    const replayPreflight = preflightAgentSelectedImageLiveSessionAuditReplay(record);
+    const exportReceipt = buildAgentSelectedImageLiveSessionAuditExportReceipt({
+      audit: record,
+      exportedAt: '2026-07-03T12:00:00.000Z',
+      replayPreflight,
+    });
+    const exportedText = JSON.stringify(exportReceipt);
+
+    expect(exportReceipt.kind).toBe('agent.selectedImageLiveSession.auditReceipt');
+    expect(exportReceipt.sessionId).toBe(record.receipt.sessionId);
+    expect(exportReceipt.selectedImage.basename).toBe('DSC_4846.ARW');
+    expect(exportReceipt.selectedImage.stableHash).toMatch(/^sha256:[0-9a-f]{16}$/);
+    expect(exportReceipt.requestIds).toContain(record.receipt.requestId);
+    expect(exportReceipt.toolNames).toContain('rawengine.agent.adjustments.apply');
+    expect(exportReceipt.graphRevisions).toMatchObject({
+      final: record.receipt.finalGraphRevision,
+      initial: record.receipt.initialGraphRevision,
+      rollbackCheckpoint: record.receipt.rollbackGraphRevision,
+    });
+    expect(exportReceipt.previewHashes).toMatchObject({
+      after: record.receipt.afterPreviewHash,
+      before: record.receipt.beforePreviewHash,
+    });
+    expect(exportReceipt.auditRecord.receipt.applyReceipts?.[0]?.toolCallId).toBe('agent-audit-store-apply');
+    expect(exportReceipt.rollbackState.status).toBe('available');
+    expect(exportReceipt.replayPreflight.status).toBe('ready');
+    expect(replayAgentSelectedImageLiveSessionAudit(exportReceipt.auditRecord).sessionId).toBe(
+      record.receipt.sessionId,
+    );
+    expect(exportedText).not.toContain(selectedPath);
+    expect(exportedText).not.toContain('/fixtures/public');
+    expect(exportedText).not.toContain('data:image');
+    expect(exportedText).not.toContain('base64');
+    expect(exportedText).not.toContain('blob:');
   });
 
   test('marks replay preflight stale when selected image path mismatches', () => {

@@ -1,19 +1,14 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useEditorStore } from '../../../../store/useEditorStore';
-import { useSettingsStore } from '../../../../store/useSettingsStore';
-import { buildAgentImageContextSnapshot } from '../../../../utils/agent/context/agentImageContextSnapshot';
-import {
-  AGENT_EXPORT_PROOF_TOOL_NAME,
-  buildAgentExportPresetSettings,
-} from '../../../../utils/agent/safety/agentExportProofTool';
-import { dispatchAgentExportReviewTool } from '../../../../utils/agent/session/agentLiveToolDispatch';
 import {
   type AgentSelectedImageLiveSessionAuditRecord,
   type AgentSelectedImageLiveSessionDraft,
   appendAgentSelectedImageLiveSessionAuditRecord,
   applyAgentSelectedImageLiveSession,
   approveAgentSelectedImageLiveSession,
+  buildAgentSelectedImageLiveSessionAuditExportReceipt,
   buildAgentSelectedImageLiveSessionAuditStorageKey,
+  preflightAgentSelectedImageLiveSessionAuditReplay,
   rollbackAgentSelectedImageLiveSession,
   startAgentSelectedImageLiveSessionDryRun,
 } from '../../../../utils/agent/session/agentSelectedImageLiveSession';
@@ -27,6 +22,7 @@ import type { SelectedImage } from '../../../ui/AppProperties';
 
 const LIVE_AGENT_SELECTED_IMAGE_SESSION_AUDIT_KEY = 'rawengine.agent.selectedImageLiveSessionAudit.v1';
 const WORKSPACE_SESSION_ID = 'agent-workspace-selected-image';
+export const AGENT_AUDIT_EXPORT_FILE_TOOL_NAME = 'rawengine.agent.audit.export';
 
 export type AgentSelectedImageWorkspaceActionStatus =
   | 'applied'
@@ -120,6 +116,49 @@ const buildActivityEntry = (
   id: `agent-workspace-live-action-${Date.now()}-${index}`,
 });
 
+const getImageBasename = (path: string): string => {
+  const cleanPath = path.split('?')[0] ?? path;
+  return cleanPath.split(/[\\/]/u).pop() || cleanPath || 'selected-image';
+};
+
+const buildAuditExportFilename = (record: AgentSelectedImageLiveSessionAuditRecord): string => {
+  const basename = getImageBasename(record.receipt.selectedImagePath).replaceAll(/[^A-Za-z0-9._-]/gu, '_');
+  return `${basename}-${record.receipt.sessionId}-audit.json`.replaceAll(/[^A-Za-z0-9._-]/gu, '_');
+};
+
+const saveAuditReceiptWithBrowserFallback = async ({
+  filename,
+  text,
+}: {
+  filename: string;
+  text: string;
+}): Promise<string> => {
+  if (
+    typeof globalThis.document === 'undefined' ||
+    typeof globalThis.Blob === 'undefined' ||
+    typeof globalThis.URL === 'undefined' ||
+    typeof globalThis.URL.createObjectURL !== 'function'
+  ) {
+    return filename;
+  }
+
+  const blob = new Blob([text], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  try {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.rel = 'noopener';
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    return filename;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+};
+
 export const useAgentSelectedImageWorkspaceController = ({
   selectedImage,
 }: AgentSelectedImageWorkspaceControllerInput): AgentSelectedImageWorkspaceController => {
@@ -129,14 +168,12 @@ export const useAgentSelectedImageWorkspaceController = ({
   const [error, setError] = useState<string | null>(null);
   const [rollbackCheckpoint, setRollbackCheckpoint] = useState<AgentSessionCheckpoint | null>(null);
   const [status, setStatus] = useState<AgentSelectedImageWorkspaceActionStatus>('idle');
-  const exportPresetCount = useSettingsStore((state) => state.appSettings?.exportPresets?.length ?? 0);
 
   const selectedImageReady = selectedImage !== null && selectedImage.isReady;
   const operationPending = status === 'applying' || status === 'exporting' || status === 'rolling_back';
   const canDryRun = selectedImageReady && !operationPending;
   const canApply = selectedImageReady && draft !== null && draft.state === 'approval_required' && !operationPending;
-  const canExportAudit =
-    selectedImageReady && auditRecord !== null && status === 'applied' && exportPresetCount > 0 && !operationPending;
+  const canExportAudit = selectedImageReady && auditRecord !== null && !operationPending;
   const canRollback =
     selectedImageReady &&
     auditRecord !== null &&
@@ -147,12 +184,9 @@ export const useAgentSelectedImageWorkspaceController = ({
     if (selectedImage === null) return 'Select an image before running selected-image live actions.';
     if (!selectedImage.isReady) return 'Selected image is still loading.';
     if (operationPending) return 'Selected-image live action is already running.';
-    if (auditRecord !== null && status === 'applied' && exportPresetCount === 0) {
-      return 'Create or load an export preset before exporting the selected-image audit proof.';
-    }
     if (status === 'blocked' && error !== null) return error;
     return '';
-  }, [auditRecord, error, exportPresetCount, operationPending, selectedImage, status]);
+  }, [error, operationPending, selectedImage, status]);
 
   const pushActivityEntry = useCallback((entry: Omit<AgentSelectedImageWorkspaceActivityEntry, 'id'>) => {
     setActivityEntries((entries) => [...entries, buildActivityEntry(entries.length, entry)]);
@@ -273,47 +307,26 @@ export const useAgentSelectedImageWorkspaceController = ({
     if (!canExportAudit || auditRecord === null) return;
     setError(null);
     setStatus('exporting');
-    const requestId = `${auditRecord.receipt.requestId}-workspace-export-proof`;
+    const requestId = `${auditRecord.receipt.requestId}-workspace-audit-export`;
     try {
-      const snapshot = buildAgentImageContextSnapshot();
-      if (snapshot.activeImagePath !== auditRecord.receipt.selectedImagePath) {
-        throw new Error('Selected-image audit export rejected a different selected image.');
-      }
-      if (snapshot.graphRevision !== auditRecord.receipt.finalGraphRevision) {
-        throw new Error('Selected-image audit export requires the applied graph revision to be current.');
-      }
-      const exportPresetSettings = buildAgentExportPresetSettings({
-        presets: useSettingsStore.getState().appSettings?.exportPresets ?? [],
+      const replayPreflight = preflightAgentSelectedImageLiveSessionAuditReplay(auditRecord);
+      const exportReceipt = buildAgentSelectedImageLiveSessionAuditExportReceipt({
+        audit: auditRecord,
+        replayPreflight,
       });
-      const exportProof = await dispatchAgentExportReviewTool({
-        request: {
-          approval: {
-            approvalId: `approval_workspace_export_${auditRecord.receipt.requestId}`,
-            approvedGraphRevision: snapshot.graphRevision,
-            approvedRecipeHash: snapshot.initialPreview.recipeHash,
-            approvedSelectedImagePath: snapshot.activeImagePath,
-            approvedSessionId: auditRecord.receipt.sessionId,
-            status: 'pending',
-          },
-          dryRun: true,
-          expectedRecipeHash: snapshot.initialPreview.recipeHash,
-          operationId: `${auditRecord.receipt.operationId}-workspace-export-proof`,
-          requestId,
-          sessionId: auditRecord.receipt.sessionId,
-          ...exportPresetSettings,
-        },
-        requestId,
-      });
+      const filename = buildAuditExportFilename(auditRecord);
+      const payload = `${JSON.stringify(exportReceipt, null, 2)}\n`;
+      await saveAuditReceiptWithBrowserFallback({ filename, text: payload });
       setStatus('exported');
       pushActivityEntry({
-        body: exportProof.exportHash,
-        graphRevision: exportProof.receipt.graphRevision,
+        body: `${filename} (${exportReceipt.replayPreflight.status})`,
+        graphRevision: auditRecord.receipt.finalGraphRevision ?? auditRecord.receipt.initialGraphRevision,
         kind: 'export',
-        previewAfterHash: exportProof.receipt.previewRenderHash,
-        recipeHash: exportProof.receipt.recipeHash,
+        previewAfterHash: auditRecord.receipt.afterPreviewHash ?? auditRecord.receipt.beforePreviewHash,
+        recipeHash: auditRecord.receipt.finalRecipeHash ?? auditRecord.receipt.initialRecipeHash,
         requestId,
         status: 'completed',
-        toolName: AGENT_EXPORT_PROOF_TOOL_NAME,
+        toolName: AGENT_AUDIT_EXPORT_FILE_TOOL_NAME,
       });
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : 'Selected-image audit export failed.';
@@ -324,7 +337,7 @@ export const useAgentSelectedImageWorkspaceController = ({
         kind: 'error',
         requestId,
         status: 'blocked',
-        toolName: AGENT_EXPORT_PROOF_TOOL_NAME,
+        toolName: AGENT_AUDIT_EXPORT_FILE_TOOL_NAME,
       });
     }
   }, [auditRecord, canExportAudit, pushActivityEntry]);
