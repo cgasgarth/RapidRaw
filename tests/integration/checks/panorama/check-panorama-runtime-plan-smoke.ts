@@ -144,6 +144,22 @@ assertEqual(dryRun.provenance.tileRender.seamHaloPx, 64, 'tile seam halo');
 if (dryRun.provenance.tileRender.tileCount < 2) {
   throw new Error('Expected panorama runtime to render through multiple tiles.');
 }
+assertEqual(
+  dryRun.provenance.tilePerformance.observedTileCount,
+  dryRun.provenance.tileRender.tileCount,
+  'observed tile count',
+);
+assertEqual(
+  dryRun.provenance.tilePerformance.observedOutputPixels,
+  dryRun.provenance.crop.width * dryRun.provenance.crop.height,
+  'observed tile output pixels',
+);
+if (
+  dryRun.provenance.tilePerformance.observedTileBufferBytes <
+  dryRun.provenance.tilePerformance.observedOutputPixels * 4
+) {
+  throw new Error('Expected observed tile buffer bytes to cover RGB plus mask tile buffers.');
+}
 assertEqual(dryRun.dryRunResult.mergePlan.preflight.executionMode, 'tile_backed_render', 'preflight execution mode');
 assertEqual(
   dryRun.dryRunResult.mergePlan.preflight.engineCapabilities.tileBackedRender,
@@ -260,6 +276,16 @@ assertEqual(
   applied.sidecarArtifact.validationMetrics.tileCount,
   applied.provenance.tileRender.tileCount,
   'apply sidecar tile count',
+);
+assertEqual(
+  applied.sidecarArtifact.tilePerformance?.observedTileCount,
+  applied.provenance.tilePerformance.observedTileCount,
+  'apply sidecar observed tile count',
+);
+assertEqual(
+  applied.sidecarArtifact.tilePerformance?.observedOutputPixels,
+  applied.provenance.tilePerformance.observedOutputPixels,
+  'apply sidecar observed output pixels',
 );
 assertEqual(
   applied.sidecarArtifact.projectionSettings.requestedProjection,

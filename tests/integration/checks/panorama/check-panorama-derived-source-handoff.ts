@@ -150,6 +150,13 @@ if (sourcePaths.includes(receipt.openInEditorAction.path ?? '')) {
 if (receipt.provenanceSidecar?.sourceState[1]?.contentHash !== review.sourceRefs[1]?.contentHash) {
   throw new Error('Panorama provenance sidecar must carry source content hashes.');
 }
+if (
+  receipt.panorama?.tilePerformance?.observedTileCount !== applied.apply.provenance.tilePerformance.observedTileCount ||
+  receipt.provenanceSidecar?.panorama?.tilePerformance?.observedOutputPixels !==
+    applied.apply.provenance.tilePerformance.observedOutputPixels
+) {
+  throw new Error('Panorama derived receipt must preserve observed tile performance metadata.');
+}
 
 const mutationResult = {
   ...applied.apply.mutationResult,
@@ -326,6 +333,7 @@ function buildReview(outputPath: string) {
       path: sourcePathForIndex(source.sourceIndex),
       sourceIndex: source.sourceIndex,
     })),
+    tilePerformance: applied.apply.provenance.tilePerformance,
     warningCodes: applied.apply.mutationResult.warnings,
   };
 }

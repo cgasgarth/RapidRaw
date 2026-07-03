@@ -297,6 +297,7 @@ export const buildPanoramaDerivedOutputReceipt = ({
       exposureNormalizationSummary: review.exposureNormalizationSummary,
       seamReview: review.seamReview,
       sourceContribution: review.sourceContribution,
+      tilePerformance: review.tilePerformance,
     }),
     outputPath: review.outputPath,
     panorama: buildPanoramaReceiptMetadata({ review, settings }),
@@ -347,6 +348,7 @@ const buildPanoramaReceiptMetadata = ({
       sourceIndex: source.sourceIndex,
     })),
   ),
+  ...(review.tilePerformance === undefined ? {} : { tilePerformance: review.tilePerformance }),
 });
 
 const buildPanoramaPreviewDimensions = (

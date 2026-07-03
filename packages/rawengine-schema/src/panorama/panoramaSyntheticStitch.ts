@@ -73,6 +73,7 @@ export interface PanoramaSyntheticStitchResultV1 {
   outputPixels: Uint8Array | null;
   stitchedSourceCount: number;
   tilePlan: PanoramaSyntheticTilePlanV1;
+  tilePerformance: PanoramaSyntheticTilePerformanceV1;
   warningCodes: string[];
 }
 
@@ -82,6 +83,14 @@ export interface PanoramaSyntheticTilePlanV1 {
   seamHaloPx: number;
   tileCount: number;
   tileSizePx: number;
+}
+
+export interface PanoramaSyntheticTilePerformanceV1 {
+  largestTilePixels: number;
+  observedOutputPixels: number;
+  observedTileBufferBytes: number;
+  observedTileCount: number;
+  timingMode: 'synthetic_deterministic_tile_iterations';
 }
 
 export const renderSyntheticPanoramaStitchV1 = (requestValue: unknown): PanoramaSyntheticStitchResultV1 => {
@@ -94,9 +103,11 @@ export const renderSyntheticPanoramaStitchV1 = (requestValue: unknown): Panorama
 
   const bounds = calculatePanoramaBounds(connectedFrames, request.projection);
   const tilePlan = buildPanoramaSyntheticTilePlan(bounds.outputWidth, bounds.height, request.seamHaloPx);
-  const outputPixels = canRenderSyntheticPanorama(connectedFrames)
+  const rendered = canRenderSyntheticPanorama(connectedFrames)
     ? renderSyntheticPanoramaTiles(request, connectedFrames, bounds, tilePlan)
     : null;
+  const outputPixels = rendered?.outputPixels ?? null;
+  const tilePerformance = rendered?.tilePerformance ?? buildEmptySyntheticTilePerformance();
 
   if (outputPixels !== null) {
     const exposureProof = buildSyntheticTileExposureProof(request, connectedFrames, bounds, tilePlan);
@@ -108,6 +119,7 @@ export const renderSyntheticPanoramaStitchV1 = (requestValue: unknown): Panorama
       outputPixels,
       request,
       tilePlan,
+      tilePerformance,
     });
   }
 
@@ -119,6 +131,7 @@ export const renderSyntheticPanoramaStitchV1 = (requestValue: unknown): Panorama
     outputPixels,
     request,
     tilePlan,
+    tilePerformance,
   });
 };
 
@@ -133,6 +146,7 @@ const buildSyntheticStitchResult = ({
   outputPixels,
   request,
   tilePlan,
+  tilePerformance,
 }: {
   appliedLuminanceGains: Array<{ gain: number; sourceIndex: number }>;
   bounds: ReturnType<typeof calculatePanoramaBounds>;
@@ -141,6 +155,7 @@ const buildSyntheticStitchResult = ({
   outputPixels: Uint8Array | null;
   request: z.infer<typeof panoramaSyntheticStitchRequestV1Schema>;
   tilePlan: PanoramaSyntheticTilePlanV1;
+  tilePerformance: PanoramaSyntheticTilePerformanceV1;
 }): PanoramaSyntheticStitchResultV1 => {
   const estimatedOutputBytes = bounds.outputWidth * bounds.height * BYTES_PER_PIXEL_RGBA;
   const warningCodes = new Set(request.expectedWarningCodes);
@@ -166,6 +181,7 @@ const buildSyntheticStitchResult = ({
     outputPixels,
     stitchedSourceCount: connectedFrames.length,
     tilePlan,
+    tilePerformance,
     warningCodes: [...warningCodes].sort(),
   };
 };
@@ -194,12 +210,21 @@ const renderSyntheticPanoramaTiles = (
   connectedFrames: PanoramaSyntheticSourceFrameV1[],
   bounds: ReturnType<typeof calculatePanoramaBounds>,
   tilePlan: PanoramaSyntheticTilePlanV1,
-): Uint8Array => {
+): { outputPixels: Uint8Array; tilePerformance: PanoramaSyntheticTilePerformanceV1 } => {
   const outputPixels = new Uint8Array(bounds.outputWidth * bounds.height * 3);
+  let largestTilePixels = 0;
+  let observedOutputPixels = 0;
+  let observedTileBufferBytes = 0;
+  let observedTileCount = 0;
   for (let tileY = 0; tileY < bounds.height; tileY += tilePlan.maxTileHeightPx) {
     const tileHeight = Math.min(tilePlan.maxTileHeightPx, bounds.height - tileY);
     for (let tileX = 0; tileX < bounds.outputWidth; tileX += tilePlan.maxTileWidthPx) {
       const tileWidth = Math.min(tilePlan.maxTileWidthPx, bounds.outputWidth - tileX);
+      const tilePixelsCount = tileWidth * tileHeight;
+      observedTileCount += 1;
+      observedOutputPixels += tilePixelsCount;
+      observedTileBufferBytes += tilePixelsCount * 3 + tilePixelsCount;
+      largestTilePixels = Math.max(largestTilePixels, tilePixelsCount);
       const tilePixels = new Uint8Array(tileWidth * tileHeight * 3);
       const tileWeights = new Uint8Array(tileWidth * tileHeight);
       for (const sourceFrame of connectedFrames) {
@@ -241,8 +266,25 @@ const renderSyntheticPanoramaTiles = (
       copyTileToOutput(outputPixels, bounds.outputWidth, tilePixels, tileX, tileY, tileWidth, tileHeight);
     }
   }
-  return outputPixels;
+  return {
+    outputPixels,
+    tilePerformance: {
+      largestTilePixels,
+      observedOutputPixels,
+      observedTileBufferBytes,
+      observedTileCount,
+      timingMode: 'synthetic_deterministic_tile_iterations',
+    },
+  };
 };
+
+const buildEmptySyntheticTilePerformance = (): PanoramaSyntheticTilePerformanceV1 => ({
+  largestTilePixels: 0,
+  observedOutputPixels: 0,
+  observedTileBufferBytes: 0,
+  observedTileCount: 0,
+  timingMode: 'synthetic_deterministic_tile_iterations',
+});
 
 const buildSyntheticTileExposureProof = (
   request: z.infer<typeof panoramaSyntheticStitchRequestV1Schema>,
