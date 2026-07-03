@@ -698,6 +698,61 @@ async function assertProfessionalEditorToolbar(page) {
   }
 }
 
+async function assertProfessionalFilmstripContext(page) {
+  const context = page.getByTestId('professional-filmstrip-context-expanded');
+  await context.waitFor({ timeout: 10_000 });
+
+  const summary = context.getByTestId('filmstrip-selection-summary');
+  await summary.waitFor({ timeout: 10_000 });
+
+  const summaryDataset = await summary.evaluate((element) => ({ ...element.dataset }));
+  if (
+    summaryDataset.selectedCount !== '4' ||
+    summaryDataset.activeFilename !== 'filmstrip-context-active.ARW' ||
+    summaryDataset.editedCount !== '2' ||
+    summaryDataset.rawQualityImageCount !== '3' ||
+    summaryDataset.rawQualityBadgeCount !== '4' ||
+    summaryDataset.ratingCount !== '4' ||
+    summaryDataset.colorLabelCount !== '4' ||
+    summaryDataset.virtualCopyCount !== '1'
+  ) {
+    throw new Error(
+      `Filmstrip selection summary did not expose selected runtime badge state: ${JSON.stringify(summaryDataset)}`,
+    );
+  }
+
+  await context
+    .getByTestId('filmstrip-selection-summary-selected-count')
+    .getByText('4 selected', { exact: true })
+    .waitFor({
+      timeout: 10_000,
+    });
+  await context
+    .getByTestId('filmstrip-selection-summary-active-filename')
+    .getByText('filmstrip-context-active.ARW', { exact: true })
+    .waitFor({ timeout: 10_000 });
+
+  const selectedBeforeClear = await context
+    .locator('[data-testid="filmstrip-thumbnail"][aria-selected="true"]')
+    .count();
+  if (selectedBeforeClear < 4) {
+    throw new Error(`Expected at least four selected filmstrip thumbnails before clear, found ${selectedBeforeClear}.`);
+  }
+
+  await context.getByTestId('filmstrip-selection-summary-clear').click();
+  await page.waitForFunction(() => {
+    const summaryElement = document.querySelector('[data-testid="filmstrip-selection-summary"]');
+    return summaryElement?.getAttribute('data-selected-count') === '0';
+  });
+
+  const selectedAfterClear = await context.locator('[data-testid="filmstrip-thumbnail"][aria-selected="true"]').count();
+  if (selectedAfterClear !== 0) {
+    throw new Error(
+      `Summary clear action should clear actual filmstrip selection, found ${selectedAfterClear} selected thumbnails.`,
+    );
+  }
+}
+
 export async function prepareScenario(page, mode) {
   if (
     mode === VISUAL_SMOKE_SCENARIO_IDS.AdjustmentsPanelRetune ||
@@ -719,6 +774,11 @@ export async function prepareScenario(page, mode) {
 
   if (mode === VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorToolbar) {
     await assertProfessionalEditorToolbar(page);
+    return;
+  }
+
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.ProfessionalFilmstripContext) {
+    await assertProfessionalFilmstripContext(page);
     return;
   }
 

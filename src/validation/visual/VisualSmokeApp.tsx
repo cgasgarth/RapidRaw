@@ -799,7 +799,7 @@ function useProfessionalFilmstripContextSmokeState() {
         [professionalFilmstripImageList[2]?.path ?? '']: 5,
         [professionalFilmstripImageList[3]?.path ?? '']: 1,
       },
-      multiSelectedPaths: professionalFilmstripImageList.slice(0, 3).map((image) => image.path),
+      multiSelectedPaths: professionalFilmstripImageList.slice(0, 4).map((image) => image.path),
     });
     useProcessStore.setState({
       isCopied: true,
@@ -1141,6 +1141,9 @@ function ProfessionalEditorBottomBar() {
 
 function ProfessionalFilmstripContextVisualSmoke() {
   const [isFilmstripVisible, setIsFilmstripVisible] = useState(true);
+  const [multiSelectedPaths, setMultiSelectedPaths] = useState(() =>
+    professionalFilmstripImageList.slice(0, 4).map((image) => image.path),
+  );
   useProfessionalFilmstripContextSmokeState();
 
   const imageRatings = {
@@ -1149,7 +1152,6 @@ function ProfessionalFilmstripContextVisualSmoke() {
     [professionalFilmstripImageList[2]?.path ?? '']: 5,
     [professionalFilmstripImageList[3]?.path ?? '']: 1,
   };
-  const multiSelectedPaths = professionalFilmstripImageList.slice(0, 3).map((image) => image.path);
 
   const bottomBarProps = {
     imageList: professionalFilmstripImageList,
@@ -1159,9 +1161,13 @@ function ProfessionalFilmstripContextVisualSmoke() {
     isPasteDisabled: false,
     isRatingDisabled: false,
     multiSelectedPaths,
-    onClearSelection: () => {},
+    onClearSelection: () => {
+      setMultiSelectedPaths([]);
+    },
     onCopy: () => {},
-    onImageSelect: () => {},
+    onImageSelect: (path: string) => {
+      setMultiSelectedPaths([path]);
+    },
     onOpenCopyPasteSettings: () => {},
     onPaste: () => {},
     onRate: () => {},
