@@ -258,6 +258,7 @@ const FilmstripThumbnail = memo(
         style={{
           zIndex: isActive ? 2 : isSelected ? 1 : 'auto',
         }}
+        data-image-path={path}
         data-tooltip={truncatedTitle}
         data-testid="filmstrip-thumbnail"
       >
