@@ -78,9 +78,17 @@ import PanelScopesStrip from '../inspector/PanelScopesStrip';
 const ADJUSTMENT_SECTION_NAMES = ['basic', 'curves', 'transformLens', 'details', 'effects'] as const;
 type AdjustmentSectionName = (typeof ADJUSTMENT_SECTION_NAMES)[number];
 type RawProcessingModeOverrideOption = RawProcessingMode | 'inherit';
+type RawReconstructionComparisonModeResult = RawReconstructionComparisonResult['modes'][number];
 type CollapsibleSectionsUpdater =
   | CollapsibleSectionsState
   | ((prev: CollapsibleSectionsState) => CollapsibleSectionsState);
+interface AppliedRawReconstructionModeReceipt {
+  cropHash: string;
+  decodeElapsedMs: number;
+  mode: RawProcessingMode;
+  proofBoundary: RawReconstructionComparisonResult['proofBoundary'];
+  savedOverrideValue: RawProcessingMode;
+}
 interface AdjustmentSectionActions {
   headerActions: CollapsibleSectionHeaderAction[];
   menuOptions: Option[];
@@ -206,7 +214,10 @@ export default function Controls() {
   const { setAdjustments, handleAutoAdjustments, handleLutSelect } = useEditorActions();
   const [rawReconstructionComparison, setRawReconstructionComparison] =
     useState<RawReconstructionComparisonResult | null>(null);
+  const [appliedRawReconstructionModeReceipt, setAppliedRawReconstructionModeReceipt] =
+    useState<AppliedRawReconstructionModeReceipt | null>(null);
   const [isComparingRawReconstruction, setIsComparingRawReconstruction] = useState(false);
+  const [applyingRawProcessingMode, setApplyingRawProcessingMode] = useState<RawProcessingMode | null>(null);
   const [isRawProcessingModeProvenanceVisible, setIsRawProcessingModeProvenanceVisible] = useState(false);
   const [isRawProcessingControlsOpen, setIsRawProcessingControlsOpen] = useState(false);
   const [developPanelSearchQuery, setDevelopPanelSearchQuery] = useState('');
@@ -273,6 +284,7 @@ export default function Controls() {
     setIsRawProcessingControlsOpen(isRawProcessingStatusAttentionRequired);
     setIsRawProcessingModeProvenanceVisible(false);
     setRawReconstructionComparison(null);
+    setAppliedRawReconstructionModeReceipt(null);
   }, [isRawProcessingStatusAttentionRequired, selectedImage?.path]);
 
   const onDragStateChange = useCallback(
@@ -966,12 +978,12 @@ export default function Controls() {
   };
 
   const handleRawProcessingModeOverrideChange = useCallback(
-    async (mode: RawProcessingModeOverrideOption) => {
-      if (!selectedImage?.path) return;
+    async (mode: RawProcessingModeOverrideOption): Promise<boolean> => {
+      if (!selectedImage?.path) return false;
 
       const rawProcessingModeOverride = mode === 'inherit' ? null : mode;
       const nextAdjustments = { ...adjustments, rawProcessingModeOverride };
-      setAdjustments(nextAdjustments);
+      setApplyingRawProcessingMode(rawProcessingModeOverride);
 
       try {
         await invokeWithSchema(
@@ -980,13 +992,25 @@ export default function Controls() {
           emptyTauriResponseSchema,
         );
         await invokeWithSchema(Invokes.ClearImageCaches, {}, emptyTauriResponseSchema);
+        setAdjustments(nextAdjustments);
         setEditor((state) =>
           state.selectedImage?.path === selectedImage.path
-            ? { selectedImage: { ...state.selectedImage, isReady: false } }
+            ? {
+                finalPreviewUrl: null,
+                interactivePatch: null,
+                previewScopeStatus: null,
+                selectedImage: { ...state.selectedImage, isReady: false },
+                transformedOriginalUrl: null,
+                uncroppedAdjustedPreviewUrl: null,
+              }
             : {},
         );
+        return true;
       } catch (error) {
         toast.error(t('editor.adjustments.rawProcessingModeOverride.error', { error: formatUnknownError(error) }));
+        return false;
+      } finally {
+        setApplyingRawProcessingMode(null);
       }
     },
     [adjustments, selectedImage, setAdjustments, setEditor, t],
@@ -1003,12 +1027,29 @@ export default function Controls() {
         rawReconstructionComparisonResultSchema,
       );
       setRawReconstructionComparison(comparison);
+      setAppliedRawReconstructionModeReceipt(null);
     } catch (error) {
       toast.error(t('editor.adjustments.rawReconstructionComparison.error', { error: formatUnknownError(error) }));
     } finally {
       setIsComparingRawReconstruction(false);
     }
   }, [selectedImage, t]);
+
+  const handleApplyRawReconstructionComparisonMode = useCallback(
+    async (modeResult: RawReconstructionComparisonModeResult) => {
+      const didApply = await handleRawProcessingModeOverrideChange(modeResult.mode);
+      if (!didApply) return;
+
+      setAppliedRawReconstructionModeReceipt({
+        cropHash: modeResult.cropHash,
+        decodeElapsedMs: modeResult.decodeElapsedMs,
+        mode: modeResult.mode,
+        proofBoundary: rawReconstructionComparison?.proofBoundary ?? 'runtime_raw_reconstruction_mode_crop_comparison',
+        savedOverrideValue: modeResult.mode,
+      });
+    },
+    [handleRawProcessingModeOverrideChange, rawReconstructionComparison?.proofBoundary],
+  );
 
   const handleResetAdjustments = () => {
     const resetValues = pickAdjustmentValues(Object.values(ADJUSTMENT_SECTIONS).flat(), INITIAL_ADJUSTMENTS);
@@ -1333,7 +1374,11 @@ export default function Controls() {
                   <div className="grid grid-cols-3 gap-1.5">
                     {rawReconstructionComparison.modes.map((mode) => (
                       <div
-                        className={density.rawProcessing.resultMetric}
+                        className={cx(density.rawProcessing.resultMetric, {
+                          'ring-1 ring-editor-focus-ring':
+                            appliedRawReconstructionModeReceipt?.savedOverrideValue === mode.mode,
+                        })}
+                        data-applied={appliedRawReconstructionModeReceipt?.savedOverrideValue === mode.mode}
                         data-crop-hash={mode.cropHash}
                         data-decode-ms={mode.decodeElapsedMs}
                         data-mode={mode.mode}
@@ -1370,9 +1415,78 @@ export default function Controls() {
                         >
                           {formatBytes(mode.estimatedMemoryBytes)}
                         </UiText>
+                        <button
+                          className="mt-1 flex min-h-6 w-full items-center justify-center rounded bg-editor-selected-quiet px-1.5 py-0.5 text-[10px] font-semibold leading-4 text-editor-selected-quiet-text transition-colors hover:bg-editor-selected-quiet/80 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring"
+                          data-testid={`raw-reconstruction-comparison-apply-${mode.mode}`}
+                          disabled={
+                            applyingRawProcessingMode !== null ||
+                            adjustments.rawProcessingModeOverride === mode.mode ||
+                            !selectedImage.isReady
+                          }
+                          onClick={() => {
+                            void handleApplyRawReconstructionComparisonMode(mode);
+                          }}
+                          type="button"
+                        >
+                          {applyingRawProcessingMode === mode.mode
+                            ? t('editor.adjustments.rawReconstructionComparison.applying')
+                            : adjustments.rawProcessingModeOverride === mode.mode
+                              ? t('editor.adjustments.rawReconstructionComparison.applied')
+                              : t('editor.adjustments.rawReconstructionComparison.applyMode')}
+                        </button>
                       </div>
                     ))}
                   </div>
+                  {appliedRawReconstructionModeReceipt !== null && (
+                    <div
+                      className="space-y-1 rounded border border-editor-focus-ring/50 bg-editor-selected-quiet px-1.5 py-1"
+                      data-crop-hash={appliedRawReconstructionModeReceipt.cropHash}
+                      data-decode-ms={appliedRawReconstructionModeReceipt.decodeElapsedMs}
+                      data-proof-boundary={appliedRawReconstructionModeReceipt.proofBoundary}
+                      data-saved-override-value={appliedRawReconstructionModeReceipt.savedOverrideValue}
+                      data-testid="raw-reconstruction-comparison-applied-receipt"
+                    >
+                      <UiText as="div" variant={TextVariants.small} className="text-[11px] font-semibold leading-4">
+                        {t('editor.adjustments.rawReconstructionComparison.appliedReceiptTitle', {
+                          mode: t(`settings.processing.rawModes.${appliedRawReconstructionModeReceipt.mode}.label`),
+                        })}
+                      </UiText>
+                      <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-0.5">
+                        <UiText variant={TextVariants.small} className="text-[10px] leading-3 text-text-secondary">
+                          {t('editor.adjustments.rawReconstructionComparison.receiptSavedOverride')}
+                        </UiText>
+                        <UiText
+                          variant={TextVariants.small}
+                          className="truncate font-mono text-[10px] leading-3 text-text-primary"
+                        >
+                          {appliedRawReconstructionModeReceipt.savedOverrideValue}
+                        </UiText>
+                        <UiText variant={TextVariants.small} className="text-[10px] leading-3 text-text-secondary">
+                          {t('editor.adjustments.rawReconstructionComparison.receiptCropHash')}
+                        </UiText>
+                        <UiText
+                          variant={TextVariants.small}
+                          className="truncate font-mono text-[10px] leading-3 text-text-primary"
+                        >
+                          {appliedRawReconstructionModeReceipt.cropHash}
+                        </UiText>
+                        <UiText variant={TextVariants.small} className="text-[10px] leading-3 text-text-secondary">
+                          {t('editor.adjustments.rawReconstructionComparison.receiptDecodeMs')}
+                        </UiText>
+                        <UiText
+                          variant={TextVariants.small}
+                          className="font-mono text-[10px] leading-3 text-text-primary"
+                        >
+                          {t('editor.adjustments.rawReconstructionComparison.decodeMsLabel', {
+                            ms: appliedRawReconstructionModeReceipt.decodeElapsedMs,
+                          })}
+                        </UiText>
+                      </div>
+                      <UiText as="div" variant={TextVariants.small} className="break-all font-mono text-[10px]">
+                        {appliedRawReconstructionModeReceipt.proofBoundary}
+                      </UiText>
+                    </div>
+                  )}
                   <UiText as="div" variant={TextVariants.small} className="break-all font-mono text-text-secondary">
                     {rawReconstructionComparison.proofBoundary}
                   </UiText>
