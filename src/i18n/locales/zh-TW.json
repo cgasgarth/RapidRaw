@@ -1775,6 +1775,7 @@
       "title": ""
     },
     "status": {
+      "blocked": "",
       "cancelExport": "取消匯出",
       "cancelled": "匯出已取消",
       "chooseExternalEditor": "",
@@ -1822,8 +1823,16 @@
       "offlineSmartPreviewBlocked": "",
       "openInEditor": "",
       "parityUnknown": "",
+      "ready": "",
       "resolvingOriginalFile": "",
       "retryExport": "",
+      "reviewParityPending": "",
+      "reviewReceipt": "",
+      "reviewReceiptUnavailable": "",
+      "reviewSelected_other": "",
+      "reviewSmartPreviewBlocked": "",
+      "reviewSmartPreviewReady": "",
+      "reviewSmartPreviewResolving": "",
       "showInFinder": "",
       "success": "匯出成功！",
       "transformApplied": ""

@@ -1925,6 +1925,7 @@
       "title": ""
     },
     "status": {
+      "blocked": "",
       "cancelExport": "Отменить экспорт",
       "cancelled": "Экспорт отменен",
       "chooseExternalEditor": "Выбрать редактор...",
@@ -1983,8 +1984,19 @@
       "offlineSmartPreviewBlocked": "",
       "openInEditor": "Открыть в редакторе",
       "parityUnknown": "",
+      "ready": "",
       "resolvingOriginalFile": "",
       "retryExport": "",
+      "reviewParityPending": "",
+      "reviewReceipt": "",
+      "reviewReceiptUnavailable": "",
+      "reviewSelected_one": "",
+      "reviewSelected_few": "",
+      "reviewSelected_many": "",
+      "reviewSelected_other": "",
+      "reviewSmartPreviewBlocked": "",
+      "reviewSmartPreviewReady": "",
+      "reviewSmartPreviewResolving": "",
       "showInFinder": "",
       "success": "Экспорт успешно завершен!",
       "transformApplied": ""

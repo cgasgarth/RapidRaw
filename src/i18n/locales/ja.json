@@ -1801,6 +1801,7 @@
       "title": ""
     },
     "status": {
+      "blocked": "",
       "cancelExport": "書き出しをキャンセル",
       "cancelled": "書き出しがキャンセルされました",
       "chooseExternalEditor": "エディタを選択...",
@@ -1848,8 +1849,16 @@
       "offlineSmartPreviewBlocked": "",
       "openInEditor": "エディタで開く",
       "parityUnknown": "",
+      "ready": "",
       "resolvingOriginalFile": "",
       "retryExport": "",
+      "reviewParityPending": "",
+      "reviewReceipt": "",
+      "reviewReceiptUnavailable": "",
+      "reviewSelected_other": "",
+      "reviewSmartPreviewBlocked": "",
+      "reviewSmartPreviewReady": "",
+      "reviewSmartPreviewResolving": "",
       "showInFinder": "",
       "success": "書き出しが成功しました！",
       "transformApplied": ""
