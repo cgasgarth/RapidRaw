@@ -739,6 +739,41 @@ async function assertProfessionalFilmstripContext(page) {
     throw new Error(`Expected at least four selected filmstrip thumbnails before clear, found ${selectedBeforeClear}.`);
   }
 
+  const tabbableBeforeArrow = await context.locator('[data-testid="filmstrip-thumbnail"][tabindex="0"]').count();
+  if (tabbableBeforeArrow !== 1) {
+    throw new Error(`Filmstrip roving tabindex should expose one active thumbnail, found ${tabbableBeforeArrow}.`);
+  }
+
+  const activeThumbnail = context.locator('[data-testid="filmstrip-thumbnail"][aria-current="true"]').first();
+  await activeThumbnail.focus();
+  await page.keyboard.press('ArrowRight');
+  await page.waitForFunction(() => {
+    const summaryElement = document.querySelector('[data-testid="filmstrip-selection-summary"]');
+    return (
+      summaryElement?.getAttribute('data-active-filename') === 'filmstrip-context-selected.NEF' &&
+      summaryElement?.getAttribute('data-selected-count') === '1'
+    );
+  });
+
+  const rovingState = await context.evaluate((root) => {
+    const thumbnails = Array.from(root.querySelectorAll<HTMLElement>('[data-testid="filmstrip-thumbnail"]'));
+    const focused = document.activeElement as HTMLElement | null;
+    return {
+      activePath: thumbnails.find((thumbnail) => thumbnail.getAttribute('aria-current') === 'true')?.dataset.imagePath,
+      focusedPath: focused?.dataset.imagePath,
+      selectedCount: thumbnails.filter((thumbnail) => thumbnail.getAttribute('aria-selected') === 'true').length,
+      tabbableCount: thumbnails.filter((thumbnail) => thumbnail.tabIndex === 0).length,
+    };
+  });
+  if (
+    rovingState.activePath !== '/visual-smoke/filmstrip-context-selected.NEF' ||
+    rovingState.focusedPath !== '/visual-smoke/filmstrip-context-selected.NEF' ||
+    rovingState.selectedCount !== 1 ||
+    rovingState.tabbableCount !== 1
+  ) {
+    throw new Error(`Filmstrip roving keyboard state mismatch: ${JSON.stringify(rovingState)}`);
+  }
+
   await context.getByTestId('filmstrip-selection-summary-clear').click();
   await page.waitForFunction(() => {
     const summaryElement = document.querySelector('[data-testid="filmstrip-selection-summary"]');

@@ -33,6 +33,7 @@ interface ResettableGridImperativeAPI extends GridImperativeAPI {
 }
 
 interface ItemData {
+  activeIndex: number;
   imageList: ImageFile[];
   imageRatings: ImageRatings;
   selectedPath: string | undefined;
@@ -44,6 +45,8 @@ interface ItemData {
   onImageSelect?: ((path: string, event: ThumbnailSelectEvent) => void) | undefined;
   itemHeight: number;
   consumeClickTriggeredScroll: () => boolean;
+  onRegisterThumbnail: (path: string, element: HTMLDivElement | null) => void;
+  onThumbnailRovingKeyDown: (event: ThumbnailKeyboardEvent, index: number) => void;
   setRatio: (index: number, ratio: number) => void;
 }
 
@@ -54,7 +57,10 @@ interface FilmstripThumbnailProps {
   isSelected: boolean;
   onContextMenu?: ((event: ThumbnailMouseEvent, path: string) => void) | undefined;
   onImageSelect?: ((path: string, event: ThumbnailSelectEvent) => void) | undefined;
+  onRegisterThumbnail: (path: string, element: HTMLDivElement | null) => void;
+  onThumbnailRovingKeyDown: (event: ThumbnailKeyboardEvent, index: number) => void;
   selectedImageThumbnailUrl?: string | undefined;
+  tabIndex: 0 | -1;
   thumbnailAspectRatio: ThumbnailAspectRatio;
   itemHeight: number;
   index: number;
@@ -125,7 +131,10 @@ const FilmstripThumbnail = memo(
     isSelected,
     onContextMenu,
     onImageSelect,
+    onRegisterThumbnail,
+    onThumbnailRovingKeyDown,
     selectedImageThumbnailUrl,
+    tabIndex,
     thumbnailAspectRatio,
     itemHeight: _itemHeight,
     index,
@@ -243,7 +252,16 @@ const FilmstripThumbnail = memo(
       onImageSelect?.(path, event);
     };
 
+    const registerThumbnail = useCallback(
+      (element: HTMLDivElement | null) => {
+        onRegisterThumbnail(path, element);
+      },
+      [onRegisterThumbnail, path],
+    );
+
     const handleKeyDown = (event: ThumbnailKeyboardEvent) => {
+      onThumbnailRovingKeyDown(event, index);
+      if (event.defaultPrevented) return;
       if (event.key !== 'Enter' && event.key !== ' ') return;
       event.preventDefault();
       handleSelect(event);
@@ -262,8 +280,9 @@ const FilmstripThumbnail = memo(
         onClick={handleSelect}
         onContextMenu={(e: ThumbnailMouseEvent) => onContextMenu?.(e, path)}
         onKeyDown={handleKeyDown}
-        role="button"
-        tabIndex={0}
+        ref={registerThumbnail}
+        role="option"
+        tabIndex={tabIndex}
         style={{
           zIndex: isActive ? 2 : isSelected ? 1 : 'auto',
         }}
@@ -392,6 +411,7 @@ const FilmstripThumbnail = memo(
 FilmstripThumbnail.displayName = 'FilmstripThumbnail';
 
 const FilmstripCell = ({
+  activeIndex,
   columnIndex,
   style,
   imageList,
@@ -402,6 +422,8 @@ const FilmstripCell = ({
   thumbnailAspectRatio,
   onContextMenu,
   onImageSelect,
+  onRegisterThumbnail,
+  onThumbnailRovingKeyDown,
   itemHeight,
   setRatio,
 }: FilmstripCellProps) => {
@@ -432,7 +454,10 @@ const FilmstripCell = ({
           isSelected={multiSelectedPaths.includes(imageFile.path)}
           onContextMenu={onContextMenu}
           onImageSelect={onImageSelect}
+          onRegisterThumbnail={onRegisterThumbnail}
+          onThumbnailRovingKeyDown={onThumbnailRovingKeyDown}
           selectedImageThumbnailUrl={selectedImageThumbnailUrl}
+          tabIndex={activeIndex === columnIndex ? 0 : -1}
           thumbnailAspectRatio={thumbnailAspectRatio}
           itemHeight={itemHeight}
           index={columnIndex}
@@ -450,7 +475,7 @@ const FilmstripList = ({
 }: {
   height: number;
   width: number;
-  data: Omit<ItemData, 'itemHeight' | 'setRatio'>;
+  data: Omit<ItemData, 'activeIndex' | 'itemHeight' | 'onRegisterThumbnail' | 'onThumbnailRovingKeyDown' | 'setRatio'>;
 }) => {
   const [gridHandle, setGridHandle] = useGridCallbackRef();
   const ratioMapRef = useRef<Record<number, number>>({});
@@ -467,6 +492,14 @@ const FilmstripList = ({
   const scrollAnimationTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingScrollTarget = useRef<number | null>(null);
   const hasCompletedInitialScroll = useRef(false);
+  const thumbnailElements = useRef(new Map<string, HTMLDivElement>());
+  const pendingFocusPath = useRef<string | null>(null);
+
+  const selectedIndex = useMemo(() => {
+    if (!data.selectedPath) return -1;
+    return data.imageList.findIndex((image) => image.path === data.selectedPath);
+  }, [data.imageList, data.selectedPath]);
+  const activeIndex = selectedIndex >= 0 ? selectedIndex : 0;
 
   const itemHeight = useMemo(() => {
     const baseHeight = Math.max(20, height - 20);
@@ -679,18 +712,82 @@ const FilmstripList = ({
     [gridHandle],
   );
 
+  const focusThumbnail = useCallback((path: string) => {
+    const element = thumbnailElements.current.get(path);
+    if (!element) {
+      pendingFocusPath.current = path;
+      return;
+    }
+
+    pendingFocusPath.current = null;
+    element.focus({ preventScroll: true });
+  }, []);
+
+  const onRegisterThumbnail = useCallback(
+    (path: string, element: HTMLDivElement | null) => {
+      if (element) {
+        thumbnailElements.current.set(path, element);
+        if (pendingFocusPath.current === path) {
+          requestAnimationFrame(() => {
+            focusThumbnail(path);
+          });
+        }
+        return;
+      }
+
+      thumbnailElements.current.delete(path);
+    },
+    [focusThumbnail],
+  );
+
+  const onThumbnailRovingKeyDown = useCallback(
+    (event: ThumbnailKeyboardEvent, index: number) => {
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+
+      let nextIndex: number | null = null;
+      if (event.key === 'ArrowLeft') {
+        nextIndex = Math.max(0, index - 1);
+      } else if (event.key === 'ArrowRight') {
+        nextIndex = Math.min(data.imageList.length - 1, index + 1);
+      } else if (event.key === 'Home') {
+        nextIndex = 0;
+      } else if (event.key === 'End') {
+        nextIndex = data.imageList.length - 1;
+      }
+
+      if (nextIndex === null || nextIndex === index) return;
+
+      const nextImage = data.imageList[nextIndex];
+      if (!nextImage) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      data.onImageSelect?.(nextImage.path, event);
+      performSafeScroll(nextIndex, true);
+      requestAnimationFrame(() => {
+        focusThumbnail(nextImage.path);
+      });
+    },
+    [data, focusThumbnail, performSafeScroll],
+  );
+
   const cellProps = useMemo<FilmstripCellData>(
     () => ({
       ...data,
+      activeIndex,
       itemHeight,
+      onRegisterThumbnail,
+      onThumbnailRovingKeyDown,
       setRatio,
     }),
-    [data, itemHeight, setRatio],
+    [activeIndex, data, itemHeight, onRegisterThumbnail, onThumbnailRovingKeyDown, setRatio],
   );
 
   return (
     <div style={{ height, width }}>
       <Grid<FilmstripCellData>
+        aria-label="Filmstrip"
+        aria-orientation="horizontal"
         gridRef={setGridHandle}
         defaultWidth={width}
         rowCount={1}
@@ -700,6 +797,7 @@ const FilmstripList = ({
         cellComponent={FilmstripCell}
         cellProps={cellProps}
         className="custom-scrollbar"
+        role="listbox"
         style={{ overflowY: 'hidden' }}
         onWheel={(e: React.WheelEvent<HTMLDivElement>) => {
           if (e.deltaY !== 0 && Math.abs(e.deltaX) < Math.abs(e.deltaY)) {

@@ -1174,6 +1174,7 @@ function ProfessionalFilmstripContextVisualSmoke() {
   const [multiSelectedPaths, setMultiSelectedPaths] = useState(() =>
     professionalFilmstripImageList.slice(0, 4).map((image) => image.path),
   );
+  const [selectedImage, setSelectedImage] = useState<SelectedImage>(professionalFilmstripSelectedImage);
   useProfessionalFilmstripContextSmokeState();
 
   const imageRatings = {
@@ -1196,6 +1197,17 @@ function ProfessionalFilmstripContextVisualSmoke() {
     },
     onCopy: () => {},
     onImageSelect: (path: string) => {
+      const selectedFile = professionalFilmstripImageList.find((image) => image.path === path);
+      if (selectedFile) {
+        setSelectedImage({
+          ...professionalFilmstripSelectedImage,
+          exif: selectedFile.exif ?? null,
+          path: selectedFile.path,
+          thumbnailUrl:
+            professionalFilmstripThumbs[professionalFilmstripImageList.indexOf(selectedFile)] ??
+            professionalFilmstripSelectedImage.thumbnailUrl,
+        });
+      }
       setMultiSelectedPaths([path]);
     },
     onOpenCopyPasteSettings: () => {},
@@ -1204,7 +1216,7 @@ function ProfessionalFilmstripContextVisualSmoke() {
     onRequestThumbnails: () => {},
     onZoomChange: () => {},
     rating: 4,
-    selectedImage: professionalFilmstripSelectedImage,
+    selectedImage,
     thumbnailAspectRatio: ThumbnailAspectRatio.Cover,
     totalImages: professionalFilmstripImageList.length,
   } satisfies Pick<
