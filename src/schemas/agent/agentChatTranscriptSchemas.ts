@@ -34,6 +34,13 @@ export const agentSelectedImagePreviewLoopControlStateSchema = z.enum([
   'rejected',
   'unavailable',
 ]);
+export const agentSelectedImagePreviewLoopIterationApprovalStateSchema = z.enum([
+  'approved',
+  'blocked_stale',
+  'latest_reviewed',
+  'pending_review',
+  'superseded',
+]);
 export const agentSelectedImagePreviewLoopBlockerSchema = z.enum([
   'missing_dry_run_approval',
   'missing_selected_image',
@@ -587,6 +594,27 @@ export const agentSelectedImagePreviewLoopReviewSchema = z
     initialGraphRevision: z.string().min(1),
     initialPreviewArtifactId: z.string().min(1),
     initialRecipeHash: z.string().min(1),
+    iterations: z
+      .array(
+        z
+          .object({
+            afterHash: z.string().min(1),
+            approvalState: agentSelectedImagePreviewLoopIterationApprovalStateSchema,
+            beforeHash: z.string().min(1),
+            graphRevision: z.string().min(1),
+            id: z.string().min(1),
+            previewArtifactId: z.string().min(1),
+            previewIdentity: z.string().min(1),
+            recipeHash: z.string().min(1),
+            requestId: z.string().min(1),
+            staleReason: z.string().min(1).optional(),
+            userFeedback: z.string().min(1).optional(),
+          })
+          .strict(),
+      )
+      .optional(),
+    previousPreviewArtifactId: z.string().min(1).optional(),
+    previousPreviewIdentity: z.string().min(1).optional(),
     previewIdentity: z.string().min(1).nullable(),
     previewLineage: z
       .array(
@@ -661,6 +689,7 @@ export const agentSelectedImagePreviewLoopReviewSchema = z
       .strict(),
     status: z.enum(['max_iterations_reached', 'needs_user_review']),
     title: z.string().min(1),
+    userFeedback: z.string().min(1).optional(),
     warnings: z.array(z.string().min(1)),
   })
   .strict();

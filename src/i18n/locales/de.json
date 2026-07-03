@@ -806,6 +806,7 @@
           "deltaHelp": "mean delta / max delta",
           "exportReceipt": "",
           "graphRevision": "Graph revision",
+          "iterations": "Review iterations",
           "luminanceChannel": "Luminance / channel",
           "maxPixelCountValue": "{{pixelCount}} px max",
           "previewRender": "Preview render",
