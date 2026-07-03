@@ -2,7 +2,7 @@
 
 These screenshots are repo-owned README assets captured from the public visual-smoke harness.
 
-Last refreshed and manually reviewed: 2026-07-02.
+Last refreshed and manually reviewed: 2026-07-03.
 
 | README asset                 | Visual-smoke scenario            |
 | ---------------------------- | -------------------------------- |
