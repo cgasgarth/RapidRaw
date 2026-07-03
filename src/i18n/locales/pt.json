@@ -278,6 +278,13 @@
       "threshold": "Limiar"
     },
     "effects": {
+      "activeSummary": "",
+      "activeSummaryCount_one": "",
+      "activeSummaryCount_few": "",
+      "activeSummaryCount_many": "",
+      "activeSummaryCount_other": "",
+      "activeSummaryEmpty": "",
+      "activeSummaryNoScroll": "",
       "amount": "Quantidade",
       "creative": "Criativo",
       "feather": "Difusão",

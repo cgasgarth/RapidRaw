@@ -278,6 +278,13 @@
       "threshold": "Soglia"
     },
     "effects": {
+      "activeSummary": "",
+      "activeSummaryCount_one": "",
+      "activeSummaryCount_few": "",
+      "activeSummaryCount_many": "",
+      "activeSummaryCount_other": "",
+      "activeSummaryEmpty": "",
+      "activeSummaryNoScroll": "",
       "amount": "Quantità",
       "creative": "Creativo",
       "feather": "Sfumatura",

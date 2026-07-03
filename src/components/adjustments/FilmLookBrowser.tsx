@@ -41,17 +41,17 @@ const FILM_LOOK_STRENGTH_PRESETS = [25, 50, 75, 100] as const;
 const GOVERNED_FILM_LOOK_RUNTIME_LOOK_ID = 'film_look.generic.warm_print.v1';
 const GOVERNED_FILM_LOOK_RUNTIME_RECIPE_ID = 'film_look.governed.warm_print_grain_halation.v1';
 const filmLookButtonClassName =
-  'rounded border border-editor-border bg-editor-panel px-2 py-1 text-xs text-text-secondary transition-colors hover:bg-editor-panel-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:opacity-45';
+  'rounded border border-editor-border bg-editor-panel px-1.5 py-0.5 text-[11px] leading-4 text-text-secondary transition-colors hover:bg-editor-panel-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:opacity-45';
 const filmLookChoiceClassName = (isActive: boolean) =>
   cx(
-    'rounded-md border px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring',
+    'rounded border px-2 py-1 text-[11px] leading-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring',
     isActive
       ? 'border-accent bg-accent/10 text-text-primary'
       : 'border-editor-border bg-editor-panel text-text-secondary hover:bg-editor-panel-raised hover:text-text-primary',
   );
 const filmLookSmallChoiceClassName = (isActive: boolean) =>
   cx(
-    'shrink-0 rounded-md border px-3 py-2 text-left text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring',
+    'shrink-0 rounded border px-2 py-1 text-left text-[11px] leading-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring',
     isActive
       ? 'border-accent bg-accent/10 text-text-primary'
       : 'border-editor-border bg-editor-panel text-text-secondary hover:bg-editor-panel-raised hover:text-text-primary',
@@ -290,9 +290,14 @@ export function FilmLookBrowser({
   };
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <UiText variant={TextVariants.heading}>{t('adjustments.effects.filmLookBrowser.title')}</UiText>
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <UiText
+          className="text-[11px] font-semibold uppercase leading-4 tracking-normal text-text-secondary"
+          variant={TextVariants.heading}
+        >
+          {t('adjustments.effects.filmLookBrowser.title')}
+        </UiText>
         <UiText
           className={cx(editorChromeStatusChipClassName('neutral'), 'tabular-nums')}
           data-testid="film-look-result-count"
@@ -308,7 +313,7 @@ export function FilmLookBrowser({
       <div className="relative">
         <input
           aria-label={t('adjustments.effects.filmLookBrowser.search')}
-          className={cx(editorChromeTokens.input.base, editorChromeTokens.input.default, 'w-full pr-10')}
+          className={cx(editorChromeTokens.input.base, editorChromeTokens.input.default, 'h-7 w-full pr-8 text-[12px]')}
           onChange={(event) => {
             setSearchQuery(event.target.value);
           }}
@@ -318,7 +323,7 @@ export function FilmLookBrowser({
         />
         <button
           aria-label={t('adjustments.effects.filmLookBrowser.searchClear')}
-          className="absolute right-1 top-1 h-8 w-8 rounded text-text-secondary transition-colors hover:bg-editor-selected-quiet hover:text-text-primary disabled:pointer-events-none disabled:opacity-0"
+          className="absolute right-0.5 top-0.5 h-6 w-6 rounded text-text-secondary transition-colors hover:bg-editor-selected-quiet hover:text-text-primary disabled:pointer-events-none disabled:opacity-0"
           data-testid="film-look-search-clear"
           data-tooltip={t('adjustments.effects.filmLookBrowser.searchClear')}
           disabled={searchQuery.length === 0}
@@ -331,13 +336,13 @@ export function FilmLookBrowser({
         </button>
       </div>
 
-      <label className="block space-y-1">
+      <label className="block space-y-0.5">
         <UiText variant={TextVariants.small} className="uppercase tracking-normal text-text-secondary">
           {t('adjustments.effects.filmLookBrowser.sort')}
         </UiText>
         <select
           aria-label={t('adjustments.effects.filmLookBrowser.sort')}
-          className={cx(editorChromeTokens.input.base, editorChromeTokens.input.default, 'w-full')}
+          className={cx(editorChromeTokens.input.base, editorChromeTokens.input.default, 'h-7 w-full text-[12px]')}
           onChange={(event) => {
             const nextSortMode = event.target.value;
 
@@ -355,7 +360,7 @@ export function FilmLookBrowser({
         </select>
       </label>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-1">
         <button
           aria-pressed={!showFavoritesOnly}
           className={filmLookChoiceClassName(!showFavoritesOnly)}
@@ -383,13 +388,13 @@ export function FilmLookBrowser({
 
       {activeLook !== undefined && (
         <section
-          className="grid grid-cols-[72px_1fr] gap-3 rounded-md border border-accent bg-accent/10 p-2"
+          className="grid grid-cols-[56px_1fr] gap-2 rounded border border-accent bg-accent/10 p-1.5"
           data-active-look-id={activeLook.id}
           data-active-look-strength={clampFilmLookStrength(activeStrength)}
           data-testid="film-look-active-state"
         >
           <div
-            className="h-16 rounded-md border border-editor-border"
+            className="h-12 rounded border border-editor-border"
             data-testid="film-look-active-render-preview"
             style={getFilmLookComparePreviewStyle(activeLook, activeStrength)}
           />
@@ -407,11 +412,11 @@ export function FilmLookBrowser({
         </section>
       )}
 
-      <section className="space-y-2" aria-label={t('adjustments.effects.filmLookBrowser.categoryFilter')}>
+      <section className="space-y-1" aria-label={t('adjustments.effects.filmLookBrowser.categoryFilter')}>
         <UiText variant={TextVariants.small} className="uppercase tracking-normal text-text-secondary">
           {t('adjustments.effects.filmLookBrowser.categoryFilter')}
         </UiText>
-        <div className="flex gap-2 overflow-x-auto pb-1">
+        <div className="flex gap-1 overflow-x-auto pb-0.5">
           {categoryTabs.map((tab) => {
             const isActive = activeCategory === tab.category;
 
@@ -435,7 +440,7 @@ export function FilmLookBrowser({
         </div>
       </section>
 
-      <section className="space-y-2" aria-label={t('adjustments.effects.filmLookBrowser.compareTitle')}>
+      <section className="space-y-1" aria-label={t('adjustments.effects.filmLookBrowser.compareTitle')}>
         <div className="flex items-center justify-between gap-2">
           <UiText variant={TextVariants.small} className="uppercase tracking-normal text-text-secondary">
             {t('adjustments.effects.filmLookBrowser.compareTitle')}
@@ -466,7 +471,7 @@ export function FilmLookBrowser({
           </div>
         </div>
         <div
-          className="grid grid-cols-2 gap-2 rounded-md border border-editor-border bg-editor-panel p-2 text-xs"
+          className="grid grid-cols-2 gap-1 rounded border border-editor-border bg-editor-panel p-1.5 text-[11px]"
           data-color-pipeline-input-domain="camera_linear_rgb"
           data-color-pipeline-operation-domain="acescg_linear_v1"
           data-color-pipeline-render-target="display_p3"
@@ -491,7 +496,7 @@ export function FilmLookBrowser({
               : t('adjustments.effects.filmLookBrowser.compareIncomplete')}
           </span>
         </div>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-1">
           {FILM_LOOK_COMPARE_SLOTS.map((slot) => {
             const slotLabel = FILM_LOOK_COMPARE_SLOT_LABELS[slot];
             const lookId = comparisonSelection[slot];
@@ -499,8 +504,8 @@ export function FilmLookBrowser({
             const adjustmentSummaries = look === undefined ? [] : getFilmLookAdjustmentSummaries(look);
 
             return (
-              <div className="min-h-28 rounded-md border border-editor-border bg-editor-panel p-2" key={slot}>
-                <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="min-h-24 rounded border border-editor-border bg-editor-panel p-1.5" key={slot}>
+                <div className="mb-1 flex items-center justify-between gap-2">
                   <UiText variant={TextVariants.small} className="tabular-nums text-text-secondary">
                     {slotLabel}
                   </UiText>
@@ -524,12 +529,12 @@ export function FilmLookBrowser({
                     {t('adjustments.effects.filmLookBrowser.compareEmpty')}
                   </UiText>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-1">
                     <UiText className="block truncate" variant={TextVariants.body}>
                       {look.displayName}
                     </UiText>
                     <div
-                      className="h-20 overflow-hidden rounded-md border border-editor-border"
+                      className="h-14 overflow-hidden rounded border border-editor-border"
                       data-look-id={look.id}
                       data-output-proof="filmLook.applyAbCandidate"
                       data-preview-strength={look.id === selectedLookId ? strengthPercent : look.strengthDefault}
@@ -540,7 +545,7 @@ export function FilmLookBrowser({
                         look.id === selectedLookId ? strengthPercent : look.strengthDefault,
                       )}
                     >
-                      <div className="flex h-full items-end justify-between bg-black/10 p-2 text-[11px] text-white/90">
+                      <div className="flex h-full items-end justify-between bg-black/10 p-1.5 text-[10px] text-white/90">
                         <span className="rounded bg-black/40 px-1.5 py-0.5">{slotLabel}</span>
                         <span className="rounded bg-black/40 px-1.5 py-0.5">
                           {formatFilmLookStrength(look.id === selectedLookId ? strengthPercent : look.strengthDefault)}
@@ -555,7 +560,7 @@ export function FilmLookBrowser({
                       ))}
                     </div>
                     <button
-                      className="w-full rounded bg-editor-primary-active px-2 py-1 text-xs font-medium text-editor-primary-active-text hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring"
+                      className="w-full rounded bg-editor-primary-active px-2 py-0.5 text-[11px] font-medium leading-4 text-editor-primary-active-text hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring"
                       onClick={() => {
                         handleApplyLookAtCurrentStrength(look);
                       }}
@@ -571,7 +576,7 @@ export function FilmLookBrowser({
         </div>
       </section>
 
-      <section className="space-y-2" aria-label={t('adjustments.effects.filmLookBrowser.strength')}>
+      <section className="space-y-1" aria-label={t('adjustments.effects.filmLookBrowser.strength')}>
         <div className="flex items-center justify-between gap-2">
           <UiText variant={TextVariants.small} className="uppercase tracking-normal text-text-secondary">
             {t('adjustments.effects.filmLookBrowser.strength')}
@@ -602,7 +607,7 @@ export function FilmLookBrowser({
                   strength: formatFilmLookStrength(presetStrength),
                 })}
                 aria-pressed={isActiveStrength}
-                className={`rounded border px-2 py-1 text-xs tabular-nums transition-colors ${
+                className={`rounded border px-1.5 py-0.5 text-[11px] leading-4 tabular-nums transition-colors ${
                   isActiveStrength
                     ? 'border-accent bg-accent/10 text-text-primary'
                     : 'border-editor-border bg-editor-panel text-text-secondary hover:bg-editor-panel-raised'
@@ -620,7 +625,7 @@ export function FilmLookBrowser({
           })}
         </div>
         <button
-          className={cx(filmLookButtonClassName, 'w-full py-1.5')}
+          className={cx(filmLookButtonClassName, 'w-full')}
           data-testid="film-look-strength-reset-default"
           disabled={selectedLook === undefined || strengthPercent === selectedLook.strengthDefault}
           onClick={resetSelectedLookStrength}
@@ -632,7 +637,7 @@ export function FilmLookBrowser({
 
       {selectedLook !== undefined && (
         <section
-          className="space-y-2 rounded-md border border-editor-border bg-editor-panel p-3"
+          className="space-y-1.5 rounded border border-editor-border bg-editor-panel p-1.5"
           data-governed-output-effects-ready={String(selectedLookGovernedRuntimeReady)}
           data-governed-output-effects-recipe-id={
             selectedLookGovernedRuntimeReady ? GOVERNED_FILM_LOOK_RUNTIME_RECIPE_ID : undefined
@@ -654,7 +659,7 @@ export function FilmLookBrowser({
             </span>
           </div>
           <div
-            className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[11px] text-text-tertiary"
+            className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-[11px] text-text-tertiary"
             data-testid="film-look-provenance-fields"
           >
             <span>{t('adjustments.effects.filmLookBrowser.claimLevel')}</span>
@@ -685,20 +690,20 @@ export function FilmLookBrowser({
             ))}
           </div>
           <div
-            className="grid grid-cols-3 gap-2 rounded-md border border-editor-border bg-editor-panel-well p-2 text-[11px]"
+            className="grid grid-cols-3 gap-1 rounded border border-editor-border bg-editor-panel-well p-1 text-[10px]"
             data-claim-level={selectedLook.provenance.claimLevel}
             data-governed-output-effects-ready={String(selectedLookGovernedRuntimeReady)}
             data-look-family={selectedLook.category}
             data-preview-export-ready={String(selectedLookRuntimeReady)}
             data-testid="film-look-readiness-summary"
           >
-            <div className="min-w-0 rounded bg-editor-panel px-2 py-1" data-testid="film-look-readiness-family">
+            <div className="min-w-0 rounded bg-editor-panel px-1.5 py-0.5" data-testid="film-look-readiness-family">
               <span className="block truncate text-text-tertiary">
                 {t('adjustments.effects.filmLookBrowser.family')}
               </span>
               <span className="block truncate text-text-secondary">{formatFilmLookToken(selectedLook.category)}</span>
             </div>
-            <div className="min-w-0 rounded bg-editor-panel px-2 py-1" data-testid="film-look-readiness-claim">
+            <div className="min-w-0 rounded bg-editor-panel px-1.5 py-0.5" data-testid="film-look-readiness-claim">
               <span className="block truncate text-text-tertiary">
                 {t('adjustments.effects.filmLookBrowser.claimLevel')}
               </span>
@@ -706,7 +711,7 @@ export function FilmLookBrowser({
                 {formatFilmLookToken(selectedLook.provenance.claimLevel)}
               </span>
             </div>
-            <div className="min-w-0 rounded bg-editor-panel px-2 py-1" data-testid="film-look-readiness-runtime">
+            <div className="min-w-0 rounded bg-editor-panel px-1.5 py-0.5" data-testid="film-look-readiness-runtime">
               <span className="block truncate text-text-tertiary">
                 {t('adjustments.effects.filmLookBrowser.measurementSource')}
               </span>
@@ -718,38 +723,43 @@ export function FilmLookBrowser({
         </section>
       )}
 
-      <div className="space-y-3">
+      <div className="space-y-1.5">
         {showFavoritesOnly && favoriteLookCount === 0 && (
-          <div className="rounded-md border border-dashed border-editor-border bg-editor-panel p-3 text-center">
+          <div className="rounded border border-dashed border-editor-border bg-editor-panel p-2 text-center">
             <UiText variant={TextVariants.small} className="text-text-secondary">
               {t('adjustments.effects.filmLookBrowser.emptyFavorites')}
             </UiText>
           </div>
         )}
         {visibleLookCount === 0 && !(showFavoritesOnly && favoriteLookCount === 0) && (
-          <div className="rounded-md border border-dashed border-editor-border bg-editor-panel p-3 text-center">
+          <div className="rounded border border-dashed border-editor-border bg-editor-panel p-2 text-center">
             <UiText variant={TextVariants.small} className="text-text-secondary">
               {t('adjustments.effects.filmLookBrowser.emptySearch')}
             </UiText>
           </div>
         )}
         {visibleGroups.map((group) => (
-          <section className="space-y-2" key={group.category}>
+          <section className="space-y-1" key={group.category}>
             <UiText variant={TextVariants.small} className="uppercase tracking-normal text-text-secondary">
               {group.displayName}
             </UiText>
-            <div className="flex gap-2 overflow-x-auto pb-1">
+            <div className="flex gap-1 overflow-x-auto pb-0.5">
               {group.looks.map((look) => {
                 const isSelected = selectedLookId === look.id;
+                const isActiveLook = activeLookId === look.id;
                 const isFavorite = favoriteLookIds.has(look.id);
-                const activeStrength = isSelected ? strengthPercent : look.strengthDefault;
+                const lookStrength = isActiveLook
+                  ? clampFilmLookStrength(activeStrength)
+                  : isSelected
+                    ? strengthPercent
+                    : look.strengthDefault;
                 const favoriteLabel = isFavorite
                   ? t('adjustments.effects.filmLookBrowser.unfavoriteLook', { displayName: look.displayName })
                   : t('adjustments.effects.filmLookBrowser.favoriteLook', { displayName: look.displayName });
 
                 return (
                   <div
-                    className={`flex h-40 min-w-40 max-w-40 flex-col rounded-md border p-2 transition-colors ${
+                    className={`flex h-32 min-w-32 max-w-32 flex-col rounded border p-1.5 transition-colors ${
                       isSelected
                         ? 'border-accent bg-accent/10 text-text-primary shadow-sm'
                         : 'border-editor-border bg-editor-panel text-text-secondary hover:bg-editor-panel-raised hover:text-text-primary'
@@ -769,7 +779,7 @@ export function FilmLookBrowser({
                       <span className="flex items-center justify-between gap-2">
                         <Film size={16} aria-hidden="true" />
                         <span
-                          className="h-5 flex-1 rounded-sm border border-editor-border"
+                          className="h-4 flex-1 rounded-sm border border-editor-border"
                           style={getFilmLookSwatchStyle(look)}
                         />
                         <span className="flex items-center gap-1">
@@ -784,11 +794,11 @@ export function FilmLookBrowser({
                           {look.displayName}
                         </UiText>
                         <UiText className="block" variant={TextVariants.small}>
-                          {formatFilmLookStrength(activeStrength)}
+                          {formatFilmLookStrength(lookStrength)}
                         </UiText>
                       </span>
                     </button>
-                    <div className="mt-2 grid grid-cols-5 gap-1">
+                    <div className="mt-1 grid grid-cols-5 gap-1">
                       {FILM_LOOK_COMPARE_SLOTS.map((slot) => {
                         const slotLabel = FILM_LOOK_COMPARE_SLOT_LABELS[slot];
                         const isPinned = comparisonSelection[slot] === look.id;
@@ -800,7 +810,7 @@ export function FilmLookBrowser({
                               slot: slotLabel,
                             })}
                             aria-pressed={isPinned}
-                            className={`rounded px-2 py-1 text-xs font-medium tabular-nums ${
+                            className={`rounded px-1 py-0.5 text-[11px] font-medium leading-4 tabular-nums ${
                               isPinned
                                 ? 'bg-editor-primary-active text-editor-primary-active-text'
                                 : 'bg-editor-panel-raised text-text-secondary hover:bg-editor-selected-quiet hover:text-text-primary'
@@ -822,7 +832,7 @@ export function FilmLookBrowser({
                       <button
                         aria-label={favoriteLabel}
                         aria-pressed={isFavorite}
-                        className={`rounded bg-editor-panel-raised px-2 py-1 text-text-secondary hover:bg-editor-selected-quiet ${
+                        className={`rounded bg-editor-panel-raised px-1 py-0.5 text-text-secondary hover:bg-editor-selected-quiet ${
                           isFavorite ? 'text-editor-primary-active' : ''
                         }`}
                         data-tooltip={favoriteLabel}
@@ -842,12 +852,12 @@ export function FilmLookBrowser({
                         aria-label={t('adjustments.effects.filmLookBrowser.saveLook', {
                           displayName: look.displayName,
                         })}
-                        className="rounded bg-editor-panel-raised px-2 py-1 text-text-secondary hover:bg-editor-selected-quiet hover:text-text-primary"
+                        className="rounded bg-editor-panel-raised px-1 py-0.5 text-text-secondary hover:bg-editor-selected-quiet hover:text-text-primary"
                         data-tooltip={t('adjustments.effects.filmLookBrowser.saveLook', {
                           displayName: look.displayName,
                         })}
                         onClick={() => {
-                          onSaveLook(look, activeStrength);
+                          onSaveLook(look, lookStrength);
                         }}
                         type="button"
                       >
@@ -857,12 +867,12 @@ export function FilmLookBrowser({
                         aria-label={t('adjustments.effects.filmLookBrowser.shareLook', {
                           displayName: look.displayName,
                         })}
-                        className="rounded bg-editor-panel-raised px-2 py-1 text-text-secondary hover:bg-editor-selected-quiet hover:text-text-primary"
+                        className="rounded bg-editor-panel-raised px-1 py-0.5 text-text-secondary hover:bg-editor-selected-quiet hover:text-text-primary"
                         data-tooltip={t('adjustments.effects.filmLookBrowser.shareLook', {
                           displayName: look.displayName,
                         })}
                         onClick={() => {
-                          onShareLook(look, activeStrength);
+                          onShareLook(look, lookStrength);
                         }}
                         type="button"
                       >

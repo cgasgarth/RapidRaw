@@ -278,6 +278,13 @@
       "threshold": "Порог"
     },
     "effects": {
+      "activeSummary": "",
+      "activeSummaryCount_one": "",
+      "activeSummaryCount_few": "",
+      "activeSummaryCount_many": "",
+      "activeSummaryCount_other": "",
+      "activeSummaryEmpty": "",
+      "activeSummaryNoScroll": "",
       "amount": "Величина",
       "creative": "Творчество",
       "feather": "Растушевка",

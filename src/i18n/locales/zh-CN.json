@@ -299,6 +299,13 @@
       "threshold": "阈值"
     },
     "effects": {
+      "activeSummary": "",
+      "activeSummaryCount_one": "",
+      "activeSummaryCount_few": "",
+      "activeSummaryCount_many": "",
+      "activeSummaryCount_other": "",
+      "activeSummaryEmpty": "",
+      "activeSummaryNoScroll": "",
       "amount": "数量",
       "creative": "创意",
       "feather": "羽化",
