@@ -266,6 +266,15 @@ function hashJson(value: unknown): string {
   return `sha256:${createHash('sha256').update(JSON.stringify(value)).digest('hex')}`;
 }
 
+function rectanglesOverlap(left, right) {
+  return (
+    left.x < right.x + right.width &&
+    left.x + left.width > right.x &&
+    left.y < right.y + right.height &&
+    left.y + left.height > right.y
+  );
+}
+
 export async function assertSectionCount(page, minimum) {
   const sectionCount = await page.locator('[data-visual-smoke-section]').count();
   if (sectionCount < minimum) {
@@ -325,6 +334,45 @@ export async function assertAdjustmentsPanelRetune(page) {
     throw new Error(`Adjustments scopes strip should use compact default height, got ${scopesBounds.height}.`);
   }
   await assertPanelScopesStripControls(page, panel, scopesStrip, 'adjustments-panel-scopes-toggle', 'Adjustments');
+}
+
+export async function assertProfessionalAdjustmentsCompactSearchShelf(page) {
+  const panel = page.locator('[data-visual-smoke-section="adjustments-panel-retune"]');
+  await panel.waitFor({ timeout: 10_000 });
+
+  const searchInput = panel.getByRole('searchbox', { name: 'Search adjustment controls' });
+  await searchInput.fill('dehaze');
+
+  const searchResults = panel.getByTestId('develop-panel-search-results');
+  const dehazeResult = panel.getByTestId('develop-panel-search-result-dehaze');
+  await searchResults.waitFor({ timeout: 10_000 });
+  await dehazeResult.waitFor({ timeout: 10_000 });
+  await dehazeResult.press('Enter');
+
+  const pinnedControls = panel.getByTestId('develop-panel-pinned-controls');
+  const pinnedDehaze = panel.getByTestId('develop-panel-pinned-control-row-dehaze');
+  await pinnedControls.waitFor({ timeout: 10_000 });
+  await pinnedDehaze.waitFor({ timeout: 10_000 });
+
+  const searchBounds = await searchResults.boundingBox();
+  const pinnedBounds = await pinnedControls.boundingBox();
+  const pinnedRowBounds = await pinnedDehaze.boundingBox();
+  if (!searchBounds || !pinnedBounds || !pinnedRowBounds) {
+    throw new Error('Professional compact adjustments search proof could not read search/pinned bounds.');
+  }
+  if (searchBounds.width > 390 || pinnedBounds.width > 390 || pinnedRowBounds.width > 390) {
+    throw new Error(
+      `Professional compact adjustments shelf exceeded compact viewport width: search=${searchBounds.width}, pinned=${pinnedBounds.width}, row=${pinnedRowBounds.width}.`,
+    );
+  }
+  if (rectanglesOverlap(searchBounds, pinnedBounds)) {
+    throw new Error('Professional compact adjustments search results overlap pinned controls.');
+  }
+
+  const activeElementTestId = await page.evaluate(() => document.activeElement?.getAttribute('data-testid'));
+  if (activeElementTestId !== 'develop-pinned-control-dehaze-range') {
+    throw new Error(`Professional compact adjustments search did not focus pinned Dehaze, got ${activeElementTestId}.`);
+  }
 }
 
 async function assertAdjustmentSectionHeaderActions(page, panel) {
@@ -794,6 +842,9 @@ export async function prepareScenario(page, mode) {
     mode === VISUAL_SMOKE_SCENARIO_IDS.ProfessionalAdjustmentsCompact
   ) {
     await assertAdjustmentsPanelRetune(page);
+    if (mode === VISUAL_SMOKE_SCENARIO_IDS.ProfessionalAdjustmentsCompact) {
+      await assertProfessionalAdjustmentsCompactSearchShelf(page);
+    }
     return;
   }
 

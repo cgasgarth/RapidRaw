@@ -14,7 +14,16 @@ import {
   Search,
   X,
 } from 'lucide-react';
-import { type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  type KeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 import { useShallow } from 'zustand/react/shallow';
@@ -121,9 +130,14 @@ const RAW_RECONSTRUCTION_COMPARISON_CROP_SIZE = 256;
 const PANEL_ACTION_ICON_SIZE = 14;
 const PINNED_CONTROLS_LIMIT = 8;
 const DEVELOP_PANEL_SEARCH_NORMALIZER = /\s+/g;
+const DEVELOP_PANEL_FOCUSABLE_SELECTOR =
+  'input:not([disabled]), button:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 const normalizeDevelopPanelSearchText = (value: string) =>
   value.trim().toLowerCase().replace(DEVELOP_PANEL_SEARCH_NORMALIZER, ' ');
+
+const escapeDevelopPanelSelectorValue = (value: string): string =>
+  value.replaceAll('\\', '\\\\').replaceAll('"', '\\"');
 
 const getLumaParametricCurve = (adjustments: Adjustments): ParametricCurveSettings =>
   (adjustments.parametricCurve ?? INITIAL_ADJUSTMENTS.parametricCurve)?.[ActiveChannel.Luma] ?? {
@@ -210,6 +224,7 @@ export default function Controls() {
   const [isRawProcessingModeProvenanceVisible, setIsRawProcessingModeProvenanceVisible] = useState(false);
   const [isRawProcessingControlsOpen, setIsRawProcessingControlsOpen] = useState(false);
   const [developPanelSearchQuery, setDevelopPanelSearchQuery] = useState('');
+  const developPanelScrollRootRef = useRef<HTMLDivElement | null>(null);
 
   const { appSettings, theme } = useSettingsStore(
     useShallow((state) => ({
@@ -934,6 +949,73 @@ export default function Controls() {
     [setUI],
   );
 
+  const focusDevelopPanelPinnedControl = useCallback((controlId: string) => {
+    window.requestAnimationFrame(() => {
+      const escapedControlId = escapeDevelopPanelSelectorValue(controlId);
+      const control = document.querySelector<HTMLElement>(`[data-testid="develop-pinned-control-${escapedControlId}"]`);
+      const focusTarget =
+        control?.querySelector<HTMLElement>(`[data-testid="develop-pinned-control-${escapedControlId}-range"]`) ??
+        control?.querySelector<HTMLElement>(DEVELOP_PANEL_FOCUSABLE_SELECTOR) ??
+        control;
+      focusTarget?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+      focusTarget?.focus({ preventScroll: true });
+    });
+  }, []);
+
+  const focusCanonicalDevelopPanelControl = useCallback((control: DevelopPanelControl) => {
+    window.requestAnimationFrame(() => {
+      const section = document.querySelector<HTMLElement>(
+        `[data-testid="adjustments-section-${escapeDevelopPanelSelectorValue(control.sectionName)}"]`,
+      );
+      const labelledFocusTarget = Array.from(
+        section?.querySelectorAll<HTMLElement>(DEVELOP_PANEL_FOCUSABLE_SELECTOR) ?? [],
+      ).find((element) => {
+        const ariaLabel = element.getAttribute('aria-label');
+        return ariaLabel === control.label || ariaLabel === `${control.label} value`;
+      });
+      const focusTarget = labelledFocusTarget ?? section?.querySelector<HTMLElement>(DEVELOP_PANEL_FOCUSABLE_SELECTOR);
+      focusTarget?.scrollIntoView?.({ block: 'center', inline: 'nearest' });
+      focusTarget?.focus({ preventScroll: true });
+    });
+  }, []);
+
+  const activateDevelopPanelSearchResult = useCallback(
+    (control: DevelopPanelControl) => {
+      const wasPinned = developPanelPinnedControlIds.includes(control.id);
+      const nextPinnedControlIds = wasPinned
+        ? developPanelPinnedControlIds.filter((pinnedControlId) => pinnedControlId !== control.id)
+        : [...developPanelPinnedControlIds, control.id].slice(-PINNED_CONTROLS_LIMIT);
+
+      setDevelopPanelPinnedControlIds(nextPinnedControlIds);
+      setCollapsibleState((prev) => (prev[control.sectionName] ? prev : { ...prev, [control.sectionName]: true }));
+
+      if (wasPinned) {
+        focusCanonicalDevelopPanelControl(control);
+      } else {
+        focusDevelopPanelPinnedControl(control.id);
+      }
+    },
+    [
+      developPanelPinnedControlIds,
+      focusCanonicalDevelopPanelControl,
+      focusDevelopPanelPinnedControl,
+      setCollapsibleState,
+      setDevelopPanelPinnedControlIds,
+    ],
+  );
+
+  const handleDevelopPanelSearchResultKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLButtonElement>, control: DevelopPanelControl) => {
+      if (event.key !== 'Enter' && event.key !== ' ') {
+        return;
+      }
+
+      event.preventDefault();
+      activateDevelopPanelSearchResult(control);
+    },
+    [activateDevelopPanelSearchResult],
+  );
+
   useEffect(() => {
     if (!isDevelopPanelSearching || matchingDevelopPanelSections.size === 0) {
       return;
@@ -1439,7 +1521,10 @@ export default function Controls() {
                     data-testid={`develop-panel-search-result-${control.id}`}
                     key={control.id}
                     onClick={() => {
-                      toggleDevelopPanelPinnedControl(control.id);
+                      activateDevelopPanelSearchResult(control);
+                    }}
+                    onKeyDown={(event) => {
+                      handleDevelopPanelSearchResultKeyDown(event, control);
                     }}
                     type="button"
                   >
@@ -1466,7 +1551,10 @@ export default function Controls() {
         )}
 
         {pinnedDevelopPanelControls.length > 0 && (
-          <div className="mt-1 space-y-0.5" data-testid="develop-panel-pinned-controls">
+          <div
+            className="mt-1 max-h-44 min-w-0 space-y-0.5 overflow-y-auto overscroll-contain pr-0.5"
+            data-testid="develop-panel-pinned-controls"
+          >
             <div className="flex items-center justify-between gap-2">
               <UiText
                 as="div"
@@ -1486,10 +1574,11 @@ export default function Controls() {
             {pinnedDevelopPanelControls.map((control) => (
               <div
                 className={cx(
-                  'grid grid-cols-[minmax(0,1fr)_1.25rem] items-center gap-1 rounded border border-editor-border bg-editor-panel-well px-1 py-0.5',
+                  'grid min-w-0 grid-cols-[minmax(0,1fr)_1.25rem] items-center gap-1 rounded border border-editor-border bg-editor-panel-well px-1 py-0.5',
                   control.isDirty && 'border-editor-focus-ring/70',
                 )}
                 data-dirty={control.isDirty}
+                data-testid={`develop-panel-pinned-control-row-${control.id}`}
                 key={control.id}
               >
                 <div className="min-w-0">{control.render()}</div>
@@ -1516,7 +1605,7 @@ export default function Controls() {
         )}
       </div>
 
-      <div className="grow overflow-y-auto px-2 py-1.5 flex flex-col gap-1">
+      <div className="grow overflow-y-auto px-2 py-1.5 flex flex-col gap-1" ref={developPanelScrollRootRef}>
         {ADJUSTMENT_SECTION_NAMES.map((sectionName) => {
           if (isDevelopPanelSearching && !matchingDevelopPanelSections.has(sectionName)) {
             return null;
