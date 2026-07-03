@@ -4364,6 +4364,22 @@
       "validRecipeCount_other": ""
     },
     "filmstrip": {
+      "selectionSummary": {
+        "activePrefix": "",
+        "badges": {
+          "color": "",
+          "edited": "",
+          "rating": "",
+          "rawQuality": "",
+          "virtualCopy": ""
+        },
+        "clearSelection": "",
+        "noActive": "",
+        "selectedCount_one": "",
+        "selectedCount_few": "",
+        "selectedCount_many": "",
+        "selectedCount_other": ""
+      },
       "tooltips": {
         "color": "Цвет: {{color}}",
         "virtualCopy": "Виртуальная копия"

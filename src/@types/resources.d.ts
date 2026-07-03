@@ -4384,6 +4384,20 @@ export default interface Resources {
         validRecipeCount_other: '{{count}} valid';
       };
       filmstrip: {
+        selectionSummary: {
+          activePrefix: 'Active';
+          badges: {
+            color: 'Color';
+            edited: 'Edited';
+            rating: 'Rated';
+            rawQuality: 'RAW';
+            virtualCopy: 'VC';
+          };
+          clearSelection: 'Clear filmstrip selection';
+          noActive: 'No active image';
+          selectedCount_one: '{{count}} selected';
+          selectedCount_other: '{{count}} selected';
+        };
         tooltips: {
           color: 'Color: {{color}}';
           virtualCopy: 'Virtual Copy';

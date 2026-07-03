@@ -4497,6 +4497,22 @@
       "validRecipeCount_other": "{{count}} valid"
     },
     "filmstrip": {
+      "selectionSummary": {
+        "activePrefix": "",
+        "badges": {
+          "color": "",
+          "edited": "",
+          "rating": "",
+          "rawQuality": "",
+          "virtualCopy": ""
+        },
+        "clearSelection": "",
+        "noActive": "",
+        "selectedCount_one": "",
+        "selectedCount_few": "",
+        "selectedCount_many": "",
+        "selectedCount_other": ""
+      },
       "tooltips": {
         "color": "Kolor: {{color}}",
         "virtualCopy": "Kopia wirtualna"

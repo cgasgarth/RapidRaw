@@ -4094,6 +4094,19 @@
       "validRecipeCount_other": ""
     },
     "filmstrip": {
+      "selectionSummary": {
+        "activePrefix": "",
+        "badges": {
+          "color": "",
+          "edited": "",
+          "rating": "",
+          "rawQuality": "",
+          "virtualCopy": ""
+        },
+        "clearSelection": "",
+        "noActive": "",
+        "selectedCount_other": ""
+      },
       "tooltips": {
         "color": "カラー: {{color}}",
         "virtualCopy": "仮想コピー"

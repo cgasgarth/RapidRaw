@@ -4249,6 +4249,19 @@
       "validRecipeCount_other": "{{count}} valid"
     },
     "filmstrip": {
+      "selectionSummary": {
+        "activePrefix": "",
+        "badges": {
+          "color": "",
+          "edited": "",
+          "rating": "",
+          "rawQuality": "",
+          "virtualCopy": ""
+        },
+        "clearSelection": "",
+        "noActive": "",
+        "selectedCount_other": ""
+      },
       "tooltips": {
         "color": "颜色：{{color}}",
         "virtualCopy": "虚拟副本"
