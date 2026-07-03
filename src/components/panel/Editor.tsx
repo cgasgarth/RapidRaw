@@ -1690,6 +1690,12 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
               onSelectMask={(id) => {
                 setEditor({ activeMaskId: id });
               }}
+              onCompareModeChange={(mode) => {
+                setEditor({ compareMode: mode });
+              }}
+              onShowOriginalChange={(nextShowOriginal) => {
+                setEditor({ showOriginal: nextShowOriginal });
+              }}
               onStraighten={handleStraighten}
               selectedImage={selectedImage}
               setCrop={handleCropChange}

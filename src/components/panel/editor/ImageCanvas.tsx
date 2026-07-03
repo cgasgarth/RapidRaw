@@ -147,6 +147,7 @@ type EditableKonvaEllipse = KonvaEllipse & {
   lastValidScaleY?: number;
 };
 type RetouchHandleKind = 'sourcePoint' | 'targetPoint';
+type PreviewCompareStripMode = Exclude<EditorCompareMode, 'off'>;
 
 const toMaskParameters = (parameters: SubMask['parameters']): MaskParameters => parameters as MaskParameters;
 
@@ -264,6 +265,8 @@ interface ImageCanvasProps {
   onQuickErase: (subMaskId: string | null, startPoint: Coord, endpoint: Coord) => void;
   onSelectAiSubMask: (id: string | null) => void;
   onSelectMask: (id: string | null) => void;
+  onCompareModeChange?: (mode: EditorCompareMode) => void;
+  onShowOriginalChange?: (showOriginal: boolean) => void;
   onStraighten: (val: number) => void;
   selectedImage: SelectedImage;
   setCrop: (crop: Crop, perfentCrop: PercentCrop) => void;
@@ -1221,6 +1224,8 @@ const ImageCanvas = memo(
     onQuickErase,
     onSelectAiSubMask,
     onSelectMask,
+    onCompareModeChange = () => {},
+    onShowOriginalChange = () => {},
     onStraighten,
     selectedImage,
     setCrop,
@@ -3113,6 +3118,74 @@ const ImageCanvas = memo(
                   style={{ zIndex: 9 }}
                 >
                   {t('editor.canvas.compare.overlayDisabled')}
+                </div>
+              )}
+              {!isCropping && (
+                <div
+                  className="pointer-events-auto absolute left-1/2 top-3 flex max-w-[min(92%,520px)] -translate-x-1/2 items-center gap-1 rounded-md border border-editor-overlay-stroke bg-editor-panel/92 px-1.5 py-1 text-[11px] shadow-[0_12px_30px_var(--editor-overlay-shadow)] backdrop-blur"
+                  data-compare-active={String(isCompareModeActive)}
+                  data-compare-original-ready={String(canShowOriginalCompare)}
+                  data-compare-show-original={String(showOriginal)}
+                  data-preview-compare-mode={compareMode}
+                  data-testid="editor-preview-compare-strip"
+                  style={{ zIndex: 10 }}
+                >
+                  <span className="shrink-0 px-1.5 font-medium text-text-secondary">
+                    {t('editor.canvas.compare.stripTitle')}
+                  </span>
+                  {(['hold-original', 'split-wipe', 'side-by-side'] satisfies PreviewCompareStripMode[]).map((mode) => {
+                    const isActive = compareMode === mode;
+                    const label =
+                      mode === 'hold-original'
+                        ? t('editor.canvas.compare.stripMode.hold-original')
+                        : mode === 'split-wipe'
+                          ? t('editor.canvas.compare.stripMode.split-wipe')
+                          : t('editor.canvas.compare.stripMode.side-by-side');
+                    return (
+                      <button
+                        aria-label={label}
+                        aria-pressed={isActive}
+                        className={[
+                          'h-7 rounded px-2 text-[11px] font-medium transition',
+                          isActive
+                            ? 'bg-text-primary text-bg-primary shadow-sm'
+                            : 'bg-editor-panel-well text-text-secondary hover:bg-editor-hover hover:text-text-primary',
+                        ].join(' ')}
+                        data-testid={`editor-preview-compare-${mode}`}
+                        key={mode}
+                        onClick={() => {
+                          onCompareModeChange(isActive ? 'off' : mode);
+                        }}
+                        onPointerDown={(event) => {
+                          if (mode !== 'hold-original' || event.button !== 0) return;
+                          onShowOriginalChange(true);
+                        }}
+                        onPointerLeave={(event) => {
+                          if (mode !== 'hold-original' || event.buttons !== 1) return;
+                          onShowOriginalChange(false);
+                        }}
+                        onPointerUp={() => {
+                          if (mode === 'hold-original') onShowOriginalChange(false);
+                        }}
+                        type="button"
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                  {isCompareModeActive && (
+                    <button
+                      aria-label={t('editor.canvas.compare.stripOff')}
+                      className="h-7 rounded px-2 text-[11px] font-medium text-text-secondary transition hover:bg-editor-hover hover:text-text-primary"
+                      data-testid="editor-preview-compare-off"
+                      onClick={() => {
+                        onCompareModeChange('off');
+                      }}
+                      type="button"
+                    >
+                      {t('editor.canvas.compare.stripOff')}
+                    </button>
+                  )}
                 </div>
               )}
               {displayedMaskUrl && (

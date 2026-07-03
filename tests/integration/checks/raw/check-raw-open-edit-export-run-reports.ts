@@ -125,6 +125,17 @@ for (const report of reports) {
   if (changedPixelMetric === undefined || changedPixelMetric.value <= 0) {
     failures.push(`${report.fixtureId}: changedPixelRatio must be greater than zero.`);
   }
+  for (const [name, value] of [
+    ['finalFileMetadataRetained', report.finalFile.metadataRetained],
+    ['finalFileTimestampsPreserved', report.finalFile.timestampsPreserved],
+    ['finalFileGpsStripped', report.finalFile.gpsStripped],
+  ] as const) {
+    const metric = reportMetrics.get(name);
+    if (!value) failures.push(`${report.fixtureId}: ${name} finalFile field must be true.`);
+    if (metric === undefined || metric.value !== 1 || metric.threshold !== 1) {
+      failures.push(`${report.fixtureId}: ${name} metric must be present with value 1 and threshold 1.`);
+    }
+  }
 
   if (requireAssets && root !== undefined) {
     await verifyPrivateAssets(root, report.fixtureId, [
