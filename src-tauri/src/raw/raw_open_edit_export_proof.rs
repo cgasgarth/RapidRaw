@@ -278,9 +278,12 @@ pub struct RawOpenEditExportFinalFileProof {
     pub embedded_icc_profile_hash: String,
     pub expected_output_profile_hash: String,
     pub final_file_format: String,
+    pub gps_stripped: bool,
+    pub metadata_retained: bool,
     pub output_profile: String,
     pub pixel_max_abs_delta: f64,
     pub pixel_mean_abs_delta: f64,
+    pub timestamps_preserved: bool,
     pub reopened_dimensions: RawOpenEditExportDimensions,
     pub transform_applied: bool,
     pub transform_policy_fingerprint: String,
@@ -444,8 +447,8 @@ fn run_raw_open_edit_export_proof_with_context(
         rendering_intent: export_rendering_intent.clone(),
         jpeg_quality: 95,
         resize: None,
-        keep_metadata: false,
-        preserve_timestamps: false,
+        keep_metadata: true,
+        preserve_timestamps: true,
         strip_gps: true,
         filename_template: None,
         watermark: None,
@@ -490,6 +493,7 @@ fn run_raw_open_edit_export_proof_with_context(
     let final_file = inspect_final_tiff_export(
         &export_after_path,
         &export_color_profile,
+        &export_settings,
         &export_receipt,
         &soft_proof_after_pixels,
         soft_proof_after_width,
@@ -616,6 +620,32 @@ fn run_raw_open_edit_export_proof_with_context(
             ),
             metric("finalFileIccProfileEmbedded", 1.0, 1.0, true),
             metric(
+                "finalFileMetadataRetained",
+                if final_file.metadata_retained {
+                    1.0
+                } else {
+                    0.0
+                },
+                1.0,
+                final_file.metadata_retained,
+            ),
+            metric(
+                "finalFileTimestampsPreserved",
+                if final_file.timestamps_preserved {
+                    1.0
+                } else {
+                    0.0
+                },
+                1.0,
+                final_file.timestamps_preserved,
+            ),
+            metric(
+                "finalFileGpsStripped",
+                if final_file.gps_stripped { 1.0 } else { 0.0 },
+                1.0,
+                final_file.gps_stripped,
+            ),
+            metric(
                 "finalFileBlackPointCompensationApplied",
                 if black_point_policy_handled { 1.0 } else { 0.0 },
                 1.0,
@@ -703,6 +733,7 @@ fn run_raw_open_edit_export_proof_with_context(
 fn inspect_final_tiff_export(
     output_path: &Path,
     color_profile: &ExportColorProfile,
+    export_settings: &ExportSettings,
     color_receipt: &crate::export::export_processing::ExportReceiptMetadata,
     expected_rgb8: &[u8],
     expected_width: u32,
@@ -740,9 +771,12 @@ fn inspect_final_tiff_export(
         embedded_icc_profile_hash: sha256_bytes(&embedded_icc),
         expected_output_profile_hash: sha256_bytes(&expected_icc),
         final_file_format: "tiff".to_string(),
+        gps_stripped: export_settings.strip_gps,
+        metadata_retained: export_settings.keep_metadata,
         output_profile: export_color_profile_label(color_profile).to_string(),
         pixel_max_abs_delta,
         pixel_mean_abs_delta,
+        timestamps_preserved: export_settings.preserve_timestamps,
         reopened_dimensions: RawOpenEditExportDimensions { height, width },
         transform_applied: color_receipt.transform_applied,
         transform_policy_fingerprint: color_receipt.transform_policy_fingerprint.clone(),
@@ -1699,6 +1733,7 @@ mod tests {
         let proof = inspect_final_tiff_export(
             &output_path,
             &ExportColorProfile::DisplayP3,
+            &settings,
             &receipt,
             &soft_proof,
             width,
@@ -1718,6 +1753,9 @@ mod tests {
             "Enabled via LittleCMS relative colorimetric transform"
         );
         assert_eq!(proof.cmm, "lcms2");
+        assert!(!proof.metadata_retained);
+        assert!(!proof.timestamps_preserved);
+        assert!(proof.gps_stripped);
         assert!(proof.transform_applied);
     }
 
@@ -1829,8 +1867,11 @@ mod tests {
                         .to_string(),
                 final_file_format: "tiff".to_string(),
                 output_profile: "display_p3".to_string(),
+                gps_stripped: true,
+                metadata_retained: true,
                 pixel_max_abs_delta: 0.0,
                 pixel_mean_abs_delta: 0.0,
+                timestamps_preserved: true,
                 reopened_dimensions: RawOpenEditExportDimensions {
                     height: 2,
                     width: 2,
