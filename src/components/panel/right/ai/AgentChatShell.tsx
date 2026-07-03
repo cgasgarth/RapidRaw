@@ -77,6 +77,8 @@ import {
   appendAgentSelectedImageLiveSessionAuditRecord,
   applyAgentSelectedImageLiveSession,
   approveAgentSelectedImageLiveSession,
+  buildAgentSelectedImageLiveSessionAuditStorageKey,
+  buildAgentSelectedImagePreviewLoopAuditRecord,
   preflightAgentSelectedImageLiveSessionAuditReplay,
   readAgentSelectedImageLiveSessionAuditStore,
   replayAgentSelectedImageLiveSessionAudit,
@@ -668,13 +670,25 @@ const createLiveSessionEvent = (role: AgentChatMessage['role'], body: string, su
 const LIVE_AGENT_SELECTED_IMAGE_SESSION_AUDIT_KEY = 'rawengine.agent.selectedImageLiveSessionAudit.v1';
 const LIVE_AGENT_SELECTED_IMAGE_EXPORT_RECEIPTS_KEY = 'rawengine.agent.selectedImageExportReceipts.v1';
 
-const createLocalAgentSelectedImageLiveSessionAuditStorageAdapter = (): AgentSessionAuditStorageAdapter | null => {
+const createLocalAgentSelectedImageLiveSessionAuditStorageAdapter = ({
+  selectedImagePath,
+  sessionId,
+}: {
+  selectedImagePath: string;
+  sessionId: string;
+}): AgentSessionAuditStorageAdapter | null => {
   if (typeof globalThis.localStorage === 'undefined') return null;
 
+  const storageKey = buildAgentSelectedImageLiveSessionAuditStorageKey({
+    namespace: LIVE_AGENT_SELECTED_IMAGE_SESSION_AUDIT_KEY,
+    selectedImagePath,
+    sessionId,
+  });
+
   return {
-    readText: () => globalThis.localStorage.getItem(LIVE_AGENT_SELECTED_IMAGE_SESSION_AUDIT_KEY),
+    readText: () => globalThis.localStorage.getItem(storageKey),
     writeText: (value) => {
-      globalThis.localStorage.setItem(LIVE_AGENT_SELECTED_IMAGE_SESSION_AUDIT_KEY, value);
+      globalThis.localStorage.setItem(storageKey, value);
     },
   };
 };
@@ -1726,7 +1740,17 @@ function LivePromptComposer({
   };
 
   const runAuditReplayCheck = () => {
-    const adapter = createLocalAgentSelectedImageLiveSessionAuditStorageAdapter();
+    let snapshot: ReturnType<typeof buildAgentImageContextSnapshot>;
+    try {
+      snapshot = buildAgentImageContextSnapshot();
+    } catch (error) {
+      setAuditReplay({ error: error instanceof Error ? error.message : 'Replay audit context is unavailable.' });
+      return;
+    }
+    const adapter = createLocalAgentSelectedImageLiveSessionAuditStorageAdapter({
+      selectedImagePath: snapshot.activeImagePath,
+      sessionId: 'agent-chat-shell',
+    });
     if (adapter === null) {
       setAuditReplay({ error: 'Replay audit storage is unavailable.' });
       return;
@@ -2359,6 +2383,16 @@ function LivePromptComposer({
       setSelectedImageLoopReview(
         buildSelectedImageLoopReview({ prompt: acceptedPrompt, request: loopRequest, result: loopResult }),
       );
+      const auditStorageAdapter = createLocalAgentSelectedImageLiveSessionAuditStorageAdapter({
+        selectedImagePath: loopResult.selectedImagePath,
+        sessionId,
+      });
+      if (auditStorageAdapter !== null) {
+        appendAgentSelectedImageLiveSessionAuditRecord(
+          auditStorageAdapter,
+          buildAgentSelectedImagePreviewLoopAuditRecord({ request: loopRequest, result: loopResult }),
+        );
+      }
       const latestReceipt = loopResult.applyReceipts.at(-1);
       if (latestReceipt === undefined) throw new Error('Selected-image preview loop did not return an apply receipt.');
       const nextResult = {
