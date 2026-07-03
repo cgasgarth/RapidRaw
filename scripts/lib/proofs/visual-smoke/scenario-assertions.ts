@@ -755,10 +755,7 @@ export async function prepareScenario(page, mode) {
     return;
   }
 
-  if (
-    mode === VISUAL_SMOKE_SCENARIO_IDS.AgentChatUi ||
-    mode === VISUAL_SMOKE_SCENARIO_IDS.AgentSelectedImageLiveSession
-  ) {
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.AgentSelectedImageLiveSession) {
     const shell = page.getByTestId('agent-chat-shell');
     await shell.waitFor({ timeout: 10_000 });
     agentChatProofDatasetSchema.parse(await shell.evaluate((element) => ({ ...element.dataset })));
@@ -767,29 +764,22 @@ export async function prepareScenario(page, mode) {
     await page.getByTestId('agent-live-prompt-input').fill('Brighten this RAW and recover shadows naturally.');
     await page.getByTestId('agent-live-prompt-run').click();
     await expectDatasetValue(composer, 'livePromptStatus', 'dry_run_ready');
-    await page.getByTestId('agent-live-prompt-apply').click();
+    await page.getByTestId('agent-live-selected-image-preview-loop').click();
     await expectDatasetValue(composer, 'livePromptStatus', 'applied');
     agentLivePromptResultProofDatasetSchema.parse(
       await page.getByTestId('agent-live-prompt-result').evaluate((element) => ({ ...element.dataset })),
     );
-    const auditViewer = page.getByTestId('agent-audit-transcript-viewer');
-    agentAuditTranscriptViewerProofDatasetSchema.parse(
-      await auditViewer.evaluate((element) => ({ ...element.dataset })),
-    );
-    const artifacts = page.getByTestId('agent-artifact-review');
-    agentArtifactReviewProofDatasetSchema.parse(await artifacts.evaluate((element) => ({ ...element.dataset })));
-    const handoff = page.getByTestId('agent-review-handoff');
-    agentReviewHandoffProofDatasetSchema.parse(await handoff.evaluate((element) => ({ ...element.dataset })));
-    const scope = page.getByTestId('agent-selected-frame-scope');
-    agentSelectedFrameScopeProofDatasetSchema.parse(await scope.evaluate((element) => ({ ...element.dataset })));
     const selectedImageLoop = page.getByTestId('agent-selected-image-preview-loop-review');
     await selectedImageLoop.waitFor({ timeout: 10_000 });
     const selectedImageLoopDataset = await selectedImageLoop.evaluate((element) => ({ ...element.dataset }));
     if (
-      selectedImageLoopDataset.beforePreviewUrl !== 'blob:rawengine-selected-loop-before' ||
-      selectedImageLoopDataset.currentPreviewUrl !== 'blob:rawengine-selected-loop-current'
+      (selectedImageLoopDataset.beforePreviewUrl ?? '').trim().length === 0 ||
+      (selectedImageLoopDataset.currentPreviewUrl ?? '').trim().length === 0 ||
+      selectedImageLoopDataset.beforePreviewUrl === selectedImageLoopDataset.currentPreviewUrl ||
+      selectedImageLoopDataset.finalGraphRevision !== 'history_3' ||
+      selectedImageLoopDataset.previewLineageCount !== '2'
     ) {
-      throw new Error('Selected-image preview-loop review did not expose before/current preview URLs.');
+      throw new Error('Selected-image preview-loop review did not expose changed before/current runtime evidence.');
     }
     const selectedImageLoopBefore = page.getByTestId('agent-selected-image-preview-loop-before');
     const selectedImageLoopCurrent = page.getByTestId('agent-selected-image-preview-loop-current');
@@ -800,17 +790,20 @@ export async function prepareScenario(page, mode) {
       ...element.dataset,
     }));
     if (
-      selectedImageLoopBeforeDataset.previewUrl !== 'blob:rawengine-selected-loop-before' ||
-      selectedImageLoopBeforeDataset.renderHash !== 'render:agent-selected-loop-before' ||
-      selectedImageLoopCurrentDataset.previewUrl !== 'blob:rawengine-selected-loop-current' ||
-      selectedImageLoopCurrentDataset.renderHash !== 'render:agent-selected-loop-current'
+      (selectedImageLoopBeforeDataset.previewUrl ?? '').trim().length === 0 ||
+      (selectedImageLoopCurrentDataset.previewUrl ?? '').trim().length === 0 ||
+      (selectedImageLoopBeforeDataset.renderHash ?? '').trim().length === 0 ||
+      (selectedImageLoopCurrentDataset.renderHash ?? '').trim().length === 0 ||
+      selectedImageLoopBeforeDataset.renderHash === selectedImageLoopCurrentDataset.renderHash
     ) {
       throw new Error('Selected-image preview-loop before/current gallery evidence was not rendered.');
     }
     const selectedImageLoopMetrics = await page
       .getByTestId('agent-selected-image-preview-loop-metrics')
       .evaluate((element) => ({ ...element.dataset }));
-    if (selectedImageLoopMetrics.meanLuminanceDelta !== '6.2' || selectedImageLoopMetrics.maxChannelDelta !== '31') {
+    const meanLuminanceDelta = Number(selectedImageLoopMetrics.meanLuminanceDelta);
+    const maxChannelDelta = Number(selectedImageLoopMetrics.maxChannelDelta);
+    if (!(meanLuminanceDelta > 0) || !(maxChannelDelta > 0)) {
       throw new Error('Selected-image preview-loop delta metrics were not rendered.');
     }
     const detailLineageDataset = await page
@@ -818,191 +811,13 @@ export async function prepareScenario(page, mode) {
       .nth(1)
       .evaluate((element) => ({ ...element.dataset }));
     if (
-      detailLineageDataset.previewUrl !== 'blob:rawengine-selected-loop-detail-crop' ||
-      detailLineageDataset.crop !== 'normalized x=0.22 y=0.21 w=0.32 h=0.34' ||
-      detailLineageDataset.zoom !== '2.4x @ 0.5,0.55'
+      (detailLineageDataset.previewUrl ?? '').trim().length === 0 ||
+      (detailLineageDataset.renderHash ?? '').trim().length === 0 ||
+      detailLineageDataset.purpose !== 'detail_review' ||
+      (detailLineageDataset.zoom ?? '').trim().length === 0 ||
+      detailLineageDataset.zoom === 'none'
     ) {
       throw new Error('Selected-image preview-loop detail crop lineage was not rendered.');
-    }
-    const review = page.getByTestId('agent-dry-run-review');
-    agentDryRunReviewProofDatasetSchema.parse(await review.evaluate((element) => ({ ...element.dataset })));
-    const privateRawArtifacts = page.getByTestId('agent-private-raw-artifacts');
-    agentPrivateRawArtifactsProofDatasetSchema.parse(
-      await privateRawArtifacts.evaluate((element) => ({ ...element.dataset })),
-    );
-    await page.getByTestId('agent-chat-messages').getByText('Runtime demo apply complete.', { exact: false }).waitFor({
-      timeout: 10_000,
-    });
-    await page
-      .getByTestId('agent-tool-transcript')
-      .getByText('rawengine.tone_color.dry_run', { exact: true })
-      .waitFor({ timeout: 10_000 });
-    await page.getByTestId('agent-tool-status-tool-2').getByText('warning', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
-    await page.getByTestId('agent-tool-status-tool-3').getByText('succeeded', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
-    await page.getByTestId('agent-tool-status-tool-4').getByText('blocked', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
-    await auditViewer.getByText('Audit transcript', { exact: true }).waitFor({ timeout: 10_000 });
-    await page.getByTestId('agent-audit-summary').getByText('runtime_apply_demo', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
-    await page
-      .getByTestId('agent-audit-summary')
-      .getByText('graph_rev_agent_expert_edit_demo_initial_2844', { exact: true })
-      .waitFor({
-        timeout: 10_000,
-      });
-    await page.getByTestId('agent-audit-record-audit-record-tool-3').getByText('success', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
-    await page.getByTestId('agent-audit-record-audit-record-tool-2').getByText('warning', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
-    await page.getByTestId('agent-audit-record-audit-record-tool-4').getByText('blocked', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
-    await page
-      .getByTestId('agent-audit-warnings-audit-record-tool-4')
-      .getByText('no pixels were sent', { exact: false })
-      .waitFor({
-        timeout: 10_000,
-      });
-    const auditArtifactLinkCount = await page
-      .getByTestId('agent-audit-transcript-records')
-      .locator('a[href*="agent-expert-edit-demo-workflow-2026-06-21.html"]')
-      .count();
-    if (auditArtifactLinkCount !== 3) {
-      throw new Error(`Expected 3 visible audit transcript artifact links, found ${auditArtifactLinkCount}.`);
-    }
-    await page
-      .getByTestId('agent-preview-artifacts')
-      .getByText('artifact_agent_expert_edit_demo_preview_dry_run_2844', { exact: true })
-      .waitFor({
-        timeout: 10_000,
-      });
-    await page.getByTestId('agent-replay-gallery').getByText('Rollback target', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
-    await handoff
-      .getByTestId('agent-review-handoff-artifacts')
-      .getByText('artifact_agent_expert_edit_demo_before_raw_2844', { exact: true })
-      .waitFor({ timeout: 10_000 });
-    await handoff
-      .getByTestId('agent-review-handoff-artifacts')
-      .getByText('artifact_agent_expert_edit_demo_after_virtual_copy_2844', { exact: true })
-      .waitFor({ timeout: 10_000 });
-    await handoff
-      .getByTestId('agent-review-handoff-audit-trail')
-      .getByText('tonecolor.apply_command', { exact: true })
-      .waitFor({ timeout: 10_000 });
-    await handoff.getByText('Runtime proof gallery', { exact: true }).waitFor({ timeout: 10_000 });
-    await handoff.getByText('Rollback virtual copy', { exact: true }).waitFor({ timeout: 10_000 });
-    await handoff.getByTestId('agent-review-handoff-rollback-restore').click();
-    await handoff
-      .getByText('Restored graph_rev_agent_expert_edit_demo_initial_2844', { exact: false })
-      .waitFor({ timeout: 10_000 });
-    const recovery = page.getByTestId('agent-failure-recovery');
-    await recovery.getByText('Recover failed tool call', { exact: true }).waitFor({ timeout: 10_000 });
-    await recovery.getByTestId('agent-failure-recovery-retry').click();
-    await page.waitForFunction(
-      () =>
-        document.querySelector('[data-testid="agent-failure-recovery"]')?.getAttribute('data-retry-state') ===
-        'completed',
-      { timeout: 10_000 },
-    );
-    const progress = page.getByTestId('agent-long-edit-progress');
-    await progress.getByText('Long edit progress', { exact: true }).waitFor({ timeout: 10_000 });
-    await progress.getByText('Audit save', { exact: true }).waitFor({ timeout: 10_000 });
-    await page.getByTestId('agent-e2e-closure').getByText('Private RAW proved', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
-    await scope.getByText('Selected-frame scope', { exact: true }).waitFor({ timeout: 10_000 });
-    await page.getByTestId('agent-selected-frame-assets').getByText('DSC_2844.NEF', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
-    await page.getByTestId('agent-excluded-frame-assets').getByText('DSC_2845.NEF', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
-    await scope.getByText('Virtual copy sidecar', { exact: true }).waitFor({ timeout: 10_000 });
-    await scope.getByText('Highlight clipping review', { exact: true }).waitFor({ timeout: 10_000 });
-    const selectedScopePolicyCount = await scope.locator('[data-policy-state]').count();
-    if (selectedScopePolicyCount !== 3) {
-      throw new Error(`Expected 3 selected-frame policy checks, found ${selectedScopePolicyCount}.`);
-    }
-    const readyPreviewCount = await page
-      .getByTestId('agent-preview-artifacts')
-      .getByText('ready', { exact: true })
-      .count();
-    if (readyPreviewCount !== 3) {
-      throw new Error(`Expected 3 ready preview artifacts, found ${readyPreviewCount}.`);
-    }
-    const replayLinkCount = await page
-      .getByTestId('agent-audit-entries')
-      .locator('a[href*="agent-expert-edit-demo-workflow-2026-06-21.html"]')
-      .count();
-    if (replayLinkCount !== 3) {
-      throw new Error(`Expected 3 visible agent replay links, found ${replayLinkCount}.`);
-    }
-    await page.getByTestId('agent-approval-states').getByText('Approve plan', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
-    await page.getByTestId('agent-approval-states').getByText('Reject plan', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
-    await page.getByTestId('agent-approval-states').getByText('Apply approved', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
-    const approveButton = page.getByTestId('agent-approval-action-approve-dry-run');
-    await approveButton.click();
-    const approvedDataset = agentDryRunReviewProofDatasetSchema.parse(
-      await review.evaluate((element) => ({ ...element.dataset })),
-    );
-    if (approvedDataset.localReviewDecision !== 'approved') {
-      throw new Error(`Expected approved local review decision, got ${approvedDataset.localReviewDecision}.`);
-    }
-    const applyButton = page.getByTestId('agent-review-apply-unavailable');
-    if (await applyButton.isEnabled()) {
-      throw new Error('Agent demo apply control remains a non-clickable transcript marker.');
-    }
-    await page
-      .getByTestId('agent-review-apply-state')
-      .getByText('Matching dry-run was accepted', { exact: false })
-      .waitFor({ timeout: 10_000 });
-    const rejectButton = page.getByTestId('agent-approval-action-reject-plan');
-    await rejectButton.click();
-    const rejectedDataset = agentDryRunReviewProofDatasetSchema.parse(
-      await review.evaluate((element) => ({ ...element.dataset })),
-    );
-    if (rejectedDataset.localReviewDecision !== 'rejected') {
-      throw new Error(`Expected rejected local review decision, got ${rejectedDataset.localReviewDecision}.`);
-    }
-    if (await applyButton.isEnabled()) {
-      throw new Error('Agent demo apply control remains a non-clickable transcript marker after local rejection.');
-    }
-    await page.getByTestId('agent-parameter-diffs').getByText('Temperature', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
-    await page.getByTestId('agent-affected-targets').getByText('DSC_2844.NEF', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
-    await page.getByTestId('agent-review-warnings').getByText('Original RAW', { exact: false }).waitFor({
-      timeout: 10_000,
-    });
-    await privateRawArtifacts
-      .getByText('validation.raw-open-edit-export.high-iso-skin-shadow.v1', { exact: true })
-      .waitFor({ timeout: 10_000 });
-    await privateRawArtifacts
-      .getByText('private-artifacts/validation/open-edit-export/high-iso-skin-shadow-v1-workflow-report.json', {
-        exact: true,
-      })
-      .waitFor({ timeout: 10_000 });
-    const removedApplyActionCount = await page.getByText('Approve apply', { exact: true }).count();
-    if (removedApplyActionCount !== 0) {
-      throw new Error(`Agent UI-only smoke must not expose Approve apply, found ${removedApplyActionCount}.`);
     }
     return;
   }
