@@ -48,6 +48,29 @@ const computationalMergeToolRegistryEntries = [
   ...buildComputationalMergeToolRegistryEntries('super_resolution'),
 ];
 
+const agentSelectedImagePreviewLoopToolRegistryEntries: RawEngineToolDefinitionV1[] = [
+  {
+    approvalClass: ApprovalClass.EditApply,
+    inputSchemaName: 'AgentCurrentImagePreviewLoopRequestV1',
+    mutates: true,
+    outputSchemaName: 'AgentCurrentImagePreviewLoopResponseV1',
+    requiresDryRun: true,
+    returnsArtifactHandles: true,
+    toolKind: 'apply',
+    toolName: 'rawengine.agent.selected_image.preview_loop',
+  },
+  {
+    approvalClass: ApprovalClass.EditApply,
+    inputSchemaName: 'AgentCurrentImagePreviewLoopApplyReviewRequestV1',
+    mutates: true,
+    outputSchemaName: 'AgentCurrentImagePreviewLoopResponseV1',
+    requiresDryRun: true,
+    returnsArtifactHandles: true,
+    toolKind: 'apply',
+    toolName: 'rawengine.agent.selected_image.preview_loop.apply_review',
+  },
+];
+
 export const rawEngineDefaultToolRegistryV1: RawEngineToolRegistryV1 = rawEngineToolRegistryV1Schema.parse({
   schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
   tools: [
@@ -121,6 +144,7 @@ export const rawEngineDefaultToolRegistryV1: RawEngineToolRegistryV1 = rawEngine
       toolKind: 'read',
       toolName: 'rawengine.agent.preview.render',
     },
+    ...agentSelectedImagePreviewLoopToolRegistryEntries,
     {
       approvalClass: ApprovalClass.PreviewOnly,
       inputSchemaName: 'CommandEnvelopeV1',

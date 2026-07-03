@@ -32,15 +32,26 @@ export const dispatchAgentLiveEditorTool = async ({
   requestId: string;
   runtimeToolName: string;
 }): Promise<unknown> => {
-  const response = agentLiveToolDispatchResultSchema.parse(
-    await handleRawEngineAppServerHostRequestAsync({
-      arguments: args,
-      draftSession,
-      requestId,
-      runtimeToolName,
-      toolName: RawEngineAppServerHostToolName.DispatchTool,
-    }),
-  );
+  const rawResponse = await handleRawEngineAppServerHostRequestAsync({
+    arguments: args,
+    draftSession,
+    requestId,
+    runtimeToolName,
+    toolName: RawEngineAppServerHostToolName.DispatchTool,
+  });
+  const parsedResponse = agentLiveToolDispatchResultSchema.safeParse(rawResponse);
+  if (!parsedResponse.success) {
+    const message =
+      typeof rawResponse === 'object' &&
+      rawResponse !== null &&
+      'message' in rawResponse &&
+      typeof rawResponse.message === 'string'
+        ? rawResponse.message
+        : parsedResponse.error.message;
+    throw new Error(message);
+  }
+
+  const response = parsedResponse.data;
   return response.result;
 };
 
