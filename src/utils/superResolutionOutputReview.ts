@@ -1,4 +1,7 @@
-import type { SuperResolutionOutputReviewWorkflow } from '../schemas/computational-merge/superResolutionOutputReviewSchemas';
+import type {
+  SuperResolutionOutputReviewWorkflow,
+  SuperResolutionTiledApplyReceipt,
+} from '../schemas/computational-merge/superResolutionOutputReviewSchemas';
 import { superResolutionOutputReviewWorkflowSchema } from '../schemas/computational-merge/superResolutionOutputReviewSchemas';
 import type { SuperResolutionUiSettings } from '../schemas/computational-merge/superResolutionUiSchemas';
 import { getSuperResolutionModeForDetailPolicy } from '../schemas/computational-merge/superResolutionUiSchemas';
@@ -46,6 +49,7 @@ type SuperResolutionArtifactReviewInput = {
     reviewStatus: 'apply_ready' | 'blocked' | 'review_required';
     weakSupportRatio: number;
   };
+  tiledApplyReceipt?: SuperResolutionTiledApplyReceipt;
   validationSummary: {
     alignmentConfidence?: number;
     downscaleReconstructionError?: number;
@@ -207,6 +211,7 @@ export const buildSuperResolutionOutputReviewFromArtifact = (
             weakSupportRatio: artifactValue.supportMap.weakSupportRatio,
             warningCodes: artifactValue.warningCodes,
           }),
+    ...(artifactValue.tiledApplyReceipt === undefined ? {} : { tiledApplyReceipt: artifactValue.tiledApplyReceipt }),
     warningCodes: artifactValue.warningCodes,
   });
 };

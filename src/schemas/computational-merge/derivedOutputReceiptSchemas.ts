@@ -109,6 +109,66 @@ const derivedOutputHdrMetadataSchema = z
     }
   });
 
+export const superResolutionTiledApplyReceiptSchema = z
+  .object({
+    applyMode: z.literal('tiled_conservative'),
+    conservativeLimits: z
+      .object({
+        enhancementMode: z.literal('bounded_pixel_shift_interleave'),
+        fullResolutionEnhancement: z.literal(false),
+        maxOutputMegapixels: z.number().positive(),
+        maxPeakMemoryBytes: z.number().int().positive(),
+        previewExportParityClaimed: z.literal(false),
+      })
+      .strict(),
+    observedPerformance: z
+      .object({
+        estimatedPeakMemoryBytes: z.number().int().positive(),
+        observedApplyMs: z.number().min(0),
+        observedMegapixelsPerSecond: z.number().positive(),
+        outputMegapixels: z.number().positive(),
+      })
+      .strict(),
+    outputDimensions: derivedOutputDimensionsSchema,
+    receiptVersion: z.literal(1),
+    runtimeArtifactId: z.string().trim().min(1),
+    runtimeStatus: z.literal('apply_rendered'),
+    tileGrid: z
+      .object({
+        overlapPx: z.number().int().nonnegative(),
+        tileCount: z.number().int().positive(),
+        tileHeight: z.number().int().positive(),
+        tileWidth: z.number().int().positive(),
+        tilesX: z.number().int().positive(),
+        tilesY: z.number().int().positive(),
+      })
+      .strict(),
+  })
+  .strict()
+  .superRefine((receipt, context) => {
+    if (receipt.tileGrid.tileCount !== receipt.tileGrid.tilesX * receipt.tileGrid.tilesY) {
+      context.addIssue({
+        code: 'custom',
+        message: 'SR tiled apply receipt tileCount must equal tilesX * tilesY.',
+        path: ['tileGrid', 'tileCount'],
+      });
+    }
+    if (receipt.observedPerformance.outputMegapixels > receipt.conservativeLimits.maxOutputMegapixels) {
+      context.addIssue({
+        code: 'custom',
+        message: 'SR tiled apply receipt output megapixels must stay within conservative limits.',
+        path: ['observedPerformance', 'outputMegapixels'],
+      });
+    }
+    if (receipt.observedPerformance.estimatedPeakMemoryBytes > receipt.conservativeLimits.maxPeakMemoryBytes) {
+      context.addIssue({
+        code: 'custom',
+        message: 'SR tiled apply receipt estimated peak memory must stay within conservative limits.',
+        path: ['observedPerformance', 'estimatedPeakMemoryBytes'],
+      });
+    }
+  });
+
 export const derivedOutputProvenanceSidecarSchema = z
   .object({
     acceptedApplyId: z.string().trim().min(1).optional(),
@@ -169,6 +229,7 @@ export const derivedOutputProvenanceSidecarSchema = z
             weakSupportRatio: z.number().min(0).max(1),
           })
           .strict(),
+        tiledApplyReceipt: superResolutionTiledApplyReceiptSchema.optional(),
       })
       .strict()
       .optional(),
@@ -223,6 +284,31 @@ export const derivedOutputReceiptSchema = z
       .optional(),
     hdr: derivedOutputHdrMetadataSchema.optional(),
     panorama: derivedOutputPanoramaMetadataSchema.optional(),
+    superResolution: z
+      .object({
+        registrationMetrics: z
+          .object({
+            algorithmId: z.literal('output_lattice_phase_residual_v1'),
+            averageConfidence: z.number().min(0).max(1),
+            averageResidualPx: z.number().min(0),
+            maxResidualPx: z.number().min(0),
+            measuredSubpixelFrameCount: z.number().int().nonnegative(),
+          })
+          .strict(),
+        supportMap: z
+          .object({
+            artifactId: z.string().trim().min(1),
+            coverageRatio: z.number().min(0).max(1),
+            effectiveScale: z.number().min(1).max(4),
+            requestedScale: z.number().min(1.1).max(4),
+            reviewStatus: z.enum(['apply_ready', 'blocked', 'review_required']),
+            weakSupportRatio: z.number().min(0).max(1),
+          })
+          .strict(),
+        tiledApplyReceipt: superResolutionTiledApplyReceiptSchema.optional(),
+      })
+      .strict()
+      .optional(),
     previewDimensions: derivedOutputDimensionsSchema.optional(),
     recipeHash: z.string().trim().min(1).optional(),
     provenanceSidecar: derivedOutputProvenanceSidecarSchema.optional(),
@@ -370,3 +456,4 @@ export const derivedOutputReceiptSchema = z
 export type DerivedOutputReceipt = z.infer<typeof derivedOutputReceiptSchema>;
 export type DerivedOutputStaleReason = z.infer<typeof derivedOutputStaleReasonSchema>;
 export type DerivedOutputProvenanceSidecar = z.infer<typeof derivedOutputProvenanceSidecarSchema>;
+export type SuperResolutionTiledApplyReceipt = z.infer<typeof superResolutionTiledApplyReceiptSchema>;
