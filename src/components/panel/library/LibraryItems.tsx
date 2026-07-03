@@ -351,6 +351,8 @@ const ThumbnailComponent = ({
       onKeyDown={handleKeyDown}
       role="button"
       tabIndex={0}
+      data-image-path={path}
+      data-testid="library-thumbnail"
     >
       <div className="relative w-full flex-1 min-h-0 z-0 bg-surface">
         {layers.length > 0 && (

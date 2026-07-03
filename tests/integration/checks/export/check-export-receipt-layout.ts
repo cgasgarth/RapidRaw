@@ -91,6 +91,10 @@ try {
 
   const receipt = page.getByTestId('export-success-receipt');
   await receipt.waitFor({ timeout: 10_000 });
+  await page
+    .locator('[data-testid="filmstrip-thumbnail"][data-image-path="/tmp/rawengine-browser-harness/export.tif"]')
+    .waitFor({ timeout: 10_000 });
+  await receipt.locator('summary').click();
 
   const detailsBox = await page.getByTestId('export-success-receipt-details').boundingBox();
   const actionsBox = await page.getByTestId('export-success-receipt-actions').boundingBox();
@@ -109,6 +113,22 @@ try {
   if (!transformBox || transformBox.height > 36) {
     throw new Error(`Receipt transform text wrapped too tall: ${transformBox?.height ?? 'missing'}`);
   }
+
+  const harnessProof = await page.evaluate(() => {
+    const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+    return {
+      listRefreshCount: calls.filter((call) => call.command === 'list_images_in_dir').length,
+      snapshotCount: calls.filter((call) => call.command === 'get_folder_refresh_snapshot').length,
+    };
+  });
+  if (harnessProof.listRefreshCount < 2) {
+    throw new Error(`Expected export completion to refresh the selected folder, saw ${harnessProof.listRefreshCount}.`);
+  }
+
+  await page.getByRole('button', { name: /Back to Library/u }).click();
+  await page
+    .locator('[data-testid="library-thumbnail"][data-image-path="/tmp/rawengine-browser-harness/export.tif"]')
+    .waitFor({ timeout: 10_000 });
 
   console.log('export receipt layout ok');
 } catch (error) {

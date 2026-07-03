@@ -17,6 +17,16 @@ interface BrowserTauriInvokeCall {
   options?: unknown;
 }
 
+interface BrowserHarnessImage {
+  exif: null;
+  is_edited: boolean;
+  is_virtual_copy: boolean;
+  modified: number;
+  path: string;
+  rating: number;
+  tags: null;
+}
+
 declare global {
   interface ImportMetaEnv {
     VITE_RAWENGINE_BROWSER_TAURI_HARNESS?: string | undefined;
@@ -127,6 +137,18 @@ const harnessPreviewJpegBase64 =
 let callbackId = 0;
 const callbacks = new Map<number, (event: unknown) => void>();
 const eventListeners = new Map<string, Set<number>>();
+let folderRevision = 1;
+const harnessImages: BrowserHarnessImage[] = [
+  {
+    exif: null,
+    is_edited: false,
+    is_virtual_copy: false,
+    modified: 0,
+    path: `${browserHarnessRoot}/browser-harness.ARW`,
+    rating: 0,
+    tags: null,
+  },
+];
 
 const isBrowserTauriEventCallback = (value: unknown): value is BrowserTauriEventCallback => typeof value === 'function';
 
@@ -249,8 +271,8 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
       });
     case commandNames.getFolderRefreshSnapshot:
       return Promise.resolve({
-        fingerprint: `${getStringArg(args, 'path') ?? browserHarnessRoot}:${getBooleanArg(args, 'recursive') ? 'recursive' : 'flat'}`,
-        itemCount: 1,
+        fingerprint: `${getStringArg(args, 'path') ?? browserHarnessRoot}:${getBooleanArg(args, 'recursive') ? 'recursive' : 'flat'}:${folderRevision}`,
+        itemCount: harnessImages.length,
         path: getStringArg(args, 'path') ?? browserHarnessRoot,
         recursive: getBooleanArg(args, 'recursive'),
       });
@@ -262,17 +284,7 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
       return Promise.resolve('/tmp/rawengine-browser-harness/RapidRAW.log');
     case commandNames.listImagesInDir:
     case commandNames.listImagesRecursive:
-      return Promise.resolve([
-        {
-          exif: null,
-          is_edited: false,
-          is_virtual_copy: false,
-          modified: 0,
-          path: `${getStringArg(args, 'path') ?? browserHarnessRoot}/browser-harness.ARW`,
-          rating: 0,
-          tags: null,
-        },
-      ]);
+      return Promise.resolve(harnessImages.map((image) => ({ ...image })));
     case commandNames.readExifForPaths:
       return Promise.resolve({});
     case commandNames.getAlbumImages:
@@ -343,6 +355,20 @@ const createHarnessExportReceipt = (args: Record<string, unknown> | undefined) =
   const sourcePath = paths[0] ?? `${browserHarnessRoot}/browser-harness.ARW`;
   const outputPath = getStringArg(args, 'outputFolderOrFile') ?? `${browserHarnessRoot}/export.tif`;
   const outputFormat = getStringArg(args, 'outputFormat') ?? 'tif';
+  const exportedImage: BrowserHarnessImage = {
+    exif: null,
+    is_edited: false,
+    is_virtual_copy: false,
+    modified: folderRevision,
+    path: outputPath,
+    rating: 0,
+    tags: null,
+  };
+
+  if (!harnessImages.some((image) => image.path === outputPath)) {
+    harnessImages.push(exportedImage);
+    folderRevision += 1;
+  }
 
   return {
     completedAt: new Date('2026-06-24T00:00:00.000Z').toISOString(),
