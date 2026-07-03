@@ -441,6 +441,9 @@ function buildNegativeLabRuntimeProofV1({
   if (previewArtifact === undefined) {
     throw new Error('Negative Lab runtime preview dry-run requires a preview artifact.');
   }
+  if (previewArtifact.dimensions === undefined || previewArtifact.contentHash === undefined) {
+    throw new Error('Negative Lab runtime before/after proof requires preview dimensions and content hash.');
+  }
   const baseFogSampleSummary =
     renderedPreview.baseFogSampleSummary ??
     buildDefaultBaseFogSampleSummary(
@@ -452,6 +455,32 @@ function buildNegativeLabRuntimeProofV1({
         : 'runtime_estimate_negative_base_fog',
       command.parameters.baseStrategy.mode === 'profile_default_low_confidence' ? ['low_acquisition_confidence'] : [],
     );
+  const dryRunPlanId = `negative_lab_dry_run_plan_${command.commandId}`;
+  const acceptedDryRunPlanHash = `sha256:${dryRunPlanId}`;
+  const sourceImagePath = resolveNegativeLabRuntimeSourceImageIdentity(command);
+  const sourceNegativeArtifact = {
+    artifactId: `artifact_source_negative_${stableProofToken(
+      JSON.stringify({
+        frameIds: command.parameters.frameSelection.frameIds,
+        imagePath: sourceImagePath,
+        sessionId: command.parameters.sessionId,
+      }),
+    )}`,
+    contentHash: `sha256:source_negative:${stableProofToken(
+      JSON.stringify({
+        curveModel: command.parameters.curveModel,
+        frameIds: command.parameters.frameSelection.frameIds,
+        imagePath: sourceImagePath,
+        processFamily: command.parameters.processFamily,
+        sessionId: command.parameters.sessionId,
+      }),
+    )}`,
+    dimensions: previewArtifact.dimensions,
+    imagePath: sourceImagePath,
+    kind: 'source_negative' as const,
+    storage: 'source_file' as const,
+  };
+  const claimLevel = negativeLabRuntimePreviewClaimLevelV1(command);
   const planHash = `sha256:${stableProofToken(
     JSON.stringify({
       algorithm,
@@ -533,8 +562,31 @@ function buildNegativeLabRuntimeProofV1({
         frameIds: command.parameters.frameSelection.frameIds.length
           ? command.parameters.frameSelection.frameIds
           : ['negative_lab_frame_runtime_preview'],
-        imagePath: resolveNegativeLabRuntimeSourceImageIdentity(command),
+        imagePath: sourceImagePath,
         sessionId: command.parameters.sessionId,
+      },
+      beforeAfterPreviewProof: {
+        acceptedDryRunPlanRequirement: {
+          acceptedDryRunPlanHash,
+          dryRunPlanId,
+          requiredBeforeApply: true,
+        },
+        baseFogSampleSummary: {
+          ...baseFogSampleSummary,
+        },
+        behaviorProofHash: `sha256:${stableProofToken(
+          JSON.stringify({
+            acceptedDryRunPlanHash,
+            claimLevel,
+            generatedPositiveContentHash: previewArtifact.contentHash,
+            sourceNegativeContentHash: sourceNegativeArtifact.contentHash,
+            warningCodes,
+          }),
+        )}`,
+        claimLevel,
+        generatedPositiveDryRunArtifact: previewArtifact,
+        sourceNegativeArtifact,
+        warningCodes,
       },
     },
     schemaVersion: 1,
@@ -547,6 +599,21 @@ function buildNegativeLabRuntimeProofV1({
     },
     warningCodes,
   };
+}
+
+function negativeLabRuntimePreviewClaimLevelV1(
+  command: NegativeLabSetConversionRecipeCommandV1,
+):
+  | 'blocked_or_unsupported'
+  | 'generic_starting_point_only'
+  | 'licensed_exact_profile'
+  | 'measured_project_profile'
+  | 'stock_family_reference_metadata'
+  | 'user_supplied_profile' {
+  if (command.parameters.curveModel.curveFamily === 'process_profile_monotonic_v1') {
+    return 'measured_project_profile';
+  }
+  return 'generic_starting_point_only';
 }
 
 function buildAcceptedNegativeLabRuntimeProofV1(

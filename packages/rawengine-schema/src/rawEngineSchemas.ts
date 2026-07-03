@@ -9322,6 +9322,65 @@ export const negativeLabRuntimeProofV1Schema = z
           .strict(),
         dryRunMode: z.literal('runtime_preview_non_mutating'),
         planHash: z.string().regex(/^sha256:[A-Za-z0-9:_-]+$/u),
+        beforeAfterPreviewProof: z
+          .object({
+            acceptedDryRunPlanRequirement: z
+              .object({
+                acceptedDryRunPlanHash: z.string().regex(/^sha256:[A-Za-z0-9:_-]+$/u),
+                dryRunPlanId: z.string().trim().min(1),
+                requiredBeforeApply: z.literal(true),
+              })
+              .strict(),
+            baseFogSampleSummary: z
+              .object({
+                clippedFraction: z.number().min(0).max(1),
+                confidence: z.number().min(0).max(1),
+                densityRange: z.number().min(0),
+                densityRgb: negativeLabDensityRgbV1Schema,
+                meanRgb: z
+                  .object({
+                    b: z.number().min(0).max(1),
+                    g: z.number().min(0).max(1),
+                    r: z.number().min(0).max(1),
+                  })
+                  .strict(),
+                sampleCount: z.number().int().positive(),
+                sampleRect: negativeLabSampleRectV1Schema,
+                source: z.enum([
+                  'runtime_estimate_negative_base_fog',
+                  'recipe_default_base_fog',
+                  'requested_base_fog_sample_rect',
+                  'deterministic_edge_safe_default_rect',
+                ]),
+                warningCodes: z.array(negativeWarningCodeSchema),
+              })
+              .strict(),
+            behaviorProofHash: z.string().regex(/^sha256:[A-Za-z0-9:_-]+$/u),
+            claimLevel: z.enum([
+              'generic_starting_point_only',
+              'stock_family_reference_metadata',
+              'measured_project_profile',
+              'licensed_exact_profile',
+              'user_supplied_profile',
+              'blocked_or_unsupported',
+            ]),
+            generatedPositiveDryRunArtifact: artifactHandleV1Schema,
+            sourceNegativeArtifact: z
+              .object({
+                artifactId: z.string().trim().min(1),
+                contentHash: z.string().regex(/^sha256:[A-Za-z0-9:_-]+$/u),
+                dimensions: z
+                  .object({ height: z.number().int().positive(), width: z.number().int().positive() })
+                  .strict(),
+                imagePath: z.string().trim().min(1),
+                kind: z.literal('source_negative'),
+                storage: z.literal('source_file'),
+              })
+              .strict(),
+            warningCodes: z.array(negativeWarningCodeSchema),
+          })
+          .strict()
+          .optional(),
         previewArtifactHandle: artifactHandleV1Schema,
         previewContentHash: z.string().regex(/^sha256:[A-Za-z0-9:_-]+$/u),
         previewRenderer: z.enum([
@@ -9368,6 +9427,38 @@ export const negativeLabRuntimeProofV1Schema = z
         code: 'custom',
         message: 'Negative Lab dry-run preview artifacts must stay in temp cache.',
         path: ['runtimePreview', 'previewArtifactHandle', 'storage'],
+      });
+    }
+
+    const beforeAfterProof = proof.runtimePreview.beforeAfterPreviewProof;
+    if (beforeAfterProof === undefined) return;
+    if (
+      beforeAfterProof.generatedPositiveDryRunArtifact.artifactId !==
+      proof.runtimePreview.previewArtifactHandle.artifactId
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Negative Lab before/after proof must use the rendered dry-run preview artifact.',
+        path: ['runtimePreview', 'beforeAfterPreviewProof', 'generatedPositiveDryRunArtifact'],
+      });
+    }
+
+    if (beforeAfterProof.generatedPositiveDryRunArtifact.kind !== 'preview') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Negative Lab generated-positive dry-run artifact must be a preview artifact.',
+        path: ['runtimePreview', 'beforeAfterPreviewProof', 'generatedPositiveDryRunArtifact', 'kind'],
+      });
+    }
+
+    if (
+      beforeAfterProof.sourceNegativeArtifact.artifactId === beforeAfterProof.generatedPositiveDryRunArtifact.artifactId
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message:
+          'Negative Lab before/after proof must keep source-negative and generated-positive artifact IDs distinct.',
+        path: ['runtimePreview', 'beforeAfterPreviewProof', 'sourceNegativeArtifact', 'artifactId'],
       });
     }
   });
