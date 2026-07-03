@@ -8,8 +8,10 @@ import {
   applyAgentSelectedImageLiveSession,
   approveAgentSelectedImageLiveSession,
   refreshAgentSelectedImageLiveSessionContext,
+  rejectAgentSelectedImageLiveSession,
   replayAgentSelectedImageLiveSessionAudit,
   startAgentSelectedImageLiveSessionDryRun,
+  validateAgentSelectedImageApplyToolEnvelope,
 } from '../../../src/utils/agent/session/agentSelectedImageLiveSession';
 import {
   applyAgentGlobalAdjustments,
@@ -116,6 +118,60 @@ describe('agent stale apply guards', () => {
       status: 'rejected',
     });
     expect(useEditorStore.getState().historyIndex).toBe(historyIndexBeforeApply);
+  });
+
+  test('blocks apply when approval is missing without mutating history', async () => {
+    const draft = await startAgentSelectedImageLiveSessionDryRun({
+      adjustments: { exposure: 0.18, highlights: -10, shadows: 12 },
+      operationId: 'issue-4878-missing-approval-operation',
+      prompt: 'Brighten the selected RAW and preserve highlight detail.',
+      requestId: 'issue-4878-missing-approval',
+      sessionId: 'agent-stale-apply-guards',
+    });
+    const historyIndexBeforeApply = useEditorStore.getState().historyIndex;
+
+    rejectAgentSelectedImageLiveSession(draft);
+    const result = await applyAgentSelectedImageLiveSession(draft);
+
+    expect(result.status).toBe('blocked');
+    if (result.status !== 'blocked') throw new Error('Expected missing approval to block apply.');
+    expect(result.reason).toBe('missing_approval');
+    expect(result.staleReason).toBeUndefined();
+    expect(result.audit.receipt.toolCalls.at(-1)).toMatchObject({ status: 'blocked' });
+    expect(useEditorStore.getState().historyIndex).toBe(historyIndexBeforeApply);
+  });
+
+  test('validates selected-image apply tool name before dispatch', async () => {
+    const draft = await startApprovedSession('issue-4878-runtime-tool-mismatch');
+    const validation = validateAgentSelectedImageApplyToolEnvelope({
+      args: {
+        acceptedPlanHash: draft.dryRun.dryRunPlanHash,
+        acceptedPlanId: draft.dryRun.dryRunPlanId,
+        adjustments: draft.adjustments,
+        approval: {
+          approvalId: draft.approvalId,
+          approvedGraphRevision: draft.dryRun.sourceGraphRevision,
+          approvedPlanHash: draft.dryRun.dryRunPlanHash,
+          approvedPlanId: draft.dryRun.dryRunPlanId,
+          approvedRecipeHash: draft.snapshot.recipeHash,
+          approvedSessionId: draft.sessionId,
+          status: 'approved',
+        },
+        expectedGraphRevision: draft.dryRun.sourceGraphRevision,
+        expectedRecipeHash: draft.snapshot.recipeHash,
+        operationId: draft.operationId,
+        requestId: `${draft.requestId}-apply`,
+        sessionId: draft.sessionId,
+      },
+      draft,
+      requestId: `${draft.requestId}-apply`,
+      runtimeToolName: 'rawengine.agent.adjustments.delete',
+    });
+
+    expect(validation.status).toBe('blocked');
+    if (validation.status !== 'blocked') throw new Error('Expected wrong runtime tool to block apply.');
+    expect(validation.reason).toBe('runtime_tool_mismatch');
+    expect(validation.applyGuard.status).toBe('passed');
   });
 
   test('rejects apply when the accepted plan hash does not match the approved dry-run', async () => {
