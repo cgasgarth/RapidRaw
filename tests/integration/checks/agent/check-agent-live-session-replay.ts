@@ -84,7 +84,10 @@ if (
 ) {
   throw new Error('live session rejected approval audit did not replay blocked apply state.');
 }
-await expectRejects(() => applyAgentSelectedImageLiveSession(rejectedDraft), 'requires approval');
+const rejectedApplyResult = await applyAgentSelectedImageLiveSession(rejectedDraft);
+if (rejectedApplyResult.status !== 'blocked' || rejectedApplyResult.reason !== 'missing_approval') {
+  throw new Error('live session rejected approval did not block apply through envelope validation.');
+}
 
 const fakeLateApply = agentAdjustmentsApplyResponseSchema.parse({
   adjustedFields: ['exposure'],

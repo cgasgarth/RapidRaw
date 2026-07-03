@@ -1996,6 +1996,7 @@
       "title": ""
     },
     "status": {
+      "blocked": "",
       "cancelExport": "Anuluj eksport",
       "cancelled": "Eksport anulowany",
       "chooseExternalEditor": "Wybierz edytor...",
@@ -2054,8 +2055,19 @@
       "offlineSmartPreviewBlocked": "Podłącz ponownie oryginalny plik przed eksportem w pełnej rozdzielczości. Nadal możesz edytować inteligentny podgląd.",
       "openInEditor": "Otwórz w edytorze",
       "parityUnknown": "",
+      "ready": "",
       "resolvingOriginalFile": "Sprawdzanie oryginalnego pliku przed eksportem w pełnej rozdzielczości…",
       "retryExport": "",
+      "reviewParityPending": "",
+      "reviewReceipt": "",
+      "reviewReceiptUnavailable": "",
+      "reviewSelected_one": "",
+      "reviewSelected_few": "",
+      "reviewSelected_many": "",
+      "reviewSelected_other": "",
+      "reviewSmartPreviewBlocked": "",
+      "reviewSmartPreviewReady": "",
+      "reviewSmartPreviewResolving": "",
       "showInFinder": "Pokaż w Finderze",
       "success": "Eksport zakończony sukcesem!",
       "transformApplied": ""

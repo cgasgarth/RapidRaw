@@ -1896,6 +1896,7 @@
       "title": ""
     },
     "status": {
+      "blocked": "",
       "cancelExport": "Export abbrechen",
       "cancelled": "Export abgebrochen",
       "chooseExternalEditor": "Editor wählen...",
@@ -1946,8 +1947,17 @@
       "offlineSmartPreviewBlocked": "Verbinde die Originaldatei erneut, bevor du in voller Auflösung exportierst. Du kannst die Smart-Vorschau weiter bearbeiten.",
       "openInEditor": "Im Editor öffnen",
       "parityUnknown": "",
+      "ready": "",
       "resolvingOriginalFile": "Originaldatei vor dem Export in voller Auflösung wird geprüft…",
       "retryExport": "",
+      "reviewParityPending": "",
+      "reviewReceipt": "",
+      "reviewReceiptUnavailable": "",
+      "reviewSelected_one": "",
+      "reviewSelected_other": "",
+      "reviewSmartPreviewBlocked": "",
+      "reviewSmartPreviewReady": "",
+      "reviewSmartPreviewResolving": "",
       "showInFinder": "Im Finder anzeigen",
       "success": "Export erfolgreich!",
       "transformApplied": ""
