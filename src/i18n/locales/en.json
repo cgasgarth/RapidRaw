@@ -1935,6 +1935,28 @@
       "unavailable": "One or more proofs could not be generated.",
       "unavailableNoImage": "No ready image is loaded for soft-proof comparison."
     },
+    "softProofResolver": {
+      "blackPointCompensation": "BPC {{value}}",
+      "consistent": "Preview and export are using the same proof profile, intent, and black point compensation.",
+      "currentExportPresetName": "Current export settings proof",
+      "description": "Proof is {{proofProfile}} / {{proofIntent}}; export is {{exportProfile}} / {{exportIntent}}.",
+      "missingAppSettings": "Export settings are still loading; resolver actions will unlock when settings are available.",
+      "missingProofPreset": "No active soft-proof recipe is selected. Preview current export settings to create one.",
+      "parity": {
+        "matched": "Matched",
+        "mismatch": "Mismatch",
+        "pending": "Pending",
+        "unsupported": "Unsupported"
+      },
+      "previewCurrentExport": "Preview current export settings",
+      "renderingIntent": "Intent {{intent}}",
+      "resultingProfile": "Profile {{profile}}",
+      "title": "Resolve preview/export mismatch",
+      "transformFingerprint": "Transform {{fingerprint}}",
+      "unsupportedProfileFormat": "{{format}} cannot export {{profile}} with the color-managed transform path.",
+      "unsupportedRenderingIntent": "The active proof rendering intent is not supported for this export profile.",
+      "useCurrentSoftProof": "Use current soft proof for export"
+    },
     "softProofWarnings": {
       "gamutClipping": "Gamut warning overlay is active: {{coverage}} of the preview is flagged before export.",
       "intentMismatch": "Soft proof intent is {{proofIntent}}, while export is set to {{exportIntent}}.",

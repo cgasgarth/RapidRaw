@@ -1,8 +1,16 @@
 import { z } from 'zod';
-import { ExportColorProfile, ExportRenderingIntent } from '../../components/ui/ExportImportProperties';
+import type { ExportColorCapabilityCatalogV1 } from '../../../packages/rawengine-schema/src/exportColorCapabilities';
+import {
+  ExportColorProfile,
+  type ExportPreset,
+  ExportRenderingIntent,
+  type FileFormats,
+} from '../../components/ui/ExportImportProperties';
 import type { ExportSoftProofTransformState } from '../../store/useEditorStore';
+import { getSupportedRenderingIntents, isSupportedColorProfileForFormat } from './exportColorCapabilityContracts';
 
 export const EXPORT_SOFT_PROOF_PROFILE_COMPARE_TARGET_RESOLUTION = 1024;
+export const EXPORT_SOFT_PROOF_RESOLVER_PRESET_ID = 'internal-soft-proof-export-resolver';
 
 export type ExportSoftProofProfileCompareSideId = 'srgb' | 'displayP3';
 
@@ -224,4 +232,139 @@ export const getSoftProofProfileCompareStatus = (
   if (sides.some((side) => side.status === 'unavailable')) return 'unavailable';
   if (sides.every((side) => side.status === 'ready')) return 'ready';
   return 'idle';
+};
+
+export interface ExportSoftProofResolverStatus {
+  canPreviewCurrentExportSettings: boolean;
+  canUseCurrentSoftProofForExport: boolean;
+  currentProofPreset: ExportPreset | null;
+  isCurrentProofExportConsistent: boolean;
+  parityStatus: 'matched' | 'mismatch' | 'pending' | 'unsupported';
+  unsupportedReason:
+    | 'missing-app-settings'
+    | 'missing-proof-preset'
+    | 'unsupported-profile-format'
+    | 'unsupported-rendering-intent'
+    | null;
+}
+
+export const buildExportSoftProofResolverPreset = ({
+  currentSettings,
+  name,
+}: {
+  currentSettings: Omit<ExportPreset, 'id' | 'name'>;
+  name: string;
+}): ExportPreset => ({
+  ...currentSettings,
+  id: EXPORT_SOFT_PROOF_RESOLVER_PRESET_ID,
+  name,
+});
+
+export const upsertExportSoftProofResolverPreset = ({
+  currentSettings,
+  name,
+  presets,
+}: {
+  currentSettings: Omit<ExportPreset, 'id' | 'name'>;
+  name: string;
+  presets: ExportPreset[];
+}): ExportPreset[] => {
+  const resolverPreset = buildExportSoftProofResolverPreset({ currentSettings, name });
+  const existingIndex = presets.findIndex((preset) => preset.id === EXPORT_SOFT_PROOF_RESOLVER_PRESET_ID);
+  if (existingIndex === -1) return [...presets, resolverPreset];
+  return presets.map((preset, index) => (index === existingIndex ? resolverPreset : preset));
+};
+
+export const getExportSoftProofResolverStatus = ({
+  appSettingsAvailable,
+  catalog,
+  currentExportBlackPointCompensation,
+  currentExportColorProfile,
+  currentExportRenderingIntent,
+  exportSoftProofRecipeId,
+  exportSoftProofTransform,
+  fileFormat,
+  isExportSoftProofEnabled,
+  proofPreset,
+}: {
+  appSettingsAvailable: boolean;
+  catalog: ExportColorCapabilityCatalogV1;
+  currentExportBlackPointCompensation: boolean;
+  currentExportColorProfile: ExportColorProfile;
+  currentExportRenderingIntent: ExportRenderingIntent;
+  exportSoftProofRecipeId: string | null;
+  exportSoftProofTransform: ExportSoftProofTransformState | null;
+  fileFormat: FileFormats;
+  isExportSoftProofEnabled: boolean;
+  proofPreset: ExportPreset | null;
+}): ExportSoftProofResolverStatus => {
+  if (!appSettingsAvailable) {
+    return {
+      canPreviewCurrentExportSettings: false,
+      canUseCurrentSoftProofForExport: false,
+      currentProofPreset: null,
+      isCurrentProofExportConsistent: false,
+      parityStatus: 'unsupported',
+      unsupportedReason: 'missing-app-settings',
+    };
+  }
+
+  if (!proofPreset || !exportSoftProofRecipeId) {
+    return {
+      canPreviewCurrentExportSettings: true,
+      canUseCurrentSoftProofForExport: false,
+      currentProofPreset: null,
+      isCurrentProofExportConsistent: false,
+      parityStatus: 'pending',
+      unsupportedReason: 'missing-proof-preset',
+    };
+  }
+
+  const proofColorProfile = proofPreset.colorProfile ?? ExportColorProfile.Srgb;
+  const proofRenderingIntent = proofPreset.renderingIntent ?? ExportRenderingIntent.RelativeColorimetric;
+  const supportedIntents = getSupportedRenderingIntents(catalog, fileFormat, proofColorProfile);
+  const supportsProofProfile = isSupportedColorProfileForFormat(fileFormat, proofColorProfile);
+  const supportsProofIntent = supportedIntents.length === 0 || supportedIntents.includes(proofRenderingIntent);
+
+  if (!supportsProofProfile) {
+    return {
+      canPreviewCurrentExportSettings: true,
+      canUseCurrentSoftProofForExport: false,
+      currentProofPreset: proofPreset,
+      isCurrentProofExportConsistent: false,
+      parityStatus: 'unsupported',
+      unsupportedReason: 'unsupported-profile-format',
+    };
+  }
+
+  if (!supportsProofIntent) {
+    return {
+      canPreviewCurrentExportSettings: true,
+      canUseCurrentSoftProofForExport: false,
+      currentProofPreset: proofPreset,
+      isCurrentProofExportConsistent: false,
+      parityStatus: 'unsupported',
+      unsupportedReason: 'unsupported-rendering-intent',
+    };
+  }
+
+  const isCurrentProofExportConsistent =
+    isExportSoftProofEnabled &&
+    proofColorProfile === currentExportColorProfile &&
+    proofRenderingIntent === currentExportRenderingIntent &&
+    (proofPreset.blackPointCompensation ?? false) === currentExportBlackPointCompensation &&
+    exportSoftProofTransform !== null;
+
+  return {
+    canPreviewCurrentExportSettings: true,
+    canUseCurrentSoftProofForExport: !isCurrentProofExportConsistent,
+    currentProofPreset: proofPreset,
+    isCurrentProofExportConsistent,
+    parityStatus: isCurrentProofExportConsistent
+      ? 'matched'
+      : exportSoftProofTransform === null
+        ? 'pending'
+        : 'mismatch',
+    unsupportedReason: null,
+  };
 };
