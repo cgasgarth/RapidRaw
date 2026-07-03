@@ -22,13 +22,31 @@ mock.module(`${repoRoot}/src/components/panel/Editor.tsx`, () => ({
   default: () => createElement('div', { 'data-testid': 'stub-editor' }),
 }));
 mock.module(`${repoRoot}/src/components/panel/BottomBar.tsx`, () => ({
-  default: () => createElement('div', { 'data-testid': 'stub-bottom-bar' }),
+  default: () =>
+    createElement(
+      'div',
+      { 'data-testid': 'stub-bottom-bar' },
+      createElement(
+        'button',
+        { 'data-testid': 'stub-filmstrip-thumbnail', tabIndex: 0, type: 'button' },
+        'Hidden thumbnail',
+      ),
+    ),
 }));
 mock.module(`${repoRoot}/src/components/panel/right/EditorRightPanelHost.tsx`, () => ({
   EditorRightPanelHost: () => createElement('div', { 'data-testid': 'stub-right-panel-host' }),
 }));
 mock.module(`${repoRoot}/src/components/panel/right/RightPanelSwitcher.tsx`, () => ({
-  default: () => createElement('div', { 'data-testid': 'stub-right-panel-switcher' }),
+  default: () =>
+    createElement(
+      'div',
+      { 'data-testid': 'stub-right-panel-switcher' },
+      createElement(
+        'button',
+        { 'data-testid': 'stub-right-panel-button', tabIndex: 0, type: 'button' },
+        'Hidden panel',
+      ),
+    ),
 }));
 mock.module(`${repoRoot}/src/components/ui/Resizer.tsx`, () => ({
   default: () => createElement('div', { 'data-testid': 'stub-resizer' }),
@@ -115,13 +133,39 @@ const collapsedMarkup = renderEditorView(false);
 assertIncludes(collapsedMarkup, 'data-testid="editor-right-panel-shell"', 'editor right panel shell should render');
 assertIncludes(collapsedMarkup, 'data-testid="editor-bottom-bar-shell"', 'editor bottom bar shell should render');
 assertIncludes(collapsedMarkup, 'max-height:500px', 'editor filmstrip should be expanded in normal mode');
-assertIncludes(collapsedMarkup, 'max-width:1000px', 'editor tools panel should be expanded in normal mode');
+assertShellOpeningTagNotIncludes(
+  collapsedMarkup,
+  'editor-right-panel-shell',
+  'width:0px',
+  'editor tools panel should be expanded in normal mode',
+);
+assertNotIncludes(collapsedMarkup, 'inert=""', 'normal editor chrome should remain focusable');
+assertNotIncludes(collapsedMarkup, 'pointer-events-none', 'normal editor chrome should remain pointer-interactive');
 
 setupStores(true);
 const fullscreenMarkup = renderEditorView(true);
 assertIncludes(fullscreenMarkup, 'aria-hidden="true"', 'editor chrome should be hidden from assistive tech');
 assertIncludes(fullscreenMarkup, 'max-height:0px', 'filmstrip should collapse in preview-only mode');
-assertIncludes(fullscreenMarkup, 'max-width:0px', 'editor tools should collapse in preview-only mode');
+assertShellOpeningTagIncludes(
+  fullscreenMarkup,
+  'editor-right-panel-shell',
+  'width:0px',
+  'editor tools should collapse in preview-only mode',
+);
+assertIncludes(fullscreenMarkup, 'inert=""', 'fullscreen editor chrome should be removed from sequential focus');
+assertIncludes(fullscreenMarkup, 'pointer-events-none', 'fullscreen editor chrome should suppress pointer interaction');
+assertSuppressedShellContains(
+  fullscreenMarkup,
+  'editor-bottom-bar-shell',
+  'stub-filmstrip-thumbnail',
+  'fullscreen filmstrip controls should stay inside an inert hidden shell',
+);
+assertSuppressedShellContains(
+  fullscreenMarkup,
+  'editor-right-panel-shell',
+  'stub-right-panel-button',
+  'fullscreen right-panel controls should stay inside an inert hidden shell',
+);
 
 if (failures.length > 0) {
   console.error('editor preview-mode exit UI failed');
@@ -225,6 +269,66 @@ function createSelectedImage() {
 
 function assertIncludes(markup: string, needle: string, message: string): void {
   if (!markup.includes(needle)) failures.push(message);
+}
+
+function assertNotIncludes(markup: string, needle: string, message: string): void {
+  if (markup.includes(needle)) failures.push(message);
+}
+
+function assertShellOpeningTagIncludes(markup: string, shellTestId: string, needle: string, message: string): void {
+  const shellOpeningTag = getShellOpeningTag(markup, shellTestId);
+  if (!shellOpeningTag) {
+    failures.push(`${message}: missing shell ${shellTestId}`);
+    return;
+  }
+  if (!shellOpeningTag.includes(needle)) failures.push(message);
+}
+
+function assertShellOpeningTagNotIncludes(markup: string, shellTestId: string, needle: string, message: string): void {
+  const shellOpeningTag = getShellOpeningTag(markup, shellTestId);
+  if (!shellOpeningTag) {
+    failures.push(`${message}: missing shell ${shellTestId}`);
+    return;
+  }
+  if (shellOpeningTag.includes(needle)) failures.push(message);
+}
+
+function assertSuppressedShellContains(
+  markup: string,
+  shellTestId: string,
+  descendantTestId: string,
+  message: string,
+): void {
+  const shellIndex = markup.indexOf(`data-testid="${shellTestId}"`);
+  if (shellIndex === -1) {
+    failures.push(`${message}: missing shell ${shellTestId}`);
+    return;
+  }
+
+  const shellOpeningTag = getShellOpeningTag(markup, shellTestId);
+  const descendantIndex = markup.indexOf(`data-testid="${descendantTestId}"`, shellIndex);
+  if (!shellOpeningTag || descendantIndex === -1) {
+    failures.push(`${message}: missing rendered descendant ${descendantTestId}`);
+    return;
+  }
+
+  if (!shellOpeningTag.includes('aria-hidden="true"') || !shellOpeningTag.includes('inert=""')) {
+    failures.push(`${message}: shell is not hidden and inert`);
+  }
+  if (!shellOpeningTag.includes('pointer-events-none')) {
+    failures.push(`${message}: shell does not suppress pointer interaction`);
+  }
+}
+
+function getShellOpeningTag(markup: string, shellTestId: string): string | null {
+  const shellIndex = markup.indexOf(`data-testid="${shellTestId}"`);
+  if (shellIndex === -1) return null;
+
+  const shellOpeningTagStart = markup.lastIndexOf('<', shellIndex);
+  const shellOpeningTagEnd = markup.indexOf('>', shellIndex);
+  if (shellOpeningTagStart === -1 || shellOpeningTagEnd === -1) return null;
+
+  return markup.slice(shellOpeningTagStart, shellOpeningTagEnd);
 }
 
 async function createTestI18n(resources: typeof locale) {

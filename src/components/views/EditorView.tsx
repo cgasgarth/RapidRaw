@@ -1,6 +1,6 @@
 import cx from 'clsx';
 import type { MouseEvent, KeyboardEvent as ReactKeyboardEvent, RefObject } from 'react';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 import type { CreateResizeHandler } from '../../hooks/viewport/usePanelResize';
@@ -107,9 +107,27 @@ export default function EditorView({
     })),
   );
   const isFullScreen = isFullScreenProp ?? isFullScreenFromStore;
+  const previewRegionRef = useRef<HTMLDivElement | null>(null);
+  const bottomBarShellRef = useRef<HTMLDivElement | null>(null);
+  const rightPanelShellRef = useRef<HTMLDivElement | null>(null);
   const desktopRightShellWidth = activeRightPanel
     ? rightPanelWidth + DESKTOP_RIGHT_RAIL_WIDTH
     : DESKTOP_RIGHT_RAIL_WIDTH;
+
+  useEffect(() => {
+    if (!isFullScreen) return;
+
+    const activeElement = document.activeElement;
+    if (!(activeElement instanceof HTMLElement)) return;
+
+    const focusIsInsideHiddenChrome =
+      bottomBarShellRef.current?.contains(activeElement) || rightPanelShellRef.current?.contains(activeElement);
+
+    if (!focusIsInsideHiddenChrome) return;
+
+    activeElement.blur();
+    previewRegionRef.current?.focus({ preventScroll: true });
+  }, [isFullScreen]);
 
   const { multiSelectedPaths, imageRatings, isViewLoading, rootPaths } = useLibraryStore(
     useShallow((state) => ({
@@ -209,9 +227,12 @@ export default function EditorView({
       className={cx(
         'flex flex-col w-full overflow-hidden shrink-0',
         !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
+        isFullScreen && 'pointer-events-none',
       )}
       aria-hidden={isFullScreen}
       data-testid="editor-bottom-bar-shell"
+      inert={isFullScreen ? true : undefined}
+      ref={bottomBarShellRef}
       style={{
         maxHeight: isFullScreen ? '0px' : '500px',
         opacity: isFullScreen ? 0 : 1,
@@ -260,7 +281,9 @@ export default function EditorView({
       <div
         aria-label={t('editor.accessibility.previewRegion')}
         className={cx('flex-1 flex flex-col min-w-0 gap-2', isCompactPortrait && 'min-h-[240px]')}
+        ref={previewRegionRef}
         role="region"
+        tabIndex={-1}
       >
         {editorNode}
         {!isCompactPortrait && editorBottomBarNode}
@@ -273,9 +296,12 @@ export default function EditorView({
             ? 'flex-col rounded-lg border border-editor-border bg-editor-panel'
             : 'h-full min-w-0 bg-transparent',
           !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
+          isFullScreen && 'pointer-events-none',
         )}
         aria-hidden={isFullScreen}
         data-testid="editor-right-panel-shell"
+        inert={isFullScreen ? true : undefined}
+        ref={rightPanelShellRef}
         role="complementary"
         style={
           isCompactPortrait
