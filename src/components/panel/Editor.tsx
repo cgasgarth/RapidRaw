@@ -200,6 +200,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const isInitialMount = useRef(true);
+  const previousFullScreenRef = useRef(isFullScreen);
   const isClickAnimating = useRef(false);
   const clickAnimationTime = 250;
   const mouseDownPos = useRef<{ x: number; y: number } | null>(null);
@@ -329,6 +330,12 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       clearTimeout(timer);
     };
   }, [isFullScreen]);
+
+  useEffect(() => {
+    if (previousFullScreenRef.current === isFullScreen) return;
+    previousFullScreenRef.current = isFullScreen;
+    setEditor({ compareMode: 'off' });
+  }, [isFullScreen, setEditor]);
 
   const isCropping = activeRightPanel === Panel.Crop;
   const isMasking = activeRightPanel === Panel.Masks;
@@ -1563,6 +1570,9 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
           onOpenNegativeLab={handleOpenNegativeLab}
           onRedo={redo}
           onToggleFullScreen={handleToggleFullScreen}
+          onShowOriginalChange={(nextShowOriginal) => {
+            setEditor({ showOriginal: nextShowOriginal });
+          }}
           onToggleShowOriginal={toggleShowOriginal}
           onUndo={undo}
           selectedImage={selectedImage}

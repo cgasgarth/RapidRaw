@@ -91,6 +91,7 @@ export function useImageProcessing(
   const baseRenderSize = useEditorStore((state) => state.baseRenderSize);
   const originalSize = useEditorStore((state) => state.originalSize);
   const compareMode = useEditorStore((state) => state.compareMode);
+  const showOriginal = useEditorStore((state) => state.showOriginal);
   const isSliderDragging = useEditorStore((state) => state.isSliderDragging);
   const isExportSoftProofEnabled = useEditorStore((state) => state.isExportSoftProofEnabled);
   const exportSoftProofRecipeId = useEditorStore((state) => state.exportSoftProofRecipeId);
@@ -676,7 +677,12 @@ export function useImageProcessing(
   }, [geometricAdjustmentsKey, selectedImage?.path, setEditor]);
 
   useEffect(() => {
-    if (compareMode !== 'off' && selectedImage?.isReady && displaySize.width > 0 && !isSliderDragging) {
+    if (
+      (compareMode !== 'off' || showOriginal) &&
+      selectedImage?.isReady &&
+      displaySize.width > 0 &&
+      !isSliderDragging
+    ) {
       const targetRes = calculateTargetRes();
       if (targetRes > currentOriginalResRef.current) {
         requestHiFiOriginalZoom(adjustments, targetRes);
@@ -687,6 +693,7 @@ export function useImageProcessing(
     };
   }, [
     compareMode,
+    showOriginal,
     displaySize.width,
     displaySize.height,
     calculateTargetRes,
@@ -700,7 +707,7 @@ export function useImageProcessing(
   useEffect(() => {
     let isEffectActive = true;
     const generate = async () => {
-      if (compareMode !== 'off' && selectedImage?.path && !transformedOriginalUrl) {
+      if ((compareMode !== 'off' || showOriginal) && selectedImage?.path && !transformedOriginalUrl) {
         try {
           const targetRes = calculateTargetRes();
           const base64Data = await invokeWithSchema(
@@ -727,7 +734,15 @@ export function useImageProcessing(
     return () => {
       isEffectActive = false;
     };
-  }, [compareMode, selectedImage?.path, adjustments, transformedOriginalUrl, calculateTargetRes, setEditor]);
+  }, [
+    compareMode,
+    showOriginal,
+    selectedImage?.path,
+    adjustments,
+    transformedOriginalUrl,
+    calculateTargetRes,
+    setEditor,
+  ]);
 
   return {
     applyAdjustments,

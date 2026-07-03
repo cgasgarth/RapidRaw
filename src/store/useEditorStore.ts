@@ -157,6 +157,31 @@ const shouldRevalidateGamutWarningOverlay = (update: Partial<EditorState>): bool
   'exportSoftProofRecipeId' in update ||
   'exportSoftProofTransform' in update;
 
+const normalizeCompareStateUpdate = (state: EditorState, update: Partial<EditorState>): void => {
+  if ('selectedImage' in update && update.selectedImage?.path !== state.selectedImage?.path) {
+    update.compareMode = 'off';
+    update.showOriginal = false;
+    update.transformedOriginalUrl = null;
+  }
+
+  if ('compareMode' in update) {
+    if (update.compareMode === 'hold-original') {
+      update.showOriginal = true;
+    } else if (!('showOriginal' in update)) {
+      update.showOriginal = false;
+    }
+    return;
+  }
+
+  if ('showOriginal' in update) {
+    if (update.showOriginal && state.compareMode === 'off') {
+      update.compareMode = 'hold-original';
+    } else if (!update.showOriginal && state.compareMode === 'hold-original') {
+      update.compareMode = 'off';
+    }
+  }
+};
+
 const createSessionCheckpointId = (historyIndex: number): string => {
   const randomId = globalThis.crypto?.randomUUID?.();
   return randomId ?? `checkpoint-${String(historyIndex)}-${String(Date.now())}`;
@@ -258,11 +283,7 @@ export const useEditorStore = create<EditorState>((set) => ({
       const rawUpdate = typeof updater === 'function' ? updater(state) : updater;
       const update: Partial<EditorState> = { ...rawUpdate };
 
-      if ('compareMode' in update) {
-        update.showOriginal = update.compareMode === 'hold-original';
-      } else if ('showOriginal' in update) {
-        update.compareMode = update.showOriginal ? 'hold-original' : 'off';
-      }
+      normalizeCompareStateUpdate(state, update);
 
       if (!shouldRevalidateGamutWarningOverlay(update)) return update;
 
