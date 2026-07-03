@@ -941,7 +941,14 @@
         "overlayDisabled": "Interactive overlays are disabled in compare preview",
         "sideBySideRegion": "Side-by-side before and after preview",
         "splitWipeDivider": "Before and after split divider",
-        "splitWipeLabel": "Before / After"
+        "splitWipeLabel": "Before / After",
+        "stripMode": {
+          "hold-original": "Before",
+          "side-by-side": "Side",
+          "split-wipe": "Split"
+        },
+        "stripOff": "Off",
+        "stripTitle": "Compare"
       },
       "cropPreviewAlt": "Crop preview",
       "gamutWarningCoverage": "{{profile}} gamut · {{value}}",

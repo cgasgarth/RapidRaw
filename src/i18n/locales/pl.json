@@ -977,7 +977,14 @@
         "overlayDisabled": "Interactive overlays are disabled in compare preview",
         "sideBySideRegion": "Side-by-side before and after preview",
         "splitWipeDivider": "Before and after split divider",
-        "splitWipeLabel": "Before / After"
+        "splitWipeLabel": "Before / After",
+        "stripMode": {
+          "hold-original": "",
+          "side-by-side": "",
+          "split-wipe": ""
+        },
+        "stripOff": "",
+        "stripTitle": ""
       },
       "cropPreviewAlt": "Podglad kadrowania",
       "gamutWarningCoverage": "",
