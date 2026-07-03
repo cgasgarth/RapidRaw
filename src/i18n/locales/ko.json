@@ -1447,7 +1447,15 @@
       "stockProfileStatusHeuristic": "Heuristic",
       "stockProfileStatusMeasured": "Measured",
       "stockProfileStatusNeedsFixture": "Needs fixture",
-      "stockProfileStatusPlaceholder": "Placeholder"
+      "stockProfileStatusPlaceholder": "Placeholder",
+      "confidence": "",
+      "currentProjectedRgb": "",
+      "suggestedDelta": "",
+      "patchRole": {
+        "neutral": "",
+        "highlight": "",
+        "shadow": ""
+      }
     },
     "panorama": {
       "cancel": "취소",

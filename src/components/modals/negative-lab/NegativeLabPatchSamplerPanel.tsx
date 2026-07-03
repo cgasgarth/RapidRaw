@@ -11,37 +11,13 @@ import type {
 } from '../../../schemas/negative-lab/negativeLabPresetCatalogSchemas';
 import type { NegativeLabShadowPatchBlackPointSuggestion } from '../../../schemas/negative-lab/negativeLabShadowPatchBlackPointSuggestionSchemas';
 import { TextVariants } from '../../../types/typography';
+import {
+  type DensitometerPatchLabelKey,
+  NEGATIVE_LAB_DENSITOMETER_PATCH_PRESETS,
+  NEGATIVE_LAB_PATCH_ROLES,
+  type NegativeLabPatchRole,
+} from '../../../utils/negative-lab/negativeLabPatchSamplerUi';
 import UiText from '../../ui/primitives/Text';
-
-export type NegativeLabPatchRole = 'highlight' | 'neutral';
-export type DensitometerPatchLabelKey =
-  | 'modals.negativeConversion.sampleCenterPatch'
-  | 'modals.negativeConversion.sampleHighlightPatch'
-  | 'modals.negativeConversion.sampleLeftEdge'
-  | 'modals.negativeConversion.sampleShadowPatch';
-
-const DENSITOMETER_PATCH_PRESETS = [
-  {
-    labelKey: 'modals.negativeConversion.sampleLeftEdge',
-    rect: { height: 0.5, width: 0.08, x: 0.02, y: 0.25 },
-    testId: 'negative-lab-patch-probe-left-edge',
-  },
-  {
-    labelKey: 'modals.negativeConversion.sampleCenterPatch',
-    rect: { height: 0.1, width: 0.1, x: 0.45, y: 0.45 },
-    testId: 'negative-lab-patch-probe-center-patch',
-  },
-  {
-    labelKey: 'modals.negativeConversion.sampleShadowPatch',
-    rect: { height: 0.12, width: 0.12, x: 0.18, y: 0.72 },
-    testId: 'negative-lab-patch-probe-shadow-patch',
-  },
-  {
-    labelKey: 'modals.negativeConversion.sampleHighlightPatch',
-    rect: { height: 0.1, width: 0.1, x: 0.68, y: 0.18 },
-    testId: 'negative-lab-patch-probe-highlight-patch',
-  },
-] satisfies Array<{ labelKey: DensitometerPatchLabelKey; rect: NegativeLabBaseFogSampleRect; testId: string }>;
 
 const DENSITOMETER_CHANNEL_LABEL_KEYS: Record<
   NegativeBaseFogDensitometerReadout['dominantChannel'],
@@ -128,7 +104,7 @@ export function NegativeLabPatchSamplerPanel({
         </UiText>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        {DENSITOMETER_PATCH_PRESETS.map((samplePreset) => (
+        {NEGATIVE_LAB_DENSITOMETER_PATCH_PRESETS.map((samplePreset) => (
           <button
             key={samplePreset.labelKey}
             type="button"
@@ -144,7 +120,7 @@ export function NegativeLabPatchSamplerPanel({
         ))}
       </div>
       <div className="grid grid-cols-2 gap-2" data-testid="negative-lab-patch-role-selector">
-        {(['neutral', 'highlight'] satisfies NegativeLabPatchRole[]).map((role) => (
+        {NEGATIVE_LAB_PATCH_ROLES.map((role) => (
           <button
             key={role}
             type="button"
@@ -188,6 +164,10 @@ export function NegativeLabPatchSamplerPanel({
           <span className="text-text-secondary">{t('modals.negativeConversion.baseRgb')}</span>
           <span className="text-right tabular-nums" data-testid="negative-lab-patch-probe-rgb">
             {patchProbeEstimate.baseRgb.map(formatRgbValue).join(' / ')}
+          </span>
+          <span className="text-text-secondary">{t('modals.negativeConversion.confidence')}</span>
+          <span className="text-right tabular-nums" data-testid="negative-lab-patch-probe-confidence">
+            {formatPercentValue(patchProbeEstimate.confidence * 100)}
           </span>
           <span className="text-text-secondary">{t('modals.negativeConversion.densitometer')}</span>
           <span className="text-right tabular-nums" data-testid="negative-lab-patch-probe-density-spread">
@@ -245,6 +225,10 @@ export function NegativeLabPatchSamplerPanel({
           <span className="text-right tabular-nums" data-testid="negative-lab-shadow-black-point-value">
             {shadowPatchBlackPointSuggestion.projectedBlackPoint.toFixed(2)}
           </span>
+          <span className="text-text-secondary">{t('modals.negativeConversion.suggestedDelta')}</span>
+          <span className="text-right tabular-nums" data-testid="negative-lab-shadow-black-point-delta">
+            {formatSignedRecipeValue(shadowPatchBlackPointSuggestion.suggestedBlackPointDelta)}
+          </span>
           <span className="text-text-secondary">{t('modals.negativeConversion.shadowBlackPointP01')}</span>
           <span className="text-right tabular-nums" data-testid="negative-lab-shadow-black-point-p01">
             {t('modals.negativeConversion.highlightRecoveryValueTransition', {
@@ -255,6 +239,13 @@ export function NegativeLabPatchSamplerPanel({
           <span className="text-text-secondary">{t('modals.negativeConversion.applicationRisk')}</span>
           <span className="text-right" data-testid="negative-lab-shadow-black-point-risk">
             {t(`modals.negativeConversion.neutralityRiskLevels.${shadowPatchBlackPointSuggestion.applicationRisk}`)}
+          </span>
+          <span className="text-text-secondary">{t('modals.negativeConversion.currentProjectedRgb')}</span>
+          <span className="text-right tabular-nums" data-testid="negative-lab-shadow-black-point-rgb">
+            {t('modals.negativeConversion.highlightRecoveryValueTransition', {
+              from: shadowPatchBlackPointSuggestion.currentSampleRgb.map(formatRgbValue).join(' / '),
+              to: shadowPatchBlackPointSuggestion.projectedSampleRgb.map(formatRgbValue).join(' / '),
+            })}
           </span>
           {shadowPatchBlackPointSuggestion.endpointClamped || !shadowPatchBlackPointSuggestion.applyAllowed ? (
             <span
@@ -291,6 +282,10 @@ export function NegativeLabPatchSamplerPanel({
           <span className="text-right tabular-nums" data-testid="negative-lab-highlight-recovery-offset">
             {formatSignedRecipeValue(highlightPatchExposureSuggestion.suggestedFrameExposureOffset)}
           </span>
+          <span className="text-text-secondary">{t('modals.negativeConversion.suggestedDelta')}</span>
+          <span className="text-right tabular-nums" data-testid="negative-lab-highlight-recovery-delta">
+            {formatSignedRecipeValue(highlightPatchExposureSuggestion.suggestedExposureDeltaEv)}
+          </span>
           <span className="text-text-secondary">{t('modals.negativeConversion.highlightRecoveryP99')}</span>
           <span className="text-right tabular-nums" data-testid="negative-lab-highlight-recovery-p99">
             {t('modals.negativeConversion.highlightRecoveryValueTransition', {
@@ -308,6 +303,13 @@ export function NegativeLabPatchSamplerPanel({
           <span className="text-text-secondary">{t('modals.negativeConversion.applicationRisk')}</span>
           <span className="text-right" data-testid="negative-lab-highlight-recovery-risk">
             {t(`modals.negativeConversion.neutralityRiskLevels.${highlightPatchExposureSuggestion.applicationRisk}`)}
+          </span>
+          <span className="text-text-secondary">{t('modals.negativeConversion.currentProjectedRgb')}</span>
+          <span className="text-right tabular-nums" data-testid="negative-lab-highlight-recovery-rgb">
+            {t('modals.negativeConversion.highlightRecoveryValueTransition', {
+              from: highlightPatchExposureSuggestion.currentSampleRgb.map(formatRgbValue).join(' / '),
+              to: highlightPatchExposureSuggestion.projectedSampleRgb.map(formatRgbValue).join(' / '),
+            })}
           </span>
           {highlightPatchExposureSuggestion.offsetClamped || !highlightPatchExposureSuggestion.applyAllowed ? (
             <span
@@ -342,6 +344,22 @@ export function NegativeLabPatchSamplerPanel({
               blue: formatSignedRecipeValue(neutralPatchSuggestion.suggestedRgbBalanceOffset.blueWeight),
               green: formatSignedRecipeValue(neutralPatchSuggestion.suggestedRgbBalanceOffset.greenWeight),
               red: formatSignedRecipeValue(neutralPatchSuggestion.suggestedRgbBalanceOffset.redWeight),
+            })}
+          </span>
+          <span className="text-text-secondary">{t('modals.negativeConversion.confidence')}</span>
+          <span className="text-right tabular-nums" data-testid="negative-lab-neutral-patch-confidence">
+            {formatPercentValue(neutralPatchSuggestion.confidence * 100)}
+          </span>
+          <span className="text-text-secondary">{t('modals.negativeConversion.baseRgb')}</span>
+          <span className="text-right tabular-nums" data-testid="negative-lab-neutral-patch-sample-rgb">
+            {neutralPatchSuggestion.sampleRgb.map(formatRgbValue).join(' / ')}
+          </span>
+          <span className="text-text-secondary">{t('modals.negativeConversion.frameRgbBalanceOffset')}</span>
+          <span className="text-right tabular-nums" data-testid="negative-lab-neutral-patch-effective-balance">
+            {t('modals.negativeConversion.effectiveFrameRgbBalance', {
+              blue: formatRgbValue(neutralPatchSuggestion.effectiveRgbBalance.blueWeight),
+              green: formatRgbValue(neutralPatchSuggestion.effectiveRgbBalance.greenWeight),
+              red: formatRgbValue(neutralPatchSuggestion.effectiveRgbBalance.redWeight),
             })}
           </span>
           <span className="text-text-secondary">{t('modals.negativeConversion.neutralityRisk')}</span>
