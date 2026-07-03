@@ -24,6 +24,7 @@ const zeroDepthMarkup = renderToolbar({
 const zeroDepthControl = getHistoryDepthControlMarkup(zeroDepthMarkup);
 assertIncludes(zeroDepthMarkup, 'data-testid="editor-history-depth-control"', 'history depth control did not render');
 assertIncludes(zeroDepthControl, 'disabled=""', 'zero-depth history control should be disabled');
+assertIncludes(zeroDepthControl, 'data-history-popover-state="closed"', 'history control should expose closed state');
 assertIncludes(zeroDepthMarkup, '1/1', 'zero-depth history should fall back to a stable 1/1 label');
 assertExcludes(zeroDepthMarkup, 'Initial State', 'zero-depth history should not render a history stack menu');
 
@@ -43,6 +44,12 @@ assertIncludes(
   'non-zero history control did not render',
 );
 assertIncludes(nonZeroDepthMarkup, '2/3', 'non-zero history label should show the active index and total depth');
+assertIncludes(nonZeroDepthMarkup, 'Exposure', 'history control should visibly show the active history label');
+assertIncludes(
+  nonZeroDepthMarkup,
+  'data-testid="editor-history-active-label"',
+  'history control should expose the active history label hook',
+);
 assertIncludes(
   nonZeroDepthControl,
   'data-tooltip="Show History Stack"',
@@ -75,6 +82,7 @@ assertExcludes(macMarkup, 'Ctrl+Y', 'macOS redo tooltip should not render a Ctrl
 
 const toolbar = locale.editor?.toolbar;
 if (typeof toolbar?.historyDepth !== 'string') failures.push('missing locale key: editor.toolbar.historyDepth');
+if (typeof toolbar?.history?.review !== 'string') failures.push('missing locale key: editor.toolbar.history.review');
 if (typeof toolbar?.tooltips?.history !== 'string')
   failures.push('missing locale key: editor.toolbar.tooltips.history');
 

@@ -1551,7 +1551,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       )}
       <div
         className={cx(
-          'shrink-0 relative z-10 rounded-lg border border-editor-border bg-editor-panel',
+          'shrink-0 relative z-[120] rounded-lg border border-editor-border bg-editor-panel',
           !isInstantTransition && 'transition-all duration-300 ease-in-out',
           isFullScreen ? 'max-h-0 opacity-0 m-0 border-transparent' : 'max-h-25 opacity-100',
           toolbarOverflowVisible ? 'overflow-visible' : 'overflow-hidden',

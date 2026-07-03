@@ -81,15 +81,21 @@ try {
   await page
     .getByRole('button', { name: /browser-harness\.ARW/u })
     .first()
+    .waitFor({ timeout: 10_000 });
+  await page
+    .getByRole('button', { name: /browser-harness\.ARW/u })
+    .first()
     .dblclick();
   await page.getByRole('main', { name: 'Editor workspace' }).waitFor({ timeout: 10_000 });
   await page.getByRole('complementary', { name: 'Editor tools' }).waitFor({ timeout: 10_000 });
+  await page.getByTestId('right-panel-switcher-button-adjustments').click();
   await page.getByRole('slider', { exact: true, name: 'Brightness' }).waitFor({ timeout: 10_000 });
   await page.getByRole('slider', { exact: true, name: 'Contrast' }).waitFor({ timeout: 10_000 });
 
   await setSlider(page, 'Brightness', '0.35');
   await page.waitForFunction(() => document.body.textContent?.includes('2/2') === true, null, { timeout: 10_000 });
   await page.getByTestId('editor-history-depth-control').click();
+  await page.getByTestId('editor-history-jump-action').first().waitFor({ timeout: 10_000 });
   await page.getByTestId('editor-history-add-checkpoint').click();
   await page.getByRole('button', { name: 'Rename checkpoint' }).click();
   await page.getByTestId('editor-history-checkpoint-label-input').fill('Brightened base');
@@ -110,7 +116,7 @@ try {
   }
 
   await page.getByTestId('editor-history-depth-control').click();
-  const activeCheckpoint = page.getByTestId('editor-history-active-checkpoint');
+  const activeCheckpoint = page.getByTestId('editor-history-active-row');
   await activeCheckpoint.waitFor({ timeout: 10_000 });
   const activeText = await activeCheckpoint.innerText();
   if (!activeText.includes('Brightened base')) {
