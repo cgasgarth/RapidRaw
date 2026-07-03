@@ -162,12 +162,15 @@ const rawEngineLocalAppServerSelectedImagePreviewLoopCommandBaseV1Schema = z
     expectedRecipeHash: z.string().trim().min(1),
     maxIterations: z.number().int().min(2).max(6).default(4),
     operationId: z.string().trim().min(1),
+    previousPreviewArtifactId: z.string().trim().min(1).optional(),
+    previousPreviewIdentity: z.string().trim().min(1).optional(),
     prompt: z.string().trim().min(1),
     requestId: z.string().trim().min(1),
     rollbackAfterReview: z.boolean().default(false),
     selectedImagePath: z.string().trim().min(1),
     sessionId: z.string().trim().min(1),
     steps: z.array(rawEngineLocalAppServerSelectedImagePreviewLoopStepV1Schema).min(2).max(6),
+    userFeedback: z.string().trim().min(1).optional(),
   })
   .strict();
 

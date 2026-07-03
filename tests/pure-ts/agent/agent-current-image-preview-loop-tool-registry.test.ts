@@ -3,7 +3,9 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 import {
   filterRawEngineLocalAppServerExecutableToolRegistry,
   RawEngineLocalAppServerCommandType,
+  type RawEngineLocalAppServerSelectedImagePreviewLoopApplyReviewCommandV1,
   type RawEngineLocalAppServerSelectedImagePreviewLoopCommandV1,
+  rawEngineLocalAppServerSelectedImagePreviewLoopApplyReviewCommandV1Schema,
   rawEngineLocalAppServerSelectedImagePreviewLoopCommandV1Schema,
 } from '../../../packages/rawengine-schema/src/localAppServerBridge';
 import { rawEngineDefaultToolRegistryV1 } from '../../../packages/rawengine-schema/src/toolRegistry';
@@ -194,6 +196,51 @@ describe('agent selected-image preview-loop executable tool registry', () => {
     expect(result.previewRefreshCount).toBe(2);
     expect(result.previewRefreshReceipts.at(-1)?.toolName).toBe('rawengine.agent.preview.render');
     expect(result.rollbackReceipt?.toolName).toBe('rawengine.agent.history.rollback');
+  });
+
+  test('applies only the latest reviewed selected-image iteration through apply-review', async () => {
+    const command = await buildCommand();
+    const bridge = createLiveEditorAppServerBridge();
+    const reviewResponse = await bridge.dispatch(command, { now: () => new Date('2026-07-02T12:00:00.000Z') });
+    if (!reviewResponse.ok) throw new Error(reviewResponse.message);
+    const review = agentCurrentImagePreviewLoopResultSchema.parse(reviewResponse.result);
+    const latestPreview = review.previewLineage.at(-1);
+    const latestReceipt = review.previewRefreshReceipts.at(-1);
+    if (latestPreview === undefined || latestReceipt === undefined) {
+      throw new Error('Expected latest reviewed preview and receipt.');
+    }
+    const { commandType: _commandType, ...requestWithoutCommandType } = command;
+
+    const applyCommand: RawEngineLocalAppServerSelectedImagePreviewLoopApplyReviewCommandV1 =
+      rawEngineLocalAppServerSelectedImagePreviewLoopApplyReviewCommandV1Schema.parse({
+        acceptedPreviewArtifactId: latestPreview.previewArtifactId,
+        acceptedPreviewReceiptHash: latestReceipt.contentHash,
+        commandType: RawEngineLocalAppServerCommandType.AgentSelectedImagePreviewLoopApplyReview,
+        request: {
+          ...requestWithoutCommandType,
+          requestId: `${command.requestId}-apply-review`,
+        },
+        review,
+      });
+    const applyResponse = await bridge.dispatch(applyCommand, { now: () => new Date('2026-07-02T12:05:00.000Z') });
+    if (!applyResponse.ok) throw new Error(applyResponse.message);
+
+    const applied = agentCurrentImagePreviewLoopResultSchema.parse(applyResponse.result);
+    expect(applied.requestId).toContain('accepted-apply');
+    expect(applied.selectedImagePath).toBe(selectedPath);
+    expect(applied.initialGraphRevision).toBe(review.rollbackCheckpoint.graphRevision);
+    expect(applied.initialRecipeHash).toBe(review.rollbackCheckpoint.previewRecipeHash);
+
+    seedEditor();
+    const staleApplyResponse = await bridge.dispatch({
+      ...applyCommand,
+      acceptedPreviewArtifactId: review.previewLineage[0]?.previewArtifactId,
+    });
+    expect(staleApplyResponse.ok).toBe(false);
+    expect(staleApplyResponse).toMatchObject({
+      message: expect.stringContaining('stale preview artifact'),
+      reason: 'handler_failed',
+    });
   });
 
   test('rejects stale selected-image state before applying through the bridge executor', async () => {

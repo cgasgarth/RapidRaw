@@ -83,12 +83,15 @@ export const agentCurrentImagePreviewLoopRequestSchema = z
     expectedRecipeHash: z.string().trim().min(1),
     maxIterations: z.number().int().min(2).max(6).default(4),
     operationId: z.string().trim().min(1),
+    previousPreviewArtifactId: z.string().trim().min(1).optional(),
+    previousPreviewIdentity: z.string().trim().min(1).optional(),
     prompt: z.string().trim().min(1),
     requestId: z.string().trim().min(1),
     rollbackAfterReview: z.boolean().default(false),
     selectedImagePath: z.string().trim().min(1),
     sessionId: z.string().trim().min(1),
     steps: z.array(agentLoopStepSchema).min(2).max(6),
+    userFeedback: z.string().trim().min(1).optional(),
   })
   .strict();
 
@@ -328,6 +331,8 @@ export const agentCurrentImagePreviewLoopResultSchema = z
     initialPreviewArtifactId: z.string().trim().min(1),
     initialPreviewReceipt: rawEngineAgentInitialPreviewReceiptV1Schema,
     initialRecipeHash: z.string().trim().min(1),
+    previousPreviewArtifactId: z.string().trim().min(1).optional(),
+    previousPreviewIdentity: z.string().trim().min(1).optional(),
     previewIdentity: z.string().trim().min(1).nullable(),
     previewLineage: z.array(previewLineageSchema).min(1),
     previewRefreshCount: z.number().int().min(1),
@@ -347,6 +352,7 @@ export const agentCurrentImagePreviewLoopResultSchema = z
     selectedImagePath: z.string().trim().min(1),
     status: z.enum(['needs_user_review', 'max_iterations_reached']),
     toolName: z.literal(AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME),
+    userFeedback: z.string().trim().min(1).optional(),
   })
   .strict();
 
@@ -465,6 +471,8 @@ export const runAgentCurrentImagePreviewLoop = async (
     initialPreviewArtifactId: initialSnapshot.initialPreview.artifactId,
     initialPreviewReceipt,
     initialRecipeHash: initialSnapshot.initialPreview.recipeHash,
+    previousPreviewArtifactId: parsedRequest.previousPreviewArtifactId,
+    previousPreviewIdentity: parsedRequest.previousPreviewIdentity,
     previewIdentity: initialSnapshot.previewIdentity,
     previewLineage: loopResult.previewLineage,
     previewRefreshCount: loopResult.previewRefreshCount,
@@ -482,6 +490,7 @@ export const runAgentCurrentImagePreviewLoop = async (
     selectedImagePath: initialSnapshot.activeImagePath,
     status: loopResult.reviewStatus,
     toolName: AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME,
+    userFeedback: parsedRequest.userFeedback,
   });
 };
 

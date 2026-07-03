@@ -33,6 +33,7 @@ import { useEditorStore } from '../../../../store/useEditorStore';
 import { useSettingsStore } from '../../../../store/useSettingsStore';
 import { buildAgentAppServerToolReadinessSummary } from '../../../../utils/agent/context/agentAppServerToolReadiness';
 import {
+  AGENT_CURRENT_IMAGE_PREVIEW_LOOP_APPLY_REVIEW_TOOL_NAME,
   AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME,
   type AgentCurrentImagePreviewLoopRequest,
   type AgentCurrentImagePreviewLoopResult,
@@ -561,65 +562,104 @@ const buildSelectedImageLoopReview = ({
   prompt: string;
   request: AgentCurrentImagePreviewLoopRequest;
   result: AgentCurrentImagePreviewLoopResult;
-}): AgentSelectedImagePreviewLoopReview => ({
-  acceptedDryRunPlanCount: result.acceptedDryRunPlanCount,
-  applyReceipts: result.applyReceipts,
-  auditEventSummary: result.auditEventSummary,
-  blockers: [],
-  command: {
-    operationId: request.operationId,
-    requestId: request.requestId,
-    sessionId: request.sessionId,
-    toolName: result.toolName,
-  },
-  compareArtifacts: result.compareArtifactIds,
-  controls: {
-    acceptApply: {
-      label: 'Accepted apply',
-      reason: 'Selected-image preview-loop command completed through typed live-tool dispatch.',
-      state: 'dispatched',
+}): AgentSelectedImagePreviewLoopReview => {
+  const latestPreview = result.previewLineage.at(-1);
+  const latestPreviewReceipt = result.previewRefreshReceipts.at(-1);
+  const latestPreviewArtifactId = latestPreview?.previewArtifactId ?? result.compareArtifactIds.currentArtifactId;
+  const acceptedPreviewReceiptHash = latestPreviewReceipt?.contentHash;
+  const reviseFeedback =
+    result.userFeedback ??
+    'Refine the latest selected-image medium preview using reviewer feedback while preserving the selected image context.';
+  const reviseRequest: AgentCurrentImagePreviewLoopRequest = {
+    ...request,
+    operationId: `${request.operationId}-revision`,
+    previousPreviewArtifactId: latestPreviewArtifactId,
+    previousPreviewIdentity:
+      result.compareArtifactIds.currentEvidence?.previewRef ??
+      latestPreview?.previewRef ??
+      result.previousPreviewIdentity,
+    prompt: `${prompt}\nReviewer feedback: ${reviseFeedback}`,
+    requestId: `${request.requestId}-revision`,
+    rollbackAfterReview: true,
+    userFeedback: reviseFeedback,
+  };
+
+  return {
+    acceptedDryRunPlanCount: result.acceptedDryRunPlanCount,
+    applyReceipts: result.applyReceipts,
+    auditEventSummary: result.auditEventSummary,
+    blockers: [],
+    command: {
+      operationId: request.operationId,
+      requestId: request.requestId,
+      sessionId: request.sessionId,
+      toolName: result.toolName,
     },
-    reviseWithFeedback: {
-      feedback: 'Review the current selected-image compare artifacts before requesting another loop.',
-      label: 'Revise with feedback',
-      reason: 'Review is available after the completed selected-image loop.',
-      state: 'disabled',
+    compareArtifacts: result.compareArtifactIds,
+    controls: {
+      acceptApply: {
+        commandRequest:
+          acceptedPreviewReceiptHash === undefined
+            ? undefined
+            : {
+                acceptedPreviewArtifactId: latestPreviewArtifactId,
+                acceptedPreviewReceiptHash,
+                request,
+                review: result,
+              },
+        label: 'Accept apply',
+        reason: 'Applies only the latest reviewed selected-image preview iteration.',
+        state:
+          acceptedPreviewReceiptHash === undefined || result.rollbackReceipt === undefined ? 'disabled' : 'available',
+      },
+      reviseWithFeedback: {
+        commandRequest: reviseRequest,
+        feedback: reviseFeedback,
+        label: 'Revise with feedback',
+        reason:
+          'Runs another selected-image preview-loop iteration with the current feedback and previous preview identity.',
+        state: result.rollbackReceipt === undefined ? 'disabled' : 'available',
+      },
+      rollback: {
+        label: 'Rollback',
+        reason:
+          result.rollbackReceipt === undefined
+            ? 'Rollback is available from the command checkpoint when enabled.'
+            : 'Rollback-after-review restored the checkpoint from the command receipt.',
+        state: result.rollbackReceipt === undefined ? 'available' : 'dispatched',
+        toolName: AGENT_HISTORY_ROLLBACK_TOOL_NAME,
+      },
+      exportReviewed: {
+        label: 'Export reviewed edit',
+        reason: 'Exports only after selected-image preview-loop review evidence is available.',
+        state: 'disabled',
+        toolName: AGENT_FINAL_EXPORT_TOOL_NAME,
+      },
     },
-    rollback: {
-      label: 'Rollback',
-      reason:
-        result.rollbackReceipt === undefined
-          ? 'Rollback is available from the command checkpoint when enabled.'
-          : 'Rollback-after-review restored the checkpoint from the command receipt.',
-      state: result.rollbackReceipt === undefined ? 'available' : 'dispatched',
-      toolName: AGENT_HISTORY_ROLLBACK_TOOL_NAME,
-    },
-    exportReviewed: {
-      label: 'Export reviewed edit',
-      reason: 'Exports only after selected-image preview-loop review evidence is available.',
-      state: result.reviewStatus === 'needs_user_review' ? 'available' : 'disabled',
-      toolName: AGENT_FINAL_EXPORT_TOOL_NAME,
-    },
-  },
-  editCount: result.editCount,
-  finalGraphRevision: result.finalGraphRevision,
-  finalRecipeHash: result.finalRecipeHash,
-  id: `${request.requestId}-review`,
-  initialGraphRevision: result.initialGraphRevision,
-  initialPreviewArtifactId: result.initialPreviewArtifactId,
-  initialRecipeHash: result.initialRecipeHash,
-  previewIdentity: result.previewIdentity,
-  previewLineage: result.previewLineage,
-  previewRefreshCount: result.previewRefreshCount,
-  prompt,
-  reviewStatus: result.reviewStatus,
-  rollbackCheckpoint: result.rollbackCheckpoint,
-  rollbackReceipt: result.rollbackReceipt,
-  selectedImage: result.selectedImage,
-  status: result.status,
-  title: 'Selected-image preview loop',
-  warnings: [],
-});
+    editCount: result.editCount,
+    finalGraphRevision: result.finalGraphRevision,
+    finalRecipeHash: result.finalRecipeHash,
+    id: `${request.requestId}-review`,
+    initialGraphRevision: result.initialGraphRevision,
+    initialPreviewArtifactId: result.initialPreviewArtifactId,
+    initialRecipeHash: result.initialRecipeHash,
+    iterations: [buildSelectedImagePreviewLoopIteration({ approvalState: 'latest_reviewed', result })],
+    previousPreviewArtifactId: result.previousPreviewArtifactId,
+    previousPreviewIdentity: result.previousPreviewIdentity,
+    previewIdentity: result.previewIdentity,
+    previewLineage: result.previewLineage,
+    previewRefreshCount: result.previewRefreshCount,
+    prompt,
+    reviewStatus: result.reviewStatus,
+    rollbackCheckpoint: result.rollbackCheckpoint,
+    rollbackReceipt: result.rollbackReceipt,
+    selectedImage: result.selectedImage,
+    status: result.status,
+    title: 'Selected-image preview loop',
+    userFeedback: result.userFeedback,
+    warnings: [],
+  };
+};
 
 function MessageBubble({ message }: { message: AgentChatMessage }) {
   const isUser = message.role === 'user';
@@ -1009,6 +1049,74 @@ type SelectedImageLoopRuntimeState =
       status: 'idle' | 'pending';
     };
 
+type SelectedImagePreviewLoopIteration = NonNullable<AgentSelectedImagePreviewLoopReview['iterations']>[number];
+
+const buildSelectedImagePreviewLoopIteration = ({
+  approvalState,
+  result,
+  staleReason,
+  userFeedback,
+}: {
+  approvalState: SelectedImagePreviewLoopIteration['approvalState'];
+  result: AgentCurrentImagePreviewLoopResult;
+  staleReason?: string;
+  userFeedback?: string;
+}): SelectedImagePreviewLoopIteration => {
+  const latestPreview = result.previewLineage.at(-1);
+  const latestPreviewReceipt = result.previewRefreshReceipts.at(-1);
+  const currentEvidence = result.compareArtifactIds.currentEvidence;
+  const beforeHash =
+    result.compareArtifactIds.beforeEvidence?.contentHash ??
+    result.initialPreviewReceipt.contentHash ??
+    result.initialRecipeHash;
+  const afterHash =
+    latestPreviewReceipt?.contentHash ??
+    currentEvidence?.contentHash ??
+    latestPreview?.renderHash ??
+    result.finalRecipeHash;
+  const previewIdentity =
+    currentEvidence?.previewRef ??
+    latestPreview?.previewRef ??
+    result.compareArtifactIds.mediumPreview?.previewRef ??
+    result.previewIdentity ??
+    result.selectedImagePath;
+
+  return {
+    afterHash,
+    approvalState,
+    beforeHash,
+    graphRevision: result.finalGraphRevision,
+    id: `${result.requestId}-iteration`,
+    previewArtifactId: latestPreview?.previewArtifactId ?? result.compareArtifactIds.currentArtifactId,
+    previewIdentity,
+    recipeHash: result.finalRecipeHash,
+    requestId: result.requestId,
+    ...(staleReason === undefined ? {} : { staleReason }),
+    ...(userFeedback === undefined ? {} : { userFeedback }),
+  };
+};
+
+const getSelectedImagePreviewLoopStaleReason = (review: AgentSelectedImagePreviewLoopReview): string | null => {
+  try {
+    const snapshot = buildAgentImageContextSnapshot();
+    if (snapshot.activeImagePath !== review.selectedImage.path) {
+      return 'Selected image changed after this preview iteration was reviewed.';
+    }
+    if (snapshot.graphRevision !== review.rollbackCheckpoint.graphRevision) {
+      return 'Graph revision changed after this preview iteration was reviewed.';
+    }
+    if (snapshot.initialPreview.recipeHash !== review.rollbackCheckpoint.previewRecipeHash) {
+      return 'Recipe hash changed after this preview iteration was reviewed.';
+    }
+    if (snapshot.previewIdentity !== review.selectedImage.previewIdentity) {
+      return 'Preview identity changed after this preview iteration was reviewed.';
+    }
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : 'Selected-image review context is unavailable.';
+  }
+};
+
 function SelectedImagePreviewLoopReviewPanel({ review }: { review: AgentSelectedImagePreviewLoopReview }) {
   const { t } = useTranslation();
   const [runtimeState, setRuntimeState] = useState<SelectedImageLoopRuntimeState>({ status: 'idle' });
@@ -1016,6 +1124,7 @@ function SelectedImagePreviewLoopReviewPanel({ review }: { review: AgentSelected
     runtimeState.status === 'accepted' || runtimeState.status === 'revised'
       ? agentCurrentImagePreviewLoopResultSchema.safeParse(runtimeState.result).data
       : undefined;
+  const activeResult = latestResult;
   const compareArtifacts = latestResult?.compareArtifactIds ?? review.compareArtifacts;
   const previewLineage = latestResult?.previewLineage ?? review.previewLineage;
   const latestApplyReceipt = latestResult?.applyReceipts.at(-1);
@@ -1029,8 +1138,61 @@ function SelectedImagePreviewLoopReviewPanel({ review }: { review: AgentSelected
     state: 'disabled' as const,
     toolName: AGENT_FINAL_EXPORT_TOOL_NAME,
   };
-  const acceptEnabled = review.controls.acceptApply.state === 'available' && runtimeState.status !== 'pending';
-  const reviseEnabled = review.controls.reviseWithFeedback.state === 'available' && runtimeState.status !== 'pending';
+  const staleReason = getSelectedImagePreviewLoopStaleReason(review);
+  const reviewIterations = review.iterations ?? [
+    {
+      afterHash:
+        review.compareArtifacts.currentEvidence?.contentHash ??
+        review.previewLineage.at(-1)?.renderHash ??
+        review.finalRecipeHash,
+      approvalState: 'latest_reviewed' as const,
+      beforeHash: review.compareArtifacts.beforeEvidence?.contentHash ?? review.initialRecipeHash,
+      graphRevision: review.finalGraphRevision,
+      id: `${review.command.requestId}-iteration`,
+      previewArtifactId: review.previewLineage.at(-1)?.previewArtifactId ?? review.compareArtifacts.currentArtifactId,
+      previewIdentity:
+        review.compareArtifacts.currentEvidence?.previewRef ??
+        review.previewLineage.at(-1)?.previewRef ??
+        review.previewIdentity ??
+        review.selectedImage.path,
+      recipeHash: review.finalRecipeHash,
+      requestId: review.command.requestId,
+    },
+  ];
+  const activeIterations =
+    activeResult === undefined
+      ? reviewIterations
+      : [
+          ...reviewIterations.map((iteration) => ({ ...iteration, approvalState: 'superseded' as const })),
+          buildSelectedImagePreviewLoopIteration({
+            approvalState: runtimeState.status === 'accepted' ? 'approved' : 'latest_reviewed',
+            result: activeResult,
+            ...(runtimeState.status === 'revised' && activeResult.userFeedback !== undefined
+              ? { userFeedback: activeResult.userFeedback }
+              : {}),
+          }),
+        ];
+  const displayedIterations =
+    staleReason === null
+      ? activeIterations
+      : activeIterations.map((iteration) =>
+          iteration.approvalState === 'latest_reviewed'
+            ? { ...iteration, approvalState: 'blocked_stale' as const, staleReason }
+            : iteration,
+        );
+  const latestReviewedIteration = [...displayedIterations]
+    .reverse()
+    .find((iteration) => iteration.approvalState === 'latest_reviewed' || iteration.approvalState === 'approved');
+  const acceptEnabled =
+    review.controls.acceptApply.state === 'available' &&
+    runtimeState.status !== 'pending' &&
+    runtimeState.status !== 'accepted' &&
+    staleReason === null &&
+    latestReviewedIteration?.approvalState === 'latest_reviewed';
+  const reviseEnabled =
+    review.controls.reviseWithFeedback.state === 'available' &&
+    runtimeState.status !== 'pending' &&
+    staleReason === null;
   const rollbackEnabled = review.controls.rollback.state === 'available' && runtimeState.status !== 'pending';
   const exportReceipt = runtimeState.status === 'exported' ? runtimeState.exportReceipt : undefined;
   const hasExportEvidence =
@@ -1048,9 +1210,8 @@ function SelectedImagePreviewLoopReviewPanel({ review }: { review: AgentSelected
   const formatZoom = (zoom: (typeof previewLineage)[number]['zoom']) =>
     zoom === undefined || zoom === null ? 'none' : `${zoom.scale}x @ ${zoom.centerX},${zoom.centerY}`;
 
-  const dispatchLoop = async (
-    control: AgentSelectedImagePreviewLoopReview['controls']['acceptApply'],
-    status: 'accepted' | 'revised',
+  const dispatchRevisionLoop = async (
+    control: AgentSelectedImagePreviewLoopReview['controls']['reviseWithFeedback'],
   ) => {
     if (control.state !== 'available' || control.commandRequest === undefined) return;
     setRuntimeState({ status: 'pending' });
@@ -1058,11 +1219,52 @@ function SelectedImagePreviewLoopReviewPanel({ review }: { review: AgentSelected
       const result = agentCurrentImagePreviewLoopResultSchema.parse(
         await dispatchAgentLiveEditorTool({
           args: control.commandRequest,
-          requestId: `${review.command.requestId}-${status}`,
+          requestId: `${review.command.requestId}-revised`,
           runtimeToolName: AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME,
         }),
       );
-      setRuntimeState({ result, status });
+      setRuntimeState({ result, status: 'revised' });
+    } catch (error) {
+      setRuntimeState({
+        error: error instanceof Error ? error.message : t('editor.ai.agent.composer.unknownError'),
+        status: 'rejected',
+      });
+    }
+  };
+
+  const applyLatestReviewedIteration = async () => {
+    if (!acceptEnabled || review.controls.acceptApply.commandRequest === undefined) return;
+    setRuntimeState({ status: 'pending' });
+    try {
+      const baseCommand = review.controls.acceptApply.commandRequest as {
+        acceptedPreviewArtifactId: string;
+        acceptedPreviewReceiptHash: string;
+        request: AgentCurrentImagePreviewLoopRequest;
+        review: AgentCurrentImagePreviewLoopResult;
+      };
+      const applyReviewRequest =
+        latestResult === undefined
+          ? baseCommand
+          : {
+              ...baseCommand,
+              acceptedPreviewArtifactId:
+                latestReviewedIteration?.previewArtifactId ?? baseCommand.acceptedPreviewArtifactId,
+              acceptedPreviewReceiptHash:
+                latestResult.previewRefreshReceipts.at(-1)?.contentHash ?? baseCommand.acceptedPreviewReceiptHash,
+              request: {
+                ...(review.controls.reviseWithFeedback.commandRequest as AgentCurrentImagePreviewLoopRequest),
+                requestId: `${latestResult.requestId}-accepted-apply`,
+              },
+              review: latestResult,
+            };
+      const result = agentCurrentImagePreviewLoopResultSchema.parse(
+        await dispatchAgentLiveEditorTool({
+          args: applyReviewRequest,
+          requestId: `${review.command.requestId}-apply-review`,
+          runtimeToolName: AGENT_CURRENT_IMAGE_PREVIEW_LOOP_APPLY_REVIEW_TOOL_NAME,
+        }),
+      );
+      setRuntimeState({ result, status: 'accepted' });
     } catch (error) {
       setRuntimeState({
         error: error instanceof Error ? error.message : t('editor.ai.agent.composer.unknownError'),
@@ -1228,11 +1430,13 @@ function SelectedImagePreviewLoopReviewPanel({ review }: { review: AgentSelected
       data-initial-recipe-hash={review.initialRecipeHash}
       data-preview-identity={review.previewIdentity ?? ''}
       data-preview-lineage-count={previewLineage.length}
+      data-review-iteration-count={displayedIterations.length}
       data-review-status={latestResult?.reviewStatus ?? review.reviewStatus}
       data-rollback-checkpoint-graph-revision={review.rollbackCheckpoint.graphRevision}
       data-rollback-receipt-graph-revision={review.rollbackReceipt?.graphRevision ?? ''}
       data-runtime-state={runtimeState.status}
       data-selected-image-path={review.selectedImage.path}
+      data-stale-reason={staleReason ?? ''}
       data-testid="agent-selected-image-preview-loop-review"
       data-tool-name={review.command.toolName}
       data-warning-count={review.warnings.length}
@@ -1472,6 +1676,51 @@ function SelectedImagePreviewLoopReviewPanel({ review }: { review: AgentSelected
         ))}
       </div>
 
+      <div
+        className="space-y-1 rounded border border-white/10 bg-black/15 p-2 text-[11px]"
+        data-latest-reviewed-preview-artifact-id={latestReviewedIteration?.previewArtifactId ?? ''}
+        data-latest-reviewed-request-id={latestReviewedIteration?.requestId ?? ''}
+        data-stale-reason={staleReason ?? ''}
+        data-testid="agent-selected-image-preview-loop-iterations"
+      >
+        <div className="flex items-center justify-between gap-2">
+          <span className="font-semibold text-text-primary">{t('editor.ai.agent.selectedImageLoop.iterations')}</span>
+          <span className="rounded border border-white/10 bg-black/20 px-1.5 py-0.5 text-text-secondary">
+            {displayedIterations.length}
+          </span>
+        </div>
+        {displayedIterations.map((iteration) => (
+          <div
+            className="grid gap-1 rounded border border-white/10 bg-white/[0.03] p-2 font-mono text-[10px]"
+            data-after-hash={iteration.afterHash}
+            data-approval-state={iteration.approvalState}
+            data-before-hash={iteration.beforeHash}
+            data-graph-revision={iteration.graphRevision}
+            data-preview-artifact-id={iteration.previewArtifactId}
+            data-preview-identity={iteration.previewIdentity}
+            data-recipe-hash={iteration.recipeHash}
+            data-request-id={iteration.requestId}
+            data-stale-reason={iteration.staleReason ?? ''}
+            data-testid="agent-selected-image-preview-loop-iteration"
+            key={iteration.id}
+          >
+            <div className="flex min-w-0 items-center justify-between gap-2">
+              <span className="truncate text-text-primary">{iteration.requestId}</span>
+              <span className="shrink-0 rounded border border-white/10 bg-black/20 px-1.5 py-0.5 text-text-secondary">
+                {iteration.approvalState}
+              </span>
+            </div>
+            <div className="truncate text-sky-100">{iteration.previewIdentity}</div>
+            <div className="truncate text-text-secondary">{iteration.graphRevision}</div>
+            <div className="truncate text-text-secondary">{iteration.recipeHash}</div>
+            <div className="truncate text-text-secondary">{`${iteration.beforeHash} -> ${iteration.afterHash}`}</div>
+            {iteration.staleReason === undefined ? null : (
+              <div className="truncate text-amber-100">{iteration.staleReason}</div>
+            )}
+          </div>
+        ))}
+      </div>
+
       <div className="flex flex-wrap gap-1.5" data-testid="agent-selected-image-preview-loop-changed-fields">
         {changedFields.map((field) => (
           <span
@@ -1535,7 +1784,7 @@ function SelectedImagePreviewLoopReviewPanel({ review }: { review: AgentSelected
           data-testid="agent-selected-image-preview-loop-accept-apply"
           disabled={!acceptEnabled}
           onClick={() => {
-            void dispatchLoop(review.controls.acceptApply, 'accepted');
+            void applyLatestReviewedIteration();
           }}
           type="button"
         >
@@ -1550,7 +1799,7 @@ function SelectedImagePreviewLoopReviewPanel({ review }: { review: AgentSelected
           data-testid="agent-selected-image-preview-loop-revise"
           disabled={!reviseEnabled}
           onClick={() => {
-            void dispatchLoop(review.controls.reviseWithFeedback, 'revised');
+            void dispatchRevisionLoop(review.controls.reviseWithFeedback);
           }}
           type="button"
         >
@@ -2356,7 +2605,7 @@ function LivePromptComposer({
         operationId,
         prompt: acceptedPrompt,
         requestId,
-        rollbackAfterReview: false,
+        rollbackAfterReview: true,
         selectedImagePath: initialSnapshot.activeImagePath,
         sessionId,
         steps,
@@ -2418,10 +2667,14 @@ function LivePromptComposer({
         toolName: loopResult.toolName,
       });
       pushActivityEntry({
-        body: `${loopResult.compareArtifactIds.beforeArtifactId} -> ${loopResult.compareArtifactIds.currentArtifactId}`,
+        body: `${loopResult.requestId}: ${loopResult.compareArtifactIds.beforeArtifactId} -> ${loopResult.compareArtifactIds.currentArtifactId}`,
         graphRevision: loopResult.finalGraphRevision,
         kind: 'preview',
+        previewAfterHash: loopResult.compareArtifactIds.currentEvidence?.contentHash,
+        previewBeforeHash: loopResult.compareArtifactIds.beforeEvidence?.contentHash,
+        previewHashIdentity: loopResult.compareArtifactIds.currentEvidence?.previewRef,
         recipeHash: loopResult.finalRecipeHash,
+        requestId: loopResult.requestId,
         status: 'completed',
         toolName: 'rawengine.agent.preview.compare',
       });
