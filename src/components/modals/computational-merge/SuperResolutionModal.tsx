@@ -20,7 +20,11 @@ import {
   buildSuperResolutionDerivedOutputReceipt,
   deriveDerivedOutputReceiptState,
 } from '../../../utils/derivedOutputReceipt';
-import { buildSuperResolutionOutputReviewWorkflow } from '../../../utils/superResolutionOutputReview';
+import {
+  buildSuperResolutionOutputReviewWorkflow,
+  hasAcceptedSuperResolutionCropReview,
+  hasSuperResolutionCropReviewEvidence,
+} from '../../../utils/superResolutionOutputReview';
 import type { SuperResolutionSourcePreflightMetadata } from '../../../utils/superResolutionSourcePreflight';
 import { buildSuperResolutionSourcePreflight } from '../../../utils/superResolutionSourcePreflight';
 import Button from '../../ui/primitives/Button';
@@ -287,10 +291,18 @@ export function SuperResolutionModal({
     outputReview.downscaleReconstructionError === null
       ? t('modals.superResolution.review.notMeasured')
       : outputReview.downscaleReconstructionError.toFixed(4);
-  const isEditableHandoffReady = outputReview.editableGate === 'ready';
+  const hasCropReviewEvidence = hasSuperResolutionCropReviewEvidence(outputReview);
+  const hasAcceptedCropReview = hasAcceptedSuperResolutionCropReview(outputReview);
+  const cropReviewEvidenceStatus = hasAcceptedCropReview
+    ? 'accepted'
+    : hasCropReviewEvidence
+      ? 'pending_acceptance'
+      : 'missing';
+  const isEditableHandoffReady = outputReview.editableGate === 'ready' && hasAcceptedCropReview;
   const openInEditorPath = derivedOutputReceipt.openInEditorAction.path ?? '';
   const exportHandoffReady = isEditableHandoffReady && openInEditorPath.length > 0;
   const acceptanceGateStatus = isEditableHandoffReady ? 'ready' : 'review';
+  const cropReviewStatus = hasAcceptedCropReview ? 'ready' : hasCropReviewEvidence ? 'review' : 'pending';
   const artifactWarningsStatus = outputReview.warningCodes.length === 0 ? 'ready' : 'pending';
 
   const setSetting = useCallback(
@@ -754,8 +766,8 @@ export function SuperResolutionModal({
           },
           {
             label: t('modals.superResolution.review.cropMetrics'),
-            status: hasRuntimeOutputReview ? 'ready' : 'pending',
-            value: outputReviewCropMetricsLabel,
+            status: cropReviewStatus,
+            value: `${outputReviewCropMetricsLabel} - ${cropReviewEvidenceStatus}`,
           },
           {
             label: t('modals.superResolution.review.artifactWarnings'),
@@ -859,7 +871,7 @@ export function SuperResolutionModal({
                 label: t('modals.superResolution.review.reviewCrops'),
                 value: `${t('modals.superResolution.review.reviewCropValue', {
                   count: outputReview.reviewCropCount,
-                })} - ${reviewArtifactSummary}`,
+                })} - ${cropReviewEvidenceStatus} - ${reviewArtifactSummary}`,
               },
               {
                 label: t('modals.superResolution.review.reviewPacket'),
@@ -1068,6 +1080,7 @@ export function SuperResolutionModal({
         className="sr-only"
         data-alignment-confidence={outputReview.alignmentConfidence ?? 'not_measured'}
         data-crop-metrics={`${outputReview.cropMetrics.reviewCropCount}:${outputReview.cropMetrics.overlapCoverageRatio ?? 'not_measured'}`}
+        data-crop-review-evidence={cropReviewEvidenceStatus}
         data-editable-handoff-ready={String(isEditableHandoffReady)}
         data-export-handoff-ready={String(exportHandoffReady)}
         data-false-detail-risk={outputReview.falseDetailRisk}
