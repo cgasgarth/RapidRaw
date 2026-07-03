@@ -3927,6 +3927,19 @@
       "validRecipeCount_other": ""
     },
     "filmstrip": {
+      "selectionSummary": {
+        "activePrefix": "",
+        "badges": {
+          "color": "",
+          "edited": "",
+          "rating": "",
+          "rawQuality": "",
+          "virtualCopy": ""
+        },
+        "clearSelection": "",
+        "noActive": "",
+        "selectedCount_other": ""
+      },
       "tooltips": {
         "color": "顏色：{{color}}",
         "virtualCopy": "虛擬副本"

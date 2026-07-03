@@ -1,5 +1,5 @@
 import cx from 'clsx';
-import { AlertTriangle, Image as ImageIcon, SlidersHorizontal, Star } from 'lucide-react';
+import { AlertTriangle, Image as ImageIcon, SlidersHorizontal, Star, X } from 'lucide-react';
 import type React from 'react';
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -15,6 +15,7 @@ import UiText from '../ui/primitives/Text';
 const HORIZONTAL_PADDING = 4;
 const ITEM_GAP = 8;
 const THUMBNAIL_FOCUS_CLASS = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring';
+const FILMSTRIP_SUMMARY_HEIGHT = 30;
 
 interface ImageLayer {
   id: string;
@@ -61,6 +62,16 @@ interface FilmstripThumbnailProps {
 }
 
 type FilmstripCellData = ItemData;
+
+const getFilmstripFilename = (path: string): string => {
+  const cleanPath = path.split('?')[0] ?? path;
+  return cleanPath.split(/[\\/]/u).pop() || cleanPath;
+};
+
+const getFilmstripColorLabel = (tags: ImageFile['tags']) => {
+  const colorTag = tags?.find((tag: string) => tag.startsWith('color:'))?.substring(6);
+  return COLOR_LABELS.find((color: Color) => color.name === colorTag);
+};
 
 export const resolveFilmstripThumbnailUrl = (
   thumbnailUrl: string | undefined,
@@ -141,8 +152,7 @@ const FilmstripThumbnail = memo(
 
     const { path, tags, is_edited: isEdited } = imageFile;
     const rating = imageRatings?.[path] || 0;
-    const colorTag = tags?.find((t: string) => t.startsWith('color:'))?.substring(6);
-    const colorLabel = COLOR_LABELS.find((c: Color) => c.name === colorTag);
+    const colorLabel = getFilmstripColorLabel(tags);
     const isVirtualCopy = path.includes('?vc=');
     const displayEditIcon = useSettingsStore((s) => s.appSettings?.displayEditIcon ?? true);
     const showEditIcon = isEdited && displayEditIcon;
@@ -152,11 +162,10 @@ const FilmstripThumbnail = memo(
     const hasRating = rating > 0;
     const hasAnyOverlay = hasEditIcon || hasColorLabel || hasRating;
 
-    const cleanPath = path.split('?')[0] ?? path;
-    const filename = cleanPath.split(/[\\/]/).pop() || '';
+    const filename = getFilmstripFilename(path);
 
     const truncatedTitle =
-      filename.length > 40 ? filename.substring(0, 20) + '...' + filename.substring(filename.length - 17) : filename;
+      filename.length > 40 ? `${filename.substring(0, 20)}...${filename.substring(filename.length - 17)}` : filename;
 
     useEffect(() => {
       if (thumbnailAspectRatio === ThumbnailAspectRatio.Contain && displayThumbnailUrl) {
@@ -705,6 +714,162 @@ const FilmstripList = ({
   );
 };
 
+interface FilmstripSelectionSummaryProps {
+  imageList: ImageFile[];
+  imageRatings: ImageRatings;
+  multiSelectedPaths: string[];
+  onClearSelection?: (() => void) | undefined;
+  selectedImage?: SelectedImage | undefined;
+}
+
+const FilmstripSelectionSummary = ({
+  imageList,
+  imageRatings,
+  multiSelectedPaths,
+  onClearSelection,
+  selectedImage,
+}: FilmstripSelectionSummaryProps) => {
+  const { t } = useTranslation();
+
+  const summary = useMemo(() => {
+    const selectedPathSet = new Set(multiSelectedPaths);
+    const selectedImages = imageList.filter((image) => selectedPathSet.has(image.path));
+    const activePath = selectedImage?.path ?? multiSelectedPaths[0];
+    const activeFilename = activePath ? getFilmstripFilename(activePath) : t('ui.filmstrip.selectionSummary.noActive');
+
+    return selectedImages.reduce(
+      (acc, image) => {
+        const rating = imageRatings?.[image.path] ?? image.rating ?? 0;
+        const rawBadgeCount = buildRawQualityBadges(image.exif).length;
+
+        return {
+          activeFilename: acc.activeFilename,
+          colorLabelCount: acc.colorLabelCount + (getFilmstripColorLabel(image.tags) ? 1 : 0),
+          editedCount: acc.editedCount + (image.is_edited ? 1 : 0),
+          ratingCount: acc.ratingCount + (rating > 0 ? 1 : 0),
+          rawQualityBadgeCount: acc.rawQualityBadgeCount + rawBadgeCount,
+          rawQualityImageCount: acc.rawQualityImageCount + (rawBadgeCount > 0 ? 1 : 0),
+          selectedCount: acc.selectedCount + 1,
+          virtualCopyCount: acc.virtualCopyCount + (image.is_virtual_copy || image.path.includes('?vc=') ? 1 : 0),
+        };
+      },
+      {
+        activeFilename,
+        colorLabelCount: 0,
+        editedCount: 0,
+        ratingCount: 0,
+        rawQualityBadgeCount: 0,
+        rawQualityImageCount: 0,
+        selectedCount: 0,
+        virtualCopyCount: 0,
+      },
+    );
+  }, [imageList, imageRatings, multiSelectedPaths, selectedImage?.path, t]);
+
+  const badgeCounters = [
+    {
+      count: summary.editedCount,
+      key: 'edited',
+      label: t('ui.filmstrip.selectionSummary.badges.edited'),
+      testId: 'filmstrip-selection-summary-edited-count',
+    },
+    {
+      count: summary.rawQualityImageCount,
+      key: 'rawQuality',
+      label: t('ui.filmstrip.selectionSummary.badges.rawQuality'),
+      testId: 'filmstrip-selection-summary-raw-quality-count',
+    },
+    {
+      count: summary.ratingCount,
+      key: 'rating',
+      label: t('ui.filmstrip.selectionSummary.badges.rating'),
+      testId: 'filmstrip-selection-summary-rating-count',
+    },
+    {
+      count: summary.colorLabelCount,
+      key: 'color',
+      label: t('ui.filmstrip.selectionSummary.badges.color'),
+      testId: 'filmstrip-selection-summary-color-count',
+    },
+    {
+      count: summary.virtualCopyCount,
+      key: 'virtualCopy',
+      label: t('ui.filmstrip.selectionSummary.badges.virtualCopy'),
+      testId: 'filmstrip-selection-summary-virtual-copy-count',
+    },
+  ] as const;
+
+  const handleClearSelection = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    onClearSelection?.();
+  };
+
+  return (
+    <div
+      className="mb-1 flex h-[30px] min-w-0 items-center gap-2 overflow-hidden rounded border border-editor-border bg-editor-panel px-2"
+      data-active-filename={summary.activeFilename}
+      data-color-label-count={summary.colorLabelCount}
+      data-edited-count={summary.editedCount}
+      data-raw-quality-badge-count={summary.rawQualityBadgeCount}
+      data-raw-quality-image-count={summary.rawQualityImageCount}
+      data-rating-count={summary.ratingCount}
+      data-selected-count={summary.selectedCount}
+      data-testid="filmstrip-selection-summary"
+      data-virtual-copy-count={summary.virtualCopyCount}
+      onClick={(event) => {
+        event.stopPropagation();
+      }}
+      onKeyDown={(event) => {
+        event.stopPropagation();
+      }}
+    >
+      <div className="flex min-w-0 shrink-0 items-center gap-1.5">
+        <span
+          className="rounded-full bg-editor-selected-quiet px-2 py-0.5 text-[11px] font-semibold text-accent"
+          data-testid="filmstrip-selection-summary-selected-count"
+        >
+          {t('ui.filmstrip.selectionSummary.selectedCount', { count: summary.selectedCount })}
+        </span>
+        <span className="max-w-[18rem] truncate text-[11px] text-text-secondary">
+          {t('ui.filmstrip.selectionSummary.activePrefix')}
+          <span
+            className="ml-1 font-medium text-text-primary"
+            data-testid="filmstrip-selection-summary-active-filename"
+          >
+            {summary.activeFilename}
+          </span>
+        </span>
+      </div>
+
+      <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
+        {badgeCounters.map((counter) => (
+          <span
+            className="inline-flex shrink-0 items-center gap-1 rounded border border-editor-border bg-editor-panel-well px-1.5 py-0.5 text-[10px] font-medium text-text-secondary"
+            data-badge-counter={counter.key}
+            data-count={counter.count}
+            data-testid={counter.testId}
+            key={counter.key}
+          >
+            <span>{counter.label}</span>
+            <span className={counter.count > 0 ? 'text-text-primary' : 'text-text-secondary'}>{counter.count}</span>
+          </span>
+        ))}
+      </div>
+
+      <button
+        aria-label={t('ui.filmstrip.selectionSummary.clearSelection')}
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-text-secondary transition-colors hover:bg-editor-panel-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:opacity-40"
+        data-testid="filmstrip-selection-summary-clear"
+        disabled={summary.selectedCount === 0 || !onClearSelection}
+        onClick={handleClearSelection}
+        type="button"
+      >
+        <X size={14} />
+      </button>
+    </div>
+  );
+};
+
 interface FilmStripProps {
   imageList: Array<ImageFile>;
   imageRatings: ImageRatings;
@@ -769,22 +934,31 @@ export default function Filmstrip({
   return (
     <div ref={containerRef} className="h-full w-full" role="presentation" onClick={onClearSelection}>
       {size.height > 0 && size.width > 0 && (
-        <FilmstripList
-          height={size.height}
-          width={size.width}
-          data={{
-            imageList,
-            imageRatings,
-            selectedPath: selectedImage?.path,
-            multiSelectedPaths,
-            thumbnailAspectRatio,
-            onContextMenu,
-            onRequestThumbnails,
-            onImageSelect: handleImageSelect,
-            consumeClickTriggeredScroll,
-            selectedImageThumbnailUrl,
-          }}
-        />
+        <div className="flex h-full min-h-0 w-full flex-col">
+          <FilmstripSelectionSummary
+            imageList={imageList}
+            imageRatings={imageRatings}
+            multiSelectedPaths={multiSelectedPaths}
+            onClearSelection={onClearSelection}
+            selectedImage={selectedImage}
+          />
+          <FilmstripList
+            height={Math.max(20, size.height - FILMSTRIP_SUMMARY_HEIGHT - 4)}
+            width={size.width}
+            data={{
+              imageList,
+              imageRatings,
+              selectedPath: selectedImage?.path,
+              multiSelectedPaths,
+              thumbnailAspectRatio,
+              onContextMenu,
+              onRequestThumbnails,
+              onImageSelect: handleImageSelect,
+              consumeClickTriggeredScroll,
+              selectedImageThumbnailUrl,
+            }}
+          />
+        </div>
       )}
     </div>
   );

@@ -4282,6 +4282,20 @@
       "validRecipeCount_other": "{{count}} valid"
     },
     "filmstrip": {
+      "selectionSummary": {
+        "activePrefix": "",
+        "badges": {
+          "color": "",
+          "edited": "",
+          "rating": "",
+          "rawQuality": "",
+          "virtualCopy": ""
+        },
+        "clearSelection": "",
+        "noActive": "",
+        "selectedCount_one": "",
+        "selectedCount_other": ""
+      },
       "tooltips": {
         "color": "Farbe: {{color}}",
         "virtualCopy": "Virtuelle Kopie"
