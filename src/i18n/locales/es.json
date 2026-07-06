@@ -724,6 +724,7 @@
             "artifact": "artifact",
             "recipeHash": "recipe",
             "renderHash": "render",
+            "request": "request",
             "tool": "tool"
           },
           "purpose": {
