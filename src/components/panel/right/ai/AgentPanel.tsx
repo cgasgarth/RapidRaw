@@ -1,4 +1,13 @@
-import { CheckCircle2, CircleDashed, Eye, FileCheck2, GitCompareArrows, RotateCcw, ShieldCheck } from 'lucide-react';
+import {
+  CheckCircle2,
+  CircleDashed,
+  Eye,
+  FileCheck2,
+  GitCompareArrows,
+  RotateCcw,
+  ShieldCheck,
+  SlidersHorizontal,
+} from 'lucide-react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AgentChatTranscript } from '../../../../schemas/agent/agentChatTranscriptSchemas';
@@ -425,6 +434,70 @@ export function AgentPanel() {
               {t('editor.ai.agent.workspace.audit')} <span className="font-mono">{readiness.runtimeCheckCount}</span>
             </span>
           </div>
+        </section>
+
+        <section
+          className={agentReviewWorkspaceTokens.card}
+          data-command-id={liveWorkspaceController.selectedCommandPlan.receipt.commandId}
+          data-command-intensity={liveWorkspaceController.selectedCommandPlan.receipt.intensity}
+          data-testid="agent-reviewed-command-composer"
+        >
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className={agentReviewWorkspaceTokens.sectionTitle}>
+              {t('editor.ai.agent.workspace.reviewedCommand')}
+            </span>
+            <span className={`${agentReviewWorkspaceTokens.chip} ${agentReviewWorkspaceTokens.stateActive}`}>
+              <SlidersHorizontal size={11} />
+              {liveWorkspaceController.selectedCommandPlan.receipt.intensity}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-1" role="listbox">
+            {liveWorkspaceController.reviewedCommandOptions.map((command) => {
+              const selected = command.id === liveWorkspaceController.selectedCommandId;
+              return (
+                <button
+                  aria-selected={selected}
+                  className={`${agentReviewWorkspaceTokens.actionButton} ${
+                    selected
+                      ? 'border-sky-500/40 bg-sky-500/15 text-sky-100'
+                      : 'border-editor-border bg-editor-panel text-text-secondary'
+                  }`}
+                  data-command-id={command.id}
+                  data-command-intensity={command.intensity}
+                  data-selected={String(selected)}
+                  data-testid={`agent-reviewed-command-option-${command.id}`}
+                  disabled={!liveWorkspaceController.canDryRun}
+                  key={command.id}
+                  onClick={() => {
+                    liveWorkspaceController.actions.selectCommand(command.id);
+                  }}
+                  role="option"
+                  title={command.description}
+                  type="button"
+                >
+                  <SlidersHorizontal size={13} />
+                  {command.label}
+                </button>
+              );
+            })}
+          </div>
+          <dl className="mt-2 grid grid-cols-[minmax(0,1fr)_auto_auto] gap-x-2 gap-y-1 text-[11px] leading-4">
+            {liveWorkspaceController.selectedCommandPlan.receipt.adjustmentDiffs.map((diff) => (
+              <div
+                className="contents"
+                data-after={diff.after}
+                data-before={diff.before}
+                data-delta={diff.delta}
+                data-key={diff.key}
+                data-testid={`agent-reviewed-command-diff-${diff.key}`}
+                key={diff.key}
+              >
+                <dt className="truncate text-text-secondary">{diff.key}</dt>
+                <dd className="font-mono text-text-tertiary">{diff.before}</dd>
+                <dd className="font-mono text-sky-100">{diff.delta > 0 ? `+${diff.delta}` : diff.delta}</dd>
+              </div>
+            ))}
+          </dl>
         </section>
 
         <section

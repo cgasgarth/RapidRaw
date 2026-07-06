@@ -863,6 +863,7 @@
           "noImage": "No image selected",
           "previewReady": "Preview ready",
           "previewReceipt": "Preview receipt",
+          "reviewedCommand": "Reviewed command",
           "reviewReady": "Review ready",
           "states": {
             "applied": "Applied",
