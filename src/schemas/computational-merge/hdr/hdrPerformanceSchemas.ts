@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const hdrPerformanceResultSchema = z
+const hdrPerformanceResultSchema = z
   .object({
     budgetMs: z.number().int().positive(),
     elapsedMs: z.number().nonnegative(),
