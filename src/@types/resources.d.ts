@@ -3192,6 +3192,7 @@ export default interface Resources {
           output_format_changed: 'output format changed';
           output_options_changed: 'output options changed';
           selected_profile_changed: 'profile changed';
+          session_revision_changed: 'session recipe changed';
           source_paths_changed: 'source frame list changed';
           unparseable_fingerprint: 'accepted plan could not be read';
         };

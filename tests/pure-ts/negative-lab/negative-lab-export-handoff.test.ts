@@ -39,6 +39,7 @@ const buildFixture = (outputFormat: 'jpeg_proof' | 'tiff16') => {
       params: DEFAULT_NEGATIVE_LAB_UI_PRESET.params,
       pathsToConvert: sourcePaths,
       selectedProfileSnapshot: null,
+      sessionRevision: 0,
       suffix: 'Positive',
       writeConversionBundle: true,
     }),

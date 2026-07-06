@@ -38,6 +38,7 @@ import {
   type LayerMaskProvenanceReceipt,
   markLayerMaskReceiptsStale,
 } from '../utils/layers/layerMaskProvenance';
+import type { NegativeLabSessionSnapshot } from '../utils/negative-lab/negativeLabSessionState';
 import type { SuperResolutionSourcePreflightMetadata } from '../utils/superResolutionSourcePreflight';
 
 export interface CollapsibleSectionsState {
@@ -242,6 +243,7 @@ export interface DenoiseModalState {
 
 export interface NegativeConversionModalState {
   isOpen: boolean;
+  session: NegativeLabSessionSnapshot | null;
   targetPaths: Array<string>;
 }
 
@@ -436,7 +438,7 @@ export const useUIStore = create<UIState>((set, get) => {
     hdrModalState: createDefaultHdrModalState(),
     superResolutionModalState: createDefaultSuperResolutionModalState(),
     focusStackModalState: createDefaultFocusStackModalState(),
-    negativeModalState: { isOpen: false, targetPaths: [] },
+    negativeModalState: { isOpen: false, session: null, targetPaths: [] },
     denoiseModalState: {
       isOpen: false,
       isProcessing: false,

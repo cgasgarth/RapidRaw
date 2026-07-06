@@ -331,7 +331,13 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               disabled: !negativeLabReadiness.isReady,
               onClick: () => {
                 if (!negativeLabReadiness.isReady) return;
-                setUI({ negativeModalState: { isOpen: true, targetPaths: negativeLabReadiness.targetPaths } });
+                setUI((state) => ({
+                  negativeModalState: {
+                    ...state.negativeModalState,
+                    isOpen: true,
+                    targetPaths: negativeLabReadiness.targetPaths,
+                  },
+                }));
               },
             },
             {
@@ -673,7 +679,13 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               disabled: !negativeLabReadiness.isReady,
               onClick: () => {
                 if (!negativeLabReadiness.isReady) return;
-                setUI({ negativeModalState: { isOpen: true, targetPaths: negativeLabReadiness.targetPaths } });
+                setUI((state) => ({
+                  negativeModalState: {
+                    ...state.negativeModalState,
+                    isOpen: true,
+                    targetPaths: negativeLabReadiness.targetPaths,
+                  },
+                }));
               },
             },
             {
