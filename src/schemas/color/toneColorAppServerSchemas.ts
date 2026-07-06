@@ -10,10 +10,10 @@ import {
   ToneColorAppServerSchemaName,
 } from '../../utils/toneColorAppServerRouteIds';
 
-export const toneColorAppServerRouteExecutionModeSchema = z.enum(TONE_COLOR_APP_SERVER_EXECUTION_MODES);
-export const toneColorAppServerRouteStatusSchema = z.enum(TONE_COLOR_APP_SERVER_ROUTE_STATUSES);
+const toneColorAppServerRouteExecutionModeSchema = z.enum(TONE_COLOR_APP_SERVER_EXECUTION_MODES);
+const toneColorAppServerRouteStatusSchema = z.enum(TONE_COLOR_APP_SERVER_ROUTE_STATUSES);
 
-export const toneColorAppServerRouteSchema = z
+const toneColorAppServerRouteSchema = z
   .object({
     commandType: z.enum(TONE_COLOR_APP_SERVER_COMMAND_TYPES),
     executionMode: toneColorAppServerRouteExecutionModeSchema,

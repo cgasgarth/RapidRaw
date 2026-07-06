@@ -4,7 +4,7 @@ const nonnegativeIntegerSchema = z.number().int().nonnegative();
 const positiveIntegerSchema = z.number().int().positive();
 const ratioSchema = z.number().min(0).max(1);
 
-export const focusPreviewBlendRegionMetricSchema = z
+const focusPreviewBlendRegionMetricSchema = z
   .object({
     expectedSourceIndex: nonnegativeIntegerSchema,
     meanAbsoluteError: z.number().nonnegative(),
@@ -13,7 +13,7 @@ export const focusPreviewBlendRegionMetricSchema = z
   })
   .strict();
 
-export const focusPreviewBlendFixtureReportSchema = z
+const focusPreviewBlendFixtureReportSchema = z
   .object({
     artifactPath: z.string().min(1),
     blockCodes: z.array(z.enum(['stale_source_graph_revision'])),
