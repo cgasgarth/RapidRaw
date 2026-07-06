@@ -59,10 +59,14 @@ const patchSamplerPanelSource = readFileSync(
   'src/components/modals/negative-lab/NegativeLabPatchSamplerPanel.tsx',
   'utf8',
 );
+const profileComparisonGridSource = readFileSync(
+  'src/components/modals/negative-lab/NegativeLabProfileComparisonGrid.tsx',
+  'utf8',
+);
 const qcProofPanelSource = readFileSync('src/components/modals/negative-lab/NegativeLabQcProofPanel.tsx', 'utf8');
 const rollHealthPanelSource = readFileSync('src/components/modals/negative-lab/NegativeLabRollHealthPanel.tsx', 'utf8');
 const rollHealthModelSource = readFileSync('src/components/modals/negative-lab/NegativeLabRollHealthModel.ts', 'utf8');
-const workspaceUiSource = `${modalSource}\n${patchSamplerPanelSource}\n${qcProofPanelSource}\n${rollHealthPanelSource}\n${rollHealthModelSource}`;
+const workspaceUiSource = `${modalSource}\n${patchSamplerPanelSource}\n${profileComparisonGridSource}\n${qcProofPanelSource}\n${rollHealthPanelSource}\n${rollHealthModelSource}`;
 const firstReviewFrame = mixedReviewReport.frames.find((frame) =>
   frame.candidates.some((candidate) => candidate.kind === 'dust_spot'),
 );
@@ -412,7 +416,7 @@ for (const marker of [
   'data-runtime-dry-run-command={NEGATIVE_LAB_RUNTIME_PREVIEW_TOOL_NAME}',
   'data-runtime-dry-run-mode="runtime_preview_non_mutating"',
   'data-runtime-dry-run-mutates="false"',
-  'data-runtime-preview-rendered={String(previewUrl !== null)}',
+  'data-runtime-preview-rendered={String(hasCurrentRuntimePreview)}',
   'data-preview-artifact-status={runtimePreviewArtifactStatus}',
   'data-base-fog-runtime-status={runtimePreviewBaseFogStatus}',
   'data-density-curve-runtime-status={runtimePreviewDensityStatus}',
