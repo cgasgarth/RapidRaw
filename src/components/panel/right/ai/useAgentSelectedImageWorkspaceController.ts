@@ -1,5 +1,9 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { AgentReviewedAdjustmentCommandId } from '../../../../schemas/agent/agentReviewedCommandSchemas';
+import {
+  type AgentSelectedImagePreviewReceipt,
+  agentSelectedImagePreviewReceiptSchema,
+} from '../../../../schemas/agent/agentSelectedImagePreviewReceiptSchemas';
 import { useEditorStore } from '../../../../store/useEditorStore';
 import {
   AGENT_REVIEWED_ADJUSTMENT_COMMAND_OPTIONS,
@@ -8,6 +12,8 @@ import {
   buildAgentReviewedAdjustmentCommandPlan,
   DEFAULT_AGENT_REVIEWED_ADJUSTMENT_COMMAND_ID,
 } from '../../../../utils/agent/agentReviewedAdjustmentCommands';
+import { buildAgentImageContextSnapshot } from '../../../../utils/agent/context/agentImageContextSnapshot';
+import { AGENT_PREVIEW_RENDER_TOOL_NAME } from '../../../../utils/agent/context/agentReadOnlyAppServerTools';
 import {
   type AgentSelectedImageLiveSessionAuditRecord,
   type AgentSelectedImageLiveSessionDraft,
@@ -78,11 +84,14 @@ export interface AgentSelectedImageWorkspaceController {
   error: string | null;
   latestRequestId: string | null;
   latestToolName: string | null;
+  previewReceipt: AgentSelectedImagePreviewReceipt | null;
   reviewedCommandOptions: AgentReviewedAdjustmentCommandOption[];
   selectedCommandId: AgentReviewedAdjustmentCommandId;
   selectedCommandPlan: AgentReviewedAdjustmentCommandPlan;
   status: AgentSelectedImageWorkspaceActionStatus;
 }
+
+type AgentSelectedImagePreviewReceiptBase = Omit<AgentSelectedImagePreviewReceipt, 'staleReason' | 'state'>;
 
 const createLocalAgentSelectedImageLiveSessionAuditStorageAdapter = ({
   selectedImagePath,
@@ -125,6 +134,42 @@ const buildAuditExportFilename = (record: AgentSelectedImageLiveSessionAuditReco
   return `${basename}-${record.receipt.sessionId}-audit.json`.replaceAll(/[^A-Za-z0-9._-]/gu, '_');
 };
 
+const getCurrentSnapshotForReceipt = () => {
+  try {
+    const snapshot = buildAgentImageContextSnapshot();
+    return {
+      graphRevision: snapshot.graphRevision,
+      recipeHash: snapshot.initialPreview.recipeHash,
+      selectedImagePath: snapshot.activeImagePath,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const resolveReceiptState = (
+  receipt: AgentSelectedImagePreviewReceiptBase,
+): Pick<AgentSelectedImagePreviewReceipt, 'staleReason' | 'state'> => {
+  const current = getCurrentSnapshotForReceipt();
+  const target = receipt.kind === 'apply' ? receipt.after : receipt.before;
+  if (current === null || current.selectedImagePath !== receipt.selectedImagePath) {
+    return { staleReason: 'image_changed', state: 'stale' };
+  }
+  if (current.graphRevision !== target.graphRevision) {
+    return { staleReason: 'graph_revision_changed', state: 'stale' };
+  }
+  if (current.recipeHash !== target.recipeHash) {
+    return { staleReason: 'recipe_hash_changed', state: 'stale' };
+  }
+  return { state: 'current' };
+};
+
+const parsePreviewReceipt = (receipt: AgentSelectedImagePreviewReceiptBase): AgentSelectedImagePreviewReceipt =>
+  agentSelectedImagePreviewReceiptSchema.parse({
+    ...receipt,
+    ...resolveReceiptState(receipt),
+  });
+
 const saveAuditReceiptWithBrowserFallback = async ({
   filename,
   text,
@@ -165,6 +210,7 @@ export const useAgentSelectedImageWorkspaceController = ({
   const [auditRecord, setAuditRecord] = useState<AgentSelectedImageLiveSessionAuditRecord | null>(null);
   const [draft, setDraft] = useState<AgentSelectedImageLiveSessionDraft | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [previewReceiptBase, setPreviewReceiptBase] = useState<AgentSelectedImagePreviewReceiptBase | null>(null);
   const [rollbackCheckpoint, setRollbackCheckpoint] = useState<AgentSessionCheckpoint | null>(null);
   const [selectedCommandId, setSelectedCommandId] = useState<AgentReviewedAdjustmentCommandId>(
     DEFAULT_AGENT_REVIEWED_ADJUSTMENT_COMMAND_ID,
@@ -179,6 +225,8 @@ export const useAgentSelectedImageWorkspaceController = ({
       }),
     [currentAdjustments, selectedCommandId],
   );
+  const editorGraphRevision = useEditorStore((state) => `history_${state.historyIndex}`);
+  const editorRecipeInputs = useEditorStore((state) => state.adjustments);
 
   const selectedImageReady = selectedImage !== null && selectedImage.isReady;
   const operationPending = status === 'applying' || status === 'exporting' || status === 'rolling_back';
@@ -238,6 +286,32 @@ export const useAgentSelectedImageWorkspaceController = ({
       });
       setDraft(sessionDraft);
       setRollbackCheckpoint(sessionDraft.checkpoint);
+      setPreviewReceiptBase(
+        parsePreviewReceipt({
+          after: {
+            artifactId: `${requestId}-dry-run-plan`,
+            graphRevision: sessionDraft.dryRun.predictedGraphRevision,
+            recipeHash: sessionDraft.dryRun.dryRunPlanHash,
+            renderHash: sessionDraft.dryRun.dryRunPlanHash,
+            role: 'after',
+            toolName: sessionDraft.dryRun.toolName,
+          },
+          before: {
+            artifactId: sessionDraft.snapshot.previewArtifactId,
+            graphRevision: sessionDraft.snapshot.graphRevision,
+            previewRef: sessionDraft.snapshot.previewRef,
+            recipeHash: sessionDraft.snapshot.recipeHash,
+            renderHash: sessionDraft.snapshot.previewRenderHash,
+            role: 'before',
+            toolName: sessionDraft.dryRun.toolName,
+          },
+          id: `${requestId}-dry-run-receipt`,
+          kind: 'dry_run',
+          requestId: `${requestId}-dry-run`,
+          selectedImagePath: sessionDraft.snapshot.selectedImagePath,
+          toolName: sessionDraft.dryRun.toolName,
+        }),
+      );
       setStatus('approval_required');
       pushActivityEntry({
         body: `${sessionDraft.reviewedCommand.label}: ${sessionDraft.dryRun.dryRunPlanHash}`,
@@ -285,6 +359,7 @@ export const useAgentSelectedImageWorkspaceController = ({
       if (result.status === 'blocked') {
         const message = `Selected-image live session blocked: ${result.staleReason}.`;
         setError(message);
+        setPreviewReceiptBase((receipt) => (receipt === null ? null : parsePreviewReceipt(receipt)));
         setStatus('blocked');
         pushActivityEntry({
           body: message,
@@ -297,7 +372,36 @@ export const useAgentSelectedImageWorkspaceController = ({
         });
         return;
       }
+      const beforeLineage = result.audit.receipt.previewLineage?.[0];
+      const afterLineage = result.audit.receipt.previewLineage?.at(-1);
       setStatus('applied');
+      setPreviewReceiptBase(
+        parsePreviewReceipt({
+          after: {
+            artifactId: afterLineage?.previewArtifactId ?? `${approvedDraft.requestId}-after-preview`,
+            graphRevision: result.apply.appliedGraphRevision,
+            previewRef: afterLineage?.previewRef,
+            recipeHash: result.audit.receipt.finalRecipeHash ?? result.audit.receipt.initialRecipeHash,
+            renderHash: result.previewAfterHash,
+            role: 'after',
+            toolName: afterLineage?.sourceToolName ?? AGENT_PREVIEW_RENDER_TOOL_NAME,
+          },
+          before: {
+            artifactId: beforeLineage?.previewArtifactId ?? approvedDraft.snapshot.previewArtifactId,
+            graphRevision: approvedDraft.snapshot.graphRevision,
+            previewRef: beforeLineage?.previewRef ?? approvedDraft.snapshot.previewRef,
+            recipeHash: approvedDraft.snapshot.recipeHash,
+            renderHash: result.previewBeforeHash,
+            role: 'before',
+            toolName: approvedDraft.dryRun.toolName,
+          },
+          id: `${approvedDraft.requestId}-apply-receipt`,
+          kind: 'apply',
+          requestId: result.apply.requestId,
+          selectedImagePath: approvedDraft.snapshot.selectedImagePath,
+          toolName: result.apply.toolName,
+        }),
+      );
       pushActivityEntry({
         body: result.apply.appliedGraphRevision,
         graphRevision: result.apply.appliedGraphRevision,
@@ -398,6 +502,10 @@ export const useAgentSelectedImageWorkspaceController = ({
   }, [auditRecord, canRollback, persistAuditRecord, pushActivityEntry, rollbackCheckpoint]);
 
   const latestActivity = activityEntries.at(-1);
+  const previewReceipt = useMemo(
+    () => (previewReceiptBase === null ? null : parsePreviewReceipt(previewReceiptBase)),
+    [editorGraphRevision, editorRecipeInputs, previewReceiptBase, selectedImage?.path],
+  );
 
   return {
     actions: {
@@ -417,6 +525,7 @@ export const useAgentSelectedImageWorkspaceController = ({
     error,
     latestRequestId: latestActivity?.requestId ?? null,
     latestToolName: latestActivity?.toolName ?? null,
+    previewReceipt,
     reviewedCommandOptions: AGENT_REVIEWED_ADJUSTMENT_COMMAND_OPTIONS,
     selectedCommandId,
     selectedCommandPlan,

@@ -543,10 +543,17 @@
       },
       "rawReconstructionComparison": {
         "action": "Compare 100% crops",
+        "applied": "Applied",
+        "appliedReceiptTitle": "Applied {{mode}} to this image",
+        "applying": "Applying...",
+        "applyMode": "Use this mode",
         "cropAlt": "{{mode}} 100% RAW reconstruction crop",
         "cropSizeLabel": "{{size}}px",
         "decodeMsLabel": "{{ms}}ms",
         "error": "Failed to compare RAW reconstruction modes: {{error}}",
+        "receiptCropHash": "Crop hash",
+        "receiptDecodeMs": "Decode",
+        "receiptSavedOverride": "Saved override",
         "running": "Comparing crops...",
         "title": "100% RAW crop comparison"
       },
@@ -689,6 +696,7 @@
             "artifact": "artifact",
             "recipeHash": "recipe",
             "renderHash": "render",
+            "request": "request",
             "tool": "tool"
           },
           "purpose": {

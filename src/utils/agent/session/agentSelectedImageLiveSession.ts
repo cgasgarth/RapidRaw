@@ -69,6 +69,7 @@ const selectedImageLiveSessionSnapshotSchema = z
     previewArtifactId: z.string().trim().min(1),
     previewHeight: z.number().int().positive(),
     previewIdentity: z.string().trim().min(1).nullable(),
+    previewRef: z.string().trim().min(1),
     previewRenderHash: z.string().trim().min(1),
     previewWidth: z.number().int().positive(),
     recipeHash: z.string().trim().min(1),
@@ -484,6 +485,7 @@ const buildSnapshot = (): z.infer<typeof selectedImageLiveSessionSnapshotSchema>
     previewArtifactId: snapshot.initialPreview.artifactId,
     previewHeight: snapshot.initialPreview.height,
     previewIdentity: snapshot.previewIdentity,
+    previewRef: snapshot.initialPreview.previewRef,
     previewRenderHash: snapshot.initialPreview.renderHash,
     previewWidth: snapshot.initialPreview.width,
     recipeHash: snapshot.initialPreview.recipeHash,
@@ -1065,7 +1067,9 @@ export const applyAgentSelectedImageLiveSession = async (
   return {
     apply,
     audit: buildAgentSelectedImageLiveSessionAuditRecord(draft, {
+      afterPreviewArtifactId: afterPreview.preview.artifactId,
       afterPreviewHash: apply.afterPreviewHash,
+      afterPreviewRef: afterPreview.preview.previewRef,
       approvalDecision: 'approved',
       applyGuard: envelopeValidation.applyGuard,
       cancellationOutcome: 'not_cancelled',
@@ -1193,7 +1197,9 @@ export const rollbackAgentSelectedImageLiveSession = async ({
 export const buildAgentSelectedImageLiveSessionAuditRecord = (
   draft: AgentSelectedImageLiveSessionDraft,
   receiptPatch: {
+    afterPreviewArtifactId?: string;
     afterPreviewHash?: string;
+    afterPreviewRef?: string;
     approvalDecision: AgentSelectedImageLiveSessionApprovalDecision;
     applyGuard?: AgentSelectedImageLiveSessionApplyGuard;
     cancellationOutcome: AgentSelectedImageLiveSessionCancellationOutcome;
@@ -1247,6 +1253,7 @@ export const buildAgentSelectedImageLiveSessionAuditRecord = (
         {
           graphRevision: draft.snapshot.graphRevision,
           previewArtifactId: draft.snapshot.previewArtifactId,
+          previewRef: draft.snapshot.previewRef,
           purpose: 'accepted_preview',
           recipeHash: draft.snapshot.recipeHash,
           renderHash: draft.snapshot.previewRenderHash,
@@ -1258,7 +1265,8 @@ export const buildAgentSelectedImageLiveSessionAuditRecord = (
           : [
               {
                 graphRevision: receiptPatch.finalGraphRevision ?? draft.snapshot.graphRevision,
-                previewArtifactId: `${draft.requestId}-after-preview`,
+                previewArtifactId: receiptPatch.afterPreviewArtifactId ?? `${draft.requestId}-after-preview`,
+                previewRef: receiptPatch.afterPreviewRef,
                 purpose: 'refresh' as const,
                 recipeHash: receiptPatch.finalRecipeHash ?? draft.snapshot.recipeHash,
                 renderHash: receiptPatch.afterPreviewHash,
@@ -1294,7 +1302,9 @@ export const buildAgentSelectedImageLiveSessionAuditRecord = (
 const buildAgentSelectedImageLiveSessionTranscript = (
   draft: AgentSelectedImageLiveSessionDraft,
   receiptPatch: {
+    afterPreviewArtifactId?: string;
     afterPreviewHash?: string;
+    afterPreviewRef?: string;
     approvalDecision: AgentSelectedImageLiveSessionApprovalDecision;
     applyGuard?: AgentSelectedImageLiveSessionApplyGuard;
     cancellationOutcome: AgentSelectedImageLiveSessionCancellationOutcome;

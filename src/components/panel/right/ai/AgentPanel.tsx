@@ -1,7 +1,17 @@
-import { CheckCircle2, CircleDashed, Eye, FileCheck2, RotateCcw, ShieldCheck, SlidersHorizontal } from 'lucide-react';
+import {
+  CheckCircle2,
+  CircleDashed,
+  Eye,
+  FileCheck2,
+  GitCompareArrows,
+  RotateCcw,
+  ShieldCheck,
+  SlidersHorizontal,
+} from 'lucide-react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AgentChatTranscript } from '../../../../schemas/agent/agentChatTranscriptSchemas';
+import type { AgentSelectedImagePreviewReceipt } from '../../../../schemas/agent/agentSelectedImagePreviewReceiptSchemas';
 import { useEditorStore } from '../../../../store/useEditorStore';
 import { buildAgentAppServerToolReadinessSummary } from '../../../../utils/agent/context/agentAppServerToolReadiness';
 import {
@@ -147,6 +157,115 @@ const buildLiveAgentTranscript = (
     ],
   };
 };
+
+const shortReceiptValue = (value: string): string => {
+  const markerIndex = value.indexOf(':');
+  const prefix = markerIndex === -1 ? '' : `${value.slice(0, markerIndex + 1)}`;
+  const body = markerIndex === -1 ? value : value.slice(markerIndex + 1);
+  return `${prefix}${body.slice(0, 12)}`;
+};
+
+function AgentBeforeAfterReceiptCard({ receipt }: { receipt: AgentSelectedImagePreviewReceipt }) {
+  const { t } = useTranslation();
+  const receiptTitle =
+    receipt.kind === 'apply' ? t('editor.ai.agent.composer.applyReceipt') : t('editor.ai.agent.composer.dryRun');
+
+  return (
+    <section
+      className={agentReviewWorkspaceTokens.card}
+      data-after-artifact-id={receipt.after.artifactId}
+      data-after-graph-revision={receipt.after.graphRevision}
+      data-after-recipe-hash={receipt.after.recipeHash}
+      data-after-render-hash={receipt.after.renderHash}
+      data-before-artifact-id={receipt.before.artifactId}
+      data-before-graph-revision={receipt.before.graphRevision}
+      data-before-recipe-hash={receipt.before.recipeHash}
+      data-before-render-hash={receipt.before.renderHash}
+      data-receipt-kind={receipt.kind}
+      data-receipt-request-id={receipt.requestId}
+      data-receipt-state={receipt.state}
+      data-stale-reason={receipt.staleReason ?? ''}
+      data-testid="agent-before-after-preview-receipt"
+      data-tool-name={receipt.toolName}
+    >
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <span className={`${agentReviewWorkspaceTokens.sectionTitle} inline-flex min-w-0 items-center gap-1.5`}>
+          <GitCompareArrows size={12} />
+          <span className="truncate">{receiptTitle}</span>
+        </span>
+        <span
+          className={`${agentReviewWorkspaceTokens.chip} ${
+            receipt.state === 'current'
+              ? agentReviewWorkspaceTokens.stateActive
+              : agentReviewWorkspaceTokens.stateBlocked
+          }`}
+          data-testid="agent-before-after-preview-receipt-state"
+        >
+          {receipt.state}
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-1.5">
+        {([receipt.before, receipt.after] as const).map((side) => (
+          <div
+            className="min-w-0 rounded border border-editor-border bg-editor-panel p-1"
+            data-artifact-id={side.artifactId}
+            data-graph-revision={side.graphRevision}
+            data-preview-ref={side.previewRef ?? ''}
+            data-recipe-hash={side.recipeHash}
+            data-render-hash={side.renderHash}
+            data-testid={`agent-before-after-preview-receipt-${side.role}`}
+            data-tool-name={side.toolName ?? ''}
+            key={side.role}
+          >
+            <div className="mb-1 flex items-center justify-between gap-1">
+              <span className={agentReviewWorkspaceTokens.label}>
+                {side.role === 'before'
+                  ? t('editor.ai.agent.previewLineage.role.before')
+                  : t('editor.ai.agent.proposal.after')}
+              </span>
+              <span className="truncate font-mono text-[9px] leading-3 text-text-tertiary">
+                {shortReceiptValue(side.graphRevision)}
+              </span>
+            </div>
+            <div className="mb-1 aspect-[4/3] overflow-hidden rounded-sm border border-editor-border bg-editor-panel-well">
+              {side.previewRef === undefined ? (
+                <div className="grid h-full place-items-center px-1 text-center font-mono text-[9px] leading-3 text-text-tertiary">
+                  {shortReceiptValue(side.renderHash)}
+                </div>
+              ) : (
+                <img
+                  alt={
+                    side.role === 'before'
+                      ? t('editor.ai.agent.previewLineage.role.before')
+                      : t('editor.ai.agent.proposal.after')
+                  }
+                  className="h-full w-full object-cover"
+                  src={side.previewRef}
+                />
+              )}
+            </div>
+            <dl className="grid grid-cols-[2.7rem_minmax(0,1fr)] gap-x-1 gap-y-0.5">
+              <dt className={agentReviewWorkspaceTokens.label}>
+                {t('editor.ai.agent.previewLineage.meta.renderHash')}
+              </dt>
+              <dd className={agentReviewWorkspaceTokens.metaValue}>{shortReceiptValue(side.renderHash)}</dd>
+              <dt className={agentReviewWorkspaceTokens.label}>
+                {t('editor.ai.agent.previewLineage.meta.recipeHash')}
+              </dt>
+              <dd className={agentReviewWorkspaceTokens.metaValue}>{shortReceiptValue(side.recipeHash)}</dd>
+            </dl>
+          </div>
+        ))}
+      </div>
+      <dl className="mt-1 grid grid-cols-[3.6rem_minmax(0,1fr)] gap-x-2 gap-y-0.5">
+        <dt className={agentReviewWorkspaceTokens.label}>{t('editor.ai.agent.previewLineage.meta.tool')}</dt>
+        <dd className={agentReviewWorkspaceTokens.metaValue}>{receipt.toolName}</dd>
+        <dt className={agentReviewWorkspaceTokens.label}>{t('editor.ai.agent.previewLineage.meta.request')}</dt>
+        <dd className={agentReviewWorkspaceTokens.metaValue}>{receipt.requestId}</dd>
+      </dl>
+    </section>
+  );
+}
 
 export function AgentPanel() {
   const { t } = useTranslation();
@@ -441,6 +560,10 @@ export function AgentPanel() {
             </button>
           </div>
         </section>
+
+        {liveWorkspaceController.previewReceipt === null ? null : (
+          <AgentBeforeAfterReceiptCard receipt={liveWorkspaceController.previewReceipt} />
+        )}
 
         <section className={agentReviewWorkspaceTokens.card} data-testid="agent-review-live-activity-timeline">
           <div className="mb-1 flex items-center justify-between gap-2">
