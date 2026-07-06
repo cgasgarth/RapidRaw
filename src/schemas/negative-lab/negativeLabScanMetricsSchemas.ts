@@ -7,14 +7,14 @@ const finiteNonnegativeNumberSchema = finiteNumberSchema.refine((value) => value
   message: 'Expected a nonnegative finite number.',
 });
 
-export const negativeLabScanMetricsWarningCodeSchema = z.enum([
+const negativeLabScanMetricsWarningCodeSchema = z.enum([
   'border_density_contamination',
   'insufficient_density_samples',
   'low_density_frame',
   'near_flat_density_field',
 ]);
 
-export const negativeLabScanMetricsRectSchema = z
+const negativeLabScanMetricsRectSchema = z
   .object({
     height: finiteNonnegativeNumberSchema,
     width: finiteNonnegativeNumberSchema,
@@ -23,7 +23,7 @@ export const negativeLabScanMetricsRectSchema = z
   })
   .strict();
 
-export const negativeLabScanMetricsPercentilesSchema = z
+const negativeLabScanMetricsPercentilesSchema = z
   .object({
     p02: finiteNumberSchema,
     p10: finiteNumberSchema,
@@ -54,7 +54,7 @@ export const negativeLabScanMetricsPercentilesSchema = z
     }
   });
 
-export const negativeLabScanMetricsChannelSchema = z
+const negativeLabScanMetricsChannelSchema = z
   .object({
     densityPercentiles: negativeLabScanMetricsPercentilesSchema,
     deviationBounds: z
@@ -142,5 +142,5 @@ export type NegativeLabScanMetricsRect = z.infer<typeof negativeLabScanMetricsRe
 export type NegativeLabScanMetricsPercentiles = z.infer<typeof negativeLabScanMetricsPercentilesSchema>;
 export type NegativeLabScanMetricsV1 = z.infer<typeof negativeLabScanMetricsV1Schema>;
 
-export const parseNegativeLabScanMetricsV1 = (value: unknown): NegativeLabScanMetricsV1 =>
+const parseNegativeLabScanMetricsV1 = (value: unknown): NegativeLabScanMetricsV1 =>
   negativeLabScanMetricsV1Schema.parse(value);

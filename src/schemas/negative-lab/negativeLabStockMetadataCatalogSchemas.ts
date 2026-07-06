@@ -2,32 +2,28 @@ import { z } from 'zod';
 
 import { negativeLabPresetIdSchema } from './negativeLabPresetCatalogSchemas';
 
-export const NEGATIVE_LAB_STOCK_METADATA_CATALOG_SCHEMA_VERSION = 1;
+const NEGATIVE_LAB_STOCK_METADATA_CATALOG_SCHEMA_VERSION = 1;
 
-export const negativeLabStockMetadataClassSchema = z.enum([
+const negativeLabStockMetadataClassSchema = z.enum([
   'black_and_white_negative',
   'cinema_negative',
   'color_negative',
   'slide_reversal',
 ]);
 
-export const negativeLabStockMetadataProcessFamilySchema = z.enum([
+const negativeLabStockMetadataProcessFamilySchema = z.enum([
   'black_and_white_silver_negative',
   'c41_color_negative',
   'e6_slide_reversal',
   'ecn2_cinema_negative',
 ]);
 
-export const negativeLabStockMetadataNamingTierSchema = z.enum(['named_stock_reference']);
-export const negativeLabStockMetadataRuntimeStatusSchema = z.enum(['metadata_only_not_applicable']);
-export const negativeLabStockMetadataClaimPolicySchema = z.enum(['reference_metadata_no_emulation_no_match_claim']);
-export const negativeLabStockMetadataSourceStatusSchema = z.enum([
-  'nominal_public_metadata',
-  'project_verified',
-  'unknown',
-]);
+const negativeLabStockMetadataNamingTierSchema = z.enum(['named_stock_reference']);
+const negativeLabStockMetadataRuntimeStatusSchema = z.enum(['metadata_only_not_applicable']);
+const negativeLabStockMetadataClaimPolicySchema = z.enum(['reference_metadata_no_emulation_no_match_claim']);
+const negativeLabStockMetadataSourceStatusSchema = z.enum(['nominal_public_metadata', 'project_verified', 'unknown']);
 
-export const negativeLabStockMetadataDoesNotProveSchema = z.enum([
+const negativeLabStockMetadataDoesNotProveSchema = z.enum([
   'colorimetric_match',
   'licensed_profile',
   'manufacturer_endorsement',
@@ -36,11 +32,9 @@ export const negativeLabStockMetadataDoesNotProveSchema = z.enum([
   'stock_emulation',
 ]);
 
-export const negativeLabStockMetadataEntryIdSchema = z
-  .string()
-  .regex(/^negative_lab\.stock_metadata\.[a-z0-9_]+\.v[0-9]+$/u);
+const negativeLabStockMetadataEntryIdSchema = z.string().regex(/^negative_lab\.stock_metadata\.[a-z0-9_]+\.v[0-9]+$/u);
 
-export const negativeLabStockMetadataEntrySchema = z
+const negativeLabStockMetadataEntrySchema = z
   .object({
     claimPolicy: negativeLabStockMetadataClaimPolicySchema,
     colorResponseNotes: z.string().trim().min(1).max(240),
@@ -167,7 +161,5 @@ export const negativeLabStockMetadataCatalogSchema = z
   });
 
 export type NegativeLabStockMetadataCatalog = z.infer<typeof negativeLabStockMetadataCatalogSchema>;
-export type NegativeLabStockMetadataEntry = z.infer<typeof negativeLabStockMetadataEntrySchema>;
-
-export const parseNegativeLabStockMetadataCatalog = (value: unknown): NegativeLabStockMetadataCatalog =>
+const parseNegativeLabStockMetadataCatalog = (value: unknown): NegativeLabStockMetadataCatalog =>
   negativeLabStockMetadataCatalogSchema.parse(value);
