@@ -1,19 +1,14 @@
 import { z } from 'zod';
 
-export const computationalMergeAppServerRouteFamilySchema = z.enum([
-  'hdr',
-  'panorama',
-  'focus_stack',
-  'super_resolution',
-]);
-export const computationalMergeAppServerRouteExecutionModeSchema = z.enum([
+const computationalMergeAppServerRouteFamilySchema = z.enum(['hdr', 'panorama', 'focus_stack', 'super_resolution']);
+const computationalMergeAppServerRouteExecutionModeSchema = z.enum([
   'apply_dry_run_plan',
   'dry_run_command',
   'open_derived_source',
 ]);
-export const computationalMergeAppServerRouteStatusSchema = z.enum(['mapped']);
+const computationalMergeAppServerRouteStatusSchema = z.enum(['mapped']);
 
-export const computationalMergeAppServerRouteSchema = z
+const computationalMergeAppServerRouteSchema = z
   .object({
     commandType: z.enum([
       'computationalMerge.createFocusStack',

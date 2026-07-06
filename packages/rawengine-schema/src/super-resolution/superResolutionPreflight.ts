@@ -13,7 +13,7 @@ import {
   RAW_ENGINE_SCHEMA_VERSION,
 } from '../rawEngineSchemas.js';
 
-export const superResolutionDryRunPreflightSourceStateV1Schema = z
+const superResolutionDryRunPreflightSourceStateV1Schema = z
   .object({
     contentHash: z.string().trim().min(1),
     graphRevision: z.string().trim().min(1),
@@ -21,7 +21,7 @@ export const superResolutionDryRunPreflightSourceStateV1Schema = z
   })
   .strict();
 
-export const superResolutionDryRunPreflightOptionsV1Schema = z
+const superResolutionDryRunPreflightOptionsV1Schema = z
   .object({
     planId: z.string().trim().min(1).optional(),
     predictedGraphRevision: z.string().trim().min(1).optional(),

@@ -10,10 +10,10 @@ import {
   focusStackRetouchSeedSchema,
 } from '../focus-stack/focusStackOutputReviewSchemas';
 
-export const derivedOutputFamilySchema = z.enum(['focus_stack', 'hdr', 'panorama', 'super_resolution']);
-export const derivedOutputStoragePolicySchema = z.enum(['export_path', 'sidecar_artifact', 'temp_cache']);
-export const derivedOutputOpenActionStateSchema = z.enum(['available', 'deferred', 'unavailable']);
-export const derivedOutputStaleReasonSchema = z.enum([
+const derivedOutputFamilySchema = z.enum(['focus_stack', 'hdr', 'panorama', 'super_resolution']);
+const derivedOutputStoragePolicySchema = z.enum(['export_path', 'sidecar_artifact', 'temp_cache']);
+const derivedOutputOpenActionStateSchema = z.enum(['available', 'deferred', 'unavailable']);
+const derivedOutputStaleReasonSchema = z.enum([
   'accepted_dry_run_plan_changed',
   'output_artifact_changed',
   'recipe_hash_changed',
@@ -24,7 +24,7 @@ export const derivedOutputStaleReasonSchema = z.enum([
   'source_set_changed',
 ]);
 
-export const derivedOutputProvenanceSourceSchema = z
+const derivedOutputProvenanceSourceSchema = z
   .object({
     contentHash: z.string().trim().min(1),
     graphRevision: z.string().trim().min(1),

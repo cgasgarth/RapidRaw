@@ -12,9 +12,9 @@ import {
   superResolutionReconstructionModeSchema,
 } from './superResolutionUiSchemas';
 
-export const superResolutionOutputReviewDecisionSchema = z.enum(['human_review_required', 'preview_only', 'blocked']);
+const superResolutionOutputReviewDecisionSchema = z.enum(['human_review_required', 'preview_only', 'blocked']);
 
-export const superResolutionOutputReviewWarningSchema = z.enum([
+const superResolutionOutputReviewWarningSchema = z.enum([
   'effective_scale_downgraded',
   'human_review_required',
   'low_overlap_coverage',
@@ -23,16 +23,12 @@ export const superResolutionOutputReviewWarningSchema = z.enum([
   'aggressive_preview_only',
 ]);
 
-export const superResolutionOutputReviewEditableGateSchema = z.enum([
-  'blocked_review_required',
-  'blocked_stale',
-  'ready',
-]);
+const superResolutionOutputReviewEditableGateSchema = z.enum(['blocked_review_required', 'blocked_stale', 'ready']);
 
-export const superResolutionOutputReviewStaleStateSchema = z.enum(['current', 'stale', 'unknown']);
-export const superResolutionFalseDetailRiskSchema = z.enum(['unknown', 'low', 'medium', 'high']);
+const superResolutionOutputReviewStaleStateSchema = z.enum(['current', 'stale', 'unknown']);
+const superResolutionFalseDetailRiskSchema = z.enum(['unknown', 'low', 'medium', 'high']);
 
-export const superResolutionOutputReviewSourceRefSchema = z
+const superResolutionOutputReviewSourceRefSchema = z
   .object({
     contentHash: z.string().trim().min(1),
     graphRevision: z.string().trim().min(1),
@@ -41,7 +37,7 @@ export const superResolutionOutputReviewSourceRefSchema = z
   })
   .strict();
 
-export const superResolutionOutputReviewArtifactSchema = z
+const superResolutionOutputReviewArtifactSchema = z
   .object({
     contentHash: z
       .string()
@@ -53,7 +49,7 @@ export const superResolutionOutputReviewArtifactSchema = z
   })
   .strict();
 
-export const superResolutionSupportMapRegionSchema = z
+const superResolutionSupportMapRegionSchema = z
   .object({
     coverageRatio: z.number().min(0).max(1),
     label: z.string().trim().min(1),
@@ -62,9 +58,9 @@ export const superResolutionSupportMapRegionSchema = z
   })
   .strict();
 
-export const superResolutionSupportMapDowngradeReasonSchema = z.literal('effective_scale_downgraded');
+const superResolutionSupportMapDowngradeReasonSchema = z.literal('effective_scale_downgraded');
 
-export const superResolutionDetailReviewRegionSchema = z
+const superResolutionDetailReviewRegionSchema = z
   .object({
     baselineSharpnessScore: z.number().min(0).max(1),
     improvementRatio: z.number().min(0),
