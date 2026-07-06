@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const NEGATIVE_LAB_WORKSPACE_SCHEMA_VERSION = 1;
 
-export const negativeLabWorkspaceStageIdSchema = z.enum([
+const negativeLabWorkspaceStageIdSchema = z.enum([
   'setup',
   'filmProfile',
   'colorInversion',
@@ -10,8 +10,8 @@ export const negativeLabWorkspaceStageIdSchema = z.enum([
   'printGrade',
   'export',
 ]);
-export const negativeLabDustScratchSeveritySchema = z.enum(['clear', 'review', 'retouch']);
-export const negativeLabDustScratchFindingCodeSchema = z.enum([
+const negativeLabDustScratchSeveritySchema = z.enum(['clear', 'review', 'retouch']);
+const negativeLabDustScratchFindingCodeSchema = z.enum([
   'acquisition_review_required',
   'base_fog_only_review',
   'candidate_dust_spot',
@@ -22,7 +22,7 @@ export const negativeLabDustScratchFindingCodeSchema = z.enum([
   'preview_required',
 ]);
 
-export const negativeLabDustScratchCandidateSchema = z
+const negativeLabDustScratchCandidateSchema = z
   .object({
     candidateId: z.string().trim().min(1),
     confidence: z.number().min(0).max(1),
@@ -50,7 +50,7 @@ export const negativeLabDustScratchCandidateSchema = z
     }
   });
 
-export const negativeLabDustScratchReviewFrameSchema = z
+const negativeLabDustScratchReviewFrameSchema = z
   .object({
     candidates: z.array(negativeLabDustScratchCandidateSchema),
     findingCodes: z.array(negativeLabDustScratchFindingCodeSchema).min(1),
@@ -107,7 +107,7 @@ export const negativeLabDustScratchReviewReportSchema = z
     }
   });
 
-export const negativeLabDustHealCorrectionMetricsSchema = z
+const negativeLabDustHealCorrectionMetricsSchema = z
   .object({
     acceptedCandidateCount: z.number().int().nonnegative(),
     editableHealLayerCount: z.number().int().nonnegative(),
@@ -154,7 +154,7 @@ export const negativeLabDustHealCorrectionMetricsSchema = z
     }
   });
 
-export const negativeLabQcProofRowSchema = z
+const negativeLabQcProofRowSchema = z
   .object({
     candidates: z.array(negativeLabDustScratchCandidateSchema),
     contactSheetSlot: z.number().int().positive(),
@@ -254,7 +254,6 @@ export type NegativeLabDustScratchReviewReport = z.infer<typeof negativeLabDustS
 export type NegativeLabDustHealCorrectionMetrics = z.infer<typeof negativeLabDustHealCorrectionMetricsSchema>;
 export type NegativeLabQcProofReport = z.infer<typeof negativeLabQcProofReportSchema>;
 export type NegativeLabWorkspaceProof = z.infer<typeof negativeLabWorkspaceProofSchema>;
-export type NegativeLabWorkspaceStageId = z.infer<typeof negativeLabWorkspaceStageIdSchema>;
 
 export const parseNegativeLabDustScratchReviewReport = (value: unknown): NegativeLabDustScratchReviewReport =>
   negativeLabDustScratchReviewReportSchema.parse(value);
@@ -265,5 +264,5 @@ export const parseNegativeLabDustHealCorrectionMetrics = (value: unknown): Negat
 export const parseNegativeLabQcProofReport = (value: unknown): NegativeLabQcProofReport =>
   negativeLabQcProofReportSchema.parse(value);
 
-export const parseNegativeLabWorkspaceProof = (value: unknown): NegativeLabWorkspaceProof =>
+const parseNegativeLabWorkspaceProof = (value: unknown): NegativeLabWorkspaceProof =>
   negativeLabWorkspaceProofSchema.parse(value);
