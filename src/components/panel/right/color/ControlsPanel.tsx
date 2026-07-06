@@ -12,6 +12,7 @@ import {
   RotateCcw,
   ScanSearch,
   Search,
+  TriangleAlert,
   X,
 } from 'lucide-react';
 import {
@@ -58,6 +59,7 @@ import {
   pickAdjustmentValues,
   TransformAdjustment,
 } from '../../../../utils/adjustments';
+import { getEditorClippingStatusChips } from '../../../../utils/color/runtime/gamutWarningDisplay';
 import { formatUnknownError } from '../../../../utils/errorFormatting';
 import {
   getRawProcessingModeDisplayCopy,
@@ -294,6 +296,12 @@ export default function Controls() {
     () => selectedImage?.isRaw === true && hasRawProcessingStatusRequiringAttention(selectedImage.rawDevelopmentReport),
     [selectedImage?.isRaw, selectedImage?.rawDevelopmentReport],
   );
+  const activeClippingStatusChips = useMemo(
+    () => getEditorClippingStatusChips(adjustments).filter((chip) => chip.active),
+    [adjustments],
+  );
+  const clippingWarningState =
+    activeClippingStatusChips.length === 0 ? 'clean' : activeClippingStatusChips.map((chip) => chip.id).join(' ');
 
   useEffect(() => {
     setIsRawProcessingControlsOpen(isRawProcessingStatusAttentionRequired);
@@ -1143,6 +1151,17 @@ export default function Controls() {
     }));
   };
 
+  const handleResetClippingEndpoints = () => {
+    setAdjustments((prev: Adjustments) => ({
+      ...prev,
+      levels: {
+        ...prev.levels,
+        inputBlack: INITIAL_ADJUSTMENTS.levels.inputBlack,
+        inputWhite: INITIAL_ADJUSTMENTS.levels.inputWhite,
+      },
+    }));
+  };
+
   const handleToggleSection = (section: AdjustmentSectionName) => {
     setCollapsibleState((prev) => {
       const isOpening = !prev[section];
@@ -1248,12 +1267,42 @@ export default function Controls() {
     switch (sectionName) {
       case 'basic':
         return (
-          <BasicAdjustments
-            adjustments={adjustments}
-            setAdjustments={setAdjustments}
-            appSettings={appSettings}
-            onDragStateChange={onDragStateChange}
-          />
+          <>
+            {activeClippingStatusChips.length > 0 && (
+              <div
+                className="mb-2 rounded border border-editor-danger/40 bg-editor-danger-surface px-2 py-2 text-xs"
+                data-clipping-state={clippingWarningState}
+                data-testid="adjustments-clipping-warning"
+                role="status"
+              >
+                <div className="flex items-start gap-2">
+                  <TriangleAlert aria-hidden="true" className="mt-0.5 shrink-0 text-editor-danger" size={14} />
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="font-semibold text-editor-danger">
+                      {t('editor.adjustments.clippingWarning.title')}
+                    </div>
+                    <div className="text-text-secondary">
+                      {activeClippingStatusChips.map((chip) => chip.detail).join(' · ')}
+                    </div>
+                  </div>
+                  <button
+                    className="shrink-0 rounded border border-editor-danger/50 px-2 py-1 font-medium text-editor-danger transition-colors hover:bg-editor-danger/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring"
+                    data-testid="adjustments-clipping-reset-endpoints"
+                    onClick={handleResetClippingEndpoints}
+                    type="button"
+                  >
+                    {t('editor.adjustments.clippingWarning.action')}
+                  </button>
+                </div>
+              </div>
+            )}
+            <BasicAdjustments
+              adjustments={adjustments}
+              setAdjustments={setAdjustments}
+              appSettings={appSettings}
+              onDragStateChange={onDragStateChange}
+            />
+          </>
         );
       case 'curves':
         return (
