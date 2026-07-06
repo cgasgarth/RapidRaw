@@ -551,6 +551,10 @@
         "pasteSettings": "Coller les paramètres",
         "resetSectionSettings": "Réinitialiser les paramètres de la section {{section}}"
       },
+      "clippingWarning": {
+        "action": "Réinitialiser les points",
+        "title": "Risque d'écrêtage"
+      },
       "pinnedControls": {
         "title": "Épinglés",
         "unpin": "Désépingler {{control}}"

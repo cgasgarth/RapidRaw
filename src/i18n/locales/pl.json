@@ -598,6 +598,10 @@
         "pasteSettings": "Wklej ustawienia",
         "resetSectionSettings": "Resetuj ustawienia sekcji {{section}}"
       },
+      "clippingWarning": {
+        "action": "Resetuj punkty",
+        "title": "Ryzyko przycięcia"
+      },
       "pinnedControls": {
         "title": "Przypięte",
         "unpin": "Odepnij {{control}}"

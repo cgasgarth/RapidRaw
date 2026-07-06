@@ -97,6 +97,10 @@ export interface EditorChromeStatusChip {
   value: string;
 }
 
+export type EditorClippingStatusChip = EditorChromeStatusChip & {
+  id: 'shadow-clipping' | 'highlight-clipping';
+};
+
 export const formatGamutWarningCoverage = (overlay: GamutWarningOverlayPayload | null): string => {
   if (!overlay || overlay.warning_pixel_count === 0) return 'Clear';
 
@@ -464,33 +468,13 @@ export const getEditorChromeStatusChips = ({
     previewScopeStatus,
     proofContext.selectedImagePath,
   );
-  const levels = adjustments.levels;
-  const isShadowClipping = levels.inputBlack > 0;
-  const isHighlightClipping = levels.inputWhite < 1;
   const hasCurrentGamutWarning =
     renderedPreviewWarningStatus.state === 'current' &&
     gamutWarningOverlay !== null &&
     gamutWarningOverlay.warning_pixel_count > 0;
 
   return [
-    {
-      active: isShadowClipping,
-      detail: isShadowClipping ? `Input black ${Math.round(levels.inputBlack * 100)}%` : 'Input black at 0%',
-      id: 'shadow-clipping',
-      label: 'Shadows',
-      state: isShadowClipping ? 'current' : 'unavailable',
-      tone: isShadowClipping ? 'danger' : 'neutral',
-      value: isShadowClipping ? 'Clipping' : 'Clean',
-    },
-    {
-      active: isHighlightClipping,
-      detail: isHighlightClipping ? `Input white ${Math.round(levels.inputWhite * 100)}%` : 'Input white at 100%',
-      id: 'highlight-clipping',
-      label: 'Highlights',
-      state: isHighlightClipping ? 'current' : 'unavailable',
-      tone: isHighlightClipping ? 'danger' : 'neutral',
-      value: isHighlightClipping ? 'Clipping' : 'Clean',
-    },
+    ...getEditorClippingStatusChips(adjustments),
     {
       active: hasCurrentGamutWarning,
       detail: renderedPreviewWarningStatus.renderTargetLabel,
@@ -520,6 +504,33 @@ export const getEditorChromeStatusChips = ({
       state: previewScopeFreshnessStatus.state,
       tone: previewStateToTone(previewScopeFreshnessStatus.state),
       value: previewScopeFreshnessStatus.statusLabel.replace(/^Scopes\s+/u, ''),
+    },
+  ];
+};
+
+export const getEditorClippingStatusChips = (adjustments: Pick<Adjustments, 'levels'>): EditorClippingStatusChip[] => {
+  const levels = adjustments.levels;
+  const isShadowClipping = levels.inputBlack > 0;
+  const isHighlightClipping = levels.inputWhite < 1;
+
+  return [
+    {
+      active: isShadowClipping,
+      detail: isShadowClipping ? `Input black ${Math.round(levels.inputBlack * 100)}%` : 'Input black at 0%',
+      id: 'shadow-clipping',
+      label: 'Shadows',
+      state: isShadowClipping ? 'current' : 'unavailable',
+      tone: isShadowClipping ? 'danger' : 'neutral',
+      value: isShadowClipping ? 'Clipping' : 'Clean',
+    },
+    {
+      active: isHighlightClipping,
+      detail: isHighlightClipping ? `Input white ${Math.round(levels.inputWhite * 100)}%` : 'Input white at 100%',
+      id: 'highlight-clipping',
+      label: 'Highlights',
+      state: isHighlightClipping ? 'current' : 'unavailable',
+      tone: isHighlightClipping ? 'danger' : 'neutral',
+      value: isHighlightClipping ? 'Clipping' : 'Clean',
     },
   ];
 };

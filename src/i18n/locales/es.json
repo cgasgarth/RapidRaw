@@ -551,6 +551,10 @@
         "pasteSettings": "Pegar ajustes",
         "resetSectionSettings": "Restablecer ajustes de {{section}}"
       },
+      "clippingWarning": {
+        "action": "Restablecer extremos",
+        "title": "Riesgo de recorte"
+      },
       "pinnedControls": {
         "title": "Fijados",
         "unpin": "Desfijar {{control}}"

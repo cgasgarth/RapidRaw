@@ -551,6 +551,10 @@
         "pasteSettings": "Incolla Impostazioni",
         "resetSectionSettings": "Ripristina Impostazioni {{section}}"
       },
+      "clippingWarning": {
+        "action": "Ripristina estremi",
+        "title": "Rischio clipping"
+      },
       "pinnedControls": {
         "title": "Fissati",
         "unpin": "Rimuovi {{control}}"

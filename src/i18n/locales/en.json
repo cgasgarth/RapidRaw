@@ -558,6 +558,10 @@
         "pasteSettings": "Paste Settings",
         "resetSectionSettings": "Reset {{section}} Settings"
       },
+      "clippingWarning": {
+        "action": "Reset endpoints",
+        "title": "Clipping risk"
+      },
       "pinnedControls": {
         "title": "Pinned",
         "unpin": "Unpin {{control}}"

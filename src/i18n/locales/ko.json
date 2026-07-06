@@ -327,6 +327,10 @@
         "pasteSettings": "설정 붙여넣기",
         "resetSectionSettings": "{{section}} 설정 초기화"
       },
+      "clippingWarning": {
+        "action": "끝점 초기화",
+        "title": "클리핑 위험"
+      },
       "rawReconstructionComparison": {
         "action": "Compare 100% crops",
         "cropAlt": "{{mode}} 100% RAW reconstruction crop",

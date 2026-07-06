@@ -299,6 +299,11 @@ function useAdjustmentPanelSmokeState() {
       clarity: 18,
       contrast: 12,
       glowAmount: 16,
+      levels: {
+        ...INITIAL_ADJUSTMENTS.levels,
+        inputBlack: 0.06,
+        inputWhite: 0.92,
+      },
       sectionVisibility: {
         ...INITIAL_ADJUSTMENTS.sectionVisibility,
         effects: false,
