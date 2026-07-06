@@ -41,6 +41,16 @@ pub struct NegativeConversionParams {
     pub black_point: f32,
     #[serde(default = "default_white_point")]
     pub white_point: f32,
+    #[serde(default)]
+    pub conversion_model: NegativeConversionModel,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum NegativeConversionModel {
+    #[default]
+    DensityRgbV1,
+    NegativeLogDensityV1,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -87,10 +97,36 @@ pub struct NegativeLabDryRunPreviewArtifact {
     pub artifact_id: String,
     pub base_fog_sample_summary: NegativeLabRuntimeBaseFogSampleSummary,
     pub content_hash: String,
+    pub density_normalization_metrics: NegativeLabDensityNormalizationMetrics,
     pub dimensions: NegativeLabPreviewArtifactDimensions,
     pub preview_data_url: String,
     pub renderer: String,
     pub storage: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabDensityChannelBoundsSummary {
+    pub min: f32,
+    pub max: f32,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabDensityNormalizationChannelBounds {
+    pub r: NegativeLabDensityChannelBoundsSummary,
+    pub g: NegativeLabDensityChannelBoundsSummary,
+    pub b: NegativeLabDensityChannelBoundsSummary,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabDensityNormalizationMetrics {
+    pub channel_bounds: NegativeLabDensityNormalizationChannelBounds,
+    pub clipped_pixel_count: u32,
+    pub density_range_unclamped: f32,
+    pub epsilon_clamped_pixel_count: u32,
+    pub renderer_version: u8,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Default)]
@@ -301,7 +337,10 @@ const MAX_BLACK_POINT: f32 = 0.95;
 const MIN_WHITE_POINT: f32 = 0.05;
 const MAX_WHITE_POINT: f32 = 1.0;
 const MIN_ENDPOINT_SEPARATION: f32 = 0.05;
+const NEGATIVE_LAB_DENSITY_EPSILON: f32 = 0.000001;
+const NEGATIVE_LAB_DENSITY_RANGE_EPSILON: f32 = 0.0001;
 const NEGATIVE_LAB_RUNTIME_PREVIEW_RENDERER: &str = "rawengine_negative_lab_runtime_preview_v1";
+const NEGATIVE_LAB_LOG_DENSITY_RENDERER_VERSION: u8 = 1;
 const NEGATIVE_LAB_RUNTIME_PREVIEW_STORAGE: &str = "temp_cache";
 const NEGATIVE_LAB_BASE_FOG_SOURCE_REQUESTED_RECT: &str = "requested_base_fog_sample_rect";
 const NEGATIVE_LAB_BASE_FOG_SOURCE_DEFAULT_RECT: &str = "deterministic_edge_safe_default_rect";
@@ -582,6 +621,7 @@ impl Default for NegativeConversionParams {
             contrast: 1.0,
             black_point: default_black_point(),
             white_point: default_white_point(),
+            conversion_model: NegativeConversionModel::DensityRgbV1,
         }
     }
 }
@@ -1814,6 +1854,7 @@ impl NegativeConversionParams {
                 .clamp(MIN_BLACK_POINT, MAX_BLACK_POINT),
             white_point: finite_or_default(self.white_point, defaults.white_point)
                 .clamp(MIN_WHITE_POINT, MAX_WHITE_POINT),
+            conversion_model: self.conversion_model,
         }
         .with_sanitized_endpoints()
     }
@@ -1835,6 +1876,121 @@ impl NegativeConversionParams {
 pub struct ChannelBounds {
     pub min: f32,
     pub max: f32,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct NegativeLabDensityMetricsAccumulator {
+    min: [f32; 3],
+    max: [f32; 3],
+}
+
+impl Default for NegativeLabDensityMetricsAccumulator {
+    fn default() -> Self {
+        Self {
+            min: [f32::INFINITY; 3],
+            max: [f32::NEG_INFINITY; 3],
+        }
+    }
+}
+
+impl NegativeLabDensityMetricsAccumulator {
+    fn observe(&mut self, normalized_density: [f32; 3]) {
+        for (channel_index, value) in normalized_density.into_iter().enumerate() {
+            self.min[channel_index] = self.min[channel_index].min(value);
+            self.max[channel_index] = self.max[channel_index].max(value);
+        }
+    }
+
+    fn merge(mut self, other: Self) -> Self {
+        for channel_index in 0..3 {
+            self.min[channel_index] = self.min[channel_index].min(other.min[channel_index]);
+            self.max[channel_index] = self.max[channel_index].max(other.max[channel_index]);
+        }
+        self
+    }
+
+    fn into_metrics(
+        self,
+        clipped_pixel_count: u32,
+        epsilon_clamped_pixel_count: u32,
+    ) -> NegativeLabDensityNormalizationMetrics {
+        let fallback = ChannelBounds { min: 0.0, max: 0.0 };
+        let red = if self.min[0].is_finite() && self.max[0].is_finite() {
+            ChannelBounds {
+                min: self.min[0],
+                max: self.max[0],
+            }
+        } else {
+            fallback
+        };
+        let green = if self.min[1].is_finite() && self.max[1].is_finite() {
+            ChannelBounds {
+                min: self.min[1],
+                max: self.max[1],
+            }
+        } else {
+            fallback
+        };
+        let blue = if self.min[2].is_finite() && self.max[2].is_finite() {
+            ChannelBounds {
+                min: self.min[2],
+                max: self.max[2],
+            }
+        } else {
+            fallback
+        };
+        let global_min = red.min.min(green.min).min(blue.min);
+        let global_max = red.max.max(green.max).max(blue.max);
+
+        NegativeLabDensityNormalizationMetrics {
+            channel_bounds: NegativeLabDensityNormalizationChannelBounds {
+                r: NegativeLabDensityChannelBoundsSummary {
+                    min: red.min,
+                    max: red.max,
+                },
+                g: NegativeLabDensityChannelBoundsSummary {
+                    min: green.min,
+                    max: green.max,
+                },
+                b: NegativeLabDensityChannelBoundsSummary {
+                    min: blue.min,
+                    max: blue.max,
+                },
+            },
+            clipped_pixel_count,
+            density_range_unclamped: (global_max - global_min).max(0.0),
+            epsilon_clamped_pixel_count,
+            renderer_version: NEGATIVE_LAB_LOG_DENSITY_RENDERER_VERSION,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct NegativeLabPipelineRender {
+    rendered_preview: DynamicImage,
+    density_normalization_metrics: NegativeLabDensityNormalizationMetrics,
+}
+
+fn negative_lab_density_from_linear_channel(value: f32) -> f32 {
+    -value.clamp(NEGATIVE_LAB_DENSITY_EPSILON, 1.0).log10()
+}
+
+fn negative_lab_count_density_input_guards(raw_pixels: &[f32]) -> (u32, u32) {
+    raw_pixels
+        .chunks_exact(3)
+        .fold((0_u32, 0_u32), |(epsilon_count, clipped_count), pixel| {
+            let epsilon_hit = pixel
+                .iter()
+                .any(|&value| !value.is_finite() || value <= NEGATIVE_LAB_DENSITY_EPSILON);
+            let clipped_hit = pixel
+                .iter()
+                .any(|&value| !value.is_finite() || value < 0.0 || value > 1.0);
+
+            (
+                epsilon_count + u32::from(epsilon_hit),
+                clipped_count + u32::from(clipped_hit),
+            )
+        })
 }
 
 fn sanitize_sample_rect(rect: NegativeBaseFogSampleRect) -> Option<NegativeBaseFogSampleRect> {
@@ -1949,7 +2105,7 @@ fn estimate_base_fog_from_image(
     let log_pixels: Vec<f32> = rgb
         .as_raw()
         .par_iter()
-        .map(|&v| -v.clamp(1e-6, 1.0).log10())
+        .map(|&v| negative_lab_density_from_linear_channel(v))
         .collect();
     let bounds = analyze_bounds(&log_pixels, width as usize, height as usize, sample_rect);
 
@@ -1983,19 +2139,21 @@ fn estimate_base_fog_from_image(
     }
 }
 
-fn run_pipeline(
+fn run_pipeline_with_metrics(
     input: &DynamicImage,
     params: &NegativeConversionParams,
     override_bounds: Option<[ChannelBounds; 3]>,
-) -> DynamicImage {
+) -> NegativeLabPipelineRender {
     let params = params.sanitized();
     let rgb = input.to_rgb32f();
     let (width, height) = rgb.dimensions();
     let raw_pixels = rgb.as_raw();
+    let (epsilon_clamped_pixel_count, clipped_pixel_count) =
+        negative_lab_count_density_input_guards(raw_pixels);
 
     let log_pixels: Vec<f32> = raw_pixels
         .par_iter()
-        .map(|&v| -v.clamp(1e-6, 1.0).log10())
+        .map(|&v| negative_lab_density_from_linear_channel(v))
         .collect();
 
     let bounds = if let Some(b) = override_bounds {
@@ -2021,54 +2179,104 @@ fn run_pipeline(
     let endpoint_span = (params.white_point - params.black_point).max(MIN_ENDPOINT_SEPARATION);
     let apply_endpoints =
         |value: f32| -> f32 { ((value - params.black_point) / endpoint_span).clamp(0.0, 1.0) };
+    let base = [
+        bounds[0].min * params.base_fog_strength,
+        bounds[1].min * params.base_fog_strength,
+        bounds[2].min * params.base_fog_strength,
+    ];
+    let range = [
+        (bounds[0].max - base[0]).max(NEGATIVE_LAB_DENSITY_RANGE_EPSILON),
+        (bounds[1].max - base[1]).max(NEGATIVE_LAB_DENSITY_RANGE_EPSILON),
+        (bounds[2].max - base[2]).max(NEGATIVE_LAB_DENSITY_RANGE_EPSILON),
+    ];
+    let weights = [params.red_weight, params.green_weight, params.blue_weight];
+    let legacy_pre_curve_clamp = params.conversion_model == NegativeConversionModel::DensityRgbV1;
 
-    out_buffer
+    let density_metrics = out_buffer
         .par_chunks_mut(3)
-        .enumerate()
-        .for_each(|(i, out_pixel)| {
-            let idx = i * 3;
+        .zip(log_pixels.par_chunks(3))
+        .fold(
+            NegativeLabDensityMetricsAccumulator::default,
+            |mut metrics, (out_pixel, log_pixel)| {
+                let normalized_density = [
+                    (log_pixel[0] - base[0]) / range[0],
+                    (log_pixel[1] - base[1]) / range[1],
+                    (log_pixel[2] - base[2]) / range[2],
+                ];
+                let model_density = [
+                    if legacy_pre_curve_clamp {
+                        normalized_density[0].max(0.0)
+                    } else {
+                        normalized_density[0]
+                    },
+                    if legacy_pre_curve_clamp {
+                        normalized_density[1].max(0.0)
+                    } else {
+                        normalized_density[1]
+                    },
+                    if legacy_pre_curve_clamp {
+                        normalized_density[2].max(0.0)
+                    } else {
+                        normalized_density[2]
+                    },
+                ];
+                metrics.observe(model_density);
 
-            let base_r = bounds[0].min * params.base_fog_strength;
-            let base_g = bounds[1].min * params.base_fog_strength;
-            let base_b = bounds[2].min * params.base_fog_strength;
+                let weighted_density = [
+                    model_density[0] * weights[0],
+                    model_density[1] * weights[1],
+                    model_density[2] * weights[2],
+                ];
 
-            let mut n_r = (log_pixels[idx] - base_r) / (bounds[0].max - base_r).max(0.0001);
-            let mut n_g = (log_pixels[idx + 1] - base_g) / (bounds[1].max - base_g).max(0.0001);
-            let mut n_b = (log_pixels[idx + 2] - base_b) / (bounds[2].max - base_b).max(0.0001);
+                let apply_curve = |x: f32| -> f32 {
+                    let sigmoid = 1.0 / (1.0 + (-k * (x - x0)).exp());
+                    let s_norm = (sigmoid - y0) * scale;
+                    s_norm.clamp(0.0, 1.0)
+                };
 
-            n_r = n_r.max(0.0) * params.red_weight;
-            n_g = n_g.max(0.0) * params.green_weight;
-            n_b = n_b.max(0.0) * params.blue_weight;
+                let mut r = apply_curve(weighted_density[0]);
+                let mut g = apply_curve(weighted_density[1]);
+                let mut b = apply_curve(weighted_density[2]);
 
-            let apply_curve = |x: f32| -> f32 {
-                let sigmoid = 1.0 / (1.0 + (-k * (x - x0)).exp());
-                let s_norm = (sigmoid - y0) * scale;
-                s_norm.clamp(0.0, 1.0)
-            };
+                let luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+                let max_ch = r.max(g).max(b);
 
-            let mut r = apply_curve(n_r);
-            let mut g = apply_curve(n_g);
-            let mut b = apply_curve(n_b);
+                if max_ch > 0.9 {
+                    let overflow = ((max_ch - 0.9) * 10.0).clamp(0.0, 1.0);
+                    let sat_reduction = overflow * overflow;
 
-            let luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-            let max_ch = r.max(g).max(b);
+                    r = r + (luma - r) * sat_reduction;
+                    g = g + (luma - g) * sat_reduction;
+                    b = b + (luma - b) * sat_reduction;
+                }
 
-            if max_ch > 0.9 {
-                let overflow = ((max_ch - 0.9) * 10.0).clamp(0.0, 1.0);
-                let sat_reduction = overflow * overflow;
+                out_pixel[0] = apply_endpoints(r).powf(gamma_inv);
+                out_pixel[1] = apply_endpoints(g).powf(gamma_inv);
+                out_pixel[2] = apply_endpoints(b).powf(gamma_inv);
 
-                r = r + (luma - r) * sat_reduction;
-                g = g + (luma - g) * sat_reduction;
-                b = b + (luma - b) * sat_reduction;
-            }
-
-            out_pixel[0] = apply_endpoints(r).powf(gamma_inv);
-            out_pixel[1] = apply_endpoints(g).powf(gamma_inv);
-            out_pixel[2] = apply_endpoints(b).powf(gamma_inv);
-        });
+                metrics
+            },
+        )
+        .reduce(
+            NegativeLabDensityMetricsAccumulator::default,
+            NegativeLabDensityMetricsAccumulator::merge,
+        )
+        .into_metrics(clipped_pixel_count, epsilon_clamped_pixel_count);
 
     let out_img = Rgb32FImage::from_vec(width, height, out_buffer).unwrap();
-    DynamicImage::ImageRgb32F(out_img)
+
+    NegativeLabPipelineRender {
+        rendered_preview: DynamicImage::ImageRgb32F(out_img),
+        density_normalization_metrics: density_metrics,
+    }
+}
+
+fn run_pipeline(
+    input: &DynamicImage,
+    params: &NegativeConversionParams,
+    override_bounds: Option<[ChannelBounds; 3]>,
+) -> DynamicImage {
+    run_pipeline_with_metrics(input, params, override_bounds).rendered_preview
 }
 
 fn build_negative_lab_preview_cache_key(source_path: &str) -> u64 {
@@ -2253,6 +2461,7 @@ fn build_negative_lab_runtime_base_fog_sample_summary(
 fn build_negative_lab_dry_run_preview_artifact(
     rendered_preview: &DynamicImage,
     base_fog_sample_summary: NegativeLabRuntimeBaseFogSampleSummary,
+    density_normalization_metrics: NegativeLabDensityNormalizationMetrics,
 ) -> Result<NegativeLabDryRunPreviewArtifact, String> {
     let rgb8 = rendered_preview.to_rgb8();
     let dimensions = NegativeLabPreviewArtifactDimensions {
@@ -2275,6 +2484,7 @@ fn build_negative_lab_dry_run_preview_artifact(
         artifact_id,
         base_fog_sample_summary,
         content_hash,
+        density_normalization_metrics,
         dimensions,
         preview_data_url: jpeg_data_url(base64_str),
         renderer: NEGATIVE_LAB_RUNTIME_PREVIEW_RENDERER.to_string(),
@@ -2293,15 +2503,17 @@ pub async fn preview_negative_conversion(
     let source_path_str = source_path.to_string_lossy().to_string();
     let base_image_for_processing =
         load_negative_lab_preview_processing_image(&source_path_str, &state, &app_handle)?;
-    let rendered_preview = run_pipeline(&base_image_for_processing, &params, None);
+    let rendered_preview = run_pipeline_with_metrics(&base_image_for_processing, &params, None);
     let base_fog_sample_summary = build_negative_lab_runtime_base_fog_sample_summary(
         &base_image_for_processing,
         params.base_fog_sample,
     );
-    Ok(
-        build_negative_lab_dry_run_preview_artifact(&rendered_preview, base_fog_sample_summary)?
-            .preview_data_url,
-    )
+    Ok(build_negative_lab_dry_run_preview_artifact(
+        &rendered_preview.rendered_preview,
+        base_fog_sample_summary,
+        rendered_preview.density_normalization_metrics,
+    )?
+    .preview_data_url)
 }
 
 #[tauri::command]
@@ -2315,12 +2527,16 @@ pub async fn render_negative_lab_dry_run_preview_artifact(
     let source_path_str = source_path.to_string_lossy().to_string();
     let base_image_for_processing =
         load_negative_lab_preview_processing_image(&source_path_str, &state, &app_handle)?;
-    let rendered_preview = run_pipeline(&base_image_for_processing, &params, None);
+    let rendered_preview = run_pipeline_with_metrics(&base_image_for_processing, &params, None);
     let base_fog_sample_summary = build_negative_lab_runtime_base_fog_sample_summary(
         &base_image_for_processing,
         params.base_fog_sample,
     );
-    build_negative_lab_dry_run_preview_artifact(&rendered_preview, base_fog_sample_summary)
+    build_negative_lab_dry_run_preview_artifact(
+        &rendered_preview.rendered_preview,
+        base_fog_sample_summary,
+        rendered_preview.density_normalization_metrics,
+    )
 }
 
 #[tauri::command]
@@ -3194,6 +3410,7 @@ mod tests {
                 width: 0.1,
                 height: 0.1,
             }),
+            conversion_model: NegativeConversionModel::DensityRgbV1,
             exposure: f32::INFINITY,
             contrast: f32::NEG_INFINITY,
             black_point: f32::NAN,
@@ -3576,6 +3793,7 @@ mod tests {
             blue_weight: 1.02,
             base_fog_strength: 1.0,
             base_fog_sample: None,
+            conversion_model: NegativeConversionModel::DensityRgbV1,
             exposure: 0.1,
             contrast: 1.08,
             black_point: 0.0,
@@ -3822,6 +4040,7 @@ mod tests {
             blue_weight: 1.0,
             base_fog_strength: 1.0,
             base_fog_sample: None,
+            conversion_model: NegativeConversionModel::DensityRgbV1,
             exposure: 0.0,
             contrast: 1.0,
             black_point: 0.0,
@@ -3902,6 +4121,7 @@ mod tests {
             blue_weight: 0.98,
             base_fog_strength: 1.0,
             base_fog_sample: None,
+            conversion_model: NegativeConversionModel::DensityRgbV1,
             exposure: 0.05,
             contrast: 0.95,
             black_point: 0.0,
@@ -4014,6 +4234,7 @@ mod tests {
                 blue_weight: f32::NEG_INFINITY,
                 base_fog_strength: 99.0,
                 base_fog_sample: None,
+                conversion_model: NegativeConversionModel::DensityRgbV1,
                 exposure: 50.0,
                 contrast: -50.0,
                 black_point: 0.99,
@@ -4057,6 +4278,7 @@ mod tests {
                 blue_weight: 0.75,
                 base_fog_strength: 1.0,
                 base_fog_sample: None,
+                conversion_model: NegativeConversionModel::DensityRgbV1,
                 exposure: 0.0,
                 contrast: 1.0,
                 black_point: 0.0,
@@ -4273,6 +4495,7 @@ mod tests {
                 width: 0.5,
                 height: 1.0,
             }),
+            conversion_model: NegativeConversionModel::DensityRgbV1,
             exposure: 0.05,
             contrast: 1.1,
             black_point: 0.0,
@@ -4326,12 +4549,14 @@ mod tests {
                 width: 0.5,
                 height: 1.0,
             }),
+            conversion_model: NegativeConversionModel::DensityRgbV1,
             exposure: 0.05,
             contrast: 1.1,
             black_point: 0.0,
             white_point: 1.0,
         };
-        let rendered = run_pipeline(&input, &params, None).to_rgb32f();
+        let render = run_pipeline_with_metrics(&input, &params, None);
+        let rendered = render.rendered_preview.to_rgb32f();
         let input_rgb = input.to_rgb32f();
         let input_to_output_delta = mean_abs_delta(&input_rgb, &rendered);
         let changed_pixel_count = rendered
@@ -4360,6 +4585,26 @@ mod tests {
                 "algorithm": "density_rgb_v1",
                 "artifactHash": hash_rendered_image(&rendered),
                 "changedPixelCount": changed_pixel_count,
+                "densityNormalizationMetrics": {
+                    "channelBounds": {
+                        "blue": {
+                            "max": render.density_normalization_metrics.channel_bounds.b.max,
+                            "min": render.density_normalization_metrics.channel_bounds.b.min
+                        },
+                        "green": {
+                            "max": render.density_normalization_metrics.channel_bounds.g.max,
+                            "min": render.density_normalization_metrics.channel_bounds.g.min
+                        },
+                        "red": {
+                            "max": render.density_normalization_metrics.channel_bounds.r.max,
+                            "min": render.density_normalization_metrics.channel_bounds.r.min
+                        }
+                    },
+                    "clippedPixelCount": render.density_normalization_metrics.clipped_pixel_count,
+                    "densityRangeUnclamped": render.density_normalization_metrics.density_range_unclamped,
+                    "epsilonClampedPixelCount": render.density_normalization_metrics.epsilon_clamped_pixel_count,
+                    "rendererVersion": render.density_normalization_metrics.renderer_version
+                },
                 "doesNotProve": [
                     "camera_raw_decode_path",
                     "automatic_base_fog_estimation",
@@ -4384,6 +4629,155 @@ mod tests {
             fs::write(report_path, serde_json::to_vec_pretty(&report).unwrap())
                 .expect("write Negative Lab density CPU report");
         }
+    }
+
+    #[test]
+    fn negative_log_density_v1_reports_unclamped_density_metrics() {
+        let input = DynamicImage::ImageRgb32F(
+            Rgb32FImage::from_vec(
+                5,
+                1,
+                vec![
+                    0.95, 0.90, 0.88, 0.65, 0.60, 0.58, 0.30, 0.26, 0.22, 0.0000001, 0.0, 0.0, 1.2,
+                    0.98, 0.96,
+                ],
+            )
+            .unwrap(),
+        );
+        let legacy_render = run_pipeline_with_metrics(
+            &input,
+            &NegativeConversionParams {
+                base_fog_sample: Some(NegativeBaseFogSampleRect {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 0.4,
+                    height: 1.0,
+                }),
+                contrast: 1.05,
+                exposure: 0.03,
+                ..NegativeConversionParams::default()
+            },
+            None,
+        );
+        let neg_log_render = run_pipeline_with_metrics(
+            &input,
+            &NegativeConversionParams {
+                base_fog_sample: Some(NegativeBaseFogSampleRect {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 0.4,
+                    height: 1.0,
+                }),
+                conversion_model: NegativeConversionModel::NegativeLogDensityV1,
+                contrast: 1.05,
+                exposure: 0.03,
+                ..NegativeConversionParams::default()
+            },
+            None,
+        );
+        let rendered = neg_log_render.rendered_preview.to_rgb32f();
+
+        assert!(rendered.as_raw().iter().all(|value| value.is_finite()));
+        assert_eq!(
+            legacy_render
+                .density_normalization_metrics
+                .channel_bounds
+                .r
+                .min,
+            0.0
+        );
+        assert!(
+            neg_log_render
+                .density_normalization_metrics
+                .channel_bounds
+                .r
+                .min
+                < 0.0
+        );
+        assert!(
+            neg_log_render
+                .density_normalization_metrics
+                .epsilon_clamped_pixel_count
+                >= 1
+        );
+        assert!(
+            neg_log_render
+                .density_normalization_metrics
+                .clipped_pixel_count
+                >= 1
+        );
+        assert!(
+            neg_log_render
+                .density_normalization_metrics
+                .density_range_unclamped
+                > 0.0
+        );
+    }
+
+    #[test]
+    fn negative_log_density_v1_preserves_preview_runtime_shape() {
+        let input = DynamicImage::ImageRgb32F(
+            Rgb32FImage::from_vec(
+                4,
+                2,
+                vec![
+                    0.72, 0.68, 0.60, 0.74, 0.70, 0.62, 0.95, 0.93, 0.90, 0.98, 0.96, 0.94, 0.30,
+                    0.28, 0.24, 0.18, 0.16, 0.12, 0.06, 0.05, 0.04, 0.02, 0.015, 0.01,
+                ],
+            )
+            .unwrap(),
+        );
+        let legacy_params = NegativeConversionParams {
+            base_fog_sample: Some(NegativeBaseFogSampleRect {
+                x: 0.0,
+                y: 0.0,
+                width: 0.5,
+                height: 0.5,
+            }),
+            contrast: 1.1,
+            exposure: 0.02,
+            red_weight: 1.03,
+            green_weight: 0.99,
+            blue_weight: 0.96,
+            ..NegativeConversionParams::default()
+        };
+        let neg_log_params = NegativeConversionParams {
+            conversion_model: NegativeConversionModel::NegativeLogDensityV1,
+            ..legacy_params
+        };
+
+        let legacy_render = run_pipeline_with_metrics(&input, &legacy_params, None);
+        let neg_log_render = run_pipeline_with_metrics(&input, &neg_log_params, None);
+        let legacy_rgb = legacy_render.rendered_preview.to_rgb32f();
+        let neg_log_rgb = neg_log_render.rendered_preview.to_rgb32f();
+
+        assert_eq!(legacy_rgb.dimensions(), neg_log_rgb.dimensions());
+        assert!(
+            legacy_rgb.as_raw().iter().all(|value| value.is_finite())
+                && neg_log_rgb.as_raw().iter().all(|value| value.is_finite())
+        );
+        assert!(
+            neg_log_render
+                .density_normalization_metrics
+                .channel_bounds
+                .r
+                .min
+                < 0.0
+        );
+        assert_eq!(
+            legacy_render
+                .density_normalization_metrics
+                .channel_bounds
+                .r
+                .min,
+            0.0
+        );
+        assert_eq!(
+            neg_log_render
+                .density_normalization_metrics
+                .renderer_version,
+            NEGATIVE_LAB_LOG_DENSITY_RENDERER_VERSION
+        );
     }
 
     #[test]
@@ -4443,6 +4837,7 @@ mod tests {
             blue_weight: selected_base_fog_candidate.estimate.blue_weight,
             base_fog_strength: 1.0,
             base_fog_sample: Some(selected_base_fog_candidate.sample_rect),
+            conversion_model: NegativeConversionModel::DensityRgbV1,
             exposure: 0.05,
             contrast: 0.95,
             black_point: 0.0,
@@ -4768,6 +5163,7 @@ mod tests {
                 width: 0.35,
                 height: 0.35,
             }),
+            conversion_model: NegativeConversionModel::DensityRgbV1,
             exposure: 0.05,
             contrast: 0.95,
             black_point: 0.0,
@@ -5019,10 +5415,24 @@ mod tests {
             Rgb32FImage::from_vec(2, 1, vec![0.12, 0.34, 0.56, 0.78, 0.52, 0.21]).unwrap(),
         );
         let summary = build_negative_lab_runtime_base_fog_sample_summary(&rendered_preview, None);
+        let density_metrics = NegativeLabDensityNormalizationMetrics {
+            channel_bounds: NegativeLabDensityNormalizationChannelBounds {
+                r: NegativeLabDensityChannelBoundsSummary { min: 0.0, max: 1.0 },
+                g: NegativeLabDensityChannelBoundsSummary { min: 0.0, max: 1.0 },
+                b: NegativeLabDensityChannelBoundsSummary { min: 0.0, max: 1.0 },
+            },
+            clipped_pixel_count: 0,
+            density_range_unclamped: 1.0,
+            epsilon_clamped_pixel_count: 0,
+            renderer_version: NEGATIVE_LAB_LOG_DENSITY_RENDERER_VERSION,
+        };
 
-        let artifact =
-            build_negative_lab_dry_run_preview_artifact(&rendered_preview, summary.clone())
-                .expect("build preview artifact");
+        let artifact = build_negative_lab_dry_run_preview_artifact(
+            &rendered_preview,
+            summary.clone(),
+            density_metrics,
+        )
+        .expect("build preview artifact");
         let rgb8 = rendered_preview.to_rgb8();
         let expected_hash = format!("sha256:{}", hex::encode(Sha256::digest(rgb8.as_raw())));
 
@@ -5031,6 +5441,10 @@ mod tests {
         assert_eq!(artifact.dimensions.height, 1);
         assert_eq!(artifact.renderer, NEGATIVE_LAB_RUNTIME_PREVIEW_RENDERER);
         assert_eq!(artifact.storage, NEGATIVE_LAB_RUNTIME_PREVIEW_STORAGE);
+        assert_eq!(
+            artifact.density_normalization_metrics.renderer_version,
+            NEGATIVE_LAB_LOG_DENSITY_RENDERER_VERSION
+        );
         assert_eq!(
             artifact.artifact_id,
             format!(
@@ -5117,6 +5531,7 @@ mod tests {
             blue_weight: auto_estimate.blue_weight,
             base_fog_strength: 1.0,
             base_fog_sample: None,
+            conversion_model: NegativeConversionModel::DensityRgbV1,
             exposure: 0.0,
             contrast: 1.0,
             black_point: 0.0,
@@ -5128,6 +5543,7 @@ mod tests {
             blue_weight: sampled_estimate.blue_weight,
             base_fog_strength: 1.0,
             base_fog_sample: Some(sample_rect),
+            conversion_model: NegativeConversionModel::DensityRgbV1,
             exposure: 0.0,
             contrast: 1.0,
             black_point: 0.0,

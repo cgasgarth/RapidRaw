@@ -235,8 +235,10 @@ export const resolveNegativeLabRuntimeProfile = (
 export const buildNegativeLabRuntimeProfileProvenanceHash = (
   profile: NegativeLabResolvedRuntimeProfile,
 ): `fnv1a32:${string}` => {
-  const { print_curve_algorithm, print_curve_output_tag, print_curve_v2, ...legacyCompatibleParams } = profile.params;
+  const { conversion_model, print_curve_algorithm, print_curve_output_tag, print_curve_v2, ...legacyCompatibleParams } =
+    profile.params;
   const params =
+    conversion_model === 'density_rgb_v1' &&
     print_curve_algorithm === 'density_rgb_v1' &&
     print_curve_output_tag === 'preview_display' &&
     print_curve_v2 === null
@@ -267,6 +269,7 @@ const NEGATIVE_LAB_RUNTIME_APPLY_DIFF_KEYS = [
   'black_point',
   'blue_weight',
   'contrast',
+  'conversion_model',
   'exposure',
   'green_weight',
   'print_curve_algorithm',
@@ -282,6 +285,7 @@ const getNegativeLabRuntimeApplyParameterGroup = (
 ): NegativeLabRuntimeProfileApplyProof['parameterDiffs'][number]['group'] => {
   if (key === 'base_fog_strength') return 'base_fog';
   if (key === 'blue_weight' || key === 'green_weight' || key === 'red_weight') return 'rgb_balance';
+  if (key === 'conversion_model') return 'print_curve';
   if (key === 'print_curve_algorithm' || key === 'print_curve_output_tag') return 'print_curve';
   return 'tone_curve';
 };

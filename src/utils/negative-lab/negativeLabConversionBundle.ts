@@ -21,6 +21,7 @@ const paramsNear = (
   numbersNear(left.black_point, right.black_point) &&
   numbersNear(left.blue_weight, right.blue_weight) &&
   numbersNear(left.contrast, right.contrast) &&
+  left.conversion_model === right.conversion_model &&
   numbersNear(left.exposure, right.exposure) &&
   numbersNear(left.green_weight, right.green_weight) &&
   left.print_curve_algorithm === right.print_curve_algorithm &&

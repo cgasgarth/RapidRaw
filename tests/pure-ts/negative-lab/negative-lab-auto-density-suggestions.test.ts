@@ -13,6 +13,7 @@ const params: NegativeLabPresetParams = {
   black_point: 0.02,
   blue_weight: 1,
   contrast: 1.1,
+  conversion_model: 'density_rgb_v1',
   exposure: 0.1,
   green_weight: 1,
   red_weight: 1,
