@@ -558,6 +558,10 @@
         "pasteSettings": "Einstellungen einfügen",
         "resetSectionSettings": "{{section}}-Einstellungen zurücksetzen"
       },
+      "clippingWarning": {
+        "action": "Endpunkte zurücksetzen",
+        "title": "Clipping-Risiko"
+      },
       "pinnedControls": {
         "title": "Angeheftet",
         "unpin": "{{control}} lösen"

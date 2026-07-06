@@ -556,6 +556,10 @@
         "pasteSettings": "粘贴设置",
         "resetSectionSettings": "重置 {{section}} 设置"
       },
+      "clippingWarning": {
+        "action": "重置端点",
+        "title": "裁剪风险"
+      },
       "pinnedControls": {
         "title": "已固定",
         "unpin": "取消固定 {{control}}"

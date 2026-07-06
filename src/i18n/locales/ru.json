@@ -571,6 +571,10 @@
         "pasteSettings": "Вставить настройки",
         "resetSectionSettings": "Сбросить настройки раздела «{{section}}»"
       },
+      "clippingWarning": {
+        "action": "Сбросить точки",
+        "title": "Риск клиппинга"
+      },
       "pinnedControls": {
         "title": "Закреплено",
         "unpin": "Открепить {{control}}"

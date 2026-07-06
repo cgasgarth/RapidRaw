@@ -551,6 +551,10 @@
         "pasteSettings": "Colar Configurações",
         "resetSectionSettings": "Redefinir Configurações de {{section}}"
       },
+      "clippingWarning": {
+        "action": "Redefinir extremos",
+        "title": "Risco de corte"
+      },
       "pinnedControls": {
         "title": "Fixados",
         "unpin": "Desafixar {{control}}"
