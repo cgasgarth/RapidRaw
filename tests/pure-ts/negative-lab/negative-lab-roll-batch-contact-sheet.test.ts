@@ -30,10 +30,12 @@ const buildAcceptedFingerprint = ({
   dryRunPlanJson,
   outputFormat = 'tiff16',
   pathsToConvert = targetPaths,
+  sessionRevision = 0,
 }: {
   dryRunPlanJson: string;
   outputFormat?: 'jpeg_proof' | 'tiff16';
   pathsToConvert?: readonly string[];
+  sessionRevision?: number;
 }) =>
   buildNegativeLabAcceptedApplyPlanFingerprint({
     dryRunPlanJson,
@@ -41,6 +43,7 @@ const buildAcceptedFingerprint = ({
     params: DEFAULT_NEGATIVE_LAB_UI_PRESET.params,
     pathsToConvert,
     selectedProfileSnapshot: null,
+    sessionRevision,
     suffix: 'Positive',
     writeConversionBundle: true,
   });
@@ -76,7 +79,7 @@ describe('negative lab roll batch contact sheet workflow', () => {
     expect(warningSortedRows.at(-1)?.frameId).toBe('negative-lab-frame-3');
   });
 
-  test('rejects stale accepted plans with actionable reasons', () => {
+  test('invalidates accepted plans when the session revision changes', () => {
     const frameHealthReport = buildNegativeLabFrameHealthReport({
       activePathIndex: 0,
       baseFogConfidence: 0.9,
@@ -92,6 +95,7 @@ describe('negative lab roll batch contact sheet workflow', () => {
       dryRunPlanJson: currentPlanJson,
       outputFormat: 'jpeg_proof',
       pathsToConvert: targetPaths.slice(0, 3),
+      sessionRevision: 1,
     });
 
     expect(
@@ -111,7 +115,7 @@ describe('negative lab roll batch contact sheet workflow', () => {
         acceptedApplyPlanFingerprint: acceptedFingerprint,
         currentApplyPlanFingerprint: staleFingerprint,
       }),
-    ).toEqual(['source_paths_changed', 'output_format_changed']);
+    ).toEqual(['session_revision_changed']);
   });
 
   test('creates roll and per-frame receipts from the QC contact sheet artifact', () => {

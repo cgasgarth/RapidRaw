@@ -9,6 +9,7 @@ export interface NegativeLabAcceptedApplyPlanFingerprintInput {
   params: NegativeLabPresetParams;
   pathsToConvert: readonly string[];
   selectedProfileSnapshot: NegativeLabSelectedProfileSnapshot | null;
+  sessionRevision: number;
   suffix: string;
   writeConversionBundle: boolean;
 }
@@ -19,6 +20,7 @@ export type NegativeLabAcceptedApplyPlanStaleReason =
   | 'output_format_changed'
   | 'output_options_changed'
   | 'selected_profile_changed'
+  | 'session_revision_changed'
   | 'source_paths_changed'
   | 'unparseable_fingerprint';
 
@@ -46,6 +48,7 @@ export const buildNegativeLabAcceptedApplyPlanFingerprint = ({
   params,
   pathsToConvert,
   selectedProfileSnapshot,
+  sessionRevision,
   suffix,
   writeConversionBundle,
 }: NegativeLabAcceptedApplyPlanFingerprintInput): string =>
@@ -56,6 +59,7 @@ export const buildNegativeLabAcceptedApplyPlanFingerprint = ({
       params,
       pathsToConvert,
       selectedProfileSnapshot,
+      sessionRevision,
       suffix,
       writeConversionBundle,
     },
@@ -69,7 +73,15 @@ export const isNegativeLabAcceptedApplyPlanCurrent = ({
 }: {
   acceptedApplyPlanFingerprint: string | null;
   currentApplyPlanFingerprint: string;
-}): boolean => acceptedApplyPlanFingerprint === currentApplyPlanFingerprint;
+}): boolean => {
+  if (acceptedApplyPlanFingerprint === currentApplyPlanFingerprint) return true;
+
+  const accepted = parseFingerprint(acceptedApplyPlanFingerprint);
+  const current = parseFingerprint(currentApplyPlanFingerprint);
+  if (accepted === null || current === null) return false;
+
+  return accepted.sessionRevision === current.sessionRevision;
+};
 
 const parseFingerprint = (fingerprint: string | null): NegativeLabAcceptedApplyPlanFingerprintInput | null => {
   if (fingerprint === null) return null;
@@ -94,6 +106,7 @@ export const getNegativeLabAcceptedApplyPlanStaleReasons = ({
   const accepted = parseFingerprint(acceptedApplyPlanFingerprint);
   const current = parseFingerprint(currentApplyPlanFingerprint);
   if (accepted === null || current === null) return ['unparseable_fingerprint'];
+  if (accepted.sessionRevision !== current.sessionRevision) return ['session_revision_changed'];
 
   const reasons: NegativeLabAcceptedApplyPlanStaleReason[] = [];
   if (accepted.dryRunPlanJson !== current.dryRunPlanJson) reasons.push('dry_run_plan_changed');

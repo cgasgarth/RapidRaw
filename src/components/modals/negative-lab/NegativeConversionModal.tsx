@@ -19,7 +19,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
-import { type PointerEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type PointerEvent, type SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import {
@@ -72,6 +72,7 @@ import {
   negativeConversionSavedPositiveHandoffsSchema,
 } from '../../../schemas/negative-lab/negativeLabPresetCatalogSchemas';
 import type { NegativeLabSelectedProfileSnapshot } from '../../../schemas/negative-lab/negativeLabProfileComparisonSchemas';
+import type { NegativeLabSessionSaveOptions } from '../../../schemas/negative-lab/negativeLabSessionStateSchemas';
 import {
   type NegativeLabShadowPatchBlackPointSuggestion,
   negativeLabShadowPatchBlackPointSuggestionSchema,
@@ -79,6 +80,7 @@ import {
 import type { NegativeLabWorkspaceProof } from '../../../schemas/negative-lab/negativeLabWorkspaceSchemas';
 import { parsePathProgressPayload } from '../../../schemas/tauriEventSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
+import { useUIStore } from '../../../store/useUIStore';
 import { Invokes } from '../../../tauri/commands';
 import { TextColors, TextVariants } from '../../../types/typography';
 import {
@@ -192,6 +194,24 @@ import {
 import { buildNegativeLabRollNormalizationPlan } from '../../../utils/negative-lab/negativeLabRollNormalizationPlan';
 import { renderNegativeLabRuntimeDryRunPreview } from '../../../utils/negative-lab/negativeLabRuntimeDryRunAdapter';
 import {
+  acceptNegativeLabSessionPlan,
+  buildNegativeLabSessionFrameViewState,
+  createNegativeLabSessionState,
+  type NegativeLabSessionSnapshot,
+  reconcileNegativeLabSessionTargetPaths,
+  setNegativeLabSessionActiveFrame,
+  setNegativeLabSessionBatchApplyReceipt,
+  setNegativeLabSessionFrameCropStatus,
+  setNegativeLabSessionFrameExposureOffset,
+  setNegativeLabSessionFrameRgbBalanceOffset,
+  setNegativeLabSessionIncludedPathSet,
+  setNegativeLabSessionQcDecision,
+  setNegativeLabSessionRollNormalizationApplyReceipt,
+  setNegativeLabSessionRollNormalizationRestoreReceipt,
+  setNegativeLabSessionRollNormalizationRestoreRevision,
+  updateNegativeLabSessionRecipe,
+} from '../../../utils/negative-lab/negativeLabSessionState';
+import {
   buildNegativeLabStockMetadataCounts,
   NEGATIVE_LAB_STOCK_METADATA_CATALOG,
 } from '../../../utils/negative-lab/negativeLabStockMetadataCatalog';
@@ -302,7 +322,6 @@ const CUSTOM_BASE_SAMPLE_DEFAULT = {
   x: 0.25,
   y: 0.25,
 } satisfies NegativeLabBaseFogSampleRect;
-const getInitialIncludedPaths = (paths: string[]) => new Set(paths);
 const readNegativeLabQcOverlayVisibility = (): NegativeLabQcOverlayVisibility => {
   if (typeof window === 'undefined') return DEFAULT_NEGATIVE_LAB_QC_OVERLAY_VISIBILITY;
 
@@ -535,8 +554,87 @@ type NegativeLabPatchProbeByRole = Partial<Record<NegativeLabPatchRole, Negative
 export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }: NegativeConversionModalProps) {
   const { t } = useTranslation();
   const selectedEditorImage = useEditorStore((state) => state.selectedImage);
-  const [params, setParams] = useState<NegativeParams>(DEFAULT_PARAMS);
-  const [selectedPresetId, setSelectedPresetId] = useState<string>(DEFAULT_NEGATIVE_LAB_UI_PRESET.presetId);
+  const persistedSession = useUIStore((state) => state.negativeModalState.session);
+  const setUI = useUIStore((state) => state.setUI);
+  const buildDefaultSession = useCallback(
+    (paths: readonly string[]): NegativeLabSessionSnapshot =>
+      createNegativeLabSessionState(paths, {
+        recipeState: {
+          conversionScope: 'all',
+          openSavedPositiveInEditor: true,
+          params: DEFAULT_PARAMS,
+          patchSamplerCorrectionPayload: EMPTY_NEGATIVE_LAB_PATCH_SAMPLER_CORRECTION_PAYLOAD,
+          saveOptions: DEFAULT_SAVE_OPTIONS,
+          selectedAcquisitionProfileId: DEFAULT_NEGATIVE_LAB_ACQUISITION_PROFILE_ID,
+          selectedPresetId: DEFAULT_NEGATIVE_LAB_UI_PRESET.presetId,
+        },
+        sessionId: `negative_lab_modal_session_${buildNegativeLabPlanHash(paths.join('|'))}`,
+      }),
+    [],
+  );
+  const sessionSnapshot = useMemo(
+    () => reconcileNegativeLabSessionTargetPaths(persistedSession ?? buildDefaultSession(targetPaths), targetPaths),
+    [buildDefaultSession, persistedSession, targetPaths],
+  );
+  const updateSessionSnapshot = useCallback(
+    (updater: (currentSnapshot: NegativeLabSessionSnapshot) => NegativeLabSessionSnapshot) => {
+      setUI((state) => {
+        const currentSnapshot = reconcileNegativeLabSessionTargetPaths(
+          state.negativeModalState.session ?? buildDefaultSession(targetPaths),
+          targetPaths,
+        );
+        const nextSnapshot = updater(currentSnapshot);
+        if (nextSnapshot === currentSnapshot && currentSnapshot === state.negativeModalState.session) {
+          return state;
+        }
+        return {
+          negativeModalState: {
+            ...state.negativeModalState,
+            session: nextSnapshot,
+          },
+        };
+      });
+    },
+    [buildDefaultSession, setUI, targetPaths],
+  );
+  useEffect(() => {
+    if (persistedSession === sessionSnapshot) return;
+    setUI((state) => ({
+      negativeModalState: {
+        ...state.negativeModalState,
+        session: sessionSnapshot,
+      },
+    }));
+  }, [persistedSession, sessionSnapshot, setUI]);
+
+  const sessionFrameViewState = useMemo(
+    () => buildNegativeLabSessionFrameViewState(sessionSnapshot),
+    [sessionSnapshot],
+  );
+  const params = sessionSnapshot.session.recipeState.params;
+  const setParams = useCallback(
+    (nextState: SetStateAction<NegativeParams>) => {
+      updateSessionSnapshot((currentSnapshot) =>
+        updateNegativeLabSessionRecipe(currentSnapshot, (recipeState) => ({
+          ...recipeState,
+          params: typeof nextState === 'function' ? nextState(recipeState.params) : nextState,
+        })),
+      );
+    },
+    [updateSessionSnapshot],
+  );
+  const selectedPresetId = sessionSnapshot.session.recipeState.selectedPresetId;
+  const setSelectedPresetId = useCallback(
+    (nextState: SetStateAction<string>) => {
+      updateSessionSnapshot((currentSnapshot) =>
+        updateNegativeLabSessionRecipe(currentSnapshot, (recipeState) => ({
+          ...recipeState,
+          selectedPresetId: typeof nextState === 'function' ? nextState(recipeState.selectedPresetId) : nextState,
+        })),
+      );
+    },
+    [updateSessionSnapshot],
+  );
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [runtimePreviewDryRunResult, setRuntimePreviewDryRunResult] =
     useState<NegativeLabAppServerRuntimeDryRunToolResultV1 | null>(null);
@@ -569,25 +667,153 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const [customBaseSampleEstimate, setCustomBaseSampleEstimate] = useState<NegativeBaseFogEstimate | null>(null);
   const [isMeasuringCustomBaseSample, setIsMeasuringCustomBaseSample] = useState(false);
   const [copiedBatchPlanJson, setCopiedBatchPlanJson] = useState<string | null>(null);
-  const [acceptedBatchPlanJson, setAcceptedBatchPlanJson] = useState<string | null>(null);
-  const [batchApplyReceipt, setBatchApplyReceipt] = useState<NegativeLabBatchApplyReceipt | null>(null);
-  const [rollNormalizationApplyReceipt, setRollNormalizationApplyReceipt] =
-    useState<NegativeLabRollNormalizationApplyReceipt | null>(null);
-  const [rollNormalizationRestoreReceipt, setRollNormalizationRestoreReceipt] =
-    useState<NegativeLabRollNormalizationRestoreReceipt | null>(null);
-  const [rollNormalizationRestoreRevision, setRollNormalizationRestoreRevision] = useState(0);
+  const acceptedBatchPlanJson = sessionSnapshot.planState.acceptedApplyPlanFingerprint;
+  const setAcceptedBatchPlanJson = useCallback(
+    (nextState: SetStateAction<string | null>) => {
+      updateSessionSnapshot((currentSnapshot) =>
+        acceptNegativeLabSessionPlan(
+          currentSnapshot,
+          typeof nextState === 'function'
+            ? nextState(currentSnapshot.planState.acceptedApplyPlanFingerprint)
+            : nextState,
+        ),
+      );
+    },
+    [updateSessionSnapshot],
+  );
+  const batchApplyReceipt = sessionSnapshot.proofState.batchApplyReceipt;
+  const setBatchApplyReceipt = useCallback(
+    (nextState: SetStateAction<NegativeLabBatchApplyReceipt | null>) => {
+      updateSessionSnapshot((currentSnapshot) =>
+        setNegativeLabSessionBatchApplyReceipt(
+          currentSnapshot,
+          typeof nextState === 'function' ? nextState(currentSnapshot.proofState.batchApplyReceipt) : nextState,
+        ),
+      );
+    },
+    [updateSessionSnapshot],
+  );
+  const rollNormalizationApplyReceipt = sessionSnapshot.proofState.rollNormalizationApplyReceipt;
+  const setRollNormalizationApplyReceipt = useCallback(
+    (nextState: SetStateAction<NegativeLabRollNormalizationApplyReceipt | null>) => {
+      updateSessionSnapshot((currentSnapshot) =>
+        setNegativeLabSessionRollNormalizationApplyReceipt(
+          currentSnapshot,
+          typeof nextState === 'function'
+            ? nextState(currentSnapshot.proofState.rollNormalizationApplyReceipt)
+            : nextState,
+        ),
+      );
+    },
+    [updateSessionSnapshot],
+  );
+  const rollNormalizationRestoreReceipt = sessionSnapshot.proofState.rollNormalizationRestoreReceipt;
+  const setRollNormalizationRestoreReceipt = useCallback(
+    (nextState: SetStateAction<NegativeLabRollNormalizationRestoreReceipt | null>) => {
+      updateSessionSnapshot((currentSnapshot) =>
+        setNegativeLabSessionRollNormalizationRestoreReceipt(
+          currentSnapshot,
+          typeof nextState === 'function'
+            ? nextState(currentSnapshot.proofState.rollNormalizationRestoreReceipt)
+            : nextState,
+        ),
+      );
+    },
+    [updateSessionSnapshot],
+  );
+  const rollNormalizationRestoreRevision = sessionSnapshot.planState.rollNormalizationRestoreRevision;
+  const setRollNormalizationRestoreRevision = useCallback(
+    (nextRevision: SetStateAction<number>) => {
+      updateSessionSnapshot((currentSnapshot) =>
+        setNegativeLabSessionRollNormalizationRestoreRevision(
+          currentSnapshot,
+          typeof nextRevision === 'function'
+            ? nextRevision(currentSnapshot.planState.rollNormalizationRestoreRevision)
+            : nextRevision,
+        ),
+      );
+    },
+    [updateSessionSnapshot],
+  );
   const [activeBaseFogSampleLabel, setActiveBaseFogSampleLabel] = useState<string | null>(null);
   const [baseFogScope, setBaseFogScope] = useState<'frame' | 'roll'>('frame');
   const [baseFogSampleUndoStack, setBaseFogSampleUndoStack] = useState<BaseFogSampleUndoEntry[]>([]);
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
-  const [saveOptions, setSaveOptions] = useState(DEFAULT_SAVE_OPTIONS);
-  const [openSavedPositiveInEditor, setOpenSavedPositiveInEditor] = useState(true);
-  const [conversionScope, setConversionScope] = useState<NegativeConversionScope>('all');
-  const [selectedAcquisitionProfileId, setSelectedAcquisitionProfileId] = useState<NegativeLabAcquisitionProfileId>(
-    DEFAULT_NEGATIVE_LAB_ACQUISITION_PROFILE_ID,
+  const saveOptions = sessionSnapshot.session.recipeState.saveOptions;
+  const setSaveOptions = useCallback(
+    (nextState: SetStateAction<NegativeLabSessionSaveOptions>) => {
+      updateSessionSnapshot((currentSnapshot) =>
+        updateNegativeLabSessionRecipe(currentSnapshot, (recipeState) => ({
+          ...recipeState,
+          saveOptions: typeof nextState === 'function' ? nextState(recipeState.saveOptions) : nextState,
+        })),
+      );
+    },
+    [updateSessionSnapshot],
   );
-  const [includedPathSet, setIncludedPathSet] = useState<Set<string>>(() => getInitialIncludedPaths(targetPaths));
-  const [activePathIndex, setActivePathIndex] = useState(0);
+  const openSavedPositiveInEditor = sessionSnapshot.session.recipeState.openSavedPositiveInEditor;
+  const setOpenSavedPositiveInEditor = useCallback(
+    (nextState: SetStateAction<boolean>) => {
+      updateSessionSnapshot((currentSnapshot) =>
+        updateNegativeLabSessionRecipe(currentSnapshot, (recipeState) => ({
+          ...recipeState,
+          openSavedPositiveInEditor:
+            typeof nextState === 'function' ? nextState(recipeState.openSavedPositiveInEditor) : nextState,
+        })),
+      );
+    },
+    [updateSessionSnapshot],
+  );
+  const conversionScope = sessionSnapshot.session.recipeState.conversionScope;
+  const setConversionScope = useCallback(
+    (nextState: SetStateAction<NegativeConversionScope>) => {
+      updateSessionSnapshot((currentSnapshot) =>
+        updateNegativeLabSessionRecipe(currentSnapshot, (recipeState) => ({
+          ...recipeState,
+          conversionScope: typeof nextState === 'function' ? nextState(recipeState.conversionScope) : nextState,
+        })),
+      );
+    },
+    [updateSessionSnapshot],
+  );
+  const selectedAcquisitionProfileId = sessionSnapshot.session.recipeState.selectedAcquisitionProfileId;
+  const setSelectedAcquisitionProfileId = useCallback(
+    (nextState: SetStateAction<NegativeLabAcquisitionProfileId>) => {
+      updateSessionSnapshot((currentSnapshot) =>
+        updateNegativeLabSessionRecipe(currentSnapshot, (recipeState) => ({
+          ...recipeState,
+          selectedAcquisitionProfileId:
+            typeof nextState === 'function' ? nextState(recipeState.selectedAcquisitionProfileId) : nextState,
+        })),
+      );
+    },
+    [updateSessionSnapshot],
+  );
+  const includedPathSet = sessionFrameViewState.includedPathSet;
+  const setIncludedPathSet = useCallback(
+    (nextState: SetStateAction<Set<string>>) => {
+      updateSessionSnapshot((currentSnapshot) =>
+        setNegativeLabSessionIncludedPathSet(
+          currentSnapshot,
+          typeof nextState === 'function'
+            ? nextState(buildNegativeLabSessionFrameViewState(currentSnapshot).includedPathSet)
+            : nextState,
+        ),
+      );
+    },
+    [updateSessionSnapshot],
+  );
+  const activePathIndex = sessionFrameViewState.activePathIndex;
+  const setActivePathIndex = useCallback(
+    (nextState: SetStateAction<number>) => {
+      updateSessionSnapshot((currentSnapshot) => {
+        const currentActivePathIndex = buildNegativeLabSessionFrameViewState(currentSnapshot).activePathIndex;
+        const nextIndex = typeof nextState === 'function' ? nextState(currentActivePathIndex) : nextState;
+        return setNegativeLabSessionActiveFrame(currentSnapshot, `negative-lab-frame-${nextIndex + 1}`);
+      });
+    },
+    [updateSessionSnapshot],
+  );
   const [profileSearchQuery, setProfileSearchQuery] = useState('');
   const [profileFilter, setProfileFilter] = useState<NegativeLabProfileFilter>('all');
   const [profileSort, setProfileSort] = useState<NegativeLabProfileSort>('catalog');
@@ -600,7 +826,26 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const [qcOverlayVisibility, setQcOverlayVisibility] = useState<NegativeLabQcOverlayVisibility>(
     readNegativeLabQcOverlayVisibility,
   );
-  const [qcDecisionByFrameId, setQcDecisionByFrameId] = useState<Record<string, NegativeLabQcDecision>>({});
+  const qcDecisionByFrameId = sessionFrameViewState.qcDecisionByFrameId;
+  const setQcDecisionByFrameId = useCallback(
+    (nextState: SetStateAction<Record<string, NegativeLabQcDecision>>) => {
+      updateSessionSnapshot((currentSnapshot) => {
+        const currentMap = buildNegativeLabSessionFrameViewState(currentSnapshot).qcDecisionByFrameId;
+        const resolvedMap = typeof nextState === 'function' ? nextState(currentMap) : nextState;
+        let nextSnapshot = currentSnapshot;
+        for (const [frameId, decision] of Object.entries(resolvedMap)) {
+          nextSnapshot = setNegativeLabSessionQcDecision(nextSnapshot, frameId, decision);
+        }
+        for (const frameId of Object.keys(currentMap)) {
+          if (!Object.hasOwn(resolvedMap, frameId)) {
+            nextSnapshot = setNegativeLabSessionQcDecision(nextSnapshot, frameId, 'pending');
+          }
+        }
+        return nextSnapshot;
+      });
+    },
+    [updateSessionSnapshot],
+  );
   const [dustCandidateDecisionById, setDustCandidateDecisionById] = useState<
     Record<string, NegativeLabDustCandidateDecision>
   >({});
@@ -608,13 +853,71 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const [dustHealLayerByCandidateId, setDustHealLayerByCandidateId] = useState<
     Record<string, ReturnType<typeof buildDustCandidateHealLayer>>
   >({});
-  const [cropStatusByFrameId, setCropStatusByFrameId] = useState<Record<string, NegativeLabFrameCropStatus>>({});
-  const [frameExposureOffsetByFrameId, setFrameExposureOffsetByFrameId] = useState<Record<string, number>>({});
-  const [frameRgbBalanceOffsetByFrameId, setFrameRgbBalanceOffsetByFrameId] = useState<
-    Record<string, NegativeLabFrameRgbBalanceOffset>
-  >({});
-  const [patchSamplerCorrectionPayload, setPatchSamplerCorrectionPayload] =
-    useState<NegativeLabPatchSamplerCorrectionPayload>(EMPTY_NEGATIVE_LAB_PATCH_SAMPLER_CORRECTION_PAYLOAD);
+  const cropStatusByFrameId = sessionFrameViewState.cropStatusByFrameId;
+  const setCropStatusByFrameId = useCallback(
+    (nextState: SetStateAction<Record<string, NegativeLabFrameCropStatus>>) => {
+      updateSessionSnapshot((currentSnapshot) => {
+        const currentMap = buildNegativeLabSessionFrameViewState(currentSnapshot).cropStatusByFrameId;
+        const resolvedMap = typeof nextState === 'function' ? nextState(currentMap) : nextState;
+        let nextSnapshot = currentSnapshot;
+        const frameIds = new Set([...Object.keys(currentMap), ...Object.keys(resolvedMap)]);
+        for (const frameId of frameIds) {
+          nextSnapshot = setNegativeLabSessionFrameCropStatus(nextSnapshot, frameId, resolvedMap[frameId] ?? null);
+        }
+        return nextSnapshot;
+      });
+    },
+    [updateSessionSnapshot],
+  );
+  const frameExposureOffsetByFrameId = sessionFrameViewState.frameExposureOffsetByFrameId;
+  const setFrameExposureOffsetByFrameId = useCallback(
+    (nextState: SetStateAction<Record<string, number>>) => {
+      updateSessionSnapshot((currentSnapshot) => {
+        const currentMap = buildNegativeLabSessionFrameViewState(currentSnapshot).frameExposureOffsetByFrameId;
+        const resolvedMap = typeof nextState === 'function' ? nextState(currentMap) : nextState;
+        let nextSnapshot = currentSnapshot;
+        const frameIds = new Set([...Object.keys(currentMap), ...Object.keys(resolvedMap)]);
+        for (const frameId of frameIds) {
+          nextSnapshot = setNegativeLabSessionFrameExposureOffset(nextSnapshot, frameId, resolvedMap[frameId] ?? null);
+        }
+        return nextSnapshot;
+      });
+    },
+    [updateSessionSnapshot],
+  );
+  const frameRgbBalanceOffsetByFrameId = sessionFrameViewState.frameRgbBalanceOffsetByFrameId;
+  const setFrameRgbBalanceOffsetByFrameId = useCallback(
+    (nextState: SetStateAction<Record<string, NegativeLabFrameRgbBalanceOffset>>) => {
+      updateSessionSnapshot((currentSnapshot) => {
+        const currentMap = buildNegativeLabSessionFrameViewState(currentSnapshot).frameRgbBalanceOffsetByFrameId;
+        const resolvedMap = typeof nextState === 'function' ? nextState(currentMap) : nextState;
+        let nextSnapshot = currentSnapshot;
+        const frameIds = new Set([...Object.keys(currentMap), ...Object.keys(resolvedMap)]);
+        for (const frameId of frameIds) {
+          nextSnapshot = setNegativeLabSessionFrameRgbBalanceOffset(
+            nextSnapshot,
+            frameId,
+            resolvedMap[frameId] ?? null,
+          );
+        }
+        return nextSnapshot;
+      });
+    },
+    [updateSessionSnapshot],
+  );
+  const patchSamplerCorrectionPayload = sessionSnapshot.session.recipeState.patchSamplerCorrectionPayload;
+  const setPatchSamplerCorrectionPayload = useCallback(
+    (nextState: SetStateAction<NegativeLabPatchSamplerCorrectionPayload>) => {
+      updateSessionSnapshot((currentSnapshot) =>
+        updateNegativeLabSessionRecipe(currentSnapshot, (recipeState) => ({
+          ...recipeState,
+          patchSamplerCorrectionPayload:
+            typeof nextState === 'function' ? nextState(recipeState.patchSamplerCorrectionPayload) : nextState,
+        })),
+      );
+    },
+    [updateSessionSnapshot],
+  );
 
   const { isMounted, show } = useModalTransition(isOpen);
   const [isCompareActive, setIsCompareActive] = useState(false);
@@ -1103,6 +1406,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         params,
         pathsToConvert,
         selectedProfileSnapshot,
+        sessionRevision: sessionSnapshot.session.sessionRevision,
         suffix: saveOptions.suffix,
         writeConversionBundle: saveOptions.writeConversionBundle,
       }),
@@ -1114,6 +1418,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       saveOptions.suffix,
       saveOptions.writeConversionBundle,
       selectedProfileSnapshot,
+      sessionSnapshot.session.sessionRevision,
     ],
   );
   const acceptedBatchPlanIdentity = useMemo(() => {
@@ -1262,7 +1567,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       overlayVisibility: qcOverlayVisibility,
       qcDecisionByFrameId,
       report: qcProofReport,
-      sessionId: `negative_lab_session_${targetPaths.length}_${pathsToConvert.length}`,
+      sessionId: sessionSnapshot.session.sessionId,
       sourcePathsByFrameId,
     });
   }, [
@@ -1271,6 +1576,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     qcDecisionByFrameId,
     qcOverlayVisibility,
     qcProofReport,
+    sessionSnapshot.session.sessionId,
     targetPaths.length,
   ]);
   const activePositiveVariant = useMemo(
@@ -1486,7 +1792,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       ).slice('fnv1a32:'.length);
       const sampleIds = baseFogEstimate === null ? [] : [`base_sample_${sampleHash}`];
       const usingPrintCurveV2 = currentParams.print_curve_algorithm === 'negative_density_print_v2';
-      const sessionId = `negative_lab_modal_session_${buildNegativeLabPlanHash(targetPaths.join('|'))}`;
+      const sessionId = sessionSnapshot.session.sessionId;
       const manualBalanceActive =
         currentParams.red_weight !== 1 || currentParams.green_weight !== 1 || currentParams.blue_weight !== 1;
 
@@ -1610,6 +1916,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       selectedImagePath,
       selectedPresetId,
       selectedProfile,
+      sessionSnapshot.session.sessionId,
       targetPaths,
     ],
   );
@@ -1714,9 +2021,6 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       setPreviewUrl(null);
       setRuntimePreviewDryRunResult(null);
       setOriginalUrl(null);
-      setParams(DEFAULT_PARAMS);
-      setSelectedPresetId(DEFAULT_NEGATIVE_LAB_UI_PRESET.presetId);
-      setSelectedAcquisitionProfileId(DEFAULT_NEGATIVE_LAB_ACQUISITION_PROFILE_ID);
       resetViewport();
       setBaseFogConfidence(null);
       setBaseFogEstimate(null);
@@ -1735,18 +2039,9 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       setBaseFogSampleUndoStack([]);
       setCustomBaseSampleRect(CUSTOM_BASE_SAMPLE_DEFAULT);
       setCustomBaseSampleEstimate(null);
-      setActivePathIndex(0);
       setBrowsedComparisonProfileId(null);
       setIsLoading(true);
       setProgress(null);
-      setSaveOptions(DEFAULT_SAVE_OPTIONS);
-      setOpenSavedPositiveInEditor(true);
-      setConversionScope('all');
-      setIncludedPathSet(getInitialIncludedPaths(targetPaths));
-      setFrameExposureOffsetByFrameId({});
-      setFrameRgbBalanceOffsetByFrameId({});
-      setPatchSamplerCorrectionPayload(EMPTY_NEGATIVE_LAB_PATCH_SAMPLER_CORRECTION_PAYLOAD);
-      setQcDecisionByFrameId({});
     }, 300);
     return () => {
       window.clearTimeout(timer);
@@ -1937,7 +2232,6 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       setActiveBaseFogSampleLabel(null);
     }
     setParams(newParams);
-    setAcceptedBatchPlanJson(null);
     updatePreview(buildParamsWithFrameOverrides(newParams));
   };
 
@@ -1945,7 +2239,6 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     const newParams = { ...params, black_point: DEFAULT_PARAMS.black_point, white_point: DEFAULT_PARAMS.white_point };
     setSelectedPresetId('');
     setParams(newParams);
-    setAcceptedBatchPlanJson(null);
     updatePreview(buildParamsWithFrameOverrides(newParams));
   };
 
@@ -1965,7 +2258,6 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         };
     setSelectedPresetId('');
     setParams(newParams);
-    setAcceptedBatchPlanJson(null);
     updatePreview(buildParamsWithFrameOverrides(newParams));
   };
 
@@ -1982,7 +2274,6 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     };
     setSelectedPresetId('');
     setParams(newParams);
-    setAcceptedBatchPlanJson(null);
     updatePreview(buildParamsWithFrameOverrides(newParams));
   };
 
@@ -2001,7 +2292,6 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     setBaseFogSampleUndoStack([]);
     setParams(preset.params);
     setPatchSamplerCorrectionPayload(EMPTY_NEGATIVE_LAB_PATCH_SAMPLER_CORRECTION_PAYLOAD);
-    setAcceptedBatchPlanJson(null);
     updatePreview(buildParamsWithFrameOverrides(preset.params));
   };
 
@@ -2037,7 +2327,6 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     setSelectedPresetId(previous.selectedPresetId);
     setParams(previous.params);
     setPatchSamplerCorrectionPayload(previous.patchSamplerCorrectionPayload);
-    setAcceptedBatchPlanJson(null);
     updatePreview(buildParamsWithFrameOverrides(previous.params));
   };
 
@@ -2078,7 +2367,6 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       setRejectedBaseSampleLabel(null);
       setActiveBaseFogSampleLabel(t('modals.negativeConversion.sampleFullFrame'));
       setParams(nextParams);
-      setAcceptedBatchPlanJson(null);
       updatePreview(buildParamsWithFrameOverrides(nextParams), false, proofContext);
     } catch (e) {
       console.error('Negative base/fog estimate failed', e);
@@ -2124,7 +2412,6 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       setRejectedBaseSampleLabel(null);
       setActiveBaseFogSampleLabel(t(labelKey));
       setParams(nextParams);
-      setAcceptedBatchPlanJson(null);
       updatePreview(buildParamsWithFrameOverrides(nextParams), false, proofContext);
     } catch (e) {
       console.error('Base/fog sample failed', e);
@@ -2187,7 +2474,6 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     setRejectedBaseSampleLabel(null);
     setActiveBaseFogSampleLabel(t('modals.negativeConversion.customBaseSample'));
     setParams(nextParams);
-    setAcceptedBatchPlanJson(null);
     updatePreview(buildParamsWithFrameOverrides(nextParams), false, proofContext);
   };
 
@@ -2212,7 +2498,6 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         }),
       ),
     );
-    setAcceptedBatchPlanJson(null);
   };
 
   const handleAcceptBaseSample = () => {
@@ -2473,7 +2758,6 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     setRollNormalizationApplyReceipt(receipt);
     setRollNormalizationRestoreReceipt(null);
     setRollNormalizationRestoreRevision(receipt.restoreRevision);
-    setAcceptedBatchPlanJson(null);
     updatePreview(
       buildParamsWithFrameOverrides(
         params,
@@ -2495,7 +2779,6 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       restored: true,
     });
     setRollNormalizationRestoreReceipt(receipt);
-    setAcceptedBatchPlanJson(null);
     updatePreview(
       buildParamsWithFrameOverrides(
         params,
@@ -2516,7 +2799,6 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       nextDecisions[frameId] = decision;
       return nextDecisions;
     });
-    setAcceptedBatchPlanJson(null);
   };
 
   const handleSetVisibleQcDecision = (decision: NegativeLabQcDecision) => {
@@ -2536,7 +2818,6 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       }
       return nextDecisions;
     });
-    setAcceptedBatchPlanJson(null);
   };
 
   const handleToggleQcOverlay = (overlayKey: keyof NegativeLabQcOverlayVisibility) => {
@@ -2544,7 +2825,6 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       ...currentVisibility,
       [overlayKey]: !currentVisibility[overlayKey],
     }));
-    setAcceptedBatchPlanJson(null);
   };
 
   const handleSetActiveFrameCropStatus = (cropStatus: NegativeLabFrameCropStatus) => {
@@ -2557,7 +2837,6 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       }
       return { ...currentStatuses, [activeFrameId]: cropStatus };
     });
-    setAcceptedBatchPlanJson(null);
   };
 
   const handleFrameExposureOffsetChange = (frameId: string, value: number) => {
@@ -2567,7 +2846,6 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         ? Object.fromEntries(Object.entries(frameExposureOffsetByFrameId).filter(([key]) => key !== frameId))
         : { ...frameExposureOffsetByFrameId, [frameId]: snappedOffset };
     setFrameExposureOffsetByFrameId(nextOffsets);
-    setAcceptedBatchPlanJson(null);
     updatePreview(buildParamsWithFrameOverrides(params, frameId, nextOffsets));
   };
 
@@ -2585,7 +2863,6 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       ? Object.fromEntries(Object.entries(frameRgbBalanceOffsetByFrameId).filter(([key]) => key !== frameId))
       : { ...frameRgbBalanceOffsetByFrameId, [frameId]: nextOffset };
     setFrameRgbBalanceOffsetByFrameId(nextOffsetsByFrameId);
-    setAcceptedBatchPlanJson(null);
     updatePreview(buildParamsWithFrameOverrides(params, frameId, frameExposureOffsetByFrameId, nextOffsetsByFrameId));
   };
 
@@ -2594,7 +2871,6 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       Object.entries(frameRgbBalanceOffsetByFrameId).filter(([key]) => key !== frameId),
     );
     setFrameRgbBalanceOffsetByFrameId(nextOffsetsByFrameId);
-    setAcceptedBatchPlanJson(null);
     updatePreview(buildParamsWithFrameOverrides(params, frameId, frameExposureOffsetByFrameId, nextOffsetsByFrameId));
   };
 
@@ -2625,7 +2901,6 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         }),
       ),
     );
-    setAcceptedBatchPlanJson(null);
     updatePreview(
       buildParamsWithFrameOverrides(params, activeFrameId, frameExposureOffsetByFrameId, nextOffsetsByFrameId),
     );
@@ -2680,16 +2955,12 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         }),
       ),
     );
-    setAcceptedBatchPlanJson(null);
     updatePreview(buildParamsWithFrameOverrides(nextParams));
   };
 
   const handleSave = async () => {
     if (!canSave) return;
-    if (!isBatchPlanAccepted) {
-      setAcceptedBatchPlanJson(null);
-      return;
-    }
+    if (!isBatchPlanAccepted) return;
     setIsSaving(true);
     setProgress(null);
     try {
@@ -4176,7 +4447,6 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                   setSelectedAcquisitionProfileId(
                     negativeLabAcquisitionProfileIdSchema.parse(event.currentTarget.value),
                   );
-                  setAcceptedBatchPlanJson(null);
                 }}
                 value={selectedAcquisitionProfileId}
               >

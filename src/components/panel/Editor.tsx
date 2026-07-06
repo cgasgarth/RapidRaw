@@ -248,7 +248,13 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
 
   const handleOpenNegativeLab = useCallback(() => {
     if (!negativeLabSourceReadiness.isReady) return;
-    setUI({ negativeModalState: { isOpen: true, targetPaths: negativeLabSourceReadiness.targetPaths } });
+    setUI((state) => ({
+      negativeModalState: {
+        ...state.negativeModalState,
+        isOpen: true,
+        targetPaths: negativeLabSourceReadiness.targetPaths,
+      },
+    }));
   }, [negativeLabSourceReadiness, setUI]);
 
   const handleDisplaySizeChange = useCallback(
