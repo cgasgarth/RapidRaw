@@ -45,6 +45,17 @@ const invokeMock = mock((command: string) => {
       warningCodes: [],
     },
     contentHash: 'sha256:4b05ce465b138a4232a9cf196884b41c6dd3b9a1a3f2f2916e4e3e78328701dd',
+    densityNormalizationMetrics: {
+      channelBounds: {
+        b: { max: 1.06, min: -0.03 },
+        g: { max: 1.01, min: -0.02 },
+        r: { max: 0.97, min: -0.01 },
+      },
+      clippedPixelCount: 3,
+      densityRangeUnclamped: 1.09,
+      epsilonClampedPixelCount: 1,
+      rendererVersion: 1,
+    },
     dimensions: {
       height: 480,
       width: 720,
@@ -139,6 +150,7 @@ describe('renderNegativeLabRuntimeDryRunPreview', () => {
         black_point: 0,
         blue_weight: 1,
         contrast: 1,
+        conversion_model: 'density_rgb_v1',
         exposure: 0,
         green_weight: 1,
         red_weight: 1,
@@ -153,6 +165,7 @@ describe('renderNegativeLabRuntimeDryRunPreview', () => {
         black_point: 0,
         blue_weight: 1,
         contrast: 1,
+        conversion_model: 'density_rgb_v1',
         exposure: 0,
         green_weight: 1,
         red_weight: 1,
@@ -180,7 +193,121 @@ describe('renderNegativeLabRuntimeDryRunPreview', () => {
       sampleCount: 400,
       source: 'deterministic_edge_safe_default_rect',
     });
+    expect(result.runtimeDryRun.dryRun.proof?.runtimePreview.densityNormalizationMetrics).toEqual({
+      channelBounds: {
+        blue: { max: 1.06, min: -0.03 },
+        green: { max: 1.01, min: -0.02 },
+        red: { max: 0.97, min: -0.01 },
+      },
+      clippedPixelCount: 3,
+      densityRangeUnclamped: 1.09,
+      epsilonClampedPixelCount: 1,
+      rendererVersion: 1,
+    });
     expect(result.runtimeDryRun.dryRun.changeSet.createdPositiveVariantIds).toEqual([]);
     expect(NEGATIVE_LAB_AGENT_TOOL_MANIFEST.tools[0]?.toolName).toBe(NEGATIVE_LAB_AGENT_PREVIEW_TOOL_NAME);
+  });
+
+  test('passes through the new negative log density conversion model', async () => {
+    const command = negativeLabCommandEnvelopeV1Schema.parse({
+      actor: {
+        id: 'negative-lab-ui',
+        kind: ActorKind.Ui,
+        sessionId: 'session_negative_lab_adapter_neg_log',
+      },
+      approval: {
+        approvalClass: ApprovalClass.PreviewOnly,
+        reason: 'Negative log density adapter test',
+        state: 'not_required',
+      },
+      commandId: 'command_negative_lab_adapter_neg_log',
+      commandType: 'negativeLab.setConversionRecipe',
+      correlationId: 'corr_negative_lab_adapter_neg_log',
+      dryRun: true,
+      expectedGraphRevision: 'graph_rev_negative_lab_adapter_neg_log',
+      idempotencyKey: 'idem_negative_lab_adapter_neg_log',
+      parameters: {
+        baseStrategy: {
+          baseSampleIds: ['base_sample_adapter_neg_log'],
+          mode: 'manual_samples',
+        },
+        conversionModel: {
+          algorithmId: 'negative_log_density_v1',
+          algorithmVersion: 1,
+          densityMax: 4,
+          epsilonPolicyId: 'density_epsilon_v1',
+          negativeDensityTolerance: 0.02,
+        },
+        curveModel: {
+          curveFamily: 'parametric_monotonic_v1',
+        },
+        frameSelection: {
+          excludeFrameIds: [],
+          frameIds: ['frame_0001'],
+          mode: 'selected',
+          qcStatuses: [],
+          warningCodes: [],
+        },
+        inputCharacterization: {
+          channelBasis: 'scanner_rgb',
+          confidence: 'profiled_acquisition',
+          pixelBasis: 'linear_scan_rgb',
+        },
+        neutralization: {
+          mode: 'neutral_sample',
+          sampleIds: ['base_sample_adapter_neg_log'],
+        },
+        outputIntent: 'proof_preview',
+        outputTransformRef: {
+          chromaticAdaptation: 'bradford',
+          renderingIntent: 'scene_referred',
+          transformId: 'rawengine_scene_linear_v1',
+        },
+        previewRequest: {
+          artifactPurposes: ['objective_positive_preview'],
+          includePreview: true,
+          maxEdgePx: 1080,
+        },
+        processFamily: 'c41_color_negative',
+        sessionId: 'session_negative_lab_adapter_neg_log',
+      },
+      schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+      target: {
+        imagePath: '/synthetic/negative-lab-adapter-neg-log.dng',
+        kind: 'image',
+      },
+    });
+
+    await renderNegativeLabRuntimeDryRunPreview({
+      command,
+      path: '/synthetic/negative-lab-adapter-neg-log.dng',
+      recipeParams: {
+        base_fog_sample: null,
+        base_fog_strength: 1,
+        black_point: 0,
+        blue_weight: 1,
+        contrast: 1,
+        exposure: 0,
+        green_weight: 1,
+        red_weight: 1,
+        white_point: 1,
+      },
+    });
+
+    expect(invokeMock).toHaveBeenLastCalledWith(Invokes.RenderNegativeLabDryRunPreviewArtifact, {
+      params: {
+        base_fog_sample: null,
+        base_fog_strength: 1,
+        black_point: 0,
+        blue_weight: 1,
+        contrast: 1,
+        conversion_model: 'negative_log_density_v1',
+        exposure: 0,
+        green_weight: 1,
+        red_weight: 1,
+        white_point: 1,
+      },
+      path: '/synthetic/negative-lab-adapter-neg-log.dng',
+    });
   });
 });

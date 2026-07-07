@@ -14,6 +14,21 @@ const reportSchema = z
     algorithm: z.literal('density_rgb_v1'),
     artifactHash: z.string().regex(/^fnv1a64:[a-f0-9]{16}$/u),
     changedPixelCount: z.number().int().positive(),
+    densityNormalizationMetrics: z
+      .object({
+        channelBounds: z
+          .object({
+            blue: z.object({ max: z.number(), min: z.number() }).strict(),
+            green: z.object({ max: z.number(), min: z.number() }).strict(),
+            red: z.object({ max: z.number(), min: z.number() }).strict(),
+          })
+          .strict(),
+        clippedPixelCount: z.number().int().nonnegative(),
+        densityRangeUnclamped: z.number().nonnegative(),
+        epsilonClampedPixelCount: z.number().int().nonnegative(),
+        rendererVersion: z.literal(1),
+      })
+      .strict(),
     doesNotProve: z.array(z.string().trim().min(1)).min(8),
     inputContract: z.literal('declared_linear_scan_rgb'),
     inputToOutputMeanAbsDelta: z.number().min(0.05),
@@ -25,6 +40,20 @@ const reportSchema = z
   })
   .strict()
   .superRefine((report, context) => {
+    if (report.densityNormalizationMetrics.channelBounds.red.min < 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Legacy density_rgb_v1 proof should clamp normalized density minima at 0.',
+        path: ['densityNormalizationMetrics', 'channelBounds', 'red', 'min'],
+      });
+    }
+    if (report.densityNormalizationMetrics.densityRangeUnclamped <= 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Negative Lab density CPU proof must report a positive normalized density range.',
+        path: ['densityNormalizationMetrics', 'densityRangeUnclamped'],
+      });
+    }
     for (const requiredNonClaim of [
       'camera_raw_decode_path',
       'automatic_base_fog_estimation',

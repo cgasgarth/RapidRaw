@@ -41,6 +41,21 @@ export const negativeLabDryRunPreviewArtifactSchema = z
       })
       .strict(),
     contentHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    densityNormalizationMetrics: z
+      .object({
+        channelBounds: z
+          .object({
+            b: z.object({ max: z.number(), min: z.number() }).strict(),
+            g: z.object({ max: z.number(), min: z.number() }).strict(),
+            r: z.object({ max: z.number(), min: z.number() }).strict(),
+          })
+          .strict(),
+        clippedPixelCount: z.number().int().nonnegative(),
+        densityRangeUnclamped: z.number().nonnegative(),
+        epsilonClampedPixelCount: z.number().int().nonnegative(),
+        rendererVersion: z.number().int().positive(),
+      })
+      .strict(),
     dimensions: z
       .object({
         height: z.number().int().positive(),
@@ -67,13 +82,24 @@ const toRuntimePreviewRenderResult = (
   artifactId: artifact.artifactId,
   baseFogSampleSummary: artifact.baseFogSampleSummary,
   contentHash: artifact.contentHash,
+  densityNormalizationMetrics: {
+    channelBounds: {
+      blue: artifact.densityNormalizationMetrics.channelBounds.b,
+      green: artifact.densityNormalizationMetrics.channelBounds.g,
+      red: artifact.densityNormalizationMetrics.channelBounds.r,
+    },
+    clippedPixelCount: artifact.densityNormalizationMetrics.clippedPixelCount,
+    densityRangeUnclamped: artifact.densityNormalizationMetrics.densityRangeUnclamped,
+    epsilonClampedPixelCount: artifact.densityNormalizationMetrics.epsilonClampedPixelCount,
+    rendererVersion: artifact.densityNormalizationMetrics.rendererVersion,
+  },
   dimensions: artifact.dimensions,
   renderer: artifact.renderer,
   storage: artifact.storage,
 });
 
 export async function renderNegativeLabRuntimeDryRunPreview(params: {
-  command: NegativeLabCommandEnvelopeV1;
+  command: Extract<NegativeLabCommandEnvelopeV1, { commandType: 'negativeLab.setConversionRecipe' }>;
   path: string;
   recipeParams: {
     base_fog_sample: { height: number; width: number; x: number; y: number } | null;
@@ -81,16 +107,24 @@ export async function renderNegativeLabRuntimeDryRunPreview(params: {
     black_point: number;
     blue_weight: number;
     contrast: number;
+    conversion_model?: 'density_rgb_v1' | 'negative_log_density_v1';
     exposure: number;
     green_weight: number;
     red_weight: number;
     white_point: number;
   };
 }): Promise<NegativeLabRuntimeDryRunAdapterResult> {
+  const conversionModel =
+    params.command.parameters.conversionModel.algorithmId === 'negative_log_density_v1'
+      ? 'negative_log_density_v1'
+      : 'density_rgb_v1';
   const nativeArtifact = await invokeWithSchema(
     Invokes.RenderNegativeLabDryRunPreviewArtifact,
     {
-      params: params.recipeParams,
+      params: {
+        ...params.recipeParams,
+        conversion_model: conversionModel,
+      },
       path: params.path,
     },
     negativeLabDryRunPreviewArtifactSchema,
