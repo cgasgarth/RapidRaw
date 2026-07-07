@@ -1,5 +1,15 @@
 import cx from 'clsx';
-import { Camera, CircleGauge, FolderOpen, Layers3, RotateCcw, SlidersHorizontal, Sparkles } from 'lucide-react';
+import {
+  Camera,
+  ChevronDown,
+  CircleGauge,
+  FolderOpen,
+  GripVertical,
+  Layers3,
+  RotateCcw,
+  SlidersHorizontal,
+  Sparkles,
+} from 'lucide-react';
 import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Crop, PercentCrop } from 'react-image-crop';
@@ -1583,6 +1593,33 @@ function ProfessionalEditorCompactPortraitVisualSmoke() {
           className="flex min-h-[360px] shrink-0 flex-col overflow-hidden rounded-lg border border-editor-border bg-editor-panel"
           data-testid="professional-editor-compact-panel-shell"
         >
+          <div
+            className="flex min-h-10 shrink-0 items-center justify-between gap-2 border-b border-editor-border px-2 py-1.5"
+            data-testid="professional-editor-compact-panel-header"
+          >
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="truncate text-sm font-medium text-text-primary">{activePanel ?? 'Closed'}</span>
+              <span className={editorChromeStatusChipClassName(activePanel ? 'success' : 'warning')}>
+                {activePanel ? 'Open' : 'Closed'}
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span
+                aria-hidden="true"
+                className="flex h-7 w-7 items-center justify-center rounded-md border border-transparent text-text-tertiary"
+                data-testid="professional-editor-compact-panel-grip"
+              >
+                <GripVertical size={14} />
+              </span>
+              <span
+                aria-hidden="true"
+                className="flex h-7 w-7 items-center justify-center rounded-md border border-transparent text-text-secondary"
+                data-testid="professional-editor-compact-panel-toggle"
+              >
+                <ChevronDown size={14} />
+              </span>
+            </div>
+          </div>
           <div className="min-h-0 flex-1 overflow-hidden" data-visual-smoke-section="professional-editor-compact-panel">
             <ContextMenuProvider>
               <EditorRightPanelHost
