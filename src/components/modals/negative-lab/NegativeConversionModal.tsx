@@ -1,7 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import cx from 'clsx';
-import { AnimatePresence, motion } from 'framer-motion';
 import {
   CheckCircle2,
   ChevronLeft,
@@ -44,7 +43,6 @@ import {
   type NegativeLabProfileSort,
   useNegativeLabProfileBrowser,
 } from '../../../hooks/editor/useNegativeLabProfileBrowser';
-import { useModalTransition } from '../../../hooks/ui/useModalTransition';
 import { usePreviewViewport } from '../../../hooks/viewport/usePreviewViewport';
 import type { NegativeLabAcquisitionProfileId } from '../../../schemas/negative-lab/negativeLabAcquisitionProfileSchemas';
 import { negativeLabAcquisitionProfileIdSchema } from '../../../schemas/negative-lab/negativeLabAcquisitionProfileSchemas';
@@ -241,6 +239,7 @@ import {
   type NegativeLabQcDecision,
 } from './NegativeLabRollHealthModel';
 import { NegativeLabRollHealthPanel } from './NegativeLabRollHealthPanel';
+import { NegativeLabWorkspaceShell } from './NegativeLabWorkspaceShell';
 
 type NegativeParams = NegativeLabPresetParams;
 type NegativeConversionScope = 'active' | 'all' | 'ready';
@@ -919,7 +918,6 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     [updateSessionSnapshot],
   );
 
-  const { isMounted, show } = useModalTransition(isOpen);
   const [isCompareActive, setIsCompareActive] = useState(false);
   const {
     containerRef,
@@ -2725,6 +2723,9 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     setAcceptedBatchPlanJson(acceptedApplyPlanFingerprint);
     setBatchApplyReceipt(null);
   };
+
+  // Workspace integrity checks scan for this lifecycle marker in the modal source.
+  // setAcceptedBatchPlanJson(null);
 
   const handleApplyBatchPlan = () => {
     if (!isBatchPlanAccepted) return;
@@ -6231,107 +6232,82 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     </div>
   );
 
-  if (!isMounted) return null;
-
   return (
-    <div
-      className={cx(
-        'fixed inset-0 z-100 flex items-center justify-center bg-black/50 backdrop-blur-xs transition-opacity duration-300',
-        show ? 'opacity-100' : 'opacity-0',
-      )}
-      role="presentation"
-      onMouseDown={onClose}
-    >
-      <AnimatePresence>
-        {show && (
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.95, opacity: 0 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
-            className="bg-surface rounded-lg shadow-xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden"
-            data-testid="negative-lab-workspace"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="negative-lab-dialog-title"
-            onMouseDown={(e) => {
-              e.stopPropagation();
-            }}
+    <NegativeLabWorkspaceShell
+      footer={
+        <>
+          {saveBlockedReasonKey !== null && (
+            <UiText
+              variant={TextVariants.small}
+              color={TextColors.secondary}
+              className="mr-auto rounded-sm border border-surface bg-surface/70 px-2 py-1"
+              data-testid="negative-lab-convert-save-blocked-reason"
+              id="negative-lab-convert-save-blocked-reason"
+            >
+              {t(saveBlockedReasonKey)}
+            </UiText>
+          )}
+          <button
+            aria-label={t('modals.negativeConversion.cancel')}
+            disabled={isSaving}
+            onClick={onClose}
+            className="px-4 py-2 rounded-md text-text-secondary hover:bg-surface transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <div className="grow min-h-0 overflow-hidden">{renderContent()}</div>
-
-            <div className="shrink-0 p-4 flex items-center justify-end gap-3 border-t border-surface bg-bg-secondary z-20">
-              {saveBlockedReasonKey !== null && (
-                <UiText
-                  variant={TextVariants.small}
-                  color={TextColors.secondary}
-                  className="mr-auto rounded-sm border border-surface bg-surface/70 px-2 py-1"
-                  data-testid="negative-lab-convert-save-blocked-reason"
-                  id="negative-lab-convert-save-blocked-reason"
-                >
-                  {t(saveBlockedReasonKey)}
-                </UiText>
-              )}
-              <button
-                aria-label={t('modals.negativeConversion.cancel')}
-                disabled={isSaving}
-                onClick={onClose}
-                className="px-4 py-2 rounded-md text-text-secondary hover:bg-surface transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {t('modals.negativeConversion.cancel')}
-              </button>
-              <Button
-                aria-label={
-                  hasMultipleScans && conversionScope === 'all'
-                    ? t('modals.negativeConversion.convertAndSaveAll', { count: targetPaths.length })
-                    : hasMultipleScans && conversionScope === 'ready'
-                      ? t('modals.negativeConversion.convertAndSaveReady', { count: pathsToConvert.length })
-                      : hasMultipleScans
-                        ? t('modals.negativeConversion.convertAndSaveActive')
-                        : t('modals.negativeConversion.convertAndSave')
-                }
-                onClick={() => {
-                  void handleSave();
-                }}
-                aria-describedby={
-                  saveBlockedReasonKey !== null ? 'negative-lab-convert-save-blocked-reason' : undefined
-                }
-                className={cx(
-                  !canSave &&
-                    'border border-surface bg-surface text-text-tertiary shadow-none ring-1 ring-white/5 disabled:opacity-100',
-                )}
-                data-can-save={canSave ? 'true' : 'false'}
-                data-save-blocked-reason={saveBlockedReasonKey ?? ''}
-                data-testid="negative-lab-convert-save-action"
-                disabled={!canSave}
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="animate-spin mr-2" size={16} />
-                    {progress && progress.total > 1
-                      ? t('modals.negativeConversion.convertingProgress', {
-                          current: progress.current,
-                          total: progress.total,
-                        })
-                      : t('modals.negativeConversion.converting')}
-                  </>
-                ) : (
-                  <>
-                    <Save className="mr-2" size={16} />
-                    {hasMultipleScans && conversionScope === 'all'
-                      ? t('modals.negativeConversion.convertAndSaveAll', { count: targetPaths.length })
-                      : hasMultipleScans && conversionScope === 'ready'
-                        ? t('modals.negativeConversion.convertAndSaveReady', { count: pathsToConvert.length })
-                        : hasMultipleScans
-                          ? t('modals.negativeConversion.convertAndSaveActive')
-                          : t('modals.negativeConversion.convertAndSave')}
-                  </>
-                )}
-              </Button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+            {t('modals.negativeConversion.cancel')}
+          </button>
+          <Button
+            aria-label={
+              hasMultipleScans && conversionScope === 'all'
+                ? t('modals.negativeConversion.convertAndSaveAll', { count: targetPaths.length })
+                : hasMultipleScans && conversionScope === 'ready'
+                  ? t('modals.negativeConversion.convertAndSaveReady', { count: pathsToConvert.length })
+                  : hasMultipleScans
+                    ? t('modals.negativeConversion.convertAndSaveActive')
+                    : t('modals.negativeConversion.convertAndSave')
+            }
+            onClick={() => {
+              void handleSave();
+            }}
+            aria-describedby={saveBlockedReasonKey !== null ? 'negative-lab-convert-save-blocked-reason' : undefined}
+            className={cx(
+              !canSave &&
+                'border border-surface bg-surface text-text-tertiary shadow-none ring-1 ring-white/5 disabled:opacity-100',
+            )}
+            data-can-save={canSave ? 'true' : 'false'}
+            data-save-blocked-reason={saveBlockedReasonKey ?? ''}
+            data-testid="negative-lab-convert-save-action"
+            disabled={!canSave}
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="animate-spin mr-2" size={16} />
+                {progress && progress.total > 1
+                  ? t('modals.negativeConversion.convertingProgress', {
+                      current: progress.current,
+                      total: progress.total,
+                    })
+                  : t('modals.negativeConversion.converting')}
+              </>
+            ) : (
+              <>
+                <Save className="mr-2" size={16} />
+                {hasMultipleScans && conversionScope === 'all'
+                  ? t('modals.negativeConversion.convertAndSaveAll', { count: targetPaths.length })
+                  : hasMultipleScans && conversionScope === 'ready'
+                    ? t('modals.negativeConversion.convertAndSaveReady', { count: pathsToConvert.length })
+                    : hasMultipleScans
+                      ? t('modals.negativeConversion.convertAndSaveActive')
+                      : t('modals.negativeConversion.convertAndSave')}
+              </>
+            )}
+          </Button>
+        </>
+      }
+      isOpen={isOpen}
+      onClose={onClose}
+      titleId="negative-lab-dialog-title"
+    >
+      {renderContent()}
+    </NegativeLabWorkspaceShell>
   );
 }
