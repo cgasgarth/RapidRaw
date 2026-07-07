@@ -1984,7 +1984,7 @@ fn negative_lab_count_density_input_guards(raw_pixels: &[f32]) -> (u32, u32) {
                 .any(|&value| !value.is_finite() || value <= NEGATIVE_LAB_DENSITY_EPSILON);
             let clipped_hit = pixel
                 .iter()
-                .any(|&value| !value.is_finite() || value < 0.0 || value > 1.0);
+                .any(|&value| !value.is_finite() || !(0.0..=1.0).contains(&value));
 
             (
                 epsilon_count + u32::from(epsilon_hit),
