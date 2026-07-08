@@ -3478,6 +3478,17 @@ export const sampleNegativeLabDryRunResultV1: NegativeLabDryRunResultV1 = negati
         outputTag: 'preview_display',
         processProfileId: 'rawengine_c41_default_process_profile',
       },
+      densityNormalizationMetrics: {
+        channelBounds: {
+          blue: { max: 1.07, min: -0.02 },
+          green: { max: 1.01, min: -0.01 },
+          red: { max: 0.96, min: 0 },
+        },
+        clippedPixelCount: 0,
+        densityRangeUnclamped: 1.09,
+        epsilonClampedPixelCount: 0,
+        rendererVersion: 1,
+      },
       dryRunMode: 'runtime_preview_non_mutating',
       planHash: 'sha256:negative_lab_sample_runtime_preview_plan',
       previewArtifactHandle: sampleArtifactHandleV1,

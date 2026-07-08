@@ -29,6 +29,7 @@ import {
   type NegativeLabCommandEnvelopeV1,
   type NegativeLabRuntimeProofV1,
   negativeLabCommandEnvelopeV1Schema,
+  negativeLabSetConversionRecipeCommandV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
 } from '../../../../packages/rawengine-schema/src';
 import {
@@ -246,6 +247,8 @@ type NegativeConversionScope = 'active' | 'all' | 'ready';
 type NegativeLabBaseSampleStudioDecision = 'accepted' | 'candidate' | 'rejected';
 type NegativeLabAgentCommitState = 'committing' | 'not_committed' | 'ready_to_commit';
 type NegativeLabAgentDryRunState = 'accepted' | 'blocked' | 'ready';
+type NegativeLabSetConversionRecipeCommandV1 = z.infer<typeof negativeLabSetConversionRecipeCommandV1Schema>;
+
 const NEGATIVE_LAB_AGENT_DRY_RUN_LABELS = {
   accepted: 'modals.negativeConversion.agentDryRunAccepted',
   blocked: 'modals.negativeConversion.agentDryRunBlocked',
@@ -1776,7 +1779,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   }, [qcOverlayVisibility]);
 
   const buildNegativeLabRuntimePreviewCommand = useCallback(
-    (currentParams: NegativeParams): NegativeLabCommandEnvelopeV1 | null => {
+    (currentParams: NegativeParams): NegativeLabSetConversionRecipeCommandV1 | null => {
       if (selectedImagePath === null) return null;
 
       const previewFrameId = `negative_lab_frame_${String(effectiveActivePathIndex + 1).padStart(4, '0')}`;
@@ -1790,11 +1793,12 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       ).slice('fnv1a32:'.length);
       const sampleIds = baseFogEstimate === null ? [] : [`base_sample_${sampleHash}`];
       const usingPrintCurveV2 = currentParams.print_curve_algorithm === 'negative_density_print_v2';
+      const conversionModelId = usingPrintCurveV2 ? 'negative_density_print_v2' : currentParams.conversion_model;
       const sessionId = sessionSnapshot.session.sessionId;
       const manualBalanceActive =
         currentParams.red_weight !== 1 || currentParams.green_weight !== 1 || currentParams.blue_weight !== 1;
 
-      return negativeLabCommandEnvelopeV1Schema.parse({
+      return negativeLabSetConversionRecipeCommandV1Schema.parse({
         actor: {
           id: 'negative-lab-ui',
           kind: ActorKind.Ui,
@@ -1838,7 +1842,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                   : 'manual_samples',
           },
           conversionModel: {
-            algorithmId: usingPrintCurveV2 ? 'negative_density_print_v2' : 'density_rgb_v1',
+            algorithmId: conversionModelId,
             algorithmVersion: usingPrintCurveV2 ? 2 : 1,
             densityMax: 4,
             epsilonPolicyId: 'density_epsilon_v1',

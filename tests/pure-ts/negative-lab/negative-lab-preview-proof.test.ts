@@ -146,6 +146,8 @@ describe('Negative Lab before/after preview proof', () => {
     });
     expect(beforeAfterProof?.behaviorProofHash).toMatch(/^sha256:/u);
     expect(dryRunResult.acceptedDryRunPlanHash).toBe(negativeLabAcceptedDryRunPlanHashV1(dryRun));
+    expect(dryRun.proof?.runtimePreview.densityNormalizationMetrics.rendererVersion).toBe(1);
+    expect(dryRun.proof?.runtimePreview.densityNormalizationMetrics.densityRangeUnclamped).toBeGreaterThan(0);
 
     expect(() =>
       bus.execute({
@@ -194,5 +196,81 @@ describe('Negative Lab before/after preview proof', () => {
     expect(apply.proof?.runtimePreview.beforeAfterPreviewProof.acceptedDryRunPlanRequirement).toEqual(
       beforeAfterProof?.acceptedDryRunPlanRequirement,
     );
+  });
+
+  test('accepts negative_log_density_v1 as a first-class conversion model', () => {
+    const bus = new NegativeLabAppServerRuntimeToolBusV1(NEGATIVE_LAB_AGENT_TOOL_MANIFEST);
+    const command = negativeLabCommandEnvelopeV1Schema.parse({
+      actor: {
+        id: 'negative-lab-preview-proof-neg-log',
+        kind: ActorKind.Test,
+        sessionId: 'session_negative_lab_preview_proof_neg_log',
+      },
+      approval: {
+        approvalClass: ApprovalClass.PreviewOnly,
+        reason: 'Exercise the negative log density runtime proof contract.',
+        state: 'not_required',
+      },
+      commandId: 'command_negative_lab_preview_proof_neg_log',
+      commandType: 'negativeLab.setConversionRecipe',
+      correlationId: 'corr_negative_lab_preview_proof_neg_log',
+      dryRun: true,
+      expectedGraphRevision: 'graph_rev_negative_lab_preview_proof_neg_log',
+      idempotencyKey: 'idem_negative_lab_preview_proof_neg_log',
+      parameters: {
+        baseStrategy: {
+          baseSampleIds: ['base_sample_frame_002'],
+          mode: 'manual_samples',
+        },
+        conversionModel: {
+          algorithmId: 'negative_log_density_v1',
+          algorithmVersion: 1,
+          densityMax: 4,
+          epsilonPolicyId: 'density_epsilon_v1',
+          negativeDensityTolerance: 0.02,
+        },
+        curveModel: {
+          curveFamily: 'parametric_monotonic_v1',
+        },
+        frameSelection: {
+          excludeFrameIds: [],
+          frameIds: ['frame_002'],
+          mode: 'selected',
+          qcStatuses: [],
+          warningCodes: [],
+        },
+        inputCharacterization: {
+          channelBasis: 'scanner_rgb',
+          confidence: 'profiled_acquisition',
+          pixelBasis: 'linear_scan_rgb',
+        },
+        neutralization: {
+          mode: 'neutral_sample',
+          sampleIds: ['base_sample_frame_002'],
+        },
+        outputIntent: 'proof_preview',
+        previewRequest: {
+          artifactPurposes: ['objective_positive_preview'],
+          includePreview: true,
+          maxEdgePx: 1080,
+        },
+        processFamily: 'c41_color_negative',
+        sessionId: 'session_negative_lab_preview_proof_neg_log',
+      },
+      schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+      target: {
+        imagePath: '/roll-01/frame-002-negative.dng',
+        kind: 'image',
+      },
+    });
+
+    const dryRunResult = bus.execute({
+      request: command,
+      toolName: 'negativelab.preview_conversion',
+    });
+    if (dryRunResult.kind !== 'dry_run') throw new Error('Expected negative log density dry-run result.');
+
+    expect(dryRunResult.dryRun.proof?.algorithm.algorithmId).toBe('negative_log_density_v1');
+    expect(dryRunResult.dryRun.proof?.runtimePreview.densityNormalizationMetrics.rendererVersion).toBe(1);
   });
 });

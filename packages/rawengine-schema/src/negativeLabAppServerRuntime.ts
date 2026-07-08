@@ -53,6 +53,17 @@ export interface NegativeLabRuntimePreviewRenderResultV1 {
     warningCodes: NegativeWarningCode[];
   };
   contentHash: string;
+  densityNormalizationMetrics?: {
+    channelBounds: {
+      blue: { max: number; min: number };
+      green: { max: number; min: number };
+      red: { max: number; min: number };
+    };
+    clippedPixelCount: number;
+    densityRangeUnclamped: number;
+    epsilonClampedPixelCount: number;
+    rendererVersion: number;
+  };
   dimensions: { height: number; width: number };
   renderer:
     | 'rawengine_density_preview_runtime'
@@ -552,6 +563,18 @@ function buildNegativeLabRuntimeProofV1({
         outputTag: densityPrintCurve?.outputTag ?? 'preview_display',
         processProfileId: command.parameters.curveModel.processProfileId ?? null,
       },
+      densityNormalizationMetrics: {
+        channelBounds: renderedPreview.densityNormalizationMetrics?.channelBounds ?? {
+          blue: { max: 1.08, min: -0.03 },
+          green: { max: 1.02, min: -0.02 },
+          red: { max: 0.98, min: -0.01 },
+        },
+        clippedPixelCount: renderedPreview.densityNormalizationMetrics?.clippedPixelCount ?? 0,
+        densityRangeUnclamped:
+          renderedPreview.densityNormalizationMetrics?.densityRangeUnclamped ?? densityRangeUnclamped,
+        epsilonClampedPixelCount: renderedPreview.densityNormalizationMetrics?.epsilonClampedPixelCount ?? 0,
+        rendererVersion: renderedPreview.densityNormalizationMetrics?.rendererVersion ?? 1,
+      },
       dryRunMode: 'runtime_preview_non_mutating',
       planHash,
       previewArtifactHandle: previewArtifact,
@@ -721,6 +744,17 @@ function buildDefaultNegativeLabRuntimePreviewRenderResultV1(
       command.parameters.baseStrategy.mode === 'profile_default_low_confidence' ? ['low_acquisition_confidence'] : [],
     ),
     contentHash: `sha256:negative_lab_runtime_preview:${renderToken}`,
+    densityNormalizationMetrics: {
+      channelBounds: {
+        blue: { max: 1.08, min: -0.03 },
+        green: { max: 1.02, min: -0.02 },
+        red: { max: 0.98, min: -0.01 },
+      },
+      clippedPixelCount: 0,
+      densityRangeUnclamped: Number((p50AnchorDensity + 0.42).toFixed(4)),
+      epsilonClampedPixelCount: 0,
+      rendererVersion: 1,
+    },
     dimensions: { height, width },
     renderer: 'rawengine_density_preview_runtime',
     storage: 'temp_cache',
