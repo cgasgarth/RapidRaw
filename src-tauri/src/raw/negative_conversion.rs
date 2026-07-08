@@ -1904,14 +1904,20 @@ impl NegativeConversionParams {
                 .clamp(MIN_CONTRAST, MAX_CONTRAST),
             black_point: finite_or_default(self.black_point, defaults.black_point)
                 .clamp(MIN_BLACK_POINT, MAX_BLACK_POINT),
-            black_point_offset: finite_or_default(self.black_point_offset, defaults.black_point_offset)
-                .clamp(-0.25, 0.25),
+            black_point_offset: finite_or_default(
+                self.black_point_offset,
+                defaults.black_point_offset,
+            )
+            .clamp(-0.25, 0.25),
             color_range_clip: finite_or_default(self.color_range_clip, defaults.color_range_clip)
                 .clamp(0.01, 0.3),
             luma_range_clip: finite_or_default(self.luma_range_clip, defaults.luma_range_clip)
                 .clamp(0.01, 0.3),
-            white_point_offset: finite_or_default(self.white_point_offset, defaults.white_point_offset)
-                .clamp(-0.25, 0.25),
+            white_point_offset: finite_or_default(
+                self.white_point_offset,
+                defaults.white_point_offset,
+            )
+            .clamp(-0.25, 0.25),
             white_point: finite_or_default(self.white_point, defaults.white_point)
                 .clamp(MIN_WHITE_POINT, MAX_WHITE_POINT),
             conversion_model: self.conversion_model,
@@ -1920,8 +1926,10 @@ impl NegativeConversionParams {
     }
 
     fn with_sanitized_endpoints(mut self) -> Self {
-        self.black_point = (self.black_point + self.black_point_offset).clamp(MIN_BLACK_POINT, MAX_BLACK_POINT);
-        self.white_point = (self.white_point + self.white_point_offset).clamp(MIN_WHITE_POINT, MAX_WHITE_POINT);
+        self.black_point =
+            (self.black_point + self.black_point_offset).clamp(MIN_BLACK_POINT, MAX_BLACK_POINT);
+        self.white_point =
+            (self.white_point + self.white_point_offset).clamp(MIN_WHITE_POINT, MAX_WHITE_POINT);
 
         if self.white_point - self.black_point < MIN_ENDPOINT_SEPARATION {
             self.white_point = (self.black_point + MIN_ENDPOINT_SEPARATION).min(MAX_WHITE_POINT);
@@ -2118,10 +2126,7 @@ fn percentile_bounds(mut values: Vec<f32>, tail_clip: f32) -> ChannelBounds {
         max
     };
 
-    ChannelBounds {
-        min,
-        max: safe_max,
-    }
+    ChannelBounds { min, max: safe_max }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -2160,9 +2165,13 @@ fn build_analysis_window(
     let margin_y = ((height as f32 * 0.12) + buffer_y as f32).round() as usize;
     (
         margin_x.min(width.saturating_sub(1)),
-        width.saturating_sub(margin_x.min(width.saturating_sub(1))).max(margin_x.min(width.saturating_sub(1)) + 1),
+        width
+            .saturating_sub(margin_x.min(width.saturating_sub(1)))
+            .max(margin_x.min(width.saturating_sub(1)) + 1),
         margin_y.min(height.saturating_sub(1)),
-        height.saturating_sub(margin_y.min(height.saturating_sub(1))).max(margin_y.min(height.saturating_sub(1)) + 1),
+        height
+            .saturating_sub(margin_y.min(height.saturating_sub(1)))
+            .max(margin_y.min(height.saturating_sub(1)) + 1),
     )
 }
 
@@ -2175,10 +2184,13 @@ fn analyze_axis_bounds(
     luma_range_clip: f32,
     color_range_clip: f32,
 ) -> NegativeLabAxisBounds {
-    let (start_x, end_x, start_y, end_y) = build_analysis_window(width, height, sample_rect, analysis_buffer);
+    let (start_x, end_x, start_y, end_y) =
+        build_analysis_window(width, height, sample_rect, analysis_buffer);
     let span_x = end_x.saturating_sub(start_x).max(1);
     let span_y = end_y.saturating_sub(start_y).max(1);
-    let block_span = ((span_x.min(span_y) as f32 / 12.0).round() as usize).clamp(4, 32).max(1);
+    let block_span = ((span_x.min(span_y) as f32 / 12.0).round() as usize)
+        .clamp(4, 32)
+        .max(1);
     let mut block_luma_values = Vec::new();
     let mut block_color_values = Vec::new();
 
@@ -2212,8 +2224,10 @@ fn analyze_axis_bounds(
             }
 
             if !luma_values.is_empty() {
-                luma_values.sort_by(|left, right| left.partial_cmp(right).unwrap_or(Ordering::Equal));
-                color_values.sort_by(|left, right| left.partial_cmp(right).unwrap_or(Ordering::Equal));
+                luma_values
+                    .sort_by(|left, right| left.partial_cmp(right).unwrap_or(Ordering::Equal));
+                color_values
+                    .sort_by(|left, right| left.partial_cmp(right).unwrap_or(Ordering::Equal));
                 block_luma_values.push(median_from_sorted(&luma_values));
                 block_color_values.push(median_from_sorted(&color_values));
             }
@@ -5670,8 +5684,14 @@ mod tests {
         let summary = build_negative_lab_runtime_base_fog_sample_summary(&rendered_preview, None);
         let density_metrics = NegativeLabDensityNormalizationMetrics {
             axis_bounds: NegativeLabDensityNormalizationAxisBounds {
-                color: NegativeLabDensityAxisBoundsSummary { min: -0.12, max: 0.12 },
-                luma: NegativeLabDensityAxisBoundsSummary { min: -0.03, max: 1.02 },
+                color: NegativeLabDensityAxisBoundsSummary {
+                    min: -0.12,
+                    max: 0.12,
+                },
+                luma: NegativeLabDensityAxisBoundsSummary {
+                    min: -0.03,
+                    max: 1.02,
+                },
             },
             channel_bounds: NegativeLabDensityNormalizationChannelBounds {
                 r: NegativeLabDensityChannelBoundsSummary { min: 0.0, max: 1.0 },
