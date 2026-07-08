@@ -8877,7 +8877,7 @@ export const negativeLabSetConversionRecipeParametersV1Schema = z
       .strict(),
     conversionModel: z
       .object({
-        algorithmId: z.enum(['density_rgb_v1', 'negative_density_print_v2']),
+        algorithmId: z.enum(['density_rgb_v1', 'negative_log_density_v1', 'negative_density_print_v2']),
         algorithmVersion: z.union([z.literal(1), z.literal(2)]),
         densityMax: z.number().positive(),
         epsilonPolicyId: z.literal('density_epsilon_v1'),
@@ -8942,6 +8942,17 @@ export const negativeLabSetConversionRecipeParametersV1Schema = z
       context.addIssue({
         code: 'custom',
         message: 'density_rgb_v1 recipes must declare algorithmVersion 1.',
+        path: ['conversionModel', 'algorithmVersion'],
+      });
+    }
+
+    if (
+      recipe.conversionModel.algorithmId === 'negative_log_density_v1' &&
+      recipe.conversionModel.algorithmVersion !== 1
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'negative_log_density_v1 recipes must declare algorithmVersion 1.',
         path: ['conversionModel', 'algorithmVersion'],
       });
     }
@@ -9234,7 +9245,7 @@ export const negativeLabRuntimeProofV1Schema = z
       .strict(),
     algorithm: z
       .object({
-        algorithmId: z.enum(['density_rgb_v1', 'negative_density_print_v2']),
+        algorithmId: z.enum(['density_rgb_v1', 'negative_log_density_v1', 'negative_density_print_v2']),
         algorithmVersion: z.union([z.literal(1), z.literal(2)]),
         densityMax: z.number().positive(),
         epsilonPolicyId: z.literal('density_epsilon_v1'),
@@ -9318,6 +9329,21 @@ export const negativeLabRuntimeProofV1Schema = z
             normalizationProfileId: z.string().trim().min(1).nullable(),
             outputTag: z.enum(['preview_display', 'export_linear']),
             processProfileId: z.string().trim().min(1).nullable(),
+          })
+          .strict(),
+        densityNormalizationMetrics: z
+          .object({
+            channelBounds: z
+              .object({
+                blue: z.object({ max: z.number(), min: z.number() }).strict(),
+                green: z.object({ max: z.number(), min: z.number() }).strict(),
+                red: z.object({ max: z.number(), min: z.number() }).strict(),
+              })
+              .strict(),
+            clippedPixelCount: z.number().int().nonnegative(),
+            densityRangeUnclamped: z.number().nonnegative(),
+            epsilonClampedPixelCount: z.number().int().nonnegative(),
+            rendererVersion: z.number().int().positive(),
           })
           .strict(),
         dryRunMode: z.literal('runtime_preview_non_mutating'),

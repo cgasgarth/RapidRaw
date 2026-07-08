@@ -249,6 +249,17 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
           warningCodes: [],
         },
         contentHash: 'sha256:d20f6ffd523b78a86cd2f916fa34af5d1918d75f7b142237c752ad6b254213ab',
+        densityNormalizationMetrics: {
+          channelBounds: {
+            b: { max: 0.77, min: 0.09 },
+            g: { max: 0.74, min: 0.08 },
+            r: { max: 0.71, min: 0.07 },
+          },
+          clippedPixelCount: 0,
+          densityRangeUnclamped: 1.04,
+          epsilonClampedPixelCount: 0,
+          rendererVersion: 1,
+        },
         dimensions: {
           height: 1,
           width: 1,

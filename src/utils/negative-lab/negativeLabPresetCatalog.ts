@@ -41,6 +41,7 @@ const makeNegativeLabPreset = (
       NegativeLabPresetParams,
       | 'base_fog_sample'
       | 'black_point'
+      | 'conversion_model'
       | 'print_curve_algorithm'
       | 'print_curve_output_tag'
       | 'print_curve_v2'
@@ -54,6 +55,7 @@ const makeNegativeLabPreset = (
     ...preset.params,
     black_point: 0,
     base_fog_sample: null,
+    conversion_model: 'density_rgb_v1',
     print_curve_algorithm: 'density_rgb_v1',
     print_curve_output_tag: 'preview_display',
     print_curve_v2: null,

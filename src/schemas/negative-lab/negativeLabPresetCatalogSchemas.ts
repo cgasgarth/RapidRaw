@@ -28,6 +28,7 @@ export const negativeLabBaseFogSampleRectSchema = z
     message: 'Negative Lab base/fog sample rect must stay within normalized image bounds.',
   });
 
+export const negativeLabConversionModelSchema = z.enum(['density_rgb_v1', 'negative_log_density_v1']);
 export const negativeLabDensityPrintAlgorithmSchema = z.enum(['density_rgb_v1', 'negative_density_print_v2']);
 export const negativeLabDensityPrintOutputTagSchema = z.enum(['preview_display', 'export_linear']);
 
@@ -60,6 +61,7 @@ export const negativeLabPresetParamsSchema = z
     base_fog_strength: z.number().min(0).max(1.25).default(1),
     base_fog_sample: negativeLabBaseFogSampleRectSchema.nullable().default(null),
     contrast: z.number().min(0.5).max(2.5),
+    conversion_model: negativeLabConversionModelSchema.default('density_rgb_v1'),
     exposure: z.number().min(-2).max(2),
     green_weight: z.number().min(0.5).max(2),
     print_curve_algorithm: negativeLabDensityPrintAlgorithmSchema.default('density_rgb_v1'),
@@ -238,6 +240,7 @@ export const negativeLabBuiltInUiPresetCatalogSchema = z
 
 export type NegativeLabBuiltInUiPreset = z.infer<typeof negativeLabBuiltInUiPresetSchema>;
 export type NegativeLabBaseFogSampleRect = z.infer<typeof negativeLabBaseFogSampleRectSchema>;
+export type NegativeLabConversionModel = z.infer<typeof negativeLabConversionModelSchema>;
 export type NegativeLabDensityPrintAlgorithm = z.infer<typeof negativeLabDensityPrintAlgorithmSchema>;
 export type NegativeLabDensityPrintOutputTag = z.infer<typeof negativeLabDensityPrintOutputTagSchema>;
 export type NegativeLabDensityPrintV2Params = z.infer<typeof negativeLabDensityPrintV2ParamsSchema>;

@@ -2,6 +2,26 @@
   "algorithm": "density_rgb_v1",
   "artifactHash": "fnv1a64:8df655677efae33c",
   "changedPixelCount": 8,
+  "densityNormalizationMetrics": {
+    "channelBounds": {
+      "blue": {
+        "max": 5.8754658699035645,
+        "min": 0
+      },
+      "green": {
+        "max": 5.537485122680664,
+        "min": 0
+      },
+      "red": {
+        "max": 8.260682106018066,
+        "min": 0
+      }
+    },
+    "clippedPixelCount": 0,
+    "densityRangeUnclamped": 8.260682106018066,
+    "epsilonClampedPixelCount": 0,
+    "rendererVersion": 1
+  },
   "doesNotProve": [
     "camera_raw_decode_path",
     "automatic_base_fog_estimation",
