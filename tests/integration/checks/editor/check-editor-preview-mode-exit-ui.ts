@@ -142,6 +142,50 @@ assertShellOpeningTagNotIncludes(
 assertNotIncludes(collapsedMarkup, 'inert=""', 'normal editor chrome should remain focusable');
 assertNotIncludes(collapsedMarkup, 'pointer-events-none', 'normal editor chrome should remain pointer-interactive');
 
+setupStores(false);
+const compactMarkup = renderEditorView(false, true);
+assertIncludes(
+  compactMarkup,
+  'data-testid="editor-compact-tools-header"',
+  'compact editor shell should render a tools header',
+);
+assertIncludes(
+  compactMarkup,
+  'data-testid="editor-compact-tools-active-panel"',
+  'compact tools header should expose the active panel label',
+);
+assertIncludes(
+  compactMarkup,
+  'data-testid="editor-compact-tools-state"',
+  'compact tools header should expose collapse state',
+);
+assertIncludes(
+  compactMarkup,
+  'data-testid="editor-compact-tools-toggle"',
+  'compact tools header should expose an expand/collapse control',
+);
+assertIncludes(
+  compactMarkup,
+  'data-testid="editor-compact-tools-grip"',
+  'compact tools header should expose a resize affordance',
+);
+assertIncludes(
+  compactMarkup,
+  'data-compact-panel-state="expanded"',
+  'compact editor shell should report the open panel state',
+);
+assertIncludes(
+  compactMarkup,
+  'data-compact-editor-panel-height="280"',
+  'compact editor shell should report the panel height',
+);
+assertIncludes(
+  compactMarkup,
+  'data-compact-preview-min-height="240"',
+  'compact preview region should report its minimum height',
+);
+assertIncludes(compactMarkup, 'data-testid="editor-compact-filmstrip-shell"', 'compact filmstrip shell should render');
+
 setupStores(true);
 const fullscreenMarkup = renderEditorView(true);
 assertIncludes(fullscreenMarkup, 'aria-hidden="true"', 'editor chrome should be hidden from assistive tech');
@@ -175,7 +219,7 @@ if (failures.length > 0) {
 
 console.log('editor preview-mode exit UI ok');
 
-function renderEditorView(isFullScreen: boolean): string {
+function renderEditorView(isFullScreen: boolean, isCompactPortrait = false): string {
   return renderToStaticMarkup(
     createElement(
       I18nextProvider,
@@ -197,7 +241,7 @@ function renderEditorView(isFullScreen: boolean): string {
         handleThumbnailContextMenu: () => undefined,
         handleZoomChange: () => undefined,
         isAndroid: false,
-        isCompactPortrait: false,
+        isCompactPortrait,
         isResizing: false,
         requestThumbnails: () => undefined,
         refreshImageList: async () => undefined,

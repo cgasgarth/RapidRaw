@@ -217,9 +217,13 @@ function App() {
     viewportSize.width > 0 && viewportSize.width <= COMPACT_EDITOR_MAX_WIDTH && isPortraitViewport;
 
   const compactEditorPanelMinHeight = 220;
+  const compactEditorPreviewSafeHeight = 300;
   const compactEditorPanelMaxHeight =
     viewportSize.height > 0
-      ? Math.max(compactEditorPanelMinHeight, Math.min(Math.round(viewportSize.height * 0.85), 850))
+      ? Math.max(
+          compactEditorPanelMinHeight,
+          Math.min(Math.round(viewportSize.height - compactEditorPreviewSafeHeight), 850),
+        )
       : 520;
 
   const getDynamicCompactPanelHeight = () => {
