@@ -33,6 +33,8 @@ run_gate lint bun run lint
 run_gate format bun run format:check
 run_gate typecheck bun run typecheck
 run_gate test bun run test:unit
+run_gate unsafe-casts bun tests/integration/checks/check-unsafe-casts.ts
+run_gate rustfmt bun run check:rust:fmt
 run_gate i18n bun scripts/ci/run-compact-command.ts --label i18n:lint -- bunx i18next-cli lint
 run_gate i18n-extract bun scripts/ci/run-compact-command.ts --label i18n:extract -- bunx i18next-cli extract --ci --dry-run
 run_gate unused-deps bun scripts/ci/run-compact-command.ts --label unused-deps -- bunx knip --config knip.jsonc --dependencies --reporter compact
