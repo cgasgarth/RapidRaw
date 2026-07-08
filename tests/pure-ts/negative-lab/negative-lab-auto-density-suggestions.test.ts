@@ -9,14 +9,19 @@ import {
 } from '../../../src/utils/negative-lab/negativeLabScanMetrics.ts';
 
 const params: NegativeLabPresetParams = {
+  analysis_buffer: 0.04,
   base_fog_strength: 0.72,
   black_point: 0.02,
+  black_point_offset: 0,
   blue_weight: 1,
+  color_range_clip: 0.12,
   contrast: 1.1,
   conversion_model: 'density_rgb_v1',
   exposure: 0.1,
   green_weight: 1,
+  luma_range_clip: 0.08,
   red_weight: 1,
+  white_point_offset: 0,
   white_point: 0.98,
 };
 

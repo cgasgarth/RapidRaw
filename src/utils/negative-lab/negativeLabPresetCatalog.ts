@@ -39,12 +39,17 @@ const makeNegativeLabPreset = (
   > & {
     params: Omit<
       NegativeLabPresetParams,
+      | 'analysis_buffer'
       | 'base_fog_sample'
+      | 'black_point_offset'
       | 'black_point'
+      | 'color_range_clip'
       | 'conversion_model'
+      | 'luma_range_clip'
       | 'print_curve_algorithm'
       | 'print_curve_output_tag'
       | 'print_curve_v2'
+      | 'white_point_offset'
       | 'white_point'
     >;
   },
@@ -53,12 +58,17 @@ const makeNegativeLabPreset = (
   ...preset,
   params: {
     ...preset.params,
+    analysis_buffer: 0.04,
     black_point: 0,
+    black_point_offset: 0,
     base_fog_sample: null,
+    color_range_clip: 0.12,
     conversion_model: 'density_rgb_v1',
+    luma_range_clip: 0.08,
     print_curve_algorithm: 'density_rgb_v1',
     print_curve_output_tag: 'preview_display',
     print_curve_v2: null,
+    white_point_offset: 0,
     white_point: 1,
   },
 });

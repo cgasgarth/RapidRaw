@@ -173,6 +173,14 @@ export function NegativeLabPatchSamplerPanel({
           <span className="text-right tabular-nums" data-testid="negative-lab-patch-probe-density-spread">
             {formatDensityValue(patchProbeDensitometerReadout.densityRange)}
           </span>
+          <span className="text-text-secondary">{t('modals.negativeConversion.lumaAxis')}</span>
+          <span className="text-right tabular-nums" data-testid="negative-lab-patch-probe-luma-axis">
+            {formatDensityValue(patchProbeDensitometerReadout.lumaDensity)}
+          </span>
+          <span className="text-text-secondary">{t('modals.negativeConversion.colorAxis')}</span>
+          <span className="text-right tabular-nums" data-testid="negative-lab-patch-probe-color-axis">
+            {formatDensityValue(patchProbeDensitometerReadout.colorDensity)}
+          </span>
           <span className="text-text-secondary">{t('modals.negativeConversion.densitometerDominant')}</span>
           <span className="text-right" data-testid="negative-lab-patch-probe-dominant-channel">
             {t(DENSITOMETER_CHANNEL_LABEL_KEYS[patchProbeDensitometerReadout.dominantChannel])}

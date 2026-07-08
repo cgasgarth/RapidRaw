@@ -59,6 +59,17 @@ interface NegativeLabQcProofPanelProps {
   qcOverlayVisibility: NegativeLabQcOverlayVisibility;
   qcProofArtifact: NegativeLabQcContactSheetArtifact;
   qcProofReport: NegativeLabQcProofReport;
+  runtimePreviewDensityNormalizationMetrics: {
+    axisBounds: {
+      color: { max: number; min: number };
+      luma: { max: number; min: number };
+    };
+    channelBounds: {
+      blue: { max: number; min: number };
+      green: { max: number; min: number };
+      red: { max: number; min: number };
+    };
+  } | null;
 }
 
 export function NegativeLabQcProofPanel({
@@ -70,6 +81,7 @@ export function NegativeLabQcProofPanel({
   qcOverlayVisibility,
   qcProofArtifact,
   qcProofReport,
+  runtimePreviewDensityNormalizationMetrics,
 }: NegativeLabQcProofPanelProps) {
   const { t } = useTranslation();
   const frameStateByFrameId = new Map(
@@ -186,6 +198,24 @@ export function NegativeLabQcProofPanel({
             overlayCount: qcProofArtifact.overlays.length,
           })}
         </span>
+        {runtimePreviewDensityNormalizationMetrics !== null ? (
+          <>
+            <span>
+              {t('modals.negativeConversion.axisBoundsReadout', {
+                axis: t('modals.negativeConversion.lumaAxis'),
+                max: runtimePreviewDensityNormalizationMetrics.axisBounds.luma.max.toFixed(3),
+                min: runtimePreviewDensityNormalizationMetrics.axisBounds.luma.min.toFixed(3),
+              })}
+            </span>
+            <span>
+              {t('modals.negativeConversion.axisBoundsReadout', {
+                axis: t('modals.negativeConversion.colorAxis'),
+                max: runtimePreviewDensityNormalizationMetrics.axisBounds.color.max.toFixed(3),
+                min: runtimePreviewDensityNormalizationMetrics.axisBounds.color.min.toFixed(3),
+              })}
+            </span>
+          </>
+        ) : null}
       </div>
       <div
         className="grid gap-1"

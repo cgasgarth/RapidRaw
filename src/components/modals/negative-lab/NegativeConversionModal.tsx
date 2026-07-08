@@ -937,6 +937,8 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const previewImageRef = useRef<HTMLImageElement | null>(null);
   const previewRequestSequenceRef = useRef(0);
   const previewImageUrl = isCompareActive && originalUrl !== null ? originalUrl : previewUrl;
+  const runtimePreviewDensityNormalizationMetrics =
+    runtimePreviewDryRunResult?.dryRun.proof?.runtimePreview.densityNormalizationMetrics ?? null;
   const activePatchProbe = patchProbeByRole[patchRole] ?? null;
   const patchProbeEstimate = activePatchProbe?.estimate ?? null;
   const patchProbeRect = activePatchProbe?.rect ?? null;
@@ -4226,6 +4228,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       qcOverlayVisibility={qcOverlayVisibility}
       qcProofArtifact={qcProofArtifact}
       qcProofReport={qcProofReport}
+      runtimePreviewDensityNormalizationMetrics={runtimePreviewDensityNormalizationMetrics}
     />
   );
 

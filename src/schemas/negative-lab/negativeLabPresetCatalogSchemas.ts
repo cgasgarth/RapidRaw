@@ -56,18 +56,23 @@ export const negativeLabDensityPrintV2ParamsSchema = z
 
 export const negativeLabPresetParamsSchema = z
   .object({
+    analysis_buffer: z.number().min(0).max(0.25).default(0.04),
     black_point: z.number().min(0).max(0.95).default(0),
+    black_point_offset: z.number().min(-0.25).max(0.25).default(0),
     blue_weight: z.number().min(0.5).max(2),
     base_fog_strength: z.number().min(0).max(1.25).default(1),
     base_fog_sample: negativeLabBaseFogSampleRectSchema.nullable().default(null),
+    color_range_clip: z.number().min(0.01).max(0.3).default(0.12),
     contrast: z.number().min(0.5).max(2.5),
     conversion_model: negativeLabConversionModelSchema.default('density_rgb_v1'),
     exposure: z.number().min(-2).max(2),
     green_weight: z.number().min(0.5).max(2),
+    luma_range_clip: z.number().min(0.01).max(0.3).default(0.08),
     print_curve_algorithm: negativeLabDensityPrintAlgorithmSchema.default('density_rgb_v1'),
     print_curve_output_tag: negativeLabDensityPrintOutputTagSchema.default('preview_display'),
     print_curve_v2: negativeLabDensityPrintV2ParamsSchema.nullable().default(null),
     red_weight: z.number().min(0.5).max(2),
+    white_point_offset: z.number().min(-0.25).max(0.25).default(0),
     white_point: z.number().min(0.05).max(1).default(1),
   })
   .strict()
@@ -285,6 +290,8 @@ export const negativeBaseFogDensitometerReadoutSchema = z
   .object({
     densityRange: z.number().min(0),
     dominantChannel: negativeBaseFogDensitometerChannelSchema,
+    colorDensity: z.number(),
+    lumaDensity: z.number().min(0),
     status: negativeBaseFogDensitometerStatusSchema,
   })
   .strict();

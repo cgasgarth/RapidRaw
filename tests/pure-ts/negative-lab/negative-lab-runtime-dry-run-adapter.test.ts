@@ -46,6 +46,10 @@ const invokeMock = mock((command: string) => {
     },
     contentHash: 'sha256:4b05ce465b138a4232a9cf196884b41c6dd3b9a1a3f2f2916e4e3e78328701dd',
     densityNormalizationMetrics: {
+      axisBounds: {
+        color: { max: 0.12, min: -0.12 },
+        luma: { max: 1.02, min: -0.03 },
+      },
       channelBounds: {
         b: { max: 1.06, min: -0.03 },
         g: { max: 1.01, min: -0.02 },
@@ -145,30 +149,40 @@ describe('renderNegativeLabRuntimeDryRunPreview', () => {
       command,
       path: '/synthetic/negative-lab-adapter-source.dng',
       recipeParams: {
+        analysis_buffer: 0.04,
         base_fog_sample: null,
         base_fog_strength: 1,
         black_point: 0,
+        black_point_offset: 0,
         blue_weight: 1,
+        color_range_clip: 0.12,
         contrast: 1,
         conversion_model: 'density_rgb_v1',
         exposure: 0,
         green_weight: 1,
+        luma_range_clip: 0.08,
         red_weight: 1,
+        white_point_offset: 0,
         white_point: 1,
       },
     });
 
     expect(invokeMock).toHaveBeenCalledWith(Invokes.RenderNegativeLabDryRunPreviewArtifact, {
       params: {
+        analysis_buffer: 0.04,
         base_fog_sample: null,
         base_fog_strength: 1,
         black_point: 0,
+        black_point_offset: 0,
         blue_weight: 1,
+        color_range_clip: 0.12,
         contrast: 1,
         conversion_model: 'density_rgb_v1',
         exposure: 0,
         green_weight: 1,
+        luma_range_clip: 0.08,
         red_weight: 1,
+        white_point_offset: 0,
         white_point: 1,
       },
       path: '/synthetic/negative-lab-adapter-source.dng',
@@ -194,6 +208,10 @@ describe('renderNegativeLabRuntimeDryRunPreview', () => {
       source: 'deterministic_edge_safe_default_rect',
     });
     expect(result.runtimeDryRun.dryRun.proof?.runtimePreview.densityNormalizationMetrics).toEqual({
+      axisBounds: {
+        color: { max: 0.12, min: -0.12 },
+        luma: { max: 1.02, min: -0.03 },
+      },
       channelBounds: {
         blue: { max: 1.06, min: -0.03 },
         green: { max: 1.01, min: -0.02 },
@@ -282,29 +300,39 @@ describe('renderNegativeLabRuntimeDryRunPreview', () => {
       command,
       path: '/synthetic/negative-lab-adapter-neg-log.dng',
       recipeParams: {
+        analysis_buffer: 0.04,
         base_fog_sample: null,
         base_fog_strength: 1,
         black_point: 0,
+        black_point_offset: 0,
         blue_weight: 1,
+        color_range_clip: 0.12,
         contrast: 1,
         exposure: 0,
         green_weight: 1,
+        luma_range_clip: 0.08,
         red_weight: 1,
+        white_point_offset: 0,
         white_point: 1,
       },
     });
 
     expect(invokeMock).toHaveBeenLastCalledWith(Invokes.RenderNegativeLabDryRunPreviewArtifact, {
       params: {
+        analysis_buffer: 0.04,
         base_fog_sample: null,
         base_fog_strength: 1,
         black_point: 0,
+        black_point_offset: 0,
         blue_weight: 1,
+        color_range_clip: 0.12,
         contrast: 1,
         conversion_model: 'negative_log_density_v1',
         exposure: 0,
         green_weight: 1,
+        luma_range_clip: 0.08,
         red_weight: 1,
+        white_point_offset: 0,
         white_point: 1,
       },
       path: '/synthetic/negative-lab-adapter-neg-log.dng',

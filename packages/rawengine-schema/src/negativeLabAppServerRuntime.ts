@@ -54,6 +54,10 @@ export interface NegativeLabRuntimePreviewRenderResultV1 {
   };
   contentHash: string;
   densityNormalizationMetrics?: {
+    axisBounds: {
+      color: { max: number; min: number };
+      luma: { max: number; min: number };
+    };
     channelBounds: {
       blue: { max: number; min: number };
       green: { max: number; min: number };
@@ -564,6 +568,10 @@ function buildNegativeLabRuntimeProofV1({
         processProfileId: command.parameters.curveModel.processProfileId ?? null,
       },
       densityNormalizationMetrics: {
+        axisBounds: renderedPreview.densityNormalizationMetrics?.axisBounds ?? {
+          color: { max: 0.12, min: -0.12 },
+          luma: { max: 1.08, min: -0.03 },
+        },
         channelBounds: renderedPreview.densityNormalizationMetrics?.channelBounds ?? {
           blue: { max: 1.08, min: -0.03 },
           green: { max: 1.02, min: -0.02 },
@@ -745,6 +753,10 @@ function buildDefaultNegativeLabRuntimePreviewRenderResultV1(
     ),
     contentHash: `sha256:negative_lab_runtime_preview:${renderToken}`,
     densityNormalizationMetrics: {
+      axisBounds: {
+        color: { max: 0.12, min: -0.12 },
+        luma: { max: 1.08, min: -0.03 },
+      },
       channelBounds: {
         blue: { max: 1.08, min: -0.03 },
         green: { max: 1.02, min: -0.02 },

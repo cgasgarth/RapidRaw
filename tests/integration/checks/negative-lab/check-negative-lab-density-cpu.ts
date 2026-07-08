@@ -16,6 +16,12 @@ const reportSchema = z
     changedPixelCount: z.number().int().positive(),
     densityNormalizationMetrics: z
       .object({
+        axisBounds: z
+          .object({
+            color: z.object({ max: z.number(), min: z.number() }).strict(),
+            luma: z.object({ max: z.number(), min: z.number() }).strict(),
+          })
+          .strict(),
         channelBounds: z
           .object({
             blue: z.object({ max: z.number(), min: z.number() }).strict(),
@@ -52,6 +58,15 @@ const reportSchema = z
         code: 'custom',
         message: 'Negative Lab density CPU proof must report a positive normalized density range.',
         path: ['densityNormalizationMetrics', 'densityRangeUnclamped'],
+      });
+    }
+    if (
+      report.densityNormalizationMetrics.axisBounds.luma.max <= report.densityNormalizationMetrics.axisBounds.luma.min
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Negative Lab density CPU proof must report a positive luma axis span.',
+        path: ['densityNormalizationMetrics', 'axisBounds', 'luma'],
       });
     }
     for (const requiredNonClaim of [
