@@ -1432,6 +1432,8 @@
       "compareTooltip": "길게 눌러 원본 보기",
       "contrast": "대비 (그레이드)",
       "convertAndSave": "변환 및 저장",
+      "axisBoundsReadout": "{{axis}}: {{min}} .. {{max}}",
+      "lumaAxis": "Luma axis",
       "convertAndSaveAll": "모두 변환 및 저장 ({{count}})",
       "convertAndSaveAll_one": "모두 변환 및 저장 ({{count}})",
       "convertAndSaveAll_other": "모두 변환 및 저장 ({{count}})",

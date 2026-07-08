@@ -131,8 +131,28 @@ if (balancedDensitometer.status !== 'strong_cast' || balancedDensitometer.domina
   failures.push('gray-ramp base/fog should resolve to a blue-dominant strong cast.');
 }
 if (
+  !approxEqual(
+    balancedDensitometer.lumaDensity,
+    0.2126 * balancedEstimate.baseDensity[0] +
+      0.7152 * balancedEstimate.baseDensity[1] +
+      0.0722 * balancedEstimate.baseDensity[2],
+  )
+) {
+  failures.push('balanced base/fog luma axis did not match the runtime readout.');
+}
+if (
+  !approxEqual(
+    balancedDensitometer.colorDensity,
+    (balancedEstimate.baseDensity[0] + balancedEstimate.baseDensity[1]) / 2 - balancedEstimate.baseDensity[2],
+  )
+) {
+  failures.push('balanced base/fog color axis did not match the runtime readout.');
+}
+if (
   balancedRouteResult.status !== balancedDensitometer.status ||
-  balancedRouteResult.densityRange !== balancedDensitometer.densityRange
+  balancedRouteResult.densityRange !== balancedDensitometer.densityRange ||
+  balancedRouteResult.lumaDensity !== balancedDensitometer.lumaDensity ||
+  balancedRouteResult.colorDensity !== balancedDensitometer.colorDensity
 ) {
   failures.push('densitometer route result diverged from the base/fog utility output.');
 }
@@ -158,8 +178,28 @@ if (clippedDensitometer.status !== 'strong_cast' || clippedDensitometer.dominant
   failures.push('clipped base/fog should resolve to a blue-dominant strong cast.');
 }
 if (
+  !approxEqual(
+    clippedDensitometer.lumaDensity,
+    0.2126 * clippedEstimate.baseDensity[0] +
+      0.7152 * clippedEstimate.baseDensity[1] +
+      0.0722 * clippedEstimate.baseDensity[2],
+  )
+) {
+  failures.push('clipped base/fog luma axis did not match the runtime readout.');
+}
+if (
+  !approxEqual(
+    clippedDensitometer.colorDensity,
+    (clippedEstimate.baseDensity[0] + clippedEstimate.baseDensity[1]) / 2 - clippedEstimate.baseDensity[2],
+  )
+) {
+  failures.push('clipped base/fog color axis did not match the runtime readout.');
+}
+if (
   clippedRouteResult.status !== clippedDensitometer.status ||
-  clippedRouteResult.densityRange !== clippedDensitometer.densityRange
+  clippedRouteResult.densityRange !== clippedDensitometer.densityRange ||
+  clippedRouteResult.lumaDensity !== clippedDensitometer.lumaDensity ||
+  clippedRouteResult.colorDensity !== clippedDensitometer.colorDensity
 ) {
   failures.push('clipped densitometer route result diverged from the base/fog utility output.');
 }

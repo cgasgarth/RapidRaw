@@ -265,16 +265,21 @@ export const buildNegativeLabRuntimeProfileProvenanceHash = (
 };
 
 const NEGATIVE_LAB_RUNTIME_APPLY_DIFF_KEYS = [
+  'analysis_buffer',
+  'black_point_offset',
   'base_fog_strength',
   'black_point',
   'blue_weight',
+  'color_range_clip',
   'contrast',
   'conversion_model',
   'exposure',
   'green_weight',
+  'luma_range_clip',
   'print_curve_algorithm',
   'print_curve_output_tag',
   'red_weight',
+  'white_point_offset',
   'white_point',
 ] as const satisfies Array<keyof NegativeLabPresetParams>;
 
@@ -283,10 +288,18 @@ const NEGATIVE_LAB_RUNTIME_APPLIED_GROUPS = ['base_fog', 'print_curve', 'rgb_bal
 const getNegativeLabRuntimeApplyParameterGroup = (
   key: (typeof NEGATIVE_LAB_RUNTIME_APPLY_DIFF_KEYS)[number],
 ): NegativeLabRuntimeProfileApplyProof['parameterDiffs'][number]['group'] => {
-  if (key === 'base_fog_strength') return 'base_fog';
+  if (
+    key === 'analysis_buffer' ||
+    key === 'base_fog_strength' ||
+    key === 'black_point_offset' ||
+    key === 'white_point_offset'
+  ) {
+    return 'base_fog';
+  }
   if (key === 'blue_weight' || key === 'green_weight' || key === 'red_weight') return 'rgb_balance';
   if (key === 'conversion_model') return 'print_curve';
   if (key === 'print_curve_algorithm' || key === 'print_curve_output_tag') return 'print_curve';
+  if (key === 'color_range_clip' || key === 'luma_range_clip') return 'tone_curve';
   return 'tone_curve';
 };
 

@@ -43,6 +43,12 @@ export const negativeLabDryRunPreviewArtifactSchema = z
     contentHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
     densityNormalizationMetrics: z
       .object({
+        axisBounds: z
+          .object({
+            color: z.object({ max: z.number(), min: z.number() }).strict(),
+            luma: z.object({ max: z.number(), min: z.number() }).strict(),
+          })
+          .strict(),
         channelBounds: z
           .object({
             b: z.object({ max: z.number(), min: z.number() }).strict(),
@@ -83,6 +89,10 @@ const toRuntimePreviewRenderResult = (
   baseFogSampleSummary: artifact.baseFogSampleSummary,
   contentHash: artifact.contentHash,
   densityNormalizationMetrics: {
+    axisBounds: {
+      color: artifact.densityNormalizationMetrics.axisBounds.color,
+      luma: artifact.densityNormalizationMetrics.axisBounds.luma,
+    },
     channelBounds: {
       blue: artifact.densityNormalizationMetrics.channelBounds.b,
       green: artifact.densityNormalizationMetrics.channelBounds.g,
@@ -102,15 +112,20 @@ export async function renderNegativeLabRuntimeDryRunPreview(params: {
   command: Extract<NegativeLabCommandEnvelopeV1, { commandType: 'negativeLab.setConversionRecipe' }>;
   path: string;
   recipeParams: {
+    analysis_buffer: number;
     base_fog_sample: { height: number; width: number; x: number; y: number } | null;
     base_fog_strength: number;
     black_point: number;
+    black_point_offset: number;
     blue_weight: number;
+    color_range_clip: number;
     contrast: number;
     conversion_model?: 'density_rgb_v1' | 'negative_log_density_v1';
     exposure: number;
     green_weight: number;
+    luma_range_clip: number;
     red_weight: number;
+    white_point_offset: number;
     white_point: number;
   };
 }): Promise<NegativeLabRuntimeDryRunAdapterResult> {

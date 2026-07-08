@@ -9333,6 +9333,12 @@ export const negativeLabRuntimeProofV1Schema = z
           .strict(),
         densityNormalizationMetrics: z
           .object({
+            axisBounds: z
+              .object({
+                color: z.object({ max: z.number(), min: z.number() }).strict(),
+                luma: z.object({ max: z.number(), min: z.number() }).strict(),
+              })
+              .strict(),
             channelBounds: z
               .object({
                 blue: z.object({ max: z.number(), min: z.number() }).strict(),
