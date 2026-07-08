@@ -3,7 +3,7 @@
 
 import { readFileSync } from 'node:fs';
 
-import ts from 'typescript';
+import ts from '@typescript/typescript6';
 
 import { getExtension, toRepoPath, walkRepoFiles } from '../../../../scripts/lib/ci/repo-files.ts';
 
