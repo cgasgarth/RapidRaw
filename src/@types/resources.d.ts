@@ -3143,6 +3143,7 @@ export default interface Resources {
         baseReadyFrame: 'Frame base {{confidence}}%';
         baseReadyRoll: 'Roll base {{confidence}}%';
         baseRgb: 'Base RGB';
+        colorAxis: 'Color axis';
         baseSampleAccepted: 'Base sample accepted';
         baseSampleActive: 'Active sample';
         baseSampleArea: 'Area {{area}}';
@@ -3218,6 +3219,8 @@ export default interface Resources {
         conversionBundleEnabled: 'On';
         conversionBundleHint: 'Write a JSON bundle with replay metadata, source refs, output hashes, sidecars, and profile provenance.';
         convertAndSave: 'Convert & Save';
+        axisBoundsReadout: '{{axis}}: {{min}} .. {{max}}';
+        lumaAxis: 'Luma axis';
         convertAndSaveActive: 'Convert & Save Active';
         convertAndSaveAll: 'Convert & Save All ({{count}})';
         convertAndSaveAll_one: 'Convert & Save All ({{count}})';

@@ -148,6 +148,9 @@ describe('Negative Lab before/after preview proof', () => {
     expect(dryRunResult.acceptedDryRunPlanHash).toBe(negativeLabAcceptedDryRunPlanHashV1(dryRun));
     expect(dryRun.proof?.runtimePreview.densityNormalizationMetrics.rendererVersion).toBe(1);
     expect(dryRun.proof?.runtimePreview.densityNormalizationMetrics.densityRangeUnclamped).toBeGreaterThan(0);
+    expect(dryRun.proof?.runtimePreview.densityNormalizationMetrics.axisBounds.luma.max).toBeGreaterThan(
+      dryRun.proof?.runtimePreview.densityNormalizationMetrics.axisBounds.luma.min,
+    );
 
     expect(() =>
       bus.execute({

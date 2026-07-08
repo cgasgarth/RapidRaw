@@ -9,10 +9,15 @@ import {
 import { buildNegativeLabPlanHash } from './negativeLabPlanIdentity';
 
 const PROFILE_DELTA_KEYS = [
+  'analysis_buffer',
+  'black_point_offset',
+  'color_range_clip',
   'exposure',
   'contrast',
   'black_point',
+  'luma_range_clip',
   'white_point',
+  'white_point_offset',
   'base_fog_strength',
   'red_weight',
   'green_weight',
@@ -28,7 +33,8 @@ const profileParamsToCssRgb = (params: NegativeLabPresetParams): `rgb(${number} 
   const densityLift = params.base_fog_strength * 18;
   const exposureLift = params.exposure * 22;
   const contrastLift = (params.contrast - 1) * 28;
-  const endpointLift = (params.black_point + (1 - params.white_point)) * 36;
+  const endpointLift =
+    (params.black_point + params.black_point_offset + (1 - params.white_point) - params.white_point_offset) * 36;
 
   return `rgb(${clampRgbChannel(118 + densityLift + exposureLift + endpointLift + contrastLift + params.red_weight * 22)} ${clampRgbChannel(116 + densityLift + exposureLift + endpointLift + params.green_weight * 18)} ${clampRgbChannel(112 + densityLift + exposureLift + endpointLift - contrastLift + params.blue_weight * 24)})`;
 };

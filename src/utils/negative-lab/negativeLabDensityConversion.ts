@@ -57,8 +57,10 @@ const DEFAULT_DENSITY_PRINT_V2_PARAMS: NonNullable<NegativeLabPresetParams['prin
 export const clampNegativeLabUnitValue = (value: number): number => Math.min(1, Math.max(0, value));
 
 const applyPositiveEndpoints = (value: number, params: NegativeLabPresetParams): number => {
-  const blackPoint = clampNegativeLabUnitValue(params.black_point);
-  const whitePoint = clampNegativeLabUnitValue(Math.max(blackPoint + MIN_ENDPOINT_SEPARATION, params.white_point));
+  const blackPoint = clampNegativeLabUnitValue(params.black_point + params.black_point_offset);
+  const whitePoint = clampNegativeLabUnitValue(
+    Math.max(blackPoint + MIN_ENDPOINT_SEPARATION, params.white_point + params.white_point_offset),
+  );
   return clampNegativeLabUnitValue((value - blackPoint) / (whitePoint - blackPoint));
 };
 
@@ -76,21 +78,28 @@ const buildChannelBounds = (sampleDensities: readonly number[], baseFogDensity: 
   };
 };
 
-const buildChannelBoundsFromPercentiles = (
-  percentiles: NegativeLabScanMetricsV1['channels']['red']['densityPercentiles'],
-) =>
-  ({
-    max: percentiles.p98 <= percentiles.p02 + MIN_DENSITY_RANGE ? percentiles.p02 + 1 : percentiles.p98,
-    min: percentiles.p02,
-  }) satisfies NegativeLabChannelBounds;
-
 export const buildNegativeLabDensityBoundsFromScanMetrics = (
   scanMetrics: NegativeLabScanMetricsV1,
-): NegativeLabDensityBounds => [
-  buildChannelBoundsFromPercentiles(scanMetrics.channels.red.densityPercentiles),
-  buildChannelBoundsFromPercentiles(scanMetrics.channels.green.densityPercentiles),
-  buildChannelBoundsFromPercentiles(scanMetrics.channels.blue.densityPercentiles),
-];
+): NegativeLabDensityBounds => {
+  const lumaBounds = scanMetrics.lumaDensityPercentiles;
+  const buildBoundsFromAxis = (
+    deviationBounds: { lower: number; upper: number },
+    fallbackPercentiles: NegativeLabScanMetricsV1['channels']['red']['densityPercentiles'],
+  ) => {
+    const min = lumaBounds.p02 + deviationBounds.lower;
+    const max = lumaBounds.p98 + deviationBounds.upper;
+    return {
+      max: max <= min + MIN_DENSITY_RANGE ? fallbackPercentiles.p98 : max,
+      min,
+    } satisfies NegativeLabChannelBounds;
+  };
+
+  return [
+    buildBoundsFromAxis(scanMetrics.channels.red.deviationBounds, scanMetrics.channels.red.densityPercentiles),
+    buildBoundsFromAxis(scanMetrics.channels.green.deviationBounds, scanMetrics.channels.green.densityPercentiles),
+    buildBoundsFromAxis(scanMetrics.channels.blue.deviationBounds, scanMetrics.channels.blue.densityPercentiles),
+  ];
+};
 
 const buildNegativeLabDensityBoundsFromDensitySample = (
   densityRgb: NegativeLabRgbTriplet,

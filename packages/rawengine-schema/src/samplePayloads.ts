@@ -3479,6 +3479,10 @@ export const sampleNegativeLabDryRunResultV1: NegativeLabDryRunResultV1 = negati
         processProfileId: 'rawengine_c41_default_process_profile',
       },
       densityNormalizationMetrics: {
+        axisBounds: {
+          color: { max: 0.12, min: -0.12 },
+          luma: { max: 1.02, min: -0.03 },
+        },
         channelBounds: {
           blue: { max: 1.07, min: -0.02 },
           green: { max: 1.01, min: -0.01 },

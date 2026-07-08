@@ -35,10 +35,20 @@ pub struct NegativeConversionParams {
     pub base_fog_strength: f32,
     #[serde(default)]
     pub base_fog_sample: Option<NegativeBaseFogSampleRect>,
+    #[serde(default = "default_analysis_buffer")]
+    pub analysis_buffer: f32,
     pub exposure: f32,
     pub contrast: f32,
     #[serde(default = "default_black_point")]
     pub black_point: f32,
+    #[serde(default = "default_black_point_offset")]
+    pub black_point_offset: f32,
+    #[serde(default = "default_color_range_clip")]
+    pub color_range_clip: f32,
+    #[serde(default = "default_luma_range_clip")]
+    pub luma_range_clip: f32,
+    #[serde(default = "default_white_point_offset")]
+    pub white_point_offset: f32,
     #[serde(default = "default_white_point")]
     pub white_point: f32,
     #[serde(default)]
@@ -106,9 +116,23 @@ pub struct NegativeLabDryRunPreviewArtifact {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
+pub struct NegativeLabDensityAxisBoundsSummary {
+    pub min: f32,
+    pub max: f32,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
 pub struct NegativeLabDensityChannelBoundsSummary {
     pub min: f32,
     pub max: f32,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabDensityNormalizationAxisBounds {
+    pub color: NegativeLabDensityAxisBoundsSummary,
+    pub luma: NegativeLabDensityAxisBoundsSummary,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -122,6 +146,7 @@ pub struct NegativeLabDensityNormalizationChannelBounds {
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
 pub struct NegativeLabDensityNormalizationMetrics {
+    pub axis_bounds: NegativeLabDensityNormalizationAxisBounds,
     pub channel_bounds: NegativeLabDensityNormalizationChannelBounds,
     pub clipped_pixel_count: u32,
     pub density_range_unclamped: f32,
@@ -378,7 +403,27 @@ fn default_base_fog_strength() -> f32 {
     1.0
 }
 
+fn default_analysis_buffer() -> f32 {
+    0.04
+}
+
 fn default_black_point() -> f32 {
+    0.0
+}
+
+fn default_black_point_offset() -> f32 {
+    0.0
+}
+
+fn default_color_range_clip() -> f32 {
+    0.12
+}
+
+fn default_luma_range_clip() -> f32 {
+    0.08
+}
+
+fn default_white_point_offset() -> f32 {
     0.0
 }
 
@@ -617,9 +662,14 @@ impl Default for NegativeConversionParams {
             blue_weight: 1.0,
             base_fog_strength: default_base_fog_strength(),
             base_fog_sample: None,
+            analysis_buffer: default_analysis_buffer(),
             exposure: 0.0,
             contrast: 1.0,
             black_point: default_black_point(),
+            black_point_offset: default_black_point_offset(),
+            color_range_clip: default_color_range_clip(),
+            luma_range_clip: default_luma_range_clip(),
+            white_point_offset: default_white_point_offset(),
             white_point: default_white_point(),
             conversion_model: NegativeConversionModel::DensityRgbV1,
         }
@@ -1846,12 +1896,28 @@ impl NegativeConversionParams {
             )
             .clamp(MIN_BASE_FOG_STRENGTH, MAX_BASE_FOG_STRENGTH),
             base_fog_sample: self.base_fog_sample.and_then(sanitize_sample_rect),
+            analysis_buffer: finite_or_default(self.analysis_buffer, defaults.analysis_buffer)
+                .clamp(0.0, 0.25),
             exposure: finite_or_default(self.exposure, defaults.exposure)
                 .clamp(MIN_EXPOSURE, MAX_EXPOSURE),
             contrast: finite_or_default(self.contrast, defaults.contrast)
                 .clamp(MIN_CONTRAST, MAX_CONTRAST),
             black_point: finite_or_default(self.black_point, defaults.black_point)
                 .clamp(MIN_BLACK_POINT, MAX_BLACK_POINT),
+            black_point_offset: finite_or_default(
+                self.black_point_offset,
+                defaults.black_point_offset,
+            )
+            .clamp(-0.25, 0.25),
+            color_range_clip: finite_or_default(self.color_range_clip, defaults.color_range_clip)
+                .clamp(0.01, 0.3),
+            luma_range_clip: finite_or_default(self.luma_range_clip, defaults.luma_range_clip)
+                .clamp(0.01, 0.3),
+            white_point_offset: finite_or_default(
+                self.white_point_offset,
+                defaults.white_point_offset,
+            )
+            .clamp(-0.25, 0.25),
             white_point: finite_or_default(self.white_point, defaults.white_point)
                 .clamp(MIN_WHITE_POINT, MAX_WHITE_POINT),
             conversion_model: self.conversion_model,
@@ -1860,6 +1926,11 @@ impl NegativeConversionParams {
     }
 
     fn with_sanitized_endpoints(mut self) -> Self {
+        self.black_point =
+            (self.black_point + self.black_point_offset).clamp(MIN_BLACK_POINT, MAX_BLACK_POINT);
+        self.white_point =
+            (self.white_point + self.white_point_offset).clamp(MIN_WHITE_POINT, MAX_WHITE_POINT);
+
         if self.white_point - self.black_point < MIN_ENDPOINT_SEPARATION {
             self.white_point = (self.black_point + MIN_ENDPOINT_SEPARATION).min(MAX_WHITE_POINT);
             self.black_point = self
@@ -1913,6 +1984,7 @@ impl NegativeLabDensityMetricsAccumulator {
         self,
         clipped_pixel_count: u32,
         epsilon_clamped_pixel_count: u32,
+        axis_bounds: NegativeLabDensityNormalizationAxisBounds,
     ) -> NegativeLabDensityNormalizationMetrics {
         let fallback = ChannelBounds { min: 0.0, max: 0.0 };
         let red = if self.min[0].is_finite() && self.max[0].is_finite() {
@@ -1943,6 +2015,7 @@ impl NegativeLabDensityMetricsAccumulator {
         let global_max = red.max.max(green.max).max(blue.max);
 
         NegativeLabDensityNormalizationMetrics {
+            axis_bounds,
             channel_bounds: NegativeLabDensityNormalizationChannelBounds {
                 r: NegativeLabDensityChannelBoundsSummary {
                     min: red.min,
@@ -2013,6 +2086,158 @@ fn sanitize_sample_rect(rect: NegativeBaseFogSampleRect) -> Option<NegativeBaseF
         width,
         height,
     })
+}
+
+fn percentile_from_sorted(values: &[f32], percentile: f32) -> f32 {
+    if values.is_empty() {
+        return 0.0;
+    }
+
+    let clamped_percentile = percentile.clamp(0.0, 1.0);
+    let position = (values.len().saturating_sub(1)) as f32 * clamped_percentile;
+    let lower_index = position.floor() as usize;
+    let upper_index = position.ceil() as usize;
+    let lower_value = values[lower_index.min(values.len().saturating_sub(1))];
+    let upper_value = values[upper_index.min(values.len().saturating_sub(1))];
+
+    if lower_index == upper_index {
+        lower_value
+    } else {
+        lower_value + ((upper_value - lower_value) * (position - lower_index as f32))
+    }
+}
+
+fn median_from_sorted(values: &[f32]) -> f32 {
+    percentile_from_sorted(values, 0.5)
+}
+
+fn percentile_bounds(mut values: Vec<f32>, tail_clip: f32) -> ChannelBounds {
+    if values.is_empty() {
+        return ChannelBounds { min: 0.0, max: 0.0 };
+    }
+
+    values.sort_by(|left, right| left.partial_cmp(right).unwrap_or(Ordering::Equal));
+    let clip = tail_clip.clamp(0.0, 0.49);
+    let min = percentile_from_sorted(&values, clip);
+    let max = percentile_from_sorted(&values, 1.0 - clip);
+    let safe_max = if max <= min + NEGATIVE_LAB_DENSITY_RANGE_EPSILON {
+        min + 1.0
+    } else {
+        max
+    };
+
+    ChannelBounds { min, max: safe_max }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct NegativeLabAxisBounds {
+    color: ChannelBounds,
+    luma: ChannelBounds,
+}
+
+fn build_analysis_window(
+    width: usize,
+    height: usize,
+    sample_rect: Option<NegativeBaseFogSampleRect>,
+    analysis_buffer: f32,
+) -> (usize, usize, usize, usize) {
+    let buffer_x = ((analysis_buffer.clamp(0.0, 0.25) * width as f32).round() as isize).max(0);
+    let buffer_y = ((analysis_buffer.clamp(0.0, 0.25) * height as f32).round() as isize).max(0);
+    let sanitized_rect = sample_rect.and_then(sanitize_sample_rect);
+
+    if let Some(rect) = sanitized_rect {
+        let start_x = ((rect.x * width as f32).floor() as isize - buffer_x)
+            .max(0)
+            .min(width.saturating_sub(1) as isize) as usize;
+        let start_y = ((rect.y * height as f32).floor() as isize - buffer_y)
+            .max(0)
+            .min(height.saturating_sub(1) as isize) as usize;
+        let end_x = (((rect.x + rect.width) * width as f32).ceil() as isize + buffer_x)
+            .max(start_x as isize + 1)
+            .min(width as isize) as usize;
+        let end_y = (((rect.y + rect.height) * height as f32).ceil() as isize + buffer_y)
+            .max(start_y as isize + 1)
+            .min(height as isize) as usize;
+        return (start_x, end_x, start_y, end_y);
+    }
+
+    let margin_x = ((width as f32 * 0.12) + buffer_x as f32).round() as usize;
+    let margin_y = ((height as f32 * 0.12) + buffer_y as f32).round() as usize;
+    (
+        margin_x.min(width.saturating_sub(1)),
+        width
+            .saturating_sub(margin_x.min(width.saturating_sub(1)))
+            .max(margin_x.min(width.saturating_sub(1)) + 1),
+        margin_y.min(height.saturating_sub(1)),
+        height
+            .saturating_sub(margin_y.min(height.saturating_sub(1)))
+            .max(margin_y.min(height.saturating_sub(1)) + 1),
+    )
+}
+
+fn analyze_axis_bounds(
+    log_data: &[f32],
+    width: usize,
+    height: usize,
+    sample_rect: Option<NegativeBaseFogSampleRect>,
+    analysis_buffer: f32,
+    luma_range_clip: f32,
+    color_range_clip: f32,
+) -> NegativeLabAxisBounds {
+    let (start_x, end_x, start_y, end_y) =
+        build_analysis_window(width, height, sample_rect, analysis_buffer);
+    let span_x = end_x.saturating_sub(start_x).max(1);
+    let span_y = end_y.saturating_sub(start_y).max(1);
+    let block_span = ((span_x.min(span_y) as f32 / 12.0).round() as usize)
+        .clamp(4, 32)
+        .max(1);
+    let mut block_luma_values = Vec::new();
+    let mut block_color_values = Vec::new();
+
+    for block_y in (start_y..end_y).step_by(block_span) {
+        for block_x in (start_x..end_x).step_by(block_span) {
+            let block_end_x = (block_x + block_span).min(end_x);
+            let block_end_y = (block_y + block_span).min(end_y);
+            let mut luma_values = Vec::with_capacity(block_span * block_span);
+            let mut color_values = Vec::with_capacity(block_span * block_span);
+
+            for y in block_y..block_end_y {
+                let row_offset = y * width * 3;
+                for x in block_x..block_end_x {
+                    let idx = row_offset + (x * 3);
+                    if idx + 2 >= log_data.len() {
+                        continue;
+                    }
+
+                    let r = log_data[idx];
+                    let g = log_data[idx + 1];
+                    let b = log_data[idx + 2];
+                    if !(r.is_finite() && g.is_finite() && b.is_finite()) {
+                        continue;
+                    }
+
+                    let luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+                    let color = ((r + g) * 0.5) - b;
+                    luma_values.push(luma);
+                    color_values.push(color);
+                }
+            }
+
+            if !luma_values.is_empty() {
+                luma_values
+                    .sort_by(|left, right| left.partial_cmp(right).unwrap_or(Ordering::Equal));
+                color_values
+                    .sort_by(|left, right| left.partial_cmp(right).unwrap_or(Ordering::Equal));
+                block_luma_values.push(median_from_sorted(&luma_values));
+                block_color_values.push(median_from_sorted(&color_values));
+            }
+        }
+    }
+
+    NegativeLabAxisBounds {
+        luma: percentile_bounds(block_luma_values, luma_range_clip),
+        color: percentile_bounds(block_color_values, color_range_clip),
+    }
 }
 
 fn analyze_bounds(
@@ -2166,6 +2391,15 @@ fn run_pipeline_with_metrics(
             params.base_fog_sample,
         )
     };
+    let axis_bounds = analyze_axis_bounds(
+        &log_pixels,
+        width as usize,
+        height as usize,
+        params.base_fog_sample,
+        params.analysis_buffer,
+        params.luma_range_clip,
+        params.color_range_clip,
+    );
 
     let mut out_buffer = vec![0.0f32; raw_pixels.len()];
 
@@ -2261,7 +2495,20 @@ fn run_pipeline_with_metrics(
             NegativeLabDensityMetricsAccumulator::default,
             NegativeLabDensityMetricsAccumulator::merge,
         )
-        .into_metrics(clipped_pixel_count, epsilon_clamped_pixel_count);
+        .into_metrics(
+            clipped_pixel_count,
+            epsilon_clamped_pixel_count,
+            NegativeLabDensityNormalizationAxisBounds {
+                color: NegativeLabDensityAxisBoundsSummary {
+                    min: axis_bounds.color.min,
+                    max: axis_bounds.color.max,
+                },
+                luma: NegativeLabDensityAxisBoundsSummary {
+                    min: axis_bounds.luma.min,
+                    max: axis_bounds.luma.max,
+                },
+            },
+        );
 
     let out_img = Rgb32FImage::from_vec(width, height, out_buffer).unwrap();
 
@@ -3415,6 +3662,7 @@ mod tests {
             contrast: f32::NEG_INFINITY,
             black_point: f32::NAN,
             white_point: f32::NEG_INFINITY,
+            ..NegativeConversionParams::default()
         }
         .sanitized();
 
@@ -3798,6 +4046,7 @@ mod tests {
             contrast: 1.08,
             black_point: 0.0,
             white_point: 1.0,
+            ..NegativeConversionParams::default()
         };
         let accepted_dust_heal_layers = vec![serde_json::json!({
             "adjustmentPreset": "empty_adjustment_layer_v1",
@@ -4045,6 +4294,7 @@ mod tests {
             contrast: 1.0,
             black_point: 0.0,
             white_point: 1.0,
+            ..NegativeConversionParams::default()
         };
         let save_options = NegativeConversionSaveOptions {
             accepted_dry_run_plan_hash: Some("fnv1a32:2f4a91bc".to_string()),
@@ -4126,6 +4376,7 @@ mod tests {
             contrast: 0.95,
             black_point: 0.0,
             white_point: 1.0,
+            ..NegativeConversionParams::default()
         };
         let selected_acquisition_profile = NegativeLabAcquisitionProfileSnapshot {
             channel_basis: "scanner_rgb".to_string(),
@@ -4239,6 +4490,7 @@ mod tests {
                 contrast: -50.0,
                 black_point: 0.99,
                 white_point: 0.01,
+                ..NegativeConversionParams::default()
             },
             [
                 ChannelBounds {
@@ -4283,6 +4535,7 @@ mod tests {
                 contrast: 1.0,
                 black_point: 0.0,
                 white_point: 1.0,
+                ..NegativeConversionParams::default()
             },
             [
                 ChannelBounds {
@@ -4500,6 +4753,7 @@ mod tests {
             contrast: 1.1,
             black_point: 0.0,
             white_point: 1.0,
+            ..NegativeConversionParams::default()
         };
         let rgb = input.to_rgb32f();
         let (width, height) = rgb.dimensions();
@@ -4554,6 +4808,7 @@ mod tests {
             contrast: 1.1,
             black_point: 0.0,
             white_point: 1.0,
+            ..NegativeConversionParams::default()
         };
         let render = run_pipeline_with_metrics(&input, &params, None);
         let rendered = render.rendered_preview.to_rgb32f();
@@ -4586,6 +4841,16 @@ mod tests {
                 "artifactHash": hash_rendered_image(&rendered),
                 "changedPixelCount": changed_pixel_count,
                 "densityNormalizationMetrics": {
+                    "axisBounds": {
+                        "color": {
+                            "max": render.density_normalization_metrics.axis_bounds.color.max,
+                            "min": render.density_normalization_metrics.axis_bounds.color.min
+                        },
+                        "luma": {
+                            "max": render.density_normalization_metrics.axis_bounds.luma.max,
+                            "min": render.density_normalization_metrics.axis_bounds.luma.min
+                        }
+                    },
                     "channelBounds": {
                         "blue": {
                             "max": render.density_normalization_metrics.channel_bounds.b.max,
@@ -4842,6 +5107,7 @@ mod tests {
             contrast: 0.95,
             black_point: 0.0,
             white_point: 1.0,
+            ..NegativeConversionParams::default()
         };
         let preview_before =
             run_pipeline(&input, &NegativeConversionParams::default(), None).to_rgb32f();
@@ -5168,6 +5434,7 @@ mod tests {
             contrast: 0.95,
             black_point: 0.0,
             white_point: 1.0,
+            ..NegativeConversionParams::default()
         };
         let bounds_ref = downscale_f32_image(&input, 1080, 1080);
         let ref_rgb = bounds_ref.to_rgb32f();
@@ -5416,6 +5683,16 @@ mod tests {
         );
         let summary = build_negative_lab_runtime_base_fog_sample_summary(&rendered_preview, None);
         let density_metrics = NegativeLabDensityNormalizationMetrics {
+            axis_bounds: NegativeLabDensityNormalizationAxisBounds {
+                color: NegativeLabDensityAxisBoundsSummary {
+                    min: -0.12,
+                    max: 0.12,
+                },
+                luma: NegativeLabDensityAxisBoundsSummary {
+                    min: -0.03,
+                    max: 1.02,
+                },
+            },
             channel_bounds: NegativeLabDensityNormalizationChannelBounds {
                 r: NegativeLabDensityChannelBoundsSummary { min: 0.0, max: 1.0 },
                 g: NegativeLabDensityChannelBoundsSummary { min: 0.0, max: 1.0 },
@@ -5536,6 +5813,7 @@ mod tests {
             contrast: 1.0,
             black_point: 0.0,
             white_point: 1.0,
+            ..NegativeConversionParams::default()
         };
         let sampled_params = NegativeConversionParams {
             red_weight: sampled_estimate.red_weight,
@@ -5548,6 +5826,7 @@ mod tests {
             contrast: 1.0,
             black_point: 0.0,
             white_point: 1.0,
+            ..NegativeConversionParams::default()
         };
         let rgb = input.to_rgb32f();
         let (width, height) = rgb.dimensions();

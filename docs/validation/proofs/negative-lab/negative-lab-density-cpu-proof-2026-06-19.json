@@ -3,6 +3,16 @@
   "artifactHash": "fnv1a64:8df655677efae33c",
   "changedPixelCount": 8,
   "densityNormalizationMetrics": {
+    "axisBounds": {
+      "color": {
+        "max": 0.6715457439422607,
+        "min": -0.32845425605773926
+      },
+      "luma": {
+        "max": 1.1340703964233398,
+        "min": 0.13407039642333984
+      }
+    },
     "channelBounds": {
       "blue": {
         "max": 5.8754658699035645,
