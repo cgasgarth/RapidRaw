@@ -1,5 +1,5 @@
 import cx from 'clsx';
-import { ChartArea, RotateCcw } from 'lucide-react';
+import { ChartArea, Palette, RotateCcw } from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
@@ -8,20 +8,21 @@ import { useEditorActions } from '../../../../hooks/editor/useEditorActions';
 import { useWaveformControls } from '../../../../hooks/editor/useWaveformControls';
 import { useEditorStore } from '../../../../store/useEditorStore';
 import { useSettingsStore } from '../../../../store/useSettingsStore';
-import { TextVariants } from '../../../../types/typography';
 import {
   ADJUSTMENT_SECTIONS,
   type Adjustments,
+  hasAdjustmentValueChanges,
   INITIAL_ADJUSTMENTS,
   pickAdjustmentValues,
 } from '../../../../utils/adjustments';
 import ColorPanel from '../../../adjustments/Color';
 import { professionalInspectorDensityTokens } from '../../../ui/inspectorTokens';
-import UiText from '../../../ui/primitives/Text';
+import InspectorPanelFrame, {
+  type InspectorPanelNotice,
+  type InspectorPanelStatus,
+} from '../inspector/InspectorPanelFrame';
 import PanelScopesStrip from '../inspector/PanelScopesStrip';
 
-const PANEL_ACTION_BUTTON_CLASS =
-  'inline-flex h-6 w-6 items-center justify-center rounded text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:opacity-45';
 const PANEL_ACTION_ICON_SIZE = 15;
 
 export default function ColorWorkspacePanel() {
@@ -44,6 +45,27 @@ export default function ColorWorkspacePanel() {
       setEditor: state.setEditor,
     })),
   );
+  const panelStatus: InspectorPanelStatus | undefined = hasAdjustmentValueChanges(
+    ADJUSTMENT_SECTIONS.color,
+    adjustments,
+  )
+    ? {
+        label: t('ui.collapsibleSection.dirtyBadge', { defaultValue: 'Edited' }),
+        tone: 'info',
+      }
+    : undefined;
+  const panelNotice: InspectorPanelNotice | undefined =
+    selectedImage === null
+      ? {
+          kind: 'empty',
+          label: t('editor.ai.noImageSelected', { defaultValue: 'No image selected.' }),
+        }
+      : !selectedImage.isReady
+        ? {
+            kind: 'loading',
+            label: t('editor.adjustments.status.loadingImage', { defaultValue: 'Loading image preview' }),
+          }
+        : undefined;
 
   const toggleWbPicker = useCallback(() => {
     setEditor((state) => ({ isWbPickerActive: !state.isWbPickerActive }));
@@ -70,21 +92,13 @@ export default function ColorWorkspacePanel() {
   }, [setAdjustments]);
 
   return (
-    <div aria-label={colorLabel} className="flex h-full flex-col" data-testid="color-workspace-panel">
-      <div className={density.panelHeader.root}>
-        <UiText as="h2" variant={TextVariants.heading} className={density.panelHeader.title}>
-          {colorLabel}
-        </UiText>
-        <div className="flex items-center gap-1">
+    <InspectorPanelFrame
+      actions={
+        <>
           <button
             aria-label={t('editor.adjustments.tooltips.toggleAnalytics')}
             aria-pressed={isWaveformVisible}
-            className={cx(
-              PANEL_ACTION_BUTTON_CLASS,
-              isWaveformVisible
-                ? 'bg-editor-selected-quiet text-editor-selected-quiet-text hover:bg-editor-selected-quiet'
-                : 'hover:bg-editor-selected-quiet',
-            )}
+            className={cx(density.frame.actionButton, isWaveformVisible ? density.frame.actionButtonActive : undefined)}
             data-state={isWaveformVisible ? 'open' : 'closed'}
             data-testid="color-workspace-scopes-toggle"
             data-tooltip={t('editor.adjustments.tooltips.toggleAnalytics')}
@@ -95,7 +109,7 @@ export default function ColorWorkspacePanel() {
           </button>
           <button
             aria-label={resetColorLabel}
-            className={cx(PANEL_ACTION_BUTTON_CLASS, 'hover:bg-editor-selected-quiet')}
+            className={density.frame.actionButton}
             disabled={!selectedImage}
             onClick={handleResetColor}
             data-tooltip={resetColorLabel}
@@ -103,9 +117,14 @@ export default function ColorWorkspacePanel() {
           >
             <RotateCcw size={PANEL_ACTION_ICON_SIZE} />
           </button>
-        </div>
-      </div>
-
+        </>
+      }
+      icon={Palette}
+      label={colorLabel}
+      notice={panelNotice}
+      status={panelStatus}
+      testId="color-workspace-panel"
+    >
       <PanelScopesStrip testId="color-workspace-scopes-strip" />
 
       <div className="grow overflow-y-auto bg-editor-panel px-3 py-2">
@@ -118,6 +137,6 @@ export default function ColorWorkspacePanel() {
           toggleWbPicker={toggleWbPicker}
         />
       </div>
-    </div>
+    </InspectorPanelFrame>
   );
 }

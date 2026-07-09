@@ -651,6 +651,13 @@
         "details": "Detale",
         "effects": "Efekty"
       },
+      "status": {
+        "editedSections_one": "",
+        "editedSections_few": "",
+        "editedSections_many": "",
+        "editedSections_other": "",
+        "loadingImage": ""
+      },
       "title": "Ustawienia",
       "tooltips": {
         "autoAdjust": "Auto-korekta obrazu",

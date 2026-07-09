@@ -10,13 +10,11 @@ North star: `RAW_EDITOR_PLAN.md` drives a macOS-first, Capture One/Lightroom-cla
 
 ## Model Routing
 
-- Use GPT-5.6 Luna for cost-efficient routine work: PR polling, CI log triage, issue cleanup, mechanical refactors, docs edits, simple test fixes, and search/inventory summaries.
-- Use GPT-5.6 Terra for balanced everyday work: normal product implementation, focused bug fixes, validation updates, moderate UI work, and repo cleanup.
-- Use GPT-5.6 Sol for frontier work: architecture, coding agents, computer-use/UI inspection, design judgment, color science, image-processing math, agentic editing, complex UI redesign, hard debugging, consult synthesis, cyber/security review, and risky cross-cutting changes.
-- Use Sol `max` for the hardest design/debugging/science calls.
+- Use GPT-5.6 Terra for every subagent. Vary reasoning effort with task complexity: low/medium for polling and mechanical work; high/xhigh for product implementation, UI review, science, and cross-cutting changes.
+- Do not use GPT-5.6 Sol unless the user explicitly approves it. Route hard implementation, UI review, science, and cross-cutting changes to Terra in that case.
 - Use programmatic tool calling or compact local scripts when tool-heavy work needs filtering, progress checks, or intermediate-data reduction without flooding model context.
 - Subagents may implement, validate, and open PRs when issue context is sufficient. Orchestrator still reviews scope, validation evidence, issue linkage, and merge safety.
-- Do not use Sol for routine polling, formatting, simple renames, or low-risk mechanical cleanup. If a subagent stalls, re-scope, upgrade the tier, or switch streams.
+- Do not spend high-reasoning Terra capacity on routine polling, formatting, simple renames, or low-risk mechanical cleanup. If a subagent stalls, re-scope or switch streams.
 
 ## Code Hygiene
 

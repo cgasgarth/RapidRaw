@@ -163,8 +163,8 @@ describe('editor chrome status strip', () => {
     expect(chip(container, 'shadow-clipping').dataset.active).toBe('true');
     expect(chip(container, 'highlight-clipping').dataset.active).toBe('true');
     expect(chip(container, 'gamut-warning').dataset.value).toBe('12.5%');
-    expect(chip(container, 'soft-proof').dataset.state).toBe('current');
-    expect(chip(container, 'preview-scopes').dataset.state).toBe('current');
+    expect(container.querySelector('[data-testid="editor-chrome-status-chip-soft-proof"]')).toBeNull();
+    expect(container.querySelector('[data-testid="editor-chrome-status-chip-preview-scopes"]')).toBeNull();
 
     await rerenderStrip(true);
     const hiddenStrip = container.querySelector<HTMLElement>('[data-testid="editor-chrome-status-strip"]');

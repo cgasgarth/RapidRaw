@@ -580,6 +580,10 @@
         "details": "細節",
         "effects": "效果"
       },
+      "status": {
+        "editedSections_other": "",
+        "loadingImage": ""
+      },
       "title": "調整",
       "tooltips": {
         "autoAdjust": "自動調整影像",

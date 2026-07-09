@@ -604,6 +604,12 @@
         "details": "Détails",
         "effects": "Effets"
       },
+      "status": {
+        "editedSections_one": "",
+        "editedSections_many": "",
+        "editedSections_other": "",
+        "loadingImage": ""
+      },
       "title": "Ajustements",
       "tooltips": {
         "autoAdjust": "Ajustement auto de l'image",

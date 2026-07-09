@@ -35,7 +35,7 @@ interface CollapsibleSectionProps {
 export default function CollapsibleSection({
   actionsMenuLabel,
   actionsMenuTestId,
-  canToggleVisibility = true,
+  canToggleVisibility = false,
   children,
   headerActions = [],
   isContentVisible,
@@ -140,9 +140,12 @@ export default function CollapsibleSection({
             </span>
           )}
           {isDirty && (
-            <span className={cx(inspectorSectionTokens.badge, inspectorSectionTokens.dirtyBadge)}>
-              {t('ui.collapsibleSection.dirtyBadge', { defaultValue: 'Edited' })}
-            </span>
+            <span
+              aria-label={t('ui.collapsibleSection.dirtyBadge', { defaultValue: 'Edited' })}
+              className={inspectorSectionTokens.dirtyIndicator}
+              role="status"
+              title={t('ui.collapsibleSection.dirtyBadge', { defaultValue: 'Edited' })}
+            />
           )}
         </div>
         <div className="flex shrink-0 items-center gap-1">

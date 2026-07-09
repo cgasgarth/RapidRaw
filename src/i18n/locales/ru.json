@@ -624,6 +624,13 @@
         "details": "Детали",
         "effects": "Эффекты"
       },
+      "status": {
+        "editedSections_one": "Изменён {{count}} раздел",
+        "editedSections_few": "Изменено разделов: {{count}}",
+        "editedSections_many": "Изменено разделов: {{count}}",
+        "editedSections_other": "Изменено разделов: {{count}}",
+        "loadingImage": "Загрузка предпросмотра изображения"
+      },
       "title": "Настройки",
       "tooltips": {
         "autoAdjust": "Автонастройка изображения",

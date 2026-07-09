@@ -580,6 +580,10 @@
         "details": "ディテール",
         "effects": "効果"
       },
+      "status": {
+        "editedSections_other": "{{count}} 個のセクションを編集済み",
+        "loadingImage": "画像プレビューを読み込み中"
+      },
       "title": "補正",
       "tooltips": {
         "autoAdjust": "画像を自動補正",

@@ -1,26 +1,17 @@
 import cx from 'clsx';
-import { type KeyboardEvent, type ReactNode, useEffect, useId, useMemo, useState } from 'react';
+import { TriangleAlert } from 'lucide-react';
+import { type KeyboardEvent, type ReactNode, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { debouncedSave } from '../../hooks/editor/useEditorActions';
 import type { BlackWhiteMixerChannel } from '../../schemas/color/blackWhiteMixerSchemas';
 import type { ChannelMixerOutput } from '../../schemas/color/channelMixerSchemas';
 import type { ColorBalanceRgbRange } from '../../schemas/color/colorBalanceRgbSchemas';
-import {
-  type ActiveDisplayProfile,
-  activeDisplayProfileSchema,
-  type DisplayPreviewLutStatus,
-  displayPreviewLutStatusSchema,
-} from '../../schemas/displayProfileSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
-import { Invokes } from '../../tauri/commands';
 import { type Adjustments, ColorAdjustment } from '../../utils/adjustments';
 import {
-  buildColorOutputProofingDiagnostics,
-  formatGamutWarningCoverage,
   getPreviewScopeFreshnessStatus,
   getRenderedPreviewWarningStatus,
   isCurrentExportSoftProofGamutWarningOverlay,
-  resolveGamutWarningProofDimensions,
 } from '../../utils/color/runtime/gamutWarningDisplay';
 import {
   applyColorRangeLocalAdjustmentLayerFlow,
@@ -30,14 +21,12 @@ import {
 import { persistLayerStackSidecarInAdjustments } from '../../utils/layers/layerStackSidecarAdjustments';
 import { createColorRangeMaskParameters } from '../../utils/mask/colorRangeMaskParameters';
 import { getSelectiveColorRange } from '../../utils/selectiveColorRanges';
-import { applySkinToneUniformity, type SkinToneUniformityInput } from '../../utils/skinToneUniformity';
-import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import type { AppSettings } from '../ui/AppProperties';
-import { editorChromeStatusChipClassName } from '../ui/editorChromeTokens';
+import { professionalInspectorDensityTokens } from '../ui/inspectorTokens';
 import { ColorAdvancedControls } from './color/ColorAdvancedControls';
 import { ColorGradingControls } from './color/ColorGradingControls';
 import { ColorMixerControls } from './color/ColorMixerControls';
-import { ColorProfileToneControls, getProfileToneLabels } from './color/ColorProfileToneControls';
+import { ColorProfileToneControls } from './color/ColorProfileToneControls';
 import { ColorProofingDiagnostics } from './color/ColorProofingDiagnostics';
 import { ColorQuickControls } from './color/ColorQuickControls';
 import type { AdjustmentUpdate } from './color/types';
@@ -52,41 +41,17 @@ interface ColorPanelProps {
   onDragStateChange?: ((isDragging: boolean) => void) | undefined;
 }
 
-const skinToneInspectorSample: SkinToneUniformityInput = {
-  hueDegrees: 18,
-  luminance: 0.5,
-  saturation: 0.45,
-};
-
-const COLOR_WORKSPACE_TAB_IDS = ['quick', 'editor', 'grading', 'output', 'advanced'] as const;
+const COLOR_WORKSPACE_TAB_IDS = ['quick', 'editor', 'grading', 'output'] as const;
 type ColorWorkspaceTabId = (typeof COLOR_WORKSPACE_TAB_IDS)[number];
 const COLOR_WORKSPACE_TAB_SESSION_KEY = 'rawengine.colorWorkspace.activeTab';
 let sessionColorWorkspaceTab: ColorWorkspaceTabId = 'quick';
-const COLOR_WORKSPACE_TAB_BASE_CLASS =
-  'relative inline-flex min-h-6 shrink-0 items-center justify-center rounded px-2 text-[11px] font-semibold leading-4 tracking-normal transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring focus-visible:ring-offset-1 focus-visible:ring-offset-editor-matte';
-const COLOR_WORKSPACE_TAB_ACTIVE_CLASS = 'bg-editor-primary-active text-editor-primary-active-text shadow-sm';
-const COLOR_WORKSPACE_TAB_INACTIVE_CLASS =
-  'bg-transparent text-text-secondary hover:bg-editor-selected-quiet hover:text-text-primary';
-const COLOR_WORKSPACE_CHIP_CLASS = cx(
-  editorChromeStatusChipClassName('warning'),
-  'max-w-[8.25rem] shrink-0 truncate whitespace-nowrap normal-case',
-);
-const COLOR_WORKSPACE_NEUTRAL_CHIP_CLASS = cx(
-  editorChromeStatusChipClassName('neutral'),
-  'max-w-[8.25rem] shrink-0 truncate whitespace-nowrap normal-case',
-);
-
+const COLOR_WORKSPACE_TAB_BASE_CLASS = professionalInspectorDensityTokens.workspaceNavigation.tab;
+const COLOR_WORKSPACE_TAB_ACTIVE_CLASS = professionalInspectorDensityTokens.workspaceNavigation.active;
+const COLOR_WORKSPACE_TAB_INACTIVE_CLASS = professionalInspectorDensityTokens.workspaceNavigation.inactive;
 interface ColorWorkspaceTab {
   id: ColorWorkspaceTabId;
   label: string;
   panel: ReactNode;
-}
-
-interface ColorOutputDisplayDiagnosticsState {
-  error: string | null;
-  loading: boolean;
-  lut: DisplayPreviewLutStatus | null;
-  profile: ActiveDisplayProfile | null;
 }
 
 const getNextColorWorkspaceTabId = (
@@ -130,18 +95,6 @@ const rememberSessionColorWorkspaceTab = (tabId: ColorWorkspaceTabId) => {
   }
 };
 
-const skinToneTargetDistance = (
-  input: SkinToneUniformityInput,
-  settings: Pick<Adjustments['skinToneUniformity'], 'targetHueDegrees' | 'targetLuminance' | 'targetSaturation'>,
-): number => {
-  const hueDelta = Math.abs((((settings.targetHueDegrees - input.hueDegrees + 540) % 360) - 180) / 180);
-  return (
-    hueDelta +
-    Math.abs(settings.targetLuminance - input.luminance) +
-    Math.abs(settings.targetSaturation - input.saturation)
-  );
-};
-
 const skinTonePreviewHsl = (settings: Adjustments['skinToneUniformity']) => {
   const hueDelta = Math.min(
     settings.maxHueShiftDegrees,
@@ -167,15 +120,10 @@ export default function ColorPanel({
   const { t } = useTranslation();
   const tablistId = useId();
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<ColorWorkspaceTabId>(readSessionColorWorkspaceTab);
+  const panelRef = useRef<HTMLDivElement>(null);
   const [activeColor, setActiveColor] = useState<BlackWhiteMixerChannel>('reds');
   const [activeColorBalanceRange, setActiveColorBalanceRange] = useState<ColorBalanceRgbRange>('midtones');
   const [activeChannelMixerOutput, setActiveChannelMixerOutput] = useState<ChannelMixerOutput>('red');
-  const [displayDiagnosticsState, setDisplayDiagnosticsState] = useState<ColorOutputDisplayDiagnosticsState>({
-    error: null,
-    loading: true,
-    lut: null,
-    profile: null,
-  });
   const gamutWarningOverlay = useEditorStore((state) => state.gamutWarningOverlay);
   const previewScopeStatus = useEditorStore((state) => state.previewScopeStatus);
   const selectedImage = useEditorStore((state) => state.selectedImage);
@@ -190,7 +138,6 @@ export default function ColorPanel({
   const isColorCalibrationVisible = (adjustmentVisibility as { colorCalibration?: boolean }).colorCalibration !== false;
   const isLevelsVisible = adjustmentVisibility[ColorAdjustment.Levels] !== false;
   const isWgpuEnabled = appSettings?.useWgpuRenderer !== false;
-  const activeExportPresetName = appSettings?.exportPresets?.[0]?.name ?? null;
   const isCurrentGamutWarningOverlay = isCurrentExportSoftProofGamutWarningOverlay(gamutWarningOverlay, {
     exportSoftProofRecipeId,
     exportSoftProofTransform,
@@ -198,8 +145,6 @@ export default function ColorPanel({
     selectedImagePath,
   });
   const currentGamutWarningOverlay = isCurrentGamutWarningOverlay ? gamutWarningOverlay : null;
-  const proofDimensions = resolveGamutWarningProofDimensions(gamutWarningOverlay, selectedImage);
-  const gamutWarningCoverage = formatGamutWarningCoverage(currentGamutWarningOverlay);
   const renderedPreviewWarningStatus = getRenderedPreviewWarningStatus(gamutWarningOverlay, {
     exportSoftProofRecipeId,
     exportSoftProofTransform,
@@ -207,18 +152,6 @@ export default function ColorPanel({
     selectedImagePath,
   });
   const previewScopeFreshnessStatus = getPreviewScopeFreshnessStatus(previewScopeStatus, selectedImagePath);
-  const colorOutputProofingDiagnostics = buildColorOutputProofingDiagnostics({
-    activeDisplayProfile: displayDiagnosticsState.profile,
-    currentGamutWarningOverlay,
-    displayProfileError: displayDiagnosticsState.error,
-    displayProfileLoading: displayDiagnosticsState.loading,
-    displayPreviewLutStatus: displayDiagnosticsState.lut,
-    exportSoftProofRecipeId,
-    exportSoftProofTransform,
-    previewScopeFreshnessStatus,
-    previewScopeWarningCodes: previewScopeStatus?.warningCodes ?? [],
-    renderedPreviewWarningStatus,
-  });
   const levels = adjustments.levels;
   const levelsClippingWarnings = [
     levels.inputBlack > 0 ? t('adjustments.color.levels.warnings.shadowClipping') : null,
@@ -226,30 +159,23 @@ export default function ColorPanel({
     levels.outputBlack > 0 || levels.outputWhite < 1 ? t('adjustments.color.levels.warnings.outputCompression') : null,
   ].filter((warning): warning is string => warning !== null);
   const colorWorkspaceWarningChips = [
-    renderedPreviewWarningStatus.state === 'current'
-      ? t('editor.canvas.gamutWarningCoverage', {
-          profile: renderedPreviewWarningStatus.displayProfileLabel,
-          value: renderedPreviewWarningStatus.coverageLabel,
-        })
-      : renderedPreviewWarningStatus.statusLabel,
-    previewScopeFreshnessStatus.statusLabel,
+    isExportSoftProofEnabled && renderedPreviewWarningStatus.state !== 'current'
+      ? renderedPreviewWarningStatus.statusLabel
+      : currentGamutWarningOverlay !== null
+        ? t('editor.canvas.gamutWarningCoverage', {
+            profile: renderedPreviewWarningStatus.displayProfileLabel,
+            value: renderedPreviewWarningStatus.coverageLabel,
+          })
+        : null,
+    previewScopeFreshnessStatus.state === 'stale' || previewScopeFreshnessStatus.state === 'unsupported'
+      ? previewScopeFreshnessStatus.statusLabel
+      : null,
     ...levelsClippingWarnings,
     adjustments.skinToneUniformity.enabled ? t('adjustments.color.skinToneUniformity.warning') : null,
   ].filter((warning): warning is string => warning !== null);
-  const colorWorkspaceHeaderChips =
-    colorWorkspaceWarningChips.length > 0 ? colorWorkspaceWarningChips : [t('adjustments.color.gamutWarning.off')];
-  const skinTonePreview = skinTonePreviewHsl(adjustments.skinToneUniformity);
-  const skinToneInspectorOutput = applySkinToneUniformity(skinToneInspectorSample, adjustments.skinToneUniformity);
-  const skinToneInspectorBeforeDistance = skinToneTargetDistance(
-    skinToneInspectorSample,
-    adjustments.skinToneUniformity,
-  );
-  const skinToneInspectorAfterDistance = skinToneTargetDistance(
-    skinToneInspectorOutput,
-    adjustments.skinToneUniformity,
-  );
-  const skinToneInspectorImprovement = skinToneInspectorBeforeDistance - skinToneInspectorAfterDistance;
-  const { activeCameraProfileLabel, activeToneCurveLabel } = getProfileToneLabels(adjustments, t);
+  const colorWorkspacePrimaryStatus = colorWorkspaceWarningChips[0] ?? null;
+  const colorWorkspaceAdditionalStatusCount = Math.max(0, colorWorkspaceWarningChips.length - 1);
+  const colorWorkspaceStatusSummary = colorWorkspaceWarningChips.join(' · ');
 
   const createLocalAdjustmentFromActiveColorRange = () => {
     if (isForMask || selectedImage === null) return;
@@ -387,6 +313,17 @@ export default function ColorPanel({
               setActiveColorBalanceRange={setActiveColorBalanceRange}
               setAdjustments={setAdjustments}
             />
+            {!isForMask && (isLevelsVisible || isColorCalibrationVisible) ? (
+              <ColorAdvancedControls
+                adjustmentVisibility={adjustmentVisibility}
+                adjustments={adjustments}
+                appSettings={appSettings}
+                isColorCalibrationVisible={isColorCalibrationVisible}
+                levelsClippingWarnings={levelsClippingWarnings}
+                onDragStateChange={onDragStateChange}
+                setAdjustments={setAdjustments}
+              />
+            ) : null}
           </div>
         ),
       },
@@ -410,46 +347,16 @@ export default function ColorPanel({
         label: t('adjustments.color.workspaceTabs.output'),
         panel: (
           <ColorProofingDiagnostics
-            activeCameraProfileLabel={activeCameraProfileLabel}
-            activeExportPresetName={activeExportPresetName}
-            activeToneCurveLabel={activeToneCurveLabel}
             adjustments={adjustments}
             appSettings={appSettings}
             colorWorkspaceWarningChips={colorWorkspaceWarningChips}
-            colorOutputProofingDiagnostics={colorOutputProofingDiagnostics}
-            currentGamutWarningOverlay={currentGamutWarningOverlay}
-            gamutWarningCoverage={gamutWarningCoverage}
+            hasCurrentGamutWarning={currentGamutWarningOverlay !== null}
             isGamutWarningOverlayVisible={isGamutWarningOverlayVisible}
             onDragStateChange={onDragStateChange}
-            previewScopeFreshnessStatus={previewScopeFreshnessStatus}
-            proofDimensions={proofDimensions}
             renderedPreviewWarningStatus={renderedPreviewWarningStatus}
             setAdjustments={setAdjustments}
             setEditor={setEditor}
-            skinToneInspectorAfterDistance={skinToneInspectorAfterDistance}
-            skinToneInspectorBeforeDistance={skinToneInspectorBeforeDistance}
-            skinToneInspectorImprovement={skinToneInspectorImprovement}
-            skinToneInspectorOutputHue={skinToneInspectorOutput.hueDegrees}
-            skinTonePreview={skinTonePreview}
             syncSkinToneUniformity={syncSkinToneUniformity}
-          />
-        ),
-      });
-    }
-
-    if (!isForMask && (isLevelsVisible || isColorCalibrationVisible)) {
-      tabs.push({
-        id: 'advanced',
-        label: t('adjustments.color.workspaceTabs.advanced'),
-        panel: (
-          <ColorAdvancedControls
-            adjustmentVisibility={adjustmentVisibility}
-            adjustments={adjustments}
-            appSettings={appSettings}
-            isColorCalibrationVisible={isColorCalibrationVisible}
-            levelsClippingWarnings={levelsClippingWarnings}
-            onDragStateChange={onDragStateChange}
-            setAdjustments={setAdjustments}
           />
         ),
       });
@@ -457,19 +364,14 @@ export default function ColorPanel({
 
     return tabs;
   }, [
-    activeCameraProfileLabel,
     activeChannelMixerOutput,
     activeColor,
     activeColorBalanceRange,
-    activeExportPresetName,
-    activeToneCurveLabel,
     adjustmentVisibility,
     adjustments,
     appSettings,
     colorWorkspaceWarningChips,
-    colorOutputProofingDiagnostics,
     currentGamutWarningOverlay,
-    gamutWarningCoverage,
     isColorCalibrationVisible,
     isForMask,
     isGamutWarningOverlayVisible,
@@ -479,52 +381,14 @@ export default function ColorPanel({
     levelsClippingWarnings,
     onDragStateChange,
     previewScopeFreshnessStatus,
-    proofDimensions,
     renderedPreviewWarningStatus,
     setAdjustments,
     setEditor,
-    skinToneInspectorAfterDistance,
-    skinToneInspectorBeforeDistance,
-    skinToneInspectorImprovement,
-    skinToneInspectorOutput.hueDegrees,
-    skinTonePreview,
     syncSkinToneUniformity,
     t,
     toggleWbPicker,
   ]);
-
-  useEffect(() => {
-    let isActive = true;
-
-    const loadDisplayDiagnostics = async () => {
-      setDisplayDiagnosticsState((state) => ({ ...state, error: null, loading: true }));
-      try {
-        const [profile, lut] = await Promise.all([
-          invokeWithSchema(Invokes.GetActiveDisplayProfile, {}, activeDisplayProfileSchema),
-          invokeWithSchema(Invokes.GetDisplayPreviewLutStatus, {}, displayPreviewLutStatusSchema),
-        ]);
-
-        if (isActive) {
-          setDisplayDiagnosticsState({ error: null, loading: false, lut, profile });
-        }
-      } catch (error) {
-        if (isActive) {
-          setDisplayDiagnosticsState({
-            error: error instanceof Error ? error.message : String(error),
-            loading: false,
-            lut: null,
-            profile: null,
-          });
-        }
-      }
-    };
-
-    void loadDisplayDiagnostics();
-
-    return () => {
-      isActive = false;
-    };
-  }, []);
+  const canRevealColorDiagnostics = workspaceTabs.some((tab) => tab.id === 'output');
 
   useEffect(() => {
     if (!workspaceTabs.some((tab) => tab.id === activeWorkspaceTab)) {
@@ -583,10 +447,23 @@ export default function ColorPanel({
     }
   };
 
+  const revealColorDiagnostics = () => {
+    if (!canRevealColorDiagnostics) return;
+    selectWorkspaceTab('output');
+    window.requestAnimationFrame(() => {
+      const disclosure = panelRef.current?.querySelector<HTMLDetailsElement>(
+        '[data-testid="color-proofing-diagnostics-disclosure"]',
+      );
+      disclosure?.setAttribute('open', '');
+      disclosure?.querySelector<HTMLElement>('summary')?.focus();
+      disclosure?.scrollIntoView({ block: 'nearest' });
+    });
+  };
+
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1.5" ref={panelRef}>
       <div
-        className="sticky top-0 z-20 -mx-3 border-b border-editor-border bg-editor-panel px-3 py-1 shadow-sm"
+        className="sticky top-0 z-20 -mx-3 border-b border-editor-border bg-editor-panel px-2 py-1.5"
         data-gamut-warning-count={currentGamutWarningOverlay?.warning_pixel_count ?? 0}
         data-preview-warning-state={renderedPreviewWarningStatus.state}
         data-scope-freshness-state={previewScopeFreshnessStatus.state}
@@ -594,61 +471,90 @@ export default function ColorPanel({
         data-testid="color-workspace-tab-header"
         data-warning-count={colorWorkspaceWarningChips.length}
       >
-        <div
-          aria-label={t('adjustments.color.workspaceTabs.label')}
-          className="flex min-w-0 gap-1 overflow-x-auto"
-          data-testid="color-workspace-tabs"
-          onKeyDown={handleWorkspaceTabKeyDown}
-          role="tablist"
-        >
-          {workspaceTabs.map((tab) => {
-            const isActive = activeWorkspaceTab === tab.id;
+        <div className={professionalInspectorDensityTokens.workspaceNavigation.scroller}>
+          <div
+            aria-label={t('adjustments.color.workspaceTabs.label')}
+            className={professionalInspectorDensityTokens.workspaceNavigation.tabList}
+            data-testid="color-workspace-tabs"
+            onKeyDown={handleWorkspaceTabKeyDown}
+            role="tablist"
+          >
+            {workspaceTabs.map((tab) => {
+              const isActive = activeWorkspaceTab === tab.id;
 
-            return (
-              <button
-                aria-controls={`${tablistId}-${tab.id}-panel`}
-                aria-selected={isActive}
-                className={cx(
-                  COLOR_WORKSPACE_TAB_BASE_CLASS,
-                  isActive ? COLOR_WORKSPACE_TAB_ACTIVE_CLASS : COLOR_WORKSPACE_TAB_INACTIVE_CLASS,
-                )}
-                data-active={String(isActive)}
-                data-testid={`color-workspace-tab-${tab.id}`}
-                id={`${tablistId}-${tab.id}-tab`}
-                key={tab.id}
-                onClick={() => {
-                  selectWorkspaceTab(tab.id);
-                }}
-                role="tab"
-                tabIndex={isActive ? 0 : -1}
-                type="button"
-              >
-                {tab.label}
-              </button>
-            );
-          })}
+              return (
+                <button
+                  aria-controls={`${tablistId}-${tab.id}-panel`}
+                  aria-label={tab.label}
+                  aria-selected={isActive}
+                  className={cx(
+                    COLOR_WORKSPACE_TAB_BASE_CLASS,
+                    isActive ? COLOR_WORKSPACE_TAB_ACTIVE_CLASS : COLOR_WORKSPACE_TAB_INACTIVE_CLASS,
+                  )}
+                  data-active={String(isActive)}
+                  data-testid={`color-workspace-tab-${tab.id}`}
+                  data-tooltip={tab.label}
+                  id={`${tablistId}-${tab.id}-tab`}
+                  key={tab.id}
+                  onClick={() => {
+                    selectWorkspaceTab(tab.id);
+                  }}
+                  role="tab"
+                  tabIndex={isActive ? 0 : -1}
+                  title={tab.label}
+                  type="button"
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
-        <div
-          aria-label={t('adjustments.color.proofingDiagnostics.summary', {
-            coverage: gamutWarningCoverage,
-            warningCount: colorWorkspaceWarningChips.length,
-          })}
-          className="mt-1 flex min-w-0 gap-1 overflow-hidden"
-          data-testid="color-workspace-warning-chips"
-        >
-          {colorWorkspaceHeaderChips.map((warning) => (
+        {colorWorkspacePrimaryStatus ? (
+          <div
+            aria-live="polite"
+            aria-label={colorWorkspaceStatusSummary}
+            className={professionalInspectorDensityTokens.workspaceNavigation.statusRow}
+            data-tooltip={colorWorkspaceStatusSummary}
+            data-testid="color-workspace-warning-chips"
+            role="group"
+            title={colorWorkspaceStatusSummary}
+          >
+            <TriangleAlert aria-hidden="true" className="shrink-0 text-editor-warning" size={12} />
             <span
-              className={
-                colorWorkspaceWarningChips.length > 0 ? COLOR_WORKSPACE_CHIP_CLASS : COLOR_WORKSPACE_NEUTRAL_CHIP_CLASS
-              }
-              data-testid="color-workspace-warning-chip"
-              key={warning}
-              title={warning}
+              className={professionalInspectorDensityTokens.workspaceNavigation.statusLabel}
+              data-testid="color-workspace-primary-status"
+              data-tooltip={colorWorkspacePrimaryStatus}
+              title={colorWorkspacePrimaryStatus}
             >
-              {warning}
+              {colorWorkspacePrimaryStatus}
             </span>
-          ))}
-        </div>
+            {colorWorkspaceAdditionalStatusCount > 0 ? (
+              canRevealColorDiagnostics ? (
+                <button
+                  aria-label={colorWorkspaceStatusSummary}
+                  className={professionalInspectorDensityTokens.workspaceNavigation.statusCount}
+                  data-testid="color-workspace-status-details"
+                  data-tooltip={colorWorkspaceStatusSummary}
+                  onClick={revealColorDiagnostics}
+                  title={colorWorkspaceStatusSummary}
+                  type="button"
+                >
+                  +{colorWorkspaceAdditionalStatusCount}
+                </button>
+              ) : (
+                <span
+                  aria-label={colorWorkspaceStatusSummary}
+                  className={professionalInspectorDensityTokens.workspaceNavigation.statusCount}
+                  data-tooltip={colorWorkspaceStatusSummary}
+                  title={colorWorkspaceStatusSummary}
+                >
+                  +{colorWorkspaceAdditionalStatusCount}
+                </span>
+              )
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       {workspaceTabs.map((tab) => (

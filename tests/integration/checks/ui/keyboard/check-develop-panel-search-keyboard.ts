@@ -88,6 +88,15 @@ async function validateDevelopPanelSearchKeyboard() {
   });
 
   const rendered = await renderPanel();
+  const inspector = getByTestId(rendered.container, 'adjustments-inspector');
+  assert.equal(inspector.getAttribute('data-inspector-density'), 'compact');
+  assert.ok(getByTestId(rendered.container, 'adjustments-inspector-header'));
+  assert.equal(
+    getByTestId(rendered.container, 'adjustments-inspector-notice').getAttribute('data-notice-kind'),
+    'empty',
+    'no-selection state should remain explicit while control search stays available.',
+  );
+  assert.ok(getByTestId(rendered.container, 'develop-panel-search-shelf'));
   const searchInput = getByLabel<HTMLInputElement>(rendered.container, 'Search adjustment controls');
   await input(searchInput, 'dehaze');
   await flushPromises();
