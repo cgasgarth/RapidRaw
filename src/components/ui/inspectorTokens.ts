@@ -47,7 +47,7 @@ export const professionalInspectorDensityTokens = {
     actionButtonActive: 'bg-editor-selected-quiet text-editor-selected-quiet-text hover:bg-editor-selected-quiet',
     actions: 'flex h-7 shrink-0 items-center gap-0.5',
     header:
-      'flex min-h-9 shrink-0 items-center justify-between gap-2 border-b border-editor-border bg-editor-panel px-2.5 py-1',
+      'flex min-h-10 shrink-0 items-center justify-between gap-2 border-b border-editor-border bg-editor-panel px-2.5 py-1',
     iconSlot:
       'flex h-6 w-6 shrink-0 items-center justify-center rounded border border-editor-border bg-editor-panel-well text-text-secondary',
     notice:

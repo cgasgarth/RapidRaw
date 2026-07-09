@@ -292,7 +292,7 @@ export async function assertAdjustmentsPanelRetune(page) {
   }
   const inspectorStatus = panel.getByTestId('adjustments-inspector-status');
   await inspectorStatus.waitFor({ timeout: 10_000 });
-  const inspectorStatusLabel = (await inspectorStatus.textContent())?.trim().toLowerCase() ?? '';
+  const inspectorStatusLabel = (await inspectorStatus.getAttribute('aria-label'))?.trim().toLowerCase() ?? '';
   if (!/^\d+ edited$/u.test(inspectorStatusLabel)) {
     throw new Error(`Adjustments inspector should summarize edited sections, got ${inspectorStatusLabel}.`);
   }
@@ -310,7 +310,7 @@ export async function assertAdjustmentsPanelRetune(page) {
 
   await assertAdjustmentSectionHeaderActions(page, panel);
 
-  await panel.getByText('Edited', { exact: true }).first().waitFor({ timeout: 10_000 });
+  await panel.locator('[role="status"][aria-label$="edited" i]').first().waitFor({ timeout: 10_000 });
   await panel.getByText('Off', { exact: true }).first().waitFor({ timeout: 10_000 });
 
   const rawProcessingControl = panel.getByTestId('raw-processing-mode-override-control');
