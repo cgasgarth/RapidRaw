@@ -15,6 +15,7 @@ use crate::gpu_textures::{
 };
 use crate::image_processing::{AllAdjustments, GpuContext, MAX_MASKS};
 use crate::lut_processing::Lut;
+use crate::mixer_render::apply_native_color_mixer_adjustments;
 use crate::render_caches::RenderCaches;
 use crate::{AppState, GpuImageCache};
 
@@ -1202,7 +1203,11 @@ fn process_and_get_dynamic_image_inner(
             height,
             max_dim
         );
-        return Ok(base_image.clone());
+        return Ok(apply_native_color_mixer_adjustments(
+            std::borrow::Cow::Borrowed(base_image),
+            &request.adjustments.global,
+        )
+        .into_owned());
     }
 
     let mut old_processor = None;

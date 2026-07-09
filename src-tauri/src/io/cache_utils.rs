@@ -94,6 +94,19 @@ pub fn calculate_transform_hash(adjustments: &serde_json::Value) -> u64 {
         crop_val.to_string().hash(&mut hasher);
     }
 
+    for key in adjustment_fields::CPU_COLOR_RENDER_HASH_KEYS {
+        if let Some(value) = adjustments.get(key) {
+            key.hash(&mut hasher);
+            value.to_string().hash(&mut hasher);
+        }
+    }
+    adjustments
+        .get("sectionVisibility")
+        .and_then(|visibility| visibility.get("color"))
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(true)
+        .hash(&mut hasher);
+
     for key in adjustment_fields::GEOMETRY_KEYS {
         if let Some(val) = adjustments.get(key) {
             key.hash(&mut hasher);
@@ -160,6 +173,45 @@ pub fn calculate_full_job_hash(path: &str, adjustments: &serde_json::Value) -> u
     path.hash(&mut hasher);
     adjustments.to_string().hash(&mut hasher);
     hasher.finish()
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::calculate_transform_hash;
+
+    #[test]
+    fn color_mixer_changes_invalidate_the_transformed_preview_cache() {
+        let base = json!({
+            "colorBalanceRgb": {
+                "enabled": true,
+                "preserveLuminance": true,
+                "shadows": { "red": 0, "green": 0, "blue": 0 },
+                "midtones": { "red": 0, "green": 0, "blue": 0 },
+                "highlights": { "red": 0, "green": 0, "blue": 0 }
+            },
+            "channelMixer": { "enabled": false },
+            "blackWhiteMixer": { "enabled": false },
+            "sectionVisibility": { "color": true }
+        });
+        let mut updated = base.clone();
+        updated["colorBalanceRgb"]["midtones"]["red"] = json!(80);
+
+        assert_ne!(
+            calculate_transform_hash(&base),
+            calculate_transform_hash(&updated),
+            "a native color edit must rebuild the preview and zoom source image"
+        );
+
+        let mut hidden = base.clone();
+        hidden["sectionVisibility"]["color"] = json!(false);
+        assert_ne!(
+            calculate_transform_hash(&base),
+            calculate_transform_hash(&hidden),
+            "hiding the color section must invalidate baked mixer pixels"
+        );
+    }
 }
 
 pub struct DecodedImageCache {

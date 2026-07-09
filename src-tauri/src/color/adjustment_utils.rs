@@ -139,3 +139,57 @@ pub fn apply_all_transformations<'a, I: IntoCowImage<'a>>(
 
     (cropped_image, unscaled_crop_offset)
 }
+
+#[cfg(test)]
+mod tests {
+    use image::{DynamicImage, ImageBuffer, Rgba};
+    use serde_json::json;
+
+    use super::apply_all_transformations;
+
+    #[test]
+    fn shared_transform_path_keeps_color_mixers_for_the_render_stage() {
+        let source = DynamicImage::ImageRgba32F(ImageBuffer::from_pixel(
+            1,
+            1,
+            Rgba([0.68, 0.48, 0.34, 1.0]),
+        ));
+        let enabled = json!({
+            "colorBalanceRgb": {
+                "enabled": true,
+                "preserveLuminance": false,
+                "shadows": { "red": 0, "green": 0, "blue": 0 },
+                "midtones": { "red": 100, "green": 0, "blue": 0 },
+                "highlights": { "red": 0, "green": 0, "blue": 0 }
+            },
+            "channelMixer": {
+                "enabled": true,
+                "preserveLuminance": false,
+                "red": { "red": 0, "green": 100, "blue": 0, "constant": 0 },
+                "green": { "red": 0, "green": 0, "blue": 100, "constant": 0 },
+                "blue": { "red": 100, "green": 0, "blue": 0, "constant": 0 }
+            },
+            "blackWhiteMixer": {
+                "enabled": true,
+                "weights": {
+                    "reds": 100,
+                    "oranges": 0,
+                    "yellows": 0,
+                    "greens": 0,
+                    "aquas": 0,
+                    "blues": 0,
+                    "purples": 0,
+                    "magentas": 0
+                }
+            }
+        });
+
+        let (enabled_output, _) = apply_all_transformations(&source, &enabled);
+
+        assert_eq!(
+            enabled_output.as_ref().to_rgba32f().into_raw(),
+            source.to_rgba32f().into_raw(),
+            "geometry transforms must not bake mixer edits into compare-original input"
+        );
+    }
+}
