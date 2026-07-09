@@ -61,22 +61,6 @@ export const professionalInspectorDensityTokens = {
     root: 'flex min-h-9 shrink-0 items-center justify-between border-b border-editor-border bg-editor-panel px-3 py-1',
     title: 'truncate text-[13px] font-semibold leading-5 tracking-normal text-text-primary',
   },
-  rawProcessing: {
-    body: 'space-y-1.5 pt-1.5',
-    compareButton:
-      'flex min-h-7 w-full items-center justify-center gap-2 rounded bg-editor-panel-raised px-2 py-1 text-[11px] font-medium leading-4 text-text-primary transition-colors hover:bg-editor-selected-quiet disabled:cursor-not-allowed disabled:opacity-45 aria-busy:cursor-progress focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring',
-    description: 'min-w-0 text-[11px] leading-4 text-text-secondary',
-    disclosure:
-      'flex min-h-7 w-full items-center justify-between gap-2 rounded-sm text-left transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring',
-    label: 'shrink-0 text-[11px] font-semibold uppercase leading-4 tracking-normal text-text-secondary',
-    provenanceButton:
-      'inline-flex items-center gap-1.5 rounded text-[11px] font-medium leading-4 text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring',
-    provenanceValue: 'break-all font-mono text-[11px] leading-4 text-text-secondary',
-    resultCard: 'space-y-1.5 rounded border border-editor-border bg-editor-panel-well p-1.5',
-    resultMetric: 'min-w-0 space-y-0.5 rounded bg-editor-panel px-1.5 pb-1 pt-1',
-    root: 'shrink-0 border-b border-editor-border bg-editor-panel px-3 py-1',
-    statusValue: 'truncate text-[11px] leading-4 text-text-primary',
-  },
   workspaceNavigation: {
     active: 'bg-editor-panel-raised text-text-primary shadow-[inset_0_-2px_0_var(--editor-primary-active)]',
     inactive: 'text-text-secondary hover:bg-editor-panel-raised hover:text-text-primary',

@@ -361,10 +361,11 @@
         "toggleAnalytics": "분석 표시 전환"
       },
       "scopedSections": {
-        "basic": "Basic Tone",
-        "curves": "Tone Curves",
+        "basic": "Light",
+        "curves": "Curve",
         "details": "Detail",
-        "effects": "Effects & Looks"
+        "effects": "Effects",
+        "transformLens": "Geometry & Lens"
       },
       "rawProcessingModeOverride": {
         "attention": "Check"
