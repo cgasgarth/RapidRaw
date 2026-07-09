@@ -7,6 +7,7 @@ import {
   type NegativeLabApplyResultV1,
   type NegativeLabAppServerToolDefinitionV1,
   type NegativeLabCommandEnvelopeV1,
+  type NegativeLabDensityBoundsReceiptV1,
   type NegativeLabDryRunResultV1,
   type NegativeLabPositiveOutputReceiptV1,
   type NegativeLabRuntimeProofV1,
@@ -63,6 +64,7 @@ export interface NegativeLabRuntimePreviewRenderResultV1 {
       green: { max: number; min: number };
       red: { max: number; min: number };
     };
+    boundsReceipt: NegativeLabDensityBoundsReceiptV1;
     clippedPixelCount: number;
     densityRangeUnclamped: number;
     epsilonClampedPixelCount: number;
@@ -387,6 +389,11 @@ function buildNegativeLabRuntimePositiveOutputReceiptsV1({
   provenanceEntryIds: string[];
   request: NegativeLabApplyPlanRequestV1;
 }): NegativeLabPositiveOutputReceiptV1[] {
+  const boundsReceipt = acceptedPlan.dryRun.proof?.runtimePreview.densityNormalizationMetrics.boundsReceipt;
+  if (boundsReceipt === undefined) {
+    throw new Error('Negative Lab positive output receipts require accepted density bounds.');
+  }
+
   return positiveVariantIds.map((positiveVariantId, index) => {
     const frameId = acceptedPlan.dryRun.changeSet.updatedFrameIds[index] ?? positiveVariantId;
     const artifact = exportArtifacts[index];
@@ -409,6 +416,7 @@ function buildNegativeLabRuntimePositiveOutputReceiptsV1({
     return {
       acceptedDryRunPlanHash: request.acceptedDryRunPlanHash,
       acceptedDryRunPlanId: request.dryRunPlanId,
+      boundsReceipt,
       conversionBundleContentHash: `sha256:${stableProofToken(
         JSON.stringify({ ...receiptPayload, kind: 'conversion_bundle' }),
       )}`,
@@ -577,11 +585,13 @@ function buildNegativeLabRuntimeProofV1({
           green: { max: 1.02, min: -0.02 },
           red: { max: 0.98, min: -0.01 },
         },
+        boundsReceipt:
+          renderedPreview.densityNormalizationMetrics?.boundsReceipt ?? buildDefaultNegativeLabBoundsReceipt(command),
         clippedPixelCount: renderedPreview.densityNormalizationMetrics?.clippedPixelCount ?? 0,
         densityRangeUnclamped:
           renderedPreview.densityNormalizationMetrics?.densityRangeUnclamped ?? densityRangeUnclamped,
         epsilonClampedPixelCount: renderedPreview.densityNormalizationMetrics?.epsilonClampedPixelCount ?? 0,
-        rendererVersion: renderedPreview.densityNormalizationMetrics?.rendererVersion ?? 1,
+        rendererVersion: renderedPreview.densityNormalizationMetrics?.rendererVersion ?? 2,
       },
       dryRunMode: 'runtime_preview_non_mutating',
       planHash,
@@ -762,14 +772,61 @@ function buildDefaultNegativeLabRuntimePreviewRenderResultV1(
         green: { max: 1.02, min: -0.02 },
         red: { max: 0.98, min: -0.01 },
       },
+      boundsReceipt: buildDefaultNegativeLabBoundsReceipt(command),
       clippedPixelCount: 0,
       densityRangeUnclamped: Number((p50AnchorDensity + 0.42).toFixed(4)),
       epsilonClampedPixelCount: 0,
-      rendererVersion: 1,
+      rendererVersion: 2,
     },
     dimensions: { height, width },
     renderer: 'rawengine_density_preview_runtime',
     storage: 'temp_cache',
+  };
+}
+
+function buildDefaultNegativeLabBoundsReceipt(
+  command: NegativeLabSetConversionRecipeCommandV1,
+): NegativeLabDensityBoundsReceiptV1 {
+  const params = command.parameters.densityBounds;
+  const baseBounds = {
+    axisBounds: {
+      color: { max: 0.08, min: -0.08 },
+      luma: { max: 0.16, min: 0.02 },
+    },
+    channelBounds: {
+      blue: { max: 0.2, min: 0.04 },
+      green: { max: 0.16, min: 0.02 },
+      red: { max: 0.14, min: 0.01 },
+    },
+  };
+
+  return {
+    algorithmId: 'fixed_grid_block_median_luma_color_v1',
+    analysisBuffer: params.analysisBuffer,
+    analysisRect: {
+      height: 1 - params.analysisBuffer * 2,
+      width: 1 - params.analysisBuffer * 2,
+      x: params.analysisBuffer,
+      y: params.analysisBuffer,
+    },
+    baseBounds,
+    baseFogProvenance: params.baseFogProvenance,
+    colorRangeClip: params.colorRangeClip,
+    finalBounds: {
+      axisBounds: {
+        color: { max: 0.12, min: -0.12 },
+        luma: { max: 1.08, min: -0.03 },
+      },
+      channelBounds: {
+        blue: { max: 1.08, min: -0.03 },
+        green: { max: 1.02, min: -0.02 },
+        red: { max: 0.98, min: -0.01 },
+      },
+    },
+    lumaRangeClip: params.lumaRangeClip,
+    schemaVersion: 1,
+    warningCodes:
+      command.parameters.baseStrategy.mode === 'profile_default_low_confidence' ? ['missing_visible_base'] : [],
   };
 }
 

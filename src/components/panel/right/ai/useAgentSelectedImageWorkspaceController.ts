@@ -4,6 +4,10 @@ import {
   type AgentSelectedImagePreviewReceipt,
   agentSelectedImagePreviewReceiptSchema,
 } from '../../../../schemas/agent/agentSelectedImagePreviewReceiptSchemas';
+import type {
+  AgentSelectedImageRecoveryStaleReason,
+  AgentSelectedImageRollbackReadiness,
+} from '../../../../schemas/agent/agentSelectedImageRecoverySchemas';
 import { useEditorStore } from '../../../../store/useEditorStore';
 import {
   AGENT_REVIEWED_ADJUSTMENT_COMMAND_OPTIONS,
@@ -16,13 +20,16 @@ import { buildAgentImageContextSnapshot } from '../../../../utils/agent/context/
 import { AGENT_PREVIEW_RENDER_TOOL_NAME } from '../../../../utils/agent/context/agentReadOnlyAppServerTools';
 import {
   type AgentSelectedImageLiveSessionAuditRecord,
+  type AgentSelectedImageLiveSessionBlockedResult,
   type AgentSelectedImageLiveSessionDraft,
   appendAgentSelectedImageLiveSessionAuditRecord,
   applyAgentSelectedImageLiveSession,
   approveAgentSelectedImageLiveSession,
   buildAgentSelectedImageLiveSessionAuditExportReceipt,
   buildAgentSelectedImageLiveSessionAuditStorageKey,
+  getAgentSelectedImageLiveSessionRollbackReadiness,
   preflightAgentSelectedImageLiveSessionAuditReplay,
+  recoverAgentSelectedImageLiveSessionDryRun,
   rollbackAgentSelectedImageLiveSession,
   startAgentSelectedImageLiveSessionDryRun,
 } from '../../../../utils/agent/session/agentSelectedImageLiveSession';
@@ -46,18 +53,23 @@ export type AgentSelectedImageWorkspaceActionStatus =
   | 'exported'
   | 'exporting'
   | 'idle'
+  | 'refreshing'
   | 'rolled_back'
   | 'rolling_back';
 
 export interface AgentSelectedImageWorkspaceActivityEntry {
   body: string;
   graphRevision?: string;
+  currentGraphRevision?: string;
+  currentRecipeHash?: string;
   id: string;
-  kind: 'approval' | 'error' | 'export' | 'preview' | 'rollback' | 'tool_call';
+  kind: 'approval' | 'error' | 'export' | 'preview' | 'recovery' | 'rollback' | 'tool_call';
   previewAfterHash?: string;
   previewBeforeHash?: string;
   recipeHash?: string;
+  recoveryRequestId?: string;
   requestId?: string;
+  staleReason?: AgentSelectedImageRecoveryStaleReason;
   status: 'blocked' | 'completed' | 'pending' | 'rolled_back';
   toolName?: string;
 }
@@ -71,14 +83,22 @@ export interface AgentSelectedImageWorkspaceController {
     apply: () => Promise<void>;
     dryRun: () => Promise<void>;
     exportAudit: () => Promise<void>;
+    refreshDryRun: () => Promise<void>;
     rollback: () => Promise<void>;
     selectCommand: (commandId: AgentReviewedAdjustmentCommandId) => void;
   };
   activityEntries: AgentSelectedImageWorkspaceActivityEntry[];
   auditRecord: AgentSelectedImageLiveSessionAuditRecord | null;
+  blockedRecovery: {
+    blockedRequestId: string;
+    currentGraphRevision: string;
+    currentRecipeHash: string;
+    staleReason: AgentSelectedImageRecoveryStaleReason;
+  } | null;
   canApply: boolean;
   canDryRun: boolean;
   canExportAudit: boolean;
+  canRecover: boolean;
   canRollback: boolean;
   disabledReason: string;
   error: string | null;
@@ -86,6 +106,7 @@ export interface AgentSelectedImageWorkspaceController {
   latestToolName: string | null;
   previewReceipt: AgentSelectedImagePreviewReceipt | null;
   reviewedCommandOptions: AgentReviewedAdjustmentCommandOption[];
+  rollbackReadiness: AgentSelectedImageRollbackReadiness | null;
   selectedCommandId: AgentReviewedAdjustmentCommandId;
   selectedCommandPlan: AgentReviewedAdjustmentCommandPlan;
   status: AgentSelectedImageWorkspaceActionStatus;
@@ -208,6 +229,7 @@ export const useAgentSelectedImageWorkspaceController = ({
 }: AgentSelectedImageWorkspaceControllerInput): AgentSelectedImageWorkspaceController => {
   const [activityEntries, setActivityEntries] = useState<AgentSelectedImageWorkspaceActivityEntry[]>([]);
   const [auditRecord, setAuditRecord] = useState<AgentSelectedImageLiveSessionAuditRecord | null>(null);
+  const [blockedResult, setBlockedResult] = useState<AgentSelectedImageLiveSessionBlockedResult | null>(null);
   const [draft, setDraft] = useState<AgentSelectedImageLiveSessionDraft | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [previewReceiptBase, setPreviewReceiptBase] = useState<AgentSelectedImagePreviewReceiptBase | null>(null);
@@ -229,15 +251,23 @@ export const useAgentSelectedImageWorkspaceController = ({
   const editorRecipeInputs = useEditorStore((state) => state.adjustments);
 
   const selectedImageReady = selectedImage !== null && selectedImage.isReady;
-  const operationPending = status === 'applying' || status === 'exporting' || status === 'rolling_back';
+  const operationPending =
+    status === 'applying' || status === 'exporting' || status === 'refreshing' || status === 'rolling_back';
   const canDryRun = selectedImageReady && !operationPending;
   const canApply = selectedImageReady && draft !== null && draft.state === 'approval_required' && !operationPending;
   const canExportAudit = selectedImageReady && auditRecord !== null && !operationPending;
+  const canRecover = selectedImageReady && blockedResult?.staleReason !== undefined && !operationPending;
+  const rollbackReadiness = useMemo(
+    () =>
+      auditRecord === null || rollbackCheckpoint === null
+        ? null
+        : getAgentSelectedImageLiveSessionRollbackReadiness({ audit: auditRecord, checkpoint: rollbackCheckpoint }),
+    [auditRecord, editorGraphRevision, editorRecipeInputs, rollbackCheckpoint, selectedImage?.path],
+  );
   const canRollback =
     selectedImageReady &&
-    auditRecord !== null &&
-    rollbackCheckpoint !== null &&
     (status === 'applied' || status === 'exported') &&
+    rollbackReadiness?.status === 'safe' &&
     !operationPending;
   const disabledReason = useMemo(() => {
     if (selectedImage === null) return 'Select an image before running selected-image live actions.';
@@ -262,6 +292,7 @@ export const useAgentSelectedImageWorkspaceController = ({
 
   const selectCommand = useCallback((commandId: AgentReviewedAdjustmentCommandId) => {
     setSelectedCommandId(commandId);
+    setBlockedResult(null);
     setDraft(null);
     setError(null);
     setRollbackCheckpoint(null);
@@ -270,6 +301,7 @@ export const useAgentSelectedImageWorkspaceController = ({
 
   const dryRun = useCallback(async () => {
     if (!canDryRun) return;
+    setBlockedResult(null);
     setError(null);
     const stamp = Date.now();
     const operationId = `agent_workspace_selected_image_${stamp}`;
@@ -337,6 +369,86 @@ export const useAgentSelectedImageWorkspaceController = ({
     }
   }, [canDryRun, pushActivityEntry, selectedCommandPlan]);
 
+  const refreshDryRun = useCallback(async () => {
+    if (!canRecover || blockedResult === null || blockedResult.staleReason === undefined) return;
+    setError(null);
+    setStatus('refreshing');
+    const stamp = Date.now();
+    const recoveryRequestId = `${blockedResult.audit.receipt.requestId}-recovery-${stamp}`;
+    try {
+      const sessionDraft = await recoverAgentSelectedImageLiveSessionDryRun({
+        adjustments: selectedCommandPlan.adjustments,
+        blockedResult,
+        operationId: `agent_workspace_selected_image_recovery_${stamp}`,
+        prompt: `Recover reviewed command from the current edit: ${selectedCommandPlan.receipt.label}.`,
+        recoveryRequestId,
+        reviewedCommand: selectedCommandPlan.receipt,
+        sessionId: WORKSPACE_SESSION_ID,
+      });
+      setDraft(sessionDraft);
+      setRollbackCheckpoint(sessionDraft.checkpoint);
+      setPreviewReceiptBase(
+        parsePreviewReceipt({
+          after: {
+            artifactId: `${recoveryRequestId}-dry-run-plan`,
+            graphRevision: sessionDraft.dryRun.predictedGraphRevision,
+            recipeHash: sessionDraft.dryRun.dryRunPlanHash,
+            renderHash: sessionDraft.dryRun.dryRunPlanHash,
+            role: 'after',
+            toolName: sessionDraft.dryRun.toolName,
+          },
+          before: {
+            artifactId: sessionDraft.snapshot.previewArtifactId,
+            graphRevision: sessionDraft.snapshot.graphRevision,
+            previewRef: sessionDraft.snapshot.previewRef,
+            recipeHash: sessionDraft.snapshot.recipeHash,
+            renderHash: sessionDraft.snapshot.previewRenderHash,
+            role: 'before',
+            toolName: sessionDraft.dryRun.toolName,
+          },
+          id: `${recoveryRequestId}-dry-run-receipt`,
+          kind: 'dry_run',
+          requestId: `${recoveryRequestId}-dry-run`,
+          selectedImagePath: sessionDraft.snapshot.selectedImagePath,
+          toolName: sessionDraft.dryRun.toolName,
+        }),
+      );
+      setBlockedResult(null);
+      setStatus('approval_required');
+      pushActivityEntry({
+        body: `Refreshed from ${sessionDraft.snapshot.graphRevision}`,
+        currentGraphRevision: sessionDraft.snapshot.graphRevision,
+        currentRecipeHash: sessionDraft.snapshot.recipeHash,
+        graphRevision: sessionDraft.snapshot.graphRevision,
+        kind: 'recovery',
+        previewBeforeHash: sessionDraft.snapshot.previewRenderHash,
+        recipeHash: sessionDraft.snapshot.recipeHash,
+        recoveryRequestId,
+        requestId: `${recoveryRequestId}-dry-run`,
+        staleReason: blockedResult.staleReason,
+        status: 'completed',
+        toolName: sessionDraft.dryRun.toolName,
+      });
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : 'Selected-image recovery dry-run failed.';
+      setError(message);
+      setStatus('blocked');
+      pushActivityEntry({
+        body: message,
+        currentGraphRevision: blockedResult.applyGuard.currentGraphRevision,
+        currentRecipeHash: blockedResult.applyGuard.currentRecipeHash,
+        graphRevision: blockedResult.applyGuard.currentGraphRevision,
+        kind: 'error',
+        recipeHash: blockedResult.applyGuard.currentRecipeHash,
+        recoveryRequestId,
+        requestId: recoveryRequestId,
+        staleReason: blockedResult.staleReason,
+        status: 'blocked',
+        toolName: 'rawengine.agent.adjustments.dry_run',
+      });
+    }
+  }, [blockedResult, canRecover, pushActivityEntry, selectedCommandPlan]);
+
   const apply = useCallback(async () => {
     if (!canApply || draft === null) return;
     setError(null);
@@ -358,15 +470,19 @@ export const useAgentSelectedImageWorkspaceController = ({
       persistAuditRecord(result.audit);
       if (result.status === 'blocked') {
         const message = `Selected-image live session blocked: ${result.staleReason}.`;
+        setBlockedResult(result);
         setError(message);
         setPreviewReceiptBase((receipt) => (receipt === null ? null : parsePreviewReceipt(receipt)));
         setStatus('blocked');
         pushActivityEntry({
           body: message,
+          currentGraphRevision: result.applyGuard.currentGraphRevision,
+          currentRecipeHash: result.applyGuard.currentRecipeHash,
           graphRevision: result.applyGuard.currentGraphRevision,
           kind: 'error',
           recipeHash: result.applyGuard.currentRecipeHash,
           requestId: approvedDraft.requestId,
+          ...(result.staleReason === undefined ? {} : { staleReason: result.staleReason }),
           status: 'blocked',
           toolName: 'rawengine.agent.adjustments.apply',
         });
@@ -374,6 +490,8 @@ export const useAgentSelectedImageWorkspaceController = ({
       }
       const beforeLineage = result.audit.receipt.previewLineage?.[0];
       const afterLineage = result.audit.receipt.previewLineage?.at(-1);
+      const recoveryRequestId = result.audit.receipt.recoveries?.at(-1)?.recoveryRequestId;
+      setBlockedResult(null);
       setStatus('applied');
       setPreviewReceiptBase(
         parsePreviewReceipt({
@@ -409,6 +527,7 @@ export const useAgentSelectedImageWorkspaceController = ({
         previewAfterHash: result.previewAfterHash,
         previewBeforeHash: result.previewBeforeHash,
         recipeHash: result.audit.receipt.finalRecipeHash ?? result.audit.receipt.initialRecipeHash,
+        ...(recoveryRequestId === undefined ? {} : { recoveryRequestId }),
         requestId: result.apply.requestId,
         status: 'completed',
         toolName: result.apply.toolName,
@@ -475,14 +594,19 @@ export const useAgentSelectedImageWorkspaceController = ({
         audit: auditRecord,
         checkpoint: rollbackCheckpoint,
       });
+      const recoveryRequestId = rollbackAudit.receipt.recoveries?.at(-1)?.recoveryRequestId;
       persistAuditRecord(rollbackAudit);
       setStatus('rolled_back');
       pushActivityEntry({
         body: rollbackAudit.receipt.rollbackReceiptGraphRevision ?? rollbackAudit.receipt.rollbackGraphRevision,
+        currentGraphRevision:
+          rollbackAudit.receipt.rollbackReceiptGraphRevision ?? rollbackAudit.receipt.rollbackGraphRevision,
+        currentRecipeHash: rollbackAudit.receipt.rollbackReceiptRecipeHash ?? rollbackAudit.receipt.initialRecipeHash,
         graphRevision:
           rollbackAudit.receipt.rollbackReceiptGraphRevision ?? rollbackAudit.receipt.rollbackGraphRevision,
         kind: 'rollback',
         recipeHash: rollbackAudit.receipt.initialRecipeHash,
+        ...(recoveryRequestId === undefined ? {} : { recoveryRequestId }),
         requestId: `${rollbackAudit.receipt.requestId}-rollback`,
         status: 'rolled_back',
         toolName: AGENT_HISTORY_ROLLBACK_TOOL_NAME,
@@ -512,14 +636,25 @@ export const useAgentSelectedImageWorkspaceController = ({
       apply,
       dryRun,
       exportAudit,
+      refreshDryRun,
       rollback,
       selectCommand,
     },
     activityEntries,
     auditRecord,
+    blockedRecovery:
+      blockedResult?.staleReason === undefined
+        ? null
+        : {
+            blockedRequestId: blockedResult.audit.receipt.requestId,
+            currentGraphRevision: blockedResult.applyGuard.currentGraphRevision,
+            currentRecipeHash: blockedResult.applyGuard.currentRecipeHash,
+            staleReason: blockedResult.staleReason,
+          },
     canApply,
     canDryRun,
     canExportAudit,
+    canRecover,
     canRollback,
     disabledReason,
     error,
@@ -527,6 +662,7 @@ export const useAgentSelectedImageWorkspaceController = ({
     latestToolName: latestActivity?.toolName ?? null,
     previewReceipt,
     reviewedCommandOptions: AGENT_REVIEWED_ADJUSTMENT_COMMAND_OPTIONS,
+    rollbackReadiness,
     selectedCommandId,
     selectedCommandPlan,
     status,

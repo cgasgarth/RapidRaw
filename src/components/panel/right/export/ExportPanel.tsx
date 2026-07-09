@@ -53,9 +53,9 @@ import {
   getExportColorCapability,
   isBlackPointCompensationAvailable as getIsBlackPointCompensationAvailable,
   getSupportedRenderingIntents,
+  hasExportColorCapabilityForFormat,
   hasColorManagedTransform as hasExportColorManagedTransform,
   isSupportedColorProfileForFormat,
-  supportsColorManagedOutput,
 } from '../../../../utils/export/exportColorCapabilityContracts';
 import {
   hasStaleOrOfflineSmartPreview,
@@ -810,23 +810,27 @@ export default function ExportPanel({
   );
 
   const colorProfileOptions = useMemo(
-    () => [
-      { label: t('export.colorProfiles.srgb'), value: ExportColorProfile.Srgb },
-      ...(supportsColorManagedOutput(fileFormat)
-        ? [
-            { label: t('export.colorProfiles.displayP3'), value: ExportColorProfile.DisplayP3 },
-            { label: t('export.colorProfiles.adobeRgb1998'), value: ExportColorProfile.AdobeRgb1998 },
-            { label: t('export.colorProfiles.proPhotoRgb'), value: ExportColorProfile.ProPhotoRgb },
-          ]
-        : []),
-    ],
-    [fileFormat, t],
+    () =>
+      [
+        { label: t('export.colorProfiles.srgb'), value: ExportColorProfile.Srgb },
+        { label: t('export.colorProfiles.displayP3'), value: ExportColorProfile.DisplayP3 },
+        { label: t('export.colorProfiles.adobeRgb1998'), value: ExportColorProfile.AdobeRgb1998 },
+        { label: t('export.colorProfiles.proPhotoRgb'), value: ExportColorProfile.ProPhotoRgb },
+        { label: t('export.colorProfiles.sourceEmbedded'), value: ExportColorProfile.SourceEmbedded },
+      ].filter(
+        (option) =>
+          isSupportedColorProfileForFormat(fileFormat, option.value) &&
+          getExportColorCapability(exportColorCapabilityCatalog, option.value) !== null,
+      ),
+    [exportColorCapabilityCatalog, fileFormat, t],
   );
   const hasColorManagedTransform = hasExportColorManagedTransform(fileFormat, colorProfile);
   const exportColorCapability = useMemo(
-    () => (hasColorManagedTransform ? getExportColorCapability(exportColorCapabilityCatalog, colorProfile) : null),
-    [colorProfile, exportColorCapabilityCatalog, hasColorManagedTransform],
+    () => getExportColorCapability(exportColorCapabilityCatalog, colorProfile),
+    [colorProfile, exportColorCapabilityCatalog],
   );
+  const hasColorPolicyCapability =
+    hasExportColorCapabilityForFormat(fileFormat, colorProfile) && exportColorCapability !== null;
   const renderingIntentOptions = useMemo(() => {
     const supportedIntents = getSupportedRenderingIntents(exportColorCapabilityCatalog, fileFormat, colorProfile);
     return [
@@ -841,6 +845,10 @@ export default function ExportPanel({
     fileFormat,
     colorProfile,
   );
+  const resolvedExportRenderingIntent =
+    colorProfile === ExportColorProfile.SourceEmbedded ? ExportRenderingIntent.RelativeColorimetric : renderingIntent;
+  const resolvedExportBlackPointCompensation =
+    colorProfile === ExportColorProfile.SourceEmbedded ? false : blackPointCompensation;
   const isBlackPointCompensationAvailable = getIsBlackPointCompensationAvailable({
     catalog: exportColorCapabilityCatalog,
     colorProfile,
@@ -945,16 +953,16 @@ export default function ExportPanel({
   }, [isVisible]);
 
   useEffect(() => {
-    if (!isSupportedColorProfileForFormat(fileFormat, colorProfile)) {
+    if (!colorProfileOptions.some((option) => option.value === colorProfile)) {
       setColorProfile(ExportColorProfile.Srgb);
     }
-  }, [colorProfile, fileFormat, setColorProfile]);
+  }, [colorProfile, colorProfileOptions, setColorProfile]);
 
   useEffect(() => {
-    if (hasColorManagedTransform && !renderingIntentOptions.some((option) => option.value === renderingIntent)) {
+    if (hasColorPolicyCapability && !renderingIntentOptions.some((option) => option.value === renderingIntent)) {
       setRenderingIntent(ExportRenderingIntent.RelativeColorimetric);
     }
-  }, [hasColorManagedTransform, renderingIntent, renderingIntentOptions, setRenderingIntent]);
+  }, [hasColorPolicyCapability, renderingIntent, renderingIntentOptions, setRenderingIntent]);
 
   useEffect(() => {
     if (blackPointCompensation && !isBlackPointCompensationAvailable) {
@@ -1123,7 +1131,7 @@ export default function ExportPanel({
 
   useEffect(() => {
     const exportSettings: ExportSettings = {
-      blackPointCompensation,
+      blackPointCompensation: resolvedExportBlackPointCompensation,
       colorProfile,
       filenameTemplate,
       jpegQuality,
@@ -1134,7 +1142,7 @@ export default function ExportPanel({
       stripGps,
       exportMasks: !isLibraryContext ? exportMasks : undefined,
       outputSharpening: parsedOutputSharpening,
-      renderingIntent,
+      renderingIntent: resolvedExportRenderingIntent,
       watermark:
         enableWatermark && watermarkPath
           ? {
@@ -1156,9 +1164,9 @@ export default function ExportPanel({
     adjustments,
     selectedImage?.path,
     fileFormat,
-    blackPointCompensation,
+    resolvedExportBlackPointCompensation,
     colorProfile,
-    renderingIntent,
+    resolvedExportRenderingIntent,
     jpegQuality,
     enableResize,
     resizeMode,
@@ -1209,7 +1217,7 @@ export default function ExportPanel({
     }
 
     const exportSettings: ExportSettings = {
-      blackPointCompensation,
+      blackPointCompensation: resolvedExportBlackPointCompensation,
       colorProfile,
       filenameTemplate: finalFilenameTemplate,
       jpegQuality,
@@ -1220,7 +1228,7 @@ export default function ExportPanel({
       stripGps,
       exportMasks: !isLibraryContext ? exportMasks : undefined,
       outputSharpening: parsedOutputSharpening,
-      renderingIntent,
+      renderingIntent: resolvedExportRenderingIntent,
       watermark:
         enableWatermark && watermarkPath
           ? {
@@ -1473,7 +1481,7 @@ export default function ExportPanel({
     fileFormat === FileFormats.Cube
       ? t('export.readiness.lutProfile')
       : t('export.readiness.colorProfile', { profile: selectedColorProfileLabel }),
-    fileFormat === FileFormats.Cube || !hasColorManagedTransform
+    fileFormat === FileFormats.Cube || !hasColorPolicyCapability
       ? t('export.readiness.renderingIntentUnavailable')
       : t('export.readiness.renderingIntent', { intent: selectedRenderingIntentLabel }),
     enableResize
@@ -2131,7 +2139,7 @@ export default function ExportPanel({
                                 className="w-full"
                               />
                             </div>
-                            {hasColorManagedTransform ? (
+                            {hasColorPolicyCapability ? (
                               <div
                                 className="space-y-1"
                                 data-black-point-compensation-status={blackPointCompensationStatus}
@@ -2624,6 +2632,28 @@ export default function ExportPanel({
                     variant={TextVariants.small}
                   >
                     {firstReceiptPolicyText}
+                  </UiText>
+                )}
+                {firstReceiptOutput.sourceIccProfileHash && (
+                  <UiText
+                    className="break-all"
+                    color={TextColors.secondary}
+                    data-testid="export-success-source-icc-profile-hash"
+                    variant={TextVariants.small}
+                  >
+                    {t('editor.metadata.displayProfile.iccHash')} {firstReceiptOutput.sourceIccProfileHash}
+                  </UiText>
+                )}
+                {firstReceiptOutput.transformPolicyFingerprint && (
+                  <UiText
+                    className="break-all"
+                    color={TextColors.secondary}
+                    data-testid="export-success-transform-policy-fingerprint"
+                    variant={TextVariants.small}
+                  >
+                    {t('export.softProofResolver.transformFingerprint', {
+                      fingerprint: firstReceiptOutput.transformPolicyFingerprint,
+                    })}
                   </UiText>
                 )}
                 {colorStackParityReceipt && colorStackParitySummary && (

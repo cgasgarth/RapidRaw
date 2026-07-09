@@ -16,10 +16,15 @@ export const supportsColorManagedOutput = (fileFormat: FileFormats) => COLOR_MAN
 
 export const isSupportedColorProfileForFormat = (fileFormat: FileFormats, colorProfile: ExportColorProfile) =>
   colorProfile === ExportColorProfile.Srgb ||
-  (WIDE_GAMUT_EXPORT_PROFILES.has(colorProfile) && supportsColorManagedOutput(fileFormat));
+  ((WIDE_GAMUT_EXPORT_PROFILES.has(colorProfile) || colorProfile === ExportColorProfile.SourceEmbedded) &&
+    supportsColorManagedOutput(fileFormat));
 
 export const hasColorManagedTransform = (fileFormat: FileFormats, colorProfile: ExportColorProfile) =>
   supportsColorManagedOutput(fileFormat) && WIDE_GAMUT_EXPORT_PROFILES.has(colorProfile);
+
+export const hasExportColorCapabilityForFormat = (fileFormat: FileFormats, colorProfile: ExportColorProfile) =>
+  hasColorManagedTransform(fileFormat, colorProfile) ||
+  (supportsColorManagedOutput(fileFormat) && colorProfile === ExportColorProfile.SourceEmbedded);
 
 export const getExportColorCapability = (
   catalog: ExportColorCapabilityCatalogV1,
@@ -31,7 +36,7 @@ export const getSupportedRenderingIntents = (
   fileFormat: FileFormats,
   colorProfile: ExportColorProfile,
 ): ExportRenderingIntent[] => {
-  if (!hasColorManagedTransform(fileFormat, colorProfile)) return [];
+  if (!hasExportColorCapabilityForFormat(fileFormat, colorProfile)) return [];
   const capability = getExportColorCapability(catalog, colorProfile);
   return (
     capability?.renderingIntents.filter((intent): intent is ExportRenderingIntent =>

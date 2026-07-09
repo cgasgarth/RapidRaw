@@ -1068,6 +1068,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         activePathIndex: effectiveActivePathIndex,
         baseFogConfidence,
         baseScope: baseFogScope,
+        boundsReceipt: runtimePreviewDensityNormalizationMetrics?.boundsReceipt ?? null,
         cropStatusByFrameId,
         includedPathSet,
         previewReady: previewReadyForWorkspace,
@@ -1076,6 +1077,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     [
       baseFogConfidence,
       baseFogScope,
+      runtimePreviewDensityNormalizationMetrics,
       cropStatusByFrameId,
       effectiveActivePathIndex,
       includedPathSet,
@@ -1850,6 +1852,15 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             epsilonPolicyId: 'density_epsilon_v1',
             negativeDensityTolerance: 0.02,
           },
+          densityBounds: {
+            analysisBuffer: currentParams.analysis_buffer,
+            baseFogProvenance: currentParams.base_fog_bounds_provenance,
+            blackPointOffset: currentParams.black_point_offset,
+            colorRangeClip: currentParams.color_range_clip,
+            lumaRangeClip: currentParams.luma_range_clip,
+            schemaVersion: currentParams.bounds_schema_version,
+            whitePointOffset: currentParams.white_point_offset,
+          },
           ...(usingPrintCurveV2 && currentParams.print_curve_v2 !== null
             ? {
                 densityPrintCurve: {
@@ -2346,8 +2357,9 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         },
         negativeBaseFogEstimateSchema,
       );
-      const nextParams = {
+      const nextParams: NegativeParams = {
         ...params,
+        base_fog_bounds_provenance: 'automatic_analysis',
         base_fog_strength: 1,
         base_fog_sample: null,
         blue_weight: estimate.blueWeight,
@@ -2391,8 +2403,9 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         },
         negativeBaseFogEstimateSchema,
       );
-      const nextParams = {
+      const nextParams: NegativeParams = {
         ...params,
+        base_fog_bounds_provenance: 'manual_base_fog_sample',
         base_fog_strength: 1,
         base_fog_sample: sampleRect,
         blue_weight: estimate.blueWeight,
@@ -2453,8 +2466,9 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
 
   const handleApplyCustomBaseSample = () => {
     if (customBaseSampleEstimate === null || selectedImagePath === null) return;
-    const nextParams = {
+    const nextParams: NegativeParams = {
       ...params,
+      base_fog_bounds_provenance: 'manual_base_fog_sample',
       base_fog_strength: 1,
       base_fog_sample: customBaseSampleRect,
       blue_weight: customBaseSampleEstimate.blueWeight,
@@ -5541,6 +5555,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
               patchRole={patchRole}
               selectedImagePath={selectedImagePath}
               shadowPatchBlackPointSuggestion={shadowPatchBlackPointSuggestion}
+              runtimePreviewDensityNormalizationMetrics={runtimePreviewDensityNormalizationMetrics}
             />
             {renderDustScratchReview()}
             {renderQcProofReport()}

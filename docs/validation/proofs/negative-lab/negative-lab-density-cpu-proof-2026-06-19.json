@@ -1,36 +1,105 @@
 {
   "algorithm": "density_rgb_v1",
-  "artifactHash": "fnv1a64:8df655677efae33c",
+  "artifactHash": "fnv1a64:8e531a305204463e",
   "changedPixelCount": 8,
   "densityNormalizationMetrics": {
     "axisBounds": {
       "color": {
-        "max": 0.6715457439422607,
-        "min": -0.32845425605773926
+        "max": 0.016596782952547073,
+        "min": -0.054390598088502884
       },
       "luma": {
-        "max": 1.1340703964233398,
-        "min": 0.13407039642333984
+        "max": 1.143246054649353,
+        "min": -0.07478869706392288
       }
+    },
+    "boundsReceipt": {
+      "algorithmId": "fixed_grid_block_median_luma_color_v1",
+      "analysisBuffer": 0.03999999910593033,
+      "analysisRect": {
+        "height": 1,
+        "width": 1,
+        "x": 0,
+        "y": 0
+      },
+      "baseBounds": {
+        "axisBounds": {
+          "color": {
+            "max": 0.2972637414932251,
+            "min": -0.1260562539100647
+          },
+          "luma": {
+            "max": 0.25995516777038574,
+            "min": 0.09641151130199432
+          }
+        },
+        "channelBounds": {
+          "b": {
+            "max": 0.5355835556983948,
+            "min": 0.37564805150032043
+          },
+          "g": {
+            "max": 0.2696017026901245,
+            "min": 0.08901696652173996
+          },
+          "r": {
+            "max": 0.13389894366264343,
+            "min": 0.026457129046320915
+          }
+        }
+      },
+      "baseFogProvenance": "automatic_analysis",
+      "colorRangeClip": 0.11999999731779099,
+      "finalBounds": {
+        "axisBounds": {
+          "color": {
+            "max": 0.016596782952547073,
+            "min": -0.054390598088502884
+          },
+          "luma": {
+            "max": 1.143246054649353,
+            "min": -0.07478869706392288
+          }
+        },
+        "channelBounds": {
+          "b": {
+            "max": 1.1473122835159302,
+            "min": -0.0780443623661995
+          },
+          "g": {
+            "max": 1.159842848777771,
+            "min": -0.07391824573278427
+          },
+          "r": {
+            "max": 1.1389368772506714,
+            "min": -0.12917929887771606
+          }
+        }
+      },
+      "lumaRangeClip": 0.07999999821186066,
+      "schemaVersion": 1,
+      "warningCodes": [
+        "uneven_illumination"
+      ]
     },
     "channelBounds": {
       "blue": {
-        "max": 5.8754658699035645,
+        "max": 1.0539549589157104,
         "min": 0
       },
       "green": {
-        "max": 5.537485122680664,
+        "max": 1.0625838041305542,
         "min": 0
       },
       "red": {
-        "max": 8.260682106018066,
+        "max": 1.0059621334075928,
         "min": 0
       }
     },
     "clippedPixelCount": 0,
-    "densityRangeUnclamped": 8.260682106018066,
+    "densityRangeUnclamped": 1.0625838041305542,
     "epsilonClampedPixelCount": 0,
-    "rendererVersion": 1
+    "rendererVersion": 2
   },
   "doesNotProve": [
     "camera_raw_decode_path",
@@ -43,7 +112,7 @@
     "commercial_converter_parity"
   ],
   "inputContract": "declared_linear_scan_rgb",
-  "inputToOutputMeanAbsDelta": 0.6669523119926453,
+  "inputToOutputMeanAbsDelta": 0.5745485424995422,
   "issue": 2343,
   "monotonicLuma": true,
   "outputDimensions": {

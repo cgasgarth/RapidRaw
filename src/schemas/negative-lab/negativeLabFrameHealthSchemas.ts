@@ -18,6 +18,7 @@ export const negativeLabFrameBatchDispositionSchema = z.enum(['apply', 'review',
 export const negativeLabFrameBatchDispositionReasonSchema = z.enum([
   'acquisition_review_required',
   'base_not_estimated',
+  'bounds_review_required',
   'excluded_from_batch',
   'preview_required',
   'ready_to_apply',
@@ -25,6 +26,9 @@ export const negativeLabFrameBatchDispositionReasonSchema = z.enum([
 export const negativeLabFrameWarningSeveritySchema = z.enum(['ok', 'info', 'review']);
 export const negativeLabFrameWarningCodeSchema = z.enum([
   'base_estimate_active_frame_only',
+  'bounds_missing_visible_base',
+  'bounds_narrow_luma_span',
+  'bounds_uneven_base_fog',
   'excluded_from_batch',
   'preview_not_ready',
 ]);

@@ -53,6 +53,34 @@ export const exportRecipeSchema = z
   })
   .strict()
   .superRefine((recipe, context) => {
+    if (
+      recipe.colorProfile === 'sourceEmbedded' &&
+      recipe.fileFormat !== ExportFileFormatId.Jpeg &&
+      recipe.fileFormat !== ExportFileFormatId.Tiff
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Source-embedded profile export is only available for JPEG and TIFF recipes.',
+        path: ['colorProfile'],
+      });
+    }
+
+    if (recipe.colorProfile === 'sourceEmbedded' && recipe.renderingIntent !== 'relativeColorimetric') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Source-embedded profile export requires relative colorimetric rendering intent.',
+        path: ['renderingIntent'],
+      });
+    }
+
+    if (recipe.colorProfile === 'sourceEmbedded' && recipe.blackPointCompensation) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Source-embedded profile export does not support black-point compensation.',
+        path: ['blackPointCompensation'],
+      });
+    }
+
     if (recipe.fileFormat !== ExportFileFormatId.Jpeg && recipe.jpegQuality !== 100) {
       context.addIssue({
         code: 'custom',

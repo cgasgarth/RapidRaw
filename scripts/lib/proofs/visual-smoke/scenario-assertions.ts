@@ -913,6 +913,9 @@ export async function prepareScenario(page, mode) {
   }
 
   if (mode === VISUAL_SMOKE_SCENARIO_IDS.AgentSelectedImageLiveSession) {
+    const workspaceControls = page.getByTestId('agent-dry-run-apply-review-controls');
+    await page.getByTestId('agent-review-control-dry-run').click();
+    await expectDatasetValue(workspaceControls, 'liveActionStatus', 'approval_required');
     const shell = page.getByTestId('agent-chat-shell');
     await shell.waitFor({ timeout: 10_000 });
     agentChatProofDatasetSchema.parse(await shell.evaluate((element) => ({ ...element.dataset })));
@@ -954,6 +957,20 @@ export async function prepareScenario(page, mode) {
       selectedImageLoopBeforeDataset.renderHash === selectedImageLoopCurrentDataset.renderHash
     ) {
       throw new Error('Selected-image preview-loop before/current gallery evidence was not rendered.');
+    }
+    const acceptReviewedApply = page.getByTestId('agent-selected-image-preview-loop-accept-apply');
+    if (await acceptReviewedApply.isDisabled()) {
+      throw new Error('Selected-image reviewed apply was unavailable before stale-graph proof.');
+    }
+    await acceptReviewedApply.click();
+    await expectDatasetValue(selectedImageLoop, 'runtimeState', 'accepted');
+    await page.getByTestId('agent-review-control-apply').click();
+    await expectDatasetValue(workspaceControls, 'liveActionStatus', 'blocked');
+    const recoveryCard = page.getByTestId('agent-stale-recovery-card');
+    await expectDatasetValue(recoveryCard, 'staleReason', 'graph_revision_changed');
+    await expectDatasetValue(recoveryCard, 'currentGraphRevision', 'history_3');
+    if (await page.getByTestId('agent-review-control-refresh-dry-run').isDisabled()) {
+      throw new Error('Selected-image stale recovery action was disabled after a stale graph block.');
     }
     const selectedImageLoopMetrics = await page
       .getByTestId('agent-selected-image-preview-loop-metrics')

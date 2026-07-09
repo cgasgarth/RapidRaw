@@ -6,18 +6,27 @@ import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import { AgentPanel, resolveAgentReviewWorkspaceState } from '../../../src/components/panel/right/ai/AgentPanel';
-import { type AppSettings, type SelectedImage, Theme } from '../../../src/components/ui/AppProperties';
+import {
+  EditorRightPanelHost,
+  type EditorRightPanelHostProps,
+} from '../../../src/components/panel/right/EditorRightPanelHost';
+import { type AppSettings, Panel, type SelectedImage, Theme } from '../../../src/components/ui/AppProperties';
 import {
   ExportColorProfile,
   type ExportPreset,
   ExportRenderingIntent,
+  Status,
   WatermarkAnchor,
 } from '../../../src/components/ui/ExportImportProperties';
 import en from '../../../src/i18n/locales/en.json';
 import { useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { useSettingsStore } from '../../../src/store/useSettingsStore';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
-import { agentSelectedImageLiveSessionAuditStoreSchema } from '../../../src/utils/agent/session/agentSelectedImageLiveSession';
+import {
+  agentSelectedImageLiveSessionAuditStoreSchema,
+  buildAgentSelectedImageLiveSessionAuditExportReceipt,
+  preflightAgentSelectedImageLiveSessionAuditReplay,
+} from '../../../src/utils/agent/session/agentSelectedImageLiveSession';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -159,6 +168,8 @@ describe('agent panel preview-review workspace', () => {
     expect((required(container, 'agent-review-control-dry-run') as HTMLButtonElement).disabled).toBe(true);
     expect((required(container, 'agent-review-control-apply') as HTMLButtonElement).disabled).toBe(true);
     expect(required(container, 'agent-preview-receipt-card').dataset.previewReady).toBe('false');
+    expect(required(container, 'agent-stale-recovery-card').dataset.staleReason).toBe('missing_selection');
+    expect((required(container, 'agent-review-control-refresh-dry-run') as HTMLButtonElement).disabled).toBe(true);
   });
 
   test('wires the top dry-run control to a selected-image live-session receipt', async () => {
@@ -204,6 +215,37 @@ describe('agent panel preview-review workspace', () => {
     expect(required(container, 'agent-before-after-preview-receipt-after').dataset.previewRef).toBe('');
     expect(required(container, 'agent-review-state-approval-required').dataset.state).toBe('active');
     expect((required(container, 'agent-review-control-apply') as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  test('keeps a pending dry-run mounted while another right panel makes the graph stale', async () => {
+    resetEditorStore();
+    useEditorStore.getState().setEditor({
+      finalPreviewUrl: 'data:image/jpeg;base64,BBBB',
+      selectedImage,
+    });
+
+    const { container, renderHost } = await renderAgentPanelHost();
+    await clickAndFlush(container, 'agent-review-control-dry-run');
+    const requestId = required(container, 'agent-before-after-preview-receipt').dataset.receiptRequestId;
+
+    await renderHost(Panel.Export);
+    expect(required(container, 'editor-agent-panel-keep-alive').getAttribute('aria-hidden')).toBe('true');
+    expect(required(container, 'editor-agent-panel-keep-alive').className).toContain('hidden');
+
+    await act(async () => {
+      const outsideAgentEdit = { ...useEditorStore.getState().adjustments, contrast: 7 };
+      useEditorStore.getState().setEditor({ adjustments: outsideAgentEdit });
+      useEditorStore.getState().pushHistory(outsideAgentEdit);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    await renderHost(Panel.Agent);
+    expect(required(container, 'agent-before-after-preview-receipt').dataset.receiptRequestId).toBe(requestId);
+    expect((required(container, 'agent-review-control-apply') as HTMLButtonElement).disabled).toBe(false);
+
+    await clickAndFlush(container, 'agent-review-control-apply');
+    expect(required(container, 'agent-stale-recovery-card').dataset.currentGraphRevision).toBe('history_1');
+    expect(required(container, 'agent-dry-run-apply-review-controls').dataset.liveActionStatus).toBe('blocked');
   });
 
   test('applies and rolls back through the top selected-image live-session controls', async () => {
@@ -267,6 +309,121 @@ describe('agent panel preview-review workspace', () => {
     expect(required(container, 'agent-review-live-activity-timeline').dataset).toBeDefined();
     expect(useEditorStore.getState().historyIndex).toBe(0);
   });
+
+  test('recovers a stale graph from the current edit and preserves block, apply, and rollback proof', async () => {
+    resetEditorStore();
+    useEditorStore.getState().setEditor({
+      finalPreviewUrl: 'data:image/jpeg;base64,BBBB',
+      selectedImage,
+    });
+
+    const { container } = await renderAgentPanel();
+    await clickAndFlush(container, 'agent-reviewed-command-option-gentle_exposure_lift');
+    await clickAndFlush(container, 'agent-review-control-dry-run');
+
+    await act(async () => {
+      const current = useEditorStore.getState().adjustments;
+      const outsideAgentEdit = { ...current, contrast: 7 };
+      useEditorStore.getState().setEditor({ adjustments: outsideAgentEdit });
+      useEditorStore.getState().pushHistory(outsideAgentEdit);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(useEditorStore.getState().historyIndex).toBe(1);
+
+    await clickAndFlush(container, 'agent-review-control-apply');
+
+    expect(required(container, 'agent-dry-run-apply-review-controls').dataset.liveActionStatus).toBe('blocked');
+    const recoveryCard = required(container, 'agent-stale-recovery-card');
+    expect(recoveryCard.dataset.staleReason).toBe('graph_revision_changed');
+    expect(recoveryCard.dataset.currentGraphRevision).toBe('history_1');
+    expect(recoveryCard.dataset.currentRecipeHash).toMatch(/^recipe:/u);
+    expect((required(container, 'agent-review-control-refresh-dry-run') as HTMLButtonElement).disabled).toBe(false);
+    expect((required(container, 'agent-review-control-rollback') as HTMLButtonElement).disabled).toBe(true);
+    expect(useEditorStore.getState().adjustments.exposure).toBe(INITIAL_ADJUSTMENTS.exposure);
+
+    await clickAndFlush(container, 'agent-review-control-refresh-dry-run');
+
+    expect(container.querySelector('[data-testid="agent-stale-recovery-card"]')).toBeNull();
+    expect(required(container, 'agent-dry-run-apply-review-controls').dataset.liveActionStatus).toBe(
+      'approval_required',
+    );
+    const recoveryPreview = required(container, 'agent-before-after-preview-receipt');
+    expect(recoveryPreview.dataset.beforeGraphRevision).toBe('history_1');
+    const recoveryBeforePreviewHash = recoveryPreview.dataset.beforeRenderHash;
+    expect(recoveryBeforePreviewHash).toBeTruthy();
+    const recoveryActivity = Array.from(
+      container.querySelectorAll<HTMLElement>('[data-testid^="agent-review-live-activity-"]'),
+    ).find((entry) => entry.dataset.recoveryRequestId?.length);
+    expect(recoveryActivity?.dataset.currentGraphRevision).toBe('history_1');
+    expect(recoveryActivity?.dataset.currentRecipeHash).toBe(recoveryCard.dataset.currentRecipeHash);
+    expect(recoveryActivity?.dataset.staleReason).toBe('graph_revision_changed');
+
+    await clickAndFlush(container, 'agent-review-control-apply');
+
+    expect(required(container, 'agent-dry-run-apply-review-controls').dataset.liveActionStatus).toBe('applied');
+    expect(useEditorStore.getState().historyIndex).toBe(2);
+    expect(useEditorStore.getState().adjustments.contrast).toBe(7);
+    expect(useEditorStore.getState().adjustments.exposure).toBe(0.25);
+    expect((required(container, 'agent-review-control-rollback') as HTMLButtonElement).disabled).toBe(false);
+
+    const appliedAdjustments = useEditorStore.getState().adjustments;
+    await act(async () => {
+      useEditorStore.getState().setEditor({ adjustments: { ...appliedAdjustments, saturation: 4 } });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect((required(container, 'agent-review-control-rollback') as HTMLButtonElement).disabled).toBe(true);
+    expect(required(container, 'agent-dry-run-apply-review-controls').dataset.rollbackBlockedReason).toBe(
+      'stale_recipe_hash',
+    );
+    await act(async () => {
+      useEditorStore.getState().setEditor({ adjustments: appliedAdjustments });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(required(container, 'agent-dry-run-apply-review-controls').dataset.rollbackReadiness).toBe('safe');
+    expect((required(container, 'agent-review-control-rollback') as HTMLButtonElement).disabled).toBe(false);
+
+    const appliedAudit = readLatestAuditRecord();
+    expect(appliedAudit.receipt.recoveries).toHaveLength(1);
+    expect(appliedAudit.receipt.recoveries?.[0]).toMatchObject({
+      currentGraphRevision: 'history_1',
+      recoveredGraphRevision: 'history_1',
+      staleReason: 'graph_revision_changed',
+      status: 'applied',
+    });
+    expect(appliedAudit.transcript.some((entry) => entry.kind === 'recovery')).toBe(true);
+    expect(
+      appliedAudit.transcript.some((entry) => entry.kind === 'apply_decision' && entry.status === 'rejected'),
+    ).toBe(true);
+    expect(
+      appliedAudit.transcript.some((entry) => entry.kind === 'apply_decision' && entry.status === 'succeeded'),
+    ).toBe(true);
+
+    await clickAndFlush(container, 'agent-review-control-rollback');
+
+    expect(useEditorStore.getState().historyIndex).toBe(1);
+    expect(useEditorStore.getState().adjustments.contrast).toBe(7);
+    expect(useEditorStore.getState().adjustments.exposure).toBe(INITIAL_ADJUSTMENTS.exposure);
+    const rollbackAudit = readLatestAuditRecord();
+    expect(rollbackAudit.receipt.state).toBe('rolled_back');
+    expect(rollbackAudit.receipt.rollbackReceiptGraphRevision).toBe('history_1');
+    expect(rollbackAudit.receipt.rollbackReceiptRecipeHash).toBe(rollbackAudit.receipt.initialRecipeHash);
+    expect(rollbackAudit.receipt.rollbackReceiptPreviewHash).toBe(recoveryBeforePreviewHash);
+    expect(rollbackAudit.receipt.recoveries?.[0]?.status).toBe('rolled_back');
+    expect(rollbackAudit.auditEvents.some((event) => event.state === 'failed')).toBe(true);
+    expect(rollbackAudit.auditEvents.some((event) => event.state === 'rolled_back')).toBe(true);
+    const exportReceipt = buildAgentSelectedImageLiveSessionAuditExportReceipt({
+      audit: rollbackAudit,
+      exportedAt: '2026-07-09T12:00:00.000Z',
+      replayPreflight: preflightAgentSelectedImageLiveSessionAuditReplay(rollbackAudit),
+    });
+    const recovery = rollbackAudit.receipt.recoveries?.[0];
+    if (recovery === undefined) throw new Error('Expected recovery receipt in rollback audit.');
+    expect(exportReceipt.rollbackState.status).toBe('restored');
+    expect(exportReceipt.previewHashes.rollback).toBe(recoveryBeforePreviewHash);
+    expect(exportReceipt.auditRecord.transcript.some((entry) => entry.kind === 'recovery')).toBe(true);
+    expect(exportReceipt.requestIds).toContain(recovery.blockedRequestId);
+    expect(exportReceipt.requestIds).toContain(recovery.recoveryRequestId);
+  });
 });
 
 async function renderAgentPanel() {
@@ -294,6 +451,59 @@ async function renderAgentPanel() {
   });
 
   return { container, root };
+}
+
+async function renderAgentPanelHost() {
+  if (!globalThis.window) {
+    const window = new Window();
+    Object.assign(globalThis, {
+      document: window.document,
+      HTMLButtonElement: window.HTMLButtonElement,
+      HTMLDivElement: window.HTMLDivElement,
+      HTMLElement: window.HTMLElement,
+      HTMLTextAreaElement: window.HTMLTextAreaElement,
+      localStorage: window.localStorage,
+      window,
+    });
+  }
+
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  const root = createRoot(container);
+  const i18n = await createTestI18n();
+  renderedRoot = { container, root };
+  const baseProps: Omit<EditorRightPanelHostProps, 'activeRightPanel' | 'renderedRightPanel'> = {
+    appSettings: null,
+    exportState: { errorMessage: '', progress: { current: 0, total: 0 }, status: Status.Idle },
+    handleSettingsChange: () => {},
+    multiSelectedPaths: [selectedImage.path],
+    onLinkedVariantImported: () => {},
+    onNavigateToCommunity: () => {},
+    onOpenTetherCapture: () => {},
+    rootPaths: ['/photos'],
+    selectedImage,
+    setExportState: () => {},
+    slideDirection: 1,
+  };
+  const renderHost = async (panel: Panel) => {
+    await act(async () => {
+      root.render(
+        createElement(
+          I18nextProvider,
+          { i18n },
+          createElement(EditorRightPanelHost, {
+            ...baseProps,
+            activeRightPanel: panel,
+            renderedRightPanel: panel,
+          }),
+        ),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+  };
+
+  await renderHost(Panel.Agent);
+  return { container, renderHost, root };
 }
 
 async function clickAndFlush(container: HTMLElement, testId: string) {
@@ -335,6 +545,10 @@ function resetEditorStore() {
 }
 
 function readLatestAuditCommandId() {
+  return readLatestAuditRecord().receipt.reviewedCommand?.commandId;
+}
+
+function readLatestAuditRecord() {
   if (typeof globalThis.localStorage === 'undefined') throw new Error('Expected localStorage.');
   const storageKeys = Array.from({ length: globalThis.localStorage.length }, (_value, index) =>
     globalThis.localStorage.key(index),
@@ -347,8 +561,6 @@ function readLatestAuditCommandId() {
   const parsedJson: unknown = value === null ? null : JSON.parse(value);
   const store = agentSelectedImageLiveSessionAuditStoreSchema.parse(parsedJson);
   const latestRecord = store.records.at(-1);
-  if (latestRecord === undefined || latestRecord.receipt.reviewedCommand === undefined) {
-    throw new Error('Expected reviewed command audit receipt.');
-  }
-  return latestRecord.receipt.reviewedCommand.commandId;
+  if (latestRecord === undefined) throw new Error('Expected selected-image audit receipt.');
+  return latestRecord;
 }

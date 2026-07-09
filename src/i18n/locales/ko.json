@@ -405,6 +405,12 @@
       },
       "addNewEdit": "새 편집 추가",
       "agent": {
+        "recovery": {
+          "currentGraph": "현재 그래프",
+          "currentRecipe": "현재 레시피",
+          "refresh": "현재 편집에서 드라이런 새로 고침",
+          "title": "복구 필요"
+        },
         "selectedImageLoop": {
           "audit": "Audit summary",
           "before": "Before",

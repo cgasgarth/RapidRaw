@@ -31,6 +31,11 @@ export const negativeLabBaseFogSampleRectSchema = z
 export const negativeLabConversionModelSchema = z.enum(['density_rgb_v1', 'negative_log_density_v1']);
 export const negativeLabDensityPrintAlgorithmSchema = z.enum(['density_rgb_v1', 'negative_density_print_v2']);
 export const negativeLabDensityPrintOutputTagSchema = z.enum(['preview_display', 'export_linear']);
+export const negativeLabBaseFogBoundsProvenanceSchema = z.enum([
+  'automatic_analysis',
+  'manual_base_fog_sample',
+  'profile_embedded_base_fog_sample',
+]);
 
 export const negativeLabDensityPrintV2ParamsSchema = z
   .object({
@@ -57,9 +62,11 @@ export const negativeLabDensityPrintV2ParamsSchema = z
 export const negativeLabPresetParamsSchema = z
   .object({
     analysis_buffer: z.number().min(0).max(0.25).default(0.04),
+    base_fog_bounds_provenance: negativeLabBaseFogBoundsProvenanceSchema.default('automatic_analysis'),
     black_point: z.number().min(0).max(0.95).default(0),
     black_point_offset: z.number().min(-0.25).max(0.25).default(0),
     blue_weight: z.number().min(0.5).max(2),
+    bounds_schema_version: z.literal(1).default(1),
     base_fog_strength: z.number().min(0).max(1.25).default(1),
     base_fog_sample: negativeLabBaseFogSampleRectSchema.nullable().default(null),
     color_range_clip: z.number().min(0.01).max(0.3).default(0.12),
@@ -245,10 +252,14 @@ export const negativeLabBuiltInUiPresetCatalogSchema = z
 
 export type NegativeLabBuiltInUiPreset = z.infer<typeof negativeLabBuiltInUiPresetSchema>;
 export type NegativeLabBaseFogSampleRect = z.infer<typeof negativeLabBaseFogSampleRectSchema>;
+export type NegativeLabBaseFogBoundsProvenance = z.infer<typeof negativeLabBaseFogBoundsProvenanceSchema>;
 export type NegativeLabConversionModel = z.infer<typeof negativeLabConversionModelSchema>;
 export type NegativeLabDensityPrintAlgorithm = z.infer<typeof negativeLabDensityPrintAlgorithmSchema>;
 export type NegativeLabDensityPrintOutputTag = z.infer<typeof negativeLabDensityPrintOutputTagSchema>;
 export type NegativeLabDensityPrintV2Params = z.infer<typeof negativeLabDensityPrintV2ParamsSchema>;
+export type NegativeLabNativeDensityNormalizationMetrics = z.infer<
+  typeof negativeLabNativeDensityNormalizationMetricsSchema
+>;
 export type NegativeLabPresetParams = z.infer<typeof negativeLabPresetParamsSchema>;
 export type NegativeLabBuiltInUiPresetCatalog = z.infer<typeof negativeLabBuiltInUiPresetCatalogSchema>;
 export type NegativeLabUiPresetFilmClass = z.infer<typeof negativeLabUiPresetFilmClassSchema>;
@@ -296,10 +307,61 @@ export const negativeBaseFogDensitometerReadoutSchema = z
   })
   .strict();
 
+const negativeLabNativeDensityAxisBoundsSchema = z.object({ max: z.number(), min: z.number() }).strict();
+const negativeLabNativeDensityBoundsSetSchema = z
+  .object({
+    axisBounds: z
+      .object({ color: negativeLabNativeDensityAxisBoundsSchema, luma: negativeLabNativeDensityAxisBoundsSchema })
+      .strict(),
+    channelBounds: z
+      .object({
+        b: negativeLabNativeDensityAxisBoundsSchema,
+        g: negativeLabNativeDensityAxisBoundsSchema,
+        r: negativeLabNativeDensityAxisBoundsSchema,
+      })
+      .strict(),
+  })
+  .strict();
+export const negativeLabNativeDensityNormalizationMetricsSchema = z
+  .object({
+    axisBounds: z
+      .object({ color: negativeLabNativeDensityAxisBoundsSchema, luma: negativeLabNativeDensityAxisBoundsSchema })
+      .strict(),
+    boundsReceipt: z
+      .object({
+        algorithmId: z.literal('fixed_grid_block_median_luma_color_v1'),
+        analysisBuffer: z.number().min(0).max(0.25),
+        analysisRect: negativeLabBaseFogSampleRectSchema,
+        baseBounds: negativeLabNativeDensityBoundsSetSchema,
+        baseFogProvenance: negativeLabBaseFogBoundsProvenanceSchema,
+        colorRangeClip: z.number().min(0.01).max(0.3),
+        finalBounds: negativeLabNativeDensityBoundsSetSchema,
+        lumaRangeClip: z.number().min(0.01).max(0.3),
+        schemaVersion: z.literal(1),
+        warningCodes: z.array(
+          z.enum(['clipped_base_channel', 'low_acquisition_confidence', 'missing_visible_base', 'uneven_illumination']),
+        ),
+      })
+      .strict(),
+    channelBounds: z
+      .object({
+        b: negativeLabNativeDensityAxisBoundsSchema,
+        g: negativeLabNativeDensityAxisBoundsSchema,
+        r: negativeLabNativeDensityAxisBoundsSchema,
+      })
+      .strict(),
+    clippedPixelCount: z.number().int().nonnegative(),
+    densityRangeUnclamped: z.number().nonnegative(),
+    epsilonClampedPixelCount: z.number().int().nonnegative(),
+    rendererVersion: z.number().int().positive(),
+  })
+  .strict();
+
 export const negativeLabSavedPositiveHandoffSchema = z
   .object({
     artifactId: z.string().trim().min(1),
     conversionBundlePath: z.string().trim().min(1).nullable(),
+    densityNormalizationMetrics: negativeLabNativeDensityNormalizationMetricsSchema.optional(),
     dimensions: z.object({ height: z.number().int().positive(), width: z.number().int().positive() }).strict(),
     frameExposureOverrides: z.unknown(),
     frameRgbBalanceOverrides: z.unknown(),

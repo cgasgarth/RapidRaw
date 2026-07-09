@@ -28,6 +28,15 @@
       "epsilonPolicyId": "density_epsilon_v1",
       "negativeDensityTolerance": 0.02
     },
+    "densityBounds": {
+      "analysisBuffer": 0.04,
+      "baseFogProvenance": "automatic_analysis",
+      "blackPointOffset": 0,
+      "colorRangeClip": 0.12,
+      "lumaRangeClip": 0.08,
+      "schemaVersion": 1,
+      "whitePointOffset": 0
+    },
     "curveModel": {
       "curveFamily": "process_profile_monotonic_v1",
       "inversionCurveSet": {

@@ -791,6 +791,12 @@
           "title": "",
           "tools": ""
         },
+        "recovery": {
+          "currentGraph": "Grafo atual",
+          "currentRecipe": "Receita atual",
+          "refresh": "Atualizar simulação a partir da edição atual",
+          "title": "Recuperação necessária"
+        },
         "review": {
           "applyUnavailable": "",
           "dryRun": "",

@@ -14,6 +14,7 @@ const negativeLabDustScratchSeveritySchema = z.enum(['clear', 'review', 'retouch
 const negativeLabDustScratchFindingCodeSchema = z.enum([
   'acquisition_review_required',
   'base_fog_only_review',
+  'bounds_review_required',
   'candidate_dust_spot',
   'candidate_emulsion_scratch',
   'edge_dust_check',

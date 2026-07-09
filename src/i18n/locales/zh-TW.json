@@ -763,6 +763,12 @@
           "title": "",
           "tools": ""
         },
+        "recovery": {
+          "currentGraph": "目前圖譜",
+          "currentRecipe": "目前配方",
+          "refresh": "從目前編輯重新整理試執行",
+          "title": "需要復原"
+        },
         "review": {
           "applyUnavailable": "",
           "dryRun": "",
@@ -1706,6 +1712,7 @@
       "adobeRgb1998": "",
       "displayP3": "",
       "proPhotoRgb": "",
+      "sourceEmbedded": "",
       "srgb": ""
     },
     "dialog": {

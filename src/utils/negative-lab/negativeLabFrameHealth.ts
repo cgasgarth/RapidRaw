@@ -58,7 +58,12 @@ export const buildNegativeLabFrameAcquisitionHealth = (path: string): NegativeLa
 const getNegativeLabWarningSeverity = (
   warningCodes: ReadonlyArray<NegativeLabFrameWarningCode>,
 ): NegativeLabFrameWarningSeverity => {
-  if (warningCodes.includes('excluded_from_batch') || warningCodes.includes('preview_not_ready')) {
+  if (
+    warningCodes.includes('bounds_missing_visible_base') ||
+    warningCodes.includes('bounds_uneven_base_fog') ||
+    warningCodes.includes('excluded_from_batch') ||
+    warningCodes.includes('preview_not_ready')
+  ) {
     return 'review';
   }
 
@@ -68,11 +73,13 @@ const getNegativeLabWarningSeverity = (
 const buildNegativeLabFrameBatchDisposition = ({
   acquisitionHealth,
   hasBaseEstimate,
+  boundsNeedReview,
   included,
   previewReady,
 }: {
   acquisitionHealth: NegativeLabFrameAcquisitionHealth;
   hasBaseEstimate: boolean;
+  boundsNeedReview: boolean;
   included: boolean;
   previewReady: boolean;
 }): {
@@ -89,6 +96,10 @@ const buildNegativeLabFrameBatchDisposition = ({
 
   if (!hasBaseEstimate) {
     return { batchDisposition: 'review', batchDispositionReason: 'base_not_estimated' };
+  }
+
+  if (boundsNeedReview) {
+    return { batchDisposition: 'review', batchDispositionReason: 'bounds_review_required' };
   }
 
   if (acquisitionHealth.severity === 'review') {
@@ -137,6 +148,10 @@ interface BuildNegativeLabFrameHealthReportParams {
   activePathIndex: number;
   baseFogConfidence: number | null;
   baseScope?: NegativeLabFrameBaseScope;
+  boundsReceipt?: {
+    finalBounds: { axisBounds: { luma: { max: number; min: number } } };
+    warningCodes: readonly string[];
+  } | null;
   cropStatusByFrameId?: Readonly<Record<string, NegativeLabFrameCropStatus>>;
   includedPathSet: ReadonlySet<string>;
   previewReady: boolean;
@@ -147,6 +162,7 @@ export const buildNegativeLabFrameHealthReport = ({
   activePathIndex,
   baseFogConfidence,
   baseScope = 'frame',
+  boundsReceipt = null,
   cropStatusByFrameId = {},
   includedPathSet,
   previewReady,
@@ -164,6 +180,12 @@ export const buildNegativeLabFrameHealthReport = ({
     const warningCodes: NegativeLabFrameWarningCode[] = [];
     const batchDisposition = buildNegativeLabFrameBatchDisposition({
       acquisitionHealth,
+      boundsNeedReview:
+        (active || baseScope === 'roll') &&
+        (boundsReceipt?.warningCodes.includes('missing_visible_base') === true ||
+          boundsReceipt?.warningCodes.includes('uneven_illumination') === true ||
+          (boundsReceipt !== null &&
+            boundsReceipt.finalBounds.axisBounds.luma.max - boundsReceipt.finalBounds.axisBounds.luma.min < 0.08)),
       hasBaseEstimate,
       included,
       previewReady,
@@ -173,6 +195,20 @@ export const buildNegativeLabFrameHealthReport = ({
     if (!previewReady && active) warningCodes.push('preview_not_ready');
     if (baseScope === 'frame' && baseFogConfidence !== null && !active) {
       warningCodes.push('base_estimate_active_frame_only');
+    }
+    if (active || baseScope === 'roll') {
+      if (boundsReceipt?.warningCodes.includes('missing_visible_base')) {
+        warningCodes.push('bounds_missing_visible_base');
+      }
+      if (boundsReceipt?.warningCodes.includes('uneven_illumination')) {
+        warningCodes.push('bounds_uneven_base_fog');
+      }
+      if (
+        boundsReceipt !== null &&
+        boundsReceipt.finalBounds.axisBounds.luma.max - boundsReceipt.finalBounds.axisBounds.luma.min < 0.08
+      ) {
+        warningCodes.push('bounds_narrow_luma_span');
+      }
     }
     const warningSeverity =
       acquisitionHealth.severity === 'review' ? 'review' : getNegativeLabWarningSeverity(warningCodes);

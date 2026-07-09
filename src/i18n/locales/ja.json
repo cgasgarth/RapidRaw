@@ -763,6 +763,12 @@
           "title": "",
           "tools": ""
         },
+        "recovery": {
+          "currentGraph": "現在のグラフ",
+          "currentRecipe": "現在のレシピ",
+          "refresh": "現在の編集からドライランを更新",
+          "title": "復旧が必要です"
+        },
         "review": {
           "applyUnavailable": "",
           "dryRun": "",

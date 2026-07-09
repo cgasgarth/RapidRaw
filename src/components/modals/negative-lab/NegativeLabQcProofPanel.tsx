@@ -1,5 +1,6 @@
 import cx from 'clsx';
 import { useTranslation } from 'react-i18next';
+import type { NegativeLabRuntimeProofV1 } from '../../../../packages/rawengine-schema/src';
 import type { NegativeLabQcProofReport } from '../../../schemas/negative-lab/negativeLabWorkspaceSchemas';
 import { TextVariants } from '../../../types/typography';
 import type {
@@ -43,6 +44,7 @@ const QC_CANDIDATE_KIND_LABEL_KEYS = {
 const OBJECTIVE_QC_FINDING_CODES = new Set([
   'acquisition_review_required',
   'base_fog_only_review',
+  'bounds_review_required',
   'excluded_not_reviewed',
   'preview_required',
 ]);
@@ -59,17 +61,9 @@ interface NegativeLabQcProofPanelProps {
   qcOverlayVisibility: NegativeLabQcOverlayVisibility;
   qcProofArtifact: NegativeLabQcContactSheetArtifact;
   qcProofReport: NegativeLabQcProofReport;
-  runtimePreviewDensityNormalizationMetrics: {
-    axisBounds: {
-      color: { max: number; min: number };
-      luma: { max: number; min: number };
-    };
-    channelBounds: {
-      blue: { max: number; min: number };
-      green: { max: number; min: number };
-      red: { max: number; min: number };
-    };
-  } | null;
+  runtimePreviewDensityNormalizationMetrics:
+    | NegativeLabRuntimeProofV1['runtimePreview']['densityNormalizationMetrics']
+    | null;
 }
 
 export function NegativeLabQcProofPanel({
@@ -200,19 +194,51 @@ export function NegativeLabQcProofPanel({
         </span>
         {runtimePreviewDensityNormalizationMetrics !== null ? (
           <>
-            <span>
+            <span data-testid="negative-lab-qc-base-bounds-luma">
               {t('modals.negativeConversion.axisBoundsReadout', {
                 axis: t('modals.negativeConversion.lumaAxis'),
-                max: runtimePreviewDensityNormalizationMetrics.axisBounds.luma.max.toFixed(3),
-                min: runtimePreviewDensityNormalizationMetrics.axisBounds.luma.min.toFixed(3),
+                max: runtimePreviewDensityNormalizationMetrics.boundsReceipt.baseBounds.axisBounds.luma.max.toFixed(3),
+                min: runtimePreviewDensityNormalizationMetrics.boundsReceipt.baseBounds.axisBounds.luma.min.toFixed(3),
               })}
             </span>
-            <span>
+            <span data-testid="negative-lab-qc-base-bounds-color">
               {t('modals.negativeConversion.axisBoundsReadout', {
                 axis: t('modals.negativeConversion.colorAxis'),
-                max: runtimePreviewDensityNormalizationMetrics.axisBounds.color.max.toFixed(3),
-                min: runtimePreviewDensityNormalizationMetrics.axisBounds.color.min.toFixed(3),
+                max: runtimePreviewDensityNormalizationMetrics.boundsReceipt.baseBounds.axisBounds.color.max.toFixed(3),
+                min: runtimePreviewDensityNormalizationMetrics.boundsReceipt.baseBounds.axisBounds.color.min.toFixed(3),
               })}
+            </span>
+            <span data-testid="negative-lab-qc-final-bounds-luma">
+              {t('modals.negativeConversion.axisBoundsReadout', {
+                axis: t('modals.negativeConversion.lumaAxis'),
+                max: runtimePreviewDensityNormalizationMetrics.boundsReceipt.finalBounds.axisBounds.luma.max.toFixed(3),
+                min: runtimePreviewDensityNormalizationMetrics.boundsReceipt.finalBounds.axisBounds.luma.min.toFixed(3),
+              })}
+            </span>
+            <span data-testid="negative-lab-qc-final-bounds-color">
+              {t('modals.negativeConversion.axisBoundsReadout', {
+                axis: t('modals.negativeConversion.colorAxis'),
+                max: runtimePreviewDensityNormalizationMetrics.boundsReceipt.finalBounds.axisBounds.color.max.toFixed(
+                  3,
+                ),
+                min: runtimePreviewDensityNormalizationMetrics.boundsReceipt.finalBounds.axisBounds.color.min.toFixed(
+                  3,
+                ),
+              })}
+            </span>
+            <span data-testid="negative-lab-qc-base-bounds-provenance">
+              {runtimePreviewDensityNormalizationMetrics.boundsReceipt.baseFogProvenance === 'automatic_analysis'
+                ? t('modals.negativeConversion.autoBaseFog')
+                : t('modals.negativeConversion.baseSampleActive')}
+            </span>
+            <span className="font-mono" data-testid="negative-lab-qc-channel-bounds">
+              {(['red', 'green', 'blue'] as const)
+                .map((channel) => {
+                  const bounds =
+                    runtimePreviewDensityNormalizationMetrics.boundsReceipt.finalBounds.channelBounds[channel];
+                  return `${channel[0]?.toLocaleUpperCase('en-US')} ${bounds.min.toFixed(3)}..${bounds.max.toFixed(3)}`;
+                })
+                .join(' ')}
             </span>
           </>
         ) : null}
