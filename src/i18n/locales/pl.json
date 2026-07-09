@@ -838,6 +838,12 @@
           "title": "",
           "tools": ""
         },
+        "recovery": {
+          "currentGraph": "Bieżący graf",
+          "currentRecipe": "Bieżąca receptura",
+          "refresh": "Odśwież próbę na podstawie bieżącej edycji",
+          "title": "Wymagane odzyskiwanie"
+        },
         "review": {
           "applyUnavailable": "",
           "dryRun": "",

@@ -806,6 +806,12 @@
           "title": "",
           "tools": ""
         },
+        "recovery": {
+          "currentGraph": "Текущий граф",
+          "currentRecipe": "Текущий рецепт",
+          "refresh": "Обновить пробный запуск по текущей правке",
+          "title": "Требуется восстановление"
+        },
         "review": {
           "applyUnavailable": "",
           "dryRun": "",

@@ -795,6 +795,22 @@
           "title": "Tool readiness",
           "tools": "Tools"
         },
+        "recovery": {
+          "currentGraph": "Current graph",
+          "currentRecipe": "Current recipe",
+          "reasons": {
+            "graph_revision_changed": "The edit graph changed after this dry-run. Refresh before applying.",
+            "image_changed": "The selected image changed after this dry-run.",
+            "missing_selection": "Select an image to create a current dry-run.",
+            "preview_artifact_changed": "The preview artifact changed after this dry-run.",
+            "preview_dimensions_changed": "The preview dimensions changed after this dry-run.",
+            "preview_identity_changed": "The preview source changed after this dry-run.",
+            "recipe_hash_changed": "The edit recipe changed after this dry-run. Refresh before applying.",
+            "stale_preview_state": "Wait for the selected image preview to finish loading."
+          },
+          "refresh": "Refresh dry-run from current edit",
+          "title": "Recovery required"
+        },
         "review": {
           "applyUnavailable": "Apply unavailable",
           "dryRun": "Dry-run",

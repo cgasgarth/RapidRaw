@@ -794,6 +794,12 @@
           "title": "",
           "tools": ""
         },
+        "recovery": {
+          "currentGraph": "Aktueller Graph",
+          "currentRecipe": "Aktuelles Rezept",
+          "refresh": "Trockenlauf aus aktueller Bearbeitung aktualisieren",
+          "title": "Wiederherstellung erforderlich"
+        },
         "review": {
           "applyUnavailable": "",
           "dryRun": "",

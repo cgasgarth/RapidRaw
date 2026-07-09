@@ -4,6 +4,7 @@ import {
   Eye,
   FileCheck2,
   GitCompareArrows,
+  RefreshCcw,
   RotateCcw,
   ShieldCheck,
   SlidersHorizontal,
@@ -301,6 +302,23 @@ export function AgentPanel() {
     ? getImageLabelFromPath(selectedImage.path)
     : t('editor.ai.agent.workspace.noImage');
   const preview = initialPromptContext?.preview;
+  const recoveryBlock =
+    liveWorkspaceController.blockedRecovery ??
+    (selectedImage === null
+      ? {
+          blockedRequestId: '',
+          currentGraphRevision: '',
+          currentRecipeHash: '',
+          staleReason: 'missing_selection' as const,
+        }
+      : !selectedImage.isReady
+        ? {
+            blockedRequestId: '',
+            currentGraphRevision: '',
+            currentRecipeHash: '',
+            staleReason: 'stale_preview_state' as const,
+          }
+        : null);
 
   return (
     <div
@@ -329,6 +347,52 @@ export function AgentPanel() {
             {reviewState.blocked ? t('editor.ai.agent.workspace.blocked') : t('editor.ai.agent.workspace.reviewReady')}
           </span>
         </header>
+
+        {recoveryBlock === null ? null : (
+          <section
+            className={`${agentReviewWorkspaceTokens.card} border-amber-500/35 bg-amber-500/5`}
+            data-blocked-request-id={recoveryBlock.blockedRequestId}
+            data-current-graph-revision={recoveryBlock.currentGraphRevision}
+            data-current-recipe-hash={recoveryBlock.currentRecipeHash}
+            data-stale-reason={recoveryBlock.staleReason}
+            data-testid="agent-stale-recovery-card"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 text-[12px] font-semibold text-amber-100">
+                  <RefreshCcw size={13} />
+                  <span>{t('editor.ai.agent.recovery.title')}</span>
+                </div>
+                <p className="mt-1 text-[11px] leading-4 text-text-secondary">
+                  {t(`editor.ai.agent.recovery.reasons.${recoveryBlock.staleReason}`)}
+                </p>
+              </div>
+              <span className={`${agentReviewWorkspaceTokens.chip} ${agentReviewWorkspaceTokens.stateBlocked}`}>
+                {t('editor.ai.agent.workspace.blocked')}
+              </span>
+            </div>
+            {recoveryBlock.currentGraphRevision.length === 0 ? null : (
+              <dl className="mt-2 grid grid-cols-[4.1rem_minmax(0,1fr)] gap-x-2 gap-y-1">
+                <dt className={agentReviewWorkspaceTokens.label}>{t('editor.ai.agent.recovery.currentGraph')}</dt>
+                <dd className={agentReviewWorkspaceTokens.metaValue}>{recoveryBlock.currentGraphRevision}</dd>
+                <dt className={agentReviewWorkspaceTokens.label}>{t('editor.ai.agent.recovery.currentRecipe')}</dt>
+                <dd className={agentReviewWorkspaceTokens.metaValue}>{recoveryBlock.currentRecipeHash}</dd>
+              </dl>
+            )}
+            <button
+              className={`${agentReviewWorkspaceTokens.actionButton} mt-2 w-full border-amber-500/30 bg-amber-500/10 text-amber-100`}
+              data-testid="agent-review-control-refresh-dry-run"
+              disabled={!liveWorkspaceController.canRecover}
+              onClick={() => {
+                void liveWorkspaceController.actions.refreshDryRun();
+              }}
+              type="button"
+            >
+              <RefreshCcw size={13} />
+              {t('editor.ai.agent.recovery.refresh')}
+            </button>
+          </section>
+        )}
 
         <section
           className={agentReviewWorkspaceTokens.card}
@@ -507,6 +571,8 @@ export function AgentPanel() {
           data-live-action-request-id={liveWorkspaceController.latestRequestId ?? ''}
           data-live-action-status={liveWorkspaceController.status}
           data-live-action-tool-name={liveWorkspaceController.latestToolName ?? ''}
+          data-rollback-blocked-reason={liveWorkspaceController.rollbackReadiness?.reason ?? ''}
+          data-rollback-readiness={liveWorkspaceController.rollbackReadiness?.status ?? 'unavailable'}
           data-testid="agent-dry-run-apply-review-controls"
         >
           <div className="grid grid-cols-2 gap-1">
@@ -571,12 +637,16 @@ export function AgentPanel() {
             <span className="font-mono text-[10px] text-text-tertiary">{transcript.toolCalls.length}</span>
           </div>
           <div className="space-y-1">
-            {liveWorkspaceController.activityEntries.slice(-3).map((entry) => (
+            {liveWorkspaceController.activityEntries.slice(-6).map((entry) => (
               <div
                 className="grid grid-cols-[0.5rem_minmax(0,1fr)_auto] items-center gap-1 text-[11px] leading-4"
+                data-current-graph-revision={entry.currentGraphRevision ?? ''}
+                data-current-recipe-hash={entry.currentRecipeHash ?? ''}
                 data-graph-revision={entry.graphRevision ?? ''}
                 data-recipe-hash={entry.recipeHash ?? ''}
+                data-recovery-request-id={entry.recoveryRequestId ?? ''}
                 data-request-id={entry.requestId ?? ''}
+                data-stale-reason={entry.staleReason ?? ''}
                 data-status={entry.status}
                 data-testid={`agent-review-live-activity-${entry.id}`}
                 data-tool-name={entry.toolName ?? ''}

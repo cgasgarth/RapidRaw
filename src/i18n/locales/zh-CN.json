@@ -790,6 +790,12 @@
           "title": "",
           "tools": ""
         },
+        "recovery": {
+          "currentGraph": "当前图谱",
+          "currentRecipe": "当前配方",
+          "refresh": "从当前编辑刷新试运行",
+          "title": "需要恢复"
+        },
         "review": {
           "applyUnavailable": "",
           "dryRun": "",

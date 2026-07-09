@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, type Variants } from 'framer-motion';
-import { lazy, type ReactNode, Suspense } from 'react';
+import { lazy, type ReactNode, Suspense, useEffect, useState } from 'react';
 import { type AppSettings, Panel, type SelectedImage } from '../../ui/AppProperties';
 import type { ExportState } from '../../ui/ExportImportProperties';
 import ColorWorkspacePanel from './color/ColorWorkspacePanel';
@@ -113,23 +113,47 @@ function EditorRightPanelSkeleton() {
 
 export function EditorRightPanelHost(props: EditorRightPanelHostProps) {
   const { activeRightPanel, renderedRightPanel, slideDirection } = props;
-  const renderPanel = renderedRightPanel === null ? null : rightPanelRegistry[renderedRightPanel];
+  const [hasMountedAgentPanel, setHasMountedAgentPanel] = useState(renderedRightPanel === Panel.Agent);
+  const shouldMountAgentPanel = hasMountedAgentPanel || renderedRightPanel === Panel.Agent;
+  const isAgentPanelActive = activeRightPanel === Panel.Agent;
+  const renderPanel =
+    renderedRightPanel === null || renderedRightPanel === Panel.Agent ? null : rightPanelRegistry[renderedRightPanel];
+
+  useEffect(() => {
+    if (renderedRightPanel === Panel.Agent) setHasMountedAgentPanel(true);
+  }, [renderedRightPanel]);
 
   return (
-    <AnimatePresence mode="wait" custom={slideDirection}>
-      {activeRightPanel && (
-        <motion.div
-          animate="animate"
-          className="h-full w-full overflow-hidden bg-editor-panel text-text-primary"
-          custom={slideDirection}
-          exit="exit"
-          initial="initial"
-          key={renderedRightPanel}
-          variants={panelVariants}
+    <>
+      {shouldMountAgentPanel ? (
+        <div
+          aria-hidden={!isAgentPanelActive}
+          className={`h-full w-full overflow-hidden bg-editor-panel text-text-primary ${
+            isAgentPanelActive ? '' : 'hidden'
+          }`}
+          data-testid="editor-agent-panel-keep-alive"
+          inert={isAgentPanelActive ? undefined : true}
         >
-          <Suspense fallback={<EditorRightPanelSkeleton />}>{renderPanel?.(props)}</Suspense>
-        </motion.div>
-      )}
-    </AnimatePresence>
+          <Suspense fallback={<EditorRightPanelSkeleton />}>
+            <AgentPanel />
+          </Suspense>
+        </div>
+      ) : null}
+      <AnimatePresence mode="wait" custom={slideDirection}>
+        {activeRightPanel && !isAgentPanelActive && (
+          <motion.div
+            animate="animate"
+            className="h-full w-full overflow-hidden bg-editor-panel text-text-primary"
+            custom={slideDirection}
+            exit="exit"
+            initial="initial"
+            key={renderedRightPanel}
+            variants={panelVariants}
+          >
+            <Suspense fallback={<EditorRightPanelSkeleton />}>{renderPanel?.(props)}</Suspense>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
