@@ -785,6 +785,12 @@
           "title": "",
           "tools": ""
         },
+        "recovery": {
+          "currentGraph": "Grafo actual",
+          "currentRecipe": "Receta actual",
+          "refresh": "Actualizar simulación desde la edición actual",
+          "title": "Recuperación necesaria"
+        },
         "review": {
           "applyUnavailable": "",
           "dryRun": "",
