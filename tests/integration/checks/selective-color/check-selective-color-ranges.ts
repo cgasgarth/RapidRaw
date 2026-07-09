@@ -87,14 +87,13 @@ for (const [index, expectedRange] of fixture.ranges.entries()) {
 }
 
 for (const marker of [
-  'selective-color-range-summary',
-  'selective-color-range-summary-label',
-  'selective-color-range-summary-center',
-  'selective-color-range-summary-width',
-  'activeSelectiveColorRange.widthDegrees',
+  'selective-color-range-controls',
+  'local-color-range-adjustment-disclosure',
+  'local-color-range-adjustment-controls',
+  "handleRangeControlChange('widthDegrees'",
 ]) {
   if (!colorPanelSource.includes(marker)) {
-    failures.push(`Color Mixer UI is missing selective color range summary marker: ${marker}.`);
+    failures.push(`Color Mixer UI is missing selective color range control marker: ${marker}.`);
   }
 }
 

@@ -103,13 +103,6 @@ import {
   type MaskContainer,
 } from '../../utils/adjustments';
 import { agentChatTranscriptFixture } from '../../utils/agent/session/agentChatTranscriptFixture';
-import { lookupCameraProfile } from '../../utils/cameraProfileLookup';
-import { applyBlackWhiteMixerToRgbPixel } from '../../utils/color/runtime/blackWhiteMixerRuntime';
-import {
-  applyCameraProfileInputTransform,
-  type CameraProfileMatrix3x3,
-} from '../../utils/color/runtime/cameraProfileInputTransformRuntime';
-import { applyColorBalanceRgbToPixel } from '../../utils/color/runtime/colorBalanceRgbRuntime';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/computational-merge/computationalMergeAppServerRoutePairs';
 import { DETAIL_OUTPUT_COMPARISON_VISUAL_PROOF } from '../../utils/detail/detailOutputComparisonProof';
 import type { EditHistoryCheckpoint } from '../../utils/editHistory';
@@ -121,7 +114,6 @@ import {
 } from '../../utils/layers/layerMaskExportParityReceipt';
 import { applyLayerStackCommandBridgeOperation } from '../../utils/layers/layerStackCommandBridge';
 import { handleNegativeConversionEditorHandoff } from '../../utils/negative-lab/negativeLabEditorHandoff';
-import { applySkinToneUniformityToRgbPixel } from '../../utils/skinToneUniformity';
 import { buildSuperResolutionOutputReviewWorkflow } from '../../utils/superResolutionOutputReview';
 import type { SuperResolutionSourcePreflightMetadata } from '../../utils/superResolutionSourcePreflight';
 import { PANEL_SCOPES_HEIGHT } from '../../utils/waveformSizing';
@@ -4880,69 +4872,6 @@ const filmSmokeMetricLabels = {
   temperature: 'Temp',
 } as const;
 const formatSmokeMetric = (label: string, value: number | string) => `${label} ${value}`;
-const formatRgbTriplet = ({ blue, green, red }: { blue: number; green: number; red: number }) =>
-  `R ${Math.round(red * 255)} / G ${Math.round(green * 255)} / B ${Math.round(blue * 255)}`;
-const maxRgbDelta = (
-  left: { blue: number; green: number; red: number },
-  right: { blue: number; green: number; red: number },
-) => Math.max(Math.abs(left.red - right.red), Math.abs(left.green - right.green), Math.abs(left.blue - right.blue));
-const colorSmokeMetricLabels = {
-  channelMixer: 'CM',
-  colorBalance: 'CB',
-  saturation: 'Sat',
-  skinTone: 'Skin',
-  temperature: 'Temp',
-} as const;
-const cameraProfilePreviewCatalog = {
-  fallbacks: [
-    {
-      id: 'fallback.raw-decoder-neutral',
-      inputTransform: 'raw_decoder_neutral_matrix',
-      rawExtensions: ['arw', 'cr3', 'nef', 'raf'],
-      warning: 'camera_profile_generic_fallback',
-    },
-  ],
-  profiles: [
-    {
-      id: 'camera.sony-ilce-7m4.generic-arw-v1',
-      inputTransform: 'libraw_camera_matrix',
-      manufacturer: 'Sony',
-      models: ['ILCE-7M4', 'Alpha 7 IV', 'A7 IV'],
-      priority: 80,
-      profileClass: 'generic_camera_profile',
-      rawExtensions: ['arw'],
-      source: 'raw_decoder_metadata',
-    },
-  ],
-  schemaVersion: 1,
-} as const;
-const cameraProfilePreviewInputRgb = {
-  blue: 0.18,
-  green: 0.5,
-  red: 0.25,
-} as const;
-const cameraProfilePreviewMatrix = [
-  [1.12, -0.04, -0.02],
-  [-0.03, 1.05, -0.01],
-  [0.01, -0.08, 1.13],
-] satisfies CameraProfileMatrix3x3;
-const cameraProfilePreviewMetadata = {
-  manufacturer: 'Sony',
-  model: 'ILCE-7M4',
-  rawExtension: 'ARW',
-} as const;
-const skinToneProof = applySkinToneUniformityToRgbPixel(
-  { blue: 0.34, green: 0.45, red: 0.72 },
-  {
-    hueUniformity: 0.5,
-    luminanceUniformity: 0.4,
-    saturationUniformity: 0.5,
-    targetHueDegrees: 20,
-    targetLuminance: 0.61,
-    targetSaturation: 0.34,
-  },
-);
-const skinToneOutputRed = skinToneProof.outputRgb.red.toFixed(3);
 const commandPaletteWorkflowSourcePath = '/Users/example/Pictures/CommandPalette/DSC_7853.ARW';
 
 function CommandPaletteWorkflowSmoke() {
@@ -7536,21 +7465,6 @@ function ColorWorkflowVisualSmoke() {
   const handleAdjustmentsChange = (update: Partial<Adjustments> | ((current: Adjustments) => Adjustments)) => {
     setAdjustments((current) => (typeof update === 'function' ? update(current) : { ...current, ...update }));
   };
-  const colorBalanceSourcePixel = { blue: 0.34, green: 0.48, red: 0.68 };
-  const colorBalanceResult = applyColorBalanceRgbToPixel(colorBalanceSourcePixel, adjustments.colorBalanceRgb);
-  const blackWhiteSourcePixel = { blue: 0.12, green: 0.38, red: 0.9 };
-  const blackWhitePreviewResult = applyBlackWhiteMixerToRgbPixel(blackWhiteSourcePixel, adjustments.blackWhiteMixer);
-  const blackWhiteExportResult = applyBlackWhiteMixerToRgbPixel(blackWhiteSourcePixel, adjustments.blackWhiteMixer);
-  const cameraProfileLookup = lookupCameraProfile(cameraProfilePreviewCatalog, cameraProfilePreviewMetadata);
-  const cameraProfileWorkingRgb = applyCameraProfileInputTransform(
-    cameraProfilePreviewInputRgb,
-    cameraProfilePreviewMatrix,
-  );
-  const clipChannelCount = Object.values(colorBalanceResult.outputRgb).filter(
-    (channel) => channel <= 0 || channel >= 1,
-  ).length;
-  const compareChanged = formatRgbTriplet(colorBalanceSourcePixel) !== formatRgbTriplet(colorBalanceResult.outputRgb);
-
   return (
     <main
       className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
@@ -7565,122 +7479,9 @@ function ColorWorkflowVisualSmoke() {
           className={cx('relative min-w-0 bg-[#0f1114] p-6', isCompactViewport && 'hidden')}
           data-visual-smoke-section="color-workflow-preview"
         >
-          <div className="mx-auto flex h-full max-w-4xl flex-col justify-center gap-5">
+          <div className="mx-auto flex h-full max-w-4xl flex-col justify-center">
             <div className="aspect-[4/3] overflow-hidden rounded-md border border-white/10 bg-[linear-gradient(135deg,#182629,#435b5a_42%,#c79c63_72%,#f4d6a1)] shadow-2xl">
               <div className="h-full w-full bg-[radial-gradient(circle_at_38%_32%,rgba(255,246,219,0.48),transparent_20%),linear-gradient(170deg,transparent_45%,rgba(24,43,50,0.72)_46%)]" />
-            </div>
-            <div
-              className="grid gap-2 rounded-md border border-white/10 bg-black/45 p-3 text-xs text-[#dce4ea]"
-              data-camera-metadata={`${cameraProfilePreviewMetadata.manufacturer} ${cameraProfilePreviewMetadata.model}`}
-              data-camera-profile-id={cameraProfileLookup.id}
-              data-input-camera-rgb={formatRgbTriplet(cameraProfilePreviewInputRgb)}
-              data-input-transform={cameraProfileLookup.inputTransform}
-              data-output-working-rgb={formatRgbTriplet(cameraProfileWorkingRgb)}
-              data-profile-warning={cameraProfileLookup.warning ?? ''}
-              data-runtime-stage="camera_profile_to_working_space"
-              data-testid="camera-profile-input-transform-preview"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <span className="font-semibold text-white">{copy.cameraProfilePreview}</span>
-                <span className="rounded bg-white/10 px-2 py-1 text-[#aab5bd]">
-                  {cameraProfileLookup.inputTransform}
-                </span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="rounded border border-white/10 bg-white/5 p-2">
-                  <div className="mb-1 text-[11px] uppercase text-[#9ba6b2]">{copy.cameraProfileInputRgb}</div>
-                  <div className="font-mono">{formatRgbTriplet(cameraProfilePreviewInputRgb)}</div>
-                </div>
-                <div className="rounded border border-sky-500/25 bg-sky-500/10 p-2">
-                  <div className="mb-1 text-[11px] uppercase text-[#9ba6b2]">{copy.cameraProfileWorkingRgb}</div>
-                  <div className="font-mono">{formatRgbTriplet(cameraProfileWorkingRgb)}</div>
-                </div>
-              </div>
-            </div>
-            <div
-              className="grid gap-2 rounded-md border border-white/10 bg-black/45 p-3 text-xs text-[#dce4ea]"
-              data-enabled={String(adjustments.blackWhiteMixer.enabled)}
-              data-export-rgb={formatRgbTriplet(blackWhiteExportResult.outputRgb)}
-              data-parity-delta={String(
-                maxRgbDelta(blackWhitePreviewResult.outputRgb, blackWhiteExportResult.outputRgb),
-              )}
-              data-preview-rgb={formatRgbTriplet(blackWhitePreviewResult.outputRgb)}
-              data-testid="black-white-mixer-parity-strip"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <span className="font-semibold text-white">{copy.blackWhiteParity}</span>
-                <span className="rounded bg-white/10 px-2 py-1 text-[#aab5bd]">{copy.blackWhiteCommandSummary}</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="rounded border border-white/10 bg-white/5 p-2" data-testid="black-white-preview">
-                  <div className="mb-1 text-[11px] uppercase text-[#9ba6b2]">{copy.previewRgb}</div>
-                  <div className="font-mono">{formatRgbTriplet(blackWhitePreviewResult.outputRgb)}</div>
-                </div>
-                <div className="rounded border border-white/10 bg-white/5 p-2" data-testid="black-white-export">
-                  <div className="mb-1 text-[11px] uppercase text-[#9ba6b2]">{copy.exportRgb}</div>
-                  <div className="font-mono">{formatRgbTriplet(blackWhiteExportResult.outputRgb)}</div>
-                </div>
-              </div>
-            </div>
-            <div
-              className="grid gap-2 rounded-md border border-white/10 bg-black/45 p-3 text-xs text-[#dce4ea]"
-              data-after-rgb={formatRgbTriplet(colorBalanceResult.outputRgb)}
-              data-before-rgb={formatRgbTriplet(colorBalanceSourcePixel)}
-              data-clip-channel-count={clipChannelCount}
-              data-command-summary="toneColor.colorBalanceRgb"
-              data-compare-changed={String(compareChanged)}
-              data-testid="color-balance-compare-strip"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <span className="font-semibold text-white">{copy.colorBalanceCompare}</span>
-                <span className="rounded bg-white/10 px-2 py-1 text-[#aab5bd]">{copy.colorCompareReset}</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="rounded border border-white/10 bg-white/5 p-2" data-testid="color-balance-before">
-                  <div className="mb-1 text-[11px] uppercase text-[#9ba6b2]">{copy.colorBefore}</div>
-                  <div className="font-mono">{formatRgbTriplet(colorBalanceSourcePixel)}</div>
-                </div>
-                <div
-                  className="rounded border border-emerald-500/25 bg-emerald-500/10 p-2"
-                  data-testid="color-balance-after"
-                >
-                  <div className="mb-1 text-[11px] uppercase text-[#9ba6b2]">{copy.colorAfter}</div>
-                  <div className="font-mono">{formatRgbTriplet(colorBalanceResult.outputRgb)}</div>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-[11px] text-[#aab5bd]">
-                <span className="rounded bg-white/5 px-2 py-1">{copy.colorBalanceCommandSummary}</span>
-                <span className="rounded bg-white/5 px-2 py-1" data-testid="color-balance-gamut-warning">
-                  {copy.colorGamutWarning}
-                </span>
-              </div>
-            </div>
-            <div
-              className="grid grid-cols-4 gap-2 rounded-md border border-white/10 bg-black/45 p-3 text-sm"
-              data-testid="color-workflow-adjustment-proof"
-            >
-              <span>{formatSmokeMetric(colorSmokeMetricLabels.temperature, adjustments.temperature)}</span>
-              <span>{formatSmokeMetric(colorSmokeMetricLabels.saturation, adjustments.saturation)}</span>
-              <span>
-                {formatSmokeMetric(
-                  colorSmokeMetricLabels.colorBalance,
-                  adjustments.colorBalanceRgb.enabled ? 'on' : 'off',
-                )}
-              </span>
-              <span>
-                {formatSmokeMetric(
-                  colorSmokeMetricLabels.channelMixer,
-                  adjustments.channelMixer.enabled ? 'on' : 'off',
-                )}
-              </span>
-              <span data-testid="skin-tone-uniformity-ui-proof">
-                {formatSmokeMetric(colorSmokeMetricLabels.skinTone, skinToneOutputRed)}
-              </span>
-              <span data-testid="selective-color-ui-proof">
-                {formatSmokeMetric('Orange', adjustments.hsl.oranges.hue)}
-              </span>
-              <span>{formatSmokeMetric('Orange sat', adjustments.hsl.oranges.saturation)}</span>
-              <span>{formatSmokeMetric('Orange lum', adjustments.hsl.oranges.luminance)}</span>
             </div>
           </div>
         </section>
