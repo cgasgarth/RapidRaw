@@ -193,14 +193,8 @@ export function NegativeLabProfileComparisonGrid({
                 {profile.doesNotProve.join(', ')}
               </span>
               <div className="mt-2 flex items-center justify-between gap-2">
-                <span
-                  className="min-w-0 truncate text-[10px] text-text-tertiary"
-                  data-testid={`negative-lab-profile-comparison-render-hash-${profile.presetId}`}
-                >
-                  {candidate.renderEvidence.renderHash}
-                </span>
                 <button
-                  className="shrink-0 rounded border border-surface bg-bg-primary px-2 py-1 text-[10px] text-text-secondary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
+                  className="ml-auto shrink-0 rounded border border-surface bg-bg-primary px-2 py-1 text-[10px] text-text-secondary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
                   data-testid={`negative-lab-profile-comparison-use-${profile.presetId}`}
                   disabled={!candidate.mutationSafety.selectableForRuntimeApply}
                   onClick={() => {

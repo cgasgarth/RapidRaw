@@ -4309,22 +4309,6 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             {t(`modals.negativeConversion.outputFormats.${saveOptions.outputFormat}`)}
           </span>
           <span
-            className="truncate rounded bg-bg-secondary px-1.5 py-0.5"
-            data-testid="negative-lab-positive-sidecar"
-            title={activePositiveVariant.outputArtifact.artifactId}
-          >
-            {t('modals.negativeConversion.positiveHandoffSidecar', {
-              artifactId: activePositiveVariant.outputArtifact.artifactId,
-            })}
-          </span>
-          <span
-            className="truncate rounded bg-bg-secondary px-1.5 py-0.5"
-            data-testid="negative-lab-positive-provenance"
-            title={provenanceLink}
-          >
-            {t('modals.negativeConversion.positiveHandoffProvenance', { proofId: provenanceLink })}
-          </span>
-          <span
             className={cx(
               'truncate rounded px-1.5 py-0.5',
               dustHealLayerCount > 0 && openSavedPositiveInEditor
@@ -4348,37 +4332,62 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
               type="checkbox"
             />
           </label>
+          <details className="col-span-2 rounded bg-bg-secondary px-1.5 py-0.5 text-text-tertiary">
+            <summary className="cursor-pointer text-[11px]">{t('modals.negativeConversion.conversionBundle')}</summary>
+            <div className="mt-1 grid gap-1 text-[11px]">
+              <span
+                className="truncate"
+                data-testid="negative-lab-positive-sidecar"
+                title={activePositiveVariant.outputArtifact.artifactId}
+              >
+                {t('modals.negativeConversion.positiveHandoffSidecar', {
+                  artifactId: activePositiveVariant.outputArtifact.artifactId,
+                })}
+              </span>
+              <span className="truncate" data-testid="negative-lab-positive-provenance" title={provenanceLink}>
+                {t('modals.negativeConversion.positiveHandoffProvenance', { proofId: provenanceLink })}
+              </span>
+            </div>
+          </details>
         </div>
       </div>
     );
   };
 
   const renderControls = () => (
-    <div className="modal-adjustments-pane w-80 shrink-0 bg-bg-secondary flex flex-col border-l border-surface h-full z-10">
-      <div className="p-4 flex justify-between items-center shrink-0 border-b border-surface">
-        <UiText id="negative-lab-dialog-title" variant={TextVariants.title}>
-          {t('modals.negativeConversion.title')}
-        </UiText>
-        <button
-          aria-label={t('modals.negativeConversion.resetTooltip')}
-          onClick={() => {
-            setParams(DEFAULT_PARAMS);
-            setSelectedPresetId(DEFAULT_NEGATIVE_LAB_UI_PRESET.presetId);
-            setBaseFogConfidence(null);
-            setActiveBaseFogSampleLabel(null);
-            setFrameExposureOffsetByFrameId({});
-            updatePreview(DEFAULT_PARAMS);
-          }}
-          disabled={isSaving || isEstimatingBaseFog}
-          data-tooltip={t('modals.negativeConversion.resetTooltip')}
-          className="p-2 rounded-full hover:bg-surface transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <RotateCcw size={18} />
-        </button>
-      </div>
+    <div className="modal-adjustments-pane z-10 flex min-h-0 w-full shrink-0 flex-col border-t border-surface bg-bg-secondary xl:w-[25rem] xl:min-w-[25rem] xl:border-l xl:border-t-0">
+      <nav
+        aria-label={t('modals.negativeConversion.title')}
+        className="grid shrink-0 grid-cols-3 gap-px border-b border-surface bg-surface"
+        data-testid="negative-lab-workspace-task-nav"
+      >
+        {[
+          { id: 'negative-lab-source-context', label: t('modals.negativeConversion.workflowSetup') },
+          { id: 'negative-lab-correction-controls', label: t('modals.negativeConversion.workflowColorTiming') },
+          { id: 'negative-lab-qc', label: t('modals.negativeConversion.workflowInspection') },
+        ].map((task) => (
+          <button
+            className="min-w-0 bg-bg-secondary px-2 py-2 text-xs font-medium text-text-secondary transition-colors hover:bg-bg-primary hover:text-text-primary"
+            data-testid={`negative-lab-workspace-task-${task.id.replace('negative-lab-', '')}`}
+            key={task.id}
+            onClick={() => {
+              document.getElementById(task.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}
+            type="button"
+          >
+            <span className="block truncate">{task.label}</span>
+          </button>
+        ))}
+      </nav>
 
-      <div className="grow overflow-y-auto p-4 flex flex-col gap-8">
-        <div className={cx('transition-opacity duration-200', isSaving && 'opacity-50 pointer-events-none grayscale')}>
+      <div className="grow space-y-5 overflow-y-auto scroll-smooth p-3 sm:p-4">
+        <section
+          className={cx(
+            'scroll-mt-3 transition-opacity duration-200',
+            isSaving && 'pointer-events-none opacity-50 grayscale',
+          )}
+          id="negative-lab-source-context"
+        >
           <UiText variant={TextVariants.heading} className="mb-2">
             {t('modals.negativeConversion.workflowSetup')}
           </UiText>
@@ -4515,15 +4524,17 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
               </div>
             )}
             {renderAcquisitionHealth()}
-            {renderScanInputGuidance()}
-            {renderBatchReadiness()}
             {renderBaseSamplingCta()}
-            {renderWalkthroughClosure()}
-            {renderAgentActivityPanel()}
           </div>
-        </div>
+        </section>
 
-        <div className={cx('transition-opacity duration-200', isSaving && 'opacity-50 pointer-events-none grayscale')}>
+        <div
+          className={cx(
+            'scroll-mt-3 transition-opacity duration-200',
+            isSaving && 'pointer-events-none opacity-50 grayscale',
+          )}
+          id="negative-lab-correction-controls"
+        >
           <UiText variant={TextVariants.heading} className="mb-2">
             {t('modals.negativeConversion.genericPresets')}
           </UiText>
@@ -5557,9 +5568,6 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
               shadowPatchBlackPointSuggestion={shadowPatchBlackPointSuggestion}
               runtimePreviewDensityNormalizationMetrics={runtimePreviewDensityNormalizationMetrics}
             />
-            {renderDustScratchReview()}
-            {renderQcProofReport()}
-            {renderPositiveVariantHandoff()}
             <Slider
               label={t('modals.negativeConversion.redWeight')}
               value={params.red_weight}
@@ -5813,6 +5821,24 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           </div>
         </div>
 
+        <section
+          className={cx(
+            'scroll-mt-3 transition-opacity duration-200',
+            isSaving && 'pointer-events-none opacity-50 grayscale',
+          )}
+          id="negative-lab-qc"
+        >
+          <UiText variant={TextVariants.heading} className="mb-2">
+            {t('modals.negativeConversion.workflowInspection')}
+          </UiText>
+          <div className="space-y-3">
+            {renderBatchReadiness()}
+            {renderDustScratchReview()}
+            {renderQcProofReport()}
+            {renderPositiveVariantHandoff()}
+          </div>
+        </section>
+
         <div className={cx('transition-opacity duration-200', isSaving && 'opacity-50 pointer-events-none grayscale')}>
           <UiText variant={TextVariants.heading} className="mb-2">
             {t('modals.negativeConversion.exportOptions')}
@@ -5913,6 +5939,20 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             </div>
           </div>
         </div>
+
+        <details
+          className="rounded-md border border-surface bg-bg-primary"
+          data-testid="negative-lab-technical-disclosure"
+        >
+          <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-text-secondary marker:text-text-tertiary">
+            {t('modals.negativeConversion.agentActivity')}
+          </summary>
+          <div className="space-y-3 border-t border-surface p-3">
+            {renderScanInputGuidance()}
+            {renderWalkthroughClosure()}
+            {renderAgentActivityPanel()}
+          </div>
+        </details>
 
         <div className="mt-auto pt-4 space-y-2">
           <UiText
@@ -6117,7 +6157,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   );
 
   const renderContent = () => (
-    <div className="modal-preview-adjustments flex flex-row h-full w-full overflow-hidden">
+    <div className="modal-preview-adjustments flex h-full w-full flex-col overflow-hidden xl:flex-row">
       <div
         className="sr-only"
         data-active-stage={workspaceProof.activeStage}
@@ -6131,12 +6171,12 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         data-target-count={workspaceProof.targetCount}
         data-testid="negative-lab-workspace-proof"
       />
-      <div className="modal-preview-pane grow flex flex-col relative min-h-0 bg-[#0f0f0f] overflow-hidden">
+      <div className="modal-preview-pane relative flex min-h-[20rem] grow flex-col overflow-hidden bg-[#0f0f0f] xl:min-h-0">
         {renderWorkflowRail()}
         {renderRollFrameNavigator()}
         <div
           ref={containerRef}
-          className="flex-1 relative overflow-hidden cursor-grab active:cursor-grabbing select-none"
+          className="relative flex-1 select-none overflow-hidden cursor-grab active:cursor-grabbing"
           role="presentation"
           onMouseDown={handleMouseDown}
           onWheel={handleWheel}
@@ -6149,6 +6189,16 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           {isLoading && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/20 z-30">
               <Loader2 className="w-12 h-12 text-accent animate-spin" />
+            </div>
+          )}
+
+          {previewImageUrl === null && !isLoading && (
+            <div
+              className="absolute inset-0 flex items-center justify-center px-8 text-center text-sm text-white/65"
+              data-testid="negative-lab-preview-pending"
+              role="status"
+            >
+              {t('modals.negativeConversion.previewPending')}
             </div>
           )}
 
@@ -6256,6 +6306,77 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
 
   return (
     <NegativeLabWorkspaceShell
+      header={
+        <div className="flex min-w-0 items-center justify-between gap-3">
+          <div className="min-w-0">
+            <UiText
+              id="negative-lab-dialog-title"
+              variant={TextVariants.heading}
+              className="truncate text-text-primary"
+            >
+              {t('modals.negativeConversion.title')}
+            </UiText>
+            <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-text-tertiary">
+              <span
+                className="max-w-56 truncate"
+                title={selectedImagePath ?? undefined}
+                data-testid="negative-lab-header-source"
+              >
+                {selectedImagePath === null
+                  ? t('modals.negativeConversion.previewPending')
+                  : getNegativeLabScanLabel(selectedImagePath, effectiveActivePathIndex)}
+              </span>
+              <span className="shrink-0" data-testid="negative-lab-header-roll-count">
+                {targetPaths.length === 1
+                  ? t('modals.negativeConversion.workflowSetupDetailSingle')
+                  : t('modals.negativeConversion.workflowSetupDetailMultiple', { scanCount: targetPaths.length })}
+              </span>
+              <span
+                className="max-w-44 truncate"
+                title={selectedProfile?.displayName}
+                data-testid="negative-lab-header-profile"
+              >
+                {selectedProfile?.displayName ?? t('modals.negativeConversion.workflowCustomPresetDetail')}
+              </span>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            <span
+              className="hidden max-w-40 truncate rounded-sm bg-bg-primary px-2 py-1 text-[11px] text-text-secondary sm:block"
+              data-testid="negative-lab-header-preview-status"
+            >
+              {previewReadinessLabel}
+            </span>
+            <button
+              aria-label={t('modals.negativeConversion.resetTooltip')}
+              className="rounded p-2 text-text-secondary transition-colors hover:bg-surface hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+              data-tooltip={t('modals.negativeConversion.resetTooltip')}
+              disabled={isSaving || isEstimatingBaseFog}
+              onClick={() => {
+                setParams(DEFAULT_PARAMS);
+                setSelectedPresetId(DEFAULT_NEGATIVE_LAB_UI_PRESET.presetId);
+                setBaseFogConfidence(null);
+                setActiveBaseFogSampleLabel(null);
+                setFrameExposureOffsetByFrameId({});
+                updatePreview(DEFAULT_PARAMS);
+              }}
+              type="button"
+            >
+              <RotateCcw size={16} />
+            </button>
+            <button
+              aria-label={t('window.titleBar.close')}
+              className="rounded p-2 text-text-secondary transition-colors hover:bg-surface hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+              data-tooltip={t('window.titleBar.close')}
+              disabled={isSaving}
+              onClick={onClose}
+              type="button"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+      }
       footer={
         <>
           {saveBlockedReasonKey !== null && (
