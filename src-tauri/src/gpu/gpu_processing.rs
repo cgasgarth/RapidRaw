@@ -15,9 +15,7 @@ use crate::gpu_textures::{
 };
 use crate::image_processing::{AllAdjustments, GpuContext, MAX_MASKS};
 use crate::lut_processing::Lut;
-use crate::mixer_render::{
-    apply_native_color_mixer_adjustments, disable_native_color_mixer_adjustments,
-};
+use crate::mixer_render::apply_native_color_mixer_adjustments;
 use crate::render_caches::RenderCaches;
 use crate::{AppState, GpuImageCache};
 
@@ -66,7 +64,6 @@ pub struct RenderRequest<'a> {
     pub adjustments: AllAdjustments,
     pub mask_bitmaps: &'a [ImageBuffer<Luma<u8>, Vec<u8>>],
     pub lut: Option<Arc<Lut>>,
-    pub native_color_mixers_preapplied: bool,
     pub roi: Option<Roi>,
 }
 
@@ -1194,17 +1191,6 @@ fn process_and_get_dynamic_image_inner(
     preserve_unclamped_float_readback: bool,
 ) -> Result<DynamicImage, String> {
     let start_time = Instant::now();
-    let mut request = request;
-    let color_adjusted_input = if request.native_color_mixers_preapplied {
-        std::borrow::Cow::Borrowed(base_image)
-    } else {
-        apply_native_color_mixer_adjustments(
-            std::borrow::Cow::Borrowed(base_image),
-            &request.adjustments.global,
-        )
-    };
-    disable_native_color_mixer_adjustments(&mut request.adjustments);
-    let base_image = color_adjusted_input.as_ref();
     let (width, height) = base_image.dimensions();
     let device = &context.device;
     let queue = &context.queue;
@@ -1217,7 +1203,11 @@ fn process_and_get_dynamic_image_inner(
             height,
             max_dim
         );
-        return Ok(base_image.clone());
+        return Ok(apply_native_color_mixer_adjustments(
+            std::borrow::Cow::Borrowed(base_image),
+            &request.adjustments.global,
+        )
+        .into_owned());
     }
 
     let mut old_processor = None;

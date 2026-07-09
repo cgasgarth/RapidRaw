@@ -100,6 +100,12 @@ pub fn calculate_transform_hash(adjustments: &serde_json::Value) -> u64 {
             value.to_string().hash(&mut hasher);
         }
     }
+    adjustments
+        .get("sectionVisibility")
+        .and_then(|visibility| visibility.get("color"))
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(true)
+        .hash(&mut hasher);
 
     for key in adjustment_fields::GEOMETRY_KEYS {
         if let Some(val) = adjustments.get(key) {
@@ -186,7 +192,8 @@ mod tests {
                 "highlights": { "red": 0, "green": 0, "blue": 0 }
             },
             "channelMixer": { "enabled": false },
-            "blackWhiteMixer": { "enabled": false }
+            "blackWhiteMixer": { "enabled": false },
+            "sectionVisibility": { "color": true }
         });
         let mut updated = base.clone();
         updated["colorBalanceRgb"]["midtones"]["red"] = json!(80);
@@ -195,6 +202,14 @@ mod tests {
             calculate_transform_hash(&base),
             calculate_transform_hash(&updated),
             "a native color edit must rebuild the preview and zoom source image"
+        );
+
+        let mut hidden = base.clone();
+        hidden["sectionVisibility"]["color"] = json!(false);
+        assert_ne!(
+            calculate_transform_hash(&base),
+            calculate_transform_hash(&hidden),
+            "hiding the color section must invalidate baked mixer pixels"
         );
     }
 }

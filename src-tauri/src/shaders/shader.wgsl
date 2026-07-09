@@ -802,7 +802,7 @@ fn apply_black_white_mixer(color: vec3<f32>, settings: BlackWhiteMixerSettings) 
     }
 
     if (influence_total > 0.0) {
-        weighted_adjustment = weighted_adjustment / influence_total / 100.0;
+        weighted_adjustment = weighted_adjustment / influence_total;
     }
     let mixed = clamp(luma * (1.0 + weighted_adjustment * 0.5), 0.0, 1.0);
     return vec3<f32>(mixed);

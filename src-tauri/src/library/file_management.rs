@@ -1209,7 +1209,6 @@ fn generate_thumbnail_data_with_target(
                 adjustments: gpu_adjustments,
                 mask_bitmaps: &mask_bitmaps,
                 lut,
-                native_color_mixers_preapplied: false,
                 roi: None,
             },
             "generate_thumbnail_data",

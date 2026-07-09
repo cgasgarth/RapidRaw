@@ -8,7 +8,6 @@ use crate::image_processing::{
     Crop, IntoCowImage, apply_coarse_rotation, apply_crop, apply_flip, apply_geometry_warp,
     apply_rotation,
 };
-use crate::{get_all_adjustments_from_json, mixer_render::apply_native_color_mixer_adjustments};
 
 pub fn hydrate_sub_masks(
     sub_masks: &mut Vec<serde_json::Value>,
@@ -132,16 +131,13 @@ pub fn apply_all_transformations<'a, I: IntoCowImage<'a>>(
         serde_json::from_value(adjustments[adjustment_fields::CROP].clone()).ok();
     let crop_json = serde_json::to_value(crop_data).unwrap_or(serde_json::Value::Null);
     let cropped_image = apply_crop(rotated_image, &crop_json);
-    let parsed_adjustments = get_all_adjustments_from_json(adjustments, false, None);
-    let color_adjusted_image =
-        apply_native_color_mixer_adjustments(cropped_image, &parsed_adjustments.global);
 
     let unscaled_crop_offset = crop_data.map_or((0.0, 0.0), |c| (c.x as f32, c.y as f32));
 
     let total_duration = start_time.elapsed();
     log::info!("apply_all_transformations took {:.2?}", total_duration);
 
-    (color_adjusted_image, unscaled_crop_offset)
+    (cropped_image, unscaled_crop_offset)
 }
 
 #[cfg(test)]
@@ -152,17 +148,12 @@ mod tests {
     use super::apply_all_transformations;
 
     #[test]
-    fn shared_transform_path_applies_color_mixers_and_keeps_disabled_input_identical() {
+    fn shared_transform_path_keeps_color_mixers_for_the_render_stage() {
         let source = DynamicImage::ImageRgba32F(ImageBuffer::from_pixel(
             1,
             1,
             Rgba([0.68, 0.48, 0.34, 1.0]),
         ));
-        let disabled = json!({
-            "colorBalanceRgb": { "enabled": false },
-            "channelMixer": { "enabled": false },
-            "blackWhiteMixer": { "enabled": false }
-        });
         let enabled = json!({
             "colorBalanceRgb": {
                 "enabled": true,
@@ -193,18 +184,12 @@ mod tests {
             }
         });
 
-        let (disabled_output, _) = apply_all_transformations(&source, &disabled);
         let (enabled_output, _) = apply_all_transformations(&source, &enabled);
 
         assert_eq!(
-            disabled_output.as_ref().to_rgba32f().into_raw(),
-            source.to_rgba32f().into_raw(),
-            "disabled controls must preserve their source pixels"
-        );
-        assert_ne!(
             enabled_output.as_ref().to_rgba32f().into_raw(),
             source.to_rgba32f().into_raw(),
-            "the shared preview/export transform must consume enabled color controls"
+            "geometry transforms must not bake mixer edits into compare-original input"
         );
     }
 }

@@ -4,8 +4,8 @@ use image::{DynamicImage, ImageBuffer, Rgba};
 use rayon::prelude::*;
 
 use crate::adjustments::abi::{
-    AllAdjustments, BlackWhiteMixerSettings, ChannelMixerRow, ChannelMixerSettings,
-    ColorBalanceRgbSettings, GlobalAdjustments,
+    BlackWhiteMixerSettings, ChannelMixerRow, ChannelMixerSettings, ColorBalanceRgbSettings,
+    GlobalAdjustments,
 };
 
 const REC709_RED: f32 = 0.2126;
@@ -44,12 +44,6 @@ pub(crate) fn has_active_native_color_mixer_adjustments(global: &GlobalAdjustmen
     global.color_balance_rgb.enabled != 0
         || global.channel_mixer.enabled != 0
         || global.black_white_mixer.enabled != 0
-}
-
-pub(crate) fn disable_native_color_mixer_adjustments(adjustments: &mut AllAdjustments) {
-    adjustments.global.color_balance_rgb.enabled = 0;
-    adjustments.global.channel_mixer.enabled = 0;
-    adjustments.global.black_white_mixer.enabled = 0;
 }
 
 fn apply_color_balance_rgb(color: [f32; 3], settings: ColorBalanceRgbSettings) -> [f32; 3] {
@@ -370,13 +364,10 @@ mod tests {
 
 #[cfg(all(test, feature = "tauri-test"))]
 mod gpu_runtime_tests {
-    use std::borrow::Cow;
-
     use image::{DynamicImage, ImageBuffer, Rgba};
     use serde_json::json;
     use tauri::Manager;
 
-    use super::apply_native_color_mixer_adjustments;
     use crate::AppState;
     use crate::adjustments::parse::get_all_adjustments_from_json;
     use crate::gpu_processing::{
@@ -392,7 +383,6 @@ mod gpu_runtime_tests {
             adjustments,
             mask_bitmaps: &[],
             lut: None,
-            native_color_mixers_preapplied: true,
             roi,
         }
     }
@@ -411,7 +401,7 @@ mod gpu_runtime_tests {
     }
 
     #[test]
-    fn native_color_mixers_share_preview_zoom_and_export_pixels_without_gpu_reapplication() {
+    fn color_mixers_share_preview_zoom_and_export_pixels_without_reapplication() {
         let source = DynamicImage::ImageRgba32F(ImageBuffer::from_pixel(
             2,
             2,
@@ -447,9 +437,6 @@ mod gpu_runtime_tests {
             }
         });
         let adjustments = get_all_adjustments_from_json(&recipe, false, None);
-        let native_input =
-            apply_native_color_mixer_adjustments(Cow::Borrowed(&source), &adjustments.global)
-                .into_owned();
         let disabled_adjustments = get_all_adjustments_from_json(&json!({}), false, None);
 
         let app = tauri::test::mock_builder()
@@ -463,7 +450,7 @@ mod gpu_runtime_tests {
         let preview = process_and_get_dynamic_image(
             &context,
             &state,
-            &native_input,
+            &source,
             4_996,
             render_request(adjustments, None),
             "color_mixer_preview",
@@ -472,7 +459,7 @@ mod gpu_runtime_tests {
         let zoom = process_and_get_dynamic_image(
             &context,
             &state,
-            &native_input,
+            &source,
             4_996,
             render_request(
                 adjustments,
@@ -489,7 +476,7 @@ mod gpu_runtime_tests {
         let export = process_and_get_unclamped_dynamic_image(
             &context,
             &state,
-            &native_input,
+            &source,
             4_996,
             render_request(adjustments, None),
             "color_mixer_export",
@@ -512,7 +499,7 @@ mod gpu_runtime_tests {
         ));
         assert!(
             max_rgb_delta(&preview, &export) < 0.002,
-            "preview and export must share the native color result"
+            "preview and export must share the mixer result"
         );
         assert!(
             max_rgb_delta(&preview_pixel, &zoom) < 0.002,
@@ -520,7 +507,7 @@ mod gpu_runtime_tests {
         );
         assert!(
             max_rgb_delta(&preview, &disabled) > 0.05,
-            "large enabled color controls must visibly change the native preview"
+            "large enabled mixer controls must visibly change the render"
         );
     }
 }

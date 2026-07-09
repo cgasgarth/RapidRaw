@@ -236,7 +236,6 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
             adjustments: final_adjustments,
             mask_bitmaps: &mask_bitmaps,
             lut,
-            native_color_mixers_preapplied: true,
             roi: pixel_roi,
         },
         "apply_adjustments",
