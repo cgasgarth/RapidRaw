@@ -64,3 +64,6 @@ pub const TRANSFORM_HASH_KEYS: &[&str] = &[
     FLIP_HORIZONTAL,
     FLIP_VERTICAL,
 ];
+
+pub const CPU_COLOR_RENDER_HASH_KEYS: &[&str] =
+    &["colorBalanceRgb", "channelMixer", "blackWhiteMixer"];
