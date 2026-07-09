@@ -12,6 +12,8 @@ import { type Adjustments, DisplayMode } from '../../../../utils/adjustments';
 import { getPreviewScopeFreshnessStatus } from '../../../../utils/color/runtime/gamutWarningDisplay';
 import { PANEL_SCOPES_HEIGHT } from '../../../../utils/waveformSizing';
 import { Orientation } from '../../../ui/AppProperties';
+import { type EditorChromeStatus, editorChromeStatusChipClassName } from '../../../ui/editorChromeTokens';
+import { professionalInspectorDensityTokens } from '../../../ui/inspectorTokens';
 import Resizer from '../../../ui/Resizer';
 import Waveform from '../../editor/Waveform';
 
@@ -84,6 +86,12 @@ export default function PanelScopesStrip({ testId }: PanelScopesStripProps) {
   const controlsId = `${testId}-controls`;
   const waveformPaddingClass = panelScopesLayout === 'overlay' ? 'p-2 pt-9' : 'px-3 pb-1.5 pt-1';
   const scopeFreshnessStatus = getPreviewScopeFreshnessStatus(previewScopeStatus, selectedImagePath);
+  const scopeFreshnessTone: EditorChromeStatus =
+    scopeFreshnessStatus.state === 'current'
+      ? 'success'
+      : scopeFreshnessStatus.state === 'stale' || scopeFreshnessStatus.state === 'unsupported'
+        ? 'warning'
+        : 'neutral';
 
   const toggleClipping = () => {
     setAdjustments((prev: Adjustments) => ({
@@ -97,7 +105,7 @@ export default function PanelScopesStrip({ testId }: PanelScopesStripProps) {
       {isWaveformVisible ? (
         <motion.div
           animate={{ height: currentHeight, opacity: 1 }}
-          className="relative flex shrink-0 flex-col overflow-hidden border-b border-surface"
+          className="relative flex shrink-0 flex-col overflow-hidden border-b border-editor-border"
           data-active-waveform-channel={activeWaveformChannel}
           data-max-height={PANEL_SCOPES_HEIGHT.max}
           data-min-height={PANEL_SCOPES_HEIGHT.min}
@@ -114,20 +122,23 @@ export default function PanelScopesStrip({ testId }: PanelScopesStripProps) {
         >
           <div
             className={cx(
-              'z-30 flex shrink-0 items-center gap-1 border-surface bg-editor-panel/95 px-2 py-1 text-text-primary backdrop-blur',
-              panelScopesLayout === 'overlay' ? 'absolute inset-x-2 top-2 rounded border shadow-lg' : 'border-b',
+              'z-30 flex shrink-0 items-center gap-1 border-editor-border bg-editor-panel/95 px-2 py-1 text-text-primary backdrop-blur',
+              panelScopesLayout === 'overlay'
+                ? 'absolute inset-x-2 top-2 rounded border shadow-[0_8px_24px_var(--editor-overlay-shadow)]'
+                : 'border-b',
             )}
             data-testid={controlsId}
           >
             <span
-              className="max-w-[7rem] truncate rounded bg-bg-secondary px-1.5 py-1 text-[10px] font-semibold text-text-secondary"
+              className={cx(editorChromeStatusChipClassName(scopeFreshnessTone), 'max-w-28 shrink-0 truncate')}
               data-testid={`${testId}-freshness-status`}
+              title={scopeFreshnessStatus.statusLabel}
             >
               {scopeFreshnessStatus.statusLabel}
             </span>
             <div
               aria-label={t('ui.waveform.drawerControls.mode', { defaultValue: 'Scope mode' })}
-              className="grid min-w-0 flex-1 grid-cols-5 gap-0.5 rounded bg-bg-secondary p-0.5"
+              className="grid min-w-0 flex-1 grid-cols-5 gap-px overflow-hidden rounded border border-editor-border bg-editor-panel-well p-px"
               role="group"
             >
               {scopeModeButtons.map(({ label, mode, testId: modeTestId, tooltipKey }) => (
@@ -135,10 +146,10 @@ export default function PanelScopesStrip({ testId }: PanelScopesStripProps) {
                   aria-label={t(tooltipKey, { defaultValue: label })}
                   aria-pressed={activeWaveformChannel === mode}
                   className={cx(
-                    'h-6 min-w-0 rounded px-1 text-[10px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring',
+                    'h-6 min-w-0 px-1 text-[10px] font-semibold transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-editor-focus-ring',
                     activeWaveformChannel === mode
-                      ? 'bg-accent text-button-text'
-                      : 'text-text-secondary hover:bg-bg-tertiary hover:text-text-primary',
+                      ? 'bg-editor-primary-active text-editor-primary-active-text'
+                      : 'text-text-secondary hover:bg-editor-panel-raised hover:text-text-primary',
                   )}
                   data-testid={`${testId}-mode-${modeTestId}`}
                   data-tooltip={t(tooltipKey, { defaultValue: label })}
@@ -158,8 +169,8 @@ export default function PanelScopesStrip({ testId }: PanelScopesStripProps) {
               }
               aria-pressed={clippingEnabled}
               className={cx(
-                'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring',
-                clippingEnabled ? 'bg-accent text-button-text' : 'text-text-secondary hover:bg-bg-tertiary',
+                professionalInspectorDensityTokens.frame.actionButton,
+                clippingEnabled && professionalInspectorDensityTokens.frame.actionButtonActive,
               )}
               data-testid={`${testId}-clipping-toggle`}
               data-tooltip={
@@ -172,7 +183,7 @@ export default function PanelScopesStrip({ testId }: PanelScopesStripProps) {
             </button>
             <button
               aria-label={t(activeLayoutToggle.labelKey, { defaultValue: 'Toggle scope layout' })}
-              className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded text-text-secondary transition-colors hover:bg-bg-tertiary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring"
+              className={professionalInspectorDensityTokens.frame.actionButton}
               data-testid={`${testId}-layout-toggle`}
               data-tooltip={t(activeLayoutToggle.labelKey, { defaultValue: 'Toggle scope layout' })}
               onClick={() => {
@@ -184,7 +195,7 @@ export default function PanelScopesStrip({ testId }: PanelScopesStripProps) {
             </button>
             <button
               aria-label={t('ui.waveform.drawerControls.resetHeight', { defaultValue: 'Reset scope height' })}
-              className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded text-text-secondary transition-colors hover:bg-bg-tertiary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring"
+              className={professionalInspectorDensityTokens.frame.actionButton}
               data-testid={`${testId}-reset-height`}
               data-tooltip={t('ui.waveform.drawerControls.resetHeight', { defaultValue: 'Reset scope height' })}
               onClick={resetWaveformHeight}

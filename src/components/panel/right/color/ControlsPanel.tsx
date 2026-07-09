@@ -12,6 +12,7 @@ import {
   RotateCcw,
   ScanSearch,
   Search,
+  SlidersHorizontal,
   TriangleAlert,
   X,
 } from 'lucide-react';
@@ -84,6 +85,10 @@ import Dropdown, { type OptionItem } from '../../../ui/primitives/Dropdown';
 import Input from '../../../ui/primitives/Input';
 import Switch from '../../../ui/primitives/Switch';
 import UiText from '../../../ui/primitives/Text';
+import InspectorPanelFrame, {
+  type InspectorPanelNotice,
+  type InspectorPanelStatus,
+} from '../inspector/InspectorPanelFrame';
 import PanelScopesStrip from '../inspector/PanelScopesStrip';
 
 const ADJUSTMENT_SECTION_NAMES = ['basic', 'curves', 'transformLens', 'details', 'effects'] as const;
@@ -302,6 +307,31 @@ export default function Controls() {
   );
   const clippingWarningState =
     activeClippingStatusChips.length === 0 ? 'clean' : activeClippingStatusChips.map((chip) => chip.id).join(' ');
+  const editedSectionCount = ADJUSTMENT_SECTION_NAMES.filter((sectionName) =>
+    hasAdjustmentValueChanges(ADJUSTMENT_SECTIONS[sectionName], adjustments),
+  ).length;
+  const panelStatus: InspectorPanelStatus | undefined =
+    editedSectionCount > 0
+      ? {
+          label: t('editor.adjustments.status.editedSections', {
+            count: editedSectionCount,
+            defaultValue: '{{count}} edited',
+          }),
+          tone: 'info',
+        }
+      : undefined;
+  const panelNotice: InspectorPanelNotice | undefined =
+    selectedImage === null
+      ? {
+          kind: 'empty',
+          label: t('editor.ai.noImageSelected', { defaultValue: 'No image selected.' }),
+        }
+      : !selectedImage.isReady
+        ? {
+            kind: 'loading',
+            label: t('editor.adjustments.status.loadingImage', { defaultValue: 'Loading image preview' }),
+          }
+        : undefined;
 
   useEffect(() => {
     setIsRawProcessingControlsOpen(isRawProcessingStatusAttentionRequired);
@@ -1349,15 +1379,12 @@ export default function Controls() {
   };
 
   return (
-    <div className="flex h-full flex-col bg-editor-panel text-text-primary">
-      <div className={density.panelHeader.root}>
-        <UiText as="h2" variant={TextVariants.heading} className={density.panelHeader.title}>
-          {t('editor.adjustments.title')}
-        </UiText>
-        <div className="flex items-center gap-1">
+    <InspectorPanelFrame
+      actions={
+        <>
           <button
             aria-label={t('editor.adjustments.tooltips.autoAdjust')}
-            className={density.panelHeader.actionButton}
+            className={density.frame.actionButton}
             disabled={!selectedImage?.isReady}
             onClick={() => {
               void handleAutoAdjustments();
@@ -1370,10 +1397,7 @@ export default function Controls() {
           <button
             aria-label={t('editor.adjustments.tooltips.toggleAnalytics')}
             aria-pressed={isWaveformVisible}
-            className={cx(
-              density.panelHeader.actionButton,
-              isWaveformVisible && density.panelHeader.actionButtonActive,
-            )}
+            className={cx(density.frame.actionButton, isWaveformVisible && density.frame.actionButtonActive)}
             data-state={isWaveformVisible ? 'open' : 'closed'}
             onClick={onToggleWaveform}
             data-testid="adjustments-panel-scopes-toggle"
@@ -1384,7 +1408,7 @@ export default function Controls() {
           </button>
           <button
             aria-label={t('editor.adjustments.tooltips.resetAdjustments')}
-            className={density.panelHeader.actionButton}
+            className={density.frame.actionButton}
             disabled={!selectedImage}
             onClick={() => {
               handleResetAdjustments();
@@ -1394,9 +1418,14 @@ export default function Controls() {
           >
             <RotateCcw size={PANEL_ACTION_ICON_SIZE} />
           </button>
-        </div>
-      </div>
-
+        </>
+      }
+      icon={SlidersHorizontal}
+      label={t('editor.adjustments.title')}
+      notice={panelNotice}
+      status={panelStatus}
+      testId="adjustments-inspector"
+    >
       {selectedImage?.isRaw && (
         <div
           className={density.rawProcessing.root}
@@ -1630,7 +1659,10 @@ export default function Controls() {
 
       <PanelScopesStrip testId="adjustments-panel-scopes-strip" />
 
-      <div className="shrink-0 border-b border-editor-border bg-editor-panel px-2 py-1.5">
+      <div
+        className="shrink-0 border-b border-editor-border bg-editor-panel px-2 py-1.5"
+        data-testid="develop-panel-search-shelf"
+      >
         <div className="relative">
           <Search
             aria-hidden="true"
@@ -1640,7 +1672,7 @@ export default function Controls() {
           <Input
             aria-label={t('editor.adjustments.search.label', { defaultValue: 'Search adjustment controls' })}
             chrome="editor"
-            className="h-6 pl-7 pr-7 text-[11px]"
+            className="pl-7 pr-7 text-[11px]"
             density="compact"
             onChange={(event) => {
               setDevelopPanelSearchQuery(event.currentTarget.value);
@@ -1665,6 +1697,7 @@ export default function Controls() {
 
         {isDevelopPanelSearching && (
           <div
+            aria-live="polite"
             className="mt-1 flex max-h-20 flex-wrap gap-1 overflow-y-auto"
             data-testid="develop-panel-search-results"
           >
@@ -1812,6 +1845,6 @@ export default function Controls() {
           );
         })}
       </div>
-    </div>
+    </InspectorPanelFrame>
   );
 }

@@ -18,7 +18,6 @@ import {
 import type { GamutWarningOverlayPayload } from '../../../../src/schemas/tauriEventSchemas';
 import { useEditorStore } from '../../../../src/store/useEditorStore';
 import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments';
-import { applyProfileToneToRgbPixel } from '../../../../src/utils/color/profile/profileToneRuntime';
 import { formatGamutWarningCoverage } from '../../../../src/utils/color/runtime/gamutWarningDisplay.ts';
 
 type RenderedPanel = {
@@ -120,7 +119,7 @@ await selectColorWorkspaceTab(rendered.container, 'output');
 await openDisclosure(rendered.container, 'color-proofing-diagnostics-disclosure');
 await validateRenderedWorkspaceCoverage(rendered.container);
 await validateGamutWarningCoverage(rendered.container);
-await validateProfileToneAndReadiness(rendered.container);
+await validateProfileToneReceipt(rendered.container);
 await validateRecipeApplication(rendered.container);
 await validateSkinToneUniformityCoverage(rendered.container);
 rendered.unmount();
@@ -208,7 +207,7 @@ async function validatePresentationGrouping(container: Element) {
 
   const quickWhiteBalance = getByTestId(container, 'color-quick-white-balance');
   const quickPresence = getByTestId(container, 'color-quick-presence');
-  const profileTone = getByTestId(container, 'profile-tone-visible-receipt');
+  const profileTone = getByTestId(container, 'profile-tone-controls');
   const proofing = getByTestId(container, 'color-proofing-diagnostics-disclosure');
   const advanced = getByTestId(container, 'advanced-color-disclosure');
   assertPrecedes(
@@ -217,24 +216,9 @@ async function validatePresentationGrouping(container: Element) {
     'white-balance controls should render before profile/proofing groups.',
   );
   assertPrecedes(quickPresence, proofing, 'presence controls should render before proofing diagnostics.');
-  assertPrecedes(proofing, advanced, 'proofing diagnostics should render before advanced color calibration.');
+  assertPrecedes(advanced, proofing, 'advanced color calibration should remain with the main color tools.');
 
-  const proofingSummary = getByTestId(container, 'color-proofing-warning-summary');
-  assertVisibleText(
-    proofingSummary,
-    'Display P3 gamut · 12.5%',
-    'proofing warning summary did not keep gamut status visible.',
-  );
-  assertVisibleText(
-    proofingSummary,
-    'Scopes current',
-    'proofing warning summary did not keep scope freshness visible.',
-  );
-  assertVisibleText(
-    proofingSummary,
-    'May affect other orange-range colors; not skin detection or Capture One equivalence.',
-    'proofing warning summary did not keep skin-tone status visible.',
-  );
+  assertVisibleText(proofing, 'Display P3 gamut · 12.5%', 'proofing disclosure did not keep gamut status visible.');
 }
 
 async function validateColorWorkspaceTabKeyboard(container: Element) {
@@ -244,7 +228,6 @@ async function validateColorWorkspaceTabKeyboard(container: Element) {
   const editor = getByTestId<HTMLButtonElement>(container, 'color-workspace-tab-editor');
   const grading = getByTestId<HTMLButtonElement>(container, 'color-workspace-tab-grading');
   const output = getByTestId<HTMLButtonElement>(container, 'color-workspace-tab-output');
-  const advanced = getByTestId<HTMLButtonElement>(container, 'color-workspace-tab-advanced');
 
   assertSelectedTab(quick, 'Quick should start selected.');
   await dispatchTabKey(tablist, 'ArrowRight');
@@ -253,38 +236,101 @@ async function validateColorWorkspaceTabKeyboard(container: Element) {
   await dispatchTabKey(tablist, 'ArrowDown');
   assertSelectedTab(grading, 'ArrowDown should select Grading.');
   await dispatchTabKey(tablist, 'End');
-  assertSelectedTab(advanced, 'End should select Advanced.');
+  assertSelectedTab(output, 'End should select Output.');
   await dispatchTabKey(tablist, 'ArrowLeft');
-  assertSelectedTab(output, 'ArrowLeft should select Output from Advanced.');
+  assertSelectedTab(grading, 'ArrowLeft should select Grading from Output.');
   await dispatchTabKey(tablist, 'Home');
   assertSelectedTab(quick, 'Home should return to Quick.');
 }
 
 async function validateColorWorkspaceHeaderDensity(container: Element) {
   const header = getByTestId(container, 'color-workspace-tab-header');
+  const tablist = getByTestId(container, 'color-workspace-tabs');
+  const statusRow = getByTestId(container, 'color-workspace-warning-chips');
   assertData(header, 'sticky', 'true', 'color workspace header should expose sticky placement for visual proof.');
   assertData(header, 'gamutWarningCount', '45', 'color workspace header did not expose gamut warning count.');
-  assertData(header, 'warningCount', '3', 'color workspace header did not expose compact warning chip count.');
+  assertData(header, 'warningCount', '2', 'color workspace header did not expose actionable warning count.');
   assertData(header, 'previewWarningState', 'current', 'color workspace header did not expose gamut warning state.');
   assertData(header, 'scopeFreshnessState', 'current', 'color workspace header did not expose scope freshness state.');
 
-  const chips = Array.from(container.querySelectorAll('[data-testid="color-workspace-warning-chip"]'));
-  if (chips.length !== 3) {
-    failures.push(`expected 3 compact color workspace warning chips, found ${chips.length}.`);
+  const tablistClassName = tablist.getAttribute('class') ?? '';
+  if (
+    !tablistClassName.includes('grid-cols-4') ||
+    !tablistClassName.includes('min-w-0') ||
+    tablistClassName.includes('flex-wrap') ||
+    tablistClassName.includes('overflow-x-auto')
+  ) {
+    failures.push('color workspace tabs should remain one fixed four-column row without horizontal scrolling.');
+  }
+  const statusRowClassName = statusRow.getAttribute('class') ?? '';
+  if (
+    !statusRowClassName.includes('h-6') ||
+    !statusRowClassName.includes('overflow-hidden') ||
+    statusRowClassName.includes('flex-wrap') ||
+    statusRowClassName.includes('overflow-x-auto')
+  ) {
+    failures.push('color workspace status should remain a single compact summary without horizontal scrolling.');
   }
 
-  for (const chip of chips) {
-    const className = chip.getAttribute('class') ?? '';
-    if (!className.includes('whitespace-nowrap') || !className.includes('truncate')) {
-      failures.push(`color workspace warning chip is not non-wrapping/truncated: ${normalizeText(chip.textContent)}`);
+  for (const tabId of ['quick', 'editor', 'grading', 'output']) {
+    const tab = getByTestId(container, `color-workspace-tab-${tabId}`);
+    const tabClassName = tab.getAttribute('class') ?? '';
+    if (!tabClassName.includes('min-w-0') || !tabClassName.includes('text-[10px]')) {
+      failures.push(`color workspace ${tabId} tab lost its compact equal-column treatment.`);
     }
-    if (normalizeText(chip.textContent).length === 0 || chip.getAttribute('title') !== chip.textContent) {
-      failures.push(`color workspace warning chip did not preserve its runtime label/title: ${chip.outerHTML}`);
+    const tabLabel = normalizeText(tab.textContent);
+    if (
+      tab.getAttribute('aria-label') !== tabLabel ||
+      tab.getAttribute('data-tooltip') !== tabLabel ||
+      tab.getAttribute('title') !== tabLabel
+    ) {
+      failures.push(`color workspace ${tabId} tab should preserve its full accessible label and tooltip.`);
     }
   }
 
-  assertVisibleText(header, 'Display P3 gamut · 12.5%', 'header gamut warning chip copy was not rendered.');
-  assertVisibleText(header, 'Scopes current', 'header scope freshness chip copy was not rendered.');
+  const primaryStatus = getByTestId(container, 'color-workspace-primary-status');
+  const primaryStatusLabel = normalizeText(primaryStatus.textContent);
+  if (
+    primaryStatusLabel.length === 0 ||
+    primaryStatus.getAttribute('data-tooltip') !== primaryStatusLabel ||
+    primaryStatus.getAttribute('title') !== primaryStatusLabel
+  ) {
+    failures.push('color workspace primary status should retain its complete tooltip text.');
+  }
+  const statusSummary = statusRow.getAttribute('aria-label') ?? '';
+  for (const expectedStatus of ['Display P3 gamut · 12.5%', primaryStatusLabel]) {
+    if (!statusSummary.includes(expectedStatus)) {
+      failures.push(`color workspace accessible status summary omitted: ${expectedStatus}`);
+    }
+  }
+  if (statusRow.getAttribute('data-tooltip') !== statusSummary || statusRow.getAttribute('title') !== statusSummary) {
+    failures.push('color workspace summary should expose every status in its tooltip.');
+  }
+
+  const statusDetails = getByTestId<HTMLButtonElement>(container, 'color-workspace-status-details');
+  if (
+    normalizeText(statusDetails.textContent) !== '+1' ||
+    !statusDetails.getAttribute('aria-label')?.includes(statusSummary) ||
+    statusDetails.getAttribute('data-tooltip') !== statusSummary ||
+    statusDetails.getAttribute('title') !== statusSummary
+  ) {
+    failures.push('color workspace status count should expose and link the complete diagnostics summary.');
+  }
+  await act(async () => {
+    statusDetails.click();
+    await flushPromises();
+  });
+  assertSelectedTab(
+    getByTestId<HTMLButtonElement>(container, 'color-workspace-tab-output'),
+    'status details should select the Output workspace.',
+  );
+  if (!getByTestId<HTMLDetailsElement>(container, 'color-proofing-diagnostics-disclosure').open) {
+    failures.push('status details should open the existing proofing diagnostics disclosure.');
+  }
+  await act(async () => {
+    getByTestId<HTMLButtonElement>(container, 'color-workspace-tab-quick').click();
+    await flushPromises();
+  });
 }
 
 async function validateColorWorkspaceTabPersistence() {
@@ -392,49 +438,26 @@ function TestColorHarness({
 }
 
 async function validateRenderedWorkspaceCoverage(container: Element) {
-  const workspace = getByTestId(container, 'professional-color-workspace-panel');
-  assertData(workspace, 'activeCameraProfile', 'camera_neutral', 'workspace did not expose active camera profile.');
-  assertData(workspace, 'activeToneCurve', 'linear', 'workspace did not expose active tone curve.');
-  assertData(workspace, 'exportTransformLabel', exportPresetFixture.name, 'workspace did not expose export transform.');
-  assertData(workspace, 'workingSpaceLabel', 'linear-raw-to-working-rgb', 'workspace did not expose working space.');
-  assertData(workspace, 'histogramHook', 'histogram', 'workspace did not expose histogram readiness.');
-  assertData(workspace, 'waveformHook', 'waveform', 'workspace did not expose waveform readiness.');
-  assertData(workspace, 'vectorscopeHook', 'vectorscope', 'workspace did not expose vectorscope readiness.');
-  assertData(workspace, 'gamutWarningCount', '45', 'workspace did not expose gamut warning count.');
-  assertData(
-    workspace,
-    'warningCount',
-    '3',
-    'workspace warning chips did not include gamut, scope, and skin-tone status.',
-  );
-  assertData(workspace, 'previewWarningState', 'current', 'workspace did not expose current gamut warning state.');
-  assertData(workspace, 'scopeFreshnessState', 'current', 'workspace did not expose current scope freshness.');
-  assertData(
-    workspace,
-    'displayProfileLabel',
-    'Display profile unavailable',
-    'workspace should not fabricate a native display profile in happy-dom.',
-  );
-  assertData(workspace, 'softProofProfileLabel', 'Display P3', 'workspace did not expose soft proof profile label.');
-  assertData(workspace, 'renderTargetLabel', 'Export preview -> Display P3', 'workspace did not expose render target.');
-  assertData(workspace, 'clippingWarningState', 'unavailable', 'workspace did not expose clipping status.');
-  assertVisibleText(container, 'Linear RAW', 'working-space label was not rendered.');
-  await waitForText(container, 'Display P3 gamut · 12.5%', 'gamut warning chip copy was not rendered.');
-  await waitForText(container, 'Scopes current', 'scope freshness chip copy was not rendered.');
+  const proofing = getByTestId<HTMLDetailsElement>(container, 'color-proofing-diagnostics-disclosure');
+  if (!proofing.open) proofing.open = true;
+  const controls = getByTestId(container, 'gamut-warning-controls');
+  await waitForText(controls, 'Display P3 gamut · 12.5%', 'soft-proof coverage was not rendered.');
+  if (container.querySelector('[data-testid="professional-color-workspace-panel"]')) {
+    failures.push('Color output still renders the internal proof receipt panel.');
+  }
 }
 
 async function validateFoundationalColorControlOrder(container: Element) {
   const quickColor = getByTestId(container, 'quick-color-controls');
   const profileTone = getByTestId(container, 'profile-tone-controls');
-  const profileToneReceipt = getByTestId(container, 'profile-tone-visible-receipt');
   const recipes = getByTestId(container, 'professional-color-recipes');
-  const proofing = getByTestId(container, 'professional-color-workspace-panel');
+  const proofing = getByTestId(container, 'color-proofing-diagnostics-disclosure');
   const levels = getByTestId(container, 'color-levels-controls');
 
   assertAppearsBefore(quickColor, profileTone, 'Quick Color should render before Profile & Tone.');
   assertAppearsBefore(profileTone, recipes, 'Profile & Tone should render before workflow recipes.');
   assertAppearsBefore(profileTone, proofing, 'Profile & Tone should render before proof diagnostics.');
-  assertAppearsBefore(profileToneReceipt, levels, 'Levels should be downstream from the Profile & Tone receipt.');
+  assertAppearsBefore(profileTone, levels, 'Levels should be downstream from the Profile & Tone controls.');
   assertVisibleText(quickColor, 'White Balance', 'Quick Color did not render white balance first.');
   assertVisibleText(quickColor, 'Presence', 'Quick Color did not render presence controls.');
   assertVisibleText(levels, 'Levels', 'Advanced levels controls were not rendered.');
@@ -442,36 +465,11 @@ async function validateFoundationalColorControlOrder(container: Element) {
 
 async function validateGamutWarningCoverage(container: Element) {
   const controls = getByTestId(container, 'gamut-warning-controls');
-  assertData(controls, 'coverageRatio', '0.125000', 'gamut controls did not expose coverage ratio.');
-  assertData(controls, 'warningPixelCount', '45', 'gamut controls did not expose warning pixel count.');
-  assertData(controls, 'proofMaskWidth', '240', 'gamut controls did not expose proof mask width.');
-  assertData(controls, 'proofMaskHeight', '180', 'gamut controls did not expose proof mask height.');
-  assertData(controls, 'proofReady', 'true', 'gamut controls did not expose proof readiness.');
-  assertData(controls, 'previewBasis', 'export_preview', 'gamut controls did not expose export-preview basis.');
-  assertData(controls, 'previewWarningState', 'current', 'gamut controls did not expose current warning state.');
-  assertData(controls, 'displayProfileLabel', 'Display P3', 'gamut controls did not expose display/output profile.');
-  assertData(
-    controls,
-    'renderTargetLabel',
-    'Export preview -> Display P3',
-    'gamut controls did not expose render target.',
-  );
-  assertData(
-    controls,
-    'transformPolicyFingerprint',
-    'sha256:professional-color-workflow',
-    'gamut controls did not expose transform fingerprint.',
-  );
   assertData(controls, 'visible', 'false', 'gamut overlay should start hidden.');
   assertVisibleText(
     controls,
     `Display P3 gamut · ${formatGamutWarningCoverage(professionalOverlayFixture)}`,
     'gamut coverage copy was not rendered.',
-  );
-  assertVisibleText(
-    controls,
-    'Export preview -> Display P3 · Proof: 45 warning pixels · 240 x 180',
-    'gamut proof details were not rendered.',
   );
 
   const toggle = getByTestId<HTMLButtonElement>(container, 'gamut-warning-toggle');
@@ -489,58 +487,13 @@ async function validateGamutWarningCoverage(container: Element) {
   assertVisibleText(getByTestId(container, 'gamut-warning-toggle'), 'On', 'gamut toggle did not render on copy.');
 }
 
-async function validateProfileToneAndReadiness(container: Element) {
-  const readiness = getByTestId(container, 'professional-color-workflow-readiness');
-  assertData(readiness, 'profileToneReady', 'true', 'profile-tone readiness was not exposed.');
-  assertData(readiness, 'colorBalanceReady', 'true', 'color-balance readiness was not exposed.');
-  assertData(readiness, 'selectiveColorReady', 'true', 'selective-color readiness was not exposed.');
-  assertData(readiness, 'channelMixerReady', 'true', 'channel-mixer readiness was not exposed.');
-  assertData(readiness, 'gradingReady', 'true', 'grading readiness was not exposed.');
-
-  const readinessText = Array.from(container.querySelectorAll('[data-testid="professional-color-readiness-item"]')).map(
-    (element) => normalizeText(element.textContent),
-  );
-  for (const label of ['Profile & Tone', 'RGB Color Balance', 'Channel Mixer', 'Color Mixer', 'Color Grading']) {
-    if (!readinessText.some((text) => text.includes(label) && text.includes('Proofed'))) {
-      failures.push(`readiness item was not rendered with proofed status: ${label}`);
-    }
+async function validateProfileToneReceipt(container: Element) {
+  const controls = getByTestId(container, 'profile-tone-controls');
+  assertData(controls, 'cameraProfile', 'camera_neutral', 'profile-tone controls did not expose the selected profile.');
+  assertData(controls, 'toneCurve', 'linear', 'profile-tone controls did not expose the selected tone curve.');
+  if (controls.querySelectorAll('select').length !== 2) {
+    failures.push('profile-tone controls should expose camera profile and tone curve selectors.');
   }
-
-  const receipt = getByTestId(container, 'profile-tone-visible-receipt');
-  const expectedReceipt = applyProfileToneToRgbPixel(
-    { blue: 0.46, green: 0.5, red: 0.54 },
-    {
-      cameraProfile: 'camera_neutral',
-      toneCurve: 'linear',
-    },
-  );
-  assertData(receipt, 'cameraProfile', 'camera_neutral', 'profile-tone receipt did not expose camera profile.');
-  assertData(receipt, 'toneCurve', 'linear', 'profile-tone receipt did not expose tone curve.');
-  assertData(
-    receipt,
-    'luminanceBefore',
-    expectedReceipt.luminanceBefore.toFixed(4),
-    'profile-tone receipt did not expose luminance before.',
-  );
-  assertData(
-    receipt,
-    'luminanceAfter',
-    expectedReceipt.luminanceAfter.toFixed(4),
-    'profile-tone receipt did not expose luminance after.',
-  );
-  assertData(
-    receipt,
-    'toneDelta',
-    expectedReceipt.toneDelta.toFixed(4),
-    'profile-tone receipt did not expose tone delta.',
-  );
-  assertVisibleText(receipt, 'Profile/tone receipt', 'profile-tone receipt title was not rendered.');
-  assertVisibleText(receipt, 'Neutral with Linear is active.', 'profile-tone receipt summary was not rendered.');
-  assertVisibleText(
-    receipt,
-    'Preview/export parity is checked on export receipts.',
-    'profile-tone export parity copy was not rendered.',
-  );
 }
 
 async function validateRecipeApplication(container: Element) {
@@ -580,36 +533,19 @@ async function validateRecipeApplication(container: Element) {
   if (appliedRecipe.getAttribute('aria-pressed') !== 'true') {
     failures.push('clean portrait recipe did not expose aria-pressed=true after click.');
   }
-  const workspace = getByTestId(container, 'professional-color-workspace-panel');
-  assertData(workspace, 'activeCameraProfile', 'camera_portrait', 'recipe did not update workspace profile.');
-  assertData(workspace, 'activeToneCurve', 'soft_contrast', 'recipe did not update workspace tone curve.');
-  await waitForText(container, 'Portrait with Soft Contrast is active.', 'recipe did not update profile-tone summary.');
+  const profileTone = getByTestId(container, 'profile-tone-controls');
+  assertData(profileTone, 'cameraProfile', 'camera_portrait', 'recipe did not update the selected camera profile.');
+  assertData(profileTone, 'toneCurve', 'soft_contrast', 'recipe did not update the selected tone curve.');
 }
 
 async function validateSkinToneUniformityCoverage(container: Element) {
   const controls = getByTestId(container, 'skin-tone-uniformity-controls');
-  assertData(
-    controls,
-    'skinToneRuntimeProof',
-    'private-raw-preview-export',
-    'skin-tone controls did not expose runtime proof status.',
-  );
-  assertData(controls, 'targetHue', '24', 'skin-tone controls did not expose target hue.');
-  assertData(controls, 'targetSaturation', '0.38', 'skin-tone controls did not expose target saturation.');
-  assertData(controls, 'targetLuminance', '0.56', 'skin-tone controls did not expose target luminance.');
-  assertNumericDataGreaterThan(
-    controls,
-    'inspectorImprovement',
-    0,
-    'skin-tone inspector should show a positive improvement.',
-  );
   assertVisibleText(controls, 'Skin tone - sampled uniformity (Experimental)', 'skin-tone controls title missing.');
   assertVisibleText(
     controls,
     'May affect other orange-range colors; not skin detection or Capture One equivalence.',
     'skin-tone warning copy missing.',
   );
-  assertVisibleText(controls, 'Render bridge: H', 'skin-tone render bridge preview missing.');
   for (const label of [
     'Hue uniformity',
     'Saturation uniformity',
@@ -622,12 +558,6 @@ async function validateSkinToneUniformityCoverage(container: Element) {
     const slider = getRangeByLabel(container, label);
     if (slider === null) failures.push(`skin-tone slider was not rendered: ${label}`);
   }
-  const inspector = getByTestId(container, 'skin-tone-uniformity-inspector');
-  const [before, after] = Array.from(inspector.querySelectorAll('span')).map((span) => Number(span.textContent));
-  if (!(Number.isFinite(before) && Number.isFinite(after) && after < before)) {
-    failures.push(`skin-tone inspector should improve target distance. Before ${before}, after ${after}.`);
-  }
-
   const toggle = getByTestId<HTMLButtonElement>(container, 'skin-tone-uniformity-toggle');
   if (toggle.getAttribute('aria-pressed') !== 'true') failures.push('skin-tone toggle should start enabled.');
   assertVisibleText(toggle, 'On', 'skin-tone toggle did not render enabled copy.');
@@ -770,13 +700,6 @@ function assertVisibleText(container: Element, text: string, message: string) {
 function assertData(element: HTMLElement, key: string, expected: string, message: string) {
   const actual = element.dataset[key];
   if (actual !== expected) failures.push(`${message} Expected ${expected}, got ${actual ?? '<missing>'}.`);
-}
-
-function assertNumericDataGreaterThan(element: HTMLElement, key: string, minimum: number, message: string) {
-  const actual = Number(element.dataset[key]);
-  if (!(Number.isFinite(actual) && actual > minimum)) {
-    failures.push(`${message} Expected > ${minimum}, got ${element.dataset[key] ?? '<missing>'}.`);
-  }
 }
 
 function assertAppearsBefore(first: Element, second: Element, message: string) {

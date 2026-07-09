@@ -7494,6 +7494,7 @@ function ColorRangeLocalAdjustmentVisualSmoke() {
 function ColorWorkflowVisualSmoke() {
   const [adjustments, setAdjustments] = useState<Adjustments>(() => structuredClone(INITIAL_ADJUSTMENTS));
   const [isWbPickerActive, setIsWbPickerActive] = useState(false);
+  const isCompactViewport = typeof window !== 'undefined' && window.innerWidth < 700;
   const handleAdjustmentsChange = (update: Partial<Adjustments> | ((current: Adjustments) => Adjustments)) => {
     setAdjustments((current) => (typeof update === 'function' ? update(current) : { ...current, ...update }));
   };
@@ -7518,8 +7519,14 @@ function ColorWorkflowVisualSmoke() {
       data-visual-smoke-ready="true"
       data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.ColorWorkflow}
     >
-      <div className="grid h-screen grid-cols-[1fr_420px] overflow-hidden">
-        <section className="relative min-w-0 bg-[#0f1114] p-6" data-visual-smoke-section="color-workflow-preview">
+      <div
+        className="grid h-screen overflow-hidden"
+        style={{ gridTemplateColumns: isCompactViewport ? 'minmax(0, 1fr)' : 'minmax(0, 1fr) 280px' }}
+      >
+        <section
+          className={cx('relative min-w-0 bg-[#0f1114] p-6', isCompactViewport && 'hidden')}
+          data-visual-smoke-section="color-workflow-preview"
+        >
           <div className="mx-auto flex h-full max-w-4xl flex-col justify-center gap-5">
             <div className="aspect-[4/3] overflow-hidden rounded-md border border-white/10 bg-[linear-gradient(135deg,#182629,#435b5a_42%,#c79c63_72%,#f4d6a1)] shadow-2xl">
               <div className="h-full w-full bg-[radial-gradient(circle_at_38%_32%,rgba(255,246,219,0.48),transparent_20%),linear-gradient(170deg,transparent_45%,rgba(24,43,50,0.72)_46%)]" />
@@ -7640,7 +7647,7 @@ function ColorWorkflowVisualSmoke() {
           </div>
         </section>
         <aside
-          className="overflow-y-auto border-l border-white/10 bg-[#15181c] p-3"
+          className={cx('min-w-0 overflow-y-auto bg-[#15181c] p-3', !isCompactViewport && 'border-l border-white/10')}
           data-visual-smoke-section="color-workflow-panel"
         >
           <div className="mb-3 flex items-center justify-between">

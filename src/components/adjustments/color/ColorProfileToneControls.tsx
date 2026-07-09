@@ -14,7 +14,6 @@ import {
   type HueSatLum,
   INITIAL_ADJUSTMENTS,
 } from '../../../utils/adjustments';
-import { applyProfileToneToRgbPixel } from '../../../utils/color/profile/profileToneRuntime';
 import { TONE_CURVE_PARAMETRIC_PRESETS } from '../../../utils/profileTonePresets';
 import { getSelectiveColorRange } from '../../../utils/selectiveColorRanges';
 import { editorChromeStatusChipClassName, editorChromeTokens } from '../../ui/editorChromeTokens';
@@ -194,12 +193,6 @@ const professionalColorRecipes = [
   },
 ] satisfies Array<ProfessionalColorRecipe>;
 
-const profileTonePreviewPixel = {
-  blue: 0.46,
-  green: 0.5,
-  red: 0.54,
-};
-
 const areHueSatLumValuesEqual = (left: HueSatLum | undefined, right: HueSatLum) =>
   left?.hue === right.hue && left.saturation === right.saturation && left.luminance === right.luminance;
 
@@ -258,15 +251,6 @@ export const ColorProfileToneControls = ({
       ] satisfies Array<{ key: ToneCurveId; label: string }>,
     [t],
   );
-  const profileToneReceipt = applyProfileToneToRgbPixel(profileTonePreviewPixel, {
-    cameraProfile: adjustments.cameraProfile,
-    toneCurve: adjustments.toneCurve,
-  });
-  const activeCameraProfileLabel =
-    cameraProfileOptions.find((option) => option.key === adjustments.cameraProfile)?.label ?? adjustments.cameraProfile;
-  const activeToneCurveLabel =
-    toneCurveOptions.find((option) => option.key === adjustments.toneCurve)?.label ?? adjustments.toneCurve;
-
   const handleCameraProfileChange = (cameraProfile: CameraProfileId) => {
     setAdjustments((prev) => ({
       ...prev,
@@ -349,13 +333,18 @@ export const ColorProfileToneControls = ({
     <>
       {(adjustmentVisibility[ColorAdjustment.CameraProfile] !== false ||
         adjustmentVisibility[ColorAdjustment.ToneCurve] !== false) && (
-        <div className={density.card.panel} data-testid="profile-tone-controls">
+        <section
+          className="border-b border-editor-border px-0.5 pb-2"
+          data-camera-profile={adjustments.cameraProfile}
+          data-testid="profile-tone-controls"
+          data-tone-curve={adjustments.toneCurve}
+        >
           <UiText variant={TextVariants.heading} className={cx(density.sectionHeader.title, 'mb-2 block')}>
             {t('adjustments.color.profileTone.title')}
           </UiText>
           {adjustmentVisibility[ColorAdjustment.CameraProfile] !== false && (
-            <div className="mb-3">
-              <UiText variant={TextVariants.label} color={TextColors.secondary} className="mb-2 block">
+            <div className="mb-2">
+              <UiText variant={TextVariants.label} color={TextColors.secondary} className="mb-1 block">
                 {t('adjustments.color.profileTone.cameraProfile')}
               </UiText>
               <select
@@ -375,7 +364,7 @@ export const ColorProfileToneControls = ({
           )}
           {adjustmentVisibility[ColorAdjustment.ToneCurve] !== false && (
             <div>
-              <UiText variant={TextVariants.label} color={TextColors.secondary} className="mb-2 block">
+              <UiText variant={TextVariants.label} color={TextColors.secondary} className="mb-1 block">
                 {t('adjustments.color.profileTone.toneCurve')}
               </UiText>
               <select
@@ -393,32 +382,7 @@ export const ColorProfileToneControls = ({
               </select>
             </div>
           )}
-          <div
-            className="mt-3 grid gap-1 rounded border border-editor-border bg-editor-panel p-2 text-[11px] text-text-secondary"
-            data-camera-profile={adjustments.cameraProfile}
-            data-luminance-after={profileToneReceipt.luminanceAfter.toFixed(4)}
-            data-luminance-before={profileToneReceipt.luminanceBefore.toFixed(4)}
-            data-testid="profile-tone-visible-receipt"
-            data-tone-curve={adjustments.toneCurve}
-            data-tone-delta={profileToneReceipt.toneDelta.toFixed(4)}
-          >
-            <span className="font-medium text-text-primary">{t('adjustments.color.profileTone.receiptTitle')}</span>
-            <span>
-              {t('adjustments.color.profileTone.receiptSummary', {
-                profile: activeCameraProfileLabel,
-                toneCurve: activeToneCurveLabel,
-              })}
-            </span>
-            <span>
-              {t('adjustments.color.profileTone.receiptRuntime', {
-                after: profileToneReceipt.luminanceAfter.toFixed(3),
-                before: profileToneReceipt.luminanceBefore.toFixed(3),
-                delta: profileToneReceipt.toneDelta.toFixed(3),
-              })}
-            </span>
-            <span>{t('adjustments.color.profileTone.receiptExportParity')}</span>
-          </div>
-        </div>
+        </section>
       )}
 
       <details className={density.card.nestedPanel} data-testid="professional-color-recipes-disclosure">

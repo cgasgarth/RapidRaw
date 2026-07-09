@@ -24,15 +24,9 @@ import {
   VISUAL_SMOKE_SCENARIO_IDS,
 } from '../../../../src/validation/visual/visualSmokeScenarios.ts';
 import {
-  agentArtifactReviewProofDatasetSchema,
-  agentAuditTranscriptViewerProofDatasetSchema,
   agentChatProofDatasetSchema,
-  agentDryRunReviewProofDatasetSchema,
   agentLivePromptComposerProofDatasetSchema,
   agentLivePromptResultProofDatasetSchema,
-  agentPrivateRawArtifactsProofDatasetSchema,
-  agentReviewHandoffProofDatasetSchema,
-  agentSelectedFrameScopeProofDatasetSchema,
   assertFilmLookExportProof,
   assertNegativeLabBaseFogPreviewExportProof,
   assertNegativeLabBatchColorInvokeProof,
@@ -71,8 +65,6 @@ import {
   superResolutionReviewWorkspaceProofSchema,
   superResolutionUiSettingsProofSchema,
 } from '../visual-smoke-proofs.ts';
-
-const sleep = (milliseconds) => new Promise((resolveSleep) => setTimeout(resolveSleep, milliseconds));
 
 async function expectDatasetValue(locator: Locator, key: string, value: string): Promise<void> {
   await locator.waitFor({ timeout: 10_000 });
@@ -285,6 +277,25 @@ export async function assertSectionCount(page, minimum) {
 export async function assertAdjustmentsPanelRetune(page) {
   const panel = page.locator('[data-visual-smoke-section="adjustments-panel-retune"]');
   await panel.waitFor({ timeout: 10_000 });
+
+  const inspector = panel.getByTestId('adjustments-inspector');
+  const inspectorHeader = panel.getByTestId('adjustments-inspector-header');
+  await inspector.waitFor({ timeout: 10_000 });
+  if ((await inspector.getAttribute('data-inspector-density')) !== 'compact') {
+    throw new Error('Adjustments inspector should expose compact professional density.');
+  }
+  const inspectorHeaderBounds = await inspectorHeader.boundingBox();
+  if (!inspectorHeaderBounds || inspectorHeaderBounds.height < 38 || inspectorHeaderBounds.height > 44) {
+    throw new Error(
+      `Adjustments inspector header should keep a stable compact height, got ${inspectorHeaderBounds?.height ?? 'none'}.`,
+    );
+  }
+  const inspectorStatus = panel.getByTestId('adjustments-inspector-status');
+  await inspectorStatus.waitFor({ timeout: 10_000 });
+  const inspectorStatusLabel = (await inspectorStatus.textContent())?.trim().toLowerCase() ?? '';
+  if (!/^\d+ edited$/u.test(inspectorStatusLabel)) {
+    throw new Error(`Adjustments inspector should summarize edited sections, got ${inspectorStatusLabel}.`);
+  }
 
   for (const sectionName of ['basic', 'curves', 'details', 'effects']) {
     await panel.getByTestId(`adjustments-section-${sectionName}`).waitFor({
@@ -1923,6 +1934,121 @@ export async function prepareScenario(page, mode) {
 
   if (mode === VISUAL_SMOKE_SCENARIO_IDS.ColorWorkflow || mode === VISUAL_SMOKE_SCENARIO_IDS.ColorAdjustmentDensity) {
     const colorPanel = page.locator('[data-visual-smoke-section="color-workflow-panel"]');
+    const colorViewport = page.viewportSize();
+    const workspaceHeaderFitProof = await colorPanel.getByTestId('color-workspace-tab-header').evaluate((header) => {
+      const tablist = header.querySelector<HTMLElement>('[data-testid="color-workspace-tabs"]');
+      const statusRow = header.querySelector<HTMLElement>('[data-testid="color-workspace-warning-chips"]');
+      if (!tablist || !statusRow) {
+        throw new Error('Color workspace header fit proof could not find tabs or status row.');
+      }
+      const tablistBounds = tablist.getBoundingClientRect();
+      const statusBounds = statusRow.getBoundingClientRect();
+      const serializeElement = (element: HTMLElement, bounds: DOMRect) => ({
+        ariaLabel: element.getAttribute('aria-label'),
+        clientWidth: element.clientWidth,
+        dataTooltip: element.dataset.tooltip,
+        left: bounds.left,
+        right: bounds.right,
+        scrollWidth: element.scrollWidth,
+        text: element.textContent?.trim() ?? '',
+        title: element.title,
+      });
+
+      return {
+        pageHasHorizontalOverflow: document.documentElement.scrollWidth > window.innerWidth + 1,
+        primaryStatus: (() => {
+          const primaryStatus = statusRow.querySelector<HTMLElement>('[data-testid="color-workspace-primary-status"]');
+          return primaryStatus ? serializeElement(primaryStatus, primaryStatus.getBoundingClientRect()) : null;
+        })(),
+        statusDetails: (() => {
+          const statusDetails = statusRow.querySelector<HTMLElement>('[data-testid="color-workspace-status-details"]');
+          return statusDetails ? serializeElement(statusDetails, statusDetails.getBoundingClientRect()) : null;
+        })(),
+        statusRow: {
+          ariaLabel: statusRow.getAttribute('aria-label'),
+          clientWidth: statusRow.clientWidth,
+          dataTooltip: statusRow.dataset.tooltip,
+          flexWrap: getComputedStyle(statusRow).flexWrap,
+          height: statusBounds.height,
+          left: statusBounds.left,
+          right: statusBounds.right,
+          scrollWidth: statusRow.scrollWidth,
+          title: statusRow.title,
+        },
+        tablist: {
+          clientWidth: tablist.clientWidth,
+          columnCount: getComputedStyle(tablist).gridTemplateColumns.split(' ').filter(Boolean).length,
+          display: getComputedStyle(tablist).display,
+          height: tablistBounds.height,
+          left: tablistBounds.left,
+          right: tablistBounds.right,
+          scrollWidth: tablist.scrollWidth,
+        },
+        tabs: Array.from(tablist.querySelectorAll<HTMLElement>('[role="tab"]')).map((tab) =>
+          serializeElement(tab, tab.getBoundingClientRect()),
+        ),
+      };
+    });
+    const expectedTabLabels = ['Quick', 'Editor', 'Grading', 'Output'];
+    const clippedTabs = workspaceHeaderFitProof.tabs.filter(
+      (tab) =>
+        tab.scrollWidth > tab.clientWidth + 1 ||
+        tab.left < workspaceHeaderFitProof.tablist.left - 1 ||
+        tab.right > workspaceHeaderFitProof.tablist.right + 1,
+    );
+    const inaccessibleTabs = workspaceHeaderFitProof.tabs.filter(
+      (tab) => tab.ariaLabel !== tab.text || tab.dataTooltip !== tab.text || tab.title !== tab.text,
+    );
+    if (
+      JSON.stringify(workspaceHeaderFitProof.tabs.map((tab) => tab.text)) !== JSON.stringify(expectedTabLabels) ||
+      workspaceHeaderFitProof.tablist.display !== 'grid' ||
+      workspaceHeaderFitProof.tablist.columnCount !== 4 ||
+      workspaceHeaderFitProof.tablist.scrollWidth > workspaceHeaderFitProof.tablist.clientWidth + 1 ||
+      workspaceHeaderFitProof.tablist.height > 32 ||
+      clippedTabs.length > 0 ||
+      inaccessibleTabs.length > 0
+    ) {
+      throw new Error(
+        `Color workspace tabs clipped or lost their full names: ${JSON.stringify(workspaceHeaderFitProof)}`,
+      );
+    }
+    const primaryStatus = workspaceHeaderFitProof.primaryStatus;
+    const statusDetails = workspaceHeaderFitProof.statusDetails;
+    if (
+      !primaryStatus ||
+      !statusDetails ||
+      workspaceHeaderFitProof.statusRow.flexWrap !== 'nowrap' ||
+      workspaceHeaderFitProof.statusRow.height > 24 ||
+      workspaceHeaderFitProof.statusRow.scrollWidth > workspaceHeaderFitProof.statusRow.clientWidth + 1 ||
+      primaryStatus.left < workspaceHeaderFitProof.statusRow.left - 1 ||
+      primaryStatus.right > workspaceHeaderFitProof.statusRow.right + 1 ||
+      primaryStatus.dataTooltip !== primaryStatus.text ||
+      primaryStatus.title !== primaryStatus.text ||
+      statusDetails.left < workspaceHeaderFitProof.statusRow.left - 1 ||
+      statusDetails.right > workspaceHeaderFitProof.statusRow.right + 1 ||
+      !/^\+\d+$/.test(statusDetails.text) ||
+      !statusDetails.ariaLabel?.includes(workspaceHeaderFitProof.statusRow.ariaLabel ?? '') ||
+      statusDetails.dataTooltip !== workspaceHeaderFitProof.statusRow.ariaLabel ||
+      statusDetails.title !== workspaceHeaderFitProof.statusRow.ariaLabel ||
+      workspaceHeaderFitProof.statusRow.dataTooltip !== workspaceHeaderFitProof.statusRow.ariaLabel ||
+      workspaceHeaderFitProof.statusRow.title !== workspaceHeaderFitProof.statusRow.ariaLabel ||
+      workspaceHeaderFitProof.pageHasHorizontalOverflow
+    ) {
+      throw new Error(`Color workspace status row clipped or overflowed: ${JSON.stringify(workspaceHeaderFitProof)}`);
+    }
+    if (colorViewport !== null && colorViewport.width < 700) {
+      const compactBounds = await colorPanel.boundingBox();
+      if (
+        !compactBounds ||
+        compactBounds.x < -1 ||
+        compactBounds.x + compactBounds.width > colorViewport.width + 1 ||
+        workspaceHeaderFitProof.pageHasHorizontalOverflow
+      ) {
+        throw new Error(
+          `Compact Color inspector exceeded the viewport: ${JSON.stringify({ compactBounds, colorViewport, pageHasHorizontalOverflow: workspaceHeaderFitProof.pageHasHorizontalOverflow })}`,
+        );
+      }
+    }
     const assertColorWorkspaceTab = async (name: string, activePanel: string, hiddenPanel: string) => {
       await colorPanel.getByRole('tab', { exact: true, name }).click();
       await colorPanel.getByTestId(`color-workspace-tab-panel-${activePanel}`).waitFor({ state: 'visible' });
@@ -1999,17 +2125,26 @@ export async function prepareScenario(page, mode) {
         { timeout: 10_000 },
       );
     };
+    await colorPanel.getByTestId('color-workspace-status-details').click();
+    await colorPanel.getByTestId('color-workspace-tab-panel-output').waitFor({ state: 'visible' });
+    await page.waitForFunction(
+      () => {
+        const disclosure = document.querySelector<HTMLDetailsElement>(
+          '[data-testid="color-proofing-diagnostics-disclosure"]',
+        );
+        return disclosure?.open === true && document.activeElement === disclosure.querySelector('summary');
+      },
+      undefined,
+      { timeout: 10_000 },
+    );
     await assertColorWorkspaceTab('Output', 'output', 'quick');
-    await colorPanel.getByTestId('color-runtime-status-rail').getByText('Preview/export', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
     const proofingDisclosure = colorPanel.getByTestId('color-proofing-diagnostics-disclosure');
     if (!(await proofingDisclosure.evaluate((element) => (element as HTMLDetailsElement).open))) {
       await proofingDisclosure.locator('summary').click();
     }
     const gamutWarningControls = colorPanel.getByTestId('gamut-warning-controls');
     await gamutWarningControls.getByText('sRGB gamut warning', { exact: true }).waitFor({ timeout: 10_000 });
-    await gamutWarningControls.getByText('sRGB gamut · Clear', { exact: true }).waitFor({ timeout: 10_000 });
+    await gamutWarningControls.getByText('Soft proof disabled', { exact: true }).waitFor({ timeout: 10_000 });
     const gamutWarningToggle = gamutWarningControls.getByTestId('gamut-warning-toggle');
     await gamutWarningControls.getByText('Off', { exact: true }).waitFor({ timeout: 10_000 });
     await gamutWarningToggle.click();
@@ -2110,15 +2245,16 @@ export async function prepareScenario(page, mode) {
     cameraProfileInputTransformPreviewProofSchema.parse(
       await page.getByTestId('camera-profile-input-transform-preview').evaluate((element) => ({ ...element.dataset })),
     );
-    await page.getByTestId('color-balance-before').getByText('R 173', { exact: false }).waitFor({
-      timeout: 10_000,
-    });
-    await page.getByTestId('color-balance-after').getByText('R 175 / G 122 / B 85', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
-    await page.getByTestId('color-balance-gamut-warning').getByText('No gamut clipping', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
+    const colorBalanceBeforeText = await page.getByTestId('color-balance-before').textContent();
+    const colorBalanceAfterText = await page.getByTestId('color-balance-after').textContent();
+    const colorBalanceGamutText = await page.getByTestId('color-balance-gamut-warning').textContent();
+    if (
+      !colorBalanceBeforeText?.includes('R 173') ||
+      !colorBalanceAfterText?.includes('R 175 / G 122 / B 85') ||
+      !colorBalanceGamutText?.includes('No gamut clipping')
+    ) {
+      throw new Error('Color balance compare proof text did not match the expected rendered values.');
+    }
     await waitForColorAdjustmentProofText('Skin 0.725');
     const skinToneInspector = await colorPanel
       .getByTestId('skin-tone-uniformity-controls')

@@ -609,6 +609,10 @@
         "details": "细节",
         "effects": "效果"
       },
+      "status": {
+        "editedSections_other": "",
+        "loadingImage": ""
+      },
       "title": "调整",
       "tooltips": {
         "autoAdjust": "自动调整图像",

@@ -33,7 +33,7 @@ export const ColorQuickControls = ({
 
   return (
     <div className={cx(density.gutter.panel, density.scrollPadding)} data-testid="quick-color-controls">
-      <div className={density.card.panel} data-testid="color-quick-white-balance">
+      <section className="border-b border-editor-border px-0.5 pb-2" data-testid="color-quick-white-balance">
         <div className={cx(density.sectionHeader.root, 'mb-1')}>
           <div className="min-w-0">
             <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
@@ -99,9 +99,9 @@ export const ColorQuickControls = ({
           trackClassName="tint-gradient-track"
           onDragStateChange={onDragStateChange}
         />
-      </div>
+      </section>
 
-      <div className={density.card.panel} data-testid="color-quick-presence">
+      <section className="border-b border-editor-border px-0.5 pb-2 pt-1" data-testid="color-quick-presence">
         <div className={cx(density.sectionHeader.root, 'mb-1')}>
           <div className="min-w-0">
             <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
@@ -150,7 +150,7 @@ export const ColorQuickControls = ({
           trackClassName="hue-range-track"
           onDragStateChange={onDragStateChange}
         />
-      </div>
+      </section>
     </div>
   );
 };

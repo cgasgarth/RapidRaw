@@ -1,5 +1,5 @@
 import cx from 'clsx';
-import { AlertTriangle, CheckCircle2, Info, RadioTower, TriangleAlert } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, RadioTower, TriangleAlert } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -21,8 +21,6 @@ const chipIcons: Record<EditorChromeStatusChip['id'], typeof AlertTriangle> = {
   'shadow-clipping': AlertTriangle,
   'soft-proof': CheckCircle2,
 };
-
-const inactiveIcon = Info;
 
 export default function EditorChromeStatusStrip({ isFullScreen }: EditorChromeStatusStripProps) {
   const { t } = useTranslation();
@@ -57,8 +55,9 @@ export default function EditorChromeStatusStrip({ isFullScreen }: EditorChromeSt
       selectedImagePath,
     },
   });
+  const actionableChips = chips.filter((chip) => chip.active && (chip.tone === 'warning' || chip.tone === 'danger'));
 
-  if (isFullScreen) {
+  if (isFullScreen || actionableChips.length === 0) {
     return <div aria-hidden="true" data-testid="editor-chrome-status-strip" data-state="hidden" hidden />;
   }
 
@@ -70,8 +69,8 @@ export default function EditorChromeStatusStrip({ isFullScreen }: EditorChromeSt
       data-state="visible"
       role="status"
     >
-      {chips.map((chip) => {
-        const Icon = chip.active ? chipIcons[chip.id] : inactiveIcon;
+      {actionableChips.map((chip) => {
+        const Icon = chipIcons[chip.id];
 
         return (
           <span
