@@ -25,11 +25,13 @@ if (missingKeys.length > 0) {
 const source = readFileSync('src/components/adjustments/color/ColorMixerControls.tsx', 'utf8');
 for (const marker of [
   'data-testid="selective-color-range-controls"',
-  'data-testid="selective-color-range-disclosure"',
+  'data-scope="local-adjustment"',
+  'data-testid="local-color-range-adjustment-disclosure"',
   'data-testid="selective-color-reset-active-range"',
-  'data-testid="selective-color-range-shape-controls"',
-  'data-dirty={String(hasActiveRangeChanges)}',
-  'resetActiveRange',
+  'data-testid="local-color-range-adjustment-controls"',
+  'data-dirty={String(hasActiveHslChanges)}',
+  'resetActiveHsl',
+  'resetActiveLocalRange',
   'handleRangeControlChange',
   'adjustments.color.rangeCenter',
   'adjustments.color.rangeWidth',

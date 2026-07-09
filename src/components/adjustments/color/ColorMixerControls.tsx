@@ -153,10 +153,11 @@ export const ColorMixerControls = ({
     .map((source) => `${source.label.charAt(0)} ${formatSignedInteger(activeChannelMixerRow[source.key])}`)
     .join(' / ');
   const activeBlackWhiteWeight = blackWhiteMixer.weights[activeColor];
-  const hasActiveRangeChanges =
+  const hasActiveHslChanges =
     currentHsl.hue !== INITIAL_ADJUSTMENTS.hsl[activeColor].hue ||
     currentHsl.saturation !== INITIAL_ADJUSTMENTS.hsl[activeColor].saturation ||
-    currentHsl.luminance !== INITIAL_ADJUSTMENTS.hsl[activeColor].luminance ||
+    currentHsl.luminance !== INITIAL_ADJUSTMENTS.hsl[activeColor].luminance;
+  const hasActiveLocalRangeChanges =
     activeRangeControls.centerHueDegrees !==
       INITIAL_ADJUSTMENTS.selectiveColorRangeControls[activeColor].centerHueDegrees ||
     activeRangeControls.widthDegrees !== INITIAL_ADJUSTMENTS.selectiveColorRangeControls[activeColor].widthDegrees ||
@@ -176,13 +177,19 @@ export const ColorMixerControls = ({
     }));
   };
 
-  const resetActiveRange = () => {
+  const resetActiveHsl = () => {
     setAdjustments((previous) => ({
       ...previous,
       hsl: {
         ...previous.hsl,
         [activeColor]: { ...INITIAL_ADJUSTMENTS.hsl[activeColor] },
       },
+    }));
+  };
+
+  const resetActiveLocalRange = () => {
+    setAdjustments((previous) => ({
+      ...previous,
       selectiveColorRangeControls: {
         ...previous.selectiveColorRangeControls,
         [activeColor]: { ...INITIAL_ADJUSTMENTS.selectiveColorRangeControls[activeColor] },
@@ -310,7 +317,7 @@ export const ColorMixerControls = ({
       <section
         className="pb-2"
         data-active-range={activeColor}
-        data-dirty={String(hasActiveRangeChanges)}
+        data-dirty={String(hasActiveHslChanges)}
         data-testid="selective-color-range-controls"
       >
         <div className={density.sectionHeader.rootLoose}>
@@ -384,8 +391,8 @@ export const ColorMixerControls = ({
             aria-label={t('adjustments.color.resetActiveRange')}
             className={cx(density.actionButton.base, density.actionButton.icon, density.actionButton.quiet)}
             data-testid="selective-color-reset-active-range"
-            disabled={!hasActiveRangeChanges}
-            onClick={resetActiveRange}
+            disabled={!hasActiveHslChanges}
+            onClick={resetActiveHsl}
             title={t('adjustments.color.resetActiveRange')}
             type="button"
           >
@@ -394,78 +401,95 @@ export const ColorMixerControls = ({
         </div>
       </section>
 
-      <details className="border-t border-editor-border" data-testid="selective-color-range-disclosure">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 py-1.5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring [&::-webkit-details-marker]:hidden">
-          <span className={density.sectionHeader.title}>{t('adjustments.color.rangeCenter')}</span>
-          <span className={cx(density.sectionHeader.summary, 'flex items-center gap-1')}>
-            <span>{Math.round(activeRangeControls.centerHueDegrees)}°</span>
-            <span aria-hidden="true">/</span>
-            <span>{Math.round(activeRangeControls.widthDegrees)}°</span>
-          </span>
-        </summary>
-        <div
-          className="grid gap-1 border-t border-editor-border pb-2 pt-1.5"
-          data-testid="selective-color-range-shape-controls"
+      {!isForMask && (
+        <details
+          className="border-t border-editor-border"
+          data-scope="local-adjustment"
+          data-testid="local-color-range-adjustment-disclosure"
         >
-          <AdjustmentSlider
-            density="compact"
-            label={t('adjustments.color.rangeCenter')}
-            max={359}
-            min={0}
-            onDragStateChange={onDragStateChange}
-            onValueChange={(value) => {
-              handleRangeControlChange('centerHueDegrees', value);
-            }}
-            step={1}
-            suffix="°"
-            value={Math.round(activeRangeControls.centerHueDegrees)}
-          />
-          <AdjustmentSlider
-            density="compact"
-            label={t('adjustments.color.rangeWidth')}
-            max={180}
-            min={10}
-            onDragStateChange={onDragStateChange}
-            onValueChange={(value) => {
-              handleRangeControlChange('widthDegrees', value);
-            }}
-            step={1}
-            suffix="°"
-            value={Math.round(activeRangeControls.widthDegrees)}
-          />
-          <AdjustmentSlider
-            density="compact"
-            label={t('adjustments.color.falloffSmoothness')}
-            max={40}
-            min={3}
-            onDragStateChange={onDragStateChange}
-            onValueChange={(value) => {
-              handleRangeControlChange('falloffSmoothness', value / 10);
-            }}
-            step={1}
-            value={Math.round(activeRangeControls.falloffSmoothness * 10)}
-          />
-          {!isForMask && (
-            <button
-              className={cx(
-                density.actionButton.base,
-                'mt-1 w-fit gap-1 border border-editor-border bg-editor-panel text-text-secondary hover:bg-editor-panel-raised hover:text-text-primary',
-              )}
-              data-command-type="layerMask.createRangeMask"
-              data-range-key={activeColor}
-              data-testid="selective-color-create-local-adjustment"
-              disabled={
-                !canCreateLocalAdjustmentFromActiveRange || onCreateLocalAdjustmentFromActiveRange === undefined
-              }
-              onClick={onCreateLocalAdjustmentFromActiveRange}
-              type="button"
-            >
-              <Layers size={13} />
-              <span>{t('adjustments.color.createLocalAdjustmentFromRange')}</span>
-            </button>
-          )}
-        </div>
-      </details>
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 py-1.5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring [&::-webkit-details-marker]:hidden">
+            <span className={density.sectionHeader.title}>{t('adjustments.color.createLocalAdjustmentFromRange')}</span>
+            <span className={cx(density.sectionHeader.summary, 'flex items-center gap-1')}>
+              <span>{Math.round(activeRangeControls.centerHueDegrees)}°</span>
+              <span aria-hidden="true">/</span>
+              <span>{Math.round(activeRangeControls.widthDegrees)}°</span>
+            </span>
+          </summary>
+          <div
+            className="grid gap-1 border-t border-editor-border pb-2 pt-1.5"
+            data-testid="local-color-range-adjustment-controls"
+          >
+            <AdjustmentSlider
+              density="compact"
+              label={t('adjustments.color.rangeCenter')}
+              max={359}
+              min={0}
+              onDragStateChange={onDragStateChange}
+              onValueChange={(value) => {
+                handleRangeControlChange('centerHueDegrees', value);
+              }}
+              step={1}
+              suffix="°"
+              value={Math.round(activeRangeControls.centerHueDegrees)}
+            />
+            <AdjustmentSlider
+              density="compact"
+              label={t('adjustments.color.rangeWidth')}
+              max={180}
+              min={10}
+              onDragStateChange={onDragStateChange}
+              onValueChange={(value) => {
+                handleRangeControlChange('widthDegrees', value);
+              }}
+              step={1}
+              suffix="°"
+              value={Math.round(activeRangeControls.widthDegrees)}
+            />
+            <AdjustmentSlider
+              density="compact"
+              label={t('adjustments.color.falloffSmoothness')}
+              max={40}
+              min={3}
+              onDragStateChange={onDragStateChange}
+              onValueChange={(value) => {
+                handleRangeControlChange('falloffSmoothness', value / 10);
+              }}
+              step={1}
+              value={Math.round(activeRangeControls.falloffSmoothness * 10)}
+            />
+            <div className="mt-1 flex items-center justify-between gap-2">
+              <button
+                aria-label={t('adjustments.color.resetActiveRange')}
+                className={cx(density.actionButton.base, density.actionButton.icon, density.actionButton.quiet)}
+                data-testid="local-color-range-reset"
+                disabled={!hasActiveLocalRangeChanges}
+                onClick={resetActiveLocalRange}
+                title={t('adjustments.color.resetActiveRange')}
+                type="button"
+              >
+                <RotateCcw size={13} />
+              </button>
+              <button
+                className={cx(
+                  density.actionButton.base,
+                  'w-fit gap-1 border border-editor-border bg-editor-panel text-text-secondary hover:bg-editor-panel-raised hover:text-text-primary',
+                )}
+                data-command-type="layerMask.createRangeMask"
+                data-range-key={activeColor}
+                data-testid="selective-color-create-local-adjustment"
+                disabled={
+                  !canCreateLocalAdjustmentFromActiveRange || onCreateLocalAdjustmentFromActiveRange === undefined
+                }
+                onClick={onCreateLocalAdjustmentFromActiveRange}
+                type="button"
+              >
+                <Layers size={13} />
+                <span>{t('adjustments.color.createLocalAdjustmentFromRange')}</span>
+              </button>
+            </div>
+          </div>
+        </details>
+      )}
 
       {!isForMask && adjustmentVisibility[ColorAdjustment.ColorBalanceRgb] !== false && (
         <details className="border-t border-editor-border" data-testid="color-balance-disclosure">

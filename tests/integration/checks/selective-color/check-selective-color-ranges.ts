@@ -88,8 +88,8 @@ for (const [index, expectedRange] of fixture.ranges.entries()) {
 
 for (const marker of [
   'selective-color-range-controls',
-  'selective-color-range-disclosure',
-  'selective-color-range-shape-controls',
+  'local-color-range-adjustment-disclosure',
+  'local-color-range-adjustment-controls',
   "handleRangeControlChange('widthDegrees'",
 ]) {
   if (!colorPanelSource.includes(marker)) {

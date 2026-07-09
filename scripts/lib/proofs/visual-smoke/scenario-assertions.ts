@@ -2150,7 +2150,10 @@ export async function prepareScenario(page, mode) {
     await assertAdvancedDisclosure('color-balance-toggle', 'color-balance-controls');
     await assertAdvancedDisclosure('channel-mixer-toggle', 'channel-mixer-controls');
     await assertAdvancedDisclosure('black-white-mixer-toggle', 'black-white-mixer-controls');
-    const rangeDisclosure = colorPanel.getByTestId('selective-color-range-disclosure');
+    const rangeDisclosure = colorPanel.getByTestId('local-color-range-adjustment-disclosure');
+    if ((await rangeDisclosure.getAttribute('data-scope')) !== 'local-adjustment') {
+      throw new Error('Range controls must be scoped to the local adjustment workflow.');
+    }
     if (await rangeDisclosure.evaluate((element) => (element as HTMLDetailsElement).open)) {
       throw new Error('Range controls should start collapsed.');
     }

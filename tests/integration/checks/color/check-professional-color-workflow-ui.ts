@@ -133,7 +133,7 @@ async function validateCompactEditorSurface(container: Element) {
   const profileTone = getByTestId(container, 'profile-tone-controls');
   const colorMixer = getByTestId(container, 'color-mixer-controls');
   const hslControls = getByTestId(container, 'selective-color-range-controls');
-  const rangeDisclosure = getByTestId<HTMLDetailsElement>(container, 'selective-color-range-disclosure');
+  const localRangeDisclosure = getByTestId<HTMLDetailsElement>(container, 'local-color-range-adjustment-disclosure');
   const balanceDisclosure = getByTestId<HTMLDetailsElement>(container, 'color-balance-disclosure');
   const channelDisclosure = getByTestId<HTMLDetailsElement>(container, 'channel-mixer-disclosure');
   const blackWhiteDisclosure = getByTestId<HTMLDetailsElement>(container, 'black-white-mixer-disclosure');
@@ -152,7 +152,8 @@ async function validateCompactEditorSurface(container: Element) {
   for (const label of ['Hue', 'Saturation', 'Luminance']) {
     assert.ok(getRangeByLabel(container, label), `Primary HSL slider was not rendered: ${label}.`);
   }
-  for (const disclosure of [rangeDisclosure, balanceDisclosure, channelDisclosure, blackWhiteDisclosure]) {
+  assert.equal(localRangeDisclosure.dataset.scope, 'local-adjustment');
+  for (const disclosure of [localRangeDisclosure, balanceDisclosure, channelDisclosure, blackWhiteDisclosure]) {
     assert.equal(disclosure.open, false, 'Secondary color tools should start collapsed.');
   }
 }
@@ -230,6 +231,22 @@ async function validateHslSurfaceInteraction(container: Element) {
   );
   assert.equal(getByTestId(container, 'selective-color-range-controls').dataset.activeRange, 'oranges');
   assert.equal(normalizeText(getByTestId(container, 'selective-color-active-range-chip').textContent), 'Oranges');
+
+  const localRangeDisclosure = getByTestId<HTMLDetailsElement>(container, 'local-color-range-adjustment-disclosure');
+  const localRangeSummary = localRangeDisclosure.querySelector<HTMLElement>('summary');
+  assert.ok(localRangeSummary, 'Local range disclosure summary was not rendered.');
+  assert.equal(normalizeText(localRangeSummary.textContent).startsWith('Create local adjustment'), true);
+  await click(localRangeSummary);
+  const rangeCenter = getRangeByLabel(localRangeDisclosure, 'Range center');
+  assert.ok(rangeCenter, 'Local range center slider was not rendered.');
+  await changeRange(rangeCenter, 42);
+  assert.equal(getByTestId<HTMLButtonElement>(container, 'selective-color-reset-active-range').disabled, true);
+  assert.equal(getByTestId<HTMLButtonElement>(container, 'local-color-range-reset').disabled, false);
+
+  await changeRange(hue, 8);
+  await click(getByTestId<HTMLButtonElement>(container, 'selective-color-reset-active-range'));
+  assert.equal(rangeCenter.value, '42', 'Resetting HSL must not reset the local mask range.');
+  assert.equal(getByTestId<HTMLButtonElement>(container, 'local-color-range-reset').disabled, false);
 }
 
 async function click(element: HTMLElement) {
@@ -243,6 +260,14 @@ async function changeSelect(select: HTMLSelectElement, value: string) {
   await act(async () => {
     select.value = value;
     select.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushPromises();
+  });
+}
+
+async function changeRange(input: HTMLInputElement, value: number) {
+  await act(async () => {
+    input.value = String(value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
     await flushPromises();
   });
 }
