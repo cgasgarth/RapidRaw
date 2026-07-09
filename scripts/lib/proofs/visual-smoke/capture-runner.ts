@@ -184,7 +184,7 @@ export async function runVisualSmokeCapture({
           waitUntil: 'networkidle',
         });
         await page.locator('[data-visual-smoke-ready="true"]').waitFor({ timeout: 10_000 });
-        await page.getByTestId('adjustments-panel-retune-heading').getByText('Basic Tone', { exact: true }).waitFor({
+        await page.getByTestId('adjustments-panel-retune-heading').getByText('Light', { exact: true }).waitFor({
           timeout: 10_000,
         });
         await assertAdjustmentsPanelRetune(page);

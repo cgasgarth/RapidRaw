@@ -1,21 +1,18 @@
 import { invoke } from '@tauri-apps/api/core';
 import cx from 'clsx';
-import { Aperture, Check, CircleDashed, Info, Loader, Scan, SquareDashed, Wand2 } from 'lucide-react';
+import { Aperture, CircleDashed, Loader, SquareDashed, Wand2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { Invokes } from '../../tauri/commands';
 import { TextVariants } from '../../types/typography';
 import type { Adjustments } from '../../utils/adjustments';
-import { formatUnknownError } from '../../utils/errorFormatting';
 import { parseExifMetadataNumber } from '../../utils/metadataPanelContracts';
 import {
-  buildGeometryPreviewParams,
   getLensCorrectionAvailability,
   hasSupportedLensCorrections,
   type LensDistortionParams,
 } from '../../utils/transformLensControls';
 import type { SelectedImage } from '../ui/AppProperties';
-import { editorChromeStatusChipClassName } from '../ui/editorChromeTokens';
 import Dropdown, { type OptionItem } from '../ui/primitives/Dropdown';
 import Switch from '../ui/primitives/Switch';
 import UiText from '../ui/primitives/Text';
@@ -26,7 +23,6 @@ type LensCorrectionMode = Adjustments['lensCorrectionMode'];
 type ExifData = Record<string, string | number | null | undefined>;
 type AutodetectLensResult = [string, string] | { maker: string; model: string };
 type DetectionStatus = 'idle' | 'detecting' | 'success' | 'not_found' | 'error';
-type PreviewProbeStatus = 'idle' | 'running' | 'success' | 'error';
 
 interface TransformLensProps {
   adjustments: Adjustments;
@@ -44,14 +40,10 @@ const copy = {
   correctionAmount: 'Correction amount',
   detecting: 'Detecting',
   distortionAmount: 'Distortion amount',
-  exportParity: 'Preview/export',
   horizontal: 'Horizontal perspective',
-  lensDatabaseUnavailable: 'Lens profile database unavailable.',
   lensHeading: 'Lens correction',
   manual: 'Manual',
-  nativePreviewAccepted: 'Native preview accepted recipe',
   opticalDistortion: 'Optical distortion',
-  previewProbe: 'Check native preview recipe',
   profileDistortion: 'Profile distortion',
   profileError: 'Profile error',
   profileIdle: 'Profile idle',
@@ -63,9 +55,7 @@ const copy = {
   scale: 'Scale',
   selectLens: 'Select lens',
   selectMaker: 'Select maker',
-  supportedCopy: 'Supported lens profile fields are applied by the same geometry recipe used for export.',
   transformHeading: 'Transform',
-  unsupportedCopy: 'Choose a lens profile to enable profile-specific distortion, vignette, and TCA controls.',
   unsupportedProfileField: 'Current lens profile does not provide this correction.',
   vertical: 'Vertical perspective',
   vignetteAmount: 'Vignette amount',
@@ -101,8 +91,6 @@ export default function TransformLens({
   const [makers, setMakers] = useState<string[]>([]);
   const [lenses, setLenses] = useState<string[]>([]);
   const [detectionStatus, setDetectionStatus] = useState<DetectionStatus>('idle');
-  const [previewProbeStatus, setPreviewProbeStatus] = useState<PreviewProbeStatus>('idle');
-  const [runtimeMessage, setRuntimeMessage] = useState<string | null>(null);
 
   const selectedExif = selectedImage?.exif as ExifData | null | undefined;
   const focalLength = useMemo(
@@ -128,7 +116,7 @@ export default function TransformLens({
         if (isMounted) setMakers(nextMakers);
       })
       .catch(() => {
-        if (isMounted) setRuntimeMessage(copy.lensDatabaseUnavailable);
+        if (isMounted) setDetectionStatus('error');
       });
     return () => {
       isMounted = false;
@@ -156,7 +144,6 @@ export default function TransformLens({
 
   const updateAdjustment = <Key extends keyof Adjustments>(key: Key, value: Adjustments[Key]) => {
     setAdjustments((prev: Adjustments) => ({ ...prev, [key]: value }));
-    setPreviewProbeStatus('idle');
   };
 
   const fetchDistortionParams = async (maker: string, model: string): Promise<LensDistortionParams | null> =>
@@ -169,7 +156,6 @@ export default function TransformLens({
     });
 
   const applyLensProfile = async (maker: string, model: string, mode: LensCorrectionMode) => {
-    setRuntimeMessage(null);
     try {
       const lensDistortionParams = await fetchDistortionParams(maker, model);
       setAdjustments((prev: Adjustments) => ({
@@ -180,10 +166,9 @@ export default function TransformLens({
         lensModel: model,
       }));
       setDetectionStatus(lensDistortionParams === null ? 'not_found' : 'success');
-      setPreviewProbeStatus('idle');
     } catch (error) {
       setDetectionStatus('error');
-      setRuntimeMessage(formatUnknownError(error));
+      console.error('Failed to apply lens profile', error);
     }
   };
 
@@ -203,7 +188,6 @@ export default function TransformLens({
     }
 
     setDetectionStatus('detecting');
-    setRuntimeMessage(null);
     try {
       const detected = normalizeAutodetectLensResult(
         await invoke<AutodetectLensResult | null>(Invokes.AutodetectLens, {
@@ -225,7 +209,7 @@ export default function TransformLens({
       await applyLensProfile(detected.maker, detected.model, 'auto');
     } catch (error) {
       setDetectionStatus('error');
-      setRuntimeMessage(formatUnknownError(error));
+      console.error('Failed to detect lens profile', error);
     }
   };
 
@@ -238,28 +222,11 @@ export default function TransformLens({
       lensModel: null,
     }));
     setDetectionStatus('idle');
-    setPreviewProbeStatus('idle');
   };
 
   const handleModelChange = (model: string) => {
     if (!adjustments.lensMaker) return;
     void applyLensProfile(adjustments.lensMaker, model, 'manual');
-  };
-
-  const handlePreviewProbe = async () => {
-    setPreviewProbeStatus('running');
-    setRuntimeMessage(null);
-    try {
-      await invoke<string>(Invokes.PreviewGeometryTransform, {
-        jsAdjustments: adjustments,
-        params: buildGeometryPreviewParams(adjustments),
-        showLines: false,
-      });
-      setPreviewProbeStatus('success');
-    } catch (error) {
-      setPreviewProbeStatus('error');
-      setRuntimeMessage(formatUnknownError(error));
-    }
   };
 
   const makerOptions = useMemo(() => toOptions(makers), [makers]);
@@ -284,15 +251,12 @@ export default function TransformLens({
             : copy.profileIdle;
 
   return (
-    <div className="space-y-3" data-testid="transform-lens-inspector">
+    <div className="space-y-2" data-testid="transform-lens-inspector">
       <section className="space-y-1.5">
-        <div className="flex items-center justify-between gap-2">
-          <UiText variant={TextVariants.label} className="text-[11px] font-semibold uppercase text-text-secondary">
-            {copy.transformHeading}
-          </UiText>
-          <span className={editorChromeStatusChipClassName('neutral')}>{copy.exportParity}</span>
-        </div>
-        <div className="space-y-px rounded border border-editor-border bg-editor-panel-raised p-1.5">
+        <UiText variant={TextVariants.label} className="text-[11px] font-semibold uppercase text-text-secondary">
+          {copy.transformHeading}
+        </UiText>
+        <div className="space-y-px">
           <AdjustmentSlider
             density="compact"
             label={copy.vertical}
@@ -401,7 +365,7 @@ export default function TransformLens({
           </span>
         </div>
 
-        <div className="space-y-2 rounded border border-editor-border bg-editor-panel-raised p-2">
+        <div className="space-y-1.5 rounded border border-editor-border bg-editor-panel-well p-1.5">
           <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
             <Dropdown
               chrome="editor"
@@ -539,38 +503,6 @@ export default function TransformLens({
             />
           </div>
         </div>
-      </section>
-
-      <section className="space-y-2 rounded border border-editor-border bg-editor-panel-raised p-2">
-        <div className="flex items-start gap-2 text-text-secondary">
-          <Info className="mt-0.5 shrink-0" size={13} />
-          <UiText as="div" variant={TextVariants.small} className="text-[11px] leading-4">
-            {hasSupportedLensProfile ? copy.supportedCopy : copy.unsupportedCopy}
-          </UiText>
-        </div>
-        <button
-          className="inline-flex h-7 w-full items-center justify-center gap-1.5 rounded border border-editor-border bg-editor-panel text-[11px] font-medium text-text-secondary transition-colors hover:bg-editor-selected-quiet hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={previewProbeStatus === 'running' || !selectedImage?.isReady}
-          onClick={() => {
-            void handlePreviewProbe();
-          }}
-          type="button"
-          data-testid="transform-lens-preview-probe"
-        >
-          {previewProbeStatus === 'running' ? (
-            <Loader className="animate-spin" size={13} />
-          ) : previewProbeStatus === 'success' ? (
-            <Check size={13} />
-          ) : (
-            <Scan size={13} />
-          )}
-          {previewProbeStatus === 'success' ? copy.nativePreviewAccepted : copy.previewProbe}
-        </button>
-        {runtimeMessage && (
-          <UiText as="div" variant={TextVariants.small} className="text-[11px] leading-4 text-danger">
-            {runtimeMessage}
-          </UiText>
-        )}
       </section>
     </div>
   );

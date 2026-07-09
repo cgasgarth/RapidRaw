@@ -297,7 +297,24 @@ export async function assertAdjustmentsPanelRetune(page) {
     throw new Error(`Adjustments inspector should summarize edited sections, got ${inspectorStatusLabel}.`);
   }
 
-  for (const sectionName of ['basic', 'curves', 'details', 'effects']) {
+  const sectionNames = ['basic', 'curves', 'transformLens', 'details', 'effects'];
+  const sectionBounds = await Promise.all(
+    sectionNames.map(async (sectionName) => {
+      const section = panel.getByTestId(`adjustments-section-${sectionName}`);
+      await section.waitFor({ timeout: 10_000 });
+      return section.boundingBox();
+    }),
+  );
+  if (sectionBounds.some((bounds) => bounds === null)) {
+    throw new Error('Every primary Adjust inspector section should remain mounted.');
+  }
+  if (sectionBounds.some((bounds, index) => index > 0 && (bounds?.y ?? 0) <= (sectionBounds[index - 1]?.y ?? 0))) {
+    throw new Error(
+      'Adjust inspector sections should follow the Light, Curve, Geometry & Lens, Detail, Effects order.',
+    );
+  }
+
+  for (const sectionName of sectionNames) {
     await panel.getByTestId(`adjustments-section-${sectionName}`).waitFor({
       timeout: 10_000,
     });
@@ -313,19 +330,8 @@ export async function assertAdjustmentsPanelRetune(page) {
   await panel.locator('[role="status"][aria-label$="edited" i]').first().waitFor({ timeout: 10_000 });
   await panel.getByText('Off', { exact: true }).first().waitFor({ timeout: 10_000 });
 
-  const rawProcessingControl = panel.getByTestId('raw-processing-mode-override-control');
-  await rawProcessingControl.waitFor({ timeout: 10_000 });
-  const rawProcessingToggle = rawProcessingControl.locator('button[aria-expanded]').first();
-  await rawProcessingToggle.waitFor({ timeout: 10_000 });
-  const rawExpanded = await rawProcessingToggle.getAttribute('aria-expanded');
-  if (rawExpanded !== 'false') {
-    throw new Error(`RAW processing utility should be collapsed without RAW attention status, got ${rawExpanded}.`);
-  }
-  const rawBounds = await rawProcessingControl.boundingBox();
-  if (!rawBounds || rawBounds.height > 44) {
-    throw new Error(
-      `RAW processing utility should remain compact when collapsed, height=${rawBounds?.height ?? 'none'}.`,
-    );
+  if ((await panel.getByTestId('raw-processing-mode-override-control').count()) !== 0) {
+    throw new Error('The Adjust inspector should not render RAW processing diagnostics.');
   }
 
   const scopesStrip = await waitForScopesStripState(page, 'adjustments-panel-scopes-strip', 'closed');
@@ -451,13 +457,13 @@ async function assertAdjustmentSectionHeaderActions(page, panel) {
   }
 
   await menuAction.click();
-  await page.getByRole('menuitem', { name: 'Copy Basic Tone Settings' }).first().waitFor({ timeout: 10_000 });
+  await page.getByRole('menuitem', { name: 'Copy Light Settings' }).first().waitFor({ timeout: 10_000 });
   await page.keyboard.press('Escape');
   await page.getByRole('menu').waitFor({ state: 'hidden', timeout: 10_000 });
 
   await header.focus();
   await page.keyboard.press('Shift+F10');
-  await page.getByRole('menuitem', { name: 'Reset Basic Tone Settings' }).first().waitFor({ timeout: 10_000 });
+  await page.getByRole('menuitem', { name: 'Reset Light Settings' }).first().waitFor({ timeout: 10_000 });
   await page.keyboard.press('Escape');
 }
 
