@@ -1,6 +1,7 @@
 import cx from 'clsx';
 import { Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import type { NegativeLabRuntimeProofV1 } from '../../../../packages/rawengine-schema/src';
 import type { NegativeLabHighlightPatchExposureSuggestion } from '../../../schemas/negative-lab/negativeLabHighlightPatchExposureSuggestionSchemas';
 import type { NegativeLabNeutralPatchSuggestion } from '../../../schemas/negative-lab/negativeLabNeutralPatchSuggestionSchemas';
 import type {
@@ -59,6 +60,9 @@ interface NegativeLabPatchSamplerPanelProps {
   patchRole: NegativeLabPatchRole;
   selectedImagePath: string | null;
   shadowPatchBlackPointSuggestion: NegativeLabShadowPatchBlackPointSuggestion | null;
+  runtimePreviewDensityNormalizationMetrics:
+    | NegativeLabRuntimeProofV1['runtimePreview']['densityNormalizationMetrics']
+    | null;
 }
 
 export function NegativeLabPatchSamplerPanel({
@@ -90,6 +94,7 @@ export function NegativeLabPatchSamplerPanel({
   patchRole,
   selectedImagePath,
   shadowPatchBlackPointSuggestion,
+  runtimePreviewDensityNormalizationMetrics,
 }: NegativeLabPatchSamplerPanelProps) {
   const { t } = useTranslation();
 
@@ -103,6 +108,49 @@ export function NegativeLabPatchSamplerPanel({
           {t('modals.negativeConversion.patchSamplerHint')}
         </UiText>
       </div>
+      {runtimePreviewDensityNormalizationMetrics !== null ? (
+        <div
+          className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-md border border-surface bg-bg-secondary p-2 text-[11px] text-text-tertiary"
+          data-testid="negative-lab-patch-density-bounds"
+        >
+          <span className="text-text-secondary">{t('modals.negativeConversion.baseDensity')}</span>
+          <span className="text-right tabular-nums" data-testid="negative-lab-patch-base-channel-bounds">
+            {(['red', 'green', 'blue'] as const)
+              .map((channel) => {
+                const bounds =
+                  runtimePreviewDensityNormalizationMetrics.boundsReceipt.baseBounds.channelBounds[channel];
+                return t('modals.negativeConversion.axisBoundsReadout', {
+                  axis: channel[0]?.toLocaleUpperCase('en-US'),
+                  max: bounds.max.toFixed(3),
+                  min: bounds.min.toFixed(3),
+                });
+              })
+              .join(' ')}
+          </span>
+          <span className="col-span-2 text-right tabular-nums" data-testid="negative-lab-patch-final-luma-bounds">
+            {t('modals.negativeConversion.axisBoundsReadout', {
+              axis: t('modals.negativeConversion.lumaAxis'),
+              max: formatDensityValue(
+                runtimePreviewDensityNormalizationMetrics.boundsReceipt.finalBounds.axisBounds.luma.max,
+              ),
+              min: formatDensityValue(
+                runtimePreviewDensityNormalizationMetrics.boundsReceipt.finalBounds.axisBounds.luma.min,
+              ),
+            })}
+          </span>
+          <span className="col-span-2 text-right tabular-nums" data-testid="negative-lab-patch-final-color-bounds">
+            {t('modals.negativeConversion.axisBoundsReadout', {
+              axis: t('modals.negativeConversion.colorAxis'),
+              max: formatDensityValue(
+                runtimePreviewDensityNormalizationMetrics.boundsReceipt.finalBounds.axisBounds.color.max,
+              ),
+              min: formatDensityValue(
+                runtimePreviewDensityNormalizationMetrics.boundsReceipt.finalBounds.axisBounds.color.min,
+              ),
+            })}
+          </span>
+        </div>
+      ) : null}
       <div className="grid grid-cols-2 gap-2">
         {NEGATIVE_LAB_DENSITOMETER_PATCH_PRESETS.map((samplePreset) => (
           <button

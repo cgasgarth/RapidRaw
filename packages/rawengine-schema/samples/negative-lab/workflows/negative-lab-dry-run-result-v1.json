@@ -128,6 +128,73 @@
             "min": 0
           }
         },
+        "boundsReceipt": {
+          "algorithmId": "fixed_grid_block_median_luma_color_v1",
+          "analysisBuffer": 0.04,
+          "analysisRect": {
+            "height": 0.92,
+            "width": 0.92,
+            "x": 0.04,
+            "y": 0.04
+          },
+          "baseBounds": {
+            "axisBounds": {
+              "color": {
+                "max": 0.08,
+                "min": -0.08
+              },
+              "luma": {
+                "max": 0.16,
+                "min": 0.02
+              }
+            },
+            "channelBounds": {
+              "blue": {
+                "max": 0.2,
+                "min": 0.04
+              },
+              "green": {
+                "max": 0.16,
+                "min": 0.02
+              },
+              "red": {
+                "max": 0.14,
+                "min": 0.01
+              }
+            }
+          },
+          "baseFogProvenance": "automatic_analysis",
+          "colorRangeClip": 0.12,
+          "finalBounds": {
+            "axisBounds": {
+              "color": {
+                "max": 0.12,
+                "min": -0.12
+              },
+              "luma": {
+                "max": 1.08,
+                "min": -0.03
+              }
+            },
+            "channelBounds": {
+              "blue": {
+                "max": 1.08,
+                "min": -0.03
+              },
+              "green": {
+                "max": 1.02,
+                "min": -0.02
+              },
+              "red": {
+                "max": 0.98,
+                "min": -0.01
+              }
+            }
+          },
+          "lumaRangeClip": 0.08,
+          "schemaVersion": 1,
+          "warningCodes": ["missing_visible_base"]
+        },
         "clippedPixelCount": 0,
         "densityRangeUnclamped": 1.09,
         "epsilonClampedPixelCount": 0,

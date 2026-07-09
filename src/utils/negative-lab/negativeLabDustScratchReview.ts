@@ -98,6 +98,18 @@ export const buildNegativeLabDustScratchReviewReport = (
       };
     }
 
+    if (frame.batchDisposition === 'review' && frame.batchDispositionReason === 'bounds_review_required') {
+      return {
+        candidates: [],
+        findingCodes: ['bounds_review_required'],
+        frameId: frame.frameId,
+        included: true,
+        recommendation: 'Review density bounds and base/fog warnings before final export.',
+        scanLabel: frame.scanLabel,
+        severity: 'review',
+      };
+    }
+
     if (frame.warningCodes.includes('base_estimate_active_frame_only')) {
       return {
         candidates: buildReviewCandidates(frame.frameId, true, 'acknowledged'),

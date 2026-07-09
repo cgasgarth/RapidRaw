@@ -207,7 +207,7 @@ describe('renderNegativeLabRuntimeDryRunPreview', () => {
       sampleCount: 400,
       source: 'deterministic_edge_safe_default_rect',
     });
-    expect(result.runtimeDryRun.dryRun.proof?.runtimePreview.densityNormalizationMetrics).toEqual({
+    expect(result.runtimeDryRun.dryRun.proof?.runtimePreview.densityNormalizationMetrics).toMatchObject({
       axisBounds: {
         color: { max: 0.12, min: -0.12 },
         luma: { max: 1.02, min: -0.03 },
@@ -221,6 +221,11 @@ describe('renderNegativeLabRuntimeDryRunPreview', () => {
       densityRangeUnclamped: 1.09,
       epsilonClampedPixelCount: 1,
       rendererVersion: 1,
+    });
+    expect(result.runtimeDryRun.dryRun.proof?.runtimePreview.densityNormalizationMetrics.boundsReceipt).toMatchObject({
+      algorithmId: 'fixed_grid_block_median_luma_color_v1',
+      baseFogProvenance: 'automatic_analysis',
+      schemaVersion: 1,
     });
     expect(result.runtimeDryRun.dryRun.changeSet.createdPositiveVariantIds).toEqual([]);
     expect(NEGATIVE_LAB_AGENT_TOOL_MANIFEST.tools[0]?.toolName).toBe(NEGATIVE_LAB_AGENT_PREVIEW_TOOL_NAME);
