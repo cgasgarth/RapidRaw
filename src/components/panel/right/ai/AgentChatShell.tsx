@@ -1,5 +1,5 @@
 import { RotateCcw, Send } from 'lucide-react';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type {
   AgentChatMessage,
@@ -21,6 +21,7 @@ import {
   applyAgentToneAdjustment,
   buildAgentToneAdjustmentPromptDraft,
   dryRunAgentToneAdjustment,
+  renderAgentToneDryRunPreview,
 } from '../../../../utils/agent/tools/agentToneAdjustmentTool';
 
 interface AgentChatShellProps {
@@ -41,6 +42,7 @@ type LivePromptStatus =
 interface LivePromptResult {
   dryRunReceipt?: AgentToneAdjustmentDryRunResponse['receipt'];
   error?: string;
+  previewAfterUrl?: string;
   recipeName?: string;
   toneAdjustmentDraft?: AgentToneAdjustmentPromptDraft;
   status: LivePromptStatus;
@@ -185,6 +187,12 @@ function LivePromptComposer({ initialPromptPreviewContext, isContextReady, onSes
   const canCancel = result.status === 'applying' && activeOperationRef.current !== null;
   const canRollback =
     rollbackSnapshot !== null && rollbackValidation?.state === 'available' && result.status === 'applied';
+  useEffect(() => {
+    const previewUrl = result.previewAfterUrl;
+    return () => {
+      if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
+    };
+  }, [result.previewAfterUrl]);
   let statusLabel;
 
   switch (result.status) {
@@ -247,10 +255,12 @@ function LivePromptComposer({ initialPromptPreviewContext, isContextReady, onSes
         requestId,
         sessionId: 'agent-chat-shell',
       });
+      const previewAfterUrl = await renderAgentToneDryRunPreview(draft.requestedAdjustments);
       setToneAdjustmentDraft(draft);
 
       const nextResult = {
         dryRunReceipt: dryRun.receipt,
+        previewAfterUrl,
         recipeName: dryRun.receipt.dryRunPlanHash,
         status: 'dry_run_ready',
         toneAdjustmentDraft: draft,
@@ -454,7 +464,7 @@ function LivePromptComposer({ initialPromptPreviewContext, isContextReady, onSes
                 <img
                   alt={t('editor.ai.agent.proposal.after')}
                   className="aspect-[4/3] w-full rounded border border-editor-border object-cover"
-                  src={result.dryRunReceipt.previewAfter.previewRef}
+                  src={result.previewAfterUrl}
                 />
               </figure>
             </div>
