@@ -5,6 +5,7 @@ import {
   exportColorCapabilityCatalogV1Schema,
   MOXCMS_EXPORT_COLOR_CAPABILITIES_V1,
 } from '../../../../packages/rawengine-schema/src/exportColorCapabilities.ts';
+import { exportRecipeV1Schema } from '../../../../packages/rawengine-schema/src/exportRecipeSchemas.ts';
 import {
   ExportColorProfile,
   ExportRenderingIntent,
@@ -16,6 +17,7 @@ import {
   getExportColorCapability,
   getSupportedRenderingIntents,
   hasColorManagedTransform,
+  hasExportColorCapabilityForFormat,
   isBlackPointCompensationAvailable,
   isSupportedColorProfileForFormat,
   supportsColorManagedOutput,
@@ -82,6 +84,15 @@ if (supportsColorManagedOutput(FileFormats.Png))
 if (!isSupportedColorProfileForFormat(FileFormats.Jpeg, ExportColorProfile.DisplayP3)) {
   failures.push('JPEG must accept Display P3 exports.');
 }
+if (!isSupportedColorProfileForFormat(FileFormats.Jpeg, ExportColorProfile.SourceEmbedded)) {
+  failures.push('JPEG must accept source-embedded profile exports.');
+}
+if (!isSupportedColorProfileForFormat(FileFormats.Tiff, ExportColorProfile.SourceEmbedded)) {
+  failures.push('TIFF must accept source-embedded profile exports.');
+}
+if (isSupportedColorProfileForFormat(FileFormats.Png, ExportColorProfile.SourceEmbedded)) {
+  failures.push('PNG must reject source-embedded profile exports.');
+}
 if (isSupportedColorProfileForFormat(FileFormats.Png, ExportColorProfile.DisplayP3)) {
   failures.push('PNG must reject Display P3 exports.');
 }
@@ -94,6 +105,12 @@ if (!hasColorManagedTransform(FileFormats.Jpeg, ExportColorProfile.DisplayP3)) {
 if (hasColorManagedTransform(FileFormats.Jpeg, ExportColorProfile.Srgb)) {
   failures.push('JPEG sRGB exports must not require a wide-gamut transform.');
 }
+if (hasColorManagedTransform(FileFormats.Jpeg, ExportColorProfile.SourceEmbedded)) {
+  failures.push('Source-embedded passthrough must not be reported as a color-managed transform.');
+}
+if (!hasExportColorCapabilityForFormat(FileFormats.Jpeg, ExportColorProfile.SourceEmbedded)) {
+  failures.push('JPEG source-embedded passthrough must expose its catalog color capability.');
+}
 
 const displayP3Intents = getSupportedRenderingIntents(
   capabilityCatalog,
@@ -105,6 +122,14 @@ if (displayP3Intents.join(',') !== ExportRenderingIntent.RelativeColorimetric) {
 }
 const srgbIntents = getSupportedRenderingIntents(capabilityCatalog, FileFormats.Jpeg, ExportColorProfile.Srgb);
 if (srgbIntents.length !== 0) failures.push('sRGB exports should not render wide-gamut intent controls.');
+const sourceEmbeddedIntents = getSupportedRenderingIntents(
+  capabilityCatalog,
+  FileFormats.Jpeg,
+  ExportColorProfile.SourceEmbedded,
+);
+if (sourceEmbeddedIntents.join(',') !== ExportRenderingIntent.RelativeColorimetric) {
+  failures.push('Source-embedded rendering-intent options must be limited to relative colorimetric.');
+}
 if (
   getBlackPointCompensationStatus(capabilityCatalog, FileFormats.Jpeg, ExportColorProfile.DisplayP3) !== 'supported'
 ) {
@@ -171,6 +196,62 @@ if (
   failures.push('Export recipe schema accepted an unsupported rendering intent.');
 }
 
+const sourceEmbeddedRecipe = {
+  ...parsedRecipe,
+  blackPointCompensation: false,
+  colorProfile: 'sourceEmbedded',
+  id: 'source-embedded-relative-intent',
+  name: 'Source Embedded Relative Intent',
+};
+if (!exportRecipeSchema.safeParse(sourceEmbeddedRecipe).success) {
+  failures.push('Export recipe schema rejected a valid source-embedded JPEG recipe.');
+}
+for (const invalidRecipe of [
+  { ...sourceEmbeddedRecipe, fileFormat: 'png', jpegQuality: 100 },
+  { ...sourceEmbeddedRecipe, renderingIntent: 'perceptual' },
+  { ...sourceEmbeddedRecipe, blackPointCompensation: true },
+]) {
+  if (exportRecipeSchema.safeParse(invalidRecipe).success) {
+    failures.push('Export recipe schema accepted an impossible source-embedded recipe.');
+  }
+}
+
+const packageSourceEmbeddedRecipe = {
+  colorProfile: 'sourceEmbedded',
+  dontEnlarge: true,
+  enableResize: false,
+  enableWatermark: false,
+  exportMasks: false,
+  fileFormat: 'tiff',
+  filenameTemplate: '{original_filename}_source_profile',
+  id: 'package-source-embedded-relative-intent',
+  jpegQuality: 100,
+  keepMetadata: true,
+  name: 'Package Source Embedded Relative Intent',
+  preserveFolders: false,
+  preserveTimestamps: false,
+  renderingIntent: 'relativeColorimetric',
+  resizeMode: 'longEdge',
+  resizeValue: 2048,
+  stripGps: true,
+  watermarkAnchor: 'bottomRight',
+  watermarkOpacity: 75,
+  watermarkPath: null,
+  watermarkScale: 10,
+  watermarkSpacing: 5,
+};
+if (!exportRecipeV1Schema.safeParse(packageSourceEmbeddedRecipe).success) {
+  failures.push('Shared package recipe schema rejected a valid source-embedded TIFF recipe.');
+}
+for (const invalidRecipe of [
+  { ...packageSourceEmbeddedRecipe, fileFormat: 'webp' },
+  { ...packageSourceEmbeddedRecipe, renderingIntent: 'perceptual' },
+]) {
+  if (exportRecipeV1Schema.safeParse(invalidRecipe).success) {
+    failures.push('Shared package recipe schema accepted an impossible source-embedded recipe.');
+  }
+}
+
 for (const key of [
   locale.export?.advanced?.renderingIntent,
   locale.export?.advanced?.blackPointCompensationUnavailable,
@@ -178,6 +259,7 @@ for (const key of [
   locale.export?.advanced?.blackPointCompensationJpegTiffRelativeOnly,
   locale.export?.colorProfiles?.adobeRgb1998,
   locale.export?.colorProfiles?.proPhotoRgb,
+  locale.export?.colorProfiles?.sourceEmbedded,
   locale.export?.renderingIntents?.relativeColorimetric,
   locale.export?.readiness?.renderingIntent,
 ]) {

@@ -1,0 +1,13 @@
+{
+  "fixtureId": "synthetic.export.source-embedded-display-p3.v1",
+  "fixturePath": "src-tauri/tests/fixtures/export/source-embedded-display-p3.jpg",
+  "fixtureSha256": "b4f03738f6bdd7be65bd5b8afbd1448b0e57b207776c2fc016bd81d9c49986d6",
+  "sourcePath": "src-tauri/icons/128x128.png",
+  "sourceSha256": "24488961e3e71db6a04d0d550dd6eacfd8a8c54b2b3c2662d229bfa3b9856f4d",
+  "sourceLicense": "project-generated repository asset",
+  "embeddedIccProfile": "moxcms ColorProfile::new_display_p3 with normalized creation timestamp",
+  "embeddedIccSha256": "d2ff5597fd937a24f90548f5e85803545334fcfd480601d19c3bc225d7355733",
+  "generator": "RapidRAW export_rgb_pixels_and_profile Display P3 conversion followed by SourceEmbedded JPEG encoding at quality 95",
+  "content": "Synthetic aperture-logo graphic; contains no people.",
+  "createdAt": "2026-07-09"
+}

@@ -55,6 +55,22 @@ export const exportRecipeV1Schema = z
   })
   .strict()
   .superRefine((recipe, context) => {
+    if (recipe.colorProfile === 'sourceEmbedded' && recipe.fileFormat !== 'jpeg' && recipe.fileFormat !== 'tiff') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Source-embedded profile export is only available for JPEG and TIFF recipes.',
+        path: ['colorProfile'],
+      });
+    }
+
+    if (recipe.colorProfile === 'sourceEmbedded' && recipe.renderingIntent !== 'relativeColorimetric') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Source-embedded profile export requires relative colorimetric rendering intent.',
+        path: ['renderingIntent'],
+      });
+    }
+
     if (recipe.fileFormat !== 'jpeg' && recipe.jpegQuality !== 100) {
       context.addIssue({
         code: 'custom',
