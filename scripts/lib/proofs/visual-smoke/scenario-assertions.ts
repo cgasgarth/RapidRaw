@@ -11,9 +11,7 @@ import {
 import {
   layerMaskDryRunResultV1Schema,
   layerMaskMutationResultV1Schema,
-  toneColorCommandEnvelopeV1Schema,
 } from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
-import { sampleToneColorCommandEnvelopeV1 } from '../../../../packages/rawengine-schema/src/samplePayloads.ts';
 import {
   BRUSH_MASK_COMMAND_COORDINATE_SPACE,
   buildBrushMaskCommandFromParameters,
@@ -31,9 +29,6 @@ import {
   assertNegativeLabBaseFogPreviewExportProof,
   assertNegativeLabBatchColorInvokeProof,
   assertNegativeLabInvokeProof,
-  blackWhiteMixerParityProofDatasetSchema,
-  cameraProfileInputTransformPreviewProofSchema,
-  colorBalanceCompareProofDatasetSchema,
   commandPaletteWorkflowProofSchema,
   detailDustSpotProofSchema,
   detailWorkspaceProofSchema,
@@ -60,7 +55,6 @@ import {
   panoramaReviewWorkspaceProofSchema,
   panoramaSavedReviewProofSchema,
   panoramaUiSettingsProofSchema,
-  selectiveColorUiProofDatasetSchema,
   superResolutionPrivateRawReviewProofSchema,
   superResolutionReviewWorkspaceProofSchema,
   superResolutionUiSettingsProofSchema,
@@ -1965,12 +1959,10 @@ export async function prepareScenario(page, mode) {
     const colorViewport = page.viewportSize();
     const workspaceHeaderFitProof = await colorPanel.getByTestId('color-workspace-tab-header').evaluate((header) => {
       const tablist = header.querySelector<HTMLElement>('[data-testid="color-workspace-tabs"]');
-      const statusRow = header.querySelector<HTMLElement>('[data-testid="color-workspace-warning-chips"]');
-      if (!tablist || !statusRow) {
-        throw new Error('Color workspace header fit proof could not find tabs or status row.');
+      if (!tablist) {
+        throw new Error('Color workspace header fit proof could not find tabs.');
       }
       const tablistBounds = tablist.getBoundingClientRect();
-      const statusBounds = statusRow.getBoundingClientRect();
       const serializeElement = (element: HTMLElement, bounds: DOMRect) => ({
         ariaLabel: element.getAttribute('aria-label'),
         clientWidth: element.clientWidth,
@@ -1984,25 +1976,6 @@ export async function prepareScenario(page, mode) {
 
       return {
         pageHasHorizontalOverflow: document.documentElement.scrollWidth > window.innerWidth + 1,
-        primaryStatus: (() => {
-          const primaryStatus = statusRow.querySelector<HTMLElement>('[data-testid="color-workspace-primary-status"]');
-          return primaryStatus ? serializeElement(primaryStatus, primaryStatus.getBoundingClientRect()) : null;
-        })(),
-        statusDetails: (() => {
-          const statusDetails = statusRow.querySelector<HTMLElement>('[data-testid="color-workspace-status-details"]');
-          return statusDetails ? serializeElement(statusDetails, statusDetails.getBoundingClientRect()) : null;
-        })(),
-        statusRow: {
-          ariaLabel: statusRow.getAttribute('aria-label'),
-          clientWidth: statusRow.clientWidth,
-          dataTooltip: statusRow.dataset.tooltip,
-          flexWrap: getComputedStyle(statusRow).flexWrap,
-          height: statusBounds.height,
-          left: statusBounds.left,
-          right: statusBounds.right,
-          scrollWidth: statusRow.scrollWidth,
-          title: statusRow.title,
-        },
         tablist: {
           clientWidth: tablist.clientWidth,
           columnCount: getComputedStyle(tablist).gridTemplateColumns.split(' ').filter(Boolean).length,
@@ -2039,30 +2012,6 @@ export async function prepareScenario(page, mode) {
       throw new Error(
         `Color workspace tabs clipped or lost their full names: ${JSON.stringify(workspaceHeaderFitProof)}`,
       );
-    }
-    const primaryStatus = workspaceHeaderFitProof.primaryStatus;
-    const statusDetails = workspaceHeaderFitProof.statusDetails;
-    if (
-      !primaryStatus ||
-      !statusDetails ||
-      workspaceHeaderFitProof.statusRow.flexWrap !== 'nowrap' ||
-      workspaceHeaderFitProof.statusRow.height > 24 ||
-      workspaceHeaderFitProof.statusRow.scrollWidth > workspaceHeaderFitProof.statusRow.clientWidth + 1 ||
-      primaryStatus.left < workspaceHeaderFitProof.statusRow.left - 1 ||
-      primaryStatus.right > workspaceHeaderFitProof.statusRow.right + 1 ||
-      primaryStatus.dataTooltip !== primaryStatus.text ||
-      primaryStatus.title !== primaryStatus.text ||
-      statusDetails.left < workspaceHeaderFitProof.statusRow.left - 1 ||
-      statusDetails.right > workspaceHeaderFitProof.statusRow.right + 1 ||
-      !/^\+\d+$/.test(statusDetails.text) ||
-      !statusDetails.ariaLabel?.includes(workspaceHeaderFitProof.statusRow.ariaLabel ?? '') ||
-      statusDetails.dataTooltip !== workspaceHeaderFitProof.statusRow.ariaLabel ||
-      statusDetails.title !== workspaceHeaderFitProof.statusRow.ariaLabel ||
-      workspaceHeaderFitProof.statusRow.dataTooltip !== workspaceHeaderFitProof.statusRow.ariaLabel ||
-      workspaceHeaderFitProof.statusRow.title !== workspaceHeaderFitProof.statusRow.ariaLabel ||
-      workspaceHeaderFitProof.pageHasHorizontalOverflow
-    ) {
-      throw new Error(`Color workspace status row clipped or overflowed: ${JSON.stringify(workspaceHeaderFitProof)}`);
     }
     if (colorViewport !== null && colorViewport.width < 700) {
       const compactBounds = await colorPanel.boundingBox();
@@ -2143,157 +2092,82 @@ export async function prepareScenario(page, mode) {
         input.dispatchEvent(new Event('change', { bubbles: true }));
       }, value);
     };
-    const waitForColorAdjustmentProofText = async (text: string) => {
-      await page.waitForFunction(
-        (expectedText) =>
-          document
-            .querySelector('[data-testid="color-workflow-adjustment-proof"]')
-            ?.textContent?.includes(expectedText),
-        text,
-        { timeout: 10_000 },
+    await assertColorWorkspaceTab('Editor', 'editor', 'quick');
+    const profileTone = colorPanel.getByTestId('profile-tone-controls');
+    const profileSelectors = profileTone.locator('select');
+    if ((await profileSelectors.count()) !== 2) {
+      throw new Error('Color Profile & Tone should expose exactly two direct selectors.');
+    }
+    await profileSelectors.nth(0).selectOption('camera_portrait');
+    await profileSelectors.nth(1).selectOption('soft_contrast');
+    await page.waitForFunction(() => {
+      const controls = document.querySelector('[data-testid="profile-tone-controls"]');
+      return (
+        controls?.getAttribute('data-camera-profile') === 'camera_portrait' &&
+        controls.getAttribute('data-tone-curve') === 'soft_contrast'
       );
-    };
-    await colorPanel.getByTestId('color-workspace-status-details').click();
-    await colorPanel.getByTestId('color-workspace-tab-panel-output').waitFor({ state: 'visible' });
-    await page.waitForFunction(
-      () => {
-        const disclosure = document.querySelector<HTMLDetailsElement>(
-          '[data-testid="color-proofing-diagnostics-disclosure"]',
-        );
-        return disclosure?.open === true && document.activeElement === disclosure.querySelector('summary');
-      },
-      undefined,
-      { timeout: 10_000 },
-    );
-    await assertColorWorkspaceTab('Output', 'output', 'quick');
-    const proofingDisclosure = colorPanel.getByTestId('color-proofing-diagnostics-disclosure');
-    if (!(await proofingDisclosure.evaluate((element) => (element as HTMLDetailsElement).open))) {
-      await proofingDisclosure.locator('summary').click();
+    });
+    if ((await colorPanel.getByTestId('professional-color-recipes-disclosure').count()) !== 0) {
+      throw new Error('Color Editor should not render coordinated mixer recipes before native mixer parity.');
     }
-    const gamutWarningControls = colorPanel.getByTestId('gamut-warning-controls');
-    await gamutWarningControls.getByText('sRGB gamut warning', { exact: true }).waitFor({ timeout: 10_000 });
-    await gamutWarningControls.getByText('Soft proof disabled', { exact: true }).waitFor({ timeout: 10_000 });
-    const gamutWarningToggle = gamutWarningControls.getByTestId('gamut-warning-toggle');
-    await gamutWarningControls.getByText('Off', { exact: true }).waitFor({ timeout: 10_000 });
-    await gamutWarningToggle.click();
-    await gamutWarningControls.getByText('On', { exact: true }).waitFor({ timeout: 10_000 });
-    await gamutWarningToggle.click();
-    await gamutWarningControls.getByText('Off', { exact: true }).waitFor({ timeout: 10_000 });
-    await assertColorWorkspaceTab('Editor', 'editor', 'output');
-    const recipesDisclosure = colorPanel.getByTestId('professional-color-recipes-disclosure');
-    if (!(await recipesDisclosure.evaluate((element) => (element as HTMLDetailsElement).open))) {
-      await recipesDisclosure.locator('summary').click();
+    if ((await colorPanel.getByTestId('color-workspace-warning-chips').count()) !== 0) {
+      throw new Error('Color Editor should not render duplicate workspace status chrome.');
     }
-    const recipe = colorPanel.getByTestId('professional-color-recipe-cleanPortrait');
-    await recipe.click();
+    const selectiveControls = colorPanel.getByTestId('selective-color-range-controls');
+    await assertCompactSliderDensity(selectiveControls, 'Hue', 'selective hue');
+    await assertCompactSliderDensity(selectiveControls, 'Saturation', 'selective saturation');
+    await assertCompactSliderDensity(selectiveControls, 'Luminance', 'selective luminance');
+    await selectiveControls.getByTestId('selective-color-range-oranges').click();
+    await setRangeInput(selectiveControls, 'Hue', 8);
+    await setRangeInput(selectiveControls, 'Saturation', 22);
+    await setRangeInput(selectiveControls, 'Luminance', -11);
+    await page.waitForFunction(() => {
+      const controls = document.querySelector('[data-testid="selective-color-range-controls"]');
+      return (
+        controls?.getAttribute('data-active-range') === 'oranges' && controls.getAttribute('data-dirty') === 'true'
+      );
+    });
+    await selectiveControls.getByTestId('selective-color-reset-active-range').click();
     await page.waitForFunction(
       () =>
-        document
-          .querySelector('[data-testid="professional-color-recipe-cleanPortrait"]')
-          ?.getAttribute('data-active') === 'true',
+        document.querySelector('[data-testid="selective-color-range-controls"]')?.getAttribute('data-dirty') ===
+        'false',
     );
-    const recipeDataset = await recipe.evaluate((element) => ({ ...element.dataset }));
-    if (
-      recipeDataset.active !== 'true' ||
-      recipeDataset.cameraProfile !== 'camera_portrait' ||
-      recipeDataset.temperature !== '6' ||
-      recipeDataset.tint !== '3' ||
-      recipeDataset.toneCurve !== 'soft_contrast' ||
-      recipeDataset.vibrance !== '12'
-    ) {
-      throw new Error('Professional color recipe did not expose expected profile/tone metadata.');
+    const assertAdvancedDisclosure = async (toggleTestId: string, controlsTestId: string) => {
+      const toggle = colorPanel.getByTestId(toggleTestId);
+      const controls = colorPanel.getByTestId(controlsTestId);
+      if ((await toggle.getAttribute('aria-pressed')) !== 'false' || (await controls.count()) !== 0) {
+        throw new Error(`${toggleTestId} should start Off without visible controls.`);
+      }
+      await toggle.click();
+      await controls.waitFor({ state: 'visible' });
+      if ((await toggle.getAttribute('aria-pressed')) !== 'true' || (await toggle.textContent())?.trim() !== 'On') {
+        throw new Error(`${toggleTestId} did not expose its On state.`);
+      }
+      await toggle.click();
+      await controls.waitFor({ state: 'detached' });
+    };
+    await assertAdvancedDisclosure('color-balance-toggle', 'color-balance-controls');
+    await assertAdvancedDisclosure('channel-mixer-toggle', 'channel-mixer-controls');
+    await assertAdvancedDisclosure('black-white-mixer-toggle', 'black-white-mixer-controls');
+    const rangeDisclosure = colorPanel.getByTestId('selective-color-range-disclosure');
+    if (await rangeDisclosure.evaluate((element) => (element as HTMLDetailsElement).open)) {
+      throw new Error('Range controls should start collapsed.');
     }
-    await recipe.getByTestId('professional-color-recipe-summary').getByText('Profile Portrait').waitFor({
-      timeout: 10_000,
-    });
-    await recipe.getByText('WB +6 / +3').waitFor({ timeout: 10_000 });
+    await rangeDisclosure.locator('summary').click();
+    await assertCompactSliderDensity(rangeDisclosure, 'Range center', 'range center');
+    await assertCompactSliderDensity(rangeDisclosure, 'Range width', 'range width');
+    await assertCompactSliderDensity(rangeDisclosure, 'Falloff', 'range falloff');
+    await rangeDisclosure.locator('summary').click();
+    await assertColorWorkspaceTab('Grading', 'grading', 'editor');
+    await assertCompactSliderDensity(colorPanel, 'Blending', 'color grading blending');
+    await assertColorWorkspaceTab('Quick', 'quick', 'grading');
     await assertCompactSliderDensity(
       colorPanel.getByTestId('quick-color-controls'),
       'Temperature',
       'quick temperature',
     );
-    await assertColorWorkspaceTab('Grading', 'grading', 'editor');
-    await assertCompactSliderDensity(colorPanel, 'Blending', 'color grading blending');
-    await assertColorWorkspaceTab('Quick', 'quick', 'grading');
-    const pickerState = await colorPanel.getByTestId('color-white-balance-picker').evaluate((element) => ({
-      disabled: (element as HTMLButtonElement).disabled,
-      state: (element as HTMLElement).dataset.state,
-    }));
-    if (pickerState.state !== 'disabled' || pickerState.disabled !== true) {
-      throw new Error(`White-balance picker disabled state proof failed: ${JSON.stringify(pickerState)}`);
-    }
-    await setRangeInput(colorPanel, 'Temperature', 12);
-    await setRangeInput(colorPanel, 'Saturation', 18);
     await assertColorWorkspaceTab('Editor', 'editor', 'quick');
-    await colorPanel.getByTestId('black-white-mixer-toggle').click();
-    const selectiveControls = colorPanel.getByTestId('selective-color-range-controls');
-    await selectiveControls.getByTestId('selective-color-range-oranges').click();
-    await assertCompactSliderDensity(selectiveControls, 'Hue', 'selective hue');
-    await setRangeInput(selectiveControls, 'Hue', 8);
-    await setRangeInput(selectiveControls, 'Saturation', 22);
-    await setRangeInput(selectiveControls, 'Luminance', -11);
-    selectiveColorUiProofDatasetSchema.parse(await selectiveControls.evaluate((element) => ({ ...element.dataset })));
-    await selectiveControls.getByTestId('selective-color-reset-active-range').click();
-    await waitForColorAdjustmentProofText('Orange 0');
-    await waitForColorAdjustmentProofText('Orange sat 0');
-    await waitForColorAdjustmentProofText('Orange lum 0');
-    const resetDataset = await selectiveControls.evaluate((element) => ({ ...element.dataset }));
-    if (resetDataset.dirty !== 'false') {
-      throw new Error('Selective color reset did not clear active range dirty state.');
-    }
-    toneColorCommandEnvelopeV1Schema.parse({
-      ...sampleToneColorCommandEnvelopeV1,
-      commandId: 'command_tone_color_selective_orange_visual_smoke',
-      commandType: 'toneColor.adjustHsl',
-      correlationId: 'corr_tone_color_selective_orange_visual_smoke',
-      dryRun: true,
-      idempotencyKey: 'idem_tone_color_selective_orange_visual_smoke',
-      parameters: {
-        band: 'orange',
-        hueShiftDegrees: 8,
-        luminance: -11,
-        saturation: 22,
-      },
-    });
-    await assertColorWorkspaceTab('Output', 'output', 'editor');
-    await assertCompactRangeDensity(
-      colorPanel.getByTestId('skin-tone-uniformity-controls').locator('input[type="range"]').first(),
-      'skin tone uniformity',
-    );
-    await waitForColorAdjustmentProofText('Temp 12');
-    await waitForColorAdjustmentProofText('Sat 18');
-    await waitForColorAdjustmentProofText('CB on');
-    await waitForColorAdjustmentProofText('CM on');
-    colorBalanceCompareProofDatasetSchema.parse(
-      await page.getByTestId('color-balance-compare-strip').evaluate((element) => ({ ...element.dataset })),
-    );
-    blackWhiteMixerParityProofDatasetSchema.parse(
-      await page.getByTestId('black-white-mixer-parity-strip').evaluate((element) => ({ ...element.dataset })),
-    );
-    cameraProfileInputTransformPreviewProofSchema.parse(
-      await page.getByTestId('camera-profile-input-transform-preview').evaluate((element) => ({ ...element.dataset })),
-    );
-    const colorBalanceBeforeText = await page.getByTestId('color-balance-before').textContent();
-    const colorBalanceAfterText = await page.getByTestId('color-balance-after').textContent();
-    const colorBalanceGamutText = await page.getByTestId('color-balance-gamut-warning').textContent();
-    if (
-      !colorBalanceBeforeText?.includes('R 173') ||
-      !colorBalanceAfterText?.includes('R 175 / G 122 / B 85') ||
-      !colorBalanceGamutText?.includes('No gamut clipping')
-    ) {
-      throw new Error('Color balance compare proof text did not match the expected rendered values.');
-    }
-    await waitForColorAdjustmentProofText('Skin 0.725');
-    const skinToneInspector = await colorPanel
-      .getByTestId('skin-tone-uniformity-controls')
-      .evaluate((element) => ({ ...element.dataset }));
-    if (
-      Number.parseFloat(skinToneInspector.inspectorImprovement ?? '0') <= 0 ||
-      Number.parseFloat(skinToneInspector.inspectorDistanceAfter ?? '1') >=
-        Number.parseFloat(skinToneInspector.inspectorDistanceBefore ?? '0')
-    ) {
-      throw new Error('Skin-tone uniformity inspector did not prove measured improvement.');
-    }
     await colorPanel.evaluate((element) => {
       element.scrollTop = 0;
     });

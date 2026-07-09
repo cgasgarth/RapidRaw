@@ -49,9 +49,9 @@ if (Math.abs(shiftedPreview.red - shiftedYellowWeight) > 0.0001) {
 const colorPanelSource = readFileSync('src/components/adjustments/color/ColorMixerControls.tsx', 'utf8');
 for (const marker of [
   'data-testid="selective-color-range-shape-controls"',
-  "handleSelectiveColorRangeControlChange('centerHueDegrees'",
-  "handleSelectiveColorRangeControlChange('widthDegrees'",
-  "handleSelectiveColorRangeControlChange('falloffSmoothness'",
+  "handleRangeControlChange('centerHueDegrees'",
+  "handleRangeControlChange('widthDegrees'",
+  "handleRangeControlChange('falloffSmoothness'",
 ]) {
   if (!colorPanelSource.includes(marker)) throw new Error(`Missing selective color range control marker: ${marker}`);
 }

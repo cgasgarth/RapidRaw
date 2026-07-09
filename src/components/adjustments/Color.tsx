@@ -1,6 +1,5 @@
 import cx from 'clsx';
-import { TriangleAlert } from 'lucide-react';
-import { type KeyboardEvent, type ReactNode, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { type KeyboardEvent, type ReactNode, useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { debouncedSave } from '../../hooks/editor/useEditorActions';
 import type { BlackWhiteMixerChannel } from '../../schemas/color/blackWhiteMixerSchemas';
@@ -120,7 +119,6 @@ export default function ColorPanel({
   const { t } = useTranslation();
   const tablistId = useId();
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<ColorWorkspaceTabId>(readSessionColorWorkspaceTab);
-  const panelRef = useRef<HTMLDivElement>(null);
   const [activeColor, setActiveColor] = useState<BlackWhiteMixerChannel>('reds');
   const [activeColorBalanceRange, setActiveColorBalanceRange] = useState<ColorBalanceRgbRange>('midtones');
   const [activeChannelMixerOutput, setActiveChannelMixerOutput] = useState<ChannelMixerOutput>('red');
@@ -173,10 +171,6 @@ export default function ColorPanel({
     ...levelsClippingWarnings,
     adjustments.skinToneUniformity.enabled ? t('adjustments.color.skinToneUniformity.warning') : null,
   ].filter((warning): warning is string => warning !== null);
-  const colorWorkspacePrimaryStatus = colorWorkspaceWarningChips[0] ?? null;
-  const colorWorkspaceAdditionalStatusCount = Math.max(0, colorWorkspaceWarningChips.length - 1);
-  const colorWorkspaceStatusSummary = colorWorkspaceWarningChips.join(' · ');
-
   const createLocalAdjustmentFromActiveColorRange = () => {
     if (isForMask || selectedImage === null) return;
 
@@ -284,16 +278,13 @@ export default function ColorPanel({
         id: 'editor',
         label: t('adjustments.color.workspaceTabs.editor'),
         panel: (
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             {!isForMask && (
               <ColorProfileToneControls
                 adjustmentVisibility={adjustmentVisibility}
                 adjustments={adjustments}
                 appSettings={appSettings}
                 onDragStateChange={onDragStateChange}
-                setActiveChannelMixerOutput={setActiveChannelMixerOutput}
-                setActiveColor={setActiveColor}
-                setActiveColorBalanceRange={setActiveColorBalanceRange}
                 setAdjustments={setAdjustments}
               />
             )}
@@ -388,8 +379,6 @@ export default function ColorPanel({
     t,
     toggleWbPicker,
   ]);
-  const canRevealColorDiagnostics = workspaceTabs.some((tab) => tab.id === 'output');
-
   useEffect(() => {
     if (!workspaceTabs.some((tab) => tab.id === activeWorkspaceTab)) {
       const nextTabId = workspaceTabs[0]?.id ?? 'quick';
@@ -447,29 +436,12 @@ export default function ColorPanel({
     }
   };
 
-  const revealColorDiagnostics = () => {
-    if (!canRevealColorDiagnostics) return;
-    selectWorkspaceTab('output');
-    window.requestAnimationFrame(() => {
-      const disclosure = panelRef.current?.querySelector<HTMLDetailsElement>(
-        '[data-testid="color-proofing-diagnostics-disclosure"]',
-      );
-      disclosure?.setAttribute('open', '');
-      disclosure?.querySelector<HTMLElement>('summary')?.focus();
-      disclosure?.scrollIntoView({ block: 'nearest' });
-    });
-  };
-
   return (
-    <div className="space-y-1.5" ref={panelRef}>
+    <div className="space-y-1.5">
       <div
         className="sticky top-0 z-20 -mx-3 border-b border-editor-border bg-editor-panel px-2 py-1.5"
-        data-gamut-warning-count={currentGamutWarningOverlay?.warning_pixel_count ?? 0}
-        data-preview-warning-state={renderedPreviewWarningStatus.state}
-        data-scope-freshness-state={previewScopeFreshnessStatus.state}
         data-sticky="true"
         data-testid="color-workspace-tab-header"
-        data-warning-count={colorWorkspaceWarningChips.length}
       >
         <div className={professionalInspectorDensityTokens.workspaceNavigation.scroller}>
           <div
@@ -510,51 +482,6 @@ export default function ColorPanel({
             })}
           </div>
         </div>
-        {colorWorkspacePrimaryStatus ? (
-          <div
-            aria-live="polite"
-            aria-label={colorWorkspaceStatusSummary}
-            className={professionalInspectorDensityTokens.workspaceNavigation.statusRow}
-            data-tooltip={colorWorkspaceStatusSummary}
-            data-testid="color-workspace-warning-chips"
-            role="group"
-            title={colorWorkspaceStatusSummary}
-          >
-            <TriangleAlert aria-hidden="true" className="shrink-0 text-editor-warning" size={12} />
-            <span
-              className={professionalInspectorDensityTokens.workspaceNavigation.statusLabel}
-              data-testid="color-workspace-primary-status"
-              data-tooltip={colorWorkspacePrimaryStatus}
-              title={colorWorkspacePrimaryStatus}
-            >
-              {colorWorkspacePrimaryStatus}
-            </span>
-            {colorWorkspaceAdditionalStatusCount > 0 ? (
-              canRevealColorDiagnostics ? (
-                <button
-                  aria-label={colorWorkspaceStatusSummary}
-                  className={professionalInspectorDensityTokens.workspaceNavigation.statusCount}
-                  data-testid="color-workspace-status-details"
-                  data-tooltip={colorWorkspaceStatusSummary}
-                  onClick={revealColorDiagnostics}
-                  title={colorWorkspaceStatusSummary}
-                  type="button"
-                >
-                  +{colorWorkspaceAdditionalStatusCount}
-                </button>
-              ) : (
-                <span
-                  aria-label={colorWorkspaceStatusSummary}
-                  className={professionalInspectorDensityTokens.workspaceNavigation.statusCount}
-                  data-tooltip={colorWorkspaceStatusSummary}
-                  title={colorWorkspaceStatusSummary}
-                >
-                  +{colorWorkspaceAdditionalStatusCount}
-                </span>
-              )
-            ) : null}
-          </div>
-        ) : null}
       </div>
 
       {workspaceTabs.map((tab) => (
