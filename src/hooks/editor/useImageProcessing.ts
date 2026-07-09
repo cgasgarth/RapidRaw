@@ -18,8 +18,12 @@ import {
   logAppOperationFailure,
   logAppOperationSuccess,
 } from '../../utils/appEventLogger';
+import { resolveEditorPreviewSource } from '../../utils/editorImagePreviewSource';
 import { globalImageCache } from '../../utils/ImageLRUCache';
-import { parseInteractivePreviewPatchPayload } from '../../utils/interactivePreviewPatch';
+import {
+  buildInteractivePreviewGeometryIdentity,
+  parseInteractivePreviewPatchPayload,
+} from '../../utils/interactivePreviewPatch';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import { debounce } from '../../utils/timing';
 import { debouncedSave } from './useEditorActions';
@@ -122,10 +126,22 @@ export function useImageProcessing(
     selectedImagePathRef.current = selectedImage?.path ?? null;
   }, [selectedImage?.path]);
 
-  const geometricAdjustmentsKey = useMemo(() => {
-    const { crop, rotation, flipHorizontal, flipVertical, orientationSteps } = adjustments;
-    return JSON.stringify({ crop, rotation, flipHorizontal, flipVertical, orientationSteps });
-  }, [adjustments]);
+  const geometricAdjustmentsKey = useMemo(() => buildInteractivePreviewGeometryIdentity(adjustments), [adjustments]);
+
+  const clearInteractivePatch = useCallback(
+    (revokeDelay = 100) => {
+      setEditor((state) => {
+        const previousPatchUrl = state.interactivePatch?.url;
+        if (previousPatchUrl) {
+          setTimeout(() => {
+            URL.revokeObjectURL(previousPatchUrl);
+          }, revokeDelay);
+        }
+        return { interactivePatch: null };
+      });
+    },
+    [setEditor],
+  );
 
   const calculateROI = useCallback(() => {
     if (!transformWrapperRef.current) return null;
@@ -279,10 +295,7 @@ export function useImageProcessing(
           const textDecoder = new TextDecoder();
           const prefix = textDecoder.decode(buffer.slice(0, 11));
           if (prefix === 'WGPU_RENDER') {
-            setEditor((state) => {
-              if (state.interactivePatch?.url) URL.revokeObjectURL(state.interactivePatch.url);
-              return { interactivePatch: null };
-            });
+            clearInteractivePatch();
             if (operation) {
               logAppOperationSuccess(operation, {
                 backend: 'wgpu',
@@ -296,15 +309,7 @@ export function useImageProcessing(
           if (dragging) {
             const patch = parseInteractivePreviewPatchPayload(buffer);
             if (!patch.ok) {
-              setEditor((state) => {
-                const previousPatchUrl = state.interactivePatch?.url;
-                if (previousPatchUrl) {
-                  setTimeout(() => {
-                    URL.revokeObjectURL(previousPatchUrl);
-                  }, 100);
-                }
-                return { interactivePatch: null };
-              });
+              clearInteractivePatch();
               if (operation) {
                 logAppOperationSuccess(operation, {
                   byteLength: buffer.byteLength,
@@ -320,17 +325,31 @@ export function useImageProcessing(
 
             setEditor((state) => {
               const previousPatchUrl = state.interactivePatch?.url;
+              const patchSelectedImage = state.selectedImage;
               if (previousPatchUrl)
                 setTimeout(() => {
                   URL.revokeObjectURL(previousPatchUrl);
                 }, 100);
               return {
                 interactivePatch: {
+                  basePreviewUrl: patchSelectedImage
+                    ? resolveEditorPreviewSource({
+                        finalPreviewUrl: state.finalPreviewUrl,
+                        isReady: patchSelectedImage.isReady,
+                        thumbnailUrl: patchSelectedImage.thumbnailUrl,
+                      })
+                    : null,
+                  fullHeight: patch.fullHeight,
+                  fullWidth: patch.fullWidth,
+                  geometryIdentity: geometricAdjustmentsKey,
                   url,
                   normX: patch.normX,
                   normY: patch.normY,
                   normW: patch.normW,
                   normH: patch.normH,
+                  pixelHeight: patch.pixelHeight,
+                  pixelWidth: patch.pixelWidth,
+                  sourceImagePath: currentPath,
                 },
               };
             });
@@ -362,15 +381,7 @@ export function useImageProcessing(
               return { exportSoftProofTransform: transform, finalPreviewUrl: url };
             });
 
-            setEditor((state) => {
-              const previousPatchUrl = state.interactivePatch?.url;
-              if (previousPatchUrl) {
-                setTimeout(() => {
-                  URL.revokeObjectURL(previousPatchUrl);
-                }, 500);
-              }
-              return { interactivePatch: null };
-            });
+            clearInteractivePatch(500);
             if (operation) {
               logAppOperationSuccess(operation, {
                 byteLength: buffer.byteLength,
@@ -398,11 +409,8 @@ export function useImageProcessing(
             jobId,
           });
         }
-        if (!dragging) {
-          setEditor((state) => {
-            if (state.interactivePatch?.url) URL.revokeObjectURL(state.interactivePatch.url);
-            return { interactivePatch: null };
-          });
+        if (jobId >= latestRenderedJobIdRef.current) {
+          clearInteractivePatch();
         }
       }
     },
@@ -411,6 +419,8 @@ export function useImageProcessing(
       calculateROI,
       isWaveformVisible,
       selectedProofRecipe,
+      clearInteractivePatch,
+      geometricAdjustmentsKey,
       setEditor,
       previewJobIdRef,
       latestRenderedJobIdRef,

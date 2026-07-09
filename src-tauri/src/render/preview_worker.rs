@@ -287,6 +287,17 @@ fn encode_preview_response(
     fn_start: std::time::Instant,
 ) -> Result<Vec<u8>, String> {
     let final_rgba_image = Arc::new(to_preview_rgba8(final_processed_image));
+    let interactive_geometry = if is_interactive {
+        Some(validate_interactive_patch_geometry(
+            final_rgba_image.width(),
+            final_rgba_image.height(),
+            pixel_roi,
+            preview_width,
+            preview_height,
+        )?)
+    } else {
+        None
+    };
 
     let raw_bytes: &[u8] = final_rgba_image.as_raw();
     let rgba8_pixels: &[RGBA8] = raw_bytes.as_rgba();
@@ -304,8 +315,8 @@ fn encode_preview_response(
         .map_err(|e| format!("Failed to encode preview: {}", e))?;
 
     if is_interactive {
-        let (roi_w, roi_h) = final_rgba_image.dimensions();
-        let (rx, ry) = pixel_roi.map_or((0, 0), |roi| (roi.x, roi.y));
+        let (rx, ry, roi_w, roi_h) = interactive_geometry
+            .ok_or_else(|| "Interactive patch geometry was not validated".to_string())?;
         let mut response = Vec::with_capacity(24 + jpeg_bytes.len());
         response.extend_from_slice(&rx.to_le_bytes());
         response.extend_from_slice(&ry.to_le_bytes());
@@ -335,6 +346,47 @@ fn encode_preview_response(
         );
         Ok(jpeg_bytes)
     }
+}
+
+fn validate_interactive_patch_geometry(
+    encoded_width: u32,
+    encoded_height: u32,
+    pixel_roi: Option<crate::gpu_processing::Roi>,
+    preview_width: u32,
+    preview_height: u32,
+) -> Result<(u32, u32, u32, u32), String> {
+    if preview_width == 0 || preview_height == 0 {
+        return Err("Interactive patch full-frame dimensions must be non-zero".to_string());
+    }
+
+    let roi = pixel_roi.unwrap_or(crate::gpu_processing::Roi {
+        x: 0,
+        y: 0,
+        width: preview_width,
+        height: preview_height,
+    });
+    if roi.width == 0 || roi.height == 0 {
+        return Err("Interactive patch ROI dimensions must be non-zero".to_string());
+    }
+    let roi_right = roi
+        .x
+        .checked_add(roi.width)
+        .ok_or_else(|| "Interactive patch ROI horizontal bounds overflowed".to_string())?;
+    let roi_bottom = roi
+        .y
+        .checked_add(roi.height)
+        .ok_or_else(|| "Interactive patch ROI vertical bounds overflowed".to_string())?;
+    if roi_right > preview_width || roi_bottom > preview_height {
+        return Err("Interactive patch ROI exceeds full-frame dimensions".to_string());
+    }
+    if encoded_width != roi.width || encoded_height != roi.height {
+        return Err(format!(
+            "Interactive patch encoded dimensions {}x{} do not match ROI {}x{}",
+            encoded_width, encoded_height, roi.width, roi.height
+        ));
+    }
+
+    Ok((roi.x, roi.y, roi.width, roi.height))
 }
 
 fn to_preview_rgba8(image: DynamicImage) -> RgbaImage {
@@ -396,5 +448,81 @@ mod tests {
 
         assert!(encoded.starts_with(&[0xff, 0xd8]));
         assert!(encoded.len() > 16);
+    }
+
+    #[test]
+    fn interactive_preview_encoder_preserves_roi_geometry_contract() {
+        let image =
+            DynamicImage::ImageRgba8(ImageBuffer::from_pixel(3, 2, Rgba([20, 40, 60, 255])));
+        let encoded = encode_preview_response(
+            image,
+            true,
+            Some(crate::gpu_processing::Roi {
+                x: 2,
+                y: 1,
+                width: 3,
+                height: 2,
+            }),
+            8,
+            6,
+            75,
+            std::time::Instant::now(),
+        )
+        .expect("coherent ROI preview should encode");
+
+        assert_eq!(u32::from_le_bytes(encoded[0..4].try_into().unwrap()), 2);
+        assert_eq!(u32::from_le_bytes(encoded[4..8].try_into().unwrap()), 1);
+        assert_eq!(u32::from_le_bytes(encoded[8..12].try_into().unwrap()), 3);
+        assert_eq!(u32::from_le_bytes(encoded[12..16].try_into().unwrap()), 2);
+        assert_eq!(u32::from_le_bytes(encoded[16..20].try_into().unwrap()), 8);
+        assert_eq!(u32::from_le_bytes(encoded[20..24].try_into().unwrap()), 6);
+        assert!(encoded[24..].starts_with(&[0xff, 0xd8]));
+
+        let full_frame =
+            DynamicImage::ImageRgba8(ImageBuffer::from_pixel(3, 2, Rgba([20, 40, 60, 255])));
+        let full_frame_encoded =
+            encode_preview_response(full_frame, true, None, 3, 2, 75, std::time::Instant::now())
+                .expect("coherent full-frame interactive preview should encode");
+        assert_eq!(
+            u32::from_le_bytes(full_frame_encoded[0..4].try_into().unwrap()),
+            0
+        );
+        assert_eq!(
+            u32::from_le_bytes(full_frame_encoded[4..8].try_into().unwrap()),
+            0
+        );
+        assert_eq!(
+            u32::from_le_bytes(full_frame_encoded[8..12].try_into().unwrap()),
+            3
+        );
+        assert_eq!(
+            u32::from_le_bytes(full_frame_encoded[12..16].try_into().unwrap()),
+            2
+        );
+    }
+
+    #[test]
+    fn interactive_preview_encoder_rejects_full_frame_pixels_labeled_as_roi() {
+        let full_frame =
+            DynamicImage::ImageRgba8(ImageBuffer::from_pixel(8, 6, Rgba([20, 40, 60, 255])));
+        let result = encode_preview_response(
+            full_frame,
+            true,
+            Some(crate::gpu_processing::Roi {
+                x: 2,
+                y: 1,
+                width: 3,
+                height: 2,
+            }),
+            8,
+            6,
+            75,
+            std::time::Instant::now(),
+        );
+
+        assert_eq!(
+            result.unwrap_err(),
+            "Interactive patch encoded dimensions 8x6 do not match ROI 3x2"
+        );
     }
 }
