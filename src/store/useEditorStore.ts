@@ -27,11 +27,18 @@ import { PANEL_SCOPES_HEIGHT } from '../utils/waveformSizing';
 import type { WhiteBalancePickerRuntimeReceipt } from '../utils/whiteBalancePicker';
 
 export interface InteractivePatch {
+  basePreviewUrl: string | null;
+  fullHeight: number;
+  fullWidth: number;
+  geometryIdentity: string;
   url: string;
   normX: number;
   normY: number;
   normW: number;
   normH: number;
+  pixelHeight: number;
+  pixelWidth: number;
+  sourceImagePath: string;
 }
 
 export interface CopiedSectionAdjustments {

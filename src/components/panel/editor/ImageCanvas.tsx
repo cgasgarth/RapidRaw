@@ -22,7 +22,7 @@ import {
 } from 'react-konva';
 import type { RenderSize } from '../../../hooks/viewport/useImageRenderSize';
 import type { GamutWarningOverlayPayload } from '../../../schemas/tauriEventSchemas';
-import type { EditorCompareMode, ExportSoftProofTransformState } from '../../../store/useEditorStore';
+import type { EditorCompareMode, ExportSoftProofTransformState, InteractivePatch } from '../../../store/useEditorStore';
 import type {
   Adjustments,
   AiPatch,
@@ -37,6 +37,10 @@ import {
 } from '../../../utils/color/runtime/gamutWarningDisplay';
 import { resolveEditorPreviewSource } from '../../../utils/editorImagePreviewSource';
 import { resolveEditorOverlayBlocker, resolveEditorOverlayVisibility } from '../../../utils/editorOverlayVisibility';
+import {
+  buildInteractivePreviewGeometryIdentity,
+  isInteractivePreviewPatchCoherent,
+} from '../../../utils/interactivePreviewPatch';
 import {
   BRUSH_MASK_COMMAND_COORDINATE_SPACE,
   type BrushMaskCommandReceipt,
@@ -277,7 +281,7 @@ interface ImageCanvasProps {
   transformedOriginalUrl: string | null;
   uncroppedAdjustedPreviewUrl: string | null;
   updateSubMask: (id: string | null, subMask: Partial<SubMask>) => void;
-  interactivePatch?: { url: string; normX: number; normY: number; normW: number; normH: number } | null;
+  interactivePatch?: InteractivePatch | null;
   isWbPickerActive?: boolean;
   lastWhiteBalancePickerReceipt?: WhiteBalancePickerRuntimeReceipt | null;
   onWbPicked?: (receipt: WhiteBalancePickerRuntimeReceipt, nextAdjustments: Adjustments) => void;
@@ -1284,7 +1288,7 @@ const ImageCanvas = memo(
     const [baseTool, setBaseTool] = useState<ToolType>(brushSettings?.tool ?? ToolType.Brush);
     const [isAltPressed, setIsAltPressed] = useState(false);
     const [lastBrushCommandCapture, setLastBrushCommandCapture] = useState<BrushMaskCommandCaptureSummary | null>(null);
-    const retainedPatchRef = useRef<typeof interactivePatch>(null);
+    const retainedPatchRef = useRef<{ geometryKey: string; patch: InteractivePatch } | null>(null);
 
     const wgpuPreviewVisibility = resolveWgpuPreviewVisibility({
       hasRenderedFirstFrame,
@@ -1329,16 +1333,6 @@ const ImageCanvas = memo(
       },
       [groupOffsetX, groupOffsetY, maxSafeScale],
     );
-
-    useEffect(() => {
-      if (interactivePatch) {
-        retainedPatchRef.current = interactivePatch;
-      }
-    }, [interactivePatch]);
-
-    useEffect(() => {
-      retainedPatchRef.current = null;
-    }, [selectedImage.path]);
 
     useEffect(() => {
       const newSrc = previewSource;
@@ -2757,8 +2751,39 @@ const ImageCanvas = memo(
 
     const currentTarget = previewSource;
     const baseIsReady = displayState.base === currentTarget && !displayState.fade;
+    const patchGeometryIdentity = buildInteractivePreviewGeometryIdentity(adjustments);
+    const patchGeometryKey = [
+      selectedImage.path,
+      previewSource,
+      patchGeometryIdentity,
+      imageRenderSize.width,
+      imageRenderSize.height,
+      imageRenderSize.offsetX,
+      imageRenderSize.offsetY,
+    ].join(':');
+    const patchContext = {
+      basePreviewUrl: previewSource,
+      geometryIdentity: patchGeometryIdentity,
+      sourceImagePath: selectedImage.path,
+    };
+    const coherentInteractivePatch =
+      interactivePatch && isInteractivePreviewPatchCoherent(interactivePatch, patchContext) ? interactivePatch : null;
+    const retainedPatch = retainedPatchRef.current;
+    const coherentRetainedPatch =
+      retainedPatch &&
+      retainedPatch.geometryKey === patchGeometryKey &&
+      isInteractivePreviewPatchCoherent(retainedPatch.patch, patchContext)
+        ? retainedPatch.patch
+        : null;
+    const visiblePatch = coherentInteractivePatch ?? (baseIsReady ? null : coherentRetainedPatch);
 
-    const visiblePatch = interactivePatch ?? (baseIsReady ? null : retainedPatchRef.current);
+    useEffect(() => {
+      if (coherentInteractivePatch) {
+        retainedPatchRef.current = { geometryKey: patchGeometryKey, patch: coherentInteractivePatch };
+      } else if (!interactivePatch || retainedPatchRef.current?.geometryKey !== patchGeometryKey) {
+        retainedPatchRef.current = null;
+      }
+    }, [coherentInteractivePatch, interactivePatch, patchGeometryKey]);
 
     useEffect(() => {
       if (baseIsReady && !interactivePatch) {
