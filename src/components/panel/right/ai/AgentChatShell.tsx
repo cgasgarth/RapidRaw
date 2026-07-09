@@ -37,6 +37,7 @@ type LivePromptStatus =
   | 'dry_run_ready'
   | 'failed'
   | 'idle'
+  | 'previewing'
   | 'rolled_back';
 
 interface LivePromptResult {
@@ -165,6 +166,7 @@ function LivePromptComposer({ initialPromptPreviewContext, isContextReady, onSes
   const { t } = useTranslation();
   const promptInputRef = useRef<HTMLTextAreaElement | null>(null);
   const activeOperationRef = useRef<{ cancelled: boolean; id: string } | null>(null);
+  const previewRequestRef = useRef(0);
   const [prompt, setPrompt] = useState('');
   const [result, setResult] = useState<LivePromptResult>({ status: 'idle' });
   const [toneAdjustmentDraft, setToneAdjustmentDraft] = useState<AgentToneAdjustmentPromptDraft | null>(null);
@@ -182,7 +184,8 @@ function LivePromptComposer({ initialPromptPreviewContext, isContextReady, onSes
     void rollbackValidationKey;
     return rollbackSnapshot === null ? null : validateAgentRollbackSnapshot(rollbackSnapshot);
   }, [rollbackSnapshot, rollbackValidationKey]);
-  const canRun = isContextReady && result.status !== 'applying' && result.status !== 'cancelling';
+  const canRun =
+    isContextReady && result.status !== 'applying' && result.status !== 'cancelling' && result.status !== 'previewing';
   const canApply = isContextReady && toneAdjustmentDraft?.supported === true && result.status === 'dry_run_ready';
   const canCancel = result.status === 'applying' && activeOperationRef.current !== null;
   const canRollback =
@@ -193,6 +196,12 @@ function LivePromptComposer({ initialPromptPreviewContext, isContextReady, onSes
       if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
     };
   }, [result.previewAfterUrl]);
+  useEffect(
+    () => () => {
+      previewRequestRef.current += 1;
+    },
+    [],
+  );
   let statusLabel;
 
   switch (result.status) {
@@ -223,17 +232,25 @@ function LivePromptComposer({ initialPromptPreviewContext, isContextReady, onSes
     case 'idle':
       statusLabel = t('editor.ai.agent.composer.status.idle');
       break;
+    case 'previewing':
+      statusLabel = 'Preparing preview';
+      break;
   }
 
   const runDryRun = async () => {
     const requestedPrompt = (promptInputRef.current?.value ?? prompt).trim();
     if (!isContextReady || requestedPrompt.length === 0) return;
+    const previewRequest = ++previewRequestRef.current;
 
     try {
+      const initialState = useEditorStore.getState();
+      const selectedImagePath = initialState.selectedImage?.path;
+      if (selectedImagePath === undefined) throw new Error('Select an image before previewing an AI edit.');
       setToneAdjustmentDraft(null);
+      setResult({ status: 'previewing' });
       onSessionEvent?.(createLiveSessionEvent('user', requestedPrompt, 'prompt'));
       const snapshot = buildAgentImageContextSnapshot();
-      const draft = buildAgentToneAdjustmentPromptDraft(requestedPrompt, useEditorStore.getState().adjustments);
+      const draft = buildAgentToneAdjustmentPromptDraft(requestedPrompt, initialState.adjustments);
       if (!draft.supported) {
         const nextResult = {
           error: draft.reason,
@@ -255,7 +272,21 @@ function LivePromptComposer({ initialPromptPreviewContext, isContextReady, onSes
         requestId,
         sessionId: 'agent-chat-shell',
       });
-      const previewAfterUrl = await renderAgentToneDryRunPreview(draft.requestedAdjustments);
+      const previewAfterUrl = await renderAgentToneDryRunPreview({
+        baseAdjustments: initialState.adjustments,
+        path: selectedImagePath,
+        patch: draft.requestedAdjustments,
+      });
+      const currentSnapshot = buildAgentImageContextSnapshot();
+      const previewIsCurrent =
+        previewRequest === previewRequestRef.current &&
+        currentSnapshot.activeImagePath === selectedImagePath &&
+        currentSnapshot.graphRevision === snapshot.graphRevision &&
+        currentSnapshot.initialPreview.recipeHash === snapshot.initialPreview.recipeHash;
+      if (!previewIsCurrent) {
+        URL.revokeObjectURL(previewAfterUrl);
+        return;
+      }
       setToneAdjustmentDraft(draft);
 
       const nextResult = {
@@ -418,8 +449,10 @@ function LivePromptComposer({ initialPromptPreviewContext, isContextReady, onSes
         runtimeToolName: AGENT_HISTORY_ROLLBACK_TOOL_NAME,
       }),
     );
+    previewRequestRef.current += 1;
+    if (result.previewAfterUrl?.startsWith('blob:')) URL.revokeObjectURL(result.previewAfterUrl);
     setRollbackSnapshot(null);
-    const nextResult = { ...result, status: 'rolled_back' } satisfies LivePromptResult;
+    const nextResult = { status: 'rolled_back' } satisfies LivePromptResult;
     setResult(nextResult);
     onSessionEvent?.(
       createLiveSessionEvent('assistant', t('editor.ai.agent.composer.status.rolled_back'), 'rolled-back'),

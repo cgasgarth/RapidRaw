@@ -1659,6 +1659,7 @@ async fn save_collage(base64_data: String, first_path_str: String) -> Result<Str
 fn generate_preview_for_path(
     path: String,
     js_adjustments: Value,
+    target_resolution: Option<u32>,
     state: tauri::State<AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<Response, String> {
@@ -1745,7 +1746,15 @@ fn generate_preview_for_path(
         },
         "generate_preview_for_path",
     )?;
-    encode_jpeg_response(&final_image, 92)
+    let preview_image = match target_resolution {
+        Some(max_edge) => final_image.resize(
+            max_edge.clamp(256, 4096),
+            max_edge.clamp(256, 4096),
+            image::imageops::FilterType::Lanczos3,
+        ),
+        None => final_image,
+    };
+    encode_jpeg_response(&preview_image, 92)
 }
 
 #[tauri::command]

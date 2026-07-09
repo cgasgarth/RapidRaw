@@ -4,7 +4,6 @@ import {
   toneColorDryRunResultV1Schema,
   toneColorMutationResultV1Schema,
 } from '../../../../packages/rawengine-schema/src/rawEngineSchemas';
-import { prepareAdjustmentPayloadForBackend } from '../../../schemas/adjustmentPayloadSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { Invokes } from '../../../tauri/commands';
 import type { Adjustments } from '../../adjustments';
@@ -307,18 +306,21 @@ const setPatchedToneAdjustments = (
   return adjustments;
 };
 
-export const renderAgentToneDryRunPreview = async (patch: AgentToneAdjustmentPatch): Promise<string> => {
-  const state = useEditorStore.getState();
-  const renderedAdjustments = setPatchedToneAdjustments(state.adjustments, patch);
-  const { payload } = prepareAdjustmentPayloadForBackend(structuredClone(renderedAdjustments), new Set());
+export const renderAgentToneDryRunPreview = async ({
+  baseAdjustments,
+  patch,
+  path,
+}: {
+  baseAdjustments: Adjustments;
+  patch: AgentToneAdjustmentPatch;
+  path: string;
+}): Promise<string> => {
+  const adjustments = setPatchedToneAdjustments(baseAdjustments, patch);
   const buffer = await invokeWithSchema(
-    Invokes.ApplyAdjustments,
+    Invokes.GeneratePreviewForPath,
     {
-      activeWaveformChannel: null,
-      computeWaveform: false,
-      isInteractive: false,
-      jsAdjustments: payload,
-      roi: null,
+      jsAdjustments: structuredClone(adjustments),
+      path,
       targetResolution: 1536,
     },
     previewBufferResponseSchema,
