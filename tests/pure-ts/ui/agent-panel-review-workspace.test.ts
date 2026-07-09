@@ -6,11 +6,16 @@ import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import { AgentPanel, resolveAgentReviewWorkspaceState } from '../../../src/components/panel/right/ai/AgentPanel';
-import { type AppSettings, type SelectedImage, Theme } from '../../../src/components/ui/AppProperties';
+import {
+  EditorRightPanelHost,
+  type EditorRightPanelHostProps,
+} from '../../../src/components/panel/right/EditorRightPanelHost';
+import { type AppSettings, Panel, type SelectedImage, Theme } from '../../../src/components/ui/AppProperties';
 import {
   ExportColorProfile,
   type ExportPreset,
   ExportRenderingIntent,
+  Status,
   WatermarkAnchor,
 } from '../../../src/components/ui/ExportImportProperties';
 import en from '../../../src/i18n/locales/en.json';
@@ -210,6 +215,37 @@ describe('agent panel preview-review workspace', () => {
     expect(required(container, 'agent-before-after-preview-receipt-after').dataset.previewRef).toBe('');
     expect(required(container, 'agent-review-state-approval-required').dataset.state).toBe('active');
     expect((required(container, 'agent-review-control-apply') as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  test('keeps a pending dry-run mounted while another right panel makes the graph stale', async () => {
+    resetEditorStore();
+    useEditorStore.getState().setEditor({
+      finalPreviewUrl: 'data:image/jpeg;base64,BBBB',
+      selectedImage,
+    });
+
+    const { container, renderHost } = await renderAgentPanelHost();
+    await clickAndFlush(container, 'agent-review-control-dry-run');
+    const requestId = required(container, 'agent-before-after-preview-receipt').dataset.receiptRequestId;
+
+    await renderHost(Panel.Export);
+    expect(required(container, 'editor-agent-panel-keep-alive').getAttribute('aria-hidden')).toBe('true');
+    expect(required(container, 'editor-agent-panel-keep-alive').className).toContain('hidden');
+
+    await act(async () => {
+      const outsideAgentEdit = { ...useEditorStore.getState().adjustments, contrast: 7 };
+      useEditorStore.getState().setEditor({ adjustments: outsideAgentEdit });
+      useEditorStore.getState().pushHistory(outsideAgentEdit);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    await renderHost(Panel.Agent);
+    expect(required(container, 'agent-before-after-preview-receipt').dataset.receiptRequestId).toBe(requestId);
+    expect((required(container, 'agent-review-control-apply') as HTMLButtonElement).disabled).toBe(false);
+
+    await clickAndFlush(container, 'agent-review-control-apply');
+    expect(required(container, 'agent-stale-recovery-card').dataset.currentGraphRevision).toBe('history_1');
+    expect(required(container, 'agent-dry-run-apply-review-controls').dataset.liveActionStatus).toBe('blocked');
   });
 
   test('applies and rolls back through the top selected-image live-session controls', async () => {
@@ -415,6 +451,59 @@ async function renderAgentPanel() {
   });
 
   return { container, root };
+}
+
+async function renderAgentPanelHost() {
+  if (!globalThis.window) {
+    const window = new Window();
+    Object.assign(globalThis, {
+      document: window.document,
+      HTMLButtonElement: window.HTMLButtonElement,
+      HTMLDivElement: window.HTMLDivElement,
+      HTMLElement: window.HTMLElement,
+      HTMLTextAreaElement: window.HTMLTextAreaElement,
+      localStorage: window.localStorage,
+      window,
+    });
+  }
+
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  const root = createRoot(container);
+  const i18n = await createTestI18n();
+  renderedRoot = { container, root };
+  const baseProps: Omit<EditorRightPanelHostProps, 'activeRightPanel' | 'renderedRightPanel'> = {
+    appSettings: null,
+    exportState: { errorMessage: '', progress: { current: 0, total: 0 }, status: Status.Idle },
+    handleSettingsChange: () => {},
+    multiSelectedPaths: [selectedImage.path],
+    onLinkedVariantImported: () => {},
+    onNavigateToCommunity: () => {},
+    onOpenTetherCapture: () => {},
+    rootPaths: ['/photos'],
+    selectedImage,
+    setExportState: () => {},
+    slideDirection: 1,
+  };
+  const renderHost = async (panel: Panel) => {
+    await act(async () => {
+      root.render(
+        createElement(
+          I18nextProvider,
+          { i18n },
+          createElement(EditorRightPanelHost, {
+            ...baseProps,
+            activeRightPanel: panel,
+            renderedRightPanel: panel,
+          }),
+        ),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+  };
+
+  await renderHost(Panel.Agent);
+  return { container, renderHost, root };
 }
 
 async function clickAndFlush(container: HTMLElement, testId: string) {
