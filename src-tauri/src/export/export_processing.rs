@@ -1456,8 +1456,16 @@ mod tests {
     use std::{fs, io::Cursor};
 
     use image::{
-        ColorType, DynamicImage, ImageBuffer, ImageDecoder, Rgb, Rgba, codecs::tiff::TiffDecoder,
+        ColorType, DynamicImage, ImageBuffer, ImageDecoder, Rgb, Rgba,
+        codecs::{jpeg::JpegDecoder, tiff::TiffDecoder},
     };
+
+    const SOURCE_EMBEDDED_DISPLAY_P3_FIXTURE: &[u8] =
+        include_bytes!("../../tests/fixtures/export/source-embedded-display-p3.jpg");
+    const SOURCE_EMBEDDED_DISPLAY_P3_FIXTURE_SHA256: &str =
+        "b4f03738f6bdd7be65bd5b8afbd1448b0e57b207776c2fc016bd81d9c49986d6";
+    const SOURCE_EMBEDDED_DISPLAY_P3_ICC_SHA256: &str =
+        "sha256:d2ff5597fd937a24f90548f5e85803545334fcfd480601d19c3bc225d7355733";
 
     fn synthetic_export_edge() -> DynamicImage {
         let mut buffer = ImageBuffer::<Rgb<f32>, Vec<f32>>::new(11, 5);
@@ -2717,6 +2725,130 @@ mod tests {
             error.contains("requires a source ICC profile"),
             "unexpected source-embedded profile error: {error}"
         );
+    }
+
+    #[test]
+    fn source_embedded_fixture_export_roundtrips_icc_and_truthful_receipt() {
+        assert_eq!(
+            hex::encode(Sha256::digest(SOURCE_EMBEDDED_DISPLAY_P3_FIXTURE)),
+            SOURCE_EMBEDDED_DISPLAY_P3_FIXTURE_SHA256
+        );
+        let source_path = std::env::temp_dir().join(format!(
+            "rawengine-source-embedded-fixture-source-{}.jpg",
+            std::process::id()
+        ));
+        let output_path = std::env::temp_dir().join(format!(
+            "rawengine-source-embedded-fixture-output-{}.jpg",
+            std::process::id()
+        ));
+        fs::write(&source_path, SOURCE_EMBEDDED_DISPLAY_P3_FIXTURE)
+            .expect("write tagged JPEG source fixture");
+        let image = image::load_from_memory(SOURCE_EMBEDDED_DISPLAY_P3_FIXTURE)
+            .expect("decode tagged JPEG source fixture");
+        let mut settings = base_export_settings(None);
+        settings.color_profile = ExportColorProfile::SourceEmbedded;
+        settings.rendering_intent = ExportRenderingIntent::RelativeColorimetric;
+        settings.black_point_compensation = false;
+
+        let metadata = save_image_with_metadata(
+            &image,
+            &output_path,
+            &source_path.to_string_lossy(),
+            &settings,
+        )
+        .expect("source-embedded fixture export should save")
+        .expect("source-embedded JPEG should emit color receipt metadata");
+        let output_bytes = fs::read(&output_path).expect("read source-embedded export output");
+        let mut source_decoder = JpegDecoder::new(Cursor::new(SOURCE_EMBEDDED_DISPLAY_P3_FIXTURE))
+            .expect("inspect source fixture JPEG");
+        let source_icc = source_decoder
+            .icc_profile()
+            .expect("read source fixture ICC")
+            .expect("source fixture should contain ICC");
+        let expected_icc = normalize_icc_creation_time(
+            encode_icc_profile(&ColorProfile::new_display_p3())
+                .expect("encode expected moxcms Display P3 ICC"),
+        );
+        let mut output_decoder =
+            JpegDecoder::new(Cursor::new(output_bytes.as_slice())).expect("inspect export JPEG");
+        let output_icc = output_decoder
+            .icc_profile()
+            .expect("read export ICC")
+            .expect("source-embedded export should contain ICC");
+
+        assert_eq!(source_icc, expected_icc);
+        assert_eq!(output_icc, source_icc);
+        assert_eq!(
+            format!("sha256:{}", hex::encode(Sha256::digest(&output_icc))),
+            SOURCE_EMBEDDED_DISPLAY_P3_ICC_SHA256
+        );
+        assert_eq!(
+            metadata.source_icc_profile_hash.as_deref(),
+            Some(SOURCE_EMBEDDED_DISPLAY_P3_ICC_SHA256)
+        );
+        assert_eq!(metadata.color_profile, "Source embedded");
+        assert_eq!(
+            metadata.color_managed_transform,
+            "Source embedded profile passthrough; ICC embedded"
+        );
+        assert_eq!(metadata.rendering_intent, "Relative colorimetric");
+        assert!(metadata.icc_embedded);
+        assert!(!metadata.transform_applied);
+        assert!(metadata.transform_policy_fingerprint.starts_with("sha256:"));
+
+        let receipt = export_receipt_output(
+            &output_path,
+            &source_path.to_string_lossy(),
+            "jpg",
+            Some(metadata),
+            None,
+            None,
+            None,
+        )
+        .expect("build real output receipt");
+        assert_eq!(receipt.color_profile.as_deref(), Some("Source embedded"));
+        assert_eq!(receipt.icc_embedded, Some(true));
+        assert_eq!(
+            receipt.source_icc_profile_hash.as_deref(),
+            Some(SOURCE_EMBEDDED_DISPLAY_P3_ICC_SHA256)
+        );
+        assert_eq!(receipt.transform_applied, Some(false));
+
+        fs::remove_file(output_path).ok();
+        fs::remove_file(source_path).ok();
+    }
+
+    #[test]
+    fn raw_derived_source_embedded_export_is_explicitly_unavailable() {
+        let source_path = std::env::temp_dir().join(format!(
+            "rawengine-source-embedded-unavailable-{}.ARW",
+            std::process::id()
+        ));
+        let output_path = std::env::temp_dir().join(format!(
+            "rawengine-source-embedded-unavailable-{}.jpg",
+            std::process::id()
+        ));
+        fs::write(&source_path, SOURCE_EMBEDDED_DISPLAY_P3_FIXTURE)
+            .expect("write RAW-derived source placeholder");
+        let image = image::load_from_memory(SOURCE_EMBEDDED_DISPLAY_P3_FIXTURE)
+            .expect("decode source pixels for unavailable proof");
+        let mut settings = base_export_settings(None);
+        settings.color_profile = ExportColorProfile::SourceEmbedded;
+
+        let error = save_image_with_metadata(
+            &image,
+            &output_path,
+            &source_path.to_string_lossy(),
+            &settings,
+        )
+        .expect_err("RAW-derived source must not silently fall back to sRGB");
+
+        assert_eq!(
+            error,
+            "Source embedded export profile requires a tagged JPEG or TIFF source."
+        );
+        assert!(!output_path.exists());
+        fs::remove_file(source_path).ok();
     }
 
     #[test]
