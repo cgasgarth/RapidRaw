@@ -76,14 +76,10 @@ import type {
 import {
   type AgentSelectedImageLiveSessionReplayPreflight,
   appendAgentSelectedImageLiveSessionAuditRecord,
-  applyAgentSelectedImageLiveSession,
-  approveAgentSelectedImageLiveSession,
   buildAgentSelectedImageLiveSessionAuditStorageKey,
   buildAgentSelectedImagePreviewLoopAuditRecord,
   preflightAgentSelectedImageLiveSessionAuditReplay,
   readAgentSelectedImageLiveSessionAuditStore,
-  replayAgentSelectedImageLiveSessionAudit,
-  startAgentSelectedImageLiveSessionDryRun,
 } from '../../../../utils/agent/session/agentSelectedImageLiveSession';
 import {
   type AgentSelectedImageExportReceipt,
@@ -345,7 +341,10 @@ const createAgentRollbackSnapshot = () => {
   };
 };
 
-type AgentRollbackSnapshot = ReturnType<typeof createAgentRollbackSnapshot>;
+type AgentRollbackSnapshot = ReturnType<typeof createAgentRollbackSnapshot> & {
+  expectedCurrentGraphRevision?: string;
+  expectedCurrentRecipeHash?: string;
+};
 type AgentRollbackInvalidationReason =
   | 'context_unavailable'
   | 'graph_revision_changed'
@@ -378,10 +377,10 @@ const validateAgentRollbackSnapshot = (snapshot: AgentRollbackSnapshot): AgentRo
     if (current.currentImagePath !== snapshot.activeImagePath) {
       return { ...current, reason: 'image_changed', state: 'invalidated' };
     }
-    if (current.currentGraphRevision !== snapshot.graphRevision) {
+    if (current.currentGraphRevision !== (snapshot.expectedCurrentGraphRevision ?? snapshot.graphRevision)) {
       return { ...current, reason: 'graph_revision_changed', state: 'invalidated' };
     }
-    if (current.currentRecipeHash !== snapshot.recipeHash) {
+    if (current.currentRecipeHash !== (snapshot.expectedCurrentRecipeHash ?? snapshot.recipeHash)) {
       return { ...current, reason: 'recipe_hash_changed', state: 'invalidated' };
     }
     return { ...current, reason: null, state: 'available' };
@@ -397,15 +396,6 @@ const validateAgentRollbackSnapshot = (snapshot: AgentRollbackSnapshot): AgentRo
 };
 
 const formatRouteFamily = (family: string): string => family.replaceAll('_', ' ');
-
-const agentRuntimeBadge = {
-  runtime_apply_ready: {
-    className: 'border-emerald-500/25 bg-emerald-500/10 text-emerald-100',
-  },
-  ui_only_demo: {
-    className: 'border-amber-500/25 bg-amber-500/10 text-amber-100',
-  },
-} satisfies Record<AgentChatTranscript['runtimeStatus'], { className: string }>;
 
 const normalizeRuntimeStatus = (runtimeStatus: AgentChatTranscript['runtimeStatus']) =>
   runtimeStatus === 'ui_only_demo' ? 'ui_only_demo' : 'runtime_apply_ready';
@@ -692,6 +682,8 @@ interface LivePromptComposerProps {
   onSessionEvent?: (event: LiveSessionEvent) => void;
   runtimeStatus: AgentChatTranscript['runtimeStatus'];
 }
+
+const AGENT_QUICK_START_KEYS = ['recoverHighlights', 'liftShadows', 'naturalContrast', 'brightenGently'] as const;
 
 interface LiveSessionEvent {
   body: string;
@@ -1889,7 +1881,7 @@ function LivePromptComposer({
   const [prompt, setPrompt] = useState('');
   const [acceptedPrompt, setAcceptedPrompt] = useState('');
   const [activityEntries, setActivityEntries] = useState<LiveActivityEntry[]>([]);
-  const [auditArtifact, setAuditArtifact] = useState<LiveAuditArtifactState | null>(null);
+  const [auditArtifact] = useState<LiveAuditArtifactState | null>(null);
   const [auditReplay, setAuditReplay] = useState<LiveAuditReplayState | null>(null);
   const [expertArtifactReview, setExpertArtifactReview] = useState<AgentArtifactReview | null>(null);
   const [expertDryRunReview, setExpertDryRunReview] = useState<AgentChatDryRunReview | null>(null);
@@ -2406,6 +2398,15 @@ function LivePromptComposer({
         toolName: AGENT_TONE_ADJUSTMENT_APPLY_TOOL_NAME,
       });
       const afterSnapshot = buildAgentImageContextSnapshot();
+      setRollbackSnapshot((checkpoint) =>
+        checkpoint === null
+          ? null
+          : {
+              ...checkpoint,
+              expectedCurrentGraphRevision: afterSnapshot.graphRevision,
+              expectedCurrentRecipeHash: afterSnapshot.initialPreview.recipeHash,
+            },
+      );
       const previewRequestId = `${requestId}-preview-refresh`;
       const previewRefresh = renderAgentReadOnlyPreview({
         expectedRecipeHash: afterSnapshot.initialPreview.recipeHash,
@@ -2455,7 +2456,7 @@ function LivePromptComposer({
         previewStaleRecipeHash: previewRefresh.staleRecipeHash,
         recipeName: previewRefresh.preview.recipeHash,
         status: 'applied',
-        summary: `${toneAdjustmentDraft.summary} Preview refreshed as ${previewRefresh.preview.artifactId}.`,
+        summary: `${toneAdjustmentDraft.summary} Preview refreshed.`,
         toneAdjustmentDraft,
       } satisfies LivePromptResult;
       setResult(nextResult);
@@ -2854,7 +2855,7 @@ function LivePromptComposer({
 
   return (
     <form
-      className="pointer-events-auto relative z-10 space-y-3 rounded-md border border-sky-500/20 bg-sky-500/5 p-3"
+      className="pointer-events-auto relative z-10 space-y-3 rounded border border-editor-border bg-editor-panel-well p-2.5"
       data-color-tool-name={AGENT_COLOR_APPLY_TOOL_NAME}
       data-detail-tool-name={AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME}
       data-layer-create-tool-name={AGENT_LAYER_CREATE_TOOL_NAME}
@@ -2891,9 +2892,6 @@ function LivePromptComposer({
           onChange={(event) => {
             setPrompt(event.target.value);
           }}
-          onInput={(event) => {
-            setPrompt(event.currentTarget.value);
-          }}
           onMouseDown={() => {
             promptInputRef.current?.focus();
           }}
@@ -2903,26 +2901,39 @@ function LivePromptComposer({
         />
       </div>
 
+      <div className="flex flex-wrap gap-1" data-testid="agent-live-prompt-quick-starts">
+        {AGENT_QUICK_START_KEYS.map((key) => (
+          <button
+            className="rounded border border-editor-border bg-editor-panel px-2 py-1 text-[11px] leading-4 text-text-secondary transition-colors hover:bg-editor-selected-quiet hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring"
+            key={key}
+            onClick={() => {
+              const nextPrompt = t(`editor.ai.agent.composer.quickStarts.${key}`);
+              setPrompt(nextPrompt);
+              promptInputRef.current?.focus();
+            }}
+            type="button"
+          >
+            {t(`editor.ai.agent.composer.quickStarts.${key}`)}
+          </button>
+        ))}
+      </div>
+
       <div className="flex flex-wrap gap-2">
         <button
           className="inline-flex items-center gap-2 rounded-md border border-primary/30 bg-primary/15 px-3 py-2 text-xs font-semibold text-text-primary disabled:border-white/10 disabled:bg-white/5 disabled:text-text-secondary"
           data-testid="agent-live-prompt-run"
           data-native-accessibility-input="reads-textarea-dom-value"
           disabled={!canRun}
-          onMouseDown={(event) => {
-            event.preventDefault();
-            void runDryRun();
-          }}
           onClick={() => {
             void runDryRun();
           }}
           type="button"
         >
           <Send size={14} />
-          {t('editor.ai.agent.composer.dryRun')}
+          {t('editor.ai.agent.composer.previewEdit')}
         </button>
         <button
-          className="inline-flex items-center gap-2 rounded-md border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-text-primary disabled:border-white/10 disabled:bg-white/5 disabled:text-text-secondary"
+          className="hidden"
           data-testid="agent-live-prompt-inspect-state"
           disabled={!canInspectState}
           onMouseDown={(event) => {
@@ -2936,7 +2947,7 @@ function LivePromptComposer({
           {t('editor.ai.agent.composer.inspectState')}
         </button>
         <button
-          className="inline-flex items-center gap-2 rounded-md border border-violet-500/30 bg-violet-500/10 px-3 py-2 text-xs font-semibold text-violet-100 disabled:border-white/10 disabled:bg-white/5 disabled:text-text-secondary"
+          className="hidden"
           data-testid="agent-live-prompt-detail-preview"
           disabled={!canRequestDetailPreview}
           onMouseDown={(event) => {
@@ -2950,7 +2961,7 @@ function LivePromptComposer({
           {t('editor.ai.agent.composer.detailPreview')}
         </button>
         <button
-          className="inline-flex items-center gap-2 rounded-md border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs font-semibold text-sky-100 disabled:border-white/10 disabled:bg-white/5 disabled:text-text-secondary"
+          className="hidden"
           data-testid="agent-live-prompt-refresh-preview"
           disabled={!canRefreshPreview}
           onMouseDown={(event) => {
@@ -2964,7 +2975,7 @@ function LivePromptComposer({
           {t('editor.ai.agent.composer.refreshPreview')}
         </button>
         <button
-          className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-100 disabled:border-white/10 disabled:bg-white/5 disabled:text-text-secondary"
+          className="rounded border border-editor-primary-active/40 bg-editor-primary-active px-3 py-2 text-xs font-semibold text-editor-primary-active-text disabled:border-editor-border disabled:bg-editor-panel disabled:text-text-tertiary"
           data-disabled-reason={
             result.status === 'blocked' || result.status === 'approval_required'
               ? (result.safetyDecision?.decisionId ?? result.status)
@@ -2972,10 +2983,6 @@ function LivePromptComposer({
           }
           data-testid="agent-live-prompt-apply"
           disabled={!canApply}
-          onMouseDown={(event) => {
-            event.preventDefault();
-            void applyDryRun();
-          }}
           onClick={() => {
             void applyDryRun();
           }}
@@ -2988,17 +2995,13 @@ function LivePromptComposer({
           data-cancel-boundary="late-result-guard"
           data-testid="agent-live-prompt-cancel"
           disabled={!canCancel}
-          onMouseDown={(event) => {
-            event.preventDefault();
-            cancelActiveOperation();
-          }}
           onClick={cancelActiveOperation}
           type="button"
         >
           {t('editor.ai.agent.composer.cancel')}
         </button>
         <button
-          className="inline-flex items-center gap-2 rounded-md border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs font-semibold text-sky-100 disabled:border-white/10 disabled:bg-white/5 disabled:text-text-secondary"
+          className="hidden"
           data-dispatch-path={AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME}
           data-testid="agent-live-selected-image-preview-loop"
           disabled={!canRunSelectedImageLoop}
@@ -3015,7 +3018,7 @@ function LivePromptComposer({
           {t('editor.ai.agent.selectedImageLoop.run')}
         </button>
         <button
-          className="inline-flex items-center gap-2 rounded-md border border-teal-500/30 bg-teal-500/10 px-3 py-2 text-xs font-semibold text-teal-100 disabled:border-white/10 disabled:bg-white/5 disabled:text-text-secondary"
+          className="hidden"
           data-testid="agent-live-prompt-export-proof"
           disabled={!canRequestExportProof}
           onMouseDown={(event) => {
@@ -3031,7 +3034,7 @@ function LivePromptComposer({
           {t('editor.ai.agent.composer.exportProof')}
         </button>
         <button
-          className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-100 disabled:border-white/10 disabled:bg-white/5 disabled:text-text-secondary"
+          className="hidden"
           data-policy-state={result.status}
           data-testid="agent-live-prompt-approve-policy"
           disabled={result.status !== 'approval_required'}
@@ -3045,42 +3048,78 @@ function LivePromptComposer({
           {t('editor.ai.agent.composer.policy.approve')}
         </button>
         <button
-          className="inline-flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-100 disabled:border-white/10 disabled:bg-white/5 disabled:text-text-secondary"
+          className="inline-flex items-center gap-2 rounded border border-editor-border bg-editor-panel px-3 py-2 text-xs font-semibold text-text-secondary transition-colors hover:bg-editor-selected-quiet hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-45"
           data-discard-control="rollback-session"
           data-testid="agent-live-prompt-rollback"
           disabled={!canRollback}
-          onMouseDown={(event) => {
-            event.preventDefault();
-            rollbackApply();
-          }}
           onClick={rollbackApply}
           type="button"
         >
           <RotateCcw size={14} />
-          {t('editor.ai.agent.composer.rollback')}
+          {t('editor.ai.agent.composer.revertEdit')}
         </button>
       </div>
 
-      <LiveActivityTimeline entries={activityEntries} />
-      <LiveSessionReviewPanel review={effectiveSessionReview} />
-      <LiveAuditArtifactPanel artifact={auditArtifact} onReplayCheck={runAuditReplayCheck} replay={auditReplay} />
-      {expertArtifactReview === null || expertDryRunReview === null ? null : (
-        <div
-          className="space-y-2 rounded-md border border-sky-500/20 bg-black/10 p-2"
-          data-after-artifact-id={expertArtifactReview.previewArtifacts[1]?.id ?? ''}
-          data-before-artifact-id={expertArtifactReview.previewArtifacts[0]?.id ?? ''}
-          data-testid="agent-live-tone-color-dry-run-review"
+      {result.status === 'idle' ? null : (
+        <section
+          aria-live="polite"
+          className="space-y-2 border-t border-editor-border pt-2"
+          data-testid="agent-photographer-result"
         >
-          <DryRunReviewPanel review={expertDryRunReview} runtimeStatus={runtimeStatus} />
-          <ArtifactReviewPanel review={expertArtifactReview} />
-        </div>
-      )}
-      {selectedImageLoopReview === null ? null : (
-        <SelectedImagePreviewLoopReviewPanel review={selectedImageLoopReview} />
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[12px] font-semibold text-text-primary">{statusLabel}</span>
+          </div>
+          {result.summary ? <p className="text-[11px] leading-4 text-text-secondary">{result.summary}</p> : null}
+          {result.dryRunReceipt && result.status !== 'rolled_back' ? (
+            <div className="grid grid-cols-2 gap-2" data-testid="agent-photographer-before-after">
+              <figure className="min-w-0">
+                <figcaption className="mb-1 text-[10px] font-semibold uppercase text-text-tertiary">
+                  {t('editor.ai.agent.previewLineage.role.before')}
+                </figcaption>
+                <img
+                  alt={t('editor.ai.agent.previewLineage.role.before')}
+                  className="aspect-[4/3] w-full rounded border border-editor-border object-cover"
+                  src={initialPromptPreviewContext?.previewRef}
+                />
+              </figure>
+              <figure className="min-w-0">
+                <figcaption className="mb-1 text-[10px] font-semibold uppercase text-text-tertiary">
+                  {t('editor.ai.agent.proposal.after')}
+                </figcaption>
+                <img
+                  alt={t('editor.ai.agent.proposal.after')}
+                  className="aspect-[4/3] w-full rounded border border-editor-border object-cover"
+                  src={result.dryRunReceipt.previewAfter.previewRef}
+                />
+              </figure>
+            </div>
+          ) : null}
+          {result.error ? <p className="text-[11px] leading-4 text-editor-danger">{result.error}</p> : null}
+        </section>
       )}
 
+      <div className="hidden">
+        <LiveActivityTimeline entries={activityEntries} />
+        <LiveSessionReviewPanel review={effectiveSessionReview} />
+        <LiveAuditArtifactPanel artifact={auditArtifact} onReplayCheck={runAuditReplayCheck} replay={auditReplay} />
+        {expertArtifactReview === null || expertDryRunReview === null ? null : (
+          <div
+            className="space-y-2 rounded-md border border-sky-500/20 bg-black/10 p-2"
+            data-after-artifact-id={expertArtifactReview.previewArtifacts[1]?.id ?? ''}
+            data-before-artifact-id={expertArtifactReview.previewArtifacts[0]?.id ?? ''}
+            data-testid="agent-live-tone-color-dry-run-review"
+          >
+            <DryRunReviewPanel review={expertDryRunReview} runtimeStatus={runtimeStatus} />
+            <ArtifactReviewPanel review={expertArtifactReview} />
+          </div>
+        )}
+        {selectedImageLoopReview === null ? null : (
+          <SelectedImagePreviewLoopReviewPanel review={selectedImageLoopReview} />
+        )}
+      </div>
+
       <div
-        className="rounded border border-white/10 bg-black/15 p-2 text-[11px]"
+        className="hidden"
         data-apply-plan-hash={result.applyReceipt?.acceptedPlanHash ?? ''}
         data-applied-graph-revision={result.appliedGraphRevision ?? ''}
         data-dry-run-plan-hash={result.dryRunReceipt?.dryRunPlanHash ?? ''}
@@ -4608,8 +4647,6 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
   const { t } = useTranslation();
   const [livePromptResult, setLivePromptResult] = useState<LivePromptResult>({ status: 'idle' });
   const [liveSessionEvents, setLiveSessionEvents] = useState<LiveSessionEvent[]>([]);
-  const runtimeStatus = normalizeRuntimeStatus(transcript.runtimeStatus);
-  const runtimeBadge = agentRuntimeBadge[runtimeStatus];
   const isContextReady = transcript.toolCalls.some(
     (toolCall) => toolCall.toolName === 'rawengine.live_context' && toolCall.status === 'succeeded',
   );
@@ -4656,15 +4693,9 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
         <div>
           <div className="flex items-center gap-1.5 text-[12px] font-semibold leading-4 text-text-primary">
             <Sparkles size={14} />
-            <span>{t('editor.ai.agent.title')}</span>
+            <span>{t('editor.ai.agent.composer.describeEdit')}</span>
           </div>
-          <p className="mt-0.5 truncate text-[11px] leading-4 text-text-secondary">{transcript.sessionTitle}</p>
         </div>
-        <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] ${runtimeBadge.className}`}>
-          {runtimeStatus === 'runtime_apply_ready'
-            ? t('editor.ai.agent.runtimeApplyProof')
-            : t('editor.ai.agent.uiOnly')}
-        </span>
       </div>
 
       <LivePromptComposer
@@ -4677,59 +4708,45 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
         runtimeStatus={transcript.runtimeStatus}
       />
 
-      {transcript.initialPromptPreviewContext ? (
-        <InitialPromptPreviewContextCard context={transcript.initialPromptPreviewContext} />
-      ) : null}
-
-      {hasReviewProposal ? (
-        <AgentProposedEditCard
-          artifactReview={transcript.artifactReview}
-          auditTranscript={transcript.auditTranscript}
-          dryRunReview={transcript.dryRunReview}
-          reviewHandoff={transcript.reviewHandoff}
-          runtimeStatus={transcript.runtimeStatus}
-          selectedFrameScope={transcript.selectedFrameScope}
-          selectedImagePreviewLoopReview={transcript.selectedImagePreviewLoopReview}
-        />
-      ) : null}
-
-      <AppServerToolReadinessSummary />
-
       <div className="space-y-2" data-testid="agent-chat-messages">
         {liveSessionEvents.map((message) => (
           <MessageBubble key={message.id} message={message} />
         ))}
-        {transcript.messages.map((message) => (
-          <MessageBubble key={message.id} message={message} />
-        ))}
+        {transcript.messages
+          .filter((message) => message.role !== 'system')
+          .map((message) => (
+            <MessageBubble key={message.id} message={message} />
+          ))}
       </div>
 
-      {transcript.livePromptWalkthrough ? (
-        <LivePromptWalkthroughPanel walkthrough={transcript.livePromptWalkthrough} />
-      ) : null}
-
-      {transcript.e2eClosure ? <E2eClosurePanel closure={transcript.e2eClosure} /> : null}
-
-      {transcript.failureRecovery ? <FailureRecoveryPanel recovery={transcript.failureRecovery} /> : null}
-
-      {transcript.longEditProgress ? <LongEditProgressPanel progress={transcript.longEditProgress} /> : null}
-
-      <div className="space-y-2" data-testid="agent-tool-transcript">
-        <div className="flex items-center justify-between text-xs">
-          <span className="font-semibold text-text-primary">{t('editor.ai.agent.transcript')}</span>
-          <span className="text-text-secondary">
-            {hasLiveApplyProof || runtimeStatus === 'runtime_apply_ready'
-              ? t('editor.ai.agent.runtimeApplyProof')
-              : t('editor.ai.agent.noAppliedEdits')}
-          </span>
-        </div>
+      <div className="hidden">
+        {transcript.initialPromptPreviewContext ? (
+          <InitialPromptPreviewContextCard context={transcript.initialPromptPreviewContext} />
+        ) : null}
+        {hasReviewProposal ? (
+          <AgentProposedEditCard
+            artifactReview={transcript.artifactReview}
+            auditTranscript={transcript.auditTranscript}
+            dryRunReview={transcript.dryRunReview}
+            reviewHandoff={transcript.reviewHandoff}
+            runtimeStatus={transcript.runtimeStatus}
+            selectedFrameScope={transcript.selectedFrameScope}
+            selectedImagePreviewLoopReview={transcript.selectedImagePreviewLoopReview}
+          />
+        ) : null}
+        <AppServerToolReadinessSummary />
+        {transcript.livePromptWalkthrough ? (
+          <LivePromptWalkthroughPanel walkthrough={transcript.livePromptWalkthrough} />
+        ) : null}
+        {transcript.e2eClosure ? <E2eClosurePanel closure={transcript.e2eClosure} /> : null}
+        {transcript.failureRecovery ? <FailureRecoveryPanel recovery={transcript.failureRecovery} /> : null}
+        {transcript.longEditProgress ? <LongEditProgressPanel progress={transcript.longEditProgress} /> : null}
         {liveApplyToolCall ? <ToolCallRow toolCall={liveApplyToolCall} /> : null}
         {transcript.toolCalls.map((toolCall) => (
           <ToolCallRow key={toolCall.id} toolCall={toolCall} />
         ))}
+        {transcript.privateRawArtifacts ? <PrivateRawArtifactsPanel proof={transcript.privateRawArtifacts} /> : null}
       </div>
-
-      {transcript.privateRawArtifacts ? <PrivateRawArtifactsPanel proof={transcript.privateRawArtifacts} /> : null}
     </section>
   );
 }

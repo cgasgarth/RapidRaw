@@ -698,6 +698,7 @@
           "applyReceipt": "",
           "applyReceiptPixels": "",
           "cancel": "",
+          "describeEdit": "",
           "detailPreview": "",
           "dryRun": "",
           "exportProof": "",
@@ -713,7 +714,16 @@
             "title": ""
           },
           "previewDelta": "",
+          "previewEdit": "",
+          "previewReady": "",
+          "quickStarts": {
+            "brightenGently": "",
+            "liftShadows": "",
+            "naturalContrast": "",
+            "recoverHighlights": ""
+          },
           "refreshPreview": "",
+          "revertEdit": "",
           "rollback": "",
           "rollbackAvailable": "Rollback target still matches the current image and recipe.",
           "rollbackInvalidated": "Rollback disabled because the image, graph revision, or recipe changed.",
