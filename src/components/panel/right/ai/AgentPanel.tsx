@@ -112,7 +112,7 @@ export function AgentPanel() {
       </header>
 
       {isReady ? (
-        <div className="min-h-0 flex-1 overflow-y-auto px-2.5 py-2" data-testid="agent-photographer-workspace">
+        <div className="min-h-0 flex-1 overflow-hidden px-2.5 py-2" data-testid="agent-photographer-workspace">
           <AgentChatShell transcript={transcript} />
         </div>
       ) : (
