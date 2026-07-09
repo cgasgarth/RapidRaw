@@ -2146,6 +2146,17 @@ export function MasksPanel() {
         <Suspense fallback={<LayerStackPanelFallback />}>
           <LayerStackPanel
             activeMaskContainerId={activeMaskContainerId}
+            creationSlot={
+              <MaskContextualCreation
+                activeMaskContainerId={activeMaskContainerId}
+                onCreate={(maskType) => {
+                  handleGridClick(maskType);
+                }}
+                onOpenMenu={(event) => {
+                  handleAddMaskContextMenu(event, activeMaskContainerId);
+                }}
+              />
+            }
             masks={adjustments.masks}
             onSelectMaskContainer={onSelectContainer}
             onSetMaskContainers={(nextMasks: Array<MaskContainer>) => {
@@ -2153,15 +2164,6 @@ export function MasksPanel() {
             }}
           />
         </Suspense>
-
-        <div className="shrink-0 border-b border-editor-border p-2">
-          <MaskOverlayReviewControls
-            settings={maskOverlaySettings}
-            onChange={setMaskOverlaySettings}
-            onDragStateChange={onDragStateChange}
-            hotkeyHint="Shift+O"
-          />
-        </div>
 
         <AnimatePresence initial={false}>
           {isWaveformVisible && (
@@ -2306,6 +2308,7 @@ export function MasksPanel() {
                 {activeContainer && (
                   <div className="mb-2 space-y-1.5">
                     <div
+                      hidden
                       className="grid grid-cols-4 gap-1 rounded-md border border-editor-border bg-editor-panel-well p-1.5 text-[11px]"
                       data-component-count={activeContainer.subMasks.length}
                       data-has-brush={String(activeMaskHasBrush)}
@@ -2344,38 +2347,43 @@ export function MasksPanel() {
                         </span>
                       </div>
                     </div>
-                    <div
-                      className="flex items-center justify-between gap-2 rounded-md border border-editor-border bg-editor-panel-well px-2 py-1.5"
-                      data-testid="mask-panel-provenance-summary"
-                    >
-                      <span className="min-w-0">
-                        <UiText
-                          variant={TextVariants.small}
-                          weight={TextWeights.medium}
-                          className="block text-text-primary"
+                    {activeLayerMaskProvenanceView !== null &&
+                      activeLayerMaskProvenanceView !== undefined &&
+                      activeLayerMaskProvenanceView.status !== 'current' && (
+                        <div
+                          className="flex items-center justify-between gap-2 rounded-md border border-editor-border bg-editor-panel-well px-2 py-1.5"
+                          data-testid="mask-panel-provenance-summary"
                         >
-                          {t('editor.masks.settings.layerMaskProvenanceSummaryTitle')}
-                        </UiText>
-                        <UiText variant={TextVariants.small} className="block truncate text-text-tertiary">
-                          {t('editor.masks.settings.layerMaskProvenanceSummary')}
-                        </UiText>
-                      </span>
-                      <button
-                        className={maskPanelRowActionClassName}
-                        data-testid="mask-panel-preview-receipts-record"
-                        data-tooltip={t('editor.masks.settings.layerMaskProvenancePreviewTooltip')}
-                        onClick={() => {
-                          recordLayerMaskPreviewReceipt({
-                            appliedCommandId: `mask_panel_preview_${layerMaskSourceGraphRevision}`,
-                            masks: adjustments.masks,
-                          });
-                        }}
-                        type="button"
-                      >
-                        <Eye size={15} />
-                      </button>
-                    </div>
+                          <span className="min-w-0">
+                            <UiText
+                              variant={TextVariants.small}
+                              weight={TextWeights.medium}
+                              className="block text-text-primary"
+                            >
+                              {t('editor.masks.settings.layerMaskProvenanceSummaryTitle')}
+                            </UiText>
+                            <UiText variant={TextVariants.small} className="block truncate text-text-tertiary">
+                              {t('editor.masks.settings.layerMaskProvenanceSummary')}
+                            </UiText>
+                          </span>
+                          <button
+                            className={maskPanelRowActionClassName}
+                            data-testid="mask-panel-preview-receipts-record"
+                            data-tooltip={t('editor.masks.settings.layerMaskProvenancePreviewTooltip')}
+                            onClick={() => {
+                              recordLayerMaskPreviewReceipt({
+                                appliedCommandId: `mask_panel_preview_${layerMaskSourceGraphRevision}`,
+                                masks: adjustments.masks,
+                              });
+                            }}
+                            type="button"
+                          >
+                            <Eye size={15} />
+                          </button>
+                        </div>
+                      )}
                     <div
+                      hidden
                       className="grid grid-cols-3 gap-1.5 rounded-md border border-editor-border bg-editor-panel-well p-1.5"
                       data-testid="mask-component-quick-add"
                     >
@@ -2445,6 +2453,15 @@ export function MasksPanel() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          <div className="mt-2 shrink-0 border-t border-editor-border pt-2" data-testid="mask-overlay-utility">
+            <MaskOverlayReviewControls
+              settings={maskOverlaySettings}
+              onChange={setMaskOverlaySettings}
+              onDragStateChange={onDragStateChange}
+              hotkeyHint="Shift+O"
+            />
+          </div>
         </div>
       </div>
 
@@ -2524,6 +2541,63 @@ function NewMaskDropZone({ isOver }: { isOver: boolean }) {
     >
       <UiText weight={TextWeights.medium}>{t('editor.masks.dropzoneText')}</UiText>
     </motion.div>
+  );
+}
+
+function MaskContextualCreation({
+  activeMaskContainerId,
+  onCreate,
+  onOpenMenu,
+}: {
+  activeMaskContainerId: string | null;
+  onCreate: (type: Mask) => void;
+  onOpenMenu: (event: ReactMouseEvent<HTMLElement>) => void;
+}) {
+  const { t } = useTranslation();
+  const quickTypes = [Mask.Brush, Mask.Linear, Mask.Radial, Mask.AiSubject] as const;
+  const creationLabel = activeMaskContainerId
+    ? t('editor.masks.actions.addNewComponent')
+    : t('editor.masks.addNewMask');
+
+  return (
+    <div className="flex min-w-0 items-center gap-0.5" data-testid="mask-contextual-creation">
+      <UiText variant={TextVariants.small} weight={TextWeights.medium} className="sr-only">
+        {creationLabel}
+      </UiText>
+      {quickTypes.map((maskType) => {
+        const Icon = MASK_ICON_MAP[maskType];
+        const name = formatMaskTypeName(maskType);
+        const tooltip = activeMaskContainerId
+          ? t('editor.masks.tooltips.addToCurrent', { name })
+          : t('editor.masks.tooltips.createNew', { name });
+
+        return (
+          <button
+            key={maskType}
+            aria-label={tooltip}
+            className={maskPanelIconButtonClassName}
+            data-testid={`mask-contextual-create-${maskType}`}
+            data-tooltip={tooltip}
+            onClick={() => {
+              onCreate(maskType);
+            }}
+            type="button"
+          >
+            <Icon size={16} />
+          </button>
+        );
+      })}
+      <button
+        aria-label={creationLabel}
+        className={maskPanelIconButtonClassName}
+        data-testid="mask-contextual-create-more"
+        data-tooltip={creationLabel}
+        onClick={onOpenMenu}
+        type="button"
+      >
+        <Plus size={16} />
+      </button>
+    </div>
   );
 }
 
@@ -2970,7 +3044,7 @@ function ContainerRow({
               >
                 {container.name}
               </UiText>
-              {layerMaskProvenanceView !== undefined && (
+              {layerMaskProvenanceView !== undefined && layerMaskProvenanceView.status !== 'current' && (
                 <div className="mt-1">
                   <MaskProvenanceBadge view={layerMaskProvenanceView} />
                 </div>
@@ -3766,7 +3840,7 @@ function SettingsPanel({
         isContentVisible={true}
       >
         <div className="space-y-2 pt-1.5">
-          {layerMaskProvenanceView !== null && (
+          {layerMaskProvenanceView !== null && layerMaskProvenanceView.status !== 'current' && (
             <div
               className={`${maskPanelCardClassName} grid gap-1 text-[11px]`}
               data-applied-command-id={layerMaskProvenanceView.receipt.appliedCommandId}
