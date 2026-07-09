@@ -8,6 +8,32 @@ import { z } from 'zod';
 const REPORT_PATH = resolve('src-tauri/target/rawengine-negative-lab-density-cpu-report.json');
 const COMMITTED_REPORT_PATH = 'docs/validation/proofs/negative-lab/negative-lab-density-cpu-proof-2026-06-19.json';
 const shouldUpdate = process.argv.includes('--update');
+const boundsSchema = z.object({ max: z.number(), min: z.number() }).strict();
+const boundsSetSchema = z
+  .object({
+    axisBounds: z.object({ color: boundsSchema, luma: boundsSchema }).strict(),
+    channelBounds: z.object({ b: boundsSchema, g: boundsSchema, r: boundsSchema }).strict(),
+  })
+  .strict();
+const boundsReceiptSchema = z
+  .object({
+    algorithmId: z.literal('fixed_grid_block_median_luma_color_v1'),
+    analysisBuffer: z.number().min(0).max(0.25),
+    analysisRect: z.object({
+      height: z.number().positive(),
+      width: z.number().positive(),
+      x: z.number(),
+      y: z.number(),
+    }),
+    baseBounds: boundsSetSchema,
+    baseFogProvenance: z.enum(['automatic_analysis', 'manual_base_fog_sample', 'profile_embedded_base_fog_sample']),
+    colorRangeClip: z.number().min(0.01).max(0.3),
+    finalBounds: boundsSetSchema,
+    lumaRangeClip: z.number().min(0.01).max(0.3),
+    schemaVersion: z.literal(1),
+    warningCodes: z.array(z.string()),
+  })
+  .strict();
 
 const reportSchema = z
   .object({
@@ -22,6 +48,7 @@ const reportSchema = z
             luma: z.object({ max: z.number(), min: z.number() }).strict(),
           })
           .strict(),
+        boundsReceipt: boundsReceiptSchema,
         channelBounds: z
           .object({
             blue: z.object({ max: z.number(), min: z.number() }).strict(),
@@ -32,7 +59,7 @@ const reportSchema = z
         clippedPixelCount: z.number().int().nonnegative(),
         densityRangeUnclamped: z.number().nonnegative(),
         epsilonClampedPixelCount: z.number().int().nonnegative(),
-        rendererVersion: z.literal(1),
+        rendererVersion: z.literal(2),
       })
       .strict(),
     doesNotProve: z.array(z.string().trim().min(1)).min(8),

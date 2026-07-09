@@ -40,9 +40,11 @@ const makeNegativeLabPreset = (
     params: Omit<
       NegativeLabPresetParams,
       | 'analysis_buffer'
+      | 'base_fog_bounds_provenance'
       | 'base_fog_sample'
       | 'black_point_offset'
       | 'black_point'
+      | 'bounds_schema_version'
       | 'color_range_clip'
       | 'conversion_model'
       | 'luma_range_clip'
@@ -59,9 +61,11 @@ const makeNegativeLabPreset = (
   params: {
     ...preset.params,
     analysis_buffer: 0.04,
+    base_fog_bounds_provenance: 'automatic_analysis',
     black_point: 0,
     black_point_offset: 0,
     base_fog_sample: null,
+    bounds_schema_version: 1,
     color_range_clip: 0.12,
     conversion_model: 'density_rgb_v1',
     luma_range_clip: 0.08,

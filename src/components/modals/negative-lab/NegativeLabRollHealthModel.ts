@@ -57,6 +57,7 @@ export const BATCH_DISPOSITION_LABEL_KEYS = {
 export const BATCH_DISPOSITION_REASON_LABEL_KEYS = {
   acquisition_review_required: 'modals.negativeConversion.batchDispositionReasonAcquisition',
   base_not_estimated: 'modals.negativeConversion.batchDispositionReasonBase',
+  bounds_review_required: 'modals.negativeConversion.batchDispositionReasonBase',
   excluded_from_batch: 'modals.negativeConversion.batchDispositionReasonExcluded',
   preview_required: 'modals.negativeConversion.batchDispositionReasonPreview',
   ready_to_apply: 'modals.negativeConversion.batchDispositionReasonReady',

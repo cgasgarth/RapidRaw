@@ -30,6 +30,8 @@ pub struct NegativeConversionParams {
     pub red_weight: f32,
     pub green_weight: f32,
     pub blue_weight: f32,
+    #[serde(default = "default_bounds_schema_version")]
+    pub bounds_schema_version: u8,
 
     #[serde(default = "default_base_fog_strength")]
     pub base_fog_strength: f32,
@@ -37,6 +39,8 @@ pub struct NegativeConversionParams {
     pub base_fog_sample: Option<NegativeBaseFogSampleRect>,
     #[serde(default = "default_analysis_buffer")]
     pub analysis_buffer: f32,
+    #[serde(default)]
+    pub base_fog_bounds_provenance: NegativeLabBaseFogBoundsProvenance,
     pub exposure: f32,
     pub contrast: f32,
     #[serde(default = "default_black_point")]
@@ -61,6 +65,15 @@ pub enum NegativeConversionModel {
     #[default]
     DensityRgbV1,
     NegativeLogDensityV1,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum NegativeLabBaseFogBoundsProvenance {
+    #[default]
+    AutomaticAnalysis,
+    ManualBaseFogSample,
+    ProfileEmbeddedBaseFogSample,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -145,8 +158,31 @@ pub struct NegativeLabDensityNormalizationChannelBounds {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
+pub struct NegativeLabDensityBoundsSet {
+    pub axis_bounds: NegativeLabDensityNormalizationAxisBounds,
+    pub channel_bounds: NegativeLabDensityNormalizationChannelBounds,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabDensityBoundsReceipt {
+    pub algorithm_id: String,
+    pub analysis_buffer: f32,
+    pub analysis_rect: NegativeBaseFogSampleRect,
+    pub base_bounds: NegativeLabDensityBoundsSet,
+    pub base_fog_provenance: NegativeLabBaseFogBoundsProvenance,
+    pub color_range_clip: f32,
+    pub final_bounds: NegativeLabDensityBoundsSet,
+    pub luma_range_clip: f32,
+    pub schema_version: u8,
+    pub warning_codes: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct NegativeLabDensityNormalizationMetrics {
     pub axis_bounds: NegativeLabDensityNormalizationAxisBounds,
+    pub bounds_receipt: NegativeLabDensityBoundsReceipt,
     pub channel_bounds: NegativeLabDensityNormalizationChannelBounds,
     pub clipped_pixel_count: u32,
     pub density_range_unclamped: f32,
@@ -365,7 +401,7 @@ const MIN_ENDPOINT_SEPARATION: f32 = 0.05;
 const NEGATIVE_LAB_DENSITY_EPSILON: f32 = 0.000001;
 const NEGATIVE_LAB_DENSITY_RANGE_EPSILON: f32 = 0.0001;
 const NEGATIVE_LAB_RUNTIME_PREVIEW_RENDERER: &str = "rawengine_negative_lab_runtime_preview_v1";
-const NEGATIVE_LAB_LOG_DENSITY_RENDERER_VERSION: u8 = 1;
+const NEGATIVE_LAB_LOG_DENSITY_RENDERER_VERSION: u8 = 2;
 const NEGATIVE_LAB_RUNTIME_PREVIEW_STORAGE: &str = "temp_cache";
 const NEGATIVE_LAB_BASE_FOG_SOURCE_REQUESTED_RECT: &str = "requested_base_fog_sample_rect";
 const NEGATIVE_LAB_BASE_FOG_SOURCE_DEFAULT_RECT: &str = "deterministic_edge_safe_default_rect";
@@ -405,6 +441,10 @@ fn default_base_fog_strength() -> f32 {
 
 fn default_analysis_buffer() -> f32 {
     0.04
+}
+
+fn default_bounds_schema_version() -> u8 {
+    1
 }
 
 fn default_black_point() -> f32 {
@@ -663,6 +703,8 @@ impl Default for NegativeConversionParams {
             base_fog_strength: default_base_fog_strength(),
             base_fog_sample: None,
             analysis_buffer: default_analysis_buffer(),
+            base_fog_bounds_provenance: NegativeLabBaseFogBoundsProvenance::AutomaticAnalysis,
+            bounds_schema_version: default_bounds_schema_version(),
             exposure: 0.0,
             contrast: 1.0,
             black_point: default_black_point(),
@@ -1309,6 +1351,7 @@ fn negative_lab_file_state(path: &Path, label: &str) -> Result<serde_json::Value
 
 #[derive(Debug, Clone)]
 struct NegativeLabConversionBundleOutputRef {
+    density_normalization_metrics: NegativeLabDensityNormalizationMetrics,
     source_path: PathBuf,
     output_path: PathBuf,
     sidecar_path: PathBuf,
@@ -1328,6 +1371,7 @@ pub struct NegativeLabSavedPositiveDimensions {
 pub struct NegativeLabSavedPositiveHandoff {
     pub artifact_id: String,
     pub conversion_bundle_path: Option<String>,
+    pub density_normalization_metrics: NegativeLabDensityNormalizationMetrics,
     pub frame_exposure_overrides: NegativeLabFrameExposureOverridePayload,
     pub frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload,
     pub output_artifact_id: String,
@@ -1354,6 +1398,11 @@ struct NegativeLabOutputSidecarReceipt {
     positive_variant_id: String,
     replay_plan_hash: String,
     sidecar_path: PathBuf,
+}
+
+struct NegativeLabOutputRenderReceipt<'a> {
+    density_normalization_metrics: &'a NegativeLabDensityNormalizationMetrics,
+    dimensions: NegativeLabSavedPositiveDimensions,
 }
 
 fn negative_lab_path_filename(path: &Path) -> String {
@@ -1408,6 +1457,7 @@ fn write_negative_lab_conversion_bundle(
         .map(|output| {
             Ok(serde_json::json!({
                 "contentHash": hash_negative_lab_output_file(&output.output_path)?,
+                "densityNormalizationMetrics": output.density_normalization_metrics,
                 "dimensions": {
                     "height": output.output_height,
                     "width": output.output_width,
@@ -1557,7 +1607,7 @@ fn write_negative_lab_output_sidecar(
     save_options: &NegativeConversionSaveOptions,
     accepted_dust_heal_layers: &[serde_json::Value],
     replay_plan_hash: &str,
-    dimensions: NegativeLabSavedPositiveDimensions,
+    render_receipt: NegativeLabOutputRenderReceipt<'_>,
 ) -> Result<NegativeLabOutputSidecarReceipt, String> {
     let sidecar_path = negative_lab_output_sidecar_path(output_path);
     let mut sidecar = crate::exif_processing::load_sidecar(&sidecar_path);
@@ -1586,6 +1636,7 @@ fn write_negative_lab_output_sidecar(
             },
             "frameExposureOverrides": save_options.frame_exposure_overrides.clone(),
             "frameRgbBalanceOverrides": save_options.frame_rgb_balance_overrides.clone(),
+            "densityNormalizationMetrics": render_receipt.density_normalization_metrics,
             "noOverwritePolicy": "never_overwrite_original",
             "outputFormat": output_format,
             "patchSamplerCorrections": save_options.patch_sampler_corrections.clone(),
@@ -1606,8 +1657,8 @@ fn write_negative_lab_output_sidecar(
             "artifactId": output_artifact_id,
             "contentHash": content_hash,
             "dimensions": {
-                "height": dimensions.height,
-                "width": dimensions.width,
+                "height": render_receipt.dimensions.height,
+                "width": render_receipt.dimensions.width,
             },
             "fileState": output_state,
             "format": output_format,
@@ -1882,6 +1933,7 @@ impl NegativeConversionParams {
         }
 
         let defaults = Self::default();
+        let base_fog_sample = self.base_fog_sample.and_then(sanitize_sample_rect);
 
         Self {
             red_weight: finite_or_default(self.red_weight, defaults.red_weight)
@@ -1895,9 +1947,15 @@ impl NegativeConversionParams {
                 defaults.base_fog_strength,
             )
             .clamp(MIN_BASE_FOG_STRENGTH, MAX_BASE_FOG_STRENGTH),
-            base_fog_sample: self.base_fog_sample.and_then(sanitize_sample_rect),
+            base_fog_sample,
             analysis_buffer: finite_or_default(self.analysis_buffer, defaults.analysis_buffer)
                 .clamp(0.0, 0.25),
+            base_fog_bounds_provenance: if base_fog_sample.is_some() {
+                self.base_fog_bounds_provenance
+            } else {
+                NegativeLabBaseFogBoundsProvenance::AutomaticAnalysis
+            },
+            bounds_schema_version: default_bounds_schema_version(),
             exposure: finite_or_default(self.exposure, defaults.exposure)
                 .clamp(MIN_EXPOSURE, MAX_EXPOSURE),
             contrast: finite_or_default(self.contrast, defaults.contrast)
@@ -1926,11 +1984,6 @@ impl NegativeConversionParams {
     }
 
     fn with_sanitized_endpoints(mut self) -> Self {
-        self.black_point =
-            (self.black_point + self.black_point_offset).clamp(MIN_BLACK_POINT, MAX_BLACK_POINT);
-        self.white_point =
-            (self.white_point + self.white_point_offset).clamp(MIN_WHITE_POINT, MAX_WHITE_POINT);
-
         if self.white_point - self.black_point < MIN_ENDPOINT_SEPARATION {
             self.white_point = (self.black_point + MIN_ENDPOINT_SEPARATION).min(MAX_WHITE_POINT);
             self.black_point = self
@@ -1984,7 +2037,7 @@ impl NegativeLabDensityMetricsAccumulator {
         self,
         clipped_pixel_count: u32,
         epsilon_clamped_pixel_count: u32,
-        axis_bounds: NegativeLabDensityNormalizationAxisBounds,
+        bounds_receipt: NegativeLabDensityBoundsReceipt,
     ) -> NegativeLabDensityNormalizationMetrics {
         let fallback = ChannelBounds { min: 0.0, max: 0.0 };
         let red = if self.min[0].is_finite() && self.max[0].is_finite() {
@@ -2014,8 +2067,10 @@ impl NegativeLabDensityMetricsAccumulator {
         let global_min = red.min.min(green.min).min(blue.min);
         let global_max = red.max.max(green.max).max(blue.max);
 
+        let axis_bounds = bounds_receipt.final_bounds.axis_bounds;
         NegativeLabDensityNormalizationMetrics {
             axis_bounds,
+            bounds_receipt,
             channel_bounds: NegativeLabDensityNormalizationChannelBounds {
                 r: NegativeLabDensityChannelBoundsSummary {
                     min: red.min,
@@ -2121,7 +2176,7 @@ fn percentile_bounds(mut values: Vec<f32>, tail_clip: f32) -> ChannelBounds {
     let min = percentile_from_sorted(&values, clip);
     let max = percentile_from_sorted(&values, 1.0 - clip);
     let safe_max = if max <= min + NEGATIVE_LAB_DENSITY_RANGE_EPSILON {
-        min + 1.0
+        min + NEGATIVE_LAB_DENSITY_RANGE_EPSILON
     } else {
         max
     };
@@ -2130,114 +2185,360 @@ fn percentile_bounds(mut values: Vec<f32>, tail_clip: f32) -> ChannelBounds {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct NegativeLabAxisBounds {
-    color: ChannelBounds,
-    luma: ChannelBounds,
+struct AnalysisWindow {
+    end_x: usize,
+    end_y: usize,
+    start_x: usize,
+    start_y: usize,
 }
 
-fn build_analysis_window(
+#[derive(Debug, Clone)]
+struct NegativeLabRobustBoundsAnalysis {
+    base_density: [f32; 3],
+    chroma_bounds: [ChannelBounds; 3],
+    luma_bounds: ChannelBounds,
+    receipt: NegativeLabDensityBoundsReceipt,
+}
+
+fn build_analysis_window(width: usize, height: usize, analysis_buffer: f32) -> AnalysisWindow {
+    let margin_x = (analysis_buffer.clamp(0.0, 0.25) * width as f32).round() as usize;
+    let margin_y = (analysis_buffer.clamp(0.0, 0.25) * height as f32).round() as usize;
+    let start_x = margin_x.min(width.saturating_sub(1));
+    let start_y = margin_y.min(height.saturating_sub(1));
+    AnalysisWindow {
+        end_x: width.saturating_sub(margin_x).max(start_x + 1),
+        end_y: height.saturating_sub(margin_y).max(start_y + 1),
+        start_x,
+        start_y,
+    }
+}
+
+fn sample_rect_analysis_window(
     width: usize,
     height: usize,
-    sample_rect: Option<NegativeBaseFogSampleRect>,
+    sample_rect: NegativeBaseFogSampleRect,
     analysis_buffer: f32,
-) -> (usize, usize, usize, usize) {
-    let buffer_x = ((analysis_buffer.clamp(0.0, 0.25) * width as f32).round() as isize).max(0);
-    let buffer_y = ((analysis_buffer.clamp(0.0, 0.25) * height as f32).round() as isize).max(0);
-    let sanitized_rect = sample_rect.and_then(sanitize_sample_rect);
-
-    if let Some(rect) = sanitized_rect {
-        let start_x = ((rect.x * width as f32).floor() as isize - buffer_x)
-            .max(0)
-            .min(width.saturating_sub(1) as isize) as usize;
-        let start_y = ((rect.y * height as f32).floor() as isize - buffer_y)
-            .max(0)
-            .min(height.saturating_sub(1) as isize) as usize;
-        let end_x = (((rect.x + rect.width) * width as f32).ceil() as isize + buffer_x)
-            .max(start_x as isize + 1)
-            .min(width as isize) as usize;
-        let end_y = (((rect.y + rect.height) * height as f32).ceil() as isize + buffer_y)
-            .max(start_y as isize + 1)
-            .min(height as isize) as usize;
-        return (start_x, end_x, start_y, end_y);
+) -> AnalysisWindow {
+    let buffer_x = (analysis_buffer.clamp(0.0, 0.25) * width as f32).round() as usize;
+    let buffer_y = (analysis_buffer.clamp(0.0, 0.25) * height as f32).round() as usize;
+    let start_x = ((sample_rect.x * width as f32).floor() as usize)
+        .saturating_sub(buffer_x)
+        .min(width.saturating_sub(1));
+    let start_y = ((sample_rect.y * height as f32).floor() as usize)
+        .saturating_sub(buffer_y)
+        .min(height.saturating_sub(1));
+    AnalysisWindow {
+        end_x: (((sample_rect.x + sample_rect.width) * width as f32).ceil() as usize)
+            .saturating_add(buffer_x)
+            .clamp(start_x + 1, width),
+        end_y: (((sample_rect.y + sample_rect.height) * height as f32).ceil() as usize)
+            .saturating_add(buffer_y)
+            .clamp(start_y + 1, height),
+        start_x,
+        start_y,
     }
-
-    let margin_x = ((width as f32 * 0.12) + buffer_x as f32).round() as usize;
-    let margin_y = ((height as f32 * 0.12) + buffer_y as f32).round() as usize;
-    (
-        margin_x.min(width.saturating_sub(1)),
-        width
-            .saturating_sub(margin_x.min(width.saturating_sub(1)))
-            .max(margin_x.min(width.saturating_sub(1)) + 1),
-        margin_y.min(height.saturating_sub(1)),
-        height
-            .saturating_sub(margin_y.min(height.saturating_sub(1)))
-            .max(margin_y.min(height.saturating_sub(1)) + 1),
-    )
 }
 
-fn analyze_axis_bounds(
+fn fixed_grid_block_medians(
     log_data: &[f32],
     width: usize,
-    height: usize,
-    sample_rect: Option<NegativeBaseFogSampleRect>,
-    analysis_buffer: f32,
-    luma_range_clip: f32,
-    color_range_clip: f32,
-) -> NegativeLabAxisBounds {
-    let (start_x, end_x, start_y, end_y) =
-        build_analysis_window(width, height, sample_rect, analysis_buffer);
-    let span_x = end_x.saturating_sub(start_x).max(1);
-    let span_y = end_y.saturating_sub(start_y).max(1);
-    let block_span = ((span_x.min(span_y) as f32 / 12.0).round() as usize)
-        .clamp(4, 32)
-        .max(1);
-    let mut block_luma_values = Vec::new();
-    let mut block_color_values = Vec::new();
+    window: AnalysisWindow,
+) -> Vec<[f32; 3]> {
+    const GRID_SIZE: usize = 12;
+    let span_x = window.end_x.saturating_sub(window.start_x).max(1);
+    let span_y = window.end_y.saturating_sub(window.start_y).max(1);
+    let mut medians = Vec::with_capacity(GRID_SIZE * GRID_SIZE);
 
-    for block_y in (start_y..end_y).step_by(block_span) {
-        for block_x in (start_x..end_x).step_by(block_span) {
-            let block_end_x = (block_x + block_span).min(end_x);
-            let block_end_y = (block_y + block_span).min(end_y);
-            let mut luma_values = Vec::with_capacity(block_span * block_span);
-            let mut color_values = Vec::with_capacity(block_span * block_span);
-
-            for y in block_y..block_end_y {
-                let row_offset = y * width * 3;
-                for x in block_x..block_end_x {
-                    let idx = row_offset + (x * 3);
-                    if idx + 2 >= log_data.len() {
-                        continue;
-                    }
-
-                    let r = log_data[idx];
-                    let g = log_data[idx + 1];
-                    let b = log_data[idx + 2];
-                    if !(r.is_finite() && g.is_finite() && b.is_finite()) {
-                        continue;
-                    }
-
-                    let luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-                    let color = ((r + g) * 0.5) - b;
-                    luma_values.push(luma);
-                    color_values.push(color);
-                }
+    for grid_y in 0..GRID_SIZE {
+        let block_start_y = window.start_y + (span_y * grid_y) / GRID_SIZE;
+        let block_end_y = window.start_y + (span_y * (grid_y + 1)) / GRID_SIZE;
+        if block_start_y >= block_end_y {
+            continue;
+        }
+        for grid_x in 0..GRID_SIZE {
+            let block_start_x = window.start_x + (span_x * grid_x) / GRID_SIZE;
+            let block_end_x = window.start_x + (span_x * (grid_x + 1)) / GRID_SIZE;
+            if block_start_x >= block_end_x {
+                continue;
             }
 
-            if !luma_values.is_empty() {
-                luma_values
-                    .sort_by(|left, right| left.partial_cmp(right).unwrap_or(Ordering::Equal));
-                color_values
-                    .sort_by(|left, right| left.partial_cmp(right).unwrap_or(Ordering::Equal));
-                block_luma_values.push(median_from_sorted(&luma_values));
-                block_color_values.push(median_from_sorted(&color_values));
+            let mut channels = [Vec::new(), Vec::new(), Vec::new()];
+            for y in block_start_y..block_end_y {
+                let row_offset = y * width * 3;
+                for x in block_start_x..block_end_x {
+                    let index = row_offset + x * 3;
+                    if index + 2 >= log_data.len() {
+                        continue;
+                    }
+                    for channel_index in 0..3 {
+                        let value = log_data[index + channel_index];
+                        if value.is_finite() {
+                            channels[channel_index].push(value);
+                        }
+                    }
+                }
+            }
+            if channels.iter().all(|values| !values.is_empty()) {
+                for values in &mut channels {
+                    values
+                        .sort_by(|left, right| left.partial_cmp(right).unwrap_or(Ordering::Equal));
+                }
+                medians.push([
+                    median_from_sorted(&channels[0]),
+                    median_from_sorted(&channels[1]),
+                    median_from_sorted(&channels[2]),
+                ]);
             }
         }
     }
 
-    NegativeLabAxisBounds {
-        luma: percentile_bounds(block_luma_values, luma_range_clip),
-        color: percentile_bounds(block_color_values, color_range_clip),
+    medians
+}
+
+fn density_luma(channels: [f32; 3]) -> f32 {
+    0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
+}
+
+fn project_zero_luma(mut channels: [f32; 3]) -> [f32; 3] {
+    let luma = density_luma(channels);
+    for channel in &mut channels {
+        *channel -= luma;
     }
+    channels
+}
+
+fn channel_bounds_summary(
+    bounds: [ChannelBounds; 3],
+) -> NegativeLabDensityNormalizationChannelBounds {
+    let summary = |bound: ChannelBounds| NegativeLabDensityChannelBoundsSummary {
+        max: bound.max,
+        min: bound.min,
+    };
+    NegativeLabDensityNormalizationChannelBounds {
+        r: summary(bounds[0]),
+        g: summary(bounds[1]),
+        b: summary(bounds[2]),
+    }
+}
+
+fn analyze_robust_density_bounds(
+    log_data: &[f32],
+    width: usize,
+    height: usize,
+    params: &NegativeConversionParams,
+) -> NegativeLabRobustBoundsAnalysis {
+    let analysis_window = build_analysis_window(width, height, params.analysis_buffer);
+    let analysis_medians = fixed_grid_block_medians(log_data, width, analysis_window);
+    let sample_rect = params.base_fog_sample.and_then(sanitize_sample_rect);
+    let base_medians = sample_rect
+        .map(|rect| {
+            fixed_grid_block_medians(
+                log_data,
+                width,
+                sample_rect_analysis_window(width, height, rect, params.analysis_buffer),
+            )
+        })
+        .filter(|medians| !medians.is_empty())
+        .unwrap_or_else(|| analysis_medians.clone());
+    let base_channel_bounds = std::array::from_fn(|channel_index| {
+        percentile_bounds(
+            base_medians
+                .iter()
+                .map(|channels| channels[channel_index])
+                .collect(),
+            0.1,
+        )
+    });
+    let base_density = std::array::from_fn(|channel_index| {
+        let bounds = base_channel_bounds[channel_index];
+        let automatic_floor = bounds.min;
+        let manual_center = (bounds.min + bounds.max) * 0.5;
+        (if sample_rect.is_some() {
+            manual_center
+        } else {
+            automatic_floor
+        }) * params.base_fog_strength
+    });
+    let mut luma_values = Vec::with_capacity(analysis_medians.len());
+    let mut chroma_values = [Vec::new(), Vec::new(), Vec::new()];
+    for channels in &analysis_medians {
+        let relative = [
+            channels[0] - base_density[0],
+            channels[1] - base_density[1],
+            channels[2] - base_density[2],
+        ];
+        let luma = density_luma(relative);
+        luma_values.push(luma);
+        for channel_index in 0..3 {
+            chroma_values[channel_index].push(relative[channel_index] - luma);
+        }
+    }
+    let analyzed_luma_bounds = percentile_bounds(luma_values, params.luma_range_clip);
+    let analyzed_luma_span = (analyzed_luma_bounds.max - analyzed_luma_bounds.min)
+        .max(NEGATIVE_LAB_DENSITY_RANGE_EPSILON);
+    let luma_bounds = ChannelBounds {
+        min: analyzed_luma_bounds.min + params.black_point_offset * analyzed_luma_span,
+        max: (analyzed_luma_bounds.max + params.white_point_offset * analyzed_luma_span).max(
+            analyzed_luma_bounds.min
+                + params.black_point_offset * analyzed_luma_span
+                + NEGATIVE_LAB_DENSITY_RANGE_EPSILON,
+        ),
+    };
+    let raw_chroma_bounds: [ChannelBounds; 3] = std::array::from_fn(|channel_index| {
+        percentile_bounds(
+            std::mem::take(&mut chroma_values[channel_index]),
+            params.color_range_clip,
+        )
+    });
+    let projected_chroma_min = project_zero_luma(raw_chroma_bounds.map(|bounds| bounds.min));
+    let projected_chroma_max = project_zero_luma(raw_chroma_bounds.map(|bounds| bounds.max));
+    let chroma_bounds = std::array::from_fn(|channel_index| ChannelBounds {
+        min: projected_chroma_min[channel_index].min(projected_chroma_max[channel_index]),
+        max: projected_chroma_min[channel_index]
+            .max(projected_chroma_max[channel_index])
+            .max(projected_chroma_min[channel_index] + NEGATIVE_LAB_DENSITY_RANGE_EPSILON),
+    });
+    let final_channel_bounds = std::array::from_fn(|channel_index| ChannelBounds {
+        min: luma_bounds.min + chroma_bounds[channel_index].min,
+        max: luma_bounds.max + chroma_bounds[channel_index].max,
+    });
+    let base_luma_bounds = percentile_bounds(
+        base_medians
+            .iter()
+            .map(|channels| density_luma(*channels))
+            .collect(),
+        0.1,
+    );
+    let base_chroma_bounds: [ChannelBounds; 3] = std::array::from_fn(|channel_index| {
+        percentile_bounds(
+            base_medians
+                .iter()
+                .map(|channels| channels[channel_index] - density_luma(*channels))
+                .collect(),
+            0.1,
+        )
+    });
+    let color_axis = ChannelBounds {
+        min: chroma_bounds
+            .iter()
+            .map(|bounds| bounds.min)
+            .fold(f32::INFINITY, f32::min),
+        max: chroma_bounds
+            .iter()
+            .map(|bounds| bounds.max)
+            .fold(f32::NEG_INFINITY, f32::max),
+    };
+    let base_color_axis = ChannelBounds {
+        min: base_chroma_bounds
+            .iter()
+            .map(|bounds| bounds.min)
+            .fold(f32::INFINITY, f32::min),
+        max: base_chroma_bounds
+            .iter()
+            .map(|bounds| bounds.max)
+            .fold(f32::NEG_INFINITY, f32::max),
+    };
+    let axis_summary =
+        |luma: ChannelBounds, color: ChannelBounds| NegativeLabDensityNormalizationAxisBounds {
+            color: NegativeLabDensityAxisBoundsSummary {
+                max: color.max,
+                min: color.min,
+            },
+            luma: NegativeLabDensityAxisBoundsSummary {
+                max: luma.max,
+                min: luma.min,
+            },
+        };
+    let base_spread = base_density
+        .iter()
+        .copied()
+        .fold(f32::NEG_INFINITY, f32::max)
+        - base_density.iter().copied().fold(f32::INFINITY, f32::min);
+    let mean_base_range = base_channel_bounds
+        .iter()
+        .map(|bounds| bounds.max - bounds.min)
+        .sum::<f32>()
+        / 3.0;
+    let base_confidence = ((mean_base_range * 2.0) + (base_spread * 1.5)).clamp(0.0, 1.0);
+    let mut warning_codes = Vec::new();
+    if base_confidence < 0.6 {
+        warning_codes.push(NEGATIVE_LAB_BASE_FOG_WARNING_LOW_CONFIDENCE.to_string());
+    }
+    if base_confidence < 0.12 {
+        warning_codes.push(NEGATIVE_LAB_BASE_FOG_WARNING_MISSING_VISIBLE_BASE.to_string());
+    }
+    if base_density
+        .iter()
+        .any(|density| 10.0_f32.powf(-density) <= 0.01 || 10.0_f32.powf(-density) >= 0.99)
+    {
+        warning_codes.push(NEGATIVE_LAB_BASE_FOG_WARNING_CLIPPED_CHANNEL.to_string());
+    }
+    if base_spread > 0.18 {
+        warning_codes.push(NEGATIVE_LAB_BASE_FOG_WARNING_UNEVEN_ILLUMINATION.to_string());
+    }
+    warning_codes.sort();
+    warning_codes.dedup();
+    let receipt = NegativeLabDensityBoundsReceipt {
+        algorithm_id: "fixed_grid_block_median_luma_color_v1".to_string(),
+        analysis_buffer: params.analysis_buffer,
+        analysis_rect: NegativeBaseFogSampleRect {
+            height: (analysis_window.end_y - analysis_window.start_y) as f32 / height.max(1) as f32,
+            width: (analysis_window.end_x - analysis_window.start_x) as f32 / width.max(1) as f32,
+            x: analysis_window.start_x as f32 / width.max(1) as f32,
+            y: analysis_window.start_y as f32 / height.max(1) as f32,
+        },
+        base_bounds: NegativeLabDensityBoundsSet {
+            axis_bounds: axis_summary(base_luma_bounds, base_color_axis),
+            channel_bounds: channel_bounds_summary(base_channel_bounds),
+        },
+        base_fog_provenance: if sample_rect.is_some() {
+            params.base_fog_bounds_provenance
+        } else {
+            NegativeLabBaseFogBoundsProvenance::AutomaticAnalysis
+        },
+        color_range_clip: params.color_range_clip,
+        final_bounds: NegativeLabDensityBoundsSet {
+            axis_bounds: axis_summary(luma_bounds, color_axis),
+            channel_bounds: channel_bounds_summary(final_channel_bounds),
+        },
+        luma_range_clip: params.luma_range_clip,
+        schema_version: default_bounds_schema_version(),
+        warning_codes,
+    };
+
+    NegativeLabRobustBoundsAnalysis {
+        base_density,
+        chroma_bounds,
+        luma_bounds,
+        receipt,
+    }
+}
+
+fn normalize_density_with_robust_bounds(
+    density: [f32; 3],
+    robust_bounds: &NegativeLabRobustBoundsAnalysis,
+) -> [f32; 3] {
+    let relative_density = [
+        density[0] - robust_bounds.base_density[0],
+        density[1] - robust_bounds.base_density[1],
+        density[2] - robust_bounds.base_density[2],
+    ];
+    let luma_density = density_luma(relative_density);
+    let luma_range = (robust_bounds.luma_bounds.max - robust_bounds.luma_bounds.min)
+        .max(NEGATIVE_LAB_DENSITY_RANGE_EPSILON);
+    let normalized_luma = (luma_density - robust_bounds.luma_bounds.min) / luma_range;
+    let mut chroma = std::array::from_fn(|channel_index| {
+        (relative_density[channel_index] - luma_density).clamp(
+            robust_bounds.chroma_bounds[channel_index].min,
+            robust_bounds.chroma_bounds[channel_index].max,
+        )
+    });
+    chroma = project_zero_luma(chroma);
+    [
+        normalized_luma + chroma[0] / luma_range,
+        normalized_luma + chroma[1] / luma_range,
+        normalized_luma + chroma[2] / luma_range,
+    ]
 }
 
 fn analyze_bounds(
@@ -2367,7 +2668,7 @@ fn estimate_base_fog_from_image(
 fn run_pipeline_with_metrics(
     input: &DynamicImage,
     params: &NegativeConversionParams,
-    override_bounds: Option<[ChannelBounds; 3]>,
+    _override_bounds: Option<[ChannelBounds; 3]>,
 ) -> NegativeLabPipelineRender {
     let params = params.sanitized();
     let rgb = input.to_rgb32f();
@@ -2381,25 +2682,8 @@ fn run_pipeline_with_metrics(
         .map(|&v| negative_lab_density_from_linear_channel(v))
         .collect();
 
-    let bounds = if let Some(b) = override_bounds {
-        b
-    } else {
-        analyze_bounds(
-            &log_pixels,
-            width as usize,
-            height as usize,
-            params.base_fog_sample,
-        )
-    };
-    let axis_bounds = analyze_axis_bounds(
-        &log_pixels,
-        width as usize,
-        height as usize,
-        params.base_fog_sample,
-        params.analysis_buffer,
-        params.luma_range_clip,
-        params.color_range_clip,
-    );
+    let robust_bounds =
+        analyze_robust_density_bounds(&log_pixels, width as usize, height as usize, &params);
 
     let mut out_buffer = vec![0.0f32; raw_pixels.len()];
 
@@ -2413,16 +2697,6 @@ fn run_pipeline_with_metrics(
     let endpoint_span = (params.white_point - params.black_point).max(MIN_ENDPOINT_SEPARATION);
     let apply_endpoints =
         |value: f32| -> f32 { ((value - params.black_point) / endpoint_span).clamp(0.0, 1.0) };
-    let base = [
-        bounds[0].min * params.base_fog_strength,
-        bounds[1].min * params.base_fog_strength,
-        bounds[2].min * params.base_fog_strength,
-    ];
-    let range = [
-        (bounds[0].max - base[0]).max(NEGATIVE_LAB_DENSITY_RANGE_EPSILON),
-        (bounds[1].max - base[1]).max(NEGATIVE_LAB_DENSITY_RANGE_EPSILON),
-        (bounds[2].max - base[2]).max(NEGATIVE_LAB_DENSITY_RANGE_EPSILON),
-    ];
     let weights = [params.red_weight, params.green_weight, params.blue_weight];
     let legacy_pre_curve_clamp = params.conversion_model == NegativeConversionModel::DensityRgbV1;
 
@@ -2432,11 +2706,10 @@ fn run_pipeline_with_metrics(
         .fold(
             NegativeLabDensityMetricsAccumulator::default,
             |mut metrics, (out_pixel, log_pixel)| {
-                let normalized_density = [
-                    (log_pixel[0] - base[0]) / range[0],
-                    (log_pixel[1] - base[1]) / range[1],
-                    (log_pixel[2] - base[2]) / range[2],
-                ];
+                let normalized_density = normalize_density_with_robust_bounds(
+                    [log_pixel[0], log_pixel[1], log_pixel[2]],
+                    &robust_bounds,
+                );
                 let model_density = [
                     if legacy_pre_curve_clamp {
                         normalized_density[0].max(0.0)
@@ -2498,16 +2771,7 @@ fn run_pipeline_with_metrics(
         .into_metrics(
             clipped_pixel_count,
             epsilon_clamped_pixel_count,
-            NegativeLabDensityNormalizationAxisBounds {
-                color: NegativeLabDensityAxisBoundsSummary {
-                    min: axis_bounds.color.min,
-                    max: axis_bounds.color.max,
-                },
-                luma: NegativeLabDensityAxisBoundsSummary {
-                    min: axis_bounds.luma.min,
-                    max: axis_bounds.luma.max,
-                },
-            },
+            robust_bounds.receipt,
         );
 
     let out_img = Rgb32FImage::from_vec(width, height, out_buffer).unwrap();
@@ -3023,24 +3287,11 @@ pub async fn convert_negatives(
             }
             .map_err(|e| e.to_string())?;
 
-            let bounds_ref = downscale_f32_image(&img, 1080, 1080);
-            let ref_rgb = bounds_ref.to_rgb32f();
-            let (ref_w, ref_h) = ref_rgb.dimensions();
-            let log_pixels: Vec<f32> = ref_rgb
-                .as_raw()
-                .par_iter()
-                .map(|&v| -v.clamp(1e-6, 1.0).log10())
-                .collect();
             let effective_params =
                 save_options.effective_params_for_path(&sanitized_params, &real_path);
-            let bounds = analyze_bounds(
-                &log_pixels,
-                ref_w as usize,
-                ref_h as usize,
-                effective_params.base_fog_sample,
-            );
-
-            let processed = run_pipeline(&img, &effective_params, Some(bounds));
+            let pipeline_render = run_pipeline_with_metrics(&img, &effective_params, None);
+            let processed = pipeline_render.rendered_preview;
+            let density_normalization_metrics = pipeline_render.density_normalization_metrics;
 
             let out_path = build_negative_output_path(&real_path, &save_options);
             let filename = out_path
@@ -3078,12 +3329,16 @@ pub async fn convert_negatives(
                 &save_options,
                 &save_options.accepted_dust_heal_layers_for_path(&real_path),
                 &replay_plan_hash,
-                NegativeLabSavedPositiveDimensions {
-                    height: processed.height(),
-                    width: processed.width(),
+                NegativeLabOutputRenderReceipt {
+                    density_normalization_metrics: &density_normalization_metrics,
+                    dimensions: NegativeLabSavedPositiveDimensions {
+                        height: processed.height(),
+                        width: processed.width(),
+                    },
                 },
             )?;
             bundle_outputs.push(NegativeLabConversionBundleOutputRef {
+                density_normalization_metrics: density_normalization_metrics.clone(),
                 output_height: processed.height(),
                 output_path: out_path.clone(),
                 output_width: processed.width(),
@@ -3094,6 +3349,7 @@ pub async fn convert_negatives(
             results.push(NegativeLabSavedPositiveHandoff {
                 artifact_id: sidecar_receipt.artifact_id,
                 conversion_bundle_path: None,
+                density_normalization_metrics,
                 dimensions: NegativeLabSavedPositiveDimensions {
                     height: processed.height(),
                     width: processed.width(),
@@ -3161,6 +3417,23 @@ mod tests {
     ) -> Rgb32FImage {
         let input = DynamicImage::ImageRgb32F(Rgb32FImage::from_vec(3, 1, pixels).unwrap());
         run_pipeline(&input, &params, Some(bounds)).to_rgb32f()
+    }
+
+    fn fixture_density_metrics() -> NegativeLabDensityNormalizationMetrics {
+        let mut pixels = Vec::with_capacity(12 * 12 * 3);
+        for y in 0..12 {
+            for x in 0..12 {
+                let density = 0.1 + (x + y) as f32 / 16.0;
+                let rgb = 10.0_f32.powf(-density);
+                pixels.extend_from_slice(&[rgb, rgb * 0.98, rgb * 0.94]);
+            }
+        }
+        run_pipeline_with_metrics(
+            &DynamicImage::ImageRgb32F(Rgb32FImage::from_vec(12, 12, pixels).unwrap()),
+            &NegativeConversionParams::default(),
+            None,
+        )
+        .density_normalization_metrics
     }
 
     fn luminance(pixel: image::Rgb<f32>) -> f32 {
@@ -4129,9 +4402,12 @@ mod tests {
             &save_options,
             &save_options.accepted_dust_heal_layers_for_path(&source_path.to_string_lossy()),
             "fnv1a32:2f4a91bc",
-            NegativeLabSavedPositiveDimensions {
-                height: 8,
-                width: 12,
+            NegativeLabOutputRenderReceipt {
+                density_normalization_metrics: &fixture_density_metrics(),
+                dimensions: NegativeLabSavedPositiveDimensions {
+                    height: 8,
+                    width: 12,
+                },
             },
         )
         .expect("sidecar should be written");
@@ -4250,6 +4526,7 @@ mod tests {
         attach_negative_lab_conversion_bundle_path_to_output_sidecars(
             &bundle_path,
             &[NegativeLabConversionBundleOutputRef {
+                density_normalization_metrics: fixture_density_metrics(),
                 output_height: 8,
                 output_path,
                 output_width: 12,
@@ -4320,9 +4597,12 @@ mod tests {
             &save_options,
             &[],
             "fnv1a32:2f4a91bc",
-            NegativeLabSavedPositiveDimensions {
-                height: 8,
-                width: 12,
+            NegativeLabOutputRenderReceipt {
+                density_normalization_metrics: &fixture_density_metrics(),
+                dimensions: NegativeLabSavedPositiveDimensions {
+                    height: 8,
+                    width: 12,
+                },
             },
         )
         .expect("sidecar should be written");
@@ -4430,6 +4710,7 @@ mod tests {
             &params,
             &save_options,
             &[NegativeLabConversionBundleOutputRef {
+                density_normalization_metrics: fixture_density_metrics(),
                 output_height: 8,
                 output_path,
                 output_width: 12,
@@ -4443,6 +4724,10 @@ mod tests {
             serde_json::from_slice(&fs::read(&bundle_path).expect("read conversion bundle"))
                 .expect("parse conversion bundle");
         assert_eq!(bundle["schemaVersion"], 1);
+        assert_eq!(
+            bundle["outputs"][0]["densityNormalizationMetrics"]["boundsReceipt"]["schemaVersion"],
+            1
+        );
         assert_eq!(bundle["conversion"]["outputFormat"], "jpeg_proof");
         assert_eq!(
             bundle["conversion"]["profileProvenanceHash"],
@@ -4851,6 +5136,7 @@ mod tests {
                             "min": render.density_normalization_metrics.axis_bounds.luma.min
                         }
                     },
+                    "boundsReceipt": render.density_normalization_metrics.bounds_receipt,
                     "channelBounds": {
                         "blue": {
                             "max": render.density_normalization_metrics.channel_bounds.b.max,
@@ -4943,21 +5229,23 @@ mod tests {
         let rendered = neg_log_render.rendered_preview.to_rgb32f();
 
         assert!(rendered.as_raw().iter().all(|value| value.is_finite()));
-        assert_eq!(
+        assert!(
             legacy_render
                 .density_normalization_metrics
                 .channel_bounds
                 .r
-                .min,
-            0.0
-        );
-        assert!(
-            neg_log_render
-                .density_normalization_metrics
-                .channel_bounds
-                .r
                 .min
-                < 0.0
+                >= 0.0
+        );
+        let neg_log_channel_bounds = neg_log_render.density_normalization_metrics.channel_bounds;
+        assert!(
+            [
+                neg_log_channel_bounds.r.min,
+                neg_log_channel_bounds.g.min,
+                neg_log_channel_bounds.b.min,
+            ]
+            .into_iter()
+            .any(|minimum| minimum < 0.0)
         );
         assert!(
             neg_log_render
@@ -5183,9 +5471,12 @@ mod tests {
             &save_options,
             &[],
             "fnv1a32:2f4a91bc",
-            NegativeLabSavedPositiveDimensions {
-                height: rendered.height(),
-                width: rendered.width(),
+            NegativeLabOutputRenderReceipt {
+                density_normalization_metrics: &fixture_density_metrics(),
+                dimensions: NegativeLabSavedPositiveDimensions {
+                    height: rendered.height(),
+                    width: rendered.width(),
+                },
             },
         )
         .expect("write public negative positive sidecar");
@@ -5219,12 +5510,17 @@ mod tests {
             artifact["conversion"]["selectedAcquisitionProfile"]["id"],
             "camera_raw_linear_v1"
         );
+        assert_eq!(
+            artifact["conversion"]["densityNormalizationMetrics"]["boundsReceipt"]["algorithmId"],
+            "fixed_grid_block_median_luma_color_v1"
+        );
         let bundle_path = negative_lab_conversion_bundle_path(&output_path);
         write_negative_lab_conversion_bundle(
             &bundle_path,
             &params,
             &save_options,
             &[NegativeLabConversionBundleOutputRef {
+                density_normalization_metrics: fixture_density_metrics(),
                 output_height: rendered.height(),
                 output_path: output_path.clone(),
                 output_width: rendered.width(),
@@ -5527,9 +5823,12 @@ mod tests {
             &save_options,
             &[],
             "fnv1a32:2f4a91bc",
-            NegativeLabSavedPositiveDimensions {
-                height: rendered.height(),
-                width: rendered.width(),
+            NegativeLabOutputRenderReceipt {
+                density_normalization_metrics: &fixture_density_metrics(),
+                dimensions: NegativeLabSavedPositiveDimensions {
+                    height: rendered.height(),
+                    width: rendered.width(),
+                },
             },
         )
         .expect("write private RAW Negative Lab sidecar");
@@ -5541,6 +5840,7 @@ mod tests {
             &params,
             &save_options,
             &[NegativeLabConversionBundleOutputRef {
+                density_normalization_metrics: fixture_density_metrics(),
                 output_height: rendered.height(),
                 output_path: output_path.clone(),
                 output_width: rendered.width(),
@@ -5693,6 +5993,7 @@ mod tests {
                     max: 1.02,
                 },
             },
+            bounds_receipt: fixture_density_metrics().bounds_receipt,
             channel_bounds: NegativeLabDensityNormalizationChannelBounds {
                 r: NegativeLabDensityChannelBoundsSummary { min: 0.0, max: 1.0 },
                 g: NegativeLabDensityChannelBoundsSummary { min: 0.0, max: 1.0 },
@@ -5924,6 +6225,120 @@ mod tests {
                 right_patch.green_weight,
                 right_patch.blue_weight
             )
+        );
+    }
+
+    #[test]
+    fn robust_bounds_reject_isolated_dust_better_than_naive_percentiles() {
+        let width = 120_usize;
+        let height = 120_usize;
+        let mut clean = Vec::with_capacity(width * height * 3);
+        for y in 0..height {
+            let density = 0.12 + 1.4 * y as f32 / (height - 1) as f32;
+            for _ in 0..width {
+                clean.extend_from_slice(&[density + 0.04, density, density - 0.03]);
+            }
+        }
+        let mut dusty = clean.clone();
+        for grid_y in 0..12 {
+            for grid_x in 0..12 {
+                let pixel_index = ((grid_y * 10) * width + grid_x * 10) * 3;
+                dusty[pixel_index..pixel_index + 3].copy_from_slice(&[4.0, 4.0, 4.0]);
+            }
+        }
+        let params = NegativeConversionParams {
+            analysis_buffer: 0.0,
+            ..NegativeConversionParams::default()
+        };
+        let clean_bounds = analyze_robust_density_bounds(&clean, width, height, &params);
+        let dusty_bounds = analyze_robust_density_bounds(&dusty, width, height, &params);
+        let naive_clean = percentile_bounds(
+            clean
+                .chunks_exact(3)
+                .map(|pixel| density_luma([pixel[0], pixel[1], pixel[2]]))
+                .collect(),
+            0.001,
+        );
+        let naive_dusty = percentile_bounds(
+            dusty
+                .chunks_exact(3)
+                .map(|pixel| density_luma([pixel[0], pixel[1], pixel[2]]))
+                .collect(),
+            0.001,
+        );
+
+        assert!((clean_bounds.luma_bounds.max - dusty_bounds.luma_bounds.max).abs() < 0.0001);
+        assert!((clean_bounds.luma_bounds.min - dusty_bounds.luma_bounds.min).abs() < 0.0001);
+        assert!((naive_clean.max - naive_dusty.max).abs() > 1.0);
+    }
+
+    #[test]
+    fn luma_and_color_clips_drive_independent_density_bounds() {
+        let width = 120_usize;
+        let height = 120_usize;
+        let mut density = Vec::with_capacity(width * height * 3);
+        for y in 0..height {
+            let luma = 0.1 + 1.6 * y as f32 / (height - 1) as f32;
+            for x in 0..width {
+                let color = -0.24 + 0.48 * x as f32 / (width - 1) as f32;
+                density.extend_from_slice(&[luma + color, luma - color * 0.2, luma - color * 0.65]);
+            }
+        }
+        let baseline = analyze_robust_density_bounds(
+            &density,
+            width,
+            height,
+            &NegativeConversionParams {
+                analysis_buffer: 0.0,
+                color_range_clip: 0.02,
+                luma_range_clip: 0.08,
+                ..NegativeConversionParams::default()
+            },
+        );
+        let color_clipped = analyze_robust_density_bounds(
+            &density,
+            width,
+            height,
+            &NegativeConversionParams {
+                analysis_buffer: 0.0,
+                color_range_clip: 0.25,
+                luma_range_clip: 0.08,
+                ..NegativeConversionParams::default()
+            },
+        );
+        let luma_clipped = analyze_robust_density_bounds(
+            &density,
+            width,
+            height,
+            &NegativeConversionParams {
+                analysis_buffer: 0.0,
+                color_range_clip: 0.02,
+                luma_range_clip: 0.2,
+                ..NegativeConversionParams::default()
+            },
+        );
+
+        assert!((baseline.luma_bounds.min - color_clipped.luma_bounds.min).abs() < 0.000001);
+        assert!((baseline.luma_bounds.max - color_clipped.luma_bounds.max).abs() < 0.000001);
+        let probe = [1.5, 0.75, 0.35];
+        let baseline_probe = normalize_density_with_robust_bounds(probe, &baseline);
+        let color_clipped_probe = normalize_density_with_robust_bounds(probe, &color_clipped);
+        assert!(
+            baseline_probe
+                .iter()
+                .zip(color_clipped_probe)
+                .any(|(baseline, clipped)| (baseline - clipped).abs() > 0.001)
+        );
+        assert!((density_luma(baseline_probe) - density_luma(color_clipped_probe)).abs() < 0.00001);
+        assert!(
+            baseline.receipt.final_bounds.axis_bounds.color.max
+                - baseline.receipt.final_bounds.axis_bounds.color.min
+                > color_clipped.receipt.final_bounds.axis_bounds.color.max
+                    - color_clipped.receipt.final_bounds.axis_bounds.color.min
+        );
+        assert!(
+            baseline.luma_bounds.max - baseline.luma_bounds.min
+                > luma_clipped.luma_bounds.max - luma_clipped.luma_bounds.min
         );
     }
 }

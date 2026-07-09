@@ -13,6 +13,69 @@ import {
   NEGATIVE_LAB_AGENT_TOOL_MANIFEST,
 } from './app-server/negativeLabAgentAppServerToolDispatch';
 
+const nativeDensityAxisBoundsSchema = z.object({ max: z.number(), min: z.number() }).strict();
+const nativeDensityBoundsSetSchema = z
+  .object({
+    axisBounds: z.object({ color: nativeDensityAxisBoundsSchema, luma: nativeDensityAxisBoundsSchema }).strict(),
+    channelBounds: z
+      .object({ b: nativeDensityAxisBoundsSchema, g: nativeDensityAxisBoundsSchema, r: nativeDensityAxisBoundsSchema })
+      .strict(),
+  })
+  .strict();
+const LEGACY_NATIVE_DENSITY_BOUNDS_RECEIPT = {
+  algorithmId: 'fixed_grid_block_median_luma_color_v1',
+  analysisBuffer: 0.04,
+  analysisRect: { height: 0.92, width: 0.92, x: 0.04, y: 0.04 },
+  baseBounds: {
+    axisBounds: { color: { max: 0.08, min: -0.08 }, luma: { max: 0.16, min: 0.02 } },
+    channelBounds: {
+      b: { max: 0.2, min: 0.04 },
+      g: { max: 0.16, min: 0.02 },
+      r: { max: 0.14, min: 0.01 },
+    },
+  },
+  baseFogProvenance: 'automatic_analysis',
+  colorRangeClip: 0.12,
+  finalBounds: {
+    axisBounds: { color: { max: 0.12, min: -0.12 }, luma: { max: 1.08, min: -0.03 } },
+    channelBounds: {
+      b: { max: 1.08, min: -0.03 },
+      g: { max: 1.02, min: -0.02 },
+      r: { max: 0.98, min: -0.01 },
+    },
+  },
+  lumaRangeClip: 0.08,
+  schemaVersion: 1,
+  warningCodes: ['missing_visible_base'],
+} as const;
+const nativeDensityBoundsReceiptSchema = z
+  .object({
+    algorithmId: z.literal('fixed_grid_block_median_luma_color_v1'),
+    analysisBuffer: z.number().min(0).max(0.25),
+    analysisRect: z
+      .object({
+        height: z.number().positive(),
+        width: z.number().positive(),
+        x: z.number().min(0),
+        y: z.number().min(0),
+      })
+      .strict(),
+    baseBounds: nativeDensityBoundsSetSchema,
+    baseFogProvenance: z.enum(['automatic_analysis', 'manual_base_fog_sample', 'profile_embedded_base_fog_sample']),
+    colorRangeClip: z.number().min(0.01).max(0.3),
+    finalBounds: nativeDensityBoundsSetSchema,
+    lumaRangeClip: z.number().min(0.01).max(0.3),
+    schemaVersion: z.literal(1),
+    warningCodes: z.array(
+      z.enum(['clipped_base_channel', 'low_acquisition_confidence', 'missing_visible_base', 'uneven_illumination']),
+    ),
+  })
+  .strict()
+  .default(() => ({
+    ...LEGACY_NATIVE_DENSITY_BOUNDS_RECEIPT,
+    warningCodes: [...LEGACY_NATIVE_DENSITY_BOUNDS_RECEIPT.warningCodes],
+  }));
+
 export const negativeLabDryRunPreviewArtifactSchema = z
   .object({
     artifactId: z.string().trim().min(1),
@@ -56,6 +119,7 @@ export const negativeLabDryRunPreviewArtifactSchema = z
             r: z.object({ max: z.number(), min: z.number() }).strict(),
           })
           .strict(),
+        boundsReceipt: nativeDensityBoundsReceiptSchema,
         clippedPixelCount: z.number().int().nonnegative(),
         densityRangeUnclamped: z.number().nonnegative(),
         epsilonClampedPixelCount: z.number().int().nonnegative(),
@@ -98,6 +162,25 @@ const toRuntimePreviewRenderResult = (
       green: artifact.densityNormalizationMetrics.channelBounds.g,
       red: artifact.densityNormalizationMetrics.channelBounds.r,
     },
+    boundsReceipt: {
+      ...artifact.densityNormalizationMetrics.boundsReceipt,
+      baseBounds: {
+        axisBounds: artifact.densityNormalizationMetrics.boundsReceipt.baseBounds.axisBounds,
+        channelBounds: {
+          blue: artifact.densityNormalizationMetrics.boundsReceipt.baseBounds.channelBounds.b,
+          green: artifact.densityNormalizationMetrics.boundsReceipt.baseBounds.channelBounds.g,
+          red: artifact.densityNormalizationMetrics.boundsReceipt.baseBounds.channelBounds.r,
+        },
+      },
+      finalBounds: {
+        axisBounds: artifact.densityNormalizationMetrics.boundsReceipt.finalBounds.axisBounds,
+        channelBounds: {
+          blue: artifact.densityNormalizationMetrics.boundsReceipt.finalBounds.channelBounds.b,
+          green: artifact.densityNormalizationMetrics.boundsReceipt.finalBounds.channelBounds.g,
+          red: artifact.densityNormalizationMetrics.boundsReceipt.finalBounds.channelBounds.r,
+        },
+      },
+    },
     clippedPixelCount: artifact.densityNormalizationMetrics.clippedPixelCount,
     densityRangeUnclamped: artifact.densityNormalizationMetrics.densityRangeUnclamped,
     epsilonClampedPixelCount: artifact.densityNormalizationMetrics.epsilonClampedPixelCount,
@@ -113,11 +196,13 @@ export async function renderNegativeLabRuntimeDryRunPreview(params: {
   path: string;
   recipeParams: {
     analysis_buffer: number;
+    base_fog_bounds_provenance: 'automatic_analysis' | 'manual_base_fog_sample' | 'profile_embedded_base_fog_sample';
     base_fog_sample: { height: number; width: number; x: number; y: number } | null;
     base_fog_strength: number;
     black_point: number;
     black_point_offset: number;
     blue_weight: number;
+    bounds_schema_version: 1;
     color_range_clip: number;
     contrast: number;
     conversion_model?: 'density_rgb_v1' | 'negative_log_density_v1';

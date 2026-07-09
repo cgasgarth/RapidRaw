@@ -146,7 +146,7 @@ describe('Negative Lab before/after preview proof', () => {
     });
     expect(beforeAfterProof?.behaviorProofHash).toMatch(/^sha256:/u);
     expect(dryRunResult.acceptedDryRunPlanHash).toBe(negativeLabAcceptedDryRunPlanHashV1(dryRun));
-    expect(dryRun.proof?.runtimePreview.densityNormalizationMetrics.rendererVersion).toBe(1);
+    expect(dryRun.proof?.runtimePreview.densityNormalizationMetrics.rendererVersion).toBe(2);
     expect(dryRun.proof?.runtimePreview.densityNormalizationMetrics.densityRangeUnclamped).toBeGreaterThan(0);
     expect(dryRun.proof?.runtimePreview.densityNormalizationMetrics.axisBounds.luma.max).toBeGreaterThan(
       dryRun.proof?.runtimePreview.densityNormalizationMetrics.axisBounds.luma.min,
@@ -193,6 +193,10 @@ describe('Negative Lab before/after preview proof', () => {
     expect(apply.positiveOutputReceipts[0]).toMatchObject({
       acceptedDryRunPlanHash: dryRunResult.acceptedDryRunPlanHash,
       acceptedDryRunPlanId: dryRun.dryRunPlanId,
+      boundsReceipt: {
+        algorithmId: 'fixed_grid_block_median_luma_color_v1',
+        schemaVersion: 1,
+      },
       dimensions: { height: 720, width: 1080 },
       sourcePath: '/roll-01/frame-001-negative.dng',
     });
@@ -274,6 +278,6 @@ describe('Negative Lab before/after preview proof', () => {
     if (dryRunResult.kind !== 'dry_run') throw new Error('Expected negative log density dry-run result.');
 
     expect(dryRunResult.dryRun.proof?.algorithm.algorithmId).toBe('negative_log_density_v1');
-    expect(dryRunResult.dryRun.proof?.runtimePreview.densityNormalizationMetrics.rendererVersion).toBe(1);
+    expect(dryRunResult.dryRun.proof?.runtimePreview.densityNormalizationMetrics.rendererVersion).toBe(2);
   });
 });

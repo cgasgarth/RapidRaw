@@ -8866,6 +8866,18 @@ export const negativeLabEstimateBaseFogParametersV1Schema = z
     }
   });
 
+export const negativeLabDensityBoundsParamsV1Schema = z
+  .object({
+    analysisBuffer: z.number().min(0).max(0.25),
+    baseFogProvenance: z.enum(['automatic_analysis', 'manual_base_fog_sample', 'profile_embedded_base_fog_sample']),
+    blackPointOffset: z.number().min(-0.25).max(0.25),
+    colorRangeClip: z.number().min(0.01).max(0.3),
+    lumaRangeClip: z.number().min(0.01).max(0.3),
+    schemaVersion: z.literal(1),
+    whitePointOffset: z.number().min(-0.25).max(0.25),
+  })
+  .strict();
+
 export const negativeLabSetConversionRecipeParametersV1Schema = z
   .object({
     baseStrategy: z
@@ -8884,6 +8896,15 @@ export const negativeLabSetConversionRecipeParametersV1Schema = z
         negativeDensityTolerance: z.number().nonnegative(),
       })
       .strict(),
+    densityBounds: negativeLabDensityBoundsParamsV1Schema.default({
+      analysisBuffer: 0.04,
+      baseFogProvenance: 'automatic_analysis',
+      blackPointOffset: 0,
+      colorRangeClip: 0.12,
+      lumaRangeClip: 0.08,
+      schemaVersion: 1,
+      whitePointOffset: 0,
+    }),
     densityPrintCurve: z
       .object({
         contrastGrade: z.number().min(0.5).max(2),
@@ -9226,6 +9247,77 @@ export const negativeLabChangeSetV1Schema = z
   })
   .strict();
 
+export const negativeLabDensityAxisBoundsV1Schema = z
+  .object({ max: z.number(), min: z.number() })
+  .strict()
+  .refine((bounds) => bounds.max > bounds.min, { message: 'Density axis bounds require max > min.' });
+
+export const negativeLabDensityChannelBoundsV1Schema = z
+  .object({
+    blue: negativeLabDensityAxisBoundsV1Schema,
+    green: negativeLabDensityAxisBoundsV1Schema,
+    red: negativeLabDensityAxisBoundsV1Schema,
+  })
+  .strict();
+
+export const negativeLabDensityBoundsSetV1Schema = z
+  .object({
+    axisBounds: z
+      .object({
+        color: negativeLabDensityAxisBoundsV1Schema,
+        luma: negativeLabDensityAxisBoundsV1Schema,
+      })
+      .strict(),
+    channelBounds: negativeLabDensityChannelBoundsV1Schema,
+  })
+  .strict();
+
+const LEGACY_NEGATIVE_LAB_DENSITY_BOUNDS_RECEIPT_V1 = {
+  algorithmId: 'fixed_grid_block_median_luma_color_v1',
+  analysisBuffer: 0.04,
+  analysisRect: { height: 0.92, width: 0.92, x: 0.04, y: 0.04 },
+  baseBounds: {
+    axisBounds: { color: { max: 0.08, min: -0.08 }, luma: { max: 0.16, min: 0.02 } },
+    channelBounds: {
+      blue: { max: 0.2, min: 0.04 },
+      green: { max: 0.16, min: 0.02 },
+      red: { max: 0.14, min: 0.01 },
+    },
+  },
+  baseFogProvenance: 'automatic_analysis',
+  colorRangeClip: 0.12,
+  finalBounds: {
+    axisBounds: { color: { max: 0.12, min: -0.12 }, luma: { max: 1.08, min: -0.03 } },
+    channelBounds: {
+      blue: { max: 1.08, min: -0.03 },
+      green: { max: 1.02, min: -0.02 },
+      red: { max: 0.98, min: -0.01 },
+    },
+  },
+  lumaRangeClip: 0.08,
+  schemaVersion: 1,
+  warningCodes: ['missing_visible_base'],
+} as const;
+
+export const negativeLabDensityBoundsReceiptV1Schema = z
+  .object({
+    algorithmId: z.literal('fixed_grid_block_median_luma_color_v1'),
+    analysisBuffer: z.number().min(0).max(0.25),
+    analysisRect: negativeLabSampleRectV1Schema,
+    baseBounds: negativeLabDensityBoundsSetV1Schema,
+    baseFogProvenance: z.enum(['automatic_analysis', 'manual_base_fog_sample', 'profile_embedded_base_fog_sample']),
+    colorRangeClip: z.number().min(0.01).max(0.3),
+    finalBounds: negativeLabDensityBoundsSetV1Schema,
+    lumaRangeClip: z.number().min(0.01).max(0.3),
+    schemaVersion: z.literal(1),
+    warningCodes: z.array(negativeWarningCodeSchema),
+  })
+  .strict()
+  .default(() => ({
+    ...LEGACY_NEGATIVE_LAB_DENSITY_BOUNDS_RECEIPT_V1,
+    warningCodes: [...LEGACY_NEGATIVE_LAB_DENSITY_BOUNDS_RECEIPT_V1.warningCodes],
+  }));
+
 export const negativeLabRuntimeProofV1Schema = z
   .object({
     acceptedSuggestionSummary: z
@@ -9346,6 +9438,7 @@ export const negativeLabRuntimeProofV1Schema = z
                 red: z.object({ max: z.number(), min: z.number() }).strict(),
               })
               .strict(),
+            boundsReceipt: negativeLabDensityBoundsReceiptV1Schema,
             clippedPixelCount: z.number().int().nonnegative(),
             densityRangeUnclamped: z.number().nonnegative(),
             epsilonClampedPixelCount: z.number().int().nonnegative(),
@@ -9514,6 +9607,7 @@ export const negativeLabPositiveOutputReceiptV1Schema = z
   .object({
     acceptedDryRunPlanHash: z.string().regex(/^sha256:[A-Za-z0-9:_-]+$/u),
     acceptedDryRunPlanId: z.string().trim().min(1),
+    boundsReceipt: negativeLabDensityBoundsReceiptV1Schema,
     conversionBundleContentHash: z.string().regex(/^sha256:[A-Za-z0-9:_-]+$/u),
     conversionBundlePath: z.string().trim().min(1),
     dimensions: z.object({ height: z.number().int().positive(), width: z.number().int().positive() }).strict(),
@@ -11217,6 +11311,8 @@ export type NegativeLabCreatePositiveVariantParametersV1 = z.infer<
 >;
 export type NegativeLabDensityCurvePointV1 = z.infer<typeof negativeLabDensityCurvePointV1Schema>;
 export type NegativeLabDensityCurveV1 = z.infer<typeof negativeLabDensityCurveV1Schema>;
+export type NegativeLabDensityBoundsParamsV1 = z.infer<typeof negativeLabDensityBoundsParamsV1Schema>;
+export type NegativeLabDensityBoundsReceiptV1 = z.infer<typeof negativeLabDensityBoundsReceiptV1Schema>;
 export type NegativeLabDensityNormalizationProfileV1 = z.infer<typeof negativeLabDensityNormalizationProfileV1Schema>;
 export type NegativeLabDryRunResultV1 = z.infer<typeof negativeLabDryRunResultV1Schema>;
 export type NegativeLabEstimateBaseFogParametersV1 = z.infer<typeof negativeLabEstimateBaseFogParametersV1Schema>;
