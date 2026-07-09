@@ -5,8 +5,17 @@ North star: `RAW_EDITOR_PLAN.md` drives a macOS-first, Capture One/Lightroom-cla
 ## Workflow
 
 - Preflight each turn/worktree: repo root, branch/worktree, deps, remotes, GitHub repo, and PR queue. GitHub repo must be `cgasgarth/RapidRaw`; if not, run `bun run repo:fix-gh-resolution`. `origin` is the fork; `upstream` is `CyberTimon/RapidRAW`.
-- Create worktrees with `bun run worktree:create -- --branch codex/name`; fix the helper if incomplete. Keep at most four active PRs; check queue before opening; enable auto-merge when safe; every PR gets merge, fix, close, or explicit deferral. Never push to protected `main`, stale PRs, or force-push healthy waiting PRs.
-- If blocked, move another stream: implementation, validation, issue refinement, backlog, CI, or PR review. Main agent coordinates, delegates, reviews, decides, merges; keep two independent PR-bound streams active when feasible.
+- Create worktrees with `bun run worktree:create -- --branch codex/name`; fix the helper if incomplete. Keep at most four active PRs, enable auto-merge when safe, and give every PR a disposition: merge, fix, close, or explicit deferral. Never push to protected `main`, leave stale PRs, or force-push healthy waiting PRs.
+- Orchestrator owns backlog shape, task routing, final review, integration judgment, PR queue health, merge decisions, and user-facing status. If blocked, move another stream: implementation, validation, issue refinement, backlog, CI, or PR review. Keep two independent PR-bound streams active when feasible.
+
+## Model Routing
+
+- Use GPT-5.6 Luna for PR polling, CI log triage, issue cleanup, mechanical refactors, docs edits, simple test fixes, and search/inventory summaries.
+- Use GPT-5.6 Terra for normal product implementation, focused bug fixes, validation updates, moderate UI work, and repo cleanup.
+- Use GPT-5.6 Sol for architecture, color science, image-processing math, agentic editing design, complex UI redesign, hard debugging, consult synthesis, and risky cross-cutting changes.
+- Use Sol `max` reasoning for the hardest design/debugging/science calls. Use Sol `ultra` mode when complex work benefits from coordinated subagents.
+- Subagents may implement, validate, and open PRs when issue context is sufficient. Orchestrator still reviews scope, validation evidence, issue linkage, and merge safety.
+- Do not use Sol for routine polling, formatting, simple renames, or low-risk mechanical cleanup. If a subagent stalls, re-scope, upgrade the tier, or switch streams.
 
 ## Code Hygiene
 
@@ -16,7 +25,7 @@ North star: `RAW_EDITOR_PLAN.md` drives a macOS-first, Capture One/Lightroom-cla
 
 ## Validation
 
-- Before push/PR, stage intended files and commit so precommit runs; bypass only if user paused local validation, then say CI is the source. If GHA finds a deterministic repo failure, add the cheapest local gate unless already covered. Keep success tiny, failure actionable, and preserve evidence: commands, blockers, runtime proof, consult decisions.
+- Before push/PR, stage intended files and commit so precommit runs; bypass only if user paused local validation, then say CI is the source. If GHA finds a deterministic repo failure, add the cheapest local gate unless covered. Keep success tiny, failure actionable, and preserve evidence: commands, blockers, runtime proof, consult decisions.
 - Match proof to claim: plan-only, schema-only, API-only, dry-run-only, UI-only, and runtime-capable are distinct. Do not call features complete without runtime, preview/export, E2E/equivalent proof, screenshots/artifacts, and tracked gaps.
 - Image features require app execution on RAWs and output validation, preferably `/Users/cgas/Pictures/Capture One/Alaska`. Never commit private RAWs/artifacts; use one private-root/report pattern. Use Computer Use for visible UI claims and `bun run install:computer-use` for the app bundle.
 - README/docs marketing media must use current UI captures without people in images, GIFs, filmstrips, thumbnails, previews, or generated assets; use landscapes, objects, synthetic fixtures, or clearly licensed/repo-owned assets instead, and do not introduce people in new README/docs images or GIFs.
@@ -24,5 +33,5 @@ North star: `RAW_EDITOR_PLAN.md` drives a macOS-first, Capture One/Lightroom-cla
 ## Issues, Consult, CI
 
 - Issues map to one realistic PR and include concise Why, How, Validation, constraints, links/artifacts, runtime proof needs, and plan-only status when relevant. Use milestones for themes; split broad issues and close stale, duplicate, or meta-only ones.
-- Use consult at milestone level before creating/reshaping milestones; ask for architecture, sequence, risks, validation, and PR-sized issues, passing milestone titles/numbers and GitHub data when available. Reconsult per PR only when scope/risk changes. Use consult heavily for UI, color science, negative processing, film sims, deblur/denoise/detail math, panorama, HDR, focus stacking, super-resolution, app-server agents, GHA, and hard decisions. RapidRaw consults belong in the RapidRaw ChatGPT project.
+- Use consult at milestone level before creating/reshaping milestones; ask for architecture, sequence, risks, validation, and PR-sized issues, passing milestone titles/numbers and GitHub data when available. Reconsult per PR only when scope/risk changes. Use consult heavily for UI, color science, negative processing, film sims, deblur/denoise/detail math, panorama, HDR, focus stacking, super-resolution, app-server agents, GHA, and hard decisions. RapidRaw consults belong in the RapidRaw ChatGPT project; consult guides architecture but does not replace runtime proof.
 - Use Bun test for non-UI TS, Playwright/native app automation for UI/E2E, and Cargo test for Rust. Maintain `PR CI / required`, supported GitHub Actions versions, and non-canceling PR/main workflow runs.
