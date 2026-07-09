@@ -241,7 +241,7 @@ interface LivePromptResult {
   stateRecipeHash?: string;
   stateStaleRecipeHash?: boolean;
   status: LivePromptStatus;
-  summary?: string;
+  summary?: string | undefined;
 }
 
 interface LiveSessionReviewState {
@@ -2845,7 +2845,7 @@ function LivePromptComposer({
       status: 'rolled_back',
       toolName: rollbackReceipt.toolName,
     });
-    const nextResult = { ...result, status: 'rolled_back' } satisfies LivePromptResult;
+    const nextResult = { ...result, status: 'rolled_back', summary: undefined } satisfies LivePromptResult;
     setResult(nextResult);
     onResultChange?.(nextResult);
     onSessionEvent?.(

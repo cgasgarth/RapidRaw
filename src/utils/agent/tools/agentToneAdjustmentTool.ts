@@ -288,7 +288,7 @@ export const buildAgentToneAdjustmentPromptDraft = (
     adjustedFields,
     requestedAdjustments,
     supported: true,
-    summary: `Preview ready: ${adjustedFields.join(', ')} adjusted.`,
+    summary: `${adjustedFields.join(', ')} adjusted.`,
   };
 };
 
