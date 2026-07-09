@@ -15,7 +15,7 @@ import {
   Sparkles,
   Trash2,
 } from 'lucide-react';
-import { type KeyboardEvent, useEffect, useMemo, useState } from 'react';
+import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { debouncedSave } from '../../../../hooks/editor/useEditorActions';
 import { useEditorStore } from '../../../../store/useEditorStore';
@@ -74,6 +74,7 @@ import {
 
 interface LayerStackPanelProps {
   activeMaskContainerId: string | null;
+  creationSlot?: ReactNode;
   masks: Array<MaskContainer>;
   onSelectMaskContainer: (id: string | null) => void;
   onSetMaskContainers: (masks: Array<MaskContainer>) => void;
@@ -469,6 +470,7 @@ function tFallbackLayerGroupName(): string {
 
 export function LayerStackPanel({
   activeMaskContainerId,
+  creationSlot,
   masks,
   onSelectMaskContainer,
   onSetMaskContainers,
@@ -1107,212 +1109,160 @@ export function LayerStackPanel({
       <div className={professionalInspectorDensityTokens.panelHeader.root}>
         <div className="flex min-w-0 items-center gap-2">
           <Layers3 size={18} className="shrink-0 text-text-secondary" />
+          <UiText variant={TextVariants.heading} className={professionalInspectorDensityTokens.panelHeader.title}>
+            {t('editor.layers.title')}
+          </UiText>
+        </div>
+        <UiText
+          variant={TextVariants.small}
+          className={editorChromeStatusChipClassName('neutral')}
+          data-testid="layer-stack-count"
+        >
+          {masks.length}
+        </UiText>
+      </div>
+
+      <details className="mx-2 mt-1 rounded border border-editor-border bg-editor-panel-well">
+        <summary className="cursor-pointer px-2 py-1 text-[10px] font-medium uppercase leading-4 text-text-tertiary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring">
+          {t('editor.layers.provenance.summaryTitle')}
+        </summary>
+        <div
+          className="mx-2 mt-2 grid grid-cols-3 gap-1 rounded-md border border-editor-border bg-editor-panel-well p-1.5"
+          data-collapsed-group-count={groupWorkflowProof.collapsedGroupCount}
+          data-collapsed-group-ids={groupWorkflowProof.collapsedGroupIds.join(',')}
+          data-group-count={groupCount}
+          data-hidden-group-count={groupWorkflowProof.hiddenGroupCount}
+          data-grouped-layer-count={groupWorkflowProof.groupedLayerCount}
+          data-hidden-layer-count={hiddenLayerCount}
+          data-mixed-group-count={groupWorkflowProof.mixedGroupCount}
+          data-testid="layer-stack-composition-summary"
+          data-visible-group-count={groupWorkflowProof.visibleGroupCount}
+          data-visible-layer-count={visibleLayerCount}
+          data-visible-order={groupWorkflowProof.visibleOrder.join(',')}
+        >
+          <UiText
+            variant={TextVariants.small}
+            weight={TextWeights.medium}
+            className="truncate rounded bg-editor-panel px-1.5 py-1 text-center text-[11px] tabular-nums text-text-secondary"
+            data-testid="layer-visible-count"
+          >
+            {t('editor.layers.visibleLayerCount', { count: visibleLayerCount })}
+          </UiText>
+          <UiText
+            variant={TextVariants.small}
+            weight={TextWeights.medium}
+            className="truncate rounded bg-editor-panel px-1.5 py-1 text-center text-[11px] tabular-nums text-text-secondary"
+            data-testid="layer-hidden-count"
+          >
+            {t('editor.layers.hiddenLayerCount', { count: hiddenLayerCount })}
+          </UiText>
+          <UiText
+            variant={TextVariants.small}
+            weight={TextWeights.medium}
+            className="truncate rounded bg-editor-panel px-1.5 py-1 text-center text-[11px] tabular-nums text-text-secondary"
+            data-testid="layer-stack-count-summary"
+          >
+            {t('editor.layers.groupSummaryCount', { count: groupCount })}
+          </UiText>
+        </div>
+
+        <div
+          className="mx-2 mt-1.5 rounded-md border border-editor-border bg-editor-panel-well px-2 py-1.5"
+          data-exportable-layer-count={exportReadiness.exportableLayerCount}
+          data-hidden-layer-count={exportReadiness.hiddenLayerCount}
+          data-masked-layer-count={exportReadiness.maskedLayerCount}
+          data-testid="layer-export-readiness-summary"
+          data-total-layer-count={exportReadiness.totalLayerCount}
+        >
+          <UiText variant={TextVariants.small} weight={TextWeights.medium} className="block text-text-primary">
+            {t('editor.layers.exportReadiness.title')}
+          </UiText>
+          <UiText variant={TextVariants.small} className="block text-text-tertiary">
+            {t('editor.layers.exportReadiness.summary', {
+              exportable: exportReadiness.exportableLayerCount,
+              masked: exportReadiness.maskedLayerCount,
+              total: exportReadiness.totalLayerCount,
+            })}
+          </UiText>
+        </div>
+
+        <div
+          className="mx-2 mt-1.5 grid grid-cols-3 gap-1 rounded-md border border-editor-border bg-editor-panel-well p-1.5"
+          data-can-group-active-layer={String(canGroupActiveLayer)}
+          data-can-move-active-layer={String(canMoveActiveLayerUp || canMoveActiveLayerDown)}
+          data-can-ungroup-active-layer={String(canUngroupActiveLayer)}
+          data-layer-stack-graph-revision={layerGraphRevision}
+          data-layer-stack-last-brush-local-receipt-id={lastBrushLocalReceiptId}
+          data-layer-stack-last-changed-layer-count={lastChangedLayerCount}
+          data-layer-stack-last-command-type={lastCommandType}
+          data-layer-mask-source-graph-revision={layerMaskSourceGraphRevision}
+          data-testid="layer-operation-readiness-summary"
+        >
+          <UiText
+            variant={TextVariants.small}
+            weight={TextWeights.medium}
+            className="rounded bg-editor-panel px-1.5 py-1 text-left text-[11px] leading-4 text-text-secondary"
+            data-testid="layer-operation-move-ready"
+          >
+            {canMoveActiveLayerUp || canMoveActiveLayerDown
+              ? t('editor.layers.operationReadiness.moveReady')
+              : t('editor.layers.operationReadiness.moveBlocked')}
+          </UiText>
+          <UiText
+            variant={TextVariants.small}
+            weight={TextWeights.medium}
+            className="rounded bg-editor-panel px-1.5 py-1 text-left text-[11px] leading-4 text-text-secondary"
+            data-testid="layer-operation-group-ready"
+          >
+            {canGroupActiveLayer
+              ? t('editor.layers.operationReadiness.groupReady')
+              : t('editor.layers.operationReadiness.groupBlocked')}
+          </UiText>
+          <UiText
+            variant={TextVariants.small}
+            weight={TextWeights.medium}
+            className="rounded bg-editor-panel px-1.5 py-1 text-left text-[11px] leading-4 text-text-secondary"
+            data-testid="layer-operation-ungroup-ready"
+          >
+            {canUngroupActiveLayer
+              ? t('editor.layers.operationReadiness.ungroupReady')
+              : t('editor.layers.operationReadiness.ungroupBlocked')}
+          </UiText>
+        </div>
+
+        <div
+          className="mx-2 mt-1.5 flex items-center justify-between gap-2 rounded-md border border-editor-border bg-editor-panel-well px-2 py-1.5"
+          data-current-receipt-count={
+            Object.values(layerMaskProvenanceViews).filter((view) => view.status === 'current').length
+          }
+          data-stale-receipt-count={
+            Object.values(layerMaskProvenanceViews).filter((view) => view.status !== 'current').length
+          }
+          data-testid="layer-mask-provenance-summary"
+        >
           <span className="min-w-0">
-            <UiText variant={TextVariants.heading} className={professionalInspectorDensityTokens.panelHeader.title}>
-              {t('editor.layers.title')}
+            <UiText variant={TextVariants.small} weight={TextWeights.medium} className="block text-text-primary">
+              {t('editor.layers.provenance.summaryTitle')}
             </UiText>
-            <UiText
-              variant={TextVariants.small}
-              className="block tabular-nums text-text-tertiary"
-              data-testid="layer-stack-count"
-            >
-              {t('editor.layers.layerCount', { count: masks.length })}
+            <UiText variant={TextVariants.small} className="block truncate text-text-tertiary">
+              {t('editor.layers.provenance.summary')}
             </UiText>
           </span>
-        </div>
-        <div className="flex items-center gap-1">
           <button
-            className={layerPanelButtonClassName}
-            data-tooltip={t('editor.layers.actions.groupWithNext')}
-            disabled={!canGroupActiveLayer}
-            onClick={groupActiveLayer}
+            className={layerSecondaryActionClassName}
+            data-testid="layer-mask-preview-receipts-record"
+            onClick={() => {
+              recordLayerMaskPreviewReceipt({
+                appliedCommandId: `layer_stack_preview_${layerMaskSourceGraphRevision}`,
+                masks,
+              });
+            }}
             type="button"
           >
-            <Layers3 size={17} className="mx-auto" />
-          </button>
-          <button
-            className={layerPanelButtonClassName}
-            data-tooltip={t('editor.layers.actions.createAdjustmentLayer')}
-            onClick={createActiveAdjustmentLayer}
-            type="button"
-          >
-            <Plus size={17} className="mx-auto" />
-          </button>
-          <button
-            className={layerPanelButtonClassName}
-            data-tooltip={t('editor.layers.actions.createBrushLocalAdjustmentLayer')}
-            data-testid="layer-create-brush-local-adjustment"
-            onClick={createBrushLocalAdjustmentLayer}
-            type="button"
-          >
-            <Brush size={17} className="mx-auto" />
-          </button>
-          <button
-            className={layerPanelButtonClassName}
-            data-tooltip={t('editor.layers.actions.createCloneLayer')}
-            data-testid="layer-create-clone-layer"
-            onClick={createCloneLayer}
-            type="button"
-          >
-            <Copy size={17} className="mx-auto" />
-          </button>
-          <button
-            className={layerPanelButtonClassName}
-            data-tooltip={t('editor.layers.actions.createHealLayer')}
-            data-testid="layer-create-heal-layer"
-            onClick={createHealLayer}
-            type="button"
-          >
-            <Sparkles size={17} className="mx-auto" />
-          </button>
-          <button
-            className={layerPanelButtonClassName}
-            data-tooltip={t('editor.layers.actions.createRemoveLayer')}
-            data-testid="layer-create-remove-layer"
-            onClick={createRemoveLayer}
-            type="button"
-          >
-            <Eraser size={17} className="mx-auto" />
+            {t('editor.layers.provenance.preview')}
           </button>
         </div>
-      </div>
-
-      <div
-        className="mx-2 mt-2 grid grid-cols-3 gap-1 rounded-md border border-editor-border bg-editor-panel-well p-1.5"
-        data-collapsed-group-count={groupWorkflowProof.collapsedGroupCount}
-        data-collapsed-group-ids={groupWorkflowProof.collapsedGroupIds.join(',')}
-        data-group-count={groupCount}
-        data-hidden-group-count={groupWorkflowProof.hiddenGroupCount}
-        data-grouped-layer-count={groupWorkflowProof.groupedLayerCount}
-        data-hidden-layer-count={hiddenLayerCount}
-        data-mixed-group-count={groupWorkflowProof.mixedGroupCount}
-        data-testid="layer-stack-composition-summary"
-        data-visible-group-count={groupWorkflowProof.visibleGroupCount}
-        data-visible-layer-count={visibleLayerCount}
-        data-visible-order={groupWorkflowProof.visibleOrder.join(',')}
-      >
-        <UiText
-          variant={TextVariants.small}
-          weight={TextWeights.medium}
-          className="truncate rounded bg-editor-panel px-1.5 py-1 text-center text-[11px] tabular-nums text-text-secondary"
-          data-testid="layer-visible-count"
-        >
-          {t('editor.layers.visibleLayerCount', { count: visibleLayerCount })}
-        </UiText>
-        <UiText
-          variant={TextVariants.small}
-          weight={TextWeights.medium}
-          className="truncate rounded bg-editor-panel px-1.5 py-1 text-center text-[11px] tabular-nums text-text-secondary"
-          data-testid="layer-hidden-count"
-        >
-          {t('editor.layers.hiddenLayerCount', { count: hiddenLayerCount })}
-        </UiText>
-        <UiText
-          variant={TextVariants.small}
-          weight={TextWeights.medium}
-          className="truncate rounded bg-editor-panel px-1.5 py-1 text-center text-[11px] tabular-nums text-text-secondary"
-          data-testid="layer-stack-count-summary"
-        >
-          {t('editor.layers.groupSummaryCount', { count: groupCount })}
-        </UiText>
-      </div>
-
-      <div
-        className="mx-2 mt-1.5 rounded-md border border-editor-border bg-editor-panel-well px-2 py-1.5"
-        data-exportable-layer-count={exportReadiness.exportableLayerCount}
-        data-hidden-layer-count={exportReadiness.hiddenLayerCount}
-        data-masked-layer-count={exportReadiness.maskedLayerCount}
-        data-testid="layer-export-readiness-summary"
-        data-total-layer-count={exportReadiness.totalLayerCount}
-      >
-        <UiText variant={TextVariants.small} weight={TextWeights.medium} className="block text-text-primary">
-          {t('editor.layers.exportReadiness.title')}
-        </UiText>
-        <UiText variant={TextVariants.small} className="block text-text-tertiary">
-          {t('editor.layers.exportReadiness.summary', {
-            exportable: exportReadiness.exportableLayerCount,
-            masked: exportReadiness.maskedLayerCount,
-            total: exportReadiness.totalLayerCount,
-          })}
-        </UiText>
-      </div>
-
-      <div
-        className="mx-2 mt-1.5 grid grid-cols-3 gap-1 rounded-md border border-editor-border bg-editor-panel-well p-1.5"
-        data-can-group-active-layer={String(canGroupActiveLayer)}
-        data-can-move-active-layer={String(canMoveActiveLayerUp || canMoveActiveLayerDown)}
-        data-can-ungroup-active-layer={String(canUngroupActiveLayer)}
-        data-layer-stack-graph-revision={layerGraphRevision}
-        data-layer-stack-last-brush-local-receipt-id={lastBrushLocalReceiptId}
-        data-layer-stack-last-changed-layer-count={lastChangedLayerCount}
-        data-layer-stack-last-command-type={lastCommandType}
-        data-layer-mask-source-graph-revision={layerMaskSourceGraphRevision}
-        data-testid="layer-operation-readiness-summary"
-      >
-        <UiText
-          variant={TextVariants.small}
-          weight={TextWeights.medium}
-          className="rounded bg-editor-panel px-1.5 py-1 text-left text-[11px] leading-4 text-text-secondary"
-          data-testid="layer-operation-move-ready"
-        >
-          {canMoveActiveLayerUp || canMoveActiveLayerDown
-            ? t('editor.layers.operationReadiness.moveReady')
-            : t('editor.layers.operationReadiness.moveBlocked')}
-        </UiText>
-        <UiText
-          variant={TextVariants.small}
-          weight={TextWeights.medium}
-          className="rounded bg-editor-panel px-1.5 py-1 text-left text-[11px] leading-4 text-text-secondary"
-          data-testid="layer-operation-group-ready"
-        >
-          {canGroupActiveLayer
-            ? t('editor.layers.operationReadiness.groupReady')
-            : t('editor.layers.operationReadiness.groupBlocked')}
-        </UiText>
-        <UiText
-          variant={TextVariants.small}
-          weight={TextWeights.medium}
-          className="rounded bg-editor-panel px-1.5 py-1 text-left text-[11px] leading-4 text-text-secondary"
-          data-testid="layer-operation-ungroup-ready"
-        >
-          {canUngroupActiveLayer
-            ? t('editor.layers.operationReadiness.ungroupReady')
-            : t('editor.layers.operationReadiness.ungroupBlocked')}
-        </UiText>
-      </div>
-
-      <div
-        className="mx-2 mt-1.5 flex items-center justify-between gap-2 rounded-md border border-editor-border bg-editor-panel-well px-2 py-1.5"
-        data-current-receipt-count={
-          Object.values(layerMaskProvenanceViews).filter((view) => view.status === 'current').length
-        }
-        data-stale-receipt-count={
-          Object.values(layerMaskProvenanceViews).filter((view) => view.status !== 'current').length
-        }
-        data-testid="layer-mask-provenance-summary"
-      >
-        <span className="min-w-0">
-          <UiText variant={TextVariants.small} weight={TextWeights.medium} className="block text-text-primary">
-            {t('editor.layers.provenance.summaryTitle')}
-          </UiText>
-          <UiText variant={TextVariants.small} className="block truncate text-text-tertiary">
-            {t('editor.layers.provenance.summary')}
-          </UiText>
-        </span>
-        <button
-          className={layerSecondaryActionClassName}
-          data-testid="layer-mask-preview-receipts-record"
-          onClick={() => {
-            recordLayerMaskPreviewReceipt({
-              appliedCommandId: `layer_stack_preview_${layerMaskSourceGraphRevision}`,
-              masks,
-            });
-          }}
-          type="button"
-        >
-          {t('editor.layers.provenance.preview')}
-        </button>
-      </div>
+      </details>
 
       <div className="space-y-1 px-2 py-2">
         {rows.map((row) => {
@@ -1446,22 +1396,13 @@ export function LayerStackPanel({
                         })}
                 </UiText>
                 {row.retouchCloneSource !== null && (
-                  <UiText
-                    as="span"
-                    variant={TextVariants.small}
-                    color={TextColors.secondary}
-                    className="block truncate text-[11px] leading-4 tabular-nums"
-                    data-testid="layer-retouch-transform-summary"
-                  >
+                  <span hidden data-testid="layer-retouch-transform-summary">
                     {`scale ${row.retouchCloneSource.scale.toFixed(2)} | rotate ${row.retouchCloneSource.rotationDegrees.toFixed(1)} deg`}
-                  </UiText>
+                  </span>
                 )}
                 {row.retouchRemoveSource !== null && (
-                  <UiText
-                    as="span"
-                    variant={TextVariants.small}
-                    color={TextColors.secondary}
-                    className="block truncate text-[11px] leading-4 tabular-nums"
+                  <span
+                    hidden
                     data-remove-row-search-radius-multiplier={row.retouchRemoveSource.searchRadiusMultiplier}
                     data-remove-row-seed={row.retouchRemoveSource.seed}
                     data-remove-row-status={row.retouchRemoveSource.status ?? 'needs_regeneration'}
@@ -1472,9 +1413,9 @@ export function LayerStackPanel({
                       seedValue: row.retouchRemoveSource.seed,
                       status: t(getRemoveStatusLabelKey(row.retouchRemoveSource.status)),
                     })}
-                  </UiText>
+                  </span>
                 )}
-                {provenanceView !== undefined && (
+                {provenanceView !== undefined && provenanceView.status !== 'current' && (
                   <span className="mt-1 block">
                     <LayerMaskProvenanceBadge view={provenanceView} />
                   </span>
@@ -1503,6 +1444,70 @@ export function LayerStackPanel({
             </div>
           );
         })}
+      </div>
+
+      <div
+        className="border-t border-editor-border bg-editor-panel-well px-2 py-1.5"
+        data-testid="layer-contextual-creation"
+      >
+        <div className="flex min-w-0 items-center gap-1.5">
+          <UiText
+            variant={TextVariants.small}
+            weight={TextWeights.medium}
+            className="shrink-0 text-[10px] uppercase text-text-tertiary"
+          >
+            {t('editor.layers.title')}
+          </UiText>
+          <div className="flex items-center gap-0.5">
+            <button
+              className={layerPanelButtonClassName}
+              data-tooltip={t('editor.layers.actions.createAdjustmentLayer')}
+              onClick={createActiveAdjustmentLayer}
+              type="button"
+            >
+              <Plus size={17} className="mx-auto" />
+            </button>
+            <button
+              className={layerPanelButtonClassName}
+              data-tooltip={t('editor.layers.actions.createBrushLocalAdjustmentLayer')}
+              data-testid="layer-create-brush-local-adjustment"
+              onClick={createBrushLocalAdjustmentLayer}
+              type="button"
+            >
+              <Brush size={17} className="mx-auto" />
+            </button>
+            <button
+              className={layerPanelButtonClassName}
+              data-tooltip={t('editor.layers.actions.createCloneLayer')}
+              data-testid="layer-create-clone-layer"
+              onClick={createCloneLayer}
+              type="button"
+            >
+              <Copy size={17} className="mx-auto" />
+            </button>
+            <button
+              className={layerPanelButtonClassName}
+              data-tooltip={t('editor.layers.actions.createHealLayer')}
+              data-testid="layer-create-heal-layer"
+              onClick={createHealLayer}
+              type="button"
+            >
+              <Sparkles size={17} className="mx-auto" />
+            </button>
+            <button
+              className={layerPanelButtonClassName}
+              data-tooltip={t('editor.layers.actions.createRemoveLayer')}
+              data-testid="layer-create-remove-layer"
+              onClick={createRemoveLayer}
+              type="button"
+            >
+              <Eraser size={17} className="mx-auto" />
+            </button>
+          </div>
+          {creationSlot !== undefined && (
+            <div className="ml-auto min-w-0 border-l border-editor-border pl-1.5">{creationSlot}</div>
+          )}
+        </div>
       </div>
 
       {activeRow && (
@@ -2075,6 +2080,15 @@ export function LayerStackPanel({
           </div>
 
           <div className="flex items-center justify-end gap-1" data-testid="layer-icon-action-row">
+            <button
+              className={layerPanelButtonClassName}
+              data-tooltip={t('editor.layers.actions.groupWithNext')}
+              disabled={!canGroupActiveLayer}
+              onClick={groupActiveLayer}
+              type="button"
+            >
+              <Layers3 size={16} className="mx-auto" />
+            </button>
             <button
               className={layerPanelButtonClassName}
               data-tooltip={t('editor.layers.actions.moveUp')}

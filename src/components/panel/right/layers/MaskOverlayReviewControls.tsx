@@ -35,7 +35,7 @@ export function MaskOverlayReviewControls({
 
   return (
     <div
-      className={`${professionalInspectorDensityTokens.card.nestedPanel} space-y-2`}
+      className={`${professionalInspectorDensityTokens.card.nestedPanel} space-y-1`}
       data-mask-overlay-edge-threshold={settings.edgeThreshold.toFixed(2)}
       data-mask-overlay-hotkey={hotkeyHint}
       data-mask-overlay-mode={settings.mode}
@@ -53,69 +53,74 @@ export function MaskOverlayReviewControls({
         }}
       />
 
-      <div className="grid grid-cols-4 gap-1" role="group" aria-label={t('editor.masks.overlay.modeGroup')}>
-        {MASK_OVERLAY_REVIEW_MODES.map((option) => {
-          const isActive = activeMode === option.mode;
-          return (
-            <button
-              key={option.mode}
-              type="button"
-              aria-label={option.mode}
-              aria-pressed={isActive && isEnabled}
-              data-mask-overlay-mode-option={option.mode}
-              data-testid={`mask-overlay-mode-${option.mode}`}
-              className={cx(
-                'h-6 rounded border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring',
-                isActive && isEnabled
-                  ? 'border-editor-primary-active'
-                  : 'border-editor-border hover:border-text-secondary',
-              )}
-              style={{ backgroundColor: option.color }}
-              onClick={() => {
-                onChange({ ...settings, mode: option.mode });
+      {isEnabled && (
+        <>
+          <div className="grid grid-cols-8 gap-0.5" role="group" aria-label={t('editor.masks.overlay.modeGroup')}>
+            {MASK_OVERLAY_REVIEW_MODES.map((option) => {
+              const isActive = activeMode === option.mode;
+              return (
+                <button
+                  key={option.mode}
+                  type="button"
+                  aria-label={option.mode}
+                  aria-pressed={isActive}
+                  data-mask-overlay-mode-option={option.mode}
+                  data-testid={`mask-overlay-mode-${option.mode}`}
+                  data-tooltip={option.mode}
+                  className={cx(
+                    'h-5 rounded-sm border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring',
+                    isActive
+                      ? 'border-editor-primary-active ring-1 ring-editor-primary-active'
+                      : 'border-editor-border hover:border-text-secondary',
+                  )}
+                  style={{ backgroundColor: option.color }}
+                  onClick={() => {
+                    onChange({ ...settings, mode: option.mode });
+                  }}
+                />
+              );
+            })}
+          </div>
+
+          <div data-testid="mask-overlay-opacity-control">
+            <AdjustmentSlider
+              defaultValue={50}
+              disabled={!isEnabled}
+              fillOrigin="min"
+              label={t('editor.masks.overlay.opacity')}
+              max={100}
+              min={0}
+              onDragStateChange={onDragStateChange}
+              onValueChange={(value) => {
+                onChange({ ...settings, opacity: value / 100 });
               }}
+              step={1}
+              suffix="%"
+              value={Math.round(settings.opacity * 100)}
+              density="compact"
             />
-          );
-        })}
-      </div>
+          </div>
 
-      <div data-testid="mask-overlay-opacity-control">
-        <AdjustmentSlider
-          defaultValue={50}
-          disabled={!isEnabled}
-          fillOrigin="min"
-          label={t('editor.masks.overlay.opacity')}
-          max={100}
-          min={0}
-          onDragStateChange={onDragStateChange}
-          onValueChange={(value) => {
-            onChange({ ...settings, opacity: value / 100 });
-          }}
-          step={1}
-          suffix="%"
-          value={Math.round(settings.opacity * 100)}
-          density="compact"
-        />
-      </div>
-
-      <div data-testid="mask-overlay-edge-threshold-control">
-        <AdjustmentSlider
-          defaultValue={50}
-          disabled={!isEnabled || activeMode !== 'edges'}
-          fillOrigin="min"
-          label={t('editor.masks.overlay.edgeThreshold')}
-          max={100}
-          min={0}
-          onDragStateChange={onDragStateChange}
-          onValueChange={(value) => {
-            onChange({ ...settings, edgeThreshold: value / 100 });
-          }}
-          step={1}
-          suffix="%"
-          value={Math.round(settings.edgeThreshold * 100)}
-          density="compact"
-        />
-      </div>
+          <div data-testid="mask-overlay-edge-threshold-control">
+            <AdjustmentSlider
+              defaultValue={50}
+              disabled={!isEnabled || activeMode !== 'edges'}
+              fillOrigin="min"
+              label={t('editor.masks.overlay.edgeThreshold')}
+              max={100}
+              min={0}
+              onDragStateChange={onDragStateChange}
+              onValueChange={(value) => {
+                onChange({ ...settings, edgeThreshold: value / 100 });
+              }}
+              step={1}
+              suffix="%"
+              value={Math.round(settings.edgeThreshold * 100)}
+              density="compact"
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 }

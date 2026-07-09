@@ -1709,19 +1709,24 @@ export async function prepareScenario(page, mode) {
   }
 
   if (mode === 'professional-layers-compact') {
-    await page
-      .getByTestId(/mask-panel-provenance-badge-/u)
-      .first()
-      .waitFor({ timeout: 10_000 });
-    await page
-      .getByTestId(/mask-panel-provenance-badge-/u)
-      .first()
-      .click();
-    await page
-      .getByTestId(/mask-panel-provenance-popover-/u)
-      .first()
-      .waitFor({ timeout: 10_000 });
-    await page.getByTestId('mask-settings-provenance-card').waitFor({ timeout: 10_000 });
+    await page.getByTestId('professional-layers-stack-proof').waitFor({ timeout: 10_000 });
+    await page.getByTestId('professional-layer-mask-creation-proof').waitFor({ timeout: 10_000 });
+    await page.getByTestId('professional-local-adjustment-proof').waitFor({ timeout: 10_000 });
+    await page.getByTestId('professional-mask-overlay-proof').waitFor({ timeout: 10_000 });
+
+    const currentProvenanceCount = await page.getByTestId(/mask-panel-provenance-badge-/u).count();
+    if (currentProvenanceCount !== 0) {
+      throw new Error(
+        `Compact mask editing must not show current provenance badges (${currentProvenanceCount} found).`,
+      );
+    }
+
+    const currentProvenanceCardCount = await page.getByTestId('mask-settings-provenance-card').count();
+    if (currentProvenanceCardCount !== 0) {
+      throw new Error(
+        `Compact mask editing must not show current provenance cards (${currentProvenanceCardCount} found).`,
+      );
+    }
     return;
   }
 

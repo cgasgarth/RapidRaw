@@ -1,14 +1,18 @@
 import cx from 'clsx';
 import {
+  Brush,
   Camera,
   ChevronDown,
+  Circle,
   CircleGauge,
   FolderOpen,
   GripVertical,
   Layers3,
+  Plus,
   RotateCcw,
   SlidersHorizontal,
   Sparkles,
+  TriangleRight,
 } from 'lucide-react';
 import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -4085,6 +4089,7 @@ function LibraryWorkflowVisualSmoke() {
 }
 
 function ProfessionalLayersCompactVisualSmoke() {
+  const { t } = useTranslation();
   const hierarchyRows = [
     {
       count: '2 masks',
@@ -4159,6 +4164,41 @@ function ProfessionalLayersCompactVisualSmoke() {
               </button>
             ))}
           </div>
+          <div
+            className="flex items-center justify-between gap-2 border-t border-editor-border px-2 py-1.5"
+            data-testid="professional-layer-mask-creation-proof"
+          >
+            <div className="flex items-center gap-0.5">
+              <span className="mr-1 text-[10px] font-semibold uppercase text-text-tertiary">
+                {t('editor.layers.title')}
+              </span>
+              {[Plus, Brush, Sparkles].map((Icon, index) => (
+                <button
+                  aria-label={['Create layer', 'Create brush layer', 'Create healing layer'][index]}
+                  className="flex h-6 w-6 items-center justify-center rounded text-text-secondary hover:bg-editor-selected-quiet hover:text-text-primary"
+                  key={index}
+                  type="button"
+                >
+                  <Icon size={15} />
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-0.5 border-l border-editor-border pl-2">
+              <span className="mr-1 text-[10px] font-semibold uppercase text-text-tertiary">
+                {t('editor.masks.masksTitle')}
+              </span>
+              {[Brush, TriangleRight, Circle, Sparkles, Plus].map((Icon, index) => (
+                <button
+                  aria-label={['Add brush', 'Add gradient', 'Add radial', 'Select subject', 'Add mask'][index]}
+                  className="flex h-6 w-6 items-center justify-center rounded text-text-secondary hover:bg-editor-selected-quiet hover:text-text-primary"
+                  key={index}
+                  type="button"
+                >
+                  <Icon size={15} />
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="border-t border-editor-border p-2" data-visual-smoke-section="compact-submask-hierarchy">
             <p className="mb-1 text-[11px] font-semibold uppercase text-text-secondary">
               {copy.professionalLayersMaskComponents}
@@ -4201,26 +4241,6 @@ function ProfessionalLayersCompactVisualSmoke() {
         >
           <div
             className="rounded-md border border-editor-border bg-editor-panel-well p-2"
-            data-testid="professional-mask-status-proof"
-          >
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <span className="truncate text-[12px] font-semibold">{copy.professionalLayersDustRemove}</span>
-              <span className={editorChromeStatusChipClassName('warning')}>{copy.professionalLayersStale}</span>
-            </div>
-            <div className="grid grid-cols-3 gap-1 text-[11px]">
-              <span className="rounded bg-editor-panel px-1.5 py-1 text-text-secondary">
-                {copy.professionalLayersReady}
-              </span>
-              <span className="rounded bg-editor-panel px-1.5 py-1 text-text-secondary">
-                {copy.professionalLayersLoading}
-              </span>
-              <span className="rounded bg-editor-panel px-1.5 py-1 text-text-secondary">
-                {copy.professionalLayersDisabled}
-              </span>
-            </div>
-          </div>
-          <div
-            className="mt-2 rounded-md border border-editor-border bg-editor-panel-well p-2"
             data-testid="professional-local-adjustment-proof"
           >
             <p className="text-[11px] font-semibold uppercase text-text-secondary">
@@ -4232,6 +4252,24 @@ function ProfessionalLayersCompactVisualSmoke() {
                 <span className="h-1 rounded bg-editor-primary-active" />
               </div>
             ))}
+          </div>
+          <div
+            className="mt-2 rounded-md border border-editor-border bg-editor-panel-well p-2"
+            data-testid="professional-mask-overlay-proof"
+          >
+            <MaskOverlayReviewControls
+              settings={{ edgeThreshold: 0.5, mode: 'rubylith', opacity: 0.5 }}
+              onChange={() => {}}
+              onDragStateChange={() => {}}
+              hotkeyHint="Shift+O"
+            />
+          </div>
+          <div
+            className="mt-2 flex items-center justify-between gap-2 rounded-md border border-editor-warning bg-editor-warning-surface px-2 py-1.5"
+            data-testid="professional-mask-status-proof"
+          >
+            <span className="truncate text-[12px] font-medium">{copy.professionalLayersDustRemove}</span>
+            <span className={editorChromeStatusChipClassName('warning')}>{copy.professionalLayersStale}</span>
           </div>
           <div
             className="mt-2 rounded-md border border-editor-border bg-editor-panel-well p-2"
