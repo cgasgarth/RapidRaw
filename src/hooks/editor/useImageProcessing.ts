@@ -71,6 +71,7 @@ interface InteractivePreviewRequest {
 
 interface PreviewRenderRequest extends InteractivePreviewRequest {
   dragging: boolean;
+  scopeRecovery: boolean;
 }
 
 interface InteractivePreviewScopeSnapshot {
@@ -371,6 +372,8 @@ export function useImageProcessing(
                 colorProfile: selectedProofRecipe.colorProfile ?? 'srgb',
                 expectedImagePath: request.identity.sourceImagePath,
                 exportSoftProofRecipeId: selectedProofRecipe.id,
+                computeWaveform: isWaveformVisible || request.scopeRecovery,
+                activeWaveformChannel: activeWaveformChannelRef.current,
                 jsAdjustments: payload,
                 renderingIntent: selectedProofRecipe.renderingIntent ?? 'relativeColorimetric',
                 targetResolution: request.targetRes,
@@ -432,7 +435,7 @@ export function useImageProcessing(
                   {
                     request: applyAdjustmentsInvokeSchema.parse({
                       activeWaveformChannel: activeWaveformChannelRef.current,
-                      computeWaveform: isWaveformVisible,
+                      computeWaveform: isWaveformVisible || request.scopeRecovery,
                       expectedImagePath: request.identity.sourceImagePath,
                       isInteractive: request.dragging,
                       jsAdjustments: payload,
@@ -595,9 +598,31 @@ export function useImageProcessing(
           return;
         }
         const commitStartedAt = previewNow();
+        const completedScopeStatus = useEditorStore.getState().previewScopeStatus;
         setEditor({
           exportSoftProofTransform: transform,
           finalPreviewUrl: url,
+          previewScopeStatus:
+            transform &&
+            completedScopeStatus?.path === request.identity.sourceImagePath &&
+            completedScopeStatus.histogramReady &&
+            completedScopeStatus.waveformReady
+              ? {
+                  ...completedScopeStatus,
+                  displayTransformLabel: transform.colorManagedTransform ?? 'Display preview transform',
+                  exportProfileLabel: transform.effectiveColorProfile,
+                  exportRenderingIntentLabel: transform.effectiveRenderingIntent,
+                  renderBasis: 'export_preview',
+                  softProofTransformApplied: transform.transformApplied === true,
+                  sourceLabel: 'Export preview',
+                  warningCodes: [
+                    transform.transformApplied
+                      ? 'export_profile_transform_applied'
+                      : 'export_profile_transform_missing',
+                    'render_target_matches_export_recipe',
+                  ],
+                }
+              : completedScopeStatus,
           previewQualityStatus: {
             ...request.quality,
             generation: request.identity.generation,
@@ -622,6 +647,7 @@ export function useImageProcessing(
             softProofTransformApplied: transform?.transformApplied ?? false,
           });
         }
+        if (request.scopeRecovery) setEditor({ previewScopeRecoveryError: null });
       } catch (err) {
         if (err !== 'Superseded or worker failed') {
           console.error('Failed to apply adjustments:', err);
@@ -637,6 +663,12 @@ export function useImageProcessing(
             reason: 'render_error',
             sufficientForSemanticZoom: false,
           });
+          if (request.scopeRecovery) {
+            setEditor({
+              previewScopeRecoveryError: err instanceof Error ? err.message : String(err),
+              previewScopeRecoveryState: 'error',
+            });
+          }
         }
       }
     },
@@ -652,7 +684,8 @@ export function useImageProcessing(
     ],
   );
 
-  executeInteractiveRenderRef.current = (request) => executeApplyAdjustments({ ...request, dragging: true });
+  executeInteractiveRenderRef.current = (request) =>
+    executeApplyAdjustments({ ...request, dragging: true, scopeRecovery: false });
 
   useEffect(
     () => () => {
@@ -666,7 +699,7 @@ export function useImageProcessing(
   }, [selectedImage?.path]);
 
   const applyAdjustments = useCallback(
-    (currentAdjustments: Adjustments, dragging: boolean = false, targetRes?: number) => {
+    (currentAdjustments: Adjustments, dragging: boolean = false, targetRes?: number, scopeRecovery = false) => {
       if (!selectedImage?.isReady) return;
 
       const requestedTargetRes = Math.max(1, Math.round(targetRes ?? appSettings?.editorPreviewResolution ?? 1920));
@@ -699,6 +732,7 @@ export function useImageProcessing(
           quality,
           roi: synchronized.roi,
           requestId: latestInteractiveRequestIdRef.current,
+          scopeRecovery,
           targetRes: normalizedTargetRes,
         });
       }
@@ -712,6 +746,14 @@ export function useImageProcessing(
       synchronizePreviewIdentity,
     ],
   );
+
+  const previewScopeRecoveryRequestId = useEditorStore((state) => state.previewScopeRecoveryRequestId);
+  const handledScopeRecoveryRequestIdRef = useRef(previewScopeRecoveryRequestId);
+  useEffect(() => {
+    if (previewScopeRecoveryRequestId === handledScopeRecoveryRequestIdRef.current) return;
+    handledScopeRecoveryRequestIdRef.current = previewScopeRecoveryRequestId;
+    applyAdjustments(adjustments, false, undefined, true);
+  }, [adjustments, applyAdjustments, previewScopeRecoveryRequestId]);
 
   const generateUncroppedPreview = useCallback(
     (currentAdjustments: Adjustments) => {

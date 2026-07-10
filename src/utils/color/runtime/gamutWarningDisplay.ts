@@ -27,7 +27,7 @@ interface ExportSoftProofOverlayContext {
   selectedImagePath: string | null;
 }
 
-export type PreviewBoundWarningState = 'current' | 'stale' | 'unavailable' | 'unsupported';
+export type PreviewBoundWarningState = 'current' | 'error' | 'stale' | 'unavailable' | 'unsupported';
 
 export interface RenderedPreviewWarningStatus {
   coverageLabel: string;
@@ -44,6 +44,7 @@ export interface PreviewScopeFreshnessInput {
   renderBasis: string;
   softProofTransformApplied: boolean;
   waveformReady: boolean;
+  warningCodes?: string[];
 }
 
 export interface PreviewScopeFreshnessStatus {
@@ -78,6 +79,22 @@ export interface ColorOutputProofingDiagnosticsSummary {
   transformPolicyFingerprint: string | null;
   workingSpaceLabel: string;
 }
+
+export interface ColorOutputProofingDiagnosticRow {
+  code: string;
+  fingerprint: string | null;
+  label: string;
+  state: PreviewBoundWarningState;
+}
+
+export const buildColorOutputProofingDiagnosticRow = (
+  diagnostics: ColorOutputProofingDiagnosticsSummary,
+): ColorOutputProofingDiagnosticRow => ({
+  code: `preview_scope_${diagnostics.previewScopeState}`,
+  fingerprint: diagnostics.transformPolicyFingerprint,
+  label: diagnostics.previewScopeStatusLabel,
+  state: diagnostics.previewScopeState,
+});
 
 export type EditorChromeStatusChipTone = 'neutral' | 'success' | 'warning' | 'danger' | 'info';
 export type EditorChromeStatusChipId =
@@ -278,6 +295,10 @@ export const getPreviewScopeFreshnessStatus = (
     return { state: 'unavailable', statusLabel: 'Scopes unavailable' };
   }
 
+  if (previewScopeStatus.warningCodes?.some((code) => /error|fail/iu.test(code))) {
+    return { state: 'error', statusLabel: 'Scopes error' };
+  }
+
   if (previewScopeStatus.renderBasis === 'export_preview' && !previewScopeStatus.softProofTransformApplied) {
     return { state: 'unsupported', statusLabel: 'Soft proof scopes unsupported' };
   }
@@ -347,6 +368,8 @@ const proofStateCode = (state: PreviewBoundWarningState): string => {
   switch (state) {
     case 'current':
       return 'preview_proof_current';
+    case 'error':
+      return 'preview_proof_error';
     case 'stale':
       return 'preview_proof_stale';
     case 'unsupported':
@@ -469,6 +492,8 @@ const previewStateToTone = (state: PreviewBoundWarningState): EditorChromeStatus
   switch (state) {
     case 'current':
       return 'success';
+    case 'error':
+      return 'danger';
     case 'stale':
       return 'warning';
     case 'unsupported':
@@ -479,6 +504,7 @@ const previewStateToTone = (state: PreviewBoundWarningState): EditorChromeStatus
 };
 
 const softProofStateToTone = (state: RenderedPreviewWarningStatus['state']): EditorChromeStatusChipTone => {
+  if (state === 'error') return 'danger';
   if (state === 'current') return 'success';
   if (state === 'stale') return 'warning';
   if (state === 'unsupported') return 'neutral';
@@ -530,7 +556,7 @@ export const getEditorChromeStatusChips = ({
       value: proofContext.isExportSoftProofEnabled ? renderedPreviewWarningStatus.statusLabel : 'Off',
     },
     {
-      active: previewScopeFreshnessStatus.state === 'current',
+      active: previewScopeStatus !== null,
       detail: previewScopeStatus?.renderBasis ?? 'Scopes pending',
       id: 'preview-scopes',
       label: 'Scopes',
