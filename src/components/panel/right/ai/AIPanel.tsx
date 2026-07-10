@@ -374,7 +374,9 @@ export function AIPanel() {
   const isGeneratingAiMask = useEditorStore((s) => s.isGeneratingAiMask);
   const maskOverlaySettings = useEditorStore((s) => s.maskOverlaySettings);
   const selectedImage = useEditorStore((s) => s.selectedImage);
-  const showOriginal = useEditorStore((s) => s.showOriginal);
+  const compare = useEditorStore((s) => s.compare);
+  const showOriginal = compare.isOriginalHeld || compare.mode === 'hold-original';
+  const dispatchCompare = useEditorStore((s) => s.dispatchCompare);
   const setEditor = useEditorStore((s) => s.setEditor);
 
   const aiModelDownloadStatus = useProcessStore((s) => s.aiModelDownloadStatus);
@@ -1337,7 +1339,7 @@ export function AIPanel() {
                     onSelectSubMask(null);
                   }}
                   onToggleOriginal={() => {
-                    setEditor({ showOriginal: !showOriginal });
+                    dispatchCompare({ type: 'toggle-original' });
                   }}
                   onToggleVisibility={(id) => {
                     updatePatch(id, {

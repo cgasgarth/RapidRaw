@@ -37,6 +37,7 @@ import {
   percentCropFromPixelCrop,
   resolveNextCropForGeometryChange,
 } from '../../utils/cropUtils';
+import { resolveComparePaneLayout } from '../../utils/editorCompare';
 import {
   applyPointerOverscrollResistance,
   applyWheelPanResistance,
@@ -153,6 +154,7 @@ export default function Editor({
   const activeRightPanel = useUIStore((s) => s.activeRightPanel);
   const isInstantTransition = useUIStore((s) => s.isInstantTransition);
   const setUI = useUIStore((s) => s.setUI);
+  const setDefaultEditorCompareMode = useUIStore((s) => s.setDefaultEditorCompareMode);
   const isLoading = useLibraryStore((s) => s.isViewLoading);
   const selectedImage = useEditorStore((s) => s.selectedImage);
   const adjustments = useEditorStore((s) => s.adjustments);
@@ -173,8 +175,8 @@ export default function Editor({
     historyIndex: adjustmentsHistoryIndex,
     isExportSoftProofEnabled,
   });
-  const compareMode = useEditorStore((s) => s.compareMode);
-  const showOriginal = useEditorStore((s) => s.showOriginal);
+  const compare = useEditorStore((s) => s.compare);
+  const showOriginal = compare.isOriginalHeld || compare.mode === 'hold-original';
   const isSliderDragging = useEditorStore((s) => s.isSliderDragging);
   const zoom = useEditorStore((s) => s.zoom);
   const zoomMode = useEditorStore((s) => s.zoomMode);
@@ -197,6 +199,7 @@ export default function Editor({
   const hasRenderedFirstFrame = useEditorStore((s) => s.hasRenderedFirstFrame);
 
   const setEditor = useEditorStore((s) => s.setEditor);
+  const dispatchCompare = useEditorStore((s) => s.dispatchCompare);
   const undo = useEditorStore((s) => s.undo);
   const redo = useEditorStore((s) => s.redo);
   const goToHistoryIndex = useEditorStore((s) => s.goToHistoryIndex);
@@ -271,8 +274,8 @@ export default function Editor({
   const prevViewportContextKeyRef = useRef<string | null>(null);
   const prevViewportDprRef = useRef<number | null>(null);
   const toggleShowOriginal = useCallback(() => {
-    setEditor((state) => ({ compareMode: state.compareMode === 'hold-original' ? 'off' : 'hold-original' }));
-  }, [setEditor]);
+    dispatchCompare({ type: 'toggle-original' });
+  }, [dispatchCompare]);
 
   const handleToggleFullScreen = useCallback(() => {
     const currentlyZoomed = zoom > 1.01;
@@ -407,8 +410,8 @@ export default function Editor({
   useEffect(() => {
     if (previousFullScreenRef.current === isFullScreen) return;
     previousFullScreenRef.current = isFullScreen;
-    setEditor({ compareMode: 'off' });
-  }, [isFullScreen, setEditor]);
+    dispatchCompare({ type: 'exit' });
+  }, [dispatchCompare, isFullScreen]);
 
   const isCropping = activeRightPanel === Panel.Crop;
   const isMasking = activeRightPanel === Panel.Masks;
@@ -440,7 +443,22 @@ export default function Editor({
     selectedImage?.width,
   ]);
 
-  const imageRenderSize = useImageRenderSize(imageContainerRef, croppedDimensions);
+  const singleImageRenderSize = useImageRenderSize(imageContainerRef, croppedDimensions);
+  const comparePaneLayout = useMemo(() => {
+    if (!croppedDimensions) {
+      return { edited: singleImageRenderSize, original: singleImageRenderSize };
+    }
+    return resolveComparePaneLayout({
+      imageDimensions: croppedDimensions,
+      mode: compare.mode,
+      orientation: compare.orientation,
+      viewport: {
+        height: singleImageRenderSize.height + singleImageRenderSize.offsetY * 2,
+        width: singleImageRenderSize.width + singleImageRenderSize.offsetX * 2,
+      },
+    });
+  }, [compare.mode, compare.orientation, croppedDimensions, singleImageRenderSize]);
+  const imageRenderSize = compare.mode === 'side-by-side' ? comparePaneLayout.edited : singleImageRenderSize;
   const [devicePixelRatio, setDevicePixelRatio] = useState(() =>
     getEditorZoomDpr(typeof window === 'undefined' ? 1 : window.devicePixelRatio),
   );
@@ -827,6 +845,7 @@ export default function Editor({
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.target instanceof Element && e.target.closest('[data-canvas-pointer-owner="compare-divider"]')) return;
       if (e.pointerType === 'mouse' && e.button !== 0 && e.button !== 1) return;
       activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
       pointerStarts.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -1058,16 +1077,16 @@ export default function Editor({
       return;
     }
 
-    if (compareMode !== 'hold-original' && !showOriginal) return;
+    if (compare.mode !== 'hold-original' && !compare.isOriginalHeld) return;
 
     const syncTimer = setTimeout(() => {
-      setEditor({ compareMode: 'off' });
+      dispatchCompare({ type: 'exit' });
     }, 0);
 
     return () => {
       clearTimeout(syncTimer);
     };
-  }, [adjustments, compareMode, setEditor, showOriginal]);
+  }, [adjustments, compare.isOriginalHeld, compare.mode, dispatchCompare]);
 
   useEffect(() => {
     if (isMasking || isAiEditing) return;
@@ -1925,16 +1944,21 @@ export default function Editor({
           onRedo={redo}
           onToggleFullScreen={handleToggleFullScreen}
           onShowOriginalChange={(nextShowOriginal) => {
-            setEditor({ showOriginal: nextShowOriginal });
+            dispatchCompare({ held: nextShowOriginal, type: 'set-original-held' });
           }}
           onToggleShowOriginal={toggleShowOriginal}
           onUndo={undo}
           selectedImage={selectedImage}
-          compareMode={compareMode}
+          compareMode={compare.mode}
+          compareOrientation={compare.orientation}
           onCompareModeChange={(mode) => {
-            setEditor({ compareMode: mode });
+            dispatchCompare({ mode, type: 'set-mode' });
+            setDefaultEditorCompareMode(mode);
           }}
-          showOriginal={showOriginal}
+          onCompareOrientationChange={(orientation) => {
+            dispatchCompare({ orientation, type: 'set-orientation' });
+          }}
+          showOriginal={compare.isOriginalHeld || compare.mode === 'hold-original'}
           showDateView={showExifDateView}
           onToggleDateView={() => {
             setShowExifDateView((prev) => !prev);
@@ -2024,6 +2048,7 @@ export default function Editor({
               gamutWarningOverlay={gamutWarningOverlay}
               handleCropComplete={handleCropComplete}
               imageRenderSize={imageRenderSize}
+              originalImageRenderSize={comparePaneLayout.original}
               overlayGeometry={overlayGeometry}
               interactivePatch={interactivePatch}
               isAiEditing={isAiEditing}
@@ -2056,8 +2081,17 @@ export default function Editor({
               setCrop={handleCropChange}
               setIsMaskHovered={setIsMaskHovered}
               setIsMaskTouchInteracting={setIsMaskTouchInteracting}
-              compareMode={compareMode}
-              showOriginal={showOriginal}
+              compareMode={compare.mode}
+              compareOrientation={compare.orientation}
+              compareDividerPosition={compare.dividerPosition}
+              compareLabelsVisible={compare.labelsVisible}
+              onCompareDividerPositionChange={(position) => {
+                dispatchCompare({ position, type: 'set-divider' });
+              }}
+              onCompareDividerReset={() => {
+                dispatchCompare({ type: 'reset-divider' });
+              }}
+              showOriginal={compare.isOriginalHeld}
               transformedOriginalUrl={transformedOriginalUrl}
               uncroppedAdjustedPreviewUrl={uncroppedAdjustedPreviewUrl}
               updateSubMask={updateSubMaskLocal}

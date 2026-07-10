@@ -28,7 +28,11 @@ describe('viewer sampler contract', () => {
         displayedImageRect: { x: 100, y: 50, width: 400, height: 200 },
         surfaceRect: { x: 0, y: 0, width: 1200, height: 800, layoutWidth: 600, layoutHeight: 400 },
       }),
-    ).toEqual({ normalizedImagePoint: { x: 0.125, y: 0.375 }, normalizedViewerX: 0.25 });
+    ).toEqual({
+      normalizedImagePoint: { x: 0.125, y: 0.375 },
+      normalizedViewerX: 0.25,
+      normalizedViewerY: 0.3125,
+    });
   });
 
   test('selects the compare pane under the pointer and preserves proof target', () => {
@@ -41,6 +45,16 @@ describe('viewer sampler contract', () => {
     expect(resolveViewerSampleTarget({ compareMode: 'off', normalizedViewerX: 0.2, softProofEnabled: false })).toBe(
       'edited',
     );
+    expect(
+      resolveViewerSampleTarget({
+        compareMode: 'split-wipe',
+        compareDividerPosition: 0.7,
+        compareOrientation: 'horizontal',
+        normalizedViewerX: 0.9,
+        normalizedViewerY: 0.6,
+        softProofEnabled: false,
+      }),
+    ).toBe('original');
   });
 
   test('binds result acceptance to image, graph, geometry, target, radius, and point identity', () => {

@@ -78,16 +78,24 @@ export const isViewerSampleResultCurrent = (
 
 export const resolveViewerSampleTarget = ({
   compareMode,
+  compareDividerPosition = 0.5,
+  compareOrientation = 'vertical',
   normalizedViewerX,
+  normalizedViewerY = 0.5,
   softProofEnabled,
 }: {
   compareMode: 'off' | 'hold-original' | 'split-wipe' | 'side-by-side';
+  compareDividerPosition?: number;
+  compareOrientation?: 'horizontal' | 'vertical';
   normalizedViewerX: number;
+  normalizedViewerY?: number;
   softProofEnabled: boolean;
 }): ViewerSampleTarget => {
   if (compareMode === 'hold-original') return 'original';
   if (compareMode === 'split-wipe' || compareMode === 'side-by-side') {
-    return normalizedViewerX < 0.5 ? 'original' : softProofEnabled ? 'softProof' : 'edited';
+    const axisPosition = compareOrientation === 'vertical' ? normalizedViewerX : normalizedViewerY;
+    const boundary = compareMode === 'split-wipe' ? compareDividerPosition : 0.5;
+    return axisPosition < boundary ? 'original' : softProofEnabled ? 'softProof' : 'edited';
   }
   return softProofEnabled ? 'softProof' : 'edited';
 };
@@ -100,7 +108,11 @@ export const mapViewerPointToImage = ({
   clientPoint: { x: number; y: number };
   displayedImageRect: { x: number; y: number; width: number; height: number };
   surfaceRect: { x: number; y: number; width: number; height: number; layoutWidth: number; layoutHeight: number };
-}): { normalizedImagePoint: { x: number; y: number }; normalizedViewerX: number } | null => {
+}): {
+  normalizedImagePoint: { x: number; y: number };
+  normalizedViewerX: number;
+  normalizedViewerY: number;
+} | null => {
   if (surfaceRect.layoutWidth <= 0 || surfaceRect.layoutHeight <= 0) return null;
   const scaleX = surfaceRect.width / surfaceRect.layoutWidth;
   const scaleY = surfaceRect.height / surfaceRect.layoutHeight;
@@ -115,6 +127,7 @@ export const mapViewerPointToImage = ({
   return {
     normalizedImagePoint: { x: clamp01(x), y: clamp01(y) },
     normalizedViewerX: clamp01((clientPoint.x - surfaceRect.x) / surfaceRect.width),
+    normalizedViewerY: clamp01((clientPoint.y - surfaceRect.y) / surfaceRect.height),
   };
 };
 
