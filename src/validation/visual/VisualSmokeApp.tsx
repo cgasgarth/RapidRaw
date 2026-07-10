@@ -1120,24 +1120,24 @@ function ProfessionalEditorStatusChipsVisualSmoke() {
         </header>
         <section className="grid min-h-0 grid-cols-[minmax(0,1fr)_320px] gap-3" data-visual-smoke-section="normal">
           <div className="relative min-h-0 overflow-hidden rounded-lg border border-editor-border bg-editor-panel-well p-2">
-            <div className="relative h-full overflow-hidden rounded-lg bg-editor-panel-well">
-              <EditorChromeStatusStrip isFullScreen={false} />
-              <div className="grid h-full place-items-center">
+            <div className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-lg bg-editor-panel-well">
+              <div className="grid min-h-0 flex-1 place-items-center">
                 <div className="aspect-[4/3] w-[82%] overflow-hidden rounded-md border border-editor-overlay-stroke bg-[linear-gradient(135deg,#18232b_0%,#3f5960_36%,#968762_64%,#ebd5aa_100%)] shadow-[0_24px_52px_var(--editor-overlay-shadow)]">
                   <div className="h-full w-full bg-[radial-gradient(circle_at_36%_28%,rgba(255,246,208,0.56),transparent_18%),linear-gradient(170deg,transparent_52%,rgba(12,16,20,0.68)_53%)]" />
                 </div>
               </div>
+              <EditorChromeStatusStrip isFullScreen={false} />
             </div>
           </div>
           <aside
             className="min-h-0 overflow-hidden rounded-lg border border-editor-border bg-editor-panel p-3"
             data-visual-smoke-section="fullscreen"
           >
-            <div className="relative h-full overflow-hidden rounded-lg border border-editor-border bg-editor-panel-well">
-              <EditorChromeStatusStrip isFullScreen={true} />
-              <div className="grid h-full place-items-center">
+            <div className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-editor-border bg-editor-panel-well">
+              <div className="grid min-h-0 flex-1 place-items-center">
                 <div className="aspect-[3/4] h-[78%] rounded-md border border-editor-overlay-stroke bg-[linear-gradient(160deg,#1b2630,#6d856f_52%,#d6c28c)] shadow-[0_18px_42px_var(--editor-overlay-shadow)]" />
               </div>
+              <EditorChromeStatusStrip isFullScreen={true} />
             </div>
           </aside>
         </section>
