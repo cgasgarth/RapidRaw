@@ -8,6 +8,7 @@ import ImageLoaderManager from './components/managers/ImageLoaderManager';
 import ImageProcessingManager from './components/managers/ImageProcessingManager';
 import AppModals from './components/modals/AppModals';
 import EditorLeftSidebar, { type EditorLeftSectionId } from './components/panel/editor/EditorLeftSidebar';
+import EditorNavigator, { type EditorTransformController } from './components/panel/editor/EditorNavigator';
 import FolderTreePanel from './components/panel/FolderTree';
 import ExportPanel from './components/panel/right/export/ExportPanel';
 import {
@@ -65,7 +66,7 @@ interface PreviousAdjustments {
   path: string;
 }
 
-interface TransformController {
+interface TransformController extends EditorTransformController {
   resetTransform(time?: number): void;
   setTransform(x: number, y: number, scale: number, time?: number): void;
   zoomIn(factor: number, time?: number): void;
@@ -725,6 +726,11 @@ function App() {
                 }}
                 onVisibleChange={(visible: boolean) => {
                   setEditorRegionVisibility('leftSidebar', visible);
+                }}
+                slots={{
+                  navigator: (
+                    <EditorNavigator onZoomChange={handleZoomChange} transformControllerRef={transformWrapperRef} />
+                  ),
                 }}
                 width={leftPanelWidth}
               />
