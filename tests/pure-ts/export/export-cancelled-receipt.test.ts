@@ -17,6 +17,7 @@ test('cancelled terminal receipt preserves committed outputs for UI actions and 
         byteSize: 256,
         format: 'cube',
         outputPath: '/tmp/exported-look.cube',
+        rawProvenanceSidecarPath: '/tmp/exported-look.cube.rawengine-provenance.json',
         sourcePath: '/tmp/source.arw',
       },
     ],
@@ -34,6 +35,9 @@ test('cancelled terminal receipt preserves committed outputs for UI actions and 
   expect(terminalState.lastReceipt?.terminalStatus).toBe('cancelled');
   expect(terminalState.lastReceipt?.outputs.map((output) => output.outputPath)).toEqual(['/tmp/exported-look.cube']);
   expect(terminalState.lastReceipt?.outputs[0]?.auxiliaryOutputPaths).toEqual(['/tmp/exported-look_mask_0_alpha.png']);
+  expect(terminalState.lastReceipt?.outputs[0]?.rawProvenanceSidecarPath).toBe(
+    '/tmp/exported-look.cube.rawengine-provenance.json',
+  );
   expect(terminalState.lastReceipt?.outputs.length).toBeGreaterThan(0);
   expect(hasCommittedExportOutputs(receipt)).toBe(true);
   expect(shouldRefreshLibraryForExportReceipt(receipt, '/tmp')).toBe(true);

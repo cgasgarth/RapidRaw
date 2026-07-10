@@ -32,7 +32,6 @@ interface ProcessState {
   invalidateThumbnails: (paths: ReadonlyArray<string>) => void;
 }
 
-let exportTimeout: ReturnType<typeof setTimeout>;
 let importTimeout: ReturnType<typeof setTimeout>;
 let copyTimeout: ReturnType<typeof setTimeout>;
 let pasteTimeout: ReturnType<typeof setTimeout>;
@@ -106,23 +105,6 @@ export const useProcessStore = create<ProcessState>((set, get) => ({
         };
       })(),
     }));
-
-    const status = get().exportState.status;
-
-    clearTimeout(exportTimeout);
-
-    if ([Status.Success, Status.Error, Status.Cancelled].includes(status)) {
-      exportTimeout = setTimeout(() => {
-        set((prev) => ({
-          exportState: {
-            ...prev.exportState,
-            status: Status.Idle,
-            errorMessage: '',
-            progress: { current: 0, total: 0 },
-          },
-        }));
-      }, 5000);
-    }
   },
 
   setImportState: (updater) => {

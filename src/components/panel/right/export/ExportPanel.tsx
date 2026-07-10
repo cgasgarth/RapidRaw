@@ -2607,6 +2607,7 @@ export default function ExportPanel({
             data-export-receipt-auxiliary-output-paths={(firstReceiptOutput.auxiliaryOutputPaths ?? []).join(',')}
             data-export-receipt-policy-status={firstReceiptOutput.policyStatus ?? ''}
             data-export-receipt-policy-version={firstReceiptOutput.policyVersion ?? ''}
+            data-export-receipt-raw-provenance-sidecar-path={firstReceiptOutput.rawProvenanceSidecarPath ?? ''}
             data-export-receipt-requested-color-profile={firstReceiptOutput.requestedColorProfile ?? ''}
             data-export-receipt-requested-rendering-intent={firstReceiptOutput.requestedRenderingIntent ?? ''}
             data-export-receipt-resolved-disabled-reason={firstReceiptOutput.resolvedDisabledReason ?? ''}

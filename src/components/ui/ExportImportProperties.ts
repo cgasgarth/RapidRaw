@@ -119,6 +119,7 @@ export interface ExportReceiptOutput {
   policyStatus?: string | null | undefined;
   policyVersion?: string | null | undefined;
   rawDevelopmentReport?: RawDevelopmentReport | null | undefined;
+  rawProvenanceSidecarPath?: string | null | undefined;
   renderingIntent?: string | null | undefined;
   requestedColorProfile?: string | null | undefined;
   requestedRenderingIntent?: string | null | undefined;
