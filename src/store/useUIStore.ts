@@ -1,12 +1,7 @@
 import { create } from 'zustand';
 
-import {
-  DEFAULT_EDITOR_RIGHT_PANEL,
-  isEditingRightPanel,
-  isRightPanel,
-  RIGHT_PANEL_ORDER,
-} from '../components/panel/right/rightPanelRegistry';
-import type { CullingSuggestions, ImageFile, Panel, UiVisibility } from '../components/ui/AppProperties';
+import { isEditingRightPanel, isRightPanel, RIGHT_PANEL_ORDER } from '../components/panel/right/rightPanelRegistry';
+import { type CullingSuggestions, type ImageFile, Panel, type UiVisibility } from '../components/ui/AppProperties';
 import type { DerivedOutputReceipt } from '../schemas/computational-merge/derivedOutputReceiptSchemas';
 import {
   DEFAULT_HDR_MERGE_UI_SETTINGS,
@@ -25,9 +20,26 @@ import {
   DEFAULT_SUPER_RESOLUTION_UI_SETTINGS,
   type SuperResolutionUiSettings,
 } from '../schemas/computational-merge/superResolutionUiSchemas';
+import type {
+  EditorWorkspaceCompareMode,
+  EditorWorkspaceLightsOutLevel,
+  EditorWorkspacePreferences,
+  EditorWorkspaceZoomMode,
+} from '../schemas/editorWorkspacePreferencesSchemas';
+import { editorWorkspacePreferencesSchema } from '../schemas/editorWorkspacePreferencesSchemas';
 import type { FocusStackOutputReviewWorkflow } from '../schemas/focus-stack/focusStackOutputReviewSchemas';
 import { DEFAULT_FOCUS_STACK_UI_SETTINGS, type FocusStackUiSettings } from '../schemas/focus-stack/focusStackUiSchemas';
 import type { MaskContainer } from '../utils/adjustments';
+import {
+  EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY,
+  type EditorWorkspaceViewport,
+  getEffectiveEditorWorkspaceLayout,
+  LEGACY_LAST_EDITING_RIGHT_PANEL_STORAGE_KEY,
+  type LegacyEditorWorkspacePreferences,
+  readEditorWorkspacePreferences,
+  saveEditorWorkspacePreferences,
+  shouldPersistLegacyWorkspaceMigration,
+} from '../utils/editorWorkspacePreferences';
 import type { FocusStackSourcePreflightMetadata } from '../utils/focusStackSourcePreflight';
 import type { HdrBracketPreflightSourceMetadata } from '../utils/hdrBracketPreflight';
 import {
@@ -51,46 +63,11 @@ export interface CollapsibleSectionsState {
   transformLens: boolean;
 }
 
-const DEVELOP_PANEL_PINNED_CONTROL_IDS_STORAGE_KEY = 'rapidraw.developPanelPinnedControlIds.v1';
-export const LAST_EDITING_RIGHT_PANEL_STORAGE_KEY = 'rapidraw.lastEditingRightPanel.v1';
+export const LAST_EDITING_RIGHT_PANEL_STORAGE_KEY = LEGACY_LAST_EDITING_RIGHT_PANEL_STORAGE_KEY;
+export { EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY };
 export const MAX_RECENT_RIGHT_PANELS = 5;
 
-export const readLastEditingRightPanel = (): Panel => {
-  if (typeof globalThis.localStorage === 'undefined') return DEFAULT_EDITOR_RIGHT_PANEL;
-
-  try {
-    const stored = globalThis.localStorage.getItem(LAST_EDITING_RIGHT_PANEL_STORAGE_KEY);
-    if (stored === null) return DEFAULT_EDITOR_RIGHT_PANEL;
-    return isEditingRightPanel(stored) ? stored : DEFAULT_EDITOR_RIGHT_PANEL;
-  } catch {
-    return DEFAULT_EDITOR_RIGHT_PANEL;
-  }
-};
-
-const persistLastEditingRightPanel = (panel: Panel) => {
-  if (typeof globalThis.localStorage === 'undefined' || !isEditingRightPanel(panel)) return;
-
-  globalThis.localStorage.setItem(LAST_EDITING_RIGHT_PANEL_STORAGE_KEY, panel);
-};
-
-const readDevelopPanelPinnedControlIds = (): string[] => {
-  if (typeof globalThis.localStorage === 'undefined') return [];
-
-  try {
-    const stored = globalThis.localStorage.getItem(DEVELOP_PANEL_PINNED_CONTROL_IDS_STORAGE_KEY);
-    if (stored === null) return [];
-    const parsed = JSON.parse(stored);
-    return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === 'string') : [];
-  } catch {
-    return [];
-  }
-};
-
-const persistDevelopPanelPinnedControlIds = (controlIds: string[]) => {
-  if (typeof globalThis.localStorage === 'undefined') return;
-
-  globalThis.localStorage.setItem(DEVELOP_PANEL_PINNED_CONTROL_IDS_STORAGE_KEY, JSON.stringify(controlIds));
-};
+export const readLastEditingRightPanel = (): Panel => readEditorWorkspacePreferences().rightInspector.activePanel;
 
 export const createRecentRightPanels = (selectedPanel: Panel, currentPanels: readonly Panel[]): Panel[] =>
   [selectedPanel, ...currentPanels.filter((panel) => panel !== selectedPanel && isRightPanel(panel))].slice(
@@ -106,6 +83,16 @@ export const DEFAULT_COLLAPSIBLE_SECTIONS_STATE: CollapsibleSectionsState = {
   effects: false,
   transformLens: false,
 };
+
+const createCollapsibleSectionsState = (preferences: EditorWorkspacePreferences): CollapsibleSectionsState => ({
+  basic: preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('basic') ?? false,
+  color: preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('color') ?? false,
+  curves: preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('curves') ?? false,
+  details: preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('details') ?? false,
+  effects: preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('effects') ?? false,
+  transformLens:
+    preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('transformLens') ?? false,
+});
 
 export interface ConfirmModalState {
   confirmText?: string;
@@ -331,6 +318,8 @@ export interface UIState {
   isLayoutReady: boolean;
   uiVisibility: UiVisibility;
   isLibraryExportPanelVisible: boolean;
+  editorWorkspacePreferences: EditorWorkspacePreferences;
+  editorWorkspaceViewport: EditorWorkspaceViewport;
 
   // Dimensions
   leftPanelWidth: number;
@@ -386,6 +375,17 @@ export interface UIState {
   markLayerMaskProvenanceStale: (input: { layerIds?: string[]; reason: LayerMaskProvenanceInvalidationReason }) => void;
   recordLayerMaskPreviewReceipt: (input: { appliedCommandId: string; masks: Array<MaskContainer> }) => void;
   setDevelopPanelPinnedControlIds: (controlIds: string[]) => void;
+  hydrateEditorWorkspacePreferences: (legacy?: LegacyEditorWorkspacePreferences) => void;
+  setDefaultEditorCompareMode: (mode: EditorWorkspaceCompareMode) => void;
+  setDefaultEditorZoomMode: (mode: EditorWorkspaceZoomMode) => void;
+  setEditorLightsOutLevel: (level: EditorWorkspaceLightsOutLevel) => void;
+  setEditorRegionSize: (
+    region: 'compactTools' | 'filmstrip' | 'leftSidebar' | 'rightInspector',
+    size: number | null,
+  ) => void;
+  setEditorRegionVisibility: (region: 'filmstrip' | 'leftSidebar' | 'rightInspector', visible: boolean) => void;
+  setEditorSectionExpanded: (panel: Panel, sectionId: string, expanded: boolean) => void;
+  setEditorWorkspaceViewport: (viewport: EditorWorkspaceViewport) => void;
   recordRecentRightPanel: (panel: Panel) => void;
   setUI: (updater: Partial<UIState> | ((state: UIState) => Partial<UIState>)) => void;
   setRightPanel: (panel: Panel | null) => void;
@@ -395,7 +395,32 @@ export interface UIState {
 }
 
 export const useUIStore = create<UIState>((set, get) => {
-  const initialRightPanel = readLastEditingRightPanel();
+  const initialPreferences = readEditorWorkspacePreferences();
+  const initialRightPanel = initialPreferences.rightInspector.activePanel;
+  const initialLayout = getEffectiveEditorWorkspaceLayout(initialPreferences, {
+    height: Number.MAX_SAFE_INTEGER,
+    isCompactPortrait: false,
+    width: Number.MAX_SAFE_INTEGER,
+  });
+
+  const applyWorkspacePreferences = (
+    preferences: EditorWorkspacePreferences,
+    viewport: EditorWorkspaceViewport = get().editorWorkspaceViewport,
+  ) => {
+    const effectiveLayout = getEffectiveEditorWorkspaceLayout(preferences, viewport);
+    return {
+      bottomPanelHeight: effectiveLayout.bottomPanelHeight,
+      compactEditorPanelHeightOverride: effectiveLayout.compactEditorPanelHeightOverride,
+      editorWorkspacePreferences: preferences,
+      editorWorkspaceViewport: viewport,
+      leftPanelWidth: effectiveLayout.leftPanelWidth,
+      rightPanelWidth: effectiveLayout.rightPanelWidth,
+      uiVisibility: {
+        filmstrip: preferences.filmstrip.visible,
+        folderTree: preferences.leftSidebar.visible,
+      },
+    };
+  };
 
   return {
     activeView: 'library',
@@ -403,20 +428,25 @@ export const useUIStore = create<UIState>((set, get) => {
     isWindowFullScreen: false,
     isInstantTransition: false,
     isLayoutReady: false,
-    uiVisibility: { folderTree: true, filmstrip: true },
+    uiVisibility: {
+      folderTree: initialPreferences.leftSidebar.visible,
+      filmstrip: initialPreferences.filmstrip.visible,
+    },
     isLibraryExportPanelVisible: false,
+    editorWorkspacePreferences: initialPreferences,
+    editorWorkspaceViewport: { height: 0, isCompactPortrait: false, width: 0 },
 
     leftPanelWidth: 256,
     rightPanelWidth: 360,
-    bottomPanelHeight: 144,
-    compactEditorPanelHeightOverride: null,
+    bottomPanelHeight: initialLayout.bottomPanelHeight,
+    compactEditorPanelHeightOverride: initialLayout.compactEditorPanelHeightOverride,
 
     activeRightPanel: initialRightPanel,
     renderedRightPanel: initialRightPanel,
     recentRightPanels: [initialRightPanel],
     slideDirection: 1,
-    collapsibleSectionsState: { ...DEFAULT_COLLAPSIBLE_SECTIONS_STATE },
-    developPanelPinnedControlIds: readDevelopPanelPinnedControlIds(),
+    collapsibleSectionsState: createCollapsibleSectionsState(initialPreferences),
+    developPanelPinnedControlIds: initialPreferences.rightInspector.pinnedControlIds,
 
     isCreateFolderModalOpen: false,
     isRenameFolderModalOpen: false,
@@ -493,8 +523,130 @@ export const useUIStore = create<UIState>((set, get) => {
 
     setDevelopPanelPinnedControlIds: (controlIds) => {
       const normalizedControlIds = [...new Set(controlIds)].filter((controlId) => controlId.trim().length > 0);
-      persistDevelopPanelPinnedControlIds(normalizedControlIds);
-      set({ developPanelPinnedControlIds: normalizedControlIds });
+      set((state) => {
+        const preferences = {
+          ...state.editorWorkspacePreferences,
+          rightInspector: {
+            ...state.editorWorkspacePreferences.rightInspector,
+            pinnedControlIds: normalizedControlIds,
+          },
+        };
+        saveEditorWorkspacePreferences(preferences);
+        return { developPanelPinnedControlIds: normalizedControlIds, editorWorkspacePreferences: preferences };
+      });
+    },
+
+    hydrateEditorWorkspacePreferences: (legacy = {}) => {
+      const preferences = readEditorWorkspacePreferences(legacy);
+      if (shouldPersistLegacyWorkspaceMigration(legacy)) saveEditorWorkspacePreferences(preferences);
+      const activeRightPanel = preferences.rightInspector.visible ? preferences.rightInspector.activePanel : null;
+      set({
+        ...applyWorkspacePreferences(preferences),
+        activeRightPanel,
+        collapsibleSectionsState: createCollapsibleSectionsState(preferences),
+        developPanelPinnedControlIds: preferences.rightInspector.pinnedControlIds,
+        recentRightPanels: preferences.rightInspector.recentPanels,
+        renderedRightPanel: preferences.rightInspector.activePanel,
+      });
+    },
+
+    setDefaultEditorCompareMode: (mode) => {
+      set((state) => {
+        const preferences = {
+          ...state.editorWorkspacePreferences,
+          viewer: { ...state.editorWorkspacePreferences.viewer, compareMode: mode },
+        };
+        saveEditorWorkspacePreferences(preferences);
+        return { editorWorkspacePreferences: preferences };
+      });
+    },
+
+    setDefaultEditorZoomMode: (mode) => {
+      set((state) => {
+        const preferences = {
+          ...state.editorWorkspacePreferences,
+          viewer: { ...state.editorWorkspacePreferences.viewer, defaultZoomMode: mode },
+        };
+        saveEditorWorkspacePreferences(preferences);
+        return { editorWorkspacePreferences: preferences };
+      });
+    },
+
+    setEditorLightsOutLevel: (level) => {
+      set((state) => {
+        const preferences = {
+          ...state.editorWorkspacePreferences,
+          viewer: { ...state.editorWorkspacePreferences.viewer, lightsOutLevel: level },
+        };
+        saveEditorWorkspacePreferences(preferences);
+        return { editorWorkspacePreferences: preferences };
+      });
+    },
+
+    setEditorRegionSize: (region, size) => {
+      set((state) => {
+        const preferences = structuredClone(state.editorWorkspacePreferences);
+        if (region === 'leftSidebar' && typeof size === 'number') preferences.leftSidebar.width = size;
+        if (region === 'rightInspector' && typeof size === 'number') preferences.rightInspector.width = size;
+        if (region === 'filmstrip' && typeof size === 'number') preferences.filmstrip.height = size;
+        if (region === 'compactTools') preferences.compact.toolsHeight = size;
+
+        const parsed = editorWorkspacePreferencesSchema.safeParse(preferences);
+        if (!parsed.success) return state;
+        saveEditorWorkspacePreferences(parsed.data);
+        return applyWorkspacePreferences(parsed.data, state.editorWorkspaceViewport);
+      });
+    },
+
+    setEditorRegionVisibility: (region, visible) => {
+      set((state) => {
+        const preferences = structuredClone(state.editorWorkspacePreferences);
+        if (region === 'leftSidebar') preferences.leftSidebar.visible = visible;
+        if (region === 'rightInspector') {
+          preferences.compact.toolsExpanded = visible;
+          preferences.rightInspector.visible = visible;
+        }
+        if (region === 'filmstrip') preferences.filmstrip.visible = visible;
+        saveEditorWorkspacePreferences(preferences);
+        return {
+          ...applyWorkspacePreferences(preferences, state.editorWorkspaceViewport),
+          ...(region === 'rightInspector'
+            ? { activeRightPanel: visible ? preferences.rightInspector.activePanel : null }
+            : {}),
+        };
+      });
+    },
+
+    setEditorSectionExpanded: (panel, sectionId, expanded) => {
+      if (sectionId.trim().length === 0) return;
+      set((state) => {
+        const currentSections = state.editorWorkspacePreferences.rightInspector.expandedSectionsByPanel[panel] ?? [];
+        const nextSections = expanded
+          ? [...new Set([...currentSections, sectionId])]
+          : currentSections.filter((currentSection) => currentSection !== sectionId);
+        const preferences = {
+          ...state.editorWorkspacePreferences,
+          rightInspector: {
+            ...state.editorWorkspacePreferences.rightInspector,
+            expandedSectionsByPanel: {
+              ...state.editorWorkspacePreferences.rightInspector.expandedSectionsByPanel,
+              [panel]: nextSections,
+            },
+          },
+        };
+        saveEditorWorkspacePreferences(preferences);
+        return {
+          collapsibleSectionsState:
+            panel === Panel.Adjustments
+              ? { ...state.collapsibleSectionsState, [sectionId]: expanded }
+              : state.collapsibleSectionsState,
+          editorWorkspacePreferences: preferences,
+        };
+      });
+    },
+
+    setEditorWorkspaceViewport: (viewport) => {
+      set((state) => applyWorkspacePreferences(state.editorWorkspacePreferences, viewport));
     },
 
     recordRecentRightPanel: (panel) => {
@@ -508,20 +660,34 @@ export const useUIStore = create<UIState>((set, get) => {
     setRightPanel: (panelId) => {
       const current = get().activeRightPanel;
       if (panelId === current) {
-        set({ activeRightPanel: null });
+        get().setEditorRegionVisibility('rightInspector', false);
       } else {
         const rendered = get().renderedRightPanel;
         const previousPanel = current ?? rendered;
         const currentIndex = previousPanel ? RIGHT_PANEL_ORDER.indexOf(previousPanel) : -1;
         const newIndex = panelId ? RIGHT_PANEL_ORDER.indexOf(panelId) : -1;
-        if (panelId && isEditingRightPanel(panelId)) {
-          persistLastEditingRightPanel(panelId);
-        }
-        set({
-          slideDirection: newIndex === currentIndex ? 0 : newIndex > currentIndex ? 1 : -1,
-          activeRightPanel: panelId,
-          renderedRightPanel: panelId,
-          ...(panelId === null ? {} : { recentRightPanels: createRecentRightPanels(panelId, get().recentRightPanels) }),
+        set((state) => {
+          const preferences = structuredClone(state.editorWorkspacePreferences);
+          if (panelId && isEditingRightPanel(panelId)) {
+            preferences.rightInspector.activePanel = panelId;
+            preferences.rightInspector.visible = true;
+            preferences.compact.toolsExpanded = true;
+          }
+          if (panelId)
+            preferences.rightInspector.recentPanels = createRecentRightPanels(
+              panelId,
+              preferences.rightInspector.recentPanels,
+            );
+          saveEditorWorkspacePreferences(preferences);
+          return {
+            slideDirection: newIndex === currentIndex ? 0 : newIndex > currentIndex ? 1 : -1,
+            activeRightPanel: panelId,
+            renderedRightPanel: panelId,
+            ...(panelId === null
+              ? {}
+              : { recentRightPanels: createRecentRightPanels(panelId, state.recentRightPanels) }),
+            editorWorkspacePreferences: preferences,
+          };
         });
       }
     },

@@ -57,7 +57,7 @@ import CurveGraph from '../../../adjustments/Curves';
 import DetailsPanel from '../../../adjustments/Details';
 import EffectsPanel from '../../../adjustments/Effects';
 import TransformLens from '../../../adjustments/TransformLens';
-import { OPTION_SEPARATOR, type Option } from '../../../ui/AppProperties';
+import { OPTION_SEPARATOR, type Option, Panel } from '../../../ui/AppProperties';
 import CollapsibleSection, { type CollapsibleSectionHeaderAction } from '../../../ui/CollapsibleSection';
 import { editorChromeStatusChipClassName } from '../../../ui/editorChromeTokens';
 import { professionalInspectorDensityTokens } from '../../../ui/inspectorTokens';
@@ -193,12 +193,17 @@ export default function Controls() {
     })),
   );
 
-  const { collapsibleSectionsState, developPanelPinnedControlIds, setDevelopPanelPinnedControlIds, setUI } = useUIStore(
+  const {
+    collapsibleSectionsState,
+    developPanelPinnedControlIds,
+    setDevelopPanelPinnedControlIds,
+    setEditorSectionExpanded,
+  } = useUIStore(
     useShallow((state) => ({
       collapsibleSectionsState: state.collapsibleSectionsState,
       developPanelPinnedControlIds: state.developPanelPinnedControlIds,
       setDevelopPanelPinnedControlIds: state.setDevelopPanelPinnedControlIds,
-      setUI: state.setUI,
+      setEditorSectionExpanded: state.setEditorSectionExpanded,
     })),
   );
 
@@ -898,11 +903,15 @@ export default function Controls() {
 
   const setCollapsibleState = useCallback(
     (updater: CollapsibleSectionsUpdater) => {
-      setUI((state) => ({
-        collapsibleSectionsState: typeof updater === 'function' ? updater(state.collapsibleSectionsState) : updater,
-      }));
+      const current = useUIStore.getState().collapsibleSectionsState;
+      const next = typeof updater === 'function' ? updater(current) : updater;
+      for (const [sectionId, expanded] of Object.entries(next)) {
+        if (current[sectionId as keyof CollapsibleSectionsState] !== expanded) {
+          setEditorSectionExpanded(Panel.Adjustments, sectionId, expanded);
+        }
+      }
     },
-    [setUI],
+    [setEditorSectionExpanded],
   );
 
   const focusDevelopPanelPinnedControl = useCallback((controlId: string) => {
