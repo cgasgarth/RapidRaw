@@ -14,7 +14,8 @@ const locale = JSON.parse(readFileSync('src/i18n/locales/en.json', 'utf8'));
 const i18n = await createTestI18n(locale);
 
 const markup = renderToolbar('macos');
-assertIncludes(markup, 'data-testid="editor-toolbar-history-commands"', 'undo/redo history commands did not render');
+assertIncludes(markup, 'data-command-id="undo"', 'undo command did not render');
+assertIncludes(markup, 'data-command-id="redo"', 'redo command did not render');
 assertIncludes(markup, 'data-tooltip="Undo (⌘Z) or History (Right-click)"', 'macOS undo shortcut did not render');
 assertIncludes(markup, 'data-tooltip="Redo (⌘Y) or History (Right-click)"', 'macOS redo shortcut did not render');
 assertExcludes(markup, 'editor-history-depth-control', 'toolbar must not duplicate the sidebar history control');
@@ -41,13 +42,11 @@ function renderToolbar(osPlatform: string): string {
         onBackToLibrary: () => undefined,
         onOpenNegativeLab: () => undefined,
         onRedo: () => undefined,
-        onToggleDateView: () => undefined,
         onToggleFullScreen: () => undefined,
         onToggleShowOriginal: () => undefined,
         onUndo: () => undefined,
         osPlatform,
         selectedImage: createSelectedImage(),
-        showDateView: false,
         showOriginal: false,
       }),
     ),

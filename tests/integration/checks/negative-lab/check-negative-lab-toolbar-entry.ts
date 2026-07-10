@@ -31,6 +31,8 @@ const rendered = await renderToolbar(() => {
   openedPaths.push([targetPath]);
 });
 
+await openOverflow(rendered.container);
+
 const button = rendered.container.querySelector<HTMLButtonElement>('[data-testid="editor-toolbar-negative-lab"]');
 assert(button, 'Negative Lab toolbar entry should render when an editor image is selected');
 assert.equal(button.getAttribute('aria-label'), locale.contextMenus.editor.convertNegative);
@@ -48,6 +50,7 @@ rendered.unmount();
 const disabledRendered = await renderToolbar(() => {
   openedPaths.push(['/library/negative-lab/unsupported.txt']);
 }, locale.negativeLabEntryPoints.disabled.unsupported);
+await openOverflow(disabledRendered.container);
 const disabledButton = disabledRendered.container.querySelector<HTMLButtonElement>(
   '[data-testid="editor-toolbar-negative-lab"]',
 );
@@ -67,6 +70,30 @@ await act(async () => {
 assert.deepEqual(openedPaths, [[targetPath]], 'Disabled Negative Lab toolbar entry should not open');
 
 disabledRendered.unmount();
+
+const keyboardRendered = await renderToolbar(() => undefined);
+const keyboardTrigger = keyboardRendered.container.querySelector<HTMLButtonElement>(
+  '[data-testid="editor-command-overflow-trigger"]',
+);
+assert(keyboardTrigger, 'Editor command overflow trigger should render for keyboard use');
+keyboardTrigger.focus();
+await act(async () => {
+  keyboardTrigger.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' }));
+  await flushPromises();
+});
+assert.equal(keyboardTrigger.getAttribute('aria-expanded'), 'true', 'ArrowDown should open editor command overflow');
+assert.equal(document.activeElement?.getAttribute('role'), 'menuitemcheckbox', 'Overflow should focus its first item');
+await act(async () => {
+  document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
+  await flushPromises();
+});
+assert.equal(
+  keyboardRendered.container.querySelector('[role="menu"]'),
+  null,
+  'Escape should close editor command overflow',
+);
+assert.equal(document.activeElement, keyboardTrigger, 'Escape should restore focus to the overflow trigger');
+keyboardRendered.unmount();
 
 if (failures.length > 0) {
   console.error('negative lab toolbar entry failed');
@@ -101,13 +128,11 @@ async function renderToolbar(
           onBackToLibrary: () => undefined,
           onOpenNegativeLab,
           onRedo: () => undefined,
-          onToggleDateView: () => undefined,
           onToggleFullScreen: () => undefined,
           onToggleShowOriginal: () => undefined,
           onUndo: () => undefined,
           osPlatform: 'linux',
           selectedImage: createSelectedImage(),
-          showDateView: false,
           showOriginal: false,
         }),
       ),
@@ -125,6 +150,17 @@ async function renderToolbar(
       container.remove();
     },
   };
+}
+
+async function openOverflow(container: HTMLDivElement) {
+  const trigger = container.querySelector<HTMLButtonElement>('[data-testid="editor-command-overflow-trigger"]');
+  assert(trigger, 'Editor command overflow trigger should render');
+  await act(async () => {
+    trigger.click();
+    await flushPromises();
+  });
+  assert.equal(trigger.getAttribute('aria-expanded'), 'true');
+  assert(container.querySelector('[role="menu"]'), 'Editor command overflow should expose a menu');
 }
 
 function createSelectedImage(): SelectedImage {
@@ -158,6 +194,7 @@ function installDom() {
     document: window.document,
     HTMLElement: window.HTMLElement,
     HTMLButtonElement: window.HTMLButtonElement,
+    KeyboardEvent: window.KeyboardEvent,
     MouseEvent: window.MouseEvent,
     navigator: window.navigator,
     requestAnimationFrame: window.requestAnimationFrame.bind(window),
