@@ -521,8 +521,13 @@ fn generate_export_soft_proof_preview(
         preview_dim,
     )?;
     let (proof_pixels, width, height, _) =
-        export::export_processing::export_soft_proof_rgb_pixels_and_profile_with_policy(
+        export::export_processing::export_soft_proof_rgb_pixels_with_working_color_state(
             &preview_image,
+            if loaded_image.is_raw {
+                color::working_to_output_transform::WorkingColorState::AcesCgLinearV1
+            } else {
+                color::working_to_output_transform::WorkingColorState::EncodedSrgbV1
+            },
             &request.color_profile,
             &request.rendering_intent,
             request.black_point_compensation,

@@ -11,12 +11,14 @@ use jxl_encoder::{LosslessConfig, LossyConfig, PixelLayout};
 use mozjpeg_rs::{Encoder as MozJpegEncoder, Preset};
 use sha2::{Digest, Sha256};
 
-use crate::export::export_color_policy::output_color_profile;
+use crate::color::working_to_output_transform::WorkingColorState;
+use crate::export::export_color_policy::{
+    export_rgb16_pixels_with_working_color_state, output_color_profile,
+};
 use crate::export::export_processing::{
     ExportColorProfile, ExportReceiptMetadata, ExportRenderingIntent, encode_icc_profile,
-    export_jpeg_rgb_pixels_and_profile, export_receipt_metadata, export_rgb16_pixels_and_profile,
-    export_source_precision_receipt_label, export_source_rgb16_pixels, quantize_rgb16_to_rgb8,
-    validate_export_color_policy,
+    export_receipt_metadata, export_source_precision_receipt_label, export_source_rgb16_pixels,
+    quantize_rgb16_to_rgb8, validate_export_color_policy,
 };
 
 #[derive(Debug)]
@@ -70,6 +72,29 @@ pub(crate) fn encode_image_with_applied_policy(
 
 pub(crate) fn encode_image_with_applied_policy_and_source_profile(
     image: &DynamicImage,
+    output_format: &str,
+    jpeg_quality: u8,
+    color_profile: &ExportColorProfile,
+    rendering_intent: &ExportRenderingIntent,
+    black_point_compensation: bool,
+    source_embedded_icc: Option<&EmbeddedSourceIccProfile>,
+) -> Result<EncodedExportImage, String> {
+    encode_image_with_working_color_state(
+        image,
+        WorkingColorState::EncodedSrgbV1,
+        output_format,
+        jpeg_quality,
+        color_profile,
+        rendering_intent,
+        black_point_compensation,
+        source_embedded_icc,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn encode_image_with_working_color_state(
+    image: &DynamicImage,
+    source_color_state: WorkingColorState,
     output_format: &str,
     jpeg_quality: u8,
     color_profile: &ExportColorProfile,
@@ -134,6 +159,7 @@ pub(crate) fn encode_image_with_applied_policy_and_source_profile(
         "jpg" | "jpeg" => {
             let bytes = encode_jpeg_to_bytes(
                 image,
+                source_color_state,
                 jpeg_quality,
                 color_profile,
                 rendering_intent,
@@ -177,6 +203,7 @@ pub(crate) fn encode_image_with_applied_policy_and_source_profile(
         "tiff" => {
             let bytes = encode_tiff16_to_bytes(
                 image,
+                source_color_state,
                 color_profile,
                 rendering_intent,
                 black_point_compensation,
@@ -431,6 +458,7 @@ fn normalize_icc_creation_time(mut profile: Vec<u8>) -> Vec<u8> {
 
 fn encode_tiff16_to_bytes(
     image: &DynamicImage,
+    source_color_state: WorkingColorState,
     color_profile: &ExportColorProfile,
     rendering_intent: &ExportRenderingIntent,
     black_point_compensation: bool,
@@ -445,12 +473,14 @@ fn encode_tiff16_to_bytes(
             })?;
             (pixels, width, height, source_icc.bytes.clone())
         } else {
-            let (pixels, width, height, output_profile) = export_rgb16_pixels_and_profile(
-                image,
-                color_profile,
-                rendering_intent,
-                black_point_compensation,
-            )?;
+            let (pixels, width, height, output_profile) =
+                export_rgb16_pixels_with_working_color_state(
+                    image,
+                    source_color_state,
+                    color_profile,
+                    rendering_intent,
+                    black_point_compensation,
+                )?;
             (pixels, width, height, encode_icc_profile(&output_profile)?)
         };
     let mut image_bytes = Vec::new();
@@ -474,6 +504,7 @@ fn encode_tiff16_to_bytes(
 
 fn encode_jpeg_to_bytes(
     image: &DynamicImage,
+    source_color_state: WorkingColorState,
     jpeg_quality: u8,
     color_profile: &ExportColorProfile,
     rendering_intent: &ExportRenderingIntent,
@@ -494,14 +525,16 @@ fn encode_jpeg_to_bytes(
                 source_icc.bytes.clone(),
             )
         } else {
-            let (rgb_pixels, width, height, output_profile) = export_jpeg_rgb_pixels_and_profile(
-                image,
-                color_profile,
-                rendering_intent,
-                black_point_compensation,
-            )?;
+            let (rgb16_pixels, width, height, output_profile) =
+                export_rgb16_pixels_with_working_color_state(
+                    image,
+                    source_color_state,
+                    color_profile,
+                    rendering_intent,
+                    black_point_compensation,
+                )?;
             (
-                rgb_pixels,
+                quantize_rgb16_to_rgb8(&rgb16_pixels),
                 width,
                 height,
                 encode_icc_profile(&output_profile)?,
