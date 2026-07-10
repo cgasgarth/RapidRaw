@@ -1039,6 +1039,7 @@
       "custom": {
         "hPlaceholder": "В",
         "hTooltip": "Высота",
+        "invalid": "Введите значения больше нуля.",
         "wPlaceholder": "Ш",
         "wTooltip": "Ширина"
       },
@@ -1126,6 +1127,11 @@
       },
       "resetTooltip": "Сбросить кадрирование и геометрию",
       "rotationHeading": "Вращение",
+      "status": {
+        "landscape": "Альбомная",
+        "portrait": "Книжная",
+        "straighten": "Выравнивание"
+      },
       "title": "Обрезка и трансформация",
       "tooltips": {
         "compositionOverlay": "Сетка композиции",

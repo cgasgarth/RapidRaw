@@ -1079,6 +1079,7 @@
       "custom": {
         "hPlaceholder": "Wys.",
         "hTooltip": "Wysokość",
+        "invalid": "Wprowadź wartości większe od zera.",
         "wPlaceholder": "Szer.",
         "wTooltip": "Szerokość"
       },
@@ -1166,6 +1167,11 @@
       },
       "resetTooltip": "Resetuj Kadrowanie i Przekształcanie",
       "rotationHeading": "Obrót",
+      "status": {
+        "landscape": "Poziomo",
+        "portrait": "Pionowo",
+        "straighten": "Prostowanie"
+      },
       "title": "Kadrowanie i Przekształcanie",
       "tooltips": {
         "compositionOverlay": "Nakładka kompozycji",

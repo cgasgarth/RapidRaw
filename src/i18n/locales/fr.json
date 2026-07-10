@@ -1013,6 +1013,7 @@
       "custom": {
         "hPlaceholder": "H",
         "hTooltip": "Hauteur",
+        "invalid": "Saisissez des valeurs supérieures à zéro.",
         "wPlaceholder": "L",
         "wTooltip": "Largeur"
       },
@@ -1100,6 +1101,11 @@
       },
       "resetTooltip": "Réinitialiser Recadrage & Transformation",
       "rotationHeading": "Rotation",
+      "status": {
+        "landscape": "Paysage",
+        "portrait": "Portrait",
+        "straighten": "Redresser"
+      },
       "title": "Recadrage & Transformation",
       "tooltips": {
         "compositionOverlay": "Superposition de composition",

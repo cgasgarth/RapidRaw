@@ -502,6 +502,7 @@
       "custom": {
         "hPlaceholder": "높이",
         "hTooltip": "높이",
+        "invalid": "0보다 큰 값을 입력하세요.",
         "wPlaceholder": "너비",
         "wTooltip": "너비"
       },
@@ -589,6 +590,11 @@
       },
       "resetTooltip": "자르기 및 변형 초기화",
       "rotationHeading": "회전",
+      "status": {
+        "landscape": "가로",
+        "portrait": "세로",
+        "straighten": "수평 맞추기"
+      },
       "title": "자르기 및 변형",
       "tooltips": {
         "compositionOverlay": "구도 오버레이",

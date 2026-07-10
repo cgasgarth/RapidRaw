@@ -1013,6 +1013,7 @@
       "custom": {
         "hPlaceholder": "A",
         "hTooltip": "Altura",
+        "invalid": "Insira valores maiores que zero.",
         "wPlaceholder": "L",
         "wTooltip": "Largura"
       },
@@ -1100,6 +1101,11 @@
       },
       "resetTooltip": "Redefinir Corte e Transformação",
       "rotationHeading": "Rotação",
+      "status": {
+        "landscape": "Paisagem",
+        "portrait": "Retrato",
+        "straighten": "Endireitar"
+      },
       "title": "Cortar e Transformar",
       "tooltips": {
         "compositionOverlay": "Sobreposição de Composição",

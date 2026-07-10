@@ -1025,6 +1025,7 @@
       "custom": {
         "hPlaceholder": "H",
         "hTooltip": "Höhe",
+        "invalid": "Werte müssen größer als null sein.",
         "wPlaceholder": "B",
         "wTooltip": "Breite"
       },
@@ -1112,6 +1113,11 @@
       },
       "resetTooltip": "Zuschnitt & Transformation zurücksetzen",
       "rotationHeading": "Drehung",
+      "status": {
+        "landscape": "Querformat",
+        "portrait": "Hochformat",
+        "straighten": "Ausrichten"
+      },
       "title": "Zuschnitt & Form",
       "tooltips": {
         "compositionOverlay": "Kompositions-Überlagerung",

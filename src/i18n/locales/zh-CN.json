@@ -1018,6 +1018,7 @@
       "custom": {
         "hPlaceholder": "高",
         "hTooltip": "高度",
+        "invalid": "请输入大于零的值。",
         "wPlaceholder": "宽",
         "wTooltip": "宽度"
       },
@@ -1105,6 +1106,11 @@
       },
       "resetTooltip": "重置裁剪和变换",
       "rotationHeading": "旋转",
+      "status": {
+        "landscape": "横向",
+        "portrait": "纵向",
+        "straighten": "校正"
+      },
       "title": "裁剪与变换",
       "tooltips": {
         "compositionOverlay": "构图叠加",
