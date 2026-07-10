@@ -421,6 +421,37 @@ const buildDryRunReceiptKey = ({
   planId: string;
 }) => `${expectedGraphRevision}:${planId}:${planHash}`;
 
+export const assertAgentToneDryRunPlanForProposal = ({
+  adjustments,
+  expectedGraphRevision,
+  expectedRecipeHash,
+  operationId,
+  planHash,
+  planId,
+  sessionId,
+}: {
+  adjustments: AgentToneAdjustmentPatch;
+  expectedGraphRevision: string;
+  expectedRecipeHash: string;
+  operationId: string;
+  planHash: string;
+  planId: string;
+  sessionId: string;
+}): void => {
+  const receipt = acceptedToneAdjustmentDryRunReceipts.get(
+    buildDryRunReceiptKey({ expectedGraphRevision, planHash, planId }),
+  );
+  if (receipt === undefined) throw new Error('Proposal renderer rejected missing dry-run receipt.');
+  if (
+    receipt.expectedRecipeHash !== expectedRecipeHash ||
+    receipt.operationId !== operationId ||
+    receipt.sessionId !== sessionId ||
+    JSON.stringify(receipt.adjustments) !== JSON.stringify(adjustments)
+  ) {
+    throw new Error('Proposal renderer rejected mismatched dry-run receipt.');
+  }
+};
+
 export const dryRunAgentToneAdjustment = async (
   request: AgentToneAdjustmentDryRunRequest,
 ): Promise<AgentToneAdjustmentDryRunResponse> => {

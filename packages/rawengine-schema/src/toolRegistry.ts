@@ -1,3 +1,4 @@
+import { RAW_ENGINE_AGENT_SELECTED_IMAGE_PROPOSAL_RENDER_TOOL_NAME } from './agentSelectedImageProposalSchemas.js';
 import {
   ApprovalClass,
   RAW_ENGINE_SCHEMA_VERSION,
@@ -49,6 +50,16 @@ const computationalMergeToolRegistryEntries = [
 ];
 
 const agentSelectedImagePreviewLoopToolRegistryEntries: RawEngineToolDefinitionV1[] = [
+  {
+    approvalClass: ApprovalClass.PreviewOnly,
+    inputSchemaName: 'RawEngineAgentSelectedImageProposalRenderCommandV1',
+    mutates: false,
+    outputSchemaName: 'RawEngineAgentSelectedImageProposalReceiptV1',
+    requiresDryRun: true,
+    returnsArtifactHandles: true,
+    toolKind: 'dry_run',
+    toolName: RAW_ENGINE_AGENT_SELECTED_IMAGE_PROPOSAL_RENDER_TOOL_NAME,
+  },
   {
     approvalClass: ApprovalClass.EditApply,
     inputSchemaName: 'AgentCurrentImagePreviewLoopRequestV1',
