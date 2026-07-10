@@ -6,6 +6,7 @@ import type { BrushSettings, SelectedImage, WaveformData } from '../components/u
 import type { BaseRenderSize, ImageDimensions } from '../hooks/viewport/useImageRenderSize';
 import type { MaskOverlaySettings } from '../schemas/masks/maskOverlaySchemas';
 import type { GamutWarningOverlayPayload } from '../schemas/tauriEventSchemas';
+import type { PreviewQualityStatus } from '../utils/adaptivePreviewQuality';
 import { type Adjustments, DisplayMode, INITIAL_ADJUSTMENTS, type MaskContainer } from '../utils/adjustments';
 import {
   applyBasicToneCommandEnvelopeToAdjustments,
@@ -107,6 +108,7 @@ interface EditorState {
   uncroppedAdjustedPreviewUrl: string | null;
   transformedOriginalUrl: string | null;
   interactivePatch: InteractivePatch | null;
+  previewQualityStatus: PreviewQualityStatus | null;
   compare: EditorCompareState;
 
   // Analytics
@@ -192,6 +194,7 @@ const normalizeCompareStateUpdate = (state: EditorState, update: Partial<EditorS
       source: { identity: update.selectedImage?.path ?? null, kind: 'original' },
     };
     update.transformedOriginalUrl = null;
+    update.previewQualityStatus = null;
   }
 };
 
@@ -205,6 +208,7 @@ const historyNavigationPreviewInvalidation = {
   finalPreviewUrl: null,
   gamutWarningOverlay: null,
   interactivePatch: null,
+  previewQualityStatus: null,
   previewScopeStatus: null,
   transformedOriginalUrl: null,
   uncroppedAdjustedPreviewUrl: null,
@@ -257,6 +261,7 @@ export const useEditorStore = create<EditorState>((set) => ({
 
   isSliderDragging: false,
   interactivePatch: null,
+  previewQualityStatus: null,
   activeMaskContainerId: null,
   activeMaskId: null,
   activeAiPatchContainerId: null,

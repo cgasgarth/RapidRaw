@@ -10,6 +10,14 @@ import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
+import {
+  AdaptivePreviewQualityController,
+  getPreviewReadyPhase,
+  type PreviewOperationClass,
+  type PreviewQualityDecision,
+  type PreviewQualityStatus,
+  type PreviewRoi,
+} from '../../utils/adaptivePreviewQuality';
 import { type Adjustments, COPYABLE_ADJUSTMENT_KEYS } from '../../utils/adjustments';
 import { areAdjustmentsEqual } from '../../utils/adjustmentsSnapshot';
 import {
@@ -53,7 +61,9 @@ interface TransformWrapperRefValue {
 
 interface InteractivePreviewRequest {
   adjustments: Adjustments;
+  createdAt: number;
   identity: InteractivePreviewIdentity;
+  quality: PreviewQualityDecision;
   roi: [number, number, number, number] | null;
   requestId: number;
   targetRes: number;
@@ -103,6 +113,7 @@ const exportSoftProofTransformResponseSchema = z
       transformPolicyFingerprint: metadata.transformPolicyFingerprint,
     }),
   );
+const previewNow = (): number => globalThis.performance?.now() ?? Date.now();
 
 export function useImageProcessing(
   transformWrapperRef: React.RefObject<TransformWrapperRefValue | null>,
@@ -164,7 +175,10 @@ export function useImageProcessing(
   const activeWaveformChannelRef = useRef(activeWaveformChannel);
   activeWaveformChannelRef.current = activeWaveformChannel;
   const interactiveGenerationRef = useRef(new InteractivePreviewGenerationController());
-  const interactiveScopeRef = useRef<(targetRes: number) => InteractivePreviewScopeSnapshot | null>(() => null);
+  const interactiveScopeRef = useRef<
+    (targetRes: number, roi: PreviewRoi | null) => InteractivePreviewScopeSnapshot | null
+  >(() => null);
+  const previewQualityControllerRef = useRef(new AdaptivePreviewQualityController());
 
   const geometricAdjustmentsKey = useMemo(() => buildInteractivePreviewGeometryIdentity(adjustments), [adjustments]);
 
@@ -190,10 +204,6 @@ export function useImageProcessing(
     if (!baseW || !baseH || !containerWidth || !containerHeight) return null;
     if (scale <= 1.01) return null;
 
-    const paddingPixels = 2.0;
-    const paddingX = paddingPixels / baseW;
-    const paddingY = paddingPixels / baseH;
-
     const visibleLeft = -positionX / scale;
     const visibleTop = -positionY / scale;
     const visibleRight = visibleLeft + containerWidth / scale;
@@ -218,22 +228,11 @@ export function useImageProcessing(
     const roiW = (intersectRight - intersectLeft) / baseW;
     const roiH = (intersectBottom - intersectTop) / baseH;
 
-    const newRoiX = roiX - paddingX;
-    const newRoiY = roiY - paddingY;
-    const newRoiW = roiW + paddingX * 2;
-    const newRoiH = roiH + paddingY * 2;
-
-    const clampedX = Math.max(0, newRoiX);
-    const clampedY = Math.max(0, newRoiY);
-    const clampedW = Math.min(1 - clampedX, newRoiW);
-    const clampedH = Math.min(1 - clampedY, newRoiH);
-
-    if (clampedW > 0.999 && clampedH > 0.999) return null;
-
-    return [clampedX, clampedY, clampedW, clampedH] as [number, number, number, number];
+    if (roiW > 0.999 && roiH > 0.999) return null;
+    return [roiX, roiY, roiW, roiH] as PreviewRoi;
   }, [baseRenderSize, transformWrapperRef]);
 
-  interactiveScopeRef.current = (targetRes) => {
+  interactiveScopeRef.current = (targetRes, roi) => {
     const editor = useEditorStore.getState();
     const settings = useSettingsStore.getState().appSettings;
     const selectedImage = editor.selectedImage;
@@ -242,7 +241,6 @@ export function useImageProcessing(
 
     const dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
     const normalizedTargetRes = Math.max(1, Math.round(targetRes));
-    const roi = calculateROI();
     return {
       roi,
       scope: {
@@ -277,8 +275,8 @@ export function useImageProcessing(
   };
 
   const synchronizePreviewIdentity = useCallback(
-    (targetRes: number) => {
-      const snapshot = interactiveScopeRef.current(targetRes);
+    (targetRes: number, roi: PreviewRoi | null) => {
+      const snapshot = interactiveScopeRef.current(targetRes, roi);
       if (!snapshot) return null;
 
       const synchronized = interactiveGenerationRef.current.synchronize(snapshot.scope);
@@ -293,15 +291,66 @@ export function useImageProcessing(
 
   const isPreviewRequestCurrent = useCallback(
     (request: PreviewRenderRequest) => {
-      const current = synchronizePreviewIdentity(request.targetRes);
+      const current = synchronizePreviewIdentity(request.targetRes, request.roi);
       return current !== null && interactiveGenerationRef.current.isCurrent(request.identity, current.identity);
     },
     [synchronizePreviewIdentity],
   );
 
+  const resolveQualityDecision = useCallback(
+    (requestedTargetResolution: number, interacting: boolean) => {
+      const editor = useEditorStore.getState();
+      const settings = useSettingsStore.getState().appSettings;
+      const sourceSize = getEditorZoomSourceSize({
+        crop: editor.adjustments.crop,
+        orientationSteps: editor.adjustments.orientationSteps,
+        originalSize: editor.originalSize,
+      });
+      const backend = settings?.useWgpuRenderer !== false && editor.hasRenderedFirstFrame ? 'wgpu' : 'cpu';
+      const operationClass: PreviewOperationClass =
+        activeRightPanel === Panel.Crop
+          ? 'geometry'
+          : activeRightPanel === Panel.Masks || editor.adjustments.masks.length > 0
+            ? 'mask'
+            : 'standard';
+      const semanticZoom =
+        editor.zoomMode.kind === 'fit'
+          ? 'fit'
+          : editor.zoomMode.kind === 'ratio' && editor.zoomMode.devicePixelsPerImagePixel >= 1
+            ? 'inspection'
+            : 'viewport';
+      if (interacting) previewQualityControllerRef.current.noteInput(previewNow());
+      return previewQualityControllerRef.current.decide({
+        backend,
+        devicePixelRatio: typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1,
+        interacting,
+        operationClass,
+        requestedTargetResolution,
+        semanticZoom,
+        sourceHeight: sourceSize.height,
+        sourceWidth: sourceSize.width,
+        visibleRoi: calculateROI(),
+      });
+    },
+    [activeRightPanel, calculateROI],
+  );
+
   const executeApplyAdjustments = useCallback(
     async (request: PreviewRenderRequest) => {
       if (!isPreviewRequestCurrent(request)) return;
+      const dispatchedAt = previewNow();
+      const inputToDispatchMs = Math.max(0, dispatchedAt - request.createdAt);
+      const publishQualityStatus = (phase: PreviewQualityStatus['phase'], quality = request.quality) => {
+        setEditor({
+          previewQualityStatus: {
+            ...quality,
+            generation: request.identity.generation,
+            phase,
+            requestId: request.requestId,
+          },
+        });
+      };
+      publishQualityStatus(request.dragging ? 'rendering_interaction' : 'refining_current_view');
 
       const { patchesSentToBackend } = useEditorStore.getState();
       const { newlySentPatchIds, payload } = prepareAdjustmentPayloadForBackend(
@@ -313,7 +362,7 @@ export function useImageProcessing(
 
       try {
         if (!request.dragging) {
-          setEditor({ requestedPreviewResolution: request.targetRes });
+          setEditor({ requestedPreviewResolution: request.quality.requestedTargetResolution });
         }
         const proofRequest =
           !request.dragging && selectedProofRecipe
@@ -340,6 +389,9 @@ export function useImageProcessing(
               jobId,
               softProof: Boolean(proofRequest),
               targetResolution: request.targetRes,
+              previewQualityTier: request.quality.tier,
+              previewQualityReason: request.quality.reason,
+              previewQualitySufficient: request.quality.sufficientForSemanticZoom,
             },
             domain: 'preview',
             operationId: `preview_${String(jobId)}`,
@@ -359,6 +411,7 @@ export function useImageProcessing(
               targetResolution: proofRequest.targetResolution,
             }
           : null;
+        const renderStartedAt = previewNow();
         const proofResult =
           proofRequest && proofTransformRequest
             ? await Promise.all([
@@ -393,6 +446,7 @@ export function useImageProcessing(
                 transform: null,
               };
         const { buffer, transform } = proofResult;
+        const renderMs = Math.max(0, previewNow() - renderStartedAt);
 
         if (!isPreviewRequestCurrent(request)) {
           if (operation)
@@ -409,16 +463,40 @@ export function useImageProcessing(
 
         if (buffer.byteLength === 0) {
           if (operation) logAppOperationSuccess(operation, { byteLength: 0, droppedReason: 'empty_buffer', jobId });
+          publishQualityStatus('degraded_limited', {
+            ...request.quality,
+            limitedBy: 'backend',
+            reason: 'empty_render_buffer',
+            sufficientForSemanticZoom: false,
+          });
           return;
         }
 
         latestRenderedJobIdRef.current = jobId;
         const prefix = new TextDecoder().decode(buffer.slice(0, 11));
         if (prefix === 'WGPU_RENDER') {
+          if (request.dragging) {
+            const current = synchronizePreviewIdentity(request.targetRes, request.roi);
+            if (
+              current === null ||
+              !interactiveGenerationRef.current.canCommit(request.identity, request.requestId, current.identity)
+            ) {
+              return;
+            }
+          }
           if (!request.dragging) {
             setEditor({ renderedPreviewResolution: request.targetRes });
           }
           clearInteractivePatch();
+          publishQualityStatus(getPreviewReadyPhase(request.quality));
+          previewQualityControllerRef.current.record({
+            commitMs: 0,
+            decodeMs: 0,
+            displayedAgeMs: Math.max(0, previewNow() - request.createdAt),
+            inputToDispatchMs,
+            renderMs,
+            tier: request.quality.tier,
+          });
           if (operation) logAppOperationSuccess(operation, { backend: 'wgpu', byteLength: buffer.byteLength, jobId });
           return;
         }
@@ -426,6 +504,12 @@ export function useImageProcessing(
         const patch = request.dragging ? parseInteractivePreviewPatchPayload(buffer) : null;
         if (patch && !patch.ok) {
           clearInteractivePatch();
+          publishQualityStatus('degraded_limited', {
+            ...request.quality,
+            limitedBy: 'backend',
+            reason: patch.reason,
+            sufficientForSemanticZoom: false,
+          });
           if (operation)
             logAppOperationSuccess(operation, { byteLength: buffer.byteLength, droppedReason: patch.reason, jobId });
           return;
@@ -433,14 +517,24 @@ export function useImageProcessing(
 
         const blob = new Blob([patch?.ok ? patch.imageBuffer : buffer], { type: 'image/jpeg' });
         const url = URL.createObjectURL(blob);
+        const decodeStartedAt = previewNow();
         try {
           await decodeInteractivePreviewUrl(url);
         } catch {
           URL.revokeObjectURL(url);
           if (operation && !request.dragging)
             logAppOperationFailure(operation, new Error('final_preview_decode_failed'));
+          if (isPreviewRequestCurrent(request)) {
+            publishQualityStatus('degraded_limited', {
+              ...request.quality,
+              limitedBy: 'error',
+              reason: 'preview_decode_failed',
+              sufficientForSemanticZoom: false,
+            });
+          }
           return;
         }
+        const decodeMs = Math.max(0, previewNow() - decodeStartedAt);
 
         if (!isPreviewRequestCurrent(request)) {
           URL.revokeObjectURL(url);
@@ -454,7 +548,7 @@ export function useImageProcessing(
         }
 
         if (patch?.ok) {
-          const current = synchronizePreviewIdentity(request.targetRes);
+          const current = synchronizePreviewIdentity(request.targetRes, request.roi);
           if (
             current === null ||
             !interactiveGenerationRef.current.canCommit(request.identity, request.requestId, current.identity)
@@ -462,6 +556,7 @@ export function useImageProcessing(
             URL.revokeObjectURL(url);
             return;
           }
+          const commitStartedAt = previewNow();
           setEditor({
             interactivePatch: {
               basePreviewUrl: request.identity.basePreviewUrl,
@@ -477,6 +572,20 @@ export function useImageProcessing(
               sourceImagePath: request.identity.sourceImagePath,
               url,
             },
+            previewQualityStatus: {
+              ...request.quality,
+              generation: request.identity.generation,
+              phase: getPreviewReadyPhase(request.quality),
+              requestId: request.requestId,
+            },
+          });
+          previewQualityControllerRef.current.record({
+            commitMs: Math.max(0, previewNow() - commitStartedAt),
+            decodeMs,
+            displayedAgeMs: Math.max(0, previewNow() - request.createdAt),
+            inputToDispatchMs,
+            renderMs,
+            tier: request.quality.tier,
           });
           return;
         }
@@ -485,10 +594,25 @@ export function useImageProcessing(
           URL.revokeObjectURL(url);
           return;
         }
+        const commitStartedAt = previewNow();
         setEditor({
           exportSoftProofTransform: transform,
           finalPreviewUrl: url,
+          previewQualityStatus: {
+            ...request.quality,
+            generation: request.identity.generation,
+            phase: getPreviewReadyPhase(request.quality),
+            requestId: request.requestId,
+          },
           renderedPreviewResolution: request.targetRes,
+        });
+        previewQualityControllerRef.current.record({
+          commitMs: Math.max(0, previewNow() - commitStartedAt),
+          decodeMs,
+          displayedAgeMs: Math.max(0, previewNow() - request.createdAt),
+          inputToDispatchMs,
+          renderMs,
+          tier: request.quality.tier,
         });
         clearInteractivePatch();
         if (operation) {
@@ -505,7 +629,15 @@ export function useImageProcessing(
         } else if (operation) {
           logAppOperationSuccess(operation, { droppedReason: 'superseded', jobId });
         }
-        if (isPreviewRequestCurrent(request)) clearInteractivePatch();
+        if (isPreviewRequestCurrent(request)) {
+          clearInteractivePatch();
+          publishQualityStatus('degraded_limited', {
+            ...request.quality,
+            limitedBy: 'error',
+            reason: 'render_error',
+            sufficientForSemanticZoom: false,
+          });
+        }
       }
     },
     [
@@ -529,19 +661,28 @@ export function useImageProcessing(
     [],
   );
 
+  useEffect(() => {
+    previewQualityControllerRef.current.reset();
+  }, [selectedImage?.path]);
+
   const applyAdjustments = useCallback(
     (currentAdjustments: Adjustments, dragging: boolean = false, targetRes?: number) => {
       if (!selectedImage?.isReady) return;
 
-      const normalizedTargetRes = Math.max(1, Math.round(targetRes ?? appSettings?.editorPreviewResolution ?? 1920));
-      const synchronized = synchronizePreviewIdentity(normalizedTargetRes);
+      const requestedTargetRes = Math.max(1, Math.round(targetRes ?? appSettings?.editorPreviewResolution ?? 1920));
+      const quality = resolveQualityDecision(requestedTargetRes, dragging);
+      const normalizedTargetRes = quality.effectiveTargetResolution;
+      const synchronized = synchronizePreviewIdentity(normalizedTargetRes, quality.effectiveRoi);
       if (!synchronized) return;
+      const createdAt = previewNow();
 
       if (dragging) {
         const requestId = ++latestInteractiveRequestIdRef.current;
         interactiveSchedulerRef.current?.schedule({
           adjustments: structuredClone(currentAdjustments),
+          createdAt,
           identity: synchronized.identity,
+          quality,
           roi: synchronized.roi,
           requestId,
           targetRes: normalizedTargetRes,
@@ -552,8 +693,10 @@ export function useImageProcessing(
         clearInteractivePatch();
         void executeApplyAdjustments({
           adjustments: structuredClone(currentAdjustments),
+          createdAt,
           dragging: false,
           identity: interactiveGenerationRef.current.supersede(synchronized.scope),
+          quality,
           roi: synchronized.roi,
           requestId: latestInteractiveRequestIdRef.current,
           targetRes: normalizedTargetRes,
@@ -564,6 +707,7 @@ export function useImageProcessing(
       appSettings?.editorPreviewResolution,
       clearInteractivePatch,
       executeApplyAdjustments,
+      resolveQualityDecision,
       selectedImage?.isReady,
       synchronizePreviewIdentity,
     ],
@@ -637,7 +781,8 @@ export function useImageProcessing(
 
   useLayoutEffect(() => {
     if (!selectedImage?.isReady) return;
-    synchronizePreviewIdentity(calculateTargetRes());
+    const quality = resolveQualityDecision(calculateTargetRes(), false);
+    synchronizePreviewIdentity(quality.effectiveTargetResolution, quality.effectiveRoi);
   }, [
     baseRenderSize,
     calculateTargetRes,
@@ -648,6 +793,7 @@ export function useImageProcessing(
     exportSoftProofRecipeId,
     selectedImage?.isReady,
     selectedImage?.path,
+    resolveQualityDecision,
     synchronizePreviewIdentity,
   ]);
 

@@ -961,6 +961,14 @@ export default interface Resources {
       };
       chromeStatus: {
         accessibilityLabel: 'Editor image-quality status';
+        previewQuality: {
+          degraded_limited: 'Preview quality limited';
+          detail_ready: '1:1 detail ready';
+          displaying_interaction: 'Displaying interaction quality';
+          final_ready: 'Final preview ready';
+          refining_current_view: 'Refining current view';
+          rendering_interaction: 'Rendering interaction preview';
+        };
         visualSmokeSummary: 'clipping/gamut/scope';
         visualSmokeTitle: 'Editor chrome status chips';
       };
