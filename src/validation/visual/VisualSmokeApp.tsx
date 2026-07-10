@@ -1093,6 +1093,12 @@ function useProfessionalFilmstripContextSmokeState() {
       waveformHeight: PANEL_SCOPES_HEIGHT.default,
     });
     useLibraryStore.setState({
+      filterCriteria: {
+        ...useLibraryStore.getState().filterCriteria,
+        colors: ['red', 'yellow'],
+        rating: 2,
+      },
+      imageList: professionalFilmstripImageList,
       imageRatings: {
         [professionalFilmstripImageList[0]?.path ?? '']: 4,
         [professionalFilmstripImageList[1]?.path ?? '']: 2,
@@ -1541,10 +1547,12 @@ function ProfessionalFilmstripContextVisualSmoke() {
         display: 'grid',
         fontFamily: 'var(--font-sans)',
         minHeight: '100vh',
+        overflow: 'hidden',
         padding: 12,
+        width: '100%',
       }}
     >
-      <div style={{ display: 'grid', gap: 8, minHeight: 0, overflow: 'hidden' }}>
+      <div style={{ display: 'grid', gap: 8, minHeight: 0, minWidth: 0, overflow: 'hidden', width: '100%' }}>
         <div
           data-visual-smoke-section="professional-filmstrip-context-title"
           style={{
@@ -1568,6 +1576,7 @@ function ProfessionalFilmstripContextVisualSmoke() {
         <section
           data-testid="professional-filmstrip-context-expanded"
           data-visual-smoke-section="professional-filmstrip-context-expanded"
+          style={{ minWidth: 0 }}
         >
           <BottomBar
             {...bottomBarProps}
@@ -1578,13 +1587,12 @@ function ProfessionalFilmstripContextVisualSmoke() {
             isResizing={false}
             setIsFilmstripVisible={setIsFilmstripVisible}
             showFilmstrip={true}
-            showZoomControls={true}
           />
         </section>
 
         <section
           data-visual-smoke-section="professional-filmstrip-context-secondary-states"
-          style={{ display: 'grid', gap: 8 }}
+          style={{ display: 'grid', gap: 8, minWidth: 0 }}
         >
           <BottomBar
             {...bottomBarProps}
@@ -1599,7 +1607,6 @@ function ProfessionalFilmstripContextVisualSmoke() {
             selectedImage={undefined}
             setIsFilmstripVisible={() => {}}
             showFilmstrip={true}
-            showZoomControls={true}
           />
           <BottomBar
             {...bottomBarProps}
@@ -1607,7 +1614,6 @@ function ProfessionalFilmstripContextVisualSmoke() {
             isFilmstripVisible={false}
             isPasted={true}
             showFilmstrip={false}
-            showZoomControls={true}
           />
         </section>
       </div>
