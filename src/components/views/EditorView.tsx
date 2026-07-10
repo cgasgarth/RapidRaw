@@ -95,6 +95,7 @@ export default function EditorView({
     renderedRightPanel,
     slideDirection,
     setUI,
+    setEditorRegionVisibility,
   } = useUIStore(
     useShallow((state) => ({
       isFullScreen: state.isFullScreen,
@@ -106,6 +107,7 @@ export default function EditorView({
       renderedRightPanel: state.renderedRightPanel,
       slideDirection: state.slideDirection,
       setUI: state.setUI,
+      setEditorRegionVisibility: state.setEditorRegionVisibility,
     })),
   );
   const isFullScreen = isFullScreenProp ?? isFullScreenFromStore;
@@ -235,7 +237,7 @@ export default function EditorView({
       rating={imageRatings[selectedImage?.path || ''] || 0}
       selectedImage={selectedImage ?? undefined}
       setIsFilmstripVisible={(value: boolean) => {
-        setUI((state) => ({ uiVisibility: { ...state.uiVisibility, filmstrip: value } }));
+        setEditorRegionVisibility('filmstrip', value);
       }}
       showFilmstrip={!isCompactPortrait}
       showZoomControls={!isAndroid}

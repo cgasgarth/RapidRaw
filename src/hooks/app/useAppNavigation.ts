@@ -212,7 +212,6 @@ export function useAppNavigation({ clearThumbnailQueue, requestThumbnails, refs 
 
       setUI({
         isLibraryExportPanelVisible: false,
-        compactEditorPanelHeightOverride: null,
       });
 
       if (cachedReadyEntry) {

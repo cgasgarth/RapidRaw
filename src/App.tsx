@@ -120,6 +120,9 @@ function App() {
     compactEditorPanelHeightOverride,
     activeRightPanel,
     setUI,
+    setEditorRegionSize,
+    setEditorRegionVisibility,
+    setEditorWorkspaceViewport,
     setRightPanel,
   } = useUIStore(
     useShallow((state) => ({
@@ -134,6 +137,9 @@ function App() {
       compactEditorPanelHeightOverride: state.compactEditorPanelHeightOverride,
       activeRightPanel: state.activeRightPanel,
       setUI: state.setUI,
+      setEditorRegionSize: state.setEditorRegionSize,
+      setEditorRegionVisibility: state.setEditorRegionVisibility,
+      setEditorWorkspaceViewport: state.setEditorWorkspaceViewport,
       setRightPanel: state.setRightPanel,
     })),
   );
@@ -216,6 +222,14 @@ function App() {
   const isCompactPortrait =
     viewportSize.width > 0 && viewportSize.width <= COMPACT_EDITOR_MAX_WIDTH && isPortraitViewport;
 
+  useEffect(() => {
+    setEditorWorkspaceViewport({
+      height: viewportSize.height,
+      isCompactPortrait,
+      width: viewportSize.width,
+    });
+  }, [isCompactPortrait, setEditorWorkspaceViewport, viewportSize.height, viewportSize.width]);
+
   const compactEditorPanelMinHeight = 220;
   const compactEditorPreviewSafeHeight = 300;
   const compactEditorPanelMaxHeight =
@@ -256,27 +270,27 @@ function App() {
   const compactEditorPanelCollapsedHeight = 96;
   const handleLeftPanelWidthChange = useCallback(
     (width: number) => {
-      setUI({ leftPanelWidth: width });
+      setEditorRegionSize('leftSidebar', width);
     },
-    [setUI],
+    [setEditorRegionSize],
   );
   const handleRightPanelWidthChange = useCallback(
     (width: number) => {
-      setUI({ rightPanelWidth: width });
+      setEditorRegionSize('rightInspector', width);
     },
-    [setUI],
+    [setEditorRegionSize],
   );
   const handleBottomPanelHeightChange = useCallback(
     (height: number) => {
-      setUI({ bottomPanelHeight: height });
+      setEditorRegionSize('filmstrip', height);
     },
-    [setUI],
+    [setEditorRegionSize],
   );
   const handleCompactEditorPanelHeightOverrideChange = useCallback(
     (height: number) => {
-      setUI({ compactEditorPanelHeightOverride: height });
+      setEditorRegionSize('compactTools', height);
     },
-    [setUI],
+    [setEditorRegionSize],
   );
   const createResizeHandler = usePanelResize({
     compactEditorPanelMaxHeight,
@@ -613,7 +627,7 @@ function App() {
           }}
           onOpenFolder={handleOpenFolderVoid}
           setIsVisible={(value: boolean) => {
-            setUI((state) => ({ uiVisibility: { ...state.uiVisibility, folderTree: value } }));
+            setEditorRegionVisibility('leftSidebar', value);
           }}
           style={{ width: uiVisibility.folderTree ? `${leftPanelWidth}px` : '32px' }}
           isInstantTransition={isInstantTransition}
