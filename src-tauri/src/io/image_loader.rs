@@ -306,9 +306,13 @@ pub(crate) fn raw_processing_mode_cache_key(source_path: &str, settings: &AppSet
         },
         (0, 0),
     );
+    let source_content_hash = std::fs::read(source_path)
+        .map(|bytes| blake3::hash(&bytes).to_hex().to_string())
+        .unwrap_or_else(|_| "unavailable".to_string());
     format!(
-        "{}::raw-processing-mode={}::linear-raw-mode={}::highlight-compression={}::color-nr={}::capture-sharpening={}:{}:{}:{}::camera-profile-resolver={}::raw-reconstruction={}::demosaic-plan={}",
+        "{}::source-content-blake3={}::raw-processing-mode={}::linear-raw-mode={}::highlight-compression={}::color-nr={}::capture-sharpening={}:{}:{}:{}::camera-profile-resolver={}::raw-reconstruction={}::demosaic-plan={}::raw-decoder=rawler-0.7.1::input-transform={}::xyz-to-ap1={}::numeric-policy={}",
         source_path,
+        source_content_hash,
         mode,
         settings.linear_raw_mode,
         raw_cache_f32(highlight_compression),
@@ -319,7 +323,10 @@ pub(crate) fn raw_processing_mode_cache_key(source_path: &str, settings: &AppSet
         raw_cache_f32(sharpening.radius_px),
         RAW_CACHE_CAMERA_PROFILE_RESOLVER_VERSION,
         RAW_CACHE_RECONSTRUCTION_VERSION,
-        recipe.provenance
+        recipe.provenance,
+        crate::color::camera_input_transform::RAW_INPUT_TRANSFORM_CONTRACT,
+        crate::color::camera_input_transform::XYZ_TO_AP1_MATRIX_VERSION,
+        crate::color::camera_input_transform::NUMERIC_POLICY_VERSION,
     )
 }
 
@@ -541,6 +548,28 @@ fn add_raw_development_report_exif(
         exif.insert(
             "RawEngineCameraProfileMatrixHash".to_string(),
             value.clone(),
+        );
+    }
+    if let Some(transform) = &report.input_transform {
+        exif.insert(
+            "RawEngineInputSourceDomain".to_string(),
+            transform.source_domain.to_string(),
+        );
+        exif.insert(
+            "RawEngineInputDestinationDomain".to_string(),
+            transform.destination_domain.to_string(),
+        );
+        exif.insert(
+            "RawEngineInputTransformHash".to_string(),
+            transform.transform_content_sha256.clone(),
+        );
+        exif.insert(
+            "RawEngineInputWorkingPixelsHash".to_string(),
+            transform.working_pixels_blake3.clone(),
+        );
+        exif.insert(
+            "RawEngineInputChromaticAdaptation".to_string(),
+            transform.chromatic_adaptation.to_string(),
         );
     }
     if let Some(value) = &profile.warm_illuminant {

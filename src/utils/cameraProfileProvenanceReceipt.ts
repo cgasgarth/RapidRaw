@@ -31,6 +31,7 @@ export function buildCameraProfileProvenanceReceipt(report: RawDevelopmentReport
     fallbackReason: report.cameraProfile.fallbackReason ?? null,
     illuminantEstimateConfidence: report.cameraProfile.illuminantEstimateConfidence,
     illuminantEstimateMethod: report.cameraProfile.illuminantEstimateMethod,
+    inputTransform: report.inputTransform ?? null,
     matrixHash: report.cameraProfile.matrixHash ?? null,
     outputDimensions: report.runtime?.outputDimensions ?? null,
     previewElapsedMs: report.runtime?.previewElapsedMs ?? null,
