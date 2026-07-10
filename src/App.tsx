@@ -7,6 +7,7 @@ import { useShallow } from 'zustand/react/shallow';
 import ImageLoaderManager from './components/managers/ImageLoaderManager';
 import ImageProcessingManager from './components/managers/ImageProcessingManager';
 import AppModals from './components/modals/AppModals';
+import { EditorHistorySection, EditorSnapshotsSection } from './components/panel/editor/EditorHistorySections';
 import EditorLeftSidebar, { type EditorLeftSectionId } from './components/panel/editor/EditorLeftSidebar';
 import FolderTreePanel from './components/panel/FolderTree';
 import ExportPanel from './components/panel/right/export/ExportPanel';
@@ -725,6 +726,10 @@ function App() {
                 }}
                 onVisibleChange={(visible: boolean) => {
                   setEditorRegionVisibility('leftSidebar', visible);
+                }}
+                slots={{
+                  history: <EditorHistorySection />,
+                  snapshots: <EditorSnapshotsSection />,
                 }}
                 width={leftPanelWidth}
               />

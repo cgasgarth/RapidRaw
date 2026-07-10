@@ -165,7 +165,6 @@ export default function Editor({
   const selectedImage = useEditorStore((s) => s.selectedImage);
   const adjustments = useEditorStore((s) => s.adjustments);
   const adjustmentsHistory = useEditorStore((s) => s.history);
-  const adjustmentsHistoryCheckpoints = useEditorStore((s) => s.historyCheckpoints);
   const adjustmentsHistoryIndex = useEditorStore((s) => s.historyIndex);
   const finalPreviewUrl = useEditorStore((s) => s.finalPreviewUrl);
   const uncroppedAdjustedPreviewUrl = useEditorStore((s) => s.uncroppedAdjustedPreviewUrl);
@@ -208,9 +207,6 @@ export default function Editor({
   const dispatchCompare = useEditorStore((s) => s.dispatchCompare);
   const undo = useEditorStore((s) => s.undo);
   const redo = useEditorStore((s) => s.redo);
-  const goToHistoryIndex = useEditorStore((s) => s.goToHistoryIndex);
-  const createHistoryCheckpoint = useEditorStore((s) => s.createHistoryCheckpoint);
-  const renameHistoryCheckpoint = useEditorStore((s) => s.renameHistoryCheckpoint);
   const pushHistory = useEditorStore((s) => s.pushHistory);
   const canUndo = adjustmentsHistoryIndex > 0;
   const canRedo = adjustmentsHistoryIndex < adjustmentsHistory.length - 1;
@@ -1959,12 +1955,6 @@ export default function Editor({
           onToggleDateView={() => {
             setShowExifDateView((prev) => !prev);
           }}
-          adjustmentsHistory={adjustmentsHistory}
-          adjustmentsHistoryCheckpoints={adjustmentsHistoryCheckpoints}
-          adjustmentsHistoryIndex={adjustmentsHistoryIndex}
-          onCreateAdjustmentsHistoryCheckpoint={createHistoryCheckpoint}
-          goToAdjustmentsHistoryIndex={goToHistoryIndex}
-          onRenameAdjustmentsHistoryCheckpoint={renameHistoryCheckpoint}
         />
         {selectedImage.isOfflineSmartPreview === true && (
           <div

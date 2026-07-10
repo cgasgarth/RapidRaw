@@ -107,7 +107,6 @@ import {
 import { agentChatTranscriptFixture } from '../../utils/agent/session/agentChatTranscriptFixture';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/computational-merge/computationalMergeAppServerRoutePairs';
 import { DETAIL_OUTPUT_COMPARISON_VISUAL_PROOF } from '../../utils/detail/detailOutputComparisonProof';
-import type { EditHistoryCheckpoint } from '../../utils/editHistory';
 import { buildFocusStackOutputReviewWorkflow } from '../../utils/focusStackOutputReview';
 import { buildHdrBracketPreflight, type HdrBracketPreflightSourceMetadata } from '../../utils/hdrBracketPreflight';
 import {
@@ -1140,15 +1139,6 @@ function ProfessionalEditorToolbarVisualSmoke() {
     };
     return [initial, exposure, crop, masks];
   });
-  const [historyCheckpoints, setHistoryCheckpoints] = useState<Array<EditHistoryCheckpoint>>([
-    {
-      createdAt: '2026-07-03T12:00:00.000Z',
-      historyIndex: 2,
-      id: 'visual-smoke-checkpoint-crop-review',
-      label: 'Crop review',
-    },
-  ]);
-
   useProfessionalEditorToolbarSmokeState();
 
   return (
@@ -1171,12 +1161,8 @@ function ProfessionalEditorToolbarVisualSmoke() {
           data-visual-smoke-section="professional-editor-toolbar-primary"
         >
           <EditorToolbar
-            adjustmentsHistory={history}
-            adjustmentsHistoryCheckpoints={historyCheckpoints}
-            adjustmentsHistoryIndex={historyIndex}
             canRedo={historyIndex < history.length - 1}
             canUndo={historyIndex > 0}
-            goToAdjustmentsHistoryIndex={setHistoryIndex}
             isAndroid={false}
             isFullScreen={isFullscreen}
             isLoading={true}
@@ -1184,26 +1170,6 @@ function ProfessionalEditorToolbarVisualSmoke() {
             onBackToLibrary={() => {}}
             onOpenNegativeLab={() => {}}
             onRedo={() => setHistoryIndex((index) => Math.min(index + 1, history.length - 1))}
-            onCreateAdjustmentsHistoryCheckpoint={(label) => {
-              setHistoryCheckpoints((checkpoints) => [
-                ...checkpoints.filter((checkpoint) => checkpoint.historyIndex !== historyIndex),
-                {
-                  createdAt: '2026-07-03T12:00:01.000Z',
-                  historyIndex,
-                  id: `visual-smoke-checkpoint-${historyIndex}`,
-                  label,
-                },
-              ]);
-            }}
-            onRenameAdjustmentsHistoryCheckpoint={(checkpointId, label) => {
-              setHistoryCheckpoints((checkpoints) =>
-                checkpoints.map((checkpoint) =>
-                  checkpoint.id === checkpointId
-                    ? { ...checkpoint, label: label.trim() || checkpoint.label }
-                    : checkpoint,
-                ),
-              );
-            }}
             onToggleDateView={() => setShowDateView((value) => !value)}
             onToggleFullScreen={() => setIsFullscreen((value) => !value)}
             onToggleShowOriginal={() => setShowOriginal((value) => !value)}
@@ -1271,11 +1237,8 @@ function ProfessionalEditorToolbarVisualSmoke() {
           data-visual-smoke-section="professional-editor-toolbar-fullscreen-state"
         >
           <EditorToolbar
-            adjustmentsHistory={history}
-            adjustmentsHistoryIndex={history.length - 1}
             canRedo={false}
             canUndo={true}
-            goToAdjustmentsHistoryIndex={() => {}}
             isAndroid={false}
             isFullScreen={true}
             isLoading={false}

@@ -1,10 +1,6 @@
 import cx from 'clsx';
-import { AnimatePresence, motion } from 'framer-motion';
 import {
   ArrowLeft,
-  Bookmark,
-  BookmarkPlus,
-  Check,
   Columns2,
   Eye,
   EyeOff,
@@ -14,12 +10,10 @@ import {
   Minimize2,
   MoonStar,
   Palette,
-  Pencil,
   Redo,
   SquareSplitHorizontal,
   SquareSplitVertical,
   Undo,
-  X,
 } from 'lucide-react';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -28,8 +22,6 @@ import { type EditorCompareMode, useEditorStore } from '../../../store/useEditor
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
-import type { Adjustments } from '../../../utils/adjustments';
-import { buildEditHistoryItems, type EditHistoryCheckpoint } from '../../../utils/editHistory';
 import type { EditorCompareOrientation } from '../../../utils/editorCompare';
 import { formatShortcutLabel } from '../../../utils/keyboardUtils';
 import {
@@ -68,12 +60,6 @@ interface EditorToolbarProps {
   showOriginal: boolean;
   showDateView: boolean;
   onToggleDateView: () => void;
-  adjustmentsHistory: Array<Adjustments>;
-  adjustmentsHistoryCheckpoints?: Array<EditHistoryCheckpoint>;
-  adjustmentsHistoryIndex: number;
-  onCreateAdjustmentsHistoryCheckpoint?: (label: string) => void;
-  goToAdjustmentsHistoryIndex: (index: number) => void;
-  onRenameAdjustmentsHistoryCheckpoint?: (checkpointId: string, label: string) => void;
   osPlatform?: string;
 }
 
@@ -102,12 +88,6 @@ const EditorToolbar = memo(
     showOriginal,
     showDateView,
     onToggleDateView,
-    adjustmentsHistory,
-    adjustmentsHistoryCheckpoints = [],
-    adjustmentsHistoryIndex,
-    onCreateAdjustmentsHistoryCheckpoint = () => undefined,
-    goToAdjustmentsHistoryIndex,
-    onRenameAdjustmentsHistoryCheckpoint = () => undefined,
     osPlatform,
   }: EditorToolbarProps) => {
     const { t } = useTranslation();
@@ -118,11 +98,6 @@ const EditorToolbar = memo(
     const prevIsLoadingRef = useRef(isLoading);
     const [isVcHovered, setIsVcHovered] = useState(false);
     const [isInfoHovered, setIsInfoHovered] = useState(false);
-    const [isHistoryVisible, setIsHistoryVisible] = useState(false);
-    const [editingCheckpointId, setEditingCheckpointId] = useState<string | null>(null);
-    const [editingCheckpointLabel, setEditingCheckpointLabel] = useState('');
-    const historyContainerRef = useRef<HTMLDivElement>(null);
-    const historyButtonRef = useRef<HTMLDivElement>(null);
     const appSettings = useSettingsStore((state) => state.appSettings);
     const osPlatformFromStore = useSettingsStore((state) => state.osPlatform);
     const isExportSoftProofEnabled = useEditorStore((state) => state.isExportSoftProofEnabled);
@@ -262,89 +237,25 @@ const EditorToolbar = memo(
       };
     }, [isAnyLoading, isLoading, isLoaderVisible]);
 
-    useEffect(() => {
-      if (!isHistoryVisible) return;
-      const handleClickOutside = (e: MouseEvent) => {
-        if (
-          historyContainerRef.current &&
-          !historyContainerRef.current.contains(e.target as Node) &&
-          historyButtonRef.current &&
-          !historyButtonRef.current.contains(e.target as Node)
-        ) {
-          setIsHistoryVisible(false);
-        }
-      };
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => {
-        document.removeEventListener('mousedown', handleClickOutside);
-      };
-    }, [isHistoryVisible]);
-
-    const historyItems = useMemo(
-      () => buildEditHistoryItems(adjustmentsHistory, adjustmentsHistoryCheckpoints),
-      [adjustmentsHistory, adjustmentsHistoryCheckpoints],
-    );
-
-    useEffect(() => {
-      if (isHistoryVisible && historyContainerRef.current) {
-        const timer = setTimeout(() => {
-          const activeEl = historyContainerRef.current?.querySelector('[data-active="true"]');
-          if (activeEl) {
-            activeEl.scrollIntoView({ block: 'nearest', behavior: 'auto' });
-          }
-        }, 10);
-        return () => {
-          clearTimeout(timer);
-        };
-      }
-      return undefined;
-    }, [isHistoryVisible, adjustmentsHistoryIndex]);
-
     const handleButtonKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
-      if (e.key === 'Escape') {
-        setIsHistoryVisible(false);
-        e.currentTarget.blur();
-        return;
-      }
       if (e.key === 'Tab') return;
       e.currentTarget.blur();
     };
 
     const isExpanded = isInfoHovered && (hasExif || isLoading);
-    const historyDepthTotal = Math.max(adjustmentsHistory.length, 1);
-    const historyDepthLabel = t('editor.toolbar.historyDepth', {
-      current: Math.min(adjustmentsHistoryIndex + 1, historyDepthTotal),
-      total: historyDepthTotal,
-    });
-    const activeHistoryItem = historyItems[adjustmentsHistoryIndex] ?? null;
-    const activeCheckpoint = activeHistoryItem?.checkpoint ?? null;
-    const activeHistoryLabel =
-      activeCheckpoint?.label.trim() || activeHistoryItem?.label || t('editor.toolbar.history.noActiveAdjustment');
-    const canCreateCheckpoint = adjustmentsHistory.length > 0;
     const effectiveOsPlatform = osPlatform ?? osPlatformFromStore;
     const undoShortcutLabel = formatShortcutLabel(['ctrl', 'KeyZ'], effectiveOsPlatform);
     const redoShortcutLabel = formatShortcutLabel(['ctrl', 'KeyY'], effectiveOsPlatform);
     const token = editorChromeTokens;
     const commandGroupClass =
       'flex h-9 items-center gap-1 rounded-md border border-editor-border bg-editor-panel-well p-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]';
-    const commandDividerClass = 'mx-0.5 h-5 w-px bg-editor-border';
     const iconButtonClass = `${token.button.base} ${token.button.icon} ${token.button.quiet} ${token.button.disabled} ${token.focusRing}`;
     const activeIconButtonClass = `${token.button.base} ${token.button.icon} ${token.button.selectedQuiet} ${token.focusRing}`;
     const statusPillClass =
       'border border-editor-border bg-editor-panel-raised text-text-primary shadow-[0_8px_22px_var(--editor-overlay-shadow)]';
-    const commitCheckpointRename = (checkpointId: string) => {
-      onRenameAdjustmentsHistoryCheckpoint(checkpointId, editingCheckpointLabel);
-      setEditingCheckpointId(null);
-      setEditingCheckpointLabel('');
-    };
-
     return (
       <div
-        className={cx(
-          'relative flex h-11 shrink-0 items-center justify-between gap-3 px-3 max-[700px]:h-auto max-[700px]:flex-wrap max-[700px]:items-start max-[700px]:gap-1 max-[700px]:p-2',
-          isHistoryVisible ? 'z-[100]' : 'z-40',
-        )}
-        data-toolbar-history={isHistoryVisible ? 'open' : 'closed'}
+        className="relative z-40 flex h-11 shrink-0 items-center justify-between gap-3 px-3 max-[700px]:h-auto max-[700px]:flex-wrap max-[700px]:items-start max-[700px]:gap-1 max-[700px]:p-2"
         data-toolbar-loading={isLoaderVisible ? 'true' : 'false'}
         data-toolbar-negative-lab={negativeLabDisabledReason ? 'disabled' : 'available'}
         data-toolbar-compare-mode={compareMode}
@@ -352,12 +263,7 @@ const EditorToolbar = memo(
         data-toolbar-soft-proof={isExportSoftProofEnabled ? 'active' : canSoftProof ? 'available' : 'unavailable'}
         data-toolbar-fullscreen={isFullScreen ? 'active' : 'inactive'}
       >
-        <div
-          className={cx(
-            'flex shrink-0 items-center gap-1.5 max-[700px]:order-1',
-            isHistoryVisible ? 'z-[100]' : 'z-40',
-          )}
-        >
+        <div className="z-40 flex shrink-0 items-center gap-1.5 max-[700px]:order-1">
           <div className={commandGroupClass} data-testid="editor-toolbar-back-group">
             <button
               aria-label={t('editor.toolbar.tooltips.backToLibrary')}
@@ -614,22 +520,13 @@ const EditorToolbar = memo(
           </div>
         </div>
 
-        <div
-          className={cx(
-            'flex shrink-0 items-center gap-1.5 max-[700px]:order-3 max-[700px]:w-full max-[700px]:flex-wrap max-[700px]:justify-start max-[700px]:gap-1',
-            isHistoryVisible ? 'z-[100]' : 'z-40',
-          )}
-        >
-          <div className={cx(commandGroupClass, 'relative')} ref={historyButtonRef}>
+        <div className="z-40 flex shrink-0 items-center gap-1.5 max-[700px]:order-3 max-[700px]:w-full max-[700px]:flex-wrap max-[700px]:justify-start max-[700px]:gap-1">
+          <div className={commandGroupClass} data-testid="editor-toolbar-history-commands">
             <button
               className={iconButtonClass}
               disabled={!canUndo}
               onClick={onUndo}
               onKeyDown={handleButtonKeyDown}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                setIsHistoryVisible((prev) => !prev);
-              }}
               aria-label={t('editor.toolbar.tooltips.undo')}
               data-tooltip={t('editor.toolbar.tooltips.undo', { shortcut: undoShortcutLabel })}
               type="button"
@@ -641,255 +538,12 @@ const EditorToolbar = memo(
               disabled={!canRedo}
               onClick={onRedo}
               onKeyDown={handleButtonKeyDown}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                setIsHistoryVisible((prev) => !prev);
-              }}
               aria-label={t('editor.toolbar.tooltips.redo')}
               data-tooltip={t('editor.toolbar.tooltips.redo', { shortcut: redoShortcutLabel })}
               type="button"
             >
               <Redo size={16} />
             </button>
-            <div className={commandDividerClass} aria-hidden="true" />
-            <button
-              aria-label={historyDepthLabel}
-              aria-expanded={isHistoryVisible}
-              aria-haspopup="menu"
-              className={`${token.button.base} ${token.button.quiet} ${token.button.disabled} ${token.focusRing} h-8 max-w-56 gap-2 px-2.5 max-[700px]:w-8 max-[700px]:p-0`}
-              data-history-popover-state={isHistoryVisible ? 'open' : 'closed'}
-              disabled={adjustmentsHistory.length === 0}
-              onClick={() => {
-                setIsHistoryVisible((prev) => !prev);
-              }}
-              onKeyDown={handleButtonKeyDown}
-              data-testid="editor-history-depth-control"
-              data-tooltip={t('editor.toolbar.tooltips.history')}
-              type="button"
-            >
-              <Bookmark
-                size={13}
-                className={cx('shrink-0', activeCheckpoint ? 'text-editor-info' : 'text-text-secondary')}
-              />
-              <span className="flex min-w-0 max-w-36 flex-col items-start leading-none max-[700px]:hidden">
-                <UiText
-                  as="span"
-                  variant={TextVariants.small}
-                  weight={TextWeights.medium}
-                  className="block max-w-full truncate"
-                  data-testid="editor-history-active-label"
-                >
-                  {activeHistoryLabel}
-                </UiText>
-                <UiText as="span" variant={TextVariants.small} color={TextColors.secondary} className="block">
-                  {t('editor.toolbar.history.review')}
-                </UiText>
-              </span>
-              <UiText
-                as="span"
-                variant={TextVariants.small}
-                color={TextColors.secondary}
-                weight={TextWeights.medium}
-                className="max-[700px]:hidden"
-              >
-                {historyDepthLabel}
-              </UiText>
-            </button>
-
-            <AnimatePresence>
-              {isHistoryVisible && adjustmentsHistory.length > 0 && (
-                <motion.div
-                  ref={historyContainerRef}
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.15, ease: 'easeOut' }}
-                  className="absolute right-0 top-full z-[110] mt-3 flex max-h-80 w-72 flex-col overflow-y-auto rounded-lg border border-editor-overlay-stroke bg-editor-panel/95 px-0.5 py-1.5 shadow-[0_14px_34px_var(--editor-overlay-shadow)] backdrop-blur-md custom-scrollbar"
-                  data-testid="editor-history-popover"
-                  role="menu"
-                >
-                  <div className="border-b border-editor-border px-1 pb-1">
-                    <button
-                      className={cx(
-                        'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring',
-                        canCreateCheckpoint ? 'hover:bg-editor-selected-quiet' : 'opacity-50',
-                      )}
-                      data-testid="editor-history-add-checkpoint"
-                      disabled={!canCreateCheckpoint}
-                      onClick={() => {
-                        if (!activeHistoryItem) return;
-                        if (activeCheckpoint) {
-                          setEditingCheckpointId(activeCheckpoint.id);
-                          setEditingCheckpointLabel(activeCheckpoint.label);
-                          return;
-                        }
-                        onCreateAdjustmentsHistoryCheckpoint(activeHistoryItem.label);
-                      }}
-                      role="menuitem"
-                      type="button"
-                    >
-                      <BookmarkPlus size={14} className="shrink-0 text-text-secondary" />
-                      <span className="min-w-0 flex-1">
-                        <UiText as="span" weight={TextWeights.medium}>
-                          {activeCheckpoint
-                            ? t('editor.toolbar.history.updateCheckpoint')
-                            : t('editor.toolbar.history.addCheckpoint')}
-                        </UiText>
-                        <UiText
-                          as="span"
-                          variant={TextVariants.small}
-                          color={TextColors.secondary}
-                          className="block truncate"
-                        >
-                          {activeHistoryItem?.label ?? t('editor.toolbar.history.noActiveAdjustment')}
-                        </UiText>
-                      </span>
-                    </button>
-                  </div>
-
-                  {historyItems.map((item) => {
-                    const i = item.historyIndex;
-                    const checkpoint = item.checkpoint;
-                    const isCurrent = i === adjustmentsHistoryIndex;
-                    const isFuture = i > adjustmentsHistoryIndex;
-                    const isEditing = checkpoint?.id === editingCheckpointId;
-
-                    const textColor = isCurrent
-                      ? TextColors.button
-                      : isFuture
-                        ? TextColors.secondary
-                        : TextColors.primary;
-                    const textWeight = isCurrent ? TextWeights.medium : TextWeights.normal;
-
-                    return (
-                      <div
-                        key={i}
-                        data-active={isCurrent}
-                        data-history-checkpoint={item.isCheckpoint ? 'true' : 'false'}
-                        data-testid={isCurrent ? 'editor-history-active-row' : undefined}
-                        className={cx(
-                          'mx-1 my-0.5 flex items-center gap-1 rounded-md px-2 py-1.5 transition-colors',
-                          isCurrent
-                            ? 'bg-editor-primary-active'
-                            : isFuture
-                              ? 'opacity-55 hover:bg-editor-selected-quiet hover:opacity-100'
-                              : 'hover:bg-editor-selected-quiet',
-                        )}
-                        role="none"
-                      >
-                        <div className="flex min-w-0 flex-1 items-center gap-2">
-                          {item.isCheckpoint && (
-                            <Bookmark
-                              size={13}
-                              className={cx('shrink-0', isCurrent ? 'text-current' : 'text-text-secondary')}
-                            />
-                          )}
-                          {isEditing && checkpoint ? (
-                            <input
-                              aria-label={t('editor.toolbar.history.editCheckpointLabel')}
-                              className="h-7 min-w-0 flex-1 rounded border border-editor-border bg-editor-panel-well px-2 text-sm text-text-primary outline-none focus:ring-2 focus:ring-editor-focus-ring"
-                              data-testid="editor-history-checkpoint-label-input"
-                              onChange={(event) => {
-                                setEditingCheckpointLabel(event.currentTarget.value);
-                              }}
-                              onKeyDown={(event) => {
-                                if (event.key === 'Enter') {
-                                  event.preventDefault();
-                                  commitCheckpointRename(checkpoint.id);
-                                } else if (event.key === 'Escape') {
-                                  setEditingCheckpointId(null);
-                                  setEditingCheckpointLabel('');
-                                }
-                              }}
-                              value={editingCheckpointLabel}
-                            />
-                          ) : (
-                            <button
-                              data-testid="editor-history-jump-action"
-                              className="min-w-0 flex-1 text-left focus-visible:outline-none"
-                              onClick={() => {
-                                goToAdjustmentsHistoryIndex(i);
-                                setIsHistoryVisible(false);
-                              }}
-                              role="menuitem"
-                              type="button"
-                            >
-                              <UiText as="span" color={textColor} weight={textWeight} className="block truncate">
-                                {item.label}
-                              </UiText>
-                            </button>
-                          )}
-                        </div>
-                        <div className="flex shrink-0 items-center gap-1">
-                          <UiText
-                            as="span"
-                            variant={TextVariants.small}
-                            color={textColor}
-                            weight={textWeight}
-                            className="opacity-50 shrink-0"
-                          >
-                            {i === 0 ? '' : i}
-                          </UiText>
-                          {checkpoint &&
-                            (isEditing ? (
-                              <>
-                                <button
-                                  aria-label={t('editor.toolbar.history.saveCheckpointLabel')}
-                                  className={cx(
-                                    token.button.base,
-                                    token.button.icon,
-                                    token.button.quiet,
-                                    token.focusRing,
-                                  )}
-                                  onClick={() => {
-                                    commitCheckpointRename(checkpoint.id);
-                                  }}
-                                  type="button"
-                                >
-                                  <Check size={13} />
-                                </button>
-                                <button
-                                  aria-label={t('editor.toolbar.history.cancelCheckpointLabel')}
-                                  className={cx(
-                                    token.button.base,
-                                    token.button.icon,
-                                    token.button.quiet,
-                                    token.focusRing,
-                                  )}
-                                  onClick={() => {
-                                    setEditingCheckpointId(null);
-                                    setEditingCheckpointLabel('');
-                                  }}
-                                  type="button"
-                                >
-                                  <X size={13} />
-                                </button>
-                              </>
-                            ) : (
-                              <button
-                                aria-label={t('editor.toolbar.history.renameCheckpoint')}
-                                className={cx(
-                                  token.button.base,
-                                  token.button.icon,
-                                  token.button.quiet,
-                                  token.focusRing,
-                                )}
-                                onClick={() => {
-                                  setEditingCheckpointId(checkpoint.id);
-                                  setEditingCheckpointLabel(checkpoint.label);
-                                }}
-                                type="button"
-                              >
-                                <Pencil size={13} />
-                              </button>
-                            ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </motion.div>
-              )}
-            </AnimatePresence>
           </div>
 
           <div className={commandGroupClass} data-testid="editor-toolbar-negative-lab-group">
