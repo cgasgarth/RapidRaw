@@ -47,6 +47,14 @@ pub struct CachedPreview {
     pub interactive_divisor: f32,
 }
 
+#[derive(Clone)]
+pub struct CachedViewerSampleFrame {
+    pub graph_revision: String,
+    pub image: Arc<DynamicImage>,
+    pub image_identity: String,
+    pub space_label: String,
+}
+
 pub struct GpuImageCache {
     pub texture: Texture,
     pub texture_view: TextureView,
@@ -69,6 +77,7 @@ pub struct PreviewJob {
     pub roi: Option<(f32, f32, f32, f32)>,
     pub compute_waveform: bool,
     pub active_waveform_channel: Option<String>,
+    pub viewer_sample_graph_revision: Option<String>,
     pub responder: tokio::sync::oneshot::Sender<Vec<u8>>,
 }
 
@@ -154,6 +163,7 @@ pub struct AppState {
     pub thumbnail_cancellation_token: Arc<AtomicBool>,
     pub thumbnail_progress: Mutex<ThumbnailProgressTracker>,
     pub preview_worker_tx: Mutex<Option<Sender<PreviewJob>>>,
+    pub viewer_sample_frames: Mutex<HashMap<String, CachedViewerSampleFrame>>,
     pub analytics_worker_tx: Mutex<Option<Sender<AnalyticsJob>>>,
     pub mask_cache: Mutex<HashMap<u64, GrayImage>>,
     pub patch_cache: Mutex<HashMap<String, serde_json::Value>>,
@@ -196,6 +206,7 @@ impl AppState {
                 completed: 0,
             }),
             preview_worker_tx: Mutex::new(None),
+            viewer_sample_frames: Mutex::new(HashMap::new()),
             analytics_worker_tx: Mutex::new(None),
             mask_cache: Mutex::new(HashMap::new()),
             patch_cache: Mutex::new(HashMap::new()),
