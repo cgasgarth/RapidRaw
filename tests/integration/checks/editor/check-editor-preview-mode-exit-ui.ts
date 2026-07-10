@@ -132,6 +132,36 @@ setupStores(false);
 const collapsedMarkup = renderEditorView(false);
 assertIncludes(collapsedMarkup, 'data-testid="editor-right-panel-shell"', 'editor right panel shell should render');
 assertIncludes(collapsedMarkup, 'data-testid="editor-bottom-bar-shell"', 'editor bottom bar shell should render');
+assertIncludes(
+  collapsedMarkup,
+  'data-editor-shell="desktop"',
+  'desktop editor should identify its contiguous shell variant',
+);
+assertIncludes(
+  collapsedMarkup,
+  'data-editor-region="viewer"',
+  'desktop editor should expose a stable viewer region hook',
+);
+assertIncludes(
+  collapsedMarkup,
+  'data-editor-region="tool-rail"',
+  'desktop editor should expose a stable tool rail region hook',
+);
+assertIncludes(
+  collapsedMarkup,
+  'data-editor-region="inspector"',
+  'desktop editor should expose a stable inspector region hook',
+);
+assertIncludes(
+  collapsedMarkup,
+  'data-editor-region="filmstrip"',
+  'desktop editor should expose a stable filmstrip region hook',
+);
+assertIncludes(
+  collapsedMarkup,
+  'editor-desktop-workspace grid grid-cols-[minmax(0,1fr)_auto]',
+  'desktop editor should use a contiguous residual-viewer grid',
+);
 assertIncludes(collapsedMarkup, 'max-height:500px', 'editor filmstrip should be expanded in normal mode');
 assertShellOpeningTagNotIncludes(
   collapsedMarkup,

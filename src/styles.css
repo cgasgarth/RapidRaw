@@ -90,7 +90,8 @@
   --editor-info-surface: rgba(118, 184, 216, 0.16);
 }
 
-/* Editor values inherit only within the editor workspace; root values above remain legacy fallbacks. */
+/* Editor values inherit only within editor surfaces; root values above remain legacy fallbacks. */
+.editor-shell[data-editor-shell="desktop"],
 .editor-workspace,
 .editor-visual-fixture {
   --editor-viewer-matte: rgb(10, 12, 15);
@@ -205,6 +206,53 @@
 }
 
 @layer components {
+  .editor-shell[data-editor-shell="desktop"],
+  .editor-workspace[data-editor-shell="desktop"] {
+    --editor-shell-divider: var(--editor-divider);
+  }
+
+  .editor-shell[data-editor-shell="desktop"] [data-editor-region],
+  .editor-workspace[data-editor-shell="desktop"] [data-editor-region] {
+    min-height: 0;
+    min-width: 0;
+  }
+
+  .editor-shell[data-editor-shell="desktop"] .editor-shell-resizer,
+  .editor-workspace[data-editor-shell="desktop"] .editor-shell-resizer {
+    position: relative;
+  }
+
+  .editor-shell[data-editor-shell="desktop"] .editor-shell-resizer::after,
+  .editor-workspace[data-editor-shell="desktop"] .editor-shell-resizer::after {
+    background: var(--editor-shell-divider);
+    content: "";
+    pointer-events: none;
+    position: absolute;
+  }
+
+  .editor-shell[data-editor-shell="desktop"] .editor-shell-resizer-vertical::after,
+  .editor-workspace[data-editor-shell="desktop"] .editor-shell-resizer-vertical::after {
+    bottom: 0;
+    left: calc(50% - 0.5px);
+    top: 0;
+    width: 1px;
+  }
+
+  .editor-shell[data-editor-shell="desktop"] .editor-shell-resizer-horizontal::after,
+  .editor-workspace[data-editor-shell="desktop"] .editor-shell-resizer-horizontal::after {
+    height: 1px;
+    left: 0;
+    right: 0;
+    top: calc(50% - 0.5px);
+  }
+
+  .editor-shell[data-editor-shell="desktop"][data-editor-resizing="true"] .editor-shell-track,
+  .editor-shell[data-editor-shell="desktop"][data-editor-resizing="true"] [data-editor-region],
+  .editor-workspace[data-editor-shell="desktop"][data-editor-resizing="true"] .editor-shell-track,
+  .editor-workspace[data-editor-shell="desktop"][data-editor-resizing="true"] [data-editor-region] {
+    transition-duration: 0ms !important;
+  }
+
   .slider-input::-webkit-slider-thumb {
     @apply h-4 w-4 appearance-none rounded-full bg-accent;
     transition:

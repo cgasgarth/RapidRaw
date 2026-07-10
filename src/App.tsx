@@ -582,21 +582,24 @@ function App() {
 
   const hasRoots = rootPaths.length > 0;
 
-  const renderFolderTree = () => {
+  const renderFolderTree = (isDesktopEditorShell = false) => {
     if (!hasRoots) return null;
 
     return (
       <div
         className={cx(
-          'flex h-full overflow-hidden shrink-0',
-          !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
+          'flex h-full min-h-0 overflow-hidden shrink-0',
+          isDesktopEditorShell && 'editor-shell-left',
+          !isResizing && !isInstantTransition && !isFullScreen && 'transition-all duration-300 ease-in-out',
         )}
+        data-editor-region={isDesktopEditorShell ? 'left' : undefined}
         style={{
-          maxWidth: isFullScreen ? '0px' : '1000px',
+          width: isFullScreen ? '0px' : undefined,
           opacity: isFullScreen ? 0 : 1,
         }}
       >
         <FolderTreePanel
+          isContiguousShell={isDesktopEditorShell}
           isResizing={isResizing}
           isVisible={uiVisibility.folderTree}
           onContextMenu={handleFolderTreeContextMenu}
@@ -615,7 +618,11 @@ function App() {
           style={{ width: uiVisibility.folderTree ? `${leftPanelWidth}px` : '32px' }}
           isInstantTransition={isInstantTransition}
         />
-        <Resizer direction={Orientation.Vertical} onMouseDown={createResizeHandler('left', leftPanelWidth)} />
+        <Resizer
+          className={isDesktopEditorShell ? 'editor-shell-resizer editor-shell-resizer-vertical' : undefined}
+          direction={Orientation.Vertical}
+          onMouseDown={createResizeHandler('left', leftPanelWidth)}
+        />
       </div>
     );
   };
@@ -654,11 +661,20 @@ function App() {
           className={cx(
             'flex-1 flex flex-col min-h-0',
             isLayoutReady && hasRoots && !isInstantTransition && 'transition-all duration-300 ease-in-out',
-            [hasRoots && (isFullScreen ? 'p-0 gap-0' : 'p-2 gap-2')],
+            [hasRoots && !selectedImage && (isFullScreen ? 'p-0 gap-0' : 'p-2 gap-2')],
           )}
         >
-          <div className="flex flex-row grow h-full min-h-0">
-            {!shouldHideFolderTree && renderFolderTree()}
+          <div
+            className={cx(
+              'grow h-full min-h-0',
+              selectedImage && !isCompactPortrait
+                ? 'editor-shell grid grid-cols-[auto_minmax(0,1fr)] bg-editor-matte'
+                : 'flex flex-row',
+            )}
+            data-editor-resizing={selectedImage && !isCompactPortrait ? String(isResizing) : undefined}
+            data-editor-shell={selectedImage && !isCompactPortrait ? 'desktop' : undefined}
+          >
+            {!shouldHideFolderTree && renderFolderTree(selectedImage !== null && !isCompactPortrait)}
             <div className="flex-1 flex flex-col min-w-0">
               {selectedImage ? (
                 <EditorView
