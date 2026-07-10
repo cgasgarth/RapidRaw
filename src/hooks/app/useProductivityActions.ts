@@ -120,7 +120,8 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
           setUI((state) => ({
             hdrModalState: {
               ...state.hdrModalState,
-              progressMessage: 'HDR dry-run complete.',
+              isProcessing: false,
+              progressMessage: 'HDR alignment plan ready. Radiance reconstruction is pending.',
               runtimePlan,
             },
           }));
@@ -134,11 +135,6 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
             }));
             return;
           }
-          await invoke(Invokes.MergeHdr, {
-            acceptedDryRunPlanHash: runtimePlan.acceptedDryRunPlanHash,
-            acceptedDryRunPlanId: runtimePlan.acceptedDryRunPlanId,
-            paths: selectedPaths,
-          });
         } catch (err: unknown) {
           setUI((state) => ({ hdrModalState: { ...state.hdrModalState, isProcessing: false, error: String(err) } }));
         }

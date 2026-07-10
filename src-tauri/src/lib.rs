@@ -74,10 +74,10 @@ use tempfile::NamedTempFile;
 
 use crate::formats::PNG_DATA_URL_PREFIX;
 use crate::hdr_artifact_sidecar::{
-    HdrDryRunPlanResponse, build_hdr_dry_run_plan_response, build_hdr_runtime_plan,
-    build_unique_hdr_output_path, write_hdr_output_sidecar,
+    build_hdr_runtime_plan, build_unique_hdr_output_path, write_hdr_output_sidecar,
 };
 use crate::image_codecs::{encode_jpeg_data_url, encode_jpeg_response, encode_png_data_url};
+use crate::merge::hdr::{ALIGNMENT_POLICY_ID, HdrAlignmentPlanResponse, build_alignment_plan};
 
 use crate::cache_utils::{
     calculate_full_job_hash, calculate_geometry_hash, calculate_transform_hash,
@@ -1711,28 +1711,42 @@ fn build_hdr_source_refs(
 #[tauri::command]
 async fn plan_hdr(
     paths: Vec<String>,
-    app_handle: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
-) -> Result<HdrDryRunPlanResponse, String> {
+) -> Result<HdrAlignmentPlanResponse, String> {
     if paths.len() < 2 {
         return Err("Please select at least two images to merge.".to_string());
     }
 
-    let loaded_items = load_hdr_merge_items(&paths, &app_handle, false)?;
-    let source_refs = build_hdr_source_refs(&loaded_items);
-    let output_width = source_refs.first().map(|source| source.width).unwrap_or(0);
-    let output_height = source_refs.first().map(|source| source.height).unwrap_or(0);
-    let runtime_plan_response =
-        build_hdr_dry_run_plan_response(&source_refs, output_width, output_height);
+    *state.hdr_runtime_plan.lock().unwrap() = None;
+    state.hdr_source_refs.lock().unwrap().clear();
+    let generation = state.hdr_plan_generation.fetch_add(1, Ordering::SeqCst) + 1;
+    let generation_handle = state.hdr_plan_generation.clone();
+    let response = build_alignment_plan(&paths, || {
+        generation_handle.load(Ordering::SeqCst) != generation
+    })?;
+    if state.hdr_plan_generation.load(Ordering::SeqCst) != generation {
+        return Err("hdr_plan_cancelled:artifact_publication".to_string());
+    }
+    *state.hdr_runtime_plan.lock().unwrap() = Some(app_state::PendingHdrMergePlan {
+        accepted_dry_run_plan_hash: response.accepted_dry_run_plan_hash.clone(),
+        accepted_dry_run_plan_id: response.accepted_dry_run_plan_id.clone(),
+        alignment_policy_id: ALIGNMENT_POLICY_ID.to_string(),
+        source_content_hashes: response
+            .sources
+            .iter()
+            .map(|source| source.frame.content_hash.clone())
+            .collect(),
+        source_paths: paths,
+    });
+    Ok(response)
+}
 
-    *state.hdr_runtime_plan.lock().unwrap() = Some(build_hdr_runtime_plan(
-        &source_refs,
-        output_width,
-        output_height,
-    ));
-    *state.hdr_source_refs.lock().unwrap() = source_refs;
-
-    Ok(runtime_plan_response)
+#[tauri::command]
+async fn cancel_hdr_plan(state: tauri::State<'_, AppState>) -> Result<(), String> {
+    state.hdr_plan_generation.fetch_add(1, Ordering::SeqCst);
+    *state.hdr_runtime_plan.lock().unwrap() = None;
+    state.hdr_source_refs.lock().unwrap().clear();
+    Ok(())
 }
 
 #[tauri::command]
@@ -1745,6 +1759,17 @@ async fn merge_hdr(
 ) -> Result<(), String> {
     if paths.len() < 2 {
         return Err("Please select at least two images to merge.".to_string());
+    }
+    if state
+        .hdr_runtime_plan
+        .lock()
+        .unwrap()
+        .as_ref()
+        .is_some_and(|plan| plan.alignment_policy_id == ALIGNMENT_POLICY_ID)
+    {
+        return Err(
+            "HDR radiance reconstruction is unavailable for alignment_plan_ready.".to_string(),
+        );
     }
 
     let hdr_result_handle = state.hdr_result.clone();
@@ -2618,6 +2643,7 @@ pub fn run() {
             frontend_log,
             save_collage,
             merge_hdr,
+            cancel_hdr_plan,
             save_hdr,
             load_and_parse_lut,
             fetch_community_presets,

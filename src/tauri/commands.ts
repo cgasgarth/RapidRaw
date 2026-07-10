@@ -87,6 +87,7 @@ export enum Invokes {
   LoadPresets = 'load_presets',
   LoadSettings = 'load_settings',
   MoveFiles = 'move_files',
+  CancelHdrPlan = 'cancel_hdr_plan',
   PlanHdr = 'plan_hdr',
   PlanPanorama = 'plan_panorama',
   PlanSuperResolution = 'plan_super_resolution',
