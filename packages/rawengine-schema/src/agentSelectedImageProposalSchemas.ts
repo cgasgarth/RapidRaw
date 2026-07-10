@@ -24,7 +24,7 @@ const basicTonePatchSchema = z
   .strict()
   .refine((patch) => Object.keys(patch).length > 0, { message: 'Proposal edit requires at least one adjustment.' });
 
-const proposalArtifactSchema = z
+export const rawEngineAgentSelectedImageProposalArtifactV1Schema = z
   .object({
     accessScope: z.literal('local_private'),
     artifactId: z.string().trim().min(1),
@@ -52,8 +52,8 @@ const proposalArtifactSchema = z
     expiresAt: z.iso.datetime(),
     mediaType: z.literal('image/jpeg'),
     quality: z.literal(0.86),
-    renderHash: sha256Schema,
-    recipeHash: sha256Schema,
+    renderHash: z.string().trim().min(1),
+    recipeHash: z.string().trim().min(1),
   })
   .strict();
 
@@ -70,12 +70,7 @@ const proposalStatusSchema = z.enum([
 
 export const rawEngineAgentSelectedImageProposalRenderCommandV1Schema = z
   .object({
-    basePreview: z
-      .object({
-        artifactId: z.string().trim().min(1),
-        contentHash: sha256Schema,
-      })
-      .strict(),
+    basePreview: rawEngineAgentSelectedImageProposalArtifactV1Schema,
     cancellationId: z.string().trim().min(1),
     commandType: z.literal(RawEngineAgentSelectedImageProposalCommandType.Render),
     deadlineAt: z.iso.datetime(),
@@ -115,19 +110,36 @@ export const rawEngineAgentSelectedImageProposalRenderCommandV1Schema = z
     requestId: z.string().trim().min(1),
     sessionId: z.string().trim().min(1),
   })
-  .strict();
+  .strict()
+  .superRefine((command, context) => {
+    if (command.basePreview.recipeHash !== command.expectedRecipeHash) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Proposal base preview recipe hash must match the expected editor recipe.',
+        path: ['basePreview', 'recipeHash'],
+      });
+    }
+    if (command.basePreview.renderHash !== command.expectedRenderHash) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Proposal base preview render hash must match the expected editor render.',
+        path: ['basePreview', 'renderHash'],
+      });
+    }
+  });
 
 export const rawEngineAgentSelectedImageProposalReceiptV1Schema = z
   .object({
     artifacts: z
       .object({
-        after: proposalArtifactSchema,
-        before: proposalArtifactSchema,
+        after: rawEngineAgentSelectedImageProposalArtifactV1Schema,
+        before: rawEngineAgentSelectedImageProposalArtifactV1Schema,
       })
       .strict()
       .optional(),
     base: z
       .object({
+        artifact: rawEngineAgentSelectedImageProposalArtifactV1Schema,
         graphRevision: z.string().trim().min(1),
         previewArtifactId: z.string().trim().min(1),
         previewContentHash: sha256Schema,
@@ -184,20 +196,55 @@ export const rawEngineAgentSelectedImageProposalReceiptV1Schema = z
       });
     }
     if (receipt.artifacts !== undefined) {
-      if (receipt.artifacts.before.contentHash !== receipt.base.previewContentHash) {
+      if (receipt.artifacts['before'].contentHash !== receipt.base.previewContentHash) {
         context.addIssue({
           code: 'custom',
           message: 'Proposal before artifact must match the bound base preview bytes.',
           path: ['artifacts', 'before', 'contentHash'],
         });
       }
-      if (receipt.artifacts.before.artifactId !== receipt.base.previewArtifactId) {
+      if (receipt.artifacts['before'].artifactId !== receipt.base.previewArtifactId) {
         context.addIssue({
           code: 'custom',
           message: 'Proposal before artifact must match the bound base preview artifact.',
           path: ['artifacts', 'before', 'artifactId'],
         });
       }
+      if (JSON.stringify(receipt.artifacts['before']) !== JSON.stringify(receipt.base.artifact)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Proposal before artifact must preserve the full acquired base attachment metadata.',
+          path: ['artifacts', 'before'],
+        });
+      }
+    }
+    if (receipt.base.artifact.artifactId !== receipt.base.previewArtifactId) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Proposal base artifact id must match the bound base attachment.',
+        path: ['base', 'artifact', 'artifactId'],
+      });
+    }
+    if (receipt.base.artifact.contentHash !== receipt.base.previewContentHash) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Proposal base artifact hash must match the bound base attachment.',
+        path: ['base', 'artifact', 'contentHash'],
+      });
+    }
+    if (receipt.base.artifact.recipeHash !== receipt.base.recipeHash) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Proposal base artifact recipe hash must match the bound editor recipe.',
+        path: ['base', 'artifact', 'recipeHash'],
+      });
+    }
+    if (receipt.base.artifact.renderHash !== receipt.base.renderHash) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Proposal base artifact render hash must match the bound editor render.',
+        path: ['base', 'artifact', 'renderHash'],
+      });
     }
   });
 

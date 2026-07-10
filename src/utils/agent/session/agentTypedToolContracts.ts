@@ -1,6 +1,11 @@
 import type { z } from 'zod';
 
 import {
+  RAW_ENGINE_AGENT_SELECTED_IMAGE_PROPOSAL_RENDER_TOOL_NAME,
+  rawEngineAgentSelectedImageProposalReceiptV1Schema,
+  rawEngineAgentSelectedImageProposalRenderCommandV1Schema,
+} from '../../../../packages/rawengine-schema/src/agentSelectedImageProposalSchemas';
+import {
   AGENT_CURRENT_IMAGE_PREVIEW_LOOP_APPLY_REVIEW_TOOL_NAME,
   AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME,
   agentCurrentImagePreviewLoopApplyReviewRequestSchema,
@@ -56,6 +61,13 @@ export const agentEditorToolContracts = {
     mutates: false,
     requestSchema: rawEngineImageGetPreviewRequestSchema,
     responseSchema: rawEngineImageGetPreviewAttachmentResponseSchema,
+    schemaVersion: 1,
+  }),
+  [RAW_ENGINE_AGENT_SELECTED_IMAGE_PROPOSAL_RENDER_TOOL_NAME]: defineAgentEditorToolContract({
+    isPreviewRefresh: false,
+    mutates: false,
+    requestSchema: rawEngineAgentSelectedImageProposalRenderCommandV1Schema,
+    responseSchema: rawEngineAgentSelectedImageProposalReceiptV1Schema,
     schemaVersion: 1,
   }),
   [AGENT_PREVIEW_RENDER_TOOL_NAME]: defineAgentEditorToolContract({

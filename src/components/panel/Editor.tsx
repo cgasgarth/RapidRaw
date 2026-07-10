@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import cx from 'clsx';
-import { Loader2, Minimize2 } from 'lucide-react';
+import { Minimize2 } from 'lucide-react';
 import {
   type MouseEvent,
   type RefObject,
@@ -1559,7 +1559,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
         className={cx(
           'shrink-0 relative z-[120] rounded-lg border border-editor-border bg-editor-panel',
           !isInstantTransition && 'transition-all duration-300 ease-in-out',
-          isFullScreen ? 'max-h-0 opacity-0 m-0 border-transparent' : 'max-h-25 opacity-100',
+          isFullScreen ? 'max-h-0 opacity-0 m-0 border-transparent' : 'max-h-25 opacity-100 max-[700px]:max-h-none',
           toolbarOverflowVisible ? 'overflow-visible' : 'overflow-hidden',
         )}
         aria-hidden={isFullScreen}
@@ -1611,7 +1611,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       <div
         aria-label={t('editor.accessibility.imagePreview')}
         className={cx(
-          'flex-1 min-h-0 overflow-hidden bg-editor-panel-well',
+          'flex flex-1 min-h-0 flex-col overflow-hidden bg-editor-panel-well',
           isFullScreen ? 'rounded-none' : 'rounded-lg border border-editor-border p-2',
         )}
         data-testid="editor-image-preview-region"
@@ -1619,10 +1619,11 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       >
         <div
           className={cx(
-            'relative h-full overflow-hidden touch-none bg-editor-panel-well',
+            'relative min-h-0 flex-1 overflow-hidden touch-none bg-editor-panel-well',
             isFullScreen ? 'rounded-none' : 'rounded-lg',
             !isWgpuActive && 'bg-editor-panel-well',
           )}
+          aria-busy={isLoaderVisible}
           style={{ cursor: cursorStyle }}
           role="presentation"
           onContextMenu={onContextMenu}
@@ -1636,20 +1637,6 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
           data-fullscreen-preview={String(isFullScreen)}
           data-testid="editor-image-preview-panel"
         >
-          <EditorChromeStatusStrip isFullScreen={isFullScreen} />
-          {showSpinner && (
-            <div
-              className={cx(
-                'absolute inset-0 z-50 flex items-center justify-center bg-editor-panel-well/90 transition-opacity duration-300',
-                isLoaderVisible ? 'opacity-100' : 'opacity-0 pointer-events-none',
-              )}
-            >
-              <div className="flex h-full w-full items-center justify-center rounded-lg border border-editor-border bg-[linear-gradient(135deg,var(--editor-panel-well),var(--editor-panel)_48%,var(--editor-panel-well))]">
-                <Loader2 size={42} className="animate-spin text-editor-primary-active" />
-              </div>
-            </div>
-          )}
-
           <div
             ref={contentRef}
             className="relative w-full h-full flex items-center justify-center origin-top-left"
@@ -1773,6 +1760,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
             )}
           </div>
         </div>
+        <EditorChromeStatusStrip isFullScreen={isFullScreen} isRendering={isLoaderVisible} />
       </div>
     </div>
   );

@@ -1261,7 +1261,7 @@ export default function Controls() {
       <PanelScopesStrip testId="adjustments-panel-scopes-strip" />
 
       <div
-        className="shrink-0 border-b border-editor-border bg-editor-panel px-2 py-1.5"
+        className="shrink-0 border-b border-editor-border bg-editor-panel px-2 py-1"
         data-testid="develop-panel-search-shelf"
       >
         <div className="relative">
@@ -1371,8 +1371,8 @@ export default function Controls() {
             {pinnedDevelopPanelControls.map((control) => (
               <div
                 className={cx(
-                  'grid min-w-0 grid-cols-[minmax(0,1fr)_1.25rem] items-center gap-1 rounded border border-editor-border bg-editor-panel-well px-1 py-0.5',
-                  control.isDirty && 'border-editor-focus-ring/70',
+                  'grid min-w-0 grid-cols-[minmax(0,1fr)_1.25rem] items-center gap-1 border-l border-editor-border bg-editor-panel-well px-1 py-0.5',
+                  control.isDirty && 'border-l-editor-info',
                 )}
                 data-dirty={control.isDirty}
                 data-testid={`develop-panel-pinned-control-row-${control.id}`}
@@ -1402,7 +1402,7 @@ export default function Controls() {
         )}
       </div>
 
-      <div className="grow overflow-y-auto px-2 py-1.5 flex flex-col gap-1" ref={developPanelScrollRootRef}>
+      <div className="grow flex flex-col gap-0 overflow-y-auto px-2 py-1" ref={developPanelScrollRootRef}>
         {ADJUSTMENT_SECTION_NAMES.map((sectionName) => {
           if (isDevelopPanelSearching && !matchingDevelopPanelSections.has(sectionName)) {
             return null;

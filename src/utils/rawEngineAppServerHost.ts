@@ -1,4 +1,9 @@
 import {
+  RAW_ENGINE_AGENT_SELECTED_IMAGE_PROPOSAL_RENDER_TOOL_NAME,
+  rawEngineAgentSelectedImageProposalReceiptV1Schema,
+  rawEngineAgentSelectedImageProposalRenderCommandV1Schema,
+} from '../../packages/rawengine-schema/src/agentSelectedImageProposalSchemas';
+import {
   buildRawEngineLocalAppServerToolRegistryQuery,
   createRawEngineLocalAppServerBridge,
   dispatchRawEngineLocalAppServerComputationalMergeDerivedSourceOpen,
@@ -104,6 +109,7 @@ import {
   renderAgentPreviewCompare,
   renderAgentReadOnlyPreview,
 } from './agent/context/agentReadOnlyAppServerTools';
+import { agentSelectedImageProposalRuntime } from './agent/context/agentSelectedImageProposalRuntime';
 import {
   AGENT_LAYER_CREATE_INPUT_SCHEMA_NAME,
   AGENT_LAYER_CREATE_OUTPUT_SCHEMA_NAME,
@@ -1249,6 +1255,7 @@ const APPROVED_AGENT_APP_SERVER_TOOL_NAMES = new Set<string>([
   AGENT_PREVIEW_COMPARE_TOOL_NAME,
   AGENT_PREVIEW_RENDER_TOOL_NAME,
   AGENT_RETOUCH_APPLY_TOOL_NAME,
+  RAW_ENGINE_AGENT_SELECTED_IMAGE_PROPOSAL_RENDER_TOOL_NAME,
   AGENT_STATE_GET_TOOL_NAME,
   RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
   NEGATIVE_LAB_AGENT_APPLY_TOOL_NAME,
@@ -1289,7 +1296,9 @@ const hasAgentSessionIntent = ({
 export const isApprovedAgentAppServerToolName = (runtimeToolName: string): boolean =>
   APPROVED_AGENT_APP_SERVER_TOOL_NAMES.has(runtimeToolName);
 
-const rawEngineAppServerLocalBridge = createRawEngineLocalAppServerBridge();
+const rawEngineAppServerLocalBridge = createRawEngineLocalAppServerBridge({
+  runSelectedImageProposalRender: (command) => agentSelectedImageProposalRuntime.render(command),
+});
 
 const validateDraftSessionForDispatch = (request: RawEngineAppServerToolDispatchRequest): string | null => {
   const draftSession = request.draftSession;
@@ -1370,6 +1379,14 @@ const dispatchAgentAppServerTool = async (
         agentCurrentImagePreviewLoopApplyReviewRequestSchema.parse(request.arguments),
       );
       break;
+    case RAW_ENGINE_AGENT_SELECTED_IMAGE_PROPOSAL_RENDER_TOOL_NAME: {
+      const dispatched = await rawEngineAppServerLocalBridge.dispatch(
+        rawEngineAgentSelectedImageProposalRenderCommandV1Schema.parse(request.arguments),
+      );
+      if (!dispatched.ok) throw new Error(dispatched.message);
+      result = dispatched.result;
+      break;
+    }
     case AGENT_COLOR_APPLY_TOOL_NAME:
       result = await applyAgentColor(agentColorApplyRequestSchema.parse(request.arguments));
       break;
@@ -1607,6 +1624,7 @@ const buildRawEngineAppServerToolDispatchResponseUnchecked = async (
 interface TypedDispatchSessionState {
   completedByIdempotencyKey: Map<string, RawEngineAppServerToolDispatchResponse>;
   inFlightIdempotencyKeys: Set<string>;
+  inFlightResponses: Map<string, Promise<RawEngineAppServerToolDispatchResponse>>;
   mutationInFlight: boolean;
   previewInFlight: boolean;
   queuedPreview?: {
@@ -1621,6 +1639,7 @@ const typedDispatchResultCleanups = new Map<string, (result: unknown) => void>()
 
 export const cancelRawEngineAppServerTypedDispatch = (cancellationId: string) => {
   cancelledTypedDispatches.add(cancellationId);
+  void agentSelectedImageProposalRuntime.cancel(cancellationId);
 };
 
 export const registerRawEngineAppServerTypedDispatchResultCleanup = (
@@ -1633,6 +1652,10 @@ export const registerRawEngineAppServerTypedDispatchResultCleanup = (
 
 const cleanupTypedDispatchResult = (cancellationId: string, result: unknown) => {
   releaseRawEngineImagePreviewAttachmentResult(result);
+  const proposal = rawEngineAgentSelectedImageProposalReceiptV1Schema.safeParse(result);
+  if (proposal.success && proposal.data.status === 'ready') {
+    void agentSelectedImageProposalRuntime.release(proposal.data.proposalId, 'cancelled');
+  }
   const cleanup = typedDispatchResultCleanups.get(cancellationId);
   typedDispatchResultCleanups.delete(cancellationId);
   cleanup?.(result);
@@ -1644,6 +1667,7 @@ const getTypedDispatchSessionState = (sessionId: string): TypedDispatchSessionSt
   const state: TypedDispatchSessionState = {
     completedByIdempotencyKey: new Map(),
     inFlightIdempotencyKeys: new Set(),
+    inFlightResponses: new Map(),
     mutationInFlight: false,
     previewInFlight: false,
   };
@@ -1702,6 +1726,16 @@ const rejectTypedDispatch = ({
     ...(startedAtIso === undefined ? {} : { startedAtIso }),
   });
 
+const isSelectedImageProposalTerminalReceipt = (
+  request: RawEngineAppServerToolDispatchRequest,
+  result: unknown,
+): boolean =>
+  request.runtimeToolName === RAW_ENGINE_AGENT_SELECTED_IMAGE_PROPOSAL_RENDER_TOOL_NAME &&
+  (() => {
+    const proposal = rawEngineAgentSelectedImageProposalReceiptV1Schema.safeParse(result);
+    return proposal.success && proposal.data.status !== 'ready';
+  })();
+
 const validateTypedDispatch = (
   request: RawEngineAppServerToolDispatchRequest,
 ): RawEngineAppServerToolDispatchResponse | null => {
@@ -1725,6 +1759,7 @@ const validateTypedDispatch = (
       request,
     });
   }
+  if (request.runtimeToolName === RAW_ENGINE_AGENT_SELECTED_IMAGE_PROPOSAL_RENDER_TOOL_NAME) return null;
   if (Date.parse(context.deadlineAt) <= Date.now()) {
     return rejectTypedDispatch({ context, message: 'Typed dispatch deadline expired.', outcome: 'timed_out', request });
   }
@@ -1774,6 +1809,10 @@ const executeTypedDispatch = async (
   try {
     const response = await buildRawEngineAppServerToolDispatchResponseUnchecked(request);
     if (cancelledTypedDispatches.has(context.cancellationId)) {
+      if (isSelectedImageProposalTerminalReceipt(request, response.result)) {
+        cancelledTypedDispatches.delete(context.cancellationId);
+        return buildTypedExecutionResponse({ context, outcome: 'completed', response, startedAtIso });
+      }
       if (response.result !== undefined) cleanupTypedDispatchResult(context.cancellationId, response.result);
       cancelledTypedDispatches.delete(context.cancellationId);
       return rejectTypedDispatch({
@@ -1785,6 +1824,9 @@ const executeTypedDispatch = async (
       });
     }
     if (Date.parse(context.deadlineAt) <= Date.now()) {
+      if (isSelectedImageProposalTerminalReceipt(request, response.result)) {
+        return buildTypedExecutionResponse({ context, outcome: 'completed', response, startedAtIso });
+      }
       if (response.result !== undefined) cleanupTypedDispatchResult(context.cancellationId, response.result);
       return rejectTypedDispatch({
         context,
@@ -1824,13 +1866,16 @@ const drainTypedPreviewQueue = async (state: TypedDispatchSessionState) => {
     return;
   }
   state.inFlightIdempotencyKeys.add(context.idempotencyKey);
+  const responsePromise = executeTypedDispatch(queued.request, state);
+  state.inFlightResponses.set(context.idempotencyKey, responsePromise);
   try {
-    const response = await executeTypedDispatch(queued.request, state);
+    const response = await responsePromise;
     state.completedByIdempotencyKey.set(context.idempotencyKey, response);
     queued.resolve(response);
     await drainTypedPreviewQueue(state);
   } finally {
     state.inFlightIdempotencyKeys.delete(context.idempotencyKey);
+    state.inFlightResponses.delete(context.idempotencyKey);
   }
 };
 
@@ -1846,12 +1891,21 @@ export const buildRawEngineAppServerToolDispatchResponse = async (
     return rejectTypedDispatch({ context, message: 'Unknown typed dispatch tool.', outcome: 'rejected', request });
   const state = getTypedDispatchSessionState(context.sessionId);
   const prior = state.completedByIdempotencyKey.get(context.idempotencyKey);
-  if (prior !== undefined) return prior;
+  if (prior !== undefined) {
+    if (request.runtimeToolName !== RAW_ENGINE_AGENT_SELECTED_IMAGE_PROPOSAL_RENDER_TOOL_NAME) return prior;
+    const receipt = rawEngineAgentSelectedImageProposalReceiptV1Schema.safeParse(prior.result);
+    const current = receipt.success ? agentSelectedImageProposalRuntime.getReceipt(receipt.data.proposalId) : undefined;
+    return current === undefined
+      ? prior
+      : rawEngineAppServerToolDispatchResponseSchema.parse({ ...prior, result: current });
+  }
   const validation = validateTypedDispatch(request);
   if (validation !== null) {
     if (validation.execution?.outcome === 'cancelled') cancelledTypedDispatches.delete(context.cancellationId);
     return validation;
   }
+  const inFlight = state.inFlightResponses.get(context.idempotencyKey);
+  if (inFlight !== undefined) return inFlight;
   if (state.inFlightIdempotencyKeys.has(context.idempotencyKey)) {
     return rejectTypedDispatch({
       context,
@@ -1885,13 +1939,16 @@ export const buildRawEngineAppServerToolDispatchResponse = async (
     });
   }
   state.inFlightIdempotencyKeys.add(context.idempotencyKey);
+  const responsePromise = executeTypedDispatch(request, state);
+  state.inFlightResponses.set(context.idempotencyKey, responsePromise);
   try {
-    const response = await executeTypedDispatch(request, state);
+    const response = await responsePromise;
     state.completedByIdempotencyKey.set(context.idempotencyKey, response);
     if (contract.isPreviewRefresh) await drainTypedPreviewQueue(state);
     return response;
   } finally {
     state.inFlightIdempotencyKeys.delete(context.idempotencyKey);
+    state.inFlightResponses.delete(context.idempotencyKey);
   }
 };
 

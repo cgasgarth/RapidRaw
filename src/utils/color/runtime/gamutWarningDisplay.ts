@@ -97,6 +97,39 @@ export interface EditorChromeStatusChip {
   value: string;
 }
 
+const editorChromeStatusPriority: Record<EditorChromeStatusChipId, number> = {
+  'shadow-clipping': 0,
+  'highlight-clipping': 1,
+  'gamut-warning': 2,
+  'soft-proof': 3,
+  'preview-scopes': 4,
+};
+
+const editorChromeTonePriority: Record<EditorChromeStatusChipTone, number> = {
+  danger: 0,
+  warning: 1,
+  info: 2,
+  neutral: 3,
+  success: 4,
+};
+
+/**
+ * Surface only the diagnostics that need canvas-adjacent feedback, ordered by
+ * urgency so the compact status lane cannot bury clipping behind routine state.
+ */
+export const getEditorChromeStatusStripChips = (chips: EditorChromeStatusChip[]): EditorChromeStatusChip[] =>
+  chips
+    .filter(
+      (chip) =>
+        chip.active &&
+        (chip.tone === 'danger' || chip.tone === 'warning' || chip.id === 'soft-proof' || chip.id === 'preview-scopes'),
+    )
+    .sort(
+      (left, right) =>
+        editorChromeTonePriority[left.tone] - editorChromeTonePriority[right.tone] ||
+        editorChromeStatusPriority[left.id] - editorChromeStatusPriority[right.id],
+    );
+
 export type EditorClippingStatusChip = EditorChromeStatusChip & {
   id: 'shadow-clipping' | 'highlight-clipping';
 };

@@ -4684,6 +4684,7 @@
     },
     "slider": {
       "clickToEdit": "Click to edit",
+      "modified": "Modified",
       "reset": "Reset"
     },
     "waveform": {
