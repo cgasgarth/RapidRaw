@@ -4,7 +4,9 @@ import {
   DEFAULT_EDITOR_RIGHT_PANEL,
   EDITING_RIGHT_PANELS,
   getRightPanelEntry,
+  getRightPanelHostDescriptor,
   isEditingRightPanel,
+  RIGHT_PANEL_ENTRIES,
   RIGHT_PANEL_ORDER,
   searchRightPanels,
 } from '../../../src/components/panel/right/rightPanelRegistry';
@@ -229,5 +231,28 @@ describe('editor right panel persistence', () => {
       'Tether',
       'Export',
     ]);
+  });
+
+  test('declares a complete stable-host contract for every registered panel', () => {
+    expect(RIGHT_PANEL_ENTRIES.map(({ id }) => id)).toEqual(RIGHT_PANEL_ORDER);
+
+    for (const panel of RIGHT_PANEL_ORDER) {
+      const descriptor = getRightPanelHostDescriptor(panel);
+      expect(descriptor.header.ownership).toBe('panel');
+      expect(descriptor.header.fallbackLabel.length).toBeGreaterThan(0);
+      expect(descriptor.loading).toEqual({ fallback: 'progress', retainPredecessor: true });
+      expect(descriptor.error.presentation).toBe('inline');
+      expect(descriptor.error.fallbackLabel.length).toBeGreaterThan(0);
+      expect(['preserve', 'workspace']).toContain(descriptor.compact);
+      expect(['none', 'session']).toContain(descriptor.keepAlive);
+
+      if (descriptor.scroll.mode === 'panel') {
+        expect(descriptor.scroll.rootSelector).toBe('[data-right-panel-scroll-root]');
+      }
+    }
+
+    expect(getRightPanelHostDescriptor(Panel.Agent).keepAlive).toBe('session');
+    expect(getRightPanelHostDescriptor(Panel.Agent).scroll.mode).toBe('workspace');
+    expect(getRightPanelHostDescriptor(Panel.Color).scroll.mode).toBe('panel');
   });
 });

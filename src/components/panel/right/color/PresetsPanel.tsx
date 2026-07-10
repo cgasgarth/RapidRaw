@@ -1068,6 +1068,7 @@ export function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProps) {
 
         <div
           className={cx('min-h-0 flex-1 overflow-y-auto', isRootOver && 'bg-editor-selected-quiet')}
+          data-right-panel-scroll-root="true"
           onContextMenu={(event) => {
             event.preventDefault();
             showContextMenu(event.clientX, event.clientY, [

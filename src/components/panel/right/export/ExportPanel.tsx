@@ -1784,7 +1784,7 @@ export default function ExportPanel({
           </button>
         )}
       </div>
-      <div className="grow space-y-6 overflow-y-auto p-3">
+      <div className="grow space-y-6 overflow-y-auto p-3" data-right-panel-scroll-root="true">
         {hasExportTarget ? (
           <>
             <ExportPresetsList
