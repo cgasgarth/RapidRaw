@@ -76,6 +76,7 @@ const commandNames: Record<
   | 'listImagesRecursive'
   | 'loadImage'
   | 'loadMetadata'
+  | 'loadPresets'
   | 'loadSettings'
   | 'previewNegativeConversion'
   | 'renderNegativeLabDryRunPreviewArtifact'
@@ -107,6 +108,7 @@ const commandNames: Record<
   listImagesRecursive: Invokes.ListImagesRecursive,
   loadImage: Invokes.LoadImage,
   loadMetadata: Invokes.LoadMetadata,
+  loadPresets: Invokes.LoadPresets,
   loadSettings: Invokes.LoadSettings,
   previewNegativeConversion: Invokes.PreviewNegativeConversion,
   renderNegativeLabDryRunPreviewArtifact: Invokes.RenderNegativeLabDryRunPreviewArtifact,
@@ -203,6 +205,8 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
       return Promise.resolve(false);
     case commandNames.loadMetadata:
       return Promise.resolve({ adjustments: null });
+    case commandNames.loadPresets:
+      return Promise.resolve([]);
     case commandNames.loadImage:
       return Promise.resolve({
         exif: { Make: 'RawEngine Harness', Model: 'Browser Tauri API' },

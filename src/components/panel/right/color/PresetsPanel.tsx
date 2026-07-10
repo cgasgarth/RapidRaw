@@ -83,6 +83,7 @@ import { professionalInspectorDensityTokens } from '../../../ui/inspectorTokens'
 import InspectorPanelFrame from '../inspector/InspectorPanelFrame';
 
 interface PresetsPanelProps {
+  placement?: 'right-panel' | 'sidebar';
   onNavigateToCommunity: () => void;
 }
 
@@ -414,7 +415,7 @@ function FolderResult({
   );
 }
 
-export function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProps) {
+export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' }: PresetsPanelProps) {
   const { t } = useTranslation();
   const selectedImage = useEditorStore((state) => state.selectedImage);
   const adjustments = useEditorStore((state) => state.adjustments);
@@ -609,7 +610,8 @@ export function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProps) {
       currentImagePathRef.current = selectedImage?.path ?? null;
       clearPreviews();
     }
-    if (activePanel !== Panel.Presets || !selectedImage?.isReady) return;
+    const isSurfaceActive = placement === 'sidebar' || activePanel === Panel.Presets;
+    if (!isSurfaceActive || !selectedImage?.isReady) return;
     enqueuePreviews(rootPresets.map((entry) => ({ folderId: null, preset: entry.preset })));
     folders
       .filter((entry) => expandedFolders.has(entry.folder.id) || queryText.length > 0)
@@ -622,6 +624,7 @@ export function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProps) {
     enqueuePreviews,
     expandedFolders,
     folders,
+    placement,
     queryText,
     rootPresets,
     selectedImage?.isReady,
@@ -951,6 +954,7 @@ export function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProps) {
         notice={notice}
         status={status}
         testId="presets-panel"
+        variant={placement === 'sidebar' ? 'section' : 'panel'}
       >
         <div
           className="border-b border-editor-border px-2.5 py-2"
@@ -1067,7 +1071,11 @@ export function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProps) {
         ) : null}
 
         <div
-          className={cx('min-h-0 flex-1 overflow-y-auto', isRootOver && 'bg-editor-selected-quiet')}
+          className={cx(
+            'min-h-0 flex-1',
+            placement === 'right-panel' && 'overflow-y-auto',
+            isRootOver && 'bg-editor-selected-quiet',
+          )}
           data-right-panel-scroll-root="true"
           onContextMenu={(event) => {
             event.preventDefault();

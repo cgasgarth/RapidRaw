@@ -126,7 +126,7 @@ export default function EditorLeftSidebar({
                       data-editor-left-slot={sectionId}
                       role="group"
                     >
-                      {slots[sectionId]}
+                      {isOpen ? slots[sectionId] : null}
                     </div>
                   </CollapsibleSection>
                 );
