@@ -9,7 +9,7 @@ use rgb::{FromSlice, RGBA8};
 use tauri::{Emitter, Manager};
 
 use crate::adjustment_utils::hydrate_adjustments;
-use crate::app_settings::load_settings_or_default;
+use crate::app_settings::load_preview_runtime_settings_or_default;
 use crate::app_state::{
     AnalyticsConfig, AppState, CachedPreview, CachedViewerSampleFrame, PreviewJob,
 };
@@ -65,10 +65,10 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
     crate::validate_expected_preview_image(&loaded_image.path, expected_image_path)?;
 
     let new_transform_hash = calculate_transform_hash(&adjustments_clone);
-    let settings = load_settings_or_default(app_handle);
-    let live_quality = settings.live_preview_quality.as_deref().unwrap_or("high");
+    let settings = load_preview_runtime_settings_or_default(app_handle);
+    let live_quality = settings.live_preview_quality.as_str();
 
-    let default_preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
+    let default_preview_dim = settings.editor_preview_resolution;
     let preview_dim = target_resolution.unwrap_or(default_preview_dim);
     let use_wgpu_renderer = false;
 
