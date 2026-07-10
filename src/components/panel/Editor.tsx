@@ -175,6 +175,11 @@ export default function Editor({
   const isExportSoftProofEnabled = useEditorStore((s) => s.isExportSoftProofEnabled);
   const exportSoftProofRecipeId = useEditorStore((s) => s.exportSoftProofRecipeId);
   const exportSoftProofTransform = useEditorStore((s) => s.exportSoftProofTransform);
+  const viewerSampleGraphRevision = JSON.stringify({
+    exportSoftProofRecipeId,
+    historyIndex: adjustmentsHistoryIndex,
+    isExportSoftProofEnabled,
+  });
   const compare = useEditorStore((s) => s.compare);
   const showOriginal = compare.isOriginalHeld || compare.mode === 'hold-original';
   const isSliderDragging = useEditorStore((s) => s.isSliderDragging);
@@ -2089,6 +2094,7 @@ export default function Editor({
               liveRotation={liveRotation}
               transformState={transformState}
               hasRenderedFirstFrame={hasRenderedFirstFrame}
+              viewerSampleGraphRevision={viewerSampleGraphRevision}
             />
             {activeObjectPromptState !== null && (
               <div className="pointer-events-none absolute inset-0" data-testid="object-prompt-canvas-overlay">

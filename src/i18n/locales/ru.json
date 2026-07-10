@@ -1028,7 +1028,8 @@
       "gamutWarningCoverage": "",
       "gamutWarningOverlay": "",
       "maskOverlayAlt": "",
-      "originalAlt": ""
+      "originalAlt": "",
+      "sampler": { "clipped": "Обрезка {{channels}}", "paused": "Приостановлено" }
     },
     "chromeStatus": {
       "accessibilityLabel": "",

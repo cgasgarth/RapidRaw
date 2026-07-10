@@ -1002,7 +1002,8 @@
       "gamutWarningCoverage": "",
       "gamutWarningOverlay": "",
       "maskOverlayAlt": "",
-      "originalAlt": ""
+      "originalAlt": "",
+      "sampler": { "clipped": "Corte {{channels}}", "paused": "Em pausa" }
     },
     "chromeStatus": {
       "accessibilityLabel": "",

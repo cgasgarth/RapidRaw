@@ -144,6 +144,11 @@ export function useImageProcessing(
         : undefined,
     [appSettings?.exportPresets, exportSoftProofRecipeId, isExportSoftProofEnabled],
   );
+  const viewerSampleGraphRevision = JSON.stringify({
+    exportSoftProofRecipeId,
+    historyIndex,
+    isExportSoftProofEnabled,
+  });
 
   const latestInteractiveRequestIdRef = useRef(0);
   const executeInteractiveRenderRef = useRef<(request: InteractivePreviewRequest) => Promise<void>>(async () => {});
@@ -320,6 +325,7 @@ export function useImageProcessing(
                 jsAdjustments: payload,
                 renderingIntent: selectedProofRecipe.renderingIntent ?? 'relativeColorimetric',
                 targetResolution: request.targetRes,
+                viewerSampleGraphRevision: request.identity.graphIdentity,
               }
             : null;
 
@@ -379,6 +385,7 @@ export function useImageProcessing(
                       jsAdjustments: payload,
                       roi: request.roi,
                       targetResolution: request.targetRes,
+                      viewerSampleGraphRevision: request.identity.graphIdentity,
                     }),
                   },
                   previewBufferResponseSchema,
@@ -665,6 +672,7 @@ export function useImageProcessing(
               {
                 jsAdjustments: currentAdjustments,
                 targetResolution: targetRes,
+                viewerSampleGraphRevision,
               },
               previewDataUrlResponseSchema,
             );
@@ -675,7 +683,7 @@ export function useImageProcessing(
           }
         }
       }, 200),
-    [setEditor],
+    [setEditor, viewerSampleGraphRevision],
   );
 
   useEffect(() => {
@@ -848,6 +856,7 @@ export function useImageProcessing(
             {
               jsAdjustments: adjustments,
               targetResolution: targetRes,
+              viewerSampleGraphRevision,
             },
             previewDataUrlResponseSchema,
           );
@@ -875,6 +884,7 @@ export function useImageProcessing(
     calculateTargetRes,
     dispatchCompare,
     setEditor,
+    viewerSampleGraphRevision,
   ]);
 
   return {

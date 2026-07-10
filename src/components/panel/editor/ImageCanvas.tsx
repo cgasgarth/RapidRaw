@@ -23,6 +23,7 @@ import {
 import type { RenderSize } from '../../../hooks/viewport/useImageRenderSize';
 import type { GamutWarningOverlayPayload } from '../../../schemas/tauriEventSchemas';
 import type { EditorCompareMode, ExportSoftProofTransformState, InteractivePatch } from '../../../store/useEditorStore';
+import { Invokes } from '../../../tauri/commands';
 import type {
   Adjustments,
   AiPatch,
@@ -60,6 +61,18 @@ import {
   normalizeLinearGradientParameters,
   normalizeRadialGradientParameters,
 } from '../../../utils/mask/gradientMaskParameters';
+import { invokeWithSchema } from '../../../utils/tauriSchemaInvoke';
+import {
+  createViewerSampleRequest,
+  isViewerSampleResultCurrent,
+  LatestViewerSampleScheduler,
+  mapViewerPointToImage,
+  resolveViewerSampleTarget,
+  type ViewerSampleRequest,
+  type ViewerSampleResult,
+  type ViewerSampleTarget,
+  viewerSampleResultSchema,
+} from '../../../utils/viewerSampler';
 import { resolveWgpuPreviewVisibility } from '../../../utils/wgpuPreviewHealth';
 import {
   averageWhiteBalancePickerRgbaSample,
@@ -78,6 +91,7 @@ import {
   canvasOverlayTokens,
 } from './overlays/canvasOverlayTokens';
 import { PreviewSurface } from './PreviewSurface';
+import { ViewerSamplerHud } from './ViewerSamplerHud';
 import type { ViewerActiveTool } from './viewerInputResolver';
 
 declare global {
@@ -311,6 +325,7 @@ interface ImageCanvasProps {
   liveRotation?: number | null;
   transformState: { scale: number; positionX: number; positionY: number };
   hasRenderedFirstFrame: boolean;
+  viewerSampleGraphRevision?: string;
 }
 
 interface MaskOverlay {
@@ -1723,6 +1738,7 @@ const ImageCanvas = memo(
     liveRotation,
     transformState,
     hasRenderedFirstFrame,
+    viewerSampleGraphRevision = 'viewer-sample-unbound',
   }: ImageCanvasProps) => {
     const { t } = useTranslation();
     const [isCropViewVisible, setIsCropViewVisible] = useState(false);
@@ -2114,6 +2130,148 @@ const ImageCanvas = memo(
     const isInitialDrawing = (isMasking || isAiEditing) && activeSubMaskParameters?.isInitialDraw === true;
 
     const isToolActive = isBrushActive || isAiSubjectActive || isInitialDrawing || isParametricActive;
+    const samplerSuppressed =
+      isCropping ||
+      isMasking ||
+      isAiEditing ||
+      isSliderDragging ||
+      isStraightenActive ||
+      Boolean(isRotationActive) ||
+      isWbPickerActive ||
+      isMaskInteractionActive ||
+      isToolActive ||
+      (viewerInputState?.activeTool !== undefined && viewerInputState.activeTool !== 'none');
+    const [viewerSampleResult, setViewerSampleResult] = useState<ViewerSampleResult | null>(null);
+    const [viewerSampleLocked, setViewerSampleLocked] = useState(false);
+    const [viewerSampleTarget, setViewerSampleTarget] = useState<ViewerSampleTarget>(
+      isExportSoftProofEnabled ? 'softProof' : 'edited',
+    );
+    const latestViewerSampleRequestRef = useRef<ViewerSampleRequest | null>(null);
+    const executeViewerSampleRef = useRef<(request: ViewerSampleRequest) => Promise<void>>(async () => {});
+    const viewerSampleSchedulerRef = useRef<LatestViewerSampleScheduler | null>(null);
+    if (!viewerSampleSchedulerRef.current) {
+      viewerSampleSchedulerRef.current = new LatestViewerSampleScheduler((request) =>
+        executeViewerSampleRef.current(request),
+      );
+    }
+    executeViewerSampleRef.current = async (request) => {
+      try {
+        const result = await invokeWithSchema(Invokes.SampleViewerPixel, { request }, viewerSampleResultSchema);
+        if (isViewerSampleResultCurrent(result, latestViewerSampleRequestRef.current)) {
+          setViewerSampleResult(result);
+        }
+      } catch {
+        if (latestViewerSampleRequestRef.current?.requestIdentity === request.requestIdentity) {
+          setViewerSampleResult({
+            status: 'unavailable',
+            requestIdentity: request.requestIdentity,
+            reason: 'frameUnavailable',
+            spaceLabel: 'Unavailable',
+          });
+        }
+      }
+    };
+
+    useEffect(
+      () => () => {
+        viewerSampleSchedulerRef.current?.dispose();
+      },
+      [],
+    );
+
+    useEffect(() => {
+      latestViewerSampleRequestRef.current = null;
+      viewerSampleSchedulerRef.current?.clear();
+      setViewerSampleResult(null);
+    }, [
+      overlayGeometry.geometryEpoch,
+      selectedImage.path,
+      viewerSampleGraphRevision,
+      compareMode,
+      exportSoftProofRecipeId,
+      isExportSoftProofEnabled,
+      wgpuPreviewVisibility.previewBackend,
+    ]);
+
+    const handleViewerSamplerPointerMove = useCallback(
+      (event: React.PointerEvent<HTMLDivElement>) => {
+        if (viewerSampleLocked || samplerSuppressed || event.pointerType === 'touch') return;
+        const surface = event.currentTarget;
+        const rect = surface.getBoundingClientRect();
+        const normalizedViewerX = (event.clientX - rect.x) / rect.width;
+        const normalizedViewerY = (event.clientY - rect.y) / rect.height;
+        const target = resolveViewerSampleTarget({
+          compareMode,
+          compareDividerPosition,
+          compareOrientation,
+          normalizedViewerX,
+          normalizedViewerY,
+          softProofEnabled: isExportSoftProofEnabled,
+        });
+        const sideBySideRenderSize =
+          compareMode === 'side-by-side' ? (target === 'original' ? originalImageRenderSize : imageRenderSize) : null;
+        const mapped = mapViewerPointToImage({
+          clientPoint: { x: event.clientX, y: event.clientY },
+          displayedImageRect: sideBySideRenderSize
+            ? {
+                x: sideBySideRenderSize.offsetX,
+                y: sideBySideRenderSize.offsetY,
+                width: sideBySideRenderSize.width,
+                height: sideBySideRenderSize.height,
+              }
+            : overlayGeometry.displayedImageRectInViewCssPixels,
+          surfaceRect: {
+            x: rect.x,
+            y: rect.y,
+            width: rect.width,
+            height: rect.height,
+            layoutWidth: surface.offsetWidth,
+            layoutHeight: surface.offsetHeight,
+          },
+        });
+        if (!mapped) {
+          latestViewerSampleRequestRef.current = null;
+          viewerSampleSchedulerRef.current?.clear();
+          setViewerSampleResult(null);
+          return;
+        }
+        const request = createViewerSampleRequest({
+          imageIdentity: selectedImage.path,
+          graphRevision: viewerSampleGraphRevision,
+          geometryEpoch: overlayGeometry.geometryEpoch,
+          normalizedImagePoint: mapped.normalizedImagePoint,
+          sourceImageSize: { width: selectedImage.width, height: selectedImage.height },
+          target,
+          sampleRadiusImagePx: event.altKey ? 4 : 0,
+          requestedSpace: 'displayEncoded',
+        });
+        setViewerSampleTarget(target);
+        latestViewerSampleRequestRef.current = request;
+        viewerSampleSchedulerRef.current?.schedule(request);
+      },
+      [
+        compareMode,
+        compareDividerPosition,
+        compareOrientation,
+        imageRenderSize,
+        isExportSoftProofEnabled,
+        originalImageRenderSize,
+        overlayGeometry,
+        samplerSuppressed,
+        selectedImage.height,
+        selectedImage.path,
+        selectedImage.width,
+        viewerSampleGraphRevision,
+        viewerSampleLocked,
+      ],
+    );
+
+    const handleViewerSamplerPointerLeave = useCallback(() => {
+      if (viewerSampleLocked) return;
+      latestViewerSampleRequestRef.current = null;
+      viewerSampleSchedulerRef.current?.clear();
+      setViewerSampleResult(null);
+    }, [viewerSampleLocked]);
 
     useEffect(() => {
       if (maskOverlayUrl && (isMasking || isAiEditing)) {
@@ -3390,6 +3548,8 @@ const ImageCanvas = memo(
         }
         data-wgpu-frame-health={wgpuPreviewVisibility.health}
         data-testid="image-canvas"
+        onPointerLeave={handleViewerSamplerPointerLeave}
+        onPointerMove={handleViewerSamplerPointerMove}
         style={{ width: '100%', height: '100%', cursor: effectiveCursor, pointerEvents: 'auto' }}
       >
         <>
@@ -3505,6 +3665,16 @@ const ImageCanvas = memo(
               </div>
             )}
           </PreviewSurface>
+
+          <ViewerSamplerHud
+            locked={viewerSampleLocked}
+            onToggleLock={() => {
+              setViewerSampleLocked((locked) => !locked);
+            }}
+            result={viewerSampleResult}
+            suppressed={samplerSuppressed}
+            target={viewerSampleTarget}
+          />
 
           {activeRetouchLayer &&
             activeRetouchSource &&
