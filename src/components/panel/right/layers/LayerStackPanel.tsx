@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { type KeyboardEvent, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { readLayerStackSidecarsFromSidecar } from '../../../../../packages/rawengine-schema/src';
 import { debouncedSave } from '../../../../hooks/editor/useEditorActions';
 import { useEditorStore } from '../../../../store/useEditorStore';
 import { useUIStore } from '../../../../store/useUIStore';
@@ -601,10 +602,15 @@ export function LayerStackPanel({
     materializeMasks: (nextMasks: Array<MaskContainer>) => Array<MaskContainer> = (nextMasks) => nextMasks,
   ) => {
     const imagePath = selectedImage?.path ?? 'rapidraw://current-image';
+    const currentState = useEditorStore.getState();
+    const persistedSidecar = readLayerStackSidecarsFromSidecar(currentState.adjustments).find(
+      (sidecar) => sidecar.sourceImagePath === imagePath,
+    );
     const result = applyLayerStackCommandBridgeOperation(masks, operation, {
       graphRevision: layerGraphRevision,
       imagePath,
       operationId: crypto.randomUUID(),
+      ...(persistedSidecar === undefined ? {} : { persistedSidecar }),
       sessionId: 'rapidraw-layer-stack-panel',
     });
     const staleLayerIds =
@@ -628,7 +634,6 @@ export function LayerStackPanel({
               : 'source_state_changed',
     });
     const nextMasks = materializeMasks(result.masks);
-    const currentState = useEditorStore.getState();
     const nextAdjustments = persistLayerStackSidecarInAdjustments(
       { ...currentState.adjustments, masks: nextMasks },
       result.sidecar,
