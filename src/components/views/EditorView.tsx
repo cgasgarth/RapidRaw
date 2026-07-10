@@ -10,6 +10,7 @@ import { useLibraryStore } from '../../store/useLibraryStore';
 import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
+import type { EditorZoomCommand } from '../../utils/editorZoom';
 import BottomBar from '../panel/BottomBar';
 import Editor from '../panel/Editor';
 import { EditorRightPanelHost } from '../panel/right/EditorRightPanelHost';
@@ -45,7 +46,7 @@ interface EditorViewProps {
   handleCopyAdjustments: () => void;
   handlePasteAdjustments: () => void;
   handleRate: (rate: number, paths?: string[]) => void;
-  handleZoomChange: (zoom: number) => void;
+  handleZoomChange: (command: EditorZoomCommand) => void;
   handleRightPanelSelect: (panelId: Panel) => void;
   requestThumbnails: (paths: string[]) => void;
   refreshImageList: () => Promise<void>;

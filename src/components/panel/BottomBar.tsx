@@ -1,12 +1,20 @@
 import cx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Check, ChevronDown, ChevronUp, ClipboardPaste, Copy, FileInput, Filter, Settings, Star } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { COLOR_LABELS } from '../../utils/adjustments';
+import {
+  type EditorZoomCommand,
+  formatEditorZoomLabel,
+  getEditorZoomDpr,
+  getEditorZoomResolutionState,
+  getEditorZoomSourceSize,
+  resolveEditorZoom,
+} from '../../utils/editorZoom';
 import { GLOBAL_KEYS, type ImageFile, type SelectedImage, type ThumbnailAspectRatio } from '../ui/AppProperties';
 import { editorChromeStatusChipClassName } from '../ui/editorChromeTokens';
 import UiText from '../ui/primitives/Text';
@@ -41,7 +49,7 @@ interface BottomBarProps {
   onPaste: () => void;
   onRate: (rate: number) => void;
   onReset?: () => void;
-  onZoomChange?: (zoomValue: number, fitToWindow?: boolean) => void;
+  onZoomChange?: (command: EditorZoomCommand) => void;
   rating: number;
   selectedImage?: SelectedImage | undefined;
   setIsFilmstripVisible?: (isVisible: boolean) => void;
@@ -144,12 +152,17 @@ export default function BottomBar({
   totalImages,
 }: BottomBarProps) {
   const { t } = useTranslation();
-  const { displaySize, originalSize } = useEditorStore(
-    useShallow((state) => ({
-      displaySize: state.displaySize,
-      originalSize: state.originalSize,
-    })),
-  );
+  const { adjustments, baseRenderSize, originalSize, renderedPreviewResolution, requestedPreviewResolution, zoomMode } =
+    useEditorStore(
+      useShallow((state) => ({
+        adjustments: state.adjustments,
+        baseRenderSize: state.baseRenderSize,
+        originalSize: state.originalSize,
+        renderedPreviewResolution: state.renderedPreviewResolution,
+        requestedPreviewResolution: state.requestedPreviewResolution,
+        zoomMode: state.zoomMode,
+      })),
+    );
 
   const [isEditingPercent, setIsEditingPercent] = useState(false);
   const [percentInputValue, setPercentInputValue] = useState('');
@@ -158,11 +171,33 @@ export default function BottomBar({
 
   const percentInputRef = useRef<HTMLInputElement>(null);
   const [isZoomLabelHovered, setIsZoomLabelHovered] = useState(false);
-  const isZoomReady = !isLoading && originalSize.width > 0 && displaySize.width > 0;
-
-  const currentOriginalPercent = isZoomReady
-    ? (displaySize.width * (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1)) / originalSize.width
-    : 1.0;
+  const zoomSourceSize = getEditorZoomSourceSize({
+    crop: adjustments.crop,
+    orientationSteps: adjustments.orientationSteps,
+    originalSize,
+  });
+  const resolvedZoom = useMemo(
+    () =>
+      resolveEditorZoom({
+        devicePixelRatio: getEditorZoomDpr(typeof window === 'undefined' ? 1 : window.devicePixelRatio),
+        mode: zoomMode,
+        renderSize: {
+          height: baseRenderSize.height,
+          scale: baseRenderSize.width / Math.max(zoomSourceSize.width, 1),
+          width: baseRenderSize.width,
+        },
+        sourceSize: zoomSourceSize,
+        viewportSize: { height: baseRenderSize.containerHeight, width: baseRenderSize.containerWidth },
+      }),
+    [baseRenderSize, zoomMode, zoomSourceSize],
+  );
+  const zoomResolutionState = getEditorZoomResolutionState({
+    renderedPreviewResolution,
+    requestedPreviewResolution,
+    resolvedZoom,
+  });
+  const isZoomReady = !isLoading && zoomSourceSize.width > 0 && baseRenderSize.width > 0;
+  const currentOriginalPercent = resolvedZoom.devicePixelsPerImagePixel;
 
   const [latchedSliderValue, setLatchedSliderValue] = useState(1.0);
   const [latchedDisplayPercent, setLatchedDisplayPercent] = useState(100);
@@ -174,7 +209,7 @@ export default function BottomBar({
   const isCompactEditorBar = !isLibraryView && !showFilmstrip;
   const activeFilename = selectedImage?.path ? getDisplayFilename(selectedImage.path) : undefined;
   const compactSelectionCount = Math.max(numSelected, selectedImage ? 1 : 0);
-  const zoomFillPercent = `${Math.max(0, Math.min(100, ((latchedSliderValue - 0.1) / 1.9) * 100))}%`;
+  const zoomFillPercent = `${Math.max(0, Math.min(100, ((latchedSliderValue - 0.1) / 3.9) * 100))}%`;
   const commandButtonClassName =
     'relative flex h-8 w-8 items-center justify-center rounded text-text-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-transparent';
   const commandButtonIdleClassName =
@@ -221,7 +256,7 @@ export default function BottomBar({
     const newZoom = parseFloat(e.target.value);
     setLatchedSliderValue(newZoom);
     setLatchedDisplayPercent(Math.round(newZoom * 100));
-    onZoomChange(newZoom);
+    onZoomChange({ devicePixelsPerImagePixel: newZoom, kind: 'ratio' });
   };
 
   const handleMouseDown = () => {
@@ -248,7 +283,7 @@ export default function BottomBar({
   };
 
   const handleResetZoom = () => {
-    onZoomChange(0, true);
+    onZoomChange({ kind: 'fit' });
   };
 
   const handlePercentClick = () => {
@@ -265,8 +300,8 @@ export default function BottomBar({
     const value = parseFloat(percentInputValue);
     if (!Number.isNaN(value)) {
       const originalPercent = value / 100;
-      const clampedPercent = Math.max(0.1, Math.min(2.0, originalPercent));
-      onZoomChange(clampedPercent);
+      const clampedPercent = Math.max(0.1, Math.min(4.0, originalPercent));
+      onZoomChange({ devicePixelsPerImagePixel: clampedPercent, kind: 'ratio' });
     }
     setIsEditingPercent(false);
     setPercentInputValue('');
@@ -280,6 +315,15 @@ export default function BottomBar({
     }
     e.stopPropagation();
   };
+
+  const zoomLabel = formatEditorZoomLabel(resolvedZoom, {
+    fill: t('ui.bottomBar.zoomModes.fill'),
+    fit: t('ui.bottomBar.zoomModes.fit'),
+  });
+  const zoomResolutionLabel =
+    zoomMode.kind === 'ratio' && zoomResolutionState !== 'ready'
+      ? ` ${t(`ui.bottomBar.zoomResolution.${zoomResolutionState}`)}`
+      : '';
 
   return (
     <div
@@ -582,7 +626,7 @@ export default function BottomBar({
                 <input
                   type="range"
                   min={0.1}
-                  max={2.0}
+                  max={4.0}
                   step="0.05"
                   aria-label={t('ui.bottomBar.tooltips.customZoom')}
                   data-testid="editor-bottom-bar-zoom-slider"
@@ -603,7 +647,7 @@ export default function BottomBar({
 
               <div
                 className="relative text-xs text-text-secondary text-right flex items-center justify-end h-5 gap-1"
-                style={{ width: 44 }}
+                style={{ width: 72 }}
               >
                 {isEditingPercent ? (
                   <input
@@ -624,10 +668,12 @@ export default function BottomBar({
                     disabled={!isZoomReady}
                     onClick={handlePercentClick}
                     className="cursor-pointer select-none rounded bg-transparent p-0 text-right font-mono text-xs tabular-nums text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:text-editor-disabled"
-                    style={{ width: 44 }}
+                    style={{ width: 72 }}
                     data-tooltip={t('ui.bottomBar.tooltips.customZoom')}
+                    data-resolution-state={zoomResolutionState}
                   >
-                    {latchedDisplayPercent}%
+                    {zoomLabel}
+                    {zoomResolutionLabel}
                   </button>
                 )}
               </div>

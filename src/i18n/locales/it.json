@@ -4395,7 +4395,16 @@
         "selectToRate": "Seleziona un'immagine da valutare"
       },
       "zoomLabel": "Zoom",
-      "zoomLabelReset": "Ripristina Zoom"
+      "zoomLabelReset": "Ripristina Zoom",
+      "zoomModes": {
+        "fill": "",
+        "fit": ""
+      },
+      "zoomResolution": {
+        "limited": "",
+        "ready": "",
+        "settling": ""
+      }
     },
     "collapsibleSection": {
       "dirtyBadge": "Modificato",

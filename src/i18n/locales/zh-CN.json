@@ -4379,7 +4379,16 @@
         "selectToRate": "选择一张图像以评分"
       },
       "zoomLabel": "缩放",
-      "zoomLabelReset": "重置缩放"
+      "zoomLabelReset": "重置缩放",
+      "zoomModes": {
+        "fill": "",
+        "fit": ""
+      },
+      "zoomResolution": {
+        "limited": "",
+        "ready": "",
+        "settling": ""
+      }
     },
     "collapsibleSection": {
       "dirtyBadge": "已编辑",

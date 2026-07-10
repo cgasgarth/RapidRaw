@@ -4636,7 +4636,16 @@
         "selectToRate": "Zaznacz obraz, aby ocenić"
       },
       "zoomLabel": "Przybliżenie",
-      "zoomLabelReset": "Zresetuj powiększenie"
+      "zoomLabelReset": "Zresetuj powiększenie",
+      "zoomModes": {
+        "fill": "",
+        "fit": ""
+      },
+      "zoomResolution": {
+        "limited": "",
+        "ready": "",
+        "settling": ""
+      }
     },
     "collapsibleSection": {
       "dirtyBadge": "Edytowano",

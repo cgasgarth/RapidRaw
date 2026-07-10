@@ -4503,7 +4503,16 @@
         "selectToRate": "Выберите снимок, чтобы выставить ему оценку"
       },
       "zoomLabel": "Масштаб",
-      "zoomLabelReset": "Сбросить масштаб"
+      "zoomLabelReset": "Сбросить масштаб",
+      "zoomModes": {
+        "fill": "",
+        "fit": ""
+      },
+      "zoomResolution": {
+        "limited": "",
+        "ready": "",
+        "settling": ""
+      }
     },
     "collapsibleSection": {
       "dirtyBadge": "Изменено",

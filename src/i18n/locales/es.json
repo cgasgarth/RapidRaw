@@ -4401,7 +4401,16 @@
         "selectToRate": "Selecciona una imagen para puntuarla"
       },
       "zoomLabel": "Zoom",
-      "zoomLabelReset": "Restablecer Zoom"
+      "zoomLabelReset": "Restablecer Zoom",
+      "zoomModes": {
+        "fill": "",
+        "fit": ""
+      },
+      "zoomResolution": {
+        "limited": "",
+        "ready": "",
+        "settling": ""
+      }
     },
     "collapsibleSection": {
       "dirtyBadge": "Editado",

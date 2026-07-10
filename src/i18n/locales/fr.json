@@ -4396,7 +4396,16 @@
         "selectToRate": "Sélectionnez une image à noter"
       },
       "zoomLabel": "Zoom",
-      "zoomLabelReset": "Réinitialiser le zoom"
+      "zoomLabelReset": "Réinitialiser le zoom",
+      "zoomModes": {
+        "fill": "",
+        "fit": ""
+      },
+      "zoomResolution": {
+        "limited": "",
+        "ready": "",
+        "settling": ""
+      }
     },
     "collapsibleSection": {
       "dirtyBadge": "Modifié",

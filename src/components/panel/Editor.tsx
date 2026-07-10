@@ -52,6 +52,13 @@ import {
 import { getEditorPreviewDimensions } from '../../utils/editorPreviewDimensions';
 import { reconcileViewportTransform, type ViewportSnapshot } from '../../utils/editorViewportBounds';
 import {
+  getEditorZoomDpr,
+  getEditorZoomResolutionState,
+  getEditorZoomSourceSize,
+  isEditorPixelInspectionZoom,
+  resolveEditorZoom,
+} from '../../utils/editorZoom';
+import {
   buildMaskOverlayInvokePayload,
   buildMaskOverlayRequestIdentity,
   buildMaskOverlayTriggerHash,
@@ -142,7 +149,10 @@ export default function Editor({
   const compareMode = useEditorStore((s) => s.compareMode);
   const showOriginal = useEditorStore((s) => s.showOriginal);
   const isSliderDragging = useEditorStore((s) => s.isSliderDragging);
-  const targetZoom = useEditorStore((s) => s.zoom);
+  const zoom = useEditorStore((s) => s.zoom);
+  const zoomMode = useEditorStore((s) => s.zoomMode);
+  const requestedPreviewResolution = useEditorStore((s) => s.requestedPreviewResolution);
+  const renderedPreviewResolution = useEditorStore((s) => s.renderedPreviewResolution);
   const isRotationActive = useEditorStore((s) => s.isRotationActive);
   const overlayMode = useEditorStore((s) => s.overlayMode);
   const overlayRotation = useEditorStore((s) => s.overlayRotation);
@@ -232,7 +242,7 @@ export default function Editor({
   }, [setEditor]);
 
   const handleToggleFullScreen = useCallback(() => {
-    const currentlyZoomed = targetZoom > 1.01;
+    const currentlyZoomed = zoom > 1.01;
     setUI({ isInstantTransition: currentlyZoomed });
 
     if (isFullScreen) {
@@ -246,7 +256,7 @@ export default function Editor({
         setUI({ isInstantTransition: false });
       }, 100);
     }
-  }, [isFullScreen, selectedImage, targetZoom, setUI]);
+  }, [isFullScreen, selectedImage, setUI, zoom]);
 
   const negativeLabSourceReadiness = useMemo(
     () => getNegativeLabSourceReadiness(selectedImage ? [selectedImage.path] : [], supportedTypes),
@@ -372,6 +382,48 @@ export default function Editor({
   }, [adjustments.crop, adjustments.orientationSteps, croppedDimensions, selectedImage?.path]);
 
   const imageRenderSize = useImageRenderSize(imageContainerRef, croppedDimensions);
+  const [devicePixelRatio, setDevicePixelRatio] = useState(() =>
+    getEditorZoomDpr(typeof window === 'undefined' ? 1 : window.devicePixelRatio),
+  );
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const synchronizeDpr = () => setDevicePixelRatio(getEditorZoomDpr(window.devicePixelRatio));
+    const mediaQuery = window.matchMedia(`(resolution: ${String(window.devicePixelRatio)}dppx)`);
+    window.addEventListener('resize', synchronizeDpr);
+    window.visualViewport?.addEventListener('resize', synchronizeDpr);
+    mediaQuery.addEventListener('change', synchronizeDpr);
+    return () => {
+      window.removeEventListener('resize', synchronizeDpr);
+      window.visualViewport?.removeEventListener('resize', synchronizeDpr);
+      mediaQuery.removeEventListener('change', synchronizeDpr);
+    };
+  }, [devicePixelRatio]);
+  const resolvedZoom = useMemo(
+    () =>
+      resolveEditorZoom({
+        devicePixelRatio,
+        mode: zoomMode,
+        renderSize: imageRenderSize,
+        sourceSize: getEditorZoomSourceSize({
+          crop: adjustments.crop,
+          orientationSteps: adjustments.orientationSteps,
+          originalSize: selectedImage
+            ? { height: selectedImage.height, width: selectedImage.width }
+            : { height: 0, width: 0 },
+        }),
+        viewportSize: {
+          height: imageContainerRef.current?.clientHeight ?? 0,
+          width: imageContainerRef.current?.clientWidth ?? 0,
+        },
+      }),
+    [adjustments.crop, adjustments.orientationSteps, devicePixelRatio, imageRenderSize, selectedImage, zoomMode],
+  );
+  const zoomResolutionState = getEditorZoomResolutionState({
+    renderedPreviewResolution,
+    requestedPreviewResolution,
+    resolvedZoom,
+  });
   const handleZoomed = useCallback(
     (state: { scale: number }) => {
       setEditor({ zoom: state.scale });
@@ -393,12 +445,12 @@ export default function Editor({
     setIsMiddleMousePanningState,
     setIsPanningState,
     startPhysicsLoop,
-    transformConfig,
     transformState,
     transformStateRef,
     wheelSnapTimeout,
   } = useEditorViewportPhysics({
     contentRef,
+    devicePixelRatio,
     hasSelectedImage: selectedImage !== null,
     imageContainerRef,
     imageRenderSize,
@@ -460,18 +512,19 @@ export default function Editor({
   );
 
   useEffect(() => {
-    if (!transformWrapperRef.current || !targetZoom || targetZoom <= 0) return;
+    if (!transformWrapperRef.current || !imageRenderSize.width || !imageRenderSize.height) return;
 
     const currentScale = transformStateRef.current.scale || 1;
-    if (Math.abs(currentScale - targetZoom) < 0.001) return;
-
-    const animationTime = 200;
-    if (targetZoom > currentScale) {
-      transformWrapperRef.current.zoomIn(Math.log(targetZoom / currentScale), animationTime);
-    } else {
-      transformWrapperRef.current.zoomOut(Math.log(currentScale / targetZoom), animationTime);
-    }
-  }, [targetZoom, transformStateRef, transformWrapperRef]);
+    if (Math.abs(currentScale - resolvedZoom.transformScale) < 0.001) return;
+    zoomToCenter(resolvedZoom.transformScale, 200);
+  }, [
+    imageRenderSize.height,
+    imageRenderSize.width,
+    resolvedZoom.transformScale,
+    transformStateRef,
+    transformWrapperRef,
+    zoomToCenter,
+  ]);
 
   const activeSubMask = useMemo(() => {
     if (isMasking && activeMaskId) {
@@ -1512,7 +1565,10 @@ export default function Editor({
   }
 
   const isZoomActionActive = !isPanningDisabled;
-  const isMaxZoom = transformState.scale >= transformConfig.maxScale - 0.5;
+  const isMaxZoom =
+    appSettings?.useWgpuRenderer === false &&
+    zoomResolutionState === 'ready' &&
+    isEditorPixelInspectionZoom(resolvedZoom);
 
   let cursorStyle = 'default';
   if (isPanningState && isMiddleMousePanningState) {

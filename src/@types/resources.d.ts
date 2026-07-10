@@ -4219,6 +4219,8 @@ export default interface Resources {
           toggle_tether: 'Toggle Tether panel';
           undo: 'Undo adjustment';
           zoom_100: 'Zoom to 100%';
+          zoom_200: 'Zoom to 200%';
+          zoom_fill: 'Zoom to fill';
           zoom_fit: 'Zoom to fit';
           zoom_in: 'Zoom in';
           zoom_in_step: 'Zoom in (by step)';
@@ -4487,6 +4489,15 @@ export default interface Resources {
     ui: {
       bottomBar: {
         imagesSelected: '{{current}} of {{total}} images selected';
+        zoomModes: {
+          fill: 'Fill';
+          fit: 'Fit';
+        };
+        zoomResolution: {
+          limited: 'limited';
+          ready: 'ready';
+          settling: 'settling';
+        };
         tooltips: {
           collapseFilmstrip: 'Collapse Filmstrip';
           copyPasteSettings: 'Copy & Paste Settings';

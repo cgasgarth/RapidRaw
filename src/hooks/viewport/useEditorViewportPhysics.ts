@@ -1,10 +1,17 @@
 import { type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { TransformState } from '../../components/ui/AppProperties';
 import { getImageTransformBounds, type TransformBounds } from '../../utils/editorViewportBounds';
+import {
+  EDITOR_ZOOM_MAX_RATIO,
+  EDITOR_ZOOM_MIN_RATIO,
+  getEditorZoomDpr,
+  getEditorZoomTransformScale,
+} from '../../utils/editorZoom';
 import type { RenderSize } from './useImageRenderSize';
 
 interface EditorViewportPhysicsOptions {
   contentRef: RefObject<HTMLDivElement | null>;
+  devicePixelRatio: number;
   hasSelectedImage: boolean;
   imageContainerRef: RefObject<HTMLDivElement | null>;
   imageRenderSize: RenderSize;
@@ -13,6 +20,7 @@ interface EditorViewportPhysicsOptions {
 
 export function useEditorViewportPhysics({
   contentRef,
+  devicePixelRatio,
   hasSelectedImage,
   imageContainerRef,
   imageRenderSize,
@@ -35,17 +43,23 @@ export function useEditorViewportPhysics({
       return { minScale: 0.1, maxScale: 20 };
     }
 
-    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-    const scaleFor100Percent = 1 / imageRenderSize.scale;
-
-    const minScale = (0.1 / dpr) * scaleFor100Percent;
-    const maxScale = (2.0 / dpr) * scaleFor100Percent;
+    const dpr = getEditorZoomDpr(devicePixelRatio);
+    const minScale = getEditorZoomTransformScale({
+      devicePixelRatio: dpr,
+      devicePixelsPerImagePixel: EDITOR_ZOOM_MIN_RATIO,
+      renderScale: imageRenderSize.scale,
+    });
+    const maxScale = getEditorZoomTransformScale({
+      devicePixelRatio: dpr,
+      devicePixelsPerImagePixel: EDITOR_ZOOM_MAX_RATIO,
+      renderScale: imageRenderSize.scale,
+    });
 
     return {
-      minScale: Math.max(0.1, minScale),
-      maxScale: Math.max(20, maxScale),
+      minScale: Math.max(0.0001, minScale),
+      maxScale: Math.max(minScale, maxScale),
     };
-  }, [hasSelectedImage, imageRenderSize.scale]);
+  }, [devicePixelRatio, hasSelectedImage, imageRenderSize.scale]);
 
   const minScaleRef = useRef(transformConfig.minScale);
   const maxScaleRef = useRef(transformConfig.maxScale);
