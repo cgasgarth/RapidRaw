@@ -61,6 +61,7 @@ import { inspectorTokens } from '../../components/ui/inspectorTokens';
 import Button from '../../components/ui/primitives/Button';
 import Dropdown from '../../components/ui/primitives/Dropdown';
 import Input from '../../components/ui/primitives/Input';
+import InspectorSegmentedControl from '../../components/ui/primitives/InspectorSegmentedControl';
 import Switch from '../../components/ui/primitives/Switch';
 import { ContextMenuProvider } from '../../context/ContextMenuContext';
 import {
@@ -407,6 +408,7 @@ function ProfessionalEditorTokensVisualSmoke() {
   const [sliderValue, setSliderValue] = useState(18);
   const [isSwitchChecked, setIsSwitchChecked] = useState(true);
   const [dropdownValue, setDropdownValue] = useState<'balanced' | 'proof' | 'mask'>('balanced');
+  const [segmentedValue, setSegmentedValue] = useState<'raw' | 'proof' | 'mask'>('raw');
   const token = editorChromeTokens;
   const focusStateClass = 'ring-2 ring-editor-focus-ring ring-offset-1 ring-offset-editor-matte outline-none';
 
@@ -522,6 +524,16 @@ function ProfessionalEditorTokensVisualSmoke() {
                   value={dropdownValue}
                   onChange={setDropdownValue}
                 />
+                <InspectorSegmentedControl
+                  ariaLabel="Inspector proof mode"
+                  onChange={setSegmentedValue}
+                  options={[
+                    { label: 'RAW', value: 'raw' },
+                    { label: 'Proof', value: 'proof' },
+                    { label: 'Mask', value: 'mask' },
+                  ]}
+                  value={segmentedValue}
+                />
                 <Switch
                   chrome="editor"
                   checked={isSwitchChecked}
@@ -548,6 +560,25 @@ function ProfessionalEditorTokensVisualSmoke() {
                   value={34}
                   fillOrigin="min"
                 />
+                <p className={inspectorTokens.control.validation.error} role="alert">
+                  {copy.professionalEditorValidationError}
+                </p>
+                <div
+                  className={inspectorTokens.actionRow.root}
+                  aria-label={copy.professionalEditorActions}
+                  role="group"
+                >
+                  <button
+                    aria-label={copy.professionalEditorResetInspector}
+                    className={inspectorTokens.actionRow.iconButton}
+                    type="button"
+                  >
+                    <RotateCcw size={13} />
+                  </button>
+                  <button className={inspectorTokens.actionRow.button} type="button">
+                    {copy.professionalEditorCopySettings}
+                  </button>
+                </div>
               </section>
 
               <section className="grid grid-cols-2 gap-2 text-[11px] max-[700px]:grid-cols-3">
@@ -3719,9 +3750,13 @@ const copy = {
   professionalEditorDisabled: 'Disabled',
   professionalEditorLoading: 'Loading',
   professionalEditorCompactRow: 'Compact inspector row',
+  professionalEditorActions: 'Inspector actions',
+  professionalEditorCopySettings: 'Copy settings',
   professionalEditorReady: 'ready',
   professionalEditorRailSize: '42 px rail',
+  professionalEditorResetInspector: 'Reset inspector',
   professionalEditorSoftProof: 'soft proof',
+  professionalEditorValidationError: 'Value must remain within the selected profile range.',
   focusStackSmoke: 'Focus Stack Smoke',
   focusReview: 'Focus review',
   focusDryRunPreview: 'Dry-run preview',

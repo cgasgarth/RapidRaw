@@ -1,6 +1,7 @@
 import cx from 'clsx';
 import { forwardRef, type InputHTMLAttributes } from 'react';
 import { editorChromeTokens } from '../editorChromeTokens';
+import { inspectorTokens } from '../inspectorTokens';
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   bgClassName?: string;
@@ -23,10 +24,10 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
       chrome === 'editor'
         ? cx(
             'flex w-full',
-            editorChromeTokens.input.base,
+            inspectorTokens.control.field,
             editorChromeTokens.focusRing,
-            density === 'compact' ? editorChromeTokens.input.compact : editorChromeTokens.input.default,
-            type === 'number' && editorChromeTokens.input.numeric,
+            density === 'compact' ? inspectorTokens.control.fieldCompact : inspectorTokens.control.fieldDefault,
+            type === 'number' && inspectorTokens.control.numeric,
           )
         : null;
 

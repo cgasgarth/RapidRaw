@@ -24,10 +24,11 @@ assertContains(
 );
 assertContains(
   tokensSource,
-  'grid-cols-[minmax(4.5rem,0.74fr)_minmax(5.25rem,1fr)_3.25rem]',
+  'grid-cols-[minmax(4.75rem,0.72fr)_minmax(3.75rem,1fr)_3.5rem]',
   'Compact row reserves numeric slot.',
 );
-assertContains(tokensSource, "valueSlot: 'w-[3.25rem] shrink-0 text-right'", 'Compact numeric value slot is fixed.');
+assertContains(tokensSource, "valueSlot: 'w-[3.5rem] shrink-0 text-right", 'Compact numeric value slot is fixed.');
+assertContains(tokensSource, 'inspector-slider-row', 'Compact rows declare their coarse-pointer target hook.');
 assertContains(
   unitCoverageSource,
   'numeric edits commit, cancel, and increment predictably',

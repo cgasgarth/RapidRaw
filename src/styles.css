@@ -276,6 +276,17 @@
     @apply scale-110;
   }
 
+  @media (pointer: coarse) {
+    .inspector-slider-row {
+      min-height: 44px;
+    }
+
+    .inspector-slider-track,
+    .inspector-slider-row .slider-input {
+      height: 44px;
+    }
+  }
+
   .temperature-gradient-track {
     background: linear-gradient(to right, #2d4a74, #4993b1, #8a8a8a, #c7c549, #c7863c) !important;
   }
