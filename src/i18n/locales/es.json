@@ -23,10 +23,13 @@
       "activeRangeDeltas": "",
       "adjustedPreviewEnabled": "",
       "advanced": {
+        "levelsSummary": "Input, gamma, and output levels.",
+        "levelsTitle": "Levels / Advanced",
         "summary": "Levels, primary calibration, and shadows tint.",
         "title": "Advanced Color"
       },
       "ariaSelectColor": "Seleccionar color {{name}}",
+      "asShot": "As Shot",
       "blackWhiteMixer": {
         "ariaSelectChannel": "",
         "contribution": "",
@@ -35,6 +38,8 @@
         "title": ""
       },
       "calibration": {
+        "advancedSummary": "Existing primary and shadow adjustments.",
+        "advancedTitle": "Calibration / Input Controls",
         "colors": {
           "blue": "Azul",
           "green": "Verde",
@@ -87,6 +92,7 @@
       "colorRangeLocalAdjustmentLayerName": "{{range}} local adjustment",
       "colorRangeLocalAdjustmentMaskName": "{{range}} range mask",
       "createLocalAdjustmentFromRange": "Create local adjustment",
+      "defaultState": "Default",
       "falloffSmoothness": "",
       "gamutWarning": {
         "coverage": "",
@@ -95,6 +101,7 @@
         "proofDetails": "Prueba: {{pixels}} pixeles de aviso · {{width}} x {{height}}",
         "title": ""
       },
+      "globalColor": "Global Color",
       "grading": {
         "applyPreset": "",
         "balance": "Equilibrio",
@@ -124,6 +131,8 @@
           "shadowClipping": "Shadow clipping active"
         }
       },
+      "localColor": "Local Color",
+      "localColorBalance": "Local Color Balance",
       "localHue": "Tono local",
       "luminance": "Luminancia",
       "maskPreview": "",
@@ -149,10 +158,15 @@
           "camera_standard": "",
           "linear_raw": ""
         },
+        "foundationTitle": "Input / Profile",
+        "inputTransform": "Input status",
+        "profilePreset": "Profile preset",
         "receiptExportParity": "",
         "receiptRuntime": "",
         "receiptSummary": "",
         "receiptTitle": "",
+        "runtimeNotReported": "Provenance not reported",
+        "runtimeProcess": "{{process}} process",
         "title": "",
         "toneCurve": "",
         "toneCurves": {
@@ -177,6 +191,8 @@
       "rangeCenter": "",
       "rangeWidth": "",
       "resetActiveRange": "",
+      "resetLocalColorBalance": "Reset local color balance",
+      "resetWhiteBalanceAsShot": "Reset white balance to as shot",
       "saturation": "Saturación",
       "skinToneUniformity": {
         "description": "",
@@ -212,8 +228,10 @@
       "workspaceTabs": {
         "advanced": "Advanced",
         "editor": "Editor",
+        "foundation": "Foundation",
         "grading": "Grading",
         "label": "Color workspace tools",
+        "mixer": "Mixer",
         "output": "Output",
         "quick": "Quick"
       }

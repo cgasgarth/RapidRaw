@@ -1,5 +1,5 @@
 import cx from 'clsx';
-import { Pipette } from 'lucide-react';
+import { Pipette, RotateCcw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ColorAdjustment, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
 import CompactInspectorSectionHeader from '../../ui/CompactInspectorSectionHeader';
@@ -37,48 +37,85 @@ export const ColorQuickControls = ({
     setAdjustments((prev) => ({ ...prev, [key]: value }));
   };
 
+  const resetWhiteBalance = () => {
+    setAdjustments((prev) => ({
+      ...prev,
+      temperature: INITIAL_ADJUSTMENTS.temperature,
+      tint: INITIAL_ADJUSTMENTS.tint,
+    }));
+  };
+
   return (
     <div className={cx('space-y-px px-0.5', density.scrollPadding)} data-testid="quick-color-controls">
-      <section className="border-b border-editor-border pb-1.5" data-testid="color-quick-white-balance">
+      <section
+        className="border-b border-editor-border pb-1.5"
+        data-testid="color-quick-white-balance"
+        data-white-balance-state={isWhiteBalanceModified ? 'custom' : isForMask ? 'default' : 'as-shot'}
+      >
         <CompactInspectorSectionHeader
           actions={
-            !isForMask && toggleWbPicker ? (
+            <div className="flex items-center gap-0.5">
               <button
                 aria-label={
-                  isWgpuEnabled ? t('adjustments.color.wbPickerWgpuDisabled') : t('adjustments.color.wbPickerTooltip')
+                  isForMask
+                    ? t('adjustments.color.resetLocalColorBalance')
+                    : t('adjustments.color.resetWhiteBalanceAsShot')
                 }
-                aria-pressed={isWbPickerActive}
-                className={cx(
-                  density.actionButton.base,
-                  density.actionButton.icon,
-                  'border border-transparent data-[state=active]:border-accent',
-                  isWgpuEnabled
-                    ? 'cursor-not-allowed text-text-secondary hover:bg-transparent'
-                    : isWbPickerActive
-                      ? density.actionButton.active
-                      : density.actionButton.quiet,
-                )}
-                data-state={isWbPickerActive ? 'active' : isWgpuEnabled ? 'disabled' : 'idle'}
-                data-testid="color-white-balance-picker"
+                className={cx(density.actionButton.base, density.actionButton.icon, density.actionButton.quiet)}
+                data-testid="color-white-balance-as-shot"
                 data-tooltip={
-                  isWgpuEnabled ? t('adjustments.color.wbPickerWgpuDisabled') : t('adjustments.color.wbPickerTooltip')
+                  isForMask
+                    ? t('adjustments.color.resetLocalColorBalance')
+                    : t('adjustments.color.resetWhiteBalanceAsShot')
                 }
-                disabled={isWgpuEnabled}
-                onClick={toggleWbPicker}
+                disabled={!isWhiteBalanceModified}
+                onClick={resetWhiteBalance}
                 type="button"
               >
-                <Pipette size={14} />
+                <RotateCcw size={13} />
               </button>
-            ) : undefined
+              {!isForMask && toggleWbPicker ? (
+                <button
+                  aria-label={
+                    isWgpuEnabled ? t('adjustments.color.wbPickerWgpuDisabled') : t('adjustments.color.wbPickerTooltip')
+                  }
+                  aria-pressed={isWbPickerActive}
+                  className={cx(
+                    density.actionButton.base,
+                    density.actionButton.icon,
+                    'border border-transparent data-[state=active]:border-accent',
+                    isWgpuEnabled
+                      ? 'cursor-not-allowed text-text-secondary hover:bg-transparent'
+                      : isWbPickerActive
+                        ? density.actionButton.active
+                        : density.actionButton.quiet,
+                  )}
+                  data-state={isWbPickerActive ? 'active' : isWgpuEnabled ? 'disabled' : 'idle'}
+                  data-testid="color-white-balance-picker"
+                  data-tooltip={
+                    isWgpuEnabled ? t('adjustments.color.wbPickerWgpuDisabled') : t('adjustments.color.wbPickerTooltip')
+                  }
+                  disabled={isWgpuEnabled}
+                  onClick={toggleWbPicker}
+                  type="button"
+                >
+                  <Pipette size={14} />
+                </button>
+              ) : null}
+            </div>
           }
           modified={isWhiteBalanceModified}
           modifiedLabel={modifiedLabel}
           summary={
             <span data-testid="color-quick-white-balance-summary">
-              {adjustments.temperature || 0} / {adjustments.tint || 0}
+              {isWhiteBalanceModified
+                ? `${adjustments.temperature || 0} / ${adjustments.tint || 0}`
+                : isForMask
+                  ? t('adjustments.color.defaultState')
+                  : t('adjustments.color.asShot')}
             </span>
           }
-          title={t('adjustments.color.whiteBalance')}
+          title={isForMask ? t('adjustments.color.localColorBalance') : t('adjustments.color.whiteBalance')}
         />
         <AdjustmentSlider
           defaultValue={0}
@@ -119,7 +156,7 @@ export const ColorQuickControls = ({
               {adjustments.vibrance || 0} / {adjustments.saturation || 0}
             </span>
           }
-          title={t('adjustments.color.presence')}
+          title={isForMask ? t('adjustments.color.localColor') : t('adjustments.color.globalColor')}
         />
         <AdjustmentSlider
           defaultValue={0}
@@ -147,20 +184,22 @@ export const ColorQuickControls = ({
           value={adjustments.saturation || 0}
           onDragStateChange={onDragStateChange}
         />
-        <AdjustmentSlider
-          defaultValue={0}
-          density="compact"
-          label={isForMask ? t('adjustments.color.localHue') : t('adjustments.color.hue')}
-          max={180}
-          min={-180}
-          onValueChange={(value) => {
-            handleGlobalChange(ColorAdjustment.Hue, value);
-          }}
-          step={1}
-          value={adjustments.hue || 0}
-          trackClassName="hue-range-track"
-          onDragStateChange={onDragStateChange}
-        />
+        {!isForMask ? (
+          <AdjustmentSlider
+            defaultValue={0}
+            density="compact"
+            label={t('adjustments.color.hue')}
+            max={180}
+            min={-180}
+            onValueChange={(value) => {
+              handleGlobalChange(ColorAdjustment.Hue, value);
+            }}
+            step={1}
+            value={adjustments.hue || 0}
+            trackClassName="hue-range-track"
+            onDragStateChange={onDragStateChange}
+          />
+        ) : null}
       </section>
     </div>
   );
