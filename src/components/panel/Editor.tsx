@@ -50,6 +50,7 @@ import {
   WHEEL_SNAP_DELAY_MS,
 } from '../../utils/editorGestureMath';
 import { createEditorOverlayGeometry, overlayPoint, overlayRect } from '../../utils/editorOverlayGeometry';
+import { createEditorPresentationDescriptor } from '../../utils/editorPresentationDescriptor';
 import { getEditorPreviewDimensions } from '../../utils/editorPreviewDimensions';
 import {
   reconcileViewportTransform,
@@ -202,6 +203,8 @@ export default function Editor({
   const activeAiSubMaskId = useEditorStore((s) => s.activeAiSubMaskId);
   const isMaskControlHovered = useEditorStore((s) => s.isMaskControlHovered);
   const hasRenderedFirstFrame = useEditorStore((s) => s.hasRenderedFirstFrame);
+  const wgpuFrameSerial = useEditorStore((s) => s.wgpuFrameSerial);
+  const wgpuFailureSerial = useEditorStore((s) => s.wgpuFailureSerial);
 
   const setEditor = useEditorStore((s) => s.setEditor);
   const dispatchCompare = useEditorStore((s) => s.dispatchCompare);
@@ -593,6 +596,48 @@ export default function Editor({
       selectedImage?.height,
       selectedImage?.width,
       transformState,
+    ],
+  );
+  const presentationDescriptor = useMemo(
+    () =>
+      createEditorPresentationDescriptor({
+        colorTransformIdentity: 'working-display:v1',
+        compareIdentity: JSON.stringify(compare),
+        geometry: overlayGeometry,
+        graphRevision: viewerSampleGraphRevision,
+        overlayIdentity: JSON.stringify({
+          gamutWarning: isGamutWarningOverlayVisible,
+          mask: maskOverlayRuntimeState.identity,
+          maskStatus: maskOverlayRuntimeState.status,
+          mode: overlayMode,
+        }),
+        proofTransformIdentity: JSON.stringify({
+          enabled: isExportSoftProofEnabled,
+          recipeId: exportSoftProofRecipeId,
+          transform: exportSoftProofTransform,
+        }),
+        quality: isSliderDragging ? 'interactive' : 'settled',
+        sourceIdentity: selectedImage?.path ?? '',
+        textureSize: {
+          height: imageRenderSize.height,
+          width: imageRenderSize.width,
+        },
+      }),
+    [
+      compare,
+      exportSoftProofRecipeId,
+      exportSoftProofTransform,
+      imageRenderSize.height,
+      imageRenderSize.width,
+      isExportSoftProofEnabled,
+      isGamutWarningOverlayVisible,
+      isSliderDragging,
+      maskOverlayRuntimeState.identity,
+      maskOverlayRuntimeState.status,
+      overlayGeometry,
+      overlayMode,
+      selectedImage?.path,
+      viewerSampleGraphRevision,
     ],
   );
 
@@ -1305,6 +1350,13 @@ export default function Editor({
     processOverlayQueueRef.current = processOverlayQueue;
   }, [processOverlayQueue]);
 
+  const handleWgpuFailure = useCallback(() => {
+    setEditor((state) => ({ wgpuFailureSerial: state.wgpuFailureSerial + 1 }));
+  }, [setEditor]);
+  const handleWgpuFrameCommitted = useCallback(() => {
+    setEditor((state) => ({ wgpuFrameSerial: state.wgpuFrameSerial + 1 }));
+  }, [setEditor]);
+
   const requestMaskOverlay = useCallback(
     (maskDef: MaskPreviewDefinition, renderSize: RenderSize, currentAdjustments: Adjustments) => {
       const { maskOverlaySettings: currentMaskOverlaySettings } = useEditorStore.getState();
@@ -1354,6 +1406,9 @@ export default function Editor({
     isCropping,
     isReady: selectedImage?.isReady ?? false,
     maxScaleRef,
+    onWgpuFrameCommitted: handleWgpuFrameCommitted,
+    onWgpuFailure: handleWgpuFailure,
+    presentationDescriptor,
     showOriginal,
     theme: appSettings?.theme,
     transformStateRef,
@@ -2081,6 +2136,9 @@ export default function Editor({
               liveRotation={liveRotation}
               transformState={transformState}
               hasRenderedFirstFrame={hasRenderedFirstFrame}
+              presentationDescriptor={presentationDescriptor}
+              wgpuFrameSerial={wgpuFrameSerial}
+              wgpuFailureSerial={wgpuFailureSerial}
               viewerSampleGraphRevision={viewerSampleGraphRevision}
               onViewerSamplerStateChange={setViewerSamplerState}
             />

@@ -402,7 +402,10 @@ export function useTauriListeners({ refreshAllFolderTrees, refreshImageList, mar
       listen<unknown>(WGPU_FRAME_READY_EVENT, (event) => {
         const payload = parseRenderPathPayload(event.payload);
         if (isEffectActive && payload.path === useEditorStore.getState().selectedImage?.path) {
-          useEditorStore.getState().setEditor({ hasRenderedFirstFrame: true });
+          useEditorStore.getState().setEditor((state) => ({
+            hasRenderedFirstFrame: true,
+            wgpuFrameSerial: state.wgpuFrameSerial + 1,
+          }));
         }
       }),
       listen<unknown>(PANORAMA_PROGRESS_EVENT, (event) => {

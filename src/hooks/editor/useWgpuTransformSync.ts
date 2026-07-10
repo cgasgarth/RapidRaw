@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { type RefObject, useEffect, useRef } from 'react';
 import type { TransformState } from '../../components/ui/AppProperties';
 import { Invokes } from '../../tauri/commands';
+import type { EditorPresentationDescriptor } from '../../utils/editorPresentationDescriptor';
 import {
   buildHiddenWgpuTransformPayload,
   buildVisibleWgpuTransformPayload,
@@ -30,6 +31,9 @@ interface UseWgpuTransformSyncOptions {
   isCropping: boolean;
   isReady: boolean;
   maxScaleRef: RefObject<number>;
+  onWgpuFrameCommitted?: (() => void) | undefined;
+  onWgpuFailure?: (() => void) | undefined;
+  presentationDescriptor: EditorPresentationDescriptor;
   showOriginal: boolean;
   theme: string | undefined;
   transformStateRef: RefObject<TransformState>;
@@ -49,6 +53,9 @@ export function useWgpuTransformSync({
   isCropping,
   isReady,
   maxScaleRef,
+  onWgpuFrameCommitted,
+  onWgpuFailure,
+  presentationDescriptor,
   showOriginal,
   theme,
   transformStateRef,
@@ -148,9 +155,15 @@ export function useWgpuTransformSync({
         isInvoking = true;
 
         invoke(Invokes.UpdateWgpuTransform, { payload })
+          .then(() => {
+            if (state.useWgpuRenderer === true && state.isReady && state.hasRenderedFirstFrame) {
+              onWgpuFrameCommitted?.();
+            }
+          })
           .catch((err: unknown) => {
             if (state.useWgpuRenderer !== false && state.isReady && state.hasRenderedFirstFrame) {
               console.warn('WGPU Sync Error:', err);
+              onWgpuFailure?.();
             }
           })
           .finally(() => {
@@ -169,5 +182,13 @@ export function useWgpuTransformSync({
         cancelAnimationFrame(wgpuSyncRef.current);
       }
     };
-  }, [imageContainerRef, imageRenderSizeRef, maxScaleRef, transformStateRef]);
+  }, [
+    imageContainerRef,
+    imageRenderSizeRef,
+    maxScaleRef,
+    onWgpuFrameCommitted,
+    onWgpuFailure,
+    presentationDescriptor.fingerprint,
+    transformStateRef,
+  ]);
 }

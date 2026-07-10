@@ -46,6 +46,12 @@ import {
   overlayPoint,
 } from '../../../utils/editorOverlayGeometry';
 import { resolveEditorOverlayBlocker, resolveEditorOverlayVisibility } from '../../../utils/editorOverlayVisibility';
+import {
+  advanceRendererHandoff,
+  createEditorPresentationDescriptor,
+  createRendererHandoffState,
+  type EditorPresentationDescriptor,
+} from '../../../utils/editorPresentationDescriptor';
 import { globalImageCache } from '../../../utils/ImageLRUCache';
 import {
   buildInteractivePreviewGeometryIdentity,
@@ -325,6 +331,9 @@ interface ImageCanvasProps {
   liveRotation?: number | null;
   transformState: { scale: number; positionX: number; positionY: number };
   hasRenderedFirstFrame: boolean;
+  presentationDescriptor?: EditorPresentationDescriptor;
+  wgpuFrameSerial?: number;
+  wgpuFailureSerial?: number;
   viewerSampleGraphRevision?: string;
   onViewerSamplerStateChange?: (state: ViewerSamplerState) => void;
 }
@@ -1739,6 +1748,9 @@ const ImageCanvas = memo(
     liveRotation,
     transformState,
     hasRenderedFirstFrame,
+    presentationDescriptor: providedPresentationDescriptor,
+    wgpuFrameSerial = 0,
+    wgpuFailureSerial = 0,
     viewerSampleGraphRevision = 'viewer-sample-unbound',
     onViewerSamplerStateChange,
   }: ImageCanvasProps) => {
@@ -1808,6 +1820,41 @@ const ImageCanvas = memo(
       isReady: selectedImage.isReady,
       thumbnailUrl: selectedImage.thumbnailUrl,
     });
+    const presentationDescriptor = useMemo(
+      () =>
+        providedPresentationDescriptor ??
+        createEditorPresentationDescriptor({
+          colorTransformIdentity: 'fixture-display:v1',
+          compareIdentity: JSON.stringify({ compareDividerPosition, compareMode, compareOrientation, showOriginal }),
+          geometry: overlayGeometry,
+          graphRevision: viewerSampleGraphRevision,
+          overlayIdentity: JSON.stringify({ mask: maskOverlayRuntimeState?.identity ?? null, overlayMode }),
+          proofTransformIdentity: JSON.stringify({
+            enabled: isExportSoftProofEnabled,
+            recipeId: exportSoftProofRecipeId,
+          }),
+          quality: isSliderDragging ? 'interactive' : 'settled',
+          sourceIdentity: selectedImage.path,
+          textureSize: { height: imageRenderSize.height, width: imageRenderSize.width },
+        }),
+      [
+        compareDividerPosition,
+        compareMode,
+        compareOrientation,
+        exportSoftProofRecipeId,
+        imageRenderSize.height,
+        imageRenderSize.width,
+        isExportSoftProofEnabled,
+        isSliderDragging,
+        maskOverlayRuntimeState?.identity,
+        overlayGeometry,
+        overlayMode,
+        providedPresentationDescriptor,
+        selectedImage.path,
+        showOriginal,
+        viewerSampleGraphRevision,
+      ],
+    );
 
     const [interactivePreviewUrlRegistry] = useState(() => new InteractivePreviewUrlRegistry());
 
@@ -1838,7 +1885,20 @@ const ImageCanvas = memo(
     const [isAltPressed, setIsAltPressed] = useState(false);
     const [lastBrushCommandCapture, setLastBrushCommandCapture] = useState<BrushMaskCommandCaptureSummary | null>(null);
 
+    const rendererHandoffRef = useRef(createRendererHandoffState(presentationDescriptor, wgpuFrameSerial));
+    const handledWgpuFailureSerialRef = useRef(wgpuFailureSerial);
+    const hasNewWgpuFailure = wgpuFailureSerial > handledWgpuFailureSerialRef.current;
+    handledWgpuFailureSerialRef.current = wgpuFailureSerial;
+    rendererHandoffRef.current = advanceRendererHandoff({
+      descriptor: presentationDescriptor,
+      failed: hasNewWgpuFailure,
+      state: rendererHandoffRef.current,
+      useWgpuRenderer: appSettings?.useWgpuRenderer === true,
+      wgpuFrameSerial,
+    });
+    const rendererHandoff = rendererHandoffRef.current;
     const wgpuPreviewVisibility = resolveWgpuPreviewVisibility({
+      currentFrameHealth: rendererHandoff.committedBackend === 'wgpu' ? 'fresh' : null,
       hasRenderedFirstFrame,
       previewSource,
       selectedImageIsReady: selectedImage.isReady,
@@ -3543,6 +3603,9 @@ const ImageCanvas = memo(
         data-mask-overlay-identity={maskOverlayRuntimeState?.identity ?? ''}
         data-mask-overlay-status={maskOverlayRuntimeState?.status ?? 'none'}
         data-preview-backend={wgpuPreviewVisibility.previewBackend}
+        data-presentation-fingerprint={presentationDescriptor.fingerprint}
+        data-renderer-generation={String(rendererHandoff.generation)}
+        data-renderer-handoff-status={rendererHandoff.status}
         data-viewer-active-tool={viewerInputState?.activeTool ?? activeCanvasOverlayTool}
         data-viewer-temporary-hand={String(viewerInputState?.isTemporaryHand ?? false)}
         data-wb-picker-image-path={lastWhiteBalancePickerReceipt?.selectedImagePath ?? undefined}
