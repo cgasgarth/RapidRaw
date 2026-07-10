@@ -16,6 +16,11 @@ const requiredFilmstripMarkers = [
   'data.onImageSelect?.(nextImage.path, event)',
   'performSafeScroll(nextIndex, true)',
   'focusThumbnail(nextImage.path)',
+  'data-filmstrip-layout="navigator"',
+  'data-filmstrip-state={thumbnailState}',
+  'data-testid="filmstrip-metadata-rail"',
+  'data-testid="filmstrip-current-marker"',
+  'motion-reduce:transition-none',
 ] as const;
 
 const requiredVisualProofMarkers = [
@@ -23,6 +28,7 @@ const requiredVisualProofMarkers = [
   "page.keyboard.press('ArrowRight')",
   "data-active-filename') === 'filmstrip-context-selected.NEF'",
   'Filmstrip roving keyboard state mismatch',
+  'Filmstrip navigator geometry/state contract mismatch',
 ] as const;
 
 const missingMarkers = [

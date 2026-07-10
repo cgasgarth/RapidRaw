@@ -133,8 +133,10 @@ try {
   const imageCanvas = page.getByTestId('image-canvas');
   await imageCanvas.waitFor({ timeout: 10_000 });
   await verifyPreviewBoundsScenario(page, boundsSamples);
-  const splitCompareButton = page.getByRole('button', { name: /Compare split wipe/u });
-  const sideBySideCompareButton = page.getByRole('button', { name: /Compare side by side/u });
+  const commandOverflowButton = page.getByTestId('editor-command-overflow-trigger');
+  await commandOverflowButton.click();
+  const splitCompareButton = page.getByRole('menuitemcheckbox', { name: /Compare split wipe/u });
+  const sideBySideCompareButton = page.getByRole('menuitemcheckbox', { name: /Compare side by side/u });
   await splitCompareButton.waitFor({ timeout: 10_000 });
   await sideBySideCompareButton.waitFor({ timeout: 10_000 });
   await splitCompareButton.click();
@@ -143,18 +145,24 @@ try {
     throw new Error('Split-wipe compare mode did not activate on the image canvas.');
   }
   await page.getByTestId('editor-compare-split-divider').waitFor({ timeout: 10_000 });
+  await commandOverflowButton.click();
   await sideBySideCompareButton.click();
   if ((await imageCanvas.getAttribute('data-editor-compare-mode')) !== 'side-by-side') {
     throw new Error('Side-by-side compare mode did not activate on the image canvas.');
   }
   await page.getByTestId('editor-compare-side-by-side-preview').waitFor({ timeout: 10_000 });
+  await commandOverflowButton.click();
   await sideBySideCompareButton.click();
   if ((await imageCanvas.getAttribute('data-editor-compare-mode')) !== 'off') {
     throw new Error('Compare mode did not return to off after toggling side-by-side.');
   }
   await page.getByRole('complementary', { name: 'Editor tools' }).waitFor({ timeout: 10_000 });
   await page.getByRole('heading', { name: 'Color' }).waitFor({ timeout: 10_000 });
-  await page.getByText(/1024 × 768/u).waitFor({ timeout: 10_000 });
+  const viewerFooterOverflow = page.getByTestId('viewer-footer-overflow');
+  if (await viewerFooterOverflow.isVisible()) {
+    await viewerFooterOverflow.locator('summary').click();
+  }
+  await page.getByText(/1024 x 768/u).waitFor({ timeout: 10_000 });
   await page.keyboard.press('Control+K');
   await page.getByRole('dialog', { name: /Command Palette/u }).waitFor({ timeout: 10_000 });
   await page.getByRole('button', { name: /Show crop tools/u }).click();

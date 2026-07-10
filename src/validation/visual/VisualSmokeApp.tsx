@@ -1116,7 +1116,6 @@ function useProfessionalFilmstripContextSmokeState() {
 
 function ProfessionalEditorToolbarVisualSmoke() {
   const [historyIndex, setHistoryIndex] = useState(2);
-  const [showDateView, setShowDateView] = useState(false);
   const [showOriginal, setShowOriginal] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [history] = useState(() => {
@@ -1170,13 +1169,11 @@ function ProfessionalEditorToolbarVisualSmoke() {
             onBackToLibrary={() => {}}
             onOpenNegativeLab={() => {}}
             onRedo={() => setHistoryIndex((index) => Math.min(index + 1, history.length - 1))}
-            onToggleDateView={() => setShowDateView((value) => !value)}
             onToggleFullScreen={() => setIsFullscreen((value) => !value)}
             onToggleShowOriginal={() => setShowOriginal((value) => !value)}
             onUndo={() => setHistoryIndex((index) => Math.max(index - 1, 0))}
             osPlatform="macos"
             selectedImage={professionalEditorToolbarImage}
-            showDateView={showDateView}
             showOriginal={showOriginal}
           />
         </section>
@@ -1246,13 +1243,11 @@ function ProfessionalEditorToolbarVisualSmoke() {
             onBackToLibrary={() => {}}
             onOpenNegativeLab={() => {}}
             onRedo={() => {}}
-            onToggleDateView={() => setShowDateView((value) => !value)}
             onToggleFullScreen={() => {}}
             onToggleShowOriginal={() => {}}
             onUndo={() => {}}
             osPlatform="macos"
             selectedImage={professionalEditorToolbarImage}
-            showDateView={true}
             showOriginal={false}
           />
         </section>

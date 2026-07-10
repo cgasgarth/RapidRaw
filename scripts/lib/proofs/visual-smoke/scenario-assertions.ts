@@ -753,16 +753,11 @@ async function assertProfessionalEditorToolbar(page) {
   const toolbar = page.locator('[data-visual-smoke-section="professional-editor-toolbar-primary"]');
   await toolbar.waitFor({ timeout: 10_000 });
 
-  const fileStatus = toolbar.getByTestId('editor-toolbar-file-status');
-  await fileStatus.hover();
-  await page.waitForFunction(() => {
-    const status = document.querySelector('[data-testid="editor-toolbar-file-status"]');
-    return status?.getAttribute('data-editor-status-expanded') === 'true';
-  });
-
-  const historyControl = toolbar.getByTestId('editor-history-depth-control');
-  await historyControl.click();
-  await toolbar.getByTestId('editor-history-popover').waitFor({ timeout: 10_000 });
+  await toolbar.getByTestId('editor-toolbar-file-status').waitFor({ timeout: 10_000 });
+  await toolbar.locator('[data-command-id="undo"]').waitFor({ timeout: 10_000 });
+  await toolbar.getByTestId('editor-command-overflow-trigger').click();
+  await toolbar.getByTestId('editor-command-overflow-menu').waitFor({ timeout: 10_000 });
+  await toolbar.getByTestId('editor-toolbar-negative-lab').waitFor({ timeout: 10_000 });
 
   const toolbarRoot = toolbar.locator('[data-toolbar-soft-proof="active"]').first();
   await toolbarRoot.waitFor({ timeout: 10_000 });
@@ -772,10 +767,7 @@ async function assertProfessionalEditorToolbar(page) {
     throw new Error(`Professional toolbar state mismatch: original=${originalState}, negativeLab=${negativeLabState}`);
   }
 
-  if ((page.viewportSize()?.width ?? 0) >= 1280) {
-    await toolbar.getByTestId('export-soft-proof-active-badge').waitFor({ timeout: 10_000 });
-    await toolbar.getByTestId('export-soft-proof-active-dot').waitFor({ timeout: 10_000 });
-  }
+  await toolbar.locator('[data-command-id="soft-proof"]').waitFor({ timeout: 10_000 });
 }
 
 async function assertProfessionalFilmstripContext(page) {
@@ -817,6 +809,42 @@ async function assertProfessionalFilmstripContext(page) {
     .count();
   if (selectedBeforeClear < 4) {
     throw new Error(`Expected at least four selected filmstrip thumbnails before clear, found ${selectedBeforeClear}.`);
+  }
+
+  const navigatorGeometry = await context.evaluate((root) => {
+    const lane = root.querySelector<HTMLElement>('[data-testid="filmstrip-navigator-lane"]');
+    const thumbnails = Array.from(root.querySelectorAll<HTMLElement>('[data-testid="filmstrip-thumbnail"]'));
+    const rails = Array.from(root.querySelectorAll<HTMLElement>('[data-testid="filmstrip-metadata-rail"]'));
+    const sizes = thumbnails.map((thumbnail) => {
+      const box = thumbnail.getBoundingClientRect();
+      return { height: Math.round(box.height), width: Math.round(box.width) };
+    });
+    const railSizes = rails.map((rail) => {
+      const box = rail.getBoundingClientRect();
+      return { height: Math.round(box.height), width: Math.round(box.width) };
+    });
+
+    return {
+      currentMarkerCount: root.querySelectorAll('[data-testid="filmstrip-current-marker"]').length,
+      currentStateCount: thumbnails.filter((thumbnail) => thumbnail.dataset.filmstripState === 'current').length,
+      layout: lane?.dataset.filmstripLayout,
+      railSizes,
+      selectedStateCount: thumbnails.filter((thumbnail) => thumbnail.dataset.filmstripState === 'selected').length,
+      sizes,
+    };
+  });
+  const allEqual = (sizes: Array<{ height: number; width: number }>) =>
+    sizes.length > 0 && sizes.every((size) => size.height === sizes[0]?.height && size.width === sizes[0]?.width);
+  if (
+    navigatorGeometry.layout !== 'navigator' ||
+    navigatorGeometry.currentStateCount !== 1 ||
+    navigatorGeometry.selectedStateCount < 3 ||
+    navigatorGeometry.currentMarkerCount !== 1 ||
+    !allEqual(navigatorGeometry.sizes) ||
+    !allEqual(navigatorGeometry.railSizes) ||
+    navigatorGeometry.railSizes.length !== navigatorGeometry.sizes.length
+  ) {
+    throw new Error(`Filmstrip navigator geometry/state contract mismatch: ${JSON.stringify(navigatorGeometry)}`);
   }
 
   const tabbableBeforeArrow = await context.locator('[data-testid="filmstrip-thumbnail"][tabindex="0"]').count();
