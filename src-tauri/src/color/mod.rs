@@ -1,6 +1,7 @@
 pub(crate) mod adjustment_fields;
 pub(crate) mod adjustment_utils;
 pub(crate) mod auto_adjust;
+pub(crate) mod camera_input_transform;
 pub(crate) mod display_profile;
 pub(crate) mod gamut_mapping;
 pub(crate) mod lens_correction;
