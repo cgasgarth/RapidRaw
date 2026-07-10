@@ -819,6 +819,42 @@ async function assertProfessionalFilmstripContext(page) {
     throw new Error(`Expected at least four selected filmstrip thumbnails before clear, found ${selectedBeforeClear}.`);
   }
 
+  const navigatorGeometry = await context.evaluate((root) => {
+    const lane = root.querySelector<HTMLElement>('[data-testid="filmstrip-navigator-lane"]');
+    const thumbnails = Array.from(root.querySelectorAll<HTMLElement>('[data-testid="filmstrip-thumbnail"]'));
+    const rails = Array.from(root.querySelectorAll<HTMLElement>('[data-testid="filmstrip-metadata-rail"]'));
+    const sizes = thumbnails.map((thumbnail) => {
+      const box = thumbnail.getBoundingClientRect();
+      return { height: Math.round(box.height), width: Math.round(box.width) };
+    });
+    const railSizes = rails.map((rail) => {
+      const box = rail.getBoundingClientRect();
+      return { height: Math.round(box.height), width: Math.round(box.width) };
+    });
+
+    return {
+      currentMarkerCount: root.querySelectorAll('[data-testid="filmstrip-current-marker"]').length,
+      currentStateCount: thumbnails.filter((thumbnail) => thumbnail.dataset.filmstripState === 'current').length,
+      layout: lane?.dataset.filmstripLayout,
+      railSizes,
+      selectedStateCount: thumbnails.filter((thumbnail) => thumbnail.dataset.filmstripState === 'selected').length,
+      sizes,
+    };
+  });
+  const allEqual = (sizes: Array<{ height: number; width: number }>) =>
+    sizes.length > 0 && sizes.every((size) => size.height === sizes[0]?.height && size.width === sizes[0]?.width);
+  if (
+    navigatorGeometry.layout !== 'navigator' ||
+    navigatorGeometry.currentStateCount !== 1 ||
+    navigatorGeometry.selectedStateCount < 3 ||
+    navigatorGeometry.currentMarkerCount !== 1 ||
+    !allEqual(navigatorGeometry.sizes) ||
+    !allEqual(navigatorGeometry.railSizes) ||
+    navigatorGeometry.railSizes.length !== navigatorGeometry.sizes.length
+  ) {
+    throw new Error(`Filmstrip navigator geometry/state contract mismatch: ${JSON.stringify(navigatorGeometry)}`);
+  }
+
   const tabbableBeforeArrow = await context.locator('[data-testid="filmstrip-thumbnail"][tabindex="0"]').count();
   if (tabbableBeforeArrow !== 1) {
     throw new Error(`Filmstrip roving tabindex should expose one active thumbnail, found ${tabbableBeforeArrow}.`);
