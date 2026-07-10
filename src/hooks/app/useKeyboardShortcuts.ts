@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { shouldAllowViewerImageNavigation } from '../../components/panel/editor/viewerInputResolver';
+import { getNextViewerLightsOutLevel } from '../../components/panel/editor/viewerPresentationContracts';
 import { ExifOverlay, type ImageFile, Panel } from '../../components/ui/AppProperties';
 import { normalizeKeyboardShortcutMap } from '../../schemas/keyboardShortcutSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
@@ -488,6 +489,15 @@ export const useKeyboardShortcuts = ({
 
     const builtinShortcuts: Array<BuiltinShortcut> = [
       {
+        match: (e, s) =>
+          e.code === 'KeyL' && !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && !!s.editor.selectedImage,
+        execute: (e, s) => {
+          e.preventDefault();
+          const level = s.ui.editorWorkspacePreferences.viewer.lightsOutLevel;
+          s.ui.setEditorLightsOutLevel(getNextViewerLightsOutLevel(level));
+        },
+      },
+      {
         match: (e: KeyboardEvent) => e.code === 'Escape',
         execute: (e, s) => {
           e.preventDefault();
@@ -498,6 +508,7 @@ export const useKeyboardShortcuts = ({
           else if (s.editor.activeMaskId) s.editor.setEditor({ activeMaskId: null });
           else if (s.editor.activeMaskContainerId) s.editor.setEditor({ activeMaskContainerId: null });
           else if (s.ui.activeRightPanel === Panel.Crop) s.ui.setRightPanel(Panel.Adjustments);
+          else if (s.ui.editorWorkspacePreferences.viewer.lightsOutLevel !== 'off') s.ui.setEditorLightsOutLevel('off');
           else if (s.ui.isFullScreen) handleToggleFullScreen();
           else if (s.editor.selectedImage) handleBackToLibrary();
         },

@@ -3406,6 +3406,7 @@ const ImageCanvas = memo(
             showOriginalCompare={showOriginalCompare}
             showSideBySideCompare={isSideBySideCompare}
             showSplitCompare={showSplitCompare}
+            showFrameShadow={transformState.scale <= 1.01}
             svgPreview={
               <SvgPreviewHandoff
                 baseScopeKey={selectedImage.path}

@@ -12,6 +12,7 @@ import {
   Loader2,
   Maximize,
   Minimize2,
+  MoonStar,
   Palette,
   Pencil,
   Redo,
@@ -22,6 +23,7 @@ import {
 } from 'lucide-react';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { EditorWorkspaceLightsOutLevel } from '../../../schemas/editorWorkspacePreferencesSchemas';
 import { type EditorCompareMode, useEditorStore } from '../../../store/useEditorStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useUIStore } from '../../../store/useUIStore';
@@ -40,6 +42,7 @@ import { editorChromeStatusChipClassName, editorChromeTokens } from '../../ui/ed
 import Dropdown from '../../ui/primitives/Dropdown';
 import UiText from '../../ui/primitives/Text';
 import { IconAperture, IconCalendar, IconClock, IconFocalLength, IconIso, IconShutter } from './ExifIcons';
+import { getViewerLightsOutLabel } from './viewerPresentationContracts';
 
 interface EditorToolbarProps {
   canRedo: boolean;
@@ -55,6 +58,8 @@ interface EditorToolbarProps {
   onCompareOrientationChange?: (orientation: EditorCompareOrientation) => void;
   onShowOriginalChange?: (showOriginal: boolean) => void;
   onToggleFullScreen: () => void;
+  lightsOutLevel?: EditorWorkspaceLightsOutLevel;
+  onCycleLightsOut?: () => void;
   onToggleShowOriginal: () => void;
   onUndo: () => void;
   selectedImage: SelectedImage;
@@ -87,6 +92,8 @@ const EditorToolbar = memo(
     onCompareOrientationChange = () => undefined,
     onShowOriginalChange = () => undefined,
     onToggleFullScreen,
+    lightsOutLevel = 'off',
+    onCycleLightsOut = () => undefined,
     onToggleShowOriginal,
     onUndo,
     selectedImage,
@@ -1087,6 +1094,19 @@ const EditorToolbar = memo(
           </div>
 
           <div className={commandGroupClass} data-testid="editor-toolbar-viewport-group">
+            <button
+              aria-label={`Lights out: ${getViewerLightsOutLabel(lightsOutLevel)}`}
+              aria-pressed={lightsOutLevel !== 'off'}
+              className={lightsOutLevel === 'off' ? iconButtonClass : activeIconButtonClass}
+              data-lights-out-level={lightsOutLevel}
+              data-testid="editor-lights-out-toggle"
+              data-tooltip={`Lights out: ${getViewerLightsOutLabel(lightsOutLevel)} (L)`}
+              onClick={onCycleLightsOut}
+              onKeyDown={handleButtonKeyDown}
+              type="button"
+            >
+              <MoonStar size={16} />
+            </button>
             <button
               className={cx(isFullScreen ? activeIconButtonClass : iconButtonClass, 'relative')}
               onClick={onToggleFullScreen}
