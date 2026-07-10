@@ -270,6 +270,13 @@ export class AgentMediumPreviewAttachmentManager {
     return this.released.get(artifactId);
   }
 
+  getModelAttachment(artifactId: string): AgentModelImageAttachment | undefined {
+    for (const stored of this.cache.values()) {
+      if (stored.attachment.artifactId === artifactId) return this.toModelAttachment(stored);
+    }
+    return undefined;
+  }
+
   private async createAttachment({
     adjustments,
     cacheKey,
