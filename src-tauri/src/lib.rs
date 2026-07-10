@@ -2395,6 +2395,13 @@ pub fn run() {
                         display.surface.configure(&ctx.device, &display.config);
                         display.render(&ctx.device, &ctx.queue);
                     }
+        } else if let tauri::WindowEvent::Moved(_) = event {
+            #[cfg(target_os = "macos")]
+            {
+                let state = window.state::<AppState>();
+                // Recreate presentation resources so a cross-display move cannot retain the old ICC LUT.
+                *state.gpu_context.lock().unwrap() = None;
+            }
         })
         .setup(|app| {
             #[cfg(any(windows, target_os = "linux"))]
