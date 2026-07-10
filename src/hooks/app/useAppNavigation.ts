@@ -161,10 +161,7 @@ export function useAppNavigation({ clearThumbnailQueue, requestThumbnails, refs 
     resetHistory(INITIAL_ADJUSTMENTS);
 
     isBackendReadyRef.current = true;
-    setEditor((state) => {
-      if (state.interactivePatch?.url) URL.revokeObjectURL(state.interactivePatch.url);
-      return { interactivePatch: null };
-    });
+    setEditor({ interactivePatch: null });
   }, [cachedEditStateRef, isBackendReadyRef, selectedImagePathRef, transformWrapperRef]);
 
   const handleImageSelect = useCallback(
@@ -331,48 +328,30 @@ export function useAppNavigation({ clearThumbnailQueue, requestThumbnails, refs 
 
       isBackendReadyRef.current = true;
 
-      setEditor((state) => {
-        const previousPreviewUrl = state.finalPreviewUrl;
-        const previousPatchUrl = state.interactivePatch?.url;
-
-        if (previousPreviewUrl?.startsWith('blob:') && !globalImageCache.isProtected(previousPreviewUrl)) {
-          setTimeout(() => {
-            if (!globalImageCache.isProtected(previousPreviewUrl)) {
-              URL.revokeObjectURL(previousPreviewUrl);
-            }
-          }, 250);
-        }
-        if (previousPatchUrl) {
-          setTimeout(() => {
-            URL.revokeObjectURL(previousPatchUrl);
-          }, 250);
-        }
-
-        return {
-          selectedImage: {
-            exif: null,
-            height: 0,
-            isRaw: false,
-            isReady: false,
-            metadata: null,
-            originalUrl: null,
-            path,
-            rawDevelopmentReport: null,
-            thumbnailUrl: useProcessStore.getState().thumbnails[path] ?? '',
-            width: 0,
-          },
-          originalSize: { width: 0, height: 0 },
-          previewSize: { width: 0, height: 0 },
-          histogram: null,
-          waveform: null,
-          previewScopeStatus: null,
-          gamutWarningOverlay: null,
-          exportSoftProofTransform: null,
-          finalPreviewUrl: null,
-          transformedOriginalUrl: null,
-          uncroppedAdjustedPreviewUrl: null,
-          interactivePatch: null,
-        };
+      setEditor({
+        selectedImage: {
+          exif: null,
+          height: 0,
+          isRaw: false,
+          isReady: false,
+          metadata: null,
+          originalUrl: null,
+          path,
+          rawDevelopmentReport: null,
+          thumbnailUrl: useProcessStore.getState().thumbnails[path] ?? '',
+          width: 0,
+        },
+        originalSize: { width: 0, height: 0 },
+        previewSize: { width: 0, height: 0 },
+        histogram: null,
+        waveform: null,
+        previewScopeStatus: null,
+        gamutWarningOverlay: null,
+        exportSoftProofTransform: null,
+        finalPreviewUrl: null,
+        transformedOriginalUrl: null,
+        uncroppedAdjustedPreviewUrl: null,
+        interactivePatch: null,
       });
 
       setLibrary({ isViewLoading: true });

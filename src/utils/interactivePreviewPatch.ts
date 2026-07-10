@@ -78,35 +78,36 @@ export class LatestOnlyInteractiveScheduler<T> {
 }
 
 export class InteractivePreviewUrlRegistry {
-  private readonly urls = new Set<string>();
+  private readonly ownersByUrl = new Map<string, Set<string>>();
 
-  constructor(private readonly revoke: (url: string) => void = URL.revokeObjectURL) {}
-
-  track(url: string): void {
-    this.urls.add(url);
+  claim(owner: string, url: string): void {
+    if (!url.startsWith('blob:')) return;
+    const owners = this.ownersByUrl.get(url) ?? new Set<string>();
+    owners.add(owner);
+    this.ownersByUrl.set(url, owners);
   }
 
-  confirmPaint(url: string): void {
-    this.track(url);
-    for (const candidate of this.urls) {
-      if (candidate !== url) {
-        this.revoke(candidate);
-        this.urls.delete(candidate);
+  release(owner: string, url: string): boolean {
+    const owners = this.ownersByUrl.get(url);
+    if (!owners) return false;
+
+    owners.delete(owner);
+    if (owners.size > 0) return false;
+
+    this.ownersByUrl.delete(url);
+    return true;
+  }
+
+  releaseOwner(owner: string): string[] {
+    const releasedUrls: string[] = [];
+    for (const [url, owners] of this.ownersByUrl) {
+      owners.delete(owner);
+      if (owners.size === 0) {
+        this.ownersByUrl.delete(url);
+        releasedUrls.push(url);
       }
     }
-  }
-
-  release(url: string): void {
-    if (this.urls.delete(url)) {
-      this.revoke(url);
-    }
-  }
-
-  clear(): void {
-    for (const url of this.urls) {
-      this.revoke(url);
-    }
-    this.urls.clear();
+    return releasedUrls;
   }
 }
 
