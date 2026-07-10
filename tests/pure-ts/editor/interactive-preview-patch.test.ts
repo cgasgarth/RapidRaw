@@ -3,9 +3,19 @@ import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 import { resolveEditorPreviewSource } from '../../../src/utils/editorImagePreviewSource.ts';
 import {
   buildInteractivePreviewGeometryIdentity,
+  decodeInteractivePreviewUrl,
+  InteractivePreviewUrlRegistry,
+  isCurrentInteractivePreviewRequest,
   isInteractivePreviewPatchCoherent,
+  LatestOnlyInteractiveScheduler,
   parseInteractivePreviewPatchPayload,
 } from '../../../src/utils/interactivePreviewPatch.ts';
+
+const flushMicrotasks = async () => {
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+};
 
 const buildJpegBytes = (width: number, height: number) =>
   new Uint8Array([
@@ -140,4 +150,87 @@ test('interactive preview patch coherence rejects base preview and geometry tran
       geometryIdentity: buildInteractivePreviewGeometryIdentity({ ...INITIAL_ADJUSTMENTS, rotation: 1 }),
     }),
   ).toBe(false);
+});
+
+test('interactive previews decode their successor URL before it can be published', async () => {
+  let assignedUrl = '';
+  let decodeUrl = '';
+  await decodeInteractivePreviewUrl('blob:successor', () => ({
+    decode: async () => {
+      decodeUrl = assignedUrl;
+    },
+    onerror: null,
+    onload: null,
+    get src() {
+      return assignedUrl;
+    },
+    set src(value: string) {
+      assignedUrl = value;
+    },
+  }));
+
+  expect(decodeUrl).toBe('blob:successor');
+});
+
+test('interactive previews reject stale request and render identities', () => {
+  expect(isCurrentInteractivePreviewRequest({ currentJobId: 12, jobId: 12, latestRequestId: 8, requestId: 8 })).toBe(
+    true,
+  );
+  expect(isCurrentInteractivePreviewRequest({ currentJobId: 12, jobId: 11, latestRequestId: 8, requestId: 8 })).toBe(
+    false,
+  );
+  expect(isCurrentInteractivePreviewRequest({ currentJobId: 12, jobId: 12, latestRequestId: 8, requestId: 7 })).toBe(
+    false,
+  );
+});
+
+test('interactive preview scheduler bounds active work and keeps only the latest pending request', async () => {
+  const started: number[] = [];
+  const completions: Array<() => void> = [];
+  let active = 0;
+  let maxActive = 0;
+  const scheduler = new LatestOnlyInteractiveScheduler<number>(async (request) => {
+    started.push(request);
+    active += 1;
+    maxActive = Math.max(maxActive, active);
+    await new Promise<void>((resolve) => {
+      completions.push(() => {
+        active -= 1;
+        resolve();
+      });
+    });
+  });
+
+  scheduler.schedule(1);
+  scheduler.schedule(2);
+  scheduler.schedule(3);
+  expect(started).toEqual([1]);
+  expect(maxActive).toBe(1);
+
+  completions[0]?.();
+  await flushMicrotasks();
+  expect(started).toEqual([1, 3]);
+  expect(maxActive).toBe(1);
+
+  completions[1]?.();
+  await flushMicrotasks();
+  scheduler.dispose();
+});
+
+test('canvas URL cleanup retains the painted patch until its decoded successor confirms paint', () => {
+  const revoked: string[] = [];
+  const registry = new InteractivePreviewUrlRegistry((url) => revoked.push(url));
+
+  registry.track('blob:painted');
+  registry.track('blob:decoded-successor');
+  expect(revoked).toEqual([]);
+
+  registry.confirmPaint('blob:decoded-successor');
+  expect(revoked).toEqual(['blob:painted']);
+
+  registry.release('blob:painted');
+  expect(revoked).toEqual(['blob:painted']);
+
+  registry.clear();
+  expect(revoked).toEqual(['blob:painted', 'blob:decoded-successor']);
 });

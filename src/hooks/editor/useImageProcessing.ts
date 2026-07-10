@@ -22,6 +22,9 @@ import { resolveEditorPreviewSource } from '../../utils/editorImagePreviewSource
 import { globalImageCache } from '../../utils/ImageLRUCache';
 import {
   buildInteractivePreviewGeometryIdentity,
+  decodeInteractivePreviewUrl,
+  isCurrentInteractivePreviewRequest,
+  LatestOnlyInteractiveScheduler,
   parseInteractivePreviewPatchPayload,
 } from '../../utils/interactivePreviewPatch';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
@@ -43,6 +46,12 @@ interface TransformWrapperRefValue {
   instance?: {
     transformState?: TransformState | null;
   };
+}
+
+interface InteractivePreviewRequest {
+  adjustments: Adjustments;
+  requestId: number;
+  targetRes?: number | undefined;
 }
 
 const previewBufferResponseSchema = z.instanceof(ArrayBuffer);
@@ -113,8 +122,14 @@ export function useImageProcessing(
     [appSettings?.exportPresets, exportSoftProofRecipeId, isExportSoftProofEnabled],
   );
 
-  const inFlightCountRef = useRef(0);
-  const pendingApplyRef = useRef<{ adjustments: Adjustments; targetRes?: number | undefined } | null>(null);
+  const latestInteractiveRequestIdRef = useRef(0);
+  const executeInteractiveRenderRef = useRef<(request: InteractivePreviewRequest) => Promise<void>>(async () => {});
+  const interactiveSchedulerRef = useRef<LatestOnlyInteractiveScheduler<InteractivePreviewRequest> | null>(null);
+  if (!interactiveSchedulerRef.current) {
+    interactiveSchedulerRef.current = new LatestOnlyInteractiveScheduler((request) =>
+      executeInteractiveRenderRef.current(request),
+    );
+  }
   const currentOriginalResRef = useRef<number>(0);
   const previewIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const persistIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -128,20 +143,9 @@ export function useImageProcessing(
 
   const geometricAdjustmentsKey = useMemo(() => buildInteractivePreviewGeometryIdentity(adjustments), [adjustments]);
 
-  const clearInteractivePatch = useCallback(
-    (revokeDelay = 100) => {
-      setEditor((state) => {
-        const previousPatchUrl = state.interactivePatch?.url;
-        if (previousPatchUrl) {
-          setTimeout(() => {
-            URL.revokeObjectURL(previousPatchUrl);
-          }, revokeDelay);
-        }
-        return { interactivePatch: null };
-      });
-    },
-    [setEditor],
-  );
+  const clearInteractivePatch = useCallback(() => {
+    setEditor({ interactivePatch: null });
+  }, [setEditor]);
 
   const calculateROI = useCallback(() => {
     if (!transformWrapperRef.current) return null;
@@ -198,7 +202,12 @@ export function useImageProcessing(
   }, [baseRenderSize, transformWrapperRef]);
 
   const executeApplyAdjustments = useCallback(
-    async (currentAdjustments: Adjustments, dragging: boolean = false, targetRes?: number) => {
+    async (
+      currentAdjustments: Adjustments,
+      dragging: boolean = false,
+      targetRes?: number,
+      interactiveRequestId?: number,
+    ) => {
       const currentPath = selectedImage?.path;
       if (!currentPath) return;
 
@@ -278,18 +287,32 @@ export function useImageProcessing(
           newlySentPatchIds.forEach((id) => patchesSentToBackend.add(id));
         }
 
-        if (currentPath !== selectedImagePathRef.current) {
+        const isCurrentInteractiveRequest = isCurrentInteractivePreviewRequest({
+          currentJobId: previewJobIdRef.current,
+          jobId,
+          latestRequestId: latestInteractiveRequestIdRef.current,
+          requestId: interactiveRequestId,
+        });
+        const droppedReason =
+          currentPath !== selectedImagePathRef.current
+            ? 'image_selection_changed'
+            : jobId !== previewJobIdRef.current
+              ? 'stale_job'
+              : dragging && !isCurrentInteractiveRequest
+                ? 'stale_interactive_request'
+                : null;
+        if (droppedReason) {
           if (operation) {
             logAppOperationSuccess(operation, {
               byteLength: buffer.byteLength,
-              droppedReason: 'image_selection_changed',
+              droppedReason,
               jobId,
             });
           }
           return;
         }
 
-        if (buffer.byteLength > 0 && jobId >= latestRenderedJobIdRef.current) {
+        if (buffer.byteLength > 0) {
           latestRenderedJobIdRef.current = jobId;
 
           const textDecoder = new TextDecoder();
@@ -323,13 +346,41 @@ export function useImageProcessing(
             const blob = new Blob([patch.imageBuffer], { type: 'image/jpeg' });
             const url = URL.createObjectURL(blob);
 
+            try {
+              await decodeInteractivePreviewUrl(url);
+            } catch {
+              URL.revokeObjectURL(url);
+              return;
+            }
+
+            const isCurrentDecodedInteractiveRequest = isCurrentInteractivePreviewRequest({
+              currentJobId: previewJobIdRef.current,
+              jobId,
+              latestRequestId: latestInteractiveRequestIdRef.current,
+              requestId: interactiveRequestId,
+            });
+            const decodeDroppedReason =
+              currentPath !== selectedImagePathRef.current
+                ? 'image_selection_changed'
+                : jobId !== previewJobIdRef.current
+                  ? 'stale_job'
+                  : !isCurrentDecodedInteractiveRequest
+                    ? 'stale_interactive_request'
+                    : null;
+            if (decodeDroppedReason) {
+              URL.revokeObjectURL(url);
+              if (operation) {
+                logAppOperationSuccess(operation, {
+                  byteLength: buffer.byteLength,
+                  droppedReason: decodeDroppedReason,
+                  jobId,
+                });
+              }
+              return;
+            }
+
             setEditor((state) => {
-              const previousPatchUrl = state.interactivePatch?.url;
               const patchSelectedImage = state.selectedImage;
-              if (previousPatchUrl)
-                setTimeout(() => {
-                  URL.revokeObjectURL(previousPatchUrl);
-                }, 100);
               return {
                 interactivePatch: {
                   basePreviewUrl: patchSelectedImage
@@ -357,7 +408,7 @@ export function useImageProcessing(
             const blob = new Blob([buffer], { type: 'image/jpeg' });
             const url = URL.createObjectURL(blob);
 
-            if (currentPath !== selectedImagePathRef.current || jobId < latestRenderedJobIdRef.current) {
+            if (currentPath !== selectedImagePathRef.current || jobId !== previewJobIdRef.current) {
               URL.revokeObjectURL(url);
               if (operation) {
                 logAppOperationSuccess(operation, {
@@ -381,7 +432,7 @@ export function useImageProcessing(
               return { exportSoftProofTransform: transform, finalPreviewUrl: url };
             });
 
-            clearInteractivePatch(500);
+            clearInteractivePatch();
             if (operation) {
               logAppOperationSuccess(operation, {
                 byteLength: buffer.byteLength,
@@ -409,7 +460,7 @@ export function useImageProcessing(
             jobId,
           });
         }
-        if (jobId >= latestRenderedJobIdRef.current) {
+        if (jobId === previewJobIdRef.current) {
           clearInteractivePatch();
         }
       }
@@ -427,26 +478,14 @@ export function useImageProcessing(
     ],
   );
 
-  const flushPipeline = useCallback(
-    function flushPipeline() {
-      if (inFlightCountRef.current >= 3) return;
-      if (!pendingApplyRef.current) return;
+  executeInteractiveRenderRef.current = ({ adjustments: currentAdjustments, requestId, targetRes }) =>
+    executeApplyAdjustments(currentAdjustments, true, targetRes, requestId);
 
-      const { adjustments, targetRes } = pendingApplyRef.current;
-      pendingApplyRef.current = null;
-
-      inFlightCountRef.current += 1;
-
-      void executeApplyAdjustments(adjustments, true, targetRes).finally(() => {
-        inFlightCountRef.current -= 1;
-        if (pendingApplyRef.current) {
-          requestAnimationFrame(() => {
-            flushPipeline();
-          });
-        }
-      });
+  useEffect(
+    () => () => {
+      interactiveSchedulerRef.current?.dispose();
     },
-    [executeApplyAdjustments],
+    [],
   );
 
   const applyAdjustments = useCallback(
@@ -454,14 +493,15 @@ export function useImageProcessing(
       if (!selectedImage?.isReady) return;
 
       if (dragging) {
-        pendingApplyRef.current = { adjustments: currentAdjustments, targetRes };
-        flushPipeline();
+        const requestId = ++latestInteractiveRequestIdRef.current;
+        interactiveSchedulerRef.current?.schedule({ adjustments: currentAdjustments, requestId, targetRes });
       } else {
-        pendingApplyRef.current = null;
+        latestInteractiveRequestIdRef.current += 1;
+        interactiveSchedulerRef.current?.clear();
         void executeApplyAdjustments(currentAdjustments, false, targetRes);
       }
     },
-    [selectedImage?.isReady, flushPipeline, executeApplyAdjustments],
+    [selectedImage?.isReady, executeApplyAdjustments],
   );
 
   const generateUncroppedPreview = useCallback(
