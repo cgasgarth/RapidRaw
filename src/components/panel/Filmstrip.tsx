@@ -48,7 +48,8 @@ interface ItemData {
   imageList: ImageFile[];
   imageRatings: ImageRatings;
   selectedPath: string | undefined;
-  multiSelectedPaths: string[];
+  multiSelectedCount: number;
+  selectedPathSet: ReadonlySet<string>;
   selectedImageThumbnailUrl?: string | undefined;
   thumbnailAspectRatio: ThumbnailAspectRatio;
   onRequestThumbnails?: ((paths: string[]) => void) | undefined;
@@ -572,7 +573,7 @@ const FilmstripCell = ({
   imageList,
   imageRatings,
   selectedPath,
-  multiSelectedPaths,
+  selectedPathSet,
   selectedImageThumbnailUrl,
   thumbnailAspectRatio,
   onContextMenu,
@@ -606,7 +607,7 @@ const FilmstripCell = ({
           imageFile={imageFile}
           imageRatings={imageRatings}
           isActive={selectedPath === imageFile.path}
-          isSelected={multiSelectedPaths.includes(imageFile.path)}
+          isSelected={selectedPathSet.has(imageFile.path)}
           onContextMenu={onContextMenu}
           onImageSelect={onImageSelect}
           onRegisterThumbnail={onRegisterThumbnail}
@@ -621,7 +622,7 @@ const FilmstripCell = ({
   );
 };
 
-const FilmstripList = ({
+export const FilmstripList = memo(function FilmstripList({
   height,
   width,
   data,
@@ -629,7 +630,7 @@ const FilmstripList = ({
   height: number;
   width: number;
   data: Omit<ItemData, 'activeIndex' | 'itemHeight' | 'onRegisterThumbnail' | 'onThumbnailRovingKeyDown'>;
-}) => {
+}) {
   const [gridHandle, setGridHandle] = useGridCallbackRef();
   const visibleRange = useRef({ start: 0, stop: 0 });
   const prevSelectedPath = useRef<string | null>(null);
@@ -681,9 +682,9 @@ const FilmstripList = ({
     if (resizeEndTimer.current) clearTimeout(resizeEndTimer.current);
 
     resizeEndTimer.current = window.setTimeout(() => {
-      const { selectedPath, imageList, multiSelectedPaths } = currentDataRef.current;
+      const { selectedPath, imageList, multiSelectedCount } = currentDataRef.current;
 
-      if (selectedPath && gridHandle && multiSelectedPaths.length <= 1) {
+      if (selectedPath && gridHandle && multiSelectedCount <= 1) {
         const index = imageList.findIndex((img) => img.path === selectedPath);
         if (index !== -1) {
           gridHandle.scrollToColumn({ index, align: 'center', behavior: 'smooth' });
@@ -780,7 +781,7 @@ const FilmstripList = ({
     const consumeClickTriggeredScroll = data.consumeClickTriggeredScroll;
 
     if (currentPath && gridHandle) {
-      if (data.multiSelectedPaths.length > 1) {
+      if (data.multiSelectedCount > 1) {
         prevSelectedPath.current = currentPath;
         consumeClickTriggeredScroll();
         return;
@@ -808,7 +809,7 @@ const FilmstripList = ({
     }
   }, [
     data.selectedPath,
-    data.multiSelectedPaths,
+    data.multiSelectedCount,
     data.imageList,
     isItemVisible,
     data.consumeClickTriggeredScroll,
@@ -844,6 +845,7 @@ const FilmstripList = ({
     [focusThumbnail],
   );
 
+  const { imageList } = data;
   const onThumbnailRovingKeyDown = useCallback(
     (event: ThumbnailKeyboardEvent, index: number) => {
       if (event.altKey || event.ctrlKey || event.metaKey) return;
@@ -852,16 +854,16 @@ const FilmstripList = ({
       if (event.key === 'ArrowLeft') {
         nextIndex = Math.max(0, index - 1);
       } else if (event.key === 'ArrowRight') {
-        nextIndex = Math.min(data.imageList.length - 1, index + 1);
+        nextIndex = Math.min(imageList.length - 1, index + 1);
       } else if (event.key === 'Home') {
         nextIndex = 0;
       } else if (event.key === 'End') {
-        nextIndex = data.imageList.length - 1;
+        nextIndex = imageList.length - 1;
       }
 
       if (nextIndex === null || nextIndex === index) return;
 
-      const nextImage = data.imageList[nextIndex];
+      const nextImage = imageList[nextIndex];
       if (!nextImage) return;
 
       event.preventDefault();
@@ -872,7 +874,7 @@ const FilmstripList = ({
         focusThumbnail(nextImage.path);
       });
     },
-    [data, focusThumbnail, performSafeScroll],
+    [data.onImageSelect, focusThumbnail, imageList, performSafeScroll],
   );
 
   const cellProps = useMemo<FilmstripCellData>(
@@ -918,7 +920,9 @@ const FilmstripList = ({
       />
     </div>
   );
-};
+});
+
+FilmstripList.displayName = 'FilmstripList';
 
 interface FilmstripSelectionSummaryProps {
   imageList: ImageFile[];
@@ -928,13 +932,13 @@ interface FilmstripSelectionSummaryProps {
   selectedImage?: SelectedImage | undefined;
 }
 
-const FilmstripSelectionSummary = ({
+const FilmstripSelectionSummary = memo(function FilmstripSelectionSummary({
   imageList,
   imageRatings,
   multiSelectedPaths,
   onClearSelection,
   selectedImage,
-}: FilmstripSelectionSummaryProps) => {
+}: FilmstripSelectionSummaryProps) {
   const { t } = useTranslation();
 
   const summary = useMemo(() => {
@@ -1074,7 +1078,9 @@ const FilmstripSelectionSummary = ({
       </button>
     </div>
   );
-};
+});
+
+FilmstripSelectionSummary.displayName = 'FilmstripSelectionSummary';
 
 interface FilmStripProps {
   imageList: Array<ImageFile>;
@@ -1124,18 +1130,54 @@ export default function Filmstrip({
     };
   }, []);
 
-  const handleImageSelect = (path: string, event: ThumbnailSelectEvent) => {
-    if (path !== selectedImage?.path) {
-      clickTriggeredScroll.current = true;
-    }
-    onImageSelect?.(path, event);
-  };
+  const selectedPath = selectedImage?.path;
+  const handleImageSelect = useCallback(
+    (path: string, event: ThumbnailSelectEvent) => {
+      if (path !== selectedPath) {
+        clickTriggeredScroll.current = true;
+      }
+      onImageSelect?.(path, event);
+    },
+    [onImageSelect, selectedPath],
+  );
+  const selectedPathSet = useMemo<ReadonlySet<string>>(() => new Set(multiSelectedPaths), [multiSelectedPaths]);
 
   const consumeClickTriggeredScroll = useCallback(() => {
     const wasClickTriggered = clickTriggeredScroll.current;
     clickTriggeredScroll.current = false;
     return wasClickTriggered;
   }, []);
+
+  const filmstripListData = useMemo<
+    Omit<ItemData, 'activeIndex' | 'itemHeight' | 'onRegisterThumbnail' | 'onThumbnailRovingKeyDown'>
+  >(
+    () => ({
+      imageList,
+      imageRatings,
+      selectedPath,
+      multiSelectedCount: multiSelectedPaths.length,
+      selectedPathSet,
+      thumbnailAspectRatio,
+      onContextMenu,
+      onRequestThumbnails,
+      onImageSelect: handleImageSelect,
+      consumeClickTriggeredScroll,
+      selectedImageThumbnailUrl,
+    }),
+    [
+      consumeClickTriggeredScroll,
+      handleImageSelect,
+      imageList,
+      imageRatings,
+      multiSelectedPaths.length,
+      onContextMenu,
+      onRequestThumbnails,
+      selectedImageThumbnailUrl,
+      selectedPath,
+      selectedPathSet,
+      thumbnailAspectRatio,
+    ],
+  );
 
   return (
     <div ref={containerRef} className="h-full w-full" role="presentation" onClick={onClearSelection}>
@@ -1151,18 +1193,7 @@ export default function Filmstrip({
           <FilmstripList
             height={Math.max(20, size.height - FILMSTRIP_SUMMARY_HEIGHT - 4)}
             width={size.width}
-            data={{
-              imageList,
-              imageRatings,
-              selectedPath: selectedImage?.path,
-              multiSelectedPaths,
-              thumbnailAspectRatio,
-              onContextMenu,
-              onRequestThumbnails,
-              onImageSelect: handleImageSelect,
-              consumeClickTriggeredScroll,
-              selectedImageThumbnailUrl,
-            }}
+            data={filmstripListData}
           />
         </div>
       )}
