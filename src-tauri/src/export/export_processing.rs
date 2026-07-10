@@ -42,10 +42,22 @@ use crate::image_loader::{
     raw_processing_settings_for_adjustments,
 };
 use crate::image_processing::{
-    AllAdjustments, Crop, GpuContext, RenderRequest, downscale_f32_image,
+    AllAdjustments, Crop, GpuContext, ImageMetadata, RenderRequest, downscale_f32_image,
     get_all_adjustments_from_json, get_or_init_gpu_context, process_and_get_dynamic_image,
     process_and_get_unclamped_dynamic_image, resolve_tonemapper_override_from_handle,
 };
+
+fn adjustments_with_raw_engine_artifacts(metadata: ImageMetadata) -> Value {
+    let mut adjustments = metadata.adjustments;
+    if let Some(artifacts) = metadata.raw_engine_artifacts {
+        if !adjustments.is_object() {
+            adjustments = serde_json::json!({});
+        }
+        adjustments["rawEngineArtifacts"] =
+            serde_json::to_value(artifacts).expect("RawEngine artifacts must serialize");
+    }
+    adjustments
+}
 use crate::lut_processing::{convert_image_to_cube_lut, generate_identity_lut_image};
 use crate::mask_generation::{MaskDefinition, generate_mask_bitmap};
 use crate::raw_processing::RawDevelopmentReport;
@@ -335,12 +347,24 @@ pub(crate) fn process_image_for_export_pipeline(
     debug_tag: &str,
     app_handle: &tauri::AppHandle,
 ) -> Result<DynamicImage, String> {
-    let (transformed_image, mask_bitmaps) = prepare_export_masks(base_image, js_adjustments, state);
+    let mut authoritative_adjustments = js_adjustments.clone();
+    if let Some(plan) =
+        crate::layers::apply_authoritative_layer_stack(&mut authoritative_adjustments, path)?
+    {
+        log::debug!(
+            "native layer export plan revision={} layer={:?} hash={}",
+            plan.graph_revision,
+            plan.layer_id,
+            plan.plan_hash
+        );
+    }
+    let (transformed_image, mask_bitmaps) =
+        prepare_export_masks(base_image, &authoritative_adjustments, state);
     let tm_override = resolve_tonemapper_override_from_handle(app_handle, is_raw);
     process_image_for_export_pipeline_with_tonemapper_override(
         path,
         transformed_image.as_ref(),
-        js_adjustments,
+        &authoritative_adjustments,
         context,
         state,
         is_raw,
@@ -958,7 +982,7 @@ pub async fn export_images(
                     (true, Some(adjustments)) => adjustments,
                     _ => {
                         let metadata = crate::exif_processing::load_sidecar(&sidecar_path);
-                        metadata.adjustments
+                        adjustments_with_raw_engine_artifacts(metadata)
                     }
                 };
 
@@ -1530,7 +1554,7 @@ pub async fn estimate_export_sizes(
         (preview_byte_size as f64 * pixel_ratio) as usize
     } else {
         let metadata = crate::exif_processing::load_sidecar(&sidecar_path);
-        let mut js_adjustments = metadata.adjustments;
+        let mut js_adjustments = adjustments_with_raw_engine_artifacts(metadata);
 
         const ESTIMATE_DIM: u32 = 1280;
 
