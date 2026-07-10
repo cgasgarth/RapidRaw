@@ -19,7 +19,8 @@ import {
 
 const HORIZONTAL_PADDING = 4;
 const ITEM_GAP = 8;
-const THUMBNAIL_FOCUS_CLASS = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring';
+const THUMBNAIL_FOCUS_CLASS =
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring focus-visible:ring-offset-1 focus-visible:ring-offset-editor-panel-well';
 const FILMSTRIP_SUMMARY_HEIGHT = 30;
 
 interface ImageLayer {
@@ -150,10 +151,8 @@ const FilmstripRawQualityBadges = ({ exif }: { exif: ImageFile['exif'] }) => {
         <span
           key={badge.code}
           className={cx(
-            'inline-flex h-5 items-center gap-1 rounded-full border px-1.5 text-[10px] font-semibold shadow-md backdrop-blur',
-            badge.severity === 'warning'
-              ? 'border-amber-300/35 bg-amber-500/20 text-amber-100'
-              : 'border-sky-300/30 bg-sky-500/20 text-sky-100',
+            'inline-flex h-4 items-center gap-0.5 rounded-sm border bg-black/75 px-1 text-[9px] font-semibold leading-none',
+            badge.severity === 'warning' ? 'border-amber-300/60 text-amber-100' : 'border-sky-300/50 text-sky-100',
           )}
           data-raw-quality-badge-code={badge.code}
           data-raw-quality-badge-detail={badge.detail}
@@ -216,6 +215,13 @@ export const FilmstripThumbnail = memo(
 
     const truncatedTitle =
       filename.length > 40 ? `${filename.substring(0, 20)}...${filename.substring(filename.length - 17)}` : filename;
+    const accessibleMetadata = [
+      hasEditIcon ? t('ui.filmstrip.selectionSummary.badges.edited') : null,
+      colorLabel ? `${t('ui.filmstrip.selectionSummary.badges.color')}: ${colorLabel.name}` : null,
+      hasRating ? `${t('ui.filmstrip.selectionSummary.badges.rating')}: ${rating}` : null,
+      isVirtualCopy ? t('ui.filmstrip.tooltips.virtualCopy') : null,
+    ].filter((label): label is string => label !== null);
+    const accessibleLabel = [truncatedTitle, ...accessibleMetadata].join(', ');
 
     const isCurrentBinding = useCallback(
       (candidate: ThumbnailBinding) => isSameBinding(bindingRef.current, candidate),
@@ -377,13 +383,13 @@ export const FilmstripThumbnail = memo(
       };
     }, [isCurrentBinding, reducedMotion, retireHandoff, visibleLayers]);
 
-    const ringClass = isActive
-      ? 'border-accent ring-2 ring-accent shadow-md'
+    const selectionClass = isActive
+      ? 'border-editor-primary-active bg-editor-selected-quiet ring-1 ring-inset ring-editor-primary-active'
       : isSelected
-        ? 'border-editor-border ring-2 ring-gray-400 shadow-md'
-        : 'border-editor-border hover:ring-2 hover:ring-hover-color';
+        ? 'border-editor-focus-ring bg-editor-selected-quiet ring-1 ring-inset ring-editor-focus-ring/70'
+        : 'border-editor-border hover:border-editor-focus-ring hover:bg-editor-panel-raised';
 
-    const imageClasses = `w-full h-full group-hover:scale-[1.02] transition-transform duration-300`;
+    const thumbnailState = isActive ? 'current' : isSelected ? 'selected' : 'idle';
     const handleSelect = (event: ThumbnailMouseEvent | ThumbnailKeyboardEvent) => {
       event.stopPropagation();
       onImageSelect?.(path, event);
@@ -407,12 +413,12 @@ export const FilmstripThumbnail = memo(
     return (
       <div
         className={cx(
-          'h-full w-full rounded-md overflow-hidden cursor-pointer shrink-0 group relative border bg-editor-panel transition-all duration-150',
-          ringClass,
+          'group relative h-full w-full shrink-0 cursor-pointer overflow-hidden rounded-sm border bg-editor-panel-well transition-colors duration-100 motion-reduce:transition-none',
+          selectionClass,
           THUMBNAIL_FOCUS_CLASS,
         )}
         aria-current={isActive ? 'true' : undefined}
-        aria-label={truncatedTitle}
+        aria-label={accessibleLabel}
         aria-selected={isSelected}
         onClick={handleSelect}
         onContextMenu={(e: ThumbnailMouseEvent) => onContextMenu?.(e, path)}
@@ -424,11 +430,23 @@ export const FilmstripThumbnail = memo(
           zIndex: isActive ? 2 : isSelected ? 1 : 'auto',
         }}
         data-image-path={path}
+        data-filmstrip-state={thumbnailState}
+        data-thumbnail-availability={visibleLayers.some((layer) => layer.opacity === 1) ? 'ready' : 'loading'}
         data-tooltip={truncatedTitle}
         data-testid="filmstrip-thumbnail"
       >
+        {isActive ? (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 top-0 z-20 h-0.5 bg-editor-primary-active"
+            data-testid="filmstrip-current-marker"
+          />
+        ) : null}
         {visibleLayers.length > 0 ? (
-          <div className="absolute inset-0 w-full h-full">
+          <div
+            className="absolute inset-[3px] overflow-hidden rounded-[1px] bg-black"
+            data-testid="filmstrip-image-well"
+          >
             {visibleLayers.map((layer) => (
               <div
                 key={layer.binding.generation}
@@ -444,19 +462,12 @@ export const FilmstripThumbnail = memo(
                   handleTransitionEnd(event, layer.binding);
                 }}
               >
-                {thumbnailAspectRatio === ThumbnailAspectRatio.Contain && (
-                  <img
-                    alt=""
-                    className="absolute inset-0 w-full h-full object-cover blur-md scale-110 opacity-50"
-                    loading="eager"
-                    src={layer.url}
-                  />
-                )}
                 <img
                   alt={truncatedTitle}
-                  className={`${imageClasses} ${
-                    thumbnailAspectRatio === ThumbnailAspectRatio.Contain ? 'object-contain' : 'object-cover'
-                  } relative`}
+                  className={cx(
+                    'relative h-full w-full',
+                    thumbnailAspectRatio === ThumbnailAspectRatio.Contain ? 'object-contain' : 'object-cover',
+                  )}
                   data-testid="filmstrip-thumbnail-image"
                   decoding="async"
                   loading="eager"
@@ -473,86 +484,78 @@ export const FilmstripThumbnail = memo(
           </div>
         ) : null}
         {!visibleLayers.some((layer) => layer.opacity === 1) ? (
-          <div className="flex h-full w-full items-center justify-center border border-dashed border-editor-border bg-editor-panel-well">
+          <div className="absolute inset-[3px] flex items-center justify-center border border-dashed border-editor-border bg-editor-panel">
             <ImageIcon
               data-testid="filmstrip-thumbnail-placeholder"
               size={24}
-              className="text-text-secondary animate-pulse"
+              className="animate-pulse text-text-secondary motion-reduce:animate-none"
             />
           </div>
         ) : null}
 
         <div
           className={cx(
-            'absolute top-0 right-0 w-3/4 h-3/4 bg-linear-to-bl from-black/25 via-black/0 to-transparent pointer-events-none z-0 transition-opacity duration-200 ease-in-out',
+            'absolute right-1 top-1 z-10 grid h-5 grid-cols-[14px_14px_28px] items-center gap-0.5 rounded-sm bg-black/70 px-0.5 transition-opacity duration-100 motion-reduce:transition-none',
             hasAnyOverlay ? 'opacity-100' : 'opacity-0',
           )}
-        />
-
-        <div className="absolute top-1 right-1 flex items-center justify-end z-10 pointer-events-none">
-          <div
-            className={cx(
-              'rounded-full h-5 px-1.5 flex items-center justify-center gap-0 shadow-md bg-black/30 pointer-events-auto transition-all duration-200 ease-out origin-top-right',
-              hasAnyOverlay ? 'opacity-100 scale-100' : 'opacity-0 scale-90 pointer-events-none',
-            )}
-          >
+          data-testid="filmstrip-metadata-rail"
+        >
+          <div className="flex h-4 w-3.5 items-center justify-center">
             <div
               className={cx(
-                'text-white flex items-center transition-all duration-200 ease-out overflow-hidden',
-                hasEditIcon ? 'max-w-3 opacity-100 scale-100' : 'max-w-0 opacity-0 scale-75 pointer-events-none',
+                'flex items-center justify-center text-white transition-opacity duration-100 motion-reduce:transition-none',
+                hasEditIcon ? 'opacity-100' : 'opacity-0',
               )}
+              aria-hidden={!hasEditIcon}
+              data-tooltip={hasEditIcon ? t('ui.filmstrip.selectionSummary.badges.edited') : undefined}
               data-testid={hasEditIcon ? 'filmstrip-edit-badge' : undefined}
             >
               <SlidersHorizontal size={12} />
             </div>
+          </div>
 
+          <div className="flex h-4 w-3.5 items-center justify-center">
             <div
               className={cx(
-                'flex items-center justify-center shrink-0 transition-all duration-200 ease-out overflow-hidden',
-                hasColorLabel ? 'max-w-3 opacity-100 scale-100' : 'max-w-0 opacity-0 scale-75 pointer-events-none',
-                hasColorLabel && hasEditIcon ? 'ml-1.5' : 'ml-0',
+                'h-2.5 w-2.5 rounded-[1px] border border-white/70 transition-opacity duration-100 motion-reduce:transition-none',
+                hasColorLabel ? 'opacity-100' : 'opacity-0',
               )}
-            >
-              <div
-                className="w-3 h-3 rounded-full transition-colors duration-200"
-                style={{ backgroundColor: colorLabel ? colorLabel.color : 'transparent' }}
-                data-testid={hasColorLabel ? 'filmstrip-color-tag-badge' : undefined}
-              />
-            </div>
+              aria-hidden={!hasColorLabel}
+              data-tooltip={colorLabel?.name}
+              style={{ backgroundColor: colorLabel ? colorLabel.color : 'transparent' }}
+              data-testid={hasColorLabel ? 'filmstrip-color-tag-badge' : undefined}
+            />
+          </div>
 
+          <div className="flex h-4 w-7 items-center justify-end">
             <div
               className={cx(
-                'flex items-center gap-0.5 shrink-0 transition-all duration-200 ease-out overflow-hidden',
-                hasRating ? 'max-w-7 opacity-100 scale-100' : 'max-w-0 opacity-0 scale-75 pointer-events-none',
-                hasRating && (hasEditIcon || hasColorLabel) ? 'ml-1.5' : 'ml-0',
+                'flex items-center gap-0.5 text-white transition-opacity duration-100 motion-reduce:transition-none',
+                hasRating ? 'opacity-100' : 'opacity-0',
               )}
+              aria-hidden={!hasRating}
+              data-tooltip={hasRating ? `${t('ui.filmstrip.selectionSummary.badges.rating')}: ${rating}` : undefined}
               data-testid={hasRating ? 'filmstrip-rating-badge' : undefined}
             >
-              <UiText variant={TextVariants.small} color={TextColors.white}>
-                {rating}
-              </UiText>
-              <Star size={12} className="text-white fill-white" />
+              <span className="text-[10px] font-semibold leading-none">{rating}</span>
+              <Star aria-hidden="true" size={10} className="fill-white text-white" />
             </div>
           </div>
         </div>
 
         {isVirtualCopy && (
-          <>
-            <div className="absolute bottom-0 right-0 w-1/2 h-1/2 bg-linear-to-tl from-black/30 via-black/0 to-transparent pointer-events-none z-0" />
-
-            <div className="absolute bottom-1 right-1 z-10">
-              <UiText
-                as="div"
-                variant={TextVariants.small}
-                color={TextColors.white}
-                weight={TextWeights.bold}
-                className="shadow-md text-[10px] px-1 py-0.5 rounded-full bg-black/30"
-                data-tooltip={t('ui.filmstrip.tooltips.virtualCopy')}
-              >
-                {t('ui.filmstrip.virtualCopyAbbreviation')}
-              </UiText>
-            </div>
-          </>
+          <div className="absolute bottom-1 right-1 z-10">
+            <UiText
+              as="div"
+              variant={TextVariants.small}
+              color={TextColors.white}
+              weight={TextWeights.bold}
+              className="rounded-sm border border-white/30 bg-black/75 px-1 py-0.5 text-[9px] leading-none"
+              data-tooltip={t('ui.filmstrip.tooltips.virtualCopy')}
+            >
+              {t('ui.filmstrip.virtualCopyAbbreviation')}
+            </UiText>
+          </div>
         )}
         <FilmstripRawQualityBadges exif={imageFile.exif} />
       </div>
@@ -884,7 +887,12 @@ const FilmstripList = ({
   );
 
   return (
-    <div style={{ height, width }}>
+    <div
+      className="border-b border-editor-border bg-editor-panel-well"
+      data-filmstrip-layout="navigator"
+      data-testid="filmstrip-navigator-lane"
+      style={{ height, width }}
+    >
       <Grid<FilmstripCellData>
         aria-label="Filmstrip"
         aria-orientation="horizontal"
@@ -1004,7 +1012,7 @@ const FilmstripSelectionSummary = ({
 
   return (
     <div
-      className="mb-1 flex h-[30px] min-w-0 items-center gap-2 overflow-hidden rounded border border-editor-border bg-editor-panel px-2"
+      className="mb-1 flex h-[30px] min-w-0 items-center gap-2 overflow-hidden border-y border-editor-border bg-editor-panel px-2"
       data-active-filename={summary.activeFilename}
       data-color-label-count={summary.colorLabelCount}
       data-edited-count={summary.editedCount}
@@ -1023,7 +1031,7 @@ const FilmstripSelectionSummary = ({
     >
       <div className="flex min-w-0 shrink-0 items-center gap-1.5">
         <span
-          className="rounded-full bg-editor-selected-quiet px-2 py-0.5 text-[11px] font-semibold text-accent"
+          className="rounded-sm border border-editor-border bg-editor-selected-quiet px-1.5 py-0.5 text-[10px] font-semibold text-text-primary"
           data-testid="filmstrip-selection-summary-selected-count"
         >
           {t('ui.filmstrip.selectionSummary.selectedCount', { count: summary.selectedCount })}
@@ -1042,7 +1050,7 @@ const FilmstripSelectionSummary = ({
       <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
         {badgeCounters.map((counter) => (
           <span
-            className="inline-flex shrink-0 items-center gap-1 rounded border border-editor-border bg-editor-panel-well px-1.5 py-0.5 text-[10px] font-medium text-text-secondary"
+            className="inline-flex shrink-0 items-center gap-1 rounded-sm border border-editor-border bg-editor-panel-well px-1.5 py-0.5 text-[10px] font-medium text-text-secondary"
             data-badge-counter={counter.key}
             data-count={counter.count}
             data-testid={counter.testId}
@@ -1056,7 +1064,7 @@ const FilmstripSelectionSummary = ({
 
       <button
         aria-label={t('ui.filmstrip.selectionSummary.clearSelection')}
-        className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-text-secondary transition-colors hover:bg-editor-panel-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:opacity-40"
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-text-secondary transition-colors hover:bg-editor-panel-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:opacity-40"
         data-testid="filmstrip-selection-summary-clear"
         disabled={summary.selectedCount === 0 || !onClearSelection}
         onClick={handleClearSelection}
