@@ -29,6 +29,10 @@ import type {
 import { editorWorkspacePreferencesSchema } from '../schemas/editorWorkspacePreferencesSchemas';
 import type { FocusStackOutputReviewWorkflow } from '../schemas/focus-stack/focusStackOutputReviewSchemas';
 import { DEFAULT_FOCUS_STACK_UI_SETTINGS, type FocusStackUiSettings } from '../schemas/focus-stack/focusStackUiSchemas';
+import {
+  type LibraryWorkspacePreferences,
+  libraryWorkspacePreferencesSchema,
+} from '../schemas/libraryWorkspacePreferencesSchemas';
 import type { MaskContainer } from '../utils/adjustments';
 import {
   EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY,
@@ -50,6 +54,7 @@ import {
   type LayerMaskProvenanceReceipt,
   markLayerMaskReceiptsStale,
 } from '../utils/layers/layerMaskProvenance';
+import { readLibraryWorkspacePreferences, saveLibraryWorkspacePreferences } from '../utils/libraryWorkspacePreferences';
 import type { NegativeLabSessionSnapshot } from '../utils/negative-lab/negativeLabSessionState';
 import type { SuperResolutionNativeReadiness } from '../utils/superResolutionNativeReadiness';
 import type { SuperResolutionSourcePreflightMetadata } from '../utils/superResolutionSourcePreflight';
@@ -320,12 +325,14 @@ export interface UIState {
   isLibraryExportPanelVisible: boolean;
   editorWorkspacePreferences: EditorWorkspacePreferences;
   editorWorkspaceViewport: EditorWorkspaceViewport;
+  libraryWorkspacePreferences: LibraryWorkspacePreferences;
 
   // Dimensions
   leftPanelWidth: number;
   rightPanelWidth: number;
   bottomPanelHeight: number;
   compactEditorPanelHeightOverride: number | null;
+  libraryLeftPanelWidth: number;
 
   // Right Panel
   activeRightPanel: Panel | null;
@@ -376,6 +383,7 @@ export interface UIState {
   recordLayerMaskPreviewReceipt: (input: { appliedCommandId: string; masks: Array<MaskContainer> }) => void;
   setDevelopPanelPinnedControlIds: (controlIds: string[]) => void;
   hydrateEditorWorkspacePreferences: (legacy?: LegacyEditorWorkspacePreferences) => void;
+  hydrateLibraryWorkspacePreferences: (folderTreeVisible?: unknown) => void;
   setDefaultEditorCompareMode: (mode: EditorWorkspaceCompareMode) => void;
   setDefaultEditorZoomMode: (mode: EditorWorkspaceZoomMode) => void;
   setEditorLightsOutLevel: (level: EditorWorkspaceLightsOutLevel) => void;
@@ -385,7 +393,10 @@ export interface UIState {
   ) => void;
   setEditorRegionVisibility: (region: 'filmstrip' | 'leftSidebar' | 'rightInspector', visible: boolean) => void;
   setEditorSectionExpanded: (panel: Panel, sectionId: string, expanded: boolean) => void;
+  setEditorLeftSectionExpanded: (sectionId: string, expanded: boolean) => void;
   setEditorWorkspaceViewport: (viewport: EditorWorkspaceViewport) => void;
+  setLibraryFolderTreeVisibility: (visible: boolean) => void;
+  setLibraryFolderTreeWidth: (width: number) => void;
   recordRecentRightPanel: (panel: Panel) => void;
   setUI: (updater: Partial<UIState> | ((state: UIState) => Partial<UIState>)) => void;
   setRightPanel: (panel: Panel | null) => void;
@@ -396,6 +407,7 @@ export interface UIState {
 
 export const useUIStore = create<UIState>((set, get) => {
   const initialPreferences = readEditorWorkspacePreferences();
+  const initialLibraryPreferences = readLibraryWorkspacePreferences();
   const initialRightPanel = initialPreferences.rightInspector.activePanel;
   const initialLayout = getEffectiveEditorWorkspaceLayout(initialPreferences, {
     height: Number.MAX_SAFE_INTEGER,
@@ -435,11 +447,13 @@ export const useUIStore = create<UIState>((set, get) => {
     isLibraryExportPanelVisible: false,
     editorWorkspacePreferences: initialPreferences,
     editorWorkspaceViewport: { height: 0, isCompactPortrait: false, width: 0 },
+    libraryWorkspacePreferences: initialLibraryPreferences,
 
     leftPanelWidth: 256,
     rightPanelWidth: 360,
     bottomPanelHeight: initialLayout.bottomPanelHeight,
     compactEditorPanelHeightOverride: initialLayout.compactEditorPanelHeightOverride,
+    libraryLeftPanelWidth: initialLibraryPreferences.folderTree.width,
 
     activeRightPanel: initialRightPanel,
     renderedRightPanel: initialRightPanel,
@@ -550,6 +564,12 @@ export const useUIStore = create<UIState>((set, get) => {
       });
     },
 
+    hydrateLibraryWorkspacePreferences: (folderTreeVisible) => {
+      const preferences = readLibraryWorkspacePreferences({ folderTreeVisible });
+      saveLibraryWorkspacePreferences(preferences);
+      set({ libraryLeftPanelWidth: preferences.folderTree.width, libraryWorkspacePreferences: preferences });
+    },
+
     setDefaultEditorCompareMode: (mode) => {
       set((state) => {
         const preferences = {
@@ -645,8 +665,48 @@ export const useUIStore = create<UIState>((set, get) => {
       });
     },
 
+    setEditorLeftSectionExpanded: (sectionId, expanded) => {
+      if (sectionId.trim().length === 0) return;
+      set((state) => {
+        const currentSections = state.editorWorkspacePreferences.leftSidebar.expandedSections;
+        const expandedSections = expanded
+          ? [...new Set([...currentSections, sectionId])]
+          : currentSections.filter((currentSection) => currentSection !== sectionId);
+        const preferences = {
+          ...state.editorWorkspacePreferences,
+          leftSidebar: { ...state.editorWorkspacePreferences.leftSidebar, expandedSections },
+        };
+        saveEditorWorkspacePreferences(preferences);
+        return { editorWorkspacePreferences: preferences };
+      });
+    },
+
     setEditorWorkspaceViewport: (viewport) => {
       set((state) => applyWorkspacePreferences(state.editorWorkspacePreferences, viewport));
+    },
+
+    setLibraryFolderTreeVisibility: (visible) => {
+      set((state) => {
+        const preferences = {
+          ...state.libraryWorkspacePreferences,
+          folderTree: { ...state.libraryWorkspacePreferences.folderTree, visible },
+        };
+        saveLibraryWorkspacePreferences(preferences);
+        return { libraryWorkspacePreferences: preferences };
+      });
+    },
+
+    setLibraryFolderTreeWidth: (width) => {
+      set((state) => {
+        const preferences = {
+          ...state.libraryWorkspacePreferences,
+          folderTree: { ...state.libraryWorkspacePreferences.folderTree, width },
+        };
+        const parsed = libraryWorkspacePreferencesSchema.safeParse(preferences);
+        if (!parsed.success) return state;
+        saveLibraryWorkspacePreferences(parsed.data);
+        return { libraryLeftPanelWidth: width, libraryWorkspacePreferences: parsed.data };
+      });
     },
 
     recordRecentRightPanel: (panel) => {

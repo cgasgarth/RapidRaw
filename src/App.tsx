@@ -7,6 +7,7 @@ import { useShallow } from 'zustand/react/shallow';
 import ImageLoaderManager from './components/managers/ImageLoaderManager';
 import ImageProcessingManager from './components/managers/ImageProcessingManager';
 import AppModals from './components/modals/AppModals';
+import EditorLeftSidebar, { type EditorLeftSectionId } from './components/panel/editor/EditorLeftSidebar';
 import FolderTreePanel from './components/panel/FolderTree';
 import ExportPanel from './components/panel/right/export/ExportPanel';
 import {
@@ -52,6 +53,7 @@ import type { Adjustments } from './utils/adjustments';
 import { findAlbumById } from './utils/folderTreeUtils';
 import { getViteEnv } from './utils/frontendEnv.mjs';
 import { globalImageCache, type ImageCacheEntry } from './utils/ImageLRUCache';
+import { getWorkspaceLeftSurface } from './utils/workspaceLeftSurface';
 import { getOptionalCurrentWindow } from './window/currentWindow';
 import TitleBar from './window/TitleBar';
 
@@ -114,16 +116,21 @@ function App() {
     isWindowFullScreen,
     isInstantTransition,
     isLayoutReady,
-    uiVisibility,
     isLibraryExportPanelVisible,
+    editorLeftSidebarPreferences,
     leftPanelWidth,
+    libraryLeftPanelWidth,
+    libraryWorkspacePreferences,
     rightPanelWidth,
     compactEditorPanelHeightOverride,
     activeRightPanel,
     setUI,
     setEditorRegionSize,
     setEditorRegionVisibility,
+    setEditorLeftSectionExpanded,
     setEditorWorkspaceViewport,
+    setLibraryFolderTreeVisibility,
+    setLibraryFolderTreeWidth,
     setRightPanel,
   } = useUIStore(
     useShallow((state) => ({
@@ -132,16 +139,21 @@ function App() {
       isWindowFullScreen: state.isWindowFullScreen,
       isInstantTransition: state.isInstantTransition,
       isLayoutReady: state.isLayoutReady,
-      uiVisibility: state.uiVisibility,
       isLibraryExportPanelVisible: state.isLibraryExportPanelVisible,
+      editorLeftSidebarPreferences: state.editorWorkspacePreferences.leftSidebar,
       leftPanelWidth: state.leftPanelWidth,
+      libraryLeftPanelWidth: state.libraryLeftPanelWidth,
+      libraryWorkspacePreferences: state.libraryWorkspacePreferences,
       rightPanelWidth: state.rightPanelWidth,
       compactEditorPanelHeightOverride: state.compactEditorPanelHeightOverride,
       activeRightPanel: state.activeRightPanel,
       setUI: state.setUI,
       setEditorRegionSize: state.setEditorRegionSize,
       setEditorRegionVisibility: state.setEditorRegionVisibility,
+      setEditorLeftSectionExpanded: state.setEditorLeftSectionExpanded,
       setEditorWorkspaceViewport: state.setEditorWorkspaceViewport,
+      setLibraryFolderTreeVisibility: state.setLibraryFolderTreeVisibility,
+      setLibraryFolderTreeWidth: state.setLibraryFolderTreeWidth,
       setRightPanel: state.setRightPanel,
     })),
   );
@@ -276,6 +288,12 @@ function App() {
     },
     [setEditorRegionSize],
   );
+  const handleLibraryLeftPanelWidthChange = useCallback(
+    (width: number) => {
+      setLibraryFolderTreeWidth(width);
+    },
+    [setLibraryFolderTreeWidth],
+  );
   const handleRightPanelWidthChange = useCallback(
     (width: number) => {
       setEditorRegionSize('rightInspector', width);
@@ -300,6 +318,7 @@ function App() {
     onBottomPanelHeightChange: handleBottomPanelHeightChange,
     onCompactEditorPanelHeightOverrideChange: handleCompactEditorPanelHeightOverrideChange,
     onLeftPanelWidthChange: handleLeftPanelWidthChange,
+    onLibraryLeftPanelWidthChange: handleLibraryLeftPanelWidthChange,
     onResizingChange: setIsResizing,
     onRightPanelWidthChange: handleRightPanelWidthChange,
   });
@@ -598,27 +617,24 @@ function App() {
 
   const hasRoots = rootPaths.length > 0;
 
-  const renderFolderTree = (isDesktopEditorShell = false) => {
+  const renderLibraryFolderTree = () => {
     if (!hasRoots) return null;
 
     return (
       <div
         className={cx(
           'flex h-full min-h-0 overflow-hidden shrink-0',
-          isDesktopEditorShell && 'editor-shell-left',
           !isResizing && !isInstantTransition && !isFullScreen && 'transition-all duration-300 ease-in-out',
         )}
-        data-editor-region={isDesktopEditorShell ? 'left' : undefined}
-        data-editor-surrounding-chrome={isDesktopEditorShell ? 'true' : undefined}
         style={{
           width: isFullScreen ? '0px' : undefined,
           opacity: isFullScreen ? 0 : 1,
         }}
       >
         <FolderTreePanel
-          isContiguousShell={isDesktopEditorShell}
+          isContiguousShell={false}
           isResizing={isResizing}
-          isVisible={uiVisibility.folderTree}
+          isVisible={libraryWorkspacePreferences.folderTree.visible}
           onContextMenu={handleFolderTreeContextMenu}
           onAlbumContextMenu={handleAlbumTreeContextMenu}
           onSelectAlbum={handleSelectAlbumVoid}
@@ -630,21 +646,25 @@ function App() {
           }}
           onOpenFolder={handleOpenFolderVoid}
           setIsVisible={(value: boolean) => {
-            setEditorRegionVisibility('leftSidebar', value);
+            setLibraryFolderTreeVisibility(value);
           }}
-          style={{ width: uiVisibility.folderTree ? `${leftPanelWidth}px` : '32px' }}
+          style={{ width: libraryWorkspacePreferences.folderTree.visible ? `${libraryLeftPanelWidth}px` : '32px' }}
           isInstantTransition={isInstantTransition}
         />
         <Resizer
-          className={isDesktopEditorShell ? 'editor-shell-resizer editor-shell-resizer-vertical' : undefined}
           direction={Orientation.Vertical}
-          onMouseDown={createResizeHandler('left', leftPanelWidth)}
+          onMouseDown={createResizeHandler('libraryLeft', libraryLeftPanelWidth)}
         />
       </div>
     );
   };
 
-  const shouldHideFolderTree = isAndroid;
+  const leftSurface = getWorkspaceLeftSurface({
+    hasRoots,
+    hasSelectedImage: selectedImage !== null,
+    isAndroid,
+    isCompactPortrait,
+  });
   const isWgpuActive = appSettings?.useWgpuRenderer !== false && selectedImage?.isReady && hasRenderedFirstFrame;
   const useMacWindowShell = osPlatform === 'macos' && !appSettings?.decorations && !isWindowFullScreen && !isFullScreen;
 
@@ -693,7 +713,24 @@ function App() {
             data-editor-resizing={selectedImage && !isCompactPortrait ? String(isResizing) : undefined}
             data-editor-shell={selectedImage && !isCompactPortrait ? 'desktop' : undefined}
           >
-            {!shouldHideFolderTree && renderFolderTree(selectedImage !== null && !isCompactPortrait)}
+            {leftSurface === 'editor' ? (
+              <EditorLeftSidebar
+                expandedSections={editorLeftSidebarPreferences.expandedSections}
+                isFullScreen={isFullScreen}
+                isResizing={isResizing}
+                isVisible={editorLeftSidebarPreferences.visible}
+                onResizeStart={createResizeHandler('left', leftPanelWidth)}
+                onSectionExpandedChange={(sectionId: EditorLeftSectionId, expanded: boolean) => {
+                  setEditorLeftSectionExpanded(sectionId, expanded);
+                }}
+                onVisibleChange={(visible: boolean) => {
+                  setEditorRegionVisibility('leftSidebar', visible);
+                }}
+                width={leftPanelWidth}
+              />
+            ) : leftSurface === 'library' ? (
+              renderLibraryFolderTree()
+            ) : null}
             <div className="flex-1 flex flex-col min-w-0">
               {selectedImage ? (
                 <EditorView

@@ -106,9 +106,10 @@ export const useAppInitialization = ({
     })),
   );
 
-  const { hydrateEditorWorkspacePreferences } = useUIStore(
+  const { hydrateEditorWorkspacePreferences, hydrateLibraryWorkspacePreferences } = useUIStore(
     useShallow((state) => ({
       hydrateEditorWorkspacePreferences: state.hydrateEditorWorkspacePreferences,
+      hydrateLibraryWorkspacePreferences: state.hydrateLibraryWorkspacePreferences,
     })),
   );
 
@@ -205,6 +206,7 @@ export const useAppInitialization = ({
         hydrateEditorWorkspacePreferences(
           settings.uiVisibility === undefined ? {} : { uiVisibility: settings.uiVisibility },
         );
+        hydrateLibraryWorkspacePreferences(settings.uiVisibility?.folderTree);
 
         if (settings.isWaveformVisible !== undefined) setEditor({ isWaveformVisible: settings.isWaveformVisible });
         if (settings.activeWaveformChannel && isDisplayMode(settings.activeWaveformChannel)) {
@@ -262,6 +264,7 @@ export const useAppInitialization = ({
     setAppSettings,
     setTheme,
     hydrateEditorWorkspacePreferences,
+    hydrateLibraryWorkspacePreferences,
     defaultLibraryViewMode,
     defaultThumbnailSize,
     setSortCriteria,
