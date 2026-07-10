@@ -41,16 +41,28 @@ export const hdrRuntimePlanSchema = z
     accepted: z.boolean(),
     acceptedDryRunPlanHash: z.string().trim().min(1),
     acceptedDryRunPlanId: z.string().trim().min(1),
+    alignmentArtifact: z
+      .object({
+        artifactHash: z.string().startsWith('blake3:'),
+        handle: z.string().startsWith('native:'),
+        height: z.number().int().positive(),
+        kind: z.literal('scene_linear_alignment_proxy'),
+        width: z.number().int().positive(),
+      })
+      .strict()
+      .optional(),
     blockCodes: z.array(z.string().trim().min(1)),
     bracketCount: z.number().int().nonnegative(),
-    dimensionWarnings: z.array(z.string().trim().min(1)),
+    commonOverlapFraction: z.number().min(0).max(1).optional(),
+    dimensionWarnings: z.array(z.string().trim().min(1)).optional(),
     estimatedMemory: z
       .object({
         mergeBufferMb: z.number().int().nonnegative(),
         previewBufferMb: z.number().int().nonnegative(),
         totalMb: z.number().int().nonnegative(),
       })
-      .strict(),
+      .strict()
+      .optional(),
     exposureSpacing: z
       .object({
         maxStepEv: z.number(),
@@ -59,36 +71,101 @@ export const hdrRuntimePlanSchema = z
         stepCount: z.number().int().nonnegative(),
       })
       .strict()
-      .nullable(),
-    metadataWarnings: z.array(z.string().trim().min(1)),
+      .nullable()
+      .optional(),
+    metadataWarnings: z.array(z.string().trim().min(1)).optional(),
     previewDimensions: z
       .object({
         height: z.number().int().nonnegative(),
         width: z.number().int().nonnegative(),
       })
-      .strict(),
-    sourcePaths: z.array(z.string().trim().min(1)),
+      .strict()
+      .optional(),
+    readiness: z.literal('alignment_plan_ready').optional(),
+    referenceSourceIndex: z.number().int().nonnegative().optional(),
+    schemaVersion: z.literal(2).optional(),
+    sourcePaths: z.array(z.string().trim().min(1)).optional(),
     sources: z.array(
-      z
-        .object({
-          contentHash: z.string().trim().min(1),
-          dimensions: z
-            .object({
-              height: z.number().int().nonnegative(),
-              width: z.number().int().nonnegative(),
-            })
-            .strict(),
-          exposure: z
-            .object({
-              exposureEv: z.number(),
-              exposureTimeSeconds: z.number().positive(),
-              iso: z.number().positive(),
-            })
-            .strict(),
-          path: z.string().trim().min(1),
-          sourceIndex: z.number().int().nonnegative(),
-        })
-        .strict(),
+      z.union([
+        z
+          .object({
+            contentHash: z.string().trim().min(1),
+            dimensions: z
+              .object({
+                height: z.number().int().nonnegative(),
+                width: z.number().int().nonnegative(),
+              })
+              .strict(),
+            exposure: z
+              .object({
+                exposureEv: z.number(),
+                exposureTimeSeconds: z.number().positive(),
+                iso: z.number().positive(),
+              })
+              .strict(),
+            path: z.string().trim().min(1),
+            sourceIndex: z.number().int().nonnegative(),
+          })
+          .strict(),
+        z
+          .object({
+            activeArea: z
+              .object({
+                height: z.number().int().positive(),
+                width: z.number().int().positive(),
+                x: z.number().int().nonnegative(),
+                y: z.number().int().nonnegative(),
+              })
+              .strict(),
+            alignment: z
+              .object({
+                confidence: z.number().min(0).max(1),
+                converged: z.boolean(),
+                iterations: z.number().int().nonnegative(),
+                matrix: z.array(z.number()).length(9),
+                model: z.enum(['identity', 'translation']),
+                overlapFraction: z.number().min(0).max(1),
+                policyId: z.literal('bounded_ncc_translation_v1'),
+                residualP95: z.number().nonnegative(),
+                residualRms: z.number().nonnegative(),
+              })
+              .strict(),
+            calibration: z
+              .object({
+                algorithmId: z.literal('cfa_black_white_wb_linear_v1'),
+                blackLevels: z.array(z.number()).min(1),
+                linearizationId: z.string().min(1),
+                whiteBalance: z.array(z.number()).min(3),
+                whiteLevels: z.array(z.number()).min(1),
+              })
+              .strict(),
+            cameraMake: z.string().min(1),
+            cameraModel: z.string().min(1),
+            cfaPattern: z.string().min(1),
+            contentHash: z.string().startsWith('blake3:'),
+            decoderId: z.literal('rawler_sensor_decode_v1'),
+            exposure: z
+              .object({
+                aperture: z.number().positive(),
+                exposureScale: z.number().positive(),
+                exposureTimeSeconds: z.number().positive(),
+                iso: z.number().positive(),
+              })
+              .strict(),
+            focalLengthMm: z.number().positive(),
+            graphRevision: z.string().min(1),
+            height: z.number().int().positive(),
+            isReference: z.boolean(),
+            lensModel: z.string().min(1),
+            orientation: z.string().min(1),
+            path: z.string().min(1),
+            proxyHash: z.string().startsWith('blake3:'),
+            proxyId: z.literal('cfa_scene_linear_luma_box_v1'),
+            sourceIndex: z.number().int().nonnegative(),
+            width: z.number().int().positive(),
+          })
+          .strict(),
+      ]),
     ),
     warningCodes: z.array(z.string().trim().min(1)),
   })

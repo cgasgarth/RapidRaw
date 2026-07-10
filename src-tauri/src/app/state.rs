@@ -110,6 +110,9 @@ pub struct PendingHdrSourceRef {
 pub struct PendingHdrMergePlan {
     pub accepted_dry_run_plan_hash: String,
     pub accepted_dry_run_plan_id: String,
+    pub alignment_policy_id: String,
+    pub source_content_hashes: Vec<String>,
+    pub source_paths: Vec<String>,
 }
 
 pub struct ThumbnailProgressTracker {
@@ -154,6 +157,7 @@ pub struct AppState {
     pub super_resolution_registration_job: Mutex<Option<Arc<AtomicBool>>>,
     pub hdr_result: Arc<Mutex<Option<DynamicImage>>>,
     pub hdr_runtime_plan: Arc<Mutex<Option<PendingHdrMergePlan>>>,
+    pub hdr_plan_generation: Arc<AtomicUsize>,
     pub hdr_source_refs: Arc<Mutex<Vec<PendingHdrSourceRef>>>,
     pub panorama_result: Arc<Mutex<Option<PendingPanoramaResult>>>,
     pub denoise_result: Arc<Mutex<Option<DynamicImage>>>,
@@ -194,6 +198,7 @@ impl AppState {
             super_resolution_registration_job: Mutex::new(None),
             hdr_result: Arc::new(Mutex::new(None)),
             hdr_runtime_plan: Arc::new(Mutex::new(None)),
+            hdr_plan_generation: Arc::new(AtomicUsize::new(0)),
             hdr_source_refs: Arc::new(Mutex::new(Vec::new())),
             panorama_result: Arc::new(Mutex::new(None)),
             denoise_result: Arc::new(Mutex::new(None)),

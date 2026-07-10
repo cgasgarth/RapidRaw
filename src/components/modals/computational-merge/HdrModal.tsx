@@ -606,11 +606,11 @@ export function HdrModal({
               data-block-codes={runtimePlan?.blockCodes.join(',') ?? ''}
               data-bracket-count={runtimePlan?.bracketCount ?? lastDryRunCommand.sources}
               data-command-type={lastDryRunCommand.commandType}
-              data-dimension-warnings={runtimePlan?.dimensionWarnings.join(',') ?? ''}
+              data-dimension-warnings={runtimePlan?.dimensionWarnings?.join(',') ?? ''}
               data-dry-run={String(lastDryRunCommand.dryRun)}
-              data-estimated-memory-mb={runtimePlan?.estimatedMemory.totalMb ?? ''}
+              data-estimated-memory-mb={runtimePlan?.estimatedMemory?.totalMb ?? ''}
               data-exposure-spacing-span-ev={runtimePlan?.exposureSpacing?.spanEv ?? ''}
-              data-metadata-warnings={runtimePlan?.metadataWarnings.join(',') ?? ''}
+              data-metadata-warnings={runtimePlan?.metadataWarnings?.join(',') ?? ''}
               data-source-count={lastDryRunCommand.sources}
               data-testid="hdr-dry-run-command-state"
               data-tool-name={lastDryRunCommand.toolName}
@@ -697,6 +697,36 @@ export function HdrModal({
             </div>
             <ComputationalMergeAppServerBadge family="hdr" statusLabel={t('editor.ai.connection.ready')} />
           </div>
+          {runtimePlan?.readiness === 'alignment_plan_ready' && runtimePlan.alignmentArtifact ? (
+            <section
+              className="mb-5 grid gap-2 border-y border-border-color py-3"
+              data-alignment-artifact-handle={runtimePlan.alignmentArtifact.handle}
+              data-alignment-artifact-hash={runtimePlan.alignmentArtifact.artifactHash}
+              data-common-overlap-fraction={runtimePlan.commonOverlapFraction}
+              data-reference-source-index={runtimePlan.referenceSourceIndex}
+              data-testid="hdr-native-alignment-review"
+            >
+              {runtimePlan.sources.map((source) =>
+                'alignment' in source ? (
+                  <div
+                    className="grid grid-cols-[36px_72px_1fr_72px] gap-2 text-xs"
+                    data-alignment-policy-id={source.alignment.policyId}
+                    data-alignment-transform={source.alignment.matrix.join(',')}
+                    data-testid="hdr-native-alignment-source"
+                    key={source.contentHash}
+                  >
+                    <span>#{source.sourceIndex + 1}</span>
+                    <span>{source.isReference ? 'Reference' : source.alignment.model}</span>
+                    <span>{`${source.exposure.exposureScale.toPrecision(4)} exposure scale`}</span>
+                    <span>{`${source.alignment.residualP95.toFixed(2)} px p95`}</span>
+                  </div>
+                ) : null,
+              )}
+              <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                Alignment review only. Radiance reconstruction and Apply are unavailable.
+              </UiText>
+            </section>
+          ) : null}
           <section
             className="mb-5 grid grid-cols-3 gap-2 rounded-md border border-border-color bg-surface p-3 text-xs"
             data-estimated-preview-memory-mb={estimatedPreviewMemoryMb}
