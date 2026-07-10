@@ -129,6 +129,48 @@ describe('editor workspace preferences', () => {
     expect(readEditorWorkspacePreferences().rightInspector.activePanel).toBe(Panel.Masks);
   });
 
+  test('migrates the legacy compact visibility flag into an explicit drawer state', () => {
+    const storage = new MemoryStorage();
+    installStorage(storage);
+    const legacyCurrent = createDefaultEditorWorkspacePreferences();
+    const { drawerState: _drawerState, ...legacyCompact } = legacyCurrent.compact;
+    legacyCompact.toolsExpanded = false;
+    storage.setItem(
+      EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY,
+      JSON.stringify({ ...legacyCurrent, compact: legacyCompact }),
+    );
+
+    expect(readEditorWorkspacePreferences().compact.drawerState).toBe('collapsed');
+  });
+
+  test('persists compact drawer states without overwriting the preferred drawer height', () => {
+    const storage = new MemoryStorage();
+    installStorage(storage);
+    const preferences = createDefaultEditorWorkspacePreferences();
+    preferences.compact.toolsHeight = 520;
+    useUIStore.setState({
+      activeRightPanel: Panel.Color,
+      editorWorkspacePreferences: preferences,
+      renderedRightPanel: Panel.Color,
+    });
+
+    useUIStore.getState().setCompactEditorDrawerState('peek');
+    expect(useUIStore.getState().activeRightPanel).toBe(Panel.Color);
+    expect(useUIStore.getState().editorWorkspacePreferences.compact).toMatchObject({
+      drawerState: 'peek',
+      toolsExpanded: true,
+      toolsHeight: 520,
+    });
+
+    useUIStore.getState().setCompactEditorDrawerState('collapsed');
+    expect(useUIStore.getState().activeRightPanel).toBe(Panel.Color);
+    expect(JSON.parse(storage.getItem(EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY) ?? '{}').compact).toMatchObject({
+      drawerState: 'collapsed',
+      toolsExpanded: false,
+      toolsHeight: 520,
+    });
+  });
+
   test('clamps only the effective viewport layout and retains desktop preferences across compact transitions', () => {
     const preferences = createDefaultEditorWorkspacePreferences();
     preferences.leftSidebar.width = 500;

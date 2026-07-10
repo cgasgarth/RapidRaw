@@ -6,7 +6,7 @@ import {
   Circle,
   CircleGauge,
   FolderOpen,
-  GripVertical,
+  GripHorizontal,
   Layers3,
   Plus,
   RotateCcw,
@@ -1866,6 +1866,14 @@ function ProfessionalEditorCompactPortraitVisualSmoke() {
           <span className={editorChromeStatusChipClassName('info')}>{copy.professionalEditorCompact}</span>
         </div>
 
+        <div
+          className="shrink-0 border-y border-editor-border bg-editor-panel"
+          data-visual-smoke-section="professional-editor-compact-bottom-bar"
+          data-testid="professional-editor-compact-bottom-bar"
+        >
+          <ProfessionalEditorBottomBar />
+        </div>
+
         <div className="min-h-[250px] flex-1 overflow-hidden">
           <ProfessionalEditorCanvasWell portrait />
         </div>
@@ -1879,18 +1887,16 @@ function ProfessionalEditorCompactPortraitVisualSmoke() {
             data-testid="professional-editor-compact-panel-header"
           >
             <div className="flex min-w-0 items-center gap-2">
-              <span className="truncate text-sm font-medium text-text-primary">{activePanel ?? 'Closed'}</span>
-              <span className={editorChromeStatusChipClassName(activePanel ? 'success' : 'warning')}>
-                {activePanel ? 'Open' : 'Closed'}
-              </span>
+              <SlidersHorizontal aria-hidden="true" className="text-text-secondary" size={16} />
+              <span className="truncate text-sm font-medium text-text-primary">{activePanel ?? Panel.Color}</span>
             </div>
             <div className="flex items-center gap-1">
               <span
                 aria-hidden="true"
-                className="flex h-7 w-7 items-center justify-center rounded-md border border-transparent text-text-tertiary"
+                className="flex h-9 w-9 items-center justify-center text-text-tertiary"
                 data-testid="professional-editor-compact-panel-grip"
               >
-                <GripVertical size={14} />
+                <GripHorizontal size={18} />
               </span>
               <span
                 aria-hidden="true"
@@ -1901,7 +1907,21 @@ function ProfessionalEditorCompactPortraitVisualSmoke() {
               </span>
             </div>
           </div>
-          <div className="min-h-0 flex-1 overflow-hidden" data-visual-smoke-section="professional-editor-compact-panel">
+          <div
+            className="shrink-0 border-b border-editor-border"
+            data-visual-smoke-section="professional-editor-compact-switcher"
+          >
+            <RightPanelSwitcher
+              activePanel={activePanel}
+              isInstantTransition={true}
+              layout="horizontal"
+              onPanelSelect={handlePanelSelect}
+            />
+          </div>
+          <div
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+            data-visual-smoke-section="professional-editor-compact-panel"
+          >
             <ContextMenuProvider>
               <EditorRightPanelHost
                 activeRightPanel={activePanel}
@@ -1919,24 +1939,6 @@ function ProfessionalEditorCompactPortraitVisualSmoke() {
                 slideDirection={0}
               />
             </ContextMenuProvider>
-          </div>
-          <div
-            className="shrink-0 border-t border-editor-border"
-            data-visual-smoke-section="professional-editor-compact-switcher"
-          >
-            <RightPanelSwitcher
-              activePanel={activePanel}
-              isInstantTransition={true}
-              layout="horizontal"
-              onPanelSelect={handlePanelSelect}
-            />
-          </div>
-          <div
-            className="shrink-0 border-t border-editor-border"
-            data-visual-smoke-section="professional-editor-compact-bottom-bar"
-            data-testid="professional-editor-compact-bottom-bar"
-          >
-            <ProfessionalEditorBottomBar />
           </div>
         </section>
       </div>
