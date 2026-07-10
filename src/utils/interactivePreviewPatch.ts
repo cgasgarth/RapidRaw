@@ -1,8 +1,156 @@
+import { z } from 'zod';
 import type { Adjustments } from './adjustments';
 
 export type DecodableImage = Pick<HTMLImageElement, 'decode' | 'onerror' | 'onload' | 'src'>;
 
 export type CreateDecodableImage = () => DecodableImage;
+
+const positiveSafeIntegerSchema = z.number().int().positive().safe();
+const finitePositiveNumberSchema = z.number().finite().positive();
+
+export const interactivePreviewScopeSchema = z.object({
+  backend: z.enum(['cpu', 'wgpu']),
+  basePreviewUrl: z.string().nullable(),
+  devicePixelRatio: finitePositiveNumberSchema,
+  geometryIdentity: z.string(),
+  graphIdentity: z.string().min(1),
+  roiIdentity: z.string(),
+  sourceImagePath: z.string().trim().min(1),
+  targetResolution: positiveSafeIntegerSchema,
+  viewportIdentity: z.string(),
+});
+
+export type InteractivePreviewScope = z.infer<typeof interactivePreviewScopeSchema>;
+
+export const interactivePreviewIdentitySchema = interactivePreviewScopeSchema.extend({
+  backendEpoch: positiveSafeIntegerSchema,
+  devicePixelRatioEpoch: positiveSafeIntegerSchema,
+  generation: positiveSafeIntegerSchema,
+  geometryEpoch: positiveSafeIntegerSchema,
+  graphEpoch: positiveSafeIntegerSchema,
+  roiEpoch: positiveSafeIntegerSchema,
+  selectionEpoch: positiveSafeIntegerSchema,
+  viewportEpoch: positiveSafeIntegerSchema,
+});
+
+export type InteractivePreviewIdentity = z.infer<typeof interactivePreviewIdentitySchema>;
+
+export interface InteractivePreviewSynchronization {
+  identity: InteractivePreviewIdentity;
+  invalidated: boolean;
+}
+
+const scopeKeys: Array<keyof InteractivePreviewScope> = [
+  'backend',
+  'basePreviewUrl',
+  'devicePixelRatio',
+  'geometryIdentity',
+  'graphIdentity',
+  'roiIdentity',
+  'sourceImagePath',
+  'targetResolution',
+  'viewportIdentity',
+];
+
+const identityEpochKeys: Array<
+  | 'backendEpoch'
+  | 'devicePixelRatioEpoch'
+  | 'generation'
+  | 'geometryEpoch'
+  | 'graphEpoch'
+  | 'roiEpoch'
+  | 'selectionEpoch'
+  | 'viewportEpoch'
+> = [
+  'backendEpoch',
+  'devicePixelRatioEpoch',
+  'generation',
+  'geometryEpoch',
+  'graphEpoch',
+  'roiEpoch',
+  'selectionEpoch',
+  'viewportEpoch',
+];
+
+const isSameScope = (left: InteractivePreviewScope, right: InteractivePreviewScope): boolean =>
+  scopeKeys.every((key) => left[key] === right[key]);
+
+/**
+ * Owns the preview generation that is shared by dispatch, decode, and commit.
+ * Parameter scrubs deliberately do not advance it: a completed active request may
+ * still improve the display while the scheduler holds the newest parameter snapshot.
+ */
+export class InteractivePreviewGenerationController {
+  private backendEpoch = 1;
+  private devicePixelRatioEpoch = 1;
+  private generation = 1;
+  private geometryEpoch = 1;
+  private graphEpoch = 1;
+  private lastPaintedRequestId = 0;
+  private roiEpoch = 1;
+  private scope: InteractivePreviewScope | null = null;
+  private selectionEpoch = 1;
+  private viewportEpoch = 1;
+
+  synchronize(input: InteractivePreviewScope): InteractivePreviewSynchronization {
+    const nextScope = interactivePreviewScopeSchema.parse(input);
+    const previousScope = this.scope;
+    const invalidated = previousScope !== null && !isSameScope(previousScope, nextScope);
+
+    if (previousScope !== null) {
+      if (previousScope.sourceImagePath !== nextScope.sourceImagePath) this.selectionEpoch += 1;
+      if (previousScope.graphIdentity !== nextScope.graphIdentity) this.graphEpoch += 1;
+      if (previousScope.geometryIdentity !== nextScope.geometryIdentity) this.geometryEpoch += 1;
+      if (previousScope.roiIdentity !== nextScope.roiIdentity) this.roiEpoch += 1;
+      if (previousScope.viewportIdentity !== nextScope.viewportIdentity) this.viewportEpoch += 1;
+      if (previousScope.devicePixelRatio !== nextScope.devicePixelRatio) this.devicePixelRatioEpoch += 1;
+      if (previousScope.backend !== nextScope.backend) this.backendEpoch += 1;
+      if (invalidated) {
+        this.generation += 1;
+        this.lastPaintedRequestId = 0;
+      }
+    }
+
+    this.scope = nextScope;
+    return { identity: this.createIdentity(nextScope), invalidated };
+  }
+
+  supersede(input: InteractivePreviewScope): InteractivePreviewIdentity {
+    this.synchronize(input);
+    this.generation += 1;
+    this.lastPaintedRequestId = 0;
+    return this.createIdentity(interactivePreviewScopeSchema.parse(input));
+  }
+
+  isCurrent(identity: InteractivePreviewIdentity, current: InteractivePreviewIdentity): boolean {
+    const parsedIdentity = interactivePreviewIdentitySchema.parse(identity);
+    const parsedCurrent = interactivePreviewIdentitySchema.parse(current);
+    return (
+      identityEpochKeys.every((key) => parsedIdentity[key] === parsedCurrent[key]) &&
+      isSameScope(parsedIdentity, parsedCurrent)
+    );
+  }
+
+  canCommit(identity: InteractivePreviewIdentity, requestId: number, current: InteractivePreviewIdentity): boolean {
+    if (!this.isCurrent(identity, current) || requestId <= this.lastPaintedRequestId) return false;
+    this.lastPaintedRequestId = requestId;
+    return true;
+  }
+
+  private createIdentity(scope: InteractivePreviewScope): InteractivePreviewIdentity {
+    return interactivePreviewIdentitySchema.parse({
+      ...scope,
+      backendEpoch: this.backendEpoch,
+      devicePixelRatioEpoch: this.devicePixelRatioEpoch,
+      generation: this.generation,
+      geometryEpoch: this.geometryEpoch,
+      graphEpoch: this.graphEpoch,
+      roiEpoch: this.roiEpoch,
+      selectionEpoch: this.selectionEpoch,
+      viewportEpoch: this.viewportEpoch,
+    });
+  }
+}
 
 export interface InteractivePreviewPatchPayload {
   fullHeight: number;
