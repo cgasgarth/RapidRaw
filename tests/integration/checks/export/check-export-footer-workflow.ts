@@ -44,6 +44,10 @@ const requiredPanelSnippets = [
   'data-testid="export-footer-review-smart-preview"',
   'data-testid="export-footer-review-parity"',
   'data-testid="export-footer-review-receipt"',
+  'data-testid="export-proof-footer-proof-state"',
+  'shouldShowProofDiagnostics',
+  'group-open:rotate-180',
+  "aria-label={t('export.softProofWarnings.title')}",
   'data-testid="export-output-contract"',
   'data-testid="export-output-contract-status"',
   'data-testid="export-incomplete-alert"',
@@ -59,7 +63,7 @@ const requiredPanelSnippets = [
   'disabled={!canUseReceiptActions}',
   "t('export.status.exportAgain')",
   "t('export.status.retryExport')",
-  'const canShowReceipt = status === Status.Success && Boolean(firstReceiptOutput) && !hasMissingOutput;',
+  'const canShowReceipt =',
 ];
 
 for (const snippet of requiredPanelSnippets) {

@@ -1553,15 +1553,6 @@ export default function ExportPanel({
         : t('export.readiness.metadataOn')
       : t('export.readiness.metadataOff'),
   ];
-  const primaryExportReadinessItems = [
-    exportReadinessItems[0],
-    exportReadinessItems[1],
-    exportReadinessItems[3],
-    exportReadinessItems[6],
-  ].filter((item): item is string => Boolean(item));
-  const secondaryExportReadinessItems = exportReadinessItems.filter(
-    (item) => !primaryExportReadinessItems.includes(item),
-  );
   const softProofWarningItems = useMemo(() => {
     if (fileFormat === FileFormats.Cube || !hasColorManagedTransform) return [];
 
@@ -1658,6 +1649,15 @@ export default function ExportPanel({
   const shouldShowSoftProofResolver =
     fileFormat !== FileFormats.Cube &&
     (softProofWarningItems.length > 0 || !softProofResolverStatus.isCurrentProofExportConsistent);
+  const shouldShowProofDiagnostics =
+    canExport &&
+    !firstReceiptOutput &&
+    (isSoftProofProfileCompareUnavailable || shouldShowSoftProofResolver || softProofWarningItems.length > 0);
+  const proofDiagnosticTitle = isSoftProofProfileCompareUnavailable
+    ? t('export.softProofCompare.footerUnavailableTitle')
+    : softProofWarningItems.length > 0
+      ? t('export.softProofWarnings.title')
+      : t('export.softProofResolver.title');
   const renderSoftProofProfileCompareSide = (sideId: ExportSoftProofProfileCompareSideId) => {
     const sideState = softProofProfileCompareState[sideId];
     const proof = sideState.status === 'ready' ? sideState.proof : null;
@@ -2298,211 +2298,6 @@ export default function ExportPanel({
       </div>
 
       <div className="sticky bottom-0 z-10 shrink-0 space-y-2 border-t border-surface bg-bg-secondary p-3">
-        {canExport && !firstReceiptOutput ? (
-          <div className="space-y-2" data-testid="export-proof-footer-proof-state">
-            {isSoftProofProfileCompareUnavailable ? (
-              <div
-                className="flex min-w-0 items-start gap-2 rounded-md border border-yellow-500/40 bg-yellow-500/10 px-3 py-2"
-                data-export-soft-proof-compare-footer-status={softProofProfileCompareStatus}
-                data-testid="export-soft-proof-compare-footer-warning"
-              >
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-yellow-400" />
-                <div className="min-w-0 flex-1">
-                  <UiText as="p" className="text-yellow-200" variant={TextVariants.small} weight={TextWeights.semibold}>
-                    {t('export.softProofCompare.footerUnavailableTitle')}
-                  </UiText>
-                  <UiText as="p" className="mt-0.5" color={TextColors.secondary} variant={TextVariants.small}>
-                    {t('export.softProofCompare.footerUnavailableDescription')}
-                  </UiText>
-                </div>
-                <button
-                  className="shrink-0 rounded border border-yellow-500/40 px-2 py-1 text-xs font-medium text-yellow-200 transition-colors hover:bg-card-active disabled:opacity-50"
-                  data-testid="export-soft-proof-compare-footer-action"
-                  disabled={isExporting || isSoftProofProfileCompareLoading}
-                  onClick={() => {
-                    void handleGenerateSoftProofProfileCompare();
-                  }}
-                  type="button"
-                >
-                  {t('export.softProofCompare.footerRetry')}
-                </button>
-              </div>
-            ) : null}
-            <div
-              className="min-w-0 rounded-md border border-editor-border bg-editor-panel px-2.5 py-2"
-              data-testid="export-readiness-summary"
-            >
-              <div className="flex min-w-0 items-start gap-2">
-                <CheckCircle className="h-4 w-4 shrink-0 text-accent" />
-                <div className="min-w-0 flex-1 space-y-1.5">
-                  <div className="flex min-w-0 items-center justify-between gap-2">
-                    <UiText
-                      as="p"
-                      className="truncate"
-                      color={TextColors.primary}
-                      variant={TextVariants.small}
-                      weight={TextWeights.semibold}
-                    >
-                      {primaryExportReadinessItems.map((item, index) => (
-                        <span data-export-readiness-item={item} key={item}>
-                          {index > 0 ? ' · ' : ''}
-                          {item}
-                        </span>
-                      ))}
-                    </UiText>
-                    <span
-                      className={editorChromeStatusChipClassName(
-                        softProofWarningItems.length > 0 ? 'warning' : 'success',
-                      )}
-                    >
-                      {softProofWarningItems.length > 0
-                        ? t('export.softProofWarnings.title')
-                        : softProofProfileCompareSummary}
-                    </span>
-                  </div>
-                  <div className="flex min-w-0 flex-wrap gap-1.5">
-                    {secondaryExportReadinessItems.map((item) => (
-                      <UiText
-                        as="span"
-                        className="rounded bg-editor-panel-raised px-1.5 py-0.5"
-                        color={TextColors.secondary}
-                        data-export-readiness-item={item}
-                        key={item}
-                        variant={TextVariants.small}
-                      >
-                        {item}
-                      </UiText>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-            {shouldShowSoftProofResolver ? (
-              <div
-                className="rounded-md border border-yellow-500/40 bg-yellow-500/10 px-3 py-2"
-                data-export-soft-proof-resolver-black-point-compensation={softProofResolverBlackPointCompensation}
-                data-export-soft-proof-resolver-can-preview={String(
-                  softProofResolverStatus.canPreviewCurrentExportSettings,
-                )}
-                data-export-soft-proof-resolver-can-use-proof={String(
-                  softProofResolverStatus.canUseCurrentSoftProofForExport,
-                )}
-                data-export-soft-proof-resolver-export-intent={renderingIntent}
-                data-export-soft-proof-resolver-export-profile={colorProfile}
-                data-export-soft-proof-resolver-fingerprint={softProofResolverFingerprint}
-                data-export-soft-proof-resolver-parity-status={softProofResolverStatus.parityStatus}
-                data-export-soft-proof-resolver-proof-intent={softProofResolverProofIntent}
-                data-export-soft-proof-resolver-proof-profile={softProofResolverProofProfile}
-                data-export-soft-proof-resolver-unsupported-reason={softProofResolverStatus.unsupportedReason ?? ''}
-                data-testid="export-soft-proof-resolver"
-              >
-                <div className="flex min-w-0 items-start gap-2">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-yellow-400" />
-                  <div className="min-w-0 flex-1 space-y-1.5">
-                    <div className="flex min-w-0 items-center justify-between gap-2">
-                      <UiText className="text-yellow-200" variant={TextVariants.small} weight={TextWeights.semibold}>
-                        {t('export.softProofResolver.title')}
-                      </UiText>
-                      <span className={editorChromeStatusChipClassName(exportFooterParityTone)}>
-                        {t(`export.softProofResolver.parity.${softProofResolverStatus.parityStatus}`)}
-                      </span>
-                    </div>
-                    <UiText as="p" color={TextColors.secondary} variant={TextVariants.small}>
-                      {softProofResolverStatus.isCurrentProofExportConsistent
-                        ? t('export.softProofResolver.consistent')
-                        : t('export.softProofResolver.description', {
-                            exportIntent: selectedRenderingIntentLabel,
-                            exportProfile: selectedColorProfileLabel,
-                            proofIntent: softProofResolverProofIntent || t('export.status.parityUnknown'),
-                            proofProfile: softProofResolverProofProfile || t('export.status.parityUnknown'),
-                          })}
-                    </UiText>
-                    <div className="grid min-w-0 grid-cols-2 gap-x-3 gap-y-1">
-                      <UiText className="truncate" color={TextColors.secondary} variant={TextVariants.small}>
-                        {t('export.softProofResolver.resultingProfile', {
-                          profile: softProofResolverProofProfile || selectedColorProfileLabel,
-                        })}
-                      </UiText>
-                      <UiText className="truncate" color={TextColors.secondary} variant={TextVariants.small}>
-                        {t('export.softProofResolver.renderingIntent', {
-                          intent: softProofResolverProofIntent || selectedRenderingIntentLabel,
-                        })}
-                      </UiText>
-                      <UiText className="truncate" color={TextColors.secondary} variant={TextVariants.small}>
-                        {t('export.softProofResolver.blackPointCompensation', {
-                          value: softProofResolverBlackPointCompensation || String(blackPointCompensation),
-                        })}
-                      </UiText>
-                      <UiText className="truncate" color={TextColors.secondary} variant={TextVariants.small}>
-                        {t('export.softProofResolver.transformFingerprint', {
-                          fingerprint: softProofResolverFingerprint || t('export.status.parityUnknown'),
-                        })}
-                      </UiText>
-                    </div>
-                    {softProofResolverUnsupportedMessage ? (
-                      <UiText as="p" className="text-yellow-200" variant={TextVariants.small}>
-                        {softProofResolverUnsupportedMessage}
-                      </UiText>
-                    ) : null}
-                    <div className="flex min-w-0 flex-wrap gap-1.5">
-                      <button
-                        className="rounded border border-yellow-500/40 px-2 py-1 text-xs font-medium text-yellow-200 transition-colors hover:bg-card-active disabled:opacity-50"
-                        data-testid="export-soft-proof-resolver-use-proof"
-                        disabled={
-                          isExporting ||
-                          !softProofResolverStatus.canUseCurrentSoftProofForExport ||
-                          softProofResolverStatus.unsupportedReason !== null
-                        }
-                        onClick={handleUseCurrentSoftProofForExport}
-                        type="button"
-                      >
-                        {t('export.softProofResolver.useCurrentSoftProof')}
-                      </button>
-                      <button
-                        className="rounded border border-yellow-500/40 px-2 py-1 text-xs font-medium text-yellow-200 transition-colors hover:bg-card-active disabled:opacity-50"
-                        data-testid="export-soft-proof-resolver-preview-export"
-                        disabled={
-                          isExporting ||
-                          !softProofResolverStatus.canPreviewCurrentExportSettings ||
-                          !isSupportedColorProfileForFormat(fileFormat, colorProfile)
-                        }
-                        onClick={handlePreviewCurrentExportSettings}
-                        type="button"
-                      >
-                        {t('export.softProofResolver.previewCurrentExport')}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-            {softProofWarningItems.length > 0 ? (
-              <details
-                className="rounded-md border border-yellow-500/40 bg-yellow-500/10 px-3 py-2"
-                data-export-soft-proof-warning-codes={softProofWarningItems.map((item) => item.code).join(',')}
-                data-export-soft-proof-warning-count={softProofWarningItems.length}
-                data-testid="export-soft-proof-warnings"
-              >
-                <summary className="flex cursor-pointer list-none items-center gap-1.5">
-                  <AlertTriangle className="h-4 w-4 shrink-0 text-yellow-400" />
-                  <UiText className="text-yellow-200" variant={TextVariants.small} weight={TextWeights.medium}>
-                    {t('export.softProofWarnings.title')}
-                  </UiText>
-                  <ChevronDown className="ml-auto h-3.5 w-3.5 text-yellow-200" />
-                </summary>
-                <ul className="mt-1 space-y-1">
-                  {softProofWarningItems.map((item) => (
-                    <li data-export-soft-proof-warning-code={item.code} key={item.code}>
-                      <UiText variant={TextVariants.small} color={TextColors.secondary}>
-                        {item.message}
-                      </UiText>
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            ) : null}
-          </div>
-        ) : null}
         <div
           className="min-w-0 rounded-md border border-editor-border bg-editor-panel px-2.5 py-2"
           data-export-footer-color-stack-parity={colorStackParityReceipt?.status ?? 'pending'}
@@ -2534,66 +2329,247 @@ export default function ExportPanel({
               {exportFooterStatusText}
             </UiText>
           </div>
-          <div className="mt-2 grid min-w-0 grid-cols-2 gap-x-3 gap-y-1.5">
+          <div
+            className="mt-1.5 flex min-w-0 items-center gap-1.5 overflow-hidden"
+            data-testid="export-readiness-summary"
+          >
             <UiText
               as="p"
-              className="min-w-0 truncate"
+              className="min-w-0 flex-1 truncate"
               color={TextColors.secondary}
+              data-export-readiness-item={exportReadinessItems[0]}
               data-testid="export-footer-review-selected"
               variant={TextVariants.small}
             >
               {t('export.status.reviewSelected', { count: numImages })}
             </UiText>
+            <span aria-hidden="true" className="shrink-0 text-text-tertiary">
+              ·
+            </span>
             <UiText
               as="p"
-              className="min-w-0 truncate"
+              className="min-w-0 flex-1 truncate"
               color={TextColors.secondary}
+              data-export-readiness-item={exportReadinessItems[1]}
               data-testid="export-footer-review-format-profile"
               variant={TextVariants.small}
             >
               {exportFooterFormatProfileText}
             </UiText>
+            <span aria-hidden="true" className="shrink-0 text-text-tertiary">
+              ·
+            </span>
             <UiText
               as="p"
-              className="min-w-0 truncate"
+              className="min-w-0 flex-1 truncate"
               color={TextColors.secondary}
+              data-export-readiness-item={exportReadinessItems[3]}
               data-testid="export-footer-review-resize"
               variant={TextVariants.small}
             >
               {exportFooterResizeText}
             </UiText>
+          </div>
+          <div className="mt-1 grid min-w-0 grid-cols-2 gap-2">
             <div className="flex min-w-0 items-center gap-1.5" data-testid="export-footer-review-smart-preview">
-              <span className={editorChromeStatusChipClassName(exportFooterSmartPreviewTone)}>
-                {isSmartPreviewExportBlocked ? t('export.status.blocked') : t('export.status.ready')}
-              </span>
+              {exportFooterSmartPreviewTone === 'success' ? (
+                <CheckCircle aria-hidden="true" className="h-4 w-4 shrink-0 text-editor-success" />
+              ) : exportFooterSmartPreviewTone === 'danger' ? (
+                <XCircle aria-hidden="true" className="h-4 w-4 shrink-0 text-editor-danger" />
+              ) : (
+                <AlertTriangle aria-hidden="true" className="h-4 w-4 shrink-0 text-editor-warning" />
+              )}
               <UiText as="p" className="min-w-0 truncate" color={TextColors.secondary} variant={TextVariants.small}>
                 {exportFooterSmartPreviewText}
               </UiText>
             </div>
+            <div className="flex min-w-0 items-center gap-1.5" data-testid="export-footer-review-parity">
+              {exportFooterParityTone === 'danger' ? (
+                <XCircle aria-hidden="true" className="h-4 w-4 shrink-0 text-editor-danger" />
+              ) : exportFooterParityTone === 'warning' ? (
+                <AlertTriangle aria-hidden="true" className="h-4 w-4 shrink-0 text-editor-warning" />
+              ) : (
+                <CheckCircle aria-hidden="true" className="h-4 w-4 shrink-0 text-editor-success" />
+              )}
+              <UiText
+                as="p"
+                className="min-w-0 flex-1 truncate"
+                color={exportFooterParityTone === 'danger' ? TextColors.error : TextColors.secondary}
+                variant={TextVariants.small}
+              >
+                {exportFooterParityText}
+              </UiText>
+            </div>
           </div>
-          <div className="mt-1.5 flex min-w-0 items-center gap-1.5" data-testid="export-footer-review-parity">
-            <span className={editorChromeStatusChipClassName(exportFooterParityTone)}>
-              {t('export.status.colorStackParityTitle')}
-            </span>
+          {canShowReceipt ? (
             <UiText
               as="p"
-              className="min-w-0 flex-1 truncate"
-              color={exportFooterParityTone === 'danger' ? TextColors.error : TextColors.secondary}
+              className="mt-1 min-w-0 truncate"
+              color={TextColors.secondary}
+              data-testid="export-footer-review-receipt"
               variant={TextVariants.small}
             >
-              {exportFooterParityText}
+              {latestReceiptText}
             </UiText>
-          </div>
-          <UiText
-            as="p"
-            className="mt-1 min-w-0 truncate"
-            color={TextColors.secondary}
-            data-testid="export-footer-review-receipt"
-            variant={TextVariants.small}
-          >
-            {latestReceiptText}
-          </UiText>
+          ) : null}
         </div>
+        {shouldShowProofDiagnostics ? (
+          <details
+            className="group rounded-md border border-yellow-500/40 bg-yellow-500/10 px-2.5 py-2"
+            data-testid="export-proof-footer-proof-state"
+          >
+            <summary className="flex min-w-0 cursor-pointer list-none items-center gap-1.5">
+              <AlertTriangle className="h-4 w-4 shrink-0 text-yellow-400" />
+              <UiText
+                className="min-w-0 flex-1 truncate text-yellow-200"
+                variant={TextVariants.small}
+                weight={TextWeights.semibold}
+              >
+                {proofDiagnosticTitle}
+              </UiText>
+              <ChevronDown className="h-3.5 w-3.5 shrink-0 text-yellow-200 transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="mt-2 space-y-2 border-t border-yellow-500/25 pt-2">
+              {isSoftProofProfileCompareUnavailable ? (
+                <div
+                  className="flex min-w-0 items-center gap-2"
+                  data-export-soft-proof-compare-footer-status={softProofProfileCompareStatus}
+                  data-testid="export-soft-proof-compare-footer-warning"
+                >
+                  <UiText as="p" className="min-w-0 flex-1" color={TextColors.secondary} variant={TextVariants.small}>
+                    {t('export.softProofCompare.footerUnavailableDescription')}
+                  </UiText>
+                  <button
+                    className="shrink-0 rounded border border-yellow-500/40 px-2 py-1 text-xs font-medium text-yellow-200 transition-colors hover:bg-card-active disabled:opacity-50"
+                    data-testid="export-soft-proof-compare-footer-action"
+                    disabled={isExporting || isSoftProofProfileCompareLoading}
+                    onClick={() => {
+                      void handleGenerateSoftProofProfileCompare();
+                    }}
+                    type="button"
+                  >
+                    {t('export.softProofCompare.footerRetry')}
+                  </button>
+                </div>
+              ) : null}
+              {shouldShowSoftProofResolver ? (
+                <div
+                  className="border-l-2 border-yellow-500/40 pl-2"
+                  data-export-soft-proof-resolver-black-point-compensation={softProofResolverBlackPointCompensation}
+                  data-export-soft-proof-resolver-can-preview={String(
+                    softProofResolverStatus.canPreviewCurrentExportSettings,
+                  )}
+                  data-export-soft-proof-resolver-can-use-proof={String(
+                    softProofResolverStatus.canUseCurrentSoftProofForExport,
+                  )}
+                  data-export-soft-proof-resolver-export-intent={renderingIntent}
+                  data-export-soft-proof-resolver-export-profile={colorProfile}
+                  data-export-soft-proof-resolver-fingerprint={softProofResolverFingerprint}
+                  data-export-soft-proof-resolver-parity-status={softProofResolverStatus.parityStatus}
+                  data-export-soft-proof-resolver-proof-intent={softProofResolverProofIntent}
+                  data-export-soft-proof-resolver-proof-profile={softProofResolverProofProfile}
+                  data-export-soft-proof-resolver-unsupported-reason={softProofResolverStatus.unsupportedReason ?? ''}
+                  data-testid="export-soft-proof-resolver"
+                >
+                  <div className="flex min-w-0 items-center justify-between gap-2">
+                    <UiText
+                      className="min-w-0 truncate text-yellow-200"
+                      variant={TextVariants.small}
+                      weight={TextWeights.semibold}
+                    >
+                      {t('export.softProofResolver.title')}
+                    </UiText>
+                    <span className={editorChromeStatusChipClassName(exportFooterParityTone)}>
+                      {t(`export.softProofResolver.parity.${softProofResolverStatus.parityStatus}`)}
+                    </span>
+                  </div>
+                  <UiText as="p" className="mt-1" color={TextColors.secondary} variant={TextVariants.small}>
+                    {softProofResolverStatus.isCurrentProofExportConsistent
+                      ? t('export.softProofResolver.consistent')
+                      : t('export.softProofResolver.description', {
+                          exportIntent: selectedRenderingIntentLabel,
+                          exportProfile: selectedColorProfileLabel,
+                          proofIntent: softProofResolverProofIntent || t('export.status.parityUnknown'),
+                          proofProfile: softProofResolverProofProfile || t('export.status.parityUnknown'),
+                        })}
+                  </UiText>
+                  <div className="mt-1 grid min-w-0 grid-cols-2 gap-x-3 gap-y-1">
+                    <UiText className="truncate" color={TextColors.secondary} variant={TextVariants.small}>
+                      {t('export.softProofResolver.resultingProfile', {
+                        profile: softProofResolverProofProfile || selectedColorProfileLabel,
+                      })}
+                    </UiText>
+                    <UiText className="truncate" color={TextColors.secondary} variant={TextVariants.small}>
+                      {t('export.softProofResolver.renderingIntent', {
+                        intent: softProofResolverProofIntent || selectedRenderingIntentLabel,
+                      })}
+                    </UiText>
+                    <UiText className="truncate" color={TextColors.secondary} variant={TextVariants.small}>
+                      {t('export.softProofResolver.blackPointCompensation', {
+                        value: softProofResolverBlackPointCompensation || String(blackPointCompensation),
+                      })}
+                    </UiText>
+                    <UiText className="truncate" color={TextColors.secondary} variant={TextVariants.small}>
+                      {t('export.softProofResolver.transformFingerprint', {
+                        fingerprint: softProofResolverFingerprint || t('export.status.parityUnknown'),
+                      })}
+                    </UiText>
+                  </div>
+                  {softProofResolverUnsupportedMessage ? (
+                    <UiText as="p" className="mt-1 text-yellow-200" variant={TextVariants.small}>
+                      {softProofResolverUnsupportedMessage}
+                    </UiText>
+                  ) : null}
+                  <div className="mt-2 flex min-w-0 flex-wrap gap-1.5">
+                    <button
+                      className="rounded border border-yellow-500/40 px-2 py-1 text-xs font-medium text-yellow-200 transition-colors hover:bg-card-active disabled:opacity-50"
+                      data-testid="export-soft-proof-resolver-use-proof"
+                      disabled={
+                        isExporting ||
+                        !softProofResolverStatus.canUseCurrentSoftProofForExport ||
+                        softProofResolverStatus.unsupportedReason !== null
+                      }
+                      onClick={handleUseCurrentSoftProofForExport}
+                      type="button"
+                    >
+                      {t('export.softProofResolver.useCurrentSoftProof')}
+                    </button>
+                    <button
+                      className="rounded border border-yellow-500/40 px-2 py-1 text-xs font-medium text-yellow-200 transition-colors hover:bg-card-active disabled:opacity-50"
+                      data-testid="export-soft-proof-resolver-preview-export"
+                      disabled={
+                        isExporting ||
+                        !softProofResolverStatus.canPreviewCurrentExportSettings ||
+                        !isSupportedColorProfileForFormat(fileFormat, colorProfile)
+                      }
+                      onClick={handlePreviewCurrentExportSettings}
+                      type="button"
+                    >
+                      {t('export.softProofResolver.previewCurrentExport')}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+              {softProofWarningItems.length > 0 ? (
+                <ul
+                  aria-label={t('export.softProofWarnings.title')}
+                  className="space-y-1 border-l-2 border-yellow-500/40 pl-2"
+                  data-export-soft-proof-warning-codes={softProofWarningItems.map((item) => item.code).join(',')}
+                  data-export-soft-proof-warning-count={softProofWarningItems.length}
+                  data-testid="export-soft-proof-warnings"
+                >
+                  {softProofWarningItems.map((item) => (
+                    <li data-export-soft-proof-warning-code={item.code} key={item.code}>
+                      <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                        {item.message}
+                      </UiText>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          </details>
+        ) : null}
         {canShowReceipt && firstReceiptOutput && (
           <details
             className="rounded-md border border-editor-border bg-editor-panel p-2"
@@ -2843,13 +2819,13 @@ export default function ExportPanel({
           </details>
         )}
         {canExport ? (
-          <div className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-editor-border bg-editor-panel-raised p-2">
+          <div className="flex min-w-0 items-center justify-between gap-3 px-0.5">
             <UiText as="div" variant={TextVariants.small} color={TextColors.secondary} className="min-w-0 truncate">
               {exportEstimateText}
             </UiText>
-            <span className={editorChromeStatusChipClassName(canExport ? 'success' : 'warning')}>
+            <UiText as="span" className="shrink-0" color={TextColors.secondary} variant={TextVariants.small}>
               {numImages > 1 ? `${numImages} ${itemLabelPlural}` : itemLabel}
-            </span>
+            </UiText>
           </div>
         ) : (
           <div
@@ -2880,11 +2856,17 @@ export default function ExportPanel({
         ) : null}
         {hasMissingOutput || hasPartialExport ? (
           <div
-            className="rounded-md border border-yellow-500/40 bg-yellow-500/10 px-3 py-2"
+            className="flex min-w-0 items-center gap-2 border-l-2 border-yellow-500/40 px-2 py-1"
             data-export-incomplete-state={hasMissingOutput ? 'missing-output' : 'partial'}
             data-testid="export-incomplete-alert"
           >
-            <UiText as="p" className="text-yellow-200" variant={TextVariants.small} weight={TextWeights.semibold}>
+            <AlertTriangle className="h-4 w-4 shrink-0 text-yellow-400" />
+            <UiText
+              as="p"
+              className="min-w-0 text-yellow-200"
+              variant={TextVariants.small}
+              weight={TextWeights.semibold}
+            >
               {hasMissingOutput
                 ? t('export.status.footerMissingOutput')
                 : t('export.status.footerPartial', { count: receiptOutputCount, total: lastReceipt?.total ?? 0 })}
@@ -2892,7 +2874,7 @@ export default function ExportPanel({
           </div>
         ) : null}
         <Button
-          className={`group h-12 w-full rounded-lg text-sm font-semibold! shadow-none transition-colors ${
+          className={`group h-10 w-full rounded-md text-sm font-semibold! shadow-none transition-colors ${
             status === Status.Exporting
               ? 'bg-editor-primary-active text-editor-primary-active-text hover:bg-red-600 hover:text-white'
               : status === Status.Success
