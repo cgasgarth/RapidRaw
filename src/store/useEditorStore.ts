@@ -158,6 +158,8 @@ interface EditorState {
   isGeneratingAi: boolean;
   isAIConnectorConnected: boolean;
   hasRenderedFirstFrame: boolean;
+  wgpuFrameSerial: number;
+  wgpuFailureSerial: number;
   patchesSentToBackend: Set<string>;
 
   // Clipboard
@@ -298,6 +300,8 @@ export const useEditorStore = create<EditorState>((set) => ({
   isGeneratingAi: false,
   isMaskControlHovered: false,
   hasRenderedFirstFrame: false,
+  wgpuFrameSerial: 0,
+  wgpuFailureSerial: 0,
   patchesSentToBackend: new Set<string>(),
 
   setEditor: (updater) => {
