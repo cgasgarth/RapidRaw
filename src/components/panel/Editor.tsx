@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import cx from 'clsx';
-import { Minimize2 } from 'lucide-react';
+import { Eye, Maximize, Minimize2, MoonStar, Scan } from 'lucide-react';
 import {
   type MouseEvent,
   type RefObject,
@@ -86,7 +86,6 @@ import { debounce } from '../../utils/timing';
 import type { WhiteBalancePickerRuntimeReceipt } from '../../utils/whiteBalancePicker';
 import { Panel } from '../ui/AppProperties';
 import { editorChromeTokens } from '../ui/editorChromeTokens';
-import UiText from '../ui/primitives/Text';
 import EditorChromeStatusStrip from './editor/EditorChromeStatusStrip';
 import EditorToolbar from './editor/EditorToolbar';
 import ImageCanvas from './editor/ImageCanvas';
@@ -100,6 +99,11 @@ import {
   type ViewerGestureOwner,
   type ViewerPointerType,
 } from './editor/viewerInputResolver';
+import {
+  getNextViewerLightsOutLevel,
+  getViewerLightsOutLabel,
+  resolveViewerFramePresentation,
+} from './editor/viewerPresentationContracts';
 import { Mask, type SubMask } from './right/layers/Masks';
 
 interface TransformController {
@@ -151,10 +155,11 @@ export default function Editor({
   const osPlatform = useSettingsStore((s) => s.osPlatform);
   const supportedTypes = useSettingsStore((s) => s.supportedTypes);
   const isFullScreen = useUIStore((s) => s.isFullScreen);
+  const lightsOutLevel = useUIStore((s) => s.editorWorkspacePreferences.viewer.lightsOutLevel);
   const activeRightPanel = useUIStore((s) => s.activeRightPanel);
-  const isInstantTransition = useUIStore((s) => s.isInstantTransition);
   const setUI = useUIStore((s) => s.setUI);
   const setDefaultEditorCompareMode = useUIStore((s) => s.setDefaultEditorCompareMode);
+  const setEditorLightsOutLevel = useUIStore((s) => s.setEditorLightsOutLevel);
   const isLoading = useLibraryStore((s) => s.isViewLoading);
   const selectedImage = useEditorStore((s) => s.selectedImage);
   const adjustments = useEditorStore((s) => s.adjustments);
@@ -249,9 +254,10 @@ export default function Editor({
   const contentRef = useRef<HTMLDivElement>(null);
   const isInitialMount = useRef(true);
   const previousFullScreenRef = useRef(isFullScreen);
+  const previousLightsOutLevelRef = useRef(lightsOutLevel);
+  const lightsOutRestoreFocusRef = useRef<HTMLElement | null>(null);
   const pendingZoomAnchorRef = useRef<{ x: number; y: number } | null>(null);
   const suppressDoubleClickUntilRef = useRef(0);
-  const [toolbarOverflowVisible, setToolbarOverflowVisible] = useState(!isFullScreen);
   const isGeneratingOverlayRef = useRef(false);
   const pendingOverlayRequestRef = useRef<MaskOverlayRequest | null>(null);
   const latestOverlayRequestIdentityRef = useRef<string | null>(null);
@@ -293,6 +299,30 @@ export default function Editor({
       }, 100);
     }
   }, [isFullScreen, selectedImage, setUI, zoom]);
+
+  const handleCycleLightsOut = useCallback(() => {
+    setEditorLightsOutLevel(getNextViewerLightsOutLevel(lightsOutLevel));
+  }, [lightsOutLevel, setEditorLightsOutLevel]);
+
+  const handleExitLightsOut = useCallback(() => {
+    setEditorLightsOutLevel('off');
+  }, [setEditorLightsOutLevel]);
+
+  useEffect(() => {
+    const previousLevel = previousLightsOutLevelRef.current;
+    previousLightsOutLevelRef.current = lightsOutLevel;
+    if (previousLevel === lightsOutLevel) return;
+
+    if (previousLevel === 'off') {
+      lightsOutRestoreFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      return;
+    }
+    if (lightsOutLevel !== 'off') return;
+
+    const restoreTarget = lightsOutRestoreFocusRef.current;
+    lightsOutRestoreFocusRef.current = null;
+    requestAnimationFrame(() => restoreTarget?.focus({ preventScroll: true }));
+  }, [lightsOutLevel]);
 
   const negativeLabSourceReadiness = useMemo(
     () => getNegativeLabSourceReadiness(selectedImage ? [selectedImage.path] : [], supportedTypes),
@@ -393,19 +423,6 @@ export default function Editor({
     },
     [pushHistory, setEditor],
   );
-
-  useEffect(() => {
-    const timer = setTimeout(
-      () => {
-        setToolbarOverflowVisible(!isFullScreen);
-      },
-      isFullScreen ? 0 : 300,
-    );
-
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [isFullScreen]);
 
   useEffect(() => {
     if (previousFullScreenRef.current === isFullScreen) return;
@@ -1874,7 +1891,6 @@ export default function Editor({
     y: 0.5,
   };
 
-  const isWgpuActive = appSettings?.useWgpuRenderer !== false && hasRenderedFirstFrame;
   const previewOnlyLabel = t('editor.previewOnly.label');
   const exitPreviewLabel = t('editor.previewOnly.exit');
   const chrome = editorChromeTokens;
@@ -1882,53 +1898,29 @@ export default function Editor({
     isCompact: !isContiguousShell,
     isFullScreen,
   });
+  const framePresentation = resolveViewerFramePresentation({
+    transformScale: transformState.scale,
+    zoomMode: zoomMode.kind,
+  });
+  const showPresentationHud = isFullScreen || lightsOutLevel !== 'off';
+  const presentationHudIsActive = activeViewerTool !== 'none' || isLoaderVisible;
 
   return (
     <div
-      className={cx(
-        'flex-1 flex flex-col relative overflow-hidden min-h-0 bg-editor-matte',
-        !isInstantTransition && !isFullScreen && 'transition-all duration-300 ease-in-out',
-        isFullScreen || isContiguousShell ? 'rounded-none p-0 gap-0' : 'rounded-lg gap-2',
-      )}
+      className="flex-1 flex flex-col relative overflow-hidden min-h-0 bg-editor-viewer-matte"
       data-editor-viewer-layout={viewerChromeRegion.layout}
+      data-viewer-lights-out={lightsOutLevel}
     >
-      {isFullScreen && (
-        <div
-          className={chrome.region.viewerFullscreenExit}
-          data-editor-chrome="fullscreen-exit"
-          data-editor-control-placement={viewerChromeRegion.persistentControlPlacement}
-        >
-          <div
-            aria-live="polite"
-            className="flex max-w-full items-center gap-3 rounded-md border border-editor-border bg-editor-panel-raised px-3 py-2 shadow-[0_14px_34px_var(--editor-overlay-shadow)]"
-            data-testid="editor-preview-exit-banner"
-          >
-            <UiText as="span" className="whitespace-nowrap text-xs">
-              {previewOnlyLabel}
-            </UiText>
-            <button
-              className="inline-flex items-center gap-1.5 rounded-md bg-editor-selected-quiet px-3 py-1.5 text-sm text-text-primary transition-colors hover:bg-editor-panel-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring"
-              data-testid="editor-preview-exit-button"
-              onClick={handleToggleFullScreen}
-              type="button"
-            >
-              <Minimize2 size={16} />
-              <span className="whitespace-nowrap">{exitPreviewLabel}</span>
-            </button>
-          </div>
-        </div>
-      )}
       <div
         className={cx(
           chrome.region.viewerCommandBar,
-          'rounded-lg border border-editor-border bg-editor-panel',
-          !isInstantTransition && !isFullScreen && 'transition-all duration-300 ease-in-out',
+          'overflow-visible rounded-lg border border-editor-border bg-editor-panel',
           isContiguousShell && !isFullScreen && 'rounded-none border-x-0 border-t-0 border-b',
-          isFullScreen ? 'max-h-0 opacity-0 m-0 border-transparent' : 'max-h-25 opacity-100 max-[700px]:max-h-none',
-          toolbarOverflowVisible ? 'overflow-visible' : 'overflow-hidden',
+          isFullScreen && 'hidden',
         )}
         aria-hidden={isFullScreen}
         data-editor-chrome="command-bar"
+        data-editor-surrounding-chrome="true"
         data-editor-control-placement={viewerChromeRegion.persistentControlPlacement}
         data-testid="editor-toolbar-shell"
       >
@@ -1943,6 +1935,8 @@ export default function Editor({
           onOpenNegativeLab={handleOpenNegativeLab}
           onRedo={redo}
           onToggleFullScreen={handleToggleFullScreen}
+          lightsOutLevel={lightsOutLevel}
+          onCycleLightsOut={handleCycleLightsOut}
           onShowOriginalChange={(nextShowOriginal) => {
             dispatchCompare({ held: nextShowOriginal, type: 'set-original-held' });
           }}
@@ -1982,22 +1976,13 @@ export default function Editor({
 
       <div
         aria-label={t('editor.accessibility.imagePreview')}
-        className={cx(
-          'flex flex-1 min-h-0 flex-col overflow-hidden bg-editor-panel-well',
-          isFullScreen || isContiguousShell
-            ? 'rounded-none border-0 p-0'
-            : 'rounded-lg border border-editor-border p-2',
-        )}
+        className="relative flex flex-1 min-h-0 flex-col overflow-hidden bg-editor-viewer-matte"
         data-testid="editor-image-preview-region"
         data-editor-content-region="image"
         role="region"
       >
         <div
-          className={cx(
-            'relative min-h-0 flex-1 overflow-hidden touch-none bg-editor-panel-well',
-            isFullScreen || isContiguousShell ? 'rounded-none' : 'rounded-lg',
-            !isWgpuActive && 'bg-editor-panel-well',
-          )}
+          className="relative min-h-0 flex-1 overflow-hidden touch-none bg-editor-viewer-matte"
           aria-busy={isLoaderVisible}
           style={{ cursor: cursorStyle }}
           role="presentation"
@@ -2023,6 +2008,8 @@ export default function Editor({
           data-viewer-active-tool={activeViewerTool}
           data-viewer-gesture-state={isViewerGestureDragging ? 'dragging' : 'idle'}
           data-viewer-temporary-hand={String(isTemporaryHand)}
+          data-viewer-frame-edge={String(framePresentation.edgeVisible)}
+          data-viewer-frame-shadow={String(framePresentation.shadowVisible)}
           data-testid="editor-image-preview-panel"
         >
           <div
@@ -2176,6 +2163,66 @@ export default function Editor({
             )}
           </div>
         </div>
+        {showPresentationHud && (
+          <div
+            aria-label={previewOnlyLabel}
+            className={cx(
+              'absolute top-3 right-3 z-[140] flex items-center gap-1 rounded-md border border-editor-overlay-stroke bg-editor-overlay-surface p-1 shadow-[0_14px_34px_var(--editor-overlay-shadow)] transition-opacity duration-150',
+              presentationHudIsActive ? 'opacity-100' : 'opacity-35 hover:opacity-100 focus-within:opacity-100',
+            )}
+            data-editor-control-placement={viewerChromeRegion.persistentControlPlacement}
+            data-editor-hud-active={String(presentationHudIsActive)}
+            data-testid="editor-presentation-hud"
+          >
+            <button
+              aria-label={`Lights out: ${getViewerLightsOutLabel(lightsOutLevel)}`}
+              className={cx(chrome.button.base, chrome.button.iconCompact, chrome.button.quiet, chrome.focusRing)}
+              data-testid="editor-presentation-lights-out"
+              onClick={lightsOutLevel === 'black' ? handleExitLightsOut : handleCycleLightsOut}
+              type="button"
+            >
+              <MoonStar size={15} />
+            </button>
+            <button
+              aria-label={t('editor.toolbar.tooltips.showOriginal')}
+              className={cx(chrome.button.base, chrome.button.iconCompact, chrome.button.quiet, chrome.focusRing)}
+              onClick={toggleShowOriginal}
+              type="button"
+            >
+              <Eye size={15} />
+            </button>
+            <button
+              aria-label={zoomMode.kind === 'fit' ? 'View at 1:1' : 'Fit image'}
+              className={cx(chrome.button.base, chrome.button.iconCompact, chrome.button.quiet, chrome.focusRing)}
+              onClick={() => {
+                setEditor({
+                  zoomMode: getEditorZoomModeForCommand(
+                    { kind: zoomMode.kind === 'fit' ? 'one-to-one' : 'fit' },
+                    resolvedZoom,
+                  ),
+                });
+              }}
+              type="button"
+            >
+              <Scan size={15} />
+            </button>
+            <span
+              className="max-w-24 truncate px-1 text-[10px] text-text-secondary"
+              data-testid="editor-active-tool-status"
+            >
+              {activeViewerTool}
+            </span>
+            <button
+              aria-label={isFullScreen ? exitPreviewLabel : previewOnlyLabel}
+              className={cx(chrome.button.base, chrome.button.iconCompact, chrome.button.quiet, chrome.focusRing)}
+              data-testid="editor-preview-exit-button"
+              onClick={handleToggleFullScreen}
+              type="button"
+            >
+              {isFullScreen ? <Minimize2 size={15} /> : <Maximize size={15} />}
+            </button>
+          </div>
+        )}
         <EditorChromeStatusStrip isFullScreen={isFullScreen} isRendering={isLoaderVisible} />
       </div>
     </div>

@@ -1,4 +1,5 @@
 export const imageCanvasLayer = {
+  imageFrame: 0,
   preview: 1,
   comparisonReveal: 2,
   diagnosticPixels: 3,

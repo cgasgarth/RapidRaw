@@ -88,6 +88,7 @@ export default function EditorView({
 
   const {
     isFullScreen: isFullScreenFromStore,
+    lightsOutLevel,
     isInstantTransition,
     uiVisibility,
     bottomPanelHeight,
@@ -100,6 +101,7 @@ export default function EditorView({
   } = useUIStore(
     useShallow((state) => ({
       isFullScreen: state.isFullScreen,
+      lightsOutLevel: state.editorWorkspacePreferences.viewer.lightsOutLevel,
       isInstantTransition: state.isInstantTransition,
       uiVisibility: state.uiVisibility,
       bottomPanelHeight: state.bottomPanelHeight,
@@ -118,15 +120,27 @@ export default function EditorView({
   const rightRailRef = useRef<HTMLDivElement | null>(null);
   const inspectorRegionRef = useRef<HTMLDivElement | null>(null);
   const previousActiveRightPanelRef = useRef<Panel | null>(activeRightPanel);
+  const previousFullScreenRef = useRef(isFullScreen);
+  const fullScreenRestoreFocusRef = useRef<HTMLElement | null>(null);
   const desktopRightShellWidth = activeRightPanel
     ? rightPanelWidth + DESKTOP_RIGHT_RAIL_WIDTH + 8
     : DESKTOP_RIGHT_RAIL_WIDTH;
 
   useEffect(() => {
-    if (!isFullScreen) return;
+    const wasFullScreen = previousFullScreenRef.current;
+    previousFullScreenRef.current = isFullScreen;
+    if (wasFullScreen === isFullScreen) return;
+
+    if (!isFullScreen) {
+      const restoreTarget = fullScreenRestoreFocusRef.current;
+      fullScreenRestoreFocusRef.current = null;
+      requestAnimationFrame(() => restoreTarget?.focus({ preventScroll: true }));
+      return;
+    }
 
     const activeElement = document.activeElement;
     if (!(activeElement instanceof HTMLElement)) return;
+    fullScreenRestoreFocusRef.current = activeElement;
 
     const focusIsInsideHiddenChrome =
       bottomBarShellRef.current?.contains(activeElement) || rightPanelShellRef.current?.contains(activeElement);
@@ -256,6 +270,7 @@ export default function EditorView({
       )}
       aria-hidden={isFullScreen}
       data-editor-region={!isCompactPortrait ? 'filmstrip' : undefined}
+      data-editor-surrounding-chrome="true"
       data-testid="editor-bottom-bar-shell"
       inert={isFullScreen ? true : undefined}
       ref={bottomBarShellRef}
@@ -314,6 +329,7 @@ export default function EditorView({
       data-editor-resizing={isCompactPortrait ? undefined : String(isResizing)}
       data-editor-shell={isCompactPortrait ? 'compact' : 'desktop'}
       data-testid="editor-workspace"
+      data-viewer-lights-out={lightsOutLevel}
       role="main"
     >
       <div
@@ -350,6 +366,7 @@ export default function EditorView({
         )}
         aria-hidden={isFullScreen}
         data-testid="editor-right-panel-shell"
+        data-editor-surrounding-chrome="true"
         data-active-panel-id={compactRightPanelId}
         data-compact-editor-panel-height={
           isCompactPortrait

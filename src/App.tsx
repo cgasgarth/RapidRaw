@@ -110,6 +110,7 @@ function App() {
 
   const {
     isFullScreen,
+    lightsOutLevel,
     isWindowFullScreen,
     isInstantTransition,
     isLayoutReady,
@@ -127,6 +128,7 @@ function App() {
   } = useUIStore(
     useShallow((state) => ({
       isFullScreen: state.isFullScreen,
+      lightsOutLevel: state.editorWorkspacePreferences.viewer.lightsOutLevel,
       isWindowFullScreen: state.isWindowFullScreen,
       isInstantTransition: state.isInstantTransition,
       isLayoutReady: state.isLayoutReady,
@@ -607,6 +609,7 @@ function App() {
           !isResizing && !isInstantTransition && !isFullScreen && 'transition-all duration-300 ease-in-out',
         )}
         data-editor-region={isDesktopEditorShell ? 'left' : undefined}
+        data-editor-surrounding-chrome={isDesktopEditorShell ? 'true' : undefined}
         style={{
           width: isFullScreen ? '0px' : undefined,
           opacity: isFullScreen ? 0 : 1,
@@ -661,6 +664,7 @@ function App() {
           useMacWindowShell && 'macos-window-shell',
           isWgpuActive ? 'bg-transparent' : 'bg-bg-primary',
         )}
+        data-viewer-lights-out={selectedImage ? lightsOutLevel : 'off'}
       >
         <div
           className={cx(
@@ -668,6 +672,7 @@ function App() {
             !isInstantTransition && 'transition-all duration-300 ease-in-out',
             isFullScreen ? 'max-h-0 opacity-0 pointer-events-none' : 'max-h-[60px] opacity-100',
           )}
+          data-editor-surrounding-chrome="true"
         >
           {appSettings?.decorations || (!isWindowFullScreen && <TitleBar />)}
         </div>

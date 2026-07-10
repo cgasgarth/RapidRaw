@@ -22,6 +22,7 @@ interface PreviewSurfaceProps {
   showOriginalCompare: boolean;
   showSideBySideCompare: boolean;
   showSplitCompare: boolean;
+  showFrameShadow: boolean;
   svgPreview: ReactNode;
 }
 
@@ -48,6 +49,7 @@ export function PreviewSurface({
   showOriginalCompare,
   showSideBySideCompare,
   showSplitCompare,
+  showFrameShadow,
   svgPreview,
 }: PreviewSurfaceProps) {
   const { t } = useTranslation();
@@ -75,6 +77,20 @@ export function PreviewSurface({
     >
       <div className="relative h-full w-full opacity-100">
         <div className="absolute inset-0 h-full w-full">
+          {[imageRenderSize, ...(isPaired ? [originalImageRenderSize] : [])].map((rect, index) => (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none border border-editor-overlay-stroke"
+              data-editor-image-frame={index === 0 ? 'edited' : 'original'}
+              data-editor-image-shadow={String(showFrameShadow)}
+              key={index === 0 ? 'edited' : 'original'}
+              style={{
+                ...renderRectStyle(rect),
+                boxShadow: showFrameShadow ? '0 20px 44px var(--editor-image-shadow)' : 'none',
+                zIndex: imageCanvasLayerZIndex('imageFrame'),
+              }}
+            />
+          ))}
           <svg
             className="pointer-events-none"
             preserveAspectRatio={hasSizedImage ? 'none' : 'xMidYMid meet'}

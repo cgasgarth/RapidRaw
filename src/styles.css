@@ -74,6 +74,7 @@
   --editor-border: rgb(47, 53, 61);
   --editor-overlay-stroke: rgba(245, 247, 250, 0.36);
   --editor-overlay-shadow: rgba(0, 0, 0, 0.48);
+  --editor-image-shadow: rgba(0, 0, 0, 0.58);
   --editor-focus-ring: rgb(126, 174, 220);
   --editor-primary-active: rgb(222, 227, 232);
   --editor-primary-active-text: rgb(16, 18, 21);
@@ -99,6 +100,7 @@
   --editor-hover: rgba(160, 177, 194, 0.14);
   --editor-disabled-surface: rgba(161, 168, 176, 0.1);
   --editor-overlay-surface: rgba(23, 26, 31, 0.96);
+  --editor-image-shadow: rgba(0, 0, 0, 0.62);
 }
 
 .editor-workspace[data-editor-theme="light"],
@@ -114,12 +116,30 @@
   --editor-overlay-surface: rgba(255, 255, 255, 0.96);
   --editor-overlay-stroke: rgba(27, 35, 43, 0.34);
   --editor-overlay-shadow: rgba(43, 51, 59, 0.24);
+  --editor-image-shadow: rgba(43, 51, 59, 0.3);
   --editor-focus-ring: rgb(35, 103, 164);
   --editor-primary-active: rgb(32, 42, 52);
   --editor-primary-active-text: rgb(255, 255, 255);
   --editor-selected-quiet: rgba(45, 92, 131, 0.14);
   --editor-selected-quiet-text: rgb(20, 29, 38);
   --editor-disabled: rgba(69, 79, 89, 0.45);
+}
+
+[data-viewer-lights-out="dim"] [data-editor-surrounding-chrome="true"] {
+  filter: brightness(0.52) saturate(0.72);
+  opacity: 0.38;
+}
+
+[data-viewer-lights-out="black"] [data-editor-surrounding-chrome="true"] {
+  filter: brightness(0);
+  opacity: 0;
+  pointer-events: none;
+}
+
+[data-editor-surrounding-chrome="true"] {
+  transition:
+    filter 150ms ease-out,
+    opacity 150ms ease-out;
 }
 
 @media (prefers-reduced-motion: reduce) {
