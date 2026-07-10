@@ -6,11 +6,12 @@ import { flushSync } from 'react-dom';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
-import {
+import Filmstrip, {
   FilmstripThumbnail,
   getFilmstripColumnWidth,
   resolveFilmstripThumbnailUrl,
 } from '../../../src/components/panel/Filmstrip.tsx';
+import { DecodedThumbnailReadinessCache } from '../../../src/components/panel/filmstripThumbnailLifecycle.ts';
 import { type ImageFile, ThumbnailAspectRatio } from '../../../src/components/ui/AppProperties.tsx';
 import en from '../../../src/i18n/locales/en.json';
 import { useProcessStore } from '../../../src/store/useProcessStore.ts';
@@ -48,8 +49,95 @@ test('prefers the cached thumbnail when present', () => {
   );
 });
 
-describe('filmstrip thumbnail loading', () => {
-  test('does not render a recycled cell predecessor while its successor thumbnail loads', async () => {
+test('bounds decoded readiness entries and refreshes recent revisions', () => {
+  const cache = new DecodedThumbnailReadinessCache(2);
+  cache.markDecoded('/validation/one.ARW', 'blob:one');
+  cache.markDecoded('/validation/two.ARW', 'blob:two');
+  expect(cache.has('/validation/one.ARW', 'blob:one')).toBe(true);
+
+  cache.markDecoded('/validation/three.ARW', 'blob:three');
+
+  expect(cache.has('/validation/two.ARW', 'blob:two')).toBe(false);
+  expect(cache.has('/validation/one.ARW', 'blob:one')).toBe(true);
+  expect(cache.has('/validation/three.ARW', 'blob:three')).toBe(true);
+});
+
+describe('filmstrip thumbnail decode handoff', () => {
+  test('keeps a same-path predecessor visible until the actual successor image decodes and completes opacity handoff', async () => {
+    const current = image('/validation/revision.ARW');
+    useProcessStore.setState({ thumbnails: { [current.path]: 'blob:revision-one' } });
+    const rendered = await renderThumbnail(current);
+    const predecessor = requiredImage(rendered.container, 'blob:revision-one');
+
+    expect(placeholder(rendered.container)).not.toBeNull();
+    await loadImage(predecessor);
+    expect(placeholder(rendered.container)).toBeNull();
+
+    await setThumbnails({ [current.path]: 'blob:revision-two' });
+    const successor = requiredImage(rendered.container, 'blob:revision-two');
+    const decode = deferred<void>();
+    setImageDecode(successor, decode.promise);
+
+    expect(imageSources(rendered.container)).toEqual(['blob:revision-one', 'blob:revision-two']);
+    expect(layerOpacity(successor)).toBe('0');
+
+    await dispatchLoad(successor);
+    expect(layerOpacity(successor)).toBe('0');
+    expect(imageSources(rendered.container)).toEqual(['blob:revision-one', 'blob:revision-two']);
+
+    await act(async () => {
+      decode.resolve();
+    });
+    await settleReact();
+    expect(layerOpacity(successor)).toBe('1');
+
+    await dispatchTransition(successor, 'transform');
+    expect(imageSources(rendered.container)).toEqual(['blob:revision-one', 'blob:revision-two']);
+
+    await dispatchTransition(layer(successor), 'opacity');
+    expect(imageSources(rendered.container)).toEqual(['blob:revision-two']);
+  });
+
+  test('rejects stale same-path revision callbacks without removing the valid predecessor', async () => {
+    const current = image('/validation/stale-revision.ARW');
+    useProcessStore.setState({ thumbnails: { [current.path]: 'blob:stale-one' } });
+    const rendered = await renderThumbnail(current);
+    const predecessor = requiredImage(rendered.container, 'blob:stale-one');
+    await loadImage(predecessor);
+
+    await setThumbnails({ [current.path]: 'blob:stale-two' });
+    const successor = requiredImage(rendered.container, 'blob:stale-two');
+
+    await act(async () => {
+      predecessor.dispatchEvent(new window.Event('error'));
+      await settle();
+    });
+
+    expect(imageSources(rendered.container)).toEqual(['blob:stale-one', 'blob:stale-two']);
+    await loadImage(successor);
+    await dispatchTransition(layer(successor), 'opacity');
+    expect(imageSources(rendered.container)).toEqual(['blob:stale-two']);
+  });
+
+  test('keeps a same-path predecessor when successor decode rejects', async () => {
+    const current = image('/validation/decode-error.ARW');
+    useProcessStore.setState({ thumbnails: { [current.path]: 'blob:decode-error-one' } });
+    const rendered = await renderThumbnail(current);
+    const predecessor = requiredImage(rendered.container, 'blob:decode-error-one');
+    await loadImage(predecessor);
+
+    await setThumbnails({ [current.path]: 'blob:decode-error-two' });
+    const successor = requiredImage(rendered.container, 'blob:decode-error-two');
+    setImageDecode(successor, Promise.reject(new Error('decode failed')));
+
+    await dispatchLoad(successor);
+    await settleReact();
+
+    expect(imageSources(rendered.container)).toEqual(['blob:decode-error-one']);
+    expect(placeholder(rendered.container)).toBeNull();
+  });
+
+  test('does not retain a different-path predecessor while a recycled thumbnail cell decodes', async () => {
     const previous = image('/validation/previous.ARW');
     const successor = image('/validation/successor.ARW');
     useProcessStore.setState({
@@ -60,31 +148,49 @@ describe('filmstrip thumbnail loading', () => {
     });
 
     const rendered = await renderThumbnail(previous);
-    expect(imageSources(rendered.container)).toEqual(['blob:previous']);
+    await loadImage(requiredImage(rendered.container, 'blob:previous'));
 
     rendered.render(successor);
-
-    const preload = required<HTMLImageElement>(rendered.container, '[data-filmstrip-thumbnail-preload="true"]');
-    expect(imageSources(rendered.container)).toEqual([]);
-
-    await act(async () => {
-      preload.dispatchEvent(new window.Event('load', { bubbles: true }));
-      await flush();
-    });
-    await act(async () => {
-      await flush();
-    });
+    await settleReact();
 
     expect(imageSources(rendered.container)).toEqual(['blob:successor']);
+    expect(placeholder(rendered.container)).not.toBeNull();
+    await loadImage(requiredImage(rendered.container, 'blob:successor'));
+    expect(placeholder(rendered.container)).toBeNull();
+  });
 
-    const successorLayer = Array.from(
-      rendered.container.querySelectorAll<HTMLImageElement>('[data-testid="filmstrip-thumbnail-image"]'),
-    ).find((element) => element.src === 'blob:successor');
-    if (successorLayer?.parentElement === null || successorLayer === undefined) {
-      throw new Error('Expected the decoded successor thumbnail layer.');
-    }
+  test('preserves decoded readiness across a virtualized remount without showing the placeholder', async () => {
+    const current = image('/validation/warm-remount.ARW');
+    useProcessStore.setState({ thumbnails: { [current.path]: 'blob:warm-remount' } });
+    const rendered = await renderThumbnail(current);
+    await loadImage(requiredImage(rendered.container, 'blob:warm-remount'));
 
-    expect(imageSources(rendered.container)).toEqual(['blob:successor']);
+    rendered.unmount();
+    const remounted = await renderThumbnail(current);
+
+    expect(imageSources(remounted.container)).toEqual(['blob:warm-remount']);
+    expect(placeholder(remounted.container)).toBeNull();
+  });
+
+  test('uses the real Grid path without showing a different-path predecessor after its cell changes', async () => {
+    const previous = image('/validation/grid-previous.ARW');
+    const successor = image('/validation/grid-successor.ARW');
+    useProcessStore.setState({
+      thumbnails: {
+        [previous.path]: 'blob:grid-previous',
+        [successor.path]: 'blob:grid-successor',
+      },
+    });
+
+    const rendered = await renderFilmstrip([previous]);
+    await loadImage(requiredImage(rendered.container, 'blob:grid-previous'));
+
+    rendered.render([successor]);
+    await settleReact();
+
+    expect(imageSources(rendered.container)).toEqual(['blob:grid-successor']);
+    await loadImage(requiredImage(rendered.container, 'blob:grid-successor'));
+    expect(placeholder(rendered.container)).toBeNull();
   });
 });
 
@@ -141,9 +247,90 @@ async function renderThumbnail(initialImage: ImageFile) {
   };
 
   render(initialImage);
+  renderedRoot = { container, root };
+  return {
+    container,
+    render,
+    unmount: () => {
+      act(() => {
+        root.unmount();
+      });
+      container.remove();
+      renderedRoot = null;
+    },
+  };
+}
 
+async function renderFilmstrip(initialImages: ImageFile[]) {
+  installDom();
+  const container = document.createElement('div');
+  document.body.append(container);
+  const root = createRoot(container);
+  const i18n = await createTestI18n();
+
+  const render = (imageList: ImageFile[]) => {
+    act(() => {
+      flushSync(() => {
+        root.render(
+          createElement(
+            I18nextProvider,
+            { i18n },
+            createElement(Filmstrip, {
+              imageList,
+              imageRatings: null,
+              isLoading: false,
+              multiSelectedPaths: [],
+              thumbnailAspectRatio: ThumbnailAspectRatio.Cover,
+            }),
+          ),
+        );
+      });
+    });
+  };
+
+  render(initialImages);
+  await settleReact();
   renderedRoot = { container, root };
   return { container, render };
+}
+
+async function setThumbnails(thumbnails: Record<string, string>) {
+  act(() => {
+    useProcessStore.setState({ thumbnails });
+  });
+  await settleReact();
+}
+
+async function loadImage(imageElement: HTMLImageElement) {
+  await act(async () => {
+    imageElement.dispatchEvent(new window.Event('load'));
+    await Promise.resolve();
+  });
+  await settleReact();
+}
+
+async function dispatchLoad(imageElement: HTMLImageElement) {
+  await act(async () => {
+    imageElement.dispatchEvent(new window.Event('load'));
+    await Promise.resolve();
+  });
+}
+
+function setImageDecode(imageElement: HTMLImageElement, decode: Promise<void>) {
+  Object.defineProperty(imageElement, 'decode', {
+    configurable: true,
+    value: () => decode,
+  });
+}
+
+async function dispatchTransition(element: Element, propertyName: string) {
+  await act(async () => {
+    const event = new window.Event('transitionend', { bubbles: true });
+    Object.defineProperty(event, 'propertyName', { value: propertyName });
+    element.dispatchEvent(event);
+    await Promise.resolve();
+  });
+  await settleReact();
 }
 
 function imageSources(container: Element): string[] {
@@ -152,19 +339,51 @@ function imageSources(container: Element): string[] {
   );
 }
 
-function required<T extends Element>(container: Element, selector: string): T {
-  const element = container.querySelector<T>(selector);
-  if (element === null) throw new Error(`Expected ${selector} to render.`);
-  return element;
+function requiredImage(container: Element, url: string): HTMLImageElement {
+  const imageElement = Array.from(
+    container.querySelectorAll<HTMLImageElement>('[data-testid="filmstrip-thumbnail-image"]'),
+  ).find((element) => element.src === url);
+  if (imageElement === undefined) throw new Error(`Expected thumbnail image ${url}.`);
+  return imageElement;
 }
 
-async function flush() {
+function layer(imageElement: HTMLImageElement): HTMLDivElement {
+  const parent = imageElement.parentElement;
+  if (!(parent instanceof HTMLDivElement)) throw new Error('Expected a thumbnail image layer.');
+  return parent;
+}
+
+function layerOpacity(imageElement: HTMLImageElement): string {
+  return layer(imageElement).style.opacity;
+}
+
+function placeholder(container: Element) {
+  return container.querySelector('[data-testid="filmstrip-thumbnail-placeholder"]');
+}
+
+function deferred<Value>() {
+  let resolvePromise: (value: Value | PromiseLike<Value>) => void = () => {};
+  const promise = new Promise<Value>((resolve) => {
+    resolvePromise = resolve;
+  });
+  return { promise, resolve: resolvePromise };
+}
+
+async function settle() {
   await new Promise((resolve) => setTimeout(resolve, 0));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+async function settleReact() {
+  await act(async () => {
+    await settle();
+  });
 }
 
 function installDom() {
   const domWindow = new Window({ url: 'http://localhost/filmstrip-thumbnail-test' });
   Object.assign(globalThis, {
+    DOMRectReadOnly: domWindow.DOMRectReadOnly,
     document: domWindow.document,
     HTMLElement: domWindow.HTMLElement,
     HTMLDivElement: domWindow.HTMLDivElement,
@@ -173,8 +392,34 @@ function installDom() {
     navigator: domWindow.navigator,
     requestAnimationFrame: (callback: FrameRequestCallback) => setTimeout(() => callback(Date.now()), 0),
     cancelAnimationFrame: (id: number) => clearTimeout(id),
+    ResizeObserver: TestResizeObserver,
     window: domWindow,
   });
+
+  Object.defineProperty(domWindow.HTMLImageElement.prototype, 'decode', {
+    configurable: true,
+    value: () => Promise.resolve(),
+  });
+}
+
+class TestResizeObserver implements ResizeObserver {
+  constructor(private readonly callback: ResizeObserverCallback) {}
+
+  disconnect() {}
+
+  observe(target: Element, _options?: ResizeObserverOptions) {
+    const size: ResizeObserverSize = { blockSize: 120, inlineSize: 320 };
+    const entry: ResizeObserverEntry = {
+      borderBoxSize: [size],
+      contentBoxSize: [size],
+      contentRect: new DOMRectReadOnly(0, 0, 320, 120),
+      devicePixelContentBoxSize: [size],
+      target,
+    };
+    this.callback([entry], this);
+  }
+
+  unobserve(_target: Element) {}
 }
 
 async function createTestI18n() {
