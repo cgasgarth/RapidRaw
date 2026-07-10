@@ -93,30 +93,25 @@ try {
   await page.getByRole('slider', { exact: true, name: 'Contrast' }).waitFor({ timeout: 10_000 });
 
   await setSlider(page, 'Brightness', '0.35');
-  await page.waitForFunction(() => document.body.textContent?.includes('2/2') === true, null, { timeout: 10_000 });
-  await page.getByTestId('editor-history-depth-control').click();
-  await page.getByTestId('editor-history-jump-action').first().waitFor({ timeout: 10_000 });
-  await page.getByTestId('editor-history-add-checkpoint').click();
-  await page.getByRole('button', { name: 'Rename checkpoint' }).click();
-  await page.getByTestId('editor-history-checkpoint-label-input').fill('Brightened base');
+  await page.getByTestId('editor-left-snapshots-toggle').click();
+  await page.getByTestId('editor-sidebar-snapshot-create').click();
+  await page.locator('[data-snapshot-rename]').click();
+  await page.getByTestId('editor-sidebar-snapshot-name-input').fill('Brightened base');
   await page.keyboard.press('Enter');
-  await page.getByRole('menuitem', { exact: true, name: 'Brightened base' }).waitFor({ timeout: 10_000 });
-  await page.locator('body').click({ position: { x: 5, y: 5 } });
+  await page.getByRole('option', { exact: true, name: 'Brightened base' }).waitFor({ timeout: 10_000 });
 
   await setSlider(page, 'Contrast', '18');
-  await page.waitForFunction(() => document.body.textContent?.includes('3/3') === true, null, { timeout: 10_000 });
-  await page.getByTestId('editor-history-depth-control').click();
-  await page.getByRole('menuitem', { exact: true, name: 'Contrast' }).waitFor({ timeout: 10_000 });
-  await page.getByRole('menuitem', { name: /Brightened base/u }).click();
-  await page.waitForFunction(() => document.body.textContent?.includes('2/3') === true, null, { timeout: 10_000 });
+  await page.getByTestId('editor-left-history-toggle').click();
+  const historySection = page.locator('[data-editor-left-slot="history"]');
+  await historySection.getByRole('option', { name: /Contrast/u }).waitFor({ timeout: 10_000 });
+  await historySection.getByRole('option', { name: /Brightened base/u }).click();
 
   const redoButton = page.getByRole('button', { name: /Redo/u }).first();
   if (!(await redoButton.isEnabled())) {
     throw new Error('Redo was not available after selecting an earlier checkpoint.');
   }
 
-  await page.getByTestId('editor-history-depth-control').click();
-  const activeCheckpoint = page.getByTestId('editor-history-active-row');
+  const activeCheckpoint = page.getByTestId('editor-sidebar-history-active-row');
   await activeCheckpoint.waitFor({ timeout: 10_000 });
   const activeText = await activeCheckpoint.innerText();
   if (!activeText.includes('Brightened base')) {

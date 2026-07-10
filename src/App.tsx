@@ -7,6 +7,7 @@ import { useShallow } from 'zustand/react/shallow';
 import ImageLoaderManager from './components/managers/ImageLoaderManager';
 import ImageProcessingManager from './components/managers/ImageProcessingManager';
 import AppModals from './components/modals/AppModals';
+import { EditorHistorySection, EditorSnapshotsSection } from './components/panel/editor/EditorHistorySections';
 import EditorLeftSidebar, { type EditorLeftSectionId } from './components/panel/editor/EditorLeftSidebar';
 import EditorNavigator, { type EditorTransformController } from './components/panel/editor/EditorNavigator';
 import FolderTreePanel from './components/panel/FolderTree';
@@ -728,9 +729,11 @@ function App() {
                   setEditorRegionVisibility('leftSidebar', visible);
                 }}
                 slots={{
+                  history: <EditorHistorySection />,
                   navigator: (
                     <EditorNavigator onZoomChange={handleZoomChange} transformControllerRef={transformWrapperRef} />
                   ),
+                  snapshots: <EditorSnapshotsSection />,
                 }}
                 width={leftPanelWidth}
               />
