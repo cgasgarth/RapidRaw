@@ -91,15 +91,16 @@ import {
   AGENT_STATE_GET_INPUT_SCHEMA_NAME,
   AGENT_STATE_GET_OUTPUT_SCHEMA_NAME,
   AGENT_STATE_GET_TOOL_NAME,
+  acquireRawEngineImagePreviewAttachment,
   agentPreviewCompareRequestSchema,
   agentPreviewRenderRequestSchema,
   agentStateGetRequestSchema,
   getAgentReadOnlyState,
-  getRawEngineImagePreview,
   RAW_ENGINE_IMAGE_GET_PREVIEW_INPUT_SCHEMA_NAME,
   RAW_ENGINE_IMAGE_GET_PREVIEW_OUTPUT_SCHEMA_NAME,
   RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
   rawEngineImageGetPreviewRequestSchema,
+  releaseRawEngineImagePreviewAttachmentResult,
   renderAgentPreviewCompare,
   renderAgentReadOnlyPreview,
 } from './agent/context/agentReadOnlyAppServerTools';
@@ -1437,7 +1438,14 @@ const dispatchAgentAppServerTool = async (
       result = renderAgentReadOnlyPreview(agentPreviewRenderRequestSchema.parse(request.arguments));
       break;
     case RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME:
-      result = getRawEngineImagePreview(rawEngineImageGetPreviewRequestSchema.parse(request.arguments));
+      result = await acquireRawEngineImagePreviewAttachment({
+        deadlineAt:
+          request.executionContext === undefined
+            ? Date.now() + 15_000
+            : Date.parse(request.executionContext.deadlineAt),
+        request: rawEngineImageGetPreviewRequestSchema.parse(request.arguments),
+        sessionId: request.executionContext?.sessionId ?? 'agent-readonly-preview',
+      });
       break;
     case AGENT_RETOUCH_APPLY_TOOL_NAME:
       result = applyAgentRetouch(agentRetouchApplyRequestSchema.parse(request.arguments));
@@ -1624,6 +1632,7 @@ export const registerRawEngineAppServerTypedDispatchResultCleanup = (
 };
 
 const cleanupTypedDispatchResult = (cancellationId: string, result: unknown) => {
+  releaseRawEngineImagePreviewAttachmentResult(result);
   const cleanup = typedDispatchResultCleanups.get(cancellationId);
   typedDispatchResultCleanups.delete(cancellationId);
   cleanup?.(result);

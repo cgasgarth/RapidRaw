@@ -4,12 +4,19 @@ import {
   type RawEngineAgentInitialPreviewReceiptV1,
   type RawEngineAgentPreviewRefreshReceiptV1,
   rawEngineAgentInitialPreviewReceiptV1Schema,
+  rawEngineAgentInitialPreviewReceiptV2Schema,
   rawEngineAgentPreviewRefreshReceiptV1Schema,
 } from '../../../../packages/rawengine-schema/src/localAppServerBridge';
 import { rawEngineAgentPreviewRenderRequestV1Schema } from '../../../../packages/rawengine-schema/src/rawEngineSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
 import { buildAgentMediumPreviewArtifact } from './agentMediumPreviewArtifactRuntime';
+import {
+  type AgentMediumPreviewAttachmentManager,
+  agentMediumPreviewAttachmentManager,
+  agentModelImageAttachmentSchema,
+  buildAgentInitialPreviewReceiptV2,
+} from './agentMediumPreviewAttachmentRuntime';
 import {
   AGENT_PREVIEW_MAX_PIXEL_COUNT,
   agentMediumPreviewArtifactSchema,
@@ -200,6 +207,20 @@ export const rawEngineImageGetPreviewResponseSchema = z
     path: ['receipt', 'contentHash'],
   });
 
+export const rawEngineImageGetPreviewAttachmentResponseSchema = z
+  .object({
+    attachment: agentModelImageAttachmentSchema,
+    receipt: rawEngineAgentInitialPreviewReceiptV2Schema,
+    requestId: z.string().trim().min(1),
+    snapshot: z.custom<ReturnType<typeof buildAgentImageContextSnapshot>>(),
+    toolName: z.literal(RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME),
+  })
+  .strict()
+  .refine((response) => response.attachment.attachment.artifactId === response.receipt.attachment.artifactId, {
+    message: 'Initial model attachment and receipt must share an artifact id.',
+    path: ['receipt', 'attachment', 'artifactId'],
+  });
+
 export type AgentStateGetRequest = z.infer<typeof agentStateGetRequestSchema>;
 export type AgentPreviewRenderRequest = z.input<typeof agentPreviewRenderRequestSchema>;
 export type AgentPreviewCompareRequest = z.input<typeof agentPreviewCompareRequestSchema>;
@@ -208,6 +229,9 @@ export type AgentStateGetResponse = z.infer<typeof agentStateGetResponseSchema>;
 export type AgentPreviewRenderResponse = z.infer<typeof agentPreviewRenderResponseSchema>;
 export type AgentPreviewCompareResponse = z.infer<typeof agentPreviewCompareResponseSchema>;
 export type RawEngineImageGetPreviewResponse = z.infer<typeof rawEngineImageGetPreviewResponseSchema>;
+export type RawEngineImageGetPreviewAttachmentResponse = z.infer<
+  typeof rawEngineImageGetPreviewAttachmentResponseSchema
+>;
 
 const buildInitialPreviewReceipt = ({
   contentHash,
@@ -418,6 +442,7 @@ export const getRawEngineImagePreview = (
     width: snapshot.initialPreview.width,
     zoom: snapshot.initialPreview.zoom,
   });
+
   const staleRecipeHash =
     parsedRequest.expectedRecipeHash !== undefined &&
     parsedRequest.expectedRecipeHash !== snapshot.initialPreview.recipeHash;
@@ -465,6 +490,61 @@ export const getRawEngineImagePreview = (
     staleRecipeHash,
     toolName: RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
   });
+};
+
+export const acquireRawEngineImagePreviewAttachment = async ({
+  deadlineAt,
+  manager = agentMediumPreviewAttachmentManager,
+  request,
+  sessionId,
+  signal,
+}: {
+  deadlineAt: number;
+  manager?: AgentMediumPreviewAttachmentManager;
+  request: RawEngineImageGetPreviewRequest;
+  sessionId: string;
+  signal?: AbortSignal;
+}): Promise<RawEngineImageGetPreviewAttachmentResponse> => {
+  const parsedRequest = rawEngineImageGetPreviewRequestSchema.parse(request);
+  const snapshot = buildAgentImageContextSnapshot();
+  if (
+    parsedRequest.expectedRecipeHash !== undefined &&
+    parsedRequest.expectedRecipeHash !== snapshot.initialPreview.recipeHash
+  ) {
+    throw new Error('Initial preview attachment rejected stale recipe hash.');
+  }
+  const attachment = await manager.acquire({
+    deadlineAt,
+    ...(signal === undefined ? {} : { signal }),
+    snapshot,
+  });
+  const receipt = buildAgentInitialPreviewReceiptV2({
+    attachment: attachment.attachment,
+    requestId: parsedRequest.requestId,
+    sessionId,
+  });
+  return rawEngineImageGetPreviewAttachmentResponseSchema.parse({
+    attachment,
+    receipt,
+    requestId: parsedRequest.requestId,
+    snapshot,
+    toolName: RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
+  });
+};
+
+export const releaseRawEngineImagePreviewAttachment = (
+  artifactId: string,
+  status: 'released' | 'stale' | 'superseded' = 'released',
+): void => {
+  agentMediumPreviewAttachmentManager.release(artifactId, status);
+};
+
+export const releaseRawEngineImagePreviewAttachmentResult = (
+  result: unknown,
+  status: 'released' | 'stale' | 'superseded' = 'released',
+): void => {
+  const parsed = rawEngineImageGetPreviewAttachmentResponseSchema.safeParse(result);
+  if (parsed.success) releaseRawEngineImagePreviewAttachment(parsed.data.receipt.attachment.artifactId, status);
 };
 
 const buildCompareArtifact = ({

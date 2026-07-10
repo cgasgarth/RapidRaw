@@ -1660,6 +1660,7 @@ fn generate_preview_for_path(
     path: String,
     js_adjustments: Value,
     target_resolution: Option<u32>,
+    jpeg_quality: Option<u8>,
     state: tauri::State<AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<Response, String> {
@@ -1754,7 +1755,7 @@ fn generate_preview_for_path(
         ),
         None => final_image,
     };
-    encode_jpeg_response(&preview_image, 92)
+    encode_jpeg_response(&preview_image, jpeg_quality.unwrap_or(92).clamp(50, 95))
 }
 
 #[tauri::command]

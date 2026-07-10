@@ -1,8 +1,11 @@
 #!/usr/bin/env bun
 
+import { readFile } from 'node:fs/promises';
+
 import { ToolType } from '../../../../src/components/panel/right/layers/Masks.tsx';
 import { useEditorStore } from '../../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
+import { setAgentMediumPreviewAttachmentRendererForTest } from '../../../../src/utils/agent/context/agentMediumPreviewAttachmentRuntime.ts';
 import {
   agentMultiTurnAppServerSessionRequestSchema,
   runAgentMultiTurnAppServerSession,
@@ -10,6 +13,12 @@ import {
 
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3164.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 12 : 2));
+const mediumPreviewFixture = new Uint8Array(
+  await readFile(new URL('../../../fixtures/agent/agent-medium-preview-1536.jpg', import.meta.url)),
+);
+const recordedModelInputs: Array<{ attachments: unknown[] }> = [];
+
+setAgentMediumPreviewAttachmentRendererForTest(async () => new Uint8Array(mediumPreviewFixture));
 
 useEditorStore.getState().setEditor({
   adjustments: INITIAL_ADJUSTMENTS,
@@ -50,32 +59,39 @@ if (
   throw new Error('agent multi-turn session accepted a single-turn request.');
 }
 
-const result = await runAgentMultiTurnAppServerSession({
-  operationId: 'agent_multiturn_3164',
-  prompt: 'Brighten the RAW, inspect a medium preview, then refine shadows after seeing the result.',
-  requestId: 'agent-multiturn-3164',
-  sessionId: 'agent-multiturn-3164',
-  turns: [
-    {
-      adjustment: { exposure: 0.28, highlights: -10 },
-      assistantRationale: 'First pass: lift exposure while protecting highlights.',
-      preview: { purpose: 'refresh' },
-    },
-    {
-      adjustment: { shadows: 18, contrast: 9 },
-      assistantRationale: 'Second pass after preview: open foreground shadows and restore midtone contrast.',
-      color: { hsl: { blues: { hue: -2, luminance: 3, saturation: 8 } } },
-      detailEffects: { clarity: 18, dehaze: 8, sharpness: 12 },
-      preview: {
-        crop: { height: 0.35, width: 0.3, x: 0.25, y: 0.2 },
-        maxPixelCount: 800_000,
-        purpose: 'detail_review',
-        zoom: { centerX: 0.5, centerY: 0.55, scale: 2.5 },
+const result = await runAgentMultiTurnAppServerSession(
+  {
+    operationId: 'agent_multiturn_3164',
+    prompt: 'Brighten the RAW, inspect a medium preview, then refine shadows after seeing the result.',
+    requestId: 'agent-multiturn-3164',
+    sessionId: 'agent-multiturn-3164',
+    turns: [
+      {
+        adjustment: { exposure: 0.28, highlights: -10 },
+        assistantRationale: 'First pass: lift exposure while protecting highlights.',
+        preview: { purpose: 'refresh' },
       },
-      userFollowUp: 'Foreground still feels dense; inspect the detail area and refine.',
+      {
+        adjustment: { shadows: 18, contrast: 9 },
+        assistantRationale: 'Second pass after preview: open foreground shadows and restore midtone contrast.',
+        color: { hsl: { blues: { hue: -2, luminance: 3, saturation: 8 } } },
+        detailEffects: { clarity: 18, dehaze: 8, sharpness: 12 },
+        preview: {
+          crop: { height: 0.35, width: 0.3, x: 0.25, y: 0.2 },
+          maxPixelCount: 800_000,
+          purpose: 'detail_review',
+          zoom: { centerX: 0.5, centerY: 0.55, scale: 2.5 },
+        },
+        userFollowUp: 'Foreground still feels dense; inspect the detail area and refine.',
+      },
+    ],
+  },
+  {
+    initialModelInputSink: (input) => {
+      recordedModelInputs.push({ attachments: input.attachments });
     },
-  ],
-});
+  },
+);
 
 const state = useEditorStore.getState();
 const previewPurposes = result.previews.map((preview) => preview.purpose);
@@ -86,6 +102,18 @@ if (result.turnCount !== 2 || result.sessionId !== 'agent-multiturn-3164') {
 }
 if (result.initialContext.preview.purpose !== 'initial_context' || result.previews.length !== 3) {
   throw new Error('agent multi-turn session did not include initial plus per-turn previews.');
+}
+if (
+  recordedModelInputs.length !== 1 ||
+  recordedModelInputs[0]?.attachments.length !== 1 ||
+  result.initialContext.modelInput.attachments.length !== 1 ||
+  result.initialContext.modelInput.attachments[0]?.attachment.artifactId !==
+    result.initialPreviewReceipt.attachment.artifactId ||
+  result.initialPreviewReceipt.attachment.revision.graphRevision !== result.previewLineage[0]?.graphRevision
+) {
+  throw new Error(
+    'agent multi-turn session did not deliver one revision-bound image attachment to the recording sink.',
+  );
 }
 if (previewPurposes.join(',') !== 'initial_context,refresh,detail_review') {
   throw new Error(`agent multi-turn session preview purposes were wrong: ${previewPurposes.join(',')}`);

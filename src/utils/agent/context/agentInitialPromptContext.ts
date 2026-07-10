@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { type AgentImageContextSnapshot, buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
+import { type AgentModelImageAttachment, agentModelImageAttachmentSchema } from './agentMediumPreviewAttachmentRuntime';
 import { RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME } from './agentReadOnlyAppServerTools';
 
 export const agentInitialPromptContextSchema = z
@@ -9,6 +10,7 @@ export const agentInitialPromptContextSchema = z
     modelInput: z
       .object({
         activeImagePath: z.string().trim().min(1),
+        attachments: z.array(agentModelImageAttachmentSchema).max(1),
         currentAdjustments: z.array(z.object({ key: z.string().trim().min(1), value: z.unknown() }).strict()),
         graphRevision: z.string().trim().min(1),
         initialPreview: z
@@ -81,6 +83,7 @@ export const buildAgentInitialPromptContext = ({
     imageContext: snapshot,
     modelInput: {
       activeImagePath: snapshot.activeImagePath,
+      attachments: [],
       currentAdjustments: snapshot.adjustmentSummary,
       graphRevision: snapshot.graphRevision,
       initialPreview: {
@@ -127,3 +130,27 @@ export const buildAgentInitialPromptContext = ({
     schemaVersion: 1,
     sessionId,
   });
+
+export const bindAgentInitialPromptContextAttachment = ({
+  attachment,
+  context,
+}: {
+  attachment: AgentModelImageAttachment;
+  context: AgentInitialPromptContext;
+}): AgentInitialPromptContext => {
+  const preview = attachment.attachment;
+  if (
+    preview.revision.graphRevision !== context.imageContext.graphRevision ||
+    preview.revision.recipeHash !== context.imageContext.initialPreview.recipeHash ||
+    preview.revision.renderHash !== context.imageContext.initialPreview.renderHash
+  ) {
+    throw new Error('Initial model attachment does not match the selected-image context revision.');
+  }
+  return agentInitialPromptContextSchema.parse({
+    ...context,
+    modelInput: {
+      ...context.modelInput,
+      attachments: [attachment],
+    },
+  });
+};

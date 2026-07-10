@@ -18,8 +18,8 @@ import {
   agentStateGetRequestSchema,
   agentStateGetResponseSchema,
   RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
+  rawEngineImageGetPreviewAttachmentResponseSchema,
   rawEngineImageGetPreviewRequestSchema,
-  rawEngineImageGetPreviewResponseSchema,
 } from '../context/agentReadOnlyAppServerTools';
 import {
   AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
@@ -55,7 +55,7 @@ export const agentEditorToolContracts = {
     isPreviewRefresh: true,
     mutates: false,
     requestSchema: rawEngineImageGetPreviewRequestSchema,
-    responseSchema: rawEngineImageGetPreviewResponseSchema,
+    responseSchema: rawEngineImageGetPreviewAttachmentResponseSchema,
     schemaVersion: 1,
   }),
   [AGENT_PREVIEW_RENDER_TOOL_NAME]: defineAgentEditorToolContract({

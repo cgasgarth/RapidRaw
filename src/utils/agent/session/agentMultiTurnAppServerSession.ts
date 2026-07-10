@@ -1,9 +1,14 @@
 import { z } from 'zod';
 import {
-  type RawEngineAgentInitialPreviewReceiptV1,
-  rawEngineAgentInitialPreviewReceiptV1Schema,
+  type RawEngineAgentInitialPreviewReceiptV2,
+  rawEngineAgentInitialPreviewReceiptV2Schema,
 } from '../../../../packages/rawengine-schema/src/localAppServerBridge';
-import { agentInitialPromptContextSchema, buildAgentInitialPromptContext } from '../context/agentInitialPromptContext';
+import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
+import {
+  agentInitialPromptContextSchema,
+  bindAgentInitialPromptContextAttachment,
+  buildAgentInitialPromptContext,
+} from '../context/agentInitialPromptContext';
 import { agentPreviewEnvelopeSchema } from '../context/agentPreviewEnvelope';
 import {
   AGENT_PREVIEW_RENDER_TOOL_NAME,
@@ -11,7 +16,8 @@ import {
   agentPreviewRenderResponseSchema,
   agentStateGetResponseSchema,
   RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
-  rawEngineImageGetPreviewResponseSchema,
+  rawEngineImageGetPreviewAttachmentResponseSchema,
+  releaseRawEngineImagePreviewAttachment,
 } from '../context/agentReadOnlyAppServerTools';
 import { agentEditQualityReviewSchema, buildAgentEditQualityReview } from '../planning/agentEditQualityReview';
 import {
@@ -129,7 +135,7 @@ export const agentMultiTurnAppServerSessionResultSchema = z
     finalGraphRevision: z.string().trim().min(1),
     finalRecipeHash: z.string().trim().min(1),
     initialContext: agentInitialPromptContextSchema,
-    initialPreviewReceipt: rawEngineAgentInitialPreviewReceiptV1Schema,
+    initialPreviewReceipt: rawEngineAgentInitialPreviewReceiptV2Schema,
     maxChannelDelta: z.number().nonnegative(),
     meanLuminanceDelta: z.number().nonnegative(),
     messages: z.array(sessionMessageSchema).min(5),
@@ -160,6 +166,10 @@ export const agentMultiTurnAppServerSessionResultSchema = z
 
 export type AgentMultiTurnAppServerSessionRequest = z.infer<typeof agentMultiTurnAppServerSessionRequestSchema>;
 export type AgentMultiTurnAppServerSessionResult = z.infer<typeof agentMultiTurnAppServerSessionResultSchema>;
+
+export type AgentInitialModelInputSink = (
+  input: AgentMultiTurnAppServerSessionResult['initialContext']['modelInput'],
+) => Promise<void> | void;
 
 const stateRecipeHashSchema = agentStateGetResponseSchema.safeExtend({
   snapshot: z.looseObject({
@@ -198,24 +208,25 @@ const refreshRecipeHash = async ({
 
 export const runAgentMultiTurnAppServerSession = async (
   request: AgentMultiTurnAppServerSessionRequest,
+  { initialModelInputSink }: { initialModelInputSink?: AgentInitialModelInputSink } = {},
 ): Promise<AgentMultiTurnAppServerSessionResult> => {
   const parsedRequest = agentMultiTurnAppServerSessionRequestSchema.parse(request);
   const checkpoint = createAgentSessionCheckpoint(parsedRequest.sessionId);
-  const initialContext = buildAgentInitialPromptContext({
+  const initialContextBase = buildAgentInitialPromptContext({
     operationId: parsedRequest.operationId,
     prompt: parsedRequest.prompt,
     sessionId: parsedRequest.sessionId,
   });
   const initialPreviewToolCallId = `${parsedRequest.requestId}-initial-preview`;
-  const initialPreviewResult = rawEngineImageGetPreviewResponseSchema.parse(
+  const initialPreviewResult = rawEngineImageGetPreviewAttachmentResponseSchema.parse(
     await dispatchAgentTypedEditorTool({
       args: {
-        expectedRecipeHash: initialContext.preview.recipeHash,
+        expectedRecipeHash: initialContextBase.preview.recipeHash,
         requestId: initialPreviewToolCallId,
       },
       context: createAgentTypedToolExecutionContext({
         arguments: {
-          expectedRecipeHash: initialContext.preview.recipeHash,
+          expectedRecipeHash: initialContextBase.preview.recipeHash,
           requestId: initialPreviewToolCallId,
         },
         callId: initialPreviewToolCallId,
@@ -225,47 +236,63 @@ export const runAgentMultiTurnAppServerSession = async (
       toolName: RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
     }),
   );
+  const currentInitialSnapshot = buildAgentImageContextSnapshot();
+  if (
+    currentInitialSnapshot.activeImagePath !== initialContextBase.imageContext.activeImagePath ||
+    currentInitialSnapshot.graphRevision !== initialPreviewResult.receipt.attachment.revision.graphRevision ||
+    currentInitialSnapshot.initialPreview.recipeHash !== initialPreviewResult.receipt.attachment.revision.recipeHash ||
+    currentInitialSnapshot.initialPreview.renderHash !== initialPreviewResult.receipt.attachment.revision.renderHash
+  ) {
+    releaseRawEngineImagePreviewAttachment(initialPreviewResult.receipt.attachment.artifactId, 'stale');
+    throw new Error('Initial model preview attachment became stale before transport delivery.');
+  }
+  const initialContext = bindAgentInitialPromptContextAttachment({
+    attachment: initialPreviewResult.attachment,
+    context: initialContextBase,
+  });
+  await initialModelInputSink?.(initialContext.modelInput);
+  releaseRawEngineImagePreviewAttachment(initialPreviewResult.receipt.attachment.artifactId);
   const initialPreviewReceipt = initialPreviewResult.receipt;
   const messages: AgentMultiTurnAppServerSessionResult['messages'] = [
     {
-      content: `${parsedRequest.prompt}\n\nInitial medium preview ${initialPreviewReceipt.preview.artifactId} (${initialPreviewReceipt.contentHash}) is attached.`,
-      previewArtifactId: initialPreviewReceipt.preview.artifactId,
+      content: `${parsedRequest.prompt}\n\nInitial medium preview ${initialPreviewReceipt.attachment.artifactId} (${initialPreviewReceipt.attachment.contentHash}) is attached.`,
+      previewArtifactId: initialPreviewReceipt.attachment.artifactId,
       role: 'user',
       turn: 0,
     },
     {
-      content: `Initial selected-image preview ${initialPreviewReceipt.preview.artifactId} is ready at ${initialPreviewReceipt.preview.width}x${initialPreviewReceipt.preview.height}.`,
-      previewArtifactId: initialPreviewReceipt.preview.artifactId,
+      content: `Initial selected-image preview ${initialPreviewReceipt.attachment.artifactId} is ready at ${initialPreviewReceipt.attachment.dimensions.width}x${initialPreviewReceipt.attachment.dimensions.height}.`,
+      previewArtifactId: initialPreviewReceipt.attachment.artifactId,
       role: 'tool',
       toolCallId: initialPreviewToolCallId,
       turn: 0,
     },
   ];
-  const previews: AgentMultiTurnAppServerSessionResult['previews'] = [initialPreviewResult.preview];
+  const previews: AgentMultiTurnAppServerSessionResult['previews'] = [initialPreviewResult.snapshot.initialPreview];
   const previewLineage: AgentMultiTurnAppServerSessionResult['previewLineage'] = [
     {
-      artifactId: initialPreviewReceipt.preview.artifactId,
-      graphRevision: initialPreviewReceipt.graphRevision,
+      artifactId: initialPreviewReceipt.attachment.artifactId,
+      graphRevision: initialPreviewReceipt.attachment.revision.graphRevision,
       purpose: 'initial_context',
-      recipeHash: initialPreviewReceipt.preview.recipeHash,
-      renderHash: initialPreviewReceipt.preview.renderHash,
+      recipeHash: initialPreviewReceipt.attachment.revision.recipeHash,
+      renderHash: initialPreviewReceipt.attachment.revision.renderHash,
       toolCallId: initialPreviewToolCallId,
       turn: 0,
     },
   ];
   const toolCalls: AgentMultiTurnAppServerSessionResult['toolCalls'] = [
     {
-      contentHash: initialPreviewReceipt.contentHash,
+      contentHash: initialPreviewReceipt.attachment.contentHash,
       id: initialPreviewToolCallId,
       name: initialPreviewReceipt.toolName,
-      previewArtifactId: initialPreviewReceipt.preview.artifactId,
-      receiptGraphRevision: initialPreviewReceipt.graphRevision,
+      previewArtifactId: initialPreviewReceipt.attachment.artifactId,
+      receiptGraphRevision: initialPreviewReceipt.attachment.revision.graphRevision,
       status: 'succeeded',
       turn: 0,
     },
   ];
-  let recipeHash = initialPreviewReceipt.preview.recipeHash;
-  let finalGraphRevision = initialPreviewReceipt.graphRevision;
+  let recipeHash = initialPreviewReceipt.attachment.revision.recipeHash;
+  let finalGraphRevision = initialPreviewReceipt.attachment.revision.graphRevision;
   let changedPixelCount = 0;
   let changedPixelPercent = 0;
   let maxChannelDelta = 0;

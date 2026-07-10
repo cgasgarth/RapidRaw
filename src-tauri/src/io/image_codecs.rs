@@ -41,7 +41,7 @@ mod tests {
         encode_jpeg_bytes, encode_jpeg_data_url, encode_jpeg_response, encode_png_data_url,
     };
     use crate::formats::{JPEG_DATA_URL_PREFIX, PNG_DATA_URL_PREFIX};
-    use image::{DynamicImage, ImageBuffer, Rgba};
+    use image::{DynamicImage, GenericImageView, ImageBuffer, ImageFormat, Rgba};
 
     #[test]
     fn jpeg_helpers_encode_response_and_data_url() {
@@ -50,9 +50,12 @@ mod tests {
         let data_url = encode_jpeg_data_url(&image, 75).expect("jpeg data url should encode");
         encode_jpeg_response(&image, 75).expect("jpeg response should encode");
         let bytes = encode_jpeg_bytes(&image, 75).expect("jpeg bytes should encode");
+        let decoded = image::load_from_memory_with_format(&bytes, ImageFormat::Jpeg)
+            .expect("encoded JPEG should decode through the native image decoder");
 
         assert!(data_url.starts_with(JPEG_DATA_URL_PREFIX));
         assert!(!bytes.is_empty());
+        assert_eq!(decoded.dimensions(), (4, 4));
     }
 
     #[test]

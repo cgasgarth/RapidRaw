@@ -321,6 +321,79 @@ export const rawEngineAgentInitialPreviewReceiptV1Schema = z
 
 export type RawEngineAgentInitialPreviewReceiptV1 = z.infer<typeof rawEngineAgentInitialPreviewReceiptV1Schema>;
 
+export const rawEngineAgentMediumPreviewAttachmentV2Schema = z
+  .object({
+    accessScope: z.literal('local_private'),
+    artifactId: z.string().trim().min(1),
+    byteLength: z
+      .number()
+      .int()
+      .positive()
+      .max(8 * 1024 * 1024),
+    colorPipeline: z
+      .object({
+        encodedProfile: z.literal('srgb-preview'),
+        outputProfile: z.literal('srgb'),
+        previewTransform: z.literal('editor-preview-to-srgb-jpeg'),
+        workingSpace: z.literal('rawengine-scene-linear'),
+      })
+      .strict(),
+    contentHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    createdAt: z.iso.datetime(),
+    dimensions: z
+      .object({
+        height: z.number().int().positive(),
+        width: z.number().int().positive(),
+      })
+      .strict(),
+    encodedFormat: z.literal('jpeg'),
+    expiresAt: z.iso.datetime(),
+    includesOriginalRaw: z.literal(false),
+    lifecycle: z
+      .object({
+        releaseToken: z.string().trim().min(1),
+        status: z.enum(['acquiring', 'cancelled', 'failed', 'ready', 'released', 'stale', 'superseded', 'timed_out']),
+      })
+      .strict(),
+    longEdgePx: z.literal(1536),
+    mediaType: z.literal('image/jpeg'),
+    quality: z.literal(0.86),
+    revision: z
+      .object({
+        graphRevision: z.string().trim().min(1),
+        recipeHash: z.string().trim().min(1),
+        renderHash: z.string().trim().min(1),
+        revisionToken: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+        selectedImageId: z.string().trim().min(1),
+      })
+      .strict(),
+    transport: z
+      .object({
+        handle: z.string().trim().min(1),
+        kind: z.literal('opaque_ephemeral_handle'),
+      })
+      .strict(),
+  })
+  .strict()
+  .refine(
+    (attachment) => Math.max(attachment.dimensions.width, attachment.dimensions.height) === attachment.longEdgePx,
+    { message: 'Medium preview dimensions must match its long edge.', path: ['dimensions'] },
+  );
+
+export type RawEngineAgentMediumPreviewAttachmentV2 = z.infer<typeof rawEngineAgentMediumPreviewAttachmentV2Schema>;
+
+export const rawEngineAgentInitialPreviewReceiptV2Schema = z
+  .object({
+    attachment: rawEngineAgentMediumPreviewAttachmentV2Schema,
+    requestId: z.string().trim().min(1),
+    schemaVersion: z.literal(2),
+    sessionId: z.string().trim().min(1),
+    toolName: z.literal('rawengine.image.get_preview'),
+  })
+  .strict();
+
+export type RawEngineAgentInitialPreviewReceiptV2 = z.infer<typeof rawEngineAgentInitialPreviewReceiptV2Schema>;
+
 export const rawEngineAgentPreviewRefreshReceiptV1Schema = z
   .object({
     colorPipeline: z
