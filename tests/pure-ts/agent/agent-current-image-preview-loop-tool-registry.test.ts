@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
-
+import { RAW_ENGINE_AGENT_SELECTED_IMAGE_PROPOSAL_RENDER_TOOL_NAME } from '../../../packages/rawengine-schema/src/agentSelectedImageProposalSchemas';
 import {
   filterRawEngineLocalAppServerExecutableToolRegistry,
   RawEngineLocalAppServerCommandType,
@@ -155,6 +155,9 @@ describe('agent selected-image preview-loop executable tool registry', () => {
 
   test('exposes selected-image preview-loop tools in the filtered local executable registry', () => {
     const registry = filterRawEngineLocalAppServerExecutableToolRegistry(rawEngineDefaultToolRegistryV1);
+    const proposal = registry.tools.find(
+      (tool) => tool.toolName === RAW_ENGINE_AGENT_SELECTED_IMAGE_PROPOSAL_RENDER_TOOL_NAME,
+    );
     const previewLoop = registry.tools.find((tool) => tool.toolName === AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME);
     const applyReview = registry.tools.find(
       (tool) => tool.toolName === AGENT_CURRENT_IMAGE_PREVIEW_LOOP_APPLY_REVIEW_TOOL_NAME,
@@ -168,6 +171,15 @@ describe('agent selected-image preview-loop executable tool registry', () => {
       requiresDryRun: true,
       returnsArtifactHandles: true,
       toolKind: 'apply',
+    });
+    expect(proposal).toMatchObject({
+      approvalClass: 'preview_only',
+      inputSchemaName: 'RawEngineAgentSelectedImageProposalRenderCommandV1',
+      mutates: false,
+      outputSchemaName: 'RawEngineAgentSelectedImageProposalReceiptV1',
+      requiresDryRun: true,
+      returnsArtifactHandles: true,
+      toolKind: 'dry_run',
     });
     expect(applyReview).toMatchObject({
       approvalClass: 'edit_apply',
