@@ -653,8 +653,11 @@ pub async fn export_images(
         return Err("An export is already in progress.".to_string());
     }
 
+    state.export_cancel_requested.store(false, Ordering::SeqCst);
+
     let context = get_or_init_gpu_context(&state, &app_handle)?;
     let context = Arc::new(context);
+    let export_cancel_requested = Arc::clone(&state.export_cancel_requested);
     let progress_counter = Arc::new(AtomicUsize::new(0));
 
     let available_cores = std::thread::available_parallelism()
@@ -721,10 +724,19 @@ pub async fn export_images(
         let mut join_handles = Vec::new();
 
         for (global_index, image_path_str, appearance_count, explicit_vc) in export_items {
+            if export_cancel_requested.load(Ordering::SeqCst) {
+                break;
+            }
+
             let permit = semaphore.clone().acquire_owned().await.unwrap();
+
+            if export_cancel_requested.load(Ordering::SeqCst) {
+                break;
+            }
 
             let app_handle_clone = app_handle.clone();
             let context_clone = Arc::clone(&context);
+            let export_cancel_requested = Arc::clone(&export_cancel_requested);
             let progress_counter_clone = Arc::clone(&progress_counter);
             let output_folder_path = output_folder_path.to_path_buf();
             let base_origin_folders = base_origin_folders.clone();
@@ -735,13 +747,7 @@ pub async fn export_images(
             let settings = settings.clone();
 
             let handle = tokio::task::spawn_blocking(move || {
-                if app_handle_clone
-                    .state::<AppState>()
-                    .export_task_handle
-                    .lock()
-                    .unwrap()
-                    .is_none()
-                {
+                if export_cancel_requested.load(Ordering::SeqCst) {
                     return Err("Export cancelled".to_string());
                 }
 
@@ -818,6 +824,9 @@ pub async fn export_images(
                     }
 
                     let export_started = Instant::now();
+                    if export_cancel_requested.load(Ordering::SeqCst) {
+                        return Err("Export cancelled".to_string());
+                    }
                     let (base_image, raw_development_report) = if is_current_edit {
                         match get_full_image_for_processing(&state) {
                             Ok((orig_data, _)) => {
@@ -885,6 +894,9 @@ pub async fn export_images(
                         is_raw,
                         &app_handle_clone,
                     )?;
+                    if export_cancel_requested.load(Ordering::SeqCst) {
+                        return Err("Export cancelled".to_string());
+                    }
                     let export_color_policy = save_image_with_metadata(
                         &final_image,
                         &output_path,
@@ -897,6 +909,9 @@ pub async fn export_images(
                     }
 
                     if export_settings.export_masks {
+                        if export_cancel_requested.load(Ordering::SeqCst) {
+                            return Err("Export cancelled".to_string());
+                        }
                         export_masks_for_image(
                             &base_image,
                             &js_adjustments,
@@ -966,7 +981,9 @@ pub async fn export_images(
             }
         }
 
-        if error_count > 0 && total_paths > 1 {
+        if export_cancel_requested.load(Ordering::SeqCst) {
+            let _ = app_handle.emit(crate::events::EXPORT_CANCELLED, ());
+        } else if error_count > 0 && total_paths > 1 {
             let _ = app_handle.emit(
                 crate::events::EXPORT_COMPLETE_WITH_ERRORS,
                 serde_json::json!({ "errors": error_count, "total": total_paths }),
@@ -1125,15 +1142,15 @@ fn write_raw_export_provenance_sidecar(
 
 #[tauri::command]
 pub fn cancel_export(state: tauri::State<AppState>) -> Result<(), String> {
-    match state.export_task_handle.lock().unwrap().take() {
-        Some(handle) => {
-            handle.abort();
-            println!("Export task cancellation requested.");
-        }
-        _ => {
-            return Err("No export task is currently running.".to_string());
-        }
+    if state.export_task_handle.lock().unwrap().is_none() {
+        return Err("No export task is currently running.".to_string());
     }
+
+    if state.export_cancel_requested.swap(true, Ordering::SeqCst) {
+        return Err("Export cancellation is already in progress.".to_string());
+    }
+
+    println!("Export task cancellation requested.");
     Ok(())
 }
 
