@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { shouldAllowViewerImageNavigation } from '../../components/panel/editor/viewerInputResolver';
 import { ExifOverlay, type ImageFile, Panel } from '../../components/ui/AppProperties';
 import { normalizeKeyboardShortcutMap } from '../../schemas/keyboardShortcutSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
@@ -135,7 +136,12 @@ export const useKeyboardShortcuts = ({
         },
       },
       preview_prev: {
-        shouldFire: (s) => !!s.editor.selectedImage,
+        shouldFire: (s) =>
+          !!s.editor.selectedImage &&
+          shouldAllowViewerImageNavigation({
+            controlOwnsKey: false,
+            isViewerGestureDragging: isViewerGestureDragging(),
+          }),
         execute: (e, s) => {
           e.preventDefault();
           const selectedImage = s.editor.selectedImage;
@@ -148,7 +154,12 @@ export const useKeyboardShortcuts = ({
         },
       },
       preview_next: {
-        shouldFire: (s) => !!s.editor.selectedImage,
+        shouldFire: (s) =>
+          !!s.editor.selectedImage &&
+          shouldAllowViewerImageNavigation({
+            controlOwnsKey: false,
+            isViewerGestureDragging: isViewerGestureDragging(),
+          }),
         execute: (e, s) => {
           e.preventDefault();
           const selectedImage = s.editor.selectedImage;
@@ -617,4 +628,8 @@ function isEditableKeyboardTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   if (target.isContentEditable) return true;
   return ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName);
+}
+
+function isViewerGestureDragging(): boolean {
+  return document.querySelector('[data-editor-pointer-surface="image"][data-viewer-gesture-state="dragging"]') !== null;
 }

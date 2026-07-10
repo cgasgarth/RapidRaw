@@ -70,6 +70,7 @@ import {
   canvasOverlayTokens,
 } from './overlays/canvasOverlayTokens';
 import { PreviewSurface } from './PreviewSurface';
+import type { ViewerActiveTool } from './viewerInputResolver';
 
 declare global {
   interface Window {
@@ -290,6 +291,7 @@ interface ImageCanvasProps {
   overlayMode?: OverlayMode;
   overlayRotation?: number;
   cursorStyle: string;
+  viewerInputState?: { activeTool: ViewerActiveTool; isTemporaryHand: boolean };
   isMaxZoom?: boolean;
   liveRotation?: number | null;
   transformState: { scale: number; positionX: number; positionY: number };
@@ -1653,6 +1655,7 @@ const ImageCanvas = memo(
     overlayRotation,
     overlayMode,
     cursorStyle,
+    viewerInputState,
     isMaxZoom,
     liveRotation,
     transformState,
@@ -3170,13 +3173,22 @@ const ImageCanvas = memo(
     }, [adjustments.rotation, liveRotation]);
 
     const effectiveCursor = useMemo(() => {
+      if (viewerInputState?.isTemporaryHand) return cursorStyle;
       if (isWbPickerActive) return 'crosshair';
       if (isParametricActive) return 'crosshair';
       if (isInitialDrawing) return 'crosshair';
       if (isBrushActive) return 'none';
       if (isAiSubjectActive) return 'crosshair';
       return cursorStyle;
-    }, [isWbPickerActive, isInitialDrawing, isBrushActive, isAiSubjectActive, isParametricActive, cursorStyle]);
+    }, [
+      isWbPickerActive,
+      isInitialDrawing,
+      isBrushActive,
+      isAiSubjectActive,
+      isParametricActive,
+      cursorStyle,
+      viewerInputState?.isTemporaryHand,
+    ]);
 
     const handlePreviewUpdate = useCallback(
       (id: string, subMaskPreview: Partial<SubMask>) => {
@@ -3263,6 +3275,8 @@ const ImageCanvas = memo(
         data-mask-overlay-identity={maskOverlayRuntimeState?.identity ?? ''}
         data-mask-overlay-status={maskOverlayRuntimeState?.status ?? 'none'}
         data-preview-backend={wgpuPreviewVisibility.previewBackend}
+        data-viewer-active-tool={viewerInputState?.activeTool ?? activeCanvasOverlayTool}
+        data-viewer-temporary-hand={String(viewerInputState?.isTemporaryHand ?? false)}
         data-wb-picker-image-path={lastWhiteBalancePickerReceipt?.selectedImagePath ?? undefined}
         data-wb-picker-preview-identity={lastWhiteBalancePickerReceipt?.previewIdentity ?? undefined}
         data-wb-picker-result-temperature={
