@@ -46,6 +46,7 @@ export enum Invokes {
   GenerateAiSubjectMask = 'generate_ai_subject_mask',
   GenerateAiDepthMask = 'generate_ai_depth_mask',
   GenerateOriginalTransformedPreview = 'generate_original_transformed_preview',
+  SampleViewerPixel = 'sample_viewer_pixel',
   GenerateExportSoftProofPreview = 'generate_export_soft_proof_preview',
   ResolveExportSoftProofTransformMetadata = 'resolve_export_soft_proof_transform_metadata',
   GeneratePreviewForPath = 'generate_preview_for_path',

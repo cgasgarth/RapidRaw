@@ -1001,7 +1001,8 @@
       "gamutWarningCoverage": "",
       "gamutWarningOverlay": "",
       "maskOverlayAlt": "",
-      "originalAlt": ""
+      "originalAlt": "",
+      "sampler": { "clipped": "Écrêtage {{channels}}", "paused": "En pause" }
     },
     "chromeStatus": {
       "accessibilityLabel": "",

@@ -10,7 +10,9 @@ use tauri::{Emitter, Manager};
 
 use crate::adjustment_utils::hydrate_adjustments;
 use crate::app_settings::load_settings_or_default;
-use crate::app_state::{AnalyticsConfig, AppState, CachedPreview, PreviewJob};
+use crate::app_state::{
+    AnalyticsConfig, AppState, CachedPreview, CachedViewerSampleFrame, PreviewJob,
+};
 use crate::cache_utils::{calculate_full_job_hash, calculate_transform_hash};
 use crate::film_look_render::normalize_film_look_adjustments_for_render;
 use crate::generate_transformed_preview;
@@ -32,6 +34,7 @@ pub(crate) struct PreviewJobConfig<'a> {
     pub(crate) roi: Option<(f32, f32, f32, f32)>,
     pub(crate) compute_waveform: bool,
     pub(crate) active_waveform_channel: Option<&'a str>,
+    pub(crate) viewer_sample_graph_revision: Option<&'a str>,
 }
 
 pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8>, String> {
@@ -45,6 +48,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         roi,
         compute_waveform,
         active_waveform_channel,
+        viewer_sample_graph_revision,
     } = config;
 
     let fn_start = std::time::Instant::now();
@@ -257,6 +261,18 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         }
     };
 
+    if !is_interactive && let Some(graph_revision) = viewer_sample_graph_revision {
+        state.viewer_sample_frames.lock().unwrap().insert(
+            "edited".to_string(),
+            CachedViewerSampleFrame {
+                graph_revision: graph_revision.to_string(),
+                image: Arc::new(final_processed_image.clone()),
+                image_identity: loaded_image.path.clone(),
+                space_label: "Display encoded sRGB".to_string(),
+            },
+        );
+    }
+
     if use_wgpu_renderer {
         let _ = context.device.poll(wgpu::PollType::Wait {
             submission_index: None,
@@ -423,6 +439,7 @@ pub(crate) fn start_preview_worker(app_handle: tauri::AppHandle) {
                 roi: job.roi,
                 compute_waveform: job.compute_waveform,
                 active_waveform_channel: job.active_waveform_channel.as_deref(),
+                viewer_sample_graph_revision: job.viewer_sample_graph_revision.as_deref(),
             }) {
                 Ok(bytes) => {
                     let _ = responder.send(bytes);

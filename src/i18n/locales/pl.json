@@ -1067,7 +1067,8 @@
       "gamutWarningCoverage": "",
       "gamutWarningOverlay": "",
       "maskOverlayAlt": "Nakladka maski",
-      "originalAlt": "Oryginal"
+      "originalAlt": "Oryginal",
+      "sampler": { "clipped": "Przycięcie {{channels}}", "paused": "Wstrzymano" }
     },
     "chromeStatus": {
       "accessibilityLabel": "",

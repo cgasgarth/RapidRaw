@@ -430,6 +430,7 @@ struct ApplyAdjustmentsRequest {
     roi: Option<(f32, f32, f32, f32)>,
     compute_waveform: bool,
     active_waveform_channel: Option<String>,
+    viewer_sample_graph_revision: Option<String>,
 }
 
 #[tauri::command]
@@ -460,6 +461,7 @@ async fn apply_adjustments(
                 roi: request.roi,
                 compute_waveform: request.compute_waveform,
                 active_waveform_channel: request.active_waveform_channel,
+                viewer_sample_graph_revision: request.viewer_sample_graph_revision,
                 responder: tx,
             };
             worker_tx
@@ -486,6 +488,7 @@ struct ExportSoftProofPreviewRequest {
     js_adjustments: serde_json::Value,
     rendering_intent: export::export_processing::ExportRenderingIntent,
     target_resolution: Option<u32>,
+    viewer_sample_graph_revision: Option<String>,
 }
 
 #[tauri::command]
@@ -528,6 +531,20 @@ fn generate_export_soft_proof_preview(
         &request.rendering_intent,
         request.black_point_compensation,
     )?;
+
+    if let Some(graph_revision) = request.viewer_sample_graph_revision.as_deref()
+        && let Some(proof_image) = RgbImage::from_raw(width, height, proof_pixels.clone())
+    {
+        state.viewer_sample_frames.lock().unwrap().insert(
+            "softProof".to_string(),
+            CachedViewerSampleFrame {
+                graph_revision: graph_revision.to_string(),
+                image: Arc::new(DynamicImage::ImageRgb8(proof_image)),
+                image_identity: loaded_image.path.clone(),
+                space_label: format!("Soft proof · {}", proof_metadata.effective_color_profile),
+            },
+        );
+    }
 
     if let Some(recipe_id) = request.export_soft_proof_recipe_id
         && let Some(proof_image) = RgbImage::from_raw(width, height, proof_pixels.clone())
@@ -816,6 +833,7 @@ fn generate_uncropped_preview(
 fn generate_original_transformed_preview(
     js_adjustments: serde_json::Value,
     target_resolution: Option<u32>,
+    viewer_sample_graph_revision: Option<String>,
     state: tauri::State<AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<String, String> {
@@ -848,7 +866,222 @@ fn generate_original_transformed_preview(
         transformed_full_res.into_owned()
     };
 
+    if let Some(graph_revision) = viewer_sample_graph_revision {
+        state.viewer_sample_frames.lock().unwrap().insert(
+            "original".to_string(),
+            CachedViewerSampleFrame {
+                graph_revision,
+                image: Arc::new(transformed_image.clone()),
+                image_identity: loaded_image.path,
+                space_label: "Original · Display encoded sRGB".to_string(),
+            },
+        );
+    }
+
     encode_jpeg_data_url(&transformed_image, 80)
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ViewerSamplePoint {
+    x: f64,
+    y: f64,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ViewerSampleImageSize {
+    width: u32,
+    height: u32,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ViewerSampleRequest {
+    request_identity: String,
+    image_identity: String,
+    graph_revision: String,
+    geometry_epoch: u64,
+    normalized_image_point: ViewerSamplePoint,
+    source_image_size: ViewerSampleImageSize,
+    target: String,
+    sample_radius_image_px: u32,
+    requested_space: String,
+}
+
+fn unavailable_viewer_sample(
+    request: &ViewerSampleRequest,
+    reason: &str,
+    space_label: &str,
+) -> serde_json::Value {
+    serde_json::json!({
+        "status": "unavailable",
+        "requestIdentity": request.request_identity,
+        "reason": reason,
+        "spaceLabel": space_label,
+    })
+}
+
+fn sample_viewer_frame(
+    request: &ViewerSampleRequest,
+    frame: &CachedViewerSampleFrame,
+) -> serde_json::Value {
+    if request.requested_space != "displayEncoded" {
+        return unavailable_viewer_sample(request, "unsupportedSpace", &frame.space_label);
+    }
+    if !request.normalized_image_point.x.is_finite()
+        || !request.normalized_image_point.y.is_finite()
+        || !(0.0..=1.0).contains(&request.normalized_image_point.x)
+        || !(0.0..=1.0).contains(&request.normalized_image_point.y)
+        || request.source_image_size.width == 0
+        || request.source_image_size.height == 0
+    {
+        return unavailable_viewer_sample(request, "invalidPoint", &frame.space_label);
+    }
+
+    let rgb = frame.image.to_rgb32f();
+    let width = rgb.width();
+    let height = rgb.height();
+    if width == 0 || height == 0 {
+        return unavailable_viewer_sample(request, "frameUnavailable", &frame.space_label);
+    }
+    let center_x =
+        (request.normalized_image_point.x * f64::from(width.saturating_sub(1))).round() as u32;
+    let center_y =
+        (request.normalized_image_point.y * f64::from(height.saturating_sub(1))).round() as u32;
+    let source_max = request
+        .source_image_size
+        .width
+        .max(request.source_image_size.height)
+        .max(1);
+    let frame_max = width.max(height).max(1);
+    let radius = ((request.sample_radius_image_px as f64 * f64::from(frame_max)
+        / f64::from(source_max))
+    .ceil() as u32)
+        .min(16);
+    let min_x = center_x.saturating_sub(radius);
+    let max_x = center_x.saturating_add(radius).min(width - 1);
+    let min_y = center_y.saturating_sub(radius);
+    let max_y = center_y.saturating_add(radius).min(height - 1);
+    let mut totals = [0.0_f64; 3];
+    let mut count = 0_u64;
+    for y in min_y..=max_y {
+        for x in min_x..=max_x {
+            let pixel = rgb.get_pixel(x, y).0;
+            totals[0] += f64::from(pixel[0]);
+            totals[1] += f64::from(pixel[1]);
+            totals[2] += f64::from(pixel[2]);
+            count += 1;
+        }
+    }
+    let channels = totals.map(|value| (value / count as f64).clamp(0.0, 1.0));
+    let clipped_channels: Vec<&str> = ["r", "g", "b"]
+        .into_iter()
+        .zip(channels)
+        .filter_map(|(label, value)| (value >= 1.0 - f64::EPSILON).then_some(label))
+        .collect();
+    let image_x = (request.normalized_image_point.x
+        * f64::from(request.source_image_size.width.saturating_sub(1)))
+    .round() as u32;
+    let image_y = (request.normalized_image_point.y
+        * f64::from(request.source_image_size.height.saturating_sub(1)))
+    .round() as u32;
+    serde_json::json!({
+        "status": "available",
+        "requestIdentity": request.request_identity,
+        "imagePointPx": { "x": image_x, "y": image_y },
+        "rgb": channels,
+        "luma": channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722,
+        "clippedChannels": clipped_channels,
+        "spaceLabel": frame.space_label,
+    })
+}
+
+#[tauri::command]
+fn sample_viewer_pixel(
+    request: ViewerSampleRequest,
+    state: tauri::State<AppState>,
+) -> serde_json::Value {
+    let _geometry_epoch = request.geometry_epoch;
+    let frames = state.viewer_sample_frames.lock().unwrap();
+    let Some(frame) = frames.get(&request.target) else {
+        return unavailable_viewer_sample(&request, "frameUnavailable", "Unavailable");
+    };
+    if frame.image_identity != request.image_identity
+        || frame.graph_revision != request.graph_revision
+    {
+        return unavailable_viewer_sample(&request, "staleFrame", &frame.space_label);
+    }
+    sample_viewer_frame(&request, frame)
+}
+
+#[cfg(test)]
+mod viewer_sampler_tests {
+    use super::*;
+
+    fn fixture_request(radius: u32) -> ViewerSampleRequest {
+        ViewerSampleRequest {
+            request_identity: "fixture-request".to_string(),
+            image_identity: "/fixture/color-patches.tif".to_string(),
+            graph_revision: "history_3".to_string(),
+            geometry_epoch: 9,
+            normalized_image_point: ViewerSamplePoint { x: 0.5, y: 0.5 },
+            source_image_size: ViewerSampleImageSize {
+                width: 3,
+                height: 1,
+            },
+            target: "edited".to_string(),
+            sample_radius_image_px: radius,
+            requested_space: "displayEncoded".to_string(),
+        }
+    }
+
+    #[test]
+    fn samples_known_display_encoded_patch_and_luma() {
+        let image = DynamicImage::ImageRgb8(ImageBuffer::from_fn(3, 1, |x, _| match x {
+            0 => image::Rgb([255, 0, 0]),
+            1 => image::Rgb([0, 128, 0]),
+            _ => image::Rgb([0, 0, 255]),
+        }));
+        let frame = CachedViewerSampleFrame {
+            graph_revision: "history_3".to_string(),
+            image: Arc::new(image),
+            image_identity: "/fixture/color-patches.tif".to_string(),
+            space_label: "Display encoded sRGB".to_string(),
+        };
+
+        let result = sample_viewer_frame(&fixture_request(0), &frame);
+        let rgb = result["rgb"].as_array().expect("RGB tuple");
+        assert!((rgb[1].as_f64().unwrap() - 128.0 / 255.0).abs() < 1e-6);
+        assert!((result["luma"].as_f64().unwrap() - 0.7152 * 128.0 / 255.0).abs() < 1e-6);
+        assert_eq!(result["spaceLabel"], "Display encoded sRGB");
+        assert_eq!(
+            result["imagePointPx"],
+            serde_json::json!({ "x": 1, "y": 0 })
+        );
+    }
+
+    #[test]
+    fn radius_average_and_unsupported_domain_are_explicit() {
+        let frame = CachedViewerSampleFrame {
+            graph_revision: "history_3".to_string(),
+            image: Arc::new(DynamicImage::ImageRgb8(ImageBuffer::from_fn(
+                3,
+                1,
+                |x, _| image::Rgb(if x == 1 { [255, 255, 255] } else { [0, 0, 0] }),
+            ))),
+            image_identity: "/fixture/color-patches.tif".to_string(),
+            space_label: "Display encoded sRGB".to_string(),
+        };
+        let averaged = sample_viewer_frame(&fixture_request(1), &frame);
+        assert!((averaged["rgb"][0].as_f64().unwrap() - 1.0 / 3.0).abs() < 1e-6);
+
+        let mut linear_request = fixture_request(0);
+        linear_request.requested_space = "workingLinear".to_string();
+        let unavailable = sample_viewer_frame(&linear_request, &frame);
+        assert_eq!(unavailable["status"], "unavailable");
+        assert_eq!(unavailable["reason"], "unsupportedSpace");
+    }
 }
 
 #[tauri::command]
@@ -2362,6 +2595,7 @@ pub fn run() {
             resolve_export_soft_proof_transform_metadata,
             generate_preview_for_path,
             generate_original_transformed_preview,
+            sample_viewer_pixel,
             generate_preset_preview,
             generate_uncropped_preview,
             preview_geometry_transform,

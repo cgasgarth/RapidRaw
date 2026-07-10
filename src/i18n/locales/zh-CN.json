@@ -1006,7 +1006,8 @@
       "gamutWarningCoverage": "",
       "gamutWarningOverlay": "",
       "maskOverlayAlt": "蒙版叠加",
-      "originalAlt": "原始图像"
+      "originalAlt": "原始图像",
+      "sampler": { "clipped": "剪切 {{channels}}", "paused": "已暂停" }
     },
     "chromeStatus": {
       "accessibilityLabel": "",

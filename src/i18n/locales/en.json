@@ -1037,7 +1037,11 @@
       "gamutWarningCoverage": "{{profile}} gamut · {{value}}",
       "gamutWarningOverlay": "sRGB gamut warning overlay",
       "maskOverlayAlt": "Mask Overlay",
-      "originalAlt": "Original"
+      "originalAlt": "Original",
+      "sampler": {
+        "clipped": "Clip {{channels}}",
+        "paused": "Paused"
+      }
     },
     "chromeStatus": {
       "accessibilityLabel": "Editor image-quality status",

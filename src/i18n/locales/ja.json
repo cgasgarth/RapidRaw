@@ -967,7 +967,8 @@
       "gamutWarningCoverage": "",
       "gamutWarningOverlay": "",
       "maskOverlayAlt": "",
-      "originalAlt": ""
+      "originalAlt": "",
+      "sampler": { "clipped": "クリップ {{channels}}", "paused": "一時停止" }
     },
     "chromeStatus": {
       "accessibilityLabel": "",
