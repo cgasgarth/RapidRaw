@@ -622,7 +622,7 @@ export default function CropPanel() {
         </div>
       </div>
 
-      <div className="grow overflow-y-auto px-2.5 py-1.5">
+      <div className="grow overflow-y-auto px-2.5 py-1.5" data-right-panel-scroll-root="true">
         {selectedImage?.isReady ? (
           <>
             <section

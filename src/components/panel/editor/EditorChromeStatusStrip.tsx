@@ -70,7 +70,9 @@ export default function EditorChromeStatusStrip({ isFullScreen, isRendering = fa
     <div
       aria-label={t('editor.chromeStatus.accessibilityLabel')}
       aria-live={isRendering ? 'polite' : 'off'}
-      className="shrink-0 border-t border-editor-border bg-editor-panel px-2 py-1"
+      className={editorChromeTokens.region.viewerStatusFooter}
+      data-editor-chrome="status-footer"
+      data-editor-control-placement="outside-image"
       data-layout="footer"
       data-testid="editor-chrome-status-strip"
       data-state="visible"

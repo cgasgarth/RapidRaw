@@ -1,37 +1,24 @@
 import { useTranslation } from 'react-i18next';
-import type { EditorCompareMode } from '../../../store/useEditorStore';
 import { imageCanvasLayerZIndex } from './imageCanvasContracts';
-
-type PreviewCompareStripMode = Exclude<EditorCompareMode, 'off'>;
 
 interface CompareOverlayProps {
   canShowOriginalCompare: boolean;
-  compareMode: EditorCompareMode;
   compareOverlayDisabled: boolean;
   isCompareModeActive: boolean;
-  isCropping: boolean;
   isMaxZoom: boolean | undefined;
-  onCompareModeChange: (mode: EditorCompareMode) => void;
-  onShowOriginalChange: (showOriginal: boolean) => void;
   originalSrc: string | null;
   previewSource: string;
-  showOriginal: boolean;
   showSideBySideCompare: boolean;
   showSplitCompare: boolean;
 }
 
 export function CompareOverlay({
   canShowOriginalCompare,
-  compareMode,
   compareOverlayDisabled,
   isCompareModeActive,
-  isCropping,
   isMaxZoom,
-  onCompareModeChange,
-  onShowOriginalChange,
   originalSrc,
   previewSource,
-  showOriginal,
   showSideBySideCompare,
   showSplitCompare,
 }: CompareOverlayProps) {
@@ -66,7 +53,8 @@ export function CompareOverlay({
       {showSideBySideCompare && (
         <div
           aria-label={t('editor.canvas.compare.sideBySideRegion')}
-          className="absolute inset-0 grid grid-cols-2 gap-2 bg-editor-panel-well/95 p-2"
+          className="pointer-events-none absolute inset-0 grid grid-cols-2 gap-2 bg-editor-panel-well/95 p-2"
+          data-canvas-pointer-owner="pan-zoom"
           data-testid="editor-compare-side-by-side-preview"
           style={{ zIndex: imageCanvasLayerZIndex('viewerHud') }}
         >
@@ -114,68 +102,6 @@ export function CompareOverlay({
           style={{ zIndex: imageCanvasLayerZIndex('viewerHud') }}
         >
           {t('editor.canvas.compare.overlayDisabled')}
-        </div>
-      )}
-      {!isCropping && (
-        <div
-          className="pointer-events-auto absolute left-1/2 top-3 flex max-w-[min(92%,520px)] -translate-x-1/2 items-center gap-1 rounded-md border border-editor-overlay-stroke bg-editor-panel/92 px-1.5 py-1 text-[11px] shadow-[0_12px_30px_var(--editor-overlay-shadow)] backdrop-blur"
-          data-compare-active={String(isCompareModeActive)}
-          data-compare-original-ready={String(canShowOriginalCompare)}
-          data-compare-show-original={String(showOriginal)}
-          data-preview-compare-mode={compareMode}
-          data-testid="editor-preview-compare-strip"
-          style={{ zIndex: imageCanvasLayerZIndex('viewerHud') }}
-        >
-          <span className="shrink-0 px-1.5 font-medium text-text-secondary">
-            {t('editor.canvas.compare.stripTitle')}
-          </span>
-          {(['hold-original', 'split-wipe', 'side-by-side'] satisfies PreviewCompareStripMode[]).map((mode) => {
-            const isActive = compareMode === mode;
-            const label =
-              mode === 'hold-original'
-                ? t('editor.canvas.compare.stripMode.hold-original')
-                : mode === 'split-wipe'
-                  ? t('editor.canvas.compare.stripMode.split-wipe')
-                  : t('editor.canvas.compare.stripMode.side-by-side');
-            return (
-              <button
-                aria-label={label}
-                aria-pressed={isActive}
-                className={[
-                  'h-7 rounded px-2 text-[11px] font-medium transition',
-                  isActive
-                    ? 'bg-text-primary text-bg-primary shadow-sm'
-                    : 'bg-editor-panel-well text-text-secondary hover:bg-editor-hover hover:text-text-primary',
-                ].join(' ')}
-                data-testid={`editor-preview-compare-${mode}`}
-                key={mode}
-                onClick={() => onCompareModeChange(isActive ? 'off' : mode)}
-                onPointerDown={(event) => {
-                  if (mode === 'hold-original' && event.button === 0) onShowOriginalChange(true);
-                }}
-                onPointerLeave={(event) => {
-                  if (mode === 'hold-original' && event.buttons === 1) onShowOriginalChange(false);
-                }}
-                onPointerUp={() => {
-                  if (mode === 'hold-original') onShowOriginalChange(false);
-                }}
-                type="button"
-              >
-                {label}
-              </button>
-            );
-          })}
-          {isCompareModeActive && (
-            <button
-              aria-label={t('editor.canvas.compare.stripOff')}
-              className="h-7 rounded px-2 text-[11px] font-medium text-text-secondary transition hover:bg-editor-hover hover:text-text-primary"
-              data-testid="editor-preview-compare-off"
-              onClick={() => onCompareModeChange('off')}
-              type="button"
-            >
-              {t('editor.canvas.compare.stripOff')}
-            </button>
-          )}
         </div>
       )}
     </>

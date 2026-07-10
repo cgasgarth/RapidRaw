@@ -12,9 +12,35 @@ import {
   SwatchBook,
 } from 'lucide-react';
 import { Panel } from '../../ui/AppProperties';
+export type RightPanelHeaderOwnership = 'host' | 'panel';
+export type RightPanelScrollMode = 'host' | 'panel' | 'workspace';
+export type RightPanelKeepAlivePolicy = 'none' | 'session';
+export type RightPanelCompactBehavior = 'preserve' | 'workspace';
+
+export interface RightPanelHostDescriptor {
+  compact: RightPanelCompactBehavior;
+  error: {
+    fallbackLabel: string;
+    presentation: 'inline';
+  };
+  header: {
+    fallbackLabel: string;
+    ownership: RightPanelHeaderOwnership;
+  };
+  keepAlive: RightPanelKeepAlivePolicy;
+  loading: {
+    fallback: 'progress';
+    retainPredecessor: boolean;
+  };
+  scroll: {
+    mode: RightPanelScrollMode;
+    rootSelector?: string | undefined;
+  };
+}
 
 export interface RightPanelRegistryEntry {
   fallbackLabel: string;
+  host: RightPanelHostDescriptor;
   icon: LucideIcon;
   id: Panel;
   keywords: readonly string[];
@@ -23,100 +49,154 @@ export interface RightPanelRegistryEntry {
   tooltipKey: string;
 }
 
+const panelScroll = (
+  fallbackLabel: string,
+): Pick<RightPanelHostDescriptor, 'compact' | 'error' | 'header' | 'keepAlive' | 'loading' | 'scroll'> => ({
+  compact: 'preserve',
+  error: { fallbackLabel: `Unable to load ${fallbackLabel}.`, presentation: 'inline' },
+  header: { fallbackLabel, ownership: 'panel' },
+  keepAlive: 'none',
+  loading: { fallback: 'progress', retainPredecessor: true },
+  scroll: { mode: 'panel', rootSelector: '[data-right-panel-scroll-root]' },
+});
+
+const workspacePanel = (
+  fallbackLabel: string,
+): Pick<RightPanelHostDescriptor, 'compact' | 'error' | 'header' | 'keepAlive' | 'loading' | 'scroll'> => ({
+  ...panelScroll(fallbackLabel),
+  compact: 'workspace',
+  scroll: { mode: 'workspace' },
+});
+
+const withHost = (
+  entry: Omit<RightPanelRegistryEntry, 'host'>,
+  host: RightPanelHostDescriptor,
+): RightPanelRegistryEntry => ({ ...entry, host });
+
 export const RIGHT_PANEL_GROUPS = [
   [
-    {
-      fallbackLabel: 'Color',
-      icon: Palette,
-      id: Panel.Color,
-      keywords: ['color', 'profile', 'tone', 'grading', 'white balance', 'hsl', 'mixer', 'film look'],
-      priority: 'primary',
-      shortLabel: 'Color',
-      tooltipKey: 'editor.switcher.tooltips.color',
-    },
-    {
-      fallbackLabel: 'Adjust',
-      icon: SlidersHorizontal,
-      id: Panel.Adjustments,
-      keywords: ['adjust', 'basic', 'exposure', 'contrast', 'curves', 'details', 'effects', 'sharpen'],
-      priority: 'primary',
-      shortLabel: 'Adjust',
-      tooltipKey: 'editor.switcher.tooltips.adjust',
-    },
-    {
-      fallbackLabel: 'Crop',
-      icon: Crop,
-      id: Panel.Crop,
-      keywords: ['crop', 'rotate', 'straighten', 'aspect', 'transform', 'lens'],
-      priority: 'primary',
-      shortLabel: 'Crop',
-      tooltipKey: 'editor.switcher.tooltips.crop',
-    },
-    {
-      fallbackLabel: 'Masks',
-      icon: Layers,
-      id: Panel.Masks,
-      keywords: ['mask', 'layer', 'brush', 'gradient', 'local adjustment', 'selection'],
-      priority: 'primary',
-      shortLabel: 'Masks',
-      tooltipKey: 'editor.switcher.tooltips.masks',
-    },
-    {
-      fallbackLabel: 'Agent Edit',
-      icon: BotMessageSquare,
-      id: Panel.Agent,
-      keywords: ['agent', 'chat', 'ai edit', 'assistant', 'instruction', 'review'],
-      priority: 'primary',
-      shortLabel: 'Agent',
-      tooltipKey: 'editor.switcher.tooltips.agent',
-    },
-    {
-      fallbackLabel: 'Inpaint',
-      icon: Paintbrush,
-      id: Panel.Ai,
-      keywords: ['inpaint', 'remove', 'retouch', 'object', 'fill', 'ai'],
-      priority: 'primary',
-      shortLabel: 'Inpaint',
-      tooltipKey: 'editor.switcher.tooltips.inpaint',
-    },
+    withHost(
+      {
+        fallbackLabel: 'Color',
+        icon: Palette,
+        id: Panel.Color,
+        keywords: ['color', 'profile', 'tone', 'grading', 'white balance', 'hsl', 'mixer', 'film look'],
+        priority: 'primary',
+        shortLabel: 'Color',
+        tooltipKey: 'editor.switcher.tooltips.color',
+      },
+      panelScroll('Color'),
+    ),
+    withHost(
+      {
+        fallbackLabel: 'Adjust',
+        icon: SlidersHorizontal,
+        id: Panel.Adjustments,
+        keywords: ['adjust', 'basic', 'exposure', 'contrast', 'curves', 'details', 'effects', 'sharpen'],
+        priority: 'primary',
+        shortLabel: 'Adjust',
+        tooltipKey: 'editor.switcher.tooltips.adjust',
+      },
+      panelScroll('Adjustments'),
+    ),
+    withHost(
+      {
+        fallbackLabel: 'Crop',
+        icon: Crop,
+        id: Panel.Crop,
+        keywords: ['crop', 'rotate', 'straighten', 'aspect', 'transform', 'lens'],
+        priority: 'primary',
+        shortLabel: 'Crop',
+        tooltipKey: 'editor.switcher.tooltips.crop',
+      },
+      panelScroll('Crop'),
+    ),
+    withHost(
+      {
+        fallbackLabel: 'Masks',
+        icon: Layers,
+        id: Panel.Masks,
+        keywords: ['mask', 'layer', 'brush', 'gradient', 'local adjustment', 'selection'],
+        priority: 'primary',
+        shortLabel: 'Masks',
+        tooltipKey: 'editor.switcher.tooltips.masks',
+      },
+      workspacePanel('Masks'),
+    ),
+    withHost(
+      {
+        fallbackLabel: 'Agent Edit',
+        icon: BotMessageSquare,
+        id: Panel.Agent,
+        keywords: ['agent', 'chat', 'ai edit', 'assistant', 'instruction', 'review'],
+        priority: 'primary',
+        shortLabel: 'Agent',
+        tooltipKey: 'editor.switcher.tooltips.agent',
+      },
+      { ...workspacePanel('Agent Edit'), keepAlive: 'session' },
+    ),
+    withHost(
+      {
+        fallbackLabel: 'Inpaint',
+        icon: Paintbrush,
+        id: Panel.Ai,
+        keywords: ['inpaint', 'remove', 'retouch', 'object', 'fill', 'ai'],
+        priority: 'primary',
+        shortLabel: 'Inpaint',
+        tooltipKey: 'editor.switcher.tooltips.inpaint',
+      },
+      workspacePanel('Inpaint'),
+    ),
   ],
   [
-    {
-      fallbackLabel: 'Info',
-      icon: Info,
-      id: Panel.Metadata,
-      keywords: ['info', 'metadata', 'exif', 'camera', 'lens', 'file'],
-      priority: 'secondary',
-      shortLabel: 'Info',
-      tooltipKey: 'editor.switcher.tooltips.info',
-    },
-    {
-      fallbackLabel: 'Presets',
-      icon: SwatchBook,
-      id: Panel.Presets,
-      keywords: ['preset', 'look', 'style', 'recipe', 'saved settings'],
-      priority: 'secondary',
-      shortLabel: 'Presets',
-      tooltipKey: 'editor.switcher.tooltips.presets',
-    },
-    {
-      fallbackLabel: 'Tether',
-      icon: Camera,
-      id: Panel.Tether,
-      keywords: ['tether', 'capture', 'camera', 'import', 'session'],
-      priority: 'secondary',
-      shortLabel: 'Tether',
-      tooltipKey: 'editor.switcher.tooltips.tether',
-    },
-    {
-      fallbackLabel: 'Export',
-      icon: FileInput,
-      id: Panel.Export,
-      keywords: ['export', 'output', 'save', 'render', 'format', 'jpg', 'tiff'],
-      priority: 'secondary',
-      shortLabel: 'Export',
-      tooltipKey: 'editor.switcher.tooltips.export',
-    },
+    withHost(
+      {
+        fallbackLabel: 'Info',
+        icon: Info,
+        id: Panel.Metadata,
+        keywords: ['info', 'metadata', 'exif', 'camera', 'lens', 'file'],
+        priority: 'secondary',
+        shortLabel: 'Info',
+        tooltipKey: 'editor.switcher.tooltips.info',
+      },
+      panelScroll('Info'),
+    ),
+    withHost(
+      {
+        fallbackLabel: 'Presets',
+        icon: SwatchBook,
+        id: Panel.Presets,
+        keywords: ['preset', 'look', 'style', 'recipe', 'saved settings'],
+        priority: 'secondary',
+        shortLabel: 'Presets',
+        tooltipKey: 'editor.switcher.tooltips.presets',
+      },
+      panelScroll('Presets'),
+    ),
+    withHost(
+      {
+        fallbackLabel: 'Tether',
+        icon: Camera,
+        id: Panel.Tether,
+        keywords: ['tether', 'capture', 'camera', 'import', 'session'],
+        priority: 'secondary',
+        shortLabel: 'Tether',
+        tooltipKey: 'editor.switcher.tooltips.tether',
+      },
+      panelScroll('Tether'),
+    ),
+    withHost(
+      {
+        fallbackLabel: 'Export',
+        icon: FileInput,
+        id: Panel.Export,
+        keywords: ['export', 'output', 'save', 'render', 'format', 'jpg', 'tiff'],
+        priority: 'secondary',
+        shortLabel: 'Export',
+        tooltipKey: 'editor.switcher.tooltips.export',
+      },
+      panelScroll('Export'),
+    ),
   ],
 ] as const satisfies ReadonlyArray<ReadonlyArray<RightPanelRegistryEntry>>;
 
@@ -147,11 +227,11 @@ export const isRightPanel = (panel: string | null): panel is Panel => panel !== 
 
 export const getRightPanelEntry = (panel: Panel): RightPanelRegistryEntry => {
   const entry = RIGHT_PANEL_ENTRY_BY_ID.get(panel);
-  if (entry === undefined) {
-    throw new Error(`Unknown right panel: ${panel}`);
-  }
+  if (entry === undefined) throw new Error(`Unknown right panel: ${panel}`);
   return entry;
 };
+
+export const getRightPanelHostDescriptor = (panel: Panel): RightPanelHostDescriptor => getRightPanelEntry(panel).host;
 
 export const getRecentRightPanelEntries = (
   recentPanels: readonly string[],
@@ -164,7 +244,6 @@ export const getRecentRightPanelEntries = (
   const seenPanels = new Set<Panel>();
   for (const panel of recentPanels) {
     if (!isRightPanel(panel) || panel === activePanel || seenPanels.has(panel)) continue;
-
     recentEntries.push(getRightPanelEntry(panel));
     seenPanels.add(panel);
     if (recentEntries.length === limit) break;

@@ -1,35 +1,9 @@
-import { AnimatePresence, motion, type Variants } from 'framer-motion';
-import { lazy, type ReactNode, Suspense, useEffect, useState } from 'react';
-import { type AppSettings, Panel, type SelectedImage } from '../../ui/AppProperties';
+import { motion, useReducedMotion } from 'framer-motion';
+import { Component, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { AppSettings, Panel, SelectedImage } from '../../ui/AppProperties';
 import type { ExportState } from '../../ui/ExportImportProperties';
-import ColorWorkspacePanel from './color/ColorWorkspacePanel';
-import Controls from './color/ControlsPanel';
-import CropPanel from './color/CropPanel';
-import ExportPanel from './export/ExportPanel';
-import MetadataPanel from './metadata/MetadataPanel';
-
-const AIPanel = lazy(() => import('./ai/AIPanel.js').then((module) => ({ default: module.AIPanel })));
-const AgentPanel = lazy(() => import('./ai/AgentPanel.js').then((module) => ({ default: module.AgentPanel })));
-const MasksPanel = lazy(() => import('./layers/MasksPanel.js').then((module) => ({ default: module.MasksPanel })));
-const PresetsPanel = lazy(() => import('./color/PresetsPanel.js').then((module) => ({ default: module.PresetsPanel })));
-const TetherPanel = lazy(() => import('./capture/TetherPanel.js').then((module) => ({ default: module.TetherPanel })));
-
-const panelVariants: Variants = {
-  animate: (direction: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: { duration: direction === 0 ? 0 : 0.18, ease: 'circOut' },
-  }),
-  exit: (direction: number) => ({
-    opacity: direction === 0 ? 1 : 0.2,
-    y: direction === 0 ? 0 : direction > 0 ? -12 : 12,
-    transition: { duration: direction === 0 ? 0 : 0.1, ease: 'circIn' },
-  }),
-  initial: (direction: number) => ({
-    opacity: direction === 0 ? 1 : 0.2,
-    y: direction === 0 ? 0 : direction > 0 ? 12 : -12,
-  }),
-};
+import { getRightPanelHostDescriptor, RIGHT_PANEL_ENTRIES, type RightPanelHostDescriptor } from './rightPanelRegistry';
+import { getRightPanelRenderer } from './rightPanelRenderers';
 
 export interface EditorRightPanelHostProps {
   activeRightPanel: Panel | null;
@@ -47,59 +21,30 @@ export interface EditorRightPanelHostProps {
   slideDirection: number;
 }
 
-type RightPanelRenderer = (props: EditorRightPanelHostProps) => ReactNode;
+interface PanelSlotProps {
+  onReady: () => void;
+  panel: Panel;
+  props: EditorRightPanelHostProps;
+}
 
-const rightPanelRegistry: Record<Panel, RightPanelRenderer> = {
-  [Panel.Adjustments]: () => <Controls />,
-  [Panel.Agent]: () => <AgentPanel />,
-  [Panel.Ai]: () => <AIPanel />,
-  [Panel.Color]: () => <ColorWorkspacePanel />,
-  [Panel.Crop]: () => <CropPanel />,
-  [Panel.Export]: ({
-    appSettings,
-    exportState,
-    handleSettingsChange,
-    multiSelectedPaths,
-    onLinkedVariantImported,
-    rootPaths,
-    selectedImage,
-    setExportState,
-  }) => (
-    <ExportPanel
-      appSettings={appSettings}
-      exportState={exportState}
-      multiSelectedPaths={multiSelectedPaths}
-      onLinkedVariantImported={onLinkedVariantImported}
-      onSettingsChange={(settings) => {
-        void handleSettingsChange(settings);
-      }}
-      rootPaths={rootPaths}
-      selectedImage={selectedImage}
-      setExportState={setExportState}
-    />
-  ),
-  [Panel.Masks]: () => <MasksPanel />,
-  [Panel.Metadata]: () => <MetadataPanel />,
-  [Panel.Presets]: ({ onNavigateToCommunity }) => <PresetsPanel onNavigateToCommunity={onNavigateToCommunity} />,
-  [Panel.Tether]: ({ onOpenTetherCapture }) => (
-    <TetherPanel
-      onOpenCapture={(path) => {
-        void onOpenTetherCapture(path);
-      }}
-    />
-  ),
-};
+interface PanelErrorBoundaryProps {
+  children: ReactNode;
+  descriptor: RightPanelHostDescriptor;
+}
+
+interface PanelErrorBoundaryState {
+  hasError: boolean;
+}
 
 function EditorRightPanelSkeleton() {
   return (
     <div
-      className="flex h-full w-full flex-col bg-editor-panel"
       aria-busy="true"
+      className="flex h-full w-full flex-col bg-editor-panel"
       data-testid="editor-right-panel-skeleton"
     >
-      <div className="flex min-h-11 shrink-0 items-center justify-between border-b border-editor-border px-3">
+      <div className="flex min-h-11 shrink-0 items-center border-b border-editor-border px-3">
         <div className="h-3 w-28 rounded bg-editor-panel-raised" />
-        <div className="h-5 w-12 rounded bg-editor-panel-raised" />
       </div>
       <div className="space-y-3 p-3">
         <div className="h-20 rounded-md border border-editor-border bg-editor-panel-well" />
@@ -111,49 +56,154 @@ function EditorRightPanelSkeleton() {
   );
 }
 
+class PanelErrorBoundary extends Component<PanelErrorBoundaryProps, PanelErrorBoundaryState> {
+  override state: PanelErrorBoundaryState = { hasError: false };
+
+  static getDerivedStateFromError(): PanelErrorBoundaryState {
+    return { hasError: true };
+  }
+
+  override componentDidUpdate(previousProps: PanelErrorBoundaryProps) {
+    if (previousProps.descriptor !== this.props.descriptor && this.state.hasError) {
+      this.setState({ hasError: false });
+    }
+  }
+
+  override render() {
+    if (!this.state.hasError) return this.props.children;
+
+    return (
+      <div
+        aria-live="polite"
+        className="grid h-full place-items-center px-5 text-center text-[12px] leading-5 text-text-secondary"
+        data-testid="editor-right-panel-error"
+        role="status"
+      >
+        {this.props.descriptor.error.fallbackLabel}
+      </div>
+    );
+  }
+}
+
+function PanelReady({ onReady, panel, props }: PanelSlotProps) {
+  useEffect(onReady, [onReady]);
+  return <>{getRightPanelRenderer(panel)(props)}</>;
+}
+
 export function EditorRightPanelHost(props: EditorRightPanelHostProps) {
-  const { activeRightPanel, renderedRightPanel, slideDirection } = props;
-  const [hasMountedAgentPanel, setHasMountedAgentPanel] = useState(renderedRightPanel === Panel.Agent);
-  const shouldMountAgentPanel = hasMountedAgentPanel || renderedRightPanel === Panel.Agent;
-  const isAgentPanelActive = activeRightPanel === Panel.Agent;
-  const renderPanel =
-    renderedRightPanel === null || renderedRightPanel === Panel.Agent ? null : rightPanelRegistry[renderedRightPanel];
+  const { activeRightPanel, renderedRightPanel } = props;
+  const prefersReducedMotion = useReducedMotion();
+  const hostRef = useRef<HTMLElement | null>(null);
+  const scrollPositionsRef = useRef(new Map<Panel, number>());
+  const [lastCoherentPanel, setLastCoherentPanel] = useState<Panel | null>(renderedRightPanel);
+  const [mountedKeepAlivePanels, setMountedKeepAlivePanels] = useState<ReadonlySet<Panel>>(() => new Set());
+  const activeDescriptor = activeRightPanel === null ? null : getRightPanelHostDescriptor(activeRightPanel);
+
+  const restoreScrollPosition = useCallback((panel: Panel) => {
+    const descriptor = getRightPanelHostDescriptor(panel);
+    const scrollTop = scrollPositionsRef.current.get(panel);
+    if (descriptor.scroll.mode !== 'panel' || descriptor.scroll.rootSelector === undefined || scrollTop === undefined)
+      return;
+    const rootSelector = descriptor.scroll.rootSelector;
+
+    window.requestAnimationFrame(() => {
+      const scrollRoot = hostRef.current?.querySelector<HTMLElement>(rootSelector);
+      if (scrollRoot === undefined || scrollRoot === null) return;
+      scrollRoot.scrollTop = Math.min(scrollTop, Math.max(0, scrollRoot.scrollHeight - scrollRoot.clientHeight));
+    });
+  }, []);
+
+  const handlePanelReady = useCallback(
+    (panel: Panel) => {
+      setLastCoherentPanel(panel);
+      restoreScrollPosition(panel);
+    },
+    [restoreScrollPosition],
+  );
 
   useEffect(() => {
-    if (renderedRightPanel === Panel.Agent) setHasMountedAgentPanel(true);
-  }, [renderedRightPanel]);
+    if (activeRightPanel === null || activeDescriptor?.keepAlive !== 'session') return;
+    setMountedKeepAlivePanels((mountedPanels) => {
+      if (mountedPanels.has(activeRightPanel)) return mountedPanels;
+      return new Set([...mountedPanels, activeRightPanel]);
+    });
+  }, [activeDescriptor?.keepAlive, activeRightPanel]);
+
+  useLayoutEffect(() => {
+    if (activeRightPanel !== null) restoreScrollPosition(activeRightPanel);
+  }, [activeRightPanel, restoreScrollPosition]);
+
+  const renderPanel = (panel: Panel, onReady: () => void) => {
+    const descriptor = getRightPanelHostDescriptor(panel);
+    return (
+      <PanelErrorBoundary descriptor={descriptor}>
+        <PanelReady onReady={onReady} panel={panel} props={props} />
+      </PanelErrorBoundary>
+    );
+  };
+
+  const predecessorPanel = lastCoherentPanel ?? renderedRightPanel;
+  const renderLoadingFallback = () => {
+    if (predecessorPanel === null || predecessorPanel === activeRightPanel) return <EditorRightPanelSkeleton />;
+    return renderPanel(predecessorPanel, () => undefined);
+  };
+
+  const onScrollCapture = (event: React.UIEvent<HTMLElement>) => {
+    if (activeRightPanel === null || activeDescriptor?.scroll.mode !== 'panel') return;
+    const scrollRoot = event.target;
+    if (!(scrollRoot instanceof HTMLElement) || !scrollRoot.matches(activeDescriptor.scroll.rootSelector ?? '')) return;
+    scrollPositionsRef.current.set(activeRightPanel, scrollRoot.scrollTop);
+  };
 
   return (
-    <>
-      {shouldMountAgentPanel ? (
-        <div
-          aria-hidden={!isAgentPanelActive}
-          className={`h-full w-full overflow-hidden bg-editor-panel text-text-primary ${
-            isAgentPanelActive ? '' : 'hidden'
-          }`}
-          data-testid="editor-agent-panel-keep-alive"
-          inert={isAgentPanelActive ? undefined : true}
-        >
-          <Suspense fallback={<EditorRightPanelSkeleton />}>
-            <AgentPanel />
-          </Suspense>
-        </div>
-      ) : null}
-      <AnimatePresence mode="wait" custom={slideDirection}>
-        {activeRightPanel && !isAgentPanelActive && (
-          <motion.div
-            animate="animate"
-            className="h-full w-full overflow-hidden bg-editor-panel text-text-primary"
-            custom={slideDirection}
-            exit="exit"
-            initial="initial"
-            key={renderedRightPanel}
-            variants={panelVariants}
+    <section
+      aria-label={activeDescriptor?.header.fallbackLabel ?? 'Inspector'}
+      className="h-full min-h-0 w-full overflow-hidden bg-editor-panel text-text-primary"
+      data-active-panel={activeRightPanel ?? undefined}
+      data-compact-behavior={activeDescriptor?.compact ?? 'preserve'}
+      data-testid="editor-right-panel-host"
+      onScrollCapture={onScrollCapture}
+      ref={hostRef}
+    >
+      <div className="h-full min-h-0 w-full" data-right-panel-focus-entry="true" tabIndex={-1}>
+        {RIGHT_PANEL_ENTRIES.filter((entry) => entry.host.keepAlive === 'session').map(({ id }) => {
+          const isActive = activeRightPanel === id;
+          const hasMounted = mountedKeepAlivePanels.has(id);
+          if (!isActive && !hasMounted) return null;
+
+          return (
+            <Suspense fallback={isActive ? renderLoadingFallback() : null} key={id}>
+              <div
+                aria-hidden={!isActive}
+                className="h-full w-full overflow-hidden"
+                data-testid={`editor-right-panel-keep-alive-${id}`}
+                hidden={!isActive}
+                inert={isActive ? undefined : true}
+              >
+                {renderPanel(id, () => handlePanelReady(id))}
+              </div>
+            </Suspense>
+          );
+        })}
+
+        {activeRightPanel !== null && activeDescriptor !== null && activeDescriptor.keepAlive !== 'session' ? (
+          <Suspense
+            fallback={
+              activeDescriptor.loading.retainPredecessor ? renderLoadingFallback() : <EditorRightPanelSkeleton />
+            }
           >
-            <Suspense fallback={<EditorRightPanelSkeleton />}>{renderPanel?.(props)}</Suspense>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </>
+            <motion.div
+              animate={{ opacity: 1 }}
+              className="h-full w-full overflow-hidden"
+              initial={prefersReducedMotion ? false : { opacity: 0.96 }}
+              key={activeRightPanel}
+              transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.12, ease: 'easeOut' }}
+            >
+              {renderPanel(activeRightPanel, () => handlePanelReady(activeRightPanel))}
+            </motion.div>
+          </Suspense>
+        ) : null}
+      </div>
+    </section>
   );
 }

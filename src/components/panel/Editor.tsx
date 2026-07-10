@@ -79,10 +79,12 @@ import {
 import { debounce } from '../../utils/timing';
 import type { WhiteBalancePickerRuntimeReceipt } from '../../utils/whiteBalancePicker';
 import { Panel } from '../ui/AppProperties';
+import { editorChromeTokens } from '../ui/editorChromeTokens';
 import UiText from '../ui/primitives/Text';
 import EditorChromeStatusStrip from './editor/EditorChromeStatusStrip';
 import EditorToolbar from './editor/EditorToolbar';
 import ImageCanvas from './editor/ImageCanvas';
+import { resolveViewerChromeRegionContract } from './editor/imageCanvasContracts';
 import { Mask, type SubMask } from './right/layers/Masks';
 
 interface TransformController {
@@ -1586,6 +1588,11 @@ export default function Editor({
   const isWgpuActive = appSettings?.useWgpuRenderer !== false && hasRenderedFirstFrame;
   const previewOnlyLabel = t('editor.previewOnly.label');
   const exitPreviewLabel = t('editor.previewOnly.exit');
+  const chrome = editorChromeTokens;
+  const viewerChromeRegion = resolveViewerChromeRegionContract({
+    isCompact: !isContiguousShell,
+    isFullScreen,
+  });
 
   return (
     <div
@@ -1594,12 +1601,17 @@ export default function Editor({
         !isInstantTransition && !isFullScreen && 'transition-all duration-300 ease-in-out',
         isFullScreen || isContiguousShell ? 'rounded-none p-0 gap-0' : 'rounded-lg gap-2',
       )}
+      data-editor-viewer-layout={viewerChromeRegion.layout}
     >
       {isFullScreen && (
-        <div className="pointer-events-none absolute inset-x-0 top-3 z-20 flex justify-center px-3">
+        <div
+          className={chrome.region.viewerFullscreenExit}
+          data-editor-chrome="fullscreen-exit"
+          data-editor-control-placement={viewerChromeRegion.persistentControlPlacement}
+        >
           <div
             aria-live="polite"
-            className="pointer-events-auto flex max-w-full items-center gap-3 rounded-md border border-editor-border bg-editor-panel/95 px-3 py-2 shadow-[0_14px_34px_var(--editor-overlay-shadow)]"
+            className="flex max-w-full items-center gap-3 rounded-md border border-editor-border bg-editor-panel-raised px-3 py-2 shadow-[0_14px_34px_var(--editor-overlay-shadow)]"
             data-testid="editor-preview-exit-banner"
           >
             <UiText as="span" className="whitespace-nowrap text-xs">
@@ -1619,13 +1631,16 @@ export default function Editor({
       )}
       <div
         className={cx(
-          'shrink-0 relative z-[120] rounded-lg border border-editor-border bg-editor-panel',
+          chrome.region.viewerCommandBar,
+          'rounded-lg border border-editor-border bg-editor-panel',
           !isInstantTransition && !isFullScreen && 'transition-all duration-300 ease-in-out',
           isContiguousShell && !isFullScreen && 'rounded-none border-x-0 border-t-0 border-b',
           isFullScreen ? 'max-h-0 opacity-0 m-0 border-transparent' : 'max-h-25 opacity-100 max-[700px]:max-h-none',
           toolbarOverflowVisible ? 'overflow-visible' : 'overflow-hidden',
         )}
         aria-hidden={isFullScreen}
+        data-editor-chrome="command-bar"
+        data-editor-control-placement={viewerChromeRegion.persistentControlPlacement}
         data-testid="editor-toolbar-shell"
       >
         <EditorToolbar
@@ -1680,6 +1695,7 @@ export default function Editor({
             : 'rounded-lg border border-editor-border p-2',
         )}
         data-testid="editor-image-preview-region"
+        data-editor-content-region="image"
         role="region"
       >
         <div
@@ -1700,6 +1716,7 @@ export default function Editor({
           onClick={handleClick}
           onDoubleClick={handleDoubleClick}
           data-fullscreen-preview={String(isFullScreen)}
+          data-editor-pointer-surface="image"
           data-testid="editor-image-preview-panel"
         >
           <div
@@ -1750,12 +1767,6 @@ export default function Editor({
               }}
               onSelectMask={(id) => {
                 setEditor({ activeMaskId: id });
-              }}
-              onCompareModeChange={(mode) => {
-                setEditor({ compareMode: mode });
-              }}
-              onShowOriginalChange={(nextShowOriginal) => {
-                setEditor({ showOriginal: nextShowOriginal });
               }}
               onStraighten={handleStraighten}
               selectedImage={selectedImage}
