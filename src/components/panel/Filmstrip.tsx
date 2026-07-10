@@ -11,6 +11,11 @@ import { COLOR_LABELS, type Color } from '../../utils/adjustments';
 import { buildRawQualityBadges, formatRawQualityBadgeTooltip } from '../../utils/rawQualityBadges';
 import { type ImageFile, type SelectedImage, ThumbnailAspectRatio } from '../ui/AppProperties';
 import UiText from '../ui/primitives/Text';
+import {
+  FILMSTRIP_THUMBNAIL_DECODE_TIMEOUT_MS,
+  FILMSTRIP_THUMBNAIL_HANDOFF_DURATION_MS,
+  filmstripThumbnailReadiness,
+} from './filmstripThumbnailLifecycle';
 
 const HORIZONTAL_PADDING = 4;
 const ITEM_GAP = 8;
@@ -20,11 +25,19 @@ const THUMBNAIL_FOCUS_CLASS = 'focus-visible:outline-none focus-visible:ring-2 f
 const FILMSTRIP_SUMMARY_HEIGHT = 30;
 
 interface ImageLayer {
-  id: string;
-  path: string;
+  binding: ThumbnailBinding;
+  phase: 'pending' | 'ready' | 'handoff' | 'settled';
   url: string;
   opacity: number;
 }
+
+interface ThumbnailBinding {
+  generation: number;
+  path: string;
+  url: string | undefined;
+}
+
+type ThumbnailFailure = 'decode' | 'error' | 'timeout';
 
 type ImageRatings = Record<string, number> | null | undefined;
 type ThumbnailMouseEvent = React.MouseEvent<HTMLDivElement>;
@@ -76,6 +89,41 @@ const getFilmstripFilename = (path: string): string => {
 const getFilmstripColorLabel = (tags: ImageFile['tags']) => {
   const colorTag = tags?.find((tag: string) => tag.startsWith('color:'))?.substring(6);
   return COLOR_LABELS.find((color: Color) => color.name === colorTag);
+};
+
+const isSameBinding = (left: ThumbnailBinding, right: ThumbnailBinding) =>
+  left.generation === right.generation && left.path === right.path && left.url === right.url;
+
+const createImageLayer = (binding: ThumbnailBinding, isSettled: boolean): ImageLayer => {
+  if (!binding.url) throw new Error('Filmstrip thumbnail layers require a URL.');
+
+  return {
+    binding,
+    opacity: isSettled ? 1 : 0,
+    phase: isSettled ? 'settled' : 'pending',
+    url: binding.url,
+  };
+};
+
+const useReducedMotion = () => {
+  const [reducedMotion, setReducedMotion] = useState(false);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    if (!mediaQuery) return undefined;
+
+    const updateReducedMotion = () => {
+      setReducedMotion(mediaQuery.matches);
+    };
+
+    updateReducedMotion();
+    mediaQuery.addEventListener('change', updateReducedMotion);
+    return () => {
+      mediaQuery.removeEventListener('change', updateReducedMotion);
+    };
+  }, []);
+
+  return reducedMotion;
 };
 
 export const resolveFilmstripThumbnailUrl = (
@@ -150,17 +198,22 @@ export const FilmstripThumbnail = memo(
     const { t } = useTranslation();
     const thumbData = useProcessStore((s) => s.thumbnails[imageFile.path]);
     const displayThumbnailUrl = resolveFilmstripThumbnailUrl(thumbData, selectedImageThumbnailUrl, isActive);
+    const { path, tags, is_edited: isEdited } = imageFile;
+
+    const bindingRef = useRef<ThumbnailBinding>({ generation: 0, path, url: displayThumbnailUrl });
+    const previousBinding = bindingRef.current;
+    if (previousBinding.path !== path || previousBinding.url !== displayThumbnailUrl) {
+      bindingRef.current = { generation: previousBinding.generation + 1, path, url: displayThumbnailUrl };
+    }
+    const binding = bindingRef.current;
 
     const [layers, setLayers] = useState<ImageLayer[]>(() =>
-      displayThumbnailUrl
-        ? [{ id: displayThumbnailUrl, path: imageFile.path, url: displayThumbnailUrl, opacity: 1 }]
-        : [],
+      binding.url ? [createImageLayer(binding, filmstripThumbnailReadiness.has(binding.path, binding.url))] : [],
     );
-    const currentThumbnailRef = useRef({ path: imageFile.path, url: displayThumbnailUrl });
-    currentThumbnailRef.current = { path: imageFile.path, url: displayThumbnailUrl };
+    const decodingGenerationRef = useRef<number | null>(null);
+    const reducedMotion = useReducedMotion();
 
-    const { path, tags, is_edited: isEdited } = imageFile;
-    const visibleLayers = layers.filter((layer) => layer.path === path);
+    const visibleLayers = layers.filter((layer) => layer.binding.path === path);
     const rating = imageRatings?.[path] || 0;
     const colorLabel = getFilmstripColorLabel(tags);
     const isVirtualCopy = path.includes('?vc=');
@@ -177,63 +230,169 @@ export const FilmstripThumbnail = memo(
     const truncatedTitle =
       filename.length > 40 ? `${filename.substring(0, 20)}...${filename.substring(filename.length - 17)}` : filename;
 
-    useEffect(() => {
-      if (thumbnailAspectRatio === ThumbnailAspectRatio.Contain && displayThumbnailUrl) {
-        const img = new Image();
-        let cancelled = false;
-        img.onload = () => {
-          if (cancelled || img.naturalHeight === 0) return;
-          const ratio = img.naturalWidth / img.naturalHeight;
-          setRatio(path, ratio);
-        };
-        img.src = displayThumbnailUrl;
-        return () => {
-          cancelled = true;
-        };
-      }
-      return undefined;
-    }, [displayThumbnailUrl, path, setRatio, thumbnailAspectRatio]);
+    const isCurrentBinding = useCallback(
+      (candidate: ThumbnailBinding) => isSameBinding(bindingRef.current, candidate),
+      [],
+    );
 
     useLayoutEffect(() => {
       setLayers((previousLayers) => {
-        if (previousLayers.every((layer) => layer.path === path)) return previousLayers;
-        return previousLayers.filter((layer) => layer.path === path);
+        const samePathLayers = previousLayers.filter((layer) => layer.binding.path === binding.path);
+        if (!binding.url) return samePathLayers.length === 0 ? previousLayers : [];
+
+        const target = samePathLayers.find((layer) => isSameBinding(layer.binding, binding));
+        if (target) {
+          const predecessor = samePathLayers.find(
+            (layer) => !isSameBinding(layer.binding, binding) && layer.opacity === 1,
+          );
+          const nextLayers = predecessor ? [predecessor, target] : [target];
+          return nextLayers.length === previousLayers.length &&
+            nextLayers.every((layer, index) => layer === previousLayers[index])
+            ? previousLayers
+            : nextLayers;
+        }
+
+        const predecessor = samePathLayers.find((layer) => layer.opacity === 1);
+        const targetStartsSettled =
+          predecessor === undefined && filmstripThumbnailReadiness.has(binding.path, binding.url);
+        return [...(predecessor ? [predecessor] : []), createImageLayer(binding, targetStartsSettled)];
       });
-    }, [path]);
+    }, [binding]);
+
+    const handleLayerFailure = useCallback(
+      (candidate: ThumbnailBinding, _failure: ThumbnailFailure) => {
+        if (!isCurrentBinding(candidate)) return;
+
+        setLayers((previousLayers) => {
+          const target = previousLayers.find((layer) => isSameBinding(layer.binding, candidate));
+          if (!target) return previousLayers;
+          return previousLayers.filter((layer) => !isSameBinding(layer.binding, candidate));
+        });
+      },
+      [isCurrentBinding],
+    );
+
+    const handleLayerDecoded = useCallback(
+      (candidate: ThumbnailBinding) => {
+        if (!candidate.url || !isCurrentBinding(candidate)) return;
+
+        filmstripThumbnailReadiness.markDecoded(candidate.path, candidate.url);
+        setLayers((previousLayers) =>
+          previousLayers.map((layer) =>
+            isSameBinding(layer.binding, candidate) && layer.phase === 'pending' ? { ...layer, phase: 'ready' } : layer,
+          ),
+        );
+      },
+      [isCurrentBinding],
+    );
+
+    const handleLayerLoad = useCallback(
+      (candidate: ThumbnailBinding, element: HTMLImageElement) => {
+        if (!isCurrentBinding(candidate)) return;
+
+        if (thumbnailAspectRatio === ThumbnailAspectRatio.Contain && element.naturalHeight > 0) {
+          setRatio(candidate.path, element.naturalWidth / element.naturalHeight);
+        }
+
+        if (decodingGenerationRef.current === candidate.generation) return;
+        decodingGenerationRef.current = candidate.generation;
+
+        let decodePromise: Promise<void>;
+        try {
+          decodePromise = typeof element.decode === 'function' ? element.decode() : Promise.resolve();
+        } catch {
+          handleLayerFailure(candidate, 'decode');
+          return;
+        }
+
+        void decodePromise.then(
+          () => handleLayerDecoded(candidate),
+          () => handleLayerFailure(candidate, 'decode'),
+        );
+      },
+      [handleLayerDecoded, handleLayerFailure, isCurrentBinding, setRatio, thumbnailAspectRatio],
+    );
 
     useEffect(() => {
-      const layerToFadeIn = layers.find((l) => l.opacity === 0);
-      if (layerToFadeIn) {
+      const pendingLayer = visibleLayers.find((layer) => layer.phase === 'pending' && isCurrentBinding(layer.binding));
+      if (!pendingLayer) return undefined;
+
+      const timeout = window.setTimeout(() => {
+        handleLayerFailure(pendingLayer.binding, 'timeout');
+      }, FILMSTRIP_THUMBNAIL_DECODE_TIMEOUT_MS);
+      return () => {
+        window.clearTimeout(timeout);
+      };
+    }, [handleLayerFailure, isCurrentBinding, visibleLayers]);
+
+    useEffect(() => {
+      const readyLayer = visibleLayers.find((layer) => layer.phase === 'ready' && isCurrentBinding(layer.binding));
+      if (!readyLayer) return undefined;
+
+      const frame = requestAnimationFrame(() => {
+        if (!isCurrentBinding(readyLayer.binding)) return;
+
+        setLayers((previousLayers) => {
+          const target = previousLayers.find((layer) => isSameBinding(layer.binding, readyLayer.binding));
+          if (!target || target.phase !== 'ready') return previousLayers;
+
+          const hasPredecessor = previousLayers.some(
+            (layer) =>
+              layer.binding.path === readyLayer.binding.path && !isSameBinding(layer.binding, readyLayer.binding),
+          );
+          return previousLayers.map((layer) =>
+            isSameBinding(layer.binding, readyLayer.binding)
+              ? { ...layer, opacity: 1, phase: hasPredecessor ? 'handoff' : 'settled' }
+              : layer,
+          );
+        });
+      });
+      return () => {
+        cancelAnimationFrame(frame);
+      };
+    }, [isCurrentBinding, visibleLayers]);
+
+    const retireHandoff = useCallback(
+      (candidate: ThumbnailBinding) => {
+        if (!isCurrentBinding(candidate)) return;
+
+        setLayers((previousLayers) => {
+          const target = previousLayers.find((layer) => isSameBinding(layer.binding, candidate));
+          if (!target || target.phase !== 'handoff') return previousLayers;
+          return [{ ...target, phase: 'settled' }];
+        });
+      },
+      [isCurrentBinding],
+    );
+
+    const handleTransitionEnd = useCallback(
+      (event: React.TransitionEvent<HTMLDivElement>, candidate: ThumbnailBinding) => {
+        if (event.target !== event.currentTarget || event.propertyName !== 'opacity') return;
+        retireHandoff(candidate);
+      },
+      [retireHandoff],
+    );
+
+    useEffect(() => {
+      const handoffLayer = visibleLayers.find((layer) => layer.phase === 'handoff' && isCurrentBinding(layer.binding));
+      if (!handoffLayer) return undefined;
+
+      if (reducedMotion) {
         const frame = requestAnimationFrame(() => {
-          setLayers((prev) => prev.map((l) => (l.id === layerToFadeIn.id ? { ...l, opacity: 1 } : l)));
+          retireHandoff(handoffLayer.binding);
         });
         return () => {
           cancelAnimationFrame(frame);
         };
       }
-      return undefined;
-    }, [layers]);
 
-    const handleTransitionEnd = useCallback((finishedId: string) => {
-      setLayers((prev) => {
-        const finishedIndex = prev.findIndex((l) => l.id === finishedId);
-        if (finishedIndex < 0 || prev.length <= 1) return prev;
-        return prev.slice(finishedIndex);
-      });
-    }, []);
-
-    const handleSuccessorLoad = useCallback((path: string, url: string) => {
-      const currentThumbnail = currentThumbnailRef.current;
-      if (currentThumbnail.path !== path || currentThumbnail.url !== url) return;
-
-      setLayers((prev) => {
-        if (prev.some((layer) => layer.id === url)) return prev;
-        return [...prev, { id: url, path, url, opacity: 0 }];
-      });
-    }, []);
-
-    const shouldLoadSuccessor =
-      displayThumbnailUrl !== undefined && !visibleLayers.some((layer) => layer.id === displayThumbnailUrl);
+      const retirementTimeout = window.setTimeout(() => {
+        retireHandoff(handoffLayer.binding);
+      }, FILMSTRIP_THUMBNAIL_HANDOFF_DURATION_MS + 50);
+      return () => {
+        window.clearTimeout(retirementTimeout);
+      };
+    }, [isCurrentBinding, reducedMotion, retireHandoff, visibleLayers]);
 
     const ringClass = isActive
       ? 'border-accent ring-2 ring-accent shadow-md'
@@ -289,21 +448,24 @@ export const FilmstripThumbnail = memo(
           <div className="absolute inset-0 w-full h-full">
             {visibleLayers.map((layer) => (
               <div
-                key={layer.id}
+                key={layer.binding.generation}
                 className="absolute inset-0 w-full h-full"
                 style={{
                   opacity: layer.opacity,
-                  transition: 'opacity 150ms ease-in-out',
-                  willChange: 'opacity',
+                  transition: reducedMotion
+                    ? 'none'
+                    : `opacity ${FILMSTRIP_THUMBNAIL_HANDOFF_DURATION_MS}ms ease-in-out`,
+                  willChange: layer.phase === 'handoff' ? 'opacity' : undefined,
                 }}
-                onTransitionEnd={() => {
-                  handleTransitionEnd(layer.id);
+                onTransitionEnd={(event) => {
+                  handleTransitionEnd(event, layer.binding);
                 }}
               >
                 {thumbnailAspectRatio === ThumbnailAspectRatio.Contain && (
                   <img
                     alt=""
                     className="absolute inset-0 w-full h-full object-cover blur-md scale-110 opacity-50"
+                    loading="eager"
                     src={layer.url}
                   />
                 )}
@@ -313,30 +475,28 @@ export const FilmstripThumbnail = memo(
                     thumbnailAspectRatio === ThumbnailAspectRatio.Contain ? 'object-contain' : 'object-cover'
                   } relative`}
                   data-testid="filmstrip-thumbnail-image"
-                  loading="lazy"
                   decoding="async"
+                  loading="eager"
+                  onError={() => {
+                    handleLayerFailure(layer.binding, 'error');
+                  }}
+                  onLoad={(event) => {
+                    handleLayerLoad(layer.binding, event.currentTarget);
+                  }}
                   src={layer.url}
                 />
               </div>
             ))}
           </div>
-        ) : (
+        ) : null}
+        {!visibleLayers.some((layer) => layer.opacity === 1) ? (
           <div className="flex h-full w-full items-center justify-center border border-dashed border-editor-border bg-editor-panel-well">
-            <ImageIcon size={24} className="text-text-secondary animate-pulse" />
+            <ImageIcon
+              data-testid="filmstrip-thumbnail-placeholder"
+              size={24}
+              className="text-text-secondary animate-pulse"
+            />
           </div>
-        )}
-        {shouldLoadSuccessor && displayThumbnailUrl ? (
-          <img
-            alt=""
-            aria-hidden="true"
-            className="absolute inset-0 h-full w-full opacity-0 pointer-events-none"
-            data-filmstrip-thumbnail-preload="true"
-            decoding="async"
-            key={`${path}:${displayThumbnailUrl}`}
-            loading="lazy"
-            onLoad={() => handleSuccessorLoad(path, displayThumbnailUrl)}
-            src={displayThumbnailUrl}
-          />
         ) : null}
 
         <div
