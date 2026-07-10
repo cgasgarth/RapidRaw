@@ -93,16 +93,9 @@ const toValidationSource = (
     rawBlackLevelKnown: false,
     rawDefaultsApplied: false,
     rawWhiteLevelKnown: false,
-    shiftX: parseShift(source.imagePath, 'x'),
-    shiftY: parseShift(source.imagePath, 'y'),
+    shiftX: undefined,
+    shiftY: undefined,
     sourceIndex: source.sourceIndex,
     width: source.width,
   };
-};
-
-const parseShift = (imagePath: string, axis: 'x' | 'y'): number | undefined => {
-  const match = new RegExp(`(?:shift|d)${axis}[-_=](\\d+)`, 'iu').exec(imagePath);
-  if (!match) return undefined;
-  const parsed = Number.parseInt(match[1] ?? '', 10);
-  return Number.isFinite(parsed) ? parsed : undefined;
 };
