@@ -12,6 +12,7 @@ interface RightPanelSwitcherProps {
   activePanel: Panel | null;
   onPanelSelect: (id: Panel) => void;
   isInstantTransition: boolean;
+  hiddenPanels?: readonly Panel[];
   layout?: 'horizontal' | 'vertical';
 }
 
@@ -19,6 +20,7 @@ export default function RightPanelSwitcher({
   activePanel,
   onPanelSelect,
   isInstantTransition,
+  hiddenPanels = [],
   layout = 'vertical',
 }: RightPanelSwitcherProps) {
   const { t } = useTranslation();
@@ -193,59 +195,61 @@ export default function RightPanelSwitcher({
             )}
             data-testid={`right-panel-switcher-group-${groupIndex}`}
           >
-            {group.map(({ fallbackLabel, icon: Icon, id, priority, tooltipKey }) => {
-              const isActive = activePanel === id;
-              const isPrimary = priority === 'primary';
+            {group
+              .filter(({ id }) => !hiddenPanels.includes(id))
+              .map(({ fallbackLabel, icon: Icon, id, priority, tooltipKey }) => {
+                const isActive = activePanel === id;
+                const isPrimary = priority === 'primary';
 
-              return (
-                <button
-                  aria-label={t(tooltipKey, { defaultValue: fallbackLabel })}
-                  aria-pressed={isActive}
-                  className={cx(
-                    'relative isolate flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-transparent transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring focus-visible:ring-offset-1 focus-visible:ring-offset-editor-matte disabled:cursor-not-allowed disabled:opacity-45',
-                    isActive
-                      ? isPrimary
-                        ? 'bg-editor-primary-active text-editor-primary-active-text'
-                        : 'bg-editor-selected-quiet text-editor-selected-quiet-text'
-                      : isPrimary
-                        ? 'text-text-primary hover:border-editor-border hover:bg-editor-panel-raised'
-                        : 'text-text-secondary hover:bg-editor-panel-raised hover:text-text-primary',
-                  )}
-                  data-panel-id={id}
-                  data-panel-priority={priority}
-                  data-panel-state={isActive ? 'active' : 'idle'}
-                  data-testid={`right-panel-switcher-button-${id}`}
-                  data-tooltip={t(tooltipKey, { defaultValue: fallbackLabel })}
-                  key={id}
-                  onClick={() => {
-                    selectPanel(id);
-                  }}
-                  ref={(button) => {
-                    if (button === null) {
-                      panelButtonRefs.current.delete(id);
-                    } else {
-                      panelButtonRefs.current.set(id, button);
-                    }
-                  }}
-                  type="button"
-                >
-                  {isActive && (
-                    <motion.span
-                      aria-hidden="true"
-                      layoutId={`${activeIndicatorId}-active-panel-indicator`}
-                      className={cx(
-                        'absolute inset-y-1 left-0 w-0.5 rounded-full',
-                        isPrimary ? 'bg-editor-primary-active-text' : 'bg-editor-selected-quiet-text',
-                      )}
-                      transition={
-                        isInstantTransition ? { duration: 0 } : { type: 'spring', bounce: 0.2, duration: 0.32 }
+                return (
+                  <button
+                    aria-label={t(tooltipKey, { defaultValue: fallbackLabel })}
+                    aria-pressed={isActive}
+                    className={cx(
+                      'relative isolate flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-transparent transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring focus-visible:ring-offset-1 focus-visible:ring-offset-editor-matte disabled:cursor-not-allowed disabled:opacity-45',
+                      isActive
+                        ? isPrimary
+                          ? 'bg-editor-primary-active text-editor-primary-active-text'
+                          : 'bg-editor-selected-quiet text-editor-selected-quiet-text'
+                        : isPrimary
+                          ? 'text-text-primary hover:border-editor-border hover:bg-editor-panel-raised'
+                          : 'text-text-secondary hover:bg-editor-panel-raised hover:text-text-primary',
+                    )}
+                    data-panel-id={id}
+                    data-panel-priority={priority}
+                    data-panel-state={isActive ? 'active' : 'idle'}
+                    data-testid={`right-panel-switcher-button-${id}`}
+                    data-tooltip={t(tooltipKey, { defaultValue: fallbackLabel })}
+                    key={id}
+                    onClick={() => {
+                      selectPanel(id);
+                    }}
+                    ref={(button) => {
+                      if (button === null) {
+                        panelButtonRefs.current.delete(id);
+                      } else {
+                        panelButtonRefs.current.set(id, button);
                       }
-                    />
-                  )}
-                  <Icon size={18} className="relative z-10" />
-                </button>
-              );
-            })}
+                    }}
+                    type="button"
+                  >
+                    {isActive && (
+                      <motion.span
+                        aria-hidden="true"
+                        layoutId={`${activeIndicatorId}-active-panel-indicator`}
+                        className={cx(
+                          'absolute inset-y-1 left-0 w-0.5 rounded-full',
+                          isPrimary ? 'bg-editor-primary-active-text' : 'bg-editor-selected-quiet-text',
+                        )}
+                        transition={
+                          isInstantTransition ? { duration: 0 } : { type: 'spring', bounce: 0.2, duration: 0.32 }
+                        }
+                      />
+                    )}
+                    <Icon size={18} className="relative z-10" />
+                  </button>
+                );
+              })}
           </div>
         ))}
       </div>

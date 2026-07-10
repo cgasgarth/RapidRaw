@@ -24,6 +24,7 @@ interface InspectorPanelFrameProps {
   label: string;
   notice?: InspectorPanelNotice | undefined;
   status?: InspectorPanelStatus | undefined;
+  variant?: 'panel' | 'section';
   testId: string;
 }
 
@@ -49,24 +50,36 @@ export default function InspectorPanelFrame({
   notice,
   status,
   testId,
+  variant = 'panel',
 }: InspectorPanelFrameProps) {
   const density = professionalInspectorDensityTokens;
 
   return (
     <section
       aria-label={label}
-      className="flex h-full min-w-0 flex-col overflow-hidden bg-editor-panel text-text-primary"
+      className={cx(
+        'flex min-w-0 flex-col bg-editor-panel text-text-primary',
+        variant === 'panel' ? 'h-full overflow-hidden' : 'overflow-visible',
+      )}
+      data-inspector-variant={variant}
       data-inspector-density="compact"
       data-testid={testId}
     >
-      <header className={density.frame.header} data-testid={`${testId}-header`}>
+      <header
+        className={cx(density.frame.header, variant === 'section' && 'min-h-8 justify-end border-t-0')}
+        data-testid={`${testId}-header`}
+      >
         <div className="flex min-w-0 items-center gap-2">
-          <span aria-hidden="true" className={density.frame.iconSlot}>
-            <Icon size={14} strokeWidth={1.8} />
-          </span>
-          <UiText as="h2" variant={TextVariants.heading} className={density.frame.title}>
-            {label}
-          </UiText>
+          {variant === 'panel' ? (
+            <>
+              <span aria-hidden="true" className={density.frame.iconSlot}>
+                <Icon size={14} strokeWidth={1.8} />
+              </span>
+              <UiText as="h2" variant={TextVariants.heading} className={density.frame.title}>
+                {label}
+              </UiText>
+            </>
+          ) : null}
           {status ? (
             <span
               aria-label={status.label}

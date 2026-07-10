@@ -16,7 +16,7 @@ import Editor from '../panel/Editor';
 import { EditorRightPanelHost } from '../panel/right/EditorRightPanelHost';
 import RightPanelSwitcher from '../panel/right/RightPanelSwitcher';
 import { DEFAULT_EDITOR_RIGHT_PANEL, getRightPanelEntry } from '../panel/right/rightPanelRegistry';
-import { type ImageFile, Orientation, type Panel, type ThumbnailAspectRatio } from '../ui/AppProperties';
+import { type ImageFile, Orientation, Panel, type ThumbnailAspectRatio } from '../ui/AppProperties';
 import Resizer from '../ui/Resizer';
 
 interface TransformController {
@@ -495,6 +495,7 @@ export default function EditorView({
               >
                 <RightPanelSwitcher
                   activePanel={activeRightPanel}
+                  hiddenPanels={[Panel.Presets]}
                   onPanelSelect={handleRightPanelSelect}
                   isInstantTransition={isInstantTransition}
                 />

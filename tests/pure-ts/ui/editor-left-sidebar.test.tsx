@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from 'bun:test';
 import { Window } from 'happy-dom';
 import i18next from 'i18next';
-import { act, createElement, useState } from 'react';
+import { act, createElement, useEffect, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
@@ -75,7 +75,48 @@ test('collapse restores focus to the stable expand control and preserves geometr
   expect(container.querySelector('[data-testid="editor-left-resizer"]')).toBeNull();
 });
 
-function SidebarHarness({ changes = [] }: { changes?: Array<[EditorLeftSectionId, boolean]> }) {
+test('unmounts Presets workflow when its section or sidebar collapses', async () => {
+  const lifecycle: string[] = [];
+  const { container } = await renderSidebar({ lifecycle });
+
+  expect(lifecycle).toEqual(['mounted']);
+
+  await act(async () => {
+    getRequiredElement<HTMLButtonElement>(container, '[data-testid="editor-left-presets-toggle"]').click();
+    await flushPromises();
+  });
+  expect(lifecycle).toEqual(['mounted', 'unmounted']);
+
+  await act(async () => {
+    getRequiredElement<HTMLButtonElement>(container, '[data-testid="editor-left-presets-toggle"]').click();
+    await flushPromises();
+  });
+  expect(lifecycle).toEqual(['mounted', 'unmounted', 'mounted']);
+
+  await act(async () => {
+    getRequiredElement<HTMLButtonElement>(container, '[data-testid="editor-left-collapse"]').click();
+    await flushPromises();
+  });
+  expect(lifecycle).toEqual(['mounted', 'unmounted', 'mounted', 'unmounted']);
+});
+
+function PresetsLifecycleProbe({ lifecycle }: { lifecycle: string[] }) {
+  useEffect(() => {
+    lifecycle.push('mounted');
+    return () => {
+      lifecycle.push('unmounted');
+    };
+  }, [lifecycle]);
+  return createElement('div', { 'data-testid': 'presets-workflow' });
+}
+
+function SidebarHarness({
+  changes = [],
+  lifecycle,
+}: {
+  changes?: Array<[EditorLeftSectionId, boolean]>;
+  lifecycle?: string[];
+}) {
   const [expandedSections, setExpandedSections] = useState<EditorLeftSectionId[]>(['navigator', 'presets']);
   const [isVisible, setIsVisible] = useState(true);
 
@@ -92,11 +133,18 @@ function SidebarHarness({ changes = [] }: { changes?: Array<[EditorLeftSectionId
       );
     },
     onVisibleChange: setIsVisible,
+    slots: lifecycle ? { presets: createElement(PresetsLifecycleProbe, { lifecycle }) } : undefined,
     width: 288,
   });
 }
 
-async function renderSidebar({ changes = [] }: { changes?: Array<[EditorLeftSectionId, boolean]> } = {}) {
+async function renderSidebar({
+  changes = [],
+  lifecycle,
+}: {
+  changes?: Array<[EditorLeftSectionId, boolean]>;
+  lifecycle?: string[];
+} = {}) {
   installDom();
   const i18n = i18next.createInstance();
   await i18n.use(initReactI18next).init({ fallbackLng: 'en', lng: 'en', react: { useSuspense: false } });
@@ -105,7 +153,7 @@ async function renderSidebar({ changes = [] }: { changes?: Array<[EditorLeftSect
   const root = createRoot(container);
 
   await act(async () => {
-    root.render(createElement(I18nextProvider, { i18n }, createElement(SidebarHarness, { changes })));
+    root.render(createElement(I18nextProvider, { i18n }, createElement(SidebarHarness, { changes, lifecycle })));
     await flushPromises();
   });
 

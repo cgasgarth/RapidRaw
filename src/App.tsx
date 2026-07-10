@@ -11,6 +11,7 @@ import { EditorHistorySection, EditorSnapshotsSection } from './components/panel
 import EditorLeftSidebar, { type EditorLeftSectionId } from './components/panel/editor/EditorLeftSidebar';
 import EditorNavigator, { type EditorTransformController } from './components/panel/editor/EditorNavigator';
 import FolderTreePanel from './components/panel/FolderTree';
+import { PresetsPanel } from './components/panel/right/color/PresetsPanel';
 import ExportPanel from './components/panel/right/export/ExportPanel';
 import {
   type ImageFile,
@@ -608,11 +609,26 @@ function App() {
 
   const handleRightPanelSelect = useCallback(
     (panelId: Panel) => {
+      if (panelId === Panel.Presets && !isCompactPortrait) {
+        setEditorRegionVisibility('leftSidebar', true);
+        setEditorLeftSectionExpanded('presets', true);
+        requestAnimationFrame(() => {
+          document.querySelector<HTMLButtonElement>('[data-testid="editor-left-presets-toggle"]')?.focus();
+        });
+        return;
+      }
       setRightPanel(panelId);
       setEditor({ activeMaskId: null, activeAiSubMaskId: null, isWbPickerActive: false });
     },
-    [setRightPanel, setEditor],
+    [isCompactPortrait, setEditorLeftSectionExpanded, setEditorRegionVisibility, setRightPanel, setEditor],
   );
+
+  useEffect(() => {
+    if (isCompactPortrait || activeRightPanel !== Panel.Presets) return;
+    setEditorRegionVisibility('leftSidebar', true);
+    setEditorLeftSectionExpanded('presets', true);
+    setRightPanel(null);
+  }, [activeRightPanel, isCompactPortrait, setEditorLeftSectionExpanded, setEditorRegionVisibility, setRightPanel]);
 
   const enableFolderImageCounts = appSettings?.enableFolderImageCounts ?? false;
   const handleToggleFolder = useFolderExpansionLoader(enableFolderImageCounts);
@@ -732,6 +748,15 @@ function App() {
                   history: <EditorHistorySection />,
                   navigator: (
                     <EditorNavigator onZoomChange={handleZoomChange} transformControllerRef={transformWrapperRef} />
+                  ),
+                  presets: (
+                    <PresetsPanel
+                      onNavigateToCommunity={() => {
+                        handleBackToLibrary();
+                        useUIStore.getState().setUI({ activeView: 'community' });
+                      }}
+                      placement="sidebar"
+                    />
                   ),
                   snapshots: <EditorSnapshotsSection />,
                 }}
