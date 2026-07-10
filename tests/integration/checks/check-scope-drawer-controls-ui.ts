@@ -38,11 +38,12 @@ mock.module('@tauri-apps/plugin-os', () => ({
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 installDom();
 
-const { default: PanelScopesStrip } = await import(
-  '../../../src/components/panel/right/inspector/PanelScopesStrip.tsx'
+const { default: InspectorAnalyticsHeader } = await import(
+  '../../../src/components/panel/right/inspector/InspectorAnalyticsHeader.tsx'
 );
-const { Theme } = await import('../../../src/components/ui/AppProperties.tsx');
+const { Panel, Theme } = await import('../../../src/components/ui/AppProperties.tsx');
 const { useEditorStore } = await import('../../../src/store/useEditorStore.ts');
+const { useUIStore } = await import('../../../src/store/useUIStore.ts');
 const { useSettingsStore } = await import('../../../src/store/useSettingsStore.ts');
 const { DisplayMode, INITIAL_ADJUSTMENTS } = await import('../../../src/utils/adjustments.ts');
 const { PANEL_SCOPES_HEIGHT } = await import('../../../src/utils/waveformSizing.ts');
@@ -79,6 +80,32 @@ async function validateScopeDrawerControls() {
     },
     isWaveformVisible: true,
     panelScopesLayout: 'stacked',
+    previewScopeStatus: {
+      displayTransformLabel: 'Display P3',
+      exportProfileLabel: null,
+      exportRenderingIntentLabel: null,
+      histogramReady: true,
+      path: '/analytics.ARW',
+      renderBasis: 'editor_preview',
+      softProofTransformApplied: false,
+      sourceLabel: 'Editor preview',
+      updatedAt: '2026-07-10T12:00:00.000Z',
+      waveformReady: true,
+      workingTransformLabel: 'Working RGB',
+      warningCodes: [],
+    },
+    selectedImage: {
+      exif: null,
+      height: 3000,
+      isRaw: true,
+      isReady: true,
+      metadata: null,
+      originalUrl: null,
+      path: '/analytics.ARW',
+      rawDevelopmentReport: null,
+      thumbnailUrl: 'data:image/jpeg;base64,AAAA',
+      width: 4000,
+    },
     waveformHeight: PANEL_SCOPES_HEIGHT.max,
   });
   useSettingsStore.getState().setAppSettings({
@@ -94,15 +121,21 @@ async function validateScopeDrawerControls() {
   assert.equal(strip.getAttribute('data-active-waveform-channel'), DisplayMode.Luma);
   assert.equal(strip.getAttribute('data-panel-scopes-layout'), 'stacked');
   assert.equal(strip.getAttribute('data-show-clipping'), 'false');
+  assert.equal(strip.getAttribute('data-analytics-state'), 'current');
   assert.equal(strip.getAttribute('data-panel-scopes-height'), String(PANEL_SCOPES_HEIGHT.max));
 
   await click(getByTestId(rendered.container, 'scope-drawer-under-test-mode-parade'));
   assert.equal(useEditorStore.getState().activeWaveformChannel, DisplayMode.Parade);
   assert.equal(strip.getAttribute('data-active-waveform-channel'), DisplayMode.Parade);
 
-  await click(getByTestId(rendered.container, 'scope-drawer-under-test-clipping-toggle'));
+  await keyDown(getByTestId(rendered.container, 'scope-drawer-under-test-mode-parade'), 'ArrowRight');
+  assert.equal(useEditorStore.getState().activeWaveformChannel, DisplayMode.Vectorscope);
+
+  await click(getByTestId(rendered.container, 'scope-drawer-under-test-shadow-clipping-toggle'));
   assert.equal(useEditorStore.getState().adjustments.showClipping, true);
   assert.equal(strip.getAttribute('data-show-clipping'), 'true');
+  await click(getByTestId(rendered.container, 'scope-drawer-under-test-highlight-clipping-toggle'));
+  assert.equal(useEditorStore.getState().adjustments.showClipping, false);
 
   await click(getByTestId(rendered.container, 'scope-drawer-under-test-layout-toggle'));
   assert.equal(useEditorStore.getState().panelScopesLayout, 'overlay');
@@ -129,6 +162,43 @@ async function validateScopeDrawerControls() {
   assert.ok(savedLayout, 'layout control did not persist the drawer layout.');
   assert.ok(savedHeight, 'reset height control did not persist the default height.');
 
+  await act(async () => {
+    useEditorStore.getState().setEditor((state) => ({
+      previewScopeStatus: state.previewScopeStatus
+        ? { ...state.previewScopeStatus, path: '/stale.ARW' }
+        : state.previewScopeStatus,
+    }));
+    await flushPromises();
+  });
+  assert.equal(strip.getAttribute('data-analytics-state'), 'stale');
+  assert.equal(
+    getByTestId(rendered.container, 'scope-drawer-under-test-freshness-status').getAttribute('aria-live'),
+    'polite',
+  );
+
+  await act(async () => {
+    useEditorStore.getState().setEditor((state) => ({
+      previewScopeStatus: state.previewScopeStatus
+        ? { ...state.previewScopeStatus, warningCodes: ['scope_render_failed'] }
+        : state.previewScopeStatus,
+    }));
+    await flushPromises();
+  });
+  assert.equal(strip.getAttribute('data-analytics-state'), 'error');
+
+  await act(async () => {
+    useUIStore.getState().setRightPanel(Panel.Adjustments);
+    await flushPromises();
+  });
+  await click(getByTestId(rendered.container, 'scope-drawer-under-test-proof-status'));
+  assert.equal(useUIStore.getState().activeRightPanel, Panel.Color);
+  assert.equal(window.sessionStorage.getItem('rawengine.colorWorkspace.activeTab'), 'output');
+
+  await click(getByTestId(rendered.container, 'scope-drawer-under-test-expand-toggle'));
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  assert.equal(strip.getAttribute('data-state'), 'collapsed');
+  assert.ok(getByTestId(rendered.container, 'scope-drawer-under-test-summary'));
+
   rendered.unmount();
 }
 
@@ -143,7 +213,7 @@ async function renderPanel(): Promise<RenderedPanel> {
       createElement(
         I18nextProvider,
         { i18n },
-        createElement(PanelScopesStrip, {
+        createElement(InspectorAnalyticsHeader, {
           testId: 'scope-drawer-under-test',
         }),
       ),
@@ -172,6 +242,8 @@ function installDom() {
   Object.defineProperty(globalThis, 'HTMLButtonElement', { configurable: true, value: window.HTMLButtonElement });
   Object.defineProperty(globalThis, 'MouseEvent', { configurable: true, value: window.MouseEvent });
   Object.defineProperty(globalThis, 'Event', { configurable: true, value: window.Event });
+  Object.defineProperty(globalThis, 'CustomEvent', { configurable: true, value: window.CustomEvent });
+  Object.defineProperty(globalThis, 'KeyboardEvent', { configurable: true, value: window.KeyboardEvent });
   Object.defineProperty(globalThis, 'Node', { configurable: true, value: window.Node });
   Object.defineProperty(globalThis, 'MutationObserver', { configurable: true, value: window.MutationObserver });
   Object.defineProperty(globalThis, 'PointerEvent', { configurable: true, value: window.PointerEvent ?? window.Event });
@@ -212,6 +284,13 @@ async function click(element: Element) {
     } else {
       element.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     }
+    await flushPromises();
+  });
+}
+
+async function keyDown(element: Element, key: string) {
+  await act(async () => {
+    element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key }));
     await flushPromises();
   });
 }

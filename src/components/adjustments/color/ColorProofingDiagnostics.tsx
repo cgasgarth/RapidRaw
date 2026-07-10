@@ -9,7 +9,6 @@ import AdjustmentSlider from '../AdjustmentSlider';
 import type { ColorPanelGroupProps } from './types';
 
 interface ColorProofingDiagnosticsProps extends ColorPanelGroupProps {
-  colorWorkspaceWarningChips: Array<string>;
   hasCurrentGamutWarning: boolean;
   isGamutWarningOverlayVisible: boolean;
   renderedPreviewWarningStatus: RenderedPreviewWarningStatus;
@@ -19,7 +18,6 @@ interface ColorProofingDiagnosticsProps extends ColorPanelGroupProps {
 
 export const ColorProofingDiagnostics = ({
   adjustments,
-  colorWorkspaceWarningChips,
   hasCurrentGamutWarning,
   isGamutWarningOverlayVisible,
   onDragStateChange,
@@ -65,15 +63,7 @@ export const ColorProofingDiagnostics = ({
             <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
               {t('adjustments.color.gamutWarning.title')}
             </UiText>
-            <UiText variant={TextVariants.small} color={TextColors.secondary} className={density.sectionHeader.summary}>
-              {gamutCoverageLabel}
-            </UiText>
           </div>
-          <span className={density.sectionHeader.badge}>
-            {colorWorkspaceWarningChips.length > 0
-              ? colorWorkspaceWarningChips.length
-              : t('adjustments.color.gamutWarning.off')}
-          </span>
         </div>
       </summary>
       <div className="space-y-2 border-t border-editor-border px-2.5 py-2">

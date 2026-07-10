@@ -1,5 +1,5 @@
 import cx from 'clsx';
-import { type KeyboardEvent, type ReactNode, useEffect, useId, useMemo, useState } from 'react';
+import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { debouncedSave } from '../../hooks/editor/useEditorActions';
 import type { BlackWhiteMixerChannel } from '../../schemas/color/blackWhiteMixerSchemas';
@@ -8,10 +8,10 @@ import type { ColorBalanceRgbRange } from '../../schemas/color/colorBalanceRgbSc
 import { useEditorStore } from '../../store/useEditorStore';
 import { type Adjustments, ColorAdjustment } from '../../utils/adjustments';
 import {
-  getPreviewScopeFreshnessStatus,
   getRenderedPreviewWarningStatus,
   isCurrentExportSoftProofGamutWarningOverlay,
 } from '../../utils/color/runtime/gamutWarningDisplay';
+import { COLOR_OUTPUT_FOCUS_EVENT, COLOR_WORKSPACE_TAB_SESSION_KEY } from '../../utils/colorWorkspaceNavigation';
 import {
   applyColorRangeLocalAdjustmentLayerFlow,
   buildColorRangeProposalSourcePixels,
@@ -42,7 +42,6 @@ interface ColorPanelProps {
 
 const COLOR_WORKSPACE_TAB_IDS = ['quick', 'editor', 'grading', 'output'] as const;
 type ColorWorkspaceTabId = (typeof COLOR_WORKSPACE_TAB_IDS)[number];
-const COLOR_WORKSPACE_TAB_SESSION_KEY = 'rawengine.colorWorkspace.activeTab';
 let sessionColorWorkspaceTab: ColorWorkspaceTabId = 'quick';
 const COLOR_WORKSPACE_TAB_BASE_CLASS = professionalInspectorDensityTokens.workspaceNavigation.tab;
 const COLOR_WORKSPACE_TAB_ACTIVE_CLASS = professionalInspectorDensityTokens.workspaceNavigation.active;
@@ -123,7 +122,6 @@ export default function ColorPanel({
   const [activeColorBalanceRange, setActiveColorBalanceRange] = useState<ColorBalanceRgbRange>('midtones');
   const [activeChannelMixerOutput, setActiveChannelMixerOutput] = useState<ChannelMixerOutput>('red');
   const gamutWarningOverlay = useEditorStore((state) => state.gamutWarningOverlay);
-  const previewScopeStatus = useEditorStore((state) => state.previewScopeStatus);
   const selectedImage = useEditorStore((state) => state.selectedImage);
   const selectedImagePath = useEditorStore((state) => state.selectedImage?.path ?? null);
   const exportSoftProofRecipeId = useEditorStore((state) => state.exportSoftProofRecipeId);
@@ -149,27 +147,11 @@ export default function ColorPanel({
     isExportSoftProofEnabled,
     selectedImagePath,
   });
-  const previewScopeFreshnessStatus = getPreviewScopeFreshnessStatus(previewScopeStatus, selectedImagePath);
   const levels = adjustments.levels;
   const levelsClippingWarnings = [
     levels.inputBlack > 0 ? t('adjustments.color.levels.warnings.shadowClipping') : null,
     levels.inputWhite < 1 ? t('adjustments.color.levels.warnings.highlightClipping') : null,
     levels.outputBlack > 0 || levels.outputWhite < 1 ? t('adjustments.color.levels.warnings.outputCompression') : null,
-  ].filter((warning): warning is string => warning !== null);
-  const colorWorkspaceWarningChips = [
-    isExportSoftProofEnabled && renderedPreviewWarningStatus.state !== 'current'
-      ? renderedPreviewWarningStatus.statusLabel
-      : currentGamutWarningOverlay !== null
-        ? t('editor.canvas.gamutWarningCoverage', {
-            profile: renderedPreviewWarningStatus.displayProfileLabel,
-            value: renderedPreviewWarningStatus.coverageLabel,
-          })
-        : null,
-    previewScopeFreshnessStatus.state === 'stale' || previewScopeFreshnessStatus.state === 'unsupported'
-      ? previewScopeFreshnessStatus.statusLabel
-      : null,
-    ...levelsClippingWarnings,
-    adjustments.skinToneUniformity.enabled ? t('adjustments.color.skinToneUniformity.warning') : null,
   ].filter((warning): warning is string => warning !== null);
   const createLocalAdjustmentFromActiveColorRange = () => {
     if (isForMask || selectedImage === null) return;
@@ -340,7 +322,6 @@ export default function ColorPanel({
           <ColorProofingDiagnostics
             adjustments={adjustments}
             appSettings={appSettings}
-            colorWorkspaceWarningChips={colorWorkspaceWarningChips}
             hasCurrentGamutWarning={currentGamutWarningOverlay !== null}
             isGamutWarningOverlayVisible={isGamutWarningOverlayVisible}
             onDragStateChange={onDragStateChange}
@@ -361,7 +342,6 @@ export default function ColorPanel({
     adjustmentVisibility,
     adjustments,
     appSettings,
-    colorWorkspaceWarningChips,
     currentGamutWarningOverlay,
     isColorCalibrationVisible,
     isForMask,
@@ -371,7 +351,6 @@ export default function ColorPanel({
     isWgpuEnabled,
     levelsClippingWarnings,
     onDragStateChange,
-    previewScopeFreshnessStatus,
     renderedPreviewWarningStatus,
     setAdjustments,
     setEditor,
@@ -388,10 +367,22 @@ export default function ColorPanel({
     }
   }, [activeWorkspaceTab, workspaceTabs]);
 
-  const selectWorkspaceTab = (tabId: ColorWorkspaceTabId) => {
+  const selectWorkspaceTab = useCallback((tabId: ColorWorkspaceTabId) => {
     setActiveWorkspaceTab(tabId);
     rememberSessionColorWorkspaceTab(tabId);
-  };
+  }, []);
+
+  useEffect(() => {
+    const focusOutputControls = () => {
+      selectWorkspaceTab('output');
+      requestAnimationFrame(() => {
+        document.getElementById(`${tablistId}-output-tab`)?.focus();
+      });
+    };
+
+    window.addEventListener(COLOR_OUTPUT_FOCUS_EVENT, focusOutputControls);
+    return () => window.removeEventListener(COLOR_OUTPUT_FOCUS_EVENT, focusOutputControls);
+  }, [selectWorkspaceTab, tablistId]);
 
   const focusColorWorkspaceTab = (tabId: ColorWorkspaceTabId) => {
     requestAnimationFrame(() => {
