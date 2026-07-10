@@ -22,6 +22,9 @@ const requiredPanelSnippets = [
   "'completed'",
   "'failed'",
   "'canceled'",
+  "'cancelling'",
+  "'partial'",
+  "'missing-output'",
   "'importing-linked-variant'",
   "'imported-linked-variant'",
   'data-testid="export-footer-workflow-state"',
@@ -41,13 +44,22 @@ const requiredPanelSnippets = [
   'data-testid="export-footer-review-smart-preview"',
   'data-testid="export-footer-review-parity"',
   'data-testid="export-footer-review-receipt"',
+  'data-testid="export-output-contract"',
+  'data-testid="export-output-contract-status"',
+  'data-testid="export-incomplete-alert"',
+  "data-export-incomplete-state={hasMissingOutput ? 'missing-output' : 'partial'}",
+  'aria-live="polite"',
+  'setIsCancellingExport(true);',
   'const canImportLinkedVariant =',
+  'const hasMissingOutput =',
+  'const hasPartialExport =',
+  'const exportContractIssue =',
   'currentExternalVariantImportedPath === null',
   'disabled={!canImportLinkedVariant}',
   'disabled={!canUseReceiptActions}',
   "t('export.status.exportAgain')",
   "t('export.status.retryExport')",
-  'const canShowReceipt = status === Status.Success && Boolean(firstReceiptOutput);',
+  'const canShowReceipt = status === Status.Success && Boolean(firstReceiptOutput) && !hasMissingOutput;',
 ];
 
 for (const snippet of requiredPanelSnippets) {
@@ -100,6 +112,7 @@ const receipt = {
       sourcePath: '/tmp/source.ARW',
     },
   ],
+  terminalStatus: 'completed' as const,
   total: 1,
 };
 

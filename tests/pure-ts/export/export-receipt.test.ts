@@ -20,6 +20,7 @@ test('export receipt accepts TIFF color profile and bit depth metadata', () => {
         effectiveRenderingIntent: 'Relative colorimetric',
       },
     ],
+    terminalStatus: 'completed',
     total: 1,
   });
 
@@ -41,6 +42,7 @@ test('export receipt remains compatible with outputs without image metadata', ()
         sourcePath: '/tmp/source.arw',
       },
     ],
+    terminalStatus: 'completed',
     total: 1,
   });
 
@@ -79,6 +81,7 @@ test('source-embedded export receipt preserves passthrough and ICC identity evid
         transformPolicyFingerprint,
       },
     ],
+    terminalStatus: 'completed',
     total: 1,
   });
 

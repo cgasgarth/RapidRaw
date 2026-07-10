@@ -49,10 +49,14 @@ if (!exportPresetLocale.success) {
 
 for (const marker of [
   'data-testid="export-recipe-readiness-summary"',
+  'data-testid="export-recipe-picker"',
+  'data-testid="export-selected-recipe-status"',
   'data-recipe-count={recipeRows.length}',
   'data-valid-recipe-count={validRecipeCount}',
   'data-built-in-recipe-count={builtInRecipeCount}',
   'ui.exportPresets.validRecipeCount',
+  'data-recipe-state={',
+  'aria-pressed={selectedPresetId === row.id}',
 ]) {
   if (!componentSource.includes(marker)) {
     failures.push(`Export recipe readiness marker missing: ${marker}`);

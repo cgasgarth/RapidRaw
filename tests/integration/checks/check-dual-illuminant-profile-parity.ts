@@ -36,6 +36,7 @@ const receipt = exportReceiptPayloadSchema.parse({
       sourcePath: '/private/input.ARW',
     },
   ],
+  terminalStatus: 'completed',
   total: 1,
 });
 

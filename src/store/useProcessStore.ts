@@ -32,7 +32,6 @@ interface ProcessState {
   invalidateThumbnails: (paths: ReadonlyArray<string>) => void;
 }
 
-let exportTimeout: ReturnType<typeof setTimeout>;
 let importTimeout: ReturnType<typeof setTimeout>;
 let copyTimeout: ReturnType<typeof setTimeout>;
 let pasteTimeout: ReturnType<typeof setTimeout>;
@@ -93,7 +92,8 @@ export const useProcessStore = create<ProcessState>((set, get) => ({
         const patch = typeof updater === 'function' ? updater(prev.exportState) : updater;
         const nextStatus = patch.status ?? prev.exportState.status;
         const isStartingNewExport = nextStatus === Status.Exporting && prev.exportState.status !== Status.Exporting;
-        const isTerminalWithoutReceipt = [Status.Error, Status.Cancelled].includes(nextStatus);
+        const isTerminalWithoutReceipt =
+          nextStatus === Status.Error || (nextStatus === Status.Cancelled && patch.lastReceipt === undefined);
         const isResetting = nextStatus === Status.Idle;
 
         return {
@@ -105,23 +105,6 @@ export const useProcessStore = create<ProcessState>((set, get) => ({
         };
       })(),
     }));
-
-    const status = get().exportState.status;
-
-    clearTimeout(exportTimeout);
-
-    if ([Status.Success, Status.Error, Status.Cancelled].includes(status)) {
-      exportTimeout = setTimeout(() => {
-        set((prev) => ({
-          exportState: {
-            ...prev.exportState,
-            status: Status.Idle,
-            errorMessage: '',
-            progress: { current: 0, total: 0 },
-          },
-        }));
-      }, 5000);
-    }
   },
 
   setImportState: (updater) => {

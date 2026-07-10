@@ -100,10 +100,12 @@ export interface ExportState {
 export interface ExportReceipt {
   completedAt: string;
   outputs: Array<ExportReceiptOutput>;
+  terminalStatus: 'cancelled' | 'completed';
   total: number;
 }
 
 export interface ExportReceiptOutput {
+  auxiliaryOutputPaths?: Array<string> | undefined;
   bitDepth?: number | null | undefined;
   blackPointCompensation?: string | null | undefined;
   byteSize: number;
@@ -117,6 +119,7 @@ export interface ExportReceiptOutput {
   policyStatus?: string | null | undefined;
   policyVersion?: string | null | undefined;
   rawDevelopmentReport?: RawDevelopmentReport | null | undefined;
+  rawProvenanceSidecarPath?: string | null | undefined;
   renderingIntent?: string | null | undefined;
   requestedColorProfile?: string | null | undefined;
   requestedRenderingIntent?: string | null | undefined;
