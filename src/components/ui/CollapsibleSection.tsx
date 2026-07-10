@@ -1,14 +1,23 @@
 import cx from 'clsx';
 import { ChevronDown, Eye, EyeOff, type LucideIcon, MoreHorizontal } from 'lucide-react';
-import { type KeyboardEvent, type MouseEvent, type MouseEventHandler, type ReactNode, useEffect, useRef } from 'react';
+import {
+  type KeyboardEvent,
+  type MouseEvent,
+  type MouseEventHandler,
+  type ReactNode,
+  useEffect,
+  useId,
+  useRef,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { TextVariants, TextWeights } from '../../types/typography';
-import { inspectorSectionTokens } from './inspectorTokens';
+import { inspectorSectionTokens, inspectorTokens } from './inspectorTokens';
 import UiText from './primitives/Text';
 
 export interface CollapsibleSectionHeaderAction {
   className?: string;
   disabled?: boolean;
+  disabledReason?: string;
   icon: LucideIcon;
   label: string;
   onClick: () => void;
@@ -16,7 +25,7 @@ export interface CollapsibleSectionHeaderAction {
   testId?: string;
 }
 
-interface CollapsibleSectionProps {
+export interface CollapsibleSectionProps {
   actionsMenuLabel?: string;
   actionsMenuTestId?: string;
   canToggleVisibility?: boolean;
@@ -29,6 +38,8 @@ interface CollapsibleSectionProps {
   onOpenActionsMenu?: (x: number, y: number) => void;
   onToggle: () => void;
   onToggleVisibility?: () => void;
+  status?: ReactNode;
+  testId?: string;
   title: string;
 }
 
@@ -45,11 +56,16 @@ export default function CollapsibleSection({
   onOpenActionsMenu,
   onToggle,
   onToggleVisibility = () => {},
+  status,
+  testId,
   title,
 }: CollapsibleSectionProps) {
   const { t } = useTranslation();
   const contentRef = useRef<HTMLDivElement | null>(null);
+  const headerRef = useRef<HTMLButtonElement | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const contentId = useId();
+  const titleId = useId();
 
   useEffect(() => {
     const wrapper = wrapperRef.current;
@@ -69,12 +85,23 @@ export default function CollapsibleSection({
 
     updateMaxHeight();
 
+    if (typeof ResizeObserver === 'undefined') {
+      return undefined;
+    }
+
     const resizeObserver = new ResizeObserver(updateMaxHeight);
     resizeObserver.observe(content);
 
     return () => {
       resizeObserver.disconnect();
     };
+  }, [isOpen]);
+
+  useEffect(() => {
+    const content = contentRef.current;
+    if (!isOpen && content?.contains(document.activeElement)) {
+      headerRef.current?.focus();
+    }
   }, [isOpen]);
 
   const handleVisibilityClick = (e: MouseEvent<HTMLButtonElement>) => {
@@ -100,34 +127,38 @@ export default function CollapsibleSection({
     event.stopPropagation();
   };
 
-  const handleHeaderKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+  const handleHeaderKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (event.shiftKey && event.key === 'F10' && onOpenActionsMenu) {
       event.preventDefault();
       const rect = event.currentTarget.getBoundingClientRect();
       onOpenActionsMenu(rect.left, rect.bottom + 4);
       return;
     }
-
-    if (event.key !== 'Enter' && event.key !== ' ') {
-      return;
-    }
-    event.preventDefault();
-    onToggle();
   };
 
   return (
     <div className={inspectorSectionTokens.shell} onContextMenu={onContextMenu}>
-      <div
-        className={cx(inspectorSectionTokens.header, !isContentVisible && 'bg-bg-primary')}
-        aria-expanded={isOpen}
-        onClick={onToggle}
-        onKeyDown={handleHeaderKeyDown}
-        role="button"
-        tabIndex={0}
-      >
-        <div className={inspectorSectionTokens.titleRow}>
-          <ChevronDown className={cx(inspectorSectionTokens.chevron, { 'rotate-180': isOpen })} size={14} />
+      <div className={cx(inspectorSectionTokens.header, !isContentVisible && 'bg-bg-primary')}>
+        <button
+          aria-controls={contentId}
+          aria-expanded={isOpen}
+          className={cx(
+            inspectorSectionTokens.titleRow,
+            'min-h-6 flex-1 rounded-sm text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring',
+          )}
+          data-testid={testId ? `${testId}-toggle` : undefined}
+          onClick={onToggle}
+          onKeyDown={handleHeaderKeyDown}
+          ref={headerRef}
+          type="button"
+        >
+          <ChevronDown
+            aria-hidden="true"
+            className={cx(inspectorSectionTokens.chevron, { 'rotate-180': isOpen })}
+            size={14}
+          />
           <UiText
+            id={titleId}
             variant={TextVariants.label}
             weight={TextWeights.medium}
             className={cx(inspectorSectionTokens.title, !isContentVisible && 'text-text-secondary')}
@@ -145,10 +176,13 @@ export default function CollapsibleSection({
               className={inspectorSectionTokens.dirtyIndicator}
               role="status"
               title={t('ui.collapsibleSection.dirtyBadge', { defaultValue: 'Edited' })}
-            />
+            >
+              {t('ui.collapsibleSection.dirtyBadge', { defaultValue: 'Edited' })}
+            </span>
           )}
-        </div>
-        <div className="flex shrink-0 items-center gap-1">
+          {status ? <span className="shrink-0 text-[10px] leading-4 text-text-secondary">{status}</span> : null}
+        </button>
+        <div className={inspectorTokens.actionRow.root}>
           {headerActions.length > 0 && (
             <div className={inspectorSectionTokens.headerActions}>
               {headerActions.map((action) => {
@@ -162,7 +196,7 @@ export default function CollapsibleSection({
                       action.disabled && 'cursor-not-allowed opacity-50',
                       action.className,
                     )}
-                    data-tooltip={action.label}
+                    data-tooltip={action.disabledReason ?? action.label}
                     data-testid={action.testId}
                     disabled={action.disabled ?? false}
                     key={action.label}
@@ -170,6 +204,7 @@ export default function CollapsibleSection({
                       handleActionClick(event, action);
                     }}
                     onKeyDown={handleActionKeyDown}
+                    title={action.disabledReason ?? action.label}
                     type="button"
                   >
                     <Icon size={14} />
@@ -219,8 +254,13 @@ export default function CollapsibleSection({
       </div>
       <div ref={wrapperRef} className="overflow-hidden transition-all duration-200 ease-in-out">
         <div
+          aria-hidden={!isOpen || !isContentVisible}
+          aria-labelledby={titleId}
           className={cx(inspectorSectionTokens.body, !isContentVisible && 'opacity-30 pointer-events-none')}
+          id={contentId}
+          inert={!isOpen || !isContentVisible ? true : undefined}
           ref={contentRef}
+          role="region"
         >
           {children}
         </div>
