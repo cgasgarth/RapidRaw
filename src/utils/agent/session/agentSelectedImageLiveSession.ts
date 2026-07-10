@@ -33,13 +33,13 @@ import {
   agentAdjustmentsApplyResponseSchema,
   agentAdjustmentsDryRunResponseSchema,
 } from '../tools/agentAdjustmentApplyTool';
-import { dispatchAgentLiveEditorTool } from './agentLiveToolDispatch';
 import {
   AGENT_HISTORY_ROLLBACK_TOOL_NAME,
   type AgentSessionCheckpoint,
   agentHistoryRollbackResponseSchema,
   createAgentSessionCheckpoint,
 } from './agentSessionHistory';
+import { createAgentTypedToolExecutionContext, dispatchAgentTypedEditorTool } from './agentTypedToolDispatch';
 
 export type AgentSelectedImageLiveSessionState =
   | 'idle'
@@ -849,7 +849,7 @@ export const startAgentSelectedImageLiveSessionDryRun = async ({
 }): Promise<AgentSelectedImageLiveSessionDraft> => {
   const snapshot = buildSnapshot();
   const dryRun = agentAdjustmentsDryRunResponseSchema.parse(
-    await dispatchAgentLiveEditorTool({
+    await dispatchAgentTypedEditorTool({
       args: {
         adjustments,
         expectedGraphRevision: snapshot.graphRevision,
@@ -858,8 +858,20 @@ export const startAgentSelectedImageLiveSessionDryRun = async ({
         requestId: `${requestId}-dry-run`,
         sessionId,
       },
-      requestId: `${requestId}-dry-run`,
-      runtimeToolName: AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
+      context: createAgentTypedToolExecutionContext({
+        arguments: {
+          adjustments,
+          expectedGraphRevision: snapshot.graphRevision,
+          expectedRecipeHash: snapshot.recipeHash,
+          operationId,
+          requestId: `${requestId}-dry-run`,
+          sessionId,
+        },
+        callId: `${requestId}-dry-run`,
+        requestId: `${requestId}-dry-run`,
+        sessionId,
+      }),
+      toolName: AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
     }),
   );
   const draft: AgentSelectedImageLiveSessionDraft = {
@@ -1126,22 +1138,38 @@ export const applyAgentSelectedImageLiveSession = async (
   });
 
   const apply = agentAdjustmentsApplyResponseSchema.parse(
-    await dispatchAgentLiveEditorTool({
+    await dispatchAgentTypedEditorTool({
       args: envelopeValidation.parsedRequest,
+      context: createAgentTypedToolExecutionContext({
+        arguments: envelopeValidation.parsedRequest,
+        callId: `${draft.requestId}-apply`,
+        parentCallId: `${draft.requestId}-dry-run`,
+        requestId: `${draft.requestId}-apply`,
+        sessionId: draft.sessionId,
+      }),
       draftSession: buildDraftSession(draft, 'active'),
-      requestId: `${draft.requestId}-apply`,
-      runtimeToolName: AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
+      toolName: AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
     }),
   );
   const afterPreview = agentPreviewRenderResponseSchema.parse(
-    await dispatchAgentLiveEditorTool({
+    await dispatchAgentTypedEditorTool({
       args: {
         expectedRecipeHash: buildSnapshot().recipeHash,
         purpose: 'refresh',
         requestId: `${draft.requestId}-after-preview`,
       },
-      requestId: `${draft.requestId}-after-preview`,
-      runtimeToolName: AGENT_PREVIEW_RENDER_TOOL_NAME,
+      context: createAgentTypedToolExecutionContext({
+        arguments: {
+          expectedRecipeHash: buildSnapshot().recipeHash,
+          purpose: 'refresh',
+          requestId: `${draft.requestId}-after-preview`,
+        },
+        callId: `${draft.requestId}-after-preview`,
+        parentCallId: `${draft.requestId}-apply`,
+        requestId: `${draft.requestId}-after-preview`,
+        sessionId: draft.sessionId,
+      }),
+      toolName: AGENT_PREVIEW_RENDER_TOOL_NAME,
     }),
   );
 
@@ -1205,7 +1233,7 @@ export const rollbackAgentSelectedImageLiveSession = async ({
     throw new Error('Selected-image live session rollback rejected mismatched rollback checkpoint.');
   }
   const rollbackReceipt = agentHistoryRollbackResponseSchema.parse(
-    await dispatchAgentLiveEditorTool({
+    await dispatchAgentTypedEditorTool({
       args: {
         checkpoint,
         expectedCurrentGraphRevision: current.graphRevision,
@@ -1215,8 +1243,22 @@ export const rollbackAgentSelectedImageLiveSession = async ({
         scope: 'session_start',
         sessionId: receipt.sessionId,
       },
-      requestId: `${receipt.requestId}-rollback`,
-      runtimeToolName: AGENT_HISTORY_ROLLBACK_TOOL_NAME,
+      context: createAgentTypedToolExecutionContext({
+        arguments: {
+          checkpoint,
+          expectedCurrentGraphRevision: current.graphRevision,
+          expectedCurrentPreviewRecipeHash: current.recipeHash,
+          expectedSelectedImagePath: current.selectedImagePath,
+          requestId: `${receipt.requestId}-rollback`,
+          scope: 'session_start',
+          sessionId: receipt.sessionId,
+        },
+        callId: `${receipt.requestId}-rollback`,
+        parentCallId: `${receipt.requestId}-apply`,
+        requestId: `${receipt.requestId}-rollback`,
+        sessionId: receipt.sessionId,
+      }),
+      toolName: AGENT_HISTORY_ROLLBACK_TOOL_NAME,
     }),
   );
   const restored = buildSnapshot();

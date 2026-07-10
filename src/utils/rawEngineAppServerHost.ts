@@ -152,6 +152,7 @@ import {
   agentHistoryRollbackRequestSchema,
   rollbackAgentSessionHistory,
 } from './agent/session/agentSessionHistory';
+import { agentEditorToolContracts, isAgentEditorToolName } from './agent/session/agentTypedToolContracts';
 import {
   AGENT_ADJUSTMENTS_APPLY_INPUT_SCHEMA_NAME,
   AGENT_ADJUSTMENTS_APPLY_OUTPUT_SCHEMA_NAME,
@@ -1460,7 +1461,7 @@ const dispatchAgentAppServerTool = async (
   });
 };
 
-export const buildRawEngineAppServerToolDispatchResponse = async (
+const buildRawEngineAppServerToolDispatchResponseUnchecked = async (
   request: RawEngineAppServerToolDispatchRequest,
 ): Promise<RawEngineAppServerToolDispatchResponse> => {
   const draftSessionError = validateDraftSessionForDispatch(request);
@@ -1593,6 +1594,296 @@ export const buildRawEngineAppServerToolDispatchResponse = async (
     status: RawEngineAppServerResponseStatus.Ok,
     transport: RAW_ENGINE_APP_SERVER_HOST_MANIFEST.transport,
   });
+};
+
+interface TypedDispatchSessionState {
+  completedByIdempotencyKey: Map<string, RawEngineAppServerToolDispatchResponse>;
+  inFlightIdempotencyKeys: Set<string>;
+  mutationInFlight: boolean;
+  previewInFlight: boolean;
+  queuedPreview?: {
+    request: RawEngineAppServerToolDispatchRequest;
+    resolve: (response: RawEngineAppServerToolDispatchResponse) => void;
+  };
+}
+
+const typedDispatchSessions = new Map<string, TypedDispatchSessionState>();
+const cancelledTypedDispatches = new Set<string>();
+const typedDispatchResultCleanups = new Map<string, (result: unknown) => void>();
+
+export const cancelRawEngineAppServerTypedDispatch = (cancellationId: string) => {
+  cancelledTypedDispatches.add(cancellationId);
+};
+
+export const registerRawEngineAppServerTypedDispatchResultCleanup = (
+  cancellationId: string,
+  cleanup: (result: unknown) => void,
+): (() => void) => {
+  typedDispatchResultCleanups.set(cancellationId, cleanup);
+  return () => typedDispatchResultCleanups.delete(cancellationId);
+};
+
+const cleanupTypedDispatchResult = (cancellationId: string, result: unknown) => {
+  const cleanup = typedDispatchResultCleanups.get(cancellationId);
+  typedDispatchResultCleanups.delete(cancellationId);
+  cleanup?.(result);
+};
+
+const getTypedDispatchSessionState = (sessionId: string): TypedDispatchSessionState => {
+  const existing = typedDispatchSessions.get(sessionId);
+  if (existing !== undefined) return existing;
+  const state: TypedDispatchSessionState = {
+    completedByIdempotencyKey: new Map(),
+    inFlightIdempotencyKeys: new Set(),
+    mutationInFlight: false,
+    previewInFlight: false,
+  };
+  typedDispatchSessions.set(sessionId, state);
+  return state;
+};
+
+const buildTypedExecutionResponse = ({
+  context,
+  outcome,
+  response,
+  startedAtIso,
+}: {
+  context: NonNullable<RawEngineAppServerToolDispatchRequest['executionContext']>;
+  outcome: 'completed' | 'rejected' | 'stale' | 'cancelled' | 'timed_out';
+  response: RawEngineAppServerToolDispatchResponse;
+  startedAtIso?: string;
+}): RawEngineAppServerToolDispatchResponse =>
+  rawEngineAppServerToolDispatchResponseSchema.parse({
+    ...response,
+    ...(outcome === 'completed' ? {} : { dispatchStatus: 'rejected', result: undefined }),
+    execution: {
+      callId: context.callId,
+      cancellationId: context.cancellationId,
+      completedAtIso: new Date().toISOString(),
+      deadlineAt: context.deadlineAt,
+      idempotencyKey: context.idempotencyKey,
+      ...(context.iterationId === undefined ? {} : { iterationId: context.iterationId }),
+      outcome,
+      ...(context.parentCallId === undefined ? {} : { parentCallId: context.parentCallId }),
+      requestId: context.requestId,
+      requestSchemaVersion: 1,
+      responseSchemaVersion: 1,
+      sessionId: context.sessionId,
+      ...(startedAtIso === undefined ? {} : { startedAtIso }),
+    },
+  });
+
+const rejectTypedDispatch = ({
+  context,
+  message,
+  outcome,
+  request,
+  startedAtIso,
+}: {
+  context: NonNullable<RawEngineAppServerToolDispatchRequest['executionContext']>;
+  message: string;
+  outcome: 'rejected' | 'stale' | 'cancelled' | 'timed_out';
+  request: RawEngineAppServerToolDispatchRequest;
+  startedAtIso?: string;
+}): RawEngineAppServerToolDispatchResponse =>
+  buildTypedExecutionResponse({
+    context,
+    outcome,
+    response: rejectToolDispatch({ commandType: request.runtimeToolName, message, request }),
+    ...(startedAtIso === undefined ? {} : { startedAtIso }),
+  });
+
+const validateTypedDispatch = (
+  request: RawEngineAppServerToolDispatchRequest,
+): RawEngineAppServerToolDispatchResponse | null => {
+  const context = request.executionContext;
+  if (context === undefined) return null;
+  if (!isAgentEditorToolName(request.runtimeToolName)) {
+    return rejectTypedDispatch({
+      context,
+      message: `${request.runtimeToolName} is not an allowlisted typed selected-image tool.`,
+      outcome: 'rejected',
+      request,
+    });
+  }
+  const contract = agentEditorToolContracts[request.runtimeToolName];
+  const parsedArguments = contract.requestSchema.safeParse(request.arguments);
+  if (!parsedArguments.success) {
+    return rejectTypedDispatch({
+      context,
+      message: `Typed selected-image arguments rejected ${request.runtimeToolName}.`,
+      outcome: 'rejected',
+      request,
+    });
+  }
+  if (Date.parse(context.deadlineAt) <= Date.now()) {
+    return rejectTypedDispatch({ context, message: 'Typed dispatch deadline expired.', outcome: 'timed_out', request });
+  }
+  if (cancelledTypedDispatches.has(context.cancellationId)) {
+    return rejectTypedDispatch({ context, message: 'Typed dispatch was cancelled.', outcome: 'cancelled', request });
+  }
+  const expected = context.expected;
+  if (expected === undefined) return null;
+  const snapshot = buildAgentImageContextSnapshot();
+  if (expected.selectedImagePath !== undefined && expected.selectedImagePath !== snapshot.activeImagePath) {
+    return rejectTypedDispatch({
+      context,
+      message: 'Typed dispatch selected image is stale.',
+      outcome: 'stale',
+      request,
+    });
+  }
+  if (expected.graphRevision !== undefined && expected.graphRevision !== snapshot.graphRevision) {
+    return rejectTypedDispatch({
+      context,
+      message: 'Typed dispatch graph revision is stale.',
+      outcome: 'stale',
+      request,
+    });
+  }
+  if (expected.recipeHash !== undefined && expected.recipeHash !== snapshot.initialPreview.recipeHash) {
+    return rejectTypedDispatch({ context, message: 'Typed dispatch recipe hash is stale.', outcome: 'stale', request });
+  }
+  return null;
+};
+
+const executeTypedDispatch = async (
+  request: RawEngineAppServerToolDispatchRequest,
+  state: TypedDispatchSessionState,
+): Promise<RawEngineAppServerToolDispatchResponse> => {
+  const context = request.executionContext;
+  if (context === undefined) return buildRawEngineAppServerToolDispatchResponseUnchecked(request);
+  const validation = validateTypedDispatch(request);
+  if (validation !== null) return validation;
+  if (!isAgentEditorToolName(request.runtimeToolName)) {
+    return rejectTypedDispatch({ context, message: 'Unknown typed dispatch tool.', outcome: 'rejected', request });
+  }
+  const contract = agentEditorToolContracts[request.runtimeToolName];
+  const startedAtIso = new Date().toISOString();
+  if (contract.mutates) state.mutationInFlight = true;
+  if (contract.isPreviewRefresh) state.previewInFlight = true;
+  try {
+    const response = await buildRawEngineAppServerToolDispatchResponseUnchecked(request);
+    if (cancelledTypedDispatches.has(context.cancellationId)) {
+      if (response.result !== undefined) cleanupTypedDispatchResult(context.cancellationId, response.result);
+      cancelledTypedDispatches.delete(context.cancellationId);
+      return rejectTypedDispatch({
+        context,
+        message: 'Typed dispatch result arrived after cancellation.',
+        outcome: 'cancelled',
+        request,
+        startedAtIso,
+      });
+    }
+    if (Date.parse(context.deadlineAt) <= Date.now()) {
+      if (response.result !== undefined) cleanupTypedDispatchResult(context.cancellationId, response.result);
+      return rejectTypedDispatch({
+        context,
+        message: 'Typed dispatch result arrived after its deadline.',
+        outcome: 'timed_out',
+        request,
+        startedAtIso,
+      });
+    }
+    if (response.dispatchStatus !== 'completed' || response.result === undefined) {
+      return buildTypedExecutionResponse({ context, outcome: 'rejected', response, startedAtIso });
+    }
+    const parsedResult = contract.responseSchema.safeParse(response.result);
+    if (!parsedResult.success) {
+      return rejectTypedDispatch({
+        context,
+        message: `Typed selected-image result rejected ${request.runtimeToolName}.`,
+        outcome: 'rejected',
+        request,
+        startedAtIso,
+      });
+    }
+    return buildTypedExecutionResponse({ context, outcome: 'completed', response, startedAtIso });
+  } finally {
+    if (contract.mutates) state.mutationInFlight = false;
+    if (contract.isPreviewRefresh) state.previewInFlight = false;
+  }
+};
+
+const drainTypedPreviewQueue = async (state: TypedDispatchSessionState) => {
+  const queued = state.queuedPreview;
+  delete state.queuedPreview;
+  if (queued === undefined) return;
+  const context = queued.request.executionContext;
+  if (context === undefined) {
+    queued.resolve(await buildRawEngineAppServerToolDispatchResponseUnchecked(queued.request));
+    return;
+  }
+  state.inFlightIdempotencyKeys.add(context.idempotencyKey);
+  try {
+    const response = await executeTypedDispatch(queued.request, state);
+    state.completedByIdempotencyKey.set(context.idempotencyKey, response);
+    queued.resolve(response);
+    await drainTypedPreviewQueue(state);
+  } finally {
+    state.inFlightIdempotencyKeys.delete(context.idempotencyKey);
+  }
+};
+
+export const buildRawEngineAppServerToolDispatchResponse = async (
+  request: RawEngineAppServerToolDispatchRequest,
+): Promise<RawEngineAppServerToolDispatchResponse> => {
+  const context = request.executionContext;
+  if (context === undefined) return buildRawEngineAppServerToolDispatchResponseUnchecked(request);
+  const contract = isAgentEditorToolName(request.runtimeToolName)
+    ? agentEditorToolContracts[request.runtimeToolName]
+    : undefined;
+  if (contract === undefined)
+    return rejectTypedDispatch({ context, message: 'Unknown typed dispatch tool.', outcome: 'rejected', request });
+  const state = getTypedDispatchSessionState(context.sessionId);
+  const prior = state.completedByIdempotencyKey.get(context.idempotencyKey);
+  if (prior !== undefined) return prior;
+  const validation = validateTypedDispatch(request);
+  if (validation !== null) {
+    if (validation.execution?.outcome === 'cancelled') cancelledTypedDispatches.delete(context.cancellationId);
+    return validation;
+  }
+  if (state.inFlightIdempotencyKeys.has(context.idempotencyKey)) {
+    return rejectTypedDispatch({
+      context,
+      message: 'Typed dispatch idempotency key is already in flight.',
+      outcome: 'rejected',
+      request,
+    });
+  }
+  if (contract.mutates && state.mutationInFlight) {
+    return rejectTypedDispatch({
+      context,
+      message: 'Typed dispatch mutation session is busy.',
+      outcome: 'rejected',
+      request,
+    });
+  }
+  if (contract.isPreviewRefresh && state.previewInFlight) {
+    return new Promise((resolve) => {
+      const superseded = state.queuedPreview;
+      if (superseded !== undefined && superseded.request.executionContext !== undefined) {
+        superseded.resolve(
+          rejectTypedDispatch({
+            context: superseded.request.executionContext,
+            message: 'Typed preview refresh was superseded by a newer refresh.',
+            outcome: 'stale',
+            request: superseded.request,
+          }),
+        );
+      }
+      state.queuedPreview = { request, resolve };
+    });
+  }
+  state.inFlightIdempotencyKeys.add(context.idempotencyKey);
+  try {
+    const response = await executeTypedDispatch(request, state);
+    state.completedByIdempotencyKey.set(context.idempotencyKey, response);
+    if (contract.isPreviewRefresh) await drainTypedPreviewQueue(state);
+    return response;
+  } finally {
+    state.inFlightIdempotencyKeys.delete(context.idempotencyKey);
+  }
 };
 
 export const handleRawEngineAppServerHostRequest = (request: unknown): RawEngineAppServerHostResponse => {
