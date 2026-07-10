@@ -39,6 +39,7 @@ import {
   markLayerMaskReceiptsStale,
 } from '../utils/layers/layerMaskProvenance';
 import type { NegativeLabSessionSnapshot } from '../utils/negative-lab/negativeLabSessionState';
+import type { SuperResolutionNativeReadiness } from '../utils/superResolutionNativeReadiness';
 import type { SuperResolutionSourcePreflightMetadata } from '../utils/superResolutionSourcePreflight';
 
 export interface CollapsibleSectionsState {
@@ -202,6 +203,7 @@ export interface SuperResolutionModalState {
     toolName: string;
   };
   outputReview: SuperResolutionOutputReviewWorkflow | null;
+  nativeReadiness?: SuperResolutionNativeReadiness | null;
   settings: SuperResolutionUiSettings;
   sourcePreflightMetadata: SuperResolutionSourcePreflightMetadata[];
   sourcePaths: Array<string>;
@@ -290,6 +292,7 @@ export const createDefaultSuperResolutionModalState = (
   settings: SuperResolutionUiSettings = DEFAULT_SUPER_RESOLUTION_UI_SETTINGS,
 ): SuperResolutionModalState => ({
   isOpen: false,
+  nativeReadiness: null,
   outputReview: null,
   settings,
   sourcePreflightMetadata: [],

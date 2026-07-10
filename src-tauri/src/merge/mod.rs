@@ -4,3 +4,4 @@ pub(crate) mod hdr_artifact_sidecar;
 pub(crate) mod panorama_opencv_spike;
 pub(crate) mod panorama_stitching;
 pub(crate) mod panorama_utils;
+pub(crate) mod super_resolution;

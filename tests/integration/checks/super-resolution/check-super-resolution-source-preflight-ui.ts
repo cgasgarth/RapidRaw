@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 
+import { readFileSync } from 'node:fs';
 import {
   buildSuperResolutionSourcePreflight,
   createSuperResolutionSourcePreflightMetadata,
@@ -27,10 +28,8 @@ const imageRecords = paths.map((path) => ({
 
 const metadata = createSuperResolutionSourcePreflightMetadata(paths, imageRecords);
 const ready = buildSuperResolutionSourcePreflight({ requestedScale: 2, sources: metadata });
-if (ready.status !== 'ready') failures.push(`expected ready status, got ${ready.status}.`);
-if (ready.validation?.effectiveScale !== 2) failures.push('expected x2 effective scale.');
-if (ready.validation?.sourceMetadata[0]?.resolvedShiftRole !== 'reference') {
-  failures.push('expected first dx0/dy0 frame to be reference.');
+if (ready.validation?.sourceMetadata.some((source) => source.shiftX !== undefined || source.shiftY !== undefined)) {
+  failures.push('source preflight must not infer registration shifts from filenames.');
 }
 
 const missingMetadata = buildSuperResolutionSourcePreflight({
@@ -45,6 +44,18 @@ const blocked = buildSuperResolutionSourcePreflight({
 });
 if (blocked.status !== 'blocked') failures.push('expected dimension mismatch to block preflight.');
 if (!blocked.validation?.blockCodes.includes('dimension_mismatch')) failures.push('expected dimension_mismatch block.');
+
+const appModalsSource = readFileSync('src/components/modals/AppModals.tsx', 'utf8');
+const modalSource = readFileSync('src/components/modals/computational-merge/SuperResolutionModal.tsx', 'utf8');
+if (!appModalsSource.includes('Invokes.PlanSuperResolution')) {
+  failures.push('SR Preview must invoke native super-resolution readiness.');
+}
+if (!appModalsSource.includes('nativeReadiness: readiness')) {
+  failures.push('SR Preview must store native readiness instead of a synthetic review.');
+}
+if (!modalSource.includes('sr-native-readiness-row')) {
+  failures.push('SR modal must display native source readiness rows.');
+}
 
 if (failures.length > 0) {
   console.error(failures.join('\n'));
