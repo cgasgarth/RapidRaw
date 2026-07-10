@@ -170,6 +170,7 @@ export default function Editor({
   const uncroppedAdjustedPreviewUrl = useEditorStore((s) => s.uncroppedAdjustedPreviewUrl);
   const transformedOriginalUrl = useEditorStore((s) => s.transformedOriginalUrl);
   const interactivePatch = useEditorStore((s) => s.interactivePatch);
+  const previewQualityStatus = useEditorStore((s) => s.previewQualityStatus);
   const gamutWarningOverlay = useEditorStore((s) => s.gamutWarningOverlay);
   const isGamutWarningOverlayVisible = useEditorStore((s) => s.isGamutWarningOverlayVisible);
   const isExportSoftProofEnabled = useEditorStore((s) => s.isExportSoftProofEnabled);
@@ -2223,7 +2224,11 @@ export default function Editor({
             </button>
           </div>
         )}
-        <EditorChromeStatusStrip isFullScreen={isFullScreen} isRendering={isLoaderVisible} />
+        <EditorChromeStatusStrip
+          isFullScreen={isFullScreen}
+          isRendering={isLoaderVisible}
+          qualityStatus={previewQualityStatus}
+        />
       </div>
     </div>
   );
