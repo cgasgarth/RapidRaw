@@ -57,7 +57,7 @@ const uniqueNonEmptyStrings = (values: unknown, maximum = 32): string[] => {
 };
 
 export const createDefaultEditorWorkspacePreferences = (): EditorWorkspacePreferences => ({
-  compact: { toolsExpanded: true, toolsHeight: null },
+  compact: { drawerState: 'expanded', toolsExpanded: true, toolsHeight: null },
   filmstrip: { height: 144, visible: true },
   leftSidebar: { expandedSections: ['navigator', 'presets'], visible: true, width: 256 },
   rightInspector: {
@@ -154,7 +154,13 @@ export const readEditorWorkspacePreferences = (
     try {
       const serialized = storage.getItem(EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY);
       if (serialized !== null) {
-        const parsed = editorWorkspacePreferencesSchema.safeParse(JSON.parse(serialized));
+        const stored = JSON.parse(serialized) as Record<string, unknown>;
+        const compact = stored['compact'];
+        if (compact && typeof compact === 'object' && !('drawerState' in compact)) {
+          const legacyCompact = compact as Record<string, unknown>;
+          legacyCompact['drawerState'] = legacyCompact['toolsExpanded'] === false ? 'collapsed' : 'expanded';
+        }
+        const parsed = editorWorkspacePreferencesSchema.safeParse(stored);
         if (parsed.success) return parsed.data;
       }
     } catch {

@@ -226,6 +226,45 @@
 }
 
 @layer components {
+  .editor-workspace[data-editor-shell="compact"] {
+    gap: 0;
+    overflow: hidden;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .editor-workspace[data-editor-shell="compact"] .compact-editor-command-row {
+    border-bottom: 1px solid var(--editor-divider);
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .editor-workspace[data-editor-shell="compact"] .compact-editor-drawer-resizer {
+    height: 12px;
+    margin-bottom: -6px;
+    position: relative;
+    z-index: 20;
+  }
+
+  .editor-workspace[data-editor-shell="compact"] .compact-editor-drawer-resizer::after {
+    background: var(--editor-divider);
+    content: "";
+    height: 1px;
+    inset: 5px 0 auto;
+    position: absolute;
+  }
+
+  .editor-workspace[data-editor-shell="compact"] .compact-editor-inspector {
+    scroll-padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
+    touch-action: pan-y;
+  }
+
+  @media (pointer: coarse) {
+    .editor-workspace[data-editor-shell="compact"] [data-editor-region="tool-tabs"] button,
+    .editor-workspace[data-editor-shell="compact"] .compact-editor-drawer-header button {
+      min-height: 44px;
+      min-width: 44px;
+    }
+  }
+
   .editor-shell[data-editor-shell="desktop"],
   .editor-workspace[data-editor-shell="desktop"] {
     --editor-shell-divider: var(--editor-divider);

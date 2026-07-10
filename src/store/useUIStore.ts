@@ -21,6 +21,7 @@ import {
   type SuperResolutionUiSettings,
 } from '../schemas/computational-merge/superResolutionUiSchemas';
 import type {
+  CompactEditorDrawerState,
   EditorWorkspaceCompareMode,
   EditorWorkspaceLightsOutLevel,
   EditorWorkspacePreferences,
@@ -387,6 +388,7 @@ export interface UIState {
   setDefaultEditorCompareMode: (mode: EditorWorkspaceCompareMode) => void;
   setDefaultEditorZoomMode: (mode: EditorWorkspaceZoomMode) => void;
   setEditorLightsOutLevel: (level: EditorWorkspaceLightsOutLevel) => void;
+  setCompactEditorDrawerState: (state: CompactEditorDrawerState) => void;
   setEditorRegionSize: (
     region: 'compactTools' | 'filmstrip' | 'leftSidebar' | 'rightInspector',
     size: number | null,
@@ -603,6 +605,16 @@ export const useUIStore = create<UIState>((set, get) => {
       });
     },
 
+    setCompactEditorDrawerState: (drawerState) => {
+      set((state) => {
+        const preferences = structuredClone(state.editorWorkspacePreferences);
+        preferences.compact.drawerState = drawerState;
+        preferences.compact.toolsExpanded = drawerState !== 'collapsed';
+        saveEditorWorkspacePreferences(preferences);
+        return applyWorkspacePreferences(preferences, state.editorWorkspaceViewport);
+      });
+    },
+
     setEditorRegionSize: (region, size) => {
       set((state) => {
         const preferences = structuredClone(state.editorWorkspacePreferences);
@@ -624,6 +636,7 @@ export const useUIStore = create<UIState>((set, get) => {
         if (region === 'leftSidebar') preferences.leftSidebar.visible = visible;
         if (region === 'rightInspector') {
           preferences.compact.toolsExpanded = visible;
+          preferences.compact.drawerState = visible ? 'expanded' : 'collapsed';
           preferences.rightInspector.visible = visible;
         }
         if (region === 'filmstrip') preferences.filmstrip.visible = visible;
@@ -732,6 +745,7 @@ export const useUIStore = create<UIState>((set, get) => {
             preferences.rightInspector.activePanel = panelId;
             preferences.rightInspector.visible = true;
             preferences.compact.toolsExpanded = true;
+            preferences.compact.drawerState = 'expanded';
           }
           if (panelId)
             preferences.rightInspector.recentPanels = createRecentRightPanels(
