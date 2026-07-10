@@ -421,7 +421,9 @@ interface MaskListProps {
     event: ReactMouseEvent<HTMLElement> | ReactKeyboardEvent<HTMLElement>,
     containerId: string | null,
   ) => void;
+  onCreateMask: (type: Mask) => void;
   onExitComplete: () => void;
+  onOpenCreationMenu: (event: ReactMouseEvent<HTMLElement>) => void;
   onRootClick: () => void;
   onSelectContainer: (containerId: string | null) => void;
   onSelectMask: (subMaskId: string | null) => void;
@@ -2118,10 +2120,19 @@ export function MasksPanel() {
         className="flex h-full flex-col overflow-hidden bg-editor-panel text-text-primary select-none"
         onContextMenu={handlePanelContextMenu}
       >
-        <div className={professionalInspectorDensityTokens.panelHeader.root}>
-          <UiText variant={TextVariants.title} className={professionalInspectorDensityTokens.panelHeader.title}>
-            {t('editor.masks.maskingTitle')}
-          </UiText>
+        <div className={professionalInspectorDensityTokens.panelHeader.root} data-testid="mask-panel-header">
+          <div className="flex min-w-0 items-center gap-2">
+            <UiText variant={TextVariants.title} className={professionalInspectorDensityTokens.panelHeader.title}>
+              {t('editor.masks.maskingTitle')}
+            </UiText>
+            <UiText
+              variant={TextVariants.small}
+              className={editorChromeTokens.statusChip.base}
+              data-testid="mask-panel-mask-count"
+            >
+              {adjustments.masks.length}
+            </UiText>
+          </div>
           <div className="flex items-center gap-1">
             <button
               className={cx(
@@ -2146,17 +2157,6 @@ export function MasksPanel() {
         <Suspense fallback={<LayerStackPanelFallback />}>
           <LayerStackPanel
             activeMaskContainerId={activeMaskContainerId}
-            creationSlot={
-              <MaskContextualCreation
-                activeMaskContainerId={activeMaskContainerId}
-                onCreate={(maskType) => {
-                  handleGridClick(maskType);
-                }}
-                onOpenMenu={(event) => {
-                  handleAddMaskContextMenu(event, activeMaskContainerId);
-                }}
-              />
-            }
             masks={adjustments.masks}
             onSelectMaskContainer={onSelectContainer}
             onSetMaskContainers={(nextMasks: Array<MaskContainer>) => {
@@ -2214,7 +2214,7 @@ export function MasksPanel() {
                   {t('editor.masks.createNewTitle')}
                 </UiText>
                 <div
-                  className="mt-1 grid grid-cols-3 gap-1.5"
+                  className="mt-1 grid grid-cols-2 gap-1"
                   role="presentation"
                   onClick={(e) => {
                     e.stopPropagation();
@@ -2263,11 +2263,15 @@ export function MasksPanel() {
                 isRootOver={isRootOver}
                 layerMaskProvenanceViews={layerMaskProvenanceViews}
                 onAddComponent={handleAddMaskContextMenu}
+                onCreateMask={handleGridClick}
                 onExitComplete={() => {
                   if (pendingAction) {
                     pendingAction();
                     setPendingAction(null);
                   }
+                }}
+                onOpenCreationMenu={(event) => {
+                  handleAddMaskContextMenu(event, activeMaskContainerId);
                 }}
                 onRootClick={handleDeselect}
                 onSelectContainer={onSelectContainer}
@@ -2578,7 +2582,8 @@ function MaskContextualCreation({
             className={maskPanelIconButtonClassName}
             data-testid={`mask-contextual-create-${maskType}`}
             data-tooltip={tooltip}
-            onClick={() => {
+            onClick={(event) => {
+              event.stopPropagation();
               onCreate(maskType);
             }}
             type="button"
@@ -2651,15 +2656,15 @@ function DraggableGridItem({
         if (event.button !== 2) return;
         onRightClick(event);
       }}
-      className={`flex aspect-square flex-col items-center justify-center gap-1.5 rounded-md border border-editor-border bg-editor-panel-well p-2 text-text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring
+      className={`flex min-h-15 items-center justify-start gap-2 rounded border border-editor-border bg-editor-panel-well px-2 py-1.5 text-left text-text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring
                 ${maskType.disabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-editor-panel-raised active:bg-editor-selected-quiet'} ${isDragging ? 'opacity-50' : ''}`}
       data-tooltip={tooltip}
       type="button"
       whileTap={{ scale: 0.98 }}
       transition={{ type: 'spring', stiffness: 400, damping: 17 }}
     >
-      <maskType.icon size={24} />{' '}
-      <UiText as="span" variant={TextVariants.small} color={TextColors.primary}>
+      <maskType.icon size={18} className="shrink-0" />
+      <UiText as="span" variant={TextVariants.small} color={TextColors.primary} className="min-w-0 truncate">
         {getMaskTypeName(maskType)}
       </UiText>
     </motion.button>
@@ -2688,7 +2693,9 @@ function MaskList({
   isRootOver,
   layerMaskProvenanceViews,
   onAddComponent,
+  onCreateMask,
   onExitComplete,
+  onOpenCreationMenu,
   onRootClick,
   onSelectContainer,
   onSelectMask,
@@ -2717,9 +2724,25 @@ function MaskList({
       className={`flex-col transition-colors ${isRootOver ? 'bg-editor-panel-well' : ''}`}
       onClick={onRootClick}
     >
-      <UiText variant={TextVariants.heading} className={professionalInspectorDensityTokens.sectionHeader.title}>
-        {t('editor.masks.masksTitle')}
-      </UiText>
+      <div className="mb-1 flex min-h-7 min-w-0 items-center justify-between gap-2" data-testid="mask-stack-header">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <UiText variant={TextVariants.heading} className={professionalInspectorDensityTokens.sectionHeader.title}>
+            {t('editor.masks.masksTitle')}
+          </UiText>
+          <UiText
+            variant={TextVariants.small}
+            className={editorChromeTokens.statusChip.base}
+            data-testid="mask-stack-count"
+          >
+            {containers.length}
+          </UiText>
+        </div>
+        <MaskContextualCreation
+          activeMaskContainerId={activeMaskContainerId}
+          onCreate={onCreateMask}
+          onOpenMenu={onOpenCreationMenu}
+        />
+      </div>
 
       <AnimatePresence initial={false} mode="popLayout" onExitComplete={onExitComplete}>
         {containers.map((container) => (
@@ -2776,15 +2799,13 @@ function MaskList({
 
       <button
         aria-label={t('editor.masks.addNewMask')}
-        className="mt-1 flex min-h-8 w-full cursor-pointer items-center gap-2 rounded bg-transparent px-2 py-1 text-left text-[12px] font-medium text-text-secondary opacity-80 transition-colors transition-opacity hover:bg-editor-panel-raised hover:text-text-primary hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring"
+        className="mt-1 flex min-h-7 w-full cursor-pointer items-center gap-2 rounded bg-transparent px-2 py-1 text-left text-[12px] font-medium text-text-secondary opacity-80 transition-colors transition-opacity hover:bg-editor-panel-raised hover:text-text-primary hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring"
         onClick={(event: ReactMouseEvent<HTMLElement>) => {
           onAddComponent(event, null);
         }}
         type="button"
       >
-        <div className="p-0.5">
-          <Plus size={18} />
-        </div>
+        <Plus size={16} className="shrink-0" />
         <span>{t('editor.masks.addNewMask')}</span>
       </button>
     </motion.div>
@@ -2981,12 +3002,17 @@ function ContainerRow({
       <div
         {...listeners}
         {...attributes}
+        aria-current={isSelected || hasActiveChild ? 'true' : undefined}
         aria-expanded={isExpanded}
         aria-label={containerLabel}
         aria-pressed={isSelected}
-        className={`group flex min-h-8 items-center gap-1.5 rounded px-1.5 py-1 text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring
-             ${isSelected ? 'bg-editor-selected-quiet text-editor-selected-quiet-text' : hasActiveChild ? 'bg-editor-panel-well text-text-primary' : 'text-text-secondary hover:bg-editor-panel-raised hover:text-text-primary'}
+        className={`group relative flex min-h-8 items-center gap-1.5 rounded px-1.5 py-1 text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring
+             ${isSelected ? 'bg-editor-selected-quiet text-editor-selected-quiet-text before:absolute before:inset-y-1 before:left-0 before:w-0.5 before:rounded-full before:bg-editor-primary-active' : hasActiveChild ? 'bg-editor-panel-well text-text-primary before:absolute before:inset-y-1 before:left-0 before:w-0.5 before:rounded-full before:bg-editor-primary-active/60' : 'text-text-secondary hover:bg-editor-panel-raised hover:text-text-primary'}
              ${borderClass}`}
+        data-component-count={container.subMasks.length}
+        data-mask-container-active={String(isSelected || hasActiveChild)}
+        data-mask-container-visible={String(container.visible)}
+        data-testid={`mask-container-row-${container.id}`}
         onClick={(e) => {
           e.stopPropagation();
           onSelect();
@@ -3004,14 +3030,14 @@ function ContainerRow({
             e.stopPropagation();
             onToggle();
           }}
-          className={`flex h-6 w-6 cursor-pointer items-center justify-center rounded bg-transparent transition-colors hover:bg-editor-selected-quiet ${
+          className={`flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded bg-transparent transition-colors hover:bg-editor-selected-quiet ${
             TEXT_COLOR_KEYS[hasActiveChild || isExpanded ? TextColors.primary : TextColors.secondary]
           }`}
         >
           {isExpanded ? <FolderOpen size={18} /> : <FolderIcon size={18} />}
         </button>
         <div
-          className="flex-1 min-w-0 cursor-pointer"
+          className="flex min-w-0 flex-1 items-center gap-1.5 cursor-pointer"
           onDoubleClick={(e) => {
             e.stopPropagation();
             onToggle();
@@ -3036,7 +3062,7 @@ function ContainerRow({
               ref={renameInputRef}
             />
           ) : (
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <UiText
                 color={TextColors.primary}
                 weight={TextWeights.medium}
@@ -3051,8 +3077,16 @@ function ContainerRow({
               )}
             </div>
           )}
+          <UiText
+            as="span"
+            variant={TextVariants.small}
+            className={editorChromeTokens.statusChip.base}
+            data-testid={`mask-container-component-count-${container.id}`}
+          >
+            {container.subMasks.length}
+          </UiText>
         </div>
-        <div className="flex opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+        <div className="flex shrink-0 items-center">
           <button
             className={maskPanelRowActionClassName}
             aria-label={container.visible ? t('editor.masks.actions.hideMask') : t('editor.masks.actions.showMask')}
@@ -3073,7 +3107,7 @@ function ContainerRow({
             {container.visible ? <Eye size={16} /> : <EyeOff size={16} />}
           </button>
           <button
-            className={`${maskPanelRowActionClassName} hover:text-editor-danger`}
+            className={`${maskPanelRowActionClassName} opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 hover:text-editor-danger`}
             aria-label={t('editor.masks.actions.deleteMask')}
             onClick={(e) => {
               e.stopPropagation();
@@ -3274,17 +3308,22 @@ function SubMaskRow({
       ref={setCombinedRef}
       {...attributes}
       {...listeners}
+      aria-current={isActive ? 'true' : undefined}
       aria-label={subMaskLabel}
       aria-pressed={isActive}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className={`group flex min-h-8 cursor-pointer items-center gap-1.5 rounded px-1.5 py-1 text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring
-            ${isActive ? 'bg-editor-selected-quiet text-editor-selected-quiet-text' : 'text-text-secondary hover:bg-editor-panel-raised hover:text-text-primary'}
+      className={`group relative flex min-h-8 cursor-pointer items-center gap-1.5 rounded px-1.5 py-1 text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring
+            ${isActive ? 'bg-editor-selected-quiet text-editor-selected-quiet-text before:absolute before:inset-y-1 before:left-0 before:w-0.5 before:rounded-full before:bg-editor-primary-active' : 'text-text-secondary hover:bg-editor-panel-raised hover:text-text-primary'}
             ${dropClass}
             ${isDragging ? 'opacity-40 z-50' : ''}
             ${!parentVisible ? 'opacity-50' : ''}
             ${isDraggingContainer ? 'opacity-30 pointer-events-none' : ''}
             transition-opacity duration-300`}
+      data-mask-submask-active={String(isActive)}
+      data-mask-submask-mode={subMask.mode}
+      data-mask-submask-visible={String(subMask.visible)}
+      data-testid={`mask-submask-row-${subMask.id}`}
       onClick={(e) => {
         e.stopPropagation();
         onSelect();
@@ -3360,10 +3399,10 @@ function SubMaskRow({
           {getSubMaskName(subMask)}
         </UiText>
       )}
-      <div className="flex opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+      <div className="flex shrink-0 items-center">
         {index > 1 && (
           <button
-            className={maskPanelRowActionClassName}
+            className={`${maskPanelRowActionClassName} opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100`}
             aria-label={
               subMask.mode === SubMaskMode.Additive
                 ? t('editor.masks.actions.switchToSubtract')
@@ -3425,7 +3464,7 @@ function SubMaskRow({
           {subMask.visible ? <Eye size={16} /> : <EyeOff size={16} />}
         </button>
         <button
-          className={`${maskPanelRowActionClassName} hover:text-editor-danger`}
+          className={`${maskPanelRowActionClassName} opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 hover:text-editor-danger`}
           aria-label={t('editor.masks.actions.deleteComponent')}
           data-tooltip={t('editor.ai.actions.deleteComponent')}
           onClick={(e) => {

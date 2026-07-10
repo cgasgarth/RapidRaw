@@ -8,6 +8,7 @@ import {
   isMaskLikeContainerDrag,
   MASK_CONTAINER_RUNTIME_BLEND_MODES,
 } from '../../../src/components/panel/right/layers/maskPanelRowHelpers.ts';
+import { reorderMaskListContainers } from '../../../src/utils/mask/maskClipboard.ts';
 
 test('container drop class distinguishes container reorder from cross-container drops', () => {
   expect(
@@ -40,6 +41,20 @@ test('submask drop class disables insert target while dragging containers', () =
   expect(getMaskLikeSubMaskDropClass({ type: 'Container' }, true)).toBe('');
   expect(getMaskLikeSubMaskDropClass({ type: 'SubMask' }, true)).toBe('border-t-2 border-editor-primary-active');
   expect(getMaskLikeSubMaskDropClass({ type: 'Creation' }, false)).toBe('');
+});
+
+test('container reorder keeps the production drag target order without mutating the source stack', () => {
+  const containers = [
+    { id: 'mask-a', subMasks: [] },
+    { id: 'mask-b', subMasks: [] },
+    { id: 'mask-c', subMasks: [] },
+  ];
+
+  const reordered = reorderMaskListContainers(containers, 'mask-a', 'mask-c');
+
+  expect(reordered?.map((container) => container.id)).toEqual(['mask-b', 'mask-c', 'mask-a']);
+  expect(containers.map((container) => container.id)).toEqual(['mask-a', 'mask-b', 'mask-c']);
+  expect(reorderMaskListContainers(containers, 'mask-a', 'mask-a')).toBeNull();
 });
 
 test('runtime blend helper gates unsupported mask container blend modes', () => {
