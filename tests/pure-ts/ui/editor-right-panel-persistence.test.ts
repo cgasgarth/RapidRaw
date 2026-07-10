@@ -11,6 +11,7 @@ import {
 import { Panel } from '../../../src/components/ui/AppProperties';
 import {
   createRecentRightPanels,
+  EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY,
   LAST_EDITING_RIGHT_PANEL_STORAGE_KEY,
   MAX_RECENT_RIGHT_PANELS,
   readLastEditingRightPanel,
@@ -111,15 +112,20 @@ describe('editor right panel persistence', () => {
     resetRightPanelState(Panel.Color);
 
     useUIStore.getState().setRightPanel(Panel.Masks);
-    expect(storage.getItem(LAST_EDITING_RIGHT_PANEL_STORAGE_KEY)).toBe(Panel.Masks);
-
+    expect(
+      JSON.parse(storage.getItem(EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY) ?? '{}').rightInspector.activePanel,
+    ).toBe(Panel.Masks);
     useUIStore.getState().setRightPanel(Panel.Export);
     expect(useUIStore.getState().activeRightPanel).toBe(Panel.Export);
-    expect(storage.getItem(LAST_EDITING_RIGHT_PANEL_STORAGE_KEY)).toBe(Panel.Masks);
+    expect(
+      JSON.parse(storage.getItem(EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY) ?? '{}').rightInspector.activePanel,
+    ).toBe(Panel.Masks);
 
     useUIStore.getState().setRightPanel(Panel.Tether);
     expect(useUIStore.getState().activeRightPanel).toBe(Panel.Tether);
-    expect(storage.getItem(LAST_EDITING_RIGHT_PANEL_STORAGE_KEY)).toBe(Panel.Masks);
+    expect(
+      JSON.parse(storage.getItem(EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY) ?? '{}').rightInspector.activePanel,
+    ).toBe(Panel.Masks);
   });
 
   test('keeps slide direction deterministic from rail ordering', () => {
@@ -167,17 +173,30 @@ describe('editor right panel persistence', () => {
   test('collapses the active panel without replacing the rendered or persisted editing rail', () => {
     const storage = installMemoryStorage();
     resetRightPanelState(Panel.Masks);
-    storage.setItem(LAST_EDITING_RIGHT_PANEL_STORAGE_KEY, Panel.Masks);
+    useUIStore.setState((state) => ({
+      editorWorkspacePreferences: {
+        ...state.editorWorkspacePreferences,
+        rightInspector: { ...state.editorWorkspacePreferences.rightInspector, activePanel: Panel.Masks, visible: true },
+      },
+    }));
 
     useUIStore.getState().setRightPanel(Panel.Masks);
     expect(useUIStore.getState().activeRightPanel).toBeNull();
     expect(useUIStore.getState().renderedRightPanel).toBe(Panel.Masks);
-    expect(storage.getItem(LAST_EDITING_RIGHT_PANEL_STORAGE_KEY)).toBe(Panel.Masks);
+    expect(
+      JSON.parse(storage.getItem(EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY) ?? '{}').rightInspector.activePanel,
+    ).toBe(Panel.Masks);
+    expect(JSON.parse(storage.getItem(EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY) ?? '{}').compact.toolsExpanded).toBe(
+      false,
+    );
 
     useUIStore.getState().setRightPanel(Panel.Masks);
     expect(useUIStore.getState().activeRightPanel).toBe(Panel.Masks);
     expect(useUIStore.getState().renderedRightPanel).toBe(Panel.Masks);
     expect(useUIStore.getState().slideDirection).toBe(0);
+    expect(JSON.parse(storage.getItem(EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY) ?? '{}').compact.toolsExpanded).toBe(
+      true,
+    );
   });
 
   test('classifies only primary editing rails as restorable editing panels', () => {

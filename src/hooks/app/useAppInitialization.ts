@@ -106,10 +106,9 @@ export const useAppInitialization = ({
     })),
   );
 
-  const { uiVisibility, setUI } = useUIStore(
+  const { hydrateEditorWorkspacePreferences } = useUIStore(
     useShallow((state) => ({
-      uiVisibility: state.uiVisibility,
-      setUI: state.setUI,
+      hydrateEditorWorkspacePreferences: state.hydrateEditorWorkspacePreferences,
     })),
   );
 
@@ -203,8 +202,9 @@ export const useAppInitialization = ({
 
         setTheme(settings.theme);
 
-        if (settings.uiVisibility)
-          setUI((state) => ({ uiVisibility: { ...state.uiVisibility, ...settings.uiVisibility } }));
+        hydrateEditorWorkspacePreferences(
+          settings.uiVisibility === undefined ? {} : { uiVisibility: settings.uiVisibility },
+        );
 
         if (settings.isWaveformVisible !== undefined) setEditor({ isWaveformVisible: settings.isWaveformVisible });
         if (settings.activeWaveformChannel && isDisplayMode(settings.activeWaveformChannel)) {
@@ -261,7 +261,7 @@ export const useAppInitialization = ({
     isAndroid,
     setAppSettings,
     setTheme,
-    setUI,
+    hydrateEditorWorkspacePreferences,
     defaultLibraryViewMode,
     defaultThumbnailSize,
     setSortCriteria,
@@ -274,13 +274,6 @@ export const useAppInitialization = ({
     handleSettingsChange,
     i18n,
   ]);
-
-  useEffect(() => {
-    if (isInitialMount.current || !appSettings) return;
-    if (JSON.stringify(appSettings.uiVisibility) !== JSON.stringify(uiVisibility)) {
-      persistSettings({ ...appSettings, uiVisibility });
-    }
-  }, [uiVisibility, appSettings, persistSettings]);
 
   useEffect(() => {
     if (isInitialMount.current || !appSettings) return;
