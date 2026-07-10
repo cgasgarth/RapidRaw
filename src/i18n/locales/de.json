@@ -1015,7 +1015,10 @@
       "gamutWarningOverlay": "",
       "maskOverlayAlt": "Maskenuberlagerung",
       "originalAlt": "Original",
-      "sampler": { "clipped": "Clip {{channels}}", "paused": "Pausiert" }
+      "sampler": {
+        "clipped": "Clip {{channels}}",
+        "paused": "Pausiert"
+      }
     },
     "chromeStatus": {
       "accessibilityLabel": "",
@@ -1914,6 +1917,20 @@
         "undo": "Rückgängig ({{shortcut}}) oder Verlauf (Rechtsklick)"
       },
       "vc": "VK"
+    },
+    "viewerFooter": {
+      "accessibilityLabel": "",
+      "moreStatus": "",
+      "zoom": {
+        "fill": "",
+        "fit": "",
+        "in": "",
+        "label": "",
+        "oneToOne": "",
+        "out": "",
+        "percent": "",
+        "twoToOne": ""
+      }
     }
   },
   "export": {

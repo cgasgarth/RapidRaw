@@ -265,9 +265,9 @@ try {
 
 async function verifyPreviewBoundsScenario(page: Page, samples: BoundsSample[]): Promise<void> {
   const previewPanel = page.getByTestId('editor-image-preview-panel');
-  const zoomSlider = page.getByTestId('editor-bottom-bar-zoom-slider');
+  const zoomSelector = page.getByTestId('viewer-footer-zoom-select');
   await previewPanel.waitFor({ timeout: 10_000 });
-  await zoomSlider.waitFor({ timeout: 10_000 });
+  await zoomSelector.waitFor({ timeout: 10_000 });
   await waitForStablePreview(page);
 
   samples.push(await collectBoundsSample(page, 'fit-after-image-select'));
@@ -283,17 +283,12 @@ async function verifyPreviewBoundsScenario(page: Page, samples: BoundsSample[]):
   samples.push(await collectBoundsSample(page, 'keyboard-zoom-out'));
   await assertLatestBoundsSample(samples);
 
-  await zoomSlider.evaluate((input) => {
-    if (!(input instanceof HTMLInputElement)) throw new Error('Zoom slider test id did not resolve to an input.');
-    input.value = '1.75';
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-    input.dispatchEvent(new Event('change', { bubbles: true }));
-  });
+  await zoomSelector.selectOption('2');
   await waitForStablePreview(page);
-  samples.push(await collectBoundsSample(page, 'slider-zoom-175'));
+  samples.push(await collectBoundsSample(page, 'selector-zoom-200'));
   await assertLatestBoundsSample(samples);
 
-  await page.getByTestId('editor-bottom-bar-zoom').getByRole('button').first().click();
+  await zoomSelector.selectOption('fit');
   await waitForStablePreview(page);
   samples.push(await collectBoundsSample(page, 'reset-to-fit'));
   await assertLatestBoundsSample(samples);
@@ -317,8 +312,8 @@ async function collectBoundsSample(page: Page, label: string): Promise<BoundsSam
     rightPanelShell: await readBounds(page.getByTestId('editor-right-panel-shell')),
     toolbarShell: await readBounds(page.getByTestId('editor-toolbar-shell')),
     workspace: await readBounds(page.getByTestId('editor-workspace')),
-    zoomControls: await readBounds(page.getByTestId('editor-bottom-bar-zoom')),
-    zoomSlider: await readBounds(page.getByTestId('editor-bottom-bar-zoom-slider')),
+    viewerFooter: await readBounds(page.getByTestId('viewer-footer')),
+    zoomSelector: await readBounds(page.getByTestId('viewer-footer-zoom-select')),
   };
   const failures = evaluateBounds(elements);
   return { elements, failures, label, viewport };
@@ -370,8 +365,8 @@ function evaluateBounds(elements: BoundsSample['elements']): string[] {
     'rightPanelShell',
     'toolbarShell',
     'workspace',
-    'zoomControls',
-    'zoomSlider',
+    'viewerFooter',
+    'zoomSelector',
   ];
   for (const name of viewportBoundedElements) {
     const bounds = elements[name];
@@ -392,17 +387,17 @@ function evaluateBounds(elements: BoundsSample['elements']): string[] {
   const previewPanel = elements.previewPanel;
   const previewRegion = elements.previewRegion;
   const bottomBarShell = elements.bottomBarShell;
-  const zoomControls = elements.zoomControls;
-  const zoomSlider = elements.zoomSlider;
+  const viewerFooter = elements.viewerFooter;
+  const zoomSelector = elements.zoomSelector;
   const firstFilmstripThumbnail = elements.firstFilmstripThumbnail;
   if (previewRegion !== null && previewPanel !== null && !containsBounds(previewRegion, previewPanel, tolerance)) {
     failures.push('preview panel is not fully contained by the preview region.');
   }
-  if (bottomBarShell !== null && zoomControls !== null && !containsBounds(bottomBarShell, zoomControls, tolerance)) {
-    failures.push('zoom controls are not fully contained by the bottom bar shell.');
+  if (previewRegion !== null && viewerFooter !== null && !containsBounds(previewRegion, viewerFooter, tolerance)) {
+    failures.push('viewer footer is not fully contained by the preview region.');
   }
-  if (zoomControls !== null && zoomSlider !== null && !containsBounds(zoomControls, zoomSlider, tolerance)) {
-    failures.push('zoom slider is not fully contained by the zoom controls.');
+  if (viewerFooter !== null && zoomSelector !== null && !containsBounds(viewerFooter, zoomSelector, tolerance)) {
+    failures.push('zoom selector is not fully contained by the viewer footer.');
   }
   if (
     bottomBarShell !== null &&
@@ -411,8 +406,8 @@ function evaluateBounds(elements: BoundsSample['elements']): string[] {
   ) {
     failures.push('first filmstrip thumbnail is not fully contained by the bottom bar shell.');
   }
-  if (zoomControls !== null && firstFilmstripThumbnail !== null && overlaps(zoomControls, firstFilmstripThumbnail)) {
-    failures.push('zoom controls overlap the filmstrip thumbnails.');
+  if (viewerFooter !== null && firstFilmstripThumbnail !== null && overlaps(viewerFooter, firstFilmstripThumbnail)) {
+    failures.push('viewer footer overlaps the filmstrip thumbnails.');
   }
 
   return failures;

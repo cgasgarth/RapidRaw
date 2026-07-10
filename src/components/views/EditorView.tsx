@@ -58,7 +58,6 @@ export default function EditorView({
   transformWrapperRef,
   isResizing,
   isCompactPortrait,
-  isAndroid,
   isFullScreen: isFullScreenProp,
   compactEditorPanelHeight,
   compactEditorPanelCollapsedHeight,
@@ -74,7 +73,6 @@ export default function EditorView({
   handleCopyAdjustments,
   handlePasteAdjustments,
   handleRate,
-  handleZoomChange,
   handleRightPanelSelect,
   requestThumbnails,
   refreshImageList,
@@ -248,14 +246,13 @@ export default function EditorView({
       }}
       onRate={handleRate}
       onRequestThumbnails={requestThumbnails}
-      onZoomChange={handleZoomChange}
       rating={imageRatings[selectedImage?.path || ''] || 0}
       selectedImage={selectedImage ?? undefined}
       setIsFilmstripVisible={(value: boolean) => {
         setEditorRegionVisibility('filmstrip', value);
       }}
       showFilmstrip={!isCompactPortrait}
-      showZoomControls={!isAndroid}
+      showZoomControls={false}
       thumbnailAspectRatio={thumbnailAspectRatio}
       totalImages={sortedImageList.length}
     />

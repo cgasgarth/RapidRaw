@@ -969,7 +969,10 @@
       "gamutWarningOverlay": "",
       "maskOverlayAlt": "",
       "originalAlt": "",
-      "sampler": { "clipped": "裁切 {{channels}}", "paused": "已暫停" }
+      "sampler": {
+        "clipped": "裁切 {{channels}}",
+        "paused": "已暫停"
+      }
     },
     "chromeStatus": {
       "accessibilityLabel": "",
@@ -1798,6 +1801,20 @@
         "undo": "復原（{{shortcut}}）或歷史記錄（右鍵單擊）"
       },
       "vc": "VC"
+    },
+    "viewerFooter": {
+      "accessibilityLabel": "",
+      "moreStatus": "",
+      "zoom": {
+        "fill": "",
+        "fit": "",
+        "in": "",
+        "label": "",
+        "oneToOne": "",
+        "out": "",
+        "percent": "",
+        "twoToOne": ""
+      }
     }
   },
   "export": {

@@ -3,12 +3,16 @@ import { useTranslation } from 'react-i18next';
 import type { ViewerSampleResult, ViewerSampleTarget } from '../../../utils/viewerSampler';
 import { imageCanvasLayerZIndex } from './imageCanvasContracts';
 
-interface ViewerSamplerHudProps {
+export interface ViewerSamplerState {
   locked: boolean;
   onToggleLock: () => void;
   result: ViewerSampleResult | null;
   suppressed: boolean;
   target: ViewerSampleTarget;
+}
+
+interface ViewerSamplerHudProps extends ViewerSamplerState {
+  placement?: 'footer' | 'overlay';
 }
 
 const targetLabel = (target: ViewerSampleTarget): string => {
@@ -22,7 +26,14 @@ const unavailableLabel = (result: Extract<ViewerSampleResult, { status: 'unavail
   return 'Unavailable';
 };
 
-export function ViewerSamplerHud({ locked, onToggleLock, result, suppressed, target }: ViewerSamplerHudProps) {
+export function ViewerSamplerHud({
+  locked,
+  onToggleLock,
+  placement = 'overlay',
+  result,
+  suppressed,
+  target,
+}: ViewerSamplerHudProps) {
   const { t } = useTranslation();
   const available = result?.status === 'available' ? result : null;
   const unavailable = result?.status === 'unavailable' ? result : null;
@@ -31,16 +42,20 @@ export function ViewerSamplerHud({ locked, onToggleLock, result, suppressed, tar
   return (
     <div
       aria-live="polite"
-      className="pointer-events-auto absolute bottom-2 left-1/2 flex h-8 max-w-[calc(100%-16px)] -translate-x-1/2 items-center gap-2 overflow-hidden rounded border border-editor-overlay-stroke bg-editor-panel/95 px-2 text-[11px] tabular-nums text-text-primary shadow-lg"
+      className={
+        placement === 'overlay'
+          ? 'pointer-events-auto absolute bottom-2 left-1/2 flex h-8 max-w-[calc(100%-16px)] -translate-x-1/2 items-center gap-2 overflow-hidden rounded border border-editor-overlay-stroke bg-editor-panel/95 px-2 text-[11px] tabular-nums text-text-primary shadow-lg'
+          : 'flex min-w-0 max-w-80 items-center gap-1 overflow-hidden text-[10px] tabular-nums text-text-primary'
+      }
       data-sampler-locked={String(locked)}
       data-sampler-status={suppressed ? 'suppressed' : (result?.status ?? 'idle')}
       data-sampler-target={target}
       data-testid="viewer-sampler-hud"
-      style={{ zIndex: imageCanvasLayerZIndex('viewerHud') }}
+      style={placement === 'overlay' ? { zIndex: imageCanvasLayerZIndex('viewerHud') } : undefined}
     >
       <button
         aria-label={locked ? 'Unlock viewer sample' : 'Lock viewer sample'}
-        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-text-secondary hover:bg-editor-hover hover:text-text-primary disabled:opacity-40"
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-text-secondary hover:bg-editor-hover hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring disabled:opacity-40"
         disabled={suppressed || result === null}
         onClick={(event) => {
           event.stopPropagation();

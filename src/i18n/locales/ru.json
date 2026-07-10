@@ -1029,7 +1029,10 @@
       "gamutWarningOverlay": "",
       "maskOverlayAlt": "",
       "originalAlt": "",
-      "sampler": { "clipped": "Обрезка {{channels}}", "paused": "Приостановлено" }
+      "sampler": {
+        "clipped": "Обрезка {{channels}}",
+        "paused": "Приостановлено"
+      }
     },
     "chromeStatus": {
       "accessibilityLabel": "",
@@ -1954,6 +1957,20 @@
         "undo": "Отменить ({{shortcut}}) или история (правый клик)"
       },
       "vc": "ВК"
+    },
+    "viewerFooter": {
+      "accessibilityLabel": "",
+      "moreStatus": "",
+      "zoom": {
+        "fill": "",
+        "fit": "",
+        "in": "",
+        "label": "",
+        "oneToOne": "",
+        "out": "",
+        "percent": "",
+        "twoToOne": ""
+      }
     }
   },
   "export": {

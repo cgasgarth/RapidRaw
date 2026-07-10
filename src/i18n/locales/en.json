@@ -1967,6 +1967,20 @@
         "undo": "Undo ({{shortcut}}) or History (Right-click)"
       },
       "vc": "VC"
+    },
+    "viewerFooter": {
+      "accessibilityLabel": "Viewer status and controls",
+      "moreStatus": "More viewer status",
+      "zoom": {
+        "fill": "Fill",
+        "fit": "Fit",
+        "in": "Zoom in",
+        "label": "Zoom",
+        "oneToOne": "1:1",
+        "out": "Zoom out",
+        "percent": "{{value}}%",
+        "twoToOne": "2:1"
+      }
     }
   },
   "export": {

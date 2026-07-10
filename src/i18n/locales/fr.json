@@ -1003,7 +1003,10 @@
       "gamutWarningOverlay": "",
       "maskOverlayAlt": "",
       "originalAlt": "",
-      "sampler": { "clipped": "Écrêtage {{channels}}", "paused": "En pause" }
+      "sampler": {
+        "clipped": "Écrêtage {{channels}}",
+        "paused": "En pause"
+      }
     },
     "chromeStatus": {
       "accessibilityLabel": "",
@@ -1903,6 +1906,20 @@
         "undo": "Annuler ({{shortcut}}) ou Historique (Clic-droit)"
       },
       "vc": "CV"
+    },
+    "viewerFooter": {
+      "accessibilityLabel": "",
+      "moreStatus": "",
+      "zoom": {
+        "fill": "",
+        "fit": "",
+        "in": "",
+        "label": "",
+        "oneToOne": "",
+        "out": "",
+        "percent": "",
+        "twoToOne": ""
+      }
     }
   },
   "export": {

@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import cx from 'clsx';
-import { Eye, Maximize, Minimize2, MoonStar, Scan } from 'lucide-react';
+import { Eye, Maximize, Minimize2, MoonStar } from 'lucide-react';
 import {
   type MouseEvent,
   type RefObject,
@@ -86,10 +86,11 @@ import { debounce } from '../../utils/timing';
 import type { WhiteBalancePickerRuntimeReceipt } from '../../utils/whiteBalancePicker';
 import { Panel } from '../ui/AppProperties';
 import { editorChromeTokens } from '../ui/editorChromeTokens';
-import EditorChromeStatusStrip from './editor/EditorChromeStatusStrip';
 import EditorToolbar from './editor/EditorToolbar';
 import ImageCanvas from './editor/ImageCanvas';
 import { resolveViewerChromeRegionContract } from './editor/imageCanvasContracts';
+import ViewerFooter from './editor/ViewerFooter';
+import type { ViewerSamplerState } from './editor/ViewerSamplerHud';
 import {
   isViewerDrag,
   resolveViewerInput,
@@ -170,7 +171,6 @@ export default function Editor({
   const uncroppedAdjustedPreviewUrl = useEditorStore((s) => s.uncroppedAdjustedPreviewUrl);
   const transformedOriginalUrl = useEditorStore((s) => s.transformedOriginalUrl);
   const interactivePatch = useEditorStore((s) => s.interactivePatch);
-  const previewQualityStatus = useEditorStore((s) => s.previewQualityStatus);
   const gamutWarningOverlay = useEditorStore((s) => s.gamutWarningOverlay);
   const isGamutWarningOverlayVisible = useEditorStore((s) => s.isGamutWarningOverlayVisible);
   const isExportSoftProofEnabled = useEditorStore((s) => s.isExportSoftProofEnabled);
@@ -244,6 +244,7 @@ export default function Editor({
   const [isMaskHovered, setIsMaskHovered] = useState(false);
   const [isMaskTouchInteracting, setIsMaskTouchInteracting] = useState(false);
   const [isLoaderVisible, setIsLoaderVisible] = useState(false);
+  const [viewerSamplerState, setViewerSamplerState] = useState<ViewerSamplerState | null>(null);
   const [showExifDateView, setShowExifDateView] = useState(false);
   const [maskOverlayUrl, setMaskOverlayUrl] = useState<string | null>(null);
   const [maskOverlayRuntimeState, setMaskOverlayRuntimeState] = useState<MaskOverlayRuntimeState>({
@@ -2096,6 +2097,7 @@ export default function Editor({
               transformState={transformState}
               hasRenderedFirstFrame={hasRenderedFirstFrame}
               viewerSampleGraphRevision={viewerSampleGraphRevision}
+              onViewerSamplerStateChange={setViewerSamplerState}
             />
             {activeObjectPromptState !== null && (
               <div className="pointer-events-none absolute inset-0" data-testid="object-prompt-canvas-overlay">
@@ -2193,27 +2195,6 @@ export default function Editor({
               <Eye size={15} />
             </button>
             <button
-              aria-label={zoomMode.kind === 'fit' ? 'View at 1:1' : 'Fit image'}
-              className={cx(chrome.button.base, chrome.button.iconCompact, chrome.button.quiet, chrome.focusRing)}
-              onClick={() => {
-                setEditor({
-                  zoomMode: getEditorZoomModeForCommand(
-                    { kind: zoomMode.kind === 'fit' ? 'one-to-one' : 'fit' },
-                    resolvedZoom,
-                  ),
-                });
-              }}
-              type="button"
-            >
-              <Scan size={15} />
-            </button>
-            <span
-              className="max-w-24 truncate px-1 text-[10px] text-text-secondary"
-              data-testid="editor-active-tool-status"
-            >
-              {activeViewerTool}
-            </span>
-            <button
               aria-label={isFullScreen ? exitPreviewLabel : previewOnlyLabel}
               className={cx(chrome.button.base, chrome.button.iconCompact, chrome.button.quiet, chrome.focusRing)}
               data-testid="editor-preview-exit-button"
@@ -2224,10 +2205,13 @@ export default function Editor({
             </button>
           </div>
         )}
-        <EditorChromeStatusStrip
+        <ViewerFooter
+          activeTool={activeViewerTool}
           isFullScreen={isFullScreen}
           isRendering={isLoaderVisible}
-          qualityStatus={previewQualityStatus}
+          resolvedZoom={resolvedZoom}
+          samplerState={viewerSamplerState}
+          zoomResolutionState={zoomResolutionState}
         />
       </div>
     </div>

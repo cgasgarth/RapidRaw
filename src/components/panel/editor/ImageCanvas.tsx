@@ -91,7 +91,7 @@ import {
   canvasOverlayTokens,
 } from './overlays/canvasOverlayTokens';
 import { PreviewSurface } from './PreviewSurface';
-import { ViewerSamplerHud } from './ViewerSamplerHud';
+import type { ViewerSamplerState } from './ViewerSamplerHud';
 import type { ViewerActiveTool } from './viewerInputResolver';
 
 declare global {
@@ -326,6 +326,7 @@ interface ImageCanvasProps {
   transformState: { scale: number; positionX: number; positionY: number };
   hasRenderedFirstFrame: boolean;
   viewerSampleGraphRevision?: string;
+  onViewerSamplerStateChange?: (state: ViewerSamplerState) => void;
 }
 
 interface MaskOverlay {
@@ -1739,6 +1740,7 @@ const ImageCanvas = memo(
     transformState,
     hasRenderedFirstFrame,
     viewerSampleGraphRevision = 'viewer-sample-unbound',
+    onViewerSamplerStateChange,
   }: ImageCanvasProps) => {
     const { t } = useTranslation();
     const [isCropViewVisible, setIsCropViewVisible] = useState(false);
@@ -2146,6 +2148,26 @@ const ImageCanvas = memo(
     const [viewerSampleTarget, setViewerSampleTarget] = useState<ViewerSampleTarget>(
       isExportSoftProofEnabled ? 'softProof' : 'edited',
     );
+    const handleToggleViewerSampleLock = useCallback(() => {
+      setViewerSampleLocked((locked) => !locked);
+    }, []);
+
+    useEffect(() => {
+      onViewerSamplerStateChange?.({
+        locked: viewerSampleLocked,
+        onToggleLock: handleToggleViewerSampleLock,
+        result: viewerSampleResult,
+        suppressed: samplerSuppressed,
+        target: viewerSampleTarget,
+      });
+    }, [
+      handleToggleViewerSampleLock,
+      onViewerSamplerStateChange,
+      samplerSuppressed,
+      viewerSampleLocked,
+      viewerSampleResult,
+      viewerSampleTarget,
+    ]);
     const latestViewerSampleRequestRef = useRef<ViewerSampleRequest | null>(null);
     const executeViewerSampleRef = useRef<(request: ViewerSampleRequest) => Promise<void>>(async () => {});
     const viewerSampleSchedulerRef = useRef<LatestViewerSampleScheduler | null>(null);
@@ -3648,33 +3670,9 @@ const ImageCanvas = memo(
                     imageRendering: isMaxZoom ? 'pixelated' : 'auto',
                   }}
                 />
-                <div
-                  className="absolute bottom-3 right-3 rounded-md border px-3 py-2 text-xs font-medium"
-                  style={{
-                    background: 'rgba(12, 14, 17, 0.84)',
-                    borderColor: 'var(--editor-danger)',
-                    boxShadow: '0 12px 28px rgba(0, 0, 0, 0.58)',
-                    color: '#ffe8fb',
-                  }}
-                >
-                  {t('editor.canvas.gamutWarningCoverage', {
-                    profile: renderedPreviewWarningStatus.displayProfileLabel,
-                    value: renderedPreviewWarningStatus.coverageLabel,
-                  })}
-                </div>
               </div>
             )}
           </PreviewSurface>
-
-          <ViewerSamplerHud
-            locked={viewerSampleLocked}
-            onToggleLock={() => {
-              setViewerSampleLocked((locked) => !locked);
-            }}
-            result={viewerSampleResult}
-            suppressed={samplerSuppressed}
-            target={viewerSampleTarget}
-          />
 
           {activeRetouchLayer &&
             activeRetouchSource &&
