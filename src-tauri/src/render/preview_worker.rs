@@ -54,7 +54,6 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
     let fn_start = std::time::Instant::now();
     let context = get_or_init_gpu_context(&state, app_handle)?;
     hydrate_adjustments(&state, &mut adjustments_json);
-    let adjustments_clone = adjustments_json;
 
     let loaded_image_guard = state.original_image.lock().unwrap();
     let loaded_image = loaded_image_guard
@@ -63,6 +62,17 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         .clone();
     drop(loaded_image_guard);
     crate::validate_expected_preview_image(&loaded_image.path, expected_image_path)?;
+    if let Some(plan) =
+        crate::layers::apply_authoritative_layer_stack(&mut adjustments_json, expected_image_path)?
+    {
+        log::debug!(
+            "native layer preview plan revision={} layer={:?} hash={}",
+            plan.graph_revision,
+            plan.layer_id,
+            plan.plan_hash
+        );
+    }
+    let adjustments_clone = adjustments_json;
 
     let new_transform_hash = calculate_transform_hash(&adjustments_clone);
     let settings = load_settings_or_default(app_handle);
