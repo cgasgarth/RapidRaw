@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use chrono::{SecondsFormat, Utc};
@@ -21,7 +21,6 @@ use sha2::{Digest, Sha256};
 use tauri::Emitter;
 use tauri::Manager;
 
-use crate::AppState;
 use crate::exif_processing;
 pub(crate) use crate::export::export_encoders::{
     EmbeddedSourceIccProfile, encode_image_to_bytes,
@@ -50,6 +49,7 @@ use crate::image_processing::{
 use crate::lut_processing::{convert_image_to_cube_lut, generate_identity_lut_image};
 use crate::mask_generation::{MaskDefinition, generate_mask_bitmap};
 use crate::raw_processing::RawDevelopmentReport;
+use crate::{AppState, ExportJob};
 
 use crate::cache_utils::{calculate_full_job_hash, calculate_transform_hash};
 #[cfg(test)]
@@ -105,7 +105,93 @@ struct ExportReceiptOutput {
 struct ExportReceipt {
     completed_at: String,
     outputs: Vec<ExportReceiptOutput>,
+    terminal_status: ExportTerminalStatus,
     total: usize,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+enum ExportTerminalStatus {
+    Cancelled,
+    Completed,
+}
+
+enum ExportItemResult {
+    Cancelled(Option<ExportReceiptOutput>),
+    Completed(ExportReceiptOutput),
+    Failed(String),
+}
+
+fn claim_export_job(registry: &Mutex<Option<ExportJob>>) -> Result<Arc<AtomicBool>, String> {
+    let mut job = registry.lock().unwrap();
+    if job.is_some() {
+        return Err("An export is already in progress.".to_string());
+    }
+
+    let cancellation_token = Arc::new(AtomicBool::new(false));
+    *job = Some(ExportJob {
+        cancellation_token: Arc::clone(&cancellation_token),
+        task_handle: None,
+    });
+    Ok(cancellation_token)
+}
+
+fn request_export_cancellation(registry: &Mutex<Option<ExportJob>>) -> Result<(), String> {
+    let job = registry.lock().unwrap();
+    let Some(job) = job.as_ref() else {
+        return Err("No export task is currently running.".to_string());
+    };
+
+    if job.cancellation_token.swap(true, Ordering::SeqCst) {
+        return Err("Export cancellation is already in progress.".to_string());
+    }
+    Ok(())
+}
+
+fn attach_export_task(
+    registry: &Mutex<Option<ExportJob>>,
+    cancellation_token: &Arc<AtomicBool>,
+    task: tokio::task::JoinHandle<()>,
+) {
+    let mut job = registry.lock().unwrap();
+    if let Some(job) = job.as_mut()
+        && Arc::ptr_eq(&job.cancellation_token, cancellation_token)
+    {
+        job.task_handle = Some(task);
+    }
+}
+
+fn finish_export_job(registry: &Mutex<Option<ExportJob>>, cancellation_token: &Arc<AtomicBool>) {
+    let mut job = registry.lock().unwrap();
+    if job
+        .as_ref()
+        .is_some_and(|job| Arc::ptr_eq(&job.cancellation_token, cancellation_token))
+    {
+        *job = None;
+    }
+}
+
+fn export_terminal_receipt(
+    terminal_status: ExportTerminalStatus,
+    outputs: Vec<ExportReceiptOutput>,
+    total: usize,
+) -> ExportReceipt {
+    ExportReceipt {
+        completed_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
+        outputs,
+        terminal_status,
+        total,
+    }
+}
+
+fn commit_export_output<T>(
+    cancellation_token: &AtomicBool,
+    write: impl FnOnce() -> Result<T, String>,
+) -> Result<Option<T>, String> {
+    if cancellation_token.load(Ordering::SeqCst) {
+        return Ok(None);
+    }
+    write().map(Some)
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -494,7 +580,12 @@ fn export_masks_for_image(
     state: &tauri::State<AppState>,
     is_raw: bool,
     app_handle: &tauri::AppHandle,
+    cancellation_token: &AtomicBool,
 ) -> Result<(), String> {
+    if cancellation_token.load(Ordering::SeqCst) {
+        return Err("Export cancelled".to_string());
+    }
+
     let (transformed_image, mask_bitmaps) = prepare_export_masks(base_image, js_adjustments, state);
     let (img_w, img_h) = transformed_image.dimensions();
 
@@ -517,6 +608,10 @@ fn export_masks_for_image(
             .unwrap_or("jpg");
 
         for (i, _) in mask_bitmaps.iter().enumerate() {
+            if cancellation_token.load(Ordering::SeqCst) {
+                return Err("Export cancelled".to_string());
+            }
+
             let single_adjustments = build_single_mask_adjustments(&all_adjustments, i);
             let full_white_mask = ImageBuffer::from_fn(img_w, img_h, |_, _| Luma([255u8]));
             let single_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = vec![full_white_mask];
@@ -549,33 +644,60 @@ fn export_masks_for_image(
                 output_dir.join(format!("{}_mask_{}_image.{}", stem, i, extension));
             let mask_alpha_path = output_dir.join(format!("{}_mask_{}_alpha.png", stem, i));
 
-            save_image_with_metadata(
-                &with_options,
-                &mask_image_path,
-                source_path_str,
-                export_settings,
-            )?;
+            if cancellation_token.load(Ordering::SeqCst) {
+                return Err("Export cancelled".to_string());
+            }
+            if commit_export_output(cancellation_token, || {
+                save_image_with_metadata(
+                    &with_options,
+                    &mask_image_path,
+                    source_path_str,
+                    export_settings,
+                )
+            })?
+            .is_none()
+            {
+                return Err("Export cancelled".to_string());
+            }
+
+            if cancellation_token.load(Ordering::SeqCst) {
+                return Err("Export cancelled".to_string());
+            }
 
             if export_settings.preserve_timestamps {
                 set_timestamps_from_exif(Path::new(source_path_str), &mask_image_path);
             }
 
             let alpha_bytes = encode_grayscale_to_png(&alpha_resized)?;
-            #[cfg(target_os = "android")]
+            if cancellation_token.load(Ordering::SeqCst) {
+                return Err("Export cancelled".to_string());
+            }
+            if commit_export_output(cancellation_token, || {
+                #[cfg(target_os = "android")]
+                {
+                    let file_name = mask_alpha_path
+                        .file_name()
+                        .and_then(|name| name.to_str())
+                        .ok_or_else(|| "Missing Android mask export file name".to_string())?;
+                    crate::android_integration::save_image_bytes_to_android_gallery(
+                        file_name,
+                        crate::formats::IMAGE_MIME_PNG,
+                        &alpha_bytes,
+                    )?;
+                }
+
+                #[cfg(not(target_os = "android"))]
+                fs::write(&mask_alpha_path, &alpha_bytes).map_err(|e| e.to_string())?;
+                Ok(())
+            })?
+            .is_none()
             {
-                let file_name = mask_alpha_path
-                    .file_name()
-                    .and_then(|name| name.to_str())
-                    .ok_or_else(|| "Missing Android mask export file name".to_string())?;
-                crate::android_integration::save_image_bytes_to_android_gallery(
-                    file_name,
-                    crate::formats::IMAGE_MIME_PNG,
-                    &alpha_bytes,
-                )?;
+                return Err("Export cancelled".to_string());
             }
 
-            #[cfg(not(target_os = "android"))]
-            fs::write(&mask_alpha_path, alpha_bytes).map_err(|e| e.to_string())?;
+            if cancellation_token.load(Ordering::SeqCst) {
+                return Err("Export cancelled".to_string());
+            }
         }
     }
     Ok(())
@@ -647,17 +769,46 @@ pub async fn export_images(
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
+    let total_paths = paths.len();
+    let cancellation_token = claim_export_job(&state.export_job)?;
     tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-
-    if state.export_task_handle.lock().unwrap().is_some() {
-        return Err("An export is already in progress.".to_string());
+    if cancellation_token.load(Ordering::SeqCst) {
+        let _ = app_handle.emit(
+            crate::events::EXPORT_CANCELLED,
+            export_terminal_receipt(ExportTerminalStatus::Cancelled, Vec::new(), total_paths),
+        );
+        finish_export_job(&state.export_job, &cancellation_token);
+        return Ok(());
     }
 
-    state.export_cancel_requested.store(false, Ordering::SeqCst);
-
-    let context = get_or_init_gpu_context(&state, &app_handle)?;
+    let context = match get_or_init_gpu_context(&state, &app_handle) {
+        Ok(context) => context,
+        Err(error) => {
+            if cancellation_token.load(Ordering::SeqCst) {
+                let _ = app_handle.emit(
+                    crate::events::EXPORT_CANCELLED,
+                    export_terminal_receipt(
+                        ExportTerminalStatus::Cancelled,
+                        Vec::new(),
+                        total_paths,
+                    ),
+                );
+                finish_export_job(&state.export_job, &cancellation_token);
+                return Ok(());
+            }
+            finish_export_job(&state.export_job, &cancellation_token);
+            return Err(error);
+        }
+    };
+    if cancellation_token.load(Ordering::SeqCst) {
+        let _ = app_handle.emit(
+            crate::events::EXPORT_CANCELLED,
+            export_terminal_receipt(ExportTerminalStatus::Cancelled, Vec::new(), total_paths),
+        );
+        finish_export_job(&state.export_job, &cancellation_token);
+        return Ok(());
+    }
     let context = Arc::new(context);
-    let export_cancel_requested = Arc::clone(&state.export_cancel_requested);
     let progress_counter = Arc::new(AtomicUsize::new(0));
 
     let available_cores = std::thread::available_parallelism()
@@ -684,9 +835,11 @@ pub async fn export_images(
         num_threads
     );
 
+    let task_cancellation_token = Arc::clone(&cancellation_token);
     let task = tokio::spawn(async move {
+        let cancellation_token = task_cancellation_token;
         let output_folder_path = std::path::Path::new(&output_folder_or_file);
-        let total_paths = paths.len();
+        let total_paths = total_paths;
         let settings = load_settings_or_default(&app_handle);
 
         let mut base_path_counts: HashMap<String, usize> = HashMap::new();
@@ -724,19 +877,19 @@ pub async fn export_images(
         let mut join_handles = Vec::new();
 
         for (global_index, image_path_str, appearance_count, explicit_vc) in export_items {
-            if export_cancel_requested.load(Ordering::SeqCst) {
+            if cancellation_token.load(Ordering::SeqCst) {
                 break;
             }
 
             let permit = semaphore.clone().acquire_owned().await.unwrap();
 
-            if export_cancel_requested.load(Ordering::SeqCst) {
+            if cancellation_token.load(Ordering::SeqCst) {
                 break;
             }
 
             let app_handle_clone = app_handle.clone();
             let context_clone = Arc::clone(&context);
-            let export_cancel_requested = Arc::clone(&export_cancel_requested);
+            let cancellation_token = Arc::clone(&cancellation_token);
             let progress_counter_clone = Arc::clone(&progress_counter);
             let output_folder_path = output_folder_path.to_path_buf();
             let base_origin_folders = base_origin_folders.clone();
@@ -747,8 +900,8 @@ pub async fn export_images(
             let settings = settings.clone();
 
             let handle = tokio::task::spawn_blocking(move || {
-                if export_cancel_requested.load(Ordering::SeqCst) {
-                    return Err("Export cancelled".to_string());
+                if cancellation_token.load(Ordering::SeqCst) {
+                    return ExportItemResult::Cancelled(None);
                 }
 
                 let state = app_handle_clone.state::<AppState>();
@@ -789,7 +942,8 @@ pub async fn export_images(
 
                 let extension = output_format.to_lowercase();
 
-                let result: Result<ExportReceiptOutput, String> = (|| {
+                let mut committed_primary_output = None;
+                let result: Result<ExportItemResult, String> = (|| {
                     if extension == "cube" {
                         let cube_bytes = export_adjustments_as_lut(
                             &js_adjustments,
@@ -798,21 +952,30 @@ pub async fn export_images(
                             &state,
                             &app_handle_clone,
                         )?;
-                        #[cfg(target_os = "android")]
-                        {
-                            let file_name = output_path
-                                .file_name()
-                                .and_then(|name| name.to_str())
-                                .ok_or_else(|| "Missing Android LUT file name".to_string())?;
-                            crate::android_integration::save_file_bytes_to_android_downloads(
-                                file_name,
-                                "application/octet-stream",
-                                &cube_bytes,
-                            )?;
+                        if cancellation_token.load(Ordering::SeqCst) {
+                            return Ok(ExportItemResult::Cancelled(None));
                         }
-                        #[cfg(not(target_os = "android"))]
-                        fs::write(&output_path, cube_bytes).map_err(|e| e.to_string())?;
-                        return export_receipt_output(
+                        let wrote_lut = commit_export_output(cancellation_token.as_ref(), || {
+                            #[cfg(target_os = "android")]
+                            {
+                                let file_name = output_path
+                                    .file_name()
+                                    .and_then(|name| name.to_str())
+                                    .ok_or_else(|| "Missing Android LUT file name".to_string())?;
+                                crate::android_integration::save_file_bytes_to_android_downloads(
+                                    file_name,
+                                    "application/octet-stream",
+                                    &cube_bytes,
+                                )?;
+                            }
+                            #[cfg(not(target_os = "android"))]
+                            fs::write(&output_path, &cube_bytes).map_err(|e| e.to_string())?;
+                            Ok(())
+                        })?;
+                        if wrote_lut.is_none() {
+                            return Ok(ExportItemResult::Cancelled(None));
+                        }
+                        return Ok(ExportItemResult::Completed(export_receipt_output(
                             &output_path,
                             &source_path_str,
                             &extension,
@@ -820,12 +983,12 @@ pub async fn export_images(
                             None,
                             None,
                             None,
-                        );
+                        )?));
                     }
 
                     let export_started = Instant::now();
-                    if export_cancel_requested.load(Ordering::SeqCst) {
-                        return Err("Export cancelled".to_string());
+                    if cancellation_token.load(Ordering::SeqCst) {
+                        return Ok(ExportItemResult::Cancelled(None));
                     }
                     let (base_image, raw_development_report) = if is_current_edit {
                         match get_full_image_for_processing(&state) {
@@ -894,38 +1057,27 @@ pub async fn export_images(
                         is_raw,
                         &app_handle_clone,
                     )?;
-                    if export_cancel_requested.load(Ordering::SeqCst) {
-                        return Err("Export cancelled".to_string());
+                    if cancellation_token.load(Ordering::SeqCst) {
+                        return Ok(ExportItemResult::Cancelled(None));
                     }
-                    let export_color_policy = save_image_with_metadata(
-                        &final_image,
-                        &output_path,
-                        &source_path_str,
-                        &export_settings,
-                    )?;
+                    let Some(export_color_policy) =
+                        commit_export_output(cancellation_token.as_ref(), || {
+                            save_image_with_metadata(
+                                &final_image,
+                                &output_path,
+                                &source_path_str,
+                                &export_settings,
+                            )
+                        })?
+                    else {
+                        return Ok(ExportItemResult::Cancelled(None));
+                    };
 
                     if export_settings.preserve_timestamps {
                         set_timestamps_from_exif(Path::new(&source_path_str), &output_path);
                     }
 
-                    if export_settings.export_masks {
-                        if export_cancel_requested.load(Ordering::SeqCst) {
-                            return Err("Export cancelled".to_string());
-                        }
-                        export_masks_for_image(
-                            &base_image,
-                            &js_adjustments,
-                            &export_settings,
-                            &output_path,
-                            &source_path_str,
-                            &context_clone,
-                            &state,
-                            is_raw,
-                            &app_handle_clone,
-                        )?;
-                    }
-
-                    export_receipt_output(
+                    let primary_output = export_receipt_output(
                         &output_path,
                         &source_path_str,
                         &extension,
@@ -936,8 +1088,46 @@ pub async fn export_images(
                             calculate_full_job_hash(&source_path_str, &js_adjustments)
                         )),
                         Some(export_started.elapsed().as_millis()),
-                    )
+                    )?;
+                    committed_primary_output = Some(primary_output.clone());
+
+                    if cancellation_token.load(Ordering::SeqCst) {
+                        return Ok(ExportItemResult::Cancelled(
+                            committed_primary_output.clone(),
+                        ));
+                    }
+
+                    if export_settings.export_masks {
+                        export_masks_for_image(
+                            &base_image,
+                            &js_adjustments,
+                            &export_settings,
+                            &output_path,
+                            &source_path_str,
+                            &context_clone,
+                            &state,
+                            is_raw,
+                            &app_handle_clone,
+                            cancellation_token.as_ref(),
+                        )?;
+                    }
+
+                    if cancellation_token.load(Ordering::SeqCst) {
+                        return Ok(ExportItemResult::Cancelled(
+                            committed_primary_output.clone(),
+                        ));
+                    }
+
+                    Ok(ExportItemResult::Completed(primary_output))
                 })();
+
+                let result = match result {
+                    Ok(result) => result,
+                    Err(_error) if cancellation_token.load(Ordering::SeqCst) => {
+                        ExportItemResult::Cancelled(committed_primary_output)
+                    }
+                    Err(error) => ExportItemResult::Failed(error),
+                };
 
                 let current_progress = progress_counter_clone.fetch_add(1, Ordering::SeqCst) + 1;
                 let _ = app_handle_clone.emit(
@@ -960,7 +1150,9 @@ pub async fn export_images(
         for handle in join_handles {
             match handle.await {
                 Ok(res) => results.push(res),
-                Err(e) => results.push(Err(format!("Thread crashed: {}", e))),
+                Err(error) => {
+                    results.push(ExportItemResult::Failed(format!("Thread crashed: {error}")))
+                }
             }
         }
 
@@ -970,19 +1162,24 @@ pub async fn export_images(
         let mut outputs = Vec::new();
         for result in results {
             match result {
-                Ok(output) => outputs.push(output),
-                Err(e) => {
+                ExportItemResult::Completed(output) => outputs.push(output),
+                ExportItemResult::Cancelled(Some(output)) => outputs.push(output),
+                ExportItemResult::Cancelled(None) => {}
+                ExportItemResult::Failed(error) => {
                     error_count += 1;
-                    log::error!("Export error: {}", e);
+                    log::error!("Export error: {error}");
                     if total_paths == 1 {
-                        let _ = app_handle.emit(crate::events::EXPORT_ERROR, e);
+                        let _ = app_handle.emit(crate::events::EXPORT_ERROR, error);
                     }
                 }
             }
         }
 
-        if export_cancel_requested.load(Ordering::SeqCst) {
-            let _ = app_handle.emit(crate::events::EXPORT_CANCELLED, ());
+        if cancellation_token.load(Ordering::SeqCst) {
+            let _ = app_handle.emit(
+                crate::events::EXPORT_CANCELLED,
+                export_terminal_receipt(ExportTerminalStatus::Cancelled, outputs, total_paths),
+            );
         } else if error_count > 0 && total_paths > 1 {
             let _ = app_handle.emit(
                 crate::events::EXPORT_COMPLETE_WITH_ERRORS,
@@ -995,22 +1192,17 @@ pub async fn export_images(
             );
             let _ = app_handle.emit(
                 crate::events::EXPORT_COMPLETE,
-                ExportReceipt {
-                    completed_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
-                    outputs,
-                    total: total_paths,
-                },
+                export_terminal_receipt(ExportTerminalStatus::Completed, outputs, total_paths),
             );
         }
 
-        *app_handle
-            .state::<AppState>()
-            .export_task_handle
-            .lock()
-            .unwrap() = None;
+        finish_export_job(
+            &app_handle.state::<AppState>().export_job,
+            &cancellation_token,
+        );
     });
 
-    *state.export_task_handle.lock().unwrap() = Some(task);
+    attach_export_task(&state.export_job, &cancellation_token, task);
     Ok(())
 }
 
@@ -1142,14 +1334,7 @@ fn write_raw_export_provenance_sidecar(
 
 #[tauri::command]
 pub fn cancel_export(state: tauri::State<AppState>) -> Result<(), String> {
-    if state.export_task_handle.lock().unwrap().is_none() {
-        return Err("No export task is currently running.".to_string());
-    }
-
-    if state.export_cancel_requested.swap(true, Ordering::SeqCst) {
-        return Err("Export cancellation is already in progress.".to_string());
-    }
-
+    request_export_cancellation(&state.export_job)?;
     println!("Export task cancellation requested.");
     Ok(())
 }
@@ -1451,15 +1636,17 @@ mod tests {
     use super::{
         EmbeddedSourceIccProfile, ExportBlackPointCompensationStatus, ExportColorEngineId,
         ExportColorProfile, ExportRenderingIntent, ExportSettings, OutputSharpeningSettings,
-        applied_export_color_policy, apply_export_resize_and_watermark, encode_icc_profile,
-        encode_image_to_bytes, encode_image_with_applied_policy_and_source_profile,
-        export_color_profile_receipt_label, export_jpeg_rgb_pixels_and_profile,
-        export_receipt_metadata, export_receipt_output, export_rgb_pixels_and_profile,
-        export_rgb16_pixels_and_profile, export_rgb16_pixels_with_shared_conversion_core,
+        applied_export_color_policy, apply_export_resize_and_watermark, claim_export_job,
+        commit_export_output, encode_icc_profile, encode_image_to_bytes,
+        encode_image_with_applied_policy_and_source_profile, export_color_profile_receipt_label,
+        export_jpeg_rgb_pixels_and_profile, export_receipt_metadata, export_receipt_output,
+        export_rgb_pixels_and_profile, export_rgb16_pixels_and_profile,
+        export_rgb16_pixels_with_shared_conversion_core,
         export_soft_proof_rgb_pixels_and_profile_with_policy,
-        export_source_precision_receipt_label, export_transform_options, mox_rendering_intent,
-        quantize_rgb16_to_rgb8, resolve_export_color_capabilities,
-        resolve_export_color_transform_plan, should_apply_srgb_perceptual_gamut_mapping,
+        export_source_precision_receipt_label, export_transform_options, finish_export_job,
+        mox_rendering_intent, quantize_rgb16_to_rgb8, request_export_cancellation,
+        resolve_export_color_capabilities, resolve_export_color_transform_plan,
+        should_apply_srgb_perceptual_gamut_mapping,
     };
     use crate::export::export_encoders::{
         encode_image_with_applied_policy, validate_export_file_readback_color_policy,
@@ -1470,7 +1657,9 @@ mod tests {
     use crate::raw_processing::{RawCameraProfileReport, RawDemosaicPath, RawDevelopmentReport};
     use moxcms::ColorProfile;
     use sha2::{Digest, Sha256};
-    use std::{fs, io::Cursor};
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+    use std::sync::{Arc, Barrier, Mutex};
+    use std::{fs, io::Cursor, thread};
 
     use image::{
         ColorType, DynamicImage, ImageBuffer, ImageDecoder, Rgb, Rgba,
@@ -1483,6 +1672,117 @@ mod tests {
         "b4f03738f6bdd7be65bd5b8afbd1448b0e57b207776c2fc016bd81d9c49986d6";
     const SOURCE_EMBEDDED_DISPLAY_P3_ICC_SHA256: &str =
         "sha256:d2ff5597fd937a24f90548f5e85803545334fcfd480601d19c3bc225d7355733";
+
+    #[test]
+    fn cancellation_claimed_before_gpu_initialization_prevents_runnable_export_work() {
+        let registry = Arc::new(Mutex::new(None));
+        let cancellation_token =
+            claim_export_job(&registry).expect("export admission should claim job ownership");
+        let initialization_started = Arc::new(Barrier::new(2));
+        let release_initialization = Arc::new(Barrier::new(2));
+        let runnable_work = Arc::new(AtomicUsize::new(0));
+        let event_order = Arc::new(Mutex::new(Vec::new()));
+
+        let initialization_thread = {
+            let cancellation_token = Arc::clone(&cancellation_token);
+            let initialization_started = Arc::clone(&initialization_started);
+            let release_initialization = Arc::clone(&release_initialization);
+            let runnable_work = Arc::clone(&runnable_work);
+            let event_order = Arc::clone(&event_order);
+            thread::spawn(move || {
+                event_order.lock().unwrap().push("init-started");
+                initialization_started.wait();
+                release_initialization.wait();
+                if cancellation_token.load(Ordering::SeqCst) {
+                    event_order
+                        .lock()
+                        .unwrap()
+                        .push("cancel-observed-before-schedule");
+                    return;
+                }
+                runnable_work.fetch_add(1, Ordering::SeqCst);
+                event_order.lock().unwrap().push("work-scheduled");
+            })
+        };
+
+        initialization_started.wait();
+        request_export_cancellation(&registry)
+            .expect("cancel must be accepted while initialization is gated");
+        event_order.lock().unwrap().push("cancel-accepted");
+        release_initialization.wait();
+        initialization_thread
+            .join()
+            .expect("initialization thread should finish");
+
+        assert_eq!(
+            runnable_work.load(Ordering::SeqCst),
+            0,
+            "cancelled jobs must schedule no work"
+        );
+        assert_eq!(
+            event_order.lock().unwrap().as_slice(),
+            [
+                "init-started",
+                "cancel-accepted",
+                "cancel-observed-before-schedule"
+            ],
+            "cancellation must linearize before any runnable export work"
+        );
+        finish_export_job(&registry, &cancellation_token);
+        assert!(
+            registry.lock().unwrap().is_none(),
+            "terminal cancellation must release job ownership"
+        );
+    }
+
+    #[test]
+    fn cancellation_after_committed_lut_image_and_mask_writes_keeps_each_output_receipt_eligible() {
+        let directory = tempfile::tempdir().expect("temporary output directory should exist");
+
+        for output_kind in ["lut", "image", "mask"] {
+            let cancellation_token = AtomicBool::new(false);
+            let output_path = directory.path().join(format!("{output_kind}.bin"));
+            let events = Mutex::new(vec![format!("{output_kind}:rendered")]);
+
+            let committed_path = commit_export_output(&cancellation_token, || {
+                fs::write(&output_path, output_kind.as_bytes())
+                    .map_err(|error| error.to_string())?;
+                events
+                    .lock()
+                    .unwrap()
+                    .push(format!("{output_kind}:write-committed"));
+                cancellation_token.store(true, Ordering::SeqCst);
+                events
+                    .lock()
+                    .unwrap()
+                    .push(format!("{output_kind}:cancel-requested"));
+                Ok(output_path.clone())
+            })
+            .expect("output write should succeed");
+
+            let receipt_path = committed_path
+                .expect("a write that completed before cancellation remains receiptable");
+            events
+                .lock()
+                .unwrap()
+                .push(format!("{output_kind}:receipt-recorded"));
+            assert!(
+                receipt_path.exists(),
+                "{output_kind} write must be visible before its receipt is retained"
+            );
+            assert!(cancellation_token.load(Ordering::SeqCst));
+            assert_eq!(
+                events.lock().unwrap().as_slice(),
+                [
+                    format!("{output_kind}:rendered"),
+                    format!("{output_kind}:write-committed"),
+                    format!("{output_kind}:cancel-requested"),
+                    format!("{output_kind}:receipt-recorded"),
+                ],
+                "{output_kind} receipt must follow its committed write even when cancellation wins the terminal state"
+            );
+        }
+    }
 
     fn synthetic_export_edge() -> DynamicImage {
         let mut buffer = ImageBuffer::<Rgb<f32>, Vec<f32>>::new(11, 5);

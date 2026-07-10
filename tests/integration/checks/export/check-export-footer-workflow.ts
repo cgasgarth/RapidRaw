@@ -112,6 +112,7 @@ const receipt = {
       sourcePath: '/tmp/source.ARW',
     },
   ],
+  terminalStatus: 'completed' as const,
   total: 1,
 };
 

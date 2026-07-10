@@ -186,6 +186,7 @@ export const exportReceiptPayloadSchema = z
         })
         .strict(),
     ),
+    terminalStatus: z.enum(['cancelled', 'completed']),
     total: z.number().int().nonnegative(),
   })
   .strict();

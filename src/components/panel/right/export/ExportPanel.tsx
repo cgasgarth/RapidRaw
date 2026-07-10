@@ -1403,7 +1403,8 @@ export default function ExportPanel({
     lastReceipt !== undefined &&
     receiptOutputCount > 0 &&
     receiptOutputCount < lastReceipt.total;
-  const canShowReceipt = status === Status.Success && Boolean(firstReceiptOutput) && !hasMissingOutput;
+  const canShowReceipt =
+    (status === Status.Success || status === Status.Cancelled) && Boolean(firstReceiptOutput) && !hasMissingOutput;
   const canUseReceiptActions = canShowReceipt && !isExporting;
   const canImportLinkedVariant =
     canUseReceiptActions &&
@@ -2611,6 +2612,7 @@ export default function ExportPanel({
             data-export-receipt-effective-rendering-intent={firstReceiptOutput.effectiveRenderingIntent ?? ''}
             data-export-receipt-source-icc-profile-hash={firstReceiptOutput.sourceIccProfileHash ?? ''}
             data-export-receipt-source-precision-path={firstReceiptOutput.sourcePrecisionPath ?? ''}
+            data-export-receipt-terminal-status={lastReceipt.terminalStatus}
             data-export-receipt-total={lastReceipt.total}
             data-export-receipt-transform-applied={String(firstReceiptOutput.transformApplied ?? '')}
             data-export-receipt-transform-policy-fingerprint={firstReceiptOutput.transformPolicyFingerprint ?? ''}

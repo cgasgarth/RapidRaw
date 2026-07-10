@@ -29,6 +29,10 @@ import {
   buildPanoramaApplyCommandState,
 } from '../../utils/computational-merge/computationalMergeModalState';
 import {
+  hasCommittedExportOutputs,
+  shouldRefreshLibraryForExportReceipt,
+} from '../../utils/export/exportTerminalReceipt';
+import {
   AI_MODEL_DOWNLOAD_FINISH_EVENT,
   AI_MODEL_DOWNLOAD_START_EVENT,
   BATCH_EXPORT_PROGRESS_EVENT,
@@ -293,14 +297,17 @@ export function useTauriListeners({ refreshAllFolderTrees, refreshImageList, mar
       }),
       listen<unknown>(EXPORT_COMPLETE_EVENT, (event) => {
         if (isEffectActive) {
+          const receipt = parseExportReceiptPayload(event.payload);
           useProcessStore.getState().setExportState({
-            lastReceipt: parseExportReceiptPayload(event.payload),
+            lastReceipt: receipt,
             status: Status.Success,
           });
           const currentPath = useLibraryStore.getState().currentFolderPath;
-          if (currentPath && !currentPath.startsWith('Album: ')) {
-            refs.current.refreshImageList();
+          if (hasCommittedExportOutputs(receipt)) {
             refs.current.refreshAllFolderTrees();
+            if (shouldRefreshLibraryForExportReceipt(receipt, currentPath)) {
+              refs.current.refreshImageList();
+            }
           }
         }
       }),
@@ -311,8 +318,18 @@ export function useTauriListeners({ refreshAllFolderTrees, refreshImageList, mar
             errorMessage: parseStringPayload(event.payload),
           });
       }),
-      listen(EXPORT_CANCELLED_EVENT, () => {
-        if (isEffectActive) useProcessStore.getState().setExportState({ status: Status.Cancelled });
+      listen<unknown>(EXPORT_CANCELLED_EVENT, (event) => {
+        if (isEffectActive) {
+          const receipt = parseExportReceiptPayload(event.payload);
+          useProcessStore.getState().setExportState({ lastReceipt: receipt, status: Status.Cancelled });
+          const currentPath = useLibraryStore.getState().currentFolderPath;
+          if (hasCommittedExportOutputs(receipt)) {
+            refs.current.refreshAllFolderTrees();
+            if (shouldRefreshLibraryForExportReceipt(receipt, currentPath)) {
+              refs.current.refreshImageList();
+            }
+          }
+        }
       }),
       listen<unknown>(IMPORT_START_EVENT, (event) => {
         const payload = parseImportStartPayload(event.payload);

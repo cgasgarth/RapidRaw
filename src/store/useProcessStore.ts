@@ -93,7 +93,8 @@ export const useProcessStore = create<ProcessState>((set, get) => ({
         const patch = typeof updater === 'function' ? updater(prev.exportState) : updater;
         const nextStatus = patch.status ?? prev.exportState.status;
         const isStartingNewExport = nextStatus === Status.Exporting && prev.exportState.status !== Status.Exporting;
-        const isTerminalWithoutReceipt = [Status.Error, Status.Cancelled].includes(nextStatus);
+        const isTerminalWithoutReceipt =
+          nextStatus === Status.Error || (nextStatus === Status.Cancelled && patch.lastReceipt === undefined);
         const isResetting = nextStatus === Status.Idle;
 
         return {

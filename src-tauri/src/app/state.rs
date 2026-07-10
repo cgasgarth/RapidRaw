@@ -113,6 +113,11 @@ pub struct ThumbnailManager {
     pub processing_now: Mutex<HashSet<String>>,
 }
 
+pub struct ExportJob {
+    pub cancellation_token: Arc<AtomicBool>,
+    pub task_handle: Option<JoinHandle<()>>,
+}
+
 impl ThumbnailManager {
     pub fn new() -> Arc<Self> {
         Arc::new(Self {
@@ -135,8 +140,7 @@ pub struct AppState {
     pub gpu_processor: Mutex<Option<GpuProcessorState>>,
     pub ai_state: Mutex<Option<AiState>>,
     pub ai_init_lock: TokioMutex<()>,
-    pub export_cancel_requested: Arc<AtomicBool>,
-    pub export_task_handle: Mutex<Option<JoinHandle<()>>>,
+    pub export_job: Mutex<Option<ExportJob>>,
     pub hdr_result: Arc<Mutex<Option<DynamicImage>>>,
     pub hdr_runtime_plan: Arc<Mutex<Option<PendingHdrMergePlan>>>,
     pub hdr_source_refs: Arc<Mutex<Vec<PendingHdrSourceRef>>>,
@@ -174,8 +178,7 @@ impl AppState {
             gpu_processor: Mutex::new(None),
             ai_state: Mutex::new(None),
             ai_init_lock: TokioMutex::new(()),
-            export_cancel_requested: Arc::new(AtomicBool::new(false)),
-            export_task_handle: Mutex::new(None),
+            export_job: Mutex::new(None),
             hdr_result: Arc::new(Mutex::new(None)),
             hdr_runtime_plan: Arc::new(Mutex::new(None)),
             hdr_source_refs: Arc::new(Mutex::new(Vec::new())),

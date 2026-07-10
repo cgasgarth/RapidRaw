@@ -1456,6 +1456,7 @@ const exportProofFooterReceipt = {
       transformPolicyFingerprint: 'sha256:professional-export-proof-footer',
     },
   ],
+  terminalStatus: 'completed' as const,
   total: 1,
 };
 

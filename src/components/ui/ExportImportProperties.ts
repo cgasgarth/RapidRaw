@@ -100,6 +100,7 @@ export interface ExportState {
 export interface ExportReceipt {
   completedAt: string;
   outputs: Array<ExportReceiptOutput>;
+  terminalStatus: 'cancelled' | 'completed';
   total: number;
 }
 
