@@ -76,6 +76,7 @@ import {
   getSoftProofProfileCompareStatus,
   upsertExportSoftProofResolverPreset,
 } from '../../../../utils/export/exportSoftProofProfileCompare';
+import { resolveExportTargetPaths } from '../../../../utils/export/exportTargetPaths';
 import { buildRawWarningChips } from '../../../../utils/rawWarningReceipts';
 import { invokeWithSchema } from '../../../../utils/tauriSchemaInvoke';
 import { debounce } from '../../../../utils/timing';
@@ -678,14 +679,12 @@ export default function ExportPanel({
 
   const pathsToExport = useMemo(
     () =>
-      isLibraryContext
-        ? multiSelectedPaths
-        : multiSelectedPaths.length > 0
-          ? multiSelectedPaths
-          : selectedImage
-            ? [selectedImage.path]
-            : [],
-    [isLibraryContext, multiSelectedPaths, selectedImage],
+      resolveExportTargetPaths({
+        isLibraryContext,
+        multiSelectedPaths,
+        selectedImagePath: selectedImage?.path,
+      }),
+    [isLibraryContext, multiSelectedPaths, selectedImage?.path],
   );
   const numImages = pathsToExport.length;
   const isOfflineSmartPreviewExport = !isLibraryContext && selectedImage?.isOfflineSmartPreview === true;
