@@ -4395,7 +4395,16 @@
         "selectToRate": "Selecione uma imagem para avaliar"
       },
       "zoomLabel": "Zoom",
-      "zoomLabelReset": "Redefinir Zoom"
+      "zoomLabelReset": "Redefinir Zoom",
+      "zoomModes": {
+        "fill": "",
+        "fit": ""
+      },
+      "zoomResolution": {
+        "limited": "",
+        "ready": "",
+        "settling": ""
+      }
     },
     "collapsibleSection": {
       "dirtyBadge": "Editado",

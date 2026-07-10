@@ -128,8 +128,6 @@ export function useAppNavigation({ clearThumbnailQueue, requestThumbnails, refs 
     if (transformWrapperRef.current) {
       transformWrapperRef.current.resetTransform(0);
     }
-    setEditor({ zoom: 1 });
-
     debouncedSave.flush();
     debouncedSetHistory.cancel();
 
@@ -342,6 +340,8 @@ export function useAppNavigation({ clearThumbnailQueue, requestThumbnails, refs 
         },
         originalSize: { width: 0, height: 0 },
         previewSize: { width: 0, height: 0 },
+        requestedPreviewResolution: 0,
+        renderedPreviewResolution: 0,
         histogram: null,
         waveform: null,
         previewScopeStatus: null,

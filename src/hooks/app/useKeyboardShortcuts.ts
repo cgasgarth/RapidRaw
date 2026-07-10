@@ -6,6 +6,7 @@ import { useLibraryStore } from '../../store/useLibraryStore';
 import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
+import type { EditorZoomCommand } from '../../utils/editorZoom';
 import { KEYBIND_DEFINITIONS, normalizeCombo } from '../../utils/keyboardUtils';
 import { useEditorActions } from '../editor/useEditorActions';
 import { useLibraryActions } from '../library/useLibraryActions';
@@ -17,7 +18,7 @@ interface KeyboardShortcutsProps {
   handleImageSelect: (path: string) => void;
   handlePasteFiles: (str: string) => void;
   handleToggleFullScreen: () => void;
-  handleZoomChange: (zoomValue: number, fitToWindow?: boolean) => void;
+  handleZoomChange: (command: EditorZoomCommand) => void;
 }
 
 interface KeyboardStoreState {
@@ -161,95 +162,65 @@ export const useKeyboardShortcuts = ({
       },
       zoom_in_step: {
         shouldFire: (s) => !!s.editor.selectedImage,
-        execute: (e, s) => {
+        execute: (e) => {
           e.preventDefault();
-          const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-          const currentPercent =
-            s.editor.originalSize.width > 0 && s.editor.displaySize.width > 0
-              ? (s.editor.displaySize.width * dpr) / s.editor.originalSize.width
-              : 1.0;
-          handleZoomChange(Math.min(currentPercent + 0.1, 2.0));
+          handleZoomChange({ direction: 'in', kind: 'step' });
         },
       },
       zoom_out_step: {
         shouldFire: (s) => !!s.editor.selectedImage,
-        execute: (e, s) => {
+        execute: (e) => {
           e.preventDefault();
-          const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-          const currentPercent =
-            s.editor.originalSize.width > 0 && s.editor.displaySize.width > 0
-              ? (s.editor.displaySize.width * dpr) / s.editor.originalSize.width
-              : 1.0;
-          handleZoomChange(Math.max(currentPercent - 0.1, 0.1));
+          handleZoomChange({ direction: 'out', kind: 'step' });
         },
       },
       cycle_zoom: {
         shouldFire: (s) => !!s.editor.selectedImage,
-        execute: (e, s) => {
+        execute: (e) => {
           e.preventDefault();
-          const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-          const { originalSize, displaySize, baseRenderSize } = s.editor;
-          const currentPercent =
-            originalSize.width > 0 && displaySize.width > 0
-              ? Math.round(((displaySize.width * dpr) / originalSize.width) * 100)
-              : 100;
-          let fitPercent = 100;
-
-          if (originalSize.width > 0 && baseRenderSize.width > 0) {
-            const originalAspect = originalSize.width / originalSize.height;
-            const baseAspect = baseRenderSize.width / baseRenderSize.height;
-            fitPercent =
-              originalAspect > baseAspect
-                ? Math.round(((baseRenderSize.width * dpr) / originalSize.width) * 100)
-                : Math.round(((baseRenderSize.height * dpr) / originalSize.height) * 100);
-          }
-
-          const doubleFitPercent = fitPercent * 2;
-          if (Math.abs(currentPercent - fitPercent) < 5) {
-            handleZoomChange(doubleFitPercent < 100 ? doubleFitPercent / 100 : 1.0);
-          } else if (Math.abs(currentPercent - doubleFitPercent) < 5 && doubleFitPercent < 100) {
-            handleZoomChange(1.0);
-          } else {
-            handleZoomChange(0, true);
-          }
+          handleZoomChange({ kind: 'cycle' });
         },
       },
       zoom_in: {
         shouldFire: (s) => !!s.editor.selectedImage,
-        execute: (e, s) => {
+        execute: (e) => {
           e.preventDefault();
-          const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-          const currentPercent =
-            s.editor.originalSize.width > 0 && s.editor.displaySize.width > 0
-              ? (s.editor.displaySize.width * dpr) / s.editor.originalSize.width
-              : 1.0;
-          handleZoomChange(Math.min(currentPercent * 1.2, 2.0));
+          handleZoomChange({ direction: 'in', kind: 'step' });
         },
       },
       zoom_out: {
         shouldFire: (s) => !!s.editor.selectedImage,
-        execute: (e, s) => {
+        execute: (e) => {
           e.preventDefault();
-          const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-          const currentPercent =
-            s.editor.originalSize.width > 0 && s.editor.displaySize.width > 0
-              ? (s.editor.displaySize.width * dpr) / s.editor.originalSize.width
-              : 1.0;
-          handleZoomChange(Math.max(currentPercent / 1.2, 0.1));
+          handleZoomChange({ direction: 'out', kind: 'step' });
         },
       },
       zoom_fit: {
         shouldFire: (s) => !!s.editor.selectedImage,
         execute: (e) => {
           e.preventDefault();
-          handleZoomChange(0, true);
+          handleZoomChange({ kind: 'fit' });
         },
       },
       zoom_100: {
         shouldFire: (s) => !!s.editor.selectedImage,
         execute: (e) => {
           e.preventDefault();
-          handleZoomChange(1.0);
+          handleZoomChange({ kind: 'one-to-one' });
+        },
+      },
+      zoom_fill: {
+        shouldFire: (s) => !!s.editor.selectedImage,
+        execute: (e) => {
+          e.preventDefault();
+          handleZoomChange({ kind: 'fill' });
+        },
+      },
+      zoom_200: {
+        shouldFire: (s) => !!s.editor.selectedImage,
+        execute: (e) => {
+          e.preventDefault();
+          handleZoomChange({ kind: 'two-to-one' });
         },
       },
       rotate_left: {

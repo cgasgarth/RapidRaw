@@ -22,6 +22,7 @@ import {
   renameEditHistoryCheckpoint,
   undoEditHistory,
 } from '../utils/editHistory';
+import { DEFAULT_EDITOR_ZOOM_MODE, type EditorZoomMode } from '../utils/editorZoom';
 import { loadMaskOverlaySettingsPreference } from '../utils/mask/maskOverlayPreferences';
 import { PANEL_SCOPES_HEIGHT } from '../utils/waveformSizing';
 import type { WhiteBalancePickerRuntimeReceipt } from '../utils/whiteBalancePicker';
@@ -120,8 +121,11 @@ interface EditorState {
   // Interaction State
   isSliderDragging: boolean;
   zoom: number;
+  zoomMode: EditorZoomMode;
   displaySize: ImageDimensions;
   previewSize: ImageDimensions;
+  requestedPreviewResolution: number;
+  renderedPreviewResolution: number;
   baseRenderSize: BaseRenderSize;
   originalSize: ImageDimensions;
 
@@ -268,8 +272,11 @@ export const useEditorStore = create<EditorState>((set) => ({
   activeAiSubMaskId: null,
 
   zoom: 1,
+  zoomMode: DEFAULT_EDITOR_ZOOM_MODE,
   displaySize: { width: 0, height: 0 },
   previewSize: { width: 0, height: 0 },
+  requestedPreviewResolution: 0,
+  renderedPreviewResolution: 0,
   baseRenderSize: { width: 0, height: 0, offsetX: 0, offsetY: 0, containerWidth: 0, containerHeight: 0 },
   originalSize: { width: 0, height: 0 },
 

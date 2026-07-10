@@ -4070,7 +4070,16 @@
         "selectToRate": "選擇一張影像以評分"
       },
       "zoomLabel": "縮放",
-      "zoomLabelReset": "重置縮放"
+      "zoomLabelReset": "重置縮放",
+      "zoomModes": {
+        "fill": "",
+        "fit": ""
+      },
+      "zoomResolution": {
+        "limited": "",
+        "ready": "",
+        "settling": ""
+      }
     },
     "collapsibleSection": {
       "dirtyBadge": "已編輯",

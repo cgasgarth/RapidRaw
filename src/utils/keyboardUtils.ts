@@ -104,6 +104,18 @@ export const KEYBIND_DEFINITIONS: KeybindDefinition[] = [
     section: 'view',
   },
   {
+    action: 'zoom_200',
+    description: 'settings.keybinds.actions.zoom_200',
+    defaultCombo: ['ctrl', 'Digit2'],
+    section: 'view',
+  },
+  {
+    action: 'zoom_fill',
+    description: 'settings.keybinds.actions.zoom_fill',
+    defaultCombo: ['ctrl', 'shift', 'Digit0'],
+    section: 'view',
+  },
+  {
     action: 'toggle_fullscreen',
     description: 'settings.keybinds.actions.toggle_fullscreen',
     defaultCombo: ['KeyF'],

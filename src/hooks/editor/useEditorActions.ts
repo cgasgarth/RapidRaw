@@ -24,6 +24,13 @@ import {
   hasBasicToneAdjustmentChange,
 } from '../../utils/basicToneCommandBridge';
 import { calculateCenteredCrop } from '../../utils/cropUtils';
+import {
+  type EditorZoomCommand,
+  getEditorZoomDpr,
+  getEditorZoomModeForCommand,
+  getEditorZoomSourceSize,
+  resolveEditorZoom,
+} from '../../utils/editorZoom';
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { globalImageCache } from '../../utils/ImageLRUCache';
 import { debounce } from '../../utils/timing';
@@ -296,54 +303,29 @@ export function useEditorActions() {
     [setAdjustments],
   );
 
-  const handleZoomChange = useCallback((zoomValue: number, fitToWindow: boolean = false) => {
-    const { originalSize, baseRenderSize, adjustments } = useEditorStore.getState();
-    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-    let targetZoomPercent: number;
-
-    const orientationSteps = adjustments.orientationSteps || 0;
-    const isSwapped = orientationSteps === 1 || orientationSteps === 3;
-    const effectiveOriginalWidth = isSwapped ? originalSize.height : originalSize.width;
-    const effectiveOriginalHeight = isSwapped ? originalSize.width : originalSize.height;
-
-    if (fitToWindow) {
-      if (
-        effectiveOriginalWidth > 0 &&
-        effectiveOriginalHeight > 0 &&
-        baseRenderSize.width > 0 &&
-        baseRenderSize.height > 0
-      ) {
-        const originalAspect = effectiveOriginalWidth / effectiveOriginalHeight;
-        const baseAspect = baseRenderSize.width / baseRenderSize.height;
-        targetZoomPercent =
-          originalAspect > baseAspect
-            ? baseRenderSize.width / effectiveOriginalWidth
-            : baseRenderSize.height / effectiveOriginalHeight;
-      } else {
-        targetZoomPercent = 1.0;
-      }
-    } else {
-      targetZoomPercent = zoomValue / dpr;
-    }
-
-    targetZoomPercent = Math.max(0.1 / dpr, Math.min(2.0, targetZoomPercent));
-
-    let transformZoom = 1.0;
-    if (
-      effectiveOriginalWidth > 0 &&
-      effectiveOriginalHeight > 0 &&
-      baseRenderSize.width > 0 &&
-      baseRenderSize.height > 0
-    ) {
-      const originalAspect = effectiveOriginalWidth / effectiveOriginalHeight;
-      const baseAspect = baseRenderSize.width / baseRenderSize.height;
-      if (originalAspect > baseAspect) {
-        transformZoom = (targetZoomPercent * effectiveOriginalWidth) / baseRenderSize.width;
-      } else {
-        transformZoom = (targetZoomPercent * effectiveOriginalHeight) / baseRenderSize.height;
-      }
-    }
-    useEditorStore.getState().setEditor({ zoom: transformZoom });
+  const handleZoomChange = useCallback((command: EditorZoomCommand) => {
+    const editor = useEditorStore.getState();
+    const sourceSize = getEditorZoomSourceSize({
+      crop: editor.adjustments.crop,
+      orientationSteps: editor.adjustments.orientationSteps,
+      originalSize: editor.originalSize,
+    });
+    const resolved = resolveEditorZoom({
+      devicePixelRatio: getEditorZoomDpr(typeof window === 'undefined' ? 1 : window.devicePixelRatio),
+      mode: editor.zoomMode,
+      renderSize: {
+        height: editor.baseRenderSize.height,
+        scale: editor.baseRenderSize.width / Math.max(sourceSize.width, 1),
+        width: editor.baseRenderSize.width,
+      },
+      sourceSize,
+      viewportSize: {
+        height: editor.baseRenderSize.containerHeight,
+        width: editor.baseRenderSize.containerWidth,
+      },
+    });
+    const zoomMode = getEditorZoomModeForCommand(command, resolved);
+    useEditorStore.getState().setEditor({ zoomMode });
   }, []);
 
   return {

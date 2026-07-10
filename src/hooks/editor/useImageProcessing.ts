@@ -19,6 +19,7 @@ import {
   logAppOperationSuccess,
 } from '../../utils/appEventLogger';
 import { resolveEditorPreviewSource } from '../../utils/editorImagePreviewSource';
+import { getEditorZoomDpr, getEditorZoomSourceSize, resolveEditorZoom } from '../../utils/editorZoom';
 import { globalImageCache } from '../../utils/ImageLRUCache';
 import {
   buildInteractivePreviewGeometryIdentity,
@@ -121,6 +122,7 @@ export function useImageProcessing(
   const displaySize = useEditorStore((state) => state.displaySize);
   const baseRenderSize = useEditorStore((state) => state.baseRenderSize);
   const originalSize = useEditorStore((state) => state.originalSize);
+  const zoomMode = useEditorStore((state) => state.zoomMode);
   const historyIndex = useEditorStore((state) => state.historyIndex);
   const hasRenderedFirstFrame = useEditorStore((state) => state.hasRenderedFirstFrame);
   const compareMode = useEditorStore((state) => state.compareMode);
@@ -254,6 +256,7 @@ export function useImageProcessing(
           enableZoomHifi: settings?.enableZoomHifi ?? true,
           highResZoomMultiplier: settings?.highResZoomMultiplier ?? 1,
           useFullDpiRendering: settings?.useFullDpiRendering ?? false,
+          zoomMode: editor.zoomMode,
         }),
       },
     };
@@ -295,6 +298,9 @@ export function useImageProcessing(
       let operation: AppOperationContext | null = null;
 
       try {
+        if (!request.dragging) {
+          setEditor({ requestedPreviewResolution: request.targetRes });
+        }
         const proofRequest =
           !request.dragging && selectedProofRecipe
             ? {
@@ -393,6 +399,9 @@ export function useImageProcessing(
         latestRenderedJobIdRef.current = jobId;
         const prefix = new TextDecoder().decode(buffer.slice(0, 11));
         if (prefix === 'WGPU_RENDER') {
+          if (!request.dragging) {
+            setEditor({ renderedPreviewResolution: request.targetRes });
+          }
           clearInteractivePatch();
           if (operation) logAppOperationSuccess(operation, { backend: 'wgpu', byteLength: buffer.byteLength, jobId });
           return;
@@ -460,7 +469,11 @@ export function useImageProcessing(
           URL.revokeObjectURL(url);
           return;
         }
-        setEditor({ exportSoftProofTransform: transform, finalPreviewUrl: url });
+        setEditor({
+          exportSoftProofTransform: transform,
+          finalPreviewUrl: url,
+          renderedPreviewResolution: request.targetRes,
+        });
         clearInteractivePatch();
         if (operation) {
           logAppOperationSuccess(operation, {
@@ -556,16 +569,30 @@ export function useImageProcessing(
 
   const calculateTargetRes = useCallback(() => {
     const baseTargetRes = appSettings?.editorPreviewResolution || 1920;
-    if (!(appSettings?.enableZoomHifi ?? true) || displaySize.width === 0) {
+    if (!(appSettings?.enableZoomHifi ?? true) || baseRenderSize.width === 0) {
       return baseTargetRes;
     }
 
-    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
     const sharpnessFactor = 1.25;
     const zoomMultiplier = appSettings?.highResZoomMultiplier || 1.0;
-    const effectiveDpr = appSettings?.useFullDpiRendering ? dpr : 1;
+    const sourceSize = getEditorZoomSourceSize({
+      crop: adjustments.crop,
+      orientationSteps: adjustments.orientationSteps,
+      originalSize,
+    });
+    const resolvedZoom = resolveEditorZoom({
+      devicePixelRatio: getEditorZoomDpr(typeof window === 'undefined' ? 1 : window.devicePixelRatio),
+      mode: zoomMode,
+      renderSize: {
+        height: baseRenderSize.height,
+        scale: baseRenderSize.width / Math.max(sourceSize.width, 1),
+        width: baseRenderSize.width,
+      },
+      sourceSize,
+      viewportSize: { height: baseRenderSize.containerHeight, width: baseRenderSize.containerWidth },
+    });
 
-    let targetRes = Math.max(displaySize.width, displaySize.height) * effectiveDpr * sharpnessFactor * zoomMultiplier;
+    let targetRes = Math.max(baseTargetRes, resolvedZoom.requiredPreviewResolution * sharpnessFactor * zoomMultiplier);
     targetRes = Math.max(targetRes, 512);
 
     if (originalSize.width > 0 && originalSize.height > 0) {
@@ -585,10 +612,11 @@ export function useImageProcessing(
     appSettings?.enableZoomHifi,
     appSettings?.editorPreviewResolution,
     appSettings?.highResZoomMultiplier,
-    appSettings?.useFullDpiRendering,
-    displaySize.width,
-    displaySize.height,
+    adjustments.crop,
+    adjustments.orientationSteps,
+    baseRenderSize,
     originalSize,
+    zoomMode,
   ]);
 
   useLayoutEffect(() => {
