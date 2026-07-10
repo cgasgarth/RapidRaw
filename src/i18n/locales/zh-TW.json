@@ -1893,6 +1893,7 @@
       "fileSettings": "檔案設定",
       "imageSizing": "影像大小",
       "metadata": "後設資料",
+      "outputContract": "",
       "outputSharpening": "",
       "watermark": "水印"
     },
@@ -1950,6 +1951,7 @@
     "status": {
       "blocked": "",
       "cancelExport": "取消匯出",
+      "cancelExportingProgress": "",
       "cancelled": "匯出已取消",
       "chooseExternalEditor": "",
       "chooseExternalEditorTitle": "",
@@ -1978,11 +1980,14 @@
       "externalEditorWatching": "",
       "failed": "匯出失敗",
       "footerCanceled": "",
+      "footerCancelling": "",
       "footerCompleted_other": "",
       "footerFailed": "",
       "footerIdle": "",
       "footerImportedLinkedVariant": "",
       "footerImportingLinkedVariant": "",
+      "footerMissingOutput": "",
+      "footerPartial_other": "",
       "footerQueued_other": "",
       "footerRunning": "",
       "iccEmbedded": "",
@@ -2008,7 +2013,9 @@
       "reviewSmartPreviewResolving": "",
       "showInFinder": "",
       "success": "匯出成功！",
-      "transformApplied": ""
+      "transformApplied": "",
+      "unsupportedFormatProfile": "",
+      "watermarkMissing": ""
     },
     "title": "匯出",
     "watermark": {
@@ -4082,12 +4089,17 @@
     "exportPresets": {
       "builtIn": "",
       "builtInRecipeCount_other": "",
+      "cancelTooltip": "",
+      "current": "",
       "deleteTooltip": "刪除預設",
+      "edited": "",
       "heading": "匯出預設",
+      "invalid": "",
       "overwriteTooltip": "覆蓋所選預設",
       "placeholder": "選擇一個預設...",
       "presetNamePlaceholder": "預設名稱",
       "recipeCount_other": "",
+      "recipeListLabel": "",
       "saveAsNewTooltip": "將當前設定儲存為新預設",
       "savedTooltip": "已儲存！",
       "validRecipeCount_other": ""

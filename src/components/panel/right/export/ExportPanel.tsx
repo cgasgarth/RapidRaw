@@ -108,12 +108,15 @@ const QUALITY_FILE_FORMATS: ReadonlySet<FileFormats> = new Set([FileFormats.Jpeg
 const SOFT_PROOF_PROFILE_COMPARE_SIDE_IDS = ['srgb', 'displayP3'] as const;
 type ExportFooterWorkflowState =
   | 'canceled'
+  | 'cancelling'
   | 'completed'
   | 'estimating'
   | 'failed'
   | 'idle'
   | 'imported-linked-variant'
   | 'importing-linked-variant'
+  | 'missing-output'
+  | 'partial'
   | 'queued'
   | 'running';
 
@@ -432,6 +435,7 @@ export default function ExportPanel({
 
   const [estimatedSize, setEstimatedSize] = useState<number | null>(null);
   const [isEstimating, setIsEstimating] = useState<boolean>(false);
+  const [isCancellingExport, setIsCancellingExport] = useState(false);
   const [externalVariantStatus, setExternalVariantStatus] = useState<{
     embeddedIccProfile: boolean | null;
     error: string | null;
@@ -559,6 +563,10 @@ export default function ExportPanel({
   const isImportingCurrentExternalVariant = isCurrentExternalVariantStatus && externalVariantStatus.importing;
   const isCurrentExternalEditorWatch = externalEditorWatch?.outputPath === firstReceiptOutput?.outputPath;
   const currentExternalEditorWatch = isCurrentExternalEditorWatch ? externalEditorWatch : null;
+
+  useEffect(() => {
+    if (!isExporting) setIsCancellingExport(false);
+  }, [isExporting]);
 
   const handleImportExternalVariant = useCallback(
     async (sourceVirtualPath: string, output: NonNullable<typeof firstReceiptOutput>) => {
@@ -1203,7 +1211,15 @@ export default function ExportPanel({
   };
 
   const handleExport = async () => {
-    if (numImages === 0 || isExporting || isSmartPreviewExportBlocked) return;
+    if (
+      numImages === 0 ||
+      isExporting ||
+      isSmartPreviewExportBlocked ||
+      (enableWatermark && !watermarkPath) ||
+      (fileFormat !== FileFormats.Cube && !isSupportedColorProfileForFormat(fileFormat, colorProfile))
+    ) {
+      return;
+    }
 
     let finalFilenameTemplate = filenameTemplate;
     if (
@@ -1315,6 +1331,7 @@ export default function ExportPanel({
           progress: { current: 0, total: numImages },
           status: Status.Exporting,
         });
+        setIsCancellingExport(false);
         await invoke(Invokes.ExportImages, {
           paths: pathsToExport,
           outputFolderOrFile: outputFolderOrFile,
@@ -1347,18 +1364,46 @@ export default function ExportPanel({
   };
 
   const handleCancel = async () => {
+    if (isCancellingExport) return;
+    setIsCancellingExport(true);
     try {
       await invoke(Invokes.CancelExport);
     } catch (error) {
       console.error('Failed to cancel:', error);
+      setIsCancellingExport(false);
     }
   };
 
-  const canExport = numImages > 0 && !isSmartPreviewExportBlocked;
+  const selectedFileFormat = FILE_FORMATS.find((format) => format.id === fileFormat);
+  const selectedColorProfileLabel =
+    colorProfileOptions.find((option) => option.value === colorProfile)?.label ?? t('export.colorProfiles.srgb');
+  const selectedRenderingIntentLabel =
+    renderingIntentOptions.find((option) => option.value === renderingIntent)?.label ??
+    t('export.renderingIntents.relativeColorimetric');
+  const selectedResizeModeLabel =
+    resizeModeOptions.find((option) => option.value === resizeMode)?.label ?? t('export.resize.modes.longEdge');
+  const hasExportTarget = numImages > 0 && !isSmartPreviewExportBlocked;
+  const exportContractIssue =
+    enableWatermark && !watermarkPath
+      ? t('export.status.watermarkMissing')
+      : fileFormat !== FileFormats.Cube && !isSupportedColorProfileForFormat(fileFormat, colorProfile)
+        ? t('export.status.unsupportedFormatProfile', {
+            format: selectedFileFormat?.name ?? fileFormat.toUpperCase(),
+            profile: selectedColorProfileLabel,
+          })
+        : null;
+  const canExport = hasExportTarget && exportContractIssue === null;
   const progressCurrent = progress.current || progress.completed || 0;
   const isQueuedExport = isExporting && progressCurrent === 0;
   const isRunningExport = isExporting && progressCurrent > 0;
-  const canShowReceipt = status === Status.Success && Boolean(firstReceiptOutput);
+  const receiptOutputCount = lastReceipt?.outputs.length ?? 0;
+  const hasMissingOutput = status === Status.Success && receiptOutputCount === 0;
+  const hasPartialExport =
+    status === Status.Success &&
+    lastReceipt !== undefined &&
+    receiptOutputCount > 0 &&
+    receiptOutputCount < lastReceipt.total;
+  const canShowReceipt = status === Status.Success && Boolean(firstReceiptOutput) && !hasMissingOutput;
   const canUseReceiptActions = canShowReceipt && !isExporting;
   const canImportLinkedVariant =
     canUseReceiptActions &&
@@ -1369,44 +1414,61 @@ export default function ExportPanel({
     ? 'importing-linked-variant'
     : currentExternalVariantImportedPath
       ? 'imported-linked-variant'
-      : status === Status.Error
-        ? 'failed'
-        : status === Status.Cancelled
-          ? 'canceled'
-          : canShowReceipt
-            ? 'completed'
-            : isQueuedExport
-              ? 'queued'
-              : isRunningExport
-                ? 'running'
-                : isEstimating && canExport
-                  ? 'estimating'
-                  : 'idle';
+      : hasMissingOutput
+        ? 'missing-output'
+        : hasPartialExport
+          ? 'partial'
+          : status === Status.Error
+            ? 'failed'
+            : status === Status.Cancelled
+              ? 'canceled'
+              : canShowReceipt
+                ? 'completed'
+                : isCancellingExport
+                  ? 'cancelling'
+                  : isQueuedExport
+                    ? 'queued'
+                    : isRunningExport
+                      ? 'running'
+                      : isEstimating && canExport
+                        ? 'estimating'
+                        : 'idle';
   const exportFooterStatusText =
     exportFooterWorkflowState === 'importing-linked-variant'
       ? t('export.status.footerImportingLinkedVariant')
       : exportFooterWorkflowState === 'imported-linked-variant'
         ? t('export.status.footerImportedLinkedVariant')
-        : exportFooterWorkflowState === 'failed'
-          ? t('export.status.footerFailed')
-          : exportFooterWorkflowState === 'canceled'
-            ? t('export.status.footerCanceled')
-            : exportFooterWorkflowState === 'completed'
-              ? t('export.status.footerCompleted', {
-                  count: lastReceipt?.outputs.length ?? 0,
-                  total: lastReceipt?.total ?? 0,
-                })
-              : exportFooterWorkflowState === 'queued'
-                ? t('export.status.footerQueued', { count: progress.total || numImages })
-                : exportFooterWorkflowState === 'running'
-                  ? t('export.status.footerRunning', { current: progressCurrent, total: progress.total || numImages })
-                  : exportFooterWorkflowState === 'estimating'
-                    ? t('export.status.estimatingSize')
-                    : t('export.status.footerIdle');
+        : exportFooterWorkflowState === 'missing-output'
+          ? t('export.status.footerMissingOutput')
+          : exportFooterWorkflowState === 'partial'
+            ? t('export.status.footerPartial', { count: receiptOutputCount, total: lastReceipt?.total ?? 0 })
+            : exportFooterWorkflowState === 'failed'
+              ? t('export.status.footerFailed')
+              : exportFooterWorkflowState === 'canceled'
+                ? t('export.status.footerCanceled')
+                : exportFooterWorkflowState === 'completed'
+                  ? t('export.status.footerCompleted', {
+                      count: lastReceipt?.outputs.length ?? 0,
+                      total: lastReceipt?.total ?? 0,
+                    })
+                  : exportFooterWorkflowState === 'queued'
+                    ? t('export.status.footerQueued', { count: progress.total || numImages })
+                    : exportFooterWorkflowState === 'running'
+                      ? t('export.status.footerRunning', {
+                          current: progressCurrent,
+                          total: progress.total || numImages,
+                        })
+                      : exportFooterWorkflowState === 'cancelling'
+                        ? t('export.status.footerCancelling')
+                        : exportFooterWorkflowState === 'estimating'
+                          ? t('export.status.estimatingSize')
+                          : t('export.status.footerIdle');
   const exportFooterStatusTone =
-    exportFooterWorkflowState === 'failed'
+    exportFooterWorkflowState === 'failed' || exportFooterWorkflowState === 'missing-output'
       ? 'danger'
       : exportFooterWorkflowState === 'canceled' ||
+          exportFooterWorkflowState === 'partial' ||
+          exportFooterWorkflowState === 'cancelling' ||
           exportFooterWorkflowState === 'estimating' ||
           exportFooterWorkflowState === 'queued'
         ? 'warning'
@@ -1425,24 +1487,18 @@ export default function ExportPanel({
           )}`
         : t('export.status.estimatedSize', { size: formatBytes(estimatedSize, t) })
       : t('export.status.estimatePending');
-  const exportDisabledReason = isLibrarySmartPreviewResolving
-    ? t('export.status.resolvingOriginalFile')
-    : isSmartPreviewExportBlocked
-      ? t('export.status.offlineSmartPreviewBlocked')
-      : isLibraryContext
-        ? t('export.status.noImagesSelected')
-        : t('export.status.noImageSelected');
+  const exportDisabledReason =
+    exportContractIssue ??
+    (isLibrarySmartPreviewResolving
+      ? t('export.status.resolvingOriginalFile')
+      : isSmartPreviewExportBlocked
+        ? t('export.status.offlineSmartPreviewBlocked')
+        : isLibraryContext
+          ? t('export.status.noImagesSelected')
+          : t('export.status.noImageSelected'));
   const isLut = fileFormat === FileFormats.Cube;
   const itemLabel = isLut ? t('export.labels.lut') : t('export.labels.image');
   const itemLabelPlural = isLut ? t('export.labels.lut_plural') : t('export.labels.image_plural');
-  const selectedFileFormat = FILE_FORMATS.find((format) => format.id === fileFormat);
-  const selectedColorProfileLabel =
-    colorProfileOptions.find((option) => option.value === colorProfile)?.label ?? t('export.colorProfiles.srgb');
-  const selectedRenderingIntentLabel =
-    renderingIntentOptions.find((option) => option.value === renderingIntent)?.label ??
-    t('export.renderingIntents.relativeColorimetric');
-  const selectedResizeModeLabel =
-    resizeModeOptions.find((option) => option.value === resizeMode)?.label ?? t('export.resize.modes.longEdge');
   const exportFooterFormatProfileText =
     fileFormat === FileFormats.Cube
       ? `${selectedFileFormat?.name ?? fileFormat.toUpperCase()} · ${t('export.readiness.lutProfile')}`
@@ -1715,7 +1771,7 @@ export default function ExportPanel({
 
   return (
     <div className={onClose ? 'h-full bg-bg-secondary rounded-lg flex flex-col' : 'flex flex-col h-full'}>
-      <div className="p-4 flex justify-between items-center shrink-0 border-b border-surface">
+      <div className="flex shrink-0 items-center justify-between border-b border-surface p-3">
         <UiText variant={TextVariants.title}>{t('export.title')}</UiText>
         {onClose && (
           <button
@@ -1727,8 +1783,8 @@ export default function ExportPanel({
           </button>
         )}
       </div>
-      <div className="grow overflow-y-auto p-4 space-y-8">
-        {canExport ? (
+      <div className="grow space-y-6 overflow-y-auto p-3">
+        {hasExportTarget ? (
           <>
             <ExportPresetsList
               appSettings={appSettings}
@@ -1737,6 +1793,38 @@ export default function ExportPanel({
               onApplyPreset={handleApplyPreset}
             />
 
+            <section className="border-y border-surface py-3" data-testid="export-output-contract">
+              <div className="mb-2 flex min-w-0 items-center justify-between gap-2">
+                <UiText variant={TextVariants.heading}>{t('export.sections.outputContract')}</UiText>
+                <span className={editorChromeStatusChipClassName(exportContractIssue ? 'danger' : 'success')}>
+                  {exportContractIssue ? t('export.status.blocked') : t('export.status.ready')}
+                </span>
+              </div>
+              <div className="grid min-w-0 grid-cols-2 gap-x-3 gap-y-1.5">
+                <UiText className="truncate" color={TextColors.secondary} variant={TextVariants.small}>
+                  {t('export.status.reviewSelected', { count: numImages })}
+                </UiText>
+                <UiText className="truncate" color={TextColors.secondary} variant={TextVariants.small}>
+                  {exportFooterFormatProfileText}
+                </UiText>
+                <UiText className="truncate" color={TextColors.secondary} variant={TextVariants.small}>
+                  {exportFooterResizeText}
+                </UiText>
+                <UiText className="truncate" color={TextColors.secondary} variant={TextVariants.small}>
+                  {exportReadinessItems[6]}
+                </UiText>
+              </div>
+              <UiText
+                as="p"
+                className={exportContractIssue ? 'mt-2 break-words text-red-400' : 'mt-2 truncate'}
+                color={exportContractIssue ? TextColors.error : TextColors.secondary}
+                data-testid="export-output-contract-status"
+                variant={TextVariants.small}
+              >
+                {exportContractIssue ?? exportEstimateText}
+              </UiText>
+            </section>
+
             <Section title={t('export.sections.fileSettings')}>
               <div className="grid grid-cols-3 gap-2">
                 {FILE_FORMATS.map((format: FileFormat) => (
@@ -1744,9 +1832,12 @@ export default function ExportPanel({
                     className={`px-2 py-1.5 rounded-md transition-colors ${fileFormat === format.id ? 'bg-accent' : 'bg-surface hover:bg-card-active'} disabled:opacity-50`}
                     disabled={isExporting}
                     key={format.id}
+                    aria-pressed={fileFormat === format.id}
+                    data-tooltip={format.name}
                     onClick={() => {
                       setFileFormat(format.id);
                     }}
+                    type="button"
                   >
                     <UiText color={fileFormat === format.id ? TextColors.button : TextColors.secondary}>
                       {format.name}
@@ -2073,7 +2164,7 @@ export default function ExportPanel({
               <UiText variant={TextVariants.heading} className="mb-2">
                 {t('export.sections.advanced')}
               </UiText>
-              <div className="bg-surface rounded-xl overflow-hidden">
+              <div className="overflow-hidden rounded-md border border-surface">
                 <button
                   onClick={() => {
                     setIsAdvancedExpanded(!isAdvancedExpanded);
@@ -2205,7 +2296,7 @@ export default function ExportPanel({
         )}
       </div>
 
-      <div className="sticky bottom-0 z-10 shrink-0 space-y-3 border-t border-surface bg-bg-secondary p-3">
+      <div className="sticky bottom-0 z-10 shrink-0 space-y-2 border-t border-surface bg-bg-secondary p-3">
         {canExport && !firstReceiptOutput ? (
           <div className="space-y-2" data-testid="export-proof-footer-proof-state">
             {isSoftProofProfileCompareUnavailable ? (
@@ -2431,7 +2522,7 @@ export default function ExportPanel({
           data-export-footer-can-import-linked-variant={String(canImportLinkedVariant)}
           data-testid="export-footer-workflow-state"
         >
-          <div className="flex min-w-0 items-center gap-2">
+          <div aria-live="polite" className="flex min-w-0 items-center gap-2" role="status">
             <span className={editorChromeStatusChipClassName(exportFooterStatusTone)}>{exportFooterWorkflowState}</span>
             <UiText
               as="p"
@@ -2783,6 +2874,19 @@ export default function ExportPanel({
             </UiText>
           </details>
         ) : null}
+        {hasMissingOutput || hasPartialExport ? (
+          <div
+            className="rounded-md border border-yellow-500/40 bg-yellow-500/10 px-3 py-2"
+            data-export-incomplete-state={hasMissingOutput ? 'missing-output' : 'partial'}
+            data-testid="export-incomplete-alert"
+          >
+            <UiText as="p" className="text-yellow-200" variant={TextVariants.small} weight={TextWeights.semibold}>
+              {hasMissingOutput
+                ? t('export.status.footerMissingOutput')
+                : t('export.status.footerPartial', { count: receiptOutputCount, total: lastReceipt?.total ?? 0 })}
+            </UiText>
+          </div>
+        ) : null}
         <Button
           className={`group h-12 w-full rounded-lg text-sm font-semibold! shadow-none transition-colors ${
             status === Status.Exporting
@@ -2795,7 +2899,9 @@ export default function ExportPanel({
                     ? 'bg-editor-warning-surface text-editor-warning'
                     : 'bg-editor-primary-active text-editor-primary-active-text'
           }`}
-          disabled={status === Status.Exporting ? false : !canExport}
+          aria-busy={isExporting}
+          data-tooltip={isExporting ? t('export.status.cancelExport') : exportDisabledReason}
+          disabled={status === Status.Exporting ? isCancellingExport : !canExport}
           onClick={() => {
             if (status === Status.Exporting) {
               void handleCancel();
@@ -2807,16 +2913,16 @@ export default function ExportPanel({
         >
           {status === Status.Exporting ? (
             <>
-              <span className="flex items-center group-hover:hidden">
-                <Loader size={16} className="animate-spin mr-2" />
-                {progress.total > 1
-                  ? t('export.status.exportingProgress', { current: progress.current, total: progress.total })
-                  : t('export.status.exporting')}
-              </span>
-              <span className="hidden items-center group-hover:flex">
-                <Ban size={16} className="mr-2" />
-                {t('export.status.cancelExport')}
-              </span>
+              {isCancellingExport ? <Loader size={16} className="animate-spin" /> : <Ban size={16} />}
+              {isCancellingExport
+                ? t('export.status.footerCancelling')
+                : progress.total > 1
+                  ? t('export.status.cancelExportingProgress', { current: progressCurrent, total: progress.total })
+                  : t('export.status.cancelExport')}
+            </>
+          ) : status === Status.Success && (hasMissingOutput || hasPartialExport) ? (
+            <>
+              <RefreshCw size={16} className="mr-2" /> {t('export.status.retryExport')}
             </>
           ) : status === Status.Success ? (
             <>
