@@ -14,9 +14,18 @@ import {
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3164.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 12 : 2));
 const mediumPreviewFixture = new Uint8Array(
-  await readFile(new URL('../../../fixtures/agent/agent-medium-preview-1536.jpg', import.meta.url)),
+  await readFile(new URL('../../../../docs/baseline/render/rapidraw-vite-empty-root-2026-06-10.jpg', import.meta.url)),
 );
 const recordedModelInputs: Array<{ attachments: unknown[] }> = [];
+
+for (let index = 0; index + 8 < mediumPreviewFixture.length; index += 1) {
+  if (mediumPreviewFixture[index] !== 0xff || mediumPreviewFixture[index + 1] !== 0xc0) continue;
+  mediumPreviewFixture[index + 5] = 0x04;
+  mediumPreviewFixture[index + 6] = 0x00;
+  mediumPreviewFixture[index + 7] = 0x06;
+  mediumPreviewFixture[index + 8] = 0x00;
+  break;
+}
 
 setAgentMediumPreviewAttachmentRendererForTest(async () => new Uint8Array(mediumPreviewFixture));
 
