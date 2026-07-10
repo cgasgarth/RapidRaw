@@ -63,6 +63,7 @@ pub struct GpuProcessorState {
 
 pub struct PreviewJob {
     pub adjustments: serde_json::Value,
+    pub expected_image_path: String,
     pub is_interactive: bool,
     pub target_resolution: Option<u32>,
     pub roi: Option<(f32, f32, f32, f32)>,

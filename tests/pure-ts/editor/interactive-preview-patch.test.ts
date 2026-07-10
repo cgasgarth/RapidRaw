@@ -4,6 +4,8 @@ import { resolveEditorPreviewSource } from '../../../src/utils/editorImagePrevie
 import {
   buildInteractivePreviewGeometryIdentity,
   decodeInteractivePreviewUrl,
+  InteractivePreviewGenerationController,
+  type InteractivePreviewScope,
   InteractivePreviewUrlRegistry,
   isCurrentInteractivePreviewRequest,
   isInteractivePreviewPatchCoherent,
@@ -66,6 +68,19 @@ const buildPatchBuffer = ({
   new Uint8Array(buffer, 24).set(imageBytes);
   return buffer;
 };
+
+const previewScope = (overrides: Partial<InteractivePreviewScope> = {}): InteractivePreviewScope => ({
+  backend: 'cpu',
+  basePreviewUrl: 'blob:base-a',
+  devicePixelRatio: 2,
+  geometryIdentity: 'geometry-a',
+  graphIdentity: 'history_4',
+  roiIdentity: '[0.1,0.1,0.5,0.5]',
+  sourceImagePath: '/photos/alaska-a.ARW',
+  targetResolution: 2048,
+  viewportIdentity: 'viewport-a',
+  ...overrides,
+});
 
 test('interactive preview patch parser returns normalized bounds for valid backend payloads', () => {
   const patch = parseInteractivePreviewPatchPayload(buildPatchBuffer());
@@ -182,6 +197,57 @@ test('interactive previews reject stale request and render identities', () => {
   expect(isCurrentInteractivePreviewRequest({ currentJobId: 12, jobId: 12, latestRequestId: 8, requestId: 7 })).toBe(
     false,
   );
+});
+
+test('generation-bound interactive work cannot dispatch, decode, or publish after A to B selection', () => {
+  const controller = new InteractivePreviewGenerationController();
+  const requestIdentity = controller.synchronize(previewScope()).identity;
+
+  expect(controller.isCurrent(requestIdentity, controller.synchronize(previewScope()).identity)).toBe(true);
+
+  const imageB = controller.synchronize(previewScope({ sourceImagePath: '/photos/alaska-b.ARW' }));
+  expect(imageB.invalidated).toBe(true);
+  expect(controller.isCurrent(requestIdentity, imageB.identity)).toBe(false);
+  expect(controller.isCurrent(requestIdentity, imageB.identity)).toBe(false);
+  expect(controller.canCommit(requestIdentity, 1, imageB.identity)).toBe(false);
+
+  const imageAAgain = controller.synchronize(previewScope());
+  expect(imageAAgain.identity.selectionEpoch).toBeGreaterThan(requestIdentity.selectionEpoch);
+  expect(controller.isCurrent(requestIdentity, imageAAgain.identity)).toBe(false);
+});
+
+test('generation identity invalidates geometry, ROI, viewport, DPR, graph, and backend changes', () => {
+  const variants: Array<Partial<InteractivePreviewScope>> = [
+    { geometryIdentity: 'geometry-b' },
+    { roiIdentity: '[0.2,0.1,0.5,0.5]' },
+    { viewportIdentity: 'viewport-b' },
+    { devicePixelRatio: 3 },
+    { graphIdentity: 'history_5' },
+    { backend: 'wgpu' },
+  ];
+
+  for (const variant of variants) {
+    const controller = new InteractivePreviewGenerationController();
+    const requestIdentity = controller.synchronize(previewScope()).identity;
+    const current = controller.synchronize(previewScope(variant));
+
+    expect(current.invalidated).toBe(true);
+    expect(controller.isCurrent(requestIdentity, current.identity)).toBe(false);
+    expect(controller.canCommit(requestIdentity, 1, current.identity)).toBe(false);
+  }
+});
+
+test('active interactive completions paint monotonically while only newer work is pending', () => {
+  const controller = new InteractivePreviewGenerationController();
+  const identity = controller.synchronize(previewScope()).identity;
+  const current = controller.synchronize(previewScope()).identity;
+
+  expect(controller.canCommit(identity, 1, current)).toBe(true);
+  expect(controller.canCommit(identity, 2, current)).toBe(true);
+  expect(controller.canCommit(identity, 1, current)).toBe(false);
+
+  const releasedIdentity = controller.supersede(previewScope());
+  expect(controller.isCurrent(identity, releasedIdentity)).toBe(false);
 });
 
 test('interactive preview scheduler bounds active work and keeps only the latest pending request', async () => {
