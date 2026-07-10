@@ -18,6 +18,7 @@ export const activeDisplayProfileSchema = z
     profileByteCount: z.number().int().nonnegative().nullable().optional(),
     source: z.string().min(1),
     status: activeDisplayProfileStatusSchema,
+    fallbackReason: z.string().min(1).nullable().optional(),
   })
   .strict();
 

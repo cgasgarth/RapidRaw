@@ -286,6 +286,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
     }
 
     encode_preview_response(
+        Some(app_handle),
         final_processed_image,
         is_interactive,
         pixel_roi,
@@ -296,7 +297,9 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn encode_preview_response(
+    app_handle: Option<&tauri::AppHandle>,
     final_processed_image: DynamicImage,
     is_interactive: bool,
     pixel_roi: Option<crate::gpu_processing::Roi>,
@@ -305,7 +308,10 @@ fn encode_preview_response(
     jpeg_quality: u8,
     fn_start: std::time::Instant,
 ) -> Result<Vec<u8>, String> {
-    let final_rgba_image = Arc::new(to_preview_rgba8(final_processed_image));
+    let final_rgba_image = Arc::new(match app_handle {
+        Some(app) => to_display_preview_rgba8(app, final_processed_image),
+        None => to_preview_rgba8(final_processed_image),
+    });
     let interactive_geometry = if is_interactive {
         Some(validate_interactive_patch_geometry(
             final_rgba_image.width(),
@@ -327,11 +333,17 @@ fn encode_preview_response(
     );
 
     let step_start = std::time::Instant::now();
-    let jpeg_bytes = Encoder::new(Preset::BaselineFastest)
+    let mut jpeg_bytes = Encoder::new(Preset::BaselineFastest)
         .quality(jpeg_quality)
         .fast_color(true)
         .encode_imgref(img_ref)
         .map_err(|e| format!("Failed to encode preview: {}", e))?;
+    #[cfg(target_os = "macos")]
+    if let Some(app) = app_handle
+        && let Ok(icc) = crate::display_profile::active_display_profile_bytes_for_app(app)
+    {
+        jpeg_bytes = jpeg_with_icc_profile(&jpeg_bytes, &icc)?;
+    }
 
     if is_interactive {
         let (rx, ry, roi_w, roi_h) = interactive_geometry
@@ -365,6 +377,32 @@ fn encode_preview_response(
         );
         Ok(jpeg_bytes)
     }
+}
+
+#[cfg(target_os = "macos")]
+fn jpeg_with_icc_profile(jpeg: &[u8], icc: &[u8]) -> Result<Vec<u8>, String> {
+    const HEADER: &[u8] = b"ICC_PROFILE\0";
+    const MAX_CHUNK: usize = 65_519;
+    if !jpeg.starts_with(&[0xff, 0xd8]) || icc.is_empty() {
+        return Err("Cannot tag invalid preview JPEG or empty display ICC profile".to_string());
+    }
+    let count = icc.len().div_ceil(MAX_CHUNK);
+    if count > u8::MAX as usize {
+        return Err("Display ICC profile is too large for JPEG APP2 chunking".to_string());
+    }
+    let mut output = Vec::with_capacity(jpeg.len() + icc.len() + count * 18);
+    output.extend_from_slice(&jpeg[..2]);
+    for (index, chunk) in icc.chunks(MAX_CHUNK).enumerate() {
+        let payload_len = HEADER.len() + 2 + chunk.len();
+        output.extend_from_slice(&[0xff, 0xe2]);
+        output.extend_from_slice(&((payload_len + 2) as u16).to_be_bytes());
+        output.extend_from_slice(HEADER);
+        output.push((index + 1) as u8);
+        output.push(count as u8);
+        output.extend_from_slice(chunk);
+    }
+    output.extend_from_slice(&jpeg[2..]);
+    Ok(output)
 }
 
 fn validate_interactive_patch_geometry(
@@ -415,6 +453,28 @@ fn to_preview_rgba8(image: DynamicImage) -> RgbaImage {
     }
 }
 
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
+fn to_display_preview_rgba8(app: &tauri::AppHandle, image: DynamicImage) -> RgbaImage {
+    let mut image = to_preview_rgba8(image);
+    let lut = crate::display_profile::build_srgb_to_active_display_lut_for_app(app);
+    for pixel in image.pixels_mut() {
+        let transformed = lut.sample_rgb([
+            pixel[0] as f32 / 255.0,
+            pixel[1] as f32 / 255.0,
+            pixel[2] as f32 / 255.0,
+        ]);
+        for channel in 0..3 {
+            pixel[channel] = (transformed[channel].clamp(0.0, 1.0) * 255.0).round() as u8;
+        }
+    }
+    image
+}
+
+#[cfg(any(target_os = "android", target_os = "linux"))]
+fn to_display_preview_rgba8(_app: &tauri::AppHandle, image: DynamicImage) -> RgbaImage {
+    to_preview_rgba8(image)
+}
+
 pub(crate) fn start_preview_worker(app_handle: tauri::AppHandle) {
     let state = app_handle.state::<AppState>();
     let (tx, rx): (Sender<PreviewJob>, Receiver<PreviewJob>) = mpsc::channel();
@@ -463,9 +523,17 @@ mod tests {
             Rgba([x as f32 / 2.0, y as f32 / 2.0, 0.25 + x as f32 * 0.1, 1.0])
         }));
 
-        let encoded =
-            encode_preview_response(image, false, None, 2, 2, 82, std::time::Instant::now())
-                .expect("RGBA32F preview should encode through RGBA8 boundary");
+        let encoded = encode_preview_response(
+            None,
+            image,
+            false,
+            None,
+            2,
+            2,
+            82,
+            std::time::Instant::now(),
+        )
+        .expect("RGBA32F preview should encode through RGBA8 boundary");
 
         assert!(encoded.starts_with(&[0xff, 0xd8]));
         assert!(encoded.len() > 16);
@@ -476,6 +544,7 @@ mod tests {
         let image =
             DynamicImage::ImageRgba8(ImageBuffer::from_pixel(3, 2, Rgba([20, 40, 60, 255])));
         let encoded = encode_preview_response(
+            None,
             image,
             true,
             Some(crate::gpu_processing::Roi {
@@ -501,9 +570,17 @@ mod tests {
 
         let full_frame =
             DynamicImage::ImageRgba8(ImageBuffer::from_pixel(3, 2, Rgba([20, 40, 60, 255])));
-        let full_frame_encoded =
-            encode_preview_response(full_frame, true, None, 3, 2, 75, std::time::Instant::now())
-                .expect("coherent full-frame interactive preview should encode");
+        let full_frame_encoded = encode_preview_response(
+            None,
+            full_frame,
+            true,
+            None,
+            3,
+            2,
+            75,
+            std::time::Instant::now(),
+        )
+        .expect("coherent full-frame interactive preview should encode");
         assert_eq!(
             u32::from_le_bytes(full_frame_encoded[0..4].try_into().unwrap()),
             0
@@ -527,6 +604,7 @@ mod tests {
         let full_frame =
             DynamicImage::ImageRgba8(ImageBuffer::from_pixel(8, 6, Rgba([20, 40, 60, 255])));
         let result = encode_preview_response(
+            None,
             full_frame,
             true,
             Some(crate::gpu_processing::Roi {

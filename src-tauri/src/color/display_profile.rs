@@ -9,6 +9,7 @@ pub struct ActiveDisplayProfile {
     pub profile_byte_count: Option<usize>,
     pub source: String,
     pub status: ActiveDisplayProfileStatus,
+    pub fallback_reason: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -40,27 +41,45 @@ pub enum DisplayPreviewLutTransformStatus {
 }
 
 #[tauri::command]
-pub fn get_active_display_profile() -> Result<ActiveDisplayProfile, String> {
-    active_display_profile()
+pub fn get_active_display_profile(app: tauri::AppHandle) -> Result<ActiveDisplayProfile, String> {
+    active_display_profile_for_app(&app)
 }
 
 #[tauri::command]
-pub fn get_display_preview_lut_status() -> Result<DisplayPreviewLutStatus, String> {
-    display_preview_lut_status()
+pub fn get_display_preview_lut_status(
+    app: tauri::AppHandle,
+) -> Result<DisplayPreviewLutStatus, String> {
+    display_preview_lut_status_for_app(&app)
 }
 
 #[cfg(target_os = "macos")]
+#[allow(dead_code)]
 pub fn active_display_profile() -> Result<ActiveDisplayProfile, String> {
     let display_id = macos::main_display_id();
+    active_display_profile_for_id(display_id)
+}
+
+#[cfg(target_os = "macos")]
+pub fn active_display_profile_for_app(
+    app: &tauri::AppHandle,
+) -> Result<ActiveDisplayProfile, String> {
+    active_display_profile_for_id(
+        macos::display_id_for_app(app).unwrap_or_else(macos::main_display_id),
+    )
+}
+
+#[cfg(target_os = "macos")]
+fn active_display_profile_for_id(display_id: u32) -> Result<ActiveDisplayProfile, String> {
     let icc_bytes = macos::copy_display_profile_data(display_id)?;
 
     Ok(ActiveDisplayProfile {
-        cmm: "colorsync+moxcms".to_string(),
+        cmm: "colorsync+lcms2".to_string(),
         display_id: Some(display_id),
         icc_sha256: Some(sha256_hex(&icc_bytes)),
         profile_byte_count: Some(icc_bytes.len()),
-        source: "ColorSyncProfileCreateWithDisplayID(CGMainDisplayID())".to_string(),
+        source: "ColorSyncProfileCreateWithDisplayID(active_window_display)".to_string(),
         status: ActiveDisplayProfileStatus::ActiveProfileLoaded,
+        fallback_reason: None,
     })
 }
 
@@ -73,12 +92,33 @@ pub fn active_display_profile() -> Result<ActiveDisplayProfile, String> {
         profile_byte_count: None,
         source: "unsupported_platform".to_string(),
         status: ActiveDisplayProfileStatus::UnsupportedPlatform,
+        fallback_reason: Some("native_display_profile_unavailable_on_platform".to_string()),
     })
 }
 
+#[cfg(not(target_os = "macos"))]
+pub fn active_display_profile_for_app(
+    _app: &tauri::AppHandle,
+) -> Result<ActiveDisplayProfile, String> {
+    active_display_profile()
+}
+
 #[cfg(target_os = "macos")]
+#[allow(dead_code)]
 pub fn active_display_profile_bytes() -> Result<Vec<u8>, String> {
     macos::copy_display_profile_data(macos::main_display_id())
+}
+
+#[cfg(target_os = "macos")]
+fn active_display_profile_bytes_for_id(display_id: u32) -> Result<Vec<u8>, String> {
+    macos::copy_display_profile_data(display_id)
+}
+
+#[cfg(target_os = "macos")]
+pub fn active_display_profile_bytes_for_app(app: &tauri::AppHandle) -> Result<Vec<u8>, String> {
+    active_display_profile_bytes_for_id(
+        macos::display_id_for_app(app).unwrap_or_else(macos::main_display_id),
+    )
 }
 
 #[cfg(not(any(target_os = "android", target_os = "linux")))]
@@ -92,13 +132,73 @@ pub struct DisplayLut {
 }
 
 #[cfg(not(any(target_os = "android", target_os = "linux")))]
+impl DisplayLut {
+    pub fn sample_rgb(&self, rgb: [f32; 3]) -> [f32; 3] {
+        let max = (self.size - 1) as f32;
+        let scaled = rgb.map(|channel| channel.clamp(0.0, 1.0) * max);
+        let lo = scaled.map(|channel| channel.floor() as u32);
+        let hi = lo.map(|index| (index + 1).min(self.size - 1));
+        let mix = [
+            scaled[0] - lo[0] as f32,
+            scaled[1] - lo[1] as f32,
+            scaled[2] - lo[2] as f32,
+        ];
+        let fetch = |r: u32, g: u32, b: u32, channel: usize| {
+            let index = (((b * self.size + g) * self.size + r) * 4) as usize + channel;
+            self.rgba16f[index].to_f32()
+        };
+        let mut out = [0.0; 3];
+        for (channel, value) in out.iter_mut().enumerate() {
+            let x00 = fetch(lo[0], lo[1], lo[2], channel) * (1.0 - mix[0])
+                + fetch(hi[0], lo[1], lo[2], channel) * mix[0];
+            let x10 = fetch(lo[0], hi[1], lo[2], channel) * (1.0 - mix[0])
+                + fetch(hi[0], hi[1], lo[2], channel) * mix[0];
+            let x01 = fetch(lo[0], lo[1], hi[2], channel) * (1.0 - mix[0])
+                + fetch(hi[0], lo[1], hi[2], channel) * mix[0];
+            let x11 = fetch(lo[0], hi[1], hi[2], channel) * (1.0 - mix[0])
+                + fetch(hi[0], hi[1], hi[2], channel) * mix[0];
+            let y0 = x00 * (1.0 - mix[1]) + x10 * mix[1];
+            let y1 = x01 * (1.0 - mix[1]) + x11 * mix[1];
+            *value = y0 * (1.0 - mix[2]) + y1 * mix[2];
+        }
+        out
+    }
+}
+
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
+#[allow(dead_code)]
 pub fn build_srgb_to_active_display_lut() -> DisplayLut {
     build_srgb_to_active_display_lut_with_size(DISPLAY_LUT_SIZE)
 }
 
 #[cfg(not(any(target_os = "android", target_os = "linux")))]
+pub fn build_srgb_to_active_display_lut_for_app(app: &tauri::AppHandle) -> DisplayLut {
+    let size = DISPLAY_LUT_SIZE;
+    #[cfg(target_os = "macos")]
+    if let Some(display_id) = macos::display_id_for_app(app) {
+        return try_build_srgb_to_display_id_lut(size, display_id)
+            .unwrap_or_else(|error| fallback_display_lut(size, error));
+    }
+    build_srgb_to_active_display_lut_with_size(size)
+}
+
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
+#[allow(dead_code)]
 pub fn display_preview_lut_status() -> Result<DisplayPreviewLutStatus, String> {
     let lut = build_srgb_to_active_display_lut();
+    Ok(DisplayPreviewLutStatus {
+        sample_count: lut.rgba16f.len() / 4,
+        size: lut.size,
+        status: display_lut_transform_status(&lut.profile),
+        profile: lut.profile,
+    })
+}
+
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
+pub fn display_preview_lut_status_for_app(
+    app: &tauri::AppHandle,
+) -> Result<DisplayPreviewLutStatus, String> {
+    let lut = build_srgb_to_active_display_lut_for_app(app);
     Ok(DisplayPreviewLutStatus {
         sample_count: lut.rgba16f.len() / 4,
         size: lut.size,
@@ -115,6 +215,13 @@ pub fn display_preview_lut_status() -> Result<DisplayPreviewLutStatus, String> {
         size: 0,
         status: DisplayPreviewLutTransformStatus::UnsupportedPlatform,
     })
+}
+
+#[cfg(any(target_os = "android", target_os = "linux"))]
+pub fn display_preview_lut_status_for_app(
+    _app: &tauri::AppHandle,
+) -> Result<DisplayPreviewLutStatus, String> {
+    display_preview_lut_status()
 }
 
 #[cfg(not(any(target_os = "android", target_os = "linux")))]
@@ -140,11 +247,7 @@ pub fn build_srgb_to_active_display_lut_with_size(size: u32) -> DisplayLut {
 
     match try_build_srgb_to_active_display_lut(size) {
         Ok(lut) => lut,
-        Err(_) => DisplayLut {
-            profile: fallback_display_profile(),
-            rgba16f: build_identity_display_lut(size),
-            size,
-        },
+        Err(error) => fallback_display_lut(size, error),
     }
 }
 
@@ -153,12 +256,17 @@ pub fn build_srgb_to_active_display_lut_with_size(size: u32) -> DisplayLut {
     not(any(target_os = "android", target_os = "linux"))
 ))]
 fn try_build_srgb_to_active_display_lut(size: u32) -> Result<DisplayLut, String> {
-    use moxcms::ColorProfile;
+    try_build_srgb_to_display_id_lut(size, macos::main_display_id())
+}
 
-    let display_profile_bytes = active_display_profile_bytes()?;
-    let display_profile = ColorProfile::new_from_slice(&display_profile_bytes)
-        .map_err(|error| format!("Failed to parse active display ICC profile: {error}"))?;
-    build_srgb_to_display_profile_lut_with_size(&display_profile, active_display_profile()?, size)
+#[cfg(target_os = "macos")]
+fn try_build_srgb_to_display_id_lut(size: u32, display_id: u32) -> Result<DisplayLut, String> {
+    let display_profile_bytes = active_display_profile_bytes_for_id(display_id)?;
+    build_srgb_to_display_profile_lut_with_size(
+        &display_profile_bytes,
+        active_display_profile_for_id(display_id)?,
+        size,
+    )
 }
 
 #[cfg(all(
@@ -167,14 +275,14 @@ fn try_build_srgb_to_active_display_lut(size: u32) -> Result<DisplayLut, String>
 ))]
 fn try_build_srgb_to_active_display_lut(size: u32) -> Result<DisplayLut, String> {
     Ok(DisplayLut {
-        profile: fallback_display_profile(),
+        profile: fallback_display_profile("native_colorsync_profile_unavailable".to_string()),
         rgba16f: build_identity_display_lut(size),
         size,
     })
 }
 
 #[cfg(not(any(target_os = "android", target_os = "linux")))]
-fn fallback_display_profile() -> ActiveDisplayProfile {
+fn fallback_display_profile(reason: String) -> ActiveDisplayProfile {
     ActiveDisplayProfile {
         cmm: "identity".to_string(),
         display_id: None,
@@ -182,6 +290,16 @@ fn fallback_display_profile() -> ActiveDisplayProfile {
         profile_byte_count: None,
         source: "identity_srgb_display_lut".to_string(),
         status: ActiveDisplayProfileStatus::FallbackNoActiveProfile,
+        fallback_reason: Some(reason),
+    }
+}
+
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
+fn fallback_display_lut(size: u32, reason: String) -> DisplayLut {
+    DisplayLut {
+        profile: fallback_display_profile(reason),
+        rgba16f: build_identity_display_lut(size),
+        size,
     }
 }
 
@@ -205,27 +323,38 @@ fn build_lut_source_rgb(size: u32) -> Vec<f32> {
 
 #[cfg(not(any(target_os = "android", target_os = "linux")))]
 fn build_srgb_to_display_profile_lut_with_size(
-    display_profile: &moxcms::ColorProfile,
+    display_profile_bytes: &[u8],
     profile: ActiveDisplayProfile,
     size: u32,
 ) -> Result<DisplayLut, String> {
-    use moxcms::{ColorProfile, Layout, TransformOptions};
-
-    let transform = ColorProfile::new_srgb()
-        .create_transform_f32(
-            Layout::Rgb,
-            display_profile,
-            Layout::Rgb,
-            TransformOptions::default(),
-        )
-        .map_err(|error| format!("Failed to create display transform: {error}"))?;
+    use lcms2::{Flags, Intent, PixelFormat, Profile, Transform};
+    let source_profile = Profile::new_srgb();
+    let display_profile = Profile::new_icc(display_profile_bytes)
+        .map_err(|error| format!("Failed to open active display ICC with LittleCMS: {error}"))?;
+    let transform = Transform::<[u16; 3], [u16; 3], _, _>::new_flags(
+        &source_profile,
+        PixelFormat::RGB_16,
+        &display_profile,
+        PixelFormat::RGB_16,
+        Intent::RelativeColorimetric,
+        Flags::BLACKPOINT_COMPENSATION | Flags::NO_CACHE,
+    )
+    .map_err(|error| format!("Failed to create display transform: {error}"))?;
 
     let size = size.max(2);
-    let source = build_lut_source_rgb(size);
-    let mut transformed = vec![0.0_f32; source.len()];
-    transform
-        .transform(&source, &mut transformed)
-        .map_err(|error| format!("Failed to transform display LUT: {error}"))?;
+    let source: Vec<[u16; 3]> = build_lut_source_rgb(size)
+        .chunks_exact(3)
+        .map(|rgb| {
+            [rgb[0], rgb[1], rgb[2]].map(|channel| (channel * u16::MAX as f32).round() as u16)
+        })
+        .collect();
+    let mut transformed = vec![[0_u16; 3]; source.len()];
+    transform.transform_pixels(&source, &mut transformed);
+    let transformed: Vec<f32> = transformed
+        .into_iter()
+        .flatten()
+        .map(|channel| channel as f32 / u16::MAX as f32)
+        .collect();
 
     Ok(DisplayLut {
         profile,
@@ -268,11 +397,31 @@ fn sha256_hex(bytes: &[u8]) -> String {
 #[cfg(target_os = "macos")]
 mod macos {
     use std::ffi::c_void;
+    use tauri::Manager;
 
     type CFDataRef = *const c_void;
     type CFErrorRef = *const c_void;
     type CFIndex = isize;
     type ColorSyncProfileRef = *const c_void;
+
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    struct CGPoint {
+        x: f64,
+        y: f64,
+    }
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    struct CGSize {
+        width: f64,
+        height: f64,
+    }
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    struct CGRect {
+        origin: CGPoint,
+        size: CGSize,
+    }
 
     #[link(name = "CoreFoundation", kind = "framework")]
     unsafe extern "C" {
@@ -284,6 +433,12 @@ mod macos {
     #[link(name = "CoreGraphics", kind = "framework")]
     unsafe extern "C" {
         fn CGMainDisplayID() -> u32;
+        fn CGGetActiveDisplayList(
+            max_displays: u32,
+            active_displays: *mut u32,
+            display_count: *mut u32,
+        ) -> i32;
+        fn CGDisplayBounds(display: u32) -> CGRect;
     }
 
     #[link(name = "ColorSync", kind = "framework")]
@@ -297,6 +452,47 @@ mod macos {
 
     pub fn main_display_id() -> u32 {
         unsafe { CGMainDisplayID() }
+    }
+
+    pub fn display_id_for_app(app: &tauri::AppHandle) -> Option<u32> {
+        let window = app.get_webview_window("main")?;
+        let position = window.outer_position().ok()?;
+        let size = window.outer_size().ok()?;
+        let scale = window.scale_factor().unwrap_or(1.0);
+        let window_rect = CGRect {
+            origin: CGPoint {
+                x: position.x as f64 / scale,
+                y: position.y as f64 / scale,
+            },
+            size: CGSize {
+                width: size.width as f64 / scale,
+                height: size.height as f64 / scale,
+            },
+        };
+        let mut displays = [0_u32; 32];
+        let mut count = 0_u32;
+        if unsafe {
+            CGGetActiveDisplayList(displays.len() as u32, displays.as_mut_ptr(), &mut count)
+        } != 0
+        {
+            return None;
+        }
+        displays[..count as usize]
+            .iter()
+            .copied()
+            .max_by(|left, right| {
+                intersection_area(window_rect, unsafe { CGDisplayBounds(*left) }).total_cmp(
+                    &intersection_area(window_rect, unsafe { CGDisplayBounds(*right) }),
+                )
+            })
+    }
+
+    fn intersection_area(left: CGRect, right: CGRect) -> f64 {
+        let width = (left.origin.x + left.size.width).min(right.origin.x + right.size.width)
+            - left.origin.x.max(right.origin.x);
+        let height = (left.origin.y + left.size.height).min(right.origin.y + right.size.height)
+            - left.origin.y.max(right.origin.y);
+        width.max(0.0) * height.max(0.0)
     }
 
     pub fn copy_display_profile_data(display_id: u32) -> Result<Vec<u8>, String> {
@@ -430,9 +626,10 @@ mod cross_platform_tests {
             profile_byte_count: None,
             source: "controlled_display_p3_test_profile".to_string(),
             status: ActiveDisplayProfileStatus::ActiveProfileLoaded,
+            fallback_reason: None,
         };
         let lut = build_srgb_to_display_profile_lut_with_size(
-            &moxcms::ColorProfile::new_display_p3(),
+            &moxcms::ColorProfile::new_display_p3().encode().unwrap(),
             profile,
             3,
         )
@@ -449,5 +646,64 @@ mod cross_platform_tests {
                 || red[2].to_f32() > 0.0001
         );
         assert_eq!(red[3].to_f32(), 1.0);
+    }
+
+    #[test]
+    fn cpu_trilinear_sampling_tracks_display_cmm_reference() {
+        use lcms2::{Flags, Intent, PixelFormat, Profile, Transform};
+        let target_bytes = moxcms::ColorProfile::new_display_p3().encode().unwrap();
+        let profile = ActiveDisplayProfile {
+            cmm: "moxcms".to_string(),
+            display_id: Some(42),
+            icc_sha256: Some(format!("sha256:{}", "1".repeat(64))),
+            profile_byte_count: Some(128),
+            source: "controlled_display_p3_test_profile".to_string(),
+            status: ActiveDisplayProfileStatus::ActiveProfileLoaded,
+            fallback_reason: None,
+        };
+        let lut = build_srgb_to_display_profile_lut_with_size(&target_bytes, profile, 32).unwrap();
+        let source = [0.13_f32, 0.47, 0.91];
+        let source_profile = Profile::new_srgb();
+        let target = Profile::new_icc(&target_bytes).unwrap();
+        let transform = Transform::<[u16; 3], [u16; 3], _, _>::new_flags(
+            &source_profile,
+            PixelFormat::RGB_16,
+            &target,
+            PixelFormat::RGB_16,
+            Intent::RelativeColorimetric,
+            Flags::BLACKPOINT_COMPENSATION | Flags::NO_CACHE,
+        )
+        .unwrap();
+        let source_u16 = [source.map(|channel| (channel * u16::MAX as f32).round() as u16)];
+        let mut expected_u16 = [[0_u16; 3]];
+        transform.transform_pixels(&source_u16, &mut expected_u16);
+        let expected = expected_u16[0].map(|channel| channel as f32 / u16::MAX as f32);
+        let sampled = lut.sample_rgb(source);
+        let max_abs = sampled
+            .iter()
+            .zip(expected)
+            .map(|(actual, expected)| (actual - expected).abs())
+            .fold(0.0_f32, f32::max);
+        assert!(max_abs < 0.003, "CPU/WGPU LUT contract max_abs={max_abs}");
+    }
+
+    #[test]
+    fn fallback_is_explicitly_uncalibrated() {
+        let lut = fallback_display_lut(4, "colorsync_profile_access_failed".to_string());
+        assert!(matches!(
+            lut.profile.status,
+            ActiveDisplayProfileStatus::FallbackNoActiveProfile
+        ));
+        assert_eq!(
+            lut.profile.fallback_reason.as_deref(),
+            Some("colorsync_profile_access_failed")
+        );
+        let sampled = lut.sample_rgb([0.2, 0.4, 0.8]);
+        assert!(
+            sampled
+                .iter()
+                .zip([0.2, 0.4, 0.8])
+                .all(|(actual, expected)| (actual - expected).abs() < 0.001)
+        );
     }
 }
