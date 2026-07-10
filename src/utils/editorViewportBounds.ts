@@ -1,4 +1,5 @@
 import type { RenderSize } from '../hooks/viewport/useImageRenderSize';
+import type { EditorZoomMode } from './editorZoom';
 
 export interface TransformBounds {
   maxX: number;
@@ -20,11 +21,30 @@ export interface ViewportSnapshot {
   renderSize: RenderSize;
 }
 
+export type ViewportFocalPointSource = 'center' | 'navigator' | 'pointer';
+
+export interface ViewportFocalPoint {
+  source: ViewportFocalPointSource;
+  viewportX: number;
+  viewportY: number;
+  x: number;
+  y: number;
+}
+
+export interface ViewportPoint {
+  x: number;
+  y: number;
+}
+
 export interface ReconcileViewportTransformInput {
   contextChanged: boolean;
   current: ViewportSnapshot;
+  focalPoint?: ViewportPoint | null;
+  mode?: EditorZoomMode;
   previous: ViewportSnapshot | null;
+  targetScale?: number;
   transform: ViewportTransform;
+  viewportAnchor?: ViewportPoint | null;
 }
 
 export interface ViewportTransform {
@@ -34,6 +54,11 @@ export interface ViewportTransform {
 }
 
 export const FIT_TRANSFORM: ViewportTransform = { scale: 1, positionX: 0, positionY: 0 };
+
+const centerOfSnapshot = (snapshot: ViewportSnapshot): ViewportPoint => ({
+  x: snapshot.containerWidth / 2,
+  y: snapshot.containerHeight / 2,
+});
 
 const centeredAxisBounds = (
   containerSize: number,
@@ -103,36 +128,95 @@ const clampTransformToSnapshot = (transform: ViewportTransform, snapshot: Viewpo
   };
 };
 
+const safeTransformScale = (scale: number): number =>
+  Number.isFinite(scale) && scale > 0 ? scale : FIT_TRANSFORM.scale;
+
+export const getImageSpacePointAtViewportPoint = ({
+  snapshot,
+  transform,
+  viewportPoint,
+}: {
+  snapshot: ViewportSnapshot;
+  transform: ViewportTransform;
+  viewportPoint: ViewportPoint;
+}): ViewportPoint => {
+  const scale = safeTransformScale(transform.scale);
+  if (!isValidSnapshot(snapshot)) return { x: 0.5, y: 0.5 };
+
+  return {
+    x:
+      (viewportPoint.x - transform.positionX - snapshot.renderSize.offsetX * scale) /
+      (snapshot.renderSize.width * scale),
+    y:
+      (viewportPoint.y - transform.positionY - snapshot.renderSize.offsetY * scale) /
+      (snapshot.renderSize.height * scale),
+  };
+};
+
+export const getTransformForImageSpacePoint = ({
+  focalPoint,
+  scale,
+  snapshot,
+  viewportPoint,
+}: {
+  focalPoint: ViewportPoint;
+  scale: number;
+  snapshot: ViewportSnapshot;
+  viewportPoint: ViewportPoint;
+}): ViewportTransform => {
+  const safeScale = safeTransformScale(scale);
+  return {
+    positionX:
+      viewportPoint.x - snapshot.renderSize.offsetX * safeScale - focalPoint.x * snapshot.renderSize.width * safeScale,
+    positionY:
+      viewportPoint.y - snapshot.renderSize.offsetY * safeScale - focalPoint.y * snapshot.renderSize.height * safeScale,
+    scale: safeScale,
+  };
+};
+
 export const reconcileViewportTransform = ({
   contextChanged,
   current,
+  focalPoint,
+  mode,
   previous,
+  targetScale,
   transform,
+  viewportAnchor,
 }: ReconcileViewportTransformInput): ViewportTransform => {
   if (!isValidSnapshot(current)) return FIT_TRANSFORM;
-  if (contextChanged || !isValidSnapshot(previous)) return FIT_TRANSFORM;
+  if (mode?.kind === 'fit') return FIT_TRANSFORM;
 
-  const scale = Number.isFinite(transform.scale) && transform.scale > 0 ? transform.scale : FIT_TRANSFORM.scale;
+  const scale = safeTransformScale(targetScale ?? transform.scale);
+  if (contextChanged || !isValidSnapshot(previous)) {
+    if (!mode) return FIT_TRANSFORM;
+    return clampTransformToSnapshot(
+      getTransformForImageSpacePoint({
+        focalPoint: { x: 0.5, y: 0.5 },
+        scale,
+        snapshot: current,
+        viewportPoint: centerOfSnapshot(current),
+      }),
+      current,
+    );
+  }
+
   if (Math.abs(scale - FIT_TRANSFORM.scale) <= 0.01) return FIT_TRANSFORM;
 
-  const previousCenterX =
-    (previous.containerWidth / 2 - transform.positionX - previous.renderSize.offsetX * scale) /
-    (previous.renderSize.width * scale);
-  const previousCenterY =
-    (previous.containerHeight / 2 - transform.positionY - previous.renderSize.offsetY * scale) /
-    (previous.renderSize.height * scale);
-
-  const nextTransform = {
+  const previousAnchor = focalPoint ? (viewportAnchor ?? centerOfSnapshot(previous)) : centerOfSnapshot(previous);
+  const imageSpacePoint =
+    focalPoint ??
+    getImageSpacePointAtViewportPoint({
+      snapshot: previous,
+      transform,
+      viewportPoint: previousAnchor,
+    });
+  const nextTransform = getTransformForImageSpacePoint({
+    focalPoint: imageSpacePoint,
     scale,
-    positionX:
-      current.containerWidth / 2 -
-      current.renderSize.offsetX * scale -
-      previousCenterX * current.renderSize.width * scale,
-    positionY:
-      current.containerHeight / 2 -
-      current.renderSize.offsetY * scale -
-      previousCenterY * current.renderSize.height * scale,
-  };
+    snapshot: current,
+    viewportPoint: viewportAnchor ?? centerOfSnapshot(current),
+  });
 
   return clampTransformToSnapshot(nextTransform, current);
 };

@@ -49,7 +49,11 @@ import {
   WHEEL_SNAP_DELAY_MS,
 } from '../../utils/editorGestureMath';
 import { getEditorPreviewDimensions } from '../../utils/editorPreviewDimensions';
-import { reconcileViewportTransform, type ViewportSnapshot } from '../../utils/editorViewportBounds';
+import {
+  reconcileViewportTransform,
+  type ViewportFocalPoint,
+  type ViewportSnapshot,
+} from '../../utils/editorViewportBounds';
 import {
   getEditorZoomDpr,
   getEditorZoomModeForCommand,
@@ -254,9 +258,12 @@ export default function Editor({
   const hadViewerPanGesture = useRef(false);
   const [isTemporaryHand, setIsTemporaryHand] = useState(false);
   const [isViewerGestureDragging, setIsViewerGestureDragging] = useState(false);
+  const [viewportLayoutEpoch, setViewportLayoutEpoch] = useState(0);
+  const viewportLayoutEpochRef = useRef(0);
 
   const prevViewportSnapshotRef = useRef<ViewportSnapshot | null>(null);
   const prevViewportContextKeyRef = useRef<string | null>(null);
+  const prevViewportDprRef = useRef<number | null>(null);
   const toggleShowOriginal = useCallback(() => {
     setEditor((state) => ({ compareMode: state.compareMode === 'hold-original' ? 'off' : 'hold-original' }));
   }, [setEditor]);
@@ -297,20 +304,36 @@ export default function Editor({
 
   const handleDisplaySizeChange = useCallback(
     (size: DisplaySizeUpdate) => {
-      setEditor({ displaySize: { width: size.width, height: size.height } });
-      if (size.scale) {
-        const baseWidth = size.width / size.scale;
-        const baseHeight = size.height / size.scale;
-        const newSize = {
-          width: baseWidth,
-          height: baseHeight,
-          offsetX: size.offsetX || 0,
-          offsetY: size.offsetY || 0,
-          containerWidth: size.containerWidth || 0,
-          containerHeight: size.containerHeight || 0,
+      if (!size.scale) return;
+      const nextDisplaySize = { width: size.width, height: size.height };
+      const nextBaseRenderSize = {
+        width: size.width / size.scale,
+        height: size.height / size.scale,
+        offsetX: size.offsetX || 0,
+        offsetY: size.offsetY || 0,
+        containerWidth: size.containerWidth || 0,
+        containerHeight: size.containerHeight || 0,
+      };
+
+      setEditor((state) => {
+        const previousDisplaySize = state.displaySize;
+        const previousBaseRenderSize = state.baseRenderSize;
+        const isUnchanged =
+          previousDisplaySize.width === nextDisplaySize.width &&
+          previousDisplaySize.height === nextDisplaySize.height &&
+          previousBaseRenderSize.width === nextBaseRenderSize.width &&
+          previousBaseRenderSize.height === nextBaseRenderSize.height &&
+          previousBaseRenderSize.offsetX === nextBaseRenderSize.offsetX &&
+          previousBaseRenderSize.offsetY === nextBaseRenderSize.offsetY &&
+          previousBaseRenderSize.containerWidth === nextBaseRenderSize.containerWidth &&
+          previousBaseRenderSize.containerHeight === nextBaseRenderSize.containerHeight;
+        if (isUnchanged) return {};
+        return {
+          baseRenderSize: nextBaseRenderSize,
+          displaySize: nextDisplaySize,
+          viewportEpoch: state.viewportEpoch + 1,
         };
-        setEditor({ baseRenderSize: newSize });
-      }
+      });
     },
     [setEditor],
   );
@@ -394,12 +417,22 @@ export default function Editor({
   const viewportContextKey = useMemo(() => {
     const crop = adjustments.crop;
     return JSON.stringify({
+      dimensions: croppedDimensions,
+      isReady: selectedImage?.isReady ?? false,
+      originalSize: selectedImage ? { height: selectedImage.height, width: selectedImage.width } : null,
       path: selectedImage?.path ?? null,
       crop: crop ? { x: crop.x, y: crop.y, width: crop.width, height: crop.height } : null,
-      dimensions: croppedDimensions,
       orientationSteps: adjustments.orientationSteps || 0,
     });
-  }, [adjustments.crop, adjustments.orientationSteps, croppedDimensions, selectedImage?.path]);
+  }, [
+    adjustments.crop,
+    adjustments.orientationSteps,
+    croppedDimensions,
+    selectedImage?.height,
+    selectedImage?.isReady,
+    selectedImage?.path,
+    selectedImage?.width,
+  ]);
 
   const imageRenderSize = useImageRenderSize(imageContainerRef, croppedDimensions);
   const [devicePixelRatio, setDevicePixelRatio] = useState(() =>
@@ -454,7 +487,9 @@ export default function Editor({
     animationFrameId,
     animateTransform,
     applyTransform,
+    captureFocalPoint,
     clampToBounds,
+    focalPointRef,
     getTransformBounds,
     imageRenderSizeRef,
     isPanningState,
@@ -484,6 +519,7 @@ export default function Editor({
       const ch = container.clientHeight;
       const centerX = cw / 2;
       const centerY = ch / 2;
+      captureFocalPoint({ x: centerX, y: centerY }, 'center');
 
       const ratio = newScale / transformStateRef.current.scale;
       const newX = centerX - (centerX - transformStateRef.current.positionX) * ratio;
@@ -496,18 +532,19 @@ export default function Editor({
         applyTransform(bounded.x, bounded.y, bounded.scale);
       }
     },
-    [animateTransform, applyTransform, clampToBounds, transformStateRef],
+    [animateTransform, applyTransform, captureFocalPoint, clampToBounds, transformStateRef],
   );
 
   const zoomToAnchor = useCallback(
     (anchor: { x: number; y: number }, newScale: number, duration: number) => {
       const current = transformStateRef.current;
+      captureFocalPoint(anchor, 'pointer');
       const ratio = newScale / current.scale;
       const x = anchor.x - (anchor.x - current.positionX) * ratio;
       const y = anchor.y - (anchor.y - current.positionY) * ratio;
       animateTransform(x, y, newScale, duration);
     },
-    [animateTransform, transformStateRef],
+    [animateTransform, captureFocalPoint, transformStateRef],
   );
 
   useImperativeHandle(
@@ -520,6 +557,8 @@ export default function Editor({
         zoomToCenter(transformStateRef.current.scale * Math.exp(-factor), time || 0);
       },
       resetTransform: (time?: number) => {
+        const container = imageContainerRef.current;
+        if (container) captureFocalPoint({ x: container.clientWidth / 2, y: container.clientHeight / 2 }, 'center');
         if (time) animateTransform(0, 0, 1, time);
         else applyTransform(0, 0, 1);
       },
@@ -538,7 +577,7 @@ export default function Editor({
         },
       },
     }),
-    [animateTransform, applyTransform, clampToBounds, transformStateRef, zoomToCenter],
+    [animateTransform, applyTransform, captureFocalPoint, clampToBounds, transformStateRef, zoomToCenter],
   );
 
   useEffect(() => {
@@ -692,6 +731,7 @@ export default function Editor({
 
         const bounded = clampToBounds(newX, newY, newScale);
         applyTransform(bounded.x, bounded.y, bounded.scale);
+        captureFocalPoint({ x: mouseX, y: mouseY }, 'pointer');
       } else {
         if (transformStateRef.current.scale <= 1.01) return;
 
@@ -703,6 +743,8 @@ export default function Editor({
         const { x: newX, y: newY } = applyWheelPanResistance(curX - dx, curY - dy, bounds);
 
         applyTransform(newX, newY, scale);
+        const rect = container.getBoundingClientRect();
+        captureFocalPoint({ x: e.clientX - rect.left, y: e.clientY - rect.top }, 'pointer');
 
         if (wheelSnapTimeout.current) clearTimeout(wheelSnapTimeout.current);
         wheelSnapTimeout.current = window.setTimeout(() => {
@@ -717,6 +759,7 @@ export default function Editor({
     };
   }, [
     applyTransform,
+    captureFocalPoint,
     cancelViewerMotion,
     clampToBounds,
     getTransformBounds,
@@ -751,6 +794,8 @@ export default function Editor({
 
       hadViewerPanGesture.current = true;
       panVelocityHistory.current = [];
+      const rect = e.currentTarget.getBoundingClientRect();
+      captureFocalPoint({ x: e.clientX - rect.left, y: e.clientY - rect.top }, 'pointer');
       if (resolution.reason === 'middle-button') {
         isMiddleMousePanning.current = true;
         setIsMiddleMousePanningState(true);
@@ -771,7 +816,14 @@ export default function Editor({
 
       if (resolution.shouldCapturePointer) e.currentTarget.setPointerCapture(e.pointerId);
     },
-    [activeViewerTool, cancelViewerMotion, isTemporaryHand, setIsMiddleMousePanningState, transformStateRef],
+    [
+      activeViewerTool,
+      cancelViewerMotion,
+      captureFocalPoint,
+      isTemporaryHand,
+      setIsMiddleMousePanningState,
+      transformStateRef,
+    ],
   );
 
   const handlePointerMove = useCallback(
@@ -808,6 +860,8 @@ export default function Editor({
         ({ dx, dy } = applyPointerOverscrollResistance(dx, dy, { x: curX, y: curY }, bounds));
 
         applyTransform(curX + dx, curY + dy, transformStateRef.current.scale);
+        const rect = imageContainerRef.current?.getBoundingClientRect();
+        if (rect) captureFocalPoint({ x: e.clientX - rect.left, y: e.clientY - rect.top }, 'pointer');
       } else if (activePointers.current.size === 2 && lastPinch.current) {
         setIsPanningState(true);
         setIsViewerGestureDragging(true);
@@ -837,12 +891,22 @@ export default function Editor({
 
           const bounded = clampToBounds(newX, newY, newScale);
           applyTransform(bounded.x, bounded.y, bounded.scale);
+          captureFocalPoint({ x: mouseX, y: mouseY }, 'pointer');
         }
 
         lastPinch.current = { dist, midX, midY };
       }
     },
-    [applyTransform, clampToBounds, getTransformBounds, maxScaleRef, minScaleRef, setIsPanningState, transformStateRef],
+    [
+      applyTransform,
+      captureFocalPoint,
+      clampToBounds,
+      getTransformBounds,
+      maxScaleRef,
+      minScaleRef,
+      setIsPanningState,
+      transformStateRef,
+    ],
   );
 
   const handlePointerUp = useCallback(
@@ -872,6 +936,10 @@ export default function Editor({
         setIsViewerGestureDragging(false);
         isMiddleMousePanning.current = false;
         setIsMiddleMousePanningState(false);
+        const container = imageContainerRef.current;
+        if (container) {
+          captureFocalPoint({ x: container.clientWidth / 2, y: container.clientHeight / 2 }, 'center');
+        }
 
         const { vx, vy } = getRecentPanVelocity(panVelocityHistory.current, performance.now());
 
@@ -896,6 +964,7 @@ export default function Editor({
       setIsPanningState,
       setIsViewerGestureDragging,
       startPhysicsLoop,
+      captureFocalPoint,
       transformStateRef,
     ],
   );
@@ -979,11 +1048,47 @@ export default function Editor({
     };
     const contextChanged =
       prevViewportContextKeyRef.current !== null && prevViewportContextKeyRef.current !== viewportContextKey;
+    const previousSnapshot = prevViewportSnapshotRef.current;
+    const geometryChanged =
+      previousSnapshot === null ||
+      previousSnapshot.containerWidth !== currentSnapshot.containerWidth ||
+      previousSnapshot.containerHeight !== currentSnapshot.containerHeight ||
+      previousSnapshot.renderSize.width !== currentSnapshot.renderSize.width ||
+      previousSnapshot.renderSize.height !== currentSnapshot.renderSize.height ||
+      previousSnapshot.renderSize.offsetX !== currentSnapshot.renderSize.offsetX ||
+      previousSnapshot.renderSize.offsetY !== currentSnapshot.renderSize.offsetY;
+    const dprChanged = prevViewportDprRef.current !== null && prevViewportDprRef.current !== devicePixelRatio;
+    const layoutChanged = geometryChanged || dprChanged;
+    const focalPoint = focalPointRef.current;
+    let viewportAnchor = null;
+    if (focalPoint?.source === 'pointer') {
+      const rect = container.getBoundingClientRect();
+      const activePoints = Array.from(activePointers.current.values());
+      const firstPoint = activePoints[0];
+      if (firstPoint) {
+        const secondPoint = activePoints[1];
+        viewportAnchor = secondPoint
+          ? {
+              x: (firstPoint.x + secondPoint.x) / 2 - rect.left,
+              y: (firstPoint.y + secondPoint.y) / 2 - rect.top,
+            }
+          : { x: firstPoint.x - rect.left, y: firstPoint.y - rect.top };
+      } else {
+        viewportAnchor = { x: focalPoint.viewportX, y: focalPoint.viewportY };
+      }
+    } else if (focalPoint?.source === 'navigator') {
+      viewportAnchor = { x: focalPoint.viewportX, y: focalPoint.viewportY };
+    }
+    const targetScale = layoutChanged || contextChanged ? resolvedZoom.transformScale : transformStateRef.current.scale;
     const nextTransform = reconcileViewportTransform({
       contextChanged,
       current: currentSnapshot,
-      previous: prevViewportSnapshotRef.current,
+      focalPoint,
+      mode: zoomMode,
+      previous: previousSnapshot,
+      targetScale,
       transform: transformStateRef.current,
+      viewportAnchor,
     });
 
     if (contextChanged) {
@@ -1000,6 +1105,7 @@ export default function Editor({
       setIsPanningState(false);
       setIsMiddleMousePanningState(false);
       setIsViewerGestureDragging(false);
+      focalPointRef.current = null;
     }
 
     if (
@@ -1010,18 +1116,40 @@ export default function Editor({
       applyTransform(nextTransform.positionX, nextTransform.positionY, nextTransform.scale);
     }
 
+    if (layoutChanged || contextChanged) {
+      viewportLayoutEpochRef.current += 1;
+      setViewportLayoutEpoch(viewportLayoutEpochRef.current);
+    }
+    if (layoutChanged || contextChanged) {
+      handleDisplaySizeChange({
+        containerHeight: currentSnapshot.containerHeight,
+        containerWidth: currentSnapshot.containerWidth,
+        height: imageRenderSize.height * nextTransform.scale,
+        offsetX: imageRenderSize.offsetX,
+        offsetY: imageRenderSize.offsetY,
+        scale: nextTransform.scale,
+        width: imageRenderSize.width * nextTransform.scale,
+      });
+    }
+
     prevViewportSnapshotRef.current = currentSnapshot;
     prevViewportContextKeyRef.current = viewportContextKey;
+    prevViewportDprRef.current = devicePixelRatio;
   }, [
     animationFrameId,
+    focalPointRef,
     imageRenderSize,
     physicsFrameId,
     viewportContextKey,
     applyTransform,
+    devicePixelRatio,
+    handleDisplaySizeChange,
+    resolvedZoom.transformScale,
     setIsMiddleMousePanningState,
     setIsPanningState,
     setIsViewerGestureDragging,
     transformStateRef,
+    zoomMode,
   ]);
 
   useEffect(() => {
@@ -1672,6 +1800,13 @@ export default function Editor({
     pointerType: 'mouse',
     zoomed: transformState.scale > 1.01,
   }).cursor;
+  const currentFocalPoint: ViewportFocalPoint = focalPointRef.current ?? {
+    source: 'center',
+    viewportX: 0,
+    viewportY: 0,
+    x: 0.5,
+    y: 0.5,
+  };
 
   const isWgpuActive = appSettings?.useWgpuRenderer !== false && hasRenderedFirstFrame;
   const previewOnlyLabel = t('editor.previewOnly.label');
@@ -1805,6 +1940,15 @@ export default function Editor({
           onDoubleClick={handleDoubleClick}
           data-fullscreen-preview={String(isFullScreen)}
           data-editor-pointer-surface="image"
+          data-editor-focal-point-source={currentFocalPoint.source}
+          data-editor-focal-point-x={String(currentFocalPoint.x)}
+          data-editor-focal-point-y={String(currentFocalPoint.y)}
+          data-editor-layout-epoch={String(viewportLayoutEpoch)}
+          data-editor-resolved-transform-scale={String(resolvedZoom.transformScale)}
+          data-editor-transform-position-x={String(transformState.positionX)}
+          data-editor-transform-position-y={String(transformState.positionY)}
+          data-editor-transform-scale={String(transformState.scale)}
+          data-editor-zoom-mode={zoomMode.kind}
           data-viewer-active-tool={activeViewerTool}
           data-viewer-gesture-state={isViewerGestureDragging ? 'dragging' : 'idle'}
           data-viewer-temporary-hand={String(isTemporaryHand)}
