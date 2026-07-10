@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { SubMask } from '../../components/panel/right/layers/Masks';
-import type { RenderSize } from '../../hooks/viewport/useImageRenderSize';
+import { type EditorOverlayGeometry, overlayPoint } from '../editorOverlayGeometry';
 import { type MaskParameterRecord, toMaskParameterRecord } from './maskParameterAccess';
 
 export const objectPromptModeSchema = z.enum(['foreground_point', 'background_point', 'box']);
@@ -134,13 +134,12 @@ export function writeObjectPromptCanvasState(
 
 export function imagePointFromCanvasClick(
   click: CanvasHitPoint,
-  renderSize: Pick<RenderSize, 'height' | 'offsetX' | 'offsetY' | 'width'>,
+  geometry: EditorOverlayGeometry,
 ): ObjectPromptPoint | null {
-  if (renderSize.width <= 0 || renderSize.height <= 0) return null;
-  const x = (click.x - renderSize.offsetX) / renderSize.width;
-  const y = (click.y - renderSize.offsetY) / renderSize.height;
-  if (x < 0 || x > 1 || y < 0 || y > 1) return null;
-  return { label: 'foreground', x: clamp01(x), y: clamp01(y) };
+  if (!geometry.valid) return null;
+  const point = geometry.viewportToNormalizedCrop(overlayPoint<'viewport-css-pixels'>(click.x, click.y));
+  if (!geometry.isPointInBounds(point, 'normalized-crop')) return null;
+  return { label: 'foreground', x: clamp01(point.x), y: clamp01(point.y) };
 }
 
 export function applyObjectPromptClick(

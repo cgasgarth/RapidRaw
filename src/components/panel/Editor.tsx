@@ -48,6 +48,7 @@ import {
   PAN_VELOCITY_THRESHOLD,
   WHEEL_SNAP_DELAY_MS,
 } from '../../utils/editorGestureMath';
+import { createEditorOverlayGeometry, overlayPoint, overlayRect } from '../../utils/editorOverlayGeometry';
 import { getEditorPreviewDimensions } from '../../utils/editorPreviewDimensions';
 import {
   reconcileViewportTransform,
@@ -510,6 +511,53 @@ export default function Editor({
     imageRenderSize,
     onZoomed: handleZoomed,
   });
+  const overlayGeometryIdentity = JSON.stringify({
+    crop: adjustments.crop,
+    dpr: devicePixelRatio,
+    orientationSteps: adjustments.orientationSteps,
+    renderSize: imageRenderSize,
+    rotationDegrees: liveRotation ?? adjustments.rotation ?? 0,
+    sourceHeight: selectedImage?.height ?? 0,
+    sourceWidth: selectedImage?.width ?? 0,
+    transformState,
+  });
+  const previousOverlayGeometryIdentityRef = useRef<string | null>(null);
+  const overlayGeometryEpochRef = useRef(0);
+  if (previousOverlayGeometryIdentityRef.current !== overlayGeometryIdentity) {
+    previousOverlayGeometryIdentityRef.current = overlayGeometryIdentity;
+    overlayGeometryEpochRef.current += 1;
+  }
+  const overlayGeometry = useMemo(
+    () =>
+      createEditorOverlayGeometry({
+        crop: adjustments.crop,
+        devicePixelRatio,
+        geometryEpoch: overlayGeometryEpochRef.current,
+        orientationSteps: adjustments.orientationSteps ?? 0,
+        renderSize: imageRenderSize,
+        rotationDegrees: liveRotation ?? adjustments.rotation ?? 0,
+        semanticZoom: resolvedZoom,
+        sourceSize: { height: selectedImage?.height ?? 0, width: selectedImage?.width ?? 0 },
+        transform: transformState,
+        viewportSizeCssPixels: {
+          height: imageRenderSize.height + imageRenderSize.offsetY * 2,
+          width: imageRenderSize.width + imageRenderSize.offsetX * 2,
+        },
+      }),
+    [
+      adjustments.crop,
+      adjustments.orientationSteps,
+      adjustments.rotation,
+      devicePixelRatio,
+      imageRenderSize,
+      liveRotation,
+      overlayGeometryIdentity,
+      resolvedZoom,
+      selectedImage?.height,
+      selectedImage?.width,
+      transformState,
+    ],
+  );
 
   const zoomToCenter = useCallback(
     (newScale: number, duration: number) => {
@@ -978,13 +1026,7 @@ export default function Editor({
 
       if (isObjectPromptActive && activeObjectPromptState !== null && activeMaskId !== null && container !== null) {
         const rect = container.getBoundingClientRect();
-        const point = imagePointFromCanvasClick(
-          {
-            x: (e.clientX - rect.left - transformStateRef.current.positionX) / transformStateRef.current.scale,
-            y: (e.clientY - rect.top - transformStateRef.current.positionY) / transformStateRef.current.scale,
-          },
-          imageRenderSize,
-        );
+        const point = imagePointFromCanvasClick({ x: e.clientX - rect.left, y: e.clientY - rect.top }, overlayGeometry);
         if (point !== null) {
           const nextState = applyObjectPromptClick(activeObjectPromptState, point);
           updateSubMaskLocal(activeMaskId, {
@@ -998,8 +1040,8 @@ export default function Editor({
       activeMaskId,
       activeObjectPromptState,
       activeSubMask,
-      imageRenderSize,
       isObjectPromptActive,
+      overlayGeometry,
       transformStateRef,
       updateSubMaskLocal,
     ],
@@ -1977,6 +2019,7 @@ export default function Editor({
               gamutWarningOverlay={gamutWarningOverlay}
               handleCropComplete={handleCropComplete}
               imageRenderSize={imageRenderSize}
+              overlayGeometry={overlayGeometry}
               interactivePatch={interactivePatch}
               isAiEditing={isAiEditing}
               isCropping={isCropping}
@@ -2038,34 +2081,55 @@ export default function Editor({
                     data-object-prompt-x={point.x}
                     data-object-prompt-y={point.y}
                     key={`${point.label}-${point.x}-${point.y}-${index}`}
-                    style={{
-                      left: imageRenderSize.offsetX + point.x * imageRenderSize.width,
-                      top: imageRenderSize.offsetY + point.y * imageRenderSize.height,
-                    }}
+                    style={(() => {
+                      const viewPoint = overlayGeometry.normalizedCropToView(
+                        overlayPoint<'normalized-crop'>(point.x, point.y),
+                      );
+                      return {
+                        left: overlayGeometry.displayedImageRectInViewCssPixels.x + viewPoint.x,
+                        top: overlayGeometry.displayedImageRectInViewCssPixels.y + viewPoint.y,
+                      };
+                    })()}
                   />
                 ))}
                 {activeObjectPromptState.pendingBoxAnchor !== null && (
                   <span
                     className="absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-sky-400 shadow-lg"
                     data-testid="object-prompt-pending-box-anchor"
-                    style={{
-                      left:
-                        imageRenderSize.offsetX + activeObjectPromptState.pendingBoxAnchor.x * imageRenderSize.width,
-                      top:
-                        imageRenderSize.offsetY + activeObjectPromptState.pendingBoxAnchor.y * imageRenderSize.height,
-                    }}
+                    style={(() => {
+                      const viewPoint = overlayGeometry.normalizedCropToView(
+                        overlayPoint<'normalized-crop'>(
+                          activeObjectPromptState.pendingBoxAnchor.x,
+                          activeObjectPromptState.pendingBoxAnchor.y,
+                        ),
+                      );
+                      return {
+                        left: overlayGeometry.displayedImageRectInViewCssPixels.x + viewPoint.x,
+                        top: overlayGeometry.displayedImageRectInViewCssPixels.y + viewPoint.y,
+                      };
+                    })()}
                   />
                 )}
                 {activeObjectPromptState.boxPrompt !== null && (
                   <span
                     className="absolute border-2 border-sky-300 bg-sky-300/15 shadow-lg"
                     data-testid="object-prompt-box"
-                    style={{
-                      height: activeObjectPromptState.boxPrompt.height * imageRenderSize.height,
-                      left: imageRenderSize.offsetX + activeObjectPromptState.boxPrompt.x * imageRenderSize.width,
-                      top: imageRenderSize.offsetY + activeObjectPromptState.boxPrompt.y * imageRenderSize.height,
-                      width: activeObjectPromptState.boxPrompt.width * imageRenderSize.width,
-                    }}
+                    style={(() => {
+                      const viewRect = overlayGeometry.normalizedCropRectToView(
+                        overlayRect<'normalized-crop'>(
+                          activeObjectPromptState.boxPrompt.x,
+                          activeObjectPromptState.boxPrompt.y,
+                          activeObjectPromptState.boxPrompt.width,
+                          activeObjectPromptState.boxPrompt.height,
+                        ),
+                      );
+                      return {
+                        height: viewRect.height,
+                        left: overlayGeometry.displayedImageRectInViewCssPixels.x + viewRect.x,
+                        top: overlayGeometry.displayedImageRectInViewCssPixels.y + viewRect.y,
+                        width: viewRect.width,
+                      };
+                    })()}
                   />
                 )}
               </div>
