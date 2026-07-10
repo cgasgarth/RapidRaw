@@ -15,7 +15,7 @@ import {
   Sparkles,
   Trash2,
 } from 'lucide-react';
-import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type KeyboardEvent, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { debouncedSave } from '../../../../hooks/editor/useEditorActions';
 import { useEditorStore } from '../../../../store/useEditorStore';
@@ -74,7 +74,6 @@ import {
 
 interface LayerStackPanelProps {
   activeMaskContainerId: string | null;
-  creationSlot?: ReactNode;
   masks: Array<MaskContainer>;
   onSelectMaskContainer: (id: string | null) => void;
   onSetMaskContainers: (masks: Array<MaskContainer>) => void;
@@ -470,7 +469,6 @@ function tFallbackLayerGroupName(): string {
 
 export function LayerStackPanel({
   activeMaskContainerId,
-  creationSlot,
   masks,
   onSelectMaskContainer,
   onSetMaskContainers,
@@ -1106,7 +1104,7 @@ export function LayerStackPanel({
 
   return (
     <section className="shrink-0 border-b border-editor-border bg-editor-panel">
-      <div className={professionalInspectorDensityTokens.panelHeader.root}>
+      <div className={professionalInspectorDensityTokens.panelHeader.root} data-testid="layer-stack-header">
         <div className="flex min-w-0 items-center gap-2">
           <Layers3 size={18} className="shrink-0 text-text-secondary" />
           <UiText variant={TextVariants.heading} className={professionalInspectorDensityTokens.panelHeader.title}>
@@ -1273,9 +1271,9 @@ export function LayerStackPanel({
             <div
               key={row.id}
               className={cx(
-                'group grid min-h-9 w-full grid-cols-[18px_24px_minmax(0,1fr)_auto] items-center gap-1.5 rounded px-1.5 py-1 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring',
+                'group relative grid min-h-9 w-full grid-cols-[18px_24px_minmax(0,1fr)_auto] items-center gap-1.5 rounded px-1.5 py-1 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring',
                 isSelected
-                  ? 'bg-editor-selected-quiet text-editor-selected-quiet-text'
+                  ? 'bg-editor-selected-quiet text-editor-selected-quiet-text before:absolute before:inset-y-1 before:left-0 before:w-0.5 before:rounded-full before:bg-editor-primary-active'
                   : 'text-text-secondary hover:bg-editor-panel-raised hover:text-text-primary',
                 row.isGroupHeader && 'border border-editor-border bg-editor-panel-well',
                 row.isGroupedLayer && 'ml-5 w-[calc(100%-1.25rem)] border-l border-editor-border pl-2.5',
@@ -1291,6 +1289,7 @@ export function LayerStackPanel({
               data-group-visible-state={row.isGroupHeader ? row.visibleState : ''}
               data-grouped-layer={String(row.isGroupedLayer)}
               data-layer-row-id={row.id}
+              data-layer-row-active={String(isSelected)}
               data-retouch-candidate-id={row.retouchCloneSource?.candidateProvenance?.candidateId ?? ''}
               data-retouch-candidate-origin={row.retouchCloneSource?.candidateProvenance?.origin ?? ''}
               data-retouch-clone-source={row.retouchCloneSourceLabel ?? ''}
@@ -1303,6 +1302,7 @@ export function LayerStackPanel({
                   : `layer-stack-layer-row-${row.id}`
               }
               role="button"
+              aria-current={isSelected ? 'true' : undefined}
               tabIndex={0}
             >
               {row.isGroupHeader && row.groupId ? (
@@ -1424,6 +1424,8 @@ export function LayerStackPanel({
               <span className="flex items-center gap-1">
                 <button
                   className={layerCompactButtonClassName}
+                  aria-label={row.visible ? t('editor.layers.actions.hide') : t('editor.layers.actions.show')}
+                  aria-pressed={row.visible}
                   data-tooltip={row.visible ? t('editor.layers.actions.hide') : t('editor.layers.actions.show')}
                   onClick={(event) => {
                     event.stopPropagation();
@@ -1504,9 +1506,6 @@ export function LayerStackPanel({
               <Eraser size={17} className="mx-auto" />
             </button>
           </div>
-          {creationSlot !== undefined && (
-            <div className="ml-auto min-w-0 border-l border-editor-border pl-1.5">{creationSlot}</div>
-          )}
         </div>
       </div>
 
