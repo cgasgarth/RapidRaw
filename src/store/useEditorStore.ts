@@ -89,6 +89,8 @@ export interface PreviewScopeStatus {
   warningCodes: string[];
 }
 
+export type PreviewScopeRecoveryState = 'idle' | 'loading' | 'error';
+
 export type PanelScopesLayout = 'overlay' | 'stacked';
 export type { EditorCompareMode } from '../utils/editorCompare';
 
@@ -115,6 +117,9 @@ interface EditorState {
   histogram: ChannelConfig | null;
   waveform: WaveformData | null;
   previewScopeStatus: PreviewScopeStatus | null;
+  previewScopeRecoveryRequestId: number;
+  previewScopeRecoveryState: PreviewScopeRecoveryState;
+  previewScopeRecoveryError: string | null;
   gamutWarningOverlay: GamutWarningOverlayPayload | null;
   isGamutWarningOverlayVisible: boolean;
   isExportSoftProofEnabled: boolean;
@@ -212,6 +217,9 @@ const historyNavigationPreviewInvalidation = {
   interactivePatch: null,
   previewQualityStatus: null,
   previewScopeStatus: null,
+  previewScopeRecoveryRequestId: 0,
+  previewScopeRecoveryState: 'idle',
+  previewScopeRecoveryError: null,
   transformedOriginalUrl: null,
   uncroppedAdjustedPreviewUrl: null,
 } satisfies Partial<EditorState>;
@@ -251,6 +259,9 @@ export const useEditorStore = create<EditorState>((set) => ({
   histogram: null,
   waveform: null,
   previewScopeStatus: null,
+  previewScopeRecoveryRequestId: 0,
+  previewScopeRecoveryState: 'idle',
+  previewScopeRecoveryError: null,
   gamutWarningOverlay: null,
   isGamutWarningOverlayVisible: false,
   isExportSoftProofEnabled: false,
