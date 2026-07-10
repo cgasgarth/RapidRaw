@@ -74,7 +74,7 @@ const ratioButtonClassName = cx(
   token.button.base,
   token.focusRing,
   token.button.disabled,
-  'h-8 min-w-0 px-1.5 text-xs leading-4',
+  'h-7 min-w-0 px-1 text-[11px] leading-4',
 );
 
 export default function CropPanel() {
@@ -242,7 +242,7 @@ export default function CropPanel() {
   }, [aspectRatio, getEffectiveOriginalRatio, PRESETS]);
 
   let orientation = Orientation.Horizontal;
-  if (activePreset && activePreset.value && activePreset.value !== 1) {
+  if (activePreset?.value && activePreset.value !== 1) {
     let baseRatio: number | null = activePreset.value;
     if (activePreset.value === ORIGINAL_RATIO) {
       baseRatio = getEffectiveOriginalRatio();
@@ -390,9 +390,7 @@ export default function CropPanel() {
 
   const handleReset = () => {
     const originalAspectRatio =
-      selectedImage !== null && selectedImage.width && selectedImage.height
-        ? selectedImage.width / selectedImage.height
-        : null;
+      selectedImage?.width && selectedImage.height ? selectedImage.width / selectedImage.height : null;
 
     setPreferPortrait(false);
     setIsEditingCustom(false);
@@ -588,25 +586,22 @@ export default function CropPanel() {
   }, [activeOverlay, adjustments, handleApply, handleCancel, setOverlayRotation]);
 
   return (
-    <div className="flex h-full flex-col bg-editor-panel">
+    <div className="flex h-full flex-col bg-editor-panel" data-crop-panel-density="compact">
       <div
-        className="flex min-h-12 shrink-0 items-center justify-between gap-2 border-b border-editor-border px-3 py-2"
+        className="flex min-h-10 shrink-0 items-center justify-between gap-2 border-b border-editor-border px-2.5 py-1"
         data-crop-dirty={String(isDirty)}
         data-testid="crop-panel-status"
       >
-        <div className="min-w-0">
+        <div className="flex min-w-0 items-center gap-2">
           <UiText variant={TextVariants.title} className={token.typography.panelTitle}>
             {t('editor.crop.title')}
           </UiText>
-          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1">
-            <span className={editorChromeStatusChipClassName(isDirty ? 'info' : 'neutral')}>{activeRatioLabel}</span>
-            <span className={editorChromeStatusChipClassName(isStraightenActive ? 'info' : 'neutral')}>
-              {isStraightenActive ? t('editor.crop.status.straighten') : activeOverlayLabel}
-            </span>
-            <span className={editorChromeStatusChipClassName('neutral')}>{orientationLabel}</span>
-          </div>
+          <span className={editorChromeStatusChipClassName(isDirty ? 'info' : 'neutral')}>
+            {activeRatioLabel}
+            {isDirty ? <span className="sr-only">{t('ui.collapsibleSection.dirtyBadge')}</span> : null}
+          </span>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex shrink-0 items-center">
           <button
             aria-label={
               showOriginal ? t('editor.toolbar.tooltips.showEdited') : t('editor.toolbar.tooltips.showOriginal')
@@ -624,41 +619,24 @@ export default function CropPanel() {
           >
             {showOriginal ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
-          <button
-            aria-label={t('editor.crop.resetTooltip')}
-            className={iconButtonClassName}
-            data-tooltip={t('editor.crop.resetTooltip')}
-            disabled={!selectedImage?.isReady}
-            onClick={handleReset}
-            type="button"
-          >
-            <RotateCcw size={16} />
-          </button>
         </div>
       </div>
 
-      <div className="grow overflow-y-auto p-3">
+      <div className="grow overflow-y-auto px-2.5 py-1.5">
         {selectedImage?.isReady ? (
           <>
-            <section className="space-y-2 border-b border-editor-border pb-3" data-testid="crop-panel-ratio-section">
-              <div className="flex min-h-7 items-center justify-between gap-2">
-                <div>
+            <section
+              className="space-y-1.5 border-b border-editor-border py-2.5"
+              data-testid="crop-panel-ratio-section"
+            >
+              <div className="flex min-h-6 items-center justify-between gap-2">
+                <div className="min-w-0">
                   <UiText variant={TextVariants.heading} className={sectionTitleClassName}>
                     {t('editor.crop.aspectRatioHeading')}
                   </UiText>
-                  <div className={utilityLabelClassName}>{orientationLabel}</div>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
-                  <button
-                    aria-label={getOverlayTooltip()}
-                    className={iconButtonClassName}
-                    onClick={handleOverlayCycle}
-                    data-tooltip={getOverlayTooltip()}
-                    data-testid="crop-panel-overlay-cycle"
-                    type="button"
-                  >
-                    <Grid3x3 size={16} />
-                  </button>
+                  <span className={utilityLabelClassName}>{orientationLabel}</span>
                   <button
                     aria-label={getOrientationTooltip()}
                     className={iconButtonClassName}
@@ -676,7 +654,7 @@ export default function CropPanel() {
                   </button>
                 </div>
               </div>
-              <div className="grid grid-cols-4 gap-1" role="group" aria-label={t('editor.crop.aspectRatioHeading')}>
+              <div className="grid grid-cols-5 gap-1" role="group" aria-label={t('editor.crop.aspectRatioHeading')}>
                 {PRESETS.map((preset: CropPreset) => (
                   <button
                     className={cx(
@@ -700,7 +678,7 @@ export default function CropPanel() {
                 <button
                   className={cx(
                     ratioButtonClassName,
-                    'w-full justify-between',
+                    'w-full justify-between px-2',
                     isCustomActive ? selectedControlClassName : quietControlClassName,
                   )}
                   onClick={() => {
@@ -725,8 +703,8 @@ export default function CropPanel() {
                     {customW && customH ? `${customW}:${customH}` : '1.62:1'}
                   </span>
                 </button>
-                {isCustomActive && (
-                  <div className="mt-2" data-state="active" data-testid="crop-custom-ratio-inputs">
+                {isCustomActive ? (
+                  <div className="mt-1.5" data-state="active" data-testid="crop-custom-ratio-inputs">
                     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1">
                       <input
                         aria-describedby="crop-custom-ratio-error"
@@ -776,22 +754,23 @@ export default function CropPanel() {
                       {customRatioError ? t('editor.crop.custom.invalid') : null}
                     </div>
                   </div>
-                )}
+                ) : null}
               </div>
             </section>
 
-            <section className="space-y-2 border-b border-editor-border py-3" data-testid="crop-panel-rotation-section">
-              <div className="flex min-h-7 items-center justify-between gap-2">
+            <section
+              className="space-y-1.5 border-b border-editor-border py-2.5"
+              data-testid="crop-panel-rotation-section"
+            >
+              <div className="flex min-h-6 items-center justify-between gap-2">
                 <UiText variant={TextVariants.heading} className={sectionTitleClassName}>
                   {t('editor.crop.rotationHeading')}
                 </UiText>
-                <span className={editorChromeStatusChipClassName(isRotationActive ? 'info' : 'neutral')}>
-                  {displayRotation.toFixed(1)}°
-                </span>
-              </div>
-              <Slider
-                label={
-                  <div className="flex items-center gap-1">
+                <div className="flex shrink-0 items-center gap-1">
+                  <span className={cx(token.typography.numericValue, utilityLabelClassName)}>
+                    {displayRotation.toFixed(1)}°
+                  </span>
+                  <div className="flex items-center gap-1" role="group" aria-label={t('editor.crop.rotationHeading')}>
                     <button
                       aria-label={t('editor.crop.tooltips.straighten')}
                       aria-pressed={isStraightenActive}
@@ -824,7 +803,11 @@ export default function CropPanel() {
                       <RotateCcw size={14} />
                     </button>
                   </div>
-                }
+                </div>
+              </div>
+              <Slider
+                density="compact"
+                label={t('modals.transform.rotate')}
                 min={-45}
                 max={45}
                 step={0.1}
@@ -833,24 +816,23 @@ export default function CropPanel() {
                 suffix="°"
                 onChange={handleFineRotationChange}
                 onDragStateChange={handleDragStateChange}
+                testId="crop-panel-fine-rotation"
               />
             </section>
 
             <section
-              className="flex items-center justify-between gap-2 py-3"
+              className="space-y-1.5 border-b border-editor-border py-2.5"
               data-testid="crop-panel-orientation-section"
             >
-              <div className="min-w-0">
+              <div className="flex min-h-6 items-center justify-between gap-2">
                 <UiText variant={TextVariants.heading} className={sectionTitleClassName}>
                   {t('editor.crop.orientationHeading')}
                 </UiText>
-                <div className={utilityLabelClassName}>{orientationSteps * 90}°</div>
+                <span className={cx(token.typography.numericValue, utilityLabelClassName)}>
+                  {orientationSteps * 90}°
+                </span>
               </div>
-              <div
-                className="flex shrink-0 items-center gap-1"
-                role="group"
-                aria-label={t('editor.crop.orientationHeading')}
-              >
+              <div className="grid grid-cols-4 gap-1" role="group" aria-label={t('editor.crop.orientationHeading')}>
                 <button
                   aria-label={t('editor.crop.tooltips.rotateLeft')}
                   className={iconButtonClassName}
@@ -897,26 +879,94 @@ export default function CropPanel() {
                 >
                   <FlipVertical size={16} />
                 </button>
-                <span className="mx-0.5 h-5 border-l border-editor-border" aria-hidden="true" />
+              </div>
+            </section>
+
+            <section
+              className="space-y-1.5 border-b border-editor-border py-2.5"
+              data-testid="crop-panel-overlay-section"
+            >
+              <div className="flex min-h-6 items-center justify-between gap-2">
+                <UiText variant={TextVariants.heading} className={sectionTitleClassName}>
+                  {t('editor.crop.tooltips.compositionOverlay')}
+                </UiText>
+                <span className={utilityLabelClassName}>{activeOverlayLabel}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  aria-label={getOverlayTooltip()}
+                  className={cx(
+                    token.button.base,
+                    token.button.quiet,
+                    token.focusRing,
+                    token.button.disabled,
+                    'h-7 min-w-0 flex-1 justify-start px-2 text-[11px]',
+                  )}
+                  data-active-overlay={activeOverlay}
+                  data-testid="crop-panel-overlay-cycle"
+                  data-tooltip={getOverlayTooltip()}
+                  onClick={handleOverlayCycle}
+                  type="button"
+                >
+                  <Grid3x3 size={14} />
+                  <span className="min-w-0 truncate">{activeOverlayLabel}</span>
+                </button>
+                <button
+                  aria-label={getOverlayTooltip()}
+                  className={iconButtonClassName}
+                  data-tooltip={getOverlayTooltip()}
+                  data-testid="crop-panel-overlay-rotate"
+                  disabled={activeOverlay !== 'goldenSpiral' && activeOverlay !== 'goldenTriangle'}
+                  onClick={() => {
+                    setOverlayRotation((prev) => (prev + 1) % 4);
+                  }}
+                  type="button"
+                >
+                  <RotateCw size={14} />
+                </button>
+              </div>
+            </section>
+
+            <section className="space-y-1.5 py-2.5" data-testid="crop-panel-geometry-section">
+              <div className="flex min-h-6 items-center justify-between gap-2">
+                <UiText variant={TextVariants.heading} className={sectionTitleClassName}>
+                  {t('editor.crop.geometryHeading')}
+                </UiText>
+              </div>
+              <div className="grid grid-cols-2 gap-1">
                 <button
                   aria-label={t('editor.crop.tooltips.transform')}
-                  className={iconButtonClassName}
+                  className={cx(
+                    token.button.base,
+                    token.button.quiet,
+                    token.focusRing,
+                    token.button.disabled,
+                    'h-7 min-w-0 justify-start px-2 text-[11px]',
+                  )}
                   data-tooltip={t('editor.crop.tooltips.transform')}
                   data-testid="crop-panel-transform-entry"
                   onClick={() => setUI({ isTransformModalOpen: true })}
                   type="button"
                 >
-                  <Scan size={16} />
+                  <Scan size={14} />
+                  <span className="truncate">{t('editor.crop.labels.transform')}</span>
                 </button>
                 <button
                   aria-label={t('editor.crop.tooltips.lens')}
-                  className={iconButtonClassName}
+                  className={cx(
+                    token.button.base,
+                    token.button.quiet,
+                    token.focusRing,
+                    token.button.disabled,
+                    'h-7 min-w-0 justify-start px-2 text-[11px]',
+                  )}
                   data-tooltip={t('editor.crop.tooltips.lens')}
                   data-testid="crop-panel-lens-entry"
                   onClick={() => setUI({ isLensCorrectionModalOpen: true })}
                   type="button"
                 >
-                  <Aperture size={16} />
+                  <Aperture size={14} />
+                  <span className="truncate">{t('editor.crop.labels.lens')}</span>
                 </button>
               </div>
             </section>
@@ -944,7 +994,7 @@ export default function CropPanel() {
       </div>
 
       <div
-        className="flex shrink-0 items-center justify-between gap-2 border-t border-editor-border px-3 py-2"
+        className="flex min-h-11 shrink-0 items-center justify-between gap-2 border-t border-editor-border px-2.5 py-1.5"
         data-testid="crop-panel-actions"
       >
         <button
