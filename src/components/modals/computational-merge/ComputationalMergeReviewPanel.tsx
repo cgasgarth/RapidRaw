@@ -19,6 +19,7 @@ interface ComputationalMergeReviewSection {
 
 interface ComputationalMergeReviewPanelProps {
   derivedOutputReceipt?: DerivedOutputReceipt;
+  hidden?: boolean;
   items: ComputationalMergeReviewItem[];
   limitation: string;
   onOpenDerivedOutput?: (path: string) => void;
@@ -37,6 +38,7 @@ const statusClassName = {
 
 export default function ComputationalMergeReviewPanel({
   derivedOutputReceipt,
+  hidden = false,
   items,
   limitation,
   onExportDerivedOutput,
@@ -54,7 +56,7 @@ export default function ComputationalMergeReviewPanel({
   const warnings = items.filter((item) => item.status === 'pending').map((item) => `${item.label}: ${item.value}`);
 
   return (
-    <div className="grid gap-3" data-testid={testId}>
+    <div className="grid gap-3" data-testid={testId} hidden={hidden}>
       <section className="rounded-md border border-border-color bg-bg-primary p-4">
         <div className="mb-3 flex items-start justify-between gap-4">
           <UiText variant={TextVariants.heading}>{title}</UiText>
