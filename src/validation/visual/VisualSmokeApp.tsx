@@ -57,6 +57,7 @@ import {
 } from '../../components/ui/AppProperties';
 import { ExportColorProfile, ExportRenderingIntent, Status } from '../../components/ui/ExportImportProperties';
 import { editorChromeStatusChipClassName, editorChromeTokens } from '../../components/ui/editorChromeTokens';
+import { inspectorTokens } from '../../components/ui/inspectorTokens';
 import Button from '../../components/ui/primitives/Button';
 import Dropdown from '../../components/ui/primitives/Dropdown';
 import Input from '../../components/ui/primitives/Input';
@@ -560,6 +561,260 @@ function ProfessionalEditorTokensVisualSmoke() {
             </div>
           </div>
         </aside>
+      </div>
+    </main>
+  );
+}
+
+const editorParityToolTabs = [
+  { Icon: SlidersHorizontal, id: 'adjust', label: 'Adjust' },
+  { Icon: CircleGauge, id: 'color', label: 'Color' },
+  { Icon: Circle, id: 'crop', label: 'Crop' },
+  { Icon: Layers3, id: 'masks', label: 'Masks' },
+  { Icon: Sparkles, id: 'agent', label: 'Agent' },
+  { Icon: FolderOpen, id: 'export', label: 'Export' },
+] as const;
+
+function EditorParityContractVisualSmoke() {
+  const token = editorChromeTokens;
+
+  return (
+    <main
+      className="editor-visual-fixture h-screen min-h-screen overflow-hidden bg-editor-matte p-2 font-sans text-text-primary max-[700px]:h-auto max-[700px]:min-h-screen"
+      data-editor-parity-motion="standard"
+      data-testid="editor-parity-contract"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.EditorParityContract}
+      data-visual-smoke-ready="true"
+    >
+      <div className="grid h-full min-h-0 w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] grid-rows-[40px_minmax(0,1fr)_84px] overflow-hidden border border-editor-divider bg-editor-panel shadow-[0_14px_34px_var(--editor-overlay-shadow)] max-[700px]:h-auto max-[700px]:min-h-[calc(100vh-16px)] max-[700px]:grid-rows-[44px_auto_76px]">
+        <header className="flex w-full min-w-0 max-w-full items-center justify-between gap-2 overflow-hidden border-b border-editor-divider bg-editor-panel px-2 max-[700px]:px-1">
+          <div className="flex min-w-0 items-center gap-2 overflow-hidden">
+            <span className={`${token.typography.panelTitle} truncate max-[700px]:text-[12px]`}>
+              {copy.editorParityContractTitle}
+            </span>
+            <span className={`${token.typography.metadata} max-[700px]:hidden`}>{copy.editorParityDesktopMatrix}</span>
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            <span
+              className={`${token.typography.status} rounded-sm bg-editor-selected-quiet px-1.5 py-0.5 max-[700px]:hidden`}
+            >
+              {copy.editorParityReadyImage}
+            </span>
+            <button
+              aria-label={copy.editorParityKeyboardFocus}
+              className={`${token.button.base} ${token.button.iconCompact} ${token.button.quiet} ${token.focusRing} shrink-0 max-[700px]:min-h-11 max-[700px]:min-w-11`}
+              data-editor-parity-coarse-pointer="true"
+              data-editor-parity-state="keyboard-focus"
+              type="button"
+            >
+              <Camera size={14} />
+            </button>
+          </div>
+        </header>
+
+        <div className="grid min-h-0 w-full min-w-0 max-w-full grid-cols-[132px_minmax(0,1fr)_272px] overflow-hidden max-[700px]:grid-cols-1 max-[700px]:overflow-visible">
+          <aside
+            className="min-h-0 border-r border-editor-divider bg-editor-panel max-[700px]:border-r-0 max-[700px]:border-b"
+            data-editor-parity-panel="left-expanded"
+            data-visual-smoke-section="editor-parity-left-panel"
+          >
+            <div className="flex min-h-9 items-center justify-between border-b border-editor-divider px-2">
+              <span className={token.typography.sectionTitle}>{copy.editorParityWorkflow}</span>
+              <span className="h-1.5 w-1.5 bg-editor-info" aria-hidden="true" />
+            </div>
+            <div className="space-y-1 p-1.5">
+              {[copy.editorParityCatalog, copy.editorParityDevelop, copy.editorParityReview].map((label) => (
+                <button
+                  className={`${token.button.base} ${token.button.quiet} h-7 w-full justify-start px-2 text-[11px] ${
+                    label === 'Develop' ? token.state.selected : ''
+                  }`}
+                  key={label}
+                  type="button"
+                >
+                  {label}
+                </button>
+              ))}
+              <button
+                aria-label={copy.editorParityCollapsedLeftPanel}
+                className={`${token.button.base} ${token.button.iconCompact} ${token.button.quiet} ${token.focusRing}`}
+                data-editor-parity-panel="left-collapsed"
+                type="button"
+              >
+                <ChevronDown className="-rotate-90" size={14} />
+              </button>
+            </div>
+          </aside>
+
+          <section
+            className="grid min-h-0 grid-rows-[minmax(0,1fr)_38px] bg-editor-viewer-matte max-[700px]:min-h-[290px]"
+            data-visual-smoke-section="editor-parity-viewer"
+          >
+            <div className="relative m-2 min-h-0 overflow-hidden border border-editor-overlay-stroke bg-editor-viewer-matte shadow-[0_24px_52px_var(--editor-overlay-shadow)]">
+              <div className="absolute inset-0 bg-[linear-gradient(145deg,#1b2b31,#4d6868_42%,#b39b70_67%,#e7d4a7)]" />
+              <div className="absolute inset-x-[18%] inset-y-[10%] border border-editor-overlay-stroke bg-black/20" />
+              <div className="absolute left-2 top-2 flex flex-wrap gap-1">
+                {[
+                  ['no-image', copy.editorParityNoImage],
+                  ['loading-image', copy.editorParityLoadingImage],
+                  ['ready-image', copy.editorParityReadyImage],
+                  ['render-failure', copy.editorParityRenderFailed],
+                ].map(([state, label]) => (
+                  <span
+                    className={`rounded-sm px-1.5 py-0.5 ${token.typography.status} ${
+                      state === 'render-failure'
+                        ? 'bg-editor-danger-surface text-editor-danger'
+                        : 'bg-editor-overlay-surface'
+                    }`}
+                    data-editor-parity-viewer-state={state}
+                    key={state}
+                  >
+                    {label}
+                  </span>
+                ))}
+              </div>
+              <div className="absolute bottom-2 left-2 flex gap-1">
+                <span className="rounded-sm bg-editor-overlay-surface px-1.5 py-0.5 text-[10px] font-medium">
+                  {copy.editorParityFit}
+                </span>
+                <span className="rounded-sm bg-editor-overlay-surface px-1.5 py-0.5 text-[10px] font-medium">
+                  {copy.editorParityFullSize}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center justify-between border-t border-editor-divider bg-editor-panel px-2">
+              <span className={token.typography.metadata}>{copy.editorParityViewerZoom}</span>
+              <span className={`${token.typography.status} text-editor-warning`}>{copy.editorParityProofWarning}</span>
+            </div>
+          </section>
+
+          <aside
+            className="grid min-h-0 grid-cols-[34px_minmax(0,1fr)] border-l border-editor-divider bg-editor-panel max-[700px]:grid-cols-[42px_minmax(0,1fr)] max-[700px]:border-l-0 max-[700px]:border-t"
+            data-editor-parity-panel="right-expanded"
+            data-visual-smoke-section="editor-parity-inspector"
+          >
+            <nav
+              aria-label={copy.editorParityTools}
+              className="flex flex-col gap-1 border-r border-editor-divider bg-editor-matte p-1 max-[700px]:flex-row max-[700px]:overflow-x-auto"
+            >
+              {editorParityToolTabs.map(({ Icon, id, label }) => (
+                <button
+                  aria-label={label}
+                  aria-pressed={id === 'adjust'}
+                  className={`${token.button.base} ${token.button.iconCompact} ${
+                    id === 'adjust' ? token.toolTab.active : token.toolTab.inactive
+                  } ${token.focusRing}`}
+                  data-editor-parity-tool={id}
+                  key={id}
+                  type="button"
+                >
+                  <Icon size={14} />
+                </button>
+              ))}
+            </nav>
+            <div className="min-h-0 overflow-hidden">
+              <header className="flex min-h-9 items-center justify-between border-b border-editor-divider px-2">
+                <span className={token.typography.panelTitle}>{copy.editorParityAdjust}</span>
+                <button
+                  aria-label={copy.editorParityCollapsedRightPanel}
+                  className={`${token.button.base} ${token.button.iconCompact} ${token.button.quiet} ${token.focusRing}`}
+                  data-editor-parity-panel="right-collapsed"
+                  type="button"
+                >
+                  <ChevronDown className="rotate-90" size={14} />
+                </button>
+              </header>
+              <div className="space-y-1.5 p-2">
+                <section className="border-b border-editor-divider pb-1.5" data-editor-parity-section="default">
+                  <button className={`${inspectorTokens.disclosure.header} ${token.focusRing}`} type="button">
+                    <span className={token.typography.sectionTitle}>{copy.editorParityLight}</span>
+                    <span className={token.typography.metadata}>{copy.editorParityDefault}</span>
+                  </button>
+                  <div className="grid grid-cols-[minmax(0,1fr)_3.25rem] items-center gap-2 px-2 pt-1">
+                    <span className={token.typography.controlLabel}>{copy.editorParityExposure}</span>
+                    <span className={`${inspectorTokens.numeric.value} text-right text-[11px]`}>0.00</span>
+                  </div>
+                </section>
+                <section
+                  className={`border-b border-editor-divider pb-1.5 ${inspectorTokens.state.edited}`}
+                  data-editor-parity-section="edited"
+                >
+                  <button className={`${inspectorTokens.disclosure.header} ${token.focusRing}`} type="button">
+                    <span className={token.typography.sectionTitle}>{copy.editorParityColor}</span>
+                    <span className="text-[10px] font-medium text-editor-info">{copy.editorParityEdited}</span>
+                  </button>
+                  <div className="grid grid-cols-[minmax(0,1fr)_3.25rem] items-center gap-2 px-2 pt-1">
+                    <span className={token.typography.controlLabel}>{copy.editorParitySaturation}</span>
+                    <span className={`${inspectorTokens.numeric.value} text-right text-[11px]`}>+12</span>
+                  </div>
+                </section>
+                <button
+                  className={`${token.button.base} h-8 w-full ${token.button.quiet} ${token.state.disabled}`}
+                  data-editor-parity-state="disabled"
+                  disabled={true}
+                  type="button"
+                >
+                  {copy.editorParityDisabledControl}
+                </button>
+                <div className="grid grid-cols-2 gap-1" data-visual-smoke-section="editor-parity-theme-audit">
+                  <div
+                    className="editor-visual-fixture border border-editor-divider bg-editor-panel-well p-1.5"
+                    data-editor-theme="dark"
+                  >
+                    <span className={token.typography.status}>{copy.editorParityDark}</span>
+                  </div>
+                  <div
+                    className="editor-visual-fixture border border-editor-divider bg-editor-panel-well p-1.5"
+                    data-editor-theme="light"
+                  >
+                    <span className={token.typography.status}>{copy.editorParityLight}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </div>
+
+        <footer
+          className="border-t border-editor-divider bg-editor-panel"
+          data-editor-parity-filmstrip="expanded"
+          data-visual-smoke-section="editor-parity-filmstrip"
+        >
+          <div className="flex min-h-7 items-center justify-between border-b border-editor-divider px-2">
+            <span className={token.typography.sectionTitle}>{copy.editorParityFilmstrip}</span>
+            <button
+              aria-label={copy.editorParityCollapsedFilmstrip}
+              className={`${token.button.base} ${token.button.iconCompact} ${token.button.quiet} ${token.focusRing}`}
+              data-editor-parity-filmstrip="collapsed"
+              type="button"
+            >
+              <ChevronDown size={14} />
+            </button>
+          </div>
+          <div className="flex h-[55px] items-center gap-1 overflow-hidden px-2">
+            {['A01', 'A02', 'A03', 'A04', 'A05', 'A06', 'A07'].map((label, index) => (
+              <div
+                className={`h-11 w-14 shrink-0 border ${
+                  index === 2
+                    ? 'border-editor-primary-active bg-editor-selected-quiet'
+                    : 'border-editor-divider bg-editor-panel-well'
+                }`}
+                data-editor-parity-thumbnail={index === 2 ? 'selected' : 'idle'}
+                key={label}
+              >
+                <div className="h-7 bg-[linear-gradient(145deg,#1f3037,#809477_55%,#b2855f)]" />
+                <span className="block px-1 pt-0.5 text-[9px] font-medium text-text-secondary">{label}</span>
+              </div>
+            ))}
+            <button
+              aria-label={copy.editorParityCoarsePointerTarget}
+              className={`${token.button.base} ${token.density.coarsePointerTarget} ${token.button.quiet} ${token.focusRing} ml-auto`}
+              data-editor-parity-state="coarse-pointer"
+              type="button"
+            >
+              <Plus size={16} />
+            </button>
+          </div>
+        </footer>
       </div>
     </main>
   );
@@ -1670,6 +1925,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.CullingCompareSync]: CullingCompareSyncVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.DetailDustSpot]: DetailDustSpotVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.DetailWorkspace]: DetailWorkspaceVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.EditorParityContract]: EditorParityContractVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.FilmLookBrowser]: FilmLookVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.FocusPrivateRawModalReview]: FocusPrivateRawModalReviewSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.FocusPrivateRawUi]: FocusPrivateRawVisualSmoke,
@@ -3399,6 +3655,36 @@ const copy = {
   colorRangeOverlayCoverageSuffix: '% proposal coverage',
   colorRangeReceiptTitle: 'Range mask receipt',
   colorRangeReplayReady: 'Replay ready',
+  editorParityAdjust: 'Adjust',
+  editorParityCatalog: 'Catalog',
+  editorParityCoarsePointerTarget: 'Coarse pointer tool target',
+  editorParityCollapsedFilmstrip: 'Collapsed filmstrip',
+  editorParityCollapsedLeftPanel: 'Collapsed left panel',
+  editorParityCollapsedRightPanel: 'Collapsed right panel',
+  editorParityColor: 'Color',
+  editorParityContractTitle: 'Editor parity contract',
+  editorParityDark: 'Dark',
+  editorParityDefault: 'Default',
+  editorParityDesktopMatrix: '1224 / 1440 desktop matrix',
+  editorParityDevelop: 'Develop',
+  editorParityDisabledControl: 'Disabled control',
+  editorParityEdited: 'Edited',
+  editorParityExposure: 'Exposure',
+  editorParityFilmstrip: 'Filmstrip',
+  editorParityFit: 'Fit',
+  editorParityFullSize: '100%',
+  editorParityKeyboardFocus: 'Keyboard focus example',
+  editorParityLight: 'Light',
+  editorParityLoadingImage: 'Loading',
+  editorParityNoImage: 'No image',
+  editorParityProofWarning: 'Proof warning',
+  editorParityReadyImage: 'Ready image',
+  editorParityRenderFailed: 'Render failed',
+  editorParityReview: 'Review',
+  editorParitySaturation: 'Saturation',
+  editorParityTools: 'Editor tools',
+  editorParityViewerZoom: 'Viewer: Fit / 100%',
+  editorParityWorkflow: 'Workflow',
   professionalEditorTokens: 'Professional editor tokens',
   professionalEditorShell: 'Professional editor shell',
   professionalEditorToolbar: 'Professional editor toolbar',

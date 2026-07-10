@@ -865,6 +865,72 @@ async function assertProfessionalFilmstripContext(page) {
   }
 }
 
+async function assertEditorParityContractFixture(page) {
+  const fixture = page.getByTestId('editor-parity-contract');
+  await fixture.waitFor({ timeout: 10_000 });
+
+  const viewerStates = await fixture
+    .locator('[data-editor-parity-viewer-state]')
+    .evaluateAll((elements) => elements.map((element) => element.getAttribute('data-editor-parity-viewer-state')));
+  const expectedViewerStates = ['no-image', 'loading-image', 'ready-image', 'render-failure'];
+  if (expectedViewerStates.some((state) => !viewerStates.includes(state))) {
+    throw new Error(`Editor parity fixture viewer states are incomplete: ${JSON.stringify(viewerStates)}`);
+  }
+
+  const toolTabs = await fixture
+    .locator('[data-editor-parity-tool]')
+    .evaluateAll((elements) => elements.map((element) => element.getAttribute('data-editor-parity-tool')));
+  const expectedToolTabs = ['adjust', 'color', 'crop', 'masks', 'agent', 'export'];
+  if (expectedToolTabs.some((tool) => !toolTabs.includes(tool))) {
+    throw new Error(`Editor parity fixture tool tabs are incomplete: ${JSON.stringify(toolTabs)}`);
+  }
+
+  for (const selector of [
+    '[data-editor-parity-panel="left-expanded"]',
+    '[data-editor-parity-panel="left-collapsed"]',
+    '[data-editor-parity-panel="right-expanded"]',
+    '[data-editor-parity-panel="right-collapsed"]',
+    '[data-editor-parity-filmstrip="expanded"]',
+    '[data-editor-parity-filmstrip="collapsed"]',
+    '[data-editor-parity-section="default"]',
+    '[data-editor-parity-section="edited"]',
+    '[data-editor-parity-state="disabled"]',
+    '[data-editor-parity-state="coarse-pointer"]',
+    '[data-editor-theme="dark"]',
+    '[data-editor-theme="light"]',
+  ]) {
+    await fixture.locator(selector).waitFor({ timeout: 10_000 });
+  }
+
+  const focusExample = fixture.locator('[data-editor-parity-state="keyboard-focus"]');
+  await focusExample.focus();
+  const isFocused = await focusExample.evaluate((element) => document.activeElement === element);
+  if (!isFocused) throw new Error('Editor parity fixture keyboard-focus example did not receive focus.');
+
+  if ((page.viewportSize()?.width ?? 0) <= 700) {
+    const layout = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      viewportWidth: window.innerWidth,
+    }));
+    if (layout.scrollWidth > layout.viewportWidth) {
+      throw new Error(`Editor parity fixture has compact horizontal overflow: ${JSON.stringify(layout)}`);
+    }
+
+    const coarseTarget = await fixture.locator('[data-editor-parity-coarse-pointer="true"]').boundingBox();
+    if (coarseTarget === null || coarseTarget.width < 44 || coarseTarget.height < 44) {
+      throw new Error(`Editor parity fixture coarse target is too small: ${JSON.stringify(coarseTarget)}`);
+    }
+  }
+
+  const prefersReducedMotion = await page.evaluate(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  if (prefersReducedMotion) {
+    const duration = await focusExample.evaluate((element) => parseFloat(getComputedStyle(element).transitionDuration));
+    if (!Number.isFinite(duration) || duration > 0.001) {
+      throw new Error(`Editor parity fixture did not reduce motion: transition duration=${duration}.`);
+    }
+  }
+}
+
 export async function prepareScenario(page, mode) {
   if (
     mode === VISUAL_SMOKE_SCENARIO_IDS.AdjustmentsPanelRetune ||
@@ -894,6 +960,11 @@ export async function prepareScenario(page, mode) {
 
   if (mode === VISUAL_SMOKE_SCENARIO_IDS.ProfessionalFilmstripContext) {
     await assertProfessionalFilmstripContext(page);
+    return;
+  }
+
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.EditorParityContract) {
+    await assertEditorParityContractFixture(page);
     return;
   }
 
