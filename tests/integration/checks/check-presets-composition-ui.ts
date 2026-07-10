@@ -123,18 +123,29 @@ async function validateDiscoveryPreviewApplyAndRevert() {
   assert.equal(useEditorStore.getState().adjustments.temperature, 2);
 
   await act(async () => {
+    rendered.unmount();
+    await flushPromises();
+  });
+  const remounted = await renderExistingPanel();
+  await waitForText(
+    remounted.container,
+    'Applied User Portrait Style',
+    'applied state did not persist while navigating away from the presets rail.',
+  );
+
+  await act(async () => {
     useEditorStore.getState().setEditor({
       adjustments: { ...useEditorStore.getState().adjustments, exposure: 1.25 },
     });
     await flushPromises();
   });
   await waitForText(
-    rendered.container,
+    remounted.container,
     'Applied User Portrait Style then edited',
     'edited-after-apply state was not rendered.',
   );
 
-  const revert = Array.from(rendered.container.querySelectorAll('button')).find(
+  const revert = Array.from(remounted.container.querySelectorAll('button')).find(
     (button) => normalizeText(button.textContent) === 'Revert',
   );
   assert.ok(revert, 'revert action was not rendered after apply.');
@@ -145,7 +156,7 @@ async function validateDiscoveryPreviewApplyAndRevert() {
   assert.equal(useEditorStore.getState().adjustments.temperature, INITIAL_ADJUSTMENTS.temperature);
   assert.equal(useEditorStore.getState().adjustments.exposure, INITIAL_ADJUSTMENTS.exposure);
 
-  const filter = rendered.container.querySelector<HTMLSelectElement>('select[aria-label="Filter presets"]');
+  const filter = remounted.container.querySelector<HTMLSelectElement>('select[aria-label="Filter presets"]');
   assert.ok(filter, 'preset filter was not rendered.');
   await act(async () => {
     const valueSetter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value')?.set;
@@ -154,12 +165,12 @@ async function validateDiscoveryPreviewApplyAndRevert() {
     await flushPromises();
   });
   await waitForText(
-    rendered.container,
+    remounted.container,
     'No presets match this search or filter.',
     'empty search state was not rendered.',
   );
 
-  rendered.unmount();
+  remounted.unmount();
 }
 
 async function validateLoadFailure() {
@@ -224,6 +235,39 @@ async function renderPanel(options: { invoke: InvokeHandler; selectedReady: bool
       act(() => {
         root.unmount();
       });
+      container.remove();
+    },
+  };
+}
+
+async function renderExistingPanel(): Promise<RenderedPanel> {
+  const container = document.createElement('div');
+  document.body.append(container);
+  const root = createRoot(container);
+  const i18n = await createTestI18n();
+
+  await act(async () => {
+    root.render(
+      createElement(
+        I18nextProvider,
+        { i18n },
+        createElement(
+          ContextMenuProvider,
+          null,
+          createElement(PresetsPanel, {
+            onNavigateToCommunity: () => undefined,
+          }),
+        ),
+      ),
+    );
+    await flushPromises();
+  });
+
+  return {
+    container,
+    root,
+    unmount: () => {
+      root.unmount();
       container.remove();
     },
   };

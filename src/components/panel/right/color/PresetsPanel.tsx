@@ -96,13 +96,6 @@ interface FolderModalState {
   isOpen: boolean;
 }
 
-interface AppliedPresetState {
-  before: Adjustments;
-  expected: Adjustments;
-  id: string;
-  name: string;
-}
-
 interface PreviewQueueItem {
   folderId: string | null;
   preset: Preset;
@@ -425,6 +418,8 @@ export function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProps) {
   const { t } = useTranslation();
   const selectedImage = useEditorStore((state) => state.selectedImage);
   const adjustments = useEditorStore((state) => state.adjustments);
+  const appliedPreset = useEditorStore((state) => state.presetApplication);
+  const setAppliedPreset = useEditorStore((state) => state.setPresetApplication);
   const activePanel = useUIStore((state) => state.activeRightPanel);
   const { setAdjustments } = useEditorActions();
   const {
@@ -459,7 +454,6 @@ export function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProps) {
   const [isGeneratingPreviews, setIsGeneratingPreviews] = useState(false);
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
   const [previewedPresetId, setPreviewedPresetId] = useState<string | null>(null);
-  const [appliedPreset, setAppliedPreset] = useState<AppliedPresetState | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [importConflictCount, setImportConflictCount] = useState(0);
   const [configureModalState, setConfigureModalState] = useState<ConfigureModalState>({ isOpen: false, preset: null });
@@ -538,8 +532,11 @@ export function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProps) {
     [displayFolders, displayRootPresets],
   );
   const isEditedAfterApply = useMemo(
-    () => appliedPreset !== null && !areAdjustmentsEqual(adjustments, appliedPreset.expected),
-    [adjustments, appliedPreset],
+    () =>
+      appliedPreset !== null &&
+      appliedPreset.imagePath === (selectedImage?.path ?? null) &&
+      !areAdjustmentsEqual(adjustments, appliedPreset.expected),
+    [adjustments, appliedPreset, selectedImage?.path],
   );
   const previewedPreset = previewedPresetId ? (allPresetMap.get(previewedPresetId) ?? null) : null;
   const hasUserPresets = rootPresets.length > 0 || folders.some((entry) => entry.folder.children.length > 0);
@@ -660,13 +657,19 @@ export function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProps) {
         setAdjustments(() => expected);
         setActionError(null);
         setSelectedPresetId(preset.id);
-        setAppliedPreset({ before, expected, id: preset.id, name: preset.name });
+        setAppliedPreset({
+          before,
+          expected,
+          id: preset.id,
+          imagePath: selectedImage?.path ?? null,
+          name: preset.name,
+        });
       } catch (error) {
         console.error(`Failed to apply preset ${preset.name}:`, error);
         setActionError(t('editor.presets.errors.applyFailed'));
       }
     },
-    [adjustments, setAdjustments, t],
+    [adjustments, selectedImage?.path, setAdjustments, setAppliedPreset, t],
   );
 
   const applyColorStyle = useCallback(
@@ -676,13 +679,19 @@ export function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProps) {
         const expected = { ...adjustments, ...preset.adjustmentPatch };
         setAdjustments(() => expected);
         setActionError(null);
-        setAppliedPreset({ before, expected, id: preset.id, name: preset.name });
+        setAppliedPreset({
+          before,
+          expected,
+          id: preset.id,
+          imagePath: selectedImage?.path ?? null,
+          name: preset.name,
+        });
       } catch (error) {
         console.error(`Failed to apply color style ${preset.name}:`, error);
         setActionError(t('editor.presets.errors.applyFailed'));
       }
     },
-    [adjustments, setAdjustments, t],
+    [adjustments, selectedImage?.path, setAdjustments, setAppliedPreset, t],
   );
 
   const revertAppliedPreset = useCallback(() => {
