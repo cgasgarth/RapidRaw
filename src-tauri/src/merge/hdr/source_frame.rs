@@ -45,6 +45,15 @@ pub(crate) struct AlignmentProxy {
     pub width: usize,
 }
 
+#[derive(Clone, Debug)]
+pub(crate) struct ColorProxy {
+    pub height: usize,
+    pub pixels: Vec<[f32; 3]>,
+    pub valid: Vec<[bool; 3]>,
+    pub clipped: Vec<[bool; 3]>,
+    pub width: usize,
+}
+
 #[derive(Clone, Debug, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SourceFrame {
@@ -68,6 +77,8 @@ pub(crate) struct SourceFrame {
     pub width: usize,
     #[serde(skip)]
     pub proxy: AlignmentProxy,
+    #[serde(skip)]
+    pub color_proxy: ColorProxy,
 }
 
 fn rational(value: Option<rawler::formats::tiff::Rational>) -> Option<f32> {
@@ -105,7 +116,7 @@ fn cfa_pattern(raw: &RawImage) -> Result<String, String> {
         .join(""))
 }
 
-fn make_proxy(raw: &RawImage, area: &ActiveArea) -> Result<AlignmentProxy, String> {
+fn make_proxies(raw: &RawImage, area: &ActiveArea) -> Result<(AlignmentProxy, ColorProxy), String> {
     let RawPhotometricInterpretation::Cfa(config) = &raw.photometric else {
         return Err("unsupported_raw_photometric".to_string());
     };
@@ -137,10 +148,15 @@ fn make_proxy(raw: &RawImage, area: &ActiveArea) -> Result<AlignmentProxy, Strin
         RawImageData::Float(values) => values[index],
     };
     let mut pixels = vec![0.0; width * height];
+    let mut color_pixels = vec![[0.0; 3]; width * height];
+    let mut valid = vec![[false; 3]; width * height];
+    let mut clipped = vec![[false; 3]; width * height];
     for py in 0..height {
         for px in 0..width {
             let mut sum = 0.0;
             let mut count = 0usize;
+            let mut channel_sum = [0.0f32; 3];
+            let mut channel_count = [0usize; 3];
             let y_end = ((py + 1) * step).min(area.height);
             let x_end = ((px + 1) * step).min(area.width);
             for ay in (py * step)..y_end {
@@ -151,21 +167,46 @@ fn make_proxy(raw: &RawImage, area: &ActiveArea) -> Result<AlignmentProxy, Strin
                     let b = black.get(channel).copied().unwrap_or(black[0]);
                     let w = white.get(channel).copied().unwrap_or(white[0]);
                     let value = sample(y * raw.width + x);
-                    if w > b && value > b && value < w * 0.995 {
-                        sum += ((value - b) / (w - b)) * raw.wb_coeffs[channel];
+                    if w > b && value.is_finite() && value > b {
+                        let normalized = ((value - b) / (w - b)) * raw.wb_coeffs[channel];
+                        if value < w * 0.995 {
+                            sum += normalized;
+                            channel_sum[channel] += normalized;
+                            channel_count[channel] += 1;
+                        } else {
+                            clipped[py * width + px][channel] = true;
+                        }
+                    }
+                    if w > b && value.is_finite() && value > b && value < w * 0.995 {
                         count += 1;
                     }
                 }
             }
             pixels[py * width + px] = if count == 0 { 0.0 } else { sum / count as f32 };
+            for channel in 0..3 {
+                if channel_count[channel] > 0 {
+                    color_pixels[py * width + px][channel] =
+                        channel_sum[channel] / channel_count[channel] as f32;
+                    valid[py * width + px][channel] = true;
+                }
+            }
         }
     }
-    Ok(AlignmentProxy {
-        width,
-        height,
-        pixels,
-        scale: step as f32,
-    })
+    Ok((
+        AlignmentProxy {
+            width,
+            height,
+            pixels,
+            scale: step as f32,
+        },
+        ColorProxy {
+            width,
+            height,
+            pixels: color_pixels,
+            valid,
+            clipped,
+        },
+    ))
 }
 
 pub(crate) fn decode_source(path: &str, source_index: usize) -> Result<SourceFrame, String> {
@@ -201,7 +242,7 @@ pub(crate) fn decode_source(path: &str, source_index: usize) -> Result<SourceFra
     let focal_length_mm = rational(decoded.metadata.exif.focal_length)
         .filter(|value| *value > 0.0)
         .ok_or_else(|| "missing_focal_length".to_string())?;
-    let proxy = make_proxy(&raw, &area)?;
+    let (proxy, color_proxy) = make_proxies(&raw, &area)?;
     let proxy_bytes = proxy
         .pixels
         .iter()
@@ -250,6 +291,7 @@ pub(crate) fn decode_source(path: &str, source_index: usize) -> Result<SourceFra
         proxy_hash,
         proxy_id: PROXY_ID,
         proxy,
+        color_proxy,
         source_index,
         width: raw.width,
     })
