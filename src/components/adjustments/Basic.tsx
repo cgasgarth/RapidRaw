@@ -1,10 +1,11 @@
 import cx from 'clsx';
-import { motion } from 'framer-motion';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { type Adjustments, BasicAdjustment } from '../../utils/adjustments';
+
+import { type Adjustments, BasicAdjustment, INITIAL_ADJUSTMENTS } from '../../utils/adjustments';
 import type { AppSettings } from '../ui/AppProperties';
-import { professionalInspectorDensityTokens } from '../ui/inspectorTokens';
+import { compactInspectorSliderTokens } from '../ui/inspectorTokens';
+import InspectorSegmentedControl from '../ui/primitives/InspectorSegmentedControl';
 import AdjustmentSlider from './AdjustmentSlider';
 
 interface BasicAdjustmentsProps {
@@ -12,152 +13,84 @@ interface BasicAdjustmentsProps {
   setAdjustments: (adjustments: AdjustmentUpdate) => void;
   isForMask?: boolean;
   onDragStateChange?: ((isDragging: boolean) => void) | undefined;
-  appSettings?: AppSettings | null;
+  appSettings?: Pick<AppSettings, 'tonemapperOverrideEnabled'> | null;
 }
 
 interface ToneMapperSwitchProps {
-  selectedMapper: string;
-  onMapperChange: (mapper: string) => void;
-  evShiftValue: number;
-  onEvShiftChange: (value: number) => void;
-  onDragStateChange?: ((isDragging: boolean) => void) | undefined;
+  selectedMapper: Adjustments['toneMapper'];
+  onMapperChange: (mapper: Adjustments['toneMapper']) => void;
+  onReset: () => void;
 }
 
 type AdjustmentUpdate = Partial<Adjustments> | ((prev: Adjustments) => Adjustments);
 
-const formatPercent = (value: number) => `${String(value)}%`;
+const TONE_CONTROL_ORDER = [
+  BasicAdjustment.Contrast,
+  BasicAdjustment.Highlights,
+  BasicAdjustment.Shadows,
+  BasicAdjustment.Whites,
+  BasicAdjustment.Blacks,
+] as const;
 
-const ToneMapperSwitch = ({
-  selectedMapper,
-  onMapperChange,
-  evShiftValue,
-  onEvShiftChange,
-  onDragStateChange,
-}: ToneMapperSwitchProps) => {
+const ToneMapperSwitch = ({ selectedMapper, onMapperChange, onReset }: ToneMapperSwitchProps) => {
   const { t } = useTranslation();
-  const density = professionalInspectorDensityTokens;
-  const [bubbleStyle, setBubbleStyle] = useState({});
-  const isInitialAnimation = useRef(true);
   const [isLabelHovered, setIsLabelHovered] = useState(false);
-
+  const isModified = selectedMapper !== INITIAL_ADJUSTMENTS.toneMapper;
   const toneMapperOptions = useMemo(
     () => [
       {
-        id: 'basic',
         label: t('adjustments.basic.mappers.basic'),
-        title: t('adjustments.basic.mappers.basicDesc'),
+        value: 'basic' as const,
       },
       {
-        id: 'agx',
         label: t('adjustments.basic.mappers.agx'),
-        title: t('adjustments.basic.mappers.agxDesc'),
+        value: 'agx' as const,
       },
     ],
     [t],
   );
 
-  const handleReset = () => {
-    onMapperChange('basic');
-    onEvShiftChange(0);
-  };
-
-  useEffect(() => {
-    const selectedIndex = toneMapperOptions.findIndex((m) => m.id === selectedMapper);
-    const safeIndex = selectedIndex >= 0 ? selectedIndex : 0;
-
-    const widthPercent = 100 / toneMapperOptions.length;
-    const targetX = formatPercent(safeIndex * 100);
-    const targetWidth = formatPercent(widthPercent);
-
-    if (isInitialAnimation.current) {
-      let initialX;
-      if (selectedMapper === 'agx') {
-        initialX = formatPercent(toneMapperOptions.length * 100);
-      } else {
-        initialX = '-25%';
-      }
-
-      setBubbleStyle({
-        x: [initialX, targetX],
-        width: targetWidth,
-      });
-      isInitialAnimation.current = false;
-    } else {
-      setBubbleStyle({
-        x: targetX,
-        width: targetWidth,
-      });
-    }
-  }, [selectedMapper, toneMapperOptions]);
-
   return (
-    <div className={density.toneMapper.root}>
-      <div className={density.toneMapper.titleRow}>
-        <button
-          type="button"
-          className="grid cursor-pointer rounded border-0 bg-transparent p-0 text-left font-inherit focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring"
-          onClick={handleReset}
-          onDoubleClick={handleReset}
-          onMouseEnter={() => {
-            setIsLabelHovered(true);
-          }}
-          onMouseLeave={() => {
-            setIsLabelHovered(false);
-          }}
+    <div
+      className={cx(compactInspectorSliderTokens.root, 'mb-0.5 max-[319px]:grid-cols-[minmax(0,1fr)_3.5rem]')}
+      data-modified={String(isModified)}
+      data-testid="basic-tone-mapper"
+    >
+      {isModified ? <span className="sr-only">{t('ui.slider.modified', { defaultValue: 'Modified' })}</span> : null}
+      <button
+        className={compactInspectorSliderTokens.labelButton}
+        data-testid="basic-tone-mapper-label"
+        onClick={onReset}
+        onDoubleClick={onReset}
+        onMouseEnter={() => {
+          setIsLabelHovered(true);
+        }}
+        onMouseLeave={() => {
+          setIsLabelHovered(false);
+        }}
+        type="button"
+      >
+        <span
+          aria-hidden={isLabelHovered}
+          className={cx(compactInspectorSliderTokens.label, isLabelHovered ? 'opacity-0' : 'opacity-100')}
+          data-tooltip={t('adjustments.basic.toneMapper')}
         >
-          <span
-            aria-hidden={isLabelHovered}
-            className={cx(density.toneMapper.label, isLabelHovered ? 'opacity-0' : 'opacity-100')}
-          >
-            {t('adjustments.basic.toneMapper')}
-          </span>
-          <span
-            aria-hidden={!isLabelHovered}
-            className={cx(density.toneMapper.resetLabel, isLabelHovered ? 'opacity-100' : 'opacity-0')}
-          >
-            {t('adjustments.basic.reset')}
-          </span>
-        </button>
-      </div>
-      <div className={density.toneMapper.card}>
-        <div className="relative flex w-full">
-          <motion.div
-            className="absolute top-0 bottom-0 z-0 bg-editor-primary-active"
-            style={{ borderRadius: 4 }}
-            animate={bubbleStyle}
-            transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
-          />
-          {toneMapperOptions.map((mapper) => (
-            <button
-              key={mapper.id}
-              data-tooltip={mapper.title}
-              onClick={() => {
-                onMapperChange(mapper.id);
-              }}
-              className={cx(density.toneMapper.option, {
-                'text-text-primary hover:bg-editor-selected-quiet': selectedMapper !== mapper.id,
-                'text-editor-primary-active-text': selectedMapper === mapper.id,
-              })}
-              style={{ WebkitTapHighlightColor: 'transparent' }}
-            >
-              <span className="relative z-10 flex items-center">{mapper.label}</span>
-            </button>
-          ))}
-        </div>
-        <div className={density.toneMapper.sliderWrap}>
-          <AdjustmentSlider
-            density="compact"
-            label={t('adjustments.basic.evShift')}
-            max={5}
-            min={-5}
-            onValueChange={onEvShiftChange}
-            step={0.01}
-            value={evShiftValue}
-            trackClassName="bg-editor-panel"
-            onDragStateChange={onDragStateChange}
-          />
-        </div>
-      </div>
+          {t('adjustments.basic.toneMapper')}
+        </span>
+        <span
+          aria-hidden={!isLabelHovered}
+          className={cx(compactInspectorSliderTokens.resetLabel, isLabelHovered ? 'opacity-100' : 'opacity-0')}
+        >
+          {t('adjustments.basic.reset')}
+        </span>
+      </button>
+      <InspectorSegmentedControl
+        ariaLabel={t('adjustments.basic.toneMapper')}
+        className="col-span-2 min-w-0 max-[319px]:col-span-2 max-[319px]:col-start-1 max-[319px]:row-start-2"
+        onChange={onMapperChange}
+        options={toneMapperOptions}
+        value={selectedMapper}
+      />
     </div>
   );
 };
@@ -175,115 +108,74 @@ export default function BasicAdjustments({
     setAdjustments((prev: Adjustments) => ({ ...prev, [key]: value }));
   };
 
-  const handleToneMapperChange = (mapper: string) => {
+  const handleToneMapperChange = (mapper: Adjustments['toneMapper']) => {
     setAdjustments((prev: Adjustments) => ({
       ...prev,
-      toneMapper: mapper as 'basic' | 'agx',
+      toneMapper: mapper,
     }));
   };
 
-  const hideTonemapper = isForMask || appSettings?.tonemapperOverrideEnabled;
+  const handleToneMapperReset = () => {
+    setAdjustments((prev: Adjustments) => ({
+      ...prev,
+      exposure: INITIAL_ADJUSTMENTS.exposure,
+      toneMapper: INITIAL_ADJUSTMENTS.toneMapper,
+    }));
+  };
+
+  const renderSlider = (key: BasicAdjustment, label: string, range: { max: number; min: number; step: number }) => (
+    <AdjustmentSlider
+      defaultValue={INITIAL_ADJUSTMENTS[key]}
+      density="compact"
+      label={label}
+      max={range.max}
+      min={range.min}
+      onDragStateChange={onDragStateChange}
+      onValueChange={(value) => {
+        handleAdjustmentChange(key, value);
+      }}
+      step={range.step}
+      testId={`basic-control-${key}`}
+      value={adjustments[key]}
+    />
+  );
+
+  const hideToneMapper = isForMask || appSettings?.tonemapperOverrideEnabled;
+  const toneLabels: Record<(typeof TONE_CONTROL_ORDER)[number], string> = {
+    [BasicAdjustment.Blacks]: t('adjustments.basic.blacks'),
+    [BasicAdjustment.Contrast]: t('adjustments.basic.contrast'),
+    [BasicAdjustment.Highlights]: t('adjustments.basic.highlights'),
+    [BasicAdjustment.Shadows]: t('adjustments.basic.shadows'),
+    [BasicAdjustment.Whites]: t('adjustments.basic.whites'),
+  };
 
   return (
-    <div className="space-y-px">
-      {hideTonemapper ? (
-        <AdjustmentSlider
-          density="compact"
-          label={t('adjustments.basic.evShift')}
-          max={5}
-          min={-5}
-          onValueChange={(value) => {
-            handleAdjustmentChange(BasicAdjustment.Exposure, value);
-          }}
-          step={0.01}
-          value={adjustments.exposure}
-          onDragStateChange={onDragStateChange}
-        />
-      ) : (
+    <div className="min-w-0 space-y-px" data-testid="basic-light-controls">
+      {!hideToneMapper && (
         <ToneMapperSwitch
           selectedMapper={adjustments.toneMapper}
           onMapperChange={handleToneMapperChange}
-          evShiftValue={adjustments.exposure}
-          onEvShiftChange={(value) => {
-            handleAdjustmentChange(BasicAdjustment.Exposure, value);
-          }}
-          onDragStateChange={onDragStateChange}
+          onReset={handleToneMapperReset}
         />
       )}
-      <AdjustmentSlider
-        density="compact"
-        label={t('adjustments.basic.brightness', {
-          defaultValue: t('adjustments.basic.exposure'),
-        })}
-        max={5}
-        min={-5}
-        onValueChange={(value) => {
-          handleAdjustmentChange(BasicAdjustment.Brightness, value);
-        }}
-        step={0.01}
-        value={adjustments.brightness}
-        onDragStateChange={onDragStateChange}
-      />
-      <AdjustmentSlider
-        density="compact"
-        label={t('adjustments.basic.contrast')}
-        max={100}
-        min={-100}
-        onValueChange={(value) => {
-          handleAdjustmentChange(BasicAdjustment.Contrast, value);
-        }}
-        step={1}
-        value={adjustments.contrast}
-        onDragStateChange={onDragStateChange}
-      />
-      <AdjustmentSlider
-        density="compact"
-        label={t('adjustments.basic.highlights')}
-        max={100}
-        min={-100}
-        onValueChange={(value) => {
-          handleAdjustmentChange(BasicAdjustment.Highlights, value);
-        }}
-        step={1}
-        value={adjustments.highlights}
-        onDragStateChange={onDragStateChange}
-      />
-      <AdjustmentSlider
-        density="compact"
-        label={t('adjustments.basic.shadows')}
-        max={100}
-        min={-100}
-        onValueChange={(value) => {
-          handleAdjustmentChange(BasicAdjustment.Shadows, value);
-        }}
-        step={1}
-        value={adjustments.shadows}
-        onDragStateChange={onDragStateChange}
-      />
-      <AdjustmentSlider
-        density="compact"
-        label={t('adjustments.basic.whites')}
-        max={100}
-        min={-100}
-        onValueChange={(value) => {
-          handleAdjustmentChange(BasicAdjustment.Whites, value);
-        }}
-        step={1}
-        value={adjustments.whites}
-        onDragStateChange={onDragStateChange}
-      />
-      <AdjustmentSlider
-        density="compact"
-        label={t('adjustments.basic.blacks')}
-        max={100}
-        min={-100}
-        onValueChange={(value) => {
-          handleAdjustmentChange(BasicAdjustment.Blacks, value);
-        }}
-        step={1}
-        value={adjustments.blacks}
-        onDragStateChange={onDragStateChange}
-      />
+
+      {renderSlider(BasicAdjustment.Exposure, t('adjustments.basic.evShift'), {
+        max: 5,
+        min: -5,
+        step: 0.01,
+      })}
+
+      {TONE_CONTROL_ORDER.map((key) => (
+        <div key={key}>{renderSlider(key, toneLabels[key], { max: 100, min: -100, step: 1 })}</div>
+      ))}
+
+      <div className="mt-1 border-t border-editor-divider pt-1" data-testid="basic-secondary-controls">
+        {renderSlider(
+          BasicAdjustment.Brightness,
+          t('adjustments.basic.brightness', { defaultValue: t('adjustments.basic.exposure') }),
+          { max: 5, min: -5, step: 0.01 },
+        )}
+      </div>
     </div>
   );
 }
