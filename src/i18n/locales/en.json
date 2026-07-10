@@ -1679,6 +1679,15 @@
         "userPresets_one": "{{count}} user preset",
         "userPresets_other": "{{count}} user presets"
       },
+      "dialog": {
+        "allPresetFiles": "All Preset Files",
+        "exportAllTitle": "Export All Presets",
+        "exportTitle": "Export {{type}}",
+        "importPresetsTitle": "Import Presets",
+        "legacyPreset": "Legacy Preset",
+        "presetFile": "Preset File",
+        "rapidRawPreset": "RapidRAW Preset"
+      },
       "discovery": {
         "dismiss": "Dismiss",
         "dismissError": "Dismiss preset error",
@@ -1704,15 +1713,6 @@
         },
         "sortLabel": "Sort preset results",
         "toggleFolder": "Toggle folder {{name}}"
-      },
-      "dialog": {
-        "allPresetFiles": "All Preset Files",
-        "exportAllTitle": "Export All Presets",
-        "exportTitle": "Export {{type}}",
-        "importPresetsTitle": "Import Presets",
-        "legacyPreset": "Legacy Preset",
-        "presetFile": "Preset File",
-        "rapidRawPreset": "RapidRAW Preset"
       },
       "errors": {
         "applyFailed": "The preset could not be applied. Your current edits are unchanged.",
@@ -1744,25 +1744,27 @@
         "renameFolder": "Rename Folder",
         "sortAll": "Sort All Alphabetically"
       },
-      "status": {
-        "empty": "No presets saved yet. Create your own, import from a file, or explore community presets.",
-        "emptySearch": "No presets match this search or filter.",
-        "getCommunity": "Get Community Presets",
-        "loading": "Loading Presets..."
-      },
       "states": {
         "applied": "Applied",
         "appliedEdited": "Applied, then edited",
         "available": "Available",
         "error": "Preset error",
         "importConflict": "{{count}} imported name conflict was renamed to preserve both presets.",
+        "importConflict_one": "",
+        "importConflict_other": "",
         "invalid": "Invalid preset",
         "previewFailed": "Preview unavailable",
         "previewing": "Previewing",
-        "previewUnavailable": "Select a ready image to build preset previews.",
         "previewsLoading": "Building previews",
+        "previewUnavailable": "Select a ready image to build preset previews.",
         "ready": "Ready",
         "selected": "Selected"
+      },
+      "status": {
+        "empty": "No presets saved yet. Create your own, import from a file, or explore community presets.",
+        "emptySearch": "No presets match this search or filter.",
+        "getCommunity": "Get Community Presets",
+        "loading": "Loading Presets..."
       },
       "supports": {
         "cropTransform": "Crop & Transform",
@@ -2545,11 +2547,11 @@
       "saveScope": "Save the current edit as a reusable look or targeted tool.",
       "titleConfigure": "Configure Preset",
       "titleSave": "Save New Preset",
+      "typeLabel": "Preset scope",
       "typeStyleDesc": "Applies the complete look. This will override all your current settings to match the preset exactly.",
       "typeStyleLabel": "Style",
       "typeToolDesc": "Only applies specific changes without touching your other settings.",
       "typeToolLabel": "Tool",
-      "typeLabel": "Preset scope",
       "updateScope": "Update what this preset stores without applying it to the current image."
     },
     "confirm": {

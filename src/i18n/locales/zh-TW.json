@@ -1548,6 +1548,49 @@
         "presetFile": "預設檔案",
         "rapidRawPreset": "RapidRAW 預設"
       },
+      "discovery": {
+        "dismiss": "",
+        "dismissError": "",
+        "filterLabel": "",
+        "filters": {
+          "all": "",
+          "styles": "",
+          "tools": ""
+        },
+        "gridView": "",
+        "libraryLabel": "",
+        "listView": "",
+        "moveFolderLabel": "",
+        "moveLabel": "",
+        "moving": "",
+        "retry": "",
+        "searchLabel": "",
+        "searchPlaceholder": "",
+        "selectLabel": "",
+        "sort": {
+          "library": "",
+          "name": ""
+        },
+        "sortLabel": "",
+        "toggleFolder": ""
+      },
+      "errors": {
+        "applyFailed": "",
+        "exportFailed": "",
+        "importFailed": "",
+        "invalidPreset": "",
+        "loadFailed": "",
+        "saveFailed": "",
+        "storageFailed": ""
+      },
+      "footer": {
+        "applied": "",
+        "appliedEdited": "",
+        "previewing": "",
+        "ready": "",
+        "revert": "",
+        "selected": ""
+      },
       "menu": {
         "configurePreset": "配置預設",
         "deleteFolder": "刪除資料夾",
@@ -1561,8 +1604,23 @@
         "renameFolder": "重新命名資料夾",
         "sortAll": "全部按字母排序"
       },
+      "states": {
+        "applied": "",
+        "appliedEdited": "",
+        "available": "",
+        "error": "",
+        "importConflict_other": "",
+        "invalid": "",
+        "previewFailed": "",
+        "previewing": "",
+        "previewsLoading": "",
+        "previewUnavailable": "",
+        "ready": "",
+        "selected": ""
+      },
       "status": {
         "empty": "尚未儲存預設。建立您自己的預設、從檔案匯入或探索社群預設。",
+        "emptySearch": "",
         "getCommunity": "取得社群預設",
         "loading": "載入預設中..."
       },
@@ -2302,14 +2360,19 @@
       "cancel": "取消",
       "includeCropTransform": "包含裁剪與變換",
       "includeMasks": "包含遮色片",
+      "nameLabel": "",
+      "nameRequired": "",
       "placeholder": "輸入預設名稱...",
       "save": "儲存",
+      "saveScope": "",
       "titleConfigure": "配置預設",
       "titleSave": "儲存新預設",
+      "typeLabel": "",
       "typeStyleDesc": "應用完整外觀。這將覆蓋您當前的所有設定以完全匹配預設。",
       "typeStyleLabel": "風格",
       "typeToolDesc": "僅應用特定更改而不影響您的其他設定。",
-      "typeToolLabel": "工具"
+      "typeToolLabel": "工具",
+      "updateScope": ""
     },
     "confirm": {
       "cancel": "取消",

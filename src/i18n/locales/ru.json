@@ -1687,6 +1687,49 @@
         "presetFile": "Файл пресета",
         "rapidRawPreset": "Пресет RapidRAW"
       },
+      "discovery": {
+        "dismiss": "",
+        "dismissError": "",
+        "filterLabel": "",
+        "filters": {
+          "all": "",
+          "styles": "",
+          "tools": ""
+        },
+        "gridView": "",
+        "libraryLabel": "",
+        "listView": "",
+        "moveFolderLabel": "",
+        "moveLabel": "",
+        "moving": "",
+        "retry": "",
+        "searchLabel": "",
+        "searchPlaceholder": "",
+        "selectLabel": "",
+        "sort": {
+          "library": "",
+          "name": ""
+        },
+        "sortLabel": "",
+        "toggleFolder": ""
+      },
+      "errors": {
+        "applyFailed": "",
+        "exportFailed": "",
+        "importFailed": "",
+        "invalidPreset": "",
+        "loadFailed": "",
+        "saveFailed": "",
+        "storageFailed": ""
+      },
+      "footer": {
+        "applied": "",
+        "appliedEdited": "",
+        "previewing": "",
+        "ready": "",
+        "revert": "",
+        "selected": ""
+      },
       "menu": {
         "configurePreset": "Настроить пресет",
         "deleteFolder": "Удалить папку",
@@ -1700,8 +1743,26 @@
         "renameFolder": "Переименовать папку",
         "sortAll": "Сортировать всё по алфавиту"
       },
+      "states": {
+        "applied": "",
+        "appliedEdited": "",
+        "available": "",
+        "error": "",
+        "importConflict_one": "",
+        "importConflict_few": "",
+        "importConflict_many": "",
+        "importConflict_other": "",
+        "invalid": "",
+        "previewFailed": "",
+        "previewing": "",
+        "previewsLoading": "",
+        "previewUnavailable": "",
+        "ready": "",
+        "selected": ""
+      },
       "status": {
         "empty": "Пока нет сохраненных пресетов. Создайте свои, импортируйте из файла или изучите пресеты сообщества.",
+        "emptySearch": "",
         "getCommunity": "Загрузить пресеты сообщества",
         "loading": "Загрузка пресетов..."
       },
@@ -2494,14 +2555,19 @@
       "cancel": "Отмена",
       "includeCropTransform": "Включить кадрирование и трансформацию",
       "includeMasks": "Включить маски",
+      "nameLabel": "",
+      "nameRequired": "",
       "placeholder": "Введите название пресета...",
       "save": "Сохранить",
+      "saveScope": "",
       "titleConfigure": "Настройка пресета",
       "titleSave": "Сохранить новый пресет",
+      "typeLabel": "",
       "typeStyleDesc": "Применяет оформление целиком. Все ваши текущие настройки будут перезаписаны для точного соответствия пресету.",
       "typeStyleLabel": "Стиль",
       "typeToolDesc": "Применяет только определенные настройки, не затрагивая остальные параметры.",
-      "typeToolLabel": "Инструмент"
+      "typeToolLabel": "Инструмент",
+      "updateScope": ""
     },
     "confirm": {
       "cancel": "Отмена",

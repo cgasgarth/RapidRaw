@@ -1639,6 +1639,49 @@
         "presetFile": "Arquivo de Predefinição",
         "rapidRawPreset": "Predefinição RapidRAW"
       },
+      "discovery": {
+        "dismiss": "",
+        "dismissError": "",
+        "filterLabel": "",
+        "filters": {
+          "all": "",
+          "styles": "",
+          "tools": ""
+        },
+        "gridView": "",
+        "libraryLabel": "",
+        "listView": "",
+        "moveFolderLabel": "",
+        "moveLabel": "",
+        "moving": "",
+        "retry": "",
+        "searchLabel": "",
+        "searchPlaceholder": "",
+        "selectLabel": "",
+        "sort": {
+          "library": "",
+          "name": ""
+        },
+        "sortLabel": "",
+        "toggleFolder": ""
+      },
+      "errors": {
+        "applyFailed": "",
+        "exportFailed": "",
+        "importFailed": "",
+        "invalidPreset": "",
+        "loadFailed": "",
+        "saveFailed": "",
+        "storageFailed": ""
+      },
+      "footer": {
+        "applied": "",
+        "appliedEdited": "",
+        "previewing": "",
+        "ready": "",
+        "revert": "",
+        "selected": ""
+      },
       "menu": {
         "configurePreset": "Configurar Predefinição",
         "deleteFolder": "Excluir Pasta",
@@ -1652,8 +1695,25 @@
         "renameFolder": "Renomear Pasta",
         "sortAll": "Classificar Todos em Ordem Alfabética"
       },
+      "states": {
+        "applied": "",
+        "appliedEdited": "",
+        "available": "",
+        "error": "",
+        "importConflict_one": "",
+        "importConflict_many": "",
+        "importConflict_other": "",
+        "invalid": "",
+        "previewFailed": "",
+        "previewing": "",
+        "previewsLoading": "",
+        "previewUnavailable": "",
+        "ready": "",
+        "selected": ""
+      },
       "status": {
         "empty": "Nenhuma predefinição salva ainda. Crie a sua própria, importe de um arquivo ou explore as predefinições da comunidade.",
+        "emptySearch": "",
         "getCommunity": "Obter Predefinições da Comunidade",
         "loading": "Carregando Predefinições..."
       },
@@ -2430,14 +2490,19 @@
       "cancel": "Cancelar",
       "includeCropTransform": "Incluir Corte e Transformação",
       "includeMasks": "Incluir Máscaras",
+      "nameLabel": "",
+      "nameRequired": "",
       "placeholder": "Digite o nome da predefinição...",
       "save": "Salvar",
+      "saveScope": "",
       "titleConfigure": "Configurar Predefinição",
       "titleSave": "Salvar Nova Predefinição",
+      "typeLabel": "",
       "typeStyleDesc": "Aplica o visual completo. Isso substituirá todas as suas configurações atuais para corresponder exatamente à predefinição.",
       "typeStyleLabel": "Estilo",
       "typeToolDesc": "Aplica apenas alterações específicas sem tocar em suas outras configurações.",
-      "typeToolLabel": "Ferramenta"
+      "typeToolLabel": "Ferramenta",
+      "updateScope": ""
     },
     "confirm": {
       "cancel": "Cancelar",

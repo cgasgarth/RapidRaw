@@ -1565,6 +1565,49 @@
         "presetFile": "プリセットファイル",
         "rapidRawPreset": "RapidRAWプリセット"
       },
+      "discovery": {
+        "dismiss": "",
+        "dismissError": "",
+        "filterLabel": "",
+        "filters": {
+          "all": "",
+          "styles": "",
+          "tools": ""
+        },
+        "gridView": "",
+        "libraryLabel": "",
+        "listView": "",
+        "moveFolderLabel": "",
+        "moveLabel": "",
+        "moving": "",
+        "retry": "",
+        "searchLabel": "",
+        "searchPlaceholder": "",
+        "selectLabel": "",
+        "sort": {
+          "library": "",
+          "name": ""
+        },
+        "sortLabel": "",
+        "toggleFolder": ""
+      },
+      "errors": {
+        "applyFailed": "",
+        "exportFailed": "",
+        "importFailed": "",
+        "invalidPreset": "",
+        "loadFailed": "",
+        "saveFailed": "",
+        "storageFailed": ""
+      },
+      "footer": {
+        "applied": "",
+        "appliedEdited": "",
+        "previewing": "",
+        "ready": "",
+        "revert": "",
+        "selected": ""
+      },
       "menu": {
         "configurePreset": "プリセットを構成",
         "deleteFolder": "フォルダを削除",
@@ -1578,8 +1621,23 @@
         "renameFolder": "フォルダ名を変更",
         "sortAll": "すべて名前順に並べ替え"
       },
+      "states": {
+        "applied": "",
+        "appliedEdited": "",
+        "available": "",
+        "error": "",
+        "importConflict_other": "",
+        "invalid": "",
+        "previewFailed": "",
+        "previewing": "",
+        "previewsLoading": "",
+        "previewUnavailable": "",
+        "ready": "",
+        "selected": ""
+      },
       "status": {
         "empty": "保存されたプリセットはまだありません。作成、インポート、またはコミュニティのプリセットを探してみましょう。",
+        "emptySearch": "",
         "getCommunity": "コミュニティプリセットを入手",
         "loading": "プリセットを読み込み中..."
       },
@@ -2327,14 +2385,19 @@
       "cancel": "キャンセル",
       "includeCropTransform": "切り抜きと変形を含める",
       "includeMasks": "マスクを含める",
+      "nameLabel": "",
+      "nameRequired": "",
       "placeholder": "プリセット名を入力...",
       "save": "保存",
+      "saveScope": "",
       "titleConfigure": "プリセットの構成",
       "titleSave": "新規プリセットを保存",
+      "typeLabel": "",
       "typeStyleDesc": "全体のルックを適用します。プリセットと完全に一致するように現在の設定がすべて上書きされます。",
       "typeStyleLabel": "スタイル",
       "typeToolDesc": "他の設定を変更せずに、特定の設定のみを適用します。",
-      "typeToolLabel": "ツール"
+      "typeToolLabel": "ツール",
+      "updateScope": ""
     },
     "confirm": {
       "cancel": "キャンセル",
