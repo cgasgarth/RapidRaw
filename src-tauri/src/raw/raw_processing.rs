@@ -1,3 +1,7 @@
+use crate::color::camera_input_transform::{
+    AcesCgLinearV1, CameraInputTransform, RawInputTransformReceiptV1, RawWorkingImageV1,
+    apply_camera_input_transform,
+};
 use crate::image_processing::apply_orientation;
 use anyhow::{Result, anyhow};
 use image::{DynamicImage, ImageBuffer, Rgba};
@@ -5,7 +9,6 @@ use rawler::imgop::xyz::Illuminant;
 use rawler::{
     decoders::{Orientation, RawDecodeParams, RawMetadata},
     imgop::develop::{DemosaicAlgorithm, Intermediate, ProcessingStep, RawDevelop},
-    pixarray::Color2D,
     rawimage::{RawImage, RawImageData, RawPhotometricInterpretation},
     rawsource::RawSource,
 };
@@ -120,6 +123,7 @@ pub(crate) struct RawDevelopmentReport {
     pub demosaic_algorithm_id: Option<&'static str>,
     pub processing_profile: RawProcessingProfile,
     pub camera_profile: RawCameraProfileReport,
+    pub input_transform: Option<RawInputTransformReceiptV1>,
     pub runtime: Option<RawRuntimeReport>,
     pub xtrans_hq: Option<XTransHqDevelopmentReport>,
 }
@@ -691,31 +695,6 @@ fn reconstruct_raw_sensor_highlights(raw_image: &mut RawImage) -> HighlightRecon
     }
 }
 
-fn multiply_4x3_3x3(a: &[[f32; 3]; 4], b: &[[f32; 3]; 3]) -> [[f32; 3]; 4] {
-    let mut result = [[0.0; 3]; 4];
-    for i in 0..4 {
-        for j in 0..3 {
-            for (k, row) in b.iter().enumerate().take(3) {
-                result[i][j] += a[i][k] * row[j];
-            }
-        }
-    }
-    result
-}
-
-fn normalize_4x3(matrix: [[f32; 3]; 4]) -> [[f32; 3]; 4] {
-    let mut result = [[0.0; 3]; 4];
-    for row in 0..4 {
-        let sum: f32 = matrix[row].iter().sum();
-        if sum.abs() > f32::EPSILON {
-            for col in 0..3 {
-                result[row][col] = matrix[row][col] / sum;
-            }
-        }
-    }
-    result
-}
-
 fn illuminant_cct_kelvin(illuminant: Illuminant) -> Option<f32> {
     match illuminant {
         Illuminant::A | Illuminant::Tungsten | Illuminant::IsoStudioTungsten => Some(2_856.0),
@@ -796,7 +775,54 @@ fn illuminant_label(illuminant: Illuminant) -> String {
 
 struct CameraProfileResolution {
     matrix: Option<Vec<f32>>,
+    calibration_white_xy: Option<[f64; 2]>,
     report: RawCameraProfileReport,
+}
+
+fn cct_to_xy(cct: f32) -> Option<[f64; 2]> {
+    let t = f64::from(cct);
+    if !(1_667.0..=25_000.0).contains(&t) {
+        return None;
+    }
+    let x = if t <= 4_000.0 {
+        -0.266_123_9e9 / t.powi(3) - 0.234_358_0e6 / t.powi(2) + 0.877_695_6e3 / t + 0.179_910
+    } else {
+        -3.025_846_9e9 / t.powi(3) + 2.107_037_9e6 / t.powi(2) + 0.222_634_7e3 / t + 0.240_390
+    };
+    let y = if t <= 2_222.0 {
+        -1.106_381_4 * x.powi(3) - 1.348_110_20 * x.powi(2) + 2.185_558_32 * x - 0.202_196_83
+    } else if t <= 4_000.0 {
+        -0.954_947_6 * x.powi(3) - 1.374_185_93 * x.powi(2) + 2.091_370_15 * x - 0.167_488_67
+    } else {
+        3.081_758_0 * x.powi(3) - 5.873_386_70 * x.powi(2) + 3.751_129_97 * x - 0.370_014_83
+    };
+    Some([x, y])
+}
+
+fn illuminant_white_xy(illuminant: Illuminant) -> Option<[f64; 2]> {
+    match illuminant {
+        Illuminant::A | Illuminant::Tungsten | Illuminant::IsoStudioTungsten => {
+            Some([0.44757, 0.40745])
+        }
+        Illuminant::D50 => Some([0.34567, 0.35850]),
+        Illuminant::D55 => Some([0.33242, 0.34743]),
+        Illuminant::Daylight | Illuminant::FineWeather | Illuminant::Flash | Illuminant::D65 => {
+            Some([0.31271, 0.32902])
+        }
+        Illuminant::CloudyWeather | Illuminant::D75 => Some([0.29902, 0.31485]),
+        Illuminant::Shade => cct_to_xy(8_000.0),
+        _ => None,
+    }
+}
+
+fn interpolate_white_xy(warm: Illuminant, cool: Illuminant, cool_weight: f32) -> Option<[f64; 2]> {
+    let warm = illuminant_white_xy(warm)?;
+    let cool = illuminant_white_xy(cool)?;
+    let weight = f64::from(cool_weight);
+    Some([
+        warm[0] * (1.0 - weight) + cool[0] * weight,
+        warm[1] * (1.0 - weight) + cool[1] * weight,
+    ])
 }
 
 fn resolve_camera_color_profile(
@@ -836,6 +862,13 @@ fn resolve_camera_color_profile(
         };
         return CameraProfileResolution {
             matrix: selected.clone(),
+            calibration_white_xy: if d65.is_some() {
+                illuminant_white_xy(Illuminant::D65)
+            } else {
+                candidates
+                    .first()
+                    .and_then(|candidate| illuminant_white_xy(candidate.0))
+            },
             report: RawCameraProfileReport {
                 algorithm_id: CAMERA_PROFILE_RESOLVER_ALGORITHM_ID,
                 candidate_count,
@@ -878,6 +911,7 @@ fn resolve_camera_color_profile(
             let cool_weight = interpolation_weight_for_cct(target_cct, warm.1, cool.1);
             let matrix = interpolate_color_matrix(warm.2, cool.2, cool_weight);
             return CameraProfileResolution {
+                calibration_white_xy: interpolate_white_xy(warm.0, cool.0, cool_weight),
                 report: RawCameraProfileReport {
                     algorithm_id: CAMERA_PROFILE_RESOLVER_ALGORITHM_ID,
                     candidate_count,
@@ -899,6 +933,7 @@ fn resolve_camera_color_profile(
 
         let matrix = warm.2.to_vec();
         return CameraProfileResolution {
+            calibration_white_xy: illuminant_white_xy(warm.0),
             report: RawCameraProfileReport {
                 algorithm_id: CAMERA_PROFILE_RESOLVER_ALGORITHM_ID,
                 candidate_count,
@@ -925,6 +960,9 @@ fn resolve_camera_color_profile(
     });
     CameraProfileResolution {
         matrix: selected.clone(),
+        calibration_white_xy: candidates
+            .first()
+            .and_then(|candidate| illuminant_white_xy(candidate.0)),
         report: RawCameraProfileReport {
             algorithm_id: CAMERA_PROFILE_RESOLVER_ALGORITHM_ID,
             candidate_count,
@@ -959,130 +997,18 @@ fn resolve_camera_color_profile(
     }
 }
 
-fn select_camera_color_matrix(
-    color_matrices: &HashMap<Illuminant, Vec<f32>>,
-    wb: [f32; 4],
-) -> Option<Vec<f32>> {
-    resolve_camera_color_profile(color_matrices, wb).matrix
-}
-
-fn apply_dual_illuminant_camera_profile(raw_image: &mut RawImage) -> RawCameraProfileReport {
+fn apply_dual_illuminant_camera_profile(raw_image: &mut RawImage) -> CameraProfileResolution {
     let wb = if raw_image.wb_coeffs[0].is_nan() {
         [1.0, 1.0, 1.0, 1.0]
     } else {
         raw_image.wb_coeffs
     };
     let resolution = resolve_camera_color_profile(&raw_image.color_matrix, wb);
-    if let Some(color_matrix) = resolution.matrix {
+    if let Some(color_matrix) = resolution.matrix.clone() {
         raw_image.color_matrix.clear();
         raw_image.color_matrix.insert(Illuminant::D65, color_matrix);
     }
-    resolution.report
-}
-
-fn pseudo_inverse_4x3(matrix: [[f32; 3]; 4]) -> [[f32; 4]; 3] {
-    let mut tmp: [[f32; 3]; 4] = [[0.0; 3]; 4];
-    let mut result: [[f32; 4]; 3] = [[0.0; 4]; 3];
-    let mut work: [[f32; 6]; 3] = [[0.0; 6]; 3];
-
-    for i in 0..3 {
-        for (j, value) in work[i].iter_mut().enumerate() {
-            *value = if j == i + 3 { 1.0 } else { 0.0 };
-        }
-        for j in 0..3 {
-            for row in &matrix {
-                work[i][j] += row[i] * row[j];
-            }
-        }
-    }
-
-    for i in 0..3 {
-        let pivot = work[i][i];
-        if pivot.abs() <= f32::EPSILON {
-            continue;
-        }
-        for value in &mut work[i] {
-            *value /= pivot;
-        }
-        let pivot_row = work[i];
-        for (k, row) in work.iter_mut().enumerate() {
-            if k == i {
-                continue;
-            }
-            let factor = row[i];
-            for (value, pivot_value) in row.iter_mut().zip(pivot_row.iter()) {
-                *value -= pivot_value * factor;
-            }
-        }
-    }
-
-    for i in 0..4 {
-        for j in 0..3 {
-            tmp[i][j] = (0..3).map(|k| work[j][k + 3] * matrix[i][k]).sum();
-        }
-    }
-    for i in 0..3 {
-        for j in 0..4 {
-            result[i][j] = tmp[j][i];
-        }
-    }
-
-    result
-}
-
-fn clip_euclidean_norm_avg(pix: [f32; 3]) -> [f32; 3] {
-    let pix = pix.map(|p| p.max(0.0));
-    let max_val = pix.iter().copied().reduce(f32::max).unwrap_or(0.0);
-    if max_val <= 1.0 {
-        return pix;
-    }
-
-    let color = pix.map(|p| p / max_val);
-    let euclidean = pix.iter().map(|p| p.powi(2)).sum::<f32>().sqrt() / 3.0_f32.sqrt();
-    color.map(|p| (p + euclidean) * 0.5)
-}
-
-fn calibrate_three_color(raw_image: &RawImage, pixels: Color2D<f32, 3>) -> Color2D<f32, 3> {
-    let wb = if raw_image.wb_coeffs[0].is_nan() {
-        [1.0, 1.0, 1.0, 1.0]
-    } else {
-        raw_image.wb_coeffs
-    };
-    let Some(color_matrix) = select_camera_color_matrix(&raw_image.color_matrix, wb) else {
-        return pixels;
-    };
-
-    let mut xyz_to_cam = [[0.0; 3]; 4];
-    let components = (color_matrix.len() / 3).min(4);
-    for i in 0..components {
-        for j in 0..3 {
-            xyz_to_cam[i][j] = color_matrix[i * 3 + j];
-        }
-    }
-    let srgb_to_xyz_d65 = [
-        [0.412_456_4, 0.357_576_1, 0.180_437_5],
-        [0.212_672_9, 0.715_152_2, 0.072_175],
-        [0.019_333_9, 0.119_192, 0.950_304_1],
-    ];
-    let rgb_to_cam = normalize_4x3(multiply_4x3_3x3(&xyz_to_cam, &srgb_to_xyz_d65));
-    let cam_to_rgb = pseudo_inverse_4x3(rgb_to_cam);
-
-    let data = pixels
-        .data
-        .iter()
-        .map(|pixel| {
-            let r = pixel[0] * wb[0];
-            let g = pixel[1] * wb[1];
-            let b = pixel[2] * wb[2];
-            clip_euclidean_norm_avg([
-                cam_to_rgb[0][0] * r + cam_to_rgb[0][1] * g + cam_to_rgb[0][2] * b,
-                cam_to_rgb[1][0] * r + cam_to_rgb[1][1] * g + cam_to_rgb[1][2] * b,
-                cam_to_rgb[2][0] * r + cam_to_rgb[2][1] * g + cam_to_rgb[2][2] * b,
-            ])
-        })
-        .collect();
-
-    Color2D::new_with(data, pixels.width, pixels.height)
+    resolution
 }
 
 fn apply_default_crop(raw_image: &RawImage, intermediate: Intermediate) -> Intermediate {
@@ -1133,10 +1059,8 @@ fn develop_bayer_hq_intermediate(
     let roi = scaled.active_area.unwrap_or(pixels.rect());
     let mut demosaiced = crate::bayer_hq::demosaic_bayer_hq(&pixels, &config.cfa, roi);
     let suppression_report = crate::bayer_hq::suppress_false_color_and_zipper(&mut demosaiced);
-    let calibrated = calibrate_three_color(&scaled, demosaiced);
-
     Ok((
-        apply_default_crop(&scaled, Intermediate::ThreeColor(calibrated)),
+        apply_default_crop(&scaled, Intermediate::ThreeColor(demosaiced)),
         BayerHqDevelopmentReport {
             artifact_suppression: suppression_report,
         },
@@ -1168,10 +1092,8 @@ fn develop_xtrans_hq_intermediate(
             }
             Ok(())
         })?;
-    let calibrated = calibrate_three_color(&scaled, demosaiced);
-
     Ok((
-        apply_default_crop(&scaled, Intermediate::ThreeColor(calibrated)),
+        apply_default_crop(&scaled, Intermediate::ThreeColor(demosaiced)),
         XTransHqDevelopmentReport {
             reconstruction: reconstruction_report,
         },
@@ -1302,11 +1224,22 @@ fn develop_internal_with_options(
         );
     }
 
-    let camera_profile = if apply_calibration {
+    let profile_resolution = if apply_calibration {
         apply_dual_illuminant_camera_profile(&mut raw_image)
     } else {
-        RawCameraProfileReport::unavailable("calibration_disabled", raw_image.color_matrix.len())
+        CameraProfileResolution {
+            matrix: None,
+            calibration_white_xy: None,
+            report: RawCameraProfileReport::unavailable(
+                "calibration_disabled",
+                raw_image.color_matrix.len(),
+            ),
+        }
     };
+    let camera_profile = profile_resolution.report.clone();
+    if apply_calibration && is_linear_format {
+        return Err(anyhow!("raw_input_transform_unsupported_linear_raw"));
+    }
 
     for level in raw_image.whitelevel.0.iter_mut() {
         *level = u32::MAX;
@@ -1343,9 +1276,19 @@ fn develop_internal_with_options(
         });
     } else if fast_demosaic {
         developer.demosaic_algorithm = DemosaicAlgorithm::Speed;
-        developer.steps.retain(|&step| step != ProcessingStep::SRgb);
+        developer.steps.retain(|&step| {
+            !matches!(
+                step,
+                ProcessingStep::SRgb | ProcessingStep::Calibrate | ProcessingStep::WhiteBalance
+            )
+        });
     } else {
-        developer.steps.retain(|&step| step != ProcessingStep::SRgb);
+        developer.steps.retain(|&step| {
+            !matches!(
+                step,
+                ProcessingStep::SRgb | ProcessingStep::Calibrate | ProcessingStep::WhiteBalance
+            )
+        });
     }
 
     check_cancel()?;
@@ -1360,8 +1303,6 @@ fn develop_internal_with_options(
     } else {
         developer.develop_intermediate(&raw_image)?
     };
-
-    drop(raw_image);
 
     let denominator = (original_white_level - original_black_level).max(1.0);
     let rescale_factor = (u32::MAX as f32 - original_black_level) / denominator;
@@ -1386,48 +1327,11 @@ fn develop_internal_with_options(
                 *p = linear_val.clamp(0.0, clamp_limit);
             });
         }
-        Intermediate::ThreeColor(pixels) => {
-            pixels.data.iter_mut().for_each(|p| {
-                let mut r = (p[0] * rescale_factor).max(0.0);
-                let mut g = (p[1] * rescale_factor).max(0.0);
-                let mut b = (p[2] * rescale_factor).max(0.0);
-
-                if is_linear_format && apply_ungamma {
-                    r = srgb_to_linear(r.clamp(0.0, 1.0));
-                    g = srgb_to_linear(g.clamp(0.0, 1.0));
-                    b = srgb_to_linear(b.clamp(0.0, 1.0));
-                }
-
-                let max_c = r.max(g).max(b);
-
-                let (final_r, final_g, final_b) = if max_c > 1.0 {
-                    let min_c = r.min(g).min(b);
-                    let compression_factor =
-                        (1.0 - (max_c - 1.0) / (safe_highlight_compression - 1.0)).clamp(0.0, 1.0);
-                    let compressed_r = min_c + (r - min_c) * compression_factor;
-                    let compressed_g = min_c + (g - min_c) * compression_factor;
-                    let compressed_b = min_c + (b - min_c) * compression_factor;
-                    let compressed_max = compressed_r.max(compressed_g).max(compressed_b);
-
-                    if compressed_max > 1e-6 {
-                        let rescale = max_c / compressed_max;
-                        (
-                            compressed_r * rescale,
-                            compressed_g * rescale,
-                            compressed_b * rescale,
-                        )
-                    } else {
-                        (max_c, max_c, max_c)
-                    }
-                } else {
-                    (r, g, b)
-                };
-
-                p[0] = final_r.clamp(0.0, clamp_limit);
-                p[1] = final_g.clamp(0.0, clamp_limit);
-                p[2] = final_b.clamp(0.0, clamp_limit);
-            });
-        }
+        Intermediate::ThreeColor(pixels) => pixels.data.iter_mut().for_each(|p| {
+            p[0] *= rescale_factor;
+            p[1] *= rescale_factor;
+            p[2] *= rescale_factor;
+        }),
         Intermediate::FourColor(pixels) => {
             pixels.data.iter_mut().for_each(|p| {
                 p.iter_mut().for_each(|c| {
@@ -1440,6 +1344,49 @@ fn develop_internal_with_options(
             });
         }
     }
+
+    let input_transform = if apply_calibration {
+        let Intermediate::ThreeColor(pixels) = &mut developed_intermediate else {
+            return Err(anyhow!("raw_input_transform_unsupported_pixel_domain"));
+        };
+        let matrix = profile_resolution
+            .matrix
+            .as_deref()
+            .ok_or_else(|| anyhow!("raw_input_transform_missing_camera_matrix"))?;
+        let white = profile_resolution
+            .calibration_white_xy
+            .ok_or_else(|| anyhow!("raw_input_transform_unknown_calibration_white"))?;
+        let matrix_hash = camera_profile
+            .matrix_hash
+            .as_deref()
+            .ok_or_else(|| anyhow!("raw_input_transform_missing_matrix_hash"))?;
+        let wb = raw_image.wb_coeffs;
+        let wb = if wb[0].is_finite() && wb[1].is_finite() && wb[2].is_finite() {
+            [wb[0], wb[1], wb[2]]
+        } else {
+            return Err(anyhow!("raw_input_transform_invalid_as_shot_white_balance"));
+        };
+        let camera_id = format!(
+            "{} {}",
+            raw_image.clean_make.trim(),
+            raw_image.clean_model.trim()
+        );
+        Some(apply_camera_input_transform(
+            &mut pixels.data,
+            CameraInputTransform {
+                camera_make_model_id: camera_id.trim(),
+                resolver_algorithm_id: CAMERA_PROFILE_RESOLVER_ALGORITHM_ID,
+                selected_matrix_sha256: matrix_hash,
+                xyz_to_camera: matrix,
+                calibration_white_xy: white,
+                as_shot_wb: wb,
+                sensor_floor_count: 0,
+            },
+        )?)
+    } else {
+        None
+    };
+    drop(raw_image);
 
     let (width, height) = {
         let dim = developed_intermediate.dim();
@@ -1454,7 +1401,16 @@ fn develop_internal_with_options(
                 let p = pixels.data[(y * width + x) as usize];
                 Rgba([p[0], p[1], p[2], 1.0])
             });
-            DynamicImage::ImageRgba32F(buffer)
+            if let Some(receipt) = input_transform.clone() {
+                RawWorkingImageV1 {
+                    pixels: buffer,
+                    domain: AcesCgLinearV1,
+                    input_transform_receipt: receipt,
+                }
+                .into_dynamic_image()
+            } else {
+                DynamicImage::ImageRgba32F(buffer)
+            }
         }
         Intermediate::Monochrome(pixels) => {
             let buffer = ImageBuffer::<Rgba<f32>, _>::from_fn(width, height, |x, y| {
@@ -1480,6 +1436,7 @@ fn develop_internal_with_options(
             },
             processing_profile: profile,
             camera_profile,
+            input_transform,
             runtime: None,
             xtrans_hq: xtrans_hq_report,
         },
