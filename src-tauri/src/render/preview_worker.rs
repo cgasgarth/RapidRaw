@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::sync::Arc;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
@@ -251,7 +252,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
     );
 
     let final_processed_image = match final_processed_image_result {
-        Ok(image) => image,
+        Ok(image) => Arc::new(image),
         Err(_) => {
             log::error!(
                 "[process_preview_job] processing failed after {:.2?}",
@@ -264,12 +265,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
     if !is_interactive && let Some(graph_revision) = viewer_sample_graph_revision {
         state.viewer_sample_frames.lock().unwrap().insert(
             "edited".to_string(),
-            CachedViewerSampleFrame {
-                graph_revision: graph_revision.to_string(),
-                image: Arc::new(final_processed_image.clone()),
-                image_identity: loaded_image.path.clone(),
-                space_label: "Display encoded sRGB".to_string(),
-            },
+            settled_viewer_sample_frame(&final_processed_image, graph_revision, &loaded_image.path),
         );
     }
 
@@ -286,7 +282,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
     }
 
     encode_preview_response(
-        final_processed_image,
+        final_processed_image.as_ref(),
         is_interactive,
         pixel_roi,
         preview_width,
@@ -296,8 +292,21 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
     )
 }
 
+fn settled_viewer_sample_frame(
+    image: &Arc<DynamicImage>,
+    graph_revision: &str,
+    image_identity: &str,
+) -> CachedViewerSampleFrame {
+    CachedViewerSampleFrame {
+        graph_revision: graph_revision.to_string(),
+        image: Arc::clone(image),
+        image_identity: image_identity.to_string(),
+        space_label: "Display encoded sRGB".to_string(),
+    }
+}
+
 fn encode_preview_response(
-    final_processed_image: DynamicImage,
+    final_processed_image: &DynamicImage,
     is_interactive: bool,
     pixel_roi: Option<crate::gpu_processing::Roi>,
     preview_width: u32,
@@ -305,7 +314,7 @@ fn encode_preview_response(
     jpeg_quality: u8,
     fn_start: std::time::Instant,
 ) -> Result<Vec<u8>, String> {
-    let final_rgba_image = Arc::new(to_preview_rgba8(final_processed_image));
+    let final_rgba_image = to_preview_rgba8(final_processed_image);
     let interactive_geometry = if is_interactive {
         Some(validate_interactive_patch_geometry(
             final_rgba_image.width(),
@@ -408,10 +417,10 @@ fn validate_interactive_patch_geometry(
     Ok((roi.x, roi.y, roi.width, roi.height))
 }
 
-fn to_preview_rgba8(image: DynamicImage) -> RgbaImage {
+fn to_preview_rgba8(image: &DynamicImage) -> Cow<'_, RgbaImage> {
     match image {
-        DynamicImage::ImageRgba8(image) => image,
-        image => image.to_rgba8(),
+        DynamicImage::ImageRgba8(image) => Cow::Borrowed(image),
+        image => Cow::Owned(image.to_rgba8()),
     }
 }
 
@@ -457,6 +466,51 @@ mod tests {
     use super::*;
     use image::{ImageBuffer, Rgba};
 
+    fn encode_with_owned_source_baseline(
+        image: DynamicImage,
+        is_interactive: bool,
+        pixel_roi: Option<crate::gpu_processing::Roi>,
+        preview_width: u32,
+        preview_height: u32,
+        jpeg_quality: u8,
+    ) -> Result<Vec<u8>, String> {
+        let rgba = match image {
+            DynamicImage::ImageRgba8(rgba) => rgba,
+            image => image.to_rgba8(),
+        };
+        let geometry = if is_interactive {
+            Some(validate_interactive_patch_geometry(
+                rgba.width(),
+                rgba.height(),
+                pixel_roi,
+                preview_width,
+                preview_height,
+            )?)
+        } else {
+            None
+        };
+        let jpeg = Encoder::new(Preset::BaselineFastest)
+            .quality(jpeg_quality)
+            .fast_color(true)
+            .encode_imgref(ImgRef::new(
+                rgba.as_raw().as_slice().as_rgba(),
+                rgba.width() as usize,
+                rgba.height() as usize,
+            ))
+            .map_err(|error| format!("Failed to encode preview: {error}"))?;
+
+        if let Some((x, y, width, height)) = geometry {
+            let mut response = Vec::with_capacity(24 + jpeg.len());
+            for value in [x, y, width, height, preview_width, preview_height] {
+                response.extend_from_slice(&value.to_le_bytes());
+            }
+            response.extend_from_slice(&jpeg);
+            Ok(response)
+        } else {
+            Ok(jpeg)
+        }
+    }
+
     #[test]
     fn preview_encoder_accepts_rgba32f_raw_pipeline_output() {
         let image = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(2, 2, |x, y| {
@@ -464,7 +518,7 @@ mod tests {
         }));
 
         let encoded =
-            encode_preview_response(image, false, None, 2, 2, 82, std::time::Instant::now())
+            encode_preview_response(&image, false, None, 2, 2, 82, std::time::Instant::now())
                 .expect("RGBA32F preview should encode through RGBA8 boundary");
 
         assert!(encoded.starts_with(&[0xff, 0xd8]));
@@ -472,11 +526,47 @@ mod tests {
     }
 
     #[test]
+    fn shared_encoder_matches_owned_source_bytes_for_rgba8_and_rgba32f() {
+        let rgba8 = DynamicImage::ImageRgba8(ImageBuffer::from_fn(7, 5, |x, y| {
+            Rgba([(x * 31) as u8, (y * 47) as u8, ((x + y) * 19) as u8, 255])
+        }));
+        let rgba32f = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(7, 5, |x, y| {
+            Rgba([x as f32 / 7.0, y as f32 / 5.0, (x + y) as f32 / 12.0, 1.0])
+        }));
+
+        for image in [rgba8, rgba32f] {
+            let actual =
+                encode_preview_response(&image, false, None, 7, 5, 94, std::time::Instant::now())
+                    .expect("shared source should encode");
+            let expected = encode_with_owned_source_baseline(image, false, None, 7, 5, 94)
+                .expect("owned source baseline should encode");
+            assert_eq!(actual, expected);
+        }
+    }
+
+    #[test]
+    fn preview_rgba8_conversion_borrows_rgba8_and_owns_float_conversion() {
+        let rgba8 = DynamicImage::ImageRgba8(ImageBuffer::from_pixel(2, 1, Rgba([1, 2, 3, 4])));
+        let borrowed = to_preview_rgba8(&rgba8);
+        assert!(matches!(borrowed, Cow::Borrowed(_)));
+        assert_eq!(
+            borrowed.as_raw().as_ptr(),
+            rgba8.as_rgba8().unwrap().as_raw().as_ptr()
+        );
+
+        let rgba32f =
+            DynamicImage::ImageRgba32F(ImageBuffer::from_pixel(1, 1, Rgba([0.25, 0.5, 0.75, 1.0])));
+        let converted = to_preview_rgba8(&rgba32f);
+        assert!(matches!(converted, Cow::Owned(_)));
+        assert_eq!(converted.get_pixel(0, 0).0, [64, 128, 191, 255]);
+    }
+
+    #[test]
     fn interactive_preview_encoder_preserves_roi_geometry_contract() {
         let image =
             DynamicImage::ImageRgba8(ImageBuffer::from_pixel(3, 2, Rgba([20, 40, 60, 255])));
         let encoded = encode_preview_response(
-            image,
+            &image,
             true,
             Some(crate::gpu_processing::Roi {
                 x: 2,
@@ -498,11 +588,26 @@ mod tests {
         assert_eq!(u32::from_le_bytes(encoded[16..20].try_into().unwrap()), 8);
         assert_eq!(u32::from_le_bytes(encoded[20..24].try_into().unwrap()), 6);
         assert!(encoded[24..].starts_with(&[0xff, 0xd8]));
+        let baseline = encode_with_owned_source_baseline(
+            image,
+            true,
+            Some(crate::gpu_processing::Roi {
+                x: 2,
+                y: 1,
+                width: 3,
+                height: 2,
+            }),
+            8,
+            6,
+            75,
+        )
+        .expect("owned ROI baseline should encode");
+        assert_eq!(encoded, baseline);
 
         let full_frame =
             DynamicImage::ImageRgba8(ImageBuffer::from_pixel(3, 2, Rgba([20, 40, 60, 255])));
         let full_frame_encoded =
-            encode_preview_response(full_frame, true, None, 3, 2, 75, std::time::Instant::now())
+            encode_preview_response(&full_frame, true, None, 3, 2, 75, std::time::Instant::now())
                 .expect("coherent full-frame interactive preview should encode");
         assert_eq!(
             u32::from_le_bytes(full_frame_encoded[0..4].try_into().unwrap()),
@@ -527,7 +632,7 @@ mod tests {
         let full_frame =
             DynamicImage::ImageRgba8(ImageBuffer::from_pixel(8, 6, Rgba([20, 40, 60, 255])));
         let result = encode_preview_response(
-            full_frame,
+            &full_frame,
             true,
             Some(crate::gpu_processing::Roi {
                 x: 2,
@@ -545,5 +650,49 @@ mod tests {
             result.unwrap_err(),
             "Interactive patch encoded dimensions 8x6 do not match ROI 3x2"
         );
+    }
+
+    #[test]
+    fn settled_sampler_frame_shares_encoder_allocation_and_outlives_render_owner() {
+        let rendered = Arc::new(DynamicImage::ImageRgba32F(ImageBuffer::from_fn(
+            1920,
+            1080,
+            |x, y| Rgba([x as f32 / 1920.0, y as f32 / 1080.0, 0.25, 1.0]),
+        )));
+        let sampler_frame =
+            settled_viewer_sample_frame(&rendered, "history_4", "/fixture/settled.raw");
+
+        assert!(Arc::ptr_eq(&rendered, &sampler_frame.image));
+        assert_eq!(Arc::strong_count(&rendered), 2);
+
+        let encoded = encode_preview_response(
+            rendered.as_ref(),
+            false,
+            None,
+            1920,
+            1080,
+            82,
+            std::time::Instant::now(),
+        )
+        .expect("shared RGBA32F settled frame should encode");
+        drop(rendered);
+
+        assert_eq!(Arc::strong_count(&sampler_frame.image), 1);
+        assert_eq!(sampler_frame.image.dimensions(), (1920, 1080));
+        assert_eq!(sampler_frame.graph_revision, "history_4");
+        assert_eq!(sampler_frame.image_identity, "/fixture/settled.raw");
+        assert_eq!(sampler_frame.space_label, "Display encoded sRGB");
+        assert_eq!(
+            sampler_frame
+                .image
+                .as_rgba32f()
+                .unwrap()
+                .get_pixel(960, 540)
+                .0,
+            [0.5, 0.5, 0.25, 1.0]
+        );
+        assert!(encoded.starts_with(&[0xff, 0xd8]));
+        let decoded = image::load_from_memory(&encoded).expect("encoded preview should decode");
+        assert_eq!(decoded.dimensions(), (1920, 1080));
     }
 }
