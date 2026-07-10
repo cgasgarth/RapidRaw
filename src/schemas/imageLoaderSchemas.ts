@@ -91,6 +91,33 @@ export const rawCameraProfileReportSchema = z
 export const rawDevelopmentReportSchema = z
   .object({
     cameraProfile: rawCameraProfileReportSchema,
+    inputTransform: z
+      .object({
+        asShotCameraWbGains: z.tuple([z.number().positive(), z.number().positive(), z.number().positive()]),
+        cameraMakeModelId: z.string().trim().min(1),
+        chromaticAdaptation: z.enum(['none_same_white', 'bradford_v1', 'already_adapted']),
+        contract: z.literal('rapidraw.raw_input_transform.v1'),
+        destinationDomain: z.literal('acescg_linear_v1'),
+        destinationWhiteXy: z.tuple([z.literal(0.32168), z.literal(0.33767)]),
+        greaterThanOneAp1ComponentCount: z.number().int().nonnegative(),
+        limitationCodes: z.array(z.string().trim().min(1)),
+        negativeAp1ComponentCount: z.number().int().nonnegative(),
+        nonFiniteCount: z.literal(0),
+        numericPolicyVersion: z.string().trim().min(1),
+        profileSource: z.enum(['raw_metadata', 'project_profile']),
+        resolverAlgorithmId: z.literal('dual_illuminant_mired_v1'),
+        selectedCalibrationWhiteXy: z.tuple([z.number().positive(), z.number().positive()]),
+        selectedMatrixDirection: z.literal('xyz_to_camera'),
+        selectedMatrixSha256: z.string().regex(/^blake3:[0-9a-f]+$/u),
+        sensorFloorCount: z.number().int().nonnegative(),
+        sourceDomain: z.literal('linear_camera_rgb_v1'),
+        transformContentSha256: z.string().regex(/^blake3:[0-9a-f]+$/u),
+        workingPixelsBlake3: z.string().regex(/^blake3:[0-9a-f]+$/u),
+        xyzToAp1MatrixVersion: z.string().trim().min(1),
+      })
+      .strict()
+      .nullable()
+      .optional(),
     demosaicAlgorithmId: z.string().trim().min(1).nullable().optional(),
     demosaicPath: rawDemosaicPathSchema,
     processingProfile: rawProcessingProfileSchema,
@@ -165,6 +192,7 @@ export const rawCameraProfileProvenanceReceiptSchema = z
     fallbackReason: rawCameraProfileReportSchema.shape.fallbackReason,
     illuminantEstimateConfidence: rawCameraProfileReportSchema.shape.illuminantEstimateConfidence,
     illuminantEstimateMethod: rawCameraProfileReportSchema.shape.illuminantEstimateMethod,
+    inputTransform: rawDevelopmentReportSchema.shape.inputTransform,
     matrixHash: rawCameraProfileReportSchema.shape.matrixHash,
     receiptVersion: z.literal(1),
     processingProfile: rawProcessingProfileSchema,
