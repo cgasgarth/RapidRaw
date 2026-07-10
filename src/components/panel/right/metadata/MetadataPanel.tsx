@@ -1100,6 +1100,14 @@ export default function MetadataPanel() {
                         data-demosaic-path={cameraProfileReceipt.demosaicPath}
                         data-estimated-cct-kelvin={cameraProfileReceipt.estimatedCctKelvin ?? ''}
                         data-matrix-hash={cameraProfileReceipt.matrixHash ?? ''}
+                        data-input-source-domain={cameraProfileReceipt.inputTransform?.sourceDomain ?? ''}
+                        data-input-destination-domain={cameraProfileReceipt.inputTransform?.destinationDomain ?? ''}
+                        data-input-calibration-white={
+                          cameraProfileReceipt.inputTransform?.selectedCalibrationWhiteXy.join(',') ?? ''
+                        }
+                        data-input-chromatic-adaptation={cameraProfileReceipt.inputTransform?.chromaticAdaptation ?? ''}
+                        data-input-transform-hash={cameraProfileReceipt.inputTransform?.transformContentSha256 ?? ''}
+                        data-input-working-pixels-hash={cameraProfileReceipt.inputTransform?.workingPixelsBlake3 ?? ''}
                         data-processing-profile={cameraProfileReceipt.processingProfile}
                         data-preview-elapsed-ms={cameraProfileReceipt.previewElapsedMs ?? ''}
                         data-profile-confidence-basis={cameraProfileReceipt.profileConfidenceBasis}
@@ -1115,6 +1123,14 @@ export default function MetadataPanel() {
                           processingProfile: formatRawReceiptToken(cameraProfileReceipt.processingProfile),
                           status: cameraProfileReceipt.status,
                         })}
+                        {cameraProfileReceipt.inputTransform != null && (
+                          <span className="block">
+                            {cameraProfileReceipt.inputTransform.sourceDomain} →{' '}
+                            {cameraProfileReceipt.inputTransform.destinationDomain} ·{' '}
+                            {cameraProfileReceipt.inputTransform.chromaticAdaptation} ·{' '}
+                            {formatCameraProfileHash(cameraProfileReceipt.inputTransform.transformContentSha256)}
+                          </span>
+                        )}
                       </UiText>
                     </>
                   )}
