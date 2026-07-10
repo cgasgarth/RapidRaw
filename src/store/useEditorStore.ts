@@ -46,6 +46,14 @@ export interface CopiedSectionAdjustments {
   values: Partial<Adjustments>;
 }
 
+export interface PresetApplication {
+  before: Adjustments;
+  expected: Adjustments;
+  id: string;
+  imagePath: string | null;
+  name: string;
+}
+
 export interface ExportSoftProofTransformState {
   blackPointCompensation: string | null;
   colorManagedTransform: string | null;
@@ -144,9 +152,11 @@ interface EditorState {
   copiedSectionAdjustments: CopiedSectionAdjustments | null;
   copiedMask: MaskContainer | null;
   copiedAdjustments: Partial<Adjustments> | null;
+  presetApplication: PresetApplication | null;
 
   // Actions
   setEditor: (updater: Partial<EditorState> | ((state: EditorState) => Partial<EditorState>)) => void;
+  setPresetApplication: (presetApplication: PresetApplication | null) => void;
   createHistoryCheckpoint: (label: string) => void;
   applyBasicToneCommand: (command: BasicToneCommandEnvelope) => void;
   pushHistory: (newAdjustments: Adjustments) => void;
@@ -277,6 +287,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   copiedMask: null,
   brushSettings: { size: 50, feather: 50, tool: ToolType.Brush },
   copiedAdjustments: null,
+  presetApplication: null,
 
   isGeneratingAiMask: false,
   isAIConnectorConnected: false,
@@ -291,6 +302,10 @@ export const useEditorStore = create<EditorState>((set) => ({
       const update: Partial<EditorState> = { ...rawUpdate };
 
       normalizeCompareStateUpdate(state, update);
+
+      if ('selectedImage' in update && update.selectedImage?.path !== state.selectedImage?.path) {
+        update.presetApplication = null;
+      }
 
       if (!shouldRevalidateGamutWarningOverlay(update)) return update;
 
@@ -312,6 +327,8 @@ export const useEditorStore = create<EditorState>((set) => ({
       return { ...update, gamutWarningOverlay: null };
     });
   },
+
+  setPresetApplication: (presetApplication) => set({ presetApplication }),
 
   createHistoryCheckpoint: (label) => {
     set((state) => ({

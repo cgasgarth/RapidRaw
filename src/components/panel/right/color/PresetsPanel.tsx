@@ -1,7 +1,6 @@
 import {
   DndContext,
   type DragEndEvent,
-  DragOverlay,
   type DragStartEvent,
   PointerSensor,
   useDraggable,
@@ -11,22 +10,34 @@ import {
 } from '@dnd-kit/core';
 import { invoke } from '@tauri-apps/api/core';
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
-import { AnimatePresence, motion } from 'framer-motion';
+import cx from 'clsx';
 import {
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  CircleAlert,
+  CircleDot,
   CopyPlus,
-  Crop,
-  Edit,
+  Eye,
   FileDown,
   FileUp,
-  Folder as FolderIcon,
-  FolderOpen,
+  Folder,
   FolderPlus,
-  Layers,
+  Grid2X2,
+  GripVertical,
+  ImageOff,
+  List,
   Loader2,
+  MoreHorizontal,
   Palette,
+  PencilLine,
   Plus,
+  RotateCcw,
   Save,
+  Search,
   Settings2,
+  SlidersHorizontal,
   SortAsc,
   Trash2,
   Users,
@@ -52,8 +63,7 @@ import type { ColorStylePreset } from '../../../../schemas/color/colorStylePrese
 import { useEditorStore } from '../../../../store/useEditorStore';
 import { useUIStore } from '../../../../store/useUIStore';
 import { Invokes } from '../../../../tauri/commands';
-import { TextColors, TextVariants, TextWeights } from '../../../../types/typography';
-import { ADJUSTMENT_GROUPS, type Adjustments, INITIAL_ADJUSTMENTS } from '../../../../utils/adjustments';
+import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../../utils/adjustments';
 import { createBlobFromUint8Array } from '../../../../utils/blobUtils';
 import {
   BUILT_IN_COLOR_STYLE_PRESETS,
@@ -62,207 +72,132 @@ import {
 import ConfigurePresetModal from '../../../modals/library/ConfigurePresetModal';
 import CreateFolderModal from '../../../modals/library/CreateFolderModal';
 import RenameFolderModal from '../../../modals/library/RenameFolderModal';
-import { type Folder, OPTION_SEPARATOR, type Option, Panel, type Preset } from '../../../ui/AppProperties';
-import Button from '../../../ui/primitives/Button';
-import UiText from '../../../ui/primitives/Text';
-
-interface DroppableFolderItemProps {
-  children: ReactNode;
-  folder: PresetFolder;
-  isExpanded: boolean;
-  onContextMenu: (event: ReactMouseEvent<HTMLElement>, item: PresetContextItem) => void;
-  onToggle: (id: string) => void;
-}
-
-interface DraggablePresetItemProps {
-  isGeneratingPreviews: boolean;
-  onApply: (preset: Preset) => void;
-  onContextMenu: (event: ReactMouseEvent<HTMLElement>, item: PresetContextItem) => void;
-  preset: Preset;
-  previewUrl: string;
-}
-
-interface FolderProps {
-  folder: PresetFolder;
-}
-
-interface FolderState {
-  isOpen: boolean;
-  folder: PresetFolder | null;
-}
-
-interface ModalState {
-  isOpen: boolean;
-  preset: Preset | null;
-}
-
-interface PresetItemDisplayProps {
-  isGeneratingPreviews: boolean;
-  preset: Preset;
-  previewUrl: string;
-}
+import {
+  OPTION_SEPARATOR,
+  type Option,
+  Panel,
+  type Preset,
+  type Folder as PresetFolderBase,
+} from '../../../ui/AppProperties';
+import { professionalInspectorDensityTokens } from '../../../ui/inspectorTokens';
+import InspectorPanelFrame from '../inspector/InspectorPanelFrame';
 
 interface PresetsPanelProps {
   onNavigateToCommunity: () => void;
 }
 
-type PresetFolder = Omit<Folder, 'children' | 'id' | 'name'> & {
-  children: Array<Preset>;
+interface ConfigureModalState {
+  isOpen: boolean;
+  preset: Preset | null;
+}
+
+interface FolderModalState {
+  folder: PresetFolder | null;
+  isOpen: boolean;
+}
+
+interface PreviewQueueItem {
+  folderId: string | null;
+  preset: Preset;
+}
+
+type PresetFolder = Omit<PresetFolderBase, 'children' | 'id' | 'name'> & {
+  children: Preset[];
   id: string;
   name: string;
 };
-
-type PresetEntry = UserPreset & { preset: Preset; folder?: undefined };
+type PresetEntry = UserPreset & { folder?: undefined; preset: Preset };
 type FolderEntry = UserPreset & { folder: PresetFolder; preset?: undefined };
-type PresetContextItem = PresetEntry | FolderEntry;
-type ActivePresetItem =
-  | { data: Preset; type: PresetListType.Preset }
-  | { data: PresetFolder; type: PresetListType.Folder };
-type PreviewQueueItem = { folderId: string | null; preset: Preset };
+type PresetContextItem = FolderEntry | PresetEntry;
+type DiscoveryFilter = 'all' | 'style' | 'tool';
+type DiscoverySort = 'library' | 'name';
+type DiscoveryDensity = 'list' | 'grid';
 
-const isPresetEntry = (item: UserPreset): item is PresetEntry => !!item.preset;
-const isFolderEntry = (item: UserPreset): item is FolderEntry => !!item.folder;
-const toDragId = (id: DragStartEvent['active']['id']): string => String(id);
-const getColorStyleAdjustmentCount = (preset: ColorStylePreset): number => Object.keys(preset.adjustmentPatch).length;
-const isPresetListType = (value: unknown): value is PresetListType =>
-  value === PresetListType.Folder || value === PresetListType.Preset;
-const getPresetDragType = (data: unknown): PresetListType | null => {
-  if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
-  const type = (data as Record<string, unknown>)['type'];
-  return isPresetListType(type) ? type : null;
-};
+const isPresetEntry = (item: UserPreset): item is PresetEntry => item.preset !== undefined;
+const isFolderEntry = (item: UserPreset): item is FolderEntry => item.folder !== undefined;
+const isPresetValid = (preset: Preset): boolean =>
+  preset.id.trim().length > 0 &&
+  preset.name.trim().length > 0 &&
+  typeof preset.adjustments === 'object' &&
+  preset.adjustments !== null;
+const dragId = (value: DragStartEvent['active']['id']): string => String(value);
+const compareNames = (first: { name: string }, second: { name: string }) =>
+  first.name.localeCompare(second.name, undefined, { numeric: true, sensitivity: 'base' });
 
-const itemVariants = {
-  hidden: { opacity: 0, x: -15 },
-  visible: (i: number) => ({
-    opacity: 1,
-    x: 0,
-    transition: {
-      duration: 0.25,
-      delay: i * 0.05,
-    },
-  }),
-  exit: { opacity: 0, x: -15, transition: { duration: 0.2 } },
-};
-
-function PresetItemDisplay({ preset, previewUrl, isGeneratingPreviews }: PresetItemDisplayProps) {
-  const { t } = useTranslation();
-  const geometryKeys = (ADJUSTMENT_GROUPS['geometry'] ?? []).flatMap((g) => g.keys);
-  const presetMasks = preset.adjustments['masks'];
-
-  const supportsMasks = preset.includeMasks ?? (Array.isArray(presetMasks) && presetMasks.length > 0);
-  const supportsGeometry =
-    preset.includeCropTransform ?? geometryKeys.some((key) => preset.adjustments[key] !== undefined);
-  const isTool = preset.presetType === 'tool';
-  const colorStyleProvenance = preset.presetType === 'style' ? preset.colorStyleProvenance : undefined;
-  const tooltipContent = useMemo(() => {
-    const features = [];
-    if (supportsMasks) features.push(t('editor.presets.supports.masks'));
-    if (supportsGeometry) features.push(t('editor.presets.supports.cropTransform'));
-
-    if (features.length === 0) return undefined;
-    return t('editor.presets.supports.label', { features: features.join(' + ') });
-  }, [supportsMasks, supportsGeometry, t]);
-
+function areAdjustmentsEqual(first: Adjustments, second: Adjustments): boolean {
+  const firstKeys = Object.keys(first) as Array<keyof Adjustments>;
+  const secondKeys = Object.keys(second) as Array<keyof Adjustments>;
   return (
-    <div className="flex items-center gap-3 p-2 rounded-lg bg-surface cursor-grabbing">
-      <div
-        className="w-20 h-14 bg-bg-tertiary rounded-md flex items-center justify-center shrink-0 relative overflow-hidden"
-        data-tooltip={tooltipContent}
-      >
-        {isGeneratingPreviews && !previewUrl ? (
-          <Loader2 size={20} className="animate-spin text-text-secondary" />
-        ) : previewUrl ? (
-          <img
-            src={previewUrl}
-            alt={`${preset.name} preview`}
-            className="w-full h-full object-cover rounded-md pointer-events-none"
-          />
-        ) : (
-          <Loader2 size={20} className="animate-spin text-text-secondary" />
-        )}
-
-        {(supportsMasks || supportsGeometry) && (
-          <>
-            <div className="absolute top-0 right-0 w-1/2 h-1/2 bg-linear-to-bl from-black/30 via-black/0 to-transparent pointer-events-none z-0" />
-
-            <div className="absolute top-1 right-1 bg-primary rounded-full px-1.5 py-0.5 flex items-center gap-1.5 backdrop-blur-xs shadow-xs z-10 pointer-events-none">
-              {supportsMasks && <Layers size={11} className="text-white" />}
-              {supportsGeometry && <Crop size={11} className="text-white" />}
-            </div>
-          </>
-        )}
-      </div>
-
-      <div className="grow min-w-0 flex flex-col justify-center">
-        <div className="flex min-w-0 items-center gap-2">
-          <UiText color={TextColors.primary} weight={TextWeights.medium} className="truncate">
-            {preset.name}
-          </UiText>
-          {colorStyleProvenance && (
-            <UiText
-              className="shrink-0 rounded border border-border-color px-1 text-text-secondary"
-              data-color-style-legal-warning={colorStyleProvenance.legalWarning}
-              data-color-style-provenance-source={colorStyleProvenance.source}
-              data-testid={`user-color-style-provenance-${preset.id}`}
-              variant={TextVariants.small}
-            >
-              {t('editor.presets.colorStyles.userBadge')}
-            </UiText>
-          )}
-        </div>
-        <div className="flex items-center gap-1.5 mt-0.5">
-          {isTool ? (
-            <Wrench size={12} className="text-text-secondary" />
-          ) : (
-            <Palette size={12} className="text-text-secondary" />
-          )}
-          <UiText
-            variant={TextVariants.small}
-            color={TextColors.secondary}
-            className="text-[10px] uppercase tracking-wider"
-          >
-            {isTool ? t('editor.presets.types.tool') : t('editor.presets.types.style')}
-          </UiText>
-        </div>
-        {colorStyleProvenance && (
-          <UiText
-            className="mt-1 line-clamp-2"
-            color={TextColors.secondary}
-            data-testid={`user-color-style-legal-note-${preset.id}`}
-            variant={TextVariants.small}
-          >
-            {t('editor.presets.colorStyles.legalNote')}
-          </UiText>
-        )}
-      </div>
-    </div>
+    firstKeys.length === secondKeys.length &&
+    firstKeys.every((key) => JSON.stringify(first[key]) === JSON.stringify(second[key]))
   );
 }
 
-function FolderItemDisplay({ folder }: FolderProps) {
-  return (
-    <div className="flex items-center gap-2 p-2 rounded-lg bg-surface cursor-grabbing w-full">
-      <div className="p-1">
-        <FolderIcon size={18} />
-      </div>
-      <UiText color={TextColors.primary} weight={TextWeights.medium} className="grow truncate select-none">
-        {folder.name}
-      </UiText>
-      <UiText as="span" weight={TextWeights.medium} className="ml-auto pr-1">
-        {folder.children.length}
-      </UiText>
-    </div>
-  );
+function collectPresetNames(items: UserPreset[]): string[] {
+  return items.flatMap((item) => {
+    if (isPresetEntry(item)) return [item.preset.name];
+    if (isFolderEntry(item)) return [item.folder.name, ...item.folder.children.map((preset) => preset.name)];
+    return [];
+  });
 }
 
-function DraggablePresetItem({
+function PresetThumbnail({
   preset,
+  previewUrl,
+  previewState,
+}: {
+  preset: Preset;
+  previewState: 'failed' | 'idle' | 'loading' | 'ready';
+  previewUrl?: string | undefined;
+}) {
+  if (previewUrl) {
+    return <img alt={`${preset.name} preview`} className="h-full w-full object-cover" src={previewUrl} />;
+  }
+
+  if (previewState === 'failed') {
+    return <ImageOff aria-label="Preview unavailable" className="text-editor-danger" size={16} />;
+  }
+
+  if (previewState === 'loading') {
+    return <Loader2 aria-label="Preview loading" className="animate-spin text-text-secondary" size={16} />;
+  }
+
+  return <Palette aria-label="Preview not generated" className="text-text-secondary" size={16} />;
+}
+
+interface PresetResultItemProps {
+  appliedId: string | null;
+  density: DiscoveryDensity;
+  editedAfterApply: boolean;
+  isSelected: boolean;
+  isPreviewed: boolean;
+  onApply: (preset: Preset) => void;
+  onContextMenu: (event: ReactMouseEvent<HTMLElement>, item: PresetContextItem) => void;
+  onKeyDown: (event: ReactKeyboardEvent<HTMLButtonElement>, preset: Preset) => void;
+  onPreview: (preset: Preset | null) => void;
+  onSelect: (preset: Preset) => void;
+  preset: Preset;
+  presetButtonRef: (node: HTMLButtonElement | null) => void;
+  previewState: 'failed' | 'idle' | 'loading' | 'ready';
+  previewUrl?: string | undefined;
+}
+
+function PresetResultItem({
+  appliedId,
+  density,
+  editedAfterApply,
+  isSelected,
+  isPreviewed,
   onApply,
   onContextMenu,
+  onKeyDown,
+  onPreview,
+  onSelect,
+  preset,
+  presetButtonRef,
+  previewState,
   previewUrl,
-  isGeneratingPreviews,
-}: DraggablePresetItemProps) {
+}: PresetResultItemProps) {
   const { t } = useTranslation();
   const {
     attributes,
@@ -271,157 +206,222 @@ function DraggablePresetItem({
     isDragging,
   } = useDraggable({
     id: preset.id,
-    data: { type: PresetListType.Preset, preset },
+    data: { type: PresetListType.Preset },
   });
-
   const { setNodeRef: setDroppableNodeRef, isOver } = useDroppable({
-    data: { type: PresetListType.Preset, preset },
     id: preset.id,
+    data: { type: PresetListType.Preset },
   });
-
+  const valid = isPresetValid(preset);
+  const isApplied = appliedId === preset.id;
+  const isTool = preset.presetType === 'tool';
   const setCombinedRef = useCallback(
-    (node: HTMLElement | null) => {
+    (node: HTMLDivElement | null) => {
       setDraggableNodeRef(node);
       setDroppableNodeRef(node);
     },
     [setDraggableNodeRef, setDroppableNodeRef],
   );
 
-  const style = {
-    borderRadius: '10px',
-    opacity: isDragging ? 0.4 : 1,
-    outline: isOver ? '2px solid var(--color-primary)' : '2px solid transparent',
-    outlineOffset: '-2px',
-    touchAction: 'none',
-  };
-
-  const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== 'Enter' && event.key !== ' ') return;
-    event.preventDefault();
-    onApply(preset);
-  };
-
   return (
     <div
-      onClick={() => {
-        onApply(preset);
-      }}
-      onContextMenu={(e) => {
-        onContextMenu(e, { preset });
-      }}
+      className={cx(
+        'group relative min-w-0 border border-editor-border bg-editor-panel transition-colors',
+        density === 'grid' ? 'rounded p-1' : 'rounded-sm',
+        isSelected && 'border-editor-focus-ring',
+        isPreviewed && 'outline outline-1 outline-offset-[-1px] outline-editor-primary-active',
+        isOver && 'bg-editor-selected-quiet',
+        isDragging && 'opacity-40',
+      )}
+      data-applied={isApplied ? 'true' : 'false'}
+      data-edited-after-apply={isApplied && editedAfterApply ? 'true' : 'false'}
+      data-preview-state={previewState}
+      data-selected={isSelected ? 'true' : 'false'}
+      data-testid={`preset-result-${preset.id}`}
+      onContextMenu={(event) => onContextMenu(event, { preset })}
       ref={setCombinedRef}
-      role="button"
-      tabIndex={0}
-      aria-label={t('editor.presets.applyPresetLabel', { name: preset.name })}
-      onKeyDown={handleKeyDown}
-      style={style}
     >
-      <motion.div
-        {...listeners}
-        {...attributes}
-        className="cursor-grab"
-        whileTap={{ scale: 0.98 }}
-        transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+      <button
+        aria-describedby={`preset-state-${preset.id}`}
+        aria-label={t('editor.presets.discovery.selectLabel', { name: preset.name })}
+        className={cx(
+          'flex min-w-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-editor-focus-ring',
+          density === 'grid' ? 'w-full flex-col gap-1.5 rounded p-1.5' : 'w-full items-center gap-2 px-2 py-1.5',
+        )}
+        onBlur={() => onPreview(null)}
+        onClick={() => onSelect(preset)}
+        onFocus={() => onPreview(preset)}
+        onKeyDown={(event) => onKeyDown(event, preset)}
+        onMouseEnter={() => onPreview(preset)}
+        onMouseLeave={() => onPreview(null)}
+        ref={presetButtonRef}
+        type="button"
       >
-        <PresetItemDisplay preset={preset} previewUrl={previewUrl} isGeneratingPreviews={isGeneratingPreviews} />
-      </motion.div>
+        <span
+          className={cx(
+            'flex shrink-0 items-center justify-center overflow-hidden border border-editor-border bg-editor-panel-well',
+            density === 'grid' ? 'aspect-[4/3] w-full rounded-sm' : 'h-11 w-14 rounded-sm',
+          )}
+        >
+          <PresetThumbnail preset={preset} previewState={previewState} previewUrl={previewUrl} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex min-w-0 items-center gap-1.5">
+            {isTool ? <Wrench aria-hidden="true" size={12} /> : <Palette aria-hidden="true" size={12} />}
+            <span className="truncate text-[12px] font-medium leading-4 text-text-primary" title={preset.name}>
+              {preset.name}
+            </span>
+          </span>
+          <span className="mt-0.5 flex min-w-0 items-center gap-1 text-[10px] leading-3 text-text-secondary">
+            {isTool ? t('editor.presets.types.tool') : t('editor.presets.types.style')}
+            {previewState === 'failed' ? <span>{t('editor.presets.states.previewFailed')}</span> : null}
+            {!valid ? <span>{t('editor.presets.states.invalid')}</span> : null}
+          </span>
+        </span>
+      </button>
+      <span className="sr-only" id={`preset-state-${preset.id}`}>
+        {isApplied
+          ? editedAfterApply
+            ? t('editor.presets.states.appliedEdited')
+            : t('editor.presets.states.applied')
+          : isPreviewed
+            ? t('editor.presets.states.previewing')
+            : isSelected
+              ? t('editor.presets.states.selected')
+              : t('editor.presets.states.available')}
+      </span>
+      <div
+        className={cx(
+          'absolute flex items-center gap-0.5',
+          density === 'grid' ? 'right-1 top-1' : 'right-1 top-1/2 -translate-y-1/2',
+        )}
+      >
+        {isApplied ? (
+          <span
+            aria-label={
+              editedAfterApply ? t('editor.presets.states.appliedEdited') : t('editor.presets.states.applied')
+            }
+            className="flex h-5 w-5 items-center justify-center text-text-primary"
+            title={editedAfterApply ? t('editor.presets.states.appliedEdited') : t('editor.presets.states.applied')}
+          >
+            {editedAfterApply ? <PencilLine size={13} /> : <CheckCircle2 size={13} />}
+          </span>
+        ) : null}
+        <button
+          aria-label={t('editor.presets.applyPresetLabel', { name: preset.name })}
+          className="flex h-6 w-6 items-center justify-center rounded text-text-secondary opacity-0 transition-opacity hover:bg-editor-selected-quiet hover:text-text-primary focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-45"
+          data-tooltip={t('editor.presets.applyPresetLabel', { name: preset.name })}
+          disabled={!valid}
+          onClick={(event) => {
+            event.stopPropagation();
+            onApply(preset);
+          }}
+          type="button"
+        >
+          <Check size={13} />
+        </button>
+        <button
+          aria-label={t('editor.presets.discovery.moveLabel', { name: preset.name })}
+          className="flex h-6 w-5 cursor-grab items-center justify-center rounded text-text-tertiary hover:bg-editor-selected-quiet hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring active:cursor-grabbing"
+          data-tooltip={t('editor.presets.discovery.moveLabel', { name: preset.name })}
+          type="button"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical size={13} />
+        </button>
+      </div>
     </div>
   );
 }
 
-function DroppableFolderItem({ folder, onContextMenu, children, onToggle, isExpanded }: DroppableFolderItemProps) {
+function FolderResult({
+  children,
+  folder,
+  forceExpanded,
+  isExpanded,
+  onContextMenu,
+  onToggle,
+}: {
+  children: ReactNode;
+  folder: PresetFolder;
+  forceExpanded: boolean;
+  isExpanded: boolean;
+  onContextMenu: (event: ReactMouseEvent<HTMLElement>, item: PresetContextItem) => void;
+  onToggle: (id: string) => void;
+}) {
+  const { t } = useTranslation();
   const {
     attributes,
     listeners,
     setNodeRef: setDraggableNodeRef,
     isDragging,
   } = useDraggable({
-    data: { type: PresetListType.Folder, folder },
     id: folder.id,
+    data: { type: PresetListType.Folder },
   });
-
   const { setNodeRef: setDroppableNodeRef, isOver } = useDroppable({
-    data: { type: PresetListType.Folder, folder },
     id: folder.id,
+    data: { type: PresetListType.Folder },
   });
-
-  const style = {
-    opacity: isDragging ? 0.4 : 1,
-    touchAction: 'none',
-  };
-
-  const hasChildren = folder.children.length > 0;
+  const shown = forceExpanded || isExpanded;
 
   return (
-    <div
-      className={`rounded-lg transition-colors ${isOver ? 'bg-surface-hover' : ''}`}
+    <section
+      aria-label={folder.name}
+      className={cx(
+        'border-b border-editor-border py-1',
+        isOver && 'bg-editor-selected-quiet',
+        isDragging && 'opacity-40',
+      )}
+      onContextMenu={(event) => onContextMenu(event, { folder })}
       ref={setDroppableNodeRef}
-      style={style}
     >
-      <div
-        className="flex items-center gap-2 p-2 rounded-lg bg-surface cursor-pointer"
-        onContextMenu={(e) => {
-          onContextMenu(e, { folder });
-        }}
-      >
-        <div className="p-1 cursor-grab" ref={setDraggableNodeRef} {...listeners} {...attributes}>
-          {isExpanded ? (
-            <FolderOpen
-              className="text-primary"
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggle(folder.id);
-              }}
-              size={18}
-            />
-          ) : (
-            <FolderIcon
-              className="text-text-secondary"
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggle(folder.id);
-              }}
-              size={18}
-            />
-          )}
-        </div>
-        <UiText
-          color={TextColors.primary}
-          weight={TextWeights.medium}
-          className="grow truncate select-none"
-          onClick={() => {
-            onToggle(folder.id);
+      <div className="flex min-w-0 items-center gap-1 px-1">
+        <button
+          aria-expanded={shown}
+          aria-label={t('editor.presets.discovery.toggleFolder', { name: folder.name })}
+          className="flex min-w-0 flex-1 items-center gap-1.5 rounded-sm px-1.5 py-1 text-left text-[11px] font-semibold leading-4 text-text-primary hover:bg-editor-selected-quiet focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring"
+          data-tooltip={t('editor.presets.discovery.toggleFolder', { name: folder.name })}
+          onClick={() => onToggle(folder.id)}
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowRight' && !shown) onToggle(folder.id);
+            if (event.key === 'ArrowLeft' && shown && !forceExpanded) onToggle(folder.id);
           }}
+          type="button"
         >
-          {folder.name}
-        </UiText>
-        <UiText as="span" variant={TextVariants.small} color={TextColors.secondary} className="ml-auto pr-1">
-          {folder.children.length}
-        </UiText>
+          {shown ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+          <Folder size={13} />
+          <span className="truncate" title={folder.name}>
+            {folder.name}
+          </span>
+          <span className="ml-auto text-[10px] font-normal text-text-secondary">{folder.children.length}</span>
+        </button>
+        <button
+          aria-label={t('editor.presets.discovery.moveFolderLabel', { name: folder.name })}
+          className="flex h-6 w-5 cursor-grab items-center justify-center rounded text-text-tertiary hover:bg-editor-selected-quiet hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring active:cursor-grabbing"
+          data-tooltip={t('editor.presets.discovery.moveFolderLabel', { name: folder.name })}
+          ref={setDraggableNodeRef}
+          type="button"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical size={13} />
+        </button>
       </div>
-      <AnimatePresence>
-        {isExpanded && hasChildren && (
-          <motion.div
-            animate={{ height: 'auto', opacity: 1 }}
-            className="ml-5 pl-4 border-l-[1.5px] border-border-color/50 space-y-2 overflow-hidden pt-2"
-            exit={{ height: 0, opacity: 0 }}
-            initial={{ height: 0, opacity: 0 }}
-          >
-            {children}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+      {shown ? <div className="ml-3 grid gap-1 border-l border-editor-border px-1.5 py-1">{children}</div> : null}
+    </section>
   );
 }
 
 export function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProps) {
   const { t } = useTranslation();
-  const selectedImage = useEditorStore((s) => s.selectedImage);
-  const adjustments = useEditorStore((s) => s.adjustments);
-  const activePanel = useUIStore((s) => s.activeRightPanel);
+  const selectedImage = useEditorStore((state) => state.selectedImage);
+  const adjustments = useEditorStore((state) => state.adjustments);
+  const appliedPreset = useEditorStore((state) => state.presetApplication);
+  const setAppliedPreset = useEditorStore((state) => state.setPresetApplication);
+  const activePanel = useUIStore((state) => state.activeRightPanel);
   const { setAdjustments } = useEditorActions();
-
   const {
     addFolder,
     addPreset,
@@ -429,171 +429,158 @@ export function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProps) {
     deleteItem,
     duplicatePreset,
     exportPresetsToFile,
-    importPresetsFromFile,
     importLegacyPresetsFromFile,
+    importPresetsFromFile,
     isLoading,
+    loadError,
     movePreset,
     overwritePreset,
     presets,
+    refreshPresets,
     renameItem,
     reorderItems,
     sortAllPresetsAlphabetically,
+    storageError,
   } = usePresets(adjustments);
   const { showContextMenu } = useContextMenu();
-  const [previews, setPreviews] = useState<Record<string, string | null>>({});
-  const [isGeneratingPreviews, setIsGeneratingPreviews] = useState(false);
-  const [configureModalState, setConfigureModalState] = useState<ModalState>({ isOpen: false, preset: null });
-  const [isAddFolderModalOpen, setIsAddFolderModalOpen] = useState(false);
-  const [renameFolderState, setRenameFolderState] = useState<FolderState>({ isOpen: false, folder: null });
+  const density = professionalInspectorDensityTokens;
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<DiscoveryFilter>('all');
+  const [sort, setSort] = useState<DiscoverySort>('library');
+  const [resultDensity, setResultDensity] = useState<DiscoveryDensity>('list');
   const [expandedFolders, setExpandedFolders] = useState(new Set<string>());
-  const [activeItem, setActiveItem] = useState<ActivePresetItem | null>(null);
-  const [folderPreviewsGenerated, setFolderPreviewsGenerated] = useState<Set<string>>(new Set());
-  const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
+  const [previews, setPreviews] = useState<Record<string, string | null>>({});
+  const [previewStates, setPreviewStates] = useState<Record<string, 'failed' | 'idle' | 'loading' | 'ready'>>({});
+  const [isGeneratingPreviews, setIsGeneratingPreviews] = useState(false);
+  const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
+  const [previewedPresetId, setPreviewedPresetId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [importConflictCount, setImportConflictCount] = useState(0);
+  const [configureModalState, setConfigureModalState] = useState<ConfigureModalState>({ isOpen: false, preset: null });
+  const [isAddFolderModalOpen, setIsAddFolderModalOpen] = useState(false);
+  const [renameFolderState, setRenameFolderState] = useState<FolderModalState>({ folder: null, isOpen: false });
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const presetButtonRefs = useRef(new Map<string, HTMLButtonElement>());
   const previewsRef = useRef(previews);
-  const expandedFoldersRef = useRef(expandedFolders);
+  const previewQueue = useRef<PreviewQueueItem[]>([]);
+  const isProcessingQueue = useRef(false);
+  const currentImagePathRef = useRef<string | null>(selectedImage?.path ?? null);
+
   useLayoutEffect(() => {
     previewsRef.current = previews;
-    expandedFoldersRef.current = expandedFolders;
-  }, [expandedFolders, previews]);
-  const previewQueue = useRef<Array<PreviewQueueItem>>([]);
-  const isProcessingQueue = useRef(false);
-  const currentImagePathRef = useRef<string | null>(selectedImage?.path || null);
+  }, [previews]);
 
-  useEffect(() => {
-    const allPresetIds = new Set<string>();
-    presets.forEach((item: UserPreset) => {
-      if (isPresetEntry(item)) {
-        allPresetIds.add(item.preset.id);
-      } else if (isFolderEntry(item)) {
-        item.folder.children.forEach((p: Preset) => allPresetIds.add(p.id));
-      }
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const { setNodeRef: setRootDropRef, isOver: isRootOver } = useDroppable({ id: 'preset-root' });
+
+  const folders = useMemo(() => presets.filter(isFolderEntry), [presets]);
+  const rootPresets = useMemo(() => presets.filter(isPresetEntry), [presets]);
+  const allPresetMap = useMemo(() => {
+    const entries = new Map<string, Preset>();
+    rootPresets.forEach((entry) => entries.set(entry.preset.id, entry.preset));
+    folders.forEach((entry) => entry.folder.children.forEach((preset) => entries.set(preset.id, preset)));
+    return entries;
+  }, [folders, rootPresets]);
+  const parentByPresetId = useMemo(() => {
+    const parents = new Map<string, string | null>();
+    rootPresets.forEach((entry) => parents.set(entry.preset.id, null));
+    folders.forEach((entry) => {
+      parents.set(entry.folder.id, null);
+      entry.folder.children.forEach((preset) => parents.set(preset.id, entry.folder.id));
     });
+    return parents;
+  }, [folders, rootPresets]);
+  const queryText = query.trim().toLocaleLowerCase();
+  const matchesPreset = useCallback(
+    (preset: Preset) =>
+      (filter === 'all' || (preset.presetType ?? 'style') === filter) &&
+      (queryText.length === 0 || preset.name.toLocaleLowerCase().includes(queryText)),
+    [filter, queryText],
+  );
+  const displayFolders = useMemo(() => {
+    const matching = folders.flatMap((entry) => {
+      const folderMatches = queryText.length > 0 && entry.folder.name.toLocaleLowerCase().includes(queryText);
+      const children = entry.folder.children.filter((preset) => matchesPreset(preset) || folderMatches);
+      return children.length > 0 || folderMatches ? [{ ...entry, folder: { ...entry.folder, children } }] : [];
+    });
+    return sort === 'name'
+      ? [...matching].sort((first, second) => compareNames(first.folder, second.folder))
+      : matching;
+  }, [folders, matchesPreset, queryText, sort]);
+  const displayRootPresets = useMemo(() => {
+    const matching = rootPresets.filter((entry) => matchesPreset(entry.preset));
+    return sort === 'name'
+      ? [...matching].sort((first, second) => compareNames(first.preset, second.preset))
+      : matching;
+  }, [matchesPreset, rootPresets, sort]);
+  const displayBuiltInStyles = useMemo(
+    () =>
+      BUILT_IN_COLOR_STYLE_PRESETS.filter(
+        (preset) =>
+          filter !== 'tool' &&
+          (queryText.length === 0 ||
+            `${preset.name} ${preset.category} ${preset.description}`.toLocaleLowerCase().includes(queryText)),
+      ),
+    [filter, queryText],
+  );
+  const visiblePresetIds = useMemo(
+    () => [
+      ...displayFolders.flatMap((entry) => entry.folder.children.map((preset) => preset.id)),
+      ...displayRootPresets.map((entry) => entry.preset.id),
+    ],
+    [displayFolders, displayRootPresets],
+  );
+  const isEditedAfterApply = useMemo(
+    () =>
+      appliedPreset !== null &&
+      appliedPreset.imagePath === (selectedImage?.path ?? null) &&
+      !areAdjustmentsEqual(adjustments, appliedPreset.expected),
+    [adjustments, appliedPreset, selectedImage?.path],
+  );
+  const previewedPreset = previewedPresetId ? (allPresetMap.get(previewedPresetId) ?? null) : null;
+  const hasUserPresets = rootPresets.length > 0 || folders.some((entry) => entry.folder.children.length > 0);
+  const hasDiscoveryResults =
+    displayBuiltInStyles.length > 0 || displayFolders.length > 0 || displayRootPresets.length > 0;
 
-    const currentPreviews = previewsRef.current;
-    const previewsToDelete = Object.keys(currentPreviews).filter((id) => !allPresetIds.has(id));
-
-    if (previewsToDelete.length > 0) {
-      setPreviews((prev) => {
-        const deletedPreviewIds = new Set(previewsToDelete);
-
-        return Object.fromEntries(
-          Object.entries(prev).filter(([id, url]) => {
-            if (!deletedPreviewIds.has(id)) return true;
-
-            if (url && url.startsWith('blob:')) {
-              URL.revokeObjectURL(url);
-            }
-            return false;
-          }),
-        );
-      });
-    }
-  }, [presets]);
-
-  useEffect(() => {
-    return () => {
-      Object.values(previewsRef.current).forEach((url) => {
-        if (url && url.startsWith('blob:')) {
-          URL.revokeObjectURL(url);
-        }
-      });
-      previewQueue.current = [];
-      isProcessingQueue.current = false;
-    };
+  const clearPreviews = useCallback(() => {
+    Object.values(previewsRef.current).forEach((url) => {
+      if (url?.startsWith('blob:')) URL.revokeObjectURL(url);
+    });
+    previewsRef.current = {};
+    previewQueue.current = [];
+    setPreviews({});
+    setPreviewStates({});
   }, []);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 10,
-      },
-    }),
-  );
-
-  const { setNodeRef: setRootNodeRef, isOver: isRootOver } = useDroppable({ id: 'root' });
-
-  const allItemsMap = useMemo(() => {
-    const map = new Map<string, ActivePresetItem>();
-    presets.forEach((item: UserPreset) => {
-      if (isPresetEntry(item)) {
-        map.set(item.preset.id, { type: PresetListType.Preset, data: item.preset });
-      } else if (isFolderEntry(item)) {
-        map.set(item.folder.id, { type: PresetListType.Folder, data: item.folder });
-        item.folder.children.forEach((preset: Preset) =>
-          map.set(preset.id, { type: PresetListType.Preset, data: preset }),
-        );
-      }
-    });
-    return map;
-  }, [presets]);
-
-  const itemParentMap = useMemo(() => {
-    const map = new Map<string, string | null>();
-    presets.forEach((item: UserPreset) => {
-      if (isPresetEntry(item)) {
-        map.set(item.preset.id, null);
-      } else if (isFolderEntry(item)) {
-        map.set(item.folder.id, null);
-        item.folder.children.forEach((preset: Preset) => {
-          map.set(preset.id, item.folder.id);
-        });
-      }
-    });
-    return map;
-  }, [presets]);
-
   const processPreviewQueue = useCallback(async () => {
-    if (isProcessingQueue.current || previewQueue.current.length === 0) {
-      return;
-    }
-
+    if (isProcessingQueue.current || previewQueue.current.length === 0) return;
     isProcessingQueue.current = true;
     setIsGeneratingPreviews(true);
-
-    const pathAtStart = currentImagePathRef.current;
+    const imagePathAtStart = currentImagePathRef.current;
 
     while (previewQueue.current.length > 0) {
-      if (pathAtStart !== currentImagePathRef.current) {
-        previewQueue.current = [];
-        break;
-      }
-
+      if (imagePathAtStart !== currentImagePathRef.current) break;
       const item = previewQueue.current.shift();
-      if (!item) break;
-      const { preset, folderId } = item;
-
-      if (folderId && !expandedFoldersRef.current.has(folderId)) {
-        continue;
-      }
-
-      if (previewsRef.current[preset.id]) {
-        continue;
-      }
+      if (!item || previewsRef.current[item.preset.id] !== undefined) continue;
 
       try {
-        const fullPresetAdjustments = { ...INITIAL_ADJUSTMENTS, ...preset.adjustments };
-        const imageData: Uint8Array = await invoke(Invokes.GeneratePresetPreview, {
-          jsAdjustments: fullPresetAdjustments,
+        const imageData = await invoke<Uint8Array>(Invokes.GeneratePresetPreview, {
+          jsAdjustments: { ...INITIAL_ADJUSTMENTS, ...item.preset.adjustments },
         });
-
-        if (pathAtStart !== currentImagePathRef.current) {
-          previewQueue.current = [];
-          break;
-        }
-
-        const blob = createBlobFromUint8Array(imageData, 'image/jpeg');
-        const url = URL.createObjectURL(blob);
-        setPreviews((prev: Record<string, string | null>) => {
-          const oldUrl = prev[preset.id];
-          if (oldUrl && oldUrl.startsWith('blob:')) {
-            URL.revokeObjectURL(oldUrl);
-          }
-          return { ...prev, [preset.id]: url };
+        if (imagePathAtStart !== currentImagePathRef.current) break;
+        const previewUrl = URL.createObjectURL(createBlobFromUint8Array(imageData, 'image/jpeg'));
+        setPreviews((current) => {
+          const previous = current[item.preset.id];
+          if (previous?.startsWith('blob:')) URL.revokeObjectURL(previous);
+          return { ...current, [item.preset.id]: previewUrl };
         });
+        setPreviewStates((current) => ({ ...current, [item.preset.id]: 'ready' }));
       } catch (error) {
-        console.error(`Failed to generate preview for preset ${preset.name}:`, error);
-        if (pathAtStart === currentImagePathRef.current) {
-          setPreviews((prev: Record<string, string | null>) => ({ ...prev, [preset.id]: null }));
+        console.error(`Failed to generate preview for preset ${item.preset.name}:`, error);
+        if (imagePathAtStart === currentImagePathRef.current) {
+          setPreviews((current) => ({ ...current, [item.preset.id]: null }));
+          setPreviewStates((current) => ({ ...current, [item.preset.id]: 'failed' }));
         }
       }
     }
@@ -603,273 +590,157 @@ export function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProps) {
   }, []);
 
   const enqueuePreviews = useCallback(
-    (presetsToGenerate: Array<Preset>, folderId: string | null = null) => {
-      const newItems = presetsToGenerate
-        .filter((preset) => !previewsRef.current[preset.id])
-        .map((preset) => ({ preset, folderId }));
-      if (newItems.length > 0) {
-        previewQueue.current.push(...newItems);
-        void processPreviewQueue();
-      }
+    (items: PreviewQueueItem[]) => {
+      const newItems = items.filter((item) => previewsRef.current[item.preset.id] === undefined);
+      if (newItems.length === 0) return;
+      previewQueue.current.push(...newItems);
+      setPreviewStates((current) => ({
+        ...current,
+        ...Object.fromEntries(newItems.map((item) => [item.preset.id, 'loading' as const])),
+      }));
+      void processPreviewQueue();
     },
     [processPreviewQueue],
   );
 
-  const toggleFolder = (folderId: string) => {
-    setExpandedFolders((prev: Set<string>) => {
-      const newSet = new Set(prev);
-      if (newSet.has(folderId)) {
-        newSet.delete(folderId);
-      } else {
-        newSet.add(folderId);
-        if (!folderPreviewsGenerated.has(folderId)) {
-          generateFolderPreviews(folderId);
-        }
-      }
-      return newSet;
-    });
-  };
-
-  const generateSinglePreview = useCallback(
-    async (preset: Preset) => {
-      if (!selectedImage?.isReady) {
-        return;
-      }
-
-      setIsGeneratingPreviews(true);
-      const pathAtStart = currentImagePathRef.current;
-
-      try {
-        const fullPresetAdjustments: Adjustments = { ...INITIAL_ADJUSTMENTS, ...preset.adjustments };
-        const imageData: Uint8Array = await invoke(Invokes.GeneratePresetPreview, {
-          jsAdjustments: fullPresetAdjustments,
-        });
-
-        if (pathAtStart !== currentImagePathRef.current) return;
-
-        const blob = createBlobFromUint8Array(imageData, 'image/jpeg');
-        const url = URL.createObjectURL(blob);
-
-        setPreviews((prev: Record<string, string | null>) => {
-          const oldUrl = prev[preset.id];
-          if (oldUrl && oldUrl.startsWith('blob:')) {
-            URL.revokeObjectURL(oldUrl);
-          }
-          return { ...prev, [preset.id]: url };
-        });
-      } catch (error) {
-        console.error(`Failed to generate preview for preset ${preset.name}:`, error);
-        if (pathAtStart === currentImagePathRef.current) {
-          setPreviews((prev: Record<string, string | null>) => ({ ...prev, [preset.id]: null }));
-        }
-      } finally {
-        if (pathAtStart === currentImagePathRef.current) {
-          setIsGeneratingPreviews(false);
-        }
-      }
-    },
-    [selectedImage?.isReady],
-  );
-
-  const generateFolderPreviews = useCallback(
-    (folderId: string) => {
-      if (!selectedImage?.isReady) {
-        return;
-      }
-
-      const folder = presets.find(
-        (item: UserPreset): item is FolderEntry => isFolderEntry(item) && item.folder.id === folderId,
-      );
-      if (folder === undefined || folder.folder.children.length === 0) {
-        return;
-      }
-
-      const presetsToGenerate = folder.folder.children.filter((preset: Preset) => !previewsRef.current[preset.id]);
-      if (presetsToGenerate.length > 0) {
-        enqueuePreviews(presetsToGenerate, folderId);
-      }
-      setFolderPreviewsGenerated((prev: Set<string>) => new Set(prev).add(folderId));
-    },
-    [selectedImage?.isReady, presets, enqueuePreviews],
-  );
-
-  const generateRootPreviews = useCallback(() => {
-    if (!selectedImage?.isReady) {
-      return;
-    }
-
-    const rootPresets = presets.filter(isPresetEntry).map((item) => item.preset);
-    const presetsToGenerate = rootPresets.filter((preset) => !previewsRef.current[preset.id]);
-
-    if (presetsToGenerate.length > 0) {
-      enqueuePreviews(presetsToGenerate);
-    }
-  }, [selectedImage?.isReady, presets, enqueuePreviews]);
-
   useEffect(() => {
-    const isPathChanged = selectedImage?.path !== currentImagePathRef.current;
-
-    if (isPathChanged || !selectedImage.isReady) {
-      Object.values(previewsRef.current).forEach((url) => {
-        if (url && url.startsWith('blob:')) {
-          URL.revokeObjectURL(url);
-        }
-      });
-
-      previewsRef.current = {};
-      previewQueue.current = [];
-
-      setPreviews({});
-      setFolderPreviewsGenerated(new Set<string>());
-
-      if (isPathChanged && selectedImage?.path) {
-        currentImagePathRef.current = selectedImage.path;
-      }
+    const hasChangedImage = selectedImage?.path !== currentImagePathRef.current;
+    if (hasChangedImage) {
+      currentImagePathRef.current = selectedImage?.path ?? null;
+      clearPreviews();
     }
-
-    if (activePanel === Panel.Presets && selectedImage?.isReady && presets.length > 0) {
-      generateRootPreviews();
-      expandedFolders.forEach((folderId: string) => {
-        generateFolderPreviews(folderId);
-      });
-    }
+    if (activePanel !== Panel.Presets || !selectedImage?.isReady) return;
+    enqueuePreviews(rootPresets.map((entry) => ({ folderId: null, preset: entry.preset })));
+    folders
+      .filter((entry) => expandedFolders.has(entry.folder.id) || queryText.length > 0)
+      .forEach((entry) =>
+        enqueuePreviews(entry.folder.children.map((preset) => ({ folderId: entry.folder.id, preset }))),
+      );
   }, [
     activePanel,
+    clearPreviews,
+    enqueuePreviews,
+    expandedFolders,
+    folders,
+    queryText,
+    rootPresets,
     selectedImage?.isReady,
     selectedImage?.path,
-    presets.length,
-    generateRootPreviews,
-    generateFolderPreviews,
-    expandedFolders,
   ]);
 
-  const handleApplyPreset = (preset: Preset) => {
-    setAdjustments((prevAdjustments: Adjustments) => ({
-      ...prevAdjustments,
-      ...preset.adjustments,
-    }));
-  };
+  useEffect(
+    () => () => {
+      clearPreviews();
+      isProcessingQueue.current = false;
+    },
+    [clearPreviews],
+  );
 
-  const handleApplyColorStylePreset = (preset: ColorStylePreset) => {
-    setAdjustments((prevAdjustments: Adjustments) => ({
-      ...prevAdjustments,
-      ...preset.adjustmentPatch,
-    }));
-  };
+  const toggleFolder = useCallback((folderId: string) => {
+    setExpandedFolders((current) => {
+      const next = new Set(current);
+      if (next.has(folderId)) next.delete(folderId);
+      else next.add(folderId);
+      return next;
+    });
+  }, []);
 
-  const handleSaveConfiguredPreset = async (
-    name: string,
-    includeMasks: boolean,
-    includeCropTransform: boolean,
-    presetType: 'tool' | 'style',
-  ) => {
-    if (configureModalState.preset) {
-      const updated = configurePreset(
-        configureModalState.preset.id,
-        name,
-        includeMasks,
-        includeCropTransform,
-        presetType,
-      );
-      if (updated) {
-        await generateSinglePreview(updated);
+  const applyPreset = useCallback(
+    (preset: Preset) => {
+      if (!isPresetValid(preset)) {
+        setActionError(t('editor.presets.errors.invalidPreset'));
+        return;
       }
-    } else {
-      const newPreset = addPreset(name, null, includeMasks, includeCropTransform, presetType);
-      await generateSinglePreview(newPreset);
-    }
-    setConfigureModalState({ isOpen: false, preset: null });
-  };
-
-  const handleAddFolder = (name: string) => {
-    addFolder(name);
-    setIsAddFolderModalOpen(false);
-  };
-
-  const handleRenameFolderSave = (newName: string) => {
-    if (renameFolderState.folder) {
-      renameItem(renameFolderState.folder.id, newName);
-    }
-    setRenameFolderState({ isOpen: false, folder: null });
-  };
-
-  const handleDeleteItem = (id: string | null, isFolder = false) => {
-    setDeletingItemId(id);
-    if (!id) {
-      return;
-    }
-
-    setTimeout(() => {
-      deleteItem(id);
-      if (isFolder) {
-        setExpandedFolders((prev: Set<string>) => {
-          const newSet = new Set(prev);
-          newSet.delete(id);
-          return newSet;
+      try {
+        const before = structuredClone(adjustments);
+        const expected = { ...adjustments, ...preset.adjustments };
+        setAdjustments(() => expected);
+        setActionError(null);
+        setSelectedPresetId(preset.id);
+        setAppliedPreset({
+          before,
+          expected,
+          id: preset.id,
+          imagePath: selectedImage?.path ?? null,
+          name: preset.name,
         });
-        setFolderPreviewsGenerated((prev: Set<string>) => {
-          const newSet = new Set(prev);
-          newSet.delete(id);
-          return newSet;
+      } catch (error) {
+        console.error(`Failed to apply preset ${preset.name}:`, error);
+        setActionError(t('editor.presets.errors.applyFailed'));
+      }
+    },
+    [adjustments, selectedImage?.path, setAdjustments, setAppliedPreset, t],
+  );
+
+  const applyColorStyle = useCallback(
+    (preset: ColorStylePreset) => {
+      try {
+        const before = structuredClone(adjustments);
+        const expected = { ...adjustments, ...preset.adjustmentPatch };
+        setAdjustments(() => expected);
+        setActionError(null);
+        setAppliedPreset({
+          before,
+          expected,
+          id: preset.id,
+          imagePath: selectedImage?.path ?? null,
+          name: preset.name,
         });
+      } catch (error) {
+        console.error(`Failed to apply color style ${preset.name}:`, error);
+        setActionError(t('editor.presets.errors.applyFailed'));
       }
-    }, 300);
-  };
+    },
+    [adjustments, selectedImage?.path, setAdjustments, setAppliedPreset, t],
+  );
 
-  const handleDragStart = (event: DragStartEvent) => {
-    setActiveItem(allItemsMap.get(toDragId(event.active.id)) ?? null);
-  };
+  const revertAppliedPreset = useCallback(() => {
+    if (!appliedPreset) return;
+    setAdjustments(() => structuredClone(appliedPreset.before));
+    setAppliedPreset(null);
+    setActionError(null);
+  }, [appliedPreset, setAdjustments]);
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    setActiveItem(null);
-
-    const activeId = toDragId(active.id);
-    const activeParentId = itemParentMap.get(activeId);
-    const activeType = getPresetDragType(active.data.current);
-
-    if (!over) {
-      if (activeParentId !== null) {
-        movePreset(activeId, null, null);
+  const handlePresetKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLButtonElement>, preset: Preset) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        applyPreset(preset);
+        return;
       }
-      return;
-    }
-
-    if (active.id === over.id) {
-      return;
-    }
-
-    const overId = toDragId(over.id);
-    const overParentId = itemParentMap.get(overId);
-    const overType = getPresetDragType(over.data.current);
-
-    const targetFolderId = overType === PresetListType.Folder ? overId : overParentId;
-
-    if (activeType === PresetListType.Preset && targetFolderId) {
-      if (activeParentId !== targetFolderId) {
-        movePreset(activeId, targetFolderId);
-        setExpandedFolders((prev: Set<string>) => new Set(prev).add(targetFolderId));
-        if (!folderPreviewsGenerated.has(targetFolderId)) {
-          generateFolderPreviews(targetFolderId);
-        }
-      } else {
-        reorderItems(activeId, overId);
+      if (event.key === ' ') {
+        event.preventDefault();
+        setSelectedPresetId(preset.id);
+        setPreviewedPresetId(preset.id);
+        return;
       }
-      return;
-    }
+      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+      event.preventDefault();
+      const index = visiblePresetIds.indexOf(preset.id);
+      const direction = event.key === 'ArrowDown' ? 1 : -1;
+      const nextId = visiblePresetIds[index + direction];
+      if (nextId) presetButtonRefs.current.get(nextId)?.focus();
+    },
+    [applyPreset, visiblePresetIds],
+  );
 
-    if (activeParentId !== null && !targetFolderId) {
-      movePreset(activeId, null, overId);
-      return;
-    }
+  const handleSaveConfiguredPreset = useCallback(
+    async (name: string, includeMasks: boolean, includeCropTransform: boolean, presetType: 'style' | 'tool') => {
+      try {
+        const preset = configureModalState.preset
+          ? configurePreset(configureModalState.preset.id, name, includeMasks, includeCropTransform, presetType)
+          : addPreset(name, null, includeMasks, includeCropTransform, presetType);
+        if (preset && selectedImage?.isReady) enqueuePreviews([{ folderId: null, preset }]);
+        setConfigureModalState({ isOpen: false, preset: null });
+      } catch (error) {
+        console.error('Failed to save preset:', error);
+        setActionError(t('editor.presets.errors.saveFailed'));
+      }
+    },
+    [addPreset, configureModalState.preset, configurePreset, enqueuePreviews, selectedImage?.isReady, t],
+  );
 
-    if (activeParentId === null && !targetFolderId) {
-      reorderItems(activeId, overId);
-      return;
-    }
-  };
-
-  const handleImportPresets = async () => {
+  const handleImportPresets = useCallback(async () => {
     try {
       const selectedPath = await openDialog({
         filters: [
@@ -880,485 +751,602 @@ export function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProps) {
         multiple: false,
         title: t('editor.presets.dialog.importPresetsTitle'),
       });
+      if (typeof selectedPath !== 'string') return;
 
-      if (typeof selectedPath === 'string') {
-        const isLegacy =
-          selectedPath.toLowerCase().endsWith('.xmp') || selectedPath.toLowerCase().endsWith('.lrtemplate');
-
-        if (isLegacy) {
-          await importLegacyPresetsFromFile(selectedPath);
-        } else {
-          await importPresetsFromFile(selectedPath);
-        }
-
-        setFolderPreviewsGenerated(new Set<string>());
-        setPreviews({});
-      }
+      const previousNames = new Set(collectPresetNames(presets));
+      const imported =
+        selectedPath.toLocaleLowerCase().endsWith('.xmp') || selectedPath.toLocaleLowerCase().endsWith('.lrtemplate')
+          ? await importLegacyPresetsFromFile(selectedPath)
+          : await importPresetsFromFile(selectedPath);
+      const conflicts = collectPresetNames(imported ?? []).filter((name) => {
+        const suffix = name.match(/^(.*) \((\d+)\)$/u);
+        return suffix?.[1] !== undefined && previousNames.has(suffix[1]);
+      });
+      setImportConflictCount(conflicts.length);
+      setActionError(null);
+      clearPreviews();
     } catch (error) {
       console.error('Failed to import presets:', error);
+      setActionError(t('editor.presets.errors.importFailed'));
     }
-  };
+  }, [clearPreviews, importLegacyPresetsFromFile, importPresetsFromFile, presets, t]);
 
-  const handleExport = async (item: UserPreset) => {
-    const isFolder = !!item.folder;
-    const name = (isFolder ? item.folder?.name : item.preset?.name) ?? 'preset';
-    const itemsToExport = [item];
-
-    try {
-      const filePath = await saveDialog({
-        defaultPath: `${name}.rrpreset`.replace(/[<>:"/\\|?*]/g, '_'),
-        filters: [{ name: t('editor.presets.dialog.presetFile'), extensions: ['rrpreset'] }],
-        title: t('editor.presets.dialog.exportTitle', {
-          type: isFolder ? t('editor.presets.types.folder') : t('editor.presets.types.preset'),
-        }),
-      });
-
-      if (filePath) {
-        await exportPresetsToFile(itemsToExport, filePath);
+  const handleExport = useCallback(
+    async (item: UserPreset) => {
+      const isFolder = isFolderEntry(item);
+      const name = isFolder ? item.folder.name : (item.preset?.name ?? 'preset');
+      try {
+        const filePath = await saveDialog({
+          defaultPath: `${name}.rrpreset`.replace(/[<>:"/\\|?*]/g, '_'),
+          filters: [{ name: t('editor.presets.dialog.presetFile'), extensions: ['rrpreset'] }],
+          title: t('editor.presets.dialog.exportTitle', {
+            type: isFolder ? t('editor.presets.types.folder') : t('editor.presets.types.preset'),
+          }),
+        });
+        if (filePath) await exportPresetsToFile([item], filePath);
+      } catch (error) {
+        console.error('Failed to export preset:', error);
+        setActionError(t('editor.presets.errors.exportFailed'));
       }
-    } catch (error) {
-      console.error(`Failed to export ${isFolder ? PresetListType.Folder : PresetListType.Preset}:`, error);
-    }
-  };
+    },
+    [exportPresetsToFile, t],
+  );
 
-  const handleExportAllPresets = async () => {
-    if (presets.length === 0) {
-      return;
-    }
+  const handleExportAll = useCallback(async () => {
+    if (presets.length === 0) return;
     try {
       const filePath = await saveDialog({
         defaultPath: 'all_presets.rrpreset',
         filters: [{ name: t('editor.presets.dialog.presetFile'), extensions: ['rrpreset'] }],
         title: t('editor.presets.dialog.exportAllTitle'),
       });
-
-      if (filePath) {
-        await exportPresetsToFile(presets, filePath);
-      }
+      if (filePath) await exportPresetsToFile(presets, filePath);
     } catch (error) {
-      console.error('Failed to export all presets:', error);
+      console.error('Failed to export presets:', error);
+      setActionError(t('editor.presets.errors.exportFailed'));
     }
-  };
+  }, [exportPresetsToFile, presets, t]);
 
-  const handleContextMenu = (event: ReactMouseEvent<HTMLElement>, item: PresetContextItem) => {
-    event.preventDefault();
-    event.stopPropagation();
-
-    const isFolder = isFolderEntry(item);
-
-    const options: Array<Option> = isFolder
-      ? [
-          {
-            icon: Edit,
-            label: t('editor.presets.menu.renameFolder'),
-            onClick: () => {
-              setRenameFolderState({ isOpen: true, folder: item.folder });
+  const handleContextMenu = useCallback(
+    (event: ReactMouseEvent<HTMLElement>, item: PresetContextItem) => {
+      event.preventDefault();
+      const options: Option[] = isFolderEntry(item)
+        ? [
+            {
+              icon: Settings2,
+              label: t('editor.presets.menu.renameFolder'),
+              onClick: () => setRenameFolderState({ folder: item.folder, isOpen: true }),
             },
-          },
-          {
-            icon: FileDown,
-            label: t('editor.presets.menu.exportFolder'),
-            onClick: () => {
-              void handleExport(item);
+            { icon: FileDown, label: t('editor.presets.menu.exportFolder'), onClick: () => void handleExport(item) },
+            { type: OPTION_SEPARATOR },
+            {
+              icon: Trash2,
+              isDestructive: true,
+              label: t('editor.presets.menu.deleteFolder'),
+              onClick: () => deleteItem(item.folder.id),
             },
-          },
-          { type: OPTION_SEPARATOR },
-          {
-            icon: Trash2,
-            isDestructive: true,
-            label: t('editor.presets.menu.deleteFolder'),
-            onClick: () => {
-              handleDeleteItem(item.folder.id, true);
+          ]
+        : [
+            { icon: Save, label: t('editor.presets.menu.overwrite'), onClick: () => overwritePreset(item.preset.id) },
+            {
+              icon: Settings2,
+              label: t('editor.presets.menu.configurePreset'),
+              onClick: () => setConfigureModalState({ isOpen: true, preset: item.preset }),
             },
-          },
-        ]
-      : [
-          {
-            icon: Save,
-            label: t('editor.presets.menu.overwrite'),
-            onClick: () => {
-              const updated = overwritePreset(item.preset.id);
-              if (updated) {
-                void generateSinglePreview(updated);
-              }
+            {
+              icon: CopyPlus,
+              label: t('editor.presets.menu.duplicatePreset'),
+              onClick: () => duplicatePreset(item.preset.id),
             },
-          },
-          {
-            icon: Settings2,
-            label: t('editor.presets.menu.configurePreset'),
-            onClick: () => {
-              setConfigureModalState({ isOpen: true, preset: item.preset });
+            { icon: FileDown, label: t('editor.presets.menu.exportPreset'), onClick: () => void handleExport(item) },
+            { type: OPTION_SEPARATOR },
+            {
+              icon: Trash2,
+              isDestructive: true,
+              label: t('editor.presets.menu.deletePreset'),
+              onClick: () => deleteItem(item.preset.id),
             },
-          },
-          { type: OPTION_SEPARATOR },
-          {
-            icon: CopyPlus,
-            label: t('editor.presets.menu.duplicatePreset'),
-            onClick: () => {
-              const duplicated = duplicatePreset(item.preset.id);
-              if (duplicated) {
-                void generateSinglePreview(duplicated);
-              }
-            },
-          },
-          {
-            icon: FileDown,
-            label: t('editor.presets.menu.exportPreset'),
-            onClick: () => {
-              void handleExport(item);
-            },
-          },
-          { type: OPTION_SEPARATOR },
-          {
-            icon: Trash2,
-            isDestructive: true,
-            label: t('editor.presets.menu.deletePreset'),
-            onClick: () => {
-              handleDeleteItem(item.preset.id, false);
-            },
-          },
-        ];
-
-    showContextMenu(event.clientX, event.clientY, options);
-  };
-
-  const handleBackgroundContextMenu = (event: ReactMouseEvent<HTMLElement>) => {
-    if (!(event.target instanceof Node) || !event.currentTarget.contains(event.target)) {
-      return;
-    }
-    event.preventDefault();
-    const options = [
-      {
-        icon: Plus,
-        label: t('editor.presets.menu.newPreset'),
-        onClick: () => {
-          setConfigureModalState({ isOpen: true, preset: null });
-        },
-      },
-      {
-        icon: FolderPlus,
-        label: t('editor.presets.menu.newFolder'),
-        onClick: () => {
-          setIsAddFolderModalOpen(true);
-        },
-      },
-      { type: OPTION_SEPARATOR },
-      {
-        disabled: presets.length === 0,
-        icon: SortAsc,
-        label: t('editor.presets.menu.sortAll'),
-        onClick: sortAllPresetsAlphabetically,
-      },
-    ];
-    showContextMenu(event.clientX, event.clientY, options);
-  };
-
-  const folders = useMemo<Array<FolderEntry>>(() => presets.filter(isFolderEntry), [presets]);
-  const rootPresets = useMemo<Array<PresetEntry>>(() => presets.filter(isPresetEntry), [presets]);
-  const hasBuiltInColorStyles = BUILT_IN_COLOR_STYLE_PRESETS.length > 0;
-  const userPresetCount = useMemo(
-    () => rootPresets.length + folders.reduce((count, item) => count + item.folder.children.length, 0),
-    [folders, rootPresets.length],
+          ];
+      showContextMenu(event.clientX, event.clientY, options);
+    },
+    [deleteItem, duplicatePreset, handleExport, overwritePreset, showContextMenu, t],
   );
-  const generatedPreviewCount = useMemo(
-    () => Object.values(previews).filter((url) => typeof url === 'string' && url.length > 0).length,
-    [previews],
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      setActiveDragId(null);
+      const activeId = dragId(event.active.id);
+      const overId = event.over ? dragId(event.over.id) : null;
+      if (!overId || activeId === overId) return;
+      const activeParent = parentByPresetId.get(activeId);
+      const overParent = parentByPresetId.get(overId);
+      const activeIsFolder = folders.some((entry) => entry.folder.id === activeId);
+      const targetFolder = folders.some((entry) => entry.folder.id === overId) ? overId : overParent;
+      if (!activeIsFolder && targetFolder && activeParent !== targetFolder) {
+        movePreset(activeId, targetFolder);
+        setExpandedFolders((current) => new Set(current).add(targetFolder));
+      } else if (!activeIsFolder && activeParent === targetFolder) {
+        reorderItems(activeId, overId);
+      } else if (!activeIsFolder && activeParent !== null && targetFolder === null) {
+        movePreset(activeId, null, overId);
+      } else if (activeParent === null && targetFolder === null) {
+        reorderItems(activeId, overId);
+      }
+    },
+    [folders, movePreset, parentByPresetId, reorderItems],
   );
-  const presetCompositionItems = [
-    t('editor.presets.composition.colorStyles', { count: BUILT_IN_COLOR_STYLE_PRESETS.length }),
-    t('editor.presets.composition.userPresets', { count: userPresetCount }),
-    t('editor.presets.composition.folders', { count: folders.length }),
-    isGeneratingPreviews
-      ? t('editor.presets.composition.previewsGenerating')
-      : t('editor.presets.composition.previewsReady', { count: generatedPreviewCount }),
-  ];
+
+  const selectedPreset = selectedPresetId ? (allPresetMap.get(selectedPresetId) ?? null) : null;
+  const notice = loadError
+    ? { kind: 'error' as const, label: t('editor.presets.errors.loadFailed') }
+    : storageError
+      ? { kind: 'error' as const, label: t('editor.presets.errors.storageFailed') }
+      : isLoading
+        ? { kind: 'loading' as const, label: t('editor.presets.status.loading') }
+        : undefined;
+  const status =
+    actionError || loadError || storageError
+      ? { label: t('editor.presets.states.error'), tone: 'danger' as const }
+      : appliedPreset
+        ? {
+            label: isEditedAfterApply ? t('editor.presets.states.appliedEdited') : t('editor.presets.states.applied'),
+            tone: isEditedAfterApply ? ('warning' as const) : ('success' as const),
+          }
+        : previewedPreset
+          ? { label: t('editor.presets.states.previewing'), tone: 'info' as const }
+          : { label: t('editor.presets.states.ready'), tone: 'neutral' as const };
 
   return (
-    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="flex flex-col h-full">
-        <div className="p-4 flex justify-between items-center shrink-0 border-b border-surface">
-          <UiText variant={TextVariants.title}>{t('editor.presets.title')}</UiText>
-          <div className="flex items-center gap-1">
+    <DndContext
+      sensors={sensors}
+      onDragEnd={handleDragEnd}
+      onDragStart={(event) => setActiveDragId(dragId(event.active.id))}
+    >
+      <InspectorPanelFrame
+        actions={
+          <>
             <button
-              className="p-2 rounded-full hover:bg-surface transition-colors"
-              onClick={onNavigateToCommunity}
+              aria-label={t('editor.presets.tooltips.explore')}
+              className={density.frame.actionButton}
               data-tooltip={t('editor.presets.tooltips.explore')}
+              onClick={onNavigateToCommunity}
+              type="button"
             >
-              <Users size={18} />
+              <Users size={14} />
             </button>
             <button
-              className="p-2 rounded-full hover:bg-surface transition-colors"
-              disabled={isLoading}
-              onClick={() => {
-                void handleImportPresets();
-              }}
+              aria-label={t('editor.presets.tooltips.import')}
+              className={density.frame.actionButton}
               data-tooltip={t('editor.presets.tooltips.import')}
-            >
-              <FileUp size={18} />
-            </button>
-            <button
-              className="p-2 rounded-full hover:bg-surface transition-colors"
-              disabled={presets.length === 0 || isLoading}
-              onClick={() => {
-                void handleExportAllPresets();
-              }}
-              data-tooltip={t('editor.presets.tooltips.export')}
-            >
-              <FileDown size={18} />
-            </button>
-            <button
-              className="p-2 rounded-full hover:bg-surface transition-colors"
               disabled={isLoading}
-              onClick={() => {
-                setConfigureModalState({ isOpen: true, preset: null });
-              }}
-              data-tooltip={t('editor.presets.tooltips.saveNew')}
+              onClick={() => void handleImportPresets()}
+              type="button"
             >
-              <Plus size={18} />
+              <FileUp size={14} />
+            </button>
+            <button
+              aria-label={t('editor.presets.tooltips.export')}
+              className={density.frame.actionButton}
+              data-tooltip={t('editor.presets.tooltips.export')}
+              disabled={presets.length === 0 || isLoading}
+              onClick={() => void handleExportAll()}
+              type="button"
+            >
+              <FileDown size={14} />
+            </button>
+            <button
+              aria-label={t('editor.presets.tooltips.saveNew')}
+              className={density.frame.actionButton}
+              data-tooltip={t('editor.presets.tooltips.saveNew')}
+              disabled={isLoading}
+              onClick={() => setConfigureModalState({ isOpen: true, preset: null })}
+              type="button"
+            >
+              <Plus size={14} />
+            </button>
+          </>
+        }
+        icon={SlidersHorizontal}
+        label={t('editor.presets.title')}
+        notice={notice}
+        status={status}
+        testId="presets-panel"
+      >
+        <div
+          className="border-b border-editor-border px-2.5 py-2"
+          onKeyDown={(event) => {
+            if ((event.metaKey || event.ctrlKey) && event.key.toLocaleLowerCase() === 'f') {
+              event.preventDefault();
+              searchInputRef.current?.focus();
+            }
+            if (event.key === 'Escape' && previewedPresetId) setPreviewedPresetId(null);
+          }}
+        >
+          <label className="relative block">
+            <span className="sr-only">{t('editor.presets.discovery.searchLabel')}</span>
+            <Search
+              aria-hidden="true"
+              className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-text-tertiary"
+              size={13}
+            />
+            <input
+              className="h-7 w-full rounded-sm border border-editor-border bg-editor-panel-well pl-7 pr-2 text-[11px] text-text-primary outline-none placeholder:text-text-tertiary focus:ring-1 focus:ring-editor-focus-ring"
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={t('editor.presets.discovery.searchPlaceholder')}
+              ref={searchInputRef}
+              type="search"
+              value={query}
+            />
+          </label>
+          <div className="mt-1.5 flex min-w-0 items-center gap-1">
+            <select
+              aria-label={t('editor.presets.discovery.filterLabel')}
+              className="h-6 min-w-0 flex-1 rounded-sm border border-editor-border bg-editor-panel px-1 text-[10px] text-text-primary focus:outline-none focus:ring-1 focus:ring-editor-focus-ring"
+              onChange={(event) => setFilter(event.target.value as DiscoveryFilter)}
+              value={filter}
+            >
+              <option value="all">{t('editor.presets.discovery.filters.all')}</option>
+              <option value="style">{t('editor.presets.discovery.filters.styles')}</option>
+              <option value="tool">{t('editor.presets.discovery.filters.tools')}</option>
+            </select>
+            <select
+              aria-label={t('editor.presets.discovery.sortLabel')}
+              className="h-6 min-w-0 flex-1 rounded-sm border border-editor-border bg-editor-panel px-1 text-[10px] text-text-primary focus:outline-none focus:ring-1 focus:ring-editor-focus-ring"
+              onChange={(event) => setSort(event.target.value as DiscoverySort)}
+              value={sort}
+            >
+              <option value="library">{t('editor.presets.discovery.sort.library')}</option>
+              <option value="name">{t('editor.presets.discovery.sort.name')}</option>
+            </select>
+            <button
+              aria-label={t('editor.presets.discovery.listView')}
+              aria-pressed={resultDensity === 'list'}
+              className={cx(density.frame.actionButton, resultDensity === 'list' && density.frame.actionButtonActive)}
+              data-tooltip={t('editor.presets.discovery.listView')}
+              onClick={() => setResultDensity('list')}
+              type="button"
+            >
+              <List size={13} />
+            </button>
+            <button
+              aria-label={t('editor.presets.discovery.gridView')}
+              aria-pressed={resultDensity === 'grid'}
+              className={cx(density.frame.actionButton, resultDensity === 'grid' && density.frame.actionButtonActive)}
+              data-tooltip={t('editor.presets.discovery.gridView')}
+              onClick={() => setResultDensity('grid')}
+              type="button"
+            >
+              <Grid2X2 size={13} />
+            </button>
+            <button
+              aria-label={t('editor.presets.menu.sortAll')}
+              className={density.frame.actionButton}
+              data-tooltip={t('editor.presets.menu.sortAll')}
+              disabled={!hasUserPresets}
+              onClick={sortAllPresetsAlphabetically}
+              type="button"
+            >
+              <SortAsc size={13} />
+            </button>
+            <button
+              aria-label={t('editor.presets.menu.newFolder')}
+              className={density.frame.actionButton}
+              data-tooltip={t('editor.presets.menu.newFolder')}
+              onClick={() => setIsAddFolderModalOpen(true)}
+              type="button"
+            >
+              <FolderPlus size={13} />
             </button>
           </div>
         </div>
-        <div
-          className="flex flex-wrap gap-1.5 border-b border-surface px-4 py-2"
-          data-testid="presets-composition-summary"
-        >
-          {presetCompositionItems.map((item) => (
-            <UiText
-              as="span"
-              className="rounded bg-surface px-2 py-1"
-              color={TextColors.secondary}
-              data-presets-composition-item={item}
-              key={item}
-              variant={TextVariants.small}
-            >
-              {item}
-            </UiText>
-          ))}
-        </div>
 
-        <div
-          className={`grow overflow-y-auto p-4 space-y-2 rounded-lg transition-colors ${
-            isRootOver ? 'bg-surface-hover' : ''
-          }`}
-          onContextMenu={handleBackgroundContextMenu}
-          ref={setRootNodeRef}
-        >
-          {isLoading && presets.length === 0 && (
-            <UiText
-              as="div"
-              variant={TextVariants.heading}
-              color={TextColors.secondary}
-              weight={TextWeights.normal}
-              className="text-center mt-4"
-            >
-              <Loader2 size={14} className="animate-spin inline-block mr-2" /> {t('editor.presets.status.loading')}
-            </UiText>
-          )}
-          {!isLoading && presets.length === 0 && !hasBuiltInColorStyles ? (
-            <div className="text-center text-text-secondary flex flex-col items-center gap-4 pt-4">
-              <UiText className="max-w-xs">{t('editor.presets.status.empty')}</UiText>
-              <Button variant="secondary" onClick={onNavigateToCommunity}>
-                <Users size={16} className="mr-2" />
-                {t('editor.presets.status.getCommunity')}
-              </Button>
-            </div>
-          ) : (
-            <>
-              <section className="space-y-2 pb-2" aria-label={t('editor.presets.colorStyles.title')}>
-                <div className="flex items-center justify-between gap-2">
-                  <UiText variant={TextVariants.small} className="uppercase tracking-normal text-text-secondary">
-                    {t('editor.presets.colorStyles.title')}
-                  </UiText>
-                  <UiText variant={TextVariants.small} className="tabular-nums text-text-secondary">
-                    {t('editor.presets.colorStyles.count', { count: BUILT_IN_COLOR_STYLE_PRESETS.length })}
-                  </UiText>
-                </div>
-                <div className="grid gap-2">
-                  {BUILT_IN_COLOR_STYLE_PRESETS.map((preset) => {
-                    const isDefaultPreset = preset.id === COLOR_STYLE_PRESET_CATALOG.defaultPresetId;
-
-                    return (
-                      <button
-                        aria-label={t('editor.presets.colorStyles.applyLabel', { name: preset.name })}
-                        className="rounded-md border border-surface bg-bg-secondary p-2 text-left transition-colors hover:bg-surface"
-                        data-tooltip={preset.description}
-                        key={preset.id}
-                        onClick={() => {
-                          handleApplyColorStylePreset(preset);
-                        }}
-                        type="button"
-                      >
-                        <span className="flex items-center justify-between gap-2">
-                          <span className="flex min-w-0 items-center gap-2">
-                            <UiText className="truncate" weight={TextWeights.medium}>
-                              {preset.name}
-                            </UiText>
-                            {isDefaultPreset && (
-                              <UiText
-                                className="shrink-0 rounded border border-accent/40 px-1 text-accent"
-                                data-testid="color-style-default-preset-badge"
-                                variant={TextVariants.small}
-                              >
-                                {t('editor.presets.colorStyles.defaultBadge')}
-                              </UiText>
-                            )}
-                            <UiText
-                              className="shrink-0 rounded border border-border-color px-1 text-text-secondary"
-                              data-color-style-built-in-claim="generic_safe_name"
-                              data-color-style-built-in-provenance="generic_engineered_starting_point"
-                              data-testid={`color-style-generic-safe-badge-${preset.id}`}
-                              variant={TextVariants.small}
-                            >
-                              {t('editor.presets.colorStyles.genericSafeBadge')}
-                            </UiText>
-                          </span>
-                          <UiText
-                            variant={TextVariants.small}
-                            className="uppercase tracking-normal text-text-secondary"
-                          >
-                            {preset.category.replaceAll('_', ' ')}
-                          </UiText>
-                        </span>
-                        <UiText variant={TextVariants.small} className="mt-1 block text-text-secondary">
-                          {preset.previewTags.join(' / ')}
-                        </UiText>
-                        <UiText
-                          className="mt-1 block text-text-secondary"
-                          data-testid={`color-style-generic-safe-note-${preset.id}`}
-                          variant={TextVariants.small}
-                        >
-                          {t('editor.presets.colorStyles.genericLegalNote')}
-                        </UiText>
-                        <UiText
-                          as="span"
-                          variant={TextVariants.small}
-                          className="mt-2 inline-flex rounded border border-border-color px-1.5 py-0.5 text-[10px] text-text-secondary"
-                          data-testid={`color-style-adjustment-count-${preset.id}`}
-                        >
-                          {t('editor.presets.colorStyles.adjustmentCoverage', {
-                            count: getColorStyleAdjustmentCount(preset),
-                          })}
-                        </UiText>
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
-              <AnimatePresence>
-                {folders
-                  .filter((item) => item.folder.id !== deletingItemId)
-                  .map((item, index: number) => (
-                    <motion.div
-                      animate="visible"
-                      custom={index}
-                      exit="exit"
-                      initial="hidden"
-                      key={item.folder.id}
-                      layout="position"
-                      variants={itemVariants}
-                    >
-                      <DroppableFolderItem
-                        folder={item.folder}
-                        isExpanded={expandedFolders.has(item.folder.id)}
-                        onContextMenu={(e) => {
-                          handleContextMenu(e, item);
-                        }}
-                        onToggle={toggleFolder}
-                      >
-                        <AnimatePresence>
-                          {item.folder.children
-                            .filter((preset: Preset) => preset.id !== deletingItemId)
-                            .map((preset: Preset) => (
-                              <motion.div
-                                exit={{ opacity: 0, x: -15, transition: { duration: 0.2 } }}
-                                key={preset.id}
-                                layout="position"
-                              >
-                                <DraggablePresetItem
-                                  isGeneratingPreviews={isGeneratingPreviews}
-                                  onApply={handleApplyPreset}
-                                  onContextMenu={(e) => {
-                                    handleContextMenu(e, { preset });
-                                  }}
-                                  preset={preset}
-                                  previewUrl={previews[preset.id] || ''}
-                                />
-                              </motion.div>
-                            ))}
-                        </AnimatePresence>
-                      </DroppableFolderItem>
-                    </motion.div>
-                  ))}
-              </AnimatePresence>
-              <AnimatePresence>
-                {rootPresets
-                  .filter((item) => item.preset.id !== deletingItemId)
-                  .map((item, index: number) => (
-                    <motion.div
-                      animate="visible"
-                      custom={folders.length + index}
-                      exit="exit"
-                      initial="hidden"
-                      key={item.preset.id}
-                      layout="position"
-                      variants={itemVariants}
-                    >
-                      <DraggablePresetItem
-                        isGeneratingPreviews={isGeneratingPreviews}
-                        onApply={handleApplyPreset}
-                        onContextMenu={(e) => {
-                          handleContextMenu(e, item);
-                        }}
-                        preset={item.preset}
-                        previewUrl={previews[item.preset.id] || ''}
-                      />
-                    </motion.div>
-                  ))}
-              </AnimatePresence>
-            </>
-          )}
-        </div>
-
-        <ConfigurePresetModal
-          isOpen={configureModalState.isOpen}
-          initialPreset={configureModalState.preset}
-          onClose={() => {
-            setConfigureModalState({ isOpen: false, preset: null });
-          }}
-          onSave={(name, description, isFavorite, tags) => {
-            void handleSaveConfiguredPreset(name, description, isFavorite, tags);
-          }}
-        />
-        <CreateFolderModal
-          isOpen={isAddFolderModalOpen}
-          onClose={() => {
-            setIsAddFolderModalOpen(false);
-          }}
-          onSave={handleAddFolder}
-        />
-        <RenameFolderModal
-          currentName={renameFolderState.folder?.name ?? ''}
-          isOpen={renameFolderState.isOpen}
-          onClose={() => {
-            setRenameFolderState({ isOpen: false, folder: null });
-          }}
-          onSave={handleRenameFolderSave}
-        />
-      </div>
-      <DragOverlay>
-        {activeItem ? (
-          activeItem.type === PresetListType.Preset ? (
-            <PresetItemDisplay
-              isGeneratingPreviews={false}
-              preset={activeItem.data}
-              previewUrl={previews[activeItem.data.id] || ''}
-            />
-          ) : (
-            <FolderItemDisplay folder={activeItem.data} />
-          )
+        {importConflictCount > 0 ? (
+          <div
+            aria-live="polite"
+            className="flex items-center gap-1.5 border-b border-editor-border bg-editor-panel-well px-2.5 py-1 text-[10px] leading-4 text-text-secondary"
+          >
+            <CircleAlert size={12} />
+            {t('editor.presets.states.importConflict', { count: importConflictCount })}
+          </div>
         ) : null}
-      </DragOverlay>
+        {actionError ? (
+          <div
+            aria-live="assertive"
+            className="flex items-center justify-between gap-2 border-b border-editor-border px-2.5 py-1 text-[10px] leading-4 text-editor-danger"
+          >
+            <span>{actionError}</span>
+            <button
+              aria-label={t('editor.presets.discovery.dismissError')}
+              className="rounded px-1 hover:bg-editor-selected-quiet focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring"
+              onClick={() => setActionError(null)}
+              type="button"
+            >
+              {t('editor.presets.discovery.dismiss')}
+            </button>
+          </div>
+        ) : null}
+
+        <div
+          className={cx('min-h-0 flex-1 overflow-y-auto', isRootOver && 'bg-editor-selected-quiet')}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            showContextMenu(event.clientX, event.clientY, [
+              {
+                icon: Plus,
+                label: t('editor.presets.menu.newPreset'),
+                onClick: () => setConfigureModalState({ isOpen: true, preset: null }),
+              },
+              {
+                icon: FolderPlus,
+                label: t('editor.presets.menu.newFolder'),
+                onClick: () => setIsAddFolderModalOpen(true),
+              },
+            ]);
+          }}
+          ref={setRootDropRef}
+        >
+          {isLoading && !hasUserPresets ? (
+            <EmptyState
+              icon={<Loader2 className="animate-spin" size={18} />}
+              label={t('editor.presets.status.loading')}
+            />
+          ) : null}
+          {!isLoading && loadError ? (
+            <EmptyState
+              actionLabel={t('editor.presets.discovery.retry')}
+              icon={<CircleAlert size={18} />}
+              label={t('editor.presets.errors.loadFailed')}
+              onAction={() => void refreshPresets()}
+            />
+          ) : null}
+          {!isLoading && !loadError && !hasUserPresets && BUILT_IN_COLOR_STYLE_PRESETS.length === 0 ? (
+            <EmptyState
+              actionLabel={t('editor.presets.status.getCommunity')}
+              icon={<Folder size={18} />}
+              label={t('editor.presets.status.empty')}
+              onAction={onNavigateToCommunity}
+            />
+          ) : null}
+          {!isLoading &&
+          !loadError &&
+          (hasUserPresets || BUILT_IN_COLOR_STYLE_PRESETS.length > 0) &&
+          !hasDiscoveryResults ? (
+            <EmptyState icon={<Search size={18} />} label={t('editor.presets.status.emptySearch')} />
+          ) : null}
+          {!isLoading && !loadError && hasDiscoveryResults ? (
+            <div className="pb-2">
+              {displayBuiltInStyles.length > 0 ? (
+                <section
+                  aria-label={t('editor.presets.colorStyles.title')}
+                  className="border-b border-editor-border px-2.5 py-2"
+                >
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-semibold uppercase leading-4 text-text-secondary">
+                      {t('editor.presets.colorStyles.title')}
+                    </span>
+                    <span className="text-[10px] text-text-tertiary">{displayBuiltInStyles.length}</span>
+                  </div>
+                  <div className={cx('gap-1', resultDensity === 'grid' ? 'grid grid-cols-2' : 'grid')}>
+                    {displayBuiltInStyles.map((preset) => {
+                      const isApplied = appliedPreset?.id === preset.id;
+                      return (
+                        <button
+                          aria-pressed={isApplied}
+                          className={cx(
+                            'min-w-0 rounded-sm border border-editor-border bg-editor-panel px-2 py-1.5 text-left hover:bg-editor-selected-quiet focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring',
+                            isApplied && 'border-editor-focus-ring',
+                          )}
+                          data-tooltip={preset.description}
+                          key={preset.id}
+                          onClick={() => applyColorStyle(preset)}
+                          type="button"
+                        >
+                          <span className="flex min-w-0 items-center gap-1.5">
+                            <Palette size={12} />
+                            <span className="truncate text-[11px] font-medium text-text-primary">{preset.name}</span>
+                            {preset.id === COLOR_STYLE_PRESET_CATALOG.defaultPresetId ? (
+                              <span className="text-[10px] text-text-secondary">
+                                {t('editor.presets.colorStyles.defaultBadge')}
+                              </span>
+                            ) : null}
+                            {isApplied ? (
+                              <CheckCircle2
+                                aria-label={t('editor.presets.states.applied')}
+                                className="ml-auto shrink-0"
+                                size={12}
+                              />
+                            ) : null}
+                          </span>
+                          <span className="mt-0.5 block truncate text-[10px] leading-3 text-text-secondary">
+                            {preset.previewTags.join(' / ')}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+              ) : null}
+              <section aria-label={t('editor.presets.discovery.libraryLabel')} className="px-2.5 py-1">
+                <div className="flex items-center justify-between gap-2 py-1">
+                  <span className="text-[10px] font-semibold uppercase leading-4 text-text-secondary">
+                    {t('editor.presets.discovery.libraryLabel')}
+                  </span>
+                  <span className="text-[10px] text-text-tertiary">{visiblePresetIds.length}</span>
+                </div>
+                {displayFolders.map((entry) => (
+                  <FolderResult
+                    forceExpanded={queryText.length > 0}
+                    folder={entry.folder}
+                    isExpanded={expandedFolders.has(entry.folder.id)}
+                    key={entry.folder.id}
+                    onContextMenu={handleContextMenu}
+                    onToggle={toggleFolder}
+                  >
+                    <div className={cx('gap-1', resultDensity === 'grid' ? 'grid grid-cols-2' : 'grid')}>
+                      {entry.folder.children.map((preset) => (
+                        <PresetResultItem
+                          appliedId={appliedPreset?.id ?? null}
+                          density={resultDensity}
+                          editedAfterApply={isEditedAfterApply}
+                          isPreviewed={previewedPresetId === preset.id}
+                          isSelected={selectedPresetId === preset.id}
+                          key={preset.id}
+                          onApply={applyPreset}
+                          onContextMenu={handleContextMenu}
+                          onKeyDown={handlePresetKeyDown}
+                          onPreview={(nextPreset) => setPreviewedPresetId(nextPreset?.id ?? null)}
+                          onSelect={(nextPreset) => setSelectedPresetId(nextPreset.id)}
+                          preset={preset}
+                          presetButtonRef={(node) => {
+                            if (node) presetButtonRefs.current.set(preset.id, node);
+                            else presetButtonRefs.current.delete(preset.id);
+                          }}
+                          previewState={previewStates[preset.id] ?? (selectedImage?.isReady ? 'idle' : 'failed')}
+                          previewUrl={previews[preset.id] ?? undefined}
+                        />
+                      ))}
+                    </div>
+                  </FolderResult>
+                ))}
+                {displayRootPresets.length > 0 ? (
+                  <div className={cx('gap-1 pt-1', resultDensity === 'grid' ? 'grid grid-cols-2' : 'grid')}>
+                    {displayRootPresets.map((entry) => (
+                      <PresetResultItem
+                        appliedId={appliedPreset?.id ?? null}
+                        density={resultDensity}
+                        editedAfterApply={isEditedAfterApply}
+                        isPreviewed={previewedPresetId === entry.preset.id}
+                        isSelected={selectedPresetId === entry.preset.id}
+                        key={entry.preset.id}
+                        onApply={applyPreset}
+                        onContextMenu={handleContextMenu}
+                        onKeyDown={handlePresetKeyDown}
+                        onPreview={(nextPreset) => setPreviewedPresetId(nextPreset?.id ?? null)}
+                        onSelect={(nextPreset) => setSelectedPresetId(nextPreset.id)}
+                        preset={entry.preset}
+                        presetButtonRef={(node) => {
+                          if (node) presetButtonRefs.current.set(entry.preset.id, node);
+                          else presetButtonRefs.current.delete(entry.preset.id);
+                        }}
+                        previewState={previewStates[entry.preset.id] ?? (selectedImage?.isReady ? 'idle' : 'failed')}
+                        previewUrl={previews[entry.preset.id] ?? undefined}
+                      />
+                    ))}
+                  </div>
+                ) : null}
+              </section>
+            </div>
+          ) : null}
+        </div>
+
+        <footer aria-live="polite" className="border-t border-editor-border bg-editor-panel-well px-2.5 py-1.5">
+          <div className="flex min-w-0 items-center gap-1.5 text-[10px] leading-4 text-text-secondary">
+            {appliedPreset ? (
+              isEditedAfterApply ? (
+                <PencilLine size={12} />
+              ) : (
+                <CheckCircle2 size={12} />
+              )
+            ) : previewedPreset ? (
+              <Eye size={12} />
+            ) : selectedPreset ? (
+              <CircleDot size={12} />
+            ) : (
+              <MoreHorizontal size={12} />
+            )}
+            <span className="min-w-0 flex-1 truncate">
+              {appliedPreset
+                ? isEditedAfterApply
+                  ? t('editor.presets.footer.appliedEdited', { name: appliedPreset.name })
+                  : t('editor.presets.footer.applied', { name: appliedPreset.name })
+                : previewedPreset
+                  ? t('editor.presets.footer.previewing', { name: previewedPreset.name })
+                  : selectedPreset
+                    ? t('editor.presets.footer.selected', { name: selectedPreset.name })
+                    : t('editor.presets.footer.ready')}
+            </span>
+            {appliedPreset ? (
+              <button
+                aria-label={t('editor.presets.footer.revert')}
+                className="flex h-6 items-center gap-1 rounded-sm px-1.5 text-[10px] font-medium text-text-primary hover:bg-editor-selected-quiet focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring"
+                data-tooltip={t('editor.presets.footer.revert')}
+                onClick={revertAppliedPreset}
+                type="button"
+              >
+                <RotateCcw size={12} />
+                {t('editor.presets.footer.revert')}
+              </button>
+            ) : null}
+          </div>
+          {isGeneratingPreviews ? (
+            <div className="mt-0.5 flex items-center gap-1 text-[10px] leading-3 text-text-tertiary">
+              <Loader2 className="animate-spin" size={10} />
+              {t('editor.presets.states.previewsLoading')}
+            </div>
+          ) : null}
+          {!selectedImage?.isReady && hasUserPresets ? (
+            <div className="mt-0.5 text-[10px] leading-3 text-text-tertiary">
+              {t('editor.presets.states.previewUnavailable')}
+            </div>
+          ) : null}
+        </footer>
+      </InspectorPanelFrame>
+
+      <ConfigurePresetModal
+        isOpen={configureModalState.isOpen}
+        initialPreset={configureModalState.preset}
+        onClose={() => setConfigureModalState({ isOpen: false, preset: null })}
+        onSave={(name, includeMasks, includeCropTransform, presetType) =>
+          void handleSaveConfiguredPreset(name, includeMasks, includeCropTransform, presetType)
+        }
+      />
+      <CreateFolderModal
+        isOpen={isAddFolderModalOpen}
+        onClose={() => setIsAddFolderModalOpen(false)}
+        onSave={(name) => {
+          addFolder(name);
+          setIsAddFolderModalOpen(false);
+        }}
+      />
+      <RenameFolderModal
+        currentName={renameFolderState.folder?.name ?? ''}
+        isOpen={renameFolderState.isOpen}
+        onClose={() => setRenameFolderState({ folder: null, isOpen: false })}
+        onSave={(name) => {
+          if (renameFolderState.folder) renameItem(renameFolderState.folder.id, name);
+          setRenameFolderState({ folder: null, isOpen: false });
+        }}
+      />
+      {activeDragId ? <span className="sr-only">{t('editor.presets.discovery.moving')}</span> : null}
     </DndContext>
+  );
+}
+
+function EmptyState({
+  actionLabel,
+  icon,
+  label,
+  onAction,
+}: {
+  actionLabel?: string;
+  icon: ReactNode;
+  label: string;
+  onAction?: () => void;
+}) {
+  return (
+    <div className="flex min-h-40 flex-col items-center justify-center gap-2 px-6 text-center text-text-secondary">
+      <span aria-hidden="true">{icon}</span>
+      <span className="max-w-xs text-[11px] leading-4">{label}</span>
+      {actionLabel && onAction ? (
+        <button
+          className="h-7 rounded-sm border border-editor-border px-2 text-[11px] font-medium text-text-primary hover:bg-editor-selected-quiet focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring"
+          onClick={onAction}
+          type="button"
+        >
+          {actionLabel}
+        </button>
+      ) : null}
+    </div>
   );
 }
 

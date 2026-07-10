@@ -1751,6 +1751,49 @@
         "presetFile": "Plik presetu",
         "rapidRawPreset": "Preset RapidRAW"
       },
+      "discovery": {
+        "dismiss": "",
+        "dismissError": "",
+        "filterLabel": "",
+        "filters": {
+          "all": "",
+          "styles": "",
+          "tools": ""
+        },
+        "gridView": "",
+        "libraryLabel": "",
+        "listView": "",
+        "moveFolderLabel": "",
+        "moveLabel": "",
+        "moving": "",
+        "retry": "",
+        "searchLabel": "",
+        "searchPlaceholder": "",
+        "selectLabel": "",
+        "sort": {
+          "library": "",
+          "name": ""
+        },
+        "sortLabel": "",
+        "toggleFolder": ""
+      },
+      "errors": {
+        "applyFailed": "",
+        "exportFailed": "",
+        "importFailed": "",
+        "invalidPreset": "",
+        "loadFailed": "",
+        "saveFailed": "",
+        "storageFailed": ""
+      },
+      "footer": {
+        "applied": "",
+        "appliedEdited": "",
+        "previewing": "",
+        "ready": "",
+        "revert": "",
+        "selected": ""
+      },
       "menu": {
         "configurePreset": "Konfiguruj preset",
         "deleteFolder": "Usuń folder",
@@ -1764,8 +1807,26 @@
         "renameFolder": "Zmień nazwę folderu",
         "sortAll": "Sortuj wszystko alfabetycznie"
       },
+      "states": {
+        "applied": "",
+        "appliedEdited": "",
+        "available": "",
+        "error": "",
+        "importConflict_one": "",
+        "importConflict_few": "",
+        "importConflict_many": "",
+        "importConflict_other": "",
+        "invalid": "",
+        "previewFailed": "",
+        "previewing": "",
+        "previewsLoading": "",
+        "previewUnavailable": "",
+        "ready": "",
+        "selected": ""
+      },
       "status": {
         "empty": "Brak zapisanych presetów. Utwórz własne, zaimportuj z pliku lub odkryj presety społeczności.",
+        "emptySearch": "",
         "getCommunity": "Pobierz presety społeczności",
         "loading": "Wczytywanie presetów..."
       },
@@ -2558,14 +2619,19 @@
       "cancel": "Anuluj",
       "includeCropTransform": "Uwzględnij Kadrowanie i Przekształcanie",
       "includeMasks": "Uwzględnij Maski",
+      "nameLabel": "",
+      "nameRequired": "",
       "placeholder": "Wpisz nazwę presetu...",
       "save": "Zapisz",
+      "saveScope": "",
       "titleConfigure": "Konfiguruj preset",
       "titleSave": "Zapisz nowy preset",
+      "typeLabel": "",
       "typeStyleDesc": "Zastosowuje kompletny wygląd. Nadpisze wszystkie twoje obecne ustawienia, aby idealnie dopasować się do presetu.",
       "typeStyleLabel": "Styl",
       "typeToolDesc": "Stosuje tylko wybrane zmiany bez dotykania reszty twoich ustawień.",
-      "typeToolLabel": "Narzędzie"
+      "typeToolLabel": "Narzędzie",
+      "updateScope": ""
     },
     "confirm": {
       "cancel": "Anuluj",

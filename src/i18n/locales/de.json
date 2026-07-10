@@ -1653,6 +1653,49 @@
         "presetFile": "Vorgabendatei",
         "rapidRawPreset": "RapidRAW Vorgabe"
       },
+      "discovery": {
+        "dismiss": "",
+        "dismissError": "",
+        "filterLabel": "",
+        "filters": {
+          "all": "",
+          "styles": "",
+          "tools": ""
+        },
+        "gridView": "",
+        "libraryLabel": "",
+        "listView": "",
+        "moveFolderLabel": "",
+        "moveLabel": "",
+        "moving": "",
+        "retry": "",
+        "searchLabel": "",
+        "searchPlaceholder": "",
+        "selectLabel": "",
+        "sort": {
+          "library": "",
+          "name": ""
+        },
+        "sortLabel": "",
+        "toggleFolder": ""
+      },
+      "errors": {
+        "applyFailed": "",
+        "exportFailed": "",
+        "importFailed": "",
+        "invalidPreset": "",
+        "loadFailed": "",
+        "saveFailed": "",
+        "storageFailed": ""
+      },
+      "footer": {
+        "applied": "",
+        "appliedEdited": "",
+        "previewing": "",
+        "ready": "",
+        "revert": "",
+        "selected": ""
+      },
       "menu": {
         "configurePreset": "Vorgabe konfigurieren",
         "deleteFolder": "Ordner löschen",
@@ -1666,8 +1709,24 @@
         "renameFolder": "Ordner umbenennen",
         "sortAll": "Alle alphabetisch sortieren"
       },
+      "states": {
+        "applied": "",
+        "appliedEdited": "",
+        "available": "",
+        "error": "",
+        "importConflict_one": "",
+        "importConflict_other": "",
+        "invalid": "",
+        "previewFailed": "",
+        "previewing": "",
+        "previewsLoading": "",
+        "previewUnavailable": "",
+        "ready": "",
+        "selected": ""
+      },
       "status": {
         "empty": "Noch keine Vorgaben gespeichert. Eigene erstellen, importieren oder Community-Vorgaben entdecken.",
+        "emptySearch": "",
         "getCommunity": "Community-Vorgaben holen",
         "loading": "Vorgaben laden..."
       },
@@ -2428,14 +2487,19 @@
       "cancel": "Abbrechen",
       "includeCropTransform": "Zuschnitt & Form einbeziehen",
       "includeMasks": "Masken einbeziehen",
+      "nameLabel": "",
+      "nameRequired": "",
       "placeholder": "Vorgaben-Namen eingeben...",
       "save": "Speichern",
+      "saveScope": "",
       "titleConfigure": "Vorgabe konfigurieren",
       "titleSave": "Neue Vorgabe speichern",
+      "typeLabel": "",
       "typeStyleDesc": "Wendet den kompletten Look an. Dies überschreibt alle aktuellen Einstellungen, um der Vorgabe exakt zu entsprechen.",
       "typeStyleLabel": "Stil",
       "typeToolDesc": "Wendet nur spezifische Änderungen an, ohne Ihre anderen Einstellungen zu berühren.",
-      "typeToolLabel": "Werkzeug"
+      "typeToolLabel": "Werkzeug",
+      "updateScope": ""
     },
     "confirm": {
       "cancel": "Abbrechen",

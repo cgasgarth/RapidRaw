@@ -1639,6 +1639,49 @@
         "presetFile": "Archivo de ajuste preestablecido",
         "rapidRawPreset": "Ajuste preestablecido de RapidRAW"
       },
+      "discovery": {
+        "dismiss": "",
+        "dismissError": "",
+        "filterLabel": "",
+        "filters": {
+          "all": "",
+          "styles": "",
+          "tools": ""
+        },
+        "gridView": "",
+        "libraryLabel": "",
+        "listView": "",
+        "moveFolderLabel": "",
+        "moveLabel": "",
+        "moving": "",
+        "retry": "",
+        "searchLabel": "",
+        "searchPlaceholder": "",
+        "selectLabel": "",
+        "sort": {
+          "library": "",
+          "name": ""
+        },
+        "sortLabel": "",
+        "toggleFolder": ""
+      },
+      "errors": {
+        "applyFailed": "",
+        "exportFailed": "",
+        "importFailed": "",
+        "invalidPreset": "",
+        "loadFailed": "",
+        "saveFailed": "",
+        "storageFailed": ""
+      },
+      "footer": {
+        "applied": "",
+        "appliedEdited": "",
+        "previewing": "",
+        "ready": "",
+        "revert": "",
+        "selected": ""
+      },
       "menu": {
         "configurePreset": "Configurar ajuste preestablecido",
         "deleteFolder": "Eliminar carpeta",
@@ -1652,8 +1695,25 @@
         "renameFolder": "Renombrar carpeta",
         "sortAll": "Ordenar todo alfabéticamente"
       },
+      "states": {
+        "applied": "",
+        "appliedEdited": "",
+        "available": "",
+        "error": "",
+        "importConflict_one": "",
+        "importConflict_many": "",
+        "importConflict_other": "",
+        "invalid": "",
+        "previewFailed": "",
+        "previewing": "",
+        "previewsLoading": "",
+        "previewUnavailable": "",
+        "ready": "",
+        "selected": ""
+      },
       "status": {
         "empty": "Aún no hay ajustes guardados. Crea el tuyo, impórtalo desde un archivo o explora los de la comunidad.",
+        "emptySearch": "",
         "getCommunity": "Obtener ajustes de la comunidad",
         "loading": "Cargando ajustes preestablecidos..."
       },
@@ -2430,14 +2490,19 @@
       "cancel": "Cancelar",
       "includeCropTransform": "Incluir recorte y transformación",
       "includeMasks": "Incluir máscaras",
+      "nameLabel": "",
+      "nameRequired": "",
       "placeholder": "Introduce el nombre del ajuste preestablecido...",
       "save": "Guardar",
+      "saveScope": "",
       "titleConfigure": "Configurar ajuste preestablecido",
       "titleSave": "Guardar nuevo ajuste",
+      "typeLabel": "",
       "typeStyleDesc": "Aplica el aspecto completo. Esto sobrescribirá todos tus ajustes actuales para que coincidan exactamente con el ajuste preestablecido.",
       "typeStyleLabel": "Estilo",
       "typeToolDesc": "Solo aplica cambios específicos sin tocar el resto de tus ajustes.",
-      "typeToolLabel": "Herramienta"
+      "typeToolLabel": "Herramienta",
+      "updateScope": ""
     },
     "confirm": {
       "cancel": "Cancelar",

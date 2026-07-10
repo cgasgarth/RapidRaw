@@ -1639,6 +1639,49 @@
         "presetFile": "File Predefinito",
         "rapidRawPreset": "Predefinito RapidRAW"
       },
+      "discovery": {
+        "dismiss": "",
+        "dismissError": "",
+        "filterLabel": "",
+        "filters": {
+          "all": "",
+          "styles": "",
+          "tools": ""
+        },
+        "gridView": "",
+        "libraryLabel": "",
+        "listView": "",
+        "moveFolderLabel": "",
+        "moveLabel": "",
+        "moving": "",
+        "retry": "",
+        "searchLabel": "",
+        "searchPlaceholder": "",
+        "selectLabel": "",
+        "sort": {
+          "library": "",
+          "name": ""
+        },
+        "sortLabel": "",
+        "toggleFolder": ""
+      },
+      "errors": {
+        "applyFailed": "",
+        "exportFailed": "",
+        "importFailed": "",
+        "invalidPreset": "",
+        "loadFailed": "",
+        "saveFailed": "",
+        "storageFailed": ""
+      },
+      "footer": {
+        "applied": "",
+        "appliedEdited": "",
+        "previewing": "",
+        "ready": "",
+        "revert": "",
+        "selected": ""
+      },
       "menu": {
         "configurePreset": "Configura Predefinito",
         "deleteFolder": "Elimina Cartella",
@@ -1652,8 +1695,25 @@
         "renameFolder": "Rinomina Cartella",
         "sortAll": "Ordina Tutti in Ordine Alfabetico"
       },
+      "states": {
+        "applied": "",
+        "appliedEdited": "",
+        "available": "",
+        "error": "",
+        "importConflict_one": "",
+        "importConflict_many": "",
+        "importConflict_other": "",
+        "invalid": "",
+        "previewFailed": "",
+        "previewing": "",
+        "previewsLoading": "",
+        "previewUnavailable": "",
+        "ready": "",
+        "selected": ""
+      },
       "status": {
         "empty": "Ancora nessun predefinito salvato. Creane uno, importalo da un file o esplora i predefiniti della community.",
+        "emptySearch": "",
         "getCommunity": "Ottieni Predefiniti della Community",
         "loading": "Caricamento Predefiniti..."
       },
@@ -2430,14 +2490,19 @@
       "cancel": "Annulla",
       "includeCropTransform": "Includi Ritaglio e Trasformazione",
       "includeMasks": "Includi Maschere",
+      "nameLabel": "",
+      "nameRequired": "",
       "placeholder": "Inserisci nome predefinito...",
       "save": "Salva",
+      "saveScope": "",
       "titleConfigure": "Configura Predefinito",
       "titleSave": "Salva Nuovo Predefinito",
+      "typeLabel": "",
       "typeStyleDesc": "Applica l'aspetto completo. Questo sovrascriverà tutte le tue impostazioni attuali per corrispondere esattamente al predefinito.",
       "typeStyleLabel": "Stile",
       "typeToolDesc": "Applica solo modifiche specifiche senza toccare le altre tue impostazioni.",
-      "typeToolLabel": "Strumento"
+      "typeToolLabel": "Strumento",
+      "updateScope": ""
     },
     "confirm": {
       "cancel": "Annulla",

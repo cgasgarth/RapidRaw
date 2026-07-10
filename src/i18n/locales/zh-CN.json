@@ -1636,6 +1636,49 @@
         "presetFile": "预设文件",
         "rapidRawPreset": "RapidRAW 预设"
       },
+      "discovery": {
+        "dismiss": "",
+        "dismissError": "",
+        "filterLabel": "",
+        "filters": {
+          "all": "",
+          "styles": "",
+          "tools": ""
+        },
+        "gridView": "",
+        "libraryLabel": "",
+        "listView": "",
+        "moveFolderLabel": "",
+        "moveLabel": "",
+        "moving": "",
+        "retry": "",
+        "searchLabel": "",
+        "searchPlaceholder": "",
+        "selectLabel": "",
+        "sort": {
+          "library": "",
+          "name": ""
+        },
+        "sortLabel": "",
+        "toggleFolder": ""
+      },
+      "errors": {
+        "applyFailed": "",
+        "exportFailed": "",
+        "importFailed": "",
+        "invalidPreset": "",
+        "loadFailed": "",
+        "saveFailed": "",
+        "storageFailed": ""
+      },
+      "footer": {
+        "applied": "",
+        "appliedEdited": "",
+        "previewing": "",
+        "ready": "",
+        "revert": "",
+        "selected": ""
+      },
       "menu": {
         "configurePreset": "配置预设",
         "deleteFolder": "删除文件夹",
@@ -1649,8 +1692,23 @@
         "renameFolder": "重命名文件夹",
         "sortAll": "全部按字母排序"
       },
+      "states": {
+        "applied": "",
+        "appliedEdited": "",
+        "available": "",
+        "error": "",
+        "importConflict_other": "",
+        "invalid": "",
+        "previewFailed": "",
+        "previewing": "",
+        "previewsLoading": "",
+        "previewUnavailable": "",
+        "ready": "",
+        "selected": ""
+      },
       "status": {
         "empty": "尚未保存预设。创建您自己的预设、从文件导入或探索社区预设。",
+        "emptySearch": "",
         "getCommunity": "获取社区预设",
         "loading": "加载预设中..."
       },
@@ -2399,14 +2457,19 @@
       "cancel": "取消",
       "includeCropTransform": "包含裁剪与变换",
       "includeMasks": "包含蒙版",
+      "nameLabel": "",
+      "nameRequired": "",
       "placeholder": "输入预设名称...",
       "save": "保存",
+      "saveScope": "",
       "titleConfigure": "配置预设",
       "titleSave": "保存新预设",
+      "typeLabel": "",
       "typeStyleDesc": "应用完整外观。这将覆盖您当前的所有设置以完全匹配预设。",
       "typeStyleLabel": "风格",
       "typeToolDesc": "仅应用特定更改而不影响您的其他设置。",
-      "typeToolLabel": "工具"
+      "typeToolLabel": "工具",
+      "updateScope": ""
     },
     "confirm": {
       "cancel": "取消",

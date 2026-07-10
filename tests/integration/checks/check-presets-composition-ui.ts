@@ -46,9 +46,9 @@ installDom();
 
 const { PresetsPanel } = await import('../../../src/components/panel/right/color/PresetsPanel');
 
-await validateLocaleContract();
 await validateEmptyStateWithoutBuiltInStyles();
-await validateRenderedBuiltInAndUserComposition();
+await validateDiscoveryPreviewApplyAndRevert();
+await validateLoadFailure();
 
 if (failures.length > 0) {
   console.error('presets rendered behavior coverage failed');
@@ -57,44 +57,6 @@ if (failures.length > 0) {
 }
 
 console.log('presets rendered behavior coverage ok');
-
-async function validateLocaleContract() {
-  const locale = JSON.parse(readFileSync('src/i18n/locales/en.json', 'utf8')) as {
-    editor?: { presets?: { colorStyles?: Record<string, string>; composition?: Record<string, string> } };
-  };
-
-  const colorStyleKeys = [
-    'adjustmentCoverage_one',
-    'adjustmentCoverage_other',
-    'defaultBadge',
-    'genericLegalNote',
-    'genericSafeBadge',
-    'legalNote',
-    'userBadge',
-  ];
-  const compositionKeys = [
-    'colorStyles_one',
-    'colorStyles_other',
-    'userPresets_one',
-    'userPresets_other',
-    'folders_one',
-    'folders_other',
-    'previewsGenerating',
-    'previewsReady_one',
-    'previewsReady_other',
-  ];
-
-  const missing = [
-    ...colorStyleKeys
-      .filter((key) => typeof locale.editor?.presets?.colorStyles?.[key] !== 'string')
-      .map((key) => `missing color style locale: ${key}`),
-    ...compositionKeys
-      .filter((key) => typeof locale.editor?.presets?.composition?.[key] !== 'string')
-      .map((key) => `missing composition locale: ${key}`),
-  ];
-
-  failures.push(...missing);
-}
 
 async function validateEmptyStateWithoutBuiltInStyles() {
   const originalBuiltIns = [...BUILT_IN_COLOR_STYLE_PRESETS];
@@ -110,10 +72,6 @@ async function validateEmptyStateWithoutBuiltInStyles() {
     });
 
     await waitForText(rendered.container, 'No presets saved yet.', 'empty presets copy was not rendered.');
-    assertVisibleText(rendered.container, '0 styles', 'empty panel did not expose zero built-in color styles.');
-    assertVisibleText(rendered.container, '0 user presets', 'empty panel did not expose zero user presets.');
-    assertVisibleText(rendered.container, '0 folders', 'empty panel did not expose zero folders.');
-    assertVisibleText(rendered.container, '0 previews', 'empty panel did not expose zero generated previews.');
     assertVisibleText(rendered.container, 'Get Community Presets', 'empty presets community action was not rendered.');
 
     rendered.unmount();
@@ -122,7 +80,7 @@ async function validateEmptyStateWithoutBuiltInStyles() {
   }
 }
 
-async function validateRenderedBuiltInAndUserComposition() {
+async function validateDiscoveryPreviewApplyAndRevert() {
   let previewResolvers: Array<(value: Uint8Array) => void> = [];
   const rendered = await renderPanel({
     invoke: (command) => {
@@ -137,52 +95,95 @@ async function validateRenderedBuiltInAndUserComposition() {
     selectedReady: true,
   });
 
-  await waitForText(rendered.container, '4 styles', 'built-in color style count was not rendered.');
-  await waitForText(rendered.container, '2 user presets', 'user preset composition count was not rendered.');
-  assertCompositionItem(rendered.container, '2 user presets');
-  assertCompositionItem(rendered.container, '1 folder');
-  assertCompositionItem(rendered.container, 'Previews building');
-
-  assertVisibleText(rendered.container, 'Clean Skin Balance', 'default built-in color style was not rendered.');
-  assertVisibleText(rendered.container, 'Default', 'default color style badge was not rendered.');
-  assertVisibleText(rendered.container, 'Generic', 'generic-safe color style badge was not rendered.');
-  assertVisibleText(
-    rendered.container,
-    'Generic RawEngine recipe. No manufacturer, film-stock, official, or exact-emulation claim.',
-    'generic-safe legal note was not rendered.',
-  );
-  assertVisibleText(rendered.container, '5 adjustments', 'built-in adjustment coverage count was not rendered.');
-
   await waitForText(rendered.container, 'User Portrait Style', 'root user preset was not rendered.');
-  assertVisibleText(rendered.container, 'User', 'user style provenance badge was not rendered.');
-  assertVisibleText(
-    rendered.container,
-    'User-created style. Naming and source stay user supplied; RawEngine does not claim an official or exact emulation.',
-    'user style legal note was not rendered.',
-  );
-  assertData(
-    getByTestId(rendered.container, 'user-color-style-provenance-user-style-root'),
-    'colorStyleProvenanceSource',
-    'user_created',
-    'user style provenance source was not exposed.',
-  );
-  assertData(
-    getByTestId(rendered.container, 'user-color-style-provenance-user-style-root'),
-    'colorStyleLegalWarning',
-    'User-created fixture legal warning.',
-    'user style legal warning was not exposed.',
-  );
 
   previewResolvers.forEach((resolve) => resolve(new Uint8Array([1, 2, 3, 4])));
   previewResolvers = [];
-  await waitForText(rendered.container, '1 preview', 'generated root preview count was not rendered.');
-  const preview = rendered.container.querySelector<HTMLImageElement>('img[alt="User Portrait Style preview"]');
-  if (preview === null || !preview.src.startsWith('blob:rawengine-presets-panel-')) {
-    failures.push('generated preview image did not render with the expected preview URL.');
-  }
 
   assertVisibleText(rendered.container, 'Travel Folder', 'preset folder was not rendered.');
 
+  const presetButton = getByTestId(rendered.container, 'preset-result-user-style-root').querySelector('button');
+  assert.ok(presetButton, 'user preset selection button was not rendered.');
+  await act(async () => {
+    presetButton.click();
+    await flushPromises();
+  });
+  assertVisibleText(
+    rendered.container,
+    'Selected User Portrait Style',
+    'selecting a preset did not remain non-destructive.',
+  );
+  assert.equal(useEditorStore.getState().adjustments.temperature, INITIAL_ADJUSTMENTS.temperature);
+
+  await act(async () => {
+    presetButton.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
+    await flushPromises();
+  });
+  await waitForText(rendered.container, 'Applied User Portrait Style', 'keyboard apply status was not rendered.');
+  assert.equal(useEditorStore.getState().adjustments.temperature, 2);
+
+  await act(async () => {
+    rendered.unmount();
+    await flushPromises();
+  });
+  const remounted = await renderExistingPanel();
+  await waitForText(
+    remounted.container,
+    'Applied User Portrait Style',
+    'applied state did not persist while navigating away from the presets rail.',
+  );
+
+  await act(async () => {
+    useEditorStore.getState().setEditor({
+      adjustments: { ...useEditorStore.getState().adjustments, exposure: 1.25 },
+    });
+    await flushPromises();
+  });
+  await waitForText(
+    remounted.container,
+    'Applied User Portrait Style then edited',
+    'edited-after-apply state was not rendered.',
+  );
+
+  const revert = Array.from(remounted.container.querySelectorAll('button')).find(
+    (button) => normalizeText(button.textContent) === 'Revert',
+  );
+  assert.ok(revert, 'revert action was not rendered after apply.');
+  await act(async () => {
+    revert.click();
+    await flushPromises();
+  });
+  assert.equal(useEditorStore.getState().adjustments.temperature, INITIAL_ADJUSTMENTS.temperature);
+  assert.equal(useEditorStore.getState().adjustments.exposure, INITIAL_ADJUSTMENTS.exposure);
+
+  const filter = remounted.container.querySelector<HTMLSelectElement>('select[aria-label="Filter presets"]');
+  assert.ok(filter, 'preset filter was not rendered.');
+  await act(async () => {
+    const valueSetter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value')?.set;
+    valueSetter?.call(filter, 'tool');
+    filter.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushPromises();
+  });
+  await waitForText(
+    remounted.container,
+    'No presets match this search or filter.',
+    'empty search state was not rendered.',
+  );
+
+  remounted.unmount();
+}
+
+async function validateLoadFailure() {
+  const rendered = await renderPanel({
+    invoke: (command) => {
+      if (command === Invokes.LoadPresets) throw new Error('disk unavailable');
+      return [];
+    },
+    selectedReady: false,
+  });
+
+  await waitForText(rendered.container, 'Presets could not be loaded.', 'preset load failure was not rendered.');
+  assertVisibleText(rendered.container, 'Retry', 'preset load retry action was not rendered.');
   rendered.unmount();
 }
 
@@ -234,6 +235,39 @@ async function renderPanel(options: { invoke: InvokeHandler; selectedReady: bool
       act(() => {
         root.unmount();
       });
+      container.remove();
+    },
+  };
+}
+
+async function renderExistingPanel(): Promise<RenderedPanel> {
+  const container = document.createElement('div');
+  document.body.append(container);
+  const root = createRoot(container);
+  const i18n = await createTestI18n();
+
+  await act(async () => {
+    root.render(
+      createElement(
+        I18nextProvider,
+        { i18n },
+        createElement(
+          ContextMenuProvider,
+          null,
+          createElement(PresetsPanel, {
+            onNavigateToCommunity: () => undefined,
+          }),
+        ),
+      ),
+    );
+    await flushPromises();
+  });
+
+  return {
+    container,
+    root,
+    unmount: () => {
+      root.unmount();
       container.remove();
     },
   };
@@ -313,6 +347,7 @@ function installDom() {
   Object.defineProperty(globalThis, 'HTMLImageElement', { configurable: true, value: window.HTMLImageElement });
   Object.defineProperty(globalThis, 'Event', { configurable: true, value: window.Event });
   Object.defineProperty(globalThis, 'MouseEvent', { configurable: true, value: window.MouseEvent });
+  Object.defineProperty(globalThis, 'KeyboardEvent', { configurable: true, value: window.KeyboardEvent });
   Object.defineProperty(globalThis, 'Node', { configurable: true, value: window.Node });
   Object.defineProperty(globalThis, 'MutationObserver', { configurable: true, value: window.MutationObserver });
   Object.defineProperty(globalThis, 'PointerEvent', { configurable: true, value: window.PointerEvent ?? window.Event });
@@ -342,21 +377,8 @@ async function waitForCondition(message: string, check: () => boolean): Promise<
   failures.push(message);
 }
 
-function assertCompositionItem(container: Element, text: string) {
-  const summary = getByTestId(container, 'presets-composition-summary');
-  const item = Array.from(summary.querySelectorAll('[data-presets-composition-item]')).find((element) =>
-    normalizeText(element.textContent).includes(text),
-  );
-  if (item === undefined) failures.push(`composition item was not rendered: ${text}`);
-}
-
 function assertVisibleText(container: Element, text: string, message: string) {
   if (!normalizeText(container.textContent).includes(text)) failures.push(message);
-}
-
-function assertData(element: HTMLElement, key: string, expected: string, message: string) {
-  const actual = element.dataset[key];
-  if (actual !== expected) failures.push(`${message} Expected ${expected}, got ${actual ?? '<missing>'}.`);
 }
 
 function getByTestId<T extends HTMLElement = HTMLElement>(container: Element, testId: string): T {

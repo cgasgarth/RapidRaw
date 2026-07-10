@@ -1639,6 +1639,49 @@
         "presetFile": "Fichier de paramètre prédéfini",
         "rapidRawPreset": "Paramètre prédéfini RapidRAW"
       },
+      "discovery": {
+        "dismiss": "",
+        "dismissError": "",
+        "filterLabel": "",
+        "filters": {
+          "all": "",
+          "styles": "",
+          "tools": ""
+        },
+        "gridView": "",
+        "libraryLabel": "",
+        "listView": "",
+        "moveFolderLabel": "",
+        "moveLabel": "",
+        "moving": "",
+        "retry": "",
+        "searchLabel": "",
+        "searchPlaceholder": "",
+        "selectLabel": "",
+        "sort": {
+          "library": "",
+          "name": ""
+        },
+        "sortLabel": "",
+        "toggleFolder": ""
+      },
+      "errors": {
+        "applyFailed": "",
+        "exportFailed": "",
+        "importFailed": "",
+        "invalidPreset": "",
+        "loadFailed": "",
+        "saveFailed": "",
+        "storageFailed": ""
+      },
+      "footer": {
+        "applied": "",
+        "appliedEdited": "",
+        "previewing": "",
+        "ready": "",
+        "revert": "",
+        "selected": ""
+      },
       "menu": {
         "configurePreset": "Configurer le paramètre prédéfini",
         "deleteFolder": "Supprimer le dossier",
@@ -1652,8 +1695,25 @@
         "renameFolder": "Renommer le dossier",
         "sortAll": "Trier tout par ordre alphabétique"
       },
+      "states": {
+        "applied": "",
+        "appliedEdited": "",
+        "available": "",
+        "error": "",
+        "importConflict_one": "",
+        "importConflict_many": "",
+        "importConflict_other": "",
+        "invalid": "",
+        "previewFailed": "",
+        "previewing": "",
+        "previewsLoading": "",
+        "previewUnavailable": "",
+        "ready": "",
+        "selected": ""
+      },
       "status": {
         "empty": "Aucun paramètre prédéfini enregistré pour le moment. Créez les vôtres, importez-en à partir d'un fichier ou explorez ceux de la communauté.",
+        "emptySearch": "",
         "getCommunity": "Obtenir les paramètres de la communauté",
         "loading": "Chargement des paramètres prédéfinis..."
       },
@@ -2430,14 +2490,19 @@
       "cancel": "Annuler",
       "includeCropTransform": "Inclure Recadrage & Transformation",
       "includeMasks": "Inclure les masques",
+      "nameLabel": "",
+      "nameRequired": "",
       "placeholder": "Saisir le nom du paramètre prédéfini...",
       "save": "Enregistrer",
+      "saveScope": "",
       "titleConfigure": "Configurer le paramètre prédéfini",
       "titleSave": "Enregistrer le nouveau paramètre prédéfini",
+      "typeLabel": "",
       "typeStyleDesc": "Applique le rendu complet. Cela remplacera tous vos paramètres actuels pour correspondre exactement au paramètre prédéfini.",
       "typeStyleLabel": "Style",
       "typeToolDesc": "N'applique que des modifications spécifiques sans toucher à vos autres paramètres.",
-      "typeToolLabel": "Outil"
+      "typeToolLabel": "Outil",
+      "updateScope": ""
     },
     "confirm": {
       "cancel": "Annuler",
