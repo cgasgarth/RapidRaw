@@ -2,7 +2,6 @@ import cx from 'clsx';
 import type { TFunction } from 'i18next';
 import {
   Aperture,
-  ChartArea,
   ClipboardPaste,
   Copy,
   Pin,
@@ -28,7 +27,6 @@ import { useShallow } from 'zustand/react/shallow';
 
 import { useContextMenu } from '../../../../context/ContextMenuContext';
 import { useEditorActions } from '../../../../hooks/editor/useEditorActions';
-import { useWaveformControls } from '../../../../hooks/editor/useWaveformControls';
 import { type CopiedSectionAdjustments, useEditorStore } from '../../../../store/useEditorStore';
 import { useSettingsStore } from '../../../../store/useSettingsStore';
 import { type CollapsibleSectionsState, useUIStore } from '../../../../store/useUIStore';
@@ -64,11 +62,11 @@ import { professionalInspectorDensityTokens } from '../../../ui/inspectorTokens'
 import Input from '../../../ui/primitives/Input';
 import Switch from '../../../ui/primitives/Switch';
 import UiText from '../../../ui/primitives/Text';
+import InspectorAnalyticsHeader from '../inspector/InspectorAnalyticsHeader';
 import InspectorPanelFrame, {
   type InspectorPanelNotice,
   type InspectorPanelStatus,
 } from '../inspector/InspectorPanelFrame';
-import PanelScopesStrip from '../inspector/PanelScopesStrip';
 
 const ADJUSTMENT_SECTION_NAMES = ['basic', 'curves', 'transformLens', 'details', 'effects'] as const;
 type AdjustmentSectionName = (typeof ADJUSTMENT_SECTION_NAMES)[number];
@@ -181,7 +179,6 @@ export default function Controls() {
   const { t } = useTranslation();
   const density = professionalInspectorDensityTokens;
   const { showContextMenu } = useContextMenu();
-  const { onToggleWaveform } = useWaveformControls();
   const { setAdjustments, handleAutoAdjustments, handleLutSelect } = useEditorActions();
   const [developPanelSearchQuery, setDevelopPanelSearchQuery] = useState('');
   const developPanelScrollRootRef = useRef<HTMLDivElement | null>(null);
@@ -207,17 +204,15 @@ export default function Controls() {
     })),
   );
 
-  const { adjustments, copiedSectionAdjustments, histogram, selectedImage, isWaveformVisible, setEditor } =
-    useEditorStore(
-      useShallow((state) => ({
-        adjustments: state.adjustments,
-        copiedSectionAdjustments: state.copiedSectionAdjustments,
-        histogram: state.histogram,
-        selectedImage: state.selectedImage,
-        isWaveformVisible: state.isWaveformVisible,
-        setEditor: state.setEditor,
-      })),
-    );
+  const { adjustments, copiedSectionAdjustments, histogram, selectedImage, setEditor } = useEditorStore(
+    useShallow((state) => ({
+      adjustments: state.adjustments,
+      copiedSectionAdjustments: state.copiedSectionAdjustments,
+      histogram: state.histogram,
+      selectedImage: state.selectedImage,
+      setEditor: state.setEditor,
+    })),
+  );
 
   const activeClippingStatusChips = useMemo(
     () => getEditorClippingStatusChips(adjustments).filter((chip) => chip.active),
@@ -1236,18 +1231,6 @@ export default function Controls() {
             <Aperture size={PANEL_ACTION_ICON_SIZE} />
           </button>
           <button
-            aria-label={t('editor.adjustments.tooltips.toggleAnalytics')}
-            aria-pressed={isWaveformVisible}
-            className={cx(density.frame.actionButton, isWaveformVisible && density.frame.actionButtonActive)}
-            data-state={isWaveformVisible ? 'open' : 'closed'}
-            onClick={onToggleWaveform}
-            data-testid="adjustments-panel-scopes-toggle"
-            data-tooltip={t('editor.adjustments.tooltips.toggleAnalytics')}
-            type="button"
-          >
-            <ChartArea size={PANEL_ACTION_ICON_SIZE} />
-          </button>
-          <button
             aria-label={t('editor.adjustments.tooltips.resetAdjustments')}
             className={density.frame.actionButton}
             disabled={!selectedImage}
@@ -1267,7 +1250,7 @@ export default function Controls() {
       status={panelStatus}
       testId="adjustments-inspector"
     >
-      <PanelScopesStrip testId="adjustments-panel-scopes-strip" />
+      <InspectorAnalyticsHeader testId="adjustments-analytics-header" />
 
       <div
         className="shrink-0 border-b border-editor-border bg-editor-panel px-2 py-1"

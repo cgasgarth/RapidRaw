@@ -152,7 +152,7 @@ describe('editor chrome status strip', () => {
     ]);
   });
 
-  test('renders live store updates and hides in fullscreen', async () => {
+  test('keeps inspector analytics out of the viewer status footer', async () => {
     const { container } = await renderStrip(false);
 
     act(() => {
@@ -170,20 +170,11 @@ describe('editor chrome status strip', () => {
       });
     });
 
-    expect(chip(container, 'shadow-clipping').dataset.active).toBe('true');
-    expect(chip(container, 'highlight-clipping').dataset.active).toBe('true');
-    expect(chip(container, 'gamut-warning').dataset.value).toBe('12.5%');
-    expect(container.querySelector('[data-testid="editor-chrome-status-strip"]')?.getAttribute('data-layout')).toBe(
-      'footer',
-    );
-    expect(chip(container, 'shadow-clipping').dataset.placement).toBe('primary');
-    expect(chip(container, 'highlight-clipping').dataset.placement).toBe('primary');
-    expect(chip(container, 'gamut-warning').dataset.placement).toBe('disclosure');
-    expect(chip(container, 'soft-proof').dataset.placement).toBe('disclosure');
-    expect(chip(container, 'preview-scopes').dataset.placement).toBe('disclosure');
-    expect(
-      container.querySelector('[data-testid="editor-chrome-status-disclosure"]')?.getAttribute('data-status-overflow'),
-    ).toBe('3');
+    const strip = container.querySelector<HTMLElement>('[data-testid="editor-chrome-status-strip"]');
+    expect(strip?.dataset.state).toBe('hidden');
+    expect(strip?.hidden).toBe(true);
+    expect(container.querySelector('[data-status-chip="soft-proof"]')).toBeNull();
+    expect(container.querySelector('[data-status-chip="preview-scopes"]')).toBeNull();
 
     await rerenderStrip(true);
     const hiddenStrip = container.querySelector<HTMLElement>('[data-testid="editor-chrome-status-strip"]');
@@ -233,12 +224,6 @@ async function rerenderStrip(isFullScreen: boolean, isRendering = false) {
     );
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
-}
-
-function chip(container: HTMLElement, id: string): HTMLElement {
-  const element = container.querySelector<HTMLElement>(`[data-testid="editor-chrome-status-chip-${id}"]`);
-  if (element === null) throw new Error(`Expected ${id} chip to render.`);
-  return element;
 }
 
 function resetEditorStore() {

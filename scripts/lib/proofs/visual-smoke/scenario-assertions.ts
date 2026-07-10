@@ -325,23 +325,27 @@ export async function assertAdjustmentsPanelRetune(page) {
     throw new Error('The Adjust inspector should not render RAW processing diagnostics.');
   }
 
-  const scopesStrip = await waitForScopesStripState(page, 'adjustments-panel-scopes-strip', 'closed');
+  const scopesStrip = await waitForScopesStripState(page, 'adjustments-analytics-header', 'collapsed');
 
-  await panel.getByTestId('adjustments-panel-scopes-toggle').click();
+  await panel.getByTestId('adjustments-analytics-header-expand-toggle').click();
   await scopesStrip.waitFor({ state: 'visible', timeout: 10_000 });
   const openState = await scopesStrip.getAttribute('data-state');
   if (openState !== 'open') {
     throw new Error(`Adjustments scopes strip did not open from the shared header action, got ${openState}.`);
   }
+  await assertCompactOpenScopesStrip(scopesStrip, 'Adjustments');
   const scopesBounds = await scopesStrip.boundingBox();
   const firstAdjustmentBounds = await panel.getByTestId('adjustments-section-basic').boundingBox();
   if (!scopesBounds || !firstAdjustmentBounds || scopesBounds.y >= firstAdjustmentBounds.y) {
     throw new Error('Adjustments scopes strip should render above the adjustment sections when open.');
   }
-  if (scopesBounds.height < 180 || scopesBounds.height > 260) {
-    throw new Error(`Adjustments scopes strip should use compact default height, got ${scopesBounds.height}.`);
-  }
-  await assertPanelScopesStripControls(page, panel, scopesStrip, 'adjustments-panel-scopes-toggle', 'Adjustments');
+  await assertPanelScopesStripControls(
+    page,
+    panel,
+    scopesStrip,
+    'adjustments-analytics-header-expand-toggle',
+    'Adjustments',
+  );
 }
 
 export async function assertProfessionalAdjustmentsCompactSearchShelf(page) {
@@ -467,6 +471,17 @@ async function waitForScopesStripState(page, testId, expectedState) {
 
 async function assertCompactOpenScopesStrip(strip, label) {
   await strip.waitFor({ state: 'visible', timeout: 10_000 });
+  const testId = await strip.getAttribute('data-testid');
+  if (!testId) {
+    throw new Error(`${label} analytics header should expose a data-testid.`);
+  }
+  await strip
+    .page()
+    .waitForFunction(
+      ({ testId }) => (document.querySelector(`[data-testid="${testId}"]`)?.getBoundingClientRect().height ?? 0) >= 180,
+      { testId },
+      { timeout: 10_000 },
+    );
   const bounds = await strip.boundingBox();
   if (!bounds) {
     throw new Error(`${label} scopes strip should be visible when open.`);
@@ -478,24 +493,25 @@ async function assertCompactOpenScopesStrip(strip, label) {
 
 async function assertPanelScopesStripControls(page, panel, strip, toggleTestId, label) {
   const toggle = panel.getByTestId(toggleTestId);
-  const togglePressed = await toggle.getAttribute('aria-pressed');
-  const toggleState = await toggle.getAttribute('data-state');
-  if (togglePressed !== 'true' || toggleState !== 'open') {
-    throw new Error(`${label} scopes toggle should expose open pressed state, got ${togglePressed}/${toggleState}.`);
-  }
-
-  const minHeight = Number(await strip.getAttribute('data-min-height'));
-  const maxHeight = Number(await strip.getAttribute('data-max-height'));
-  const stripHeight = Number(await strip.getAttribute('data-panel-scopes-height'));
-  if (minHeight !== 160 || maxHeight !== 320 || stripHeight < minHeight || stripHeight > maxHeight) {
-    throw new Error(
-      `${label} scopes sizing metadata should expose compact clamp values, got min=${minHeight}, max=${maxHeight}, height=${stripHeight}.`,
-    );
+  const toggleExpanded = await toggle.getAttribute('aria-expanded');
+  if (toggleExpanded !== 'true') {
+    throw new Error(`${label} analytics toggle should expose expanded state, got ${toggleExpanded}.`);
   }
 
   const stripTestId = await strip.getAttribute('data-testid');
   if (!stripTestId) {
-    throw new Error(`${label} scopes strip should expose a data-testid for scoped controls.`);
+    throw new Error(`${label} analytics header should expose a data-testid for scoped controls.`);
+  }
+
+  const content = panel.locator(`#${stripTestId}-content`);
+  await content.waitFor({ state: 'visible', timeout: 10_000 });
+  const minHeight = Number(await content.getAttribute('data-min-height'));
+  const maxHeight = Number(await content.getAttribute('data-max-height'));
+  const stripHeight = Number(await content.getAttribute('data-panel-scopes-height'));
+  if (minHeight !== 160 || maxHeight !== 320 || stripHeight < minHeight || stripHeight > maxHeight) {
+    throw new Error(
+      `${label} scopes sizing metadata should expose compact clamp values, got min=${minHeight}, max=${maxHeight}, height=${stripHeight}.`,
+    );
   }
 
   const resizer = panel.getByTestId(`${stripTestId}-resizer`);
@@ -517,9 +533,22 @@ async function assertPanelScopesStripControls(page, panel, strip, toggleTestId, 
   await rgbMode.click();
   await pageWaitForAttribute(page, strip, 'data-active-waveform-channel', 'rgb', label);
 
-  const clippingToggle = panel.getByTestId(`${stripTestId}-clipping-toggle`);
-  await clippingToggle.click();
+  const shadowClippingToggle = panel.getByTestId(`${stripTestId}-shadow-clipping-toggle`);
+  const highlightClippingToggle = panel.getByTestId(`${stripTestId}-highlight-clipping-toggle`);
+  if (
+    (await shadowClippingToggle.getAttribute('aria-pressed')) !== 'false' ||
+    (await highlightClippingToggle.getAttribute('aria-pressed')) !== 'false'
+  ) {
+    throw new Error(`${label} clipping controls should both start disabled.`);
+  }
+  await shadowClippingToggle.click();
   await pageWaitForAttribute(page, strip, 'data-show-clipping', 'true', label);
+  if (
+    (await shadowClippingToggle.getAttribute('aria-pressed')) !== 'true' ||
+    (await highlightClippingToggle.getAttribute('aria-pressed')) !== 'true'
+  ) {
+    throw new Error(`${label} clipping controls should stay synchronized after enabling clipping.`);
+  }
 }
 
 async function pageWaitForAttribute(page, locator, attribute, expectedValue, label) {
@@ -594,28 +623,28 @@ export async function assertWorkflowRailSharedScopes(page) {
   await page.getByTestId('color-workspace-panel').getByRole('heading', { exact: true, name: 'Color' }).waitFor({
     timeout: 10_000,
   });
-  await waitForScopesStripState(page, 'color-workspace-scopes-strip', 'closed');
+  await waitForScopesStripState(page, 'color-analytics-header', 'collapsed');
 
-  await page.getByTestId('color-workspace-scopes-toggle').click();
-  const openColorStrip = await waitForScopesStripState(page, 'color-workspace-scopes-strip', 'open');
+  await page.getByTestId('color-analytics-header-expand-toggle').click();
+  const openColorStrip = await waitForScopesStripState(page, 'color-analytics-header', 'open');
   await assertCompactOpenScopesStrip(openColorStrip, 'Color workspace');
   await assertPanelScopesStripControls(
     page,
     page.getByTestId('color-workspace-panel'),
     openColorStrip,
-    'color-workspace-scopes-toggle',
+    'color-analytics-header-expand-toggle',
     'Color workspace',
   );
 
   await page.getByRole('button', { name: 'Adjust' }).first().click();
-  const openAdjustmentsStrip = await waitForScopesStripState(page, 'adjustments-panel-scopes-strip', 'open');
+  const openAdjustmentsStrip = await waitForScopesStripState(page, 'adjustments-analytics-header', 'open');
   await assertCompactOpenScopesStrip(openAdjustmentsStrip, 'Adjustments panel');
 
-  await page.getByTestId('adjustments-panel-scopes-toggle').click();
-  await waitForScopesStripState(page, 'adjustments-panel-scopes-strip', 'closed');
+  await page.getByTestId('adjustments-analytics-header-expand-toggle').click();
+  await waitForScopesStripState(page, 'adjustments-analytics-header', 'collapsed');
 
   await page.getByRole('button', { name: 'Color' }).first().click();
-  await waitForScopesStripState(page, 'color-workspace-scopes-strip', 'closed');
+  await waitForScopesStripState(page, 'color-analytics-header', 'collapsed');
 }
 
 async function assertProfessionalCropTransformWorkspace(page) {
