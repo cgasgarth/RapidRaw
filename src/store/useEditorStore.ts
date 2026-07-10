@@ -127,6 +127,7 @@ interface EditorState {
   requestedPreviewResolution: number;
   renderedPreviewResolution: number;
   baseRenderSize: BaseRenderSize;
+  viewportEpoch: number;
   originalSize: ImageDimensions;
 
   // Tools State
@@ -278,6 +279,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   requestedPreviewResolution: 0,
   renderedPreviewResolution: 0,
   baseRenderSize: { width: 0, height: 0, offsetX: 0, offsetY: 0, containerWidth: 0, containerHeight: 0 },
+  viewportEpoch: 0,
   originalSize: { width: 0, height: 0 },
 
   isRotationActive: false,

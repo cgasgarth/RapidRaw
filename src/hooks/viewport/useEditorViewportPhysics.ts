@@ -1,6 +1,14 @@
 import { type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { TransformState } from '../../components/ui/AppProperties';
-import { getImageTransformBounds, type TransformBounds } from '../../utils/editorViewportBounds';
+import {
+  getImageSpacePointAtViewportPoint,
+  getImageTransformBounds,
+  type TransformBounds,
+  type ViewportFocalPoint,
+  type ViewportFocalPointSource,
+  type ViewportPoint,
+  type ViewportSnapshot,
+} from '../../utils/editorViewportBounds';
 import {
   EDITOR_ZOOM_MAX_RATIO,
   EDITOR_ZOOM_MIN_RATIO,
@@ -32,7 +40,7 @@ export function useEditorViewportPhysics({
   const transformStateRef = useRef<TransformState>(transformState);
   const imageRenderSizeRef = useRef(imageRenderSize);
   const zoomDebounceTimeoutRef = useRef<number | null>(null);
-  const focalPointRef = useRef({ x: 0.5, y: 0.5 });
+  const focalPointRef = useRef<ViewportFocalPoint | null>(null);
   const isTransitioningRef = useRef(false);
   const animationFrameId = useRef<number | null>(null);
   const physicsFrameId = useRef<number | null>(null);
@@ -73,6 +81,37 @@ export function useEditorViewportPhysics({
     minScaleRef.current = transformConfig.minScale;
     maxScaleRef.current = transformConfig.maxScale;
   }, [transformConfig.minScale, transformConfig.maxScale]);
+
+  const captureFocalPoint = useCallback(
+    (viewportPoint: ViewportPoint, source: ViewportFocalPointSource) => {
+      const container = imageContainerRef.current;
+      const renderSize = imageRenderSizeRef.current;
+      if (!container || container.clientWidth <= 0 || container.clientHeight <= 0) return;
+
+      const snapshot: ViewportSnapshot = {
+        containerHeight: container.clientHeight,
+        containerWidth: container.clientWidth,
+        renderSize,
+      };
+      const imagePoint = getImageSpacePointAtViewportPoint({
+        snapshot,
+        transform: transformStateRef.current,
+        viewportPoint,
+      });
+      focalPointRef.current = {
+        source,
+        viewportX: viewportPoint.x,
+        viewportY: viewportPoint.y,
+        x: imagePoint.x,
+        y: imagePoint.y,
+      };
+    },
+    [imageContainerRef],
+  );
+
+  const setFocalPoint = useCallback((focalPoint: ViewportFocalPoint) => {
+    focalPointRef.current = focalPoint;
+  }, []);
 
   const getTransformBounds = useCallback(
     (scale: number): TransformBounds => {
@@ -121,18 +160,32 @@ export function useEditorViewportPhysics({
       }
 
       if (!isTransitioningRef.current) {
-        if (scale > 1.01) {
-          const container = imageContainerRef.current;
-          if (container) {
-            const cw = container.offsetWidth;
-            const ch = container.offsetHeight;
-            focalPointRef.current = {
-              x: (cw / 2 - x) / (cw * scale),
-              y: (ch / 2 - y) / (ch * scale),
-            };
-          }
-        } else {
-          focalPointRef.current = { x: 0.5, y: 0.5 };
+        const container = imageContainerRef.current;
+        const existingFocalPoint = focalPointRef.current;
+        const viewportPoint =
+          existingFocalPoint?.source === 'pointer' || existingFocalPoint?.source === 'navigator'
+            ? { x: existingFocalPoint.viewportX, y: existingFocalPoint.viewportY }
+            : container
+              ? { x: container.clientWidth / 2, y: container.clientHeight / 2 }
+              : null;
+        if (container && viewportPoint) {
+          const snapshot: ViewportSnapshot = {
+            containerHeight: container.clientHeight,
+            containerWidth: container.clientWidth,
+            renderSize: imageRenderSizeRef.current,
+          };
+          const imagePoint = getImageSpacePointAtViewportPoint({
+            snapshot,
+            transform: { positionX: x, positionY: y, scale },
+            viewportPoint,
+          });
+          focalPointRef.current = {
+            source: existingFocalPoint?.source ?? 'center',
+            viewportX: viewportPoint.x,
+            viewportY: viewportPoint.y,
+            x: imagePoint.x,
+            y: imagePoint.y,
+          };
         }
       }
 
@@ -250,6 +303,7 @@ export function useEditorViewportPhysics({
     animationFrameId,
     animateTransform,
     applyTransform,
+    captureFocalPoint,
     clampToBounds,
     focalPointRef,
     getTransformBounds,
@@ -262,6 +316,7 @@ export function useEditorViewportPhysics({
     physicsFrameId,
     setIsMiddleMousePanningState,
     setIsPanningState,
+    setFocalPoint,
     startPhysicsLoop,
     transformConfig,
     transformState,

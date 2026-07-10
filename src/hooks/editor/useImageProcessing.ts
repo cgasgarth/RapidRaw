@@ -172,7 +172,14 @@ export function useImageProcessing(
     if (!state) return null;
 
     const { scale, positionX, positionY } = state;
-    const { width: baseW, height: baseH, offsetX, offsetY, containerWidth, containerHeight } = baseRenderSize;
+    const {
+      width: baseW,
+      height: baseH,
+      offsetX,
+      offsetY,
+      containerWidth,
+      containerHeight,
+    } = useEditorStore.getState().baseRenderSize;
 
     if (!baseW || !baseH || !containerWidth || !containerHeight) return null;
     if (scale <= 1.01) return null;
@@ -252,6 +259,7 @@ export function useImageProcessing(
         viewportIdentity: JSON.stringify({
           baseRenderSize: editor.baseRenderSize,
           displaySize: editor.displaySize,
+          viewportEpoch: editor.viewportEpoch,
           editorPreviewResolution: settings?.editorPreviewResolution ?? 1920,
           enableZoomHifi: settings?.enableZoomHifi ?? true,
           highResZoomMultiplier: settings?.highResZoomMultiplier ?? 1,

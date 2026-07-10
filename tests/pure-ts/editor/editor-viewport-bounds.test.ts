@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'bun:test';
-import { getImageTransformBounds, reconcileViewportTransform } from '../../../src/utils/editorViewportBounds';
+import {
+  getImageSpacePointAtViewportPoint,
+  getImageTransformBounds,
+  reconcileViewportTransform,
+} from '../../../src/utils/editorViewportBounds';
 
 describe('editor viewport bounds', () => {
   test('keeps a fit-to-window portrait image centered in its rendered image rect', () => {
@@ -132,5 +136,134 @@ describe('editor viewport bounds', () => {
     });
 
     expect(transform).toEqual({ scale: 1, positionX: 0, positionY: 0 });
+  });
+
+  test('preserves an explicit pointer image anchor while ratio zoom rescales with the viewport', () => {
+    const previous = {
+      containerWidth: 1000,
+      containerHeight: 700,
+      renderSize: {
+        width: 1000,
+        height: 562.5,
+        offsetX: 0,
+        offsetY: 68.75,
+        scale: 0.1666666667,
+      },
+    };
+    const current = {
+      containerWidth: 760,
+      containerHeight: 700,
+      renderSize: {
+        width: 760,
+        height: 427.5,
+        offsetX: 0,
+        offsetY: 136.25,
+        scale: 0.1266666667,
+      },
+    };
+    const transform = { scale: 2, positionX: -400, positionY: -200 };
+    const previousPointer = { x: 240, y: 210 };
+    const focalPoint = getImageSpacePointAtViewportPoint({
+      snapshot: previous,
+      transform,
+      viewportPoint: previousPointer,
+    });
+    const next = reconcileViewportTransform({
+      contextChanged: false,
+      current,
+      focalPoint,
+      mode: { devicePixelsPerImagePixel: 1, kind: 'ratio' },
+      previous,
+      targetScale: 3,
+      transform,
+      viewportAnchor: { x: 240, y: 210 },
+    });
+    const nextPointer = getImageSpacePointAtViewportPoint({
+      snapshot: current,
+      transform: next,
+      viewportPoint: { x: 240, y: 210 },
+    });
+
+    expect(next.scale).toBe(3);
+    expect(nextPointer.x).toBeCloseTo(focalPoint.x);
+    expect(nextPointer.y).toBeCloseTo(focalPoint.y);
+  });
+
+  test('recomputes Fit instead of carrying a stale focal point or pan', () => {
+    const transform = reconcileViewportTransform({
+      contextChanged: false,
+      current: {
+        containerWidth: 800,
+        containerHeight: 600,
+        renderSize: { width: 800, height: 450, offsetX: 0, offsetY: 75, scale: 0.2 },
+      },
+      focalPoint: { x: 0.13, y: 0.87 },
+      mode: { kind: 'fit' },
+      previous: {
+        containerWidth: 1000,
+        containerHeight: 600,
+        renderSize: { width: 1000, height: 562.5, offsetX: 0, offsetY: 18.75, scale: 0.25 },
+      },
+      targetScale: 2,
+      transform: { scale: 2, positionX: -700, positionY: -250 },
+      viewportAnchor: { x: 100, y: 500 },
+    });
+
+    expect(transform).toEqual({ scale: 1, positionX: 0, positionY: 0 });
+  });
+
+  test('uses the Navigator-selected image point when its viewport anchor is the center', () => {
+    const current = {
+      containerWidth: 900,
+      containerHeight: 600,
+      renderSize: { width: 900, height: 600, offsetX: 0, offsetY: 0, scale: 0.3 },
+    };
+    const transform = reconcileViewportTransform({
+      contextChanged: false,
+      current,
+      focalPoint: { x: 0.6, y: 0.4 },
+      mode: { kind: 'fill' },
+      previous: current,
+      targetScale: 1.5,
+      transform: { scale: 1.25, positionX: -100, positionY: -50 },
+      viewportAnchor: { x: 450, y: 300 },
+    });
+    const pointAtCenter = getImageSpacePointAtViewportPoint({
+      snapshot: current,
+      transform,
+      viewportPoint: { x: 450, y: 300 },
+    });
+
+    expect(pointAtCenter.x).toBeCloseTo(0.6);
+    expect(pointAtCenter.y).toBeCloseTo(0.4);
+  });
+
+  test('resets a ratio transform to the new centered geometry on source generation changes', () => {
+    const current = {
+      containerWidth: 800,
+      containerHeight: 600,
+      renderSize: { width: 800, height: 600, offsetX: 0, offsetY: 0, scale: 0.2 },
+    };
+    const transform = reconcileViewportTransform({
+      contextChanged: true,
+      current,
+      mode: { devicePixelsPerImagePixel: 2, kind: 'ratio' },
+      previous: {
+        containerWidth: 1000,
+        containerHeight: 700,
+        renderSize: { width: 1000, height: 700, offsetX: 0, offsetY: 0, scale: 0.25 },
+      },
+      targetScale: 2,
+      transform: { scale: 4, positionX: -1600, positionY: -800 },
+    });
+
+    expect(transform.scale).toBe(2);
+    expect(
+      getImageSpacePointAtViewportPoint({
+        snapshot: current,
+        transform,
+        viewportPoint: { x: 400, y: 300 },
+      }),
+    ).toEqual({ x: 0.5, y: 0.5 });
   });
 });

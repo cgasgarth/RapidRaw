@@ -22,6 +22,35 @@ export interface RenderSize {
 
 const DEFAULT_SIZE: RenderSize = { width: 0, height: 0, scale: 1, offsetX: 0, offsetY: 0 };
 
+export const resolveImageRenderSize = (
+  containerSize: ImageDimensions,
+  imageDimensions: ImageDimensions | null,
+): RenderSize => {
+  if (
+    !imageDimensions ||
+    containerSize.width <= 0 ||
+    containerSize.height <= 0 ||
+    imageDimensions.width <= 0 ||
+    imageDimensions.height <= 0
+  ) {
+    return DEFAULT_SIZE;
+  }
+
+  const imageAspectRatio = imageDimensions.width / imageDimensions.height;
+  const containerAspectRatio = containerSize.width / containerSize.height;
+  const width = imageAspectRatio > containerAspectRatio ? containerSize.width : containerSize.height * imageAspectRatio;
+  const height =
+    imageAspectRatio > containerAspectRatio ? containerSize.width / imageAspectRatio : containerSize.height;
+
+  return {
+    width,
+    height,
+    scale: width / imageDimensions.width,
+    offsetX: (containerSize.width - width) / 2,
+    offsetY: (containerSize.height - height) / 2,
+  };
+};
+
 export const useImageRenderSize = (
   containerRef: React.RefObject<HTMLElement | null>,
   imageDimensions: ImageDimensions | null,
@@ -39,23 +68,12 @@ export const useImageRenderSize = (
     }
 
     const updateSize = () => {
-      const { clientWidth: containerWidth, clientHeight: containerHeight } = container;
-      const imageAspectRatio = imgWidth / imgHeight;
-      const containerAspectRatio = containerWidth / containerHeight;
-
-      let width, height;
-      if (imageAspectRatio > containerAspectRatio) {
-        width = containerWidth;
-        height = containerWidth / imageAspectRatio;
-      } else {
-        height = containerHeight;
-        width = containerHeight * imageAspectRatio;
-      }
-
-      const offsetX = (containerWidth - width) / 2;
-      const offsetY = (containerHeight - height) / 2;
-
-      setRenderSize({ width, height, scale: width / imgWidth, offsetX, offsetY });
+      setRenderSize(
+        resolveImageRenderSize(
+          { height: container.clientHeight, width: container.clientWidth },
+          { height: imgHeight, width: imgWidth },
+        ),
+      );
     };
 
     updateSize();
