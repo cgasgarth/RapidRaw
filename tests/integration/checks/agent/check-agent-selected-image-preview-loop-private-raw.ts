@@ -17,6 +17,7 @@ import {
   AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME,
 } from '../../../../src/utils/agent/context/agentCurrentImagePreviewLoop.ts';
 import { buildAgentImageContextSnapshot } from '../../../../src/utils/agent/context/agentImageContextSnapshot.ts';
+import { createAgentTypedToolExecutionContext } from '../../../../src/utils/agent/session/agentTypedToolDispatch.ts';
 import {
   applyAgentGlobalAdjustments,
   buildAgentAdjustmentsApplyApproval,
@@ -56,6 +57,19 @@ const runtimeProofReportSchema = z
     acceptedDryRunPlanCount: z.literal(2),
     auditTypes: z.array(z.string().trim().min(1)).min(10),
     editCount: z.literal(2),
+    dispatchTrace: z
+      .array(
+        z
+          .object({
+            callId: z.string().trim().min(1),
+            outcome: z.enum(['completed', 'rejected', 'stale', 'cancelled', 'timed_out']),
+            parentCallId: z.string().trim().min(1).optional(),
+            requestId: z.string().trim().min(1),
+            runtimeToolName: z.string().trim().min(1),
+          })
+          .strict(),
+      )
+      .min(4),
     finalRecipeHash: z.string().trim().min(1),
     fixtureId: z.literal('agent.selected-image-preview-loop.private-alaska.v1'),
     initialPreviewArtifactId: z.string().trim().min(1),
@@ -83,6 +97,8 @@ const runtimeProofReportSchema = z
     validationMode: z.literal('agent_selected_image_preview_loop_private_raw'),
   })
   .strict();
+
+const dispatchTrace: Array<z.infer<typeof runtimeProofReportSchema>['dispatchTrace'][number]> = [];
 
 const publicReport = publicProofReportSchema.parse({
   acceptanceCriteria: [
@@ -287,6 +303,7 @@ const runtimeReport = runtimeProofReportSchema.parse({
   acceptedDryRunPlanCount: result.acceptedDryRunPlanCount,
   auditTypes,
   editCount: result.editCount,
+  dispatchTrace,
   finalRecipeHash: result.finalRecipeHash,
   fixtureId: 'agent.selected-image-preview-loop.private-alaska.v1',
   initialPreviewArtifactId: result.initialPreviewArtifactId,
@@ -320,6 +337,9 @@ await writeFile(
 <dt>Selected RAW</dt><dd>${runtimeReport.selectedRawBasename}</dd>
 <dt>Source unchanged</dt><dd>${runtimeReport.sourceHashUnchanged}</dd>
 <dt>Tool calls</dt><dd>${runtimeReport.toolNames.join(', ')}</dd>
+<dt>Typed dispatch</dt><dd>${runtimeReport.dispatchTrace
+    .map((entry) => `${entry.runtimeToolName}:${entry.outcome}:${entry.callId}`)
+    .join(' -> ')}</dd>
 <dt>Audit</dt><dd>${runtimeReport.auditTypes.join(' -> ')}</dd>
 <dt>Preview artifacts</dt><dd>${runtimeReport.previewArtifactIds.join(' -> ')}</dd>
 <dt>Preview purposes</dt><dd>${runtimeReport.previewPurposes.join(' -> ')}</dd>
@@ -409,12 +429,29 @@ async function hashFile(path: string): Promise<z.infer<typeof hashSchema>> {
 }
 
 async function dispatchAgentTool(runtimeToolName: string, args: unknown, requestId: string) {
-  return handleRawEngineAppServerHostRequestAsync({
+  const response = await handleRawEngineAppServerHostRequestAsync({
     arguments: args,
+    executionContext: createAgentTypedToolExecutionContext({
+      arguments: args,
+      callId: requestId,
+      requestId,
+      sessionId: 'agent-private-preview-loop',
+    }),
     requestId,
     runtimeToolName,
     toolName: RawEngineAppServerHostToolName.DispatchTool,
   });
+  if (!('execution' in response) || response.execution === undefined) {
+    throw new Error(`typed selected-image dispatch omitted execution envelope for ${runtimeToolName}`);
+  }
+  dispatchTrace.push({
+    callId: response.execution.callId,
+    outcome: response.execution.outcome,
+    ...(response.execution.parentCallId === undefined ? {} : { parentCallId: response.execution.parentCallId }),
+    requestId: response.execution.requestId,
+    runtimeToolName,
+  });
+  return response;
 }
 
 async function dispatchSelectedImageLoop(args: unknown, requestId: string) {
