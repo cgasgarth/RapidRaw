@@ -28,6 +28,7 @@ import {
 } from '../tools/agentDetailEffectsApplyTool';
 import { dispatchAgentLiveEditorTool } from './agentLiveToolDispatch';
 import { createAgentSessionCheckpoint } from './agentSessionHistory';
+import { createAgentTypedToolExecutionContext, dispatchAgentTypedEditorTool } from './agentTypedToolDispatch';
 
 const sessionAdjustmentPatchSchema = z
   .object({
@@ -172,12 +173,26 @@ const getRecipeHash = (stateResult: unknown): string =>
 const buildStateToolCallId = (requestId: string, turnNumber: number, suffix: string): string =>
   `${requestId}-turn-${turnNumber}-${suffix}-state`;
 
-const refreshRecipeHash = async (requestId: string): Promise<string> =>
+const refreshRecipeHash = async ({
+  parentCallId,
+  requestId,
+  sessionId,
+}: {
+  parentCallId: string;
+  requestId: string;
+  sessionId: string;
+}): Promise<string> =>
   getRecipeHash(
-    await dispatchAgentLiveEditorTool({
+    await dispatchAgentTypedEditorTool({
       args: { requestId },
-      requestId,
-      runtimeToolName: AGENT_STATE_GET_TOOL_NAME,
+      context: createAgentTypedToolExecutionContext({
+        arguments: { requestId },
+        callId: requestId,
+        parentCallId,
+        requestId,
+        sessionId,
+      }),
+      toolName: AGENT_STATE_GET_TOOL_NAME,
     }),
   );
 
@@ -193,13 +208,21 @@ export const runAgentMultiTurnAppServerSession = async (
   });
   const initialPreviewToolCallId = `${parsedRequest.requestId}-initial-preview`;
   const initialPreviewResult = rawEngineImageGetPreviewResponseSchema.parse(
-    await dispatchAgentLiveEditorTool({
+    await dispatchAgentTypedEditorTool({
       args: {
         expectedRecipeHash: initialContext.preview.recipeHash,
         requestId: initialPreviewToolCallId,
       },
-      requestId: initialPreviewToolCallId,
-      runtimeToolName: RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
+      context: createAgentTypedToolExecutionContext({
+        arguments: {
+          expectedRecipeHash: initialContext.preview.recipeHash,
+          requestId: initialPreviewToolCallId,
+        },
+        callId: initialPreviewToolCallId,
+        requestId: initialPreviewToolCallId,
+        sessionId: parsedRequest.sessionId,
+      }),
+      toolName: RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
     }),
   );
   const initialPreviewReceipt = initialPreviewResult.receipt;
@@ -259,7 +282,7 @@ export const runAgentMultiTurnAppServerSession = async (
     if (turn.adjustment !== undefined) {
       const dryRunToolCallId = `${parsedRequest.requestId}-turn-${turnNumber}-dry-run`;
       const dryRunResult = agentAdjustmentsDryRunResponseSchema.parse(
-        await dispatchAgentLiveEditorTool({
+        await dispatchAgentTypedEditorTool({
           args: {
             adjustments: turn.adjustment,
             expectedGraphRevision: finalGraphRevision,
@@ -268,8 +291,22 @@ export const runAgentMultiTurnAppServerSession = async (
             requestId: dryRunToolCallId,
             sessionId: parsedRequest.sessionId,
           },
-          requestId: dryRunToolCallId,
-          runtimeToolName: AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
+          context: createAgentTypedToolExecutionContext({
+            arguments: {
+              adjustments: turn.adjustment,
+              expectedGraphRevision: finalGraphRevision,
+              expectedRecipeHash: recipeHash,
+              operationId: `${parsedRequest.operationId}-${turnNumber}`,
+              requestId: dryRunToolCallId,
+              sessionId: parsedRequest.sessionId,
+            },
+            callId: dryRunToolCallId,
+            parentCallId: initialPreviewToolCallId,
+            iterationId: `turn-${turnNumber}`,
+            requestId: dryRunToolCallId,
+            sessionId: parsedRequest.sessionId,
+          }),
+          toolName: AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
         }),
       );
       toolCalls.push({
@@ -281,7 +318,7 @@ export const runAgentMultiTurnAppServerSession = async (
       });
       const applyToolCallId = `${parsedRequest.requestId}-turn-${turnNumber}-apply`;
       const applyResult = agentAdjustmentsApplyResponseSchema.parse(
-        await dispatchAgentLiveEditorTool({
+        await dispatchAgentTypedEditorTool({
           args: {
             acceptedPlanHash: dryRunResult.dryRunPlanHash,
             acceptedPlanId: dryRunResult.dryRunPlanId,
@@ -298,8 +335,30 @@ export const runAgentMultiTurnAppServerSession = async (
             requestId: applyToolCallId,
             sessionId: parsedRequest.sessionId,
           },
-          requestId: applyToolCallId,
-          runtimeToolName: AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
+          context: createAgentTypedToolExecutionContext({
+            arguments: {
+              acceptedPlanHash: dryRunResult.dryRunPlanHash,
+              acceptedPlanId: dryRunResult.dryRunPlanId,
+              adjustments: turn.adjustment,
+              approval: buildAgentAdjustmentsApplyApproval({
+                approvalId: `approval_${applyToolCallId}`,
+                dryRun: dryRunResult,
+                expectedRecipeHash: recipeHash,
+                sessionId: parsedRequest.sessionId,
+              }),
+              expectedGraphRevision: dryRunResult.sourceGraphRevision,
+              expectedRecipeHash: recipeHash,
+              operationId: `${parsedRequest.operationId}-${turnNumber}`,
+              requestId: applyToolCallId,
+              sessionId: parsedRequest.sessionId,
+            },
+            callId: applyToolCallId,
+            parentCallId: dryRunToolCallId,
+            iterationId: `turn-${turnNumber}`,
+            requestId: applyToolCallId,
+            sessionId: parsedRequest.sessionId,
+          }),
+          toolName: AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
         }),
       );
       finalGraphRevision = applyResult.appliedGraphRevision;
@@ -321,7 +380,11 @@ export const runAgentMultiTurnAppServerSession = async (
         turn: turnNumber,
       });
       const stateToolCallId = buildStateToolCallId(parsedRequest.requestId, turnNumber, 'adjustments');
-      recipeHash = await refreshRecipeHash(stateToolCallId);
+      recipeHash = await refreshRecipeHash({
+        parentCallId: applyToolCallId,
+        requestId: stateToolCallId,
+        sessionId: parsedRequest.sessionId,
+      });
       toolCalls.push({ id: stateToolCallId, name: AGENT_STATE_GET_TOOL_NAME, status: 'succeeded', turn: turnNumber });
     }
 
@@ -357,7 +420,11 @@ export const runAgentMultiTurnAppServerSession = async (
         turn: turnNumber,
       });
       const stateToolCallId = buildStateToolCallId(parsedRequest.requestId, turnNumber, 'color');
-      recipeHash = await refreshRecipeHash(stateToolCallId);
+      recipeHash = await refreshRecipeHash({
+        parentCallId: colorToolCallId,
+        requestId: stateToolCallId,
+        sessionId: parsedRequest.sessionId,
+      });
       toolCalls.push({ id: stateToolCallId, name: AGENT_STATE_GET_TOOL_NAME, status: 'succeeded', turn: turnNumber });
     }
 
@@ -393,7 +460,11 @@ export const runAgentMultiTurnAppServerSession = async (
         turn: turnNumber,
       });
       const stateToolCallId = buildStateToolCallId(parsedRequest.requestId, turnNumber, 'detail');
-      recipeHash = await refreshRecipeHash(stateToolCallId);
+      recipeHash = await refreshRecipeHash({
+        parentCallId: detailToolCallId,
+        requestId: stateToolCallId,
+        sessionId: parsedRequest.sessionId,
+      });
       toolCalls.push({ id: stateToolCallId, name: AGENT_STATE_GET_TOOL_NAME, status: 'succeeded', turn: turnNumber });
     }
 
@@ -402,14 +473,24 @@ export const runAgentMultiTurnAppServerSession = async (
 
     const previewToolCallId = `${parsedRequest.requestId}-turn-${turnNumber}-preview`;
     const previewResult = agentPreviewRenderResponseSchema.parse(
-      await dispatchAgentLiveEditorTool({
+      await dispatchAgentTypedEditorTool({
         args: {
           ...turn.preview,
           expectedRecipeHash: recipeHash,
           requestId: previewToolCallId,
         },
-        requestId: previewToolCallId,
-        runtimeToolName: AGENT_PREVIEW_RENDER_TOOL_NAME,
+        context: createAgentTypedToolExecutionContext({
+          arguments: {
+            ...turn.preview,
+            expectedRecipeHash: recipeHash,
+            requestId: previewToolCallId,
+          },
+          callId: previewToolCallId,
+          iterationId: `turn-${turnNumber}`,
+          requestId: previewToolCallId,
+          sessionId: parsedRequest.sessionId,
+        }),
+        toolName: AGENT_PREVIEW_RENDER_TOOL_NAME,
       }),
     );
     previews.push(previewResult.preview);

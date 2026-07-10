@@ -300,6 +300,36 @@ export const rawEngineAppServerToolDispatchRequestSchema = z
       })
       .strict()
       .optional(),
+    executionContext: z
+      .object({
+        callId: z.string().trim().min(1),
+        cancellationId: z.string().trim().min(1),
+        deadlineAt: z.iso.datetime(),
+        expected: z
+          .object({
+            graphRevision: z.string().trim().min(1).optional(),
+            recipeHash: z.string().trim().min(1).optional(),
+            selectedImagePath: z.string().trim().min(1).optional(),
+          })
+          .strict()
+          .optional(),
+        idempotencyKey: z.string().trim().min(1),
+        iterationId: z.string().trim().min(1).optional(),
+        parentCallId: z.string().trim().min(1).optional(),
+        requestId: z.string().trim().min(1),
+        sessionId: z.string().trim().min(1),
+      })
+      .strict()
+      .superRefine((context, refinement) => {
+        if (context.callId === context.parentCallId) {
+          refinement.addIssue({
+            code: 'custom',
+            message: 'Dispatch callId cannot equal parentCallId.',
+            path: ['parentCallId'],
+          });
+        }
+      })
+      .optional(),
     requestId: z.string().trim().min(1),
     runtimeToolName: z.string().trim().min(1),
     toolCall: z
@@ -318,7 +348,16 @@ export const rawEngineAppServerToolDispatchRequestSchema = z
       .optional(),
     toolName: z.literal(RawEngineAppServerHostToolName.DispatchTool),
   })
-  .strict();
+  .strict()
+  .superRefine((request, refinement) => {
+    if (request.executionContext?.requestId !== undefined && request.executionContext.requestId !== request.requestId) {
+      refinement.addIssue({
+        code: 'custom',
+        message: 'Dispatch execution context requestId must match the host requestId.',
+        path: ['executionContext', 'requestId'],
+      });
+    }
+  });
 
 export const rawEngineAppServerHealthResponseSchema = z
   .object({
@@ -393,6 +432,24 @@ export const rawEngineAppServerToolDispatchResponseSchema = z
   .object({
     commandType: z.string().trim().min(1).optional(),
     dispatchStatus: z.enum(['completed', 'rejected']),
+    execution: z
+      .object({
+        callId: z.string().trim().min(1),
+        cancellationId: z.string().trim().min(1),
+        completedAtIso: z.iso.datetime(),
+        deadlineAt: z.iso.datetime(),
+        idempotencyKey: z.string().trim().min(1),
+        iterationId: z.string().trim().min(1).optional(),
+        outcome: z.enum(['queued', 'running', 'completed', 'rejected', 'stale', 'cancelled', 'timed_out']),
+        parentCallId: z.string().trim().min(1).optional(),
+        requestId: z.string().trim().min(1),
+        requestSchemaVersion: z.literal(1),
+        responseSchemaVersion: z.literal(1),
+        sessionId: z.string().trim().min(1),
+        startedAtIso: z.iso.datetime().optional(),
+      })
+      .strict()
+      .optional(),
     message: z.string().trim().min(1).optional(),
     requestId: z.string().trim().min(1),
     result: z.unknown().optional(),

@@ -15,6 +15,10 @@ import {
   agentHistoryRollbackResponseSchema,
 } from '../../../../utils/agent/session/agentSessionHistory';
 import {
+  createAgentTypedToolExecutionContext,
+  dispatchAgentTypedEditorTool,
+} from '../../../../utils/agent/session/agentTypedToolDispatch';
+import {
   AGENT_TONE_ADJUSTMENT_APPLY_TOOL_NAME,
   type AgentToneAdjustmentDryRunResponse,
   type AgentToneAdjustmentPromptDraft,
@@ -425,7 +429,7 @@ function LivePromptComposer({ initialPromptPreviewContext, isContextReady, onSes
 
     const rollbackRequestId = `agent-live-rollback-${Date.now()}`;
     agentHistoryRollbackResponseSchema.parse(
-      await dispatchAgentLiveEditorTool({
+      await dispatchAgentTypedEditorTool({
         args: {
           checkpoint: {
             adjustments: rollbackSnapshot.adjustments,
@@ -445,8 +449,31 @@ function LivePromptComposer({ initialPromptPreviewContext, isContextReady, onSes
           scope: 'session_start',
           sessionId: 'agent-chat-shell',
         },
-        requestId: rollbackRequestId,
-        runtimeToolName: AGENT_HISTORY_ROLLBACK_TOOL_NAME,
+        context: createAgentTypedToolExecutionContext({
+          arguments: {
+            checkpoint: {
+              adjustments: rollbackSnapshot.adjustments,
+              activeImagePath: rollbackSnapshot.activeImagePath,
+              graphRevision: rollbackSnapshot.graphRevision,
+              historyIndex: rollbackSnapshot.historyIndex,
+              lastBasicToneCommand: rollbackSnapshot.lastBasicToneCommand,
+              previewRecipeHash: rollbackSnapshot.recipeHash,
+              previewRef: rollbackSnapshot.finalPreviewUrl,
+              sessionId: 'agent-chat-shell',
+              uncroppedPreviewRef: rollbackSnapshot.uncroppedAdjustedPreviewUrl,
+            },
+            expectedCurrentGraphRevision: validation.currentGraphRevision,
+            expectedCurrentPreviewRecipeHash: validation.currentRecipeHash,
+            expectedSelectedImagePath: validation.currentImagePath,
+            requestId: rollbackRequestId,
+            scope: 'session_start',
+            sessionId: 'agent-chat-shell',
+          },
+          callId: rollbackRequestId,
+          requestId: rollbackRequestId,
+          sessionId: 'agent-chat-shell',
+        }),
+        toolName: AGENT_HISTORY_ROLLBACK_TOOL_NAME,
       }),
     );
     previewRequestRef.current += 1;
