@@ -59,7 +59,7 @@ const uniqueNonEmptyStrings = (values: unknown, maximum = 32): string[] => {
 export const createDefaultEditorWorkspacePreferences = (): EditorWorkspacePreferences => ({
   compact: { toolsExpanded: true, toolsHeight: null },
   filmstrip: { height: 144, visible: true },
-  leftSidebar: { expandedSections: [], visible: true, width: 256 },
+  leftSidebar: { expandedSections: ['navigator', 'presets'], visible: true, width: 256 },
   rightInspector: {
     activePanel: Panel.Color,
     expandedSectionsByPanel: { [Panel.Adjustments]: ['basic', 'curves'] },

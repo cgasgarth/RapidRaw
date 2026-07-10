@@ -1,6 +1,6 @@
 import { type PointerEvent as ReactPointerEvent, useCallback } from 'react';
 
-export type ResizeTarget = 'bottom' | 'compact' | 'left' | 'right';
+export type ResizeTarget = 'bottom' | 'compact' | 'left' | 'libraryLeft' | 'right';
 
 export type CreateResizeHandler = (
   target: ResizeTarget,
@@ -19,6 +19,7 @@ interface UsePanelResizeOptions {
   onBottomPanelHeightChange: (height: number) => void;
   onCompactEditorPanelHeightOverrideChange: (height: number) => void;
   onLeftPanelWidthChange: (width: number) => void;
+  onLibraryLeftPanelWidthChange: (width: number) => void;
   onResizingChange: (isResizing: boolean) => void;
   onRightPanelWidthChange: (width: number) => void;
 }
@@ -31,6 +32,7 @@ export function usePanelResize({
   onBottomPanelHeightChange,
   onCompactEditorPanelHeightOverrideChange,
   onLeftPanelWidthChange,
+  onLibraryLeftPanelWidthChange,
   onResizingChange,
   onRightPanelWidthChange,
 }: UsePanelResizeOptions): CreateResizeHandler {
@@ -59,8 +61,9 @@ export function usePanelResize({
         if (moveEvent.pointerId !== pointerId) return;
         moveEvent.preventDefault();
 
-        if (target === 'left') {
-          onLeftPanelWidthChange(
+        if (target === 'left' || target === 'libraryLeft') {
+          const onWidthChange = target === 'left' ? onLeftPanelWidthChange : onLibraryLeftPanelWidthChange;
+          onWidthChange(
             clampPanelSize(
               startSize + (moveEvent.clientX - startX),
               PANEL_RESIZE_LIMITS.left.min,
@@ -118,6 +121,7 @@ export function usePanelResize({
       onBottomPanelHeightChange,
       onCompactEditorPanelHeightOverrideChange,
       onLeftPanelWidthChange,
+      onLibraryLeftPanelWidthChange,
       onResizingChange,
       onRightPanelWidthChange,
     ],
