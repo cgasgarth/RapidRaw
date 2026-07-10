@@ -1,9 +1,9 @@
 import cx from 'clsx';
 import { AlertTriangle, Image as ImageIcon, SlidersHorizontal, Star, X } from 'lucide-react';
 import type React from 'react';
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Grid, type GridImperativeAPI, useGridCallbackRef } from 'react-window';
+import { Grid, useGridCallbackRef } from 'react-window';
 import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
@@ -14,6 +14,8 @@ import UiText from '../ui/primitives/Text';
 
 const HORIZONTAL_PADDING = 4;
 const ITEM_GAP = 8;
+const DEFAULT_CONTAIN_RATIO = 1.5;
+const SCROLL_SETTLE_DELAY = 120;
 const THUMBNAIL_FOCUS_CLASS = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring';
 const FILMSTRIP_SUMMARY_HEIGHT = 30;
 
@@ -27,10 +29,6 @@ type ImageRatings = Record<string, number> | null | undefined;
 type ThumbnailMouseEvent = React.MouseEvent<HTMLDivElement>;
 type ThumbnailKeyboardEvent = React.KeyboardEvent<HTMLDivElement>;
 type ThumbnailSelectEvent = ThumbnailMouseEvent | ThumbnailKeyboardEvent;
-
-interface ResettableGridImperativeAPI extends GridImperativeAPI {
-  resetAfterColumnIndex?: (index: number) => void;
-}
 
 interface ItemData {
   activeIndex: number;
@@ -47,7 +45,7 @@ interface ItemData {
   consumeClickTriggeredScroll: () => boolean;
   onRegisterThumbnail: (path: string, element: HTMLDivElement | null) => void;
   onThumbnailRovingKeyDown: (event: ThumbnailKeyboardEvent, index: number) => void;
-  setRatio: (index: number, ratio: number) => void;
+  setRatio: (path: string, ratio: number) => void;
 }
 
 interface FilmstripThumbnailProps {
@@ -64,7 +62,7 @@ interface FilmstripThumbnailProps {
   thumbnailAspectRatio: ThumbnailAspectRatio;
   itemHeight: number;
   index: number;
-  setRatio: (index: number, ratio: number) => void;
+  setRatio: (path: string, ratio: number) => void;
 }
 
 type FilmstripCellData = ItemData;
@@ -84,6 +82,14 @@ export const resolveFilmstripThumbnailUrl = (
   selectedImageThumbnailUrl: string | undefined,
   isActive: boolean,
 ) => thumbnailUrl ?? (isActive ? selectedImageThumbnailUrl : undefined);
+
+export const getFilmstripColumnWidth = (
+  itemHeight: number,
+  thumbnailAspectRatio: ThumbnailAspectRatio,
+  measuredRatio: number | undefined,
+) =>
+  itemHeight * (thumbnailAspectRatio === ThumbnailAspectRatio.Cover ? 1 : (measuredRatio ?? DEFAULT_CONTAIN_RATIO)) +
+  ITEM_GAP;
 
 interface FilmstripCellProps extends FilmstripCellData {
   columnIndex: number;
@@ -123,7 +129,7 @@ const FilmstripRawQualityBadges = ({ exif }: { exif: ImageFile['exif'] }) => {
   );
 };
 
-const FilmstripThumbnail = memo(
+export const FilmstripThumbnail = memo(
   ({
     imageFile,
     imageRatings,
@@ -144,20 +150,11 @@ const FilmstripThumbnail = memo(
     const thumbData = useProcessStore((s) => s.thumbnails[imageFile.path]);
     const displayThumbnailUrl = resolveFilmstripThumbnailUrl(thumbData, selectedImageThumbnailUrl, isActive);
 
-    const [layers, setLayers] = useState<ImageLayer[]>([]);
-
-    const pathRef = useRef(imageFile.path);
-    const hadDataOnPathChange = useRef(!!displayThumbnailUrl);
-
-    useLayoutEffect(() => {
-      if (pathRef.current !== imageFile.path) {
-        pathRef.current = imageFile.path;
-        hadDataOnPathChange.current = !!displayThumbnailUrl;
-        setLayers([]);
-      }
-    }, [displayThumbnailUrl, imageFile.path]);
-
-    const isInitialLoad = useRef(true);
+    const [layers, setLayers] = useState<ImageLayer[]>(() =>
+      displayThumbnailUrl ? [{ id: displayThumbnailUrl, url: displayThumbnailUrl, opacity: 1 }] : [],
+    );
+    const currentThumbnailRef = useRef({ path: imageFile.path, url: displayThumbnailUrl });
+    currentThumbnailRef.current = { path: imageFile.path, url: displayThumbnailUrl };
 
     const { path, tags, is_edited: isEdited } = imageFile;
     const rating = imageRatings?.[path] || 0;
@@ -179,45 +176,19 @@ const FilmstripThumbnail = memo(
     useEffect(() => {
       if (thumbnailAspectRatio === ThumbnailAspectRatio.Contain && displayThumbnailUrl) {
         const img = new Image();
+        let cancelled = false;
         img.onload = () => {
+          if (cancelled || img.naturalHeight === 0) return;
           const ratio = img.naturalWidth / img.naturalHeight;
-          setRatio(index, ratio);
-
-          if (isInitialLoad.current) {
-            setTimeout(() => {
-              isInitialLoad.current = false;
-            }, 50);
-          }
+          setRatio(path, ratio);
         };
         img.src = displayThumbnailUrl;
-      }
-    }, [displayThumbnailUrl, thumbnailAspectRatio, index, setRatio]);
-
-    useEffect(() => {
-      if (!displayThumbnailUrl) {
-        const frame = requestAnimationFrame(() => {
-          setLayers([]);
-        });
         return () => {
-          cancelAnimationFrame(frame);
+          cancelled = true;
         };
       }
-
-      setLayers((prev) => {
-        if (prev.some((l) => l.id === displayThumbnailUrl)) return prev;
-
-        if (prev.length === 0) {
-          if (hadDataOnPathChange.current) {
-            return [{ id: displayThumbnailUrl, url: displayThumbnailUrl, opacity: 1 }];
-          } else {
-            return [{ id: displayThumbnailUrl, url: displayThumbnailUrl, opacity: 0 }];
-          }
-        }
-
-        return [...prev, { id: displayThumbnailUrl, url: displayThumbnailUrl, opacity: 0 }];
-      });
       return undefined;
-    }, [displayThumbnailUrl, imageFile.path]);
+    }, [displayThumbnailUrl, path, setRatio, thumbnailAspectRatio]);
 
     useEffect(() => {
       const layerToFadeIn = layers.find((l) => l.opacity === 0);
@@ -239,6 +210,19 @@ const FilmstripThumbnail = memo(
         return prev.slice(finishedIndex);
       });
     }, []);
+
+    const handleSuccessorLoad = useCallback((path: string, url: string) => {
+      const currentThumbnail = currentThumbnailRef.current;
+      if (currentThumbnail.path !== path || currentThumbnail.url !== url) return;
+
+      setLayers((prev) => {
+        if (prev.some((layer) => layer.id === url)) return prev;
+        return [...prev, { id: url, url, opacity: 0 }];
+      });
+    }, []);
+
+    const shouldLoadSuccessor =
+      displayThumbnailUrl !== undefined && !layers.some((layer) => layer.id === displayThumbnailUrl);
 
     const ringClass = isActive
       ? 'border-accent ring-2 ring-accent shadow-md'
@@ -317,6 +301,7 @@ const FilmstripThumbnail = memo(
                   className={`${imageClasses} ${
                     thumbnailAspectRatio === ThumbnailAspectRatio.Contain ? 'object-contain' : 'object-cover'
                   } relative`}
+                  data-testid="filmstrip-thumbnail-image"
                   loading="lazy"
                   decoding="async"
                   src={layer.url}
@@ -329,6 +314,19 @@ const FilmstripThumbnail = memo(
             <ImageIcon size={24} className="text-text-secondary animate-pulse" />
           </div>
         )}
+        {shouldLoadSuccessor && displayThumbnailUrl ? (
+          <img
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 h-full w-full opacity-0 pointer-events-none"
+            data-filmstrip-thumbnail-preload="true"
+            decoding="async"
+            key={`${path}:${displayThumbnailUrl}`}
+            loading="lazy"
+            onLoad={() => handleSuccessorLoad(path, displayThumbnailUrl)}
+            src={displayThumbnailUrl}
+          />
+        ) : null}
 
         <div
           className={cx(
@@ -478,8 +476,8 @@ const FilmstripList = ({
   data: Omit<ItemData, 'activeIndex' | 'itemHeight' | 'onRegisterThumbnail' | 'onThumbnailRovingKeyDown' | 'setRatio'>;
 }) => {
   const [gridHandle, setGridHandle] = useGridCallbackRef();
-  const ratioMapRef = useRef<Record<number, number>>({});
-  const [ratioMapSnapshot, setRatioMapSnapshot] = useState<Record<number, number>>({});
+  const ratioMapRef = useRef<Record<string, number>>({});
+  const [ratioMapSnapshot, setRatioMapSnapshot] = useState<Record<string, number>>({});
   const visibleRange = useRef({ start: 0, stop: 0 });
   const prevSelectedPath = useRef<string | null>(null);
   const isReadyForSmooth = useRef(false);
@@ -487,7 +485,8 @@ const FilmstripList = ({
   const currentDataRef = useRef(data);
   currentDataRef.current = data;
   const pendingResizeRef = useRef<number | null>(null);
-  const lowestPendingIndexRef = useRef<number>(Infinity);
+  const scrollSettleTimer = useRef<number | null>(null);
+  const isScrollingRef = useRef(false);
   const isAnimatingScroll = useRef(false);
   const scrollAnimationTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingScrollTarget = useRef<number | null>(null);
@@ -507,7 +506,11 @@ const FilmstripList = ({
 
     let totalWidthExpanded = HORIZONTAL_PADDING * 2;
     for (let i = 0; i < data.imageList.length; i++) {
-      const ratio = data.thumbnailAspectRatio === ThumbnailAspectRatio.Cover ? 1 : ratioMapSnapshot[i] || 1.5;
+      const imagePath = data.imageList[i]?.path;
+      const ratio =
+        data.thumbnailAspectRatio === ThumbnailAspectRatio.Cover
+          ? 1
+          : (imagePath ? ratioMapSnapshot[imagePath] : undefined) || DEFAULT_CONTAIN_RATIO;
       totalWidthExpanded += expandedHeight * ratio + ITEM_GAP;
     }
 
@@ -516,14 +519,18 @@ const FilmstripList = ({
     }
 
     return baseHeight;
-  }, [data.imageList.length, data.thumbnailAspectRatio, height, width, ratioMapSnapshot]);
+  }, [data.imageList, data.thumbnailAspectRatio, height, width, ratioMapSnapshot]);
 
   const getColumnWidth = useCallback(
     (index: number) => {
-      const ratio = data.thumbnailAspectRatio === ThumbnailAspectRatio.Cover ? 1 : ratioMapSnapshot[index] || 1.5;
-      return itemHeight * ratio + ITEM_GAP;
+      const imagePath = data.imageList[index]?.path;
+      return getFilmstripColumnWidth(
+        itemHeight,
+        data.thumbnailAspectRatio,
+        imagePath ? ratioMapSnapshot[imagePath] : undefined,
+      );
     },
-    [data.thumbnailAspectRatio, itemHeight, ratioMapSnapshot],
+    [data.imageList, data.thumbnailAspectRatio, itemHeight, ratioMapSnapshot],
   );
 
   useEffect(() => {
@@ -564,16 +571,14 @@ const FilmstripList = ({
       if (pendingResizeRef.current !== null) {
         cancelAnimationFrame(pendingResizeRef.current);
       }
+      if (scrollSettleTimer.current !== null) {
+        clearTimeout(scrollSettleTimer.current);
+      }
       if (scrollAnimationTimeout.current) {
         clearTimeout(scrollAnimationTimeout.current);
       }
     };
   }, []);
-
-  useEffect(() => {
-    ratioMapRef.current = {};
-    setRatioMapSnapshot({});
-  }, [data.thumbnailAspectRatio]);
 
   const onCellsRendered = useCallback(
     (
@@ -687,30 +692,35 @@ const FilmstripList = ({
     gridHandle,
   ]);
 
+  const flushPendingRatios = useCallback(() => {
+    if (isScrollingRef.current || pendingResizeRef.current !== null) return;
+
+    pendingResizeRef.current = requestAnimationFrame(() => {
+      setRatioMapSnapshot({ ...ratioMapRef.current });
+      pendingResizeRef.current = null;
+    });
+  }, []);
+
   const setRatio = useCallback(
-    (index: number, ratio: number) => {
-      if (Math.abs((ratioMapRef.current[index] || 0) - ratio) > 0.01) {
-        ratioMapRef.current[index] = ratio;
+    (path: string, ratio: number) => {
+      if (Math.abs((ratioMapRef.current[path] || 0) - ratio) <= 0.01) return;
 
-        if (index < lowestPendingIndexRef.current) {
-          lowestPendingIndexRef.current = index;
-        }
-
-        if (pendingResizeRef.current === null) {
-          pendingResizeRef.current = requestAnimationFrame(() => {
-            const resettableGridHandle = gridHandle as ResettableGridImperativeAPI | null;
-            if (typeof resettableGridHandle?.resetAfterColumnIndex === 'function') {
-              resettableGridHandle.resetAfterColumnIndex(lowestPendingIndexRef.current);
-            }
-            setRatioMapSnapshot({ ...ratioMapRef.current });
-            lowestPendingIndexRef.current = Infinity;
-            pendingResizeRef.current = null;
-          });
-        }
-      }
+      ratioMapRef.current[path] = ratio;
+      flushPendingRatios();
     },
-    [gridHandle],
+    [flushPendingRatios],
   );
+
+  const handleScroll = useCallback(() => {
+    isScrollingRef.current = true;
+    if (scrollSettleTimer.current !== null) clearTimeout(scrollSettleTimer.current);
+
+    scrollSettleTimer.current = window.setTimeout(() => {
+      isScrollingRef.current = false;
+      scrollSettleTimer.current = null;
+      flushPendingRatios();
+    }, SCROLL_SETTLE_DELAY);
+  }, [flushPendingRatios]);
 
   const focusThumbnail = useCallback((path: string) => {
     const element = thumbnailElements.current.get(path);
@@ -806,6 +816,7 @@ const FilmstripList = ({
           }
         }}
         onCellsRendered={onCellsRendered}
+        onScroll={handleScroll}
         overscanCount={16}
       />
     </div>
