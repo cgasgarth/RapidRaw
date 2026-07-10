@@ -3,7 +3,7 @@ import type { TFunction } from 'i18next';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { CameraProfileId, ToneCurveId } from '../../../schemas/color/profileToneSchemas';
-import { TextColors, TextVariants } from '../../../types/typography';
+import { TextVariants } from '../../../types/typography';
 import {
   type Adjustments,
   ColorAdjustment,
@@ -11,8 +11,8 @@ import {
   INITIAL_ADJUSTMENTS,
 } from '../../../utils/adjustments';
 import { TONE_CURVE_PARAMETRIC_PRESETS } from '../../../utils/profileTonePresets';
+import CompactInspectorSectionHeader from '../../ui/CompactInspectorSectionHeader';
 import { editorChromeTokens } from '../../ui/editorChromeTokens';
-import { professionalInspectorDensityTokens } from '../../ui/inspectorTokens';
 import UiText from '../../ui/primitives/Text';
 import type { ColorPanelGroupProps } from './types';
 
@@ -47,7 +47,10 @@ export const ColorProfileToneControls = ({
   setAdjustments,
 }: ColorProfileToneControlsProps) => {
   const { t } = useTranslation();
-  const density = professionalInspectorDensityTokens;
+  const profileToneLabels = getProfileToneLabels(adjustments, t);
+  const isModified =
+    adjustments.cameraProfile !== INITIAL_ADJUSTMENTS.cameraProfile ||
+    adjustments.toneCurve !== INITIAL_ADJUSTMENTS.toneCurve;
   const cameraProfileOptions = useMemo(
     () =>
       [
@@ -101,18 +104,28 @@ export const ColorProfileToneControls = ({
 
   return (
     <section
-      className="border-b border-editor-border pb-2"
+      className="border-b border-editor-border pb-1.5"
       data-camera-profile={adjustments.cameraProfile}
       data-testid="profile-tone-controls"
       data-tone-curve={adjustments.toneCurve}
     >
-      <UiText variant={TextVariants.heading} className={cx(density.sectionHeader.title, 'mb-1.5 block')}>
-        {t('adjustments.color.profileTone.title')}
-      </UiText>
-      <div className="grid gap-1.5 sm:grid-cols-2">
+      <CompactInspectorSectionHeader
+        modified={isModified}
+        modifiedLabel={t('ui.collapsibleSection.dirtyBadge', { defaultValue: 'Edited' })}
+        summary={
+          <span
+            data-testid="profile-tone-summary"
+            title={`${profileToneLabels.activeCameraProfileLabel} / ${profileToneLabels.activeToneCurveLabel}`}
+          >
+            {profileToneLabels.activeCameraProfileLabel} / {profileToneLabels.activeToneCurveLabel}
+          </span>
+        }
+        title={t('adjustments.color.profileTone.title')}
+      />
+      <div className="space-y-1">
         {adjustmentVisibility[ColorAdjustment.CameraProfile] !== false && (
-          <label className="grid min-w-0 gap-0.5">
-            <UiText variant={TextVariants.label} color={TextColors.secondary} className="block">
+          <label className="grid min-w-0 grid-cols-[5.75rem_minmax(0,1fr)] items-center gap-2">
+            <UiText variant={TextVariants.label} className="truncate text-[10px] leading-4 text-text-secondary">
               {t('adjustments.color.profileTone.cameraProfile')}
             </UiText>
             <select
@@ -132,8 +145,8 @@ export const ColorProfileToneControls = ({
           </label>
         )}
         {adjustmentVisibility[ColorAdjustment.ToneCurve] !== false && (
-          <label className="grid min-w-0 gap-0.5">
-            <UiText variant={TextVariants.label} color={TextColors.secondary} className="block">
+          <label className="grid min-w-0 grid-cols-[5.75rem_minmax(0,1fr)] items-center gap-2">
+            <UiText variant={TextVariants.label} className="truncate text-[10px] leading-4 text-text-secondary">
               {t('adjustments.color.profileTone.toneCurve')}
             </UiText>
             <select

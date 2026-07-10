@@ -1,10 +1,15 @@
 import cx from 'clsx';
+import { ChevronDown } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
-import { type Adjustments, ColorAdjustment, type ColorCalibration } from '../../../utils/adjustments';
+import {
+  type Adjustments,
+  ColorAdjustment,
+  type ColorCalibration,
+  INITIAL_ADJUSTMENTS,
+} from '../../../utils/adjustments';
+import CompactInspectorSectionHeader from '../../ui/CompactInspectorSectionHeader';
 import { professionalInspectorDensityTokens } from '../../ui/inspectorTokens';
-import UiText from '../../ui/primitives/Text';
 import AdjustmentSlider from '../AdjustmentSlider';
 import { ColorSwatch } from './ColorSwatch';
 import type { ColorPanelGroupProps } from './types';
@@ -92,125 +97,155 @@ export const ColorAdvancedControls = ({
   };
 
   const trackSuffix = `${activePrimary}s`;
+  const initialLevels = INITIAL_ADJUSTMENTS.levels;
+  const isLevelsModified =
+    levels.enabled !== initialLevels.enabled ||
+    levels.inputBlack !== initialLevels.inputBlack ||
+    levels.inputWhite !== initialLevels.inputWhite ||
+    levels.gamma !== initialLevels.gamma ||
+    levels.outputBlack !== initialLevels.outputBlack ||
+    levels.outputWhite !== initialLevels.outputWhite;
+  const isCalibrationModified = (Object.keys(colorCalibration) as Array<keyof ColorCalibration>).some(
+    (key) => colorCalibration[key] !== INITIAL_ADJUSTMENTS.colorCalibration[key],
+  );
+  const activePrimaryLabel = primaryColors.find((primary) => primary.name === activePrimary)?.label ?? activePrimary;
+  const modifiedLabel = t('ui.collapsibleSection.dirtyBadge', { defaultValue: 'Edited' });
 
   return (
-    <details className={density.card.nestedPanel} data-testid="advanced-color-disclosure">
-      <summary className="flex cursor-pointer items-center justify-between gap-2 px-1 py-1 text-xs">
-        <span className="min-w-0">
-          <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
-            {t('adjustments.color.advanced.title')}
-          </UiText>
-          <UiText variant={TextVariants.small} color={TextColors.secondary} className={density.sectionHeader.summary}>
-            {t('adjustments.color.advanced.summary')}
-          </UiText>
-        </span>
-        <span className={density.sectionHeader.badge}>{t('adjustments.color.collapsed')}</span>
+    <details className="group border-b border-editor-border" data-testid="advanced-color-disclosure">
+      <summary className="cursor-pointer list-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring [&::-webkit-details-marker]:hidden">
+        <CompactInspectorSectionHeader
+          actions={
+            <ChevronDown
+              aria-hidden="true"
+              className="text-text-secondary transition-transform group-open:rotate-180"
+              size={14}
+            />
+          }
+          modified={isLevelsModified || isCalibrationModified}
+          modifiedLabel={modifiedLabel}
+          summary={t('adjustments.color.advanced.summary')}
+          title={t('adjustments.color.advanced.title')}
+        />
       </summary>
-      <div className={cx(density.gutter.panel, 'border-t border-border p-1.5')} data-testid="advanced-color-controls">
+      <div
+        className="divide-y divide-editor-border border-t border-editor-border"
+        data-testid="advanced-color-controls"
+      >
         {isLevelsVisible && (
-          <div className={density.card.panel} data-testid="color-levels-controls">
-            <div className={density.sectionHeader.root}>
-              <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
-                {t('adjustments.color.levels.title')}
-              </UiText>
-              <button
-                className={cx(
-                  density.actionButton.base,
-                  levels.enabled ? density.actionButton.active : density.actionButton.inactive,
-                )}
-                onClick={handleLevelsToggle}
-                type="button"
-              >
-                {levels.enabled ? t('adjustments.color.levels.enabled') : t('adjustments.color.levels.disabled')}
-              </button>
+          <section className="py-1.5" data-testid="color-levels-controls">
+            <CompactInspectorSectionHeader
+              actions={
+                <button
+                  aria-pressed={levels.enabled}
+                  className={cx(
+                    density.actionButton.base,
+                    levels.enabled ? density.actionButton.active : density.actionButton.inactive,
+                  )}
+                  onClick={handleLevelsToggle}
+                  type="button"
+                >
+                  {levels.enabled ? t('adjustments.color.levels.enabled') : t('adjustments.color.levels.disabled')}
+                </button>
+              }
+              modified={isLevelsModified}
+              modifiedLabel={modifiedLabel}
+              title={t('adjustments.color.levels.title')}
+            />
+            <div className="space-y-px">
+              <AdjustmentSlider
+                defaultValue={Math.round(initialLevels.inputBlack * 100)}
+                density="compact"
+                label={t('adjustments.color.levels.inputBlack')}
+                max={inputBlackMax}
+                min={0}
+                onValueChange={(value) => {
+                  handleLevelsChange('inputBlack', value / 100);
+                }}
+                step={1}
+                value={Math.round(levels.inputBlack * 100)}
+                onDragStateChange={onDragStateChange}
+              />
+              <AdjustmentSlider
+                defaultValue={Math.round(initialLevels.inputWhite * 100)}
+                density="compact"
+                label={t('adjustments.color.levels.inputWhite')}
+                max={100}
+                min={inputWhiteMin}
+                onValueChange={(value) => {
+                  handleLevelsChange('inputWhite', value / 100);
+                }}
+                step={1}
+                value={Math.round(levels.inputWhite * 100)}
+                onDragStateChange={onDragStateChange}
+              />
+              <AdjustmentSlider
+                defaultValue={Math.round(initialLevels.gamma * 100)}
+                density="compact"
+                label={t('adjustments.color.levels.gamma')}
+                max={300}
+                min={25}
+                onValueChange={(value) => {
+                  handleLevelsChange('gamma', value / 100);
+                }}
+                step={1}
+                value={Math.round(levels.gamma * 100)}
+                onDragStateChange={onDragStateChange}
+              />
+              <AdjustmentSlider
+                defaultValue={Math.round(initialLevels.outputBlack * 100)}
+                density="compact"
+                label={t('adjustments.color.levels.outputBlack')}
+                max={outputBlackMax}
+                min={0}
+                onValueChange={(value) => {
+                  handleLevelsChange('outputBlack', value / 100);
+                }}
+                step={1}
+                value={Math.round(levels.outputBlack * 100)}
+                onDragStateChange={onDragStateChange}
+              />
+              <AdjustmentSlider
+                defaultValue={Math.round(initialLevels.outputWhite * 100)}
+                density="compact"
+                label={t('adjustments.color.levels.outputWhite')}
+                max={100}
+                min={outputWhiteMin}
+                onValueChange={(value) => {
+                  handleLevelsChange('outputWhite', value / 100);
+                }}
+                step={1}
+                value={Math.round(levels.outputWhite * 100)}
+                onDragStateChange={onDragStateChange}
+              />
             </div>
-            <AdjustmentSlider
-              density="compact"
-              label={t('adjustments.color.levels.inputBlack')}
-              max={inputBlackMax}
-              min={0}
-              onValueChange={(value) => {
-                handleLevelsChange('inputBlack', value / 100);
-              }}
-              step={1}
-              value={Math.round(levels.inputBlack * 100)}
-              onDragStateChange={onDragStateChange}
-            />
-            <AdjustmentSlider
-              density="compact"
-              label={t('adjustments.color.levels.inputWhite')}
-              max={100}
-              min={inputWhiteMin}
-              onValueChange={(value) => {
-                handleLevelsChange('inputWhite', value / 100);
-              }}
-              step={1}
-              value={Math.round(levels.inputWhite * 100)}
-              onDragStateChange={onDragStateChange}
-            />
-            <AdjustmentSlider
-              density="compact"
-              label={t('adjustments.color.levels.gamma')}
-              max={300}
-              min={25}
-              onValueChange={(value) => {
-                handleLevelsChange('gamma', value / 100);
-              }}
-              step={1}
-              value={Math.round(levels.gamma * 100)}
-              onDragStateChange={onDragStateChange}
-            />
-            <AdjustmentSlider
-              density="compact"
-              label={t('adjustments.color.levels.outputBlack')}
-              max={outputBlackMax}
-              min={0}
-              onValueChange={(value) => {
-                handleLevelsChange('outputBlack', value / 100);
-              }}
-              step={1}
-              value={Math.round(levels.outputBlack * 100)}
-              onDragStateChange={onDragStateChange}
-            />
-            <AdjustmentSlider
-              density="compact"
-              label={t('adjustments.color.levels.outputWhite')}
-              max={100}
-              min={outputWhiteMin}
-              onValueChange={(value) => {
-                handleLevelsChange('outputWhite', value / 100);
-              }}
-              step={1}
-              value={Math.round(levels.outputWhite * 100)}
-              onDragStateChange={onDragStateChange}
-            />
             {levelsClippingWarnings.length > 0 && (
-              <div className="mt-2 space-y-1">
+              <div className="mt-1 space-y-0.5">
                 {levelsClippingWarnings.map((warning) => (
-                  <UiText key={warning} variant={TextVariants.small} color={TextColors.secondary} className="block">
+                  <p className="text-[10px] leading-4 text-text-secondary" key={warning}>
                     {warning}
-                  </UiText>
+                  </p>
                 ))}
               </div>
             )}
-          </div>
+          </section>
         )}
         {isColorCalibrationVisible && (
-          <div className={density.card.panel} data-testid="color-calibration-controls">
-            <UiText variant={TextVariants.heading} className={cx(density.sectionHeader.title, 'mb-2 block')}>
-              {t('adjustments.color.calibration.title')}
-            </UiText>
-            <div>
-              <UiText color={TextColors.primary} weight={TextWeights.medium} className="mb-1 text-[12px] leading-4">
-                {t('adjustments.color.calibration.shadows')}
-              </UiText>
+          <section className="py-1.5" data-testid="color-calibration-controls">
+            <CompactInspectorSectionHeader
+              modified={isCalibrationModified}
+              modifiedLabel={modifiedLabel}
+              summary={activePrimaryLabel}
+              title={t('adjustments.color.calibration.title')}
+            />
+            <div className="space-y-1">
               <AdjustmentSlider
+                defaultValue={0}
                 density="compact"
                 label={t('adjustments.color.calibration.tint')}
                 min={-100}
                 max={100}
                 step={1}
-                defaultValue={0}
                 value={colorCalibration.shadowsTint}
                 onValueChange={(value) => {
                   handleShadowsChange(value);
@@ -218,53 +253,50 @@ export const ColorAdvancedControls = ({
                 onDragStateChange={onDragStateChange}
                 trackClassName="tint-gradient-track"
               />
-            </div>
-            <div className="mt-2">
-              <UiText color={TextColors.primary} weight={TextWeights.medium} className="mb-2 text-[12px] leading-4">
-                {t('adjustments.color.calibration.primaries')}
-              </UiText>
-              <div className="mb-2 flex justify-center gap-5 px-1">
-                {primaryColors.map(({ name, color, label }) => (
-                  <ColorSwatch
-                    color={color}
-                    isActive={activePrimary === name}
-                    key={name}
-                    name={name}
-                    onClick={setActivePrimary}
-                    ariaLabel={t('adjustments.color.ariaSelectColor', { name: label })}
-                  />
-                ))}
+              <div className="pt-0.5">
+                <div className="mb-1 flex gap-1 px-0.5">
+                  {primaryColors.map(({ name, color, label }) => (
+                    <ColorSwatch
+                      ariaLabel={t('adjustments.color.ariaSelectColor', { name: label })}
+                      color={color}
+                      isActive={activePrimary === name}
+                      key={name}
+                      name={name}
+                      onClick={setActivePrimary}
+                    />
+                  ))}
+                </div>
+                <AdjustmentSlider
+                  defaultValue={0}
+                  density="compact"
+                  label={t('adjustments.color.calibration.hue')}
+                  min={-100}
+                  max={100}
+                  step={1}
+                  value={currentValues.hue}
+                  onValueChange={(value) => {
+                    handlePrimaryChange('Hue', value);
+                  }}
+                  onDragStateChange={onDragStateChange}
+                  trackClassName={`hue-slider-${trackSuffix}`}
+                />
+                <AdjustmentSlider
+                  defaultValue={0}
+                  density="compact"
+                  label={t('adjustments.color.calibration.saturation')}
+                  min={-100}
+                  max={100}
+                  step={1}
+                  value={currentValues.saturation}
+                  onValueChange={(value) => {
+                    handlePrimaryChange('Saturation', value);
+                  }}
+                  onDragStateChange={onDragStateChange}
+                  trackClassName={`sat-slider-${trackSuffix}`}
+                />
               </div>
-              <AdjustmentSlider
-                density="compact"
-                label={t('adjustments.color.calibration.hue')}
-                min={-100}
-                max={100}
-                step={1}
-                defaultValue={0}
-                value={currentValues.hue}
-                onValueChange={(value) => {
-                  handlePrimaryChange('Hue', value);
-                }}
-                onDragStateChange={onDragStateChange}
-                trackClassName={`hue-slider-${trackSuffix}`}
-              />
-              <AdjustmentSlider
-                density="compact"
-                label={t('adjustments.color.calibration.saturation')}
-                min={-100}
-                max={100}
-                step={1}
-                defaultValue={0}
-                value={currentValues.saturation}
-                onValueChange={(value) => {
-                  handlePrimaryChange('Saturation', value);
-                }}
-                onDragStateChange={onDragStateChange}
-                trackClassName={`sat-slider-${trackSuffix}`}
-              />
             </div>
-          </div>
+          </section>
         )}
       </div>
     </details>

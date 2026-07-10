@@ -4141,6 +4141,7 @@
     },
     "slider": {
       "clickToEdit": "點選編輯",
+      "modified": "已修改",
       "reset": "重置"
     },
     "waveform": {

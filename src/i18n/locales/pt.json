@@ -4474,6 +4474,7 @@
     },
     "slider": {
       "clickToEdit": "Clique para editar",
+      "modified": "Modificado",
       "reset": "Redefinir"
     },
     "waveform": {

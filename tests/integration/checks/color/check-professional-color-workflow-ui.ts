@@ -137,14 +137,24 @@ async function validateCompactEditorSurface(container: Element) {
   const balanceDisclosure = getByTestId<HTMLDetailsElement>(container, 'color-balance-disclosure');
   const channelDisclosure = getByTestId<HTMLDetailsElement>(container, 'channel-mixer-disclosure');
   const blackWhiteDisclosure = getByTestId<HTMLDetailsElement>(container, 'black-white-mixer-disclosure');
+  const advancedDisclosure = getByTestId<HTMLDetailsElement>(container, 'advanced-color-disclosure');
 
+  assert.equal(container.querySelector('[data-color-inspector-density="compact"]') !== null, true);
   assert.equal(profileTone.querySelectorAll('select').length, 2, 'Profile & Tone should expose two direct selectors.');
+  assert.equal(profileTone.querySelector('[data-inspector-section-header="true"]') !== null, true);
+  assert.equal(colorMixer.querySelector('[data-inspector-section-header="true"]') !== null, true);
+  assert.equal(advancedDisclosure.querySelector('[data-inspector-section-header="true"]') !== null, true);
   assert.equal(
     hslControls.compareDocumentPosition(balanceDisclosure) & Node.DOCUMENT_POSITION_FOLLOWING,
     Node.DOCUMENT_POSITION_FOLLOWING,
     'HSL controls should lead the Editor workspace.',
   );
   assert.equal(colorMixer.className.includes('rounded'), false, 'Color Mixer should not be framed as a card.');
+  assert.equal(
+    advancedDisclosure.className.includes('rounded'),
+    false,
+    'Advanced Color should use a sectional disclosure.',
+  );
   assert.equal(container.querySelector('[data-testid="color-workspace-warning-chips"]'), null);
   assert.equal(container.querySelector('[data-testid="professional-color-recipes-disclosure"]'), null);
   assert.equal(container.querySelector('[data-testid="selective-color-mask-preview-toggle"]'), null);

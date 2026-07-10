@@ -127,7 +127,7 @@ export default function ColorWorkspacePanel() {
     >
       <PanelScopesStrip testId="color-workspace-scopes-strip" />
 
-      <div className="grow overflow-y-auto bg-editor-panel px-2.5 py-1.5">
+      <div className="grow overflow-y-auto bg-editor-panel px-2.5 py-1" data-testid="color-workspace-scroll-root">
         <ColorPanel
           adjustments={adjustments}
           appSettings={appSettings}

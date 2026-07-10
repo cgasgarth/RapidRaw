@@ -76,12 +76,28 @@ test('adjustment slider numeric edits commit, cancel, and increment predictably'
     getRequiredElement<HTMLButtonElement>(container, '[data-testid="precision-slider-value"]').click();
     await flushPromises();
   });
+  const enterInput = getRequiredElement<HTMLInputElement>(container, '[data-testid="precision-slider-input"]');
+  valueSetter?.call(enterInput, '13.5');
+  await act(async () => {
+    enterInput.dispatchEvent(createInputEvent());
+    enterInput.dispatchEvent(new window.KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
+    await flushPromises();
+  });
+  expect(changes).toEqual([12.5, 13.5]);
+  expect(document.activeElement).toBe(
+    getRequiredElement<HTMLButtonElement>(container, '[data-testid="precision-slider-value"]'),
+  );
+
+  await act(async () => {
+    getRequiredElement<HTMLButtonElement>(container, '[data-testid="precision-slider-value"]').click();
+    await flushPromises();
+  });
   const reopenedInput = getRequiredElement<HTMLInputElement>(container, '[data-testid="precision-slider-input"]');
   await act(async () => {
     reopenedInput.dispatchEvent(new window.KeyboardEvent('keydown', { bubbles: true, key: 'ArrowUp' }));
     await flushPromises();
   });
-  expect(changes).toEqual([12.5, 13]);
+  expect(changes).toEqual([12.5, 13.5, 14]);
 
   valueSetter?.call(reopenedInput, '19');
   await act(async () => {
@@ -90,8 +106,11 @@ test('adjustment slider numeric edits commit, cancel, and increment predictably'
     reopenedInput.dispatchEvent(new window.KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
     await flushPromises();
   });
-  expect(changes).toEqual([12.5, 13, 12.5]);
-  expect(container.querySelector('[data-testid="current-value"]')?.textContent).toBe('12.5');
+  expect(changes).toEqual([12.5, 13.5, 14, 13.5]);
+  expect(container.querySelector('[data-testid="current-value"]')?.textContent).toBe('13.5');
+  expect(document.activeElement).toBe(
+    getRequiredElement<HTMLButtonElement>(container, '[data-testid="precision-slider-value"]'),
+  );
 });
 
 test('compact adjustment slider supports shift wheel edits and label reset hooks', async () => {
@@ -107,6 +126,10 @@ test('compact adjustment slider supports shift wheel edits and label reset hooks
   });
 
   const root = getRequiredElement<HTMLDivElement>(container, '[data-testid="precision-slider"]');
+  expect(root.dataset.density).toBe('compact');
+  expect(root.dataset.modified).toBe('true');
+  expect(root.querySelector('[data-slider-track="true"]')).not.toBeNull();
+  expect(root.querySelector('[data-slider-value-slot="true"]')?.className).toContain('w-[3.5rem]');
   const wheelEvent = createWheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -100, shiftKey: true });
   await act(async () => {
     root.dispatchEvent(wheelEvent);
@@ -120,6 +143,7 @@ test('compact adjustment slider supports shift wheel edits and label reset hooks
     await flushPromises();
   });
   expect(changes).toEqual([1.1, 0]);
+  expect(root.dataset.modified).toBe('false');
 });
 
 function AdjustmentSliderHarness({

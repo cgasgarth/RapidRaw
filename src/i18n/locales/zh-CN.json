@@ -4453,6 +4453,7 @@
     },
     "slider": {
       "clickToEdit": "点击编辑",
+      "modified": "已修改",
       "reset": "重置"
     },
     "waveform": {
