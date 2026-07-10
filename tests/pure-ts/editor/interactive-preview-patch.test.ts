@@ -217,20 +217,23 @@ test('interactive preview scheduler bounds active work and keeps only the latest
   scheduler.dispose();
 });
 
-test('canvas URL cleanup retains the painted patch until its decoded successor confirms paint', () => {
-  const revoked: string[] = [];
-  const registry = new InteractivePreviewUrlRegistry((url) => revoked.push(url));
+test('canvas URL ownership retains predecessor bytes until the owning rendered layer retires', () => {
+  const registry = new InteractivePreviewUrlRegistry();
 
-  registry.track('blob:painted');
-  registry.track('blob:decoded-successor');
-  expect(revoked).toEqual([]);
+  registry.claim('base:painted', 'blob:painted');
+  registry.claim('patch:painted', 'blob:painted');
+  registry.claim('base:successor', 'blob:successor');
 
-  registry.confirmPaint('blob:decoded-successor');
-  expect(revoked).toEqual(['blob:painted']);
+  expect(registry.release('base:painted', 'blob:painted')).toBe(false);
+  expect(registry.release('patch:painted', 'blob:painted')).toBe(true);
+  expect(registry.release('base:successor', 'blob:successor')).toBe(true);
+});
 
-  registry.release('blob:painted');
-  expect(revoked).toEqual(['blob:painted']);
+test('canvas URL ownership releases only the final owner during unmount cleanup', () => {
+  const registry = new InteractivePreviewUrlRegistry();
+  registry.claim('base:painted', 'blob:painted');
+  registry.claim('patch:painted', 'blob:painted');
 
-  registry.clear();
-  expect(revoked).toEqual(['blob:painted', 'blob:decoded-successor']);
+  expect(registry.releaseOwner('base:painted')).toEqual([]);
+  expect(registry.releaseOwner('patch:painted')).toEqual(['blob:painted']);
 });

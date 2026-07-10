@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import CropOverlay, { type Crop, type PercentCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
@@ -37,6 +37,7 @@ import {
 } from '../../../utils/color/runtime/gamutWarningDisplay';
 import { resolveEditorPreviewSource } from '../../../utils/editorImagePreviewSource';
 import { resolveEditorOverlayBlocker, resolveEditorOverlayVisibility } from '../../../utils/editorOverlayVisibility';
+import { globalImageCache } from '../../../utils/ImageLRUCache';
 import {
   buildInteractivePreviewGeometryIdentity,
   InteractivePreviewUrlRegistry,
@@ -1196,6 +1197,413 @@ const MaskOverlay = memo(
 
 MaskOverlay.displayName = 'MaskOverlay';
 
+interface PreviewLayerValue {
+  url: string;
+}
+
+interface SvgPreviewLayer<T extends PreviewLayerValue> {
+  id: string;
+  opacity: 0 | 1;
+  owner: string;
+  status: 'loaded' | 'loading' | 'visible';
+  value: T;
+}
+
+interface SvgPreviewHandoffState<T extends PreviewLayerValue> {
+  active: SvgPreviewLayer<T> | null;
+  retired: SvgPreviewLayer<T>[];
+  retiringActiveId: string | null;
+  scopeKey: string;
+  successor: SvgPreviewLayer<T> | null;
+}
+
+interface SvgPreviewHandoffOptions<T extends PreviewLayerValue> {
+  initiallyVisible: boolean;
+  ownerPrefix: string;
+  retainActiveWithoutTarget: boolean;
+  scopeKey: string;
+  target: T | null;
+  targetKey: string | null;
+  reducedMotion: boolean;
+  onClaim: (owner: string, url: string) => void;
+  onRelease: (owner: string, url: string) => void;
+}
+
+const createSvgPreviewLayer = <T extends PreviewLayerValue>(
+  ownerPrefix: string,
+  scopeKey: string,
+  value: T,
+  opacity: 0 | 1,
+): SvgPreviewLayer<T> => ({
+  id: value.url,
+  opacity,
+  owner: `${ownerPrefix}:${scopeKey}:${value.url}`,
+  status: 'loading',
+  value,
+});
+
+const activeLayersForSvgPreviewHandoff = <T extends PreviewLayerValue>(state: SvgPreviewHandoffState<T>) => [
+  ...(state.active ? [state.active] : []),
+  ...(state.successor ? [state.successor] : []),
+];
+
+const layersForSvgPreviewHandoff = <T extends PreviewLayerValue>(state: SvgPreviewHandoffState<T>) => [
+  ...activeLayersForSvgPreviewHandoff(state),
+  ...state.retired,
+];
+
+const settleSvgPreviewSuccessor = <T extends PreviewLayerValue>(
+  state: SvgPreviewHandoffState<T>,
+  successorId: string,
+): SvgPreviewHandoffState<T> => {
+  if (state.successor?.id !== successorId) return state;
+  return {
+    ...state,
+    active: { ...state.successor, opacity: 1, status: 'visible' },
+    retired: state.active ? [...state.retired, state.active] : state.retired,
+    retiringActiveId: null,
+    successor: null,
+  };
+};
+
+function useSvgPreviewHandoff<T extends PreviewLayerValue>({
+  initiallyVisible,
+  onClaim,
+  onRelease,
+  ownerPrefix,
+  reducedMotion,
+  retainActiveWithoutTarget,
+  scopeKey,
+  target,
+  targetKey,
+}: SvgPreviewHandoffOptions<T>) {
+  const [state, setState] = useState<SvgPreviewHandoffState<T>>(() => ({
+    active: initiallyVisible && target ? createSvgPreviewLayer(ownerPrefix, scopeKey, target, 1) : null,
+    retired: [],
+    retiringActiveId: null,
+    scopeKey,
+    successor: !initiallyVisible && target ? createSvgPreviewLayer(ownerPrefix, scopeKey, target, 0) : null,
+  }));
+  const onClaimRef = useRef(onClaim);
+  const onReleaseRef = useRef(onRelease);
+  const ownedLayersRef = useRef<SvgPreviewLayer<T>[]>([]);
+
+  useLayoutEffect(() => {
+    onClaimRef.current = onClaim;
+    onReleaseRef.current = onRelease;
+  }, [onClaim, onRelease]);
+
+  useLayoutEffect(() => {
+    setState((current) => {
+      if (current.scopeKey !== scopeKey) {
+        return {
+          active: initiallyVisible && target ? createSvgPreviewLayer(ownerPrefix, scopeKey, target, 1) : null,
+          retired: [...current.retired, ...activeLayersForSvgPreviewHandoff(current)],
+          retiringActiveId: null,
+          scopeKey,
+          successor: !initiallyVisible && target ? createSvgPreviewLayer(ownerPrefix, scopeKey, target, 0) : null,
+        };
+      }
+
+      if (!target) {
+        if (retainActiveWithoutTarget) return current;
+        return {
+          ...current,
+          active: null,
+          retired: [...current.retired, ...activeLayersForSvgPreviewHandoff(current)],
+          retiringActiveId: null,
+          successor: null,
+        };
+      }
+
+      if (current.successor?.id === target.url || (current.active?.id === target.url && !current.successor)) {
+        return current;
+      }
+
+      const staleSuccessor = current.successor ? [current.successor] : [];
+      if (!current.active) {
+        return {
+          ...current,
+          retired: [...current.retired, ...staleSuccessor],
+          successor: createSvgPreviewLayer(ownerPrefix, scopeKey, target, 0),
+        };
+      }
+
+      return {
+        ...current,
+        retired: [...current.retired, ...staleSuccessor],
+        successor: createSvgPreviewLayer(ownerPrefix, scopeKey, target, 0),
+      };
+    });
+  }, [initiallyVisible, ownerPrefix, retainActiveWithoutTarget, scopeKey, target, targetKey]);
+
+  useLayoutEffect(() => {
+    const ownedLayers = layersForSvgPreviewHandoff(state);
+    ownedLayersRef.current = ownedLayers;
+    for (const layer of ownedLayers) {
+      if (!state.retired.includes(layer)) {
+        onClaimRef.current(layer.owner, layer.value.url);
+      }
+    }
+  }, [state]);
+
+  useEffect(() => {
+    if (state.retired.length === 0) return;
+    for (const layer of state.retired) {
+      onReleaseRef.current(layer.owner, layer.value.url);
+    }
+    setState((current) => (current.retired === state.retired ? { ...current, retired: [] } : current));
+  }, [state.retired]);
+
+  useEffect(
+    () => () => {
+      for (const layer of ownedLayersRef.current) {
+        onReleaseRef.current(layer.owner, layer.value.url);
+      }
+    },
+    [],
+  );
+
+  const settleSuccessor = useCallback((successorId: string) => {
+    setState((current) => settleSvgPreviewSuccessor(current, successorId));
+  }, []);
+
+  const handleSuccessorLoad = useCallback((successorId: string) => {
+    setState((current) => {
+      if (current.successor?.id !== successorId || current.successor.status !== 'loading') return current;
+      return { ...current, successor: { ...current.successor, status: 'loaded' } };
+    });
+  }, []);
+
+  const handleSuccessorError = useCallback((successorId: string) => {
+    setState((current) => {
+      if (current.successor?.id !== successorId) return current;
+      return { ...current, retired: [...current.retired, current.successor], successor: null };
+    });
+  }, []);
+
+  useEffect(() => {
+    const successor = state.successor;
+    if (!successor || successor.status !== 'loaded') return;
+
+    let frame2: number | null = null;
+    const frame1 = requestAnimationFrame(() => {
+      setState((current) => {
+        if (current.successor?.id !== successor.id) return current;
+        return { ...current, successor: { ...current.successor, opacity: 1, status: 'visible' } };
+      });
+      if (reducedMotion) {
+        frame2 = requestAnimationFrame(() => {
+          settleSuccessor(successor.id);
+        });
+      }
+    });
+
+    return () => {
+      cancelAnimationFrame(frame1);
+      if (frame2 !== null) cancelAnimationFrame(frame2);
+    };
+  }, [reducedMotion, settleSuccessor, state.successor]);
+
+  const beginActiveRetirement = useCallback(() => {
+    setState((current) => {
+      const retiredSuccessor = current.successor ? [current.successor] : [];
+      if (!current.active) {
+        return retiredSuccessor.length > 0
+          ? { ...current, retired: [...current.retired, ...retiredSuccessor], successor: null }
+          : current;
+      }
+      if (current.retiringActiveId === current.active.id && !current.successor) return current;
+      return {
+        ...current,
+        active: { ...current.active, opacity: 0 },
+        retired: [...current.retired, ...retiredSuccessor],
+        retiringActiveId: current.active.id,
+        successor: null,
+      };
+    });
+  }, []);
+
+  const retireActive = useCallback((activeId: string) => {
+    setState((current) => {
+      if (current.active?.id !== activeId || current.retiringActiveId !== activeId) return current;
+      return {
+        ...current,
+        active: null,
+        retired: [...current.retired, current.active],
+        retiringActiveId: null,
+      };
+    });
+  }, []);
+
+  useEffect(() => {
+    const activeId = state.retiringActiveId;
+    if (!reducedMotion || !activeId) return;
+
+    let frame2: number | null = null;
+    const frame1 = requestAnimationFrame(() => {
+      frame2 = requestAnimationFrame(() => {
+        retireActive(activeId);
+      });
+    });
+    return () => {
+      cancelAnimationFrame(frame1);
+      if (frame2 !== null) cancelAnimationFrame(frame2);
+    };
+  }, [reducedMotion, retireActive, state.retiringActiveId]);
+
+  const handleTransitionEnd = useCallback((layerId: string) => {
+    setState((current) => {
+      if (current.successor?.id === layerId) return settleSvgPreviewSuccessor(current, layerId);
+      if (current.active?.id === layerId && current.retiringActiveId === layerId) {
+        return {
+          ...current,
+          active: null,
+          retired: [...current.retired, current.active],
+          retiringActiveId: null,
+        };
+      }
+      return current;
+    });
+  }, []);
+
+  return { beginActiveRetirement, handleSuccessorError, handleSuccessorLoad, handleTransitionEnd, state };
+}
+
+const useReducedMotion = () => {
+  const [reducedMotion, setReducedMotion] = useState(
+    () =>
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+  );
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return undefined;
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const updateReducedMotion = () => setReducedMotion(mediaQuery.matches);
+    updateReducedMotion();
+    mediaQuery.addEventListener('change', updateReducedMotion);
+    return () => {
+      mediaQuery.removeEventListener('change', updateReducedMotion);
+    };
+  }, []);
+
+  return reducedMotion;
+};
+
+interface SvgPreviewHandoffProps {
+  baseScopeKey: string;
+  baseSource: string | null;
+  incomingPatch: InteractivePatch | null;
+  isCpuPreviewVisible: boolean;
+  isMaxZoom: boolean | undefined;
+  patchScopeKey: string;
+  reducedMotion?: boolean | undefined;
+  releaseUrl: (owner: string, url: string) => void;
+  retainUrl: (owner: string, url: string) => void;
+}
+
+export function SvgPreviewHandoff({
+  baseScopeKey,
+  baseSource,
+  incomingPatch,
+  isCpuPreviewVisible,
+  isMaxZoom,
+  patchScopeKey,
+  reducedMotion: reducedMotionOverride,
+  releaseUrl,
+  retainUrl,
+}: SvgPreviewHandoffProps) {
+  const reducedMotionPreference = useReducedMotion();
+  const reducedMotion = reducedMotionOverride ?? reducedMotionPreference;
+  const baseTarget = useMemo(() => (baseSource ? { url: baseSource } : null), [baseSource]);
+  const baseHandoff = useSvgPreviewHandoff({
+    initiallyVisible: true,
+    onClaim: retainUrl,
+    onRelease: releaseUrl,
+    ownerPrefix: 'base',
+    reducedMotion,
+    retainActiveWithoutTarget: false,
+    scopeKey: baseScopeKey,
+    target: baseTarget,
+    targetKey: baseSource,
+  });
+  const patchHandoff = useSvgPreviewHandoff({
+    initiallyVisible: false,
+    onClaim: retainUrl,
+    onRelease: releaseUrl,
+    ownerPrefix: 'patch',
+    reducedMotion,
+    retainActiveWithoutTarget: true,
+    scopeKey: patchScopeKey,
+    target: incomingPatch,
+    targetKey: incomingPatch?.url ?? null,
+  });
+  const baseSuccessorIsVisible = baseHandoff.state.successor?.opacity === 1;
+
+  useEffect(() => {
+    if (!incomingPatch && baseSuccessorIsVisible) {
+      patchHandoff.beginActiveRetirement();
+    }
+  }, [baseSuccessorIsVisible, incomingPatch, patchHandoff.beginActiveRetirement]);
+
+  if (!isCpuPreviewVisible) return null;
+
+  const imageRendering = isMaxZoom ? 'pixelated' : 'auto';
+  const transition = reducedMotion ? undefined : 'opacity 150ms ease-in-out';
+  const baseLayers = [
+    ...(baseHandoff.state.active ? [baseHandoff.state.active] : []),
+    ...(baseHandoff.state.successor ? [baseHandoff.state.successor] : []),
+  ];
+  const patchLayers = [
+    ...(patchHandoff.state.active ? [patchHandoff.state.active] : []),
+    ...(patchHandoff.state.successor ? [patchHandoff.state.successor] : []),
+  ];
+
+  return (
+    <>
+      {baseLayers.map((layer) => (
+        <image
+          data-preview-layer-id={layer.id}
+          data-testid="svg-preview-base-layer"
+          height="100%"
+          href={layer.value.url}
+          key={`base:${layer.owner}`}
+          onError={() => baseHandoff.handleSuccessorError(layer.id)}
+          onLoad={() => baseHandoff.handleSuccessorLoad(layer.id)}
+          onTransitionEnd={(event) => {
+            if (event.propertyName === 'opacity') baseHandoff.handleTransitionEnd(layer.id);
+          }}
+          style={{ imageRendering, opacity: layer.opacity, transition }}
+          width="100%"
+          x="0"
+          y="0"
+        />
+      ))}
+      {patchLayers.map((layer) => (
+        <image
+          data-preview-layer-id={layer.id}
+          data-testid="svg-preview-patch-layer"
+          height={cssPercent(layer.value.normH * 100)}
+          href={layer.value.url}
+          key={`patch:${layer.owner}`}
+          onError={() => patchHandoff.handleSuccessorError(layer.id)}
+          onLoad={() => patchHandoff.handleSuccessorLoad(layer.id)}
+          onTransitionEnd={(event) => {
+            if (event.propertyName === 'opacity') patchHandoff.handleTransitionEnd(layer.id);
+          }}
+          preserveAspectRatio="none"
+          style={{ imageRendering, opacity: layer.opacity, transition }}
+          width={cssPercent(layer.value.normW * 100)}
+          x={cssPercent(layer.value.normX * 100)}
+          y={cssPercent(layer.value.normY * 100)}
+        />
+      ))}
+    </>
+  );
+}
+
 const ImageCanvas = memo(
   ({
     appSettings,
@@ -1279,26 +1687,38 @@ const ImageCanvas = memo(
       thumbnailUrl: selectedImage.thumbnailUrl,
     });
 
-    const [displayState, setDisplayState] = useState({
-      base: previewSource,
-      fade: null as string | null,
-    });
-    const [isFadingIn, setIsFadingIn] = useState(false);
-    const prevImageIdentityRef = useRef(selectedImage.path);
+    const [interactivePreviewUrlRegistry] = useState(() => new InteractivePreviewUrlRegistry());
+
+    const retainPreviewLayerUrl = useCallback(
+      (owner: string, url: string) => {
+        interactivePreviewUrlRegistry.claim(owner, url);
+      },
+      [interactivePreviewUrlRegistry],
+    );
+
+    const releasePreviewLayerUrl = useCallback(
+      (owner: string, url: string) => {
+        if (!interactivePreviewUrlRegistry.release(owner, url)) return;
+        if (
+          url === finalPreviewUrl ||
+          url === interactivePatch?.url ||
+          url === selectedImage.thumbnailUrl ||
+          globalImageCache.isProtected(url)
+        ) {
+          return;
+        }
+        URL.revokeObjectURL(url);
+      },
+      [finalPreviewUrl, interactivePatch?.url, interactivePreviewUrlRegistry, selectedImage.thumbnailUrl],
+    );
 
     const [baseTool, setBaseTool] = useState<ToolType>(brushSettings?.tool ?? ToolType.Brush);
     const [isAltPressed, setIsAltPressed] = useState(false);
     const [lastBrushCommandCapture, setLastBrushCommandCapture] = useState<BrushMaskCommandCaptureSummary | null>(null);
-    const retainedPatchRef = useRef<{ geometryKey: string; patch: InteractivePatch } | null>(null);
-    const interactivePatchUrlRegistryRef = useRef<InteractivePreviewUrlRegistry | null>(null);
-    if (!interactivePatchUrlRegistryRef.current) {
-      interactivePatchUrlRegistryRef.current = new InteractivePreviewUrlRegistry();
-    }
-    const displayedPatchUrlRef = useRef<string | null>(null);
 
     const wgpuPreviewVisibility = resolveWgpuPreviewVisibility({
       hasRenderedFirstFrame,
-      previewSource: displayState.base,
+      previewSource,
       selectedImageIsReady: selectedImage.isReady,
       useWgpuRenderer: appSettings?.useWgpuRenderer,
     });
@@ -1339,58 +1759,6 @@ const ImageCanvas = memo(
       },
       [groupOffsetX, groupOffsetY, maxSafeScale],
     );
-
-    useEffect(() => {
-      const newSrc = previewSource;
-      const isNewImage = prevImageIdentityRef.current !== selectedImage.path;
-
-      if (isNewImage) {
-        prevImageIdentityRef.current = selectedImage.path;
-        setDisplayState({ base: newSrc, fade: null });
-        setIsFadingIn(false);
-        return undefined;
-      }
-
-      if (isSliderDragging) {
-        setDisplayState({ base: newSrc, fade: null });
-        setIsFadingIn(false);
-      } else {
-        if (displayState.base !== newSrc && displayState.base) {
-          setDisplayState((prev) => ({ base: prev.base, fade: newSrc }));
-          setIsFadingIn(false);
-
-          let frame2: number;
-
-          const frame1 = requestAnimationFrame(() => {
-            frame2 = requestAnimationFrame(() => {
-              setIsFadingIn(true);
-            });
-          });
-
-          const timer = setTimeout(() => {
-            setDisplayState({ base: newSrc, fade: null });
-            setIsFadingIn(false);
-          }, 150);
-
-          return () => {
-            cancelAnimationFrame(frame1);
-            cancelAnimationFrame(frame2);
-            clearTimeout(timer);
-          };
-        } else {
-          setDisplayState({ base: newSrc, fade: null });
-          setIsFadingIn(false);
-        }
-      }
-      return undefined;
-    }, [
-      previewSource,
-      selectedImage.isReady,
-      selectedImage.path,
-      selectedImage.thumbnailUrl,
-      isSliderDragging,
-      displayState.base,
-    ]);
 
     useEffect(() => {
       setBaseTool(brushSettings?.tool ?? ToolType.Brush);
@@ -2755,12 +3123,9 @@ const ImageCanvas = memo(
       };
     }, [originalSrc]);
 
-    const currentTarget = previewSource;
-    const baseIsReady = displayState.base === currentTarget && !displayState.fade;
     const patchGeometryIdentity = buildInteractivePreviewGeometryIdentity(adjustments);
-    const patchGeometryKey = [
+    const patchScopeKey = [
       selectedImage.path,
-      previewSource,
       patchGeometryIdentity,
       imageRenderSize.width,
       imageRenderSize.height,
@@ -2774,58 +3139,6 @@ const ImageCanvas = memo(
     };
     const coherentInteractivePatch =
       interactivePatch && isInteractivePreviewPatchCoherent(interactivePatch, patchContext) ? interactivePatch : null;
-    const retainedPatch = retainedPatchRef.current;
-    const coherentRetainedPatch =
-      retainedPatch &&
-      retainedPatch.geometryKey === patchGeometryKey &&
-      isInteractivePreviewPatchCoherent(retainedPatch.patch, patchContext)
-        ? retainedPatch.patch
-        : null;
-    const visiblePatch = coherentInteractivePatch ?? (baseIsReady ? null : coherentRetainedPatch);
-    const displayedPatchUrl = !isWgpuActive ? (visiblePatch?.url ?? null) : null;
-    displayedPatchUrlRef.current = displayedPatchUrl;
-    const handleInteractivePatchLoad = useCallback((url: string) => {
-      const registry = interactivePatchUrlRegistryRef.current;
-      if (!registry) return;
-
-      if (displayedPatchUrlRef.current === url) {
-        registry.confirmPaint(url);
-      } else {
-        registry.release(url);
-      }
-    }, []);
-
-    useEffect(() => {
-      const registry = interactivePatchUrlRegistryRef.current;
-      if (!registry) return;
-
-      if (displayedPatchUrl) {
-        registry.track(displayedPatchUrl);
-      } else {
-        registry.clear();
-      }
-    }, [displayedPatchUrl]);
-
-    useEffect(
-      () => () => {
-        interactivePatchUrlRegistryRef.current?.clear();
-      },
-      [],
-    );
-
-    useEffect(() => {
-      if (coherentInteractivePatch) {
-        retainedPatchRef.current = { geometryKey: patchGeometryKey, patch: coherentInteractivePatch };
-      } else if (!interactivePatch || retainedPatchRef.current?.geometryKey !== patchGeometryKey) {
-        retainedPatchRef.current = null;
-      }
-    }, [coherentInteractivePatch, interactivePatch, patchGeometryKey]);
-
-    useEffect(() => {
-      if (baseIsReady && !interactivePatch) {
-        retainedPatchRef.current = null;
-      }
-    }, [baseIsReady, interactivePatch]);
 
     const uncroppedImageRenderSize = useMemo<Partial<RenderSize> | null>(() => {
       if (!selectedImage.width || !selectedImage.height || !imageRenderSize.width || !imageRenderSize.height) {
@@ -2931,7 +3244,7 @@ const ImageCanvas = memo(
     const activeCanvasOverlayStatus: CanvasOverlayStatus =
       isShowingOriginal || compareOverlayDisabled
         ? 'disabled'
-        : isSliderDragging || displayState.fade
+        : isSliderDragging
           ? 'loading'
           : isMaskInteractionActive || liveBrushLine || previewBox
             ? 'drag'
@@ -3027,44 +3340,16 @@ const ImageCanvas = memo(
                 }
                 preserveAspectRatio={imageRenderSize.width > 0 && imageRenderSize.height > 0 ? 'none' : 'xMidYMid meet'}
               >
-                {displayState.base && !isWgpuActive && (
-                  <image
-                    href={displayState.base}
-                    x="0"
-                    y="0"
-                    width="100%"
-                    height="100%"
-                    style={{ imageRendering: isMaxZoom ? 'pixelated' : 'auto' }}
-                  />
-                )}
-
-                {displayState.fade && !isWgpuActive && (
-                  <image
-                    href={displayState.fade}
-                    x="0"
-                    y="0"
-                    width="100%"
-                    height="100%"
-                    style={{
-                      imageRendering: isMaxZoom ? 'pixelated' : 'auto',
-                      opacity: isFadingIn ? 1 : 0,
-                      transition: 'opacity 150ms ease-in-out',
-                    }}
-                  />
-                )}
-
-                {visiblePatch && !isWgpuActive && (
-                  <image
-                    href={visiblePatch.url}
-                    onLoad={() => handleInteractivePatchLoad(visiblePatch.url)}
-                    x={cssPercent(visiblePatch.normX * 100)}
-                    y={cssPercent(visiblePatch.normY * 100)}
-                    width={cssPercent(visiblePatch.normW * 100)}
-                    height={cssPercent(visiblePatch.normH * 100)}
-                    preserveAspectRatio="none"
-                    style={{ imageRendering: isMaxZoom ? 'pixelated' : 'auto' }}
-                  />
-                )}
+                <SvgPreviewHandoff
+                  baseScopeKey={selectedImage.path}
+                  baseSource={previewSource}
+                  incomingPatch={coherentInteractivePatch}
+                  isCpuPreviewVisible={!isWgpuActive}
+                  isMaxZoom={isMaxZoom}
+                  patchScopeKey={patchScopeKey}
+                  releaseUrl={releasePreviewLayerUrl}
+                  retainUrl={retainPreviewLayerUrl}
+                />
               </svg>
 
               {originalSrc && (

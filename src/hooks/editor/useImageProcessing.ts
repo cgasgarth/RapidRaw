@@ -408,6 +408,16 @@ export function useImageProcessing(
             const blob = new Blob([buffer], { type: 'image/jpeg' });
             const url = URL.createObjectURL(blob);
 
+            try {
+              await decodeInteractivePreviewUrl(url);
+            } catch {
+              URL.revokeObjectURL(url);
+              if (operation) {
+                logAppOperationFailure(operation, new Error('final_preview_decode_failed'));
+              }
+              return;
+            }
+
             if (currentPath !== selectedImagePathRef.current || jobId !== previewJobIdRef.current) {
               URL.revokeObjectURL(url);
               if (operation) {
@@ -420,17 +430,7 @@ export function useImageProcessing(
               return;
             }
 
-            setEditor((state) => {
-              const prevUrl = state.finalPreviewUrl;
-              if (prevUrl?.startsWith('blob:') && !globalImageCache.isProtected(prevUrl)) {
-                setTimeout(() => {
-                  if (!globalImageCache.isProtected(prevUrl)) {
-                    URL.revokeObjectURL(prevUrl);
-                  }
-                }, 250);
-              }
-              return { exportSoftProofTransform: transform, finalPreviewUrl: url };
-            });
+            setEditor({ exportSoftProofTransform: transform, finalPreviewUrl: url });
 
             clearInteractivePatch();
             if (operation) {
