@@ -385,7 +385,7 @@ export async function assertProfessionalAdjustmentsCompactSearchShelf(page) {
 
 async function assertAdjustmentSectionHeaderActions(page, panel) {
   const section = panel.getByTestId('adjustments-section-basic');
-  const header = section.locator('[role="button"][aria-expanded]').first();
+  const header = section.getByRole('button', { expanded: true });
   const copyAction = section.getByTestId('adjustments-section-basic-action-copy');
   const pasteAction = section.getByTestId('adjustments-section-basic-action-paste');
   const resetAction = section.getByTestId('adjustments-section-basic-action-reset');
@@ -402,12 +402,12 @@ async function assertAdjustmentSectionHeaderActions(page, panel) {
   }
 
   const headerBoundsBefore = await header.boundingBox();
-  const hiddenOpacity = await copyAction.evaluate((button) => {
+  const initialOpacity = await copyAction.evaluate((button) => {
     const actionGroup = button.parentElement;
     return actionGroup === null ? '' : getComputedStyle(actionGroup).opacity;
   });
-  if (hiddenOpacity !== '0') {
-    throw new Error(`Section header actions should be hidden before hover/focus, opacity=${hiddenOpacity}.`);
+  if (Number(initialOpacity) < 0.95) {
+    throw new Error(`Section header actions should be visible without hover, opacity=${initialOpacity}.`);
   }
 
   await header.focus();
@@ -416,7 +416,6 @@ async function assertAdjustmentSectionHeaderActions(page, panel) {
   if (focusedActionId !== 'adjustments-section-basic-action-copy') {
     throw new Error(`Expected Tab from section header to focus copy action, got ${focusedActionId ?? '<none>'}.`);
   }
-  await waitForActionGroupOpacity(page, 'adjustments-section-basic-action-copy', 0.95, 'keyboard focus');
   await page.keyboard.press('Enter');
   const expandedAfterKeyedCopy = await header.getAttribute('aria-expanded');
   if (expandedAfterKeyedCopy !== 'true') {
@@ -429,16 +428,14 @@ async function assertAdjustmentSectionHeaderActions(page, panel) {
     }
   });
 
-  await section.hover();
-  await waitForActionGroupOpacity(page, 'adjustments-section-basic-action-copy', 0.95, 'hover');
-  const headerBoundsAfterHover = await header.boundingBox();
+  const headerBoundsAfterKeyboardAction = await header.boundingBox();
   if (
     !headerBoundsBefore ||
-    !headerBoundsAfterHover ||
-    Math.abs(headerBoundsBefore.width - headerBoundsAfterHover.width) > 1 ||
-    Math.abs(headerBoundsBefore.height - headerBoundsAfterHover.height) > 1
+    !headerBoundsAfterKeyboardAction ||
+    Math.abs(headerBoundsBefore.width - headerBoundsAfterKeyboardAction.width) > 1 ||
+    Math.abs(headerBoundsBefore.height - headerBoundsAfterKeyboardAction.height) > 1
   ) {
-    throw new Error('Section header action reveal should not resize the Basic header.');
+    throw new Error('Always-visible section header actions should not resize the Basic header.');
   }
 
   await resetAction.click();
@@ -456,29 +453,6 @@ async function assertAdjustmentSectionHeaderActions(page, panel) {
   await page.keyboard.press('Shift+F10');
   await page.getByRole('menuitem', { name: 'Reset Light Settings' }).first().waitFor({ timeout: 10_000 });
   await page.keyboard.press('Escape');
-}
-
-async function waitForActionGroupOpacity(page, testId, minimumOpacity, reason) {
-  await page.waitForFunction(
-    ({ minimumOpacity, testId }) => {
-      const button = document.querySelector(`[data-testid="${testId}"]`);
-      const actionGroup = button?.parentElement;
-      return (
-        actionGroup !== undefined &&
-        actionGroup !== null &&
-        Number(getComputedStyle(actionGroup).opacity) >= minimumOpacity
-      );
-    },
-    { minimumOpacity, testId },
-    { timeout: 10_000 },
-  );
-  const opacity = await page.getByTestId(testId).evaluate((button) => {
-    const actionGroup = button.parentElement;
-    return actionGroup === null ? '' : getComputedStyle(actionGroup).opacity;
-  });
-  if (Number(opacity) < minimumOpacity) {
-    throw new Error(`Section header actions should be visible on ${reason}, opacity=${opacity}.`);
-  }
 }
 
 async function waitForScopesStripState(page, testId, expectedState) {
