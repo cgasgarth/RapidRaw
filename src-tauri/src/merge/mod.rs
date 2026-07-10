@@ -1,4 +1,5 @@
 pub(crate) mod derived_output_provenance;
+pub(crate) mod hdr;
 pub(crate) mod hdr_artifact_sidecar;
 #[cfg(feature = "panorama-opencv-spike")]
 pub(crate) mod panorama_opencv_spike;

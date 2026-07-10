@@ -24,6 +24,7 @@ const HDR_WARNING_TONE_MAPPED_PREVIEW_ONLY: &str = "tone_mapped_preview_only";
 
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct HdrDryRunDimensionReport {
     pub height: u32,
     pub width: u32,
@@ -31,6 +32,7 @@ pub struct HdrDryRunDimensionReport {
 
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct HdrDryRunExposureReport {
     pub exposure_ev: f32,
     pub exposure_time_seconds: f32,
@@ -39,6 +41,7 @@ pub struct HdrDryRunExposureReport {
 
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct HdrDryRunSourceReport {
     pub content_hash: String,
     pub dimensions: HdrDryRunDimensionReport,
@@ -49,6 +52,7 @@ pub struct HdrDryRunSourceReport {
 
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct HdrDryRunExposureSpacingReport {
     pub max_step_ev: f32,
     pub min_step_ev: f32,
@@ -58,6 +62,7 @@ pub struct HdrDryRunExposureSpacingReport {
 
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct HdrDryRunEstimatedMemoryReport {
     pub merge_buffer_mb: u64,
     pub preview_buffer_mb: u64,
@@ -66,6 +71,7 @@ pub struct HdrDryRunEstimatedMemoryReport {
 
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct HdrDryRunPlanResponse {
     pub accepted: bool,
     pub accepted_dry_run_plan_hash: String,
@@ -139,9 +145,19 @@ pub fn build_hdr_runtime_plan(
     PendingHdrMergePlan {
         accepted_dry_run_plan_hash: format!("blake3:{}", plan_hash_hex),
         accepted_dry_run_plan_id: format!("hdr_runtime_plan_{}", plan_id_suffix),
+        alignment_policy_id: "legacy_display_referred_v1".to_string(),
+        source_content_hashes: source_refs
+            .iter()
+            .map(|source| source.content_hash.clone())
+            .collect(),
+        source_paths: source_refs
+            .iter()
+            .map(|source| source.image_path.clone())
+            .collect(),
     }
 }
 
+#[allow(dead_code)]
 pub fn build_hdr_dry_run_plan_response(
     source_refs: &[PendingHdrSourceRef],
     output_width: u32,
