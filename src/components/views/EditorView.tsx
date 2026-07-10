@@ -114,8 +114,11 @@ export default function EditorView({
   const previewRegionRef = useRef<HTMLDivElement | null>(null);
   const bottomBarShellRef = useRef<HTMLDivElement | null>(null);
   const rightPanelShellRef = useRef<HTMLDivElement | null>(null);
+  const rightRailRef = useRef<HTMLDivElement | null>(null);
+  const inspectorRegionRef = useRef<HTMLDivElement | null>(null);
+  const previousActiveRightPanelRef = useRef<Panel | null>(activeRightPanel);
   const desktopRightShellWidth = activeRightPanel
-    ? rightPanelWidth + DESKTOP_RIGHT_RAIL_WIDTH
+    ? rightPanelWidth + DESKTOP_RIGHT_RAIL_WIDTH + 8
     : DESKTOP_RIGHT_RAIL_WIDTH;
 
   useEffect(() => {
@@ -132,6 +135,21 @@ export default function EditorView({
     activeElement.blur();
     previewRegionRef.current?.focus({ preventScroll: true });
   }, [isFullScreen]);
+
+  useEffect(() => {
+    const previousActiveRightPanel = previousActiveRightPanelRef.current;
+    previousActiveRightPanelRef.current = activeRightPanel;
+
+    if (activeRightPanel !== null || previousActiveRightPanel === null) return;
+
+    const activeElement = document.activeElement;
+    if (!(activeElement instanceof HTMLElement) || !inspectorRegionRef.current?.contains(activeElement)) return;
+
+    const panelToggle = rightRailRef.current?.querySelector<HTMLButtonElement>(
+      `[data-panel-id="${previousActiveRightPanel}"]`,
+    );
+    panelToggle?.focus({ preventScroll: true });
+  }, [activeRightPanel]);
 
   const { multiSelectedPaths, imageRatings, isViewLoading, rootPaths } = useLibraryStore(
     useShallow((state) => ({
@@ -181,6 +199,7 @@ export default function EditorView({
 
   const editorNode = (
     <Editor
+      isContiguousShell={!isCompactPortrait}
       onBackToLibrary={handleBackToLibrary}
       onContextMenu={handleEditorContextMenu}
       transformWrapperRef={transformWrapperRef}
@@ -192,6 +211,7 @@ export default function EditorView({
       filmstripHeight={bottomPanelHeight}
       imageList={sortedImageList}
       imageRatings={imageRatings}
+      isContiguousShell={!isCompactPortrait}
       isCopied={isCopied}
       isCopyDisabled={!selectedImage}
       isFilmstripVisible={uiVisibility.filmstrip}
@@ -229,21 +249,27 @@ export default function EditorView({
   const editorBottomBarNode = (
     <div
       className={cx(
-        'flex flex-col w-full overflow-hidden shrink-0',
-        !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
+        'editor-shell-track flex flex-col w-full overflow-hidden shrink-0',
+        !isResizing && !isInstantTransition && !isFullScreen && 'transition-all duration-300 ease-in-out',
         isFullScreen && 'pointer-events-none',
       )}
       aria-hidden={isFullScreen}
+      data-editor-region={!isCompactPortrait ? 'filmstrip' : undefined}
       data-testid="editor-bottom-bar-shell"
       inert={isFullScreen ? true : undefined}
       ref={bottomBarShellRef}
       style={{
+        height: isFullScreen ? '0px' : undefined,
         maxHeight: isFullScreen ? '0px' : '500px',
         opacity: isFullScreen ? 0 : 1,
       }}
     >
       {!isCompactPortrait && (
-        <Resizer direction={Orientation.Horizontal} onMouseDown={createResizeHandler('bottom', bottomPanelHeight)} />
+        <Resizer
+          className="editor-shell-resizer editor-shell-resizer-horizontal"
+          direction={Orientation.Horizontal}
+          onMouseDown={createResizeHandler('bottom', bottomPanelHeight)}
+        />
       )}
       {editorBottomBarComponent}
     </div>
@@ -279,16 +305,26 @@ export default function EditorView({
     <div
       aria-label={t('editor.accessibility.workspace')}
       className={cx(
-        'editor-workspace flex grow h-full min-h-0 bg-editor-matte',
-        isCompactPortrait ? 'flex-col gap-2' : 'flex-row gap-2',
+        'editor-workspace grow h-full min-h-0 bg-editor-matte',
+        isCompactPortrait
+          ? 'flex flex-col gap-2'
+          : 'editor-desktop-workspace grid grid-cols-[minmax(0,1fr)_auto] overflow-hidden',
       )}
+      data-editor-resizing={isCompactPortrait ? undefined : String(isResizing)}
+      data-editor-shell={isCompactPortrait ? 'compact' : 'desktop'}
       data-testid="editor-workspace"
       role="main"
     >
       <div
         aria-label={t('editor.accessibility.previewRegion')}
-        className={cx('flex-1 flex flex-col min-w-0 gap-2', isCompactPortrait && 'min-h-[240px]')}
+        className={cx(
+          'min-w-0',
+          isCompactPortrait
+            ? 'flex flex-1 flex-col gap-2 min-h-[240px]'
+            : 'grid min-h-0 grid-rows-[minmax(0,1fr)_auto]',
+        )}
         data-compact-preview-min-height={isCompactPortrait ? 240 : undefined}
+        data-editor-region={!isCompactPortrait ? 'viewer' : undefined}
         ref={previewRegionRef}
         role="region"
         tabIndex={-1}
@@ -302,8 +338,13 @@ export default function EditorView({
           'flex overflow-hidden shrink-0',
           isCompactPortrait
             ? 'flex-col rounded-lg border border-editor-border bg-editor-panel'
-            : 'h-full min-w-0 bg-transparent',
-          !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
+            : 'editor-shell-track h-full min-w-0 overflow-hidden bg-editor-panel',
+          !isCompactPortrait &&
+            !isResizing &&
+            !isInstantTransition &&
+            !isFullScreen &&
+            'transition-[width] duration-300 ease-in-out',
+          isCompactPortrait && !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
           isFullScreen && 'pointer-events-none',
         )}
         aria-hidden={isFullScreen}
@@ -332,7 +373,7 @@ export default function EditorView({
                 opacity: isFullScreen ? 0 : 1,
               }
             : {
-                width: isFullScreen ? '0px' : `${desktopRightShellWidth + 8}px`,
+                width: isFullScreen ? '0px' : `${desktopRightShellWidth}px`,
                 opacity: isFullScreen ? 0 : 1,
               }
         }
@@ -419,16 +460,23 @@ export default function EditorView({
           </>
         ) : (
           <>
-            <Resizer direction={Orientation.Vertical} onMouseDown={createResizeHandler('right', rightPanelWidth)} />
+            {activeRightPanel && (
+              <Resizer
+                className="editor-shell-resizer editor-shell-resizer-vertical"
+                direction={Orientation.Vertical}
+                onMouseDown={createResizeHandler('right', rightPanelWidth)}
+              />
+            )}
             <div
-              className="grid h-full min-w-0 overflow-hidden rounded-lg border border-editor-border bg-editor-panel"
-              style={{ gridTemplateColumns: `${DESKTOP_RIGHT_RAIL_WIDTH}px minmax(0, 1fr)` }}
+              className="grid h-full min-w-0 overflow-hidden bg-editor-panel"
+              style={{
+                gridTemplateColumns: `${DESKTOP_RIGHT_RAIL_WIDTH}px minmax(0, ${activeRightPanel ? rightPanelWidth : 0}px)`,
+              }}
             >
               <div
-                className={cx(
-                  'h-full border-r transition-colors',
-                  activeRightPanel ? 'border-editor-border' : 'border-transparent',
-                )}
+                className={cx('h-full border-r border-editor-divider', !activeRightPanel && 'border-r-0')}
+                data-editor-region="tool-rail"
+                ref={rightRailRef}
               >
                 <RightPanelSwitcher
                   activePanel={activeRightPanel}
@@ -436,13 +484,7 @@ export default function EditorView({
                   isInstantTransition={isInstantTransition}
                 />
               </div>
-              <div
-                className={cx(
-                  'h-full min-w-0 overflow-hidden',
-                  !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
-                )}
-                style={{ width: activeRightPanel ? `${rightPanelWidth}px` : '0px' }}
-              >
+              <div className="h-full min-w-0 overflow-hidden" data-editor-region="inspector" ref={inspectorRegionRef}>
                 <div style={{ width: `${rightPanelWidth}px` }} className="h-full min-w-0">
                   {editorRightPanelContent}
                 </div>

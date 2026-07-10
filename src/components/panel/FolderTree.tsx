@@ -58,6 +58,7 @@ export interface FolderTree {
 }
 
 interface FolderTreeProps {
+  isContiguousShell?: boolean;
   isResizing: boolean;
   isVisible: boolean;
   onContextMenu: (event: ReactMouseEvent<HTMLElement>, path: string | null, isPinned?: boolean) => void;
@@ -669,6 +670,7 @@ function TreeNode({
 
 export default function FolderTree({
   isResizing,
+  isContiguousShell = false,
   isVisible,
   onContextMenu,
   onAlbumContextMenu,
@@ -842,7 +844,8 @@ export default function FolderTree({
   return (
     <div
       className={cx(
-        'relative bg-bg-secondary rounded-lg shrink-0',
+        'relative bg-bg-secondary shrink-0',
+        isContiguousShell ? 'rounded-none bg-editor-panel' : 'rounded-lg',
         !isResizing && 'transition-[width] duration-300 ease-in-out',
       )}
       style={style}
