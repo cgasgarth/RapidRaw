@@ -5,14 +5,15 @@ import {
   toneColorMutationResultV1Schema,
 } from '../../../../packages/rawengine-schema/src/rawEngineSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
+import { Invokes } from '../../../tauri/commands';
 import type { Adjustments } from '../../adjustments';
 import {
-  BASIC_TONE_ADJUSTMENT_KEYS,
   buildBasicToneCommandEnvelope,
   buildBasicToneImageCommandContext,
   type LegacyBasicToneAdjustmentPayload,
 } from '../../basicToneCommandBridge';
 import { pushEditHistoryEntry } from '../../editHistory';
+import { invokeWithSchema } from '../../tauriSchemaInvoke';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
 import {
   type AgentLiveBasicTonePixel,
@@ -43,6 +44,8 @@ const agentToneAdjustmentPatchSchema = z
   .refine((patch) => Object.keys(patch).length > 0, { message: 'At least one tone adjustment is required.' });
 
 export type AgentToneAdjustmentPatch = z.infer<typeof agentToneAdjustmentPatchSchema>;
+
+const previewBufferResponseSchema = z.instanceof(ArrayBuffer);
 
 export type AgentToneAdjustmentPromptDraft =
   | {
@@ -288,7 +291,7 @@ export const buildAgentToneAdjustmentPromptDraft = (
     adjustedFields,
     requestedAdjustments,
     supported: true,
-    summary: `Typed basic tone dry-run ready for ${adjustedFields.join(', ')}.`,
+    summary: `${adjustedFields.join(', ')} adjusted.`,
   };
 };
 
@@ -301,6 +304,29 @@ const setPatchedToneAdjustments = (
     if (value !== undefined) adjustments[key as keyof Adjustments] = value as Adjustments[keyof Adjustments];
   }
   return adjustments;
+};
+
+export const renderAgentToneDryRunPreview = async ({
+  baseAdjustments,
+  patch,
+  path,
+}: {
+  baseAdjustments: Adjustments;
+  patch: AgentToneAdjustmentPatch;
+  path: string;
+}): Promise<string> => {
+  const adjustments = setPatchedToneAdjustments(baseAdjustments, patch);
+  const buffer = await invokeWithSchema(
+    Invokes.GeneratePreviewForPath,
+    {
+      jsAdjustments: structuredClone(adjustments),
+      path,
+      targetResolution: 1536,
+    },
+    previewBufferResponseSchema,
+  );
+  if (buffer.byteLength === 0) throw new Error('Agent tone preview renderer returned an empty image.');
+  return URL.createObjectURL(new Blob([buffer], { type: 'image/jpeg' }));
 };
 
 const getSnapshotGraphAndRecipe = () => {

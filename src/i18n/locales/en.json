@@ -680,20 +680,21 @@
         },
         "composer": {
           "apply": "Apply edit",
-          "applying": "Applying",
+          "applying": "Applying edit...",
           "applyReceipt": "Apply receipt",
           "applyReceiptPixels": "{{changed}}/{{sampled}} preview samples changed ({{percent}}%)",
           "cancel": "Cancel",
           "changedPixels": "{{count}} preview pixels changed",
           "changedPixels_one": "{{count}} preview pixel changed",
           "changedPixels_other": "{{count}} preview pixels changed",
+          "describeEdit": "Describe your edit",
           "detailPreview": "Detail preview",
           "dryRun": "Dry-run",
           "exportProof": "Export proof",
           "exportProofReceipt": "Export proof receipt",
           "exportProofWidth": "{{width}} px",
           "inspectState": "Inspect state",
-          "label": "Ask the agent",
+          "label": "Describe your edit",
           "noApplyStep": "The agent plan did not include an apply-capable tone step.",
           "placeholder": "Example: brighten this RAW, recover shadows, and keep the color natural",
           "policy": {
@@ -702,21 +703,30 @@
             "title": "Safety policy"
           },
           "previewDelta": "{{changed}}/{{sampled}} samples changed ({{percent}}%); mean luma delta {{meanLuma}}, max channel delta {{maxDelta}}",
+          "previewEdit": "Preview edit",
+          "previewReady": "Preview ready",
+          "quickStarts": {
+            "brightenGently": "Brighten gently",
+            "liftShadows": "Lift shadows",
+            "naturalContrast": "Add natural contrast",
+            "recoverHighlights": "Recover highlights"
+          },
           "refreshPreview": "Refresh preview",
+          "revertEdit": "Revert AI edit",
           "rollback": "Rollback",
           "rollbackAvailable": "Rollback target still matches the current image and recipe.",
           "rollbackInvalidated": "Rollback disabled because the image, graph revision, or recipe changed.",
           "rollbackReceipt": "Rollback receipt",
           "stalePreviewWarning": "Preview may be stale; inspect state or rerun before applying.",
           "status": {
-            "applied": "Applied through the local app-server bridge",
-            "applying": "Applying accepted dry-run",
+            "applied": "Edit applied",
+            "applying": "Applying edit...",
             "approval_required": "Approval required before apply",
-            "blocked": "Blocked by safety policy",
-            "dry_run_ready": "Dry-run ready for review",
+            "blocked": "Unable to preview this edit",
+            "dry_run_ready": "Preview ready",
             "failed": "Agent request failed",
             "idle": "Waiting for a prompt",
-            "rolled_back": "Rolled back to the previous edit state"
+            "rolled_back": "AI edit reverted"
           },
           "unknownError": "Unknown agent runtime error."
         },
@@ -871,7 +881,7 @@
           "subtitle": "Preview, tool calls, and rollback",
           "title": "Activity timeline"
         },
-        "title": "Expert Agent",
+        "title": "Edit with AI",
         "transcript": "Tool-call transcript",
         "uiOnly": "UI-only",
         "walkthrough": {
@@ -882,7 +892,7 @@
         "workspace": {
           "audit": "Audit",
           "blocked": "Blocked",
-          "noImage": "No image selected",
+          "noImage": "Select a photo to start.",
           "previewReady": "Preview ready",
           "previewReceipt": "Preview receipt",
           "reviewedCommand": "Reviewed command",
