@@ -1,6 +1,8 @@
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::SystemTime;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -578,6 +580,62 @@ impl Default for AppSettings {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PreviewRuntimeSettings {
+    pub editor_preview_resolution: u32,
+    pub live_preview_quality: String,
+}
+
+impl From<&AppSettings> for PreviewRuntimeSettings {
+    fn from(settings: &AppSettings) -> Self {
+        Self {
+            editor_preview_resolution: settings.editor_preview_resolution.unwrap_or(1920),
+            live_preview_quality: settings
+                .live_preview_quality
+                .clone()
+                .unwrap_or_else(|| "high".to_string()),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct SettingsFileFingerprint {
+    len: u64,
+    modified: Option<SystemTime>,
+}
+
+struct CachedPreviewRuntimeSettings {
+    fingerprint: Option<SettingsFileFingerprint>,
+    settings: Arc<PreviewRuntimeSettings>,
+}
+
+static PREVIEW_RUNTIME_SETTINGS_CACHE: OnceLock<
+    Mutex<HashMap<PathBuf, CachedPreviewRuntimeSettings>>,
+> = OnceLock::new();
+
+fn preview_runtime_settings_cache() -> &'static Mutex<HashMap<PathBuf, CachedPreviewRuntimeSettings>>
+{
+    PREVIEW_RUNTIME_SETTINGS_CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn settings_file_fingerprint(path: &Path) -> Result<Option<SettingsFileFingerprint>, String> {
+    match fs::metadata(path) {
+        Ok(metadata) => Ok(Some(SettingsFileFingerprint {
+            len: metadata.len(),
+            modified: metadata.modified().ok(),
+        })),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error.to_string()),
+    }
+}
+
+fn invalidate_preview_runtime_settings(path: &Path) {
+    preview_runtime_settings_cache()
+        .lock()
+        .unwrap()
+        .remove(path);
+}
+
 pub fn get_settings_path(app_handle: &AppHandle) -> Result<PathBuf, String> {
     let settings_dir = app_handle
         .path()
@@ -653,14 +711,116 @@ pub fn load_settings_or_default(app_handle: &AppHandle) -> AppSettings {
     load_settings(app_handle.clone()).unwrap_or_default()
 }
 
+pub fn load_preview_runtime_settings_or_default(
+    app_handle: &AppHandle,
+) -> Arc<PreviewRuntimeSettings> {
+    let path = match get_settings_path(app_handle) {
+        Ok(path) => path,
+        Err(_) => return Arc::new(PreviewRuntimeSettings::from(&AppSettings::default())),
+    };
+    load_preview_runtime_settings_from_path(&path)
+}
+
+fn load_preview_runtime_settings_from_path(path: &Path) -> Arc<PreviewRuntimeSettings> {
+    let fingerprint = match settings_file_fingerprint(path) {
+        Ok(fingerprint) => fingerprint,
+        Err(_) => return Arc::new(PreviewRuntimeSettings::from(&AppSettings::default())),
+    };
+
+    if let Some(cached) = preview_runtime_settings_cache().lock().unwrap().get(path)
+        && cached.fingerprint == fingerprint
+    {
+        return Arc::clone(&cached.settings);
+    }
+
+    let settings = if path.exists() {
+        fs::read_to_string(path)
+            .ok()
+            .and_then(|content| serde_json::from_str::<AppSettings>(&content).ok())
+            .unwrap_or_default()
+    } else {
+        AppSettings::default()
+    };
+    let settings = Arc::new(PreviewRuntimeSettings::from(&settings));
+    let refreshed_fingerprint = settings_file_fingerprint(path).unwrap_or(fingerprint);
+    preview_runtime_settings_cache().lock().unwrap().insert(
+        path.to_path_buf(),
+        CachedPreviewRuntimeSettings {
+            fingerprint: refreshed_fingerprint,
+            settings: Arc::clone(&settings),
+        },
+    );
+    settings
+}
+
 #[tauri::command]
 pub fn save_settings(settings: AppSettings, app_handle: AppHandle) -> Result<(), String> {
     let path = get_settings_path(&app_handle)?;
     let json_string = serde_json::to_string_pretty(&settings).map_err(|e| e.to_string())?;
-    fs::write(path, json_string).map_err(|e| e.to_string())?;
+    fs::write(&path, json_string).map_err(|e| e.to_string())?;
+    invalidate_preview_runtime_settings(&path);
 
     let state = app_handle.state::<AppState>();
     let cache_size = settings.image_cache_size.unwrap_or(5) as usize;
     RenderCaches::new(state.inner()).set_decoded_image_cache_capacity(cache_size);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn write_preview_settings(path: &Path, resolution: u32, quality: &str) {
+        let settings = AppSettings {
+            editor_preview_resolution: Some(resolution),
+            live_preview_quality: Some(quality.to_string()),
+            ..AppSettings::default()
+        };
+        fs::write(path, serde_json::to_vec(&settings).unwrap()).unwrap();
+    }
+
+    #[test]
+    fn preview_runtime_settings_reuse_parsed_value_until_file_changes() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("settings.json");
+        write_preview_settings(&path, 1600, "performance");
+
+        let first = load_preview_runtime_settings_from_path(&path);
+        let warm = load_preview_runtime_settings_from_path(&path);
+        assert!(Arc::ptr_eq(&first, &warm));
+
+        write_preview_settings(&path, 2048, "full-quality");
+        let refreshed = load_preview_runtime_settings_from_path(&path);
+        assert!(!Arc::ptr_eq(&warm, &refreshed));
+        assert_eq!(refreshed.editor_preview_resolution, 2048);
+        assert_eq!(refreshed.live_preview_quality, "full-quality");
+    }
+
+    #[test]
+    fn preview_runtime_settings_explicit_invalidation_refreshes_same_file() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("settings.json");
+        write_preview_settings(&path, 1920, "high");
+
+        let first = load_preview_runtime_settings_from_path(&path);
+        invalidate_preview_runtime_settings(&path);
+        let refreshed = load_preview_runtime_settings_from_path(&path);
+
+        assert!(!Arc::ptr_eq(&first, &refreshed));
+        assert_eq!(*first, *refreshed);
+    }
+
+    #[test]
+    fn preview_runtime_settings_preserve_default_on_parse_error() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("settings.json");
+        fs::write(&path, "not json").unwrap();
+
+        let settings = load_preview_runtime_settings_from_path(&path);
+
+        assert_eq!(
+            *settings,
+            PreviewRuntimeSettings::from(&AppSettings::default())
+        );
+    }
 }

@@ -237,6 +237,50 @@ test('uses fixed virtual geometry regardless of thumbnail presentation mode', ()
   expect(getFilmstripColumnWidth(66)).toBe(74);
 });
 
+test('keeps virtual cells settled across unchanged parent renders and applies selection revisions in list order', async () => {
+  let thumbnailExifReads = 0;
+  const images = Array.from({ length: 2_000 }, (_value, index) => {
+    const imageFile = image(`/validation/stable-cell-${index}.ARW`);
+    Object.defineProperty(imageFile, 'exif', {
+      configurable: true,
+      enumerable: true,
+      get: () => {
+        thumbnailExifReads += 1;
+        return null;
+      },
+    });
+    return imageFile;
+  });
+  const initialSelection: string[] = [];
+  const rendered = await renderFilmstrip(images, ThumbnailAspectRatio.Cover, initialSelection);
+
+  thumbnailExifReads = 0;
+  for (let index = 0; index < 20; index += 1) {
+    rendered.render(images, ThumbnailAspectRatio.Cover, initialSelection);
+  }
+  await settleReact();
+  expect(thumbnailExifReads).toBe(0);
+
+  const revisedSelection = Array.from({ length: 1_000 }, (_value, index) => images[(999 - index) * 2]?.path).filter(
+    (path): path is string => path !== undefined,
+  );
+  rendered.render(images, ThumbnailAspectRatio.Cover, revisedSelection);
+  await settleReact();
+  expect(thumbnailExifReads).toBeGreaterThan(0);
+
+  const visibleThumbnails = Array.from(
+    rendered.container.querySelectorAll<HTMLDivElement>('[data-testid="filmstrip-thumbnail"]'),
+  );
+  expect(visibleThumbnails.slice(0, 3).map((thumbnail) => thumbnail.dataset.imagePath)).toEqual(
+    images.slice(0, 3).map((imageFile) => imageFile.path),
+  );
+  expect(visibleThumbnails.slice(0, 3).map((thumbnail) => thumbnail.getAttribute('aria-selected'))).toEqual([
+    'true',
+    'false',
+    'true',
+  ]);
+});
+
 function image(path: string): ImageFile {
   return {
     exif: null,
@@ -298,6 +342,7 @@ async function renderThumbnail(initialImage: ImageFile) {
 async function renderFilmstrip(
   initialImages: ImageFile[],
   thumbnailAspectRatio: ThumbnailAspectRatio = ThumbnailAspectRatio.Cover,
+  initialSelectedPaths: string[] = [],
 ) {
   installDom();
   const container = document.createElement('div');
@@ -305,7 +350,11 @@ async function renderFilmstrip(
   const root = createRoot(container);
   const i18n = await createTestI18n();
 
-  const render = (imageList: ImageFile[], nextThumbnailAspectRatio: ThumbnailAspectRatio = thumbnailAspectRatio) => {
+  const render = (
+    imageList: ImageFile[],
+    nextThumbnailAspectRatio: ThumbnailAspectRatio = thumbnailAspectRatio,
+    multiSelectedPaths: string[] = initialSelectedPaths,
+  ) => {
     act(() => {
       flushSync(() => {
         root.render(
@@ -316,7 +365,7 @@ async function renderFilmstrip(
               imageList,
               imageRatings: null,
               isLoading: false,
-              multiSelectedPaths: [],
+              multiSelectedPaths,
               thumbnailAspectRatio: nextThumbnailAspectRatio,
             }),
           ),
