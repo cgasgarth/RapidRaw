@@ -1,7 +1,7 @@
 import cx from 'clsx';
 import { AlertTriangle, Image as ImageIcon, SlidersHorizontal, Star, X } from 'lucide-react';
 import type React from 'react';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Grid, useGridCallbackRef } from 'react-window';
 import { useProcessStore } from '../../store/useProcessStore';
@@ -21,6 +21,7 @@ const FILMSTRIP_SUMMARY_HEIGHT = 30;
 
 interface ImageLayer {
   id: string;
+  path: string;
   url: string;
   opacity: number;
 }
@@ -151,12 +152,15 @@ export const FilmstripThumbnail = memo(
     const displayThumbnailUrl = resolveFilmstripThumbnailUrl(thumbData, selectedImageThumbnailUrl, isActive);
 
     const [layers, setLayers] = useState<ImageLayer[]>(() =>
-      displayThumbnailUrl ? [{ id: displayThumbnailUrl, url: displayThumbnailUrl, opacity: 1 }] : [],
+      displayThumbnailUrl
+        ? [{ id: displayThumbnailUrl, path: imageFile.path, url: displayThumbnailUrl, opacity: 1 }]
+        : [],
     );
     const currentThumbnailRef = useRef({ path: imageFile.path, url: displayThumbnailUrl });
     currentThumbnailRef.current = { path: imageFile.path, url: displayThumbnailUrl };
 
     const { path, tags, is_edited: isEdited } = imageFile;
+    const visibleLayers = layers.filter((layer) => layer.path === path);
     const rating = imageRatings?.[path] || 0;
     const colorLabel = getFilmstripColorLabel(tags);
     const isVirtualCopy = path.includes('?vc=');
@@ -190,6 +194,13 @@ export const FilmstripThumbnail = memo(
       return undefined;
     }, [displayThumbnailUrl, path, setRatio, thumbnailAspectRatio]);
 
+    useLayoutEffect(() => {
+      setLayers((previousLayers) => {
+        if (previousLayers.every((layer) => layer.path === path)) return previousLayers;
+        return previousLayers.filter((layer) => layer.path === path);
+      });
+    }, [path]);
+
     useEffect(() => {
       const layerToFadeIn = layers.find((l) => l.opacity === 0);
       if (layerToFadeIn) {
@@ -217,12 +228,12 @@ export const FilmstripThumbnail = memo(
 
       setLayers((prev) => {
         if (prev.some((layer) => layer.id === url)) return prev;
-        return [...prev, { id: url, url, opacity: 0 }];
+        return [...prev, { id: url, path, url, opacity: 0 }];
       });
     }, []);
 
     const shouldLoadSuccessor =
-      displayThumbnailUrl !== undefined && !layers.some((layer) => layer.id === displayThumbnailUrl);
+      displayThumbnailUrl !== undefined && !visibleLayers.some((layer) => layer.id === displayThumbnailUrl);
 
     const ringClass = isActive
       ? 'border-accent ring-2 ring-accent shadow-md'
@@ -274,9 +285,9 @@ export const FilmstripThumbnail = memo(
         data-tooltip={truncatedTitle}
         data-testid="filmstrip-thumbnail"
       >
-        {layers.length > 0 ? (
+        {visibleLayers.length > 0 ? (
           <div className="absolute inset-0 w-full h-full">
-            {layers.map((layer) => (
+            {visibleLayers.map((layer) => (
               <div
                 key={layer.id}
                 className="absolute inset-0 w-full h-full"
@@ -446,6 +457,7 @@ const FilmstripCell = ({
     >
       <div style={{ width: contentWidth, height: itemHeight }}>
         <FilmstripThumbnail
+          key={imageFile.path}
           imageFile={imageFile}
           imageRatings={imageRatings}
           isActive={selectedPath === imageFile.path}

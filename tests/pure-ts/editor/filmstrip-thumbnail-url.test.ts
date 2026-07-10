@@ -49,7 +49,7 @@ test('prefers the cached thumbnail when present', () => {
 });
 
 describe('filmstrip thumbnail loading', () => {
-  test('keeps the decoded layer visible while a recycled cell waits for its successor to load', async () => {
+  test('does not render a recycled cell predecessor while its successor thumbnail loads', async () => {
     const previous = image('/validation/previous.ARW');
     const successor = image('/validation/successor.ARW');
     useProcessStore.setState({
@@ -65,14 +65,17 @@ describe('filmstrip thumbnail loading', () => {
     rendered.render(successor);
 
     const preload = required<HTMLImageElement>(rendered.container, '[data-filmstrip-thumbnail-preload="true"]');
-    expect(imageSources(rendered.container)).toEqual(['blob:previous']);
+    expect(imageSources(rendered.container)).toEqual([]);
 
     await act(async () => {
       preload.dispatchEvent(new window.Event('load', { bubbles: true }));
       await flush();
     });
+    await act(async () => {
+      await flush();
+    });
 
-    expect(imageSources(rendered.container)).toEqual(['blob:previous', 'blob:successor']);
+    expect(imageSources(rendered.container)).toEqual(['blob:successor']);
 
     const successorLayer = Array.from(
       rendered.container.querySelectorAll<HTMLImageElement>('[data-testid="filmstrip-thumbnail-image"]'),
@@ -80,11 +83,6 @@ describe('filmstrip thumbnail loading', () => {
     if (successorLayer?.parentElement === null || successorLayer === undefined) {
       throw new Error('Expected the decoded successor thumbnail layer.');
     }
-
-    await act(async () => {
-      successorLayer.parentElement.dispatchEvent(new window.Event('transitionend', { bubbles: true }));
-      await flush();
-    });
 
     expect(imageSources(rendered.container)).toEqual(['blob:successor']);
   });
