@@ -4200,7 +4200,7 @@
       },
       "notAssigned": "Not assigned",
       "optimization": "Input Device Optimization",
-      "optimizationDesc": "Choose the primary input device you use to pan and zoom the canvas.",
+      "optimizationDesc": "Mouse mode uses the scroll wheel to zoom. Touchpad mode uses two-axis scroll to pan and pinch or Control-scroll to zoom.",
       "pressKey": "Press a key... (Esc to clear)",
       "resetDefaults": "Reset All to Defaults",
       "speed": "Speed",
