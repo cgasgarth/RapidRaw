@@ -7460,7 +7460,13 @@ function ColorRangeLocalAdjustmentVisualSmoke() {
 }
 
 function ColorWorkflowVisualSmoke() {
-  const [adjustments, setAdjustments] = useState<Adjustments>(() => structuredClone(INITIAL_ADJUSTMENTS));
+  const [adjustments, setAdjustments] = useState<Adjustments>(() => ({
+    ...structuredClone(INITIAL_ADJUSTMENTS),
+    saturation: -6,
+    temperature: 18,
+    tint: -9,
+    vibrance: 14,
+  }));
   const [isWbPickerActive, setIsWbPickerActive] = useState(false);
   const isCompactViewport = typeof window !== 'undefined' && window.innerWidth < 700;
   const handleAdjustmentsChange = (update: Partial<Adjustments> | ((current: Adjustments) => Adjustments)) => {

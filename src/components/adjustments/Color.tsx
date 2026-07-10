@@ -278,7 +278,7 @@ export default function ColorPanel({
         id: 'editor',
         label: t('adjustments.color.workspaceTabs.editor'),
         panel: (
-          <div className="space-y-2">
+          <div className="space-y-1">
             {!isForMask && (
               <ColorProfileToneControls
                 adjustmentVisibility={adjustmentVisibility}
@@ -437,9 +437,9 @@ export default function ColorPanel({
   };
 
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1" data-color-inspector-density="compact">
       <div
-        className="sticky top-0 z-20 -mx-3 border-b border-editor-border bg-editor-panel px-2 py-1.5"
+        className="sticky top-0 z-20 -mx-2.5 border-b border-editor-border bg-editor-panel px-2.5 py-1"
         data-sticky="true"
         data-testid="color-workspace-tab-header"
       >
@@ -487,6 +487,7 @@ export default function ColorPanel({
       {workspaceTabs.map((tab) => (
         <div
           aria-labelledby={`${tablistId}-${tab.id}-tab`}
+          className="pb-0.5"
           hidden={activeWorkspaceTab !== tab.id}
           id={`${tablistId}-${tab.id}-panel`}
           key={tab.id}

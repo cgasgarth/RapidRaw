@@ -4719,6 +4719,7 @@
     },
     "slider": {
       "clickToEdit": "Kliknij, aby edytować",
+      "modified": "Zmodyfikowano",
       "reset": "Resetuj"
     },
     "waveform": {

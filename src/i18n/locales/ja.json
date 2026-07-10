@@ -4298,6 +4298,7 @@
     },
     "slider": {
       "clickToEdit": "クリックして編集",
+      "modified": "変更済み",
       "reset": "リセット"
     },
     "waveform": {

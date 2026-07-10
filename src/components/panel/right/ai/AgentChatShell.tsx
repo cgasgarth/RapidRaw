@@ -1,4 +1,4 @@
-import { RotateCcw, Send } from 'lucide-react';
+import { Check, CircleAlert, LoaderCircle, RotateCcw, Send, Sparkles, Wrench, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 // i18next-instrument-ignore
@@ -41,6 +41,7 @@ type LivePromptStatus =
   | 'applying'
   | 'approval_required'
   | 'blocked'
+  | 'cancelled'
   | 'cancelling'
   | 'dry_run_ready'
   | 'failed'
@@ -59,6 +60,18 @@ interface LivePromptResult {
   toneAdjustmentDraft?: AgentToneAdjustmentPromptDraft;
   status: LivePromptStatus;
 }
+
+interface LiveSessionEvent {
+  body: string;
+  id: string;
+  role: AgentChatMessage['role'];
+  timestamp: string;
+}
+
+export const buildAgentChatTimeline = (
+  transcript: AgentChatTranscript,
+  liveSessionEvents: readonly LiveSessionEvent[],
+): AgentChatMessage[] => [...transcript.messages.filter((message) => message.role !== 'system'), ...liveSessionEvents];
 
 const createAgentRollbackSnapshot = () => {
   const state = useEditorStore.getState();
@@ -140,12 +153,20 @@ function MessageBubble({ message }: { message: AgentChatMessage }) {
       data-testid={`agent-chat-message-${message.id}`}
     >
       {/* i18next-instrument-ignore */}
-      <div
-        className={`max-w-[92%] rounded-md px-3 py-2 text-[12px] leading-5 ${
-          isUser ? 'bg-editor-selected-quiet text-editor-selected-quiet-text' : 'bg-editor-panel-well text-text-primary'
-        }`}
-      >
-        <p>{message.body}</p>
+      <div className={`min-w-0 max-w-[88%] ${isUser ? 'text-right' : 'text-left'}`}>
+        <div className="mb-0.5 flex items-center gap-1.5 text-[10px] font-medium uppercase leading-3 text-text-tertiary">
+          <span>{isUser ? 'You' : 'Agent'}</span>
+          {message.timestamp !== 'now' ? <span className="font-normal normal-case">{message.timestamp}</span> : null}
+        </div>
+        <div
+          className={`rounded border px-2.5 py-1.5 text-[12px] leading-5 ${
+            isUser
+              ? 'border-editor-selected-quiet bg-editor-selected-quiet text-editor-selected-quiet-text'
+              : 'border-editor-border bg-editor-panel-well text-text-primary'
+          }`}
+        >
+          <p className="whitespace-pre-wrap break-words">{message.body}</p>
+        </div>
       </div>
     </div>
   );
@@ -157,13 +178,6 @@ interface LivePromptComposerProps {
 }
 
 const AGENT_QUICK_START_KEYS = ['recoverHighlights', 'liftShadows', 'naturalContrast', 'brightenGently'] as const;
-
-interface LiveSessionEvent {
-  body: string;
-  id: string;
-  role: AgentChatMessage['role'];
-  timestamp: string;
-}
 
 const createLiveSessionEvent = (role: AgentChatMessage['role'], body: string, suffix: string): LiveSessionEvent => ({
   body,
@@ -177,6 +191,7 @@ function LivePromptComposer({ isContextReady, onSessionEvent }: LivePromptCompos
   const promptInputRef = useRef<HTMLTextAreaElement | null>(null);
   const activeOperationRef = useRef<{ cancellationIds: string[]; cancelled: boolean; id: string } | null>(null);
   const previewRequestRef = useRef(0);
+  const restorePromptFocusRef = useRef(false);
   const [prompt, setPrompt] = useState('');
   const [result, setResult] = useState<LivePromptResult>({ status: 'idle' });
   const [toneAdjustmentDraft, setToneAdjustmentDraft] = useState<AgentToneAdjustmentPromptDraft | null>(null);
@@ -201,10 +216,10 @@ function LivePromptComposer({ isContextReady, onSessionEvent }: LivePromptCompos
     toneAdjustmentDraft?.supported === true &&
     result.proposal?.status === 'ready' &&
     result.status === 'dry_run_ready';
-  const canCancel =
-    (result.status === 'applying' || result.status === 'previewing') && activeOperationRef.current !== null;
+  const canCancel = result.status === 'previewing' && activeOperationRef.current !== null;
   const canRollback =
     rollbackSnapshot !== null && rollbackValidation?.state === 'available' && result.status === 'applied';
+  const canSubmit = canRun && prompt.trim().length > 0;
   useEffect(
     () => () => {
       previewRequestRef.current += 1;
@@ -238,6 +253,14 @@ function LivePromptComposer({ isContextReady, onSessionEvent }: LivePromptCompos
       active = false;
     };
   }, [result.proposalId, result.status, rollbackValidationKey]);
+  useEffect(() => {
+    if (!restorePromptFocusRef.current) return;
+    if (!['applied', 'blocked', 'cancelled', 'dry_run_ready', 'failed', 'idle', 'rolled_back'].includes(result.status))
+      return;
+    restorePromptFocusRef.current = false;
+    const frame = window.requestAnimationFrame(() => promptInputRef.current?.focus({ preventScroll: true }));
+    return () => window.cancelAnimationFrame(frame);
+  }, [result.status]);
   let statusLabel;
 
   switch (result.status) {
@@ -252,6 +275,9 @@ function LivePromptComposer({ isContextReady, onSessionEvent }: LivePromptCompos
       break;
     case 'blocked':
       statusLabel = t('editor.ai.agent.composer.status.blocked');
+      break;
+    case 'cancelled':
+      statusLabel = 'Edit preview cancelled';
       break;
     case 'cancelling':
       statusLabel = 'Cancelling edit preview';
@@ -289,6 +315,7 @@ function LivePromptComposer({ isContextReady, onSessionEvent }: LivePromptCompos
       setToneAdjustmentDraft(null);
       setResult({ status: 'previewing' });
       onSessionEvent?.(createLiveSessionEvent('user', requestedPrompt, 'prompt'));
+      setPrompt('');
       const snapshot = buildAgentImageContextSnapshot();
       const draft = buildAgentToneAdjustmentPromptDraft(requestedPrompt, initialState.adjustments);
       if (!draft.supported) {
@@ -298,7 +325,7 @@ function LivePromptComposer({ isContextReady, onSessionEvent }: LivePromptCompos
           toneAdjustmentDraft: draft,
         } satisfies LivePromptResult;
         setResult(nextResult);
-        onSessionEvent?.(createLiveSessionEvent('assistant', draft.summary, 'dry-run-blocked'));
+        restorePromptFocusRef.current = true;
         return;
       }
 
@@ -395,16 +422,13 @@ function LivePromptComposer({ isContextReady, onSessionEvent }: LivePromptCompos
         currentSnapshot.initialPreview.recipeHash === snapshot.initialPreview.recipeHash;
       if (!previewIsCurrent) {
         if (operation.cancelled) {
-          setResult({ status: 'idle' });
-          onSessionEvent?.(createLiveSessionEvent('assistant', 'Edit preview cancelled.', 'cancelled'));
+          setResult({ status: 'cancelled' });
         } else {
           setResult({
             error: 'Selected image changed while the edit proposal was rendering.',
             status: 'blocked',
           });
-          onSessionEvent?.(
-            createLiveSessionEvent('assistant', 'Edit preview became stale before delivery.', 'preview-stale'),
-          );
+          restorePromptFocusRef.current = true;
         }
         await agentSelectedImageProposalRuntime.release(
           proposal.proposalId,
@@ -419,6 +443,7 @@ function LivePromptComposer({ isContextReady, onSessionEvent }: LivePromptCompos
           proposalId: proposal.proposalId,
           status: 'blocked',
         });
+        restorePromptFocusRef.current = true;
         return;
       }
       setToneAdjustmentDraft(draft);
@@ -434,13 +459,8 @@ function LivePromptComposer({ isContextReady, onSessionEvent }: LivePromptCompos
         toneAdjustmentDraft: draft,
       } satisfies LivePromptResult;
       setResult(nextResult);
-      onSessionEvent?.(
-        createLiveSessionEvent(
-          'assistant',
-          `${t('editor.ai.agent.composer.status.dry_run_ready')}: ${draft.summary}`,
-          'dry-run-ready',
-        ),
-      );
+      restorePromptFocusRef.current = true;
+      onSessionEvent?.(createLiveSessionEvent('assistant', draft.summary, 'dry-run-ready'));
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : t('editor.ai.agent.composer.unknownError');
 
@@ -449,15 +469,12 @@ function LivePromptComposer({ isContextReady, onSessionEvent }: LivePromptCompos
         status: 'failed',
       } satisfies LivePromptResult;
       setResult(nextResult);
-      onSessionEvent?.(
-        createLiveSessionEvent(
-          'assistant',
-          `${t('editor.ai.agent.composer.status.failed')}: ${errorMessage}`,
-          'failed',
-        ),
-      );
+      restorePromptFocusRef.current = true;
     } finally {
-      if (activeOperationRef.current?.id === operation.id) activeOperationRef.current = null;
+      if (activeOperationRef.current?.id === operation.id) {
+        activeOperationRef.current = null;
+        if (operation.cancelled) setResult({ status: 'cancelled' });
+      }
     }
   };
 
@@ -470,7 +487,7 @@ function LivePromptComposer({ isContextReady, onSessionEvent }: LivePromptCompos
 
     const nextResult = { ...result, status: 'cancelling' } satisfies LivePromptResult;
     setResult(nextResult);
-    onSessionEvent?.(createLiveSessionEvent('assistant', 'Edit preview cancellation requested.', 'cancel'));
+    restorePromptFocusRef.current = true;
   };
 
   const applyDryRun = async () => {
@@ -550,7 +567,7 @@ function LivePromptComposer({ isContextReady, onSessionEvent }: LivePromptCompos
       if (result.proposalId !== undefined)
         await agentSelectedImageProposalRuntime.release(result.proposalId, 'released');
       setResult(nextResult);
-      onSessionEvent?.(createLiveSessionEvent('assistant', 'Edit applied. Preview refreshed.', 'applied'));
+      restorePromptFocusRef.current = true;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : t('editor.ai.agent.composer.unknownError');
 
@@ -560,13 +577,7 @@ function LivePromptComposer({ isContextReady, onSessionEvent }: LivePromptCompos
         status: 'failed',
       } satisfies LivePromptResult;
       setResult(nextResult);
-      onSessionEvent?.(
-        createLiveSessionEvent(
-          'assistant',
-          `${t('editor.ai.agent.composer.status.failed')}: ${errorMessage}`,
-          'apply-failed',
-        ),
-      );
+      restorePromptFocusRef.current = true;
     } finally {
       if (activeOperationRef.current?.id === operation.id) activeOperationRef.current = null;
     }
@@ -576,9 +587,11 @@ function LivePromptComposer({ isContextReady, onSessionEvent }: LivePromptCompos
     if (rollbackSnapshot === null) return;
     const validation = validateAgentRollbackSnapshot(rollbackSnapshot);
     if (validation.state === 'invalidated') {
-      onSessionEvent?.(
-        createLiveSessionEvent('assistant', 'The image changed, so this edit cannot be reverted.', 'rollback-blocked'),
-      );
+      setResult({
+        error: 'The image changed, so this edit cannot be reverted.',
+        status: 'blocked',
+      });
+      restorePromptFocusRef.current = true;
       return;
     }
 
@@ -635,10 +648,22 @@ function LivePromptComposer({ isContextReady, onSessionEvent }: LivePromptCompos
     setRollbackSnapshot(null);
     const nextResult = { status: 'rolled_back' } satisfies LivePromptResult;
     setResult(nextResult);
-    onSessionEvent?.(
-      createLiveSessionEvent('assistant', t('editor.ai.agent.composer.status.rolled_back'), 'rolled-back'),
-    );
+    restorePromptFocusRef.current = true;
   };
+
+  const hasPreview = result.previewBeforeUrl !== undefined && result.previewAfterUrl !== undefined;
+  const isBusy = result.status === 'applying' || result.status === 'cancelling' || result.status === 'previewing';
+  const showLifecycle = result.status !== 'idle';
+  const lifecycleIcon =
+    result.status === 'applied' || result.status === 'dry_run_ready' || result.status === 'rolled_back' ? (
+      <Check aria-hidden="true" size={13} strokeWidth={2.4} />
+    ) : result.status === 'applying' || result.status === 'cancelling' || result.status === 'previewing' ? (
+      <LoaderCircle aria-hidden="true" className="animate-spin" size={13} strokeWidth={2} />
+    ) : result.status === 'blocked' || result.status === 'failed' ? (
+      <CircleAlert aria-hidden="true" size={13} strokeWidth={2} />
+    ) : (
+      <X aria-hidden="true" size={13} strokeWidth={2} />
+    );
 
   return (
     <form
@@ -650,68 +675,163 @@ function LivePromptComposer({ isContextReady, onSessionEvent }: LivePromptCompos
         void runDryRun();
       }}
     >
-      {result.status === 'idle' || result.status === 'rolled_back' ? null : (
+      {showLifecycle ? (
         <section
           aria-live="polite"
-          className="rounded-md border border-editor-border bg-editor-panel-well p-2"
+          className="overflow-hidden rounded border border-editor-border bg-editor-panel-well"
+          data-proposal-state={result.status}
           data-testid="agent-photographer-result"
         >
-          {result.status === 'dry_run_ready' || result.status === 'applied' ? null : (
-            <span className="text-[12px] font-semibold text-text-primary">{statusLabel}</span>
-          )}
-          {result.dryRunReceipt && result.status === 'dry_run_ready' ? (
-            <div className="grid grid-cols-2 gap-2" data-testid="agent-photographer-before-after">
-              <figure className="min-w-0">
-                <figcaption className="mb-1 text-[10px] font-medium uppercase text-text-tertiary">
+          <div className="flex min-h-9 items-center gap-2 border-b border-editor-border px-2.5 py-1.5">
+            <span
+              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-sm ${
+                result.status === 'blocked' || result.status === 'failed'
+                  ? 'bg-editor-danger/10 text-editor-danger'
+                  : 'bg-editor-panel-raised text-text-secondary'
+              }`}
+            >
+              {lifecycleIcon}
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-[11px] font-semibold leading-4 text-text-primary">
+                {result.status === 'dry_run_ready' ? t('editor.ai.agent.proposal.title') : statusLabel}
+              </p>
+              <p className="truncate text-[10px] leading-3 text-text-secondary">
+                {result.status === 'dry_run_ready'
+                  ? t('editor.ai.agent.composer.status.dry_run_ready')
+                  : isBusy
+                    ? 'Selected image remains unchanged until the edit is applied.'
+                    : result.status === 'applied'
+                      ? 'Current preview reflects the accepted edit.'
+                      : result.status === 'rolled_back'
+                        ? 'The selected image returned to its previous edit state.'
+                        : undefined}
+              </p>
+            </div>
+          </div>
+
+          {hasPreview ? (
+            <div className="grid grid-cols-2 gap-px bg-editor-border" data-testid="agent-photographer-before-after">
+              <figure className="min-w-0 bg-editor-panel p-1.5">
+                <figcaption className="mb-1 text-[10px] font-medium uppercase leading-3 text-text-tertiary">
                   {t('editor.ai.agent.previewLineage.role.before')}
                 </figcaption>
                 <img
                   alt={t('editor.ai.agent.previewLineage.role.before')}
-                  className="aspect-[4/3] w-full rounded border border-editor-border object-cover"
+                  className="aspect-[4/3] w-full rounded-sm object-cover"
                   src={result.previewBeforeUrl}
                 />
               </figure>
-              <figure className="min-w-0">
-                <figcaption className="mb-1 text-[10px] font-medium uppercase text-text-tertiary">
+              <figure className="min-w-0 bg-editor-panel p-1.5">
+                <figcaption className="mb-1 text-[10px] font-medium uppercase leading-3 text-text-tertiary">
                   {t('editor.ai.agent.proposal.after')}
                 </figcaption>
                 <img
                   alt={t('editor.ai.agent.proposal.after')}
-                  className="aspect-[4/3] w-full rounded border border-editor-border object-cover"
+                  className="aspect-[4/3] w-full rounded-sm object-cover"
                   src={result.previewAfterUrl}
                 />
               </figure>
             </div>
           ) : null}
-          {result.proposal ? (
-            <dl
-              className="mt-2 grid grid-cols-3 gap-1 text-[10px] leading-4 text-text-secondary"
-              data-testid="agent-selected-image-proposal-state"
-            >
-              <div>
-                <dt className="text-text-tertiary">{t('editor.ai.agent.proposal.title')}</dt>
-                <dd className="truncate text-text-primary">{result.proposal.status}</dd>
-              </div>
-              <div>
-                <dt className="text-text-tertiary">{t('editor.ai.agent.selectedImageLoop.before')}</dt>
-                <dd className="truncate text-text-primary">{result.proposal.base.graphRevision}</dd>
-              </div>
-              <div>
-                <dt className="text-text-tertiary">{t('editor.ai.agent.walkthrough.plan')}</dt>
-                <dd className="truncate text-text-primary">{result.proposal.dryRunPlan.planId}</dd>
-              </div>
-            </dl>
-          ) : null}
-          {result.error ? <p className="mt-1 text-[11px] leading-4 text-editor-danger">{result.error}</p> : null}
-        </section>
-      )}
 
-      <div className="rounded-md border border-editor-border bg-editor-panel-well p-2">
+          <div className="space-y-1.5 px-2.5 py-2">
+            {isBusy ? (
+              <div
+                className="flex items-center gap-1.5 text-[11px] leading-4 text-text-secondary"
+                data-testid="agent-tool-state"
+              >
+                <Wrench aria-hidden="true" size={12} strokeWidth={1.8} />
+                <span>{result.status === 'applying' ? t('editor.ai.agent.composer.applying') : statusLabel}</span>
+              </div>
+            ) : null}
+            {result.proposal ? (
+              <div
+                className="flex items-center justify-between gap-2"
+                data-testid="agent-selected-image-proposal-state"
+              >
+                <span className="text-[10px] font-medium uppercase leading-3 text-text-tertiary">
+                  {t('editor.ai.agent.proposal.title')}
+                </span>
+                <span className="shrink-0 text-[10px] font-semibold uppercase leading-3 text-text-primary">
+                  {result.proposal.status}
+                </span>
+              </div>
+            ) : null}
+            {result.error ? (
+              <p className="break-words text-[11px] leading-4 text-editor-danger" data-testid="agent-live-prompt-error">
+                {result.error}
+              </p>
+            ) : null}
+            {result.proposal ? (
+              <details className="border-t border-editor-border pt-1.5 text-[10px] leading-4 text-text-secondary">
+                <summary className="cursor-pointer text-text-secondary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring">
+                  {t('editor.ai.agent.composer.inspectState')}
+                </summary>
+                <dl className="mt-1 grid grid-cols-2 gap-x-2 gap-y-0.5">
+                  <div className="min-w-0">
+                    <dt className="text-text-tertiary">{t('editor.ai.agent.selectedImageLoop.before')}</dt>
+                    <dd className="truncate text-text-primary">{result.proposal.base.graphRevision}</dd>
+                  </div>
+                  <div className="min-w-0">
+                    <dt className="text-text-tertiary">{t('editor.ai.agent.walkthrough.plan')}</dt>
+                    <dd className="truncate text-text-primary">{result.proposal.dryRunPlan.planId}</dd>
+                  </div>
+                </dl>
+              </details>
+            ) : null}
+            {canApply || canCancel || canRollback ? (
+              <div className="flex items-center justify-end gap-1.5 border-t border-editor-border pt-2">
+                {canCancel ? (
+                  <button
+                    aria-label={t('editor.ai.agent.composer.cancel')}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded border border-editor-danger/40 text-editor-danger transition-colors hover:bg-editor-danger/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring"
+                    data-cancel-boundary="late-result-guard"
+                    data-testid="agent-live-prompt-cancel"
+                    data-tooltip={t('editor.ai.agent.composer.cancel')}
+                    onClick={cancelActiveOperation}
+                    type="button"
+                  >
+                    <X aria-hidden="true" size={14} />
+                  </button>
+                ) : null}
+                {canRollback ? (
+                  <button
+                    className="inline-flex h-7 items-center gap-1.5 rounded px-2 text-[11px] font-medium text-text-secondary transition-colors hover:bg-editor-panel-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring"
+                    data-discard-control="rollback-session"
+                    data-testid="agent-live-prompt-rollback"
+                    onClick={rollbackApply}
+                    type="button"
+                  >
+                    <RotateCcw aria-hidden="true" size={13} />
+                    {t('editor.ai.agent.composer.revertEdit')}
+                  </button>
+                ) : null}
+                {canApply ? (
+                  <button
+                    className="inline-flex h-7 items-center gap-1.5 rounded bg-editor-primary-active px-2.5 text-[11px] font-semibold text-editor-primary-active-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring disabled:bg-editor-panel-raised disabled:text-text-tertiary"
+                    data-testid="agent-live-prompt-apply"
+                    onClick={() => {
+                      void applyDryRun();
+                    }}
+                    type="button"
+                  >
+                    <Check aria-hidden="true" size={13} strokeWidth={2.4} />
+                    {t('editor.ai.agent.composer.apply')}
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
+
+      <div className="rounded border border-editor-border bg-editor-panel-well p-2">
         <label className="sr-only" htmlFor="agent-live-prompt-input">
           {t('editor.ai.agent.composer.label')}
         </label>
         <textarea
-          className="min-h-16 w-full resize-y bg-transparent px-1 py-1 text-[12px] leading-5 text-text-primary outline-none placeholder:text-text-tertiary"
+          className="min-h-14 w-full resize-y bg-transparent px-1 py-0.5 text-[12px] leading-5 text-text-primary outline-none placeholder:text-text-tertiary disabled:cursor-not-allowed"
           data-testid="agent-live-prompt-input"
           id="agent-live-prompt-input"
           disabled={!isContextReady}
@@ -721,12 +841,23 @@ function LivePromptComposer({ isContextReady, onSessionEvent }: LivePromptCompos
           onMouseDown={() => {
             promptInputRef.current?.focus();
           }}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape' && canCancel) {
+              event.preventDefault();
+              cancelActiveOperation();
+              return;
+            }
+            if (event.key === 'Enter' && !event.shiftKey) {
+              event.preventDefault();
+              void runDryRun();
+            }
+          }}
           placeholder={t('editor.ai.agent.composer.placeholder')}
           ref={promptInputRef}
           value={prompt}
         />
 
-        <div className="mt-2 flex items-center justify-between gap-2 border-t border-editor-border pt-2">
+        <div className="mt-1.5 flex items-end justify-between gap-2 border-t border-editor-border pt-1.5">
           <div className="flex min-w-0 flex-wrap gap-1" data-testid="agent-live-prompt-quick-starts">
             {AGENT_QUICK_START_KEYS.map((key) => (
               <button
@@ -744,60 +875,22 @@ function LivePromptComposer({ isContextReady, onSessionEvent }: LivePromptCompos
             ))}
           </div>
 
-          <div className="flex shrink-0 items-center gap-1.5">
+          <div className="flex shrink-0 items-center">
             <button
-              className="inline-flex h-8 items-center gap-1.5 rounded-md bg-editor-primary-active px-2.5 text-[11px] font-semibold text-editor-primary-active-text disabled:bg-editor-panel-raised disabled:text-text-tertiary"
+              aria-label={t('editor.ai.agent.composer.previewEdit')}
+              className="inline-flex h-7 w-7 items-center justify-center rounded bg-editor-primary-active text-editor-primary-active-text transition-colors hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring disabled:bg-editor-panel-raised disabled:text-text-tertiary"
               data-testid="agent-live-prompt-run"
               data-native-accessibility-input="reads-textarea-dom-value"
-              disabled={!canRun}
+              data-tooltip={t('editor.ai.agent.composer.previewEdit')}
+              disabled={!canSubmit}
               onClick={() => {
                 void runDryRun();
               }}
               type="button"
             >
-              <Send size={14} />
-              {t('editor.ai.agent.composer.previewEdit')}
+              <Send aria-hidden="true" size={14} />
+              <span className="sr-only">{t('editor.ai.agent.composer.previewEdit')}</span>
             </button>
-            {canApply ? (
-              <button
-                className="h-8 rounded-md border border-editor-primary-active/40 bg-editor-primary-active px-2.5 text-[11px] font-semibold text-editor-primary-active-text"
-                data-testid="agent-live-prompt-apply"
-                disabled={!canApply}
-                onClick={() => {
-                  void applyDryRun();
-                }}
-                type="button"
-              >
-                {result.status === 'applying'
-                  ? t('editor.ai.agent.composer.applying')
-                  : t('editor.ai.agent.composer.apply')}
-              </button>
-            ) : null}
-            {canCancel ? (
-              <button
-                className="h-8 rounded-md border border-editor-danger/40 px-2.5 text-[11px] font-medium text-editor-danger"
-                data-cancel-boundary="late-result-guard"
-                data-testid="agent-live-prompt-cancel"
-                disabled={!canCancel}
-                onClick={cancelActiveOperation}
-                type="button"
-              >
-                {t('editor.ai.agent.composer.cancel')}
-              </button>
-            ) : null}
-            {canRollback ? (
-              <button
-                className="inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-[11px] font-medium text-text-secondary transition-colors hover:bg-editor-panel-raised hover:text-text-primary"
-                data-discard-control="rollback-session"
-                data-testid="agent-live-prompt-rollback"
-                disabled={!canRollback}
-                onClick={rollbackApply}
-                type="button"
-              >
-                <RotateCcw size={14} />
-                {t('editor.ai.agent.composer.revertEdit')}
-              </button>
-            ) : null}
           </div>
         </div>
       </div>
@@ -806,9 +899,14 @@ function LivePromptComposer({ isContextReady, onSessionEvent }: LivePromptCompos
 }
 
 export default function AgentChatShell({ transcript }: AgentChatShellProps) {
+  const { t } = useTranslation();
   const [liveSessionEvents, setLiveSessionEvents] = useState<LiveSessionEvent[]>([]);
   const isContextReady = transcript.toolCalls.some(
     (toolCall) => toolCall.toolName === 'rawengine.live_context' && toolCall.status === 'succeeded',
+  );
+  const timeline = buildAgentChatTimeline(transcript, liveSessionEvents);
+  const visibleToolCalls = transcript.toolCalls.filter(
+    (toolCall) => toolCall.mode !== 'read' || toolCall.status !== 'succeeded',
   );
   return (
     <section
@@ -817,15 +915,41 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
       data-live-session-state={isContextReady ? 'ready' : 'blocked'}
       data-testid="agent-chat-shell"
     >
-      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-0.5" data-testid="agent-chat-messages">
-        {liveSessionEvents.map((message) => (
-          <MessageBubble key={message.id} message={message} />
-        ))}
-        {transcript.messages
-          .filter((message) => message.role !== 'system')
-          .map((message) => (
-            <MessageBubble key={message.id} message={message} />
-          ))}
+      <div
+        className="flex min-h-0 flex-1 flex-col justify-end gap-3 overflow-y-auto pr-0.5"
+        data-testid="agent-chat-messages"
+      >
+        <div
+          className="flex items-center gap-1.5 text-[10px] leading-3 text-text-secondary"
+          data-testid="agent-chat-context-state"
+        >
+          <Sparkles aria-hidden="true" size={12} strokeWidth={1.8} />
+          <span className="truncate">
+            {isContextReady ? transcript.sessionTitle : 'Select an image to start an edit.'}
+          </span>
+        </div>
+        {visibleToolCalls.length > 0 ? (
+          <div className="flex flex-wrap gap-1" data-testid="agent-chat-tool-states">
+            {visibleToolCalls.map((toolCall) => (
+              <span
+                className="inline-flex max-w-full items-center gap-1 rounded-sm border border-editor-border bg-editor-panel-well px-1.5 py-0.5 text-[10px] leading-3 text-text-secondary"
+                data-tool-status={toolCall.status}
+                key={toolCall.id}
+                title={toolCall.summary}
+              >
+                <Wrench aria-hidden="true" size={10} strokeWidth={1.8} />
+                <span className="truncate">{toolCall.title}</span>
+              </span>
+            ))}
+          </div>
+        ) : null}
+        {timeline.length === 0 ? (
+          <div className="pt-4 text-[12px] leading-5 text-text-secondary" data-testid="agent-chat-empty-state">
+            {t('editor.ai.agent.composer.describeEdit')}
+          </div>
+        ) : (
+          timeline.map((message) => <MessageBubble key={message.id} message={message} />)
+        )}
       </div>
 
       <LivePromptComposer

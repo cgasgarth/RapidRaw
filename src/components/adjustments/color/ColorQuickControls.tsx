@@ -1,10 +1,9 @@
 import cx from 'clsx';
 import { Pipette } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { TextVariants } from '../../../types/typography';
-import { ColorAdjustment } from '../../../utils/adjustments';
+import { ColorAdjustment, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
+import CompactInspectorSectionHeader from '../../ui/CompactInspectorSectionHeader';
 import { professionalInspectorDensityTokens } from '../../ui/inspectorTokens';
-import UiText from '../../ui/primitives/Text';
 import AdjustmentSlider from '../AdjustmentSlider';
 import type { ColorPanelGroupProps } from './types';
 
@@ -26,54 +25,63 @@ export const ColorQuickControls = ({
 }: ColorQuickControlsProps) => {
   const { t } = useTranslation();
   const density = professionalInspectorDensityTokens;
+  const modifiedLabel = t('ui.collapsibleSection.dirtyBadge', { defaultValue: 'Edited' });
+  const isWhiteBalanceModified =
+    adjustments.temperature !== INITIAL_ADJUSTMENTS.temperature || adjustments.tint !== INITIAL_ADJUSTMENTS.tint;
+  const isPresenceModified =
+    adjustments.vibrance !== INITIAL_ADJUSTMENTS.vibrance ||
+    adjustments.saturation !== INITIAL_ADJUSTMENTS.saturation ||
+    adjustments.hue !== INITIAL_ADJUSTMENTS.hue;
 
   const handleGlobalChange = (key: ColorAdjustment, value: number) => {
     setAdjustments((prev) => ({ ...prev, [key]: value }));
   };
 
   return (
-    <div className={cx(density.gutter.panel, density.scrollPadding)} data-testid="quick-color-controls">
-      <section className="border-b border-editor-border px-0.5 pb-2" data-testid="color-quick-white-balance">
-        <div className={cx(density.sectionHeader.root, 'mb-1')}>
-          <div className="min-w-0">
-            <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
-              {t('adjustments.color.whiteBalance')}
-            </UiText>
-            <span className={density.sectionHeader.summary}>
-              {t('adjustments.color.temperature')} {adjustments.temperature || 0} / {t('adjustments.color.tint')}{' '}
-              {adjustments.tint || 0}
+    <div className={cx('space-y-px px-0.5', density.scrollPadding)} data-testid="quick-color-controls">
+      <section className="border-b border-editor-border pb-1.5" data-testid="color-quick-white-balance">
+        <CompactInspectorSectionHeader
+          actions={
+            !isForMask && toggleWbPicker ? (
+              <button
+                aria-label={
+                  isWgpuEnabled ? t('adjustments.color.wbPickerWgpuDisabled') : t('adjustments.color.wbPickerTooltip')
+                }
+                aria-pressed={isWbPickerActive}
+                className={cx(
+                  density.actionButton.base,
+                  density.actionButton.icon,
+                  'border border-transparent data-[state=active]:border-accent',
+                  isWgpuEnabled
+                    ? 'cursor-not-allowed text-text-secondary hover:bg-transparent'
+                    : isWbPickerActive
+                      ? density.actionButton.active
+                      : density.actionButton.quiet,
+                )}
+                data-state={isWbPickerActive ? 'active' : isWgpuEnabled ? 'disabled' : 'idle'}
+                data-testid="color-white-balance-picker"
+                data-tooltip={
+                  isWgpuEnabled ? t('adjustments.color.wbPickerWgpuDisabled') : t('adjustments.color.wbPickerTooltip')
+                }
+                disabled={isWgpuEnabled}
+                onClick={toggleWbPicker}
+                type="button"
+              >
+                <Pipette size={14} />
+              </button>
+            ) : undefined
+          }
+          modified={isWhiteBalanceModified}
+          modifiedLabel={modifiedLabel}
+          summary={
+            <span data-testid="color-quick-white-balance-summary">
+              {adjustments.temperature || 0} / {adjustments.tint || 0}
             </span>
-          </div>
-          {!isForMask && toggleWbPicker && (
-            <button
-              aria-label={
-                isWgpuEnabled ? t('adjustments.color.wbPickerWgpuDisabled') : t('adjustments.color.wbPickerTooltip')
-              }
-              aria-pressed={isWbPickerActive}
-              onClick={toggleWbPicker}
-              disabled={isWgpuEnabled}
-              className={cx(
-                density.actionButton.base,
-                density.actionButton.icon,
-                'border border-transparent data-[state=active]:border-accent',
-                isWgpuEnabled
-                  ? 'cursor-not-allowed text-text-secondary hover:bg-transparent'
-                  : isWbPickerActive
-                    ? density.actionButton.active
-                    : density.actionButton.quiet,
-              )}
-              data-state={isWbPickerActive ? 'active' : isWgpuEnabled ? 'disabled' : 'idle'}
-              data-testid="color-white-balance-picker"
-              data-tooltip={
-                isWgpuEnabled ? t('adjustments.color.wbPickerWgpuDisabled') : t('adjustments.color.wbPickerTooltip')
-              }
-              type="button"
-            >
-              <Pipette size={14} />
-            </button>
-          )}
-        </div>
+          }
+          title={t('adjustments.color.whiteBalance')}
+        />
         <AdjustmentSlider
+          defaultValue={0}
           density="compact"
           label={t('adjustments.color.temperature')}
           max={100}
@@ -87,6 +95,7 @@ export const ColorQuickControls = ({
           onDragStateChange={onDragStateChange}
         />
         <AdjustmentSlider
+          defaultValue={0}
           density="compact"
           label={t('adjustments.color.tint')}
           max={100}
@@ -101,19 +110,19 @@ export const ColorQuickControls = ({
         />
       </section>
 
-      <section className="border-b border-editor-border px-0.5 pb-2 pt-1" data-testid="color-quick-presence">
-        <div className={cx(density.sectionHeader.root, 'mb-1')}>
-          <div className="min-w-0">
-            <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
-              {t('adjustments.color.presence')}
-            </UiText>
-            <span className={density.sectionHeader.summary}>
-              {t('adjustments.color.vibrance')} {adjustments.vibrance || 0} / {t('adjustments.color.saturation')}{' '}
-              {adjustments.saturation || 0}
+      <section className="border-b border-editor-border pb-1.5 pt-0.5" data-testid="color-quick-presence">
+        <CompactInspectorSectionHeader
+          modified={isPresenceModified}
+          modifiedLabel={modifiedLabel}
+          summary={
+            <span data-testid="color-quick-presence-summary">
+              {adjustments.vibrance || 0} / {adjustments.saturation || 0}
             </span>
-          </div>
-        </div>
+          }
+          title={t('adjustments.color.presence')}
+        />
         <AdjustmentSlider
+          defaultValue={0}
           density="compact"
           label={t('adjustments.color.vibrance')}
           max={100}
@@ -126,6 +135,7 @@ export const ColorQuickControls = ({
           onDragStateChange={onDragStateChange}
         />
         <AdjustmentSlider
+          defaultValue={0}
           density="compact"
           label={t('adjustments.color.saturation')}
           max={100}
@@ -138,6 +148,7 @@ export const ColorQuickControls = ({
           onDragStateChange={onDragStateChange}
         />
         <AdjustmentSlider
+          defaultValue={0}
           density="compact"
           label={isForMask ? t('adjustments.color.localHue') : t('adjustments.color.hue')}
           max={180}

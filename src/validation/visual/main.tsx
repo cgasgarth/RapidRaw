@@ -78,6 +78,32 @@ const generatedPreviewBytes = [
   196, 0, 20, 16, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 218, 0, 12, 3, 1, 0, 2, 17, 3, 17, 0, 63, 0,
   191, 255, 217,
 ];
+const buildGeneratedAgentPreviewBytes = async (): Promise<ArrayBuffer> => {
+  const canvas = document.createElement('canvas');
+  canvas.height = 1024;
+  canvas.width = 1536;
+  const context = canvas.getContext('2d');
+  if (context === null) throw new Error('Visual smoke agent preview canvas is unavailable.');
+
+  const gradient = context.createLinearGradient(0, 0, canvas.width, canvas.height);
+  gradient.addColorStop(0, '#203c3f');
+  gradient.addColorStop(0.52, '#627163');
+  gradient.addColorStop(1, '#d5af70');
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (result) => {
+        if (result === null) reject(new Error('Visual smoke agent preview encoding failed.'));
+        else resolve(result);
+      },
+      'image/jpeg',
+      0.86,
+    );
+  });
+  return blob.arrayBuffer();
+};
 const generatedPreviewBase64 =
   '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoMDAsKCwsNDhIQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/wAARCAABAAEDASIAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAAAAAH/8QAFBABAAAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AL//2Q==';
 const generatedPreviewDataUrl = `data:image/jpeg;base64,${generatedPreviewBase64}`;
@@ -155,7 +181,12 @@ window.__TAURI_INTERNALS__ = {
         storage: 'temp_cache',
       });
     }
-    if (command === generatePreviewForPathCommand) return Promise.resolve(generatedPreviewBytes);
+    if (command === generatePreviewForPathCommand) {
+      const isAgentMediumPreview = Object.entries(args ?? {}).some(
+        ([key, value]) => key === 'targetResolution' && value === 1536,
+      );
+      return isAgentMediumPreview ? buildGeneratedAgentPreviewBytes() : Promise.resolve(generatedPreviewBytes);
+    }
     if (command === estimateNegativeBaseFogCommand) {
       return Promise.resolve({
         baseDensity: [0.145, 0.238, 0.356],

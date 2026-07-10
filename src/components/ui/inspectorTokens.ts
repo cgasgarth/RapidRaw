@@ -2,23 +2,23 @@ import { editorChromeStatusChipClassName, editorChromeTokens } from './editorChr
 
 export const inspectorSectionTokens = {
   badge: editorChromeTokens.statusChip.base,
-  body: 'px-2.5 pb-2 pt-1.5 transition-opacity duration-200',
+  body: 'px-2 pb-1.5 pt-1 transition-opacity duration-200',
   chevron: 'text-text-secondary transition-transform duration-200',
   dirtyIndicator: 'h-1.5 w-1.5 shrink-0 rounded-full bg-editor-info',
   header:
-    'group min-h-8 w-full px-2.5 py-1 flex items-center justify-between gap-2 text-left hover:bg-editor-panel-raised transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring focus-visible:ring-inset',
-  actionsMenuSlot: 'h-6 w-6 shrink-0',
+    'group min-h-7 w-full px-2 py-0.5 flex items-center justify-between gap-1.5 text-left hover:bg-editor-panel-raised transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring focus-visible:ring-inset',
+  actionsMenuSlot: 'h-5 w-5 shrink-0',
   headerActionButton:
-    'z-10 flex h-6 w-6 items-center justify-center rounded text-text-secondary transition-colors duration-150 hover:bg-editor-selected-quiet hover:text-text-primary focus-visible:bg-editor-selected-quiet focus-visible:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:opacity-45',
+    'z-10 flex h-5 w-5 items-center justify-center rounded text-text-secondary transition-colors duration-150 hover:bg-editor-selected-quiet hover:text-text-primary focus-visible:bg-editor-selected-quiet focus-visible:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:opacity-45',
   headerActions:
-    'flex h-6 shrink-0 items-center gap-0.5 opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto',
+    'flex h-5 shrink-0 items-center gap-0.5 opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto',
   hiddenBadge: editorChromeStatusChipClassName('neutral'),
   shell: 'bg-editor-panel overflow-hidden shrink-0 border-b border-editor-border',
-  title: 'truncate text-[12px] leading-4 tracking-normal text-text-primary',
-  titleRow: 'flex min-w-0 items-center gap-1.5 overflow-hidden',
+  title: 'truncate text-[11px] leading-4 tracking-normal text-text-primary',
+  titleRow: 'flex min-w-0 items-center gap-1 overflow-hidden',
   visibilityButton:
-    'z-10 flex h-6 w-6 items-center justify-center rounded text-text-secondary transition-colors duration-150 hover:bg-editor-selected-quiet hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring',
-  visibilitySlot: 'w-6 h-6 flex items-center justify-center shrink-0',
+    'z-10 flex h-5 w-5 items-center justify-center rounded text-text-secondary transition-colors duration-150 hover:bg-editor-selected-quiet hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring',
+  visibilitySlot: 'w-5 h-5 flex items-center justify-center shrink-0',
 } as const;
 
 export const professionalInspectorDensityTokens = {
@@ -43,15 +43,14 @@ export const professionalInspectorDensityTokens = {
   },
   frame: {
     actionButton:
-      'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded text-text-secondary transition-colors duration-150 hover:bg-editor-selected-quiet hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:text-editor-disabled disabled:opacity-45',
+      'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-text-secondary transition-colors duration-150 hover:bg-editor-selected-quiet hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:text-editor-disabled disabled:opacity-45',
     actionButtonActive: 'bg-editor-selected-quiet text-editor-selected-quiet-text hover:bg-editor-selected-quiet',
-    actions: 'flex h-7 shrink-0 items-center gap-0.5',
+    actions: 'flex h-6 shrink-0 items-center gap-0.5',
     header:
-      'flex min-h-10 shrink-0 items-center justify-between gap-2 border-b border-editor-border bg-editor-panel px-2.5 py-1',
-    iconSlot:
-      'flex h-6 w-6 shrink-0 items-center justify-center rounded border border-editor-border bg-editor-panel-well text-text-secondary',
+      'flex min-h-10 shrink-0 items-center justify-between gap-2 border-b border-editor-border bg-editor-panel px-2 py-0.5',
+    iconSlot: 'flex h-5 w-5 shrink-0 items-center justify-center text-text-secondary',
     notice:
-      'flex min-h-7 shrink-0 items-center gap-1.5 border-b border-editor-border bg-editor-panel-well px-2.5 py-1 text-[11px] font-medium leading-4',
+      'flex min-h-6 shrink-0 items-center gap-1.5 border-b border-editor-border bg-editor-panel-well px-2 py-0.5 text-[10px] font-medium leading-4',
     title: 'min-w-0 truncate text-[13px] font-semibold leading-5 tracking-normal text-text-primary',
   },
   panelHeader: {
@@ -69,9 +68,9 @@ export const professionalInspectorDensityTokens = {
       'inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded border border-editor-border bg-editor-panel-raised px-1 text-[10px] font-semibold leading-4 text-text-secondary transition-colors hover:bg-editor-selected-quiet hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-editor-focus-ring',
     statusLabel: 'min-w-0 flex-1 truncate text-[10px] font-semibold leading-4 text-editor-warning',
     statusRow: 'mt-1 flex h-6 min-w-0 items-center gap-1 overflow-hidden',
-    tab: 'relative inline-flex min-h-7 min-w-0 items-center justify-center whitespace-nowrap px-0.5 text-[10px] font-medium leading-4 tracking-normal transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-editor-focus-ring',
+    tab: 'relative inline-flex min-h-6 min-w-0 items-center justify-center whitespace-nowrap px-0.5 text-[10px] font-medium leading-4 tracking-normal transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-editor-focus-ring',
     tabList:
-      'grid min-w-0 w-full grid-cols-4 gap-px overflow-hidden rounded border border-editor-border bg-editor-panel-well p-px',
+      'grid min-w-0 w-full grid-cols-4 gap-px overflow-hidden rounded-sm border border-editor-border bg-editor-panel-well p-px',
   },
   row: {
     label: 'text-[10px] font-medium leading-3 text-text-tertiary',
@@ -82,6 +81,12 @@ export const professionalInspectorDensityTokens = {
   sectionHeader: {
     badge:
       'shrink-0 rounded bg-editor-selected-quiet px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-4 tracking-normal text-text-secondary',
+    compactActions: 'flex shrink-0 items-center gap-0.5',
+    compactRoot: 'flex min-h-6 min-w-0 items-center gap-2 py-0.5',
+    compactSummary:
+      'min-w-0 shrink truncate text-right font-mono text-[10px] leading-4 tabular-nums text-text-secondary',
+    compactTitleGroup: 'flex min-w-0 flex-1 items-center gap-1.5',
+    modifiedIndicator: 'h-1.5 w-1.5 shrink-0 rounded-full bg-editor-info',
     root: 'mb-0.5 flex min-h-5 items-center justify-between gap-2',
     rootLoose: 'mb-0.5 flex items-start justify-between gap-2',
     summary: 'block text-[10px] leading-3 text-text-secondary',
@@ -146,7 +151,7 @@ export const compactInspectorSliderTokens = {
   labelStatic: 'grid min-w-0 border-0 bg-transparent p-0 text-left cursor-default',
   resetLabel:
     'col-start-1 row-start-1 truncate text-[11px] font-medium leading-4 text-text-primary select-none transition-opacity duration-200 ease-in-out pointer-events-none',
-  root: 'group grid min-h-5 grid-cols-[minmax(5.25rem,0.62fr)_minmax(4.5rem,1fr)_3.25rem] items-center gap-1 py-px disabled:opacity-60 max-[319px]:grid-cols-[minmax(0,1fr)_3.25rem]',
+  root: 'group relative grid min-h-6 grid-cols-[minmax(4.75rem,0.72fr)_minmax(3.75rem,1fr)_3.5rem] items-center gap-1 rounded px-1 py-px transition-colors hover:bg-editor-panel-raised focus-within:bg-editor-panel-raised disabled:opacity-60 before:absolute before:inset-y-1.5 before:left-0 before:w-px before:bg-transparent data-[modified=true]:before:bg-editor-info max-[319px]:grid-cols-[minmax(0,1fr)_3.5rem]',
   suffix: 'text-[10px] align-top inline-block mt-0.5 ml-0.5',
   track: 'absolute top-1/2 left-0 h-[3px] w-full -translate-y-1/2 rounded-full pointer-events-none',
   trackWrap: 'relative h-4 min-w-0 max-[319px]:col-span-2 max-[319px]:col-start-1 max-[319px]:row-start-2',
@@ -154,5 +159,5 @@ export const compactInspectorSliderTokens = {
     'h-5 rounded border-0 bg-transparent p-0 font-mono text-[11px] leading-5 tabular-nums text-text-primary w-full text-right select-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring',
   valueInput:
     'h-5 w-full rounded-sm border border-editor-border bg-editor-panel-raised px-1 py-0 text-right font-mono text-[11px] leading-5 tabular-nums text-text-primary outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring',
-  valueSlot: 'w-[3.25rem] shrink-0 text-right max-[319px]:col-start-2 max-[319px]:row-start-1',
+  valueSlot: 'w-[3.5rem] shrink-0 text-right max-[319px]:col-start-2 max-[319px]:row-start-1',
 } as const;

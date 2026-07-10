@@ -16,6 +16,7 @@ interface DetailsPanelProps {
 }
 
 type AdjustmentUpdate = Partial<Adjustments> | ((prev: Adjustments) => Adjustments);
+const detailGroupClassName = 'border-b border-editor-border py-1.5';
 
 export default function DetailsPanel({
   adjustments,
@@ -42,9 +43,9 @@ export default function DetailsPanel({
   const density = professionalInspectorDensityTokens;
 
   return (
-    <div className={density.gutter.section}>
+    <div className="space-y-0">
       {!isForMask && adjustmentVisibility['deblur'] !== false && (
-        <div className={density.card.nestedPanel}>
+        <div className={detailGroupClassName}>
           <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
             {t('adjustments.details.deblur')}
           </UiText>
@@ -92,7 +93,7 @@ export default function DetailsPanel({
       )}
 
       {!isForMask && (
-        <div className={density.card.nestedPanel}>
+        <div className={detailGroupClassName}>
           <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
             {t('adjustments.details.dustSpotVisualization')}
           </UiText>
@@ -160,7 +161,7 @@ export default function DetailsPanel({
       )}
 
       {adjustmentVisibility['sharpening'] !== false && (
-        <div className={density.card.nestedPanel}>
+        <div className={detailGroupClassName}>
           <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
             {t('adjustments.details.sharpening')}
           </UiText>
@@ -194,7 +195,7 @@ export default function DetailsPanel({
       )}
 
       {adjustmentVisibility['presence'] !== false && (
-        <div className={density.card.nestedPanel}>
+        <div className={detailGroupClassName}>
           <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
             {t('adjustments.details.presence')}
           </UiText>
@@ -301,7 +302,7 @@ export default function DetailsPanel({
       )}
 
       {adjustmentVisibility['noiseReduction'] !== false && (
-        <div className={density.card.nestedPanel}>
+        <div className={detailGroupClassName}>
           <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
             {t('adjustments.details.noiseReduction')}
           </UiText>
@@ -333,7 +334,7 @@ export default function DetailsPanel({
       )}
 
       {!isForMask && adjustmentVisibility['chromaticAberration'] !== false && (
-        <div className={density.card.nestedPanel}>
+        <div className={detailGroupClassName}>
           <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
             {t('adjustments.details.chromaticAberration')}
           </UiText>
