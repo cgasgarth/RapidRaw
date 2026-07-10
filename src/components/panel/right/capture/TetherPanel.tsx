@@ -324,7 +324,11 @@ export function TetherPanel({
   }, [isLiveViewRunning]);
 
   return (
-    <div className="flex h-full flex-col gap-4 overflow-y-auto p-4" data-testid="tether-panel">
+    <div
+      className="flex h-full flex-col gap-4 overflow-y-auto p-4"
+      data-right-panel-scroll-root="true"
+      data-testid="tether-panel"
+    >
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">

@@ -916,7 +916,7 @@ export default function MetadataPanel() {
       <div className="p-4 flex justify-between items-center shrink-0 border-b border-surface">
         <UiText variant={TextVariants.title}>{t('editor.metadata.title')}</UiText>
       </div>
-      <div className="grow overflow-y-auto p-4 custom-scrollbar">
+      <div className="grow overflow-y-auto p-4 custom-scrollbar" data-right-panel-scroll-root="true">
         {selectedImage ? (
           <div className="flex flex-col gap-6">
             <section

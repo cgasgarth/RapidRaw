@@ -1402,7 +1402,11 @@ export default function Controls() {
         )}
       </div>
 
-      <div className="grow flex flex-col gap-0 overflow-y-auto px-2 py-1" ref={developPanelScrollRootRef}>
+      <div
+        className="grow flex flex-col gap-0 overflow-y-auto px-2 py-1"
+        data-right-panel-scroll-root="true"
+        ref={developPanelScrollRootRef}
+      >
         {ADJUSTMENT_SECTION_NAMES.map((sectionName) => {
           if (isDevelopPanelSearching && !matchingDevelopPanelSections.has(sectionName)) {
             return null;
