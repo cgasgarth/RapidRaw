@@ -74,6 +74,7 @@ pub(crate) use crate::export::export_color_policy::{
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ExportReceiptOutput {
+    auxiliary_output_paths: Vec<String>,
     bit_depth: Option<u8>,
     black_point_compensation: Option<String>,
     byte_size: u64,
@@ -120,6 +121,11 @@ enum ExportItemResult {
     Cancelled(Option<ExportReceiptOutput>),
     Completed(ExportReceiptOutput),
     Failed(String),
+}
+
+enum ExportMasksResult {
+    Cancelled(Vec<String>),
+    Completed(Vec<String>),
 }
 
 fn claim_export_job(registry: &Mutex<Option<ExportJob>>) -> Result<Arc<AtomicBool>, String> {
@@ -581,9 +587,10 @@ fn export_masks_for_image(
     is_raw: bool,
     app_handle: &tauri::AppHandle,
     cancellation_token: &AtomicBool,
-) -> Result<(), String> {
+) -> Result<ExportMasksResult, String> {
+    let mut committed_paths = Vec::new();
     if cancellation_token.load(Ordering::SeqCst) {
-        return Err("Export cancelled".to_string());
+        return Ok(ExportMasksResult::Cancelled(committed_paths));
     }
 
     let (transformed_image, mask_bitmaps) = prepare_export_masks(base_image, js_adjustments, state);
@@ -609,7 +616,7 @@ fn export_masks_for_image(
 
         for (i, _) in mask_bitmaps.iter().enumerate() {
             if cancellation_token.load(Ordering::SeqCst) {
-                return Err("Export cancelled".to_string());
+                return Ok(ExportMasksResult::Cancelled(committed_paths));
             }
 
             let single_adjustments = build_single_mask_adjustments(&all_adjustments, i);
@@ -645,7 +652,7 @@ fn export_masks_for_image(
             let mask_alpha_path = output_dir.join(format!("{}_mask_{}_alpha.png", stem, i));
 
             if cancellation_token.load(Ordering::SeqCst) {
-                return Err("Export cancelled".to_string());
+                return Ok(ExportMasksResult::Cancelled(committed_paths));
             }
             if commit_export_output(cancellation_token, || {
                 save_image_with_metadata(
@@ -657,11 +664,12 @@ fn export_masks_for_image(
             })?
             .is_none()
             {
-                return Err("Export cancelled".to_string());
+                return Ok(ExportMasksResult::Cancelled(committed_paths));
             }
+            committed_paths.push(mask_image_path.to_string_lossy().to_string());
 
             if cancellation_token.load(Ordering::SeqCst) {
-                return Err("Export cancelled".to_string());
+                return Ok(ExportMasksResult::Cancelled(committed_paths));
             }
 
             if export_settings.preserve_timestamps {
@@ -670,7 +678,7 @@ fn export_masks_for_image(
 
             let alpha_bytes = encode_grayscale_to_png(&alpha_resized)?;
             if cancellation_token.load(Ordering::SeqCst) {
-                return Err("Export cancelled".to_string());
+                return Ok(ExportMasksResult::Cancelled(committed_paths));
             }
             if commit_export_output(cancellation_token, || {
                 #[cfg(target_os = "android")]
@@ -692,15 +700,16 @@ fn export_masks_for_image(
             })?
             .is_none()
             {
-                return Err("Export cancelled".to_string());
+                return Ok(ExportMasksResult::Cancelled(committed_paths));
             }
+            committed_paths.push(mask_alpha_path.to_string_lossy().to_string());
 
             if cancellation_token.load(Ordering::SeqCst) {
-                return Err("Export cancelled".to_string());
+                return Ok(ExportMasksResult::Cancelled(committed_paths));
             }
         }
     }
-    Ok(())
+    Ok(ExportMasksResult::Completed(committed_paths))
 }
 
 fn export_adjustments_as_lut(
@@ -1077,7 +1086,7 @@ pub async fn export_images(
                         set_timestamps_from_exif(Path::new(&source_path_str), &output_path);
                     }
 
-                    let primary_output = export_receipt_output(
+                    let mut primary_output = export_receipt_output(
                         &output_path,
                         &source_path_str,
                         &extension,
@@ -1098,7 +1107,7 @@ pub async fn export_images(
                     }
 
                     if export_settings.export_masks {
-                        export_masks_for_image(
+                        match export_masks_for_image(
                             &base_image,
                             &js_adjustments,
                             &export_settings,
@@ -1109,9 +1118,22 @@ pub async fn export_images(
                             is_raw,
                             &app_handle_clone,
                             cancellation_token.as_ref(),
-                        )?;
+                        )? {
+                            ExportMasksResult::Cancelled(committed_paths) => {
+                                primary_output
+                                    .auxiliary_output_paths
+                                    .extend(committed_paths);
+                                return Ok(ExportItemResult::Cancelled(Some(primary_output)));
+                            }
+                            ExportMasksResult::Completed(committed_paths) => {
+                                primary_output
+                                    .auxiliary_output_paths
+                                    .extend(committed_paths);
+                            }
+                        }
                     }
 
+                    committed_primary_output = Some(primary_output.clone());
                     if cancellation_token.load(Ordering::SeqCst) {
                         return Ok(ExportItemResult::Cancelled(
                             committed_primary_output.clone(),
@@ -1239,6 +1261,7 @@ fn export_receipt_output(
     };
 
     Ok(ExportReceiptOutput {
+        auxiliary_output_paths: Vec::new(),
         bit_depth: metadata.as_ref().map(|metadata| metadata.bit_depth),
         black_point_compensation: metadata
             .as_ref()
@@ -1739,7 +1762,7 @@ mod tests {
     fn cancellation_after_committed_lut_image_and_mask_writes_keeps_each_output_receipt_eligible() {
         let directory = tempfile::tempdir().expect("temporary output directory should exist");
 
-        for output_kind in ["lut", "image", "mask"] {
+        for output_kind in ["lut", "image", "mask-image", "mask-alpha"] {
             let cancellation_token = AtomicBool::new(false);
             let output_path = directory.path().join(format!("{output_kind}.bin"));
             let events = Mutex::new(vec![format!("{output_kind}:rendered")]);

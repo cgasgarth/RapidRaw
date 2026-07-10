@@ -105,6 +105,7 @@ export interface ExportReceipt {
 }
 
 export interface ExportReceiptOutput {
+  auxiliaryOutputPaths?: Array<string> | undefined;
   bitDepth?: number | null | undefined;
   blackPointCompensation?: string | null | undefined;
   byteSize: number;

@@ -2604,6 +2604,7 @@ export default function ExportPanel({
             data-export-receipt-format={firstReceiptOutput.format}
             data-export-receipt-icc-embedded={String(firstReceiptOutput.iccEmbedded ?? '')}
             data-export-receipt-output-path={firstReceiptOutput.outputPath}
+            data-export-receipt-auxiliary-output-paths={(firstReceiptOutput.auxiliaryOutputPaths ?? []).join(',')}
             data-export-receipt-policy-status={firstReceiptOutput.policyStatus ?? ''}
             data-export-receipt-policy-version={firstReceiptOutput.policyVersion ?? ''}
             data-export-receipt-requested-color-profile={firstReceiptOutput.requestedColorProfile ?? ''}

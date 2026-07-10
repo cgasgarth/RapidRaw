@@ -159,6 +159,7 @@ export const exportReceiptPayloadSchema = z
     outputs: z.array(
       z
         .object({
+          auxiliaryOutputPaths: z.array(z.string().trim().min(1)).default([]),
           bitDepth: z.number().int().positive().optional().nullable(),
           blackPointCompensation: z.string().trim().min(1).optional().nullable(),
           byteSize: z.number().int().nonnegative(),

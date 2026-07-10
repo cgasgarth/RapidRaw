@@ -13,6 +13,7 @@ test('cancelled terminal receipt preserves committed outputs for UI actions and 
     completedAt: '2026-07-09T18:10:00.000Z',
     outputs: [
       {
+        auxiliaryOutputPaths: ['/tmp/exported-look_mask_0_alpha.png'],
         byteSize: 256,
         format: 'cube',
         outputPath: '/tmp/exported-look.cube',
@@ -32,6 +33,7 @@ test('cancelled terminal receipt preserves committed outputs for UI actions and 
   expect(terminalState.status).toBe(Status.Cancelled);
   expect(terminalState.lastReceipt?.terminalStatus).toBe('cancelled');
   expect(terminalState.lastReceipt?.outputs.map((output) => output.outputPath)).toEqual(['/tmp/exported-look.cube']);
+  expect(terminalState.lastReceipt?.outputs[0]?.auxiliaryOutputPaths).toEqual(['/tmp/exported-look_mask_0_alpha.png']);
   expect(terminalState.lastReceipt?.outputs.length).toBeGreaterThan(0);
   expect(hasCommittedExportOutputs(receipt)).toBe(true);
   expect(shouldRefreshLibraryForExportReceipt(receipt, '/tmp')).toBe(true);
