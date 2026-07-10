@@ -44,7 +44,7 @@ interface SuperResolutionModalProps {
   lastApplyCommand?: SuperResolutionModalState['lastApplyCommand'];
   lastDryRunCommand?: SuperResolutionModalState['lastDryRunCommand'];
   loadingImageUrl?: string | null;
-  onApplyPlan: () => void;
+  onApplyPlan?: () => void;
   onClose: () => void;
   onOpenOutput?: (path: string) => void;
   onPreviewPlan: () => void;
@@ -71,7 +71,6 @@ export function SuperResolutionModal({
   lastApplyCommand,
   lastDryRunCommand,
   loadingImageUrl,
-  onApplyPlan,
   onClose,
   onOpenOutput,
   onPreviewPlan,
@@ -101,6 +100,7 @@ export function SuperResolutionModal({
   const isSourcePreflightReady = sourcePreflight?.status === 'ready';
   const isSourcePreflightBlocked = sourcePreflight?.status === 'blocked';
   const isSourcePreflightMissingMetadata = sourcePreflight?.status === 'metadata_missing';
+  const nativeRegistration = nativeReadiness?.registration ?? null;
   const isAggressivePreviewOnly = settings.detailPolicy === 'aggressive_preview_only';
   const outputPixelMultiplier = Number((settings.outputScale * settings.outputScale).toFixed(2));
   const estimatedPreviewMegapixels = Math.round((sourceCount * settings.maxPreviewDimensionPx ** 2) / 1_000_000);
@@ -212,11 +212,6 @@ export function SuperResolutionModal({
   useEffect(() => {
     if (matchingStoredDerivedOutputReceipt === undefined) upsertDerivedOutputReceipt(derivedOutputReceipt);
   }, [derivedOutputReceipt, matchingStoredDerivedOutputReceipt, upsertDerivedOutputReceipt]);
-  const isApplyPlanReady =
-    isSourceCountValid &&
-    hasRuntimeOutputReview &&
-    outputReview.decision !== 'preview_only' &&
-    outputReview.editableGate !== 'blocked_stale';
   const previewPlanStatusLabel = hasRuntimeOutputReview
     ? t('modals.superResolution.previewPlanReady')
     : t('modals.superResolution.previewPlanPending');
@@ -371,10 +366,6 @@ export function SuperResolutionModal({
             {hasRuntimeOutputReview
               ? t('modals.superResolution.refreshPreviewPlan')
               : t('modals.superResolution.previewPlan')}
-          </Button>
-          <Button onClick={onApplyPlan} disabled={!isApplyPlanReady}>
-            <CheckCircle2 className="w-4 h-4" />
-            {t('modals.transform.apply')}
           </Button>
         </>
       }
@@ -729,7 +720,7 @@ export function SuperResolutionModal({
         </div>
         {nativeReadiness !== null && nativeReadiness !== undefined && (
           <div className="mt-3 grid grid-cols-1 gap-2 lg:grid-cols-2">
-            {nativeReadiness.sources.map((source) => (
+            {nativeReadiness.intake.sources.map((source) => (
               <div
                 className="rounded-md border border-border-color bg-card-background p-2 text-xs"
                 data-testid="sr-native-readiness-row"
@@ -767,6 +758,94 @@ export function SuperResolutionModal({
         )}
       </motion.section>
 
+      {nativeReadiness !== null && nativeReadiness !== undefined && nativeRegistration !== null && (
+        <section
+          className="grid gap-3 rounded-md border border-border-color bg-bg-primary p-4"
+          data-registration-algorithm={nativeRegistration.algorithmId}
+          data-registration-plan-hash={nativeReadiness.acceptedDryRunPlanHash}
+          data-registration-status={nativeReadiness.accepted ? 'accepted' : 'blocked'}
+          data-testid="sr-native-registration-preview"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <UiText variant={TextVariants.heading}>Registration</UiText>
+              <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
+                {`${nativeRegistration.selectedSourceIndexes.length}/${nativeReadiness.intake.sourceCount} selected`}
+              </UiText>
+            </div>
+            <UiText variant={TextVariants.small} color={TextColors.secondary}>
+              {nativeReadiness.accepted ? 'Accepted' : nativeReadiness.blockCodes.join(', ')}
+            </UiText>
+          </div>
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.75fr)]">
+            <img
+              alt={t('modals.superResolution.review.artifactPreviewAlt', {
+                artifact: t('modals.superResolution.review.registration'),
+              })}
+              className="aspect-video w-full rounded-md border border-border-color bg-black object-contain"
+              data-preview-hash={nativeRegistration.preview.contentHash}
+              height={nativeRegistration.preview.height}
+              src={nativeRegistration.preview.dataUrl}
+              width={nativeRegistration.preview.width}
+            />
+            <div className="grid content-start gap-2 text-sm">
+              <ComputationalSetupStatusLine
+                label="Reference"
+                value={`Source ${nativeRegistration.referenceSourceIndex + 1}`}
+              />
+              <ComputationalSetupStatusLine
+                label="Confidence"
+                value={`${Math.round(nativeRegistration.summary.confidence * 100)}%`}
+              />
+              <ComputationalSetupStatusLine
+                label="Coverage"
+                value={`${Math.round(nativeRegistration.summary.coverageRatio * 100)}%`}
+              />
+              <ComputationalSetupStatusLine
+                label="Residual p50 / p95"
+                value={`${nativeRegistration.summary.p50ResidualPx.toFixed(3)} / ${nativeRegistration.summary.p95ResidualPx.toFixed(3)} px`}
+              />
+              <ComputationalSetupStatusLine
+                label="x2 phases"
+                value={`${nativeRegistration.summary.uniqueX2SamplingPhases}/4`}
+              />
+            </div>
+          </div>
+          <div className="grid gap-2 lg:grid-cols-2">
+            {nativeRegistration.transforms.map((transform) => (
+              <div
+                className="rounded-md border border-border-color bg-bg-secondary/70 p-3"
+                data-registration-source-index={transform.sourceIndex}
+                data-registration-transform={`${transform.translationXPx},${transform.translationYPx},${transform.rotationDegrees}`}
+                key={transform.sourceIndex}
+              >
+                <UiText variant={TextVariants.label}>{`Source ${transform.sourceIndex + 1}`}</UiText>
+                <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
+                  {`${transform.translationXPx.toFixed(3)}, ${transform.translationYPx.toFixed(3)} px / ${transform.rotationDegrees.toFixed(3)} deg`}
+                </UiText>
+                <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
+                  {`${Math.round(transform.overlapRatio * 100)}% overlap / ${transform.p95ResidualPx.toFixed(3)} px p95`}
+                </UiText>
+              </div>
+            ))}
+            {nativeRegistration.excludedSources.map((exclusion) => (
+              <div
+                className="rounded-md border border-yellow-500/40 bg-yellow-500/10 p-3"
+                data-registration-exclusion={exclusion.code}
+                key={`excluded-${exclusion.sourceIndex}`}
+              >
+                <UiText variant={TextVariants.label}>{`Source ${exclusion.sourceIndex + 1}`}</UiText>
+                <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
+                  {`${exclusion.code}${
+                    exclusion.p95ResidualPx === null ? '' : ` / ${exclusion.p95ResidualPx.toFixed(3)} px p95`
+                  }`}
+                </UiText>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       <ComputationalMergeReviewPanel
         derivedOutputReceipt={visibleDerivedOutputReceipt}
         {...(onOpenOutput === undefined
@@ -775,6 +854,7 @@ export function SuperResolutionModal({
         title={t('modals.superResolution.review.title')}
         proofStatus={t('modals.superResolution.review.proofStatus')}
         limitation={t('modals.superResolution.review.limitation')}
+        hidden={!hasRuntimeOutputReview}
         testId="sr-review-diagnostics"
         items={[
           {
@@ -934,6 +1014,7 @@ export function SuperResolutionModal({
 
       <section
         className="rounded-md border border-border-color bg-bg-primary p-4"
+        hidden={!hasRuntimeOutputReview}
         data-baseline-artifact-id={outputReview.detailReview.baselineArtifactId}
         data-detail-review-artifact-id={outputReview.detailReview.artifactId}
         data-detail-review-highlight-count={outputReview.detailReview.improvementHighlightCount}
@@ -978,6 +1059,7 @@ export function SuperResolutionModal({
 
       <section
         className="rounded-md border border-border-color bg-bg-primary p-4"
+        hidden={!hasRuntimeOutputReview}
         data-effective-scale={outputReview.supportMap.effectiveScale}
         data-requested-scale={outputReview.supportMap.requestedScale}
         data-review-status={outputReview.supportMap.reviewStatus}
@@ -1045,6 +1127,7 @@ export function SuperResolutionModal({
 
       <section
         className="rounded-md border border-border-color bg-bg-primary p-4"
+        hidden={!hasRuntimeOutputReview}
         data-artifact-count={reviewArtifactCards.length}
         data-testid="sr-review-artifact-comparator"
       >
@@ -1116,6 +1199,7 @@ export function SuperResolutionModal({
 
       <div
         className="sr-only"
+        hidden={!hasRuntimeOutputReview}
         data-alignment-confidence={outputReview.alignmentConfidence ?? 'not_measured'}
         data-crop-metrics={`${outputReview.cropMetrics.reviewCropCount}:${outputReview.cropMetrics.overlapCoverageRatio ?? 'not_measured'}`}
         data-crop-review-evidence={cropReviewEvidenceStatus}
@@ -1147,14 +1231,17 @@ export function SuperResolutionModal({
         data-testid="sr-editable-handoff-proof"
       />
 
-      {isAggressivePreviewOnly && (
+      {isAggressivePreviewOnly && hasRuntimeOutputReview && (
         <div className="rounded-md border border-yellow-500/40 bg-yellow-500/10 px-4 py-3 flex gap-3">
           <AlertTriangle className="w-5 h-5 text-yellow-400 shrink-0 mt-0.5" />
           <UiText className="leading-relaxed">{t('modals.superResolution.aggressiveNotice')}</UiText>
         </div>
       )}
 
-      <div className="rounded-md border border-border-color bg-bg-primary px-4 py-3 flex gap-3">
+      <div
+        className="rounded-md border border-border-color bg-bg-primary px-4 py-3 flex gap-3"
+        hidden={!hasRuntimeOutputReview}
+      >
         <CheckCircle2 className="w-5 h-5 text-text-secondary shrink-0 mt-0.5" />
         <UiText className="leading-relaxed">{t('modals.superResolution.planDependency')}</UiText>
       </div>
