@@ -3,7 +3,7 @@ use anyhow::{Result, anyhow};
 use image::{DynamicImage, ImageBuffer, Rgba};
 use rawler::imgop::xyz::Illuminant;
 use rawler::{
-    decoders::{Orientation, RawDecodeParams},
+    decoders::{Orientation, RawDecodeParams, RawMetadata},
     imgop::develop::{DemosaicAlgorithm, Intermediate, ProcessingStep, RawDevelop},
     pixarray::Color2D,
     rawimage::{RawImage, RawImageData, RawPhotometricInterpretation},
@@ -18,6 +18,24 @@ use std::{
 };
 
 const CAMERA_PROFILE_RESOLVER_ALGORITHM_ID: &str = "dual_illuminant_mired_v1";
+
+/// Sensor-domain decode used by computational RAW workflows before demosaic or rendering.
+/// Callers own calibration and must not treat this as a developed RGB image.
+pub(crate) struct RawSensorDecode {
+    pub metadata: RawMetadata,
+    pub raw_image: RawImage,
+}
+
+pub(crate) fn decode_raw_sensor_image(file_bytes: &[u8]) -> Result<RawSensorDecode> {
+    let source = RawSource::new_from_slice(file_bytes);
+    let decoder = rawler::get_decoder(&source)?;
+    let params = RawDecodeParams::default();
+
+    Ok(RawSensorDecode {
+        metadata: decoder.raw_metadata(&source, &params)?,
+        raw_image: decoder.raw_image(&source, &params, false)?,
+    })
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
