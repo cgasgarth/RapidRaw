@@ -54,7 +54,6 @@ try {
   await validateKeyboardWorkspaceNavigation(rendered.container);
   await selectMixerWorkspace(rendered.container);
   await validateCompactMixerSurface(rendered.container);
-  await validateProgressiveMixerDisclosure(rendered.container);
   await validateHslSurfaceInteraction(rendered.container);
 
   window.sessionStorage.setItem('rawengine.colorWorkspace.activeTab', 'foundation');
@@ -238,19 +237,17 @@ async function validateCompactMixerSurface(container: Element) {
   const colorMixer = getByTestId(container, 'color-mixer-controls');
   const hslControls = getByTestId(container, 'selective-color-range-controls');
   const localRangeDisclosure = getByTestId<HTMLDetailsElement>(container, 'local-color-range-adjustment-disclosure');
-  const balanceDisclosure = getByTestId<HTMLDetailsElement>(container, 'color-balance-disclosure');
-  const channelDisclosure = getByTestId<HTMLDetailsElement>(container, 'channel-mixer-disclosure');
-  const blackWhiteDisclosure = getByTestId<HTMLDetailsElement>(container, 'black-white-mixer-disclosure');
   const advancedDisclosure = getByTestId<HTMLDetailsElement>(container, 'advanced-color-disclosure');
 
   assert.equal(container.querySelector('[data-color-inspector-density="compact"]') !== null, true);
   assert.equal(colorMixer.querySelector('[data-inspector-section-header="true"]') !== null, true);
   assert.equal(advancedDisclosure.querySelector('[data-inspector-section-header="true"]') !== null, true);
   assert.equal(
-    hslControls.compareDocumentPosition(balanceDisclosure) & Node.DOCUMENT_POSITION_FOLLOWING,
-    Node.DOCUMENT_POSITION_FOLLOWING,
-    'HSL controls should lead the Editor workspace.',
+    hslControls.querySelectorAll('[role="tab"]').length,
+    8,
+    'Color Mixer should expose eight stable ranges.',
   );
+  assert.ok(hslControls.querySelector('[role="radiogroup"]'), 'Color Mixer should expose its Color/HSL mode selector.');
   assert.equal(colorMixer.className.includes('rounded'), false, 'Color Mixer should not be framed as a card.');
   assert.equal(
     advancedDisclosure.className.includes('rounded'),
@@ -260,14 +257,15 @@ async function validateCompactMixerSurface(container: Element) {
   assert.equal(container.querySelector('[data-testid="color-workspace-warning-chips"]'), null);
   assert.equal(container.querySelector('[data-testid="professional-color-recipes-disclosure"]'), null);
   assert.equal(container.querySelector('[data-testid="selective-color-mask-preview-toggle"]'), null);
+  assert.equal(colorMixer.querySelector('[data-testid="color-balance-disclosure"]'), null);
+  assert.equal(colorMixer.querySelector('[data-testid="channel-mixer-disclosure"]'), null);
+  assert.equal(colorMixer.querySelector('[data-testid="black-white-mixer-disclosure"]'), null);
 
   for (const label of ['Hue', 'Saturation', 'Luminance']) {
     assert.ok(getRangeByLabel(container, label), `Primary HSL slider was not rendered: ${label}.`);
   }
   assert.equal(localRangeDisclosure.dataset.scope, 'local-adjustment');
-  for (const disclosure of [localRangeDisclosure, balanceDisclosure, channelDisclosure, blackWhiteDisclosure]) {
-    assert.equal(disclosure.open, false, 'Secondary color tools should start collapsed.');
-  }
+  assert.equal(localRangeDisclosure.open, false, 'Range refinement should start collapsed.');
 }
 
 async function validateDirectProfileToneSelection(container: Element) {
@@ -282,51 +280,6 @@ async function validateDirectProfileToneSelection(container: Element) {
   await changeSelect(toneCurve, 'soft_contrast');
   assert.equal(controls.dataset.cameraProfile, 'camera_portrait', 'Profile selector did not apply the selected value.');
   assert.equal(controls.dataset.toneCurve, 'soft_contrast', 'Tone Curve selector did not apply the selected value.');
-}
-
-async function validateProgressiveMixerDisclosure(container: Element) {
-  await validateMixerToggle(container, 'color-balance-toggle', 'color-balance-disclosure', 'color-balance-controls');
-  await validateMixerToggle(container, 'channel-mixer-toggle', 'channel-mixer-disclosure', 'channel-mixer-controls');
-  await validateMixerToggle(
-    container,
-    'black-white-mixer-toggle',
-    'black-white-mixer-disclosure',
-    'black-white-mixer-controls',
-  );
-}
-
-async function validateMixerToggle(
-  container: Element,
-  toggleTestId: string,
-  disclosureTestId: string,
-  controlsTestId: string,
-) {
-  const toggle = getByTestId<HTMLButtonElement>(container, toggleTestId);
-  const disclosure = getByTestId<HTMLDetailsElement>(container, disclosureTestId);
-  assert.equal(toggle.getAttribute('aria-pressed'), 'false', `${toggleTestId} should start Off.`);
-  assert.equal(normalizeText(toggle.textContent), 'Off', `${toggleTestId} should label its inactive state.`);
-  assert.equal(
-    container.querySelector(`[data-testid="${controlsTestId}"]`),
-    null,
-    `${controlsTestId} should stay hidden while Off.`,
-  );
-
-  await click(toggle);
-  assert.equal(toggle.getAttribute('aria-pressed'), 'true', `${toggleTestId} should expose its active state.`);
-  assert.equal(normalizeText(toggle.textContent), 'On', `${toggleTestId} should label its active state.`);
-  assert.equal(disclosure.open, true, `${toggleTestId} should reveal controls when enabled.`);
-  assert.ok(
-    container.querySelector(`[data-testid="${controlsTestId}"]`),
-    `${controlsTestId} should render when enabled.`,
-  );
-
-  await click(toggle);
-  assert.equal(toggle.getAttribute('aria-pressed'), 'false', `${toggleTestId} should return to Off.`);
-  assert.equal(
-    container.querySelector(`[data-testid="${controlsTestId}"]`),
-    null,
-    `${controlsTestId} should hide after disable.`,
-  );
 }
 
 async function validateHslSurfaceInteraction(container: Element) {
@@ -347,7 +300,7 @@ async function validateHslSurfaceInteraction(container: Element) {
   const localRangeDisclosure = getByTestId<HTMLDetailsElement>(container, 'local-color-range-adjustment-disclosure');
   const localRangeSummary = localRangeDisclosure.querySelector<HTMLElement>('summary');
   assert.ok(localRangeSummary, 'Local range disclosure summary was not rendered.');
-  assert.equal(normalizeText(localRangeSummary.textContent).startsWith('Create local adjustment'), true);
+  assert.equal(normalizeText(localRangeSummary.textContent).startsWith('Range'), true);
   await click(localRangeSummary);
   const rangeCenter = getRangeByLabel(localRangeDisclosure, 'Range center');
   assert.ok(rangeCenter, 'Local range center slider was not rendered.');
