@@ -1,4 +1,3 @@
-import { invoke } from '@tauri-apps/api/core';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
@@ -27,7 +26,8 @@ import {
   markFocusStackOutputReviewApplyReady,
 } from '../../utils/focusStackOutputReview';
 import { handleNegativeConversionEditorHandoff } from '../../utils/negative-lab/negativeLabEditorHandoff';
-import type { SuperResolutionNativeReadiness } from '../../utils/superResolutionNativeReadiness';
+import { superResolutionNativeRegistrationPlanSchema } from '../../utils/superResolutionNativeReadiness';
+import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import type { AlbumItem, AppSettings } from '../ui/AppProperties';
 import CollageModal from './editing/CollageModal';
 import CullingModal from './editing/CullingModal';
@@ -342,40 +342,16 @@ export default function AppModals(props: AppModalsProps) {
             onOpenOutput={(path) => {
               void props.handleImageSelect(path);
             }}
-            onApplyPlan={() => {
-              if (superResolutionModalState.outputReview === null) return;
-              const routePair = getComputationalMergeAppServerRoutePairSummary('super_resolution');
-              const acceptedDryRunPlanId = `super_resolution_plan_${superResolutionModalState.sourcePaths.length}`;
-              const acceptedDryRunPlanHash = superResolutionModalState.outputReview.outputArtifactHash;
-              setUI({
-                superResolutionModalState: {
-                  ...superResolutionModalState,
-                  lastApplyCommand: {
-                    acceptedDryRunPlanHash,
-                    acceptedDryRunPlanId,
-                    commandType: 'computationalMerge.createSuperResolution' as const,
-                    dryRun: false as const,
-                    sources: superResolutionModalState.sourcePaths.length,
-                    toolName: routePair.applyToolName,
-                  },
-                  outputReview: {
-                    ...superResolutionModalState.outputReview,
-                    editableGate: 'ready',
-                    humanReviewStatus: 'passed',
-                    supportMap: {
-                      ...superResolutionModalState.outputReview.supportMap,
-                      reviewStatus: 'apply_ready',
-                    },
-                  },
-                },
-              });
-            }}
             onPreviewPlan={() => {
               void (async () => {
-                const readiness = await invoke<SuperResolutionNativeReadiness>(Invokes.PlanSuperResolution, {
-                  paths: superResolutionModalState.sourcePaths,
-                  settings: superResolutionModalState.settings,
-                });
+                const readiness = await invokeWithSchema(
+                  Invokes.PlanSuperResolution,
+                  {
+                    paths: superResolutionModalState.sourcePaths,
+                    settings: superResolutionModalState.settings,
+                  },
+                  superResolutionNativeRegistrationPlanSchema,
+                );
                 const lastDryRunCommand = {
                   commandType: 'computationalMerge.createSuperResolution' as const,
                   dryRun: true as const,

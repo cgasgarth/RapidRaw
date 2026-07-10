@@ -1,4 +1,4 @@
-import { ShieldCheck } from 'lucide-react';
+import { Image as ImageIcon, ShieldCheck } from 'lucide-react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -96,19 +96,47 @@ export function AgentPanel() {
       data-review-workspace-state={isReady ? 'ready' : 'blocked'}
       data-testid="agent-right-rail-panel"
     >
-      <header className="flex min-h-10 shrink-0 items-center gap-2 border-b border-editor-border px-2.5 py-1.5">
+      <header className="flex min-h-12 shrink-0 items-center gap-2 border-b border-editor-border px-2.5 py-1.5">
         <span
           aria-hidden="true"
-          className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-editor-border bg-editor-panel-well text-text-secondary"
+          className="relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded border border-editor-border bg-editor-panel-well text-text-secondary"
+        >
+          <ImageIcon className="absolute" size={14} strokeWidth={1.8} />
+          {selectedImage?.thumbnailUrl ? (
+            <img
+              alt=""
+              className="absolute inset-0 h-full w-full object-cover"
+              onError={(event) => {
+                event.currentTarget.hidden = true;
+              }}
+              src={selectedImage.thumbnailUrl}
+            />
+          ) : null}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <h2 className="truncate text-[12px] font-semibold leading-4 text-text-primary">{targetLabel}</h2>
+            {selectedImage ? (
+              <span className="shrink-0 rounded-sm bg-editor-panel-well px-1 py-0.5 text-[9px] font-semibold leading-3 text-text-secondary">
+                {selectedImage.isRaw ? 'RAW' : 'IMAGE'}
+              </span>
+            ) : null}
+          </div>
+          <p className="truncate text-[10px] leading-4 text-text-secondary" title={selectedImage?.path}>
+            {selectedImage
+              ? `${selectedImage.width} x ${selectedImage.height}`
+              : t('editor.ai.agent.workspace.noImage')}
+          </p>
+        </div>
+        <span
+          aria-label={isReady ? 'Selected image ready for AI edits' : 'Selected image is not ready'}
+          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-sm ${
+            isReady ? 'text-text-secondary' : 'text-text-tertiary'
+          }`}
+          data-tooltip={isReady ? 'Selected image ready' : t('editor.ai.agent.workspace.noImage')}
         >
           <ShieldCheck size={14} strokeWidth={1.8} />
         </span>
-        <div className="min-w-0">
-          <h2 className="truncate text-[13px] font-semibold leading-5 text-text-primary">
-            {t('editor.ai.agent.title')}
-          </h2>
-          <p className="truncate text-[11px] leading-4 text-text-secondary">{targetLabel}</p>
-        </div>
       </header>
 
       {isReady ? (

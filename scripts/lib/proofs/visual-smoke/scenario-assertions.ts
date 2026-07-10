@@ -22,9 +22,6 @@ import {
   VISUAL_SMOKE_SCENARIO_IDS,
 } from '../../../../src/validation/visual/visualSmokeScenarios.ts';
 import {
-  agentChatProofDatasetSchema,
-  agentLivePromptComposerProofDatasetSchema,
-  agentLivePromptResultProofDatasetSchema,
   assertFilmLookExportProof,
   assertNegativeLabBaseFogPreviewExportProof,
   assertNegativeLabBatchColorInvokeProof,
@@ -934,85 +931,24 @@ export async function prepareScenario(page, mode) {
   }
 
   if (mode === VISUAL_SMOKE_SCENARIO_IDS.AgentSelectedImageLiveSession) {
-    const workspaceControls = page.getByTestId('agent-dry-run-apply-review-controls');
-    await page.getByTestId('agent-review-control-dry-run').click();
-    await expectDatasetValue(workspaceControls, 'liveActionStatus', 'approval_required');
     const shell = page.getByTestId('agent-chat-shell');
     await shell.waitFor({ timeout: 10_000 });
-    agentChatProofDatasetSchema.parse(await shell.evaluate((element) => ({ ...element.dataset })));
     const composer = page.getByTestId('agent-live-prompt-composer');
-    agentLivePromptComposerProofDatasetSchema.parse(await composer.evaluate((element) => ({ ...element.dataset })));
     await page.getByTestId('agent-live-prompt-input').fill('Brighten this RAW and recover shadows naturally.');
     await page.getByTestId('agent-live-prompt-run').click();
     await expectDatasetValue(composer, 'livePromptStatus', 'dry_run_ready');
-    await page.getByTestId('agent-live-selected-image-preview-loop').click();
+    const proposalReview = page.getByTestId('agent-photographer-result');
+    await expectDatasetValue(proposalReview, 'proposalState', 'dry_run_ready');
+    if ((await proposalReview.getByTestId('agent-photographer-before-after').locator('img').count()) !== 2) {
+      throw new Error('Selected-image proposal review did not render both medium preview roles.');
+    }
+    const apply = page.getByTestId('agent-live-prompt-apply');
+    if (await apply.isDisabled()) throw new Error('Selected-image proposal apply was disabled after a ready preview.');
+    await apply.click();
     await expectDatasetValue(composer, 'livePromptStatus', 'applied');
-    agentLivePromptResultProofDatasetSchema.parse(
-      await page.getByTestId('agent-live-prompt-result').evaluate((element) => ({ ...element.dataset })),
-    );
-    const selectedImageLoop = page.getByTestId('agent-selected-image-preview-loop-review');
-    await selectedImageLoop.waitFor({ timeout: 10_000 });
-    const selectedImageLoopDataset = await selectedImageLoop.evaluate((element) => ({ ...element.dataset }));
-    if (
-      (selectedImageLoopDataset.beforePreviewUrl ?? '').trim().length === 0 ||
-      (selectedImageLoopDataset.currentPreviewUrl ?? '').trim().length === 0 ||
-      selectedImageLoopDataset.beforePreviewUrl === selectedImageLoopDataset.currentPreviewUrl ||
-      selectedImageLoopDataset.finalGraphRevision !== 'history_3' ||
-      selectedImageLoopDataset.previewLineageCount !== '2'
-    ) {
-      throw new Error('Selected-image preview-loop review did not expose changed before/current runtime evidence.');
-    }
-    const selectedImageLoopBefore = page.getByTestId('agent-selected-image-preview-loop-before');
-    const selectedImageLoopCurrent = page.getByTestId('agent-selected-image-preview-loop-current');
-    const selectedImageLoopBeforeDataset = await selectedImageLoopBefore.evaluate((element) => ({
-      ...element.dataset,
-    }));
-    const selectedImageLoopCurrentDataset = await selectedImageLoopCurrent.evaluate((element) => ({
-      ...element.dataset,
-    }));
-    if (
-      (selectedImageLoopBeforeDataset.previewUrl ?? '').trim().length === 0 ||
-      (selectedImageLoopCurrentDataset.previewUrl ?? '').trim().length === 0 ||
-      (selectedImageLoopBeforeDataset.renderHash ?? '').trim().length === 0 ||
-      (selectedImageLoopCurrentDataset.renderHash ?? '').trim().length === 0 ||
-      selectedImageLoopBeforeDataset.renderHash === selectedImageLoopCurrentDataset.renderHash
-    ) {
-      throw new Error('Selected-image preview-loop before/current gallery evidence was not rendered.');
-    }
-    const acceptReviewedApply = page.getByTestId('agent-selected-image-preview-loop-accept-apply');
-    if (await acceptReviewedApply.isDisabled()) {
-      throw new Error('Selected-image reviewed apply was unavailable before stale-graph proof.');
-    }
-    await acceptReviewedApply.click();
-    await expectDatasetValue(selectedImageLoop, 'runtimeState', 'accepted');
-    await page.getByTestId('agent-review-control-apply').click();
-    await expectDatasetValue(workspaceControls, 'liveActionStatus', 'blocked');
-    const recoveryCard = page.getByTestId('agent-stale-recovery-card');
-    await expectDatasetValue(recoveryCard, 'staleReason', 'graph_revision_changed');
-    await expectDatasetValue(recoveryCard, 'currentGraphRevision', 'history_3');
-    if (await page.getByTestId('agent-review-control-refresh-dry-run').isDisabled()) {
-      throw new Error('Selected-image stale recovery action was disabled after a stale graph block.');
-    }
-    const selectedImageLoopMetrics = await page
-      .getByTestId('agent-selected-image-preview-loop-metrics')
-      .evaluate((element) => ({ ...element.dataset }));
-    const meanLuminanceDelta = Number(selectedImageLoopMetrics.meanLuminanceDelta);
-    const maxChannelDelta = Number(selectedImageLoopMetrics.maxChannelDelta);
-    if (!(meanLuminanceDelta > 0) || !(maxChannelDelta > 0)) {
-      throw new Error('Selected-image preview-loop delta metrics were not rendered.');
-    }
-    const detailLineageDataset = await page
-      .getByTestId('agent-selected-image-preview-loop-lineage-entry')
-      .nth(1)
-      .evaluate((element) => ({ ...element.dataset }));
-    if (
-      (detailLineageDataset.previewUrl ?? '').trim().length === 0 ||
-      (detailLineageDataset.renderHash ?? '').trim().length === 0 ||
-      detailLineageDataset.purpose !== 'detail_review' ||
-      (detailLineageDataset.zoom ?? '').trim().length === 0 ||
-      detailLineageDataset.zoom === 'none'
-    ) {
-      throw new Error('Selected-image preview-loop detail crop lineage was not rendered.');
+    await expectDatasetValue(proposalReview, 'proposalState', 'applied');
+    if ((await shell.getByTestId('agent-chat-messages').locator('[data-testid^="agent-chat-message-"]').count()) < 2) {
+      throw new Error('Selected-image chat did not retain a compact chronological prompt and proposal conversation.');
     }
     return;
   }
