@@ -209,6 +209,10 @@ export function useTauriListeners({ refreshAllFolderTrees, refreshImageList, mar
               waveformReady:
                 state.previewScopeStatus?.path === event.payload.path ? state.previewScopeStatus.waveformReady : false,
             }),
+            previewScopeRecoveryState:
+              state.previewScopeStatus?.path === event.payload.path && state.previewScopeStatus.waveformReady
+                ? 'idle'
+                : state.previewScopeRecoveryState,
           }));
         }
       }),
@@ -232,6 +236,10 @@ export function useTauriListeners({ refreshAllFolderTrees, refreshImageList, mar
               path: event.payload.path,
               waveformReady: true,
             }),
+            previewScopeRecoveryState:
+              state.previewScopeStatus?.path === event.payload.path && state.previewScopeStatus.histogramReady
+                ? 'idle'
+                : state.previewScopeRecoveryState,
             waveform: event.payload.data,
           }));
         }

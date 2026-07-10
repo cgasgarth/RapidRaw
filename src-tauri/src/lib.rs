@@ -481,7 +481,9 @@ async fn apply_adjustments(
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ExportSoftProofPreviewRequest {
+    active_waveform_channel: Option<String>,
     black_point_compensation: bool,
+    compute_waveform: bool,
     color_profile: export::export_processing::ExportColorProfile,
     expected_image_path: Option<String>,
     export_soft_proof_recipe_id: Option<String>,
@@ -546,11 +548,13 @@ fn generate_export_soft_proof_preview(
         );
     }
 
+    let proof_image =
+        RgbImage::from_raw(width, height, proof_pixels.clone()).map(DynamicImage::ImageRgb8);
+
     if let Some(recipe_id) = request.export_soft_proof_recipe_id
-        && let Some(proof_image) = RgbImage::from_raw(width, height, proof_pixels.clone())
-        && let Ok(gamut_warning_data) = image_analytics::calculate_gamut_warning_overlay_from_image(
-            &DynamicImage::ImageRgb8(proof_image),
-        )
+        && let Some(proof_image) = proof_image.as_ref()
+        && let Ok(gamut_warning_data) =
+            image_analytics::calculate_gamut_warning_overlay_from_image(proof_image)
     {
         let source_image_path = &loaded_image.path;
         let _ = app_handle.emit(
@@ -581,6 +585,17 @@ fn generate_export_soft_proof_preview(
                 }
             }),
         );
+    }
+
+    if let Some(proof_image) = proof_image
+        && let Some(sender) = state.analytics_worker_tx.lock().unwrap().clone()
+    {
+        let _ = sender.send(AnalyticsJob {
+            path: loaded_image.path,
+            image: Arc::new(proof_image),
+            compute_waveform: request.compute_waveform,
+            active_waveform_channel: request.active_waveform_channel,
+        });
     }
 
     Encoder::new(Preset::BaselineFastest)

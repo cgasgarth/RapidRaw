@@ -175,6 +175,25 @@ async function validateScopeDrawerControls() {
     getByTestId(rendered.container, 'scope-drawer-under-test-freshness-status').getAttribute('aria-live'),
     'polite',
   );
+  assert.equal(strip.getAttribute('data-preview-scope-diagnostic-code'), 'preview_scope_stale');
+
+  const recoveryRequestId = useEditorStore.getState().previewScopeRecoveryRequestId;
+  await click(getByTestId(rendered.container, 'scope-drawer-under-test-recover-scopes'));
+  assert.equal(useEditorStore.getState().previewScopeRecoveryRequestId, recoveryRequestId + 1);
+  assert.equal(strip.getAttribute('data-analytics-state'), 'loading');
+
+  await act(async () => {
+    useEditorStore.getState().setEditor((state) => ({
+      previewScopeRecoveryState: 'idle',
+      previewScopeStatus: state.previewScopeStatus
+        ? { ...state.previewScopeStatus, path: '/analytics.ARW', updatedAt: '2026-07-10T12:01:00.000Z' }
+        : state.previewScopeStatus,
+    }));
+    await flushPromises();
+  });
+  assert.equal(strip.getAttribute('data-analytics-state'), 'current');
+  assert.equal(strip.getAttribute('data-preview-scope-diagnostic-code'), 'preview_scope_current');
+  assert.equal(rendered.container.querySelector('[data-testid="scope-drawer-under-test-recover-scopes"]'), null);
 
   await act(async () => {
     useEditorStore.getState().setEditor((state) => ({
@@ -185,6 +204,23 @@ async function validateScopeDrawerControls() {
     await flushPromises();
   });
   assert.equal(strip.getAttribute('data-analytics-state'), 'error');
+  assert.equal(strip.getAttribute('data-preview-scope-diagnostic-code'), 'preview_scope_error');
+
+  await act(async () => {
+    useEditorStore.getState().setEditor((state) => ({
+      previewScopeStatus: state.previewScopeStatus
+        ? {
+            ...state.previewScopeStatus,
+            renderBasis: 'export_preview',
+            softProofTransformApplied: false,
+            warningCodes: [],
+          }
+        : state.previewScopeStatus,
+    }));
+    await flushPromises();
+  });
+  assert.equal(strip.getAttribute('data-analytics-state'), 'unsupported');
+  assert.equal(strip.getAttribute('data-preview-scope-diagnostic-code'), 'preview_scope_unsupported');
 
   await act(async () => {
     useUIStore.getState().setRightPanel(Panel.Adjustments);

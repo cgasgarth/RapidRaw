@@ -6,6 +6,7 @@ import {
   ChevronDown,
   ChevronRight,
   GalleryHorizontal,
+  RefreshCw,
   RotateCcw,
   Rows3,
   ShieldCheck,
@@ -21,6 +22,8 @@ import { useSettingsStore } from '../../../../store/useSettingsStore';
 import { useUIStore } from '../../../../store/useUIStore';
 import { type Adjustments, DisplayMode } from '../../../../utils/adjustments';
 import {
+  buildColorOutputProofingDiagnosticRow,
+  buildColorOutputProofingDiagnostics,
   getPreviewScopeFreshnessStatus,
   getRenderedPreviewWarningStatus,
   type PreviewBoundWarningState,
@@ -85,6 +88,9 @@ export default function InspectorAnalyticsHeader({ testId }: InspectorAnalyticsH
     isWaveformVisible,
     panelScopesLayout,
     previewScopeStatus,
+    previewScopeRecoveryError,
+    previewScopeRecoveryRequestId,
+    previewScopeRecoveryState,
     selectedImage,
     waveform,
     waveformHeight,
@@ -100,6 +106,9 @@ export default function InspectorAnalyticsHeader({ testId }: InspectorAnalyticsH
       isWaveformVisible: state.isWaveformVisible,
       panelScopesLayout: state.panelScopesLayout,
       previewScopeStatus: state.previewScopeStatus,
+      previewScopeRecoveryError: state.previewScopeRecoveryError,
+      previewScopeRecoveryRequestId: state.previewScopeRecoveryRequestId,
+      previewScopeRecoveryState: state.previewScopeRecoveryState,
       selectedImage: state.selectedImage,
       waveform: state.waveform,
       waveformHeight: state.waveformHeight,
@@ -117,21 +126,40 @@ export default function InspectorAnalyticsHeader({ testId }: InspectorAnalyticsH
     isExportSoftProofEnabled,
     selectedImagePath,
   });
+  const diagnosticRow = buildColorOutputProofingDiagnosticRow(
+    buildColorOutputProofingDiagnostics({
+      activeDisplayProfile: null,
+      currentGamutWarningOverlay: proofStatus.state === 'current' ? gamutWarningOverlay : null,
+      displayProfileError: null,
+      displayProfileLoading: false,
+      displayPreviewLutStatus: null,
+      exportSoftProofRecipeId,
+      exportSoftProofTransform,
+      previewScopeFreshnessStatus: scopeFreshness,
+      previewScopeWarningCodes: previewScopeStatus?.warningCodes ?? [],
+      renderedPreviewWarningStatus: proofStatus,
+    }),
+  );
   const hasScopeError = previewScopeStatus?.warningCodes.some((code) => /error|fail/iu.test(code)) ?? false;
-  const analyticsState = hasScopeError
-    ? 'error'
-    : selectedImage !== null && !selectedImage.isReady
-      ? 'loading'
-      : scopeFreshness.state;
-  const analyticsLabel = hasScopeError
-    ? 'Scopes error'
-    : analyticsState === 'loading'
-      ? t('editor.adjustments.status.loadingImage', { defaultValue: 'Loading image preview' })
-      : scopeFreshness.statusLabel;
+  const analyticsState =
+    previewScopeRecoveryState === 'error' || hasScopeError
+      ? 'error'
+      : previewScopeRecoveryState === 'loading'
+        ? 'loading'
+        : selectedImage !== null && !selectedImage.isReady
+          ? 'loading'
+          : scopeFreshness.state;
+  const analyticsLabel =
+    previewScopeRecoveryState === 'error' || hasScopeError
+      ? `Scopes error${previewScopeRecoveryError ? `: ${previewScopeRecoveryError}` : ''}`
+      : analyticsState === 'loading'
+        ? t('editor.adjustments.status.loadingImage', { defaultValue: 'Loading image preview' })
+        : scopeFreshness.statusLabel;
   const proofLabel = isExportSoftProofEnabled ? `Proof on: ${proofStatus.coverageLabel}` : 'Proof off';
   const clippingLabel = clippingEnabled
     ? t('ui.waveform.tooltips.hideClipping')
     : t('ui.waveform.tooltips.showClipping');
+  const recoverScopesLabel = t('export.softProofCompare.refresh');
 
   const toggleClipping = useCallback(() => {
     setAdjustments((previous: Adjustments) => ({ ...previous, showClipping: !previous.showClipping }));
@@ -144,6 +172,15 @@ export default function InspectorAnalyticsHeader({ testId }: InspectorAnalyticsH
       document.querySelector<HTMLElement>('[data-testid="color-workspace-tab-output"]')?.focus();
     });
   }, [setRightPanel]);
+
+  const recoverScopes = useCallback(() => {
+    if (!selectedImage?.isReady || previewScopeRecoveryState === 'loading') return;
+    useEditorStore.getState().setEditor({
+      previewScopeRecoveryError: null,
+      previewScopeRecoveryRequestId: previewScopeRecoveryRequestId + 1,
+      previewScopeRecoveryState: 'loading',
+    });
+  }, [previewScopeRecoveryRequestId, previewScopeRecoveryState, selectedImage?.isReady]);
 
   const handleModeKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     const direction =
@@ -174,6 +211,8 @@ export default function InspectorAnalyticsHeader({ testId }: InspectorAnalyticsH
       data-panel-scopes-layout={panelScopesLayout}
       data-preview-scope-freshness={scopeFreshness.state}
       data-preview-scope-status-label={analyticsLabel}
+      data-preview-scope-diagnostic-code={diagnosticRow.code}
+      data-preview-scope-transform-fingerprint={diagnosticRow.fingerprint ?? ''}
       data-show-clipping={String(clippingEnabled)}
       data-state={isWaveformVisible ? 'open' : 'collapsed'}
       data-testid={testId}
@@ -206,6 +245,23 @@ export default function InspectorAnalyticsHeader({ testId }: InspectorAnalyticsH
         >
           {analyticsLabel}
         </span>
+        {(scopeFreshness.state !== 'current' || analyticsState === 'error') && (
+          <button
+            aria-label={recoverScopesLabel}
+            className={professionalInspectorDensityTokens.frame.actionButton}
+            data-testid={`${testId}-recover-scopes`}
+            data-tooltip={recoverScopesLabel}
+            disabled={!selectedImage?.isReady || previewScopeRecoveryState === 'loading'}
+            onClick={recoverScopes}
+            type="button"
+          >
+            <RefreshCw
+              aria-hidden="true"
+              className={previewScopeRecoveryState === 'loading' ? 'animate-spin' : ''}
+              size={13}
+            />
+          </button>
+        )}
         <button
           aria-label={`${proofLabel}. Open Color Output controls`}
           className={cx(
@@ -239,6 +295,14 @@ export default function InspectorAnalyticsHeader({ testId }: InspectorAnalyticsH
             transition={{ duration: isResizingWaveform ? 0 : 0.16, ease: 'easeOut' }}
           >
             <div className="flex h-8 shrink-0 items-center gap-1 border-b border-editor-border px-2">
+              <span
+                className={cx('max-w-40 truncate text-[10px]', stateClasses[analyticsState])}
+                data-diagnostic-code={diagnosticRow.code}
+                data-testid={`${testId}-diagnostic-row`}
+                title={diagnosticRow.fingerprint ?? diagnosticRow.code}
+              >
+                {diagnosticRow.code}
+              </span>
               <div
                 aria-label={t('ui.waveform.drawerControls.mode', { defaultValue: 'Scope mode' })}
                 className="grid min-w-0 flex-1 grid-cols-5 gap-px overflow-hidden rounded border border-editor-border bg-editor-panel-well p-px"
