@@ -192,13 +192,49 @@ describe('filmstrip thumbnail decode handoff', () => {
     await loadImage(requiredImage(rendered.container, 'blob:grid-successor'));
     expect(placeholder(rendered.container)).toBeNull();
   });
+
+  test('keeps the real Grid anchor and virtual cell width stable through a contain switch and thumbnail decode', async () => {
+    const images = Array.from({ length: 40 }, (_value, index) => image(`/validation/contain-${index}.ARW`));
+    useProcessStore.setState({
+      thumbnails: Object.fromEntries(images.map((imageFile, index) => [imageFile.path, `blob:contain-${index}`])),
+    });
+
+    const rendered = await renderFilmstrip(images);
+    const grid = requiredElement<HTMLDivElement>(rendered.container, '[role="listbox"]');
+    await scrollGrid(grid, 275);
+
+    const coverAnchor = recordFilmstripAnchor(rendered.container);
+    expect(coverAnchor.columnWidths).toEqual([74]);
+
+    rendered.render(images, ThumbnailAspectRatio.Contain);
+    await settleReact();
+    const beforeDecode = recordFilmstripAnchor(rendered.container);
+    expect(beforeDecode).toEqual(coverAnchor);
+
+    const dimensions = [
+      { height: 3000, width: 4000 },
+      { height: 4000, width: 3000 },
+      { height: 3000, width: 12000 },
+      { height: 3000, width: 3000 },
+    ];
+    for (const [index, imageElement] of filmstripThumbnailImages(rendered.container).entries()) {
+      const dimension = dimensions[index % dimensions.length];
+      if (!dimension) throw new Error('Expected thumbnail dimensions.');
+      await loadImageWithDimensions(imageElement, dimension.width, dimension.height);
+    }
+
+    expect(recordFilmstripAnchor(rendered.container)).toEqual(beforeDecode);
+    expect(
+      filmstripThumbnailImages(rendered.container).every((imageElement) =>
+        imageElement.className.includes('object-contain'),
+      ),
+    ).toBe(true);
+  });
 });
 
-test('uses fixed cover geometry and measured contain geometry', () => {
-  expect(getFilmstripColumnWidth(100, ThumbnailAspectRatio.Cover, 0.5)).toBe(108);
-  expect(getFilmstripColumnWidth(100, ThumbnailAspectRatio.Cover, 2)).toBe(108);
-  expect(getFilmstripColumnWidth(100, ThumbnailAspectRatio.Contain, 0.5)).toBe(58);
-  expect(getFilmstripColumnWidth(100, ThumbnailAspectRatio.Contain, 2)).toBe(208);
+test('uses fixed virtual geometry regardless of thumbnail presentation mode', () => {
+  expect(getFilmstripColumnWidth(100)).toBe(108);
+  expect(getFilmstripColumnWidth(66)).toBe(74);
 });
 
 function image(path: string): ImageFile {
@@ -233,10 +269,8 @@ async function renderThumbnail(initialImage: ImageFile) {
               index: 0,
               isActive: false,
               isSelected: false,
-              itemHeight: 100,
               onRegisterThumbnail: () => {},
               onThumbnailRovingKeyDown: () => {},
-              setRatio: () => {},
               tabIndex: 0,
               thumbnailAspectRatio: ThumbnailAspectRatio.Cover,
             }),
@@ -261,14 +295,17 @@ async function renderThumbnail(initialImage: ImageFile) {
   };
 }
 
-async function renderFilmstrip(initialImages: ImageFile[]) {
+async function renderFilmstrip(
+  initialImages: ImageFile[],
+  thumbnailAspectRatio: ThumbnailAspectRatio = ThumbnailAspectRatio.Cover,
+) {
   installDom();
   const container = document.createElement('div');
   document.body.append(container);
   const root = createRoot(container);
   const i18n = await createTestI18n();
 
-  const render = (imageList: ImageFile[]) => {
+  const render = (imageList: ImageFile[], nextThumbnailAspectRatio: ThumbnailAspectRatio = thumbnailAspectRatio) => {
     act(() => {
       flushSync(() => {
         root.render(
@@ -280,7 +317,7 @@ async function renderFilmstrip(initialImages: ImageFile[]) {
               imageRatings: null,
               isLoading: false,
               multiSelectedPaths: [],
-              thumbnailAspectRatio: ThumbnailAspectRatio.Cover,
+              thumbnailAspectRatio: nextThumbnailAspectRatio,
             }),
           ),
         );
@@ -309,6 +346,14 @@ async function loadImage(imageElement: HTMLImageElement) {
   await settleReact();
 }
 
+async function loadImageWithDimensions(imageElement: HTMLImageElement, naturalWidth: number, naturalHeight: number) {
+  Object.defineProperties(imageElement, {
+    naturalHeight: { configurable: true, value: naturalHeight },
+    naturalWidth: { configurable: true, value: naturalWidth },
+  });
+  await loadImage(imageElement);
+}
+
 async function dispatchLoad(imageElement: HTMLImageElement) {
   await act(async () => {
     imageElement.dispatchEvent(new window.Event('load'));
@@ -334,9 +379,11 @@ async function dispatchTransition(element: Element, propertyName: string) {
 }
 
 function imageSources(container: Element): string[] {
-  return Array.from(container.querySelectorAll<HTMLImageElement>('[data-testid="filmstrip-thumbnail-image"]')).map(
-    (element) => element.src,
-  );
+  return filmstripThumbnailImages(container).map((element) => element.src);
+}
+
+function filmstripThumbnailImages(container: Element): HTMLImageElement[] {
+  return Array.from(container.querySelectorAll<HTMLImageElement>('[data-testid="filmstrip-thumbnail-image"]'));
 }
 
 function requiredImage(container: Element, url: string): HTMLImageElement {
@@ -359,6 +406,59 @@ function layerOpacity(imageElement: HTMLImageElement): string {
 
 function placeholder(container: Element) {
   return container.querySelector('[data-testid="filmstrip-thumbnail-placeholder"]');
+}
+
+async function scrollGrid(grid: HTMLDivElement, scrollLeft: number) {
+  await act(async () => {
+    grid.scrollLeft = scrollLeft;
+    grid.dispatchEvent(new window.Event('scroll'));
+    await Promise.resolve();
+  });
+  await settleReact();
+}
+
+function recordFilmstripAnchor(container: Element) {
+  const grid = requiredElement<HTMLDivElement>(container, '[role="listbox"]');
+  const cells = Array.from(container.querySelectorAll<HTMLDivElement>('[data-testid="filmstrip-thumbnail"]'))
+    .map((thumbnail) => {
+      const cell = thumbnail.parentElement?.parentElement;
+      if (!(cell instanceof HTMLDivElement)) throw new Error('Expected a Filmstrip Grid cell.');
+
+      const offset = pixelValue(cell.style.left) + translateX(cell.style.transform);
+      return {
+        path: thumbnail.dataset.imagePath ?? '',
+        offset,
+        width: pixelValue(cell.style.width),
+      };
+    })
+    .sort((left, right) => left.offset - right.offset);
+  const firstVisible = cells.find((cell) => cell.offset + cell.width > grid.scrollLeft);
+  if (!firstVisible?.path) throw new Error('Expected a visible Filmstrip thumbnail.');
+
+  return {
+    columnWidths: [...new Set(cells.map((cell) => cell.width))],
+    firstVisiblePath: firstVisible.path,
+    pixelOffset: grid.scrollLeft - firstVisible.offset,
+    scrollLeft: grid.scrollLeft,
+  };
+}
+
+function pixelValue(value: string) {
+  const parsed = Number.parseFloat(value);
+  if (!Number.isFinite(parsed)) throw new Error(`Expected a pixel value, received "${value}".`);
+  return parsed;
+}
+
+function translateX(transform: string) {
+  const match = /^translate\(([-.\d]+)px,/u.exec(transform);
+  if (!match?.[1]) throw new Error(`Expected a translate transform, received "${transform}".`);
+  return pixelValue(match[1]);
+}
+
+function requiredElement<ElementType extends Element>(container: Element, selector: string): ElementType {
+  const element = container.querySelector<ElementType>(selector);
+  if (element === null) throw new Error(`Expected ${selector}.`);
+  return element;
 }
 
 function deferred<Value>() {

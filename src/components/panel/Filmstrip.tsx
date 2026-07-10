@@ -19,8 +19,6 @@ import {
 
 const HORIZONTAL_PADDING = 4;
 const ITEM_GAP = 8;
-const DEFAULT_CONTAIN_RATIO = 1.5;
-const SCROLL_SETTLE_DELAY = 120;
 const THUMBNAIL_FOCUS_CLASS = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring';
 const FILMSTRIP_SUMMARY_HEIGHT = 30;
 
@@ -59,7 +57,6 @@ interface ItemData {
   consumeClickTriggeredScroll: () => boolean;
   onRegisterThumbnail: (path: string, element: HTMLDivElement | null) => void;
   onThumbnailRovingKeyDown: (event: ThumbnailKeyboardEvent, index: number) => void;
-  setRatio: (path: string, ratio: number) => void;
 }
 
 interface FilmstripThumbnailProps {
@@ -74,9 +71,7 @@ interface FilmstripThumbnailProps {
   selectedImageThumbnailUrl?: string | undefined;
   tabIndex: 0 | -1;
   thumbnailAspectRatio: ThumbnailAspectRatio;
-  itemHeight: number;
   index: number;
-  setRatio: (path: string, ratio: number) => void;
 }
 
 type FilmstripCellData = ItemData;
@@ -132,13 +127,7 @@ export const resolveFilmstripThumbnailUrl = (
   isActive: boolean,
 ) => thumbnailUrl ?? (isActive ? selectedImageThumbnailUrl : undefined);
 
-export const getFilmstripColumnWidth = (
-  itemHeight: number,
-  thumbnailAspectRatio: ThumbnailAspectRatio,
-  measuredRatio: number | undefined,
-) =>
-  itemHeight * (thumbnailAspectRatio === ThumbnailAspectRatio.Cover ? 1 : (measuredRatio ?? DEFAULT_CONTAIN_RATIO)) +
-  ITEM_GAP;
+export const getFilmstripColumnWidth = (itemHeight: number) => itemHeight + ITEM_GAP;
 
 interface FilmstripCellProps extends FilmstripCellData {
   columnIndex: number;
@@ -191,9 +180,7 @@ export const FilmstripThumbnail = memo(
     selectedImageThumbnailUrl,
     tabIndex,
     thumbnailAspectRatio,
-    itemHeight: _itemHeight,
     index,
-    setRatio,
   }: FilmstripThumbnailProps) => {
     const { t } = useTranslation();
     const thumbData = useProcessStore((s) => s.thumbnails[imageFile.path]);
@@ -290,10 +277,6 @@ export const FilmstripThumbnail = memo(
       (candidate: ThumbnailBinding, element: HTMLImageElement) => {
         if (!isCurrentBinding(candidate)) return;
 
-        if (thumbnailAspectRatio === ThumbnailAspectRatio.Contain && element.naturalHeight > 0) {
-          setRatio(candidate.path, element.naturalWidth / element.naturalHeight);
-        }
-
         if (decodingGenerationRef.current === candidate.generation) return;
         decodingGenerationRef.current = candidate.generation;
 
@@ -310,7 +293,7 @@ export const FilmstripThumbnail = memo(
           () => handleLayerFailure(candidate, 'decode'),
         );
       },
-      [handleLayerDecoded, handleLayerFailure, isCurrentBinding, setRatio, thumbnailAspectRatio],
+      [handleLayerDecoded, handleLayerFailure, isCurrentBinding],
     );
 
     useEffect(() => {
@@ -594,7 +577,6 @@ const FilmstripCell = ({
   onRegisterThumbnail,
   onThumbnailRovingKeyDown,
   itemHeight,
-  setRatio,
 }: FilmstripCellProps) => {
   const imageFile = imageList[columnIndex];
   if (!imageFile) {
@@ -629,9 +611,7 @@ const FilmstripCell = ({
           selectedImageThumbnailUrl={selectedImageThumbnailUrl}
           tabIndex={activeIndex === columnIndex ? 0 : -1}
           thumbnailAspectRatio={thumbnailAspectRatio}
-          itemHeight={itemHeight}
           index={columnIndex}
-          setRatio={setRatio}
         />
       </div>
     </div>
@@ -645,20 +625,15 @@ const FilmstripList = ({
 }: {
   height: number;
   width: number;
-  data: Omit<ItemData, 'activeIndex' | 'itemHeight' | 'onRegisterThumbnail' | 'onThumbnailRovingKeyDown' | 'setRatio'>;
+  data: Omit<ItemData, 'activeIndex' | 'itemHeight' | 'onRegisterThumbnail' | 'onThumbnailRovingKeyDown'>;
 }) => {
   const [gridHandle, setGridHandle] = useGridCallbackRef();
-  const ratioMapRef = useRef<Record<string, number>>({});
-  const [ratioMapSnapshot, setRatioMapSnapshot] = useState<Record<string, number>>({});
   const visibleRange = useRef({ start: 0, stop: 0 });
   const prevSelectedPath = useRef<string | null>(null);
   const isReadyForSmooth = useRef(false);
   const resizeEndTimer = useRef<number | null>(null);
   const currentDataRef = useRef(data);
   currentDataRef.current = data;
-  const pendingResizeRef = useRef<number | null>(null);
-  const scrollSettleTimer = useRef<number | null>(null);
-  const isScrollingRef = useRef(false);
   const isAnimatingScroll = useRef(false);
   const scrollAnimationTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingScrollTarget = useRef<number | null>(null);
@@ -676,34 +651,14 @@ const FilmstripList = ({
     const baseHeight = Math.max(20, height - 20);
     const expandedHeight = Math.max(20, height - 8);
 
-    let totalWidthExpanded = HORIZONTAL_PADDING * 2;
-    for (let i = 0; i < data.imageList.length; i++) {
-      const imagePath = data.imageList[i]?.path;
-      const ratio =
-        data.thumbnailAspectRatio === ThumbnailAspectRatio.Cover
-          ? 1
-          : (imagePath ? ratioMapSnapshot[imagePath] : undefined) || DEFAULT_CONTAIN_RATIO;
-      totalWidthExpanded += expandedHeight * ratio + ITEM_GAP;
-    }
+    const totalWidthExpanded = HORIZONTAL_PADDING * 2 + data.imageList.length * (expandedHeight + ITEM_GAP);
 
     if (totalWidthExpanded <= width) {
       return expandedHeight;
     }
-
     return baseHeight;
-  }, [data.imageList, data.thumbnailAspectRatio, height, width, ratioMapSnapshot]);
-
-  const getColumnWidth = useCallback(
-    (index: number) => {
-      const imagePath = data.imageList[index]?.path;
-      return getFilmstripColumnWidth(
-        itemHeight,
-        data.thumbnailAspectRatio,
-        imagePath ? ratioMapSnapshot[imagePath] : undefined,
-      );
-    },
-    [data.imageList, data.thumbnailAspectRatio, itemHeight, ratioMapSnapshot],
-  );
+  }, [data.imageList.length, height, width]);
+  const columnWidth = getFilmstripColumnWidth(itemHeight);
 
   useEffect(() => {
     isReadyForSmooth.current = false;
@@ -740,12 +695,6 @@ const FilmstripList = ({
 
   useEffect(() => {
     return () => {
-      if (pendingResizeRef.current !== null) {
-        cancelAnimationFrame(pendingResizeRef.current);
-      }
-      if (scrollSettleTimer.current !== null) {
-        clearTimeout(scrollSettleTimer.current);
-      }
       if (scrollAnimationTimeout.current) {
         clearTimeout(scrollAnimationTimeout.current);
       }
@@ -864,36 +813,6 @@ const FilmstripList = ({
     gridHandle,
   ]);
 
-  const flushPendingRatios = useCallback(() => {
-    if (isScrollingRef.current || pendingResizeRef.current !== null) return;
-
-    pendingResizeRef.current = requestAnimationFrame(() => {
-      setRatioMapSnapshot({ ...ratioMapRef.current });
-      pendingResizeRef.current = null;
-    });
-  }, []);
-
-  const setRatio = useCallback(
-    (path: string, ratio: number) => {
-      if (Math.abs((ratioMapRef.current[path] || 0) - ratio) <= 0.01) return;
-
-      ratioMapRef.current[path] = ratio;
-      flushPendingRatios();
-    },
-    [flushPendingRatios],
-  );
-
-  const handleScroll = useCallback(() => {
-    isScrollingRef.current = true;
-    if (scrollSettleTimer.current !== null) clearTimeout(scrollSettleTimer.current);
-
-    scrollSettleTimer.current = window.setTimeout(() => {
-      isScrollingRef.current = false;
-      scrollSettleTimer.current = null;
-      flushPendingRatios();
-    }, SCROLL_SETTLE_DELAY);
-  }, [flushPendingRatios]);
-
   const focusThumbnail = useCallback((path: string) => {
     const element = thumbnailElements.current.get(path);
     if (!element) {
@@ -960,9 +879,8 @@ const FilmstripList = ({
       itemHeight,
       onRegisterThumbnail,
       onThumbnailRovingKeyDown,
-      setRatio,
     }),
-    [activeIndex, data, itemHeight, onRegisterThumbnail, onThumbnailRovingKeyDown, setRatio],
+    [activeIndex, data, itemHeight, onRegisterThumbnail, onThumbnailRovingKeyDown],
   );
 
   return (
@@ -975,7 +893,7 @@ const FilmstripList = ({
         rowCount={1}
         rowHeight={height}
         columnCount={data.imageList.length}
-        columnWidth={getColumnWidth}
+        columnWidth={columnWidth}
         cellComponent={FilmstripCell}
         cellProps={cellProps}
         className="custom-scrollbar"
@@ -988,7 +906,6 @@ const FilmstripList = ({
           }
         }}
         onCellsRendered={onCellsRendered}
-        onScroll={handleScroll}
         overscanCount={16}
       />
     </div>
