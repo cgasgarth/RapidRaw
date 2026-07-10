@@ -1,6 +1,8 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { ClipboardPaste, Copy, RotateCcw, Settings2, Spline } from 'lucide-react';
 import {
+  type FocusEvent as ReactFocusEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type TouchEvent as ReactTouchEvent,
   useCallback,
@@ -11,10 +13,8 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useContextMenu } from '../../context/ContextMenuContext';
-import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { ActiveChannel, type Adjustments, type Coord, type ParametricCurveSettings } from '../../utils/adjustments';
 import { OPTION_SEPARATOR, Theme } from '../ui/AppProperties';
-import UiText from '../ui/primitives/Text';
 import AdjustmentSlider from './AdjustmentSlider';
 
 let curveClipboard: Array<Coord> | null = null;
@@ -269,7 +269,7 @@ function getZeroHistogramPath(data: Array<number> | undefined) {
 }
 
 function isDefaultCurve(points: Array<Coord> | undefined) {
-  if (!points || points.length !== 2) return false;
+  if (points?.length !== 2) return false;
   const [p1, p2] = points;
   if (!p1 || !p2) return false;
   return p1.x === 0 && p1.y === 0 && p2.x === 255 && p2.y === 255;
@@ -331,6 +331,48 @@ function getEventPoint(event: PointerInputEvent): { clientX: number; clientY: nu
   return null;
 }
 
+interface CurveRect {
+  height: number;
+  left: number;
+  top: number;
+  width: number;
+}
+
+export function clientPointToCurvePoint(clientX: number, clientY: number, rect: CurveRect): Coord {
+  if (rect.width <= 0 || rect.height <= 0) return { x: 0, y: 0 };
+  return {
+    x: Math.max(0, Math.min(255, ((clientX - rect.left) / rect.width) * 255)),
+    y: Math.max(0, Math.min(255, 255 - ((clientY - rect.top) / rect.height) * 255)),
+  };
+}
+
+export function constrainCurvePoint(points: Array<Coord>, index: number, nextPoint: Coord): Coord {
+  const previousX = index > 0 ? (points[index - 1]?.x ?? 0) : 0;
+  const followingX = index < points.length - 1 ? (points[index + 1]?.x ?? 255) : 255;
+  const minX = index === 0 ? 0 : previousX + 0.01;
+  const maxX = index === points.length - 1 ? 255 : followingX - 0.01;
+  let x = Math.max(0, Math.min(255, nextPoint.x));
+
+  if (x < 5) x = 0;
+  if (x > 250) x = 255;
+
+  return {
+    x: Math.max(minX, Math.min(maxX, x)),
+    y: Math.max(0, Math.min(255, nextPoint.y)),
+  };
+}
+
+export function constrainParametricSplit(
+  settings: ParametricCurveSettings,
+  key: 'split1' | 'split2' | 'split3',
+  value: number,
+): number {
+  const nextValue = Math.max(0, Math.min(100, value));
+  if (key === 'split1') return Math.max(10, Math.min(nextValue, settings.split2 - 10));
+  if (key === 'split2') return Math.max(settings.split1 + 10, Math.min(nextValue, settings.split3 - 10));
+  return Math.max(settings.split2 + 10, Math.min(nextValue, 90));
+}
+
 export default function CurveGraph({
   adjustments,
   setAdjustments,
@@ -344,6 +386,7 @@ export default function CurveGraph({
   const [activeChannel, setActiveChannel] = useState<ActiveChannel>(ActiveChannel.Luma);
   const [draggingPointIndex, setDraggingPointIndex] = useState<number | null>(null);
   const [draggingSplitKey, setDraggingSplitKey] = useState<'split1' | 'split2' | 'split3' | null>(null);
+  const [selectedPointIndex, setSelectedPointIndex] = useState<number | null>(null);
   const [localPoints, setLocalPoints] = useState<Array<Coord> | null>(null);
   const [localParametricSettings, setLocalParametricSettings] = useState<ParametricCurveSettings | null>(null);
 
@@ -354,6 +397,11 @@ export default function CurveGraph({
   const draggingIndexRef = useRef<number | null>(null);
   const localPointsRef = useRef<Array<Coord> | null>(null);
   const localParametricSettingsRef = useRef<ParametricCurveSettings | null>(null);
+  const pointDragStartRef = useRef<{ channel: ActiveChannel; points: Array<Coord> } | null>(null);
+  const parametricDragStartRef = useRef<{
+    channel: ActiveChannel;
+    settings: ParametricCurveSettings;
+  } | null>(null);
   const isParametricMode = curveMode === 'parametric';
   const curvesRef = useRef(adjustments.curves);
 
@@ -385,6 +433,7 @@ export default function CurveGraph({
   const handleToggleMode = (newMode: 'point' | 'parametric') => {
     if (newMode === curveMode) return;
     setCurveMode(newMode);
+    setSelectedPointIndex(null);
 
     setAdjustments((prev: Adjustments) => {
       if (newMode === 'parametric') {
@@ -441,6 +490,7 @@ export default function CurveGraph({
       setDraggingPointIndex(null);
       setLocalParametricSettings(null);
       setDraggingSplitKey(null);
+      setSelectedPointIndex(null);
     }, 0);
 
     return () => {
@@ -482,19 +532,9 @@ export default function CurveGraph({
         const clientX = eventPoint.clientX;
         const rawX = ((clientX - rect.left) / rect.width) * 100;
 
-        const minGap = 10;
-        let nextValue = Math.max(0, Math.min(100, rawX));
-
         const currentSettings =
           localParametricSettingsRef.current || parametricCurvesRef.current[activeChannelRef.current];
-
-        if (draggingSplitKey === 'split1') {
-          nextValue = Math.max(10, Math.min(nextValue, currentSettings.split2 - minGap));
-        } else if (draggingSplitKey === 'split2') {
-          nextValue = Math.max(currentSettings.split1 + minGap, Math.min(nextValue, currentSettings.split3 - minGap));
-        } else {
-          nextValue = Math.max(currentSettings.split2 + minGap, Math.min(nextValue, 90));
-        }
+        const nextValue = constrainParametricSplit(currentSettings, draggingSplitKey, rawX);
 
         const newSettings = { ...currentSettings, [draggingSplitKey]: nextValue };
         localParametricSettingsRef.current = newSettings;
@@ -519,21 +559,9 @@ export default function CurveGraph({
         const { clientX, clientY } = eventPoint;
 
         const rect = svg.getBoundingClientRect();
-        let x = Math.max(0, Math.min(255, ((clientX - rect.left) / rect.width) * 255));
-        const y = Math.max(0, Math.min(255, 255 - ((clientY - rect.top) / rect.height) * 255));
-
+        const nextPoint = clientPointToCurvePoint(clientX, clientY, rect);
         const newPoints = [...currentPoints];
-        const SNAP_THRESHOLD = 5;
-        if (x < SNAP_THRESHOLD) x = 0;
-        if (x > 255 - SNAP_THRESHOLD) x = 255;
-
-        const prevX = index > 0 ? (currentPoints[index - 1]?.x ?? 0) : 0;
-        const nextX = index < currentPoints.length - 1 ? (currentPoints[index + 1]?.x ?? 255) : 255;
-        const minX = index === 0 ? 0 : prevX + 0.01;
-        const maxX = index === currentPoints.length - 1 ? 255 : nextX - 0.01;
-
-        x = Math.max(minX, Math.min(maxX, x));
-        newPoints[index] = { x, y };
+        newPoints[index] = constrainCurvePoint(currentPoints, index, nextPoint);
 
         localPointsRef.current = newPoints;
         setLocalPoints(newPoints);
@@ -554,7 +582,42 @@ export default function CurveGraph({
       localPointsRef.current = null;
       setLocalParametricSettings(null);
       localParametricSettingsRef.current = null;
+      pointDragStartRef.current = null;
+      parametricDragStartRef.current = null;
       onDragStateChange?.(false);
+    };
+
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+
+      const pointDragStart = pointDragStartRef.current;
+      if (pointDragStart) {
+        setSelectedPointIndex(null);
+        setAdjustments((prev: Adjustments) => ({
+          ...prev,
+          curves: { ...prev.curves, [pointDragStart.channel]: pointDragStart.points },
+        }));
+      }
+
+      const parametricDragStart = parametricDragStartRef.current;
+      if (parametricDragStart) {
+        setAdjustments((prev: Adjustments) => {
+          const parametricCurve = prev.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
+          return {
+            ...prev,
+            parametricCurve: {
+              ...parametricCurve,
+              [parametricDragStart.channel]: parametricDragStart.settings,
+            },
+            curves: {
+              ...prev.curves,
+              [parametricDragStart.channel]: buildParametricPoints(parametricDragStart.settings),
+            },
+          };
+        });
+      }
+
+      handleUp();
     };
 
     if (draggingPointIndex !== null || draggingSplitKey !== null) {
@@ -563,6 +626,7 @@ export default function CurveGraph({
       window.addEventListener('touchmove', handleMove, { passive: false });
       window.addEventListener('touchend', handleUp);
       window.addEventListener('touchcancel', handleUp);
+      window.addEventListener('keydown', handleKeyDown);
     }
 
     return () => {
@@ -571,6 +635,7 @@ export default function CurveGraph({
       window.removeEventListener('touchmove', handleMove);
       window.removeEventListener('touchend', handleUp);
       window.removeEventListener('touchcancel', handleUp);
+      window.removeEventListener('keydown', handleKeyDown);
     };
   }, [
     draggingPointIndex,
@@ -599,6 +664,45 @@ export default function CurveGraph({
     : (localPoints ?? adjustments.curves[activeChannel]);
 
   const { color, data: histogramData } = channelConfig[activeChannel];
+  const activeChannelLabel = t(`adjustments.curves.channels.${activeChannel}`, {
+    defaultValue: CURVE_CHANNEL_LABEL_FALLBACKS[activeChannel],
+  });
+  const activeModeLabel = t(isParametricMode ? 'adjustments.curves.parametricCurve' : 'adjustments.curves.pointCurve');
+  const xAxisLabel = t('modals.transform.xAxis');
+  const yAxisLabel = t('modals.transform.yAxis');
+  const selectedPoint = selectedPointIndex === null ? null : (activePoints[selectedPointIndex] ?? null);
+
+  const updatePoint = useCallback(
+    (index: number, nextPoint: Coord) => {
+      const currentPoints = localPointsRef.current || curvesRef.current[activeChannelRef.current];
+      if (index < 0 || index >= currentPoints.length) return;
+      const newPoints = [...currentPoints];
+      newPoints[index] = constrainCurvePoint(currentPoints, index, nextPoint);
+      localPointsRef.current = newPoints;
+      setLocalPoints(newPoints);
+      setAdjustments((prev: Adjustments) => ({
+        ...prev,
+        curves: { ...prev.curves, [activeChannelRef.current]: newPoints },
+      }));
+    },
+    [setAdjustments],
+  );
+
+  const removePoint = useCallback(
+    (index: number) => {
+      const currentPoints = localPointsRef.current || curvesRef.current[activeChannelRef.current];
+      if (index <= 0 || index >= currentPoints.length - 1) return;
+      const newPoints = currentPoints.filter((_, pointIndex) => pointIndex !== index);
+      localPointsRef.current = newPoints;
+      setLocalPoints(newPoints);
+      setSelectedPointIndex(Math.min(index, newPoints.length - 1));
+      setAdjustments((prev: Adjustments) => ({
+        ...prev,
+        curves: { ...prev.curves, [activeChannelRef.current]: newPoints },
+      }));
+    },
+    [setAdjustments],
+  );
 
   const handlePointStart = (
     e: ReactMouseEvent<SVGCircleElement> | ReactTouchEvent<SVGCircleElement>,
@@ -611,23 +715,36 @@ export default function CurveGraph({
     onDragStateChange?.(true);
     setLocalPoints(activePoints);
     localPointsRef.current = activePoints;
+    pointDragStartRef.current = { channel: activeChannel, points: activePoints.map((point) => ({ ...point })) };
+    setSelectedPointIndex(index);
     setDraggingPointIndex(index);
     draggingIndexRef.current = index;
   };
 
   const handlePointContextMenu = (e: ReactMouseEvent<SVGCircleElement>, index: number) => {
     if (isParametricMode) return;
-    if (index > 0 && index < activePoints.length - 1) {
-      e.preventDefault();
-      e.stopPropagation();
-      const newPoints = activePoints.filter((_, i) => i !== index);
-      setLocalPoints(newPoints);
-      localPointsRef.current = newPoints;
-      setAdjustments((prev: Adjustments) => ({
-        ...prev,
-        curves: { ...prev.curves, [activeChannel]: newPoints },
-      }));
+    if (index <= 0 || index >= activePoints.length - 1) return;
+    e.preventDefault();
+    e.stopPropagation();
+    removePoint(index);
+  };
+
+  const handlePointKeyDown = (event: ReactKeyboardEvent<SVGCircleElement>, index: number) => {
+    setSelectedPointIndex(index);
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      event.preventDefault();
+      removePoint(index);
+      return;
     }
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+
+    event.preventDefault();
+    const point = activePoints[index];
+    if (!point) return;
+    const step = event.shiftKey ? 10 : 1;
+    const xDelta = event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0;
+    const yDelta = event.key === 'ArrowDown' ? -step : event.key === 'ArrowUp' ? step : 0;
+    updatePoint(index, { x: point.x + xDelta, y: point.y + yDelta });
   };
 
   const handleContainerStart = (e: ReactMouseEvent<HTMLDivElement> | ReactTouchEvent<HTMLDivElement>) => {
@@ -641,23 +758,27 @@ export default function CurveGraph({
     if (!eventPoint) return;
     const { clientX, clientY } = eventPoint;
     const rect = svg.getBoundingClientRect();
-    const x = Math.max(0, Math.min(255, ((clientX - rect.left) / rect.width) * 255));
-    const y = Math.max(0, Math.min(255, 255 - ((clientY - rect.top) / rect.height) * 255));
+    const { x, y } = clientPointToCurvePoint(clientX, clientY, rect);
 
     const newPoints = [...activePoints, { x, y }].sort((a: Coord, b: Coord) => a.x - b.x);
     const newPointIndex = newPoints.findIndex((p: Coord) => p.x === x && p.y === y);
 
     setLocalPoints(newPoints);
     localPointsRef.current = newPoints;
+    pointDragStartRef.current = {
+      channel: activeChannel,
+      points: activePoints.map((point) => ({ ...point })),
+    };
     setAdjustments((prev: Adjustments) => ({
       ...prev,
       curves: { ...prev.curves, [activeChannel]: newPoints },
     }));
     setDraggingPointIndex(newPointIndex);
+    setSelectedPointIndex(newPointIndex);
     draggingIndexRef.current = newPointIndex;
   };
 
-  const handleDoubleClick = () => {
+  const resetActiveCurve = () => {
     if (isParametricMode) {
       const defaultSettings = { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS };
       setAdjustments((prev: Adjustments) => {
@@ -674,10 +795,33 @@ export default function CurveGraph({
         { x: 255, y: 255 },
       ];
       setLocalPoints(defaultPoints);
+      localPointsRef.current = defaultPoints;
+      setSelectedPointIndex(null);
       setAdjustments((prev: Adjustments) => ({
         ...prev,
         curves: { ...prev.curves, [activeChannel]: defaultPoints },
       }));
+    }
+  };
+
+  const handleSelectedPointInputBlur = (event: ReactFocusEvent<HTMLInputElement>, axis: 'x' | 'y') => {
+    if (selectedPointIndex === null || !selectedPoint) return;
+    const parsedValue = Number(event.currentTarget.value);
+    if (!Number.isFinite(parsedValue)) {
+      event.currentTarget.value = String(Math.round(selectedPoint[axis]));
+      return;
+    }
+    if (parsedValue === Math.round(selectedPoint[axis])) return;
+    updatePoint(selectedPointIndex, { ...selectedPoint, [axis]: parsedValue });
+  };
+
+  const handleSelectedPointInputKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>, axis: 'x' | 'y') => {
+    if (event.key === 'Enter') {
+      event.currentTarget.blur();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      if (selectedPoint) event.currentTarget.value = String(Math.round(selectedPoint[axis]));
+      event.currentTarget.blur();
     }
   };
 
@@ -703,20 +847,6 @@ export default function CurveGraph({
             ...prev,
             parametricCurve: { ...pC, [activeChannel]: { ...clipboard } },
             curves: { ...prev.curves, [activeChannel]: buildParametricPoints(clipboard) },
-          };
-        });
-      };
-
-      const handleResetParametric = () => {
-        setAdjustments((prev: Adjustments) => {
-          const pC = prev.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
-          return {
-            ...prev,
-            parametricCurve: { ...pC, [activeChannel]: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS } },
-            curves: {
-              ...prev.curves,
-              [activeChannel]: buildParametricPoints(DEFAULT_PARAMETRIC_CURVE_SETTINGS),
-            },
           };
         });
       };
@@ -766,7 +896,7 @@ export default function CurveGraph({
         {
           label: t('adjustments.curves.resetParametric', { channel: channelLabel }),
           icon: RotateCcw,
-          onClick: handleResetParametric,
+          onClick: resetActiveCurve,
         },
       ];
 
@@ -805,19 +935,6 @@ export default function CurveGraph({
       setAdjustments((prev: Adjustments) => ({
         ...prev,
         curves: { ...prev.curves, [activeChannel]: newPoints },
-      }));
-    };
-
-    const handleReset = () => {
-      const defaultPoints = [
-        { x: 0, y: 0 },
-        { x: 255, y: 255 },
-      ];
-      setLocalPoints(defaultPoints);
-      localPointsRef.current = defaultPoints;
-      setAdjustments((prev: Adjustments) => ({
-        ...prev,
-        curves: { ...prev.curves, [activeChannel]: defaultPoints },
       }));
     };
 
@@ -868,7 +985,7 @@ export default function CurveGraph({
       {
         label: t('adjustments.curves.resetPoint', { channel: channelLabel }),
         icon: RotateCcw,
-        onClick: handleReset,
+        onClick: resetActiveCurve,
       },
     ];
 
@@ -893,76 +1010,123 @@ export default function CurveGraph({
   );
 
   return (
-    <div className="select-none touch-none" ref={containerRef}>
-      <div className="mb-1.5 mt-1 flex items-center justify-between gap-2">
-        <div className="flex shrink-0 items-center gap-0.5 rounded-md bg-surface-secondary p-0.5">
+    <div className="select-none touch-none pt-1" ref={containerRef} data-testid="curves-editor">
+      <div className="mb-1.5 flex items-center gap-1">
+        <div
+          className="flex min-w-0 flex-1 items-center rounded bg-surface-secondary p-0.5"
+          role="group"
+          aria-label={`${t('adjustments.curves.pointCurve')} / ${t('adjustments.curves.parametricCurve')}`}
+        >
           <button
-            className={`flex h-7 w-7 items-center justify-center rounded transition-all ${
-              !isParametricMode ? 'bg-surface text-text-primary' : 'text-text-secondary hover:text-text-primary'
+            className={`flex h-7 min-w-0 flex-1 items-center justify-center gap-1 rounded px-2 text-[11px] font-medium transition-colors ${
+              !isParametricMode
+                ? 'bg-surface text-text-primary shadow-sm'
+                : 'text-text-secondary hover:text-text-primary'
             }`}
             onClick={() => {
               handleToggleMode('point');
             }}
-            data-tooltip={t('adjustments.curves.pointCurve')}
+            aria-pressed={!isParametricMode}
             type="button"
           >
-            <Spline size={15} />
+            <Spline aria-hidden="true" size={13} />
+            <span className="truncate">{t('adjustments.curves.pointCurve')}</span>
           </button>
           <button
-            className={`flex h-7 w-7 items-center justify-center rounded transition-all ${
-              isParametricMode ? 'bg-surface text-text-primary' : 'text-text-secondary hover:text-text-primary'
+            className={`flex h-7 min-w-0 flex-1 items-center justify-center gap-1 rounded px-2 text-[11px] font-medium transition-colors ${
+              isParametricMode
+                ? 'bg-surface text-text-primary shadow-sm'
+                : 'text-text-secondary hover:text-text-primary'
             }`}
             onClick={() => {
               handleToggleMode('parametric');
             }}
-            data-tooltip={t('adjustments.curves.parametricCurve')}
+            aria-pressed={isParametricMode}
             type="button"
           >
-            <Settings2 size={15} />
+            <Settings2 aria-hidden="true" size={13} />
+            <span className="truncate">{t('adjustments.curves.parametricCurve')}</span>
           </button>
         </div>
-
-        <div className="flex shrink-0 items-center gap-1">
-          {CURVE_CHANNELS.map((channel) => {
-            const selected = activeChannel === channel;
-            const channelLabel = t(`adjustments.curves.channels.${channel}`, {
-              defaultValue: CURVE_CHANNEL_LABEL_FALLBACKS[channel],
-            });
-            return (
-              <button
-                key={channel}
-                className={`flex h-6 w-6 items-center justify-center rounded-full transition-all ${
-                  selected ? 'ring-2 ring-offset-2 ring-offset-surface ring-accent' : 'bg-surface-secondary'
-                } ${channel === ActiveChannel.Luma ? 'text-text-primary' : ''}`}
-                onClick={() => {
-                  setActiveChannel(channel);
-                }}
-                type="button"
-                style={{
-                  backgroundColor:
-                    channel !== ActiveChannel.Luma && !selected ? channelConfig[channel].color + '40' : undefined,
-                }}
-                title={t('adjustments.curves.channelTitle', { channel: channelLabel })}
-              >
-                <UiText variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.bold}>
-                  {channelLabel.charAt(0).toUpperCase()}
-                </UiText>
-              </button>
-            );
+        <button
+          aria-label={t(isParametricMode ? 'adjustments.curves.resetParametric' : 'adjustments.curves.resetPoint', {
+            channel: activeChannelLabel,
           })}
-        </div>
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-text-secondary transition-colors hover:bg-surface-secondary hover:text-text-primary disabled:opacity-40"
+          data-tooltip={t(isParametricMode ? 'adjustments.curves.resetParametric' : 'adjustments.curves.resetPoint', {
+            channel: activeChannelLabel,
+          })}
+          disabled={
+            isParametricMode
+              ? isDefaultParametricCurve(activeParametricSettings)
+              : isDefaultCurve(adjustments.curves[activeChannel])
+          }
+          onClick={resetActiveCurve}
+          type="button"
+        >
+          <RotateCcw aria-hidden="true" size={14} />
+        </button>
+        <button
+          aria-label={`${activeModeLabel} - ${t('settings.title')}`}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-text-secondary transition-colors hover:bg-surface-secondary hover:text-text-primary"
+          data-tooltip={`${activeModeLabel} - ${t('settings.title')}`}
+          onClick={handleContextMenu}
+          type="button"
+        >
+          <Settings2 aria-hidden="true" size={14} />
+        </button>
+      </div>
+
+      <div
+        className="mb-1.5 grid grid-cols-4 rounded border border-editor-divider bg-surface-secondary p-0.5"
+        role="group"
+        aria-label={t('adjustments.curves.channelTitle', { channel: activeChannelLabel })}
+      >
+        {CURVE_CHANNELS.map((channel) => {
+          const selected = activeChannel === channel;
+          const channelLabel = t(`adjustments.curves.channels.${channel}`, {
+            defaultValue: CURVE_CHANNEL_LABEL_FALLBACKS[channel],
+          });
+          return (
+            <button
+              key={channel}
+              aria-pressed={selected}
+              className={`flex h-7 min-w-0 items-center justify-center gap-1 rounded px-1 text-[11px] font-semibold transition-colors ${
+                selected ? 'bg-surface text-text-primary shadow-sm' : 'text-text-secondary hover:text-text-primary'
+              }`}
+              onClick={() => {
+                setActiveChannel(channel);
+              }}
+              type="button"
+              title={t('adjustments.curves.channelTitle', { channel: channelLabel })}
+            >
+              <span
+                aria-hidden="true"
+                className="h-1.5 w-1.5 shrink-0 rounded-full border border-black/20"
+                style={{ backgroundColor: channelConfig[channel].color }}
+              />
+              <span className="truncate">{channelLabel}</span>
+            </button>
+          );
+        })}
       </div>
 
       <div className="relative">
         <div
-          className="relative aspect-square w-full touch-none rounded-md bg-surface-secondary p-1"
-          role="presentation"
+          aria-label={`${activeChannelLabel} - ${activeModeLabel}`}
+          className="relative aspect-square w-full touch-none overflow-hidden rounded border border-white/15 bg-[#15171a]"
+          role="region"
           onMouseDown={handleContainerStart}
           onTouchStart={handleContainerStart}
-          onDoubleClick={handleDoubleClick}
+          onDoubleClick={resetActiveCurve}
           onContextMenu={handleContextMenu}
         >
-          <svg ref={svgRef} viewBox="0 0 255 255" className="w-full h-full overflow-visible">
+          {!histogramData && (
+            <span className="pointer-events-none absolute left-2 top-2 z-10 rounded bg-black/55 px-1.5 py-0.5 text-[10px] text-white/65">
+              {t('adjustments.curves.curveDataUnavailable')}
+            </span>
+          )}
+          <svg ref={svgRef} viewBox="0 0 255 255" className="h-full w-full overflow-hidden">
             <path
               d={
                 isParametricMode
@@ -1009,6 +1173,11 @@ export default function CurveGraph({
 
             <path d={getCurvePath(activePoints)} fill="none" stroke={color} strokeWidth="2.5" />
 
+            {histogramData?.[0] ? <path d="M 0 0 L 10 0 L 0 10 Z" fill={color} opacity="0.9" /> : null}
+            {histogramData?.[histogramData.length - 1] ? (
+              <path d="M 255 0 L 245 0 L 255 10 Z" fill={color} opacity="0.9" />
+            ) : null}
+
             {isParametricMode && activePoints.length >= 2 && (
               <>
                 <circle
@@ -1031,30 +1200,88 @@ export default function CurveGraph({
             )}
 
             {!isParametricMode &&
-              activePoints.map((p: Coord, i: number) => (
-                <circle
-                  className="cursor-pointer"
-                  cx={p.x}
-                  cy={255 - p.y}
-                  fill={color}
-                  key={i}
-                  onMouseDown={(e) => {
-                    handlePointStart(e, i);
-                  }}
-                  onTouchStart={(e) => {
-                    handlePointStart(e, i);
-                  }}
-                  onContextMenu={(e) => {
-                    handlePointContextMenu(e, i);
-                  }}
-                  r="6"
-                  stroke="#1e1e1e"
-                  strokeWidth="2"
-                />
-              ))}
+              activePoints.map((p: Coord, i: number) => {
+                const selected = selectedPointIndex === i;
+                return (
+                  <g key={`${String(i)}-${String(p.x)}`}>
+                    <circle
+                      aria-label={`${activeChannelLabel} ${String(i + 1)} - ${xAxisLabel} ${String(
+                        Math.round(p.x),
+                      )}, ${yAxisLabel} ${String(Math.round(p.y))}`}
+                      className="cursor-grab outline-none focus-visible:stroke-white"
+                      cx={p.x}
+                      cy={255 - p.y}
+                      fill="transparent"
+                      onDoubleClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        removePoint(i);
+                      }}
+                      onFocus={() => {
+                        setSelectedPointIndex(i);
+                      }}
+                      onKeyDown={(event) => {
+                        handlePointKeyDown(event, i);
+                      }}
+                      onMouseDown={(event) => {
+                        handlePointStart(event, i);
+                      }}
+                      onTouchStart={(event) => {
+                        handlePointStart(event, i);
+                      }}
+                      onContextMenu={(event) => {
+                        handlePointContextMenu(event, i);
+                      }}
+                      r="11"
+                      role="button"
+                      stroke="transparent"
+                      strokeWidth="1"
+                      tabIndex={0}
+                    />
+                    <circle
+                      cx={p.x}
+                      cy={255 - p.y}
+                      fill={selected ? '#ffffff' : color}
+                      pointerEvents="none"
+                      r={selected ? 5.5 : 4.5}
+                      stroke={selected ? color : '#15171a'}
+                      strokeWidth={selected ? 2.5 : 2}
+                    />
+                  </g>
+                );
+              })}
           </svg>
         </div>
       </div>
+
+      {!isParametricMode && selectedPoint && selectedPointIndex !== null && (
+        <div className="mt-1.5 flex items-center justify-end gap-2 text-[10px] text-text-secondary">
+          {(['x', 'y'] as const).map((axis) => (
+            <label className="flex items-center gap-1" key={axis}>
+              <span>{axis === 'x' ? xAxisLabel : yAxisLabel}</span>
+              <input
+                aria-label={axis === 'x' ? xAxisLabel : yAxisLabel}
+                className="h-6 w-12 rounded border border-editor-divider bg-surface px-1 text-right text-[11px] tabular-nums text-text-primary outline-none focus:border-accent"
+                defaultValue={Math.round(selectedPoint[axis])}
+                key={`${axis}-${String(selectedPoint[axis])}`}
+                max={255}
+                min={0}
+                onBlur={(event) => {
+                  handleSelectedPointInputBlur(event, axis);
+                }}
+                onKeyDown={(event) => {
+                  handleSelectedPointInputKeyDown(event, axis);
+                }}
+                onMouseDown={(event) => {
+                  event.stopPropagation();
+                }}
+                step={1}
+                type="number"
+              />
+            </label>
+          ))}
+        </div>
+      )}
 
       <AnimatePresence initial={false}>
         {isParametricMode && (
@@ -1078,18 +1305,39 @@ export default function CurveGraph({
                     {splitPositions.map(({ key, value }) => (
                       <button
                         key={key}
+                        aria-label={`${t('adjustments.curves.parametricCurve')} ${String(
+                          Number(key.slice(-1)),
+                        )}: ${String(Math.round(value))}%`}
                         className="group absolute top-0 bottom-0 w-3 -translate-x-1/2 cursor-ew-resize"
                         onMouseDown={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
                           localParametricSettingsRef.current = { ...activeParametricSettings };
+                          parametricDragStartRef.current = {
+                            channel: activeChannel,
+                            settings: { ...activeParametricSettings },
+                          };
                           setDraggingSplitKey(key);
                         }}
                         onTouchStart={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
                           localParametricSettingsRef.current = { ...activeParametricSettings };
+                          parametricDragStartRef.current = {
+                            channel: activeChannel,
+                            settings: { ...activeParametricSettings },
+                          };
                           setDraggingSplitKey(key);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+                          event.preventDefault();
+                          const step = event.shiftKey ? 10 : 1;
+                          const direction = event.key === 'ArrowLeft' ? -1 : 1;
+                          updateParametricValue(
+                            key,
+                            constrainParametricSplit(activeParametricSettings, key, value + direction * step),
+                          );
                         }}
                         onDoubleClick={(e) => {
                           e.preventDefault();
