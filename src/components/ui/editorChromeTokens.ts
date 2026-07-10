@@ -1,13 +1,32 @@
 export type EditorChromeStatus = 'neutral' | 'success' | 'warning' | 'danger' | 'info';
 
+export type EditorInteractionState =
+  | 'idle'
+  | 'hover'
+  | 'pressed'
+  | 'selected'
+  | 'edited'
+  | 'disabled'
+  | 'loading'
+  | 'error'
+  | 'focus';
+
 export const editorChromeTokens = {
   density: {
+    topToolbar: 'min-h-10',
+    bottomToolbar: 'min-h-8',
+    filmstripHeader: 'min-h-8',
+    leftPanelHeader: 'min-h-9',
+    rightPanelHeader: 'min-h-9',
     rightRail: 'w-[42px]',
+    rightRailTarget: 'h-8 w-8',
     inspectorHeader: 'min-h-9',
+    inspectorSectionHeader: 'min-h-7',
     toolbarControl: 'h-8 min-w-8',
     compactToolbarControl: 'h-7 min-w-7',
     inspectorRow: 'min-h-6',
     compactInspectorRow: 'min-h-7',
+    coarsePointerTarget: 'min-h-11 min-w-11',
     gutterXs: 'gap-1.5',
     gutterSm: 'gap-2',
     gutterMd: 'gap-3',
@@ -16,22 +35,61 @@ export const editorChromeTokens = {
     radiusMd: 'rounded-md',
     radiusLg: 'rounded-lg',
   },
+  motion: {
+    panelReveal: 'duration-200 ease-out motion-reduce:duration-0',
+    previewHandoff: 'duration-150 ease-out motion-reduce:duration-0',
+    sectionCollapse: 'duration-200 ease-in-out motion-reduce:duration-0',
+    selectionChange: 'duration-100 ease-out motion-reduce:duration-0',
+  },
   focusRing:
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring focus-visible:ring-offset-1 focus-visible:ring-offset-editor-matte',
   palette: {
+    disabled: 'bg-editor-disabled-surface',
+    divider: 'border-editor-divider',
+    focus: 'ring-editor-focus-ring',
+    hover: 'bg-editor-hover',
     matte: 'bg-editor-matte',
     overlay: 'border-editor-overlay-stroke shadow-[0_14px_34px_var(--editor-overlay-shadow)]',
     panel: 'bg-editor-panel',
     raised: 'bg-editor-panel-raised',
+    selected: 'bg-editor-selected-quiet',
+    viewer: 'bg-editor-viewer-matte',
     well: 'bg-editor-panel-well',
+  },
+  surface: {
+    dragOverlay:
+      'border border-dashed border-editor-overlay-stroke bg-editor-overlay-surface shadow-[0_14px_34px_var(--editor-overlay-shadow)]',
+    floatingHud:
+      'border border-editor-overlay-stroke bg-editor-overlay-surface shadow-[0_14px_34px_var(--editor-overlay-shadow)]',
+    imageFrame:
+      'border border-editor-overlay-stroke bg-editor-viewer-matte shadow-[0_24px_52px_var(--editor-overlay-shadow)]',
+    popover: 'border border-editor-divider bg-editor-panel-raised shadow-[0_14px_34px_var(--editor-overlay-shadow)]',
   },
   typography: {
     utilityLabel: 'text-[11px] font-medium leading-4 tracking-normal',
     compactRowLabel: 'text-[12px] font-medium leading-4 tracking-normal',
+    controlLabel: 'text-[12px] font-medium leading-4 tracking-normal',
     inspectorLabel: 'text-[13px] font-medium leading-4 tracking-normal',
+    metadata: 'text-[10px] font-medium leading-4 tracking-normal text-text-secondary',
     panelTitle: 'text-[14px] font-semibold leading-5 tracking-normal',
     numericValue: 'font-mono tabular-nums tracking-normal',
+    sectionTitle: 'text-[11px] font-semibold uppercase leading-4 tracking-normal',
     shortBadge: 'text-[10px] font-semibold uppercase leading-4 tracking-normal',
+    status: 'text-[10px] font-medium leading-4 tracking-normal',
+    tooltip: 'text-[11px] font-medium leading-4 tracking-normal',
+  },
+  state: {
+    disabled: 'cursor-not-allowed opacity-45',
+    edited: 'before:absolute before:inset-y-1 before:left-0 before:w-0.5 before:bg-editor-info',
+    error: 'border-editor-danger bg-editor-danger-surface text-editor-danger',
+    focus:
+      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring focus-visible:ring-offset-1 focus-visible:ring-offset-editor-matte',
+    hover: 'hover:bg-editor-hover hover:text-text-primary',
+    idle: 'bg-transparent text-text-secondary',
+    loading: 'aria-busy:cursor-progress aria-busy:opacity-75',
+    pressed: 'active:bg-editor-selected-quiet/80',
+    selected:
+      'relative bg-editor-selected-quiet text-editor-selected-quiet-text before:absolute before:inset-y-1 before:left-0 before:w-0.5 before:bg-editor-primary-active',
   },
   button: {
     base: 'inline-flex items-center justify-center gap-1.5 rounded border border-transparent font-medium transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-45',
@@ -54,10 +112,17 @@ export const editorChromeTokens = {
     numeric: 'font-mono tabular-nums',
   },
   slider: {
+    defaultOriginFill: 'bg-editor-info/55',
     fill: 'bg-editor-primary-active/45',
+    minimumOriginFill: 'bg-editor-primary-active/45',
     track: 'bg-editor-panel-raised',
     valueInput:
       'border-editor-border bg-editor-panel-raised text-text-primary focus-visible:ring-1 focus-visible:ring-editor-focus-ring',
+  },
+  toolTab: {
+    active:
+      'relative bg-editor-selected-quiet text-editor-selected-quiet-text before:absolute before:inset-y-1 before:left-0 before:w-0.5 before:bg-editor-primary-active',
+    inactive: 'text-text-secondary hover:bg-editor-hover hover:text-text-primary',
   },
   statusChip: {
     base: 'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-4 tracking-normal',

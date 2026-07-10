@@ -140,10 +140,20 @@ export async function runVisualSmokeCapture({
       throw error;
     });
 
-    for (const scenario of selectedScenarios) {
-      const scenarioViewport =
-        scenario.mode === VISUAL_SMOKE_SCENARIO_IDS.ProfessionalAdjustmentsCompact ? compactPortraitViewport : viewport;
-      await page.setViewportSize(scenarioViewport);
+    const primaryViewportFor = (scenario: VisualSmokeCaptureScenario) =>
+      scenario.mode === VISUAL_SMOKE_SCENARIO_IDS.ProfessionalAdjustmentsCompact
+        ? compactPortraitViewport
+        : (scenario.viewport ?? viewport);
+    const captureScenario = async ({
+      scenario,
+      targetOutputPath,
+      targetViewport,
+    }: {
+      scenario: VisualSmokeCaptureScenario;
+      targetOutputPath: string;
+      targetViewport: { height: number; width: number };
+    }) => {
+      await page.setViewportSize(targetViewport);
       await page.goto(`${baseUrl}/visual-smoke.html?scenario=${scenario.appMode ?? scenario.mode}`, {
         waitUntil: 'networkidle',
       });
@@ -151,33 +161,40 @@ export async function runVisualSmokeCapture({
       await page.getByText(scenario.marker, { exact: true }).waitFor({ timeout: 10_000 });
       await assertSectionCount(page, scenario.sectionMinimum);
       await prepareScenario(page, scenario.mode);
-      await page.screenshot({ path: scenario.outputPath, fullPage: false });
-      const dimensions = await readPngDimensions(scenario.outputPath);
-      if (dimensions.width !== scenarioViewport.width || dimensions.height !== scenarioViewport.height) {
+      await page.screenshot({ path: targetOutputPath, fullPage: false });
+      const dimensions = await readPngDimensions(targetOutputPath);
+      if (dimensions.width !== targetViewport.width || dimensions.height !== targetViewport.height) {
         throw new Error(
-          `${scenario.mode} dimensions mismatch: expected ${scenarioViewport.width}x${scenarioViewport.height}, got ${dimensions.width}x${dimensions.height}`,
+          `${scenario.mode} dimensions mismatch: expected ${targetViewport.width}x${targetViewport.height}, got ${dimensions.width}x${dimensions.height}`,
         );
       }
-      if (scenario.compactOutputPath !== undefined) {
-        await page.setViewportSize(compactPortraitViewport);
-        await page.goto(`${baseUrl}/visual-smoke.html?scenario=${scenario.appMode ?? scenario.mode}`, {
-          waitUntil: 'networkidle',
+    };
+
+    for (const scenario of selectedScenarios) {
+      const scenarioViewport = primaryViewportFor(scenario);
+      await captureScenario({ scenario, targetOutputPath: scenario.outputPath, targetViewport: scenarioViewport });
+      if (scenario.reviewOutputPath !== undefined && scenario.reviewViewport !== undefined) {
+        await captureScenario({
+          scenario,
+          targetOutputPath: scenario.reviewOutputPath,
+          targetViewport: scenario.reviewViewport,
         });
-        await page.locator('[data-visual-smoke-ready="true"]').waitFor({ timeout: 10_000 });
-        await page.getByText(scenario.marker, { exact: true }).waitFor({ timeout: 10_000 });
-        await assertSectionCount(page, scenario.sectionMinimum);
-        await prepareScenario(page, scenario.mode);
-        await page.screenshot({ path: scenario.compactOutputPath, fullPage: false });
-        const compactDimensions = await readPngDimensions(scenario.compactOutputPath);
-        if (
-          compactDimensions.width !== compactPortraitViewport.width ||
-          compactDimensions.height !== compactPortraitViewport.height
-        ) {
-          throw new Error(
-            `${scenario.mode} compact dimensions mismatch: expected ${compactPortraitViewport.width}x${compactPortraitViewport.height}, got ${compactDimensions.width}x${compactDimensions.height}`,
-          );
-        }
-        await page.setViewportSize(viewport);
+      }
+      if (scenario.compactOutputPath !== undefined) {
+        await captureScenario({
+          scenario,
+          targetOutputPath: scenario.compactOutputPath,
+          targetViewport: compactPortraitViewport,
+        });
+      }
+      if (scenario.reducedMotionOutputPath !== undefined) {
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+        await captureScenario({
+          scenario,
+          targetOutputPath: scenario.reducedMotionOutputPath,
+          targetViewport: scenarioViewport,
+        });
+        await page.emulateMedia({ reducedMotion: 'no-preference' });
       }
       if (scenario.mode === VISUAL_SMOKE_SCENARIO_IDS.EmptyLibrary) {
         await page.goto(`${baseUrl}/visual-smoke.html?scenario=${VISUAL_SMOKE_SCENARIO_IDS.AdjustmentsPanelRetune}`, {
@@ -197,6 +214,37 @@ export async function runVisualSmokeCapture({
     }
 
     await page.close();
+
+    for (const scenario of selectedScenarios) {
+      if (scenario.highDpiOutputPath === undefined || scenario.highDpiDeviceScaleFactor === undefined) continue;
+
+      const scenarioViewport = primaryViewportFor(scenario);
+      const highDpiPage = await browser.newPage({
+        deviceScaleFactor: scenario.highDpiDeviceScaleFactor,
+        viewport: scenarioViewport,
+      });
+      highDpiPage.on('pageerror', (error) => {
+        throw error;
+      });
+      await highDpiPage.goto(`${baseUrl}/visual-smoke.html?scenario=${scenario.appMode ?? scenario.mode}`, {
+        waitUntil: 'networkidle',
+      });
+      await highDpiPage.locator('[data-visual-smoke-ready="true"]').waitFor({ timeout: 10_000 });
+      await highDpiPage.getByText(scenario.marker, { exact: true }).waitFor({ timeout: 10_000 });
+      await assertSectionCount(highDpiPage, scenario.sectionMinimum);
+      await prepareScenario(highDpiPage, scenario.mode);
+      await highDpiPage.screenshot({ path: scenario.highDpiOutputPath, fullPage: false });
+      await highDpiPage.close();
+
+      const dimensions = await readPngDimensions(scenario.highDpiOutputPath);
+      const expectedWidth = scenarioViewport.width * scenario.highDpiDeviceScaleFactor;
+      const expectedHeight = scenarioViewport.height * scenario.highDpiDeviceScaleFactor;
+      if (dimensions.width !== expectedWidth || dimensions.height !== expectedHeight) {
+        throw new Error(
+          `${scenario.mode} high-DPI dimensions mismatch: expected ${expectedWidth}x${expectedHeight}, got ${dimensions.width}x${dimensions.height}`,
+        );
+      }
+    }
 
     const shouldCheckHighDpi =
       requestedScenario === null || requestedScenario === VISUAL_SMOKE_SCENARIO_IDS.EmptyLibrary;

@@ -21,7 +21,12 @@
   --color-editor-panel: var(--editor-panel);
   --color-editor-panel-raised: var(--editor-panel-raised);
   --color-editor-panel-well: var(--editor-panel-well);
+  --color-editor-viewer-matte: var(--editor-viewer-matte);
   --color-editor-border: var(--editor-border);
+  --color-editor-divider: var(--editor-divider);
+  --color-editor-hover: var(--editor-hover);
+  --color-editor-disabled-surface: var(--editor-disabled-surface);
+  --color-editor-overlay-surface: var(--editor-overlay-surface);
   --color-editor-overlay-stroke: var(--editor-overlay-stroke);
   --color-editor-focus-ring: var(--editor-focus-ring);
   --color-editor-primary-active: var(--editor-primary-active);
@@ -83,6 +88,51 @@
   --editor-danger-surface: rgba(237, 110, 116, 0.17);
   --editor-info: rgb(118, 184, 216);
   --editor-info-surface: rgba(118, 184, 216, 0.16);
+}
+
+/* Editor values inherit only within the editor workspace; root values above remain legacy fallbacks. */
+.editor-workspace,
+.editor-visual-fixture {
+  --editor-viewer-matte: rgb(10, 12, 15);
+  --editor-divider: rgb(47, 53, 61);
+  --editor-hover: rgba(160, 177, 194, 0.14);
+  --editor-disabled-surface: rgba(161, 168, 176, 0.1);
+  --editor-overlay-surface: rgba(23, 26, 31, 0.96);
+}
+
+.editor-workspace[data-editor-theme="light"],
+.editor-visual-fixture[data-editor-theme="light"] {
+  --editor-matte: rgb(224, 228, 232);
+  --editor-panel: rgb(242, 244, 246);
+  --editor-panel-raised: rgb(255, 255, 255);
+  --editor-panel-well: rgb(211, 216, 221);
+  --editor-viewer-matte: rgb(193, 199, 205);
+  --editor-border: rgb(160, 169, 178);
+  --editor-divider: rgb(177, 185, 193);
+  --editor-hover: rgba(52, 65, 78, 0.1);
+  --editor-overlay-surface: rgba(255, 255, 255, 0.96);
+  --editor-overlay-stroke: rgba(27, 35, 43, 0.34);
+  --editor-overlay-shadow: rgba(43, 51, 59, 0.24);
+  --editor-focus-ring: rgb(35, 103, 164);
+  --editor-primary-active: rgb(32, 42, 52);
+  --editor-primary-active-text: rgb(255, 255, 255);
+  --editor-selected-quiet: rgba(45, 92, 131, 0.14);
+  --editor-selected-quiet-text: rgb(20, 29, 38);
+  --editor-disabled: rgba(69, 79, 89, 0.45);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editor-workspace *,
+  .editor-workspace *::before,
+  .editor-workspace *::after,
+  .editor-visual-fixture *,
+  .editor-visual-fixture *::before,
+  .editor-visual-fixture *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 @layer base {

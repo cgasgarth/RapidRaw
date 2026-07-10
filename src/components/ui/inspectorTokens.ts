@@ -1,12 +1,46 @@
 import { editorChromeStatusChipClassName, editorChromeTokens } from './editorChromeTokens';
 
+export const inspectorTokens = {
+  disclosure: {
+    actions: 'flex h-5 shrink-0 items-center gap-0.5',
+    copyPasteAction:
+      'inline-flex h-5 w-5 items-center justify-center rounded-sm text-text-secondary transition-colors hover:bg-editor-hover hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:opacity-45',
+    enableAction:
+      'inline-flex h-5 w-5 items-center justify-center rounded-sm text-text-secondary transition-colors hover:bg-editor-hover hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:opacity-45',
+    header:
+      'group relative flex min-h-7 w-full items-center justify-between gap-1.5 px-2 py-0.5 text-left transition-colors hover:bg-editor-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-editor-focus-ring',
+    overflowAction:
+      'inline-flex h-5 w-5 items-center justify-center rounded-sm text-text-secondary transition-colors hover:bg-editor-hover hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:opacity-45',
+    resetAction:
+      'inline-flex h-5 w-5 items-center justify-center rounded-sm text-text-secondary transition-colors hover:bg-editor-hover hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:opacity-45',
+  },
+  density: {
+    compactRow: 'min-h-7',
+    coarsePointerRow: 'min-h-11',
+    desktopRow: 'min-h-6',
+    sectionHeader: 'min-h-7',
+  },
+  numeric: {
+    defaultOriginFill: 'bg-editor-info/55',
+    minimumOriginFill: 'bg-editor-primary-active/45',
+    value: 'font-mono tabular-nums text-text-primary',
+  },
+  state: {
+    disabled: editorChromeTokens.state.disabled,
+    edited: editorChromeTokens.state.edited,
+    error: editorChromeTokens.state.error,
+    focus: editorChromeTokens.state.focus,
+    loading: editorChromeTokens.state.loading,
+    selected: editorChromeTokens.state.selected,
+  },
+} as const;
+
 export const inspectorSectionTokens = {
   badge: editorChromeTokens.statusChip.base,
   body: 'px-2 pb-1.5 pt-1 transition-opacity duration-200',
   chevron: 'text-text-secondary transition-transform duration-200',
   dirtyIndicator: 'h-1.5 w-1.5 shrink-0 rounded-full bg-editor-info',
-  header:
-    'group min-h-7 w-full px-2 py-0.5 flex items-center justify-between gap-1.5 text-left hover:bg-editor-panel-raised transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring focus-visible:ring-inset',
+  header: `${inspectorTokens.disclosure.header} ${editorChromeTokens.motion.selectionChange}`,
   actionsMenuSlot: 'h-5 w-5 shrink-0',
   headerActionButton:
     'z-10 flex h-5 w-5 items-center justify-center rounded text-text-secondary transition-colors duration-150 hover:bg-editor-selected-quiet hover:text-text-primary focus-visible:bg-editor-selected-quiet focus-visible:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:opacity-45',

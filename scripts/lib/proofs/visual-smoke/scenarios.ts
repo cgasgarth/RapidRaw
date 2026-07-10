@@ -20,7 +20,14 @@ export const highDpiTargets = [
 export const scenarios = VISUAL_SMOKE_SCENARIOS.map((scenario) => ({
   ...scenario,
   compactOutputPath: 'compactOutputFile' in scenario ? resolve(outputDir, scenario.compactOutputFile) : undefined,
+  highDpiDeviceScaleFactor: 'highDpiDeviceScaleFactor' in scenario ? scenario.highDpiDeviceScaleFactor : undefined,
+  highDpiOutputPath: 'highDpiOutputFile' in scenario ? resolve(outputDir, scenario.highDpiOutputFile) : undefined,
   outputPath: resolve(outputDir, scenario.outputFile),
+  reducedMotionOutputPath:
+    'reducedMotionOutputFile' in scenario ? resolve(outputDir, scenario.reducedMotionOutputFile) : undefined,
+  reviewOutputPath: 'reviewOutputFile' in scenario ? resolve(outputDir, scenario.reviewOutputFile) : undefined,
+  reviewViewport: 'reviewViewport' in scenario ? scenario.reviewViewport : undefined,
+  viewport: 'viewport' in scenario ? scenario.viewport : undefined,
 }));
 
 export type VisualSmokeCaptureScenario = (typeof scenarios)[number];

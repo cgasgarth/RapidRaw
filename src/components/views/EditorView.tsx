@@ -277,7 +277,7 @@ export default function EditorView({
     <div
       aria-label={t('editor.accessibility.workspace')}
       className={cx(
-        'flex grow h-full min-h-0 bg-editor-matte',
+        'editor-workspace flex grow h-full min-h-0 bg-editor-matte',
         isCompactPortrait ? 'flex-col gap-2' : 'flex-row gap-2',
       )}
       data-testid="editor-workspace"
