@@ -1069,7 +1069,10 @@
       "gamutWarningOverlay": "",
       "maskOverlayAlt": "Nakladka maski",
       "originalAlt": "Oryginal",
-      "sampler": { "clipped": "Przycięcie {{channels}}", "paused": "Wstrzymano" }
+      "sampler": {
+        "clipped": "Przycięcie {{channels}}",
+        "paused": "Wstrzymano"
+      }
     },
     "chromeStatus": {
       "accessibilityLabel": "",
@@ -2018,6 +2021,20 @@
         "undo": "Cofnij ({{shortcut}}) lub Historia (Prawy przycisk)"
       },
       "vc": "VC"
+    },
+    "viewerFooter": {
+      "accessibilityLabel": "",
+      "moreStatus": "",
+      "zoom": {
+        "fill": "",
+        "fit": "",
+        "in": "",
+        "label": "",
+        "oneToOne": "",
+        "out": "",
+        "percent": "",
+        "twoToOne": ""
+      }
     }
   },
   "export": {

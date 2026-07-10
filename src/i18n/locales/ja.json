@@ -969,7 +969,10 @@
       "gamutWarningOverlay": "",
       "maskOverlayAlt": "",
       "originalAlt": "",
-      "sampler": { "clipped": "クリップ {{channels}}", "paused": "一時停止" }
+      "sampler": {
+        "clipped": "クリップ {{channels}}",
+        "paused": "一時停止"
+      }
     },
     "chromeStatus": {
       "accessibilityLabel": "",
@@ -1823,6 +1826,20 @@
         "undo": "元に戻す ({{shortcut}}) または履歴 (右クリック)"
       },
       "vc": "仮想"
+    },
+    "viewerFooter": {
+      "accessibilityLabel": "",
+      "moreStatus": "",
+      "zoom": {
+        "fill": "",
+        "fit": "",
+        "in": "",
+        "label": "",
+        "oneToOne": "",
+        "out": "",
+        "percent": "",
+        "twoToOne": ""
+      }
     }
   },
   "export": {

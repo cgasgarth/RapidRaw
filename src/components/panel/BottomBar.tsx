@@ -372,25 +372,6 @@ export default function BottomBar({
         data-testid={isCompactEditorBar ? 'editor-bottom-bar-compact-controls' : 'editor-bottom-bar-controls'}
       >
         <div className={cx('flex min-w-0 items-center', isCompactEditorBar ? 'gap-2 overflow-x-auto' : 'gap-2')}>
-          {isCompactEditorBar && (activeFilename || numSelected > 0) && (
-            <div
-              className="flex min-w-0 max-w-[16rem] items-center gap-2 rounded border border-editor-border bg-editor-panel-well px-2 py-1"
-              data-testid="editor-bottom-bar-compact-selection-summary"
-            >
-              <UiText
-                as="span"
-                className={cx(editorChromeStatusChipClassName('info'), 'shrink-0 whitespace-nowrap')}
-                data-selected-count={compactSelectionCount}
-              >
-                {t('ui.bottomBar.imagesSelected', { current: compactSelectionCount, total })}
-              </UiText>
-              {activeFilename && (
-                <UiText as="span" className="min-w-0 truncate text-[11px] text-text-secondary">
-                  {activeFilename}
-                </UiText>
-              )}
-            </div>
-          )}
           <StarRating rating={rating} onRate={onRate} disabled={isRatingDisabled} />
           <div className={cx('h-5 w-px bg-editor-border', isCompactEditorBar && 'hidden')}></div>
           <div className="flex h-8 items-center gap-1 rounded border border-editor-border bg-editor-panel-well p-1">
@@ -565,17 +546,19 @@ export default function BottomBar({
               </div>
             </>
           )}
-          <div
-            className={cx(
-              'flex items-center transition-all duration-300 ease-out overflow-hidden',
-              showSelectionCounter ? 'max-w-xs opacity-100' : 'max-w-0 opacity-0',
-            )}
-          >
-            <div className="h-5 w-px bg-editor-border mr-2"></div>
-            <UiText as="span" className={cx(editorChromeStatusChipClassName('info'), 'whitespace-nowrap')}>
-              {t('ui.bottomBar.imagesSelected', { current: numSelected, total })}
-            </UiText>
-          </div>
+          {isLibraryView && (
+            <div
+              className={cx(
+                'flex items-center transition-all duration-300 ease-out overflow-hidden',
+                showSelectionCounter ? 'max-w-xs opacity-100' : 'max-w-0 opacity-0',
+              )}
+            >
+              <div className="h-5 w-px bg-editor-border mr-2"></div>
+              <UiText as="span" className={cx(editorChromeStatusChipClassName('info'), 'whitespace-nowrap')}>
+                {t('ui.bottomBar.imagesSelected', { current: numSelected, total })}
+              </UiText>
+            </div>
+          )}
         </div>
         <div className="grow" />
         {isLibraryView ? (

@@ -1008,7 +1008,10 @@
       "gamutWarningOverlay": "",
       "maskOverlayAlt": "蒙版叠加",
       "originalAlt": "原始图像",
-      "sampler": { "clipped": "剪切 {{channels}}", "paused": "已暂停" }
+      "sampler": {
+        "clipped": "剪切 {{channels}}",
+        "paused": "已暂停"
+      }
     },
     "chromeStatus": {
       "accessibilityLabel": "",
@@ -1894,6 +1897,20 @@
         "undo": "撤销（{{shortcut}}）或历史记录（右键单击）"
       },
       "vc": "VC"
+    },
+    "viewerFooter": {
+      "accessibilityLabel": "",
+      "moreStatus": "",
+      "zoom": {
+        "fill": "",
+        "fit": "",
+        "in": "",
+        "label": "",
+        "oneToOne": "",
+        "out": "",
+        "percent": "",
+        "twoToOne": ""
+      }
     }
   },
   "export": {

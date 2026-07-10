@@ -29,9 +29,9 @@ import CullingModal from '../../components/modals/editing/CullingModal';
 import CommandPaletteModal from '../../components/modals/navigation/CommandPaletteModal';
 import { NegativeConversionModal } from '../../components/modals/negative-lab/NegativeConversionModal';
 import BottomBar from '../../components/panel/BottomBar';
-import EditorChromeStatusStrip from '../../components/panel/editor/EditorChromeStatusStrip';
 import EditorToolbar from '../../components/panel/editor/EditorToolbar';
 import ImageCanvas from '../../components/panel/editor/ImageCanvas';
+import ViewerFooter from '../../components/panel/editor/ViewerFooter';
 import AgentChatShell from '../../components/panel/right/ai/AgentChatShell';
 import { AgentPanel } from '../../components/panel/right/ai/AgentPanel';
 import { TetherPanel } from '../../components/panel/right/capture/TetherPanel';
@@ -1415,7 +1415,23 @@ function ProfessionalEditorStatusChipsVisualSmoke() {
                   <div className="h-full w-full bg-[radial-gradient(circle_at_36%_28%,rgba(255,246,208,0.56),transparent_18%),linear-gradient(170deg,transparent_52%,rgba(12,16,20,0.68)_53%)]" />
                 </div>
               </div>
-              <EditorChromeStatusStrip isFullScreen={false} />
+              <ViewerFooter
+                activeTool="crop"
+                isFullScreen={false}
+                isRendering={false}
+                resolvedZoom={{
+                  cssPercent: 100,
+                  devicePixelsPerImagePixel: 1,
+                  displayPercent: 100,
+                  imagePixelsPerCssPixel: 1,
+                  imagePixelsPerDevicePixel: 1,
+                  mode: { devicePixelsPerImagePixel: 1, kind: 'ratio' },
+                  requiredPreviewResolution: 4096,
+                  transformScale: 1,
+                }}
+                samplerState={null}
+                zoomResolutionState="ready"
+              />
             </div>
           </div>
           <aside
@@ -1426,7 +1442,23 @@ function ProfessionalEditorStatusChipsVisualSmoke() {
               <div className="grid min-h-0 flex-1 place-items-center">
                 <div className="aspect-[3/4] h-[78%] rounded-md border border-editor-overlay-stroke bg-[linear-gradient(160deg,#1b2630,#6d856f_52%,#d6c28c)] shadow-[0_18px_42px_var(--editor-overlay-shadow)]" />
               </div>
-              <EditorChromeStatusStrip isFullScreen={true} />
+              <ViewerFooter
+                activeTool="none"
+                isFullScreen={true}
+                isRendering={true}
+                resolvedZoom={{
+                  cssPercent: 50,
+                  devicePixelsPerImagePixel: 0.5,
+                  displayPercent: 50,
+                  imagePixelsPerCssPixel: 2,
+                  imagePixelsPerDevicePixel: 2,
+                  mode: { kind: 'fit' },
+                  requiredPreviewResolution: 2048,
+                  transformScale: 1,
+                }}
+                samplerState={null}
+                zoomResolutionState="settling"
+              />
             </div>
           </aside>
         </section>
@@ -1457,12 +1489,11 @@ function ProfessionalEditorBottomBar() {
       onPaste={() => {}}
       onRate={() => {}}
       onRequestThumbnails={() => {}}
-      onZoomChange={() => {}}
       rating={4}
       selectedImage={professionalEditorShellImage}
       setIsFilmstripVisible={() => {}}
       showFilmstrip={false}
-      showZoomControls={true}
+      showZoomControls={false}
       thumbnailAspectRatio={ThumbnailAspectRatio.Cover}
       totalImages={1}
     />

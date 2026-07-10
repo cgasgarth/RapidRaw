@@ -63,18 +63,14 @@ assertIncludes(
   'data-testid="editor-bottom-bar-compact-controls"',
   'compact bottom bar should expose compact controls metadata',
 );
-assertIncludes(
+assertNotIncludes(
   markup,
   'data-testid="editor-bottom-bar-compact-selection-summary"',
-  'compact bottom bar should render a selection summary',
+  'compact bottom bar should leave selection status to the viewer footer',
 );
 assertIncludes(markup, 'data-active-filename="frame-01.NEF"', 'compact bottom bar should surface the active filename');
 assertIncludes(markup, 'data-selected-count="2"', 'compact bottom bar should surface the selected count');
-assertIncludes(
-  markup,
-  'frame-01.NEF',
-  'compact bottom bar should include the active image context in the visible summary',
-);
+assertNotIncludes(markup, '>frame-01.NEF<', 'compact bottom bar should not duplicate the visible active image context');
 
 if (failures.length > 0) {
   console.error('editor compact bottom bar summary failed');
@@ -143,5 +139,11 @@ async function createTestI18n(resources: Record<string, unknown>) {
 function assertIncludes(actual: string, expected: string, message: string) {
   if (!actual.includes(expected)) {
     failures.push(`${message}: missing ${expected}`);
+  }
+}
+
+function assertNotIncludes(actual: string, expected: string, message: string) {
+  if (actual.includes(expected)) {
+    failures.push(`${message}: found ${expected}`);
   }
 }
