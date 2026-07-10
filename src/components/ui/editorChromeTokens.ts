@@ -12,6 +12,12 @@ export type EditorInteractionState =
   | 'focus';
 
 export const editorChromeTokens = {
+  region: {
+    // Persistent editor commands belong in chrome lanes that reserve layout space around the image.
+    viewerCommandBar: 'shrink-0 relative z-[120]',
+    viewerFullscreenExit: 'shrink-0 flex justify-center border-b border-editor-border bg-editor-panel px-3 py-2',
+    viewerStatusFooter: 'shrink-0 border-t border-editor-border bg-editor-panel px-2 py-1',
+  },
   density: {
     topToolbar: 'min-h-10',
     bottomToolbar: 'min-h-8',

@@ -14,6 +14,24 @@ export const imageCanvasLayerZIndex = (layer: ImageCanvasLayer): number => image
 
 export type ImageCanvasPointerOwner = 'active-tool' | 'crop' | 'pan-zoom';
 
+export type ViewerChromeLayout = 'compact' | 'desktop' | 'fullscreen';
+
+export interface ViewerChromeRegionContract {
+  layout: ViewerChromeLayout;
+  persistentControlPlacement: 'outside-image';
+}
+
+export const resolveViewerChromeRegionContract = ({
+  isCompact,
+  isFullScreen,
+}: {
+  isCompact: boolean;
+  isFullScreen: boolean;
+}): ViewerChromeRegionContract => ({
+  layout: isFullScreen ? 'fullscreen' : isCompact ? 'compact' : 'desktop',
+  persistentControlPlacement: 'outside-image',
+});
+
 export interface ResolveImageCanvasPointerOwnerInput {
   isCropping: boolean;
   isMaskInteractionActive: boolean;
