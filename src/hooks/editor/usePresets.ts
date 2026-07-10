@@ -65,15 +65,19 @@ function arrayMove<T>(array: T[], from: number, to: number): T[] {
 export function usePresets(currentAdjustments: Adjustments) {
   const [presets, setPresets] = useState<Array<UserPreset>>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [storageError, setStorageError] = useState<string | null>(null);
 
   const loadPresets = useCallback(async () => {
     setIsLoading(true);
+    setLoadError(null);
     try {
       const loadedPresets = await invoke<UserPreset[]>(Invokes.LoadPresets);
       setPresets(loadedPresets);
     } catch (error) {
       console.error('Failed to load presets:', error);
       setPresets([]);
+      setLoadError(error instanceof Error ? error.message : String(error));
     } finally {
       setIsLoading(false);
     }
@@ -82,9 +86,14 @@ export function usePresets(currentAdjustments: Adjustments) {
   const savePresetsToBackend = useMemo(
     () =>
       debounce((presetsToSave: Array<UserPreset>) => {
-        invoke(Invokes.SavePresets, { presets: presetsToSave }).catch((err: unknown) => {
-          console.error('Failed to save presets:', err);
-        });
+        void invoke(Invokes.SavePresets, { presets: presetsToSave })
+          .then(() => {
+            setStorageError(null);
+          })
+          .catch((err: unknown) => {
+            console.error('Failed to save presets:', err);
+            setStorageError(err instanceof Error ? err.message : String(err));
+          });
       }, 500),
     [],
   );
@@ -602,6 +611,7 @@ export function usePresets(currentAdjustments: Adjustments) {
       try {
         const updatedPresetList = await invoke<UserPreset[]>(Invokes.HandleImportPresetsFromFile, { filePath });
         setPresets(updatedPresetList);
+        return updatedPresetList;
       } catch (error) {
         console.error('Failed to import presets from file:', error);
         throw error;
@@ -620,6 +630,7 @@ export function usePresets(currentAdjustments: Adjustments) {
           filePath,
         });
         setPresets(updatedPresetList);
+        return updatedPresetList;
       } catch (error) {
         console.error('Failed to import legacy presets from file:', error);
         throw error;
@@ -649,6 +660,7 @@ export function usePresets(currentAdjustments: Adjustments) {
     importPresetsFromFile,
     importLegacyPresetsFromFile,
     isLoading,
+    loadError,
     movePreset,
     overwritePreset,
     presets,
@@ -656,5 +668,6 @@ export function usePresets(currentAdjustments: Adjustments) {
     renameItem,
     reorderItems,
     sortAllPresetsAlphabetically,
+    storageError,
   };
 }

@@ -1599,6 +1599,32 @@ export default interface Resources {
           userPresets_one: '{{count}} user preset';
           userPresets_other: '{{count}} user presets';
         };
+        discovery: {
+          dismiss: 'Dismiss';
+          dismissError: 'Dismiss preset error';
+          filterLabel: 'Filter presets';
+          filters: {
+            all: 'All looks';
+            styles: 'Styles';
+            tools: 'Tools';
+          };
+          gridView: 'Show grid view';
+          libraryLabel: 'Your library';
+          listView: 'Show list view';
+          moveFolderLabel: 'Move folder {{name}}';
+          moveLabel: 'Move preset {{name}}';
+          moving: 'Moving preset item';
+          retry: 'Retry';
+          searchLabel: 'Search presets';
+          searchPlaceholder: 'Search looks';
+          selectLabel: 'Select preset {{name}}';
+          sort: {
+            library: 'Library order';
+            name: 'Name';
+          };
+          sortLabel: 'Sort preset results';
+          toggleFolder: 'Toggle folder {{name}}';
+        };
         dialog: {
           allPresetFiles: 'All Preset Files';
           exportAllTitle: 'Export All Presets';
@@ -1607,6 +1633,23 @@ export default interface Resources {
           legacyPreset: 'Legacy Preset';
           presetFile: 'Preset File';
           rapidRawPreset: 'RapidRAW Preset';
+        };
+        errors: {
+          applyFailed: 'The preset could not be applied. Your current edits are unchanged.';
+          exportFailed: 'The preset export could not be completed.';
+          importFailed: 'The preset import could not be completed.';
+          invalidPreset: 'This preset is incomplete and cannot be applied.';
+          loadFailed: 'Presets could not be loaded. Retry to keep working.';
+          saveFailed: 'The preset could not be saved.';
+          storageFailed: 'Preset changes are not yet saved to disk.';
+        };
+        footer: {
+          applied: 'Applied {{name}}';
+          appliedEdited: 'Applied {{name}} then edited';
+          previewing: 'Previewing {{name}} without changing the image';
+          ready: 'Select a look to inspect it';
+          revert: 'Revert';
+          selected: 'Selected {{name}}';
         };
         menu: {
           configurePreset: 'Configure Preset';
@@ -1623,8 +1666,23 @@ export default interface Resources {
         };
         status: {
           empty: 'No presets saved yet. Create your own, import from a file, or explore community presets.';
+          emptySearch: 'No presets match this search or filter.';
           getCommunity: 'Get Community Presets';
           loading: 'Loading Presets...';
+        };
+        states: {
+          applied: 'Applied';
+          appliedEdited: 'Applied, then edited';
+          available: 'Available';
+          error: 'Preset error';
+          importConflict: '{{count}} imported name conflict was renamed to preserve both presets.';
+          invalid: 'Invalid preset';
+          previewFailed: 'Preview unavailable';
+          previewing: 'Previewing';
+          previewUnavailable: 'Select a ready image to build preset previews.';
+          previewsLoading: 'Building previews';
+          ready: 'Ready';
+          selected: 'Selected';
         };
         supports: {
           cropTransform: 'Crop & Transform';
@@ -2390,14 +2448,19 @@ export default interface Resources {
         cancel: 'Cancel';
         includeCropTransform: 'Include Crop & Transform';
         includeMasks: 'Include Masks';
+        nameLabel: 'Preset name';
+        nameRequired: 'Enter a preset name before saving.';
         placeholder: 'Enter preset name...';
         save: 'Save';
+        saveScope: 'Save the current edit as a reusable look or targeted tool.';
         titleConfigure: 'Configure Preset';
         titleSave: 'Save New Preset';
         typeStyleDesc: 'Applies the complete look. This will override all your current settings to match the preset exactly.';
         typeStyleLabel: 'Style';
         typeToolDesc: 'Only applies specific changes without touching your other settings.';
         typeToolLabel: 'Tool';
+        typeLabel: 'Preset scope';
+        updateScope: 'Update what this preset stores without applying it to the current image.';
       };
       confirm: {
         cancel: 'Cancel';

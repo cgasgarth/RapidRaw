@@ -85,7 +85,11 @@ const PresetTypeSwitch = ({ selectedType, onChange }: PresetTypeSwitchProps) => 
   }, [selectedType, presetTypeOptions]);
 
   return (
-    <div className="w-full p-1.5 bg-card-active rounded-md mt-2">
+    <div
+      aria-label={t('modals.configurePreset.typeLabel')}
+      className="mt-2 w-full rounded-md bg-card-active p-1.5"
+      role="radiogroup"
+    >
       <div className="relative flex w-full">
         <motion.div
           className="absolute top-0 bottom-0 z-0 bg-accent"
@@ -96,7 +100,13 @@ const PresetTypeSwitch = ({ selectedType, onChange }: PresetTypeSwitchProps) => 
         {presetTypeOptions.map((option) => (
           <button
             key={option.id}
+            aria-checked={selectedType === option.id}
             data-tooltip={option.title}
+            onKeyDown={(event) => {
+              if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+              event.preventDefault();
+              onChange(option.id === 'style' ? 'tool' : 'style');
+            }}
             onClick={(e) => {
               e.preventDefault();
               onChange(option.id);
@@ -108,7 +118,9 @@ const PresetTypeSwitch = ({ selectedType, onChange }: PresetTypeSwitchProps) => 
                 'text-button-text': selectedType === option.id,
               },
             )}
+            role="radio"
             style={{ WebkitTapHighlightColor: 'transparent' }}
+            type="button"
           >
             <span className="relative z-10 flex items-center">{option.label}</span>
           </button>
@@ -124,6 +136,7 @@ export default function ConfigurePresetModal({ isOpen, onClose, onSave, initialP
   const [includeMasks, setIncludeMasks] = useState(false);
   const [includeCropTransform, setIncludeCropTransform] = useState(false);
   const [presetType, setPresetType] = useState<'tool' | 'style'>('style');
+  const [didAttemptSave, setDidAttemptSave] = useState(false);
   const { isMounted, show } = useModalTransition(isOpen);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
@@ -137,6 +150,7 @@ export default function ConfigurePresetModal({ isOpen, onClose, onSave, initialP
         setIncludeMasks(presetState.includeMasks);
         setIncludeCropTransform(presetState.includeCropTransform);
         setPresetType(presetState.presetType);
+        setDidAttemptSave(false);
       }, 0);
       return () => {
         window.clearTimeout(timer);
@@ -148,6 +162,7 @@ export default function ConfigurePresetModal({ isOpen, onClose, onSave, initialP
       setIncludeMasks(false);
       setIncludeCropTransform(false);
       setPresetType('style');
+      setDidAttemptSave(false);
     }, 300);
     return () => {
       window.clearTimeout(timer);
@@ -155,10 +170,12 @@ export default function ConfigurePresetModal({ isOpen, onClose, onSave, initialP
   }, [isOpen, initialPreset]);
 
   const handleSave = useCallback(() => {
-    if (name.trim()) {
-      onSave(name.trim(), includeMasks, includeCropTransform, presetType);
-      onClose();
+    if (!name.trim()) {
+      setDidAttemptSave(true);
+      return;
     }
+    onSave(name.trim(), includeMasks, includeCropTransform, presetType);
+    onClose();
   }, [name, includeMasks, includeCropTransform, presetType, onSave, onClose]);
 
   const handleKeyDown = useCallback(
@@ -193,6 +210,8 @@ export default function ConfigurePresetModal({ isOpen, onClose, onSave, initialP
     >
       <div
         aria-modal="true"
+        aria-describedby="configure-preset-scope"
+        aria-labelledby="configure-preset-title"
         className={`
           bg-surface rounded-lg shadow-xl p-6 w-full max-w-sm
           transform transition-all duration-300 ease-out
@@ -200,13 +219,24 @@ export default function ConfigurePresetModal({ isOpen, onClose, onSave, initialP
         `}
         role="dialog"
       >
-        <UiText variant={TextVariants.title} className="mb-4">
+        <UiText as="h2" id="configure-preset-title" variant={TextVariants.title} className="mb-1">
           {initialPreset ? t('modals.configurePreset.titleConfigure') : t('modals.configurePreset.titleSave')}
         </UiText>
+        <UiText as="p" id="configure-preset-scope" className="mb-4 text-text-secondary" variant={TextVariants.small}>
+          {initialPreset ? t('modals.configurePreset.updateScope') : t('modals.configurePreset.saveScope')}
+        </UiText>
+        <label className="sr-only" htmlFor="configure-preset-name">
+          {t('modals.configurePreset.nameLabel')}
+        </label>
         <input
+          aria-describedby={didAttemptSave && !name.trim() ? 'configure-preset-name-error' : undefined}
+          aria-invalid={didAttemptSave && !name.trim()}
+          aria-required="true"
           className="w-full bg-bg-primary text-text-primary border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
+          id="configure-preset-name"
           onChange={(e) => {
             setName(e.target.value);
+            if (didAttemptSave) setDidAttemptSave(false);
           }}
           onKeyDown={handleKeyDown}
           placeholder={t('modals.configurePreset.placeholder')}
@@ -214,6 +244,17 @@ export default function ConfigurePresetModal({ isOpen, onClose, onSave, initialP
           type="text"
           value={name}
         />
+        {didAttemptSave && !name.trim() ? (
+          <UiText
+            as="p"
+            className="mt-1 text-danger"
+            id="configure-preset-name-error"
+            role="alert"
+            variant={TextVariants.small}
+          >
+            {t('modals.configurePreset.nameRequired')}
+          </UiText>
+        ) : null}
 
         <div className="mt-5 mb-4 p-1 space-y-4">
           <Switch label={t('modals.configurePreset.includeMasks')} checked={includeMasks} onChange={setIncludeMasks} />
