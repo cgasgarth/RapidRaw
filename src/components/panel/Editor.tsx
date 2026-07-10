@@ -102,12 +102,18 @@ interface MaskOverlayRuntimeState {
 }
 
 interface EditorProps {
+  isContiguousShell?: boolean;
   onBackToLibrary: () => void;
   onContextMenu: (event: MouseEvent<HTMLElement>) => void;
   transformWrapperRef: RefObject<TransformController | null>;
 }
 
-export default function Editor({ onBackToLibrary, onContextMenu, transformWrapperRef }: EditorProps) {
+export default function Editor({
+  isContiguousShell = false,
+  onBackToLibrary,
+  onContextMenu,
+  transformWrapperRef,
+}: EditorProps) {
   const { t } = useTranslation();
   const appSettings = useSettingsStore((s) => s.appSettings);
   const osPlatform = useSettingsStore((s) => s.osPlatform);
@@ -1529,8 +1535,8 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
     <div
       className={cx(
         'flex-1 flex flex-col relative overflow-hidden min-h-0 bg-editor-matte',
-        !isInstantTransition && 'transition-all duration-300 ease-in-out',
-        isFullScreen ? 'rounded-none p-0 gap-0' : 'rounded-lg gap-2',
+        !isInstantTransition && !isFullScreen && 'transition-all duration-300 ease-in-out',
+        isFullScreen || isContiguousShell ? 'rounded-none p-0 gap-0' : 'rounded-lg gap-2',
       )}
     >
       {isFullScreen && (
@@ -1558,7 +1564,8 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       <div
         className={cx(
           'shrink-0 relative z-[120] rounded-lg border border-editor-border bg-editor-panel',
-          !isInstantTransition && 'transition-all duration-300 ease-in-out',
+          !isInstantTransition && !isFullScreen && 'transition-all duration-300 ease-in-out',
+          isContiguousShell && !isFullScreen && 'rounded-none border-x-0 border-t-0 border-b',
           isFullScreen ? 'max-h-0 opacity-0 m-0 border-transparent' : 'max-h-25 opacity-100 max-[700px]:max-h-none',
           toolbarOverflowVisible ? 'overflow-visible' : 'overflow-hidden',
         )}
@@ -1612,7 +1619,9 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
         aria-label={t('editor.accessibility.imagePreview')}
         className={cx(
           'flex flex-1 min-h-0 flex-col overflow-hidden bg-editor-panel-well',
-          isFullScreen ? 'rounded-none' : 'rounded-lg border border-editor-border p-2',
+          isFullScreen || isContiguousShell
+            ? 'rounded-none border-0 p-0'
+            : 'rounded-lg border border-editor-border p-2',
         )}
         data-testid="editor-image-preview-region"
         role="region"
@@ -1620,7 +1629,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
         <div
           className={cx(
             'relative min-h-0 flex-1 overflow-hidden touch-none bg-editor-panel-well',
-            isFullScreen ? 'rounded-none' : 'rounded-lg',
+            isFullScreen || isContiguousShell ? 'rounded-none' : 'rounded-lg',
             !isWgpuActive && 'bg-editor-panel-well',
           )}
           aria-busy={isLoaderVisible}

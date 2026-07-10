@@ -14,6 +14,7 @@ import Filmstrip from './Filmstrip';
 
 interface BottomBarProps {
   filmstripHeight?: number;
+  isContiguousShell?: boolean;
   imageList?: Array<ImageFile>;
   imageRatings?: Record<string, number> | null | undefined;
   isCopied: boolean;
@@ -110,6 +111,7 @@ const getDisplayFilename = (path: string) => path.split(/[\\/]/u).pop() || path;
 
 export default function BottomBar({
   filmstripHeight,
+  isContiguousShell = false,
   imageList = [],
   imageRatings,
   isCopied,
@@ -284,6 +286,7 @@ export default function BottomBar({
       className={cx(
         'shrink-0 flex flex-col overflow-hidden rounded-lg border border-editor-border bg-editor-panel',
         isCompactEditorBar && 'rounded-none border-0',
+        isContiguousShell && 'rounded-none border-x-0 border-b-0',
       )}
       data-testid="editor-bottom-bar"
     >
