@@ -35,6 +35,7 @@ import {
   getRenderedPreviewWarningStatus,
   isCurrentExportSoftProofGamutWarningOverlay,
 } from '../../../utils/color/runtime/gamutWarningDisplay';
+import type { EditorCompareOrientation } from '../../../utils/editorCompare';
 import { resolveEditorPreviewSource } from '../../../utils/editorImagePreviewSource';
 import {
   captureGeometryEpoch,
@@ -264,6 +265,7 @@ interface ImageCanvasProps {
   gamutWarningOverlay: GamutWarningOverlayPayload | null;
   handleCropComplete: (c: Crop, cp: PercentCrop) => void;
   imageRenderSize: RenderSize;
+  originalImageRenderSize?: RenderSize;
   overlayGeometry?: EditorOverlayGeometry;
   isAiEditing: boolean;
   isCropping: boolean;
@@ -287,6 +289,11 @@ interface ImageCanvasProps {
   setIsMaskHovered: (isHovered: boolean) => void;
   setIsMaskTouchInteracting: (isInteracting: boolean) => void;
   compareMode?: EditorCompareMode;
+  compareDividerPosition?: number;
+  compareLabelsVisible?: boolean;
+  compareOrientation?: EditorCompareOrientation;
+  onCompareDividerPositionChange?: (position: number) => void;
+  onCompareDividerReset?: () => void;
   showOriginal: boolean;
   transformedOriginalUrl: string | null;
   uncroppedAdjustedPreviewUrl: string | null;
@@ -1670,6 +1677,7 @@ const ImageCanvas = memo(
     gamutWarningOverlay,
     handleCropComplete,
     imageRenderSize,
+    originalImageRenderSize = imageRenderSize,
     overlayGeometry: providedOverlayGeometry,
     interactivePatch,
     isAiEditing,
@@ -1694,6 +1702,11 @@ const ImageCanvas = memo(
     setIsMaskHovered,
     setIsMaskTouchInteracting,
     compareMode = 'off',
+    compareDividerPosition = 0.5,
+    compareLabelsVisible = true,
+    compareOrientation = 'vertical',
+    onCompareDividerPositionChange = () => undefined,
+    onCompareDividerReset = () => undefined,
     showOriginal,
     transformedOriginalUrl,
     uncroppedAdjustedPreviewUrl,
@@ -1716,6 +1729,7 @@ const ImageCanvas = memo(
     const cropImageRef = useRef<HTMLImageElement>(null);
     const [displayedMaskUrl, setDisplayedMaskUrl] = useState<string | null>(null);
     const [originalLoaded, setOriginalLoaded] = useState<boolean>(false);
+    const [originalLoadFailed, setOriginalLoadFailed] = useState(false);
     const [localInitialDrawParams, setLocalInitialDrawParams] = useState<MaskParameters | null>(null);
     const [isMaskInteractionActive, setIsMaskInteractionActive] = useState(false);
     const isDrawing = useRef(false);
@@ -3168,6 +3182,7 @@ const ImageCanvas = memo(
     useEffect(() => {
       if (!originalSrc) {
         setOriginalLoaded(false);
+        setOriginalLoadFailed(false);
         return;
       }
 
@@ -3175,16 +3190,24 @@ const ImageCanvas = memo(
       img.src = originalSrc;
 
       if (img.complete) {
-        setOriginalLoaded(true);
+        setOriginalLoaded(img.naturalWidth > 0);
+        setOriginalLoadFailed(img.naturalWidth === 0);
       } else {
         setOriginalLoaded(false);
+        setOriginalLoadFailed(false);
         img.onload = () => {
           setOriginalLoaded(true);
+          setOriginalLoadFailed(false);
+        };
+        img.onerror = () => {
+          setOriginalLoaded(false);
+          setOriginalLoadFailed(true);
         };
       }
 
       return () => {
         img.onload = null;
+        img.onerror = null;
       };
     }, [originalSrc]);
 
@@ -3371,10 +3394,14 @@ const ImageCanvas = memo(
       >
         <>
           <PreviewSurface
+            compareDividerPosition={compareDividerPosition}
+            compareMode={compareMode}
+            compareOrientation={compareOrientation}
             imageRenderSize={imageRenderSize}
             isCropViewVisible={isCropViewVisible}
             isMaxZoom={isMaxZoom}
             originalLoaded={originalLoaded}
+            originalImageRenderSize={originalImageRenderSize}
             originalSrc={originalSrc}
             showOriginalCompare={showOriginalCompare}
             showSideBySideCompare={isSideBySideCompare}
@@ -3394,11 +3421,16 @@ const ImageCanvas = memo(
           >
             <CompareOverlay
               canShowOriginalCompare={canShowOriginalCompare}
+              compareDividerPosition={compareDividerPosition}
+              compareLabelsVisible={compareLabelsVisible}
+              compareOrientation={compareOrientation}
               compareOverlayDisabled={compareOverlayDisabled}
+              editedImageRect={imageRenderSize}
               isCompareModeActive={isCompareModeActive}
-              isMaxZoom={isMaxZoom}
-              originalSrc={originalSrc}
-              previewSource={previewSource}
+              onDividerPositionChange={onCompareDividerPositionChange}
+              onDividerReset={onCompareDividerReset}
+              originalImageRect={originalImageRenderSize}
+              originalStatus={originalLoadFailed ? 'error' : canShowOriginalCompare ? 'ready' : 'loading'}
               showSideBySideCompare={showSideBySideCompare}
               showSplitCompare={showSplitCompare}
             />

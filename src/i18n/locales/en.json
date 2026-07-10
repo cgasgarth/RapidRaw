@@ -1021,6 +1021,7 @@
         "after": "After",
         "before": "Before",
         "loadingOriginal": "Preparing original preview",
+        "originalFailed": "Original preview unavailable",
         "overlayDisabled": "Interactive overlays are disabled in compare preview",
         "sideBySideRegion": "Side-by-side before and after preview",
         "splitWipeDivider": "Before and after split divider",
@@ -1919,7 +1920,9 @@
         },
         "sideBySide": "Compare side by side",
         "splitWipe": "Compare split wipe",
-        "unavailable": "Compare uses preview-only before/after rendering"
+        "unavailable": "Compare uses preview-only before/after rendering",
+        "useHorizontal": "Use horizontal compare",
+        "useVertical": "Use vertical compare"
       },
       "exportSoftProofActive": "Proofing",
       "exportSoftProofDetails": "{{profile}} / {{intent}} preview",

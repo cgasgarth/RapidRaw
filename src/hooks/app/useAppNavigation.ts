@@ -198,8 +198,12 @@ export function useAppNavigation({ clearThumbnailQueue, requestThumbnails, refs 
       setLibrary({ multiSelectedPaths: [path], libraryActivePath: null, selectionAnchorPath: path });
 
       setEditor({
-        compareMode: 'off',
-        showOriginal: false,
+        compare: {
+          ...useEditorStore.getState().compare,
+          isOriginalHeld: false,
+          mode: 'off',
+          source: { identity: path, kind: 'original' },
+        },
         activeMaskId: null,
         activeMaskContainerId: null,
         activeAiPatchContainerId: null,

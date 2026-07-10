@@ -16,6 +16,21 @@ await i18n.use(initReactI18next).init({
   resources: { en: { translation: en } },
 });
 
+const imageRect = { height: 400, offsetX: 20, offsetY: 10, scale: 0.1, width: 600 };
+const compareProps = {
+  canShowOriginalCompare: true,
+  compareDividerPosition: 0.5,
+  compareLabelsVisible: true,
+  compareOrientation: 'vertical' as const,
+  compareOverlayDisabled: false,
+  editedImageRect: imageRect,
+  isCompareModeActive: true,
+  onDividerPositionChange: () => undefined,
+  onDividerReset: () => undefined,
+  originalImageRect: imageRect,
+  originalStatus: 'ready' as const,
+};
+
 describe('viewer safe controls', () => {
   test('keeps the image canvas free of persistent compare controls in every viewer layout', () => {
     for (const scenario of [
@@ -30,12 +45,8 @@ describe('viewer safe controls', () => {
           I18nextProvider,
           { i18n },
           createElement(CompareOverlay, {
-            canShowOriginalCompare: true,
-            compareOverlayDisabled: false,
+            ...compareProps,
             isCompareModeActive: scenario.showSideBySideCompare || scenario.showSplitCompare,
-            isMaxZoom: false,
-            originalSrc: 'blob:original',
-            previewSource: 'blob:preview',
             showSideBySideCompare: scenario.showSideBySideCompare,
             showSplitCompare: scenario.showSplitCompare,
           }),
@@ -53,12 +64,7 @@ describe('viewer safe controls', () => {
         I18nextProvider,
         { i18n },
         createElement(CompareOverlay, {
-          canShowOriginalCompare: true,
-          compareOverlayDisabled: false,
-          isCompareModeActive: true,
-          isMaxZoom: false,
-          originalSrc: 'blob:original',
-          previewSource: 'blob:preview',
+          ...compareProps,
           showSideBySideCompare: true,
           showSplitCompare: false,
         }),
