@@ -36,6 +36,13 @@ import {
   isCurrentExportSoftProofGamutWarningOverlay,
 } from '../../../utils/color/runtime/gamutWarningDisplay';
 import { resolveEditorPreviewSource } from '../../../utils/editorImagePreviewSource';
+import {
+  captureGeometryEpoch,
+  createEditorOverlayGeometry,
+  type EditorOverlayGeometry,
+  isGeometryEpochCurrent,
+  overlayPoint,
+} from '../../../utils/editorOverlayGeometry';
 import { resolveEditorOverlayBlocker, resolveEditorOverlayVisibility } from '../../../utils/editorOverlayVisibility';
 import { globalImageCache } from '../../../utils/ImageLRUCache';
 import {
@@ -257,6 +264,7 @@ interface ImageCanvasProps {
   gamutWarningOverlay: GamutWarningOverlayPayload | null;
   handleCropComplete: (c: Crop, cp: PercentCrop) => void;
   imageRenderSize: RenderSize;
+  overlayGeometry?: EditorOverlayGeometry;
   isAiEditing: boolean;
   isCropping: boolean;
   isMaskControlHovered: boolean;
@@ -299,9 +307,7 @@ interface ImageCanvasProps {
 }
 
 interface MaskOverlay {
-  adjustments: Adjustments;
-  imageHeight: number;
-  imageWidth: number;
+  geometry: EditorOverlayGeometry;
   onMaskInteractionEnd: () => void;
   onMaskInteractionStart: (event?: MaskInteractionEvent) => void;
   isToolActive: boolean;
@@ -311,7 +317,6 @@ interface MaskOverlay {
   onPreviewUpdate?: (id: string, subMask: Partial<SubMask>) => void;
   onSelect: () => void;
   onUpdate: (id: string, subMask: Partial<SubMask>) => void;
-  scale: number;
   subMask: SubMask;
   offsetX: number;
   offsetY: number;
@@ -331,39 +336,36 @@ const getEdgeFadeStyle = (fadeDistancePx: number = 128): React.CSSProperties => 
   maskComposite: 'intersect',
 });
 
-const OptimizedBrushLine = memo(
-  ({ line, scale, cropX, cropY }: { line: DrawnLine; scale: number; cropX: number; cropY: number }) => {
-    const flattenedPoints = useMemo(() => {
-      const pts = new Float32Array(line.points.length * 2);
-      line.points.forEach((point, index) => {
-        pts[index * 2] = (point.x - cropX) * scale;
-        pts[index * 2 + 1] = (point.y - cropY) * scale;
-      });
-      return Array.from(pts);
-    }, [line.points, scale, cropX, cropY]);
+const OptimizedBrushLine = memo(({ geometry, line }: { geometry: EditorOverlayGeometry; line: DrawnLine }) => {
+  const flattenedPoints = useMemo(() => {
+    const pts = new Float32Array(line.points.length * 2);
+    line.points.forEach((point, index) => {
+      const viewPoint = geometry.cropToView(geometry.orientedToCrop(overlayPoint<'oriented-pixels'>(point.x, point.y)));
+      pts[index * 2] = viewPoint.x;
+      pts[index * 2 + 1] = viewPoint.y;
+    });
+    return Array.from(pts);
+  }, [geometry, line.points]);
 
-    return (
-      <Line
-        hitStrokeWidth={line.brushSize * scale}
-        lineCap="round"
-        lineJoin="round"
-        points={flattenedPoints}
-        stroke="transparent"
-        strokeScaleEnabled={false}
-        perfectDrawEnabled={false}
-        shadowForStrokeEnabled={false}
-      />
-    );
-  },
-);
+  return (
+    <Line
+      hitStrokeWidth={geometry.viewBrushWidthFromCrop(line.brushSize)}
+      lineCap="round"
+      lineJoin="round"
+      points={flattenedPoints}
+      stroke="transparent"
+      strokeScaleEnabled={false}
+      perfectDrawEnabled={false}
+      shadowForStrokeEnabled={false}
+    />
+  );
+});
 
 OptimizedBrushLine.displayName = 'OptimizedBrushLine';
 
 const MaskOverlay = memo(
   ({
-    adjustments,
-    imageHeight,
-    imageWidth,
+    geometry,
     onMaskInteractionEnd,
     onMaskInteractionStart,
     isToolActive,
@@ -373,7 +375,6 @@ const MaskOverlay = memo(
     onPreviewUpdate,
     onSelect,
     onUpdate,
-    scale,
     subMask,
     offsetX,
     offsetY,
@@ -383,13 +384,21 @@ const MaskOverlay = memo(
     const trRef = useRef<KonvaTransformer | null>(null);
     const rotateStartRef = useRef<RotateStart | null>(null);
 
-    const crop = adjustments.crop;
-    const isPercent = crop?.unit === '%';
-    const cropX = crop ? (isPercent ? (crop.x / 100) * imageWidth : crop.x) : 0;
-    const cropY = crop ? (isPercent ? (crop.y / 100) * imageHeight : crop.y) : 0;
+    const scale = geometry.displayedImageRectInViewCssPixels.width / geometry.cropRectInOrientedPixels.width;
+    const orientedToView = useCallback(
+      (x: number, y: number): Coord =>
+        geometry.cropToView(geometry.orientedToCrop(overlayPoint<'oriented-pixels'>(x, y))),
+      [geometry],
+    );
+    const viewToOriented = useCallback(
+      (x: number, y: number): Coord =>
+        geometry.cropToOriented(geometry.viewToCrop(overlayPoint<'view-css-pixels'>(x, y))),
+      [geometry],
+    );
     const [p, setP] = useState<MaskParameters>(() => toMaskParameters(subMask.parameters));
     const pRef = useRef(p);
     const isDragging = useRef(false);
+    const dragGeometryEpochRef = useRef<ReturnType<typeof captureGeometryEpoch> | null>(null);
 
     const dragStartPointer = useRef<Coord | null>(null);
     const dragStartParams = useRef<MaskParameters | null>(null);
@@ -416,6 +425,13 @@ const MaskOverlay = memo(
       setP(newP);
       pRef.current = newP;
     }, []);
+    const commitUpdate = useCallback(
+      (id: string, patch: Partial<SubMask>) => {
+        if (isDragging.current && !isGeometryEpochCurrent(dragGeometryEpochRef.current, geometry)) return;
+        onUpdate(id, patch);
+      },
+      [geometry, onUpdate],
+    );
 
     const handleMaskTouchStart = useCallback(
       (e: CanvasKonvaEvent) => {
@@ -449,6 +465,7 @@ const MaskOverlay = memo(
       (e: CanvasKonvaEvent) => {
         if (isNonPrimaryButton(e)) return;
         isDragging.current = true;
+        dragGeometryEpochRef.current = captureGeometryEpoch(geometry);
         onMaskInteractionStart(e);
         dragStartPointer.current = getPointer(e.target.getStage());
         dragStartParams.current = { ...pRef.current };
@@ -461,8 +478,10 @@ const MaskOverlay = memo(
         const pointerPos = getPointer(e.target.getStage());
         if (!pointerPos || !dragStartPointer.current || !dragStartParams.current) return;
 
-        const dx = (pointerPos.x - dragStartPointer.current.x) / scale;
-        const dy = (pointerPos.y - dragStartPointer.current.y) / scale;
+        const currentPoint = viewToOriented(pointerPos.x, pointerPos.y);
+        const startPoint = viewToOriented(dragStartPointer.current.x, dragStartPointer.current.y);
+        const dx = currentPoint.x - startPoint.x;
+        const dy = currentPoint.y - startPoint.y;
 
         const newP = normalizeRadialMaskParametersForLiveHandle({
           ...dragStartParams.current,
@@ -473,23 +492,26 @@ const MaskOverlay = memo(
         updateP(newP);
         if (onPreviewUpdate) onPreviewUpdate(subMask.id, { parameters: newP });
 
-        onUpdate(subMask.id, { parameters: newP });
+        commitUpdate(subMask.id, { parameters: newP });
       },
-      [scale, updateP, onPreviewUpdate, subMask.id, getPointer, onUpdate],
+      [viewToOriented, updateP, onPreviewUpdate, subMask.id, getPointer, commitUpdate],
     );
 
     const handleRadialDragEnd = useCallback(() => {
+      const geometryIsCurrent = isGeometryEpochCurrent(dragGeometryEpochRef.current, geometry);
       isDragging.current = false;
       onMaskInteractionEnd();
-      onUpdate(subMask.id, { parameters: pRef.current });
-    }, [subMask.id, onMaskInteractionEnd, onUpdate]);
+      if (!geometryIsCurrent) return;
+      commitUpdate(subMask.id, { parameters: pRef.current });
+    }, [subMask.id, geometry, onMaskInteractionEnd, commitUpdate]);
 
     const handleRadialTransformStart = useCallback(
       (e: CanvasKonvaEvent) => {
         isDragging.current = true;
+        dragGeometryEpochRef.current = captureGeometryEpoch(geometry);
         onMaskInteractionStart(e);
       },
-      [onMaskInteractionStart],
+      [geometry, onMaskInteractionStart],
     );
 
     const handleRadialTransform = useCallback(() => {
@@ -509,22 +531,23 @@ const MaskOverlay = memo(
 
       const newRadiusX = pRef.current.radiusX * node.scaleX();
       const newRadiusY = pRef.current.radiusY * node.scaleY();
+      const center = viewToOriented(node.x(), node.y());
 
       const newP = normalizeRadialMaskParametersForLiveHandle({
         ...pRef.current,
-        centerX: node.x() / scale + cropX,
-        centerY: node.y() / scale + cropY,
+        centerX: center.x,
+        centerY: center.y,
         radiusX: newRadiusX,
         radiusY: newRadiusY,
-        rotation: node.rotation(),
+        rotation: node.rotation() - geometry.rotationDegrees,
       });
 
       if (onPreviewUpdate) {
         onPreviewUpdate(subMask.id, { parameters: newP });
       }
 
-      onUpdate(subMask.id, { parameters: newP });
-    }, [onPreviewUpdate, scale, cropX, cropY, subMask.id, onUpdate]);
+      commitUpdate(subMask.id, { parameters: newP });
+    }, [onPreviewUpdate, geometry.rotationDegrees, subMask.id, viewToOriented, commitUpdate]);
 
     const handleRadialTransformEnd = useCallback(() => {
       const node = shapeRef.current;
@@ -538,26 +561,30 @@ const MaskOverlay = memo(
 
       node.scaleX(1);
       node.scaleY(1);
+      const center = viewToOriented(node.x(), node.y());
 
       const newP = normalizeRadialMaskParametersForLiveHandle({
         ...pRef.current,
-        centerX: node.x() / scale + cropX,
-        centerY: node.y() / scale + cropY,
+        centerX: center.x,
+        centerY: center.y,
         radiusX: newRadiusX,
         radiusY: newRadiusY,
-        rotation: node.rotation(),
+        rotation: node.rotation() - geometry.rotationDegrees,
       });
 
+      const geometryIsCurrent = isGeometryEpochCurrent(dragGeometryEpochRef.current, geometry);
       updateP(newP);
       isDragging.current = false;
       onMaskInteractionEnd();
-      onUpdate(subMask.id, { parameters: newP });
-    }, [scale, cropX, cropY, updateP, onMaskInteractionEnd, onUpdate, subMask.id]);
+      if (!geometryIsCurrent) return;
+      commitUpdate(subMask.id, { parameters: newP });
+    }, [updateP, geometry, onMaskInteractionEnd, commitUpdate, subMask.id, viewToOriented]);
 
     const setRotateCursor = useCallback(
       (stage: KonvaStage, pointerPos: Coord) => {
-        const cx = (pRef.current.centerX - cropX) * scale;
-        const cy = (pRef.current.centerY - cropY) * scale;
+        const center = orientedToView(pRef.current.centerX, pRef.current.centerY);
+        const cx = center.x;
+        const cy = center.y;
         const angle = Math.atan2(pointerPos.y - cy, pointerPos.x - cx) * (180 / Math.PI);
 
         const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0px 1px 2px rgba(0,0,0,0.8));">
@@ -570,7 +597,7 @@ const MaskOverlay = memo(
         const encodedSvg = encodeURIComponent(svgStr);
         stage.container().style.cursor = `url('data:image/svg+xml;utf8,${encodedSvg}') 16 16, crosshair`;
       },
-      [cropX, cropY, scale],
+      [orientedToView],
     );
 
     const handleRotateStart = useCallback(
@@ -578,6 +605,7 @@ const MaskOverlay = memo(
         if (isNonPrimaryButton(e)) return;
 
         isDragging.current = true;
+        dragGeometryEpochRef.current = captureGeometryEpoch(geometry);
         onMaskInteractionStart(e);
         e.cancelBubble = true;
         if (e.evt.cancelable) e.evt.preventDefault();
@@ -586,8 +614,9 @@ const MaskOverlay = memo(
         const pointer = getPointer(stage);
         if (!pointer) return;
 
-        const cx = (pRef.current.centerX - cropX) * scale;
-        const cy = (pRef.current.centerY - cropY) * scale;
+        const center = orientedToView(pRef.current.centerX, pRef.current.centerY);
+        const cx = center.x;
+        const cy = center.y;
 
         const startAngle = Math.atan2(pointer.y - cy, pointer.x - cx);
         rotateStartRef.current = {
@@ -595,7 +624,7 @@ const MaskOverlay = memo(
           rotation: pRef.current.rotation || 0,
         };
       },
-      [onMaskInteractionStart, cropX, cropY, scale, getPointer],
+      [geometry, onMaskInteractionStart, getPointer, orientedToView],
     );
 
     const handleRotateMove = useCallback(
@@ -607,8 +636,9 @@ const MaskOverlay = memo(
 
         setRotateCursor(stage, pointer);
 
-        const cx = (pRef.current.centerX - cropX) * scale;
-        const cy = (pRef.current.centerY - cropY) * scale;
+        const center = orientedToView(pRef.current.centerX, pRef.current.centerY);
+        const cx = center.x;
+        const cy = center.y;
 
         const currentAngle = Math.atan2(pointer.y - cy, pointer.x - cx);
         const angleDiff = currentAngle - rotateStartRef.current.angle;
@@ -623,21 +653,23 @@ const MaskOverlay = memo(
 
         updateP(newP);
         if (onPreviewUpdate) onPreviewUpdate(subMask.id, { parameters: newP });
-        onUpdate(subMask.id, { parameters: newP });
+        commitUpdate(subMask.id, { parameters: newP });
       },
-      [cropX, cropY, scale, updateP, onPreviewUpdate, subMask.id, setRotateCursor, getPointer, onUpdate],
+      [updateP, onPreviewUpdate, subMask.id, setRotateCursor, getPointer, orientedToView, commitUpdate],
     );
 
     const handleRotateEnd = useCallback(
       (e: CanvasKonvaEvent) => {
+        const geometryIsCurrent = isGeometryEpochCurrent(dragGeometryEpochRef.current, geometry);
         isDragging.current = false;
         rotateStartRef.current = null;
         onMaskInteractionEnd();
-        onUpdate(subMask.id, { parameters: pRef.current });
+        if (!geometryIsCurrent) return;
+        commitUpdate(subMask.id, { parameters: pRef.current });
 
         setStageCursor(e.target.getStage(), '');
       },
-      [subMask.id, onMaskInteractionEnd, onUpdate],
+      [geometry, subMask.id, onMaskInteractionEnd, commitUpdate],
     );
 
     const handleRotateHoverMove = useCallback(
@@ -676,12 +708,13 @@ const MaskOverlay = memo(
       (e: CanvasKonvaEvent) => {
         if (isNonPrimaryButton(e)) return;
         isDragging.current = true;
+        dragGeometryEpochRef.current = captureGeometryEpoch(geometry);
         onMaskInteractionStart(e);
         dragStartPointer.current = getPointer(e.target.getStage());
         dragStartParams.current = { ...pRef.current };
         e.cancelBubble = true;
       },
-      [onMaskInteractionStart, getPointer],
+      [geometry, onMaskInteractionStart, getPointer],
     );
 
     const handleLinearGroupDragMove = useCallback(
@@ -689,8 +722,10 @@ const MaskOverlay = memo(
         const pointerPos = getPointer(e.target.getStage());
         if (!pointerPos || !dragStartPointer.current || !dragStartParams.current) return;
 
-        const dx = (pointerPos.x - dragStartPointer.current.x) / scale;
-        const dy = (pointerPos.y - dragStartPointer.current.y) / scale;
+        const currentPoint = viewToOriented(pointerPos.x, pointerPos.y);
+        const startPoint = viewToOriented(dragStartPointer.current.x, dragStartPointer.current.y);
+        const dx = currentPoint.x - startPoint.x;
+        const dy = currentPoint.y - startPoint.y;
 
         const newP = normalizeLinearMaskParametersForLiveHandle({
           ...dragStartParams.current,
@@ -702,29 +737,32 @@ const MaskOverlay = memo(
 
         updateP(newP);
         if (onPreviewUpdate) onPreviewUpdate(subMask.id, { parameters: newP });
-        onUpdate(subMask.id, { parameters: newP });
+        commitUpdate(subMask.id, { parameters: newP });
       },
-      [scale, updateP, onPreviewUpdate, subMask.id, getPointer, onUpdate],
+      [viewToOriented, updateP, onPreviewUpdate, subMask.id, getPointer, commitUpdate],
     );
 
     const handleLinearGroupDragEnd = useCallback(
       (e: CanvasKonvaEvent) => {
+        const geometryIsCurrent = isGeometryEpochCurrent(dragGeometryEpochRef.current, geometry);
         isDragging.current = false;
         e.cancelBubble = true;
         onMaskInteractionEnd();
-        onUpdate(subMask.id, { parameters: pRef.current });
+        if (!geometryIsCurrent) return;
+        commitUpdate(subMask.id, { parameters: pRef.current });
       },
-      [subMask.id, onMaskInteractionEnd, onUpdate],
+      [geometry, subMask.id, onMaskInteractionEnd, commitUpdate],
     );
 
     const handleLinearPointDragStart = useCallback(
       (e: CanvasKonvaEvent) => {
         if (isNonPrimaryButton(e)) return;
         isDragging.current = true;
+        dragGeometryEpochRef.current = captureGeometryEpoch(geometry);
         onMaskInteractionStart(e);
         e.cancelBubble = true;
       },
-      [onMaskInteractionStart],
+      [geometry, onMaskInteractionStart],
     );
 
     const handleLinearPointDragMove = useCallback(
@@ -733,8 +771,9 @@ const MaskOverlay = memo(
         const pointerPos = getPointer(stage);
         if (!pointerPos) return;
 
-        const newX = pointerPos.x / scale + cropX;
-        const newY = pointerPos.y / scale + cropY;
+        const orientedPoint = viewToOriented(pointerPos.x, pointerPos.y);
+        const newX = orientedPoint.x;
+        const newY = orientedPoint.y;
 
         const nextP = { ...pRef.current };
         if (pointType === 'start') {
@@ -747,9 +786,9 @@ const MaskOverlay = memo(
         const newP = normalizeLinearMaskParametersForLiveHandle(nextP);
         updateP(newP);
         if (onPreviewUpdate) onPreviewUpdate(subMask.id, { parameters: newP });
-        onUpdate(subMask.id, { parameters: newP });
+        commitUpdate(subMask.id, { parameters: newP });
       },
-      [scale, cropX, cropY, updateP, onPreviewUpdate, subMask.id, getPointer, onUpdate],
+      [viewToOriented, updateP, onPreviewUpdate, subMask.id, getPointer, commitUpdate],
     );
 
     const handleLinearRangeDragMove = useCallback(
@@ -759,10 +798,12 @@ const MaskOverlay = memo(
         if (!pointerPos) return;
 
         const { startX, startY, endX, endY } = pRef.current;
-        const sX = (startX - cropX) * scale;
-        const sY = (startY - cropY) * scale;
-        const eX = (endX - cropX) * scale;
-        const eY = (endY - cropY) * scale;
+        const start = orientedToView(startX, startY);
+        const end = orientedToView(endX, endY);
+        const sX = start.x;
+        const sY = start.y;
+        const eX = end.x;
+        const eY = end.y;
 
         const dx = eX - sX;
         const dy = eY - sY;
@@ -778,19 +819,21 @@ const MaskOverlay = memo(
         updateP(newP);
         if (onPreviewUpdate) onPreviewUpdate(subMask.id, { parameters: newP });
 
-        onUpdate(subMask.id, { parameters: newP });
+        commitUpdate(subMask.id, { parameters: newP });
       },
-      [scale, cropX, cropY, updateP, onPreviewUpdate, subMask.id, getPointer, onUpdate],
+      [scale, updateP, onPreviewUpdate, subMask.id, getPointer, orientedToView, commitUpdate],
     );
 
     const handleLinearPointDragEnd = useCallback(
       (e: CanvasKonvaEvent) => {
+        const geometryIsCurrent = isGeometryEpochCurrent(dragGeometryEpochRef.current, geometry);
         isDragging.current = false;
         e.cancelBubble = true;
         onMaskInteractionEnd();
-        onUpdate(subMask.id, { parameters: pRef.current });
+        if (!geometryIsCurrent) return;
+        commitUpdate(subMask.id, { parameters: pRef.current });
       },
-      [subMask.id, onMaskInteractionEnd, onUpdate],
+      [geometry, subMask.id, onMaskInteractionEnd, commitUpdate],
     );
 
     if (!subMask.visible) {
@@ -809,12 +852,14 @@ const MaskOverlay = memo(
 
     if (subMask.type === Mask.AiSubject || subMask.type === Mask.QuickEraser) {
       const { startX, startY, endX, endY } = p;
+      const start = orientedToView(startX, startY);
+      const end = orientedToView(endX, endY);
       const isPoint = Math.abs(startX - endX) < 1e-6 && Math.abs(startY - endY) < 1e-6;
       if (isPoint) {
         return (
           <Circle
-            x={(startX - cropX) * scale}
-            y={(startY - cropY) * scale}
+            x={start.x}
+            y={start.y}
             radius={5}
             stroke={getSubMaskCanvasStroke(subMask, isSelected)}
             strokeWidth={2}
@@ -831,14 +876,14 @@ const MaskOverlay = memo(
       }
       return (
         <Rect
-          height={Math.max(0.1, Math.abs(endY - startY) * scale)}
+          height={Math.max(0.1, Math.abs(end.y - start.y))}
           onMouseEnter={onMaskMouseEnter}
           onMouseLeave={onMaskMouseLeave}
           onTouchEnd={handleMaskTouchEnd}
           onTouchStart={handleMaskTouchStart}
-          width={Math.max(0.1, Math.abs(endX - startX) * scale)}
-          x={(Math.min(startX, endX) - cropX) * scale}
-          y={(Math.min(startY, endY) - cropY) * scale}
+          width={Math.max(0.1, Math.abs(end.x - start.x))}
+          x={Math.min(start.x, end.x)}
+          y={Math.min(start.y, end.y)}
           {...commonProps}
         />
       );
@@ -849,7 +894,7 @@ const MaskOverlay = memo(
       return (
         <Group {...selectHandlers} onTouchEnd={handleMaskTouchEnd} onTouchStart={handleMaskTouchStart}>
           {lines.map((line: DrawnLine, i: number) => (
-            <OptimizedBrushLine key={i} line={line} scale={scale} cropX={cropX} cropY={cropY} />
+            <OptimizedBrushLine geometry={geometry} key={i} line={line} />
           ))}
         </Group>
       );
@@ -857,17 +902,18 @@ const MaskOverlay = memo(
 
     if (subMask.type === Mask.Radial) {
       const { centerX, centerY, radiusX, radiusY, rotation } = p;
+      const center = orientedToView(centerX, centerY);
       if (p.isInitialDraw && (radiusX < 1 || radiusY < 2)) return null;
 
       return (
         <Group>
           {isSelected && !isToolActive && (
             <Ellipse
-              x={(centerX - cropX) * scale}
-              y={(centerY - cropY) * scale}
+              x={center.x}
+              y={center.y}
               radiusX={Math.max(0.1, radiusX * scale) + 35}
               radiusY={Math.max(0.1, radiusY * scale) + 35}
-              rotation={rotation}
+              rotation={rotation + geometry.rotationDegrees}
               fill="transparent"
               draggable
               dragBoundFunc={lockDragBoundFunc}
@@ -908,9 +954,9 @@ const MaskOverlay = memo(
             onTouchStart={handleMaskTouchStart}
             radiusX={Math.max(0.1, radiusX * scale)}
             radiusY={Math.max(0.1, radiusY * scale)}
-            rotation={rotation}
-            x={(centerX - cropX) * scale}
-            y={(centerY - cropY) * scale}
+            rotation={rotation + geometry.rotationDegrees}
+            x={center.x}
+            y={center.y}
           />
           {isSelected && !isToolActive && (
             <Transformer
@@ -962,14 +1008,16 @@ const MaskOverlay = memo(
       const flickDistY = startY - endY;
       if (p.isInitialDraw && Math.sqrt(flickDistX * flickDistX + flickDistY * flickDistY) < 1) return null;
 
-      const sX = (startX - cropX) * scale;
-      const sY = (startY - cropY) * scale;
-      const eX = (endX - cropX) * scale;
-      const eY = (endY - cropY) * scale;
+      const start = orientedToView(startX, startY);
+      const end = orientedToView(endX, endY);
+      const sX = start.x;
+      const sY = start.y;
+      const eX = end.x;
+      const eY = end.y;
       const r = range * scale;
 
-      const idx = endX - startX;
-      const idy = endY - startY;
+      const idx = eX - sX;
+      const idy = eY - sY;
       const angle = Math.atan2(idy, idx);
       const angleDeg = (angle * 180) / Math.PI;
 
@@ -1175,10 +1223,11 @@ const MaskOverlay = memo(
     if (subMask.type === Mask.Color || subMask.type === Mask.Luminance) {
       const { targetX, targetY } = p;
       if (targetX >= 0 && targetY >= 0) {
+        const target = orientedToView(targetX, targetY);
         return (
           <Circle
-            x={(targetX - cropX) * scale}
-            y={(targetY - cropY) * scale}
+            x={target.x}
+            y={target.y}
             radius={5}
             stroke={getSubMaskCanvasStroke(subMask, isSelected)}
             strokeWidth={2}
@@ -1621,6 +1670,7 @@ const ImageCanvas = memo(
     gamutWarningOverlay,
     handleCropComplete,
     imageRenderSize,
+    overlayGeometry: providedOverlayGeometry,
     interactivePatch,
     isAiEditing,
     isCropping,
@@ -1671,6 +1721,7 @@ const ImageCanvas = memo(
     const isDrawing = useRef(false);
     const drawingStageRef = useRef<KonvaStage | null>(null);
     const dragStartPointer = useRef<Coord | null>(null);
+    const pointerGeometryEpochRef = useRef<ReturnType<typeof captureGeometryEpoch> | null>(null);
     const lastBrushPoint = useRef<Coord | null>(null);
     const currentLine = useRef<DrawnLine | null>(null);
     const previewBoxRef = useRef<{ start: Coord; end: Coord } | null>(null);
@@ -1680,6 +1731,45 @@ const ImageCanvas = memo(
     const [liveBrushLine, setLiveBrushLine] = useState<DrawnLine | null>(null);
     const [straightenLine, setStraightenLine] = useState<StraightenLine | null>(null);
     const isStraightening = useRef(false);
+    const overlayGeometry = useMemo(
+      () =>
+        providedOverlayGeometry ??
+        createEditorOverlayGeometry({
+          crop: adjustments.crop,
+          devicePixelRatio: 1,
+          geometryEpoch: 1,
+          orientationSteps: adjustments.orientationSteps ?? 0,
+          renderSize: imageRenderSize,
+          rotationDegrees: liveRotation ?? adjustments.rotation ?? 0,
+          semanticZoom: {
+            cssPercent: imageRenderSize.scale * 100,
+            devicePixelsPerImagePixel: imageRenderSize.scale,
+            displayPercent: Math.round(imageRenderSize.scale * 100),
+            imagePixelsPerCssPixel: 1 / Math.max(imageRenderSize.scale, Number.EPSILON),
+            imagePixelsPerDevicePixel: 1 / Math.max(imageRenderSize.scale, Number.EPSILON),
+            mode: { kind: 'fit' },
+            requiredPreviewResolution: Math.max(imageRenderSize.width, imageRenderSize.height),
+            transformScale: transformState.scale,
+          },
+          sourceSize: { height: selectedImage.height, width: selectedImage.width },
+          transform: transformState,
+          viewportSizeCssPixels: {
+            height: imageRenderSize.height + imageRenderSize.offsetY * 2,
+            width: imageRenderSize.width + imageRenderSize.offsetX * 2,
+          },
+        }),
+      [
+        adjustments.crop,
+        adjustments.orientationSteps,
+        adjustments.rotation,
+        imageRenderSize,
+        liveRotation,
+        providedOverlayGeometry,
+        selectedImage.height,
+        selectedImage.width,
+        transformState,
+      ],
+    );
 
     const previewSource = resolveEditorPreviewSource({
       finalPreviewUrl,
@@ -1846,28 +1936,10 @@ const ImageCanvas = memo(
       return null;
     }, [activeContainer, activeMaskId, activeAiSubMaskId, isMasking, isAiEditing]);
 
-    const effectiveImageDimensions = useMemo(() => {
-      const steps = adjustments.orientationSteps || 0;
-      const w = selectedImage.width || 0;
-      const h = selectedImage.height || 0;
-      if (steps === 1 || steps === 3) {
-        return { width: h, height: w };
-      }
-      return { width: w, height: h };
-    }, [selectedImage.width, selectedImage.height, adjustments.orientationSteps]);
-    const imageCropOffset = useMemo(() => {
-      const crop = adjustments.crop;
-      const isPercent = crop?.unit === '%';
-
-      return {
-        x: crop ? (isPercent ? (crop.x / 100) * effectiveImageDimensions.width : crop.x) : 0,
-        y: crop ? (isPercent ? (crop.y / 100) * effectiveImageDimensions.height : crop.y) : 0,
-      };
-    }, [adjustments.crop, effectiveImageDimensions.height, effectiveImageDimensions.width]);
-
+    const effectiveImageDimensions = overlayGeometry.orientedSize;
     const effectiveZoomScale = transformState.scale > 0 ? transformState.scale : 1;
     const brushStageSize = (brushSettings?.size ?? 0) / effectiveZoomScale;
-    const brushImageSpaceSize = brushStageSize / (imageRenderSize.scale || 1);
+    const brushImageSpaceSize = brushStageSize / Math.max(overlayGeometry.viewRadiusFromCrop(1), Number.EPSILON);
     const withPointerPressure = useCallback((point: Coord, event: unknown): BrushPoint => {
       const pointerEvent = event as { pointerType?: unknown; pressure?: unknown };
       if (pointerEvent.pointerType === 'mouse' || typeof pointerEvent.pressure !== 'number') {
@@ -1889,15 +1961,17 @@ const ImageCanvas = memo(
     const activeLineFlow = activeSubMask?.type === Mask.Flow ? (activeSubMaskParameters?.flow ?? 10) : undefined;
     const getImageSpacePoint = useCallback(
       (point: BrushPoint): BrushPoint => {
-        const { scale } = imageRenderSize;
+        const orientedPoint = overlayGeometry.cropToOriented(
+          overlayGeometry.viewToCrop(overlayPoint<'view-css-pixels'>(point.x, point.y)),
+        );
 
         return {
           ...(point.pressure === undefined ? {} : { pressure: point.pressure }),
-          x: point.x / scale + imageCropOffset.x,
-          y: point.y / scale + imageCropOffset.y,
+          x: orientedPoint.x,
+          y: orientedPoint.y,
         };
       },
-      [imageCropOffset.x, imageCropOffset.y, imageRenderSize],
+      [overlayGeometry],
     );
     const recordBrushMaskCommandCapture = useCallback(
       (subMaskId: string | null, subMask: SubMask | null, parameters: MaskParameters) => {
@@ -2102,11 +2176,12 @@ const ImageCanvas = memo(
         const pointerPos = getCanvasPointer(stage);
         if (!pointerPos) return;
 
-        const x = pointerPos.x / imageRenderSize.scale;
-        const y = pointerPos.y / imageRenderSize.scale;
-
-        const imgLogicalWidth = imageRenderSize.width / imageRenderSize.scale;
-        const imgLogicalHeight = imageRenderSize.height / imageRenderSize.scale;
+        const cropPoint = overlayGeometry.viewToCrop(overlayPoint<'view-css-pixels'>(pointerPos.x, pointerPos.y));
+        const x = cropPoint.x;
+        const y = cropPoint.y;
+        const imgLogicalWidth = overlayGeometry.cropRectInOrientedPixels.width;
+        const imgLogicalHeight = overlayGeometry.cropRectInOrientedPixels.height;
+        const sampleGeometryEpoch = captureGeometryEpoch(overlayGeometry);
 
         if (x < 0 || x > imgLogicalWidth || y < 0 || y > imgLogicalHeight) return;
 
@@ -2115,6 +2190,7 @@ const ImageCanvas = memo(
         img.src = finalPreviewUrl;
 
         img.onload = () => {
+          if (!isGeometryEpochCurrent(sampleGeometryEpoch, overlayGeometry)) return;
           const radius = 5;
           const side = radius * 2 + 1;
 
@@ -2162,9 +2238,9 @@ const ImageCanvas = memo(
       [
         adjustments,
         finalPreviewUrl,
-        imageRenderSize,
         isWbPickerActive,
         onWbPicked,
+        overlayGeometry,
         selectedImage.path,
         getCanvasPointer,
       ],
@@ -2177,6 +2253,7 @@ const ImageCanvas = memo(
         }
 
         if (e.evt.cancelable) e.evt.preventDefault();
+        pointerGeometryEpochRef.current = captureGeometryEpoch(overlayGeometry);
 
         if (isWbPickerActive) {
           handleWbClick(e);
@@ -2188,14 +2265,9 @@ const ImageCanvas = memo(
           const pos = getCanvasPointer(e.target.getStage());
           if (!pos) return;
 
-          const { scale } = imageRenderSize;
-          const crop = adjustments.crop;
-          const isPercent = crop?.unit === '%';
-          const cropX = crop ? (isPercent ? (crop.x / 100) * effectiveImageDimensions.width : crop.x) : 0;
-          const cropY = crop ? (isPercent ? (crop.y / 100) * effectiveImageDimensions.height : crop.y) : 0;
-
-          const x = pos.x / scale + cropX;
-          const y = pos.y / scale + cropY;
+          const imagePoint = getImageSpacePoint(pos);
+          const x = imagePoint.x;
+          const y = imagePoint.y;
 
           const newParams: MaskParameters = { ...activeSubMaskParameters };
           newParams.targetX = x;
@@ -2218,14 +2290,9 @@ const ImageCanvas = memo(
           const pos = getCanvasPointer(e.target.getStage());
           if (!pos) return;
 
-          const { scale } = imageRenderSize;
-          const crop = adjustments.crop;
-          const isPercent = crop?.unit === '%';
-          const cropX = crop ? (isPercent ? (crop.x / 100) * effectiveImageDimensions.width : crop.x) : 0;
-          const cropY = crop ? (isPercent ? (crop.y / 100) * effectiveImageDimensions.height : crop.y) : 0;
-
-          const x = pos.x / scale + cropX;
-          const y = pos.y / scale + cropY;
+          const imagePoint = getImageSpacePoint(pos);
+          const x = imagePoint.x;
+          const y = imagePoint.y;
 
           dragStartPointer.current = { x, y };
 
@@ -2284,17 +2351,8 @@ const ImageCanvas = memo(
             effectiveTool = baseTool;
           }
           if (isBrushActive && e.evt.shiftKey && lastBrushPoint.current) {
-            const { scale } = imageRenderSize;
-            const crop = adjustments.crop;
-            const isPercent = crop?.unit === '%';
-            const cropX = crop ? (isPercent ? (crop.x / 100) * effectiveImageDimensions.width : crop.x) : 0;
-            const cropY = crop ? (isPercent ? (crop.y / 100) * effectiveImageDimensions.height : crop.y) : 0;
-
             const startImageSpace = lastBrushPoint.current;
-            const endImageSpace = {
-              x: pos.x / scale + cropX,
-              y: pos.y / scale + cropY,
-            };
+            const endImageSpace = getImageSpacePoint(pos);
 
             const dx = endImageSpace.x - startImageSpace.x;
             const dy = endImageSpace.y - startImageSpace.y;
@@ -2433,6 +2491,14 @@ const ImageCanvas = memo(
         if (!isDrawing.current || !isToolActive) {
           return;
         }
+        if (!isGeometryEpochCurrent(pointerGeometryEpochRef.current, overlayGeometry)) {
+          isDrawing.current = false;
+          currentLine.current = null;
+          previewBoxRef.current = null;
+          setLiveBrushLine(null);
+          setPreviewBox(null);
+          return;
+        }
 
         if (isAiSubjectActive && previewBoxRef.current) {
           if (!pos) {
@@ -2452,14 +2518,10 @@ const ImageCanvas = memo(
           const pointerPos = getCanvasPointer(stage);
           if (!pointerPos) return;
 
-          const { scale } = imageRenderSize;
-          const crop = adjustments.crop;
-          const isPercent = crop?.unit === '%';
-          const cropX = crop ? (isPercent ? (crop.x / 100) * effectiveImageDimensions.width : crop.x) : 0;
-          const cropY = crop ? (isPercent ? (crop.y / 100) * effectiveImageDimensions.height : crop.y) : 0;
-
-          const x = pointerPos.x / scale + cropX;
-          const y = pointerPos.y / scale + cropY;
+          const imagePoint = getImageSpacePoint(pointerPos);
+          const x = imagePoint.x;
+          const y = imagePoint.y;
+          const scale = overlayGeometry.viewRadiusFromCrop(1);
 
           const distX = x - dragStartPointer.current.x;
           const distY = y - dragStartPointer.current.y;
@@ -2611,6 +2673,14 @@ const ImageCanvas = memo(
       if (!isDrawing.current) {
         return;
       }
+      if (!isGeometryEpochCurrent(pointerGeometryEpochRef.current, overlayGeometry)) {
+        isDrawing.current = false;
+        currentLine.current = null;
+        previewBoxRef.current = null;
+        setLiveBrushLine(null);
+        setPreviewBox(null);
+        return;
+      }
 
       if (isInitialDrawing && localInitialDrawParams && dragStartPointer.current) {
         if (!activeSubMask) return;
@@ -2651,16 +2721,10 @@ const ImageCanvas = memo(
         setPreviewBox(null);
         drawingStageRef.current = null;
 
-        const { scale } = imageRenderSize;
-        const crop = adjustments.crop;
-        const isPercent = crop?.unit === '%';
-        const cropX = crop ? (isPercent ? (crop.x / 100) * effectiveImageDimensions.width : crop.x) : 0;
-        const cropY = crop ? (isPercent ? (crop.y / 100) * effectiveImageDimensions.height : crop.y) : 0;
-
         const activeId = isMasking ? activeMaskId : activeAiSubMaskId;
 
-        const startPoint = { x: box.start.x / scale + cropX, y: box.start.y / scale + cropY };
-        let endPoint = { x: box.end.x / scale + cropX, y: box.end.y / scale + cropY };
+        const startPoint = getImageSpacePoint(box.start);
+        let endPoint = getImageSpacePoint(box.end);
 
         const dx = box.end.x - box.start.x;
         const dy = box.end.y - box.start.y;
@@ -2698,12 +2762,6 @@ const ImageCanvas = memo(
         return;
       }
 
-      const { scale } = imageRenderSize;
-      const crop = adjustments.crop;
-      const isPercent = crop?.unit === '%';
-      const cropX = crop ? (isPercent ? (crop.x / 100) * effectiveImageDimensions.width : crop.x) : 0;
-      const cropY = crop ? (isPercent ? (crop.y / 100) * effectiveImageDimensions.height : crop.y) : 0;
-
       const activeId = isMasking ? activeMaskId : activeAiSubMaskId;
 
       if (isBrushActive) {
@@ -2717,11 +2775,7 @@ const ImageCanvas = memo(
         const imageSpaceLine: DrawnLine = {
           brushSize: brushImageSpaceSize,
           feather: brushSettings?.feather ? brushSettings.feather / 100 : 0,
-          points: line.points.map((p: BrushPoint) => ({
-            ...(p.pressure === undefined ? {} : { pressure: p.pressure }),
-            x: p.x / scale + cropX,
-            y: p.y / scale + cropY,
-          })),
+          points: line.points.map(getImageSpacePoint),
           tool: effectiveToolForFinal,
           ...(activeLineFlow !== undefined ? { flow: activeLineFlow } : {}),
         };
@@ -2740,10 +2794,7 @@ const ImageCanvas = memo(
 
         const lastPoint = line.points[line.points.length - 1];
         if (lastPoint) {
-          lastBrushPoint.current = {
-            x: lastPoint.x / scale + cropX,
-            y: lastPoint.y / scale + cropY,
-          };
+          lastBrushPoint.current = getImageSpacePoint(lastPoint);
         }
       }
     }, [
@@ -2752,7 +2803,6 @@ const ImageCanvas = memo(
       activeMaskId,
       activeSubMask,
       activeSubMaskParameters,
-      adjustments.crop,
       brushSettings,
       isBrushActive,
       activeLineFlow,
@@ -2761,6 +2811,7 @@ const ImageCanvas = memo(
       onQuickErase,
       updateSubMask,
       recordBrushMaskCommandCapture,
+      getImageSpacePoint,
       withBrushCommandReceipt,
       effectiveImageDimensions,
       localInitialDrawParams,
@@ -2896,28 +2947,38 @@ const ImageCanvas = memo(
     };
 
     const retouchPointToCanvas = useCallback(
-      (point: RetouchCloneSource['sourcePoint']): Coord => ({
-        x: clamp01(point.x) * effectiveImageDimensions.width * imageRenderSize.scale,
-        y: clamp01(point.y) * effectiveImageDimensions.height * imageRenderSize.scale,
-      }),
-      [effectiveImageDimensions.height, effectiveImageDimensions.width, imageRenderSize.scale],
+      (point: RetouchCloneSource['sourcePoint']): Coord =>
+        overlayGeometry.cropToView(
+          overlayGeometry.orientedToCrop(
+            overlayGeometry.normalizedOrientedToOriented(
+              overlayPoint<'normalized-oriented'>(clamp01(point.x), clamp01(point.y)),
+            ),
+          ),
+        ),
+      [overlayGeometry],
     );
 
     const canvasPointToRetouchPoint = useCallback(
-      (point: Coord): RetouchCloneSource['sourcePoint'] => ({
-        x: clamp01(point.x / Math.max(1, effectiveImageDimensions.width * imageRenderSize.scale)),
-        y: clamp01(point.y / Math.max(1, effectiveImageDimensions.height * imageRenderSize.scale)),
-      }),
-      [effectiveImageDimensions.height, effectiveImageDimensions.width, imageRenderSize.scale],
+      (point: Coord): RetouchCloneSource['sourcePoint'] => {
+        const normalized = overlayGeometry.orientedToNormalized(
+          overlayGeometry.cropToOriented(overlayGeometry.viewToCrop(overlayPoint<'view-css-pixels'>(point.x, point.y))),
+        );
+        return { x: clamp01(normalized.x), y: clamp01(normalized.y) };
+      },
+      [overlayGeometry],
     );
 
     const dragBoundRetouchHandle = useCallback(
       (point: Vector2d): Vector2d => ({
-        x: Math.max(0, Math.min(effectiveImageDimensions.width * imageRenderSize.scale, point.x)),
-        y: Math.max(0, Math.min(effectiveImageDimensions.height * imageRenderSize.scale, point.y)),
+        x: Math.max(0, Math.min(overlayGeometry.displayedImageRectInViewCssPixels.width, point.x)),
+        y: Math.max(0, Math.min(overlayGeometry.displayedImageRectInViewCssPixels.height, point.y)),
       }),
-      [effectiveImageDimensions.height, effectiveImageDimensions.width, imageRenderSize.scale],
+      [overlayGeometry],
     );
+    const retouchGeometryEpochRef = useRef<ReturnType<typeof captureGeometryEpoch> | null>(null);
+    const captureRetouchGeometryEpoch = useCallback(() => {
+      retouchGeometryEpochRef.current = captureGeometryEpoch(overlayGeometry);
+    }, [overlayGeometry]);
 
     const updateRetouchHandlePoint = useCallback(
       (layerId: string, handle: RetouchHandleKind, point: RetouchCloneSource['sourcePoint']) => {
@@ -2958,18 +3019,20 @@ const ImageCanvas = memo(
     const handleRetouchHandleDragEnd = useCallback(
       (layerId: string, handle: RetouchHandleKind, event: RetouchHandleDragEvent) => {
         event.evt.stopPropagation();
+        if (!isGeometryEpochCurrent(retouchGeometryEpochRef.current, overlayGeometry)) return;
         const point = canvasPointToRetouchPoint({ x: event.target.x(), y: event.target.y() });
         updateRetouchHandlePoint(layerId, handle, point);
       },
-      [canvasPointToRetouchPoint, updateRetouchHandlePoint],
+      [canvasPointToRetouchPoint, overlayGeometry, updateRetouchHandlePoint],
     );
     const handleRetouchHandleDragMove = useCallback(
       (layerId: string, handle: RetouchHandleKind, event: RetouchHandleDragEvent) => {
         event.evt.stopPropagation();
+        if (!isGeometryEpochCurrent(retouchGeometryEpochRef.current, overlayGeometry)) return;
         const point = canvasPointToRetouchPoint({ x: event.target.x(), y: event.target.y() });
         updateRetouchHandlePoint(layerId, handle, point);
       },
-      [canvasPointToRetouchPoint, updateRetouchHandlePoint],
+      [canvasPointToRetouchPoint, overlayGeometry, updateRetouchHandlePoint],
     );
     const handleRetouchCanvasClick = useCallback(
       (layerId: string, event: CanvasKonvaEvent) => {
@@ -3021,18 +3084,20 @@ const ImageCanvas = memo(
     const handleRemoveTargetDragEnd = useCallback(
       (layerId: string, removeSource: RetouchRemoveSource, event: RetouchHandleDragEvent) => {
         event.evt.stopPropagation();
+        if (!isGeometryEpochCurrent(retouchGeometryEpochRef.current, overlayGeometry)) return;
         const point = canvasPointToRetouchPoint({ x: event.target.x(), y: event.target.y() });
         updateRemoveTargetPoint(layerId, removeSource, point);
       },
-      [canvasPointToRetouchPoint, updateRemoveTargetPoint],
+      [canvasPointToRetouchPoint, overlayGeometry, updateRemoveTargetPoint],
     );
     const handleRemoveTargetDragMove = useCallback(
       (layerId: string, removeSource: RetouchRemoveSource, event: RetouchHandleDragEvent) => {
         event.evt.stopPropagation();
+        if (!isGeometryEpochCurrent(retouchGeometryEpochRef.current, overlayGeometry)) return;
         const point = canvasPointToRetouchPoint({ x: event.target.x(), y: event.target.y() });
         updateRemoveTargetPoint(layerId, removeSource, point);
       },
-      [canvasPointToRetouchPoint, updateRemoveTargetPoint],
+      [canvasPointToRetouchPoint, overlayGeometry, updateRemoveTargetPoint],
     );
     const handleRemoveCanvasClick = useCallback(
       (layerId: string, removeSource: RetouchRemoveSource, event: CanvasKonvaEvent) => {
@@ -3343,12 +3408,12 @@ const ImageCanvas = memo(
                 className="absolute object-contain pointer-events-none"
                 src={displayedMaskUrl}
                 style={{
-                  height: cssPx(imageRenderSize.height),
-                  left: cssPx(imageRenderSize.offsetX),
+                  height: cssPx(overlayGeometry.displayedImageRectInViewCssPixels.height),
+                  left: cssPx(overlayGeometry.displayedImageRectInViewCssPixels.x),
                   opacity: overlayVisibility.showMaskOverlay ? 1 : 0,
-                  top: cssPx(imageRenderSize.offsetY),
+                  top: cssPx(overlayGeometry.displayedImageRectInViewCssPixels.y),
                   transition: 'opacity 300ms ease-in-out',
-                  width: cssPx(imageRenderSize.width),
+                  width: cssPx(overlayGeometry.displayedImageRectInViewCssPixels.width),
                   imageRendering: isMaxZoom ? 'pixelated' : 'auto',
                   zIndex: imageCanvasLayerZIndex('maskCoverage'),
                 }}
@@ -3375,10 +3440,10 @@ const ImageCanvas = memo(
                 data-testid="gamut-warning-overlay"
                 data-warning-pixel-count={gamutWarningOverlay.warning_pixel_count}
                 style={{
-                  height: cssPx(imageRenderSize.height),
-                  left: cssPx(imageRenderSize.offsetX),
-                  top: cssPx(imageRenderSize.offsetY),
-                  width: cssPx(imageRenderSize.width),
+                  height: cssPx(overlayGeometry.displayedImageRectInViewCssPixels.height),
+                  left: cssPx(overlayGeometry.displayedImageRectInViewCssPixels.x),
+                  top: cssPx(overlayGeometry.displayedImageRectInViewCssPixels.y),
+                  width: cssPx(overlayGeometry.displayedImageRectInViewCssPixels.width),
                   zIndex: imageCanvasLayerZIndex('diagnosticPixels'),
                 }}
               >
@@ -3418,10 +3483,10 @@ const ImageCanvas = memo(
               const targetPoint = retouchPointToCanvas(activeRetouchSource.targetPoint);
               const handleRadius = Math.max(6, Math.min(10, 7 / Math.max(0.75, transformState.scale)));
               const strokeWidth = Math.max(1.5, 2 / Math.max(0.75, transformState.scale));
-              const retouchRadius = (activeRetouchSource.radiusPx ?? 0) * imageRenderSize.scale;
-              const retouchFeatherRadius =
-                Math.max(0, (activeRetouchSource.radiusPx ?? 0) + (activeRetouchSource.featherRadiusPx ?? 0)) *
-                imageRenderSize.scale;
+              const retouchRadius = overlayGeometry.viewRadiusFromCrop(activeRetouchSource.radiusPx ?? 0);
+              const retouchFeatherRadius = overlayGeometry.viewRadiusFromCrop(
+                Math.max(0, (activeRetouchSource.radiusPx ?? 0) + (activeRetouchSource.featherRadiusPx ?? 0)),
+              );
               const retouchScale = Math.max(0.1, activeRetouchSource.scale);
               const sourceFootprintRadius = retouchRadius / retouchScale;
               const sourceFootprintAxisLength = Math.max(handleRadius * 1.5, sourceFootprintRadius);
@@ -3488,14 +3553,14 @@ const ImageCanvas = memo(
                             data-retouch-canvas-click-active-handle={activePlacementHandle}
                             data-testid="image-canvas-retouch-click-target"
                             fill="rgba(0, 0, 0, 0)"
-                            height={effectiveImageDimensions.height * imageRenderSize.scale}
+                            height={overlayGeometry.displayedImageRectInViewCssPixels.height}
                             onClick={(event) => {
                               handleRetouchCanvasClick(activeRetouchLayer.id, event);
                             }}
                             onTap={(event) => {
                               handleRetouchCanvasClick(activeRetouchLayer.id, event);
                             }}
-                            width={effectiveImageDimensions.width * imageRenderSize.scale}
+                            width={overlayGeometry.displayedImageRectInViewCssPixels.width}
                             x={0}
                             y={0}
                           />
@@ -3574,6 +3639,7 @@ const ImageCanvas = memo(
                             dragBoundFunc={dragBoundRetouchHandle}
                             draggable
                             fill={canvasOverlayTokens.colors.active}
+                            onDragStart={captureRetouchGeometryEpoch}
                             onDragEnd={(event) => {
                               handleRetouchHandleDragEnd(activeRetouchLayer.id, 'sourcePoint', event);
                             }}
@@ -3620,6 +3686,7 @@ const ImageCanvas = memo(
                             dragBoundFunc={dragBoundRetouchHandle}
                             draggable
                             fill={canvasOverlayTokens.colors.target}
+                            onDragStart={captureRetouchGeometryEpoch}
                             onDragEnd={(event) => {
                               handleRetouchHandleDragEnd(activeRetouchLayer.id, 'targetPoint', event);
                             }}
@@ -3687,22 +3754,22 @@ const ImageCanvas = memo(
                 'centerY',
                 effectiveImageDimensions.height * 0.5,
               );
-              const targetPoint = {
-                x: targetX * imageRenderSize.scale,
-                y: targetY * imageRenderSize.scale,
-              };
+              const targetPoint = overlayGeometry.cropToView(
+                overlayGeometry.orientedToCrop(overlayPoint<'oriented-pixels'>(targetX, targetY)),
+              );
               const resolvedSourcePoint =
                 activeRemoveSource.resolvedSourcePoint === undefined
                   ? null
                   : retouchPointToCanvas(activeRemoveSource.resolvedSourcePoint);
               const handleRadius = Math.max(6, Math.min(10, 7 / Math.max(0.75, transformState.scale)));
               const strokeWidth = Math.max(1.5, 2 / Math.max(0.75, transformState.scale));
-              const removeRadius = (activeRemoveSource.radiusPx ?? 48) * imageRenderSize.scale;
-              const removeSearchRadius =
-                (activeRemoveSource.radiusPx ?? 48) * activeRemoveSource.searchRadiusMultiplier * imageRenderSize.scale;
-              const removeFeatherRadius =
-                Math.max(0, (activeRemoveSource.radiusPx ?? 48) + (activeRemoveSource.featherRadiusPx ?? 24)) *
-                imageRenderSize.scale;
+              const removeRadius = overlayGeometry.viewRadiusFromCrop(activeRemoveSource.radiusPx ?? 48);
+              const removeSearchRadius = overlayGeometry.viewRadiusFromCrop(
+                (activeRemoveSource.radiusPx ?? 48) * activeRemoveSource.searchRadiusMultiplier,
+              );
+              const removeFeatherRadius = overlayGeometry.viewRadiusFromCrop(
+                Math.max(0, (activeRemoveSource.radiusPx ?? 48) + (activeRemoveSource.featherRadiusPx ?? 24)),
+              );
               const removeStatus = activeRemoveSource.status ?? 'needs_regeneration';
               const removeStatusLabel = t(`editor.layers.removeSource.status.${removeStatus}`);
               const removeStatusColor = getRemoveCanvasStatusColor(activeRemoveSource.status);
@@ -3752,14 +3819,14 @@ const ImageCanvas = memo(
                             data-remove-canvas-click-target="target"
                             data-testid="image-canvas-remove-click-target"
                             fill="rgba(0, 0, 0, 0)"
-                            height={effectiveImageDimensions.height * imageRenderSize.scale}
+                            height={overlayGeometry.displayedImageRectInViewCssPixels.height}
                             onClick={(event) => {
                               handleRemoveCanvasClick(activeRemoveLayer.id, activeRemoveSource, event);
                             }}
                             onTap={(event) => {
                               handleRemoveCanvasClick(activeRemoveLayer.id, activeRemoveSource, event);
                             }}
-                            width={effectiveImageDimensions.width * imageRenderSize.scale}
+                            width={overlayGeometry.displayedImageRectInViewCssPixels.width}
                             x={0}
                             y={0}
                           />
@@ -3974,9 +4041,7 @@ const ImageCanvas = memo(
 
                           return (
                             <MaskOverlay
-                              adjustments={adjustments}
-                              imageHeight={effectiveImageDimensions.height}
-                              imageWidth={effectiveImageDimensions.width}
+                              geometry={overlayGeometry}
                               isSelected={renderSubMask.id === activeId}
                               isToolActive={isToolActive}
                               key={renderSubMask.id}
@@ -4001,7 +4066,6 @@ const ImageCanvas = memo(
                                 }
                               }}
                               onUpdate={updateSubMask}
-                              scale={imageRenderSize.scale}
                               subMask={renderSubMask}
                               offsetX={groupOffsetX}
                               offsetY={groupOffsetY}
@@ -4024,12 +4088,7 @@ const ImageCanvas = memo(
                         />
                       )}
                       {isBrushActive && liveBrushLine && (
-                        <OptimizedBrushLine
-                          line={liveBrushLine}
-                          scale={imageRenderSize.scale}
-                          cropX={imageCropOffset.x}
-                          cropY={imageCropOffset.y}
-                        />
+                        <OptimizedBrushLine geometry={overlayGeometry} line={liveBrushLine} />
                       )}
                       {isBrushActive && cursorPreview.visible && (
                         <Circle
@@ -4068,6 +4127,7 @@ const ImageCanvas = memo(
           cropImageTransform={cropImageTransforms}
           cropPreviewUrl={cropPreviewUrl}
           cropRenderSize={uncroppedImageRenderSize}
+          geometry={overlayGeometry}
           handleCropComplete={handleCropComplete}
           isCropping={isCropping}
           isCropViewVisible={isCropViewVisible}

@@ -8,6 +8,7 @@ import {
   Mask,
   SUB_MASK_COMPONENT_TYPES,
 } from '../../../src/components/panel/right/layers/Masks.tsx';
+import { createEditorOverlayGeometry } from '../../../src/utils/editorOverlayGeometry.ts';
 import {
   acceptObjectMaskProposal,
   applyObjectPromptClick,
@@ -21,11 +22,32 @@ import {
 } from '../../../src/utils/mask/objectMaskPromptCanvas.ts';
 
 const renderSize = { height: 800, offsetX: 100, offsetY: 50, width: 1200 };
-const center = imagePointFromCanvasClick({ x: 700, y: 450 }, renderSize);
+const geometry = createEditorOverlayGeometry({
+  crop: null,
+  devicePixelRatio: 1,
+  geometryEpoch: 1,
+  orientationSteps: 0,
+  renderSize: { ...renderSize, scale: 0.2 },
+  rotationDegrees: 0,
+  semanticZoom: {
+    cssPercent: 20,
+    devicePixelsPerImagePixel: 0.2,
+    displayPercent: 20,
+    imagePixelsPerCssPixel: 5,
+    imagePixelsPerDevicePixel: 5,
+    mode: { kind: 'fit' },
+    requiredPreviewResolution: 1200,
+    transformScale: 1,
+  },
+  sourceSize: { height: 4000, width: 6000 },
+  transform: { positionX: 0, positionY: 0, scale: 1 },
+  viewportSizeCssPixels: { height: 900, width: 1400 },
+});
+const center = imagePointFromCanvasClick({ x: 700, y: 450 }, geometry);
 if (center === null || center.x !== 0.5 || center.y !== 0.5) {
   throw new Error('Object prompt canvas did not normalize image-space click coordinates.');
 }
-if (imagePointFromCanvasClick({ x: 20, y: 450 }, renderSize) !== null) {
+if (imagePointFromCanvasClick({ x: 20, y: 450 }, geometry) !== null) {
   throw new Error('Object prompt canvas accepted an off-image click.');
 }
 

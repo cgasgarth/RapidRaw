@@ -1,6 +1,7 @@
 import type { ReactNode, RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import CropOverlay, { type Crop, type PercentCrop } from 'react-image-crop';
+import type { EditorOverlayGeometry } from '../../../utils/editorOverlayGeometry';
 import type { OverlayMode } from '../right/color/CropPanel';
 import CompositionOverlays from './overlays/CompositionOverlays';
 
@@ -11,6 +12,7 @@ interface CropOverlaySurfaceProps {
   cropImageTransform: string;
   cropPreviewUrl: string | null;
   cropRenderSize: { height?: number; width?: number } | null;
+  geometry: EditorOverlayGeometry;
   handleCropComplete: (crop: Crop, percentCrop: PercentCrop) => void;
   isCropping: boolean;
   isCropViewVisible: boolean;
@@ -32,6 +34,7 @@ export function CropOverlaySurface({
   cropImageTransform,
   cropPreviewUrl,
   cropRenderSize,
+  geometry,
   handleCropComplete,
   isCropping,
   isCropViewVisible,
@@ -61,6 +64,8 @@ export function CropOverlaySurface({
   return (
     <div
       className="absolute inset-0 w-full h-full flex items-center justify-center transition-opacity duration-200"
+      data-overlay-geometry-epoch={geometry.geometryEpoch}
+      data-overlay-geometry-space="oriented-pixels"
       style={{ opacity: isCropViewVisible ? 1 : 0, pointerEvents: isCropViewVisible ? 'auto' : 'none' }}
     >
       {isCropping && (
