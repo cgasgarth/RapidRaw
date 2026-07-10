@@ -20,6 +20,7 @@ import {
   buildSuperResolutionDerivedOutputReceipt,
   deriveDerivedOutputReceiptState,
 } from '../../../utils/derivedOutputReceipt';
+import type { SuperResolutionNativeReadiness } from '../../../utils/superResolutionNativeReadiness';
 import {
   buildSuperResolutionOutputReviewWorkflow,
   hasAcceptedSuperResolutionCropReview,
@@ -52,6 +53,7 @@ interface SuperResolutionModalProps {
   >;
   onSettingsChange: (settings: SuperResolutionUiSettings) => void;
   outputReview?: SuperResolutionOutputReviewWorkflow | null;
+  nativeReadiness?: SuperResolutionNativeReadiness | null;
   settings: SuperResolutionUiSettings;
   sourceCount: number;
   sourcePaths?: string[];
@@ -76,6 +78,7 @@ export function SuperResolutionModal({
   reviewArtifactPreviewUrls = {},
   onSettingsChange,
   outputReview: runtimeOutputReview,
+  nativeReadiness,
   settings,
   sourceCount,
   sourcePaths = [],
@@ -93,7 +96,8 @@ export function SuperResolutionModal({
         : null,
     [settings.outputScale, sourcePreflightMetadata],
   );
-  const isSourceCountValid = sourceCount >= 2 && sourcePreflight?.status !== 'blocked';
+  const canPreviewPlan = sourceCount >= 2;
+  const isSourceCountValid = nativeReadiness?.accepted ?? canPreviewPlan;
   const isSourcePreflightReady = sourcePreflight?.status === 'ready';
   const isSourcePreflightBlocked = sourcePreflight?.status === 'blocked';
   const isSourcePreflightMissingMetadata = sourcePreflight?.status === 'metadata_missing';
@@ -147,6 +151,12 @@ export function SuperResolutionModal({
             count: sourcePreflight.missingMetadataCount,
           })
         : t('modals.superResolution.preflight.notMeasured');
+  const nativeReadinessLabel =
+    nativeReadiness === null || nativeReadiness === undefined
+      ? null
+      : nativeReadiness.accepted
+        ? t('modals.superResolution.preflight.ready')
+        : t('modals.superResolution.preflight.blocked');
   const sourcePreflightWarningsLabel =
     sourcePreflight?.validation?.warningCodes
       .map((warningCode) => t(`modals.superResolution.preflight.warning.${warningCode}`))
@@ -159,7 +169,10 @@ export function SuperResolutionModal({
     sourcePreflight?.validation?.downgradeReasons
       .map((downgradeReason) => t(`modals.superResolution.preflight.downgrade.${downgradeReason}`))
       .join(', ') || t('modals.superResolution.preflight.noDowngrades');
-  const sourcePreflightSamples = sourcePreflight?.validation?.sourceMetadata.slice(0, 4) ?? [];
+  const sourcePreflightSamples =
+    nativeReadiness === null || nativeReadiness === undefined
+      ? (sourcePreflight?.validation?.sourceMetadata.slice(0, 4) ?? [])
+      : [];
   const sourceReadinessLabel = `${t('modals.superResolution.sourceSummary', { count: sourceCount })} - ${
     isSourceCountValid ? t('modals.superResolution.preflight.ready') : t('modals.superResolution.preflight.blocked')
   }`;
@@ -353,7 +366,7 @@ export function SuperResolutionModal({
           >
             {t('modals.superResolution.close')}
           </button>
-          <Button onClick={onPreviewPlan} disabled={!isSourceCountValid} data-testid="sr-preview-plan-button">
+          <Button onClick={onPreviewPlan} disabled={!canPreviewPlan} data-testid="sr-preview-plan-button">
             <Layers3 className="w-4 h-4" />
             {hasRuntimeOutputReview
               ? t('modals.superResolution.refreshPreviewPlan')
@@ -642,7 +655,13 @@ export function SuperResolutionModal({
         animate={{ opacity: 1, y: 0 }}
         className="rounded-md border border-border-color bg-bg-primary p-4"
         data-effective-scale={effectiveScale}
-        data-preflight-status={sourcePreflight?.status ?? 'not_measured'}
+        data-preflight-status={
+          nativeReadiness === undefined || nativeReadiness === null
+            ? (sourcePreflight?.status ?? 'not_measured')
+            : nativeReadiness.accepted
+              ? 'ready'
+              : 'blocked'
+        }
         data-validation-confidence={sourcePreflight?.validation?.validationConfidence ?? ''}
         data-testid="sr-source-preflight"
       >
@@ -689,7 +708,7 @@ export function SuperResolutionModal({
           />
           <ComputationalSetupStatusLine
             label={t('modals.superResolution.preflight.status')}
-            value={sourcePreflightStatusLabel}
+            value={nativeReadinessLabel ?? sourcePreflightStatusLabel}
           />
           <ComputationalSetupStatusLine
             label={t('modals.superResolution.preflight.confidence')}
@@ -701,13 +720,32 @@ export function SuperResolutionModal({
           />
           <ComputationalSetupStatusLine
             label={t('modals.superResolution.preflight.blocks')}
-            value={sourcePreflightBlocksLabel}
+            value={nativeReadiness?.blockCodes.join(', ') || sourcePreflightBlocksLabel}
           />
           <ComputationalSetupStatusLine
             label={t('modals.superResolution.preflight.downgrades')}
             value={sourcePreflightDowngradesLabel}
           />
         </div>
+        {nativeReadiness !== null && nativeReadiness !== undefined && (
+          <div className="mt-3 grid grid-cols-1 gap-2 lg:grid-cols-2">
+            {nativeReadiness.sources.map((source) => (
+              <div
+                className="rounded-md border border-border-color bg-card-background p-2 text-xs"
+                data-testid="sr-native-readiness-row"
+                key={`${source.path}-${source.sourceIndex}`}
+              >
+                <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                  {`${source.sourceIndex + 1}. ${source.cameraMake} ${source.cameraModel}`}
+                </UiText>
+                <UiText className="truncate">{source.path}</UiText>
+                <UiText className="truncate" color={TextColors.secondary}>
+                  {source.blockCodes.join(', ') || t('modals.superResolution.preflight.ready')}
+                </UiText>
+              </div>
+            ))}
+          </div>
+        )}
         {sourcePreflightSamples.length > 0 && (
           <div className="mt-3 grid grid-cols-1 gap-2 lg:grid-cols-2">
             {sourcePreflightSamples.map((source) => (

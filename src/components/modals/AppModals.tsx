@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/core';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
@@ -14,6 +15,7 @@ import {
   createDefaultSuperResolutionModalState,
   useUIStore,
 } from '../../store/useUIStore';
+import { Invokes } from '../../tauri/commands';
 import type { CopyPasteSettings } from '../../utils/adjustments';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/computational-merge/computationalMergeAppServerRoutePairs';
 import {
@@ -25,7 +27,7 @@ import {
   markFocusStackOutputReviewApplyReady,
 } from '../../utils/focusStackOutputReview';
 import { handleNegativeConversionEditorHandoff } from '../../utils/negative-lab/negativeLabEditorHandoff';
-import { buildSuperResolutionOutputReviewWorkflow } from '../../utils/superResolutionOutputReview';
+import type { SuperResolutionNativeReadiness } from '../../utils/superResolutionNativeReadiness';
 import type { AlbumItem, AppSettings } from '../ui/AppProperties';
 import CollageModal from './editing/CollageModal';
 import CullingModal from './editing/CullingModal';
@@ -369,25 +371,29 @@ export default function AppModals(props: AppModalsProps) {
               });
             }}
             onPreviewPlan={() => {
-              const lastDryRunCommand = {
-                commandType: 'computationalMerge.createSuperResolution' as const,
-                dryRun: true as const,
-                sources: superResolutionModalState.sourcePaths.length,
-                toolName: getComputationalMergeAppServerRoutePairSummary('super_resolution').dryRunToolName,
-              };
-              const { lastApplyCommand: _lastApplyCommand, ...nextSuperResolutionModalState } =
-                superResolutionModalState;
-              setUI({
-                superResolutionModalState: {
-                  ...nextSuperResolutionModalState,
-                  lastDryRunCommand,
-                  outputReview: buildSuperResolutionOutputReviewWorkflow({
-                    artifactPath: `/tmp/rawengine-super-resolution-preview-plan-${superResolutionModalState.sourcePaths.length}.tif`,
-                    settings: superResolutionModalState.settings,
-                    sourceCount: superResolutionModalState.sourcePaths.length,
-                    sourcePaths: superResolutionModalState.sourcePaths,
-                  }),
-                },
+              void (async () => {
+                const readiness = await invoke<SuperResolutionNativeReadiness>(Invokes.PlanSuperResolution, {
+                  paths: superResolutionModalState.sourcePaths,
+                  settings: superResolutionModalState.settings,
+                });
+                const lastDryRunCommand = {
+                  commandType: 'computationalMerge.createSuperResolution' as const,
+                  dryRun: true as const,
+                  sources: superResolutionModalState.sourcePaths.length,
+                  toolName: getComputationalMergeAppServerRoutePairSummary('super_resolution').dryRunToolName,
+                };
+                const { lastApplyCommand: _lastApplyCommand, ...nextSuperResolutionModalState } =
+                  superResolutionModalState;
+                setUI({
+                  superResolutionModalState: {
+                    ...nextSuperResolutionModalState,
+                    lastDryRunCommand,
+                    nativeReadiness: readiness,
+                    outputReview: null,
+                  },
+                });
+              })().catch((error: unknown) => {
+                console.error('Super-resolution native readiness failed', error);
               });
             }}
             onSettingsChange={(settings) => {
@@ -400,6 +406,7 @@ export default function AppModals(props: AppModalsProps) {
                 return {
                   superResolutionModalState: {
                     ...superResolutionModalState,
+                    nativeReadiness: null,
                     outputReview: null,
                     settings,
                   },
@@ -407,6 +414,7 @@ export default function AppModals(props: AppModalsProps) {
               });
             }}
             outputReview={superResolutionModalState.outputReview}
+            nativeReadiness={superResolutionModalState.nativeReadiness ?? null}
             settings={superResolutionModalState.settings}
             sourceCount={superResolutionModalState.sourcePaths.length}
             sourcePaths={superResolutionModalState.sourcePaths}

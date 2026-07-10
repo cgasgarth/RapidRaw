@@ -3,25 +3,17 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 // i18next-instrument-ignore
 import {
+  RAW_ENGINE_AGENT_SELECTED_IMAGE_PROPOSAL_RENDER_TOOL_NAME,
   type RawEngineAgentSelectedImageProposalReceiptV1,
-  rawEngineAgentSelectedImageProposalReceiptV1Schema,
 } from '../../../../../packages/rawengine-schema/src/agentSelectedImageProposalSchemas';
-import { RawEngineLocalAppServerCommandType } from '../../../../../packages/rawengine-schema/src/localAppServerBridge';
-import type {
-  AgentChatMessage,
-  AgentChatTranscript,
-  AgentInitialPromptPreviewContext,
-} from '../../../../schemas/agent/agentChatTranscriptSchemas';
+import type { AgentChatMessage, AgentChatTranscript } from '../../../../schemas/agent/agentChatTranscriptSchemas';
 import { useEditorStore } from '../../../../store/useEditorStore';
 import { buildAgentImageContextSnapshot } from '../../../../utils/agent/context/agentImageContextSnapshot';
 import {
-  acquireRawEngineImagePreviewAttachment,
-  releaseRawEngineImagePreviewAttachment,
+  RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
   renderAgentReadOnlyPreview,
 } from '../../../../utils/agent/context/agentReadOnlyAppServerTools';
 import { agentSelectedImageProposalRuntime } from '../../../../utils/agent/context/agentSelectedImageProposalRuntime';
-import { createLiveEditorAppServerBridge } from '../../../../utils/agent/session/agentLiveEditorState';
-import { dispatchAgentLiveEditorTool } from '../../../../utils/agent/session/agentLiveToolDispatch';
 import {
   AGENT_HISTORY_ROLLBACK_TOOL_NAME,
   agentHistoryRollbackResponseSchema,
@@ -38,6 +30,7 @@ import {
   buildAgentToneAdjustmentPromptDraft,
   dryRunAgentToneAdjustment,
 } from '../../../../utils/agent/tools/agentToneAdjustmentTool';
+import { cancelRawEngineAppServerTypedDispatch } from '../../../../utils/rawEngineAppServerHost';
 
 interface AgentChatShellProps {
   transcript: AgentChatTranscript;
@@ -56,10 +49,10 @@ type LivePromptStatus =
   | 'rolled_back';
 
 interface LivePromptResult {
-  basePreviewArtifactId?: string;
   dryRunReceipt?: AgentToneAdjustmentDryRunResponse['receipt'];
   error?: string;
   previewAfterUrl?: string;
+  previewBeforeUrl?: string;
   proposal?: RawEngineAgentSelectedImageProposalReceiptV1;
   proposalId?: string;
   recipeName?: string;
@@ -159,7 +152,6 @@ function MessageBubble({ message }: { message: AgentChatMessage }) {
 }
 
 interface LivePromptComposerProps {
-  initialPromptPreviewContext: AgentInitialPromptPreviewContext | undefined;
   isContextReady: boolean;
   onSessionEvent?: (event: LiveSessionEvent) => void;
 }
@@ -180,10 +172,10 @@ const createLiveSessionEvent = (role: AgentChatMessage['role'], body: string, su
   timestamp: 'now',
 });
 
-function LivePromptComposer({ initialPromptPreviewContext, isContextReady, onSessionEvent }: LivePromptComposerProps) {
+function LivePromptComposer({ isContextReady, onSessionEvent }: LivePromptComposerProps) {
   const { t } = useTranslation();
   const promptInputRef = useRef<HTMLTextAreaElement | null>(null);
-  const activeOperationRef = useRef<{ cancelled: boolean; id: string } | null>(null);
+  const activeOperationRef = useRef<{ cancellationIds: string[]; cancelled: boolean; id: string } | null>(null);
   const previewRequestRef = useRef(0);
   const [prompt, setPrompt] = useState('');
   const [result, setResult] = useState<LivePromptResult>({ status: 'idle' });
@@ -213,12 +205,6 @@ function LivePromptComposer({ initialPromptPreviewContext, isContextReady, onSes
     (result.status === 'applying' || result.status === 'previewing') && activeOperationRef.current !== null;
   const canRollback =
     rollbackSnapshot !== null && rollbackValidation?.state === 'available' && result.status === 'applied';
-  useEffect(() => {
-    const previewUrl = result.previewAfterUrl;
-    return () => {
-      if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
-    };
-  }, [result.previewAfterUrl]);
   useEffect(
     () => () => {
       previewRequestRef.current += 1;
@@ -227,37 +213,30 @@ function LivePromptComposer({ initialPromptPreviewContext, isContextReady, onSes
   );
   useEffect(
     () => () => {
-      if (result.proposalId !== undefined) agentSelectedImageProposalRuntime.release(result.proposalId, 'superseded');
+      if (result.proposalId !== undefined)
+        void agentSelectedImageProposalRuntime.release(result.proposalId, 'superseded');
     },
     [result.proposalId],
   );
-  useEffect(
-    () => () => {
-      if (result.basePreviewArtifactId !== undefined) {
-        releaseRawEngineImagePreviewAttachment(result.basePreviewArtifactId, 'superseded');
-      }
-    },
-    [result.basePreviewArtifactId],
-  );
   useEffect(() => {
     if (result.proposalId === undefined || result.status !== 'dry_run_ready') return;
-    const proposal = agentSelectedImageProposalRuntime.getReceipt(result.proposalId);
-    if (proposal?.status === 'ready') return;
-    setResult((current) => {
-      if (current.proposalId !== result.proposalId) return current;
-      const {
-        basePreviewArtifactId: _basePreviewArtifactId,
-        previewAfterUrl: _previewAfterUrl,
-        proposal: _previousProposal,
-        ...staleResult
-      } = current;
-      return {
-        ...staleResult,
-        error: 'Selected-image proposal is stale. Render a new preview before applying.',
-        ...(proposal === undefined ? {} : { proposal }),
-        status: 'blocked',
-      };
+    let active = true;
+    void agentSelectedImageProposalRuntime.ensureReady(result.proposalId).then((proposal) => {
+      if (!active || proposal?.status === 'ready') return;
+      setResult((current) => {
+        if (current.proposalId !== result.proposalId) return current;
+        const { previewAfterUrl: _previewAfterUrl, previewBeforeUrl: _previewBeforeUrl, ...blockedResult } = current;
+        return {
+          ...blockedResult,
+          error: proposal?.warnings[0] ?? 'Selected-image proposal is stale. Render a new preview before applying.',
+          ...(proposal === undefined ? {} : { proposal }),
+          status: 'blocked',
+        };
+      });
     });
+    return () => {
+      active = false;
+    };
   }, [result.proposalId, result.status, rollbackValidationKey]);
   let statusLabel;
 
@@ -300,10 +279,8 @@ function LivePromptComposer({ initialPromptPreviewContext, isContextReady, onSes
     const previewRequest = ++previewRequestRef.current;
     const operationId = `agent_chat_basic_tone_${Date.now()}`;
     const requestId = `agent-live-basic-tone-${Date.now()}`;
-    const operation = { cancelled: false, id: requestId };
+    const operation = { cancellationIds: [] as string[], cancelled: false, id: requestId };
     activeOperationRef.current = operation;
-    let boundProposal = false;
-    let basePreviewArtifactId: string | undefined;
 
     try {
       const initialState = useEditorStore.getState();
@@ -334,46 +311,80 @@ function LivePromptComposer({ initialPromptPreviewContext, isContextReady, onSes
         sessionId: 'agent-chat-shell',
       });
       if (operation.cancelled || activeOperationRef.current?.id !== operation.id) return;
-      const deadlineAt = new Date(Date.now() + 60_000).toISOString();
-      const basePreview = await acquireRawEngineImagePreviewAttachment({
-        deadlineAt: Date.parse(deadlineAt),
-        request: {
-          expectedRecipeHash: snapshot.initialPreview.recipeHash,
-          requestId: `${requestId}:proposal-base`,
-        },
-        sessionId: 'agent-chat-shell',
-      });
-      basePreviewArtifactId = basePreview.receipt.attachment.artifactId;
-      if (operation.cancelled || activeOperationRef.current?.id !== operation.id) return;
-      const proposalResponse = await createLiveEditorAppServerBridge().dispatch({
-        basePreview: {
-          artifactId: basePreview.receipt.attachment.artifactId,
-          contentHash: basePreview.receipt.attachment.contentHash,
-        },
-        cancellationId: operation.id,
-        commandType: RawEngineLocalAppServerCommandType.AgentSelectedImageProposalRender,
-        deadlineAt,
-        dryRun: true,
-        dryRunPlan: {
-          planHash: dryRun.dryRunPlanHash,
-          planId: dryRun.dryRunPlanId,
-          predictedGraphRevision: dryRun.predictedGraphRevision,
-        },
-        edit: { kind: 'basic_tone_v1', patch: draft.requestedAdjustments },
-        expectedGraphRevision: snapshot.graphRevision,
+      const baseRequest = {
         expectedRecipeHash: snapshot.initialPreview.recipeHash,
-        expectedRenderHash: snapshot.initialPreview.renderHash,
-        expectedSelectedImagePath: selectedImagePath,
-        idempotencyKey: `${requestId}:proposal`,
-        lineage: { callId: `${requestId}:proposal`, parentCallId: `${requestId}:dry-run` },
-        operationId,
-        requestedPreview: { longEdgePx: 1536, maxBytes: 8 * 1024 * 1024, quality: 0.86 },
-        requestId: `${requestId}:proposal`,
+        requestId: `${requestId}:proposal-base`,
+      };
+      const baseContext = createAgentTypedToolExecutionContext({
+        arguments: baseRequest,
+        callId: baseRequest.requestId,
+        deadlineMs: 60_000,
+        requestId: baseRequest.requestId,
         sessionId: 'agent-chat-shell',
       });
-      if (!proposalResponse.ok) throw new Error(`Selected-image proposal failed: ${proposalResponse.message}`);
-      const proposal = rawEngineAgentSelectedImageProposalReceiptV1Schema.parse(proposalResponse.result);
-      const previewAfterUrl = agentSelectedImageProposalRuntime.getPreviewUrl(proposal.proposalId);
+      operation.cancellationIds.push(baseContext.cancellationId);
+      const basePreview = await dispatchAgentTypedEditorTool({
+        args: baseRequest,
+        context: baseContext,
+        toolName: RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
+      });
+      if (operation.cancelled || activeOperationRef.current?.id !== operation.id) return;
+      const proposalRequestId = `${requestId}:proposal`;
+      const proposalContext = createAgentTypedToolExecutionContext({
+        arguments: {
+          expectedGraphRevision: snapshot.graphRevision,
+          expectedRecipeHash: snapshot.initialPreview.recipeHash,
+          expectedSelectedImagePath: selectedImagePath,
+        },
+        callId: proposalRequestId,
+        deadlineMs: 60_000,
+        requestId: proposalRequestId,
+        sessionId: 'agent-chat-shell',
+      });
+      operation.cancellationIds.push(proposalContext.cancellationId);
+      const baseAttachment = basePreview.receipt.attachment;
+      const proposal = await dispatchAgentTypedEditorTool({
+        args: {
+          basePreview: {
+            accessScope: baseAttachment.accessScope,
+            artifactId: baseAttachment.artifactId,
+            byteLength: baseAttachment.byteLength,
+            colorPipeline: baseAttachment.colorPipeline,
+            contentHash: baseAttachment.contentHash,
+            dimensions: baseAttachment.dimensions,
+            encodedFormat: baseAttachment.encodedFormat,
+            expiresAt: baseAttachment.expiresAt,
+            mediaType: baseAttachment.mediaType,
+            quality: baseAttachment.quality,
+            recipeHash: baseAttachment.revision.recipeHash,
+            renderHash: baseAttachment.revision.renderHash,
+          },
+          cancellationId: proposalContext.cancellationId,
+          commandType: RAW_ENGINE_AGENT_SELECTED_IMAGE_PROPOSAL_RENDER_TOOL_NAME,
+          deadlineAt: proposalContext.deadlineAt,
+          dryRun: true,
+          dryRunPlan: {
+            planHash: dryRun.dryRunPlanHash,
+            planId: dryRun.dryRunPlanId,
+            predictedGraphRevision: dryRun.predictedGraphRevision,
+          },
+          edit: { kind: 'basic_tone_v1', patch: draft.requestedAdjustments },
+          expectedGraphRevision: snapshot.graphRevision,
+          expectedRecipeHash: snapshot.initialPreview.recipeHash,
+          expectedRenderHash: snapshot.initialPreview.renderHash,
+          expectedSelectedImagePath: selectedImagePath,
+          idempotencyKey: proposalContext.idempotencyKey,
+          lineage: { callId: proposalContext.callId, parentCallId: baseContext.callId },
+          operationId,
+          requestedPreview: { longEdgePx: 1536, maxBytes: 8 * 1024 * 1024, quality: 0.86 },
+          requestId: proposalRequestId,
+          sessionId: 'agent-chat-shell',
+        },
+        context: proposalContext,
+        toolName: RAW_ENGINE_AGENT_SELECTED_IMAGE_PROPOSAL_RENDER_TOOL_NAME,
+      });
+      const previewAfterUrl = agentSelectedImageProposalRuntime.getPreviewUrl(proposal.proposalId, 'after');
+      const previewBeforeUrl = agentSelectedImageProposalRuntime.getPreviewUrl(proposal.proposalId, 'before');
       const currentSnapshot = buildAgentImageContextSnapshot();
       const previewIsCurrent =
         previewRequest === previewRequestRef.current &&
@@ -395,25 +406,33 @@ function LivePromptComposer({ initialPromptPreviewContext, isContextReady, onSes
             createLiveSessionEvent('assistant', 'Edit preview became stale before delivery.', 'preview-stale'),
           );
         }
-        agentSelectedImageProposalRuntime.release(proposal.proposalId, 'stale');
+        await agentSelectedImageProposalRuntime.release(
+          proposal.proposalId,
+          operation.cancelled ? 'cancelled' : 'stale',
+        );
         return;
       }
-      if (proposal.status !== 'ready' || previewAfterUrl === undefined) {
-        throw new Error(proposal.warnings[0] ?? `Selected-image proposal ended as ${proposal.status}.`);
+      if (proposal.status !== 'ready' || previewAfterUrl === undefined || previewBeforeUrl === undefined) {
+        setResult({
+          error: proposal.warnings[0] ?? `Selected-image proposal ended as ${proposal.status}.`,
+          proposal,
+          proposalId: proposal.proposalId,
+          status: 'blocked',
+        });
+        return;
       }
       setToneAdjustmentDraft(draft);
 
       const nextResult = {
-        basePreviewArtifactId,
         dryRunReceipt: dryRun.receipt,
         previewAfterUrl,
+        previewBeforeUrl,
         proposal,
         proposalId: proposal.proposalId,
         recipeName: dryRun.receipt.dryRunPlanHash,
         status: 'dry_run_ready',
         toneAdjustmentDraft: draft,
       } satisfies LivePromptResult;
-      boundProposal = true;
       setResult(nextResult);
       onSessionEvent?.(
         createLiveSessionEvent(
@@ -439,9 +458,6 @@ function LivePromptComposer({ initialPromptPreviewContext, isContextReady, onSes
       );
     } finally {
       if (activeOperationRef.current?.id === operation.id) activeOperationRef.current = null;
-      if (!boundProposal && basePreviewArtifactId !== undefined) {
-        releaseRawEngineImagePreviewAttachment(basePreviewArtifactId, 'released');
-      }
     }
   };
 
@@ -449,7 +465,7 @@ function LivePromptComposer({ initialPromptPreviewContext, isContextReady, onSes
     const operation = activeOperationRef.current;
     if (operation === null) return;
     operation.cancelled = true;
-    agentSelectedImageProposalRuntime.cancel(operation.id);
+    for (const cancellationId of operation.cancellationIds) cancelRawEngineAppServerTypedDispatch(cancellationId);
     previewRequestRef.current += 1;
 
     const nextResult = { ...result, status: 'cancelling' } satisfies LivePromptResult;
@@ -460,11 +476,13 @@ function LivePromptComposer({ initialPromptPreviewContext, isContextReady, onSes
   const applyDryRun = async () => {
     if (!canApply || toneAdjustmentDraft?.supported !== true) return;
 
-    const operation = { cancelled: false, id: `agent-chat-apply-${Date.now()}` };
+    const operation = { cancellationIds: [] as string[], cancelled: false, id: `agent-chat-apply-${Date.now()}` };
     activeOperationRef.current = operation;
     try {
       const proposal =
-        result.proposalId === undefined ? undefined : agentSelectedImageProposalRuntime.getReceipt(result.proposalId);
+        result.proposalId === undefined
+          ? undefined
+          : await agentSelectedImageProposalRuntime.ensureReady(result.proposalId);
       if (proposal?.status !== 'ready') {
         throw new Error(
           'Selected-image proposal is stale or no longer available. Render a new preview before applying.',
@@ -516,8 +534,8 @@ function LivePromptComposer({ initialPromptPreviewContext, isContextReady, onSes
       }
 
       const {
-        basePreviewArtifactId: _basePreviewArtifactId,
         previewAfterUrl: _previewAfterUrl,
+        previewBeforeUrl: _previewBeforeUrl,
         proposal: _proposal,
         proposalId: _proposalId,
         ...appliedResult
@@ -529,7 +547,8 @@ function LivePromptComposer({ initialPromptPreviewContext, isContextReady, onSes
         status: 'applied',
         toneAdjustmentDraft,
       } satisfies LivePromptResult;
-      if (result.proposalId !== undefined) agentSelectedImageProposalRuntime.release(result.proposalId, 'released');
+      if (result.proposalId !== undefined)
+        await agentSelectedImageProposalRuntime.release(result.proposalId, 'released');
       setResult(nextResult);
       onSessionEvent?.(createLiveSessionEvent('assistant', 'Edit applied. Preview refreshed.', 'applied'));
     } catch (error) {
@@ -613,7 +632,6 @@ function LivePromptComposer({ initialPromptPreviewContext, isContextReady, onSes
       }),
     );
     previewRequestRef.current += 1;
-    if (result.previewAfterUrl?.startsWith('blob:')) URL.revokeObjectURL(result.previewAfterUrl);
     setRollbackSnapshot(null);
     const nextResult = { status: 'rolled_back' } satisfies LivePromptResult;
     setResult(nextResult);
@@ -650,7 +668,7 @@ function LivePromptComposer({ initialPromptPreviewContext, isContextReady, onSes
                 <img
                   alt={t('editor.ai.agent.previewLineage.role.before')}
                   className="aspect-[4/3] w-full rounded border border-editor-border object-cover"
-                  src={initialPromptPreviewContext?.previewRef}
+                  src={result.previewBeforeUrl}
                 />
               </figure>
               <figure className="min-w-0">
@@ -811,7 +829,6 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
       </div>
 
       <LivePromptComposer
-        initialPromptPreviewContext={transcript.initialPromptPreviewContext}
         isContextReady={isContextReady}
         onSessionEvent={(event) => {
           setLiveSessionEvents((events) => [...events, event]);

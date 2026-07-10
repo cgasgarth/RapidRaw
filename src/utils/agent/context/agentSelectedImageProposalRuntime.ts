@@ -1,6 +1,7 @@
 import {
   type RawEngineAgentSelectedImageProposalReceiptV1,
   type RawEngineAgentSelectedImageProposalRenderCommandV1,
+  rawEngineAgentSelectedImageProposalArtifactV1Schema,
   rawEngineAgentSelectedImageProposalReceiptV1Schema,
 } from '../../../../packages/rawengine-schema/src/agentSelectedImageProposalSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
@@ -8,30 +9,56 @@ import type { Adjustments } from '../../adjustments';
 import { assertAgentToneDryRunPlanForProposal } from '../tools/agentToneAdjustmentTool';
 import { buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
 import {
+  AgentMediumPreviewAttachmentError,
   type AgentMediumPreviewAttachmentManager,
+  type AgentModelImageAttachment,
   agentMediumPreviewAttachmentManager,
-  type renderAgentMediumPreviewNative,
   sha256ForAgentPreviewBytes,
 } from './agentMediumPreviewAttachmentRuntime';
 
-type ProposalRuntimeStatus = 'cancelled' | 'ready' | 'released' | 'stale' | 'superseded';
+type ProposalRuntimeStatus = 'cancelled' | 'failed' | 'ready' | 'released' | 'stale' | 'superseded' | 'timed_out';
+type ProposalTerminalStatus = Exclude<ProposalRuntimeStatus, 'ready'>;
+type ProposalArtifact = RawEngineAgentSelectedImageProposalReceiptV1['base']['artifact'];
+type ProposalArtifacts = NonNullable<RawEngineAgentSelectedImageProposalReceiptV1['artifacts']>;
+type ReceiptWithoutHash = Omit<RawEngineAgentSelectedImageProposalReceiptV1, 'receiptHash'>;
 
 export interface AgentSelectedImageProposalRuntime {
-  cancel: (cancellationId: string) => void;
-  getPreviewUrl: (proposalId: string) => string | undefined;
+  cancel: (cancellationId: string) => Promise<void>;
+  ensureReady: (proposalId: string) => Promise<RawEngineAgentSelectedImageProposalReceiptV1 | undefined>;
+  getPreviewUrl: (proposalId: string, role: 'after' | 'before') => string | undefined;
   getReceipt: (proposalId: string) => RawEngineAgentSelectedImageProposalReceiptV1 | undefined;
+  release: (proposalId: string, status?: ProposalTerminalStatus) => Promise<void>;
   render: (
     command: RawEngineAgentSelectedImageProposalRenderCommandV1,
   ) => Promise<RawEngineAgentSelectedImageProposalReceiptV1>;
-  release: (proposalId: string, status?: Exclude<ProposalRuntimeStatus, 'ready'>) => void;
+}
+
+interface ActiveProposal {
+  cancellationId: string;
+  controller: AbortController;
+  proposalId: string;
+  sessionId: string;
+  terminalStatus?: ProposalTerminalStatus;
 }
 
 interface StoredProposal {
-  afterPreviewArtifactId?: string;
-  cancellationId: string;
-  controller: AbortController;
-  previewUrl?: string;
+  active: ActiveProposal;
+  artifacts: ProposalArtifacts;
+  command: RawEngineAgentSelectedImageProposalRenderCommandV1;
+  manager: AgentMediumPreviewAttachmentManager;
+  makeReceipt: (input: {
+    artifacts?: ProposalArtifacts;
+    status: ProposalRuntimeStatus;
+    warnings?: string[];
+  }) => Promise<RawEngineAgentSelectedImageProposalReceiptV1>;
+  previewAfterUrl: string;
+  previewBeforeUrl: string;
   receipt: RawEngineAgentSelectedImageProposalReceiptV1;
+}
+
+interface IdempotentProposal {
+  commandFingerprint: string;
+  receipt: Promise<RawEngineAgentSelectedImageProposalReceiptV1>;
 }
 
 const colorPipeline = {
@@ -43,6 +70,30 @@ const colorPipeline = {
 
 const proposalHash = async (value: string | Uint8Array): Promise<string> =>
   sha256ForAgentPreviewBytes(typeof value === 'string' ? new TextEncoder().encode(value) : value);
+
+const canonicalize = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (typeof value !== 'object' || value === null) return value;
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([, entry]) => entry !== undefined)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, entry]) => [key, canonicalize(entry)]),
+  );
+};
+
+const canonicalJson = (value: unknown): string => JSON.stringify(canonicalize(value));
+
+export const calculateAgentSelectedImageProposalReceiptHash = async (receipt: ReceiptWithoutHash): Promise<string> =>
+  proposalHash(canonicalJson(receipt));
+
+export const verifyAgentSelectedImageProposalReceipt = async (receipt: unknown): Promise<boolean> => {
+  const parsed = rawEngineAgentSelectedImageProposalReceiptV1Schema.safeParse(receipt);
+  if (!parsed.success) return false;
+  const { receiptHash, ...evidence } = parsed.data;
+  return receiptHash === (await calculateAgentSelectedImageProposalReceiptHash(evidence));
+};
 
 const proposedAdjustments = (
   base: Adjustments,
@@ -64,113 +115,181 @@ const identityMatches = (
   command.expectedRenderHash === snapshot.initialPreview.renderHash &&
   command.expectedSelectedImagePath === snapshot.activeImagePath;
 
-const isExpired = (deadlineAt: string): boolean => Date.parse(deadlineAt) <= Date.now();
+const proposalArtifactFromAttachment = ({ attachment }: AgentModelImageAttachment): ProposalArtifact =>
+  rawEngineAgentSelectedImageProposalArtifactV1Schema.parse({
+    accessScope: attachment.accessScope,
+    artifactId: attachment.artifactId,
+    byteLength: attachment.byteLength,
+    colorPipeline: attachment.colorPipeline,
+    contentHash: attachment.contentHash,
+    dimensions: attachment.dimensions,
+    encodedFormat: attachment.encodedFormat,
+    expiresAt: attachment.expiresAt,
+    mediaType: attachment.mediaType,
+    quality: attachment.quality,
+    recipeHash: attachment.revision.recipeHash,
+    renderHash: attachment.revision.renderHash,
+  });
+
+const attachmentDataUrl = ({ attachment, payloadBase64 }: AgentModelImageAttachment): string =>
+  `data:${attachment.mediaType};base64,${payloadBase64}`;
+
+const attachmentReleaseStatus = (status: ProposalTerminalStatus): 'released' | 'stale' | 'superseded' =>
+  status === 'stale' || status === 'superseded' ? status : 'released';
+
+const terminalStatusForError = (error: unknown, active: ActiveProposal): ProposalTerminalStatus => {
+  if (active.terminalStatus !== undefined) return active.terminalStatus;
+  if (!(error instanceof AgentMediumPreviewAttachmentError)) return 'failed';
+  if (error.outcome === 'cancelled') return 'cancelled';
+  if (error.outcome === 'stale') return 'stale';
+  if (error.outcome === 'timed_out') return 'timed_out';
+  return 'failed';
+};
+
+const errorWarning = (error: unknown): string =>
+  error instanceof Error ? error.message : 'Selected-image proposal rendering failed.';
 
 export const createAgentSelectedImageProposalRuntime = ({
-  manager = agentMediumPreviewAttachmentManager,
+  manager,
   now = Date.now,
-  renderPreview,
 }: {
   manager?: AgentMediumPreviewAttachmentManager;
   now?: () => number;
-  renderPreview?: typeof renderAgentMediumPreviewNative;
 } = {}): AgentSelectedImageProposalRuntime => {
+  const activeByCancellationId = new Map<string, ActiveProposal>();
+  const activeBySession = new Map<string, ActiveProposal>();
+  const cancelledBeforeStart = new Set<string>();
+  const idempotentProposals = new Map<string, IdempotentProposal>();
   const proposals = new Map<string, StoredProposal>();
-  const cancellations = new Map<string, AbortController>();
+  const getManager = (): AgentMediumPreviewAttachmentManager => manager ?? agentMediumPreviewAttachmentManager;
 
-  const release = (proposalId: string, status: Exclude<ProposalRuntimeStatus, 'ready'> = 'superseded') => {
+  const releaseStoredProposal = async (stored: StoredProposal, status: ProposalTerminalStatus): Promise<void> => {
+    if (stored.receipt.status === status) return;
+
+    stored.active.terminalStatus = status;
+    stored.active.controller.abort();
+    stored.manager.release(stored.artifacts['before'].artifactId, attachmentReleaseStatus(status));
+    stored.manager.release(stored.artifacts['after'].artifactId, attachmentReleaseStatus(status));
+    stored.receipt = await stored.makeReceipt({
+      artifacts: stored.artifacts,
+      status,
+      warnings: stored.receipt.warnings,
+    });
+    if (activeByCancellationId.get(stored.active.cancellationId) === stored.active) {
+      activeByCancellationId.delete(stored.active.cancellationId);
+    }
+    if (activeBySession.get(stored.active.sessionId) === stored.active) activeBySession.delete(stored.active.sessionId);
+  };
+
+  const release = async (proposalId: string, status: ProposalTerminalStatus = 'superseded'): Promise<void> => {
     const stored = proposals.get(proposalId);
     if (stored === undefined) return;
-    stored.controller.abort();
-    if (stored.previewUrl?.startsWith('blob:')) URL.revokeObjectURL(stored.previewUrl);
-    if (stored.afterPreviewArtifactId !== undefined) {
-      manager.release(stored.afterPreviewArtifactId, status === 'cancelled' ? 'released' : status);
-    }
-    stored.receipt = rawEngineAgentSelectedImageProposalReceiptV1Schema.parse({
-      ...stored.receipt,
-      artifacts: undefined,
-      cleanupState: status,
-      render: { ...stored.receipt.render, outcome: status },
-      status,
-    });
+    await releaseStoredProposal(stored, status);
   };
 
-  const cancel = (cancellationId: string) => {
-    cancellations.get(cancellationId)?.abort();
-    for (const [proposalId, stored] of proposals) {
-      if (stored.cancellationId === cancellationId) release(proposalId, 'cancelled');
+  const cancel = async (cancellationId: string): Promise<void> => {
+    const active = activeByCancellationId.get(cancellationId);
+    if (active === undefined) {
+      cancelledBeforeStart.add(cancellationId);
+      return;
     }
+    active.terminalStatus = 'cancelled';
+    active.controller.abort();
+    const stored = proposals.get(active.proposalId);
+    if (stored !== undefined) await releaseStoredProposal(stored, 'cancelled');
   };
 
-  const getReceipt = (proposalId: string) => {
+  const getReceipt = (proposalId: string): RawEngineAgentSelectedImageProposalReceiptV1 | undefined => {
+    const receipt = proposals.get(proposalId)?.receipt;
+    return receipt === undefined ? undefined : structuredClone(receipt);
+  };
+
+  const getPreviewUrl = (proposalId: string, role: 'after' | 'before'): string | undefined => {
     const stored = proposals.get(proposalId);
-    if (stored === undefined) return undefined;
-    if (stored.receipt.status !== 'ready') return stored.receipt;
+    if (stored?.receipt.status !== 'ready') return undefined;
+    return role === 'before' ? stored.previewBeforeUrl : stored.previewAfterUrl;
+  };
+
+  const ensureReady = async (proposalId: string): Promise<RawEngineAgentSelectedImageProposalReceiptV1 | undefined> => {
+    const stored = proposals.get(proposalId);
+    if (stored === undefined || stored.receipt.status !== 'ready') return getReceipt(proposalId);
     if (Date.parse(stored.receipt.expiresAt) <= now()) {
-      release(proposalId, 'stale');
-      return proposals.get(proposalId)?.receipt;
+      await releaseStoredProposal(stored, 'stale');
+      return getReceipt(proposalId);
     }
     try {
-      if (identityMatchesFromReceipt(stored.receipt, buildAgentImageContextSnapshot())) return stored.receipt;
+      if (!identityMatches(stored.command, buildAgentImageContextSnapshot())) {
+        await releaseStoredProposal(stored, 'stale');
+        return getReceipt(proposalId);
+      }
     } catch {
-      // A missing selected image makes a ready proposal unusable.
+      await releaseStoredProposal(stored, 'stale');
+      return getReceipt(proposalId);
     }
-    release(proposalId, 'stale');
-    return proposals.get(proposalId)?.receipt;
+    if (!(await verifyAgentSelectedImageProposalReceipt(stored.receipt))) {
+      await releaseStoredProposal(stored, 'failed');
+    }
+    return getReceipt(proposalId);
   };
 
-  const getPreviewUrl = (proposalId: string) => {
-    const receipt = getReceipt(proposalId);
-    return receipt?.status === 'ready' ? proposals.get(proposalId)?.previewUrl : undefined;
-  };
-
-  const render = async (command: RawEngineAgentSelectedImageProposalRenderCommandV1) => {
+  const renderNewProposal = async (
+    command: RawEngineAgentSelectedImageProposalRenderCommandV1,
+    commandFingerprint: string,
+  ): Promise<RawEngineAgentSelectedImageProposalReceiptV1> => {
     const startedAt = now();
-    const snapshot = buildAgentImageContextSnapshot();
-    if (!identityMatches(command, snapshot)) throw new Error('Selected-image proposal rejected stale editor identity.');
-    if (isExpired(command.deadlineAt)) throw new Error('Selected-image proposal deadline expired before rendering.');
-    assertAgentToneDryRunPlanForProposal({
-      adjustments: command.edit.patch,
-      expectedGraphRevision: command.expectedGraphRevision,
-      expectedRecipeHash: command.expectedRecipeHash,
-      operationId: command.operationId,
-      planHash: command.dryRunPlan.planHash,
-      planId: command.dryRunPlan.planId,
-      sessionId: command.sessionId,
-    });
-
-    cancel(command.cancellationId);
-    const controller = new AbortController();
-    cancellations.set(command.cancellationId, controller);
-    const proposalId = `proposal:${await proposalHash(`${command.idempotencyKey}:${command.dryRunPlan.planHash}`)}`;
-    const beforeState = useEditorStore.getState();
-    const beforeAdjustments = beforeState.adjustments;
-    const beforeHistory = beforeState.history;
+    const proposalId = `proposal:${await proposalHash(`${command.sessionId}:${command.idempotencyKey}`)}`;
+    const selectedImageId = await proposalHash(command.expectedSelectedImagePath);
     const proposedRecipeHash = await proposalHash(
-      JSON.stringify({ base: command.expectedRecipeHash, edit: command.edit, plan: command.dryRunPlan.planHash }),
+      canonicalJson({ base: command.expectedRecipeHash, edit: command.edit, plan: command.dryRunPlan.planHash }),
     );
     const proposedRenderHash = await proposalHash(
-      JSON.stringify({
+      canonicalJson({
         base: command.expectedRenderHash,
-        recipe: proposedRecipeHash,
-        selectedImage: command.expectedSelectedImagePath,
+        graphRevision: command.dryRunPlan.predictedGraphRevision,
+        recipeHash: proposedRecipeHash,
+        selectedImagePath: command.expectedSelectedImagePath,
       }),
     );
-    const selectedImageId = await proposalHash(command.expectedSelectedImagePath);
+    const baseExpiry = Date.parse(command.basePreview.expiresAt);
+    const commandDeadline = Date.parse(command.deadlineAt);
+    const active: ActiveProposal = {
+      cancellationId: command.cancellationId,
+      controller: new AbortController(),
+      proposalId,
+      sessionId: command.sessionId,
+    };
+    const attachmentManager = getManager();
+    if (cancelledBeforeStart.has(command.cancellationId)) active.terminalStatus = 'cancelled';
+    const priorActive = activeBySession.get(command.sessionId);
+    if (priorActive !== undefined && priorActive.proposalId !== proposalId) {
+      priorActive.terminalStatus = 'superseded';
+      priorActive.controller.abort();
+      const storedPrior = proposals.get(priorActive.proposalId);
+      if (storedPrior !== undefined) void releaseStoredProposal(storedPrior, 'superseded');
+    }
+    activeByCancellationId.set(command.cancellationId, active);
+    activeBySession.set(command.sessionId, active);
 
-    const expiresAt = new Date(Math.min(Date.parse(command.deadlineAt), startedAt + 60_000)).toISOString();
-    const buildReceipt = async ({
+    const makeReceipt = async ({
       artifacts,
       status,
       warnings = [],
     }: {
-      artifacts?: RawEngineAgentSelectedImageProposalReceiptV1['artifacts'];
-      status: RawEngineAgentSelectedImageProposalReceiptV1['status'];
+      artifacts?: ProposalArtifacts;
+      status: ProposalRuntimeStatus;
       warnings?: string[];
-    }) =>
-      rawEngineAgentSelectedImageProposalReceiptV1Schema.parse({
+    }): Promise<RawEngineAgentSelectedImageProposalReceiptV1> => {
+      const expiresAt = new Date(
+        Math.min(
+          commandDeadline,
+          baseExpiry,
+          artifacts === undefined ? Number.POSITIVE_INFINITY : Date.parse(artifacts['after'].expiresAt),
+        ),
+      ).toISOString();
+      const evidence: ReceiptWithoutHash = {
         ...(artifacts === undefined ? {} : { artifacts }),
         base: {
+          artifact: command.basePreview,
           graphRevision: command.expectedGraphRevision,
           previewArtifactId: command.basePreview.artifactId,
           previewContentHash: command.basePreview.contentHash,
@@ -184,9 +303,8 @@ export const createAgentSelectedImageProposalRuntime = ({
         edit: command.edit,
         expiresAt,
         lineage: command.lineage,
-        proposalHash: await proposalHash(`${proposalId}:${proposedRenderHash}`),
+        proposalHash: await proposalHash(`${proposalId}:${commandFingerprint}:${proposedRenderHash}`),
         proposalId,
-        receiptHash: await proposalHash(`${proposalId}:${status}`),
         render: {
           deadlineAt: command.deadlineAt,
           durationMs: Math.max(0, now() - startedAt),
@@ -197,121 +315,185 @@ export const createAgentSelectedImageProposalRuntime = ({
         schemaVersion: 1,
         status,
         warnings,
+      };
+      return rawEngineAgentSelectedImageProposalReceiptV1Schema.parse({
+        ...evidence,
+        receiptHash: await calculateAgentSelectedImageProposalReceiptHash(evidence),
       });
+    };
 
-    if (controller.signal.aborted) {
-      return buildReceipt({ status: 'cancelled', warnings: ['Proposal was cancelled before rendering.'] });
-    }
-
+    let acquiredBase: AgentModelImageAttachment | undefined;
+    let acquiredAfter: AgentModelImageAttachment | undefined;
     try {
-      const adjustments = proposedAdjustments(beforeAdjustments, command.edit.patch);
-      let bytes: Uint8Array | undefined;
-      let rendered: Awaited<ReturnType<AgentMediumPreviewAttachmentManager['acquire']>> | undefined;
-      if (renderPreview === undefined) {
-        rendered = await manager.acquire({
-          adjustments,
-          deadlineAt: Date.parse(command.deadlineAt),
-          outputIdentity: {
-            graphRevision: command.dryRunPlan.predictedGraphRevision,
-            recipeHash: proposedRecipeHash,
-            renderHash: proposedRenderHash,
-            selectedImageId,
-          },
-          signal: controller.signal,
-          snapshot,
+      if (commandDeadline <= now() || baseExpiry <= now()) {
+        return await makeReceipt({ status: 'timed_out', warnings: ['Proposal deadline expired before rendering.'] });
+      }
+      if (active.terminalStatus !== undefined) {
+        return await makeReceipt({
+          status: active.terminalStatus,
+          warnings: ['Proposal was cancelled before rendering.'],
         });
-      } else {
-        bytes = await renderPreview({ adjustments, signal: controller.signal, snapshot });
       }
-      const current = buildAgentImageContextSnapshot();
-      if (controller.signal.aborted) {
-        return buildReceipt({ status: 'cancelled', warnings: ['Proposal was cancelled before delivery.'] });
+
+      let snapshot: ReturnType<typeof buildAgentImageContextSnapshot>;
+      try {
+        snapshot = buildAgentImageContextSnapshot();
+      } catch {
+        return await makeReceipt({ status: 'stale', warnings: ['Selected image is no longer available.'] });
       }
-      if (!identityMatches(command, current)) {
-        return buildReceipt({ status: 'stale', warnings: ['Selected image changed while the proposal rendered.'] });
+      if (!identityMatches(command, snapshot)) {
+        return await makeReceipt({
+          status: 'stale',
+          warnings: ['Selected-image proposal rejected stale editor identity.'],
+        });
       }
-      if (
-        beforeAdjustments !== useEditorStore.getState().adjustments ||
-        beforeHistory !== useEditorStore.getState().history
-      ) {
-        return buildReceipt({ status: 'stale', warnings: ['Editor state changed while the proposal rendered.'] });
+      try {
+        assertAgentToneDryRunPlanForProposal({
+          adjustments: command.edit.patch,
+          expectedGraphRevision: command.expectedGraphRevision,
+          expectedRecipeHash: command.expectedRecipeHash,
+          operationId: command.operationId,
+          planHash: command.dryRunPlan.planHash,
+          planId: command.dryRunPlan.planId,
+          sessionId: command.sessionId,
+        });
+      } catch (error) {
+        return await makeReceipt({ status: 'failed', warnings: [errorWarning(error)] });
       }
-      const afterContentHash =
-        rendered?.attachment.contentHash ?? (bytes === undefined ? undefined : await sha256ForAgentPreviewBytes(bytes));
-      if (afterContentHash === undefined)
-        throw new Error('Selected-image proposal renderer returned no preview bytes.');
-      const ready = await buildReceipt({
-        artifacts: {
-          after: {
-            accessScope: 'local_private',
-            artifactId: rendered?.attachment.artifactId ?? `proposal-after:${afterContentHash.slice(7, 31)}`,
-            byteLength: rendered?.attachment.byteLength ?? bytes?.byteLength ?? 0,
-            colorPipeline,
-            contentHash: afterContentHash,
-            dimensions: rendered?.attachment.dimensions ?? {
-              height: snapshot.initialPreview.height,
-              width: snapshot.initialPreview.width,
-            },
-            encodedFormat: 'jpeg',
-            expiresAt,
-            mediaType: 'image/jpeg',
-            quality: 0.86,
-            recipeHash: rendered?.attachment.revision.recipeHash ?? proposedRecipeHash,
-            renderHash: rendered?.attachment.revision.renderHash ?? proposedRenderHash,
-          },
-          before: {
-            accessScope: 'local_private',
-            artifactId: command.basePreview.artifactId,
-            byteLength: 1,
-            colorPipeline,
-            contentHash: command.basePreview.contentHash,
-            dimensions: { height: snapshot.initialPreview.height, width: snapshot.initialPreview.width },
-            encodedFormat: 'jpeg',
-            expiresAt,
-            mediaType: 'image/jpeg',
-            quality: 0.86,
-            recipeHash: proposedRecipeHash,
-            renderHash: proposedRenderHash,
-          },
+
+      acquiredBase = attachmentManager.getModelAttachment(command.basePreview.artifactId);
+      if (acquiredBase === undefined) {
+        return await makeReceipt({
+          status: 'failed',
+          warnings: ['Selected-image proposal base attachment is unavailable.'],
+        });
+      }
+      const before = proposalArtifactFromAttachment(acquiredBase);
+      if (canonicalJson(before) !== canonicalJson(command.basePreview)) {
+        return await makeReceipt({
+          status: 'failed',
+          warnings: ['Selected-image proposal base attachment does not match the acquired preview bytes.'],
+        });
+      }
+
+      acquiredAfter = await attachmentManager.acquire({
+        adjustments: proposedAdjustments(useEditorStore.getState().adjustments, command.edit.patch),
+        deadlineAt: commandDeadline,
+        outputIdentity: {
+          graphRevision: command.dryRunPlan.predictedGraphRevision,
+          recipeHash: proposedRecipeHash,
+          renderHash: proposedRenderHash,
+          selectedImageId,
         },
-        status: 'ready',
+        signal: active.controller.signal,
+        snapshot,
       });
-      const previewUrl =
-        rendered === undefined
-          ? (() => {
-              if (bytes === undefined) throw new Error('Selected-image proposal renderer returned no preview bytes.');
-              const previewBytes = new Uint8Array(bytes.byteLength);
-              previewBytes.set(bytes);
-              return URL.createObjectURL(new Blob([previewBytes.buffer], { type: 'image/jpeg' }));
-            })()
-          : `data:${rendered.attachment.mediaType};base64,${rendered.payloadBase64}`;
-      proposals.set(proposalId, {
-        ...(rendered === undefined ? {} : { afterPreviewArtifactId: rendered.attachment.artifactId }),
-        cancellationId: command.cancellationId,
-        controller,
-        previewUrl,
-        receipt: ready,
-      });
-      return ready;
-    } catch (error) {
-      if (controller.signal.aborted) {
-        return buildReceipt({ status: 'cancelled', warnings: ['Proposal was cancelled before delivery.'] });
+      if (active.terminalStatus !== undefined) {
+        return await makeReceipt({
+          status: active.terminalStatus,
+          warnings: [`Proposal was ${active.terminalStatus} before delivery.`],
+        });
       }
-      throw error;
+      if (!identityMatches(command, buildAgentImageContextSnapshot())) {
+        return await makeReceipt({
+          status: 'stale',
+          warnings: ['Selected image changed while the proposal rendered.'],
+        });
+      }
+
+      const after = proposalArtifactFromAttachment(acquiredAfter);
+      const artifacts = { after, before } satisfies ProposalArtifacts;
+      const receipt = await makeReceipt({ artifacts, status: 'ready' });
+      proposals.set(proposalId, {
+        active,
+        artifacts,
+        command,
+        manager: attachmentManager,
+        makeReceipt,
+        previewAfterUrl: attachmentDataUrl(acquiredAfter),
+        previewBeforeUrl: attachmentDataUrl(acquiredBase),
+        receipt,
+      });
+      return receipt;
+    } catch (error) {
+      const status = terminalStatusForError(error, active);
+      return await makeReceipt({ status, warnings: [errorWarning(error)] });
     } finally {
-      if (cancellations.get(command.cancellationId) === controller) cancellations.delete(command.cancellationId);
+      const stored = proposals.get(proposalId);
+      if (stored === undefined) {
+        if (acquiredBase !== undefined) {
+          attachmentManager.release(
+            acquiredBase.attachment.artifactId,
+            attachmentReleaseStatus(active.terminalStatus ?? 'released'),
+          );
+        }
+        if (acquiredAfter !== undefined) {
+          attachmentManager.release(
+            acquiredAfter.attachment.artifactId,
+            attachmentReleaseStatus(active.terminalStatus ?? 'released'),
+          );
+        }
+        if (activeBySession.get(command.sessionId) === active) activeBySession.delete(command.sessionId);
+      }
+      if (activeByCancellationId.get(command.cancellationId) === active && stored === undefined) {
+        activeByCancellationId.delete(command.cancellationId);
+      }
+      cancelledBeforeStart.delete(command.cancellationId);
     }
   };
 
-  return { cancel, getPreviewUrl, getReceipt, release, render };
-};
+  const render = async (command: RawEngineAgentSelectedImageProposalRenderCommandV1) => {
+    const commandFingerprint = await proposalHash(canonicalJson(command));
+    const idempotencyKey = `${command.sessionId}:${command.idempotencyKey}`;
+    const existing = idempotentProposals.get(idempotencyKey);
+    if (existing !== undefined) {
+      if (existing.commandFingerprint === commandFingerprint) {
+        const receipt = await existing.receipt;
+        return getReceipt(receipt.proposalId) ?? receipt;
+      }
+      const proposalId = `proposal:${await proposalHash(idempotencyKey)}`;
+      const selectedImageId = await proposalHash(command.expectedSelectedImagePath);
+      const evidence: ReceiptWithoutHash = {
+        base: {
+          artifact: command.basePreview,
+          graphRevision: command.expectedGraphRevision,
+          previewArtifactId: command.basePreview.artifactId,
+          previewContentHash: command.basePreview.contentHash,
+          recipeHash: command.expectedRecipeHash,
+          renderHash: command.expectedRenderHash,
+          selectedImageId,
+        },
+        cleanupState: 'failed',
+        createdAt: new Date(now()).toISOString(),
+        dryRunPlan: command.dryRunPlan,
+        edit: command.edit,
+        expiresAt: command.basePreview.expiresAt,
+        lineage: command.lineage,
+        proposalHash: await proposalHash(`${proposalId}:${commandFingerprint}`),
+        proposalId,
+        render: {
+          deadlineAt: command.deadlineAt,
+          durationMs: 0,
+          outcome: 'failed',
+          proposedRecipeHash: await proposalHash(canonicalJson(command.edit)),
+          proposedRenderHash: await proposalHash(canonicalJson(command)),
+        },
+        schemaVersion: 1,
+        status: 'failed',
+        warnings: ['Proposal idempotency key was reused with different command evidence.'],
+      };
+      return rawEngineAgentSelectedImageProposalReceiptV1Schema.parse({
+        ...evidence,
+        receiptHash: await calculateAgentSelectedImageProposalReceiptHash(evidence),
+      });
+    }
 
-const identityMatchesFromReceipt = (
-  receipt: RawEngineAgentSelectedImageProposalReceiptV1,
-  snapshot: ReturnType<typeof buildAgentImageContextSnapshot>,
-): boolean =>
-  receipt.base.graphRevision === snapshot.graphRevision &&
-  receipt.base.recipeHash === snapshot.initialPreview.recipeHash &&
-  receipt.base.renderHash === snapshot.initialPreview.renderHash;
+    const receipt = renderNewProposal(command, commandFingerprint);
+    idempotentProposals.set(idempotencyKey, { commandFingerprint, receipt });
+    return receipt;
+  };
+
+  return { cancel, ensureReady, getPreviewUrl, getReceipt, release, render };
+};
 
 export const agentSelectedImageProposalRuntime = createAgentSelectedImageProposalRuntime();

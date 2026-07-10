@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import type { RAW_ENGINE_AGENT_SELECTED_IMAGE_PROPOSAL_RENDER_TOOL_NAME } from '../../../../packages/rawengine-schema/src/agentSelectedImageProposalSchemas';
 import {
   RawEngineAppServerHostToolName,
   type RawEngineAppServerToolDispatchRequest,
@@ -110,6 +111,9 @@ export function dispatchAgentTypedEditorTool(
 export function dispatchAgentTypedEditorTool(
   input: TypedDispatchInput<'rawengine.image.get_preview'>,
 ): Promise<AgentEditorToolResponse<'rawengine.image.get_preview'>>;
+export function dispatchAgentTypedEditorTool(
+  input: TypedDispatchInput<typeof RAW_ENGINE_AGENT_SELECTED_IMAGE_PROPOSAL_RENDER_TOOL_NAME>,
+): Promise<AgentEditorToolResponse<typeof RAW_ENGINE_AGENT_SELECTED_IMAGE_PROPOSAL_RENDER_TOOL_NAME>>;
 export function dispatchAgentTypedEditorTool(
   input: TypedDispatchInput<'rawengine.agent.preview.render'>,
 ): Promise<AgentEditorToolResponse<'rawengine.agent.preview.render'>>;

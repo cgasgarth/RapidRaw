@@ -11,7 +11,10 @@ import en from '../../../src/i18n/locales/en.json';
 import type { GamutWarningOverlayPayload } from '../../../src/schemas/tauriEventSchemas.ts';
 import { useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
-import { getEditorChromeStatusChips } from '../../../src/utils/color/runtime/gamutWarningDisplay.ts';
+import {
+  getEditorChromeStatusChips,
+  getEditorChromeStatusStripChips,
+} from '../../../src/utils/color/runtime/gamutWarningDisplay.ts';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -140,6 +143,13 @@ describe('editor chrome status strip', () => {
       state: 'current',
       value: 'current',
     });
+    expect(getEditorChromeStatusStripChips(chips).map((chip) => chip.id)).toEqual([
+      'shadow-clipping',
+      'highlight-clipping',
+      'gamut-warning',
+      'soft-proof',
+      'preview-scopes',
+    ]);
   });
 
   test('renders live store updates and hides in fullscreen', async () => {
@@ -163,17 +173,35 @@ describe('editor chrome status strip', () => {
     expect(chip(container, 'shadow-clipping').dataset.active).toBe('true');
     expect(chip(container, 'highlight-clipping').dataset.active).toBe('true');
     expect(chip(container, 'gamut-warning').dataset.value).toBe('12.5%');
-    expect(container.querySelector('[data-testid="editor-chrome-status-chip-soft-proof"]')).toBeNull();
-    expect(container.querySelector('[data-testid="editor-chrome-status-chip-preview-scopes"]')).toBeNull();
+    expect(container.querySelector('[data-testid="editor-chrome-status-strip"]')?.getAttribute('data-layout')).toBe(
+      'footer',
+    );
+    expect(chip(container, 'shadow-clipping').dataset.placement).toBe('primary');
+    expect(chip(container, 'highlight-clipping').dataset.placement).toBe('primary');
+    expect(chip(container, 'gamut-warning').dataset.placement).toBe('disclosure');
+    expect(chip(container, 'soft-proof').dataset.placement).toBe('disclosure');
+    expect(chip(container, 'preview-scopes').dataset.placement).toBe('disclosure');
+    expect(
+      container.querySelector('[data-testid="editor-chrome-status-disclosure"]')?.getAttribute('data-status-overflow'),
+    ).toBe('3');
 
     await rerenderStrip(true);
     const hiddenStrip = container.querySelector<HTMLElement>('[data-testid="editor-chrome-status-strip"]');
     expect(hiddenStrip?.dataset.state).toBe('hidden');
     expect(hiddenStrip?.hidden).toBe(true);
   });
+
+  test('uses the status lane for rendering progress without placing a loading overlay on the image', async () => {
+    const { container } = await renderStrip(false, true);
+
+    const strip = container.querySelector<HTMLElement>('[data-testid="editor-chrome-status-strip"]');
+    expect(strip?.dataset.layout).toBe('footer');
+    expect(strip?.getAttribute('aria-live')).toBe('polite');
+    expect(container.querySelector('[data-testid="editor-chrome-status-rendering"]')).not.toBeNull();
+  });
 });
 
-async function renderStrip(isFullScreen: boolean) {
+async function renderStrip(isFullScreen: boolean, isRendering = false) {
   if (!globalThis.window) {
     const window = new Window();
     Object.assign(globalThis, {
@@ -188,11 +216,11 @@ async function renderStrip(isFullScreen: boolean) {
   document.body.appendChild(container);
   const root = createRoot(container);
   renderedRoot = { container, root };
-  await rerenderStrip(isFullScreen);
+  await rerenderStrip(isFullScreen, isRendering);
   return { container, root };
 }
 
-async function rerenderStrip(isFullScreen: boolean) {
+async function rerenderStrip(isFullScreen: boolean, isRendering = false) {
   if (renderedRoot === null) throw new Error('Expected editor chrome status strip root.');
 
   await act(async () => {
@@ -200,7 +228,7 @@ async function rerenderStrip(isFullScreen: boolean) {
       createElement(
         I18nextProvider,
         { i18n: await createTestI18n() },
-        createElement(EditorChromeStatusStrip, { isFullScreen }),
+        createElement(EditorChromeStatusStrip, { isFullScreen, isRendering }),
       ),
     );
     await new Promise((resolve) => setTimeout(resolve, 0));
