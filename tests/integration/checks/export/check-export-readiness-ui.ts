@@ -17,8 +17,6 @@ const localeJson = JSON.parse(locale) as {
 
 const requiredSourceSnippets = [
   'exportReadinessItems',
-  'primaryExportReadinessItems',
-  'secondaryExportReadinessItems',
   'selectedColorProfileLabel',
   'selectedResizeModeLabel',
   "t('export.colorProfiles.sourceEmbedded')",
@@ -26,7 +24,12 @@ const requiredSourceSnippets = [
   'resolvedExportBlackPointCompensation',
   'resolvedExportRenderingIntent',
   'data-testid="export-readiness-summary"',
-  'data-export-readiness-item={item}',
+  'data-export-readiness-item={exportReadinessItems[0]}',
+  'data-export-readiness-item={exportReadinessItems[1]}',
+  'data-export-readiness-item={exportReadinessItems[3]}',
+  'shouldShowProofDiagnostics',
+  'data-testid="export-proof-footer-proof-state"',
+  'group-open:rotate-180',
   'data-testid="export-soft-proof-compare-footer-warning"',
   'data-testid="export-soft-proof-compare-footer-action"',
   'data-testid="export-blocked-alert"',
@@ -67,6 +70,10 @@ const failures = [
 
 if (source.includes('flex flex-wrap justify-center gap-1.5" data-testid="export-readiness-summary"')) {
   failures.push('readiness summary must not render as the old centered badge cloud');
+}
+
+if (source.includes('primaryExportReadinessItems') || source.includes('secondaryExportReadinessItems')) {
+  failures.push('readiness summary must keep secondary detail out of the compact footer row');
 }
 
 if (failures.length > 0) {

@@ -1471,7 +1471,7 @@ function ExportProofFooterPanel({
 }) {
   return (
     <section
-      className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-surface bg-bg-secondary"
+      className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-surface bg-bg-secondary max-lg:min-h-[640px]"
       data-visual-smoke-section={`export-proof-footer-${label.toLowerCase()}`}
     >
       <div className="flex items-center justify-between border-b border-surface px-2 py-1">
@@ -1521,7 +1521,7 @@ function ProfessionalExportProofFooterVisualSmoke() {
             <span className={editorChromeStatusChipClassName('danger')}>{copy.exportFooterRetry}</span>
           </div>
         </header>
-        <div className="grid min-h-0 flex-1 gap-2" style={{ gridTemplateColumns: 'repeat(5, minmax(0, 1fr))' }}>
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2 lg:grid-cols-5">
           <ExportProofFooterPanel
             label="Idle"
             exportState={{ errorMessage: '', progress: { current: 0, total: 0 }, status: Status.Idle }}
