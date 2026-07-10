@@ -22,6 +22,12 @@ import {
   renameEditHistoryCheckpoint,
   undoEditHistory,
 } from '../utils/editHistory';
+import {
+  DEFAULT_EDITOR_COMPARE_STATE,
+  type EditorCompareCommand,
+  type EditorCompareState,
+  reduceEditorCompare,
+} from '../utils/editorCompare';
 import { DEFAULT_EDITOR_ZOOM_MODE, type EditorZoomMode } from '../utils/editorZoom';
 import { loadMaskOverlaySettingsPreference } from '../utils/mask/maskOverlayPreferences';
 import { PANEL_SCOPES_HEIGHT } from '../utils/waveformSizing';
@@ -83,7 +89,7 @@ export interface PreviewScopeStatus {
 }
 
 export type PanelScopesLayout = 'overlay' | 'stacked';
-export type EditorCompareMode = 'off' | 'hold-original' | 'split-wipe' | 'side-by-side';
+export type { EditorCompareMode } from '../utils/editorCompare';
 
 interface EditorState {
   // Core Image & Adjustments
@@ -101,8 +107,7 @@ interface EditorState {
   uncroppedAdjustedPreviewUrl: string | null;
   transformedOriginalUrl: string | null;
   interactivePatch: InteractivePatch | null;
-  compareMode: EditorCompareMode;
-  showOriginal: boolean;
+  compare: EditorCompareState;
 
   // Analytics
   histogram: ChannelConfig | null;
@@ -161,6 +166,7 @@ interface EditorState {
 
   // Actions
   setEditor: (updater: Partial<EditorState> | ((state: EditorState) => Partial<EditorState>)) => void;
+  dispatchCompare: (command: EditorCompareCommand) => void;
   setPresetApplication: (presetApplication: PresetApplication | null) => void;
   createHistoryCheckpoint: (label: string) => void;
   applyBasicToneCommand: (command: BasicToneCommandEnvelope) => void;
@@ -181,26 +187,11 @@ const shouldRevalidateGamutWarningOverlay = (update: Partial<EditorState>): bool
 
 const normalizeCompareStateUpdate = (state: EditorState, update: Partial<EditorState>): void => {
   if ('selectedImage' in update && update.selectedImage?.path !== state.selectedImage?.path) {
-    update.compareMode = 'off';
-    update.showOriginal = false;
+    update.compare = {
+      ...DEFAULT_EDITOR_COMPARE_STATE,
+      source: { identity: update.selectedImage?.path ?? null, kind: 'original' },
+    };
     update.transformedOriginalUrl = null;
-  }
-
-  if ('compareMode' in update) {
-    if (update.compareMode === 'hold-original') {
-      update.showOriginal = true;
-    } else if (!('showOriginal' in update)) {
-      update.showOriginal = false;
-    }
-    return;
-  }
-
-  if ('showOriginal' in update) {
-    if (update.showOriginal && state.compareMode === 'off') {
-      update.compareMode = 'hold-original';
-    } else if (!update.showOriginal && state.compareMode === 'hold-original') {
-      update.compareMode = 'off';
-    }
   }
 };
 
@@ -250,8 +241,7 @@ export const useEditorStore = create<EditorState>((set) => ({
 
   finalPreviewUrl: null,
   uncroppedAdjustedPreviewUrl: null,
-  compareMode: 'off',
-  showOriginal: false,
+  compare: DEFAULT_EDITOR_COMPARE_STATE,
   histogram: null,
   waveform: null,
   previewScopeStatus: null,
@@ -336,6 +326,8 @@ export const useEditorStore = create<EditorState>((set) => ({
       return { ...update, gamutWarningOverlay: null };
     });
   },
+
+  dispatchCompare: (command) => set((state) => ({ compare: reduceEditorCompare(state.compare, command) })),
 
   setPresetApplication: (presetApplication) => set({ presetApplication }),
 

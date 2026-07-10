@@ -125,13 +125,14 @@ export function useImageProcessing(
   const zoomMode = useEditorStore((state) => state.zoomMode);
   const historyIndex = useEditorStore((state) => state.historyIndex);
   const hasRenderedFirstFrame = useEditorStore((state) => state.hasRenderedFirstFrame);
-  const compareMode = useEditorStore((state) => state.compareMode);
-  const showOriginal = useEditorStore((state) => state.showOriginal);
+  const compare = useEditorStore((state) => state.compare);
   const isSliderDragging = useEditorStore((state) => state.isSliderDragging);
   const isExportSoftProofEnabled = useEditorStore((state) => state.isExportSoftProofEnabled);
   const exportSoftProofRecipeId = useEditorStore((state) => state.exportSoftProofRecipeId);
   const transformedOriginalUrl = useEditorStore((state) => state.transformedOriginalUrl);
   const setEditor = useEditorStore((state) => state.setEditor);
+  const dispatchCompare = useEditorStore((state) => state.dispatchCompare);
+  const isCompareActive = compare.mode !== 'off' || compare.isOriginalHeld;
 
   const activeRightPanel = useUIStore((state) => state.activeRightPanel);
   const appSettings = useSettingsStore((state) => state.appSettings);
@@ -815,12 +816,7 @@ export function useImageProcessing(
   }, [geometricAdjustmentsKey, selectedImage?.path, setEditor]);
 
   useEffect(() => {
-    if (
-      (compareMode !== 'off' || showOriginal) &&
-      selectedImage?.isReady &&
-      displaySize.width > 0 &&
-      !isSliderDragging
-    ) {
+    if (isCompareActive && selectedImage?.isReady && displaySize.width > 0 && !isSliderDragging) {
       const targetRes = calculateTargetRes();
       if (targetRes > currentOriginalResRef.current) {
         requestHiFiOriginalZoom(adjustments, targetRes);
@@ -830,8 +826,7 @@ export function useImageProcessing(
       requestHiFiOriginalZoom.cancel();
     };
   }, [
-    compareMode,
-    showOriginal,
+    isCompareActive,
     displaySize.width,
     displaySize.height,
     calculateTargetRes,
@@ -845,7 +840,7 @@ export function useImageProcessing(
   useEffect(() => {
     let isEffectActive = true;
     const generate = async () => {
-      if ((compareMode !== 'off' || showOriginal) && selectedImage?.path && !transformedOriginalUrl) {
+      if (isCompareActive && selectedImage?.path && !transformedOriginalUrl) {
         try {
           const targetRes = calculateTargetRes();
           const base64Data = await invokeWithSchema(
@@ -863,7 +858,7 @@ export function useImageProcessing(
         } catch (e) {
           if (isEffectActive) {
             console.error('Failed to generate original preview:', e);
-            setEditor({ compareMode: 'off' });
+            dispatchCompare({ type: 'exit' });
           }
         }
       }
@@ -873,12 +868,12 @@ export function useImageProcessing(
       isEffectActive = false;
     };
   }, [
-    compareMode,
-    showOriginal,
+    isCompareActive,
     selectedImage?.path,
     adjustments,
     transformedOriginalUrl,
     calculateTargetRes,
+    dispatchCompare,
     setEditor,
   ]);
 

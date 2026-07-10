@@ -16,6 +16,7 @@ import {
   Pencil,
   Redo,
   SquareSplitHorizontal,
+  SquareSplitVertical,
   Undo,
   X,
 } from 'lucide-react';
@@ -27,6 +28,7 @@ import { useUIStore } from '../../../store/useUIStore';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import type { Adjustments } from '../../../utils/adjustments';
 import { buildEditHistoryItems, type EditHistoryCheckpoint } from '../../../utils/editHistory';
+import type { EditorCompareOrientation } from '../../../utils/editorCompare';
 import { formatShortcutLabel } from '../../../utils/keyboardUtils';
 import {
   formatExifApertureFromMetadata,
@@ -50,12 +52,14 @@ interface EditorToolbarProps {
   onOpenNegativeLab: () => void;
   onRedo: () => void;
   onCompareModeChange?: (mode: EditorCompareMode) => void;
+  onCompareOrientationChange?: (orientation: EditorCompareOrientation) => void;
   onShowOriginalChange?: (showOriginal: boolean) => void;
   onToggleFullScreen: () => void;
   onToggleShowOriginal: () => void;
   onUndo: () => void;
   selectedImage: SelectedImage;
   compareMode?: EditorCompareMode;
+  compareOrientation?: EditorCompareOrientation;
   showOriginal: boolean;
   showDateView: boolean;
   onToggleDateView: () => void;
@@ -80,12 +84,14 @@ const EditorToolbar = memo(
     onOpenNegativeLab,
     onRedo,
     onCompareModeChange = () => undefined,
+    onCompareOrientationChange = () => undefined,
     onShowOriginalChange = () => undefined,
     onToggleFullScreen,
     onToggleShowOriginal,
     onUndo,
     selectedImage,
     compareMode = 'off',
+    compareOrientation = 'vertical',
     showOriginal,
     showDateView,
     onToggleDateView,
@@ -1031,7 +1037,11 @@ const EditorToolbar = memo(
               onKeyDown={handleButtonKeyDown}
               type="button"
             >
-              <SquareSplitHorizontal size={16} />
+              {compareOrientation === 'vertical' ? (
+                <SquareSplitVertical size={16} />
+              ) : (
+                <SquareSplitHorizontal size={16} />
+              )}
             </button>
             <button
               aria-label={t('editor.toolbar.compare.sideBySide')}
@@ -1047,6 +1057,33 @@ const EditorToolbar = memo(
             >
               <Columns2 size={16} />
             </button>
+            {(compareMode === 'split-wipe' || compareMode === 'side-by-side') && (
+              <button
+                aria-label={
+                  compareOrientation === 'vertical'
+                    ? t('editor.toolbar.compare.useHorizontal')
+                    : t('editor.toolbar.compare.useVertical')
+                }
+                className={iconButtonClass}
+                data-testid="editor-compare-orientation"
+                data-tooltip={
+                  compareOrientation === 'vertical'
+                    ? t('editor.toolbar.compare.useHorizontal')
+                    : t('editor.toolbar.compare.useVertical')
+                }
+                onClick={() => {
+                  onCompareOrientationChange(compareOrientation === 'vertical' ? 'horizontal' : 'vertical');
+                }}
+                onKeyDown={handleButtonKeyDown}
+                type="button"
+              >
+                {compareOrientation === 'vertical' ? (
+                  <SquareSplitHorizontal size={16} />
+                ) : (
+                  <SquareSplitVertical size={16} />
+                )}
+              </button>
+            )}
           </div>
 
           <div className={commandGroupClass} data-testid="editor-toolbar-viewport-group">

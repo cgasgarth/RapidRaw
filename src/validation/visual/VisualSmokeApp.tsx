@@ -1037,7 +1037,10 @@ function useProfessionalEditorToolbarSmokeState() {
       historyIndex: 2,
       isExportSoftProofEnabled: true,
       selectedImage: professionalEditorToolbarImage,
-      showOriginal: true,
+      compare: {
+        ...useEditorStore.getState().compare,
+        mode: 'hold-original',
+      },
     });
   }, []);
 }

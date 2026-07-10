@@ -84,7 +84,9 @@ export default function CropPanel() {
   const isStraightenActive = useEditorStore((s) => s.isStraightenActive);
   const activeOverlay = useEditorStore((s) => s.overlayMode);
   const overlayRotation = useEditorStore((s) => s.overlayRotation);
-  const showOriginal = useEditorStore((s) => s.showOriginal);
+  const compare = useEditorStore((s) => s.compare);
+  const showOriginal = compare.isOriginalHeld || compare.mode === 'hold-original';
+  const dispatchCompare = useEditorStore((s) => s.dispatchCompare);
   const setEditor = useEditorStore((s) => s.setEditor);
   const isLensModalOpen = useUIStore((s) => s.isLensCorrectionModalOpen);
   const isTransformModalOpen = useUIStore((s) => s.isTransformModalOpen);
@@ -613,7 +615,7 @@ export default function CropPanel() {
             }
             disabled={!selectedImage?.isReady}
             onClick={() => {
-              setEditor({ showOriginal: !showOriginal });
+              dispatchCompare({ type: 'toggle-original' });
             }}
             type="button"
           >

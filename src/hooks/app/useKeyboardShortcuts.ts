@@ -273,7 +273,7 @@ export const useKeyboardShortcuts = ({
         shouldFire: (s) => !!s.editor.selectedImage,
         execute: (e, s) => {
           e.preventDefault();
-          s.editor.setEditor({ compareMode: s.editor.compareMode === 'hold-original' ? 'off' : 'hold-original' });
+          s.editor.dispatchCompare({ type: 'toggle-original' });
         },
       },
       toggle_adjustments: {
