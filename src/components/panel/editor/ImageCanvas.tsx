@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import CropOverlay, { type Crop, type PercentCrop } from 'react-image-crop';
+import type { Crop, PercentCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import type { KonvaEventObject, Node as KonvaNode } from 'konva/lib/Node';
 import type { Stage as KonvaStage } from 'konva/lib/Stage';
@@ -61,12 +61,15 @@ import {
 import type { AppSettings, BrushSettings, SelectedImage } from '../../ui/AppProperties';
 import type { OverlayMode } from '../right/color/CropPanel';
 import { Mask, type SubMask, SubMaskMode, ToolType } from '../right/layers/Masks';
-import CompositionOverlays from './overlays/CompositionOverlays';
+import { CompareOverlay } from './CompareOverlay';
+import { CropOverlaySurface } from './CropOverlaySurface';
+import { imageCanvasLayerZIndex, resolveImageCanvasPointerOwner } from './imageCanvasContracts';
 import {
   type CanvasOverlayStatus,
   canvasOverlayStatusColor,
   canvasOverlayTokens,
 } from './overlays/canvasOverlayTokens';
+import { PreviewSurface } from './PreviewSurface';
 
 declare global {
   interface Window {
@@ -3172,19 +3175,6 @@ const ImageCanvas = memo(
       return `rotate(${svgNumber(rotation)}deg)`;
     }, [adjustments.rotation, liveRotation]);
 
-    const getCropDimensions = () => {
-      const uncroppedWidth = uncroppedImageRenderSize?.width;
-      const uncroppedHeight = uncroppedImageRenderSize?.height;
-      if (!crop || !uncroppedWidth || !uncroppedHeight) {
-        return { width: 0, height: 0 };
-      }
-
-      const width = crop.unit === '%' ? uncroppedWidth * (crop.width / 100) : crop.width;
-      const height = crop.unit === '%' ? uncroppedHeight * (crop.height / 100) : crop.height;
-
-      return { width, height };
-    };
-
     const effectiveCursor = useMemo(() => {
       if (isWbPickerActive) return 'crosshair';
       if (isParametricActive) return 'crosshair';
@@ -3257,15 +3247,18 @@ const ImageCanvas = memo(
               : isToolActive || isCropping || showGamutWarningOverlay
                 ? 'active'
                 : 'ready';
-    const cropCanvasRatioLabel =
-      adjustments.aspectRatio === null ? t('editor.crop.presets.free.name') : `${adjustments.aspectRatio.toFixed(2)}:1`;
-    const cropCanvasOverlayLabel = isStraightenActive ? t('editor.crop.rotationHeading') : overlayMode || 'none';
+    const canvasPointerOwner = resolveImageCanvasPointerOwner({
+      isCropping,
+      isMaskInteractionActive,
+      isToolActive,
+    });
 
     return (
       <div
         className="canvas-overlay relative"
         data-canvas-overlay-status={activeCanvasOverlayStatus}
         data-canvas-overlay-tool={activeCanvasOverlayTool}
+        data-canvas-pointer-owner={canvasPointerOwner}
         data-editor-compare-overlay-disabled-reason={compareOverlayDisabledReason}
         data-editor-compare-mode={compareMode}
         data-editor-compare-original-ready={String(canShowOriginalCompare)}
@@ -3302,313 +3295,271 @@ const ImageCanvas = memo(
         data-testid="image-canvas"
         style={{ width: '100%', height: '100%', cursor: effectiveCursor }}
       >
-        <div
-          className="absolute inset-0 w-full h-full transition-opacity duration-200 flex items-center justify-center"
-          style={{
-            opacity: isCropViewVisible ? 0 : 1,
-            pointerEvents: isCropViewVisible ? 'none' : 'auto',
-          }}
-        >
-          <div
-            className="opacity-100"
-            style={{
-              height: '100%',
-              position: 'relative',
-              width: '100%',
-            }}
+        <>
+          <PreviewSurface
+            imageRenderSize={imageRenderSize}
+            isCropViewVisible={isCropViewVisible}
+            isMaxZoom={isMaxZoom}
+            originalLoaded={originalLoaded}
+            originalSrc={originalSrc}
+            showOriginalCompare={showOriginalCompare}
+            showSideBySideCompare={isSideBySideCompare}
+            showSplitCompare={showSplitCompare}
+            svgPreview={
+              <SvgPreviewHandoff
+                baseScopeKey={selectedImage.path}
+                baseSource={previewSource}
+                incomingPatch={coherentInteractivePatch}
+                isCpuPreviewVisible={!isWgpuActive}
+                isMaxZoom={isMaxZoom}
+                patchScopeKey={patchScopeKey}
+                releaseUrl={releasePreviewLayerUrl}
+                retainUrl={retainPreviewLayerUrl}
+              />
+            }
           >
-            <div className="absolute inset-0 w-full h-full">
-              <svg
-                className="pointer-events-none"
-                style={
-                  imageRenderSize.width > 0 && imageRenderSize.height > 0
-                    ? {
-                        position: 'absolute',
-                        left: cssPx(imageRenderSize.offsetX),
-                        top: cssPx(imageRenderSize.offsetY),
-                        width: cssPx(imageRenderSize.width),
-                        height: cssPx(imageRenderSize.height),
-                        overflow: 'visible',
-                      }
-                    : {
-                        position: 'absolute',
-                        inset: '0px',
-                        width: '100%',
-                        height: '100%',
-                        overflow: 'visible',
-                      }
-                }
-                preserveAspectRatio={imageRenderSize.width > 0 && imageRenderSize.height > 0 ? 'none' : 'xMidYMid meet'}
-              >
-                <SvgPreviewHandoff
-                  baseScopeKey={selectedImage.path}
-                  baseSource={previewSource}
-                  incomingPatch={coherentInteractivePatch}
-                  isCpuPreviewVisible={!isWgpuActive}
-                  isMaxZoom={isMaxZoom}
-                  patchScopeKey={patchScopeKey}
-                  releaseUrl={releasePreviewLayerUrl}
-                  retainUrl={retainPreviewLayerUrl}
-                />
-              </svg>
-
-              {originalSrc && (
-                <img
-                  alt={t('editor.canvas.originalAlt')}
-                  className={
-                    imageRenderSize.width > 0 && imageRenderSize.height > 0
-                      ? 'pointer-events-none'
-                      : 'absolute inset-0 w-full h-full object-contain pointer-events-none'
-                  }
-                  src={originalSrc}
-                  style={
-                    imageRenderSize.width > 0 && imageRenderSize.height > 0
-                      ? {
-                          position: 'absolute',
-                          left: cssPx(imageRenderSize.offsetX),
-                          top: cssPx(imageRenderSize.offsetY),
-                          width: cssPx(imageRenderSize.width),
-                          height: cssPx(imageRenderSize.height),
-                          clipPath: showSplitCompare ? 'inset(0 50% 0 0)' : undefined,
-                          imageRendering: isMaxZoom ? 'pixelated' : 'auto',
-                          opacity:
-                            (showOriginalCompare || showSplitCompare) && originalLoaded && !isSideBySideCompare ? 1 : 0,
-                          transition: originalLoaded ? 'opacity 150ms ease-in-out' : 'none',
-                          zIndex: 2,
-                        }
-                      : {
-                          clipPath: showSplitCompare ? 'inset(0 50% 0 0)' : undefined,
-                          imageRendering: isMaxZoom ? 'pixelated' : 'auto',
-                          opacity:
-                            (showOriginalCompare || showSplitCompare) && originalLoaded && !isSideBySideCompare ? 1 : 0,
-                          transition: originalLoaded ? 'opacity 150ms ease-in-out' : 'none',
-                          zIndex: 2,
-                        }
-                  }
-                />
-              )}
-              {showSplitCompare && (
-                <div
-                  aria-label={t('editor.canvas.compare.splitWipeDivider')}
-                  className="pointer-events-none absolute top-0 h-full"
-                  data-testid="editor-compare-split-divider"
-                  style={{
-                    left: '50%',
-                    width: '1px',
-                    background: 'rgba(255, 255, 255, 0.82)',
-                    boxShadow: '0 0 0 1px rgba(0, 0, 0, 0.55), 0 0 18px rgba(0, 0, 0, 0.45)',
-                    opacity: canShowOriginalCompare ? 1 : 0.4,
-                    zIndex: 6,
-                  }}
-                >
-                  <span
-                    className="absolute left-1/2 top-3 -translate-x-1/2 rounded border border-editor-overlay-stroke bg-editor-panel/90 px-2 py-1 text-[11px] font-medium text-text-primary"
-                    data-testid="editor-compare-split-label"
+            <CompareOverlay
+              canShowOriginalCompare={canShowOriginalCompare}
+              compareMode={compareMode}
+              compareOverlayDisabled={compareOverlayDisabled}
+              isCompareModeActive={isCompareModeActive}
+              isCropping={isCropping}
+              isMaxZoom={isMaxZoom}
+              onCompareModeChange={onCompareModeChange}
+              onShowOriginalChange={onShowOriginalChange}
+              originalSrc={originalSrc}
+              previewSource={previewSource}
+              showOriginal={showOriginal}
+              showSideBySideCompare={showSideBySideCompare}
+              showSplitCompare={showSplitCompare}
+            />
+            {false && (
+              <>
+                {showSplitCompare && (
+                  <div
+                    aria-label={t('editor.canvas.compare.splitWipeDivider')}
+                    className="pointer-events-none absolute top-0 h-full"
+                    data-testid="editor-compare-split-divider"
+                    style={{
+                      left: '50%',
+                      width: '1px',
+                      background: 'rgba(255, 255, 255, 0.82)',
+                      boxShadow: '0 0 0 1px rgba(0, 0, 0, 0.55), 0 0 18px rgba(0, 0, 0, 0.45)',
+                      opacity: canShowOriginalCompare ? 1 : 0.4,
+                      zIndex: imageCanvasLayerZIndex('viewerHud'),
+                    }}
                   >
-                    {canShowOriginalCompare
-                      ? t('editor.canvas.compare.splitWipeLabel')
-                      : t('editor.canvas.compare.loadingOriginal')}
-                  </span>
-                </div>
-              )}
-              {showSideBySideCompare && (
-                <div
-                  aria-label={t('editor.canvas.compare.sideBySideRegion')}
-                  className="absolute inset-0 grid grid-cols-2 gap-2 bg-editor-panel-well/95 p-2"
-                  data-testid="editor-compare-side-by-side-preview"
-                  style={{ zIndex: 8 }}
-                >
-                  {[
-                    {
-                      label: t('editor.canvas.compare.before'),
-                      src: originalSrc,
-                    },
-                    {
-                      label: t('editor.canvas.compare.after'),
-                      src: previewSource,
-                    },
-                  ].map((pane) => (
-                    <div
-                      className="relative min-h-0 overflow-hidden rounded-md border border-editor-overlay-stroke bg-black"
-                      data-compare-pane={pane.label}
-                      key={pane.label}
+                    <span
+                      className="absolute left-1/2 top-3 -translate-x-1/2 rounded border border-editor-overlay-stroke bg-editor-panel/90 px-2 py-1 text-[11px] font-medium text-text-primary"
+                      data-testid="editor-compare-split-label"
                     >
-                      {pane.src ? (
-                        <img
-                          alt={pane.label}
-                          className="h-full w-full object-contain"
-                          src={pane.src}
-                          style={{ imageRendering: isMaxZoom ? 'pixelated' : 'auto' }}
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center px-4 text-center text-xs text-text-secondary">
-                          {t('editor.canvas.compare.loadingOriginal')}
-                        </div>
-                      )}
-                      <span className="absolute left-3 top-3 rounded border border-editor-overlay-stroke bg-editor-panel/90 px-2 py-1 text-[11px] font-medium text-text-primary">
-                        {pane.label}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {isCompareModeActive && !compareOverlayDisabled && !canShowOriginalCompare && (
-                <div
-                  className="pointer-events-none absolute bottom-3 left-3 rounded-md border border-editor-warning/50 bg-editor-warning-surface px-3 py-2 text-xs font-medium text-editor-warning"
-                  data-testid="editor-compare-loading-reason"
-                  style={{ zIndex: 9 }}
-                >
-                  {t('editor.canvas.compare.loadingOriginal')}
-                </div>
-              )}
-              {compareOverlayDisabled && (
-                <div
-                  className="pointer-events-none absolute bottom-3 right-3 rounded-md border border-editor-warning/50 bg-editor-warning-surface px-3 py-2 text-xs font-medium text-editor-warning"
-                  data-testid="editor-compare-overlay-disabled-reason"
-                  style={{ zIndex: 9 }}
-                >
-                  {t('editor.canvas.compare.overlayDisabled')}
-                </div>
-              )}
-              {!isCropping && (
-                <div
-                  className="pointer-events-auto absolute left-1/2 top-3 flex max-w-[min(92%,520px)] -translate-x-1/2 items-center gap-1 rounded-md border border-editor-overlay-stroke bg-editor-panel/92 px-1.5 py-1 text-[11px] shadow-[0_12px_30px_var(--editor-overlay-shadow)] backdrop-blur"
-                  data-compare-active={String(isCompareModeActive)}
-                  data-compare-original-ready={String(canShowOriginalCompare)}
-                  data-compare-show-original={String(showOriginal)}
-                  data-preview-compare-mode={compareMode}
-                  data-testid="editor-preview-compare-strip"
-                  style={{ zIndex: 10 }}
-                >
-                  <span className="shrink-0 px-1.5 font-medium text-text-secondary">
-                    {t('editor.canvas.compare.stripTitle')}
-                  </span>
-                  {(['hold-original', 'split-wipe', 'side-by-side'] satisfies PreviewCompareStripMode[]).map((mode) => {
-                    const isActive = compareMode === mode;
-                    const label =
-                      mode === 'hold-original'
-                        ? t('editor.canvas.compare.stripMode.hold-original')
-                        : mode === 'split-wipe'
-                          ? t('editor.canvas.compare.stripMode.split-wipe')
-                          : t('editor.canvas.compare.stripMode.side-by-side');
-                    return (
+                      {canShowOriginalCompare
+                        ? t('editor.canvas.compare.splitWipeLabel')
+                        : t('editor.canvas.compare.loadingOriginal')}
+                    </span>
+                  </div>
+                )}
+                {showSideBySideCompare && (
+                  <div
+                    aria-label={t('editor.canvas.compare.sideBySideRegion')}
+                    className="absolute inset-0 grid grid-cols-2 gap-2 bg-editor-panel-well/95 p-2"
+                    data-testid="editor-compare-side-by-side-preview"
+                    style={{ zIndex: imageCanvasLayerZIndex('viewerHud') }}
+                  >
+                    {[
+                      {
+                        label: t('editor.canvas.compare.before'),
+                        src: originalSrc,
+                      },
+                      {
+                        label: t('editor.canvas.compare.after'),
+                        src: previewSource,
+                      },
+                    ].map((pane) => (
+                      <div
+                        className="relative min-h-0 overflow-hidden rounded-md border border-editor-overlay-stroke bg-black"
+                        data-compare-pane={pane.label}
+                        key={pane.label}
+                      >
+                        {pane.src ? (
+                          <img
+                            alt={pane.label}
+                            className="h-full w-full object-contain"
+                            src={pane.src}
+                            style={{ imageRendering: isMaxZoom ? 'pixelated' : 'auto' }}
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center px-4 text-center text-xs text-text-secondary">
+                            {t('editor.canvas.compare.loadingOriginal')}
+                          </div>
+                        )}
+                        <span className="absolute left-3 top-3 rounded border border-editor-overlay-stroke bg-editor-panel/90 px-2 py-1 text-[11px] font-medium text-text-primary">
+                          {pane.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {isCompareModeActive && !compareOverlayDisabled && !canShowOriginalCompare && (
+                  <div
+                    className="pointer-events-none absolute bottom-3 left-3 rounded-md border border-editor-warning/50 bg-editor-warning-surface px-3 py-2 text-xs font-medium text-editor-warning"
+                    data-testid="editor-compare-loading-reason"
+                    style={{ zIndex: imageCanvasLayerZIndex('viewerHud') }}
+                  >
+                    {t('editor.canvas.compare.loadingOriginal')}
+                  </div>
+                )}
+                {compareOverlayDisabled && (
+                  <div
+                    className="pointer-events-none absolute bottom-3 right-3 rounded-md border border-editor-warning/50 bg-editor-warning-surface px-3 py-2 text-xs font-medium text-editor-warning"
+                    data-testid="editor-compare-overlay-disabled-reason"
+                    style={{ zIndex: imageCanvasLayerZIndex('viewerHud') }}
+                  >
+                    {t('editor.canvas.compare.overlayDisabled')}
+                  </div>
+                )}
+                {!isCropping && (
+                  <div
+                    className="pointer-events-auto absolute left-1/2 top-3 flex max-w-[min(92%,520px)] -translate-x-1/2 items-center gap-1 rounded-md border border-editor-overlay-stroke bg-editor-panel/92 px-1.5 py-1 text-[11px] shadow-[0_12px_30px_var(--editor-overlay-shadow)] backdrop-blur"
+                    data-compare-active={String(isCompareModeActive)}
+                    data-compare-original-ready={String(canShowOriginalCompare)}
+                    data-compare-show-original={String(showOriginal)}
+                    data-preview-compare-mode={compareMode}
+                    data-testid="editor-preview-compare-strip"
+                    style={{ zIndex: imageCanvasLayerZIndex('viewerHud') }}
+                  >
+                    <span className="shrink-0 px-1.5 font-medium text-text-secondary">
+                      {t('editor.canvas.compare.stripTitle')}
+                    </span>
+                    {(['hold-original', 'split-wipe', 'side-by-side'] satisfies PreviewCompareStripMode[]).map(
+                      (mode) => {
+                        const isActive = compareMode === mode;
+                        const label =
+                          mode === 'hold-original'
+                            ? t('editor.canvas.compare.stripMode.hold-original')
+                            : mode === 'split-wipe'
+                              ? t('editor.canvas.compare.stripMode.split-wipe')
+                              : t('editor.canvas.compare.stripMode.side-by-side');
+                        return (
+                          <button
+                            aria-label={label}
+                            aria-pressed={isActive}
+                            className={[
+                              'h-7 rounded px-2 text-[11px] font-medium transition',
+                              isActive
+                                ? 'bg-text-primary text-bg-primary shadow-sm'
+                                : 'bg-editor-panel-well text-text-secondary hover:bg-editor-hover hover:text-text-primary',
+                            ].join(' ')}
+                            data-testid={`editor-preview-compare-${mode}`}
+                            key={mode}
+                            onClick={() => {
+                              onCompareModeChange(isActive ? 'off' : mode);
+                            }}
+                            onPointerDown={(event) => {
+                              if (mode !== 'hold-original' || event.button !== 0) return;
+                              onShowOriginalChange(true);
+                            }}
+                            onPointerLeave={(event) => {
+                              if (mode !== 'hold-original' || event.buttons !== 1) return;
+                              onShowOriginalChange(false);
+                            }}
+                            onPointerUp={() => {
+                              if (mode === 'hold-original') onShowOriginalChange(false);
+                            }}
+                            type="button"
+                          >
+                            {label}
+                          </button>
+                        );
+                      },
+                    )}
+                    {isCompareModeActive && (
                       <button
-                        aria-label={label}
-                        aria-pressed={isActive}
-                        className={[
-                          'h-7 rounded px-2 text-[11px] font-medium transition',
-                          isActive
-                            ? 'bg-text-primary text-bg-primary shadow-sm'
-                            : 'bg-editor-panel-well text-text-secondary hover:bg-editor-hover hover:text-text-primary',
-                        ].join(' ')}
-                        data-testid={`editor-preview-compare-${mode}`}
-                        key={mode}
+                        aria-label={t('editor.canvas.compare.stripOff')}
+                        className="h-7 rounded px-2 text-[11px] font-medium text-text-secondary transition hover:bg-editor-hover hover:text-text-primary"
+                        data-testid="editor-preview-compare-off"
                         onClick={() => {
-                          onCompareModeChange(isActive ? 'off' : mode);
-                        }}
-                        onPointerDown={(event) => {
-                          if (mode !== 'hold-original' || event.button !== 0) return;
-                          onShowOriginalChange(true);
-                        }}
-                        onPointerLeave={(event) => {
-                          if (mode !== 'hold-original' || event.buttons !== 1) return;
-                          onShowOriginalChange(false);
-                        }}
-                        onPointerUp={() => {
-                          if (mode === 'hold-original') onShowOriginalChange(false);
+                          onCompareModeChange('off');
                         }}
                         type="button"
                       >
-                        {label}
+                        {t('editor.canvas.compare.stripOff')}
                       </button>
-                    );
-                  })}
-                  {isCompareModeActive && (
-                    <button
-                      aria-label={t('editor.canvas.compare.stripOff')}
-                      className="h-7 rounded px-2 text-[11px] font-medium text-text-secondary transition hover:bg-editor-hover hover:text-text-primary"
-                      data-testid="editor-preview-compare-off"
-                      onClick={() => {
-                        onCompareModeChange('off');
-                      }}
-                      type="button"
-                    >
-                      {t('editor.canvas.compare.stripOff')}
-                    </button>
-                  )}
-                </div>
-              )}
-              {displayedMaskUrl && (
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+            {displayedMaskUrl && (
+              <img
+                alt={t('editor.canvas.maskOverlayAlt')}
+                className="absolute object-contain pointer-events-none"
+                src={displayedMaskUrl}
+                style={{
+                  height: cssPx(imageRenderSize.height),
+                  left: cssPx(imageRenderSize.offsetX),
+                  opacity: overlayVisibility.showMaskOverlay ? 1 : 0,
+                  top: cssPx(imageRenderSize.offsetY),
+                  transition: 'opacity 300ms ease-in-out',
+                  width: cssPx(imageRenderSize.width),
+                  imageRendering: isMaxZoom ? 'pixelated' : 'auto',
+                  zIndex: imageCanvasLayerZIndex('maskCoverage'),
+                }}
+              />
+            )}
+            {showGamutWarningOverlay && gamutWarningOverlay && (
+              <div
+                aria-label={t('editor.canvas.gamutWarningOverlay')}
+                className="pointer-events-none absolute"
+                data-coverage-ratio={gamutWarningOverlay.coverage_ratio.toFixed(6)}
+                data-effective-color-profile={gamutWarningOverlay.effective_color_profile}
+                data-effective-rendering-intent={gamutWarningOverlay.effective_rendering_intent}
+                data-export-soft-proof-recipe-id={gamutWarningOverlay.export_soft_proof_recipe_id}
+                data-preview-warning-state={renderedPreviewWarningStatus.state}
+                data-proof-ready="true"
+                data-preview-basis={gamutWarningOverlay.preview_basis}
+                data-render-target-label={renderedPreviewWarningStatus.renderTargetLabel}
+                data-source-image-path={gamutWarningOverlay.source_image_path}
+                data-source-precision-path={gamutWarningOverlay.source_precision_path}
+                data-transform-applied={String(gamutWarningOverlay.transform_applied)}
+                data-transform-policy-fingerprint={gamutWarningOverlay.transform_policy_fingerprint}
+                data-mask-height={gamutWarningOverlay.height}
+                data-mask-width={gamutWarningOverlay.width}
+                data-testid="gamut-warning-overlay"
+                data-warning-pixel-count={gamutWarningOverlay.warning_pixel_count}
+                style={{
+                  height: cssPx(imageRenderSize.height),
+                  left: cssPx(imageRenderSize.offsetX),
+                  top: cssPx(imageRenderSize.offsetY),
+                  width: cssPx(imageRenderSize.width),
+                  zIndex: imageCanvasLayerZIndex('diagnosticPixels'),
+                }}
+              >
                 <img
-                  alt={t('editor.canvas.maskOverlayAlt')}
-                  className="absolute object-contain pointer-events-none"
-                  src={displayedMaskUrl}
+                  alt=""
+                  className="h-full w-full object-fill"
+                  src={gamutWarningOverlay.mask_data_url}
                   style={{
-                    height: cssPx(imageRenderSize.height),
-                    left: cssPx(imageRenderSize.offsetX),
-                    opacity: overlayVisibility.showMaskOverlay ? 1 : 0,
-                    top: cssPx(imageRenderSize.offsetY),
-                    transition: 'opacity 300ms ease-in-out',
-                    width: cssPx(imageRenderSize.width),
                     imageRendering: isMaxZoom ? 'pixelated' : 'auto',
-                    zIndex: 3,
                   }}
                 />
-              )}
-              {showGamutWarningOverlay && gamutWarningOverlay && (
                 <div
-                  aria-label={t('editor.canvas.gamutWarningOverlay')}
-                  className="pointer-events-none absolute"
-                  data-coverage-ratio={gamutWarningOverlay.coverage_ratio.toFixed(6)}
-                  data-effective-color-profile={gamutWarningOverlay.effective_color_profile}
-                  data-effective-rendering-intent={gamutWarningOverlay.effective_rendering_intent}
-                  data-export-soft-proof-recipe-id={gamutWarningOverlay.export_soft_proof_recipe_id}
-                  data-preview-warning-state={renderedPreviewWarningStatus.state}
-                  data-proof-ready="true"
-                  data-preview-basis={gamutWarningOverlay.preview_basis}
-                  data-render-target-label={renderedPreviewWarningStatus.renderTargetLabel}
-                  data-source-image-path={gamutWarningOverlay.source_image_path}
-                  data-source-precision-path={gamutWarningOverlay.source_precision_path}
-                  data-transform-applied={String(gamutWarningOverlay.transform_applied)}
-                  data-transform-policy-fingerprint={gamutWarningOverlay.transform_policy_fingerprint}
-                  data-mask-height={gamutWarningOverlay.height}
-                  data-mask-width={gamutWarningOverlay.width}
-                  data-testid="gamut-warning-overlay"
-                  data-warning-pixel-count={gamutWarningOverlay.warning_pixel_count}
+                  className="absolute bottom-3 right-3 rounded-md border px-3 py-2 text-xs font-medium"
                   style={{
-                    height: cssPx(imageRenderSize.height),
-                    left: cssPx(imageRenderSize.offsetX),
-                    top: cssPx(imageRenderSize.offsetY),
-                    width: cssPx(imageRenderSize.width),
-                    zIndex: 4,
+                    background: 'rgba(12, 14, 17, 0.84)',
+                    borderColor: 'var(--editor-danger)',
+                    boxShadow: '0 12px 28px rgba(0, 0, 0, 0.58)',
+                    color: '#ffe8fb',
                   }}
                 >
-                  <img
-                    alt=""
-                    className="h-full w-full object-fill"
-                    src={gamutWarningOverlay.mask_data_url}
-                    style={{
-                      imageRendering: isMaxZoom ? 'pixelated' : 'auto',
-                    }}
-                  />
-                  <div
-                    className="absolute bottom-3 right-3 rounded-md border px-3 py-2 text-xs font-medium"
-                    style={{
-                      background: 'rgba(12, 14, 17, 0.84)',
-                      borderColor: 'var(--editor-danger)',
-                      boxShadow: '0 12px 28px rgba(0, 0, 0, 0.58)',
-                      color: '#ffe8fb',
-                    }}
-                  >
-                    {t('editor.canvas.gamutWarningCoverage', {
-                      profile: renderedPreviewWarningStatus.displayProfileLabel,
-                      value: renderedPreviewWarningStatus.coverageLabel,
-                    })}
-                  </div>
+                  {t('editor.canvas.gamutWarningCoverage', {
+                    profile: renderedPreviewWarningStatus.displayProfileLabel,
+                    value: renderedPreviewWarningStatus.coverageLabel,
+                  })}
                 </div>
-              )}
-            </div>
-          </div>
+              </div>
+            )}
+          </PreviewSurface>
 
           {activeRetouchLayer &&
             activeRetouchSource &&
@@ -3676,7 +3627,7 @@ const ImageCanvas = memo(
                     transition: 'opacity 150ms ease-in-out',
                     userSelect: 'none',
                     width: stageWidth * maxSafeScale,
-                    zIndex: 5,
+                    zIndex: imageCanvasLayerZIndex('toolGeometry'),
                   }}
                 >
                   <Stage height={stageHeight * maxSafeScale} width={stageWidth * maxSafeScale}>
@@ -3943,7 +3894,7 @@ const ImageCanvas = memo(
                     transition: 'opacity 150ms ease-in-out',
                     userSelect: 'none',
                     width: stageWidth * maxSafeScale,
-                    zIndex: 5,
+                    zIndex: imageCanvasLayerZIndex('toolGeometry'),
                   }}
                 >
                   <Stage height={stageHeight * maxSafeScale} width={stageWidth * maxSafeScale}>
@@ -4142,7 +4093,7 @@ const ImageCanvas = memo(
                 transform: `scale(${svgNumber(1 / maxSafeScale)})`,
                 width: stageWidth * maxSafeScale,
                 height: stageHeight * maxSafeScale,
-                zIndex: 4,
+                zIndex: imageCanvasLayerZIndex('activeTool'),
                 touchAction: 'none',
                 userSelect: 'none',
                 opacity: showInteractiveToolOverlayStage ? 1 : 0,
@@ -4262,120 +4213,65 @@ const ImageCanvas = memo(
               </Stage>
             </div>
           )}
-        </div>
-
-        <div
-          className="absolute inset-0 w-full h-full flex items-center justify-center transition-opacity duration-200"
-          style={{
-            opacity: isCropViewVisible ? 1 : 0,
-            pointerEvents: isCropViewVisible ? 'auto' : 'none',
-          }}
-        >
-          {isCropping && (
-            <div
-              aria-live="polite"
-              className="pointer-events-none absolute left-3 top-3 z-20 flex max-w-[calc(100%-1.5rem)] items-center gap-1 overflow-hidden text-[11px]"
-              data-crop-canvas-overlay={cropCanvasOverlayLabel}
-              data-crop-canvas-ratio={cropCanvasRatioLabel}
-              data-testid="crop-canvas-mode-strip"
-            >
-              <span className="shrink-0 rounded border border-editor-overlay-stroke bg-editor-panel/92 px-1.5 py-1 text-text-primary shadow-sm backdrop-blur">
-                {t('editor.crop.title')}
-              </span>
-              <span className="truncate rounded border border-editor-overlay-stroke bg-editor-panel/92 px-1.5 py-1 font-mono text-text-secondary shadow-sm backdrop-blur">
-                {cropCanvasRatioLabel}
-              </span>
-            </div>
-          )}
-          {cropPreviewUrl && uncroppedImageRenderSize && (
-            <div
-              style={{
-                height: uncroppedImageRenderSize.height,
-                position: 'relative',
-                width: uncroppedImageRenderSize.width,
-              }}
-            >
-              <CropOverlay
-                aspect={adjustments.aspectRatio}
-                crop={crop}
-                onChange={setCrop}
-                onComplete={handleCropComplete}
-                ruleOfThirds={false}
-                renderSelectionAddon={() => {
-                  const { width, height } = getCropDimensions();
-                  if (width <= 0 || height <= 0) {
-                    return null;
-                  }
-                  const showDenseGrid = isRotationActive && !isStraightenActive;
-                  const currentOverlayMode = isRotationActive || isStraightenActive ? 'none' : overlayMode || 'none';
-                  return (
-                    <CompositionOverlays
-                      width={width}
-                      height={height}
-                      mode={currentOverlayMode}
-                      rotation={overlayRotation || 0}
-                      denseVisible={showDenseGrid}
-                    />
-                  );
+        </>
+        <CropOverlaySurface
+          aspectRatio={adjustments.aspectRatio}
+          crop={crop}
+          cropImageRef={cropImageRef}
+          cropImageTransform={cropImageTransforms}
+          cropPreviewUrl={cropPreviewUrl}
+          cropRenderSize={uncroppedImageRenderSize}
+          handleCropComplete={handleCropComplete}
+          isCropping={isCropping}
+          isCropViewVisible={isCropViewVisible}
+          isMaxZoom={isMaxZoom}
+          isRotationActive={isRotationActive}
+          isStraightenActive={isStraightenActive}
+          overlayMode={overlayMode}
+          overlayRotation={overlayRotation}
+          setCrop={setCrop}
+          straightenOverlay={
+            isStraightenActive && (
+              <Stage
+                height={uncroppedImageRenderSize?.height ?? 0}
+                onMouseDown={handleStraightenMouseDown}
+                onMouseLeave={handleStraightenMouseLeave}
+                onMouseMove={handleStraightenMouseMove}
+                onMouseUp={handleStraightenMouseUp}
+                onTouchEnd={handleStraightenMouseUp}
+                onTouchMove={handleStraightenMouseMove}
+                onTouchStart={handleStraightenMouseDown}
+                style={{
+                  cursor: 'crosshair',
+                  left: 0,
+                  position: 'absolute',
+                  top: 0,
+                  touchAction: 'none',
+                  zIndex: imageCanvasLayerZIndex('activeTool'),
                 }}
+                width={uncroppedImageRenderSize?.width ?? 0}
               >
-                <img
-                  alt={t('editor.canvas.cropPreviewAlt')}
-                  ref={cropImageRef}
-                  src={cropPreviewUrl}
-                  style={{
-                    display: 'block',
-                    width: cssPx(uncroppedImageRenderSize.width),
-                    height: cssPx(uncroppedImageRenderSize.height),
-                    objectFit: 'contain',
-                    transform: cropImageTransforms,
-                    imageRendering: isMaxZoom ? 'pixelated' : 'auto',
-                  }}
-                />
-              </CropOverlay>
-
-              {isStraightenActive && (
-                <Stage
-                  height={uncroppedImageRenderSize.height ?? 0}
-                  onMouseDown={handleStraightenMouseDown}
-                  onTouchStart={handleStraightenMouseDown}
-                  onMouseLeave={handleStraightenMouseLeave}
-                  onMouseMove={handleStraightenMouseMove}
-                  onTouchMove={handleStraightenMouseMove}
-                  onMouseUp={handleStraightenMouseUp}
-                  onTouchEnd={handleStraightenMouseUp}
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    zIndex: 10,
-                    cursor: 'crosshair',
-                    touchAction: 'none',
-                  }}
-                  width={uncroppedImageRenderSize.width ?? 0}
-                >
-                  <Layer>
-                    {straightenLine && (
-                      <Line
-                        dash={[4, 4]}
-                        listening={false}
-                        points={[
-                          straightenLine.start.x,
-                          straightenLine.start.y,
-                          straightenLine.end.x,
-                          straightenLine.end.y,
-                        ]}
-                        stroke={canvasOverlayTokens.colors.active}
-                        {...canvasOverlayShadowProps}
-                        strokeWidth={2}
-                      />
-                    )}
-                  </Layer>
-                </Stage>
-              )}
-            </div>
-          )}
-        </div>
+                <Layer>
+                  {straightenLine && (
+                    <Line
+                      dash={[4, 4]}
+                      listening={false}
+                      points={[
+                        straightenLine.start.x,
+                        straightenLine.start.y,
+                        straightenLine.end.x,
+                        straightenLine.end.y,
+                      ]}
+                      stroke={canvasOverlayTokens.colors.active}
+                      {...canvasOverlayShadowProps}
+                      strokeWidth={2}
+                    />
+                  )}
+                </Layer>
+              </Stage>
+            )
+          }
+        />
       </div>
     );
   },
