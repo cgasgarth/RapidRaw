@@ -241,7 +241,6 @@ export default function Editor({
   const [isMaskTouchInteracting, setIsMaskTouchInteracting] = useState(false);
   const [isLoaderVisible, setIsLoaderVisible] = useState(false);
   const [viewerSamplerState, setViewerSamplerState] = useState<ViewerSamplerState | null>(null);
-  const [showExifDateView, setShowExifDateView] = useState(false);
   const [maskOverlayUrl, setMaskOverlayUrl] = useState<string | null>(null);
   const [maskOverlayRuntimeState, setMaskOverlayRuntimeState] = useState<MaskOverlayRuntimeState>({
     identity: null,
@@ -1951,10 +1950,6 @@ export default function Editor({
             dispatchCompare({ orientation, type: 'set-orientation' });
           }}
           showOriginal={compare.isOriginalHeld || compare.mode === 'hold-original'}
-          showDateView={showExifDateView}
-          onToggleDateView={() => {
-            setShowExifDateView((prev) => !prev);
-          }}
         />
         {selectedImage.isOfflineSmartPreview === true && (
           <div
