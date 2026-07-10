@@ -21,10 +21,10 @@ use sha2::{Digest, Sha256};
 use tauri::Emitter;
 use tauri::Manager;
 
+use crate::color::working_to_output_transform::WorkingColorState;
 use crate::exif_processing;
 pub(crate) use crate::export::export_encoders::{
-    EmbeddedSourceIccProfile, encode_image_to_bytes,
-    encode_image_with_applied_policy_and_source_profile,
+    EmbeddedSourceIccProfile, encode_image_to_bytes, encode_image_with_working_color_state,
     validate_export_file_readback_color_policy,
 };
 use crate::export::export_output_targets::{
@@ -67,8 +67,10 @@ use crate::cache_utils::{calculate_full_job_hash, calculate_transform_hash};
 #[cfg(test)]
 pub(crate) use crate::export::export_color_policy::{
     ExportBlackPointCompensationStatus, ExportColorEngineId, applied_export_color_policy,
-    export_color_profile_receipt_label, export_rgb_pixels_and_profile,
-    export_rgb16_pixels_with_shared_conversion_core, export_transform_options,
+    export_color_profile_receipt_label, export_jpeg_rgb_pixels_and_profile,
+    export_rgb_pixels_and_profile, export_rgb16_pixels_and_profile,
+    export_rgb16_pixels_with_shared_conversion_core,
+    export_soft_proof_rgb_pixels_and_profile_with_policy, export_transform_options,
     mox_rendering_intent, resolve_export_color_transform_plan,
     should_apply_srgb_perceptual_gamut_mapping,
 };
@@ -76,9 +78,8 @@ pub use crate::export::export_color_policy::{
     ExportColorCapabilityCatalog, ExportColorProfile, ExportRenderingIntent,
 };
 pub(crate) use crate::export::export_color_policy::{
-    ExportReceiptMetadata, encode_icc_profile, export_jpeg_rgb_pixels_and_profile,
-    export_receipt_metadata, export_rgb16_pixels_and_profile,
-    export_soft_proof_rgb_pixels_and_profile_with_policy, export_soft_proof_transform_metadata,
+    ExportReceiptMetadata, encode_icc_profile, export_receipt_metadata,
+    export_soft_proof_rgb_pixels_with_working_color_state, export_soft_proof_transform_metadata,
     export_source_precision_receipt_label, export_source_rgb16_pixels, quantize_rgb16_to_rgb8,
     resolve_export_color_capabilities, validate_export_color_policy,
 };
@@ -428,6 +429,22 @@ pub(crate) fn save_image_with_metadata(
     source_path_str: &str,
     export_settings: &ExportSettings,
 ) -> Result<Option<ExportReceiptMetadata>, String> {
+    save_image_with_metadata_and_color_state(
+        image,
+        WorkingColorState::EncodedSrgbV1,
+        output_path,
+        source_path_str,
+        export_settings,
+    )
+}
+
+pub(crate) fn save_image_with_metadata_and_color_state(
+    image: &DynamicImage,
+    source_color_state: WorkingColorState,
+    output_path: &std::path::Path,
+    source_path_str: &str,
+    export_settings: &ExportSettings,
+) -> Result<Option<ExportReceiptMetadata>, String> {
     let extension = output_path
         .extension()
         .and_then(|s| s.to_str())
@@ -445,8 +462,9 @@ pub(crate) fn save_image_with_metadata(
         None
     };
 
-    let encoded_image = encode_image_with_applied_policy_and_source_profile(
+    let encoded_image = encode_image_with_working_color_state(
         image,
+        source_color_state,
         &extension,
         export_settings.jpeg_quality,
         &export_settings.color_profile,
@@ -1095,8 +1113,13 @@ pub async fn export_images(
                     }
                     let Some(export_color_policy) =
                         commit_export_output(cancellation_token.as_ref(), || {
-                            save_image_with_metadata(
+                            save_image_with_metadata_and_color_state(
                                 &final_image,
+                                if is_raw {
+                                    WorkingColorState::AcesCgLinearV1
+                                } else {
+                                    WorkingColorState::EncodedSrgbV1
+                                },
                                 &output_path,
                                 &source_path_str,
                                 &export_settings,
@@ -1685,18 +1708,21 @@ mod tests {
         ExportColorProfile, ExportRenderingIntent, ExportSettings, OutputSharpeningSettings,
         applied_export_color_policy, apply_export_resize_and_watermark, claim_export_job,
         commit_export_output, encode_icc_profile, encode_image_to_bytes,
-        encode_image_with_applied_policy_and_source_profile, export_color_profile_receipt_label,
+        encode_image_with_working_color_state, export_color_profile_receipt_label,
         export_jpeg_rgb_pixels_and_profile, export_receipt_metadata, export_receipt_output,
         export_rgb_pixels_and_profile, export_rgb16_pixels_and_profile,
         export_rgb16_pixels_with_shared_conversion_core,
         export_soft_proof_rgb_pixels_and_profile_with_policy,
+        export_soft_proof_rgb_pixels_with_working_color_state,
         export_source_precision_receipt_label, export_transform_options, finish_export_job,
         mox_rendering_intent, quantize_rgb16_to_rgb8, request_export_cancellation,
         resolve_export_color_capabilities, resolve_export_color_transform_plan,
         should_apply_srgb_perceptual_gamut_mapping,
     };
+    use crate::color::working_to_output_transform::WorkingColorState;
     use crate::export::export_encoders::{
-        encode_image_with_applied_policy, validate_export_file_readback_color_policy,
+        encode_image_with_applied_policy, encode_image_with_applied_policy_and_source_profile,
+        validate_export_file_readback_color_policy,
     };
     use crate::export::export_postprocess::OutputSharpeningTarget;
     use crate::export::export_processing::save_image_with_metadata;
@@ -3363,5 +3389,57 @@ mod tests {
             soft_proof_pixels, srgb_pixels,
             "fixture must exercise the Display P3 transform, not only dimension/identity plumbing"
         );
+    }
+
+    #[test]
+    fn typed_ap1_soft_proof_and_real_outputs_share_pixels_and_embed_destination_profile() {
+        let image = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(2, 1, |x, _| {
+            if x == 0 {
+                Rgba([0.9, 0.1, 0.05, 1.0])
+            } else {
+                Rgba([0.18, 0.18, 0.18, 1.0])
+            }
+        }));
+        let (proof, width, height, profile) =
+            export_soft_proof_rgb_pixels_with_working_color_state(
+                &image,
+                WorkingColorState::AcesCgLinearV1,
+                &ExportColorProfile::DisplayP3,
+                &ExportRenderingIntent::RelativeColorimetric,
+                false,
+            )
+            .unwrap();
+        let jpeg = encode_image_with_working_color_state(
+            &image,
+            WorkingColorState::AcesCgLinearV1,
+            "jpg",
+            95,
+            &ExportColorProfile::DisplayP3,
+            &ExportRenderingIntent::RelativeColorimetric,
+            false,
+            None,
+        )
+        .unwrap();
+        let tiff = encode_image_with_working_color_state(
+            &image,
+            WorkingColorState::AcesCgLinearV1,
+            "tiff",
+            95,
+            &ExportColorProfile::DisplayP3,
+            &ExportRenderingIntent::RelativeColorimetric,
+            false,
+            None,
+        )
+        .unwrap();
+
+        assert_eq!((width, height), (2, 1));
+        assert_eq!(proof.len(), 6);
+        let expected_icc = encode_icc_profile(&profile).unwrap();
+        let mut jpeg_decoder = JpegDecoder::new(Cursor::new(jpeg.bytes)).unwrap();
+        assert_eq!(jpeg_decoder.icc_profile().unwrap().unwrap(), expected_icc);
+        let mut tiff_decoder = TiffDecoder::new(Cursor::new(tiff.bytes)).unwrap();
+        assert_eq!(tiff_decoder.icc_profile().unwrap().unwrap(), expected_icc);
+        assert_eq!(tiff_decoder.dimensions(), (2, 1));
+        assert_eq!(tiff_decoder.color_type(), ColorType::Rgb16);
     }
 }

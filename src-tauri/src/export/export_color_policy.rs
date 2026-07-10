@@ -7,6 +7,10 @@ use moxcms::{ColorProfile, Layout, RenderingIntent as MoxRenderingIntent, Transf
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use crate::color::working_to_output_transform::{
+    WorkingColorState, transform_acescg_image_to_output_rgb16,
+};
+
 use crate::gamut_mapping::{
     ACTIVE_SRGB_OKLAB_CHROMA_REDUCE, map_srgb_oklab_chroma_reduce_rgb16_pixels,
 };
@@ -94,6 +98,7 @@ pub struct ExportColorCapabilityCatalog {
     pub schema_version: u8,
 }
 
+#[allow(dead_code)]
 pub(crate) fn export_rgb16_pixels_and_profile(
     image: &DynamicImage,
     color_profile: &ExportColorProfile,
@@ -108,12 +113,39 @@ pub(crate) fn export_rgb16_pixels_and_profile(
     )
 }
 
+#[allow(dead_code)]
 pub(crate) fn export_rgb16_pixels_with_shared_conversion_core(
     image: &DynamicImage,
     color_profile: &ExportColorProfile,
     rendering_intent: &ExportRenderingIntent,
     black_point_compensation: bool,
 ) -> Result<(Vec<u16>, u32, u32, ColorProfile), String> {
+    export_rgb16_pixels_with_working_color_state(
+        image,
+        WorkingColorState::EncodedSrgbV1,
+        color_profile,
+        rendering_intent,
+        black_point_compensation,
+    )
+}
+
+pub(crate) fn export_rgb16_pixels_with_working_color_state(
+    image: &DynamicImage,
+    source_color_state: WorkingColorState,
+    color_profile: &ExportColorProfile,
+    rendering_intent: &ExportRenderingIntent,
+    black_point_compensation: bool,
+) -> Result<(Vec<u16>, u32, u32, ColorProfile), String> {
+    if source_color_state == WorkingColorState::AcesCgLinearV1 {
+        let output_profile = output_color_profile(color_profile)?;
+        let (pixels, width, height) = transform_acescg_image_to_output_rgb16(
+            image,
+            color_profile,
+            rendering_intent,
+            black_point_compensation,
+        )?;
+        return Ok((pixels, width, height, output_profile));
+    }
     let (pixels, width, height) =
         export_source_rgb16_pixels(image, color_profile, rendering_intent);
     let output_profile = output_color_profile(color_profile)?;
@@ -204,6 +236,7 @@ pub(crate) fn should_apply_srgb_perceptual_gamut_mapping(
         && matches!(rendering_intent, ExportRenderingIntent::Perceptual)
 }
 
+#[allow(dead_code)]
 pub(crate) fn export_jpeg_rgb_pixels_and_profile(
     image: &DynamicImage,
     color_profile: &ExportColorProfile,
@@ -218,6 +251,7 @@ pub(crate) fn export_jpeg_rgb_pixels_and_profile(
     )
 }
 
+#[allow(dead_code)]
 pub(crate) fn export_soft_proof_rgb_pixels_and_profile_with_policy(
     image: &DynamicImage,
     color_profile: &ExportColorProfile,
@@ -230,6 +264,23 @@ pub(crate) fn export_soft_proof_rgb_pixels_and_profile_with_policy(
         rendering_intent,
         black_point_compensation,
     )
+}
+
+pub(crate) fn export_soft_proof_rgb_pixels_with_working_color_state(
+    image: &DynamicImage,
+    source_color_state: WorkingColorState,
+    color_profile: &ExportColorProfile,
+    rendering_intent: &ExportRenderingIntent,
+    black_point_compensation: bool,
+) -> Result<(Vec<u8>, u32, u32, ColorProfile), String> {
+    let (pixels, width, height, profile) = export_rgb16_pixels_with_working_color_state(
+        image,
+        source_color_state,
+        color_profile,
+        rendering_intent,
+        black_point_compensation,
+    )?;
+    Ok((quantize_rgb16_to_rgb8(&pixels), width, height, profile))
 }
 
 pub(crate) fn export_soft_proof_transform_metadata(
@@ -249,6 +300,7 @@ pub(crate) fn export_soft_proof_transform_metadata(
     .ok_or_else(|| "Failed to resolve export soft-proof transform metadata.".to_string())
 }
 
+#[allow(dead_code)]
 pub(crate) fn export_rgb_pixels_and_profile(
     image: &DynamicImage,
     color_profile: &ExportColorProfile,
