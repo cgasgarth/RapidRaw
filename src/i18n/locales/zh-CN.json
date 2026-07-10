@@ -740,6 +740,9 @@
           "dryRun": "",
           "read": ""
         },
+        "modelSelection": {
+          "requested": ""
+        },
         "noAppliedEdits": "",
         "previewLineage": {
           "meta": {

@@ -8,6 +8,10 @@ import {
   type AgentInitialPromptContext,
   buildAgentInitialPromptContext,
 } from '../../../../utils/agent/context/agentInitialPromptContext';
+import {
+  AGENT_APP_SERVER_DEFAULT_MODEL_LABEL,
+  AGENT_APP_SERVER_DEFAULT_REASONING_EFFORT,
+} from '../../../../utils/agent/session/agentAppServerModelSession';
 import AgentChatShell from './AgentChatShell';
 
 const getImageLabelFromPath = (path: string): string => {
@@ -108,6 +112,16 @@ export function AgentPanel() {
             {t('editor.ai.agent.title')}
           </h2>
           <p className="truncate text-[11px] leading-4 text-text-secondary">{targetLabel}</p>
+          <p
+            className="truncate text-[10px] leading-3 text-text-tertiary"
+            data-effective-reasoning-effort="pending"
+            data-model-selection-status="pending"
+            data-requested-model-id="gpt-5.6-terra"
+            data-requested-reasoning-effort={AGENT_APP_SERVER_DEFAULT_REASONING_EFFORT}
+            data-testid="agent-app-server-model-selection"
+          >
+            {t('editor.ai.agent.modelSelection.requested', { model: AGENT_APP_SERVER_DEFAULT_MODEL_LABEL })}
+          </p>
         </div>
       </header>
 

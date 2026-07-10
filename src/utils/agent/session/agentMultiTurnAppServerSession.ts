@@ -32,6 +32,14 @@ import {
   AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME,
   agentDetailEffectsApplyResponseSchema,
 } from '../tools/agentDetailEffectsApplyTool';
+import {
+  AGENT_APP_SERVER_DEFAULT_MODEL_ID,
+  AGENT_APP_SERVER_DEFAULT_REASONING_EFFORT,
+  type AgentAppServerSessionTransport,
+  agentAppServerModelSelectionReceiptSchema,
+  agentAppServerReasoningEffortSchema,
+  startAgentAppServerModelSession,
+} from './agentAppServerModelSession';
 import { dispatchAgentLiveEditorTool } from './agentLiveToolDispatch';
 import { createAgentSessionCheckpoint } from './agentSessionHistory';
 import { createAgentTypedToolExecutionContext, dispatchAgentTypedEditorTool } from './agentTypedToolDispatch';
@@ -96,10 +104,11 @@ const sessionTurnRequestSchema = z
 
 export const agentMultiTurnAppServerSessionRequestSchema = z
   .object({
-    modelId: z.string().trim().min(1).default('gpt-5.1-codex-app-server'),
+    modelId: z.string().trim().min(1).default(AGENT_APP_SERVER_DEFAULT_MODEL_ID),
     operationId: z.string().trim().min(1),
     prompt: z.string().trim().min(1),
     requestId: z.string().trim().min(1),
+    reasoningEffort: agentAppServerReasoningEffortSchema.default(AGENT_APP_SERVER_DEFAULT_REASONING_EFFORT),
     sessionId: z.string().trim().min(1),
     turns: z.array(sessionTurnRequestSchema).min(2).max(6),
   })
@@ -140,6 +149,7 @@ export const agentMultiTurnAppServerSessionResultSchema = z
     meanLuminanceDelta: z.number().nonnegative(),
     messages: z.array(sessionMessageSchema).min(5),
     modelId: z.string().trim().min(1),
+    modelSelection: agentAppServerModelSelectionReceiptSchema,
     previewLineage: z
       .array(
         z
@@ -208,9 +218,22 @@ const refreshRecipeHash = async ({
 
 export const runAgentMultiTurnAppServerSession = async (
   request: AgentMultiTurnAppServerSessionRequest,
-  { initialModelInputSink }: { initialModelInputSink?: AgentInitialModelInputSink } = {},
+  {
+    appServerSessionTransport,
+    initialModelInputSink,
+  }: {
+    appServerSessionTransport?: AgentAppServerSessionTransport;
+    initialModelInputSink?: AgentInitialModelInputSink;
+  } = {},
 ): Promise<AgentMultiTurnAppServerSessionResult> => {
   const parsedRequest = agentMultiTurnAppServerSessionRequestSchema.parse(request);
+  const modelSelection = await startAgentAppServerModelSession({
+    request: {
+      modelId: parsedRequest.modelId,
+      reasoningEffort: parsedRequest.reasoningEffort,
+    },
+    transport: appServerSessionTransport,
+  });
   const checkpoint = createAgentSessionCheckpoint(parsedRequest.sessionId);
   const initialContextBase = buildAgentInitialPromptContext({
     operationId: parsedRequest.operationId,
@@ -578,7 +601,8 @@ export const runAgentMultiTurnAppServerSession = async (
     maxChannelDelta,
     meanLuminanceDelta: Number((meanLuminanceDelta / parsedRequest.turns.length).toFixed(4)),
     messages,
-    modelId: parsedRequest.modelId,
+    modelId: modelSelection.effective.modelId,
+    modelSelection,
     previewLineage,
     previews,
     rollbackGraphRevision: checkpoint.graphRevision,

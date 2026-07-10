@@ -745,6 +745,9 @@
           "dryRun": "Dry-run",
           "read": "Read"
         },
+        "modelSelection": {
+          "requested": "{{model}} - Light reasoning requested"
+        },
         "noAppliedEdits": "No edits applied",
         "previewLineage": {
           "meta": {

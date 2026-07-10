@@ -7,6 +7,10 @@ import { useEditorStore } from '../../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
 import { setAgentMediumPreviewAttachmentRendererForTest } from '../../../../src/utils/agent/context/agentMediumPreviewAttachmentRuntime.ts';
 import {
+  AgentAppServerModelSelectionRejectedError,
+  startAgentAppServerModelSession,
+} from '../../../../src/utils/agent/session/agentAppServerModelSession.ts';
+import {
   agentMultiTurnAppServerSessionRequestSchema,
   runAgentMultiTurnAppServerSession,
 } from '../../../../src/utils/agent/session/agentMultiTurnAppServerSession.ts';
@@ -17,6 +21,8 @@ const mediumPreviewFixture = new Uint8Array(
   await readFile(new URL('../../../../docs/baseline/render/rapidraw-vite-empty-root-2026-06-10.jpg', import.meta.url)),
 );
 const recordedModelInputs: Array<{ attachments: unknown[] }> = [];
+const recordedThreadStarts: Array<{ config: { model_reasoning_effort: string }; model: string; serviceName: string }> =
+  [];
 
 for (let index = 0; index + 8 < mediumPreviewFixture.length; index += 1) {
   if (mediumPreviewFixture[index] !== 0xff || mediumPreviewFixture[index + 1] !== 0xc0) continue;
@@ -68,6 +74,28 @@ if (
   throw new Error('agent multi-turn session accepted a single-turn request.');
 }
 
+try {
+  await runAgentMultiTurnAppServerSession({
+    operationId: 'missing-transport',
+    prompt: 'This must fail before preview or edit dispatch.',
+    requestId: 'missing-transport',
+    sessionId: 'missing-transport',
+    turns: [
+      { adjustment: { exposure: 0.1 }, assistantRationale: 'First turn.' },
+      { adjustment: { shadows: 1 }, assistantRationale: 'Second turn.' },
+    ],
+  });
+  throw new Error('agent multi-turn session accepted a missing app-server transport.');
+} catch (error) {
+  if (!(error instanceof AgentAppServerModelSelectionRejectedError)) throw error;
+  if (error.receipt.status !== 'rejected' || !error.receipt.reason.includes('transport is unavailable')) {
+    throw new Error('agent multi-turn session did not expose its rejected model selection receipt.');
+  }
+}
+if (useEditorStore.getState().historyIndex !== 0) {
+  throw new Error('agent multi-turn session changed the edit graph after model transport rejection.');
+}
+
 const result = await runAgentMultiTurnAppServerSession(
   {
     operationId: 'agent_multiturn_3164',
@@ -96,6 +124,17 @@ const result = await runAgentMultiTurnAppServerSession(
     ],
   },
   {
+    appServerSessionTransport: {
+      startThread: async (params) => {
+        recordedThreadStarts.push(params);
+        return {
+          model: params.model,
+          modelProvider: 'openai',
+          reasoningEffort: params.config.model_reasoning_effort,
+          thread: { id: 'thr_agent_multiturn_3164' },
+        };
+      },
+    },
     initialModelInputSink: (input) => {
       recordedModelInputs.push({ attachments: input.attachments });
     },
@@ -108,6 +147,18 @@ const toolNames = result.toolCalls.map((toolCall) => toolCall.name);
 
 if (result.turnCount !== 2 || result.sessionId !== 'agent-multiturn-3164') {
   throw new Error('agent multi-turn session did not preserve session identity and turn count.');
+}
+if (
+  recordedThreadStarts.length !== 1 ||
+  recordedThreadStarts[0]?.model !== 'gpt-5.6-terra' ||
+  recordedThreadStarts[0]?.config.model_reasoning_effort !== 'low' ||
+  recordedThreadStarts[0]?.serviceName !== 'rapidraw_selected_image_agent' ||
+  result.modelSelection.status !== 'accepted' ||
+  result.modelSelection.effective.modelId !== 'gpt-5.6-terra' ||
+  result.modelSelection.effective.reasoningEffort !== 'low' ||
+  result.modelId !== result.modelSelection.effective.modelId
+) {
+  throw new Error('agent multi-turn session did not send and retain the Codex thread/start model receipt.');
 }
 if (result.initialContext.preview.purpose !== 'initial_context' || result.previews.length !== 3) {
   throw new Error('agent multi-turn session did not include initial plus per-turn previews.');
@@ -174,6 +225,25 @@ if (
   result.editReview.toolReceiptCount !== 2
 ) {
   throw new Error('agent multi-turn session did not bind final review to previews and receipts.');
+}
+
+const fallbackSelection = await startAgentAppServerModelSession({
+  request: { modelId: 'gpt-5.6-terra', reasoningEffort: 'low' },
+  transport: {
+    startThread: async () => ({
+      model: 'gpt-5.5-codex',
+      modelProvider: 'openai',
+      reasoningEffort: 'medium',
+      thread: { id: 'thr_agent_multiturn_fallback' },
+    }),
+  },
+});
+if (
+  fallbackSelection.status !== 'fallback' ||
+  fallbackSelection.effective.modelId !== 'gpt-5.5-codex' ||
+  fallbackSelection.effective.reasoningEffort !== 'medium'
+) {
+  throw new Error('agent multi-turn session did not retain the explicit app-server fallback receipt.');
 }
 
 console.log('agent multi-turn app-server session ok');

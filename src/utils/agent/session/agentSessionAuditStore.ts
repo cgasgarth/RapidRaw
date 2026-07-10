@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { agentAppServerModelSelectionReceiptSchema } from './agentAppServerModelSession';
+
 export const agentArtifactLineageEntrySchema = z
   .object({
     artifactId: z.string().trim().min(1),
@@ -42,6 +44,7 @@ export const agentSessionAuditRecordSchema = z
     finalGraphRevision: z.string().trim().min(1),
     initialGraphRevision: z.string().trim().min(1),
     modelId: z.string().trim().min(1),
+    modelSelection: agentAppServerModelSelectionReceiptSchema.optional(),
     planSummary: z.string().trim().min(1),
     prompt: z.string().trim().min(1),
     rollbackGraphRevision: z.string().trim().min(1),

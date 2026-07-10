@@ -41,7 +41,13 @@ try {
     ],
     finalGraphRevision: 'history_1',
     initialGraphRevision: 'history_0',
-    modelId: 'gpt-5.1-codex-app-server',
+    modelId: 'gpt-5.6-terra',
+    modelSelection: {
+      effective: { modelId: 'gpt-5.6-terra', modelProvider: 'openai', reasoningEffort: 'low' },
+      requested: { modelId: 'gpt-5.6-terra', reasoningEffort: 'low' },
+      status: 'accepted',
+      threadId: 'thr_agent_audit_3161',
+    },
     planSummary: 'Brighten RAW and add contrast after approval.',
     prompt: 'Make /Users/cgas/Pictures/Capture One/Alaska/DSC_3161.ARW brighter and punchier.',
     rollbackGraphRevision: 'history_0',
@@ -115,6 +121,13 @@ try {
   }
   if (persisted.artifactLineage.length !== 2) {
     throw new Error('Audit store did not preserve every output artifact lineage entry.');
+  }
+  if (
+    persisted.modelSelection?.status !== 'accepted' ||
+    persisted.modelSelection.effective.modelId !== 'gpt-5.6-terra' ||
+    persisted.modelSelection.effective.reasoningEffort !== 'low'
+  ) {
+    throw new Error('Audit store did not preserve the requested/effective app-server model receipt.');
   }
 
   verifyAgentSessionArtifactLineage(persisted);

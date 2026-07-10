@@ -32,7 +32,13 @@ const record = {
   ],
   finalGraphRevision: 'history_1',
   initialGraphRevision: 'history_0',
-  modelId: 'gpt-5.1-codex-app-server',
+  modelId: 'gpt-5.6-terra',
+  modelSelection: {
+    effective: { modelId: 'gpt-5.6-terra', modelProvider: 'openai', reasoningEffort: 'low' },
+    requested: { modelId: 'gpt-5.6-terra', reasoningEffort: 'low' },
+    status: 'accepted',
+    threadId: 'thr_replay_3162',
+  },
   planSummary: 'Replay brightening plan.',
   prompt: 'Replay the completed edit.',
   rollbackGraphRevision: 'history_0',
@@ -89,6 +95,13 @@ if (
 }
 if (diverged.finalGraphRevision !== 'history_1' || diverged.replayedRecordCount !== 1) {
   throw new Error('Agent replay report did not preserve session replay metadata.');
+}
+if (
+  diverged.modelSelection?.status !== 'accepted' ||
+  diverged.modelSelection.effective.modelId !== 'gpt-5.6-terra' ||
+  diverged.modelSelection.effective.reasoningEffort !== 'low'
+) {
+  throw new Error('Agent replay did not preserve the requested/effective app-server model receipt.');
 }
 
 console.log('agent session replay ok (matched+diverged)');
