@@ -26,6 +26,7 @@ pub(crate) struct PreviewJobConfig<'a> {
     pub(crate) app_handle: &'a tauri::AppHandle,
     pub(crate) state: tauri::State<'a, AppState>,
     pub(crate) adjustments_json: serde_json::Value,
+    pub(crate) expected_image_path: &'a str,
     pub(crate) is_interactive: bool,
     pub(crate) target_resolution: Option<u32>,
     pub(crate) roi: Option<(f32, f32, f32, f32)>,
@@ -38,6 +39,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         app_handle,
         state,
         mut adjustments_json,
+        expected_image_path,
         is_interactive,
         target_resolution,
         roi,
@@ -56,6 +58,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         .ok_or("No original image loaded")?
         .clone();
     drop(loaded_image_guard);
+    crate::validate_expected_preview_image(&loaded_image.path, expected_image_path)?;
 
     let new_transform_hash = calculate_transform_hash(&adjustments_clone);
     let settings = load_settings_or_default(app_handle);
@@ -414,6 +417,7 @@ pub(crate) fn start_preview_worker(app_handle: tauri::AppHandle) {
                 app_handle: &app_handle,
                 state,
                 adjustments_json: job.adjustments,
+                expected_image_path: &job.expected_image_path,
                 is_interactive: job.is_interactive,
                 target_resolution: job.target_resolution,
                 roi: job.roi,

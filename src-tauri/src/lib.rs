@@ -410,28 +410,56 @@ fn start_analytics_worker(app_handle: tauri::AppHandle) {
     });
 }
 
-#[tauri::command]
-async fn apply_adjustments(
+pub(crate) fn validate_expected_preview_image(
+    actual_path: &str,
+    expected_path: &str,
+) -> Result<(), String> {
+    if actual_path == expected_path {
+        return Ok(());
+    }
+    Err("Preview request rejected: expected image is no longer loaded".to_string())
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ApplyAdjustmentsRequest {
     js_adjustments: serde_json::Value,
+    expected_image_path: String,
     is_interactive: bool,
     target_resolution: Option<u32>,
     roi: Option<(f32, f32, f32, f32)>,
     compute_waveform: bool,
     active_waveform_channel: Option<String>,
+}
+
+#[tauri::command]
+async fn apply_adjustments(
+    request: ApplyAdjustmentsRequest,
     state: tauri::State<'_, AppState>,
 ) -> Result<Response, String> {
     let (tx, rx) = tokio::sync::oneshot::channel();
+
+    let loaded_image_path = state
+        .original_image
+        .lock()
+        .unwrap()
+        .as_ref()
+        .ok_or("No original image loaded")?
+        .path
+        .clone();
+    validate_expected_preview_image(&loaded_image_path, &request.expected_image_path)?;
 
     {
         let tx_guard = state.preview_worker_tx.lock().unwrap();
         if let Some(worker_tx) = &*tx_guard {
             let job = PreviewJob {
-                adjustments: js_adjustments,
-                is_interactive,
-                target_resolution,
-                roi,
-                compute_waveform,
-                active_waveform_channel,
+                adjustments: request.js_adjustments,
+                expected_image_path: request.expected_image_path,
+                is_interactive: request.is_interactive,
+                target_resolution: request.target_resolution,
+                roi: request.roi,
+                compute_waveform: request.compute_waveform,
+                active_waveform_channel: request.active_waveform_channel,
                 responder: tx,
             };
             worker_tx
@@ -453,6 +481,7 @@ async fn apply_adjustments(
 struct ExportSoftProofPreviewRequest {
     black_point_compensation: bool,
     color_profile: export::export_processing::ExportColorProfile,
+    expected_image_path: Option<String>,
     export_soft_proof_recipe_id: Option<String>,
     js_adjustments: serde_json::Value,
     rendering_intent: export::export_processing::ExportRenderingIntent,
@@ -474,6 +503,9 @@ fn generate_export_soft_proof_preview(
         .unwrap()
         .clone()
         .ok_or("No original image loaded")?;
+    if let Some(expected_image_path) = request.expected_image_path.as_deref() {
+        validate_expected_preview_image(&loaded_image.path, expected_image_path)?;
+    }
 
     let preview_dim = request.target_resolution.unwrap_or(1920).clamp(512, 8192);
     let preview_image = render_processed_export_soft_proof_preview(
@@ -2500,6 +2532,24 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn preview_dispatch_rejects_an_expected_image_mismatch_before_enqueue() {
+        let error = validate_expected_preview_image("/photos/alaska-b.ARW", "/photos/alaska-a.ARW")
+            .expect_err("a request for image A must not run against image B");
+
+        assert_eq!(
+            error,
+            "Preview request rejected: expected image is no longer loaded"
+        );
+    }
+
+    #[test]
+    fn preview_dispatch_accepts_the_expected_loaded_image() {
+        assert!(
+            validate_expected_preview_image("/photos/alaska-a.ARW", "/photos/alaska-a.ARW").is_ok()
+        );
+    }
 
     fn hdr_test_item(
         path: &str,
