@@ -3,6 +3,7 @@ import type { TFunction } from 'i18next';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { CameraProfileId, ToneCurveId } from '../../../schemas/color/profileToneSchemas';
+import type { RawDevelopmentReport } from '../../../schemas/imageLoaderSchemas';
 import { TextVariants } from '../../../types/typography';
 import {
   type Adjustments,
@@ -39,11 +40,13 @@ const parseToneCurveId = (value: string): ToneCurveId =>
 
 interface ColorProfileToneControlsProps extends ColorPanelGroupProps {
   adjustmentVisibility: Record<string, boolean>;
+  rawDevelopmentReport?: RawDevelopmentReport | null;
 }
 
 export const ColorProfileToneControls = ({
   adjustmentVisibility,
   adjustments,
+  rawDevelopmentReport = null,
   setAdjustments,
 }: ColorProfileToneControlsProps) => {
   const { t } = useTranslation();
@@ -73,6 +76,15 @@ export const ColorProfileToneControls = ({
       ] satisfies Array<{ key: ToneCurveId; label: string }>,
     [t],
   );
+  const runtimeProfile = rawDevelopmentReport?.cameraProfile ?? null;
+  const runtimeProfileStatus = runtimeProfile?.status ?? 'not_reported';
+  const runtimeProfileLabel =
+    runtimeProfile === null
+      ? t('adjustments.color.profileTone.runtimeNotReported')
+      : t(`editor.metadata.cameraProfile.status.${runtimeProfile.status}`);
+  const runtimeProcessLabel = rawDevelopmentReport?.processingProfile
+    ? t('adjustments.color.profileTone.runtimeProcess', { process: rawDevelopmentReport.processingProfile })
+    : null;
 
   const handleCameraProfileChange = (cameraProfile: CameraProfileId) => {
     setAdjustments((previous) => ({ ...previous, cameraProfile }));
@@ -106,6 +118,7 @@ export const ColorProfileToneControls = ({
     <section
       className="border-b border-editor-border pb-1.5"
       data-camera-profile={adjustments.cameraProfile}
+      data-runtime-profile-status={runtimeProfileStatus}
       data-testid="profile-tone-controls"
       data-tone-curve={adjustments.toneCurve}
     >
@@ -120,16 +133,45 @@ export const ColorProfileToneControls = ({
             {profileToneLabels.activeCameraProfileLabel} / {profileToneLabels.activeToneCurveLabel}
           </span>
         }
-        title={t('adjustments.color.profileTone.title')}
+        title={t('adjustments.color.profileTone.foundationTitle')}
       />
       <div className="space-y-1">
+        <div
+          className="grid min-w-0 grid-cols-[5.75rem_minmax(0,1fr)] items-center gap-2 px-0.5 py-0.5"
+          data-testid="color-input-profile-identity"
+        >
+          <UiText variant={TextVariants.label} className="truncate text-[10px] leading-4 text-text-secondary">
+            {t('adjustments.color.profileTone.inputTransform')}
+          </UiText>
+          <div className="min-w-0 text-right">
+            <UiText
+              as="span"
+              variant={TextVariants.label}
+              className={cx(
+                'inline-block max-w-full truncate text-[10px] leading-4',
+                runtimeProfileStatus === 'fallback' || runtimeProfileStatus === 'unavailable'
+                  ? 'text-editor-warning'
+                  : 'text-text-primary',
+              )}
+              data-testid="color-input-profile-status"
+              title={runtimeProfile?.fallbackReason ?? runtimeProfileLabel}
+            >
+              {runtimeProfileLabel}
+            </UiText>
+            {runtimeProcessLabel && (
+              <UiText className="truncate text-[9px] leading-3 text-text-tertiary" title={runtimeProcessLabel}>
+                {runtimeProcessLabel}
+              </UiText>
+            )}
+          </div>
+        </div>
         {adjustmentVisibility[ColorAdjustment.CameraProfile] !== false && (
           <label className="grid min-w-0 grid-cols-[5.75rem_minmax(0,1fr)] items-center gap-2">
             <UiText variant={TextVariants.label} className="truncate text-[10px] leading-4 text-text-secondary">
-              {t('adjustments.color.profileTone.cameraProfile')}
+              {t('adjustments.color.profileTone.profilePreset')}
             </UiText>
             <select
-              aria-label={t('adjustments.color.profileTone.cameraProfile')}
+              aria-label={t('adjustments.color.profileTone.profilePreset')}
               className={cx(editorChromeTokens.input.base, editorChromeTokens.input.compact, 'w-full')}
               onChange={(event) => {
                 handleCameraProfileChange(parseCameraProfileId(event.target.value));

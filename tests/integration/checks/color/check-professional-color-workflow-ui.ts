@@ -24,8 +24,22 @@ const appSettingsFixture = {
   exportPresets: [],
   lastRootPath: null,
   theme: Theme.Dark,
-  useWgpuRenderer: true,
+  useWgpuRenderer: false,
 } satisfies AppSettings;
+
+const rawDevelopmentReportFixture = {
+  cameraProfile: {
+    algorithmId: 'rawengine.camera-profile.v1',
+    candidateCount: 0,
+    fallbackReason: 'No matching measured input profile',
+    illuminantEstimateConfidence: 'low' as const,
+    illuminantEstimateMethod: 'fallback' as const,
+    status: 'fallback' as const,
+    warningCodes: ['profile_fallback'],
+  },
+  demosaicPath: 'bayer_hq' as const,
+  processingProfile: 'balanced' as const,
+};
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 installDom();
@@ -34,27 +48,50 @@ const { default: ColorPanel } = await import('../../../../src/components/adjustm
 const rendered = await renderColorPanel();
 
 try {
-  await validateKeyboardWorkspaceNavigation(rendered.container);
-  await selectEditorWorkspace(rendered.container);
-  await validateCompactEditorSurface(rendered.container);
+  await validateFoundationHierarchy(rendered.container);
   await validateDirectProfileToneSelection(rendered.container);
+  await validateWhiteBalanceFoundation(rendered.container);
+  await validateKeyboardWorkspaceNavigation(rendered.container);
+  await selectMixerWorkspace(rendered.container);
+  await validateCompactMixerSurface(rendered.container);
   await validateProgressiveMixerDisclosure(rendered.container);
   await validateHslSurfaceInteraction(rendered.container);
+
+  window.sessionStorage.setItem('rawengine.colorWorkspace.activeTab', 'foundation');
+  const localRendered = await renderColorPanel(true);
+  try {
+    validateMaskLocalFiltering(localRendered.container);
+  } finally {
+    localRendered.unmount();
+  }
 } finally {
   rendered.unmount();
 }
 
 console.log('color inspector compact workflow coverage ok');
 
-async function renderColorPanel(): Promise<RenderedPanel> {
-  useEditorStore.getState().setEditor({
-    exportSoftProofRecipeId: null,
-    exportSoftProofTransform: null,
-    gamutWarningOverlay: null,
-    isExportSoftProofEnabled: false,
-    isGamutWarningOverlayVisible: false,
-    previewScopeStatus: null,
-    selectedImage: null,
+async function renderColorPanel(isForMask = false): Promise<RenderedPanel> {
+  await act(async () => {
+    useEditorStore.getState().setEditor({
+      exportSoftProofRecipeId: null,
+      exportSoftProofTransform: null,
+      gamutWarningOverlay: null,
+      isExportSoftProofEnabled: false,
+      isGamutWarningOverlayVisible: false,
+      previewScopeStatus: null,
+      selectedImage: {
+        exif: null,
+        height: 3000,
+        isRaw: true,
+        isReady: true,
+        originalUrl: 'blob:color-foundation-fixture',
+        path: '/fixtures/color-foundation.raw',
+        rawDevelopmentReport: rawDevelopmentReportFixture,
+        thumbnailUrl: 'blob:color-foundation-thumbnail',
+        width: 4500,
+      },
+    });
+    await flushPromises();
   });
 
   const container = document.createElement('div');
@@ -70,6 +107,7 @@ async function renderColorPanel(): Promise<RenderedPanel> {
         createElement(TestColorHarness, {
           appSettings: appSettingsFixture,
           initialAdjustments: structuredClone(INITIAL_ADJUSTMENTS),
+          isForMask,
         }),
       ),
     );
@@ -91,11 +129,14 @@ async function renderColorPanel(): Promise<RenderedPanel> {
 function TestColorHarness({
   appSettings,
   initialAdjustments,
+  isForMask,
 }: {
   appSettings: AppSettings;
   initialAdjustments: Adjustments;
+  isForMask: boolean;
 }) {
   const [adjustments, setAdjustmentState] = useState(initialAdjustments);
+  const [isWbPickerActive, setIsWbPickerActive] = useState(false);
   const setAdjustments = (update: AdjustmentUpdate) => {
     setAdjustmentState((previous) => (typeof update === 'function' ? update(previous) : { ...previous, ...update }));
   };
@@ -103,34 +144,97 @@ function TestColorHarness({
   return createElement(ColorPanel, {
     adjustments,
     appSettings,
+    isForMask,
+    isWbPickerActive,
     onDragStateChange: () => undefined,
     setAdjustments,
+    toggleWbPicker: () => setIsWbPickerActive((active) => !active),
   });
 }
 
-async function selectEditorWorkspace(container: Element) {
-  await click(getByTestId<HTMLButtonElement>(container, 'color-workspace-tab-editor'));
+async function selectMixerWorkspace(container: Element) {
+  await click(getByTestId<HTMLButtonElement>(container, 'color-workspace-tab-mixer'));
   assert.equal(
-    getByTestId<HTMLButtonElement>(container, 'color-workspace-tab-editor').getAttribute('aria-selected'),
+    getByTestId<HTMLButtonElement>(container, 'color-workspace-tab-mixer').getAttribute('aria-selected'),
     'true',
-    'Editor workspace should be selected.',
+    'Mixer workspace should be selected.',
   );
 }
 
 async function validateKeyboardWorkspaceNavigation(container: Element) {
   const tablist = getByTestId<HTMLDivElement>(container, 'color-workspace-tabs');
-  const editor = getByTestId<HTMLButtonElement>(container, 'color-workspace-tab-editor');
+  const mixer = getByTestId<HTMLButtonElement>(container, 'color-workspace-tab-mixer');
 
   await act(async () => {
     tablist.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'ArrowRight' }));
     await flushPromises();
   });
-  assert.equal(editor.getAttribute('aria-selected'), 'true', 'ArrowRight should select Editor from Quick.');
-  assert.equal(document.activeElement, editor, 'ArrowRight should focus the selected workspace.');
+  assert.equal(mixer.getAttribute('aria-selected'), 'true', 'ArrowRight should select Mixer from Foundation.');
+  assert.equal(document.activeElement, mixer, 'ArrowRight should focus the selected workspace.');
 }
 
-async function validateCompactEditorSurface(container: Element) {
-  const profileTone = getByTestId(container, 'profile-tone-controls');
+function validateFoundationHierarchy(container: Element) {
+  const foundation = getByTestId(container, 'color-foundation-controls');
+  const profileTone = getByTestId(foundation, 'profile-tone-controls');
+  const whiteBalance = getByTestId(foundation, 'color-quick-white-balance');
+  const globalColor = getByTestId(foundation, 'color-quick-presence');
+  const calibration = getByTestId<HTMLDetailsElement>(foundation, 'color-calibration-disclosure');
+
+  assert.equal(getByTestId(container, 'color-workspace-tab-foundation').getAttribute('aria-selected'), 'true');
+  assert.equal(profileTone.dataset.runtimeProfileStatus, 'fallback');
+  const profileStatus = getByTestId(profileTone, 'color-input-profile-status');
+  assert.equal(normalizeText(profileStatus.textContent), 'Fallback');
+  assert.equal(profileStatus.title, rawDevelopmentReportFixture.cameraProfile.fallbackReason);
+  assert.equal(normalizeText(profileTone.textContent).includes('balanced process'), true);
+  assert.equal(calibration.open, false, 'Calibration should start collapsed.');
+  for (const next of [whiteBalance, globalColor, calibration]) {
+    assert.equal(
+      profileTone.compareDocumentPosition(next) & Node.DOCUMENT_POSITION_FOLLOWING,
+      Node.DOCUMENT_POSITION_FOLLOWING,
+      'Input / Profile should lead the Color foundation hierarchy.',
+    );
+  }
+  assert.equal(
+    whiteBalance.compareDocumentPosition(globalColor) & Node.DOCUMENT_POSITION_FOLLOWING,
+    Node.DOCUMENT_POSITION_FOLLOWING,
+    'White Balance should precede Global Color.',
+  );
+}
+
+async function validateWhiteBalanceFoundation(container: Element) {
+  const whiteBalance = getByTestId(container, 'color-quick-white-balance');
+  const temperature = getRangeByLabel(whiteBalance, 'Temperature');
+  const reset = getByTestId<HTMLButtonElement>(whiteBalance, 'color-white-balance-as-shot');
+  const picker = getByTestId<HTMLButtonElement>(whiteBalance, 'color-white-balance-picker');
+  assert.ok(temperature);
+  assert.equal(whiteBalance.dataset.whiteBalanceState, 'as-shot');
+  assert.equal(reset.disabled, true);
+
+  await changeRange(temperature, 18);
+  assert.equal(whiteBalance.dataset.whiteBalanceState, 'custom');
+  assert.equal(reset.disabled, false);
+  await click(reset);
+  assert.equal(temperature.value, '0');
+  assert.equal(whiteBalance.dataset.whiteBalanceState, 'as-shot');
+
+  await click(picker);
+  assert.equal(picker.getAttribute('aria-pressed'), 'true');
+  assert.equal(picker.dataset.state, 'active');
+}
+
+function validateMaskLocalFiltering(container: Element) {
+  const foundation = getByTestId(container, 'color-foundation-controls');
+  assert.equal(foundation.querySelector('[data-testid="profile-tone-controls"]'), null);
+  assert.equal(foundation.querySelector('[data-testid="color-calibration-disclosure"]'), null);
+  assert.equal(foundation.querySelector('[data-testid="color-white-balance-picker"]'), null);
+  assert.equal(getRangeByLabel(foundation, 'Local Hue'), null);
+  assert.equal(
+    normalizeText(getByTestId(foundation, 'color-quick-white-balance').textContent).includes('Local Color Balance'),
+    true,
+  );
+}
+
+async function validateCompactMixerSurface(container: Element) {
   const colorMixer = getByTestId(container, 'color-mixer-controls');
   const hslControls = getByTestId(container, 'selective-color-range-controls');
   const localRangeDisclosure = getByTestId<HTMLDetailsElement>(container, 'local-color-range-adjustment-disclosure');
@@ -140,8 +244,6 @@ async function validateCompactEditorSurface(container: Element) {
   const advancedDisclosure = getByTestId<HTMLDetailsElement>(container, 'advanced-color-disclosure');
 
   assert.equal(container.querySelector('[data-color-inspector-density="compact"]') !== null, true);
-  assert.equal(profileTone.querySelectorAll('select').length, 2, 'Profile & Tone should expose two direct selectors.');
-  assert.equal(profileTone.querySelector('[data-inspector-section-header="true"]') !== null, true);
   assert.equal(colorMixer.querySelector('[data-inspector-section-header="true"]') !== null, true);
   assert.equal(advancedDisclosure.querySelector('[data-inspector-section-header="true"]') !== null, true);
   assert.equal(

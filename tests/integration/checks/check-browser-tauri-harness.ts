@@ -157,7 +157,7 @@ try {
     throw new Error('Compare mode did not return to off after toggling side-by-side.');
   }
   await page.getByRole('complementary', { name: 'Editor tools' }).waitFor({ timeout: 10_000 });
-  await page.getByRole('heading', { name: 'Color' }).waitFor({ timeout: 10_000 });
+  await page.getByRole('heading', { exact: true, name: 'Color' }).waitFor({ timeout: 10_000 });
   const viewerFooterOverflow = page.getByTestId('viewer-footer-overflow');
   if (await viewerFooterOverflow.isVisible()) {
     await viewerFooterOverflow.locator('summary').click();

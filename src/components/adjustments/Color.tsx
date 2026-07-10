@@ -40,9 +40,9 @@ interface ColorPanelProps {
   onDragStateChange?: ((isDragging: boolean) => void) | undefined;
 }
 
-const COLOR_WORKSPACE_TAB_IDS = ['quick', 'editor', 'grading', 'output'] as const;
+const COLOR_WORKSPACE_TAB_IDS = ['foundation', 'mixer', 'grading', 'output'] as const;
 type ColorWorkspaceTabId = (typeof COLOR_WORKSPACE_TAB_IDS)[number];
-let sessionColorWorkspaceTab: ColorWorkspaceTabId = 'quick';
+let sessionColorWorkspaceTab: ColorWorkspaceTabId = 'foundation';
 const COLOR_WORKSPACE_TAB_BASE_CLASS = professionalInspectorDensityTokens.workspaceNavigation.tab;
 const COLOR_WORKSPACE_TAB_ACTIVE_CLASS = professionalInspectorDensityTokens.workspaceNavigation.active;
 const COLOR_WORKSPACE_TAB_INACTIVE_CLASS = professionalInspectorDensityTokens.workspaceNavigation.inactive;
@@ -61,18 +61,21 @@ const getNextColorWorkspaceTabId = (
   const currentIndex = activeIndex >= 0 ? activeIndex : 0;
   const nextIndex = (currentIndex + direction + tabs.length) % tabs.length;
 
-  return tabs[nextIndex]?.id ?? tabs[0]?.id ?? 'quick';
+  return tabs[nextIndex]?.id ?? tabs[0]?.id ?? 'foundation';
 };
 
-const isColorWorkspaceTabId = (value: string | null): value is ColorWorkspaceTabId =>
-  COLOR_WORKSPACE_TAB_IDS.some((tabId) => tabId === value);
+const parseColorWorkspaceTabId = (value: string | null): ColorWorkspaceTabId | null => {
+  if (value === 'quick') return 'foundation';
+  if (value === 'editor') return 'mixer';
+  return COLOR_WORKSPACE_TAB_IDS.find((tabId) => tabId === value) ?? null;
+};
 
 const readSessionColorWorkspaceTab = (): ColorWorkspaceTabId => {
   if (typeof window === 'undefined') return sessionColorWorkspaceTab;
 
   try {
-    const storedTab = window.sessionStorage.getItem(COLOR_WORKSPACE_TAB_SESSION_KEY);
-    if (isColorWorkspaceTabId(storedTab)) {
+    const storedTab = parseColorWorkspaceTabId(window.sessionStorage.getItem(COLOR_WORKSPACE_TAB_SESSION_KEY));
+    if (storedTab !== null) {
       sessionColorWorkspaceTab = storedTab;
     }
   } catch {
@@ -241,35 +244,50 @@ export default function ColorPanel({
   const workspaceTabs = useMemo<Array<ColorWorkspaceTab>>(() => {
     const tabs: Array<ColorWorkspaceTab> = [
       {
-        id: 'quick',
-        label: t('adjustments.color.workspaceTabs.quick'),
+        id: 'foundation',
+        label: t('adjustments.color.workspaceTabs.foundation'),
         panel: (
-          <ColorQuickControls
-            adjustments={adjustments}
-            appSettings={appSettings}
-            isForMask={isForMask}
-            isWbPickerActive={isWbPickerActive}
-            isWgpuEnabled={isWgpuEnabled}
-            onDragStateChange={onDragStateChange}
-            setAdjustments={setAdjustments}
-            {...(toggleWbPicker ? { toggleWbPicker } : {})}
-          />
-        ),
-      },
-      {
-        id: 'editor',
-        label: t('adjustments.color.workspaceTabs.editor'),
-        panel: (
-          <div className="space-y-1">
+          <div className="space-y-px" data-testid="color-foundation-controls">
             {!isForMask && (
               <ColorProfileToneControls
                 adjustmentVisibility={adjustmentVisibility}
                 adjustments={adjustments}
                 appSettings={appSettings}
+                rawDevelopmentReport={selectedImage?.rawDevelopmentReport ?? null}
                 onDragStateChange={onDragStateChange}
                 setAdjustments={setAdjustments}
               />
             )}
+            <ColorQuickControls
+              adjustments={adjustments}
+              appSettings={appSettings}
+              isForMask={isForMask}
+              isWbPickerActive={isWbPickerActive}
+              isWgpuEnabled={isWgpuEnabled}
+              onDragStateChange={onDragStateChange}
+              setAdjustments={setAdjustments}
+              {...(toggleWbPicker ? { toggleWbPicker } : {})}
+            />
+            {!isForMask && isColorCalibrationVisible ? (
+              <ColorAdvancedControls
+                adjustmentVisibility={adjustmentVisibility}
+                adjustments={adjustments}
+                appSettings={appSettings}
+                isColorCalibrationVisible={isColorCalibrationVisible}
+                levelsClippingWarnings={levelsClippingWarnings}
+                mode="calibration"
+                onDragStateChange={onDragStateChange}
+                setAdjustments={setAdjustments}
+              />
+            ) : null}
+          </div>
+        ),
+      },
+      {
+        id: 'mixer',
+        label: t('adjustments.color.workspaceTabs.mixer'),
+        panel: (
+          <div className="space-y-1">
             <ColorMixerControls
               activeChannelMixerOutput={activeChannelMixerOutput}
               activeColor={activeColor}
@@ -286,13 +304,14 @@ export default function ColorPanel({
               setActiveColorBalanceRange={setActiveColorBalanceRange}
               setAdjustments={setAdjustments}
             />
-            {!isForMask && (isLevelsVisible || isColorCalibrationVisible) ? (
+            {!isForMask && isLevelsVisible ? (
               <ColorAdvancedControls
                 adjustmentVisibility={adjustmentVisibility}
                 adjustments={adjustments}
                 appSettings={appSettings}
                 isColorCalibrationVisible={isColorCalibrationVisible}
                 levelsClippingWarnings={levelsClippingWarnings}
+                mode="levels"
                 onDragStateChange={onDragStateChange}
                 setAdjustments={setAdjustments}
               />
@@ -352,6 +371,7 @@ export default function ColorPanel({
     levelsClippingWarnings,
     onDragStateChange,
     renderedPreviewWarningStatus,
+    selectedImage,
     setAdjustments,
     setEditor,
     syncSkinToneUniformity,
@@ -360,7 +380,7 @@ export default function ColorPanel({
   ]);
   useEffect(() => {
     if (!workspaceTabs.some((tab) => tab.id === activeWorkspaceTab)) {
-      const nextTabId = workspaceTabs[0]?.id ?? 'quick';
+      const nextTabId = workspaceTabs[0]?.id ?? 'foundation';
 
       setActiveWorkspaceTab(nextTabId);
       rememberSessionColorWorkspaceTab(nextTabId);
@@ -411,7 +431,7 @@ export default function ColorPanel({
 
     if (event.key === 'Home') {
       event.preventDefault();
-      const nextTabId = workspaceTabs[0]?.id ?? 'quick';
+      const nextTabId = workspaceTabs[0]?.id ?? 'foundation';
 
       selectWorkspaceTab(nextTabId);
       focusColorWorkspaceTab(nextTabId);
@@ -420,7 +440,7 @@ export default function ColorPanel({
 
     if (event.key === 'End') {
       event.preventDefault();
-      const nextTabId = workspaceTabs.at(-1)?.id ?? 'quick';
+      const nextTabId = workspaceTabs.at(-1)?.id ?? 'foundation';
 
       selectWorkspaceTab(nextTabId);
       focusColorWorkspaceTab(nextTabId);

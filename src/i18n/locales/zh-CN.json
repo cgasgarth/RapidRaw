@@ -23,10 +23,13 @@
       "activeRangeDeltas": "HSL deltas",
       "adjustedPreviewEnabled": "",
       "advanced": {
+        "levelsSummary": "Input, gamma, and output levels.",
+        "levelsTitle": "Levels / Advanced",
         "summary": "Levels, primary calibration, and shadows tint.",
         "title": "Advanced Color"
       },
       "ariaSelectColor": "选择 {{name}} 颜色",
+      "asShot": "As Shot",
       "blackWhiteMixer": {
         "ariaSelectChannel": "选择 {{name}} 黑白通道",
         "contribution": "{{name}} 贡献",
@@ -35,6 +38,8 @@
         "title": "黑白混合器"
       },
       "calibration": {
+        "advancedSummary": "Existing primary and shadow adjustments.",
+        "advancedTitle": "Calibration / Input Controls",
         "colors": {
           "blue": "蓝色",
           "green": "绿色",
@@ -87,6 +92,7 @@
       "colorRangeLocalAdjustmentLayerName": "{{range}} local adjustment",
       "colorRangeLocalAdjustmentMaskName": "{{range}} range mask",
       "createLocalAdjustmentFromRange": "Create local adjustment",
+      "defaultState": "Default",
       "falloffSmoothness": "过渡",
       "gamutWarning": {
         "coverage": "",
@@ -95,6 +101,7 @@
         "proofDetails": "Proof: {{pixels}} warning pixels · {{width}} x {{height}}",
         "title": ""
       },
+      "globalColor": "Global Color",
       "grading": {
         "applyPreset": "应用 {{name}} 颜色分级预设。类别 {{category}}，混合 {{blending}}，平衡 {{balance}}。",
         "balance": "平衡",
@@ -130,6 +137,8 @@
           "shadowClipping": "Shadow clipping active"
         }
       },
+      "localColor": "Local Color",
+      "localColorBalance": "Local Color Balance",
       "localHue": "局部色调",
       "luminance": "亮度",
       "maskPreview": "",
@@ -155,10 +164,15 @@
           "camera_standard": "标准",
           "linear_raw": "线性 RAW"
         },
+        "foundationTitle": "Input / Profile",
+        "inputTransform": "Input status",
+        "profilePreset": "Profile preset",
         "receiptExportParity": "Preview/export parity is checked on export receipts.",
         "receiptRuntime": "Runtime preview luma {{before}} -> {{after}} (delta {{delta}}).",
         "receiptSummary": "{{profile}} with {{toneCurve}} is active.",
         "receiptTitle": "Profile/tone receipt",
+        "runtimeNotReported": "Provenance not reported",
+        "runtimeProcess": "{{process}} process",
         "title": "配置与色调",
         "toneCurve": "色调曲线",
         "toneCurves": {
@@ -183,6 +197,8 @@
       "rangeCenter": "范围中心",
       "rangeWidth": "范围宽度",
       "resetActiveRange": "Reset active range",
+      "resetLocalColorBalance": "Reset local color balance",
+      "resetWhiteBalanceAsShot": "Reset white balance to as shot",
       "runtimeStatus": {
         "apiLabel": "API",
         "ariaLabel": "颜色编辑器运行状态",
@@ -233,8 +249,10 @@
       "workspaceTabs": {
         "advanced": "Advanced",
         "editor": "Editor",
+        "foundation": "Foundation",
         "grading": "Grading",
         "label": "Color workspace tools",
+        "mixer": "Mixer",
         "output": "Output",
         "quick": "Quick"
       }
