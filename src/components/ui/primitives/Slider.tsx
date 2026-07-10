@@ -63,6 +63,8 @@ const Slider = ({
   const skipNextBlurCommitRef = useRef(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const rangeInputRef = useRef<HTMLInputElement | null>(null);
+  const valueButtonRef = useRef<HTMLButtonElement | null>(null);
+  const restoreValueFocusAfterEditRef = useRef(false);
   const [isLabelHovered, setIsLabelHovered] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const lastUpTime = useRef(0);
@@ -243,6 +245,21 @@ const Slider = ({
     }
   }, [isEditing]);
 
+  useEffect(() => {
+    if (isEditing || !restoreValueFocusAfterEditRef.current) {
+      return undefined;
+    }
+
+    restoreValueFocusAfterEditRef.current = false;
+    const restoreFocusTimeout = window.setTimeout(() => {
+      valueButtonRef.current?.focus();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(restoreFocusTimeout);
+    };
+  }, [isEditing]);
+
   const handleReset = () => {
     if (disabled) {
       return;
@@ -406,8 +423,8 @@ const Slider = ({
         value: newValue,
       },
     };
-    onChange(syntheticEvent);
     setIsEditing(false);
+    onChange(syntheticEvent);
   };
 
   const handleInputBlur = () => {
@@ -423,10 +440,12 @@ const Slider = ({
 
     if (e.key === 'Enter') {
       skipNextBlurCommitRef.current = true;
+      restoreValueFocusAfterEditRef.current = true;
       handleInputCommit();
       e.currentTarget.blur();
     } else if (e.key === 'Escape') {
       skipNextBlurCommitRef.current = true;
+      restoreValueFocusAfterEditRef.current = true;
       const startingValue = editStartValueRef.current;
       setInputValue(String(startingValue));
       onChange({
@@ -467,6 +486,7 @@ const Slider = ({
   const numericValue = Number.isNaN(value) ? 0 : value;
   const canResetFromLabel = typeof label === 'string' && !disabled;
   const tokens = density === 'compact' ? compactInspectorSliderTokens : inspectorSliderTokens;
+  const isModified = !disabled && Math.abs(value - defaultValue) > Math.max(Number.EPSILON, step / 1_000);
   const labelContent = (
     <>
       <span
@@ -517,7 +537,7 @@ const Slider = ({
   );
 
   const valueControl = (
-    <div className={tokens.valueSlot}>
+    <div className={tokens.valueSlot} data-slider-value-slot="true">
       {isEditing ? (
         <input
           aria-label={typeof label === 'string' ? `${label} value` : undefined}
@@ -543,6 +563,7 @@ const Slider = ({
           onClick={handleValueClick}
           onDoubleClick={handleReset}
           data-tooltip={t('ui.slider.clickToEdit')}
+          ref={valueButtonRef}
           type="button"
         >
           {decimalPlaces > 0 && numericValue === 0 ? '0' : numericValue.toFixed(decimalPlaces)}
@@ -553,7 +574,7 @@ const Slider = ({
   );
 
   const trackControl = (
-    <div className={tokens.trackWrap}>
+    <div className={tokens.trackWrap} data-slider-track="true">
       <div className={cx(tokens.track, trackClassName || 'bg-editor-panel-raised', disabled && 'opacity-70')} />
       <div
         className={cx(tokens.fill, disabled && 'opacity-40')}
@@ -592,7 +613,14 @@ const Slider = ({
 
   if (density === 'compact') {
     return (
-      <div className={cx(tokens.root, disabled && 'opacity-65')} data-testid={testId} ref={containerRef}>
+      <div
+        className={cx(tokens.root, disabled && 'opacity-65')}
+        data-density="compact"
+        data-modified={String(isModified)}
+        data-testid={testId}
+        ref={containerRef}
+      >
+        {isModified ? <span className="sr-only">{t('ui.slider.modified', { defaultValue: 'Modified' })}</span> : null}
         {labelControl}
         {trackControl}
         {valueControl}
@@ -601,7 +629,13 @@ const Slider = ({
   }
 
   return (
-    <div className={cx(tokens.root, disabled && 'opacity-65')} data-testid={testId} ref={containerRef}>
+    <div
+      className={cx(tokens.root, disabled && 'opacity-65')}
+      data-density="default"
+      data-modified={String(isModified)}
+      data-testid={testId}
+      ref={containerRef}
+    >
       <div className={inspectorSliderTokens.header}>
         {labelControl}
         {valueControl}

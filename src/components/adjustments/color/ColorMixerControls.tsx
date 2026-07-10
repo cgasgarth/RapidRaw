@@ -1,15 +1,14 @@
 import cx from 'clsx';
-import { Layers, RotateCcw } from 'lucide-react';
+import { ChevronDown, Layers, RotateCcw } from 'lucide-react';
 import { type MouseEvent, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { BlackWhiteMixerChannel } from '../../../schemas/color/blackWhiteMixerSchemas';
 import type { ChannelMixerOutput, ChannelMixerSource } from '../../../schemas/color/channelMixerSchemas';
 import type { ColorBalanceRgbChannel, ColorBalanceRgbRange } from '../../../schemas/color/colorBalanceRgbSchemas';
-import { TextVariants } from '../../../types/typography';
 import { type Adjustments, ColorAdjustment, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
 import { getSelectiveColorRange, SELECTIVE_COLOR_RANGES } from '../../../utils/selectiveColorRanges';
+import CompactInspectorSectionHeader from '../../ui/CompactInspectorSectionHeader';
 import { professionalInspectorDensityTokens } from '../../ui/inspectorTokens';
-import UiText from '../../ui/primitives/Text';
 import AdjustmentSlider from '../AdjustmentSlider';
 import { ColorSwatch } from './ColorSwatch';
 import type { ColorPanelGroupProps } from './types';
@@ -311,34 +310,48 @@ export const ColorMixerControls = ({
 
   const onLabel = t('adjustments.color.colorBalanceRgb.enabled');
   const offLabel = t('adjustments.color.colorBalanceRgb.disabled');
+  const modifiedLabel = t('ui.collapsibleSection.dirtyBadge', { defaultValue: 'Edited' });
 
   return (
-    <div className="border-b border-editor-border" data-testid="color-mixer-controls">
+    <div data-testid="color-mixer-controls">
       <section
-        className="pb-2"
+        className="border-b border-editor-border pb-1.5"
         data-active-range={activeColor}
         data-dirty={String(hasActiveHslChanges)}
         data-testid="selective-color-range-controls"
       >
-        <div className={density.sectionHeader.rootLoose}>
-          <div className="min-w-0">
-            <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
-              {t('adjustments.color.colorMixer')}
-            </UiText>
-            <span className={density.sectionHeader.summary}>{hslSummary}</span>
-          </div>
-          <span className={density.sectionHeader.badge} data-testid="selective-color-active-range-chip">
-            {t(activeRange.labelKey)}
-          </span>
-        </div>
-        <div className="mb-1.5 grid grid-cols-6 gap-1">
+        <CompactInspectorSectionHeader
+          actions={
+            <button
+              aria-label={t('adjustments.color.resetActiveRange')}
+              className={cx(density.actionButton.base, density.actionButton.icon, density.actionButton.quiet)}
+              data-testid="selective-color-reset-active-range"
+              disabled={!hasActiveHslChanges}
+              onClick={resetActiveHsl}
+              title={t('adjustments.color.resetActiveRange')}
+              type="button"
+            >
+              <RotateCcw size={13} />
+            </button>
+          }
+          modified={hasActiveHslChanges}
+          modifiedLabel={modifiedLabel}
+          summary={
+            <span title={`${t(activeRange.labelKey)} ${hslSummary}`}>
+              <span data-testid="selective-color-active-range-chip">{t(activeRange.labelKey)}</span>
+              <span aria-hidden="true"> / </span>
+              <span>{hslSummary}</span>
+            </span>
+          }
+          title={t('adjustments.color.colorMixer')}
+        />
+        <div className="mb-1 grid grid-cols-8 place-items-center gap-1">
           {hslColors.map(({ color, label, name }) => (
             <ColorSwatch
               ariaLabel={t('adjustments.color.ariaSelectColor', { name: label })}
               color={color}
               isActive={activeColor === name}
               key={name}
-              label={label}
               name={name}
               onClick={setActiveColor}
               size="sm"
@@ -386,37 +399,31 @@ export const ColorMixerControls = ({
             value={currentHsl.luminance}
           />
         </div>
-        <div className="mt-1 flex justify-end">
-          <button
-            aria-label={t('adjustments.color.resetActiveRange')}
-            className={cx(density.actionButton.base, density.actionButton.icon, density.actionButton.quiet)}
-            data-testid="selective-color-reset-active-range"
-            disabled={!hasActiveHslChanges}
-            onClick={resetActiveHsl}
-            title={t('adjustments.color.resetActiveRange')}
-            type="button"
-          >
-            <RotateCcw size={13} />
-          </button>
-        </div>
       </section>
 
       {!isForMask && (
         <details
-          className="border-t border-editor-border"
+          className="group border-b border-editor-border"
           data-scope="local-adjustment"
           data-testid="local-color-range-adjustment-disclosure"
         >
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 py-1.5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring [&::-webkit-details-marker]:hidden">
-            <span className={density.sectionHeader.title}>{t('adjustments.color.createLocalAdjustmentFromRange')}</span>
-            <span className={cx(density.sectionHeader.summary, 'flex items-center gap-1')}>
-              <span>{Math.round(activeRangeControls.centerHueDegrees)}°</span>
-              <span aria-hidden="true">/</span>
-              <span>{Math.round(activeRangeControls.widthDegrees)}°</span>
-            </span>
+          <summary className="cursor-pointer list-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring [&::-webkit-details-marker]:hidden">
+            <CompactInspectorSectionHeader
+              actions={
+                <ChevronDown
+                  aria-hidden="true"
+                  className="text-text-secondary transition-transform group-open:rotate-180"
+                  size={14}
+                />
+              }
+              modified={hasActiveLocalRangeChanges}
+              modifiedLabel={modifiedLabel}
+              summary={`${Math.round(activeRangeControls.centerHueDegrees)}° / ${Math.round(activeRangeControls.widthDegrees)}°`}
+              title={t('adjustments.color.createLocalAdjustmentFromRange')}
+            />
           </summary>
           <div
-            className="grid gap-1 border-t border-editor-border pb-2 pt-1.5"
+            className="grid gap-1 border-t border-editor-border pb-1.5 pt-1"
             data-testid="local-color-range-adjustment-controls"
           >
             <AdjustmentSlider
@@ -492,29 +499,31 @@ export const ColorMixerControls = ({
       )}
 
       {!isForMask && adjustmentVisibility[ColorAdjustment.ColorBalanceRgb] !== false && (
-        <details className="border-t border-editor-border" data-testid="color-balance-disclosure">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 py-1.5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring [&::-webkit-details-marker]:hidden">
-            <span className="min-w-0">
-              <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
-                {t('adjustments.color.colorBalanceRgb.title')}
-              </UiText>
-              <span className={density.sectionHeader.summary}>
-                {colorBalanceRgb.enabled ? colorBalanceSummary : offLabel}
-              </span>
-            </span>
-            <DisclosureToggle
-              isOn={colorBalanceRgb.enabled}
-              offLabel={offLabel}
-              onClick={handleColorBalanceToggle}
-              onLabel={onLabel}
-              testId="color-balance-toggle"
+        <details className="group border-b border-editor-border" data-testid="color-balance-disclosure">
+          <summary className="cursor-pointer list-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring [&::-webkit-details-marker]:hidden">
+            <CompactInspectorSectionHeader
+              actions={
+                <>
+                  <DisclosureToggle
+                    isOn={colorBalanceRgb.enabled}
+                    offLabel={offLabel}
+                    onClick={handleColorBalanceToggle}
+                    onLabel={onLabel}
+                    testId="color-balance-toggle"
+                  />
+                  <ChevronDown
+                    aria-hidden="true"
+                    className="text-text-secondary transition-transform group-open:rotate-180"
+                    size={14}
+                  />
+                </>
+              }
+              summary={colorBalanceRgb.enabled ? colorBalanceSummary : offLabel}
+              title={t('adjustments.color.colorBalanceRgb.title')}
             />
           </summary>
           {colorBalanceRgb.enabled && (
-            <div
-              className="grid gap-1.5 border-t border-editor-border pb-2 pt-1.5"
-              data-testid="color-balance-controls"
-            >
+            <div className="grid gap-1 border-t border-editor-border pb-1.5 pt-1" data-testid="color-balance-controls">
               <div className="grid grid-cols-3 gap-1">
                 {colorBalanceRanges.map((range) => (
                   <button
@@ -572,29 +581,31 @@ export const ColorMixerControls = ({
       )}
 
       {!isForMask && adjustmentVisibility[ColorAdjustment.ChannelMixer] !== false && (
-        <details className="border-t border-editor-border" data-testid="channel-mixer-disclosure">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 py-1.5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring [&::-webkit-details-marker]:hidden">
-            <span className="min-w-0">
-              <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
-                {t('adjustments.color.channelMixer.title')}
-              </UiText>
-              <span className={density.sectionHeader.summary}>
-                {channelMixer.enabled ? channelMixerSummary : offLabel}
-              </span>
-            </span>
-            <DisclosureToggle
-              isOn={channelMixer.enabled}
-              offLabel={offLabel}
-              onClick={handleChannelMixerToggle}
-              onLabel={onLabel}
-              testId="channel-mixer-toggle"
+        <details className="group border-b border-editor-border" data-testid="channel-mixer-disclosure">
+          <summary className="cursor-pointer list-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring [&::-webkit-details-marker]:hidden">
+            <CompactInspectorSectionHeader
+              actions={
+                <>
+                  <DisclosureToggle
+                    isOn={channelMixer.enabled}
+                    offLabel={offLabel}
+                    onClick={handleChannelMixerToggle}
+                    onLabel={onLabel}
+                    testId="channel-mixer-toggle"
+                  />
+                  <ChevronDown
+                    aria-hidden="true"
+                    className="text-text-secondary transition-transform group-open:rotate-180"
+                    size={14}
+                  />
+                </>
+              }
+              summary={channelMixer.enabled ? channelMixerSummary : offLabel}
+              title={t('adjustments.color.channelMixer.title')}
             />
           </summary>
           {channelMixer.enabled && (
-            <div
-              className="grid gap-1.5 border-t border-editor-border pb-2 pt-1.5"
-              data-testid="channel-mixer-controls"
-            >
+            <div className="grid gap-1 border-t border-editor-border pb-1.5 pt-1" data-testid="channel-mixer-controls">
               <div className="grid grid-cols-3 gap-1">
                 {channelMixerOutputs.map((output) => (
                   <button
@@ -650,39 +661,45 @@ export const ColorMixerControls = ({
       )}
 
       {!isForMask && adjustmentVisibility[ColorAdjustment.BlackWhiteMixer] !== false && (
-        <details className="border-t border-editor-border" data-testid="black-white-mixer-disclosure">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 py-1.5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring [&::-webkit-details-marker]:hidden">
-            <span className="min-w-0">
-              <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
-                {t('adjustments.color.blackWhiteMixer.title')}
-              </UiText>
-              <span className={density.sectionHeader.summary}>
-                {blackWhiteMixer.enabled
+        <details className="group border-b border-editor-border" data-testid="black-white-mixer-disclosure">
+          <summary className="cursor-pointer list-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring [&::-webkit-details-marker]:hidden">
+            <CompactInspectorSectionHeader
+              actions={
+                <>
+                  <DisclosureToggle
+                    isOn={blackWhiteMixer.enabled}
+                    offLabel={offLabel}
+                    onClick={handleBlackWhiteToggle}
+                    onLabel={onLabel}
+                    testId="black-white-mixer-toggle"
+                  />
+                  <ChevronDown
+                    aria-hidden="true"
+                    className="text-text-secondary transition-transform group-open:rotate-180"
+                    size={14}
+                  />
+                </>
+              }
+              summary={
+                blackWhiteMixer.enabled
                   ? `${t(activeRange.labelKey)} ${formatSignedInteger(activeBlackWhiteWeight)}`
-                  : offLabel}
-              </span>
-            </span>
-            <DisclosureToggle
-              isOn={blackWhiteMixer.enabled}
-              offLabel={offLabel}
-              onClick={handleBlackWhiteToggle}
-              onLabel={onLabel}
-              testId="black-white-mixer-toggle"
+                  : offLabel
+              }
+              title={t('adjustments.color.blackWhiteMixer.title')}
             />
           </summary>
           {blackWhiteMixer.enabled && (
             <div
-              className="grid gap-1.5 border-t border-editor-border pb-2 pt-1.5"
+              className="grid gap-1 border-t border-editor-border pb-1.5 pt-1"
               data-testid="black-white-mixer-controls"
             >
-              <div className="grid grid-cols-6 gap-1">
+              <div className="grid grid-cols-8 place-items-center gap-1">
                 {hslColors.map(({ color, label, name }) => (
                   <ColorSwatch
                     ariaLabel={t('adjustments.color.blackWhiteMixer.ariaSelectChannel', { name: label })}
                     color={color}
                     isActive={activeColor === name}
                     key={name}
-                    label={label}
                     name={name}
                     onClick={setActiveColor}
                     size="sm"

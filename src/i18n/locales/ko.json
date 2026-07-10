@@ -1999,6 +1999,7 @@
     },
     "slider": {
       "clickToEdit": "클릭하여 편집",
+      "modified": "수정됨",
       "reset": "초기화"
     },
     "waveform": {

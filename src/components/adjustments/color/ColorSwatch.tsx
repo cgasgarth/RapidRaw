@@ -58,8 +58,9 @@ export const ColorSwatch = <T extends string>({
   return (
     <button
       aria-label={ariaLabel}
-      className={`group flex min-w-0 flex-col items-center gap-1 focus:outline-hidden ${label ? 'w-full' : swatchSizeClass}`}
+      className={`group flex min-w-0 flex-col items-center gap-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring ${label ? 'w-full' : `${swatchSizeClass} justify-self-center`}`}
       data-testid={testId}
+      data-tooltip={ariaLabel}
       onClick={handleClick}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
