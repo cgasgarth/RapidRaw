@@ -153,6 +153,25 @@ export const getRightPanelEntry = (panel: Panel): RightPanelRegistryEntry => {
   return entry;
 };
 
+export const getRecentRightPanelEntries = (
+  recentPanels: readonly string[],
+  activePanel: Panel | null,
+  limit = 4,
+): RightPanelRegistryEntry[] => {
+  if (limit <= 0) return [];
+
+  const recentEntries: RightPanelRegistryEntry[] = [];
+  const seenPanels = new Set<Panel>();
+  for (const panel of recentPanels) {
+    if (!isRightPanel(panel) || panel === activePanel || seenPanels.has(panel)) continue;
+
+    recentEntries.push(getRightPanelEntry(panel));
+    seenPanels.add(panel);
+    if (recentEntries.length === limit) break;
+  }
+  return recentEntries;
+};
+
 const normalizeSearchTerm = (value: string) => value.trim().toLocaleLowerCase();
 
 export const searchRightPanels = (query: string): RightPanelRegistryEntry[] => {
