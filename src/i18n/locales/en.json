@@ -23,10 +23,13 @@
       "activeRangeDeltas": "HSL deltas",
       "adjustedPreviewEnabled": "Adjusted",
       "advanced": {
+        "levelsSummary": "Input, gamma, and output levels.",
+        "levelsTitle": "Levels / Advanced",
         "summary": "Levels, primary calibration, and shadows tint.",
         "title": "Advanced Color"
       },
       "ariaSelectColor": "Select {{name}} color",
+      "asShot": "As Shot",
       "blackWhiteMixer": {
         "ariaSelectChannel": "Select {{name}} black and white channel",
         "contribution": "{{name}} contribution",
@@ -35,6 +38,8 @@
         "title": "Black & White Mixer"
       },
       "calibration": {
+        "advancedSummary": "Existing primary and shadow adjustments.",
+        "advancedTitle": "Calibration / Input Controls",
         "colors": {
           "blue": "Blue",
           "green": "Green",
@@ -87,6 +92,7 @@
       "colorRangeLocalAdjustmentLayerName": "{{range}} local adjustment",
       "colorRangeLocalAdjustmentMaskName": "{{range}} range mask",
       "createLocalAdjustmentFromRange": "Create local adjustment",
+      "defaultState": "Default",
       "falloffSmoothness": "Falloff",
       "gamutWarning": {
         "coverage": "sRGB gamut · {{value}}",
@@ -95,6 +101,7 @@
         "proofDetails": "Proof: {{pixels}} warning pixels · {{width}} x {{height}}",
         "title": "sRGB gamut warning"
       },
+      "globalColor": "Global Color",
       "grading": {
         "applyPreset": "Apply {{name}} color grading preset. Category {{category}}, blending {{blending}}, balance {{balance}}.",
         "balance": "Balance",
@@ -130,6 +137,8 @@
           "shadowClipping": "Shadow clipping active"
         }
       },
+      "localColor": "Local Color",
+      "localColorBalance": "Local Color Balance",
       "localHue": "Local Hue",
       "luminance": "Luminance",
       "maskPreview": "Mask preview",
@@ -155,10 +164,15 @@
           "camera_standard": "Standard",
           "linear_raw": "Linear RAW"
         },
+        "foundationTitle": "Input / Profile",
+        "inputTransform": "Input status",
+        "profilePreset": "Profile preset",
         "receiptExportParity": "Preview/export parity is checked on export receipts.",
         "receiptRuntime": "Runtime preview luma {{before}} -> {{after}} (delta {{delta}}).",
         "receiptSummary": "{{profile}} with {{toneCurve}} is active.",
         "receiptTitle": "Profile/tone receipt",
+        "runtimeNotReported": "Provenance not reported",
+        "runtimeProcess": "{{process}} process",
         "title": "Profile & Tone",
         "toneCurve": "Tone Curve",
         "toneCurves": {
@@ -183,6 +197,8 @@
       "rangeCenter": "Range center",
       "rangeWidth": "Range width",
       "resetActiveRange": "Reset active range",
+      "resetLocalColorBalance": "Reset local color balance",
+      "resetWhiteBalanceAsShot": "Reset white balance to as shot",
       "runtimeStatus": {
         "apiLabel": "API",
         "ariaLabel": "Color editor runtime status",
@@ -233,8 +249,10 @@
       "workspaceTabs": {
         "advanced": "Advanced",
         "editor": "Editor",
+        "foundation": "Foundation",
         "grading": "Grading",
         "label": "Color workspace tools",
+        "mixer": "Mixer",
         "output": "Output",
         "quick": "Quick"
       }

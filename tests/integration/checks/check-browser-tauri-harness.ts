@@ -153,7 +153,7 @@ try {
     throw new Error('Compare mode did not return to off after toggling side-by-side.');
   }
   await page.getByRole('complementary', { name: 'Editor tools' }).waitFor({ timeout: 10_000 });
-  await page.getByRole('heading', { name: 'Color' }).waitFor({ timeout: 10_000 });
+  await page.getByRole('heading', { exact: true, name: 'Color' }).waitFor({ timeout: 10_000 });
   await page.getByText(/1024 × 768/u).waitFor({ timeout: 10_000 });
   await page.keyboard.press('Control+K');
   await page.getByRole('dialog', { name: /Command Palette/u }).waitFor({ timeout: 10_000 });

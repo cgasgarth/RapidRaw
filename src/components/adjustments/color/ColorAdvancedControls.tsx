@@ -20,6 +20,7 @@ interface ColorAdvancedControlsProps extends ColorPanelGroupProps {
   adjustmentVisibility: Record<string, boolean>;
   isColorCalibrationVisible: boolean;
   levelsClippingWarnings: Array<string>;
+  mode?: 'all' | 'calibration' | 'levels';
 }
 
 export const ColorAdvancedControls = ({
@@ -27,6 +28,7 @@ export const ColorAdvancedControls = ({
   adjustments,
   isColorCalibrationVisible,
   levelsClippingWarnings,
+  mode = 'all',
   setAdjustments,
   onDragStateChange,
 }: ColorAdvancedControlsProps) => {
@@ -35,7 +37,8 @@ export const ColorAdvancedControls = ({
   const [activePrimary, setActivePrimary] = useState('red');
   const colorCalibration = adjustments.colorCalibration;
   const levels = adjustments.levels;
-  const isLevelsVisible = adjustmentVisibility[ColorAdjustment.Levels] !== false;
+  const isLevelsVisible = mode !== 'calibration' && adjustmentVisibility[ColorAdjustment.Levels] !== false;
+  const isCalibrationVisible = mode !== 'levels' && isColorCalibrationVisible;
   const inputBlackMax = Math.max(0, Math.min(99, Math.round(levels.inputWhite * 100) - 1));
   const inputWhiteMin = Math.min(100, Math.max(1, Math.round(levels.inputBlack * 100) + 1));
   const outputBlackMax = Math.max(0, Math.min(99, Math.round(levels.outputWhite * 100) - 1));
@@ -110,9 +113,23 @@ export const ColorAdvancedControls = ({
   );
   const activePrimaryLabel = primaryColors.find((primary) => primary.name === activePrimary)?.label ?? activePrimary;
   const modifiedLabel = t('ui.collapsibleSection.dirtyBadge', { defaultValue: 'Edited' });
+  const disclosureTestId = mode === 'calibration' ? 'color-calibration-disclosure' : 'advanced-color-disclosure';
+  const disclosureTitle =
+    mode === 'calibration'
+      ? t('adjustments.color.calibration.advancedTitle')
+      : mode === 'levels'
+        ? t('adjustments.color.advanced.levelsTitle')
+        : t('adjustments.color.advanced.title');
+  const disclosureSummary =
+    mode === 'calibration'
+      ? t('adjustments.color.calibration.advancedSummary')
+      : mode === 'levels'
+        ? t('adjustments.color.advanced.levelsSummary')
+        : t('adjustments.color.advanced.summary');
+  const isDisclosureModified = (isLevelsVisible && isLevelsModified) || (isCalibrationVisible && isCalibrationModified);
 
   return (
-    <details className="group border-b border-editor-border" data-testid="advanced-color-disclosure">
+    <details className="group border-b border-editor-border" data-testid={disclosureTestId}>
       <summary className="cursor-pointer list-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring [&::-webkit-details-marker]:hidden">
         <CompactInspectorSectionHeader
           actions={
@@ -122,10 +139,10 @@ export const ColorAdvancedControls = ({
               size={14}
             />
           }
-          modified={isLevelsModified || isCalibrationModified}
+          modified={isDisclosureModified}
           modifiedLabel={modifiedLabel}
-          summary={t('adjustments.color.advanced.summary')}
-          title={t('adjustments.color.advanced.title')}
+          summary={disclosureSummary}
+          title={disclosureTitle}
         />
       </summary>
       <div
@@ -230,7 +247,7 @@ export const ColorAdvancedControls = ({
             )}
           </section>
         )}
-        {isColorCalibrationVisible && (
+        {isCalibrationVisible && (
           <section className="py-1.5" data-testid="color-calibration-controls">
             <CompactInspectorSectionHeader
               modified={isCalibrationModified}
