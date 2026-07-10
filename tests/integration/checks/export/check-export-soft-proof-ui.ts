@@ -6,6 +6,7 @@ const read = (path: string) => readFileSync(path, 'utf8');
 const failures: string[] = [];
 
 const toolbarSource = read('src/components/panel/editor/EditorToolbar.tsx');
+const toolbarCommandSource = read('src/components/panel/editor/editorToolbarCommands.ts');
 const exportPanelSource = read('src/components/panel/right/export/ExportPanel.tsx');
 const hookSource = read('src/hooks/editor/useImageProcessing.ts');
 const storeSource = read('src/store/useEditorStore.ts');
@@ -20,27 +21,23 @@ const locale = JSON.parse(read('src/i18n/locales/en.json'));
 for (const marker of [
   'isExportSoftProofEnabled',
   'exportSoftProofRecipeId',
-  'exportSoftProofTransform',
-  'data-testid="export-soft-proof-toolbar"',
-  'data-testid="export-soft-proof-recipe-details"',
-  'data-export-soft-proof-color-profile',
-  'data-export-soft-proof-black-point-compensation',
-  'data-export-soft-proof-effective-color-profile',
-  'data-export-soft-proof-effective-rendering-intent',
-  'data-export-soft-proof-fingerprint',
-  'data-export-soft-proof-rendering-intent',
-  'data-export-soft-proof-source-precision-path',
-  'data-export-soft-proof-status="export-transform-preview"',
-  'data-export-soft-proof-transform-applied',
-  'data-export-soft-proof-transform-policy-fingerprint',
-  'data-testid="export-soft-proof-active-dot"',
-  'data-testid="export-soft-proof-active-badge"',
-  'aria-pressed={isExportSoftProofEnabled}',
-  'editor.toolbar.exportSoftProofDetails',
-  'editor.toolbar.exportSoftProofActive',
+  'toggleSoftProof',
   'editor.toolbar.tooltips.exportSoftProof',
 ]) {
   if (!toolbarSource.includes(marker)) failures.push(`EditorToolbar missing ${marker}`);
+}
+
+if (!toolbarCommandSource.includes("command('soft-proof'")) {
+  failures.push('Editor toolbar command model missing soft-proof command');
+}
+
+for (const removedDiagnostic of [
+  'data-testid="export-soft-proof-toolbar"',
+  'data-testid="export-soft-proof-active-badge"',
+  'data-export-soft-proof-transform-policy-fingerprint',
+]) {
+  if (toolbarSource.includes(removedDiagnostic))
+    failures.push(`EditorToolbar retained proof diagnostic ${removedDiagnostic}`);
 }
 
 for (const marker of [
