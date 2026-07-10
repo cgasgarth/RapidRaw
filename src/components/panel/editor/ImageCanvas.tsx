@@ -2908,6 +2908,9 @@ const ImageCanvas = memo(
               : isToolActive || isCropping || showGamutWarningOverlay
                 ? 'active'
                 : 'ready';
+    const cropCanvasRatioLabel =
+      adjustments.aspectRatio === null ? t('editor.crop.presets.free.name') : `${adjustments.aspectRatio.toFixed(2)}:1`;
+    const cropCanvasOverlayLabel = isStraightenActive ? t('editor.crop.rotationHeading') : overlayMode || 'none';
 
     return (
       <div
@@ -3946,6 +3949,22 @@ const ImageCanvas = memo(
             pointerEvents: isCropViewVisible ? 'auto' : 'none',
           }}
         >
+          {isCropping && (
+            <div
+              aria-live="polite"
+              className="pointer-events-none absolute left-3 top-3 z-20 flex max-w-[calc(100%-1.5rem)] items-center gap-1 overflow-hidden text-[11px]"
+              data-crop-canvas-overlay={cropCanvasOverlayLabel}
+              data-crop-canvas-ratio={cropCanvasRatioLabel}
+              data-testid="crop-canvas-mode-strip"
+            >
+              <span className="shrink-0 rounded border border-editor-overlay-stroke bg-editor-panel/92 px-1.5 py-1 text-text-primary shadow-sm backdrop-blur">
+                {t('editor.crop.title')}
+              </span>
+              <span className="truncate rounded border border-editor-overlay-stroke bg-editor-panel/92 px-1.5 py-1 font-mono text-text-secondary shadow-sm backdrop-blur">
+                {cropCanvasRatioLabel}
+              </span>
+            </div>
+          )}
           {cropPreviewUrl && uncroppedImageRenderSize && (
             <div
               style={{

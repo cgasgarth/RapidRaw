@@ -1,7 +1,9 @@
 import cx from 'clsx';
-import { motion } from 'framer-motion';
 import {
   Aperture,
+  Check,
+  Eye,
+  EyeOff,
   FlipHorizontal,
   FlipVertical,
   Grid3x3,
@@ -23,7 +25,7 @@ import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../..
 import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../../utils/adjustments';
 import LensCorrectionModal from '../../../modals/editing/LensCorrectionModal';
 import TransformModal from '../../../modals/editing/TransformModal';
-import { Orientation } from '../../../ui/AppProperties';
+import { Orientation, Panel } from '../../../ui/AppProperties';
 import { editorChromeStatusChipClassName, editorChromeTokens } from '../../../ui/editorChromeTokens';
 import Slider from '../../../ui/primitives/Slider';
 import UiText from '../../../ui/primitives/Text';
@@ -55,8 +57,6 @@ type SliderChangeEvent =
     };
 
 const token = editorChromeTokens;
-const sectionClassName = 'space-y-3 rounded-md border border-editor-border bg-editor-panel-well p-3';
-const sectionHeaderClassName = 'mb-1 flex min-h-7 items-center justify-between gap-2';
 const sectionTitleClassName = cx(token.typography.inspectorLabel, 'text-text-primary');
 const utilityLabelClassName = cx(token.typography.utilityLabel, 'text-text-tertiary');
 const iconButtonClassName = cx(
@@ -66,20 +66,15 @@ const iconButtonClassName = cx(
   token.focusRing,
   token.button.disabled,
 );
-const tileButtonClassName = cx(
-  token.button.base,
-  token.focusRing,
-  token.button.disabled,
-  'min-h-10 w-full flex-col px-2 py-2 text-xs leading-4',
-);
-const selectedTileClassName = 'border-editor-primary-active bg-editor-selected-quiet text-editor-selected-quiet-text';
-const quietTileClassName =
+const selectedControlClassName =
+  'border-editor-primary-active bg-editor-selected-quiet text-editor-selected-quiet-text';
+const quietControlClassName =
   'border-editor-border bg-editor-panel-raised text-text-secondary hover:bg-editor-selected-quiet hover:text-text-primary';
 const ratioButtonClassName = cx(
   token.button.base,
   token.focusRing,
   token.button.disabled,
-  'h-8 w-full px-2 text-xs leading-4',
+  'h-8 min-w-0 px-1.5 text-xs leading-4',
 );
 
 export default function CropPanel() {
@@ -88,19 +83,26 @@ export default function CropPanel() {
   const adjustments = useEditorStore((s) => s.adjustments);
   const isStraightenActive = useEditorStore((s) => s.isStraightenActive);
   const activeOverlay = useEditorStore((s) => s.overlayMode);
+  const overlayRotation = useEditorStore((s) => s.overlayRotation);
+  const showOriginal = useEditorStore((s) => s.showOriginal);
   const setEditor = useEditorStore((s) => s.setEditor);
   const isLensModalOpen = useUIStore((s) => s.isLensCorrectionModalOpen);
   const isTransformModalOpen = useUIStore((s) => s.isTransformModalOpen);
   const setUI = useUIStore((s) => s.setUI);
+  const setRightPanel = useUIStore((s) => s.setRightPanel);
   const { setAdjustments } = useEditorActions();
   const [customW, setCustomW] = useState('');
   const [customH, setCustomH] = useState('');
   const [isRotationActive, setIsRotationActive] = useState(false);
   const [preferPortrait, setPreferPortrait] = useState(false);
   const [isEditingCustom, setIsEditingCustom] = useState(false);
+  const [customRatioError, setCustomRatioError] = useState(false);
 
   const [localRotation, setLocalRotation] = useState<number | null>(null);
   const localRotationRef = useRef<number | null>(null);
+  const sessionAdjustmentsRef = useRef<Adjustments | null>(null);
+  const sessionOverlayRef = useRef<{ mode: OverlayMode; rotation: number } | null>(null);
+  const selectedImagePath = selectedImage?.path ?? null;
 
   const PRESETS = useMemo<Array<CropPreset>>(
     () => [
@@ -193,37 +195,17 @@ export default function CropPanel() {
   }, [isStraightenActive, setAdjustments, updateLocalRotation]);
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const activeTag = document.activeElement?.tagName.toLowerCase();
-      if (activeTag === 'input' || activeTag === 'textarea') return;
-
-      if (e.ctrlKey || e.metaKey) return;
-
-      if (e.key.toLowerCase() === 'o') {
-        e.preventDefault();
-
-        if (e.shiftKey) {
-          setOverlayRotation((prev) => (prev + 1) % 4);
-        } else {
-          const currentIndex = OVERLAYS.findIndex((o) => o.id === activeOverlay);
-          const nextIndex = (currentIndex + 1) % OVERLAYS.length;
-          const nextOverlay = OVERLAYS[nextIndex];
-          if (nextOverlay) setOverlay(nextOverlay.id);
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [activeOverlay, setOverlay, setOverlayRotation, OVERLAYS]);
-
-  useEffect(() => {
     return () => {
       setEditor({ liveRotation: null });
     };
   }, [setEditor]);
+
+  useEffect(() => {
+    const state = useEditorStore.getState();
+    sessionAdjustmentsRef.current = structuredClone(state.adjustments);
+    sessionOverlayRef.current = { mode: state.overlayMode, rotation: state.overlayRotation };
+    setCustomRatioError(false);
+  }, [selectedImagePath]);
 
   const getEffectiveOriginalRatio = useCallback(() => {
     if (selectedImage === null || !selectedImage.width || !selectedImage.height) {
@@ -317,6 +299,7 @@ export default function CropPanel() {
 
   const handleCustomInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+    setCustomRatioError(false);
     if (name === 'customW') {
       setCustomW(value);
     } else if (name === 'customH') {
@@ -334,11 +317,14 @@ export default function CropPanel() {
     const numH = parseFloat(customH);
 
     if (numW > 0 && numH > 0) {
+      setCustomRatioError(false);
       const newAspectRatio = numW / numH;
       lastSyncedRatio.current = newAspectRatio;
       if (!adjustments.aspectRatio || Math.abs(adjustments.aspectRatio - newAspectRatio) > RATIO_TOLERANCE) {
         setAdjustments((prev: Adjustments) => ({ ...prev, aspectRatio: newAspectRatio }));
       }
+    } else {
+      setCustomRatioError(true);
     }
   };
 
@@ -410,6 +396,7 @@ export default function CropPanel() {
 
     setPreferPortrait(false);
     setIsEditingCustom(false);
+    setCustomRatioError(false);
     lastSyncedRatio.current = null;
     updateLocalRotation(null);
 
@@ -521,49 +508,149 @@ export default function CropPanel() {
     [setEditor, updateLocalRotation, setAdjustments],
   );
 
-  const activeRatioLabel = activePreset?.name ?? (isCustomActive ? t('editor.crop.presets.custom.name') : 'Custom');
-  const orientationLabel = orientation === Orientation.Vertical ? 'Portrait' : 'Landscape';
+  const activeRatioLabel = activePreset?.name ?? t('editor.crop.presets.custom.name');
+  const orientationLabel =
+    orientation === Orientation.Vertical ? t('editor.crop.status.portrait') : t('editor.crop.status.landscape');
   const activeOverlayLabel = OVERLAYS.find((overlay) => overlay.id === activeOverlay)?.name ?? activeOverlay;
+  const isDirty =
+    sessionAdjustmentsRef.current !== null &&
+    (JSON.stringify(sessionAdjustmentsRef.current) !== JSON.stringify(adjustments) ||
+      sessionOverlayRef.current?.mode !== activeOverlay ||
+      sessionOverlayRef.current.rotation !== overlayRotation);
+
+  const finalizeLiveRotation = () => {
+    if (localRotationRef.current === null) return;
+
+    const finalRotation = localRotationRef.current;
+    updateLocalRotation(null);
+    setAdjustments((prev: Adjustments) => ({ ...prev, rotation: finalRotation }));
+  };
+
+  const handleApply = () => {
+    finalizeLiveRotation();
+    setEditor({ isRotationActive: false, isStraightenActive: false, liveRotation: null });
+    setRightPanel(Panel.Adjustments);
+  };
+
+  const handleCancel = () => {
+    const sessionAdjustments = sessionAdjustmentsRef.current;
+    const sessionOverlay = sessionOverlayRef.current;
+    updateLocalRotation(null);
+    if (sessionOverlay !== null) {
+      setEditor({
+        isRotationActive: false,
+        isStraightenActive: false,
+        liveRotation: null,
+        overlayMode: sessionOverlay.mode,
+        overlayRotation: sessionOverlay.rotation,
+      });
+    } else {
+      setEditor({ isRotationActive: false, isStraightenActive: false, liveRotation: null });
+    }
+    if (sessionAdjustments !== null && JSON.stringify(sessionAdjustments) !== JSON.stringify(adjustments)) {
+      setAdjustments(() => structuredClone(sessionAdjustments));
+    }
+    setRightPanel(Panel.Adjustments);
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeTag = document.activeElement?.tagName.toLowerCase();
+      if (activeTag === 'input' || activeTag === 'textarea' || e.ctrlKey || e.metaKey) return;
+
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        handleCancel();
+        return;
+      }
+
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleApply();
+        return;
+      }
+
+      if (e.key.toLowerCase() === 'o') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          setOverlayRotation((prev) => (prev + 1) % 4);
+        } else {
+          handleOverlayCycle();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [activeOverlay, adjustments, handleApply, handleCancel, setOverlayRotation]);
 
   return (
     <div className="flex h-full flex-col bg-editor-panel">
-      <div className="flex min-h-11 shrink-0 items-center justify-between border-b border-editor-border px-3">
+      <div
+        className="flex min-h-12 shrink-0 items-center justify-between gap-2 border-b border-editor-border px-3 py-2"
+        data-crop-dirty={String(isDirty)}
+        data-testid="crop-panel-status"
+      >
         <div className="min-w-0">
           <UiText variant={TextVariants.title} className={token.typography.panelTitle}>
             {t('editor.crop.title')}
           </UiText>
-          {selectedImage && (
-            <div className="mt-1 flex items-center gap-1.5">
-              <span className={editorChromeStatusChipClassName('neutral')}>{activeRatioLabel}</span>
-              <span className={editorChromeStatusChipClassName(isStraightenActive ? 'info' : 'neutral')}>
-                {isStraightenActive ? 'Straighten' : activeOverlayLabel}
-              </span>
-            </div>
-          )}
+          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1">
+            <span className={editorChromeStatusChipClassName(isDirty ? 'info' : 'neutral')}>{activeRatioLabel}</span>
+            <span className={editorChromeStatusChipClassName(isStraightenActive ? 'info' : 'neutral')}>
+              {isStraightenActive ? t('editor.crop.status.straighten') : activeOverlayLabel}
+            </span>
+            <span className={editorChromeStatusChipClassName('neutral')}>{orientationLabel}</span>
+          </div>
         </div>
-        <button
-          className={iconButtonClassName}
-          onClick={handleReset}
-          data-tooltip={t('editor.crop.resetTooltip')}
-          type="button"
-        >
-          <RotateCcw size={18} />
-        </button>
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            aria-label={
+              showOriginal ? t('editor.toolbar.tooltips.showEdited') : t('editor.toolbar.tooltips.showOriginal')
+            }
+            aria-pressed={showOriginal}
+            className={cx(iconButtonClassName, showOriginal && selectedControlClassName)}
+            data-tooltip={
+              showOriginal ? t('editor.toolbar.tooltips.showEdited') : t('editor.toolbar.tooltips.showOriginal')
+            }
+            disabled={!selectedImage?.isReady}
+            onClick={() => {
+              setEditor({ showOriginal: !showOriginal });
+            }}
+            type="button"
+          >
+            {showOriginal ? <EyeOff size={16} /> : <Eye size={16} />}
+          </button>
+          <button
+            aria-label={t('editor.crop.resetTooltip')}
+            className={iconButtonClassName}
+            data-tooltip={t('editor.crop.resetTooltip')}
+            disabled={!selectedImage?.isReady}
+            onClick={handleReset}
+            type="button"
+          >
+            <RotateCcw size={16} />
+          </button>
+        </div>
       </div>
 
-      <div className="grow space-y-3 overflow-y-auto p-3">
-        {selectedImage ? (
+      <div className="grow overflow-y-auto p-3">
+        {selectedImage?.isReady ? (
           <>
-            <section className={sectionClassName} data-testid="crop-panel-ratio-section">
-              <div className={sectionHeaderClassName}>
+            <section className="space-y-2 border-b border-editor-border pb-3" data-testid="crop-panel-ratio-section">
+              <div className="flex min-h-7 items-center justify-between gap-2">
                 <div>
                   <UiText variant={TextVariants.heading} className={sectionTitleClassName}>
                     {t('editor.crop.aspectRatioHeading')}
                   </UiText>
                   <div className={utilityLabelClassName}>{orientationLabel}</div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex shrink-0 items-center gap-1">
                   <button
+                    aria-label={getOverlayTooltip()}
                     className={iconButtonClassName}
                     onClick={handleOverlayCycle}
                     data-tooltip={getOverlayTooltip()}
@@ -573,6 +660,7 @@ export default function CropPanel() {
                     <Grid3x3 size={16} />
                   </button>
                   <button
+                    aria-label={getOrientationTooltip()}
                     className={iconButtonClassName}
                     disabled={isOrientationToggleDisabled}
                     onClick={handleOrientationToggle}
@@ -588,12 +676,12 @@ export default function CropPanel() {
                   </button>
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-1.5">
+              <div className="grid grid-cols-4 gap-1" role="group" aria-label={t('editor.crop.aspectRatioHeading')}>
                 {PRESETS.map((preset: CropPreset) => (
-                  <motion.button
+                  <button
                     className={cx(
                       ratioButtonClassName,
-                      isPresetActive(preset) ? selectedTileClassName : quietTileClassName,
+                      isPresetActive(preset) ? selectedControlClassName : quietControlClassName,
                     )}
                     key={preset.name}
                     onClick={() => {
@@ -603,19 +691,17 @@ export default function CropPanel() {
                     data-testid={`crop-ratio-preset-${preset.name.toLowerCase().replace(/[^a-z0-9]+/gu, '-')}`}
                     aria-pressed={isPresetActive(preset)}
                     type="button"
-                    whileTap={{ scale: 0.98 }}
-                    transition={{ type: 'spring', stiffness: 400, damping: 17 }}
                   >
                     {preset.name}
-                  </motion.button>
+                  </button>
                 ))}
               </div>
               <div>
-                <motion.button
+                <button
                   className={cx(
                     ratioButtonClassName,
-                    'justify-between',
-                    isCustomActive ? selectedTileClassName : quietTileClassName,
+                    'w-full justify-between',
+                    isCustomActive ? selectedControlClassName : quietControlClassName,
                   )}
                   onClick={() => {
                     const imageRatio = getEffectiveOriginalRatio();
@@ -627,76 +713,75 @@ export default function CropPanel() {
                       ...prev,
                       aspectRatio: newAspectRatio,
                     }));
+                    setCustomRatioError(false);
                   }}
                   data-tooltip={t('editor.crop.presets.custom.tooltip')}
                   data-testid="crop-ratio-preset-custom"
                   aria-pressed={isCustomActive}
                   type="button"
-                  whileTap={{ scale: 0.98 }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 17 }}
                 >
                   <span>{t('editor.crop.presets.custom.name')}</span>
                   <span className={cx(token.typography.numericValue, 'text-xs opacity-80')}>
                     {customW && customH ? `${customW}:${customH}` : '1.62:1'}
                   </span>
-                </motion.button>
-                <div
-                  className={cx(
-                    'mt-2 rounded border border-editor-border bg-editor-panel-raised p-2 transition-opacity',
-                    isCustomActive ? 'opacity-100' : 'opacity-50',
-                  )}
-                  data-state={isCustomActive ? 'active' : 'disabled'}
-                  data-testid="crop-custom-ratio-inputs"
-                >
-                  <div className="flex items-center justify-center gap-2">
-                    <input
-                      className={cx(
-                        token.input.base,
-                        token.input.compact,
-                        token.input.numeric,
-                        token.focusRing,
-                        'w-full text-center',
-                      )}
-                      disabled={!isCustomActive}
-                      min="0"
-                      name="customW"
-                      onBlur={handleApplyCustomRatio}
-                      onChange={handleCustomInputChange}
-                      onFocus={handleCustomInputFocus}
-                      onKeyDown={handleCustomInputKeyDown}
-                      placeholder={t('editor.crop.custom.wPlaceholder')}
-                      data-tooltip={t('editor.crop.custom.wTooltip')}
-                      type="number"
-                      value={customW}
-                    />
-                    <X size={16} className={`shrink-0 ${TEXT_COLOR_KEYS[TextColors.secondary]}`} />
-                    <input
-                      className={cx(
-                        token.input.base,
-                        token.input.compact,
-                        token.input.numeric,
-                        token.focusRing,
-                        'w-full text-center',
-                      )}
-                      disabled={!isCustomActive}
-                      min="0"
-                      name="customH"
-                      onBlur={handleApplyCustomRatio}
-                      onChange={handleCustomInputChange}
-                      onFocus={handleCustomInputFocus}
-                      onKeyDown={handleCustomInputKeyDown}
-                      placeholder={t('editor.crop.custom.hPlaceholder')}
-                      data-tooltip={t('editor.crop.custom.hTooltip')}
-                      type="number"
-                      value={customH}
-                    />
+                </button>
+                {isCustomActive && (
+                  <div className="mt-2" data-state="active" data-testid="crop-custom-ratio-inputs">
+                    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1">
+                      <input
+                        aria-describedby="crop-custom-ratio-error"
+                        aria-invalid={customRatioError}
+                        className={cx(
+                          token.input.base,
+                          token.input.compact,
+                          token.input.numeric,
+                          token.focusRing,
+                          'min-w-0 text-center',
+                        )}
+                        min="0"
+                        name="customW"
+                        onBlur={handleApplyCustomRatio}
+                        onChange={handleCustomInputChange}
+                        onFocus={handleCustomInputFocus}
+                        onKeyDown={handleCustomInputKeyDown}
+                        placeholder={t('editor.crop.custom.wPlaceholder')}
+                        data-tooltip={t('editor.crop.custom.wTooltip')}
+                        type="number"
+                        value={customW}
+                      />
+                      <X size={14} className={`shrink-0 ${TEXT_COLOR_KEYS[TextColors.secondary]}`} />
+                      <input
+                        aria-describedby="crop-custom-ratio-error"
+                        aria-invalid={customRatioError}
+                        className={cx(
+                          token.input.base,
+                          token.input.compact,
+                          token.input.numeric,
+                          token.focusRing,
+                          'min-w-0 text-center',
+                        )}
+                        min="0"
+                        name="customH"
+                        onBlur={handleApplyCustomRatio}
+                        onChange={handleCustomInputChange}
+                        onFocus={handleCustomInputFocus}
+                        onKeyDown={handleCustomInputKeyDown}
+                        placeholder={t('editor.crop.custom.hPlaceholder')}
+                        data-tooltip={t('editor.crop.custom.hTooltip')}
+                        type="number"
+                        value={customH}
+                      />
+                    </div>
+                    <div id="crop-custom-ratio-error" className="min-h-4 text-xs text-editor-warning" role="alert">
+                      {customRatioError ? t('editor.crop.custom.invalid') : null}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </section>
 
-            <section className={sectionClassName} data-testid="crop-panel-rotation-section">
-              <div className={sectionHeaderClassName}>
+            <section className="space-y-2 border-b border-editor-border py-3" data-testid="crop-panel-rotation-section">
+              <div className="flex min-h-7 items-center justify-between gap-2">
                 <UiText variant={TextVariants.heading} className={sectionTitleClassName}>
                   {t('editor.crop.rotationHeading')}
                 </UiText>
@@ -704,170 +789,148 @@ export default function CropPanel() {
                   {displayRotation.toFixed(1)}°
                 </span>
               </div>
-              <div className="rounded border border-editor-border bg-editor-panel-raised px-3 py-3">
-                <Slider
-                  label={
-                    <div className="flex items-center gap-2">
-                      <button
-                        aria-label={t('editor.crop.tooltips.straighten')}
-                        onClick={() => {
-                          setEditor((state) => {
-                            const willBeActive = !state.isStraightenActive;
-                            if (willBeActive) {
-                              updateLocalRotation(null);
-                              setAdjustments((prev: Adjustments) => ({ ...prev, rotation: 0 }));
-                            }
-                            return { isStraightenActive: willBeActive };
-                          });
-                        }}
-                        className={cx(
-                          iconButtonClassName,
-                          isStraightenActive ? selectedTileClassName : token.button.quiet,
-                        )}
-                        data-tooltip={t('editor.crop.tooltips.straighten')}
-                        data-testid="crop-panel-straighten-toggle"
-                        type="button"
-                      >
-                        <Ruler size={14} />
-                      </button>
-                      <button
-                        aria-label={t('editor.crop.tooltips.resetFineRotation')}
-                        className={iconButtonClassName}
-                        onClick={resetFineRotation}
-                        data-tooltip={t('editor.crop.tooltips.resetFineRotation')}
-                        disabled={displayRotation === 0}
-                        data-testid="crop-panel-reset-fine-rotation"
-                        type="button"
-                      >
-                        <RotateCcw size={14} />
-                      </button>
-                    </div>
-                  }
-                  min={-45}
-                  max={45}
-                  step={0.1}
-                  value={displayRotation}
-                  defaultValue={0}
-                  suffix="°"
-                  onChange={handleFineRotationChange}
-                  onDragStateChange={handleDragStateChange}
-                />
-              </div>
+              <Slider
+                label={
+                  <div className="flex items-center gap-1">
+                    <button
+                      aria-label={t('editor.crop.tooltips.straighten')}
+                      aria-pressed={isStraightenActive}
+                      className={cx(iconButtonClassName, isStraightenActive && selectedControlClassName)}
+                      data-tooltip={t('editor.crop.tooltips.straighten')}
+                      data-testid="crop-panel-straighten-toggle"
+                      onClick={() => {
+                        setEditor((state) => {
+                          const willBeActive = !state.isStraightenActive;
+                          if (willBeActive) {
+                            updateLocalRotation(null);
+                            setAdjustments((prev: Adjustments) => ({ ...prev, rotation: 0 }));
+                          }
+                          return { isStraightenActive: willBeActive };
+                        });
+                      }}
+                      type="button"
+                    >
+                      <Ruler size={14} />
+                    </button>
+                    <button
+                      aria-label={t('editor.crop.tooltips.resetFineRotation')}
+                      className={iconButtonClassName}
+                      data-tooltip={t('editor.crop.tooltips.resetFineRotation')}
+                      data-testid="crop-panel-reset-fine-rotation"
+                      disabled={displayRotation === 0}
+                      onClick={resetFineRotation}
+                      type="button"
+                    >
+                      <RotateCcw size={14} />
+                    </button>
+                  </div>
+                }
+                min={-45}
+                max={45}
+                step={0.1}
+                value={displayRotation}
+                defaultValue={0}
+                suffix="°"
+                onChange={handleFineRotationChange}
+                onDragStateChange={handleDragStateChange}
+              />
             </section>
 
-            <section className={sectionClassName} data-testid="crop-panel-orientation-section">
-              <div className={sectionHeaderClassName}>
+            <section
+              className="flex items-center justify-between gap-2 py-3"
+              data-testid="crop-panel-orientation-section"
+            >
+              <div className="min-w-0">
                 <UiText variant={TextVariants.heading} className={sectionTitleClassName}>
                   {t('editor.crop.orientationHeading')}
                 </UiText>
-                <span className={editorChromeStatusChipClassName(flipHorizontal || flipVertical ? 'info' : 'neutral')}>
-                  {orientationSteps * 90}°
-                </span>
+                <div className={utilityLabelClassName}>{orientationSteps * 90}°</div>
               </div>
-              <div className="grid grid-cols-2 gap-1.5">
-                <motion.button
-                  className={cx(tileButtonClassName, quietTileClassName)}
-                  onClick={() => {
-                    handleStepRotate(-90);
-                  }}
+              <div
+                className="flex shrink-0 items-center gap-1"
+                role="group"
+                aria-label={t('editor.crop.orientationHeading')}
+              >
+                <button
+                  aria-label={t('editor.crop.tooltips.rotateLeft')}
+                  className={iconButtonClassName}
                   data-tooltip={t('editor.crop.tooltips.rotateLeft')}
                   data-testid="crop-panel-rotate-left"
+                  onClick={() => handleStepRotate(-90)}
                   type="button"
-                  whileTap={{ scale: 0.98 }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 17 }}
                 >
-                  <RotateCcw size={20} className="transition-none" />
-                  <span className="text-xs mt-2 transition-none">{t('editor.crop.labels.rotateLeft')}</span>
-                </motion.button>
-                <motion.button
-                  className={cx(tileButtonClassName, quietTileClassName)}
-                  onClick={() => {
-                    handleStepRotate(90);
-                  }}
+                  <RotateCcw size={16} />
+                </button>
+                <button
+                  aria-label={t('editor.crop.tooltips.rotateRight')}
+                  className={iconButtonClassName}
                   data-tooltip={t('editor.crop.tooltips.rotateRight')}
                   data-testid="crop-panel-rotate-right"
+                  onClick={() => handleStepRotate(90)}
                   type="button"
-                  whileTap={{ scale: 0.98 }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 17 }}
                 >
-                  <RotateCw size={20} className="transition-none" />
-                  <span className="text-xs mt-2 transition-none">{t('editor.crop.labels.rotateRight')}</span>
-                </motion.button>
-                <motion.button
-                  className={cx(tileButtonClassName, flipHorizontal ? selectedTileClassName : quietTileClassName)}
-                  onClick={() => {
-                    setAdjustments((prev: Adjustments) => ({
-                      ...prev,
-                      flipHorizontal: !prev.flipHorizontal,
-                    }));
-                  }}
+                  <RotateCw size={16} />
+                </button>
+                <button
+                  aria-label={t('editor.crop.tooltips.flipHoriz')}
+                  aria-pressed={flipHorizontal}
+                  className={cx(iconButtonClassName, flipHorizontal && selectedControlClassName)}
                   data-tooltip={t('editor.crop.tooltips.flipHoriz')}
                   data-testid="crop-panel-flip-horizontal"
-                  aria-pressed={flipHorizontal}
+                  onClick={() => {
+                    setAdjustments((prev: Adjustments) => ({ ...prev, flipHorizontal: !prev.flipHorizontal }));
+                  }}
                   type="button"
-                  whileTap={{ scale: 0.98 }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 17 }}
                 >
-                  <FlipHorizontal size={20} className="transition-none" />
-                  <span className="text-xs mt-2 transition-none">{t('editor.crop.labels.flipHoriz')}</span>
-                </motion.button>
-                <motion.button
-                  className={cx(tileButtonClassName, flipVertical ? selectedTileClassName : quietTileClassName)}
+                  <FlipHorizontal size={16} />
+                </button>
+                <button
+                  aria-label={t('editor.crop.tooltips.flipVert')}
+                  aria-pressed={flipVertical}
+                  className={cx(iconButtonClassName, flipVertical && selectedControlClassName)}
+                  data-tooltip={t('editor.crop.tooltips.flipVert')}
+                  data-testid="crop-panel-flip-vertical"
                   onClick={() => {
                     setAdjustments((prev: Adjustments) => ({ ...prev, flipVertical: !prev.flipVertical }));
                   }}
-                  data-tooltip={t('editor.crop.tooltips.flipVert')}
-                  data-testid="crop-panel-flip-vertical"
-                  aria-pressed={flipVertical}
                   type="button"
-                  whileTap={{ scale: 0.98 }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 17 }}
                 >
-                  <FlipVertical size={20} className="transition-none" />
-                  <span className="text-xs mt-2 transition-none">{t('editor.crop.labels.flipVert')}</span>
-                </motion.button>
-              </div>
-            </section>
-
-            <section className={sectionClassName} data-testid="crop-panel-geometry-section">
-              <div className={sectionHeaderClassName}>
-                <UiText variant={TextVariants.heading} className={sectionTitleClassName}>
-                  {t('editor.crop.geometryHeading')}
-                </UiText>
-                <span className={editorChromeStatusChipClassName('neutral')}>{t('editor.crop.geometryHeading')}</span>
-              </div>
-              <div className="grid grid-cols-2 gap-1.5">
-                <motion.button
-                  className={cx(tileButtonClassName, quietTileClassName)}
-                  onClick={() => {
-                    setUI({ isTransformModalOpen: true });
-                  }}
+                  <FlipVertical size={16} />
+                </button>
+                <span className="mx-0.5 h-5 border-l border-editor-border" aria-hidden="true" />
+                <button
+                  aria-label={t('editor.crop.tooltips.transform')}
+                  className={iconButtonClassName}
                   data-tooltip={t('editor.crop.tooltips.transform')}
                   data-testid="crop-panel-transform-entry"
+                  onClick={() => setUI({ isTransformModalOpen: true })}
                   type="button"
-                  whileTap={{ scale: 0.98 }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 17 }}
                 >
-                  <Scan size={20} className="transition-none" />
-                  <span className="text-xs mt-2 transition-none">{t('editor.crop.labels.transform')}</span>
-                </motion.button>
-                <motion.button
-                  className={cx(tileButtonClassName, quietTileClassName)}
-                  onClick={() => {
-                    setUI({ isLensCorrectionModalOpen: true });
-                  }}
+                  <Scan size={16} />
+                </button>
+                <button
+                  aria-label={t('editor.crop.tooltips.lens')}
+                  className={iconButtonClassName}
                   data-tooltip={t('editor.crop.tooltips.lens')}
                   data-testid="crop-panel-lens-entry"
+                  onClick={() => setUI({ isLensCorrectionModalOpen: true })}
                   type="button"
-                  whileTap={{ scale: 0.98 }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 17 }}
                 >
-                  <Aperture size={20} className="transition-none" />
-                  <span className="text-xs mt-2 transition-none">{t('editor.crop.labels.lens')}</span>
-                </motion.button>
+                  <Aperture size={16} />
+                </button>
               </div>
             </section>
           </>
+        ) : selectedImage ? (
+          <UiText
+            aria-busy="true"
+            className="mt-4 text-center"
+            color={TextColors.secondary}
+            variant={TextVariants.heading}
+            weight={TextWeights.normal}
+          >
+            {t('editor.canvas.compare.loadingOriginal')}
+          </UiText>
         ) : (
           <UiText
             variant={TextVariants.heading}
@@ -878,6 +941,52 @@ export default function CropPanel() {
             {t('editor.ai.noImageSelected')}
           </UiText>
         )}
+      </div>
+
+      <div
+        className="flex shrink-0 items-center justify-between gap-2 border-t border-editor-border px-3 py-2"
+        data-testid="crop-panel-actions"
+      >
+        <button
+          aria-label={t('editor.crop.resetTooltip')}
+          className={iconButtonClassName}
+          data-tooltip={t('editor.crop.resetTooltip')}
+          disabled={!selectedImage?.isReady}
+          onClick={handleReset}
+          type="button"
+        >
+          <RotateCcw size={16} />
+        </button>
+        <div className="flex min-w-0 items-center justify-end gap-2">
+          <button
+            className={cx(
+              token.button.base,
+              token.button.quiet,
+              token.focusRing,
+              token.button.disabled,
+              'h-8 px-3 text-xs',
+            )}
+            disabled={!selectedImage?.isReady}
+            onClick={handleCancel}
+            type="button"
+          >
+            {t('modals.transform.cancel')}
+          </button>
+          <button
+            className={cx(
+              token.button.base,
+              token.focusRing,
+              token.button.disabled,
+              'h-8 bg-editor-primary-active px-3 text-xs text-editor-primary-active-text hover:opacity-90',
+            )}
+            disabled={!selectedImage?.isReady}
+            onClick={handleApply}
+            type="button"
+          >
+            <Check size={14} />
+            {t('modals.transform.apply')}
+          </button>
+        </div>
       </div>
 
       <TransformModal

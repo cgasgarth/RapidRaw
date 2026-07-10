@@ -979,6 +979,7 @@
       "custom": {
         "hPlaceholder": "H",
         "hTooltip": "高さ",
+        "invalid": "ゼロより大きい値を入力してください。",
         "wPlaceholder": "W",
         "wTooltip": "幅"
       },
@@ -1066,6 +1067,11 @@
       },
       "resetTooltip": "切り抜きと変形をリセット",
       "rotationHeading": "回転",
+      "status": {
+        "landscape": "横向き",
+        "portrait": "縦向き",
+        "straighten": "傾き補正"
+      },
       "title": "切り抜きと変形",
       "tooltips": {
         "compositionOverlay": "構図ガイド",

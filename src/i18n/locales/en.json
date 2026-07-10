@@ -1049,6 +1049,7 @@
       "custom": {
         "hPlaceholder": "H",
         "hTooltip": "Height",
+        "invalid": "Enter values greater than zero.",
         "wPlaceholder": "W",
         "wTooltip": "Width"
       },
@@ -1136,6 +1137,11 @@
       },
       "resetTooltip": "Reset Crop & Transform",
       "rotationHeading": "Rotation",
+      "status": {
+        "landscape": "Landscape",
+        "portrait": "Portrait",
+        "straighten": "Straighten"
+      },
       "title": "Crop & Transform",
       "tooltips": {
         "compositionOverlay": "Composition Overlay",

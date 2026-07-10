@@ -651,10 +651,20 @@ async function assertProfessionalCropTransformWorkspace(page) {
   const panel = page.getByTestId('professional-crop-transform-panel');
   const canvas = page.getByTestId('professional-crop-transform-canvas');
   const proof = page.getByTestId('professional-crop-transform-proof');
+  const cropModeStrip = page.getByTestId('crop-canvas-mode-strip');
 
   await panel.waitFor({ timeout: 10_000 });
   await canvas.waitFor({ timeout: 10_000 });
+  await cropModeStrip.waitFor({ timeout: 10_000 });
   await page.getByTestId('composition-overlays').waitFor({ timeout: 10_000 });
+  await panel.getByTestId('crop-panel-actions').waitFor({ timeout: 10_000 });
+
+  if ((await cropModeStrip.getAttribute('data-crop-canvas-ratio')) !== '1.78:1') {
+    throw new Error('Crop canvas mode strip should expose the active ratio.');
+  }
+  if ((await cropModeStrip.getAttribute('data-crop-canvas-overlay')) !== 'phiGrid') {
+    throw new Error('Crop canvas mode strip should expose the active composition overlay.');
+  }
 
   const canvasBounds = await canvas.boundingBox();
   if (!canvasBounds || canvasBounds.width < 320 || canvasBounds.height < 220) {
@@ -671,12 +681,22 @@ async function assertProfessionalCropTransformWorkspace(page) {
 
   await panel.getByTestId('crop-panel-overlay-cycle').click();
   await expectDatasetValue(proof, 'activeOverlay', 'armature');
+  if ((await cropModeStrip.getAttribute('data-crop-canvas-overlay')) !== 'armature') {
+    throw new Error('Crop canvas mode strip should stay synchronized with overlay changes.');
+  }
 
   await panel.getByTestId('crop-ratio-preset-1-1').click();
   await page.waitForFunction(
     () =>
       document.querySelector('[data-testid="professional-crop-transform-proof"]')?.getAttribute('data-aspect-ratio') ===
       '1',
+    null,
+    { timeout: 10_000 },
+  );
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="crop-canvas-mode-strip"]')?.getAttribute('data-crop-canvas-ratio') ===
+      '1.00:1',
     null,
     { timeout: 10_000 },
   );
@@ -726,6 +746,7 @@ async function assertProfessionalCropTransformWorkspace(page) {
     state: 'hidden',
     timeout: 10_000,
   });
+  await page.evaluate(() => window.scrollTo(0, 0));
 }
 
 async function assertProfessionalEditorToolbar(page) {
