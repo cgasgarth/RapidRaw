@@ -60,8 +60,13 @@ describe('crop panel workflow', () => {
     const { container } = await renderCropPanel();
     const panel = required<HTMLElement>(container, '[data-testid="crop-panel-status"]');
     expect(panel.dataset.cropDirty).toBe('false');
+    expect(required<HTMLElement>(container, '[data-crop-panel-density="compact"]')).not.toBeNull();
     expect(container.querySelector('[data-testid="crop-panel-actions"]')).not.toBeNull();
     expect(container.querySelectorAll('[data-testid="crop-panel-ratio-section"] button').length).toBeGreaterThan(10);
+    expect(container.querySelector('[data-testid="crop-panel-overlay-section"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="crop-panel-geometry-section"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="crop-panel-transform-entry"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="crop-panel-lens-entry"]')).not.toBeNull();
 
     await act(async () => {
       required<HTMLButtonElement>(container, '[data-testid="crop-ratio-preset-5-4"]').click();
@@ -111,6 +116,43 @@ describe('crop panel workflow', () => {
     expect(required<HTMLElement>(container, '#crop-custom-ratio-error').textContent).toContain('greater than zero');
     expect(required<HTMLInputElement>(container, 'input[name="customW"]').getAttribute('aria-invalid')).toBe('true');
   });
+
+  test('binds the compact groups to crop state and keyboard overlay cycling', async () => {
+    useEditorStore.setState({
+      adjustments: { ...INITIAL_ADJUSTMENTS, aspectRatio: 3 / 2, rotation: 3 },
+      history: [{ ...INITIAL_ADJUSTMENTS, aspectRatio: 3 / 2, rotation: 3 }],
+      historyCheckpoints: [],
+      historyIndex: 0,
+      isStraightenActive: false,
+      overlayMode: 'goldenSpiral',
+      overlayRotation: 0,
+      selectedImage,
+    });
+    useUIStore.setState({ activeRightPanel: Panel.Crop, renderedRightPanel: Panel.Crop });
+
+    const { container } = await renderCropPanel();
+
+    await clickControl(container, '[data-testid="crop-panel-ratio-orientation-toggle"]');
+    await clickControl(container, '[data-testid="crop-panel-flip-horizontal"]');
+    await clickControl(container, '[data-testid="crop-panel-rotate-right"]');
+    await clickControl(container, '[data-testid="crop-panel-straighten-toggle"]');
+    await clickControl(container, '[data-testid="crop-panel-overlay-rotate"]');
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'o' }));
+      await flush();
+      await flush();
+    });
+
+    expect(useEditorStore.getState().adjustments).toMatchObject({
+      aspectRatio: 3 / 2,
+      flipHorizontal: true,
+      orientationSteps: 1,
+      rotation: 0,
+    });
+    expect(useEditorStore.getState().isStraightenActive).toBe(true);
+    expect(useEditorStore.getState().overlayMode).toBe('phiGrid');
+    expect(useEditorStore.getState().overlayRotation).toBe(1);
+  });
 });
 
 async function renderCropPanel() {
@@ -154,6 +196,14 @@ function required<T extends Element>(container: Element, selector: string): T {
 
 async function flush() {
   await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+async function clickControl(container: Element, selector: string) {
+  await act(async () => {
+    required<HTMLButtonElement>(container, selector).click();
+    await flush();
+    await flush();
+  });
 }
 
 function installDom() {
