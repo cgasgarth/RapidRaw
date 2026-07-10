@@ -1,6 +1,12 @@
 import { RotateCcw, Send } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+// i18next-instrument-ignore
+import {
+  type RawEngineAgentSelectedImageProposalReceiptV1,
+  rawEngineAgentSelectedImageProposalReceiptV1Schema,
+} from '../../../../../packages/rawengine-schema/src/agentSelectedImageProposalSchemas';
+import { RawEngineLocalAppServerCommandType } from '../../../../../packages/rawengine-schema/src/localAppServerBridge';
 import type {
   AgentChatMessage,
   AgentChatTranscript,
@@ -8,7 +14,13 @@ import type {
 } from '../../../../schemas/agent/agentChatTranscriptSchemas';
 import { useEditorStore } from '../../../../store/useEditorStore';
 import { buildAgentImageContextSnapshot } from '../../../../utils/agent/context/agentImageContextSnapshot';
-import { renderAgentReadOnlyPreview } from '../../../../utils/agent/context/agentReadOnlyAppServerTools';
+import {
+  acquireRawEngineImagePreviewAttachment,
+  releaseRawEngineImagePreviewAttachment,
+  renderAgentReadOnlyPreview,
+} from '../../../../utils/agent/context/agentReadOnlyAppServerTools';
+import { agentSelectedImageProposalRuntime } from '../../../../utils/agent/context/agentSelectedImageProposalRuntime';
+import { createLiveEditorAppServerBridge } from '../../../../utils/agent/session/agentLiveEditorState';
 import { dispatchAgentLiveEditorTool } from '../../../../utils/agent/session/agentLiveToolDispatch';
 import {
   AGENT_HISTORY_ROLLBACK_TOOL_NAME,
@@ -25,7 +37,6 @@ import {
   applyAgentToneAdjustment,
   buildAgentToneAdjustmentPromptDraft,
   dryRunAgentToneAdjustment,
-  renderAgentToneDryRunPreview,
 } from '../../../../utils/agent/tools/agentToneAdjustmentTool';
 
 interface AgentChatShellProps {
@@ -45,9 +56,12 @@ type LivePromptStatus =
   | 'rolled_back';
 
 interface LivePromptResult {
+  basePreviewArtifactId?: string;
   dryRunReceipt?: AgentToneAdjustmentDryRunResponse['receipt'];
   error?: string;
   previewAfterUrl?: string;
+  proposal?: RawEngineAgentSelectedImageProposalReceiptV1;
+  proposalId?: string;
   recipeName?: string;
   toneAdjustmentDraft?: AgentToneAdjustmentPromptDraft;
   status: LivePromptStatus;
@@ -190,8 +204,13 @@ function LivePromptComposer({ initialPromptPreviewContext, isContextReady, onSes
   }, [rollbackSnapshot, rollbackValidationKey]);
   const canRun =
     isContextReady && result.status !== 'applying' && result.status !== 'cancelling' && result.status !== 'previewing';
-  const canApply = isContextReady && toneAdjustmentDraft?.supported === true && result.status === 'dry_run_ready';
-  const canCancel = result.status === 'applying' && activeOperationRef.current !== null;
+  const canApply =
+    isContextReady &&
+    toneAdjustmentDraft?.supported === true &&
+    result.proposal?.status === 'ready' &&
+    result.status === 'dry_run_ready';
+  const canCancel =
+    (result.status === 'applying' || result.status === 'previewing') && activeOperationRef.current !== null;
   const canRollback =
     rollbackSnapshot !== null && rollbackValidation?.state === 'available' && result.status === 'applied';
   useEffect(() => {
@@ -206,6 +225,40 @@ function LivePromptComposer({ initialPromptPreviewContext, isContextReady, onSes
     },
     [],
   );
+  useEffect(
+    () => () => {
+      if (result.proposalId !== undefined) agentSelectedImageProposalRuntime.release(result.proposalId, 'superseded');
+    },
+    [result.proposalId],
+  );
+  useEffect(
+    () => () => {
+      if (result.basePreviewArtifactId !== undefined) {
+        releaseRawEngineImagePreviewAttachment(result.basePreviewArtifactId, 'superseded');
+      }
+    },
+    [result.basePreviewArtifactId],
+  );
+  useEffect(() => {
+    if (result.proposalId === undefined || result.status !== 'dry_run_ready') return;
+    const proposal = agentSelectedImageProposalRuntime.getReceipt(result.proposalId);
+    if (proposal?.status === 'ready') return;
+    setResult((current) => {
+      if (current.proposalId !== result.proposalId) return current;
+      const {
+        basePreviewArtifactId: _basePreviewArtifactId,
+        previewAfterUrl: _previewAfterUrl,
+        proposal: _previousProposal,
+        ...staleResult
+      } = current;
+      return {
+        ...staleResult,
+        error: 'Selected-image proposal is stale. Render a new preview before applying.',
+        ...(proposal === undefined ? {} : { proposal }),
+        status: 'blocked',
+      };
+    });
+  }, [result.proposalId, result.status, rollbackValidationKey]);
   let statusLabel;
 
   switch (result.status) {
@@ -245,6 +298,12 @@ function LivePromptComposer({ initialPromptPreviewContext, isContextReady, onSes
     const requestedPrompt = (promptInputRef.current?.value ?? prompt).trim();
     if (!isContextReady || requestedPrompt.length === 0) return;
     const previewRequest = ++previewRequestRef.current;
+    const operationId = `agent_chat_basic_tone_${Date.now()}`;
+    const requestId = `agent-live-basic-tone-${Date.now()}`;
+    const operation = { cancelled: false, id: requestId };
+    activeOperationRef.current = operation;
+    let boundProposal = false;
+    let basePreviewArtifactId: string | undefined;
 
     try {
       const initialState = useEditorStore.getState();
@@ -266,8 +325,6 @@ function LivePromptComposer({ initialPromptPreviewContext, isContextReady, onSes
         return;
       }
 
-      const operationId = `agent_chat_basic_tone_${Date.now()}`;
-      const requestId = `agent-live-basic-tone-${Date.now()}`;
       const dryRun = await dryRunAgentToneAdjustment({
         adjustments: draft.requestedAdjustments,
         expectedGraphRevision: snapshot.graphRevision,
@@ -276,30 +333,87 @@ function LivePromptComposer({ initialPromptPreviewContext, isContextReady, onSes
         requestId,
         sessionId: 'agent-chat-shell',
       });
-      const previewAfterUrl = await renderAgentToneDryRunPreview({
-        baseAdjustments: initialState.adjustments,
-        path: selectedImagePath,
-        patch: draft.requestedAdjustments,
+      if (operation.cancelled || activeOperationRef.current?.id !== operation.id) return;
+      const deadlineAt = new Date(Date.now() + 60_000).toISOString();
+      const basePreview = await acquireRawEngineImagePreviewAttachment({
+        deadlineAt: Date.parse(deadlineAt),
+        request: {
+          expectedRecipeHash: snapshot.initialPreview.recipeHash,
+          requestId: `${requestId}:proposal-base`,
+        },
+        sessionId: 'agent-chat-shell',
       });
+      basePreviewArtifactId = basePreview.receipt.attachment.artifactId;
+      if (operation.cancelled || activeOperationRef.current?.id !== operation.id) return;
+      const proposalResponse = await createLiveEditorAppServerBridge().dispatch({
+        basePreview: {
+          artifactId: basePreview.receipt.attachment.artifactId,
+          contentHash: basePreview.receipt.attachment.contentHash,
+        },
+        cancellationId: operation.id,
+        commandType: RawEngineLocalAppServerCommandType.AgentSelectedImageProposalRender,
+        deadlineAt,
+        dryRun: true,
+        dryRunPlan: {
+          planHash: dryRun.dryRunPlanHash,
+          planId: dryRun.dryRunPlanId,
+          predictedGraphRevision: dryRun.predictedGraphRevision,
+        },
+        edit: { kind: 'basic_tone_v1', patch: draft.requestedAdjustments },
+        expectedGraphRevision: snapshot.graphRevision,
+        expectedRecipeHash: snapshot.initialPreview.recipeHash,
+        expectedRenderHash: snapshot.initialPreview.renderHash,
+        expectedSelectedImagePath: selectedImagePath,
+        idempotencyKey: `${requestId}:proposal`,
+        lineage: { callId: `${requestId}:proposal`, parentCallId: `${requestId}:dry-run` },
+        operationId,
+        requestedPreview: { longEdgePx: 1536, maxBytes: 8 * 1024 * 1024, quality: 0.86 },
+        requestId: `${requestId}:proposal`,
+        sessionId: 'agent-chat-shell',
+      });
+      if (!proposalResponse.ok) throw new Error(`Selected-image proposal failed: ${proposalResponse.message}`);
+      const proposal = rawEngineAgentSelectedImageProposalReceiptV1Schema.parse(proposalResponse.result);
+      const previewAfterUrl = agentSelectedImageProposalRuntime.getPreviewUrl(proposal.proposalId);
       const currentSnapshot = buildAgentImageContextSnapshot();
       const previewIsCurrent =
         previewRequest === previewRequestRef.current &&
+        !operation.cancelled &&
+        activeOperationRef.current?.id === operation.id &&
         currentSnapshot.activeImagePath === selectedImagePath &&
         currentSnapshot.graphRevision === snapshot.graphRevision &&
         currentSnapshot.initialPreview.recipeHash === snapshot.initialPreview.recipeHash;
       if (!previewIsCurrent) {
-        URL.revokeObjectURL(previewAfterUrl);
+        if (operation.cancelled) {
+          setResult({ status: 'idle' });
+          onSessionEvent?.(createLiveSessionEvent('assistant', 'Edit preview cancelled.', 'cancelled'));
+        } else {
+          setResult({
+            error: 'Selected image changed while the edit proposal was rendering.',
+            status: 'blocked',
+          });
+          onSessionEvent?.(
+            createLiveSessionEvent('assistant', 'Edit preview became stale before delivery.', 'preview-stale'),
+          );
+        }
+        agentSelectedImageProposalRuntime.release(proposal.proposalId, 'stale');
         return;
+      }
+      if (proposal.status !== 'ready' || previewAfterUrl === undefined) {
+        throw new Error(proposal.warnings[0] ?? `Selected-image proposal ended as ${proposal.status}.`);
       }
       setToneAdjustmentDraft(draft);
 
       const nextResult = {
+        basePreviewArtifactId,
         dryRunReceipt: dryRun.receipt,
         previewAfterUrl,
+        proposal,
+        proposalId: proposal.proposalId,
         recipeName: dryRun.receipt.dryRunPlanHash,
         status: 'dry_run_ready',
         toneAdjustmentDraft: draft,
       } satisfies LivePromptResult;
+      boundProposal = true;
       setResult(nextResult);
       onSessionEvent?.(
         createLiveSessionEvent(
@@ -323,6 +437,11 @@ function LivePromptComposer({ initialPromptPreviewContext, isContextReady, onSes
           'failed',
         ),
       );
+    } finally {
+      if (activeOperationRef.current?.id === operation.id) activeOperationRef.current = null;
+      if (!boundProposal && basePreviewArtifactId !== undefined) {
+        releaseRawEngineImagePreviewAttachment(basePreviewArtifactId, 'released');
+      }
     }
   };
 
@@ -330,6 +449,8 @@ function LivePromptComposer({ initialPromptPreviewContext, isContextReady, onSes
     const operation = activeOperationRef.current;
     if (operation === null) return;
     operation.cancelled = true;
+    agentSelectedImageProposalRuntime.cancel(operation.id);
+    previewRequestRef.current += 1;
 
     const nextResult = { ...result, status: 'cancelling' } satisfies LivePromptResult;
     setResult(nextResult);
@@ -342,6 +463,13 @@ function LivePromptComposer({ initialPromptPreviewContext, isContextReady, onSes
     const operation = { cancelled: false, id: `agent-chat-apply-${Date.now()}` };
     activeOperationRef.current = operation;
     try {
+      const proposal =
+        result.proposalId === undefined ? undefined : agentSelectedImageProposalRuntime.getReceipt(result.proposalId);
+      if (proposal?.status !== 'ready') {
+        throw new Error(
+          'Selected-image proposal is stale or no longer available. Render a new preview before applying.',
+        );
+      }
       setRollbackSnapshot(createAgentRollbackSnapshot());
 
       const applyingResult = { ...result, status: 'applying' } satisfies LivePromptResult;
@@ -387,13 +515,21 @@ function LivePromptComposer({ initialPromptPreviewContext, isContextReady, onSes
         return;
       }
 
+      const {
+        basePreviewArtifactId: _basePreviewArtifactId,
+        previewAfterUrl: _previewAfterUrl,
+        proposal: _proposal,
+        proposalId: _proposalId,
+        ...appliedResult
+      } = applyingResult;
       const nextResult = {
-        ...applyingResult,
+        ...appliedResult,
         dryRunReceipt,
         recipeName: previewRefresh.preview.recipeHash,
         status: 'applied',
         toneAdjustmentDraft,
       } satisfies LivePromptResult;
+      if (result.proposalId !== undefined) agentSelectedImageProposalRuntime.release(result.proposalId, 'released');
       setResult(nextResult);
       onSessionEvent?.(createLiveSessionEvent('assistant', 'Edit applied. Preview refreshed.', 'applied'));
     } catch (error) {
@@ -505,7 +641,7 @@ function LivePromptComposer({ initialPromptPreviewContext, isContextReady, onSes
           {result.status === 'dry_run_ready' || result.status === 'applied' ? null : (
             <span className="text-[12px] font-semibold text-text-primary">{statusLabel}</span>
           )}
-          {result.dryRunReceipt ? (
+          {result.dryRunReceipt && result.status === 'dry_run_ready' ? (
             <div className="grid grid-cols-2 gap-2" data-testid="agent-photographer-before-after">
               <figure className="min-w-0">
                 <figcaption className="mb-1 text-[10px] font-medium uppercase text-text-tertiary">
@@ -528,6 +664,25 @@ function LivePromptComposer({ initialPromptPreviewContext, isContextReady, onSes
                 />
               </figure>
             </div>
+          ) : null}
+          {result.proposal ? (
+            <dl
+              className="mt-2 grid grid-cols-3 gap-1 text-[10px] leading-4 text-text-secondary"
+              data-testid="agent-selected-image-proposal-state"
+            >
+              <div>
+                <dt className="text-text-tertiary">{t('editor.ai.agent.proposal.title')}</dt>
+                <dd className="truncate text-text-primary">{result.proposal.status}</dd>
+              </div>
+              <div>
+                <dt className="text-text-tertiary">{t('editor.ai.agent.selectedImageLoop.before')}</dt>
+                <dd className="truncate text-text-primary">{result.proposal.base.graphRevision}</dd>
+              </div>
+              <div>
+                <dt className="text-text-tertiary">{t('editor.ai.agent.walkthrough.plan')}</dt>
+                <dd className="truncate text-text-primary">{result.proposal.dryRunPlan.planId}</dd>
+              </div>
+            </dl>
           ) : null}
           {result.error ? <p className="mt-1 text-[11px] leading-4 text-editor-danger">{result.error}</p> : null}
         </section>

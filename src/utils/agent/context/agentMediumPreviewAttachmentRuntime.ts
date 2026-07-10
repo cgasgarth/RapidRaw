@@ -40,9 +40,17 @@ export class AgentMediumPreviewAttachmentError extends Error {
 }
 
 export type AgentMediumPreviewRenderer = (input: {
+  adjustments?: unknown;
   signal?: AbortSignal;
   snapshot: AgentImageContextSnapshot;
 }) => Promise<Uint8Array>;
+
+export interface AgentMediumPreviewOutputIdentity {
+  graphRevision: string;
+  recipeHash: string;
+  renderHash: string;
+  selectedImageId?: string;
+}
 
 type StoredAttachment = {
   attachment: RawEngineAgentMediumPreviewAttachmentV2;
@@ -125,22 +133,49 @@ const identityMatches = (left: AgentImageContextSnapshot, right: AgentImageConte
   );
 };
 
-const buildCacheKey = (snapshot: AgentImageContextSnapshot): string => {
+const buildCacheKey = (
+  snapshot: AgentImageContextSnapshot,
+  outputIdentity: AgentMediumPreviewOutputIdentity | undefined,
+): string => {
   const identity = snapshotIdentity(snapshot);
-  return `${identity.selectedImagePath}:${identity.graphRevision}:${identity.recipeHash}:${identity.renderHash}`;
+  return [
+    identity.selectedImagePath,
+    identity.graphRevision,
+    identity.recipeHash,
+    identity.renderHash,
+    outputIdentity?.graphRevision ?? identity.graphRevision,
+    outputIdentity?.recipeHash ?? identity.recipeHash,
+    outputIdentity?.renderHash ?? identity.renderHash,
+    outputIdentity?.selectedImageId ?? '',
+  ].join(':');
 };
 
-const defaultNativeRenderer: AgentMediumPreviewRenderer = async ({ signal, snapshot }) => {
+export const renderAgentMediumPreviewNative = async ({
+  adjustments,
+  signal,
+  snapshot,
+}: {
+  adjustments?: unknown;
+  signal?: AbortSignal;
+  snapshot: AgentImageContextSnapshot;
+}): Promise<Uint8Array> => {
   if (signal?.aborted) throw new AgentMediumPreviewAttachmentError('cancelled', 'Preview acquisition was cancelled.');
   const { invoke } = await import('@tauri-apps/api/core');
   const bytes = await invoke<Uint8Array>(Invokes.GeneratePreviewForPath, {
     jpegQuality: Math.round(AGENT_MEDIUM_PREVIEW_QUALITY * 100),
-    jsAdjustments: useEditorStore.getState().adjustments,
+    jsAdjustments: structuredClone(adjustments ?? useEditorStore.getState().adjustments),
     path: snapshot.activeImagePath,
     targetResolution: AGENT_MEDIUM_PREVIEW_LONG_EDGE_PX,
   });
   return new Uint8Array(bytes);
 };
+
+const defaultNativeRenderer: AgentMediumPreviewRenderer = ({ adjustments, signal, snapshot }) =>
+  renderAgentMediumPreviewNative({
+    ...(adjustments === undefined ? {} : { adjustments }),
+    ...(signal === undefined ? {} : { signal }),
+    snapshot,
+  });
 
 const promiseWithDeadline = async <Value>(promise: Promise<Value>, deadlineAt: number): Promise<Value> => {
   const remainingMs = deadlineAt - Date.now();
@@ -174,16 +209,20 @@ export class AgentMediumPreviewAttachmentManager {
   ) {}
 
   async acquire({
+    adjustments,
     deadlineAt,
+    outputIdentity,
     signal,
     snapshot,
   }: {
+    adjustments?: unknown;
     deadlineAt: number;
+    outputIdentity?: AgentMediumPreviewOutputIdentity;
     signal?: AbortSignal;
     snapshot: AgentImageContextSnapshot;
   }): Promise<AgentModelImageAttachment> {
     if (signal?.aborted) throw new AgentMediumPreviewAttachmentError('cancelled', 'Preview acquisition was cancelled.');
-    const cacheKey = buildCacheKey(snapshot);
+    const cacheKey = buildCacheKey(snapshot, outputIdentity);
     const cached = this.cache.get(cacheKey);
     if (cached !== undefined && Date.parse(cached.attachment.expiresAt) > this.now()) {
       return this.toModelAttachment(cached);
@@ -195,7 +234,9 @@ export class AgentMediumPreviewAttachmentManager {
 
     const acquisition = this.createAttachment({
       cacheKey,
+      ...(adjustments === undefined ? {} : { adjustments }),
       deadlineAt,
+      ...(outputIdentity === undefined ? {} : { outputIdentity }),
       ...(signal === undefined ? {} : { signal }),
       snapshot,
     });
@@ -230,18 +271,26 @@ export class AgentMediumPreviewAttachmentManager {
   }
 
   private async createAttachment({
+    adjustments,
     cacheKey,
     deadlineAt,
+    outputIdentity,
     signal,
     snapshot,
   }: {
+    adjustments?: unknown;
     cacheKey: string;
     deadlineAt: number;
+    outputIdentity?: AgentMediumPreviewOutputIdentity;
     signal?: AbortSignal;
     snapshot: AgentImageContextSnapshot;
   }): Promise<StoredAttachment> {
     const bytes = await promiseWithDeadline(
-      this.renderer({ ...(signal === undefined ? {} : { signal }), snapshot }),
+      this.renderer({
+        ...(adjustments === undefined ? {} : { adjustments }),
+        ...(signal === undefined ? {} : { signal }),
+        snapshot,
+      }),
       deadlineAt,
     );
     if (signal?.aborted) throw new AgentMediumPreviewAttachmentError('cancelled', 'Preview acquisition was cancelled.');
@@ -270,7 +319,13 @@ export class AgentMediumPreviewAttachmentManager {
     }
 
     const contentHash = await sha256ForAgentPreviewBytes(bytes);
-    const identity = snapshotIdentity(snapshot);
+    const snapshotRevision = snapshotIdentity(snapshot);
+    const identity = {
+      graphRevision: outputIdentity?.graphRevision ?? snapshotRevision.graphRevision,
+      recipeHash: outputIdentity?.recipeHash ?? snapshotRevision.recipeHash,
+      renderHash: outputIdentity?.renderHash ?? snapshotRevision.renderHash,
+      selectedImagePath: snapshotRevision.selectedImagePath,
+    };
     const revisionToken = await sha256ForAgentPreviewBytes(
       new TextEncoder().encode(
         `${identity.selectedImagePath}:${identity.graphRevision}:${identity.recipeHash}:${identity.renderHash}`,
@@ -301,7 +356,8 @@ export class AgentMediumPreviewAttachmentManager {
         recipeHash: identity.recipeHash,
         renderHash: identity.renderHash,
         revisionToken,
-        selectedImageId: `image:${stableAgentPreviewHash(identity.selectedImagePath)}`,
+        selectedImageId:
+          outputIdentity?.selectedImageId ?? `image:${stableAgentPreviewHash(identity.selectedImagePath)}`,
       },
       transport: {
         handle: `attachment:${stableAgentPreviewHash(`${artifactId}:${revisionToken}`)}`,

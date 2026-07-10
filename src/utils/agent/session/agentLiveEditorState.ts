@@ -13,6 +13,7 @@ import {
   applyAgentCurrentImagePreviewLoopReviewedEdit,
   runAgentCurrentImagePreviewLoop,
 } from '../context/agentCurrentImagePreviewLoop';
+import { agentSelectedImageProposalRuntime } from '../context/agentSelectedImageProposalRuntime';
 
 const mapFolder = (folder: FolderTree): ProjectLibrarySnapshotV1['folders'][number] => ({
   children: folder.children.map(mapFolder),
@@ -112,6 +113,7 @@ export const buildLiveEditorProjectLibrarySnapshot = (): ProjectLibrarySnapshotV
 export const createLiveEditorAppServerBridge = () =>
   createRawEngineLocalAppServerBridge({
     getProjectLibrarySnapshot: buildLiveEditorProjectLibrarySnapshot,
+    runSelectedImageProposalRender: (command) => agentSelectedImageProposalRuntime.render(command),
     runSelectedImagePreviewLoop: (command) => {
       const { commandType: _commandType, ...request } = command;
       return runAgentCurrentImagePreviewLoop(request);

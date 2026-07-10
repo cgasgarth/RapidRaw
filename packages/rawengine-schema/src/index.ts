@@ -1,4 +1,5 @@
 export * from './agentColorEditWorkflow.js';
+export * from './agentSelectedImageProposalSchemas.js';
 export * from './appServerCommandSchemas.js';
 export * from './brushMaskCommandRuntime.js';
 export * from './computational-merge/computationalMergeDerivedSourceRuntime.js';

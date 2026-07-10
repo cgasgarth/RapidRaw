@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+import {
+  RAW_ENGINE_AGENT_SELECTED_IMAGE_PROPOSAL_RENDER_TOOL_NAME,
+  type RawEngineAgentSelectedImageProposalRenderCommandV1,
+  rawEngineAgentSelectedImageProposalRenderCommandV1Schema,
+} from './agentSelectedImageProposalSchemas.js';
 import { openComputationalMergeDerivedSourceV1 } from './computational-merge/computationalMergeDerivedSourceRuntime.js';
 import { EditCommandBus, type EditCommandBusContext, type EditCommandDispatchResult } from './editCommandBus.js';
 import { FocusStackAppServerRuntimeToolBusV1 } from './focus-stack/focusStackAppServerRuntime.js';
@@ -52,6 +57,7 @@ import { SuperResolutionAppServerRuntimeToolBusV1 } from './super-resolution/sup
 import { rawEngineDefaultToolRegistryV1 } from './toolRegistry.js';
 
 export const RawEngineLocalAppServerCommandType = {
+  AgentSelectedImageProposalRender: 'rawengine.agent.selected_image.proposal.render',
   AgentSelectedImagePreviewLoop: 'rawengine.agent.selected_image.preview_loop',
   AgentSelectedImagePreviewLoopApplyReview: 'rawengine.agent.selected_image.preview_loop.apply_review',
   EditorStateQuery: 'rawengine.local.editorState.query',
@@ -552,6 +558,8 @@ export type RawEngineLocalAppServerImageMetadataQueryV1 = z.infer<
   typeof rawEngineLocalAppServerImageMetadataQueryV1Schema
 >;
 export type RawEngineLocalAppServerEditorStateQueryV1 = z.infer<typeof rawEngineLocalAppServerEditorStateQueryV1Schema>;
+export type RawEngineLocalAppServerSelectedImageProposalRenderCommandV1 =
+  RawEngineAgentSelectedImageProposalRenderCommandV1;
 export type RawEngineLocalAppServerSelectedImagePreviewLoopCommandV1 = z.infer<
   typeof rawEngineLocalAppServerSelectedImagePreviewLoopCommandV1Schema
 >;
@@ -655,6 +663,9 @@ export interface RawEngineLocalAppServerBridgeOptions {
   commandBus?: EditCommandBus;
   getProjectLibrarySnapshot?: RawEngineLocalAppServerProjectLibrarySnapshotProvider;
   projectLibrarySnapshot?: ProjectLibrarySnapshotV1;
+  runSelectedImageProposalRender?: (
+    command: RawEngineLocalAppServerSelectedImageProposalRenderCommandV1,
+  ) => Promise<unknown> | unknown;
   runSelectedImagePreviewLoop?: (
     command: RawEngineLocalAppServerSelectedImagePreviewLoopCommandV1,
   ) => Promise<unknown> | unknown;
@@ -706,6 +717,8 @@ const AI_COMMAND_TYPE_TO_APP_SERVER_TOOL_NAME = {
   'lensProfile.applyCorrection': 'lensprofile.apply_command',
   'lensProfile.dryRunCorrection': 'lensprofile.dry_run_command',
   [RawEngineLocalAppServerCommandType.EditorStateQuery]: 'agent.editor_state.query',
+  [RawEngineLocalAppServerCommandType.AgentSelectedImageProposalRender]:
+    RAW_ENGINE_AGENT_SELECTED_IMAGE_PROPOSAL_RENDER_TOOL_NAME,
   [RawEngineLocalAppServerCommandType.ImageMetadataQuery]: 'agent.image_metadata.query',
   [RawEngineLocalAppServerCommandType.ProjectMetadataQuery]: 'agent.project_metadata.query',
   [RawEngineLocalAppServerCommandType.SelectedImagesQuery]: 'agent.selected_images.query',
@@ -721,6 +734,7 @@ const RAW_ENGINE_LOCAL_APP_SERVER_EXECUTABLE_TOOL_NAMES = new Set([
   'agent.project_metadata.query',
   'agent.selected_images.query',
   'rawengine.agent.preview.render',
+  RAW_ENGINE_AGENT_SELECTED_IMAGE_PROPOSAL_RENDER_TOOL_NAME,
   'rawengine.agent.selected_image.preview_loop',
   'rawengine.agent.selected_image.preview_loop.apply_review',
   'rawengine.image.get_preview',
@@ -2093,6 +2107,9 @@ export class RawEngineLocalAppServerBridge {
   readonly #runSelectedImagePreviewLoop:
     | RawEngineLocalAppServerBridgeOptions['runSelectedImagePreviewLoop']
     | undefined;
+  readonly #runSelectedImageProposalRender:
+    | RawEngineLocalAppServerBridgeOptions['runSelectedImageProposalRender']
+    | undefined;
   readonly #runSelectedImagePreviewLoopApplyReview:
     | RawEngineLocalAppServerBridgeOptions['runSelectedImagePreviewLoopApplyReview']
     | undefined;
@@ -2106,6 +2123,7 @@ export class RawEngineLocalAppServerBridge {
       (() =>
         projectLibrarySnapshotV1Schema.parse(options.projectLibrarySnapshot ?? DEFAULT_LOCAL_PROJECT_LIBRARY_SNAPSHOT));
     this.#runSelectedImagePreviewLoop = options.runSelectedImagePreviewLoop;
+    this.#runSelectedImageProposalRender = options.runSelectedImageProposalRender;
     this.#runSelectedImagePreviewLoopApplyReview = options.runSelectedImagePreviewLoopApplyReview;
     this.#toolRegistry = filterRawEngineLocalAppServerExecutableToolRegistry(
       options.toolRegistry ?? rawEngineDefaultToolRegistryV1,
@@ -2260,6 +2278,19 @@ export class RawEngineLocalAppServerBridge {
       commandType: RawEngineLocalAppServerCommandType.EditorStateQuery,
       execute: () => buildEditorStateResult(this.#getProjectLibrarySnapshot()),
       schema: rawEngineLocalAppServerEditorStateQueryV1Schema,
+    });
+
+    this.#commandBus.register({
+      commandType: RawEngineLocalAppServerCommandType.AgentSelectedImageProposalRender,
+      execute: (command) => {
+        const parsedCommand = rawEngineAgentSelectedImageProposalRenderCommandV1Schema.parse(command);
+        if (this.#runSelectedImageProposalRender === undefined) {
+          throw new Error('Local app-server bridge has no selected-image proposal renderer.');
+        }
+
+        return this.#runSelectedImageProposalRender(parsedCommand);
+      },
+      schema: rawEngineAgentSelectedImageProposalRenderCommandV1Schema,
     });
 
     this.#commandBus.register({
