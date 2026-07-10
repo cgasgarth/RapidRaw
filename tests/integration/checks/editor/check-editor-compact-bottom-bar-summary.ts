@@ -71,6 +71,23 @@ assertNotIncludes(
 assertIncludes(markup, 'data-active-filename="frame-01.NEF"', 'compact bottom bar should surface the active filename');
 assertIncludes(markup, 'data-selected-count="2"', 'compact bottom bar should surface the selected count');
 assertNotIncludes(markup, '>frame-01.NEF<', 'compact bottom bar should not duplicate the visible active image context');
+assertIncludes(markup, 'data-testid="editor-bottom-navigation-zone"', 'compact bar should expose navigation commands');
+assertIncludes(
+  markup,
+  'data-testid="editor-bottom-organization-zone"',
+  'compact bar should expose organization commands',
+);
+assertIncludes(
+  markup,
+  'data-testid="editor-bottom-transfer-zone"',
+  'compact bar should expose adjustment transfer commands',
+);
+assertNotIncludes(
+  markup,
+  'data-testid="editor-bottom-bar-zoom"',
+  'editor bottom commands should not duplicate viewer zoom',
+);
+assertNotIncludes(markup, 'aria-label="Export"', 'editor bottom commands should not mix in Library export');
 
 if (failures.length > 0) {
   console.error('editor compact bottom bar summary failed');
