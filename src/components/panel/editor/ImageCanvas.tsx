@@ -39,6 +39,7 @@ import { resolveEditorPreviewSource } from '../../../utils/editorImagePreviewSou
 import { resolveEditorOverlayBlocker, resolveEditorOverlayVisibility } from '../../../utils/editorOverlayVisibility';
 import {
   buildInteractivePreviewGeometryIdentity,
+  InteractivePreviewUrlRegistry,
   isInteractivePreviewPatchCoherent,
 } from '../../../utils/interactivePreviewPatch';
 import {
@@ -1289,6 +1290,11 @@ const ImageCanvas = memo(
     const [isAltPressed, setIsAltPressed] = useState(false);
     const [lastBrushCommandCapture, setLastBrushCommandCapture] = useState<BrushMaskCommandCaptureSummary | null>(null);
     const retainedPatchRef = useRef<{ geometryKey: string; patch: InteractivePatch } | null>(null);
+    const interactivePatchUrlRegistryRef = useRef<InteractivePreviewUrlRegistry | null>(null);
+    if (!interactivePatchUrlRegistryRef.current) {
+      interactivePatchUrlRegistryRef.current = new InteractivePreviewUrlRegistry();
+    }
+    const displayedPatchUrlRef = useRef<string | null>(null);
 
     const wgpuPreviewVisibility = resolveWgpuPreviewVisibility({
       hasRenderedFirstFrame,
@@ -2776,6 +2782,36 @@ const ImageCanvas = memo(
         ? retainedPatch.patch
         : null;
     const visiblePatch = coherentInteractivePatch ?? (baseIsReady ? null : coherentRetainedPatch);
+    const displayedPatchUrl = !isWgpuActive ? (visiblePatch?.url ?? null) : null;
+    displayedPatchUrlRef.current = displayedPatchUrl;
+    const handleInteractivePatchLoad = useCallback((url: string) => {
+      const registry = interactivePatchUrlRegistryRef.current;
+      if (!registry) return;
+
+      if (displayedPatchUrlRef.current === url) {
+        registry.confirmPaint(url);
+      } else {
+        registry.release(url);
+      }
+    }, []);
+
+    useEffect(() => {
+      const registry = interactivePatchUrlRegistryRef.current;
+      if (!registry) return;
+
+      if (displayedPatchUrl) {
+        registry.track(displayedPatchUrl);
+      } else {
+        registry.clear();
+      }
+    }, [displayedPatchUrl]);
+
+    useEffect(
+      () => () => {
+        interactivePatchUrlRegistryRef.current?.clear();
+      },
+      [],
+    );
 
     useEffect(() => {
       if (coherentInteractivePatch) {
@@ -3020,6 +3056,7 @@ const ImageCanvas = memo(
                 {visiblePatch && !isWgpuActive && (
                   <image
                     href={visiblePatch.url}
+                    onLoad={() => handleInteractivePatchLoad(visiblePatch.url)}
                     x={cssPercent(visiblePatch.normX * 100)}
                     y={cssPercent(visiblePatch.normY * 100)}
                     width={cssPercent(visiblePatch.normW * 100)}

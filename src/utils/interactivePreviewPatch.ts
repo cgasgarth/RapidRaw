@@ -1,5 +1,9 @@
 import type { Adjustments } from './adjustments';
 
+export type DecodableImage = Pick<HTMLImageElement, 'decode' | 'onerror' | 'onload' | 'src'>;
+
+export type CreateDecodableImage = () => DecodableImage;
+
 export interface InteractivePreviewPatchPayload {
   fullHeight: number;
   fullWidth: number;
@@ -19,6 +23,110 @@ export interface InvalidInteractivePreviewPatchPayload {
 }
 
 export type ParsedInteractivePreviewPatch = InteractivePreviewPatchPayload | InvalidInteractivePreviewPatchPayload;
+
+export function isCurrentInteractivePreviewRequest({
+  currentJobId,
+  jobId,
+  latestRequestId,
+  requestId,
+}: {
+  currentJobId: number;
+  jobId: number;
+  latestRequestId: number;
+  requestId: number | undefined;
+}): boolean {
+  return jobId === currentJobId && requestId === latestRequestId;
+}
+
+export class LatestOnlyInteractiveScheduler<T> {
+  private disposed = false;
+  private isRunning = false;
+  private pending: T | null = null;
+
+  constructor(private readonly run: (value: T) => Promise<void>) {}
+
+  schedule(value: T): void {
+    if (this.disposed) return;
+    this.pending = value;
+    this.flush();
+  }
+
+  clear(): void {
+    this.pending = null;
+  }
+
+  dispose(): void {
+    this.disposed = true;
+    this.pending = null;
+  }
+
+  private flush(): void {
+    if (this.disposed || this.isRunning || this.pending === null) return;
+
+    const next = this.pending;
+    this.pending = null;
+    this.isRunning = true;
+    void this.run(next)
+      .catch(() => {
+        // The caller owns render errors; continue so a newer preview can run.
+      })
+      .finally(() => {
+        this.isRunning = false;
+        this.flush();
+      });
+  }
+}
+
+export class InteractivePreviewUrlRegistry {
+  private readonly urls = new Set<string>();
+
+  constructor(private readonly revoke: (url: string) => void = URL.revokeObjectURL) {}
+
+  track(url: string): void {
+    this.urls.add(url);
+  }
+
+  confirmPaint(url: string): void {
+    this.track(url);
+    for (const candidate of this.urls) {
+      if (candidate !== url) {
+        this.revoke(candidate);
+        this.urls.delete(candidate);
+      }
+    }
+  }
+
+  release(url: string): void {
+    if (this.urls.delete(url)) {
+      this.revoke(url);
+    }
+  }
+
+  clear(): void {
+    for (const url of this.urls) {
+      this.revoke(url);
+    }
+    this.urls.clear();
+  }
+}
+
+export async function decodeInteractivePreviewUrl(
+  url: string,
+  createImage: CreateDecodableImage = () => new Image(),
+): Promise<void> {
+  const image = createImage();
+  if (image.decode) {
+    image.src = url;
+    await image.decode();
+    return;
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    image.onload = () => resolve();
+    image.onerror = () => reject(new Error('interactive_preview_decode_failed'));
+    image.src = url;
+  });
+}
 
 const INTERACTIVE_PATCH_HEADER_BYTES = 24;
 const JPEG_START_MARKER = 0xff;
