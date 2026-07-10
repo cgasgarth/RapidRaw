@@ -1,6 +1,39 @@
 import { editorChromeStatusChipClassName, editorChromeTokens } from './editorChromeTokens';
 
 export const inspectorTokens = {
+  actionRow: {
+    button:
+      'inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-sm px-1 text-[11px] font-medium leading-4 text-text-secondary transition-colors hover:bg-editor-selected-quiet hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:opacity-45',
+    iconButton:
+      'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-text-secondary transition-colors hover:bg-editor-selected-quiet hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:opacity-45',
+    root: 'flex min-h-7 items-center gap-1',
+  },
+  control: {
+    field:
+      'rounded-sm border border-editor-border bg-editor-panel-raised text-text-primary placeholder:text-text-tertiary transition-colors hover:border-editor-divider disabled:cursor-not-allowed disabled:opacity-45',
+    fieldCompact: 'h-7 px-2 py-1 text-[12px] leading-4',
+    fieldDefault: 'h-9 px-2.5 py-1.5 text-[13px] leading-5',
+    numeric: 'font-mono tabular-nums',
+    row: 'grid min-h-7 grid-cols-[minmax(4.75rem,0.72fr)_minmax(0,1fr)] items-center gap-1',
+    rowLabel: 'min-w-0 truncate text-[11px] font-medium leading-4 text-text-secondary',
+    segmented: {
+      option:
+        'min-w-0 rounded-sm px-1 text-[11px] font-medium leading-4 text-text-secondary transition-colors hover:bg-editor-hover hover:text-text-primary focus-visible:z-10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring aria-checked:bg-editor-selected-quiet aria-checked:text-editor-selected-quiet-text disabled:cursor-not-allowed disabled:opacity-45',
+      root: 'grid min-h-7 w-full auto-cols-fr grid-flow-col gap-px rounded-sm border border-editor-border bg-editor-panel-well p-px',
+    },
+    switch: {
+      control: 'relative h-4 w-8 shrink-0',
+      label: 'min-w-0 truncate text-[11px] leading-4 text-text-secondary select-none',
+      root: 'flex min-h-7 items-center justify-between gap-2 rounded-sm px-1 py-px transition-colors focus-within:bg-editor-panel-raised',
+      thumb: 'absolute left-0.5 top-0.5 h-3 w-3 rounded-full transition-[background-color,transform]',
+      track:
+        'h-full w-full rounded-full bg-editor-panel-raised shadow-inner transition-colors peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-editor-focus-ring peer-focus-visible:ring-offset-1 peer-focus-visible:ring-offset-editor-matte peer-checked:bg-editor-selected-quiet',
+    },
+    validation: {
+      error: 'mt-1 text-[10px] leading-4 text-editor-danger',
+      help: 'mt-1 text-[10px] leading-4 text-text-secondary',
+    },
+  },
   disclosure: {
     actions: 'flex h-5 shrink-0 items-center gap-0.5',
     copyPasteAction:
@@ -37,18 +70,18 @@ export const inspectorTokens = {
 
 export const inspectorSectionTokens = {
   badge: editorChromeTokens.statusChip.base,
-  body: 'px-2 pb-1.5 pt-1 transition-opacity duration-200',
-  chevron: 'text-text-secondary transition-transform duration-200',
-  dirtyIndicator: 'h-1.5 w-1.5 shrink-0 rounded-full bg-editor-info',
+  body: 'px-2 pb-1.5 pt-1 transition-opacity duration-200 motion-reduce:transition-none',
+  chevron: 'text-text-secondary transition-transform duration-200 motion-reduce:transition-none',
+  dirtyIndicator:
+    'shrink-0 text-[10px] font-medium leading-4 text-editor-info underline decoration-current underline-offset-2',
   header: `${inspectorTokens.disclosure.header} ${editorChromeTokens.motion.selectionChange}`,
   actionsMenuSlot: 'h-5 w-5 shrink-0',
   headerActionButton:
     'z-10 flex h-5 w-5 items-center justify-center rounded text-text-secondary transition-colors duration-150 hover:bg-editor-selected-quiet hover:text-text-primary focus-visible:bg-editor-selected-quiet focus-visible:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:opacity-45',
-  headerActions:
-    'flex h-5 shrink-0 items-center gap-0.5 opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto',
+  headerActions: 'flex h-5 shrink-0 items-center gap-0.5',
   hiddenBadge: editorChromeStatusChipClassName('neutral'),
   shell: 'bg-editor-panel overflow-hidden shrink-0 border-b border-editor-border',
-  title: 'truncate text-[11px] leading-4 tracking-normal text-text-primary',
+  title: 'truncate text-[11px] font-medium leading-4 tracking-normal text-text-primary',
   titleRow: 'flex min-w-0 items-center gap-1 overflow-hidden',
   visibilityButton:
     'z-10 flex h-5 w-5 items-center justify-center rounded text-text-secondary transition-colors duration-150 hover:bg-editor-selected-quiet hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring',
@@ -164,10 +197,10 @@ export const inspectorSliderTokens = {
   labelStatic: 'grid border-0 bg-transparent p-0 text-left cursor-default',
   resetLabel:
     'col-start-1 row-start-1 text-[13px] font-medium leading-4 text-text-primary select-none transition-opacity duration-200 ease-in-out pointer-events-none',
-  root: 'mb-1 group',
+  root: 'inspector-slider-row mb-1 group',
   suffix: 'text-[10px] align-top inline-block mt-0.5 ml-0.5',
   track: 'absolute top-1/2 left-0 h-1 w-full -translate-y-1/2 rounded-full pointer-events-none',
-  trackWrap: 'relative h-4 w-full',
+  trackWrap: 'inspector-slider-track relative h-4 w-full',
   valueButton:
     'h-5 rounded border-0 bg-transparent p-0 text-[13px] leading-5 text-text-primary w-full text-right select-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring',
   valueInput:
@@ -185,12 +218,13 @@ export const compactInspectorSliderTokens = {
   labelStatic: 'grid min-w-0 border-0 bg-transparent p-0 text-left cursor-default',
   resetLabel:
     'col-start-1 row-start-1 truncate text-[11px] font-medium leading-4 text-text-primary select-none transition-opacity duration-200 ease-in-out pointer-events-none',
-  root: 'group relative grid min-h-6 grid-cols-[minmax(4.75rem,0.72fr)_minmax(3.75rem,1fr)_3.5rem] items-center gap-1 rounded px-1 py-px transition-colors hover:bg-editor-panel-raised focus-within:bg-editor-panel-raised disabled:opacity-60 before:absolute before:inset-y-1.5 before:left-0 before:w-px before:bg-transparent data-[modified=true]:before:bg-editor-info max-[319px]:grid-cols-[minmax(0,1fr)_3.5rem]',
+  root: 'inspector-slider-row group relative grid min-h-7 grid-cols-[minmax(4.75rem,0.72fr)_minmax(3.75rem,1fr)_3.5rem] items-center gap-1 rounded-sm px-1 py-px transition-colors hover:bg-editor-panel-raised focus-within:bg-editor-panel-raised disabled:opacity-60 before:absolute before:inset-y-1.5 before:left-0 before:w-px before:bg-transparent data-[modified=true]:before:bg-editor-info max-[319px]:grid-cols-[minmax(0,1fr)_3.5rem]',
   suffix: 'text-[10px] align-top inline-block mt-0.5 ml-0.5',
   track: 'absolute top-1/2 left-0 h-[3px] w-full -translate-y-1/2 rounded-full pointer-events-none',
-  trackWrap: 'relative h-4 min-w-0 max-[319px]:col-span-2 max-[319px]:col-start-1 max-[319px]:row-start-2',
+  trackWrap:
+    'inspector-slider-track relative h-4 min-w-0 max-[319px]:col-span-2 max-[319px]:col-start-1 max-[319px]:row-start-2',
   valueButton:
-    'h-5 rounded border-0 bg-transparent p-0 font-mono text-[11px] leading-5 tabular-nums text-text-primary w-full text-right select-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring',
+    'h-5 w-full overflow-hidden rounded border-0 bg-transparent p-0 text-right font-mono text-[11px] leading-5 tabular-nums text-text-primary whitespace-nowrap select-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring',
   valueInput:
     'h-5 w-full rounded-sm border border-editor-border bg-editor-panel-raised px-1 py-0 text-right font-mono text-[11px] leading-5 tabular-nums text-text-primary outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring',
   valueSlot: 'w-[3.5rem] shrink-0 text-right max-[319px]:col-start-2 max-[319px]:row-start-1',

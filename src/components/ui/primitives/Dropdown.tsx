@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useManagedFocus } from '../../../hooks/ui/useManagedFocus';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { editorChromeTokens } from '../editorChromeTokens';
+import { inspectorTokens } from '../inspectorTokens';
 import Input from './Input';
 import UiText from './Text';
 
@@ -23,6 +24,8 @@ interface DropdownProps<T extends React.Key> {
   value: T | null;
   chrome?: 'app' | 'editor';
   disabled?: boolean;
+  ariaLabel?: string;
+  density?: 'default' | 'compact';
   triggerClassName?: string;
 }
 
@@ -36,6 +39,8 @@ const Dropdown = <T extends React.Key>({
   value,
   chrome = 'app',
   disabled = false,
+  ariaLabel,
+  density = 'compact',
   triggerClassName = '',
 }: DropdownProps<T>) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -114,11 +119,14 @@ const Dropdown = <T extends React.Key>({
       <button
         aria-expanded={isOpen}
         aria-haspopup="listbox"
+        aria-label={ariaLabel ?? selectedOption?.label ?? placeholder}
         disabled={disabled}
         className={cx(
           chrome === 'editor'
             ? [
-                'flex h-7 w-full items-center justify-between gap-2 rounded border border-editor-border bg-editor-panel-raised px-2 text-left text-[12px] leading-4 text-text-primary transition-colors hover:bg-editor-selected-quiet disabled:cursor-not-allowed disabled:opacity-45',
+                'flex w-full items-center justify-between gap-2 rounded-sm px-2 text-left text-text-primary',
+                inspectorTokens.control.field,
+                density === 'compact' ? inspectorTokens.control.fieldCompact : inspectorTokens.control.fieldDefault,
                 editorChromeTokens.focusRing,
               ]
             : [
@@ -165,7 +173,7 @@ const Dropdown = <T extends React.Key>({
               className={cx(
                 'max-h-80 overflow-y-auto backdrop-blur-md',
                 chrome === 'editor'
-                  ? 'rounded-md border border-editor-border bg-editor-panel/95 p-1 shadow-[0_14px_34px_var(--editor-overlay-shadow)]'
+                  ? 'rounded-sm border border-editor-border bg-editor-panel/95 p-1 shadow-[0_14px_34px_var(--editor-overlay-shadow)]'
                   : 'bg-surface/95 rounded-lg shadow-xl p-2',
               )}
               role="listbox"
@@ -197,7 +205,7 @@ const Dropdown = <T extends React.Key>({
                     className={cx(
                       'w-full text-left rounded-md flex items-center justify-between',
                       chrome === 'editor'
-                        ? 'min-h-7 px-2 py-1 text-[12px] leading-4 transition-colors duration-150 hover:bg-editor-selected-quiet focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring'
+                        ? 'min-h-7 rounded-sm px-2 py-1 text-[12px] leading-4 transition-colors duration-150 hover:bg-editor-selected-quiet focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring'
                         : 'px-3 py-2 transition-colors duration-150 hover:bg-bg-primary',
                       {
                         'bg-bg-primary': isSelected && chrome !== 'editor',

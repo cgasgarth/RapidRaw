@@ -130,6 +130,8 @@ test('compact adjustment slider supports shift wheel edits and label reset hooks
   expect(root.dataset.modified).toBe('true');
   expect(root.querySelector('[data-slider-track="true"]')).not.toBeNull();
   expect(root.querySelector('[data-slider-value-slot="true"]')?.className).toContain('w-[3.5rem]');
+  expect(root.className).toContain('inspector-slider-row');
+  expect(root.querySelector('[data-fill-origin="default"]')?.className).toContain('bg-editor-info/55');
   const wheelEvent = createWheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -100, shiftKey: true });
   await act(async () => {
     root.dispatchEvent(wheelEvent);

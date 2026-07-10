@@ -1,6 +1,7 @@
 import cx from 'clsx';
 import type { ChangeEvent } from 'react';
 import { TextVariants } from '../../../types/typography';
+import { inspectorTokens } from '../inspectorTokens';
 import UiText from './Text';
 
 interface SwitchProps {
@@ -42,19 +43,21 @@ const Switch = ({
     <label
       className={cx(
         'flex items-center justify-between',
+        chrome === 'editor' && inspectorTokens.control.switch.root,
         disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
         className,
       )}
       htmlFor={uniqueId}
       data-tooltip={tooltip}
+      title={disabled ? tooltip : undefined}
     >
       <UiText
         variant={TextVariants.label}
-        className={cx('select-none', chrome === 'editor' && 'text-[12px] leading-4 text-text-secondary')}
+        className={cx('select-none', chrome === 'editor' && inspectorTokens.control.switch.label)}
       >
         {label}
       </UiText>
-      <div className={cx('relative', chrome === 'editor' ? 'h-4 w-8' : 'w-10 h-5')}>
+      <div className={cx('relative', chrome === 'editor' ? inspectorTokens.control.switch.control : 'w-10 h-5')}>
         <input
           checked={checked}
           className="peer sr-only"
@@ -70,19 +73,14 @@ const Switch = ({
         <div
           className={cx(
             'h-full w-full rounded-full shadow-inner transition-colors',
-            chrome === 'editor'
-              ? [
-                  'bg-editor-panel-raised peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-editor-focus-ring peer-focus-visible:ring-offset-1 peer-focus-visible:ring-offset-editor-matte',
-                  checked && 'bg-editor-selected-quiet',
-                ]
-              : 'bg-card-active/50',
+            chrome === 'editor' ? inspectorTokens.control.switch.track : 'bg-card-active/50',
             trackClassName,
           )}
         ></div>
         <div
           className={cx(
             'absolute rounded-full transition-[background-color,transform]',
-            chrome === 'editor' ? 'left-0.5 top-0.5 h-3 w-3' : 'top-0.5 left-0.5 w-4 h-4',
+            chrome === 'editor' ? inspectorTokens.control.switch.thumb : 'top-0.5 left-0.5 w-4 h-4',
             {
               'bg-accent': checked && chrome !== 'editor',
               'bg-editor-primary-active': checked && chrome === 'editor',

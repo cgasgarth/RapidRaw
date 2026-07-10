@@ -3,7 +3,7 @@ import type React from 'react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GLOBAL_KEYS } from '../AppProperties';
-import { compactInspectorSliderTokens, inspectorSliderTokens } from '../inspectorTokens';
+import { compactInspectorSliderTokens, inspectorSliderTokens, inspectorTokens } from '../inspectorTokens';
 
 export type SliderChangeEvent =
   | React.ChangeEvent<HTMLInputElement>
@@ -577,7 +577,14 @@ const Slider = ({
     <div className={tokens.trackWrap} data-slider-track="true">
       <div className={cx(tokens.track, trackClassName || 'bg-editor-panel-raised', disabled && 'opacity-70')} />
       <div
-        className={cx(tokens.fill, disabled && 'opacity-40')}
+        className={cx(
+          tokens.fill,
+          fillOrigin === 'default'
+            ? inspectorTokens.numeric.defaultOriginFill
+            : inspectorTokens.numeric.minimumOriginFill,
+          disabled && 'opacity-40',
+        )}
+        data-fill-origin={fillOrigin}
         style={{
           left: formatPercent(Math.min(fillPercentage, originPercentage)),
           width: formatPercent(Math.abs(fillPercentage - originPercentage)),
