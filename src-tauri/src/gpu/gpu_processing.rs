@@ -238,9 +238,10 @@ struct MaskTextureKey {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct LutTextureKey {
     device_generation: GpuDeviceGeneration,
-    content_fingerprint: u64,
+    content_hash: [u8; 32],
     edge_size: u16,
     interpolation_version: u16,
+    creative_lut_abi_version: u32,
     texture_format_version: u32,
 }
 
@@ -249,6 +250,7 @@ struct ResidentMaskTexture {
     key: MaskTextureKey,
     _texture: wgpu::Texture,
     view: wgpu::TextureView,
+    layer_fingerprints: Vec<Option<u64>>,
     estimated_bytes: u64,
 }
 
@@ -275,6 +277,10 @@ pub struct GpuResourceCacheCounters {
     pub bind_group_creations: u64,
     pub cpu_conversion_bytes: u64,
     pub gpu_upload_bytes: u64,
+    pub mask_full_upload_bytes: u64,
+    pub mask_partial_upload_bytes: u64,
+    pub mask_layers_uploaded: u64,
+    pub mask_layers_cleared: u64,
     pub resident_bytes: u64,
 }
 
@@ -294,6 +300,23 @@ impl GpuResourceCache {
         Some(entry)
     }
 
+    fn compatible_mask(&mut self, key: MaskTextureKey) -> Option<ResidentMaskTexture> {
+        let index = self.masks.iter().position(|entry| {
+            entry.key.device_generation == key.device_generation
+                && entry.key.geometry_fingerprint == key.geometry_fingerprint
+                && entry.key.width == key.width
+                && entry.key.height == key.height
+                && entry.key.layer_count == key.layer_count
+                && entry.key.format_version == key.format_version
+        })?;
+        self.counters.mask_misses += 1;
+        self.masks.remove(index)
+    }
+
+    fn publish_updated_mask(&mut self, entry: ResidentMaskTexture) {
+        self.masks.push_front(entry);
+    }
+
     fn lut(&mut self, key: LutTextureKey) -> Option<ResidentLutTexture> {
         let index = self.luts.iter().position(|entry| entry.key == key)?;
         self.counters.lut_hits += 1;
@@ -307,6 +330,12 @@ impl GpuResourceCache {
         self.counters.texture_creations += 1;
         self.counters.view_creations += 1;
         self.counters.gpu_upload_bytes += entry.estimated_bytes;
+        self.counters.mask_full_upload_bytes += entry.estimated_bytes;
+        self.counters.mask_layers_uploaded += entry
+            .layer_fingerprints
+            .iter()
+            .filter(|fingerprint| fingerprint.is_some())
+            .count() as u64;
         self.counters.cpu_conversion_bytes += entry.estimated_bytes;
         self.counters.resident_bytes += entry.estimated_bytes;
         self.masks.push_front(entry);
@@ -339,43 +368,59 @@ fn hash_value(value: &impl Hash) -> u64 {
     hasher.finish()
 }
 
+#[cfg(test)]
 fn mask_texture_key(
     generation: GpuDeviceGeneration,
     width: u32,
     height: u32,
     masks: &[ImageBuffer<Luma<u8>, Vec<u8>>],
 ) -> MaskTextureKey {
+    mask_texture_key_and_layers(generation, width, height, masks).0
+}
+
+fn mask_texture_key_and_layers(
+    generation: GpuDeviceGeneration,
+    width: u32,
+    height: u32,
+    masks: &[ImageBuffer<Luma<u8>, Vec<u8>>],
+) -> (MaskTextureKey, Vec<Option<u64>>) {
     let layer_count = masks.len().clamp(2, MAX_MASKS) as u16;
     let geometry_fingerprint = hash_value(&(width, height, layer_count));
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    masks.len().min(MAX_MASKS).hash(&mut hasher);
-    for mask in masks.iter().take(MAX_MASKS) {
-        mask.width().hash(&mut hasher);
-        mask.height().hash(&mut hasher);
-        mask.as_raw().hash(&mut hasher);
-    }
-    MaskTextureKey {
-        device_generation: generation,
-        geometry_fingerprint,
-        mask_fingerprint: hasher.finish(),
-        width,
-        height,
-        layer_count,
-        format_version: MASK_TEXTURE_ABI_VERSION,
-    }
+    let layer_fingerprints = mask_layer_fingerprints(layer_count, masks);
+    (
+        MaskTextureKey {
+            device_generation: generation,
+            geometry_fingerprint,
+            mask_fingerprint: hash_value(&layer_fingerprints),
+            width,
+            height,
+            layer_count,
+            format_version: MASK_TEXTURE_ABI_VERSION,
+        },
+        layer_fingerprints,
+    )
+}
+
+fn mask_layer_fingerprints(
+    layer_count: u16,
+    masks: &[ImageBuffer<Luma<u8>, Vec<u8>>],
+) -> Vec<Option<u64>> {
+    let mut fingerprints = masks
+        .iter()
+        .take(MAX_MASKS)
+        .map(|mask| Some(hash_value(&(mask.width(), mask.height(), mask.as_raw()))))
+        .collect::<Vec<_>>();
+    fingerprints.resize(usize::from(layer_count), None);
+    fingerprints
 }
 
 fn lut_texture_key(generation: GpuDeviceGeneration, lut: &Lut) -> LutTextureKey {
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    lut.size.hash(&mut hasher);
-    for value in &lut.data {
-        value.to_bits().hash(&mut hasher);
-    }
     LutTextureKey {
         device_generation: generation,
-        content_fingerprint: hasher.finish(),
+        content_hash: lut.content_hash,
         edge_size: lut.size as u16,
         interpolation_version: 1,
+        creative_lut_abi_version: lut.abi_version,
         texture_format_version: LUT_TEXTURE_ABI_VERSION,
     }
 }
@@ -1289,22 +1334,99 @@ impl GpuProcessor {
         let out_height = bounds.height;
         let device_generation = GpuDeviceGeneration(self.context.generation);
         debug_assert_eq!(input.device_generation, self.context.generation);
-        let mask_key = mask_texture_key(device_generation, width, height, request.mask_bitmaps);
-        let resident_mask = if let Some(hit) = self.resource_cache.lock().unwrap().mask(mask_key) {
+        for mask in request.mask_bitmaps.iter().take(MAX_MASKS) {
+            if mask.dimensions() != (width, height) {
+                return Err(format!(
+                    "mask dimensions {}x{} do not match render {}x{}",
+                    mask.width(),
+                    mask.height(),
+                    width,
+                    height
+                ));
+            }
+        }
+        let (mask_key, layer_fingerprints) =
+            mask_texture_key_and_layers(device_generation, width, height, request.mask_bitmaps);
+        let mask_hit = {
+            let mut cache = self.resource_cache.lock().unwrap();
+            cache.mask(mask_key)
+        };
+        let compatible_mask = if mask_hit.is_none() {
+            let mut cache = self.resource_cache.lock().unwrap();
+            cache.compatible_mask(mask_key)
+        } else {
+            None
+        };
+        let resident_mask = if let Some(hit) = mask_hit {
             hit
+        } else if let Some(mut resident) = compatible_mask {
+            let layer_bytes = u64::from(width) * u64::from(height);
+            let zero_layer = resident
+                .layer_fingerprints
+                .iter()
+                .zip(&layer_fingerprints)
+                .any(|(previous, next)| previous != next && next.is_none())
+                .then(|| vec![0; layer_bytes as usize]);
+            let mut uploaded_layers = 0;
+            let mut cleared_layers = 0;
+            for (layer_index, (previous, next)) in resident
+                .layer_fingerprints
+                .iter()
+                .zip(&layer_fingerprints)
+                .enumerate()
+            {
+                if previous == next {
+                    continue;
+                }
+                let bytes = request.mask_bitmaps.get(layer_index).map_or_else(
+                    || {
+                        zero_layer
+                            .as_deref()
+                            .expect("removed layers allocate zero data")
+                    },
+                    |mask| mask.as_raw().as_slice(),
+                );
+                queue.write_texture(
+                    wgpu::TexelCopyTextureInfo {
+                        texture: &resident._texture,
+                        mip_level: 0,
+                        origin: wgpu::Origin3d {
+                            x: 0,
+                            y: 0,
+                            z: layer_index as u32,
+                        },
+                        aspect: wgpu::TextureAspect::All,
+                    },
+                    bytes,
+                    wgpu::TexelCopyBufferLayout {
+                        offset: 0,
+                        bytes_per_row: Some(width),
+                        rows_per_image: Some(height),
+                    },
+                    wgpu::Extent3d {
+                        width,
+                        height,
+                        depth_or_array_layers: 1,
+                    },
+                );
+                uploaded_layers += 1;
+                cleared_layers += u64::from(next.is_none());
+            }
+            resident.key = mask_key;
+            resident.layer_fingerprints = layer_fingerprints;
+            let mut cache = self.resource_cache.lock().unwrap();
+            let upload_bytes = uploaded_layers * layer_bytes;
+            cache.counters.gpu_upload_bytes += upload_bytes;
+            cache.counters.cpu_conversion_bytes += upload_bytes;
+            cache.counters.mask_partial_upload_bytes += upload_bytes;
+            cache.counters.mask_layers_uploaded += uploaded_layers;
+            cache.counters.mask_layers_cleared += cleared_layers;
+            cache.publish_updated_mask(resident.clone());
+            resident
         } else {
             let buffer_size = (width as usize) * (height as usize) * mask_key.layer_count as usize;
             let mut data = Vec::with_capacity(buffer_size);
             for mask in request.mask_bitmaps.iter().take(MAX_MASKS) {
-                if mask.dimensions() != (width, height) {
-                    return Err(format!(
-                        "mask dimensions {}x{} do not match render {}x{}",
-                        mask.width(),
-                        mask.height(),
-                        width,
-                        height
-                    ));
-                }
                 data.extend_from_slice(mask.as_raw());
             }
             data.resize(buffer_size, 0);
@@ -1334,6 +1456,7 @@ impl GpuProcessor {
                     ..Default::default()
                 }),
                 _texture: texture,
+                layer_fingerprints,
                 estimated_bytes: data.len() as u64,
             };
             self.resource_cache
@@ -1351,15 +1474,7 @@ impl GpuProcessor {
             if let Some(hit) = self.resource_cache.lock().unwrap().lut(key) {
                 Some(hit)
             } else {
-                let lut_data = &lut_arc.data;
                 let size = lut_arc.size;
-                let mut rgba_lut_data_f16 = Vec::with_capacity(lut_data.len() / 3 * 4);
-                for chunk in lut_data.chunks_exact(3) {
-                    rgba_lut_data_f16.push(f16::from_f32(chunk[0]));
-                    rgba_lut_data_f16.push(f16::from_f32(chunk[1]));
-                    rgba_lut_data_f16.push(f16::from_f32(chunk[2]));
-                    rgba_lut_data_f16.push(f16::ONE);
-                }
                 let texture = device.create_texture_with_data(
                     queue,
                     &wgpu::TextureDescriptor {
@@ -1377,19 +1492,18 @@ impl GpuProcessor {
                         view_formats: &[],
                     },
                     TextureDataOrder::MipMajor,
-                    bytemuck::cast_slice(&rgba_lut_data_f16),
+                    bytemuck::cast_slice(lut_arc.rgba16f.as_ref()),
                 );
                 let entry = ResidentLutTexture {
                     key,
                     view: texture.create_view(&Default::default()),
                     _texture: texture,
-                    estimated_bytes: rgba_lut_data_f16.len() as u64 * size_of::<f16>() as u64,
+                    estimated_bytes: lut_arc.rgba16f.len() as u64 * size_of::<u16>() as u64,
                 };
-                let conversion_bytes = entry.estimated_bytes;
                 self.resource_cache
                     .lock()
                     .unwrap()
-                    .insert_lut(entry.clone(), conversion_bytes);
+                    .insert_lut(entry.clone(), 0);
                 Some(entry)
             }
         } else {
@@ -2008,20 +2122,35 @@ mod blur_pass_tests {
     }
 
     #[test]
+    fn mask_layer_fingerprints_identify_changed_reordered_and_removed_slots() {
+        let a = ImageBuffer::from_pixel(4, 3, Luma([1]));
+        let b = ImageBuffer::from_pixel(4, 3, Luma([2]));
+        let base = mask_layer_fingerprints(2, &[a.clone(), b.clone()]);
+
+        let mut changed = a.clone();
+        changed.put_pixel(0, 0, Luma([9]));
+        let changed = mask_layer_fingerprints(2, &[changed, b.clone()]);
+        assert_ne!(base[0], changed[0]);
+        assert_eq!(base[1], changed[1]);
+
+        let reordered = mask_layer_fingerprints(2, &[b, a.clone()]);
+        assert_eq!(reordered, vec![base[1], base[0]]);
+
+        let removed = mask_layer_fingerprints(2, &[a]);
+        assert_eq!(removed[0], base[0]);
+        assert_eq!(removed[1], None);
+    }
+
+    #[test]
     fn lut_key_invalidates_on_content_size_and_device() {
-        let lut = Lut {
-            size: 2,
-            data: vec![0.0; 24],
-        };
+        let lut = Lut::compile(2, vec![0.0; 24]);
         let base = lut_texture_key(GpuDeviceGeneration(1), &lut);
-        let mut changed = lut.clone();
-        changed.data[7] = 0.5;
+        let mut changed_data = lut.data.to_vec();
+        changed_data[7] = 0.5;
+        let changed = Lut::compile(2, changed_data);
         assert_ne!(base, lut_texture_key(GpuDeviceGeneration(1), &changed));
         assert_ne!(base, lut_texture_key(GpuDeviceGeneration(2), &lut));
-        let resized = Lut {
-            size: 3,
-            data: vec![0.0; 81],
-        };
+        let resized = Lut::compile(3, vec![0.0; 81]);
         assert_ne!(base, lut_texture_key(GpuDeviceGeneration(1), &resized));
     }
 
@@ -2424,13 +2553,13 @@ mod blur_pass_tests {
             Rgba([0.25, 0.5, 0.75, 1.0]),
         ));
         let mask = ImageBuffer::from_fn(16, 16, |x, _| Luma([(x * 17) as u8]));
-        let lut = Arc::new(Lut {
-            size: 2,
-            data: vec![
+        let lut = Arc::new(Lut::compile(
+            2,
+            vec![
                 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 1.0,
                 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0,
             ],
-        });
+        ));
         let app = tauri::test::mock_builder()
             .manage(AppState::new())
             .build(tauri::test::mock_context(tauri::test::noop_assets()))
@@ -2471,6 +2600,7 @@ mod blur_pass_tests {
         assert_eq!(counters.lut_hits, 19);
         assert_eq!(counters.texture_creations, 2);
         assert_eq!(counters.gpu_upload_bytes, 16 * 16 * 2 + 2 * 2 * 2 * 8);
+        assert_eq!(counters.cpu_conversion_bytes, 16 * 16 * 2);
         assert_eq!(counters.bind_group_creations, 1);
         assert_eq!(counters.bind_group_hits, 19);
         *processor.resource_cache.lock().unwrap() = GpuResourceCache::default();
@@ -2479,6 +2609,95 @@ mod blur_pass_tests {
 
         let cold = render(0.0);
         assert_eq!(first.to_rgba16().into_raw(), cold.to_rgba16().into_raw());
+    }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
+    fn changed_and_removed_masks_write_only_affected_layers_with_cold_parity() {
+        use image::{ImageBuffer, Rgba};
+        use tauri::Manager;
+
+        let _test_guard = GPU_TEST_LOCK.lock().unwrap();
+        let source = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(16, 16, |x, y| {
+            Rgba([x as f32 / 15.0, y as f32 / 15.0, 0.25, 1.0])
+        }));
+        let first_mask = ImageBuffer::from_fn(16, 16, |x, _| Luma([(x * 17) as u8]));
+        let second_mask = ImageBuffer::from_fn(16, 16, |_, y| Luma([(y * 17) as u8]));
+        let mut changed_mask = first_mask.clone();
+        changed_mask.put_pixel(7, 9, Luma([0]));
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock Tauri app builds");
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state)
+            .expect("compute-only GPU context initializes");
+        let identity = PreGpuImageIdentity::for_source(&source, "partial_mask_upload");
+        let mut adjustments = AllAdjustments::default();
+        adjustments.mask_count = 2;
+        adjustments.mask_adjustments[0].exposure = 0.75;
+        adjustments.mask_adjustments[1].contrast = 0.3;
+        let render = |masks: &[ImageBuffer<Luma<u8>, Vec<u8>>], adjustments| {
+            process_and_get_dynamic_image(
+                &context,
+                &state,
+                &source,
+                identity,
+                RenderRequest {
+                    adjustments,
+                    mask_bitmaps: masks,
+                    lut: None,
+                    roi: None,
+                },
+                "partial_mask_upload",
+            )
+            .expect("GPU render succeeds")
+        };
+
+        render(&[first_mask, second_mask.clone()], adjustments);
+        let changed = render(&[changed_mask.clone(), second_mask], adjustments);
+        let processor_guard = state.gpu_processor.lock().unwrap();
+        let processor = &processor_guard.as_ref().unwrap().processor;
+        let counters = processor.resource_cache_counters();
+        assert_eq!(counters.mask_misses, 2);
+        assert_eq!(counters.texture_creations, 1);
+        assert_eq!(counters.view_creations, 1);
+        assert_eq!(counters.mask_full_upload_bytes, 16 * 16 * 2);
+        assert_eq!(counters.mask_partial_upload_bytes, 16 * 16);
+        assert_eq!(counters.mask_layers_uploaded, 3);
+        assert_eq!(counters.mask_layers_cleared, 0);
+
+        *processor.resource_cache.lock().unwrap() = GpuResourceCache::default();
+        *processor.main_bind_group_cache.lock().unwrap() = None;
+        drop(processor_guard);
+        let cold_changed = render(
+            &[
+                changed_mask.clone(),
+                ImageBuffer::from_fn(16, 16, |_, y| Luma([(y * 17) as u8])),
+            ],
+            adjustments,
+        );
+        assert_eq!(
+            changed.to_rgba16().into_raw(),
+            cold_changed.to_rgba16().into_raw()
+        );
+
+        adjustments.mask_count = 1;
+        let removed = render(std::slice::from_ref(&changed_mask), adjustments);
+        let processor_guard = state.gpu_processor.lock().unwrap();
+        let processor = &processor_guard.as_ref().unwrap().processor;
+        let counters = processor.resource_cache_counters();
+        assert_eq!(counters.texture_creations, 1);
+        assert_eq!(counters.mask_partial_upload_bytes, 16 * 16);
+        assert_eq!(counters.mask_layers_cleared, 1);
+        *processor.resource_cache.lock().unwrap() = GpuResourceCache::default();
+        *processor.main_bind_group_cache.lock().unwrap() = None;
+        drop(processor_guard);
+        let cold_removed = render(std::slice::from_ref(&changed_mask), adjustments);
+        assert_eq!(
+            removed.to_rgba16().into_raw(),
+            cold_removed.to_rgba16().into_raw()
+        );
     }
 }
 

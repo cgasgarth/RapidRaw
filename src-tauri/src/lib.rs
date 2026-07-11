@@ -249,17 +249,33 @@ fn compute_full_transformed_res(
     Ok((Arc::new(transformed_img.into_owned()), offset))
 }
 
-pub fn get_or_load_lut(state: &tauri::State<AppState>, path: &str) -> Result<Arc<Lut>, String> {
-    if let Some(lut) = state.lut_cache.get(&path.to_string()) {
-        return Ok(lut);
+pub fn get_or_load_lut(state: &AppState, path: &str) -> Result<Arc<Lut>, String> {
+    let fingerprint = lut_processing::source_fingerprint(path).map_err(|e| e.to_string())?;
+    if let Some(entry) = state.lut_cache.get(&path.to_string())
+        && entry.fingerprint == fingerprint
+    {
+        return Ok(Arc::clone(&entry.lut));
     }
 
-    let lut = lut_processing::parse_lut_file(path).map_err(|e| e.to_string())?;
-    let arc_lut = Arc::new(lut);
+    let parsed = lut_processing::parse_lut_file(path).map_err(|e| e.to_string())?;
+    let content_hash = parsed.content_hash;
+    let arc_lut = state
+        .lut_content_cache
+        .get(&content_hash)
+        .unwrap_or_else(|| {
+            let lut = Arc::new(parsed);
+            state
+                .lut_content_cache
+                .insert(content_hash, Arc::clone(&lut), lut.retained_bytes());
+            lut
+        });
     state.lut_cache.insert(
         path.to_string(),
-        arc_lut.clone(),
-        (arc_lut.data.capacity() * std::mem::size_of::<f32>()) as u64,
+        Arc::new(crate::lut_processing::CachedLutPath {
+            fingerprint,
+            lut: Arc::clone(&arc_lut),
+        }),
+        256,
     );
     Ok(arc_lut)
 }
@@ -2597,15 +2613,8 @@ async fn load_and_parse_lut(
     path: String,
     state: tauri::State<'_, AppState>,
 ) -> Result<LutParseResult, String> {
-    let lut = lut_processing::parse_lut_file(&path).map_err(|e| e.to_string())?;
+    let lut = get_or_load_lut(&state, &path)?;
     let lut_size = lut.size;
-
-    let lut = Arc::new(lut);
-    state.lut_cache.insert(
-        path,
-        Arc::clone(&lut),
-        (lut.data.capacity() * std::mem::size_of::<f32>()) as u64,
-    );
 
     Ok(LutParseResult { size: lut_size })
 }
@@ -3370,6 +3379,37 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn write_test_lut(path: &std::path::Path, middle: f32) {
+        let mut cube = String::from("LUT_3D_SIZE 2\n");
+        for _ in 0..8 {
+            cube.push_str(&format!("0 {middle} 1\n"));
+        }
+        std::fs::write(path, cube).unwrap();
+    }
+
+    #[test]
+    fn lut_processing_cache_reuses_content_and_invalidates_replaced_path() {
+        let temp = tempfile::tempdir().unwrap();
+        let first_path = temp.path().join("first.cube");
+        let alias_path = temp.path().join("alias.cube");
+        write_test_lut(&first_path, 0.5);
+        write_test_lut(&alias_path, 0.5);
+        let state = AppState::new();
+
+        let first = get_or_load_lut(&state, first_path.to_str().unwrap()).unwrap();
+        let warm = get_or_load_lut(&state, first_path.to_str().unwrap()).unwrap();
+        let alias = get_or_load_lut(&state, alias_path.to_str().unwrap()).unwrap();
+        assert!(Arc::ptr_eq(&first, &warm));
+        assert!(Arc::ptr_eq(&first, &alias));
+
+        let replacement = temp.path().join("replacement.cube");
+        write_test_lut(&replacement, 0.25);
+        std::fs::rename(&replacement, &first_path).unwrap();
+        let changed = get_or_load_lut(&state, first_path.to_str().unwrap()).unwrap();
+        assert!(!Arc::ptr_eq(&first, &changed));
+        assert_ne!(first.content_hash, changed.content_hash);
+    }
 
     #[test]
     fn preview_dispatch_rejects_an_expected_image_mismatch_before_enqueue() {

@@ -28,6 +28,7 @@ impl<'a> RenderCaches<'a> {
             self.state.mask_cache.stats(),
             self.state.viewer_sample_frames.stats(),
             self.state.lut_cache.stats(),
+            self.state.lut_content_cache.stats(),
             self.state.decoded_image_cache.stats(),
         ];
         if let Some(patch_stats) = crate::patch_assets::patch_asset_cache_stats() {
