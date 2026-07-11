@@ -29,6 +29,7 @@ interface BrowserHarnessImage {
 
 declare global {
   interface ImportMetaEnv {
+    VITE_RAWENGINE_AGENT_AUDIT_E2E?: string | undefined;
     VITE_RAWENGINE_BROWSER_TAURI_HARNESS?: string | undefined;
   }
 
@@ -53,6 +54,7 @@ const harnessEnabled =
     ? __RAWENGINE_BROWSER_TAURI_HARNESS__
     : import.meta.env.VITE_RAWENGINE_BROWSER_TAURI_HARNESS === '1';
 const browserHarnessRoot = '/tmp/rawengine-browser-harness';
+const agentAuditE2eEnabled = import.meta.env.VITE_RAWENGINE_AGENT_AUDIT_E2E === '1';
 const browserHarnessSettingsStorageKey = 'rawengine-browser-tauri-harness-settings-v1';
 const commandNames: Record<
   | 'cancelThumbnailGeneration'
@@ -210,19 +212,19 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
     case commandNames.loadImage:
       return Promise.resolve({
         exif: { Make: 'RawEngine Harness', Model: 'Browser Tauri API' },
-        height: 768,
+        height: agentAuditE2eEnabled ? 4 : 768,
         is_raw: true,
         metadata: { harness: true },
-        width: 1024,
+        width: agentAuditE2eEnabled ? 4 : 1024,
       });
     case commandNames.applyAdjustments:
-      return Promise.resolve(decodeBase64ToArrayBuffer(harnessPreviewJpegBase64));
+      return Promise.resolve(decodeHarnessApplyPreview());
     case commandNames.generateOriginalTransformedPreview:
       return Promise.resolve(`data:image/jpeg;base64,${harnessPreviewJpegBase64}`);
     case commandNames.generateUncroppedPreview:
       return Promise.resolve(null);
     case commandNames.generatePreviewForPath:
-      return Promise.resolve(Array.from(new Uint8Array(decodeBase64ToArrayBuffer(harnessPreviewJpegBase64))));
+      return Promise.resolve(Array.from(new Uint8Array(decodeHarnessApplyPreview())));
     case commandNames.previewNegativeConversion:
       return Promise.resolve(`data:image/jpeg;base64,${harnessPreviewJpegBase64}`);
     case commandNames.renderNegativeLabDryRunPreviewArtifact:
@@ -448,4 +450,17 @@ const decodeBase64ToArrayBuffer = (base64: string): ArrayBuffer => {
     bytes[index] = binary.charCodeAt(index);
   }
   return bytes.buffer;
+};
+
+const decodeHarnessApplyPreview = (): ArrayBuffer => {
+  const buffer = decodeBase64ToArrayBuffer(harnessPreviewJpegBase64);
+  if (!agentAuditE2eEnabled) return buffer;
+  const bytes = new Uint8Array(buffer);
+  const frameIndex = bytes.findIndex((byte, index) => byte === 0xff && bytes[index + 1] === 0xc0);
+  if (frameIndex < 0) throw new Error('Browser harness JPEG omitted its baseline frame header.');
+  bytes[frameIndex + 5] = 0x06;
+  bytes[frameIndex + 6] = 0x00;
+  bytes[frameIndex + 7] = 0x06;
+  bytes[frameIndex + 8] = 0x00;
+  return buffer;
 };

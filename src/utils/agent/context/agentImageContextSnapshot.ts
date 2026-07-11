@@ -135,7 +135,14 @@ export const buildAgentImageContextSnapshot = (): AgentImageContextSnapshot => {
 
   const histogramSummary = summarizeHistogram(editor.histogram);
   const graphRevision = `history_${editor.historyIndex}`;
-  const previewRef = editor.finalPreviewUrl ?? editor.uncroppedAdjustedPreviewUrl ?? editor.selectedImage.thumbnailUrl;
+  const previewRef =
+    [
+      editor.finalPreviewUrl,
+      editor.uncroppedAdjustedPreviewUrl,
+      editor.selectedImage.thumbnailUrl,
+      editor.selectedImage.originalUrl,
+    ].find((candidate): candidate is string => typeof candidate === 'string' && candidate.trim().length > 0) ??
+    editor.selectedImage.path;
   const crop = normalizePreviewCrop(editor.adjustments.crop);
   const recipeHash = `recipe:${stableAgentPreviewHash(
     JSON.stringify({
