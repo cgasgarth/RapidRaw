@@ -13,7 +13,11 @@ import {
 import { useTranslation } from 'react-i18next';
 import { List, useListCallbackRef } from 'react-window';
 import type { ThumbnailViewportUpdate } from '../../../hooks/library/useThumbnails';
-import { buildLibraryLayoutIndex, type LibraryLayoutIndex } from '../../../library/buildLibraryLayoutIndex';
+import {
+  buildLibraryLayoutIndex,
+  type LibraryLayoutIndex,
+  resolveLibraryPathReveal,
+} from '../../../library/buildLibraryLayoutIndex';
 import {
   buildLibrarySemanticIndex,
   buildLibraryVisibleSemanticIndex,
@@ -596,37 +600,43 @@ export default function LibraryGrid(props: LibraryGridProps) {
     [],
   );
 
-  const prevActivePath = useRef<string | null>(null);
+  const lastHandledReveal = useRef<{ activePath: string | null; location: string | null }>({
+    activePath: null,
+    location: null,
+  });
 
   useEffect(() => {
     if (!listHandle?.element || multiSelectedPaths.length > 1) {
-      prevActivePath.current = activePath;
       return;
     }
-
-    if (activePath === prevActivePath.current) return;
-    prevActivePath.current = activePath;
+    if (!activePath) return;
 
     const element = listHandle.element as HTMLElement;
-    const rowIndex = activePath ? gridData.layoutIndex.getRowIndexForPath(activePath) : undefined;
-    const targetTop = rowIndex === undefined ? 0 : gridData.layoutIndex.getRowOffset(rowIndex);
-    const found = rowIndex !== undefined;
+    const resolution = resolveLibraryPathReveal(gridData.layoutIndex, activePath);
+    const location =
+      resolution.status === 'not-visible'
+        ? resolution.status
+        : resolution.status === 'collapsed-folder'
+          ? `${resolution.status}:${resolution.folderPath}:${resolution.headerRowIndex}`
+          : `${resolution.status}:${resolution.path}:${resolution.rowIndex}:${resolution.slotIndex}`;
+    const previous = lastHandledReveal.current;
+    if (previous.activePath === activePath && previous.location === location) return;
+    lastHandledReveal.current = { activePath, location };
 
-    if (found) {
+    if (resolution.status !== 'not-visible') {
       const clientHeight = element.clientHeight;
       const scrollTop = element.scrollTop;
-      const itemBottom = targetTop + gridData.layoutIndex.getRowHeight(rowIndex);
       const SCROLL_OFFSET = 120;
 
-      if (itemBottom > scrollTop + clientHeight) {
+      if (resolution.bottom > scrollTop + clientHeight) {
         element.scrollTo({
-          top: itemBottom - clientHeight + SCROLL_OFFSET,
-          behavior: 'smooth',
+          top: resolution.bottom - clientHeight + SCROLL_OFFSET,
+          behavior: 'auto',
         });
-      } else if (targetTop < scrollTop) {
+      } else if (resolution.top < scrollTop) {
         element.scrollTo({
-          top: Math.max(0, targetTop - SCROLL_OFFSET),
-          behavior: 'smooth',
+          top: Math.max(0, resolution.top - SCROLL_OFFSET),
+          behavior: 'auto',
         });
       }
     }

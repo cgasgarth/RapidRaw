@@ -6,7 +6,7 @@ import { dirname, relative, resolve } from 'node:path';
 import { chromium, type Locator, type Page } from '@playwright/test';
 
 const host = '127.0.0.1';
-const port = 1420;
+const port = Number(process.env.BROWSER_TAURI_HARNESS_PORT ?? 1420);
 const baseUrl = `http://${host}:${port}`;
 const viewport = { height: 720, width: 1280 };
 const boundsReportPath = resolve(
@@ -80,7 +80,7 @@ async function stopServer(server: ReturnType<typeof spawn>): Promise<void> {
   ]);
 }
 
-const server = spawn('bun', ['run', 'dev', '--', '--host', host], {
+const server = spawn('bun', ['run', 'dev', '--', '--host', host, '--port', String(port)], {
   env: { ...process.env },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
@@ -246,7 +246,7 @@ try {
       !message.includes('Clerk:') &&
       !message.includes('[vite] failed to connect to websocket') &&
       !message.includes('Failed to send error to Vite server') &&
-      !message.includes("WebSocket connection to 'ws://127.0.0.1:1420/"),
+      !message.includes(`WebSocket connection to 'ws://${host}:${port}/`),
   );
   if (actionableErrors.length > 0) {
     throw new Error(`Unexpected browser harness console errors: ${actionableErrors.slice(0, 5).join(' | ')}`);
