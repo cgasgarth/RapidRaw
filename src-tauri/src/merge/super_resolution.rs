@@ -1,6 +1,9 @@
+mod candidate;
+mod cfa_cache;
 mod cfa_observations;
 mod fallback;
 mod fused_color;
+pub(crate) mod job;
 mod motion;
 mod quality;
 mod raw_frame;
@@ -11,6 +14,7 @@ mod runtime;
 mod sharpen;
 pub(crate) mod single_image;
 mod support;
+mod tiles;
 
 pub use raw_frame::SuperResolutionReadinessSettings;
 pub use runtime::SuperResolutionDryRunPlan;

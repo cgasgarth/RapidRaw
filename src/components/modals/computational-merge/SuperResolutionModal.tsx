@@ -8,6 +8,7 @@ import {
   type SingleImageX2Preview,
   singleImageX2CapabilitySchema,
 } from '../../../schemas/computational-merge/singleImageX2Schemas';
+import type { BurstSrCandidateJobResult } from '../../../schemas/computational-merge/superResolutionCandidateRuntimeSchemas';
 import type { SuperResolutionOutputReviewWorkflow } from '../../../schemas/computational-merge/superResolutionOutputReviewSchemas';
 import type {
   SuperResolutionAlignmentMode,
@@ -53,6 +54,8 @@ interface SuperResolutionModalProps {
   lastDryRunCommand?: SuperResolutionModalState['lastDryRunCommand'];
   loadingImageUrl?: string | null;
   onApplyPlan?: () => void;
+  onCancelCandidate?: () => void;
+  candidateJob?: BurstSrCandidateJobResult | null;
   onClose: () => void;
   onOpenOutput?: (path: string) => void;
   onPreviewPlan: () => void;
@@ -88,6 +91,9 @@ export function SuperResolutionModal({
   onClose,
   onOpenOutput,
   onApplySingleImage,
+  onApplyPlan,
+  onCancelCandidate,
+  candidateJob = null,
   onPreviewPlan,
   onCancelSingleImagePreview,
   reviewArtifactPreviewUrls = {},
@@ -443,10 +449,45 @@ export function SuperResolutionModal({
               {t('modals.panorama.openInEditor')}
             </Button>
           )}
+          {!isSingleImageAi && candidateJob?.status === 'active' && onCancelCandidate !== undefined && (
+            <Button onClick={onCancelCandidate} data-testid="sr-candidate-cancel-button">
+              <X className="w-4 h-4" />
+              {t('modals.hdr.cancel')}
+            </Button>
+          )}
+          {!isSingleImageAi && onApplyPlan !== undefined && (
+            <Button
+              onClick={onApplyPlan}
+              disabled={nativeReadiness?.accepted !== true || candidateJob?.status === 'active'}
+              data-testid="sr-prepare-candidate-button"
+            >
+              <Sparkles className="w-4 h-4" />
+              {t('adjustments.color.workflowRecipes.apply')}
+            </Button>
+          )}
         </>
       }
     >
       <ComputationalSetupOptionSection title="Super-resolution workflow">
+        {candidateJob !== null && (
+          <div
+            className="mb-3"
+            data-testid="sr-candidate-runtime"
+            data-stage={candidateJob.progress.stage}
+            data-status={candidateJob.status}
+            data-tile-count={candidateJob.candidate?.tileCount ?? 0}
+            data-memory-bytes={candidateJob.candidate?.observedPeakMemoryBytes ?? 0}
+          >
+            <UiText variant={TextVariants.small}>
+              {candidateJob.progress.stage} - {Math.round(candidateJob.progress.fraction * 100)}%
+            </UiText>
+            {candidateJob.candidate !== null && (
+              <UiText variant={TextVariants.small} color={TextColors.secondary} className="block">
+                {candidateJob.candidate.capabilityState}
+              </UiText>
+            )}
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-2" data-testid="sr-source-mode-selector">
           <button
             className={`min-h-16 rounded-md border px-3 py-2 text-left ${

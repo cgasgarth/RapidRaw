@@ -2871,6 +2871,8 @@ pub fn run() {
             plan_hdr,
             super_resolution::plan_super_resolution,
             super_resolution::cancel_super_resolution_registration,
+            super_resolution::job::prepare_burst_sr_candidate,
+            super_resolution::job::read_burst_sr_candidate_job,
             super_resolution::single_image::get_single_image_x2_capability,
             super_resolution::single_image::preview_single_image_x2,
             super_resolution::single_image::apply::apply_single_image_x2,

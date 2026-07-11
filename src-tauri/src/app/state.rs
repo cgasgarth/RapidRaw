@@ -172,6 +172,9 @@ pub struct AppState {
     pub focus_stack_accepted_runtime:
         Arc<Mutex<Option<crate::merge::focus_stack::job::AcceptedFocusRuntime>>>,
     pub focus_stack_job_results: crate::merge::focus_stack::job::FocusStackJobResults,
+    pub burst_sr_accepted_runtime:
+        Arc<Mutex<Option<crate::merge::super_resolution::job::AcceptedBurstSrRuntime>>>,
+    pub burst_sr_job_results: crate::merge::super_resolution::job::BurstSrJobResults,
     pub panorama_result: Arc<Mutex<Option<PendingPanoramaResult>>>,
     pub denoise_result: Arc<Mutex<Option<DynamicImage>>>,
     pub indexing_task_handle: Mutex<Option<JoinHandle<()>>>,
@@ -219,6 +222,8 @@ impl AppState {
             focus_stack_accepted_runtime: Arc::new(Mutex::new(None)),
             focus_stack_job_results: crate::merge::focus_stack::job::FocusStackJobResults::default(
             ),
+            burst_sr_accepted_runtime: Arc::new(Mutex::new(None)),
+            burst_sr_job_results: crate::merge::super_resolution::job::BurstSrJobResults::default(),
             panorama_result: Arc::new(Mutex::new(None)),
             denoise_result: Arc::new(Mutex::new(None)),
             indexing_task_handle: Mutex::new(None),
