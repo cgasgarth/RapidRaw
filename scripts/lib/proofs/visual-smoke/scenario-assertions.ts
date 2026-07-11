@@ -963,6 +963,48 @@ async function assertEditorParityContractFixture(page) {
 }
 
 export async function prepareScenario(page, mode) {
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.NavigatorPreviewArtifact) {
+    let navigator = page.getByTestId('editor-navigator');
+    await navigator.waitFor({ timeout: 10_000 });
+    await navigator.locator('img').waitFor({ timeout: 10_000 });
+    if (
+      (await navigator.getAttribute('data-preview-identity')) !== 'artifact-a-1' ||
+      (await navigator.getAttribute('data-preview-graph')) !== 'graph-a' ||
+      (await navigator.getAttribute('data-preview-session')) !== '1'
+    ) {
+      throw new Error('Navigator did not install the coherent initial A artifact.');
+    }
+    const firstSrc = await navigator.locator('img').getAttribute('src');
+    await page.getByTestId('navigator-show-b').click();
+    navigator = page.getByTestId('editor-navigator');
+    await page.waitForFunction(
+      () =>
+        document.querySelector('[data-testid="editor-navigator"]')?.getAttribute('data-preview-identity') ===
+        'artifact-b',
+    );
+    if ((await navigator.getAttribute('data-preview-session')) !== '2') {
+      throw new Error('Navigator B artifact did not carry its image session.');
+    }
+    await page.getByTestId('navigator-show-a').click();
+    await page.waitForFunction(
+      () =>
+        document.querySelector('[data-testid="editor-navigator"]')?.getAttribute('data-preview-identity') ===
+        'artifact-a-2',
+    );
+    navigator = page.getByTestId('editor-navigator');
+    if ((await navigator.getAttribute('data-preview-session')) !== '3') {
+      throw new Error('Navigator rapid A → B → A transition retained a stale session.');
+    }
+    if ((await navigator.locator('img').getAttribute('src')) !== firstSrc) {
+      throw new Error('Navigator changed the equivalent A URL while changing artifact ownership.');
+    }
+    await page.getByTestId('navigator-show-error').click();
+    await navigator.getByLabel('Navigator preview unavailable').waitFor({ timeout: 10_000 });
+    await page.getByTestId('navigator-show-a').click();
+    await page.getByTestId('editor-navigator').locator('img').waitFor({ timeout: 10_000 });
+    return;
+  }
+
   if (mode === VISUAL_SMOKE_SCENARIO_IDS.TransformPreviewSession) {
     const proof = page.getByTestId('transform-session-proof');
     let session = page.getByTestId('transform-session');

@@ -32,6 +32,7 @@ import TransformModal from '../../components/modals/editing/TransformModal';
 import CommandPaletteModal from '../../components/modals/navigation/CommandPaletteModal';
 import { NegativeConversionModal } from '../../components/modals/negative-lab/NegativeConversionModal';
 import BottomBar from '../../components/panel/BottomBar';
+import EditorNavigator, { type EditorTransformController } from '../../components/panel/editor/EditorNavigator';
 import EditorToolbar from '../../components/panel/editor/EditorToolbar';
 import ImageCanvas from '../../components/panel/editor/ImageCanvas';
 import ViewerFooter from '../../components/panel/editor/ViewerFooter';
@@ -1975,6 +1976,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.LayerMaskPrivateRawUi]: LayerMaskPrivateRawVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.LayerStackWorkflow]: LayerStackWorkflowVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.LensCorrectionSession]: LensCorrectionSessionVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.NavigatorPreviewArtifact]: NavigatorPreviewArtifactVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.TransformPreviewSession]: TransformPreviewSessionVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.LibraryWorkflow]: LibraryWorkflowVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.MaskOverlayRawProof]: MaskOverlayRawProofVisualSmoke,
@@ -3685,6 +3687,10 @@ const copy = {
   commandPaletteSelectSource: 'Select source',
   cullingCompareSync: 'Culling compare sync',
   lensCorrectionSession: 'Lens correction session',
+  navigatorPreviewArtifact: 'Navigator preview artifact',
+  navigatorShowA: 'Show A',
+  navigatorShowB: 'Show B',
+  navigatorShowError: 'Show error',
   transformPreviewSession: 'Transform preview session',
   transformReopen: 'Reopen',
   transformSwitchSource: 'Switch source',
@@ -5488,6 +5494,65 @@ function LensCorrectionSessionVisualSmoke() {
           show
         />
       </div>
+    </main>
+  );
+}
+
+function NavigatorPreviewArtifactVisualSmoke() {
+  const [controller] = useState<EditorTransformController>(() => ({
+    instance: { transformState: { positionX: -280, positionY: -180, scale: 2 } },
+    setTransform: () => {},
+  }));
+  const installArtifact = (id: string, graphIdentity: string, imageSessionId: string, url: string) => {
+    useEditorStore.setState({
+      finalPreviewUrl: url,
+      imageSessionId: Number(imageSessionId),
+      navigatorPreviewArtifact: { graphIdentity, id, imageSessionId, url },
+    });
+  };
+  useEffect(() => {
+    useEditorStore.setState({
+      baseRenderSize: { containerHeight: 480, containerWidth: 720, height: 480, offsetX: 0, offsetY: 0, width: 720 },
+      originalSize: { height: 4000, width: 6000 },
+      zoomMode: { devicePixelsPerImagePixel: 1, kind: 'ratio' },
+    });
+    installArtifact('artifact-a-1', 'graph-a', '1', brushMaskCanvasImageDataUrl);
+  }, []);
+  return (
+    <main
+      className="flex min-h-screen items-center justify-center bg-editor-matte p-8 text-text-primary"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.NavigatorPreviewArtifact}
+      data-visual-smoke-ready="true"
+    >
+      <section
+        className="w-[360px] rounded-lg border border-editor-border bg-editor-panel shadow-xl"
+        data-visual-smoke-section="navigator-preview-artifact"
+      >
+        <div className="flex items-center justify-between border-b border-editor-border px-3 py-2">
+          <span>{copy.navigatorPreviewArtifact}</span>
+          <div className="flex gap-1">
+            <button
+              data-testid="navigator-show-a"
+              onClick={() => installArtifact('artifact-a-2', 'graph-a', '3', brushMaskCanvasImageDataUrl)}
+            >
+              {copy.navigatorShowA}
+            </button>
+            <button
+              data-testid="navigator-show-b"
+              onClick={() => installArtifact('artifact-b', 'graph-b', '2', cropTransformSmokeImage.thumbnailUrl)}
+            >
+              {copy.navigatorShowB}
+            </button>
+            <button
+              data-testid="navigator-show-error"
+              onClick={() => installArtifact('artifact-error', 'graph-error', '4', 'data:image/not-valid')}
+            >
+              {copy.navigatorShowError}
+            </button>
+          </div>
+        </div>
+        <EditorNavigator onZoomChange={() => {}} transformControllerRef={{ current: controller }} />
+      </section>
     </main>
   );
 }

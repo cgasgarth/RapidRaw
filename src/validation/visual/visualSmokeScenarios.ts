@@ -25,6 +25,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   LayerMaskPrivateRawUi: 'layer-mask-private-raw-ui',
   LayerStackWorkflow: 'layer-stack-workflow',
   LensCorrectionSession: 'lens-correction-session',
+  NavigatorPreviewArtifact: 'navigator-preview-artifact',
   TransformPreviewSession: 'transform-preview-session',
   LibraryWorkflow: 'library-workflow',
   MaskOverlayRawProof: 'mask-overlay-raw-proof',
@@ -114,6 +115,12 @@ export const VISUAL_SMOKE_SCENARIOS = [
     marker: 'Lens correction session',
     mode: VISUAL_SMOKE_SCENARIO_IDS.LensCorrectionSession,
     outputFile: 'lens-correction-session.png',
+    sectionMinimum: 1,
+  },
+  {
+    marker: 'Navigator preview artifact',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.NavigatorPreviewArtifact,
+    outputFile: 'navigator-preview-artifact.png',
     sectionMinimum: 1,
   },
   {
