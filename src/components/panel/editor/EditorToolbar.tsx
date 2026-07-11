@@ -25,6 +25,7 @@ import { type EditorCompareMode, useEditorStore } from '../../../store/useEditor
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useUIStore } from '../../../store/useUIStore';
 import type { EditorCompareOrientation } from '../../../utils/editorCompare';
+import { resolveExportSoftProofRecipe } from '../../../utils/export/exportSoftProofRecipeSelection';
 import { formatShortcutLabel } from '../../../utils/keyboardUtils';
 import { parseVirtualImagePath } from '../../../utils/virtualImagePath';
 import type { SelectedImage } from '../../ui/AppProperties';
@@ -110,14 +111,16 @@ const EditorToolbar = memo(
     const isFullScreenFromStore = useUIStore((state) => state.isFullScreen);
     const setEditor = useEditorStore((state) => state.setEditor);
     const isFullScreen = isFullScreenProp ?? isFullScreenFromStore;
-    const exportRecipeIds = useMemo(
+    const resolvedSoftProofRecipe = useMemo(
       () =>
-        (appSettings?.exportPresets ?? []).filter((preset) => preset.fileFormat !== 'cube').map((preset) => preset.id),
-      [appSettings?.exportPresets],
+        resolveExportSoftProofRecipe({
+          enabled: isExportSoftProofEnabled,
+          presets: appSettings?.exportPresets ?? [],
+          requestedRecipeId: exportSoftProofRecipeId,
+        }),
+      [appSettings?.exportPresets, exportSoftProofRecipeId, isExportSoftProofEnabled],
     );
-    const selectedExportRecipeId = exportRecipeIds.includes(exportSoftProofRecipeId ?? '')
-      ? exportSoftProofRecipeId
-      : (exportRecipeIds[0] ?? null);
+    const selectedExportRecipeId = resolvedSoftProofRecipe.recipeId;
     const { baseName, fileTypeLabel, isVirtualCopy } = useMemo(() => {
       const { path, virtualCopyId } = parseVirtualImagePath(selectedImage.path);
       const fileName = path.split(/[\\/]/).pop() || '';
@@ -139,23 +142,15 @@ const EditorToolbar = memo(
     const lightsOutLabel = `Lights out: ${getViewerLightsOutLabel(lightsOutLevel)}`;
     const overflowLabel = t('modals.commandPalette.title');
 
-    useEffect(() => {
-      if (exportRecipeIds.length === 0 && (isExportSoftProofEnabled || exportSoftProofRecipeId !== null)) {
-        setEditor({ exportSoftProofRecipeId: null, isExportSoftProofEnabled: false });
-      } else if (selectedExportRecipeId !== exportSoftProofRecipeId) {
-        setEditor({ exportSoftProofRecipeId: selectedExportRecipeId });
-      }
-    }, [exportSoftProofRecipeId, exportRecipeIds, isExportSoftProofEnabled, selectedExportRecipeId, setEditor]);
-
     const commands = buildEditorToolbarCommands(
       {
         canRedo,
-        canSoftProof: exportRecipeIds.length > 0,
+        canSoftProof: selectedExportRecipeId !== null,
         canUndo,
         compareMode,
         compareOrientation,
         isFullScreen,
-        isSoftProofEnabled: isExportSoftProofEnabled,
+        isSoftProofEnabled: resolvedSoftProofRecipe.enabled,
         lightsOutLevel,
         negativeLabDisabledReason,
         showOriginal,
@@ -195,9 +190,14 @@ const EditorToolbar = memo(
         toggleLightsOut: onCycleLightsOut,
         toggleShowOriginal: onToggleShowOriginal,
         toggleSoftProof: () => {
+          const next = resolveExportSoftProofRecipe({
+            enabled: !resolvedSoftProofRecipe.enabled,
+            presets: appSettings?.exportPresets ?? [],
+            requestedRecipeId: selectedExportRecipeId,
+          });
           setEditor({
-            exportSoftProofRecipeId: selectedExportRecipeId,
-            isExportSoftProofEnabled: !isExportSoftProofEnabled,
+            exportSoftProofRecipeId: next.recipeId,
+            isExportSoftProofEnabled: next.enabled,
           });
         },
         undo: onUndo,
@@ -218,7 +218,7 @@ const EditorToolbar = memo(
         data-toolbar-negative-lab={negativeLabDisabledReason ? 'disabled' : 'available'}
         data-toolbar-original={showOriginal ? 'original' : 'edited'}
         data-toolbar-soft-proof={
-          isExportSoftProofEnabled ? 'active' : exportRecipeIds.length > 0 ? 'available' : 'unavailable'
+          resolvedSoftProofRecipe.enabled ? 'active' : selectedExportRecipeId !== null ? 'available' : 'unavailable'
         }
         role="toolbar"
       >
