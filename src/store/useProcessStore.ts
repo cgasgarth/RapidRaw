@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Progress } from '../components/ui/AppProperties';
 import { type ExportState, type ImportState, Status } from '../components/ui/ExportImportProperties';
+import { thumbnailResourceCache } from '../utils/thumbnailResources';
 
 export interface ThumbnailSmartPreviewState {
   colorProfile: string;
@@ -77,6 +78,7 @@ export const useProcessStore = create<ProcessState>((set, get) => ({
   invalidateThumbnails: (paths) => {
     const pathSet = new Set(paths);
     if (pathSet.size === 0) return;
+    for (const path of pathSet) thumbnailResourceCache.delete(path);
 
     set((prev) => {
       return {
