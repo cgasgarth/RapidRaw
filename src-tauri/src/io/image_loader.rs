@@ -102,8 +102,8 @@ enum DemosaicSharpeningPath {
     XTransHq,
 }
 
-const RAW_CACHE_CAMERA_PROFILE_RESOLVER_VERSION: &str = "dual_illuminant_mired_v1";
-const RAW_CACHE_RECONSTRUCTION_VERSION: &str = "raw_reconstruction_v3";
+const RAW_CACHE_CAMERA_PROFILE_RESOLVER_VERSION: &str = "dual_illuminant_mired_v2";
+const RAW_CACHE_RECONSTRUCTION_VERSION: &str = "raw_reconstruction_v4";
 
 fn normalize_raw_processing_mode(mode: Option<&str>) -> &'static str {
     match mode {
@@ -1327,11 +1327,11 @@ mod tests {
         assert_eq!(resolved_cache_key.mode, "maximum");
         assert_eq!(
             resolved_cache_key.camera_profile_resolver_version,
-            "dual_illuminant_mired_v1"
+            "dual_illuminant_mired_v2"
         );
         assert_eq!(
             resolved_cache_key.reconstruction_version,
-            "raw_reconstruction_v3"
+            "raw_reconstruction_v4"
         );
         assert_eq!(
             resolved_cache_key.highlight_compression_bits,
