@@ -13,6 +13,7 @@ import {
   publishAdjustmentSnapshot,
 } from '../utils/adjustmentSnapshots';
 import { type Adjustments, DisplayMode, INITIAL_ADJUSTMENTS, type MaskContainer } from '../utils/adjustments';
+import { type AiEditCommand, type AiEditSelection, resolveAiEditSelection } from '../utils/aiEditSelection';
 import {
   applyBasicToneCommandEnvelopeToAdjustments,
   BasicToneApprovalClass,
@@ -185,6 +186,7 @@ interface EditorState {
 
   // Actions
   setEditor: (updater: Partial<EditorState> | ((state: EditorState) => Partial<EditorState>)) => void;
+  applyAiEditCommand: (command: AiEditCommand) => AiEditSelection | null;
   dispatchCompare: (command: EditorCompareCommand) => void;
   setPresetApplication: (presetApplication: PresetApplication | null) => void;
   createHistoryCheckpoint: (label: string) => void;
@@ -238,6 +240,21 @@ const publishAdjustmentState = (state: EditorState, adjustments: Adjustments) =>
   adjustments,
   adjustmentSnapshot: publishAdjustmentSnapshot(state.adjustmentSnapshot, adjustments),
 });
+
+const resolveAiSelectionState = (
+  state: EditorState,
+  adjustments: Adjustments,
+  requested: AiEditSelection = {
+    containerId: state.activeAiPatchContainerId,
+    subMaskId: state.activeAiSubMaskId,
+  },
+) => {
+  const selection = resolveAiEditSelection(adjustments.aiPatches, requested);
+  return {
+    activeAiPatchContainerId: selection.containerId,
+    activeAiSubMaskId: selection.subMaskId,
+  };
+};
 
 const assertApprovedBasicToneCommand = (command: BasicToneCommandEnvelope, state: EditorState): void => {
   if (command.commandType !== 'toneColor.setBasicTone') {
@@ -353,6 +370,27 @@ export const useEditorStore = create<EditorState>((set) => ({
       if ('adjustments' in update && update.adjustments !== undefined) {
         update.adjustmentSnapshot = publishAdjustmentSnapshot(state.adjustmentSnapshot, update.adjustments);
         update.adjustments = update.adjustmentSnapshot.value as Adjustments;
+        Object.assign(
+          update,
+          resolveAiSelectionState(state, update.adjustments, {
+            containerId:
+              'activeAiPatchContainerId' in update
+                ? (update.activeAiPatchContainerId ?? null)
+                : state.activeAiPatchContainerId,
+            subMaskId: 'activeAiSubMaskId' in update ? (update.activeAiSubMaskId ?? null) : state.activeAiSubMaskId,
+          }),
+        );
+      } else if ('activeAiPatchContainerId' in update || 'activeAiSubMaskId' in update) {
+        Object.assign(
+          update,
+          resolveAiSelectionState(state, state.adjustments, {
+            containerId:
+              'activeAiPatchContainerId' in update
+                ? (update.activeAiPatchContainerId ?? null)
+                : state.activeAiPatchContainerId,
+            subMaskId: 'activeAiSubMaskId' in update ? (update.activeAiSubMaskId ?? null) : state.activeAiSubMaskId,
+          }),
+        );
       }
       if ('selectedImage' in update && update.selectedImage?.path !== state.selectedImage?.path) {
         update.imageSessionId = state.imageSessionId + 1;
@@ -393,6 +431,46 @@ export const useEditorStore = create<EditorState>((set) => ({
 
       return { ...update, gamutWarningOverlay: null };
     });
+  },
+
+  applyAiEditCommand: (command) => {
+    let committedSelection: AiEditSelection | null = null;
+    set((state) => {
+      const result = command({
+        aiPatches: state.adjustments.aiPatches,
+        selection: {
+          containerId: state.activeAiPatchContainerId,
+          subMaskId: state.activeAiSubMaskId,
+        },
+      });
+      if (!result) return {};
+
+      const selection = resolveAiEditSelection(result.aiPatches, result.selection);
+      const adjustments = { ...state.adjustments, aiPatches: result.aiPatches };
+      const nextHistory = pushEditHistoryEntryWithCheckpoints(
+        state.history,
+        state.historyIndex,
+        adjustments,
+        state.historyCheckpoints,
+      );
+      committedSelection = selection;
+
+      return {
+        ...publishAdjustmentState(state, adjustments),
+        activeAiPatchContainerId: selection.containerId,
+        activeAiSubMaskId: selection.subMaskId,
+        brushSettings: result.selectBrushTool
+          ? {
+              ...(state.brushSettings ?? { size: 50, feather: 50, tool: ToolType.Brush }),
+              tool: ToolType.Brush,
+            }
+          : state.brushSettings,
+        history: nextHistory.history,
+        historyCheckpoints: nextHistory.checkpoints,
+        historyIndex: nextHistory.historyIndex,
+      };
+    });
+    return committedSelection;
   },
 
   dispatchCompare: (command) => set((state) => ({ compare: reduceEditorCompare(state.compare, command) })),
@@ -462,6 +540,7 @@ export const useEditorStore = create<EditorState>((set) => ({
       return {
         ...historyNavigationPreviewInvalidation,
         ...publishAdjustmentState(state, nextState.adjustments),
+        ...resolveAiSelectionState(state, nextState.adjustments),
         historyIndex: nextState.historyIndex,
       };
     });
@@ -474,6 +553,7 @@ export const useEditorStore = create<EditorState>((set) => ({
       return {
         ...historyNavigationPreviewInvalidation,
         ...publishAdjustmentState(state, nextState.adjustments),
+        ...resolveAiSelectionState(state, nextState.adjustments),
         historyIndex: nextState.historyIndex,
       };
     });
@@ -485,6 +565,7 @@ export const useEditorStore = create<EditorState>((set) => ({
       historyCheckpoints: [],
       historyIndex: 0,
       ...publishAdjustmentState(state, initialState),
+      ...resolveAiSelectionState(state, initialState),
     }));
   },
 
@@ -495,6 +576,7 @@ export const useEditorStore = create<EditorState>((set) => ({
       return {
         ...historyNavigationPreviewInvalidation,
         ...publishAdjustmentState(state, nextState.adjustments),
+        ...resolveAiSelectionState(state, nextState.adjustments),
         historyIndex: nextState.historyIndex,
       };
     });

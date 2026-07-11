@@ -8,6 +8,7 @@ import { useLibraryStore } from '../../store/useLibraryStore';
 import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
+import { selectionAfterPatchDeletion } from '../../utils/aiEditSelection';
 import type { EditorZoomCommand } from '../../utils/editorZoom';
 import { KEYBIND_DEFINITIONS, normalizeCombo } from '../../utils/keyboardUtils';
 import { useEditorActions } from '../editor/useEditorActions';
@@ -533,15 +534,15 @@ export const useKeyboardShortcuts = ({
               isMaskControlHovered: false,
             }));
           } else if (s.editor.activeAiPatchContainerId) {
-            s.editor.setEditor((state) => ({
-              adjustments: {
-                ...state.adjustments,
-                aiPatches: state.adjustments.aiPatches.filter((c) => c.id !== s.editor.activeAiPatchContainerId),
-              },
-              activeAiPatchContainerId: null,
-              activeAiSubMaskId: null,
-              isMaskControlHovered: false,
-            }));
+            const patchId = s.editor.activeAiPatchContainerId;
+            s.editor.applyAiEditCommand(({ aiPatches, selection }) => {
+              if (!aiPatches.some((container) => container.id === patchId)) return null;
+              return {
+                aiPatches: aiPatches.filter((container) => container.id !== patchId),
+                selection: selectionAfterPatchDeletion(aiPatches, selection, patchId),
+              };
+            });
+            s.editor.setEditor({ isMaskControlHovered: false });
           }
         },
       },

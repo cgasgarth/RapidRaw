@@ -14,6 +14,7 @@ import {
   type AiSubjectMaskToolAppliedResult,
   prepareAiSubjectMaskAppServerTool,
 } from '../../utils/ai/aiSubjectMaskAppServerTool';
+import { selectionAfterPatchDeletion } from '../../utils/aiEditSelection';
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { mergeMaskParameters } from '../../utils/mask/maskParameterAccess';
 import { useEditorActions } from '../editor/useEditorActions';
@@ -51,6 +52,7 @@ const getTransformAdjustments = (adj: Adjustments) => ({
 export function useAiMasking() {
   const { setAdjustments } = useEditorActions();
   const setEditor = useEditorStore((state) => state.setEditor);
+  const applyAiEditCommand = useEditorStore((state) => state.applyAiEditCommand);
   const activeMaskId = useEditorStore((state) => state.activeMaskId);
   const activeAiSubMaskId = useEditorStore((state) => state.activeAiSubMaskId);
   const selectedImagePath = useEditorStore((state) => state.selectedImage?.path);
@@ -104,20 +106,22 @@ export function useAiMasking() {
         const newPatchData = parseAiPatchDataJson(newPatchDataJson);
         patchResidency.remove(patchId);
 
-        setAdjustments((prev: Adjustments) => ({
-          ...prev,
-          aiPatches: prev.aiPatches.map((p: AiPatch) =>
-            p.id === patchId
-              ? {
-                  ...p,
-                  patchData: newPatchData,
-                  isLoading: false,
-                  name: useFastInpaint ? 'Inpaint' : prompt?.trim() ? prompt.trim() : p.name,
-                }
-              : p,
-          ),
-        }));
-        setEditor({ activeAiPatchContainerId: null, activeAiSubMaskId: null });
+        applyAiEditCommand(({ aiPatches }) => {
+          if (!aiPatches.some((candidate) => candidate.id === patchId)) return null;
+          return {
+            aiPatches: aiPatches.map((p: AiPatch) =>
+              p.id === patchId
+                ? {
+                    ...p,
+                    patchData: newPatchData,
+                    isLoading: false,
+                    name: useFastInpaint ? 'Inpaint' : prompt?.trim() ? prompt.trim() : p.name,
+                  }
+                : p,
+            ),
+            selection: { containerId: null, subMaskId: null },
+          };
+        });
       } catch (err) {
         toast.error(`AI Replace Failed: ${formatUnknownError(err)}`);
         setAdjustments((prev: Adjustments) => ({
@@ -128,7 +132,7 @@ export function useAiMasking() {
         setEditor({ isGeneratingAi: false });
       }
     },
-    [getToken, setAdjustments, setEditor],
+    [applyAiEditCommand, getToken, setAdjustments, setEditor],
   );
 
   const handleQuickErase = useCallback(
@@ -194,22 +198,24 @@ export function useAiMasking() {
         const newPatchData = parseAiPatchDataJson(newPatchDataJson);
         patchResidency.remove(patchId);
 
-        setAdjustments((prev: Adjustments) => ({
-          ...prev,
-          aiPatches: prev.aiPatches.map((p: AiPatch) =>
-            p.id === patchId
-              ? {
-                  ...p,
-                  patchData: newPatchData,
-                  isLoading: false,
-                  subMasks: p.subMasks.map((sm: SubMask) =>
-                    sm.id === subMaskId ? { ...sm, parameters: finalSubMaskParams } : sm,
-                  ),
-                }
-              : p,
-          ),
-        }));
-        setEditor({ activeAiPatchContainerId: null, activeAiSubMaskId: null });
+        applyAiEditCommand(({ aiPatches }) => {
+          if (!aiPatches.some((candidate) => candidate.id === patchId)) return null;
+          return {
+            aiPatches: aiPatches.map((p: AiPatch) =>
+              p.id === patchId
+                ? {
+                    ...p,
+                    patchData: newPatchData,
+                    isLoading: false,
+                    subMasks: p.subMasks.map((sm: SubMask) =>
+                      sm.id === subMaskId ? { ...sm, parameters: finalSubMaskParams } : sm,
+                    ),
+                  }
+                : p,
+            ),
+            selection: { containerId: null, subMaskId: null },
+          };
+        });
       } catch (err) {
         toast.error(`Quick Erase Failed: ${err instanceof Error ? err.message : String(err)}`);
         setAdjustments((prev: Adjustments) => ({
@@ -220,7 +226,7 @@ export function useAiMasking() {
         setEditor({ isGeneratingAi: false });
       }
     },
-    [getToken, setAdjustments, setEditor],
+    [applyAiEditCommand, getToken, setAdjustments, setEditor],
   );
 
   const handleDeleteMaskContainer = useCallback(
@@ -239,16 +245,15 @@ export function useAiMasking() {
 
   const handleDeleteAiPatch = useCallback(
     (patchId: string) => {
-      const { activeAiPatchContainerId } = useEditorStore.getState();
-      setAdjustments((prev: Adjustments) => ({
-        ...prev,
-        aiPatches: prev.aiPatches.filter((p) => p.id !== patchId),
-      }));
-      if (activeAiPatchContainerId === patchId) {
-        setEditor({ activeAiPatchContainerId: null, activeAiSubMaskId: null });
-      }
+      applyAiEditCommand(({ aiPatches, selection }) => {
+        if (!aiPatches.some((patch) => patch.id === patchId)) return null;
+        return {
+          aiPatches: aiPatches.filter((patch) => patch.id !== patchId),
+          selection: selectionAfterPatchDeletion(aiPatches, selection, patchId),
+        };
+      });
     },
-    [setAdjustments, setEditor],
+    [applyAiEditCommand],
   );
 
   const handleToggleAiPatchVisibility = useCallback(
