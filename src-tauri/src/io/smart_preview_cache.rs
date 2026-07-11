@@ -1,13 +1,15 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use base64::{Engine as _, engine::general_purpose};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 
 use crate::file_management::parse_virtual_path;
-use crate::formats::jpeg_data_url;
+use crate::thumbnail_resources::{
+    ThumbnailResourceDescriptor, ThumbnailResourceSource, descriptor_from_manifest,
+    publish_thumbnail_artifact,
+};
 
 const SMART_PREVIEW_SCHEMA_VERSION: u8 = 1;
 const SMART_PREVIEW_COLOR_PROFILE: &str = "srgb";
@@ -109,10 +111,10 @@ pub fn write_smart_preview_artifact(
     width: u32,
     height: u32,
     adjustments_bytes: &[u8],
-) -> Option<ThumbnailSmartPreviewPayload> {
+) -> Option<(ThumbnailSmartPreviewPayload, ThumbnailResourceDescriptor)> {
     let (source_path, _) = parse_virtual_path(path_str);
     let source_available = source_path.exists();
-    let (preview_path, manifest_path) = smart_preview_paths(smart_preview_dir, path_str);
+    let (_, manifest_path) = smart_preview_paths(smart_preview_dir, path_str);
     let manifest = SmartPreviewManifest {
         schema_version: SMART_PREVIEW_SCHEMA_VERSION,
         path: path_str.to_string(),
@@ -126,31 +128,55 @@ pub fn write_smart_preview_artifact(
         created_at: Utc::now().to_rfc3339(),
     };
 
-    if fs::write(&preview_path, thumb_data).is_err() {
-        return None;
-    }
-    if let Ok(manifest_bytes) = serde_json::to_vec_pretty(&manifest) {
-        let _ = fs::write(manifest_path, manifest_bytes);
-    }
+    let resource_id = compute_smart_preview_id(path_str);
+    publish_thumbnail_artifact(
+        smart_preview_dir,
+        &resource_id,
+        &manifest.source_revision,
+        thumb_data,
+        width,
+        height,
+        &manifest.source_revision,
+    )?;
+    let manifest_bytes = serde_json::to_vec_pretty(&manifest).ok()?;
+    let temp_manifest = manifest_path.with_extension(format!("json.{}.tmp", uuid::Uuid::new_v4()));
+    fs::write(&temp_manifest, manifest_bytes).ok()?;
+    fs::rename(temp_manifest, manifest_path).ok()?;
 
-    Some(thumbnail_smart_preview_payload(&manifest, "rendered"))
+    let descriptor = descriptor_from_manifest(
+        smart_preview_dir,
+        &resource_id,
+        &manifest.source_revision,
+        0,
+        ThumbnailResourceSource::SmartPreview,
+    )?;
+    Some((
+        thumbnail_smart_preview_payload(&manifest, "rendered"),
+        descriptor,
+    ))
 }
 
 pub fn read_smart_preview_artifact(
     smart_preview_dir: &Path,
     path_str: &str,
-) -> Option<(String, ThumbnailSmartPreviewPayload)> {
-    let (preview_path, manifest_path) = smart_preview_paths(smart_preview_dir, path_str);
-    let data = fs::read(preview_path).ok()?;
+) -> Option<(ThumbnailResourceDescriptor, ThumbnailSmartPreviewPayload)> {
+    let (_, manifest_path) = smart_preview_paths(smart_preview_dir, path_str);
     let mut manifest: SmartPreviewManifest =
         serde_json::from_slice(&fs::read(manifest_path).ok()?).ok()?;
     let (source_path, _) = parse_virtual_path(path_str);
     manifest.source_available = source_path.exists();
     manifest.stale = !manifest.source_available;
 
-    let base64_str = general_purpose::STANDARD.encode(&data);
+    let resource_id = compute_smart_preview_id(path_str);
+    let descriptor = descriptor_from_manifest(
+        smart_preview_dir,
+        &resource_id,
+        &manifest.source_revision,
+        0,
+        ThumbnailResourceSource::SmartPreview,
+    )?;
     Some((
-        jpeg_data_url(base64_str),
+        descriptor,
         thumbnail_smart_preview_payload(&manifest, "smartPreview"),
     ))
 }
@@ -198,16 +224,16 @@ mod tests {
         let preview_dir = temp_dir.path().join("smart-previews");
         fs::create_dir_all(&preview_dir).expect("preview dir");
 
-        let write_payload =
+        let (write_payload, _) =
             write_smart_preview_artifact(&preview_dir, &path, b"jpeg", 2560, 1707, b"{}")
                 .expect("smart preview write");
         assert!(!write_payload.stale);
 
         fs::remove_file(&image_path).expect("source removed");
-        let (data_url, read_payload) =
+        let (descriptor, read_payload) =
             read_smart_preview_artifact(&preview_dir, &path).expect("smart preview read");
 
-        assert!(data_url.starts_with("data:image/jpeg;base64,"));
+        assert_eq!(descriptor.byte_len, 4);
         assert!(read_payload.stale);
         assert!(!read_payload.source_available);
         assert_eq!(read_payload.source, "smartPreview");
