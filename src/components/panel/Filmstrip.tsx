@@ -6,6 +6,8 @@ import { useTranslation } from 'react-i18next';
 import { Grid, useGridCallbackRef } from 'react-window';
 import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
+import { thumbnailCache } from '../../thumbnails/thumbnailCacheInstance';
+import { useThumbnail } from '../../thumbnails/useThumbnail';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { COLOR_LABELS, type Color } from '../../utils/adjustments';
 import { buildRawQualityBadges, formatRawQualityBadgeTooltip } from '../../utils/rawQualityBadges';
@@ -183,7 +185,7 @@ export const FilmstripThumbnail = memo(
     index,
   }: FilmstripThumbnailProps) => {
     const { t } = useTranslation();
-    const thumbData = useProcessStore((s) => s.thumbnails[imageFile.path]);
+    const thumbData = useThumbnail(imageFile.path) ?? undefined;
     const displayThumbnailUrl = resolveFilmstripThumbnailUrl(thumbData, selectedImageThumbnailUrl, isActive);
     const { path, tags, is_edited: isEdited } = imageFile;
 
@@ -718,12 +720,11 @@ export const FilmstripList = memo(function FilmstripList({
       const currentData = currentDataRef.current;
       if (!currentData.onRequestThumbnails) return;
 
-      const cached = useProcessStore.getState().thumbnails;
       const pathsToRequest: string[] = [];
 
       for (let i = allCells.columnStartIndex; i <= allCells.columnStopIndex; i++) {
         const img = currentData.imageList[i];
-        if (img && !cached[img.path]) {
+        if (img && !thumbnailCache.has(img.path)) {
           pathsToRequest.push(img.path);
         }
       }

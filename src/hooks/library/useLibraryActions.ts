@@ -3,6 +3,7 @@ import { type MouseEvent, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import type { FolderTree } from '../../components/panel/FolderTree';
 import type { AlbumItem, ImageFile } from '../../components/ui/AppProperties';
+import { libraryEntityRepository } from '../../library/LibraryEntityRepository';
 import { albumTreeSchema } from '../../schemas/library/albumSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
@@ -24,7 +25,7 @@ interface MultiSelectOptions {
 
 export function useLibraryActions(handleImageSelect?: (path: string) => void) {
   const handleRate = useCallback((newRating: number, paths?: string[]) => {
-    const { multiSelectedPaths, imageRatings, setLibrary } = useLibraryStore.getState();
+    const { multiSelectedPaths, patchLibraryImages } = useLibraryStore.getState();
     const { selectedImage } = useEditorStore.getState();
 
     const pathsToRate =
@@ -33,16 +34,10 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
 
     const firstPath = pathsToRate[0];
     if (!firstPath) return;
-    const currentRating = imageRatings[firstPath] || 0;
+    const currentRating = libraryEntityRepository.get(firstPath)?.rating || 0;
     const finalRating = newRating === currentRating ? 0 : newRating;
 
-    setLibrary((state) => {
-      const newRatings = { ...state.imageRatings };
-      pathsToRate.forEach((p) => {
-        newRatings[p] = finalRating;
-      });
-      return { imageRatings: newRatings };
-    });
+    patchLibraryImages(pathsToRate.map((path) => ({ path, changes: { rating: finalRating } })));
 
     invoke(Invokes.SetRatingForPaths, { paths: pathsToRate, rating: finalRating }).catch((err: unknown) => {
       console.error(err);
@@ -69,33 +64,27 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
 
     try {
       await invoke(Invokes.SetColorLabelForPaths, { paths: pathsToUpdate, color: finalColor });
-      setLibrary((state) => ({
-        imageList: state.imageList.map((image: ImageFile) => {
-          if (pathsToUpdate.includes(image.path)) {
-            const otherTags = (image.tags || []).filter((tag: string) => !tag.startsWith('color:'));
-            const newTags = finalColor ? [...otherTags, `color:${finalColor}`] : otherTags;
-            return { ...image, tags: newTags };
-          }
-          return image;
+      libraryEntityRepository.patchMany(
+        pathsToUpdate.map((path) => {
+          const image = libraryEntityRepository.get(path);
+          const otherTags = (image?.tags || []).filter((tag) => !tag.startsWith('color:'));
+          return { path, changes: { tags: finalColor ? [...otherTags, `color:${finalColor}`] : [...otherTags] } };
         }),
-      }));
+      );
     } catch (err) {
       toast.error(`Failed to set color label: ${formatUnknownError(err)}`);
     }
   }, []);
 
   const handleTagsChanged = useCallback((changedPaths: string[], newTags: { tag: string; isUser: boolean }[]) => {
-    useLibraryStore.getState().setLibrary((state) => ({
-      imageList: state.imageList.map((image) => {
-        if (changedPaths.includes(image.path)) {
-          const colorTags = (image.tags || []).filter((t) => t.startsWith('color:'));
-          const prefixedNewTags = newTags.map((t) => (t.isUser ? `user:${t.tag}` : t.tag));
-          const finalTags = [...colorTags, ...prefixedNewTags].sort();
-          return { ...image, tags: finalTags.length > 0 ? finalTags : null };
-        }
-        return image;
+    libraryEntityRepository.patchMany(
+      changedPaths.map((path) => {
+        const image = libraryEntityRepository.get(path);
+        const colorTags = (image?.tags || []).filter((tag) => tag.startsWith('color:'));
+        const finalTags = [...colorTags, ...newTags.map((tag) => (tag.isUser ? `user:${tag.tag}` : tag.tag))].sort();
+        return { path, changes: { tags: finalTags.length > 0 ? finalTags : null } };
       }),
-    }));
+    );
   }, []);
 
   const handleUpdateExif = useCallback(async (paths: Array<string> | undefined, updates: Record<string, string>) => {
@@ -123,14 +112,15 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
         return { selectedImage: { ...state.selectedImage, exif: { ...(state.selectedImage.exif || {}), ...updates } } };
       });
 
-      setLibrary((state) => ({
-        imageList: state.imageList.map((img) => {
-          if (physicalPathsSet.has(img.path.split('?vc=')[0])) {
-            return { ...img, exif: { ...(img.exif || {}), ...updates } };
-          }
-          return img;
-        }),
-      }));
+      libraryEntityRepository.patchMany(
+        useLibraryStore
+          .getState()
+          .imageList.filter((image) => physicalPathsSet.has(image.path.split('?vc=')[0]))
+          .map((image) => ({
+            path: image.path,
+            changes: { exif: { ...(libraryEntityRepository.get(image.path)?.exif || {}), ...updates } },
+          })),
+      );
 
       pathsToUpdate.forEach((p) => {
         const cached = globalImageCache.get(p);
