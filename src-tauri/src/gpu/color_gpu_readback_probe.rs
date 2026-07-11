@@ -151,6 +151,7 @@ mod tests {
         .map_err(|error| error.to_string())?;
 
         Ok(GpuContext {
+            generation: 1,
             device: Arc::new(device),
             queue: Arc::new(queue),
             limits,
