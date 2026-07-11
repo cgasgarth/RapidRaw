@@ -108,6 +108,13 @@ import {
   readMaskRefinementReplayReceipt,
 } from '../../../../utils/mask/maskRefinementCommandBus';
 import {
+  type MaskGraphCommandResult,
+  resolveMaskSelection,
+  selectionAfterContainerDeletion,
+  selectionAfterSubMaskDeletion,
+  validateMaskGraphCommand,
+} from '../../../../utils/mask/maskSelectionCommands';
+import {
   type AiObjectMaskProposal,
   acceptObjectMaskProposal,
   buildObjectMaskProposalCommandInput,
@@ -1411,15 +1418,6 @@ export function MasksPanel() {
     },
     [setEditor],
   );
-  const selectBrushToolForNewMask = useCallback(() => {
-    setEditor((state) => ({
-      brushSettings: {
-        ...(state.brushSettings ?? { size: 50, feather: 50, tool: ToolType.Brush }),
-        tool: ToolType.Brush,
-      },
-    }));
-  }, [setEditor]);
-
   const setCopiedMask = useCallback(
     (mask: MaskContainer) => {
       setEditor({ copiedMask: mask });
@@ -1476,13 +1474,28 @@ export function MasksPanel() {
   }, [setMaskOverlaySettings]);
   const onSelectContainer = useCallback(
     (id: string | null) => {
-      setEditor({ activeMaskContainerId: id });
+      const masks = useEditorStore.getState().adjustments.masks;
+      const selection = resolveMaskSelection(masks, { containerId: id, subMaskId: null });
+      setEditor({ activeMaskContainerId: selection.containerId, activeMaskId: selection.subMaskId });
+      if (selection.containerId !== null) {
+        const containerId = selection.containerId;
+        setExpandedContainers((previous) => new Set(previous).add(containerId));
+      }
     },
     [setEditor],
   );
   const onSelectMask = useCallback(
     (id: string | null) => {
-      setEditor({ activeMaskId: id });
+      const state = useEditorStore.getState();
+      const selection = resolveMaskSelection(state.adjustments.masks, {
+        containerId: state.activeMaskContainerId,
+        subMaskId: id,
+      });
+      setEditor({ activeMaskContainerId: selection.containerId, activeMaskId: selection.subMaskId });
+      if (id !== null && selection.containerId !== null) {
+        const containerId = selection.containerId;
+        setExpandedContainers((previous) => new Set(previous).add(containerId));
+      }
     },
     [setEditor],
   );
@@ -1501,10 +1514,46 @@ export function MasksPanel() {
   });
   const [copiedSectionAdjustments, setCopiedSectionAdjustments] = useState<CopiedSectionAdjustments | null>(null);
   const [isSettingsSectionOpen, setSettingsSectionOpen] = useState(true);
-  const [isSettingsPanelEverOpened, setIsSettingsPanelEverOpened] = useState(false);
-  const hasPerformedInitialSelection = useRef(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [analyzingSubMaskId, setAnalyzingSubMaskId] = useState<string | null>(null);
+
+  const commitMaskGraphCommand = useCallback(
+    (command: (masks: Array<MaskContainer>) => MaskGraphCommandResult | null): MaskGraphCommandResult | null => {
+      let committed: MaskGraphCommandResult | null = null;
+      let nextAdjustments: Adjustments | null = null;
+      setEditor((state) => {
+        const result = command(state.adjustments.masks);
+        if (result === null) return {};
+        committed = validateMaskGraphCommand(result);
+        nextAdjustments = { ...state.adjustments, masks: committed.masks };
+        return {
+          activeMaskContainerId: committed.selection.containerId,
+          activeMaskId: committed.selection.subMaskId,
+          adjustments: nextAdjustments,
+          ...(committed.selectBrushTool
+            ? {
+                brushSettings: {
+                  ...(state.brushSettings ?? { size: 50, feather: 50, tool: ToolType.Brush }),
+                  tool: ToolType.Brush,
+                },
+              }
+            : {}),
+        };
+      });
+      if (nextAdjustments !== null) useEditorStore.getState().pushHistory(nextAdjustments);
+      const committedResult = committed as MaskGraphCommandResult | null;
+      if (committedResult !== null) {
+        const validIds = new Set(committedResult.masks.map((mask) => mask.id));
+        setExpandedContainers((previous) => {
+          const next = new Set([...previous].filter((containerId) => validIds.has(containerId)));
+          if (committedResult.openContainerId !== undefined) next.add(committedResult.openContainerId);
+          return next;
+        });
+      }
+      return committed;
+    },
+    [setEditor],
+  );
 
   const { showContextMenu } = useContextMenu();
   const { presets } = usePresets(adjustments);
@@ -1530,6 +1579,7 @@ export function MasksPanel() {
   );
   const activeLayerMaskProvenanceView =
     activeContainer === undefined ? null : (layerMaskProvenanceViews[activeContainer.id] ?? null);
+  const isSettingsPanelReady = activeContainer !== undefined || adjustments.masks.length > 0;
   const markMaskPanelProvenanceStale = useCallback(
     (reason: LayerMaskProvenanceInvalidationReason, layerIds?: string[]) => {
       markLayerMaskProvenanceStale({ ...(layerIds === undefined ? {} : { layerIds }), reason });
@@ -1560,51 +1610,6 @@ export function MasksPanel() {
   }, [isGeneratingAiMask, isAiMask, activeMaskId]);
 
   useEffect(() => {
-    if (activeMaskContainerId) {
-      const containerExists = adjustments.masks.some((m) => m.id === activeMaskContainerId);
-      if (!containerExists) {
-        onSelectContainer(null);
-        onSelectMask(null);
-      }
-    }
-  }, [adjustments.masks, activeMaskContainerId, onSelectContainer, onSelectMask]);
-
-  useEffect(() => {
-    const syncTimer = setTimeout(() => {
-      if (!hasPerformedInitialSelection.current && !activeMaskContainerId && adjustments.masks.length > 0) {
-        const lastMask = adjustments.masks[adjustments.masks.length - 1];
-        if (lastMask) {
-          onSelectContainer(lastMask.id);
-          onSelectMask(null);
-        }
-      }
-
-      if (activeMaskContainerId) {
-        const shouldAutoExpand = !hasPerformedInitialSelection.current || activeMaskId;
-
-        if (shouldAutoExpand) {
-          setExpandedContainers((prev) => {
-            if (prev.has(activeMaskContainerId)) {
-              return prev;
-            }
-            return new Set(prev).add(activeMaskContainerId);
-          });
-        }
-
-        hasPerformedInitialSelection.current = true;
-      }
-
-      if (activeMaskContainerId || adjustments.masks.length > 0) {
-        setIsSettingsPanelEverOpened(true);
-      }
-    }, 0);
-
-    return () => {
-      clearTimeout(syncTimer);
-    };
-  }, [activeMaskContainerId, activeMaskId, adjustments.masks, onSelectContainer, onSelectMask]);
-
-  useEffect(() => {
     const handler = () => {
       if (renamingId) {
         setRenamingId(null);
@@ -1620,8 +1625,7 @@ export function MasksPanel() {
   }, [activeMaskContainerId, activeMaskId, renamingId, onSelectContainer, onSelectMask, setCustomEscapeHandler]);
 
   const handleDeselect = () => {
-    onSelectContainer(null);
-    onSelectMask(null);
+    setEditor({ activeMaskContainerId: null, activeMaskId: null });
   };
 
   const handleToggleExpand = (id: string) => {
@@ -1634,8 +1638,8 @@ export function MasksPanel() {
   };
 
   const handleResetAllMasks = () => {
-    handleDeselect();
-    setAdjustments((prev: Adjustments) => ({ ...prev, masks: [] }));
+    markMaskPanelProvenanceStale('layer_deleted');
+    commitMaskGraphCommand(() => ({ masks: [], selection: { containerId: null, subMaskId: null } }));
   };
 
   const createMaskLogic = (
@@ -1658,18 +1662,19 @@ export function MasksPanel() {
     const type = typeof maskTypeOrType === 'string' ? maskTypeOrType : maskTypeOrType.type;
     const personPart = typeof maskTypeOrType === 'string' ? undefined : maskTypeOrType.personPart;
     const subMask = createMaskLogic(type, SubMaskMode.Additive, personPart);
-    const count = adjustments.masks.length + 1;
+    const count = useEditorStore.getState().adjustments.masks.length + 1;
     const newContainer = {
       ...INITIAL_MASK_CONTAINER,
       id: crypto.randomUUID(),
       name: t('editor.masks.patches.maskName', { count }),
       subMasks: [subMask],
     };
-    setAdjustments((prev: Adjustments) => ({ ...prev, masks: [...prev.masks, newContainer] }));
-    onSelectContainer(newContainer.id);
-    onSelectMask(subMask.id);
-    setExpandedContainers((prev) => new Set(prev).add(newContainer.id));
-    if (type === Mask.Brush || type === Mask.Flow) selectBrushToolForNewMask();
+    commitMaskGraphCommand((masks) => ({
+      masks: [...masks, newContainer],
+      openContainerId: newContainer.id,
+      selection: { containerId: newContainer.id, subMaskId: subMask.id },
+      selectBrushTool: type === Mask.Brush || type === Mask.Flow,
+    }));
     if (type === Mask.AiForeground) void handleGenerateAiForegroundMask(subMask.id);
     else if (type === Mask.AiPerson && personPart !== undefined)
       void handleGenerateAiPersonPartMask(subMask.id, personPart);
@@ -1688,9 +1693,9 @@ export function MasksPanel() {
     const type = typeof maskTypeOrType === 'string' ? maskTypeOrType : maskTypeOrType.type;
     const personPart = typeof maskTypeOrType === 'string' ? undefined : maskTypeOrType.personPart;
     const subMask = createMaskLogic(type, mode, personPart);
-    setAdjustments((prev: Adjustments) => ({
-      ...prev,
-      masks: prev.masks.map((c: MaskContainer) => {
+    commitMaskGraphCommand((masks) => {
+      if (!masks.some((container) => container.id === containerId)) return null;
+      const nextMasks = masks.map((c: MaskContainer) => {
         if (c.id === containerId) {
           const newSubMasks = [...c.subMasks];
           if (insertIndex >= 0) {
@@ -1701,12 +1706,14 @@ export function MasksPanel() {
           return { ...c, subMasks: newSubMasks };
         }
         return c;
-      }),
-    }));
-    onSelectContainer(containerId);
-    onSelectMask(subMask.id);
-    setExpandedContainers((prev) => new Set(prev).add(containerId));
-    if (type === Mask.Brush || type === Mask.Flow) selectBrushToolForNewMask();
+      });
+      return {
+        masks: nextMasks,
+        openContainerId: containerId,
+        selection: { containerId, subMaskId: subMask.id },
+        selectBrushTool: type === Mask.Brush || type === Mask.Flow,
+      };
+    });
     if (type === Mask.AiForeground) void handleGenerateAiForegroundMask(subMask.id);
     else if (type === Mask.AiPerson && personPart !== undefined)
       void handleGenerateAiPersonPartMask(subMask.id, personPart);
@@ -1857,20 +1864,35 @@ export function MasksPanel() {
   };
 
   const handleDeleteContainer = (id: string) => {
-    if (activeMaskContainerId === id) handleDeselect();
     markMaskPanelProvenanceStale('layer_deleted');
-    setAdjustments((prev: Adjustments) => ({ ...prev, masks: prev.masks.filter((m) => m.id !== id) }));
+    commitMaskGraphCommand((masks) => {
+      if (!masks.some((container) => container.id === id)) return null;
+      const selection = selectionAfterContainerDeletion(masks, id, {
+        containerId: useEditorStore.getState().activeMaskContainerId,
+        subMaskId: useEditorStore.getState().activeMaskId,
+      });
+      return { masks: masks.filter((mask) => mask.id !== id), selection };
+    });
   };
 
   const handleDeleteSubMask = (containerId: string, subMaskId: string) => {
-    if (activeMaskId === subMaskId) onSelectMask(null);
     markMaskPanelProvenanceStale('mask_alpha_changed', [containerId]);
-    setAdjustments((prev: Adjustments) => ({
-      ...prev,
-      masks: prev.masks.map((m) =>
-        m.id === containerId ? { ...m, subMasks: m.subMasks.filter((sm) => sm.id !== subMaskId) } : m,
-      ),
-    }));
+    commitMaskGraphCommand((masks) => {
+      const parent = masks.find((container) => container.id === containerId);
+      if (parent === undefined || !parent.subMasks.some((subMask) => subMask.id === subMaskId)) return null;
+      const selection = selectionAfterSubMaskDeletion(masks, containerId, subMaskId, {
+        containerId: useEditorStore.getState().activeMaskContainerId,
+        subMaskId: useEditorStore.getState().activeMaskId,
+      });
+      return {
+        masks: masks.map((mask) =>
+          mask.id === containerId
+            ? { ...mask, subMasks: mask.subMasks.filter((subMask) => subMask.id !== subMaskId) }
+            : mask,
+        ),
+        selection,
+      };
+    });
   };
 
   const cloneMaskContainerData = (
@@ -1900,31 +1922,29 @@ export function MasksPanel() {
 
   const insertMaskContainer = (container: MaskContainer, insertIndex?: number) => {
     markMaskPanelProvenanceStale('layer_order_changed');
-    setAdjustments((prev: Adjustments) => {
-      return { ...prev, masks: insertMaskContainerAt(prev.masks, container, insertIndex) };
-    });
-
-    onSelectContainer(container.id);
-    onSelectMask(null);
-    setExpandedContainers((prev) => new Set(prev).add(container.id));
+    commitMaskGraphCommand((masks) => ({
+      masks: insertMaskContainerAt(masks, container, insertIndex),
+      openContainerId: container.id,
+      selection: { containerId: container.id, subMaskId: null },
+    }));
   };
 
   const insertSubMaskIntoContainer = (containerId: string, subMask: SubMask, insertIndex?: number) => {
     markMaskPanelProvenanceStale('mask_alpha_changed', [containerId]);
-    setAdjustments((prev: Adjustments) => ({
-      ...prev,
-      masks: prev.masks.map((container) => {
-        if (container.id !== containerId) {
-          return container;
-        }
+    commitMaskGraphCommand((masks) => {
+      if (!masks.some((container) => container.id === containerId)) return null;
+      return {
+        masks: masks.map((container) => {
+          if (container.id !== containerId) {
+            return container;
+          }
 
-        return { ...container, subMasks: insertSubMaskAt(container.subMasks, subMask, insertIndex) };
-      }),
-    }));
-
-    onSelectContainer(containerId);
-    onSelectMask(subMask.id);
-    setExpandedContainers((prev) => new Set(prev).add(containerId));
+          return { ...container, subMasks: insertSubMaskAt(container.subMasks, subMask, insertIndex) };
+        }),
+        openContainerId: containerId,
+        selection: { containerId, subMaskId: subMask.id },
+      };
+    });
   };
 
   const clipboardActions = createMaskLikeClipboardActions({
@@ -2000,25 +2020,31 @@ export function MasksPanel() {
       const overId = over?.id;
       if (!overId || active.id === overId) return;
 
-      setAdjustments((prev: Adjustments) => {
+      commitMaskGraphCommand((masks) => {
         const draggedItem = dragData.item;
-        if (!draggedItem) return prev;
+        if (!draggedItem) return null;
 
         let newIndex = -1;
 
         if (overId === 'mask-list-root') {
-          newIndex = prev.masks.length - 1;
+          newIndex = masks.length - 1;
         } else if (overData?.type === 'Container') {
-          newIndex = prev.masks.findIndex((m) => m.id === overId);
+          newIndex = masks.findIndex((m) => m.id === overId);
         } else if (overData?.type === 'SubMask') {
-          newIndex = prev.masks.findIndex((m) => m.id === overData.parentId);
+          newIndex = masks.findIndex((m) => m.id === overData.parentId);
         }
 
-        const reorderedMasks = reorderMaskListContainers(prev.masks, draggedItem.id, prev.masks[newIndex]?.id ?? '');
+        const reorderedMasks = reorderMaskListContainers(masks, draggedItem.id, masks[newIndex]?.id ?? '');
         if (reorderedMasks) {
           markMaskPanelProvenanceStale('layer_order_changed');
         }
-        return reorderedMasks ? { ...prev, masks: reorderedMasks } : prev;
+        const state = useEditorStore.getState();
+        return reorderedMasks
+          ? {
+              masks: reorderedMasks,
+              selection: { containerId: state.activeMaskContainerId, subMaskId: state.activeMaskId },
+            }
+          : null;
       });
       return;
     }
@@ -2028,31 +2054,25 @@ export function MasksPanel() {
       if (!sourceContainerId) return;
 
       if (over?.id === 'mask-list-root' || !over) {
-        setAdjustments((prev: Adjustments) => {
+        commitMaskGraphCommand((masks) => {
           const draggedItem = dragData.item;
-          if (!draggedItem) return prev;
+          if (!draggedItem) return null;
 
-          const result = splitSubMaskToContainer(
-            prev.masks,
-            sourceContainerId,
-            draggedItem.id,
-            (movedSubMask, count) => ({
-              ...INITIAL_MASK_CONTAINER,
-              id: crypto.randomUUID(),
-              name: `Mask ${count + 1}`,
-              subMasks: [movedSubMask],
-            }),
-          );
-          if (!result) return prev;
+          const result = splitSubMaskToContainer(masks, sourceContainerId, draggedItem.id, (movedSubMask, count) => ({
+            ...INITIAL_MASK_CONTAINER,
+            id: crypto.randomUUID(),
+            name: `Mask ${count + 1}`,
+            subMasks: [movedSubMask],
+          }));
+          if (!result) return null;
           markMaskPanelProvenanceStale('layer_order_changed');
 
           const { container: newContainer, containers: newMasks, subMask: movedSubMask } = result;
-          setTimeout(() => {
-            onSelectContainer(newContainer.id);
-            onSelectMask(movedSubMask.id);
-            setExpandedContainers((p) => new Set(p).add(newContainer.id));
-          }, 0);
-          return { ...prev, masks: newMasks };
+          return {
+            masks: newMasks,
+            openContainerId: newContainer.id,
+            selection: { containerId: newContainer.id, subMaskId: movedSubMask.id },
+          };
         });
         return;
       }
@@ -2063,24 +2083,30 @@ export function MasksPanel() {
 
       if (targetContainerId) {
         const expandedTargetContainerId = targetContainerId;
-        setAdjustments((prev: Adjustments) => {
+        commitMaskGraphCommand((masks) => {
           const draggedItem = dragData.item;
-          if (!draggedItem) return prev;
+          if (!draggedItem) return null;
 
           const newMasks = moveSubMaskBetweenContainers(
-            prev.masks,
+            masks,
             sourceContainerId,
             expandedTargetContainerId,
             draggedItem.id,
             overData?.type === 'SubMask' ? String(over.id) : undefined,
           );
-          if (!newMasks) return prev;
+          if (!newMasks) return null;
           markMaskPanelProvenanceStale('mask_alpha_changed', [sourceContainerId, expandedTargetContainerId]);
-
-          if (sourceContainerId !== targetContainerId) {
-            setExpandedContainers((p) => new Set(p).add(expandedTargetContainerId));
-          }
-          return { ...prev, masks: newMasks };
+          const state = useEditorStore.getState();
+          const movedWasSelected = state.activeMaskId === draggedItem.id;
+          return {
+            masks: newMasks,
+            ...(sourceContainerId !== targetContainerId && movedWasSelected
+              ? { openContainerId: expandedTargetContainerId }
+              : {}),
+            selection: movedWasSelected
+              ? { containerId: expandedTargetContainerId, subMaskId: draggedItem.id }
+              : { containerId: state.activeMaskContainerId, subMaskId: state.activeMaskId },
+          };
         });
       }
     }
@@ -2147,6 +2173,7 @@ export function MasksPanel() {
             <button
               className={maskPanelIconButtonClassName}
               onClick={handleResetAllMasks}
+              data-testid="mask-reset-all"
               data-tooltip={t('editor.masks.resetMaskingTooltip')}
             >
               <RotateCcw size={18} />
@@ -2160,7 +2187,14 @@ export function MasksPanel() {
             masks={adjustments.masks}
             onSelectMaskContainer={onSelectContainer}
             onSetMaskContainers={(nextMasks: Array<MaskContainer>) => {
-              setAdjustments((prev: Adjustments) => ({ ...prev, masks: nextMasks }));
+              const state = useEditorStore.getState();
+              commitMaskGraphCommand(() => ({
+                masks: nextMasks,
+                selection: {
+                  containerId: state.activeMaskContainerId,
+                  subMaskId: state.activeMaskId,
+                },
+              }));
             }}
           />
         </Suspense>
@@ -2294,7 +2328,7 @@ export function MasksPanel() {
           <div className="h-4 shrink-0 w-full" role="presentation" onClick={handleDeselect} />
 
           <AnimatePresence>
-            {isSettingsPanelEverOpened && (
+            {isSettingsPanelReady && (
               <motion.div
                 layout
                 initial={{ opacity: 0 }}
@@ -2642,6 +2676,7 @@ function DraggableGridItem({
       aria-disabled={maskType.disabled}
       aria-label={tooltip}
       data-mask-creation-disabled={String(maskType.disabled)}
+      data-testid={`mask-creation-${maskType.id ?? maskType.type}`}
       disabled={maskType.disabled}
       onClick={(event) => {
         if (maskType.disabled) return;
