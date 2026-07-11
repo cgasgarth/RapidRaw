@@ -100,6 +100,8 @@ export enum Invokes {
   PlanHdr = 'plan_hdr',
   PlanPanorama = 'plan_panorama',
   PlanSuperResolution = 'plan_super_resolution',
+  PrepareBurstSrCandidate = 'prepare_burst_sr_candidate',
+  ReadBurstSrCandidateJob = 'read_burst_sr_candidate_job',
   GetSingleImageX2Capability = 'get_single_image_x2_capability',
   PreviewSingleImageX2 = 'preview_single_image_x2',
   QueueSingleImageX2Batch = 'queue_single_image_x2_batch',

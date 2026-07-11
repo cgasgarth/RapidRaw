@@ -13,7 +13,7 @@ pub const SR_GREEN_PROXY_ALGORITHM_ID: &str = "calibrated_green_phase_proxy_v1";
 pub const SR_PROXY_CROP_VERSION: &str = "full_sensor_even_green_cells_v1";
 pub const SR_PROXY_NORMALIZATION_VERSION: &str = "black_white_normalized_green_v1";
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SuperResolutionBayerCalibration {
     pub bayer_pattern: String,
@@ -24,7 +24,7 @@ pub struct SuperResolutionBayerCalibration {
     pub white_level: Vec<u32>,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SuperResolutionBayerBurstSource {
     pub block_codes: Vec<String>,
@@ -52,7 +52,7 @@ pub struct SuperResolutionReadinessSettings {
     pub source_mode: String,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct GreenPhaseProxy {
     pub clipped_ratio: f32,
     pub height: usize,
@@ -70,7 +70,7 @@ pub struct SuperResolutionRawFrame {
     pub source: SuperResolutionBayerBurstSource,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum CfaClass {
     R,
     G1,
@@ -78,7 +78,7 @@ pub enum CfaClass {
     B,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct CalibratedBayerSensor {
     pub classes: Vec<CfaClass>,
     pub height: usize,

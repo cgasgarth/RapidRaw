@@ -19,6 +19,7 @@ import type {
   SingleImageX2ApplyReceipt,
   SingleImageX2Preview,
 } from '../schemas/computational-merge/singleImageX2Schemas';
+import type { BurstSrCandidateJobResult } from '../schemas/computational-merge/superResolutionCandidateRuntimeSchemas';
 import type { SuperResolutionOutputReviewWorkflow } from '../schemas/computational-merge/superResolutionOutputReviewSchemas';
 import {
   DEFAULT_SUPER_RESOLUTION_UI_SETTINGS,
@@ -186,6 +187,8 @@ export interface HdrModalState {
 }
 
 export interface SuperResolutionModalState {
+  candidateJob?: BurstSrCandidateJobResult | null;
+  candidateJobId?: string | null;
   isOpen: boolean;
   lastApplyCommand?: {
     acceptedDryRunPlanHash: string;
@@ -299,6 +302,8 @@ export const createDefaultHdrModalState = (
 export const createDefaultSuperResolutionModalState = (
   settings: SuperResolutionUiSettings = DEFAULT_SUPER_RESOLUTION_UI_SETTINGS,
 ): SuperResolutionModalState => ({
+  candidateJob: null,
+  candidateJobId: null,
   isOpen: false,
   nativeReadiness: null,
   outputReview: null,

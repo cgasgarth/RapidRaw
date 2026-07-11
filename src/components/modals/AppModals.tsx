@@ -7,6 +7,10 @@ import {
   singleImageX2ApplyReceiptSchema,
   singleImageX2PreviewSchema,
 } from '../../schemas/computational-merge/singleImageX2Schemas';
+import {
+  burstSrCandidateJobHandleSchema,
+  burstSrCandidateJobResultSchema,
+} from '../../schemas/computational-merge/superResolutionCandidateRuntimeSchemas';
 import { focusStackApplyReceiptSchema } from '../../schemas/focus-stack/focusStackApplySchemas';
 import {
   focusStackCandidateJobHandleSchema,
@@ -351,6 +355,13 @@ export default function AppModals(props: AppModalsProps) {
                   : null
             }
             onClose={() => {
+              if (
+                superResolutionModalState.candidateJobId !== null &&
+                superResolutionModalState.candidateJobId !== undefined
+              )
+                void invoke(Invokes.CancelComputationalMergeJob, {
+                  jobId: superResolutionModalState.candidateJobId,
+                });
               setUI((state) => ({
                 superResolutionModalState: createDefaultSuperResolutionModalState(
                   state.superResolutionModalState.settings,
@@ -398,6 +409,40 @@ export default function AppModals(props: AppModalsProps) {
                 console.error('Single-image Enhance x2 apply failed', error);
               });
             }}
+            onApplyPlan={() => {
+              const acceptedReviewId = superResolutionModalState.nativeReadiness?.acceptedDryRunPlanId;
+              if (acceptedReviewId === undefined) return;
+              void invokeWithSchema(
+                Invokes.PrepareBurstSrCandidate,
+                { acceptedReviewId, memoryBudgetBytes: 512 * 1024 * 1024 },
+                burstSrCandidateJobHandleSchema,
+              ).then((handle) => {
+                setUI((state) => ({
+                  superResolutionModalState: {
+                    ...state.superResolutionModalState,
+                    candidateJobId: handle.jobId,
+                    candidateJob: null,
+                  },
+                }));
+                const poll = window.setInterval(() => {
+                  void invokeWithSchema(
+                    Invokes.ReadBurstSrCandidateJob,
+                    { jobId: handle.jobId },
+                    burstSrCandidateJobResultSchema,
+                  ).then((candidateJob) => {
+                    setUI((state) => ({
+                      superResolutionModalState: { ...state.superResolutionModalState, candidateJob },
+                    }));
+                    if (['succeeded', 'failed', 'cancelled'].includes(candidateJob.status)) window.clearInterval(poll);
+                  });
+                }, 250);
+              });
+            }}
+            onCancelCandidate={() => {
+              const jobId = superResolutionModalState.candidateJobId;
+              if (jobId !== null && jobId !== undefined) void invoke(Invokes.CancelComputationalMergeJob, { jobId });
+            }}
+            candidateJob={superResolutionModalState.candidateJob ?? null}
             onPreviewPlan={() => {
               void (async () => {
                 if (superResolutionModalState.settings.sourceMode === 'single_image_ai_x2') {

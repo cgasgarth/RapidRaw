@@ -475,7 +475,7 @@ fn estimate_green_phase_gain(
     }
 }
 
-fn baseline_rgb_at(
+pub(crate) fn baseline_rgb_at(
     frame: &SuperResolutionRawFrame,
     overlap: super::cfa_observations::SceneRect,
     tile: OutputTile,
@@ -588,7 +588,13 @@ pub async fn plan_super_resolution(
         paths.len() as u64,
         paths.len() as u64,
     )?;
+    *state
+        .burst_sr_accepted_runtime
+        .lock()
+        .map_err(|_| "sr_runtime_unavailable")? = None;
     let task_token = job.cancellation_token.clone();
+    let runtime_paths = paths.clone();
+    let runtime_settings = settings.clone();
     let task = tokio::task::spawn_blocking(move || {
         let mut frames = Vec::with_capacity(paths.len());
         for (source_index, path) in paths.iter().enumerate() {
@@ -606,8 +612,44 @@ pub async fn plan_super_resolution(
         .await
         .map_err(|error| format!("super_resolution_registration_task_failed:{error}"))
         .and_then(|result| result);
-    if result.is_ok() {
+    if let Ok(plan) = &result {
         state.computational_merge_jobs.finish(&job.job_id)?;
+        if plan.accepted {
+            let registration = plan
+                .registration
+                .clone()
+                .ok_or("accepted_registration_missing")?;
+            let reconstruction = plan
+                .reconstruction
+                .as_ref()
+                .ok_or("accepted_reconstruction_missing")?;
+            let identity = super::candidate::AcceptedBurstSrIdentity {
+                review_id: plan.accepted_dry_run_plan_id.clone(),
+                plan_id: plan.accepted_dry_run_plan_id.clone(),
+                plan_hash: plan.accepted_dry_run_plan_hash.clone(),
+                source_hashes: plan
+                    .intake
+                    .sources
+                    .iter()
+                    .map(|source| source.content_hash.clone())
+                    .collect(),
+                sources: plan.intake.sources.clone(),
+                settings: runtime_settings,
+                registration,
+                reconstruction_policy_hash: reconstruction.policy_hash.clone(),
+                preview_hash: reconstruction.final_preview.content_hash.clone(),
+                width: reconstruction.width,
+                height: reconstruction.height,
+            };
+            *state
+                .burst_sr_accepted_runtime
+                .lock()
+                .map_err(|_| "sr_runtime_unavailable")? =
+                Some(super::candidate::AcceptedBurstSrRuntime {
+                    identity,
+                    paths: runtime_paths,
+                });
+        }
     } else {
         state.computational_merge_jobs.fail(&job.job_id)?;
     }
@@ -617,6 +659,10 @@ pub async fn plan_super_resolution(
 pub fn cancel_super_resolution_registration(
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
+    *state
+        .burst_sr_accepted_runtime
+        .lock()
+        .map_err(|_| "sr_runtime_unavailable")? = None;
     state
         .computational_merge_jobs
         .cancel_active_family(ComputationalMergeFamily::SuperResolution)
