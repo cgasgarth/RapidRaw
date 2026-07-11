@@ -6,7 +6,7 @@ import { toast } from 'react-toastify';
 import type { FolderTree } from '../../components/panel/FolderTree';
 import { type AlbumItem, type AppSettings, type ImageFile, LibraryViewMode } from '../../components/ui/AppProperties';
 import type { LoadImageResult } from '../../schemas/imageLoaderSchemas';
-import { useEditorStore } from '../../store/useEditorStore';
+import { createEditorImageSession, isEditorImageSessionCurrent, useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
@@ -17,7 +17,7 @@ import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } fro
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { findAlbumById } from '../../utils/folderTreeUtils';
 import { upsertReopenedDerivedOutputReceipt } from '../../utils/hdrDerivedSourceReopen';
-import { globalImageCache, type ImageCacheEntry } from '../../utils/ImageLRUCache';
+import { buildImageCacheEntry, globalImageCache } from '../../utils/ImageLRUCache';
 import {
   consumePendingNegativeConversionDustHealLayers,
   consumePendingNegativeConversionSavedPositiveHandoff,
@@ -70,8 +70,6 @@ export interface AppNavigationProps {
   refs: {
     transformWrapperRef: RefObject<TransformController | null>;
     preloadedDataRef: RefObject<PreloadedNavigationData>;
-    cachedEditStateRef: RefObject<ImageCacheEntry | null>;
-    selectedImagePathRef: RefObject<string | null>;
     isBackendReadyRef: RefObject<boolean>;
     latestRenderedJobIdRef: RefObject<number>;
     previewJobIdRef: RefObject<number>;
@@ -100,8 +98,6 @@ export function useAppNavigation({
   const {
     transformWrapperRef,
     preloadedDataRef,
-    cachedEditStateRef,
-    selectedImagePathRef,
     isBackendReadyRef,
     latestRenderedJobIdRef,
     previewJobIdRef,
@@ -110,6 +106,12 @@ export function useAppNavigation({
   } = refs;
 
   const handleGoHome = useCallback(() => {
+    const editor = useEditorStore.getState();
+    const outgoingCacheEntry = buildImageCacheEntry(editor);
+    if (editor.selectedImage?.path && outgoingCacheEntry) {
+      globalImageCache.set(editor.selectedImage.path, outgoingCacheEntry);
+    }
+    editor.setEditor({ imageSession: null, selectedImage: null });
     useLibraryStore.getState().setLibrary({
       rootPaths: [],
       currentFolderPath: null,
@@ -125,12 +127,14 @@ export function useAppNavigation({
   }, []);
 
   const handleBackToLibrary = useCallback(() => {
-    const { selectedImage, resetHistory, setEditor } = useEditorStore.getState();
+    const editor = useEditorStore.getState();
+    const { selectedImage, resetHistory, setEditor } = editor;
     const { setLibrary } = useLibraryStore.getState();
     const { setUI } = useUIStore.getState();
 
-    if (selectedImage?.path && cachedEditStateRef.current) {
-      globalImageCache.set(selectedImage.path, cachedEditStateRef.current);
+    const outgoingCacheEntry = buildImageCacheEntry(editor);
+    if (selectedImage?.path && outgoingCacheEntry) {
+      globalImageCache.set(selectedImage.path, outgoingCacheEntry);
     }
     if (transformWrapperRef.current) {
       transformWrapperRef.current.resetTransform(0);
@@ -143,6 +147,7 @@ export function useAppNavigation({
     setEditor({
       hasRenderedFirstFrame: false,
       selectedImage: null,
+      imageSession: null,
       finalPreviewUrl: null,
       uncroppedAdjustedPreviewUrl: null,
       histogram: null,
@@ -158,8 +163,6 @@ export function useAppNavigation({
       transformedOriginalUrl: null,
     });
 
-    selectedImagePathRef.current = null;
-
     setLibrary({ libraryActivePath: lastActivePath });
     setUI({ slideDirection: 1 });
 
@@ -168,11 +171,12 @@ export function useAppNavigation({
 
     isBackendReadyRef.current = true;
     setEditor({ interactivePatch: null });
-  }, [cachedEditStateRef, isBackendReadyRef, selectedImagePathRef, transformWrapperRef]);
+  }, [isBackendReadyRef, transformWrapperRef]);
 
   const handleImageSelect = useCallback(
     async (path: string) => {
-      const { selectedImage, isSliderDragging, resetHistory, setEditor } = useEditorStore.getState();
+      const editorAtNavigation = useEditorStore.getState();
+      const { selectedImage, isSliderDragging, resetHistory, setEditor } = editorAtNavigation;
       const { setLibrary } = useLibraryStore.getState();
       const { setUI } = useUIStore.getState();
 
@@ -181,16 +185,19 @@ export function useAppNavigation({
       debouncedSave.flush();
       debouncedSetHistory.cancel();
 
-      if (selectedImage?.path && cachedEditStateRef.current) {
-        globalImageCache.set(selectedImage.path, cachedEditStateRef.current);
+      const outgoingCacheEntry = buildImageCacheEntry(editorAtNavigation);
+      if (selectedImage?.path && outgoingCacheEntry) {
+        globalImageCache.set(selectedImage.path, outgoingCacheEntry);
       }
 
       const cached = globalImageCache.get(path);
       const cachedReadyEntry = cached?.selectedImage.isReady ? cached : undefined;
-      const isFrontendCached = cachedReadyEntry !== undefined;
-      const isCachedInBackend = isFrontendCached
-        ? await invoke<boolean>(Invokes.IsImageCached, { path }).catch(() => false)
-        : false;
+      const session = createEditorImageSession({
+        generation: editorAtNavigation.imageSessionId + 1,
+        path,
+        source: cachedReadyEntry ? 'cache' : 'cold-load',
+      });
+      const isCachedInBackend = cachedReadyEntry?.backendReady === true;
 
       const hasDifferentResolution =
         cached &&
@@ -201,7 +208,6 @@ export function useAppNavigation({
         setEditor({ hasRenderedFirstFrame: false });
       }
 
-      selectedImagePathRef.current = path;
       requestThumbnails([path]);
       setLibrary({ multiSelectedPaths: [path], libraryActivePath: null, selectionAnchorPath: path });
 
@@ -227,6 +233,7 @@ export function useAppNavigation({
 
       if (cachedReadyEntry) {
         setEditor({
+          imageSession: session,
           selectedImage: {
             ...cachedReadyEntry.selectedImage,
             thumbnailUrl: thumbnailCache.get(path)?.url || cachedReadyEntry.selectedImage.thumbnailUrl,
@@ -270,7 +277,7 @@ export function useAppNavigation({
 
         invoke<LoadImageResult>(Invokes.LoadImage, { path })
           .then((result) => {
-            if (selectedImagePathRef.current !== path) return;
+            if (!isEditorImageSessionCurrent(session.id)) return;
             const loadedMetadata = metadataWithNegativeLabReopenedSavedPositiveHandoff({
               imagePath: path,
               metadata: result.metadata,
@@ -300,6 +307,7 @@ export function useAppNavigation({
             }));
           })
           .catch((err: unknown) => {
+            if (!isEditorImageSessionCurrent(session.id)) return;
             if (String(err).includes('cancelled')) return;
             console.error('Background load_image failed on cache hit:', err);
             isBackendReadyRef.current = true;
@@ -308,7 +316,7 @@ export function useAppNavigation({
 
         invoke<LoadedMetadata>(Invokes.LoadMetadata, { path })
           .then((metadata) => {
-            if (selectedImagePathRef.current !== path) return;
+            if (!isEditorImageSessionCurrent(session.id)) return;
             let freshAdjustments: Adjustments;
             if (metadata.adjustments && !metadata.adjustments['is_null']) {
               freshAdjustments = normalizeLoadedAdjustments(metadata.adjustments);
@@ -328,6 +336,7 @@ export function useAppNavigation({
             consumePendingNegativeConversionSavedPositiveHandoff(path);
           })
           .catch((err: unknown) => {
+            if (!isEditorImageSessionCurrent(session.id)) return;
             console.error('Failed background metadata sync on cache hit:', err);
             consumePendingNegativeConversionDustHealLayers(path);
             consumePendingNegativeConversionSavedPositiveHandoff(path);
@@ -339,6 +348,7 @@ export function useAppNavigation({
       isBackendReadyRef.current = true;
 
       setEditor({
+        imageSession: session,
         selectedImage: {
           exif: null,
           height: 0,
@@ -368,16 +378,7 @@ export function useAppNavigation({
 
       setLibrary({ isViewLoading: true });
     },
-    [
-      cachedEditStateRef,
-      currentResRef,
-      isBackendReadyRef,
-      latestRenderedJobIdRef,
-      prevAdjustmentsRef,
-      previewJobIdRef,
-      requestThumbnails,
-      selectedImagePathRef,
-    ],
+    [currentResRef, isBackendReadyRef, latestRenderedJobIdRef, prevAdjustmentsRef, previewJobIdRef, requestThumbnails],
   );
 
   const handleSelectSubfolder = useCallback(

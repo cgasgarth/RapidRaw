@@ -12,7 +12,50 @@ export interface ImageCacheEntry {
   selectedImage: SelectedImage;
   originalSize: { width: number; height: number };
   previewSize: { width: number; height: number };
+  imageSessionId?: string;
+  sourceIdentity?: string;
+  backendReady?: boolean;
 }
+
+export interface ImageCacheEditorSnapshot {
+  adjustments: Adjustments;
+  finalPreviewUrl: string | null;
+  hasRenderedFirstFrame: boolean;
+  histogram: ChannelConfig | null;
+  imageSession: { id: string; path: string } | null;
+  originalSize: { width: number; height: number };
+  previewSize: { width: number; height: number };
+  selectedImage: SelectedImage | null;
+  uncroppedAdjustedPreviewUrl: string | null;
+  waveform: WaveformData | null;
+}
+
+export const buildImageCacheEntry = (state: ImageCacheEditorSnapshot): ImageCacheEntry | null => {
+  const selectedImage = state.selectedImage;
+  if (
+    !selectedImage?.isReady ||
+    state.imageSession === null ||
+    state.imageSession.path !== selectedImage.path ||
+    (!state.finalPreviewUrl && !state.hasRenderedFirstFrame) ||
+    state.originalSize.width <= 0 ||
+    state.originalSize.height <= 0
+  ) {
+    return null;
+  }
+  return {
+    adjustments: state.adjustments,
+    backendReady: state.hasRenderedFirstFrame,
+    finalPreviewUrl: state.finalPreviewUrl,
+    histogram: state.histogram,
+    imageSessionId: state.imageSession.id,
+    originalSize: state.originalSize,
+    previewSize: state.previewSize,
+    selectedImage,
+    sourceIdentity: selectedImage.path,
+    uncroppedPreviewUrl: state.uncroppedAdjustedPreviewUrl,
+    waveform: state.waveform,
+  };
+};
 
 export class ImageLRUCache {
   private cache: QuickLRU<string, ImageCacheEntry>;

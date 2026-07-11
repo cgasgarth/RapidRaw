@@ -971,6 +971,7 @@ export function useImageProcessing(
     }
 
     persistIdleTimer.current = setTimeout(() => {
+      if (useEditorStore.getState().imageSessionId !== imageSessionId) return;
       debouncedSave(selectedImage.path, adjustments);
       useProcessStore.getState().invalidateThumbnails([selectedImage.path]);
 
@@ -1018,6 +1019,7 @@ export function useImageProcessing(
     multiSelectedPaths,
     prevAdjustmentsRef,
     appSettings?.copyPasteSettings?.includedAdjustments,
+    imageSessionId,
   ]);
 
   useEffect(() => {
@@ -1049,6 +1051,7 @@ export function useImageProcessing(
 
   useEffect(() => {
     let isEffectActive = true;
+    const requestImageSessionId = imageSessionId;
     const generate = async () => {
       if (isCompareActive && selectedImage?.path && !transformedOriginalUrl) {
         try {
@@ -1062,12 +1065,14 @@ export function useImageProcessing(
             },
             previewDataUrlResponseSchema,
           );
-          if (isEffectActive) {
+          if (isEffectActive && useEditorStore.getState().imageSessionId === requestImageSessionId) {
             currentOriginalResRef.current = targetRes;
             setEditor({ transformedOriginalUrl: base64Data });
+          } else if (base64Data.startsWith('blob:')) {
+            URL.revokeObjectURL(base64Data);
           }
         } catch (e) {
-          if (isEffectActive) {
+          if (isEffectActive && useEditorStore.getState().imageSessionId === requestImageSessionId) {
             console.error('Failed to generate original preview:', e);
             dispatchCompare({ type: 'exit' });
           }
@@ -1087,6 +1092,7 @@ export function useImageProcessing(
     dispatchCompare,
     setEditor,
     viewerSampleGraphRevision,
+    imageSessionId,
   ]);
 
   return {

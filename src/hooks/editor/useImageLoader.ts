@@ -1,9 +1,9 @@
 import { invoke } from '@tauri-apps/api/core';
-import { type RefObject, useEffect } from 'react';
+import { useEffect } from 'react';
 import { toast } from 'react-toastify';
 
 import { isNullAdjustmentSnapshot, parseLoadedMetadata, parseLoadImageResult } from '../../schemas/imageLoaderSchemas';
-import { useEditorStore } from '../../store/useEditorStore';
+import { isEditorImageSessionCurrent, useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
@@ -12,7 +12,6 @@ import { INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../../utils/adj
 import { isSelectedImageLoadErrorCurrent } from '../../utils/editorImageLoadError';
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { upsertReopenedDerivedOutputReceipt } from '../../utils/hdrDerivedSourceReopen';
-import type { ImageCacheEntry } from '../../utils/ImageLRUCache';
 import { hydrateLayerStackMasksFromMetadata } from '../../utils/layers/layerStackSidecarAdjustments';
 import {
   consumePendingNegativeConversionDustHealLayers,
@@ -20,42 +19,33 @@ import {
 } from '../../utils/negative-lab/negativeLabEditorHandoff';
 import { metadataWithNegativeLabReopenedSavedPositiveHandoff } from '../../utils/negative-lab/negativeLabSavedPositiveReopen';
 
-export function useImageLoader(cachedEditStateRef: RefObject<ImageCacheEntry | null>) {
+export function useImageLoader() {
   const selectedImage = useEditorStore((s) => s.selectedImage);
+  const imageSession = useEditorStore((s) => s.imageSession);
   const selectedImagePath = selectedImage?.path;
   const selectedImageIsReady = selectedImage?.isReady;
-  const adjustments = useEditorStore((s) => s.adjustments);
-  const histogram = useEditorStore((s) => s.histogram);
-  const waveform = useEditorStore((s) => s.waveform);
-  const finalPreviewUrl = useEditorStore((s) => s.finalPreviewUrl);
-  const uncroppedAdjustedPreviewUrl = useEditorStore((s) => s.uncroppedAdjustedPreviewUrl);
-  const originalSize = useEditorStore((s) => s.originalSize);
-  const previewSize = useEditorStore((s) => s.previewSize);
-  const hasRenderedFirstFrame = useEditorStore((s) => s.hasRenderedFirstFrame);
 
   const setEditor = useEditorStore((s) => s.setEditor);
   const resetHistory = useEditorStore((s) => s.resetHistory);
   const setLibrary = useLibraryStore((s) => s.setLibrary);
   const appSettings = useSettingsStore((s) => s.appSettings);
 
-  const isWgpuActive = appSettings?.useWgpuRenderer !== false && selectedImage?.isReady && hasRenderedFirstFrame;
-
   useEffect(() => {
-    if (selectedImagePath && !selectedImageIsReady) {
-      let isEffectActive = true;
+    if (selectedImagePath && !selectedImageIsReady && imageSession?.path === selectedImagePath) {
+      const sessionId = imageSession.id;
 
       const loadMetadataEarly = async () => {
         try {
           const editor = useEditorStore.getState();
           editor.patchResidency.reset(editor.imageSessionId);
           await invoke(Invokes.ClearSessionCaches).catch((e: unknown) => {
-            console.warn('Cache clear failed:', e);
+            if (isEditorImageSessionCurrent(sessionId)) console.warn('Cache clear failed:', e);
           });
 
           const metadata = parseLoadedMetadata(
             await invoke<unknown>(Invokes.LoadMetadata, { path: selectedImagePath }),
           );
-          if (!isEffectActive) return;
+          if (!isEditorImageSessionCurrent(sessionId)) return;
 
           let initialAdjusts;
           if (metadata.adjustments && !isNullAdjustmentSnapshot(metadata.adjustments)) {
@@ -69,7 +59,7 @@ export function useImageLoader(cachedEditStateRef: RefObject<ImageCacheEntry | n
           setEditor({ adjustments: hydratedAdjustments });
           resetHistory(hydratedAdjustments);
         } catch (err) {
-          console.error('Failed to load metadata early:', err);
+          if (isEditorImageSessionCurrent(sessionId)) console.error('Failed to load metadata early:', err);
         }
       };
 
@@ -78,7 +68,7 @@ export function useImageLoader(cachedEditStateRef: RefObject<ImageCacheEntry | n
           const loadImageResult = parseLoadImageResult(
             await invoke<unknown>(Invokes.LoadImage, { path: selectedImagePath }),
           );
-          if (!isEffectActive) return;
+          if (!isEditorImageSessionCurrent(sessionId)) return;
           const loadedMetadata = metadataWithNegativeLabReopenedSavedPositiveHandoff({
             imagePath: selectedImagePath,
             metadata: loadImageResult.metadata,
@@ -110,8 +100,9 @@ export function useImageLoader(cachedEditStateRef: RefObject<ImageCacheEntry | n
           }
 
           setEditor((state) => {
-            if (state.selectedImage && state.selectedImage.path === selectedImagePath) {
+            if (state.imageSession?.id === sessionId && state.selectedImage?.path === selectedImagePath) {
               return {
+                imageSession: { ...state.imageSession, status: 'ready' },
                 selectedImage: {
                   ...state.selectedImage,
                   exif: loadImageResult.exif ?? null,
@@ -137,6 +128,7 @@ export function useImageLoader(cachedEditStateRef: RefObject<ImageCacheEntry | n
             }
             return state;
           });
+          if (!isEditorImageSessionCurrent(sessionId)) return;
           const savedPositiveHandoff = consumePendingNegativeConversionSavedPositiveHandoff(selectedImagePath);
           if (savedPositiveHandoff !== null) {
             setEditor((state) => ({
@@ -158,15 +150,18 @@ export function useImageLoader(cachedEditStateRef: RefObject<ImageCacheEntry | n
           }
           consumePendingNegativeConversionDustHealLayers(selectedImagePath);
         } catch (err) {
-          if (isEffectActive) {
+          if (isEditorImageSessionCurrent(sessionId)) {
             console.error('Failed to load image:', err);
+            setEditor((state) =>
+              state.imageSession?.id === sessionId ? { imageSession: { ...state.imageSession, status: 'failed' } } : {},
+            );
             const currentSelectedImage = useEditorStore.getState().selectedImage;
             if (isSelectedImageLoadErrorCurrent(currentSelectedImage, selectedImagePath)) {
               toast.error(`Failed to load image: ${formatUnknownError(err)}`);
             }
           }
         } finally {
-          if (isEffectActive) {
+          if (isEditorImageSessionCurrent(sessionId)) {
             setLibrary({ isViewLoading: false });
           }
         }
@@ -174,52 +169,23 @@ export function useImageLoader(cachedEditStateRef: RefObject<ImageCacheEntry | n
 
       const loadAll = async () => {
         await loadMetadataEarly();
-        if (isEffectActive) {
+        if (isEditorImageSessionCurrent(sessionId)) {
           await loadFullImageData();
         }
       };
 
       void loadAll();
 
-      return () => {
-        isEffectActive = false;
-      };
+      return undefined;
     }
     return undefined;
   }, [
     selectedImagePath,
     selectedImageIsReady,
+    imageSession?.id,
     appSettings?.editorPreviewResolution,
     resetHistory,
     setEditor,
     setLibrary,
-  ]);
-
-  useEffect(() => {
-    if (selectedImage?.path && selectedImage.isReady && (finalPreviewUrl || isWgpuActive)) {
-      cachedEditStateRef.current = {
-        adjustments,
-        histogram,
-        waveform,
-        finalPreviewUrl,
-        uncroppedPreviewUrl: uncroppedAdjustedPreviewUrl,
-        selectedImage,
-        originalSize,
-        previewSize,
-      };
-    } else {
-      cachedEditStateRef.current = null;
-    }
-  }, [
-    selectedImage,
-    adjustments,
-    histogram,
-    waveform,
-    finalPreviewUrl,
-    uncroppedAdjustedPreviewUrl,
-    originalSize,
-    previewSize,
-    isWgpuActive,
-    cachedEditStateRef,
   ]);
 }
