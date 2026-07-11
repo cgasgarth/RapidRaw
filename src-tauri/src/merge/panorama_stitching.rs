@@ -214,6 +214,7 @@ pub struct PanoramaRenderMetadata {
     pub output_height: u32,
     pub output_width: u32,
     pub pairwise_matches: Vec<PanoramaPairwiseMatchMetadata>,
+    pub parallax_blend: Option<projection::ParallaxBlendDiagnostics>,
     pub reference_source_index: Option<usize>,
     pub requested_boundary_mode: PanoramaBoundaryModeOption,
     pub requested_projection: PanoramaProjectionOption,
@@ -803,6 +804,7 @@ fn render_with_calibrated_engine(
             output_height,
             output_width,
             pairwise_matches,
+            parallax_blend: Some(projected.blend),
             reference_source_index: Some(reference_source_index),
             requested_boundary_mode: request.options.boundary_mode,
             requested_projection: request.options.projection,
@@ -1350,6 +1352,7 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
         output_height,
         output_width,
         pairwise_matches: pairwise_match_metadata,
+        parallax_blend: None,
         reference_source_index: stitching_order.reference_source_index,
         requested_boundary_mode: options.boundary_mode,
         requested_projection: options.projection,
@@ -1722,7 +1725,7 @@ fn upsert_panorama_artifact_metadata(
         "crop": crop,
         "exposureNormalizationApplied": exposure_normalization_applied,
         "projection": metadata.effective_projection.as_str(),
-        "seamPolicy": "adaptive_dp_feather_v1",
+        "seamPolicy": metadata.parallax_blend.as_ref().map(|blend| blend.seam_policy.as_str()).unwrap_or("adaptive_dp_feather_v1"),
     }));
     let provenance_sources = source_refs
         .iter()
@@ -1856,9 +1859,22 @@ fn upsert_panorama_artifact_metadata(
         },
         "schemaVersion": 1,
         "seamPolicy": {
-            "featherWidthPx": 100,
-            "lowDetailFeatherMultiplier": 5,
-            "mode": "adaptive_dp_feather_v1",
+            "featherWidthPx": if calibrated { 0 } else { 100 },
+            "lowDetailFeatherMultiplier": if calibrated { 1 } else { 5 },
+            "mode": metadata.parallax_blend.as_ref().map(|blend| blend.seam_policy.as_str()).unwrap_or("adaptive_dp_feather_v1"),
+            "parallaxBlend": metadata.parallax_blend.as_ref().map(|blend| json!({
+                "backend": "cpu_reference",
+                "classCounts": blend.class_counts,
+                "confidenceHash": blend.confidence_hash,
+                "fallbackReason": blend.fallback_reason,
+                "haloPx": blend.halo_px,
+                "motionCoverageRatio": blend.motion_coverage_ratio,
+                "ownershipHash": blend.ownership_hash,
+                "ownerCounts": blend.owner_counts,
+                "peakTileBufferBytes": blend.peak_tile_buffer_bytes,
+                "pyramidLevels": blend.pyramid_levels,
+                "tileSizePx": blend.tile_size_px,
+            })),
         },
         "seamReview": panorama_seam_review_metadata(metadata),
         "sourceImageRefs": source_refs.iter().map(|source| json!({
@@ -1899,6 +1915,46 @@ fn upsert_panorama_artifact_metadata(
 }
 
 fn panorama_seam_review_metadata(metadata: &PanoramaRenderMetadata) -> serde_json::Value {
+    if let Some(blend) = &metadata.parallax_blend {
+        let overlap_confidence = blend.mean_confidence.clamp(0.0, 1.0);
+        let warning_codes = blend
+            .fallback_reason
+            .iter()
+            .map(|_| "parallax_blend_fallback")
+            .collect::<Vec<_>>();
+        return json!({
+            "confidenceMapArtifactId": blend.confidence_hash,
+            "contributionMapArtifactId": blend.ownership_hash,
+            "motionCoverageRatio": blend.motion_coverage_ratio,
+            "ownershipMaskArtifactId": blend.ownership_hash,
+            "policy": blend.seam_policy,
+            "reviewStatus": if blend.motion_coverage_ratio > 0.0 { "requires_review" } else { "ready" },
+            "seamCount": metadata.connected_source_indices.len().saturating_sub(1),
+            "seamFallbackReason": blend.fallback_reason,
+            "seamMaskArtifactId": blend.ownership_hash,
+            "overlapConfidence": {
+                "edgeCount": metadata.connected_source_indices.len().saturating_sub(1),
+                "level": if overlap_confidence >= 0.75 { "high" } else if overlap_confidence >= 0.45 { "medium" } else { "low" },
+                "meanConfidenceScore": overlap_confidence,
+                "minimumConfidenceScore": overlap_confidence,
+                "minimumOverlapRatio": 0.0,
+                "weakEdgeCount": usize::from(overlap_confidence < 0.45),
+            },
+            "ownershipClassCounts": blend.class_counts,
+            "seams": [],
+            "seamWarningState": {
+                "parallaxRisk": if blend.motion_coverage_ratio > 0.2 { "high" } else if blend.motion_coverage_ratio > 0.0 { "medium" } else { "low" },
+                "state": if blend.fallback_reason.is_some() { "warning" } else { "clear" },
+                "warningCodes": warning_codes,
+            },
+            "tileBlend": {
+                "haloPx": blend.halo_px,
+                "peakBufferBytes": blend.peak_tile_buffer_bytes,
+                "pyramidLevels": blend.pyramid_levels,
+                "tileSizePx": blend.tile_size_px,
+            },
+        });
+    }
     let seams = metadata
         .selected_match_edges
         .iter()
@@ -1937,13 +1993,18 @@ fn panorama_seam_review_metadata(metadata: &PanoramaRenderMetadata) -> serde_jso
 }
 
 fn panorama_source_contribution_metadata(metadata: &PanoramaRenderMetadata) -> serde_json::Value {
+    let owned_total = metadata
+        .parallax_blend
+        .as_ref()
+        .map(|blend| blend.owner_counts.values().sum::<u64>())
+        .unwrap_or(0);
     let stitched_count = metadata.connected_source_indices.len().max(1);
     let mut regions = metadata
         .connected_source_indices
         .iter()
         .map(|source_index| {
             json!({
-                "coverageRatio": 1.0 / stitched_count as f64,
+                "coverageRatio": metadata.parallax_blend.as_ref().and_then(|blend| blend.owner_counts.get(source_index)).map(|count| *count as f64 / owned_total.max(1) as f64).unwrap_or(1.0 / stitched_count as f64),
                 "role": "stitched",
                 "sourceIndex": source_index,
             })
@@ -3446,6 +3507,7 @@ mod tests {
                 spatial_support_cell_count: 8,
                 target_index: 1,
             }],
+            parallax_blend: None,
             reference_source_index: Some(0),
             requested_boundary_mode: PanoramaBoundaryModeOption::AutoCrop,
             requested_projection: PanoramaProjectionOption::Rectilinear,
