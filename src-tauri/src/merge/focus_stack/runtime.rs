@@ -93,6 +93,48 @@ pub(crate) struct FocusStackInputPlan {
     native_blend: Option<NativeBlendReview>,
 }
 
+impl FocusStackInputPlan {
+    pub(crate) fn candidate_identity(&self) -> super::candidate::AcceptedFocusPlanIdentity {
+        super::candidate::AcceptedFocusPlanIdentity {
+            plan_id: self.accepted_dry_run_plan_id.clone(),
+            plan_hash: self.accepted_dry_run_plan_hash.clone(),
+            input_plan_hash: self.input_plan_hash.clone(),
+            width: self.common_geometry.width,
+            height: self.common_geometry.height,
+            reference_source_index: self.reference_source_index,
+            source_hashes: self
+                .sources
+                .iter()
+                .map(|source| source.content_hash.clone())
+                .collect(),
+            graph_revisions: self
+                .sources
+                .iter()
+                .map(|source| source.graph_revision.clone())
+                .collect(),
+            source_order: self
+                .sources
+                .iter()
+                .map(|source| source.path_handle.clone())
+                .collect(),
+            transform_hash: crate::merge::derived_output_provenance::stable_hash(
+                &serde_json::to_value(&self.transforms).unwrap_or(serde_json::Value::Null),
+            ),
+            policy_hash: crate::merge::derived_output_provenance::stable_hash(&serde_json::json!({
+                "focus": self.focus_evidence.as_ref().map(|value| value.algorithm_id),
+                "labels": self.focus_evidence.as_ref().map(|value| value.label_policy_id),
+                "blend": self.native_blend.as_ref().map(|value| value.blend_policy_id),
+                "haloSuppressionStrengthPercent": self.settings.halo_suppression_strength_percent,
+            })),
+            preview_hash: self
+                .native_blend
+                .as_ref()
+                .map(|value| value.preview_hash.clone())
+                .unwrap_or_default(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct FocusEvidence {

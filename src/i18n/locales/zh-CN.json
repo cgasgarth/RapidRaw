@@ -2501,6 +2501,7 @@
       }
     },
     "common": {
+      "cancel": "",
       "savedOutputFullPath": "完整保存输出路径：{{path}}",
       "savedOutputLabel": "已保存输出：{{name}}",
       "sourcePreviewAlt": "源预览"
@@ -2842,6 +2843,7 @@
         "workload": "Workload"
       },
       "preflightTitle": "Preflight",
+      "prepareFullResolution": "",
       "previewBudgetLabel": "Preview budget",
       "previewBudgetValue": "{{value}} px",
       "previewMemoryValue": "{{value}} MB estimated",

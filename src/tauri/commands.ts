@@ -93,6 +93,8 @@ export enum Invokes {
   CancelHdrPlan = 'cancel_hdr_plan',
   CancelFocusStackPlan = 'cancel_focus_stack_plan',
   PlanFocusStack = 'plan_focus_stack',
+  PrepareFocusStackCandidate = 'prepare_focus_stack_candidate',
+  ReadFocusStackJob = 'read_focus_stack_job',
   CancelPanoramaAlignment = 'cancel_panorama_alignment',
   PlanHdr = 'plan_hdr',
   PlanPanorama = 'plan_panorama',

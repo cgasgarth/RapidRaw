@@ -2594,6 +2594,7 @@
       }
     },
     "common": {
+      "cancel": "",
       "savedOutputFullPath": "Full saved output path: {{path}}",
       "savedOutputLabel": "Saved output: {{name}}",
       "sourcePreviewAlt": "Source preview"
@@ -2949,6 +2950,7 @@
         "workload": "Workload"
       },
       "preflightTitle": "Preflight",
+      "prepareFullResolution": "Prepare full resolution",
       "previewBudgetLabel": "Preview budget",
       "previewBudgetValue": "{{value}} px",
       "previewMemoryValue": "{{value}} MB estimated",
