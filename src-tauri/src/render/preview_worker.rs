@@ -342,17 +342,19 @@ fn encode_preview_response(
     );
 
     let step_start = std::time::Instant::now();
-    let mut jpeg_bytes = Encoder::new(Preset::BaselineFastest)
+    let jpeg_bytes = Encoder::new(Preset::BaselineFastest)
         .quality(jpeg_quality)
         .fast_color(true)
         .encode_imgref(img_ref)
         .map_err(|e| format!("Failed to encode preview: {}", e))?;
     #[cfg(target_os = "macos")]
-    if let Some(app) = app_handle
+    let jpeg_bytes = if let Some(app) = app_handle
         && let Ok(icc) = crate::display_profile::active_display_profile_bytes_for_app(app)
     {
-        jpeg_bytes = jpeg_with_icc_profile(&jpeg_bytes, &icc)?;
-    }
+        jpeg_with_icc_profile(&jpeg_bytes, &icc)?
+    } else {
+        jpeg_bytes
+    };
 
     if is_interactive {
         let (rx, ry, roi_w, roi_h) = interactive_geometry
