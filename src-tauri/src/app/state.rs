@@ -154,7 +154,7 @@ pub struct AppState {
     pub ai_state: Mutex<Option<AiState>>,
     pub ai_init_lock: TokioMutex<()>,
     pub export_job: Mutex<Option<ExportJob>>,
-    pub super_resolution_registration_job: Mutex<Option<Arc<AtomicBool>>>,
+    pub computational_merge_jobs: crate::merge::computational_job::ComputationalMergeJobRegistry,
     pub hdr_result: Arc<Mutex<Option<DynamicImage>>>,
     pub hdr_runtime_plan: Arc<Mutex<Option<PendingHdrMergePlan>>>,
     pub hdr_plan_generation: Arc<AtomicUsize>,
@@ -197,7 +197,8 @@ impl AppState {
             ai_state: Mutex::new(None),
             ai_init_lock: TokioMutex::new(()),
             export_job: Mutex::new(None),
-            super_resolution_registration_job: Mutex::new(None),
+            computational_merge_jobs:
+                crate::merge::computational_job::ComputationalMergeJobRegistry::default(),
             hdr_result: Arc::new(Mutex::new(None)),
             hdr_runtime_plan: Arc::new(Mutex::new(None)),
             hdr_plan_generation: Arc::new(AtomicUsize::new(0)),
