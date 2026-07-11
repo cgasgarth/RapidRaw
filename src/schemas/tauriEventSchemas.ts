@@ -46,12 +46,16 @@ export const thumbnailResourceDescriptorSchema = z
 
 export const thumbnailGeneratedPayloadSchema = z
   .object({
+    cacheRevision: z.string().optional(),
+    fromCache: z.boolean().optional(),
+    generation: nonnegativeNumberSchema.optional(),
     is_edited: z.boolean().optional(),
     path: z.string(),
     rating: z.number().optional(),
     resource: thumbnailResourceDescriptorSchema,
     smartPreview: thumbnailSmartPreviewPayloadSchema.optional().nullable(),
     smartPreviewResource: thumbnailResourceDescriptorSchema.optional().nullable(),
+    sourceRevision: z.string().optional().nullable(),
   })
   .loose();
 
