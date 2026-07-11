@@ -15,6 +15,7 @@ use serde_json::json;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Instant;
 use tauri::{AppHandle, Emitter, Runtime};
 use uuid::Uuid;
@@ -22,7 +23,7 @@ use uuid::Uuid;
 use crate::formats::is_raw_file;
 use crate::image_processing::apply_cpu_default_raw_processing;
 use crate::image_processing::{ImageMetadata, RawEngineArtifacts};
-use crate::panorama_utils::{processing, stitching};
+use crate::panorama_utils::{alignment_plan, processing, stitching};
 
 pub const BRIEF_DESCRIPTOR_SIZE: usize = 256;
 pub type Descriptor = [u8; BRIEF_DESCRIPTOR_SIZE / 8];
@@ -371,6 +372,7 @@ pub struct PanoramaPlanEngineCapabilities {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PanoramaPlanResult {
+    pub alignment_plan: Option<alignment_plan::CalibratedAlignmentPlan>,
     pub dry_run: bool,
     pub family: String,
     pub mutates: bool,
@@ -379,6 +381,10 @@ pub struct PanoramaPlanResult {
     pub source_image_refs: Vec<PanoramaPlanSourceRef>,
     pub warnings: Vec<String>,
 }
+
+static PANORAMA_ALIGNMENT_CANCELLATIONS: LazyLock<
+    Mutex<HashMap<String, Arc<alignment_plan::AlignmentCancellation>>>,
+> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 pub trait PanoramaRenderEngine {
     fn render(
@@ -430,6 +436,7 @@ pub async fn plan_panorama(
     paths: Vec<String>,
     memory_budget_bytes: Option<u64>,
     max_preview_dimension_px: Option<u32>,
+    cancellation_id: Option<String>,
     app_handle: tauri::AppHandle,
 ) -> Result<PanoramaPlanResult, String> {
     if paths.len() < 2 {
@@ -451,19 +458,55 @@ pub async fn plan_panorama(
         return Err("Panorama preview dimension must be greater than zero.".to_string());
     }
 
+    let cancellation_id = cancellation_id.unwrap_or_else(|| Uuid::new_v4().to_string());
+    let cancellation = Arc::new(alignment_plan::AlignmentCancellation::default());
+    PANORAMA_ALIGNMENT_CANCELLATIONS
+        .lock()
+        .unwrap()
+        .insert(cancellation_id.clone(), cancellation.clone());
     let task = tokio::task::spawn_blocking(move || {
-        let sources = load_panorama_source_metadata_for_plan(&source_paths, &app_handle)?;
-        Ok(estimate_panorama_plan_from_sources(
+        let (sources, images) = load_panorama_sources_for_plan(&source_paths, &app_handle)?;
+        let alignment_plan = alignment_plan::build_calibrated_alignment_plan(
+            &source_paths,
+            &images,
+            &cancellation,
+            |stage| {
+                let _ = app_handle.emit(
+                    crate::events::PANORAMA_PROGRESS,
+                    format!("alignment:{stage}"),
+                );
+            },
+        )?;
+        let plan = estimate_panorama_plan_from_sources(
             sources,
             memory_budget,
             preview_dimension,
-        ))
+            Some(alignment_plan),
+        );
+        Ok(plan)
     });
 
-    match task.await {
+    let result = match task.await {
         Ok(result) => result,
         Err(join_err) => Err(format!("Panorama plan task failed: {}", join_err)),
-    }
+    };
+    PANORAMA_ALIGNMENT_CANCELLATIONS
+        .lock()
+        .unwrap()
+        .remove(&cancellation_id);
+    result
+}
+
+#[tauri::command]
+pub fn cancel_panorama_alignment(cancellation_id: String) -> bool {
+    PANORAMA_ALIGNMENT_CANCELLATIONS
+        .lock()
+        .unwrap()
+        .get(&cancellation_id)
+        .is_some_and(|token| {
+            token.cancel();
+            true
+        })
 }
 
 #[tauri::command]
@@ -685,43 +728,34 @@ fn build_panorama_source_geometry_metadata(
     }
 }
 
-fn load_panorama_source_metadata_for_plan(
+fn load_panorama_sources_for_plan(
     image_paths: &[String],
     app_handle: &AppHandle,
-) -> Result<Vec<PanoramaSourceMetadata>, String> {
+) -> Result<(Vec<PanoramaSourceMetadata>, Vec<DynamicImage>), String> {
     let settings = load_settings_or_default(app_handle);
-
-    image_paths
-        .iter()
-        .enumerate()
-        .map(|(index, filename)| {
-            let (width, height) = match image::image_dimensions(filename) {
-                Ok(dimensions) => dimensions,
-                Err(_) => {
-                    let file_bytes = fs::read(filename)
-                        .map_err(|e| format!("Failed to read image {}: {}", filename, e))?;
-                    let dynamic_image = crate::image_loader::load_base_image_from_bytes(
-                        &file_bytes,
-                        filename,
-                        false,
-                        &settings,
-                        None,
-                    )
-                    .map_err(|e| format!("Failed to load image {}: {}", filename, e))?;
-
-                    dynamic_image.dimensions()
-                }
-            };
-
-            Ok(PanoramaSourceMetadata {
-                global_transform_3x3: None,
-                height,
-                index,
-                path: filename.clone(),
-                width,
-            })
-        })
-        .collect()
+    let mut sources = Vec::with_capacity(image_paths.len());
+    let mut images = Vec::with_capacity(image_paths.len());
+    for (index, filename) in image_paths.iter().enumerate() {
+        let bytes =
+            fs::read(filename).map_err(|e| format!("Failed to read image {}: {}", filename, e))?;
+        let mut image = crate::image_loader::load_base_image_from_bytes(
+            &bytes, filename, false, &settings, None,
+        )
+        .map_err(|e| format!("Failed to load image {}: {}", filename, e))?;
+        if is_raw_file(filename) {
+            apply_cpu_default_raw_processing(&mut image);
+        }
+        let (width, height) = image.dimensions();
+        sources.push(PanoramaSourceMetadata {
+            global_transform_3x3: None,
+            height,
+            index,
+            path: filename.clone(),
+            width,
+        });
+        images.push(image);
+    }
+    Ok((sources, images))
 }
 
 #[tauri::command]
@@ -1942,6 +1976,7 @@ fn estimate_panorama_plan_from_sources(
     sources: Vec<PanoramaSourceMetadata>,
     memory_budget_bytes: u64,
     max_preview_dimension_px: u32,
+    alignment_plan: Option<alignment_plan::CalibratedAlignmentPlan>,
 ) -> PanoramaPlanResult {
     let output_width = sources
         .iter()
@@ -2001,6 +2036,7 @@ fn estimate_panorama_plan_from_sources(
     };
 
     PanoramaPlanResult {
+        alignment_plan,
         dry_run: true,
         family: "panorama".to_string(),
         mutates: false,
@@ -3097,7 +3133,7 @@ mod tests {
 
     #[test]
     fn estimate_panorama_plan_accepts_renderable_memory_budget() {
-        let plan = estimate_panorama_plan_from_sources(sample_plan_sources(), 1_000_000, 800);
+        let plan = estimate_panorama_plan_from_sources(sample_plan_sources(), 1_000_000, 800, None);
 
         assert!(plan.dry_run);
         assert!(!plan.mutates);
@@ -3131,7 +3167,7 @@ mod tests {
 
     #[test]
     fn estimate_panorama_plan_warns_near_memory_budget() {
-        let plan = estimate_panorama_plan_from_sources(sample_plan_sources(), 400_000, 800);
+        let plan = estimate_panorama_plan_from_sources(sample_plan_sources(), 400_000, 800, None);
 
         assert_eq!(plan.preflight.status, "warning");
         assert_eq!(plan.preflight.execution_mode, "full_frame_legacy");
@@ -3145,7 +3181,7 @@ mod tests {
 
     #[test]
     fn estimate_panorama_plan_blocks_over_memory_budget_without_rendering() {
-        let plan = estimate_panorama_plan_from_sources(sample_plan_sources(), 300_000, 800);
+        let plan = estimate_panorama_plan_from_sources(sample_plan_sources(), 300_000, 800, None);
 
         assert_eq!(plan.preflight.status, "blocked_plan_only");
         assert_eq!(plan.preflight.execution_mode, "plan_only");

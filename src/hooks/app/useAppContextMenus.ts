@@ -727,6 +727,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               onClick: () => {
                 setUI({
                   panoramaModalState: {
+                    alignmentCancellationId: null,
                     error: null,
                     finalImageBase64: null,
                     isOpen: true,
