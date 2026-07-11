@@ -273,27 +273,33 @@ const FakeHistogramLoader = () => {
 
 const useRawRgbaCanvas = (
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
-  base64Data: string,
+  resourceUrl: string,
   width: number,
   height: number,
 ) => {
   useEffect(() => {
-    if (!base64Data || !canvasRef.current || !width || !height) return;
+    if (!resourceUrl || !canvasRef.current || !width || !height) return;
 
     const ctx = canvasRef.current.getContext('2d');
     if (!ctx) return;
 
     ctx.imageSmoothingEnabled = false;
 
-    const binary = atob(base64Data);
-    const bytes = new Uint8ClampedArray(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      bytes[i] = binary.charCodeAt(i);
-    }
-
-    const imageData = new ImageData(bytes, width, height);
-    ctx.putImageData(imageData, 0, 0);
-  }, [base64Data, width, height, canvasRef]);
+    const abort = new AbortController();
+    void fetch(resourceUrl, { signal: abort.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error(`Analytics resource failed: ${response.status}`);
+        return response.arrayBuffer();
+      })
+      .then((buffer) => {
+        if (buffer.byteLength !== width * height * 4 || abort.signal.aborted) return;
+        ctx.putImageData(new ImageData(new Uint8ClampedArray(buffer), width, height), 0, 0);
+      })
+      .catch((error: unknown) => {
+        if (!abort.signal.aborted) console.error('Failed to load analytics resource', error);
+      });
+    return () => abort.abort();
+  }, [resourceUrl, width, height, canvasRef]);
 };
 
 const WaveformCanvas = ({

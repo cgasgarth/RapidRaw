@@ -52,7 +52,6 @@ use std::io::Write;
 use std::panic;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
-use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
 
 use std::borrow::Cow;
@@ -370,42 +369,19 @@ async fn update_wgpu_transform(
 
 fn start_analytics_worker(app_handle: tauri::AppHandle) {
     let state = app_handle.state::<AppState>();
-    let (tx, rx): (Sender<AnalyticsJob>, Receiver<AnalyticsJob>) = mpsc::channel();
-    *state.analytics_worker_tx.lock().unwrap() = Some(tx);
+    let scheduler = analytics_scheduler::AnalyticsScheduler::new();
+    *state.analytics_scheduler.lock().unwrap() = Some(Arc::clone(&scheduler));
 
     std::thread::spawn(move || {
-        while let Ok(mut job) = rx.recv() {
-            while let Ok(latest) = rx.try_recv() {
-                job = latest;
-            }
-
-            if let Ok(histogram_data) = image_analytics::calculate_histogram_from_image(&job.image)
-            {
-                let _ = app_handle.emit(
-                    crate::events::HISTOGRAM_UPDATE,
-                    serde_json::json!({ "path": job.path, "data": histogram_data }),
-                );
-            }
-
-            if let Ok(gamut_warning_data) =
-                image_analytics::calculate_gamut_warning_overlay_from_image(&job.image)
-            {
-                let _ = app_handle.emit(
-                    crate::events::GAMUT_WARNING_UPDATE,
-                    serde_json::json!({ "path": job.path, "data": gamut_warning_data }),
-                );
-            }
-
-            if job.compute_waveform
-                && let Ok(waveform_data) = image_analytics::calculate_waveform_from_image(
-                    &job.image,
-                    job.active_waveform_channel.as_deref(),
-                )
-            {
-                let _ = app_handle.emit(
-                    crate::events::WAVEFORM_UPDATE,
-                    serde_json::json!({ "path": job.path, "data": waveform_data }),
-                );
+        while let Some(job) = scheduler.next() {
+            let id = job.frame_id;
+            let result = image_analytics::calculate(&job, || scheduler.is_current(id));
+            let current = scheduler.is_current(id);
+            if current && let Ok(result) = result {
+                let _ = app_handle.emit(crate::events::ANALYTICS_RESULT, result);
+                scheduler.finish(true);
+            } else {
+                scheduler.finish(false);
             }
         }
     });
@@ -608,13 +584,21 @@ fn generate_export_soft_proof_preview(
     }
 
     if let Some(proof_image) = proof_image
-        && let Some(sender) = state.analytics_worker_tx.lock().unwrap().clone()
+        && let Some(scheduler) = state.analytics_scheduler.lock().unwrap().clone()
     {
-        let _ = sender.send(AnalyticsJob {
+        let _ = scheduler.submit(AnalyticsJob {
             path: loaded_image.path,
+            frame_id: AnalyticsFrameId::default(),
             image: Arc::new(proof_image),
-            compute_waveform: request.compute_waveform,
+            products: AnalyticsProducts::HISTOGRAM
+                | AnalyticsProducts::GAMUT_MASK
+                | if request.compute_waveform {
+                    AnalyticsProducts::all()
+                } else {
+                    AnalyticsProducts::empty()
+                },
             active_waveform_channel: request.active_waveform_channel,
+            policy: AnalyticsSamplingPolicy::default(),
         });
     }
 
@@ -2908,6 +2892,9 @@ pub fn run() {
     builder
         .register_uri_scheme_protocol(thumbnail_resources::THUMBNAIL_PROTOCOL, |context, request| {
             thumbnail_resources::protocol_response(context.app_handle(), request.uri())
+        })
+        .register_uri_scheme_protocol(analytics_resources::ANALYTICS_PROTOCOL, |_context, request| {
+            analytics_resources::protocol_response(request.uri())
         })
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_fs::init())
