@@ -187,7 +187,7 @@ impl ThumbnailScheduler {
         if request.generation < state.active_generation {
             return Err("thumbnail_generation_stale");
         }
-        if request.replace_pending || request.generation > state.active_generation {
+        if request.generation > state.active_generation {
             for item in state.in_flight.values() {
                 item.job.cancellation.cancel();
             }
@@ -198,6 +198,11 @@ impl ThumbnailScheduler {
                 generation: request.generation,
                 ..Default::default()
             };
+        } else if request.replace_pending {
+            // A viewport reprioritization replaces work not yet claimed while
+            // allowing already-running jobs from this generation to finish.
+            state.pending_by_path.clear();
+            state.heap.clear();
         }
         for spec in request.requests {
             let path: Arc<str> = Arc::from(spec.path.trim());

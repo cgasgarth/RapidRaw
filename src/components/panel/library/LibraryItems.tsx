@@ -25,7 +25,6 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useLibraryImage } from '../../../hooks/library/useLibraryImage';
 import type { LibraryLayoutIndex } from '../../../library/buildLibraryLayoutIndex';
-import { useProcessStore } from '../../../store/useProcessStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useThumbnail, useThumbnailSmartPreview } from '../../../thumbnails/useThumbnail';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
@@ -96,7 +95,6 @@ export interface LibraryRowProps {
   outerPadding: number;
   gap: number;
   isListView: boolean;
-  queueThumbnailRequest: (path: string) => void;
   onToggleRecursiveFolder: (path: string) => void;
   onToggleAutoStack: (stackId: string) => void;
 }
@@ -746,6 +744,7 @@ const ListItemComponent = ({
       onKeyDown={handleKeyDown}
       role="button"
       tabIndex={0}
+      data-image-path={path}
     >
       <div
         style={columnWidthStyle('thumbnail')}
@@ -902,21 +901,11 @@ const RowComponent = ({
   outerPadding,
   gap,
   isListView,
-  queueThumbnailRequest,
   onToggleRecursiveFolder,
   onToggleAutoStack,
 }: LibraryRowProps) => {
   const { t } = useTranslation();
   const row = layoutIndex.getRow(index);
-
-  useEffect(() => {
-    if (row?.type === 'item-range') {
-      for (let slot = 0; slot < row.count; slot += 1) {
-        const item = layoutIndex.getItem(row, slot);
-        if (item) queueThumbnailRequest(item.path);
-      }
-    }
-  }, [layoutIndex, row, queueThumbnailRequest]);
 
   if (!row || row.type === 'footer') return null;
 

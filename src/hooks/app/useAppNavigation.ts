@@ -65,6 +65,7 @@ interface NavigationSettings extends AppSettings {
 
 export interface AppNavigationProps {
   clearThumbnailQueue: () => void;
+  invalidateThumbnails: (paths: readonly string[]) => void;
   requestThumbnails: (paths: string[]) => void;
   refs: {
     transformWrapperRef: RefObject<TransformController | null>;
@@ -90,7 +91,12 @@ const resolveRestoredFolderPath = (trees: FolderTree[], preferredPath: string | 
   return folderTreeContainsPath(trees, fallbackPath) ? fallbackPath : (trees[0]?.path ?? fallbackPath);
 };
 
-export function useAppNavigation({ clearThumbnailQueue, requestThumbnails, refs }: AppNavigationProps) {
+export function useAppNavigation({
+  clearThumbnailQueue,
+  invalidateThumbnails,
+  requestThumbnails,
+  refs,
+}: AppNavigationProps) {
   const {
     transformWrapperRef,
     preloadedDataRef,
@@ -489,7 +495,7 @@ export function useAppNavigation({ clearThumbnailQueue, requestThumbnails, refs 
           invalidatedPaths.forEach((pathToInvalidate) => {
             globalImageCache.delete(pathToInvalidate);
           });
-          requestThumbnails([...refreshReconciliation.addedPaths, ...refreshReconciliation.changedPaths]);
+          invalidateThumbnails([...refreshReconciliation.addedPaths, ...refreshReconciliation.changedPaths]);
           setLibrary({
             libraryActivePath: refreshReconciliation.nextLibraryActivePath,
             multiSelectedPaths: refreshReconciliation.nextMultiSelectedPaths,
@@ -547,7 +553,7 @@ export function useAppNavigation({ clearThumbnailQueue, requestThumbnails, refs 
         useLibraryStore.getState().setLibrary({ isViewLoading: false });
       }
     },
-    [clearThumbnailQueue, requestThumbnails],
+    [clearThumbnailQueue, invalidateThumbnails, requestThumbnails],
   );
 
   const handleSelectAlbum = useCallback(

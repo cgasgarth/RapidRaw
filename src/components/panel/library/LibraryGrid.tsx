@@ -5,21 +5,21 @@ import {
   type MouseEvent as ReactMouseEvent,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { List, useListCallbackRef } from 'react-window';
+import type { ThumbnailViewportUpdate } from '../../../hooks/library/useThumbnails';
 import { buildLibraryLayoutIndex, type LibraryLayoutIndex } from '../../../library/buildLibraryLayoutIndex';
 import {
   buildLibrarySemanticIndex,
   buildLibraryVisibleSemanticIndex,
 } from '../../../library/buildLibrarySemanticIndex';
 import { useLibraryStore } from '../../../store/useLibraryStore';
-import { useProcessStore } from '../../../store/useProcessStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
-import { thumbnailCache } from '../../../thumbnails/thumbnailCacheInstance';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { debounce } from '../../../utils/timing';
 import {
@@ -32,7 +32,6 @@ import {
   ThumbnailSize,
 } from '../../ui/AppProperties';
 import UiText from '../../ui/primitives/Text';
-
 import type { ColumnWidths } from '../MainLibrary';
 import { type LibraryRowProps, Row } from './LibraryItems';
 import {
@@ -42,6 +41,14 @@ import {
   LIBRARY_COLUMN_KEYS,
   normalizedColumnPercentages,
 } from './libraryColumnWidths';
+import {
+  captureLibraryViewportAnchor,
+  classifyLibraryLayoutChange,
+  findLibraryPathRow,
+  getLibraryRowHeight,
+  type LibraryLayoutSnapshot,
+  resolveLibraryViewportAnchor,
+} from './libraryViewport';
 import { useLibraryColumnResize } from './useLibraryColumnResize';
 
 type HeaderSortKey = SortCriteria['key'];
@@ -103,7 +110,7 @@ interface LibraryGridProps {
   onImageClick: (path: string, event: ReactMouseEvent<HTMLElement> | React.KeyboardEvent<HTMLElement>) => void;
   onImageDoubleClick: (path: string) => void;
   thumbnailAspectRatio: ThumbnailAspectRatio;
-  onRequestThumbnails?: (paths: string[]) => void;
+  onThumbnailViewportChange?: (demand: ThumbnailViewportUpdate) => void;
   thumbnailSizeOptions: ThumbnailSizeOption[];
   onThumbnailSizeChange: (size: ThumbnailSize) => void;
   onClearSelection: () => void;
@@ -113,6 +120,17 @@ interface LibraryGridProps {
 const VirtualizedRow = ({ ariaAttributes: _ariaAttributes, ...rowProps }: VirtualizedRowProps): React.ReactElement => (
   <Row {...rowProps} />
 );
+
+const imageListRevisions = new WeakMap<readonly ImageFile[], number>();
+let nextImageListRevision = 1;
+
+const getImageListRevision = (imageList: readonly ImageFile[]): number => {
+  const existing = imageListRevisions.get(imageList);
+  if (existing !== undefined) return existing;
+  const revision = nextImageListRevision++;
+  imageListRevisions.set(imageList, revision);
+  return revision;
+};
 
 function HeaderColumn({
   resize,
@@ -301,11 +319,16 @@ export default function LibraryGrid(props: LibraryGridProps) {
     onImageClick,
     onImageDoubleClick,
     thumbnailAspectRatio,
-    onRequestThumbnails,
+    onThumbnailViewportChange,
     thumbnailSizeOptions,
     onThumbnailSizeChange,
   } = props;
-  const { listColumnWidths, setLibrary, setListColumnWidths, sortCriteria, setSortCriteria } = useLibraryStore();
+  const listColumnWidths = useLibraryStore((state) => state.listColumnWidths);
+  const setLibrary = useLibraryStore((state) => state.setLibrary);
+  const setListColumnWidths = useLibraryStore((state) => state.setListColumnWidths);
+  const sortCriteria = useLibraryStore((state) => state.sortCriteria);
+  const setSortCriteria = useLibraryStore((state) => state.setSortCriteria);
+  const librarySessionId = useLibraryStore((state) => state.rootPaths.join('\u0000'));
   const [gridSize, setGridSize] = useState({ height: 0, width: 0 });
   const [listHandle, setListHandle] = useListCallbackRef();
   const [collapsedRecursiveFolders, setCollapsedRecursiveFolders] = useState<Set<string>>(new Set());
@@ -313,8 +336,13 @@ export default function LibraryGrid(props: LibraryGridProps) {
   const libraryContainerRef = useRef<HTMLDivElement>(null);
   const gridObserverRef = useRef<ResizeObserver | null>(null);
   const loadedThumbnailsRef = useRef(new Set<string>());
-  const requestQueueRef = useRef<Set<string>>(new Set());
-  const requestTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const focusedPathRef = useRef<string | null>(null);
+  const scrollSampleRef = useRef({
+    top: 0,
+    at: performance.now(),
+    direction: 'idle' as 'forward' | 'backward' | 'idle',
+    velocity: 0,
+  });
   const exifOverlay = useSettingsStore((s) => s.appSettings?.exifOverlay || ExifOverlay.Off);
   const visibleColumns = exifOverlay === ExifOverlay.Off ? CORE_LIBRARY_COLUMN_KEYS : LIBRARY_COLUMN_KEYS;
   const columnResize = useLibraryColumnResize({
@@ -392,25 +420,6 @@ export default function LibraryGrid(props: LibraryGridProps) {
     [handleScroll],
   );
 
-  const queueThumbnailRequest = useCallback(
-    (path: string) => {
-      if (!onRequestThumbnails) return;
-      if (thumbnailCache.has(path)) return;
-      requestQueueRef.current.add(path);
-      if (!requestTimeoutRef.current) {
-        requestTimeoutRef.current = setTimeout(() => {
-          const paths = Array.from(requestQueueRef.current);
-          if (paths.length > 0) {
-            onRequestThumbnails(paths);
-            requestQueueRef.current.clear();
-          }
-          requestTimeoutRef.current = null;
-        }, 50);
-      }
-    },
-    [onRequestThumbnails],
-  );
-
   const handleToggleRecursiveFolder = useCallback((path: string) => {
     setCollapsedRecursiveFolders((prev) => {
       const next = new Set(prev);
@@ -448,15 +457,13 @@ export default function LibraryGrid(props: LibraryGridProps) {
     [semanticIndex, expandedAutoStackIds, libraryViewMode],
   );
 
-  const gridData = useMemo<GridData | null>(() => {
-    if (gridSize.width === 0 || imageList.length === 0) return null;
-
+  const gridData = useMemo<GridData>(() => {
     const isListView = thumbnailSize === ThumbnailSize.List;
     const OUTER_PADDING = isListView ? 0 : 12;
     const ITEM_GAP = isListView ? 0 : 12;
     const minThumbWidth = thumbnailSizeOptions.find((option) => option.id === thumbnailSize)?.size || 240;
 
-    const availableWidth = gridSize.width - OUTER_PADDING * 2;
+    const availableWidth = Math.max(0, gridSize.width - OUTER_PADDING * 2);
     const columnCount = isListView
       ? 1
       : Math.max(1, Math.floor((availableWidth + ITEM_GAP) / (minThumbWidth + ITEM_GAP)));
@@ -498,21 +505,101 @@ export default function LibraryGrid(props: LibraryGridProps) {
     visibleSemanticIndex,
   ]);
 
-  useEffect(() => {
-    if (!listHandle?.element || !gridData) return;
+  const layoutContentRevision = useMemo(
+    () => ({ visibleSemanticIndex, collapsedRecursiveFolders, libraryViewMode }),
+    [visibleSemanticIndex, collapsedRecursiveFolders, libraryViewMode],
+  );
 
-    const savedTop = useLibraryStore.getState().libraryScrollTop;
-    const element = listHandle.element as HTMLElement;
+  const layoutSnapshot = useMemo<LibraryLayoutSnapshot>(
+    () => ({
+      layoutIndex: gridData.layoutIndex,
+      rowHeight: gridData.rowHeight,
+      headerHeight: gridData.headerHeight,
+      footerHeight: gridData.isListView ? 24 : gridData.OUTER_PADDING,
+      contentRevision: layoutContentRevision,
+      // Folder navigation changes membership; replacing the configured roots starts a new session.
+      sessionId: librarySessionId,
+    }),
+    [gridData, layoutContentRevision, librarySessionId],
+  );
+  const layoutSnapshotRef = useRef(layoutSnapshot);
+  layoutSnapshotRef.current = layoutSnapshot;
+  const rowHeight = useMemo(
+    () => (index: number) => getLibraryRowHeight(layoutSnapshotRef.current, index),
+    [layoutSnapshot.rowHeight, layoutSnapshot.headerHeight, layoutSnapshot.footerHeight],
+  );
+  const previousLayoutRef = useRef(layoutSnapshot);
+  const didRestoreSessionScrollRef = useRef(false);
+  const focusRestoreFrameRef = useRef<number | null>(null);
+  const viewportContextKey = useMemo(() => {
+    return `${currentFolderPath ?? ''}:${thumbnailSize}:${thumbnailAspectRatio}:${getImageListRevision(imageList)}`;
+  }, [currentFolderPath, imageList, thumbnailAspectRatio, thumbnailSize]);
 
-    if (savedTop > 0) {
-      element.scrollTo({ top: savedTop });
+  useLayoutEffect(() => {
+    const element = listHandle?.element;
+    if (!element) return;
+    if (!didRestoreSessionScrollRef.current) {
+      didRestoreSessionScrollRef.current = true;
+      element.scrollTo({ top: useLibraryStore.getState().libraryScrollTop });
+      previousLayoutRef.current = layoutSnapshot;
+      return;
     }
-  }, [listHandle, currentFolderPath, gridData]);
+
+    const previous = previousLayoutRef.current;
+    previousLayoutRef.current = layoutSnapshot;
+    const change = classifyLibraryLayoutChange(previous, layoutSnapshot);
+    if (change === 'dimensions-only') return;
+    if (change === 'session-replaced') {
+      element.scrollTo({ top: useLibraryStore.getState().libraryScrollTop, behavior: 'instant' });
+      return;
+    }
+
+    const activeElement = document.activeElement;
+    const focusedPath =
+      activeElement instanceof HTMLElement && element.contains(activeElement)
+        ? (activeElement.closest<HTMLElement>('[data-image-path]')?.getAttribute('data-image-path') ?? null)
+        : activeElement === document.body
+          ? focusedPathRef.current
+          : null;
+    const preferredPath = change === 'order-or-membership' ? activePath : null;
+    const anchor = captureLibraryViewportAnchor(previous, element.scrollTop, preferredPath);
+    const maxScrollTop = Math.max(0, element.scrollHeight - element.clientHeight);
+    element.scrollTo({ top: resolveLibraryViewportAnchor(layoutSnapshot, anchor, maxScrollTop), behavior: 'instant' });
+
+    if (focusedPath) {
+      const focusPath =
+        findLibraryPathRow(layoutSnapshot, focusedPath) >= 0
+          ? focusedPath
+          : activePath && findLibraryPathRow(layoutSnapshot, activePath) >= 0
+            ? activePath
+            : null;
+      if (focusRestoreFrameRef.current !== null) cancelAnimationFrame(focusRestoreFrameRef.current);
+      focusRestoreFrameRef.current = requestAnimationFrame(() => {
+        focusRestoreFrameRef.current = null;
+        const candidates = element.querySelectorAll<HTMLElement>('[data-image-path]');
+        for (const candidate of candidates) {
+          if (candidate.getAttribute('data-image-path') === focusPath) {
+            candidate.focus({ preventScroll: true });
+            focusedPathRef.current = focusPath;
+            break;
+          }
+        }
+        if (!focusPath) element.focus({ preventScroll: true });
+      });
+    }
+  }, [activePath, layoutSnapshot, listHandle]);
+
+  useEffect(
+    () => () => {
+      if (focusRestoreFrameRef.current !== null) cancelAnimationFrame(focusRestoreFrameRef.current);
+    },
+    [],
+  );
 
   const prevActivePath = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!listHandle?.element || !gridData || multiSelectedPaths.length > 1) {
+    if (!listHandle?.element || multiSelectedPaths.length > 1) {
       prevActivePath.current = activePath;
       return;
     }
@@ -570,7 +657,6 @@ export default function LibraryGrid(props: LibraryGridProps) {
       outerPadding: gridData?.OUTER_PADDING ?? 0,
       gap: gridData?.ITEM_GAP ?? 0,
       isListView: gridData?.isListView ?? false,
-      queueThumbnailRequest,
       onToggleRecursiveFolder: handleToggleRecursiveFolder,
       onToggleAutoStack: handleToggleAutoStack,
     };
@@ -584,29 +670,12 @@ export default function LibraryGrid(props: LibraryGridProps) {
     thumbnailAspectRatio,
     handleImageLoad,
     currentFolderPath,
-    queueThumbnailRequest,
     handleToggleRecursiveFolder,
     handleToggleAutoStack,
     visibleSemanticIndex,
     collapsedRecursiveFolders,
     libraryViewMode,
   ]);
-
-  if (!gridData) {
-    return (
-      <div
-        ref={libraryContainerRef}
-        className="flex-1 w-full h-full"
-        role="presentation"
-        onClick={props.onClearSelection}
-        onContextMenu={props.onEmptyAreaContextMenu}
-      />
-    );
-  }
-
-  const getItemSize = (index: number) => {
-    return gridData.layoutIndex.getRowHeight(index);
-  };
 
   const handleHeaderSort = (key: HeaderSortKey) => {
     props.onClearSelection();
@@ -628,6 +697,12 @@ export default function LibraryGrid(props: LibraryGridProps) {
       className={`flex-1 w-full h-full ${columnResize.isResizing ? 'cursor-col-resize' : ''}`}
       data-library-column-resizing={columnResize.isResizing || undefined}
       role="presentation"
+      onFocusCapture={(event) => {
+        if (event.target instanceof HTMLElement) {
+          focusedPathRef.current =
+            event.target.closest<HTMLElement>('[data-image-path]')?.getAttribute('data-image-path') ?? null;
+        }
+      }}
       onClick={props.onClearSelection}
       onContextMenu={props.onEmptyAreaContextMenu}
     >
@@ -644,11 +719,61 @@ export default function LibraryGrid(props: LibraryGridProps) {
           <List<RowRendererProps>
             listRef={setListHandle}
             rowCount={gridData.layoutIndex.rows.length}
-            rowHeight={getItemSize}
+            rowHeight={rowHeight}
             onScroll={(e: React.UIEvent<HTMLElement>) => {
-              handleScroll(e.currentTarget.scrollTop);
+              const now = performance.now();
+              const top = e.currentTarget.scrollTop;
+              const previous = scrollSampleRef.current;
+              const delta = top - previous.top;
+              scrollSampleRef.current = {
+                top,
+                at: now,
+                direction: delta > 0 ? 'forward' : delta < 0 ? 'backward' : previous.direction,
+                velocity: Math.abs(delta) / Math.max(1, now - previous.at),
+              };
+              handleScroll(top);
+            }}
+            overscanCount={3}
+            onRowsRendered={(visibleRows, allRows) => {
+              if (!onThumbnailViewportChange) return;
+              const rowPaths = (start: number, stop: number) => {
+                const paths: string[] = [];
+                for (let rowIndex = Math.max(0, start); rowIndex <= stop; rowIndex += 1) {
+                  const row = gridData.layoutIndex.getRow(rowIndex);
+                  if (row?.type !== 'item-range') continue;
+                  for (let slot = 0; slot < row.count; slot += 1) {
+                    const path = gridData.layoutIndex.getItem(row, slot)?.path;
+                    if (path) paths.push(path);
+                  }
+                }
+                return paths;
+              };
+              const visiblePaths = rowPaths(visibleRows.startIndex, visibleRows.stopIndex);
+              const before = rowPaths(allRows.startIndex, visibleRows.startIndex - 1).reverse();
+              const after = rowPaths(visibleRows.stopIndex + 1, allRows.stopIndex);
+              const { direction, velocity } = scrollSampleRef.current;
+              const overscanPaths = direction === 'backward' ? [...before, ...after] : [...after, ...before];
+              const lookaheadRows = Math.min(6, Math.max(1, Math.ceil(velocity * 2)));
+              const lookaheadPaths =
+                direction === 'backward'
+                  ? rowPaths(Math.max(0, allRows.startIndex - lookaheadRows), allRows.startIndex - 1).reverse()
+                  : direction === 'forward'
+                    ? rowPaths(
+                        allRows.stopIndex + 1,
+                        Math.min(gridData.layoutIndex.rows.length - 1, allRows.stopIndex + lookaheadRows),
+                      )
+                    : [];
+              onThumbnailViewportChange({
+                contextKey: viewportContextKey,
+                visiblePaths,
+                overscanPaths,
+                lookaheadPaths,
+                direction,
+                velocityPxPerMs: velocity,
+              });
             }}
             className="custom-scrollbar"
+            tabIndex={-1}
             rowComponent={VirtualizedRow}
             rowProps={memoizedRowProps}
           />
