@@ -1,7 +1,7 @@
 import { z } from 'zod';
-
 import { createAppServerCommandSchemasV1 } from './appServerCommandSchemas.js';
 import { artifactHandleV1Schema } from './artifactSchemas.js';
+import { brushMaskV1Schema } from './brushMaskV1.js';
 import { panoramaHomographyDltDiagnosticsV1Schema } from './panorama/panoramaHomographyDiagnostics.js';
 import { createToneColorSchemasV1 } from './toneColorSchemas.js';
 
@@ -2150,6 +2150,7 @@ export const layerMaskCommandEnvelopeV1Schema = z
         commandType: z.literal('layerMask.attachMask'),
         parameters: z
           .object({
+            brushMask: brushMaskV1Schema,
             layerId: z.string().trim().min(1),
             maskId: z.string().trim().min(1),
             replaceExisting: z.boolean(),
