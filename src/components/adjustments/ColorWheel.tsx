@@ -2,7 +2,7 @@ import { type ColorResult, type HsvaColor, hsvaToHex } from '@uiw/color-convert'
 import Wheel from '@uiw/react-color-wheel';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Sun } from 'lucide-react';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TextColors, TextVariants } from '../../types/typography';
 import type { HueSatLum } from '../../utils/adjustments';
@@ -16,6 +16,85 @@ interface ColorWheelProps {
   value: HueSatLum;
   onDragStateChange?: ((isDragging: boolean) => void) | undefined;
   isExpanded?: boolean | undefined;
+}
+
+export type ColorWheelSliderSource = 'hue' | 'luminance' | 'saturation';
+
+export interface ColorWheelInteractionState {
+  wheel: boolean;
+  sliderCount: number;
+}
+
+interface ColorWheelInteractionController {
+  activate: () => void;
+  dispose: () => void;
+  finish: () => void;
+  getState: () => ColorWheelInteractionState;
+  setSlider: (source: ColorWheelSliderSource, active: boolean) => void;
+  startWheel: () => void;
+}
+
+export function createColorWheelInteractionController(
+  onTransition: (state: ColorWheelInteractionState) => void,
+  onAggregateChange: (active: boolean) => void,
+): ColorWheelInteractionController {
+  let state: ColorWheelInteractionState = { sliderCount: 0, wheel: false };
+  let disposed = false;
+  const sliders = new Set<ColorWheelSliderSource>();
+  const commit = (next: ColorWheelInteractionState) => {
+    if (disposed) return;
+    const wasActive = state.wheel || state.sliderCount > 0;
+    const isActive = next.wheel || next.sliderCount > 0;
+    state = next;
+    onTransition(next);
+    if (wasActive !== isActive) onAggregateChange(isActive);
+  };
+  return {
+    activate: () => {
+      disposed = false;
+    },
+    dispose: () => {
+      if (disposed) return;
+      disposed = true;
+      const wasActive = state.wheel || state.sliderCount > 0;
+      state = { sliderCount: 0, wheel: false };
+      sliders.clear();
+      if (wasActive) onAggregateChange(false);
+    },
+    finish: () => {
+      if (!state.wheel) return;
+      commit({ ...state, wheel: false });
+    },
+    getState: () => state,
+    setSlider: (source, active) => {
+      const wasActive = sliders.has(source);
+      if (wasActive === active) return;
+      if (active) sliders.add(source);
+      else sliders.delete(source);
+      commit({ ...state, sliderCount: sliders.size });
+    },
+    startWheel: () => {
+      if (state.wheel) return;
+      commit({ ...state, wheel: true });
+    },
+  };
+}
+
+export function resolveColorWheelChange(
+  value: HueSatLum,
+  nextHue: number,
+  nextSaturation: number,
+  modifiers: { ctrl: boolean; shift: boolean },
+): HueSatLum {
+  if (modifiers.ctrl && !modifiers.shift) return { ...value, hue: nextHue };
+  if (modifiers.shift && !modifiers.ctrl) {
+    const hueDelta = Math.abs(nextHue - value.hue);
+    return {
+      ...value,
+      saturation: Math.max(0, Math.min(100, hueDelta > 30 ? 0 : nextSaturation)),
+    };
+  }
+  return { ...value, hue: nextHue, saturation: nextSaturation };
 }
 
 const formatPercent = (value: number) => `${String(value)}%`;
@@ -35,13 +114,21 @@ const ColorWheel = ({
   const sizerRef = useRef<HTMLDivElement>(null);
   const [wheelSize, setWheelSize] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [isWheelDragging, setIsWheelDragging] = useState(false);
-  const [isSliderDragging, setIsSliderDragging] = useState(false);
+  const [interactionState, setInteractionState] = useState<ColorWheelInteractionState>({
+    sliderCount: 0,
+    wheel: false,
+  });
   const [isLabelHovered, setIsLabelHovered] = useState(false);
   const modifierState = useRef({ ctrl: false, shift: false });
-  const instanceId = useId().replace(/:/g, '');
-
-  const isDragging = isWheelDragging || isSliderDragging;
+  const onDragStateChangeRef = useRef(onDragStateChange);
+  onDragStateChangeRef.current = onDragStateChange;
+  const interactionController = useRef<ColorWheelInteractionController | null>(null);
+  if (interactionController.current === null) {
+    interactionController.current = createColorWheelInteractionController(setInteractionState, (active) => {
+      onDragStateChangeRef.current?.(active);
+    });
+  }
+  const isDragging = interactionState.wheel || interactionState.sliderCount > 0;
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -68,11 +155,6 @@ const ColorWheel = ({
   }, []);
 
   useEffect(() => {
-    document.documentElement.style.setProperty(`--cg-hue-${instanceId}`, hue.toString());
-    document.documentElement.style.setProperty(`--cg-sat-${instanceId}`, formatPercent(saturation));
-  }, [hue, saturation, instanceId]);
-
-  useEffect(() => {
     const observer = new ResizeObserver((entries) => {
       if (entries[0]) {
         const width = entries[0].contentRect.width;
@@ -94,51 +176,34 @@ const ColorWheel = ({
     };
   }, []);
 
-  useEffect(() => {
-    const handleInteractionEnd = () => {
-      setIsWheelDragging(false);
-      onDragStateChange?.(isSliderDragging);
-    };
-    if (isWheelDragging) {
-      window.addEventListener('mouseup', handleInteractionEnd);
-      window.addEventListener('touchend', handleInteractionEnd);
-    }
-    return () => {
-      window.removeEventListener('mouseup', handleInteractionEnd);
-      window.removeEventListener('touchend', handleInteractionEnd);
-    };
-  }, [isWheelDragging, isSliderDragging, onDragStateChange]);
+  const finishWheelInteraction = useCallback(() => {
+    interactionController.current?.finish();
+  }, []);
 
   useEffect(() => {
-    onDragStateChange?.(isDragging);
-  }, [isDragging, onDragStateChange]);
+    window.addEventListener('blur', finishWheelInteraction);
+    window.addEventListener('mouseup', finishWheelInteraction);
+    window.addEventListener('pointercancel', finishWheelInteraction);
+    window.addEventListener('touchcancel', finishWheelInteraction);
+    window.addEventListener('touchend', finishWheelInteraction);
+    return () => {
+      window.removeEventListener('blur', finishWheelInteraction);
+      window.removeEventListener('mouseup', finishWheelInteraction);
+      window.removeEventListener('pointercancel', finishWheelInteraction);
+      window.removeEventListener('touchcancel', finishWheelInteraction);
+      window.removeEventListener('touchend', finishWheelInteraction);
+    };
+  }, [finishWheelInteraction]);
+
+  useEffect(() => {
+    interactionController.current?.activate();
+    return () => {
+      interactionController.current?.dispose();
+    };
+  }, []);
 
   const handleWheelChange = (color: ColorResult) => {
-    const { ctrl, shift } = modifierState.current;
-    const newValues = { ...effectiveValue };
-
-    if (ctrl && !shift) {
-      newValues.hue = color.hsva.h;
-      newValues.saturation = saturation;
-    } else if (shift && !ctrl) {
-      let newSaturation = color.hsva.s;
-
-      const hueDelta = Math.abs(color.hsva.h - hue);
-
-      if (hueDelta > 30) {
-        newSaturation = 0;
-      }
-
-      newSaturation = Math.max(0, Math.min(100, newSaturation));
-
-      newValues.saturation = newSaturation;
-      newValues.hue = hue;
-    } else {
-      newValues.hue = color.hsva.h;
-      newValues.saturation = color.hsva.s;
-    }
-
-    onChange(newValues);
+    onChange(resolveColorWheelChange(effectiveValue, color.hsva.h, color.hsva.s, modifierState.current));
   };
 
   const handleHueChange = (e: SliderChangeEvent) => {
@@ -158,24 +223,27 @@ const ColorWheel = ({
   };
 
   const handleDragStart = () => {
-    onDragStateChange?.(true);
-    setIsWheelDragging(true);
+    interactionController.current?.startWheel();
   };
 
   const hsva: HsvaColor = { h: hue, s: saturation, v: 100, a: 1 };
   const hexColor = hsvaToHex(hsva);
 
-  const pointerSize = isWheelDragging ? 14 : 12;
+  const pointerSize = interactionState.wheel ? 14 : 12;
   const pointerOffset = pointerSize / 2;
 
-  const satWrapperStyle = { '--cg-hue': `var(--cg-hue-${instanceId})` } as React.CSSProperties;
-  const lumWrapperStyle = {
-    '--cg-hue': `var(--cg-hue-${instanceId})`,
-    '--cg-sat': `var(--cg-sat-${instanceId})`,
+  const wheelStyle = {
+    '--cg-hue': String(hue),
+    '--cg-sat': formatPercent(saturation),
   } as React.CSSProperties;
 
   return (
-    <div className="relative flex flex-col items-center gap-2" ref={containerRef}>
+    <div
+      className="relative flex flex-col items-center gap-2"
+      data-testid="color-wheel"
+      ref={containerRef}
+      style={wheelStyle}
+    >
       <button
         className="relative cursor-pointer h-5 w-full overflow-hidden border-0 bg-transparent p-0 text-inherit"
         onClick={handleReset}
@@ -230,9 +298,14 @@ const ColorWheel = ({
         {wheelSize > 0 && (
           <div
             className="absolute inset-0 cursor-pointer"
+            data-testid="color-wheel-surface"
             onDoubleClick={handleReset}
             onMouseDownCapture={handleDragStart}
+            onMouseUpCapture={finishWheelInteraction}
+            onPointerCancel={finishWheelInteraction}
             onTouchStartCapture={handleDragStart}
+            onTouchCancel={finishWheelInteraction}
+            onTouchEndCapture={finishWheelInteraction}
           >
             <Wheel
               color={hsva}
@@ -281,21 +354,25 @@ const ColorWheel = ({
                 max={360}
                 min={0}
                 onChange={handleHueChange}
-                onDragStateChange={setIsSliderDragging}
+                onDragStateChange={(active) => {
+                  interactionController.current?.setSlider('hue', active);
+                }}
                 step={1}
                 value={hue}
                 trackClassName="cg-hue-gradient"
               />
             </div>
 
-            <div className="w-full" style={satWrapperStyle}>
+            <div className="w-full">
               <Slider
                 defaultValue={defaultValue.saturation}
                 label={t('ui.colorWheel.saturation')}
                 max={100}
                 min={0}
                 onChange={handleSaturationChange}
-                onDragStateChange={setIsSliderDragging}
+                onDragStateChange={(active) => {
+                  interactionController.current?.setSlider('saturation', active);
+                }}
                 step={1}
                 value={saturation}
                 trackClassName="cg-sat-gradient"
@@ -305,14 +382,16 @@ const ColorWheel = ({
         )}
       </AnimatePresence>
 
-      <div className="w-full" style={lumWrapperStyle}>
+      <div className="w-full">
         <Slider
           defaultValue={defaultValue.luminance}
           label={isExpanded ? t('ui.colorWheel.luminance') : <Sun size={16} className="text-text-secondary" />}
           max={100}
           min={-100}
           onChange={handleLumChange}
-          onDragStateChange={setIsSliderDragging}
+          onDragStateChange={(active) => {
+            interactionController.current?.setSlider('luminance', active);
+          }}
           step={1}
           value={luminance}
           trackClassName="cg-lum-gradient"
