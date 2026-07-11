@@ -821,6 +821,7 @@ export default function AppModals(props: AppModalsProps) {
       />
       <CreateFolderModal
         isOpen={isCreateFolderModalOpen}
+        operationScope={`library-folder:${folderActionTarget ?? ''}`}
         onClose={() => {
           setUI({ isCreateFolderModalOpen: false });
         }}
@@ -831,6 +832,7 @@ export default function AppModals(props: AppModalsProps) {
       <RenameFolderModal
         currentName={folderActionTarget ? folderActionTarget.split(/[\\/]/).pop() || '' : ''}
         isOpen={isRenameFolderModalOpen}
+        operationScope={`library-folder:${folderActionTarget ?? ''}`}
         onClose={() => {
           setUI({ isRenameFolderModalOpen: false });
         }}
@@ -840,6 +842,7 @@ export default function AppModals(props: AppModalsProps) {
       />
       <CreateFolderModal
         isOpen={isCreateAlbumModalOpen}
+        operationScope={`album:${albumActionTarget ?? 'root'}`}
         onClose={() => {
           setUI({ isCreateAlbumModalOpen: false });
         }}
@@ -852,6 +855,7 @@ export default function AppModals(props: AppModalsProps) {
       />
       <CreateFolderModal
         isOpen={isCreateAlbumGroupModalOpen}
+        operationScope={`album-group:${albumActionTarget ?? 'root'}`}
         onClose={() => {
           setUI({ isCreateAlbumGroupModalOpen: false });
         }}
@@ -865,6 +869,7 @@ export default function AppModals(props: AppModalsProps) {
       <RenameFolderModal
         currentName={currentAlbumName}
         isOpen={isRenameAlbumModalOpen}
+        operationScope={`album-item:${albumActionTarget ?? ''}`}
         onClose={() => {
           setUI({ isRenameAlbumModalOpen: false });
         }}

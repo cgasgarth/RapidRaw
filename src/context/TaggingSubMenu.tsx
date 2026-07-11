@@ -1,20 +1,24 @@
 import { invoke } from '@tauri-apps/api/core';
 import { AnimatePresence, motion, type Variants } from 'framer-motion';
 import { Plus, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AppSettings } from '../components/ui/AppProperties';
 import UiText from '../components/ui/primitives/Text';
+import { useManagedFocus } from '../hooks/ui/useManagedFocus';
 import { Invokes } from '../tauri/commands';
 import { TextVariants } from '../types/typography';
 import { formatUnknownError } from '../utils/errorFormatting';
+import { buildOperationFormIdentity, buildPathSetIdentity } from '../utils/operationFormDrafts';
+import { useContextMenu } from './ContextMenuContext';
 
 interface TaggingSubMenuProps {
-  paths: string[];
-  initialTags: { tag: string; isUser: boolean }[];
-  onTagsChanged: (paths: string[], newTags: { tag: string; isUser: boolean }[]) => void;
   appSettings: AppSettings | null;
   hideContextMenu: () => void;
+  initialTags: { tag: string; isUser: boolean }[];
+  invokeCommand?: typeof invoke;
+  onTagsChanged: (paths: string[], newTags: { tag: string; isUser: boolean }[]) => void;
+  paths: string[];
 }
 
 const USER_TAG_PREFIX = 'user:';
@@ -24,9 +28,10 @@ const tagVariants: Variants = {
   exit: { opacity: 0, scale: 0.8, transition: { duration: 0.15 } },
 };
 
-export default function TaggingSubMenu({
+export function TaggingDraft({
   paths,
   initialTags,
+  invokeCommand = invoke,
   onTagsChanged,
   appSettings,
   hideContextMenu,
@@ -35,46 +40,44 @@ export default function TaggingSubMenu({
   const [tags, setTags] = useState<{ tag: string; isUser: boolean }[]>(initialTags);
   const [inputValue, setInputValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const pendingMutationRef = useRef(new Set<string>());
 
-  useEffect(() => {
-    const syncTimer = setTimeout(() => {
-      setTags(initialTags);
-    }, 0);
-
-    return () => {
-      clearTimeout(syncTimer);
-    };
-  }, [initialTags]);
-
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+  useManagedFocus(inputRef, true);
 
   const handleAddTag = async (tagToAdd: string) => {
     const newTagValue = tagToAdd.trim().toLowerCase();
-    if (newTagValue && !tags.some((t) => t.tag === newTagValue)) {
+    const mutationId = `add:${newTagValue}`;
+    if (newTagValue && !tags.some((t) => t.tag === newTagValue) && !pendingMutationRef.current.has(mutationId)) {
+      pendingMutationRef.current.add(mutationId);
       try {
         const prefixedTag = `${USER_TAG_PREFIX}${newTagValue}`;
-        await invoke(Invokes.AddTagForPaths, { paths, tag: prefixedTag });
+        await invokeCommand(Invokes.AddTagForPaths, { paths, tag: prefixedTag });
         const newTags = [...tags, { tag: newTagValue, isUser: true }].sort((a, b) => a.tag.localeCompare(b.tag));
         setTags(newTags);
         onTagsChanged(paths, newTags);
         setInputValue('');
       } catch (err) {
         console.error(`Failed to add tag: ${formatUnknownError(err)}`);
+      } finally {
+        pendingMutationRef.current.delete(mutationId);
       }
     }
   };
 
   const handleRemoveTag = async (tagToRemove: { tag: string; isUser: boolean }) => {
+    const mutationId = `remove:${tagToRemove.isUser ? USER_TAG_PREFIX : ''}${tagToRemove.tag}`;
+    if (pendingMutationRef.current.has(mutationId)) return;
+    pendingMutationRef.current.add(mutationId);
     try {
       const prefixedTag = tagToRemove.isUser ? `${USER_TAG_PREFIX}${tagToRemove.tag}` : tagToRemove.tag;
-      await invoke(Invokes.RemoveTagForPaths, { paths, tag: prefixedTag });
+      await invokeCommand(Invokes.RemoveTagForPaths, { paths, tag: prefixedTag });
       const newTags = tags.filter((t) => t.tag !== tagToRemove.tag);
       setTags(newTags);
       onTagsChanged(paths, newTags);
     } catch (err) {
       console.error(`Failed to remove tag: ${formatUnknownError(err)}`);
+    } finally {
+      pendingMutationRef.current.delete(mutationId);
     }
   };
 
@@ -186,4 +189,10 @@ export default function TaggingSubMenu({
       )}
     </div>
   );
+}
+
+export default function TaggingSubMenu(props: TaggingSubMenuProps) {
+  const { menuId } = useContextMenu();
+  const operationId = buildOperationFormIdentity(buildPathSetIdentity(props.paths), menuId);
+  return <TaggingDraft {...props} key={operationId} />;
 }
