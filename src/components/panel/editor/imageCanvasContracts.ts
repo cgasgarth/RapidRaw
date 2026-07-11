@@ -52,3 +52,31 @@ export const resolveImageCanvasPointerOwner = ({
   if (isToolActive || isMaskInteractionActive) return 'active-tool';
   return 'pan-zoom';
 };
+
+export const resolveEffectiveBrushTool = (
+  canonicalTool: 'brush' | 'eraser',
+  isAltPressed: boolean,
+): 'brush' | 'eraser' => {
+  if (!isAltPressed) return canonicalTool;
+  return canonicalTool === 'brush' ? 'eraser' : 'brush';
+};
+
+export const resolveCropPreviewVisibility = ({
+  cropPreviewUrl,
+  isCropping,
+  loadedCropPreviewUrl,
+}: {
+  cropPreviewUrl: string | null;
+  isCropping: boolean;
+  loadedCropPreviewUrl: string | null;
+}): boolean => isCropping && cropPreviewUrl !== null && loadedCropPreviewUrl === cropPreviewUrl;
+
+export const resolveDisplayedMaskUrl = ({
+  isAiEditing,
+  isMasking,
+  maskOverlayUrl,
+}: {
+  isAiEditing: boolean;
+  isMasking: boolean;
+  maskOverlayUrl: string | null;
+}): string | null => (isMasking || isAiEditing ? maskOverlayUrl : null);

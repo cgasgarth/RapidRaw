@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import {
+  buildViewerSamplerIdentity,
   createViewerSampleRequest,
   isViewerSampleResultCurrent,
   LatestViewerSampleScheduler,
@@ -21,6 +22,33 @@ const request = (x: number, geometryEpoch = 7): ViewerSampleRequest =>
   });
 
 describe('viewer sampler contract', () => {
+  test('invalidates identity for every render-authoritative viewer transition', () => {
+    const baseline = {
+      backend: 'cpu' as const,
+      compareDividerPosition: 0.5,
+      compareMode: 'off' as const,
+      compareOrientation: 'vertical' as const,
+      geometryEpoch: 7,
+      graphRevision: 'history_3',
+      imageIdentity: '/fixture/color-patches.tif',
+      proofRecipeId: null,
+      softProofEnabled: false,
+    };
+    const identity = buildViewerSamplerIdentity(baseline);
+    const variants = [
+      { ...baseline, imageIdentity: '/fixture/other.tif' },
+      { ...baseline, graphRevision: 'history_4' },
+      { ...baseline, geometryEpoch: 8 },
+      { ...baseline, compareMode: 'split-wipe' as const },
+      { ...baseline, compareDividerPosition: 0.25 },
+      { ...baseline, compareOrientation: 'horizontal' as const },
+      { ...baseline, softProofEnabled: true, proofRecipeId: 'print' },
+      { ...baseline, backend: 'wgpu' as const },
+    ];
+
+    for (const variant of variants) expect(buildViewerSamplerIdentity(variant)).not.toBe(identity);
+  });
+
   test('maps transformed viewer coordinates into normalized image coordinates', () => {
     expect(
       mapViewerPointToImage({
