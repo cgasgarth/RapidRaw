@@ -1,7 +1,9 @@
 use crate::panorama_stitching::PanoramaProjectionOption;
 use crate::panorama_utils::alignment_plan::AlignmentCancellation;
 use crate::panorama_utils::alignment_plan::CalibratedAlignmentPlan;
+use crate::panorama_utils::{multiband_blend, overlap_motion};
 use image::{DynamicImage, GrayImage, Rgb, Rgb32FImage};
+use std::collections::BTreeMap;
 
 pub const TILE_SIZE_PX: u32 = 512;
 const MAX_OUTPUT_PIXELS: u64 = 250_000_000;
@@ -18,9 +20,26 @@ pub struct ProjectionGeometry {
 }
 
 pub struct ProjectedRender {
+    pub blend: ParallaxBlendDiagnostics,
     pub geometry: ProjectionGeometry,
     pub image: Rgb32FImage,
     pub mask: GrayImage,
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct ParallaxBlendDiagnostics {
+    pub class_counts: BTreeMap<String, u64>,
+    pub confidence_hash: String,
+    pub fallback_reason: Option<String>,
+    pub halo_px: u32,
+    pub mean_confidence: f64,
+    pub motion_coverage_ratio: f64,
+    pub ownership_hash: String,
+    pub owner_counts: BTreeMap<usize, u64>,
+    pub peak_tile_buffer_bytes: u64,
+    pub pyramid_levels: u32,
+    pub seam_policy: String,
+    pub tile_size_px: u32,
 }
 
 pub fn render_calibrated_projection<F>(
@@ -108,10 +127,21 @@ where
         .collect::<Vec<_>>();
     let mut output = Rgb32FImage::new(width, height);
     let mut mask = GrayImage::new(width, height);
-    stage("full_tile_render");
+    let mut class_counts = BTreeMap::<String, u64>::new();
+    let mut owner_counts = BTreeMap::<usize, u64>::new();
+    let mut confidence_bytes = Vec::new();
+    let mut ownership_bytes = Vec::new();
+    let mut confidence_sum = 0.0f64;
+    let mut overlap_pixels = 0u64;
+    let mut motion_pixels = 0u64;
+    stage("overlap_analysis");
+    cancellation.check("overlap_analysis")?;
+    stage("seam_solve");
+    cancellation.check("seam_solve")?;
+    stage("multiband_tile_render");
     for tile_y in 0..tiles_y {
         for tile_x in 0..tiles_x {
-            cancellation.check("full_tile_render")?;
+            cancellation.check("multiband_tile_render")?;
             let x0 = tile_x * TILE_SIZE_PX;
             let y0 = tile_y * TILE_SIZE_PX;
             let x1 = (x0 + TILE_SIZE_PX).min(width);
@@ -119,8 +149,7 @@ where
             for y in y0..y1 {
                 for x in x0..x1 {
                     let world = [x as f64 + geometry.min_x, y as f64 + geometry.min_y];
-                    let mut sum = [0.0f32; 3];
-                    let mut weight = 0.0f32;
+                    let mut samples = Vec::with_capacity(sources.len());
                     for ((source, source_plan), pose) in sources
                         .iter()
                         .zip(&plan.sources)
@@ -142,31 +171,103 @@ where
                             && sample[1] >= 0.0
                             && sample[1] < source.height() as f64 - 1.0
                         {
-                            let pixel = bilinear(source, sample[0], sample[1]);
-                            let edge = sample[0]
-                                .min(sample[1])
-                                .min(source.width() as f64 - 1.0 - sample[0])
-                                .min(source.height() as f64 - 1.0 - sample[1]);
-                            let w = (edge / 32.0).clamp(0.05, 1.0) as f32;
-                            for channel in 0..3 {
-                                sum[channel] += pixel[channel] * w;
+                            let center = bilinear(source, sample[0], sample[1]);
+                            let radius = f64::from(multiband_blend::TILE_HALO_PX / 4);
+                            let mut base = [0.0f32; 3];
+                            for (dx, dy) in [
+                                (0.0, 0.0),
+                                (-radius, 0.0),
+                                (radius, 0.0),
+                                (0.0, -radius),
+                                (0.0, radius),
+                            ] {
+                                let value = bilinear(
+                                    source,
+                                    (sample[0] + dx).clamp(0.0, source.width() as f64 - 1.0),
+                                    (sample[1] + dy).clamp(0.0, source.height() as f64 - 1.0),
+                                );
+                                for channel in 0..3 {
+                                    base[channel] += value[channel] * 0.2;
+                                }
                             }
-                            weight += w;
+                            samples.push((source_plan.source_index, center, Rgb(base)));
                         }
                     }
-                    if weight > 0.0 {
-                        output.put_pixel(
-                            x,
-                            y,
-                            Rgb([sum[0] / weight, sum[1] / weight, sum[2] / weight]),
-                        );
+                    if !samples.is_empty() {
+                        let motion_inputs = samples
+                            .iter()
+                            .map(|(source, center, _)| (*source, *center))
+                            .collect::<Vec<_>>();
+                        let motion = overlap_motion::classify(&motion_inputs, x, y);
+                        let blend_inputs = samples
+                            .iter()
+                            .map(|(source, center, base)| multiband_blend::BlendSample {
+                                base: *base,
+                                detail: Rgb(std::array::from_fn(|channel| {
+                                    center[channel] - base[channel]
+                                })),
+                                source: *source,
+                            })
+                            .collect::<Vec<_>>();
+                        output.put_pixel(x, y, multiband_blend::blend(&blend_inputs, motion));
                         mask.put_pixel(x, y, image::Luma([255]));
+                        *class_counts
+                            .entry(motion.class.as_str().to_string())
+                            .or_default() += 1;
+                        *owner_counts.entry(motion.owner).or_default() += 1;
+                        if samples.len() > 1 {
+                            overlap_pixels += 1;
+                            confidence_sum += f64::from(motion.confidence);
+                            if matches!(
+                                motion.class,
+                                overlap_motion::OwnershipClass::MovingSubject
+                                    | overlap_motion::OwnershipClass::LocalParallax
+                            ) {
+                                motion_pixels += 1;
+                            }
+                            if x % overlap_motion::ANALYSIS_STEP_PX == 0
+                                && y % overlap_motion::ANALYSIS_STEP_PX == 0
+                            {
+                                confidence_bytes.push((motion.confidence * 255.0).round() as u8);
+                                ownership_bytes
+                                    .extend_from_slice(&(motion.owner as u32).to_le_bytes());
+                                ownership_bytes.push(match motion.class {
+                                    overlap_motion::OwnershipClass::StaticSupported => 1,
+                                    overlap_motion::OwnershipClass::LocalParallax => 2,
+                                    overlap_motion::OwnershipClass::MovingSubject => 3,
+                                    overlap_motion::OwnershipClass::LowTexture => 4,
+                                    overlap_motion::OwnershipClass::Unsupported => 5,
+                                });
+                            }
+                        }
                     }
                 }
             }
         }
     }
+    stage("pyramid_finalize");
+    cancellation.check("pyramid_finalize")?;
+    let local_parallax_count = class_counts.get("local_parallax").copied().unwrap_or(0);
     Ok(ProjectedRender {
+        blend: ParallaxBlendDiagnostics {
+            class_counts,
+            confidence_hash: format!("blake3:{}", blake3::hash(&confidence_bytes).to_hex()),
+            fallback_reason: (local_parallax_count > 0)
+                .then(|| "local_mesh_underconstrained_global_warp_ownership_used".to_string()),
+            halo_px: multiband_blend::TILE_HALO_PX,
+            mean_confidence: confidence_sum / overlap_pixels.max(1) as f64,
+            motion_coverage_ratio: motion_pixels as f64 / overlap_pixels.max(1) as f64,
+            ownership_hash: format!("blake3:{}", blake3::hash(&ownership_bytes).to_hex()),
+            owner_counts,
+            peak_tile_buffer_bytes: u64::from(TILE_SIZE_PX + multiband_blend::TILE_HALO_PX * 2)
+                .pow(2)
+                * 3
+                * 4
+                * 2,
+            pyramid_levels: multiband_blend::PYRAMID_LEVELS,
+            seam_policy: "parallax_ownership_multiband_v1".to_string(),
+            tile_size_px: TILE_SIZE_PX,
+        },
         geometry,
         image: output,
         mask,
@@ -329,6 +430,9 @@ mod tests {
         let rectilinear = render(PanoramaProjectionOption::Rectilinear);
         assert_eq!(first.geometry, second.geometry);
         assert_eq!(first.image.as_raw(), second.image.as_raw());
+        assert_eq!(first.blend, second.blend);
+        assert_eq!(first.blend.seam_policy, "parallax_ownership_multiband_v1");
+        assert_eq!(first.blend.halo_px, multiband_blend::TILE_HALO_PX);
         assert_ne!(first.image.as_raw(), rectilinear.image.as_raw());
         assert!(first.geometry.width < rectilinear.geometry.width);
         assert!(first.geometry.tile_count > 0);
