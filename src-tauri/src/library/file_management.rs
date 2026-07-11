@@ -30,7 +30,6 @@ use crate::album_management::{add_to_album, sync_album_path_changes};
 use crate::android_integration::*;
 use crate::app_settings::*;
 use crate::auto_adjust::{auto_results_to_json, perform_auto_analysis};
-use crate::cache_utils::calculate_geometry_hash;
 use crate::delete_plan::{
     associated_files_for_source, plan_stem_associated_deletes, plan_virtual_path_deletes,
     rrdata_sidecar_path, rrexif_sidecar_path, trash_or_remove_paths,
@@ -43,12 +42,11 @@ use crate::image_processing::GpuContext;
 use crate::image_processing::{
     Crop, ImageMetadata, RawEngineArtifacts, apply_coarse_rotation,
     apply_cpu_default_raw_processing, apply_crop, apply_flip, apply_geometry_warp, apply_rotation,
-    get_all_adjustments_from_json,
 };
 use crate::library_identity::{
     LibraryRelinkIdentity, read_exif_for_paths_blocking, read_library_relink_identity_blocking,
 };
-use crate::mask_generation::MaskDefinition;
+use crate::render_plan::{CompileRenderPlanContext, compile_render_plan_cached, content_revision};
 use crate::smart_preview_cache::{
     SMART_PREVIEW_TARGET_WIDTH, ThumbnailSmartPreviewPayload, compute_source_revision,
     read_smart_preview_artifact, resolve_smart_preview_cache_dir, write_smart_preview_artifact,
@@ -1004,9 +1002,23 @@ fn generate_thumbnail_data_with_target(
         let target_res =
             target_resolution.unwrap_or_else(|| settings.thumbnail_resolution.unwrap_or(720));
 
-        let geometry_hash = calculate_geometry_hash(&meta.adjustments);
-
-        let crop_data: Option<Crop> = serde_json::from_value(meta.adjustments["crop"].clone()).ok();
+        let tm_override = crate::image_processing::resolve_tonemapper_override(&settings, is_raw);
+        let lut = meta.adjustments["lutPath"]
+            .as_str()
+            .and_then(|path| crate::get_or_load_lut(&state, path).ok());
+        let revision = content_revision(&meta.adjustments, 0, u64::from(tm_override.unwrap_or(0)));
+        let render_plan = compile_render_plan_cached(
+            &meta.adjustments,
+            CompileRenderPlanContext {
+                revision,
+                is_raw,
+                tonemapper_override: tm_override,
+            },
+            lut,
+        )
+        .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+        let geometry_hash = render_plan.fingerprints.geometry;
+        let crop_data = render_plan.crop;
 
         let cached_base: Option<(DynamicImage, f32)> = {
             if let Some(entry) = state.thumbnail_geometry_cache.get(&path_str.to_string()) {
@@ -1159,13 +1171,8 @@ fn generate_thumbnail_data_with_target(
         let (preview_w, preview_h) = cropped_preview.dimensions();
         let unscaled_crop_offset = crop_data.map_or((0.0, 0.0), |c| (c.x as f32, c.y as f32));
 
-        let mask_definitions: Vec<MaskDefinition> = meta
-            .adjustments
-            .get("masks")
-            .and_then(|m| serde_json::from_value(m.clone()).ok())
-            .unwrap_or_else(Vec::new);
-
-        let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
+        let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = render_plan
+            .masks
             .iter()
             .filter_map(|def| {
                 crate::get_cached_or_generate_mask(
@@ -1183,23 +1190,18 @@ fn generate_thumbnail_data_with_target(
             })
             .collect();
 
-        let tm_override = crate::image_processing::resolve_tonemapper_override(&settings, is_raw);
-        let gpu_adjustments = get_all_adjustments_from_json(&meta.adjustments, is_raw, tm_override);
-        let lut_path = meta.adjustments["lutPath"].as_str();
-        let lut = lut_path.and_then(|p| crate::get_or_load_lut(&state, p).ok());
-
         let mut hasher = DefaultHasher::new();
         path_str.hash(&mut hasher);
-        meta.adjustments.to_string().hash(&mut hasher);
+        render_plan.fingerprints.full.hash(&mut hasher);
         if let Ok(processed_image) = gpu_processing::process_and_get_dynamic_image(
             context,
             &state,
             cropped_preview.as_ref(),
             gpu_processing::PreGpuImageIdentity::for_source(cropped_preview.as_ref(), path_str),
             gpu_processing::RenderRequest {
-                adjustments: gpu_adjustments,
+                adjustments: render_plan.adjustments,
                 mask_bitmaps: &mask_bitmaps,
-                lut,
+                lut: render_plan.lut.clone(),
                 roi: None,
             },
             "generate_thumbnail_data",

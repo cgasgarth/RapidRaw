@@ -6,6 +6,7 @@ use crate::adjustments::abi::{
 use crate::adjustments::scales::SCALES;
 use crate::image_processing::calculate_agx_matrices;
 use crate::mask_generation::MaskDefinition;
+use serde::Deserialize;
 
 type JsonValue = serde_json::Value;
 
@@ -662,14 +663,27 @@ pub fn get_all_adjustments_from_json(
     is_raw: bool,
     tonemapper_override: Option<u32>,
 ) -> AllAdjustments {
+    let mask_definitions = js_adjustments
+        .get("masks")
+        .and_then(|value| Vec::<MaskDefinition>::deserialize(value).ok())
+        .unwrap_or_default();
+    get_all_adjustments_from_json_with_masks(
+        js_adjustments,
+        is_raw,
+        tonemapper_override,
+        &mask_definitions,
+    )
+}
+
+pub fn get_all_adjustments_from_json_with_masks(
+    js_adjustments: &JsonValue,
+    is_raw: bool,
+    tonemapper_override: Option<u32>,
+    mask_definitions: &[MaskDefinition],
+) -> AllAdjustments {
     let global = get_global_adjustments_from_json(js_adjustments, is_raw, tonemapper_override);
     let mut mask_adjustments = [MaskAdjustments::default(); MAX_MASKS];
     let mut mask_count = 0;
-
-    let mask_definitions: Vec<MaskDefinition> = js_adjustments
-        .get("masks")
-        .and_then(|m| serde_json::from_value(m.clone()).ok())
-        .unwrap_or_default();
 
     for (i, mask_def) in mask_definitions
         .iter()
