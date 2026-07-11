@@ -64,7 +64,6 @@ export interface AgentSelectedImageModelTransport {
   ) => Promise<AgentSelectedImageModelTurnResponse>;
 }
 
-type LineageEntry = AgentSelectedImageModelToolLoopResult['lineage'][number];
 type LoopState = AgentSelectedImageModelToolLoopResult['state'];
 
 const activeSessions = new Map<string, AbortController>();
@@ -134,24 +133,23 @@ export const replayAgentSelectedImageModelToolLoop = (
   record: unknown,
 ): Pick<
   AgentSelectedImageModelToolLoopResult,
-  'budget' | 'lineage' | 'proposalLineage' | 'sealedProposalId' | 'sessionId' | 'state'
+  'budget' | 'proposalLineage' | 'sealedProposalId' | 'sessionId' | 'state'
 > => {
   const parsed = agentSelectedImageModelToolLoopResultSchema.parse(record);
   if (parsed.state === 'approval_required') {
-    const head = parsed.lineage.at(-1);
-    if (head?.state !== 'sealed' || head.proposalId !== parsed.sealedProposalId) {
-      throw new Error('Model-tool replay rejected a missing or stale sealed lineage head.');
-    }
     const authoritativeHead = parsed.proposalLineage.iterations.find(
       (iteration) => iteration.iterationId === parsed.proposalLineage.sealedIterationId,
     );
-    if (authoritativeHead?.proposalId !== parsed.sealedProposalId || authoritativeHead.state !== 'sealed') {
+    if (
+      authoritativeHead === undefined ||
+      authoritativeHead.proposalId !== parsed.sealedProposalId ||
+      authoritativeHead.state !== 'sealed'
+    ) {
       throw new Error('Model-tool replay rejected an invalid authoritative sealed lineage head.');
     }
   }
   return structuredClone({
     budget: parsed.budget,
-    lineage: parsed.lineage,
     proposalLineage: parsed.proposalLineage,
     ...(parsed.sealedProposalId === undefined ? {} : { sealedProposalId: parsed.sealedProposalId }),
     sessionId: parsed.sessionId,
@@ -169,7 +167,6 @@ export const runAgentSelectedImageModelToolLoop = async (
     return agentSelectedImageModelToolLoopResultSchema.parse({
       audit: [],
       budget: { maxToolCalls: 2 * parsed.budget.maxTurns + 2, previewBytes: 0, toolCalls: 0, turns: 0 },
-      lineage: [],
       model: { id: parsed.modelId, provider: 'unstarted', transport: 'codex_app_server', version: 'unstarted' },
       proposalLineage: createAgentSelectedImageProposalLineage({
         lineageId: `lineage:${parsed.sessionId}`,
@@ -185,7 +182,6 @@ export const runAgentSelectedImageModelToolLoop = async (
   activeSessions.set(parsed.sessionId, controller);
   const absoluteDeadline = Date.parse(parsed.deadlineAt);
   const audit: AgentSelectedImageModelToolLoopResult['audit'] = [];
-  const lineage: LineageEntry[] = [];
   const maxToolCalls = 2 * parsed.budget.maxTurns + 2;
   let previewBytes = 0;
   let toolCalls = 0;
@@ -318,8 +314,6 @@ export const runAgentSelectedImageModelToolLoop = async (
         const ready = await agentSelectedImageProposalRuntime.ensureReady(head.proposalId);
         if (ready?.status !== 'ready' || ready.receiptHash !== head.receiptHash)
           throw new Error('Current proposal receipt is no longer ready.');
-        const currentHead = lineage.at(-1);
-        if (currentHead === undefined) throw new Error('Proposal lineage head is missing.');
         const authoritativeHead = proposalLineage.iterations.at(-1);
         if (authoritativeHead === undefined || authoritativeHead.proposalId !== head.proposalId) {
           throw new Error('Authoritative proposal lineage head is missing.');
@@ -330,7 +324,6 @@ export const runAgentSelectedImageModelToolLoop = async (
           'sealed',
           { expectedEpoch: proposalLineage.epoch },
         );
-        lineage[lineage.length - 1] = { ...currentHead, state: 'sealed' };
         state = 'approval_required';
         break;
       }
@@ -432,12 +425,7 @@ export const runAgentSelectedImageModelToolLoop = async (
       previewBytes += renderBytes;
       if (renderBytes > parsed.budget.maxPreviewBytes || previewBytes > parsed.budget.maxAggregatePreviewBytes)
         throw new Error('Preview byte budget exceeded.');
-      if (head !== undefined) {
-        const priorHead = lineage.at(-1);
-        if (priorHead === undefined) throw new Error('Proposal lineage head is missing.');
-        lineage[lineage.length - 1] = { ...priorHead, state: 'superseded' };
-        await agentSelectedImageProposalRuntime.release(head.proposalId, 'superseded');
-      }
+      const priorProposalId = head?.proposalId;
       head = render;
       const priorIteration = proposalLineage.iterations.at(-1);
       const iterationId = `${proposalLineage.lineageId}:iteration:${turn}`;
@@ -480,13 +468,9 @@ export const runAgentSelectedImageModelToolLoop = async (
         expectedEpoch: proposalLineage.epoch,
         now: render.createdAt,
       });
-      lineage.push({
-        epoch: lineage.length + 1,
-        ...(parentCallId === undefined ? {} : { parentProposalId: lineage.at(-1)?.proposalId }),
-        proposalId: render.proposalId,
-        receiptHash: render.receiptHash,
-        state: 'ready',
-      });
+      if (priorProposalId !== undefined) {
+        await agentSelectedImageProposalRuntime.release(priorProposalId, 'superseded');
+      }
       state = 'proposal_ready';
       await record({
         callId: renderCallId,
@@ -529,7 +513,6 @@ export const runAgentSelectedImageModelToolLoop = async (
     ...(state === 'approval_required' && approval !== undefined ? { approval } : {}),
     audit,
     budget: { maxToolCalls, previewBytes, toolCalls, turns },
-    lineage,
     model,
     proposalLineage,
     ...(state === 'approval_required' && head !== undefined ? { sealedProposalId: head.proposalId } : {}),

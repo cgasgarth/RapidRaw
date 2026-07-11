@@ -154,17 +154,6 @@ export const agentSelectedImageModelToolLoopResultSchema = z
         turns: z.number().int().nonnegative(),
       })
       .strict(),
-    lineage: z.array(
-      z
-        .object({
-          epoch: z.number().int().nonnegative(),
-          parentProposalId: z.string().trim().min(1).optional(),
-          proposalId: z.string().trim().min(1),
-          receiptHash: digestSchema,
-          state: z.enum(['ready', 'sealed', 'superseded']),
-        })
-        .strict(),
-    ),
     model: z
       .object({
         id: z.string().trim().min(1),

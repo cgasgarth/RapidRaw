@@ -4,12 +4,22 @@ import { useTranslation } from 'react-i18next';
 // i18next-instrument-ignore
 import type { RawEngineAgentSelectedImageProposalReceiptV1 } from '../../../../../packages/rawengine-schema/src/agentSelectedImageProposalSchemas';
 import type { AgentChatMessage, AgentChatTranscript } from '../../../../schemas/agent/agentChatTranscriptSchemas';
+import type { AgentSelectedImageProposalLineageV1 } from '../../../../schemas/agent/agentSelectedImageProposalIterationSchemas';
 import { useEditorStore } from '../../../../store/useEditorStore';
+import {
+  buildAgentReviewedAdjustmentCommandPlan,
+  DEFAULT_AGENT_REVIEWED_ADJUSTMENT_COMMAND_ID,
+} from '../../../../utils/agent/agentReviewedAdjustmentCommands';
 import { buildAgentImageContextSnapshot } from '../../../../utils/agent/context/agentImageContextSnapshot';
 import { renderAgentReadOnlyPreview } from '../../../../utils/agent/context/agentReadOnlyAppServerTools';
 import { agentSelectedImageProposalRuntime } from '../../../../utils/agent/context/agentSelectedImageProposalRuntime';
 import { DEFAULT_AGENT_EDITING_MODEL_SELECTION } from '../../../../utils/agent/session/agentAppServerModelSelection';
 import { createAgentSelectedImageModelTransport } from '../../../../utils/agent/session/agentCodexAppServerModelTransport';
+import {
+  approveAgentSelectedImageLiveSession,
+  runAgentSelectedImageApplyTransaction,
+  startAgentSelectedImageLiveSessionDryRun,
+} from '../../../../utils/agent/session/agentSelectedImageLiveSession';
 import {
   cancelAgentSelectedImageModelToolLoop,
   runAgentSelectedImageModelToolLoop,
@@ -26,7 +36,6 @@ import {
   AGENT_TONE_ADJUSTMENT_APPLY_TOOL_NAME,
   type AgentToneAdjustmentDryRunResponse,
   type AgentToneAdjustmentPromptDraft,
-  applyAgentToneAdjustment,
 } from '../../../../utils/agent/tools/agentToneAdjustmentTool';
 import { cancelRawEngineAppServerTypedDispatch } from '../../../../utils/rawEngineAppServerHost';
 
@@ -53,6 +62,7 @@ interface LivePromptResult {
   previewAfterUrl?: string;
   previewBeforeUrl?: string;
   proposal?: RawEngineAgentSelectedImageProposalReceiptV1;
+  proposalLineage?: AgentSelectedImageProposalLineageV1;
   proposalId?: string;
   recipeName?: string;
   toneAdjustmentDraft?: AgentToneAdjustmentPromptDraft;
@@ -394,6 +404,7 @@ function LivePromptComposer({ isContextReady, onSessionEvent }: LivePromptCompos
         previewBeforeUrl,
         proposal,
         proposalId: loop.sealedProposalId,
+        proposalLineage: loop.proposalLineage,
         recipeName: loop.approval.dryRunPlanHash,
         status: 'dry_run_ready',
         toneAdjustmentDraft: draft,
@@ -446,19 +457,26 @@ function LivePromptComposer({ isContextReady, onSessionEvent }: LivePromptCompos
       const applyingResult = { ...result, status: 'applying' } satisfies LivePromptResult;
       setResult(applyingResult);
       const requestId = operation.id;
-      const snapshot = buildAgentImageContextSnapshot();
       const dryRunReceipt = result.dryRunReceipt;
       if (dryRunReceipt === undefined) throw new Error('Typed basic-tone apply requires a prior dry-run receipt.');
-      await applyAgentToneAdjustment({
-        acceptedPlanHash: dryRunReceipt.dryRunPlanHash,
-        acceptedPlanId: dryRunReceipt.dryRunPlanId,
+      const lifecycleDraft = await startAgentSelectedImageLiveSessionDryRun({
         adjustments: toneAdjustmentDraft.requestedAdjustments,
-        expectedGraphRevision: dryRunReceipt.sourceGraphRevision,
-        expectedRecipeHash: snapshot.initialPreview.recipeHash,
         operationId: dryRunReceipt.operationId,
-        requestId,
+        prompt: 'Apply the human-approved sealed model proposal.',
+        requestId: `${requestId}-lifecycle`,
+        reviewedCommand: buildAgentReviewedAdjustmentCommandPlan({
+          commandId: DEFAULT_AGENT_REVIEWED_ADJUSTMENT_COMMAND_ID,
+          sourceAdjustments: useEditorStore.getState().adjustments,
+        }).receipt,
         sessionId: dryRunReceipt.sessionId,
       });
+      if (result.proposalLineage === undefined) throw new Error('Apply requires authoritative proposal lineage.');
+      lifecycleDraft.proposal = proposal;
+      lifecycleDraft.proposalLineage = structuredClone(result.proposalLineage);
+      const applyResult = await runAgentSelectedImageApplyTransaction(
+        approveAgentSelectedImageLiveSession(lifecycleDraft),
+      );
+      if (applyResult.status !== 'applied') throw new Error(applyResult.message);
 
       const afterSnapshot = buildAgentImageContextSnapshot();
       setRollbackSnapshot((checkpoint) =>
