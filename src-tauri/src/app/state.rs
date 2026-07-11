@@ -181,7 +181,7 @@ pub struct AppState {
     pub viewer_sample_frames: MemoryLruCache<String, CachedViewerSampleFrame>,
     pub analytics_worker_tx: Mutex<Option<Sender<AnalyticsJob>>>,
     pub mask_cache: MemoryLruCache<u64, GrayImage>,
-    pub patch_cache: Mutex<HashMap<String, serde_json::Value>>,
+    pub payload_residency_cache: Mutex<HashMap<String, serde_json::Value>>,
     pub geometry_cache: MemoryLruCache<u64, DynamicImage>,
     pub thumbnail_geometry_cache: MemoryLruCache<String, (u64, Arc<DynamicImage>, f32)>,
     pub lens_db: Mutex<Option<Arc<LensDatabase>>>,
@@ -198,6 +198,7 @@ impl AppState {
     pub fn new() -> Self {
         let mib = 1024 * 1024;
         let cache_budget = CacheBudgetCoordinator::new(768 * mib, 1024 * mib);
+        crate::patch_assets::initialize_patch_asset_cache(Arc::clone(&cache_budget));
         let policy = |name, soft, hard, max_entries| CachePolicy {
             name,
             soft_limit_bytes: soft * mib,
@@ -252,7 +253,7 @@ impl AppState {
                 policy("masks", 96, 128, Some(64)),
                 Arc::clone(&cache_budget),
             ),
-            patch_cache: Mutex::new(HashMap::new()),
+            payload_residency_cache: Mutex::new(HashMap::new()),
             geometry_cache: MemoryLruCache::new(
                 policy("geometry", 256, 384, Some(16)),
                 Arc::clone(&cache_budget),

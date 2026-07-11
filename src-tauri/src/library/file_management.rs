@@ -1040,7 +1040,7 @@ fn generate_thumbnail_data_with_target(
             let mut raw_scale_factor = 1.0f32;
 
             let composite_image = if let Some(img) = preloaded_image {
-                image_loader::composite_patches_on_image(img, &adjustments)?
+                image_loader::composite_patches_on_image(img, &adjustments)?.into_owned()
             } else {
                 let mmap_guard;
                 let vec_guard;
@@ -1229,7 +1229,7 @@ fn generate_thumbnail_data_with_target(
     let settings = load_settings_or_default(app_handle);
 
     let mut final_image = if let Some(img) = preloaded_image {
-        image_loader::composite_patches_on_image(img, &adjustments)?
+        image_loader::composite_patches_on_image(img, &adjustments)?.into_owned()
     } else {
         match read_file_mapped(&source_path) {
             Ok(mmap) => image_loader::load_and_composite(

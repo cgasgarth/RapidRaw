@@ -22,18 +22,22 @@ impl<'a> RenderCaches<'a> {
 
     pub fn native_cache_report(&self) -> NativeCacheReport {
         let (total_soft_limit_bytes, total_hard_limit_bytes) = self.state.cache_budget.limits();
+        let mut caches = vec![
+            self.state.geometry_cache.stats(),
+            self.state.thumbnail_geometry_cache.stats(),
+            self.state.mask_cache.stats(),
+            self.state.viewer_sample_frames.stats(),
+            self.state.lut_cache.stats(),
+            self.state.decoded_image_cache.stats(),
+        ];
+        if let Some(patch_stats) = crate::patch_assets::patch_asset_cache_stats() {
+            caches.extend(patch_stats);
+        }
         NativeCacheReport {
             total_known_cpu_cache_bytes: self.state.cache_budget.current_bytes(),
             total_soft_limit_bytes,
             total_hard_limit_bytes,
-            caches: vec![
-                self.state.geometry_cache.stats(),
-                self.state.thumbnail_geometry_cache.stats(),
-                self.state.mask_cache.stats(),
-                self.state.viewer_sample_frames.stats(),
-                self.state.lut_cache.stats(),
-                self.state.decoded_image_cache.stats(),
-            ],
+            caches,
             separately_tracked: "current-session image/preview slots, GPU textures/buffers, patch JSON",
         }
     }
@@ -85,8 +89,9 @@ impl<'a> RenderCaches<'a> {
     }
 
     pub fn clear_session_caches(&self) {
-        if let Ok(mut patch_cache) = self.state.patch_cache.lock() {
-            patch_cache.clear();
+        crate::patch_assets::clear_patch_asset_cache();
+        if let Ok(mut payload_cache) = self.state.payload_residency_cache.lock() {
+            payload_cache.clear();
         }
         self.state.mask_cache.clear();
         self.state.geometry_cache.clear();
