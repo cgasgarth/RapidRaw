@@ -66,6 +66,7 @@ import { readLibraryWorkspacePreferences, saveLibraryWorkspacePreferences } from
 import type { NegativeLabSessionSnapshot } from '../utils/negative-lab/negativeLabSessionState';
 import type { SuperResolutionNativeReadiness } from '../utils/superResolutionNativeReadiness';
 import type { SuperResolutionSourcePreflightMetadata } from '../utils/superResolutionSourcePreflight';
+import { useEditorStore } from './useEditorStore';
 
 export interface CollapsibleSectionsState {
   basic: boolean;
@@ -439,6 +440,7 @@ export interface UIState {
   setEditorSectionExpanded: (panel: Panel, sectionId: string, expanded: boolean) => void;
   setEditorLeftSectionExpanded: (sectionId: string, expanded: boolean) => void;
   setEditorWorkspaceViewport: (viewport: EditorWorkspaceViewport) => void;
+  selectEditorPanel: (panel: Panel, viewport?: EditorWorkspaceViewport) => void;
   setLibraryFolderTreeVisibility: (visible: boolean) => void;
   setLibraryFolderTreeWidth: (width: number) => void;
   recordRecentRightPanel: (panel: Panel) => void;
@@ -456,6 +458,7 @@ export const useUIStore = create<UIState>((set, get) => {
   const initialLayout = getEffectiveEditorWorkspaceLayout(initialPreferences, {
     height: Number.MAX_SAFE_INTEGER,
     isCompactPortrait: false,
+    isPortrait: false,
     width: Number.MAX_SAFE_INTEGER,
   });
 
@@ -490,7 +493,7 @@ export const useUIStore = create<UIState>((set, get) => {
     },
     isLibraryExportPanelVisible: false,
     editorWorkspacePreferences: initialPreferences,
-    editorWorkspaceViewport: { height: 0, isCompactPortrait: false, width: 0 },
+    editorWorkspaceViewport: { height: 0, isCompactPortrait: false, isPortrait: false, width: 0 },
     libraryWorkspacePreferences: initialLibraryPreferences,
 
     leftPanelWidth: 256,
@@ -746,7 +749,61 @@ export const useUIStore = create<UIState>((set, get) => {
     },
 
     setEditorWorkspaceViewport: (viewport) => {
-      set((state) => applyWorkspacePreferences(state.editorWorkspacePreferences, viewport));
+      set((state) => {
+        if (
+          state.editorWorkspaceViewport.width === viewport.width &&
+          state.editorWorkspaceViewport.height === viewport.height &&
+          state.editorWorkspaceViewport.isPortrait === viewport.isPortrait &&
+          state.editorWorkspaceViewport.isCompactPortrait === viewport.isCompactPortrait
+        )
+          return state;
+
+        if (!viewport.isCompactPortrait && state.activeRightPanel === Panel.Presets) {
+          const preferences = structuredClone(state.editorWorkspacePreferences);
+          preferences.leftSidebar.visible = true;
+          preferences.leftSidebar.expandedSections = [
+            ...new Set([...preferences.leftSidebar.expandedSections, 'presets']),
+          ];
+          saveEditorWorkspacePreferences(preferences);
+          return {
+            ...applyWorkspacePreferences(preferences, viewport),
+            activeRightPanel: null,
+            renderedRightPanel: Panel.Presets,
+          };
+        }
+        return applyWorkspacePreferences(state.editorWorkspacePreferences, viewport);
+      });
+    },
+
+    selectEditorPanel: (panel, viewport = get().editorWorkspaceViewport) => {
+      if (panel === Panel.Presets && !viewport.isCompactPortrait) {
+        set((state) => {
+          const preferences = structuredClone(state.editorWorkspacePreferences);
+          preferences.leftSidebar.visible = true;
+          preferences.leftSidebar.expandedSections = [
+            ...new Set([...preferences.leftSidebar.expandedSections, 'presets']),
+          ];
+          saveEditorWorkspacePreferences(preferences);
+          return {
+            ...applyWorkspacePreferences(preferences, viewport),
+            activeRightPanel: null,
+            renderedRightPanel: Panel.Presets,
+          };
+        });
+        if (typeof requestAnimationFrame === 'function') {
+          requestAnimationFrame(() =>
+            document.querySelector<HTMLButtonElement>('[data-testid="editor-left-presets-toggle"]')?.focus(),
+          );
+        }
+        return;
+      }
+      get().setRightPanel(panel);
+      useEditorStore.getState().setEditor({
+        activeAiSubMaskId: null,
+        activeMaskId: null,
+        isMaskControlHovered: false,
+        isWbPickerActive: false,
+      });
     },
 
     setLibraryFolderTreeVisibility: (visible) => {

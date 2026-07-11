@@ -281,56 +281,56 @@ export const useKeyboardShortcuts = ({
         shouldFire: (s) => !!s.editor.selectedImage,
         execute: (e, s) => {
           e.preventDefault();
-          s.ui.setRightPanel(Panel.Adjustments);
+          s.ui.selectEditorPanel(Panel.Adjustments);
         },
       },
       toggle_color: {
         shouldFire: (s) => !!s.editor.selectedImage,
         execute: (e, s) => {
           e.preventDefault();
-          s.ui.setRightPanel(Panel.Color);
+          s.ui.selectEditorPanel(Panel.Color);
         },
       },
       toggle_crop_panel: {
         shouldFire: (s) => !!s.editor.selectedImage,
         execute: (e, s) => {
           e.preventDefault();
-          s.ui.setRightPanel(Panel.Crop);
+          s.ui.selectEditorPanel(Panel.Crop);
         },
       },
       toggle_masks: {
         shouldFire: (s) => !!s.editor.selectedImage,
         execute: (e, s) => {
           e.preventDefault();
-          s.ui.setRightPanel(Panel.Masks);
+          s.ui.selectEditorPanel(Panel.Masks);
         },
       },
       toggle_ai: {
         shouldFire: (s) => !!s.editor.selectedImage,
         execute: (e, s) => {
           e.preventDefault();
-          s.ui.setRightPanel(Panel.Ai);
+          s.ui.selectEditorPanel(Panel.Ai);
         },
       },
       toggle_presets: {
         shouldFire: (s) => !!s.editor.selectedImage,
         execute: (e, s) => {
           e.preventDefault();
-          s.ui.setRightPanel(Panel.Presets);
+          s.ui.selectEditorPanel(Panel.Presets);
         },
       },
       toggle_metadata: {
         shouldFire: (s) => !!s.editor.selectedImage,
         execute: (e, s) => {
           e.preventDefault();
-          s.ui.setRightPanel(Panel.Metadata);
+          s.ui.selectEditorPanel(Panel.Metadata);
         },
       },
       toggle_tether: {
         shouldFire: (s) => !!s.editor.selectedImage,
         execute: (e, s) => {
           e.preventDefault();
-          s.ui.setRightPanel(Panel.Tether);
+          s.ui.selectEditorPanel(Panel.Tether);
         },
       },
       toggle_analytics: {
@@ -344,7 +344,7 @@ export const useKeyboardShortcuts = ({
         shouldFire: (s) => !!s.editor.selectedImage,
         execute: (e, s) => {
           e.preventDefault();
-          s.ui.setRightPanel(Panel.Export);
+          s.ui.selectEditorPanel(Panel.Export);
         },
       },
       toggle_library_exif: {
@@ -372,7 +372,7 @@ export const useKeyboardShortcuts = ({
           if (s.ui.activeRightPanel === Panel.Crop) {
             s.editor.setEditor({ isStraightenActive: !s.editor.isStraightenActive });
           } else {
-            s.ui.setRightPanel(Panel.Crop);
+            s.ui.selectEditorPanel(Panel.Crop);
             s.editor.setEditor({ isStraightenActive: true });
           }
         },
@@ -504,10 +504,12 @@ export const useKeyboardShortcuts = ({
           if (s.editor.isStraightenActive) s.editor.setEditor({ isStraightenActive: false });
           else if (s.ui.customEscapeHandler) s.ui.customEscapeHandler();
           else if (s.editor.activeAiSubMaskId) s.editor.setEditor({ activeAiSubMaskId: null });
-          else if (s.editor.activeAiPatchContainerId) s.editor.setEditor({ activeAiPatchContainerId: null });
+          else if (s.editor.activeAiPatchContainerId)
+            s.editor.setEditor({ activeAiPatchContainerId: null, isMaskControlHovered: false });
           else if (s.editor.activeMaskId) s.editor.setEditor({ activeMaskId: null });
-          else if (s.editor.activeMaskContainerId) s.editor.setEditor({ activeMaskContainerId: null });
-          else if (s.ui.activeRightPanel === Panel.Crop) s.ui.setRightPanel(Panel.Adjustments);
+          else if (s.editor.activeMaskContainerId)
+            s.editor.setEditor({ activeMaskContainerId: null, isMaskControlHovered: false });
+          else if (s.ui.activeRightPanel === Panel.Crop) s.ui.selectEditorPanel(Panel.Adjustments);
           else if (s.ui.editorWorkspacePreferences.viewer.lightsOutLevel !== 'off') s.ui.setEditorLightsOutLevel('off');
           else if (s.ui.isFullScreen) handleToggleFullScreen();
           else if (s.editor.selectedImage) handleBackToLibrary();
@@ -528,6 +530,7 @@ export const useKeyboardShortcuts = ({
               },
               activeMaskContainerId: null,
               activeMaskId: null,
+              isMaskControlHovered: false,
             }));
           } else if (s.editor.activeAiPatchContainerId) {
             s.editor.setEditor((state) => ({
@@ -537,6 +540,7 @@ export const useKeyboardShortcuts = ({
               },
               activeAiPatchContainerId: null,
               activeAiSubMaskId: null,
+              isMaskControlHovered: false,
             }));
           }
         },

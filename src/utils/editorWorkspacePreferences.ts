@@ -12,6 +12,7 @@ export const LEGACY_DEVELOP_PANEL_PINNED_CONTROL_IDS_STORAGE_KEY = 'rapidraw.dev
 export interface EditorWorkspaceViewport {
   height: number;
   isCompactPortrait: boolean;
+  isPortrait: boolean;
   width: number;
 }
 

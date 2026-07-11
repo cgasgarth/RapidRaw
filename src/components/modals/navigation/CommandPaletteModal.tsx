@@ -99,7 +99,7 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
   const multiSelectedPaths = useLibraryStore((state) => state.multiSelectedPaths);
   const supportedTypes = useSettingsStore((state) => state.supportedTypes);
   const setUI = useUIStore((state) => state.setUI);
-  const setRightPanel = useUIStore((state) => state.setRightPanel);
+  const selectEditorPanel = useUIStore((state) => state.selectEditorPanel);
   const selectedCommandPaths = useMemo(
     () => getCommandPaletteSelectedPaths(multiSelectedPaths, libraryActivePath, selectedImage),
     [libraryActivePath, multiSelectedPaths, selectedImage],
@@ -172,7 +172,9 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
       selectedCommandImages,
       selectedCommandPaths,
       selectedImage,
-      setRightPanel,
+      setRightPanel: (panel) => {
+        if (panel !== null) selectEditorPanel(panel);
+      },
       setUI,
       supportedTypes,
     });
