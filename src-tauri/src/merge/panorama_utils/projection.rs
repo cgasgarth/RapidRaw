@@ -71,7 +71,13 @@ where
             .find(|pose| pose.source_index == source.source_index)
             .ok_or_else(|| format!("Missing camera pose for source {}.", source.source_index))?;
         for sample in edge_samples(source.width, source.height) {
-            let projected = project_forward(sample, source.width, source.height, focal, projection);
+            let projected = project_forward(
+                sample,
+                source.calibration.principal_point_px,
+                focal,
+                source.calibration.radial_k1.unwrap_or(0.0),
+                projection,
+            );
             let x = projected[0] + pose.translation_px[0];
             let y = projected[1] + pose.translation_px[1];
             bounds[0] = bounds[0].min(x);
@@ -115,16 +121,20 @@ where
                     let world = [x as f64 + geometry.min_x, y as f64 + geometry.min_y];
                     let mut sum = [0.0f32; 3];
                     let mut weight = 0.0f32;
-                    for (source, pose) in sources.iter().zip(&solution.camera_poses) {
+                    for ((source, source_plan), pose) in sources
+                        .iter()
+                        .zip(&plan.sources)
+                        .zip(&solution.camera_poses)
+                    {
                         let local = [
                             world[0] - pose.translation_px[0],
                             world[1] - pose.translation_px[1],
                         ];
                         let sample = project_inverse(
                             local,
-                            source.width(),
-                            source.height(),
+                            source_plan.calibration.principal_point_px,
                             focal,
+                            source_plan.calibration.radial_k1.unwrap_or(0.0),
                             projection,
                         );
                         if sample[0] >= 0.0
@@ -180,13 +190,13 @@ fn edge_samples(width: u32, height: u32) -> Vec<[f64; 2]> {
 
 fn project_forward(
     point: [f64; 2],
-    width: u32,
-    height: u32,
+    principal: [f64; 2],
     focal: f64,
+    radial_k1: f64,
     projection: PanoramaProjectionOption,
 ) -> [f64; 2] {
-    let x = point[0] - width as f64 / 2.0;
-    let y = point[1] - height as f64 / 2.0;
+    let distorted = [point[0] - principal[0], point[1] - principal[1]];
+    let [x, y] = undistort_radial(distorted, focal, radial_k1);
     match projection {
         PanoramaProjectionOption::Rectilinear => [x, y],
         PanoramaProjectionOption::Cylindrical => {
@@ -199,24 +209,43 @@ fn project_forward(
 
 fn project_inverse(
     point: [f64; 2],
-    width: u32,
-    height: u32,
+    principal: [f64; 2],
     focal: f64,
+    radial_k1: f64,
     projection: PanoramaProjectionOption,
 ) -> [f64; 2] {
-    match projection {
-        PanoramaProjectionOption::Rectilinear => [
-            point[0] + width as f64 / 2.0,
-            point[1] + height as f64 / 2.0,
-        ],
+    let undistorted = match projection {
+        PanoramaProjectionOption::Rectilinear => point,
         PanoramaProjectionOption::Cylindrical => {
             let theta = point[0] / focal;
             let x = focal * theta.tan();
             let y = point[1] / theta.cos();
-            [x + width as f64 / 2.0, y + height as f64 / 2.0]
+            [x, y]
         }
         PanoramaProjectionOption::Spherical => unreachable!(),
+    };
+    let distorted = distort_radial(undistorted, focal, radial_k1);
+    [distorted[0] + principal[0], distorted[1] + principal[1]]
+}
+
+fn distort_radial(point: [f64; 2], focal: f64, radial_k1: f64) -> [f64; 2] {
+    let radius_squared = (point[0] * point[0] + point[1] * point[1]) / (focal * focal);
+    let scale = 1.0 + radial_k1 * radius_squared;
+    [point[0] * scale, point[1] * scale]
+}
+
+fn undistort_radial(point: [f64; 2], focal: f64, radial_k1: f64) -> [f64; 2] {
+    let mut undistorted = point;
+    for _ in 0..5 {
+        let radius_squared =
+            (undistorted[0] * undistorted[0] + undistorted[1] * undistorted[1]) / (focal * focal);
+        let scale = 1.0 + radial_k1 * radius_squared;
+        if scale.abs() <= f64::EPSILON {
+            break;
+        }
+        undistorted = [point[0] / scale, point[1] / scale];
     }
+    undistorted
 }
 
 fn bilinear(image: &Rgb32FImage, x: f64, y: f64) -> Rgb<f32> {
@@ -257,24 +286,24 @@ mod tests {
         let point = [199.0, 50.0];
         let rect = project_forward(
             point,
-            200,
-            100,
+            [100.0, 50.0],
             100.0,
+            0.0,
             PanoramaProjectionOption::Rectilinear,
         );
         let cylinder = project_forward(
             point,
-            200,
-            100,
+            [100.0, 50.0],
             100.0,
+            0.0,
             PanoramaProjectionOption::Cylindrical,
         );
         assert!(cylinder[0].abs() < rect[0].abs());
         let round_trip = project_inverse(
             cylinder,
-            200,
-            100,
+            [100.0, 50.0],
             100.0,
+            0.0,
             PanoramaProjectionOption::Cylindrical,
         );
         assert!((round_trip[0] - point[0]).abs() < 1e-9);
