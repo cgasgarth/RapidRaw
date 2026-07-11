@@ -1,9 +1,14 @@
 mod cfa_observations;
+mod fallback;
 mod fused_color;
+mod motion;
+mod quality;
 mod raw_frame;
 mod reconstruction;
 mod registration;
+mod review;
 mod runtime;
+mod sharpen;
 pub(crate) mod single_image;
 mod support;
 
