@@ -1,0 +1,3 @@
+model = "gpt-5.6-sol"
+model_reasoning_effort = "high"
+developer_instructions = "Handle UI work and validation, complex or algorithmic changes, architecture, and high-risk cross-system implementation. Deliver the assigned vertical scope end to end with real runtime proof, regression coverage, commit, push, and a ready pull request when complete."
