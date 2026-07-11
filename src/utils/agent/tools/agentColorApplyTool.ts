@@ -23,7 +23,7 @@ import {
 } from '../../selectiveColorCommandBridge';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
 import { renderAgentReadOnlyPreview } from '../context/agentReadOnlyAppServerTools';
-import { createLiveEditorCoreAppServerBridge } from '../session/agentLiveEditorCoreState';
+import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorCoreState';
 
 export const AGENT_COLOR_APPLY_TOOL_NAME = 'rawengine.agent.color.apply';
 export const AGENT_COLOR_APPLY_INPUT_SCHEMA_NAME = 'AgentColorApplyRequestV1';
@@ -352,7 +352,7 @@ const dispatchSelectiveColorPayloads = async ({
   payloads: readonly SelectiveColorAdjustmentPayload[];
   sessionId: string;
 }): Promise<{ applyCommands: SelectiveColorCommandEnvelope[]; mutations: ToneColorMutationResultV1[] }> => {
-  const bridge = createLiveEditorCoreAppServerBridge();
+  const bridge = createLiveEditorAppServerBridge();
   const mutations: ToneColorMutationResultV1[] = [];
   const applyCommands: SelectiveColorCommandEnvelope[] = [];
 

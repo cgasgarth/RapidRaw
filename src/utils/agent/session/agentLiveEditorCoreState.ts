@@ -104,7 +104,7 @@ export const buildLiveEditorProjectLibrarySnapshot = (): ProjectLibrarySnapshotV
   });
 };
 
-export const createLiveEditorCoreAppServerBridge = () =>
+export const createLiveEditorAppServerBridge = () =>
   createRawEngineLocalAppServerBridge({
     getProjectLibrarySnapshot: buildLiveEditorProjectLibrarySnapshot,
   });

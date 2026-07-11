@@ -30,7 +30,7 @@ import {
   hashBasicTonePreviewPixels,
   renderBasicTonePreviewPixels,
 } from '../session/agentLiveBasicTone';
-import { createLiveEditorCoreAppServerBridge } from '../session/agentLiveEditorCoreState';
+import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorCoreState';
 import { buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
 import {
   type AgentPreviewEnvelope,
@@ -458,7 +458,7 @@ export const buildAgentToneColorDryRunExpertEdit = async ({
     { dryRun: true },
   );
 
-  const bridge = createLiveEditorCoreAppServerBridge();
+  const bridge = createLiveEditorAppServerBridge();
   const basicToneDispatch = await bridge.dispatch(basicToneCommand);
   if (!basicToneDispatch.ok)
     throw new Error(`Tone/color expert basic-tone dry-run failed: ${basicToneDispatch.message}`);

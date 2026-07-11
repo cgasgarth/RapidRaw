@@ -17,7 +17,7 @@ import {
   hashBasicTonePreviewPixels,
   renderBasicTonePreviewPixels,
 } from '../session/agentLiveBasicTone';
-import { createLiveEditorCoreAppServerBridge } from '../session/agentLiveEditorCoreState';
+import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorCoreState';
 import {
   type AgentPreviewEnvelope,
   agentPreviewEnvelopeSchema,
@@ -127,7 +127,7 @@ export const buildAgentBasicToneDryRunPreviewArtifacts = async ({
     sessionId,
   });
   const command = buildBasicToneCommandEnvelope(requestedAdjustments, context, { dryRun: true });
-  const dryRun = await createLiveEditorCoreAppServerBridge().dispatch(command);
+  const dryRun = await createLiveEditorAppServerBridge().dispatch(command);
   if (!dryRun.ok) throw new Error(`Agent basic-tone dry-run preview failed: ${dryRun.message}`);
   const previewResult = toneColorDryRunResultV1Schema.parse(dryRun.result);
 
