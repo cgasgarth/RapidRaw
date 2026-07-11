@@ -40,6 +40,19 @@ pub(crate) struct DecodedFocusSource {
     pub noise: f32,
     pub proxy_hash: String,
     pub warnings: Vec<String>,
+    pub registration: RegistrationFrame,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct RegistrationFrame {
+    pub width: usize,
+    pub height: usize,
+    pub full_width: usize,
+    pub full_height: usize,
+    pub luma: Vec<f32>,
+    pub color: Vec<[f32; 3]>,
+    pub valid: Vec<bool>,
+    pub clipped: Vec<bool>,
 }
 
 pub(crate) fn decode(
@@ -66,6 +79,26 @@ pub(crate) fn decode(
             serde_json::to_vec(&frame.calibration).map_err(|error| error.to_string())?;
         let noise = robust_noise(&frame.proxy.pixels, frame.proxy.width);
         let focus_distance_mm = frame.focus_distance_mm;
+        let registration = RegistrationFrame {
+            width: frame.color_proxy.width,
+            height: frame.color_proxy.height,
+            full_width: frame.active_area.width,
+            full_height: frame.active_area.height,
+            luma: frame.proxy.pixels.clone(),
+            color: frame.color_proxy.pixels.clone(),
+            valid: frame
+                .color_proxy
+                .valid
+                .iter()
+                .map(|channels| channels.iter().all(|value| *value))
+                .collect(),
+            clipped: frame
+                .color_proxy
+                .clipped
+                .iter()
+                .map(|channels| channels.iter().any(|value| *value))
+                .collect(),
+        };
         return Ok(DecodedFocusSource {
             source_index,
             path_handle,
@@ -116,6 +149,7 @@ pub(crate) fn decode(
             } else {
                 vec!["focus_distance_metadata_unavailable".to_string()]
             },
+            registration,
         });
     }
     let bytes = std::fs::read(path).map_err(|error| format!("source_read_failed:{error}"))?;
@@ -132,6 +166,7 @@ pub(crate) fn decode(
         .pixels()
         .filter(|pixel| pixel.0.iter().any(|value| *value >= 0.995))
         .count();
+    let color = pixels.pixels().map(|pixel| pixel.0).collect::<Vec<_>>();
     let proxy_bytes = luma
         .iter()
         .flat_map(|value| value.to_le_bytes())
@@ -170,6 +205,19 @@ pub(crate) fn decode(
             "focus_distance_metadata_unavailable".to_string(),
             "rendered_rgb_source".to_string(),
         ],
+        registration: RegistrationFrame {
+            width: width as usize,
+            height: height as usize,
+            full_width: width as usize,
+            full_height: height as usize,
+            luma,
+            color,
+            valid: vec![true; width as usize * height as usize],
+            clipped: pixels
+                .pixels()
+                .map(|pixel| pixel.0.iter().any(|value| *value >= 0.995))
+                .collect(),
+        },
     })
 }
 
