@@ -117,6 +117,7 @@ export interface CollageModalState {
 }
 
 export interface PanoramaModalState {
+  alignmentCancellationId: string | null;
   error: string | null;
   finalImageBase64: string | null;
   isOpen: boolean;
@@ -259,6 +260,7 @@ export interface CullingModalState {
 export const createDefaultPanoramaModalState = (
   settings: PanoramaUiSettings = DEFAULT_PANORAMA_UI_SETTINGS,
 ): PanoramaModalState => ({
+  alignmentCancellationId: null,
   error: null,
   finalImageBase64: null,
   isOpen: false,

@@ -17,10 +17,12 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
     async (paths: string[]) => {
       const { panoramaModalState } = useUIStore.getState();
       const { settings } = panoramaModalState;
+      const cancellationId = crypto.randomUUID();
       const dryRunCommand = buildPanoramaDryRunCommandState(paths, settings);
       setUI((state) => ({
         panoramaModalState: {
           ...state.panoramaModalState,
+          alignmentCancellationId: cancellationId,
           isProcessing: true,
           lastApplyCommand: null,
           lastDryRunCommand: dryRunCommand,
@@ -34,41 +36,54 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
       try {
         const runtimePlan = panoramaRuntimePlanSchema.parse(
           await invoke(Invokes.PlanPanorama, {
+            cancellationId,
             maxPreviewDimensionPx: settings.maxPreviewDimensionPx,
             paths,
           }),
         );
-        setUI((state) => ({
-          panoramaModalState: {
-            ...state.panoramaModalState,
-            progressMessage: 'Panorama preflight complete.',
-            runtimePlan,
-          },
-        }));
+        setUI((state) =>
+          state.panoramaModalState.alignmentCancellationId !== cancellationId
+            ? {}
+            : {
+                panoramaModalState: {
+                  ...state.panoramaModalState,
+                  alignmentCancellationId: null,
+                  isProcessing: false,
+                  progressMessage:
+                    runtimePlan.alignment_plan?.readiness === 'global_alignment_plan_ready'
+                      ? 'Global alignment plan ready for review.'
+                      : 'Global alignment plan requires review.',
+                  runtimePlan,
+                },
+              },
+        );
         if (runtimePlan.preflight.status === 'blocked_plan_only') {
-          setUI((state) => ({
-            panoramaModalState: {
-              ...state.panoramaModalState,
-              error: runtimePlan.preflight.blocked_reasons.join('\n'),
-              isProcessing: false,
-              renderedReview: null,
-            },
-          }));
+          setUI((state) =>
+            state.panoramaModalState.runtimePlan !== runtimePlan
+              ? {}
+              : {
+                  panoramaModalState: {
+                    ...state.panoramaModalState,
+                    error: runtimePlan.preflight.blocked_reasons.join('\n'),
+                    isProcessing: false,
+                    renderedReview: null,
+                  },
+                },
+          );
           return;
         }
-        await invoke(Invokes.StitchPanorama, {
-          options: {
-            boundaryMode: settings.boundaryMode,
-            maxPreviewDimensionPx: settings.maxPreviewDimensionPx,
-            projection: settings.projection,
-            qualityPreference: settings.qualityPreference,
-            seamExposureCompensationPercent: settings.seamExposureCompensationPercent,
-          },
-          paths,
-        });
       } catch (err: unknown) {
         setUI((state) => ({
-          panoramaModalState: { ...state.panoramaModalState, isProcessing: false, error: String(err) },
+          ...(state.panoramaModalState.alignmentCancellationId !== cancellationId
+            ? {}
+            : {
+                panoramaModalState: {
+                  ...state.panoramaModalState,
+                  alignmentCancellationId: null,
+                  isProcessing: false,
+                  error: String(err),
+                },
+              }),
         }));
       }
     },

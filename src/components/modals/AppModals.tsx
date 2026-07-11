@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/core';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
@@ -251,6 +252,11 @@ export default function AppModals(props: AppModalsProps) {
                 : null
             }
             onClose={() => {
+              if (panoramaModalState.alignmentCancellationId !== null) {
+                void invoke(Invokes.CancelPanoramaAlignment, {
+                  cancellationId: panoramaModalState.alignmentCancellationId,
+                });
+              }
               setUI({
                 panoramaModalState: createDefaultPanoramaModalState(panoramaModalState.settings),
               });
