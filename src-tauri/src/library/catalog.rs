@@ -388,8 +388,7 @@ fn reconcile_root(inner: &mut CatalogInner, app: &AppHandle, root: &Path) -> Res
         } else if name.to_ascii_lowercase().ends_with(".rrexif")
             || name.to_ascii_lowercase().ends_with(".xmp")
         {
-            let lower = name.to_ascii_lowercase();
-            let source_name = lower.trim_end_matches(".rrexif").trim_end_matches(".xmp");
+            let source_name = &name[..name.rfind('.').unwrap_or(name.len())];
             auxiliary
                 .entry(path.parent().unwrap_or(&canonical).join(source_name))
                 .or_default()
@@ -1078,11 +1077,11 @@ mod tests {
     }
 
     #[test]
-    fn large_catalog_query_materializes_only_requested_page() {
+    fn fifty_thousand_row_catalog_query_materializes_only_requested_page() {
         let connection = Connection::open_in_memory().expect("memory catalog");
         connection.execute_batch(schema_sql()).expect("schema");
         let transaction = connection.unchecked_transaction().expect("transaction");
-        for index in 0..10_000 {
+        for index in 0..50_000 {
             let path = format!("/library/image-{index:05}.jpg");
             let json = serde_json::to_string(&image(path.clone())).expect("projection");
             transaction
@@ -1099,7 +1098,7 @@ mod tests {
         };
         assert_eq!(
             query_count(&mut inner, "/library", false).expect("count"),
-            10_000
+            50_000
         );
         let first = query_page(&mut inner, "/library", false, 0, 256).expect("first page");
         let second = query_page(&mut inner, "/library", false, 256, 256).expect("second page");
