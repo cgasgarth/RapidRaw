@@ -1064,7 +1064,8 @@ mod tests {
 
     use super::*;
     use crate::merge::super_resolution::raw_frame::{
-        SuperResolutionBayerBurstSource, SuperResolutionBayerCalibration,
+        CalibratedBayerSensor, CfaClass, SuperResolutionBayerBurstSource,
+        SuperResolutionBayerCalibration,
     };
 
     #[test]
@@ -1209,10 +1210,34 @@ mod tests {
         .into_iter()
         .enumerate()
         .map(|(source_index, transform)| SuperResolutionRawFrame {
+            sensor: fixture_sensor(),
             proxy: synthetic_proxy(transform),
             source: fixture_source(source_index),
         })
         .collect()
+    }
+
+    fn fixture_sensor() -> CalibratedBayerSensor {
+        let width = 512;
+        let height = 384;
+        let classes = (0..height)
+            .flat_map(|y| {
+                (0..width).map(move |x| match (y % 2, x % 2) {
+                    (0, 0) => CfaClass::R,
+                    (0, 1) => CfaClass::G1,
+                    (1, 0) => CfaClass::G2,
+                    _ => CfaClass::B,
+                })
+            })
+            .collect::<Vec<_>>();
+        CalibratedBayerSensor {
+            classes,
+            height,
+            valid: vec![true; width * height],
+            values: vec![0.5; width * height],
+            variances: vec![0.01; width * height],
+            width,
+        }
     }
 
     fn expected_transform(source_index: usize) -> ExpectedTransform {

@@ -1,5 +1,7 @@
 use std::sync::atomic::AtomicBool;
 
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+use image::{ColorType, ImageEncoder, codecs::png::PngEncoder};
 use serde::Serialize;
 use serde_json::json;
 
@@ -12,6 +14,63 @@ use super::raw_frame::{
     SuperResolutionReadinessSettings, check_cancel, decode_bayer_burst_frame,
 };
 use super::registration::{SuperResolutionRegistrationResult, solve_global_se2_registration};
+use super::{
+    cfa_observations::common_overlap,
+    fused_color::reconstruct_color,
+    raw_frame::CfaClass,
+    reconstruction::{OutputTile, SR_RECONSTRUCTION_ALGORITHM_ID, reconstruct_plane_tile},
+};
+
+const SR_COLOR_ALGORITHM_ID: &str = "support_aware_post_fusion_rgb_v1";
+const MAX_ARTIFACT_DIMENSION: u32 = 640;
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SuperResolutionNativeArtifact {
+    pub content_hash: String,
+    pub data_url: String,
+    pub height: u32,
+    pub width: u32,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SuperResolutionPlaneArtifact {
+    pub average_outlier_ratio: f32,
+    pub average_variance: f32,
+    pub class: &'static str,
+    pub contributing_source_mask: u8,
+    pub coverage_ratio: f32,
+    pub residual: SuperResolutionNativeArtifact,
+    pub support: SuperResolutionNativeArtifact,
+    pub weak_support_ratio: f32,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SuperResolutionReconstructionResult {
+    pub algorithm_id: &'static str,
+    pub capability: &'static str,
+    pub color_algorithm_id: &'static str,
+    pub decision: &'static str,
+    pub fallback_ratio: f32,
+    pub green_phase_gain: SuperResolutionGreenPhaseGain,
+    pub height: u32,
+    pub plane_artifacts: Vec<SuperResolutionPlaneArtifact>,
+    pub preview: SuperResolutionNativeArtifact,
+    pub reference_baseline: SuperResolutionNativeArtifact,
+    pub registration_plan_hash: String,
+    pub width: u32,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SuperResolutionGreenPhaseGain {
+    pub accepted: bool,
+    pub gain: f32,
+    pub residual: f32,
+    pub sample_count: usize,
+}
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -32,6 +91,7 @@ pub struct SuperResolutionDryRunPlan {
     pub intake: SuperResolutionBayerBurstIntake,
     pub registration: Option<SuperResolutionRegistrationResult>,
     pub registration_input_hash: String,
+    pub reconstruction: Option<SuperResolutionReconstructionResult>,
     pub warning_codes: Vec<String>,
 }
 
@@ -91,7 +151,7 @@ fn build_dry_run_plan(
         algorithm_id: SR_BAYER_INTAKE_ALGORITHM_ID,
         calibration_consistent,
         source_count: frames.len(),
-        sources: frames.into_iter().map(|frame| frame.source).collect(),
+        sources: frames.iter().map(|frame| frame.source.clone()).collect(),
     };
     let plan_identity = json!({
         "blockCodes": block_codes,
@@ -102,7 +162,20 @@ fn build_dry_run_plan(
     });
     let plan_hash = stable_hash(&plan_identity);
     let plan_id = format!("super_resolution_registration_plan_{}", &plan_hash[7..23]);
-    let mut warning_codes = vec!["native_registration_preview_only_no_reconstruction".to_string()];
+    let reconstruction = if block_codes.is_empty() {
+        let accepted_registration = registration
+            .as_ref()
+            .ok_or_else(|| "accepted_registration_missing".to_string())?;
+        Some(build_reconstruction(
+            &frames,
+            accepted_registration,
+            &plan_hash,
+            cancellation_token,
+        )?)
+    } else {
+        None
+    };
+    let mut warning_codes = vec!["quality_gate_pending".to_string()];
     if registration
         .as_ref()
         .is_some_and(|result| !result.excluded_sources.is_empty())
@@ -121,7 +194,282 @@ fn build_dry_run_plan(
         intake,
         registration,
         registration_input_hash,
+        reconstruction,
         warning_codes,
+    })
+}
+
+fn build_reconstruction(
+    frames: &[SuperResolutionRawFrame],
+    registration: &SuperResolutionRegistrationResult,
+    plan_hash: &str,
+    cancellation_token: &AtomicBool,
+) -> Result<SuperResolutionReconstructionResult, String> {
+    check_cancel(cancellation_token)?;
+    let overlap = common_overlap(frames, &registration.transforms)?;
+    let full_width = overlap.width * 2;
+    let full_height = overlap.height * 2;
+    let scale = 1.0;
+    let tile_width = full_width.min(MAX_ARTIFACT_DIMENSION);
+    let tile_height = full_height.min(MAX_ARTIFACT_DIMENSION);
+    let sampled_width = tile_width;
+    let sampled_height = tile_height;
+    let tile = OutputTile {
+        height: sampled_height,
+        width: sampled_width,
+        x: (full_width - sampled_width) / 2,
+        y: (full_height - sampled_height) / 2,
+    };
+    let classes = [
+        (CfaClass::R, "R"),
+        (CfaClass::G1, "G1"),
+        (CfaClass::G2, "G2"),
+        (CfaClass::B, "B"),
+    ];
+    let mut planes = Vec::with_capacity(4);
+    for (class, _) in classes {
+        planes.push(reconstruct_plane_tile(
+            frames,
+            &registration.transforms,
+            overlap,
+            class,
+            tile,
+            cancellation_token,
+        )?);
+    }
+    let green_phase_gain = estimate_green_phase_gain(frames, registration);
+    if green_phase_gain.accepted {
+        for sample in &mut planes[2].estimates {
+            sample.estimate *= green_phase_gain.gain;
+            sample.residual *= green_phase_gain.gain;
+            sample.variance *= green_phase_gain.gain * green_phase_gain.gain;
+        }
+    }
+    check_cancel(cancellation_token)?;
+    let reference = frames
+        .iter()
+        .find(|frame| frame.source.source_index == registration.reference_source_index)
+        .ok_or_else(|| "registration_reference_identity_mismatch".to_string())?;
+    let mut rgb = vec![0u8; (tile_width * tile_height * 3) as usize];
+    let mut baseline_rgb = vec![0u8; rgb.len()];
+    let mut fallback_count = 0usize;
+    for preview_y in 0..tile_height {
+        for preview_x in 0..tile_width {
+            let source_x = ((preview_x as f32 * scale).floor() as u32).min(tile.width - 1);
+            let source_y = ((preview_y as f32 * scale).floor() as u32).min(tile.height - 1);
+            let sample_index = (source_y * tile.width + source_x) as usize;
+            let baseline = baseline_rgb_at(reference, overlap, tile, source_x, source_y);
+            let color = reconstruct_color(
+                planes[0].estimates[sample_index],
+                planes[1].estimates[sample_index],
+                planes[2].estimates[sample_index],
+                planes[3].estimates[sample_index],
+                baseline,
+                reference.source.calibration.white_balance,
+            );
+            fallback_count += usize::from(color.fallback);
+            let output_index = ((preview_y * tile_width + preview_x) * 3) as usize;
+            encode_display_rgb(&mut rgb[output_index..output_index + 3], color.rgb);
+            encode_display_rgb(&mut baseline_rgb[output_index..output_index + 3], baseline);
+        }
+    }
+    let mut plane_artifacts = Vec::with_capacity(4);
+    for (plane_index, (_, label)) in classes.into_iter().enumerate() {
+        debug_assert_eq!(planes[plane_index].width, tile.width);
+        debug_assert_eq!(planes[plane_index].height, tile.height);
+        let estimates = &planes[plane_index].estimates;
+        let supported = estimates
+            .iter()
+            .filter(|sample| sample.support_class() == super::support::SupportClass::Supported)
+            .count();
+        let weak = estimates
+            .iter()
+            .filter(|sample| sample.support_class() == super::support::SupportClass::Weak)
+            .count();
+        let support_pixels = sample_map(
+            estimates,
+            tile.width,
+            tile.height,
+            tile_width,
+            tile_height,
+            scale,
+            |sample| (sample.effective_samples / 4.0).clamp(0.0, 1.0),
+        );
+        let residual_pixels = sample_map(
+            estimates,
+            tile.width,
+            tile.height,
+            tile_width,
+            tile_height,
+            scale,
+            |sample| (sample.residual * 8.0).clamp(0.0, 1.0),
+        );
+        plane_artifacts.push(SuperResolutionPlaneArtifact {
+            average_outlier_ratio: estimates
+                .iter()
+                .map(|sample| sample.outlier_ratio)
+                .sum::<f32>()
+                / estimates.len().max(1) as f32,
+            average_variance: estimates.iter().map(|sample| sample.variance).sum::<f32>()
+                / estimates.len().max(1) as f32,
+            class: label,
+            contributing_source_mask: estimates
+                .iter()
+                .fold(0, |mask, sample| mask | sample.source_mask),
+            coverage_ratio: supported as f32 / estimates.len().max(1) as f32,
+            residual: encode_png_artifact(
+                &residual_pixels,
+                tile_width,
+                tile_height,
+                ColorType::L8,
+            )?,
+            support: encode_png_artifact(&support_pixels, tile_width, tile_height, ColorType::L8)?,
+            weak_support_ratio: weak as f32 / estimates.len().max(1) as f32,
+        });
+    }
+    Ok(SuperResolutionReconstructionResult {
+        algorithm_id: SR_RECONSTRUCTION_ALGORITHM_ID,
+        capability: "native_burst_cfa_preview",
+        color_algorithm_id: SR_COLOR_ALGORITHM_ID,
+        decision: "quality_gate_pending",
+        fallback_ratio: fallback_count as f32 / (tile_width * tile_height) as f32,
+        green_phase_gain,
+        height: full_height,
+        plane_artifacts,
+        preview: encode_png_artifact(&rgb, tile_width, tile_height, ColorType::Rgb8)?,
+        reference_baseline: encode_png_artifact(
+            &baseline_rgb,
+            tile_width,
+            tile_height,
+            ColorType::Rgb8,
+        )?,
+        registration_plan_hash: plan_hash.to_string(),
+        width: full_width,
+    })
+}
+
+fn estimate_green_phase_gain(
+    frames: &[SuperResolutionRawFrame],
+    registration: &SuperResolutionRegistrationResult,
+) -> SuperResolutionGreenPhaseGain {
+    let mut g1_sum = 0.0f64;
+    let mut g2_sum = 0.0f64;
+    let mut g1_count = 0usize;
+    let mut g2_count = 0usize;
+    for frame in frames.iter().filter(|frame| {
+        registration
+            .selected_source_indexes
+            .contains(&frame.source.source_index)
+    }) {
+        for index in 0..frame.sensor.values.len() {
+            if !frame.sensor.valid[index] {
+                continue;
+            }
+            match frame.sensor.classes[index] {
+                CfaClass::G1 => {
+                    g1_sum += frame.sensor.values[index] as f64;
+                    g1_count += 1;
+                }
+                CfaClass::G2 => {
+                    g2_sum += frame.sensor.values[index] as f64;
+                    g2_count += 1;
+                }
+                _ => {}
+            }
+        }
+    }
+    let sample_count = g1_count.min(g2_count);
+    if sample_count < 64 || g1_sum <= 0.0 || g2_sum <= 0.0 {
+        return SuperResolutionGreenPhaseGain {
+            accepted: false,
+            gain: 1.0,
+            residual: 1.0,
+            sample_count,
+        };
+    }
+    let g1_mean = g1_sum / g1_count as f64;
+    let g2_mean = g2_sum / g2_count as f64;
+    let gain = (g1_mean / g2_mean) as f32;
+    let residual = ((g1_mean - g2_mean).abs() / g1_mean.max(g2_mean)) as f32;
+    SuperResolutionGreenPhaseGain {
+        accepted: (0.9..=1.1).contains(&gain) && residual <= 0.1,
+        gain,
+        residual,
+        sample_count,
+    }
+}
+
+fn baseline_rgb_at(
+    frame: &SuperResolutionRawFrame,
+    overlap: super::cfa_observations::SceneRect,
+    tile: OutputTile,
+    output_x: u32,
+    output_y: u32,
+) -> [f32; 3] {
+    let sensor_x = (overlap.left + (tile.x + output_x) as f32 * 0.5)
+        .floor()
+        .clamp(0.0, frame.sensor.width.saturating_sub(1) as f32) as usize;
+    let sensor_y = (overlap.top + (tile.y + output_y) as f32 * 0.5)
+        .floor()
+        .clamp(0.0, frame.sensor.height.saturating_sub(1) as f32) as usize;
+    let mut channels = [0.0; 3];
+    for y in sensor_y.saturating_sub(1)..=(sensor_y + 1).min(frame.sensor.height - 1) {
+        for x in sensor_x.saturating_sub(1)..=(sensor_x + 1).min(frame.sensor.width - 1) {
+            let index = y * frame.sensor.width + x;
+            let channel = match frame.sensor.classes[index] {
+                CfaClass::R => 0,
+                CfaClass::B => 2,
+                _ => 1,
+            };
+            channels[channel] = frame.sensor.values[index];
+        }
+    }
+    channels
+}
+
+fn sample_map(
+    estimates: &[super::support::SampleEstimate],
+    source_width: u32,
+    source_height: u32,
+    width: u32,
+    height: u32,
+    scale: f32,
+    value: impl Fn(super::support::SampleEstimate) -> f32,
+) -> Vec<u8> {
+    let mut pixels = vec![0; (width * height) as usize];
+    for y in 0..height {
+        for x in 0..width {
+            let sx = ((x as f32 * scale).floor() as u32).min(source_width - 1);
+            let sy = ((y as f32 * scale).floor() as u32).min(source_height - 1);
+            pixels[(y * width + x) as usize] =
+                (value(estimates[(sy * source_width + sx) as usize]) * 255.0).round() as u8;
+        }
+    }
+    pixels
+}
+
+fn encode_display_rgb(output: &mut [u8], rgb: [f32; 3]) {
+    for (target, value) in output.iter_mut().zip(rgb) {
+        *target = (value.max(0.0).powf(1.0 / 2.2).min(1.0) * 255.0).round() as u8;
+    }
+}
+
+fn encode_png_artifact(
+    pixels: &[u8],
+    width: u32,
+    height: u32,
+    color: ColorType,
+) -> Result<SuperResolutionNativeArtifact, String> {
+    let mut bytes = Vec::new();
+    PngEncoder::new(&mut bytes)
+        .write_image(pixels, width, height, color.into())
+        .map_err(|error| format!("super_resolution_artifact_encode_failed:{error}"))?;
+    let content_hash = format!("blake3:{}", blake3::hash(&bytes).to_hex());
+    Ok(SuperResolutionNativeArtifact {
+        content_hash,
+        data_url: format!("data:image/png;base64,{}", BASE64.encode(bytes)),
+        height,
+        width,
     })
 }
 

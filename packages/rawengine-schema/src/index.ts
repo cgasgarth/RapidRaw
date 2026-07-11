@@ -50,6 +50,7 @@ export * from './rawEngineSchemas.js';
 export * from './retouchRemoveRuntime.js';
 export * from './super-resolution/superResolutionAlignmentDiagnostics.js';
 export * from './super-resolution/superResolutionAppServerRuntime.js';
+export * from './super-resolution/superResolutionNativeCfaPreview.js';
 export * from './super-resolution/superResolutionReconstructionDiagnostics.js';
 export * from './super-resolution/superResolutionRuntimePlan.js';
 export * from './super-resolution/superResolutionSidecarProvenance.js';

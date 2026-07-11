@@ -65,8 +65,27 @@ pub struct GreenPhaseProxy {
 
 #[derive(Clone, Debug)]
 pub struct SuperResolutionRawFrame {
+    pub sensor: CalibratedBayerSensor,
     pub proxy: GreenPhaseProxy,
     pub source: SuperResolutionBayerBurstSource,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CfaClass {
+    R,
+    G1,
+    G2,
+    B,
+}
+
+#[derive(Clone, Debug)]
+pub struct CalibratedBayerSensor {
+    pub classes: Vec<CfaClass>,
+    pub height: usize,
+    pub valid: Vec<bool>,
+    pub values: Vec<f32>,
+    pub variances: Vec<f32>,
+    pub width: usize,
 }
 
 pub fn check_cancel(cancellation_token: &AtomicBool) -> Result<(), String> {
@@ -107,6 +126,7 @@ pub fn decode_bayer_burst_frame(
     let height = u32::try_from(raw_image.height)
         .map_err(|_| format!("{} is taller than supported by SR.", source_path.display()))?;
     let proxy = build_green_phase_proxy(&raw_image, max_preview_dimension_px, cancellation_token)?;
+    let sensor = build_calibrated_sensor(&raw_image, cancellation_token)?;
     let calibration_identity = stable_hash(
         &serde_json::to_value(&calibration)
             .map_err(|error| format!("Failed to encode Bayer calibration identity: {error}"))?,
@@ -114,6 +134,7 @@ pub fn decode_bayer_burst_frame(
     let content_hash = format!("blake3:{}", blake3::hash(&bytes).to_hex());
 
     Ok(SuperResolutionRawFrame {
+        sensor,
         proxy,
         source: SuperResolutionBayerBurstSource {
             block_codes: Vec::new(),
@@ -136,6 +157,69 @@ pub fn decode_bayer_burst_frame(
             source_index,
             width,
         },
+    })
+}
+
+fn build_calibrated_sensor(
+    raw_image: &RawImage,
+    cancellation_token: &AtomicBool,
+) -> Result<CalibratedBayerSensor, String> {
+    let RawPhotometricInterpretation::Cfa(config) = &raw_image.photometric else {
+        return Err("calibrated sensor requires a CFA image".to_string());
+    };
+    let RawImageData::Integer(pixels) = &raw_image.data else {
+        return Err("calibrated sensor requires integer samples".to_string());
+    };
+    let green_positions = green_offsets(&config.cfa)?;
+    let count = raw_image.width * raw_image.height;
+    if pixels.len() < count {
+        return Err("Bayer sample dimensions do not match decoded image dimensions".to_string());
+    }
+    let mut values = Vec::with_capacity(count);
+    let mut variances = Vec::with_capacity(count);
+    let mut valid = Vec::with_capacity(count);
+    let mut classes = Vec::with_capacity(count);
+    for y in 0..raw_image.height {
+        if y % 32 == 0 {
+            check_cancel(cancellation_token)?;
+        }
+        for x in 0..raw_image.width {
+            let color = config.cfa.color_at(y, x);
+            let class = match color {
+                0 => CfaClass::R,
+                2 => CfaClass::B,
+                1 if (y % 2, x % 2) == green_positions[0] => CfaClass::G1,
+                1 => CfaClass::G2,
+                _ => return Err("unsupported non-RGB Bayer color".to_string()),
+            };
+            let sample = pixels[y * raw_image.width + x] as f32;
+            let black = black_level_at(raw_image, x, y);
+            let white = white_level_at(raw_image, color);
+            let range = (white - black).max(1.0);
+            let value = (sample - black) / range;
+            let clip_guard = (range * 0.005).max(2.0);
+            let is_valid = sample.is_finite()
+                && sample > black
+                && sample < white - clip_guard
+                && x > 0
+                && y > 0
+                && x + 1 < raw_image.width
+                && y + 1 < raw_image.height;
+            // Conservative normalized read + shot variance until camera-specific noise is available.
+            let variance = (4.0 / (range * range) + value.max(0.0) / range).max(1.0e-7);
+            values.push(value);
+            variances.push(variance);
+            valid.push(is_valid);
+            classes.push(class);
+        }
+    }
+    Ok(CalibratedBayerSensor {
+        classes,
+        height: raw_image.height,
+        valid,
+        values,
+        variances,
+        width: raw_image.width,
     })
 }
 
