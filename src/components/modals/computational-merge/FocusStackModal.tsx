@@ -31,6 +31,7 @@ import {
 } from './ComputationalSetupModalShell';
 
 interface FocusStackModalProps {
+  applyReceipt?: import('../../../schemas/focus-stack/focusStackApplySchemas').FocusStackApplyReceipt | null;
   candidateJob?:
     | import('../../../schemas/focus-stack/focusStackCandidateRuntimeSchemas').FocusStackCandidateJobResult
     | null
@@ -43,6 +44,7 @@ interface FocusStackModalProps {
   nativePlanError?: string | null;
   isNativePlanning?: boolean;
   onApplyPlan: () => void;
+  onOpenOutput?: (path: string) => void;
   onPrepareCandidate?: () => void;
   onCancelCandidate?: () => void;
   onClose: () => void;
@@ -62,6 +64,7 @@ const reviewOverlayOpacityOptions = [40, 70, 100] as const;
 const reviewArtifactPath = '/tmp/rawengine-focus-stack-smoke.tif';
 
 export function FocusStackModal({
+  applyReceipt = null,
   candidateJob = null,
   isOpen,
   lastApplyCommand,
@@ -71,6 +74,7 @@ export function FocusStackModal({
   nativePlanError = null,
   isNativePlanning = false,
   onApplyPlan,
+  onOpenOutput = () => {},
   onPrepareCandidate = () => {},
   onCancelCandidate = () => {},
   onClose,
@@ -306,10 +310,17 @@ export function FocusStackModal({
               {t('modals.focusStack.prepareFullResolution')}
             </Button>
           )}
-          <Button onClick={onApplyPlan} disabled={true}>
-            <CheckCircle2 className="w-4 h-4" />
-            {t('modals.transform.apply')}
-          </Button>
+          {applyReceipt === null ? (
+            <Button onClick={onApplyPlan} disabled={!isApplyPlanReady || candidateJob?.candidate?.commitReady !== true}>
+              <CheckCircle2 className="w-4 h-4" />
+              {t('modals.transform.apply')}
+            </Button>
+          ) : (
+            <Button onClick={() => onOpenOutput(applyReceipt.payloadPath)}>
+              <CheckCircle2 className="w-4 h-4" />
+              {t('modals.hdr.openInEditor')}
+            </Button>
+          )}
         </>
       }
     >

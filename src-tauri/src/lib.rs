@@ -2829,6 +2829,7 @@ pub fn run() {
             cancel_focus_stack_plan,
             merge::focus_stack::job::prepare_focus_stack_candidate,
             merge::focus_stack::job::read_focus_stack_job,
+            merge::focus_stack::apply::apply_focus_stack_candidate,
             save_hdr,
             load_and_parse_lut,
             fetch_community_presets,

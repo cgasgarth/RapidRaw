@@ -1,4 +1,6 @@
 mod alignment;
+pub(crate) mod apply;
+mod artifact;
 mod blend;
 mod candidate;
 mod focus_measure;
