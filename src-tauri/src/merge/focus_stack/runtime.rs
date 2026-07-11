@@ -1,4 +1,8 @@
-use super::raw_frame::{self, DecodedFocusSource, PROXY_ID, RectU32};
+use super::{
+    alignment::{self, RectF64, SimilarityTransform},
+    raw_frame::{self, DecodedFocusSource, PROXY_ID, RectU32},
+    warp::{self, SourcePreview},
+};
 
 const SCHEMA_VERSION: u32 = 1;
 const POLICY_ID: &str = "focus_stack_intake_policy_v1";
@@ -70,6 +74,13 @@ pub(crate) struct FocusStackInputPlan {
     sources: Vec<InputSource>,
     warning_codes: Vec<String>,
     block_codes: Vec<String>,
+    input_plan_hash: String,
+    alignment_algorithm_id: &'static str,
+    alignment_policy_id: &'static str,
+    interpolation_policy_id: &'static str,
+    common_overlap: Option<RectF64>,
+    transforms: Vec<SimilarityTransform>,
+    previews: Vec<SourcePreview>,
 }
 
 pub(crate) fn build_input_plan(
@@ -110,7 +121,7 @@ pub(crate) fn build_input_plan(
 fn finish(
     decoded: Vec<DecodedFocusSource>,
     settings: FocusStackReadinessSettings,
-    cancelled: impl Fn() -> bool,
+    cancelled: impl Fn() -> bool + Copy,
 ) -> Result<FocusStackInputPlan, String> {
     let first = &decoded[0];
     let mut blocks = Vec::new();
@@ -212,41 +223,106 @@ fn finish(
         })
         .unwrap_or(0);
     let effective = decoded[reference_source_index].calibration_identity.clone();
-    let common_geometry = first.active_area.clone();
+    let common_geometry = decoded[reference_source_index].active_area.clone();
     let sources = decoded
-        .into_iter()
+        .iter()
         .zip(scores)
         .map(|(s, reference_score)| InputSource {
             source_index: s.source_index,
-            path_handle: s.path_handle,
+            path_handle: s.path_handle.clone(),
             source_kind: s.source_kind,
-            content_hash: s.content_hash,
-            graph_revision: s.graph_revision,
+            content_hash: s.content_hash.clone(),
+            graph_revision: s.graph_revision.clone(),
             width: s.width,
             height: s.height,
-            active_area: s.active_area,
-            orientation: s.orientation,
-            camera_make: s.camera_make,
-            camera_model: s.camera_model,
-            lens_model: s.lens_model,
+            active_area: s.active_area.clone(),
+            orientation: s.orientation.clone(),
+            camera_make: s.camera_make.clone(),
+            camera_model: s.camera_model.clone(),
+            lens_model: s.lens_model.clone(),
             focal_length_mm: s.focal_length_mm,
             aperture: s.aperture,
             focus_distance_mm: s.focus_distance_mm,
             exposure_ev: s.exposure_ev,
             iso: s.iso,
-            calibration_identity: s.calibration_identity,
+            calibration_identity: s.calibration_identity.clone(),
             effective_calibration_identity: effective.clone(),
             scene_linear_render_identity: s.render_identity,
             clipping_ratio: s.clipping_ratio,
             invalid_border_ratio: 0.0,
             finite_pixel_ratio: s.finite_pixel_ratio,
             luma_noise_estimate: s.noise,
-            proxy_hash: s.proxy_hash,
+            proxy_hash: s.proxy_hash.clone(),
             reference_score,
-            warnings: s.warnings,
+            warnings: s.warnings.clone(),
         })
         .collect::<Vec<_>>();
-    let canonical = serde_json::json!({"schemaVersion": SCHEMA_VERSION, "policyId": POLICY_ID, "proxyAlgorithmId": PROXY_ID, "focusOrderSource": "user_selection", "coordinateConvention": "reference_active_area_pixels_xywh_half_open", "referenceSourceIndex": reference_source_index, "commonGeometry": common_geometry, "effectiveCalibrationIdentity": effective, "settings": settings, "sources": sources, "warningCodes": warnings, "blockCodes": blocks});
+    let input_canonical = serde_json::json!({"schemaVersion": SCHEMA_VERSION, "policyId": POLICY_ID, "proxyAlgorithmId": PROXY_ID, "focusOrderSource": "user_selection", "coordinateConvention": "full_resolution_active_area_pixel_centers", "referenceSourceIndex": reference_source_index, "commonGeometry": common_geometry, "effectiveCalibrationIdentity": effective, "settings": settings, "sources": sources, "warningCodes": warnings, "blockCodes": blocks});
+    let input_plan_hash = format!(
+        "blake3:{}",
+        blake3::hash(&serde_json::to_vec(&input_canonical).map_err(|error| error.to_string())?)
+            .to_hex()
+    );
+    let transforms = alignment::solve_all(&decoded, reference_source_index, cancelled)?;
+    for transform in &transforms {
+        warnings.extend(transform.reason_codes.iter().cloned());
+    }
+    if blocks.is_empty() {
+        if transforms
+            .iter()
+            .filter(|transform| transform.status == "accepted")
+            .count()
+            < 2
+        {
+            blocks.push("alignment_fewer_than_two_sources".to_string());
+        }
+        if transforms
+            .first()
+            .is_some_and(|transform| transform.status != "accepted")
+            || transforms
+                .last()
+                .is_some_and(|transform| transform.status != "accepted")
+        {
+            blocks.push("alignment_focus_endpoint_excluded".to_string());
+        }
+    }
+    let common_overlap = alignment::common_crop(
+        &transforms,
+        common_geometry.width as f64,
+        common_geometry.height as f64,
+    );
+    if blocks.is_empty() && common_overlap.is_none() {
+        blocks.push("alignment_common_crop_unavailable".to_string());
+    }
+    if blocks.is_empty()
+        && common_overlap.as_ref().is_some_and(|crop| {
+            1.0 - (crop.width * crop.height)
+                / (common_geometry.width as f64 * common_geometry.height as f64)
+                > 0.05
+        })
+    {
+        blocks.push("alignment_common_crop_loss_exceeded".to_string());
+    }
+    warnings.sort();
+    warnings.dedup();
+    blocks.sort();
+    blocks.dedup();
+    let previews = if blocks.is_empty() {
+        warp::render_previews(
+            &decoded,
+            &transforms,
+            reference_source_index,
+            common_overlap.as_ref().expect("checked common crop"),
+            cancelled,
+        )?
+    } else {
+        Vec::new()
+    };
+    let preview_hashes = previews
+        .iter()
+        .map(|preview| (&preview.source_index, &preview.preview_hash))
+        .collect::<Vec<_>>();
+    let canonical = serde_json::json!({"inputPlanHash": input_plan_hash, "alignmentAlgorithmId": alignment::ALGORITHM_ID, "alignmentPolicyId": alignment::POLICY_ID, "interpolationPolicyId": warp::WARP_ID, "transforms": transforms, "commonOverlap": common_overlap, "previewHashes": preview_hashes, "warningCodes": warnings, "blockCodes": blocks});
     if cancelled() {
         return Err("focus_stack_plan_cancelled:plan_publication".to_string());
     }
@@ -262,7 +338,7 @@ fn finish(
         policy_id: POLICY_ID,
         proxy_algorithm_id: PROXY_ID,
         focus_order_source: "user_selection",
-        coordinate_convention: "reference_active_area_pixels_xywh_half_open",
+        coordinate_convention: "full_resolution_active_area_pixel_centers",
         reference_source_index,
         common_geometry,
         effective_calibration_identity: effective,
@@ -270,6 +346,13 @@ fn finish(
         sources,
         warning_codes: warnings,
         block_codes: blocks,
+        input_plan_hash,
+        alignment_algorithm_id: alignment::ALGORITHM_ID,
+        alignment_policy_id: alignment::POLICY_ID,
+        interpolation_policy_id: warp::WARP_ID,
+        common_overlap,
+        transforms,
+        previews,
     })
 }
 
@@ -331,11 +414,15 @@ mod tests {
         let paths = (0..count)
             .map(|index| {
                 let path = directory.path().join(format!("focus-{index:03}.png"));
-                RgbImage::from_fn(24, 16, |x, y| {
+                RgbImage::from_fn(160, 120, |x, y| {
                     Rgb([
-                        ((x * 7 + index as u32) % 255) as u8,
+                        ((x * 7) % 255) as u8,
                         ((y * 11) % 255) as u8,
-                        64,
+                        if x == 0 && y == 0 {
+                            64 + index as u8
+                        } else {
+                            64
+                        },
                     ])
                 })
                 .save(&path)
@@ -360,7 +447,16 @@ mod tests {
             let revisions = vec!["graph-v1".to_string(); count];
             let first = plan(&paths, &revisions);
             let second = plan(&paths, &revisions);
-            assert!(first.accepted);
+            assert!(
+                first.accepted,
+                "{:?} {:?}",
+                first.block_codes,
+                first
+                    .transforms
+                    .iter()
+                    .map(|transform| (&transform.status, &transform.reason_codes))
+                    .collect::<Vec<_>>()
+            );
             assert_eq!(
                 first.accepted_dry_run_plan_hash,
                 second.accepted_dry_run_plan_hash
@@ -391,7 +487,7 @@ mod tests {
             baseline,
             plan(&paths, &revisions).accepted_dry_run_plan_hash
         );
-        RgbImage::from_pixel(24, 16, Rgb([255, 0, 0]))
+        RgbImage::from_pixel(160, 120, Rgb([255, 0, 0]))
             .save(&paths[1])
             .unwrap();
         assert_ne!(
@@ -447,6 +543,24 @@ mod tests {
             noise: index as f32 * 0.001,
             proxy_hash: format!("blake3:proxy-{index}"),
             warnings: Vec::new(),
+            registration: super::raw_frame::RegistrationFrame {
+                width: 24,
+                height: 16,
+                full_width: 24,
+                full_height: 16,
+                luma: (0..16)
+                    .flat_map(|y| {
+                        (0..24).map(move |x| ((x * 7 + y * 11 + index) % 97) as f32 / 97.0)
+                    })
+                    .collect(),
+                color: (0..16)
+                    .flat_map(|y| {
+                        (0..24).map(move |x| [((x * 7 + y * 11 + index) % 97) as f32 / 97.0; 3])
+                    })
+                    .collect(),
+                valid: vec![true; 24 * 16],
+                clipped: vec![false; 24 * 16],
+            },
         }
     }
 
@@ -522,7 +636,15 @@ mod tests {
         );
         let revisions = vec!["private-proof-neutral-v1".to_string(); paths.len()];
         let result = plan(&paths, &revisions);
-        assert!(result.accepted, "{:?}", result.block_codes);
+        let repeated = plan(&paths, &revisions);
+        assert_eq!(
+            result.accepted_dry_run_plan_hash,
+            repeated.accepted_dry_run_plan_hash
+        );
+        assert_eq!(
+            serde_json::to_vec(&result.transforms).unwrap(),
+            serde_json::to_vec(&repeated.transforms).unwrap()
+        );
         let sanitized = serde_json::json!({
             "fixtureId": "alaska-plane-v1",
             "accepted": result.accepted,
@@ -534,7 +656,24 @@ mod tests {
             "dimensions": result.sources.iter().map(|source| [source.width, source.height]).collect::<Vec<_>>(),
             "warningCodes": result.warning_codes,
             "blockCodes": result.block_codes,
-            "nonClaims": ["no_alignment", "no_focus_map", "no_blend", "no_durable_output"]
+            "inputPlanHash": result.input_plan_hash,
+            "alignmentAlgorithmId": result.alignment_algorithm_id,
+            "commonOverlap": result.common_overlap,
+            "transforms": result.transforms.iter().map(|transform| serde_json::json!({
+                "sourceIndex": transform.source_index,
+                "scale": transform.scale,
+                "rotationDegrees": transform.rotation_degrees,
+                "translationXPx": transform.translation_x_px,
+                "translationYPx": transform.translation_y_px,
+                "overlapRatio": transform.overlap_ratio,
+                "p95ResidualPx": transform.p95_residual_px,
+                "confidence": transform.confidence,
+                "status": transform.status,
+                "reasonCodes": transform.reason_codes,
+                "exposureScalar": transform.exposure_normalization.scalar,
+            })).collect::<Vec<_>>(),
+            "previewHashes": result.previews.iter().map(|preview| preview.preview_hash.clone()).collect::<Vec<_>>(),
+            "nonClaims": ["no_focus_evidence", "no_label_map", "no_pyramid_blend", "no_durable_output"]
         });
         let output = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../private-artifacts/validation/computational-merge/focus-stack-intake/alaska-plan.json");
         std::fs::create_dir_all(output.parent().unwrap()).unwrap();
