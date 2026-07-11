@@ -5,6 +5,7 @@ import {
   buildVisibleWgpuTransformPayload,
   fingerprintWgpuTransformPayload,
   parseCssRgbColor,
+  shouldSubmitVisibleWgpuTransform,
   WGPU_HIDDEN_COORDINATE,
 } from '../../../src/utils/wgpuTransformPayload';
 
@@ -21,6 +22,12 @@ const rect = {
 };
 
 describe('wgpu transform payload', () => {
+  test('submits visible geometry before the first native frame receipt', () => {
+    expect(shouldSubmitVisibleWgpuTransform(true, true)).toBe(true);
+    expect(shouldSubmitVisibleWgpuTransform(true, false)).toBe(false);
+    expect(shouldSubmitVisibleWgpuTransform(false, true)).toBe(false);
+  });
+
   test('parses CSS rgb colors into normalized RGBA tuples', () => {
     expect(parseCssRgbColor('rgb(24, 36, 48)')).toEqual([24 / 255, 36 / 255, 48 / 255, 1]);
     expect(parseCssRgbColor('not-a-color')).toEqual([0, 0, 0, 1]);

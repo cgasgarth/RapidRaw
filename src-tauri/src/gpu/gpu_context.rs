@@ -1,15 +1,15 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-#[cfg(not(any(target_os = "android", target_os = "linux")))]
+#[cfg(target_os = "windows")]
 use tauri::Manager;
 
 use crate::AppState;
-#[cfg(not(any(target_os = "android", target_os = "linux")))]
+#[cfg(target_os = "windows")]
 use crate::app_settings;
-#[cfg(any(target_os = "android", target_os = "linux"))]
+#[cfg(not(target_os = "windows"))]
 use crate::gpu_display::WgpuPresentationScheduler;
-#[cfg(not(any(target_os = "android", target_os = "linux")))]
+#[cfg(target_os = "windows")]
 use crate::gpu_display::{WgpuPresentationScheduler, create_wgpu_display};
 use crate::image_processing::GpuContext;
 
@@ -19,7 +19,7 @@ pub fn get_or_init_gpu_context(
     state: &tauri::State<AppState>,
     _app_handle: &tauri::AppHandle,
 ) -> Result<GpuContext, String> {
-    #[cfg(not(any(target_os = "android", target_os = "linux")))]
+    #[cfg(target_os = "windows")]
     let app_handle = _app_handle;
 
     let mut context_lock = state.gpu_context.lock().unwrap();
@@ -45,7 +45,7 @@ pub fn get_or_init_gpu_context(
 
     let instance = wgpu::Instance::new(instance_desc);
 
-    #[cfg(not(any(target_os = "android", target_os = "linux")))]
+    #[cfg(target_os = "windows")]
     let surface_opt = {
         let settings = app_settings::load_settings_or_default(app_handle);
         let use_wgpu_renderer = settings.use_wgpu_renderer.unwrap_or(true);
@@ -73,7 +73,7 @@ pub fn get_or_init_gpu_context(
         }
     };
 
-    #[cfg(any(target_os = "android", target_os = "linux"))]
+    #[cfg(not(target_os = "windows"))]
     let surface_opt: Option<wgpu::Surface<'static>> = None;
 
     let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
@@ -117,7 +117,7 @@ pub fn get_or_init_gpu_context(
         let _ = std::fs::remove_file(p);
     }
 
-    #[cfg(not(any(target_os = "android", target_os = "linux")))]
+    #[cfg(target_os = "windows")]
     let display_opt = surface_opt.map(|surface| {
         let window = app_handle
             .get_webview_window("main")
@@ -126,7 +126,7 @@ pub fn get_or_init_gpu_context(
         create_wgpu_display(surface, &adapter, &device, &queue, &window)
     });
 
-    #[cfg(any(target_os = "android", target_os = "linux"))]
+    #[cfg(not(target_os = "windows"))]
     let display_opt = None;
 
     let device = Arc::new(device);
