@@ -818,11 +818,7 @@ pub fn is_image_cached(path: String, state: tauri::State<'_, AppState>) -> bool 
     let Ok(revision) = SourceRevision::from_path(&source_path) else {
         return false;
     };
-    state
-        .decoded_image_cache
-        .lock()
-        .unwrap()
-        .contains_revision(&revision)
+    state.decoded_image_cache.contains_revision(&revision)
 }
 
 #[tauri::command]
@@ -1019,11 +1015,7 @@ pub async fn load_image(
     let expected_revision = raw_processing_cache_key.source_revision.clone();
     let fingerprint_cache = state.source_fingerprint_cache.clone();
 
-    let cached_data = state
-        .decoded_image_cache
-        .lock()
-        .unwrap()
-        .get(&raw_processing_cache_key);
+    let cached_data = state.decoded_image_cache.get(&raw_processing_cache_key);
 
     let mut is_offline_smart_preview = false;
 
@@ -1031,8 +1023,9 @@ pub async fn load_image(
 
     let (pristine_arc, exif_data, raw_development_report) =
         if let Some((cached_img, cached_exif, cached_raw_development_report)) = cached_data {
-            let mut cached_exif = cached_exif;
-            let cached_raw_development_report = cached_raw_development_report.map(|mut report| {
+            let mut cached_exif = (*cached_exif).clone();
+            let cached_raw_development_report = cached_raw_development_report.map(|report| {
+                let mut report = (*report).clone();
                 let (width, height) = cached_img.dimensions();
                 report.runtime = Some(RawRuntimeReport {
                     cache_hit: true,
@@ -1199,7 +1192,7 @@ pub async fn load_image(
 
             let arc_img = Arc::new(pristine_img);
 
-            state.decoded_image_cache.lock().unwrap().insert(
+            state.decoded_image_cache.insert(
                 raw_processing_cache_key,
                 arc_img.clone(),
                 exif_data_loaded.clone(),

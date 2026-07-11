@@ -15,6 +15,7 @@ use std::fs;
 use std::hash::{Hash, Hasher};
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::UNIX_EPOCH;
 use tauri::AppHandle;
 use uuid::Uuid;
@@ -2803,10 +2804,8 @@ fn load_negative_lab_preview_processing_image(
     app_handle: &AppHandle,
 ) -> Result<DynamicImage, String> {
     let cache_key = build_negative_lab_preview_cache_key(source_path_str);
-    let mut cache = state.geometry_cache.lock().unwrap();
-
-    if let Some(cached_img) = cache.get(&cache_key) {
-        return Ok(cached_img.clone());
+    if let Some(cached_img) = state.geometry_cache.get(&cache_key) {
+        return Ok(cached_img.as_ref().clone());
     }
 
     let image_to_downscale = {
@@ -2848,7 +2847,11 @@ fn load_negative_lab_preview_processing_image(
     };
 
     let downscaled = downscale_f32_image(&image_to_downscale, 1080, 1080);
-    cache.insert(cache_key, downscaled.clone());
+    state.geometry_cache.insert(
+        cache_key,
+        Arc::new(downscaled.clone()),
+        downscaled.as_bytes().len() as u64,
+    );
     Ok(downscaled)
 }
 
