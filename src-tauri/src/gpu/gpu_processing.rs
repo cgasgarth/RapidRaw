@@ -2348,43 +2348,11 @@ fn process_and_get_dynamic_image_inner(
         );
         queue.submit(Some(encoder.finish()));
 
-        if let Ok(mut display_lock) = context.display.lock()
-            && let Some(display) = display_lock.as_mut()
-        {
-            display.latest_transform.texture_size =
-                [processor_state.width as f32, processor_state.height as f32];
-            queue.write_buffer(
-                &display.transform_buffer,
-                0,
-                bytemuck::bytes_of(&display.latest_transform),
-            );
-
-            let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                layout: &display.bind_group_layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: display.transform_buffer.as_entire_binding(),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::TextureView(
-                            &processor.output_texture_view,
-                        ),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 2,
-                        resource: wgpu::BindingResource::Sampler(&display.sampler),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 3,
-                        resource: wgpu::BindingResource::TextureView(&display.display_lut_view),
-                    },
-                ],
-                label: Some("Migrated Display Bind Group"),
-            });
-            display.current_bind_group = Some(bind_group);
-        }
+        context.presentation.publish_texture(
+            processor.output_texture_view.clone(),
+            [width, height],
+            [processor_state.width, processor_state.height],
+        );
     }
 
     if let Some(cache) = state.gpu_image_cache.lock().unwrap().as_ref() {
@@ -2596,11 +2564,13 @@ fn process_and_get_dynamic_image_inner(
                     if let Ok(dynamic_img) =
                         rgba16float_readback_to_dynamic_image(out_w, out_h, unpadded_data)
                     {
-                        let _ = analytics.sender.send(crate::AnalyticsJob {
+                        let _ = analytics.scheduler.submit(crate::AnalyticsJob {
                             path: analytics.path,
+                            frame_id: analytics.frame_id,
                             image: std::sync::Arc::new(dynamic_img),
-                            compute_waveform: analytics.compute_waveform,
+                            products: analytics.products,
                             active_waveform_channel: analytics.active_waveform_channel,
+                            policy: crate::AnalyticsSamplingPolicy::default(),
                         });
                     }
                 }
@@ -2611,55 +2581,25 @@ fn process_and_get_dynamic_image_inner(
                 if let Ok(dynamic_img) =
                     rgba16float_readback_to_dynamic_image(out_w, out_h, pixels_clone)
                 {
-                    let _ = analytics.sender.send(crate::AnalyticsJob {
+                    let _ = analytics.scheduler.submit(crate::AnalyticsJob {
                         path: analytics.path,
+                        frame_id: analytics.frame_id,
                         image: std::sync::Arc::new(dynamic_img),
-                        compute_waveform: analytics.compute_waveform,
+                        products: analytics.products,
                         active_waveform_channel: analytics.active_waveform_channel,
+                        policy: crate::AnalyticsSamplingPolicy::default(),
                     });
                 }
             });
         }
     }
 
-    if output_to_display
-        && let Ok(mut display_lock) = context.display.lock()
-        && let Some(display) = display_lock.as_mut()
-    {
-        display.latest_transform.image_size = [width as f32, height as f32];
-        display.latest_transform.texture_size =
-            [processor_state.width as f32, processor_state.height as f32];
-
-        queue.write_buffer(
-            &display.transform_buffer,
-            0,
-            bytemuck::bytes_of(&display.latest_transform),
+    if output_to_display {
+        context.presentation.publish_texture(
+            processor.output_texture_view.clone(),
+            [width, height],
+            [processor_state.width, processor_state.height],
         );
-
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &display.bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: display.transform_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::TextureView(&processor.output_texture_view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::Sampler(&display.sampler),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 3,
-                    resource: wgpu::BindingResource::TextureView(&display.display_lut_view),
-                },
-            ],
-            label: None,
-        });
-        display.current_bind_group = Some(bind_group);
-        display.render(device, queue);
     }
 
     drop(old_processor);

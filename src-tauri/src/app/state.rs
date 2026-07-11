@@ -1,10 +1,9 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicUsize};
-use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 
-use image::{DynamicImage, GrayImage};
+use image::{DynamicImage, GenericImageView, GrayImage};
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex as TokioMutex;
 use tokio::task::JoinHandle;
@@ -50,9 +49,34 @@ pub struct CachedPreview {
 }
 
 #[derive(Clone)]
+pub enum SampleablePixels {
+    Native(Arc<DynamicImage>),
+}
+
+impl SampleablePixels {
+    pub fn native(image: Arc<DynamicImage>) -> Self {
+        Self::Native(image)
+    }
+
+    pub fn image(&self) -> &Arc<DynamicImage> {
+        match self {
+            Self::Native(image) => image,
+        }
+    }
+
+    pub fn dimensions(&self) -> (u32, u32) {
+        self.image().dimensions()
+    }
+
+    pub fn retained_bytes(&self) -> u64 {
+        self.image().as_bytes().len() as u64
+    }
+}
+
+#[derive(Clone)]
 pub struct CachedViewerSampleFrame {
     pub graph_revision: String,
-    pub image: Arc<DynamicImage>,
+    pub pixels: SampleablePixels,
     pub image_identity: String,
     pub space_label: String,
 }
@@ -84,18 +108,46 @@ pub struct PreviewJob {
     pub responder: tokio::sync::oneshot::Sender<crate::preview_scheduler::PreviewCompletion>,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnalyticsFrameId {
+    pub image_session: u64,
+    pub preview_generation: u64,
+    pub graph_revision: u64,
+}
+
+bitflags::bitflags! {
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    pub struct AnalyticsProducts: u32 {
+        const HISTOGRAM = 1 << 0;
+        const GAMUT_MASK = 1 << 1;
+        const WAVEFORM = 1 << 2;
+        const PARADE = 1 << 3;
+        const VECTORSCOPE = 1 << 4;
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct AnalyticsSamplingPolicy {
+    pub version: u32,
+}
+
+#[derive(Debug)]
 pub struct AnalyticsJob {
     pub path: String,
+    pub frame_id: AnalyticsFrameId,
     pub image: Arc<DynamicImage>,
-    pub compute_waveform: bool,
+    pub products: AnalyticsProducts,
     pub active_waveform_channel: Option<String>,
+    pub policy: AnalyticsSamplingPolicy,
 }
 
 pub struct AnalyticsConfig {
     pub path: String,
-    pub compute_waveform: bool,
+    pub frame_id: AnalyticsFrameId,
+    pub products: AnalyticsProducts,
     pub active_waveform_channel: Option<String>,
-    pub sender: Sender<AnalyticsJob>,
+    pub scheduler: Arc<crate::analytics_scheduler::AnalyticsScheduler>,
 }
 
 #[derive(Clone)]
@@ -180,7 +232,7 @@ pub struct AppState {
     pub thumbnail_progress: Mutex<ThumbnailProgressTracker>,
     pub preview_scheduler: Mutex<Option<Arc<crate::preview_scheduler::PreviewScheduler>>>,
     pub viewer_sample_frames: MemoryLruCache<String, CachedViewerSampleFrame>,
-    pub analytics_worker_tx: Mutex<Option<Sender<AnalyticsJob>>>,
+    pub analytics_scheduler: Mutex<Option<Arc<crate::analytics_scheduler::AnalyticsScheduler>>>,
     pub mask_cache: MemoryLruCache<u64, GrayImage>,
     pub payload_residency_cache: Mutex<HashMap<String, serde_json::Value>>,
     pub geometry_cache: MemoryLruCache<u64, DynamicImage>,
@@ -249,7 +301,7 @@ impl AppState {
                 policy("viewer_samples", 96, 128, Some(8)),
                 Arc::clone(&cache_budget),
             ),
-            analytics_worker_tx: Mutex::new(None),
+            analytics_scheduler: Mutex::new(None),
             mask_cache: MemoryLruCache::new(
                 policy("masks", 96, 128, Some(64)),
                 Arc::clone(&cache_budget),

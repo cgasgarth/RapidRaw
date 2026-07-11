@@ -10,7 +10,10 @@ use tauri::{Emitter, Manager};
 
 use crate::adjustment_utils::hydrate_adjustments;
 use crate::app_settings::load_preview_runtime_settings_or_default;
-use crate::app_state::{AnalyticsConfig, AppState, CachedPreview, CachedViewerSampleFrame};
+use crate::app_state::{
+    AnalyticsConfig, AnalyticsFrameId, AnalyticsProducts, AppState, CachedPreview,
+    CachedViewerSampleFrame,
+};
 use crate::cache_utils::calculate_transform_hash;
 use crate::film_look_render::normalize_film_look_adjustments_for_render;
 use crate::generate_transformed_preview;
@@ -38,6 +41,7 @@ pub(crate) struct PreviewJobConfig<'a> {
     pub(crate) active_waveform_channel: Option<&'a str>,
     pub(crate) viewer_sample_graph_revision: Option<&'a str>,
     pub(crate) cancellation: Option<&'a PreviewCancellation>,
+    pub(crate) preview_id: crate::preview_scheduler::PreviewRequestId,
 }
 
 fn cancellation_checkpoint(
@@ -77,6 +81,27 @@ fn abort_stage(message: &str) -> PreviewStage {
     .unwrap_or(PreviewStage::Queued)
 }
 
+fn hash_revision(revision: &str) -> u64 {
+    let bytes = blake3::hash(revision.as_bytes());
+    u64::from_le_bytes(bytes.as_bytes()[..8].try_into().unwrap())
+}
+
+fn requested_products(compute_scopes: bool, active: Option<&str>) -> AnalyticsProducts {
+    let mut products = AnalyticsProducts::HISTOGRAM | AnalyticsProducts::GAMUT_MASK;
+    if !compute_scopes {
+        return products;
+    }
+    products |= match active {
+        Some("parade") => AnalyticsProducts::PARADE,
+        Some("vectorscope") => AnalyticsProducts::VECTORSCOPE,
+        Some("luma") | Some("rgb") => AnalyticsProducts::WAVEFORM,
+        _ => {
+            AnalyticsProducts::WAVEFORM | AnalyticsProducts::PARADE | AnalyticsProducts::VECTORSCOPE
+        }
+    };
+    products
+}
+
 pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8>, String> {
     let PreviewJobConfig {
         app_handle,
@@ -90,6 +115,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         active_waveform_channel,
         viewer_sample_graph_revision,
         cancellation,
+        preview_id,
     } = config;
 
     let fn_start = std::time::Instant::now();
@@ -275,15 +301,20 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
 
     let analytics_config = if wants_analytics {
         state
-            .analytics_worker_tx
+            .analytics_scheduler
             .lock()
             .unwrap()
             .clone()
-            .map(|tx| AnalyticsConfig {
+            .map(|scheduler| AnalyticsConfig {
                 path: loaded_image.path.clone(),
-                compute_waveform,
+                frame_id: AnalyticsFrameId {
+                    image_session: preview_id.image_session,
+                    preview_generation: preview_id.generation,
+                    graph_revision: viewer_sample_graph_revision.map(hash_revision).unwrap_or(0),
+                },
+                products: requested_products(compute_waveform, active_waveform_channel),
                 active_waveform_channel: channel_filter,
-                sender: tx,
+                scheduler,
             })
     } else {
         None
@@ -353,7 +384,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
     if !is_interactive && let Some(graph_revision) = viewer_sample_graph_revision {
         let frame =
             settled_viewer_sample_frame(&final_processed_image, graph_revision, &loaded_image.path);
-        let weight = frame.image.as_bytes().len() as u64;
+        let weight = frame.pixels.retained_bytes();
         state
             .viewer_sample_frames
             .insert("edited".to_string(), Arc::new(frame), weight);
@@ -368,7 +399,7 @@ fn settled_viewer_sample_frame(
 ) -> CachedViewerSampleFrame {
     CachedViewerSampleFrame {
         graph_revision: graph_revision.to_string(),
-        image: Arc::clone(image),
+        pixels: crate::app_state::SampleablePixels::native(Arc::clone(image)),
         image_identity: image_identity.to_string(),
         space_label: "Display encoded sRGB".to_string(),
     }
@@ -581,6 +612,7 @@ pub(crate) fn start_preview_worker(app_handle: tauri::AppHandle) {
                     active_waveform_channel: job.active_waveform_channel.as_deref(),
                     viewer_sample_graph_revision: job.viewer_sample_graph_revision.as_deref(),
                     cancellation: Some(&cancellation),
+                    preview_id: id,
                 })
             }));
             let completion = match result {
@@ -851,7 +883,7 @@ mod tests {
         let sampler_frame =
             settled_viewer_sample_frame(&rendered, "history_4", "/fixture/settled.raw");
 
-        assert!(Arc::ptr_eq(&rendered, &sampler_frame.image));
+        assert!(Arc::ptr_eq(&rendered, sampler_frame.pixels.image()));
         assert_eq!(Arc::strong_count(&rendered), 2);
 
         let encoded = encode_preview_response(
@@ -867,14 +899,15 @@ mod tests {
         .expect("shared RGBA32F settled frame should encode");
         drop(rendered);
 
-        assert_eq!(Arc::strong_count(&sampler_frame.image), 1);
-        assert_eq!(sampler_frame.image.dimensions(), (1920, 1080));
+        assert_eq!(Arc::strong_count(sampler_frame.pixels.image()), 1);
+        assert_eq!(sampler_frame.pixels.dimensions(), (1920, 1080));
         assert_eq!(sampler_frame.graph_revision, "history_4");
         assert_eq!(sampler_frame.image_identity, "/fixture/settled.raw");
         assert_eq!(sampler_frame.space_label, "Display encoded sRGB");
         assert_eq!(
             sampler_frame
-                .image
+                .pixels
+                .image()
                 .as_rgba32f()
                 .unwrap()
                 .get_pixel(960, 540)

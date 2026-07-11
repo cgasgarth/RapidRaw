@@ -150,12 +150,16 @@ mod tests {
         }))
         .map_err(|error| error.to_string())?;
 
+        let device = Arc::new(device);
+        let queue = Arc::new(queue);
         Ok(GpuContext {
             generation: 1,
-            device: Arc::new(device),
-            queue: Arc::new(queue),
+            device: Arc::clone(&device),
+            queue: Arc::clone(&queue),
             limits,
-            display: Arc::new(std::sync::Mutex::new(None)),
+            presentation: Arc::new(crate::gpu_display::WgpuPresentationScheduler::new(
+                None, device, queue,
+            )),
         })
     }
 
