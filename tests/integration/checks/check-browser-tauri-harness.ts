@@ -4,10 +4,15 @@ import { spawn } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, relative, resolve } from 'node:path';
 import { chromium, type Locator, type Page } from '@playwright/test';
+import { agentSelectedImageLiveSessionAuditExportReceiptSchema } from '../../../src/schemas/agent/agentSelectedImageAuditExportSchemas';
 
 const host = '127.0.0.1';
-const port = 1420;
+const port = Number.parseInt(process.env.RAWENGINE_BROWSER_HARNESS_PORT ?? '1420', 10);
+if (!Number.isInteger(port) || port < 1 || port > 65_535) {
+  throw new Error('RAWENGINE_BROWSER_HARNESS_PORT must be a valid TCP port.');
+}
 const baseUrl = `http://${host}:${port}`;
+const runAgentAuditE2e = process.env.RAWENGINE_AGENT_AUDIT_E2E === '1';
 const viewport = { height: 720, width: 1280 };
 const boundsReportPath = resolve(
   'private-artifacts/validation/preview-bounds/browser-tauri-harness-bounds-report.json',
@@ -80,7 +85,7 @@ async function stopServer(server: ReturnType<typeof spawn>): Promise<void> {
   ]);
 }
 
-const server = spawn('bun', ['run', 'dev', '--', '--host', host], {
+const server = spawn('bun', ['run', 'dev', '--', '--host', host, '--port', String(port)], {
   env: { ...process.env },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
@@ -176,6 +181,53 @@ try {
   await page.getByTestId('negative-lab-preview-image').waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-workspace').getByRole('button', { name: 'Cancel' }).click();
   await page.getByTestId('negative-lab-workspace').waitFor({ state: 'detached', timeout: 10_000 });
+  if (runAgentAuditE2e) {
+    await page.getByTestId('right-panel-switcher-button-agent').click();
+    const auditWorkspace = page.getByTestId('agent-audit-export-workspace');
+    await auditWorkspace.waitFor({ timeout: 10_000 });
+    await page.getByTestId('agent-review-control-dry-run').click();
+    const approveApply = page.getByTestId('agent-review-control-apply');
+    await expectEnabled(approveApply, 'Agent approve/apply');
+    await approveApply.click();
+    const exportAudit = page.getByTestId('agent-review-control-export');
+    await expectEnabled(exportAudit, 'Agent audit export');
+    const [auditDownload] = await Promise.all([page.waitForEvent('download'), exportAudit.click()]);
+    const auditDownloadPath = await auditDownload.path();
+    if (auditDownloadPath === null) throw new Error('Browser fallback audit download did not produce an artifact.');
+    const exportedAudit = agentSelectedImageLiveSessionAuditExportReceiptSchema.parse(
+      JSON.parse(await Bun.file(auditDownloadPath).text()),
+    );
+    await page.getByTestId('agent-audit-export-result').waitFor({ timeout: 10_000 });
+    const auditProof = await auditWorkspace.evaluate((element) => ({
+      mode: element.dataset.exportMode,
+      output: element.dataset.exportOutput,
+      preflight: element.dataset.replayPreflight,
+      validation: element.dataset.exportValidation,
+    }));
+    if (auditProof.mode !== 'browser_fallback' || auditProof.validation !== 'valid') {
+      throw new Error(`Browser audit export was mislabeled or invalid: ${JSON.stringify(auditProof)}`);
+    }
+    if (auditProof.output !== auditDownload.suggestedFilename()) {
+      throw new Error('Browser audit export UI did not report the fallback filename.');
+    }
+    if (auditProof.preflight !== exportedAudit.replayPreflight.status) {
+      throw new Error('Browser audit export UI did not report the parsed replay preflight status.');
+    }
+    const auditTimeline = await page.getByTestId('agent-audit-export-timeline-entry').evaluate((element) => ({
+      graphRevision: element.dataset.graphRevision,
+      output: element.dataset.output,
+      requestId: element.dataset.requestId,
+      toolName: element.dataset.toolName,
+    }));
+    if (
+      !auditTimeline.requestId?.includes('workspace-audit-export') ||
+      auditTimeline.toolName !== 'rawengine.agent.audit.export' ||
+      !auditTimeline.graphRevision ||
+      auditTimeline.output !== auditProof.output
+    ) {
+      throw new Error(`Browser audit export timeline proof is incomplete: ${JSON.stringify(auditTimeline)}`);
+    }
+  }
   await page.keyboard.press('Control+K');
   const commandPaletteForCopyPaste = page.getByRole('dialog', { name: /Command Palette/u });
   await commandPaletteForCopyPaste.waitFor({ timeout: 10_000 });
@@ -269,6 +321,14 @@ try {
 } finally {
   if (browser !== undefined) await browser.close();
   await stopServer(server);
+}
+
+async function expectEnabled(locator: Locator, label: string): Promise<void> {
+  const deadline = Date.now() + 10_000;
+  while (await locator.isDisabled()) {
+    if (Date.now() >= deadline) throw new Error(`${label} did not become enabled.`);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
 }
 
 async function verifyPreviewBoundsScenario(page: Page, samples: BoundsSample[]): Promise<void> {

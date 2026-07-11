@@ -1,5 +1,11 @@
+import { save as saveDialog } from '@tauri-apps/plugin-dialog';
+import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
 import { useCallback, useMemo, useState } from 'react';
 import type { AgentReviewedAdjustmentCommandId } from '../../../../schemas/agent/agentReviewedCommandSchemas';
+import {
+  type AgentSelectedImageLiveSessionReplayPreflight,
+  agentSelectedImageLiveSessionAuditExportReceiptSchema,
+} from '../../../../schemas/agent/agentSelectedImageAuditExportSchemas';
 import {
   type AgentSelectedImagePreviewReceipt,
   agentSelectedImagePreviewReceiptSchema,
@@ -74,6 +80,13 @@ export interface AgentSelectedImageWorkspaceActivityEntry {
   toolName?: string;
 }
 
+export interface AgentSelectedImageAuditExportResult {
+  destination: string;
+  mode: 'browser_fallback' | 'native';
+  replayPreflightStatus: AgentSelectedImageLiveSessionReplayPreflight['status'];
+  validationStatus: 'valid';
+}
+
 interface AgentSelectedImageWorkspaceControllerInput {
   selectedImage: Pick<SelectedImage, 'isReady' | 'path'> | null;
 }
@@ -102,6 +115,7 @@ export interface AgentSelectedImageWorkspaceController {
   canRollback: boolean;
   disabledReason: string;
   error: string | null;
+  exportResult: AgentSelectedImageAuditExportResult | null;
   latestRequestId: string | null;
   latestToolName: string | null;
   previewReceipt: AgentSelectedImagePreviewReceipt | null;
@@ -191,20 +205,45 @@ const parsePreviewReceipt = (receipt: AgentSelectedImagePreviewReceiptBase): Age
     ...resolveReceiptState(receipt),
   });
 
-const saveAuditReceiptWithBrowserFallback = async ({
+const isNativeAuditExportAvailable = (): boolean =>
+  typeof window !== 'undefined' &&
+  window.__TAURI_INTERNALS__ !== undefined &&
+  window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.enabled !== true;
+
+const saveNativeAuditReceipt = async (filename: string, text: string) => {
+  const path = await saveDialog({
+    defaultPath: filename,
+    filters: [{ name: 'RawEngine Agent Audit', extensions: ['json'] }],
+    title: 'Export agent audit receipt',
+  });
+  if (typeof path !== 'string') return null;
+  await writeTextFile(path, text);
+  return { destination: path, text: await readTextFile(path) };
+};
+
+export const saveAgentSelectedImageAuditReceipt = async ({
   filename,
+  nativeAvailable = isNativeAuditExportAvailable(),
+  nativeSave = saveNativeAuditReceipt,
   text,
 }: {
   filename: string;
+  nativeAvailable?: boolean;
+  nativeSave?: (filename: string, text: string) => Promise<{ destination: string; text: string } | null>;
   text: string;
-}): Promise<string> => {
+}): Promise<{ destination: string; mode: 'browser_fallback' | 'native'; text: string } | null> => {
+  if (nativeAvailable) {
+    const saved = await nativeSave(filename, text);
+    return saved === null ? null : { ...saved, mode: 'native' };
+  }
+
   if (
     typeof globalThis.document === 'undefined' ||
     typeof globalThis.Blob === 'undefined' ||
     typeof globalThis.URL === 'undefined' ||
     typeof globalThis.URL.createObjectURL !== 'function'
   ) {
-    return filename;
+    return { destination: filename, mode: 'browser_fallback', text };
   }
 
   const blob = new Blob([text], { type: 'application/json' });
@@ -218,7 +257,7 @@ const saveAuditReceiptWithBrowserFallback = async ({
     document.body.appendChild(link);
     link.click();
     link.remove();
-    return filename;
+    return { destination: filename, mode: 'browser_fallback', text };
   } finally {
     URL.revokeObjectURL(url);
   }
@@ -228,6 +267,7 @@ export const useAgentSelectedImageWorkspaceController = ({
   selectedImage,
 }: AgentSelectedImageWorkspaceControllerInput): AgentSelectedImageWorkspaceController => {
   const [activityEntries, setActivityEntries] = useState<AgentSelectedImageWorkspaceActivityEntry[]>([]);
+  const [exportResult, setExportResult] = useState<AgentSelectedImageAuditExportResult | null>(null);
   const [auditRecord, setAuditRecord] = useState<AgentSelectedImageLiveSessionAuditRecord | null>(null);
   const [blockedResult, setBlockedResult] = useState<AgentSelectedImageLiveSessionBlockedResult | null>(null);
   const [draft, setDraft] = useState<AgentSelectedImageLiveSessionDraft | null>(null);
@@ -559,10 +599,22 @@ export const useAgentSelectedImageWorkspaceController = ({
       });
       const filename = buildAuditExportFilename(auditRecord);
       const payload = `${JSON.stringify(exportReceipt, null, 2)}\n`;
-      await saveAuditReceiptWithBrowserFallback({ filename, text: payload });
+      const saved = await saveAgentSelectedImageAuditReceipt({ filename, text: payload });
+      if (saved === null) {
+        setStatus(auditRecord.receipt.state === 'applied' ? 'applied' : 'dry_run_ready');
+        return;
+      }
+      const parsedReceipt = agentSelectedImageLiveSessionAuditExportReceiptSchema.parse(JSON.parse(saved.text));
+      const nextExportResult: AgentSelectedImageAuditExportResult = {
+        destination: saved.destination,
+        mode: saved.mode,
+        replayPreflightStatus: parsedReceipt.replayPreflight.status,
+        validationStatus: 'valid',
+      };
+      setExportResult(nextExportResult);
       setStatus('exported');
       pushActivityEntry({
-        body: `${filename} (${exportReceipt.replayPreflight.status})`,
+        body: `${saved.destination} (${saved.mode}; replay ${parsedReceipt.replayPreflight.status}; valid)`,
         graphRevision: auditRecord.receipt.finalGraphRevision ?? auditRecord.receipt.initialGraphRevision,
         kind: 'export',
         previewAfterHash: auditRecord.receipt.afterPreviewHash ?? auditRecord.receipt.beforePreviewHash,
@@ -658,6 +710,7 @@ export const useAgentSelectedImageWorkspaceController = ({
     canRollback,
     disabledReason,
     error,
+    exportResult,
     latestRequestId: latestActivity?.requestId ?? null,
     latestToolName: latestActivity?.toolName ?? null,
     previewReceipt,
