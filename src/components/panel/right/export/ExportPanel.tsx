@@ -1012,10 +1012,11 @@ export default function ExportPanel({
       srgb: { side: 'srgb', status: 'loading' },
     });
 
-    const { patchesSentToBackend } = useEditorStore.getState();
+    const { patchResidency } = useEditorStore.getState();
+    const residency = patchResidency.snapshot();
     const { newlySentPatchIds, payload } = prepareAdjustmentPayloadForBackend(
       structuredClone(adjustments),
-      patchesSentToBackend,
+      residency.residentIds,
     );
     const compareRequests = buildSoftProofProfileCompareRequests({
       blackPointCompensation,
@@ -1078,7 +1079,7 @@ export default function ExportPanel({
     );
 
     if (newlySentPatchIds.size > 0) {
-      newlySentPatchIds.forEach((id) => patchesSentToBackend.add(id));
+      patchResidency.markResident(residency.sessionId, newlySentPatchIds);
     }
 
     softProofProfileCompareUrlsRef.current = nextUrls;

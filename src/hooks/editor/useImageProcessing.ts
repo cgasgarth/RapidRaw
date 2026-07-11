@@ -2,7 +2,6 @@ import type React from 'react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { z } from 'zod';
 import { Panel } from '../../components/ui/AppProperties';
-import { prepareAdjustmentPayloadForBackend } from '../../schemas/adjustmentPayloadSchemas';
 import { emptyTauriResponseSchema } from '../../schemas/tauriResponseSchemas';
 import { type ExportSoftProofTransformState, useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
@@ -18,6 +17,7 @@ import {
   type PreviewQualityStatus,
   type PreviewRoi,
 } from '../../utils/adaptivePreviewQuality';
+import type { AdjustmentSnapshot } from '../../utils/adjustmentSnapshots';
 import { type Adjustments, COPYABLE_ADJUSTMENT_KEYS } from '../../utils/adjustments';
 import { areAdjustmentsEqual } from '../../utils/adjustmentsSnapshot';
 import {
@@ -30,7 +30,6 @@ import { resolveEditorPreviewSource } from '../../utils/editorImagePreviewSource
 import { getEditorZoomDpr, getEditorZoomSourceSize, resolveEditorZoom } from '../../utils/editorZoom';
 import { globalImageCache } from '../../utils/ImageLRUCache';
 import {
-  buildInteractivePreviewGeometryIdentity,
   decodeInteractivePreviewUrl,
   InteractivePreviewGenerationController,
   type InteractivePreviewIdentity,
@@ -38,6 +37,7 @@ import {
   LatestOnlyInteractiveScheduler,
   parseInteractivePreviewPatchPayload,
 } from '../../utils/interactivePreviewPatch';
+import { PreparedAdjustmentPayloadCache } from '../../utils/preparedAdjustmentPayloadCache';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import { debounce } from '../../utils/timing';
 import { debouncedSave } from './useEditorActions';
@@ -60,7 +60,7 @@ interface TransformWrapperRefValue {
 }
 
 interface InteractivePreviewRequest {
-  adjustments: Adjustments;
+  snapshot: AdjustmentSnapshot;
   createdAt: number;
   identity: InteractivePreviewIdentity;
   quality: PreviewQualityDecision;
@@ -136,6 +136,9 @@ export function useImageProcessing(
   const originalSize = useEditorStore((state) => state.originalSize);
   const zoomMode = useEditorStore((state) => state.zoomMode);
   const historyIndex = useEditorStore((state) => state.historyIndex);
+  const adjustmentSnapshot = useEditorStore((state) => state.adjustmentSnapshot);
+  const imageSessionId = useEditorStore((state) => state.imageSessionId);
+  const proofRevision = useEditorStore((state) => state.proofRevision);
   const hasRenderedFirstFrame = useEditorStore((state) => state.hasRenderedFirstFrame);
   const compare = useEditorStore((state) => state.compare);
   const isSliderDragging = useEditorStore((state) => state.isSliderDragging);
@@ -156,11 +159,7 @@ export function useImageProcessing(
         : undefined,
     [appSettings?.exportPresets, exportSoftProofRecipeId, isExportSoftProofEnabled],
   );
-  const viewerSampleGraphRevision = JSON.stringify({
-    exportSoftProofRecipeId,
-    historyIndex,
-    isExportSoftProofEnabled,
-  });
+  const viewerSampleGraphRevision = `${String(imageSessionId)}:${String(adjustmentSnapshot.adjustmentRevision)}:${String(proofRevision)}`;
 
   const latestInteractiveRequestIdRef = useRef(0);
   const executeInteractiveRenderRef = useRef<(request: InteractivePreviewRequest) => Promise<void>>(async () => {});
@@ -176,12 +175,15 @@ export function useImageProcessing(
   const activeWaveformChannelRef = useRef(activeWaveformChannel);
   activeWaveformChannelRef.current = activeWaveformChannel;
   const interactiveGenerationRef = useRef(new InteractivePreviewGenerationController());
+  const preparedPayloadCacheRef = useRef(new PreparedAdjustmentPayloadCache());
+  const viewportScopeRevisionRef = useRef<{ inputs: readonly unknown[]; revision: number }>({
+    inputs: [],
+    revision: 1,
+  });
   const interactiveScopeRef = useRef<
     (targetRes: number, roi: PreviewRoi | null) => InteractivePreviewScopeSnapshot | null
   >(() => null);
   const previewQualityControllerRef = useRef(new AdaptivePreviewQualityController());
-
-  const geometricAdjustmentsKey = useMemo(() => buildInteractivePreviewGeometryIdentity(adjustments), [adjustments]);
 
   const clearInteractivePatch = useCallback(() => {
     setEditor({ interactivePatch: null });
@@ -242,6 +244,24 @@ export function useImageProcessing(
 
     const dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
     const normalizedTargetRes = Math.max(1, Math.round(targetRes));
+    const viewportInputs = [
+      editor.viewportRevision,
+      settings?.editorPreviewResolution ?? 1920,
+      settings?.enableZoomHifi ?? true,
+      settings?.highResZoomMultiplier ?? 1,
+      settings?.useFullDpiRendering ?? false,
+    ] as const;
+    if (
+      viewportInputs.length !== viewportScopeRevisionRef.current.inputs.length ||
+      viewportInputs.some((value, index) => value !== viewportScopeRevisionRef.current.inputs[index])
+    ) {
+      viewportScopeRevisionRef.current = {
+        inputs: viewportInputs,
+        revision: viewportScopeRevisionRef.current.revision + 1,
+      };
+    }
+    const quantizeRoi = (value: number | undefined): number | null =>
+      value === undefined ? null : Math.round(value * normalizedTargetRes) / normalizedTargetRes;
     return {
       roi,
       scope: {
@@ -252,25 +272,20 @@ export function useImageProcessing(
           thumbnailUrl: selectedImage.thumbnailUrl,
         }),
         devicePixelRatio: dpr,
-        geometryIdentity: buildInteractivePreviewGeometryIdentity(editor.adjustments),
-        graphIdentity: JSON.stringify({
-          exportSoftProofRecipeId: editor.exportSoftProofRecipeId,
-          historyIndex: editor.historyIndex,
-          isExportSoftProofEnabled: editor.isExportSoftProofEnabled,
-        }),
-        roiIdentity: JSON.stringify(roi),
+        adjustmentRevision: editor.adjustmentSnapshot.adjustmentRevision,
+        geometryIdentity: editor.adjustmentSnapshot.geometryRevision,
+        graphIdentity: `${String(editor.imageSessionId)}:${String(editor.adjustmentSnapshot.adjustmentRevision)}:${String(editor.proofRevision)}`,
+        imageSessionId: editor.imageSessionId,
+        maskRevision: editor.adjustmentSnapshot.maskRevision,
+        patchRevision: editor.adjustmentSnapshot.patchRevision,
+        proofRevision: editor.proofRevision,
+        roiX: quantizeRoi(roi?.[0]),
+        roiY: quantizeRoi(roi?.[1]),
+        roiW: quantizeRoi(roi?.[2]),
+        roiH: quantizeRoi(roi?.[3]),
         sourceImagePath,
         targetResolution: normalizedTargetRes,
-        viewportIdentity: JSON.stringify({
-          baseRenderSize: editor.baseRenderSize,
-          displaySize: editor.displaySize,
-          viewportEpoch: editor.viewportEpoch,
-          editorPreviewResolution: settings?.editorPreviewResolution ?? 1920,
-          enableZoomHifi: settings?.enableZoomHifi ?? true,
-          highResZoomMultiplier: settings?.highResZoomMultiplier ?? 1,
-          useFullDpiRendering: settings?.useFullDpiRendering ?? false,
-          zoomMode: editor.zoomMode,
-        }),
+        viewportIdentity: viewportScopeRevisionRef.current.revision,
       },
     };
   };
@@ -353,11 +368,9 @@ export function useImageProcessing(
       };
       publishQualityStatus(request.dragging ? 'rendering_interaction' : 'refining_current_view');
 
-      const { patchesSentToBackend } = useEditorStore.getState();
-      const { newlySentPatchIds, payload } = prepareAdjustmentPayloadForBackend(
-        structuredClone(request.adjustments),
-        patchesSentToBackend,
-      );
+      const { patchResidency } = useEditorStore.getState();
+      const residency = patchResidency.snapshot();
+      const { newlySentPatchIds, payload } = preparedPayloadCacheRef.current.prepare(request.snapshot, residency);
       const jobId = ++previewJobIdRef.current;
       let operation: AppOperationContext | null = null;
 
@@ -461,7 +474,7 @@ export function useImageProcessing(
           return;
         }
         if (newlySentPatchIds.size > 0) {
-          newlySentPatchIds.forEach((id) => patchesSentToBackend.add(id));
+          patchResidency.markResident(request.identity.imageSessionId, newlySentPatchIds);
         }
 
         if (buffer.byteLength === 0) {
@@ -700,7 +713,7 @@ export function useImageProcessing(
   }, [selectedImage?.path]);
 
   const applyAdjustments = useCallback(
-    (currentAdjustments: Adjustments, dragging: boolean = false, targetRes?: number, scopeRecovery = false) => {
+    (_currentAdjustments: Adjustments, dragging: boolean = false, targetRes?: number, scopeRecovery = false) => {
       if (!selectedImage?.isReady) return;
 
       const requestedTargetRes = Math.max(1, Math.round(targetRes ?? appSettings?.editorPreviewResolution ?? 1920));
@@ -713,7 +726,7 @@ export function useImageProcessing(
       if (dragging) {
         const requestId = ++latestInteractiveRequestIdRef.current;
         interactiveSchedulerRef.current?.schedule({
-          adjustments: structuredClone(currentAdjustments),
+          snapshot: useEditorStore.getState().adjustmentSnapshot,
           createdAt,
           identity: synchronized.identity,
           quality,
@@ -726,7 +739,7 @@ export function useImageProcessing(
         interactiveSchedulerRef.current?.clear();
         clearInteractivePatch();
         void executeApplyAdjustments({
-          adjustments: structuredClone(currentAdjustments),
+          snapshot: useEditorStore.getState().adjustmentSnapshot,
           createdAt,
           dragging: false,
           identity: interactiveGenerationRef.current.supersede(synchronized.scope),
@@ -829,7 +842,7 @@ export function useImageProcessing(
   }, [
     baseRenderSize,
     calculateTargetRes,
-    geometricAdjustmentsKey,
+    adjustmentSnapshot.geometryRevision,
     hasRenderedFirstFrame,
     historyIndex,
     isExportSoftProofEnabled,
@@ -1010,7 +1023,7 @@ export function useImageProcessing(
   useEffect(() => {
     setEditor({ transformedOriginalUrl: null });
     currentOriginalResRef.current = 0;
-  }, [geometricAdjustmentsKey, selectedImage?.path, setEditor]);
+  }, [adjustmentSnapshot.geometryRevision, selectedImage?.path, setEditor]);
 
   useEffect(() => {
     if (isCompareActive && selectedImage?.isReady && displaySize.width > 0 && !isSliderDragging) {

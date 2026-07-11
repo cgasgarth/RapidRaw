@@ -1,8 +1,6 @@
 import { expect, test } from 'bun:test';
-import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 import { resolveEditorPreviewSource } from '../../../src/utils/editorImagePreviewSource.ts';
 import {
-  buildInteractivePreviewGeometryIdentity,
   decodeInteractivePreviewUrl,
   InteractivePreviewGenerationController,
   type InteractivePreviewScope,
@@ -71,14 +69,22 @@ const buildPatchBuffer = ({
 
 const previewScope = (overrides: Partial<InteractivePreviewScope> = {}): InteractivePreviewScope => ({
   backend: 'cpu',
+  adjustmentRevision: 4,
   basePreviewUrl: 'blob:base-a',
   devicePixelRatio: 2,
-  geometryIdentity: 'geometry-a',
-  graphIdentity: 'history_4',
-  roiIdentity: '[0.1,0.1,0.5,0.5]',
+  geometryIdentity: 2,
+  graphIdentity: '1:4:1',
+  imageSessionId: 1,
+  maskRevision: 1,
+  patchRevision: 1,
+  proofRevision: 1,
+  roiX: 0.1,
+  roiY: 0.1,
+  roiW: 0.5,
+  roiH: 0.5,
   sourceImagePath: '/photos/alaska-a.ARW',
   targetResolution: 2048,
-  viewportIdentity: 'viewport-a',
+  viewportIdentity: 3,
   ...overrides,
 });
 
@@ -140,7 +146,7 @@ test('interactive preview patch parser rejects payloads that would black out the
 });
 
 test('interactive preview patch coherence rejects base preview and geometry transitions', () => {
-  const geometryIdentity = buildInteractivePreviewGeometryIdentity(INITIAL_ADJUSTMENTS);
+  const geometryIdentity = 1;
   const basePreviewUrl = resolveEditorPreviewSource({
     finalPreviewUrl: 'blob:preview-a',
     isReady: true,
@@ -162,7 +168,7 @@ test('interactive preview patch coherence rejects base preview and geometry tran
   expect(
     isInteractivePreviewPatchCoherent(patchIdentity, {
       ...patchIdentity,
-      geometryIdentity: buildInteractivePreviewGeometryIdentity({ ...INITIAL_ADJUSTMENTS, rotation: 1 }),
+      geometryIdentity: 2,
     }),
   ).toBe(false);
 });
@@ -218,11 +224,11 @@ test('generation-bound interactive work cannot dispatch, decode, or publish afte
 
 test('generation identity invalidates geometry, ROI, viewport, DPR, graph, and backend changes', () => {
   const variants: Array<Partial<InteractivePreviewScope>> = [
-    { geometryIdentity: 'geometry-b' },
-    { roiIdentity: '[0.2,0.1,0.5,0.5]' },
-    { viewportIdentity: 'viewport-b' },
+    { geometryIdentity: 3 },
+    { roiX: 0.2 },
+    { viewportIdentity: 4 },
     { devicePixelRatio: 3 },
-    { graphIdentity: 'history_5' },
+    { adjustmentRevision: 5, graphIdentity: '1:5:1' },
     { backend: 'wgpu' },
   ];
 
