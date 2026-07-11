@@ -25,6 +25,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useProcessStore } from '../../../store/useProcessStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
+import { useThumbnail, useThumbnailSmartPreview } from '../../../thumbnails/useThumbnail';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { COLOR_LABELS, type Color } from '../../../utils/adjustments';
 import type { LibraryAutoStackDisplay, LibraryAutoStackItem } from '../../../utils/libraryAutoStacks';
@@ -216,8 +217,8 @@ const ThumbnailComponent = ({
   exif,
 }: ThumbnailComponentProps) => {
   const { t } = useTranslation();
-  const data = useProcessStore((s) => s.thumbnails[path]);
-  const smartPreview = useProcessStore((s) => s.thumbnailSmartPreviews[path]);
+  const data = useThumbnail(path);
+  const smartPreview = useThumbnailSmartPreview(path);
   const exifOverlay = useSettingsStore((s) => s.appSettings?.exifOverlay || ExifOverlay.Off);
   const displayEditIcon = useSettingsStore((s) => s.appSettings?.displayEditIcon ?? true);
   const showEditIcon = isEdited && displayEditIcon;
@@ -633,8 +634,8 @@ const ListItemComponent = ({
   exif,
 }: ListItemComponentProps) => {
   const { t } = useTranslation();
-  const data = useProcessStore((s) => s.thumbnails[path]);
-  const smartPreview = useProcessStore((s) => s.thumbnailSmartPreviews[path]);
+  const data = useThumbnail(path);
+  const smartPreview = useThumbnailSmartPreview(path);
   const exifOverlay = useSettingsStore((s) => s.appSettings?.exifOverlay || ExifOverlay.Off);
   const showSmartPreviewBadge = smartPreview?.stale || smartPreview?.source === 'smartPreview';
 

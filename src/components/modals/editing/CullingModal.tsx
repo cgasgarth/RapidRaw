@@ -21,7 +21,7 @@ interface CullingModalProps {
   suggestions: CullingSuggestions | null;
   error: string | null;
   imagePaths: string[];
-  thumbnails: Record<string, string>;
+  getThumbnailUrl: (path: string) => string | null;
   onApply: (action: 'reject' | 'rate_zero' | 'delete', paths: string[]) => void;
   onError: (error: string) => void;
 }
@@ -103,11 +103,11 @@ interface ImageThumbnailProps {
   isSelected: boolean;
   onToggle?: () => void;
   path: string;
-  thumbnails: Record<string, string>;
+  getThumbnailUrl: (path: string) => string | null;
 }
 
-function ImageThumbnail({ path, thumbnails, isSelected, onToggle, children }: ImageThumbnailProps) {
-  const thumbnailUrl = thumbnails[path];
+function ImageThumbnail({ path, getThumbnailUrl, isSelected, onToggle, children }: ImageThumbnailProps) {
+  const thumbnailUrl = getThumbnailUrl(path);
   const interactiveClasses = onToggle ? 'cursor-pointer hover:border-surface' : 'cursor-default';
   const content = (
     <div
@@ -116,7 +116,7 @@ function ImageThumbnail({ path, thumbnails, isSelected, onToggle, children }: Im
       }`}
     >
       <img
-        src={thumbnailUrl}
+        src={thumbnailUrl ?? undefined}
         alt={path}
         className={`w-full h-full object-cover transition-opacity ${
           isSelected || !onToggle ? 'opacity-100' : 'opacity-75 group-hover:opacity-100'
@@ -184,7 +184,7 @@ interface CompareFrameProps {
     sharpness: string;
   };
   onToggle?: () => void;
-  thumbnails: Record<string, string>;
+  getThumbnailUrl: (path: string) => string | null;
   viewport: CompareViewport;
 }
 
@@ -194,10 +194,10 @@ function CompareFrame({
   isSelected = false,
   metadataLabels,
   onToggle,
-  thumbnails,
+  getThumbnailUrl,
   viewport,
 }: CompareFrameProps) {
-  const thumbnailUrl = thumbnails[analysis.path];
+  const thumbnailUrl = getThumbnailUrl(analysis.path);
   const frame = (
     <div
       className={`relative aspect-[4/3] overflow-hidden rounded-md border-2 bg-bg-secondary ${
@@ -215,7 +215,7 @@ function CompareFrame({
       data-width={analysis.width}
     >
       <img
-        src={thumbnailUrl}
+        src={thumbnailUrl ?? undefined}
         alt={analysis.path}
         className="h-full w-full object-cover transition-transform duration-150"
         style={getCompareViewportStyle(viewport)}
@@ -267,7 +267,7 @@ export default function CullingModal({
   suggestions,
   error,
   imagePaths,
-  thumbnails,
+  getThumbnailUrl,
   onApply,
   onError,
 }: CullingModalProps) {
@@ -532,9 +532,9 @@ export default function CullingModal({
                 className="aspect-square overflow-hidden rounded border border-border-color bg-bg-secondary"
                 key={path}
               >
-                {thumbnails[path] ? (
+                {getThumbnailUrl(path) ? (
                   <img
-                    src={thumbnails[path]}
+                    src={getThumbnailUrl(path) ?? undefined}
                     alt={t('modals.culling.batchPreviewAlt')}
                     className="h-full w-full object-cover"
                   />
@@ -959,7 +959,7 @@ export default function CullingModal({
                             analysis={group.representative}
                             isReference
                             metadataLabels={compareMetadataLabels}
-                            thumbnails={thumbnails}
+                            getThumbnailUrl={getThumbnailUrl}
                             viewport={compareViewport}
                           />
                         </div>
@@ -977,7 +977,7 @@ export default function CullingModal({
                                 onToggle={() => {
                                   handleToggleReject(dup.path);
                                 }}
-                                thumbnails={thumbnails}
+                                getThumbnailUrl={getThumbnailUrl}
                                 viewport={
                                   compareViewport.linked
                                     ? compareViewport
@@ -998,7 +998,7 @@ export default function CullingModal({
                     <ImageThumbnail
                       key={img.path}
                       path={img.path}
-                      thumbnails={thumbnails}
+                      getThumbnailUrl={getThumbnailUrl}
                       isSelected={selectedRejects.has(img.path)}
                       onToggle={() => {
                         handleToggleReject(img.path);
@@ -1046,7 +1046,7 @@ export default function CullingModal({
                         data-testid="culling-focus-ranking-card"
                         key={img.path}
                       >
-                        <ImageThumbnail path={img.path} thumbnails={thumbnails} isSelected={false}>
+                        <ImageThumbnail path={img.path} getThumbnailUrl={getThumbnailUrl} isSelected={false}>
                           {t('modals.culling.focusRankValue', { rank: index + 1 })}
                         </ImageThumbnail>
                         <div className="mt-2 grid grid-cols-2 gap-1 text-xs">

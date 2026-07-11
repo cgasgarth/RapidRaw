@@ -32,6 +32,7 @@ import {
   useUIStore,
 } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
+import { thumbnailCache } from '../../thumbnails/thumbnailCacheInstance';
 import type { CopyPasteSettings } from '../../utils/adjustments';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/computational-merge/computationalMergeAppServerRoutePairs';
 import {
@@ -166,9 +167,8 @@ export default function AppModals(props: AppModalsProps) {
     })),
   );
 
-  const { thumbnails, aiModelDownloadStatus } = useProcessStore(
+  const { aiModelDownloadStatus } = useProcessStore(
     useShallow((state) => ({
-      thumbnails: state.thumbnails,
       aiModelDownloadStatus: state.aiModelDownloadStatus,
     })),
   );
@@ -259,11 +259,11 @@ export default function AppModals(props: AppModalsProps) {
             lastDryRunCommand={panoramaModalState.lastDryRunCommand}
             loadingImageUrl={
               panoramaModalState.stitchingSourcePaths.length > 0
-                ? thumbnails[
+                ? thumbnailCache.get(
                     panoramaModalState.stitchingSourcePaths[
                       Math.floor(panoramaModalState.stitchingSourcePaths.length / 2)
-                    ] ?? ''
-                  ] || null
+                    ] ?? '',
+                  )?.url || null
                 : null
             }
             onClose={() => {
@@ -308,9 +308,9 @@ export default function AppModals(props: AppModalsProps) {
             lastDryRunCommand={hdrModalState.lastDryRunCommand}
             loadingImageUrl={
               hdrModalState.stitchingSourcePaths.length > 0
-                ? thumbnails[
-                    hdrModalState.stitchingSourcePaths[Math.floor(hdrModalState.stitchingSourcePaths.length / 2)] ?? ''
-                  ] || null
+                ? thumbnailCache.get(
+                    hdrModalState.stitchingSourcePaths[Math.floor(hdrModalState.stitchingSourcePaths.length / 2)] ?? '',
+                  )?.url || null
                 : null
             }
             onClose={() => {
@@ -347,11 +347,11 @@ export default function AppModals(props: AppModalsProps) {
             lastDryRunCommand={superResolutionModalState.lastDryRunCommand}
             loadingImageUrl={
               superResolutionModalState.sourcePaths.length > 0
-                ? thumbnails[
+                ? thumbnailCache.get(
                     superResolutionModalState.sourcePaths[
                       Math.floor(superResolutionModalState.sourcePaths.length / 2)
-                    ] ?? ''
-                  ] || null
+                    ] ?? '',
+                  )?.url || null
                 : selectedImage
                   ? finalPreviewUrl
                   : null
@@ -579,9 +579,9 @@ export default function AppModals(props: AppModalsProps) {
             lastDryRunCommand={focusStackModalState.lastDryRunCommand}
             loadingImageUrl={
               focusStackModalState.sourcePaths.length > 0
-                ? thumbnails[
-                    focusStackModalState.sourcePaths[Math.floor(focusStackModalState.sourcePaths.length / 2)] ?? ''
-                  ] || null
+                ? thumbnailCache.get(
+                    focusStackModalState.sourcePaths[Math.floor(focusStackModalState.sourcePaths.length / 2)] ?? '',
+                  )?.url || null
                 : selectedImage
                   ? finalPreviewUrl
                   : null
@@ -826,7 +826,7 @@ export default function AppModals(props: AppModalsProps) {
         targetPaths={denoiseModalState.targetPaths}
         loadingImageUrl={
           denoiseModalState.targetPaths.length > 0
-            ? thumbnails[denoiseModalState.targetPaths[0] ?? ''] ||
+            ? thumbnailCache.get(denoiseModalState.targetPaths[0] ?? '')?.url ||
               (selectedImage?.path === denoiseModalState.targetPaths[0] ? finalPreviewUrl : null)
             : null
         }
@@ -916,7 +916,7 @@ export default function AppModals(props: AppModalsProps) {
         suggestions={cullingModalState.suggestions}
         error={cullingModalState.error}
         imagePaths={cullingModalState.pathsToCull}
-        thumbnails={thumbnails}
+        getThumbnailUrl={(path) => thumbnailCache.get(path)?.url ?? null}
         onApply={(action, paths) => {
           if (action === 'reject') {
             void props.handleSetColorLabel('red', paths);
@@ -938,7 +938,6 @@ export default function AppModals(props: AppModalsProps) {
         }}
         onSave={props.handleSaveCollage}
         sourceImages={collageModalState.sourceImages}
-        thumbnails={thumbnails}
       />
     </>
   );

@@ -1,25 +1,13 @@
 import { create } from 'zustand';
 import type { Progress } from '../components/ui/AppProperties';
 import { type ExportState, type ImportState, Status } from '../components/ui/ExportImportProperties';
-import { thumbnailResourceCache } from '../utils/thumbnailResources';
-
-export interface ThumbnailSmartPreviewState {
-  colorProfile: string;
-  height: number;
-  source: string;
-  sourceAvailable: boolean;
-  sourceRevision: string;
-  stale: boolean;
-  width: number;
-}
+import { thumbnailCache } from '../thumbnails/thumbnailCacheInstance';
 
 interface ProcessState {
   exportState: ExportState;
   importState: ImportState;
   isIndexing: boolean;
   indexingProgress: Progress;
-  thumbnails: Record<string, string>;
-  thumbnailSmartPreviews: Record<string, ThumbnailSmartPreviewState>;
   thumbnailProgress: Progress;
   aiModelDownloadStatus: string | null;
   copiedFilePaths: Array<string>;
@@ -37,16 +25,11 @@ let importTimeout: ReturnType<typeof setTimeout>;
 let copyTimeout: ReturnType<typeof setTimeout>;
 let pasteTimeout: ReturnType<typeof setTimeout>;
 
-const omitPaths = <Value>(record: Record<string, Value>, paths: ReadonlySet<string>): Record<string, Value> =>
-  Object.fromEntries(Object.entries(record).filter(([path]) => !paths.has(path)));
-
 export const useProcessStore = create<ProcessState>((set, get) => ({
   exportState: { errorMessage: '', progress: { current: 0, total: 0 }, status: Status.Idle },
   importState: { errorMessage: '', path: '', progress: { current: 0, total: 0 }, status: Status.Idle },
   isIndexing: false,
   indexingProgress: { current: 0, total: 0 },
-  thumbnails: {},
-  thumbnailSmartPreviews: {},
   thumbnailProgress: { current: 0, total: 0 },
   aiModelDownloadStatus: null,
   copiedFilePaths: [],
@@ -76,16 +59,7 @@ export const useProcessStore = create<ProcessState>((set, get) => ({
   },
 
   invalidateThumbnails: (paths) => {
-    const pathSet = new Set(paths);
-    if (pathSet.size === 0) return;
-    for (const path of pathSet) thumbnailResourceCache.delete(path);
-
-    set((prev) => {
-      return {
-        thumbnailSmartPreviews: omitPaths(prev.thumbnailSmartPreviews, pathSet),
-        thumbnails: omitPaths(prev.thumbnails, pathSet),
-      };
-    });
+    thumbnailCache.deleteMany(paths);
   },
 
   setExportState: (updater) => {

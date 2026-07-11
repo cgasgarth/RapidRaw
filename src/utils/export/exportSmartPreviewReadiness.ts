@@ -1,4 +1,4 @@
-import type { ThumbnailSmartPreviewState } from '../../store/useProcessStore';
+import type { ThumbnailSmartPreviewState } from '../../thumbnails/ThumbnailCache';
 
 export const isStaleOrOfflineSmartPreview = (smartPreview: ThumbnailSmartPreviewState | undefined): boolean =>
   smartPreview?.stale === true || smartPreview?.source === 'smartPreview' || smartPreview?.sourceAvailable === false;
