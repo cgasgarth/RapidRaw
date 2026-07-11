@@ -35,7 +35,6 @@ interface CollageModalProps {
   onClose: () => void;
   onSave: (base64Data: string, firstPath: string) => Promise<string>;
   sourceImages: ImageFile[];
-  thumbnails: Record<string, string>;
 }
 
 interface LoadedImage {

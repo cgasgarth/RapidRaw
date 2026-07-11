@@ -21,9 +21,10 @@ import {
 } from '../../schemas/tauriEventSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
-import type { ThumbnailSmartPreviewState } from '../../store/useProcessStore';
 import { useProcessStore } from '../../store/useProcessStore';
 import { useUIStore } from '../../store/useUIStore';
+import type { ThumbnailCacheMutation, ThumbnailSmartPreviewState } from '../../thumbnails/ThumbnailCache';
+import { thumbnailCache } from '../../thumbnails/thumbnailCacheInstance';
 import {
   buildHdrApplyCommandState,
   buildPanoramaApplyCommandState,
@@ -146,7 +147,7 @@ export function useTauriListeners({ refreshAllFolderTrees, refreshImageList, mar
     refs.current = { refreshAllFolderTrees, refreshImageList, markGenerated };
   });
 
-  const thumbnailBuffer = useRef<Record<string, string>>({});
+  const thumbnailBuffer = useRef<Map<string, ThumbnailCacheMutation>>(new Map());
   const smartPreviewBuffer = useRef<Record<string, ThumbnailSmartPreviewState>>({});
   const ratingBuffer = useRef<Record<string, number>>({});
   const editStatusBuffer = useRef<Record<string, boolean>>({});
@@ -164,24 +165,27 @@ export function useTauriListeners({ refreshAllFolderTrees, refreshImageList, mar
       const pendingRatings = ratingBuffer.current;
       const pendingEdits = editStatusBuffer.current;
 
-      thumbnailBuffer.current = {};
+      thumbnailBuffer.current = new Map();
       smartPreviewBuffer.current = {};
       ratingBuffer.current = {};
       editStatusBuffer.current = {};
 
-      if (Object.keys(pendingThumbs).length > 0) {
-        useProcessStore.getState().setProcess((state) => ({
-          thumbnails: { ...state.thumbnails, ...pendingThumbs },
-        }));
+      if (pendingThumbs.size > 0) {
+        for (const [path, smartPreview] of Object.entries(pendingSmartPreviews)) {
+          const current = pendingThumbs.get(path);
+          if (current) pendingThumbs.set(path, { ...current, smartPreview });
+        }
+        thumbnailCache.setMany(Array.from(pendingThumbs.values()));
 
         const selectedImage = useEditorStore.getState().selectedImage;
-        if (selectedImage?.path && pendingThumbs[selectedImage.path]) {
+        const selectedUrl = selectedImage?.path ? pendingThumbs.get(selectedImage.path)?.url : undefined;
+        if (selectedImage?.path && selectedUrl) {
           useEditorStore.getState().setEditor((state) =>
             state.selectedImage?.path === selectedImage.path
               ? {
                   selectedImage: {
                     ...state.selectedImage,
-                    thumbnailUrl: pendingThumbs[selectedImage.path] ?? state.selectedImage.thumbnailUrl,
+                    thumbnailUrl: selectedUrl,
                   },
                 }
               : state,
@@ -190,21 +194,27 @@ export function useTauriListeners({ refreshAllFolderTrees, refreshImageList, mar
       }
 
       if (Object.keys(pendingSmartPreviews).length > 0) {
-        useProcessStore.getState().setProcess((state) => ({
-          thumbnailSmartPreviews: { ...state.thumbnailSmartPreviews, ...pendingSmartPreviews },
-        }));
+        const smartPreviewOnly = Object.entries(pendingSmartPreviews)
+          .filter(([path]) => !pendingThumbs.has(path))
+          .map(([path, smartPreview]) => ({
+            generation: thumbnailCache.get(path)?.generation ?? 0,
+            path,
+            smartPreview,
+          }));
+        thumbnailCache.setMany(smartPreviewOnly);
       }
 
       if (Object.keys(pendingRatings).length > 0 || Object.keys(pendingEdits).length > 0) {
-        useLibraryStore.getState().setLibrary((state) => ({
-          imageRatings: { ...state.imageRatings, ...pendingRatings },
-          imageList:
-            Object.keys(pendingEdits).length > 0
-              ? state.imageList.map((img) =>
-                  pendingEdits[img.path] !== undefined ? { ...img, is_edited: pendingEdits[img.path] ?? false } : img,
-                )
-              : state.imageList,
-        }));
+        const paths = new Set([...Object.keys(pendingRatings), ...Object.keys(pendingEdits)]);
+        useLibraryStore.getState().patchLibraryImages(
+          [...paths].map((path) => ({
+            path,
+            changes: {
+              ...(pendingRatings[path] === undefined ? {} : { rating: pendingRatings[path] }),
+              ...(pendingEdits[path] === undefined ? {} : { is_edited: pendingEdits[path] }),
+            },
+          })),
+        );
       }
     };
 
@@ -327,7 +337,11 @@ export function useTauriListeners({ refreshAllFolderTrees, refreshImageList, mar
 
         if (!refs.current.markGenerated(path, generation)) return;
 
-        thumbnailBuffer.current[path] = thumbnailResourceCache.setProtocol(path, resource);
+        thumbnailBuffer.current.set(path, {
+          generation: generation ?? resource.generation,
+          path,
+          url: thumbnailResourceCache.setProtocol(path, resource),
+        });
         if (smartPreview) {
           smartPreviewBuffer.current[path] = smartPreview;
         }
@@ -616,8 +630,8 @@ export function useTauriListeners({ refreshAllFolderTrees, refreshImageList, mar
         cancelAnimationFrame(flushHandle.current);
         flushHandle.current = null;
       }
-      thumbnailBuffer.current = {};
-      thumbnailResourceCache.clear();
+      thumbnailBuffer.current = new Map();
+      thumbnailCache.clearGeneration();
       smartPreviewBuffer.current = {};
       ratingBuffer.current = {};
       listeners.forEach((p) => {

@@ -12,6 +12,7 @@ import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
+import { thumbnailCache } from '../../thumbnails/thumbnailCacheInstance';
 import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../../utils/adjustments';
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { findAlbumById } from '../../utils/folderTreeUtils';
@@ -220,7 +221,7 @@ export function useAppNavigation({ clearThumbnailQueue, requestThumbnails, refs 
         setEditor({
           selectedImage: {
             ...cachedReadyEntry.selectedImage,
-            thumbnailUrl: useProcessStore.getState().thumbnails[path] || cachedReadyEntry.selectedImage.thumbnailUrl,
+            thumbnailUrl: thumbnailCache.get(path)?.url || cachedReadyEntry.selectedImage.thumbnailUrl,
           },
           originalSize: cachedReadyEntry.originalSize,
           previewSize: cachedReadyEntry.previewSize,
@@ -339,7 +340,7 @@ export function useAppNavigation({ clearThumbnailQueue, requestThumbnails, refs 
           originalUrl: null,
           path,
           rawDevelopmentReport: null,
-          thumbnailUrl: useProcessStore.getState().thumbnails[path] ?? '',
+          thumbnailUrl: thumbnailCache.get(path)?.url ?? '',
           width: 0,
         },
         originalSize: { width: 0, height: 0 },
@@ -402,7 +403,7 @@ export function useAppNavigation({ clearThumbnailQueue, requestThumbnails, refs 
         clearThumbnailQueue();
         setLibrary({ isViewLoading: true, activeAlbumId: null, libraryScrollTop: 0 });
         useLibraryStore.getState().setSearchCriteria({ tags: [], text: '', mode: 'OR' });
-        setProcess({ thumbnails: {} });
+        thumbnailCache.clearGeneration();
         globalImageCache.clear();
         setUI({ activeView: 'library' });
       } else {

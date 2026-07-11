@@ -14,6 +14,7 @@ import { List, useListCallbackRef } from 'react-window';
 import { useLibraryStore } from '../../../store/useLibraryStore';
 import { useProcessStore } from '../../../store/useProcessStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
+import { thumbnailCache } from '../../../thumbnails/thumbnailCacheInstance';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { buildLibraryAutoStackItems } from '../../../utils/libraryAutoStacks';
 import { debounce } from '../../../utils/timing';
@@ -103,7 +104,6 @@ interface LibraryGridProps {
   onImageClick: (path: string, event: ReactMouseEvent<HTMLElement> | React.KeyboardEvent<HTMLElement>) => void;
   onImageDoubleClick: (path: string) => void;
   thumbnailAspectRatio: ThumbnailAspectRatio;
-  imageRatings: Record<string, number>;
   onRequestThumbnails?: (paths: string[]) => void;
   thumbnailSizeOptions: ThumbnailSizeOption[];
   onThumbnailSizeChange: (size: ThumbnailSize) => void;
@@ -329,7 +329,6 @@ export default function LibraryGrid(props: LibraryGridProps) {
     onImageClick,
     onImageDoubleClick,
     thumbnailAspectRatio,
-    imageRatings,
     onRequestThumbnails,
     thumbnailSizeOptions,
     onThumbnailSizeChange,
@@ -424,7 +423,7 @@ export default function LibraryGrid(props: LibraryGridProps) {
   const queueThumbnailRequest = useCallback(
     (path: string) => {
       if (!onRequestThumbnails) return;
-      if (useProcessStore.getState().thumbnails[path]) return;
+      if (thumbnailCache.has(path)) return;
       requestQueueRef.current.add(path);
       if (!requestTimeoutRef.current) {
         requestTimeoutRef.current = setTimeout(() => {
@@ -642,7 +641,6 @@ export default function LibraryGrid(props: LibraryGridProps) {
       onImageDoubleClick,
       thumbnailAspectRatio,
       onImageLoad: handleImageLoad,
-      imageRatings,
       baseFolderPath: currentFolderPath,
       itemWidth: gridData?.itemWidth ?? 0,
       itemHeight: gridData ? (gridData.isListView ? gridData.listRowHeight : gridData.itemWidth) : 0,
@@ -662,7 +660,6 @@ export default function LibraryGrid(props: LibraryGridProps) {
     onImageDoubleClick,
     thumbnailAspectRatio,
     handleImageLoad,
-    imageRatings,
     currentFolderPath,
     queueThumbnailRequest,
     handleToggleRecursiveFolder,
