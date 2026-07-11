@@ -414,6 +414,7 @@ const panoramaSavedReviewSourceRefSchema = z
 
 export const panoramaRenderedReviewSchema = z
   .object({
+    alignmentPlan: panoramaCalibratedAlignmentPlanSchema.nullable().optional(),
     boundary: z
       .object({
         crop: panoramaRenderedReviewCropSchema,
@@ -443,6 +444,7 @@ export type PanoramaRenderedReview = z.infer<typeof panoramaRenderedReviewSchema
 
 export const panoramaSavedReviewSummarySchema = z
   .object({
+    alignmentPlan: panoramaCalibratedAlignmentPlanSchema.optional(),
     boundaryFillColor: panoramaBoundaryFillColorSchema.optional(),
     boundaryMode: panoramaUiBoundaryModeSchema,
     capabilityLevel: z.literal('runtime_apply_capable'),

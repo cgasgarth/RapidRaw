@@ -23,7 +23,7 @@ use uuid::Uuid;
 use crate::formats::is_raw_file;
 use crate::image_processing::apply_cpu_default_raw_processing;
 use crate::image_processing::{ImageMetadata, RawEngineArtifacts};
-use crate::panorama_utils::{alignment_plan, processing, stitching};
+use crate::panorama_utils::{alignment_plan, processing, projection, stitching};
 
 pub const BRIEF_DESCRIPTOR_SIZE: usize = 256;
 pub type Descriptor = [u8; BRIEF_DESCRIPTOR_SIZE / 8];
@@ -87,8 +87,9 @@ impl MatchInfo {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct PanoramaRenderRequest {
+    pub cancellation: Arc<alignment_plan::AlignmentCancellation>,
     pub options: PanoramaStitchOptions,
     pub image_paths: Vec<String>,
 }
@@ -202,6 +203,7 @@ pub struct PanoramaSelectedMatchEdgeMetadata {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PanoramaRenderMetadata {
+    pub alignment_plan: Option<alignment_plan::CalibratedAlignmentPlan>,
     pub blend_diagnostics: stitching::StitchBlendDiagnostics,
     pub connected_source_indices: Vec<usize>,
     pub crop: PanoramaCropMetadata,
@@ -396,6 +398,8 @@ pub trait PanoramaRenderEngine {
 
 pub struct LegacyRapidRawHomographyEngine;
 
+pub struct CalibratedPanoramaEngine;
+
 impl PanoramaRenderEngine for LegacyRapidRawHomographyEngine {
     fn render(
         &self,
@@ -406,14 +410,24 @@ impl PanoramaRenderEngine for LegacyRapidRawHomographyEngine {
     }
 }
 
+impl PanoramaRenderEngine for CalibratedPanoramaEngine {
+    fn render(
+        &self,
+        request: PanoramaRenderRequest,
+        app_handle: AppHandle,
+    ) -> Result<PanoramaRenderResult, String> {
+        render_with_calibrated_engine(request, app_handle)
+    }
+}
+
 const DEFAULT_PANORAMA_MEMORY_BUDGET_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const DEFAULT_PANORAMA_MAX_PREVIEW_DIMENSION_PX: u32 = 800;
 const HIGH_MEMORY_BUDGET_RATIO: f64 = 0.8;
 
 fn validate_panorama_stitch_options(options: &PanoramaStitchOptions) -> Result<(), String> {
-    if options.projection != PanoramaProjectionOption::Rectilinear {
+    if options.projection == PanoramaProjectionOption::Spherical {
         return Err(
-            "Panorama engine currently supports rectilinear projection only; cylindrical and spherical projection are blocked until runtime support lands."
+            "Spherical panorama projection remains blocked until multi-row and pole fixtures land."
                 .to_string(),
         );
     }
@@ -511,6 +525,7 @@ pub fn cancel_panorama_alignment(cancellation_id: String) -> bool {
 
 #[tauri::command]
 pub async fn stitch_panorama(
+    cancellation_id: Option<String>,
     options: Option<PanoramaStitchOptions>,
     paths: Vec<String>,
     app_handle: tauri::AppHandle,
@@ -527,18 +542,40 @@ pub async fn stitch_panorama(
         .collect();
     let stitch_options = options.unwrap_or_default();
     validate_panorama_stitch_options(&stitch_options)?;
+    let cancellation_id = cancellation_id.unwrap_or_else(|| Uuid::new_v4().to_string());
+    let cancellation = Arc::new(alignment_plan::AlignmentCancellation::default());
+    PANORAMA_ALIGNMENT_CANCELLATIONS
+        .lock()
+        .unwrap()
+        .insert(cancellation_id.clone(), cancellation.clone());
 
     let panorama_result_handle = state.panorama_result.clone();
 
     let task = tokio::task::spawn_blocking(move || {
-        let engine = LegacyRapidRawHomographyEngine;
-        let panorama_result = engine.render(
-            PanoramaRenderRequest {
-                image_paths: source_paths,
-                options: stitch_options,
-            },
-            app_handle.clone(),
-        );
+        let request = PanoramaRenderRequest {
+            cancellation,
+            image_paths: source_paths,
+            options: stitch_options,
+        };
+        let calibrated_engine = CalibratedPanoramaEngine;
+        let panorama_result = calibrated_engine
+            .render(request.clone(), app_handle.clone())
+            .or_else(|calibrated_error| {
+                if request.options.projection != PanoramaProjectionOption::Rectilinear {
+                    return Err(calibrated_error);
+                }
+                let legacy_engine = LegacyRapidRawHomographyEngine;
+                let mut fallback = legacy_engine.render(request, app_handle.clone())?;
+                fallback
+                    .metadata
+                    .warnings
+                    .push("calibrated_runtime_fallback_legacy".to_string());
+                fallback
+                    .metadata
+                    .warnings
+                    .push(format!("calibrated_runtime_blocked:{calibrated_error}"));
+                Ok(fallback)
+            });
 
         match panorama_result {
             Ok(render_result) => {
@@ -589,11 +626,16 @@ pub async fn stitch_panorama(
         }
     });
 
-    match task.await {
+    let result = match task.await {
         Ok(Ok(_)) => Ok(()),
         Ok(Err(e)) => Err(e),
         Err(join_err) => Err(format!("Panorama task failed: {}", join_err)),
-    }
+    };
+    PANORAMA_ALIGNMENT_CANCELLATIONS
+        .lock()
+        .unwrap()
+        .remove(&cancellation_id);
+    result
 }
 
 fn build_panorama_render_review(metadata: &PanoramaRenderMetadata) -> serde_json::Value {
@@ -615,6 +657,7 @@ fn build_panorama_render_review(metadata: &PanoramaRenderMetadata) -> serde_json
     }
 
     json!({
+        "alignmentPlan": &metadata.alignment_plan,
         "boundary": boundary,
         "capabilityLevel": "runtime_apply_capable",
         "outputDimensions": {
@@ -635,6 +678,140 @@ fn build_panorama_render_review(metadata: &PanoramaRenderMetadata) -> serde_json
         "sourceContribution": panorama_source_contribution_metadata(metadata),
         "exposureNormalizationSummary": panorama_exposure_normalization_summary(metadata),
         "warningCodes": &metadata.warnings,
+    })
+}
+
+fn render_with_calibrated_engine(
+    request: PanoramaRenderRequest,
+    app_handle: AppHandle,
+) -> Result<PanoramaRenderResult, String> {
+    validate_panorama_stitch_options(&request.options)?;
+    let (mut sources, images) = load_panorama_sources_for_plan(&request.image_paths, &app_handle)?;
+    let plan = alignment_plan::build_calibrated_alignment_plan(
+        &request.image_paths,
+        &images,
+        &request.cancellation,
+        |stage| {
+            let _ = app_handle.emit(
+                crate::events::PANORAMA_PROGRESS,
+                format!("alignment:{stage}"),
+            );
+        },
+    )?;
+    let projected = projection::render_calibrated_projection(
+        &images,
+        &plan,
+        request.options.projection,
+        &request.cancellation,
+        |stage| {
+            let _ = app_handle.emit(crate::events::PANORAMA_PROGRESS, format!("render:{stage}"));
+        },
+    )?;
+    let solution = plan.global_solution.as_ref().ok_or_else(|| {
+        "Calibrated panorama render requires a published global solution.".to_string()
+    })?;
+    for source in &mut sources {
+        if let Some(pose) = solution
+            .camera_poses
+            .iter()
+            .find(|pose| pose.source_index == source.index)
+        {
+            source.global_transform_3x3 = Some([
+                1.0,
+                0.0,
+                pose.translation_px[0],
+                0.0,
+                1.0,
+                pose.translation_px[1],
+                0.0,
+                0.0,
+                1.0,
+            ]);
+        }
+    }
+    let boundary =
+        apply_panorama_boundary_mode(projected.image, &projected.mask, &request.options)?;
+    let (output_width, output_height) = boundary.image.dimensions();
+    let connected_source_indices = plan
+        .sources
+        .iter()
+        .map(|source| source.source_index)
+        .filter(|index| !plan.excluded_source_indices.contains(index))
+        .collect::<Vec<_>>();
+    let pairwise_matches = plan
+        .edges
+        .iter()
+        .map(|edge| PanoramaPairwiseMatchMetadata {
+            brief_match_diagnostics: processing::BriefMatchDiagnostics {
+                accepted_match_count: edge.reciprocal_match_count,
+                best_distance: None,
+                distance_rejected_count: edge
+                    .candidate_match_count
+                    .saturating_sub(edge.reciprocal_match_count),
+                max_accepted_hamming_distance: 104,
+                no_second_best_count: 0,
+                query_feature_count: plan.sources[edge.source_index].feature_count,
+                ratio: None,
+                ratio_rejected_count: 0,
+                reciprocal_rejected_count: edge
+                    .candidate_match_count
+                    .saturating_sub(edge.reciprocal_match_count),
+                second_best_distance: None,
+                train_feature_count: plan.sources[edge.target_index].feature_count,
+            },
+            homography3x3: edge.transform_3x3,
+            homography_condition_number: edge.transform_condition_number,
+            inlier_ratio: edge.inlier_ratio,
+            inliers: edge.inlier_count,
+            match_count: edge.reciprocal_match_count,
+            mean_reprojection_error_px: edge.symmetric_error_rms_px,
+            mean_reverse_reprojection_error_px: edge.symmetric_error_rms_px,
+            mean_symmetric_transfer_error_px: edge.symmetric_error_rms_px,
+            p95_symmetric_transfer_error_px: edge.symmetric_error_p95_px,
+            source_index: edge.source_index,
+            spatial_support_cell_count: edge.spatial_support_cell_count,
+            target_index: edge.target_index,
+        })
+        .collect::<Vec<_>>();
+    let source_geometry = build_panorama_source_geometry_metadata(
+        &connected_source_indices,
+        &plan.excluded_source_indices,
+        plan.edges
+            .iter()
+            .filter(|edge| edge.status == "accepted")
+            .count(),
+        plan.sources.len(),
+    );
+    let estimated_peak_memory_bytes =
+        estimate_legacy_panorama_peak_memory_bytes(&sources, output_width, output_height);
+    let mut warnings = plan.warning_codes.clone();
+    warnings.push(format!("calibrated_plan:{}", plan.plan_hash));
+    warnings.push(format!("tile_count:{}", projected.geometry.tile_count));
+    let reference_source_index = solution.reference_source_index;
+    let excluded_source_indices = plan.excluded_source_indices.clone();
+    Ok(PanoramaRenderResult {
+        image: boundary.image,
+        metadata: PanoramaRenderMetadata {
+            alignment_plan: Some(plan),
+            blend_diagnostics: stitching::StitchBlendDiagnostics::default(),
+            connected_source_indices,
+            crop: boundary.crop,
+            effective_boundary_mode: boundary.effective_boundary_mode,
+            effective_projection: request.options.projection,
+            estimated_peak_memory_bytes,
+            excluded_source_indices,
+            output_height,
+            output_width,
+            pairwise_matches,
+            reference_source_index: Some(reference_source_index),
+            requested_boundary_mode: request.options.boundary_mode,
+            requested_projection: request.options.projection,
+            selected_match_edges: Vec::new(),
+            max_transform_chain_length: 0,
+            source_geometry,
+            sources,
+            warnings,
+        },
     })
 }
 
@@ -1162,6 +1339,7 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
     let estimated_peak_memory_bytes =
         estimate_legacy_panorama_peak_memory_bytes(&source_metadata, output_width, output_height);
     let metadata = PanoramaRenderMetadata {
+        alignment_plan: None,
         blend_diagnostics: stitch_result.blend_diagnostics,
         connected_source_indices,
         crop: boundary_application.crop,
@@ -1533,6 +1711,12 @@ fn upsert_panorama_artifact_metadata(
         .blend_diagnostics
         .overlap_gain_applications
         .is_empty();
+    let calibrated = metadata.alignment_plan.is_some();
+    let alignment_algorithm = metadata
+        .alignment_plan
+        .as_ref()
+        .map(|plan| plan.algorithm_id.as_str())
+        .unwrap_or("rapidraw_fast9_brief_ransac_v1");
     let settings_hash = stable_hash(&json!({
         "boundaryMode": metadata.effective_boundary_mode.as_str(),
         "crop": crop,
@@ -1580,7 +1764,8 @@ fn upsert_panorama_artifact_metadata(
 
     let artifact = json!({
         "alignment": {
-            "algorithmId": "rapidraw_fast9_brief_ransac_v1",
+            "algorithmId": alignment_algorithm,
+            "calibratedPlan": &metadata.alignment_plan,
             "downscaleMaxDimensionPx": processing::MAX_PROCESSING_DIMENSION,
             "globalHomographyCount": metadata.connected_source_indices.len().saturating_sub(1),
             "minimumInliersForConnection": processing::MIN_INLIERS_FOR_CONNECTION,
@@ -1624,14 +1809,15 @@ fn upsert_panorama_artifact_metadata(
             "capabilities": {
                 "adaptiveSeamFeather": true,
                 "autoCrop": true,
-                "bundleAdjustment": false,
-                "cylindricalProjection": false,
+                "bundleAdjustment": calibrated,
+                "cylindricalProjection": calibrated,
                 "exposureNormalization": exposure_normalization_applied,
                 "planarHomography": true,
-                "tiledRender": false,
+                "tiledRender": calibrated,
             },
-            "engineId": "rapidraw_homography_seam_v0",
-            "qualityTier": "legacy_local_preview",
+            "effectiveBackend": "cpu_reference",
+            "engineId": if calibrated { "rapidraw_calibrated_projection_v1" } else { "rapidraw_homography_seam_v0" },
+            "qualityTier": if calibrated { "calibrated_runtime" } else { "legacy_local_preview" },
         },
         "exposureNormalization": exposure_normalization,
         "lensCorrectionPolicy": "required_before_stitch",
@@ -1660,6 +1846,7 @@ fn upsert_panorama_artifact_metadata(
         "projection": metadata.effective_projection.as_str(),
         "projectionSettings": {
             "effectiveProjection": metadata.effective_projection.as_str(),
+            "horizontalFovDegrees": metadata.alignment_plan.as_ref().and_then(|plan| plan.estimated_horizontal_fov_degrees),
             "requestedProjection": metadata.requested_projection.as_str(),
             "support": "implemented_current_engine",
         },
@@ -3221,6 +3408,7 @@ mod tests {
 
     fn sample_render_metadata() -> PanoramaRenderMetadata {
         PanoramaRenderMetadata {
+            alignment_plan: None,
             blend_diagnostics: stitching::StitchBlendDiagnostics {
                 overlap_gain_applications: vec![stitching::OverlapGainApplication {
                     gain: 1.125,
