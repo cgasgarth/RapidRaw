@@ -19,6 +19,7 @@ import {
   parseRenderPathPayload,
   parseStringPayload,
   parseThumbnailGeneratedPayload,
+  parseThumbnailInvalidatedPayload,
   persistedRenderStateRecoveryPayloadSchema,
 } from '../../schemas/tauriEventSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
@@ -74,6 +75,7 @@ import {
   PREVIEW_UPDATE_UNCROPPED_EVENT,
   THUMBNAIL_GENERATED_EVENT,
   THUMBNAIL_GENERATION_COMPLETE_EVENT,
+  THUMBNAIL_INVALIDATED_EVENT,
   THUMBNAIL_PROGRESS_EVENT,
   WAVEFORM_UPDATE_EVENT,
   WGPU_FRAME_READY_EVENT,
@@ -367,6 +369,11 @@ export function useTauriListeners({ refreshAllFolderTrees, refreshImageList, mar
           editStatusBuffer.current[path] = is_edited;
         }
         scheduleFlush();
+      }),
+      listen<unknown>(THUMBNAIL_INVALIDATED_EVENT, (event) => {
+        if (!isEffectActive) return;
+        const { path } = parseThumbnailInvalidatedPayload(event.payload);
+        thumbnailCache.deleteMany([path]);
       }),
       listen<unknown>(AI_MODEL_DOWNLOAD_START_EVENT, (event) => {
         if (isEffectActive)

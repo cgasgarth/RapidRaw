@@ -9,7 +9,6 @@ use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
-use std::thread;
 use std::time::UNIX_EPOCH;
 
 use anyhow::Result;
@@ -57,7 +56,8 @@ use crate::thumbnail_resources::{
     next_descriptor_generation, publish_thumbnail_artifact,
 };
 use crate::thumbnail_scheduler::{
-    FinishOutcome, GenerationProgress, ThumbnailJob, UpdateThumbnailQueueRequest,
+    FinishOutcome, GenerationProgress, InvalidationOutcome, ThumbnailJob,
+    UpdateThumbnailQueueRequest,
 };
 use crate::xmp_sidecar::{
     extract_xmp_label, extract_xmp_rating, extract_xmp_tags, sync_metadata_to_xmp_sidecar,
@@ -2113,13 +2113,74 @@ fn rollback_copied_files(paths: &[PathBuf]) {
     }
 }
 
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MetadataSaveReceipt {
+    pub image_id: String,
+    pub path: String,
+    pub sidecar_revision: String,
+    pub render_fingerprint: u64,
+    pub thumbnail_revision: String,
+    pub catalog_revision: Option<u64>,
+}
+
+fn metadata_save_receipt(path: &str, metadata: &ImageMetadata) -> MetadataSaveReceipt {
+    let serialized = serde_json::to_vec(metadata).unwrap_or_default();
+    let sidecar_revision = format!("sha256:{}", hex::encode(Sha256::digest(&serialized)));
+    let thumbnail_revision = compute_source_revision(path, &serialized);
+    let fingerprint = blake3::hash(&serialized);
+    let mut fingerprint_bytes = [0u8; 8];
+    fingerprint_bytes.copy_from_slice(&fingerprint.as_bytes()[..8]);
+    MetadataSaveReceipt {
+        image_id: format!("path:{}", blake3::hash(path.as_bytes()).to_hex()),
+        path: path.to_string(),
+        sidecar_revision,
+        render_fingerprint: u64::from_le_bytes(fingerprint_bytes),
+        thumbnail_revision,
+        catalog_revision: None,
+    }
+}
+
+fn submit_thumbnail_invalidation(
+    state: &AppState,
+    app_handle: &AppHandle,
+    receipt: &MetadataSaveReceipt,
+) {
+    let (outcome, progress) = match state
+        .thumbnail_scheduler
+        .invalidate_if_demanded(&receipt.path, receipt.thumbnail_revision.clone())
+    {
+        Ok(result) => result,
+        Err(error) => {
+            log::warn!(
+                "Unable to submit thumbnail invalidation for '{}': {}",
+                receipt.path,
+                error
+            );
+            return;
+        }
+    };
+    let _ = app_handle.emit(
+        "thumbnail-invalidated",
+        serde_json::json!({
+            "outcome": outcome,
+            "path": receipt.path,
+            "sidecarRevision": receipt.sidecar_revision,
+            "thumbnailRevision": receipt.thumbnail_revision,
+        }),
+    );
+    if outcome == InvalidationOutcome::Scheduled {
+        emit_scheduler_progress(app_handle, &progress);
+    }
+}
+
 #[tauri::command]
 pub fn save_metadata_and_update_thumbnail(
     path: String,
     adjustments: Value,
     app_handle: AppHandle,
     state: tauri::State<AppState>,
-) -> Result<(), String> {
+) -> Result<MetadataSaveReceipt, String> {
     let (source_path, sidecar_path) = parse_virtual_path(&path);
 
     let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
@@ -2154,61 +2215,9 @@ pub fn save_metadata_and_update_thumbnail(
         sync_metadata_to_xmp(&source_path, &metadata, create_if_missing);
     }
 
-    let loaded_image_lock = state.original_image.lock().unwrap();
-    let preloaded_image_option = if let Some(loaded_image) = loaded_image_lock.as_ref() {
-        if loaded_image.path == path {
-            Some(loaded_image.image.clone())
-        } else {
-            None
-        }
-    } else {
-        None
-    };
-    drop(loaded_image_lock);
-
-    let gpu_context = gpu_processing::get_or_init_gpu_context(&state, &app_handle).ok();
-    let app_handle_clone = app_handle.clone();
-    let path_clone = path;
-
-    add_to_thumbnail_queue(&state, 1, &app_handle);
-
-    thread::spawn(move || {
-        let state = app_handle_clone.state::<AppState>();
-        let settings = load_settings_or_default(&app_handle_clone);
-
-        let thumb_cache_dir = match resolve_thumbnail_cache_dir(&app_handle_clone) {
-            Ok(dir) => dir,
-            Err(e) => {
-                log::warn!(
-                    "Unable to initialize thumbnail cache directory for '{}': {}",
-                    path_clone,
-                    e
-                );
-                emit_thumbnail_cache_setup_error(&app_handle_clone, &path_clone, &e);
-                increment_thumbnail_progress(&state, &app_handle_clone);
-                return;
-            }
-        };
-
-        let result = generate_single_thumbnail_and_cache(
-            &path_clone,
-            &thumb_cache_dir,
-            gpu_context.as_ref(),
-            preloaded_image_option.as_deref(),
-            true,
-            &app_handle_clone,
-            &settings,
-            None,
-        );
-
-        if let Some(thumbnail) = result {
-            emit_thumbnail_result(&app_handle_clone, &path_clone, thumbnail);
-        }
-
-        increment_thumbnail_progress(&state, &app_handle_clone);
-    });
-
-    Ok(())
+    let receipt = metadata_save_receipt(&path, &metadata);
+    submit_thumbnail_invalidation(&state, &app_handle, &receipt);
+    Ok(receipt)
 }
 
 #[tauri::command]
@@ -2216,10 +2225,7 @@ pub async fn apply_adjustments_to_paths(
     paths: Vec<String>,
     adjustments: Value,
     app_handle: AppHandle,
-) -> Result<(), String> {
-    let state = app_handle.state::<AppState>();
-    add_to_thumbnail_queue(&state, paths.len(), &app_handle);
-
+) -> Result<Vec<MetadataSaveReceipt>, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let settings = load_settings_or_default(&app_handle);
         let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
@@ -2232,78 +2238,59 @@ pub async fn apply_adjustments_to_paths(
             .unwrap()
             .clone();
 
-        paths.par_iter().for_each(|path| {
-            let (_, sidecar_path) = parse_virtual_path(path);
+        let receipts: Vec<_> = paths
+            .par_iter()
+            .filter_map(|path| {
+                let (_, sidecar_path) = parse_virtual_path(path);
 
-            let mut existing_metadata = crate::exif_processing::load_sidecar(&sidecar_path);
+                let mut existing_metadata = crate::exif_processing::load_sidecar(&sidecar_path);
 
-            let mut new_adjustments = existing_metadata.adjustments;
-            if new_adjustments.is_null() {
-                new_adjustments = serde_json::json!({});
-            }
-
-            if let (Some(new_map), Some(pasted_map)) =
-                (new_adjustments.as_object_mut(), adjustments.as_object())
-            {
-                for (k, v) in pasted_map {
-                    new_map.insert(k.clone(), v.clone());
+                let mut new_adjustments = existing_metadata.adjustments;
+                if new_adjustments.is_null() {
+                    new_adjustments = serde_json::json!({});
                 }
-            }
 
-            resolve_lens_params_in_adjustments(
-                &mut new_adjustments,
-                &existing_metadata.exif,
-                lens_db.as_deref(),
-            );
+                if let (Some(new_map), Some(pasted_map)) =
+                    (new_adjustments.as_object_mut(), adjustments.as_object())
+                {
+                    for (k, v) in pasted_map {
+                        new_map.insert(k.clone(), v.clone());
+                    }
+                }
 
-            existing_metadata.adjustments = new_adjustments;
+                resolve_lens_params_in_adjustments(
+                    &mut new_adjustments,
+                    &existing_metadata.exif,
+                    lens_db.as_deref(),
+                );
 
-            save_metadata_sidecar_or_warn(&sidecar_path, &existing_metadata, "adjustment paste");
+                existing_metadata.adjustments = new_adjustments;
 
-            if enable_xmp_sync {
-                let source_path = parse_virtual_path(path).0;
-                sync_metadata_to_xmp(&source_path, &existing_metadata, create_xmp_if_missing);
-            }
-        });
+                if let Err(error) = save_metadata_sidecar(&sidecar_path, &existing_metadata) {
+                    log::error!(
+                        "Failed to persist pasted adjustments for '{}': {}",
+                        path,
+                        error
+                    );
+                    return None;
+                }
+
+                if enable_xmp_sync {
+                    let source_path = parse_virtual_path(path).0;
+                    sync_metadata_to_xmp(&source_path, &existing_metadata, create_xmp_if_missing);
+                }
+                Some(metadata_save_receipt(path, &existing_metadata))
+            })
+            .collect();
 
         let state = app_handle.state::<AppState>();
-        let thumb_cache_dir = match resolve_thumbnail_cache_dir(&app_handle) {
-            Ok(dir) => dir,
-            Err(e) => {
-                log::warn!("Unable to initialize thumbnail cache directory: {}", e);
-                for path in &paths {
-                    emit_thumbnail_cache_setup_error(&app_handle, path, &e);
-                }
-                for _ in 0..paths.len() {
-                    increment_thumbnail_progress(&state, &app_handle);
-                }
-                return;
-            }
-        };
-
-        let gpu_context = gpu_processing::get_or_init_gpu_context(&state, &app_handle).ok();
-
-        paths.par_iter().for_each(|path_str| {
-            let result = generate_single_thumbnail_and_cache(
-                path_str,
-                &thumb_cache_dir,
-                gpu_context.as_ref(),
-                None,
-                true,
-                &app_handle,
-                &settings,
-                None,
-            );
-
-            if let Some(thumbnail) = result {
-                emit_thumbnail_result(&app_handle, path_str, thumbnail);
-            }
-
-            increment_thumbnail_progress(&state, &app_handle);
-        });
-    });
-
-    Ok(())
+        for receipt in &receipts {
+            submit_thumbnail_invalidation(&state, &app_handle, receipt);
+        }
+        Ok::<Vec<MetadataSaveReceipt>, String>(receipts)
+    })
+    .await
+    .map_err(|error| format!("Adjustment paste worker failed: {error}"))?
 }
 
 #[tauri::command]

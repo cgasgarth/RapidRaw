@@ -140,6 +140,8 @@ struct InFlightThumbnail {
 
 struct ThumbnailSchedulerState {
     active_generation: ThumbnailGeneration,
+    demanded_by_path: HashMap<Arc<str>, (i32, ThumbnailDemandClass)>,
+    last_invalidation_by_path: HashMap<Arc<str>, String>,
     pending_by_path: HashMap<Arc<str>, PendingThumbnail>,
     heap: BinaryHeap<HeapEntry>,
     in_flight: HashMap<Arc<str>, InFlightThumbnail>,
@@ -155,6 +157,14 @@ pub enum FinishOutcome {
     Cancelled,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum InvalidationOutcome {
+    Deferred,
+    Duplicate,
+    Scheduled,
+}
+
 pub struct ThumbnailScheduler {
     state: Mutex<ThumbnailSchedulerState>,
     wake: Condvar,
@@ -166,6 +176,8 @@ impl ThumbnailScheduler {
         Arc::new(Self {
             state: Mutex::new(ThumbnailSchedulerState {
                 active_generation: ThumbnailGeneration::default(),
+                demanded_by_path: HashMap::new(),
+                last_invalidation_by_path: HashMap::new(),
                 pending_by_path: HashMap::new(),
                 heap: BinaryHeap::new(),
                 in_flight: HashMap::new(),
@@ -193,6 +205,8 @@ impl ThumbnailScheduler {
             }
             state.pending_by_path.clear();
             state.heap.clear();
+            state.demanded_by_path.clear();
+            state.last_invalidation_by_path.clear();
             state.active_generation = request.generation;
             state.progress = GenerationProgress {
                 generation: request.generation,
@@ -203,12 +217,19 @@ impl ThumbnailScheduler {
             // allowing already-running jobs from this generation to finish.
             state.pending_by_path.clear();
             state.heap.clear();
+            state.demanded_by_path.clear();
+            state.last_invalidation_by_path.clear();
         }
         for spec in request.requests {
             let path: Arc<str> = Arc::from(spec.path.trim());
             if path.is_empty() {
                 continue;
             }
+            state
+                .demanded_by_path
+                .insert(path.clone(), (spec.priority, spec.demand_class));
+            let was_tracked =
+                state.pending_by_path.contains_key(&path) || state.in_flight.contains_key(&path);
             if let Some(item) = state.in_flight.get_mut(&path) {
                 if item.job.generation == request.generation
                     && item.job.source_revision == spec.source_revision
@@ -219,7 +240,7 @@ impl ThumbnailScheduler {
                 }
                 item.job.cancellation.cancel();
             }
-            let is_new = !state.pending_by_path.contains_key(&path);
+            let is_new = !was_tracked;
             state.next_revision += 1;
             let revision = state.next_revision;
             let sequence = if let Some(old) = state.pending_by_path.get(&path) {
@@ -249,6 +270,57 @@ impl ThumbnailScheduler {
         drop(state);
         self.wake.notify_all();
         Ok(progress)
+    }
+
+    pub fn invalidate_if_demanded(
+        &self,
+        path: &str,
+        source_revision: String,
+    ) -> Result<(InvalidationOutcome, GenerationProgress), &'static str> {
+        let path = path.trim();
+        if path.is_empty() {
+            return Err("thumbnail_path_empty");
+        }
+        let (generation, priority, demand_class) = {
+            let mut state = self.state.lock().unwrap();
+            let key: Arc<str> = Arc::from(path);
+            let Some((priority, demand_class)) = state.demanded_by_path.get(&key).copied() else {
+                return Ok((InvalidationOutcome::Deferred, state.progress.clone()));
+            };
+            if state
+                .last_invalidation_by_path
+                .get(&key)
+                .is_some_and(|revision| revision == &source_revision)
+            {
+                return Ok((InvalidationOutcome::Duplicate, state.progress.clone()));
+            }
+            let duplicate_pending = state
+                .pending_by_path
+                .get(&key)
+                .is_some_and(|item| item.source_revision.as_deref() == Some(&source_revision));
+            let duplicate_in_flight = state
+                .in_flight
+                .get(&key)
+                .is_some_and(|item| item.job.source_revision.as_deref() == Some(&source_revision));
+            if duplicate_pending || duplicate_in_flight {
+                return Ok((InvalidationOutcome::Duplicate, state.progress.clone()));
+            }
+            state
+                .last_invalidation_by_path
+                .insert(key, source_revision.clone());
+            (state.active_generation, priority, demand_class)
+        };
+        let progress = self.update(UpdateThumbnailQueueRequest {
+            generation,
+            replace_pending: false,
+            requests: vec![ThumbnailRequestSpec {
+                demand_class,
+                path: path.to_string(),
+                priority,
+                source_revision: Some(source_revision),
+            }],
+        })?;
+        Ok((InvalidationOutcome::Scheduled, progress))
     }
 
     fn entry(path: Arc<str>, pending: &PendingThumbnail) -> HeapEntry {
@@ -548,6 +620,95 @@ mod tests {
                 .finish(&job, FinishOutcome::Completed { cache_hit: false })
                 .is_none()
         );
+    }
+
+    #[test]
+    fn demanded_invalidation_coalesces_revisions_and_rejects_old_publication() {
+        let scheduler = ThumbnailScheduler::new(Default::default());
+        scheduler
+            .update(update(
+                3,
+                vec![spec("visible", 0, ThumbnailDemandClass::Visible)],
+            ))
+            .unwrap();
+        let old = scheduler.claim().unwrap();
+        let (outcome, progress) = scheduler
+            .invalidate_if_demanded("visible", "sidecar-b".into())
+            .unwrap();
+        assert_eq!(outcome, InvalidationOutcome::Scheduled);
+        assert_eq!(progress.requested_unique, 1);
+        assert!(old.cancellation.is_cancelled());
+        assert!(!scheduler.is_publishable(&old));
+        let current = scheduler.claim().unwrap();
+        assert_eq!(current.source_revision.as_deref(), Some("sidecar-b"));
+        assert!(scheduler.is_publishable(&current));
+        let (duplicate, _) = scheduler
+            .invalidate_if_demanded("visible", "sidecar-b".into())
+            .unwrap();
+        assert_eq!(duplicate, InvalidationOutcome::Duplicate);
+        scheduler
+            .finish(&current, FinishOutcome::Completed { cache_hit: false })
+            .unwrap();
+        let (duplicate_after_completion, _) = scheduler
+            .invalidate_if_demanded("visible", "sidecar-b".into())
+            .unwrap();
+        assert_eq!(duplicate_after_completion, InvalidationOutcome::Duplicate);
+    }
+
+    #[test]
+    fn offscreen_invalidation_is_deferred_until_viewport_demand() {
+        let scheduler = ThumbnailScheduler::new(Default::default());
+        scheduler
+            .update(update(
+                4,
+                vec![spec("visible", 0, ThumbnailDemandClass::Visible)],
+            ))
+            .unwrap();
+        let (outcome, progress) = scheduler
+            .invalidate_if_demanded("offscreen", "sidecar-a".into())
+            .unwrap();
+        assert_eq!(outcome, InvalidationOutcome::Deferred);
+        assert_eq!(progress.pending, 1);
+    }
+
+    #[test]
+    fn large_batch_invalidation_schedules_only_demanded_paths_within_bound() {
+        let scheduler = ThumbnailScheduler::new(ThumbnailSchedulerPolicy {
+            max_pending: 64,
+            ..Default::default()
+        });
+        scheduler
+            .update(update(
+                5,
+                (0..32)
+                    .map(|index| {
+                        spec(
+                            &format!("image-{index}"),
+                            index,
+                            ThumbnailDemandClass::Visible,
+                        )
+                    })
+                    .collect(),
+            ))
+            .unwrap();
+
+        let mut scheduled = 0;
+        let mut deferred = 0;
+        for index in 0..1_000 {
+            let (outcome, _) = scheduler
+                .invalidate_if_demanded(&format!("image-{index}"), format!("revision-{index}"))
+                .unwrap();
+            match outcome {
+                InvalidationOutcome::Scheduled => scheduled += 1,
+                InvalidationOutcome::Deferred => deferred += 1,
+                InvalidationOutcome::Duplicate => panic!("batch revisions are unique"),
+            }
+        }
+
+        let progress = scheduler.snapshot();
+        assert_eq!((scheduled, deferred), (32, 968));
+        assert_eq!(progress.requested_unique, 32);
+        assert_eq!(progress.pending, 32);
     }
 
     #[test]

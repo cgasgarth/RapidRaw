@@ -33,6 +33,7 @@ export const PERSISTED_RENDER_STATE_RECOVERED_EVENT = 'persisted-render-state-re
 export const PREVIEW_UPDATE_UNCROPPED_EVENT = 'preview-update-uncropped';
 export const THUMBNAIL_GENERATED_EVENT = 'thumbnail-generated';
 export const THUMBNAIL_GENERATION_COMPLETE_EVENT = 'thumbnail-generation-complete';
+export const THUMBNAIL_INVALIDATED_EVENT = 'thumbnail-invalidated';
 export const THUMBNAIL_PROGRESS_EVENT = 'thumbnail-progress';
 export const WAVEFORM_UPDATE_EVENT = 'waveform-update';
 export const WGPU_FRAME_READY_EVENT = 'wgpu-frame-ready';
