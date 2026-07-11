@@ -6,7 +6,7 @@ import { createRoot } from 'react-dom/client';
 const calls: Array<{ args: Record<string, unknown>; command: string }> = [];
 const invoke = mock(async (command: string, args: Record<string, unknown> = {}) => {
   calls.push({ args, command });
-  return command === 'load_metadata' ? { adjustments: null } : new Uint8Array([1, 2, 3]);
+  return command === 'load_metadata' ? { adjustments: null } : [1, 2, 3];
 });
 mock.module('@tauri-apps/api/core', () => ({ invoke }));
 
@@ -59,7 +59,7 @@ test('disposing during metadata load prevents stale preview work from entering a
   const metadataResolvers: Array<() => void> = [];
   invoke.mockImplementation((command: string, args: Record<string, unknown> = {}) => {
     calls.push({ args, command });
-    if (command !== 'load_metadata') return Promise.resolve(new Uint8Array([1]));
+    if (command !== 'load_metadata') return Promise.resolve([1]);
     return new Promise((resolve) => metadataResolvers.push(() => resolve({ adjustments: null })));
   });
   const runtime = installRuntime();
@@ -138,7 +138,10 @@ function installRuntime() {
     window,
   });
   Object.assign(URL, {
-    createObjectURL: () => `blob:${++objectUrl}`,
+    createObjectURL: (blob: Blob) => {
+      if (blob.size === 0) throw new Error('Preview Blob must contain native bytes');
+      return `blob:${++objectUrl}`;
+    },
     revokeObjectURL: (url: string) => revoked.push(url),
   });
   Object.assign(window.HTMLCanvasElement.prototype, {

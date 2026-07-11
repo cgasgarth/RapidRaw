@@ -223,12 +223,12 @@ export function CollageSession({ onClose, onSave, sessionId, show, sourceImages 
           if (!isCurrent) throw new Error('Collage session superseded');
           const adjustments = metadata.adjustments && !metadata.adjustments.is_null ? metadata.adjustments : {};
 
-          const imageData = await invoke<Uint8Array>(Invokes.GeneratePreviewForPath, {
+          const imageData = await invoke<number[]>(Invokes.GeneratePreviewForPath, {
             path: imageFile.path,
             jsAdjustments: adjustments,
           });
           if (!isCurrent) throw new Error('Collage session superseded');
-          const blob = createBlobFromUint8Array(imageData, 'image/jpeg');
+          const blob = createBlobFromUint8Array(new Uint8Array(imageData), 'image/jpeg');
           const url = URL.createObjectURL(blob);
           ownedUrls.add(url);
 
