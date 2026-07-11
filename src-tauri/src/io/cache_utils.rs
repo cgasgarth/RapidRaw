@@ -1,6 +1,7 @@
 use crate::AppState;
 use crate::raw_processing::RawDevelopmentReport;
 use crate::render_caches::RenderCaches;
+use crate::source_revision::{DecodedImageKey, SourceRevision};
 use image::DynamicImage;
 use std::collections::HashMap;
 use std::collections::hash_map::DefaultHasher;
@@ -10,7 +11,7 @@ use std::sync::Arc;
 use crate::adjustment_fields;
 
 type DecodedImageCacheEntry = (
-    String,
+    DecodedImageKey,
     Arc<DynamicImage>,
     HashMap<String, String>,
     Option<RawDevelopmentReport>,
@@ -234,8 +235,12 @@ impl DecodedImageCache {
         }
     }
 
-    pub(crate) fn get(&mut self, path: &str) -> Option<DecodedImageCacheValue> {
-        if let Some(pos) = self.items.iter().position(|(p, _, _, _)| p == path) {
+    pub(crate) fn get(&mut self, key: &DecodedImageKey) -> Option<DecodedImageCacheValue> {
+        if let Some(pos) = self
+            .items
+            .iter()
+            .position(|(candidate, _, _, _)| candidate == key)
+        {
             let item = self.items.remove(pos);
             let result = (item.1.clone(), item.2.clone(), item.3.clone());
             self.items.push(item);
@@ -251,17 +256,27 @@ impl DecodedImageCache {
 
     pub(crate) fn insert(
         &mut self,
-        path: String,
+        key: DecodedImageKey,
         image: Arc<DynamicImage>,
         exif: HashMap<String, String>,
         raw_development_report: Option<RawDevelopmentReport>,
     ) {
-        if let Some(pos) = self.items.iter().position(|(p, _, _, _)| *p == path) {
+        if let Some(pos) = self
+            .items
+            .iter()
+            .position(|(candidate, _, _, _)| *candidate == key)
+        {
             self.items.remove(pos);
         } else if self.items.len() >= self.capacity {
             self.items.remove(0);
         }
-        self.items.push((path, image, exif, raw_development_report));
+        self.items.push((key, image, exif, raw_development_report));
+    }
+
+    pub(crate) fn contains_revision(&self, revision: &SourceRevision) -> bool {
+        self.items
+            .iter()
+            .any(|(key, _, _, _)| &key.source_revision == revision)
     }
 }
 

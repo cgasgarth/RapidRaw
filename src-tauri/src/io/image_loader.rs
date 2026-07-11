@@ -11,6 +11,7 @@ use crate::raw_processing::{
     develop_raw_image_with_report,
 };
 use crate::render_caches::RenderCaches;
+use crate::source_revision::{DecodedImageKey, RawProcessingProfileKey, SourceRevision};
 use anyhow::{Context, Result, anyhow};
 use base64::{Engine as _, engine::general_purpose};
 use exif::{Reader as ExifReader, Tag};
@@ -283,11 +284,7 @@ pub(crate) fn raw_processing_settings_for_adjustments(
     }
 }
 
-fn raw_cache_f32(value: f32) -> String {
-    format!("{value:.4}")
-}
-
-pub(crate) fn raw_processing_mode_cache_key(source_path: &str, settings: &AppSettings) -> String {
+pub(crate) fn raw_processing_profile_key(settings: &AppSettings) -> RawProcessingProfileKey {
     let mode = normalize_raw_processing_mode(settings.raw_processing_mode.as_deref());
     let recipe = raw_processing_mode_recipe(Some(mode));
     let highlight_compression = settings
@@ -306,28 +303,35 @@ pub(crate) fn raw_processing_mode_cache_key(source_path: &str, settings: &AppSet
         },
         (0, 0),
     );
-    let source_content_hash = std::fs::read(source_path)
-        .map(|bytes| blake3::hash(&bytes).to_hex().to_string())
-        .unwrap_or_else(|_| "unavailable".to_string());
-    format!(
-        "{}::source-content-blake3={}::raw-processing-mode={}::linear-raw-mode={}::highlight-compression={}::color-nr={}::capture-sharpening={}:{}:{}:{}::camera-profile-resolver={}::raw-reconstruction={}::demosaic-plan={}::raw-decoder=rawler-0.7.1::input-transform={}::xyz-to-ap1={}::numeric-policy={}",
-        source_path,
-        source_content_hash,
+    RawProcessingProfileKey {
         mode,
-        settings.linear_raw_mode,
-        raw_cache_f32(highlight_compression),
-        raw_cache_f32(color_nr),
-        raw_cache_f32(sharpening.amount),
-        raw_cache_f32(sharpening.detail),
-        raw_cache_f32(sharpening.edge_masking),
-        raw_cache_f32(sharpening.radius_px),
-        RAW_CACHE_CAMERA_PROFILE_RESOLVER_VERSION,
-        RAW_CACHE_RECONSTRUCTION_VERSION,
-        recipe.provenance,
-        crate::color::camera_input_transform::RAW_INPUT_TRANSFORM_CONTRACT,
-        crate::color::camera_input_transform::XYZ_TO_AP1_MATRIX_VERSION,
-        crate::color::camera_input_transform::NUMERIC_POLICY_VERSION,
-    )
+        linear_raw_mode: settings.linear_raw_mode.clone(),
+        highlight_compression_bits: highlight_compression.to_bits(),
+        color_nr_bits: color_nr.to_bits(),
+        sharpening_bits: [
+            sharpening.amount.to_bits(),
+            sharpening.detail.to_bits(),
+            sharpening.edge_masking.to_bits(),
+            sharpening.radius_px.to_bits(),
+        ],
+        camera_profile_resolver_version: RAW_CACHE_CAMERA_PROFILE_RESOLVER_VERSION,
+        reconstruction_version: RAW_CACHE_RECONSTRUCTION_VERSION,
+        demosaic_plan_version: recipe.provenance,
+        decoder_version: "rawler-0.7.1",
+        input_transform_version: crate::color::camera_input_transform::RAW_INPUT_TRANSFORM_CONTRACT,
+        xyz_to_ap1_version: crate::color::camera_input_transform::XYZ_TO_AP1_MATRIX_VERSION,
+        numeric_policy_version: crate::color::camera_input_transform::NUMERIC_POLICY_VERSION,
+    }
+}
+
+pub(crate) fn raw_processing_mode_cache_key(
+    source_path: &Path,
+    settings: &AppSettings,
+) -> Result<DecodedImageKey, crate::source_revision::SourceRevisionError> {
+    Ok(DecodedImageKey {
+        source_revision: SourceRevision::from_path(source_path)?,
+        processing_profile: raw_processing_profile_key(settings),
+    })
 }
 
 #[derive(Deserialize)]
@@ -811,13 +815,14 @@ pub fn composite_patches_on_image(
 #[tauri::command]
 pub fn is_image_cached(path: String, state: tauri::State<'_, AppState>) -> bool {
     let (source_path, _) = parse_virtual_path(&path);
-    let source_path_str = source_path.to_string_lossy().to_string();
+    let Ok(revision) = SourceRevision::from_path(&source_path) else {
+        return false;
+    };
     state
         .decoded_image_cache
         .lock()
         .unwrap()
-        .get(&source_path_str)
-        .is_some()
+        .contains_revision(&revision)
 }
 
 #[tauri::command]
@@ -1007,10 +1012,12 @@ pub async fn load_image(
     let settings = load_settings_or_default(&app_handle);
     let effective_settings =
         raw_processing_settings_for_adjustments(&settings, &metadata.adjustments);
-    let raw_processing_cache_key =
-        raw_processing_mode_cache_key(&source_path_str, &effective_settings);
+    let raw_processing_cache_key = raw_processing_mode_cache_key(&source_path, &effective_settings)
+        .map_err(|error| error.to_string())?;
 
     let path_clone = source_path_str.clone();
+    let expected_revision = raw_processing_cache_key.source_revision.clone();
+    let fingerprint_cache = state.source_fingerprint_cache.clone();
 
     let cached_data = state
         .decoded_image_cache
@@ -1079,6 +1086,8 @@ pub async fn load_image(
                             return Err("Load cancelled".to_string());
                         }
 
+                        let fingerprint = fingerprint_cache.fingerprint(&expected_revision, &mmap);
+                        log::trace!("decoded_source_fingerprint={}", fingerprint.blake3.to_hex());
                         let (img, raw_development_report) = load_base_image_from_bytes_with_report(
                             &mmap,
                             &path_clone,
@@ -1106,6 +1115,12 @@ pub async fn load_image(
                         if let Some(report) = &raw_development_report {
                             add_raw_development_report_exif(&mut exif, report);
                         }
+                        if SourceRevision::from_path(Path::new(&path_clone))
+                            .map_err(|error| error.to_string())?
+                            != expected_revision
+                        {
+                            return Err("source_changed_during_decode".to_string());
+                        }
                         Ok((img, exif, raw_development_report))
                     }
                     Err(e) => {
@@ -1117,6 +1132,8 @@ pub async fn load_image(
                         let bytes = fs::read(&path_clone).map_err(|io_err| {
                             format!("Fallback read failed for {}: {}", path_clone, io_err)
                         })?;
+                        let fingerprint = fingerprint_cache.fingerprint(&expected_revision, &bytes);
+                        log::trace!("decoded_source_fingerprint={}", fingerprint.blake3.to_hex());
 
                         if generation_tracker.load(Ordering::SeqCst) != my_generation {
                             return Err("Load cancelled".to_string());
@@ -1148,6 +1165,12 @@ pub async fn load_image(
                         );
                         if let Some(report) = &raw_development_report {
                             add_raw_development_report_exif(&mut exif, report);
+                        }
+                        if SourceRevision::from_path(Path::new(&path_clone))
+                            .map_err(|error| error.to_string())?
+                            != expected_revision
+                        {
+                            return Err("source_changed_during_decode".to_string());
                         }
                         Ok((img, exif, raw_development_report))
                     }
@@ -1420,18 +1443,29 @@ mod tests {
         assert_eq!(resolved.raw_processing_mode.as_deref(), Some("maximum"));
         assert_eq!(resolved.raw_preprocessing_color_nr, Some(0.65));
         assert_eq!(resolved.raw_preprocessing_sharpening, Some(0.42));
-        let resolved_cache_key = raw_processing_mode_cache_key("/tmp/image.arw", &resolved);
-        assert!(resolved_cache_key.contains("raw-processing-mode=maximum"));
-        assert!(resolved_cache_key.contains("camera-profile-resolver=dual_illuminant_mired_v1"));
-        assert!(resolved_cache_key.contains("raw-reconstruction=raw_reconstruction_v3"));
-        assert!(resolved_cache_key.contains("highlight-compression=4.0000"));
-        assert!(resolved_cache_key.contains("capture-sharpening=0.4410:0.5940:0.4600:2.3500"));
+        let resolved_cache_key = raw_processing_profile_key(&resolved);
+        assert_eq!(resolved_cache_key.mode, "maximum");
+        assert_eq!(
+            resolved_cache_key.camera_profile_resolver_version,
+            "dual_illuminant_mired_v1"
+        );
+        assert_eq!(
+            resolved_cache_key.reconstruction_version,
+            "raw_reconstruction_v3"
+        );
+        assert_eq!(
+            resolved_cache_key.highlight_compression_bits,
+            4.0_f32.to_bits()
+        );
+        assert!(
+            (f32::from_bits(resolved_cache_key.sharpening_bits[0]) - 0.441).abs() < f32::EPSILON
+        );
 
         let inherited =
             raw_processing_settings_for_adjustments(&base_settings, &serde_json::json!({}));
         assert_eq!(inherited.raw_processing_mode.as_deref(), Some("fast"));
-        let inherited_cache_key = raw_processing_mode_cache_key("/tmp/image.arw", &inherited);
-        assert!(inherited_cache_key.contains("raw-processing-mode=fast"));
+        let inherited_cache_key = raw_processing_profile_key(&inherited);
+        assert_eq!(inherited_cache_key.mode, "fast");
         assert_ne!(resolved_cache_key, inherited_cache_key);
     }
 
@@ -1457,19 +1491,10 @@ mod tests {
             ..base.clone()
         };
 
-        let base_key = raw_processing_mode_cache_key("/tmp/image.arw", &base);
-        assert_ne!(
-            base_key,
-            raw_processing_mode_cache_key("/tmp/image.arw", &highlight_changed)
-        );
-        assert_ne!(
-            base_key,
-            raw_processing_mode_cache_key("/tmp/image.arw", &linear_mode_changed)
-        );
-        assert_ne!(
-            base_key,
-            raw_processing_mode_cache_key("/tmp/image.arw", &sharpening_changed)
-        );
+        let base_key = raw_processing_profile_key(&base);
+        assert_ne!(base_key, raw_processing_profile_key(&highlight_changed));
+        assert_ne!(base_key, raw_processing_profile_key(&linear_mode_changed));
+        assert_ne!(base_key, raw_processing_profile_key(&sharpening_changed));
     }
 
     #[test]
