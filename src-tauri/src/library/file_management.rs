@@ -58,6 +58,9 @@ use crate::thumbnail_resources::{
     ThumbnailResourceDescriptor, ThumbnailResourceSource, descriptor_from_manifest,
     next_descriptor_generation, publish_thumbnail_artifact,
 };
+use crate::thumbnail_scheduler::{
+    FinishOutcome, GenerationProgress, ThumbnailJob, UpdateThumbnailQueueRequest,
+};
 use crate::xmp_sidecar::{
     extract_xmp_label, extract_xmp_rating, extract_xmp_tags, sync_metadata_to_xmp_sidecar,
 };
@@ -125,7 +128,7 @@ fn generate_and_write_smart_preview_artifact(
     )
     .ok()?;
     let (smart_data, width, height) =
-        encode_thumbnail(&smart_image, SMART_PREVIEW_TARGET_WIDTH, app_handle).ok()?;
+        encode_thumbnail(&smart_image, SMART_PREVIEW_TARGET_WIDTH, app_handle, None).ok()?;
     write_smart_preview_artifact(
         smart_preview_dir,
         path_str,
@@ -1279,15 +1282,15 @@ fn encode_thumbnail(
     image: &DynamicImage,
     target_width: u32,
     app_handle: &AppHandle,
+    cancellation: Option<&std::sync::atomic::AtomicBool>,
 ) -> Result<(Vec<u8>, u32, u32)> {
     let state = app_handle.state::<AppState>();
+    let cancellation = cancellation.unwrap_or(&state.thumbnail_cancellation_token);
     let thumbnail = crate::image_processing::downscale_f32_image_cow(
         image,
         target_width,
         target_width,
-        Some(crate::CancellationProbe::new(
-            &state.thumbnail_cancellation_token,
-        )),
+        Some(crate::CancellationProbe::new(cancellation)),
     )?;
     let thumbnail = thumbnail.as_ref();
     let (width, height) = thumbnail.dimensions();
@@ -1297,6 +1300,7 @@ fn encode_thumbnail(
     Ok((buf.into_inner(), width, height))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn generate_single_thumbnail_and_cache(
     path_str: &str,
     thumb_cache_dir: &Path,
@@ -1305,7 +1309,13 @@ fn generate_single_thumbnail_and_cache(
     force_regenerate: bool,
     app_handle: &AppHandle,
     settings: &AppSettings,
+    cancellation: Option<&std::sync::atomic::AtomicBool>,
 ) -> Option<ThumbnailResult> {
+    let cancelled =
+        || cancellation.is_some_and(|flag| flag.load(std::sync::atomic::Ordering::Acquire));
+    if cancelled() {
+        return None;
+    }
     let (_, sidecar_path) = parse_virtual_path(path_str);
 
     let (rating, is_edited, adjustments_bytes) =
@@ -1385,8 +1395,11 @@ fn generate_single_thumbnail_and_cache(
     if let Ok(thumb_image) =
         generate_thumbnail_data(path_str, gpu_context, preloaded_image, app_handle)
         && let Ok((thumb_data, width, height)) =
-            encode_thumbnail(&thumb_image, target_width, app_handle)
+            encode_thumbnail(&thumb_image, target_width, app_handle, cancellation)
     {
+        if cancelled() {
+            return None;
+        }
         let adjustment_fingerprint = blake3::hash(&adjustments_bytes).to_hex().to_string();
         publish_thumbnail_artifact(
             thumb_cache_dir,
@@ -1397,6 +1410,9 @@ fn generate_single_thumbnail_and_cache(
             height,
             &adjustment_fingerprint,
         )?;
+        if cancelled() {
+            return None;
+        }
         let resource = descriptor_from_manifest(
             thumb_cache_dir,
             &cache_hash,
@@ -1460,61 +1476,94 @@ fn emit_thumbnail_result(app_handle: &AppHandle, path: &str, mut thumbnail: Thum
     );
 }
 
+fn emit_scheduled_thumbnail_result(
+    app_handle: &AppHandle,
+    job: &ThumbnailJob,
+    mut thumbnail: ThumbnailResult,
+) {
+    let descriptor_generation = next_descriptor_generation();
+    thumbnail.resource.generation = descriptor_generation;
+    if let Some(resource) = thumbnail.smart_preview_resource.as_mut() {
+        resource.generation = descriptor_generation;
+    }
+    let _ = app_handle.emit(
+        "thumbnail-generated",
+        serde_json::json!({
+            "generation": job.generation,
+            "path": job.path,
+            "sourceRevision": job.source_revision,
+            "cacheRevision": thumbnail.resource.revision,
+            "fromCache": thumbnail.resource.source == ThumbnailResourceSource::DiskCache,
+            "resource": thumbnail.resource,
+            "rating": thumbnail.rating,
+            "is_edited": thumbnail.is_edited,
+            "smartPreview": thumbnail.smart_preview,
+            "smartPreviewResource": thumbnail.smart_preview_resource
+        }),
+    );
+}
+
+fn emit_scheduler_progress(app_handle: &AppHandle, progress: &GenerationProgress) {
+    let mut payload = serde_json::to_value(progress).unwrap_or_default();
+    if let Some(object) = payload.as_object_mut() {
+        object.insert(
+            "current".into(),
+            (progress.completed + progress.cache_hits + progress.failed).into(),
+        );
+        object.insert("total".into(), progress.requested_unique.into());
+    }
+    let _ = app_handle.emit(crate::events::THUMBNAIL_PROGRESS, payload);
+    if progress.pending == 0 && progress.in_flight == 0 {
+        let _ = app_handle.emit(
+            crate::events::THUMBNAIL_GENERATION_COMPLETE,
+            serde_json::json!({ "generation": progress.generation }),
+        );
+    }
+}
+
 pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
     let state = app_handle.state::<crate::AppState>();
-    let manager = state.thumbnail_manager.clone();
+    let scheduler = state.thumbnail_scheduler.clone();
     let settings = load_settings_or_default(&app_handle);
     let thread_count = settings.thumbnail_worker_threads.unwrap_or(4).clamp(1, 16);
 
     for _ in 0..thread_count {
         let app_clone = app_handle.clone();
-        let manager_clone = manager.clone();
-        let worker_settings = settings.clone();
+        let scheduler = scheduler.clone();
 
         std::thread::spawn(move || {
-            loop {
-                let path_to_process: String = {
-                    let mut queue = manager_clone.queue.lock().unwrap();
-                    while queue.is_empty() {
-                        queue = manager_clone.cvar.wait(queue).unwrap();
-                    }
-                    let path = queue.pop_back().unwrap();
-
-                    let mut processing = manager_clone.processing_now.lock().unwrap();
-                    if processing.contains(&path) {
-                        let state = app_clone.state::<crate::AppState>();
-                        increment_thumbnail_progress(&state, &app_clone);
-                        continue;
-                    }
-                    processing.insert(path.clone());
-                    path
-                };
-
+            while let Some(job) = scheduler.claim() {
                 let state = app_clone.state::<crate::AppState>();
                 let gpu_context =
                     crate::gpu_processing::get_or_init_gpu_context(&state, &app_clone).ok();
-
-                if let Ok(cache_dir) = get_thumb_cache_dir(&app_clone) {
-                    let result = generate_single_thumbnail_and_cache(
-                        &path_to_process,
+                let settings = load_settings_or_default(&app_clone);
+                let execution = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    let cache_dir = get_thumb_cache_dir(&app_clone).ok()?;
+                    generate_single_thumbnail_and_cache(
+                        &job.path,
                         &cache_dir,
                         gpu_context.as_ref(),
                         None,
                         false,
                         &app_clone,
-                        &worker_settings,
-                    );
-
-                    if let Some(thumbnail) = result {
-                        emit_thumbnail_result(&app_clone, &path_to_process, thumbnail);
+                        &settings,
+                        Some(job.cancellation.flag()),
+                    )
+                }));
+                let outcome = match execution {
+                    Ok(Some(thumbnail)) if scheduler.is_publishable(&job) => {
+                        let cache_hit =
+                            thumbnail.resource.source == ThumbnailResourceSource::DiskCache;
+                        emit_scheduled_thumbnail_result(&app_clone, &job, thumbnail);
+                        FinishOutcome::Completed { cache_hit }
                     }
-                    increment_thumbnail_progress(&state, &app_clone);
+                    Ok(_) if job.cancellation.is_cancelled() => FinishOutcome::Cancelled,
+                    Ok(_) => FinishOutcome::Failed { retryable: true },
+                    Err(_) => FinishOutcome::Failed { retryable: false },
+                };
+                if let Some(progress) = scheduler.finish(&job, outcome) {
+                    emit_scheduler_progress(&app_clone, &progress);
                 }
-                manager_clone
-                    .processing_now
-                    .lock()
-                    .unwrap()
-                    .remove(&path_to_process);
             }
         });
     }
@@ -1522,62 +1571,15 @@ pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
 
 #[tauri::command]
 pub fn update_thumbnail_queue(
-    paths: Vec<String>,
+    request: UpdateThumbnailQueueRequest,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
     let state = app_handle.state::<crate::AppState>();
-
-    let mut queue = state.thumbnail_manager.queue.lock().unwrap();
-
-    if paths.is_empty() {
-        queue.clear();
-        let mut tracker = state.thumbnail_progress.lock().unwrap();
-        tracker.total = 0;
-        tracker.completed = 0;
-        drop(tracker);
-
-        let _ = app_handle.emit(
-            crate::events::THUMBNAIL_PROGRESS,
-            serde_json::json!({ "current": 0, "total": 0 }),
-        );
-        state.thumbnail_manager.cvar.notify_all();
-        return Ok(());
-    }
-
-    let mut unique_paths = Vec::new();
-    let mut seen = std::collections::HashSet::new();
-    for path in paths {
-        if seen.insert(path.clone()) {
-            unique_paths.push(path);
-        }
-    }
-
-    queue.retain(|p| !seen.contains(p));
-
-    while queue.len() + unique_paths.len() > 500 {
-        queue.pop_front();
-    }
-
-    for path in unique_paths {
-        queue.push_back(path);
-    }
-
-    let queue_len = queue.len();
-    drop(queue);
-
-    let mut tracker = state.thumbnail_progress.lock().unwrap();
-    tracker.total = tracker.completed + queue_len;
-
-    let current = tracker.completed;
-    let total = tracker.total;
-    drop(tracker);
-
-    let _ = app_handle.emit(
-        crate::events::THUMBNAIL_PROGRESS,
-        serde_json::json!({ "current": current, "total": total }),
-    );
-
-    state.thumbnail_manager.cvar.notify_all();
+    let progress = state
+        .thumbnail_scheduler
+        .update(request)
+        .map_err(str::to_string)?;
+    emit_scheduler_progress(&app_handle, &progress);
     Ok(())
 }
 
@@ -2144,6 +2146,7 @@ pub fn save_metadata_and_update_thumbnail(
             true,
             &app_handle_clone,
             &settings,
+            None,
         );
 
         if let Some(thumbnail) = result {
@@ -2239,6 +2242,7 @@ pub async fn apply_adjustments_to_paths(
                 true,
                 &app_handle,
                 &settings,
+                None,
             );
 
             if let Some(thumbnail) = result {
@@ -2308,6 +2312,7 @@ pub async fn reset_adjustments_for_paths(
                 true,
                 &app_handle,
                 &settings,
+                None,
             );
 
             if let Some(thumbnail) = result {
@@ -2418,6 +2423,7 @@ pub async fn apply_auto_adjustments_to_paths(
                 true,
                 &app_handle,
                 &settings,
+                None,
             );
 
             if let Some(thumbnail) = result {
@@ -2746,7 +2752,7 @@ pub fn get_cached_or_generate_thumbnail_image(
         }
 
         let thumb_image = generate_thumbnail_data(path_str, gpu_context, None, app_handle)?;
-        let (thumb_data, _, _) = encode_thumbnail(&thumb_image, target_width, app_handle)?;
+        let (thumb_data, _, _) = encode_thumbnail(&thumb_image, target_width, app_handle, None)?;
         fs::write(&cache_path, &thumb_data)?;
 
         Ok(thumb_image)

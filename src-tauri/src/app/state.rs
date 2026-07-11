@@ -1,8 +1,8 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::mpsc::Sender;
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::{Arc, Mutex};
 
 use image::{DynamicImage, GrayImage};
 use serde::{Deserialize, Serialize};
@@ -138,25 +138,9 @@ pub struct ThumbnailProgressTracker {
     pub completed: usize,
 }
 
-pub struct ThumbnailManager {
-    pub queue: Mutex<VecDeque<String>>,
-    pub cvar: Condvar,
-    pub processing_now: Mutex<HashSet<String>>,
-}
-
 pub struct ExportJob {
     pub cancellation_token: Arc<AtomicBool>,
     pub task_handle: Option<JoinHandle<()>>,
-}
-
-impl ThumbnailManager {
-    pub fn new() -> Arc<Self> {
-        Arc::new(Self {
-            queue: Mutex::new(VecDeque::new()),
-            cvar: Condvar::new(),
-            processing_now: Mutex::new(HashSet::new()),
-        })
-    }
 }
 
 pub type TransformedImageCache = (u64, Arc<DynamicImage>, (f32, f32));
@@ -206,7 +190,7 @@ pub struct AppState {
     pub full_transformed_cache: Mutex<Option<TransformedImageCache>>,
     pub decoded_image_cache: DecodedImageCache,
     pub source_fingerprint_cache: Arc<FingerprintCache>,
-    pub thumbnail_manager: Arc<ThumbnailManager>,
+    pub thumbnail_scheduler: Arc<crate::library::thumbnail_scheduler::ThumbnailScheduler>,
     pub tether_session: Mutex<Option<TetherSessionSnapshot>>,
 }
 
@@ -283,7 +267,9 @@ impl AppState {
             full_transformed_cache: Mutex::new(None),
             decoded_image_cache: DecodedImageCache::new(5, Arc::clone(&cache_budget)),
             source_fingerprint_cache: Arc::new(FingerprintCache::new(64)),
-            thumbnail_manager: ThumbnailManager::new(),
+            thumbnail_scheduler: crate::library::thumbnail_scheduler::ThumbnailScheduler::new(
+                Default::default(),
+            ),
             tether_session: Mutex::new(None),
         }
     }
