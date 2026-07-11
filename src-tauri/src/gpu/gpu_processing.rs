@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 use std::hash::{Hash, Hasher};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 #[cfg(test)]
 use std::sync::atomic::AtomicBool;
@@ -151,12 +151,75 @@ const BLUR_FLAG_TONAL: u32 = 1 << 1;
 const BLUR_FLAG_CLARITY: u32 = 1 << 2;
 const BLUR_FLAG_STRUCTURE: u32 = 1 << 3;
 const BLUR_ABI_VERSION: u32 = 1;
+const GPU_RENDER_GRAPH_VERSION: u32 = 1;
+const GPU_SHADER_LAYOUT_VERSION: u32 = 1;
+static NEXT_PROCESSOR_GENERATION: AtomicU64 = AtomicU64::new(1);
+
+bitflags::bitflags! {
+    #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+    pub struct GpuStageFlags: u32 {
+        const BLUR_SHARPNESS = 1 << 0;
+        const BLUR_TONAL = 1 << 1;
+        const BLUR_CLARITY = 1 << 2;
+        const BLUR_STRUCTURE = 1 << 3;
+        const FLARE = 1 << 4;
+        const MAIN_ADJUST = 1 << 5;
+        const LUT = 1 << 6;
+        const MASKS = 1 << 7;
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum BlurSemantic {
+    Sharpness,
+    Tonal,
+    Clarity,
+    Structure,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct BlurProductSpec {
+    pub semantic: BlurSemantic,
+    pub radius_bits: u32,
+    pub implementation_version: u32,
+}
+
+impl BlurProductSpec {
+    fn base_radius(self) -> f32 {
+        f32::from_bits(self.radius_bits)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GpuRenderGraphPlan {
+    pub graph_version: u32,
+    pub flags: GpuStageFlags,
+    pub blur_products: Vec<BlurProductSpec>,
+    pub mask_layer_count: u16,
+    pub tile_halo: u32,
+    pub fingerprint: u64,
+    pub estimated_peak_resource_bytes: u64,
+    #[cfg(debug_assertions)]
+    pub reasons: Vec<&'static str>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct GpuExecutionReceipt {
+    pub graph_fingerprint: u64,
+    pub stages: GpuStageFlags,
+    pub blur_dispatch_count: u32,
+    pub render_pass_count: u32,
+    pub command_buffer_count: u32,
+    pub queue_submit_count: u32,
+    pub estimated_peak_resource_bytes: u64,
+    pub cpu_encode_time: Duration,
+}
+
 const MASK_TEXTURE_ABI_VERSION: u32 = 1;
 const LUT_TEXTURE_ABI_VERSION: u32 = 1;
 const MAIN_BIND_GROUP_ABI_VERSION: u32 = 1;
 const MAX_RESIDENT_MASKS: usize = 8;
 const MAX_RESIDENT_LUTS: usize = 4;
-static NEXT_PROCESSOR_GENERATION: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct GpuDeviceGeneration(pub u64);
@@ -383,6 +446,134 @@ fn resolve_blur_pass_needs(adjustments: &AllAdjustments) -> BlurPassNeeds {
     needs
 }
 
+pub fn compile_gpu_render_graph(
+    adjustments: &AllAdjustments,
+    has_lut: bool,
+    mask_layer_count: usize,
+    width: u32,
+    height: u32,
+) -> GpuRenderGraphPlan {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+
+    let needs = resolve_blur_pass_needs(adjustments);
+    let scale = width.min(height) as f32 / 1080.0;
+    let definitions = [
+        (
+            needs.sharpness,
+            BlurSemantic::Sharpness,
+            1.0,
+            GpuStageFlags::BLUR_SHARPNESS,
+        ),
+        (
+            needs.tonal,
+            BlurSemantic::Tonal,
+            3.5,
+            GpuStageFlags::BLUR_TONAL,
+        ),
+        (
+            needs.clarity,
+            BlurSemantic::Clarity,
+            8.0,
+            GpuStageFlags::BLUR_CLARITY,
+        ),
+        (
+            needs.structure,
+            BlurSemantic::Structure,
+            40.0,
+            GpuStageFlags::BLUR_STRUCTURE,
+        ),
+    ];
+    let mut flags = GpuStageFlags::MAIN_ADJUST;
+    let mut blur_products = Vec::with_capacity(4);
+    for (active, semantic, radius, flag) in definitions {
+        if active {
+            flags |= flag;
+            blur_products.push(BlurProductSpec {
+                semantic,
+                radius_bits: f32::to_bits(radius),
+                implementation_version: BLUR_ABI_VERSION,
+            });
+        }
+    }
+    if adjustments.global.flare_amount > 0.0 {
+        flags |= GpuStageFlags::FLARE;
+    }
+    if has_lut {
+        flags |= GpuStageFlags::LUT;
+    }
+    let active_masks = (adjustments.mask_count as usize)
+        .min(mask_layer_count)
+        .min(MAX_MASKS);
+    if active_masks > 0 {
+        flags |= GpuStageFlags::MASKS;
+    }
+    let tile_halo = blur_products
+        .iter()
+        .map(|spec| (spec.base_radius() * scale).ceil().max(1.0) as u32)
+        .max()
+        .unwrap_or(0);
+    let tile_edge = 2048_u64 + u64::from(tile_halo) * 2;
+    let live_blur_surfaces = blur_products.len() as u64 + u64::from(!blur_products.is_empty());
+    let estimated_peak_resource_bytes = tile_edge * tile_edge * 8 * (2 + live_blur_surfaces);
+    let mut hasher = DefaultHasher::new();
+    GPU_RENDER_GRAPH_VERSION.hash(&mut hasher);
+    GPU_SHADER_LAYOUT_VERSION.hash(&mut hasher);
+    flags.hash(&mut hasher);
+    blur_products.hash(&mut hasher);
+    active_masks.hash(&mut hasher);
+    tile_halo.hash(&mut hasher);
+    let fingerprint = hasher.finish();
+
+    GpuRenderGraphPlan {
+        graph_version: GPU_RENDER_GRAPH_VERSION,
+        flags,
+        blur_products,
+        mask_layer_count: active_masks as u16,
+        tile_halo,
+        fingerprint,
+        estimated_peak_resource_bytes,
+        #[cfg(debug_assertions)]
+        reasons: graph_reasons(adjustments, has_lut, active_masks),
+    }
+}
+
+#[cfg(debug_assertions)]
+fn graph_reasons(
+    adjustments: &AllAdjustments,
+    has_lut: bool,
+    active_masks: usize,
+) -> Vec<&'static str> {
+    let needs = resolve_blur_pass_needs(adjustments);
+    let mut reasons = vec!["MAIN_ADJUST required by render output"];
+    for (active, reason) in [
+        (needs.sharpness, "BLUR_SHARPNESS required by sharpness"),
+        (needs.tonal, "BLUR_TONAL required by tonal adjustments"),
+        (
+            needs.clarity,
+            "BLUR_CLARITY required by clarity/centre/halation",
+        ),
+        (
+            needs.structure,
+            "BLUR_STRUCTURE required by structure/dehaze/glow",
+        ),
+        (
+            adjustments.global.flare_amount > 0.0,
+            "FLARE required by flare_amount",
+        ),
+        (has_lut, "LUT required by render request"),
+        (
+            active_masks > 0,
+            "MASKS required by active local adjustments",
+        ),
+    ] {
+        if active {
+            reasons.push(reason);
+        }
+    }
+    reasons
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 struct BlurPassCounters {
     families_requested: u32,
@@ -451,11 +642,14 @@ impl BlurPassCounters {
     }
 
     fn record_family(&mut self, pixels: u64) {
-        self.encoders += 1;
         self.bind_groups += 2;
         self.dispatches += 2;
-        self.submissions += 1;
         self.pixels_processed += pixels * 2;
+    }
+
+    fn record_command_buffer(&mut self) {
+        self.encoders += 1;
+        self.submissions += 1;
     }
 }
 
@@ -545,7 +739,7 @@ pub struct GpuProcessor {
     blur_bgl: wgpu::BindGroupLayout,
     h_blur_pipeline: wgpu::ComputePipeline,
     v_blur_pipeline: wgpu::ComputePipeline,
-    blur_params_buffer: wgpu::Buffer,
+    blur_params_buffers: [wgpu::Buffer; 4],
 
     flare_bgl_0: wgpu::BindGroupLayout,
     flare_bgl_1: wgpu::BindGroupLayout,
@@ -652,11 +846,18 @@ impl GpuProcessor {
             cache: None,
         });
 
-        let blur_params_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Blur Params Buffer"),
-            size: std::mem::size_of::<BlurParams>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
+        let blur_params_buffers = std::array::from_fn(|index| {
+            device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some(match index {
+                    0 => "Sharpness Blur Params",
+                    1 => "Tonal Blur Params",
+                    2 => "Clarity Blur Params",
+                    _ => "Structure Blur Params",
+                }),
+                size: std::mem::size_of::<BlurParams>() as u64,
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            })
         });
 
         let flare_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -1034,7 +1235,7 @@ impl GpuProcessor {
             blur_bgl,
             h_blur_pipeline,
             v_blur_pipeline,
-            blur_params_buffer,
+            blur_params_buffers,
             flare_bgl_0,
             flare_bgl_1,
             flare_threshold_pipeline,
@@ -1199,6 +1400,13 @@ impl GpuProcessor {
             .map_or(&self.dummy_lut_view, |entry| &entry.view);
 
         let mut adjustments = request.adjustments;
+        let graph = compile_gpu_render_graph(
+            &adjustments,
+            request.lut.is_some(),
+            request.mask_bitmaps.len(),
+            width,
+            height,
+        );
         let blur_pass_needs = resolve_blur_pass_needs(&adjustments);
         #[cfg(test)]
         let blur_pass_needs = if FORCE_ALL_BLUR_PASSES.load(Ordering::Relaxed) {
@@ -1213,6 +1421,7 @@ impl GpuProcessor {
         };
         adjustments.blur_pass_flags = blur_pass_needs.flags();
         let mut blur_counters = BlurPassCounters::new(blur_pass_needs);
+        let mut flare_command_buffer = None;
         if adjustments.global.flare_amount > 0.0 {
             let mut encoder = device.create_command_encoder(&Default::default());
 
@@ -1309,11 +1518,11 @@ impl GpuProcessor {
                 cpass.dispatch_workgroups(FLARE_MAP_SIZE / 16, FLARE_MAP_SIZE / 16, 1);
             }
 
-            queue.submit(Some(encoder.finish()));
+            flare_command_buffer = Some(encoder.finish());
         }
 
         const TILE_SIZE: u32 = 2048;
-        const TILE_OVERLAP: u32 = 128;
+        let tile_overlap = graph.tile_halo;
 
         let mut final_pixels = vec![
             0u8;
@@ -1323,6 +1532,8 @@ impl GpuProcessor {
                 (out_width * out_height * GPU_OUTPUT_BYTES_PER_PIXEL) as usize
             }
         ];
+        let mut cpu_encode_time = Duration::ZERO;
+        let mut command_buffer_count = u32::from(flare_command_buffer.is_some());
 
         let start_tile_x = bounds.x / TILE_SIZE;
         let start_tile_y = bounds.y / TILE_SIZE;
@@ -1346,10 +1557,10 @@ impl GpuProcessor {
                 let tile_width = x_end - x_start;
                 let tile_height = y_end - y_start;
 
-                let input_x_start = (x_start as i32 - TILE_OVERLAP as i32).max(0) as u32;
-                let input_y_start = (y_start as i32 - TILE_OVERLAP as i32).max(0) as u32;
-                let input_x_end = (x_end + TILE_OVERLAP).min(width);
-                let input_y_end = (y_end + TILE_OVERLAP).min(height);
+                let input_x_start = x_start.saturating_sub(tile_overlap);
+                let input_y_start = y_start.saturating_sub(tile_overlap);
+                let input_x_end = (x_end + tile_overlap).min(width);
+                let input_y_end = (y_end + tile_overlap).min(height);
                 let input_width = input_x_end - input_x_start;
                 let input_height = input_y_end - input_y_start;
 
@@ -1371,6 +1582,11 @@ impl GpuProcessor {
                 let cache_one_tile =
                     cache_one_tile && !FORCE_DISABLE_BLUR_CACHE.load(Ordering::Relaxed);
 
+                let encode_started = Instant::now();
+                let mut main_encoder =
+                    device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                        label: Some("GPU render graph encoder"),
+                    });
                 let mut run_blur = |family: BlurFamily,
                                     base_radius: f32,
                                     output_view: &wgpu::TextureView|
@@ -1423,9 +1639,8 @@ impl GpuProcessor {
                         _pad2: 0,
                         _pad3: 0,
                     };
-                    queue.write_buffer(&self.blur_params_buffer, 0, bytemuck::bytes_of(&params));
-
-                    let mut blur_encoder = device.create_command_encoder(&Default::default());
+                    let params_buffer = &self.blur_params_buffers[family as usize];
+                    queue.write_buffer(params_buffer, 0, bytemuck::bytes_of(&params));
 
                     let h_blur_bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
                         label: Some("H-Blur BG"),
@@ -1441,13 +1656,13 @@ impl GpuProcessor {
                             },
                             wgpu::BindGroupEntry {
                                 binding: BLUR_BINDING_PARAMS,
-                                resource: self.blur_params_buffer.as_entire_binding(),
+                                resource: params_buffer.as_entire_binding(),
                             },
                         ],
                     });
 
                     {
-                        let mut cpass = blur_encoder.begin_compute_pass(&Default::default());
+                        let mut cpass = main_encoder.begin_compute_pass(&Default::default());
                         cpass.set_pipeline(&self.h_blur_pipeline);
                         cpass.set_bind_group(0, &h_blur_bg, &[]);
                         cpass.dispatch_workgroups(input_width.div_ceil(256), input_height, 1);
@@ -1467,19 +1682,18 @@ impl GpuProcessor {
                             },
                             wgpu::BindGroupEntry {
                                 binding: BLUR_BINDING_PARAMS,
-                                resource: self.blur_params_buffer.as_entire_binding(),
+                                resource: params_buffer.as_entire_binding(),
                             },
                         ],
                     });
 
                     {
-                        let mut cpass = blur_encoder.begin_compute_pass(&Default::default());
+                        let mut cpass = main_encoder.begin_compute_pass(&Default::default());
                         cpass.set_pipeline(&self.v_blur_pipeline);
                         cpass.set_bind_group(0, &v_blur_bg, &[]);
                         cpass.dispatch_workgroups(input_width, input_height.div_ceil(256), 1);
                     }
 
-                    queue.submit(Some(blur_encoder.finish()));
                     if cache_one_tile {
                         self.blur_surface_cache.lock().unwrap().publish(family, key);
                     }
@@ -1495,8 +1709,6 @@ impl GpuProcessor {
                     && run_blur(BlurFamily::Clarity, 8.0, &self.clarity_blur_view);
                 let did_create_structure_blur = blur_pass_needs.structure
                     && run_blur(BlurFamily::Structure, 40.0, &self.structure_blur_view);
-
-                let mut main_encoder = device.create_command_encoder(&Default::default());
 
                 let mut tile_adjustments = adjustments;
                 tile_adjustments.tile_offset_x = input_x_start;
@@ -1662,7 +1874,16 @@ impl GpuProcessor {
                     );
                 }
 
-                queue.submit(Some(main_encoder.finish()));
+                let tile_command_buffer = main_encoder.finish();
+                queue.submit(
+                    flare_command_buffer
+                        .take()
+                        .into_iter()
+                        .chain(std::iter::once(tile_command_buffer)),
+                );
+                blur_counters.record_command_buffer();
+                command_buffer_count += 1;
+                cpu_encode_time += encode_started.elapsed();
 
                 if !skip_cpu_readback {
                     let processed_tile_data = read_texture_data_roi_with_bytes_per_pixel(
@@ -1706,6 +1927,17 @@ impl GpuProcessor {
             cache.totals.cache_misses += blur_counters.cache_misses;
         }
         log::debug!("blur passes: needs={blur_pass_needs:?} counters={blur_counters:?}");
+        let receipt = GpuExecutionReceipt {
+            graph_fingerprint: graph.fingerprint,
+            stages: graph.flags,
+            blur_dispatch_count: blur_counters.dispatches,
+            render_pass_count: blur_counters.dispatches + blur_counters.submissions,
+            command_buffer_count,
+            queue_submit_count: blur_counters.submissions,
+            estimated_peak_resource_bytes: graph.estimated_peak_resource_bytes,
+            cpu_encode_time,
+        };
+        log::debug!("GPU execution receipt: {receipt:?}");
 
         Ok((final_pixels, out_width, out_height, bounds.x, bounds.y))
     }
@@ -1800,6 +2032,53 @@ mod blur_pass_tests {
         let mut adjustments = AllAdjustments::default();
         adjustments.global.exposure = 1.0;
         assert_eq!(needs(adjustments), BlurPassNeeds::default());
+    }
+
+    #[test]
+    fn graph_compiler_emits_versioned_active_products_and_halo() {
+        let exposure = compile_gpu_render_graph(&AllAdjustments::default(), false, 0, 3840, 2160);
+        assert_eq!(exposure.graph_version, GPU_RENDER_GRAPH_VERSION);
+        assert_eq!(exposure.flags, GpuStageFlags::MAIN_ADJUST);
+        assert!(exposure.blur_products.is_empty());
+        assert_eq!(exposure.tile_halo, 0);
+
+        let mut adjustments = AllAdjustments::default();
+        adjustments.global.contrast = 0.2;
+        adjustments.global.highlights = -0.1;
+        adjustments.global.clarity = 0.3;
+        adjustments.mask_count = 1;
+        let graph = compile_gpu_render_graph(&adjustments, true, 1, 3840, 2160);
+        assert_eq!(
+            graph.flags,
+            GpuStageFlags::MAIN_ADJUST
+                | GpuStageFlags::BLUR_TONAL
+                | GpuStageFlags::BLUR_CLARITY
+                | GpuStageFlags::LUT
+                | GpuStageFlags::MASKS
+        );
+        assert_eq!(
+            graph
+                .blur_products
+                .iter()
+                .map(|product| product.semantic)
+                .collect::<Vec<_>>(),
+            vec![BlurSemantic::Tonal, BlurSemantic::Clarity]
+        );
+        assert_eq!(graph.tile_halo, 16);
+        assert!(graph.estimated_peak_resource_bytes > 0);
+        assert_ne!(graph.fingerprint, exposure.fingerprint);
+    }
+
+    #[test]
+    fn graph_compiler_deduplicates_consumers_and_scales_largest_radius() {
+        let mut adjustments = AllAdjustments::default();
+        adjustments.global.structure = 0.2;
+        adjustments.global.dehaze = 0.3;
+        adjustments.global.glow_amount = 0.4;
+        let graph = compile_gpu_render_graph(&adjustments, false, 0, 1920, 1080);
+        assert_eq!(graph.blur_products.len(), 1);
+        assert_eq!(graph.blur_products[0].semantic, BlurSemantic::Structure);
+        assert_eq!(graph.tile_halo, 40);
     }
 
     #[test]
@@ -1922,10 +2201,11 @@ mod blur_pass_tests {
         counters.record_family(100);
         counters.record_family(100);
         assert_eq!(counters.families_requested, 2);
-        assert_eq!(counters.encoders, 2);
+        counters.record_command_buffer();
+        assert_eq!(counters.encoders, 1);
         assert_eq!(counters.bind_groups, 4);
         assert_eq!(counters.dispatches, 4);
-        assert_eq!(counters.submissions, 2);
+        assert_eq!(counters.submissions, 1);
         assert_eq!(counters.pixels_processed, 400);
     }
 
@@ -2023,6 +2303,9 @@ mod blur_pass_tests {
         mask.mask_adjustments[0].clarity = 0.2;
         cases.push(mask);
 
+        let mut selective_elapsed = Duration::ZERO;
+        let mut full_elapsed = Duration::ZERO;
+        FORCE_DISABLE_BLUR_CACHE.store(true, Ordering::Relaxed);
         for (index, adjustments) in cases.into_iter().enumerate() {
             let render = || {
                 process_and_get_dynamic_image(
@@ -2041,9 +2324,17 @@ mod blur_pass_tests {
                 .expect("GPU render succeeds")
             };
             FORCE_ALL_BLUR_PASSES.store(false, Ordering::Relaxed);
-            let selective = render();
+            let _ = render();
             FORCE_ALL_BLUR_PASSES.store(true, Ordering::Relaxed);
+            let _ = render();
+            FORCE_ALL_BLUR_PASSES.store(false, Ordering::Relaxed);
+            let started = Instant::now();
+            let selective = render();
+            selective_elapsed += started.elapsed();
+            FORCE_ALL_BLUR_PASSES.store(true, Ordering::Relaxed);
+            let started = Instant::now();
             let always_blur = render();
+            full_elapsed += started.elapsed();
             FORCE_ALL_BLUR_PASSES.store(false, Ordering::Relaxed);
             assert_eq!(
                 selective.to_rgba16().into_raw(),
@@ -2051,6 +2342,10 @@ mod blur_pass_tests {
                 "parity case {index} differs"
             );
         }
+        eprintln!(
+            "gpu graph benchmark: selective={selective_elapsed:?} forced_full={full_elapsed:?}"
+        );
+        FORCE_DISABLE_BLUR_CACHE.store(false, Ordering::Relaxed);
     }
 
     #[cfg(feature = "tauri-test")]
@@ -2113,7 +2408,7 @@ mod blur_pass_tests {
         assert_eq!(blur.cache_misses, 1);
         assert_eq!(blur.cache_hits, 99);
         assert_eq!(blur.dispatches, 2);
-        assert_eq!(blur.submissions, 1);
+        assert_eq!(blur.submissions, 100);
     }
 
     #[cfg(feature = "tauri-test")]
