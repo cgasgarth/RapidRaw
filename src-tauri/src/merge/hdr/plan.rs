@@ -1,7 +1,8 @@
 use super::{
     alignment::{ALIGNMENT_POLICY_ID, AlignmentReceipt, align},
+    deghost::DeghostPreview,
     source_frame::{SourceFrame, decode_source},
-    static_merge::{StaticRadiancePreview, reconstruct_static_preview},
+    static_merge::{StaticRadiancePreview, reconstruct_previews},
 };
 
 pub(crate) const PLAN_SCHEMA_VERSION: u32 = 2;
@@ -35,6 +36,7 @@ pub(crate) struct HdrAlignmentPlanResponse {
     pub block_codes: Vec<String>,
     pub bracket_count: usize,
     pub common_overlap_fraction: f32,
+    pub deghost_preview: DeghostPreview,
     pub readiness: &'static str,
     pub static_radiance_preview: StaticRadiancePreview,
     pub reference_source_index: usize,
@@ -87,7 +89,7 @@ fn validate_compatibility(frames: &[SourceFrame]) -> Vec<String> {
 
 pub(crate) fn build_alignment_plan(
     paths: &[String],
-    cancelled: impl Fn() -> bool,
+    cancelled: impl Fn() -> bool + Copy,
 ) -> Result<HdrAlignmentPlanResponse, String> {
     if cancelled() {
         return Err("hdr_plan_cancelled:file_read".to_string());
@@ -111,7 +113,7 @@ pub(crate) fn build_alignment_plan(
 
 fn build_alignment_plan_from_frames(
     mut frames: Vec<SourceFrame>,
-    cancelled: impl Fn() -> bool,
+    cancelled: impl Fn() -> bool + Copy,
 ) -> Result<HdrAlignmentPlanResponse, String> {
     let blocks = validate_compatibility(&frames);
     if !blocks.is_empty() {
@@ -175,7 +177,8 @@ fn build_alignment_plan_from_frames(
     });
     let bytes = serde_json::to_vec(&canonical).map_err(|error| error.to_string())?;
     let hash = format!("blake3:{}", blake3::hash(&bytes).to_hex());
-    let static_radiance_preview = reconstruct_static_preview(&planned, &hash, cancelled)?;
+    let previews = reconstruct_previews(&planned, &hash, cancelled)?;
+    let readiness = previews.deghost_preview.action_state;
     Ok(HdrAlignmentPlanResponse {
         accepted: true,
         accepted_dry_run_plan_id: format!("hdr_alignment_plan_{}", &hash[7..23]),
@@ -190,10 +193,11 @@ fn build_alignment_plan_from_frames(
         block_codes: Vec::new(),
         bracket_count: planned.len(),
         common_overlap_fraction,
-        readiness: static_radiance_preview.action_state,
+        deghost_preview: previews.deghost_preview,
+        readiness,
         reference_source_index,
         schema_version: PLAN_SCHEMA_VERSION,
-        static_radiance_preview,
+        static_radiance_preview: previews.static_radiance_preview,
         sources: planned,
         warning_codes: Vec::new(),
     })
@@ -275,7 +279,13 @@ mod tests {
 
     #[test]
     fn plan_is_deterministic_and_selects_middle_exposure() {
-        let frames = vec![frame(0, 0.25, 2), frame(1, 1.0, 0), frame(2, 4.0, -3)];
+        let mut frames = vec![frame(0, 0.25, 2), frame(1, 1.0, 0), frame(2, 4.0, -3)];
+        for y in 20..36 {
+            for x in 16..32 {
+                frames[0].color_proxy.pixels[y * 64 + x] = [0.05; 3];
+                frames[2].color_proxy.pixels[y * 64 + x] = [0.9; 3];
+            }
+        }
         let first = build_alignment_plan_from_frames(frames.clone(), || false).unwrap();
         let second = build_alignment_plan_from_frames(frames, || false).unwrap();
         assert_eq!(first.reference_source_index, 1);
@@ -301,6 +311,45 @@ mod tests {
             first.static_radiance_preview.plan_hash,
             first.accepted_dry_run_plan_hash
         );
+        assert_eq!(
+            first.deghost_preview.plan_hash,
+            first.accepted_dry_run_plan_hash
+        );
+        assert_eq!(
+            first.deghost_preview.static_radiance_hash,
+            first.static_radiance_preview.radiance_hash
+        );
+        assert_eq!(
+            first.deghost_preview.motion_probability_hash,
+            second.deghost_preview.motion_probability_hash
+        );
+        assert_eq!(
+            first.deghost_preview.ownership_hash,
+            second.deghost_preview.ownership_hash
+        );
+        assert_eq!(
+            first.deghost_preview.radiance_hash,
+            second.deghost_preview.radiance_hash
+        );
+        assert!(first.deghost_preview.motion_coverage > 0.0);
+        assert!(
+            first
+                .deghost_preview
+                .motion_probability_data_url
+                .starts_with("data:image/png;base64,")
+        );
+        assert!(
+            first
+                .deghost_preview
+                .ownership_data_url
+                .starts_with("data:image/png;base64,")
+        );
+        assert!(
+            first
+                .deghost_preview
+                .tone_mapped_preview_data_url
+                .starts_with("data:image/png;base64,")
+        );
         assert_eq!(first.sources[0].alignment.matrix[2], -2.0);
         assert_eq!(first.sources[2].alignment.matrix[2], 3.0);
     }
@@ -321,5 +370,42 @@ mod tests {
             build_alignment_plan_from_frames(vec![frame(0, 1.0, 0), other], || false).unwrap_err(),
             "mixed_camera"
         );
+    }
+
+    #[test]
+    fn private_real_raw_deghost_preview_when_enabled() {
+        if std::env::var("RAWENGINE_RUN_PRIVATE_HDR_DEGHOST_PROOF")
+            .ok()
+            .as_deref()
+            != Some("1")
+        {
+            return;
+        }
+        let root = std::env::var("RAWENGINE_PRIVATE_RAW_ROOT").expect("private RAW root");
+        let paths = [
+            "private-fixtures/hdr/bracket-alignment-v1/frame-01-under.arw",
+            "private-fixtures/hdr/bracket-alignment-v1/frame-02-mid.arw",
+            "private-fixtures/hdr/bracket-alignment-v1/frame-03-over.arw",
+        ]
+        .map(|relative| {
+            std::path::Path::new(&root)
+                .join(relative)
+                .to_string_lossy()
+                .into_owned()
+        });
+        let plan = build_alignment_plan(&paths, || false).expect("real RAW deghost plan");
+        assert!(plan.accepted);
+        assert_eq!(
+            plan.deghost_preview.plan_hash,
+            plan.accepted_dry_run_plan_hash
+        );
+        assert_eq!(
+            plan.deghost_preview.static_radiance_hash,
+            plan.static_radiance_preview.radiance_hash
+        );
+        assert!(plan.deghost_preview.radiance_hash.starts_with("blake3:"));
+        assert!(plan.deghost_preview.tone_mapped_preview_data_url.len() > 1_000);
+        assert!(plan.deghost_preview.motion_probability_data_url.len() > 100);
+        assert!(plan.deghost_preview.ownership_data_url.len() > 100);
     }
 }

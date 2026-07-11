@@ -81,7 +81,9 @@ export const hdrRuntimePlanSchema = z
       })
       .strict()
       .optional(),
-    readiness: z.enum(['static_radiance_preview_ready', 'deghost_required']).optional(),
+    readiness: z
+      .enum(['static_radiance_preview_ready', 'deghost_required', 'deghost_preview_ready', 'deghost_unresolved'])
+      .optional(),
     referenceSourceIndex: z.number().int().nonnegative().optional(),
     schemaVersion: z.literal(2).optional(),
     staticRadiancePreview: z
@@ -104,6 +106,31 @@ export const hdrRuntimePlanSchema = z
         toneMappedPreviewHash: z.string().startsWith('blake3:'),
         varianceHash: z.string().startsWith('blake3:'),
         weightHash: z.string().startsWith('blake3:'),
+      })
+      .strict()
+      .optional(),
+    deghostPreview: z
+      .object({
+        actionState: z.enum(['deghost_preview_ready', 'deghost_unresolved']),
+        algorithmId: z.literal('scene_linear_owner_feather_v1'),
+        colorState: z.literal('scene_linear_camera_white_balanced_uncalibrated_display_fallback'),
+        confidenceMean: z.number().min(0).max(1),
+        featherHash: z.string().startsWith('blake3:'),
+        motionAlgorithmId: z.literal('noise_normalized_motion_probability_v1'),
+        motionCoverage: z.number().min(0).max(1),
+        motionProbabilityDataUrl: z.string().startsWith('data:image/png;base64,'),
+        motionProbabilityHash: z.string().startsWith('blake3:'),
+        ownershipAlgorithmId: z.literal('deterministic_source_ownership_v1'),
+        ownershipDataUrl: z.string().startsWith('data:image/png;base64,'),
+        ownershipHash: z.string().startsWith('blake3:'),
+        planHash: z.string().startsWith('blake3:'),
+        radianceHash: z.string().startsWith('blake3:'),
+        radianceHandle: z.string().startsWith('native:hdr/deghost-preview/v1/'),
+        staticRadianceHash: z.string().startsWith('blake3:'),
+        toneMapAlgorithmId: z.literal('global_reinhard_review_v1'),
+        toneMappedPreviewDataUrl: z.string().startsWith('data:image/png;base64,'),
+        toneMappedPreviewHash: z.string().startsWith('blake3:'),
+        unresolvedFraction: z.number().min(0).max(1),
       })
       .strict()
       .optional(),

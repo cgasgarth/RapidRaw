@@ -1,6 +1,9 @@
 pub(crate) mod alignment;
+pub(crate) mod deghost;
+pub(crate) mod motion;
 pub(crate) mod radiance;
 pub(crate) mod source_frame;
+pub(crate) mod source_ownership;
 pub(crate) mod static_merge;
 pub(crate) mod tone_map;
 
