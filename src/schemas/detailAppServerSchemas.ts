@@ -71,6 +71,3 @@ export const detailAppServerRouteManifestSchema = z
       toolNames.add(route.toolName);
     }
   });
-
-export type DetailAppServerRoute = z.infer<typeof detailAppServerRouteSchema>;
-export type DetailAppServerRouteManifest = z.infer<typeof detailAppServerRouteManifestSchema>;

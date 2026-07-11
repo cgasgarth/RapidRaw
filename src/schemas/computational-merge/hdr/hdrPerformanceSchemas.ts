@@ -9,7 +9,7 @@ const hdrPerformanceResultSchema = z
   })
   .strict();
 
-export const hdrPerformanceReportSchema = z
+const hdrPerformanceReportSchema = z
   .object({
     issue: z.literal(173),
     results: z.array(hdrPerformanceResultSchema).length(3),
@@ -30,7 +30,7 @@ export const hdrPerformanceReportSchema = z
     }
   });
 
-export type HdrPerformanceReport = z.infer<typeof hdrPerformanceReportSchema>;
+type HdrPerformanceReport = z.infer<typeof hdrPerformanceReportSchema>;
 
 export const parseHdrPerformanceReport = (value: unknown): HdrPerformanceReport =>
   hdrPerformanceReportSchema.parse(value);
