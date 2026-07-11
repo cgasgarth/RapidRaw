@@ -16,6 +16,8 @@ interface CropOverlaySurfaceProps {
   handleCropComplete: (crop: Crop, percentCrop: PercentCrop) => void;
   isCropping: boolean;
   isCropViewVisible: boolean;
+  onCropPreviewError: () => void;
+  onCropPreviewLoad: () => void;
   isMaxZoom: boolean | undefined;
   isRotationActive: boolean | undefined;
   isStraightenActive: boolean;
@@ -38,6 +40,8 @@ export function CropOverlaySurface({
   handleCropComplete,
   isCropping,
   isCropViewVisible,
+  onCropPreviewError,
+  onCropPreviewLoad,
   isMaxZoom,
   isRotationActive,
   isStraightenActive,
@@ -64,6 +68,7 @@ export function CropOverlaySurface({
   return (
     <div
       className="absolute inset-0 w-full h-full flex items-center justify-center transition-opacity duration-200"
+      data-crop-view-visible={String(isCropViewVisible)}
       data-overlay-geometry-epoch={geometry.geometryEpoch}
       data-overlay-geometry-space="oriented-pixels"
       style={{ opacity: isCropViewVisible ? 1 : 0, pointerEvents: isCropViewVisible ? 'auto' : 'none' }}
@@ -110,6 +115,8 @@ export function CropOverlaySurface({
           >
             <img
               alt={t('editor.canvas.cropPreviewAlt')}
+              onError={onCropPreviewError}
+              onLoad={onCropPreviewLoad}
               ref={cropImageRef}
               src={cropPreviewUrl}
               style={{
