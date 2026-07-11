@@ -963,6 +963,45 @@ async function assertEditorParityContractFixture(page) {
 }
 
 export async function prepareScenario(page, mode) {
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.LensCorrectionSession) {
+    const session = page.getByTestId('lens-correction-session');
+    await session.waitFor({ timeout: 10_000 });
+    if (
+      (await session.getAttribute('data-lens-mode')) !== 'manual' ||
+      (await session.getAttribute('data-lens-maker')) !== 'Sony' ||
+      (await session.getAttribute('data-lens-model')) !== 'FE 35mm F1.8'
+    ) {
+      throw new Error('Lens correction did not render its saved session draft on the first browser frame.');
+    }
+    await session.getByRole('img', { name: 'Lens Correction Preview' }).waitFor({ timeout: 10_000 });
+    await session.getByRole('radio', { name: 'Auto' }).click();
+    await page.waitForFunction(
+      () =>
+        document
+          .querySelector('[data-testid="lens-correction-session"]')
+          ?.getAttribute('data-lens-detection-status') === 'success',
+    );
+    if (
+      (await session.getAttribute('data-lens-mode')) !== 'auto' ||
+      (await session.getByRole('radio', { name: 'Auto' }).getAttribute('aria-checked')) !== 'true'
+    ) {
+      throw new Error('Lens correction Auto selection did not stay controlled by the session draft.');
+    }
+    const distortionInvoke = await page.evaluate(() =>
+      window.__RAWENGINE_VISUAL_SMOKE_INVOKES__?.find((entry) => entry.command === 'get_lens_distortion_params'),
+    );
+    if (
+      distortionInvoke?.args?.maker !== 'Sony' ||
+      distortionInvoke.args.model !== 'FE 35mm F1.8' ||
+      distortionInvoke.args.focalLength !== 35 ||
+      distortionInvoke.args.aperture !== 4 ||
+      distortionInvoke.args.distance !== 8
+    ) {
+      throw new Error(`Lens correction changed native profile lookup arguments: ${JSON.stringify(distortionInvoke)}`);
+    }
+    return;
+  }
+
   if (
     mode === VISUAL_SMOKE_SCENARIO_IDS.AdjustmentsPanelRetune ||
     mode === VISUAL_SMOKE_SCENARIO_IDS.ProfessionalAdjustmentsCompact
