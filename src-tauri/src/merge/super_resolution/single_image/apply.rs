@@ -72,7 +72,7 @@ pub(crate) async fn apply_request(
     if let Some(receipt) = find_committed_replay(&request)? {
         return Ok(receipt);
     }
-    let source = frame.image.to_rgb32f();
+    let source = frame.pixels.image().to_rgb32f();
     let tiles = tile_count(source.width(), source.height(), request.memory_budget_bytes)?;
     let total_units = tiles.saturating_add(3);
     let job = state.computational_merge_jobs.begin(
