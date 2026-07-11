@@ -449,10 +449,10 @@ async fn apply_adjustments(
     validate_expected_preview_image(&loaded_image_path, &request.expected_image_path)?;
 
     {
-        let tx_guard = state.preview_worker_tx.lock().unwrap();
-        if let Some(worker_tx) = &*tx_guard {
+        let scheduler_guard = state.preview_scheduler.lock().unwrap();
+        if let Some(scheduler) = &*scheduler_guard {
             let job = PreviewJob {
-                adjustments: request.js_adjustments,
+                adjustments: Arc::new(request.js_adjustments),
                 expected_image_path: request.expected_image_path,
                 is_interactive: request.is_interactive,
                 target_resolution: request.target_resolution,
@@ -462,17 +462,28 @@ async fn apply_adjustments(
                 viewer_sample_graph_revision: request.viewer_sample_graph_revision,
                 responder: tx,
             };
-            worker_tx
-                .send(job)
-                .map_err(|e| format!("Failed to send to preview worker: {}", e))?;
+            scheduler
+                .submit(job)
+                .map_err(|_| "preview_worker_stopped".to_string())?;
         } else {
             return Err("Preview worker not running".to_string());
         }
     }
 
     match rx.await {
-        Ok(bytes) => Ok(Response::new(bytes)),
-        Err(_) => Err("Superseded or worker failed".to_string()),
+        Ok(preview_scheduler::PreviewCompletion::Rendered { bytes, .. }) => {
+            Ok(Response::new(bytes))
+        }
+        Ok(preview_scheduler::PreviewCompletion::Superseded { .. }) => {
+            Err("preview_superseded".to_string())
+        }
+        Ok(preview_scheduler::PreviewCompletion::Cancelled { .. }) => {
+            Err("preview_cancelled".to_string())
+        }
+        Ok(preview_scheduler::PreviewCompletion::Failed { code, message }) => {
+            Err(format!("{code}: {message}"))
+        }
+        Err(_) => Err("preview_worker_stopped".to_string()),
     }
 }
 
