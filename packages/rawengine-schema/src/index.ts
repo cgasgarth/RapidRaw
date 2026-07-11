@@ -4,6 +4,7 @@ export * from './appServerCommandSchemas.js';
 export * from './brushMaskCommandRuntime.js';
 export * from './color/rawInputTransformSchemas.js';
 export * from './computational-merge/computationalMergeDerivedSourceRuntime.js';
+export * from './computational-merge/computationalMergeFoundationSchemas.js';
 export * from './computational-merge/computationalMergeRuntimeResultBuilders.js';
 export * from './computational-merge/computationalMergeWarningCodes.js';
 export * from './derivedArtifactInvalidation.js';
