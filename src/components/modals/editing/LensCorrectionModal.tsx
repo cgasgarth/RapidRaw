@@ -28,6 +28,7 @@ import { throttle } from '../../../utils/timing';
 import type { SelectedImage } from '../../ui/AppProperties';
 import Button from '../../ui/primitives/Button';
 import Dropdown from '../../ui/primitives/Dropdown';
+import InspectorSegmentedControl from '../../ui/primitives/InspectorSegmentedControl';
 import Slider from '../../ui/primitives/Slider';
 import Switch from '../../ui/primitives/Switch';
 import UiText from '../../ui/primitives/Text';
@@ -75,7 +76,7 @@ interface LensDistortionParams {
   vig_k3: number;
 }
 
-interface LensParams {
+export interface LensParams {
   lensCorrectionMode: 'auto' | 'manual';
   lensMaker: string | null;
   lensModel: string | null;
@@ -115,6 +116,60 @@ const DEFAULT_PARAMS: LensParams = {
   lensDistortionParams: null,
 };
 
+export function buildLensCorrectionDraft(currentAdjustments: Adjustments): LensParams {
+  return {
+    lensCorrectionMode: currentAdjustments.lensCorrectionMode,
+    lensMaker: currentAdjustments.lensMaker,
+    lensModel: currentAdjustments.lensModel,
+    lensDistortionAmount: currentAdjustments.lensDistortionAmount,
+    lensVignetteAmount: currentAdjustments.lensVignetteAmount,
+    lensTcaAmount: currentAdjustments.lensTcaAmount,
+    lensDistortionEnabled: currentAdjustments.lensDistortionEnabled,
+    lensTcaEnabled: currentAdjustments.lensTcaEnabled,
+    lensVignetteEnabled: currentAdjustments.lensVignetteEnabled,
+    lensDistortionParams: currentAdjustments.lensDistortionParams,
+  };
+}
+
+export type LensSessionRequestKind = 'compare' | 'detection' | 'distortion' | 'models' | 'preview' | 'resources';
+
+export interface LensSessionRequestGate {
+  activate: () => void;
+  begin: (kind: LensSessionRequestKind) => number;
+  close: () => void;
+  invalidate: (kind: LensSessionRequestKind) => void;
+  isCurrent: (kind: LensSessionRequestKind, requestId: number) => boolean;
+}
+
+export function createLensSessionRequestGate(): LensSessionRequestGate {
+  const generations: Record<LensSessionRequestKind, number> = {
+    compare: 0,
+    detection: 0,
+    distortion: 0,
+    models: 0,
+    preview: 0,
+    resources: 0,
+  };
+  let active = true;
+  return {
+    activate: () => {
+      active = true;
+    },
+    begin: (kind) => {
+      generations[kind] += 1;
+      return generations[kind];
+    },
+    close: () => {
+      active = false;
+      for (const kind of Object.keys(generations) as LensSessionRequestKind[]) generations[kind] += 1;
+    },
+    invalidate: (kind) => {
+      generations[kind] += 1;
+    },
+    isCurrent: (kind, requestId) => active && generations[kind] === requestId,
+  };
+}
+
 const parseFocalLength = (exif: ExifData | null | undefined): number | null => {
   const parsed = parseExifMetadataNumber(exif?.['FocalLength'] ?? exif?.['FocalLengthIn35mmFilm']);
   return parsed.status === 'valid' ? parsed.value : null;
@@ -139,22 +194,67 @@ export default function LensCorrectionModal({
   currentAdjustments,
   selectedImage,
 }: LensCorrectionModalProps) {
+  const { isMounted, show } = useModalTransition(isOpen);
+  const openEpoch = useRef(0);
+  const wasOpen = useRef(false);
+  if (isOpen && !wasOpen.current) openEpoch.current += 1;
+  wasOpen.current = isOpen;
+
+  if (!isMounted) return null;
+
+  const sessionKey = `${openEpoch.current}:${selectedImage?.path ?? 'no-image'}`;
+  return (
+    <div
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs transition-opacity duration-300 ${
+        show ? 'opacity-100' : 'opacity-0'
+      }`}
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <LensCorrectionSession
+        currentAdjustments={currentAdjustments}
+        isSessionOpen={isOpen}
+        key={sessionKey}
+        onApply={onApply}
+        onClose={onClose}
+        selectedImage={selectedImage}
+        show={show}
+      />
+    </div>
+  );
+}
+
+interface LensCorrectionSessionProps extends Omit<LensCorrectionModalProps, 'isOpen'> {
+  isSessionOpen: boolean;
+  show: boolean;
+}
+
+export function LensCorrectionSession({
+  currentAdjustments,
+  isSessionOpen,
+  onApply,
+  onClose,
+  selectedImage,
+  show,
+}: LensCorrectionSessionProps) {
   const { t } = useTranslation();
-  const [params, setParams] = useState<LensParams>(DEFAULT_PARAMS);
+  const [params, setParams] = useState<LensParams>(() => buildLensCorrectionDraft(currentAdjustments));
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isApplying, setIsApplying] = useState(false);
   const [makers, setMakers] = useState<string[]>([]);
   const [lenses, setLenses] = useState<string[]>([]);
   const [myLenses, setMyLenses] = useState<MyLens[]>([]);
-  const { isMounted, show } = useModalTransition(isOpen);
   const [detectionStatus, setDetectionStatus] = useState<'idle' | 'detecting' | 'not_found' | 'success'>('idle');
 
   const [isCompareActive, setIsCompareActive] = useState(false);
   const { containerRef, handleMouseDown, handleResetZoom, handleWheel, imageTransformStyle, zoom, zoomIn, zoomOut } =
     usePreviewViewport({ maxZoom: 8, minZoom: 0.1, zoomStep: 0.25 });
 
-  const [modeBubbleStyle, setModeBubbleStyle] = useState({});
-  const isModeInitialAnimation = useRef(true);
+  const requestGate = useRef(createLensSessionRequestGate());
+  const applySubmitted = useRef(false);
+  const detectionTimer = useRef<ReturnType<typeof window.setTimeout> | null>(null);
 
   const selectedExif = selectedImage?.exif as ExifData | null | undefined;
   const focalLength = useMemo(() => parseFocalLength(selectedExif), [selectedExif]);
@@ -171,36 +271,22 @@ export default function LensCorrectionModal({
     };
   }, [params.lensDistortionParams]);
 
-  useEffect(() => {
-    const selectedIndex = params.lensCorrectionMode === 'auto' ? 0 : 1;
-    const targetX = `${selectedIndex * 100}%`;
-    const targetWidth = '50%';
-
-    if (isModeInitialAnimation.current) {
-      const initialX = params.lensCorrectionMode === 'manual' ? '100%' : '-25%';
-      setModeBubbleStyle({
-        x: [initialX, targetX],
-        width: targetWidth,
-      });
-      isModeInitialAnimation.current = false;
-    } else {
-      setModeBubbleStyle({
-        x: targetX,
-        width: targetWidth,
-      });
-    }
-  }, [params.lensCorrectionMode]);
-
-  const fetchDistortionParams = async (maker: string, model: string): Promise<LensDistortionParams | null> => {
+  const fetchDistortionParams = async (
+    maker: string,
+    model: string,
+    requestId: number,
+  ): Promise<LensDistortionParams | null | undefined> => {
     try {
-      return await invoke<LensDistortionParams | null>(Invokes.GetLensDistortionParams, {
+      const result = await invoke<LensDistortionParams | null>(Invokes.GetLensDistortionParams, {
         maker,
         model,
         focalLength: focalLength,
         aperture: aperture,
         distance: distance,
       });
+      return requestGate.current.isCurrent('distortion', requestId) ? result : undefined;
     } catch (error) {
+      if (!requestGate.current.isCurrent('distortion', requestId)) return undefined;
       console.error('Failed to fetch lens params', error);
       return null;
     }
@@ -209,6 +295,7 @@ export default function LensCorrectionModal({
   const updatePreview = useMemo(
     () =>
       throttle(async (currentParams: LensParams) => {
+        const requestId = requestGate.current.begin('preview');
         try {
           const fullParams: GeometryParams = {
             distortion: currentAdjustments.transformDistortion,
@@ -244,8 +331,10 @@ export default function LensCorrectionModal({
             jsAdjustments: currentAdjustments,
             showLines: false,
           });
+          if (!requestGate.current.isCurrent('preview', requestId)) return;
           setPreviewUrl(result);
         } catch (e) {
+          if (!requestGate.current.isCurrent('preview', requestId)) return;
           console.error('Lens correction preview failed', e);
         }
       }, 50),
@@ -253,64 +342,51 @@ export default function LensCorrectionModal({
   );
 
   useEffect(() => {
-    if (isOpen) {
-      void invoke<LensSettings>(Invokes.LoadSettings)
-        .then((settings) => {
-          if (settings.myLenses) {
-            setMyLenses(settings.myLenses);
-          }
+    if (!isSessionOpen) return undefined;
+    requestGate.current.activate();
+    const initialParams = buildLensCorrectionDraft(currentAdjustments);
+    const loadId = requestGate.current.begin('resources');
+    const initialModelsId = requestGate.current.begin('models');
+    handleResetZoom();
+    updatePreview(initialParams);
+
+    void invoke<LensSettings>(Invokes.LoadSettings)
+      .then((settings) => {
+        if (!requestGate.current.isCurrent('resources', loadId)) return;
+        setMyLenses(settings.myLenses ?? []);
+      })
+      .catch((error) => {
+        if (requestGate.current.isCurrent('resources', loadId)) console.error(error);
+      });
+    void invoke<Array<string>>(Invokes.GetLensfunMakers)
+      .then((result) => {
+        if (!requestGate.current.isCurrent('resources', loadId)) return;
+        setMakers(result);
+      })
+      .catch((error) => {
+        if (requestGate.current.isCurrent('resources', loadId)) console.error(error);
+      });
+    if (initialParams.lensMaker) {
+      void invoke<Array<string>>(Invokes.GetLensfunLensesForMaker, { maker: initialParams.lensMaker })
+        .then((result) => {
+          if (!requestGate.current.isCurrent('models', initialModelsId)) return;
+          setLenses(result);
         })
-        .catch(console.error);
-
-      const initParams: LensParams = {
-        lensCorrectionMode: currentAdjustments.lensCorrectionMode,
-        lensMaker: currentAdjustments.lensMaker,
-        lensModel: currentAdjustments.lensModel,
-        lensDistortionAmount: currentAdjustments.lensDistortionAmount,
-        lensVignetteAmount: currentAdjustments.lensVignetteAmount,
-        lensTcaAmount: currentAdjustments.lensTcaAmount,
-        lensDistortionEnabled: currentAdjustments.lensDistortionEnabled,
-        lensTcaEnabled: currentAdjustments.lensTcaEnabled,
-        lensVignetteEnabled: currentAdjustments.lensVignetteEnabled,
-        lensDistortionParams: currentAdjustments.lensDistortionParams,
-      };
-
-      const timer = window.setTimeout(() => {
-        setParams(initParams);
-        setDetectionStatus('idle');
-        handleResetZoom();
-        updatePreview(initParams);
-      }, 0);
-
-      void invoke<Array<string>>(Invokes.GetLensfunMakers)
-        .then((m) => {
-          setMakers(m);
-        })
-        .catch(console.error);
-
-      if (initParams.lensMaker) {
-        void invoke<Array<string>>(Invokes.GetLensfunLensesForMaker, { maker: initParams.lensMaker })
-          .then((l) => {
-            setLenses(l);
-          })
-          .catch(console.error);
-      }
-
-      return () => {
-        window.clearTimeout(timer);
-      };
+        .catch((error) => {
+          if (requestGate.current.isCurrent('models', initialModelsId)) console.error(error);
+        });
     }
 
-    const timer = window.setTimeout(() => {
-      setPreviewUrl(null);
-      setIsApplying(false);
-    }, 300);
     return () => {
-      window.clearTimeout(timer);
+      requestGate.current.close();
+      updatePreview.cancel();
+      if (detectionTimer.current !== null) window.clearTimeout(detectionTimer.current);
     };
-  }, [isOpen, currentAdjustments, handleResetZoom, updatePreview]);
+  }, [currentAdjustments, handleResetZoom, isSessionOpen, updatePreview]);
 
   const handleMakerChange = (maker: string) => {
+    const requestId = requestGate.current.begin('models');
+    requestGate.current.invalidate('distortion');
     const newParams = {
       ...params,
       lensMaker: maker,
@@ -322,21 +398,26 @@ export default function LensCorrectionModal({
     setDetectionStatus('idle');
 
     void invoke<Array<string>>(Invokes.GetLensfunLensesForMaker, { maker })
-      .then((l) => {
-        setLenses(l);
+      .then((result) => {
+        if (!requestGate.current.isCurrent('models', requestId)) return;
+        setLenses(result);
       })
-      .catch(console.error);
+      .catch((error) => {
+        if (requestGate.current.isCurrent('models', requestId)) console.error(error);
+      });
 
     updatePreview(newParams);
   };
 
   const handleModelChange = async (model: string) => {
+    const requestId = requestGate.current.begin('distortion');
     const tempParams = { ...params, lensModel: model };
     setParams(tempParams);
     setDetectionStatus('idle');
 
     if (params.lensMaker) {
-      const distortionParams = await fetchDistortionParams(params.lensMaker, model);
+      const distortionParams = await fetchDistortionParams(params.lensMaker, model, requestId);
+      if (distortionParams === undefined) return;
       const finalParams = { ...tempParams, lensDistortionParams: distortionParams };
       setParams(finalParams);
       updatePreview(finalParams);
@@ -348,18 +429,24 @@ export default function LensCorrectionModal({
     const index = parseInt(val);
     const selected = myLenses[index];
     if (!selected) return;
+    const modelsId = requestGate.current.begin('models');
+    const distortionId = requestGate.current.begin('distortion');
 
     const tempParams = { ...params, lensMaker: selected.maker, lensModel: selected.model };
     setParams(tempParams);
     setDetectionStatus('idle');
 
     void invoke<Array<string>>(Invokes.GetLensfunLensesForMaker, { maker: selected.maker })
-      .then((l) => {
-        setLenses(l);
+      .then((result) => {
+        if (!requestGate.current.isCurrent('models', modelsId)) return;
+        setLenses(result);
       })
-      .catch(console.error);
+      .catch((error) => {
+        if (requestGate.current.isCurrent('models', modelsId)) console.error(error);
+      });
 
-    const distortionParams = await fetchDistortionParams(selected.maker, selected.model);
+    const distortionParams = await fetchDistortionParams(selected.maker, selected.model, distortionId);
+    if (distortionParams === undefined) return;
     const finalParams = { ...tempParams, lensDistortionParams: distortionParams };
     setParams(finalParams);
     updatePreview(finalParams);
@@ -378,6 +465,8 @@ export default function LensCorrectionModal({
   };
 
   const handleAutoDetect = async () => {
+    const requestId = requestGate.current.begin('detection');
+    const distortionId = requestGate.current.begin('distortion');
     if (!selectedImage?.exif) {
       setDetectionStatus('not_found');
       return;
@@ -397,17 +486,23 @@ export default function LensCorrectionModal({
         maker: exifMaker,
         model: exifModel,
       });
+      if (!requestGate.current.isCurrent('detection', requestId)) return;
 
       if (result) {
         const [detectedMaker, detectedModel] = result;
 
+        const modelsId = requestGate.current.begin('models');
         void invoke<Array<string>>(Invokes.GetLensfunLensesForMaker, { maker: detectedMaker })
-          .then((l) => {
-            setLenses(l);
+          .then((result) => {
+            if (!requestGate.current.isCurrent('models', modelsId)) return;
+            setLenses(result);
           })
-          .catch(console.error);
+          .catch((error) => {
+            if (requestGate.current.isCurrent('models', modelsId)) console.error(error);
+          });
 
-        const distortionParams = await fetchDistortionParams(detectedMaker, detectedModel);
+        const distortionParams = await fetchDistortionParams(detectedMaker, detectedModel, distortionId);
+        if (distortionParams === undefined || !requestGate.current.isCurrent('detection', requestId)) return;
 
         setParams((prev) => {
           const newParams = {
@@ -422,8 +517,8 @@ export default function LensCorrectionModal({
 
         setDetectionStatus('success');
 
-        setTimeout(() => {
-          setDetectionStatus('idle');
+        detectionTimer.current = window.setTimeout(() => {
+          if (requestGate.current.isCurrent('detection', requestId)) setDetectionStatus('idle');
         }, 2000);
       } else {
         setParams((prev) => {
@@ -439,12 +534,15 @@ export default function LensCorrectionModal({
         setDetectionStatus('not_found');
       }
     } catch (error) {
+      if (!requestGate.current.isCurrent('detection', requestId)) return;
       console.error('Autodetection failed with error:', error);
       setDetectionStatus('not_found');
     }
   };
 
   const handleApply = () => {
+    if (applySubmitted.current) return;
+    applySubmitted.current = true;
     setIsApplying(true);
     onApply(params);
     onClose();
@@ -464,6 +562,7 @@ export default function LensCorrectionModal({
   };
 
   const toggleCompare = (active: boolean) => {
+    const requestId = requestGate.current.begin('compare');
     setIsCompareActive(active);
     if (active) {
       const fullParams: GeometryParams = {
@@ -501,6 +600,7 @@ export default function LensCorrectionModal({
         showLines: false,
       })
         .then((result) => {
+          if (!requestGate.current.isCurrent('compare', requestId)) return;
           setPreviewUrl(result);
         })
         .catch(console.error);
@@ -529,6 +629,8 @@ export default function LensCorrectionModal({
     if (mode === 'auto') {
       void handleAutoDetect();
     } else {
+      requestGate.current.invalidate('detection');
+      setDetectionStatus('idle');
       updatePreview(newParams);
     }
   };
@@ -546,40 +648,15 @@ export default function LensCorrectionModal({
         </button>
       </div>
       <div className="grow overflow-y-auto p-4 flex flex-col gap-6 text-text-secondary">
-        <div className="w-full p-2 bg-card-active rounded-md">
-          <div className="relative flex w-full">
-            <motion.div
-              className="absolute top-0 bottom-0 z-0 bg-accent"
-              style={{ borderRadius: 6 }}
-              animate={modeBubbleStyle}
-              transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
-            />
-            <button
-              onClick={() => {
-                handleModeChange('auto');
-              }}
-              className={cx(
-                'relative flex-1 flex items-center justify-center gap-2 px-3 p-1.5 text-sm font-medium rounded-md transition-colors',
-                params.lensCorrectionMode === 'auto' ? 'text-button-text' : 'text-text-primary hover:bg-surface',
-              )}
-              style={{ WebkitTapHighlightColor: 'transparent' }}
-            >
-              <span className="relative z-10 flex items-center">{t('modals.lensCorrection.modeAuto')}</span>
-            </button>
-            <button
-              onClick={() => {
-                handleModeChange('manual');
-              }}
-              className={cx(
-                'relative flex-1 flex items-center justify-center gap-2 px-3 p-1.5 text-sm font-medium rounded-md transition-colors',
-                params.lensCorrectionMode === 'manual' ? 'text-button-text' : 'text-text-primary hover:bg-surface',
-              )}
-              style={{ WebkitTapHighlightColor: 'transparent' }}
-            >
-              <span className="relative z-10 flex items-center">{t('modals.lensCorrection.modeManual')}</span>
-            </button>
-          </div>
-        </div>
+        <InspectorSegmentedControl
+          ariaLabel={t('modals.lensCorrection.title')}
+          onChange={handleModeChange}
+          options={[
+            { label: t('modals.lensCorrection.modeAuto'), value: 'auto' },
+            { label: t('modals.lensCorrection.modeManual'), value: 'manual' },
+          ]}
+          value={params.lensCorrectionMode}
+        />
 
         {params.lensCorrectionMode === 'auto' ? (
           <div>
@@ -936,44 +1013,35 @@ export default function LensCorrectionModal({
     </div>
   );
 
-  if (!isMounted) return null;
-
   return (
-    <div
-      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs transition-opacity duration-300 ${
-        show ? 'opacity-100' : 'opacity-0'
-      }`}
-      role="presentation"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) {
-          onClose();
-        }
-      }}
-    >
-      <AnimatePresence>
-        {show && (
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.95, opacity: 0 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
-            className="bg-surface rounded-lg shadow-xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden"
-          >
-            <div className="grow min-h-0 overflow-hidden">{renderContent()}</div>
-            <div className="shrink-0 p-4 flex justify-end gap-3 border-t border-surface bg-bg-secondary z-20">
-              <button
-                onClick={onClose}
-                className="px-4 py-2 rounded-md text-text-secondary hover:bg-surface transition-colors"
-              >
-                {t('modals.lensCorrection.cancel')}
-              </button>
-              <Button onClick={handleApply} disabled={isApplying || !previewUrl}>
-                <Check className="mr-2" size={16} /> {t('modals.lensCorrection.apply')}
-              </Button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+    <AnimatePresence>
+      {show && (
+        <motion.div
+          animate={{ scale: 1, opacity: 1 }}
+          className="bg-surface rounded-lg shadow-xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden"
+          data-lens-detection-status={detectionStatus}
+          data-lens-maker={params.lensMaker ?? ''}
+          data-lens-mode={params.lensCorrectionMode}
+          data-lens-model={params.lensModel ?? ''}
+          data-testid="lens-correction-session"
+          exit={{ scale: 0.95, opacity: 0 }}
+          initial={{ scale: 0.95, opacity: 0 }}
+          transition={{ duration: 0.2, ease: 'easeOut' }}
+        >
+          <div className="grow min-h-0 overflow-hidden">{renderContent()}</div>
+          <div className="shrink-0 p-4 flex justify-end gap-3 border-t border-surface bg-bg-secondary z-20">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded-md text-text-secondary hover:bg-surface transition-colors"
+            >
+              {t('modals.lensCorrection.cancel')}
+            </button>
+            <Button onClick={handleApply} disabled={isApplying || !previewUrl}>
+              <Check className="mr-2" size={16} /> {t('modals.lensCorrection.apply')}
+            </Button>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
