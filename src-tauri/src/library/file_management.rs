@@ -4,7 +4,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::fs;
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
 use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -1205,13 +1205,11 @@ fn generate_thumbnail_data_with_target(
         let mut hasher = DefaultHasher::new();
         path_str.hash(&mut hasher);
         meta.adjustments.to_string().hash(&mut hasher);
-        let unique_hash = hasher.finish();
-
         if let Ok(processed_image) = gpu_processing::process_and_get_dynamic_image(
             context,
             &state,
             cropped_preview.as_ref(),
-            unique_hash,
+            gpu_processing::PreGpuImageIdentity::for_source(cropped_preview.as_ref(), path_str),
             gpu_processing::RenderRequest {
                 adjustments: gpu_adjustments,
                 mask_bitmaps: &mask_bitmaps,
