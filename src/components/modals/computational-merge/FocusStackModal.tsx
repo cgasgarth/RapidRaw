@@ -77,6 +77,7 @@ export function FocusStackModal({
   const { t } = useTranslation();
   const [registrationView, setRegistrationView] = useState<'reference' | 'overlay' | 'difference'>('overlay');
   const [evidenceView, setEvidenceView] = useState<'winner' | 'confidence' | 'risk'>('winner');
+  const [blendView, setBlendView] = useState<'preview' | 'contribution' | 'owner' | 'fallback' | 'halo'>('preview');
   const [registrationSourceIndex, setRegistrationSourceIndex] = useState(0);
 
   const sourcePreflight = useMemo(
@@ -103,6 +104,16 @@ export function FocusStackModal({
       : evidenceView === 'risk'
         ? nativeInputPlan?.focusEvidence?.mapArtifact.riskOverlayDataUrl
         : nativeInputPlan?.focusEvidence?.mapArtifact.winnerOverlayDataUrl;
+  const blendPreviewUrl =
+    nativeInputPlan?.nativeBlend === null
+      ? undefined
+      : {
+          preview: nativeInputPlan?.nativeBlend.previewDataUrl,
+          contribution: nativeInputPlan?.nativeBlend.contributionOverlayDataUrl,
+          owner: nativeInputPlan?.nativeBlend.edgeOwnerOverlayDataUrl,
+          fallback: nativeInputPlan?.nativeBlend.fallbackOverlayDataUrl,
+          halo: nativeInputPlan?.nativeBlend.haloRiskOverlayDataUrl,
+        }[blendView];
 
   const alignmentOptions: Array<OptionItem<FocusStackAlignmentMode>> = [
     { label: t('modals.focusStack.alignmentAuto'), value: 'auto' },
@@ -444,6 +455,57 @@ export function FocusStackModal({
             <ComputationalSetupStatusLine
               label="Fragmentation"
               value={`${nativeInputPlan.focusEvidence.metrics.labelFragmentation}`}
+            />
+          </div>
+        </section>
+      )}
+
+      {nativeInputPlan?.nativeBlend !== null && nativeInputPlan?.nativeBlend !== undefined && (
+        <section
+          className="border border-border-color bg-bg-primary p-2"
+          data-testid="focus-stack-native-laplacian-preview"
+        >
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex gap-1" role="group" aria-label={t('modals.focusStack.review.overlay')}>
+              {(['preview', 'contribution', 'owner', 'fallback', 'halo'] as const).map((view) => (
+                <button
+                  aria-pressed={blendView === view}
+                  className="h-8 border border-border-color px-2 text-xs capitalize aria-pressed:bg-card-active"
+                  key={view}
+                  onClick={() => setBlendView(view)}
+                  type="button"
+                >
+                  {view}
+                </button>
+              ))}
+            </div>
+            <span className="text-xs text-text-secondary">{nativeInputPlan.nativeBlend.blendResultHash}</span>
+          </div>
+          <img
+            alt={t('modals.common.sourcePreviewAlt')}
+            className="max-h-96 w-full bg-black object-contain"
+            src={blendPreviewUrl}
+          />
+          <div className="mt-2 grid grid-cols-2 gap-2 text-xs lg:grid-cols-5">
+            <ComputationalSetupStatusLine
+              label="Fallback"
+              value={`${Math.round(nativeInputPlan.nativeBlend.fallbackRatio * 100)}%`}
+            />
+            <ComputationalSetupStatusLine
+              label="Low confidence"
+              value={`${Math.round(nativeInputPlan.nativeBlend.lowConfidenceRatio * 100)}%`}
+            />
+            <ComputationalSetupStatusLine
+              label="Halo risk"
+              value={`${Math.round(nativeInputPlan.nativeBlend.haloRiskRatio * 100)}%`}
+            />
+            <ComputationalSetupStatusLine
+              label="Owner ambiguity"
+              value={`${Math.round(nativeInputPlan.nativeBlend.edgeOwnerAmbiguityRatio * 100)}%`}
+            />
+            <ComputationalSetupStatusLine
+              label="Owner radius"
+              value={`${nativeInputPlan.nativeBlend.effectiveOwnerRadiusPx}px`}
             />
           </div>
         </section>

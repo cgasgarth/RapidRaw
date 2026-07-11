@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 
+import { readFileSync } from 'node:fs';
 import { FocusStackAppServerRuntimeToolBusV1 } from '../../../../packages/rawengine-schema/src/focus-stack/focusStackAppServerRuntime.ts';
 import {
   ApprovalClass,
@@ -14,6 +15,19 @@ import {
 } from '../../../../src/utils/derivedOutputReceipt.ts';
 import { buildFocusStackOutputReviewFromArtifact } from '../../../../src/utils/focusStackOutputReview.ts';
 import { buildReopenedDerivedOutputReceipt } from '../../../../src/utils/hdrDerivedSourceReopen.ts';
+
+const nativeReview = readFileSync('src-tauri/src/merge/focus_stack/review.rs', 'utf8');
+for (const token of [
+  'low_margin',
+  'occlusion_risk',
+  'alignment_risk',
+  'invalid_owner',
+  'halo_overshoot',
+  'alternate_sources',
+  'mask_hash',
+]) {
+  if (!nativeReview.includes(token)) throw new Error(`Native measured retouch seed is missing ${token}`);
+}
 
 const focusRoutePair = {
   applyToolName: 'computationalmerge.focus_stack.apply_command',
