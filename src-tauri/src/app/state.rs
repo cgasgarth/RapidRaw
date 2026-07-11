@@ -17,6 +17,7 @@ use crate::image_processing::GpuContext;
 use crate::lens_correction::LensDatabase;
 use crate::lut_processing::Lut;
 use crate::panorama_stitching::PendingPanoramaResult;
+use crate::source_revision::FingerprintCache;
 use crate::tethering::TetherSessionSnapshot;
 
 #[derive(Serialize, Deserialize)]
@@ -202,6 +203,7 @@ pub struct AppState {
     pub full_warped_cache: Mutex<Option<(u64, Arc<DynamicImage>)>>,
     pub full_transformed_cache: Mutex<Option<TransformedImageCache>>,
     pub decoded_image_cache: Mutex<DecodedImageCache>,
+    pub source_fingerprint_cache: Arc<FingerprintCache>,
     pub thumbnail_manager: Arc<ThumbnailManager>,
     pub tether_session: Mutex<Option<TetherSessionSnapshot>>,
 }
@@ -254,6 +256,7 @@ impl AppState {
             full_warped_cache: Mutex::new(None),
             full_transformed_cache: Mutex::new(None),
             decoded_image_cache: Mutex::new(DecodedImageCache::new(5)),
+            source_fingerprint_cache: Arc::new(FingerprintCache::new(64)),
             thumbnail_manager: ThumbnailManager::new(),
             tether_session: Mutex::new(None),
         }
