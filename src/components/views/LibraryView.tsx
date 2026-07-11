@@ -1,5 +1,6 @@
 import type { MouseEvent, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import type { ThumbnailViewportUpdate } from '../../hooks/library/useThumbnails';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useProcessStore } from '../../store/useProcessStore';
@@ -31,6 +32,7 @@ interface LibraryViewProps {
   isAndroid: boolean;
   libraryViewMode: LibraryViewMode;
   requestThumbnails: (paths: string[]) => void;
+  updateThumbnailViewport: (demand: ThumbnailViewportUpdate) => void;
   setLibraryViewMode: (mode: LibraryViewMode) => void;
   setThumbnailAspectRatio: (ratio: ThumbnailAspectRatio) => void;
   setThumbnailSize: (size: ThumbnailSize) => void;
@@ -63,6 +65,7 @@ export default function LibraryView({
   handlePasteAdjustments,
   handleResetAdjustments,
   requestThumbnails,
+  updateThumbnailViewport,
 }: LibraryViewProps) {
   const { activeView, setUI } = useUIStore(
     useShallow((state) => ({
@@ -163,6 +166,7 @@ export default function LibraryView({
             onThumbnailAspectRatioChange={setThumbnailAspectRatio}
             onThumbnailSizeChange={setThumbnailSize}
             onRequestThumbnails={requestThumbnails}
+            onThumbnailViewportChange={updateThumbnailViewport}
             rootPaths={rootPaths}
             setLibraryViewMode={setLibraryViewMode}
             theme={theme}

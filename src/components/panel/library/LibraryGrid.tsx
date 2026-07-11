@@ -12,9 +12,9 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { List, useListCallbackRef } from 'react-window';
+import type { ThumbnailViewportUpdate } from '../../../hooks/library/useThumbnails';
 import { useLibraryStore } from '../../../store/useLibraryStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
-import { thumbnailCache } from '../../../thumbnails/thumbnailCacheInstance';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { buildLibraryAutoStackItems } from '../../../utils/libraryAutoStacks';
 import { debounce } from '../../../utils/timing';
@@ -28,7 +28,6 @@ import {
   ThumbnailSize,
 } from '../../ui/AppProperties';
 import UiText from '../../ui/primitives/Text';
-
 import type { ColumnWidths } from '../MainLibrary';
 import { type LibraryRow, type LibraryRowProps, Row } from './LibraryItems';
 import {
@@ -112,7 +111,7 @@ interface LibraryGridProps {
   onImageClick: (path: string, event: ReactMouseEvent<HTMLElement> | React.KeyboardEvent<HTMLElement>) => void;
   onImageDoubleClick: (path: string) => void;
   thumbnailAspectRatio: ThumbnailAspectRatio;
-  onRequestThumbnails?: (paths: string[]) => void;
+  onThumbnailViewportChange?: (demand: ThumbnailViewportUpdate) => void;
   thumbnailSizeOptions: ThumbnailSizeOption[];
   onThumbnailSizeChange: (size: ThumbnailSize) => void;
   onClearSelection: () => void;
@@ -122,6 +121,17 @@ interface LibraryGridProps {
 const VirtualizedRow = ({ ariaAttributes: _ariaAttributes, ...rowProps }: VirtualizedRowProps): React.ReactElement => (
   <Row {...rowProps} />
 );
+
+const imageListRevisions = new WeakMap<readonly ImageFile[], number>();
+let nextImageListRevision = 1;
+
+const getImageListRevision = (imageList: readonly ImageFile[]): number => {
+  const existing = imageListRevisions.get(imageList);
+  if (existing !== undefined) return existing;
+  const revision = nextImageListRevision++;
+  imageListRevisions.set(imageList, revision);
+  return revision;
+};
 
 function HeaderColumn({
   resize,
@@ -337,7 +347,7 @@ export default function LibraryGrid(props: LibraryGridProps) {
     onImageClick,
     onImageDoubleClick,
     thumbnailAspectRatio,
-    onRequestThumbnails,
+    onThumbnailViewportChange,
     thumbnailSizeOptions,
     onThumbnailSizeChange,
   } = props;
@@ -354,9 +364,13 @@ export default function LibraryGrid(props: LibraryGridProps) {
   const libraryContainerRef = useRef<HTMLDivElement>(null);
   const gridObserverRef = useRef<ResizeObserver | null>(null);
   const loadedThumbnailsRef = useRef(new Set<string>());
-  const requestQueueRef = useRef<Set<string>>(new Set());
-  const requestTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const focusedPathRef = useRef<string | null>(null);
+  const scrollSampleRef = useRef({
+    top: 0,
+    at: performance.now(),
+    direction: 'idle' as 'forward' | 'backward' | 'idle',
+    velocity: 0,
+  });
   const exifOverlay = useSettingsStore((s) => s.appSettings?.exifOverlay || ExifOverlay.Off);
   const visibleColumns = exifOverlay === ExifOverlay.Off ? CORE_LIBRARY_COLUMN_KEYS : LIBRARY_COLUMN_KEYS;
   const columnResize = useLibraryColumnResize({
@@ -430,29 +444,8 @@ export default function LibraryGrid(props: LibraryGridProps) {
   useEffect(
     () => () => {
       handleScroll.cancel();
-      if (requestTimeoutRef.current) clearTimeout(requestTimeoutRef.current);
-      requestQueueRef.current.clear();
     },
     [handleScroll],
-  );
-
-  const queueThumbnailRequest = useCallback(
-    (path: string) => {
-      if (!onRequestThumbnails) return;
-      if (thumbnailCache.has(path)) return;
-      requestQueueRef.current.add(path);
-      if (!requestTimeoutRef.current) {
-        requestTimeoutRef.current = setTimeout(() => {
-          const paths = Array.from(requestQueueRef.current);
-          if (paths.length > 0) {
-            onRequestThumbnails(paths);
-            requestQueueRef.current.clear();
-          }
-          requestTimeoutRef.current = null;
-        }, 50);
-      }
-    },
-    [onRequestThumbnails],
   );
 
   const handleToggleRecursiveFolder = useCallback((path: string) => {
@@ -579,6 +572,9 @@ export default function LibraryGrid(props: LibraryGridProps) {
   const previousLayoutRef = useRef(layoutSnapshot);
   const didRestoreSessionScrollRef = useRef(false);
   const focusRestoreFrameRef = useRef<number | null>(null);
+  const viewportContextKey = useMemo(() => {
+    return `${currentFolderPath ?? ''}:${thumbnailSize}:${thumbnailAspectRatio}:${getImageListRevision(imageList)}`;
+  }, [currentFolderPath, imageList, thumbnailAspectRatio, thumbnailSize]);
 
   useLayoutEffect(() => {
     const element = listHandle?.element;
@@ -733,7 +729,6 @@ export default function LibraryGrid(props: LibraryGridProps) {
       outerPadding: gridData?.OUTER_PADDING ?? 0,
       gap: gridData?.ITEM_GAP ?? 0,
       isListView: gridData?.isListView ?? false,
-      queueThumbnailRequest,
       onToggleRecursiveFolder: handleToggleRecursiveFolder,
       onToggleAutoStack: handleToggleAutoStack,
     };
@@ -747,7 +742,6 @@ export default function LibraryGrid(props: LibraryGridProps) {
     thumbnailAspectRatio,
     handleImageLoad,
     currentFolderPath,
-    queueThumbnailRequest,
     handleToggleRecursiveFolder,
     handleToggleAutoStack,
   ]);
@@ -796,7 +790,48 @@ export default function LibraryGrid(props: LibraryGridProps) {
             rowCount={gridData.rows.length}
             rowHeight={rowHeight}
             onScroll={(e: React.UIEvent<HTMLElement>) => {
-              handleScroll(e.currentTarget.scrollTop);
+              const now = performance.now();
+              const top = e.currentTarget.scrollTop;
+              const previous = scrollSampleRef.current;
+              const delta = top - previous.top;
+              scrollSampleRef.current = {
+                top,
+                at: now,
+                direction: delta > 0 ? 'forward' : delta < 0 ? 'backward' : previous.direction,
+                velocity: Math.abs(delta) / Math.max(1, now - previous.at),
+              };
+              handleScroll(top);
+            }}
+            overscanCount={3}
+            onRowsRendered={(visibleRows, allRows) => {
+              if (!onThumbnailViewportChange) return;
+              const rowPaths = (start: number, stop: number) =>
+                gridData.rows
+                  .slice(Math.max(0, start), stop + 1)
+                  .flatMap((row) => (row.type === 'images' ? row.images.map((item) => item.image.path) : []));
+              const visiblePaths = rowPaths(visibleRows.startIndex, visibleRows.stopIndex);
+              const before = rowPaths(allRows.startIndex, visibleRows.startIndex - 1).reverse();
+              const after = rowPaths(visibleRows.stopIndex + 1, allRows.stopIndex);
+              const { direction, velocity } = scrollSampleRef.current;
+              const overscanPaths = direction === 'backward' ? [...before, ...after] : [...after, ...before];
+              const lookaheadRows = Math.min(6, Math.max(1, Math.ceil(velocity * 2)));
+              const lookaheadPaths =
+                direction === 'backward'
+                  ? rowPaths(Math.max(0, allRows.startIndex - lookaheadRows), allRows.startIndex - 1).reverse()
+                  : direction === 'forward'
+                    ? rowPaths(
+                        allRows.stopIndex + 1,
+                        Math.min(gridData.rows.length - 1, allRows.stopIndex + lookaheadRows),
+                      )
+                    : [];
+              onThumbnailViewportChange({
+                contextKey: viewportContextKey,
+                visiblePaths,
+                overscanPaths,
+                lookaheadPaths,
+                direction,
+                velocityPxPerMs: velocity,
+              });
             }}
             className="custom-scrollbar"
             tabIndex={-1}
