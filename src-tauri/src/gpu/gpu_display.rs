@@ -1,10 +1,13 @@
 use std::num::NonZero;
 
 #[cfg(not(any(target_os = "android", target_os = "linux")))]
+use tauri::Manager;
+
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
 use half::f16;
 
 #[cfg(not(any(target_os = "android", target_os = "linux")))]
-use crate::display_profile::build_srgb_to_active_display_lut;
+use crate::display_profile::build_srgb_to_active_display_lut_for_app;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
@@ -263,7 +266,7 @@ pub(crate) fn create_wgpu_display(
         min_filter: wgpu::FilterMode::Linear,
         ..Default::default()
     });
-    let display_lut = build_srgb_to_active_display_lut();
+    let display_lut = build_srgb_to_active_display_lut_for_app(window.app_handle());
     let display_lut_texture = device.create_texture(&wgpu::TextureDescriptor {
         label: Some("Active Display Profile LUT"),
         size: wgpu::Extent3d {

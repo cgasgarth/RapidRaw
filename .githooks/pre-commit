@@ -39,7 +39,6 @@ run_gate typecheck bun run typecheck
 run_gate test bun run test:unit
 run_gate unsafe-casts bun tests/integration/checks/check-unsafe-casts.ts
 run_gate rustfmt bun run check:rust:fmt
-run_gate rust-check bun run check:rust:check
 run_gate rust-clippy bun run check:rust:clippy
 run_gate schema bun run check:schema
 run_gate bundle bun run check:bundle

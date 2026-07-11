@@ -13,32 +13,6 @@ permissions:
   contents: read
 
 jobs:
-  rust-check:
-    name: 'rust: cargo check Linux'
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-
-      - name: Install Tauri Linux dependencies
-        uses: ./.github/actions/install-tauri-linux-deps
-
-      - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
-        with:
-          rustflags: ''
-          rust-src-dir: src-tauri
-
-      - name: Rust cache
-        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
-        with:
-          workspaces: src-tauri
-          key: v1-${{ runner.os }}-${{ runner.arch }}-rust-check-main-long
-          cache-on-failure: true
-
-      - name: Cargo check
-        working-directory: src-tauri
-        run: cargo check --locked --no-default-features --features required-ci
-
   rust-clippy:
     name: 'rust: clippy baseline Linux'
     runs-on: ubuntu-latest
