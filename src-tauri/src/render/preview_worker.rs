@@ -528,7 +528,32 @@ fn encode_preview_response(
     jpeg_quality: u8,
     fn_start: std::time::Instant,
 ) -> Result<Vec<u8>, String> {
+    #[cfg(not(any(target_os = "android", target_os = "linux")))]
+    let display_snapshot =
+        app_handle.map(crate::display_profile::display_preview_transform_snapshot_for_app);
+    #[cfg(not(any(target_os = "android", target_os = "linux")))]
+    if let Some(snapshot) = display_snapshot.as_ref() {
+        log::debug!(
+            "display_preview_snapshot generation={} display={:?} profile={} status={:?} cmm={} intent={} bpc={} interpolation={} implementation={} contract={}",
+            snapshot.selection_generation,
+            snapshot.profile.display_id,
+            snapshot.icc_sha256,
+            snapshot.profile.status,
+            snapshot.profile.cmm,
+            snapshot.intent,
+            snapshot.black_point_compensation,
+            snapshot.interpolation,
+            snapshot.implementation_version,
+            snapshot.encoding_contract,
+        );
+    }
     let final_rgba_image = match app_handle {
+        #[cfg(not(any(target_os = "android", target_os = "linux")))]
+        Some(_) => Cow::Owned(to_display_preview_rgba8(
+            display_snapshot.as_ref().expect("snapshot resolved"),
+            final_processed_image,
+        )),
+        #[cfg(any(target_os = "android", target_os = "linux"))]
         Some(app) => Cow::Owned(to_display_preview_rgba8(app, final_processed_image)),
         None => to_preview_rgba8(final_processed_image),
     };
@@ -559,10 +584,8 @@ fn encode_preview_response(
         .encode_imgref(img_ref)
         .map_err(|e| format!("Failed to encode preview: {}", e))?;
     #[cfg(target_os = "macos")]
-    let jpeg_bytes = if let Some(app) = app_handle
-        && let Ok(icc) = crate::display_profile::active_display_profile_bytes_for_app(app)
-    {
-        jpeg_with_icc_profile(&jpeg_bytes, &icc)?
+    let jpeg_bytes = if let Some(snapshot) = display_snapshot.as_ref() {
+        jpeg_with_icc_profile(&jpeg_bytes, &snapshot.icc_bytes)?
     } else {
         jpeg_bytes
     };
@@ -676,9 +699,12 @@ fn to_preview_rgba8(image: &DynamicImage) -> Cow<'_, RgbaImage> {
 }
 
 #[cfg(not(any(target_os = "android", target_os = "linux")))]
-fn to_display_preview_rgba8(app: &tauri::AppHandle, image: &DynamicImage) -> RgbaImage {
+fn to_display_preview_rgba8(
+    snapshot: &crate::display_profile::DisplayPreviewTransformSnapshot,
+    image: &DynamicImage,
+) -> RgbaImage {
     let mut image = image.to_rgba8();
-    let lut = crate::display_profile::build_srgb_to_active_display_lut_for_app(app);
+    let lut = &snapshot.lut;
     for pixel in image.pixels_mut() {
         let transformed = lut.sample_rgb([
             pixel[0] as f32 / 255.0,

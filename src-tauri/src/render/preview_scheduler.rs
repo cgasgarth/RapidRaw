@@ -99,6 +99,15 @@ pub struct PreviewScheduler {
 }
 
 impl PreviewScheduler {
+    /// Supersede every queued/in-flight completion without changing the active image identity.
+    pub fn invalidate_current(&self) -> u64 {
+        let generation = self.current_generation.fetch_add(1, Ordering::AcqRel) + 1;
+        let mut slots = self.pending.lock().unwrap();
+        supersede_slot(slots.interactive.take(), generation);
+        supersede_slot(slots.settled.take(), generation);
+        generation
+    }
+
     pub fn new(policy: PreviewSchedulingPolicy) -> Arc<Self> {
         Arc::new(Self {
             pending: Mutex::new(PendingPreviewSlots::default()),

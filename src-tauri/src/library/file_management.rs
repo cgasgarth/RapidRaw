@@ -2246,33 +2246,50 @@ pub async fn apply_adjustments_to_paths(
 pub async fn reset_adjustments_for_paths(
     paths: Vec<String>,
     app_handle: AppHandle,
-) -> Result<(), String> {
+) -> Result<Vec<ResetAdjustmentsResult>, String> {
+    if paths.is_empty() {
+        return Err("Reset requires at least one image path".to_string());
+    }
     let state = app_handle.state::<AppState>();
     add_to_thumbnail_queue(&state, paths.len(), &app_handle);
 
-    tauri::async_runtime::spawn_blocking(move || {
+    tauri::async_runtime::spawn_blocking(move || -> Result<Vec<ResetAdjustmentsResult>, String> {
         let settings = load_settings_or_default(&app_handle);
         let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
         let create_xmp_if_missing = settings.create_xmp_if_missing.unwrap_or(false);
-
-        paths.par_iter().for_each(|path| {
-            let (_, sidecar_path) = parse_virtual_path(path);
-
-            let mut existing_metadata = crate::exif_processing::load_sidecar(&sidecar_path);
-
-            existing_metadata.adjustments = serde_json::json!({});
-
-            if let Ok(json_string) = serde_json::to_string_pretty(&existing_metadata) {
-                let _ = std::fs::write(&sidecar_path, json_string);
-            }
-
+        let mut results = Vec::with_capacity(paths.len());
+        for path in &paths {
+            let (source_path, sidecar_path) = parse_virtual_path(path);
+            let mut existing_metadata = load_sidecar_strict_for_reset(&sidecar_path)?;
+            backup_sidecar_before_reset(&sidecar_path)?;
+            clear_render_authority_for_reset(&mut existing_metadata);
+            save_metadata_sidecar(&sidecar_path, &existing_metadata)?;
             if enable_xmp_sync {
-                let source_path = parse_virtual_path(path).0;
-                sync_metadata_to_xmp(&source_path, &existing_metadata, create_xmp_if_missing);
+                sync_metadata_to_xmp_sidecar(
+                    &source_path,
+                    existing_metadata.rating,
+                    existing_metadata.tags.as_deref(),
+                    create_xmp_if_missing,
+                )?;
             }
-        });
+            let persisted = load_sidecar_strict_for_reset(&sidecar_path)?;
+            let persisted_json = serde_json::to_vec(&persisted)
+                .map_err(|error| format!("Failed to serialize Reset readback: {error}"))?;
+            results.push(ResetAdjustmentsResult {
+                path: path.clone(),
+                adjustments: persisted.adjustments,
+                revision: format!("sha256:{}", hex::encode(Sha256::digest(persisted_json))),
+            });
+        }
 
         let state = app_handle.state::<AppState>();
+        crate::render_caches::RenderCaches::new(&state).clear_active_image_render_state();
+        state.decoded_image_cache.clear();
+        state.thumbnail_geometry_cache.clear();
+        state.viewer_sample_frames.clear();
+        if let Some(scheduler) = state.preview_scheduler.lock().unwrap().as_ref() {
+            scheduler.invalidate_current();
+        }
         let thumb_cache_dir = match resolve_thumbnail_cache_dir(&app_handle) {
             Ok(dir) => dir,
             Err(e) => {
@@ -2283,13 +2300,13 @@ pub async fn reset_adjustments_for_paths(
                 for _ in 0..paths.len() {
                     increment_thumbnail_progress(&state, &app_handle);
                 }
-                return;
+                return Err(e);
             }
         };
 
         let gpu_context = gpu_processing::get_or_init_gpu_context(&state, &app_handle).ok();
 
-        paths.par_iter().for_each(|path_str| {
+        for path_str in &paths {
             let result = generate_single_thumbnail_and_cache(
                 path_str,
                 &thumb_cache_dir,
@@ -2306,10 +2323,69 @@ pub async fn reset_adjustments_for_paths(
             }
 
             increment_thumbnail_progress(&state, &app_handle);
-        });
-    });
+        }
+        Ok(results)
+    })
+    .await
+    .map_err(|error| format!("Reset worker failed: {error}"))?
+}
 
-    Ok(())
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResetAdjustmentsResult {
+    pub path: String,
+    pub adjustments: Value,
+    pub revision: String,
+}
+
+fn load_sidecar_strict_for_reset(sidecar_path: &Path) -> Result<ImageMetadata, String> {
+    if !sidecar_path.exists() {
+        return Ok(ImageMetadata::default());
+    }
+    let content = fs::read_to_string(sidecar_path)
+        .map_err(|error| format!("Failed to read sidecar {}: {error}", sidecar_path.display()))?;
+    serde_json::from_str(&content).map_err(|error| {
+        format!(
+            "Refusing to Reset corrupt sidecar {}: {error}",
+            sidecar_path.display()
+        )
+    })
+}
+
+fn backup_sidecar_before_reset(sidecar_path: &Path) -> Result<(), String> {
+    if !sidecar_path.exists() {
+        return Ok(());
+    }
+    let extension = sidecar_path
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("rrdata");
+    let backup_path = sidecar_path.with_extension(format!("{extension}.pre-reset"));
+    let content = fs::read_to_string(sidecar_path).map_err(|error| {
+        format!(
+            "Failed to back up sidecar {}: {error}",
+            sidecar_path.display()
+        )
+    })?;
+    crate::exif_processing::write_text_file_atomic(&backup_path, &content).map_err(|error| {
+        format!(
+            "Failed to create Reset backup {}: {error}",
+            backup_path.display()
+        )
+    })
+}
+
+fn clear_render_authority_for_reset(metadata: &mut ImageMetadata) {
+    metadata.adjustments = serde_json::json!({});
+    if let Some(artifacts) = metadata.raw_engine_artifacts.as_mut() {
+        artifacts.hdr_merge_artifacts.clear();
+        artifacts.negative_lab_artifacts.clear();
+        artifacts.layer_stack_sidecars.clear();
+        artifacts.external_editor_artifacts.clear();
+        artifacts.panorama_artifacts.clear();
+        artifacts.stale_artifact_ids.clear();
+        // Provenance, capture receipts, and XMP conflict receipts do not feed render input.
+    }
 }
 
 #[tauri::command]
@@ -4353,4 +4429,82 @@ mod tests {
             &serde_json::json!(["alaska", "mountain", "sunset"])
         );
     }
+}
+#[test]
+fn reset_clears_render_authority_and_preserves_library_metadata_and_provenance() {
+    let mut metadata = ImageMetadata {
+        rating: 4,
+        tags: Some(vec!["user:alaska".to_string()]),
+        exif: Some(HashMap::from([(
+            "Camera".to_string(),
+            "Control".to_string(),
+        )])),
+        adjustments: serde_json::json!({"exposure": 1, "lutPath": "/tmp/cast.cube"}),
+        raw_engine_artifacts: Some(RawEngineArtifacts {
+            ai_provenance_entries: vec![serde_json::json!({"receipt": "keep"})],
+            layer_stack_sidecars: vec![serde_json::json!({"layers": [{"exposure": 2}]})],
+            negative_lab_artifacts: vec![serde_json::json!({"render": "authoritative"})],
+            xmp_conflict_receipts: vec![serde_json::json!({"receipt": "keep"})],
+            ..RawEngineArtifacts::default()
+        }),
+        ..ImageMetadata::default()
+    };
+
+    clear_render_authority_for_reset(&mut metadata);
+
+    assert_eq!(metadata.adjustments, serde_json::json!({}));
+    assert_eq!(metadata.rating, 4);
+    assert_eq!(
+        metadata.tags.as_deref(),
+        Some(["user:alaska".to_string()].as_slice())
+    );
+    assert_eq!(metadata.exif.as_ref().unwrap()["Camera"], "Control");
+    let artifacts = metadata.raw_engine_artifacts.unwrap();
+    assert!(artifacts.layer_stack_sidecars.is_empty());
+    assert!(artifacts.negative_lab_artifacts.is_empty());
+    assert_eq!(artifacts.ai_provenance_entries.len(), 1);
+    assert_eq!(artifacts.xmp_conflict_receipts.len(), 1);
+}
+
+#[test]
+fn reset_strict_load_refuses_corrupt_sidecar() {
+    let temp = tempfile::tempdir().unwrap();
+    let sidecar = temp.path().join("broken.rrdata");
+    fs::write(&sidecar, "{not json").unwrap();
+    let error = load_sidecar_strict_for_reset(&sidecar).unwrap_err();
+    assert!(error.contains("Refusing to Reset corrupt sidecar"));
+}
+
+#[test]
+fn reset_atomic_write_survives_reopen_and_keeps_pre_reset_recovery_copy() {
+    let temp = tempfile::tempdir().unwrap();
+    let sidecar = temp.path().join("image.rrdata");
+    let original = ImageMetadata {
+        adjustments: serde_json::json!({"exposure": 2}),
+        raw_engine_artifacts: Some(RawEngineArtifacts {
+            layer_stack_sidecars: vec![serde_json::json!({"layers": [1]})],
+            ..RawEngineArtifacts::default()
+        }),
+        ..ImageMetadata::default()
+    };
+    save_metadata_sidecar(&sidecar, &original).unwrap();
+    backup_sidecar_before_reset(&sidecar).unwrap();
+    let mut reset = load_sidecar_strict_for_reset(&sidecar).unwrap();
+    clear_render_authority_for_reset(&mut reset);
+    save_metadata_sidecar(&sidecar, &reset).unwrap();
+
+    let reopened = load_sidecar_strict_for_reset(&sidecar).unwrap();
+    assert_eq!(reopened.adjustments, serde_json::json!({}));
+    assert!(
+        reopened
+            .raw_engine_artifacts
+            .unwrap()
+            .layer_stack_sidecars
+            .is_empty()
+    );
+    let backup = sidecar.with_extension("rrdata.pre-reset");
+    assert_eq!(
+        load_sidecar_strict_for_reset(&backup).unwrap().adjustments,
+        original.adjustments
+    );
 }
