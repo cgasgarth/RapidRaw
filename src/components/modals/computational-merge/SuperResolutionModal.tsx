@@ -1,8 +1,9 @@
 import { motion } from 'framer-motion';
-import { AlertTriangle, CheckCircle2, Layers3, ScanSearch, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Layers3, ScanSearch, ShieldCheck, Sparkles, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  type SingleImageX2ApplyReceipt,
   type SingleImageX2Capability,
   type SingleImageX2Preview,
   singleImageX2CapabilitySchema,
@@ -56,6 +57,7 @@ interface SuperResolutionModalProps {
   onOpenOutput?: (path: string) => void;
   onPreviewPlan: () => void;
   onCancelSingleImagePreview?: () => void;
+  onApplySingleImage?: () => void;
   reviewArtifactPreviewUrls?: Partial<
     Record<SuperResolutionOutputReviewWorkflow['reviewArtifacts'][number]['kind'], string>
   >;
@@ -63,6 +65,8 @@ interface SuperResolutionModalProps {
   outputReview?: SuperResolutionOutputReviewWorkflow | null;
   singleImagePreview?: SingleImageX2Preview | null;
   singleImagePreviewRunning?: boolean;
+  singleImageApplyRunning?: boolean;
+  singleImageApplyReceipt?: SingleImageX2ApplyReceipt | null;
   nativeReadiness?: SuperResolutionNativeReadiness | null;
   settings: SuperResolutionUiSettings;
   sourceCount: number;
@@ -83,6 +87,7 @@ export function SuperResolutionModal({
   loadingImageUrl,
   onClose,
   onOpenOutput,
+  onApplySingleImage,
   onPreviewPlan,
   onCancelSingleImagePreview,
   reviewArtifactPreviewUrls = {},
@@ -90,6 +95,8 @@ export function SuperResolutionModal({
   outputReview: runtimeOutputReview,
   singleImagePreview = null,
   singleImagePreviewRunning = false,
+  singleImageApplyRunning = false,
+  singleImageApplyReceipt = null,
   nativeReadiness,
   settings,
   sourceCount,
@@ -98,6 +105,7 @@ export function SuperResolutionModal({
 }: SuperResolutionModalProps) {
   const { t } = useTranslation();
   const [singleImageCapability, setSingleImageCapability] = useState<SingleImageX2Capability | null>(null);
+  const [acceptedSingleImageReviewHash, setAcceptedSingleImageReviewHash] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -105,6 +113,10 @@ export function SuperResolutionModal({
       .then(setSingleImageCapability)
       .catch(() => setSingleImageCapability(null));
   }, [isOpen]);
+
+  useEffect(() => {
+    setAcceptedSingleImageReviewHash(null);
+  }, [singleImagePreview?.review.outputHash]);
 
   const sourcePreflight = useMemo(
     () =>
@@ -396,6 +408,35 @@ export function SuperResolutionModal({
               {t('modals.hdr.cancel')}
             </Button>
           )}
+          {isSingleImageAi && singleImageApplyRunning && onCancelSingleImagePreview !== undefined && (
+            <Button onClick={onCancelSingleImagePreview} data-testid="sr-single-image-apply-cancel-button">
+              <X className="w-4 h-4" />
+              {t('modals.hdr.cancel')}
+            </Button>
+          )}
+          {isSingleImageAi && onApplySingleImage !== undefined && (
+            <Button
+              onClick={onApplySingleImage}
+              disabled={
+                singleImageApplyRunning ||
+                singleImageCapability?.available !== true ||
+                singleImagePreview?.review.decision !== 'preview_only_manual_review' ||
+                acceptedSingleImageReviewHash !== singleImagePreview?.review.outputHash
+              }
+              data-testid="sr-single-image-apply-button"
+            >
+              <Sparkles className="w-4 h-4" />
+              {t('adjustments.color.workflowRecipes.apply')}
+            </Button>
+          )}
+          {isSingleImageAi && singleImageApplyReceipt !== null && onOpenOutput !== undefined && (
+            <Button
+              onClick={() => onOpenOutput(singleImageApplyReceipt.payloadPath)}
+              data-testid="sr-single-image-open-output-button"
+            >
+              {t('modals.panorama.openInEditor')}
+            </Button>
+          )}
         </>
       }
     >
@@ -448,7 +489,7 @@ export function SuperResolutionModal({
         >
           <UiText variant={TextVariants.heading}>Enhance x2 (AI)</UiText>
           <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
-            Manual review required. Apply is disabled until durable commit support lands.
+            2x width and height, 4x pixels. Rendered RGB model-based derivative with manual review.
           </UiText>
           <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
             <ComputationalSetupStatusLine label="Model" value={singleImageCapability?.modelId ?? 'Checking'} />
@@ -460,7 +501,14 @@ export function SuperResolutionModal({
               label="Code license"
               value={singleImageCapability?.codeLicense ?? 'Checking'}
             />
-            <ComputationalSetupStatusLine label="Apply" value="durable_commit_pending" />
+            <ComputationalSetupStatusLine
+              label="Apply"
+              value={
+                singleImageCapability?.available
+                  ? 'Available after review'
+                  : 'Blocked until a verified model is installed'
+              }
+            />
           </div>
         </section>
       )}
@@ -507,6 +555,41 @@ export function SuperResolutionModal({
               value={`${singleImagePreview.review.meanAbsoluteResidual.toFixed(6)} / ${singleImagePreview.review.maxAbsoluteResidual.toFixed(6)}`}
             />
             <ComputationalSetupStatusLine label="Review" value="Manual review required" />
+          </div>
+          <label className="mt-3 flex items-center gap-2 text-sm" data-testid="sr-single-image-review-acceptance">
+            <input
+              type="checkbox"
+              checked={acceptedSingleImageReviewHash === singleImagePreview.review.outputHash}
+              disabled={singleImagePreview.review.decision !== 'preview_only_manual_review'}
+              onChange={(event) =>
+                setAcceptedSingleImageReviewHash(event.target.checked ? singleImagePreview.review.outputHash : null)
+              }
+            />
+            {t('modals.superResolution.review.artifactComparatorLimitation')}
+          </label>
+        </section>
+      )}
+
+      {isSingleImageAi && singleImageApplyReceipt !== null && (
+        <section
+          className="rounded-md border border-border-color bg-bg-primary p-4"
+          data-testid="sr-single-image-output"
+        >
+          <UiText variant={TextVariants.heading}>Enhanced x2 output</UiText>
+          <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+            <ComputationalSetupStatusLine
+              label="Dimensions"
+              value={`${singleImageApplyReceipt.width}x${singleImageApplyReceipt.height}`}
+            />
+            <ComputationalSetupStatusLine
+              label="Model hash"
+              value={getShortHash(singleImageApplyReceipt.modelSha256)}
+            />
+            <ComputationalSetupStatusLine
+              label="Package"
+              value={getArtifactFileName(singleImageApplyReceipt.package.finalPackagePath)}
+            />
+            <ComputationalSetupStatusLine label="Status" value={singleImageApplyReceipt.package.commitStatus} />
           </div>
         </section>
       )}

@@ -47,5 +47,53 @@ export const singleImageX2PreviewSchema = z
   })
   .strict();
 
+const atomicDerivedOutputReceiptSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    stagingIdentity: z.string().min(1),
+    finalPackagePath: z.string().min(1),
+    manifestHash: z.string().startsWith('blake3:'),
+    inventoryHash: z.string().startsWith('blake3:'),
+    payloadHash: z.string().startsWith('blake3:'),
+    mapHashes: z.array(z.string().startsWith('blake3:')),
+    commitStatus: z.enum(['committed', 'unregistered']),
+    recoveryAction: z.literal('retry_derived_source_registration').nullable(),
+  })
+  .strict();
+
+export const singleImageX2ApplyReceiptSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    jobId: z.string().uuid(),
+    sourcePath: z.string().min(1),
+    graphRevision: z.string().min(1),
+    reviewHash: z.string().startsWith('sha256:'),
+    modelId: z.string().min(1),
+    modelSha256: z.string().min(1),
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+    payloadPath: z.string().min(1),
+    package: atomicDerivedOutputReceiptSchema,
+  })
+  .strict();
+
+export const singleImageX2BatchReceiptSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    executionPolicy: z.literal('sequential_one_active_item'),
+    items: z.array(
+      z
+        .object({
+          sourcePath: z.string().min(1),
+          status: z.enum(['complete', 'failed', 'cancelled']),
+          output: singleImageX2ApplyReceiptSchema.nullable(),
+          error: z.string().min(1).nullable(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+
 export type SingleImageX2Capability = z.infer<typeof singleImageX2CapabilitySchema>;
 export type SingleImageX2Preview = z.infer<typeof singleImageX2PreviewSchema>;
+export type SingleImageX2ApplyReceipt = z.infer<typeof singleImageX2ApplyReceiptSchema>;
