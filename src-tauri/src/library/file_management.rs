@@ -213,7 +213,7 @@ pub struct ImportSettings {
     pub delete_after_import: bool,
 }
 
-fn split_rrdata_sidecar_filename(file_name: &str) -> Option<(String, Option<String>)> {
+pub(crate) fn split_rrdata_sidecar_filename(file_name: &str) -> Option<(String, Option<String>)> {
     let base = file_name.strip_suffix(".rrdata")?;
     if base.len() >= 7 && base.as_bytes()[base.len() - 7] == b'.' {
         let id = &base[base.len() - 6..];
@@ -223,6 +223,21 @@ fn split_rrdata_sidecar_filename(file_name: &str) -> Option<(String, Option<Stri
     }
 
     Some((base.to_string(), None))
+}
+
+pub(crate) fn source_path_for_library_event(path: &Path) -> PathBuf {
+    let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
+        return path.to_path_buf();
+    };
+    if let Some((source_name, _)) = split_rrdata_sidecar_filename(file_name) {
+        return path.with_file_name(source_name);
+    }
+    if file_name.to_ascii_lowercase().ends_with(".rrexif")
+        || file_name.to_ascii_lowercase().ends_with(".xmp")
+    {
+        return path.with_file_name(&file_name[..file_name.rfind('.').unwrap_or(file_name.len())]);
+    }
+    path.to_path_buf()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -483,6 +498,46 @@ pub fn list_images_in_dir(path: String, app_handle: AppHandle) -> Result<Vec<Ima
         .collect();
 
     Ok(result_list)
+}
+
+#[tauri::command]
+pub fn get_library_change_rows(paths: Vec<String>, app_handle: AppHandle) -> Vec<ImageFile> {
+    let settings = load_settings_or_default(&app_handle);
+    let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
+    paths
+        .into_iter()
+        .map(PathBuf::from)
+        .filter(|path| path.is_file() && is_supported_image_file(path))
+        .flat_map(|path| {
+            let file_name = path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or_default();
+            let sidecars = path
+                .parent()
+                .and_then(|parent| fs::read_dir(parent).ok())
+                .map_or_else(
+                    || vec![None],
+                    |entries| {
+                        let matches: Vec<_> = entries
+                            .filter_map(Result::ok)
+                            .filter_map(|entry| {
+                                split_rrdata_sidecar_filename(&entry.file_name().to_string_lossy())
+                            })
+                            .filter_map(|(source_name, copy_id)| {
+                                (source_name == file_name).then_some(copy_id)
+                            })
+                            .collect();
+                        if matches.is_empty() {
+                            vec![None]
+                        } else {
+                            matches
+                        }
+                    },
+                );
+            expand_image_file_rows(path, sidecars, &settings, enable_xmp_sync)
+        })
+        .collect()
 }
 
 #[tauri::command]
