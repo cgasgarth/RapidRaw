@@ -32,6 +32,20 @@ interface DenoiseModalProps {
   targetPaths: string[];
 }
 
+interface DenoiseSessionProps extends Omit<DenoiseModalProps, 'isOpen'> {
+  isActive: boolean;
+  sessionId: string;
+  show: boolean;
+}
+
+export const initialDenoiseDraft = (isRaw: boolean) => ({
+  intensity: isRaw ? 50 : 15,
+  method: isRaw ? ('ai' as const) : ('bm3d' as const),
+});
+
+export const createDenoiseSessionIdentity = (targetPaths: readonly string[], isRaw: boolean, openEpoch: number) =>
+  `${openEpoch}:${isRaw ? 'raw' : 'raster'}:${targetPaths.map((path) => `${path.length}:${path}`).join('')}`;
+
 const ImageCompare = ({ original, denoised }: { original: string; denoised: string }) => {
   const { t } = useTranslation();
   const [sliderPosition, setSliderPosition] = useState(50);
@@ -208,8 +222,52 @@ const ImageCompare = ({ original, denoised }: { original: string; denoised: stri
   );
 };
 
-export default function DenoiseModal({
-  isOpen,
+export default function DenoiseModal(props: DenoiseModalProps) {
+  const { isOpen, isRaw, targetPaths } = props;
+  const { isMounted, show } = useModalTransition(isOpen);
+  const epochRef = useRef(isOpen ? 1 : 0);
+  const wasOpenRef = useRef(isOpen);
+  const sessionRef = useRef(
+    isOpen
+      ? {
+          id: createDenoiseSessionIdentity(targetPaths, isRaw, epochRef.current),
+          isRaw,
+          targetPaths: [...targetPaths],
+        }
+      : null,
+  );
+  if (isOpen) {
+    const incoming = createDenoiseSessionIdentity(targetPaths, isRaw, 0);
+    const current = sessionRef.current
+      ? createDenoiseSessionIdentity(sessionRef.current.targetPaths, sessionRef.current.isRaw, 0)
+      : null;
+    if (!wasOpenRef.current || incoming !== current) {
+      epochRef.current += 1;
+      sessionRef.current = {
+        id: createDenoiseSessionIdentity(targetPaths, isRaw, epochRef.current),
+        isRaw,
+        targetPaths: [...targetPaths],
+      };
+    }
+  }
+  wasOpenRef.current = isOpen;
+  const session = sessionRef.current;
+  if (!isMounted || !session) return null;
+
+  return (
+    <DenoiseSession
+      key={session.id}
+      {...props}
+      isActive={isOpen}
+      isRaw={session.isRaw}
+      sessionId={session.id}
+      show={show}
+      targetPaths={session.targetPaths}
+    />
+  );
+}
+
+export function DenoiseSession({
   onClose,
   onDenoise,
   onBatchDenoise,
@@ -224,11 +282,14 @@ export default function DenoiseModal({
   isRaw,
   loadingImageUrl,
   targetPaths,
-}: DenoiseModalProps) {
+  isActive,
+  sessionId,
+  show,
+}: DenoiseSessionProps) {
   const { t } = useTranslation();
-  const { isMounted, show } = useModalTransition(isOpen);
-  const [intensity, setIntensity] = useState<number>(15);
-  const [method, setMethod] = useState<'ai' | 'bm3d'>('ai');
+  const initialDraft = initialDenoiseDraft(isRaw);
+  const [intensity, setIntensity] = useState<number>(() => initialDraft.intensity);
+  const [method, setMethod] = useState<'ai' | 'bm3d'>(() => initialDraft.method);
   const [isSaving, setIsSaving] = useState(false);
   const [savedPath, setSavedPath] = useState<string | null>(null);
   const [batchSavedPaths, setBatchSavedPaths] = useState<string[] | null>(null);
@@ -237,6 +298,7 @@ export default function DenoiseModal({
   const isBatch = targetPaths.length > 1;
   const denoiseSourceCount = targetPaths.length;
   const mouseDownTarget = useRef<EventTarget | null>(null);
+  const operationIdRef = useRef(0);
 
   const methodOptions = useMemo<Array<{ label: string; value: 'ai' | 'bm3d' }>>(
     () => [
@@ -247,10 +309,16 @@ export default function DenoiseModal({
   );
 
   useEffect(() => {
+    if (!isActive || !isBatch) return undefined;
+    let current = true;
     const unlisten = listen<unknown>('denoise-batch-progress', (event) => {
-      setBatchProgress(parsePathProgressPayload(event.payload));
+      if (!current) return;
+      const progress = parsePathProgressPayload(event.payload);
+      if (!targetPaths.includes(progress.path)) return;
+      setBatchProgress(progress);
     });
     return () => {
+      current = false;
       void unlisten
         .then((f) => {
           f();
@@ -259,7 +327,14 @@ export default function DenoiseModal({
           console.error('Failed to unlisten denoise progress:', error);
         });
     };
-  }, []);
+  }, [isActive, isBatch, sessionId, targetPaths]);
+
+  useEffect(
+    () => () => {
+      operationIdRef.current += 1;
+    },
+    [],
+  );
 
   const currentStatusText =
     isBatch && batchProgress
@@ -276,30 +351,9 @@ export default function DenoiseModal({
   const firstBatchSavedPath = batchSavedPaths?.[0] ?? null;
   const firstBatchSavedOutputName = firstBatchSavedPath ? getDisplayFileName(firstBatchSavedPath) : '';
 
-  useEffect(() => {
-    if (isOpen) {
-      const timer = window.setTimeout(() => {
-        setMethod(isRaw ? 'ai' : 'bm3d');
-        setIntensity(isRaw ? 50 : 15);
-      }, 0);
-      return () => {
-        window.clearTimeout(timer);
-      };
-    }
-
-    const timer = window.setTimeout(() => {
-      setSavedPath(null);
-      setBatchSavedPaths(null);
-      setIsSaving(false);
-      setBatchProgress(null);
-    }, 300);
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [isOpen, isRaw]);
-
   const handleClose = useCallback(() => {
     if (isSaving) return;
+    operationIdRef.current += 1;
     onClose();
   }, [onClose, isSaving]);
 
@@ -316,6 +370,8 @@ export default function DenoiseModal({
 
   const handleRunDenoise = async () => {
     if (!hasDenoiseTargets) return;
+    const operationId = operationIdRef.current + 1;
+    operationIdRef.current = operationId;
     setSavedPath(null);
     setBatchSavedPaths(null);
     setBatchProgress(null);
@@ -323,12 +379,14 @@ export default function DenoiseModal({
       setIsSaving(true);
       try {
         const paths = await onBatchDenoise(intensity / 100, method, targetPaths);
-        setBatchSavedPaths(paths);
+        if (operationIdRef.current === operationId) setBatchSavedPaths(paths);
       } catch (e) {
-        console.error('Batch denoise failed:', e);
+        if (operationIdRef.current === operationId) console.error('Batch denoise failed:', e);
       } finally {
-        setIsSaving(false);
-        setBatchProgress(null);
+        if (operationIdRef.current === operationId) {
+          setIsSaving(false);
+          setBatchProgress(null);
+        }
       }
     } else {
       onDenoise(intensity / 100, method);
@@ -336,14 +394,16 @@ export default function DenoiseModal({
   };
 
   const handleSave = async () => {
+    const operationId = operationIdRef.current + 1;
+    operationIdRef.current = operationId;
     setIsSaving(true);
     try {
       const path = await onSave();
-      setSavedPath(path);
+      if (operationIdRef.current === operationId) setSavedPath(path);
     } catch (e) {
-      console.error(e);
+      if (operationIdRef.current === operationId) console.error(e);
     } finally {
-      setIsSaving(false);
+      if (operationIdRef.current === operationId) setIsSaving(false);
     }
   };
 
@@ -513,6 +573,7 @@ export default function DenoiseModal({
         <UiText className="text-center max-w-md leading-relaxed">{t('modals.denoise.description')}</UiText>
         <section
           className="mt-6 grid w-full max-w-xl grid-cols-2 gap-2 rounded-md border border-border-color bg-bg-primary p-3 text-xs"
+          data-denoise-intensity={intensity}
           data-denoise-method={method}
           data-denoise-source-count={denoiseSourceCount}
           data-is-batch={String(isBatch)}
@@ -713,8 +774,6 @@ export default function DenoiseModal({
       </div>
     );
   };
-
-  if (!isMounted) return null;
 
   return (
     <div
