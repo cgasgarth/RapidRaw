@@ -1219,15 +1219,17 @@ export const approveAgentSelectedImageLiveSession = (
   if (draft.state !== 'approval_required') throw new Error('Selected-image live session is not awaiting approval.');
   upgradeLegacyDryRunToProposalLineage(draft);
   const head = draft.proposalLineage.iterations.at(-1);
-  if (head === undefined || head.state !== 'ready') {
+  if (head === undefined || (head.state !== 'ready' && head.state !== 'sealed')) {
     throw new Error('Selected-image live session approval requires the latest ready proposal iteration.');
   }
-  draft.proposalLineage = transitionAgentSelectedImageProposalIteration(
-    draft.proposalLineage,
-    head.iterationId,
-    'sealed',
-    { expectedEpoch: draft.proposalLineage.epoch },
-  );
+  if (head.state === 'ready') {
+    draft.proposalLineage = transitionAgentSelectedImageProposalIteration(
+      draft.proposalLineage,
+      head.iterationId,
+      'sealed',
+      { expectedEpoch: draft.proposalLineage.epoch },
+    );
+  }
   draft.approvalId = `approval_${draft.sessionId}_${draft.requestId}_${draft.dryRun.dryRunPlanId}`.replaceAll(
     /[^A-Za-z0-9_-]/gu,
     '_',

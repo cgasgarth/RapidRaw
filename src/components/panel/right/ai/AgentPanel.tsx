@@ -74,12 +74,15 @@ export function AgentPanel() {
   const selectedImage = useEditorStore((state) => state.selectedImage);
   const initialPromptContext = useMemo(() => {
     if (selectedImage === null) return null;
-
-    return buildAgentInitialPromptContext({
-      operationId: `live-agent-initial-context-${selectedImage.path}`,
-      prompt: `Inspect ${getImageLabelFromPath(selectedImage.path)} before planning edits.`,
-      sessionId: `live-agent-${selectedImage.path}`,
-    });
+    try {
+      return buildAgentInitialPromptContext({
+        operationId: `live-agent-initial-context-${selectedImage.path}`,
+        prompt: `Inspect ${getImageLabelFromPath(selectedImage.path)} before planning edits.`,
+        sessionId: `live-agent-${selectedImage.path}`,
+      });
+    } catch {
+      return null;
+    }
   }, [selectedImage]);
   const transcript = useMemo(
     () => buildLiveAgentTranscript(selectedImage?.path, initialPromptContext),

@@ -17,6 +17,18 @@
     "os:allow-os-type",
     "core:window:allow-set-fullscreen",
     "core:window:allow-set-decorations",
-    "shell:default"
+    "shell:default",
+    {
+      "identifier": "shell:allow-spawn",
+      "allow": [{ "name": "codex", "cmd": "codex", "args": ["app-server", "--stdio"] }]
+    },
+    {
+      "identifier": "shell:allow-stdin-write",
+      "allow": [{ "name": "codex", "cmd": "codex", "args": ["app-server", "--stdio"] }]
+    },
+    {
+      "identifier": "shell:allow-kill",
+      "allow": [{ "name": "codex", "cmd": "codex", "args": ["app-server", "--stdio"] }]
+    }
   ]
 }
