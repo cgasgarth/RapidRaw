@@ -5,8 +5,10 @@ import { useManagedFocus } from '../../../../hooks/ui/useManagedFocus';
 import { EXPORT_LAST_USED_PRESET_ID } from '../../../../schemas/export/exportRecipeIds';
 import { exportRecipeSchema } from '../../../../schemas/export/exportRecipeSchemas';
 import { buildExportRecipeUiRows } from '../../../../schemas/export/exportRecipeUiSchemas';
+import { useEditorStore } from '../../../../store/useEditorStore';
 import { TextVariants } from '../../../../types/typography';
 import { EXPORT_SOFT_PROOF_RESOLVER_PRESET_ID } from '../../../../utils/export/exportSoftProofProfileCompare';
+import { resolveExportSoftProofRecipe } from '../../../../utils/export/exportSoftProofRecipeSelection';
 import type { AppSettings } from '../../../ui/AppProperties';
 import type { ExportPreset } from '../../../ui/ExportImportProperties';
 import Dropdown from '../../../ui/primitives/Dropdown';
@@ -51,6 +53,20 @@ export default function ExportPresetsList({
 
   useManagedFocus(newPresetInputRef, isCreating);
 
+  const commitPresets = (updatedSettings: AppSettings) => {
+    onSettingsChange(updatedSettings);
+    const editor = useEditorStore.getState();
+    const resolvedProof = resolveExportSoftProofRecipe({
+      enabled: editor.isExportSoftProofEnabled,
+      presets: updatedSettings.exportPresets ?? [],
+      requestedRecipeId: editor.exportSoftProofRecipeId,
+    });
+    editor.setEditor({
+      exportSoftProofRecipeId: resolvedProof.recipeId,
+      isExportSoftProofEnabled: resolvedProof.enabled,
+    });
+  };
+
   const handleSelect = (id: string) => {
     setSelectedPresetId(id);
     const preset = presets.find((p) => p.id === id);
@@ -71,7 +87,7 @@ export default function ExportPresetsList({
     const updatedPresets = [...presets, newPreset];
     const updatedSettings = { ...appSettings, exportPresets: updatedPresets };
 
-    onSettingsChange(updatedSettings);
+    commitPresets(updatedSettings);
 
     setSelectedPresetId(newPreset.id);
     setIsCreating(false);
@@ -94,7 +110,7 @@ export default function ExportPresetsList({
     });
 
     const updatedSettings = { ...appSettings, exportPresets: updatedPresets };
-    onSettingsChange(updatedSettings);
+    commitPresets(updatedSettings);
 
     setIsSaved(true);
     setTimeout(() => {
@@ -108,7 +124,7 @@ export default function ExportPresetsList({
     const updatedPresets = presets.filter((p) => p.id !== selectedPresetId);
     const updatedSettings = { ...appSettings, exportPresets: updatedPresets };
 
-    onSettingsChange(updatedSettings);
+    commitPresets(updatedSettings);
     setSelectedPresetId('');
   };
 

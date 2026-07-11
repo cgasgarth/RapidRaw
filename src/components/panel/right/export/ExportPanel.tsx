@@ -21,7 +21,6 @@ import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { useShallow } from 'zustand/react/shallow';
 import {
-  type ExportColorCapabilityCatalogV1,
   exportColorCapabilityCatalogV1Schema,
   MOXCMS_EXPORT_COLOR_CAPABILITIES_V1,
 } from '../../../../../packages/rawengine-schema/src/exportColorCapabilities';
@@ -32,7 +31,6 @@ import { EXPORT_LAST_USED_PRESET_ID } from '../../../../schemas/export/exportRec
 import { outputSharpeningSettingsSchema } from '../../../../schemas/outputSharpeningSchemas';
 import { emptyTauriResponseSchema } from '../../../../schemas/tauriResponseSchemas';
 import { useEditorStore } from '../../../../store/useEditorStore';
-import { useProcessStore } from '../../../../store/useProcessStore';
 import { Invokes } from '../../../../tauri/commands';
 import { thumbnailCache } from '../../../../thumbnails/thumbnailCacheInstance';
 import { useThumbnailCacheRevision } from '../../../../thumbnails/useThumbnail';
@@ -50,6 +48,7 @@ import {
 } from '../../../../utils/color/runtime/gamutWarningDisplay';
 import { buildColorStackPreviewExportParityReceipt } from '../../../../utils/colorStackPreviewExportParityReceipt';
 import { formatUnknownError } from '../../../../utils/errorFormatting';
+import { resolveExportCancellationPending } from '../../../../utils/export/exportCancellationState';
 import {
   getBlackPointCompensationStatus,
   getExportColorCapability,
@@ -320,6 +319,7 @@ export default function ExportPanel({
   );
 
   const {
+    acceptExportColorCapabilityCatalog,
     fileFormat,
     setFileFormat,
     jpegQuality,
@@ -368,6 +368,8 @@ export default function ExportPanel({
     setRenderingIntent,
     handleApplyPreset,
     currentSettingsObject,
+    exportColorCapabilityCatalog,
+    updateColorSelection,
   } = useExportSettings();
 
   const {
@@ -451,9 +453,6 @@ export default function ExportPanel({
   } | null>(null);
   const [watermarkImageAspectRatio, setWatermarkImageAspectRatio] = useState(1);
   const [imageAspectRatio, setImageAspectRatio] = useState(16 / 9);
-  const [exportColorCapabilityCatalog, setExportColorCapabilityCatalog] = useState<ExportColorCapabilityCatalogV1>(
-    MOXCMS_EXPORT_COLOR_CAPABILITIES_V1,
-  );
   const [softProofProfileCompareState, setSoftProofProfileCompareState] = useState<
     Record<ExportSoftProofProfileCompareSideId, ExportSoftProofProfileCompareSideState>
   >(() => createInitialSoftProofProfileCompareState());
@@ -540,6 +539,10 @@ export default function ExportPanel({
             hash: colorStackParityReceipt.activeColorStackHash,
           });
   const isExporting = status === Status.Exporting;
+  const effectiveIsCancellingExport = resolveExportCancellationPending({
+    isExporting,
+    requested: isCancellingExport,
+  });
   const isLibraryContext = !!onClose;
   const isCurrentExternalVariantStatus = externalVariantStatus.receiptOutputPath === firstReceiptOutput?.outputPath;
   const currentExternalVariantError = isCurrentExternalVariantStatus ? externalVariantStatus.error : null;
@@ -553,10 +556,6 @@ export default function ExportPanel({
   const isImportingCurrentExternalVariant = isCurrentExternalVariantStatus && externalVariantStatus.importing;
   const isCurrentExternalEditorWatch = externalEditorWatch?.outputPath === firstReceiptOutput?.outputPath;
   const currentExternalEditorWatch = isCurrentExternalEditorWatch ? externalEditorWatch : null;
-
-  useEffect(() => {
-    if (!isExporting) setIsCancellingExport(false);
-  }, [isExporting]);
 
   const handleImportExternalVariant = useCallback(
     async (sourceVirtualPath: string, output: NonNullable<typeof firstReceiptOutput>) => {
@@ -935,43 +934,21 @@ export default function ExportPanel({
 
   const handleUseCurrentSoftProofForExport = useCallback(() => {
     if (!currentSoftProofPreset || !softProofResolverStatus.canUseCurrentSoftProofForExport) return;
-    setBlackPointCompensation(currentSoftProofPreset.blackPointCompensation ?? false);
-    setColorProfile(currentSoftProofPreset.colorProfile ?? ExportColorProfile.Srgb);
-    setRenderingIntent(currentSoftProofPreset.renderingIntent ?? ExportRenderingIntent.RelativeColorimetric);
-  }, [
-    currentSoftProofPreset,
-    setBlackPointCompensation,
-    setColorProfile,
-    setRenderingIntent,
-    softProofResolverStatus.canUseCurrentSoftProofForExport,
-  ]);
+    updateColorSelection({
+      blackPointCompensation: currentSoftProofPreset.blackPointCompensation ?? false,
+      colorProfile: currentSoftProofPreset.colorProfile ?? ExportColorProfile.Srgb,
+      renderingIntent: currentSoftProofPreset.renderingIntent ?? ExportRenderingIntent.RelativeColorimetric,
+    });
+  }, [currentSoftProofPreset, softProofResolverStatus.canUseCurrentSoftProofForExport, updateColorSelection]);
 
   useEffect(() => {
     if (!isVisible) return;
     void invokeWithSchema(Invokes.GetExportColorCapabilities, {}, exportColorCapabilityCatalogV1Schema)
-      .then(setExportColorCapabilityCatalog)
+      .then(acceptExportColorCapabilityCatalog)
       .catch(() => {
-        setExportColorCapabilityCatalog(MOXCMS_EXPORT_COLOR_CAPABILITIES_V1);
+        acceptExportColorCapabilityCatalog(MOXCMS_EXPORT_COLOR_CAPABILITIES_V1);
       });
-  }, [isVisible]);
-
-  useEffect(() => {
-    if (!colorProfileOptions.some((option) => option.value === colorProfile)) {
-      setColorProfile(ExportColorProfile.Srgb);
-    }
-  }, [colorProfile, colorProfileOptions, setColorProfile]);
-
-  useEffect(() => {
-    if (hasColorPolicyCapability && !renderingIntentOptions.some((option) => option.value === renderingIntent)) {
-      setRenderingIntent(ExportRenderingIntent.RelativeColorimetric);
-    }
-  }, [hasColorPolicyCapability, renderingIntent, renderingIntentOptions, setRenderingIntent]);
-
-  useEffect(() => {
-    if (blackPointCompensation && !isBlackPointCompensationAvailable) {
-      setBlackPointCompensation(false);
-    }
-  }, [blackPointCompensation, isBlackPointCompensationAvailable, setBlackPointCompensation]);
+  }, [acceptExportColorCapabilityCatalog, isVisible]);
 
   const revokeSoftProofProfileCompareUrls = useCallback(() => {
     for (const url of softProofProfileCompareUrlsRef.current) {
@@ -1324,7 +1301,7 @@ export default function ExportPanel({
   };
 
   const handleCancel = async () => {
-    if (isCancellingExport) return;
+    if (effectiveIsCancellingExport) return;
     setIsCancellingExport(true);
     try {
       await invoke(Invokes.CancelExport);
@@ -1358,7 +1335,7 @@ export default function ExportPanel({
     canOpenReceiptInEditor,
     currentExternalVariantImportedPath,
     exportState,
-    isCancellingExport,
+    isCancellingExport: effectiveIsCancellingExport,
     isEstimating,
     isImportingCurrentExternalVariant,
   });
@@ -2812,7 +2789,7 @@ export default function ExportPanel({
           }`}
           aria-busy={isExporting}
           data-tooltip={isExporting ? t('export.status.cancelExport') : exportDisabledReason}
-          disabled={status === Status.Exporting ? isCancellingExport : !canExport}
+          disabled={status === Status.Exporting ? effectiveIsCancellingExport : !canExport}
           onClick={() => {
             if (status === Status.Exporting) {
               void handleCancel();
@@ -2824,8 +2801,8 @@ export default function ExportPanel({
         >
           {status === Status.Exporting ? (
             <>
-              {isCancellingExport ? <Loader size={16} className="animate-spin" /> : <Ban size={16} />}
-              {isCancellingExport
+              {effectiveIsCancellingExport ? <Loader size={16} className="animate-spin" /> : <Ban size={16} />}
+              {effectiveIsCancellingExport
                 ? t('export.status.footerCancelling')
                 : progress.total > 1
                   ? t('export.status.cancelExportingProgress', { current: progressCurrent, total: progress.total })
