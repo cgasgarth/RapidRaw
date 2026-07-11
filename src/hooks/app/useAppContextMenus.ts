@@ -77,6 +77,7 @@ import {
   planLibraryRelink,
   rewriteLibraryRelinkPath,
 } from '../../utils/libraryRelinkIdentity';
+import { openNegativeLabModalSession } from '../../utils/negative-lab/negativeLabModalSession';
 import {
   getNegativeLabDisabledReasonKey,
   getNegativeLabSourceReadiness,
@@ -332,11 +333,10 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               onClick: () => {
                 if (!negativeLabReadiness.isReady) return;
                 setUI((state) => ({
-                  negativeModalState: {
-                    ...state.negativeModalState,
-                    isOpen: true,
-                    targetPaths: negativeLabReadiness.targetPaths,
-                  },
+                  negativeModalState: openNegativeLabModalSession(
+                    state.negativeModalState,
+                    negativeLabReadiness.targetPaths,
+                  ),
                 }));
               },
             },
@@ -680,11 +680,10 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               onClick: () => {
                 if (!negativeLabReadiness.isReady) return;
                 setUI((state) => ({
-                  negativeModalState: {
-                    ...state.negativeModalState,
-                    isOpen: true,
-                    targetPaths: negativeLabReadiness.targetPaths,
-                  },
+                  negativeModalState: openNegativeLabModalSession(
+                    state.negativeModalState,
+                    negativeLabReadiness.targetPaths,
+                  ),
                 }));
               },
             },

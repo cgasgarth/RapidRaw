@@ -83,6 +83,7 @@ import {
   readObjectPromptCanvasState,
   writeObjectPromptCanvasState,
 } from '../../utils/mask/objectMaskPromptCanvas';
+import { openNegativeLabModalSession } from '../../utils/negative-lab/negativeLabModalSession';
 import {
   getNegativeLabDisabledReasonKey,
   getNegativeLabSourceReadiness,
@@ -336,11 +337,7 @@ export default function Editor({
   const handleOpenNegativeLab = useCallback(() => {
     if (!negativeLabSourceReadiness.isReady) return;
     setUI((state) => ({
-      negativeModalState: {
-        ...state.negativeModalState,
-        isOpen: true,
-        targetPaths: negativeLabSourceReadiness.targetPaths,
-      },
+      negativeModalState: openNegativeLabModalSession(state.negativeModalState, negativeLabSourceReadiness.targetPaths),
     }));
   }, [negativeLabSourceReadiness, setUI]);
 

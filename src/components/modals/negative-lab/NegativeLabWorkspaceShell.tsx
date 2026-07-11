@@ -6,19 +6,27 @@ import { useModalTransition } from '../../../hooks/ui/useModalTransition';
 
 interface NegativeLabWorkspaceShellProps {
   children: ReactNode;
+  compareActive: boolean;
   footer: ReactNode;
   header: ReactNode;
   isOpen: boolean;
   onClose: () => void;
+  operationId: string;
+  runtimeChannelBasis: string;
+  runtimeProcessFamily: string;
   titleId: string;
 }
 
 export function NegativeLabWorkspaceShell({
   children,
+  compareActive,
   footer,
   header,
   isOpen,
   onClose,
+  operationId,
+  runtimeChannelBasis,
+  runtimeProcessFamily,
   titleId,
 }: NegativeLabWorkspaceShellProps) {
   const { isMounted, show } = useModalTransition(isOpen);
@@ -31,6 +39,11 @@ export function NegativeLabWorkspaceShell({
 
   return (
     <div
+      data-compare-active={String(compareActive)}
+      data-operation-id={operationId}
+      data-runtime-channel-basis={runtimeChannelBasis}
+      data-runtime-process-family={runtimeProcessFamily}
+      data-testid="negative-lab-keyed-session"
       className={cx(
         'fixed inset-0 z-100 flex items-center justify-center bg-black/50 backdrop-blur-xs transition-opacity duration-300',
         show ? 'opacity-100' : 'opacity-0',

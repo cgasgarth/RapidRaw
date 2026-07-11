@@ -190,6 +190,7 @@ export default function AppModals(props: AppModalsProps) {
   const hasLoadedHdrModal = useLazyModalSlot('hdr');
   const hasLoadedSuperResolutionModal = useLazyModalSlot('superResolution');
   const hasLoadedFocusStackModal = useLazyModalSlot('focusStack');
+  const hasLoadedNegativeLabModal = useLazyModalSlot('negativeLab');
   const focusStackPlanRequestId = useRef(0);
 
   const closeConfirmModal = () => {
@@ -767,7 +768,7 @@ export default function AppModals(props: AppModalsProps) {
           />
         </Suspense>
       )}
-      {negativeModalState.isOpen && (
+      {hasLoadedNegativeLabModal && (
         <Suspense fallback={null}>
           <NegativeConversionModal
             isOpen={negativeModalState.isOpen}

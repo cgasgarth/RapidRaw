@@ -86,12 +86,19 @@ export const LAST_EDITING_RIGHT_PANEL_STORAGE_KEY = LEGACY_LAST_EDITING_RIGHT_PA
 export { EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY };
 export const MAX_RECENT_RIGHT_PANELS = 5;
 
-export const LAZY_COMPUTATIONAL_MODAL_IDS = ['panorama', 'hdr', 'superResolution', 'focusStack'] as const;
+export const LAZY_COMPUTATIONAL_MODAL_IDS = [
+  'panorama',
+  'hdr',
+  'superResolution',
+  'focusStack',
+  'negativeLab',
+] as const;
 export type LazyComputationalModalId = (typeof LAZY_COMPUTATIONAL_MODAL_IDS)[number];
 
 const MODAL_STATE_BY_LAZY_ID = {
   focusStack: 'focusStackModalState',
   hdr: 'hdrModalState',
+  negativeLab: 'negativeModalState',
   panorama: 'panoramaModalState',
   superResolution: 'superResolutionModalState',
 } as const satisfies Record<LazyComputationalModalId, keyof UIState>;
@@ -299,6 +306,7 @@ export interface DenoiseModalState {
 
 export interface NegativeConversionModalState {
   isOpen: boolean;
+  operationEpoch: number;
   session: NegativeLabSessionSnapshot | null;
   targetPaths: Array<string>;
 }
@@ -577,7 +585,7 @@ export const useUIStore = create<UIState>((set, get) => {
       selectedSource: 0,
       session: null,
     },
-    negativeModalState: { isOpen: false, session: null, targetPaths: [] },
+    negativeModalState: { isOpen: false, operationEpoch: 0, session: null, targetPaths: [] },
     denoiseModalState: {
       isOpen: false,
       isProcessing: false,
