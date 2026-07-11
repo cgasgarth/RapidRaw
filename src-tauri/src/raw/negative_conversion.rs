@@ -6103,6 +6103,91 @@ mod tests {
             .expect("write Negative Lab private RAW report");
     }
 
+    #[test]
+    fn negative_lab_crosstalk_private_raw_changes_preview_and_saved_positive_when_enabled() {
+        if std::env::var("RAWENGINE_RUN_NEGATIVE_LAB_PRIVATE_RAW_PROOF")
+            .ok()
+            .as_deref()
+            != Some("1")
+        {
+            eprintln!("skipping Negative Lab crosstalk private RAW proof");
+            return;
+        }
+        let private_root = PathBuf::from(
+            std::env::var("RAWENGINE_PRIVATE_RAW_ROOT")
+                .unwrap_or_else(|_| "/tmp/rawengine-private-root".to_string()),
+        );
+        let source_path =
+            private_root.join("private-fixtures/negative-lab/alaska-negative-lab-v1.arw");
+        let source_path_string = source_path.to_string_lossy().to_string();
+        let input = load_base_image_from_bytes(
+            &fs::read(&source_path).expect("read private RAW"),
+            &source_path_string,
+            false,
+            &AppSettings::default(),
+            None,
+        )
+        .expect("decode private RAW through app loader");
+        let params = NegativeConversionParams::default();
+        let profile = crosstalk_profile(
+            [
+                [1.08, -0.06, -0.02],
+                [-0.03, 1.07, -0.04],
+                [-0.02, -0.08, 1.1],
+            ],
+            0.35,
+        );
+        let identity = run_pipeline_with_metrics(&input, &params, None, None);
+        let transformed = run_pipeline_with_metrics(&input, &params, None, Some(&profile));
+        let identity_rgb = identity.rendered_preview.to_rgb32f();
+        let transformed_rgb = transformed.rendered_preview.to_rgb32f();
+        let output_delta = mean_abs_delta(&identity_rgb, &transformed_rgb);
+        assert!(
+            output_delta > 0.0001,
+            "crosstalk must visibly change decoded RAW output"
+        );
+        let receipt = transformed
+            .density_normalization_metrics
+            .crosstalk_receipt
+            .as_ref()
+            .expect("crosstalk receipt");
+        assert!(receipt.post_neutral_error < 1.0e-6);
+
+        let artifact_root =
+            private_root.join("private-artifacts/validation/negative-lab-crosstalk-real-raw");
+        fs::create_dir_all(&artifact_root).expect("create private proof directory");
+        let output_path = artifact_root.join("alaska-negative-lab-crosstalk-Positive.jpg");
+        let mut encoded = Cursor::new(Vec::new());
+        transformed
+            .rendered_preview
+            .to_rgb8()
+            .write_with_encoder(JpegEncoder::new_with_quality(
+                &mut encoded,
+                JPEG_PROOF_QUALITY,
+            ))
+            .expect("encode crosstalk positive");
+        fs::write(&output_path, encoded.into_inner()).expect("write crosstalk positive");
+        let reopened = image::open(&output_path).expect("reopen crosstalk positive");
+        assert_eq!(reopened.width(), transformed.rendered_preview.width());
+        assert_eq!(reopened.height(), transformed.rendered_preview.height());
+
+        let report = json!({
+            "boundsAnalysisIdentity": receipt.bounds_analysis_identity,
+            "conditioning": receipt.conditioning,
+            "outputDeltaFromIdentity": output_delta,
+            "outputHash": sha256_negative_lab_file(&output_path).expect("hash crosstalk positive"),
+            "postNeutralError": receipt.post_neutral_error,
+            "profileId": receipt.profile_id,
+            "proofStatus": "private_raw_crosstalk_preview_and_saved_positive_rendered",
+            "sourceHash": sha256_negative_lab_file(&source_path).expect("hash private RAW"),
+        });
+        fs::write(
+            artifact_root.join("alaska-negative-lab-crosstalk-report.json"),
+            serde_json::to_vec_pretty(&report).unwrap(),
+        )
+        .expect("write crosstalk private RAW report");
+    }
+
     fn sha256_negative_lab_file(path: &Path) -> Result<String, String> {
         let bytes =
             fs::read(path).map_err(|error| format!("read {}: {}", path.display(), error))?;
