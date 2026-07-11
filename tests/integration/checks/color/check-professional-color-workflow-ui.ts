@@ -11,6 +11,10 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { type AppSettings, Theme } from '../../../../src/components/ui/AppProperties';
 import { useEditorStore } from '../../../../src/store/useEditorStore';
 import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments';
+import {
+  COLOR_OUTPUT_FOCUS_EVENT,
+  COLOR_WORKSPACE_TAB_SESSION_KEY,
+} from '../../../../src/utils/colorWorkspaceNavigation';
 
 type RenderedPanel = {
   container: HTMLDivElement;
@@ -55,16 +59,54 @@ try {
   await selectMixerWorkspace(rendered.container);
   await validateCompactMixerSurface(rendered.container);
   await validateHslSurfaceInteraction(rendered.container);
+  await validateOutputFocusEvent(rendered.container, true);
 
-  window.sessionStorage.setItem('rawengine.colorWorkspace.activeTab', 'foundation');
+  window.sessionStorage.setItem(COLOR_WORKSPACE_TAB_SESSION_KEY, 'output');
   const localRendered = await renderColorPanel(true);
   try {
     validateMaskLocalFiltering(localRendered.container);
+    assert.equal(
+      getByTestId(localRendered.container, 'color-workspace-tab-foundation').getAttribute('aria-selected'),
+      'true',
+      'Mask context must synchronously derive Foundation when the requested Output tab is unavailable.',
+    );
+    assert.equal(
+      window.sessionStorage.getItem(COLOR_WORKSPACE_TAB_SESSION_KEY),
+      'output',
+      'A temporarily unavailable session preference should be retained until an explicit navigation request.',
+    );
+    const restoredRendered = await renderColorPanel();
+    try {
+      assert.equal(
+        getByTestId(restoredRendered.container, 'color-workspace-tab-output').getAttribute('aria-selected'),
+        'true',
+        'Re-enabling Output should restore the retained session preference.',
+      );
+    } finally {
+      restoredRendered.unmount();
+    }
+    await validateOutputFocusEvent(localRendered.container, false);
   } finally {
     localRendered.unmount();
   }
 } finally {
   rendered.unmount();
+}
+
+async function validateOutputFocusEvent(container: Element, outputAvailable: boolean) {
+  await act(async () => {
+    window.dispatchEvent(new Event(COLOR_OUTPUT_FOCUS_EVENT));
+    await flushPromises();
+  });
+  const expectedTab = outputAvailable ? 'output' : 'foundation';
+  const tab = getByTestId<HTMLButtonElement>(container, `color-workspace-tab-${expectedTab}`);
+  assert.equal(tab.getAttribute('aria-selected'), 'true', 'Output focus should select an available tab explicitly.');
+  assert.equal(document.activeElement, tab, 'Output focus should focus the selected available tab.');
+  assert.equal(
+    window.sessionStorage.getItem(COLOR_WORKSPACE_TAB_SESSION_KEY),
+    expectedTab,
+    'Output focus must never persist an unavailable requested tab.',
+  );
 }
 
 console.log('color inspector compact workflow coverage ok');

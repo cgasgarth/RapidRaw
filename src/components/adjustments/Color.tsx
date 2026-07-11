@@ -120,7 +120,9 @@ export default function ColorPanel({
 }: ColorPanelProps) {
   const { t } = useTranslation();
   const tablistId = useId();
-  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<ColorWorkspaceTabId>(readSessionColorWorkspaceTab);
+  // Keep a session preference even while a context temporarily hides that tab.
+  // The effective tab is derived below, so unavailable preferences never render.
+  const [requestedWorkspaceTab, setRequestedWorkspaceTab] = useState<ColorWorkspaceTabId>(readSessionColorWorkspaceTab);
   const [activeColor, setActiveColor] = useState<BlackWhiteMixerChannel>('reds');
   const [activeColorBalanceRange, setActiveColorBalanceRange] = useState<ColorBalanceRgbRange>('midtones');
   const [activeChannelMixerOutput, setActiveChannelMixerOutput] = useState<ChannelMixerOutput>('red');
@@ -378,31 +380,28 @@ export default function ColorPanel({
     t,
     toggleWbPicker,
   ]);
-  useEffect(() => {
-    if (!workspaceTabs.some((tab) => tab.id === activeWorkspaceTab)) {
-      const nextTabId = workspaceTabs[0]?.id ?? 'foundation';
-
-      setActiveWorkspaceTab(nextTabId);
-      rememberSessionColorWorkspaceTab(nextTabId);
-    }
-  }, [activeWorkspaceTab, workspaceTabs]);
+  const effectiveWorkspaceTab = workspaceTabs.some((tab) => tab.id === requestedWorkspaceTab)
+    ? requestedWorkspaceTab
+    : (workspaceTabs[0]?.id ?? 'foundation');
 
   const selectWorkspaceTab = useCallback((tabId: ColorWorkspaceTabId) => {
-    setActiveWorkspaceTab(tabId);
+    setRequestedWorkspaceTab(tabId);
     rememberSessionColorWorkspaceTab(tabId);
   }, []);
 
   useEffect(() => {
     const focusOutputControls = () => {
-      selectWorkspaceTab('output');
+      const outputExists = workspaceTabs.some((tab) => tab.id === 'output');
+      const nextTabId: ColorWorkspaceTabId = outputExists ? 'output' : (workspaceTabs[0]?.id ?? 'foundation');
+      selectWorkspaceTab(nextTabId);
       requestAnimationFrame(() => {
-        document.getElementById(`${tablistId}-output-tab`)?.focus();
+        document.getElementById(`${tablistId}-${nextTabId}-tab`)?.focus();
       });
     };
 
     window.addEventListener(COLOR_OUTPUT_FOCUS_EVENT, focusOutputControls);
     return () => window.removeEventListener(COLOR_OUTPUT_FOCUS_EVENT, focusOutputControls);
-  }, [selectWorkspaceTab, tablistId]);
+  }, [selectWorkspaceTab, tablistId, workspaceTabs]);
 
   const focusColorWorkspaceTab = (tabId: ColorWorkspaceTabId) => {
     requestAnimationFrame(() => {
@@ -413,7 +412,7 @@ export default function ColorPanel({
   const handleWorkspaceTabKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
       event.preventDefault();
-      const nextTabId = getNextColorWorkspaceTabId(workspaceTabs, activeWorkspaceTab, 1);
+      const nextTabId = getNextColorWorkspaceTabId(workspaceTabs, effectiveWorkspaceTab, 1);
 
       selectWorkspaceTab(nextTabId);
       focusColorWorkspaceTab(nextTabId);
@@ -422,7 +421,7 @@ export default function ColorPanel({
 
     if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
       event.preventDefault();
-      const nextTabId = getNextColorWorkspaceTabId(workspaceTabs, activeWorkspaceTab, -1);
+      const nextTabId = getNextColorWorkspaceTabId(workspaceTabs, effectiveWorkspaceTab, -1);
 
       selectWorkspaceTab(nextTabId);
       focusColorWorkspaceTab(nextTabId);
@@ -463,7 +462,7 @@ export default function ColorPanel({
             role="tablist"
           >
             {workspaceTabs.map((tab) => {
-              const isActive = activeWorkspaceTab === tab.id;
+              const isActive = effectiveWorkspaceTab === tab.id;
 
               return (
                 <button
@@ -499,7 +498,7 @@ export default function ColorPanel({
         <div
           aria-labelledby={`${tablistId}-${tab.id}-tab`}
           className="pb-0.5"
-          hidden={activeWorkspaceTab !== tab.id}
+          hidden={effectiveWorkspaceTab !== tab.id}
           id={`${tablistId}-${tab.id}-panel`}
           key={tab.id}
           role="tabpanel"
