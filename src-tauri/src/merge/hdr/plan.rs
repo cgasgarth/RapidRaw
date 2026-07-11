@@ -252,6 +252,7 @@ mod tests {
                 iso: 100.0,
             },
             focal_length_mm: 35.0,
+            focus_distance_mm: None,
             graph_revision: "source_bytes_v1",
             height,
             lens_model: "Synthetic 35mm".to_string(),

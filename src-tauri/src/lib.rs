@@ -75,6 +75,9 @@ use crate::formats::PNG_DATA_URL_PREFIX;
 use crate::hdr_artifact_sidecar::write_hdr_output_sidecar;
 use crate::image_codecs::{encode_jpeg_data_url, encode_jpeg_response, encode_png_data_url};
 use crate::merge::atomic_derived_output::{AtomicDerivedOutputTransaction, DerivedOutputManifest};
+use crate::merge::focus_stack::{
+    FocusStackInputPlan, FocusStackReadinessSettings, build_input_plan,
+};
 use crate::merge::hdr::{ALIGNMENT_POLICY_ID, HdrAlignmentPlanResponse, build_alignment_plan};
 
 use crate::cache_utils::{
@@ -1767,6 +1770,52 @@ async fn cancel_hdr_plan(state: tauri::State<'_, AppState>) -> Result<(), String
 }
 
 #[tauri::command]
+async fn plan_focus_stack(
+    paths: Vec<String>,
+    ordered_source_ids: Vec<String>,
+    graph_revisions: Vec<String>,
+    settings: FocusStackReadinessSettings,
+    state: tauri::State<'_, AppState>,
+) -> Result<FocusStackInputPlan, String> {
+    *state.focus_stack_runtime_plan.lock().unwrap() = None;
+    let generation = state
+        .focus_stack_plan_generation
+        .fetch_add(1, Ordering::SeqCst)
+        + 1;
+    let tracker = state.focus_stack_plan_generation.clone();
+    let resolved_paths = paths
+        .iter()
+        .map(|path| parse_virtual_path(path).0.to_string_lossy().into_owned())
+        .collect::<Vec<_>>();
+    let plan = build_input_plan(
+        &resolved_paths,
+        &ordered_source_ids,
+        &graph_revisions,
+        settings,
+        || tracker.load(Ordering::SeqCst) != generation,
+    )?;
+    if tracker.load(Ordering::SeqCst) != generation {
+        return Err("focus_stack_plan_cancelled:plan_publication".to_string());
+    }
+    if plan.accepted {
+        *state.focus_stack_runtime_plan.lock().unwrap() = Some((
+            plan.accepted_dry_run_plan_id.clone(),
+            plan.accepted_dry_run_plan_hash.clone(),
+        ));
+    }
+    Ok(plan)
+}
+
+#[tauri::command]
+async fn cancel_focus_stack_plan(state: tauri::State<'_, AppState>) -> Result<(), String> {
+    state
+        .focus_stack_plan_generation
+        .fetch_add(1, Ordering::SeqCst);
+    *state.focus_stack_runtime_plan.lock().unwrap() = None;
+    Ok(())
+}
+
+#[tauri::command]
 async fn merge_hdr(
     paths: Vec<String>,
     accepted_dry_run_plan_hash: Option<String>,
@@ -2768,6 +2817,8 @@ pub fn run() {
             save_collage,
             merge_hdr,
             cancel_hdr_plan,
+            plan_focus_stack,
+            cancel_focus_stack_plan,
             save_hdr,
             load_and_parse_lut,
             fetch_community_presets,

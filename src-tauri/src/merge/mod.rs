@@ -2,6 +2,7 @@
 pub(crate) mod atomic_derived_output;
 pub(crate) mod computational_job;
 pub(crate) mod derived_output_provenance;
+pub(crate) mod focus_stack;
 pub(crate) mod hdr;
 pub(crate) mod hdr_artifact_sidecar;
 #[cfg(feature = "panorama-opencv-spike")]

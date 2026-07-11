@@ -66,6 +66,7 @@ pub(crate) struct SourceFrame {
     pub decoder_id: &'static str,
     pub exposure: ExposureReceipt,
     pub focal_length_mm: f32,
+    pub focus_distance_mm: Option<f32>,
     pub graph_revision: &'static str,
     pub height: usize,
     pub lens_model: String,
@@ -210,6 +211,18 @@ fn make_proxies(raw: &RawImage, area: &ActiveArea) -> Result<(AlignmentProxy, Co
 }
 
 pub(crate) fn decode_source(path: &str, source_index: usize) -> Result<SourceFrame, String> {
+    decode_source_internal(path, source_index, true)
+}
+
+pub(crate) fn decode_focus_source(path: &str, source_index: usize) -> Result<SourceFrame, String> {
+    decode_source_internal(path, source_index, false)
+}
+
+fn decode_source_internal(
+    path: &str,
+    source_index: usize,
+    require_exposure: bool,
+) -> Result<SourceFrame, String> {
     if !crate::formats::is_raw_file(path) {
         return Err("unsupported_display_referred_source".to_string());
     }
@@ -219,12 +232,16 @@ pub(crate) fn decode_source(path: &str, source_index: usize) -> Result<SourceFra
     let raw = decoded.raw_image;
     let area = active_area(&raw);
     let cfa_pattern = cfa_pattern(&raw)?;
-    let exposure_time_seconds = rational(decoded.metadata.exif.exposure_time)
-        .filter(|value| *value > 0.0)
-        .ok_or_else(|| "missing_exposure_time".to_string())?;
-    let aperture = rational(decoded.metadata.exif.fnumber)
-        .filter(|value| *value > 0.0)
-        .ok_or_else(|| "missing_aperture".to_string())?;
+    let exposure_time_seconds = optional_or_required(
+        rational(decoded.metadata.exif.exposure_time),
+        require_exposure,
+        "missing_exposure_time",
+    )?;
+    let aperture = optional_or_required(
+        rational(decoded.metadata.exif.fnumber),
+        require_exposure,
+        "missing_aperture",
+    )?;
     let iso = decoded
         .metadata
         .exif
@@ -237,11 +254,16 @@ pub(crate) fn decode_source(path: &str, source_index: usize) -> Result<SourceFra
                 .iso_speed_ratings
                 .map(|value| value as f32)
         })
+        .filter(|value| *value > 0.0);
+    let iso = optional_or_required(iso, require_exposure, "missing_iso")?;
+    let focal_length_mm = optional_or_required(
+        rational(decoded.metadata.exif.focal_length),
+        require_exposure,
+        "missing_focal_length",
+    )?;
+    let focus_distance_mm = rational(decoded.metadata.exif.subject_distance)
         .filter(|value| *value > 0.0)
-        .ok_or_else(|| "missing_iso".to_string())?;
-    let focal_length_mm = rational(decoded.metadata.exif.focal_length)
-        .filter(|value| *value > 0.0)
-        .ok_or_else(|| "missing_focal_length".to_string())?;
+        .map(|value| value * 1_000.0);
     let (proxy, color_proxy) = make_proxies(&raw, &area)?;
     let proxy_bytes = proxy
         .pixels
@@ -283,6 +305,7 @@ pub(crate) fn decode_source(path: &str, source_index: usize) -> Result<SourceFra
             iso,
         },
         focal_length_mm,
+        focus_distance_mm,
         graph_revision: "source_bytes_v1",
         height: raw.height,
         lens_model,
@@ -295,6 +318,13 @@ pub(crate) fn decode_source(path: &str, source_index: usize) -> Result<SourceFra
         source_index,
         width: raw.width,
     })
+}
+
+fn optional_or_required(value: Option<f32>, required: bool, code: &str) -> Result<f32, String> {
+    value
+        .filter(|value| value.is_finite() && *value > 0.0)
+        .or_else(|| (!required).then_some(f32::NAN))
+        .ok_or_else(|| code.to_string())
 }
 
 #[cfg(test)]
