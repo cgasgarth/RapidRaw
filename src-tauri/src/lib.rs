@@ -2693,6 +2693,7 @@ pub fn run() {
             plan_hdr,
             super_resolution::plan_super_resolution,
             super_resolution::cancel_super_resolution_registration,
+            merge::computational_job::cancel_computational_merge_job,
             panorama_stitching::plan_panorama,
             panorama_stitching::stitch_panorama,
             panorama_stitching::save_panorama,

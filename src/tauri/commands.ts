@@ -7,6 +7,7 @@ export enum Invokes {
   AutodetectLens = 'autodetect_lens',
   BatchDenoiseImages = 'batch_denoise_images',
   CalculateAutoAdjustments = 'calculate_auto_adjustments',
+  CancelComputationalMergeJob = 'cancel_computational_merge_job',
   CancelExport = 'cancel_export',
   CancelSuperResolutionRegistration = 'cancel_super_resolution_registration',
   CancelThumbnailGeneration = 'cancel_thumbnail_generation',
