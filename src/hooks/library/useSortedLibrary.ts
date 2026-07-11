@@ -5,7 +5,12 @@ import { ADVANCED_QUERY_REGEX, compileLibraryQuery } from '../../library/compile
 import { createLibraryQueryWorker } from '../../library/createLibraryQueryWorker.mjs';
 import { LibraryProjectionCache } from '../../library/LibraryProjectionCache';
 import { LibraryQueryController } from '../../library/LibraryQueryController';
-import { normalizeSupportedTypes, parseAperture, parseFocalLength, parseShutter } from '../../library/LibrarySearchProjection';
+import {
+  normalizeSupportedTypes,
+  parseAperture,
+  parseFocalLength,
+  parseShutter,
+} from '../../library/LibrarySearchProjection';
 import { type SearchCriteria, useLibraryStore } from '../../store/useLibraryStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 
@@ -41,7 +46,11 @@ export function computeSortedLibrary(
   });
   cache.retainOnly(retainedPaths);
 
-  const query = compileLibraryQuery(libraryState.searchCriteria, libraryState.filterCriteria, libraryState.sortCriteria);
+  const query = compileLibraryQuery(
+    libraryState.searchCriteria,
+    libraryState.filterCriteria,
+    libraryState.sortCriteria,
+  );
   let rawPairKeys: Set<string> | null = null;
   if (query.rawOverNonRaw) {
     rawPairKeys = new Set<string>();

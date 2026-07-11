@@ -1,9 +1,9 @@
 import { expect, test } from 'bun:test';
 
 import { RawStatus, SortDirection } from '../../src/components/ui/AppProperties';
+import type { LibrarySearchProjection } from '../../src/library/LibrarySearchProjection';
 import type { SerializedCompiledLibraryQuery } from '../../src/library/libraryQuery';
 import type { LibraryQueryWorkerCommand, LibraryQueryWorkerResult } from '../../src/library/libraryQueryWorkerProtocol';
-import type { LibrarySearchProjection } from '../../src/library/LibrarySearchProjection';
 
 const ITEM_COUNT = 50_000;
 

@@ -1,5 +1,5 @@
-import type { SerializedCompiledLibraryQuery } from './libraryQuery';
 import type { LibrarySearchProjection } from './LibrarySearchProjection';
+import type { SerializedCompiledLibraryQuery } from './libraryQuery';
 
 export type LibraryQueryWorkerCommand =
   | { type: 'hydrate'; indexRevision: number; projections: LibrarySearchProjection[] }

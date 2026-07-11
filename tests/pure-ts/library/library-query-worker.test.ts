@@ -2,12 +2,12 @@ import { describe, expect, test } from 'bun:test';
 
 import { EditedStatus, type ImageFile, RawStatus, SortDirection } from '../../../src/components/ui/AppProperties';
 import { LibraryQueryController, type LibraryQueryWorkerLike } from '../../../src/library/LibraryQueryController';
+import { buildLibrarySearchProjection, normalizeSupportedTypes } from '../../../src/library/LibrarySearchProjection';
 import { queryLibraryProjections, type SerializedCompiledLibraryQuery } from '../../../src/library/libraryQuery';
 import type {
   LibraryQueryWorkerCommand,
   LibraryQueryWorkerResult,
 } from '../../../src/library/libraryQueryWorkerProtocol';
-import { buildLibrarySearchProjection, normalizeSupportedTypes } from '../../../src/library/LibrarySearchProjection';
 import { createLibraryQueryRuntime } from '../../../src/workers/libraryQueryRuntime';
 
 const files: ImageFile[] = [
@@ -69,13 +69,21 @@ const projections = files.map((file, stableOrdinal) =>
 const firstProjection = projections[0];
 if (!firstProjection) throw new Error('Expected a projection fixture');
 
-function criteria(overrides: {
-  filter?: Partial<SerializedCompiledLibraryQuery['filterCriteria']>;
-  search?: Partial<SerializedCompiledLibraryQuery['searchCriteria']>;
-  sort?: Partial<SerializedCompiledLibraryQuery['sortCriteria']>;
-} = {}): SerializedCompiledLibraryQuery {
+function criteria(
+  overrides: {
+    filter?: Partial<SerializedCompiledLibraryQuery['filterCriteria']>;
+    search?: Partial<SerializedCompiledLibraryQuery['searchCriteria']>;
+    sort?: Partial<SerializedCompiledLibraryQuery['sortCriteria']>;
+  } = {},
+): SerializedCompiledLibraryQuery {
   return {
-    filterCriteria: { colors: [], editedStatus: EditedStatus.All, rating: 0, rawStatus: RawStatus.All, ...overrides.filter },
+    filterCriteria: {
+      colors: [],
+      editedStatus: EditedStatus.All,
+      rating: 0,
+      rawStatus: RawStatus.All,
+      ...overrides.filter,
+    },
     searchCriteria: { mode: 'OR', tags: [], text: '', ...overrides.search },
     sortCriteria: { key: 'name', order: SortDirection.Ascending, ...overrides.sort },
   };
@@ -92,12 +100,10 @@ describe('library query reference', () => {
       '/photos/camera.jpg',
       '/photos/camera.raf',
     ]);
-    expect(
-      queryLibraryProjections(
-        projections,
-        criteria({ search: { tags: ['iso>=400'] } }),
-      ),
-    ).toEqual(['/photos/camera.jpg', '/photos/camera.raf']);
+    expect(queryLibraryProjections(projections, criteria({ search: { tags: ['iso>=400'] } }))).toEqual([
+      '/photos/camera.jpg',
+      '/photos/camera.raf',
+    ]);
     expect(
       queryLibraryProjections(projections, criteria({ sort: { key: 'rating', order: SortDirection.Descending } })),
     ).toEqual(['/photos/camera.raf', '/photos/camera.raf?vc=1', '/photos/camera.jpg', '/photos/duplicate.jpg']);

@@ -1,6 +1,6 @@
+import type { LibrarySearchProjection } from '../library/LibrarySearchProjection';
 import { queryLibraryProjections } from '../library/libraryQuery';
 import type { LibraryQueryWorkerCommand, LibraryQueryWorkerResult } from '../library/libraryQueryWorkerProtocol';
-import type { LibrarySearchProjection } from '../library/LibrarySearchProjection';
 
 export interface LibraryQueryRuntime {
   handle(command: LibraryQueryWorkerCommand): void;

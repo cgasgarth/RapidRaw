@@ -1,6 +1,6 @@
+import type { LibrarySearchProjection } from './LibrarySearchProjection';
 import { queryLibraryProjections, type SerializedCompiledLibraryQuery } from './libraryQuery';
 import type { LibraryQueryWorkerCommand, LibraryQueryWorkerResult } from './libraryQueryWorkerProtocol';
-import type { LibrarySearchProjection } from './LibrarySearchProjection';
 
 export interface LibraryQueryState {
   committedQueryRevision: number;
