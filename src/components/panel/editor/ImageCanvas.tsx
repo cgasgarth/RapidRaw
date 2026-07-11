@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/core';
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Crop, PercentCrop } from 'react-image-crop';
@@ -21,8 +22,10 @@ import {
   Transformer,
 } from 'react-konva';
 import type { RenderSize } from '../../../hooks/viewport/useImageRenderSize';
+import { focusRetouchSessionSchema } from '../../../schemas/focus-stack/focusStackRetouchSchemas';
 import type { GamutWarningOverlayPayload } from '../../../schemas/tauriEventSchemas';
 import type { EditorCompareMode, ExportSoftProofTransformState, InteractivePatch } from '../../../store/useEditorStore';
+import { useUIStore } from '../../../store/useUIStore';
 import { Invokes } from '../../../tauri/commands';
 import type {
   Adjustments,
@@ -1755,6 +1758,9 @@ const ImageCanvas = memo(
     onViewerSamplerStateChange,
   }: ImageCanvasProps) => {
     const { t } = useTranslation();
+    const focusRetouchToolState = useUIStore((state) => state.focusRetouchToolState);
+    const setUI = useUIStore((state) => state.setUI);
+    const focusRetouchPoints = useRef<Array<{ x: number; y: number }>>([]);
     const [isCropViewVisible, setIsCropViewVisible] = useState(false);
     const cropImageRef = useRef<HTMLImageElement>(null);
     const [displayedMaskUrl, setDisplayedMaskUrl] = useState<string | null>(null);
@@ -2065,6 +2071,39 @@ const ImageCanvas = memo(
       },
       [overlayGeometry],
     );
+    const captureFocusRetouchPoint = useCallback(
+      (event: React.PointerEvent<HTMLDivElement>) => {
+        const rect = event.currentTarget.getBoundingClientRect();
+        const point = getImageSpacePoint({ x: event.clientX - rect.left, y: event.clientY - rect.top });
+        focusRetouchPoints.current.push({ x: Math.round(point.x * 256), y: Math.round(point.y * 256) });
+      },
+      [getImageSpacePoint],
+    );
+    const finishFocusRetouchStroke = useCallback(async () => {
+      const points = focusRetouchPoints.current;
+      focusRetouchPoints.current = [];
+      if (!focusRetouchToolState.active || points.length === 0) return;
+      try {
+        const value = await invoke(Invokes.ApplyFocusStackRetouch, {
+          request: {
+            packagePath: focusRetouchToolState.packagePath,
+            expectedRevisionId: focusRetouchToolState.session?.revision?.revisionId ?? null,
+            stroke: {
+              strokeId: crypto.randomUUID(),
+              sourceIndex: focusRetouchToolState.erase ? null : focusRetouchToolState.selectedSource,
+              pointsFixed1256Px: points,
+              radiusFixed1256Px: Math.round(focusRetouchToolState.radiusPx * 256),
+              hardnessU16: Math.round((focusRetouchToolState.hardnessPercent * 65535) / 100),
+            },
+          },
+        });
+        const session = focusRetouchSessionSchema.parse(value);
+        setUI((state) => ({ focusRetouchToolState: { ...state.focusRetouchToolState, session } }));
+      } catch (cause) {
+        setUI((state) => ({ focusRetouchToolState: { ...state.focusRetouchToolState, active: false } }));
+        console.error('focus retouch stroke failed', cause);
+      }
+    }, [focusRetouchToolState, setUI]);
     const recordBrushMaskCommandCapture = useCallback(
       (subMaskId: string | null, subMask: SubMask | null, parameters: MaskParameters) => {
         if (!subMaskId || !subMask || (subMask.type !== Mask.Brush && subMask.type !== Mask.Flow)) return null;
@@ -3634,7 +3673,24 @@ const ImageCanvas = memo(
         data-wgpu-frame-health={wgpuPreviewVisibility.health}
         data-testid="image-canvas"
         onPointerLeave={handleViewerSamplerPointerLeave}
-        onPointerMove={handleViewerSamplerPointerMove}
+        onPointerDown={(event) => {
+          if (focusRetouchToolState.active) {
+            event.currentTarget.setPointerCapture(event.pointerId);
+            focusRetouchPoints.current = [];
+            captureFocusRetouchPoint(event);
+          }
+        }}
+        onPointerMove={(event) => {
+          handleViewerSamplerPointerMove(event);
+          if (focusRetouchToolState.active && event.currentTarget.hasPointerCapture(event.pointerId))
+            captureFocusRetouchPoint(event);
+        }}
+        onPointerUp={(event) => {
+          if (focusRetouchToolState.active && event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+            void finishFocusRetouchStroke();
+          }
+        }}
         style={{ width: '100%', height: '100%', cursor: effectiveCursor, pointerEvents: 'auto' }}
       >
         <>

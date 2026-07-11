@@ -20,6 +20,7 @@ export * from './focus-stack/focusStackAlignmentRuntime.js';
 export * from './focus-stack/focusStackAppServerRuntime.js';
 export * from './focus-stack/focusStackCandidateRuntime.js';
 export * from './focus-stack/focusStackPreflight.js';
+export * from './focus-stack/focusStackRetouch.js';
 export * from './focus-stack/focusStackRuntimePlan.js';
 export * from './focus-stack/focusStackSourceValidation.js';
 export * from './focus-stack/focusStackWeightedBlend.js';

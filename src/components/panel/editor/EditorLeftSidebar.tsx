@@ -7,7 +7,7 @@ import { editorChromeTokens } from '../../ui/editorChromeTokens';
 import { professionalInspectorDensityTokens } from '../../ui/inspectorTokens';
 import Resizer from '../../ui/Resizer';
 
-export const EDITOR_LEFT_SECTION_IDS = ['navigator', 'presets', 'snapshots', 'history'] as const;
+export const EDITOR_LEFT_SECTION_IDS = ['navigator', 'focusSources', 'presets', 'snapshots', 'history'] as const;
 export type EditorLeftSectionId = (typeof EDITOR_LEFT_SECTION_IDS)[number];
 export type EditorLeftSidebarSlots = Partial<Record<EditorLeftSectionId, ReactNode>>;
 const EDITOR_LEFT_RESIZER_WIDTH = 8;
@@ -39,6 +39,7 @@ export default function EditorLeftSidebar({
   const expandButtonRef = useRef<HTMLButtonElement | null>(null);
   const shouldRestoreFocusRef = useRef(false);
   const labels: Record<EditorLeftSectionId, string> = {
+    focusSources: 'Focus Stack Sources',
     history: 'History',
     navigator: 'Navigator',
     presets: 'Presets',

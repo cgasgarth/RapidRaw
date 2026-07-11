@@ -34,6 +34,7 @@ import type {
 import { editorWorkspacePreferencesSchema } from '../schemas/editorWorkspacePreferencesSchemas';
 import type { FocusStackNativeInputPlan } from '../schemas/focus-stack/focusStackNativePlanSchemas';
 import type { FocusStackOutputReviewWorkflow } from '../schemas/focus-stack/focusStackOutputReviewSchemas';
+import type { FocusRetouchSession } from '../schemas/focus-stack/focusStackRetouchSchemas';
 import { DEFAULT_FOCUS_STACK_UI_SETTINGS, type FocusStackUiSettings } from '../schemas/focus-stack/focusStackUiSchemas';
 import {
   type LibraryWorkspacePreferences,
@@ -239,6 +240,16 @@ export interface FocusStackModalState {
   sourcePaths: Array<string>;
 }
 
+export interface FocusRetouchToolState {
+  active: boolean;
+  erase: boolean;
+  hardnessPercent: number;
+  packagePath: string;
+  radiusPx: number;
+  selectedSource: number;
+  session: FocusRetouchSession | null;
+}
+
 export interface DenoiseModalState {
   isOpen: boolean;
   isProcessing: boolean;
@@ -392,6 +403,7 @@ export interface UIState {
   hdrModalState: HdrModalState;
   superResolutionModalState: SuperResolutionModalState;
   focusStackModalState: FocusStackModalState;
+  focusRetouchToolState: FocusRetouchToolState;
   negativeModalState: NegativeConversionModalState;
   denoiseModalState: DenoiseModalState;
   cullingModalState: CullingModalState;
@@ -510,6 +522,15 @@ export const useUIStore = create<UIState>((set, get) => {
     hdrModalState: createDefaultHdrModalState(),
     superResolutionModalState: createDefaultSuperResolutionModalState(),
     focusStackModalState: createDefaultFocusStackModalState(),
+    focusRetouchToolState: {
+      active: false,
+      erase: false,
+      hardnessPercent: 70,
+      packagePath: '',
+      radiusPx: 24,
+      selectedSource: 0,
+      session: null,
+    },
     negativeModalState: { isOpen: false, session: null, targetPaths: [] },
     denoiseModalState: {
       isOpen: false,
