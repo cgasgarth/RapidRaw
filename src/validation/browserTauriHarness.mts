@@ -41,6 +41,7 @@ declare global {
     __RAWENGINE_BROWSER_TAURI_HARNESS__?: {
       calls: Array<BrowserTauriInvokeCall>;
       enabled: boolean;
+      failNextSettingsSave: boolean;
     };
     __TAURI_INTERNALS__?: BrowserTauriInternals;
     isTauri?: boolean;
@@ -86,6 +87,7 @@ const commandNames: Record<
   | 'saveSettings'
   | 'saveMetadataAndUpdateThumbnail'
   | 'startBackgroundIndexing'
+  | 'testAiConnectorConnection'
   | 'updateThumbnailQueue',
   string
 > = {
@@ -118,6 +120,7 @@ const commandNames: Record<
   saveSettings: Invokes.SaveSettings,
   saveMetadataAndUpdateThumbnail: Invokes.SaveMetadataAndUpdateThumbnail,
   startBackgroundIndexing: Invokes.StartBackgroundIndexing,
+  testAiConnectorConnection: Invokes.TestAIConnectorConnection,
   updateThumbnailQueue: Invokes.UpdateThumbnailQueue,
 };
 
@@ -160,7 +163,7 @@ export const installBrowserTauriHarness = (): void => {
   if (!harnessEnabled || window.__TAURI_INTERNALS__ !== undefined) return;
 
   const calls: Array<BrowserTauriInvokeCall> = [];
-  window.__RAWENGINE_BROWSER_TAURI_HARNESS__ = { calls, enabled: true };
+  window.__RAWENGINE_BROWSER_TAURI_HARNESS__ = { calls, enabled: true, failNextSettingsSave: false };
   window.isTauri = true;
   window.__TAURI_EVENT_PLUGIN_INTERNALS__ = {
     unregisterListener: () => {},
@@ -190,6 +193,10 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
       harnessSettings = readPersistedHarnessSettings();
       return Promise.resolve(harnessSettings);
     case commandNames.saveSettings:
+      if (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.failNextSettingsSave === true) {
+        window.__RAWENGINE_BROWSER_TAURI_HARNESS__.failNextSettingsSave = false;
+        return Promise.reject(new Error('Injected Settings save failure'));
+      }
       harnessSettings = normalizeHarnessSettings(args?.['settings']);
       window.localStorage.setItem(browserHarnessSettingsStorageKey, JSON.stringify(harnessSettings));
       return Promise.resolve(null);
@@ -280,6 +287,8 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
       });
     case commandNames.checkAiConnectorStatus:
       return Promise.resolve({ connected: false });
+    case commandNames.testAiConnectorConnection:
+      return Promise.resolve(null);
     case commandNames.getSupportedFileTypes:
       return Promise.resolve(harnessSupportedTypes);
     case commandNames.getFolderTree:
@@ -327,6 +336,8 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
       return Promise.resolve('macos');
     case 'plugin:path|resolve_directory':
       return Promise.resolve('/Users/browser-harness');
+    case 'plugin:process|restart':
+      return Promise.resolve(null);
     default:
       return Promise.reject(new Error(`Unhandled browser Tauri harness command: ${command}`));
   }
