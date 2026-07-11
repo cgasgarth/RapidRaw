@@ -1,4 +1,4 @@
-import type { LibraryRow } from './LibraryItems';
+import type { LibraryLayoutIndex } from '../../../library/buildLibraryLayoutIndex';
 
 export type LibraryLayoutChange = 'dimensions-only' | 'row-heights' | 'order-or-membership' | 'session-replaced';
 
@@ -10,7 +10,7 @@ export interface LibraryViewportAnchor {
 }
 
 export interface LibraryLayoutSnapshot {
-  rows: LibraryRow[];
+  layoutIndex: LibraryLayoutIndex;
   rowHeight: number;
   headerHeight: number;
   footerHeight: number;
@@ -19,19 +19,15 @@ export interface LibraryLayoutSnapshot {
 }
 
 export const getLibraryRowHeight = (layout: LibraryLayoutSnapshot, index: number): number => {
-  const row = layout.rows[index];
-  if (!row || row.type === 'footer') return layout.footerHeight;
-  return row.type === 'header' ? layout.headerHeight : layout.rowHeight;
+  return layout.layoutIndex.getRowHeight(index);
 };
 
 export const getLibraryRowTop = (layout: LibraryLayoutSnapshot, rowIndex: number): number => {
-  let top = 0;
-  for (let index = 0; index < rowIndex; index++) top += getLibraryRowHeight(layout, index);
-  return top;
+  return layout.layoutIndex.getRowOffset(rowIndex);
 };
 
 export const findLibraryPathRow = (layout: LibraryLayoutSnapshot, path: string): number =>
-  layout.rows.findIndex((row) => row.type === 'images' && row.images.some((item) => item.image.path === path));
+  layout.layoutIndex.getRowIndexForPath(path) ?? -1;
 
 export const classifyLibraryLayoutChange = (
   previous: LibraryLayoutSnapshot,
@@ -57,8 +53,8 @@ export const captureLibraryViewportAnchor = (
   let rowIndex = preferredRow;
   if (rowIndex < 0) {
     let top = 0;
-    rowIndex = Math.max(0, layout.rows.length - 1);
-    for (let index = 0; index < layout.rows.length; index++) {
+    rowIndex = Math.max(0, layout.layoutIndex.rows.length - 1);
+    for (let index = 0; index < layout.layoutIndex.rows.length; index++) {
       const bottom = top + getLibraryRowHeight(layout, index);
       if (bottom > scrollTop) {
         rowIndex = index;
@@ -67,8 +63,13 @@ export const captureLibraryViewportAnchor = (
       top = bottom;
     }
   }
-  const row = layout.rows[rowIndex];
-  const path = preferredRow >= 0 ? preferredPath : row?.type === 'images' ? (row.images[0]?.image.path ?? null) : null;
+  const row = layout.layoutIndex.getRow(rowIndex);
+  const path =
+    preferredRow >= 0
+      ? preferredPath
+      : row?.type === 'item-range'
+        ? (layout.layoutIndex.getItem(row, 0)?.path ?? null)
+        : null;
   return {
     path,
     rowIndex,
@@ -83,7 +84,7 @@ export const resolveLibraryViewportAnchor = (
   maxScrollTop = Number.POSITIVE_INFINITY,
 ): number => {
   const pathRow = anchor.path ? findLibraryPathRow(layout, anchor.path) : -1;
-  const rowIndex = pathRow >= 0 ? pathRow : Math.min(anchor.rowIndex, Math.max(0, layout.rows.length - 1));
+  const rowIndex = pathRow >= 0 ? pathRow : Math.min(anchor.rowIndex, Math.max(0, layout.layoutIndex.rows.length - 1));
   const desired =
     pathRow >= 0 ? getLibraryRowTop(layout, rowIndex) + anchor.offsetWithinRowPx : anchor.fallbackScrollTop;
   return Math.max(0, Math.min(desired, maxScrollTop));
