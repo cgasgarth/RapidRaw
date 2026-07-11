@@ -1,6 +1,6 @@
 import cx from 'clsx';
 import type React from 'react';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GLOBAL_KEYS } from '../AppProperties';
 import { compactInspectorSliderTokens, inspectorSliderTokens, inspectorTokens } from '../inspectorTokens';
@@ -54,9 +54,10 @@ const Slider = ({
   testId,
 }: SliderProps) => {
   const { t } = useTranslation();
-  const [displayValue, setDisplayValue] = useState<number>(value);
-  const displayValueRef = useRef<number>(value);
+  const [interactionDraft, setInteractionDraft] = useState<number | null>(null);
+  const renderedValueRef = useRef<number>(value);
   const [isDragging, setIsDragging] = useState(false);
+  const isDraggingRef = useRef(false);
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState<string>(String(value));
   const editStartValueRef = useRef<number>(value);
@@ -77,7 +78,6 @@ const Slider = ({
     startValue: number;
   } | null>(null);
   const suppressTouchChangeRef = useRef(false);
-  const [isWheelActive, setIsWheelActive] = useState(false);
   const wheelTimeoutRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
@@ -88,7 +88,7 @@ const Slider = ({
     };
   }, []);
 
-  const rangeValue = isDragging || isWheelActive ? displayValue : value;
+  const rangeValue = interactionDraft ?? value;
   const fillPercentage = max !== min ? ((rangeValue - min) / (max - min)) * 100 : 0;
   const originPercentage = useMemo(() => {
     if (fillOrigin === 'min') {
@@ -110,25 +110,37 @@ const Slider = ({
   );
 
   const onChangeRef = useRef(onChange);
+  const onDragStateChangeRef = useRef(onDragStateChange);
   const snapToStepRef = useRef(snapToStep);
   const rangeRef = useRef({ min, max });
 
-  useLayoutEffect(() => {
-    displayValueRef.current = rangeValue;
-    onChangeRef.current = onChange;
-    snapToStepRef.current = snapToStep;
-    rangeRef.current = { min, max };
-  }, [rangeValue, max, min, onChange, snapToStep]);
+  renderedValueRef.current = rangeValue;
+  onChangeRef.current = onChange;
+  onDragStateChangeRef.current = onDragStateChange;
+  snapToStepRef.current = snapToStep;
+  rangeRef.current = { min, max };
 
-  useEffect(() => {
-    if (!isDragging && !isWheelActive) {
-      setDisplayValue(value);
+  const startDrag = useCallback((draft: number) => {
+    setInteractionDraft(draft);
+    if (isDraggingRef.current) {
+      return;
     }
-  }, [isDragging, isWheelActive, value]);
+    isDraggingRef.current = true;
+    setIsDragging(true);
+    onDragStateChangeRef.current(true);
+  }, []);
 
-  useEffect(() => {
-    onDragStateChange(isDragging);
-  }, [isDragging, onDragStateChange]);
+  const finishDrag = useCallback(() => {
+    pendingTouchRef.current = null;
+    suppressTouchChangeRef.current = false;
+    setInteractionDraft(null);
+    if (!isDraggingRef.current) {
+      return;
+    }
+    isDraggingRef.current = false;
+    setIsDragging(false);
+    onDragStateChangeRef.current(false);
+  }, []);
 
   useEffect(() => {
     const sliderElement = containerRef.current;
@@ -141,17 +153,17 @@ const Slider = ({
 
       event.preventDefault();
       const direction = -Math.sign(event.deltaY || event.deltaX);
-      const clampedValue = snapToStep(displayValueRef.current + direction * step);
+      const clampedValue = snapToStepRef.current(renderedValueRef.current + direction * step);
 
-      if (clampedValue !== value && !Number.isNaN(clampedValue)) {
-        setIsWheelActive(true);
-        setDisplayValue(clampedValue);
+      if (clampedValue !== renderedValueRef.current && !Number.isNaN(clampedValue)) {
+        setInteractionDraft(clampedValue);
 
         if (wheelTimeoutRef.current !== undefined) {
           window.clearTimeout(wheelTimeoutRef.current);
         }
         wheelTimeoutRef.current = window.setTimeout(() => {
-          setIsWheelActive(false);
+          wheelTimeoutRef.current = undefined;
+          setInteractionDraft(null);
         }, 150);
 
         const syntheticEvent = {
@@ -159,7 +171,7 @@ const Slider = ({
             value: clampedValue,
           },
         };
-        onChange(syntheticEvent);
+        onChangeRef.current(syntheticEvent);
       }
     };
 
@@ -168,7 +180,7 @@ const Slider = ({
     return () => {
       sliderElement.removeEventListener('wheel', handleWheel);
     };
-  }, [value, min, max, step, onChange, snapToStep]);
+  }, [step]);
 
   // Handle Dragging
   useEffect(() => {
@@ -212,15 +224,13 @@ const Slider = ({
 
       const snappedValue = snapToStepRef.current(accumulatedValueRef.current);
 
-      setDisplayValue(snappedValue);
+      setInteractionDraft(snappedValue);
       onChangeRef.current({ target: { value: snappedValue } });
     };
 
     const handlePointerUp = () => {
       lastUpTime.current = Date.now();
-      pendingTouchRef.current = null;
-      suppressTouchChangeRef.current = false;
-      setIsDragging(false);
+      finishDrag();
     };
 
     window.addEventListener('mousemove', handlePointerMove, { passive: false });
@@ -236,7 +246,7 @@ const Slider = ({
       window.removeEventListener('touchend', handlePointerUp);
       window.removeEventListener('touchcancel', handlePointerUp);
     };
-  }, [isDragging]);
+  }, [finishDrag, isDragging]);
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -283,7 +293,6 @@ const Slider = ({
     }
 
     if (!isDragging) {
-      setDisplayValue(Number(e.currentTarget.value));
       onChange({
         target: {
           value: e.currentTarget.value,
@@ -311,8 +320,7 @@ const Slider = ({
     accumulatedValueRef.current = rawValue;
     lastPointerXRef.current = e.clientX;
 
-    setIsDragging(true);
-    setDisplayValue(snappedValue);
+    startDrag(snappedValue);
     onChange({ target: { value: snappedValue } });
   };
 
@@ -382,12 +390,15 @@ const Slider = ({
       e.preventDefault();
     }
 
-    setIsDragging(true);
-    setDisplayValue(snappedValue);
+    startDrag(snappedValue);
     onChange({ target: { value: snappedValue } });
   };
 
   const handleTouchEnd = () => {
+    if (isDraggingRef.current) {
+      finishDrag();
+      return;
+    }
     pendingTouchRef.current = null;
     suppressTouchChangeRef.current = false;
   };
