@@ -9,6 +9,7 @@ mod labels;
 mod map_artifact;
 mod pyramid;
 mod raw_frame;
+pub(crate) mod retouch;
 mod review;
 mod runtime;
 mod tiles;
