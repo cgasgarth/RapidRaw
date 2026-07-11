@@ -584,6 +584,7 @@ impl Default for AppSettings {
 pub struct PreviewRuntimeSettings {
     pub editor_preview_resolution: u32,
     pub live_preview_quality: String,
+    pub use_wgpu_renderer: bool,
 }
 
 impl From<&AppSettings> for PreviewRuntimeSettings {
@@ -594,6 +595,7 @@ impl From<&AppSettings> for PreviewRuntimeSettings {
                 .live_preview_quality
                 .clone()
                 .unwrap_or_else(|| "high".to_string()),
+            use_wgpu_renderer: settings.use_wgpu_renderer.unwrap_or(false),
         }
     }
 }

@@ -2499,6 +2499,8 @@ pub fn process_and_get_dynamic_image(
         caller_id,
         false,
         None,
+        None,
+        None,
         false,
     )
 }
@@ -2521,6 +2523,8 @@ pub fn process_and_get_unclamped_dynamic_image(
         caller_id,
         false,
         None,
+        None,
+        None,
         true,
     )
 }
@@ -2534,6 +2538,8 @@ pub fn process_and_get_dynamic_image_with_analytics(
     request: RenderRequest,
     caller_id: &str,
     output_to_display: bool,
+    presentation_identity: Option<crate::gpu_display::NativeFrameIdentity>,
+    presentation_is_current: Option<&dyn Fn() -> bool>,
     analytics_config: Option<crate::AnalyticsConfig>,
 ) -> Result<DynamicImage, String> {
     process_and_get_dynamic_image_inner(
@@ -2544,6 +2550,8 @@ pub fn process_and_get_dynamic_image_with_analytics(
         request,
         caller_id,
         output_to_display,
+        presentation_identity,
+        presentation_is_current,
         analytics_config,
         false,
     )
@@ -2558,6 +2566,8 @@ fn process_and_get_dynamic_image_inner(
     request: RenderRequest,
     caller_id: &str,
     output_to_display: bool,
+    presentation_identity: Option<crate::gpu_display::NativeFrameIdentity>,
+    presentation_is_current: Option<&dyn Fn() -> bool>,
     analytics_config: Option<crate::AnalyticsConfig>,
     preserve_unclamped_float_readback: bool,
 ) -> Result<DynamicImage, String> {
@@ -2642,12 +2652,6 @@ fn process_and_get_dynamic_image_inner(
             },
         );
         queue.submit(Some(encoder.finish()));
-
-        context.presentation.publish_texture(
-            processor.output_texture_view.clone(),
-            [width, height],
-            [processor_state.width, processor_state.height],
-        );
     }
 
     if let Some(cache) = state.gpu_image_cache.lock().unwrap().as_ref() {
@@ -2890,11 +2894,15 @@ fn process_and_get_dynamic_image_inner(
     }
 
     if output_to_display {
-        context.presentation.publish_texture(
+        if presentation_is_current.is_some_and(|is_current| !is_current()) {
+            return Err("presentation_stale_frame".into());
+        }
+        context.presentation.publish_texture_for_frame(
             processor.output_texture_view.clone(),
             [width, height],
             [processor_state.width, processor_state.height],
-        );
+            presentation_identity,
+        )?;
     }
 
     drop(old_processor);
