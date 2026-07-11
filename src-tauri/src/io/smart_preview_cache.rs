@@ -12,7 +12,7 @@ use crate::thumbnail_resources::{
     publish_thumbnail_artifact,
 };
 
-const SMART_PREVIEW_SCHEMA_VERSION: u8 = 2;
+const SMART_PREVIEW_SCHEMA_VERSION: u8 = 3;
 const SMART_PREVIEW_COLOR_PROFILE: &str = "srgb";
 pub const SMART_PREVIEW_TARGET_WIDTH: u32 = 2560;
 
@@ -161,6 +161,7 @@ pub fn write_smart_preview_artifact(
 pub fn read_smart_preview_artifact(
     smart_preview_dir: &Path,
     path_str: &str,
+    expected_adjustments: Option<&[u8]>,
 ) -> Option<(ThumbnailResourceDescriptor, ThumbnailSmartPreviewPayload)> {
     let (_, manifest_path) = smart_preview_paths(smart_preview_dir, path_str);
     let mut manifest: SmartPreviewManifest =
@@ -171,6 +172,13 @@ pub fn read_smart_preview_artifact(
     let (source_path, _) = parse_virtual_path(path_str);
     manifest.source_available = source_path.exists();
     manifest.stale = !manifest.source_available;
+    if manifest.source_available
+        && expected_adjustments.is_none_or(|adjustments| {
+            manifest.source_revision != compute_source_revision(path_str, adjustments)
+        })
+    {
+        return None;
+    }
 
     let resource_id = compute_smart_preview_id(path_str);
     let descriptor = descriptor_from_manifest(
@@ -236,11 +244,28 @@ mod tests {
 
         fs::remove_file(&image_path).expect("source removed");
         let (descriptor, read_payload) =
-            read_smart_preview_artifact(&preview_dir, &path).expect("smart preview read");
+            read_smart_preview_artifact(&preview_dir, &path, None).expect("smart preview read");
 
         assert_eq!(descriptor.byte_len, 4);
         assert!(read_payload.stale);
         assert!(!read_payload.source_available);
         assert_eq!(read_payload.source, "smartPreview");
+    }
+
+    #[test]
+    fn rejects_legacy_manifest_namespace() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let image_path = temp_dir.path().join("image.raf");
+        fs::write(&image_path, b"raw").unwrap();
+        let path = image_path.to_string_lossy().into_owned();
+        let preview_dir = temp_dir.path().join("smart-previews");
+        fs::create_dir_all(&preview_dir).unwrap();
+        write_smart_preview_artifact(&preview_dir, &path, b"jpeg", 10, 10, b"{}").unwrap();
+        let (_, manifest_path) = smart_preview_paths(&preview_dir, &path);
+        let mut manifest: serde_json::Value =
+            serde_json::from_slice(&fs::read(&manifest_path).unwrap()).unwrap();
+        manifest["schemaVersion"] = serde_json::json!(2);
+        fs::write(&manifest_path, serde_json::to_vec(&manifest).unwrap()).unwrap();
+        assert!(read_smart_preview_artifact(&preview_dir, &path, Some(b"{}")).is_none());
     }
 }

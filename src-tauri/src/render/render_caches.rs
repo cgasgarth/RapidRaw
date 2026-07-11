@@ -44,7 +44,7 @@ impl<'a> RenderCaches<'a> {
     }
 
     pub fn clear_gpu_dependent_preview(&self) {
-        self.clear_gpu_image_cache();
+        self.clear_display_encoded_artifacts();
         if let Ok(mut preview_cache) = self.state.cached_preview.lock() {
             *preview_cache = None;
         }
@@ -54,6 +54,18 @@ impl<'a> RenderCaches<'a> {
         if let Ok(mut transformed_cache) = self.state.full_transformed_cache.lock() {
             *transformed_cache = None;
         }
+    }
+
+    /// Drops only artifacts whose pixels/resources depend on the GPU device generation.
+    /// Decoded and other CPU source-domain artifacts remain reusable.
+    pub fn clear_backend_generation_artifacts(&self) {
+        self.clear_gpu_dependent_preview();
+    }
+
+    /// Drops display/view-output frames without invalidating decoded or scene-linear inputs.
+    pub fn clear_display_encoded_artifacts(&self) {
+        self.state.viewer_sample_frames.clear();
+        self.clear_gpu_image_cache();
     }
 
     pub fn clear_gpu_image_cache(&self) {
@@ -93,7 +105,7 @@ impl<'a> RenderCaches<'a> {
 
     pub fn clear_image_caches(&self) {
         self.state.decoded_image_cache.clear();
-        self.clear_gpu_dependent_preview();
+        self.clear_backend_generation_artifacts();
     }
 
     pub fn clear_session_caches(&self) {
@@ -103,6 +115,7 @@ impl<'a> RenderCaches<'a> {
         }
         self.state.mask_cache.clear();
         self.state.geometry_cache.clear();
+        self.state.viewer_sample_frames.clear();
         if let Ok(report) = serde_json::to_string(&self.native_cache_report()) {
             log::debug!("native_cache_report={report}");
         }
@@ -114,5 +127,29 @@ impl<'a> RenderCaches<'a> {
         }
         self.clear_gpu_dependent_preview();
         self.clear_session_caches();
+    }
+
+    /// Canonical Reset invalidates every edit/session-derived artifact. Source decode remains a
+    /// separate domain and may be retained when the caller keeps the active source loaded.
+    pub fn clear_canonical_reset_artifacts(&self) {
+        self.clear_active_image_render_state();
+        self.state.thumbnail_geometry_cache.clear();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn display_invalidation_preserves_scene_and_decode_domains() {
+        let state = AppState::new();
+        state
+            .geometry_cache
+            .insert_weighted(7, std::sync::Arc::new(DynamicImage::new_rgb8(2, 2)));
+        let before = state.geometry_cache.stats().entries;
+        RenderCaches::new(&state).clear_display_encoded_artifacts();
+        assert_eq!(state.geometry_cache.stats().entries, before);
+        assert_eq!(state.decoded_image_cache.stats().entries, 0);
     }
 }

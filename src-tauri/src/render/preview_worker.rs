@@ -193,11 +193,13 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
             content_revision(
                 &adjustments_clone,
                 preview_id.image_session,
+                loaded_image.artifact_source.source_fingerprint(),
                 settings_revision,
             )
         },
         |graph_revision| RenderPlanRevision {
             image_session: preview_id.image_session,
+            source_revision: loaded_image.artifact_source.source_fingerprint(),
             adjustment_revision: hash_revision(graph_revision),
             schema_version: 1,
             settings_revision,
@@ -241,12 +243,25 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         "performance" => (if has_roi { 1.8_f32 } else { 1.5_f32 }, 65_u8),
         _ => (if has_roi { 1.4_f32 } else { 1.0_f32 }, 75_u8),
     };
+    let mut preview_identity =
+        crate::render::artifact_identity::RenderArtifactIdentity::source_geometry(
+            &loaded_image.artifact_source,
+            preview_id.image_session,
+            render_plan.revision.adjustment_revision,
+            render_plan.fingerprints.source,
+            render_plan.fingerprints.geometry,
+            preview_dim,
+            preview_dim,
+        );
+    preview_identity.plan_revision = render_plan.fingerprints.full;
+    preview_identity.retouch_stage = render_plan.fingerprints.retouch;
+    preview_identity.completed_stage = "geometry-retouch-base";
 
     let cached_preview = state.cached_preview.lock().unwrap().clone();
 
     let base_valid = cached_preview
         .as_ref()
-        .is_some_and(|c| c.transform_hash == new_transform_hash && c.preview_dim == preview_dim);
+        .is_some_and(|c| c.identity == preview_identity && c.preview_dim == preview_dim);
     let small_valid = base_valid
         && cached_preview
             .as_ref()
@@ -358,7 +373,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
 
     let pre_gpu_identity = crate::gpu_processing::PreGpuImageIdentity::from_image(
         retouched_processing_image.as_ref(),
-        crate::gpu_processing::PreGpuImageIdentity::source_revision(&loaded_image.path),
+        loaded_image.artifact_source.source_fingerprint(),
         pre_gpu_detail_stage.render_hash,
     );
     let wants_analytics = !(is_interactive && pixel_roi.is_some());
@@ -487,15 +502,28 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
     *state.cached_preview.lock().unwrap() = Some(CachedPreview {
         image: Arc::clone(&final_preview_base),
         small_image: Arc::clone(&small_preview_base),
-        transform_hash: new_transform_hash,
+        identity: preview_identity.clone(),
         scale: scale_for_gpu,
         unscaled_crop_offset,
         preview_dim,
         interactive_divisor,
     });
     if !is_interactive && let Some(graph_revision) = viewer_sample_graph_revision {
-        let frame =
-            settled_viewer_sample_frame(&final_processed_image, graph_revision, &loaded_image.path);
+        let mut viewer_identity = preview_identity;
+        viewer_identity.color_domain =
+            crate::render::artifact_identity::ArtifactColorDomain::ViewEncoded;
+        viewer_identity.completed_stage = "view-output";
+        viewer_identity.detail_stage = render_plan.fingerprints.detail;
+        viewer_identity.color_stage = render_plan.fingerprints.color;
+        viewer_identity.output_stage = render_plan.fingerprints.output;
+        viewer_identity.width = final_processed_image.width();
+        viewer_identity.height = final_processed_image.height();
+        let frame = settled_viewer_sample_frame(
+            &final_processed_image,
+            graph_revision,
+            &loaded_image.path,
+            viewer_identity,
+        );
         let weight = frame.pixels.retained_bytes();
         state
             .viewer_sample_frames
@@ -508,8 +536,10 @@ fn settled_viewer_sample_frame(
     image: &Arc<DynamicImage>,
     graph_revision: &str,
     image_identity: &str,
+    artifact_identity: crate::render::artifact_identity::RenderArtifactIdentity,
 ) -> CachedViewerSampleFrame {
     CachedViewerSampleFrame {
+        artifact_identity,
         graph_revision: graph_revision.to_string(),
         pixels: crate::app_state::SampleablePixels::native(Arc::clone(image)),
         image_identity: image_identity.to_string(),
@@ -1049,8 +1079,20 @@ mod tests {
             1080,
             |x, y| Rgba([x as f32 / 1920.0, y as f32 / 1080.0, 0.25, 1.0]),
         )));
-        let sampler_frame =
-            settled_viewer_sample_frame(&rendered, "history_4", "/fixture/settled.raw");
+        let sampler_frame = settled_viewer_sample_frame(
+            &rendered,
+            "history_4",
+            "/fixture/settled.raw",
+            crate::render::artifact_identity::RenderArtifactIdentity::source_geometry(
+                &crate::render::artifact_identity::tests_support::source("/fixture/settled.raw"),
+                1,
+                1,
+                1,
+                1,
+                1920,
+                1080,
+            ),
+        );
 
         assert!(Arc::ptr_eq(&rendered, sampler_frame.pixels.image()));
         assert_eq!(Arc::strong_count(&rendered), 2);

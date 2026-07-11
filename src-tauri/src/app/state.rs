@@ -35,13 +35,14 @@ pub struct LoadedImage {
     pub path: String,
     pub image: Arc<DynamicImage>,
     pub is_raw: bool,
+    pub artifact_source: crate::render::artifact_identity::SourceArtifactIdentity,
 }
 
 #[derive(Clone)]
 pub struct CachedPreview {
     pub image: Arc<DynamicImage>,
     pub small_image: Arc<DynamicImage>,
-    pub transform_hash: u64,
+    pub identity: crate::render::artifact_identity::RenderArtifactIdentity,
     pub scale: f32,
     pub unscaled_crop_offset: (f32, f32),
     pub preview_dim: u32,
@@ -75,6 +76,7 @@ impl SampleablePixels {
 
 #[derive(Clone)]
 pub struct CachedViewerSampleFrame {
+    pub artifact_identity: crate::render::artifact_identity::RenderArtifactIdentity,
     pub graph_revision: String,
     pub pixels: SampleablePixels,
     pub image_identity: String,
@@ -197,7 +199,16 @@ pub struct ExportJob {
     pub task_handle: Option<JoinHandle<()>>,
 }
 
-pub type TransformedImageCache = (u64, Arc<DynamicImage>, (f32, f32));
+pub struct TransformedImageCache {
+    pub identity: crate::render::artifact_identity::RenderArtifactIdentity,
+    pub image: Arc<DynamicImage>,
+    pub offset: (f32, f32),
+}
+
+pub struct WarpedImageCache {
+    pub identity: crate::render::artifact_identity::RenderArtifactIdentity,
+    pub image: Arc<DynamicImage>,
+}
 
 pub struct AppState {
     pub window_setup_complete: AtomicBool,
@@ -241,7 +252,7 @@ pub struct AppState {
     pub thumbnail_geometry_cache: MemoryLruCache<String, (u64, Arc<DynamicImage>, f32)>,
     pub lens_db: Mutex<Option<Arc<LensDatabase>>>,
     pub load_image_generation: Arc<AtomicUsize>,
-    pub full_warped_cache: Mutex<Option<(u64, Arc<DynamicImage>)>>,
+    pub full_warped_cache: Mutex<Option<WarpedImageCache>>,
     pub full_transformed_cache: Mutex<Option<TransformedImageCache>>,
     pub decoded_image_cache: DecodedImageCache,
     pub source_fingerprint_cache: Arc<FingerprintCache>,
