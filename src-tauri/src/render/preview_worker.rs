@@ -14,7 +14,7 @@ use crate::app_state::{
     AnalyticsConfig, AnalyticsFrameId, AnalyticsProducts, AppState, CachedPreview,
     CachedViewerSampleFrame,
 };
-use crate::cache_utils::{calculate_full_job_hash, calculate_transform_hash};
+use crate::cache_utils::calculate_transform_hash;
 use crate::film_look_render::normalize_film_look_adjustments_for_render;
 use crate::generate_transformed_preview;
 use crate::image_processing::{
@@ -281,8 +281,11 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
     let is_raw = loaded_image.is_raw;
     let render_adjustments = normalize_film_look_adjustments_for_render(&adjustments_clone);
     let tm_override = resolve_tonemapper_override_from_handle(app_handle, is_raw);
-    let render_input_hash =
-        calculate_full_job_hash(&loaded_image.path, render_adjustments.as_ref());
+    let pre_gpu_identity = crate::gpu_processing::PreGpuImageIdentity::from_image(
+        retouched_processing_image.as_ref(),
+        crate::gpu_processing::PreGpuImageIdentity::source_revision(&loaded_image.path),
+        pre_gpu_detail_stage.render_hash,
+    );
     let final_adjustments =
         get_all_adjustments_from_json(render_adjustments.as_ref(), is_raw, tm_override);
     let lut: Option<Arc<Lut>> = render_adjustments["lutPath"]
@@ -321,7 +324,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         &context,
         &state,
         retouched_processing_image.as_ref(),
-        render_input_hash,
+        pre_gpu_identity,
         RenderRequest {
             adjustments: final_adjustments,
             mask_bitmaps: &mask_bitmaps,

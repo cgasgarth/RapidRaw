@@ -61,7 +61,8 @@ pub struct GpuImageCache {
     pub texture_view: TextureView,
     pub width: u32,
     pub height: u32,
-    pub transform_hash: u64,
+    pub pre_gpu_identity: crate::gpu_processing::PreGpuImageIdentity,
+    pub device_generation: u64,
 }
 
 pub struct GpuProcessorState {
