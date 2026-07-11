@@ -26,9 +26,7 @@ import {
   ApprovalClass,
   type LayerStackSidecarLayerV1,
   type NegativeLabAppServerRuntimeDryRunToolResultV1,
-  type NegativeLabCommandEnvelopeV1,
   type NegativeLabRuntimeProofV1,
-  negativeLabCommandEnvelopeV1Schema,
   negativeLabSetConversionRecipeCommandV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
 } from '../../../../packages/rawengine-schema/src';
@@ -90,7 +88,6 @@ import {
 import { buildLayerStackSidecarFromMasks } from '../../../utils/layers/layerStackCommandBridge';
 import { NegativeLabAppServerCommandName } from '../../../utils/negative-lab/app-server/negativeLabAppServerCommandNames';
 import {
-  DEFAULT_NEGATIVE_LAB_ACQUISITION_PROFILE_ID,
   getNegativeLabAcquisitionProfile,
   NEGATIVE_LAB_ACQUISITION_PROFILES,
 } from '../../../utils/negative-lab/negativeLabAcquisitionProfiles';
@@ -136,10 +133,10 @@ import {
   negativeLabFrameRgbBalanceOffsetIsZero,
   snapNegativeLabFrameRgbBalanceOffsets,
 } from '../../../utils/negative-lab/negativeLabFrameRgbBalanceOverrides';
+import { createDefaultNegativeLabModalSession } from '../../../utils/negative-lab/negativeLabModalSession';
 import {
   NEGATIVE_LAB_OUTPUT_FORMAT_SELECTOR_IDS,
   NegativeLabOutputFormatId,
-  type NegativeLabOutputFormatId as NegativeOutputFormat,
 } from '../../../utils/negative-lab/negativeLabOutputFormatIds';
 import {
   buildNegativeLabPickedPatchRect,
@@ -195,7 +192,6 @@ import { renderNegativeLabRuntimeDryRunPreview } from '../../../utils/negative-l
 import {
   acceptNegativeLabSessionPlan,
   buildNegativeLabSessionFrameViewState,
-  createNegativeLabSessionState,
   type NegativeLabSessionSnapshot,
   reconcileNegativeLabSessionTargetPaths,
   setNegativeLabSessionActiveFrame,
@@ -294,11 +290,6 @@ const DEFAULT_NEGATIVE_LAB_PRINT_CURVE_V2_PARAMS = {
   target_white_density: 0.04,
   toe_strength: 0.25,
 } satisfies NonNullable<NegativeParams['print_curve_v2']>;
-const DEFAULT_SAVE_OPTIONS = {
-  outputFormat: NegativeLabOutputFormatId.Tiff16 as NegativeOutputFormat,
-  suffix: 'Positive',
-  writeConversionBundle: true,
-};
 const buildNegativeLabRenderedCandidateHash = (payload: unknown): `fnv1a32:${string}` =>
   `fnv1a32:${buildNegativeLabPlanHash(JSON.stringify(payload))}`;
 const getNegativeLabProfileBaseSampleId = (params: NegativeParams): string =>
@@ -533,6 +524,19 @@ interface NegativeConversionModalProps {
   onSave: (savedPaths: string[], handoff: NegativeConversionEditorHandoff) => void;
 }
 
+interface NegativeLabSessionProps extends NegativeConversionModalProps {
+  initialSessionSnapshot: NegativeLabSessionSnapshot;
+  operationId: string;
+}
+
+interface NegativeLabPreviewRecipeContext {
+  activePathIndex?: number;
+  baseFogEstimate?: NegativeBaseFogEstimate | null;
+  selectedAcquisitionProfileId?: NegativeLabAcquisitionProfileId;
+  selectedImagePath?: string;
+  selectedPresetId?: string;
+}
+
 interface BaseFogSampleUndoEntry {
   activeBaseFogSampleLabel: string | null;
   baseFogConfidence: number | null;
@@ -553,36 +557,64 @@ interface NegativeLabPatchProbeState {
 
 type NegativeLabPatchProbeByRole = Partial<Record<NegativeLabPatchRole, NegativeLabPatchProbeState>>;
 
-export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }: NegativeConversionModalProps) {
+export function NegativeConversionModal(props: NegativeConversionModalProps) {
+  const persistedSession = useUIStore((state) => state.negativeModalState.session);
+  const operationEpoch = useUIStore((state) => state.negativeModalState.operationEpoch);
+  const initialSessionSnapshot = useMemo(
+    () =>
+      reconcileNegativeLabSessionTargetPaths(
+        persistedSession ?? createDefaultNegativeLabModalSession(props.targetPaths),
+        props.targetPaths,
+      ),
+    [persistedSession, props.targetPaths],
+  );
+  const operationId = `${operationEpoch}:${buildNegativeLabPlanHash(props.targetPaths.join('|'))}`;
+  const [retainClosingSession, setRetainClosingSession] = useState(props.isOpen);
+
+  useEffect(() => {
+    if (props.isOpen) {
+      setRetainClosingSession(true);
+      return;
+    }
+    const disposeTimer = window.setTimeout(() => {
+      setRetainClosingSession(false);
+    }, 300);
+    return () => {
+      window.clearTimeout(disposeTimer);
+    };
+  }, [props.isOpen, operationId]);
+
+  if (!props.isOpen && !retainClosingSession) return null;
+
+  return (
+    <NegativeLabSession
+      {...props}
+      initialSessionSnapshot={initialSessionSnapshot}
+      key={operationId}
+      operationId={operationId}
+    />
+  );
+}
+
+function NegativeLabSession({
+  initialSessionSnapshot,
+  isOpen,
+  onClose,
+  operationId,
+  targetPaths,
+  onSave,
+}: NegativeLabSessionProps) {
   const { t } = useTranslation();
   const selectedEditorImage = useEditorStore((state) => state.selectedImage);
-  const persistedSession = useUIStore((state) => state.negativeModalState.session);
   const setUI = useUIStore((state) => state.setUI);
-  const buildDefaultSession = useCallback(
-    (paths: readonly string[]): NegativeLabSessionSnapshot =>
-      createNegativeLabSessionState(paths, {
-        recipeState: {
-          conversionScope: 'all',
-          openSavedPositiveInEditor: true,
-          params: DEFAULT_PARAMS,
-          patchSamplerCorrectionPayload: EMPTY_NEGATIVE_LAB_PATCH_SAMPLER_CORRECTION_PAYLOAD,
-          saveOptions: DEFAULT_SAVE_OPTIONS,
-          selectedAcquisitionProfileId: DEFAULT_NEGATIVE_LAB_ACQUISITION_PROFILE_ID,
-          selectedPresetId: DEFAULT_NEGATIVE_LAB_UI_PRESET.presetId,
-        },
-        sessionId: `negative_lab_modal_session_${buildNegativeLabPlanHash(paths.join('|'))}`,
-      }),
-    [],
-  );
-  const sessionSnapshot = useMemo(
-    () => reconcileNegativeLabSessionTargetPaths(persistedSession ?? buildDefaultSession(targetPaths), targetPaths),
-    [buildDefaultSession, persistedSession, targetPaths],
+  const sessionSnapshot = useUIStore((state) =>
+    reconcileNegativeLabSessionTargetPaths(state.negativeModalState.session ?? initialSessionSnapshot, targetPaths),
   );
   const updateSessionSnapshot = useCallback(
     (updater: (currentSnapshot: NegativeLabSessionSnapshot) => NegativeLabSessionSnapshot) => {
       setUI((state) => {
         const currentSnapshot = reconcileNegativeLabSessionTargetPaths(
-          state.negativeModalState.session ?? buildDefaultSession(targetPaths),
+          state.negativeModalState.session ?? initialSessionSnapshot,
           targetPaths,
         );
         const nextSnapshot = updater(currentSnapshot);
@@ -597,17 +629,8 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         };
       });
     },
-    [buildDefaultSession, setUI, targetPaths],
+    [initialSessionSnapshot, setUI, targetPaths],
   );
-  useEffect(() => {
-    if (persistedSession === sessionSnapshot) return;
-    setUI((state) => ({
-      negativeModalState: {
-        ...state.negativeModalState,
-        session: sessionSnapshot,
-      },
-    }));
-  }, [persistedSession, sessionSnapshot, setUI]);
 
   const sessionFrameViewState = useMemo(
     () => buildNegativeLabSessionFrameViewState(sessionSnapshot),
@@ -640,6 +663,10 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [runtimePreviewDryRunResult, setRuntimePreviewDryRunResult] =
     useState<NegativeLabAppServerRuntimeDryRunToolResultV1 | null>(null);
+  const [runtimePreviewRecipeIdentity, setRuntimePreviewRecipeIdentity] = useState<{
+    channelBasis: string;
+    processFamily: string;
+  } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isEstimatingBaseFog, setIsEstimatingBaseFog] = useState(false);
@@ -934,8 +961,11 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     zoomOut,
   } = usePreviewViewport({ maxZoom: 8, minZoom: 0.1, zoomStep: 0.25 });
   const [originalUrl, setOriginalUrl] = useState<string | null>(null);
+  const originalObjectUrlRef = useRef<string | null>(null);
   const previewImageRef = useRef<HTMLImageElement | null>(null);
   const previewRequestSequenceRef = useRef(0);
+  const latestPreviewRequestIdentityRef = useRef<string | null>(null);
+  const sourcePreviewRequestSequenceRef = useRef(0);
   const previewImageUrl = isCompareActive && originalUrl !== null ? originalUrl : previewUrl;
   const runtimePreviewDensityNormalizationMetrics =
     runtimePreviewDryRunResult?.dryRun.proof?.runtimePreview.densityNormalizationMetrics ?? null;
@@ -945,6 +975,16 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const patchProbeLabel = activePatchProbe?.label ?? null;
   const effectiveActivePathIndex = targetPaths[activePathIndex] === undefined ? 0 : activePathIndex;
   const selectedImagePath = targetPaths[effectiveActivePathIndex] ?? null;
+  const previewSessionAuthority = JSON.stringify({
+    operationId,
+    selectedImagePath,
+    sessionId: sessionSnapshot.session.sessionId,
+  });
+  const previewSessionAuthorityRef = useRef(previewSessionAuthority);
+  previewSessionAuthorityRef.current = previewSessionAuthority;
+  const operationAliveRef = useRef(true);
+  const isCurrentOperation = (authority: string): boolean =>
+    operationAliveRef.current && authority === previewSessionAuthorityRef.current;
   const hasMultipleScans = targetPaths.length > 1;
   const baseFogSampleReadout = useMemo(() => {
     if (params.base_fog_sample === null || activeBaseFogSampleLabel === null) return null;
@@ -1764,6 +1804,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
 
   useEffect(() => {
     const unlisten = listen<unknown>('negative-batch-progress', (event) => {
+      if (!operationAliveRef.current) return;
       const payload = parsePathProgressPayload(event.payload);
       setProgress({ current: payload.current, total: payload.total });
     });
@@ -1783,19 +1824,29 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   }, [qcOverlayVisibility]);
 
   const buildNegativeLabRuntimePreviewCommand = useCallback(
-    (currentParams: NegativeParams): NegativeLabSetConversionRecipeCommandV1 | null => {
-      if (selectedImagePath === null) return null;
+    (
+      currentParams: NegativeParams,
+      recipeContext: NegativeLabPreviewRecipeContext = {},
+    ): NegativeLabSetConversionRecipeCommandV1 | null => {
+      const previewImagePath = recipeContext.selectedImagePath ?? selectedImagePath;
+      if (previewImagePath === null) return null;
 
-      const previewFrameId = `negative_lab_frame_${String(effectiveActivePathIndex + 1).padStart(4, '0')}`;
+      const previewActivePathIndex = recipeContext.activePathIndex ?? effectiveActivePathIndex;
+      const previewAcquisitionProfileId = recipeContext.selectedAcquisitionProfileId ?? selectedAcquisitionProfileId;
+      const previewAcquisitionProfile = getNegativeLabAcquisitionProfile(previewAcquisitionProfileId);
+      const previewPresetId = recipeContext.selectedPresetId ?? selectedPresetId;
+      const previewProfile = NEGATIVE_LAB_PROFILE_BROWSER_ROW_BY_ID.get(previewPresetId) ?? null;
+      const previewBaseFogEstimate = recipeContext.baseFogEstimate ?? baseFogEstimate;
+      const previewFrameId = `negative_lab_frame_${String(previewActivePathIndex + 1).padStart(4, '0')}`;
       const sampleRect = currentParams.base_fog_sample;
       const sampleHash = buildNegativeLabBaseSampleHash(
         JSON.stringify({
-          imagePath: selectedImagePath,
+          imagePath: previewImagePath,
           rect: sampleRect,
           scope: baseFogScope,
         }),
       ).slice('fnv1a32:'.length);
-      const sampleIds = baseFogEstimate === null ? [] : [`base_sample_${sampleHash}`];
+      const sampleIds = previewBaseFogEstimate === null ? [] : [`base_sample_${sampleHash}`];
       const usingPrintCurveV2 = currentParams.print_curve_algorithm === 'negative_density_print_v2';
       const conversionModelId = usingPrintCurveV2 ? 'negative_density_print_v2' : currentParams.conversion_model;
       const sessionId = sessionSnapshot.session.sessionId;
@@ -1815,23 +1866,23 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         },
         commandId: `command_negative_lab_runtime_preview_${buildNegativeLabPlanHash(
           JSON.stringify({
-            imagePath: selectedImagePath,
+            imagePath: previewImagePath,
             params: currentParams,
-            presetId: selectedPresetId,
+            presetId: previewPresetId,
           }),
         )}`,
         commandType: 'negativeLab.setConversionRecipe',
         correlationId: `corr_negative_lab_runtime_preview_${buildNegativeLabPlanHash(
-          `${selectedImagePath}:${selectedPresetId}`,
+          `${previewImagePath}:${previewPresetId}`,
         )}`,
         dryRun: true,
         expectedGraphRevision: `graph_rev_negative_lab_preview_${buildNegativeLabPlanHash(
-          `${selectedImagePath}:${effectiveActivePathIndex}`,
+          `${previewImagePath}:${previewActivePathIndex}`,
         )}`,
         idempotencyKey: `idem_negative_lab_runtime_preview_${buildNegativeLabPlanHash(
           JSON.stringify({
-            acquisitionProfile: selectedAcquisitionProfileId,
-            imagePath: selectedImagePath,
+            acquisitionProfile: previewAcquisitionProfileId,
+            imagePath: previewImagePath,
             params: currentParams,
           }),
         )}`,
@@ -1877,7 +1928,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
               }
             : {}),
           curveModel: {
-            curveFamily: selectedProfile === null ? 'parametric_monotonic_v1' : 'process_profile_monotonic_v1',
+            curveFamily: previewProfile === null ? 'parametric_monotonic_v1' : 'process_profile_monotonic_v1',
           },
           frameSelection: {
             excludeFrameIds: [],
@@ -1887,9 +1938,9 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             warningCodes: [],
           },
           inputCharacterization: {
-            channelBasis: selectedAcquisitionProfile.channelBasis,
+            channelBasis: previewAcquisitionProfile.channelBasis,
             confidence:
-              selectedAcquisitionProfile.channelBasis === 'rendered_rgb'
+              previewAcquisitionProfile.channelBasis === 'rendered_rgb'
                 ? 'approximate_rendered_rgb'
                 : 'profiled_acquisition',
             pixelBasis: 'linear_scan_rgb',
@@ -1910,14 +1961,14 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             maxEdgePx: 1080,
           },
           processFamily:
-            selectedProfile?.filmClass === 'black_and_white_silver'
+            previewProfile?.filmClass === 'black_and_white_silver'
               ? 'black_and_white_silver_negative'
               : 'c41_color_negative',
           sessionId,
         },
         schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
         target: {
-          imagePath: selectedImagePath,
+          imagePath: previewImagePath,
           kind: 'image',
         },
       });
@@ -1935,6 +1986,14 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       targetPaths,
     ],
   );
+  const buildRuntimePreviewCommandRef = useRef(buildNegativeLabRuntimePreviewCommand);
+  buildRuntimePreviewCommandRef.current = buildNegativeLabRuntimePreviewCommand;
+  const selectedImagePathRef = useRef(selectedImagePath);
+  selectedImagePathRef.current = selectedImagePath;
+  const operationIdRef = useRef(operationId);
+  operationIdRef.current = operationId;
+  const persistedSessionIdRef = useRef(sessionSnapshot.session.sessionId);
+  persistedSessionIdRef.current = sessionSnapshot.session.sessionId;
 
   const updatePreview = useMemo(
     () =>
@@ -1943,14 +2002,33 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           currentParams: NegativeParams,
           _isInitialLoad: boolean = false,
           baseSampleProofContext: NegativeLabBaseSamplePreviewProofContext | null = null,
+          recipeContext: NegativeLabPreviewRecipeContext = {},
         ) => {
-          if (!selectedImagePath) return;
+          const previewImagePath = recipeContext.selectedImagePath ?? selectedImagePathRef.current;
+          if (previewImagePath === null) return;
           const previewRequestSequence = ++previewRequestSequenceRef.current;
+          const requestAuthority = JSON.stringify({
+            operationId: operationIdRef.current,
+            selectedImagePath: previewImagePath,
+            sessionId: persistedSessionIdRef.current,
+          });
           const previewRevision = 1;
-          const runtimePreviewCommand = buildNegativeLabRuntimePreviewCommand(currentParams);
+          const effectiveRecipeContext =
+            recipeContext.baseFogEstimate !== undefined || baseSampleProofContext === null
+              ? recipeContext
+              : { ...recipeContext, baseFogEstimate: baseSampleProofContext.estimate };
+          const runtimePreviewCommand = buildRuntimePreviewCommandRef.current(currentParams, effectiveRecipeContext);
+          const previewRequestIdentity = JSON.stringify({
+            command: runtimePreviewCommand,
+            currentParams,
+            requestAuthority,
+            selectedImagePath: previewImagePath,
+          });
+          latestPreviewRequestIdentityRef.current = previewRequestIdentity;
           if (runtimePreviewCommand === null) {
             setPreviewUrl(null);
             setRuntimePreviewDryRunResult(null);
+            setRuntimePreviewRecipeIdentity(null);
             if (baseSampleProofContext === null) setBaseFogPreviewProof(null);
             setIsLoading(false);
             return;
@@ -1959,18 +2037,28 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           setIsLoading(true);
           setPreviewUrl(null);
           setRuntimePreviewDryRunResult(null);
+          setRuntimePreviewRecipeIdentity(null);
           if (baseSampleProofContext === null) setBaseFogPreviewProof(null);
           try {
             const result = await renderNegativeLabRuntimeDryRunPreview({
               command: runtimePreviewCommand,
-              path: selectedImagePath,
+              path: previewImagePath,
               recipeParams: currentParams,
             });
-            if (previewRequestSequence !== previewRequestSequenceRef.current) return;
+            if (
+              previewRequestSequence !== previewRequestSequenceRef.current ||
+              requestAuthority !== previewSessionAuthorityRef.current ||
+              previewRequestIdentity !== latestPreviewRequestIdentityRef.current
+            )
+              return;
 
             const runtimeBaseFogSummary = result.runtimeDryRun.dryRun.proof?.runtimePreview.baseFogSampleSummary;
             setPreviewUrl(result.displayPreviewUrl);
             setRuntimePreviewDryRunResult(result.runtimeDryRun);
+            setRuntimePreviewRecipeIdentity({
+              channelBasis: runtimePreviewCommand.parameters.inputCharacterization.channelBasis,
+              processFamily: runtimePreviewCommand.parameters.processFamily,
+            });
             if (baseSampleProofContext !== null) {
               if (runtimeBaseFogSummary !== undefined) {
                 setBaseFogConfidence(runtimeBaseFogSummary.confidence);
@@ -1996,72 +2084,23 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             }
             setIsLoading(false);
           } catch (e) {
-            if (previewRequestSequence !== previewRequestSequenceRef.current) return;
+            if (
+              previewRequestSequence !== previewRequestSequenceRef.current ||
+              requestAuthority !== previewSessionAuthorityRef.current ||
+              previewRequestIdentity !== latestPreviewRequestIdentityRef.current
+            )
+              return;
             console.error('Negative preview failed', e);
             setPreviewUrl(null);
             setRuntimePreviewDryRunResult(null);
+            setRuntimePreviewRecipeIdentity(null);
             setIsLoading(false);
           }
         },
         100,
       ),
-    [buildNegativeLabRuntimePreviewCommand, selectedImagePath],
+    [],
   );
-
-  useEffect(() => {
-    if (isOpen) {
-      const timer = window.setTimeout(() => {
-        setIsLoading(true);
-        updatePreview(DEFAULT_PARAMS, true);
-      }, 0);
-
-      if (selectedImagePath) {
-        invoke<number[]>(Invokes.GeneratePreviewForPath, {
-          path: selectedImagePath,
-          jsAdjustments: {},
-        })
-          .then((res) => {
-            const blob = new Blob([new Uint8Array(res)], { type: 'image/jpeg' });
-            setOriginalUrl(URL.createObjectURL(blob));
-          })
-          .catch(console.error);
-      }
-      return () => {
-        window.clearTimeout(timer);
-      };
-    }
-
-    const timer = window.setTimeout(() => {
-      previewRequestSequenceRef.current += 1;
-      setPreviewUrl(null);
-      setRuntimePreviewDryRunResult(null);
-      setOriginalUrl(null);
-      resetViewport();
-      setBaseFogConfidence(null);
-      setBaseFogEstimate(null);
-      setBaseFogScope('frame');
-      setBaseFogPreviewProof(null);
-      setBaseFogReadoutCopied(false);
-      setNeutralPatchSuggestion(null);
-      setShadowPatchBlackPointSuggestion(null);
-      setHighlightPatchExposureSuggestion(null);
-      setPatchRole('neutral');
-      setPatchProbeByRole({});
-      setIsPickingPatch(false);
-      setPatchDragStart(null);
-      setDraftPatchRect(null);
-      setActiveBaseFogSampleLabel(null);
-      setBaseFogSampleUndoStack([]);
-      setCustomBaseSampleRect(CUSTOM_BASE_SAMPLE_DEFAULT);
-      setCustomBaseSampleEstimate(null);
-      setBrowsedComparisonProfileId(null);
-      setIsLoading(true);
-      setProgress(null);
-    }, 300);
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [isOpen, resetViewport, selectedImagePath, targetPaths, updatePreview]);
 
   useEffect(() => {
     if (!isPickingPatch) return;
@@ -2105,9 +2144,77 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     }),
   });
 
+  const initialRuntimePreviewRef = useRef<{
+    params: NegativeParams;
+    updatePreview: typeof updatePreview;
+  } | null>(null);
+  if (initialRuntimePreviewRef.current === null) {
+    initialRuntimePreviewRef.current = {
+      params: buildParamsWithFrameOverrides(params),
+      updatePreview,
+    };
+  }
+
+  useEffect(() => {
+    if (!isOpen) return;
+    operationAliveRef.current = true;
+    const initialPreview = initialRuntimePreviewRef.current;
+    if (initialPreview === null) return;
+
+    resetViewport();
+    initialPreview.updatePreview(initialPreview.params, true);
+    return () => {
+      operationAliveRef.current = false;
+      previewRequestSequenceRef.current += 1;
+      latestPreviewRequestIdentityRef.current = null;
+      initialPreview.updatePreview.cancel();
+    };
+  }, [isOpen, operationId, resetViewport]);
+
+  useEffect(() => {
+    if (!isOpen || selectedImagePath === null) return;
+    const requestSequence = ++sourcePreviewRequestSequenceRef.current;
+    let disposed = false;
+    if (originalObjectUrlRef.current !== null) {
+      URL.revokeObjectURL(originalObjectUrlRef.current);
+      originalObjectUrlRef.current = null;
+    }
+    setOriginalUrl(null);
+
+    void invoke<number[]>(Invokes.GeneratePreviewForPath, {
+      path: selectedImagePath,
+      jsAdjustments: {},
+    })
+      .then((bytes) => {
+        if (disposed || requestSequence !== sourcePreviewRequestSequenceRef.current) return;
+        const nextUrl = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: 'image/jpeg' }));
+        if (disposed || requestSequence !== sourcePreviewRequestSequenceRef.current) {
+          URL.revokeObjectURL(nextUrl);
+          return;
+        }
+        if (originalObjectUrlRef.current !== null) URL.revokeObjectURL(originalObjectUrlRef.current);
+        originalObjectUrlRef.current = nextUrl;
+        setOriginalUrl(nextUrl);
+      })
+      .catch((error: unknown) => {
+        if (!disposed && requestSequence === sourcePreviewRequestSequenceRef.current) {
+          console.error('Negative source preview failed', error);
+        }
+      });
+
+    return () => {
+      disposed = true;
+      sourcePreviewRequestSequenceRef.current += 1;
+      if (originalObjectUrlRef.current !== null) {
+        URL.revokeObjectURL(originalObjectUrlRef.current);
+        originalObjectUrlRef.current = null;
+      }
+    };
+  }, [isOpen, operationId, selectedImagePath]);
+
   useEffect(() => {
     if (!isOpen || selectedImagePath === null) {
-      setRenderedProfileCandidatePreviewById({});
+      if (isOpen) setRenderedProfileCandidatePreviewById({});
       return;
     }
 
@@ -2307,7 +2414,9 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     setBaseFogSampleUndoStack([]);
     setParams(preset.params);
     setPatchSamplerCorrectionPayload(EMPTY_NEGATIVE_LAB_PATCH_SAMPLER_CORRECTION_PAYLOAD);
-    updatePreview(buildParamsWithFrameOverrides(preset.params));
+    updatePreview(buildParamsWithFrameOverrides(preset.params), false, null, {
+      selectedPresetId: preset.presetId,
+    });
   };
 
   const pushBaseFogSampleUndoEntry = () => {
@@ -2342,11 +2451,14 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     setSelectedPresetId(previous.selectedPresetId);
     setParams(previous.params);
     setPatchSamplerCorrectionPayload(previous.patchSamplerCorrectionPayload);
-    updatePreview(buildParamsWithFrameOverrides(previous.params));
+    updatePreview(buildParamsWithFrameOverrides(previous.params), false, null, {
+      selectedPresetId: previous.selectedPresetId,
+    });
   };
 
   const handleAutoBaseFog = async () => {
     if (!selectedImagePath) return;
+    const requestAuthority = previewSessionAuthority;
     setIsEstimatingBaseFog(true);
     try {
       const estimate = await invokeWithSchema(
@@ -2357,6 +2469,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         },
         negativeBaseFogEstimateSchema,
       );
+      if (!isCurrentOperation(requestAuthority)) return;
       const nextParams: NegativeParams = {
         ...params,
         base_fog_bounds_provenance: 'automatic_analysis',
@@ -2387,12 +2500,13 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     } catch (e) {
       console.error('Negative base/fog estimate failed', e);
     } finally {
-      setIsEstimatingBaseFog(false);
+      if (isCurrentOperation(requestAuthority)) setIsEstimatingBaseFog(false);
     }
   };
 
   const handleSampleBaseFog = async (labelKey: BaseFogSampleLabelKey, sampleRect: NegativeLabBaseFogSampleRect) => {
     if (!selectedImagePath) return;
+    const requestAuthority = previewSessionAuthority;
     setIsEstimatingBaseFog(true);
     try {
       const estimate = await invokeWithSchema(
@@ -2403,6 +2517,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         },
         negativeBaseFogEstimateSchema,
       );
+      if (!isCurrentOperation(requestAuthority)) return;
       const nextParams: NegativeParams = {
         ...params,
         base_fog_bounds_provenance: 'manual_base_fog_sample',
@@ -2433,7 +2548,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     } catch (e) {
       console.error('Base/fog sample failed', e);
     } finally {
-      setIsEstimatingBaseFog(false);
+      if (isCurrentOperation(requestAuthority)) setIsEstimatingBaseFog(false);
     }
   };
 
@@ -2446,6 +2561,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
 
   const handleMeasureCustomBaseSample = async () => {
     if (!selectedImagePath) return;
+    const requestAuthority = previewSessionAuthority;
     setIsMeasuringCustomBaseSample(true);
     try {
       const estimate = await invokeWithSchema(
@@ -2456,11 +2572,12 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         },
         negativeBaseFogEstimateSchema,
       );
+      if (!isCurrentOperation(requestAuthority)) return;
       setCustomBaseSampleEstimate(estimate);
     } catch (e) {
       console.error('Custom base sample failed', e);
     } finally {
-      setIsMeasuringCustomBaseSample(false);
+      if (isCurrentOperation(requestAuthority)) setIsMeasuringCustomBaseSample(false);
     }
   };
 
@@ -2563,6 +2680,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     sampleRect: NegativeLabBaseFogSampleRect,
   ) => {
     if (!selectedImagePath) return;
+    const requestAuthority = previewSessionAuthority;
     const nextPatchRole = getNegativeLabPatchRoleForLabelKey(labelKey);
     setIsSamplingPatchProbe(true);
     try {
@@ -2574,6 +2692,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         },
         negativeBaseFogEstimateSchema,
       );
+      if (!isCurrentOperation(requestAuthority)) return;
       setPatchProbeByRole((current) => ({
         ...current,
         [nextPatchRole]: {
@@ -2589,7 +2708,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     } catch (e) {
       console.error('Patch probe sample failed', e);
     } finally {
-      setIsSamplingPatchProbe(false);
+      if (isCurrentOperation(requestAuthority)) setIsSamplingPatchProbe(false);
     }
   };
 
@@ -2633,6 +2752,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
 
   const handleSuggestNeutralPatchRgb = async () => {
     if (selectedImagePath === null || patchProbeRect === null) return;
+    const requestAuthority = previewSessionAuthority;
     setIsSuggestingNeutralPatchRgb(true);
     try {
       const effectiveParams = buildParamsWithFrameOverrides(params);
@@ -2645,19 +2765,21 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         },
         negativeLabNeutralPatchSuggestionSchema,
       );
+      if (!isCurrentOperation(requestAuthority)) return;
       setNeutralPatchSuggestion(suggestion);
       setHighlightPatchExposureSuggestion(null);
       setShadowPatchBlackPointSuggestion(null);
     } catch (error) {
       console.error('Neutral patch RGB suggestion failed', error);
-      setNeutralPatchSuggestion(null);
+      if (isCurrentOperation(requestAuthority)) setNeutralPatchSuggestion(null);
     } finally {
-      setIsSuggestingNeutralPatchRgb(false);
+      if (isCurrentOperation(requestAuthority)) setIsSuggestingNeutralPatchRgb(false);
     }
   };
 
   const handleSuggestHighlightPatchExposure = async () => {
     if (selectedImagePath === null || patchProbeRect === null) return;
+    const requestAuthority = previewSessionAuthority;
     setIsSuggestingHighlightPatchExposure(true);
     try {
       const effectiveParams = buildParamsWithFrameOverrides(params);
@@ -2671,19 +2793,21 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         },
         negativeLabHighlightPatchExposureSuggestionSchema,
       );
+      if (!isCurrentOperation(requestAuthority)) return;
       setHighlightPatchExposureSuggestion(suggestion);
       setNeutralPatchSuggestion(null);
       setShadowPatchBlackPointSuggestion(null);
     } catch (error) {
       console.error('Highlight patch exposure suggestion failed', error);
-      setHighlightPatchExposureSuggestion(null);
+      if (isCurrentOperation(requestAuthority)) setHighlightPatchExposureSuggestion(null);
     } finally {
-      setIsSuggestingHighlightPatchExposure(false);
+      if (isCurrentOperation(requestAuthority)) setIsSuggestingHighlightPatchExposure(false);
     }
   };
 
   const handleSuggestShadowPatchBlackPoint = async () => {
     if (selectedImagePath === null || patchProbeRect === null) return;
+    const requestAuthority = previewSessionAuthority;
     setIsSuggestingShadowPatchBlackPoint(true);
     try {
       const effectiveParams = buildParamsWithFrameOverrides(params);
@@ -2696,14 +2820,15 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         },
         negativeLabShadowPatchBlackPointSuggestionSchema,
       );
+      if (!isCurrentOperation(requestAuthority)) return;
       setShadowPatchBlackPointSuggestion(suggestion);
       setHighlightPatchExposureSuggestion(null);
       setNeutralPatchSuggestion(null);
     } catch (error) {
       console.error('Shadow patch black point suggestion failed', error);
-      setShadowPatchBlackPointSuggestion(null);
+      if (isCurrentOperation(requestAuthority)) setShadowPatchBlackPointSuggestion(null);
     } finally {
-      setIsSuggestingShadowPatchBlackPoint(false);
+      if (isCurrentOperation(requestAuthority)) setIsSuggestingShadowPatchBlackPoint(false);
     }
   };
 
@@ -2982,6 +3107,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const handleSave = async () => {
     if (!canSave) return;
     if (!isBatchPlanAccepted) return;
+    const requestAuthority = previewSessionAuthority;
     setIsSaving(true);
     setProgress(null);
     try {
@@ -3033,6 +3159,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         },
         negativeConversionSavedPositiveHandoffsSchema,
       );
+      if (!isCurrentOperation(requestAuthority)) return;
       const savedPaths = savedPositiveHandoffs.map((handoff) => handoff.path);
       const activePositivePath =
         savedPositiveHandoffs.find((handoff) => handoff.sourcePath === activePositiveVariant?.sourcePath)?.path ??
@@ -3073,8 +3200,10 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     } catch (e) {
       console.error('Failed to batch save negatives', e);
     } finally {
-      setIsSaving(false);
-      setProgress(null);
+      if (isCurrentOperation(requestAuthority)) {
+        setIsSaving(false);
+        setProgress(null);
+      }
     }
   };
 
@@ -3094,11 +3223,16 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     if (targetPaths[frameIndex] === undefined) return;
     const nextFrameId = frameHealthReport.frames.find((frame) => frame.pathIndex === frameIndex)?.frameId ?? null;
     setActivePathIndex(frameIndex);
+    setIsCompareActive(false);
+    setOriginalUrl(null);
     setPatchProbeByRole({});
     setNeutralPatchSuggestion(null);
     setHighlightPatchExposureSuggestion(null);
     setShadowPatchBlackPointSuggestion(null);
-    updatePreview(buildParamsWithFrameOverrides(params, nextFrameId));
+    updatePreview(buildParamsWithFrameOverrides(params, nextFrameId), false, null, {
+      activePathIndex: frameIndex,
+      selectedImagePath: targetPaths[frameIndex],
+    });
     resetViewport();
   };
 
@@ -4475,9 +4609,13 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                 data-input-transform={selectedAcquisitionProfile.inputTransform}
                 data-testid="negative-lab-acquisition-profile"
                 onChange={(event) => {
-                  setSelectedAcquisitionProfileId(
-                    negativeLabAcquisitionProfileIdSchema.parse(event.currentTarget.value),
+                  const nextAcquisitionProfileId = negativeLabAcquisitionProfileIdSchema.parse(
+                    event.currentTarget.value,
                   );
+                  setSelectedAcquisitionProfileId(nextAcquisitionProfileId);
+                  updatePreview(buildParamsWithFrameOverrides(params), false, null, {
+                    selectedAcquisitionProfileId: nextAcquisitionProfileId,
+                  });
                 }}
                 value={selectedAcquisitionProfileId}
               >
@@ -6161,13 +6299,17 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       <div
         className="sr-only"
         data-active-stage={workspaceProof.activeStage}
+        data-candidate-preview-count={Object.keys(renderedProfileCandidatePreviewById).length}
+        data-compare-active={String(isCompareActive)}
         data-export-ready={String(workspaceProof.exportReady)}
+        data-operation-id={operationId}
         data-positive-preview-ready={String(positivePreviewReady)}
         data-preview-ready={String(workspaceProof.previewReady)}
         data-queued-count={workspaceProof.queuedCount}
         data-review-count={workspaceProof.reviewReport.reviewCount}
         data-retouch-count={workspaceProof.reviewReport.retouchCount}
         data-schema-version={workspaceProof.schemaVersion}
+        data-selected-source-path={selectedImagePath ?? ''}
         data-target-count={workspaceProof.targetCount}
         data-testid="negative-lab-workspace-proof"
       />
@@ -6293,6 +6435,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                 'p-2 rounded-full transition-colors select-none',
                 isCompareActive ? 'bg-accent text-button-text' : 'text-white/60 hover:bg-white/10 hover:text-white',
               )}
+              data-testid="negative-lab-compare-control"
               data-tooltip={t('modals.negativeConversion.compareTooltip')}
             >
               {isCompareActive ? <Eye size={18} /> : <EyeOff size={18} />}
@@ -6306,6 +6449,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
 
   return (
     <NegativeLabWorkspaceShell
+      compareActive={isCompareActive}
       header={
         <div className="flex min-w-0 items-center justify-between gap-3">
           <div className="min-w-0">
@@ -6448,6 +6592,9 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       }
       isOpen={isOpen}
       onClose={onClose}
+      operationId={operationId}
+      runtimeChannelBasis={runtimePreviewRecipeIdentity?.channelBasis ?? ''}
+      runtimeProcessFamily={runtimePreviewRecipeIdentity?.processFamily ?? ''}
       titleId="negative-lab-dialog-title"
     >
       {renderContent()}

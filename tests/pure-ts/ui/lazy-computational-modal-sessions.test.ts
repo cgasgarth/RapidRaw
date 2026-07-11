@@ -14,6 +14,7 @@ const resetModalSessions = () => {
     focusStackModalState: createDefaultFocusStackModalState(),
     hdrModalState: createDefaultHdrModalState(),
     mountedLazyModalIds: new Set(),
+    negativeModalState: { isOpen: false, operationEpoch: 0, session: null, targetPaths: [] },
     panoramaModalState: createDefaultPanoramaModalState(),
     superResolutionModalState: createDefaultSuperResolutionModalState(),
   });
@@ -66,6 +67,25 @@ describe('lazy computational modal sessions', () => {
     expect([...useUIStore.getState().mountedLazyModalIds].sort()).toEqual(['hdr', 'panorama']);
     expect(useUIStore.getState().panoramaModalState.isOpen).toBe(true);
     expect(useUIStore.getState().hdrModalState.isOpen).toBe(true);
+  });
+
+  test('retains the Negative Lab shell slot while its keyed operation disposes after close', () => {
+    resetModalSessions();
+    useUIStore.getState().setUI({
+      negativeModalState: {
+        isOpen: true,
+        operationEpoch: 1,
+        session: null,
+        targetPaths: ['/fixture/negative.raw'],
+      },
+    });
+
+    expect(useUIStore.getState().mountedLazyModalIds.has('negativeLab')).toBe(true);
+    const claimedSet = useUIStore.getState().mountedLazyModalIds;
+    useUIStore.getState().setUI((state) => ({
+      negativeModalState: { ...state.negativeModalState, isOpen: false },
+    }));
+    expect(useUIStore.getState().mountedLazyModalIds).toBe(claimedSet);
   });
 
   test('supports functional open commands without a follow-up store update', () => {
