@@ -703,6 +703,16 @@ fn apply_change_batch(
         let exif = read_exif_for_paths_blocking(vec![source_string.clone()]);
         rows.iter_mut()
             .for_each(|row| row.exif = exif.get(&source_string).cloned());
+        let next_ids = rows
+            .iter()
+            .map(|row| row.path.as_str())
+            .collect::<HashSet<_>>();
+        removed_image_ids.extend(
+            previous
+                .keys()
+                .filter(|image_id| !next_ids.contains(image_id.as_str()))
+                .cloned(),
+        );
         transaction
             .execute(
                 "DELETE FROM entities WHERE source_path=?1",
