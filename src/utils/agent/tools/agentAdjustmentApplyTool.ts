@@ -58,6 +58,16 @@ export const agentAdjustmentsApplyRequestSchema = z
     approval: agentAdjustmentsApplyApprovalSchema,
     expectedGraphRevision: z.string().trim().min(1),
     expectedRecipeHash: z.string().trim().min(1),
+    proposalLineage: z
+      .object({
+        acceptedProposalHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+        acceptedProposalId: z.string().trim().min(1),
+        lineageEpoch: z.number().int().positive(),
+        lineageId: z.string().trim().min(1),
+        sealedIterationId: z.string().trim().min(1),
+      })
+      .strict()
+      .optional(),
     operationId: z.string().trim().min(1),
     requestId: z.string().trim().min(1),
     sessionId: z.string().trim().min(1),

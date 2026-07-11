@@ -214,6 +214,7 @@ const staleApplyRejections = [
     {
       acceptedPreviewArtifactId: result.previewLineage[0]?.previewArtifactId ?? '',
       acceptedPreviewReceiptHash: latestPreviewReceiptHash,
+      ...result.sealedProposal,
       request: commandRequest,
       review: result,
     },
@@ -224,6 +225,7 @@ const staleApplyRejections = [
     {
       acceptedPreviewArtifactId: latestPreviewArtifactId,
       acceptedPreviewReceiptHash: result.previewRefreshReceipts[0]?.contentHash ?? '',
+      ...result.sealedProposal,
       request: commandRequest,
       review: result,
     },
@@ -234,6 +236,7 @@ const staleApplyRejections = [
     {
       acceptedPreviewArtifactId: latestPreviewArtifactId,
       acceptedPreviewReceiptHash: latestPreviewReceiptHash,
+      ...result.sealedProposal,
       request: commandRequest,
       review: { ...result, selectedImage: { ...result.selectedImage, width: result.selectedImage.width + 1 } },
     },
