@@ -1,10 +1,10 @@
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::AtomicBool;
 
 use serde::Serialize;
 use serde_json::json;
 
 use crate::app_state::AppState;
+use crate::merge::computational_job::ComputationalMergeFamily;
 use crate::merge::derived_output_provenance::stable_hash;
 
 use super::raw_frame::{
@@ -33,50 +33,6 @@ pub struct SuperResolutionDryRunPlan {
     pub registration: Option<SuperResolutionRegistrationResult>,
     pub registration_input_hash: String,
     pub warning_codes: Vec<String>,
-}
-
-fn claim_registration_job(
-    registry: &Mutex<Option<Arc<AtomicBool>>>,
-) -> Result<Arc<AtomicBool>, String> {
-    let mut job = registry
-        .lock()
-        .map_err(|_| "super_resolution_registration_state_unavailable".to_string())?;
-    if job.is_some() {
-        return Err("super_resolution_registration_already_running".to_string());
-    }
-    let cancellation_token = Arc::new(AtomicBool::new(false));
-    *job = Some(Arc::clone(&cancellation_token));
-    Ok(cancellation_token)
-}
-
-fn finish_registration_job(
-    registry: &Mutex<Option<Arc<AtomicBool>>>,
-    cancellation_token: &Arc<AtomicBool>,
-) {
-    let Ok(mut job) = registry.lock() else {
-        return;
-    };
-    if job
-        .as_ref()
-        .is_some_and(|active| Arc::ptr_eq(active, cancellation_token))
-    {
-        *job = None;
-    }
-}
-
-fn request_registration_cancellation(
-    registry: &Mutex<Option<Arc<AtomicBool>>>,
-) -> Result<(), String> {
-    let job = registry
-        .lock()
-        .map_err(|_| "super_resolution_registration_state_unavailable".to_string())?;
-    let Some(cancellation_token) = job.as_ref() else {
-        return Err("super_resolution_registration_not_running".to_string());
-    };
-    if cancellation_token.swap(true, Ordering::SeqCst) {
-        return Err("super_resolution_registration_cancellation_already_requested".to_string());
-    }
-    Ok(())
 }
 
 fn build_dry_run_plan(
@@ -194,36 +150,45 @@ pub async fn plan_super_resolution(
     if !(2..=8).contains(&paths.len()) {
         return Err("super_resolution_source_count_out_of_range".to_string());
     }
-    let cancellation_token = claim_registration_job(&state.super_resolution_registration_job)?;
-    let task_token = Arc::clone(&cancellation_token);
+    let job = state.computational_merge_jobs.begin(
+        ComputationalMergeFamily::SuperResolution,
+        "registration",
+        paths.len() as u64,
+        paths.len() as u64,
+    )?;
+    let task_token = job.cancellation_token.clone();
     let task = tokio::task::spawn_blocking(move || {
         let mut frames = Vec::with_capacity(paths.len());
         for (source_index, path) in paths.iter().enumerate() {
-            check_cancel(&task_token)?;
+            task_token.checkpoint()?;
             frames.push(decode_bayer_burst_frame(
                 path,
                 source_index,
                 settings.max_preview_dimension_px,
-                &task_token,
+                task_token.atomic_flag(),
             )?);
         }
-        build_dry_run_plan(frames, &settings, &task_token)
+        build_dry_run_plan(frames, &settings, task_token.atomic_flag())
     });
     let result = task
         .await
         .map_err(|error| format!("super_resolution_registration_task_failed:{error}"))
         .and_then(|result| result);
-    finish_registration_job(
-        &state.super_resolution_registration_job,
-        &cancellation_token,
-    );
+    if result.is_ok() {
+        state.computational_merge_jobs.finish(&job.job_id)?;
+    } else {
+        state.computational_merge_jobs.fail(&job.job_id)?;
+    }
     result
 }
 
 pub fn cancel_super_resolution_registration(
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
-    request_registration_cancellation(&state.super_resolution_registration_job)
+    state
+        .computational_merge_jobs
+        .cancel_active_family(ComputationalMergeFamily::SuperResolution)
+        .map(|_| ())
 }
 
 #[cfg(test)]
@@ -249,17 +214,6 @@ mod tests {
             settings_block_codes(&settings),
             vec!["unsupported_alignment_model"]
         );
-    }
-
-    #[test]
-    fn cancellation_registry_is_exclusive_and_clears() {
-        let registry = Mutex::new(None);
-        let token = claim_registration_job(&registry).expect("first job claims registry");
-        assert!(claim_registration_job(&registry).is_err());
-        request_registration_cancellation(&registry).expect("active job cancels");
-        assert!(check_cancel(&token).is_err());
-        finish_registration_job(&registry, &token);
-        assert!(claim_registration_job(&registry).is_ok());
     }
 
     #[test]
