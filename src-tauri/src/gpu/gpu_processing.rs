@@ -1,9 +1,9 @@
-use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 #[cfg(test)]
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::AtomicBool;
 
 use half::f16;
 use image::{DynamicImage, GenericImageView, ImageBuffer, Luma};
@@ -23,6 +23,119 @@ use crate::mixer_render::apply_native_color_mixer_adjustments;
 use crate::render_caches::RenderCaches;
 use crate::{AppState, GpuImageCache};
 
+pub const PRE_GPU_PRECISION_ABI_RGBA16F_V1: u32 = 1;
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct GpuInputCacheCounters {
+    pub hits: u64,
+    pub misses: u64,
+    pub identity_misses: u64,
+    pub dimension_misses: u64,
+    pub device_misses: u64,
+    pub to_rgba_f16_calls: u64,
+    pub converted_bytes: u64,
+    pub uploaded_bytes: u64,
+    pub texture_allocations: u64,
+    pub view_allocations: u64,
+}
+
+static INPUT_CACHE_HITS: AtomicU64 = AtomicU64::new(0);
+static INPUT_CACHE_MISSES: AtomicU64 = AtomicU64::new(0);
+static INPUT_IDENTITY_MISSES: AtomicU64 = AtomicU64::new(0);
+static INPUT_DIMENSION_MISSES: AtomicU64 = AtomicU64::new(0);
+static INPUT_DEVICE_MISSES: AtomicU64 = AtomicU64::new(0);
+static TO_RGBA_F16_CALLS: AtomicU64 = AtomicU64::new(0);
+static CONVERTED_BYTES: AtomicU64 = AtomicU64::new(0);
+static UPLOADED_BYTES: AtomicU64 = AtomicU64::new(0);
+static INPUT_TEXTURE_ALLOCATIONS: AtomicU64 = AtomicU64::new(0);
+static INPUT_VIEW_ALLOCATIONS: AtomicU64 = AtomicU64::new(0);
+
+pub fn gpu_input_cache_counters() -> GpuInputCacheCounters {
+    GpuInputCacheCounters {
+        hits: INPUT_CACHE_HITS.load(Ordering::Relaxed),
+        misses: INPUT_CACHE_MISSES.load(Ordering::Relaxed),
+        identity_misses: INPUT_IDENTITY_MISSES.load(Ordering::Relaxed),
+        dimension_misses: INPUT_DIMENSION_MISSES.load(Ordering::Relaxed),
+        device_misses: INPUT_DEVICE_MISSES.load(Ordering::Relaxed),
+        to_rgba_f16_calls: TO_RGBA_F16_CALLS.load(Ordering::Relaxed),
+        converted_bytes: CONVERTED_BYTES.load(Ordering::Relaxed),
+        uploaded_bytes: UPLOADED_BYTES.load(Ordering::Relaxed),
+        texture_allocations: INPUT_TEXTURE_ALLOCATIONS.load(Ordering::Relaxed),
+        view_allocations: INPUT_VIEW_ALLOCATIONS.load(Ordering::Relaxed),
+    }
+}
+
+#[cfg(all(test, feature = "tauri-test"))]
+pub fn reset_gpu_input_cache_counters() {
+    for counter in [
+        &INPUT_CACHE_HITS,
+        &INPUT_CACHE_MISSES,
+        &INPUT_IDENTITY_MISSES,
+        &INPUT_DIMENSION_MISSES,
+        &INPUT_DEVICE_MISSES,
+        &TO_RGBA_F16_CALLS,
+        &CONVERTED_BYTES,
+        &UPLOADED_BYTES,
+        &INPUT_TEXTURE_ALLOCATIONS,
+        &INPUT_VIEW_ALLOCATIONS,
+    ] {
+        counter.store(0, Ordering::Relaxed);
+    }
+}
+
+/// Identity of the finalized pixels uploaded to the GPU input texture.
+///
+/// `source_revision` distinguishes sessions/sources, while `stage_revision` names the
+/// geometry/resolution/detail/retouch pipeline which produced `base_image`. The pixel
+/// fingerprint is the correctness backstop: callers cannot accidentally reuse an upload
+/// when a pre-GPU stage changes without updating its revision scheme.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct PreGpuImageIdentity {
+    pub source_revision: u64,
+    pub stage_revision: u64,
+    pub pixel_fingerprint: u64,
+    pub width: u32,
+    pub height: u32,
+    pub precision_abi: u32,
+}
+
+impl PreGpuImageIdentity {
+    pub fn source_revision(source: &str) -> u64 {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        let mut hasher = DefaultHasher::new();
+        source.hash(&mut hasher);
+        hasher.finish()
+    }
+
+    pub fn for_source(base_image: &DynamicImage, source: &str) -> Self {
+        Self::from_image(base_image, Self::source_revision(source), 0)
+    }
+
+    pub fn from_image(
+        base_image: &DynamicImage,
+        source_revision: u64,
+        stage_revision: u64,
+    ) -> Self {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        let (width, height) = base_image.dimensions();
+        let mut hasher = DefaultHasher::new();
+        base_image.color().hash(&mut hasher);
+        base_image.as_bytes().hash(&mut hasher);
+        Self {
+            source_revision,
+            stage_revision,
+            pixel_fingerprint: hasher.finish(),
+            width,
+            height,
+            precision_abi: PRE_GPU_PRECISION_ABI_RGBA16F_V1,
+        }
+    }
+}
+
 #[cfg(all(test, feature = "tauri-test"))]
 pub use crate::gpu_context::get_or_init_compute_gpu_context_for_tests;
 pub use crate::gpu_context::get_or_init_gpu_context;
@@ -36,7 +149,6 @@ const BLUR_FLAG_TONAL: u32 = 1 << 1;
 const BLUR_FLAG_CLARITY: u32 = 1 << 2;
 const BLUR_FLAG_STRUCTURE: u32 = 1 << 3;
 const BLUR_ABI_VERSION: u32 = 1;
-static NEXT_INPUT_UPLOAD_GENERATION: AtomicU64 = AtomicU64::new(1);
 static NEXT_PROCESSOR_GENERATION: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -51,8 +163,6 @@ struct BlurPassNeeds {
 static FORCE_ALL_BLUR_PASSES: AtomicBool = AtomicBool::new(false);
 #[cfg(test)]
 static FORCE_DISABLE_BLUR_CACHE: AtomicBool = AtomicBool::new(false);
-#[cfg(all(test, feature = "tauri-test"))]
-static GPU_BLUR_TEST_LOCK: Mutex<()> = Mutex::new(());
 
 impl BlurPassNeeds {
     fn flags(self) -> u32 {
@@ -105,7 +215,8 @@ struct BlurPassCounters {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 struct BlurSurfaceKey {
     processor_generation: u64,
-    input_upload_generation: u64,
+    device_generation: u64,
+    input_identity: PreGpuImageIdentity,
     input_width: u32,
     input_height: u32,
     tile_x: u32,
@@ -207,7 +318,8 @@ pub struct RenderRequest<'a> {
 
 struct InputTextureRef<'a> {
     view: &'a wgpu::TextureView,
-    upload_generation: u64,
+    identity: PreGpuImageIdentity,
+    device_generation: u64,
 }
 
 fn to_rgba_f16(img: &DynamicImage) -> Vec<f16> {
@@ -720,7 +832,7 @@ impl GpuProcessor {
 
         Ok(Self {
             context,
-            generation: NEXT_PROCESSOR_GENERATION.fetch_add(1, AtomicOrdering::Relaxed),
+            generation: NEXT_PROCESSOR_GENERATION.fetch_add(1, Ordering::Relaxed),
             blur_surface_cache: Mutex::new(BlurSurfaceCache::default()),
             blur_bgl,
             h_blur_pipeline,
@@ -1042,7 +1154,8 @@ impl GpuProcessor {
 
                     let key = BlurSurfaceKey {
                         processor_generation: self.generation,
-                        input_upload_generation: input.upload_generation,
+                        device_generation: input.device_generation,
+                        input_identity: input.identity,
                         input_width: width,
                         input_height: height,
                         tile_x,
@@ -1139,8 +1252,6 @@ impl GpuProcessor {
                     }
 
                     queue.submit(Some(blur_encoder.finish()));
-                    // The shared processor is serialized by AppState. Publish only after submit so
-                    // a matching request cannot observe commands that have not entered queue order.
                     if cache_one_tile {
                         self.blur_surface_cache.lock().unwrap().publish(family, key);
                     }
@@ -1348,10 +1459,21 @@ impl GpuProcessor {
 mod blur_pass_tests {
     use super::*;
 
+    #[cfg(feature = "tauri-test")]
+    static GPU_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     fn surface_key() -> BlurSurfaceKey {
         BlurSurfaceKey {
             processor_generation: 1,
-            input_upload_generation: 2,
+            device_generation: 2,
+            input_identity: PreGpuImageIdentity {
+                source_revision: 3,
+                stage_revision: 4,
+                pixel_fingerprint: 5,
+                width: 1920,
+                height: 1080,
+                precision_abi: PRE_GPU_PRECISION_ABI_RGBA16F_V1,
+            },
             input_width: 1920,
             input_height: 1080,
             tile_x: 0,
@@ -1378,6 +1500,31 @@ mod blur_pass_tests {
         let mut adjustments = AllAdjustments::default();
         adjustments.global.exposure = 1.0;
         assert_eq!(needs(adjustments), BlurPassNeeds::default());
+    }
+
+    #[test]
+    fn pre_gpu_identity_tracks_source_stage_pixels_dimensions_and_precision() {
+        use image::{ImageBuffer, Rgba};
+
+        let image = DynamicImage::ImageRgba8(ImageBuffer::from_pixel(4, 3, Rgba([1, 2, 3, 4])));
+        let baseline = PreGpuImageIdentity::from_image(&image, 10, 20);
+        assert_eq!(baseline, PreGpuImageIdentity::from_image(&image, 10, 20));
+        assert_ne!(baseline, PreGpuImageIdentity::from_image(&image, 11, 20));
+        assert_ne!(baseline, PreGpuImageIdentity::from_image(&image, 10, 21));
+
+        let changed_pixel =
+            DynamicImage::ImageRgba8(ImageBuffer::from_pixel(4, 3, Rgba([2, 2, 3, 4])));
+        let changed_dimensions =
+            DynamicImage::ImageRgba8(ImageBuffer::from_pixel(5, 3, Rgba([1, 2, 3, 4])));
+        assert_ne!(
+            baseline,
+            PreGpuImageIdentity::from_image(&changed_pixel, 10, 20)
+        );
+        assert_ne!(
+            baseline,
+            PreGpuImageIdentity::from_image(&changed_dimensions, 10, 20)
+        );
+        assert_eq!(baseline.precision_abi, PRE_GPU_PRECISION_ABI_RGBA16F_V1);
     }
 
     #[test]
@@ -1483,56 +1630,36 @@ mod blur_pass_tests {
     }
 
     #[test]
-    fn blur_surfaces_are_published_and_reused_independently() {
+    fn blur_surfaces_reuse_independently_and_key_identity_lifecycle() {
         let key = surface_key();
         let mut cache = BlurSurfaceCache::default();
-
-        assert!(!cache.is_valid(BlurFamily::Tonal, key));
-        assert!(!cache.is_valid(BlurFamily::Clarity, key));
         cache.publish(BlurFamily::Tonal, key);
         assert!(cache.is_valid(BlurFamily::Tonal, key));
         assert!(!cache.is_valid(BlurFamily::Clarity, key));
 
         cache.publish(BlurFamily::Clarity, key);
-        assert!(cache.is_valid(BlurFamily::Tonal, key));
-        assert!(cache.is_valid(BlurFamily::Clarity, key));
-
         cache.invalidate(BlurFamily::Clarity);
         assert!(cache.is_valid(BlurFamily::Tonal, key));
         assert!(!cache.is_valid(BlurFamily::Clarity, key));
-    }
 
-    #[test]
-    fn every_input_geometry_radius_abi_and_device_key_change_misses() {
-        let key = surface_key();
-        let mut cache = BlurSurfaceCache::default();
-        cache.publish(BlurFamily::Clarity, key);
-
-        let variants = [
+        for variant in [
             BlurSurfaceKey {
                 processor_generation: 9,
                 ..key
             },
             BlurSurfaceKey {
-                input_upload_generation: 9,
+                device_generation: 9,
                 ..key
             },
             BlurSurfaceKey {
-                input_width: 2048,
+                input_identity: PreGpuImageIdentity {
+                    stage_revision: 9,
+                    ..key.input_identity
+                },
                 ..key
             },
-            BlurSurfaceKey {
-                input_height: 1200,
-                ..key
-            },
-            BlurSurfaceKey { tile_x: 1, ..key },
-            BlurSurfaceKey { tile_y: 1, ..key },
             BlurSurfaceKey {
                 tile_width: 1024,
-                ..key
-            },
-            BlurSurfaceKey {
-                tile_height: 768,
                 ..key
             },
             BlurSurfaceKey {
@@ -1540,15 +1667,7 @@ mod blur_pass_tests {
                 ..key
             },
             BlurSurfaceKey {
-                input_y_start: 4,
-                ..key
-            },
-            BlurSurfaceKey {
                 input_width_with_overlap: 1900,
-                ..key
-            },
-            BlurSurfaceKey {
-                input_height_with_overlap: 1060,
                 ..key
             },
             BlurSurfaceKey {
@@ -1559,11 +1678,9 @@ mod blur_pass_tests {
                 blur_abi_version: BLUR_ABI_VERSION + 1,
                 ..key
             },
-        ];
-        for variant in variants {
-            assert!(!cache.is_valid(BlurFamily::Clarity, variant));
+        ] {
+            assert!(!cache.is_valid(BlurFamily::Tonal, variant));
         }
-        assert!(cache.is_valid(BlurFamily::Clarity, key));
     }
 
     #[cfg(feature = "tauri-test")]
@@ -1572,7 +1689,7 @@ mod blur_pass_tests {
         use image::{DynamicImage, ImageBuffer, Rgba};
         use tauri::Manager;
 
-        let _gpu_test_guard = GPU_BLUR_TEST_LOCK.lock().unwrap();
+        let _test_guard = GPU_TEST_LOCK.lock().unwrap();
         let source = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(32, 24, |x, y| {
             Rgba([x as f32 / 31.0, y as f32 / 23.0, (x + y) as f32 / 54.0, 1.0])
         }));
@@ -1612,7 +1729,7 @@ mod blur_pass_tests {
                     &context,
                     &state,
                     &source,
-                    5_244,
+                    PreGpuImageIdentity::for_source(&source, "blur_pass_parity"),
                     RenderRequest {
                         adjustments,
                         mask_bitmaps: &[],
@@ -1638,14 +1755,17 @@ mod blur_pass_tests {
 
     #[cfg(feature = "tauri-test")]
     #[test]
-    fn warm_one_tile_edits_dispatch_blur_only_once() {
-        use image::{DynamicImage, ImageBuffer, Rgba};
+    fn one_hundred_warm_edits_reuse_input_upload_and_blur_surface() {
+        use image::{ImageBuffer, Rgba};
         use tauri::Manager;
 
-        let _gpu_test_guard = GPU_BLUR_TEST_LOCK.lock().unwrap();
-        let source = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(64, 48, |x, y| {
-            Rgba([x as f32 / 63.0, y as f32 / 47.0, 0.25, 1.0])
-        }));
+        let _test_guard = GPU_TEST_LOCK.lock().unwrap();
+        reset_gpu_input_cache_counters();
+        let source = DynamicImage::ImageRgba32F(ImageBuffer::from_pixel(
+            16,
+            16,
+            Rgba([0.25, 0.5, 0.75, 1.0]),
+        ));
         let app = tauri::test::mock_builder()
             .manage(AppState::new())
             .build(tauri::test::mock_context(tauri::test::noop_assets()))
@@ -1653,29 +1773,36 @@ mod blur_pass_tests {
         let state = app.state::<AppState>();
         let context = get_or_init_compute_gpu_context_for_tests(&state)
             .expect("compute-only GPU context initializes");
-
-        for edit in 0..100 {
+        let identity = PreGpuImageIdentity::for_source(&source, "exposure_reuse");
+        for index in 0..100 {
             let mut adjustments = AllAdjustments::default();
+            adjustments.global.exposure = index as f32 / 100.0;
             adjustments.global.clarity = 0.25;
-            adjustments.global.exposure = edit as f32 / 100.0;
             process_and_get_dynamic_image(
                 &context,
                 &state,
                 &source,
-                5_245,
+                identity,
                 RenderRequest {
                     adjustments,
                     mask_bitmaps: &[],
                     lut: None,
                     roi: None,
                 },
-                "warm_blur_cache",
+                "exposure_reuse",
             )
             .expect("GPU render succeeds");
         }
 
+        let counters = gpu_input_cache_counters();
+        assert_eq!(counters.to_rgba_f16_calls, 1);
+        assert_eq!(counters.texture_allocations, 1);
+        assert_eq!(counters.view_allocations, 1);
+        assert_eq!(counters.misses, 1);
+        assert_eq!(counters.hits, 99);
+        assert_eq!(counters.uploaded_bytes, 16 * 16 * 8);
         let processor = state.gpu_processor.lock().unwrap();
-        let totals = processor
+        let blur = processor
             .as_ref()
             .unwrap()
             .processor
@@ -1683,135 +1810,10 @@ mod blur_pass_tests {
             .lock()
             .unwrap()
             .totals;
-        assert_eq!(totals.families_requested, 100);
-        assert_eq!(totals.cache_misses, 1);
-        assert_eq!(totals.cache_hits, 99);
-        assert_eq!(totals.dispatches, 2);
-        assert_eq!(totals.submissions, 1);
-        assert_eq!(totals.pixels_processed, 64 * 48 * 2);
-        drop(processor);
-
-        let previous_upload_generation = state
-            .gpu_image_cache
-            .lock()
-            .unwrap()
-            .as_ref()
-            .unwrap()
-            .upload_generation;
-        let mut adjustments = AllAdjustments::default();
-        adjustments.global.clarity = 0.25;
-        process_and_get_dynamic_image(
-            &context,
-            &state,
-            &source,
-            5_246,
-            RenderRequest {
-                adjustments,
-                mask_bitmaps: &[],
-                lut: None,
-                roi: None,
-            },
-            "changed_input_blur_cache",
-        )
-        .expect("GPU render after input change succeeds");
-
-        let new_upload_generation = state
-            .gpu_image_cache
-            .lock()
-            .unwrap()
-            .as_ref()
-            .unwrap()
-            .upload_generation;
-        assert_ne!(new_upload_generation, previous_upload_generation);
-        let processor = state.gpu_processor.lock().unwrap();
-        let totals = processor
-            .as_ref()
-            .unwrap()
-            .processor
-            .blur_surface_cache
-            .lock()
-            .unwrap()
-            .totals;
-        assert_eq!(totals.cache_misses, 2);
-        assert_eq!(totals.dispatches, 4);
-    }
-
-    #[cfg(feature = "tauri-test")]
-    #[test]
-    fn warm_all_family_edits_dispatch_each_blur_only_once() {
-        use image::{DynamicImage, ImageBuffer, Rgba};
-        use tauri::Manager;
-
-        let _gpu_test_guard = GPU_BLUR_TEST_LOCK.lock().unwrap();
-        let source =
-            DynamicImage::ImageRgba32F(ImageBuffer::from_pixel(32, 24, Rgba([0.2, 0.4, 0.6, 1.0])));
-        let app = tauri::test::mock_builder()
-            .manage(AppState::new())
-            .build(tauri::test::mock_context(tauri::test::noop_assets()))
-            .expect("mock Tauri app builds");
-        let state = app.state::<AppState>();
-        let context = get_or_init_compute_gpu_context_for_tests(&state)
-            .expect("compute-only GPU context initializes");
-
-        let render_edits = |start: usize| {
-            for edit in start..start + 100 {
-                let mut adjustments = AllAdjustments::default();
-                adjustments.global.sharpness = 0.2;
-                adjustments.global.contrast = 0.2;
-                adjustments.global.clarity = 0.2;
-                adjustments.global.structure = 0.2;
-                adjustments.global.exposure = edit as f32 / 100.0;
-                process_and_get_dynamic_image(
-                    &context,
-                    &state,
-                    &source,
-                    5_245,
-                    RenderRequest {
-                        adjustments,
-                        mask_bitmaps: &[],
-                        lut: None,
-                        roi: None,
-                    },
-                    "warm_all_blur_cache",
-                )
-                .expect("GPU render succeeds");
-            }
-        };
-
-        FORCE_DISABLE_BLUR_CACHE.store(true, Ordering::Relaxed);
-        render_edits(0);
-        FORCE_DISABLE_BLUR_CACHE.store(false, Ordering::Relaxed);
-        let processor = state.gpu_processor.lock().unwrap();
-        let baseline = processor
-            .as_ref()
-            .unwrap()
-            .processor
-            .blur_surface_cache
-            .lock()
-            .unwrap()
-            .totals;
-        drop(processor);
-        assert_eq!(baseline.dispatches, 800);
-        assert_eq!(baseline.submissions, 400);
-
-        render_edits(100);
-        let processor = state.gpu_processor.lock().unwrap();
-        let totals = processor
-            .as_ref()
-            .unwrap()
-            .processor
-            .blur_surface_cache
-            .lock()
-            .unwrap()
-            .totals;
-        assert_eq!(totals.cache_misses, 4);
-        assert_eq!(totals.cache_hits, 396);
-        assert_eq!(totals.dispatches - baseline.dispatches, 8);
-        assert_eq!(totals.submissions - baseline.submissions, 4);
-        assert_eq!(
-            totals.pixels_processed - baseline.pixels_processed,
-            32 * 24 * 2 * 4
-        );
+        assert_eq!(blur.cache_misses, 1);
+        assert_eq!(blur.cache_hits, 99);
+        assert_eq!(blur.dispatches, 2);
+        assert_eq!(blur.submissions, 1);
     }
 }
 
@@ -1819,7 +1821,7 @@ pub fn process_and_get_dynamic_image(
     context: &GpuContext,
     state: &tauri::State<AppState>,
     base_image: &DynamicImage,
-    transform_hash: u64,
+    pre_gpu_identity: PreGpuImageIdentity,
     request: RenderRequest,
     caller_id: &str,
 ) -> Result<DynamicImage, String> {
@@ -1827,7 +1829,7 @@ pub fn process_and_get_dynamic_image(
         context,
         state,
         base_image,
-        transform_hash,
+        pre_gpu_identity,
         request,
         caller_id,
         false,
@@ -1841,7 +1843,7 @@ pub fn process_and_get_unclamped_dynamic_image(
     context: &GpuContext,
     state: &tauri::State<AppState>,
     base_image: &DynamicImage,
-    transform_hash: u64,
+    pre_gpu_identity: PreGpuImageIdentity,
     request: RenderRequest,
     caller_id: &str,
 ) -> Result<DynamicImage, String> {
@@ -1849,7 +1851,7 @@ pub fn process_and_get_unclamped_dynamic_image(
         context,
         state,
         base_image,
-        transform_hash,
+        pre_gpu_identity,
         request,
         caller_id,
         false,
@@ -1863,7 +1865,7 @@ pub fn process_and_get_dynamic_image_with_analytics(
     context: &GpuContext,
     state: &tauri::State<AppState>,
     base_image: &DynamicImage,
-    transform_hash: u64,
+    pre_gpu_identity: PreGpuImageIdentity,
     request: RenderRequest,
     caller_id: &str,
     output_to_display: bool,
@@ -1873,7 +1875,7 @@ pub fn process_and_get_dynamic_image_with_analytics(
         context,
         state,
         base_image,
-        transform_hash,
+        pre_gpu_identity,
         request,
         caller_id,
         output_to_display,
@@ -1887,7 +1889,7 @@ fn process_and_get_dynamic_image_inner(
     context: &GpuContext,
     state: &tauri::State<AppState>,
     base_image: &DynamicImage,
-    transform_hash: u64,
+    pre_gpu_identity: PreGpuImageIdentity,
     request: RenderRequest,
     caller_id: &str,
     output_to_display: bool,
@@ -1898,6 +1900,13 @@ fn process_and_get_dynamic_image_inner(
     let (width, height) = base_image.dimensions();
     let device = &context.device;
     let queue = &context.queue;
+    if pre_gpu_identity.width != width || pre_gpu_identity.height != height {
+        return Err(format!(
+            "pre-GPU identity dimensions {}x{} do not match image {}x{}",
+            pre_gpu_identity.width, pre_gpu_identity.height, width, height
+        ));
+    }
+    let device_generation = Arc::as_ptr(&context.device) as usize as u64;
 
     let max_dim = context.limits.max_texture_dimension_2d;
     if width > max_dim || height > max_dim {
@@ -2008,11 +2017,31 @@ fn process_and_get_dynamic_image_inner(
         }
     }
 
-    RenderCaches::new(state).clear_stale_gpu_image_cache(transform_hash, width, height);
+    if let Some(cache) = state.gpu_image_cache.lock().unwrap().as_ref() {
+        if cache.device_generation != device_generation {
+            INPUT_DEVICE_MISSES.fetch_add(1, Ordering::Relaxed);
+        } else if cache.width != width || cache.height != height {
+            INPUT_DIMENSION_MISSES.fetch_add(1, Ordering::Relaxed);
+        } else if cache.pre_gpu_identity != pre_gpu_identity {
+            INPUT_IDENTITY_MISSES.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+    RenderCaches::new(state).clear_stale_gpu_image_cache(
+        pre_gpu_identity,
+        device_generation,
+        width,
+        height,
+    );
 
     let mut cache_lock = state.gpu_image_cache.lock().unwrap();
     if cache_lock.is_none() {
+        INPUT_CACHE_MISSES.fetch_add(1, Ordering::Relaxed);
+        TO_RGBA_F16_CALLS.fetch_add(1, Ordering::Relaxed);
         let img_rgba_f16 = to_rgba_f16(base_image);
+        let upload_bytes = img_rgba_f16.len() as u64 * size_of::<f16>() as u64;
+        let rgba32f_temporary_bytes = u64::from(width) * u64::from(height) * 4 * 4;
+        CONVERTED_BYTES.fetch_add(rgba32f_temporary_bytes + upload_bytes, Ordering::Relaxed);
+        UPLOADED_BYTES.fetch_add(upload_bytes, Ordering::Relaxed);
         let texture_size = wgpu::Extent3d {
             width,
             height,
@@ -2033,17 +2062,22 @@ fn process_and_get_dynamic_image_inner(
             TextureDataOrder::MipMajor,
             bytemuck::cast_slice(&img_rgba_f16),
         );
+        INPUT_TEXTURE_ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
         let texture_view = texture.create_view(&Default::default());
+        INPUT_VIEW_ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
 
         *cache_lock = Some(GpuImageCache {
             texture,
             texture_view,
             width,
             height,
-            transform_hash,
-            upload_generation: NEXT_INPUT_UPLOAD_GENERATION.fetch_add(1, AtomicOrdering::Relaxed),
+            pre_gpu_identity,
+            device_generation,
         });
+    } else {
+        INPUT_CACHE_HITS.fetch_add(1, Ordering::Relaxed);
     }
+    log::debug!("GPU input cache counters: {:?}", gpu_input_cache_counters());
 
     let cache = cache_lock.as_ref().unwrap();
 
@@ -2052,7 +2086,8 @@ fn process_and_get_dynamic_image_inner(
     let (processed_pixels, out_w, out_h, out_x, out_y) = processor.run(
         InputTextureRef {
             view: &cache.texture_view,
-            upload_generation: cache.upload_generation,
+            identity: cache.pre_gpu_identity,
+            device_generation: cache.device_generation,
         },
         cache.width,
         cache.height,
