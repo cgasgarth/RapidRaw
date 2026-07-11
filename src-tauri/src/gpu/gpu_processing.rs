@@ -1,4 +1,5 @@
-use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 #[cfg(test)]
@@ -34,6 +35,9 @@ const BLUR_FLAG_SHARPNESS: u32 = 1 << 0;
 const BLUR_FLAG_TONAL: u32 = 1 << 1;
 const BLUR_FLAG_CLARITY: u32 = 1 << 2;
 const BLUR_FLAG_STRUCTURE: u32 = 1 << 3;
+const BLUR_ABI_VERSION: u32 = 1;
+static NEXT_INPUT_UPLOAD_GENERATION: AtomicU64 = AtomicU64::new(1);
+static NEXT_PROCESSOR_GENERATION: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 struct BlurPassNeeds {
@@ -45,6 +49,10 @@ struct BlurPassNeeds {
 
 #[cfg(test)]
 static FORCE_ALL_BLUR_PASSES: AtomicBool = AtomicBool::new(false);
+#[cfg(test)]
+static FORCE_DISABLE_BLUR_CACHE: AtomicBool = AtomicBool::new(false);
+#[cfg(all(test, feature = "tauri-test"))]
+static GPU_BLUR_TEST_LOCK: Mutex<()> = Mutex::new(());
 
 impl BlurPassNeeds {
     fn flags(self) -> u32 {
@@ -90,6 +98,54 @@ struct BlurPassCounters {
     dispatches: u32,
     submissions: u32,
     pixels_processed: u64,
+    cache_hits: u32,
+    cache_misses: u32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+struct BlurSurfaceKey {
+    processor_generation: u64,
+    input_upload_generation: u64,
+    input_width: u32,
+    input_height: u32,
+    tile_x: u32,
+    tile_y: u32,
+    tile_width: u32,
+    tile_height: u32,
+    input_x_start: u32,
+    input_y_start: u32,
+    input_width_with_overlap: u32,
+    input_height_with_overlap: u32,
+    radius_px: u32,
+    blur_abi_version: u32,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum BlurFamily {
+    Sharpness = 0,
+    Tonal = 1,
+    Clarity = 2,
+    Structure = 3,
+}
+
+#[derive(Debug, Default)]
+struct BlurSurfaceCache {
+    keys: [Option<BlurSurfaceKey>; 4],
+    totals: BlurPassCounters,
+}
+
+impl BlurSurfaceCache {
+    fn is_valid(&self, family: BlurFamily, key: BlurSurfaceKey) -> bool {
+        self.keys[family as usize] == Some(key)
+    }
+
+    fn publish(&mut self, family: BlurFamily, key: BlurSurfaceKey) {
+        self.keys[family as usize] = Some(key);
+    }
+
+    fn invalidate(&mut self, family: BlurFamily) {
+        self.keys[family as usize] = None;
+    }
 }
 
 impl BlurPassCounters {
@@ -149,6 +205,11 @@ pub struct RenderRequest<'a> {
     pub roi: Option<Roi>,
 }
 
+struct InputTextureRef<'a> {
+    view: &'a wgpu::TextureView,
+    upload_generation: u64,
+}
+
 fn to_rgba_f16(img: &DynamicImage) -> Vec<f16> {
     let rgba_f32 = img.to_rgba32f();
     rgba_f32.into_raw().into_iter().map(f16::from_f32).collect()
@@ -182,6 +243,8 @@ struct FlareParams {
 
 pub struct GpuProcessor {
     context: GpuContext,
+    generation: u64,
+    blur_surface_cache: Mutex<BlurSurfaceCache>,
     blur_bgl: wgpu::BindGroupLayout,
     h_blur_pipeline: wgpu::ComputePipeline,
     v_blur_pipeline: wgpu::ComputePipeline,
@@ -657,6 +720,8 @@ impl GpuProcessor {
 
         Ok(Self {
             context,
+            generation: NEXT_PROCESSOR_GENERATION.fetch_add(1, AtomicOrdering::Relaxed),
+            blur_surface_cache: Mutex::new(BlurSurfaceCache::default()),
             blur_bgl,
             h_blur_pipeline,
             v_blur_pipeline,
@@ -690,9 +755,9 @@ impl GpuProcessor {
         })
     }
 
-    pub fn run(
+    fn run(
         &self,
-        input_texture_view: &wgpu::TextureView,
+        input: InputTextureRef<'_>,
         width: u32,
         height: u32,
         request: RenderRequest,
@@ -701,6 +766,7 @@ impl GpuProcessor {
     ) -> Result<(Vec<u8>, u32, u32, u32, u32), String> {
         let device = &self.context.device;
         let queue = &self.context.queue;
+        let input_texture_view = input.view;
         let scale = (width.min(height) as f32) / 1080.0;
 
         let bounds = request.roi.unwrap_or(Roi {
@@ -953,10 +1019,57 @@ impl GpuProcessor {
                     depth_or_array_layers: 1,
                 };
 
-                let mut run_blur = |base_radius: f32, output_view: &wgpu::TextureView| -> bool {
+                let cache_one_tile = start_tile_x == 0
+                    && start_tile_y == 0
+                    && end_tile_x == 1
+                    && end_tile_y == 1
+                    && bounds.x == 0
+                    && bounds.y == 0
+                    && bounds.width == width
+                    && bounds.height == height;
+                #[cfg(test)]
+                let cache_one_tile =
+                    cache_one_tile && !FORCE_DISABLE_BLUR_CACHE.load(Ordering::Relaxed);
+
+                let mut run_blur = |family: BlurFamily,
+                                    base_radius: f32,
+                                    output_view: &wgpu::TextureView|
+                 -> bool {
                     let radius = (base_radius * scale).ceil().max(1.0) as u32;
                     if radius == 0 {
                         return false;
+                    }
+
+                    let key = BlurSurfaceKey {
+                        processor_generation: self.generation,
+                        input_upload_generation: input.upload_generation,
+                        input_width: width,
+                        input_height: height,
+                        tile_x,
+                        tile_y,
+                        tile_width,
+                        tile_height,
+                        input_x_start,
+                        input_y_start,
+                        input_width_with_overlap: input_width,
+                        input_height_with_overlap: input_height,
+                        radius_px: radius,
+                        blur_abi_version: BLUR_ABI_VERSION,
+                    };
+                    if cache_one_tile
+                        && self
+                            .blur_surface_cache
+                            .lock()
+                            .unwrap()
+                            .is_valid(family, key)
+                    {
+                        blur_counters.cache_hits += 1;
+                        return true;
+                    }
+                    if cache_one_tile {
+                        blur_counters.cache_misses += 1;
+                    } else {
+                        self.blur_surface_cache.lock().unwrap().invalidate(family);
                     }
 
                     let params = BlurParams {
@@ -1026,18 +1139,23 @@ impl GpuProcessor {
                     }
 
                     queue.submit(Some(blur_encoder.finish()));
+                    // The shared processor is serialized by AppState. Publish only after submit so
+                    // a matching request cannot observe commands that have not entered queue order.
+                    if cache_one_tile {
+                        self.blur_surface_cache.lock().unwrap().publish(family, key);
+                    }
                     blur_counters.record_family(u64::from(input_width) * u64::from(input_height));
                     true
                 };
 
-                let did_create_sharpness_blur =
-                    blur_pass_needs.sharpness && run_blur(1.0, &self.sharpness_blur_view);
-                let did_create_tonal_blur =
-                    blur_pass_needs.tonal && run_blur(3.5, &self.tonal_blur_view);
-                let did_create_clarity_blur =
-                    blur_pass_needs.clarity && run_blur(8.0, &self.clarity_blur_view);
-                let did_create_structure_blur =
-                    blur_pass_needs.structure && run_blur(40.0, &self.structure_blur_view);
+                let did_create_sharpness_blur = blur_pass_needs.sharpness
+                    && run_blur(BlurFamily::Sharpness, 1.0, &self.sharpness_blur_view);
+                let did_create_tonal_blur = blur_pass_needs.tonal
+                    && run_blur(BlurFamily::Tonal, 3.5, &self.tonal_blur_view);
+                let did_create_clarity_blur = blur_pass_needs.clarity
+                    && run_blur(BlurFamily::Clarity, 8.0, &self.clarity_blur_view);
+                let did_create_structure_blur = blur_pass_needs.structure
+                    && run_blur(BlurFamily::Structure, 40.0, &self.structure_blur_view);
 
                 let mut main_encoder = device.create_command_encoder(&Default::default());
 
@@ -1208,6 +1326,17 @@ impl GpuProcessor {
             }
         }
 
+        {
+            let mut cache = self.blur_surface_cache.lock().unwrap();
+            cache.totals.families_requested += blur_counters.families_requested;
+            cache.totals.encoders += blur_counters.encoders;
+            cache.totals.bind_groups += blur_counters.bind_groups;
+            cache.totals.dispatches += blur_counters.dispatches;
+            cache.totals.submissions += blur_counters.submissions;
+            cache.totals.pixels_processed += blur_counters.pixels_processed;
+            cache.totals.cache_hits += blur_counters.cache_hits;
+            cache.totals.cache_misses += blur_counters.cache_misses;
+        }
         log::debug!("blur passes: needs={blur_pass_needs:?} counters={blur_counters:?}");
 
         Ok((final_pixels, out_width, out_height, bounds.x, bounds.y))
@@ -1218,6 +1347,25 @@ impl GpuProcessor {
 #[allow(clippy::field_reassign_with_default, clippy::items_after_test_module)]
 mod blur_pass_tests {
     use super::*;
+
+    fn surface_key() -> BlurSurfaceKey {
+        BlurSurfaceKey {
+            processor_generation: 1,
+            input_upload_generation: 2,
+            input_width: 1920,
+            input_height: 1080,
+            tile_x: 0,
+            tile_y: 0,
+            tile_width: 1920,
+            tile_height: 1080,
+            input_x_start: 0,
+            input_y_start: 0,
+            input_width_with_overlap: 1920,
+            input_height_with_overlap: 1080,
+            radius_px: 8,
+            blur_abi_version: BLUR_ABI_VERSION,
+        }
+    }
 
     fn needs(adjustments: AllAdjustments) -> BlurPassNeeds {
         resolve_blur_pass_needs(&adjustments)
@@ -1334,12 +1482,97 @@ mod blur_pass_tests {
         assert_eq!(counters.pixels_processed, 400);
     }
 
+    #[test]
+    fn blur_surfaces_are_published_and_reused_independently() {
+        let key = surface_key();
+        let mut cache = BlurSurfaceCache::default();
+
+        assert!(!cache.is_valid(BlurFamily::Tonal, key));
+        assert!(!cache.is_valid(BlurFamily::Clarity, key));
+        cache.publish(BlurFamily::Tonal, key);
+        assert!(cache.is_valid(BlurFamily::Tonal, key));
+        assert!(!cache.is_valid(BlurFamily::Clarity, key));
+
+        cache.publish(BlurFamily::Clarity, key);
+        assert!(cache.is_valid(BlurFamily::Tonal, key));
+        assert!(cache.is_valid(BlurFamily::Clarity, key));
+
+        cache.invalidate(BlurFamily::Clarity);
+        assert!(cache.is_valid(BlurFamily::Tonal, key));
+        assert!(!cache.is_valid(BlurFamily::Clarity, key));
+    }
+
+    #[test]
+    fn every_input_geometry_radius_abi_and_device_key_change_misses() {
+        let key = surface_key();
+        let mut cache = BlurSurfaceCache::default();
+        cache.publish(BlurFamily::Clarity, key);
+
+        let variants = [
+            BlurSurfaceKey {
+                processor_generation: 9,
+                ..key
+            },
+            BlurSurfaceKey {
+                input_upload_generation: 9,
+                ..key
+            },
+            BlurSurfaceKey {
+                input_width: 2048,
+                ..key
+            },
+            BlurSurfaceKey {
+                input_height: 1200,
+                ..key
+            },
+            BlurSurfaceKey { tile_x: 1, ..key },
+            BlurSurfaceKey { tile_y: 1, ..key },
+            BlurSurfaceKey {
+                tile_width: 1024,
+                ..key
+            },
+            BlurSurfaceKey {
+                tile_height: 768,
+                ..key
+            },
+            BlurSurfaceKey {
+                input_x_start: 4,
+                ..key
+            },
+            BlurSurfaceKey {
+                input_y_start: 4,
+                ..key
+            },
+            BlurSurfaceKey {
+                input_width_with_overlap: 1900,
+                ..key
+            },
+            BlurSurfaceKey {
+                input_height_with_overlap: 1060,
+                ..key
+            },
+            BlurSurfaceKey {
+                radius_px: 9,
+                ..key
+            },
+            BlurSurfaceKey {
+                blur_abi_version: BLUR_ABI_VERSION + 1,
+                ..key
+            },
+        ];
+        for variant in variants {
+            assert!(!cache.is_valid(BlurFamily::Clarity, variant));
+        }
+        assert!(cache.is_valid(BlurFamily::Clarity, key));
+    }
+
     #[cfg(feature = "tauri-test")]
     #[test]
     fn selective_blurs_match_the_always_blur_gpu_path() {
         use image::{DynamicImage, ImageBuffer, Rgba};
         use tauri::Manager;
 
+        let _gpu_test_guard = GPU_BLUR_TEST_LOCK.lock().unwrap();
         let source = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(32, 24, |x, y| {
             Rgba([x as f32 / 31.0, y as f32 / 23.0, (x + y) as f32 / 54.0, 1.0])
         }));
@@ -1401,6 +1634,184 @@ mod blur_pass_tests {
                 "parity case {index} differs"
             );
         }
+    }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
+    fn warm_one_tile_edits_dispatch_blur_only_once() {
+        use image::{DynamicImage, ImageBuffer, Rgba};
+        use tauri::Manager;
+
+        let _gpu_test_guard = GPU_BLUR_TEST_LOCK.lock().unwrap();
+        let source = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(64, 48, |x, y| {
+            Rgba([x as f32 / 63.0, y as f32 / 47.0, 0.25, 1.0])
+        }));
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock Tauri app builds");
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state)
+            .expect("compute-only GPU context initializes");
+
+        for edit in 0..100 {
+            let mut adjustments = AllAdjustments::default();
+            adjustments.global.clarity = 0.25;
+            adjustments.global.exposure = edit as f32 / 100.0;
+            process_and_get_dynamic_image(
+                &context,
+                &state,
+                &source,
+                5_245,
+                RenderRequest {
+                    adjustments,
+                    mask_bitmaps: &[],
+                    lut: None,
+                    roi: None,
+                },
+                "warm_blur_cache",
+            )
+            .expect("GPU render succeeds");
+        }
+
+        let processor = state.gpu_processor.lock().unwrap();
+        let totals = processor
+            .as_ref()
+            .unwrap()
+            .processor
+            .blur_surface_cache
+            .lock()
+            .unwrap()
+            .totals;
+        assert_eq!(totals.families_requested, 100);
+        assert_eq!(totals.cache_misses, 1);
+        assert_eq!(totals.cache_hits, 99);
+        assert_eq!(totals.dispatches, 2);
+        assert_eq!(totals.submissions, 1);
+        assert_eq!(totals.pixels_processed, 64 * 48 * 2);
+        drop(processor);
+
+        let previous_upload_generation = state
+            .gpu_image_cache
+            .lock()
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .upload_generation;
+        let mut adjustments = AllAdjustments::default();
+        adjustments.global.clarity = 0.25;
+        process_and_get_dynamic_image(
+            &context,
+            &state,
+            &source,
+            5_246,
+            RenderRequest {
+                adjustments,
+                mask_bitmaps: &[],
+                lut: None,
+                roi: None,
+            },
+            "changed_input_blur_cache",
+        )
+        .expect("GPU render after input change succeeds");
+
+        let new_upload_generation = state
+            .gpu_image_cache
+            .lock()
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .upload_generation;
+        assert_ne!(new_upload_generation, previous_upload_generation);
+        let processor = state.gpu_processor.lock().unwrap();
+        let totals = processor
+            .as_ref()
+            .unwrap()
+            .processor
+            .blur_surface_cache
+            .lock()
+            .unwrap()
+            .totals;
+        assert_eq!(totals.cache_misses, 2);
+        assert_eq!(totals.dispatches, 4);
+    }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
+    fn warm_all_family_edits_dispatch_each_blur_only_once() {
+        use image::{DynamicImage, ImageBuffer, Rgba};
+        use tauri::Manager;
+
+        let _gpu_test_guard = GPU_BLUR_TEST_LOCK.lock().unwrap();
+        let source =
+            DynamicImage::ImageRgba32F(ImageBuffer::from_pixel(32, 24, Rgba([0.2, 0.4, 0.6, 1.0])));
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock Tauri app builds");
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state)
+            .expect("compute-only GPU context initializes");
+
+        let render_edits = |start: usize| {
+            for edit in start..start + 100 {
+                let mut adjustments = AllAdjustments::default();
+                adjustments.global.sharpness = 0.2;
+                adjustments.global.contrast = 0.2;
+                adjustments.global.clarity = 0.2;
+                adjustments.global.structure = 0.2;
+                adjustments.global.exposure = edit as f32 / 100.0;
+                process_and_get_dynamic_image(
+                    &context,
+                    &state,
+                    &source,
+                    5_245,
+                    RenderRequest {
+                        adjustments,
+                        mask_bitmaps: &[],
+                        lut: None,
+                        roi: None,
+                    },
+                    "warm_all_blur_cache",
+                )
+                .expect("GPU render succeeds");
+            }
+        };
+
+        FORCE_DISABLE_BLUR_CACHE.store(true, Ordering::Relaxed);
+        render_edits(0);
+        FORCE_DISABLE_BLUR_CACHE.store(false, Ordering::Relaxed);
+        let processor = state.gpu_processor.lock().unwrap();
+        let baseline = processor
+            .as_ref()
+            .unwrap()
+            .processor
+            .blur_surface_cache
+            .lock()
+            .unwrap()
+            .totals;
+        drop(processor);
+        assert_eq!(baseline.dispatches, 800);
+        assert_eq!(baseline.submissions, 400);
+
+        render_edits(100);
+        let processor = state.gpu_processor.lock().unwrap();
+        let totals = processor
+            .as_ref()
+            .unwrap()
+            .processor
+            .blur_surface_cache
+            .lock()
+            .unwrap()
+            .totals;
+        assert_eq!(totals.cache_misses, 4);
+        assert_eq!(totals.cache_hits, 396);
+        assert_eq!(totals.dispatches - baseline.dispatches, 8);
+        assert_eq!(totals.submissions - baseline.submissions, 4);
+        assert_eq!(
+            totals.pixels_processed - baseline.pixels_processed,
+            32 * 24 * 2 * 4
+        );
     }
 }
 
@@ -1630,6 +2041,7 @@ fn process_and_get_dynamic_image_inner(
             width,
             height,
             transform_hash,
+            upload_generation: NEXT_INPUT_UPLOAD_GENERATION.fetch_add(1, AtomicOrdering::Relaxed),
         });
     }
 
@@ -1638,7 +2050,10 @@ fn process_and_get_dynamic_image_inner(
     let skip_readback = output_to_display;
 
     let (processed_pixels, out_w, out_h, out_x, out_y) = processor.run(
-        &cache.texture_view,
+        InputTextureRef {
+            view: &cache.texture_view,
+            upload_generation: cache.upload_generation,
+        },
         cache.width,
         cache.height,
         request,

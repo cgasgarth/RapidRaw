@@ -62,6 +62,7 @@ pub struct GpuImageCache {
     pub width: u32,
     pub height: u32,
     pub transform_hash: u64,
+    pub upload_generation: u64,
 }
 
 pub struct GpuProcessorState {
