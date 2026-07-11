@@ -7,6 +7,7 @@ import {
   singleImageX2ApplyReceiptSchema,
   singleImageX2PreviewSchema,
 } from '../../schemas/computational-merge/singleImageX2Schemas';
+import { focusStackApplyReceiptSchema } from '../../schemas/focus-stack/focusStackApplySchemas';
 import {
   focusStackCandidateJobHandleSchema,
   focusStackCandidateJobResultSchema,
@@ -494,6 +495,7 @@ export default function AppModals(props: AppModalsProps) {
       {hasLoadedFocusStackModal && (
         <Suspense fallback={null}>
           <FocusStackModal
+            applyReceipt={focusStackModalState.applyReceipt ?? null}
             isOpen={focusStackModalState.isOpen}
             lastApplyCommand={focusStackModalState.lastApplyCommand}
             lastDryRunCommand={focusStackModalState.lastDryRunCommand}
@@ -518,8 +520,50 @@ export default function AppModals(props: AppModalsProps) {
               }));
             }}
             onApplyPlan={() => {
-              return;
+              void (async () => {
+                const candidate = focusStackModalState.candidateJob?.candidate;
+                const plan = focusStackModalState.nativeInputPlan;
+                if (candidate === null || candidate === undefined || plan === null) return;
+                const referencePath = focusStackModalState.sourcePaths[plan.referenceSourceIndex];
+                if (referencePath === undefined) return;
+                const slash = Math.max(referencePath.lastIndexOf('/'), referencePath.lastIndexOf('\\'));
+                const destinationDirectory = slash >= 0 ? referencePath.slice(0, slash) : '.';
+                const sourceName = slash >= 0 ? referencePath.slice(slash + 1) : referencePath;
+                const sourceStem = sourceName.replace(/\.[^.]+$/, '');
+                try {
+                  const receipt = await invokeWithSchema(
+                    Invokes.ApplyFocusStackCandidate,
+                    {
+                      request: {
+                        candidateId: candidate.packageId,
+                        acceptedPreviewHash: plan.nativeBlend?.previewHash ?? '',
+                        acceptedReviewHash: candidate.candidateHash,
+                        destinationDirectory,
+                        requestedName: `${sourceStem}-Focus-Stack`,
+                      },
+                    },
+                    focusStackApplyReceiptSchema,
+                  );
+                  setUI((state) => ({
+                    focusStackModalState: {
+                      ...state.focusStackModalState,
+                      applyReceipt: receipt,
+                      error: null,
+                    },
+                  }));
+                  await props.refreshImageList();
+                  await props.handleImageSelect(receipt.payloadPath);
+                } catch (error) {
+                  setUI((state) => ({
+                    focusStackModalState: {
+                      ...state.focusStackModalState,
+                      error: error instanceof Error ? error.message : String(error),
+                    },
+                  }));
+                }
+              })();
             }}
+            onOpenOutput={(path) => void props.handleImageSelect(path)}
             onPrepareCandidate={() => {
               const acceptedPreviewId = focusStackModalState.nativeInputPlan?.acceptedDryRunPlanId;
               if (acceptedPreviewId === undefined) return;
