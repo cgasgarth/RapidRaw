@@ -615,6 +615,13 @@ export function useImageProcessing(
         setEditor({
           exportSoftProofTransform: transform,
           finalPreviewUrl: url,
+          navigatorPreviewArtifact: {
+            graphIdentity: request.identity.graphIdentity,
+            id: `${request.identity.graphIdentity}:${String(request.identity.generation)}:${String(request.requestId)}`,
+            imageSessionId:
+              useEditorStore.getState().imageSession?.id ?? String(request.identity.imageSessionId),
+            url,
+          },
           previewScopeStatus:
             transform &&
             completedScopeStatus?.path === request.identity.sourceImagePath &&
