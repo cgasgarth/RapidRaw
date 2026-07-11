@@ -1,0 +1,6 @@
+{
+  "version": 99,
+  "rating": 4,
+  "tags": ["preserve"],
+  "adjustments": { "temperature": 9000 }
+}

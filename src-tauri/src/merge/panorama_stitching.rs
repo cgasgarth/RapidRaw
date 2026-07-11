@@ -1654,17 +1654,14 @@ fn write_panorama_output_sidecar(
     source_refs: &[PendingPanoramaSourceRef],
 ) -> Result<(), String> {
     let sidecar_path = panorama_sidecar_path(output_path);
-    let mut sidecar = crate::exif_processing::load_sidecar(&sidecar_path);
+    let output_identity = output_path.to_string_lossy();
+    let mut sidecar = crate::exif_processing::load_sidecar_recovering(
+        &sidecar_path,
+        Some(output_identity.as_ref()),
+    )?
+    .metadata;
     upsert_panorama_artifact_metadata(&mut sidecar, output_path, metadata, source_refs)?;
-    let json = serde_json::to_string_pretty(&sidecar)
-        .map_err(|e| format!("Failed to serialize panorama sidecar: {}", e))?;
-    fs::write(&sidecar_path, json).map_err(|e| {
-        format!(
-            "Failed to write panorama sidecar {}: {}",
-            sidecar_path.display(),
-            e
-        )
-    })
+    crate::exif_processing::save_sidecar_metadata_atomic(&sidecar_path, &sidecar)
 }
 
 fn upsert_panorama_artifact_metadata(
@@ -3566,6 +3563,7 @@ mod tests {
                 })],
                 ..RawEngineArtifacts::new_v1()
             }),
+            persisted_render_state: None,
         }
     }
 

@@ -22,7 +22,6 @@ use self::hierarchy::TAG_HIERARCHY;
 use crate::AppState;
 use crate::file_management::{self, parse_virtual_path};
 use crate::formats::is_supported_image_file;
-use crate::image_processing::ImageMetadata;
 
 pub const COLOR_TAG_PREFIX: &str = "color:";
 pub const USER_TAG_PREFIX: &str = "user:";
@@ -484,8 +483,8 @@ pub fn clear_ai_tags(root_path: String) -> Result<usize, String> {
         let path = entry.path();
         if path.is_file()
             && path.extension().and_then(|s| s.to_str()) == Some("rrdata")
-            && let Ok(content) = fs::read_to_string(path)
-            && let Ok(mut metadata) = serde_json::from_str::<ImageMetadata>(&content)
+            && let Ok(mut metadata) = crate::exif_processing::load_sidecar_recovering(path, None)
+                .map(|loaded| loaded.metadata)
             && let Some(tags) = &mut metadata.tags
         {
             let original_len = tags.len();
@@ -498,9 +497,7 @@ pub fn clear_ai_tags(root_path: String) -> Result<usize, String> {
                 if tags.is_empty() {
                     metadata.tags = None;
                 }
-                if let Ok(json_string) = serde_json::to_string_pretty(&metadata)
-                    && fs::write(path, json_string).is_ok()
-                {
+                if crate::exif_processing::save_sidecar_metadata_atomic(path, &metadata).is_ok() {
                     updated_count += 1;
                 }
             }
@@ -522,8 +519,8 @@ pub fn clear_all_tags(root_path: String) -> Result<usize, String> {
         let path = entry.path();
         if path.is_file()
             && path.extension().and_then(|s| s.to_str()) == Some("rrdata")
-            && let Ok(content) = fs::read_to_string(path)
-            && let Ok(mut metadata) = serde_json::from_str::<ImageMetadata>(&content)
+            && let Ok(mut metadata) = crate::exif_processing::load_sidecar_recovering(path, None)
+                .map(|loaded| loaded.metadata)
             && let Some(tags) = &mut metadata.tags
         {
             let original_len = tags.len();
@@ -534,9 +531,7 @@ pub fn clear_all_tags(root_path: String) -> Result<usize, String> {
                 if tags.is_empty() {
                     metadata.tags = None;
                 }
-                if let Ok(json_string) = serde_json::to_string_pretty(&metadata)
-                    && fs::write(path, json_string).is_ok()
-                {
+                if crate::exif_processing::save_sidecar_metadata_atomic(path, &metadata).is_ok() {
                     updated_count += 1;
                 }
             }

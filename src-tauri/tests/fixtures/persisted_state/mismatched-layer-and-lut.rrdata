@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "rating": 3,
+  "adjustments": {
+    "lutPath": "/synthetic/missing/look.cube",
+    "lutContentIdentity": "sha256:replaced",
+    "lutIntensity": 100
+  },
+  "rawEngineArtifacts": {
+    "schemaVersion": 1,
+    "layerStackSidecars": [{
+      "schemaVersion": 1,
+      "sourceImagePath": "/synthetic/other.arw"
+    }]
+  }
+}
