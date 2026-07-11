@@ -1,6 +1,11 @@
 import { create } from 'zustand';
 
-import { isEditingRightPanel, isRightPanel, RIGHT_PANEL_ORDER } from '../components/panel/right/rightPanelRegistry';
+import {
+  getRightPanelHostDescriptor,
+  isEditingRightPanel,
+  isRightPanel,
+  RIGHT_PANEL_ORDER,
+} from '../components/panel/right/rightPanelRegistry';
 import { type CullingSuggestions, type ImageFile, Panel, type UiVisibility } from '../components/ui/AppProperties';
 import type { DerivedOutputReceipt } from '../schemas/computational-merge/derivedOutputReceiptSchemas';
 import {
@@ -80,6 +85,39 @@ export interface CollapsibleSectionsState {
 export const LAST_EDITING_RIGHT_PANEL_STORAGE_KEY = LEGACY_LAST_EDITING_RIGHT_PANEL_STORAGE_KEY;
 export { EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY };
 export const MAX_RECENT_RIGHT_PANELS = 5;
+
+export const LAZY_COMPUTATIONAL_MODAL_IDS = [
+  'panorama',
+  'hdr',
+  'superResolution',
+  'focusStack',
+  'negativeLab',
+] as const;
+export type LazyComputationalModalId = (typeof LAZY_COMPUTATIONAL_MODAL_IDS)[number];
+
+const MODAL_STATE_BY_LAZY_ID = {
+  focusStack: 'focusStackModalState',
+  hdr: 'hdrModalState',
+  negativeLab: 'negativeModalState',
+  panorama: 'panoramaModalState',
+  superResolution: 'superResolutionModalState',
+} as const satisfies Record<LazyComputationalModalId, keyof UIState>;
+
+export const collectOpenedLazyModalIds = (
+  mountedIds: ReadonlySet<LazyComputationalModalId>,
+  update: Partial<UIState>,
+): ReadonlySet<LazyComputationalModalId> => {
+  let nextIds: Set<LazyComputationalModalId> | null = null;
+  for (const id of LAZY_COMPUTATIONAL_MODAL_IDS) {
+    const modalState = update[MODAL_STATE_BY_LAZY_ID[id]];
+    if (typeof modalState !== 'object' || modalState === null || !('isOpen' in modalState) || !modalState.isOpen)
+      continue;
+    if (mountedIds.has(id)) continue;
+    nextIds ??= new Set(mountedIds);
+    nextIds.add(id);
+  }
+  return nextIds ?? mountedIds;
+};
 
 export const readLastEditingRightPanel = (): Panel => readEditorWorkspacePreferences().rightInspector.activePanel;
 
@@ -268,6 +306,7 @@ export interface DenoiseModalState {
 
 export interface NegativeConversionModalState {
   isOpen: boolean;
+  operationEpoch: number;
   session: NegativeLabSessionSnapshot | null;
   targetPaths: Array<string>;
 }
@@ -380,6 +419,7 @@ export interface UIState {
   // Right Panel
   activeRightPanel: Panel | null;
   renderedRightPanel: Panel | null;
+  mountedKeepAlivePanels: ReadonlySet<Panel>;
   recentRightPanels: Panel[];
   slideDirection: number;
   collapsibleSectionsState: CollapsibleSectionsState;
@@ -411,6 +451,7 @@ export interface UIState {
   hdrModalState: HdrModalState;
   superResolutionModalState: SuperResolutionModalState;
   focusStackModalState: FocusStackModalState;
+  mountedLazyModalIds: ReadonlySet<LazyComputationalModalId>;
   focusRetouchToolState: FocusRetouchToolState;
   negativeModalState: NegativeConversionModalState;
   denoiseModalState: DenoiseModalState;
@@ -504,6 +545,8 @@ export const useUIStore = create<UIState>((set, get) => {
 
     activeRightPanel: initialRightPanel,
     renderedRightPanel: initialRightPanel,
+    mountedKeepAlivePanels:
+      getRightPanelHostDescriptor(initialRightPanel).keepAlive === 'session' ? new Set([initialRightPanel]) : new Set(),
     recentRightPanels: [initialRightPanel],
     slideDirection: 1,
     collapsibleSectionsState: createCollapsibleSectionsState(initialPreferences),
@@ -532,6 +575,7 @@ export const useUIStore = create<UIState>((set, get) => {
     hdrModalState: createDefaultHdrModalState(),
     superResolutionModalState: createDefaultSuperResolutionModalState(),
     focusStackModalState: createDefaultFocusStackModalState(),
+    mountedLazyModalIds: new Set(),
     focusRetouchToolState: {
       active: false,
       erase: false,
@@ -541,7 +585,7 @@ export const useUIStore = create<UIState>((set, get) => {
       selectedSource: 0,
       session: null,
     },
-    negativeModalState: { isOpen: false, session: null, targetPaths: [] },
+    negativeModalState: { isOpen: false, operationEpoch: 0, session: null, targetPaths: [] },
     denoiseModalState: {
       isOpen: false,
       isProcessing: false,
@@ -835,7 +879,11 @@ export const useUIStore = create<UIState>((set, get) => {
     },
 
     setUI: (updater) => {
-      set((state) => (typeof updater === 'function' ? updater(state) : updater));
+      set((state) => {
+        const update = typeof updater === 'function' ? updater(state) : updater;
+        const mountedLazyModalIds = collectOpenedLazyModalIds(state.mountedLazyModalIds, update);
+        return mountedLazyModalIds === state.mountedLazyModalIds ? update : { ...update, mountedLazyModalIds };
+      });
     },
 
     setRightPanel: (panelId) => {
@@ -864,7 +912,11 @@ export const useUIStore = create<UIState>((set, get) => {
           return {
             slideDirection: newIndex === currentIndex ? 0 : newIndex > currentIndex ? 1 : -1,
             activeRightPanel: panelId,
-            renderedRightPanel: panelId,
+            renderedRightPanel: previousPanel,
+            mountedKeepAlivePanels:
+              panelId !== null && getRightPanelHostDescriptor(panelId).keepAlive === 'session'
+                ? new Set([...state.mountedKeepAlivePanels, panelId])
+                : state.mountedKeepAlivePanels,
             ...(panelId === null
               ? {}
               : { recentRightPanels: createRecentRightPanels(panelId, state.recentRightPanels) }),

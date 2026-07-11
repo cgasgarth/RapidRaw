@@ -101,10 +101,59 @@ async function validateDevelopPanelSearchKeyboard() {
   await input(searchInput, 'dehaze');
   await flushPromises();
 
+  assert.equal(
+    useUIStore.getState().collapsibleSectionsState.details,
+    false,
+    'passive search must not persist matching Develop sections.',
+  );
+  const detailsDisclosure = getByTestId(rendered.container, 'adjustments-section-details').querySelector<HTMLElement>(
+    'button[aria-expanded]',
+  );
+  assert.equal(
+    detailsDisclosure?.getAttribute('aria-expanded'),
+    'true',
+    'a matching closed section should render open.',
+  );
+
+  await act(async () => {
+    detailsDisclosure?.click();
+    await flushPromises();
+  });
+  assert.equal(
+    useUIStore.getState().collapsibleSectionsState.details,
+    true,
+    'an explicit section toggle during search should update canonical state.',
+  );
+  await act(async () => {
+    detailsDisclosure?.click();
+    await flushPromises();
+  });
+  assert.equal(useUIStore.getState().collapsibleSectionsState.details, false);
+  assert.equal(
+    detailsDisclosure?.getAttribute('aria-expanded'),
+    'true',
+    'search ancestry should remain visibly open after an explicit canonical close.',
+  );
+
+  await input(searchInput, '');
+  assert.equal(
+    getByTestId(rendered.container, 'adjustments-section-details')
+      .querySelector('button[aria-expanded]')
+      ?.getAttribute('aria-expanded'),
+    'false',
+    'clearing search should restore the exact canonical disclosure state.',
+  );
+  await input(searchInput, 'dehaze');
+
   const result = getByTestId<HTMLButtonElement>(rendered.container, 'develop-panel-search-result-dehaze');
   await keyDown(result, 'Enter');
 
   assert.deepEqual(useUIStore.getState().developPanelPinnedControlIds, ['dehaze']);
+  assert.equal(
+    useUIStore.getState().collapsibleSectionsState.details,
+    true,
+    'explicit result activation should persistently open its canonical section.',
+  );
   assert.equal(
     document.activeElement?.getAttribute('data-testid'),
     'develop-pinned-control-dehaze-range',
@@ -116,7 +165,7 @@ async function validateDevelopPanelSearchKeyboard() {
   assert.deepEqual(useUIStore.getState().developPanelPinnedControlIds, []);
   assert.equal(
     getByTestId(rendered.container, 'adjustments-section-details')
-      .querySelector('[role="button"][aria-expanded]')
+      .querySelector('button[aria-expanded]')
       ?.getAttribute('aria-expanded'),
     'true',
     'Space activation on a pinned result should reveal the canonical section.',

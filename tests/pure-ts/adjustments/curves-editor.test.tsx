@@ -158,23 +158,167 @@ test('mode, channel, and point deletion operate on their existing curve models',
   expect(container.querySelectorAll('button[aria-label$="%"]')).toHaveLength(3);
 });
 
-function CurveHarness({ changes, initialAdjustments }: { changes: Adjustments[]; initialAdjustments: Adjustments }) {
-  const [adjustments, setAdjustments] = useState<Adjustments>(() => structuredClone(initialAdjustments));
-  return createElement(CurveGraph, {
-    adjustments,
-    histogram: null,
-    setAdjustments: (updater) => {
-      setAdjustments((previous) => {
-        const next = updater(previous);
-        changes.push(next);
-        return next;
-      });
-    },
-    theme: Theme.Dark,
+test('point interaction emits one start and one finish when released outside the graph', async () => {
+  const dragStates: boolean[] = [];
+  const { container } = await renderCurveEditor([], INITIAL_ADJUSTMENTS, dragStates);
+  const point = container.querySelector<SVGCircleElement>('circle[role="button"]');
+  if (!point) throw new Error('Expected an accessible curve point.');
+
+  await act(async () => {
+    point.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true, button: 0 }));
+    await flushPromises();
   });
+  expect(dragStates).toEqual([true]);
+
+  await act(async () => {
+    window.dispatchEvent(new window.MouseEvent('mouseup', { bubbles: true }));
+    window.dispatchEvent(new window.MouseEvent('mouseup', { bubbles: true }));
+    await flushPromises();
+  });
+  expect(dragStates).toEqual([true, false]);
+});
+
+test('channel and mode commands finish an active draft synchronously without timers', async () => {
+  const dragStates: boolean[] = [];
+  const changes: Adjustments[] = [];
+  const { container } = await renderCurveEditor(changes, INITIAL_ADJUSTMENTS, dragStates);
+  const point = container.querySelector<SVGCircleElement>('circle[role="button"]');
+  if (!point) throw new Error('Expected an accessible curve point.');
+
+  await act(async () => {
+    point.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true, button: 0 }));
+    getButton(container, 'Red Channel').click();
+  });
+  expect(dragStates).toEqual([true, false]);
+  expect(getButton(container, 'Red Channel').getAttribute('aria-pressed')).toBe('true');
+
+  const redPoint = container.querySelector<SVGCircleElement>('circle[role="button"]');
+  if (!redPoint) throw new Error('Expected a red curve point.');
+  await act(async () => {
+    redPoint.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true, button: 0 }));
+    getButton(container, 'Parametric Curve').click();
+  });
+  expect(dragStates.slice(0, 4)).toEqual([true, false, true, false]);
+  expect(changes.at(-1)?.curveMode).toBe('parametric');
+});
+
+test('Escape rolls a point interaction back and finishes exactly once', async () => {
+  const dragStates: boolean[] = [];
+  const changes: Adjustments[] = [];
+  const initial = structuredClone(INITIAL_ADJUSTMENTS);
+  initial.curves.luma = [
+    { x: 0, y: 0 },
+    { x: 100, y: 140 },
+    { x: 255, y: 255 },
+  ];
+  const { container } = await renderCurveEditor(changes, initial, dragStates);
+  const point = container.querySelectorAll<SVGCircleElement>('circle[role="button"]')[1];
+  if (!point) throw new Error('Expected an interior point.');
+
+  await act(async () => {
+    point.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true, button: 0 }));
+    await flushPromises();
+  });
+  await act(async () => {
+    window.dispatchEvent(new window.KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
+    await flushPromises();
+  });
+  expect(changes.at(-1)?.curves.luma).toEqual(initial.curves.luma);
+  expect(dragStates).toEqual([true, false]);
+});
+
+test('parent curve updates stay hidden by a matching draft and become canonical on finish', async () => {
+  const { container } = await renderCurveEditor([]);
+  const point = container.querySelector<SVGCircleElement>('circle[role="button"]');
+  const parentUpdate = container.querySelector<HTMLButtonElement>('[data-testid="parent-curve-update"]');
+  if (!point || !parentUpdate) throw new Error('Expected curve point and parent update control.');
+
+  await act(async () => {
+    point.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true, button: 0 }));
+    await flushPromises();
+  });
+  await click(parentUpdate);
+  expect(container.querySelector('circle[role="button"]')?.getAttribute('aria-label')).toContain('Y Axis 0');
+
+  await act(async () => {
+    window.dispatchEvent(new window.MouseEvent('mouseup', { bubbles: true }));
+    await flushPromises();
+  });
+  expect(container.querySelector('circle[role="button"]')?.getAttribute('aria-label')).toContain('Y Axis 37');
+});
+
+test('parametric split pointer cancellation uses the same exact finish path', async () => {
+  const dragStates: boolean[] = [];
+  const { container } = await renderCurveEditor([], INITIAL_ADJUSTMENTS, dragStates);
+  await click(getButton(container, 'Parametric Curve'));
+  dragStates.length = 0;
+  const split = container.querySelector<HTMLButtonElement>('button[aria-label$="%"]');
+  if (!split) throw new Error('Expected a parametric split control.');
+
+  await act(async () => {
+    split.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true, button: 0 }));
+    await flushPromises();
+  });
+  await act(async () => {
+    window.dispatchEvent(new window.Event('pointercancel'));
+    await flushPromises();
+  });
+  expect(dragStates).toEqual([true, false]);
+});
+
+function CurveHarness({
+  changes,
+  dragStates,
+  initialAdjustments,
+}: {
+  changes: Adjustments[];
+  dragStates: boolean[];
+  initialAdjustments: Adjustments;
+}) {
+  const [adjustments, setAdjustments] = useState<Adjustments>(() => structuredClone(initialAdjustments));
+  return createElement(
+    'div',
+    null,
+    createElement(CurveGraph, {
+      adjustments,
+      histogram: null,
+      setAdjustments: (updater) => {
+        setAdjustments((previous) => {
+          const next = updater(previous);
+          changes.push(next);
+          return next;
+        });
+      },
+      theme: Theme.Dark,
+      onDragStateChange: (dragging) => dragStates.push(dragging),
+    }),
+    createElement(
+      'button',
+      {
+        'data-testid': 'parent-curve-update',
+        onClick: () =>
+          setAdjustments((previous) => ({
+            ...previous,
+            curves: {
+              ...previous.curves,
+              luma: [
+                { x: 0, y: 37 },
+                { x: 255, y: 255 },
+              ],
+            },
+          })),
+        type: 'button',
+      },
+      'Parent update',
+    ),
+  );
 }
 
-async function renderCurveEditor(changes: Adjustments[], initialAdjustments = INITIAL_ADJUSTMENTS) {
+async function renderCurveEditor(
+  changes: Adjustments[],
+  initialAdjustments = INITIAL_ADJUSTMENTS,
+  dragStates: boolean[] = [],
+) {
   installDom();
   const i18n = i18next.createInstance();
   await i18n.use(initReactI18next).init({ lng: 'en', resources: { en: { translation: en } } });
@@ -187,7 +331,11 @@ async function renderCurveEditor(changes: Adjustments[], initialAdjustments = IN
       createElement(
         I18nextProvider,
         { i18n },
-        createElement(ContextMenuProvider, null, createElement(CurveHarness, { changes, initialAdjustments })),
+        createElement(
+          ContextMenuProvider,
+          null,
+          createElement(CurveHarness, { changes, dragStates, initialAdjustments }),
+        ),
       ),
     );
     await flushPromises();

@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from 'framer-motion';
-import { Component, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Component, type ReactNode, Suspense, useCallback, useLayoutEffect, useRef } from 'react';
+import { useUIStore } from '../../../store/useUIStore';
 import type { AppSettings, Panel, SelectedImage } from '../../ui/AppProperties';
 import type { ExportState } from '../../ui/ExportImportProperties';
 import { getRightPanelHostDescriptor, RIGHT_PANEL_ENTRIES, type RightPanelHostDescriptor } from './rightPanelRegistry';
@@ -19,12 +20,6 @@ export interface EditorRightPanelHostProps {
   selectedImage: SelectedImage | null;
   setExportState: (updater: Partial<ExportState> | ((state: ExportState) => Partial<ExportState>)) => void;
   slideDirection: number;
-}
-
-interface PanelSlotProps {
-  onReady: () => void;
-  panel: Panel;
-  props: EditorRightPanelHostProps;
 }
 
 interface PanelErrorBoundaryProps {
@@ -85,18 +80,12 @@ class PanelErrorBoundary extends Component<PanelErrorBoundaryProps, PanelErrorBo
   }
 }
 
-function PanelReady({ onReady, panel, props }: PanelSlotProps) {
-  useEffect(onReady, [onReady]);
-  return <>{getRightPanelRenderer(panel)(props)}</>;
-}
-
 export function EditorRightPanelHost(props: EditorRightPanelHostProps) {
   const { activeRightPanel, renderedRightPanel } = props;
   const prefersReducedMotion = useReducedMotion();
   const hostRef = useRef<HTMLElement | null>(null);
   const scrollPositionsRef = useRef(new Map<Panel, number>());
-  const [lastCoherentPanel, setLastCoherentPanel] = useState<Panel | null>(renderedRightPanel);
-  const [mountedKeepAlivePanels, setMountedKeepAlivePanels] = useState<ReadonlySet<Panel>>(() => new Set());
+  const mountedKeepAlivePanels = useUIStore((state) => state.mountedKeepAlivePanels);
   const activeDescriptor = activeRightPanel === null ? null : getRightPanelHostDescriptor(activeRightPanel);
 
   const restoreScrollPosition = useCallback((panel: Panel) => {
@@ -113,39 +102,19 @@ export function EditorRightPanelHost(props: EditorRightPanelHostProps) {
     });
   }, []);
 
-  const handlePanelReady = useCallback(
-    (panel: Panel) => {
-      setLastCoherentPanel(panel);
-      restoreScrollPosition(panel);
-    },
-    [restoreScrollPosition],
-  );
-
-  useEffect(() => {
-    if (activeRightPanel === null || activeDescriptor?.keepAlive !== 'session') return;
-    setMountedKeepAlivePanels((mountedPanels) => {
-      if (mountedPanels.has(activeRightPanel)) return mountedPanels;
-      return new Set([...mountedPanels, activeRightPanel]);
-    });
-  }, [activeDescriptor?.keepAlive, activeRightPanel]);
-
   useLayoutEffect(() => {
     if (activeRightPanel !== null) restoreScrollPosition(activeRightPanel);
   }, [activeRightPanel, restoreScrollPosition]);
 
-  const renderPanel = (panel: Panel, onReady: () => void) => {
+  const renderPanel = (panel: Panel) => {
     const descriptor = getRightPanelHostDescriptor(panel);
-    return (
-      <PanelErrorBoundary descriptor={descriptor}>
-        <PanelReady onReady={onReady} panel={panel} props={props} />
-      </PanelErrorBoundary>
-    );
+    return <PanelErrorBoundary descriptor={descriptor}>{getRightPanelRenderer(panel)(props)}</PanelErrorBoundary>;
   };
 
-  const predecessorPanel = lastCoherentPanel ?? renderedRightPanel;
+  const predecessorPanel = renderedRightPanel;
   const renderLoadingFallback = () => {
     if (predecessorPanel === null || predecessorPanel === activeRightPanel) return <EditorRightPanelSkeleton />;
-    return renderPanel(predecessorPanel, () => undefined);
+    return <Suspense fallback={<EditorRightPanelSkeleton />}>{renderPanel(predecessorPanel)}</Suspense>;
   };
 
   const onScrollCapture = (event: React.UIEvent<HTMLElement>) => {
@@ -180,7 +149,7 @@ export function EditorRightPanelHost(props: EditorRightPanelHostProps) {
                 hidden={!isActive}
                 inert={isActive ? undefined : true}
               >
-                {renderPanel(id, () => handlePanelReady(id))}
+                {renderPanel(id)}
               </div>
             </Suspense>
           );
@@ -199,7 +168,7 @@ export function EditorRightPanelHost(props: EditorRightPanelHostProps) {
               key={activeRightPanel}
               transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.12, ease: 'easeOut' }}
             >
-              {renderPanel(activeRightPanel, () => handlePanelReady(activeRightPanel))}
+              {renderPanel(activeRightPanel)}
             </motion.div>
           </Suspense>
         ) : null}

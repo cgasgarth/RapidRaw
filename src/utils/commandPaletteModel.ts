@@ -8,6 +8,7 @@ import {
 import type { UIState } from '../store/useUIStore';
 import { createFocusStackSourcePreflightMetadata } from './focusStackSourcePreflight';
 import { buildHdrLaunchSourceMetadata, resolveHdrLaunchSourcePaths } from './hdrAutoStackSelection';
+import { openNegativeLabModalSession } from './negative-lab/negativeLabModalSession';
 import {
   getNegativeLabCommandPaletteDisabledReasonKey,
   getNegativeLabSourceReadiness,
@@ -467,11 +468,7 @@ export function createCommandPaletteAction(
     if (!negativeLabReadiness.isReady) return null;
     return () => {
       setUI((state) => ({
-        negativeModalState: {
-          ...state.negativeModalState,
-          isOpen: true,
-          targetPaths: negativeLabReadiness.targetPaths,
-        },
+        negativeModalState: openNegativeLabModalSession(state.negativeModalState, negativeLabReadiness.targetPaths),
       }));
     };
   }
