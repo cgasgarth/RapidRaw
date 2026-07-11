@@ -55,6 +55,7 @@ pub struct LibraryCollectionPage {
 pub enum CatalogIndexingState {
     Current,
     Rebuilt,
+    Offline,
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
@@ -222,11 +223,11 @@ impl LibraryCatalog {
         requested_page_size: u32,
     ) -> Result<LibraryCollectionOpened, String> {
         self.with_inner(app, |inner| {
+            let available = Path::new(&path).is_dir();
             let path = Path::new(&path)
                 .canonicalize()
-                .map_err(|error| error.to_string())?
-                .to_string_lossy()
-                .into_owned();
+                .map(|path| path.to_string_lossy().into_owned())
+                .unwrap_or(path);
             let page_size = requested_page_size.clamp(1, MAX_PAGE_SIZE);
             let warm_started = Instant::now();
             let indexed = inner
@@ -234,14 +235,16 @@ impl LibraryCatalog {
                 .as_ref()
                 .expect("initialized catalog")
                 .query_row(
-                    "SELECT indexed FROM roots WHERE root_path=?1",
-                    params![path],
+                    "SELECT indexed FROM roots WHERE ?1=root_path OR ?1 LIKE root_path || ?2 || '%' ORDER BY LENGTH(root_path) DESC LIMIT 1",
+                    params![path, std::path::MAIN_SEPARATOR.to_string()],
                     |row| row.get::<_, i64>(0),
                 )
                 .optional()
                 .map_err(|error| error.to_string())?
                 == Some(1);
-            let indexing_state = if indexed {
+            let indexing_state = if indexed && !available {
+                CatalogIndexingState::Offline
+            } else if indexed {
                 inner.report.warm_query_latency_ms = warm_started.elapsed().as_millis() as u64;
                 CatalogIndexingState::Current
             } else {
