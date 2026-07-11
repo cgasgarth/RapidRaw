@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { useShallow } from 'zustand/react/shallow';
@@ -29,6 +29,7 @@ import {
   createDefaultHdrModalState,
   createDefaultPanoramaModalState,
   createDefaultSuperResolutionModalState,
+  type LazyComputationalModalId,
   useUIStore,
 } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
@@ -70,6 +71,8 @@ const PanoramaModal = lazy(() =>
 const SuperResolutionModal = lazy(() =>
   import('./computational-merge/SuperResolutionModal.js').then((module) => ({ default: module.SuperResolutionModal })),
 );
+
+const useLazyModalSlot = (id: LazyComputationalModalId) => useUIStore((state) => state.mountedLazyModalIds.has(id));
 
 interface DeleteOptions {
   includeAssociated: boolean;
@@ -181,29 +184,13 @@ export default function AppModals(props: AppModalsProps) {
     })),
   );
 
-  const [hasLoadedPanoramaModal, setHasLoadedPanoramaModal] = useState(panoramaModalState.isOpen);
-  const [hasLoadedHdrModal, setHasLoadedHdrModal] = useState(hdrModalState.isOpen);
-  const [hasLoadedSuperResolutionModal, setHasLoadedSuperResolutionModal] = useState(superResolutionModalState.isOpen);
   const [singleImagePreviewRunning, setSingleImagePreviewRunning] = useState(false);
   const [singleImageApplyRunning, setSingleImageApplyRunning] = useState(false);
-  const [hasLoadedFocusStackModal, setHasLoadedFocusStackModal] = useState(focusStackModalState.isOpen);
+  const hasLoadedPanoramaModal = useLazyModalSlot('panorama');
+  const hasLoadedHdrModal = useLazyModalSlot('hdr');
+  const hasLoadedSuperResolutionModal = useLazyModalSlot('superResolution');
+  const hasLoadedFocusStackModal = useLazyModalSlot('focusStack');
   const focusStackPlanRequestId = useRef(0);
-
-  useEffect(() => {
-    if (panoramaModalState.isOpen) setHasLoadedPanoramaModal(true);
-  }, [panoramaModalState.isOpen]);
-
-  useEffect(() => {
-    if (hdrModalState.isOpen) setHasLoadedHdrModal(true);
-  }, [hdrModalState.isOpen]);
-
-  useEffect(() => {
-    if (superResolutionModalState.isOpen) setHasLoadedSuperResolutionModal(true);
-  }, [superResolutionModalState.isOpen]);
-
-  useEffect(() => {
-    if (focusStackModalState.isOpen) setHasLoadedFocusStackModal(true);
-  }, [focusStackModalState.isOpen]);
 
   const closeConfirmModal = () => {
     setUI((state) => ({ confirmModalState: { ...state.confirmModalState, isOpen: false } }));
