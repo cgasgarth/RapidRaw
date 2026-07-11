@@ -59,8 +59,6 @@ use std::time::Duration;
 use base64::{Engine as _, engine::general_purpose};
 use image::codecs::jpeg::JpegEncoder;
 use image::{DynamicImage, GenericImageView, ImageBuffer, Luma, RgbImage, Rgba};
-use image_hdr::hdr_merge_images;
-use image_hdr::input::HDRInput;
 use imageproc::drawing::draw_line_segment_mut;
 use imageproc::edges::canny;
 use imageproc::hough::{LineDetectionOptions, detect_lines};
@@ -1754,6 +1752,14 @@ async fn plan_hdr(
         output_height: response.sources[response.reference_source_index]
             .frame
             .height as u64,
+        planned_sources: response.sources.clone(),
+        motion_probability_bytes: Vec::new(),
+        ownership_bytes: Vec::new(),
+        feather_bytes: Vec::new(),
+        scene_linear_artifact_hash: None,
+        tone_mapped_preview_hash: None,
+        motion_coverage: None,
+        confidence_mean: None,
     });
     Ok(response)
 }
@@ -1834,7 +1840,7 @@ async fn merge_hdr(
     if paths.len() < 2 {
         return Err("Please select at least two images to merge.".to_string());
     }
-    let accepted_plan = state
+    let mut accepted_plan = state
         .hdr_runtime_plan
         .lock()
         .unwrap()
@@ -1887,16 +1893,20 @@ async fn merge_hdr(
 
     let source_refs = build_hdr_source_refs(&loaded_items);
 
-    let images: Vec<HDRInput> = loaded_items
+    let developed_images = loaded_items
         .iter()
-        .map(|(path, _content_hash, img, exposure, gains)| {
-            HDRInput::with_image(img, *exposure, *gains)
-                .map_err(|e| format!("Failed to prepare HDR input for {}: {}", path, e))
-        })
-        .collect::<Result<Vec<HDRInput>, String>>()?;
-
-    log::info!("Starting HDR merge of {} images", images.len());
-    let hdr_merged = hdr_merge_images(&mut images.into()).map_err(|e| e.to_string())?;
+        .map(|(_, _, image, _, _)| image.clone())
+        .collect::<Vec<_>>();
+    log::info!(
+        "Starting calibrated native HDR merge of {} images",
+        developed_images.len()
+    );
+    let native = crate::merge::hdr::runtime::reconstruct(
+        &developed_images,
+        &accepted_plan.planned_sources,
+        || job.cancellation_token.checkpoint().is_err(),
+    )?;
+    let hdr_merged = native.scene_linear;
     job.cancellation_token.checkpoint()?;
     state.computational_merge_jobs.publish_progress(
         &job.job_id,
@@ -1912,8 +1922,8 @@ async fn merge_hdr(
     );
     log::info!("HDR merge completed");
 
-    let final_base64 = encode_png_data_url(&DynamicImage::ImageRgb8(hdr_merged.to_rgb8()))?;
-    let output_content_hash = hash_hdr_apply_output(&hdr_merged);
+    let final_base64 = encode_png_data_url(&native.preview)?;
+    let output_content_hash = native.scene_linear_hash.clone();
     let current_hashes = source_refs
         .iter()
         .map(|source| source.content_hash.clone())
@@ -1921,6 +1931,22 @@ async fn merge_hdr(
     if current_hashes != accepted_plan.source_content_hashes {
         return Err("hdr_apply_stale_source_content".to_string());
     }
+    accepted_plan.motion_probability_hash = Some(format!(
+        "blake3:{}",
+        blake3::hash(&native.motion_probability).to_hex()
+    ));
+    accepted_plan.ownership_hash = Some(format!(
+        "blake3:{}",
+        blake3::hash(&native.ownership).to_hex()
+    ));
+    accepted_plan.feather_hash = Some(format!("blake3:{}", blake3::hash(&native.feather).to_hex()));
+    accepted_plan.motion_probability_bytes = native.motion_probability;
+    accepted_plan.ownership_bytes = native.ownership;
+    accepted_plan.feather_bytes = native.feather;
+    accepted_plan.scene_linear_artifact_hash = Some(native.scene_linear_hash);
+    accepted_plan.tone_mapped_preview_hash = Some(native.preview_hash);
+    accepted_plan.motion_coverage = Some(native.motion_coverage);
+    accepted_plan.confidence_mean = Some(native.confidence_mean);
     let runtime_plan = accepted_plan;
     let receipt = HdrApplyReceipt {
         accepted_dry_run_plan_hash: runtime_plan.accepted_dry_run_plan_hash.clone(),
@@ -1986,16 +2012,6 @@ fn build_hdr_apply_source_roles(
         .collect::<Vec<_>>()
 }
 
-fn hash_hdr_apply_output(hdr_image: &DynamicImage) -> String {
-    let rgba = hdr_image.to_rgba32f();
-    let bytes = rgba
-        .as_raw()
-        .iter()
-        .flat_map(|value| value.to_le_bytes())
-        .collect::<Vec<_>>();
-    format!("blake3:{}", blake3::hash(&bytes).to_hex())
-}
-
 #[tauri::command]
 async fn save_hdr(
     first_path_str: String,
@@ -2015,7 +2031,7 @@ async fn save_hdr(
         .unwrap_or("hdr");
 
     let source_refs = state.hdr_source_refs.lock().unwrap().clone();
-    let runtime_plan = state
+    let mut runtime_plan = state
         .hdr_runtime_plan
         .lock()
         .unwrap()
@@ -2035,9 +2051,23 @@ async fn save_hdr(
         .write_to(&mut payload, image::ImageFormat::Tiff)
         .map_err(|error| format!("hdr_payload_encode_failed:{error}"))?;
     let mut preview = std::io::Cursor::new(Vec::new());
-    DynamicImage::ImageRgb8(hdr_image.to_rgb8())
+    crate::merge::hdr::runtime::tone_map(&hdr_image, 1.0)?
         .write_to(&mut preview, image::ImageFormat::Png)
         .map_err(|error| format!("hdr_preview_encode_failed:{error}"))?;
+    let scene_linear_f16 = hdr_image
+        .to_rgb32f()
+        .pixels()
+        .flat_map(|pixel| {
+            pixel
+                .0
+                .into_iter()
+                .flat_map(|value| half::f16::from_f32(value).to_bits().to_le_bytes())
+        })
+        .collect::<Vec<_>>();
+    runtime_plan.scene_linear_artifact_hash = Some(format!(
+        "blake3:{}",
+        blake3::hash(&scene_linear_f16).to_hex()
+    ));
     let map_lineage = serde_json::to_vec(&serde_json::json!({
         "deghostRadianceHash": runtime_plan.deghost_radiance_hash,
         "featherHash": runtime_plan.feather_hash,
@@ -2054,7 +2084,13 @@ async fn save_hdr(
         height: u64::from(hdr_image.height()),
         payload_path: payload_name.clone(),
         preview_paths: vec!["preview.png".to_string()],
-        map_paths: vec!["maps/accepted-artifacts.json".to_string()],
+        map_paths: vec![
+            "maps/accepted-artifacts.json".to_string(),
+            "maps/motion-probability.bin".to_string(),
+            "maps/source-selection.bin".to_string(),
+            "maps/confidence-feather.bin".to_string(),
+            "scene-linear.rgb16f".to_string(),
+        ],
         source_immutability_hashes: runtime_plan.source_content_hashes.clone(),
     };
     let mut transaction =
@@ -2062,6 +2098,13 @@ async fn save_hdr(
     transaction.write_file(&payload_name, payload.get_ref())?;
     transaction.write_file("preview.png", preview.get_ref())?;
     transaction.write_file("maps/accepted-artifacts.json", &map_lineage)?;
+    transaction.write_file(
+        "maps/motion-probability.bin",
+        &runtime_plan.motion_probability_bytes,
+    )?;
+    transaction.write_file("maps/source-selection.bin", &runtime_plan.ownership_bytes)?;
+    transaction.write_file("maps/confidence-feather.bin", &runtime_plan.feather_bytes)?;
+    transaction.write_file("scene-linear.rgb16f", &scene_linear_f16)?;
     transaction.write_file(
         "lineage.json",
         &serde_json::to_vec(&serde_json::json!({
@@ -2076,6 +2119,11 @@ async fn save_hdr(
             "tilePlanHash": tile_plan.plan_hash,
             "observedPeakMemoryBytes": tile_plan.memory.estimated_peak_bytes,
             "workingDomain": "acescg_ap1_scene_linear_v1",
+            "internalArtifact": {
+                "encoding": "rgb_half_float_little_endian",
+                "hash": format!("blake3:{}", blake3::hash(&scene_linear_f16).to_hex()),
+                "path": "scene-linear.rgb16f"
+            },
         }))
         .map_err(|error| format!("hdr_lineage_encode_failed:{error}"))?,
     )?;
