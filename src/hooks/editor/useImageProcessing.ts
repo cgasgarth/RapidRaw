@@ -649,13 +649,14 @@ export function useImageProcessing(
         }
         if (request.scopeRecovery) setEditor({ previewScopeRecoveryError: null });
       } catch (err) {
-        if (err !== 'Superseded or worker failed') {
+        const expectedSupersession = String(err).includes('preview_superseded');
+        if (!expectedSupersession) {
           console.error('Failed to apply adjustments:', err);
           if (operation) logAppOperationFailure(operation, err);
         } else if (operation) {
           logAppOperationSuccess(operation, { droppedReason: 'superseded', jobId });
         }
-        if (isPreviewRequestCurrent(request)) {
+        if (!expectedSupersession && isPreviewRequestCurrent(request)) {
           clearInteractivePatch();
           publishQualityStatus('degraded_limited', {
             ...request.quality,
