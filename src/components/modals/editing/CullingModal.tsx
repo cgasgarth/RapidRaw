@@ -1,7 +1,16 @@
 import { invoke } from '@tauri-apps/api/core';
 import { AnimatePresence, motion } from 'framer-motion';
 import { CheckCircle, Link2, Loader2, Move, Star, Tag, Trash2, Unlink, Users, XCircle } from 'lucide-react';
-import { type CSSProperties, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  type CSSProperties,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useModalTransition } from '../../../hooks/ui/useModalTransition';
@@ -13,6 +22,7 @@ import Dropdown from '../../ui/primitives/Dropdown';
 import Slider from '../../ui/primitives/Slider';
 import Switch from '../../ui/primitives/Switch';
 import UiText from '../../ui/primitives/Text';
+import { buildInitialCullingDecision, reduceCullingDecision } from './cullingSessionModel';
 
 interface CullingModalProps {
   isOpen: boolean;
@@ -271,8 +281,73 @@ export default function CullingModal({
   onApply,
   onError,
 }: CullingModalProps) {
-  const { t } = useTranslation();
   const { isMounted, show } = useModalTransition(isOpen);
+  const openEpoch = useRef(0);
+  const wasOpen = useRef(false);
+  if (isOpen && !wasOpen.current) openEpoch.current += 1;
+  wasOpen.current = isOpen;
+
+  if (!isMounted) return null;
+
+  const sessionId = `${openEpoch.current}:${JSON.stringify(imagePaths)}`;
+
+  return (
+    <div
+      className={`fixed inset-0 flex items-center justify-center z-50 bg-black/30 backdrop-blur-xs transition-opacity duration-300 ease-in-out ${
+        show ? 'opacity-100' : 'opacity-0'
+      }`}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      role="presentation"
+    >
+      <CullingSession
+        error={error}
+        getThumbnailUrl={getThumbnailUrl}
+        imagePaths={imagePaths}
+        key={sessionId}
+        onApply={onApply}
+        onClose={onClose}
+        onError={onError}
+        progress={progress}
+        show={show}
+        suggestions={suggestions}
+      />
+    </div>
+  );
+}
+
+interface CullingSessionProps extends Omit<CullingModalProps, 'isOpen'> {
+  show: boolean;
+}
+
+function CullingSession({
+  error,
+  getThumbnailUrl,
+  imagePaths,
+  onApply,
+  onClose,
+  onError,
+  progress,
+  show,
+  suggestions: initialSuggestions,
+}: CullingSessionProps) {
+  const { t } = useTranslation();
+  const requestToken = useRef(0);
+  const isSessionActive = useRef(true);
+  const hasApplied = useRef(false);
+  const [decision, dispatchDecision] = useReducer(reduceCullingDecision, undefined, () =>
+    buildInitialCullingDecision(imagePaths, initialSuggestions),
+  );
+  const { selectedRejects } = decision;
+
+  useEffect(
+    () => () => {
+      isSessionActive.current = false;
+      requestToken.current += 1;
+    },
+    [],
+  );
 
   const [settings, setSettings] = useState<CullingSettings>({
     groupSimilar: true,
@@ -282,7 +357,6 @@ export default function CullingModal({
     rankFocus: true,
   });
 
-  const [selectedRejects, setSelectedRejects] = useState<Set<string>>(new Set());
   const [action, setAction] = useState<CullAction>('reject');
   const [activeTab, setActiveTab] = useState<CullingResultsTab>('similar');
   const [compareViewport, setCompareViewport] = useState<CompareViewport>({
@@ -304,6 +378,7 @@ export default function CullingModal({
     ],
     [t],
   );
+  const suggestions = decision.suggestions;
   const stage = useMemo<CullingStage>(() => {
     if (suggestions || error) return 'results';
     if (progress) return 'progress';
@@ -324,58 +399,26 @@ export default function CullingModal({
     [imagePaths],
   );
 
-  useEffect(() => {
-    if (isOpen) return;
-
-    const resetTimer = setTimeout(() => {
-      setSelectedRejects(new Set());
-    }, 300);
-
-    return () => {
-      clearTimeout(resetTimer);
-    };
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (stage === 'results' && suggestions) {
-      const syncTimer = setTimeout(() => {
-        const initialRejects = new Set<string>();
-        suggestions.similarGroups.forEach((group) => {
-          group.duplicates.forEach((dup) => initialRejects.add(dup.path));
-        });
-        suggestions.blurryImages.forEach((img) => initialRejects.add(img.path));
-        setSelectedRejects(initialRejects);
-      }, 0);
-
-      return () => {
-        clearTimeout(syncTimer);
-      };
-    }
-    return undefined;
-  }, [stage, suggestions]);
-
   const handleStartCulling = useCallback(async () => {
+    const token = ++requestToken.current;
     try {
-      await invoke(Invokes.CullImages, { paths: imagePaths, settings });
+      const resolvedSuggestions = await invoke<CullingSuggestions>(Invokes.CullImages, { paths: imagePaths, settings });
+      if (!isSessionActive.current || requestToken.current !== token) return;
+      dispatchDecision({ paths: imagePaths, type: 'suggestionsResolved', suggestions: resolvedSuggestions });
     } catch (err) {
+      if (!isSessionActive.current || requestToken.current !== token) return;
       console.error('Culling failed to start:', err);
       onError(String(err));
     }
   }, [imagePaths, settings, onError]);
 
   const handleToggleReject = (path: string) => {
-    setSelectedRejects((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(path)) {
-        newSet.delete(path);
-      } else {
-        newSet.add(path);
-      }
-      return newSet;
-    });
+    dispatchDecision({ path, type: 'toggle' });
   };
 
   const handleApply = () => {
+    if (hasApplied.current) return;
+    hasApplied.current = true;
     onApply(action, Array.from(selectedRejects));
   };
 
@@ -1190,29 +1233,19 @@ export default function CullingModal({
     }
   };
 
-  if (!isMounted) return null;
-
   return (
     <div
-      className={`fixed inset-0 flex items-center justify-center z-50 bg-black/30 backdrop-blur-xs transition-opacity duration-300 ease-in-out ${
-        show ? 'opacity-100' : 'opacity-0'
+      aria-modal="true"
+      className={`bg-surface rounded-lg shadow-xl p-6 w-full max-w-5xl transform transition-all duration-300 ease-out ${
+        show ? 'scale-100 opacity-100 translate-y-0' : 'scale-95 opacity-0 -translate-y-4'
       }`}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          onClose();
-        }
-      }}
-      role="presentation"
+      data-culling-active-path={decision.activePath ?? ''}
+      data-culling-reviewer-changed={String(decision.reviewerChangedDecision)}
+      data-culling-session-path-count={decision.paths.length}
+      data-testid="culling-session"
+      role="dialog"
     >
-      <div
-        aria-modal="true"
-        className={`bg-surface rounded-lg shadow-xl p-6 w-full max-w-5xl transform transition-all duration-300 ease-out ${
-          show ? 'scale-100 opacity-100 translate-y-0' : 'scale-95 opacity-0 -translate-y-4'
-        }`}
-        role="dialog"
-      >
-        {renderContent()}
-      </div>
+      {renderContent()}
     </div>
   );
 }
