@@ -5,6 +5,7 @@ import { inspectorTokens } from '../inspectorTokens';
 export interface InspectorSegmentedControlOption<T extends string> {
   disabled?: boolean;
   label: string;
+  tooltip?: string;
   value: T;
 }
 
@@ -57,6 +58,7 @@ export default function InspectorSegmentedControl<T extends string>({
           <button
             aria-checked={isSelected}
             className={inspectorTokens.control.segmented.option}
+            data-tooltip={option.tooltip}
             disabled={isDisabled}
             key={option.value}
             onClick={() => {
