@@ -401,7 +401,7 @@ pub(crate) fn process_image_for_export_pipeline_with_tonemapper_override(
         context,
         state,
         retouched_image.as_ref(),
-        render_inputs.unique_hash,
+        crate::gpu_processing::PreGpuImageIdentity::for_source(retouched_image.as_ref(), path),
         RenderRequest {
             adjustments: render_inputs.adjustments,
             mask_bitmaps,
@@ -649,7 +649,6 @@ fn export_masks_for_image(
             get_all_adjustments_from_json(render_adjustments.as_ref(), is_raw, tm_override);
         let lut_path = render_adjustments["lutPath"].as_str();
         let lut = lut_path.and_then(|p| get_or_load_lut(state, p).ok());
-        let unique_hash = calculate_full_job_hash(source_path_str, render_adjustments.as_ref());
         let output_dir = output_path_obj.parent().unwrap_or(output_path_obj);
         let stem = output_path_obj
             .file_stem()
@@ -673,7 +672,10 @@ fn export_masks_for_image(
                 context,
                 state,
                 transformed_image.as_ref(),
-                unique_hash,
+                crate::gpu_processing::PreGpuImageIdentity::for_source(
+                    transformed_image.as_ref(),
+                    source_path_str,
+                ),
                 RenderRequest {
                     adjustments: single_adjustments,
                     mask_bitmaps: &single_bitmaps,
@@ -791,13 +793,12 @@ fn export_adjustments_as_lut(
 
     let lut_path = render_adjustments["lutPath"].as_str();
     let lut = lut_path.and_then(|p| get_or_load_lut(state, p).ok());
-    let unique_hash = calculate_full_job_hash(source_path_str, render_adjustments.as_ref());
 
     let processed_lut = process_and_get_dynamic_image(
         context,
         state,
         &identity_image,
-        unique_hash,
+        crate::gpu_processing::PreGpuImageIdentity::for_source(&identity_image, source_path_str),
         RenderRequest {
             adjustments: all_adjustments,
             mask_bitmaps: &[],
@@ -1518,7 +1519,10 @@ pub async fn estimate_export_sizes(
             &context,
             &state,
             &preview_image,
-            render_inputs.unique_hash,
+            crate::gpu_processing::PreGpuImageIdentity::for_source(
+                &preview_image,
+                &source_path.to_string_lossy(),
+            ),
             RenderRequest {
                 adjustments: render_inputs.adjustments,
                 mask_bitmaps: &mask_bitmaps,
@@ -1663,7 +1667,10 @@ pub async fn estimate_export_sizes(
             &context,
             &state,
             &preview_base,
-            render_inputs.unique_hash,
+            crate::gpu_processing::PreGpuImageIdentity::for_source(
+                &preview_base,
+                &source_path.to_string_lossy(),
+            ),
             RenderRequest {
                 adjustments: render_inputs.adjustments,
                 mask_bitmaps: &mask_bitmaps,
