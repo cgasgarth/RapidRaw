@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import { AlertTriangle, CheckCircle2, Layers3, ScanSearch, ShieldCheck, Sparkles, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { BurstSrApplyReceipt } from '../../../schemas/computational-merge/burstSrApplySchemas';
 import {
   type SingleImageX2ApplyReceipt,
   type SingleImageX2Capability,
@@ -49,11 +50,13 @@ import {
 } from './ComputationalSetupModalShell';
 
 interface SuperResolutionModalProps {
+  applyReceipt?: BurstSrApplyReceipt | null;
   isOpen: boolean;
   lastApplyCommand?: SuperResolutionModalState['lastApplyCommand'];
   lastDryRunCommand?: SuperResolutionModalState['lastDryRunCommand'];
   loadingImageUrl?: string | null;
   onApplyPlan?: () => void;
+  onPrepareCandidate?: () => void;
   onCancelCandidate?: () => void;
   candidateJob?: BurstSrCandidateJobResult | null;
   onClose: () => void;
@@ -79,11 +82,11 @@ interface SuperResolutionModalProps {
 
 const scaleOptions = [1.5, 2, 3, 4] as const;
 const previewDimensionOptions = [2400, 4096, 8192] as const;
-const reviewArtifactPath = '/tmp/rawengine-super-resolution-smoke.tif';
 const getArtifactFileName = (path: string): string => path.split('/').at(-1) ?? path;
 const getShortHash = (hash: string): string => `${hash.slice(0, 18)}...`;
 
 export function SuperResolutionModal({
+  applyReceipt = null,
   isOpen,
   lastApplyCommand,
   lastDryRunCommand,
@@ -92,6 +95,7 @@ export function SuperResolutionModal({
   onOpenOutput,
   onApplySingleImage,
   onApplyPlan,
+  onPrepareCandidate,
   onCancelCandidate,
   candidateJob = null,
   onPreviewPlan,
@@ -230,7 +234,7 @@ export function SuperResolutionModal({
   const outputReview =
     runtimeOutputReview ??
     buildSuperResolutionOutputReviewWorkflow({
-      artifactPath: reviewArtifactPath,
+      artifactPath: sourcePaths[0] ?? '',
       settings,
       sourceCount: fallbackOutputReviewSourceCount,
       sourcePaths,
@@ -355,7 +359,7 @@ export function SuperResolutionModal({
       ? 'pending_acceptance'
       : 'missing';
   const isEditableHandoffReady = outputReview.editableGate === 'ready' && hasAcceptedCropReview;
-  const openInEditorPath = derivedOutputReceipt.openInEditorAction.path ?? '';
+  const openInEditorPath = applyReceipt?.payloadPath ?? '';
   const exportHandoffReady = isEditableHandoffReady && openInEditorPath.length > 0;
   const acceptanceGateStatus = isEditableHandoffReady ? 'ready' : 'review';
   const cropReviewStatus = hasAcceptedCropReview ? 'ready' : hasCropReviewEvidence ? 'review' : 'pending';
@@ -455,14 +459,30 @@ export function SuperResolutionModal({
               {t('modals.hdr.cancel')}
             </Button>
           )}
-          {!isSingleImageAi && onApplyPlan !== undefined && (
+          {!isSingleImageAi && onPrepareCandidate !== undefined && applyReceipt === null && (
             <Button
-              onClick={onApplyPlan}
+              onClick={onPrepareCandidate}
               disabled={nativeReadiness?.accepted !== true || candidateJob?.status === 'active'}
               data-testid="sr-prepare-candidate-button"
             >
               <Sparkles className="w-4 h-4" />
+              {t('modals.focusStack.prepareFullResolution')}
+            </Button>
+          )}
+          {!isSingleImageAi && onApplyPlan !== undefined && applyReceipt === null && (
+            <Button
+              onClick={onApplyPlan}
+              disabled={candidateJob?.status !== 'succeeded' || candidateJob.candidate?.commitReady !== true}
+              data-testid="sr-apply-candidate-button"
+            >
+              <CheckCircle2 className="w-4 h-4" />
               {t('adjustments.color.workflowRecipes.apply')}
+            </Button>
+          )}
+          {!isSingleImageAi && applyReceipt !== null && onOpenOutput !== undefined && (
+            <Button onClick={() => onOpenOutput(applyReceipt.payloadPath)} data-testid="sr-open-output-button">
+              <CheckCircle2 className="w-4 h-4" />
+              {t('modals.panorama.openInEditor')}
             </Button>
           )}
         </>

@@ -379,19 +379,60 @@ pub(crate) fn validate(path: &Path, identity: &AcceptedBurstSrIdentity) -> Resul
             .map_err(|e| format!("sr_candidate_manifest_missing:{e}"))?,
     )
     .map_err(|e| format!("sr_candidate_manifest_invalid:{e}"))?;
-    if value["formatId"] != FORMAT_ID || value["acceptedReview"]["planHash"] != identity.plan_hash {
+    if value["formatId"] != FORMAT_ID
+        || value["temporary"] != true
+        || value["commitReady"] != true
+        || value["qualityDecision"] != "commit_ready"
+        || value["acceptedReview"]["planHash"] != identity.plan_hash
+        || value["acceptedReview"]["reviewId"] != identity.review_id
+        || value["acceptedReview"]["previewHash"] != identity.preview_hash
+        || value["acceptedReview"]["reconstructionPolicyHash"]
+            != identity.reconstruction_policy_hash
+        || value["acceptedReview"]["sourceHashes"]
+            != serde_json::to_value(&identity.source_hashes).unwrap_or_default()
+        || value["acceptedReview"]["sources"]
+            != serde_json::to_value(&identity.sources).unwrap_or_default()
+        || value["acceptedReview"]["registration"]
+            != serde_json::to_value(&identity.registration).unwrap_or_default()
+        || value["acceptedReview"]["settings"]
+            != serde_json::to_value(&identity.settings).unwrap_or_default()
+        || value["acceptedReview"]["width"] != identity.width
+        || value["acceptedReview"]["height"] != identity.height
+        || value["inventoryHash"] != stable_hash(&value["inventory"])
+    {
         return Err("sr_candidate_manifest_identity_mismatch".into());
     }
-    for tile in value["inventory"]["tiles"]
+    let tiles = value["inventory"]["tiles"]
         .as_array()
-        .ok_or("sr_candidate_tiles_missing")?
-    {
+        .ok_or("sr_candidate_tiles_missing")?;
+    if tiles.is_empty() || value["tilePlan"]["tileCount"].as_u64() != Some(tiles.len() as u64) {
+        return Err("sr_candidate_tile_inventory_invalid".into());
+    }
+    for (expected_index, tile) in tiles.iter().enumerate() {
+        if tile["index"].as_u64() != Some(expected_index as u64)
+            || tile["width"].as_u64().unwrap_or(0) == 0
+            || tile["height"].as_u64().unwrap_or(0) == 0
+        {
+            return Err("sr_candidate_tile_index_invalid".into());
+        }
         let name = format!(
             "{:08}.bin",
             tile["index"]
                 .as_u64()
                 .ok_or("sr_candidate_tile_index_invalid")?
         );
+        let pixels = tile["width"].as_u64().unwrap() * tile["height"].as_u64().unwrap();
+        if fs::metadata(path.join("rgb").join(&name))
+            .map_err(|_| "sr_candidate_rgb_missing")?
+            .len()
+            != pixels * 12
+            || fs::metadata(path.join("maps").join(&name))
+                .map_err(|_| "sr_candidate_maps_missing")?
+                .len()
+                != pixels * 68
+        {
+            return Err("sr_candidate_tile_length_mismatch".into());
+        }
         if file_hash(&path.join("rgb").join(&name))? != tile["rgbHash"].as_str().unwrap_or_default()
             || file_hash(&path.join("maps").join(name))?
                 != tile["mapsHash"].as_str().unwrap_or_default()
