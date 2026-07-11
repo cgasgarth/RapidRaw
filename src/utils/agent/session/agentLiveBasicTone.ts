@@ -20,7 +20,7 @@ import {
   buildBasicToneImageCommandContext,
   type LegacyBasicToneAdjustmentPayload,
 } from '../../basicToneCommandBridge';
-import { createLiveEditorAppServerBridge } from './agentLiveEditorState';
+import { createLiveEditorAppServerBridge } from './agentLiveEditorCoreState';
 
 export type AgentLiveBasicTonePixel = readonly [number, number, number];
 

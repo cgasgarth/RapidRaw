@@ -24,7 +24,7 @@ import {
   hashBasicTonePreviewPixels,
   renderBasicTonePreviewPixels,
 } from '../session/agentLiveBasicTone';
-import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorState';
+import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorCoreState';
 
 export type AgentCoreEditCommandBundleStep =
   | { kind: 'basic_tone'; payload: LegacyBasicToneAdjustmentPayload }
