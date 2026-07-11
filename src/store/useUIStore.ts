@@ -161,6 +161,7 @@ export interface CollageModalState {
 }
 
 export interface PanoramaModalState {
+  activeOperationId: string | null;
   alignmentCancellationId: string | null;
   error: string | null;
   finalImageBase64: string | null;
@@ -191,6 +192,7 @@ export interface PanoramaModalState {
 }
 
 export interface HdrModalState {
+  activeOperationId: string | null;
   error: string | null;
   finalImageBase64: string | null;
   isOpen: boolean;
@@ -322,6 +324,7 @@ export interface CullingModalState {
 export const createDefaultPanoramaModalState = (
   settings: PanoramaUiSettings = DEFAULT_PANORAMA_UI_SETTINGS,
 ): PanoramaModalState => ({
+  activeOperationId: null,
   alignmentCancellationId: null,
   error: null,
   finalImageBase64: null,
@@ -339,6 +342,7 @@ export const createDefaultPanoramaModalState = (
 export const createDefaultHdrModalState = (
   settings: HdrMergeUiSettings = DEFAULT_HDR_MERGE_UI_SETTINGS,
 ): HdrModalState => ({
+  activeOperationId: null,
   error: null,
   finalImageBase64: null,
   isOpen: false,

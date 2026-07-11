@@ -88,9 +88,9 @@ interface ImportSettings {
 export interface AppModalsProps {
   handleImageSelect: (path: string) => Promise<void> | void;
   handleSavePanorama: () => Promise<string>;
-  handleStartPanorama: (paths: string[]) => void;
+  handleStartPanorama: (paths: string[], operationId: string) => void;
   handleSaveHdr: () => Promise<string>;
-  handleStartHdr: (paths: string[]) => void;
+  handleStartHdr: (paths: string[], operationId: string) => void;
   requestThumbnails: (paths: string[]) => void;
   refreshImageList: () => Promise<void>;
   handleApplyDenoise: (intensity: number, method: 'ai' | 'bm3d') => Promise<void>;
@@ -268,8 +268,8 @@ export default function AppModals(props: AppModalsProps) {
               void props.handleImageSelect(path);
             }}
             onSave={props.handleSavePanorama}
-            onStitch={() => {
-              props.handleStartPanorama(panoramaModalState.stitchingSourcePaths);
+            onStitch={(operationId) => {
+              props.handleStartPanorama(panoramaModalState.stitchingSourcePaths, operationId);
             }}
             onSettingsChange={(settings) => {
               setUI((state) => ({
@@ -310,8 +310,8 @@ export default function AppModals(props: AppModalsProps) {
               void props.handleImageSelect(path);
             }}
             onSave={props.handleSaveHdr}
-            onMerge={() => {
-              props.handleStartHdr(hdrModalState.stitchingSourcePaths);
+            onMerge={(operationId) => {
+              props.handleStartHdr(hdrModalState.stitchingSourcePaths, operationId);
             }}
             onSettingsChange={(settings) => {
               setUI((state) => ({

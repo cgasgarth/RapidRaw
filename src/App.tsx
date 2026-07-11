@@ -407,8 +407,8 @@ function App() {
     handleSaveCollage,
   } = useProductivityActions(handleLibraryRefresh);
   const handleStartPanoramaVoid = useCallback(
-    (paths: string[]) => {
-      void handleStartPanorama(paths);
+    (paths: string[], operationId: string) => {
+      void handleStartPanorama(paths, operationId);
     },
     [handleStartPanorama],
   );

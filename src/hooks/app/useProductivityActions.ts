@@ -14,14 +14,16 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
   const setUI = useUIStore((state) => state.setUI);
 
   const handleStartPanorama = useCallback(
-    async (paths: string[]) => {
+    async (paths: string[], operationId: string) => {
       const { panoramaModalState } = useUIStore.getState();
+      if (panoramaModalState.isProcessing) return;
       const { settings } = panoramaModalState;
       const cancellationId = crypto.randomUUID();
       const dryRunCommand = buildPanoramaDryRunCommandState(paths, settings);
       setUI((state) => ({
         panoramaModalState: {
           ...state.panoramaModalState,
+          activeOperationId: operationId,
           alignmentCancellationId: cancellationId,
           isProcessing: true,
           lastApplyCommand: null,
@@ -42,11 +44,13 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
           }),
         );
         setUI((state) =>
-          state.panoramaModalState.alignmentCancellationId !== cancellationId
+          state.panoramaModalState.alignmentCancellationId !== cancellationId ||
+          state.panoramaModalState.activeOperationId !== operationId
             ? {}
             : {
                 panoramaModalState: {
                   ...state.panoramaModalState,
+                  activeOperationId: null,
                   alignmentCancellationId: null,
                   isProcessing: false,
                   progressMessage:
@@ -74,7 +78,8 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
         }
       } catch (err: unknown) {
         setUI((state) => ({
-          ...(state.panoramaModalState.alignmentCancellationId !== cancellationId
+          ...(state.panoramaModalState.alignmentCancellationId !== cancellationId ||
+          state.panoramaModalState.activeOperationId !== operationId
             ? {}
             : {
                 panoramaModalState: {
@@ -111,14 +116,16 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
   }, [refreshImageList, setUI]);
 
   const handleStartHdr = useCallback(
-    (paths: string[]) => {
+    (paths: string[], operationId: string) => {
       const { hdrModalState } = useUIStore.getState();
+      if (hdrModalState.isProcessing) return;
       const { settings } = hdrModalState;
       const { lastDryRunCommand, selectedPaths } = buildHdrDryRunActionState(paths, settings);
       if (hdrModalState.runtimePlan?.accepted === true && hdrModalState.runtimePlan.blockCodes.length === 0) {
         setUI((state) => ({
           hdrModalState: {
             ...state.hdrModalState,
+            activeOperationId: operationId,
             error: null,
             isProcessing: true,
             progressMessage: 'Applying calibrated HDR artifacts...',
@@ -129,9 +136,11 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
           acceptedDryRunPlanId: hdrModalState.runtimePlan.acceptedDryRunPlanId,
           paths: selectedPaths,
         }).catch((err: unknown) => {
-          setUI((state) => ({
-            hdrModalState: { ...state.hdrModalState, error: String(err), isProcessing: false },
-          }));
+          setUI((state) =>
+            state.hdrModalState.activeOperationId !== operationId
+              ? {}
+              : { hdrModalState: { ...state.hdrModalState, error: String(err), isProcessing: false } },
+          );
         });
         return;
       }
@@ -140,6 +149,7 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
         return {
           hdrModalState: {
             ...hdrModalState,
+            activeOperationId: operationId,
             isProcessing: true,
             lastDryRunCommand,
             error: null,
@@ -152,17 +162,22 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
       void (async () => {
         try {
           const runtimePlan = hdrRuntimePlanSchema.parse(await invoke(Invokes.PlanHdr, { paths: selectedPaths }));
-          setUI((state) => ({
-            hdrModalState: {
-              ...state.hdrModalState,
-              isProcessing: false,
-              progressMessage:
-                runtimePlan.readiness === 'deghost_unresolved'
-                  ? 'Deghost preview contains unresolved motion.'
-                  : 'Native deghost review preview ready.',
-              runtimePlan,
-            },
-          }));
+          setUI((state) =>
+            state.hdrModalState.activeOperationId !== operationId
+              ? {}
+              : {
+                  hdrModalState: {
+                    ...state.hdrModalState,
+                    activeOperationId: null,
+                    isProcessing: false,
+                    progressMessage:
+                      runtimePlan.readiness === 'deghost_unresolved'
+                        ? 'Deghost preview contains unresolved motion.'
+                        : 'Native deghost review preview ready.',
+                    runtimePlan,
+                  },
+                },
+          );
           if (runtimePlan.blockCodes.length > 0 || !runtimePlan.accepted) {
             setUI((state) => ({
               hdrModalState: {
@@ -174,7 +189,11 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
             return;
           }
         } catch (err: unknown) {
-          setUI((state) => ({ hdrModalState: { ...state.hdrModalState, isProcessing: false, error: String(err) } }));
+          setUI((state) =>
+            state.hdrModalState.activeOperationId !== operationId
+              ? {}
+              : { hdrModalState: { ...state.hdrModalState, isProcessing: false, error: String(err) } },
+          );
         }
       })();
     },

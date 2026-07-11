@@ -728,6 +728,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               onClick: () => {
                 setUI({
                   panoramaModalState: {
+                    activeOperationId: null,
                     alignmentCancellationId: null,
                     error: null,
                     finalImageBase64: null,
@@ -751,6 +752,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               onClick: () => {
                 setUI({
                   hdrModalState: {
+                    activeOperationId: null,
                     error: null,
                     finalImageBase64: null,
                     isOpen: true,
