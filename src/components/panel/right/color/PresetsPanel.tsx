@@ -1311,6 +1311,7 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
       />
       <CreateFolderModal
         isOpen={isAddFolderModalOpen}
+        operationScope="preset-library"
         onClose={() => setIsAddFolderModalOpen(false)}
         onSave={(name) => {
           addFolder(name);
@@ -1320,6 +1321,7 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
       <RenameFolderModal
         currentName={renameFolderState.folder?.name ?? ''}
         isOpen={renameFolderState.isOpen}
+        operationScope={`preset-folder:${renameFolderState.folder?.id ?? ''}`}
         onClose={() => setRenameFolderState({ folder: null, isOpen: false })}
         onSave={(name) => {
           if (renameFolderState.folder) renameItem(renameFolderState.folder.id, name);
