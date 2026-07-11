@@ -11,9 +11,9 @@ import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
 import type { EditorZoomCommand } from '../../utils/editorZoom';
+import { EditorRightPanelRoot } from '../app/EditorRightPanelRoot';
 import BottomBar from '../panel/BottomBar';
 import Editor from '../panel/Editor';
-import { EditorRightPanelHost } from '../panel/right/EditorRightPanelHost';
 import RightPanelSwitcher from '../panel/right/RightPanelSwitcher';
 import { DEFAULT_EDITOR_RIGHT_PANEL, getRightPanelEntry } from '../panel/right/rightPanelRegistry';
 import { type ImageFile, Orientation, Panel, type ThumbnailAspectRatio } from '../ui/AppProperties';
@@ -191,12 +191,10 @@ export default function EditorView({
     })),
   );
 
-  const { exportState, isCopied, isPasted, setExportState } = useProcessStore(
+  const { isCopied, isPasted } = useProcessStore(
     useShallow((state) => ({
-      exportState: state.exportState,
       isCopied: state.isCopied,
       isPasted: state.isPasted,
-      setExportState: state.setExportState,
     })),
   );
 
@@ -307,10 +305,9 @@ export default function EditorView({
   );
 
   const editorRightPanelContent = (
-    <EditorRightPanelHost
+    <EditorRightPanelRoot
       activeRightPanel={activeRightPanel}
       appSettings={appSettings}
-      exportState={exportState}
       handleSettingsChange={handleSettingsChange}
       multiSelectedPaths={multiSelectedPaths}
       onLinkedVariantImported={handleLinkedVariantImported}
@@ -324,7 +321,6 @@ export default function EditorView({
       renderedRightPanel={renderedRightPanel}
       rootPaths={rootPaths}
       selectedImage={selectedImage}
-      setExportState={setExportState}
       slideDirection={slideDirection}
     />
   );
