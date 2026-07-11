@@ -13,7 +13,6 @@ use std::thread;
 use std::time::UNIX_EPOCH;
 
 use anyhow::Result;
-use base64::{Engine as _, engine::general_purpose};
 use chrono::{DateTime, Utc};
 use image::codecs::{jpeg::JpegEncoder, tiff::TiffDecoder};
 use image::{ColorType, DynamicImage, GenericImageView, ImageBuffer, ImageDecoder, Luma};
@@ -37,7 +36,7 @@ use crate::delete_plan::{
     rrdata_sidecar_path, rrexif_sidecar_path, trash_or_remove_paths,
 };
 use crate::exif_processing;
-use crate::formats::{is_raw_file, is_supported_image_file, jpeg_data_url};
+use crate::formats::{is_raw_file, is_supported_image_file};
 use crate::gpu_processing;
 use crate::image_loader;
 use crate::image_processing::GpuContext;
@@ -55,6 +54,10 @@ use crate::smart_preview_cache::{
     read_smart_preview_artifact, resolve_smart_preview_cache_dir, write_smart_preview_artifact,
 };
 use crate::tagging::{COLOR_TAG_PREFIX, USER_TAG_PREFIX};
+use crate::thumbnail_resources::{
+    ThumbnailResourceDescriptor, ThumbnailResourceSource, descriptor_from_manifest,
+    next_descriptor_generation, publish_thumbnail_artifact,
+};
 use crate::xmp_sidecar::{
     extract_xmp_label, extract_xmp_rating, extract_xmp_tags, sync_metadata_to_xmp_sidecar,
 };
@@ -98,10 +101,11 @@ fn compute_thumbnail_cache_hash(path_str: &str, adjustments_bytes: &[u8]) -> Opt
 
 #[derive(Debug, Clone)]
 struct ThumbnailResult {
-    data_url: String,
+    resource: ThumbnailResourceDescriptor,
     is_edited: bool,
     rating: u8,
     smart_preview: Option<ThumbnailSmartPreviewPayload>,
+    smart_preview_resource: Option<ThumbnailResourceDescriptor>,
 }
 
 fn generate_and_write_smart_preview_artifact(
@@ -111,7 +115,7 @@ fn generate_and_write_smart_preview_artifact(
     preloaded_image: Option<&DynamicImage>,
     app_handle: &AppHandle,
     adjustments_bytes: &[u8],
-) -> Option<ThumbnailSmartPreviewPayload> {
+) -> Option<(ThumbnailSmartPreviewPayload, ThumbnailResourceDescriptor)> {
     let smart_image = generate_thumbnail_data_with_target(
         path_str,
         gpu_context,
@@ -1315,29 +1319,32 @@ fn generate_single_thumbnail_and_cache(
     if !force_regenerate
         && cache_hash.is_none()
         && let Some(smart_preview_dir) = smart_preview_dir.as_deref()
-        && let Some((data_url, smart_preview)) =
+        && let Some((resource, smart_preview)) =
             read_smart_preview_artifact(smart_preview_dir, path_str)
     {
         return Some(ThumbnailResult {
-            data_url,
+            resource,
             rating,
             is_edited,
             smart_preview: Some(smart_preview),
+            smart_preview_resource: None,
         });
     }
 
     let cache_hash = cache_hash?;
 
-    let cache_filename = format!("{}.jpg", cache_hash);
-    let cache_path = thumb_cache_dir.join(cache_filename);
-
     if !force_regenerate
-        && cache_path.exists()
-        && let Ok(data) = fs::read(&cache_path)
+        && let Some(resource) = descriptor_from_manifest(
+            thumb_cache_dir,
+            &cache_hash,
+            &cache_hash,
+            0,
+            ThumbnailResourceSource::DiskCache,
+        )
     {
-        let smart_preview = smart_preview_dir.as_deref().and_then(|dir| {
-            if let Some((_, existing)) = read_smart_preview_artifact(dir, path_str) {
-                Some(existing)
+        let smart_preview_artifact = smart_preview_dir.as_deref().and_then(|dir| {
+            if let Some((descriptor, existing)) = read_smart_preview_artifact(dir, path_str) {
+                Some((existing, descriptor))
             } else {
                 generate_and_write_smart_preview_artifact(
                     dir,
@@ -1349,12 +1356,14 @@ fn generate_single_thumbnail_and_cache(
                 )
             }
         });
-        let base64_str = general_purpose::STANDARD.encode(&data);
         return Some(ThumbnailResult {
-            data_url: jpeg_data_url(base64_str),
+            resource,
             rating,
             is_edited,
-            smart_preview,
+            smart_preview: smart_preview_artifact
+                .as_ref()
+                .map(|(payload, _)| payload.clone()),
+            smart_preview_resource: smart_preview_artifact.map(|(_, descriptor)| descriptor),
         });
     }
 
@@ -1364,8 +1373,24 @@ fn generate_single_thumbnail_and_cache(
         generate_thumbnail_data(path_str, gpu_context, preloaded_image, app_handle)
         && let Ok((thumb_data, width, height)) = encode_thumbnail(&thumb_image, target_width)
     {
-        let _ = fs::write(&cache_path, &thumb_data);
-        let smart_preview = smart_preview_dir
+        let adjustment_fingerprint = blake3::hash(&adjustments_bytes).to_hex().to_string();
+        publish_thumbnail_artifact(
+            thumb_cache_dir,
+            &cache_hash,
+            &cache_hash,
+            &thumb_data,
+            width,
+            height,
+            &adjustment_fingerprint,
+        )?;
+        let resource = descriptor_from_manifest(
+            thumb_cache_dir,
+            &cache_hash,
+            &cache_hash,
+            0,
+            ThumbnailResourceSource::Generated,
+        )?;
+        let smart_preview_artifact = smart_preview_dir
             .as_deref()
             .and_then(|dir| {
                 generate_and_write_smart_preview_artifact(
@@ -1389,26 +1414,34 @@ fn generate_single_thumbnail_and_cache(
                     )
                 })
             });
-        let base64_str = general_purpose::STANDARD.encode(&thumb_data);
         return Some(ThumbnailResult {
-            data_url: jpeg_data_url(base64_str),
+            resource,
             rating,
             is_edited,
-            smart_preview,
+            smart_preview: smart_preview_artifact
+                .as_ref()
+                .map(|(payload, _)| payload.clone()),
+            smart_preview_resource: smart_preview_artifact.map(|(_, descriptor)| descriptor),
         });
     }
     None
 }
 
-fn emit_thumbnail_result(app_handle: &AppHandle, path: &str, thumbnail: ThumbnailResult) {
+fn emit_thumbnail_result(app_handle: &AppHandle, path: &str, mut thumbnail: ThumbnailResult) {
+    let generation = next_descriptor_generation();
+    thumbnail.resource.generation = generation;
+    if let Some(resource) = thumbnail.smart_preview_resource.as_mut() {
+        resource.generation = generation;
+    }
     let _ = app_handle.emit(
         "thumbnail-generated",
         serde_json::json!({
             "path": path,
-            "data": thumbnail.data_url,
+            "resource": thumbnail.resource,
             "rating": thumbnail.rating,
             "is_edited": thumbnail.is_edited,
-            "smartPreview": thumbnail.smart_preview
+            "smartPreview": thumbnail.smart_preview,
+            "smartPreviewResource": thumbnail.smart_preview_resource
         }),
     );
 }
