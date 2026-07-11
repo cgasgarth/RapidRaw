@@ -11,16 +11,20 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { List, useListCallbackRef } from 'react-window';
+import { buildLibraryLayoutIndex, type LibraryLayoutIndex } from '../../../library/buildLibraryLayoutIndex';
+import {
+  buildLibrarySemanticIndex,
+  buildLibraryVisibleSemanticIndex,
+} from '../../../library/buildLibrarySemanticIndex';
 import { useLibraryStore } from '../../../store/useLibraryStore';
 import { useProcessStore } from '../../../store/useProcessStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
-import { buildLibraryAutoStackItems } from '../../../utils/libraryAutoStacks';
 import { debounce } from '../../../utils/timing';
 import {
   ExifOverlay,
   type ImageFile,
-  LibraryViewMode,
+  type LibraryViewMode,
   type SortCriteria,
   SortDirection,
   type ThumbnailAspectRatio,
@@ -29,7 +33,7 @@ import {
 import UiText from '../../ui/primitives/Text';
 
 import type { ColumnWidths } from '../MainLibrary';
-import { type LibraryRow, type LibraryRowProps, Row } from './LibraryItems';
+import { type LibraryRowProps, Row } from './LibraryItems';
 import {
   CORE_LIBRARY_COLUMN_KEYS,
   type ColumnWidthKey,
@@ -57,11 +61,6 @@ interface ThumbnailSizeOption {
   size: number;
 }
 
-interface ImageFolderGroup {
-  path: string;
-  images: ImageFile[];
-}
-
 interface ListHeaderProps {
   widths: ColumnWidths;
   resize: ReturnType<typeof useLibraryColumnResize>;
@@ -81,7 +80,7 @@ interface HeaderColumnProps {
 }
 
 interface GridData {
-  rows: LibraryRow[];
+  layoutIndex: LibraryLayoutIndex;
   itemWidth: number;
   rowHeight: number;
   listRowHeight: number;
@@ -290,33 +289,6 @@ function ListHeader({ widths, resize, sortCriteria, onSortChange }: ListHeaderPr
   );
 }
 
-const groupImagesByFolder = (images: ImageFile[], baseFolderPath: string | null): ImageFolderGroup[] => {
-  const groups: Record<string, ImageFile[]> = {};
-
-  images.forEach((img) => {
-    const physicalPath = img.path.split('?vc=')[0] ?? img.path;
-    const separator = physicalPath.includes('/') ? '/' : '\\';
-    const lastSep = physicalPath.lastIndexOf(separator);
-    const dir = lastSep > -1 ? physicalPath.substring(0, lastSep) : physicalPath;
-
-    if (!groups[dir]) {
-      groups[dir] = [];
-    }
-    groups[dir].push(img);
-  });
-
-  const sortedKeys = Object.keys(groups).sort((a, b) => {
-    if (a === baseFolderPath) return -1;
-    if (b === baseFolderPath) return 1;
-    return a.localeCompare(b);
-  });
-
-  return sortedKeys.map((dir) => ({
-    path: dir,
-    images: groups[dir] ?? [],
-  }));
-};
-
 export default function LibraryGrid(props: LibraryGridProps) {
   const {
     imageList,
@@ -468,6 +440,15 @@ export default function LibraryGrid(props: LibraryGridProps) {
     loadedThumbnailsRef.current.add(path);
   }, []);
 
+  const semanticIndex = useMemo(
+    () => buildLibrarySemanticIndex(imageList, currentFolderPath),
+    [imageList, currentFolderPath],
+  );
+  const visibleSemanticIndex = useMemo(
+    () => buildLibraryVisibleSemanticIndex(semanticIndex, expandedAutoStackIds, libraryViewMode),
+    [semanticIndex, expandedAutoStackIds, libraryViewMode],
+  );
+
   const gridData = useMemo<GridData | null>(() => {
     if (gridSize.width === 0 || imageList.length === 0) return null;
 
@@ -487,43 +468,18 @@ export default function LibraryGrid(props: LibraryGridProps) {
     const rowHeight = isListView ? listRowHeight : itemWidth + ITEM_GAP;
     const headerHeight = 40;
 
-    const rows: LibraryRow[] = [];
-
-    if (libraryViewMode === LibraryViewMode.Recursive) {
-      const groups = groupImagesByFolder(imageList, currentFolderPath);
-      groups.forEach((group) => {
-        const groupImages = group.images;
-        if (groupImages.length === 0) return;
-
-        const isExpanded = !collapsedRecursiveFolders.has(group.path);
-        rows.push({ type: 'header', path: group.path, count: groupImages.length, isExpanded });
-
-        if (isExpanded) {
-          const stackItems = buildLibraryAutoStackItems(groupImages, expandedAutoStackIds);
-          for (let i = 0; i < stackItems.length; i += columnCount) {
-            rows.push({
-              type: 'images',
-              images: stackItems.slice(i, i + columnCount),
-              startIndex: i,
-            });
-          }
-        }
-      });
-    } else {
-      const stackItems = buildLibraryAutoStackItems(imageList, expandedAutoStackIds);
-      for (let i = 0; i < stackItems.length; i += columnCount) {
-        rows.push({
-          type: 'images',
-          images: stackItems.slice(i, i + columnCount),
-          startIndex: i,
-        });
-      }
-    }
-
-    rows.push({ type: 'footer' });
+    const footerHeight = isListView ? 24 : OUTER_PADDING;
+    const layoutIndex = buildLibraryLayoutIndex(visibleSemanticIndex, {
+      collapsedFolderPaths: collapsedRecursiveFolders,
+      columnCount,
+      footerHeight,
+      headerHeight,
+      rowHeight,
+      viewMode: libraryViewMode,
+    });
 
     return {
-      rows,
+      layoutIndex,
       itemWidth,
       rowHeight,
       listRowHeight,
@@ -535,14 +491,12 @@ export default function LibraryGrid(props: LibraryGridProps) {
     };
   }, [
     gridSize.width,
-    imageList,
     libraryViewMode,
     collapsedRecursiveFolders,
-    expandedAutoStackIds,
     thumbnailSize,
     listColumnWidths.thumbnail,
-    currentFolderPath,
     thumbnailSizeOptions,
+    visibleSemanticIndex,
   ]);
 
   useEffect(() => {
@@ -568,45 +522,14 @@ export default function LibraryGrid(props: LibraryGridProps) {
     prevActivePath.current = activePath;
 
     const element = listHandle.element as HTMLElement;
-    const { rowHeight, headerHeight, columnCount } = gridData;
-
-    let targetTop = 0;
-    let found = false;
-
-    if (libraryViewMode === LibraryViewMode.Recursive) {
-      const groups = groupImagesByFolder(imageList, currentFolderPath);
-      for (const group of groups) {
-        const groupImages = group.images;
-        if (groupImages.length === 0) continue;
-
-        targetTop += headerHeight;
-
-        const stackItems = buildLibraryAutoStackItems(groupImages, expandedAutoStackIds);
-        const imageIndex = stackItems.findIndex((item) => item.image.path === activePath);
-        if (imageIndex !== -1) {
-          const rowIndex = Math.floor(imageIndex / columnCount);
-          targetTop += rowIndex * rowHeight;
-          found = true;
-          break;
-        }
-
-        const rowsInGroup = Math.ceil(stackItems.length / columnCount);
-        targetTop += rowsInGroup * rowHeight;
-      }
-    } else {
-      const stackItems = buildLibraryAutoStackItems(imageList, expandedAutoStackIds);
-      const index = stackItems.findIndex((item) => item.image.path === activePath);
-      if (index !== -1) {
-        const rowIndex = Math.floor(index / columnCount);
-        targetTop = rowIndex * rowHeight;
-        found = true;
-      }
-    }
+    const rowIndex = activePath ? gridData.layoutIndex.getRowIndexForPath(activePath) : undefined;
+    const targetTop = rowIndex === undefined ? 0 : gridData.layoutIndex.getRowOffset(rowIndex);
+    const found = rowIndex !== undefined;
 
     if (found) {
       const clientHeight = element.clientHeight;
       const scrollTop = element.scrollTop;
-      const itemBottom = targetTop + rowHeight;
+      const itemBottom = targetTop + gridData.layoutIndex.getRowHeight(rowIndex);
       const SCROLL_OFFSET = 120;
 
       if (itemBottom > scrollTop + clientHeight) {
@@ -621,20 +544,20 @@ export default function LibraryGrid(props: LibraryGridProps) {
         });
       }
     }
-  }, [
-    activePath,
-    gridData,
-    multiSelectedPaths.length,
-    listHandle,
-    currentFolderPath,
-    imageList,
-    libraryViewMode,
-    expandedAutoStackIds,
-  ]);
+  }, [activePath, gridData, multiSelectedPaths.length, listHandle]);
 
   const memoizedRowProps = useMemo<RowRendererProps>(() => {
     return {
-      rows: gridData?.rows ?? [],
+      layoutIndex:
+        gridData?.layoutIndex ??
+        buildLibraryLayoutIndex(visibleSemanticIndex, {
+          collapsedFolderPaths: collapsedRecursiveFolders,
+          columnCount: 1,
+          footerHeight: 0,
+          headerHeight: 0,
+          rowHeight: 0,
+          viewMode: libraryViewMode,
+        }),
       activePath,
       multiSelectedSet: new Set(multiSelectedPaths),
       onContextMenu,
@@ -667,6 +590,9 @@ export default function LibraryGrid(props: LibraryGridProps) {
     queueThumbnailRequest,
     handleToggleRecursiveFolder,
     handleToggleAutoStack,
+    visibleSemanticIndex,
+    collapsedRecursiveFolders,
+    libraryViewMode,
   ]);
 
   if (!gridData) {
@@ -682,9 +608,7 @@ export default function LibraryGrid(props: LibraryGridProps) {
   }
 
   const getItemSize = (index: number) => {
-    const row = gridData.rows[index];
-    if (!row || row.type === 'footer') return gridData.isListView ? 24 : gridData.OUTER_PADDING;
-    return row.type === 'header' ? gridData.headerHeight : gridData.rowHeight;
+    return gridData.layoutIndex.getRowHeight(index);
   };
 
   const handleHeaderSort = (key: HeaderSortKey) => {
@@ -719,13 +643,10 @@ export default function LibraryGrid(props: LibraryGridProps) {
             onSortChange={handleHeaderSort}
           />
         )}
-        <div
-          key={`${gridSize.width}-${thumbnailSize}-${libraryViewMode}-${sortCriteria.key}-${sortCriteria.order}-${thumbnailAspectRatio}`}
-          style={{ height: gridData.isListView ? gridSize.height - 36 : gridSize.height, width: gridSize.width }}
-        >
+        <div style={{ height: gridData.isListView ? gridSize.height - 36 : gridSize.height, width: gridSize.width }}>
           <List<RowRendererProps>
             listRef={setListHandle}
-            rowCount={gridData.rows.length}
+            rowCount={gridData.layoutIndex.rows.length}
             rowHeight={getItemSize}
             onScroll={(e: React.UIEvent<HTMLElement>) => {
               handleScroll(e.currentTarget.scrollTop);

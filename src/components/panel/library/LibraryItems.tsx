@@ -23,11 +23,12 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { LibraryLayoutIndex } from '../../../library/buildLibraryLayoutIndex';
 import { useProcessStore } from '../../../store/useProcessStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { COLOR_LABELS, type Color } from '../../../utils/adjustments';
-import type { LibraryAutoStackDisplay, LibraryAutoStackItem } from '../../../utils/libraryAutoStacks';
+import type { LibraryAutoStackDisplay } from '../../../utils/libraryAutoStacks';
 import {
   formatExifApertureFromMetadata,
   formatExifFocalLengthFromMetadata,
@@ -76,29 +77,10 @@ interface ListItemComponentProps extends LibraryItemBaseProps {
   modified: number;
 }
 
-export interface LibraryHeaderRow {
-  type: 'header';
-  path: string;
-  count: number;
-  isExpanded: boolean;
-}
-
-export interface LibraryImagesRow {
-  type: 'images';
-  images: LibraryAutoStackItem[];
-  startIndex: number;
-}
-
-export interface LibraryFooterRow {
-  type: 'footer';
-}
-
-export type LibraryRow = LibraryHeaderRow | LibraryImagesRow | LibraryFooterRow;
-
 export interface LibraryRowProps {
   index: number;
   style: CSSProperties;
-  rows: LibraryRow[];
+  layoutIndex: LibraryLayoutIndex;
   activePath: string | null;
   multiSelectedSet: Set<string>;
   onContextMenu: LibraryImageContextMenuHandler;
@@ -905,7 +887,7 @@ export const ListItem = memo(ListItemComponent);
 const RowComponent = ({
   index,
   style,
-  rows,
+  layoutIndex,
   activePath,
   multiSelectedSet,
   onContextMenu,
@@ -925,15 +907,16 @@ const RowComponent = ({
   onToggleAutoStack,
 }: LibraryRowProps) => {
   const { t } = useTranslation();
-  const row = rows[index];
+  const row = layoutIndex.getRow(index);
 
   useEffect(() => {
-    if (row && row.type === 'images') {
-      row.images.forEach((item: LibraryAutoStackItem) => {
-        queueThumbnailRequest(item.image.path);
-      });
+    if (row?.type === 'item-range') {
+      for (let slot = 0; slot < row.count; slot += 1) {
+        const item = layoutIndex.getItem(row, slot);
+        if (item) queueThumbnailRequest(item.path);
+      }
     }
-  }, [row, queueThumbnailRequest]);
+  }, [layoutIndex, row, queueThumbnailRequest]);
 
   if (!row || row.type === 'footer') return null;
 
@@ -950,10 +933,10 @@ const RowComponent = ({
     transform: shiftedTransform,
   };
 
-  if (row.type === 'header') {
-    let displayPath = row.path;
-    if (baseFolderPath && row.path.startsWith(baseFolderPath)) {
-      displayPath = row.path.substring(baseFolderPath.length);
+  if (row.type === 'folder-header') {
+    let displayPath = row.folderPath;
+    if (baseFolderPath && row.folderPath.startsWith(baseFolderPath)) {
+      displayPath = row.folderPath.substring(baseFolderPath.length);
       if (displayPath.startsWith('/') || displayPath.startsWith('\\')) {
         displayPath = displayPath.substring(1);
       }
@@ -978,22 +961,22 @@ const RowComponent = ({
             className={`${TEXT_COLOR_KEYS[TextColors.secondary]} p-0.5 rounded transition-colors hover:bg-surface-hover cursor-pointer`}
             onClick={(event) => {
               event.stopPropagation();
-              onToggleRecursiveFolder(row.path);
+              onToggleRecursiveFolder(row.folderPath);
             }}
-            data-tooltip={row.isExpanded ? t('library.items.collapseFolder') : t('library.items.expandFolder')}
+            data-tooltip={row.expanded ? t('library.items.collapseFolder') : t('library.items.expandFolder')}
           >
-            {row.isExpanded ? <FolderOpen size={16} /> : <Folder size={16} />}
+            {row.expanded ? <FolderOpen size={16} /> : <Folder size={16} />}
           </button>
           <UiText
             variant={TextVariants.label}
             weight={TextWeights.semibold}
             className="truncate"
-            data-tooltip={row.path}
+            data-tooltip={row.folderPath}
           >
             {displayPath}
           </UiText>
           <UiText variant={TextVariants.small} color={TextColors.secondary} className="ml-auto">
-            {t('library.items.imagesCount', { count: row.count })}
+            {t('library.items.imagesCount', { count: row.itemCount })}
           </UiText>
         </div>
       </div>
@@ -1011,51 +994,56 @@ const RowComponent = ({
         gap: gap,
       }}
     >
-      {row.images.map(({ image: imageFile, stack }: LibraryAutoStackItem) => (
-        <div
-          key={imageFile.path}
-          style={{
-            width: isListView ? '100%' : itemWidth,
-            height: itemHeight,
-          }}
-        >
-          {isListView ? (
-            <ListItem
-              autoStack={stack}
-              isActive={activePath === imageFile.path}
-              isSelected={multiSelectedSet.has(imageFile.path)}
-              onAutoStackToggle={onToggleAutoStack}
-              onContextMenu={onContextMenu}
-              onImageClick={onImageClick}
-              onImageDoubleClick={onImageDoubleClick}
-              onLoad={onImageLoad}
-              path={imageFile.path}
-              rating={imageRatings?.[imageFile.path] || 0}
-              tags={imageFile.tags}
-              exif={imageFile.exif}
-              aspectRatio={thumbnailAspectRatio}
-              modified={imageFile.modified}
-            />
-          ) : (
-            <Thumbnail
-              autoStack={stack}
-              isActive={activePath === imageFile.path}
-              isSelected={multiSelectedSet.has(imageFile.path)}
-              onAutoStackToggle={onToggleAutoStack}
-              onContextMenu={onContextMenu}
-              onImageClick={onImageClick}
-              onImageDoubleClick={onImageDoubleClick}
-              onLoad={onImageLoad}
-              path={imageFile.path}
-              rating={imageRatings?.[imageFile.path] || 0}
-              tags={imageFile.tags}
-              exif={imageFile.exif}
-              isEdited={imageFile.is_edited}
-              aspectRatio={thumbnailAspectRatio}
-            />
-          )}
-        </div>
-      ))}
+      {Array.from({ length: row.count }, (_, slot) => {
+        const item = layoutIndex.getItem(row, slot);
+        const imageFile = item ? layoutIndex.semantic.semantic.images[item.imageIndex] : undefined;
+        if (!item || !imageFile) return null;
+        return (
+          <div
+            key={item.path}
+            style={{
+              width: isListView ? '100%' : itemWidth,
+              height: itemHeight,
+            }}
+          >
+            {isListView ? (
+              <ListItem
+                autoStack={item.stack ?? undefined}
+                isActive={activePath === imageFile.path}
+                isSelected={multiSelectedSet.has(imageFile.path)}
+                onAutoStackToggle={onToggleAutoStack}
+                onContextMenu={onContextMenu}
+                onImageClick={onImageClick}
+                onImageDoubleClick={onImageDoubleClick}
+                onLoad={onImageLoad}
+                path={imageFile.path}
+                rating={imageRatings?.[imageFile.path] || 0}
+                tags={imageFile.tags}
+                exif={imageFile.exif}
+                aspectRatio={thumbnailAspectRatio}
+                modified={imageFile.modified}
+              />
+            ) : (
+              <Thumbnail
+                autoStack={item.stack ?? undefined}
+                isActive={activePath === imageFile.path}
+                isSelected={multiSelectedSet.has(imageFile.path)}
+                onAutoStackToggle={onToggleAutoStack}
+                onContextMenu={onContextMenu}
+                onImageClick={onImageClick}
+                onImageDoubleClick={onImageDoubleClick}
+                onLoad={onImageLoad}
+                path={imageFile.path}
+                rating={imageRatings?.[imageFile.path] || 0}
+                tags={imageFile.tags}
+                exif={imageFile.exif}
+                isEdited={imageFile.is_edited}
+                aspectRatio={thumbnailAspectRatio}
+              />
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 };
