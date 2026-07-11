@@ -1778,6 +1778,7 @@ async fn plan_focus_stack(
     state: tauri::State<'_, AppState>,
 ) -> Result<FocusStackInputPlan, String> {
     *state.focus_stack_runtime_plan.lock().unwrap() = None;
+    *state.focus_stack_accepted_runtime.lock().unwrap() = None;
     let generation = state
         .focus_stack_plan_generation
         .fetch_add(1, Ordering::SeqCst)
@@ -1803,6 +1804,11 @@ async fn plan_focus_stack(
             plan.accepted_dry_run_plan_id.clone(),
             plan.accepted_dry_run_plan_hash.clone(),
         ));
+        *state.focus_stack_accepted_runtime.lock().unwrap() =
+            Some(crate::merge::focus_stack::job::AcceptedFocusRuntime {
+                identity: plan.candidate_identity(),
+                paths: resolved_paths,
+            });
     }
     Ok(plan)
 }
@@ -1813,6 +1819,7 @@ async fn cancel_focus_stack_plan(state: tauri::State<'_, AppState>) -> Result<()
         .focus_stack_plan_generation
         .fetch_add(1, Ordering::SeqCst);
     *state.focus_stack_runtime_plan.lock().unwrap() = None;
+    *state.focus_stack_accepted_runtime.lock().unwrap() = None;
     Ok(())
 }
 
@@ -2820,6 +2827,8 @@ pub fn run() {
             cancel_hdr_plan,
             plan_focus_stack,
             cancel_focus_stack_plan,
+            merge::focus_stack::job::prepare_focus_stack_candidate,
+            merge::focus_stack::job::read_focus_stack_job,
             save_hdr,
             load_and_parse_lut,
             fetch_community_presets,

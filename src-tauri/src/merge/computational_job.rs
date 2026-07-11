@@ -21,6 +21,12 @@ pub enum ComputationalMergeFamily {
 #[serde(transparent)]
 pub struct ComputationalMergeJobId(String);
 
+impl ComputationalMergeJobId {
+    pub fn from_string(value: String) -> Self {
+        Self(value)
+    }
+}
+
 impl std::fmt::Display for ComputationalMergeJobId {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str(&self.0)

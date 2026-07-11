@@ -31,6 +31,10 @@ import {
 } from './ComputationalSetupModalShell';
 
 interface FocusStackModalProps {
+  candidateJob?:
+    | import('../../../schemas/focus-stack/focusStackCandidateRuntimeSchemas').FocusStackCandidateJobResult
+    | null
+    | undefined;
   isOpen: boolean;
   lastApplyCommand?: FocusStackModalState['lastApplyCommand'];
   lastDryRunCommand?: FocusStackModalState['lastDryRunCommand'];
@@ -39,6 +43,8 @@ interface FocusStackModalProps {
   nativePlanError?: string | null;
   isNativePlanning?: boolean;
   onApplyPlan: () => void;
+  onPrepareCandidate?: () => void;
+  onCancelCandidate?: () => void;
   onClose: () => void;
   onPreviewPlan: () => void;
   onSettingsChange: (settings: FocusStackUiSettings) => void;
@@ -56,6 +62,7 @@ const reviewOverlayOpacityOptions = [40, 70, 100] as const;
 const reviewArtifactPath = '/tmp/rawengine-focus-stack-smoke.tif';
 
 export function FocusStackModal({
+  candidateJob = null,
   isOpen,
   lastApplyCommand,
   lastDryRunCommand,
@@ -64,6 +71,8 @@ export function FocusStackModal({
   nativePlanError = null,
   isNativePlanning = false,
   onApplyPlan,
+  onPrepareCandidate = () => {},
+  onCancelCandidate = () => {},
   onClose,
   onPreviewPlan,
   onSettingsChange,
@@ -290,13 +299,43 @@ export function FocusStackModal({
             <Layers3 className="w-4 h-4" />
             {hasRuntimeOutputReview ? t('modals.focusStack.refreshPreviewPlan') : t('modals.focusStack.previewPlan')}
           </Button>
-          <Button onClick={onApplyPlan} disabled={!isApplyPlanReady}>
+          {candidateJob?.status === 'active' || candidateJob?.status === 'cancel_requested' ? (
+            <Button onClick={onCancelCandidate}>{t('modals.common.cancel')}</Button>
+          ) : (
+            <Button onClick={onPrepareCandidate} disabled={!isPreviewPlanReady}>
+              {t('modals.focusStack.prepareFullResolution')}
+            </Button>
+          )}
+          <Button onClick={onApplyPlan} disabled={true}>
             <CheckCircle2 className="w-4 h-4" />
             {t('modals.transform.apply')}
           </Button>
         </>
       }
     >
+      {candidateJob !== null && (
+        <section
+          className="border border-border-color bg-bg-secondary/70 p-2 text-sm"
+          data-testid="focus-stack-candidate-job"
+        >
+          <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
+            <ComputationalSetupStatusLine label="Stage" value={candidateJob.progress.stage} />
+            <ComputationalSetupStatusLine
+              label="Progress"
+              value={`${Math.round(candidateJob.progress.fraction * 100)}%`}
+            />
+            <ComputationalSetupStatusLine label="Status" value={candidateJob.status} />
+            <ComputationalSetupStatusLine label="Tiles" value={String(candidateJob.candidate?.tileCount ?? 0)} />
+            <ComputationalSetupStatusLine
+              label="Peak memory"
+              value={`${Math.round((candidateJob.candidate?.observedPeakMemoryBytes ?? 0) / 1048576)} MiB`}
+            />
+          </div>
+          {candidateJob.candidate !== null && (
+            <div className="mt-2 text-xs text-text-secondary">{candidateJob.candidate.capabilityState}</div>
+          )}
+        </section>
+      )}
       {!isPreviewPlanReady && (
         <ComputationalSetupSourceWarning>
           {nativePlanError ??

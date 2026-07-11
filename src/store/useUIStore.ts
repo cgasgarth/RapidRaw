@@ -211,6 +211,8 @@ export interface SuperResolutionModalState {
 }
 
 export interface FocusStackModalState {
+  candidateJob?: import('../schemas/focus-stack/focusStackCandidateRuntimeSchemas').FocusStackCandidateJobResult | null;
+  candidateJobId?: string | null;
   error: string | null;
   isPlanning: boolean;
   isOpen: boolean;
@@ -309,6 +311,8 @@ export const createDefaultSuperResolutionModalState = (
 export const createDefaultFocusStackModalState = (
   settings: FocusStackUiSettings = DEFAULT_FOCUS_STACK_UI_SETTINGS,
 ): FocusStackModalState => ({
+  candidateJob: null,
+  candidateJobId: null,
   error: null,
   isOpen: false,
   isPlanning: false,
