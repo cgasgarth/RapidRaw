@@ -142,6 +142,7 @@ pub struct AnalyticsJob {
     pub policy: AnalyticsSamplingPolicy,
 }
 
+#[derive(Clone)]
 pub struct AnalyticsConfig {
     pub path: String,
     pub frame_id: AnalyticsFrameId,

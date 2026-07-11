@@ -138,6 +138,12 @@ pub struct DisplayTransformState {
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd)]
 pub struct PresentationSequence(pub u64);
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd)]
+pub struct NativeFrameIdentity {
+    pub image_session: u64,
+    pub preview_generation: u64,
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 struct PresentationDirty(u8);
 
@@ -187,6 +193,15 @@ struct Mailbox {
     waiters: Vec<FlushWaiter>,
     presented_sequence: PresentationSequence,
     stopped: bool,
+    latest_native_frame: NativeFrameIdentity,
+}
+
+fn accept_native_frame(mailbox: &mut Mailbox, identity: NativeFrameIdentity) -> bool {
+    if identity < mailbox.latest_native_frame {
+        return false;
+    }
+    mailbox.latest_native_frame = identity;
+    true
 }
 
 #[derive(Default)]
@@ -225,6 +240,7 @@ struct SchedulerShared {
     next_sequence: AtomicU64,
     next_texture_revision: AtomicU64,
     metrics: SchedulerMetrics,
+    has_display: bool,
 }
 
 pub struct WgpuPresentationScheduler {
@@ -244,6 +260,7 @@ impl WgpuPresentationScheduler {
             next_sequence: AtomicU64::new(0),
             next_texture_revision: AtomicU64::new(0),
             metrics: SchedulerMetrics::default(),
+            has_display: display.is_some(),
         });
         let thread_shared = Arc::clone(&shared);
         let owner = std::thread::Builder::new()
@@ -305,15 +322,35 @@ impl WgpuPresentationScheduler {
         self.shared.wake.notify_one();
     }
 
+    pub fn is_available(&self) -> bool {
+        let mailbox = self.shared.mailbox.lock().unwrap();
+        self.shared.has_display && !mailbox.stopped
+    }
+
     pub fn publish_texture(
         &self,
         view: wgpu::TextureView,
         image_size: [u32; 2],
         texture_size: [u32; 2],
-    ) {
+    ) -> Result<(), String> {
+        self.publish_texture_for_frame(view, image_size, texture_size, None)
+    }
+
+    pub fn publish_texture_for_frame(
+        &self,
+        view: wgpu::TextureView,
+        image_size: [u32; 2],
+        texture_size: [u32; 2],
+        identity: Option<NativeFrameIdentity>,
+    ) -> Result<(), String> {
         let mut mailbox = self.shared.mailbox.lock().unwrap();
-        if mailbox.stopped {
-            return;
+        if mailbox.stopped || !self.shared.has_display {
+            return Err("presentation_unavailable".into());
+        }
+        if let Some(identity) = identity
+            && !accept_native_frame(&mut mailbox, identity)
+        {
+            return Err("presentation_stale_frame".into());
         }
         let revision = self
             .shared
@@ -339,6 +376,7 @@ impl WgpuPresentationScheduler {
         mailbox.pending.dirty.insert(PresentationDirty::TEXTURE);
         drop(mailbox);
         self.shared.wake.notify_one();
+        Ok(())
     }
 
     pub async fn flush(&self, sequence: u64) -> Result<(), String> {
@@ -871,6 +909,31 @@ mod tests {
         assert_eq!(last_presented, Some(state));
     }
 
+    #[test]
+    fn native_frame_identity_rejects_older_completion() {
+        let mut mailbox = Mailbox::default();
+        let newer = NativeFrameIdentity {
+            image_session: 8,
+            preview_generation: 42,
+        };
+        assert!(accept_native_frame(&mut mailbox, newer));
+        assert!(!accept_native_frame(
+            &mut mailbox,
+            NativeFrameIdentity {
+                image_session: 8,
+                preview_generation: 41,
+            }
+        ));
+        assert_eq!(mailbox.latest_native_frame, newer);
+        assert!(accept_native_frame(
+            &mut mailbox,
+            NativeFrameIdentity {
+                image_session: 9,
+                preview_generation: 1,
+            }
+        ));
+    }
+
     #[tokio::test]
     async fn stopping_mailbox_completes_every_waiter_once() {
         let shared = SchedulerShared {
@@ -879,6 +942,7 @@ mod tests {
             next_sequence: AtomicU64::new(0),
             next_texture_revision: AtomicU64::new(0),
             metrics: SchedulerMetrics::default(),
+            has_display: false,
         };
         let mut receivers = Vec::new();
         {

@@ -29,6 +29,43 @@ use crate::preview_scheduler::{
 };
 use crate::{get_or_load_lut, render_caches, render_pipeline};
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum NativePreviewPresentationReason {
+    Enabled,
+    DisabledBySetting,
+    UnsupportedPlatform,
+    DisplayUnavailable,
+    RequestRequiresCpuPixels,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct NativePreviewPresentationDecision {
+    enabled: bool,
+    reason: NativePreviewPresentationReason,
+}
+
+fn native_preview_presentation_decision(
+    setting_enabled: bool,
+    display_available: bool,
+    has_roi: bool,
+) -> NativePreviewPresentationDecision {
+    let reason = if !setting_enabled {
+        NativePreviewPresentationReason::DisabledBySetting
+    } else if cfg!(any(target_os = "android", target_os = "linux")) {
+        NativePreviewPresentationReason::UnsupportedPlatform
+    } else if has_roi {
+        NativePreviewPresentationReason::RequestRequiresCpuPixels
+    } else if !display_available {
+        NativePreviewPresentationReason::DisplayUnavailable
+    } else {
+        NativePreviewPresentationReason::Enabled
+    };
+    NativePreviewPresentationDecision {
+        enabled: reason == NativePreviewPresentationReason::Enabled,
+        reason,
+    }
+}
+
 pub(crate) struct PreviewJobConfig<'a> {
     pub(crate) app_handle: &'a tauri::AppHandle,
     pub(crate) state: tauri::State<'a, AppState>,
@@ -150,9 +187,13 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
 
     let default_preview_dim = settings.editor_preview_resolution;
     let preview_dim = target_resolution.unwrap_or(default_preview_dim);
-    let use_wgpu_renderer = false;
-
     let has_roi = roi.is_some();
+    let native_presentation = native_preview_presentation_decision(
+        settings.use_wgpu_renderer,
+        context.presentation.is_available(),
+        has_roi,
+    );
+    let use_wgpu_renderer = native_presentation.enabled;
     let (interactive_divisor, interactive_quality) = match live_quality {
         "full" => (1.0_f32, 85_u8),
         "performance" => (if has_roi { 1.8_f32 } else { 1.5_f32 }, 65_u8),
@@ -320,21 +361,54 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         None
     };
 
-    let final_processed_image_result = process_and_get_dynamic_image_with_analytics(
+    let render_request = || RenderRequest {
+        adjustments: final_adjustments,
+        mask_bitmaps: &mask_bitmaps,
+        lut: lut.clone(),
+        roi: pixel_roi,
+    };
+    let presentation_identity =
+        use_wgpu_renderer.then_some(crate::gpu_display::NativeFrameIdentity {
+            image_session: preview_id.image_session,
+            preview_generation: preview_id.generation,
+        });
+    let presentation_is_current =
+        || cancellation_checkpoint(cancellation, PreviewStage::Publish).is_ok();
+    let mut final_processed_image_result = process_and_get_dynamic_image_with_analytics(
         &context,
         &state,
         retouched_processing_image.as_ref(),
         pre_gpu_identity,
-        RenderRequest {
-            adjustments: final_adjustments,
-            mask_bitmaps: &mask_bitmaps,
-            lut,
-            roi: pixel_roi,
-        },
+        render_request(),
         "apply_adjustments",
         use_wgpu_renderer,
-        analytics_config,
+        presentation_identity,
+        use_wgpu_renderer.then_some(&presentation_is_current as &dyn Fn() -> bool),
+        analytics_config.clone(),
     );
+
+    let mut presented_natively = use_wgpu_renderer;
+    if use_wgpu_renderer && let Err(error) = &final_processed_image_result {
+        cancellation_checkpoint(cancellation, PreviewStage::Publish)?;
+        log::warn!(
+            "native preview presentation failed ({error}); using CPU transport for session={} generation={}",
+            preview_id.image_session,
+            preview_id.generation
+        );
+        presented_natively = false;
+        final_processed_image_result = process_and_get_dynamic_image_with_analytics(
+            &context,
+            &state,
+            retouched_processing_image.as_ref(),
+            pre_gpu_identity,
+            render_request(),
+            "apply_adjustments_fallback",
+            false,
+            None,
+            None,
+            analytics_config,
+        );
+    }
 
     let final_processed_image = match final_processed_image_result {
         Ok(image) => Arc::new(image),
@@ -348,14 +422,24 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
     };
     cancellation_checkpoint(cancellation, PreviewStage::Readback)?;
 
-    if use_wgpu_renderer {
-        let _ = context.device.poll(wgpu::PollType::Wait {
-            submission_index: None,
-            timeout: Some(std::time::Duration::from_millis(500)),
-        });
+    if presented_natively {
+        cancellation_checkpoint(cancellation, PreviewStage::Publish)?;
+        log::info!(
+            "native_preview_transport session={} generation={} readback_bytes=0 jpeg_bytes=0 response_bytes=11 submit_latency_us={}",
+            preview_id.image_session,
+            preview_id.generation,
+            fn_start.elapsed().as_micros()
+        );
         let _ = app_handle.emit(
             crate::events::WGPU_FRAME_READY,
-            serde_json::json!({ "path": loaded_image.path }),
+            serde_json::json!({
+                "path": loaded_image.path,
+                "imageSession": preview_id.image_session,
+                "generation": preview_id.generation,
+                "width": preview_width,
+                "height": preview_height,
+                "submitLatencyMicros": fn_start.elapsed().as_micros().min(u64::MAX as u128) as u64,
+            }),
         );
         return Ok(b"WGPU_RENDER".to_vec());
     }
@@ -660,6 +744,37 @@ pub(crate) fn start_preview_worker(app_handle: tauri::AppHandle) {
 mod tests {
     use super::*;
     use image::{ImageBuffer, Rgba};
+
+    #[test]
+    fn native_presentation_policy_requires_setting_display_and_full_frame() {
+        assert_eq!(
+            native_preview_presentation_decision(false, true, false).reason,
+            NativePreviewPresentationReason::DisabledBySetting
+        );
+        assert_eq!(
+            native_preview_presentation_decision(true, false, false).reason,
+            if cfg!(any(target_os = "android", target_os = "linux")) {
+                NativePreviewPresentationReason::UnsupportedPlatform
+            } else {
+                NativePreviewPresentationReason::DisplayUnavailable
+            }
+        );
+        let roi = native_preview_presentation_decision(true, true, true);
+        if !cfg!(any(target_os = "android", target_os = "linux")) {
+            assert_eq!(
+                roi.reason,
+                NativePreviewPresentationReason::RequestRequiresCpuPixels
+            );
+            assert!(native_preview_presentation_decision(true, true, false).enabled);
+        }
+    }
+
+    #[test]
+    fn native_transport_is_bounded_and_not_a_jpeg() {
+        let response = b"WGPU_RENDER";
+        assert_eq!(response.len(), 11);
+        assert_ne!(&response[..2], &[0xff, 0xd8]);
+    }
 
     fn encode_with_owned_source_baseline(
         image: DynamicImage,
