@@ -1,0 +1,83 @@
+name: Update open PR branches
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: update-open-pr-branches
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: Merge main into open PRs
+    if: github.repository == 'cgasgarth/RapidRaw'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPOSITORY: ${{ github.repository }}
+    steps:
+      - name: Update same-repository PR branches
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          pr_list="${RUNNER_TEMP}/open-prs.tsv"
+          gh api \
+            --paginate \
+            "repos/${REPOSITORY}/pulls?state=open&base=main&per_page=100" \
+            --jq '.[] | [.number, .head.sha, .head.ref, .head.repo.full_name] | @tsv' \
+            > "${pr_list}"
+
+          updated=0
+          skipped=0
+          failed=0
+
+          while IFS=$'\t' read -r number head_sha head_ref head_repository; do
+            if [[ -z "${number}" ]]; then
+              continue
+            fi
+
+            if [[ "${head_repository}" != "${REPOSITORY}" ]]; then
+              echo "Skipping PR #${number}: head is in ${head_repository}."
+              skipped=$((skipped + 1))
+              continue
+            fi
+
+            echo "Updating PR #${number} (${head_ref}) from main."
+            if response=$(jq -nc \
+              --arg expected_head_sha "${head_sha}" \
+              '{expected_head_sha: $expected_head_sha}' | \
+              gh api \
+                --method PUT \
+                "repos/${REPOSITORY}/pulls/${number}/update-branch" \
+                --input - 2>&1); then
+              echo "${response}"
+              updated=$((updated + 1))
+            elif grep -q 'HTTP 422' <<< "${response}"; then
+              echo "Skipping PR #${number}: conflicting, already current, or changed during this run."
+              skipped=$((skipped + 1))
+            else
+              echo "::error::Failed to update PR #${number}: ${response}"
+              failed=$((failed + 1))
+            fi
+          done < "${pr_list}"
+
+          {
+            echo "## Open PR branch update"
+            echo
+            echo "- Updated: ${updated}"
+            echo "- Skipped: ${skipped}"
+            echo "- Failed: ${failed}"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+          if ((failed > 0)); then
+            exit 1
+          fi
