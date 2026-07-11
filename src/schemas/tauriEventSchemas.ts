@@ -303,3 +303,10 @@ export const parseCullingProgressPayload = (value: unknown): CullingProgressPayl
 };
 export const parseCullingSuggestionsPayload = (value: unknown): CullingSuggestions =>
   cullingSuggestionsPayloadSchema.parse(value);
+
+export const persistedRenderStateRecoveryPayloadSchema = z.object({
+  backupPath: z.string().nullable(),
+  outcome: z.enum(['migrated', 'recovered', 'quarantined', 'unsupported']),
+  path: z.string(),
+  reasonCodes: z.array(z.string()),
+});

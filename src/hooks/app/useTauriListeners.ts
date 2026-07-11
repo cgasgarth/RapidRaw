@@ -1,5 +1,6 @@
 import { listen } from '@tauri-apps/api/event';
 import { useEffect, useRef } from 'react';
+import { toast } from 'react-toastify';
 import type { ChannelConfig } from '../../components/adjustments/Curves';
 import type { AnalyticsResourceDescriptor, WaveformData } from '../../components/ui/AppProperties';
 import { Status } from '../../components/ui/ExportImportProperties';
@@ -18,6 +19,7 @@ import {
   parseRenderPathPayload,
   parseStringPayload,
   parseThumbnailGeneratedPayload,
+  persistedRenderStateRecoveryPayloadSchema,
 } from '../../schemas/tauriEventSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
@@ -64,6 +66,7 @@ import {
   PANORAMA_COMPLETE_EVENT,
   PANORAMA_ERROR_EVENT,
   PANORAMA_PROGRESS_EVENT,
+  PERSISTED_RENDER_STATE_RECOVERED_EVENT,
   PREVIEW_UPDATE_UNCROPPED_EVENT,
   THUMBNAIL_GENERATED_EVENT,
   THUMBNAIL_GENERATION_COMPLETE_EVENT,
@@ -224,6 +227,14 @@ export function useTauriListeners({ refreshAllFolderTrees, refreshImageList, mar
     };
 
     const listeners = [
+      listen<unknown>(PERSISTED_RENDER_STATE_RECOVERED_EVENT, (event) => {
+        const parsed = persistedRenderStateRecoveryPayloadSchema.safeParse(event.payload);
+        if (!parsed.success) return;
+        const backup = parsed.data.backupPath ? ` Backup: ${parsed.data.backupPath}` : '';
+        toast.warn(`Recovered incompatible saved edits and reopened with safe render state.${backup}`, {
+          toastId: `persisted-render-state-recovered:${parsed.data.path}`,
+        });
+      }),
       listen<AnalyticsResultPayload>(ANALYTICS_RESULT_EVENT, (event) => {
         const result = event.payload;
         const selectedPath = useEditorStore.getState().selectedImage?.path;

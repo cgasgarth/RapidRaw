@@ -988,9 +988,9 @@ fn generate_thumbnail_data_with_target(
     let source_path_str = source_path.to_string_lossy().to_string();
     let is_raw = is_raw_file(&source_path_str);
 
-    let metadata: Option<ImageMetadata> = fs::read_to_string(sidecar_path)
+    let metadata = crate::exif_processing::load_sidecar_recovering(&sidecar_path, Some(path_str))
         .ok()
-        .and_then(|content| serde_json::from_str(&content).ok());
+        .map(|loaded| loaded.metadata);
 
     let adjustments = metadata
         .as_ref()
@@ -1312,22 +1312,24 @@ fn generate_single_thumbnail_and_cache(
     let (_, sidecar_path) = parse_virtual_path(path_str);
 
     let (rating, is_edited, adjustments_bytes) =
-        if let Ok(content) = fs::read_to_string(&sidecar_path) {
-            if let Ok(meta) = serde_json::from_str::<ImageMetadata>(&content) {
+        crate::exif_processing::load_sidecar_recovering(&sidecar_path, Some(path_str))
+            .map(|loaded| {
+                let meta = loaded.metadata;
                 let is_raw = crate::formats::is_raw_file(path_str);
                 let tm = crate::image_processing::resolve_tonemapper_override(settings, is_raw);
-
                 (
                     meta.rating,
                     crate::image_processing::is_image_edited(&meta.adjustments, is_raw, tm),
-                    serde_json::to_vec(&meta.adjustments).unwrap_or_default(),
+                    serde_json::to_vec(&(
+                        meta.persisted_render_state
+                            .as_ref()
+                            .map(|state| state.edit_revision.as_str()),
+                        &meta.adjustments,
+                    ))
+                    .unwrap_or_default(),
                 )
-            } else {
-                (0, false, Vec::new())
-            }
-        } else {
-            (0, false, Vec::new())
-        };
+            })
+            .unwrap_or((0, false, Vec::new()));
 
     let smart_preview_dir = resolve_smart_preview_cache_dir(app_handle).ok();
     let cache_hash = compute_thumbnail_cache_hash(path_str, &adjustments_bytes);
@@ -2201,9 +2203,7 @@ pub async fn apply_adjustments_to_paths(
 
             existing_metadata.adjustments = new_adjustments;
 
-            if let Ok(json_string) = serde_json::to_string_pretty(&existing_metadata) {
-                let _ = std::fs::write(&sidecar_path, json_string);
-            }
+            save_metadata_sidecar_or_warn(&sidecar_path, &existing_metadata, "adjustment paste");
 
             if enable_xmp_sync {
                 let source_path = parse_virtual_path(path).0;
@@ -2269,7 +2269,9 @@ pub async fn reset_adjustments_for_paths(
         let mut results = Vec::with_capacity(paths.len());
         for path in &paths {
             let (source_path, sidecar_path) = parse_virtual_path(path);
-            let mut existing_metadata = load_sidecar_strict_for_reset(&sidecar_path)?;
+            let mut existing_metadata =
+                crate::exif_processing::load_sidecar_recovering(&sidecar_path, Some(path))?
+                    .metadata;
             backup_sidecar_before_reset(&sidecar_path)?;
             clear_render_authority_for_reset(&mut existing_metadata);
             save_metadata_sidecar(&sidecar_path, &existing_metadata)?;
@@ -2482,9 +2484,11 @@ pub async fn apply_auto_adjustments_to_paths(
                     }
                 }
 
-                if let Ok(json_string) = serde_json::to_string_pretty(&existing_metadata) {
-                    let _ = std::fs::write(&sidecar_path, json_string);
-                }
+                save_metadata_sidecar_or_warn(
+                    &sidecar_path,
+                    &existing_metadata,
+                    "auto adjustments",
+                );
 
                 if enable_xmp_sync {
                     sync_metadata_to_xmp(&source_path, &existing_metadata, create_xmp_if_missing);
@@ -2546,9 +2550,7 @@ pub fn set_color_label_for_paths(
             metadata.tags = Some(tags);
         }
 
-        if let Ok(json_string) = serde_json::to_string_pretty(&metadata) {
-            let _ = std::fs::write(&sidecar_path, json_string);
-        }
+        save_metadata_sidecar_or_warn(&sidecar_path, &metadata, "rating update");
 
         if enable_xmp_sync {
             let source_path = parse_virtual_path(path).0;
@@ -2576,9 +2578,7 @@ pub fn set_rating_for_paths(
 
         metadata.rating = rating;
 
-        if let Ok(json_string) = serde_json::to_string_pretty(&metadata) {
-            let _ = std::fs::write(&sidecar_path, json_string);
-        }
+        save_metadata_sidecar_or_warn(&sidecar_path, &metadata, "tag update");
 
         if enable_xmp_sync {
             let source_path = parse_virtual_path(path).0;
@@ -2595,7 +2595,30 @@ pub fn load_metadata(path: String, app_handle: AppHandle) -> Result<ImageMetadat
     let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
 
     let (source_path, sidecar_path) = parse_virtual_path(&path);
-    let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
+    let persisted = crate::exif_processing::load_sidecar_recovering(&sidecar_path, Some(&path))?;
+    let repaired = !matches!(
+        persisted.outcome,
+        crate::exif_processing::PersistedStateOutcome::Absent
+            | crate::exif_processing::PersistedStateOutcome::Current
+    );
+    if repaired {
+        let _ = app_handle.emit(
+            "persisted-render-state-recovered",
+            serde_json::json!({
+                "path": path,
+                "outcome": persisted.outcome,
+                "backupPath": persisted.backup_path,
+                "reasonCodes": persisted.reason_codes,
+            }),
+        );
+        let state = app_handle.state::<AppState>();
+        crate::render_caches::RenderCaches::new(&state).clear_canonical_reset_artifacts();
+        state.decoded_image_cache.clear();
+        if let Some(scheduler) = state.preview_scheduler.lock().unwrap().as_ref() {
+            scheduler.invalidate_current();
+        }
+    }
+    let mut metadata = persisted.metadata;
     let mut should_save_sidecar = false;
 
     if enable_xmp_sync && sync_metadata_from_xmp(&source_path, &mut metadata) {
@@ -2615,8 +2638,8 @@ pub fn load_metadata(path: String, app_handle: AppHandle) -> Result<ImageMetadat
         should_save_sidecar = true;
     }
 
-    if should_save_sidecar && let Ok(json) = serde_json::to_string_pretty(&metadata) {
-        let _ = fs::write(&sidecar_path, json);
+    if should_save_sidecar {
+        save_metadata_sidecar_or_warn(&sidecar_path, &metadata, "metadata repair");
     }
 
     Ok(metadata)
@@ -2794,15 +2817,21 @@ pub fn get_thumb_cache_dir(app_handle: &AppHandle) -> Result<PathBuf, String> {
 pub fn get_cache_key_hash(path_str: &str) -> Option<String> {
     let (_, sidecar_path) = parse_virtual_path(path_str);
 
-    let adjustments_bytes = if let Ok(content) = fs::read_to_string(&sidecar_path) {
-        if let Ok(meta) = serde_json::from_str::<ImageMetadata>(&content) {
-            serde_json::to_vec(&meta.adjustments).unwrap_or_default()
-        } else {
-            Vec::new()
-        }
-    } else {
-        Vec::new()
-    };
+    let adjustments_bytes =
+        crate::exif_processing::load_sidecar_recovering(&sidecar_path, Some(path_str))
+            .ok()
+            .and_then(|loaded| {
+                serde_json::to_vec(&(
+                    loaded
+                        .metadata
+                        .persisted_render_state
+                        .as_ref()
+                        .map(|state| state.edit_revision.as_str()),
+                    &loaded.metadata.adjustments,
+                ))
+                .ok()
+            })
+            .unwrap_or_default();
 
     compute_thumbnail_cache_hash(path_str, &adjustments_bytes)
 }
@@ -3383,15 +3412,7 @@ fn write_external_editor_variant_sidecar(
         "schemaVersion": 1,
     }));
 
-    let json = serde_json::to_string_pretty(&sidecar)
-        .map_err(|err| format!("Failed to serialize external editor sidecar: {}", err))?;
-    fs::write(sidecar_path, json).map_err(|err| {
-        format!(
-            "Failed to write external editor sidecar {}: {}",
-            sidecar_path.display(),
-            err
-        )
-    })?;
+    save_metadata_sidecar(sidecar_path, &sidecar)?;
 
     Ok(ExternalEditorVariantReceipt {
         artifact_id,
@@ -3870,8 +3891,7 @@ pub fn resolve_xmp_metadata_conflicts(
         .xmp_conflict_receipts
         .push(serde_json::json!(&receipt));
 
-    let json_string = serde_json::to_string_pretty(&metadata).map_err(|e| e.to_string())?;
-    crate::exif_processing::write_text_file_atomic(&sidecar_path, &json_string)?;
+    save_metadata_sidecar(&sidecar_path, &metadata)?;
 
     let settings = load_settings_or_default(&app_handle);
     sync_metadata_to_xmp(
@@ -3896,11 +3916,6 @@ pub fn sync_metadata_from_xmp(source_path: &Path, metadata: &mut ImageMetadata) 
             && rating != 0
         {
             metadata.rating = rating;
-            if let Some(obj) = metadata.adjustments.as_object_mut() {
-                obj.insert("rating".to_string(), serde_json::json!(rating));
-            } else {
-                metadata.adjustments = serde_json::json!({"rating": rating});
-            }
             changed = true;
         }
 

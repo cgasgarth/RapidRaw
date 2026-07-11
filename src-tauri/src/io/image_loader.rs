@@ -874,7 +874,8 @@ pub async fn load_image(
     let (source_path, sidecar_path) = parse_virtual_path(&path);
     let source_path_str = source_path.to_string_lossy().to_string();
 
-    let mut metadata: ImageMetadata = crate::exif_processing::load_sidecar(&sidecar_path);
+    let mut metadata: ImageMetadata =
+        crate::exif_processing::load_sidecar_recovering(&sidecar_path, Some(&path))?.metadata;
     let mut should_save_sidecar = false;
     if is_raw_file(&source_path_str)
         && crate::exif_processing::repair_raw_sidecar_camera_metadata(&source_path, &mut metadata)
@@ -887,8 +888,8 @@ pub async fn load_image(
     if crate::negative_conversion::refresh_negative_lab_stale_artifacts(&mut metadata) {
         should_save_sidecar = true;
     }
-    if should_save_sidecar && let Ok(json) = serde_json::to_string_pretty(&metadata) {
-        let _ = fs::write(&sidecar_path, json);
+    if should_save_sidecar {
+        crate::exif_processing::save_sidecar_metadata_atomic(&sidecar_path, &metadata)?;
     }
 
     let settings = load_settings_or_default(&app_handle);

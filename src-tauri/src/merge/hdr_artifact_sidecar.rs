@@ -363,7 +363,12 @@ pub fn write_hdr_output_sidecar(
             .unwrap_or_default()
             .to_string_lossy()
     ));
-    let mut sidecar = crate::exif_processing::load_sidecar(&sidecar_path);
+    let output_identity = output_path.to_string_lossy();
+    let mut sidecar = crate::exif_processing::load_sidecar_recovering(
+        &sidecar_path,
+        Some(output_identity.as_ref()),
+    )?
+    .metadata;
     upsert_hdr_artifact_metadata(
         &mut sidecar,
         output_path,
@@ -372,15 +377,7 @@ pub fn write_hdr_output_sidecar(
         output_width,
         output_height,
     )?;
-    let json = serde_json::to_string_pretty(&sidecar)
-        .map_err(|e| format!("Failed to serialize HDR sidecar: {}", e))?;
-    fs::write(&sidecar_path, json).map_err(|e| {
-        format!(
-            "Failed to write HDR sidecar {}: {}",
-            sidecar_path.display(),
-            e
-        )
-    })
+    crate::exif_processing::save_sidecar_metadata_atomic(&sidecar_path, &sidecar)
 }
 
 fn upsert_hdr_artifact_metadata(

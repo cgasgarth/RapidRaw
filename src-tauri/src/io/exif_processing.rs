@@ -4,7 +4,10 @@ use std::io::{BufReader, Cursor, Write};
 use std::path::{Path, PathBuf};
 
 use crate::formats::is_raw_file;
-use crate::image_processing::ImageMetadata;
+use crate::image_processing::{
+    ImageMetadata, PERSISTED_RENDER_STATE_SCHEMA_VERSION, PersistedRenderState,
+    PersistedStateRecoveryReceipt,
+};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use exif::{Exif, In, Value};
 use little_exif::exif_tag::ExifTag;
@@ -12,6 +15,9 @@ use little_exif::filetype::FileExtension;
 use little_exif::metadata::Metadata;
 use little_exif::rational::{iR64, uR64};
 use rawler::decoders::RawMetadata;
+use serde::Serialize;
+use serde_json::{Map, Value as JsonValue};
+use sha2::{Digest, Sha256};
 
 pub fn truncate_large_exif(value: &str) -> String {
     if value.len() <= 500 {
@@ -37,16 +43,579 @@ pub fn truncate_large_exif(value: &str) -> String {
     value.to_string()
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PersistedStateOutcome {
+    Absent,
+    Current,
+    Migrated,
+    Recovered,
+    Quarantined,
+    Unsupported,
+}
+
+#[derive(Debug, Clone)]
+pub struct PersistedStateLoad {
+    pub metadata: ImageMetadata,
+    pub outcome: PersistedStateOutcome,
+    pub backup_path: Option<PathBuf>,
+    pub reason_codes: Vec<String>,
+}
+
+const PERSISTED_STATE_IMPLEMENTATION_REVISION: u32 = 1;
+const MAX_QUARANTINE_BACKUPS: usize = 3;
+
 pub fn load_sidecar(sidecar_path: &Path) -> ImageMetadata {
+    load_sidecar_recovering(sidecar_path, None)
+        .map(|loaded| loaded.metadata)
+        .unwrap_or_default()
+}
+
+pub fn load_sidecar_recovering(
+    sidecar_path: &Path,
+    expected_source_identity: Option<&str>,
+) -> Result<PersistedStateLoad, String> {
     if !sidecar_path.exists() {
-        return ImageMetadata::default();
+        log::debug!(
+            "persisted_state_outcome=absent sidecar={}",
+            sidecar_path.display()
+        );
+        return Ok(PersistedStateLoad {
+            metadata: ImageMetadata::default(),
+            outcome: PersistedStateOutcome::Absent,
+            backup_path: None,
+            reason_codes: Vec::new(),
+        });
     }
 
-    let Ok(content) = fs::read_to_string(sidecar_path) else {
-        return ImageMetadata::default();
-    };
+    let bytes = fs::read(sidecar_path)
+        .map_err(|error| format!("Failed to read sidecar {}: {error}", sidecar_path.display()))?;
+    let content = String::from_utf8(bytes.clone())
+        .map_err(|error| format!("Sidecar {} is not UTF-8: {error}", sidecar_path.display()));
 
-    let mut meta = serde_json::from_str::<ImageMetadata>(&content).unwrap_or_default();
+    let mut reasons = Vec::new();
+    let mut disabled_fields = Vec::new();
+    let mut quarantined_extensions = Map::new();
+    let mut outcome = PersistedStateOutcome::Current;
+    let parsed = content
+        .as_deref()
+        .ok()
+        .and_then(|text| serde_json::from_str::<JsonValue>(text).ok());
+    let mut meta = match parsed {
+        Some(document) => match serde_json::from_value::<ImageMetadata>(document) {
+            Ok(metadata) => metadata,
+            Err(_) => {
+                reasons.push("sidecar_shape_invalid".to_string());
+                outcome = PersistedStateOutcome::Quarantined;
+                ImageMetadata::default()
+            }
+        },
+        None => {
+            reasons.push(if content.is_err() {
+                "sidecar_encoding_invalid".to_string()
+            } else {
+                "sidecar_json_malformed".to_string()
+            });
+            outcome = PersistedStateOutcome::Quarantined;
+            ImageMetadata::default()
+        }
+    };
+    if heal_large_exif(&mut meta) {
+        reasons.push("oversized_exif_trimmed".to_string());
+        disabled_fields.push("exif.oversizedValues".to_string());
+        if outcome == PersistedStateOutcome::Current {
+            outcome = PersistedStateOutcome::Recovered;
+        }
+    }
+
+    if meta.version > PERSISTED_RENDER_STATE_SCHEMA_VERSION
+        || meta
+            .persisted_render_state
+            .as_ref()
+            .is_some_and(|state| state.schema_version > PERSISTED_RENDER_STATE_SCHEMA_VERSION)
+    {
+        reasons.push("unsupported_future_document".to_string());
+        outcome = PersistedStateOutcome::Unsupported;
+        quarantine_all_render_state(&mut meta, &mut quarantined_extensions);
+    } else {
+        if let Some(user_edits) = meta
+            .persisted_render_state
+            .as_ref()
+            .and_then(|state| state.user_edits.clone())
+        {
+            meta.adjustments = JsonValue::Object(user_edits);
+        }
+        let legacy = meta.version < PERSISTED_RENDER_STATE_SCHEMA_VERSION
+            || meta.persisted_render_state.is_none()
+            || meta
+                .persisted_render_state
+                .as_ref()
+                .is_some_and(|state| state.schema_version < PERSISTED_RENDER_STATE_SCHEMA_VERSION)
+            || meta
+                .persisted_render_state
+                .as_ref()
+                .is_some_and(|state| state.user_edits.is_none())
+            || expected_source_identity.is_some_and(|_| {
+                meta.persisted_render_state
+                    .as_ref()
+                    .is_some_and(|state| state.source_identity.is_empty())
+            });
+        if legacy && outcome == PersistedStateOutcome::Current {
+            outcome = PersistedStateOutcome::Migrated;
+            reasons.push("legacy_render_state_migrated".to_string());
+        }
+        validate_adjustments(
+            &mut meta.adjustments,
+            &mut quarantined_extensions,
+            &mut disabled_fields,
+        );
+        validate_artifacts(
+            &mut meta,
+            expected_source_identity,
+            &mut disabled_fields,
+            &mut reasons,
+        );
+        if !disabled_fields.is_empty() && outcome != PersistedStateOutcome::Quarantined {
+            outcome = PersistedStateOutcome::Recovered;
+        }
+    }
+
+    let previous_revision = meta
+        .persisted_render_state
+        .as_ref()
+        .map(|state| state.edit_revision.clone());
+    if let (Some(expected), Some(state)) = (expected_source_identity, &meta.persisted_render_state)
+        && !state.source_identity.is_empty()
+        && state.source_identity != expected
+    {
+        reasons.push("source_identity_mismatch".to_string());
+        disabled_fields.push("adjustments".to_string());
+        quarantine_all_render_state(&mut meta, &mut quarantined_extensions);
+        outcome = PersistedStateOutcome::Quarantined;
+    }
+
+    if outcome == PersistedStateOutcome::Current {
+        log::debug!(
+            "persisted_state_outcome=current sidecar={}",
+            sidecar_path.display()
+        );
+        return Ok(PersistedStateLoad {
+            metadata: meta,
+            outcome,
+            backup_path: None,
+            reason_codes: reasons,
+        });
+    }
+
+    let source_identity = expected_source_identity.unwrap_or_default().to_string();
+    let from_version = meta.version;
+    meta.version = PERSISTED_RENDER_STATE_SCHEMA_VERSION;
+    let edit_revision =
+        render_state_revision(&meta.adjustments, meta.raw_engine_artifacts.as_ref())?;
+    let receipt = PersistedStateRecoveryReceipt {
+        from_version,
+        to_version: PERSISTED_RENDER_STATE_SCHEMA_VERSION,
+        source_identity: source_identity.clone(),
+        previous_edit_revision: previous_revision,
+        disabled_fields,
+        reason_codes: reasons.clone(),
+    };
+    let mut receipts = meta
+        .persisted_render_state
+        .take()
+        .map(|state| state.recovery_receipts)
+        .unwrap_or_default();
+    if receipts.last() != Some(&receipt) {
+        receipts.push(receipt);
+    }
+    meta.persisted_render_state = Some(PersistedRenderState {
+        schema_version: PERSISTED_RENDER_STATE_SCHEMA_VERSION,
+        implementation_revision: PERSISTED_STATE_IMPLEMENTATION_REVISION,
+        source_identity,
+        edit_revision,
+        user_edits: meta.adjustments.as_object().cloned(),
+        defaults_policy_revision: 1,
+        camera_input_transform_receipt: None,
+        xmp_revision: None,
+        recovery_receipts: receipts,
+        quarantined_extensions,
+    });
+
+    let backup_path = quarantine_original_bytes(sidecar_path, &bytes)?;
+    save_sidecar_metadata_atomic(sidecar_path, &meta)?;
+    log::warn!(
+        "persisted_state_outcome={:?} sidecar={} backup={} reasons={}",
+        outcome,
+        sidecar_path.display(),
+        backup_path.display(),
+        reasons.join(",")
+    );
+    Ok(PersistedStateLoad {
+        metadata: meta,
+        outcome,
+        backup_path: Some(backup_path),
+        reason_codes: reasons,
+    })
+}
+
+fn render_state_revision(
+    adjustments: &JsonValue,
+    artifacts: Option<&crate::image_processing::RawEngineArtifacts>,
+) -> Result<String, String> {
+    let bytes = serde_json::to_vec(&(adjustments, artifacts))
+        .map_err(|error| format!("Failed to hash persisted render state: {error}"))?;
+    Ok(format!("sha256:{}", hex::encode(Sha256::digest(bytes))))
+}
+
+fn quarantine_all_render_state(meta: &mut ImageMetadata, extensions: &mut Map<String, JsonValue>) {
+    if !meta.adjustments.is_null() && meta.adjustments != serde_json::json!({}) {
+        extensions.insert(
+            "rejectedAdjustments".to_string(),
+            std::mem::take(&mut meta.adjustments),
+        );
+    }
+    meta.adjustments = serde_json::json!({});
+    if let Some(artifacts) = meta.raw_engine_artifacts.take()
+        && let Ok(value) = serde_json::to_value(artifacts)
+    {
+        extensions.insert("rejectedRawEngineArtifacts".to_string(), value);
+    }
+}
+
+fn validate_adjustments(
+    adjustments: &mut JsonValue,
+    extensions: &mut Map<String, JsonValue>,
+    disabled: &mut Vec<String>,
+) {
+    let Some(object) = adjustments.as_object_mut() else {
+        if !adjustments.is_null() {
+            extensions.insert(
+                "invalidAdjustments".to_string(),
+                std::mem::take(adjustments),
+            );
+            disabled.push("adjustments".to_string());
+        }
+        *adjustments = serde_json::json!({});
+        return;
+    };
+    const FORBIDDEN: &[&str] = &[
+        "displayIcc",
+        "displayLut",
+        "displayProfile",
+        "outputTransform",
+        "viewTransform",
+        "cameraToWorkingMatrix",
+        "cameraWhiteBalance",
+        "legacyWhiteBalance",
+        "inputTransform",
+    ];
+    const KNOWN: &[&str] = &[
+        "aiPatches",
+        "aspectRatio",
+        "blacks",
+        "brightness",
+        "centré",
+        "clarity",
+        "chromaticAberrationBlueYellow",
+        "chromaticAberrationRedCyan",
+        "blackWhiteMixer",
+        "cameraProfile",
+        "colorBalanceRgb",
+        "channelMixer",
+        "colorCalibration",
+        "colorGrading",
+        "colorNoiseReduction",
+        "contrast",
+        "crop",
+        "curves",
+        "pointCurves",
+        "parametricCurve",
+        "curveMode",
+        "rawProcessingModeOverride",
+        "deblurEnabled",
+        "deblurSigmaPx",
+        "deblurStrength",
+        "dustSpotMinRadiusPx",
+        "dustSpotOverlayEnabled",
+        "dustSpotSensitivity",
+        "dehaze",
+        "exposure",
+        "flipHorizontal",
+        "flipVertical",
+        "flareAmount",
+        "filmLookId",
+        "filmLookStrength",
+        "glowAmount",
+        "grainAmount",
+        "grainRoughness",
+        "grainSize",
+        "halationAmount",
+        "highlights",
+        "hue",
+        "hsl",
+        "selectiveColorRangeControls",
+        "levels",
+        "lensCorrectionMode",
+        "lensDistortionAmount",
+        "lensVignetteAmount",
+        "lensTcaAmount",
+        "lensDistortionEnabled",
+        "lensTcaEnabled",
+        "lensVignetteEnabled",
+        "lensDistortionParams",
+        "lensMaker",
+        "lensModel",
+        "localContrastHaloGuard",
+        "localContrastMidtoneMask",
+        "localContrastRadiusPx",
+        "lumaNoiseReduction",
+        "lutData",
+        "lutIntensity",
+        "lutName",
+        "lutPath",
+        "lutSize",
+        "masks",
+        "orientationSteps",
+        "rotation",
+        "saturation",
+        "sectionVisibility",
+        "shadows",
+        "sharpness",
+        "sharpnessThreshold",
+        "showClipping",
+        "skinToneUniformity",
+        "structure",
+        "temperature",
+        "tint",
+        "toneMapper",
+        "toneCurve",
+        "transformDistortion",
+        "transformVertical",
+        "transformHorizontal",
+        "transformRotate",
+        "transformAspect",
+        "transformScale",
+        "transformXOffset",
+        "transformYOffset",
+        "vibrance",
+        "vignetteAmount",
+        "vignetteFeather",
+        "vignetteMidpoint",
+        "vignetteRoundness",
+        "whites",
+        "capturePreSharpening",
+        "lutContentIdentity",
+        "negativeLab",
+        "softProof",
+        "panorama",
+        "hdrMerge",
+    ];
+    for field in FORBIDDEN {
+        if let Some(value) = object.remove(*field) {
+            extensions.insert((*field).to_string(), value);
+            disabled.push(format!("adjustments.{field}"));
+        }
+    }
+    for (legacy, canonical) in [
+        ("whiteBalanceTemperature", "temperature"),
+        ("whiteBalanceTint", "tint"),
+        ("rotate", "rotation"),
+    ] {
+        if let Some(value) = object.remove(legacy) {
+            object.entry(canonical.to_string()).or_insert(value);
+            disabled.push(format!("adjustments.{legacy}->adjustments.{canonical}"));
+        }
+    }
+    let unknown: Vec<String> = object
+        .keys()
+        .filter(|key| !KNOWN.contains(&key.as_str()))
+        .cloned()
+        .collect();
+    for field in unknown {
+        if let Some(value) = object.remove(&field) {
+            extensions.insert(field.clone(), value);
+            disabled.push(format!("adjustments.{field}"));
+        }
+    }
+    for (field, supported) in [
+        (
+            "cameraProfile",
+            &[
+                "camera_standard",
+                "camera_neutral",
+                "camera_portrait",
+                "camera_landscape",
+                "linear_raw",
+            ][..],
+        ),
+        (
+            "rawProcessingModeOverride",
+            &["fast", "balanced", "maximum"][..],
+        ),
+        ("toneMapper", &["agx", "basic"][..]),
+    ] {
+        let invalid = object.get(field).is_some_and(|value| {
+            !value.is_null()
+                && value
+                    .as_str()
+                    .is_none_or(|value| !supported.contains(&value))
+        });
+        if invalid && let Some(value) = object.remove(field) {
+            extensions.insert(field.to_string(), value);
+            disabled.push(format!("adjustments.{field}"));
+        }
+    }
+    for (field, min, max) in [
+        ("exposure", -20.0, 20.0),
+        ("temperature", -250.0, 250.0),
+        ("tint", -250.0, 250.0),
+        ("rotation", -360.0, 360.0),
+        ("orientationSteps", -4.0, 4.0),
+        ("lutIntensity", 0.0, 100.0),
+        ("transformScale", 1.0, 1000.0),
+    ] {
+        let invalid = object
+            .get(field)
+            .and_then(JsonValue::as_f64)
+            .is_some_and(|value| !(min..=max).contains(&value));
+        if invalid && let Some(value) = object.remove(field) {
+            extensions.insert(field.to_string(), value);
+            disabled.push(format!("adjustments.{field}"));
+        }
+    }
+    let invalid_numeric: Vec<String> = object
+        .iter()
+        .filter(|(_, value)| contains_extreme_number(value))
+        .map(|(key, _)| key.clone())
+        .collect();
+    for field in invalid_numeric {
+        if let Some(value) = object.remove(&field) {
+            extensions.insert(field.clone(), value);
+            disabled.push(format!("adjustments.{field}"));
+        }
+    }
+    if object
+        .get("lutPath")
+        .and_then(JsonValue::as_str)
+        .is_some_and(|path| !Path::new(path).is_file())
+    {
+        for field in ["lutPath", "lutData", "lutName", "lutSize"] {
+            if let Some(value) = object.remove(field) {
+                extensions.insert(field.to_string(), value);
+            }
+        }
+        object.insert("lutIntensity".to_string(), JsonValue::from(0));
+        disabled.push("adjustments.lut".to_string());
+    } else if let (Some(path), Some(expected_hash)) = (
+        object.get("lutPath").and_then(JsonValue::as_str),
+        object.get("lutContentIdentity").and_then(JsonValue::as_str),
+    ) && fs::read(path)
+        .ok()
+        .map(|bytes| format!("sha256:{}", hex::encode(Sha256::digest(bytes))))
+        .as_deref()
+        != Some(expected_hash)
+    {
+        for field in [
+            "lutPath",
+            "lutData",
+            "lutName",
+            "lutSize",
+            "lutContentIdentity",
+        ] {
+            if let Some(value) = object.remove(field) {
+                extensions.insert(field.to_string(), value);
+            }
+        }
+        object.insert("lutIntensity".to_string(), JsonValue::from(0));
+        disabled.push("adjustments.lutContentIdentity".to_string());
+    }
+}
+
+fn contains_extreme_number(value: &JsonValue) -> bool {
+    match value {
+        JsonValue::Number(number) => number
+            .as_f64()
+            .is_none_or(|number| !number.is_finite() || number.abs() > 1_000_000.0),
+        JsonValue::Array(values) => values.iter().any(contains_extreme_number),
+        JsonValue::Object(values) => values.values().any(contains_extreme_number),
+        _ => false,
+    }
+}
+
+fn validate_artifacts(
+    meta: &mut ImageMetadata,
+    expected_source: Option<&str>,
+    disabled: &mut Vec<String>,
+    reasons: &mut Vec<String>,
+) {
+    let Some(artifacts) = meta.raw_engine_artifacts.as_mut() else {
+        return;
+    };
+    if artifacts.schema_version != 1 {
+        meta.raw_engine_artifacts = None;
+        disabled.push("rawEngineArtifacts".to_string());
+        reasons.push("artifact_schema_unsupported".to_string());
+        return;
+    }
+    if let Some(expected) = expected_source {
+        let before = artifacts.layer_stack_sidecars.len();
+        artifacts.layer_stack_sidecars.retain(|sidecar| {
+            sidecar.get("schemaVersion").and_then(JsonValue::as_u64) == Some(1)
+                && sidecar
+                    .get("sourceImagePath")
+                    .and_then(JsonValue::as_str)
+                    .is_some_and(|source| render_sources_match(source, expected))
+        });
+        if before != artifacts.layer_stack_sidecars.len() {
+            disabled.push("rawEngineArtifacts.layerStackSidecars".to_string());
+            reasons.push("layer_authority_source_mismatch".to_string());
+        }
+    }
+}
+
+fn render_sources_match(left: &str, right: &str) -> bool {
+    if left == right {
+        return true;
+    }
+    crate::file_management::parse_virtual_path(left).0
+        == crate::file_management::parse_virtual_path(right).0
+}
+
+fn quarantine_original_bytes(sidecar_path: &Path, bytes: &[u8]) -> Result<PathBuf, String> {
+    let base = sidecar_path.with_extension("rrdata.quarantine");
+    for index in (1..MAX_QUARANTINE_BACKUPS).rev() {
+        let from = if index == 1 {
+            base.clone()
+        } else {
+            sidecar_path.with_extension(format!("rrdata.quarantine.{index}"))
+        };
+        let to = sidecar_path.with_extension(format!("rrdata.quarantine.{}", index + 1));
+        if from.exists() {
+            let _ = fs::rename(from, to);
+        }
+    }
+    write_bytes_atomic(&base, bytes)?;
+    Ok(base)
+}
+
+fn write_bytes_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+    let mut temp_file = tempfile::NamedTempFile::new_in(parent)
+        .map_err(|error| format!("Failed to create quarantine temp file: {error}"))?;
+    temp_file
+        .write_all(bytes)
+        .and_then(|_| temp_file.as_file_mut().sync_all())
+        .map_err(|error| format!("Failed to persist quarantine bytes: {error}"))?;
+    temp_file.persist(path).map(|_| ()).map_err(|error| {
+        format!(
+            "Failed to publish quarantine {}: {}",
+            path.display(),
+            error.error
+        )
+    })
+}
+
+fn heal_large_exif(meta: &mut ImageMetadata) -> bool {
     let mut healed = false;
 
     if let Some(ref mut exif_map) = meta.exif {
@@ -58,15 +627,7 @@ pub fn load_sidecar(sidecar_path: &Path) -> ImageMetadata {
         }
     }
 
-    if healed && let Ok(json) = serde_json::to_string_pretty(&meta) {
-        let _ = fs::write(sidecar_path, json);
-        log::info!(
-            "Auto-healed bloated sidecar for: {}",
-            sidecar_path.display()
-        );
-    }
-
-    meta
+    healed
 }
 
 fn to_ur64(val: &exif::Rational) -> uR64 {
@@ -1245,7 +1806,50 @@ pub fn save_sidecar_metadata_atomic(
     sidecar_path: &Path,
     metadata: &ImageMetadata,
 ) -> Result<(), String> {
-    let json = serde_json::to_string_pretty(metadata).map_err(|e| {
+    let mut normalized = metadata.clone();
+    let mut extensions = normalized
+        .persisted_render_state
+        .as_mut()
+        .map(|state| std::mem::take(&mut state.quarantined_extensions))
+        .unwrap_or_default();
+    let mut disabled = Vec::new();
+    validate_adjustments(&mut normalized.adjustments, &mut extensions, &mut disabled);
+    let mut reasons = Vec::new();
+    validate_artifacts(&mut normalized, None, &mut disabled, &mut reasons);
+    if !disabled.is_empty() {
+        return Err(format!(
+            "Refusing to persist invalid render state in {}: {}",
+            sidecar_path.display(),
+            disabled.join(", ")
+        ));
+    }
+    normalized.version = PERSISTED_RENDER_STATE_SCHEMA_VERSION;
+    let revision = render_state_revision(
+        &normalized.adjustments,
+        normalized.raw_engine_artifacts.as_ref(),
+    )?;
+    let state = normalized
+        .persisted_render_state
+        .get_or_insert_with(|| PersistedRenderState {
+            schema_version: PERSISTED_RENDER_STATE_SCHEMA_VERSION,
+            implementation_revision: PERSISTED_STATE_IMPLEMENTATION_REVISION,
+            source_identity: String::new(),
+            edit_revision: revision.clone(),
+            user_edits: normalized.adjustments.as_object().cloned(),
+            defaults_policy_revision: 1,
+            camera_input_transform_receipt: None,
+            xmp_revision: None,
+            recovery_receipts: Vec::new(),
+            quarantined_extensions: Map::new(),
+        });
+    state.schema_version = PERSISTED_RENDER_STATE_SCHEMA_VERSION;
+    state.implementation_revision = PERSISTED_STATE_IMPLEMENTATION_REVISION;
+    state.edit_revision = revision;
+    state.user_edits = normalized.adjustments.as_object().cloned();
+    state.defaults_policy_revision = 1;
+    state.quarantined_extensions = extensions;
+
+    let json = serde_json::to_string_pretty(&normalized).map_err(|e| {
         format!(
             "Failed to serialize sidecar {}: {}",
             sidecar_path.display(),
@@ -1397,6 +2001,218 @@ pub fn write_rrexif_sidecar(source_path_str: &str, target_image_path: &Path) -> 
 mod tests {
     use super::*;
     use std::fs;
+
+    fn write_sidecar(path: &Path, value: &JsonValue) -> Vec<u8> {
+        let bytes = serde_json::to_vec_pretty(value).expect("fixture json");
+        fs::write(path, &bytes).expect("write fixture");
+        bytes
+    }
+
+    #[test]
+    fn legacy_recovery_is_byte_preserving_and_idempotent() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let sidecar = temp_dir.path().join("landscape.arw.rrdata");
+        let original = write_sidecar(
+            &sidecar,
+            &serde_json::json!({
+                "version": 1,
+                "rating": 5,
+                "tags": ["keeper"],
+                "exif": {"Artist": "RawEngine"},
+                "adjustments": {"exposure": 1.25, "displayIcc": "stale"}
+            }),
+        );
+
+        let first = load_sidecar_recovering(&sidecar, Some("/photos/landscape.arw"))
+            .expect("recover legacy sidecar");
+        assert_eq!(first.outcome, PersistedStateOutcome::Recovered);
+        assert_eq!(
+            fs::read(first.backup_path.expect("backup")).unwrap(),
+            original
+        );
+        assert_eq!(first.metadata.rating, 5);
+        assert_eq!(first.metadata.tags, Some(vec!["keeper".to_string()]));
+        assert_eq!(first.metadata.adjustments["exposure"], 1.25);
+        assert!(first.metadata.adjustments.get("displayIcc").is_none());
+        let repaired_bytes = fs::read(&sidecar).unwrap();
+
+        let second = load_sidecar_recovering(&sidecar, Some("/photos/landscape.arw"))
+            .expect("reopen repaired sidecar");
+        assert_eq!(second.outcome, PersistedStateOutcome::Current);
+        assert!(second.backup_path.is_none());
+        assert_eq!(fs::read(&sidecar).unwrap(), repaired_bytes);
+    }
+
+    #[test]
+    fn malformed_and_future_sidecars_quarantine_render_state() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let malformed = temp_dir.path().join("bad.arw.rrdata");
+        let malformed_bytes = br#"{"version":1,"adjustments":{"exposure":2"#;
+        fs::write(&malformed, malformed_bytes).unwrap();
+        let loaded = load_sidecar_recovering(&malformed, Some("/photos/bad.arw"))
+            .expect("quarantine malformed");
+        assert_eq!(loaded.outcome, PersistedStateOutcome::Quarantined);
+        assert_eq!(loaded.metadata.adjustments, serde_json::json!({}));
+        assert_eq!(
+            fs::read(loaded.backup_path.unwrap()).unwrap(),
+            malformed_bytes
+        );
+
+        let future = temp_dir.path().join("future.arw.rrdata");
+        write_sidecar(
+            &future,
+            &serde_json::json!({
+                "version": 99,
+                "rating": 4,
+                "tags": ["preserve"],
+                "adjustments": {"temperature": 9000}
+            }),
+        );
+        let loaded = load_sidecar_recovering(&future, Some("/photos/future.arw"))
+            .expect("quarantine future");
+        assert_eq!(loaded.outcome, PersistedStateOutcome::Unsupported);
+        assert_eq!(loaded.metadata.rating, 4);
+        assert_eq!(loaded.metadata.tags, Some(vec!["preserve".to_string()]));
+        assert_eq!(loaded.metadata.adjustments, serde_json::json!({}));
+    }
+
+    #[test]
+    fn mismatched_authority_and_missing_lut_cannot_reach_render_state() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let sidecar = temp_dir.path().join("owned.arw.rrdata");
+        write_sidecar(
+            &sidecar,
+            &serde_json::json!({
+                "version": 1,
+                "rating": 3,
+                "adjustments": {"lutPath": "/missing/look.cube", "lutIntensity": 100},
+                "rawEngineArtifacts": {
+                    "schemaVersion": 1,
+                    "layerStackSidecars": [{
+                        "schemaVersion": 1,
+                        "sourceImagePath": "/photos/other.arw"
+                    }]
+                }
+            }),
+        );
+
+        let loaded = load_sidecar_recovering(&sidecar, Some("/photos/owned.arw"))
+            .expect("recover mismatched authority");
+        assert_eq!(loaded.outcome, PersistedStateOutcome::Recovered);
+        assert_eq!(loaded.metadata.rating, 3);
+        assert_eq!(loaded.metadata.adjustments["lutIntensity"], 0);
+        assert!(loaded.metadata.adjustments.get("lutPath").is_none());
+        assert!(
+            loaded
+                .metadata
+                .raw_engine_artifacts
+                .unwrap()
+                .layer_stack_sidecars
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn source_identity_mismatch_quarantines_all_pixel_authority() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let sidecar = temp_dir.path().join("copy.arw.rrdata");
+        let state = PersistedRenderState {
+            schema_version: 2,
+            implementation_revision: 1,
+            source_identity: "/photos/original.arw".to_string(),
+            edit_revision: "sha256:old".to_string(),
+            user_edits: Some(Map::from_iter([(
+                "exposure".to_string(),
+                JsonValue::from(4),
+            )])),
+            defaults_policy_revision: 1,
+            camera_input_transform_receipt: None,
+            xmp_revision: None,
+            recovery_receipts: Vec::new(),
+            quarantined_extensions: Map::new(),
+        };
+        write_sidecar(
+            &sidecar,
+            &serde_json::json!({
+                "version": 2,
+                "rating": 2,
+                "adjustments": {"exposure": 4},
+                "persistedRenderState": state
+            }),
+        );
+        let loaded = load_sidecar_recovering(&sidecar, Some("/photos/copy.arw"))
+            .expect("quarantine identity mismatch");
+        assert_eq!(loaded.outcome, PersistedStateOutcome::Quarantined);
+        assert_eq!(loaded.metadata.adjustments, serde_json::json!({}));
+        assert_eq!(loaded.metadata.rating, 2);
+    }
+
+    #[test]
+    fn private_alaska_raw_recovery_reopen_and_decode_lifecycle() {
+        if std::env::var_os("RAPIDRAW_RUN_PRIVATE_SIDECAR_PROOF").is_none() {
+            eprintln!("skipping private persisted-state RAW lifecycle proof");
+            return;
+        }
+        let source = Path::new("/Users/cgas/Pictures/Capture One/Alaska/_DSC8786.ARW");
+        assert!(source.is_file(), "private Alaska RAW fixture must exist");
+        let source_bytes = fs::read(source).expect("read private RAW");
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let sidecar = temp_dir.path().join("_DSC8786.ARW.rrdata");
+        write_sidecar(
+            &sidecar,
+            &serde_json::json!({
+                "version": 1,
+                "rating": 5,
+                "tags": ["private-proof"],
+                "adjustments": {
+                    "displayIcc": "stale-profile",
+                    "cameraProfile": "obsolete-double-transform",
+                    "exposure": 0.25
+                }
+            }),
+        );
+        let source_identity = source.to_string_lossy();
+        let recovered = load_sidecar_recovering(&sidecar, Some(source_identity.as_ref()))
+            .expect("recover private RAW sidecar");
+        assert_eq!(recovered.outcome, PersistedStateOutcome::Recovered);
+        assert_eq!(recovered.metadata.rating, 5);
+        assert_eq!(
+            recovered.metadata.tags,
+            Some(vec!["private-proof".to_string()])
+        );
+        assert!(recovered.metadata.adjustments.get("displayIcc").is_none());
+        assert!(
+            recovered
+                .metadata
+                .adjustments
+                .get("cameraProfile")
+                .is_none()
+        );
+
+        let settings = crate::app_settings::AppSettings::default();
+        let decoded = crate::image_loader::load_base_image_from_bytes(
+            &source_bytes,
+            source_identity.as_ref(),
+            false,
+            &settings,
+            None,
+        )
+        .expect("decode recovered private RAW");
+        assert!(decoded.width() > 1000 && decoded.height() > 1000);
+        assert!(
+            decoded
+                .to_rgb32f()
+                .pixels()
+                .take(4096)
+                .all(|pixel| { pixel.0.into_iter().all(f32::is_finite) })
+        );
+
+        let repaired_bytes = fs::read(&sidecar).expect("read repaired sidecar");
+        let reopened = load_sidecar_recovering(&sidecar, Some(source_identity.as_ref()))
+            .expect("reopen repaired private RAW sidecar");
+        assert_eq!(reopened.outcome, PersistedStateOutcome::Current);
+        assert_eq!(fs::read(&sidecar).unwrap(), repaired_bytes);
+    }
 
     #[test]
     fn save_sidecar_metadata_atomic_roundtrips_json() {
