@@ -349,11 +349,9 @@ pub fn get_cached_full_warped_image(
 fn update_wgpu_transform(
     payload: WgpuTransformPayload,
     state: tauri::State<'_, AppState>,
+    app_handle: tauri::AppHandle,
 ) -> Result<u64, String> {
-    let context = match state.gpu_context.lock().unwrap().as_ref() {
-        Some(c) => c.clone(),
-        None => return Ok(0),
-    };
+    let context = get_or_init_gpu_context(&state, &app_handle)?;
     context
         .presentation
         .submit_transform(DisplayTransformState {

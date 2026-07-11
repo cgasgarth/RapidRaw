@@ -40,6 +40,11 @@ export const WGPU_HIDDEN_COORDINATE = -999999;
 const MIN_WGPU_SURFACE_SIZE = 1;
 const PIXELATED_MAX_SCALE_EPSILON = 0.5;
 
+export const shouldSubmitVisibleWgpuTransform = (
+  useWgpuRenderer: boolean | undefined,
+  selectedImageIsReady: boolean,
+): boolean => useWgpuRenderer !== false && selectedImageIsReady;
+
 export const parseCssRgbColor = (rgbStr: string): RgbaColor => {
   const match = rgbStr.match(/[\d.]+/g);
   const [r, g, b] = match ?? [];
