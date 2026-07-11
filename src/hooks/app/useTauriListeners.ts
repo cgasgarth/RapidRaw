@@ -17,6 +17,7 @@ import {
   parsePanoramaCompletePayload,
   parseProgressPayload,
   parseRenderPathPayload,
+  parseSmartPreviewGeneratedPayload,
   parseStringPayload,
   parseThumbnailGeneratedPayload,
   parseThumbnailInvalidatedPayload,
@@ -73,6 +74,7 @@ import {
   PANORAMA_PROGRESS_EVENT,
   PERSISTED_RENDER_STATE_RECOVERED_EVENT,
   PREVIEW_UPDATE_UNCROPPED_EVENT,
+  SMART_PREVIEW_GENERATED_EVENT,
   THUMBNAIL_GENERATED_EVENT,
   THUMBNAIL_GENERATION_COMPLETE_EVENT,
   THUMBNAIL_INVALIDATED_EVENT,
@@ -381,6 +383,17 @@ export function useTauriListeners({
         const { path, thumbnailRevision } = parseThumbnailInvalidatedPayload(event.payload);
         thumbnailCache.deleteMany([path]);
         refs.current.invalidateThumbnailRevision(path, thumbnailRevision);
+      }),
+      listen<unknown>(SMART_PREVIEW_GENERATED_EVENT, (event) => {
+        if (!isEffectActive) return;
+        const { path, resource, smartPreview } = parseSmartPreviewGeneratedPayload(event.payload);
+        smartPreviewBuffer.current[path] = smartPreview;
+        thumbnailBuffer.current.set(path, {
+          generation: resource.generation,
+          path,
+          smartPreview,
+        });
+        scheduleFlush();
       }),
       listen<unknown>(AI_MODEL_DOWNLOAD_START_EVENT, (event) => {
         if (isEffectActive)
