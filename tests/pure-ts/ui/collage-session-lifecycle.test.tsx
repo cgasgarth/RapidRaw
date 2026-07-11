@@ -10,7 +10,7 @@ const invoke = mock(async (command: string, args: Record<string, unknown> = {}) 
 });
 mock.module('@tauri-apps/api/core', () => ({ invoke }));
 
-const { CollageSession } = await import('../../../src/components/modals/editing/CollageModal');
+const { CollageSession, default: CollageModal } = await import('../../../src/components/modals/editing/CollageModal');
 type ImageFile = import('../../../src/components/ui/AppProperties').ImageFile;
 
 let cleanup: (() => Promise<void>) | null = null;
@@ -77,6 +77,24 @@ test('disposing during metadata load prevents stale preview work from entering a
     calls.filter(({ command, args }) => command === 'generate_preview_for_path' && args.path === '/b.ARW'),
   ).toHaveLength(1);
   expect(runtime.container.querySelector('button[aria-label="a.ARW"]')).toBeNull();
+});
+
+test('the transition shell replaces a same-selection reopen before its first visible frame', async () => {
+  const runtime = installRuntime();
+  cleanup = runtime.unmount;
+  const images = [image('/same/a.ARW'), image('/same/b.ARW')];
+  const save = async () => '/unused.png';
+  await runtime.renderModal(true, images, save);
+  const spacing = runtime.container.querySelector<HTMLInputElement>('input[type="range"]');
+  if (!spacing) throw new Error('Missing spacing control');
+  await act(async () => {
+    spacing.value = '44';
+    spacing.dispatchEvent(new runtime.window.Event('input', { bubbles: true }));
+  });
+
+  await runtime.renderModal(false, [], save, false);
+  await runtime.renderModal(true, images, save);
+  expect(runtime.container.querySelector<HTMLInputElement>('input[type="range"]')?.value).toBe('15');
 });
 
 function image(path: string): ImageFile {
@@ -169,6 +187,17 @@ function installRuntime() {
       onSave: (data: string, path: string) => Promise<string>,
     ) => {
       await act(async () => root.render(renderElement(sessionId, images, onSave)));
+    },
+    renderModal: async (
+      isOpen: boolean,
+      images: ImageFile[],
+      onSave: (data: string, path: string) => Promise<string>,
+      settle = true,
+    ) => {
+      await act(async () =>
+        root.render(createElement(CollageModal, { isOpen, onClose: () => {}, onSave, sourceImages: images })),
+      );
+      if (settle) await act(async () => new Promise((resolve) => window.setTimeout(resolve, 20)));
     },
     unmount: async () => {
       if (!mounted) return;
