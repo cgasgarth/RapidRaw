@@ -1,18 +1,20 @@
-import { afterEach, describe, expect, test } from 'bun:test';
-import { ClerkProvider } from '@clerk/react';
+import { afterEach, describe, expect, mock, test } from 'bun:test';
 import { Window } from 'happy-dom';
 import i18next from 'i18next';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { Mask } from '../../../src/components/panel/right/layers/Masks.tsx';
-import { MasksPanel } from '../../../src/components/panel/right/layers/MasksPanel.tsx';
 import { ContextMenuProvider } from '../../../src/context/ContextMenuContext.tsx';
 import en from '../../../src/i18n/locales/en.json';
 import { useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { INITIAL_ADJUSTMENTS, INITIAL_MASK_ADJUSTMENTS, type MaskContainer } from '../../../src/utils/adjustments.ts';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+
+mock.module('@clerk/react', () => ({
+  useAuth: () => ({ getToken: async () => null }),
+}));
 
 const firstMask: MaskContainer = {
   adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
@@ -55,6 +57,31 @@ afterEach(() => {
 });
 
 describe('compact masks panel workflow', () => {
+  test('commits first creation selection and reset without a repair pass', async () => {
+    useEditorStore.setState({
+      adjustments: INITIAL_ADJUSTMENTS,
+      history: [INITIAL_ADJUSTMENTS],
+      historyIndex: 0,
+      selectedImage: null,
+    });
+
+    const { container } = await renderMasksPanel();
+    expect(container.textContent).not.toContain('Mask Adjustments');
+
+    await clickControl(container, '[data-testid="mask-creation-linear"]');
+
+    const stateAfterCreate = useEditorStore.getState();
+    const createdContainer = stateAfterCreate.adjustments.masks[0];
+    const createdSubMask = createdContainer?.subMasks[0];
+    expect(stateAfterCreate.activeMaskContainerId).toBe(createdContainer?.id);
+    expect(stateAfterCreate.activeMaskId).toBe(createdSubMask?.id);
+
+    await clickControl(container, '[data-testid="mask-reset-all"]');
+    expect(useEditorStore.getState().adjustments.masks).toHaveLength(0);
+    expect(useEditorStore.getState().activeMaskContainerId).toBeNull();
+    expect(useEditorStore.getState().activeMaskId).toBeNull();
+  });
+
   test('keeps create, select, visibility, keyboard, and context-menu commands bound to the mask state', async () => {
     const adjustments = { ...INITIAL_ADJUSTMENTS, masks: [firstMask, secondMask] };
     useEditorStore.setState({
@@ -102,6 +129,19 @@ describe('compact masks panel workflow', () => {
     expect(useEditorStore.getState().adjustments.masks[0]?.visible).toBe(false);
     expect(firstRow.dataset.maskContainerVisible).toBe('false');
 
+    const disclosure = required<HTMLButtonElement>(secondRow, 'button[aria-label^="Collapse"]');
+    await act(async () => {
+      disclosure.click();
+      await flush();
+    });
+    expect(secondRow.getAttribute('aria-expanded')).toBe('false');
+
+    await act(async () => {
+      required<HTMLButtonElement>(firstRow, '[aria-label="Show Mask"]').click();
+      await flush();
+    });
+    expect(secondRow.getAttribute('aria-expanded')).toBe('false');
+
     await act(async () => {
       firstRow.dispatchEvent(new window.KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
       await flush();
@@ -147,14 +187,11 @@ async function renderMasksPanel() {
   document.body.append(container);
   const root = createRoot(container);
   const i18n = await createTestI18n();
+  const { MasksPanel } = await import('../../../src/components/panel/right/layers/MasksPanel.tsx');
 
   await act(async () => {
     root.render(
-      createElement(
-        ClerkProvider,
-        { publishableKey: 'pk_test_Y2xlcmsuZXhhbXBsZS5jb20k' },
-        createElement(I18nextProvider, { i18n }, createElement(ContextMenuProvider, null, createElement(MasksPanel))),
-      ),
+      createElement(I18nextProvider, { i18n }, createElement(ContextMenuProvider, null, createElement(MasksPanel))),
     );
     await flush();
     await flush();
