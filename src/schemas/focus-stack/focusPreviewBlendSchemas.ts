@@ -35,7 +35,7 @@ const focusPreviewBlendFixtureReportSchema = z
   })
   .strict();
 
-export const focusPreviewBlendReportSchema = z
+const focusPreviewBlendReportSchema = z
   .object({
     $schema: z.url(),
     algorithm: z
@@ -66,7 +66,7 @@ export const focusPreviewBlendReportSchema = z
   })
   .strict();
 
-export type FocusPreviewBlendReport = z.infer<typeof focusPreviewBlendReportSchema>;
+type FocusPreviewBlendReport = z.infer<typeof focusPreviewBlendReportSchema>;
 
 export const parseFocusPreviewBlendReport = (value: unknown): FocusPreviewBlendReport =>
   focusPreviewBlendReportSchema.parse(value);
