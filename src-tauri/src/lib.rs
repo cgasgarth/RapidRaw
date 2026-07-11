@@ -20,6 +20,7 @@ mod export;
 mod geometry;
 mod gpu;
 mod io;
+mod layers;
 mod library;
 mod merge;
 mod preset_converter;
