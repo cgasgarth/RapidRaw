@@ -1711,15 +1711,7 @@ fn write_negative_lab_output_sidecar(
     );
     artifacts.stale_artifact_ids.retain(|id| !id.is_empty());
 
-    let json = serde_json::to_string_pretty(&sidecar)
-        .map_err(|e| format!("Failed to serialize Negative Lab sidecar: {}", e))?;
-    fs::write(&sidecar_path, json).map_err(|e| {
-        format!(
-            "Failed to write Negative Lab sidecar {}: {}",
-            sidecar_path.display(),
-            e
-        )
-    })?;
+    crate::exif_processing::save_sidecar_metadata_atomic(&sidecar_path, &sidecar)?;
 
     Ok(NegativeLabOutputSidecarReceipt {
         artifact_id,

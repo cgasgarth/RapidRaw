@@ -5,8 +5,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, http, ipc};
 
-const ARTIFACT_SCHEMA_VERSION: u32 = 1;
-const ENCODER_VERSION: u32 = 1;
+const ARTIFACT_SCHEMA_VERSION: u32 = 2;
+const ENCODER_VERSION: u32 = 2;
 pub const THUMBNAIL_PROTOCOL: &str = "rapidraw-thumb";
 
 static RESOURCE_REQUESTS: AtomicU64 = AtomicU64::new(0);
@@ -368,6 +368,30 @@ mod tests {
             b"partial",
         )
         .unwrap();
+        assert!(
+            descriptor_from_manifest(
+                dir.path(),
+                &resource_id,
+                &revision,
+                0,
+                ThumbnailResourceSource::DiskCache
+            )
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn legacy_manifest_namespace_is_rejected() {
+        let dir = tempfile::tempdir().unwrap();
+        let resource_id = id('1');
+        let revision = id('2');
+        publish_thumbnail_artifact(dir.path(), &resource_id, &revision, b"jpeg", 4, 3, "").unwrap();
+        let path = dir.path().join(format!("{resource_id}.resource.json"));
+        let mut manifest: serde_json::Value =
+            serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        manifest["schemaVersion"] = serde_json::json!(1);
+        manifest["encoderVersion"] = serde_json::json!(1);
+        fs::write(path, serde_json::to_vec(&manifest).unwrap()).unwrap();
         assert!(
             descriptor_from_manifest(
                 dir.path(),

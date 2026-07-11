@@ -1,4 +1,12 @@
 use serde::Serialize;
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
+use std::sync::{Mutex, OnceLock};
+
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
+static DISPLAY_SELECTION: OnceLock<Mutex<(Option<String>, u64)>> = OnceLock::new();
+
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
+pub const DISPLAY_TRANSFORM_IMPLEMENTATION_VERSION: &str = "rapidraw-display-preview-v2";
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -71,16 +79,20 @@ pub fn active_display_profile_for_app(
 #[cfg(target_os = "macos")]
 fn active_display_profile_for_id(display_id: u32) -> Result<ActiveDisplayProfile, String> {
     let icc_bytes = macos::copy_display_profile_data(display_id)?;
+    Ok(active_display_profile_from_bytes(display_id, &icc_bytes))
+}
 
-    Ok(ActiveDisplayProfile {
+#[cfg(target_os = "macos")]
+fn active_display_profile_from_bytes(display_id: u32, icc_bytes: &[u8]) -> ActiveDisplayProfile {
+    ActiveDisplayProfile {
         cmm: "colorsync+lcms2".to_string(),
         display_id: Some(display_id),
-        icc_sha256: Some(sha256_hex(&icc_bytes)),
+        icc_sha256: Some(sha256_hex(icc_bytes)),
         profile_byte_count: Some(icc_bytes.len()),
         source: "ColorSyncProfileCreateWithDisplayID(active_window_display)".to_string(),
         status: ActiveDisplayProfileStatus::ActiveProfileLoaded,
         fallback_reason: None,
-    })
+    }
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -114,21 +126,139 @@ fn active_display_profile_bytes_for_id(display_id: u32) -> Result<Vec<u8>, Strin
     macos::copy_display_profile_data(display_id)
 }
 
-#[cfg(target_os = "macos")]
-pub fn active_display_profile_bytes_for_app(app: &tauri::AppHandle) -> Result<Vec<u8>, String> {
-    active_display_profile_bytes_for_id(
-        macos::display_id_for_app(app).unwrap_or_else(macos::main_display_id),
-    )
-}
-
 #[cfg(not(any(target_os = "android", target_os = "linux")))]
 pub const DISPLAY_LUT_SIZE: u32 = 32;
 
 #[cfg(not(any(target_os = "android", target_os = "linux")))]
+#[derive(Clone)]
 pub struct DisplayLut {
     pub profile: ActiveDisplayProfile,
     pub rgba16f: Vec<half::f16>,
     pub size: u32,
+}
+
+/// Everything needed to create one color-consistent preview artifact. Pixel conversion and
+/// tagging must consume this same value; resolving either independently can mis-tag a frame.
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
+#[derive(Clone)]
+pub struct DisplayPreviewTransformSnapshot {
+    pub selection_generation: u64,
+    pub profile: ActiveDisplayProfile,
+    pub icc_bytes: Vec<u8>,
+    pub icc_sha256: String,
+    pub lut: DisplayLut,
+    pub intent: &'static str,
+    pub black_point_compensation: bool,
+    pub interpolation: &'static str,
+    pub implementation_version: &'static str,
+    pub encoding_contract: &'static str,
+}
+
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
+pub fn display_preview_transform_snapshot_for_app(
+    app: &tauri::AppHandle,
+) -> DisplayPreviewTransformSnapshot {
+    let captured = (|| -> Result<(Option<u32>, Vec<u8>), String> {
+        #[cfg(target_os = "macos")]
+        {
+            let display_id = macos::display_id_for_app(app).unwrap_or_else(macos::main_display_id);
+            let bytes = active_display_profile_bytes_for_id(display_id)?;
+            Ok((Some(display_id), bytes))
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            Err("native_display_profile_unavailable".to_string())
+        }
+    })();
+    display_preview_transform_snapshot_from_capture(captured)
+}
+
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
+fn display_preview_transform_snapshot_from_capture(
+    captured: Result<(Option<u32>, Vec<u8>), String>,
+) -> DisplayPreviewTransformSnapshot {
+    let size = DISPLAY_LUT_SIZE;
+    let resolved = captured.and_then(|(display_id, bytes)| {
+        let profile = match display_id {
+            #[cfg(target_os = "macos")]
+            Some(id) => active_display_profile_from_bytes(id, &bytes),
+            _ => ActiveDisplayProfile {
+                cmm: "lcms2".to_string(),
+                display_id,
+                icc_sha256: Some(sha256_hex(&bytes)),
+                profile_byte_count: Some(bytes.len()),
+                source: "captured_display_profile".to_string(),
+                status: ActiveDisplayProfileStatus::ActiveProfileLoaded,
+                fallback_reason: None,
+            },
+        };
+        let lut = build_srgb_to_display_profile_lut_with_size(&bytes, profile, size)?;
+        validate_display_lut(&lut)?;
+        Ok((lut, bytes))
+    });
+    let (lut, icc_bytes) = resolved.unwrap_or_else(|reason| {
+        let bytes = moxcms::ColorProfile::new_srgb()
+            .encode()
+            .expect("built-in sRGB profile must encode");
+        (fallback_display_lut(size, reason), bytes)
+    });
+    let icc_sha256 = sha256_hex(&icc_bytes);
+    debug_assert_eq!(
+        lut.profile.icc_sha256.as_deref().unwrap_or(&icc_sha256),
+        icc_sha256
+    );
+    let selection_generation = display_selection_generation(&lut.profile, &icc_sha256);
+    DisplayPreviewTransformSnapshot {
+        selection_generation,
+        profile: lut.profile.clone(),
+        icc_bytes,
+        icc_sha256,
+        lut,
+        intent: "relative_colorimetric",
+        black_point_compensation: true,
+        interpolation: "trilinear_rgba16f",
+        implementation_version: DISPLAY_TRANSFORM_IMPLEMENTATION_VERSION,
+        encoding_contract: "pixels_and_jpeg_icc_from_same_snapshot",
+    }
+}
+
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
+fn display_selection_generation(profile: &ActiveDisplayProfile, hash: &str) -> u64 {
+    let key = format!("{:?}:{hash}", profile.display_id);
+    let mut selection = DISPLAY_SELECTION
+        .get_or_init(|| Mutex::new((None, 0)))
+        .lock()
+        .unwrap();
+    if selection.0.as_deref() != Some(&key) {
+        selection.0 = Some(key);
+        selection.1 += 1;
+    }
+    selection.1
+}
+
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
+fn validate_display_lut(lut: &DisplayLut) -> Result<(), String> {
+    for &gray in &[0.0, 0.18, 0.5, 0.75, 1.0] {
+        let rgb = lut.sample_rgb([gray; 3]);
+        if !rgb.iter().all(|value| value.is_finite()) {
+            return Err("display_transform_non_finite_sample".to_string());
+        }
+        let chroma = rgb.iter().copied().fold(f32::NEG_INFINITY, f32::max)
+            - rgb.iter().copied().fold(f32::INFINITY, f32::min);
+        if chroma > 0.12 {
+            return Err("display_transform_neutral_axis_chroma_guard".to_string());
+        }
+    }
+    let black = lut.sample_rgb([0.0; 3]);
+    let white = lut.sample_rgb([1.0; 3]);
+    if black
+        .iter()
+        .zip(white)
+        .any(|(low, high)| *low > high + 0.01)
+    {
+        return Err("display_transform_non_monotonic_endpoints".to_string());
+    }
+    Ok(())
 }
 
 #[cfg(not(any(target_os = "android", target_os = "linux")))]
@@ -382,7 +512,7 @@ fn build_identity_display_lut(size: u32) -> Vec<half::f16> {
     rgb_to_rgba16f(&build_lut_source_rgb(size))
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
 fn sha256_hex(bytes: &[u8]) -> String {
     use sha2::{Digest, Sha256};
 
@@ -615,6 +745,64 @@ mod cross_platform_tests {
         assert_eq!(white[1].to_f32(), 1.0);
         assert_eq!(white[2].to_f32(), 1.0);
         assert_eq!(white[3].to_f32(), 1.0);
+    }
+
+    #[test]
+    fn neutral_axis_guard_rejects_severe_magenta_transform() {
+        let mut lut = DisplayLut {
+            profile: fallback_display_profile("test".to_string()),
+            rgba16f: build_identity_display_lut(2),
+            size: 2,
+        };
+        for pixel in lut.rgba16f.chunks_exact_mut(4) {
+            pixel[0] = half::f16::from_f32(1.0);
+            pixel[1] = half::f16::from_f32(0.0);
+            pixel[2] = half::f16::from_f32(1.0);
+        }
+        assert_eq!(
+            validate_display_lut(&lut).unwrap_err(),
+            "display_transform_neutral_axis_chroma_guard"
+        );
+    }
+
+    #[test]
+    fn display_selection_generation_changes_only_with_identity_or_profile() {
+        let profile = fallback_display_profile("test".to_string());
+        let first = display_selection_generation(&profile, "sha256:stable-test");
+        let second = display_selection_generation(&profile, "sha256:stable-test");
+        let changed = display_selection_generation(&profile, "sha256:changed-test");
+        assert_eq!(first, second);
+        assert!(changed > second);
+    }
+
+    #[test]
+    fn captured_profile_bytes_own_both_pixel_transform_and_artifact_tag() {
+        let bytes = moxcms::ColorProfile::new_srgb().encode().unwrap();
+        let snapshot =
+            display_preview_transform_snapshot_from_capture(Ok((Some(77), bytes.clone())));
+        assert_eq!(snapshot.icc_bytes, bytes);
+        assert_eq!(snapshot.icc_sha256, sha256_hex(&snapshot.icc_bytes));
+        assert_eq!(
+            snapshot.profile.icc_sha256.as_deref(),
+            Some(snapshot.icc_sha256.as_str())
+        );
+        assert_eq!(snapshot.lut.profile.icc_sha256, snapshot.profile.icc_sha256);
+        let gray = snapshot.lut.sample_rgb([0.5; 3]);
+        assert!(gray.iter().all(|channel| (*channel - 0.5).abs() < 0.002));
+    }
+
+    #[test]
+    fn malformed_capture_falls_back_to_identity_pixels_and_srgb_tag() {
+        let snapshot =
+            display_preview_transform_snapshot_from_capture(Ok((Some(88), b"bad icc".to_vec())));
+        assert!(matches!(
+            snapshot.profile.status,
+            ActiveDisplayProfileStatus::FallbackNoActiveProfile
+        ));
+        let gray = snapshot.lut.sample_rgb([0.5; 3]);
+        assert!((gray[0] - gray[1]).abs() < 0.001 && (gray[1] - gray[2]).abs() < 0.001);
+        assert!(moxcms::ColorProfile::new_from_slice(&snapshot.icc_bytes).is_ok());
+        assert_ne!(snapshot.icc_bytes, b"bad icc");
     }
 
     #[test]

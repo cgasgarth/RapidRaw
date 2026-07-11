@@ -29,6 +29,7 @@ export const OPEN_WITH_FILE_EVENT = 'open-with-file';
 export const PANORAMA_COMPLETE_EVENT = 'panorama-complete';
 export const PANORAMA_ERROR_EVENT = 'panorama-error';
 export const PANORAMA_PROGRESS_EVENT = 'panorama-progress';
+export const PERSISTED_RENDER_STATE_RECOVERED_EVENT = 'persisted-render-state-recovered';
 export const PREVIEW_UPDATE_UNCROPPED_EVENT = 'preview-update-uncropped';
 export const THUMBNAIL_GENERATED_EVENT = 'thumbnail-generated';
 export const THUMBNAIL_GENERATION_COMPLETE_EVENT = 'thumbnail-generation-complete';

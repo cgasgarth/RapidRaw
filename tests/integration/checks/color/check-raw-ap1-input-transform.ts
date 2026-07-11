@@ -1,17 +1,20 @@
-import { rawInputTransformReceiptV1Schema } from '../../../../packages/rawengine-schema/src/color/rawInputTransformSchemas.ts';
+import { rawInputTransformReceiptV2Schema } from '../../../../packages/rawengine-schema/src/color/rawInputTransformSchemas.ts';
 
-const receipt = rawInputTransformReceiptV1Schema.parse({
+const receipt = rawInputTransformReceiptV2Schema.parse({
   asShotCameraWbGains: [2, 1, 1.5],
   cameraMakeModelId: 'Fixture Camera',
   chromaticAdaptation: 'bradford_v1',
-  contract: 'rapidraw.raw_input_transform.v1',
+  contract: 'rapidraw.raw_input_transform.v2',
   destinationDomain: 'acescg_linear_v1',
   destinationWhiteXy: [0.32168, 0.33767],
   greaterThanOneAp1ComponentCount: 3,
+  invariantPolicyVersion: 'camera_input_physical_invariants_v1',
   limitationCodes: [],
   negativeAp1ComponentCount: 2,
   nonFiniteCount: 0,
-  numericPolicyVersion: 'camera_input_f64_inverse_cond_1e6_v1',
+  numericPolicyVersion: 'camera_input_f64_inverse_cond_1e6_v2',
+  outcome: 'primary_calibrated_ap1',
+  outcomeReason: 'validated_camera_profile',
   profileSource: 'raw_metadata',
   resolverAlgorithmId: 'dual_illuminant_mired_v1',
   selectedCalibrationWhiteXy: [0.3127, 0.329],
@@ -32,6 +35,6 @@ for (const invalid of [
   { ...receipt, selectedMatrixDirection: 'camera_to_xyz' },
   { ...receipt, nonFiniteCount: 1 },
 ]) {
-  if (rawInputTransformReceiptV1Schema.safeParse(invalid).success) throw new Error('Invalid RAW input domain parsed.');
+  if (rawInputTransformReceiptV2Schema.safeParse(invalid).success) throw new Error('Invalid RAW input domain parsed.');
 }
 console.log('raw AP1 input-transform schema ok');

@@ -1,6 +1,6 @@
 use crate::color::camera_input_transform::{
-    AcesCgLinearV1, CameraInputTransform, RawInputTransformReceiptV1, RawWorkingImageV1,
-    apply_camera_input_transform,
+    AcesCgLinearV1, CameraInputTransform, CameraRgbWhiteBalanceGains, RawInputTransformReceiptV1,
+    RawWorkingImageV1, XyzToCameraMatrix, apply_camera_input_transform,
 };
 use crate::image_processing::apply_orientation;
 use anyhow::{Result, anyhow};
@@ -1360,12 +1360,7 @@ fn develop_internal_with_options(
             .matrix_hash
             .as_deref()
             .ok_or_else(|| anyhow!("raw_input_transform_missing_matrix_hash"))?;
-        let wb = raw_image.wb_coeffs;
-        let wb = if wb[0].is_finite() && wb[1].is_finite() && wb[2].is_finite() {
-            [wb[0], wb[1], wb[2]]
-        } else {
-            return Err(anyhow!("raw_input_transform_invalid_as_shot_white_balance"));
-        };
+        let wb = CameraRgbWhiteBalanceGains::from_rawler(raw_image.wb_coeffs)?;
         let camera_id = format!(
             "{} {}",
             raw_image.clean_make.trim(),
@@ -1377,7 +1372,7 @@ fn develop_internal_with_options(
                 camera_make_model_id: camera_id.trim(),
                 resolver_algorithm_id: CAMERA_PROFILE_RESOLVER_ALGORITHM_ID,
                 selected_matrix_sha256: matrix_hash,
-                xyz_to_camera: matrix,
+                xyz_to_camera: XyzToCameraMatrix::from_row_major(matrix)?,
                 calibration_white_xy: white,
                 as_shot_wb: wb,
                 sensor_floor_count: 0,
@@ -2653,11 +2648,16 @@ mod tests {
         fs::create_dir_all(report_dir).expect("create report dir");
 
         let file_bytes = fs::read(&source_path).expect("read private RAW");
+        let proof_profile = match std::env::var("RAWENGINE_PRIVATE_RAW_PROFILE").as_deref() {
+            Ok("fast") => RawProcessingProfile::Fast,
+            Ok("maximum") => RawProcessingProfile::Maximum,
+            _ => RawProcessingProfile::Balanced,
+        };
         let started = std::time::Instant::now();
         let (developed, report) = develop_raw_image_with_report(
             &file_bytes,
-            false,
-            RawProcessingProfile::Balanced,
+            proof_profile == RawProcessingProfile::Fast,
+            proof_profile,
             2.5,
             "default".to_string(),
             None,
@@ -2687,7 +2687,7 @@ mod tests {
         });
 
         let proof_report = serde_json::json!({
-            "issue": 3824,
+            "issue": 5327,
             "proofBoundary": "private_dual_illuminant_profile_runtime_report",
             "proofLevel": if colorchecker_proof.is_some() {
                 "private_raw_colorchecker_runtime_sampling"

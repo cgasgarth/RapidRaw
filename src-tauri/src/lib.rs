@@ -195,20 +195,37 @@ pub fn generate_transformed_preview(
     preview_dim: u32,
 ) -> Result<(DynamicImage, f32, (f32, f32)), String> {
     let transform_hash = calculate_transform_hash(adjustments);
+    let identity = crate::render::artifact_identity::RenderArtifactIdentity::source_geometry(
+        &loaded_image.artifact_source,
+        state.load_image_generation.load(Ordering::SeqCst) as u64,
+        transform_hash,
+        loaded_image.artifact_source.source_fingerprint(),
+        calculate_geometry_hash(adjustments),
+        loaded_image.image.width(),
+        loaded_image.image.height(),
+    );
 
     let (transformed_full_res, unscaled_crop_offset) = {
         let mut cache_lock = state.full_transformed_cache.lock().unwrap();
-        if let Some((hash, img, offset)) = cache_lock.as_ref() {
-            if *hash == transform_hash {
-                (Arc::clone(img), *offset)
+        if let Some(cached) = cache_lock.as_ref() {
+            if cached.identity == identity {
+                (Arc::clone(&cached.image), cached.offset)
             } else {
                 let (arc_img, offset) = compute_full_transformed_res(loaded_image, adjustments)?;
-                *cache_lock = Some((transform_hash, Arc::clone(&arc_img), offset));
+                *cache_lock = Some(TransformedImageCache {
+                    identity,
+                    image: Arc::clone(&arc_img),
+                    offset,
+                });
                 (arc_img, offset)
             }
         } else {
             let (arc_img, offset) = compute_full_transformed_res(loaded_image, adjustments)?;
-            *cache_lock = Some((transform_hash, Arc::clone(&arc_img), offset));
+            *cache_lock = Some(TransformedImageCache {
+                identity,
+                image: Arc::clone(&arc_img),
+                offset,
+            });
             (arc_img, offset)
         }
     };
@@ -320,13 +337,28 @@ pub fn get_cached_full_warped_image(
     js_adjustments: &serde_json::Value,
 ) -> Result<Arc<DynamicImage>, String> {
     let geo_hash = calculate_geometry_hash(js_adjustments);
+    let loaded_image = state
+        .original_image
+        .lock()
+        .unwrap()
+        .clone()
+        .ok_or("No original image loaded")?;
+    let identity = crate::render::artifact_identity::RenderArtifactIdentity::source_geometry(
+        &loaded_image.artifact_source,
+        state.load_image_generation.load(Ordering::SeqCst) as u64,
+        calculate_transform_hash(js_adjustments),
+        loaded_image.artifact_source.source_fingerprint(),
+        geo_hash,
+        loaded_image.image.width(),
+        loaded_image.image.height(),
+    );
 
     {
         let cache_lock = state.full_warped_cache.lock().unwrap();
-        if let Some((hash, img)) = cache_lock.as_ref()
-            && *hash == geo_hash
+        if let Some(cached) = cache_lock.as_ref()
+            && cached.identity == identity
         {
-            return Ok(Arc::clone(img));
+            return Ok(Arc::clone(&cached.image));
         }
     }
 
@@ -339,7 +371,10 @@ pub fn get_cached_full_warped_image(
 
     {
         let mut cache_lock = state.full_warped_cache.lock().unwrap();
-        *cache_lock = Some((geo_hash, Arc::clone(&warped_arc)));
+        *cache_lock = Some(WarpedImageCache {
+            identity,
+            image: Arc::clone(&warped_arc),
+        });
     }
 
     Ok(warped_arc)
@@ -561,7 +596,27 @@ fn generate_export_soft_proof_preview(
     if let Some(graph_revision) = request.viewer_sample_graph_revision.as_deref()
         && let Some(proof_image) = RgbImage::from_raw(width, height, proof_pixels.clone())
     {
+        let graph_hash = crate::render::artifact_identity::stable_hash(&graph_revision);
+        let mut artifact_identity =
+            crate::render::artifact_identity::RenderArtifactIdentity::source_geometry(
+                &loaded_image.artifact_source,
+                state.load_image_generation.load(Ordering::SeqCst) as u64,
+                graph_hash,
+                loaded_image.artifact_source.source_fingerprint(),
+                calculate_geometry_hash(&adjustments_clone),
+                width,
+                height,
+            );
+        artifact_identity.color_domain =
+            crate::render::artifact_identity::ArtifactColorDomain::DisplayEncoded;
+        artifact_identity.completed_stage = "soft-proof-output";
+        artifact_identity.display_snapshot =
+            Some(crate::render::artifact_identity::stable_hash(&format!(
+                "{:?}:{:?}:{}",
+                request.color_profile, request.rendering_intent, request.black_point_compensation
+            )));
         let frame = CachedViewerSampleFrame {
+            artifact_identity,
             graph_revision: graph_revision.to_string(),
             pixels: crate::app_state::SampleablePixels::native(Arc::new(DynamicImage::ImageRgb8(
                 proof_image,
@@ -914,7 +969,22 @@ fn generate_original_transformed_preview(
     };
 
     if let Some(graph_revision) = viewer_sample_graph_revision {
+        let graph_hash = crate::render::artifact_identity::stable_hash(&graph_revision);
+        let mut artifact_identity =
+            crate::render::artifact_identity::RenderArtifactIdentity::source_geometry(
+                &loaded_image.artifact_source,
+                state.load_image_generation.load(Ordering::SeqCst) as u64,
+                graph_hash,
+                loaded_image.artifact_source.source_fingerprint(),
+                calculate_geometry_hash(&adjustments_clone),
+                transformed_image.width(),
+                transformed_image.height(),
+            );
+        artifact_identity.color_domain =
+            crate::render::artifact_identity::ArtifactColorDomain::ViewEncoded;
+        artifact_identity.completed_stage = "original-view";
         let frame = CachedViewerSampleFrame {
+            artifact_identity,
             graph_revision,
             pixels: crate::app_state::SampleablePixels::native(Arc::new(transformed_image.clone())),
             image_identity: loaded_image.path,
@@ -1249,7 +1319,20 @@ mod viewer_sampler_tests {
     }
 
     fn frame(image: DynamicImage) -> CachedViewerSampleFrame {
+        let (width, height) = image.dimensions();
         CachedViewerSampleFrame {
+            artifact_identity:
+                crate::render::artifact_identity::RenderArtifactIdentity::source_geometry(
+                    &crate::render::artifact_identity::tests_support::source(
+                        "/fixture/color-patches.tif",
+                    ),
+                    1,
+                    1,
+                    1,
+                    1,
+                    width,
+                    height,
+                ),
             graph_revision: "history_3".to_string(),
             pixels: crate::app_state::SampleablePixels::native(Arc::new(image)),
             image_identity: "/fixture/color-patches.tif".to_string(),

@@ -33,6 +33,7 @@ import {
 } from '../../utils/editorZoom';
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { globalImageCache } from '../../utils/ImageLRUCache';
+import { resolveResetTargetPaths } from '../../utils/resetAdjustments';
 import { debounce } from '../../utils/timing';
 
 export const debouncedSetHistory = debounce((newAdj: Adjustments) => {
@@ -174,31 +175,43 @@ export function useEditorActions() {
   );
 
   const handleResetAdjustments = useCallback(
-    (paths?: string[]) => {
+    async (paths?: string[]) => {
       const { multiSelectedPaths, libraryActivePath, setLibrary } = useLibraryStore.getState();
       const { selectedImage, resetHistory } = useEditorStore.getState();
-      const pathsToReset = paths || multiSelectedPaths;
-      if (pathsToReset.length === 0) return;
+      const pathsToReset = resolveResetTargetPaths(
+        paths,
+        selectedImage?.path,
+        multiSelectedPaths,
+        libraryActivePath ?? undefined,
+      );
+      if (pathsToReset.length === 0) {
+        toast.error('Select an image before resetting adjustments.');
+        return;
+      }
 
       pathsToReset.forEach((p) => {
         globalImageCache.delete(p);
       });
       debouncedSetHistory.cancel();
 
-      invoke(Invokes.ResetAdjustmentsForPaths, { paths: pathsToReset })
-        .then(() => {
-          useProcessStore.getState().invalidateThumbnails(pathsToReset);
-          if (libraryActivePath && pathsToReset.includes(libraryActivePath))
-            setLibrary({ libraryActiveAdjustments: { ...INITIAL_ADJUSTMENTS } });
-          if (selectedImage && pathsToReset.includes(selectedImage.path)) {
-            const aspect =
-              selectedImage.width && selectedImage.height ? selectedImage.width / selectedImage.height : null;
-            const resetData = { ...INITIAL_ADJUSTMENTS, aspectRatio: aspect, aiPatches: [] };
-            resetHistory(resetData);
-            setEditor({ adjustments: resetData });
-          }
-        })
-        .catch((err: unknown) => toast.error(`Failed to reset adjustments: ${formatUnknownError(err)}`));
+      try {
+        const results = await invoke<
+          Array<{ path: string; adjustments: Adjustments; revision: string; renderGeneration: number }>
+        >(Invokes.ResetAdjustmentsForPaths, { paths: pathsToReset });
+        useProcessStore.getState().invalidateThumbnails(pathsToReset);
+        if (libraryActivePath && pathsToReset.includes(libraryActivePath))
+          setLibrary({ libraryActiveAdjustments: { ...INITIAL_ADJUSTMENTS } });
+        if (selectedImage && pathsToReset.includes(selectedImage.path)) {
+          const aspect =
+            selectedImage.width && selectedImage.height ? selectedImage.width / selectedImage.height : null;
+          const backend = results.find((result) => result.path === selectedImage.path)?.adjustments;
+          const resetData = { ...INITIAL_ADJUSTMENTS, ...backend, aspectRatio: aspect, aiPatches: [] };
+          resetHistory(resetData);
+          setEditor({ adjustments: resetData });
+        }
+      } catch (err) {
+        toast.error(`Failed to reset adjustments: ${formatUnknownError(err)}`);
+      }
     },
     [setEditor],
   );

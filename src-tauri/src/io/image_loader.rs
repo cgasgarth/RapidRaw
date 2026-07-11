@@ -102,8 +102,8 @@ enum DemosaicSharpeningPath {
     XTransHq,
 }
 
-const RAW_CACHE_CAMERA_PROFILE_RESOLVER_VERSION: &str = "dual_illuminant_mired_v1";
-const RAW_CACHE_RECONSTRUCTION_VERSION: &str = "raw_reconstruction_v3";
+const RAW_CACHE_CAMERA_PROFILE_RESOLVER_VERSION: &str = "dual_illuminant_mired_v2";
+const RAW_CACHE_RECONSTRUCTION_VERSION: &str = "raw_reconstruction_v4";
 
 fn normalize_raw_processing_mode(mode: Option<&str>) -> &'static str {
     match mode {
@@ -874,7 +874,8 @@ pub async fn load_image(
     let (source_path, sidecar_path) = parse_virtual_path(&path);
     let source_path_str = source_path.to_string_lossy().to_string();
 
-    let mut metadata: ImageMetadata = crate::exif_processing::load_sidecar(&sidecar_path);
+    let mut metadata: ImageMetadata =
+        crate::exif_processing::load_sidecar_recovering(&sidecar_path, Some(&path))?.metadata;
     let mut should_save_sidecar = false;
     if is_raw_file(&source_path_str)
         && crate::exif_processing::repair_raw_sidecar_camera_metadata(&source_path, &mut metadata)
@@ -887,8 +888,8 @@ pub async fn load_image(
     if crate::negative_conversion::refresh_negative_lab_stale_artifacts(&mut metadata) {
         should_save_sidecar = true;
     }
-    if should_save_sidecar && let Ok(json) = serde_json::to_string_pretty(&metadata) {
-        let _ = fs::write(&sidecar_path, json);
+    if should_save_sidecar {
+        crate::exif_processing::save_sidecar_metadata_atomic(&sidecar_path, &metadata)?;
     }
 
     let settings = load_settings_or_default(&app_handle);
@@ -896,6 +897,11 @@ pub async fn load_image(
         raw_processing_settings_for_adjustments(&settings, &metadata.adjustments);
     let raw_processing_cache_key = raw_processing_mode_cache_key(&source_path, &effective_settings)
         .map_err(|error| error.to_string())?;
+    let artifact_source =
+        crate::render::artifact_identity::SourceArtifactIdentity::from_decoded_key(
+            path.clone(),
+            &raw_processing_cache_key,
+        );
 
     let path_clone = source_path_str.clone();
     let expected_revision = raw_processing_cache_key.source_revision.clone();
@@ -1106,6 +1112,7 @@ pub async fn load_image(
         path,
         image: pristine_arc,
         is_raw: loaded_is_raw,
+        artifact_source,
     });
 
     Ok(LoadImageResult {
@@ -1327,11 +1334,11 @@ mod tests {
         assert_eq!(resolved_cache_key.mode, "maximum");
         assert_eq!(
             resolved_cache_key.camera_profile_resolver_version,
-            "dual_illuminant_mired_v1"
+            "dual_illuminant_mired_v2"
         );
         assert_eq!(
             resolved_cache_key.reconstruction_version,
-            "raw_reconstruction_v3"
+            "raw_reconstruction_v4"
         );
         assert_eq!(
             resolved_cache_key.highlight_compression_bits,

@@ -64,7 +64,6 @@ use crate::raw_processing::RawDevelopmentReport;
 use crate::render_plan::{CompileRenderPlanContext, compile_render_plan_cached, content_revision};
 use crate::{AppState, ExportJob};
 
-use crate::cache_utils::calculate_transform_hash;
 #[cfg(test)]
 pub(crate) use crate::export::export_color_policy::{
     ExportBlackPointCompensationStatus, ExportColorEngineId, applied_export_color_policy,
@@ -313,7 +312,12 @@ struct ExportRenderInputs {
 }
 
 fn export_execution_fingerprint(path: &str, adjustments: &Value) -> u64 {
-    let revision = content_revision(adjustments, 0, 0);
+    let revision = content_revision(
+        adjustments,
+        0,
+        crate::render::artifact_identity::source_fingerprint_for_path(path),
+        0,
+    );
     let mut hasher = blake3::Hasher::new();
     hasher.update(path.as_bytes());
     hasher.update(&revision.adjustment_revision.to_le_bytes());
@@ -331,7 +335,12 @@ fn prepare_export_render_inputs(
     let lut = js_adjustments["lutPath"]
         .as_str()
         .and_then(|path| get_or_load_lut(state, path).ok());
-    let revision = content_revision(js_adjustments, 0, u64::from(tm_override.unwrap_or(0)));
+    let revision = content_revision(
+        js_adjustments,
+        0,
+        crate::render::artifact_identity::source_fingerprint_for_path(path),
+        u64::from(tm_override.unwrap_or(0)),
+    );
     let plan = compile_render_plan_cached(
         js_adjustments,
         CompileRenderPlanContext {
@@ -1472,33 +1481,11 @@ pub async fn estimate_export_sizes(
             .ok_or("No original image loaded")?;
         hydrate_adjustments(&state, &mut adjustments_clone);
 
-        let new_transform_hash = calculate_transform_hash(&adjustments_clone);
-        let cached_preview_lock = state.cached_preview.lock().unwrap();
         let preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
-
-        let (preview_image, scale, unscaled_crop_offset) = if let Some(cached) =
-            &*cached_preview_lock
-        {
-            if cached.transform_hash == new_transform_hash && cached.preview_dim == preview_dim {
-                let img = Arc::clone(&cached.image);
-                let s = cached.scale;
-                let offset = cached.unscaled_crop_offset;
-                drop(cached_preview_lock);
-                let owned_img = Arc::try_unwrap(img).unwrap_or_else(|arc| (*arc).clone());
-                (owned_img, s, offset)
-            } else {
-                drop(cached_preview_lock);
-                generate_transformed_preview(
-                    &state,
-                    &loaded_image,
-                    &adjustments_clone,
-                    preview_dim,
-                )?
-            }
-        } else {
-            drop(cached_preview_lock);
-            generate_transformed_preview(&state, &loaded_image, &adjustments_clone, preview_dim)?
-        };
+        // Export consumes the typed transformed-frame cache. It must never borrow the editor's
+        // presentation slot, whose output/quality contract differs from export.
+        let (preview_image, scale, unscaled_crop_offset) =
+            generate_transformed_preview(&state, &loaded_image, &adjustments_clone, preview_dim)?;
 
         let (img_w, img_h) = preview_image.dimensions();
         let mask_definitions: Vec<MaskDefinition> = adjustments_clone

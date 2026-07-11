@@ -99,6 +99,15 @@ pub struct PreviewScheduler {
 }
 
 impl PreviewScheduler {
+    /// Supersede every queued/in-flight completion without changing the active image identity.
+    pub fn invalidate_current(&self) -> u64 {
+        let generation = self.current_generation.fetch_add(1, Ordering::AcqRel) + 1;
+        let mut slots = self.pending.lock().unwrap();
+        supersede_slot(slots.interactive.take(), generation);
+        supersede_slot(slots.settled.take(), generation);
+        generation
+    }
+
     pub fn new(policy: PreviewSchedulingPolicy) -> Arc<Self> {
         Arc::new(Self {
             pending: Mutex::new(PendingPreviewSlots::default()),
@@ -419,6 +428,29 @@ mod tests {
             scheduler
                 .cancellation(old_id)
                 .check(PreviewStage::Gpu)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn reset_invalidation_acknowledges_generation_and_supersedes_stale_completion() {
+        let scheduler = PreviewScheduler::new(PreviewSchedulingPolicy::default());
+        let (pending, mut rx) = job(false);
+        let id = scheduler
+            .submit(pending)
+            .ok()
+            .expect("scheduler accepts job");
+        let acknowledged_generation = scheduler.invalidate_current();
+        assert!(acknowledged_generation > id.generation);
+        assert!(matches!(
+            rx.try_recv(),
+            Ok(PreviewCompletion::Superseded { by_generation, .. })
+                if by_generation == acknowledged_generation
+        ));
+        assert!(
+            scheduler
+                .cancellation(id)
+                .check(PreviewStage::Publish)
                 .is_err()
         );
     }

@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "rating": 5,
+  "tags": ["keeper", "color:green"],
+  "exif": { "Artist": "Synthetic RawEngine Fixture" },
+  "adjustments": {
+    "exposure": 1.25,
+    "displayIcc": "must-not-enter-rendering",
+    "cameraProfile": "obsolete-double-transform"
+  }
+}
