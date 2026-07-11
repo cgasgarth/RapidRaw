@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+use std::hash::{Hash, Hasher};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -211,6 +213,188 @@ pub struct GpuExecutionReceipt {
     pub queue_submit_count: u32,
     pub estimated_peak_resource_bytes: u64,
     pub cpu_encode_time: Duration,
+}
+
+const MASK_TEXTURE_ABI_VERSION: u32 = 1;
+const LUT_TEXTURE_ABI_VERSION: u32 = 1;
+const MAIN_BIND_GROUP_ABI_VERSION: u32 = 1;
+const MAX_RESIDENT_MASKS: usize = 8;
+const MAX_RESIDENT_LUTS: usize = 4;
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct GpuDeviceGeneration(pub u64);
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct MaskTextureKey {
+    device_generation: GpuDeviceGeneration,
+    geometry_fingerprint: u64,
+    mask_fingerprint: u64,
+    width: u32,
+    height: u32,
+    layer_count: u16,
+    format_version: u32,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct LutTextureKey {
+    device_generation: GpuDeviceGeneration,
+    content_fingerprint: u64,
+    edge_size: u16,
+    interpolation_version: u16,
+    texture_format_version: u32,
+}
+
+#[derive(Clone)]
+struct ResidentMaskTexture {
+    key: MaskTextureKey,
+    _texture: wgpu::Texture,
+    view: wgpu::TextureView,
+    estimated_bytes: u64,
+}
+
+#[derive(Clone)]
+struct ResidentLutTexture {
+    key: LutTextureKey,
+    _texture: wgpu::Texture,
+    view: wgpu::TextureView,
+    estimated_bytes: u64,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct GpuResourceCacheCounters {
+    pub mask_hits: u64,
+    pub mask_misses: u64,
+    pub lut_hits: u64,
+    pub lut_misses: u64,
+    pub evictions: u64,
+    pub texture_creations: u64,
+    pub view_creations: u64,
+    pub sampler_creations: u64,
+    pub bind_group_hits: u64,
+    pub bind_group_misses: u64,
+    pub bind_group_creations: u64,
+    pub cpu_conversion_bytes: u64,
+    pub gpu_upload_bytes: u64,
+    pub resident_bytes: u64,
+}
+
+#[derive(Default)]
+struct GpuResourceCache {
+    masks: VecDeque<ResidentMaskTexture>,
+    luts: VecDeque<ResidentLutTexture>,
+    counters: GpuResourceCacheCounters,
+}
+
+impl GpuResourceCache {
+    fn mask(&mut self, key: MaskTextureKey) -> Option<ResidentMaskTexture> {
+        let index = self.masks.iter().position(|entry| entry.key == key)?;
+        self.counters.mask_hits += 1;
+        let entry = self.masks.remove(index).unwrap();
+        self.masks.push_front(entry.clone());
+        Some(entry)
+    }
+
+    fn lut(&mut self, key: LutTextureKey) -> Option<ResidentLutTexture> {
+        let index = self.luts.iter().position(|entry| entry.key == key)?;
+        self.counters.lut_hits += 1;
+        let entry = self.luts.remove(index).unwrap();
+        self.luts.push_front(entry.clone());
+        Some(entry)
+    }
+
+    fn insert_mask(&mut self, entry: ResidentMaskTexture) {
+        self.counters.mask_misses += 1;
+        self.counters.texture_creations += 1;
+        self.counters.view_creations += 1;
+        self.counters.gpu_upload_bytes += entry.estimated_bytes;
+        self.counters.cpu_conversion_bytes += entry.estimated_bytes;
+        self.counters.resident_bytes += entry.estimated_bytes;
+        self.masks.push_front(entry);
+        while self.masks.len() > MAX_RESIDENT_MASKS {
+            let evicted = self.masks.pop_back().unwrap();
+            self.counters.resident_bytes -= evicted.estimated_bytes;
+            self.counters.evictions += 1;
+        }
+    }
+
+    fn insert_lut(&mut self, entry: ResidentLutTexture, conversion_bytes: u64) {
+        self.counters.lut_misses += 1;
+        self.counters.texture_creations += 1;
+        self.counters.view_creations += 1;
+        self.counters.gpu_upload_bytes += entry.estimated_bytes;
+        self.counters.cpu_conversion_bytes += conversion_bytes;
+        self.counters.resident_bytes += entry.estimated_bytes;
+        self.luts.push_front(entry);
+        while self.luts.len() > MAX_RESIDENT_LUTS {
+            let evicted = self.luts.pop_back().unwrap();
+            self.counters.resident_bytes -= evicted.estimated_bytes;
+            self.counters.evictions += 1;
+        }
+    }
+}
+
+fn hash_value(value: &impl Hash) -> u64 {
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    value.hash(&mut hasher);
+    hasher.finish()
+}
+
+fn mask_texture_key(
+    generation: GpuDeviceGeneration,
+    width: u32,
+    height: u32,
+    masks: &[ImageBuffer<Luma<u8>, Vec<u8>>],
+) -> MaskTextureKey {
+    let layer_count = masks.len().clamp(2, MAX_MASKS) as u16;
+    let geometry_fingerprint = hash_value(&(width, height, layer_count));
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    masks.len().min(MAX_MASKS).hash(&mut hasher);
+    for mask in masks.iter().take(MAX_MASKS) {
+        mask.width().hash(&mut hasher);
+        mask.height().hash(&mut hasher);
+        mask.as_raw().hash(&mut hasher);
+    }
+    MaskTextureKey {
+        device_generation: generation,
+        geometry_fingerprint,
+        mask_fingerprint: hasher.finish(),
+        width,
+        height,
+        layer_count,
+        format_version: MASK_TEXTURE_ABI_VERSION,
+    }
+}
+
+fn lut_texture_key(generation: GpuDeviceGeneration, lut: &Lut) -> LutTextureKey {
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    lut.size.hash(&mut hasher);
+    for value in &lut.data {
+        value.to_bits().hash(&mut hasher);
+    }
+    LutTextureKey {
+        device_generation: generation,
+        content_fingerprint: hasher.finish(),
+        edge_size: lut.size as u16,
+        interpolation_version: 1,
+        texture_format_version: LUT_TEXTURE_ABI_VERSION,
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct MainBindGroupKey {
+    device_generation: GpuDeviceGeneration,
+    processor_generation: u64,
+    input_identity: PreGpuImageIdentity,
+    mask: MaskTextureKey,
+    lut: Option<LutTextureKey>,
+    blur_flags: u32,
+    flare_enabled: bool,
+    abi_version: u32,
+}
+
+struct CachedMainBindGroup {
+    key: MainBindGroupKey,
+    bind_group: wgpu::BindGroup,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -549,6 +733,8 @@ struct FlareParams {
 pub struct GpuProcessor {
     context: GpuContext,
     generation: u64,
+    resource_cache: Mutex<GpuResourceCache>,
+    main_bind_group_cache: Mutex<Option<CachedMainBindGroup>>,
     blur_surface_cache: Mutex<BlurSurfaceCache>,
     blur_bgl: wgpu::BindGroupLayout,
     h_blur_pipeline: wgpu::ComputePipeline,
@@ -588,6 +774,10 @@ pub struct GpuProcessor {
 const FLARE_MAP_SIZE: u32 = 512;
 
 impl GpuProcessor {
+    pub fn resource_cache_counters(&self) -> GpuResourceCacheCounters {
+        self.resource_cache.lock().unwrap().counters
+    }
+
     pub fn new(context: GpuContext, max_width: u32, max_height: u32) -> Result<Self, String> {
         let device = &context.device;
 
@@ -1033,6 +1223,14 @@ impl GpuProcessor {
         Ok(Self {
             context,
             generation: NEXT_PROCESSOR_GENERATION.fetch_add(1, Ordering::Relaxed),
+            resource_cache: Mutex::new(GpuResourceCache {
+                counters: GpuResourceCacheCounters {
+                    sampler_creations: 2,
+                    ..Default::default()
+                },
+                ..Default::default()
+            }),
+            main_bind_group_cache: Mutex::new(None),
             blur_surface_cache: Mutex::new(BlurSurfaceCache::default()),
             blur_bgl,
             h_blur_pipeline,
@@ -1089,86 +1287,117 @@ impl GpuProcessor {
         });
         let out_width = bounds.width;
         let out_height = bounds.height;
-        let mask_layer_count = request.mask_bitmaps.len().clamp(2, MAX_MASKS) as u32;
-        let full_texture_size = wgpu::Extent3d {
-            width,
-            height,
-            depth_or_array_layers: mask_layer_count,
-        };
-        let buffer_size = (width as usize) * (height as usize) * (mask_layer_count as usize);
-        let mut mask_texture_data = Vec::with_capacity(buffer_size);
-        if request.mask_bitmaps.is_empty() {
-            mask_texture_data.resize(buffer_size, 0);
+        let device_generation = GpuDeviceGeneration(self.context.generation);
+        debug_assert_eq!(input.device_generation, self.context.generation);
+        let mask_key = mask_texture_key(device_generation, width, height, request.mask_bitmaps);
+        let resident_mask = if let Some(hit) = self.resource_cache.lock().unwrap().mask(mask_key) {
+            hit
         } else {
-            for mask_bitmap in request.mask_bitmaps.iter().take(MAX_MASKS) {
-                mask_texture_data.extend_from_slice(mask_bitmap.as_raw());
+            let buffer_size = (width as usize) * (height as usize) * mask_key.layer_count as usize;
+            let mut data = Vec::with_capacity(buffer_size);
+            for mask in request.mask_bitmaps.iter().take(MAX_MASKS) {
+                if mask.dimensions() != (width, height) {
+                    return Err(format!(
+                        "mask dimensions {}x{} do not match render {}x{}",
+                        mask.width(),
+                        mask.height(),
+                        width,
+                        height
+                    ));
+                }
+                data.extend_from_slice(mask.as_raw());
             }
-            if mask_texture_data.len() < buffer_size {
-                mask_texture_data.resize(buffer_size, 0);
-            }
-        }
-        let mask_texture = device.create_texture_with_data(
-            queue,
-            &wgpu::TextureDescriptor {
-                label: Some("Full Mask Texture Array"),
-                size: full_texture_size,
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: wgpu::TextureDimension::D2,
-                format: wgpu::TextureFormat::R8Unorm,
-                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-                view_formats: &[],
-            },
-            TextureDataOrder::MipMajor,
-            &mask_texture_data,
-        );
-        let mask_texture_view = mask_texture.create_view(&wgpu::TextureViewDescriptor {
-            dimension: Some(wgpu::TextureViewDimension::D2Array),
-            ..Default::default()
-        });
-
-        let (lut_texture_view, lut_sampler) = if let Some(lut_arc) = &request.lut {
-            let lut_data = &lut_arc.data;
-            let size = lut_arc.size;
-            let mut rgba_lut_data_f16 = Vec::with_capacity(lut_data.len() / 3 * 4);
-            for chunk in lut_data.chunks_exact(3) {
-                rgba_lut_data_f16.push(f16::from_f32(chunk[0]));
-                rgba_lut_data_f16.push(f16::from_f32(chunk[1]));
-                rgba_lut_data_f16.push(f16::from_f32(chunk[2]));
-                rgba_lut_data_f16.push(f16::ONE);
-            }
-            let lut_texture = device.create_texture_with_data(
+            data.resize(buffer_size, 0);
+            let texture = device.create_texture_with_data(
                 queue,
                 &wgpu::TextureDescriptor {
-                    label: Some("LUT 3D Texture"),
+                    label: Some("Resident Mask Texture Array"),
                     size: wgpu::Extent3d {
-                        width: size,
-                        height: size,
-                        depth_or_array_layers: size,
+                        width,
+                        height,
+                        depth_or_array_layers: u32::from(mask_key.layer_count),
                     },
                     mip_level_count: 1,
                     sample_count: 1,
-                    dimension: wgpu::TextureDimension::D3,
-                    format: wgpu::TextureFormat::Rgba16Float,
+                    dimension: wgpu::TextureDimension::D2,
+                    format: wgpu::TextureFormat::R8Unorm,
                     usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
                     view_formats: &[],
                 },
                 TextureDataOrder::MipMajor,
-                bytemuck::cast_slice(&rgba_lut_data_f16),
+                &data,
             );
-            let view = lut_texture.create_view(&Default::default());
-            let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-                address_mode_u: wgpu::AddressMode::ClampToEdge,
-                address_mode_v: wgpu::AddressMode::ClampToEdge,
-                address_mode_w: wgpu::AddressMode::ClampToEdge,
-                mag_filter: wgpu::FilterMode::Nearest,
-                min_filter: wgpu::FilterMode::Nearest,
-                ..Default::default()
-            });
-            (view, sampler)
-        } else {
-            (self.dummy_lut_view.clone(), self.dummy_lut_sampler.clone())
+            let entry = ResidentMaskTexture {
+                key: mask_key,
+                view: texture.create_view(&wgpu::TextureViewDescriptor {
+                    dimension: Some(wgpu::TextureViewDimension::D2Array),
+                    ..Default::default()
+                }),
+                _texture: texture,
+                estimated_bytes: data.len() as u64,
+            };
+            self.resource_cache
+                .lock()
+                .unwrap()
+                .insert_mask(entry.clone());
+            entry
         };
+
+        let lut_key = request
+            .lut
+            .as_deref()
+            .map(|lut| lut_texture_key(device_generation, lut));
+        let resident_lut = if let (Some(lut_arc), Some(key)) = (&request.lut, lut_key) {
+            if let Some(hit) = self.resource_cache.lock().unwrap().lut(key) {
+                Some(hit)
+            } else {
+                let lut_data = &lut_arc.data;
+                let size = lut_arc.size;
+                let mut rgba_lut_data_f16 = Vec::with_capacity(lut_data.len() / 3 * 4);
+                for chunk in lut_data.chunks_exact(3) {
+                    rgba_lut_data_f16.push(f16::from_f32(chunk[0]));
+                    rgba_lut_data_f16.push(f16::from_f32(chunk[1]));
+                    rgba_lut_data_f16.push(f16::from_f32(chunk[2]));
+                    rgba_lut_data_f16.push(f16::ONE);
+                }
+                let texture = device.create_texture_with_data(
+                    queue,
+                    &wgpu::TextureDescriptor {
+                        label: Some("LUT 3D Texture"),
+                        size: wgpu::Extent3d {
+                            width: size,
+                            height: size,
+                            depth_or_array_layers: size,
+                        },
+                        mip_level_count: 1,
+                        sample_count: 1,
+                        dimension: wgpu::TextureDimension::D3,
+                        format: wgpu::TextureFormat::Rgba16Float,
+                        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                        view_formats: &[],
+                    },
+                    TextureDataOrder::MipMajor,
+                    bytemuck::cast_slice(&rgba_lut_data_f16),
+                );
+                let entry = ResidentLutTexture {
+                    key,
+                    view: texture.create_view(&Default::default()),
+                    _texture: texture,
+                    estimated_bytes: rgba_lut_data_f16.len() as u64 * size_of::<f16>() as u64,
+                };
+                let conversion_bytes = entry.estimated_bytes;
+                self.resource_cache
+                    .lock()
+                    .unwrap()
+                    .insert_lut(entry.clone(), conversion_bytes);
+                Some(entry)
+            }
+        } else {
+            None
+        };
+        let lut_texture_view = resident_lut
+            .as_ref()
+            .map_or(&self.dummy_lut_view, |entry| &entry.view);
 
         let mut adjustments = request.adjustments;
         let graph = compile_gpu_render_graph(
@@ -1508,15 +1737,15 @@ impl GpuProcessor {
                 ];
                 bind_group_entries.push(wgpu::BindGroupEntry {
                     binding: MAIN_BINDING_MASK_TEXTURES,
-                    resource: wgpu::BindingResource::TextureView(&mask_texture_view),
+                    resource: wgpu::BindingResource::TextureView(&resident_mask.view),
                 });
                 bind_group_entries.push(wgpu::BindGroupEntry {
                     binding: MAIN_BINDING_LUT_TEXTURE,
-                    resource: wgpu::BindingResource::TextureView(&lut_texture_view),
+                    resource: wgpu::BindingResource::TextureView(lut_texture_view),
                 });
                 bind_group_entries.push(wgpu::BindGroupEntry {
                     binding: MAIN_BINDING_LUT_SAMPLER,
-                    resource: wgpu::BindingResource::Sampler(&lut_sampler),
+                    resource: wgpu::BindingResource::Sampler(&self.dummy_lut_sampler),
                 });
 
                 bind_group_entries.push(wgpu::BindGroupEntry {
@@ -1566,11 +1795,40 @@ impl GpuProcessor {
                     resource: wgpu::BindingResource::Sampler(&self.flare_sampler),
                 });
 
-                let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                    label: Some("Tile Bind Group"),
-                    layout: &self.main_bgl,
-                    entries: &bind_group_entries,
-                });
+                let bind_group_key = MainBindGroupKey {
+                    device_generation,
+                    processor_generation: self.generation,
+                    input_identity: input.identity,
+                    mask: mask_key,
+                    lut: lut_key,
+                    blur_flags: (u32::from(did_create_sharpness_blur) * BLUR_FLAG_SHARPNESS)
+                        | (u32::from(did_create_tonal_blur) * BLUR_FLAG_TONAL)
+                        | (u32::from(did_create_clarity_blur) * BLUR_FLAG_CLARITY)
+                        | (u32::from(did_create_structure_blur) * BLUR_FLAG_STRUCTURE),
+                    flare_enabled: use_flare,
+                    abi_version: MAIN_BIND_GROUP_ABI_VERSION,
+                };
+                let bind_group = {
+                    let mut cached = self.main_bind_group_cache.lock().unwrap();
+                    if let Some(hit) = cached.as_ref().filter(|entry| entry.key == bind_group_key) {
+                        self.resource_cache.lock().unwrap().counters.bind_group_hits += 1;
+                        hit.bind_group.clone()
+                    } else {
+                        let created = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                            label: Some("Cached Tile Bind Group"),
+                            layout: &self.main_bgl,
+                            entries: &bind_group_entries,
+                        });
+                        *cached = Some(CachedMainBindGroup {
+                            key: bind_group_key,
+                            bind_group: created.clone(),
+                        });
+                        let mut resources = self.resource_cache.lock().unwrap();
+                        resources.counters.bind_group_misses += 1;
+                        resources.counters.bind_group_creations += 1;
+                        created
+                    }
+                };
 
                 {
                     let mut compute_pass = main_encoder.begin_compute_pass(&Default::default());
@@ -1722,6 +1980,49 @@ mod blur_pass_tests {
 
     fn needs(adjustments: AllAdjustments) -> BlurPassNeeds {
         resolve_blur_pass_needs(&adjustments)
+    }
+
+    #[test]
+    fn mask_key_invalidates_on_pixels_geometry_order_and_device() {
+        let a = ImageBuffer::from_pixel(4, 3, Luma([1]));
+        let b = ImageBuffer::from_pixel(4, 3, Luma([2]));
+        let base = mask_texture_key(GpuDeviceGeneration(1), 4, 3, &[a.clone(), b.clone()]);
+        assert_ne!(
+            base,
+            mask_texture_key(GpuDeviceGeneration(2), 4, 3, &[a.clone(), b.clone()])
+        );
+        assert_ne!(
+            base,
+            mask_texture_key(GpuDeviceGeneration(1), 8, 3, &[a.clone(), b.clone()])
+        );
+        assert_ne!(
+            base,
+            mask_texture_key(GpuDeviceGeneration(1), 4, 3, &[b.clone(), a.clone()])
+        );
+        let mut changed = a;
+        changed.put_pixel(0, 0, Luma([9]));
+        assert_ne!(
+            base,
+            mask_texture_key(GpuDeviceGeneration(1), 4, 3, &[changed, b])
+        );
+    }
+
+    #[test]
+    fn lut_key_invalidates_on_content_size_and_device() {
+        let lut = Lut {
+            size: 2,
+            data: vec![0.0; 24],
+        };
+        let base = lut_texture_key(GpuDeviceGeneration(1), &lut);
+        let mut changed = lut.clone();
+        changed.data[7] = 0.5;
+        assert_ne!(base, lut_texture_key(GpuDeviceGeneration(1), &changed));
+        assert_ne!(base, lut_texture_key(GpuDeviceGeneration(2), &lut));
+        let resized = Lut {
+            size: 3,
+            data: vec![0.0; 81],
+        };
+        assert_ne!(base, lut_texture_key(GpuDeviceGeneration(1), &resized));
     }
 
     #[test]
@@ -2109,6 +2410,76 @@ mod blur_pass_tests {
         assert_eq!(blur.dispatches, 2);
         assert_eq!(blur.submissions, 100);
     }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
+    fn warm_adjustment_frames_reuse_mask_lut_and_main_bind_group_with_cold_parity() {
+        use image::{ImageBuffer, Rgba};
+        use tauri::Manager;
+
+        let _test_guard = GPU_TEST_LOCK.lock().unwrap();
+        let source = DynamicImage::ImageRgba32F(ImageBuffer::from_pixel(
+            16,
+            16,
+            Rgba([0.25, 0.5, 0.75, 1.0]),
+        ));
+        let mask = ImageBuffer::from_fn(16, 16, |x, _| Luma([(x * 17) as u8]));
+        let lut = Arc::new(Lut {
+            size: 2,
+            data: vec![
+                0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 1.0,
+                0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+            ],
+        });
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock Tauri app builds");
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state)
+            .expect("compute-only GPU context initializes");
+        let identity = PreGpuImageIdentity::for_source(&source, "resource_reuse");
+        let render = |exposure| {
+            let mut adjustments = AllAdjustments::default();
+            adjustments.global.exposure = exposure;
+            process_and_get_dynamic_image(
+                &context,
+                &state,
+                &source,
+                identity,
+                RenderRequest {
+                    adjustments,
+                    mask_bitmaps: std::slice::from_ref(&mask),
+                    lut: Some(lut.clone()),
+                    roi: None,
+                },
+                "resource_reuse",
+            )
+            .expect("GPU render succeeds")
+        };
+
+        let first = render(0.0);
+        for index in 1..20 {
+            render(index as f32 / 20.0);
+        }
+        let processor_guard = state.gpu_processor.lock().unwrap();
+        let processor = &processor_guard.as_ref().unwrap().processor;
+        let counters = processor.resource_cache_counters();
+        assert_eq!(counters.mask_misses, 1);
+        assert_eq!(counters.mask_hits, 19);
+        assert_eq!(counters.lut_misses, 1);
+        assert_eq!(counters.lut_hits, 19);
+        assert_eq!(counters.texture_creations, 2);
+        assert_eq!(counters.gpu_upload_bytes, 16 * 16 * 2 + 2 * 2 * 2 * 8);
+        assert_eq!(counters.bind_group_creations, 1);
+        assert_eq!(counters.bind_group_hits, 19);
+        *processor.resource_cache.lock().unwrap() = GpuResourceCache::default();
+        *processor.main_bind_group_cache.lock().unwrap() = None;
+        drop(processor_guard);
+
+        let cold = render(0.0);
+        assert_eq!(first.to_rgba16().into_raw(), cold.to_rgba16().into_raw());
+    }
 }
 
 pub fn process_and_get_dynamic_image(
@@ -2200,7 +2571,7 @@ fn process_and_get_dynamic_image_inner(
             pre_gpu_identity.width, pre_gpu_identity.height, width, height
         ));
     }
-    let device_generation = Arc::as_ptr(&context.device) as usize as u64;
+    let device_generation = context.generation;
 
     let max_dim = context.limits.max_texture_dimension_2d;
     if width > max_dim || height > max_dim {
@@ -2272,43 +2643,11 @@ fn process_and_get_dynamic_image_inner(
         );
         queue.submit(Some(encoder.finish()));
 
-        if let Ok(mut display_lock) = context.display.lock()
-            && let Some(display) = display_lock.as_mut()
-        {
-            display.latest_transform.texture_size =
-                [processor_state.width as f32, processor_state.height as f32];
-            queue.write_buffer(
-                &display.transform_buffer,
-                0,
-                bytemuck::bytes_of(&display.latest_transform),
-            );
-
-            let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                layout: &display.bind_group_layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: display.transform_buffer.as_entire_binding(),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::TextureView(
-                            &processor.output_texture_view,
-                        ),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 2,
-                        resource: wgpu::BindingResource::Sampler(&display.sampler),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 3,
-                        resource: wgpu::BindingResource::TextureView(&display.display_lut_view),
-                    },
-                ],
-                label: Some("Migrated Display Bind Group"),
-            });
-            display.current_bind_group = Some(bind_group);
-        }
+        context.presentation.publish_texture(
+            processor.output_texture_view.clone(),
+            [width, height],
+            [processor_state.width, processor_state.height],
+        );
     }
 
     if let Some(cache) = state.gpu_image_cache.lock().unwrap().as_ref() {
@@ -2550,44 +2889,12 @@ fn process_and_get_dynamic_image_inner(
         }
     }
 
-    if output_to_display
-        && let Ok(mut display_lock) = context.display.lock()
-        && let Some(display) = display_lock.as_mut()
-    {
-        display.latest_transform.image_size = [width as f32, height as f32];
-        display.latest_transform.texture_size =
-            [processor_state.width as f32, processor_state.height as f32];
-
-        queue.write_buffer(
-            &display.transform_buffer,
-            0,
-            bytemuck::bytes_of(&display.latest_transform),
+    if output_to_display {
+        context.presentation.publish_texture(
+            processor.output_texture_view.clone(),
+            [width, height],
+            [processor_state.width, processor_state.height],
         );
-
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &display.bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: display.transform_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::TextureView(&processor.output_texture_view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::Sampler(&display.sampler),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 3,
-                    resource: wgpu::BindingResource::TextureView(&display.display_lut_view),
-                },
-            ],
-            label: None,
-        });
-        display.current_bind_group = Some(bind_group);
-        display.render(device, queue);
     }
 
     drop(old_processor);

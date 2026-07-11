@@ -1,4 +1,4 @@
-use crate::gpu_display::WgpuDisplay;
+use crate::gpu_display::WgpuPresentationScheduler;
 use glam::{Mat3, Vec2, Vec3};
 use image::DynamicImage;
 use rawler::decoders::Orientation;
@@ -516,10 +516,11 @@ pub fn is_image_edited(
 
 #[derive(Clone)]
 pub struct GpuContext {
+    pub generation: u64,
     pub device: Arc<wgpu::Device>,
     pub queue: Arc<wgpu::Queue>,
     pub limits: wgpu::Limits,
-    pub display: Arc<std::sync::Mutex<Option<WgpuDisplay>>>,
+    pub presentation: Arc<WgpuPresentationScheduler>,
 }
 
 #[inline(always)]

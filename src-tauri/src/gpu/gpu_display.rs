@@ -1,4 +1,9 @@
 use std::num::NonZero;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Condvar, Mutex};
+use std::time::{Duration, Instant};
+
+use serde::Serialize;
 
 #[cfg(not(any(target_os = "android", target_os = "linux")))]
 use tauri::Manager;
@@ -24,20 +29,20 @@ pub struct DisplayTransform {
 }
 
 pub struct WgpuDisplay {
-    pub surface: wgpu::Surface<'static>,
-    pub config: wgpu::SurfaceConfiguration,
-    pub pipeline: wgpu::RenderPipeline,
-    pub bind_group_layout: wgpu::BindGroupLayout,
-    pub sampler: wgpu::Sampler,
-    pub display_lut_texture: wgpu::Texture,
-    pub display_lut_view: wgpu::TextureView,
-    pub transform_buffer: wgpu::Buffer,
-    pub latest_transform: DisplayTransform,
-    pub current_bind_group: Option<wgpu::BindGroup>,
+    surface: wgpu::Surface<'static>,
+    config: wgpu::SurfaceConfiguration,
+    pipeline: wgpu::RenderPipeline,
+    bind_group_layout: wgpu::BindGroupLayout,
+    sampler: wgpu::Sampler,
+    _display_lut_texture: wgpu::Texture,
+    display_lut_view: wgpu::TextureView,
+    transform_buffer: wgpu::Buffer,
+    latest_transform: DisplayTransform,
+    current_bind_group: Option<wgpu::BindGroup>,
 }
 
 impl WgpuDisplay {
-    pub fn render(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
+    fn render(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) -> bool {
         if let Some(bind_group) = &self.current_bind_group {
             let output = match self.surface.get_current_texture() {
                 wgpu::CurrentSurfaceTexture::Success(tex)
@@ -47,10 +52,10 @@ impl WgpuDisplay {
                     match self.surface.get_current_texture() {
                         wgpu::CurrentSurfaceTexture::Success(tex)
                         | wgpu::CurrentSurfaceTexture::Suboptimal(tex) => tex,
-                        _ => panic!("Failed to acquire surface texture"),
+                        _ => return false,
                     }
                 }
-                _ => return,
+                _ => return false,
             };
             let view = output
                 .texture
@@ -114,8 +119,479 @@ impl WgpuDisplay {
             }
             queue.submit(Some(encoder.finish()));
             output.present();
+            return true;
+        }
+        false
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct DisplayTransformState {
+    pub rect: [f32; 4],
+    pub clip: [f32; 4],
+    pub window: [f32; 2],
+    pub bg_primary: [f32; 4],
+    pub bg_secondary: [f32; 4],
+    pub pixelated: bool,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd)]
+pub struct PresentationSequence(pub u64);
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+struct PresentationDirty(u8);
+
+impl PresentationDirty {
+    const TRANSFORM: Self = Self(1 << 0);
+    const SURFACE_SIZE: Self = Self(1 << 1);
+    const TEXTURE: Self = Self(1 << 2);
+
+    fn insert(&mut self, other: Self) {
+        self.0 |= other.0;
+    }
+
+    fn contains(self, other: Self) -> bool {
+        self.0 & other.0 != 0
+    }
+
+    fn is_empty(self) -> bool {
+        self.0 == 0
+    }
+}
+
+struct PublishedTexture {
+    revision: u64,
+    view: wgpu::TextureView,
+    image_size: [u32; 2],
+    texture_size: [u32; 2],
+}
+
+#[derive(Default)]
+struct PendingPresentation {
+    sequence: PresentationSequence,
+    transform_submitted_at: Option<Instant>,
+    transform: Option<DisplayTransformState>,
+    surface_size: Option<[u32; 2]>,
+    texture: Option<PublishedTexture>,
+    dirty: PresentationDirty,
+}
+
+struct FlushWaiter {
+    sequence: PresentationSequence,
+    response: tokio::sync::oneshot::Sender<Result<(), String>>,
+}
+
+#[derive(Default)]
+struct Mailbox {
+    pending: PendingPresentation,
+    waiters: Vec<FlushWaiter>,
+    presented_sequence: PresentationSequence,
+    stopped: bool,
+}
+
+#[derive(Default)]
+struct SchedulerMetrics {
+    submitted_transforms: AtomicU64,
+    coalesced_transforms: AtomicU64,
+    uniform_writes: AtomicU64,
+    presents: AtomicU64,
+    surface_configures: AtomicU64,
+    texture_publications: AtomicU64,
+    texture_replaced_before_present: AtomicU64,
+    hidden_skipped_frames: AtomicU64,
+    latest_transform_latency_micros: AtomicU64,
+    max_transform_latency_micros: AtomicU64,
+}
+
+#[derive(Clone, Debug, Default, Serialize)]
+pub struct PresentationSchedulerReport {
+    pub submitted_transforms: u64,
+    pub coalesced_transforms: u64,
+    pub uniform_writes: u64,
+    pub presents: u64,
+    pub surface_configures: u64,
+    pub texture_publications: u64,
+    pub texture_replaced_before_present: u64,
+    pub hidden_skipped_frames: u64,
+    pub latest_transform_latency_micros: u64,
+    pub max_transform_latency_micros: u64,
+    pub pending_flush_waiters: usize,
+    pub mailbox_resident_bytes: usize,
+}
+
+struct SchedulerShared {
+    mailbox: Mutex<Mailbox>,
+    wake: Condvar,
+    next_sequence: AtomicU64,
+    next_texture_revision: AtomicU64,
+    metrics: SchedulerMetrics,
+}
+
+pub struct WgpuPresentationScheduler {
+    shared: Arc<SchedulerShared>,
+    owner: Mutex<Option<std::thread::JoinHandle<()>>>,
+}
+
+impl WgpuPresentationScheduler {
+    pub fn new(
+        display: Option<WgpuDisplay>,
+        device: Arc<wgpu::Device>,
+        queue: Arc<wgpu::Queue>,
+    ) -> Self {
+        let shared = Arc::new(SchedulerShared {
+            mailbox: Mutex::new(Mailbox::default()),
+            wake: Condvar::new(),
+            next_sequence: AtomicU64::new(0),
+            next_texture_revision: AtomicU64::new(0),
+            metrics: SchedulerMetrics::default(),
+        });
+        let thread_shared = Arc::clone(&shared);
+        let owner = std::thread::Builder::new()
+            .name("wgpu-presentation".into())
+            .spawn(move || {
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    presentation_owner_loop(Arc::clone(&thread_shared), display, device, queue);
+                }));
+                if result.is_err() {
+                    stop_mailbox(&thread_shared);
+                }
+            })
+            .expect("failed to start WGPU presentation owner");
+        Self {
+            shared,
+            owner: Mutex::new(Some(owner)),
         }
     }
+
+    pub fn submit_transform(&self, state: DisplayTransformState) -> Result<u64, String> {
+        if !transform_is_finite(state) {
+            return Err("invalid WGPU transform: values must be finite".into());
+        }
+        let mut mailbox = self.shared.mailbox.lock().unwrap();
+        if mailbox.stopped {
+            return Err("presentation_stopped".into());
+        }
+        let sequence =
+            PresentationSequence(self.shared.next_sequence.fetch_add(1, Ordering::Relaxed) + 1);
+        self.shared
+            .metrics
+            .submitted_transforms
+            .fetch_add(1, Ordering::Relaxed);
+        if mailbox.pending.transform.replace(state).is_some() {
+            self.shared
+                .metrics
+                .coalesced_transforms
+                .fetch_add(1, Ordering::Relaxed);
+        }
+        mailbox.pending.sequence = sequence;
+        mailbox.pending.transform_submitted_at = Some(Instant::now());
+        mailbox.pending.dirty.insert(PresentationDirty::TRANSFORM);
+        drop(mailbox);
+        self.shared.wake.notify_one();
+        Ok(sequence.0)
+    }
+
+    pub fn resize(&self, width: u32, height: u32) {
+        let mut mailbox = self.shared.mailbox.lock().unwrap();
+        if mailbox.stopped {
+            return;
+        }
+        mailbox.pending.surface_size = Some([width, height]);
+        mailbox
+            .pending
+            .dirty
+            .insert(PresentationDirty::SURFACE_SIZE);
+        drop(mailbox);
+        self.shared.wake.notify_one();
+    }
+
+    pub fn publish_texture(
+        &self,
+        view: wgpu::TextureView,
+        image_size: [u32; 2],
+        texture_size: [u32; 2],
+    ) {
+        let mut mailbox = self.shared.mailbox.lock().unwrap();
+        if mailbox.stopped {
+            return;
+        }
+        let revision = self
+            .shared
+            .next_texture_revision
+            .fetch_add(1, Ordering::Relaxed)
+            + 1;
+        self.shared
+            .metrics
+            .texture_publications
+            .fetch_add(1, Ordering::Relaxed);
+        let texture = PublishedTexture {
+            revision,
+            view,
+            image_size,
+            texture_size,
+        };
+        if mailbox.pending.texture.replace(texture).is_some() {
+            self.shared
+                .metrics
+                .texture_replaced_before_present
+                .fetch_add(1, Ordering::Relaxed);
+        }
+        mailbox.pending.dirty.insert(PresentationDirty::TEXTURE);
+        drop(mailbox);
+        self.shared.wake.notify_one();
+    }
+
+    pub async fn flush(&self, sequence: u64) -> Result<(), String> {
+        let (response, receiver) = tokio::sync::oneshot::channel();
+        {
+            let mut mailbox = self.shared.mailbox.lock().unwrap();
+            if mailbox.stopped {
+                return Err("presentation_stopped".into());
+            }
+            if PresentationSequence(sequence) <= mailbox.presented_sequence {
+                return Ok(());
+            }
+            mailbox.waiters.push(FlushWaiter {
+                sequence: PresentationSequence(sequence),
+                response,
+            });
+        }
+        self.shared.wake.notify_one();
+        receiver
+            .await
+            .unwrap_or_else(|_| Err("presentation_stopped".into()))
+    }
+
+    pub fn report(&self) -> PresentationSchedulerReport {
+        let mailbox = self.shared.mailbox.lock().unwrap();
+        let metrics = &self.shared.metrics;
+        PresentationSchedulerReport {
+            submitted_transforms: metrics.submitted_transforms.load(Ordering::Relaxed),
+            coalesced_transforms: metrics.coalesced_transforms.load(Ordering::Relaxed),
+            uniform_writes: metrics.uniform_writes.load(Ordering::Relaxed),
+            presents: metrics.presents.load(Ordering::Relaxed),
+            surface_configures: metrics.surface_configures.load(Ordering::Relaxed),
+            texture_publications: metrics.texture_publications.load(Ordering::Relaxed),
+            texture_replaced_before_present: metrics
+                .texture_replaced_before_present
+                .load(Ordering::Relaxed),
+            hidden_skipped_frames: metrics.hidden_skipped_frames.load(Ordering::Relaxed),
+            latest_transform_latency_micros: metrics
+                .latest_transform_latency_micros
+                .load(Ordering::Relaxed),
+            max_transform_latency_micros: metrics
+                .max_transform_latency_micros
+                .load(Ordering::Relaxed),
+            pending_flush_waiters: mailbox.waiters.len(),
+            mailbox_resident_bytes: std::mem::size_of::<Mailbox>()
+                + mailbox.waiters.capacity() * std::mem::size_of::<FlushWaiter>(),
+        }
+    }
+}
+
+impl Drop for WgpuPresentationScheduler {
+    fn drop(&mut self) {
+        let waiters = {
+            let mut mailbox = self.shared.mailbox.lock().unwrap();
+            mailbox.stopped = true;
+            std::mem::take(&mut mailbox.waiters)
+        };
+        for waiter in waiters {
+            let _ = waiter.response.send(Err("presentation_stopped".into()));
+        }
+        self.shared.wake.notify_one();
+        if let Some(owner) = self.owner.lock().unwrap().take() {
+            let _ = owner.join();
+        }
+    }
+}
+
+fn stop_mailbox(shared: &SchedulerShared) {
+    let waiters = {
+        let mut mailbox = shared
+            .mailbox
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        mailbox.stopped = true;
+        std::mem::take(&mut mailbox.waiters)
+    };
+    for waiter in waiters {
+        let _ = waiter.response.send(Err("presentation_stopped".into()));
+    }
+    shared.wake.notify_all();
+}
+
+fn transform_is_finite(state: DisplayTransformState) -> bool {
+    state
+        .rect
+        .into_iter()
+        .chain(state.clip)
+        .chain(state.window)
+        .chain(state.bg_primary)
+        .chain(state.bg_secondary)
+        .all(f32::is_finite)
+}
+
+fn presentation_owner_loop(
+    shared: Arc<SchedulerShared>,
+    mut display: Option<WgpuDisplay>,
+    device: Arc<wgpu::Device>,
+    queue: Arc<wgpu::Queue>,
+) {
+    let frame_interval = Duration::from_nanos(1_000_000_000 / 120);
+    let mut next_frame = Instant::now();
+    let mut last_transform = None;
+    let mut last_texture_revision = 0;
+    let mut presented_sequence = PresentationSequence(0);
+    let mut latest_unpresented_sequence = PresentationSequence(0);
+    let mut surface_visible = display
+        .as_ref()
+        .is_some_and(|display| display.config.width > 0 && display.config.height > 0);
+    let mut needs_present = false;
+    let mut latest_transform_submitted_at = None;
+    loop {
+        let mut mailbox = shared.mailbox.lock().unwrap();
+        while mailbox.pending.dirty.is_empty() && !mailbox.stopped {
+            mailbox = shared.wake.wait(mailbox).unwrap();
+        }
+        if mailbox.stopped {
+            break;
+        }
+        let mut now = Instant::now();
+        while now < next_frame {
+            let (new_mailbox, _) = shared.wake.wait_timeout(mailbox, next_frame - now).unwrap();
+            mailbox = new_mailbox;
+            if mailbox.stopped {
+                break;
+            }
+            now = Instant::now();
+        }
+        if mailbox.stopped {
+            break;
+        }
+        let pending = std::mem::take(&mut mailbox.pending);
+        drop(mailbox);
+        latest_unpresented_sequence = latest_unpresented_sequence.max(pending.sequence);
+        if pending.transform_submitted_at.is_some() {
+            latest_transform_submitted_at = pending.transform_submitted_at;
+        }
+
+        let Some(display) = display.as_mut() else {
+            continue;
+        };
+        let mut effective_change = false;
+        if pending.dirty.contains(PresentationDirty::SURFACE_SIZE)
+            && let Some([width, height]) = pending.surface_size
+        {
+            surface_visible = width > 0 && height > 0;
+            if surface_visible && (display.config.width != width || display.config.height != height)
+            {
+                display.config.width = width;
+                display.config.height = height;
+                display.surface.configure(&device, &display.config);
+                shared
+                    .metrics
+                    .surface_configures
+                    .fetch_add(1, Ordering::Relaxed);
+                effective_change = true;
+            }
+        }
+        if let Some(texture) = pending.texture
+            && texture.revision > last_texture_revision
+        {
+            display.latest_transform.image_size = texture.image_size.map(|value| value as f32);
+            display.latest_transform.texture_size = texture.texture_size.map(|value| value as f32);
+            display.current_bind_group =
+                Some(device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    layout: &display.bind_group_layout,
+                    entries: &[
+                        wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: display.transform_buffer.as_entire_binding(),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 1,
+                            resource: wgpu::BindingResource::TextureView(&texture.view),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 2,
+                            resource: wgpu::BindingResource::Sampler(&display.sampler),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 3,
+                            resource: wgpu::BindingResource::TextureView(&display.display_lut_view),
+                        },
+                    ],
+                    label: Some("Scheduled Display Bind Group"),
+                }));
+            last_texture_revision = texture.revision;
+            effective_change = true;
+        }
+        if let Some(transform) = pending.transform
+            && last_transform != Some(transform)
+        {
+            display.latest_transform.rect = transform.rect;
+            display.latest_transform.clip = transform.clip;
+            display.latest_transform.window = transform.window;
+            display.latest_transform.bg_primary = transform.bg_primary;
+            display.latest_transform.bg_secondary = transform.bg_secondary;
+            display.latest_transform.pixelated = f32::from(transform.pixelated);
+            last_transform = Some(transform);
+            effective_change = true;
+        }
+        if effective_change {
+            queue.write_buffer(
+                &display.transform_buffer,
+                0,
+                bytemuck::bytes_of(&display.latest_transform),
+            );
+            shared
+                .metrics
+                .uniform_writes
+                .fetch_add(1, Ordering::Relaxed);
+            needs_present = true;
+        }
+        if surface_visible && needs_present && display.render(&device, &queue) {
+            shared.metrics.presents.fetch_add(1, Ordering::Relaxed);
+            presented_sequence = presented_sequence.max(latest_unpresented_sequence);
+            needs_present = false;
+            next_frame = Instant::now() + frame_interval;
+            if let Some(submitted_at) = latest_transform_submitted_at.take() {
+                let latency = submitted_at.elapsed().as_micros().min(u64::MAX as u128) as u64;
+                shared
+                    .metrics
+                    .latest_transform_latency_micros
+                    .store(latency, Ordering::Relaxed);
+                shared
+                    .metrics
+                    .max_transform_latency_micros
+                    .fetch_max(latency, Ordering::Relaxed);
+            }
+            complete_covered_waiters(&shared, presented_sequence);
+        } else if surface_visible && !needs_present {
+            presented_sequence = presented_sequence.max(latest_unpresented_sequence);
+            complete_covered_waiters(&shared, presented_sequence);
+        } else if !surface_visible {
+            shared
+                .metrics
+                .hidden_skipped_frames
+                .fetch_add(1, Ordering::Relaxed);
+        }
+    }
+}
+
+fn complete_covered_waiters(shared: &SchedulerShared, presented: PresentationSequence) {
+    let mut mailbox = shared.mailbox.lock().unwrap();
+    mailbox.presented_sequence = mailbox.presented_sequence.max(presented);
+    let mut remaining = Vec::with_capacity(mailbox.waiters.len());
+    for waiter in mailbox.waiters.drain(..) {
+        if waiter.sequence <= presented {
+            let _ = waiter.response.send(Ok(()));
+        } else {
+            remaining.push(waiter);
+        }
+    }
+    mailbox.waiters = remaining;
 }
 
 #[cfg(not(any(target_os = "android", target_os = "linux")))]
@@ -316,7 +792,7 @@ pub(crate) fn create_wgpu_display(
         config,
         pipeline,
         bind_group_layout,
-        display_lut_texture,
+        _display_lut_texture: display_lut_texture,
         display_lut_view,
         transform_buffer,
         latest_transform: DisplayTransform {
@@ -332,5 +808,94 @@ pub(crate) fn create_wgpu_display(
         },
         sampler,
         current_bind_group: None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn transform(value: f32) -> DisplayTransformState {
+        DisplayTransformState {
+            rect: [value, value, 100.0, 100.0],
+            clip: [0.0, 0.0, 100.0, 100.0],
+            window: [800.0, 600.0],
+            bg_primary: [0.0, 0.0, 0.0, 1.0],
+            bg_secondary: [0.1, 0.1, 0.1, 1.0],
+            pixelated: false,
+        }
+    }
+
+    #[test]
+    fn transform_flood_retains_only_latest_snapshot() {
+        let mut pending = PendingPresentation::default();
+        let start = Instant::now();
+        for sequence in 1..=10_000 {
+            pending.sequence = PresentationSequence(sequence);
+            pending.transform = Some(transform(sequence as f32));
+            pending.dirty.insert(PresentationDirty::TRANSFORM);
+        }
+        assert_eq!(pending.sequence, PresentationSequence(10_000));
+        assert_eq!(pending.transform, Some(transform(10_000.0)));
+        assert!(pending.dirty.contains(PresentationDirty::TRANSFORM));
+        eprintln!(
+            "presentation flood benchmark: events=10000 legacy_tasks=10000 legacy_render_attempts=10000 scheduled_pending=1 mailbox_bytes={} publish_time_us={}",
+            std::mem::size_of::<PendingPresentation>(),
+            start.elapsed().as_micros()
+        );
+    }
+
+    #[test]
+    fn transform_replacement_preserves_other_dirty_state() {
+        let mut pending = PendingPresentation {
+            surface_size: Some([1920, 1080]),
+            dirty: PresentationDirty::SURFACE_SIZE,
+            ..Default::default()
+        };
+        for sequence in 1..=100 {
+            pending.sequence = PresentationSequence(sequence);
+            pending.transform = Some(transform(sequence as f32));
+            pending.dirty.insert(PresentationDirty::TRANSFORM);
+        }
+        assert_eq!(pending.surface_size, Some([1920, 1080]));
+        assert!(pending.dirty.contains(PresentationDirty::SURFACE_SIZE));
+        assert!(pending.dirty.contains(PresentationDirty::TRANSFORM));
+    }
+
+    #[test]
+    fn identical_transform_is_not_an_effective_change() {
+        let state = transform(42.0);
+        let mut last_presented = None;
+        assert_ne!(last_presented, Some(state));
+        last_presented = Some(state);
+        assert_eq!(last_presented, Some(state));
+    }
+
+    #[tokio::test]
+    async fn stopping_mailbox_completes_every_waiter_once() {
+        let shared = SchedulerShared {
+            mailbox: Mutex::new(Mailbox::default()),
+            wake: Condvar::new(),
+            next_sequence: AtomicU64::new(0),
+            next_texture_revision: AtomicU64::new(0),
+            metrics: SchedulerMetrics::default(),
+        };
+        let mut receivers = Vec::new();
+        {
+            let mut mailbox = shared.mailbox.lock().unwrap();
+            for sequence in 1..=8 {
+                let (response, receiver) = tokio::sync::oneshot::channel();
+                mailbox.waiters.push(FlushWaiter {
+                    sequence: PresentationSequence(sequence),
+                    response,
+                });
+                receivers.push(receiver);
+            }
+        }
+        stop_mailbox(&shared);
+        for receiver in receivers {
+            assert_eq!(receiver.await.unwrap(), Err("presentation_stopped".into()));
+        }
+        assert!(shared.mailbox.lock().unwrap().waiters.is_empty());
     }
 }

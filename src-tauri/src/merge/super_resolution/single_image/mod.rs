@@ -65,7 +65,7 @@ pub async fn preview_single_image_x2(
         .ok_or_else(|| "swinir_x2_disabled_weight_redistribution_unverified".to_string())?;
     model::verify_provisioned_model(&model_path)?;
     let frame = current_frame(&state, &request)?;
-    let source = frame.image.to_rgb32f();
+    let source = frame.pixels.image().to_rgb32f();
     let tile_count =
         inference::tile_count(source.width(), source.height(), request.memory_budget_bytes)?;
     let job = state.computational_merge_jobs.begin(

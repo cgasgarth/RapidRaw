@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 #[cfg(not(any(target_os = "android", target_os = "linux")))]
 use tauri::Manager;
@@ -6,9 +7,13 @@ use tauri::Manager;
 use crate::AppState;
 #[cfg(not(any(target_os = "android", target_os = "linux")))]
 use crate::app_settings;
+#[cfg(any(target_os = "android", target_os = "linux"))]
+use crate::gpu_display::WgpuPresentationScheduler;
 #[cfg(not(any(target_os = "android", target_os = "linux")))]
-use crate::gpu_display::create_wgpu_display;
+use crate::gpu_display::{WgpuPresentationScheduler, create_wgpu_display};
 use crate::image_processing::GpuContext;
+
+static NEXT_DEVICE_GENERATION: AtomicU64 = AtomicU64::new(1);
 
 pub fn get_or_init_gpu_context(
     state: &tauri::State<AppState>,
@@ -124,11 +129,16 @@ pub fn get_or_init_gpu_context(
     #[cfg(any(target_os = "android", target_os = "linux"))]
     let display_opt = None;
 
+    let device = Arc::new(device);
+    let queue = Arc::new(queue);
+    let presentation =
+        WgpuPresentationScheduler::new(display_opt, Arc::clone(&device), Arc::clone(&queue));
     let new_context = GpuContext {
-        device: Arc::new(device),
-        queue: Arc::new(queue),
+        generation: NEXT_DEVICE_GENERATION.fetch_add(1, Ordering::Relaxed),
+        device,
+        queue,
         limits,
-        display: Arc::new(std::sync::Mutex::new(display_opt)),
+        presentation: Arc::new(presentation),
     };
     *context_lock = Some(new_context.clone());
     Ok(new_context)
@@ -170,11 +180,14 @@ pub fn get_or_init_compute_gpu_context_for_tests(
     }))
     .map_err(|error| error.to_string())?;
 
+    let device = Arc::new(device);
+    let queue = Arc::new(queue);
     let new_context = GpuContext {
-        device: Arc::new(device),
-        queue: Arc::new(queue),
+        generation: NEXT_DEVICE_GENERATION.fetch_add(1, Ordering::Relaxed),
+        device: Arc::clone(&device),
+        queue: Arc::clone(&queue),
         limits,
-        display: Arc::new(std::sync::Mutex::new(None)),
+        presentation: Arc::new(WgpuPresentationScheduler::new(None, device, queue)),
     };
     *context_lock = Some(new_context.clone());
     Ok(new_context)

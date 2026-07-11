@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::{Arc, Mutex};
 
-use image::{DynamicImage, GrayImage};
+use image::{DynamicImage, GenericImageView, GrayImage};
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex as TokioMutex;
 use tokio::task::JoinHandle;
@@ -49,9 +49,34 @@ pub struct CachedPreview {
 }
 
 #[derive(Clone)]
+pub enum SampleablePixels {
+    Native(Arc<DynamicImage>),
+}
+
+impl SampleablePixels {
+    pub fn native(image: Arc<DynamicImage>) -> Self {
+        Self::Native(image)
+    }
+
+    pub fn image(&self) -> &Arc<DynamicImage> {
+        match self {
+            Self::Native(image) => image,
+        }
+    }
+
+    pub fn dimensions(&self) -> (u32, u32) {
+        self.image().dimensions()
+    }
+
+    pub fn retained_bytes(&self) -> u64 {
+        self.image().as_bytes().len() as u64
+    }
+}
+
+#[derive(Clone)]
 pub struct CachedViewerSampleFrame {
     pub graph_revision: String,
-    pub image: Arc<DynamicImage>,
+    pub pixels: SampleablePixels,
     pub image_identity: String,
     pub space_label: String,
 }
