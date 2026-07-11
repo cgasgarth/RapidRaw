@@ -80,6 +80,3 @@ export const toneColorAppServerRouteManifestSchema = z
       routeKeys.add(routeKey);
     }
   });
-
-export type ToneColorAppServerRoute = z.infer<typeof toneColorAppServerRouteSchema>;
-export type ToneColorAppServerRouteManifest = z.infer<typeof toneColorAppServerRouteManifestSchema>;
