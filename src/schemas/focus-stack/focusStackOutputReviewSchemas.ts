@@ -203,7 +203,7 @@ export const focusStackOutputReviewWorkflowSchema = z
       })
       .strict(),
     lowConfidenceCellRatio: z.number().min(0).max(1),
-    proofLevel: z.literal('synthetic_runtime'),
+    proofLevel: z.enum(['synthetic_runtime', 'native_measured_runtime']),
     qualityPreference: focusStackQualityPreferenceSchema,
     retouchLayerPolicy: focusStackRetouchLayerPolicySchema,
     reviewOverlay: z
