@@ -1089,7 +1089,7 @@ export function CropEditSession() {
           }));
         }}
         currentAdjustments={adjustments}
-        sourceKey={selectedImagePath ?? 'no-image'}
+        sourceKey={selectedImage?.path ?? 'no-image'}
       />
 
       <LensCorrectionModal
