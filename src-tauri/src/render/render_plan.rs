@@ -294,9 +294,8 @@ fn fingerprints(
     color_hasher.update(bytes_of(adjustments));
     if let Some(lut) = lut {
         color_hasher.update(&(lut.size as u64).to_le_bytes());
-        for value in &lut.data {
-            color_hasher.update(&canonical_f32(*value).to_le_bytes());
-        }
+        color_hasher.update(&lut.abi_version.to_le_bytes());
+        color_hasher.update(&lut.content_hash);
     }
     let color = first_u64(color_hasher.finalize());
     let output = hash_parts(&[
