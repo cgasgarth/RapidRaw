@@ -32,6 +32,10 @@ import {
   buildPanoramaApplyCommandState,
 } from '../../utils/computational-merge/computationalMergeModalState';
 import {
+  isMergeOperationActive,
+  orderedMergeSourcesMatch,
+} from '../../utils/computational-merge/mergeOperationIdentity';
+import {
   hasCommittedExportOutputs,
   shouldRefreshLibraryForExportReceipt,
 } from '../../utils/export/exportTerminalReceipt';
@@ -509,7 +513,12 @@ export function useTauriListeners({ refreshAllFolderTrees, refreshImageList, mar
         const payload = parseStringPayload(event.payload);
         if (isEffectActive) {
           useUIStore.getState().setUI((state) => {
-            if (state.panoramaModalState.finalImageBase64 || state.panoramaModalState.error) return state;
+            if (
+              !isMergeOperationActive(state.panoramaModalState) ||
+              state.panoramaModalState.finalImageBase64 ||
+              state.panoramaModalState.error
+            )
+              return state;
             return { panoramaModalState: { ...state.panoramaModalState, progressMessage: payload } };
           });
         }
@@ -517,83 +526,119 @@ export function useTauriListeners({ refreshAllFolderTrees, refreshImageList, mar
       listen<unknown>(PANORAMA_COMPLETE_EVENT, (event) => {
         const payload = parsePanoramaCompletePayload(event.payload);
         if (isEffectActive) {
-          useUIStore.getState().setUI((state) => ({
-            panoramaModalState: {
-              ...state.panoramaModalState,
-              error: null,
-              finalImageBase64: payload.base64,
-              isProcessing: false,
-              lastApplyCommand: buildPanoramaApplyCommandState({
-                base64Length: payload.base64.length,
-                sourceCount: state.panoramaModalState.stitchingSourcePaths.length,
-              }),
-              progressMessage: null,
-              renderedReview: payload.review,
-            },
-          }));
+          // Panorama events currently expose neither operation ids nor source paths. Requiring the current
+          // frontend session to be open and processing rejects closed-session events; full supersession
+          // correlation remains limited until the native event contract carries the operation token.
+          useUIStore.getState().setUI((state) =>
+            !isMergeOperationActive(state.panoramaModalState)
+              ? {}
+              : {
+                  panoramaModalState: {
+                    ...state.panoramaModalState,
+                    activeOperationId: null,
+                    error: null,
+                    finalImageBase64: payload.base64,
+                    isProcessing: false,
+                    lastApplyCommand: buildPanoramaApplyCommandState({
+                      base64Length: payload.base64.length,
+                      sourceCount: state.panoramaModalState.stitchingSourcePaths.length,
+                    }),
+                    progressMessage: null,
+                    renderedReview: payload.review,
+                  },
+                },
+          );
         }
       }),
       listen<unknown>(PANORAMA_ERROR_EVENT, (event) => {
         if (isEffectActive) {
-          useUIStore.getState().setUI((state) => ({
-            panoramaModalState: {
-              ...state.panoramaModalState,
-              error: parseStringPayload(event.payload),
-              finalImageBase64: null,
-              isProcessing: false,
-              progressMessage: null,
-            },
-          }));
+          useUIStore.getState().setUI((state) =>
+            !isMergeOperationActive(state.panoramaModalState)
+              ? {}
+              : {
+                  panoramaModalState: {
+                    ...state.panoramaModalState,
+                    activeOperationId: null,
+                    error: parseStringPayload(event.payload),
+                    finalImageBase64: null,
+                    isProcessing: false,
+                    progressMessage: null,
+                  },
+                },
+          );
         }
       }),
       listen<unknown>(HDR_PROGRESS_EVENT, (event) => {
         const payload = parseStringPayload(event.payload);
         if (isEffectActive) {
-          useUIStore.getState().setUI((state) => ({
-            hdrModalState: {
-              ...state.hdrModalState,
-              error: null,
-              finalImageBase64: null,
-              isOpen: true,
-              progressMessage: payload,
-            },
-          }));
+          useUIStore.getState().setUI((state) =>
+            !isMergeOperationActive(state.hdrModalState)
+              ? {}
+              : {
+                  hdrModalState: {
+                    ...state.hdrModalState,
+                    error: null,
+                    finalImageBase64: null,
+                    progressMessage: payload,
+                  },
+                },
+          );
         }
       }),
       listen<unknown>(HDR_COMPLETE_EVENT, (event) => {
         const payload = parseHdrCompletePayload(event.payload);
         if (isEffectActive) {
-          useUIStore.getState().setUI((state) => ({
-            hdrModalState: {
-              ...state.hdrModalState,
-              error: null,
-              finalImageBase64: payload.base64,
-              isProcessing: false,
-              lastApplyCommand: buildHdrApplyCommandState({
-                acceptedDryRunPlanHash: payload.receipt.acceptedDryRunPlanHash,
-                acceptedDryRunPlanId: payload.receipt.acceptedDryRunPlanId,
-                base64Length: payload.base64.length,
-                outputHandle: payload.receipt.outputHandle,
-                previewDimensions: payload.receipt.previewDimensions,
-                sourceCount: payload.receipt.sourcePaths.length,
-                sourcePaths: payload.receipt.sourcePaths,
-              }),
-              progressMessage: 'Hdr Ready',
-            },
-          }));
+          useUIStore.getState().setUI((state) => {
+            const selectedIndexes = state.hdrModalState.lastDryRunCommand?.selectedSourceIndexes ?? [];
+            const activeSources = selectedIndexes
+              .map((index) => state.hdrModalState.stitchingSourcePaths[index])
+              .filter((path): path is string => path !== undefined);
+            // Native HDR completion receipts do not carry the frontend operation id, so ordered source identity
+            // is the strongest available correlation guard until the backend event contract adds that token.
+            if (
+              !isMergeOperationActive(state.hdrModalState) ||
+              !orderedMergeSourcesMatch(activeSources, payload.receipt.sourcePaths)
+            ) {
+              return {};
+            }
+            return {
+              hdrModalState: {
+                ...state.hdrModalState,
+                activeOperationId: null,
+                error: null,
+                finalImageBase64: payload.base64,
+                isProcessing: false,
+                lastApplyCommand: buildHdrApplyCommandState({
+                  acceptedDryRunPlanHash: payload.receipt.acceptedDryRunPlanHash,
+                  acceptedDryRunPlanId: payload.receipt.acceptedDryRunPlanId,
+                  base64Length: payload.base64.length,
+                  outputHandle: payload.receipt.outputHandle,
+                  previewDimensions: payload.receipt.previewDimensions,
+                  sourceCount: payload.receipt.sourcePaths.length,
+                  sourcePaths: payload.receipt.sourcePaths,
+                }),
+                progressMessage: 'Hdr Ready',
+              },
+            };
+          });
         }
       }),
       listen<unknown>(HDR_ERROR_EVENT, (event) => {
         if (isEffectActive) {
-          useUIStore.getState().setUI((state) => ({
-            hdrModalState: {
-              ...state.hdrModalState,
-              error: parseStringPayload(event.payload),
-              finalImageBase64: null,
-              isProcessing: false,
-              progressMessage: 'An error occurred.',
-            },
-          }));
+          useUIStore.getState().setUI((state) =>
+            !isMergeOperationActive(state.hdrModalState)
+              ? {}
+              : {
+                  hdrModalState: {
+                    ...state.hdrModalState,
+                    activeOperationId: null,
+                    error: parseStringPayload(event.payload),
+                    finalImageBase64: null,
+                    isProcessing: false,
+                    progressMessage: 'An error occurred.',
+                  },
+                },
+          );
         }
       }),
       listen<unknown>(CULLING_START_EVENT, (event) => {

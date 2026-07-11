@@ -1,5 +1,5 @@
 import { Info, Layers, ShieldCheck, XCircle } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useModalTransition } from '../../../hooks/ui/useModalTransition';
 import type {
@@ -15,6 +15,7 @@ import type {
 } from '../../../schemas/computational-merge/panoramaUiSchemas';
 import { type PanoramaModalState, useUIStore } from '../../../store/useUIStore';
 import { TextColors, TextVariants } from '../../../types/typography';
+import { buildMergeOperationId } from '../../../utils/computational-merge/mergeOperationIdentity';
 import {
   buildPanoramaDerivedOutputReceipt,
   deriveDerivedOutputReceiptState,
@@ -40,7 +41,7 @@ interface PanoramaModalProps {
   onOpenFile: (path: string) => void;
   onSave: () => Promise<string>;
   onSettingsChange: (settings: PanoramaUiSettings) => void;
-  onStitch: () => void;
+  onStitch: (operationId: string) => void;
   progressMessage: string | null;
   renderedReview: PanoramaRenderedReview | null;
   runtimePlan: PanoramaRuntimePlan | null;
@@ -48,11 +49,31 @@ interface PanoramaModalProps {
   sourcePaths?: string[];
 }
 
-export function PanoramaModal({
+export function PanoramaModal(props: PanoramaModalProps) {
+  const { isMounted, show } = useModalTransition(props.isOpen);
+  const wasOpenRef = useRef(false);
+  const openEpochRef = useRef(0);
+
+  if (props.isOpen && !wasOpenRef.current) {
+    openEpochRef.current += 1;
+  }
+  wasOpenRef.current = props.isOpen;
+
+  if (!isMounted) return null;
+
+  const operationId = buildMergeOperationId('panorama', props.sourcePaths ?? [], openEpochRef.current);
+  return <PanoramaMergeSession key={operationId} {...props} operationId={operationId} show={show} />;
+}
+
+interface PanoramaMergeSessionProps extends PanoramaModalProps {
+  operationId: string;
+  show: boolean;
+}
+
+function PanoramaMergeSession({
   error,
   finalImageBase64,
   imageCount,
-  isOpen,
   isProcessing,
   lastApplyCommand,
   lastDryRunCommand,
@@ -67,15 +88,24 @@ export function PanoramaModal({
   runtimePlan,
   settings,
   sourcePaths = [],
-}: PanoramaModalProps) {
+  operationId,
+  show,
+}: PanoramaMergeSessionProps) {
   const { t } = useTranslation();
-  const { isMounted, show } = useModalTransition(isOpen);
   const [isSaving, setIsSaving] = useState(false);
   const [savedPath, setSavedPath] = useState<string | null>(null);
   const [savedReviewSummary, setSavedReviewSummary] = useState<PanoramaSavedReviewSummary | null>(null);
   const [savedDerivedOutputReceiptId, setSavedDerivedOutputReceiptId] = useState<string | null>(null);
 
   const mouseDownTarget = useRef<EventTarget | null>(null);
+  const runStartedRef = useRef(false);
+  const sawProcessingRef = useRef(false);
+  if (isProcessing) {
+    sawProcessingRef.current = true;
+  } else if (sawProcessingRef.current) {
+    sawProcessingRef.current = false;
+    runStartedRef.current = false;
+  }
   const isSourceCountValid = (imageCount ?? 0) >= 2;
 
   const projectionOptions: Array<OptionItem<PanoramaUiProjection>> = [
@@ -282,21 +312,6 @@ export function PanoramaModal({
     [onSettingsChange, settings],
   );
 
-  useEffect(() => {
-    if (!isOpen) {
-      const timer = setTimeout(() => {
-        setSavedPath(null);
-        setSavedReviewSummary(null);
-        setSavedDerivedOutputReceiptId(null);
-        setIsSaving(false);
-      }, 300);
-      return () => {
-        clearTimeout(timer);
-      };
-    }
-    return undefined;
-  }, [isOpen]);
-
   const handleClose = useCallback(() => {
     if (isSaving) return;
     onClose();
@@ -351,10 +366,12 @@ export function PanoramaModal({
   };
 
   const handleRun = () => {
+    if (isProcessing || runStartedRef.current) return;
+    runStartedRef.current = true;
     setSavedPath(null);
     setSavedReviewSummary(null);
     setSavedDerivedOutputReceiptId(null);
-    onStitch();
+    onStitch(operationId);
   };
 
   const renderContent = () => {
@@ -1400,10 +1417,9 @@ export function PanoramaModal({
     );
   };
 
-  if (!isMounted) return null;
-
   return (
     <div
+      data-merge-operation-id={operationId}
       className={`fixed inset-0 flex items-center justify-center z-50 bg-black/40 backdrop-blur-xs transition-opacity duration-300 ease-in-out ${
         show ? 'opacity-100' : 'opacity-0'
       }`}

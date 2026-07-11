@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { CheckCircle, Images, ShieldCheck, XCircle } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type {
   HdrBracketDetectionMethodV1,
@@ -22,6 +22,7 @@ import {
 import { type HdrModalState, useUIStore } from '../../../store/useUIStore';
 import { Invokes } from '../../../tauri/commands';
 import { TextColors, TextVariants } from '../../../types/typography';
+import { buildMergeOperationId } from '../../../utils/computational-merge/mergeOperationIdentity';
 import { buildHdrDerivedOutputReceipt, deriveDerivedOutputReceiptState } from '../../../utils/derivedOutputReceipt';
 import { buildHdrBracketPreflight, type HdrBracketPreflightSourceMetadata } from '../../../utils/hdrBracketPreflight';
 import { buildHdrEditableHandoffSummary } from '../../../utils/hdrEditableHandoff';
@@ -45,7 +46,7 @@ interface HdrModalProps {
   onOpenFile: (path: string) => void;
   onSave: () => Promise<string>;
   onSettingsChange: (settings: HdrMergeUiSettings) => void;
-  onMerge: () => void;
+  onMerge: (operationId: string) => void;
   progressMessage: string | null;
   runtimePlan?: HdrRuntimePlan | null;
   settings: HdrMergeUiSettings;
@@ -53,11 +54,31 @@ interface HdrModalProps {
   sourcePaths?: string[];
 }
 
-export function HdrModal({
+export function HdrModal(props: HdrModalProps) {
+  const { isMounted, show } = useModalTransition(props.isOpen);
+  const wasOpenRef = useRef(false);
+  const openEpochRef = useRef(0);
+
+  if (props.isOpen && !wasOpenRef.current) {
+    openEpochRef.current += 1;
+  }
+  wasOpenRef.current = props.isOpen;
+
+  if (!isMounted) return null;
+
+  const operationId = buildMergeOperationId('hdr', props.sourcePaths ?? [], openEpochRef.current);
+  return <HdrMergeSession key={operationId} {...props} operationId={operationId} show={show} />;
+}
+
+interface HdrMergeSessionProps extends HdrModalProps {
+  operationId: string;
+  show: boolean;
+}
+
+function HdrMergeSession({
   error,
   finalImageBase64,
   imageCount,
-  isOpen,
   isProcessing,
   lastApplyCommand,
   lastDryRunCommand,
@@ -72,15 +93,24 @@ export function HdrModal({
   settings,
   sourceMetadata,
   sourcePaths = [],
-}: HdrModalProps) {
+  operationId,
+  show,
+}: HdrMergeSessionProps) {
   const { t } = useTranslation();
-  const { isMounted, show } = useModalTransition(isOpen);
   const [isSaving, setIsSaving] = useState(false);
   const [savedPath, setSavedPath] = useState<string | null>(null);
   const [savedHandoffSummary, setSavedHandoffSummary] = useState<HdrModalState['savedHandoffSummary']>(null);
   const [savedDerivedOutputReceiptId, setSavedDerivedOutputReceiptId] = useState<string | null>(null);
 
   const mouseDownTarget = useRef<EventTarget | null>(null);
+  const runStartedRef = useRef(false);
+  const sawProcessingRef = useRef(false);
+  if (isProcessing) {
+    sawProcessingRef.current = true;
+  } else if (sawProcessingRef.current) {
+    sawProcessingRef.current = false;
+    runStartedRef.current = false;
+  }
   const isSourceCountValid = (imageCount ?? 0) >= 2;
   const bracketPreflight = buildHdrBracketPreflight(sourceMetadata);
   const isBracketBlocked =
@@ -283,21 +313,6 @@ export function HdrModal({
         })
       : storedDerivedOutputReceipt;
 
-  useEffect(() => {
-    if (!isOpen) {
-      const timer = setTimeout(() => {
-        setSavedPath(null);
-        setSavedHandoffSummary(null);
-        setSavedDerivedOutputReceiptId(null);
-        setIsSaving(false);
-      }, 300);
-      return () => {
-        clearTimeout(timer);
-      };
-    }
-    return undefined;
-  }, [isOpen]);
-
   const handleClose = useCallback(() => {
     if (isSaving) return;
     if (isProcessing) void invoke(Invokes.CancelHdrPlan);
@@ -353,10 +368,12 @@ export function HdrModal({
   };
 
   const handleRun = () => {
+    if (isProcessing || runStartedRef.current) return;
+    runStartedRef.current = true;
     setSavedPath(null);
     setSavedHandoffSummary(null);
     setSavedDerivedOutputReceiptId(null);
-    onMerge();
+    onMerge(operationId);
   };
 
   const renderContent = () => {
@@ -1422,10 +1439,9 @@ export function HdrModal({
     );
   };
 
-  if (!isMounted) return null;
-
   return (
     <div
+      data-merge-operation-id={operationId}
       className={`fixed inset-0 flex items-center justify-center z-50 bg-black/40 backdrop-blur-xs transition-opacity duration-300 ease-in-out ${
         show ? 'opacity-100' : 'opacity-0'
       }`}
