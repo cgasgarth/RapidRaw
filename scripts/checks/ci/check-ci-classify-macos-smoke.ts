@@ -29,6 +29,7 @@ const MODE_PRIORITY = new Map([
 ]);
 
 const RELEASE_PREFIXES = ['.cargo/', 'src-tauri/'];
+const MODEL_TOOLING_PREFIX = 'tools/models/';
 
 const RELEASE_ASSET_FILES = new Set(['data/io.github.CyberTimon.RapidRAW.metainfo.xml', 'public/splash-dark.jpg']);
 
@@ -440,6 +441,14 @@ function classifyPathChange(change) {
     };
   }
 
+  if (path.startsWith(MODEL_TOOLING_PREFIX)) {
+    return {
+      decision: SMOKE_DECISIONS.MAIN,
+      mode: SMOKE_MODES.RELEASE,
+      reason: 'model export, provenance, or license tooling changed',
+    };
+  }
+
   if (RELEASE_PREFIXES.some((prefix) => path.startsWith(prefix))) {
     return { decision: SMOKE_DECISIONS.MAIN, mode: SMOKE_MODES.RELEASE, reason: 'Rust or Tauri path changed' };
   }
@@ -646,6 +655,16 @@ function runSelfTest() {
   assertDecision('empty file list fails closed decision', [], SMOKE_DECISIONS.FAIL_CLOSED);
   assertClassification('tauri changes require release smoke', ['src-tauri/src/main.rs'], SMOKE_MODES.RELEASE);
   assertClassification('cargo config changes require release smoke', ['.cargo/config.toml'], SMOKE_MODES.RELEASE);
+  assertClassification(
+    'model export tooling requires release smoke',
+    ['tools/models/swinir/export_manifest.json'],
+    SMOKE_MODES.RELEASE,
+  );
+  assertDecision(
+    'model export tooling is main-smoke-needed',
+    ['tools/models/swinir/export_manifest.json'],
+    SMOKE_DECISIONS.MAIN,
+  );
   assertClassification('package changes require release smoke', ['package.json'], SMOKE_MODES.RELEASE);
   assertClassification(
     'package-lock file lists fail closed without removal status',
