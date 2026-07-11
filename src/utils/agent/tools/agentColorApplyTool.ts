@@ -23,7 +23,7 @@ import {
 } from '../../selectiveColorCommandBridge';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
 import { renderAgentReadOnlyPreview } from '../context/agentReadOnlyAppServerTools';
-import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorState';
+import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorCoreState';
 
 export const AGENT_COLOR_APPLY_TOOL_NAME = 'rawengine.agent.color.apply';
 export const AGENT_COLOR_APPLY_INPUT_SCHEMA_NAME = 'AgentColorApplyRequestV1';
