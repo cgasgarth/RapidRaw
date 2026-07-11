@@ -8,6 +8,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useReducer,
   useRef,
   useState,
 } from 'react';
@@ -45,6 +46,24 @@ interface CurveGraphProps {
   setAdjustments: (updater: CurveAdjustmentUpdater) => void;
   theme: Theme;
   onDragStateChange?: ((isDragging: boolean) => void) | undefined;
+}
+
+type SplitKey = 'split1' | 'split2' | 'split3';
+type CurveInteraction =
+  | { kind: 'idle' }
+  | { kind: 'point'; channel: ActiveChannel; index: number; points: Array<Coord>; startPoints: Array<Coord> }
+  | {
+      kind: 'split';
+      channel: ActiveChannel;
+      key: SplitKey;
+      settings: ParametricCurveSettings;
+      startSettings: ParametricCurveSettings;
+    };
+
+type CurveInteractionAction = { type: 'finish' } | { type: 'replace'; interaction: CurveInteraction };
+
+function curveInteractionReducer(_state: CurveInteraction, action: CurveInteractionAction): CurveInteraction {
+  return action.type === 'finish' ? { kind: 'idle' } : action.interaction;
 }
 
 const DEFAULT_PARAMETRIC_CURVE_SETTINGS: ParametricCurveSettings = {
@@ -382,57 +401,69 @@ export default function CurveGraph({
 }: CurveGraphProps) {
   const { t } = useTranslation();
   const { showContextMenu } = useContextMenu();
-  const [curveMode, setCurveMode] = useState<'point' | 'parametric'>(adjustments.curveMode || 'point');
   const [activeChannel, setActiveChannel] = useState<ActiveChannel>(ActiveChannel.Luma);
-  const [draggingPointIndex, setDraggingPointIndex] = useState<number | null>(null);
-  const [draggingSplitKey, setDraggingSplitKey] = useState<'split1' | 'split2' | 'split3' | null>(null);
+  const [interaction, dispatchInteraction] = useReducer(curveInteractionReducer, { kind: 'idle' });
   const [selectedPointIndex, setSelectedPointIndex] = useState<number | null>(null);
-  const [localPoints, setLocalPoints] = useState<Array<Coord> | null>(null);
-  const [localParametricSettings, setLocalParametricSettings] = useState<ParametricCurveSettings | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const splitterContainerRef = useRef<HTMLDivElement>(null);
-  const activeChannelRef = useRef(activeChannel);
-  const draggingIndexRef = useRef<number | null>(null);
-  const localPointsRef = useRef<Array<Coord> | null>(null);
-  const localParametricSettingsRef = useRef<ParametricCurveSettings | null>(null);
-  const pointDragStartRef = useRef<{ channel: ActiveChannel; points: Array<Coord> } | null>(null);
-  const parametricDragStartRef = useRef<{
-    channel: ActiveChannel;
-    settings: ParametricCurveSettings;
-  } | null>(null);
-  const isParametricMode = curveMode === 'parametric';
+  const interactionRef = useRef<CurveInteraction>(interaction);
+  const isParametricMode = (adjustments.curveMode || 'point') === 'parametric';
   const curvesRef = useRef(adjustments.curves);
 
   const parametricCurves: Record<ActiveChannel, ParametricCurveSettings> =
     adjustments.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
-  const parametricCurvesRef = useRef(parametricCurves);
-
-  useEffect(() => {
-    parametricCurvesRef.current = parametricCurves;
-  }, [parametricCurves]);
-
-  useEffect(() => {
-    const syncTimer = setTimeout(() => {
-      setCurveMode(adjustments.curveMode || 'point');
-    }, 0);
-
-    return () => {
-      clearTimeout(syncTimer);
-    };
-  }, [adjustments.curveMode]);
-
-  useEffect(() => {
-    curvesRef.current = adjustments.curves;
-  }, [adjustments.curves]);
+  interactionRef.current = interaction;
+  curvesRef.current = adjustments.curves;
 
   const activeParametricSettings =
-    (draggingSplitKey ? localParametricSettings : null) ?? parametricCurves[activeChannel];
+    interaction.kind === 'split' && interaction.channel === activeChannel && isParametricMode
+      ? interaction.settings
+      : parametricCurves[activeChannel];
+
+  const finishInteraction = useCallback(() => {
+    if (interactionRef.current.kind === 'idle') return;
+    interactionRef.current = { kind: 'idle' };
+    dispatchInteraction({ type: 'finish' });
+    onDragStateChange?.(false);
+  }, [onDragStateChange]);
+
+  const startInteraction = useCallback(
+    (nextInteraction: Exclude<CurveInteraction, { kind: 'idle' }>) => {
+      if (interactionRef.current.kind !== 'idle') finishInteraction();
+      interactionRef.current = nextInteraction;
+      dispatchInteraction({ type: 'replace', interaction: nextInteraction });
+      onDragStateChange?.(true);
+    },
+    [finishInteraction, onDragStateChange],
+  );
+
+  const cancelInteraction = useCallback(() => {
+    const current = interactionRef.current;
+    if (current.kind === 'idle') return;
+    if (current.kind === 'point') {
+      setSelectedPointIndex(null);
+      setAdjustments((prev: Adjustments) => ({
+        ...prev,
+        curves: { ...prev.curves, [current.channel]: current.startPoints },
+      }));
+    } else {
+      setAdjustments((prev: Adjustments) => {
+        const parametricCurve = prev.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
+        return {
+          ...prev,
+          parametricCurve: { ...parametricCurve, [current.channel]: current.startSettings },
+          curves: { ...prev.curves, [current.channel]: buildParametricPoints(current.startSettings) },
+        };
+      });
+    }
+    finishInteraction();
+  }, [finishInteraction, setAdjustments]);
 
   const handleToggleMode = (newMode: 'point' | 'parametric') => {
-    if (newMode === curveMode) return;
-    setCurveMode(newMode);
+    if (newMode === (adjustments.curveMode || 'point')) return;
+    finishInteraction();
     setSelectedPointIndex(null);
 
     setAdjustments((prev: Adjustments) => {
@@ -484,45 +515,9 @@ export default function CurveGraph({
   );
 
   useEffect(() => {
-    activeChannelRef.current = activeChannel;
-    const resetTimer = setTimeout(() => {
-      setLocalPoints(null);
-      setDraggingPointIndex(null);
-      setLocalParametricSettings(null);
-      setDraggingSplitKey(null);
-      setSelectedPointIndex(null);
-    }, 0);
-
-    return () => {
-      clearTimeout(resetTimer);
-    };
-  }, [activeChannel]);
-
-  const activeCurve = adjustments.curves[activeChannel];
-
-  useEffect(() => {
-    if (draggingPointIndex === null) {
-      localPointsRef.current = null;
-      const resetTimer = setTimeout(() => {
-        setLocalPoints(null);
-      }, 0);
-
-      return () => {
-        clearTimeout(resetTimer);
-      };
-    }
-    return undefined;
-  }, [activeCurve, draggingPointIndex]);
-
-  useEffect(() => {
-    const isDragging = draggingPointIndex !== null || draggingSplitKey !== null;
-    onDragStateChange?.(isDragging);
-    draggingIndexRef.current = draggingPointIndex;
-  }, [draggingPointIndex, draggingSplitKey, onDragStateChange]);
-
-  useEffect(() => {
     const handleMove = (e: globalThis.MouseEvent | TouchEvent) => {
-      if (isParametricMode && draggingSplitKey) {
+      const currentInteraction = interactionRef.current;
+      if (currentInteraction.kind === 'split') {
         const container = splitterContainerRef.current;
         if (!container) return;
 
@@ -532,23 +527,29 @@ export default function CurveGraph({
         const clientX = eventPoint.clientX;
         const rawX = ((clientX - rect.left) / rect.width) * 100;
 
-        const currentSettings =
-          localParametricSettingsRef.current || parametricCurvesRef.current[activeChannelRef.current];
-        const nextValue = constrainParametricSplit(currentSettings, draggingSplitKey, rawX);
+        const currentSettings = currentInteraction.settings;
+        const nextValue = constrainParametricSplit(currentSettings, currentInteraction.key, rawX);
 
-        const newSettings = { ...currentSettings, [draggingSplitKey]: nextValue };
-        localParametricSettingsRef.current = newSettings;
-        setLocalParametricSettings(newSettings);
-
-        updateParametricValue(draggingSplitKey, nextValue);
+        const newSettings = { ...currentSettings, [currentInteraction.key]: nextValue };
+        const nextInteraction = { ...currentInteraction, settings: newSettings };
+        interactionRef.current = nextInteraction;
+        dispatchInteraction({ type: 'replace', interaction: nextInteraction });
+        setAdjustments((prev: Adjustments) => {
+          const pC = prev.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
+          return {
+            ...prev,
+            parametricCurve: { ...pC, [currentInteraction.channel]: newSettings },
+            curves: { ...prev.curves, [currentInteraction.channel]: buildParametricPoints(newSettings) },
+          };
+        });
 
         if (e.cancelable) e.preventDefault();
         return;
       }
 
-      if (!isParametricMode && draggingIndexRef.current !== null) {
-        const index = draggingIndexRef.current;
-        const currentPoints = localPointsRef.current || curvesRef.current[activeChannelRef.current];
+      if (currentInteraction.kind === 'point') {
+        const index = currentInteraction.index;
+        const currentPoints = currentInteraction.points;
         if (index < 0 || index >= currentPoints.length) return;
 
         const svg = svgRef.current;
@@ -563,69 +564,34 @@ export default function CurveGraph({
         const newPoints = [...currentPoints];
         newPoints[index] = constrainCurvePoint(currentPoints, index, nextPoint);
 
-        localPointsRef.current = newPoints;
-        setLocalPoints(newPoints);
+        const nextInteraction = { ...currentInteraction, points: newPoints };
+        interactionRef.current = nextInteraction;
+        dispatchInteraction({ type: 'replace', interaction: nextInteraction });
 
         setAdjustments((prev: Adjustments) => ({
           ...prev,
-          curves: { ...prev.curves, [activeChannelRef.current]: newPoints },
+          curves: { ...prev.curves, [currentInteraction.channel]: newPoints },
         }));
 
         if (e.cancelable) e.preventDefault();
       }
     };
 
-    const handleUp = () => {
-      setDraggingPointIndex(null);
-      setDraggingSplitKey(null);
-      draggingIndexRef.current = null;
-      localPointsRef.current = null;
-      setLocalParametricSettings(null);
-      localParametricSettingsRef.current = null;
-      pointDragStartRef.current = null;
-      parametricDragStartRef.current = null;
-      onDragStateChange?.(false);
-    };
+    const handleUp = () => finishInteraction();
 
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key !== 'Escape') return;
 
-      const pointDragStart = pointDragStartRef.current;
-      if (pointDragStart) {
-        setSelectedPointIndex(null);
-        setAdjustments((prev: Adjustments) => ({
-          ...prev,
-          curves: { ...prev.curves, [pointDragStart.channel]: pointDragStart.points },
-        }));
-      }
-
-      const parametricDragStart = parametricDragStartRef.current;
-      if (parametricDragStart) {
-        setAdjustments((prev: Adjustments) => {
-          const parametricCurve = prev.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
-          return {
-            ...prev,
-            parametricCurve: {
-              ...parametricCurve,
-              [parametricDragStart.channel]: parametricDragStart.settings,
-            },
-            curves: {
-              ...prev.curves,
-              [parametricDragStart.channel]: buildParametricPoints(parametricDragStart.settings),
-            },
-          };
-        });
-      }
-
-      handleUp();
+      cancelInteraction();
     };
 
-    if (draggingPointIndex !== null || draggingSplitKey !== null) {
+    if (interaction.kind !== 'idle') {
       window.addEventListener('mousemove', handleMove, { passive: false });
       window.addEventListener('mouseup', handleUp);
       window.addEventListener('touchmove', handleMove, { passive: false });
       window.addEventListener('touchend', handleUp);
       window.addEventListener('touchcancel', handleUp);
+      window.addEventListener('pointercancel', handleUp);
       window.addEventListener('keydown', handleKeyDown);
     }
 
@@ -635,16 +601,10 @@ export default function CurveGraph({
       window.removeEventListener('touchmove', handleMove);
       window.removeEventListener('touchend', handleUp);
       window.removeEventListener('touchcancel', handleUp);
+      window.removeEventListener('pointercancel', handleUp);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [
-    draggingPointIndex,
-    draggingSplitKey,
-    isParametricMode,
-    onDragStateChange,
-    setAdjustments,
-    updateParametricValue,
-  ]);
+  }, [cancelInteraction, finishInteraction, interaction.kind, setAdjustments]);
 
   const isLightTheme = theme === Theme.Light || theme === Theme.Arctic;
   const histogramOpacity = isLightTheme ? 0.6 : 0.15;
@@ -661,7 +621,9 @@ export default function CurveGraph({
 
   const activePoints = isParametricMode
     ? buildParametricPoints(activeParametricSettings)
-    : (localPoints ?? adjustments.curves[activeChannel]);
+    : interaction.kind === 'point' && interaction.channel === activeChannel
+      ? interaction.points
+      : adjustments.curves[activeChannel];
 
   const { color, data: histogramData } = channelConfig[activeChannel];
   const activeChannelLabel = t(`adjustments.curves.channels.${activeChannel}`, {
@@ -674,34 +636,39 @@ export default function CurveGraph({
 
   const updatePoint = useCallback(
     (index: number, nextPoint: Coord) => {
-      const currentPoints = localPointsRef.current || curvesRef.current[activeChannelRef.current];
+      const currentInteraction = interactionRef.current;
+      const channel = currentInteraction.kind === 'point' ? currentInteraction.channel : activeChannel;
+      const currentPoints =
+        currentInteraction.kind === 'point' ? currentInteraction.points : curvesRef.current[channel];
       if (index < 0 || index >= currentPoints.length) return;
       const newPoints = [...currentPoints];
       newPoints[index] = constrainCurvePoint(currentPoints, index, nextPoint);
-      localPointsRef.current = newPoints;
-      setLocalPoints(newPoints);
+      if (currentInteraction.kind === 'point') {
+        const nextInteraction = { ...currentInteraction, points: newPoints };
+        interactionRef.current = nextInteraction;
+        dispatchInteraction({ type: 'replace', interaction: nextInteraction });
+      }
       setAdjustments((prev: Adjustments) => ({
         ...prev,
-        curves: { ...prev.curves, [activeChannelRef.current]: newPoints },
+        curves: { ...prev.curves, [channel]: newPoints },
       }));
     },
-    [setAdjustments],
+    [activeChannel, setAdjustments],
   );
 
   const removePoint = useCallback(
     (index: number) => {
-      const currentPoints = localPointsRef.current || curvesRef.current[activeChannelRef.current];
+      finishInteraction();
+      const currentPoints = curvesRef.current[activeChannel];
       if (index <= 0 || index >= currentPoints.length - 1) return;
       const newPoints = currentPoints.filter((_, pointIndex) => pointIndex !== index);
-      localPointsRef.current = newPoints;
-      setLocalPoints(newPoints);
       setSelectedPointIndex(Math.min(index, newPoints.length - 1));
       setAdjustments((prev: Adjustments) => ({
         ...prev,
-        curves: { ...prev.curves, [activeChannelRef.current]: newPoints },
+        curves: { ...prev.curves, [activeChannel]: newPoints },
       }));
     },
-    [setAdjustments],
+    [activeChannel, finishInteraction, setAdjustments],
   );
 
   const handlePointStart = (
@@ -712,13 +679,9 @@ export default function CurveGraph({
     if (!hasTouches(e)) e.preventDefault();
     e.stopPropagation();
 
-    onDragStateChange?.(true);
-    setLocalPoints(activePoints);
-    localPointsRef.current = activePoints;
-    pointDragStartRef.current = { channel: activeChannel, points: activePoints.map((point) => ({ ...point })) };
+    const startPoints = activePoints.map((point) => ({ ...point }));
+    startInteraction({ kind: 'point', channel: activeChannel, index, points: startPoints, startPoints });
     setSelectedPointIndex(index);
-    setDraggingPointIndex(index);
-    draggingIndexRef.current = index;
   };
 
   const handlePointContextMenu = (e: ReactMouseEvent<SVGCircleElement>, index: number) => {
@@ -750,8 +713,6 @@ export default function CurveGraph({
   const handleContainerStart = (e: ReactMouseEvent<HTMLDivElement> | ReactTouchEvent<HTMLDivElement>) => {
     const target = e.target instanceof Element ? e.target : null;
     if (isParametricMode || (hasButton(e) && e.button !== 0) || target?.tagName.toLowerCase() === 'circle') return;
-    onDragStateChange?.(true);
-
     const svg = svgRef.current;
     if (!svg) return;
     const eventPoint = getEventPoint(e);
@@ -763,22 +724,22 @@ export default function CurveGraph({
     const newPoints = [...activePoints, { x, y }].sort((a: Coord, b: Coord) => a.x - b.x);
     const newPointIndex = newPoints.findIndex((p: Coord) => p.x === x && p.y === y);
 
-    setLocalPoints(newPoints);
-    localPointsRef.current = newPoints;
-    pointDragStartRef.current = {
+    startInteraction({
+      kind: 'point',
       channel: activeChannel,
-      points: activePoints.map((point) => ({ ...point })),
-    };
+      index: newPointIndex,
+      points: newPoints,
+      startPoints: activePoints.map((point) => ({ ...point })),
+    });
     setAdjustments((prev: Adjustments) => ({
       ...prev,
       curves: { ...prev.curves, [activeChannel]: newPoints },
     }));
-    setDraggingPointIndex(newPointIndex);
     setSelectedPointIndex(newPointIndex);
-    draggingIndexRef.current = newPointIndex;
   };
 
   const resetActiveCurve = () => {
+    finishInteraction();
     if (isParametricMode) {
       const defaultSettings = { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS };
       setAdjustments((prev: Adjustments) => {
@@ -794,8 +755,6 @@ export default function CurveGraph({
         { x: 0, y: 0 },
         { x: 255, y: 255 },
       ];
-      setLocalPoints(defaultPoints);
-      localPointsRef.current = defaultPoints;
       setSelectedPointIndex(null);
       setAdjustments((prev: Adjustments) => ({
         ...prev,
@@ -840,6 +799,7 @@ export default function CurveGraph({
 
       const handlePasteParametric = () => {
         if (!parametricClipboard) return;
+        finishInteraction();
         const clipboard = parametricClipboard;
         setAdjustments((prev: Adjustments) => {
           const pC = prev.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
@@ -852,8 +812,7 @@ export default function CurveGraph({
       };
 
       const handleResetAllParametric = () => {
-        setLocalParametricSettings(null);
-        localParametricSettingsRef.current = null;
+        finishInteraction();
         setAdjustments((prev: Adjustments) => {
           return {
             ...prev,
@@ -918,9 +877,8 @@ export default function CurveGraph({
 
     const handlePaste = () => {
       if (!curveClipboard) return;
+      finishInteraction();
       const newPoints = curveClipboard.map((p) => ({ ...p }));
-      setLocalPoints(newPoints);
-      localPointsRef.current = newPoints;
       setAdjustments((prev: Adjustments) => ({
         ...prev,
         curves: { ...prev.curves, [activeChannel]: newPoints },
@@ -929,9 +887,8 @@ export default function CurveGraph({
 
     const handlePasteFromParametric = () => {
       if (!parametricClipboard) return;
+      finishInteraction();
       const newPoints = convertParametricToPoints(parametricClipboard);
-      setLocalPoints(newPoints);
-      localPointsRef.current = newPoints;
       setAdjustments((prev: Adjustments) => ({
         ...prev,
         curves: { ...prev.curves, [activeChannel]: newPoints },
@@ -939,12 +896,11 @@ export default function CurveGraph({
     };
 
     const handleResetAllPoint = () => {
+      finishInteraction();
       const defaultPoints = [
         { x: 0, y: 0 },
         { x: 255, y: 255 },
       ];
-      setLocalPoints(defaultPoints);
-      localPointsRef.current = defaultPoints;
       setAdjustments((prev: Adjustments) => ({
         ...prev,
         curves: {
@@ -1095,6 +1051,8 @@ export default function CurveGraph({
                 selected ? 'bg-surface text-text-primary shadow-sm' : 'text-text-secondary hover:text-text-primary'
               }`}
               onClick={() => {
+                finishInteraction();
+                setSelectedPointIndex(null);
                 setActiveChannel(channel);
               }}
               type="button"
@@ -1312,22 +1270,26 @@ export default function CurveGraph({
                         onMouseDown={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          localParametricSettingsRef.current = { ...activeParametricSettings };
-                          parametricDragStartRef.current = {
+                          const settings = { ...activeParametricSettings };
+                          startInteraction({
+                            kind: 'split',
                             channel: activeChannel,
-                            settings: { ...activeParametricSettings },
-                          };
-                          setDraggingSplitKey(key);
+                            key,
+                            settings,
+                            startSettings: settings,
+                          });
                         }}
                         onTouchStart={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          localParametricSettingsRef.current = { ...activeParametricSettings };
-                          parametricDragStartRef.current = {
+                          const settings = { ...activeParametricSettings };
+                          startInteraction({
+                            kind: 'split',
                             channel: activeChannel,
-                            settings: { ...activeParametricSettings },
-                          };
-                          setDraggingSplitKey(key);
+                            key,
+                            settings,
+                            startSettings: settings,
+                          });
                         }}
                         onKeyDown={(event) => {
                           if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
