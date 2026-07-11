@@ -6,6 +6,7 @@ import {
   type NegativeLabCommandEnvelopeV1,
   type NegativeLabRuntimePreviewRenderResultV1,
 } from '../../../packages/rawengine-schema/src';
+import type { NegativeLabCrosstalkProfile } from '../../schemas/negative-lab/negativeLabCrosstalkProfileSchemas';
 import { Invokes } from '../../tauri/commands';
 import { invokeWithSchema } from '../tauriSchemaInvoke';
 import {
@@ -121,6 +122,30 @@ export const negativeLabDryRunPreviewArtifactSchema = z
           .strict(),
         boundsReceipt: nativeDensityBoundsReceiptSchema,
         clippedPixelCount: z.number().int().nonnegative(),
+        crosstalkReceipt: z
+          .object({
+            appliedMatrix: z.tuple([
+              z.tuple([z.number(), z.number(), z.number()]),
+              z.tuple([z.number(), z.number(), z.number()]),
+              z.tuple([z.number(), z.number(), z.number()]),
+            ]),
+            boundsAnalysisIdentity: z.literal('post_crosstalk_density:fixed_grid_block_median_luma_color_v1'),
+            conditioning: z.number().positive(),
+            postNeutralError: z.number().nonnegative(),
+            preNeutralError: z.number().nonnegative(),
+            profileId: z.string().trim().min(1),
+            provenanceHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+            requestedMatrix: z.tuple([
+              z.tuple([z.number(), z.number(), z.number()]),
+              z.tuple([z.number(), z.number(), z.number()]),
+              z.tuple([z.number(), z.number(), z.number()]),
+            ]),
+            rowSums: z.tuple([z.number(), z.number(), z.number()]),
+            schemaVersion: z.literal(1),
+            strength: z.number().min(0).max(1),
+          })
+          .strict()
+          .optional(),
         densityRangeUnclamped: z.number().nonnegative(),
         epsilonClampedPixelCount: z.number().int().nonnegative(),
         rendererVersion: z.number().int().positive(),
@@ -193,6 +218,7 @@ const toRuntimePreviewRenderResult = (
 
 export async function renderNegativeLabRuntimeDryRunPreview(params: {
   command: Extract<NegativeLabCommandEnvelopeV1, { commandType: 'negativeLab.setConversionRecipe' }>;
+  crosstalkProfile?: NegativeLabCrosstalkProfile | null;
   path: string;
   recipeParams: {
     analysis_buffer: number;
@@ -225,6 +251,7 @@ export async function renderNegativeLabRuntimeDryRunPreview(params: {
         ...params.recipeParams,
         conversion_model: conversionModel,
       },
+      ...(params.crosstalkProfile == null ? {} : { crosstalkProfile: params.crosstalkProfile }),
       path: params.path,
     },
     negativeLabDryRunPreviewArtifactSchema,

@@ -2,9 +2,10 @@ import { z } from 'zod';
 
 export const negativeLabCrosstalkProfileIdSchema = z
   .string()
-  .regex(/^negative_lab\.crosstalk\.(?:identity|user|imported)\.[a-z0-9_]+\.v[0-9]+$/u);
+  .regex(/^negative_lab\.crosstalk\.(?:generic|identity|user|imported)\.[a-z0-9_]+\.v[0-9]+$/u);
 export const negativeLabCrosstalkProfileProvenanceSchema = z.enum([
   'rawengine_identity_default',
+  'rawengine_generic',
   'user_owned',
   'user_imported',
 ]);

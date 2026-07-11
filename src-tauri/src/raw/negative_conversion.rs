@@ -186,6 +186,8 @@ pub struct NegativeLabDensityNormalizationMetrics {
     pub bounds_receipt: NegativeLabDensityBoundsReceipt,
     pub channel_bounds: NegativeLabDensityNormalizationChannelBounds,
     pub clipped_pixel_count: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub crosstalk_receipt: Option<NegativeLabCrosstalkReceipt>,
     pub density_range_unclamped: f32,
     pub epsilon_clamped_pixel_count: u32,
     pub renderer_version: u8,
@@ -300,6 +302,107 @@ pub struct NegativeLabSelectedProfileSnapshot {
     pub provenance_summary: String,
     pub runtime_status: String,
     pub source_generic_preset_id: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabCrosstalkProfile {
+    pub matrix: [[f32; 3]; 3],
+    pub profile_id: String,
+    pub provenance: String,
+    pub provenance_hash: String,
+    pub schema_version: u8,
+    pub strength: f32,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabCrosstalkReceipt {
+    pub applied_matrix: [[f32; 3]; 3],
+    pub bounds_analysis_identity: String,
+    pub conditioning: f32,
+    pub post_neutral_error: f32,
+    pub pre_neutral_error: f32,
+    pub profile_id: String,
+    pub provenance_hash: String,
+    pub requested_matrix: [[f32; 3]; 3],
+    pub row_sums: [f32; 3],
+    pub schema_version: u8,
+    pub strength: f32,
+}
+
+const IDENTITY_CROSSTALK_MATRIX: [[f32; 3]; 3] =
+    [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+
+fn resolve_negative_lab_crosstalk(
+    value: Option<&serde_json::Value>,
+) -> Result<Option<NegativeLabCrosstalkReceipt>, String> {
+    let Some(value) = value else { return Ok(None) };
+    let profile: NegativeLabCrosstalkProfile = serde_json::from_value(value.clone())
+        .map_err(|error| format!("Invalid Negative Lab crosstalk profile: {error}"))?;
+    if profile.schema_version != 1
+        || !profile.strength.is_finite()
+        || !(0.0..=1.0).contains(&profile.strength)
+    {
+        return Err("Invalid Negative Lab crosstalk schema version or strength.".to_string());
+    }
+    let mut applied = [[0.0_f32; 3]; 3];
+    let mut row_sums = [0.0_f32; 3];
+    let mut pre_neutral_error = 0.0_f32;
+    for row in 0..3 {
+        for column in 0..3 {
+            let requested = profile.matrix[row][column];
+            if !requested.is_finite() || !(-2.0..=2.0).contains(&requested) {
+                return Err(
+                    "Negative Lab crosstalk matrix contains an invalid coefficient.".to_string(),
+                );
+            }
+            applied[row][column] = IDENTITY_CROSSTALK_MATRIX[row][column]
+                * (1.0 - profile.strength)
+                + requested * profile.strength;
+        }
+        let sum = applied[row].iter().sum::<f32>();
+        if !sum.is_finite() || sum.abs() < 1.0e-6 {
+            return Err("Negative Lab crosstalk matrix has a non-normalizable row.".to_string());
+        }
+        pre_neutral_error = pre_neutral_error.max((sum - 1.0).abs());
+        for coefficient in &mut applied[row] {
+            *coefficient /= sum;
+        }
+        row_sums[row] = applied[row].iter().sum();
+    }
+    let determinant = applied[0][0]
+        * (applied[1][1] * applied[2][2] - applied[1][2] * applied[2][1])
+        - applied[0][1] * (applied[1][0] * applied[2][2] - applied[1][2] * applied[2][0])
+        + applied[0][2] * (applied[1][0] * applied[2][1] - applied[1][1] * applied[2][0]);
+    if !determinant.is_finite() || determinant.abs() < 1.0e-5 {
+        return Err("Negative Lab crosstalk matrix is singular or ill-conditioned.".to_string());
+    }
+    Ok(Some(NegativeLabCrosstalkReceipt {
+        applied_matrix: applied,
+        bounds_analysis_identity: "post_crosstalk_density:fixed_grid_block_median_luma_color_v1"
+            .to_string(),
+        conditioning: determinant.abs().recip(),
+        post_neutral_error: row_sums
+            .iter()
+            .fold(0.0_f32, |error, sum| error.max((sum - 1.0).abs())),
+        pre_neutral_error,
+        profile_id: profile.profile_id,
+        provenance_hash: profile.provenance_hash,
+        requested_matrix: profile.matrix,
+        row_sums,
+        schema_version: profile.schema_version,
+        strength: profile.strength,
+    }))
+}
+
+fn apply_negative_lab_crosstalk_density(
+    density: [f32; 3],
+    receipt: &NegativeLabCrosstalkReceipt,
+) -> [f32; 3] {
+    receipt
+        .applied_matrix
+        .map(|row| row[0] * density[0] + row[1] * density[1] + row[2] * density[2])
 }
 
 #[derive(Serialize, Debug, Clone, Copy)]
@@ -2079,6 +2182,7 @@ impl NegativeLabDensityMetricsAccumulator {
                 },
             },
             clipped_pixel_count,
+            crosstalk_receipt: None,
             density_range_unclamped: (global_max - global_min).max(0.0),
             epsilon_clamped_pixel_count,
             renderer_version: NEGATIVE_LAB_LOG_DENSITY_RENDERER_VERSION,
@@ -2662,6 +2766,7 @@ fn run_pipeline_with_metrics(
     input: &DynamicImage,
     params: &NegativeConversionParams,
     _override_bounds: Option<[ChannelBounds; 3]>,
+    crosstalk_profile: Option<&serde_json::Value>,
 ) -> NegativeLabPipelineRender {
     let params = params.sanitized();
     let rgb = input.to_rgb32f();
@@ -2670,10 +2775,19 @@ fn run_pipeline_with_metrics(
     let (epsilon_clamped_pixel_count, clipped_pixel_count) =
         negative_lab_count_density_input_guards(raw_pixels);
 
-    let log_pixels: Vec<f32> = raw_pixels
+    let mut log_pixels: Vec<f32> = raw_pixels
         .par_iter()
         .map(|&v| negative_lab_density_from_linear_channel(v))
         .collect();
+    let crosstalk_receipt = resolve_negative_lab_crosstalk(crosstalk_profile)
+        .expect("Negative Lab crosstalk profiles must be validated before rendering");
+    if let Some(receipt) = crosstalk_receipt.as_ref() {
+        log_pixels.par_chunks_mut(3).for_each(|pixel| {
+            let transformed =
+                apply_negative_lab_crosstalk_density([pixel[0], pixel[1], pixel[2]], receipt);
+            pixel.copy_from_slice(&transformed);
+        });
+    }
 
     let robust_bounds =
         analyze_robust_density_bounds(&log_pixels, width as usize, height as usize, &params);
@@ -2693,7 +2807,7 @@ fn run_pipeline_with_metrics(
     let weights = [params.red_weight, params.green_weight, params.blue_weight];
     let legacy_pre_curve_clamp = params.conversion_model == NegativeConversionModel::DensityRgbV1;
 
-    let density_metrics = out_buffer
+    let mut density_metrics = out_buffer
         .par_chunks_mut(3)
         .zip(log_pixels.par_chunks(3))
         .fold(
@@ -2766,6 +2880,7 @@ fn run_pipeline_with_metrics(
             epsilon_clamped_pixel_count,
             robust_bounds.receipt,
         );
+    density_metrics.crosstalk_receipt = crosstalk_receipt;
 
     let out_img = Rgb32FImage::from_vec(width, height, out_buffer).unwrap();
 
@@ -2780,7 +2895,7 @@ fn run_pipeline(
     params: &NegativeConversionParams,
     override_bounds: Option<[ChannelBounds; 3]>,
 ) -> DynamicImage {
-    run_pipeline_with_metrics(input, params, override_bounds).rendered_preview
+    run_pipeline_with_metrics(input, params, override_bounds, None).rendered_preview
 }
 
 fn build_negative_lab_preview_cache_key(source_path: &str) -> u64 {
@@ -3002,6 +3117,7 @@ fn build_negative_lab_dry_run_preview_artifact(
 pub async fn preview_negative_conversion(
     path: String,
     params: NegativeConversionParams,
+    crosstalk_profile: Option<serde_json::Value>,
     state: tauri::State<'_, AppState>,
     app_handle: AppHandle,
 ) -> Result<String, String> {
@@ -3009,7 +3125,13 @@ pub async fn preview_negative_conversion(
     let source_path_str = source_path.to_string_lossy().to_string();
     let base_image_for_processing =
         load_negative_lab_preview_processing_image(&source_path_str, &state, &app_handle)?;
-    let rendered_preview = run_pipeline_with_metrics(&base_image_for_processing, &params, None);
+    resolve_negative_lab_crosstalk(crosstalk_profile.as_ref())?;
+    let rendered_preview = run_pipeline_with_metrics(
+        &base_image_for_processing,
+        &params,
+        None,
+        crosstalk_profile.as_ref(),
+    );
     let base_fog_sample_summary = build_negative_lab_runtime_base_fog_sample_summary(
         &base_image_for_processing,
         params.base_fog_sample,
@@ -3026,6 +3148,7 @@ pub async fn preview_negative_conversion(
 pub async fn render_negative_lab_dry_run_preview_artifact(
     path: String,
     params: NegativeConversionParams,
+    crosstalk_profile: Option<serde_json::Value>,
     state: tauri::State<'_, AppState>,
     app_handle: AppHandle,
 ) -> Result<NegativeLabDryRunPreviewArtifact, String> {
@@ -3033,7 +3156,13 @@ pub async fn render_negative_lab_dry_run_preview_artifact(
     let source_path_str = source_path.to_string_lossy().to_string();
     let base_image_for_processing =
         load_negative_lab_preview_processing_image(&source_path_str, &state, &app_handle)?;
-    let rendered_preview = run_pipeline_with_metrics(&base_image_for_processing, &params, None);
+    resolve_negative_lab_crosstalk(crosstalk_profile.as_ref())?;
+    let rendered_preview = run_pipeline_with_metrics(
+        &base_image_for_processing,
+        &params,
+        None,
+        crosstalk_profile.as_ref(),
+    );
     let base_fog_sample_summary = build_negative_lab_runtime_base_fog_sample_summary(
         &base_image_for_processing,
         params.base_fog_sample,
@@ -3241,6 +3370,11 @@ pub async fn convert_negatives(
         let save_options = options.unwrap_or_default().sanitized();
         save_options.validate_accepted_batch_plan(paths.len())?;
         let sanitized_params = params.sanitized();
+        let crosstalk_profile = save_options
+            .selected_profile
+            .as_ref()
+            .and_then(|profile| profile.crosstalk_profile.as_ref());
+        resolve_negative_lab_crosstalk(crosstalk_profile)?;
         let real_source_paths = paths
             .iter()
             .map(|path_str| {
@@ -3284,7 +3418,8 @@ pub async fn convert_negatives(
 
             let effective_params =
                 save_options.effective_params_for_path(&sanitized_params, &real_path);
-            let pipeline_render = run_pipeline_with_metrics(&img, &effective_params, None);
+            let pipeline_render =
+                run_pipeline_with_metrics(&img, &effective_params, None, crosstalk_profile);
             let processed = pipeline_render.rendered_preview;
             let density_normalization_metrics = pipeline_render.density_normalization_metrics;
 
@@ -3426,6 +3561,7 @@ mod tests {
         run_pipeline_with_metrics(
             &DynamicImage::ImageRgb32F(Rgb32FImage::from_vec(12, 12, pixels).unwrap()),
             &NegativeConversionParams::default(),
+            None,
             None,
         )
         .density_normalization_metrics
@@ -5090,7 +5226,7 @@ mod tests {
             white_point: 1.0,
             ..NegativeConversionParams::default()
         };
-        let render = run_pipeline_with_metrics(&input, &params, None);
+        let render = run_pipeline_with_metrics(&input, &params, None, None);
         let rendered = render.rendered_preview.to_rgb32f();
         let input_rgb = input.to_rgb32f();
         let input_to_output_delta = mean_abs_delta(&input_rgb, &rendered);
@@ -5204,6 +5340,7 @@ mod tests {
                 ..NegativeConversionParams::default()
             },
             None,
+            None,
         );
         let neg_log_render = run_pipeline_with_metrics(
             &input,
@@ -5219,6 +5356,7 @@ mod tests {
                 exposure: 0.03,
                 ..NegativeConversionParams::default()
             },
+            None,
             None,
         );
         let rendered = neg_log_render.rendered_preview.to_rgb32f();
@@ -5294,8 +5432,8 @@ mod tests {
             ..legacy_params
         };
 
-        let legacy_render = run_pipeline_with_metrics(&input, &legacy_params, None);
-        let neg_log_render = run_pipeline_with_metrics(&input, &neg_log_params, None);
+        let legacy_render = run_pipeline_with_metrics(&input, &legacy_params, None, None);
+        let neg_log_render = run_pipeline_with_metrics(&input, &neg_log_params, None, None);
         let legacy_rgb = legacy_render.rendered_preview.to_rgb32f();
         let neg_log_rgb = neg_log_render.rendered_preview.to_rgb32f();
 
@@ -5995,6 +6133,7 @@ mod tests {
                 b: NegativeLabDensityChannelBoundsSummary { min: 0.0, max: 1.0 },
             },
             clipped_pixel_count: 0,
+            crosstalk_receipt: None,
             density_range_unclamped: 1.0,
             epsilon_clamped_pixel_count: 0,
             renderer_version: NEGATIVE_LAB_LOG_DENSITY_RENDERER_VERSION,
@@ -6335,5 +6474,106 @@ mod tests {
             baseline.luma_bounds.max - baseline.luma_bounds.min
                 > luma_clipped.luma_bounds.max - luma_clipped.luma_bounds.min
         );
+    }
+
+    fn crosstalk_profile(matrix: [[f32; 3]; 3], strength: f32) -> serde_json::Value {
+        serde_json::json!({
+            "matrix": matrix,
+            "profileId": "negative_lab.crosstalk.user.native_test.v1",
+            "provenance": "user_owned",
+            "provenanceHash": "fnv1a32:1234abcd",
+            "schemaVersion": 1,
+            "strength": strength,
+        })
+    }
+
+    #[test]
+    fn negative_lab_crosstalk_strength_zero_is_identity() {
+        let profile = crosstalk_profile([[0.8, 0.1, 0.1], [0.1, 0.8, 0.1], [0.1, 0.1, 0.8]], 0.0);
+        let receipt = resolve_negative_lab_crosstalk(Some(&profile))
+            .unwrap()
+            .unwrap();
+        assert_eq!(receipt.applied_matrix, IDENTITY_CROSSTALK_MATRIX);
+        assert_eq!(
+            apply_negative_lab_crosstalk_density([0.2, 0.6, 1.1], &receipt),
+            [0.2, 0.6, 1.1]
+        );
+    }
+
+    #[test]
+    fn negative_lab_crosstalk_preserves_neutral_and_changes_colored_density() {
+        let profile = crosstalk_profile(
+            [
+                [1.08, -0.06, -0.02],
+                [-0.03, 1.07, -0.04],
+                [-0.02, -0.08, 1.10],
+            ],
+            1.0,
+        );
+        let receipt = resolve_negative_lab_crosstalk(Some(&profile))
+            .unwrap()
+            .unwrap();
+        let neutral = apply_negative_lab_crosstalk_density([0.7, 0.7, 0.7], &receipt);
+        assert!(neutral.iter().all(|channel| (channel - 0.7).abs() < 1.0e-6));
+        assert!(
+            receipt
+                .row_sums
+                .iter()
+                .all(|sum| (sum - 1.0).abs() < 1.0e-6)
+        );
+        let colored = apply_negative_lab_crosstalk_density([0.2, 0.6, 1.1], &receipt);
+        assert!(
+            colored
+                .iter()
+                .zip([0.2, 0.6, 1.1])
+                .any(|(actual, original)| (actual - original).abs() > 0.01)
+        );
+    }
+
+    #[test]
+    fn negative_lab_crosstalk_changes_rendered_pixels_and_reports_post_transform_bounds() {
+        let mut pixels = Vec::with_capacity(12 * 12 * 3);
+        for y in 0..12 {
+            for x in 0..12 {
+                let density = 0.08 + (x + y) as f32 / 18.0;
+                pixels.extend_from_slice(&[
+                    10.0_f32.powf(-(density * 0.72)),
+                    10.0_f32.powf(-(density * 1.05)),
+                    10.0_f32.powf(-(density * 1.38)),
+                ]);
+            }
+        }
+        let input = DynamicImage::ImageRgb32F(Rgb32FImage::from_vec(12, 12, pixels).unwrap());
+        let params = NegativeConversionParams::default();
+        let profile = crosstalk_profile(
+            [
+                [1.08, -0.06, -0.02],
+                [-0.03, 1.07, -0.04],
+                [-0.02, -0.08, 1.1],
+            ],
+            0.35,
+        );
+        let identity = run_pipeline_with_metrics(&input, &params, None, None);
+        let transformed = run_pipeline_with_metrics(&input, &params, None, Some(&profile));
+
+        assert_ne!(
+            identity.rendered_preview.to_rgb8().as_raw(),
+            transformed.rendered_preview.to_rgb8().as_raw()
+        );
+        let receipt = transformed
+            .density_normalization_metrics
+            .crosstalk_receipt
+            .unwrap();
+        assert_eq!(
+            receipt.bounds_analysis_identity,
+            "post_crosstalk_density:fixed_grid_block_median_luma_color_v1"
+        );
+        assert!(receipt.post_neutral_error < 1.0e-6);
+    }
+
+    #[test]
+    fn negative_lab_crosstalk_rejects_singular_matrices() {
+        let singular = crosstalk_profile([[1.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]], 1.0);
+        assert!(resolve_negative_lab_crosstalk(Some(&singular)).is_err());
     }
 }

@@ -51,6 +51,19 @@ export const buildNegativeLabCrosstalkProfile = (
     provenanceHash: buildNegativeLabCrosstalkProfileProvenanceHash(profile),
   });
 
+/** RawEngine-owned, stock-neutral C-41 starting point; not a film-stock emulation claim. */
+export const NEGATIVE_LAB_GENERIC_C41_CROSSTALK_PROFILE = buildNegativeLabCrosstalkProfile({
+  matrix: [
+    [1.08, -0.06, -0.02],
+    [-0.03, 1.07, -0.04],
+    [-0.02, -0.08, 1.1],
+  ],
+  profileId: 'negative_lab.crosstalk.generic.rawengine_c41_starting_point.v1',
+  provenance: 'rawengine_generic',
+  schemaVersion: 1,
+  strength: 0.35,
+});
+
 export const applyNegativeLabDensityCrosstalk = (
   densityRgb: readonly [number, number, number],
   crosstalkProfile: NegativeLabCrosstalkProfile = NEGATIVE_LAB_IDENTITY_CROSSTALK_PROFILE,

@@ -2042,6 +2042,7 @@ function NegativeLabSession({
           try {
             const result = await renderNegativeLabRuntimeDryRunPreview({
               command: runtimePreviewCommand,
+              crosstalkProfile: selectedProfileSnapshot?.crosstalkProfile ?? null,
               path: previewImagePath,
               recipeParams: currentParams,
             });
@@ -2267,6 +2268,7 @@ function NegativeLabSession({
 
         try {
           const url: string = await invoke(Invokes.PreviewNegativeConversion, {
+            crosstalkProfile: row.selectedProfileSnapshot.crosstalkProfile,
             params: candidateParams,
             path: selectedImagePath,
           });

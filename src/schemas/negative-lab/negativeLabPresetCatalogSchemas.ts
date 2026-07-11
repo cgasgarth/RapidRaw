@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { negativeLabCrosstalkProfileSchema } from './negativeLabCrosstalkProfileSchemas';
 
 export const negativeLabPresetIdSchema = z.string().regex(/^negative_lab\.generic\.(?:c41|bw)\.[a-z0-9_]+\.v[0-9]+$/u);
 
@@ -351,6 +352,22 @@ export const negativeLabNativeDensityNormalizationMetricsSchema = z
       })
       .strict(),
     clippedPixelCount: z.number().int().nonnegative(),
+    crosstalkReceipt: z
+      .object({
+        appliedMatrix: negativeLabCrosstalkProfileSchema.shape.matrix,
+        boundsAnalysisIdentity: z.literal('post_crosstalk_density:fixed_grid_block_median_luma_color_v1'),
+        conditioning: z.number().positive(),
+        postNeutralError: z.number().nonnegative(),
+        preNeutralError: z.number().nonnegative(),
+        profileId: negativeLabCrosstalkProfileSchema.shape.profileId,
+        provenanceHash: negativeLabCrosstalkProfileSchema.shape.provenanceHash,
+        requestedMatrix: negativeLabCrosstalkProfileSchema.shape.matrix,
+        rowSums: z.tuple([z.number(), z.number(), z.number()]),
+        schemaVersion: z.literal(1),
+        strength: z.number().min(0).max(1),
+      })
+      .strict()
+      .optional(),
     densityRangeUnclamped: z.number().nonnegative(),
     epsilonClampedPixelCount: z.number().int().nonnegative(),
     rendererVersion: z.number().int().positive(),
