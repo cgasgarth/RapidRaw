@@ -2607,6 +2607,9 @@ pub fn run() {
     }
 
     builder
+        .register_uri_scheme_protocol(thumbnail_resources::THUMBNAIL_PROTOCOL, |context, request| {
+            thumbnail_resources::protocol_response(context.app_handle(), request.uri())
+        })
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
@@ -2961,6 +2964,8 @@ pub fn run() {
             file_management::get_folder_refresh_snapshot,
             file_management::get_pinned_folder_trees,
             file_management::update_thumbnail_queue,
+            thumbnail_resources::get_thumbnail_resource,
+            thumbnail_resources::get_thumbnail_transport_metrics,
             file_management::create_folder,
             file_management::delete_folder,
             file_management::copy_files,

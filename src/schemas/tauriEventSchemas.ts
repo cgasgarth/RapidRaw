@@ -31,13 +31,27 @@ export const thumbnailSmartPreviewPayloadSchema = z
   })
   .strict();
 
+export const thumbnailResourceDescriptorSchema = z
+  .object({
+    byteLen: nonnegativeNumberSchema,
+    generation: nonnegativeNumberSchema,
+    height: nonnegativeNumberSchema,
+    mimeType: z.literal('image/jpeg'),
+    resourceId: z.string().regex(/^[a-f0-9]{64}$/),
+    revision: z.string().regex(/^[a-f0-9]{64}$/),
+    source: z.enum(['diskCache', 'generated', 'smartPreview']),
+    width: nonnegativeNumberSchema,
+  })
+  .strict();
+
 export const thumbnailGeneratedPayloadSchema = z
   .object({
-    data: z.string().nullable().optional(),
     is_edited: z.boolean().optional(),
     path: z.string(),
     rating: z.number().optional(),
+    resource: thumbnailResourceDescriptorSchema,
     smartPreview: thumbnailSmartPreviewPayloadSchema.optional().nullable(),
+    smartPreviewResource: thumbnailResourceDescriptorSchema.optional().nullable(),
   })
   .loose();
 

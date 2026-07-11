@@ -69,6 +69,7 @@ import {
   WAVEFORM_UPDATE_EVENT,
   WGPU_FRAME_READY_EVENT,
 } from '../../utils/tauriEventNames';
+import { thumbnailResourceCache } from '../../utils/thumbnailResources';
 
 interface TauriListenerProps {
   refreshAllFolderTrees: () => void;
@@ -256,12 +257,10 @@ export function useTauriListeners({ refreshAllFolderTrees, refreshImageList, mar
       }),
       listen<unknown>(THUMBNAIL_GENERATED_EVENT, (event) => {
         if (!isEffectActive) return;
-        const { path, data, rating, is_edited, smartPreview } = parseThumbnailGeneratedPayload(event.payload);
+        const { path, resource, rating, is_edited, smartPreview } = parseThumbnailGeneratedPayload(event.payload);
 
-        if (data) {
-          thumbnailBuffer.current[path] = data;
-          refs.current.markGenerated(path);
-        }
+        thumbnailBuffer.current[path] = thumbnailResourceCache.setProtocol(path, resource);
+        refs.current.markGenerated(path);
         if (smartPreview) {
           smartPreviewBuffer.current[path] = smartPreview;
         }
@@ -271,9 +270,7 @@ export function useTauriListeners({ refreshAllFolderTrees, refreshImageList, mar
         if (is_edited !== undefined) {
           editStatusBuffer.current[path] = is_edited;
         }
-        if (data || rating !== undefined || is_edited !== undefined || smartPreview) {
-          scheduleFlush();
-        }
+        scheduleFlush();
       }),
       listen<unknown>(AI_MODEL_DOWNLOAD_START_EVENT, (event) => {
         if (isEffectActive)
@@ -553,6 +550,7 @@ export function useTauriListeners({ refreshAllFolderTrees, refreshImageList, mar
         flushHandle.current = null;
       }
       thumbnailBuffer.current = {};
+      thumbnailResourceCache.clear();
       smartPreviewBuffer.current = {};
       ratingBuffer.current = {};
       listeners.forEach((p) => {
