@@ -618,8 +618,7 @@ export function useImageProcessing(
           navigatorPreviewArtifact: {
             graphIdentity: request.identity.graphIdentity,
             id: `${request.identity.graphIdentity}:${String(request.identity.generation)}:${String(request.requestId)}`,
-            imageSessionId:
-              useEditorStore.getState().imageSession?.id ?? String(request.identity.imageSessionId),
+            imageSessionId: useEditorStore.getState().imageSession?.id ?? String(request.identity.imageSessionId),
             url,
           },
           previewScopeStatus:
