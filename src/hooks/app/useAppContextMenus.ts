@@ -66,7 +66,7 @@ import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
-import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../../utils/adjustments';
+import { type Adjustments, normalizeLoadedAdjustments } from '../../utils/adjustments';
 import { createFocusStackSourcePreflightMetadata } from '../../utils/focusStackSourcePreflight';
 import { findAlbumById } from '../../utils/folderTreeUtils';
 import { buildHdrLaunchSourceMetadata, resolveHdrLaunchSourcePaths } from '../../utils/hdrAutoStackSelection';
@@ -140,6 +140,13 @@ const collectFolderRelinkSourcePaths = (imageList: ImageFile[], folderPath: stri
         .filter((imagePath) => isRelinkPathInside(imagePath, folderPath)),
     ),
   ).sort((left, right) => left.localeCompare(right));
+
+export async function persistEditorResetForPath(
+  path: string,
+  resetAdjustments: (paths?: string[]) => Promise<void>,
+): Promise<void> {
+  await resetAdjustments([path]);
+}
 
 export function useAppContextMenus(props: UseAppContextMenusProps) {
   const { t } = useTranslation();
@@ -235,8 +242,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       event.preventDefault();
       event.stopPropagation();
 
-      const { selectedImage, history, historyIndex, undo, redo, resetHistory, copiedAdjustments, setEditor } =
-        useEditorStore.getState();
+      const { selectedImage, history, historyIndex, undo, redo, copiedAdjustments } = useEditorStore.getState();
       const { imageList } = useLibraryStore.getState();
       const { appSettings, supportedTypes } = useSettingsStore.getState();
       const { isFullScreen, setRightPanel, setUI } = useUIStore.getState();
@@ -390,16 +396,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               {
                 label: t('contextMenus.editor.confirmReset'),
                 onClick: () => {
-                  const originalAspectRatio =
-                    selectedImage.width && selectedImage.height ? selectedImage.width / selectedImage.height : null;
-                  resetHistory({
-                    ...INITIAL_ADJUSTMENTS,
-                    aspectRatio: originalAspectRatio,
-                    aiPatches: [],
-                  });
-                  setEditor({
-                    adjustments: { ...INITIAL_ADJUSTMENTS, aspectRatio: originalAspectRatio, aiPatches: [] },
-                  });
+                  void persistEditorResetForPath(selectedImage.path, handleResetAdjustments);
                 },
               },
             ],
@@ -412,6 +409,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       getCommonTags,
       handleCopyAdjustments,
       handlePasteAdjustments,
+      handleResetAdjustments,
       handleAutoAdjustments,
       handleRate,
       handleSetColorLabel,
