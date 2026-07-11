@@ -1,5 +1,7 @@
 use super::{
     alignment::{self, RectF64, SimilarityTransform},
+    focus_measure, labels,
+    map_artifact::{self, FocusEvidenceMetrics, FocusMapArtifact},
     raw_frame::{self, DecodedFocusSource, PROXY_ID, RectU32},
     warp::{self, SourcePreview},
 };
@@ -81,6 +83,18 @@ pub(crate) struct FocusStackInputPlan {
     common_overlap: Option<RectF64>,
     transforms: Vec<SimilarityTransform>,
     previews: Vec<SourcePreview>,
+    focus_evidence: Option<FocusEvidence>,
+}
+
+#[derive(Clone, Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FocusEvidence {
+    algorithm_id: &'static str,
+    label_policy_id: &'static str,
+    noise_model_source: &'static str,
+    policy: focus_measure::FocusMeasurePolicy,
+    map_artifact: FocusMapArtifact,
+    metrics: FocusEvidenceMetrics,
 }
 
 pub(crate) fn build_input_plan(
@@ -318,11 +332,52 @@ fn finish(
     } else {
         Vec::new()
     };
+    let focus_evidence = if blocks.is_empty() {
+        let crop = common_overlap.as_ref().expect("checked common crop");
+        let response = focus_measure::compute(
+            &decoded,
+            &transforms,
+            crop,
+            reference_source_index,
+            cancelled,
+        )?;
+        let policy = response.policy.clone();
+        let maps = labels::select_and_regularize(&response, cancelled)?;
+        let coordinate_identity = format!(
+            "{}:{:.6}:{:.6}:{:.6}:{:.6}",
+            settings.common_crop_identity, crop.x, crop.y, crop.width, crop.height
+        );
+        let algorithm_identity = format!(
+            "{}:{}:{}",
+            focus_measure::POLICY_ID,
+            labels::POLICY_ID,
+            input_plan_hash
+        );
+        let (map_artifact, metrics) = map_artifact::build(
+            &maps,
+            &coordinate_identity,
+            &algorithm_identity,
+            decoded.len(),
+        )?;
+        Some(FocusEvidence {
+            algorithm_id: focus_measure::POLICY_ID,
+            label_policy_id: labels::POLICY_ID,
+            noise_model_source: "raw_estimate_or_robust_high_pass_mad",
+            policy,
+            map_artifact,
+            metrics,
+        })
+    } else {
+        None
+    };
     let preview_hashes = previews
         .iter()
         .map(|preview| (&preview.source_index, &preview.preview_hash))
         .collect::<Vec<_>>();
-    let canonical = serde_json::json!({"inputPlanHash": input_plan_hash, "alignmentAlgorithmId": alignment::ALGORITHM_ID, "alignmentPolicyId": alignment::POLICY_ID, "interpolationPolicyId": warp::WARP_ID, "transforms": transforms, "commonOverlap": common_overlap, "previewHashes": preview_hashes, "warningCodes": warnings, "blockCodes": blocks});
+    let evidence_hash = focus_evidence
+        .as_ref()
+        .map(|evidence| &evidence.map_artifact.content_hash);
+    let canonical = serde_json::json!({"inputPlanHash": input_plan_hash, "alignmentAlgorithmId": alignment::ALGORITHM_ID, "alignmentPolicyId": alignment::POLICY_ID, "interpolationPolicyId": warp::WARP_ID, "transforms": transforms, "commonOverlap": common_overlap, "previewHashes": preview_hashes, "focusEvidenceHash": evidence_hash, "warningCodes": warnings, "blockCodes": blocks});
     if cancelled() {
         return Err("focus_stack_plan_cancelled:plan_publication".to_string());
     }
@@ -353,6 +408,7 @@ fn finish(
         common_overlap,
         transforms,
         previews,
+        focus_evidence,
     })
 }
 
@@ -673,7 +729,13 @@ mod tests {
                 "exposureScalar": transform.exposure_normalization.scalar,
             })).collect::<Vec<_>>(),
             "previewHashes": result.previews.iter().map(|preview| preview.preview_hash.clone()).collect::<Vec<_>>(),
-            "nonClaims": ["no_focus_evidence", "no_label_map", "no_pyramid_blend", "no_durable_output"]
+            "focusEvidence": result.focus_evidence.as_ref().map(|evidence| serde_json::json!({
+                "algorithmId": evidence.algorithm_id,
+                "labelPolicyId": evidence.label_policy_id,
+                "mapHash": evidence.map_artifact.content_hash,
+                "metrics": evidence.metrics,
+            })),
+            "nonClaims": ["no_pyramid_blend", "no_durable_output"]
         });
         let output = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../private-artifacts/validation/computational-merge/focus-stack-intake/alaska-plan.json");
         std::fs::create_dir_all(output.parent().unwrap()).unwrap();

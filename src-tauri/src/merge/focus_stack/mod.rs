@@ -1,4 +1,7 @@
 mod alignment;
+mod focus_measure;
+mod labels;
+mod map_artifact;
 mod raw_frame;
 mod runtime;
 mod warp;
