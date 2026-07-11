@@ -697,15 +697,30 @@ export function HdrModal({
             </div>
             <ComputationalMergeAppServerBadge family="hdr" statusLabel={t('editor.ai.connection.ready')} />
           </div>
-          {runtimePlan?.readiness === 'alignment_plan_ready' && runtimePlan.alignmentArtifact ? (
+          {runtimePlan?.staticRadiancePreview && runtimePlan.alignmentArtifact ? (
             <section
               className="mb-5 grid gap-2 border-y border-border-color py-3"
               data-alignment-artifact-handle={runtimePlan.alignmentArtifact.handle}
               data-alignment-artifact-hash={runtimePlan.alignmentArtifact.artifactHash}
               data-common-overlap-fraction={runtimePlan.commonOverlapFraction}
               data-reference-source-index={runtimePlan.referenceSourceIndex}
-              data-testid="hdr-native-alignment-review"
+              data-action-state={runtimePlan.staticRadiancePreview.actionState}
+              data-motion-coverage={runtimePlan.staticRadiancePreview.motionCoverage}
+              data-radiance-hash={runtimePlan.staticRadiancePreview.radianceHash}
+              data-radiance-handle={runtimePlan.staticRadiancePreview.radianceHandle}
+              data-recovered-highlight-coverage={runtimePlan.staticRadiancePreview.recoveredHighlightCoverage}
+              data-residual-hash={runtimePlan.staticRadiancePreview.residualHash}
+              data-support-hash={runtimePlan.staticRadiancePreview.supportHash}
+              data-tone-map-preview-hash={runtimePlan.staticRadiancePreview.toneMappedPreviewHash}
+              data-variance-hash={runtimePlan.staticRadiancePreview.varianceHash}
+              data-weight-hash={runtimePlan.staticRadiancePreview.weightHash}
+              data-testid="hdr-native-static-radiance-review"
             >
+              <img
+                alt={t('modals.hdr.title')}
+                className="max-h-64 w-full bg-black object-contain"
+                src={runtimePlan.staticRadiancePreview.toneMappedPreviewDataUrl}
+              />
               {runtimePlan.sources.map((source) =>
                 'alignment' in source ? (
                   <div
@@ -723,7 +738,9 @@ export function HdrModal({
                 ) : null,
               )}
               <UiText variant={TextVariants.small} color={TextColors.secondary}>
-                Alignment review only. Radiance reconstruction and Apply are unavailable.
+                {runtimePlan.staticRadiancePreview.actionState === 'deghost_required'
+                  ? 'Static radiance preview. Motion diagnostics require deghosting; Apply remains unavailable.'
+                  : 'Static scene-linear radiance with a separate tone-mapped review. Apply remains unavailable.'}
               </UiText>
             </section>
           ) : null}

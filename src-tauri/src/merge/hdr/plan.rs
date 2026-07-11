@@ -1,6 +1,7 @@
 use super::{
     alignment::{ALIGNMENT_POLICY_ID, AlignmentReceipt, align},
     source_frame::{SourceFrame, decode_source},
+    static_merge::{StaticRadiancePreview, reconstruct_static_preview},
 };
 
 pub(crate) const PLAN_SCHEMA_VERSION: u32 = 2;
@@ -35,6 +36,7 @@ pub(crate) struct HdrAlignmentPlanResponse {
     pub bracket_count: usize,
     pub common_overlap_fraction: f32,
     pub readiness: &'static str,
+    pub static_radiance_preview: StaticRadiancePreview,
     pub reference_source_index: usize,
     pub schema_version: u32,
     pub sources: Vec<PlannedSource>,
@@ -173,6 +175,7 @@ fn build_alignment_plan_from_frames(
     });
     let bytes = serde_json::to_vec(&canonical).map_err(|error| error.to_string())?;
     let hash = format!("blake3:{}", blake3::hash(&bytes).to_hex());
+    let static_radiance_preview = reconstruct_static_preview(&planned, &hash, cancelled)?;
     Ok(HdrAlignmentPlanResponse {
         accepted: true,
         accepted_dry_run_plan_id: format!("hdr_alignment_plan_{}", &hash[7..23]),
@@ -187,11 +190,12 @@ fn build_alignment_plan_from_frames(
         block_codes: Vec::new(),
         bracket_count: planned.len(),
         common_overlap_fraction,
-        readiness: "alignment_plan_ready",
+        readiness: static_radiance_preview.action_state,
         reference_source_index,
         schema_version: PLAN_SCHEMA_VERSION,
+        static_radiance_preview,
         sources: planned,
-        warning_codes: vec!["radiance_reconstruction_pending".to_string()],
+        warning_codes: Vec::new(),
     })
 }
 
@@ -257,6 +261,13 @@ mod tests {
                 scale: 1.0,
                 width,
             },
+            color_proxy: crate::merge::hdr::source_frame::ColorProxy {
+                height,
+                pixels: scene.iter().map(|value| [*value; 3]).collect(),
+                valid: vec![[true; 3]; width * height],
+                clipped: vec![[false; 3]; width * height],
+                width,
+            },
             source_index: index,
             width,
         }
@@ -271,6 +282,24 @@ mod tests {
         assert_eq!(
             first.accepted_dry_run_plan_hash,
             second.accepted_dry_run_plan_hash
+        );
+        assert_eq!(
+            first.static_radiance_preview.radiance_hash,
+            second.static_radiance_preview.radiance_hash
+        );
+        assert_eq!(
+            first.static_radiance_preview.tone_mapped_preview_hash,
+            second.static_radiance_preview.tone_mapped_preview_hash
+        );
+        assert!(
+            first
+                .static_radiance_preview
+                .tone_mapped_preview_data_url
+                .starts_with("data:image/png;base64,")
+        );
+        assert_eq!(
+            first.static_radiance_preview.plan_hash,
+            first.accepted_dry_run_plan_hash
         );
         assert_eq!(first.sources[0].alignment.matrix[2], -2.0);
         assert_eq!(first.sources[2].alignment.matrix[2], 3.0);
