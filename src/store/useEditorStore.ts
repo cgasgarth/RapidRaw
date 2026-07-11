@@ -120,6 +120,13 @@ export const createEditorImageSession = ({
   status: source === 'cache' ? 'ready' : 'loading',
 });
 
+export interface NavigatorPreviewArtifact {
+  graphIdentity: string;
+  id: string;
+  imageSessionId: string;
+  url: string;
+}
+
 interface EditorState {
   // Core Image & Adjustments
   selectedImage: SelectedImage | null;
@@ -139,6 +146,7 @@ interface EditorState {
 
   // Previews & Overlays
   finalPreviewUrl: string | null;
+  navigatorPreviewArtifact: NavigatorPreviewArtifact | null;
   uncroppedAdjustedPreviewUrl: string | null;
   transformedOriginalUrl: string | null;
   interactivePatch: InteractivePatch | null;
@@ -246,6 +254,7 @@ const createSessionCheckpointId = (historyIndex: number): string => {
 const historyNavigationPreviewInvalidation = {
   exportSoftProofTransform: null,
   finalPreviewUrl: null,
+  navigatorPreviewArtifact: null,
   gamutWarningOverlay: null,
   interactivePatch: null,
   previewQualityStatus: null,
@@ -323,6 +332,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   historyIndex: 0,
 
   finalPreviewUrl: null,
+  navigatorPreviewArtifact: null,
   uncroppedAdjustedPreviewUrl: null,
   compare: DEFAULT_EDITOR_COMPARE_STATE,
   histogram: null,
@@ -416,6 +426,7 @@ export const useEditorStore = create<EditorState>((set) => ({
       }
       if ('imageSession' in update) {
         update.imageSessionId = update.imageSession?.generation ?? state.imageSessionId + 1;
+        update.navigatorPreviewArtifact = null;
         state.patchResidency.reset(update.imageSessionId);
       } else if (
         'selectedImage' in update &&
@@ -431,7 +442,11 @@ export const useEditorStore = create<EditorState>((set) => ({
                 path: update.selectedImage?.path ?? '',
                 source: update.selectedImage?.isReady ? 'cache' : 'cold-load',
               });
+        update.navigatorPreviewArtifact = null;
         state.patchResidency.reset(update.imageSessionId);
+      }
+      if ('finalPreviewUrl' in update && !('navigatorPreviewArtifact' in update)) {
+        update.navigatorPreviewArtifact = null;
       }
       if (viewportRevisionKeys.some((key) => key in update && update[key] !== state[key])) {
         update.viewportRevision = state.viewportRevision + 1;
