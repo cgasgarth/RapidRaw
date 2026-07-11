@@ -3,6 +3,7 @@ pub(crate) mod film_look_render;
 pub(crate) mod image_analytics;
 pub(crate) mod image_processing;
 pub(crate) mod mask_generation;
+pub(crate) mod preview_scheduler;
 pub(crate) mod preview_worker;
 pub(crate) mod render_caches;
 pub(crate) mod render_pipeline;
