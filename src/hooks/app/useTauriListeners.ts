@@ -1,7 +1,7 @@
 import { listen } from '@tauri-apps/api/event';
 import { useEffect, useRef } from 'react';
 import type { ChannelConfig } from '../../components/adjustments/Curves';
-import type { WaveformData } from '../../components/ui/AppProperties';
+import type { AnalyticsResourceDescriptor, WaveformData } from '../../components/ui/AppProperties';
 import { Status } from '../../components/ui/ExportImportProperties';
 import {
   gamutWarningOverlayPayloadSchema,
@@ -35,6 +35,7 @@ import {
 import {
   AI_MODEL_DOWNLOAD_FINISH_EVENT,
   AI_MODEL_DOWNLOAD_START_EVENT,
+  ANALYTICS_RESULT_EVENT,
   BATCH_EXPORT_PROGRESS_EVENT,
   CULLING_COMPLETE_EVENT,
   CULLING_ERROR_EVENT,
@@ -81,6 +82,23 @@ interface ImageAnalyticsPayload<TData> {
   data: TData;
   path: string;
 }
+
+interface AnalyticsResultPayload {
+  frameId: { graphRevision: number; imageSession: number; previewGeneration: number };
+  histogram: { blue: number[]; green: number[]; luma: number[]; red: number[] } | null;
+  path: string;
+  requestedProducts: number;
+  scopes: {
+    height: number;
+    luma: AnalyticsResourceDescriptor | null;
+    parade: AnalyticsResourceDescriptor | null;
+    rgb: AnalyticsResourceDescriptor | null;
+    vectorscope: AnalyticsResourceDescriptor | null;
+    width: number;
+  } | null;
+}
+
+const analyticsFrameByPath = new Map<string, { imageSession: number; previewGeneration: number }>();
 
 const PREVIEW_SCOPE_DISPLAY_TRANSFORM_LABEL = 'Display preview transform';
 const PREVIEW_SCOPE_SOURCE_LABEL = 'Edited preview';
@@ -196,6 +214,52 @@ export function useTauriListeners({ refreshAllFolderTrees, refreshImageList, mar
     };
 
     const listeners = [
+      listen<AnalyticsResultPayload>(ANALYTICS_RESULT_EVENT, (event) => {
+        const result = event.payload;
+        const selectedPath = useEditorStore.getState().selectedImage?.path;
+        if (!isEffectActive || result.path !== selectedPath) return;
+        const previous = analyticsFrameByPath.get(result.path);
+        if (
+          previous &&
+          (result.frameId.imageSession < previous.imageSession ||
+            (result.frameId.imageSession === previous.imageSession &&
+              result.frameId.previewGeneration < previous.previewGeneration))
+        )
+          return;
+        analyticsFrameByPath.set(result.path, result.frameId);
+        const histogram = result.histogram
+          ? {
+              blue: { color: '#3b82f6', data: result.histogram.blue },
+              green: { color: '#22c55e', data: result.histogram.green },
+              luma: { color: '#ffffff', data: result.histogram.luma },
+              red: { color: '#ef4444', data: result.histogram.red },
+            }
+          : null;
+        const scopes = result.scopes;
+        const waveform = scopes
+          ? {
+              blue: '',
+              green: '',
+              height: scopes.height,
+              luma: scopes.luma?.url ?? '',
+              parade: scopes.parade?.url ?? '',
+              red: '',
+              rgb: scopes.rgb?.url ?? '',
+              vectorscope: scopes.vectorscope?.url ?? '',
+              width: scopes.width,
+            }
+          : null;
+        useEditorStore.getState().setEditor({
+          histogram,
+          previewScopeRecoveryState: 'idle',
+          previewScopeStatus: buildPreviewScopeStatus({
+            histogramReady: histogram !== null,
+            path: result.path,
+            waveformReady: waveform !== null,
+          }),
+          waveform,
+        });
+      }),
       listen<unknown>(PREVIEW_UPDATE_UNCROPPED_EVENT, (event) => {
         if (isEffectActive)
           useEditorStore.getState().setEditor({ uncroppedAdjustedPreviewUrl: parseStringPayload(event.payload) });
