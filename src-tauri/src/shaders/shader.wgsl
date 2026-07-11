@@ -233,6 +233,10 @@ struct AllAdjustments {
     tile_offset_x: u32,
     tile_offset_y: u32,
     mask_atlas_cols: u32,
+    blur_pass_flags: u32,
+    _pad_blur_flags1: u32,
+    _pad_blur_flags2: u32,
+    _pad_blur_flags3: u32,
 }
 
 struct HslRange {
@@ -1786,10 +1790,22 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         t_luma_nr, t_color_nr, scale, is_raw
     );
 
-    let sharpness_blurred = textureLoad(sharpness_blur_texture, id.xy, 0).rgb;
-    let tonal_blurred = textureLoad(tonal_blur_texture, id.xy, 0).rgb;
-    let clarity_blurred = textureLoad(clarity_blur_texture, id.xy, 0).rgb;
-    let structure_blurred = textureLoad(structure_blur_texture, id.xy, 0).rgb;
+    var sharpness_blurred = initial_linear_rgb;
+    var tonal_blurred = initial_linear_rgb;
+    var clarity_blurred = initial_linear_rgb;
+    var structure_blurred = initial_linear_rgb;
+    if ((adjustments.blur_pass_flags & 1u) != 0u) {
+        sharpness_blurred = textureLoad(sharpness_blur_texture, id.xy, 0).rgb;
+    }
+    if ((adjustments.blur_pass_flags & 2u) != 0u) {
+        tonal_blurred = textureLoad(tonal_blur_texture, id.xy, 0).rgb;
+    }
+    if ((adjustments.blur_pass_flags & 4u) != 0u) {
+        clarity_blurred = textureLoad(clarity_blur_texture, id.xy, 0).rgb;
+    }
+    if ((adjustments.blur_pass_flags & 8u) != 0u) {
+        structure_blurred = textureLoad(structure_blur_texture, id.xy, 0).rgb;
+    }
 
     var locally_contrasted_rgb = initial_linear_rgb;
 
