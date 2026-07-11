@@ -10,6 +10,7 @@ import AppModals from './components/modals/AppModals';
 import { EditorHistorySection, EditorSnapshotsSection } from './components/panel/editor/EditorHistorySections';
 import EditorLeftSidebar, { type EditorLeftSectionId } from './components/panel/editor/EditorLeftSidebar';
 import EditorNavigator, { type EditorTransformController } from './components/panel/editor/EditorNavigator';
+import { FocusStackRetouchPanel } from './components/panel/editor/FocusStackRetouchPanel';
 import FolderTreePanel from './components/panel/FolderTree';
 import { PresetsPanel } from './components/panel/right/color/PresetsPanel';
 import ExportPanel from './components/panel/right/export/ExportPanel';
@@ -745,6 +746,7 @@ function App() {
                   setEditorRegionVisibility('leftSidebar', visible);
                 }}
                 slots={{
+                  focusSources: <FocusStackRetouchPanel packagePath={selectedImage?.path ?? ''} />,
                   history: <EditorHistorySection />,
                   navigator: (
                     <EditorNavigator onZoomChange={handleZoomChange} transformControllerRef={transformWrapperRef} />
