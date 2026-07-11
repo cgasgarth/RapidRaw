@@ -154,6 +154,10 @@ export function PanoramaModal({
       : `row ${Math.round(runtimePlanSourceGeometryConfidence.row_confidence * 100)}% / col ${Math.round(
           runtimePlanSourceGeometryConfidence.column_confidence * 100,
         )}% / all ${Math.round(runtimePlanSourceGeometryConfidence.overall_confidence * 100)}%`;
+  const alignmentPlan = runtimePlan?.alignment_plan;
+  const acceptedAlignmentEdges = alignmentPlan?.edges.filter((edge) => edge.status === 'accepted') ?? [];
+  const rejectedAlignmentEdges = alignmentPlan?.edges.filter((edge) => edge.status === 'rejected') ?? [];
+  const calibratedSourceCount = alignmentPlan?.sources.filter((source) => source.calibration.observable).length ?? 0;
   const sourceReadinessLabel = `${t('modals.panorama.summarySourceCount', { count: imageCount ?? 0 })} - ${
     isSourceCountValid ? t('modals.panorama.summaryReady') : t('modals.panorama.summaryBlocked')
   }`;
@@ -819,6 +823,19 @@ export function PanoramaModal({
             data-plan-status={runtimePlan?.preflight.status ?? 'pending'}
             data-projection={settings.projection}
             data-runtime-plan-ready={String(runtimePlan !== null)}
+            data-alignment-plan-hash={alignmentPlan?.planHash ?? ''}
+            data-alignment-readiness={alignmentPlan?.readiness ?? 'pending'}
+            data-alignment-accepted-edge-count={acceptedAlignmentEdges.length}
+            data-alignment-rejected-edge-count={rejectedAlignmentEdges.length}
+            data-alignment-rejection-reasons={rejectedAlignmentEdges.flatMap((edge) => edge.rejectionReasons).join(',')}
+            data-calibrated-source-count={calibratedSourceCount}
+            data-cycle-closure-error-px={alignmentPlan?.globalSolution?.cycleClosureErrorPx ?? ''}
+            data-global-residual-p95-px={alignmentPlan?.globalSolution?.residualP95Px ?? ''}
+            data-match-overlay-artifact-ids={
+              alignmentPlan?.edges.map((edge) => edge.overlay.artifactId).join(',') ?? ''
+            }
+            data-overlap-handoff-count={alignmentPlan?.overlapSeamHandoff.length ?? 0}
+            data-reference-source-index={alignmentPlan?.globalSolution?.referenceSourceIndex ?? ''}
             data-source-geometry-layout={runtimePlanSourceGeometry?.layout ?? 'pending'}
             data-source-geometry-support={runtimePlanSourceGeometry?.support ?? 'pending'}
             data-source-geometry-column-count-estimate={runtimePlanSourceGeometry?.column_count_estimate ?? ''}
@@ -869,6 +886,21 @@ export function PanoramaModal({
               {
                 label: 'Confidence',
                 value: runtimePlanSourceGeometryConfidenceLabel,
+              },
+              {
+                label: 'Alignment',
+                value: alignmentPlan?.readiness ?? t('modals.panorama.summaryBlocked'),
+              },
+              {
+                label: 'Matches',
+                value: `${acceptedAlignmentEdges.length} accepted / ${rejectedAlignmentEdges.length} rejected`,
+              },
+              {
+                label: 'Residual p95',
+                value:
+                  alignmentPlan?.globalSolution == null
+                    ? t('modals.panorama.summaryBlocked')
+                    : `${alignmentPlan.globalSolution.residualP95Px.toFixed(2)} px`,
               },
             ].map((item) => (
               <div
