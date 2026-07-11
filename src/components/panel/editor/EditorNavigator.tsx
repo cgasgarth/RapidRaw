@@ -1,10 +1,10 @@
 import cx from 'clsx';
 import { Loader2, TriangleAlert } from 'lucide-react';
 import type { KeyboardEvent, PointerEvent, RefObject } from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
-import { useEditorStore } from '../../../store/useEditorStore';
+import { type NavigatorPreviewArtifact, useEditorStore } from '../../../store/useEditorStore';
 import { getNavigatorPanTransform, getNavigatorViewportRect } from '../../../utils/editorNavigator';
 import type { ViewportSnapshot, ViewportTransform } from '../../../utils/editorViewportBounds';
 import {
@@ -27,24 +27,48 @@ interface EditorNavigatorProps {
   transformControllerRef: RefObject<EditorTransformController | null>;
 }
 
-type PreviewPhase = 'empty' | 'error' | 'loading' | 'ready';
-interface PreviewSource {
-  graphIdentity: string;
-  observedUrl: string | null;
-  url: string | null;
+export type NavigatorPreviewState =
+  | { artifact: null; phase: 'empty' }
+  | { artifact: NavigatorPreviewArtifact; phase: 'error' | 'loading' | 'ready' };
+
+export type NavigatorPreviewEvent =
+  | { artifactId: string; type: 'image-error' }
+  | { artifactId: string; type: 'image-load' };
+
+export function createNavigatorPreviewState(artifact: NavigatorPreviewArtifact | null): NavigatorPreviewState {
+  return artifact === null ? { artifact: null, phase: 'empty' } : { artifact, phase: 'loading' };
+}
+
+export function navigatorPreviewReducer(
+  state: NavigatorPreviewState,
+  event: NavigatorPreviewEvent,
+): NavigatorPreviewState {
+  if (state.artifact === null || state.artifact.id !== event.artifactId) return state;
+  return { artifact: state.artifact, phase: event.type === 'image-load' ? 'ready' : 'error' };
 }
 
 const sameTransform = (left: ViewportTransform, right: ViewportTransform): boolean =>
   left.scale === right.scale && left.positionX === right.positionX && left.positionY === right.positionY;
 
-export default function EditorNavigator({ onZoomChange, transformControllerRef }: EditorNavigatorProps) {
+export default function EditorNavigator(props: EditorNavigatorProps) {
+  const identity = useEditorStore(
+    useShallow((state) => ({ artifact: state.navigatorPreviewArtifact, imageSessionId: state.imageSessionId })),
+  );
+  const sessionKey = identity.artifact?.id ?? `empty:${String(identity.imageSessionId)}`;
+  return <EditorNavigatorSession {...props} artifact={identity.artifact} key={sessionKey} />;
+}
+
+interface EditorNavigatorSessionProps extends EditorNavigatorProps {
+  artifact: NavigatorPreviewArtifact | null;
+}
+
+function EditorNavigatorSession({ artifact, onZoomChange, transformControllerRef }: EditorNavigatorSessionProps) {
   const { t } = useTranslation();
   const editor = useEditorStore(
     useShallow((state) => ({
       adjustments: state.adjustments,
       baseRenderSize: state.baseRenderSize,
       compare: state.compare,
-      finalPreviewUrl: state.finalPreviewUrl,
       originalSize: state.originalSize,
       selectedImage: state.selectedImage,
       zoomMode: state.zoomMode,
@@ -53,47 +77,23 @@ export default function EditorNavigator({ onZoomChange, transformControllerRef }
   const [transform, setTransform] = useState<ViewportTransform>(
     () => transformControllerRef.current?.instance?.transformState ?? { positionX: 0, positionY: 0, scale: 1 },
   );
-  const [preview, setPreview] = useState<{ identity: string; phase: PreviewPhase }>({ identity: '', phase: 'empty' });
+  const [preview, dispatchPreview] = useReducer(navigatorPreviewReducer, artifact, createNavigatorPreviewState);
   const [imageBox, setImageBox] = useState({ height: 0, left: 0, top: 0, width: 0 });
   const imageRef = useRef<HTMLImageElement | null>(null);
   const overviewRef = useRef<HTMLDivElement | null>(null);
   const dragOffsetRef = useRef<{ x: number; y: number } | null>(null);
   const pointerIdRef = useRef<number | null>(null);
-  const graphIdentity = JSON.stringify({
-    adjustments: editor.adjustments,
-    image: editor.selectedImage?.path ?? null,
-    orientation: editor.adjustments.orientationSteps ?? 0,
-    rotation: editor.adjustments.rotation ?? 0,
-  });
-  const [previewSource, setPreviewSource] = useState<PreviewSource>(() => ({
-    graphIdentity,
-    observedUrl: editor.finalPreviewUrl,
-    url: editor.finalPreviewUrl,
-  }));
-  const identity = JSON.stringify({ graphIdentity, preview: previewSource.url });
-  const identityRef = useRef(identity);
-  identityRef.current = identity;
+  const identity = artifact?.id ?? 'empty';
 
   useEffect(() => {
-    setPreviewSource((current) => {
-      if (current.observedUrl !== editor.finalPreviewUrl) {
-        return { graphIdentity, observedUrl: editor.finalPreviewUrl, url: editor.finalPreviewUrl };
-      }
-      if (current.graphIdentity !== graphIdentity) {
-        return { graphIdentity: '', observedUrl: current.observedUrl, url: null };
-      }
-      return current;
-    });
-  }, [editor.finalPreviewUrl, graphIdentity]);
-
-  useEffect(() => {
-    setPreview({ identity, phase: previewSource.url ? 'loading' : 'empty' });
-    const pointerId = pointerIdRef.current;
     const overview = overviewRef.current;
-    if (pointerId !== null && overview?.hasPointerCapture(pointerId)) overview.releasePointerCapture(pointerId);
-    dragOffsetRef.current = null;
-    pointerIdRef.current = null;
-  }, [identity, previewSource.url]);
+    return () => {
+      const pointerId = pointerIdRef.current;
+      if (pointerId !== null && overview?.hasPointerCapture(pointerId)) overview.releasePointerCapture(pointerId);
+      dragOffsetRef.current = null;
+      pointerIdRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     let frame = 0;
@@ -251,7 +251,13 @@ export default function EditorNavigator({ onZoomChange, transformControllerRef }
   };
 
   return (
-    <div className="space-y-2 p-2" data-testid="editor-navigator" data-preview-identity={identity}>
+    <div
+      className="space-y-2 p-2"
+      data-preview-graph={artifact?.graphIdentity ?? ''}
+      data-preview-identity={identity}
+      data-preview-session={artifact?.imageSessionId ?? ''}
+      data-testid="editor-navigator"
+    >
       {/* i18next-instrument-ignore */}
       <div
         aria-disabled={isFit}
@@ -271,36 +277,33 @@ export default function EditorNavigator({ onZoomChange, transformControllerRef }
         ref={overviewRef}
         tabIndex={isFit ? -1 : 0}
       >
-        {previewSource.url && (
+        {preview.artifact && (
           <img
             alt=""
             className="max-h-full max-w-full select-none object-contain"
             draggable={false}
-            key={identity}
             onError={() => {
-              if (identityRef.current === identity) setPreview({ identity, phase: 'error' });
+              dispatchPreview({ artifactId: preview.artifact.id, type: 'image-error' });
             }}
             onLoad={() => {
-              if (identityRef.current === identity) {
-                updateImageBox();
-                setPreview({ identity, phase: 'ready' });
-              }
+              updateImageBox();
+              dispatchPreview({ artifactId: preview.artifact.id, type: 'image-load' });
             }}
             ref={imageRef}
-            src={previewSource.url}
+            src={preview.artifact.url}
           />
         )}
-        {preview.identity === identity && preview.phase === 'loading' && (
+        {preview.phase === 'loading' && (
           <Loader2 aria-label="Loading Navigator preview" className="absolute animate-spin" size={18} />
         )}
-        {preview.identity === identity && preview.phase === 'error' && (
+        {preview.phase === 'error' && (
           <TriangleAlert aria-label="Navigator preview unavailable" className="absolute" size={18} />
         )}
-        {preview.identity === identity && preview.phase === 'empty' && (
+        {preview.phase === 'empty' && (
           /* i18next-instrument-ignore */
           <span className="text-xs text-text-tertiary">Refining</span>
         )}
-        {preview.identity === identity && preview.phase === 'ready' && (
+        {preview.phase === 'ready' && (
           <div
             className="pointer-events-none absolute"
             style={{ height: imageBox.height, left: imageBox.left, top: imageBox.top, width: imageBox.width }}
