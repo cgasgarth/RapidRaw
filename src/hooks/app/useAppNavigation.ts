@@ -152,6 +152,7 @@ export function useAppNavigation({
       activeMaskId: null,
       activeMaskContainerId: null,
       activeAiPatchContainerId: null,
+      isMaskControlHovered: false,
       isWbPickerActive: false,
       activeAiSubMaskId: null,
       transformedOriginalUrl: null,
@@ -214,6 +215,7 @@ export function useAppNavigation({
         activeMaskId: null,
         activeMaskContainerId: null,
         activeAiPatchContainerId: null,
+        isMaskControlHovered: false,
         activeAiSubMaskId: null,
         isWbPickerActive: false,
         transformedOriginalUrl: null,
@@ -459,6 +461,7 @@ export function useAppNavigation({
             gamutWarningOverlay: null,
             histogram: null,
             selectedImage: null,
+            isMaskControlHovered: false,
             uncroppedAdjustedPreviewUrl: null,
           });
           setEditor({ adjustments: INITIAL_ADJUSTMENTS });

@@ -19,7 +19,7 @@ import {
   type ImageFile,
   LibraryViewMode,
   Orientation,
-  Panel,
+  type Panel,
   ThumbnailAspectRatio,
   ThumbnailSize,
 } from './components/ui/AppProperties';
@@ -41,11 +41,11 @@ import { useLibraryActions } from './hooks/library/useLibraryActions';
 import { useSelectedFolderRefreshWatcher } from './hooks/library/useSelectedFolderRefreshWatcher';
 import { useSortedLibrary } from './hooks/library/useSortedLibrary';
 import { useThumbnails } from './hooks/library/useThumbnails';
+import { useEditorWorkspaceViewportSubscription } from './hooks/viewport/useEditorWorkspaceViewportSubscription';
 import { usePanelResize } from './hooks/viewport/usePanelResize';
 import './i18n';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 import type { FolderTree as FolderTreeNode } from './components/panel/FolderTree';
-import type { ImageDimensions } from './hooks/viewport/useImageRenderSize';
 import { useEditorStore } from './store/useEditorStore';
 import { useLibraryStore } from './store/useLibraryStore';
 import { useProcessStore } from './store/useProcessStore';
@@ -82,7 +82,6 @@ interface PreloadedAppData {
 }
 
 function App() {
-  const COMPACT_EDITOR_MAX_WIDTH = 900;
   useTooltipAccessibility();
 
   const { appSettings, osPlatform } = useSettingsStore(
@@ -109,10 +108,9 @@ function App() {
     setEditorRegionSize,
     setEditorRegionVisibility,
     setEditorLeftSectionExpanded,
-    setEditorWorkspaceViewport,
     setLibraryFolderTreeVisibility,
     setLibraryFolderTreeWidth,
-    setRightPanel,
+    selectEditorPanel,
   } = useUIStore(
     useShallow((state) => ({
       isFullScreen: state.isFullScreen,
@@ -131,10 +129,9 @@ function App() {
       setEditorRegionSize: state.setEditorRegionSize,
       setEditorRegionVisibility: state.setEditorRegionVisibility,
       setEditorLeftSectionExpanded: state.setEditorLeftSectionExpanded,
-      setEditorWorkspaceViewport: state.setEditorWorkspaceViewport,
       setLibraryFolderTreeVisibility: state.setLibraryFolderTreeVisibility,
       setLibraryFolderTreeWidth: state.setLibraryFolderTreeWidth,
-      setRightPanel: state.setRightPanel,
+      selectEditorPanel: state.selectEditorPanel,
     })),
   );
 
@@ -145,16 +142,13 @@ function App() {
     })),
   );
 
-  const { selectedImage, activeMaskContainerId, activeAiPatchContainerId, hasRenderedFirstFrame, setEditor } =
-    useEditorStore(
-      useShallow((state) => ({
-        selectedImage: state.selectedImage,
-        activeMaskContainerId: state.activeMaskContainerId,
-        activeAiPatchContainerId: state.activeAiPatchContainerId,
-        hasRenderedFirstFrame: state.hasRenderedFirstFrame,
-        setEditor: state.setEditor,
-      })),
-    );
+  const { selectedImage, hasRenderedFirstFrame, setEditor } = useEditorStore(
+    useShallow((state) => ({
+      selectedImage: state.selectedImage,
+      hasRenderedFirstFrame: state.hasRenderedFirstFrame,
+      setEditor: state.setEditor,
+    })),
+  );
 
   const defaultThumbnailSize = osPlatform === 'android' ? ThumbnailSize.Small : ThumbnailSize.Medium;
   const defaultLibraryViewMode = osPlatform === 'android' ? LibraryViewMode.Recursive : LibraryViewMode.Flat;
@@ -166,16 +160,7 @@ function App() {
 
   const prevAdjustmentsRef = useRef<PreviousAdjustments | null>(null);
 
-  const [viewportSize, setViewportSize] = useState<ImageDimensions>(() => {
-    if (typeof window === 'undefined') {
-      return { width: 0, height: 0 };
-    }
-
-    return {
-      width: Math.round(window.visualViewport?.width ?? window.innerWidth),
-      height: Math.round(window.visualViewport?.height ?? window.innerHeight),
-    };
-  });
+  const viewportSize = useEditorWorkspaceViewportSubscription();
 
   const isBackendReadyRef = useRef(true);
   const previewJobIdRef = useRef<number>(0);
@@ -205,17 +190,7 @@ function App() {
   useAiConnectorStatus();
 
   const isAndroid = osPlatform === 'android';
-  const isPortraitViewport = viewportSize.width > 0 && viewportSize.height > viewportSize.width;
-  const isCompactPortrait =
-    viewportSize.width > 0 && viewportSize.width <= COMPACT_EDITOR_MAX_WIDTH && isPortraitViewport;
-
-  useEffect(() => {
-    setEditorWorkspaceViewport({
-      height: viewportSize.height,
-      isCompactPortrait,
-      width: viewportSize.width,
-    });
-  }, [isCompactPortrait, setEditorWorkspaceViewport, viewportSize.height, viewportSize.width]);
+  const isCompactPortrait = viewportSize.isCompactPortrait;
 
   const compactEditorPanelMinHeight = 220;
   const compactEditorPreviewSafeHeight = 300;
@@ -500,33 +475,6 @@ function App() {
   });
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const updateViewportSize = () => {
-      const nextViewportSize = {
-        width: Math.round(window.visualViewport?.width ?? window.innerWidth),
-        height: Math.round(window.visualViewport?.height ?? window.innerHeight),
-      };
-
-      setViewportSize((prev) =>
-        prev.width === nextViewportSize.width && prev.height === nextViewportSize.height ? prev : nextViewportSize,
-      );
-    };
-
-    updateViewportSize();
-
-    window.addEventListener('resize', updateViewportSize);
-    window.addEventListener('orientationchange', updateViewportSize);
-    window.visualViewport?.addEventListener('resize', updateViewportSize);
-
-    return () => {
-      window.removeEventListener('resize', updateViewportSize);
-      window.removeEventListener('orientationchange', updateViewportSize);
-      window.visualViewport?.removeEventListener('resize', updateViewportSize);
-    };
-  }, []);
-
-  useEffect(() => {
     const handleGlobalContextMenu = (event: MouseEvent) => {
       event.preventDefault();
     };
@@ -535,15 +483,6 @@ function App() {
       window.removeEventListener('contextmenu', handleGlobalContextMenu);
     };
   }, []);
-
-  useEffect(() => {
-    if (
-      (activeRightPanel !== Panel.Masks || !activeMaskContainerId) &&
-      (activeRightPanel !== Panel.Ai || !activeAiPatchContainerId)
-    ) {
-      setEditor({ isMaskControlHovered: false });
-    }
-  }, [activeRightPanel, activeMaskContainerId, activeAiPatchContainerId, setEditor]);
 
   useEffect(() => {
     const appWindow = getOptionalCurrentWindow();
@@ -578,26 +517,10 @@ function App() {
 
   const handleRightPanelSelect = useCallback(
     (panelId: Panel) => {
-      if (panelId === Panel.Presets && !isCompactPortrait) {
-        setEditorRegionVisibility('leftSidebar', true);
-        setEditorLeftSectionExpanded('presets', true);
-        requestAnimationFrame(() => {
-          document.querySelector<HTMLButtonElement>('[data-testid="editor-left-presets-toggle"]')?.focus();
-        });
-        return;
-      }
-      setRightPanel(panelId);
-      setEditor({ activeMaskId: null, activeAiSubMaskId: null, isWbPickerActive: false });
+      selectEditorPanel(panelId, viewportSize);
     },
-    [isCompactPortrait, setEditorLeftSectionExpanded, setEditorRegionVisibility, setRightPanel, setEditor],
+    [selectEditorPanel, viewportSize],
   );
-
-  useEffect(() => {
-    if (isCompactPortrait || activeRightPanel !== Panel.Presets) return;
-    setEditorRegionVisibility('leftSidebar', true);
-    setEditorLeftSectionExpanded('presets', true);
-    setRightPanel(null);
-  }, [activeRightPanel, isCompactPortrait, setEditorLeftSectionExpanded, setEditorRegionVisibility, setRightPanel]);
 
   const enableFolderImageCounts = appSettings?.enableFolderImageCounts ?? false;
   const handleToggleFolder = useFolderExpansionLoader(enableFolderImageCounts);
