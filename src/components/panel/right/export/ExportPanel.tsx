@@ -104,24 +104,12 @@ import Slider from '../../../ui/primitives/Slider';
 import Switch from '../../../ui/primitives/Switch';
 import UiText from '../../../ui/primitives/Text';
 import ExportPresetsList from './ExportPresetsList';
+import { chooseExportDestination } from './exportDestination';
+import { deriveExportFooterWorkflow } from './exportFooterWorkflow';
 import ImagePicker from './ImagePicker';
 
 const QUALITY_FILE_FORMATS: ReadonlySet<FileFormats> = new Set([FileFormats.Jpeg, FileFormats.Webp, FileFormats.Jxl]);
 const SOFT_PROOF_PROFILE_COMPARE_SIDE_IDS = ['srgb', 'displayP3'] as const;
-type ExportFooterWorkflowState =
-  | 'canceled'
-  | 'cancelling'
-  | 'completed'
-  | 'estimating'
-  | 'failed'
-  | 'idle'
-  | 'imported-linked-variant'
-  | 'importing-linked-variant'
-  | 'missing-output'
-  | 'partial'
-  | 'queued'
-  | 'running';
-
 interface ExportPanelProps {
   exportState: ExportState;
   multiSelectedPaths: Array<string>;
@@ -1230,17 +1218,7 @@ export default function ExportPanel({
       return;
     }
 
-    let finalFilenameTemplate = filenameTemplate;
-    if (
-      numImages > 1 &&
-      !filenameTemplate.includes('{sequence}') &&
-      !filenameTemplate.includes('{original_filename}')
-    ) {
-      finalFilenameTemplate = `${filenameTemplate}_{sequence}`;
-      setFilenameTemplate(finalFilenameTemplate);
-    }
-
-    const exportSettings: ExportSettings = {
+    const buildExportSettings = (finalFilenameTemplate: string): ExportSettings => ({
       blackPointCompensation: resolvedExportBlackPointCompensation,
       colorProfile,
       filenameTemplate: finalFilenameTemplate,
@@ -1263,8 +1241,8 @@ export default function ExportPanel({
               opacity: watermarkOpacity,
             }
           : null,
-    };
-
+    });
+    const operationExportSettings = buildExportSettings(filenameTemplate);
     const lastExportPath = appSettings?.exportPresets?.find((p) => p.id === EXPORT_LAST_USED_PRESET_ID)?.lastExportPath;
     const operation: AppOperationContext = beginAppOperation({
       action: 'export_images',
@@ -1272,12 +1250,12 @@ export default function ExportPanel({
       details: {
         colorProfile,
         count: numImages,
-        exportMasks: exportSettings.exportMasks ?? false,
+        exportMasks: operationExportSettings.exportMasks ?? false,
         fileFormat,
         hasCurrentEdit: Boolean(selectedImage?.path),
         preserveFolders,
-        resizeEnabled: Boolean(exportSettings.resize),
-        watermarkEnabled: Boolean(exportSettings.watermark),
+        resizeEnabled: Boolean(operationExportSettings.resize),
+        watermarkEnabled: Boolean(operationExportSettings.watermark),
       },
       domain: 'export',
       operationId: `export_${Date.now().toString(36)}`,
@@ -1285,54 +1263,27 @@ export default function ExportPanel({
     });
 
     try {
-      const selectedFormat = FILE_FORMATS.find((f) => f.id === fileFormat);
-      if (!selectedFormat) {
-        throw new Error(t('export.status.failed'));
-      }
+      const destination = await chooseExportDestination(
+        {
+          fileFormat,
+          filenameTemplate,
+          isAndroid,
+          ...(lastExportPath === undefined ? {} : { lastExportPath }),
+          pathsToExport,
+          t,
+        },
+        {
+          saveFile: async (options) => (await save(options)) as string | null,
+          selectFolder: async (options) => (await open(options)) as string | null,
+        },
+      );
 
-      let outputFolderOrFile = '';
-      if (numImages === 1) {
-        const firstPath = pathsToExport[0] ?? '';
-        const originalFilename = firstPath.split(/[\\/]/).pop() || '';
-        const stem = originalFilename.substring(0, originalFilename.lastIndexOf('.')) || originalFilename;
-        const suggestedName = finalFilenameTemplate.replace('{original_filename}', stem);
-        const extension = selectedFormat.extensions[0] ?? fileFormat;
-        const outputFileName = `${suggestedName}.${extension}`;
+      if (destination !== null) {
+        const { finalFilenameTemplate, lastExportDirectory, outputFolderOrFile, selectedFormat } = destination;
+        if (finalFilenameTemplate !== filenameTemplate) setFilenameTemplate(finalFilenameTemplate);
+        if (lastExportDirectory !== null) saveLastUsedPreset(lastExportDirectory);
 
-        outputFolderOrFile = isAndroid
-          ? outputFileName
-          : ((await save({
-              title: t('export.dialog.saveEditedImageTitle'),
-              defaultPath: lastExportPath ? `${lastExportPath}/${outputFileName}` : outputFileName,
-              filters: [
-                { name: selectedFormat.name, extensions: selectedFormat.extensions },
-                ...FILE_FORMATS.filter((f: FileFormat) => f.id !== fileFormat).map((f: FileFormat) => ({
-                  name: f.name,
-                  extensions: f.extensions,
-                })),
-              ],
-            })) as string);
-      } else {
-        outputFolderOrFile = isAndroid
-          ? ''
-          : ((await open({
-              title: t('export.dialog.selectFolderTitle', { count: numImages }),
-              directory: true,
-              ...(lastExportPath ? { defaultPath: lastExportPath } : {}),
-            })) as string);
-      }
-
-      if (isAndroid || outputFolderOrFile) {
-        if (!isAndroid) {
-          const dir =
-            numImages === 1
-              ? outputFolderOrFile.substring(
-                  0,
-                  Math.max(outputFolderOrFile.lastIndexOf('/'), outputFolderOrFile.lastIndexOf('\\')),
-                )
-              : outputFolderOrFile;
-          if (dir) saveLastUsedPreset(dir);
-        }
+        const exportSettings = buildExportSettings(finalFilenameTemplate);
 
         setExportState({
           errorMessage: '',
@@ -1402,47 +1353,26 @@ export default function ExportPanel({
           })
         : null;
   const canExport = hasExportTarget && exportContractIssue === null;
-  const progressCurrent = progress.current || progress.completed || 0;
-  const isQueuedExport = isExporting && progressCurrent === 0;
-  const isRunningExport = isExporting && progressCurrent > 0;
-  const receiptOutputCount = lastReceipt?.outputs.length ?? 0;
-  const hasMissingOutput = status === Status.Success && receiptOutputCount === 0;
-  const hasPartialExport =
-    status === Status.Success &&
-    lastReceipt !== undefined &&
-    receiptOutputCount > 0 &&
-    receiptOutputCount < lastReceipt.total;
-  const canShowReceipt =
-    (status === Status.Success || status === Status.Cancelled) && Boolean(firstReceiptOutput) && !hasMissingOutput;
-  const canUseReceiptActions = canShowReceipt && !isExporting;
-  const canImportLinkedVariant =
-    canUseReceiptActions &&
-    canOpenReceiptInEditor &&
-    !isImportingCurrentExternalVariant &&
-    currentExternalVariantImportedPath === null;
-  const exportFooterWorkflowState: ExportFooterWorkflowState = isImportingCurrentExternalVariant
-    ? 'importing-linked-variant'
-    : currentExternalVariantImportedPath
-      ? 'imported-linked-variant'
-      : hasMissingOutput
-        ? 'missing-output'
-        : hasPartialExport
-          ? 'partial'
-          : status === Status.Error
-            ? 'failed'
-            : status === Status.Cancelled
-              ? 'canceled'
-              : canShowReceipt
-                ? 'completed'
-                : isCancellingExport
-                  ? 'cancelling'
-                  : isQueuedExport
-                    ? 'queued'
-                    : isRunningExport
-                      ? 'running'
-                      : isEstimating && canExport
-                        ? 'estimating'
-                        : 'idle';
+  const exportFooterWorkflow = deriveExportFooterWorkflow({
+    canExport,
+    canOpenReceiptInEditor,
+    currentExternalVariantImportedPath,
+    exportState,
+    isCancellingExport,
+    isEstimating,
+    isImportingCurrentExternalVariant,
+  });
+  const {
+    canImportLinkedVariant,
+    canShowReceipt,
+    canUseReceiptActions,
+    hasMissingOutput,
+    hasPartialExport,
+    progressCurrent,
+    receiptOutputCount,
+    state: exportFooterWorkflowState,
+    tone: exportFooterStatusTone,
+  } = exportFooterWorkflow;
   const exportFooterStatusText =
     exportFooterWorkflowState === 'importing-linked-variant'
       ? t('export.status.footerImportingLinkedVariant')
@@ -1473,20 +1403,6 @@ export default function ExportPanel({
                         : exportFooterWorkflowState === 'estimating'
                           ? t('export.status.estimatingSize')
                           : t('export.status.footerIdle');
-  const exportFooterStatusTone =
-    exportFooterWorkflowState === 'failed' || exportFooterWorkflowState === 'missing-output'
-      ? 'danger'
-      : exportFooterWorkflowState === 'canceled' ||
-          exportFooterWorkflowState === 'partial' ||
-          exportFooterWorkflowState === 'cancelling' ||
-          exportFooterWorkflowState === 'estimating' ||
-          exportFooterWorkflowState === 'queued'
-        ? 'warning'
-        : exportFooterWorkflowState === 'completed' || exportFooterWorkflowState === 'imported-linked-variant'
-          ? 'success'
-          : exportFooterWorkflowState === 'running' || exportFooterWorkflowState === 'importing-linked-variant'
-            ? 'info'
-            : 'neutral';
   const exportEstimateText = isEstimating
     ? t('export.status.estimatingSize')
     : estimatedSize !== null
