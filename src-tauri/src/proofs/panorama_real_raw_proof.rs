@@ -817,6 +817,9 @@ fn render_private_panorama_paths(image_paths: Vec<String>) -> Result<PanoramaRen
         .map_err(|error| error.to_string())?;
     render_with_legacy_homography_engine_with_settings(
         PanoramaRenderRequest {
+            cancellation: std::sync::Arc::new(
+                crate::panorama_utils::alignment_plan::AlignmentCancellation::default(),
+            ),
             image_paths,
             options: Default::default(),
         },
