@@ -17,9 +17,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
-  useRef,
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -180,6 +178,108 @@ const RawQualityBadgeCluster = ({ exif, compact = false }: { compact?: boolean; 
   );
 };
 
+export const LibraryThumbnailImage = ({
+  aspectRatio,
+  compact = false,
+  onLoad,
+  path,
+  url,
+}: {
+  aspectRatio: ThumbnailAspectRatio;
+  compact?: boolean;
+  onLoad: LibraryImageLoadHandler;
+  path: string;
+  url: string | null;
+}) => {
+  const [showPlaceholder, setShowPlaceholder] = useState(false);
+  const [layers, setLayers] = useState<ImageLayer[]>(() => (url === null ? [] : [{ id: url, opacity: 1, url }]));
+
+  useEffect(() => {
+    const timer = window.setTimeout(
+      () => {
+        setShowPlaceholder(url === null);
+      },
+      url === null ? 500 : 0,
+    );
+    return () => window.clearTimeout(timer);
+  }, [url]);
+
+  useEffect(() => {
+    const layerTimer = window.setTimeout(() => {
+      if (url === null) {
+        setLayers([]);
+        return;
+      }
+      setLayers((current) =>
+        current.some((layer) => layer.id === url) ? current : [...current, { id: url, opacity: 0, url }],
+      );
+    }, 0);
+    return () => window.clearTimeout(layerTimer);
+  }, [url]);
+
+  useEffect(() => {
+    const layerToFadeIn = layers.find((layer) => layer.opacity === 0);
+    if (layerToFadeIn === undefined) return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      setLayers((current) =>
+        current.map((layer) => (layer.id === layerToFadeIn.id ? { ...layer, opacity: 1 } : layer)),
+      );
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [layers]);
+
+  const handleTransitionEnd = useCallback((finishedId: string) => {
+    setLayers((current) => {
+      const finishedIndex = current.findIndex((layer) => layer.id === finishedId);
+      if (finishedIndex < 0 || current.length <= 1) return current;
+      return current.slice(finishedIndex);
+    });
+  }, []);
+
+  return (
+    <>
+      {layers.length > 0 ? (
+        <div className="absolute inset-0 h-full w-full">
+          {layers.map((layer) => (
+            <div
+              className="absolute inset-0 h-full w-full"
+              data-thumbnail-layer-url={layer.url}
+              key={layer.id}
+              onTransitionEnd={() => handleTransitionEnd(layer.id)}
+              style={{ opacity: layer.opacity, transition: 'opacity 300ms ease-in-out' }}
+            >
+              <img
+                alt={path.split(/[\\/]/).pop()}
+                className={cx(
+                  'relative h-full w-full',
+                  compact ? '' : 'transition-transform duration-300 will-change-transform group-hover:scale-[1.02]',
+                  aspectRatio === ThumbnailAspectRatio.Contain ? 'object-contain' : 'object-cover',
+                )}
+                decoding="async"
+                loading="lazy"
+                onLoad={() => onLoad(path)}
+                src={layer.url}
+              />
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {layers.length === 0 && showPlaceholder ? (
+        <div
+          className="absolute inset-0 flex h-full w-full items-center justify-center bg-surface"
+          data-testid="library-thumbnail-placeholder"
+        >
+          {compact ? (
+            <ImageIcon className="animate-pulse text-text-secondary" size={14} />
+          ) : (
+            <ImageIcon className="animate-pulse text-text-secondary" />
+          )}
+        </div>
+      ) : null}
+    </>
+  );
+};
+
 const ThumbnailComponent = ({
   autoStack,
   isActive,
@@ -204,20 +304,6 @@ const ThumbnailComponent = ({
   const showEditIcon = isEdited && displayEditIcon;
   const showSmartPreviewBadge = smartPreview?.stale || smartPreview?.source === 'smartPreview';
 
-  const [showPlaceholder, setShowPlaceholder] = useState(false);
-  const [layers, setLayers] = useState<ImageLayer[]>([]);
-
-  const pathRef = useRef(path);
-  const hadDataOnPathChange = useRef(!!data);
-
-  useLayoutEffect(() => {
-    if (pathRef.current !== path) {
-      pathRef.current = path;
-      hadDataOnPathChange.current = !!data;
-      setLayers([]);
-    }
-  }, [data, path]);
-
   const { baseName, isVirtualCopy } = useMemo(() => {
     const fullFileName = path.split(/[\\/]/).pop() || '';
     const parts = fullFileName.split('?vc=');
@@ -228,67 +314,6 @@ const ThumbnailComponent = ({
   }, [path]);
 
   const { shutter, fNumber, iso, focal } = useMemo(() => getExifOverlayValues(exif), [exif]);
-
-  useEffect(() => {
-    const timer = setTimeout(
-      () => {
-        setShowPlaceholder(!data);
-      },
-      data ? 0 : 500,
-    );
-
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [data]);
-
-  useEffect(() => {
-    const layerTimer = setTimeout(() => {
-      if (!data) {
-        setLayers([]);
-        return;
-      }
-
-      setLayers((prev) => {
-        if (prev.some((l) => l.id === data)) return prev;
-
-        if (prev.length === 0) {
-          if (hadDataOnPathChange.current) {
-            return [{ id: data, url: data, opacity: 1 }];
-          } else {
-            return [{ id: data, url: data, opacity: 0 }];
-          }
-        }
-
-        return [...prev, { id: data, url: data, opacity: 0 }];
-      });
-    }, 0);
-
-    return () => {
-      clearTimeout(layerTimer);
-    };
-  }, [data, path]);
-
-  useEffect(() => {
-    const layerToFadeIn = layers.find((l) => l.opacity === 0);
-    if (layerToFadeIn) {
-      const frame = requestAnimationFrame(() => {
-        setLayers((prev) => prev.map((l) => (l.id === layerToFadeIn.id ? { ...l, opacity: 1 } : l)));
-      });
-      return () => {
-        cancelAnimationFrame(frame);
-      };
-    }
-    return undefined;
-  }, [layers]);
-
-  const handleTransitionEnd = useCallback((finishedId: string) => {
-    setLayers((prev) => {
-      const finishedIndex = prev.findIndex((l) => l.id === finishedId);
-      if (finishedIndex < 0 || prev.length <= 1) return prev;
-      return prev.slice(finishedIndex);
-    });
-  }, []);
 
   const ringClass = isActive
     ? 'ring-2 ring-inset ring-accent'
@@ -334,42 +359,13 @@ const ThumbnailComponent = ({
       data-testid="library-thumbnail"
     >
       <div className="relative w-full flex-1 min-h-0 z-0 bg-surface">
-        {layers.length > 0 && (
-          <div className="absolute inset-0 w-full h-full">
-            {layers.map((layer) => (
-              <div
-                key={layer.id}
-                className="absolute inset-0 w-full h-full"
-                style={{
-                  opacity: layer.opacity,
-                  transition: 'opacity 300ms ease-in-out',
-                }}
-                onTransitionEnd={() => {
-                  handleTransitionEnd(layer.id);
-                }}
-              >
-                <img
-                  alt={path.split(/[\\/]/).pop()}
-                  className={`w-full h-full group-hover:scale-[1.02] transition-transform duration-300 will-change-transform ${
-                    thumbnailAspectRatio === ThumbnailAspectRatio.Contain ? 'object-contain' : 'object-cover'
-                  } relative`}
-                  decoding="async"
-                  loading="lazy"
-                  src={layer.url}
-                  onLoad={() => {
-                    onLoad(path);
-                  }}
-                />
-              </div>
-            ))}
-          </div>
-        )}
-
-        {layers.length === 0 && showPlaceholder && (
-          <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-surface">
-            <ImageIcon className="text-text-secondary animate-pulse" />
-          </div>
-        )}
+        <LibraryThumbnailImage
+          aspectRatio={thumbnailAspectRatio}
+          key={path}
+          onLoad={onLoad}
+          path={path}
+          url={data ?? null}
+        />
 
         {showSmartPreviewBadge && (
           <div
@@ -619,20 +615,6 @@ const ListItemComponent = ({
   const exifOverlay = useSettingsStore((s) => s.appSettings?.exifOverlay || ExifOverlay.Off);
   const showSmartPreviewBadge = smartPreview?.stale || smartPreview?.source === 'smartPreview';
 
-  const [showPlaceholder, setShowPlaceholder] = useState(false);
-  const [layers, setLayers] = useState<ImageLayer[]>([]);
-
-  const pathRef = useRef(path);
-  const hadDataOnPathChange = useRef(!!data);
-
-  useLayoutEffect(() => {
-    if (pathRef.current !== path) {
-      pathRef.current = path;
-      hadDataOnPathChange.current = !!data;
-      setLayers([]);
-    }
-  }, [data, path]);
-
   const { baseName, isVirtualCopy } = useMemo(() => {
     const fullFileName = path.split(/[\\/]/).pop() || '';
     const parts = fullFileName.split('?vc=');
@@ -645,66 +627,6 @@ const ListItemComponent = ({
   const { shutter, fNumber, iso, focal } = useMemo(() => getExifOverlayValues(exif), [exif]);
 
   const showExifCols = exifOverlay !== ExifOverlay.Off;
-  useEffect(() => {
-    const timer = setTimeout(
-      () => {
-        setShowPlaceholder(!data);
-      },
-      data ? 0 : 500,
-    );
-
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [data]);
-
-  useEffect(() => {
-    const layerTimer = setTimeout(() => {
-      if (!data) {
-        setLayers([]);
-        return;
-      }
-
-      setLayers((prev) => {
-        if (prev.some((l) => l.id === data)) return prev;
-
-        if (prev.length === 0) {
-          if (hadDataOnPathChange.current) {
-            return [{ id: data, url: data, opacity: 1 }];
-          } else {
-            return [{ id: data, url: data, opacity: 0 }];
-          }
-        }
-
-        return [...prev, { id: data, url: data, opacity: 0 }];
-      });
-    }, 0);
-
-    return () => {
-      clearTimeout(layerTimer);
-    };
-  }, [data, path]);
-
-  useEffect(() => {
-    const layerToFadeIn = layers.find((l) => l.opacity === 0);
-    if (layerToFadeIn) {
-      const frame = requestAnimationFrame(() => {
-        setLayers((prev) => prev.map((l) => (l.id === layerToFadeIn.id ? { ...l, opacity: 1 } : l)));
-      });
-      return () => {
-        cancelAnimationFrame(frame);
-      };
-    }
-    return undefined;
-  }, [layers]);
-
-  const handleTransitionEnd = useCallback((finishedId: string) => {
-    setLayers((prev) => {
-      const finishedIndex = prev.findIndex((l) => l.id === finishedId);
-      if (finishedIndex < 0 || prev.length <= 1) return prev;
-      return prev.slice(finishedIndex);
-    });
-  }, []);
 
   const colorTag = tags?.find((tag) => tag.startsWith('color:'))?.substring(6);
   const colorLabel = COLOR_LABELS.find((c: Color) => c.name === colorTag);
@@ -751,39 +673,14 @@ const ListItemComponent = ({
         className="flex items-center justify-center p-1.5 h-full overflow-hidden"
       >
         <div className="w-full h-full relative overflow-hidden rounded-sm bg-surface flex items-center justify-center">
-          {layers.length > 0 && (
-            <div className="absolute inset-0 w-full h-full flex items-center justify-center">
-              {layers.map((layer) => (
-                <div
-                  key={layer.id}
-                  className="absolute inset-0 w-full h-full"
-                  style={{ opacity: layer.opacity, transition: 'opacity 300ms ease-in-out' }}
-                  onTransitionEnd={() => {
-                    handleTransitionEnd(layer.id);
-                  }}
-                >
-                  <img
-                    alt={baseName}
-                    className={`w-full h-full relative ${
-                      thumbnailAspectRatio === ThumbnailAspectRatio.Contain ? 'object-contain' : 'object-cover'
-                    }`}
-                    decoding="async"
-                    loading="lazy"
-                    src={layer.url}
-                    onLoad={() => {
-                      onLoad(path);
-                    }}
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-
-          {layers.length === 0 && showPlaceholder && (
-            <div className="absolute inset-0 w-full h-full flex items-center justify-center">
-              <ImageIcon size={14} className="text-text-secondary animate-pulse" />
-            </div>
-          )}
+          <LibraryThumbnailImage
+            aspectRatio={thumbnailAspectRatio}
+            compact
+            key={path}
+            onLoad={onLoad}
+            path={path}
+            url={data ?? null}
+          />
         </div>
       </div>
 
