@@ -85,17 +85,19 @@ fn emit_thumbnail_cache_setup_error(app_handle: &AppHandle, path: &str, reason: 
 fn compute_thumbnail_cache_hash(path_str: &str, adjustments_bytes: &[u8]) -> Option<String> {
     let (source_path, _) = parse_virtual_path(path_str);
 
-    let img_mod_time = fs::metadata(&source_path)
-        .ok()?
+    let metadata = fs::metadata(&source_path).ok()?;
+    let img_mod_time = metadata
         .modified()
         .ok()?
         .duration_since(std::time::UNIX_EPOCH)
         .ok()?
-        .as_secs();
+        .as_nanos();
 
     let mut hasher = blake3::Hasher::new();
+    hasher.update(b"thumbnail-render-artifact-v2");
     hasher.update(path_str.as_bytes());
     hasher.update(&img_mod_time.to_le_bytes());
+    hasher.update(&metadata.len().to_le_bytes());
     hasher.update(adjustments_bytes);
     Some(hasher.finalize().to_hex().to_string())
 }
@@ -1006,7 +1008,12 @@ fn generate_thumbnail_data_with_target(
         let lut = meta.adjustments["lutPath"]
             .as_str()
             .and_then(|path| crate::get_or_load_lut(&state, path).ok());
-        let revision = content_revision(&meta.adjustments, 0, u64::from(tm_override.unwrap_or(0)));
+        let revision = content_revision(
+            &meta.adjustments,
+            0,
+            crate::render::artifact_identity::source_fingerprint_for_path(path_str),
+            u64::from(tm_override.unwrap_or(0)),
+        );
         let render_plan = compile_render_plan_cached(
             &meta.adjustments,
             CompileRenderPlanContext {
@@ -1329,7 +1336,7 @@ fn generate_single_thumbnail_and_cache(
         && cache_hash.is_none()
         && let Some(smart_preview_dir) = smart_preview_dir.as_deref()
         && let Some((resource, smart_preview)) =
-            read_smart_preview_artifact(smart_preview_dir, path_str)
+            read_smart_preview_artifact(smart_preview_dir, path_str, None)
     {
         return Some(ThumbnailResult {
             resource,
@@ -1352,7 +1359,9 @@ fn generate_single_thumbnail_and_cache(
         )
     {
         let smart_preview_artifact = smart_preview_dir.as_deref().and_then(|dir| {
-            if let Some((descriptor, existing)) = read_smart_preview_artifact(dir, path_str) {
+            if let Some((descriptor, existing)) =
+                read_smart_preview_artifact(dir, path_str, Some(&adjustments_bytes))
+            {
                 Some((existing, descriptor))
             } else {
                 generate_and_write_smart_preview_artifact(
@@ -2284,10 +2293,8 @@ pub async fn reset_adjustments_for_paths(
         }
 
         let state = app_handle.state::<AppState>();
-        crate::render_caches::RenderCaches::new(&state).clear_active_image_render_state();
+        crate::render_caches::RenderCaches::new(&state).clear_canonical_reset_artifacts();
         state.decoded_image_cache.clear();
-        state.thumbnail_geometry_cache.clear();
-        state.viewer_sample_frames.clear();
         let render_generation = state
             .preview_scheduler
             .lock()

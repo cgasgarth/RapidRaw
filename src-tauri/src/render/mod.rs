@@ -1,5 +1,6 @@
 pub(crate) mod analytics_resources;
 pub(crate) mod analytics_scheduler;
+pub(crate) mod artifact_identity;
 pub(crate) mod culling;
 pub(crate) mod film_look_render;
 pub(crate) mod image_analytics;

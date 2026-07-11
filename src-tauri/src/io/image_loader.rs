@@ -896,6 +896,11 @@ pub async fn load_image(
         raw_processing_settings_for_adjustments(&settings, &metadata.adjustments);
     let raw_processing_cache_key = raw_processing_mode_cache_key(&source_path, &effective_settings)
         .map_err(|error| error.to_string())?;
+    let artifact_source =
+        crate::render::artifact_identity::SourceArtifactIdentity::from_decoded_key(
+            path.clone(),
+            &raw_processing_cache_key,
+        );
 
     let path_clone = source_path_str.clone();
     let expected_revision = raw_processing_cache_key.source_revision.clone();
@@ -1106,6 +1111,7 @@ pub async fn load_image(
         path,
         image: pristine_arc,
         is_raw: loaded_is_raw,
+        artifact_source,
     });
 
     Ok(LoadImageResult {

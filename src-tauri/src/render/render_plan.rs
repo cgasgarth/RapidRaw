@@ -29,6 +29,7 @@ const MAX_CACHED_PLANS: usize = 24;
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct RenderPlanRevision {
     pub image_session: u64,
+    pub source_revision: u64,
     pub adjustment_revision: u64,
     pub schema_version: u32,
     pub settings_revision: u64,
@@ -224,6 +225,7 @@ pub fn compile_render_plan(
     );
     let geometry = get_geometry_params_from_json(&effective);
     let fingerprints = fingerprints(
+        context.revision.source_revision,
         &effective,
         &adjustments,
         &geometry,
@@ -247,10 +249,12 @@ pub fn compile_render_plan(
 pub fn content_revision(
     raw: &Value,
     image_session: u64,
+    source_revision: u64,
     settings_revision: u64,
 ) -> RenderPlanRevision {
     RenderPlanRevision {
         image_session,
+        source_revision,
         adjustment_revision: hash_json(raw),
         schema_version: PLAN_SCHEMA_VERSION,
         settings_revision,
@@ -258,6 +262,7 @@ pub fn content_revision(
 }
 
 fn fingerprints(
+    source_revision: u64,
     effective: &Value,
     adjustments: &AllAdjustments,
     geometry: &GeometryParams,
@@ -265,7 +270,11 @@ fn fingerprints(
     masks: &[MaskDefinition],
     lut: Option<&Lut>,
 ) -> StageFingerprints {
-    let source = hash_parts(&[b"source", &FINGERPRINT_VERSION.to_le_bytes()]);
+    let source = hash_parts(&[
+        b"source",
+        &FINGERPRINT_VERSION.to_le_bytes(),
+        &source_revision.to_le_bytes(),
+    ]);
     let geometry = hash_parts(&[
         b"geometry",
         &FINGERPRINT_VERSION.to_le_bytes(),
@@ -482,6 +491,7 @@ mod tests {
         CompileRenderPlanContext {
             revision: RenderPlanRevision {
                 image_session: 7,
+                source_revision: 19,
                 adjustment_revision: revision,
                 schema_version: 1,
                 settings_revision: 0,
@@ -530,6 +540,18 @@ mod tests {
         let clipping =
             compile_render_plan(&json!({"showClipping":true}), context(6), None).unwrap();
         assert_ne!(base.fingerprints.output, clipping.fingerprints.output);
+    }
+
+    #[test]
+    fn source_fingerprint_scopes_plan_cache_and_full_fingerprint() {
+        let raw = json!({"exposure": 12});
+        let first = compile_render_plan_cached(&raw, context(90), None).unwrap();
+        let mut other_context = context(90);
+        other_context.revision.source_revision += 1;
+        let second = compile_render_plan_cached(&raw, other_context, None).unwrap();
+        assert!(!Arc::ptr_eq(&first, &second));
+        assert_ne!(first.fingerprints.source, second.fingerprints.source);
+        assert_ne!(first.fingerprints.full, second.fingerprints.full);
     }
 
     #[test]
