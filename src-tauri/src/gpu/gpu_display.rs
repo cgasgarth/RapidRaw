@@ -1,17 +1,17 @@
 use std::num::NonZero;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
 
-#[cfg(not(any(target_os = "android", target_os = "linux")))]
+#[cfg(target_os = "windows")]
 use tauri::Manager;
 
-#[cfg(not(any(target_os = "android", target_os = "linux")))]
+#[cfg(target_os = "windows")]
 use half::f16;
 
-#[cfg(not(any(target_os = "android", target_os = "linux")))]
+#[cfg(target_os = "windows")]
 use crate::display_profile::build_srgb_to_active_display_lut_for_app;
 
 #[repr(C)]
@@ -42,6 +42,10 @@ pub struct WgpuDisplay {
 }
 
 impl WgpuDisplay {
+    fn has_drawable_image(&self) -> bool {
+        transform_has_drawable_image(&self.latest_transform, self.current_bind_group.is_some())
+    }
+
     fn render(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) -> bool {
         if let Some(bind_group) = &self.current_bind_group {
             let output = match self.surface.get_current_texture() {
@@ -125,6 +129,14 @@ impl WgpuDisplay {
     }
 }
 
+fn transform_has_drawable_image(transform: &DisplayTransform, has_texture: bool) -> bool {
+    has_texture
+        && transform.rect[2] > 0.0
+        && transform.rect[3] > 0.0
+        && transform.clip[2] > 0.0
+        && transform.clip[3] > 0.0
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct DisplayTransformState {
     pub rect: [f32; 4],
@@ -170,6 +182,15 @@ struct PublishedTexture {
     view: wgpu::TextureView,
     image_size: [u32; 2],
     texture_size: [u32; 2],
+    receipt: Option<std::sync::mpsc::SyncSender<Result<(), String>>>,
+}
+
+impl PublishedTexture {
+    fn complete(&mut self, result: Result<(), String>) {
+        if let Some(receipt) = self.receipt.take() {
+            let _ = receipt.send(result);
+        }
+    }
 }
 
 #[derive(Default)]
@@ -240,7 +261,7 @@ struct SchedulerShared {
     next_sequence: AtomicU64,
     next_texture_revision: AtomicU64,
     metrics: SchedulerMetrics,
-    has_display: bool,
+    has_display: AtomicBool,
 }
 
 pub struct WgpuPresentationScheduler {
@@ -260,7 +281,7 @@ impl WgpuPresentationScheduler {
             next_sequence: AtomicU64::new(0),
             next_texture_revision: AtomicU64::new(0),
             metrics: SchedulerMetrics::default(),
-            has_display: display.is_some(),
+            has_display: AtomicBool::new(display.is_some()),
         });
         let thread_shared = Arc::clone(&shared);
         let owner = std::thread::Builder::new()
@@ -285,7 +306,7 @@ impl WgpuPresentationScheduler {
             return Err("invalid WGPU transform: values must be finite".into());
         }
         let mut mailbox = self.shared.mailbox.lock().unwrap();
-        if mailbox.stopped {
+        if mailbox.stopped || !self.shared.has_display.load(Ordering::Acquire) {
             return Err("presentation_stopped".into());
         }
         let sequence =
@@ -324,7 +345,7 @@ impl WgpuPresentationScheduler {
 
     pub fn is_available(&self) -> bool {
         let mailbox = self.shared.mailbox.lock().unwrap();
-        self.shared.has_display && !mailbox.stopped
+        self.shared.has_display.load(Ordering::Acquire) && !mailbox.stopped
     }
 
     pub fn publish_texture(
@@ -343,8 +364,44 @@ impl WgpuPresentationScheduler {
         texture_size: [u32; 2],
         identity: Option<NativeFrameIdentity>,
     ) -> Result<(), String> {
+        self.publish_texture_for_frame_with_receipt(view, image_size, texture_size, identity, None)
+    }
+
+    pub fn present_texture_for_frame(
+        &self,
+        view: wgpu::TextureView,
+        image_size: [u32; 2],
+        texture_size: [u32; 2],
+        identity: Option<NativeFrameIdentity>,
+    ) -> Result<(), String> {
+        let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+        self.publish_texture_for_frame_with_receipt(
+            view,
+            image_size,
+            texture_size,
+            identity,
+            Some(sender),
+        )?;
+        receiver
+            .recv_timeout(Duration::from_millis(750))
+            .map_err(|error| match error {
+                std::sync::mpsc::RecvTimeoutError::Timeout => String::from("presentation_timeout"),
+                std::sync::mpsc::RecvTimeoutError::Disconnected => {
+                    String::from("presentation_stopped")
+                }
+            })?
+    }
+
+    fn publish_texture_for_frame_with_receipt(
+        &self,
+        view: wgpu::TextureView,
+        image_size: [u32; 2],
+        texture_size: [u32; 2],
+        identity: Option<NativeFrameIdentity>,
+        receipt: Option<std::sync::mpsc::SyncSender<Result<(), String>>>,
+    ) -> Result<(), String> {
         let mut mailbox = self.shared.mailbox.lock().unwrap();
-        if mailbox.stopped || !self.shared.has_display {
+        if mailbox.stopped || !self.shared.has_display.load(Ordering::Acquire) {
             return Err("presentation_unavailable".into());
         }
         if let Some(identity) = identity
@@ -366,8 +423,10 @@ impl WgpuPresentationScheduler {
             view,
             image_size,
             texture_size,
+            receipt,
         };
-        if mailbox.pending.texture.replace(texture).is_some() {
+        if let Some(mut replaced) = mailbox.pending.texture.replace(texture) {
+            replaced.complete(Err("presentation_replaced".into()));
             self.shared
                 .metrics
                 .texture_replaced_before_present
@@ -385,6 +444,9 @@ impl WgpuPresentationScheduler {
             let mut mailbox = self.shared.mailbox.lock().unwrap();
             if mailbox.stopped {
                 return Err("presentation_stopped".into());
+            }
+            if !self.shared.has_display.load(Ordering::Acquire) {
+                return Err("presentation_unavailable".into());
             }
             if PresentationSequence(sequence) <= mailbox.presented_sequence {
                 return Ok(());
@@ -429,15 +491,7 @@ impl WgpuPresentationScheduler {
 
 impl Drop for WgpuPresentationScheduler {
     fn drop(&mut self) {
-        let waiters = {
-            let mut mailbox = self.shared.mailbox.lock().unwrap();
-            mailbox.stopped = true;
-            std::mem::take(&mut mailbox.waiters)
-        };
-        for waiter in waiters {
-            let _ = waiter.response.send(Err("presentation_stopped".into()));
-        }
-        self.shared.wake.notify_one();
+        stop_mailbox(&self.shared);
         if let Some(owner) = self.owner.lock().unwrap().take() {
             let _ = owner.join();
         }
@@ -451,6 +505,9 @@ fn stop_mailbox(shared: &SchedulerShared) {
             .lock()
             .unwrap_or_else(|error| error.into_inner());
         mailbox.stopped = true;
+        if let Some(mut texture) = mailbox.pending.texture.take() {
+            texture.complete(Err("presentation_stopped".into()));
+        }
         std::mem::take(&mut mailbox.waiters)
     };
     for waiter in waiters {
@@ -487,6 +544,7 @@ fn presentation_owner_loop(
         .is_some_and(|display| display.config.width > 0 && display.config.height > 0);
     let mut needs_present = false;
     let mut latest_transform_submitted_at = None;
+    let mut pending_texture_receipt = None;
     loop {
         let mut mailbox = shared.mailbox.lock().unwrap();
         while mailbox.pending.dirty.is_empty() && !mailbox.stopped {
@@ -534,7 +592,7 @@ fn presentation_owner_loop(
                 effective_change = true;
             }
         }
-        if let Some(texture) = pending.texture
+        if let Some(mut texture) = pending.texture
             && texture.revision > last_texture_revision
         {
             display.latest_transform.image_size = texture.image_size.map(|value| value as f32);
@@ -563,6 +621,11 @@ fn presentation_owner_loop(
                     label: Some("Scheduled Display Bind Group"),
                 }));
             last_texture_revision = texture.revision;
+            if let Some(receipt) = texture.receipt.take()
+                && let Some(previous) = pending_texture_receipt.replace(receipt)
+            {
+                let _ = previous.send(Err("presentation_replaced".into()));
+            }
             effective_change = true;
         }
         if let Some(transform) = pending.transform
@@ -593,6 +656,11 @@ fn presentation_owner_loop(
             shared.metrics.presents.fetch_add(1, Ordering::Relaxed);
             presented_sequence = presented_sequence.max(latest_unpresented_sequence);
             needs_present = false;
+            if display.has_drawable_image()
+                && let Some(receipt) = pending_texture_receipt.take()
+            {
+                let _ = receipt.send(Ok(()));
+            }
             next_frame = Instant::now() + frame_interval;
             if let Some(submitted_at) = latest_transform_submitted_at.take() {
                 let latency = submitted_at.elapsed().as_micros().min(u64::MAX as u128) as u64;
@@ -606,6 +674,11 @@ fn presentation_owner_loop(
                     .fetch_max(latency, Ordering::Relaxed);
             }
             complete_covered_waiters(&shared, presented_sequence);
+        } else if surface_visible && needs_present && display.current_bind_group.is_some() {
+            fail_presentation(&shared, "presentation_failed");
+            if let Some(receipt) = pending_texture_receipt.take() {
+                let _ = receipt.send(Err("presentation_failed".into()));
+            }
         } else if surface_visible && !needs_present {
             presented_sequence = presented_sequence.max(latest_unpresented_sequence);
             complete_covered_waiters(&shared, presented_sequence);
@@ -615,6 +688,20 @@ fn presentation_owner_loop(
                 .hidden_skipped_frames
                 .fetch_add(1, Ordering::Relaxed);
         }
+    }
+    if let Some(receipt) = pending_texture_receipt {
+        let _ = receipt.send(Err("presentation_stopped".into()));
+    }
+}
+
+fn fail_presentation(shared: &SchedulerShared, reason: &str) {
+    shared.has_display.store(false, Ordering::Release);
+    let waiters = {
+        let mut mailbox = shared.mailbox.lock().unwrap();
+        std::mem::take(&mut mailbox.waiters)
+    };
+    for waiter in waiters {
+        let _ = waiter.response.send(Err(reason.into()));
     }
 }
 
@@ -632,7 +719,7 @@ fn complete_covered_waiters(shared: &SchedulerShared, presented: PresentationSeq
     mailbox.waiters = remaining;
 }
 
-#[cfg(not(any(target_os = "android", target_os = "linux")))]
+#[cfg(target_os = "windows")]
 pub(crate) fn create_wgpu_display(
     surface: wgpu::Surface<'static>,
     adapter: &wgpu::Adapter,
@@ -853,6 +940,21 @@ pub(crate) fn create_wgpu_display(
 mod tests {
     use super::*;
 
+    #[test]
+    fn native_receipt_requires_texture_and_visible_geometry() {
+        let mut transform = <DisplayTransform as bytemuck::Zeroable>::zeroed();
+        transform.rect = [10.0, 20.0, 300.0, 200.0];
+        transform.clip = [8.0, 18.0, 304.0, 204.0];
+        assert!(!transform_has_drawable_image(&transform, false));
+        assert!(transform_has_drawable_image(&transform, true));
+
+        transform.rect[2] = 0.0;
+        assert!(!transform_has_drawable_image(&transform, true));
+        transform.rect[2] = 300.0;
+        transform.clip[3] = 0.0;
+        assert!(!transform_has_drawable_image(&transform, true));
+    }
+
     fn transform(value: f32) -> DisplayTransformState {
         DisplayTransformState {
             rect: [value, value, 100.0, 100.0],
@@ -942,7 +1044,7 @@ mod tests {
             next_sequence: AtomicU64::new(0),
             next_texture_revision: AtomicU64::new(0),
             metrics: SchedulerMetrics::default(),
-            has_display: false,
+            has_display: AtomicBool::new(false),
         };
         let mut receivers = Vec::new();
         {
