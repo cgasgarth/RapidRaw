@@ -9,6 +9,7 @@ import {
   fingerprintWgpuTransformPayload,
   parseCssRgbColor,
   type RgbaColor,
+  shouldSubmitVisibleWgpuTransform,
 } from '../../utils/wgpuTransformPayload';
 import type { RenderSize } from '../viewport/useImageRenderSize';
 
@@ -131,22 +132,21 @@ export function useWgpuTransformSync({
         bgSecondary: state.bgSecondary,
       };
 
-      const payload =
-        state.useWgpuRenderer === false || !state.isReady || !state.hasRenderedFirstFrame
-          ? buildHiddenWgpuTransformPayload({ containerRect: currentRect, dpr, windowWidth, windowHeight }, colors)
-          : buildVisibleWgpuTransformPayload(
-              {
-                containerRect: currentRect,
-                dpr,
-                imageRenderSize: imageRenderSizeRef.current,
-                maxScale: maxScaleRef.current,
-                transformState: transformStateRef.current,
-                windowWidth,
-                windowHeight,
-              },
-              colors,
-              state.isCropping && Boolean(state.uncroppedAdjustedPreviewUrl),
-            );
+      const payload = !shouldSubmitVisibleWgpuTransform(state.useWgpuRenderer, state.isReady)
+        ? buildHiddenWgpuTransformPayload({ containerRect: currentRect, dpr, windowWidth, windowHeight }, colors)
+        : buildVisibleWgpuTransformPayload(
+            {
+              containerRect: currentRect,
+              dpr,
+              imageRenderSize: imageRenderSizeRef.current,
+              maxScale: maxScaleRef.current,
+              transformState: transformStateRef.current,
+              windowWidth,
+              windowHeight,
+            },
+            colors,
+            state.isCropping && Boolean(state.uncroppedAdjustedPreviewUrl),
+          );
 
       const currentTransform = fingerprintWgpuTransformPayload(payload);
 
@@ -154,8 +154,13 @@ export function useWgpuTransformSync({
         lastWgpuTransformRef.current = currentTransform;
         isInvoking = true;
 
-        invoke(Invokes.UpdateWgpuTransform, { payload })
-          .then(() => {
+        invoke<number>(Invokes.UpdateWgpuTransform, { payload })
+          .then(async (sequence) => {
+            if (sequence === 0) {
+              lastWgpuTransformRef.current = null;
+              return;
+            }
+            await invoke(Invokes.FlushWgpuPresentation, { sequence });
             if (state.useWgpuRenderer === true && state.isReady && state.hasRenderedFirstFrame) {
               onWgpuFrameCommitted?.();
             }
