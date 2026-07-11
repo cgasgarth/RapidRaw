@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/core';
 import { CheckCircle, Images, ShieldCheck, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -19,6 +20,7 @@ import {
   type HdrToneMappingPreset,
 } from '../../../schemas/computational-merge/hdrMergeUiSchemas';
 import { type HdrModalState, useUIStore } from '../../../store/useUIStore';
+import { Invokes } from '../../../tauri/commands';
 import { TextColors, TextVariants } from '../../../types/typography';
 import { buildHdrDerivedOutputReceipt, deriveDerivedOutputReceiptState } from '../../../utils/derivedOutputReceipt';
 import { buildHdrBracketPreflight, type HdrBracketPreflightSourceMetadata } from '../../../utils/hdrBracketPreflight';
@@ -146,7 +148,8 @@ export function HdrModal({
   const hasUnresolvedNativeOwnership = (runtimePlan?.deghostPreview?.unresolvedFraction ?? 0) > 0;
   const isDeghostReviewResolved =
     (!isDeghostReviewRequired || isDeghostReviewApproved) && !hasUnresolvedNativeOwnership;
-  const isApplyReady = isMergeReady && isDeghostReviewResolved && runtimePlan?.deghostPreview === undefined;
+  const isApplyReady =
+    isMergeReady && isDeghostReviewResolved && runtimePlan?.accepted === true && runtimePlan.blockCodes.length === 0;
   const applyReadinessLabel = !isMergeReady
     ? t('modals.hdr.summaryBlocked')
     : isApplyReady
@@ -297,8 +300,9 @@ export function HdrModal({
 
   const handleClose = useCallback(() => {
     if (isSaving) return;
+    if (isProcessing) void invoke(Invokes.CancelHdrPlan);
     onClose();
-  }, [onClose, isSaving]);
+  }, [isProcessing, onClose, isSaving]);
 
   const handleBackdropMouseDown = (e: React.MouseEvent) => {
     mouseDownTarget.current = e.target;
@@ -1403,8 +1407,8 @@ export function HdrModal({
           close: t('modals.hdr.close'),
           openInEditor: t('modals.hdr.openInEditor'),
           retry: t('modals.hdr.retry'),
-          save: t('modals.hdr.save'),
-          start: t('modals.hdr.start'),
+          save: 'Apply HDR',
+          start: runtimePlan?.accepted === true ? 'Build HDR' : t('modals.hdr.start'),
         }}
         onClose={handleClose}
         onOpen={handleOpen}

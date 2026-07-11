@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 const hashSchema = z.string().regex(/^blake3:[0-9a-f]{64}$/u);
-const familySchema = z.enum(['focus_stack', 'super_resolution']);
+const familySchema = z.enum(['focus_stack', 'hdr', 'super_resolution']);
 const haloSchema = z
   .object({
     bottom: z.number().int().nonnegative(),
