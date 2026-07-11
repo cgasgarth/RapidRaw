@@ -5,7 +5,9 @@ import { AlertTriangle, Check, ChevronDown, ChevronRight, GitMerge, Plus, Star, 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLibraryActions } from '../../../../hooks/library/useLibraryActions';
+import { useLibraryImage } from '../../../../hooks/library/useLibraryImage';
 import { useManagedFocus } from '../../../../hooks/ui/useManagedFocus';
+import { libraryEntityRepository } from '../../../../library/LibraryEntityRepository';
 import {
   type ActiveDisplayProfile,
   activeDisplayProfileSchema,
@@ -21,7 +23,6 @@ import {
 } from '../../../../schemas/xmpMetadataConflictSchemas';
 import { useEditorStore } from '../../../../store/useEditorStore';
 import { useLibraryStore } from '../../../../store/useLibraryStore';
-import { useProcessStore } from '../../../../store/useProcessStore';
 import { useSettingsStore } from '../../../../store/useSettingsStore';
 import { Invokes } from '../../../../tauri/commands';
 import { useThumbnail } from '../../../../thumbnails/useThumbnail';
@@ -561,10 +562,8 @@ export default function MetadataPanel() {
   const [isTagInputFocused, setIsTagInputFocused] = useState(false);
   const selectedImage = useEditorStore((s) => s.selectedImage);
   const multiSelectedPaths = useLibraryStore((s) => s.multiSelectedPaths);
-  const imageList = useLibraryStore((s) => s.imageList);
-  const imageRatings = useLibraryStore((s) => s.imageRatings);
   const appSettings = useSettingsStore((s) => s.appSettings);
-  const setLibrary = useLibraryStore((s) => s.setLibrary);
+  const entity = useLibraryImage(selectedImage?.path ?? '');
 
   const { handleRate, handleSetColorLabel, handleTagsChanged, handleUpdateExif } = useLibraryActions();
   const [xmpConflictReport, setXmpConflictReport] = useState<XmpMetadataConflictReport | null>(null);
@@ -582,11 +581,8 @@ export default function MetadataPanel() {
     lut: null,
   });
 
-  const rating = selectedImage ? imageRatings[selectedImage.path] || 0 : 0;
-  const tags = useMemo(
-    () => (selectedImage ? imageList.find((img) => img.path === selectedImage.path)?.tags || [] : []),
-    [imageList, selectedImage],
-  );
+  const rating = entity?.rating ?? 0;
+  const tags = entity?.tags ?? [];
   const liveThumbnailUrl = useThumbnail(selectedImage?.path ?? '') ?? undefined;
 
   const targetPaths = multiSelectedPaths.length > 0 ? multiSelectedPaths : selectedImage ? [selectedImage.path] : [];
@@ -814,48 +810,43 @@ export default function MetadataPanel() {
         emptyTauriResponseSchema,
       );
 
-      setLibrary((state) => {
-        const nextRatings = { ...state.imageRatings };
-        const nextImageList = state.imageList.map((image) => {
-          if (image.path !== selectedImage.path) return image;
+      const image = libraryEntityRepository.get(selectedImage.path);
+      if (image) {
+        let nextRating = image.rating;
+        let nextTags = [...(image.tags ?? [])];
 
-          let nextRating = nextRatings[image.path] ?? image.rating;
-          let nextTags = [...(image.tags ?? [])];
+        for (const decision of decisions) {
+          const field = xmpConflictReport.fields.find((candidate) => candidate.field === decision.field);
+          if (!field) continue;
+          const value =
+            decision.choice === 'local'
+              ? field.local
+              : decision.choice === 'merge'
+                ? (field.merged ?? field.external)
+                : field.external;
 
-          for (const decision of decisions) {
-            const field = xmpConflictReport.fields.find((candidate) => candidate.field === decision.field);
-            if (!field) continue;
-            const value =
-              decision.choice === 'local'
-                ? field.local
-                : decision.choice === 'merge'
-                  ? (field.merged ?? field.external)
-                  : field.external;
-
-            if (field.field === 'rating' && typeof value === 'number') {
-              nextRating = value;
-              nextRatings[image.path] = value;
-            }
-
-            if (field.field === 'colorLabel') {
-              nextTags = nextTags.filter((tag) => !tag.startsWith('color:'));
-              if (typeof value === 'string' && value.length > 0) nextTags.push(`color:${value}`);
-            }
-
-            if (field.field === 'keywords' && Array.isArray(value)) {
-              const colorTags = nextTags.filter((tag) => tag.startsWith('color:'));
-              const keywordTags = value
-                .filter((tag): tag is string => typeof tag === 'string' && tag.trim().length > 0)
-                .map((tag) => `user:${tag.trim()}`);
-              nextTags = [...colorTags, ...keywordTags];
-            }
+          if (field.field === 'rating' && typeof value === 'number') {
+            nextRating = value;
           }
 
-          return { ...image, rating: nextRating, tags: nextTags.length > 0 ? nextTags : null };
-        });
+          if (field.field === 'colorLabel') {
+            nextTags = nextTags.filter((tag) => !tag.startsWith('color:'));
+            if (typeof value === 'string' && value.length > 0) nextTags.push(`color:${value}`);
+          }
 
-        return { imageList: nextImageList, imageRatings: nextRatings };
-      });
+          if (field.field === 'keywords' && Array.isArray(value)) {
+            const colorTags = nextTags.filter((tag) => tag.startsWith('color:'));
+            const keywordTags = value
+              .filter((tag): tag is string => typeof tag === 'string' && tag.trim().length > 0)
+              .map((tag) => `user:${tag.trim()}`);
+            nextTags = [...colorTags, ...keywordTags];
+          }
+        }
+
+        libraryEntityRepository.patchMany([
+          { path: image.path, changes: { rating: nextRating, tags: nextTags.length > 0 ? nextTags : null } },
+        ]);
+      }
       setXmpConflictReport(null);
       setXmpConflictDecisions({});
     } catch (err) {

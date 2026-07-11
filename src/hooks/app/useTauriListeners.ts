@@ -205,15 +205,16 @@ export function useTauriListeners({ refreshAllFolderTrees, refreshImageList, mar
       }
 
       if (Object.keys(pendingRatings).length > 0 || Object.keys(pendingEdits).length > 0) {
-        useLibraryStore.getState().setLibrary((state) => ({
-          imageRatings: { ...state.imageRatings, ...pendingRatings },
-          imageList:
-            Object.keys(pendingEdits).length > 0
-              ? state.imageList.map((img) =>
-                  pendingEdits[img.path] !== undefined ? { ...img, is_edited: pendingEdits[img.path] ?? false } : img,
-                )
-              : state.imageList,
-        }));
+        const paths = new Set([...Object.keys(pendingRatings), ...Object.keys(pendingEdits)]);
+        useLibraryStore.getState().patchLibraryImages(
+          [...paths].map((path) => ({
+            path,
+            changes: {
+              ...(pendingRatings[path] === undefined ? {} : { rating: pendingRatings[path] }),
+              ...(pendingEdits[path] === undefined ? {} : { is_edited: pendingEdits[path] }),
+            },
+          })),
+        );
       }
     };
 

@@ -9,6 +9,7 @@ import {
   type SortCriteria,
   SortDirection,
 } from '../components/ui/AppProperties';
+import { type LibraryImagePatch, libraryEntityRepository } from '../library/LibraryEntityRepository';
 import { type Adjustments, INITIAL_ADJUSTMENTS } from '../utils/adjustments';
 
 export interface SearchCriteria {
@@ -56,6 +57,7 @@ interface LibraryState {
   setFilterCriteria: (criteria: Partial<FilterCriteria> | ((prev: FilterCriteria) => FilterCriteria)) => void;
   setSearchCriteria: (criteria: Partial<SearchCriteria> | ((prev: SearchCriteria) => SearchCriteria)) => void;
   setSortCriteria: (criteria: Partial<SortCriteria> | ((prev: SortCriteria) => SortCriteria)) => void;
+  patchLibraryImages: (patches: readonly LibraryImagePatch[]) => void;
 }
 
 export const useLibraryStore = create<LibraryState>((set) => ({
@@ -127,4 +129,12 @@ export const useLibraryStore = create<LibraryState>((set) => ({
         typeof criteria === 'function' ? criteria(state.sortCriteria) : { ...state.sortCriteria, ...criteria },
     }));
   },
+  patchLibraryImages: (patches) => libraryEntityRepository.patchMany(patches),
 }));
+
+// Existing loaders seed normalized snapshots until their collection/order migration lands.
+useLibraryStore.subscribe((state, previous) => {
+  if (state.imageList !== previous.imageList || state.imageRatings !== previous.imageRatings) {
+    libraryEntityRepository.replaceAll(state.imageList, state.imageRatings);
+  }
+});
