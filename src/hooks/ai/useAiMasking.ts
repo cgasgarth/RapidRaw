@@ -76,7 +76,7 @@ export function useAiMasking() {
 
   const handleGenerativeReplace = useCallback(
     async (patchId: string, prompt: string, useFastInpaint: boolean) => {
-      const { selectedImage, adjustments, isGeneratingAi, patchesSentToBackend } = useEditorStore.getState();
+      const { selectedImage, adjustments, isGeneratingAi, patchResidency } = useEditorStore.getState();
       if (!selectedImage?.path || isGeneratingAi) return;
 
       const patch: AiPatch | undefined = adjustments.aiPatches.find((p: AiPatch) => p.id === patchId);
@@ -102,7 +102,7 @@ export function useAiMasking() {
         });
 
         const newPatchData = parseAiPatchDataJson(newPatchDataJson);
-        patchesSentToBackend.delete(patchId);
+        patchResidency.remove(patchId);
 
         setAdjustments((prev: Adjustments) => ({
           ...prev,
@@ -133,7 +133,7 @@ export function useAiMasking() {
 
   const handleQuickErase = useCallback(
     async (subMaskId: string | null, startPoint: Coord, endPoint: Coord) => {
-      const { selectedImage, adjustments, isGeneratingAi, patchesSentToBackend } = useEditorStore.getState();
+      const { selectedImage, adjustments, isGeneratingAi, patchResidency } = useEditorStore.getState();
       if (!selectedImage?.path || isGeneratingAi) return;
       const token = await getToken();
 
@@ -192,7 +192,7 @@ export function useAiMasking() {
         });
 
         const newPatchData = parseAiPatchDataJson(newPatchDataJson);
-        patchesSentToBackend.delete(patchId);
+        patchResidency.remove(patchId);
 
         setAdjustments((prev: Adjustments) => ({
           ...prev,
@@ -262,7 +262,7 @@ export function useAiMasking() {
   );
 
   const handleGenerateAiMask = async (subMaskId: string, startPoint: Coord, endPoint: Coord) => {
-    const { selectedImage, adjustments, patchesSentToBackend } = useEditorStore.getState();
+    const { selectedImage, adjustments, patchResidency } = useEditorStore.getState();
     if (!selectedImage?.path) return;
     setEditor({ isGeneratingAiMask: true });
 
@@ -331,7 +331,7 @@ export function useAiMasking() {
           warnings: applyResult.applyResult.warnings,
         },
       });
-      patchesSentToBackend.delete(subMaskId);
+      patchResidency.remove(subMaskId);
       updateSubMask(subMaskId, { parameters: mergedParameters });
     } catch (error) {
       toast.error(`AI Mask Failed: ${formatUnknownError(error)}`);
@@ -341,7 +341,7 @@ export function useAiMasking() {
   };
 
   const handleGenerateAiDepthMask = async (subMaskId: string, parameters: AiDepthMaskParameters) => {
-    const { selectedImage, adjustments, patchesSentToBackend } = useEditorStore.getState();
+    const { selectedImage, adjustments, patchResidency } = useEditorStore.getState();
     if (!selectedImage?.path) return;
     setEditor({ isGeneratingAiMask: true });
 
@@ -365,7 +365,7 @@ export function useAiMasking() {
         .flatMap((p: AiPatch) => p.subMasks)
         .find((sm: SubMask) => sm.id === subMaskId);
       const mergedParameters = mergeMaskParameters(subMask?.parameters, newParameters);
-      patchesSentToBackend.delete(subMaskId);
+      patchResidency.remove(subMaskId);
       updateSubMask(subMaskId, { parameters: mergedParameters });
     } catch (error) {
       toast.error(`AI Depth Mask Failed: ${formatUnknownError(error)}`);
@@ -375,7 +375,7 @@ export function useAiMasking() {
   };
 
   const handleGenerateAiForegroundMask = async (subMaskId: string) => {
-    const { selectedImage, adjustments, patchesSentToBackend } = useEditorStore.getState();
+    const { selectedImage, adjustments, patchResidency } = useEditorStore.getState();
     if (!selectedImage?.path) return;
     setEditor({ isGeneratingAiMask: true });
 
@@ -393,7 +393,7 @@ export function useAiMasking() {
         .flatMap((p: AiPatch) => p.subMasks)
         .find((sm: SubMask) => sm.id === subMaskId);
       const mergedParameters = mergeMaskParameters(subMask?.parameters, newParameters);
-      patchesSentToBackend.delete(subMaskId);
+      patchResidency.remove(subMaskId);
       updateSubMask(subMaskId, { parameters: mergedParameters });
     } catch (error) {
       toast.error(`AI Mask Failed: ${formatUnknownError(error)}`);
@@ -403,7 +403,7 @@ export function useAiMasking() {
   };
 
   const handleGenerateAiWholePersonMask = async (subMaskId: string) => {
-    const { selectedImage, adjustments, patchesSentToBackend } = useEditorStore.getState();
+    const { selectedImage, adjustments, patchResidency } = useEditorStore.getState();
     if (!selectedImage?.path) return;
     setEditor({ isGeneratingAiMask: true });
 
@@ -425,7 +425,7 @@ export function useAiMasking() {
         providerTier: 'macos_vision',
         target: { part: 'full_person', personId: null },
       });
-      patchesSentToBackend.delete(subMaskId);
+      patchResidency.remove(subMaskId);
       updateSubMask(subMaskId, { parameters: mergedParameters });
     } catch (error) {
       toast.error(`AI Person Mask Failed: ${formatUnknownError(error)}`);
@@ -435,7 +435,7 @@ export function useAiMasking() {
   };
 
   const handleGenerateAiPersonPartMask = async (subMaskId: string, part: AiPeopleMaskPart) => {
-    const { selectedImage, adjustments, patchesSentToBackend } = useEditorStore.getState();
+    const { selectedImage, adjustments, patchResidency } = useEditorStore.getState();
     if (!selectedImage?.path) return;
 
     const capability = getAiPeopleMaskPartCapability(part);
@@ -467,7 +467,7 @@ export function useAiMasking() {
           part === 'face' ? 'macos_face' : part === 'clothing' || part === 'hair' ? 'person_parser' : 'macos_vision',
         target: { part, personId: null },
       });
-      patchesSentToBackend.delete(subMaskId);
+      patchResidency.remove(subMaskId);
       updateSubMask(subMaskId, { parameters: mergedParameters });
     } catch (error) {
       toast.error(`AI Person Mask Failed: ${formatUnknownError(error)}`);
@@ -477,7 +477,7 @@ export function useAiMasking() {
   };
 
   const handleGenerateAiSkyMask = async (subMaskId: string) => {
-    const { selectedImage, adjustments, patchesSentToBackend } = useEditorStore.getState();
+    const { selectedImage, adjustments, patchResidency } = useEditorStore.getState();
     if (!selectedImage?.path) return;
     setEditor({ isGeneratingAiMask: true });
 
@@ -495,7 +495,7 @@ export function useAiMasking() {
         .flatMap((p: AiPatch) => p.subMasks)
         .find((sm: SubMask) => sm.id === subMaskId);
       const mergedParameters = mergeMaskParameters(subMask?.parameters, newParameters);
-      patchesSentToBackend.delete(subMaskId);
+      patchResidency.remove(subMaskId);
       updateSubMask(subMaskId, { parameters: mergedParameters });
     } catch (error) {
       toast.error(`AI Mask Failed: ${formatUnknownError(error)}`);

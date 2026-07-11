@@ -165,6 +165,7 @@ export default function Editor({
   const isLoading = useLibraryStore((s) => s.isViewLoading);
   const selectedImage = useEditorStore((s) => s.selectedImage);
   const adjustments = useEditorStore((s) => s.adjustments);
+  const adjustmentGeometryRevision = useEditorStore((s) => s.adjustmentSnapshot.geometryRevision);
   const adjustmentsHistory = useEditorStore((s) => s.history);
   const adjustmentsHistoryIndex = useEditorStore((s) => s.historyIndex);
   const finalPreviewUrl = useEditorStore((s) => s.finalPreviewUrl);
@@ -1303,12 +1304,12 @@ export default function Editor({
     const { identity, maskDef, renderSize, jsAdjustments } = pendingOverlayRequestRef.current;
     pendingOverlayRequestRef.current = null;
 
-    const { maskOverlaySettings, patchesSentToBackend } = useEditorStore.getState();
+    const { maskOverlaySettings, patchResidency } = useEditorStore.getState();
     const overlayPayload = buildMaskOverlayInvokePayload({
       jsAdjustments,
       maskDef,
       maskOverlaySettings,
-      patchesSentToBackend,
+      patchesSentToBackend: patchResidency.snapshot().residentIds,
       renderSize,
     });
 
@@ -2069,6 +2070,7 @@ export default function Editor({
               activeMaskContainerId={activeMaskContainerId}
               activeMaskId={activeMaskId}
               adjustments={adjustments}
+              adjustmentGeometryRevision={adjustmentGeometryRevision}
               brushSettings={brushSettings}
               crop={crop}
               exportSoftProofRecipeId={exportSoftProofRecipeId}
