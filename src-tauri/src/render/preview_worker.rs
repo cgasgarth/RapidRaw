@@ -353,7 +353,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
     if !is_interactive && let Some(graph_revision) = viewer_sample_graph_revision {
         let frame =
             settled_viewer_sample_frame(&final_processed_image, graph_revision, &loaded_image.path);
-        let weight = frame.image.as_bytes().len() as u64;
+        let weight = frame.pixels.retained_bytes();
         state
             .viewer_sample_frames
             .insert("edited".to_string(), Arc::new(frame), weight);
@@ -368,7 +368,7 @@ fn settled_viewer_sample_frame(
 ) -> CachedViewerSampleFrame {
     CachedViewerSampleFrame {
         graph_revision: graph_revision.to_string(),
-        image: Arc::clone(image),
+        pixels: crate::app_state::SampleablePixels::native(Arc::clone(image)),
         image_identity: image_identity.to_string(),
         space_label: "Display encoded sRGB".to_string(),
     }
@@ -851,7 +851,7 @@ mod tests {
         let sampler_frame =
             settled_viewer_sample_frame(&rendered, "history_4", "/fixture/settled.raw");
 
-        assert!(Arc::ptr_eq(&rendered, &sampler_frame.image));
+        assert!(Arc::ptr_eq(&rendered, sampler_frame.pixels.image()));
         assert_eq!(Arc::strong_count(&rendered), 2);
 
         let encoded = encode_preview_response(
@@ -867,14 +867,15 @@ mod tests {
         .expect("shared RGBA32F settled frame should encode");
         drop(rendered);
 
-        assert_eq!(Arc::strong_count(&sampler_frame.image), 1);
-        assert_eq!(sampler_frame.image.dimensions(), (1920, 1080));
+        assert_eq!(Arc::strong_count(sampler_frame.pixels.image()), 1);
+        assert_eq!(sampler_frame.pixels.dimensions(), (1920, 1080));
         assert_eq!(sampler_frame.graph_revision, "history_4");
         assert_eq!(sampler_frame.image_identity, "/fixture/settled.raw");
         assert_eq!(sampler_frame.space_label, "Display encoded sRGB");
         assert_eq!(
             sampler_frame
-                .image
+                .pixels
+                .image()
                 .as_rgba32f()
                 .unwrap()
                 .get_pixel(960, 540)

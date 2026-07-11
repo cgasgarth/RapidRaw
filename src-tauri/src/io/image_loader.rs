@@ -1101,6 +1101,7 @@ pub async fn load_image(
 
     let (orig_width, orig_height) = pristine_arc.dimensions();
 
+    state.viewer_sample_frames.clear();
     *state.original_image.lock().unwrap() = Some(LoadedImage {
         path,
         image: pristine_arc,
