@@ -82,6 +82,7 @@ export interface LayerStackCommandBridgeContext {
   graphRevision: string;
   imagePath: string;
   operationId: string;
+  persistedSidecar?: LayerStackSidecarV1;
   sessionId: string;
 }
 
@@ -161,7 +162,7 @@ export function applyLayerStackCommandBridgeOperation(
   operation: LayerStackCommandBridgeOperation,
   context: LayerStackCommandBridgeContext,
 ): LayerStackCommandBridgeResult {
-  const sidecar = buildLayerStackSidecarFromMasks(masks, context);
+  const sidecar = resolveCommandSidecar(masks, context);
   const command = buildLayerStackCommand(operation, sidecar, context);
   const dispatched = dispatchLayerStackCommand(command, sidecar);
   if (!('sidecar' in dispatched)) throw new Error('Layer stack bridge expected an applied sidecar result.');
@@ -173,6 +174,22 @@ export function applyLayerStackCommandBridgeOperation(
     masks: materializeMasksFromSidecar(dispatched.sidecar.layers, masks, operation),
     sidecar: dispatched.sidecar,
   };
+}
+
+function resolveCommandSidecar(
+  masks: ReadonlyArray<MaskContainer>,
+  context: LayerStackCommandBridgeContext,
+): LayerStackSidecarV1 {
+  if (context.persistedSidecar === undefined) return buildLayerStackSidecarFromMasks(masks, context);
+
+  const sidecar = layerStackSidecarV1Schema.parse(context.persistedSidecar);
+  if (sidecar.sourceImagePath !== context.imagePath) {
+    throw new Error('Persisted layer stack sidecar does not match the current image.');
+  }
+  if (sidecar.graphRevision !== context.graphRevision) {
+    throw new Error('Persisted layer stack sidecar graph revision is stale.');
+  }
+  return sidecar;
 }
 
 export function applyResolvedRemoveSourcesToLayerStack(
