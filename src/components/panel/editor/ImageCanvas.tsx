@@ -57,7 +57,6 @@ import {
 } from '../../../utils/editorPresentationDescriptor';
 import { globalImageCache } from '../../../utils/ImageLRUCache';
 import {
-  buildInteractivePreviewGeometryIdentity,
   InteractivePreviewUrlRegistry,
   isInteractivePreviewPatchCoherent,
 } from '../../../utils/interactivePreviewPatch';
@@ -280,6 +279,7 @@ interface ImageCanvasProps {
   activeMaskContainerId: string | null;
   activeMaskId: string | null;
   adjustments: Adjustments;
+  adjustmentGeometryRevision?: number;
   brushSettings: BrushSettings | null;
   crop: Crop | null;
   exportSoftProofRecipeId: string | null;
@@ -1697,6 +1697,7 @@ const ImageCanvas = memo(
     activeMaskContainerId,
     activeMaskId,
     adjustments,
+    adjustmentGeometryRevision = 1,
     brushSettings,
     crop,
     exportSoftProofRecipeId,
@@ -3490,7 +3491,7 @@ const ImageCanvas = memo(
       };
     }, [originalSrc]);
 
-    const patchGeometryIdentity = buildInteractivePreviewGeometryIdentity(adjustments);
+    const patchGeometryIdentity = adjustmentGeometryRevision;
     const patchScopeKey = [
       selectedImage.path,
       patchGeometryIdentity,
