@@ -8,8 +8,20 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
+const invokedCommands: string[] = [];
+const searchAlbumTree = [
+  {
+    children: [{ id: 'album-photos', images: ['/photos.raw'], name: 'Photos Album', type: 'album' as const }],
+    id: 'group-photos',
+    name: 'Photos Group',
+    type: 'group' as const,
+  },
+];
 mock.module('@tauri-apps/api/core', () => ({
-  invoke: async (command: string) => (command === 'get_albums' ? [] : null),
+  invoke: async (command: string) => {
+    invokedCommands.push(command);
+    return command === 'get_albums' ? searchAlbumTree : null;
+  },
 }));
 mock.module('@tauri-apps/plugin-os', () => ({ platform: () => 'macos' }));
 
@@ -140,6 +152,64 @@ for (const disclosure of collapsedTrips) {
 
 rendered.unmount();
 
+useSettingsStore.getState().setAppSettings({
+  folderTreeSort: { key: 'name', order: SortDirection.Ascending },
+  lastRootPath: '/library',
+  openTreeSections: [],
+  pinnedFolders: [],
+  theme: Theme.Dark,
+});
+useLibraryStore.getState().setLibrary({
+  albumTree: searchAlbumTree,
+  expandedFolders: new Set<string>(),
+  expandedAlbumGroups: new Set<string>(),
+  pinnedFolderTrees: [
+    {
+      children: [],
+      imageCount: 1,
+      isDir: true,
+      name: 'Photos Pinned',
+      path: '/pinned/photos',
+    },
+  ],
+});
+const closedRendered = await renderFolderTree();
+const saveCountBeforeSearch = invokedCommands.filter((command) => command === 'save_settings').length;
+const searchInput = getByTestId<HTMLInputElement>(closedRendered.container, 'folder-tree-search');
+await input(searchInput, 'photos');
+
+for (const section of ['pinned', 'albums', 'current']) {
+  if (getByTestId(closedRendered.container, `folder-tree-section-${section}`).getAttribute('data-open') !== 'true') {
+    failures.push(`matching ${section} section was not derived open during search.`);
+  }
+}
+getRoleButtonByLabel(closedRendered.container, 'Select folder Photos');
+getRoleButtonByLabel(closedRendered.container, 'Select folder Photos Pinned');
+if (!closedRendered.container.textContent?.includes('Photos Album')) {
+  failures.push('album search did not derive top-level and nested album-group expansion.');
+}
+if (useSettingsStore.getState().appSettings?.openTreeSections?.length !== 0) {
+  failures.push('passive folder search changed persisted top-level disclosure preferences.');
+}
+if (useLibraryStore.getState().expandedFolders.size !== 0) {
+  failures.push('passive folder search changed persisted nested disclosure preferences.');
+}
+if (useLibraryStore.getState().expandedAlbumGroups.size !== 0) {
+  failures.push('passive album search changed persisted album-group disclosure preferences.');
+}
+const saveCountAfterSearch = invokedCommands.filter((command) => command === 'save_settings').length;
+if (saveCountAfterSearch !== saveCountBeforeSearch) {
+  failures.push('passive folder search wrote settings.');
+}
+
+await input(searchInput, '');
+for (const section of ['pinned', 'albums', 'current']) {
+  if (getByTestId(closedRendered.container, `folder-tree-section-${section}`).getAttribute('data-open') !== 'false') {
+    failures.push(`clearing search did not restore the closed ${section} section.`);
+  }
+}
+closedRendered.unmount();
+
 if (failures.length > 0) {
   console.error('folder tree disclosure a11y check failed');
   for (const failure of failures.slice(0, 12)) console.error(`- ${failure}`);
@@ -223,6 +293,28 @@ function getRoleButtonByLabel(container: Element, label: string): HTMLElement {
     throw new Error(`missing role=button control named "${label}".`);
   }
   return element as HTMLElement;
+}
+
+function getByTestId<T extends Element>(container: Element, testId: string): T {
+  const element = container.querySelector(`[data-testid="${testId}"]`);
+  if (element === null) throw new Error(`missing test id: ${testId}`);
+  return element as T;
+}
+
+type ReactInputProps = {
+  onChange?: (event: { currentTarget: HTMLInputElement; target: HTMLInputElement }) => void;
+};
+
+async function input(element: HTMLInputElement, value: string) {
+  await act(async () => {
+    const valueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+    valueSetter?.call(element, value);
+    const reactPropKey = Object.keys(element).find((key) => key.startsWith('__reactProps$'));
+    if (!reactPropKey) throw new Error('folder search input did not expose React props.');
+    const reactProps = (element as HTMLInputElement & Record<string, ReactInputProps | undefined>)[reactPropKey];
+    reactProps?.onChange?.({ currentTarget: element, target: element });
+    await flushPromises();
+  });
 }
 
 function getButtonsByLabel(container: Element, label: string): HTMLButtonElement[] {
