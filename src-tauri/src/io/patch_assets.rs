@@ -186,7 +186,7 @@ impl PatchAssetCache {
             }
             if let Some(asset) = prepared {
                 self.prepared
-                    .insert(key.clone(), asset.clone(), asset.bytes() as u64);
+                    .insert(key, asset.clone(), asset.bytes() as u64);
             } else {
                 state.empty_prepared.insert(key);
             }
