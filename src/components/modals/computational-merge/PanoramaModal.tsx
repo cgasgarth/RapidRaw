@@ -648,6 +648,9 @@ export function PanoramaModal({
               className="pointer-events-none absolute inset-0"
               data-review-status={seamReviewSummary.reviewStatus}
               data-seam-count={seamReviewSummary.seamCount}
+              data-motion-coverage-ratio={seamReviewSummary.motionCoverageRatio ?? 0}
+              data-ownership-mask-artifact-id={seamReviewSummary.ownershipMaskArtifactId ?? ''}
+              data-confidence-map-artifact-id={seamReviewSummary.confidenceMapArtifactId ?? ''}
               data-source-contribution-count={sourceContributionSummary.regions.length}
               data-testid="panorama-seam-contribution-overlay"
             >
@@ -934,6 +937,10 @@ export function PanoramaModal({
             data-overlap-confidence-percent={overlapConfidencePercent}
             data-overlap-minimum-ratio={seamReviewSummary.overlapConfidence.minimumOverlapRatio}
             data-parallax-risk={seamReviewSummary.seamWarningState.parallaxRisk}
+            data-motion-coverage-ratio={seamReviewSummary.motionCoverageRatio ?? 0}
+            data-ownership-mask-artifact-id={seamReviewSummary.ownershipMaskArtifactId ?? ''}
+            data-confidence-map-artifact-id={seamReviewSummary.confidenceMapArtifactId ?? ''}
+            data-seam-fallback-reason={seamReviewSummary.seamFallbackReason ?? ''}
             data-seam-count={seamReviewSummary.seamCount}
             data-seam-max-p95-error-px={seamMaxP95ErrorPx}
             data-seam-review-status={seamReviewSummary.reviewStatus}

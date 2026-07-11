@@ -332,10 +332,15 @@ const panoramaRenderedReviewSourcesSchema = z
 const panoramaSeamReviewSchema = z
   .object({
     contributionMapArtifactId: z.string().trim().min(1).optional(),
-    policy: z.literal('adaptive_dp_feather_v1'),
+    confidenceMapArtifactId: z.string().trim().min(1).optional(),
+    motionCoverageRatio: z.number().min(0).max(1).optional(),
+    ownershipClassCounts: z.record(z.string(), z.number().int().nonnegative()).optional(),
+    ownershipMaskArtifactId: z.string().trim().min(1).optional(),
+    policy: z.enum(['adaptive_dp_feather_v1', 'parallax_ownership_multiband_v1']),
     reviewStatus: z.enum(['ready', 'requires_review']),
     seamCount: z.number().int().nonnegative(),
     seamMaskArtifactId: z.string().trim().min(1).optional(),
+    seamFallbackReason: z.string().trim().min(1).optional(),
     overlapConfidence: z
       .object({
         edgeCount: z.number().int().nonnegative(),
@@ -364,6 +369,15 @@ const panoramaSeamReviewSchema = z
         warningCodes: z.array(z.string().trim().min(1)),
       })
       .strict(),
+    tileBlend: z
+      .object({
+        haloPx: z.number().int().nonnegative(),
+        peakBufferBytes: z.number().int().nonnegative(),
+        pyramidLevels: z.number().int().positive(),
+        tileSizePx: z.number().int().positive(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
