@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 #[cfg(not(any(target_os = "android", target_os = "linux")))]
 use tauri::Manager;
@@ -11,6 +12,8 @@ use crate::gpu_display::WgpuPresentationScheduler;
 #[cfg(not(any(target_os = "android", target_os = "linux")))]
 use crate::gpu_display::{WgpuPresentationScheduler, create_wgpu_display};
 use crate::image_processing::GpuContext;
+
+static NEXT_DEVICE_GENERATION: AtomicU64 = AtomicU64::new(1);
 
 pub fn get_or_init_gpu_context(
     state: &tauri::State<AppState>,
@@ -131,6 +134,7 @@ pub fn get_or_init_gpu_context(
     let presentation =
         WgpuPresentationScheduler::new(display_opt, Arc::clone(&device), Arc::clone(&queue));
     let new_context = GpuContext {
+        generation: NEXT_DEVICE_GENERATION.fetch_add(1, Ordering::Relaxed),
         device,
         queue,
         limits,
@@ -179,6 +183,7 @@ pub fn get_or_init_compute_gpu_context_for_tests(
     let device = Arc::new(device);
     let queue = Arc::new(queue);
     let new_context = GpuContext {
+        generation: NEXT_DEVICE_GENERATION.fetch_add(1, Ordering::Relaxed),
         device: Arc::clone(&device),
         queue: Arc::clone(&queue),
         limits,
