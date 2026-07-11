@@ -689,6 +689,10 @@ pub fn get_all_adjustments_from_json(
         tile_offset_x: 0,
         tile_offset_y: 0,
         mask_atlas_cols: 1,
+        blur_pass_flags: 0,
+        _pad_blur_flags1: 0,
+        _pad_blur_flags2: 0,
+        _pad_blur_flags3: 0,
     }
 }
 

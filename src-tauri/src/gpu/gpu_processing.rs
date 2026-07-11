@@ -1,6 +1,9 @@
 use std::sync::Arc;
 use std::time::Instant;
 
+#[cfg(test)]
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use half::f16;
 use image::{DynamicImage, GenericImageView, ImageBuffer, Luma};
 use wgpu::util::{DeviceExt, TextureDataOrder};
@@ -26,6 +29,85 @@ pub use crate::gpu_context::get_or_init_gpu_context;
 const GPU_OUTPUT_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
 const GPU_OUTPUT_BYTES_PER_PIXEL: u32 = RGBA16_FLOAT_BYTES_PER_PIXEL;
 const MAX_MASK_BINDINGS: u32 = 1;
+
+const BLUR_FLAG_SHARPNESS: u32 = 1 << 0;
+const BLUR_FLAG_TONAL: u32 = 1 << 1;
+const BLUR_FLAG_CLARITY: u32 = 1 << 2;
+const BLUR_FLAG_STRUCTURE: u32 = 1 << 3;
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct BlurPassNeeds {
+    sharpness: bool,
+    tonal: bool,
+    clarity: bool,
+    structure: bool,
+}
+
+#[cfg(test)]
+static FORCE_ALL_BLUR_PASSES: AtomicBool = AtomicBool::new(false);
+
+impl BlurPassNeeds {
+    fn flags(self) -> u32 {
+        (u32::from(self.sharpness) * BLUR_FLAG_SHARPNESS)
+            | (u32::from(self.tonal) * BLUR_FLAG_TONAL)
+            | (u32::from(self.clarity) * BLUR_FLAG_CLARITY)
+            | (u32::from(self.structure) * BLUR_FLAG_STRUCTURE)
+    }
+}
+
+fn resolve_blur_pass_needs(adjustments: &AllAdjustments) -> BlurPassNeeds {
+    let global = &adjustments.global;
+    let mut needs = BlurPassNeeds {
+        sharpness: global.sharpness != 0.0,
+        tonal: global.contrast != 0.0
+            || global.highlights != 0.0
+            || global.shadows != 0.0
+            || global.whites != 0.0
+            || global.blacks != 0.0,
+        clarity: global.clarity != 0.0 || global.centré != 0.0 || global.halation_amount > 0.0,
+        structure: global.structure != 0.0 || global.dehaze != 0.0 || global.glow_amount > 0.0,
+    };
+
+    let mask_count = (adjustments.mask_count as usize).min(MAX_MASKS);
+    for mask in &adjustments.mask_adjustments[..mask_count] {
+        needs.sharpness |= mask.sharpness.abs() > 0.001;
+        needs.tonal |= mask.contrast != 0.0
+            || mask.highlights != 0.0
+            || mask.shadows != 0.0
+            || mask.whites != 0.0
+            || mask.blacks != 0.0;
+        needs.clarity |= mask.clarity != 0.0 || mask.halation_amount > 0.0;
+        needs.structure |= mask.structure != 0.0 || mask.dehaze != 0.0 || mask.glow_amount > 0.0;
+    }
+    needs
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct BlurPassCounters {
+    families_requested: u32,
+    encoders: u32,
+    bind_groups: u32,
+    dispatches: u32,
+    submissions: u32,
+    pixels_processed: u64,
+}
+
+impl BlurPassCounters {
+    fn new(needs: BlurPassNeeds) -> Self {
+        Self {
+            families_requested: needs.flags().count_ones(),
+            ..Self::default()
+        }
+    }
+
+    fn record_family(&mut self, pixels: u64) {
+        self.encoders += 1;
+        self.bind_groups += 2;
+        self.dispatches += 2;
+        self.submissions += 1;
+        self.pixels_processed += pixels * 2;
+    }
+}
 
 // Keep these Rust bindings in sync with src-tauri/src/shaders/shader.wgsl.
 const MAIN_BINDING_INPUT_TEXTURE: u32 = 0;
@@ -710,7 +792,21 @@ impl GpuProcessor {
             (self.dummy_lut_view.clone(), self.dummy_lut_sampler.clone())
         };
 
-        let adjustments = request.adjustments;
+        let mut adjustments = request.adjustments;
+        let blur_pass_needs = resolve_blur_pass_needs(&adjustments);
+        #[cfg(test)]
+        let blur_pass_needs = if FORCE_ALL_BLUR_PASSES.load(Ordering::Relaxed) {
+            BlurPassNeeds {
+                sharpness: true,
+                tonal: true,
+                clarity: true,
+                structure: true,
+            }
+        } else {
+            blur_pass_needs
+        };
+        adjustments.blur_pass_flags = blur_pass_needs.flags();
+        let mut blur_counters = BlurPassCounters::new(blur_pass_needs);
         if adjustments.global.flare_amount > 0.0 {
             let mut encoder = device.create_command_encoder(&Default::default());
 
@@ -857,7 +953,7 @@ impl GpuProcessor {
                     depth_or_array_layers: 1,
                 };
 
-                let run_blur = |base_radius: f32, output_view: &wgpu::TextureView| -> bool {
+                let mut run_blur = |base_radius: f32, output_view: &wgpu::TextureView| -> bool {
                     let radius = (base_radius * scale).ceil().max(1.0) as u32;
                     if radius == 0 {
                         return false;
@@ -930,13 +1026,18 @@ impl GpuProcessor {
                     }
 
                     queue.submit(Some(blur_encoder.finish()));
+                    blur_counters.record_family(u64::from(input_width) * u64::from(input_height));
                     true
                 };
 
-                let did_create_sharpness_blur = run_blur(1.0, &self.sharpness_blur_view);
-                let did_create_tonal_blur = run_blur(3.5, &self.tonal_blur_view);
-                let did_create_clarity_blur = run_blur(8.0, &self.clarity_blur_view);
-                let did_create_structure_blur = run_blur(40.0, &self.structure_blur_view);
+                let did_create_sharpness_blur =
+                    blur_pass_needs.sharpness && run_blur(1.0, &self.sharpness_blur_view);
+                let did_create_tonal_blur =
+                    blur_pass_needs.tonal && run_blur(3.5, &self.tonal_blur_view);
+                let did_create_clarity_blur =
+                    blur_pass_needs.clarity && run_blur(8.0, &self.clarity_blur_view);
+                let did_create_structure_blur =
+                    blur_pass_needs.structure && run_blur(40.0, &self.structure_blur_view);
 
                 let mut main_encoder = device.create_command_encoder(&Default::default());
 
@@ -1107,7 +1208,199 @@ impl GpuProcessor {
             }
         }
 
+        log::debug!("blur passes: needs={blur_pass_needs:?} counters={blur_counters:?}");
+
         Ok((final_pixels, out_width, out_height, bounds.x, bounds.y))
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::field_reassign_with_default, clippy::items_after_test_module)]
+mod blur_pass_tests {
+    use super::*;
+
+    fn needs(adjustments: AllAdjustments) -> BlurPassNeeds {
+        resolve_blur_pass_needs(&adjustments)
+    }
+
+    #[test]
+    fn default_and_exposure_only_need_no_blurs() {
+        assert_eq!(needs(AllAdjustments::default()), BlurPassNeeds::default());
+
+        let mut adjustments = AllAdjustments::default();
+        adjustments.global.exposure = 1.0;
+        assert_eq!(needs(adjustments), BlurPassNeeds::default());
+    }
+
+    #[test]
+    fn global_consumers_activate_their_blur_family() {
+        let mut sharpness = AllAdjustments::default();
+        sharpness.global.sharpness = -0.1;
+        assert!(needs(sharpness).sharpness);
+
+        for tonal in [
+            |a: &mut AllAdjustments| a.global.contrast = 0.1,
+            |a: &mut AllAdjustments| a.global.highlights = -0.1,
+            |a: &mut AllAdjustments| a.global.shadows = 0.1,
+            |a: &mut AllAdjustments| a.global.whites = -0.1,
+            |a: &mut AllAdjustments| a.global.blacks = 0.1,
+        ] {
+            let mut adjustments = AllAdjustments::default();
+            tonal(&mut adjustments);
+            assert!(needs(adjustments).tonal);
+        }
+
+        for clarity in [
+            |a: &mut AllAdjustments| a.global.clarity = -0.1,
+            |a: &mut AllAdjustments| a.global.centré = 0.1,
+            |a: &mut AllAdjustments| a.global.halation_amount = 0.1,
+        ] {
+            let mut adjustments = AllAdjustments::default();
+            clarity(&mut adjustments);
+            assert!(needs(adjustments).clarity);
+        }
+
+        for structure in [
+            |a: &mut AllAdjustments| a.global.structure = -0.1,
+            |a: &mut AllAdjustments| a.global.dehaze = 0.1,
+            |a: &mut AllAdjustments| a.global.glow_amount = 0.1,
+        ] {
+            let mut adjustments = AllAdjustments::default();
+            structure(&mut adjustments);
+            assert!(needs(adjustments).structure);
+        }
+    }
+
+    #[test]
+    fn mask_consumers_activate_only_within_mask_count() {
+        let mut adjustments = AllAdjustments::default();
+        adjustments.mask_count = 4;
+        adjustments.mask_adjustments[0].sharpness = 0.01;
+        adjustments.mask_adjustments[1].highlights = -0.1;
+        adjustments.mask_adjustments[2].halation_amount = 0.1;
+        adjustments.mask_adjustments[3].dehaze = -0.1;
+        assert_eq!(
+            needs(adjustments),
+            BlurPassNeeds {
+                sharpness: true,
+                tonal: true,
+                clarity: true,
+                structure: true,
+            }
+        );
+
+        adjustments.mask_count = 0;
+        assert_eq!(needs(adjustments), BlurPassNeeds::default());
+    }
+
+    #[test]
+    fn mask_activation_matches_shader_thresholds_and_sign_rules() {
+        let mut adjustments = AllAdjustments::default();
+        adjustments.mask_count = 1;
+
+        adjustments.mask_adjustments[0].sharpness = 0.001;
+        assert!(!needs(adjustments).sharpness);
+        adjustments.mask_adjustments[0].sharpness = -0.00101;
+        assert!(needs(adjustments).sharpness);
+
+        adjustments.mask_adjustments[0] = Default::default();
+        adjustments.mask_adjustments[0].halation_amount = -1.0;
+        adjustments.mask_adjustments[0].glow_amount = -1.0;
+        let resolved = needs(adjustments);
+        assert!(!resolved.clarity);
+        assert!(!resolved.structure);
+    }
+
+    #[test]
+    fn combined_consumers_union_to_one_pass_per_family() {
+        let mut adjustments = AllAdjustments::default();
+        adjustments.global.contrast = 0.1;
+        adjustments.global.highlights = 0.2;
+        adjustments.global.clarity = 0.1;
+        adjustments.mask_count = 1;
+        adjustments.mask_adjustments[0].clarity = -0.2;
+
+        let resolved = needs(adjustments);
+        assert_eq!(resolved.flags(), BLUR_FLAG_TONAL | BLUR_FLAG_CLARITY);
+
+        let mut counters = BlurPassCounters::new(resolved);
+        counters.record_family(100);
+        counters.record_family(100);
+        assert_eq!(counters.families_requested, 2);
+        assert_eq!(counters.encoders, 2);
+        assert_eq!(counters.bind_groups, 4);
+        assert_eq!(counters.dispatches, 4);
+        assert_eq!(counters.submissions, 2);
+        assert_eq!(counters.pixels_processed, 400);
+    }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
+    fn selective_blurs_match_the_always_blur_gpu_path() {
+        use image::{DynamicImage, ImageBuffer, Rgba};
+        use tauri::Manager;
+
+        let source = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(32, 24, |x, y| {
+            Rgba([x as f32 / 31.0, y as f32 / 23.0, (x + y) as f32 / 54.0, 1.0])
+        }));
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock Tauri app builds");
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state)
+            .expect("compute-only GPU context initializes");
+
+        let mut cases = Vec::new();
+        cases.push(AllAdjustments::default());
+        let mut exposure = AllAdjustments::default();
+        exposure.global.exposure = 0.5;
+        cases.push(exposure);
+        let mut sharpness = AllAdjustments::default();
+        sharpness.global.sharpness = 0.4;
+        cases.push(sharpness);
+        let mut tonal = AllAdjustments::default();
+        tonal.global.shadows = 0.3;
+        cases.push(tonal);
+        let mut clarity = AllAdjustments::default();
+        clarity.global.halation_amount = 0.2;
+        cases.push(clarity);
+        let mut structure = AllAdjustments::default();
+        structure.global.dehaze = 0.3;
+        cases.push(structure);
+        let mut mask = AllAdjustments::default();
+        mask.mask_count = 1;
+        mask.mask_adjustments[0].clarity = 0.2;
+        cases.push(mask);
+
+        for (index, adjustments) in cases.into_iter().enumerate() {
+            let render = || {
+                process_and_get_dynamic_image(
+                    &context,
+                    &state,
+                    &source,
+                    5_244,
+                    RenderRequest {
+                        adjustments,
+                        mask_bitmaps: &[],
+                        lut: None,
+                        roi: None,
+                    },
+                    "blur_pass_parity",
+                )
+                .expect("GPU render succeeds")
+            };
+            FORCE_ALL_BLUR_PASSES.store(false, Ordering::Relaxed);
+            let selective = render();
+            FORCE_ALL_BLUR_PASSES.store(true, Ordering::Relaxed);
+            let always_blur = render();
+            FORCE_ALL_BLUR_PASSES.store(false, Ordering::Relaxed);
+            assert_eq!(
+                selective.to_rgba16().into_raw(),
+                always_blur.to_rgba16().into_raw(),
+                "parity case {index} differs"
+            );
+        }
     }
 }
 
