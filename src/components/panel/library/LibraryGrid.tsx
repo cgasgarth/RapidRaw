@@ -104,7 +104,6 @@ interface LibraryGridProps {
   onImageClick: (path: string, event: ReactMouseEvent<HTMLElement> | React.KeyboardEvent<HTMLElement>) => void;
   onImageDoubleClick: (path: string) => void;
   thumbnailAspectRatio: ThumbnailAspectRatio;
-  imageRatings: Record<string, number>;
   onRequestThumbnails?: (paths: string[]) => void;
   thumbnailSizeOptions: ThumbnailSizeOption[];
   onThumbnailSizeChange: (size: ThumbnailSize) => void;
@@ -330,7 +329,6 @@ export default function LibraryGrid(props: LibraryGridProps) {
     onImageClick,
     onImageDoubleClick,
     thumbnailAspectRatio,
-    imageRatings,
     onRequestThumbnails,
     thumbnailSizeOptions,
     onThumbnailSizeChange,
@@ -643,7 +641,6 @@ export default function LibraryGrid(props: LibraryGridProps) {
       onImageDoubleClick,
       thumbnailAspectRatio,
       onImageLoad: handleImageLoad,
-      imageRatings,
       baseFolderPath: currentFolderPath,
       itemWidth: gridData?.itemWidth ?? 0,
       itemHeight: gridData ? (gridData.isListView ? gridData.listRowHeight : gridData.itemWidth) : 0,
@@ -663,7 +660,6 @@ export default function LibraryGrid(props: LibraryGridProps) {
     onImageDoubleClick,
     thumbnailAspectRatio,
     handleImageLoad,
-    imageRatings,
     currentFolderPath,
     queueThumbnailRequest,
     handleToggleRecursiveFolder,
