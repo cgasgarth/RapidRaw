@@ -6129,7 +6129,7 @@ mod tests {
         )
         .expect("decode private RAW through app loader");
         let params = NegativeConversionParams::default();
-        let profile = crosstalk_profile(
+        let mut profile = crosstalk_profile(
             [
                 [1.08, -0.06, -0.02],
                 [-0.03, 1.07, -0.04],
@@ -6137,6 +6137,10 @@ mod tests {
             ],
             0.35,
         );
+        profile["profileId"] =
+            json!("negative_lab.crosstalk.generic.rawengine_c41_starting_point.v1");
+        profile["provenance"] = json!("rawengine_generic");
+        profile["provenanceHash"] = json!("fnv1a32:664fbacc");
         let identity = run_pipeline_with_metrics(&input, &params, None, None);
         let transformed = run_pipeline_with_metrics(&input, &params, None, Some(&profile));
         let identity_rgb = identity.rendered_preview.to_rgb32f();
