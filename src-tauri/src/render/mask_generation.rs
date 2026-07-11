@@ -2138,7 +2138,7 @@ pub fn generate_mask_overlay(
     }
 
     if let Some(sub_masks) = mask_def.get_mut("subMasks").and_then(|v| v.as_array_mut()) {
-        let mut cache = state.patch_cache.lock().unwrap();
+        let mut cache = state.payload_residency_cache.lock().unwrap();
         crate::adjustment_utils::hydrate_sub_masks(sub_masks, &mut cache);
     }
 

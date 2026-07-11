@@ -1050,9 +1050,8 @@ pub async fn export_images(
                         match get_full_image_for_processing(&state) {
                             Ok((orig_data, _)) => {
                                 let image = composite_patches_on_image(&orig_data, &js_adjustments)
-                                    .map_err(|e| {
-                                        format!("Failed to composite AI patches: {}", e)
-                                    })?;
+                                    .map_err(|e| format!("Failed to composite AI patches: {}", e))?
+                                    .into_owned();
                                 (image, None)
                             }
                             Err(_) => {

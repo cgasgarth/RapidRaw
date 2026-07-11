@@ -239,10 +239,8 @@ fn compute_full_transformed_res(
         .and_then(|v| v.as_array())
         .is_some_and(|a| !a.is_empty());
     let patched_original_image = if has_patches {
-        Cow::Owned(
-            composite_patches_on_image(&loaded_image.image, adjustments)
-                .map_err(|e| format!("Failed to composite AI patches: {}", e))?,
-        )
+        composite_patches_on_image(&loaded_image.image, adjustments)
+            .map_err(|e| format!("Failed to composite AI patches: {}", e))?
     } else {
         Cow::Borrowed(loaded_image.image.as_ref())
     };
@@ -758,13 +756,11 @@ fn generate_uncropped_preview(
             .and_then(|v| v.as_array())
             .is_some_and(|a| !a.is_empty());
         let patched_image = if has_patches {
-            Cow::Owned(
-                composite_patches_on_image(&loaded_image.image, &adjustments_clone).unwrap_or_else(
-                    |e| {
-                        eprintln!("Failed to composite patches for uncropped preview: {}", e);
-                        loaded_image.image.as_ref().clone()
-                    },
-                ),
+            composite_patches_on_image(&loaded_image.image, &adjustments_clone).unwrap_or_else(
+                |e| {
+                    eprintln!("Failed to composite patches for uncropped preview: {}", e);
+                    Cow::Borrowed(loaded_image.image.as_ref())
+                },
             )
         } else {
             Cow::Borrowed(loaded_image.image.as_ref())
