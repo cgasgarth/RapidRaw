@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { RawEngineAgentSelectedImageProposalReceiptV1 } from '../../../../../packages/rawengine-schema/src/agentSelectedImageProposalSchemas';
 import type { AgentReviewedAdjustmentCommandId } from '../../../../schemas/agent/agentReviewedCommandSchemas';
 import {
   type AgentSelectedImagePreviewReceipt,
@@ -18,6 +19,7 @@ import {
 } from '../../../../utils/agent/agentReviewedAdjustmentCommands';
 import { buildAgentImageContextSnapshot } from '../../../../utils/agent/context/agentImageContextSnapshot';
 import { AGENT_PREVIEW_RENDER_TOOL_NAME } from '../../../../utils/agent/context/agentReadOnlyAppServerTools';
+import { agentSelectedImageProposalRuntime } from '../../../../utils/agent/context/agentSelectedImageProposalRuntime';
 import {
   type AgentSelectedImageLiveSessionAuditRecord,
   type AgentSelectedImageLiveSessionBlockedResult,
@@ -30,6 +32,7 @@ import {
   getAgentSelectedImageLiveSessionRollbackReadiness,
   preflightAgentSelectedImageLiveSessionAuditReplay,
   recoverAgentSelectedImageLiveSessionDryRun,
+  renderAgentSelectedImageLiveSessionProposal,
   rollbackAgentSelectedImageLiveSession,
   startAgentSelectedImageLiveSessionDryRun,
 } from '../../../../utils/agent/session/agentSelectedImageLiveSession';
@@ -49,13 +52,20 @@ export type AgentSelectedImageWorkspaceActionStatus =
   | 'applying'
   | 'approval_required'
   | 'blocked'
+  | 'cancelled'
   | 'dry_run_ready'
   | 'exported'
   | 'exporting'
+  | 'failed'
   | 'idle'
   | 'refreshing'
+  | 'released'
+  | 'rendering'
   | 'rolled_back'
-  | 'rolling_back';
+  | 'rolling_back'
+  | 'stale'
+  | 'superseded'
+  | 'timed_out';
 
 export interface AgentSelectedImageWorkspaceActivityEntry {
   body: string;
@@ -105,6 +115,7 @@ export interface AgentSelectedImageWorkspaceController {
   latestRequestId: string | null;
   latestToolName: string | null;
   previewReceipt: AgentSelectedImagePreviewReceipt | null;
+  proposalReceipt: RawEngineAgentSelectedImageProposalReceiptV1 | null;
   reviewedCommandOptions: AgentReviewedAdjustmentCommandOption[];
   rollbackReadiness: AgentSelectedImageRollbackReadiness | null;
   selectedCommandId: AgentReviewedAdjustmentCommandId;
@@ -252,9 +263,18 @@ export const useAgentSelectedImageWorkspaceController = ({
 
   const selectedImageReady = selectedImage !== null && selectedImage.isReady;
   const operationPending =
-    status === 'applying' || status === 'exporting' || status === 'refreshing' || status === 'rolling_back';
+    status === 'applying' ||
+    status === 'exporting' ||
+    status === 'refreshing' ||
+    status === 'rendering' ||
+    status === 'rolling_back';
   const canDryRun = selectedImageReady && !operationPending;
-  const canApply = selectedImageReady && draft !== null && draft.state === 'approval_required' && !operationPending;
+  const canApply =
+    selectedImageReady &&
+    draft !== null &&
+    draft.state === 'approval_required' &&
+    draft.proposal?.status === 'ready' &&
+    !operationPending;
   const canExportAudit = selectedImageReady && auditRecord !== null && !operationPending;
   const canRecover = selectedImageReady && blockedResult?.staleReason !== undefined && !operationPending;
   const rollbackReadiness = useMemo(
@@ -290,19 +310,31 @@ export const useAgentSelectedImageWorkspaceController = ({
     setAuditRecord(record);
   }, []);
 
-  const selectCommand = useCallback((commandId: AgentReviewedAdjustmentCommandId) => {
-    setSelectedCommandId(commandId);
-    setBlockedResult(null);
-    setDraft(null);
-    setError(null);
-    setRollbackCheckpoint(null);
-    setStatus('idle');
-  }, []);
+  const selectCommand = useCallback(
+    (commandId: AgentReviewedAdjustmentCommandId) => {
+      if (draft?.proposal !== undefined) void agentSelectedImageProposalRuntime.release(draft.proposal.proposalId);
+      setSelectedCommandId(commandId);
+      setBlockedResult(null);
+      setDraft(null);
+      setError(null);
+      setRollbackCheckpoint(null);
+      setStatus('idle');
+    },
+    [draft],
+  );
+
+  useEffect(
+    () => () => {
+      if (draft?.proposal !== undefined) void agentSelectedImageProposalRuntime.release(draft.proposal.proposalId);
+    },
+    [draft?.proposal],
+  );
 
   const dryRun = useCallback(async () => {
     if (!canDryRun) return;
     setBlockedResult(null);
     setError(null);
+    setStatus('rendering');
     const stamp = Date.now();
     const operationId = `agent_workspace_selected_image_${stamp}`;
     const requestId = `agent-workspace-selected-image-${stamp}`;
@@ -316,24 +348,40 @@ export const useAgentSelectedImageWorkspaceController = ({
         reviewedCommand: selectedCommandPlan.receipt,
         sessionId: WORKSPACE_SESSION_ID,
       });
+      const proposal = await renderAgentSelectedImageLiveSessionProposal(sessionDraft);
       setDraft(sessionDraft);
+      if (proposal.status !== 'ready') {
+        const message = proposal.warnings.join(' ') || `Selected-image proposal ${proposal.status}.`;
+        setError(message);
+        setStatus(proposal.status);
+        pushActivityEntry({
+          body: message,
+          kind: 'error',
+          requestId: `${requestId}-proposal`,
+          status: 'blocked',
+          toolName: 'rawengine.agent.selected_image.proposal.render',
+        });
+        return;
+      }
+      const artifacts = proposal.artifacts;
+      if (artifacts === undefined) throw new Error('Ready selected-image proposal omitted preview artifacts.');
       setRollbackCheckpoint(sessionDraft.checkpoint);
       setPreviewReceiptBase(
         parsePreviewReceipt({
           after: {
-            artifactId: `${requestId}-dry-run-plan`,
+            artifactId: artifacts.after.artifactId,
             graphRevision: sessionDraft.dryRun.predictedGraphRevision,
-            recipeHash: sessionDraft.dryRun.dryRunPlanHash,
-            renderHash: sessionDraft.dryRun.dryRunPlanHash,
+            recipeHash: artifacts.after.recipeHash,
+            renderHash: artifacts.after.renderHash,
             role: 'after',
-            toolName: sessionDraft.dryRun.toolName,
+            toolName: 'rawengine.agent.selected_image.proposal.render',
           },
           before: {
-            artifactId: sessionDraft.snapshot.previewArtifactId,
+            artifactId: artifacts.before.artifactId,
             graphRevision: sessionDraft.snapshot.graphRevision,
             previewRef: sessionDraft.snapshot.previewRef,
-            recipeHash: sessionDraft.snapshot.recipeHash,
-            renderHash: sessionDraft.snapshot.previewRenderHash,
+            recipeHash: artifacts.before.recipeHash,
+            renderHash: artifacts.before.renderHash,
             role: 'before',
             toolName: sessionDraft.dryRun.toolName,
           },
@@ -341,19 +389,20 @@ export const useAgentSelectedImageWorkspaceController = ({
           kind: 'dry_run',
           requestId: `${requestId}-dry-run`,
           selectedImagePath: sessionDraft.snapshot.selectedImagePath,
-          toolName: sessionDraft.dryRun.toolName,
+          toolName: 'rawengine.agent.selected_image.proposal.render',
         }),
       );
       setStatus('approval_required');
       pushActivityEntry({
-        body: `${sessionDraft.reviewedCommand.label}: ${sessionDraft.dryRun.dryRunPlanHash}`,
+        body: `${sessionDraft.reviewedCommand.label}: ${proposal.proposalHash}`,
         graphRevision: sessionDraft.dryRun.sourceGraphRevision,
         kind: 'tool_call',
-        previewBeforeHash: sessionDraft.snapshot.previewRenderHash,
+        previewAfterHash: artifacts.after.contentHash,
+        previewBeforeHash: artifacts.before.contentHash,
         recipeHash: sessionDraft.snapshot.recipeHash,
         requestId: `${requestId}-dry-run`,
         status: 'completed',
-        toolName: sessionDraft.dryRun.toolName,
+        toolName: 'rawengine.agent.selected_image.proposal.render',
       });
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : 'Selected-image dry-run failed.';
@@ -385,24 +434,41 @@ export const useAgentSelectedImageWorkspaceController = ({
         reviewedCommand: selectedCommandPlan.receipt,
         sessionId: WORKSPACE_SESSION_ID,
       });
+      const proposal = await renderAgentSelectedImageLiveSessionProposal(sessionDraft);
       setDraft(sessionDraft);
+      if (proposal.status !== 'ready') {
+        const message = proposal.warnings.join(' ') || `Selected-image proposal ${proposal.status}.`;
+        setError(message);
+        setStatus(proposal.status);
+        pushActivityEntry({
+          body: message,
+          kind: 'error',
+          recoveryRequestId,
+          requestId: `${recoveryRequestId}-proposal`,
+          status: 'blocked',
+          toolName: 'rawengine.agent.selected_image.proposal.render',
+        });
+        return;
+      }
+      const artifacts = proposal.artifacts;
+      if (artifacts === undefined) throw new Error('Ready selected-image proposal omitted preview artifacts.');
       setRollbackCheckpoint(sessionDraft.checkpoint);
       setPreviewReceiptBase(
         parsePreviewReceipt({
           after: {
-            artifactId: `${recoveryRequestId}-dry-run-plan`,
+            artifactId: artifacts.after.artifactId,
             graphRevision: sessionDraft.dryRun.predictedGraphRevision,
-            recipeHash: sessionDraft.dryRun.dryRunPlanHash,
-            renderHash: sessionDraft.dryRun.dryRunPlanHash,
+            recipeHash: artifacts.after.recipeHash,
+            renderHash: artifacts.after.renderHash,
             role: 'after',
-            toolName: sessionDraft.dryRun.toolName,
+            toolName: 'rawengine.agent.selected_image.proposal.render',
           },
           before: {
-            artifactId: sessionDraft.snapshot.previewArtifactId,
+            artifactId: artifacts.before.artifactId,
             graphRevision: sessionDraft.snapshot.graphRevision,
             previewRef: sessionDraft.snapshot.previewRef,
-            recipeHash: sessionDraft.snapshot.recipeHash,
-            renderHash: sessionDraft.snapshot.previewRenderHash,
+            recipeHash: artifacts.before.recipeHash,
+            renderHash: artifacts.before.renderHash,
             role: 'before',
             toolName: sessionDraft.dryRun.toolName,
           },
@@ -410,7 +476,7 @@ export const useAgentSelectedImageWorkspaceController = ({
           kind: 'dry_run',
           requestId: `${recoveryRequestId}-dry-run`,
           selectedImagePath: sessionDraft.snapshot.selectedImagePath,
-          toolName: sessionDraft.dryRun.toolName,
+          toolName: 'rawengine.agent.selected_image.proposal.render',
         }),
       );
       setBlockedResult(null);
@@ -421,13 +487,14 @@ export const useAgentSelectedImageWorkspaceController = ({
         currentRecipeHash: sessionDraft.snapshot.recipeHash,
         graphRevision: sessionDraft.snapshot.graphRevision,
         kind: 'recovery',
-        previewBeforeHash: sessionDraft.snapshot.previewRenderHash,
+        previewAfterHash: artifacts.after.contentHash,
+        previewBeforeHash: artifacts.before.contentHash,
         recipeHash: sessionDraft.snapshot.recipeHash,
         recoveryRequestId,
         requestId: `${recoveryRequestId}-dry-run`,
         staleReason: blockedResult.staleReason,
         status: 'completed',
-        toolName: sessionDraft.dryRun.toolName,
+        toolName: 'rawengine.agent.selected_image.proposal.render',
       });
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : 'Selected-image recovery dry-run failed.';
@@ -454,6 +521,10 @@ export const useAgentSelectedImageWorkspaceController = ({
     setError(null);
     setStatus('applying');
     try {
+      const currentProposal = await agentSelectedImageProposalRuntime.ensureReady(draft.proposal?.proposalId ?? '');
+      if (currentProposal?.status !== 'ready' || currentProposal.receiptHash !== draft.proposal?.receiptHash) {
+        throw new Error('Selected-image apply rejected a stale or released proposal identity.');
+      }
       const approvedDraft = approveAgentSelectedImageLiveSession(draft);
       setDraft(approvedDraft);
       pushActivityEntry({
@@ -668,6 +739,7 @@ export const useAgentSelectedImageWorkspaceController = ({
     latestRequestId: latestActivity?.requestId ?? null,
     latestToolName: latestActivity?.toolName ?? null,
     previewReceipt,
+    proposalReceipt: draft?.proposal ?? null,
     reviewedCommandOptions: AGENT_REVIEWED_ADJUSTMENT_COMMAND_OPTIONS,
     rollbackReadiness,
     selectedCommandId,

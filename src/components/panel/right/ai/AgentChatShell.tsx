@@ -14,6 +14,7 @@ import {
   renderAgentReadOnlyPreview,
 } from '../../../../utils/agent/context/agentReadOnlyAppServerTools';
 import { agentSelectedImageProposalRuntime } from '../../../../utils/agent/context/agentSelectedImageProposalRuntime';
+import { DEFAULT_AGENT_EDITING_MODEL_SELECTION } from '../../../../utils/agent/session/agentAppServerModelSelection';
 import {
   AGENT_HISTORY_ROLLBACK_TOOL_NAME,
   agentHistoryRollbackResponseSchema,
@@ -927,6 +928,16 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
           <span className="truncate">
             {isContextReady ? transcript.sessionTitle : 'Select an image to start an edit.'}
           </span>
+        </div>
+        <div
+          className="flex items-center gap-1.5 text-[10px] leading-3 text-text-tertiary"
+          data-model-id={DEFAULT_AGENT_EDITING_MODEL_SELECTION.modelId}
+          data-reasoning-tier={DEFAULT_AGENT_EDITING_MODEL_SELECTION.reasoningTier}
+          data-testid="agent-model-configuration"
+        >
+          <span>{DEFAULT_AGENT_EDITING_MODEL_SELECTION.modelId}</span>
+          <span aria-hidden="true">/</span>
+          <span>{DEFAULT_AGENT_EDITING_MODEL_SELECTION.reasoningTier}</span>
         </div>
         {visibleToolCalls.length > 0 ? (
           <div className="flex flex-wrap gap-1" data-testid="agent-chat-tool-states">

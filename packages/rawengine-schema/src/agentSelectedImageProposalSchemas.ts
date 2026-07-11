@@ -19,6 +19,9 @@ const basicTonePatchSchema = z
     highlights: z.number().min(-100).max(100).optional(),
     saturation: z.number().min(-100).max(100).optional(),
     shadows: z.number().min(-100).max(100).optional(),
+    temperature: z.number().min(-100).max(100).optional(),
+    tint: z.number().min(-100).max(100).optional(),
+    vibrance: z.number().min(-100).max(100).optional(),
     whites: z.number().min(-100).max(100).optional(),
   })
   .strict()

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { agentModelSelectionReceiptSchema } from './agentAppServerModelSelection';
 import type { AgentSessionAuditRecord, AgentSessionAuditStorageAdapter } from './agentSessionAuditStore';
 import { readAgentSessionAuditStore, verifyAgentSessionArtifactLineage } from './agentSessionAuditStore';
 
@@ -16,6 +17,7 @@ export const agentSessionReplayReportSchema = z
         .strict(),
     ),
     finalGraphRevision: z.string().trim().min(1),
+    modelSelection: agentModelSelectionReceiptSchema,
     replayedRecordCount: z.number().int().nonnegative(),
     sessionId: z.string().trim().min(1),
     status: agentSessionReplayStatusSchema,
@@ -42,6 +44,7 @@ export const replayAgentSessionAuditRecord = (
   return agentSessionReplayReportSchema.parse({
     artifactDivergences,
     finalGraphRevision: record.finalGraphRevision,
+    modelSelection: record.modelSelection,
     replayedRecordCount: 1,
     sessionId: record.sessionId,
     status: artifactDivergences.length === 0 ? 'matched' : 'diverged',

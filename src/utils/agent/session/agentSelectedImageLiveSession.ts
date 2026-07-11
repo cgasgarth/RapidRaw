@@ -1,4 +1,11 @@
 import { z } from 'zod';
+import {
+  RAW_ENGINE_AGENT_SELECTED_IMAGE_PROPOSAL_RENDER_TOOL_NAME,
+  type RawEngineAgentSelectedImageProposalReceiptV1,
+  type RawEngineAgentSelectedImageProposalRenderCommandV1,
+  rawEngineAgentSelectedImageProposalArtifactV1Schema,
+  rawEngineAgentSelectedImageProposalReceiptV1Schema,
+} from '../../../../packages/rawengine-schema/src/agentSelectedImageProposalSchemas';
 import { agentReviewedAdjustmentCommandReceiptSchema } from '../../../schemas/agent/agentReviewedCommandSchemas';
 import type { RawEngineAppServerToolDispatchRequest } from '../../../schemas/agent/agentRuntimeSchemas';
 import {
@@ -30,6 +37,7 @@ import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnap
 import {
   AGENT_PREVIEW_RENDER_TOOL_NAME,
   agentPreviewRenderResponseSchema,
+  RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
 } from '../context/agentReadOnlyAppServerTools';
 import {
   AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
@@ -399,6 +407,7 @@ export interface AgentSelectedImageLiveSessionDraft {
   auditEvents: AgentSelectedImageLiveSessionAuditEvent[];
   checkpoint: AgentSessionCheckpoint;
   dryRun: AgentAdjustmentsDryRunResponse;
+  proposal?: RawEngineAgentSelectedImageProposalReceiptV1;
   operationId: string;
   prompt: string;
   recovery?: {
@@ -914,6 +923,83 @@ export const startAgentSelectedImageLiveSessionDryRun = async ({
     toolName: AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
   });
   return draft;
+};
+
+export const renderAgentSelectedImageLiveSessionProposal = async (
+  draft: AgentSelectedImageLiveSessionDraft,
+): Promise<RawEngineAgentSelectedImageProposalReceiptV1> => {
+  const previewRequestId = `${draft.requestId}-proposal-before`;
+  const preview = await dispatchAgentTypedEditorTool({
+    args: { expectedRecipeHash: draft.snapshot.recipeHash, requestId: previewRequestId },
+    context: createAgentTypedToolExecutionContext({
+      arguments: { expectedRecipeHash: draft.snapshot.recipeHash, requestId: previewRequestId },
+      callId: previewRequestId,
+      parentCallId: `${draft.requestId}-dry-run`,
+      requestId: previewRequestId,
+      sessionId: draft.sessionId,
+    }),
+    toolName: RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
+  });
+  const callId = `${draft.requestId}-proposal`;
+  const context = createAgentTypedToolExecutionContext({
+    arguments: {
+      expectedGraphRevision: draft.snapshot.graphRevision,
+      expectedRecipeHash: draft.snapshot.recipeHash,
+      expectedSelectedImagePath: draft.snapshot.selectedImagePath,
+    },
+    callId,
+    parentCallId: `${draft.requestId}-dry-run`,
+    requestId: callId,
+    sessionId: draft.sessionId,
+  });
+  const baseAttachment = preview.attachment.attachment;
+  const command: RawEngineAgentSelectedImageProposalRenderCommandV1 = {
+    basePreview: rawEngineAgentSelectedImageProposalArtifactV1Schema.parse({
+      accessScope: baseAttachment.accessScope,
+      artifactId: baseAttachment.artifactId,
+      byteLength: baseAttachment.byteLength,
+      colorPipeline: baseAttachment.colorPipeline,
+      contentHash: baseAttachment.contentHash,
+      dimensions: baseAttachment.dimensions,
+      encodedFormat: baseAttachment.encodedFormat,
+      expiresAt: baseAttachment.expiresAt,
+      mediaType: baseAttachment.mediaType,
+      quality: baseAttachment.quality,
+      recipeHash: baseAttachment.revision.recipeHash,
+      renderHash: baseAttachment.revision.renderHash,
+    }),
+    cancellationId: context.cancellationId,
+    commandType: RAW_ENGINE_AGENT_SELECTED_IMAGE_PROPOSAL_RENDER_TOOL_NAME,
+    deadlineAt: context.deadlineAt,
+    dryRun: true,
+    dryRunPlan: {
+      planHash: draft.dryRun.dryRunPlanHash,
+      planId: draft.dryRun.dryRunPlanId,
+      predictedGraphRevision: draft.dryRun.predictedGraphRevision,
+    },
+    edit: { kind: 'basic_tone_v1' as const, patch: draft.adjustments },
+    expectedGraphRevision: draft.snapshot.graphRevision,
+    expectedRecipeHash: draft.snapshot.recipeHash,
+    expectedRenderHash: draft.snapshot.previewRenderHash,
+    expectedSelectedImagePath: draft.snapshot.selectedImagePath,
+    idempotencyKey: context.idempotencyKey,
+    lineage: { callId, parentCallId: `${draft.requestId}-dry-run` },
+    operationId: draft.operationId,
+    requestedPreview: { longEdgePx: 1536, maxBytes: 8 * 1024 * 1024, quality: 0.86 },
+    requestId: callId,
+    sessionId: draft.sessionId,
+  };
+  const receipt = rawEngineAgentSelectedImageProposalReceiptV1Schema.parse(
+    await dispatchAgentTypedEditorTool({
+      args: command,
+      context,
+      draftSession: buildDraftSession(draft, 'active'),
+      toolName: RAW_ENGINE_AGENT_SELECTED_IMAGE_PROPOSAL_RENDER_TOOL_NAME,
+    }),
+  );
+  draft.proposal = receipt;
+  if (receipt.status !== 'ready' || receipt.artifacts === undefined) draft.state = 'failed';
+  return receipt;
 };
 
 export const recoverAgentSelectedImageLiveSessionDryRun = async ({
