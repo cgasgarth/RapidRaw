@@ -8,7 +8,6 @@ import {
   buildBasicToneImageCommandContext,
   type LegacyBasicToneAdjustmentPayload,
 } from '../../basicToneCommandBridge';
-import { pushEditHistoryEntry } from '../../editHistory';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
 import { applyBasicToneToLiveEditor } from '../session/agentLiveBasicTone';
 import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorCoreState';
@@ -58,6 +57,16 @@ export const agentAdjustmentsApplyRequestSchema = z
     approval: agentAdjustmentsApplyApprovalSchema,
     expectedGraphRevision: z.string().trim().min(1),
     expectedRecipeHash: z.string().trim().min(1),
+    proposalLineage: z
+      .object({
+        acceptedProposalHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+        acceptedProposalId: z.string().trim().min(1),
+        lineageEpoch: z.number().int().positive(),
+        lineageId: z.string().trim().min(1),
+        sealedIterationId: z.string().trim().min(1),
+      })
+      .strict()
+      .optional(),
     operationId: z.string().trim().min(1),
     requestId: z.string().trim().min(1),
     sessionId: z.string().trim().min(1),
@@ -428,11 +437,12 @@ export const applyAgentGlobalAdjustments = async (
       for (const entry of extraEntries) {
         adjustments[entry.key] = entry.value;
       }
-      const history = pushEditHistoryEntry(state.history.slice(0, -1), state.historyIndex - 1, adjustments);
+      const history = [...state.history];
+      history[state.historyIndex] = adjustments;
       return {
         adjustments,
-        history: history.history,
-        historyIndex: history.historyIndex,
+        history,
+        historyIndex: state.historyIndex,
         uncroppedAdjustedPreviewUrl: null,
       };
     });

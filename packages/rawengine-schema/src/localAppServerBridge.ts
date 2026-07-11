@@ -240,9 +240,14 @@ export const rawEngineLocalAppServerSelectedImagePreviewLoopApplyReviewCommandV1
   .object({
     acceptedPreviewArtifactId: z.string().trim().min(1),
     acceptedPreviewReceiptHash: z.string().regex(/^sha256:[a-f0-9]{16,64}$/u),
+    acceptedProposalHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    acceptedProposalId: z.string().trim().min(1),
     commandType: z.literal(RawEngineLocalAppServerCommandType.AgentSelectedImagePreviewLoopApplyReview),
+    lineageEpoch: z.number().int().positive(),
+    lineageId: z.string().trim().min(1),
     request: rawEngineLocalAppServerSelectedImagePreviewLoopCommandBaseV1Schema.omit({ commandType: true }),
     review: rawEngineLocalAppServerPreviewLoopReviewV1Schema,
+    sealedIterationId: z.string().trim().min(1),
   })
   .strict();
 
