@@ -2859,6 +2859,8 @@ pub fn run() {
             super_resolution::cancel_super_resolution_registration,
             super_resolution::single_image::get_single_image_x2_capability,
             super_resolution::single_image::preview_single_image_x2,
+            super_resolution::single_image::apply::apply_single_image_x2,
+            super_resolution::single_image::batch::queue_single_image_x2_batch,
             super_resolution::single_image::cancel_single_image_x2_preview,
             merge::computational_job::cancel_computational_merge_job,
             panorama_stitching::plan_panorama,
