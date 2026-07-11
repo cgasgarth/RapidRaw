@@ -34,6 +34,7 @@ for (const librarySize of [10_000, 50_000]) {
   for (const path of batches.flat()) scheduler.markResident(path);
   const elapsedMs = performance.now() - started;
   const metrics = scheduler.getMetrics();
+  scheduler.dispose();
   console.log(
     JSON.stringify({
       librarySize,

@@ -102,7 +102,6 @@ interface LibraryGridProps {
   onImageClick: (path: string, event: ReactMouseEvent<HTMLElement> | React.KeyboardEvent<HTMLElement>) => void;
   onImageDoubleClick: (path: string) => void;
   thumbnailAspectRatio: ThumbnailAspectRatio;
-  imageRatings: Record<string, number>;
   onThumbnailViewportChange?: (demand: ThumbnailViewportUpdate) => void;
   thumbnailSizeOptions: ThumbnailSizeOption[];
   onThumbnailSizeChange: (size: ThumbnailSize) => void;
@@ -113,6 +112,17 @@ interface LibraryGridProps {
 const VirtualizedRow = ({ ariaAttributes: _ariaAttributes, ...rowProps }: VirtualizedRowProps): React.ReactElement => (
   <Row {...rowProps} />
 );
+
+const imageListRevisions = new WeakMap<readonly ImageFile[], number>();
+let nextImageListRevision = 1;
+
+const getImageListRevision = (imageList: readonly ImageFile[]): number => {
+  const existing = imageListRevisions.get(imageList);
+  if (existing !== undefined) return existing;
+  const revision = nextImageListRevision++;
+  imageListRevisions.set(imageList, revision);
+  return revision;
+};
 
 function HeaderColumn({
   resize,
@@ -328,7 +338,6 @@ export default function LibraryGrid(props: LibraryGridProps) {
     onImageClick,
     onImageDoubleClick,
     thumbnailAspectRatio,
-    imageRatings,
     onThumbnailViewportChange,
     thumbnailSizeOptions,
     onThumbnailSizeChange,
@@ -530,13 +539,7 @@ export default function LibraryGrid(props: LibraryGridProps) {
   ]);
 
   const viewportContextKey = useMemo(() => {
-    let hash = 2166136261;
-    for (const image of imageList) {
-      for (let index = 0; index < image.path.length; index += 1) {
-        hash = Math.imul(hash ^ image.path.charCodeAt(index), 16777619);
-      }
-    }
-    return `${currentFolderPath ?? ''}:${thumbnailSize}:${thumbnailAspectRatio}:${hash >>> 0}`;
+    return `${currentFolderPath ?? ''}:${thumbnailSize}:${thumbnailAspectRatio}:${getImageListRevision(imageList)}`;
   }, [currentFolderPath, imageList, thumbnailAspectRatio, thumbnailSize]);
 
   useEffect(() => {
@@ -636,7 +639,6 @@ export default function LibraryGrid(props: LibraryGridProps) {
       onImageDoubleClick,
       thumbnailAspectRatio,
       onImageLoad: handleImageLoad,
-      imageRatings,
       baseFolderPath: currentFolderPath,
       itemWidth: gridData?.itemWidth ?? 0,
       itemHeight: gridData ? (gridData.isListView ? gridData.listRowHeight : gridData.itemWidth) : 0,
@@ -655,7 +657,6 @@ export default function LibraryGrid(props: LibraryGridProps) {
     onImageDoubleClick,
     thumbnailAspectRatio,
     handleImageLoad,
-    imageRatings,
     currentFolderPath,
     handleToggleRecursiveFolder,
     handleToggleAutoStack,

@@ -76,6 +76,26 @@ const TIER_BASE: Record<DemandClass, number> = {
   background: 30_000,
 };
 
+let nextTimerHandle = 1;
+const scheduledTimers = new Map<number, ReturnType<typeof setTimeout>>();
+
+const scheduleTimer = (callback: () => void, delayMs: number): number => {
+  const handle = nextTimerHandle++;
+  const timer = globalThis.setTimeout(() => {
+    scheduledTimers.delete(handle);
+    callback();
+  }, delayMs);
+  scheduledTimers.set(handle, timer);
+  return handle;
+};
+
+const cancelTimer = (handle: number): void => {
+  const timer = scheduledTimers.get(handle);
+  if (timer === undefined) return;
+  globalThis.clearTimeout(timer);
+  scheduledTimers.delete(handle);
+};
+
 export class ThumbnailDemandScheduler {
   private generation = 0;
   private sequence = 0;
@@ -116,8 +136,8 @@ export class ThumbnailDemandScheduler {
     this.now = dependencies.now ?? (() => performance.now());
     this.requestFrame = dependencies.requestFrame ?? ((callback) => requestAnimationFrame(callback));
     this.cancelFrame = dependencies.cancelFrame ?? ((handle) => cancelAnimationFrame(handle));
-    this.setTimer = dependencies.setTimer ?? ((callback, delayMs) => window.setTimeout(callback, delayMs));
-    this.clearTimer = dependencies.clearTimer ?? ((handle) => window.clearTimeout(handle));
+    this.setTimer = dependencies.setTimer ?? scheduleTimer;
+    this.clearTimer = dependencies.clearTimer ?? cancelTimer;
   }
 
   get currentGeneration(): number {

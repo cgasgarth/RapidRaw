@@ -23,6 +23,7 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLibraryImage } from '../../../hooks/library/useLibraryImage';
 import { useProcessStore } from '../../../store/useProcessStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useThumbnail, useThumbnailSmartPreview } from '../../../thumbnails/useThumbnail';
@@ -107,7 +108,6 @@ export interface LibraryRowProps {
   onImageDoubleClick: LibraryImageDoubleClickHandler;
   thumbnailAspectRatio: ThumbnailAspectRatio;
   onImageLoad: LibraryImageLoadHandler;
-  imageRatings?: Record<string, number> | null;
   baseFolderPath: string | null;
   itemWidth: number;
   itemHeight: number;
@@ -913,7 +913,6 @@ const RowComponent = ({
   onImageDoubleClick,
   thumbnailAspectRatio,
   onImageLoad,
-  imageRatings,
   baseFolderPath,
   itemWidth,
   itemHeight,
@@ -1010,44 +1009,71 @@ const RowComponent = ({
             height: itemHeight,
           }}
         >
-          {isListView ? (
-            <ListItem
-              autoStack={stack}
-              isActive={activePath === imageFile.path}
-              isSelected={multiSelectedSet.has(imageFile.path)}
-              onAutoStackToggle={onToggleAutoStack}
-              onContextMenu={onContextMenu}
-              onImageClick={onImageClick}
-              onImageDoubleClick={onImageDoubleClick}
-              onLoad={onImageLoad}
-              path={imageFile.path}
-              rating={imageRatings?.[imageFile.path] || 0}
-              tags={imageFile.tags}
-              exif={imageFile.exif}
-              aspectRatio={thumbnailAspectRatio}
-              modified={imageFile.modified}
-            />
-          ) : (
-            <Thumbnail
-              autoStack={stack}
-              isActive={activePath === imageFile.path}
-              isSelected={multiSelectedSet.has(imageFile.path)}
-              onAutoStackToggle={onToggleAutoStack}
-              onContextMenu={onContextMenu}
-              onImageClick={onImageClick}
-              onImageDoubleClick={onImageDoubleClick}
-              onLoad={onImageLoad}
-              path={imageFile.path}
-              rating={imageRatings?.[imageFile.path] || 0}
-              tags={imageFile.tags}
-              exif={imageFile.exif}
-              isEdited={imageFile.is_edited}
-              aspectRatio={thumbnailAspectRatio}
-            />
-          )}
+          <LibraryEntityItem
+            path={imageFile.path}
+            stack={stack}
+            isListView={isListView}
+            isActive={activePath === imageFile.path}
+            isSelected={multiSelectedSet.has(imageFile.path)}
+            onAutoStackToggle={onToggleAutoStack}
+            onContextMenu={onContextMenu}
+            onImageClick={onImageClick}
+            onImageDoubleClick={onImageDoubleClick}
+            onLoad={onImageLoad}
+            aspectRatio={thumbnailAspectRatio}
+          />
         </div>
       ))}
     </div>
+  );
+};
+
+const LibraryEntityItem = ({
+  path,
+  stack,
+  isListView,
+  isActive,
+  isSelected,
+  onAutoStackToggle,
+  onContextMenu,
+  onImageClick,
+  onImageDoubleClick,
+  onLoad,
+  aspectRatio,
+}: {
+  path: string;
+  stack?: LibraryAutoStackDisplay | undefined;
+  isListView: boolean;
+  isActive: boolean;
+  isSelected: boolean;
+  onAutoStackToggle: (stackId: string) => void;
+  onContextMenu: LibraryImageContextMenuHandler;
+  onImageClick: LibraryImageClickHandler;
+  onImageDoubleClick: LibraryImageDoubleClickHandler;
+  onLoad: LibraryImageLoadHandler;
+  aspectRatio: ThumbnailAspectRatio;
+}) => {
+  const image = useLibraryImage(path);
+  if (!image) return null;
+  const common = {
+    autoStack: stack,
+    isActive,
+    isSelected,
+    onAutoStackToggle,
+    onContextMenu,
+    onImageClick,
+    onImageDoubleClick,
+    onLoad,
+    path,
+    rating: image.rating,
+    tags: image.tags ? [...image.tags] : null,
+    exif: image.exif ? { ...image.exif } : null,
+    aspectRatio,
+  };
+  return isListView ? (
+    <ListItem {...common} modified={image.modified} />
+  ) : (
+    <Thumbnail {...common} isEdited={image.is_edited} />
   );
 };
 
