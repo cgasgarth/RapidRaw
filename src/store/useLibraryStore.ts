@@ -34,6 +34,9 @@ interface LibraryState {
   // Images & Selection
   imageList: Array<ImageFile>;
   imageRatings: Record<string, number>;
+  catalogSessionId: number | null;
+  catalogRevision: number | null;
+  catalogOrderedImageIds: string[];
   multiSelectedPaths: Array<string>;
   selectionAnchorPath: string | null;
   libraryActivePath: string | null;
@@ -58,6 +61,9 @@ interface LibraryState {
   setSearchCriteria: (criteria: Partial<SearchCriteria> | ((prev: SearchCriteria) => SearchCriteria)) => void;
   setSortCriteria: (criteria: Partial<SortCriteria> | ((prev: SortCriteria) => SortCriteria)) => void;
   patchLibraryImages: (patches: readonly LibraryImagePatch[]) => void;
+  replaceCatalogCollection: (sessionId: number, revision: number, images: readonly ImageFile[]) => void;
+  appendCatalogPage: (sessionId: number, revision: number, images: readonly ImageFile[]) => boolean;
+  applyCatalogDelta: (revision: number, upserted: readonly ImageFile[], removedPaths: readonly string[]) => void;
 }
 
 export const useLibraryStore = create<LibraryState>((set) => ({
@@ -73,6 +79,9 @@ export const useLibraryStore = create<LibraryState>((set) => ({
 
   imageList: [],
   imageRatings: {},
+  catalogSessionId: null,
+  catalogRevision: null,
+  catalogOrderedImageIds: [],
   multiSelectedPaths: [],
   selectionAnchorPath: null,
   libraryActivePath: null,
@@ -130,11 +139,53 @@ export const useLibraryStore = create<LibraryState>((set) => ({
     }));
   },
   patchLibraryImages: (patches) => libraryEntityRepository.patchMany(patches),
+  replaceCatalogCollection: (catalogSessionId, catalogRevision, images) => {
+    libraryEntityRepository.replaceAll(images);
+    set({
+      catalogSessionId,
+      catalogRevision,
+      catalogOrderedImageIds: images.map((image) => image.path),
+      imageList: [...images],
+    });
+  },
+  appendCatalogPage: (sessionId, revision, images) => {
+    let accepted = false;
+    set((state) => {
+      if (state.catalogSessionId !== sessionId || state.catalogRevision !== revision) return {};
+      accepted = true;
+      libraryEntityRepository.upsertMany(images);
+      return {
+        catalogOrderedImageIds: [...state.catalogOrderedImageIds, ...images.map((image) => image.path)],
+        imageList: [...state.imageList, ...images],
+      };
+    });
+    return accepted;
+  },
+  applyCatalogDelta: (catalogRevision, upserted, removedPaths) => {
+    const removed = new Set(removedPaths);
+    const refreshed = new Set(upserted.map((image) => image.path));
+    libraryEntityRepository.removeMany(removedPaths);
+    libraryEntityRepository.upsertMany(upserted);
+    set((state) => ({
+      catalogRevision,
+      catalogOrderedImageIds: [
+        ...state.catalogOrderedImageIds.filter((path) => !removed.has(path) && !refreshed.has(path)),
+        ...upserted.map((image) => image.path),
+      ],
+      imageList: [
+        ...state.imageList.filter((image) => !removed.has(image.path) && !refreshed.has(image.path)),
+        ...upserted,
+      ],
+    }));
+  },
 }));
 
 // Existing loaders seed normalized snapshots until their collection/order migration lands.
 useLibraryStore.subscribe((state, previous) => {
-  if (state.imageList !== previous.imageList || state.imageRatings !== previous.imageRatings) {
+  if (
+    state.catalogSessionId === null &&
+    (state.imageList !== previous.imageList || state.imageRatings !== previous.imageRatings)
+  ) {
     libraryEntityRepository.replaceAll(state.imageList, state.imageRatings);
   }
 });
