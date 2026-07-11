@@ -36,7 +36,7 @@ import { buildRawQualityBadges, formatRawQualityBadgeTooltip } from '../../../ut
 import { ExifOverlay, type ImageFile, ThumbnailAspectRatio } from '../../ui/AppProperties';
 import UiText from '../../ui/primitives/Text';
 import { IconAperture, IconFocalLength, IconIso, IconShutter } from '../editor/ExifIcons';
-import type { ColumnWidths } from '../MainLibrary';
+import { columnWidthStyle } from './libraryColumnWidths';
 
 interface ImageLayer {
   id: string;
@@ -74,7 +74,6 @@ interface ThumbnailComponentProps extends LibraryItemBaseProps {
 
 interface ListItemComponentProps extends LibraryItemBaseProps {
   modified: number;
-  columnWidths: ColumnWidths;
 }
 
 export interface LibraryHeaderRow {
@@ -114,7 +113,6 @@ export interface LibraryRowProps {
   outerPadding: number;
   gap: number;
   isListView: boolean;
-  columnWidths: ColumnWidths;
   queueThumbnailRequest: (path: string) => void;
   onToggleRecursiveFolder: (path: string) => void;
   onToggleAutoStack: (stackId: string) => void;
@@ -632,7 +630,6 @@ const ListItemComponent = ({
   tags,
   modified,
   aspectRatio: thumbnailAspectRatio,
-  columnWidths,
   exif,
 }: ListItemComponentProps) => {
   const { t } = useTranslation();
@@ -667,15 +664,6 @@ const ListItemComponent = ({
   const { shutter, fNumber, iso, focal } = useMemo(() => getExifOverlayValues(exif), [exif]);
 
   const showExifCols = exifOverlay !== ExifOverlay.Off;
-  const totalBase =
-    columnWidths.thumbnail +
-    columnWidths.name +
-    columnWidths.date +
-    columnWidths.rating +
-    columnWidths.color +
-    (showExifCols ? columnWidths.shutter + columnWidths.aperture + columnWidths.iso + columnWidths.focal : 0);
-  const getW = (key: keyof ColumnWidths) => `${(columnWidths[key] / totalBase) * 100}%`;
-
   useEffect(() => {
     const timer = setTimeout(
       () => {
@@ -777,7 +765,7 @@ const ListItemComponent = ({
       tabIndex={0}
     >
       <div
-        style={{ width: getW('thumbnail') }}
+        style={columnWidthStyle('thumbnail')}
         className="flex items-center justify-center p-1.5 h-full overflow-hidden"
       >
         <div className="w-full h-full relative overflow-hidden rounded-sm bg-surface flex items-center justify-center">
@@ -817,7 +805,7 @@ const ListItemComponent = ({
         </div>
       </div>
 
-      <div style={{ width: getW('name') }} className="flex items-center gap-2 px-3 h-full overflow-hidden">
+      <div style={columnWidthStyle('name')} className="flex items-center gap-2 px-3 h-full overflow-hidden">
         <UiText
           variant={TextVariants.small}
           className="truncate"
@@ -850,13 +838,13 @@ const ListItemComponent = ({
         <RawQualityBadgeCluster compact exif={exif} />
       </div>
 
-      <div style={{ width: getW('date') }} className="flex items-center px-3 h-full overflow-hidden">
+      <div style={columnWidthStyle('date')} className="flex items-center px-3 h-full overflow-hidden">
         <UiText variant={TextVariants.small} color={TextColors.secondary} className="truncate">
           {dateStr}
         </UiText>
       </div>
 
-      <div style={{ width: getW('rating') }} className="flex items-center px-3 h-full overflow-hidden">
+      <div style={columnWidthStyle('rating')} className="flex items-center px-3 h-full overflow-hidden">
         {rating > 0 && (
           <div className="flex items-center gap-1">
             <StarIcon size={12} className="text-accent fill-accent" />
@@ -867,7 +855,7 @@ const ListItemComponent = ({
         )}
       </div>
 
-      <div style={{ width: getW('color') }} className="flex items-center px-3 h-full overflow-hidden">
+      <div style={columnWidthStyle('color')} className="flex items-center px-3 h-full overflow-hidden">
         {colorLabel && (
           <div className="flex items-center gap-1.5">
             <div
@@ -885,22 +873,22 @@ const ListItemComponent = ({
 
       {showExifCols && (
         <>
-          <div style={{ width: getW('shutter') }} className="flex items-center px-3 h-full overflow-hidden">
+          <div style={columnWidthStyle('shutter')} className="flex items-center px-3 h-full overflow-hidden">
             <UiText variant={TextVariants.small} color={TextColors.secondary} className="truncate">
               {shutter}
             </UiText>
           </div>
-          <div style={{ width: getW('aperture') }} className="flex items-center px-3 h-full overflow-hidden">
+          <div style={columnWidthStyle('aperture')} className="flex items-center px-3 h-full overflow-hidden">
             <UiText variant={TextVariants.small} color={TextColors.secondary} className="truncate">
               {fNumber}
             </UiText>
           </div>
-          <div style={{ width: getW('iso') }} className="flex items-center px-3 h-full overflow-hidden">
+          <div style={columnWidthStyle('iso')} className="flex items-center px-3 h-full overflow-hidden">
             <UiText variant={TextVariants.small} color={TextColors.secondary} className="truncate">
               {iso}
             </UiText>
           </div>
-          <div style={{ width: getW('focal') }} className="flex items-center px-3 h-full overflow-hidden">
+          <div style={columnWidthStyle('focal')} className="flex items-center px-3 h-full overflow-hidden">
             <UiText variant={TextVariants.small} color={TextColors.secondary} className="truncate">
               {focal}
             </UiText>
@@ -932,7 +920,6 @@ const RowComponent = ({
   outerPadding,
   gap,
   isListView,
-  columnWidths,
   queueThumbnailRequest,
   onToggleRecursiveFolder,
   onToggleAutoStack,
@@ -1048,7 +1035,6 @@ const RowComponent = ({
               exif={imageFile.exif}
               aspectRatio={thumbnailAspectRatio}
               modified={imageFile.modified}
-              columnWidths={columnWidths}
             />
           ) : (
             <Thumbnail
