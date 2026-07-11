@@ -14,6 +14,8 @@ import { useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 import { buildAgentMediumPreviewEncodedBytesForTest } from '../../../src/utils/agent/context/agentMediumPreviewArtifactRuntime.ts';
 import { getRawEngineImagePreview } from '../../../src/utils/agent/context/agentReadOnlyAppServerTools.ts';
+import { setAgentSelectedImageModelTransportFactoryForTest } from '../../../src/utils/agent/session/agentCodexAppServerModelTransport.ts';
+import type { AgentSelectedImageModelTransport } from '../../../src/utils/agent/session/agentSelectedImageModelToolLoop.ts';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -74,9 +76,11 @@ let previewInvokeDelayMs = 0;
 beforeEach(() => {
   previewInvokeDelayMs = 0;
   seedEditor();
+  setAgentSelectedImageModelTransportFactoryForTest(() => new UiTestModelTransport());
 });
 
 afterEach(() => {
+  setAgentSelectedImageModelTransportFactoryForTest(undefined);
   if (renderedRoot !== null) {
     act(() => {
       renderedRoot?.root.unmount();
@@ -91,6 +95,28 @@ afterEach(() => {
     selectedImage: null,
   });
 });
+
+class UiTestModelTransport implements AgentSelectedImageModelTransport {
+  async runTurn(request: Parameters<AgentSelectedImageModelTransport['runTurn']>[0]) {
+    return {
+      modelId: 'ui-test-model',
+      modelTurnId: `ui-test-turn-${request.turn}`,
+      output:
+        request.turn === 1
+          ? {
+              decision: 'call_tool',
+              tool: {
+                arguments: { patch: { highlights: -18 } },
+                callId: 'ui-test-proposal-render',
+                name: 'proposal_render',
+              },
+            }
+          : { decision: 'finalize_proposal', proposalId: request.lineageHead?.proposalId },
+      provider: 'deterministic-ui-test-only',
+      providerVersion: '1',
+    };
+  }
+}
 
 describe('agent chat shell', () => {
   test('keeps transcript messages before live events and shows the selected RAW identity', async () => {

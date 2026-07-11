@@ -20,6 +20,8 @@ import {
 } from '../../../../src/utils/rawEngineAppServerHost.ts';
 
 const selectedPath = '/fixtures/public/agent-selected-image-preview-loop/DSC_3162.ARW';
+// Scripted steps below are a deterministic compatibility fixture. The product composer uses
+// runAgentSelectedImageModelToolLoop and never routes model decisions through this mutating probe.
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 11 : 3));
 
 const seedEditor = () => {

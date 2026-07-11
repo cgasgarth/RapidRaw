@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { ToolType } from '../../../../src/components/panel/right/layers/Masks.tsx';
+import { verifyAgentSelectedImageLifecycleReceipt } from '../../../../src/schemas/agent/agentSelectedImageLifecycleReceiptSchemas.ts';
 import { useEditorStore } from '../../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
 import { buildAgentImageContextSnapshot } from '../../../../src/utils/agent/context/agentImageContextSnapshot.ts';
@@ -15,9 +16,13 @@ import {
   rollbackAgentSelectedImageLiveSession,
   startAgentSelectedImageLiveSessionDryRun,
 } from '../../../../src/utils/agent/session/agentSelectedImageLiveSession.ts';
+import { replayAgentSelectedImageModelToolLoop } from '../../../../src/utils/agent/session/agentSelectedImageModelToolLoop.ts';
 import { agentAdjustmentsApplyResponseSchema } from '../../../../src/utils/agent/tools/agentAdjustmentApplyTool.ts';
 
 const selectedPath = '/fixtures/public/agent-live-session-replay/DSC_3165.ARW';
+if (typeof replayAgentSelectedImageModelToolLoop !== 'function') {
+  throw new Error('production selected-image model/tool replay verifier is unavailable.');
+}
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 9 : 3));
 
 const seedEditor = () => {
@@ -154,6 +159,21 @@ seedEditor();
 const applyDraft = approveAgentSelectedImageLiveSession(await startDraft('agent-live-session-apply'));
 const applyResult = await applyAgentSelectedImageLiveSession(applyDraft);
 if (applyResult.status !== 'applied') throw new Error('live session apply did not return an applied result.');
+const lifecycleReceipt = applyResult.audit.lifecycleReceipt;
+const appliedLineage = applyResult.audit.receipt.proposalLineage;
+const appliedIteration = appliedLineage?.iterations.find((iteration) => iteration.state === 'applied');
+if (
+  lifecycleReceipt === undefined ||
+  appliedLineage === undefined ||
+  appliedIteration === undefined ||
+  lifecycleReceipt.proposal.lineage.lineageId !== appliedLineage.lineageId ||
+  lifecycleReceipt.proposal.lineage.epoch !== appliedLineage.epoch ||
+  lifecycleReceipt.proposal.lineage.iterationId !== appliedIteration.iterationId ||
+  lifecycleReceipt.proposal.lineage.proposalHash !== appliedIteration.proposalHash ||
+  !(await verifyAgentSelectedImageLifecycleReceipt(lifecycleReceipt))
+) {
+  throw new Error('V2 apply receipt did not bind and verify the authoritative sealed proposal lineage.');
+}
 const appliedReceipt = replayAgentSelectedImageLiveSessionAudit(applyResult.audit);
 if (
   appliedReceipt.approvalDecision !== 'approved' ||
@@ -235,6 +255,14 @@ const rollbackAudit = await rollbackAgentSelectedImageLiveSession({
   checkpoint: applyDraft.checkpoint,
 });
 const rollbackReceipt = replayAgentSelectedImageLiveSessionAudit(rollbackAudit);
+if (
+  rollbackAudit.lifecycleReceipt?.revert?.lineage.state !== 'reverted' ||
+  rollbackAudit.lifecycleReceipt.revert.lineage.iterationId !== lifecycleReceipt.proposal.lineage.iterationId ||
+  rollbackAudit.lifecycleReceipt.revert.lineage.proposalHash !== lifecycleReceipt.proposal.proposalHash ||
+  !(await verifyAgentSelectedImageLifecycleReceipt(rollbackAudit.lifecycleReceipt))
+) {
+  throw new Error('V2 revert receipt did not preserve and verify authoritative proposal lineage.');
+}
 if (rollbackReceipt.state !== 'rolled_back' || rollbackReceipt.rollbackReceiptGraphRevision !== 'history_0') {
   throw new Error('live session rollback audit did not replay rollback receipt.');
 }
@@ -244,16 +272,6 @@ if (finalState.historyIndex !== 0 || finalState.adjustments.exposure !== INITIAL
 }
 
 console.log('agent live session replay ok');
-
-async function expectRejects(action: () => Promise<unknown>, expectedMessage: string) {
-  try {
-    await action();
-  } catch (error) {
-    if (error instanceof Error && error.message.includes(expectedMessage)) return;
-    throw error;
-  }
-  throw new Error(`expected rejection containing ${expectedMessage}.`);
-}
 
 async function expectReplayRejects(
   audit: Parameters<typeof replayAgentSelectedImageLiveSessionAudit>[0],

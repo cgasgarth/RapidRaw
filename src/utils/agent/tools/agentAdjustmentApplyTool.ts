@@ -8,10 +8,9 @@ import {
   buildBasicToneImageCommandContext,
   type LegacyBasicToneAdjustmentPayload,
 } from '../../basicToneCommandBridge';
-import { pushEditHistoryEntry } from '../../editHistory';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
 import { applyBasicToneToLiveEditor } from '../session/agentLiveBasicTone';
-import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorState';
+import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorCoreState';
 
 export const AGENT_ADJUSTMENTS_APPLY_TOOL_NAME = 'rawengine.agent.adjustments.apply';
 export const AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME = 'rawengine.agent.adjustments.dry_run';
@@ -438,11 +437,12 @@ export const applyAgentGlobalAdjustments = async (
       for (const entry of extraEntries) {
         adjustments[entry.key] = entry.value;
       }
-      const history = pushEditHistoryEntry(state.history.slice(0, -1), state.historyIndex - 1, adjustments);
+      const history = [...state.history];
+      history[state.historyIndex] = adjustments;
       return {
         adjustments,
-        history: history.history,
-        historyIndex: history.historyIndex,
+        history,
+        historyIndex: state.historyIndex,
         uncroppedAdjustedPreviewUrl: null,
       };
     });

@@ -15,6 +15,7 @@ export interface AgentSessionCheckpoint {
   activeImagePath: string;
   graphRevision: string;
   historyIndex: number;
+  history: Adjustments[];
   lastBasicToneCommand: BasicToneCommandEnvelope | null;
   previewRecipeHash: string;
   previewRef: string | null;
@@ -28,6 +29,7 @@ const agentSessionCheckpointSchema: z.ZodType<AgentSessionCheckpoint> = z
     activeImagePath: z.string().trim().min(1),
     graphRevision: z.string().trim().min(1),
     historyIndex: z.number().int().nonnegative(),
+    history: z.array(z.custom<Adjustments>((value) => typeof value === 'object' && value !== null)).default([]),
     lastBasicToneCommand: z.custom<BasicToneCommandEnvelope | null>(),
     previewRecipeHash: z.string().trim().min(1),
     previewRef: z.string().trim().min(1).nullable(),
@@ -76,6 +78,7 @@ export const createAgentSessionCheckpoint = (sessionId: string): AgentSessionChe
     activeImagePath: snapshot.activeImagePath,
     graphRevision: `history_${state.historyIndex}`,
     historyIndex: state.historyIndex,
+    history: structuredClone(state.history),
     lastBasicToneCommand: state.lastBasicToneCommand,
     previewRecipeHash: snapshot.initialPreview.recipeHash,
     previewRef: state.finalPreviewUrl,
@@ -114,7 +117,10 @@ export const rollbackAgentSessionHistory = (request: AgentHistoryRollbackRequest
   useEditorStore.setState((state) => ({
     adjustments: checkpoint.adjustments,
     finalPreviewUrl: checkpoint.previewRef,
-    history: state.history.slice(0, checkpoint.historyIndex + 1),
+    history:
+      checkpoint.history.length === 0
+        ? state.history.slice(0, checkpoint.historyIndex + 1)
+        : structuredClone(checkpoint.history),
     historyIndex: checkpoint.historyIndex,
     lastBasicToneCommand: checkpoint.lastBasicToneCommand,
     uncroppedAdjustedPreviewUrl: checkpoint.uncroppedPreviewRef,

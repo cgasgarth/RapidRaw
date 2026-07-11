@@ -121,6 +121,9 @@ export function dispatchAgentTypedEditorTool(
   input: TypedDispatchInput<'rawengine.agent.preview.compare'>,
 ): Promise<AgentEditorToolResponse<'rawengine.agent.preview.compare'>>;
 export function dispatchAgentTypedEditorTool(
+  input: TypedDispatchInput<'rawengine.agent.tone_adjustment.dry_run'>,
+): Promise<AgentEditorToolResponse<'rawengine.agent.tone_adjustment.dry_run'>>;
+export function dispatchAgentTypedEditorTool(
   input: TypedDispatchInput<'rawengine.agent.adjustments.dry_run'>,
 ): Promise<AgentEditorToolResponse<'rawengine.agent.adjustments.dry_run'>>;
 export function dispatchAgentTypedEditorTool(
