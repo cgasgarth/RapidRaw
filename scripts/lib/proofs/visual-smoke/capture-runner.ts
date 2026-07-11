@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { chromium } from '@playwright/test';
+import { allocateFreeTcpPort, parseTcpPort } from '../../dev-server-port.ts';
 import {
   type FocusPrivateRawBrowserProof,
   type HdrPrivateRawBrowserProof,
@@ -26,7 +27,6 @@ import {
   prepareScenario,
 } from './scenario-assertions.ts';
 import {
-  baseUrl,
   compactPortraitViewport,
   getScenarioProofRequirements,
   highDpiTargets,
@@ -46,9 +46,15 @@ export async function runVisualSmokeCapture({
 }): Promise<void> {
   await mkdir(outputDir, { recursive: true });
 
+  const portOverride =
+    process.env.RAWENGINE_VISUAL_SMOKE_PORT === undefined
+      ? undefined
+      : parseTcpPort(process.env.RAWENGINE_VISUAL_SMOKE_PORT, 'RAWENGINE_VISUAL_SMOKE_PORT');
+  const port = await allocateFreeTcpPort(host, portOverride);
+  const baseUrl = `http://${host}:${port}`;
   let serverOutput = '';
-  const server = spawn('bun', ['run', 'dev', '--', '--host', host], {
-    env: { ...process.env, RAWENGINE_VISUAL_SMOKE: '1' },
+  const server = spawn('bun', ['run', 'dev', '--', '--host', host, '--port', String(port)], {
+    env: { ...process.env, RAWENGINE_DEV_SERVER_PORT: String(port), RAWENGINE_VISUAL_SMOKE: '1' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 
@@ -282,7 +288,7 @@ export async function runVisualSmokeCapture({
       console.error('Playwright Chromium is not installed. Run: bunx playwright install chromium');
     }
     if (serverOutput.trim().length > 0) {
-      console.error(`Vite output excerpt:\n${serverOutput.trim()}`);
+      console.error(`Vite ${baseUrl} output excerpt:\n${serverOutput.trim()}`);
     }
     throw error;
   } finally {

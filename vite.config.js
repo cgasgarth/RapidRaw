@@ -3,8 +3,17 @@ import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 import { getViteChunkSizeWarningLimitKb } from './scripts/lib/ci/vite-bundle-policy.ts';
 import { createViteProductBundleGuardPlugin } from './scripts/lib/ci/vite-product-bundle-guard.ts';
+import { parseTcpPort } from './scripts/lib/dev-server-port.ts';
 
 const host = process.env.TAURI_DEV_HOST;
+const devServerPort =
+  process.env.RAWENGINE_DEV_SERVER_PORT === undefined
+    ? 1420
+    : parseTcpPort(process.env.RAWENGINE_DEV_SERVER_PORT, 'RAWENGINE_DEV_SERVER_PORT');
+const hmrPort =
+  process.env.RAWENGINE_DEV_SERVER_HMR_PORT === undefined
+    ? devServerPort + 1
+    : parseTcpPort(process.env.RAWENGINE_DEV_SERVER_HMR_PORT, 'RAWENGINE_DEV_SERVER_HMR_PORT');
 
 // https://vitejs.dev/config/
 export default defineConfig(async ({ command }) => ({
@@ -17,14 +26,14 @@ export default defineConfig(async ({ command }) => ({
 
   clearScreen: false,
   server: {
-    port: 1420,
+    port: devServerPort,
     strictPort: true,
     host: host || false,
     hmr: host
       ? {
           protocol: 'ws',
           host,
-          port: 1421,
+          port: hmrPort,
         }
       : undefined,
     watch: {

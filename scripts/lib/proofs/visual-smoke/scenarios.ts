@@ -6,8 +6,6 @@ import {
 } from '../../../../src/validation/visual/visualSmokeScenarios.ts';
 
 export const host = '127.0.0.1';
-export const port = 1420;
-export const baseUrl = `http://${host}:${port}`;
 export const outputDir = resolve('artifacts/visual-smoke');
 export const viewport = { width: 1440, height: 960 };
 export const compactPortraitViewport = { width: 390, height: 844 };

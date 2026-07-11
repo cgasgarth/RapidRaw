@@ -4,13 +4,15 @@ import { spawn } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, relative, resolve } from 'node:path';
 import { chromium, type Locator, type Page } from '@playwright/test';
+import { allocateFreeTcpPort, parseTcpPort } from '../../../scripts/lib/dev-server-port';
 import { agentSelectedImageLiveSessionAuditExportReceiptSchema } from '../../../src/schemas/agent/agentSelectedImageAuditExportSchemas';
 
 const host = '127.0.0.1';
-const port = Number.parseInt(process.env.BROWSER_TAURI_HARNESS_PORT ?? '1420', 10);
-if (!Number.isInteger(port) || port < 1 || port > 65_535) {
-  throw new Error('BROWSER_TAURI_HARNESS_PORT must be a valid TCP port.');
-}
+const portOverride =
+  process.env.BROWSER_TAURI_HARNESS_PORT === undefined
+    ? undefined
+    : parseTcpPort(process.env.BROWSER_TAURI_HARNESS_PORT, 'BROWSER_TAURI_HARNESS_PORT');
+const port = await allocateFreeTcpPort(host, portOverride);
 const baseUrl = `http://${host}:${port}`;
 const runAgentAuditE2e = process.env.RAWENGINE_AGENT_AUDIT_E2E === '1';
 const viewport = { height: 720, width: 1280 };
@@ -86,7 +88,11 @@ async function stopServer(server: ReturnType<typeof spawn>): Promise<void> {
 }
 
 const server = spawn('bun', ['run', 'dev', '--', '--host', host, '--port', String(port)], {
-  env: { ...process.env, VITE_RAWENGINE_AGENT_AUDIT_E2E: runAgentAuditE2e ? '1' : '0' },
+  env: {
+    ...process.env,
+    RAWENGINE_DEV_SERVER_PORT: String(port),
+    VITE_RAWENGINE_AGENT_AUDIT_E2E: runAgentAuditE2e ? '1' : '0',
+  },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 let serverOutput = '';
@@ -323,7 +329,7 @@ try {
       )}`,
     );
   }
-  if (serverOutput.trim()) console.error(serverOutput.trim());
+  if (serverOutput.trim()) console.error(`Vite ${baseUrl} output excerpt:\n${serverOutput.trim()}`);
   throw error;
 } finally {
   if (browser !== undefined) await browser.close();
