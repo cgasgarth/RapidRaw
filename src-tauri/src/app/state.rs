@@ -113,6 +113,14 @@ pub struct PendingHdrMergePlan {
     pub alignment_policy_id: String,
     pub source_content_hashes: Vec<String>,
     pub source_paths: Vec<String>,
+    pub static_radiance_hash: Option<String>,
+    pub deghost_radiance_hash: Option<String>,
+    pub motion_probability_hash: Option<String>,
+    pub ownership_hash: Option<String>,
+    pub feather_hash: Option<String>,
+    pub unresolved_fraction: Option<f32>,
+    pub output_width: u64,
+    pub output_height: u64,
 }
 
 pub struct ThumbnailProgressTracker {
