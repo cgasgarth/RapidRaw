@@ -121,6 +121,14 @@ pub struct PendingHdrMergePlan {
     pub unresolved_fraction: Option<f32>,
     pub output_width: u64,
     pub output_height: u64,
+    pub(crate) planned_sources: Vec<crate::merge::hdr::PlannedSource>,
+    pub(crate) motion_probability_bytes: Vec<u8>,
+    pub(crate) ownership_bytes: Vec<u8>,
+    pub(crate) feather_bytes: Vec<u8>,
+    pub scene_linear_artifact_hash: Option<String>,
+    pub tone_mapped_preview_hash: Option<String>,
+    pub motion_coverage: Option<f32>,
+    pub confidence_mean: Option<f32>,
 }
 
 pub struct ThumbnailProgressTracker {

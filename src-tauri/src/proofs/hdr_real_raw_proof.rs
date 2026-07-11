@@ -6,8 +6,6 @@ use std::time::Duration;
 
 use chrono::{SecondsFormat, Utc};
 use image::{DynamicImage, GenericImageView, ImageFormat};
-use image_hdr::hdr_merge_images;
-use image_hdr::input::HDRInput;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
@@ -15,7 +13,6 @@ use crate::app_settings::AppSettings;
 use crate::exif_processing::{read_exposure_time_secs, read_iso};
 use crate::formats::is_raw_file;
 use crate::image_loader::load_base_image_from_bytes;
-use crate::image_processing::apply_linear_to_srgb;
 
 const ARTIFACT_ROOT: &str = "private-artifacts/validation/computational-merge";
 const FIXTURE_ID: &str = "validation.computational-merge.hdr-bracket-alignment.v1";
@@ -170,15 +167,17 @@ fn run_private_hdr_real_raw_proof(private_root: &Path) -> Result<(), String> {
         })
         .collect::<Result<Vec<_>, String>>()?;
 
-    let inputs = loaded_sources
+    let paths = loaded_sources
         .iter()
-        .map(|source| {
-            HDRInput::with_image(&source.image, source.exposure, source.iso)
-                .map_err(|error| error.to_string())
-        })
-        .collect::<Result<Vec<_>, String>>()?;
-    let mut hdr_merged = hdr_merge_images(&mut inputs.into()).map_err(|error| error.to_string())?;
-    hdr_merged = apply_linear_to_srgb(hdr_merged);
+        .map(|source| source.path.to_string_lossy().into_owned())
+        .collect::<Vec<_>>();
+    let plan = crate::merge::hdr::build_alignment_plan(&paths, || false)?;
+    let images = loaded_sources
+        .iter()
+        .map(|source| source.image.clone())
+        .collect::<Vec<_>>();
+    let native = crate::merge::hdr::runtime::reconstruct(&images, &plan.sources, || false)?;
+    let hdr_merged = native.scene_linear;
 
     let output_dir = private_root.join(ARTIFACT_ROOT);
     fs::create_dir_all(&output_dir).map_err(|error| error.to_string())?;
@@ -212,7 +211,14 @@ fn run_private_hdr_real_raw_proof(private_root: &Path) -> Result<(), String> {
     write_json(
         &alignment_path,
         &serde_json::json!({
-            "alignmentMode": "legacy_identity",
+            "alignmentMode": "bounded_translation",
+            "alignmentPolicyId": crate::merge::hdr::ALIGNMENT_POLICY_ID,
+            "transforms": plan.sources.iter().map(|source| serde_json::json!({
+                "confidence": source.alignment.confidence,
+                "matrix": source.alignment.matrix,
+                "residualRms": source.alignment.residual_rms,
+                "sourceIndex": source.frame.source_index,
+            })).collect::<Vec<_>>(),
             "sourceCount": loaded_sources.len(),
             "sourceDimensions": {
                 "height": loaded_sources[0].image.height(),
@@ -221,7 +227,7 @@ fn run_private_hdr_real_raw_proof(private_root: &Path) -> Result<(), String> {
         }),
     )?;
     let review_before = loaded_sources[1].image.thumbnail(960, 640);
-    let review_after = hdr_merged.thumbnail(960, 640);
+    let review_after = native.preview.thumbnail(960, 640);
     write_image(&hdr_merged, &merge_path, ImageFormat::Tiff)?;
     write_image(&review_after, &preview_path, ImageFormat::Png)?;
     write_image(&hdr_merged, &export_path, ImageFormat::Tiff)?;

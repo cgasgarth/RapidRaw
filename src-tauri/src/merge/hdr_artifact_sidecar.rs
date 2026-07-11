@@ -14,15 +14,14 @@ use crate::derived_output_provenance::{
 use crate::formats::is_raw_file;
 use crate::image_processing::{ImageMetadata, RawEngineArtifacts};
 
-const HDR_ENGINE_ID: &str = "rapidraw_image_hdr_legacy_v1";
-const HDR_ENGINE_BACKEND_TYPE: &str = "legacy_image_hdr";
-const HDR_ENGINE_VERSION: &str = "0.1.0";
-const HDR_GRAPH_REVISION: &str = "hdr_legacy_runtime_v1";
-const HDR_MERGE_METHOD: &str = "exposure_weighted_radiance";
-const HDR_MERGE_STRATEGY: &str = "exposure_fusion_preview";
-const HDR_MERGE_VERSION: &str = "0.1.0";
-const HDR_WORKING_COLOR_SPACE: &str = "srgb_display_referred_v1";
-const HDR_WARNING_TONE_MAPPED_PREVIEW_ONLY: &str = "tone_mapped_preview_only";
+const HDR_ENGINE_ID: &str = crate::merge::hdr::runtime::ENGINE_ID;
+const HDR_ENGINE_BACKEND_TYPE: &str = crate::merge::hdr::runtime::BACKEND_ID;
+const HDR_ENGINE_VERSION: &str = "1.0.0";
+const HDR_GRAPH_REVISION: &str = "hdr_scene_linear_runtime_v1";
+const HDR_MERGE_METHOD: &str = "noise_saturation_weighted_radiance";
+const HDR_MERGE_STRATEGY: &str = "scene_linear_radiance";
+const HDR_MERGE_VERSION: &str = "1.0.0";
+const HDR_WORKING_COLOR_SPACE: &str = "acescg_ap1_scene_linear_v1";
 
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -165,6 +164,14 @@ pub fn build_hdr_runtime_plan(
         unresolved_fraction: None,
         output_width: u64::from(output_width),
         output_height: u64::from(output_height),
+        planned_sources: Vec::new(),
+        motion_probability_bytes: Vec::new(),
+        ownership_bytes: Vec::new(),
+        feather_bytes: Vec::new(),
+        scene_linear_artifact_hash: None,
+        tone_mapped_preview_hash: None,
+        motion_coverage: None,
+        confidence_mean: None,
     }
 }
 
@@ -401,37 +408,51 @@ fn upsert_hdr_artifact_metadata(
             })
         })
         .collect::<Vec<_>>();
-    let source_metadata = source_refs
+    let source_metadata = runtime_plan
+        .planned_sources
         .iter()
         .map(|source| {
             serde_json::json!({
-                "exposureTimeSeconds": source.exposure_time_seconds,
-                "height": source.height,
-                "imagePath": source.image_path.clone(),
-                "iso": source.iso,
-                "rawBlackLevelKnown": false,
-                "rawWhiteLevelKnown": false,
-                "resolvedBracketRole": if source.source_index == reference_index {
+                "aperture": source.frame.exposure.aperture,
+                "blackLevels": source.frame.calibration.black_levels,
+                "cameraMake": source.frame.camera_make,
+                "cameraModel": source.frame.camera_model,
+                "cfaPattern": source.frame.cfa_pattern,
+                "exposureScale": source.frame.exposure.exposure_scale,
+                "exposureTimeSeconds": source.frame.exposure.exposure_time_seconds,
+                "height": source.frame.height,
+                "imagePath": source.frame.path,
+                "iso": source.frame.exposure.iso,
+                "rawBlackLevelKnown": true,
+                "rawWhiteLevelKnown": true,
+                "resolvedBracketRole": if source.frame.source_index == reference_index {
                     "reference"
-                } else if source.source_index < reference_index {
+                } else if source.frame.source_index < reference_index {
                     "under_exposed"
                 } else {
                     "over_exposed"
                 },
-                "resolvedExposureEv": source.exposure_time_seconds.log2(),
-                "sourceIndex": source.source_index,
-                "whiteBalanceComparable": false,
-                "width": source.width,
+                "resolvedExposureEv": source.frame.exposure.exposure_scale.log2(),
+                "sourceIndex": source.frame.source_index,
+                "whiteBalanceComparable": true,
+                "whiteBalance": source.frame.calibration.white_balance,
+                "whiteLevels": source.frame.calibration.white_levels,
+                "width": source.frame.width,
             })
         })
         .collect::<Vec<_>>();
-    let transforms = source_refs
+    let transforms = runtime_plan
+        .planned_sources
         .iter()
         .map(|source| {
             serde_json::json!({
-                "confidence": if source.source_index == reference_index { 1.0 } else { 0.7 },
-                "sourceIndex": source.source_index,
-                "transformType": "identity",
+                "confidence": source.alignment.confidence,
+                "matrix": source.alignment.matrix,
+                "overlapFraction": source.alignment.overlap_fraction,
+                "residualP95": source.alignment.residual_p95,
+                "residualRms": source.alignment.residual_rms,
+                "sourceIndex": source.frame.source_index,
+                "transformType": source.alignment.model,
             })
         })
         .collect::<Vec<_>>();
@@ -458,10 +479,10 @@ fn upsert_hdr_artifact_metadata(
         .collect::<Vec<_>>();
 
     let settings_hash = stable_hash(&serde_json::json!({
-        "deghosting": "off",
+        "deghosting": "source_ownership_feather",
         "engineId": HDR_ENGINE_ID,
         "mergeStrategy": HDR_MERGE_STRATEGY,
-        "outputEncoding": "display_referred_preview",
+        "outputEncoding": "scene_linear_half_float",
         "previewToneMapped": true,
         "workingColorSpace": HDR_WORKING_COLOR_SPACE,
     }));
@@ -483,16 +504,16 @@ fn upsert_hdr_artifact_metadata(
             output_path,
             settings_hash,
             sources: provenance_sources,
-            warnings: vec![HDR_WARNING_TONE_MAPPED_PREVIEW_ONLY],
+            warnings: Vec::new(),
         });
 
     let artifact = serde_json::json!({
         "alignment": {
-            "alignmentConfidence": 0.7,
+            "alignmentConfidence": runtime_plan.planned_sources.iter().map(|source| source.alignment.confidence).sum::<f32>() / runtime_plan.planned_sources.len().max(1) as f32,
             "referenceSourceIndex": reference_index,
             "rejectedSourceIndexes": [],
-            "requestedAlignmentMode": "none",
-            "resolvedAlignmentMode": "none",
+            "requestedAlignmentMode": "auto",
+            "resolvedAlignmentMode": "bounded_translation",
             "transforms": transforms,
         },
         "artifactId": artifact_id,
@@ -505,16 +526,21 @@ fn upsert_hdr_artifact_metadata(
             "detectionMethod": "metadata_exposure_time_iso_aperture",
             "referenceSourceIndex": reference_index,
             "sourceMetadata": source_metadata,
-            "warningCodes": [HDR_WARNING_TONE_MAPPED_PREVIEW_ONLY],
+            "warningCodes": [],
         },
         "createdAt": Utc::now().to_rfc3339(),
         "deghosting": {
-            "masks": [],
-            "motionCoverageRatio": 0.0,
-            "motionRisk": "none",
+            "masks": [
+                {"contentHash": runtime_plan.motion_probability_hash, "kind": "motion_probability", "path": "maps/motion-probability.bin"},
+                {"contentHash": runtime_plan.ownership_hash, "kind": "deghost_selection", "path": "maps/source-selection.bin"},
+                {"contentHash": runtime_plan.feather_hash, "kind": "confidence_feather", "path": "maps/confidence-feather.bin"}
+            ],
+            "motionCoverageRatio": runtime_plan.motion_coverage.unwrap_or(0.0),
+            "motionRisk": if runtime_plan.motion_coverage.unwrap_or(0.0) > 0.02 { "present" } else { "low" },
+            "confidenceMean": runtime_plan.confidence_mean.unwrap_or(1.0),
             "referenceSourceIndex": reference_index,
-            "requestedDeghosting": "off",
-            "resolvedDeghosting": "off",
+            "requestedDeghosting": "medium",
+            "resolvedDeghosting": "source_ownership_feather",
         },
         "displayPreviewColorState": "tone_mapped_srgb_preview",
         "mergeMethod": HDR_MERGE_METHOD,
@@ -530,7 +556,7 @@ fn upsert_hdr_artifact_metadata(
             "engineId": HDR_ENGINE_ID,
             "engineVersion": HDR_ENGINE_VERSION,
         },
-        "exportColorState": "saved_display_referred_srgb_output",
+        "exportColorState": "scene_linear_editable_with_tone_map_recipe",
         "family": "hdr",
         "highlightRecovery": {
             "clippedInputPixelRatioBySource": clipped_metrics,
@@ -551,17 +577,19 @@ fn upsert_hdr_artifact_metadata(
             "storage": "sidecar_artifact",
         },
         "outputColorSpace": HDR_WORKING_COLOR_SPACE,
-        "outputEncoding": "display_referred_preview",
+        "outputEncoding": "scene_linear_half_float",
         "outputName": output_path.file_name().unwrap_or_default().to_string_lossy(),
         "previewArtifacts": [],
         "previewExportParity": {
-            "comparedArtifacts": ["display_preview_buffer", "saved_output_file"],
-            "meanAbsDelta": 0.0,
-            "status": "matched_editor_display_path",
+            "comparedArtifacts": ["tone_mapped_preview", "scene_linear_editable_payload"],
+            "meanAbsDelta": null,
+            "status": "recipe_separated_from_scene_linear_payload",
         },
         "previewToneMapped": true,
         "schemaVersion": 1,
-        "sceneMergeColorState": "legacy_display_referred_merge_after_linear_to_srgb",
+        "sceneMergeColorState": "scene_linear",
+        "sceneLinearArtifactHash": runtime_plan.scene_linear_artifact_hash,
+        "previewToneMap": {"algorithmId": "global_reinhard_review_v1", "exposure": 1.0, "previewHash": runtime_plan.tone_mapped_preview_hash},
         "sourceImageRefs": source_image_refs,
         "sourceState": source_state,
         "staleState": {
@@ -569,7 +597,7 @@ fn upsert_hdr_artifact_metadata(
             "invalidationReasons": [],
             "state": "current",
         },
-        "warningCodes": [HDR_WARNING_TONE_MAPPED_PREVIEW_ONLY],
+        "warningCodes": [],
         "workingColorSpace": HDR_WORKING_COLOR_SPACE,
     });
 
@@ -726,7 +754,10 @@ mod tests {
 
         let artifact = &artifacts.hdr_merge_artifacts[0];
         assert_eq!(artifact["family"], "hdr");
-        assert_eq!(artifact["engine"]["backendType"], "legacy_image_hdr");
+        assert_eq!(
+            artifact["engine"]["backendType"],
+            "deterministic_cpu_tiles_v1"
+        );
         assert_eq!(
             artifact["engine"]["capabilityLevel"],
             "runtime_apply_capable"
@@ -752,24 +783,21 @@ mod tests {
                 .starts_with("blake3:")
         );
         assert_eq!(artifact["staleState"]["state"], "current");
-        assert_eq!(artifact["warningCodes"][0], "tone_mapped_preview_only");
-        assert_eq!(
-            artifact["sceneMergeColorState"],
-            "legacy_display_referred_merge_after_linear_to_srgb"
-        );
+        assert_eq!(artifact["warningCodes"], serde_json::json!([]));
+        assert_eq!(artifact["sceneMergeColorState"], "scene_linear");
         assert_eq!(
             artifact["displayPreviewColorState"],
             "tone_mapped_srgb_preview"
         );
         assert_eq!(
             artifact["exportColorState"],
-            "saved_display_referred_srgb_output"
+            "scene_linear_editable_with_tone_map_recipe"
         );
         assert_eq!(
             artifact["previewExportParity"]["status"],
-            "matched_editor_display_path"
+            "recipe_separated_from_scene_linear_payload"
         );
-        assert_eq!(artifact["previewExportParity"]["meanAbsDelta"], 0.0);
+        assert!(artifact["previewExportParity"]["meanAbsDelta"].is_null());
         assert_eq!(artifact["sourceImageRefs"].as_array().unwrap().len(), 2);
         assert_eq!(
             serialized_sidecar["rawEngineArtifacts"]["hdrMergeArtifacts"][0]["sourceState"][0]["contentHash"],

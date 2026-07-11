@@ -3,6 +3,7 @@ pub(crate) mod deghost;
 pub(crate) mod full_resolution;
 pub(crate) mod motion;
 pub(crate) mod radiance;
+pub(crate) mod runtime;
 pub(crate) mod source_frame;
 pub(crate) mod source_ownership;
 pub(crate) mod static_merge;
@@ -11,6 +12,7 @@ pub(crate) mod tone_map;
 mod plan;
 
 pub(crate) use alignment::ALIGNMENT_POLICY_ID;
+pub(crate) use plan::PlannedSource;
 pub(crate) use plan::{HdrAlignmentPlanResponse, build_alignment_plan};
 
 #[cfg(test)]
