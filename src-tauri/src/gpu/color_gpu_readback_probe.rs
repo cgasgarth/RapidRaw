@@ -153,6 +153,7 @@ mod tests {
         let device = Arc::new(device);
         let queue = Arc::new(queue);
         Ok(GpuContext {
+            generation: 1,
             device: Arc::clone(&device),
             queue: Arc::clone(&queue),
             limits,

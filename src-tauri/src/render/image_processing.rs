@@ -516,6 +516,7 @@ pub fn is_image_edited(
 
 #[derive(Clone)]
 pub struct GpuContext {
+    pub generation: u64,
     pub device: Arc<wgpu::Device>,
     pub queue: Arc<wgpu::Queue>,
     pub limits: wgpu::Limits,
