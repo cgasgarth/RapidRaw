@@ -232,6 +232,7 @@ interface ImageCanvasProps {
   finalPreviewUrl: string | null;
   gamutWarningOverlay: GamutWarningOverlayPayload | null;
   handleCropComplete: (c: Crop, cp: PercentCrop) => void;
+  handleCropStart?: () => void;
   imageRenderSize: RenderSize;
   originalImageRenderSize?: RenderSize;
   overlayGeometry?: EditorOverlayGeometry;
@@ -302,6 +303,7 @@ const ImageCanvas = memo(
     finalPreviewUrl,
     gamutWarningOverlay,
     handleCropComplete,
+    handleCropStart = () => undefined,
     imageRenderSize,
     originalImageRenderSize = imageRenderSize,
     overlayGeometry: providedOverlayGeometry,
@@ -3062,6 +3064,7 @@ const ImageCanvas = memo(
           cropRenderSize={uncroppedImageRenderSize}
           geometry={overlayGeometry}
           handleCropComplete={handleCropComplete}
+          handleCropStart={handleCropStart}
           isCropping={isCropping}
           isCropViewVisible={isCropViewVisible}
           onCropPreviewError={() => setLoadedCropPreviewUrl(null)}

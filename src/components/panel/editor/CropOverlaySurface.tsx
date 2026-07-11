@@ -14,6 +14,7 @@ interface CropOverlaySurfaceProps {
   cropRenderSize: { height?: number; width?: number } | null;
   geometry: EditorOverlayGeometry;
   handleCropComplete: (crop: Crop, percentCrop: PercentCrop) => void;
+  handleCropStart: () => void;
   isCropping: boolean;
   isCropViewVisible: boolean;
   onCropPreviewError: () => void;
@@ -38,6 +39,7 @@ export function CropOverlaySurface({
   cropRenderSize,
   geometry,
   handleCropComplete,
+  handleCropStart,
   isCropping,
   isCropViewVisible,
   onCropPreviewError,
@@ -90,7 +92,7 @@ export function CropOverlaySurface({
         </div>
       )}
       {cropPreviewUrl && cropRenderSize && (
-        <div style={{ height: cropHeight, position: 'relative', width: cropWidth }}>
+        <div onPointerDown={handleCropStart} style={{ height: cropHeight, position: 'relative', width: cropWidth }}>
           <CropOverlay
             aspect={aspectRatio}
             crop={crop}
