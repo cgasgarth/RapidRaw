@@ -7,3 +7,4 @@ pub(crate) mod preview_scheduler;
 pub(crate) mod preview_worker;
 pub(crate) mod render_caches;
 pub(crate) mod render_pipeline;
+pub(crate) mod resample;

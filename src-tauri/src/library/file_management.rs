@@ -125,7 +125,7 @@ fn generate_and_write_smart_preview_artifact(
     )
     .ok()?;
     let (smart_data, width, height) =
-        encode_thumbnail(&smart_image, SMART_PREVIEW_TARGET_WIDTH).ok()?;
+        encode_thumbnail(&smart_image, SMART_PREVIEW_TARGET_WIDTH, app_handle).ok()?;
     write_smart_preview_artifact(
         smart_preview_dir,
         path_str,
@@ -1275,8 +1275,21 @@ fn generate_thumbnail_data_with_target(
     Ok(apply_coarse_rotation(Cow::Owned(final_image), fallback_orientation_steps).into_owned())
 }
 
-fn encode_thumbnail(image: &DynamicImage, target_width: u32) -> Result<(Vec<u8>, u32, u32)> {
-    let thumbnail = crate::image_processing::downscale_f32_image(image, target_width, target_width);
+fn encode_thumbnail(
+    image: &DynamicImage,
+    target_width: u32,
+    app_handle: &AppHandle,
+) -> Result<(Vec<u8>, u32, u32)> {
+    let state = app_handle.state::<AppState>();
+    let thumbnail = crate::image_processing::downscale_f32_image_cow(
+        image,
+        target_width,
+        target_width,
+        Some(crate::CancellationProbe::new(
+            &state.thumbnail_cancellation_token,
+        )),
+    )?;
+    let thumbnail = thumbnail.as_ref();
     let (width, height) = thumbnail.dimensions();
     let mut buf = Cursor::new(Vec::new());
     let mut encoder = JpegEncoder::new_with_quality(&mut buf, 75);
@@ -1371,7 +1384,8 @@ fn generate_single_thumbnail_and_cache(
 
     if let Ok(thumb_image) =
         generate_thumbnail_data(path_str, gpu_context, preloaded_image, app_handle)
-        && let Ok((thumb_data, width, height)) = encode_thumbnail(&thumb_image, target_width)
+        && let Ok((thumb_data, width, height)) =
+            encode_thumbnail(&thumb_image, target_width, app_handle)
     {
         let adjustment_fingerprint = blake3::hash(&adjustments_bytes).to_hex().to_string();
         publish_thumbnail_artifact(
@@ -2732,7 +2746,7 @@ pub fn get_cached_or_generate_thumbnail_image(
         }
 
         let thumb_image = generate_thumbnail_data(path_str, gpu_context, None, app_handle)?;
-        let (thumb_data, _, _) = encode_thumbnail(&thumb_image, target_width)?;
+        let (thumb_data, _, _) = encode_thumbnail(&thumb_image, target_width, app_handle)?;
         fs::write(&cache_path, &thumb_data)?;
 
         Ok(thumb_image)

@@ -6,12 +6,13 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 
 use crate::file_management::parse_virtual_path;
+use crate::render::resample::RESAMPLE_KERNEL_VERSION;
 use crate::thumbnail_resources::{
     ThumbnailResourceDescriptor, ThumbnailResourceSource, descriptor_from_manifest,
     publish_thumbnail_artifact,
 };
 
-const SMART_PREVIEW_SCHEMA_VERSION: u8 = 1;
+const SMART_PREVIEW_SCHEMA_VERSION: u8 = 2;
 const SMART_PREVIEW_COLOR_PROFILE: &str = "srgb";
 pub const SMART_PREVIEW_TARGET_WIDTH: u32 = 2560;
 
@@ -45,6 +46,7 @@ pub struct ThumbnailSmartPreviewPayload {
 pub fn compute_smart_preview_id(path_str: &str) -> String {
     let mut hasher = blake3::Hasher::new();
     hasher.update(path_str.as_bytes());
+    hasher.update(&RESAMPLE_KERNEL_VERSION.to_le_bytes());
     hasher.finalize().to_hex().to_string()
 }
 
@@ -163,6 +165,9 @@ pub fn read_smart_preview_artifact(
     let (_, manifest_path) = smart_preview_paths(smart_preview_dir, path_str);
     let mut manifest: SmartPreviewManifest =
         serde_json::from_slice(&fs::read(manifest_path).ok()?).ok()?;
+    if manifest.schema_version != SMART_PREVIEW_SCHEMA_VERSION {
+        return None;
+    }
     let (source_path, _) = parse_virtual_path(path_str);
     manifest.source_available = source_path.exists();
     manifest.stale = !manifest.source_available;
