@@ -1,0 +1,28 @@
+import { type ComponentProps, memo } from 'react';
+import ImageLoaderManager from '../managers/ImageLoaderManager';
+import ImageProcessingManager from '../managers/ImageProcessingManager';
+
+interface AppServicesProps {
+  imageLoader: ComponentProps<typeof ImageLoaderManager>;
+  imageProcessing: ComponentProps<typeof ImageProcessingManager>;
+}
+
+function AppServicesComponent({ imageLoader, imageProcessing }: AppServicesProps) {
+  return (
+    <>
+      <ImageProcessingManager {...imageProcessing} />
+      <ImageLoaderManager {...imageLoader} />
+    </>
+  );
+}
+
+export const AppServices = memo(
+  AppServicesComponent,
+  (previous, next) =>
+    previous.imageLoader.cachedEditStateRef === next.imageLoader.cachedEditStateRef &&
+    previous.imageProcessing.transformWrapperRef === next.imageProcessing.transformWrapperRef &&
+    previous.imageProcessing.prevAdjustmentsRef === next.imageProcessing.prevAdjustmentsRef &&
+    previous.imageProcessing.previewJobIdRef === next.imageProcessing.previewJobIdRef &&
+    previous.imageProcessing.latestRenderedJobIdRef === next.imageProcessing.latestRenderedJobIdRef &&
+    previous.imageProcessing.currentResRef === next.imageProcessing.currentResRef,
+);

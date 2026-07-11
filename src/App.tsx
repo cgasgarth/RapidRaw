@@ -1,32 +1,30 @@
 import { ClerkProvider } from '@clerk/react';
 import cx from 'clsx';
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Slide, ToastContainer } from 'react-toastify';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
-import ImageLoaderManager from './components/managers/ImageLoaderManager';
-import ImageProcessingManager from './components/managers/ImageProcessingManager';
-import AppModals from './components/modals/AppModals';
+import { AppModalHost } from './components/app/AppModalHost';
+import { AppServices } from './components/app/AppServices';
+import { GlobalStatusSurfaces } from './components/app/GlobalStatusSurfaces';
+import { LibraryExportPanelRoot } from './components/app/LibraryExportPanelRoot';
+import { RenderIsland } from './components/app/RenderIsland';
+import { EditorWorkspaceRoot, LibraryWorkspaceRoot } from './components/app/WorkspaceRoots';
 import { EditorHistorySection, EditorSnapshotsSection } from './components/panel/editor/EditorHistorySections';
 import EditorLeftSidebar, { type EditorLeftSectionId } from './components/panel/editor/EditorLeftSidebar';
 import EditorNavigator, { type EditorTransformController } from './components/panel/editor/EditorNavigator';
 import { FocusStackRetouchPanel } from './components/panel/editor/FocusStackRetouchPanel';
 import FolderTreePanel from './components/panel/FolderTree';
 import { PresetsPanel } from './components/panel/right/color/PresetsPanel';
-import ExportPanel from './components/panel/right/export/ExportPanel';
 import {
   type ImageFile,
   LibraryViewMode,
   Orientation,
   Panel,
-  Theme,
   ThumbnailAspectRatio,
   ThumbnailSize,
 } from './components/ui/AppProperties';
 import GlobalTooltip from './components/ui/GlobalTooltip';
 import Resizer from './components/ui/Resizer';
-import EditorView from './components/views/EditorView';
-import LibraryView from './components/views/LibraryView';
 import { ContextMenuProvider } from './context/ContextMenuContext';
 import { useAiConnectorStatus } from './hooks/ai/useAiConnectorStatus';
 import { useAppContextMenus } from './hooks/app/useAppContextMenus';
@@ -83,35 +81,15 @@ interface PreloadedAppData {
   trees?: Promise<FolderTreeNode[]> | undefined;
 }
 
-export function LibraryExportPanelSlot({
-  children,
-  hasSelectedImage,
-  isLibraryExportPanelVisible,
-}: {
-  children: ReactNode;
-  hasSelectedImage: boolean;
-  isLibraryExportPanelVisible: boolean;
-}) {
-  return !hasSelectedImage && isLibraryExportPanelVisible ? children : null;
-}
-
 function App() {
   const COMPACT_EDITOR_MAX_WIDTH = 900;
   useTooltipAccessibility();
 
-  const { appSettings, theme, osPlatform, handleSettingsChange } = useSettingsStore(
+  const { appSettings, osPlatform } = useSettingsStore(
     useShallow((state) => ({
       appSettings: state.appSettings,
-      theme: state.theme,
       osPlatform: state.osPlatform,
-      handleSettingsChange: state.handleSettingsChange,
     })),
-  );
-  const handleSettingsChangeVoid = useCallback(
-    (settings: Parameters<typeof handleSettingsChange>[0]) => {
-      void handleSettingsChange(settings);
-    },
-    [handleSettingsChange],
   );
 
   const {
@@ -120,7 +98,6 @@ function App() {
     isWindowFullScreen,
     isInstantTransition,
     isLayoutReady,
-    isLibraryExportPanelVisible,
     editorLeftSidebarPreferences,
     leftPanelWidth,
     libraryLeftPanelWidth,
@@ -143,7 +120,6 @@ function App() {
       isWindowFullScreen: state.isWindowFullScreen,
       isInstantTransition: state.isInstantTransition,
       isLayoutReady: state.isLayoutReady,
-      isLibraryExportPanelVisible: state.isLibraryExportPanelVisible,
       editorLeftSidebarPreferences: state.editorWorkspacePreferences.leftSidebar,
       leftPanelWidth: state.leftPanelWidth,
       libraryLeftPanelWidth: state.libraryLeftPanelWidth,
@@ -162,11 +138,10 @@ function App() {
     })),
   );
 
-  const { rootPaths, currentFolderPath, multiSelectedPaths } = useLibraryStore(
+  const { rootPaths, currentFolderPath } = useLibraryStore(
     useShallow((state) => ({
       rootPaths: state.rootPaths,
       currentFolderPath: state.currentFolderPath,
-      multiSelectedPaths: state.multiSelectedPaths,
     })),
   );
 
@@ -180,13 +155,6 @@ function App() {
         setEditor: state.setEditor,
       })),
     );
-
-  const { exportState, setExportState } = useProcessStore(
-    useShallow((state) => ({
-      exportState: state.exportState,
-      setExportState: state.setExportState,
-    })),
-  );
 
   const defaultThumbnailSize = osPlatform === 'android' ? ThumbnailSize.Small : ThumbnailSize.Medium;
   const defaultLibraryViewMode = osPlatform === 'android' ? LibraryViewMode.Recursive : LibraryViewMode.Flat;
@@ -566,8 +534,6 @@ function App() {
     };
   }, []);
 
-  const isLightTheme = useMemo(() => [Theme.Light, Theme.Snow, Theme.Arctic].includes(theme), [theme]);
-
   useEffect(() => {
     if (
       (activeRightPanel !== Panel.Masks || !activeMaskContainerId) &&
@@ -650,26 +616,28 @@ function App() {
           opacity: isFullScreen ? 0 : 1,
         }}
       >
-        <FolderTreePanel
-          isContiguousShell={false}
-          isResizing={isResizing}
-          isVisible={libraryWorkspacePreferences.folderTree.visible}
-          onContextMenu={handleFolderTreeContextMenu}
-          onAlbumContextMenu={handleAlbumTreeContextMenu}
-          onSelectAlbum={handleSelectAlbumVoid}
-          onFolderSelect={(path) => {
-            void handleSelectSubfolder(path, false);
-          }}
-          onToggleFolder={(path) => {
-            void handleToggleFolder(path);
-          }}
-          onOpenFolder={handleOpenFolderVoid}
-          setIsVisible={(value: boolean) => {
-            setLibraryFolderTreeVisibility(value);
-          }}
-          style={{ width: libraryWorkspacePreferences.folderTree.visible ? `${libraryLeftPanelWidth}px` : '32px' }}
-          isInstantTransition={isInstantTransition}
-        />
+        <RenderIsland name="folder-tree">
+          <FolderTreePanel
+            isContiguousShell={false}
+            isResizing={isResizing}
+            isVisible={libraryWorkspacePreferences.folderTree.visible}
+            onContextMenu={handleFolderTreeContextMenu}
+            onAlbumContextMenu={handleAlbumTreeContextMenu}
+            onSelectAlbum={handleSelectAlbumVoid}
+            onFolderSelect={(path) => {
+              void handleSelectSubfolder(path, false);
+            }}
+            onToggleFolder={(path) => {
+              void handleToggleFolder(path);
+            }}
+            onOpenFolder={handleOpenFolderVoid}
+            setIsVisible={(value: boolean) => {
+              setLibraryFolderTreeVisibility(value);
+            }}
+            style={{ width: libraryWorkspacePreferences.folderTree.visible ? `${libraryLeftPanelWidth}px` : '32px' }}
+            isInstantTransition={isInstantTransition}
+          />
+        </RenderIsland>
         <Resizer
           direction={Orientation.Vertical}
           onMouseDown={createResizeHandler('libraryLeft', libraryLeftPanelWidth)}
@@ -689,14 +657,16 @@ function App() {
 
   return (
     <>
-      <ImageProcessingManager
-        transformWrapperRef={transformWrapperRef}
-        prevAdjustmentsRef={prevAdjustmentsRef}
-        previewJobIdRef={previewJobIdRef}
-        latestRenderedJobIdRef={latestRenderedJobIdRef}
-        currentResRef={currentResRef}
+      <AppServices
+        imageLoader={{ cachedEditStateRef }}
+        imageProcessing={{
+          transformWrapperRef,
+          prevAdjustmentsRef,
+          previewJobIdRef,
+          latestRenderedJobIdRef,
+          currentResRef,
+        }}
       />
-      <ImageLoaderManager cachedEditStateRef={cachedEditStateRef} />
       <div
         className={cx(
           'flex flex-col h-screen font-sans text-text-primary overflow-hidden select-none',
@@ -769,7 +739,7 @@ function App() {
             ) : null}
             <div className="flex-1 flex flex-col min-w-0">
               {selectedImage ? (
-                <EditorView
+                <EditorWorkspaceRoot
                   transformWrapperRef={transformWrapperRef}
                   isResizing={isResizing}
                   isCompactPortrait={isCompactPortrait}
@@ -795,7 +765,7 @@ function App() {
                   refreshImageList={handleLibraryRefresh}
                 />
               ) : (
-                <LibraryView
+                <LibraryWorkspaceRoot
                   sortedImageList={sortedImageList}
                   thumbnailSize={thumbnailSize}
                   thumbnailAspectRatio={thumbnailAspectRatio}
@@ -822,37 +792,14 @@ function App() {
                 />
               )}
             </div>
-            <LibraryExportPanelSlot
-              hasSelectedImage={selectedImage !== null}
-              isLibraryExportPanelVisible={isLibraryExportPanelVisible}
-            >
-              <Resizer direction={Orientation.Vertical} onMouseDown={createResizeHandler('right', rightPanelWidth)} />
-              <div
-                className={cx(
-                  'shrink-0 overflow-hidden',
-                  !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
-                )}
-                style={{ width: isFullScreen ? '0px' : `${rightPanelWidth}px` }}
-              >
-                <ExportPanel
-                  exportState={exportState}
-                  multiSelectedPaths={multiSelectedPaths}
-                  selectedImage={null}
-                  setExportState={setExportState}
-                  appSettings={appSettings}
-                  onSettingsChange={handleSettingsChangeVoid}
-                  rootPaths={rootPaths}
-                  isVisible={isLibraryExportPanelVisible}
-                  onLinkedVariantImported={handleLinkedVariantImported}
-                  onClose={() => {
-                    setUI({ isLibraryExportPanelVisible: false });
-                  }}
-                />
-              </div>
-            </LibraryExportPanelSlot>
+            <LibraryExportPanelRoot
+              isResizing={isResizing}
+              onLinkedVariantImported={handleLinkedVariantImported}
+              onResizeStart={createResizeHandler('right', rightPanelWidth)}
+            />
           </div>
         </div>
-        <AppModals
+        <AppModalHost
           handleImageSelect={handleImageSelect}
           handleSavePanorama={handleSavePanorama}
           handleStartPanorama={handleStartPanoramaVoid}
@@ -875,25 +822,7 @@ function App() {
           handleRenameAlbumItem={handleRenameAlbumItem}
           handleBackToLibrary={handleBackToLibrary}
         />
-        <ToastContainer
-          position="bottom-right"
-          autoClose={5000}
-          hideProgressBar={false}
-          newestOnTop
-          closeOnClick
-          rtl={false}
-          pauseOnFocusLoss
-          draggable={false}
-          pauseOnHover
-          theme={isLightTheme ? 'light' : 'dark'}
-          transition={Slide}
-          toastClassName={() =>
-            cx(
-              'relative flex min-h-16 p-4 rounded-lg justify-between overflow-hidden cursor-pointer mb-4',
-              'bg-surface! text-text-primary! border! border-border-color! shadow-2xl! max-w-[420px]!',
-            )
-          }
-        />
+        <GlobalStatusSurfaces />
       </div>
     </>
   );
