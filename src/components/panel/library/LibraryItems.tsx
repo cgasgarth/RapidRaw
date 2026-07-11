@@ -115,7 +115,6 @@ export interface LibraryRowProps {
   gap: number;
   isListView: boolean;
   columnWidths: ColumnWidths;
-  queueThumbnailRequest: (path: string) => void;
   onToggleRecursiveFolder: (path: string) => void;
   onToggleAutoStack: (stackId: string) => void;
 }
@@ -933,20 +932,11 @@ const RowComponent = ({
   gap,
   isListView,
   columnWidths,
-  queueThumbnailRequest,
   onToggleRecursiveFolder,
   onToggleAutoStack,
 }: LibraryRowProps) => {
   const { t } = useTranslation();
   const row = rows[index];
-
-  useEffect(() => {
-    if (row && row.type === 'images') {
-      row.images.forEach((item: LibraryAutoStackItem) => {
-        queueThumbnailRequest(item.image.path);
-      });
-    }
-  }, [row, queueThumbnailRequest]);
 
   if (!row || row.type === 'footer') return null;
 

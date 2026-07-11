@@ -11,8 +11,8 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { List, useListCallbackRef } from 'react-window';
+import type { ThumbnailViewportUpdate } from '../../../hooks/library/useThumbnails';
 import { useLibraryStore } from '../../../store/useLibraryStore';
-import { useProcessStore } from '../../../store/useProcessStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { buildLibraryAutoStackItems } from '../../../utils/libraryAutoStacks';
@@ -27,7 +27,6 @@ import {
   ThumbnailSize,
 } from '../../ui/AppProperties';
 import UiText from '../../ui/primitives/Text';
-
 import type { ColumnWidths } from '../MainLibrary';
 import { type LibraryRow, type LibraryRowProps, Row } from './LibraryItems';
 
@@ -101,6 +100,7 @@ interface LibraryGridProps {
   thumbnailAspectRatio: ThumbnailAspectRatio;
   imageRatings: Record<string, number>;
   onRequestThumbnails?: (paths: string[]) => void;
+  onThumbnailViewportChange?: (demand: ThumbnailViewportUpdate) => void;
   thumbnailSizeOptions: ThumbnailSizeOption[];
   onThumbnailSizeChange: (size: ThumbnailSize) => void;
   onClearSelection: () => void;
@@ -341,7 +341,7 @@ export default function LibraryGrid(props: LibraryGridProps) {
     onImageDoubleClick,
     thumbnailAspectRatio,
     imageRatings,
-    onRequestThumbnails,
+    onThumbnailViewportChange,
     thumbnailSizeOptions,
     onThumbnailSizeChange,
   } = props;
@@ -353,8 +353,12 @@ export default function LibraryGrid(props: LibraryGridProps) {
   const libraryContainerRef = useRef<HTMLDivElement>(null);
   const gridObserverRef = useRef<ResizeObserver | null>(null);
   const loadedThumbnailsRef = useRef(new Set<string>());
-  const requestQueueRef = useRef<Set<string>>(new Set());
-  const requestTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scrollSampleRef = useRef({
+    top: 0,
+    at: performance.now(),
+    direction: 'idle' as 'forward' | 'backward' | 'idle',
+    velocity: 0,
+  });
 
   useEffect(() => {
     const el = libraryContainerRef.current;
@@ -421,25 +425,6 @@ export default function LibraryGrid(props: LibraryGridProps) {
       handleScroll.cancel();
     },
     [handleScroll],
-  );
-
-  const queueThumbnailRequest = useCallback(
-    (path: string) => {
-      if (!onRequestThumbnails) return;
-      if (useProcessStore.getState().thumbnails[path]) return;
-      requestQueueRef.current.add(path);
-      if (!requestTimeoutRef.current) {
-        requestTimeoutRef.current = setTimeout(() => {
-          const paths = Array.from(requestQueueRef.current);
-          if (paths.length > 0) {
-            onRequestThumbnails(paths);
-            requestQueueRef.current.clear();
-          }
-          requestTimeoutRef.current = null;
-        }, 50);
-      }
-    },
-    [onRequestThumbnails],
   );
 
   const handleToggleRecursiveFolder = useCallback((path: string) => {
@@ -546,6 +531,16 @@ export default function LibraryGrid(props: LibraryGridProps) {
     thumbnailSizeOptions,
   ]);
 
+  const viewportContextKey = useMemo(() => {
+    let hash = 2166136261;
+    for (const image of imageList) {
+      for (let index = 0; index < image.path.length; index += 1) {
+        hash = Math.imul(hash ^ image.path.charCodeAt(index), 16777619);
+      }
+    }
+    return `${currentFolderPath ?? ''}:${thumbnailSize}:${thumbnailAspectRatio}:${hash >>> 0}`;
+  }, [currentFolderPath, imageList, thumbnailAspectRatio, thumbnailSize]);
+
   useEffect(() => {
     if (!listHandle?.element || !gridData) return;
 
@@ -651,7 +646,6 @@ export default function LibraryGrid(props: LibraryGridProps) {
       gap: gridData?.ITEM_GAP ?? 0,
       isListView: gridData?.isListView ?? false,
       columnWidths: listColumnWidths,
-      queueThumbnailRequest,
       onToggleRecursiveFolder: handleToggleRecursiveFolder,
       onToggleAutoStack: handleToggleAutoStack,
     };
@@ -667,7 +661,6 @@ export default function LibraryGrid(props: LibraryGridProps) {
     imageRatings,
     currentFolderPath,
     listColumnWidths,
-    queueThumbnailRequest,
     handleToggleRecursiveFolder,
     handleToggleAutoStack,
   ]);
@@ -735,7 +728,48 @@ export default function LibraryGrid(props: LibraryGridProps) {
             rowCount={gridData.rows.length}
             rowHeight={getItemSize}
             onScroll={(e: React.UIEvent<HTMLElement>) => {
-              handleScroll(e.currentTarget.scrollTop);
+              const now = performance.now();
+              const top = e.currentTarget.scrollTop;
+              const previous = scrollSampleRef.current;
+              const delta = top - previous.top;
+              scrollSampleRef.current = {
+                top,
+                at: now,
+                direction: delta > 0 ? 'forward' : delta < 0 ? 'backward' : previous.direction,
+                velocity: Math.abs(delta) / Math.max(1, now - previous.at),
+              };
+              handleScroll(top);
+            }}
+            overscanCount={3}
+            onRowsRendered={(visibleRows, allRows) => {
+              if (!onThumbnailViewportChange) return;
+              const rowPaths = (start: number, stop: number) =>
+                gridData.rows
+                  .slice(Math.max(0, start), stop + 1)
+                  .flatMap((row) => (row.type === 'images' ? row.images.map((item) => item.image.path) : []));
+              const visiblePaths = rowPaths(visibleRows.startIndex, visibleRows.stopIndex);
+              const before = rowPaths(allRows.startIndex, visibleRows.startIndex - 1).reverse();
+              const after = rowPaths(visibleRows.stopIndex + 1, allRows.stopIndex);
+              const { direction, velocity } = scrollSampleRef.current;
+              const overscanPaths = direction === 'backward' ? [...before, ...after] : [...after, ...before];
+              const lookaheadRows = Math.min(6, Math.max(1, Math.ceil(velocity * 2)));
+              const lookaheadPaths =
+                direction === 'backward'
+                  ? rowPaths(Math.max(0, allRows.startIndex - lookaheadRows), allRows.startIndex - 1).reverse()
+                  : direction === 'forward'
+                    ? rowPaths(
+                        allRows.stopIndex + 1,
+                        Math.min(gridData.rows.length - 1, allRows.stopIndex + lookaheadRows),
+                      )
+                    : [];
+              onThumbnailViewportChange({
+                contextKey: viewportContextKey,
+                visiblePaths,
+                overscanPaths,
+                lookaheadPaths,
+                direction,
+                velocityPxPerMs: velocity,
+              });
             }}
             className="custom-scrollbar"
             rowComponent={VirtualizedRow}

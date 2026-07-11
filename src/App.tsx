@@ -188,7 +188,7 @@ function App() {
   const [thumbnailSize, setThumbnailSize] = useState(defaultThumbnailSize);
   const [thumbnailAspectRatio, setThumbnailAspectRatio] = useState(ThumbnailAspectRatio.Cover);
 
-  const { requestThumbnails, clearThumbnailQueue, markGenerated } = useThumbnails();
+  const { requestThumbnails, updateThumbnailViewport, clearThumbnailQueue, markGenerated } = useThumbnails();
 
   const transformWrapperRef = useRef<TransformController | null>(null);
   const preloadedDataRef = useRef<PreloadedAppData>({});
@@ -789,6 +789,7 @@ function App() {
                   handlePasteAdjustments={handlePasteAdjustmentsVoid}
                   handleResetAdjustments={handleResetAdjustments}
                   requestThumbnails={requestThumbnails}
+                  updateThumbnailViewport={updateThumbnailViewport}
                 />
               )}
             </div>

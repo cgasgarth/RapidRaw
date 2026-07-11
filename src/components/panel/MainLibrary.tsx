@@ -20,6 +20,7 @@ import {
 import type React from 'react';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { ThumbnailViewportUpdate } from '../../hooks/library/useThumbnails';
 import { EXPORT_LAST_USED_PRESET_ID } from '../../schemas/export/exportRecipeIds';
 import { buildLibrarySessionUiCard } from '../../schemas/library/librarySessionUiSchemas';
 import { useLibraryStore } from '../../store/useLibraryStore';
@@ -78,6 +79,7 @@ interface MainLibraryProps {
   onThumbnailAspectRatioChange: (aspectRatio: ThumbnailAspectRatio) => void;
   onThumbnailSizeChange: (size: ThumbnailSize) => void;
   onRequestThumbnails?: (paths: string[]) => void;
+  onThumbnailViewportChange?: (demand: ThumbnailViewportUpdate) => void;
   rootPaths: string[];
   setLibraryViewMode: (mode: LibraryViewMode) => void;
   theme: Theme;
