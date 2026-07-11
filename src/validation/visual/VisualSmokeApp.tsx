@@ -26,6 +26,7 @@ import HdrModal from '../../components/modals/computational-merge/HdrModal';
 import PanoramaModal from '../../components/modals/computational-merge/PanoramaModal';
 import SuperResolutionModal from '../../components/modals/computational-merge/SuperResolutionModal';
 import CullingModal from '../../components/modals/editing/CullingModal';
+import { LensCorrectionSession } from '../../components/modals/editing/LensCorrectionModal';
 import CommandPaletteModal from '../../components/modals/navigation/CommandPaletteModal';
 import { NegativeConversionModal } from '../../components/modals/negative-lab/NegativeConversionModal';
 import BottomBar from '../../components/panel/BottomBar';
@@ -1970,6 +1971,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.LayerBrushLocalAdjustment]: LayerBrushLocalAdjustmentVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.LayerMaskPrivateRawUi]: LayerMaskPrivateRawVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.LayerStackWorkflow]: LayerStackWorkflowVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.LensCorrectionSession]: LensCorrectionSessionVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.LibraryWorkflow]: LibraryWorkflowVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.MaskOverlayRawProof]: MaskOverlayRawProofVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.NegativeLabPublicExportReview]: NegativeLabPublicExportReviewSmoke,
@@ -3678,6 +3680,7 @@ const copy = {
   commandPaletteSmoke: 'Command Palette Workflows',
   commandPaletteSelectSource: 'Select source',
   cullingCompareSync: 'Culling compare sync',
+  lensCorrectionSession: 'Lens correction session',
   filmLook: 'Film look',
   filmPreset: 'Neutral 400',
   colorRangeLocalAdjustment: 'Color Range Local Adjustment',
@@ -5416,6 +5419,61 @@ function CullingCompareSyncVisualSmoke() {
           progress={null}
           suggestions={cullingCompareSuggestions}
           getThumbnailUrl={(path) => cullingCompareThumbnails[path] ?? null}
+        />
+      </div>
+    </main>
+  );
+}
+
+function LensCorrectionSessionVisualSmoke() {
+  const adjustments: Adjustments = {
+    ...structuredClone(INITIAL_ADJUSTMENTS),
+    lensCorrectionMode: 'manual',
+    lensDistortionAmount: 118,
+    lensDistortionEnabled: true,
+    lensDistortionParams: {
+      k1: 0.012,
+      k2: -0.004,
+      k3: 0,
+      model: 1,
+      tca_vb: 0.9994,
+      tca_vr: 1.0006,
+      vig_k1: -0.02,
+      vig_k2: 0.004,
+      vig_k3: 0,
+    },
+    lensMaker: 'Sony',
+    lensModel: 'FE 35mm F1.8',
+    lensTcaEnabled: true,
+    lensVignetteEnabled: true,
+  };
+  const selectedImage: SelectedImage = {
+    ...cropTransformSmokeImage,
+    exif: {
+      ApertureValue: 'f/4',
+      FocalLength: '35 mm',
+      LensModel: 'FE 35mm F1.8',
+      Make: 'Sony',
+      SubjectDistance: '8',
+    },
+    isRaw: true,
+    path: '/validation/lens-correction-session.ARW',
+  };
+  return (
+    <main
+      className="h-screen bg-[#0f1114] text-[#f3f4f1]"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.LensCorrectionSession}
+      data-visual-smoke-ready="true"
+    >
+      <span className="sr-only">{copy.lensCorrectionSession}</span>
+      <div className="h-full" data-visual-smoke-section="lens-correction-session">
+        <LensCorrectionSession
+          currentAdjustments={adjustments}
+          isSessionOpen
+          onApply={() => {}}
+          onClose={() => {}}
+          selectedImage={selectedImage}
+          show
         />
       </div>
     </main>

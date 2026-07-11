@@ -23,6 +23,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   LayerBrushLocalAdjustment: 'layer-brush-local-adjustment',
   LayerMaskPrivateRawUi: 'layer-mask-private-raw-ui',
   LayerStackWorkflow: 'layer-stack-workflow',
+  LensCorrectionSession: 'lens-correction-session',
   LibraryWorkflow: 'library-workflow',
   MaskOverlayRawProof: 'mask-overlay-raw-proof',
   NegativeLabBatchColorWorkspace: 'negative-lab-batch-color-workspace',
@@ -105,6 +106,12 @@ export const VISUAL_SMOKE_SCENARIOS = [
     marker: 'Culling compare sync',
     mode: VISUAL_SMOKE_SCENARIO_IDS.CullingCompareSync,
     outputFile: 'culling-compare-sync.png',
+    sectionMinimum: 1,
+  },
+  {
+    marker: 'Lens correction session',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.LensCorrectionSession,
+    outputFile: 'lens-correction-session.png',
     sectionMinimum: 1,
   },
   {

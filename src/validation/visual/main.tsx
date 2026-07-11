@@ -121,6 +121,7 @@ const getLensDistortionParamsCommand: string = Invokes.GetLensDistortionParams;
 const getLensfunLensesForMakerCommand: string = Invokes.GetLensfunLensesForMaker;
 const getLensfunMakersCommand: string = Invokes.GetLensfunMakers;
 const autodetectLensCommand: string = Invokes.AutodetectLens;
+const loadSettingsCommand: string = Invokes.LoadSettings;
 const saveCommunityPresetCommand: string = Invokes.SaveCommunityPreset;
 const handleExportPresetsToFileCommand: string = Invokes.HandleExportPresetsToFile;
 const estimateExportSizesCommand: string = Invokes.EstimateExportSizes;
@@ -305,6 +306,8 @@ window.__TAURI_INTERNALS__ = {
       );
     }
     if (command === getLensfunMakersCommand) return Promise.resolve(['Sony', 'Canon']);
+    if (command === loadSettingsCommand)
+      return Promise.resolve({ myLenses: [{ maker: 'Sony', model: 'FE 35mm F1.8' }] });
     if (command === getLensfunLensesForMakerCommand) return Promise.resolve(['FE 35mm F1.8', 'FE 24-70mm F2.8']);
     if (command === getLensDistortionParamsCommand) {
       return Promise.resolve({
@@ -319,7 +322,7 @@ window.__TAURI_INTERNALS__ = {
         vig_k3: 0,
       });
     }
-    if (command === autodetectLensCommand) return Promise.resolve({ maker: 'Sony', model: 'FE 35mm F1.8' });
+    if (command === autodetectLensCommand) return Promise.resolve(['Sony', 'FE 35mm F1.8']);
     if (command === saveCommunityPresetCommand) return Promise.resolve(null);
     if (command === handleExportPresetsToFileCommand) return Promise.resolve(null);
     if (command === estimateExportSizesCommand) return Promise.resolve(18_432_000);
