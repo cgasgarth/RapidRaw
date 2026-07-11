@@ -1,8 +1,10 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useSyncExternalStore } from 'react';
 
 import type { FilterCriteria, ImageFile, SortCriteria, SupportedTypes } from '../../components/ui/AppProperties';
 import { ADVANCED_QUERY_REGEX, compileLibraryQuery } from '../../library/compileLibraryQuery';
+import { createLibraryQueryWorker } from '../../library/createLibraryQueryWorker.mjs';
 import { LibraryProjectionCache } from '../../library/LibraryProjectionCache';
+import { LibraryQueryController } from '../../library/LibraryQueryController';
 import {
   normalizeSupportedTypes,
   parseAperture,
@@ -27,6 +29,7 @@ interface SortedLibrarySettingsState {
 }
 
 export const libraryProjectionCache = new LibraryProjectionCache();
+const controller = new LibraryQueryController(createLibraryQueryWorker);
 
 export function computeSortedLibrary(
   libraryState: SortedLibraryState,
@@ -53,10 +56,8 @@ export function computeSortedLibrary(
     rawPairKeys = new Set<string>();
     for (const projection of projections) if (projection.isRaw) rawPairKeys.add(projection.rawPairKey);
   }
-
   const result = [];
   for (const projection of projections) {
-    // Virtual copies retain distinct entity paths but share their physical RAW-pair identity.
     if (rawPairKeys?.has(projection.rawPairKey) && projection.isNonRaw) continue;
     if (query.filter(projection)) result.push(projection);
   }
@@ -71,13 +72,33 @@ export function useSortedLibrary() {
   const searchCriteria = useLibraryStore((state) => state.searchCriteria);
   const sortCriteria = useLibraryStore((state) => state.sortCriteria);
   const supportedTypes = useSettingsStore((state) => state.supportedTypes);
+  const queryState = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
 
-  return useMemo(
-    () =>
-      computeSortedLibrary(
-        { imageList, imageRatings, filterCriteria, searchCriteria, sortCriteria },
-        { supportedTypes },
-      ),
-    [imageList, sortCriteria, imageRatings, filterCriteria, supportedTypes, searchCriteria],
+  const projections = useMemo(() => {
+    const normalizedTypes = normalizeSupportedTypes(supportedTypes);
+    const retainedPaths = new Set<string>();
+    const result = imageList.map((image) => {
+      retainedPaths.add(image.path);
+      return libraryProjectionCache.getOrBuild(image, imageRatings[image.path] || 0, normalizedTypes);
+    });
+    libraryProjectionCache.retainOnly(retainedPaths);
+    return result;
+  }, [imageList, imageRatings, supportedTypes]);
+  const criteria = useMemo(
+    () => ({ filterCriteria, searchCriteria, sortCriteria }),
+    [filterCriteria, searchCriteria, sortCriteria],
   );
+
+  useEffect(() => {
+    controller.syncIndex(projections);
+    controller.query(criteria);
+  }, [criteria, projections]);
+
+  return useMemo(() => {
+    const byPath = new Map(imageList.map((image) => [image.path, image]));
+    return queryState.orderedPaths.flatMap((path) => {
+      const image = byPath.get(path);
+      return image ? [image] : [];
+    });
+  }, [imageList, queryState.orderedPaths]);
 }
