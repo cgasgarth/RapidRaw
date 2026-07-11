@@ -6,6 +6,7 @@ import {
 } from '../../../../packages/rawengine-schema/src/agentSelectedImageProposalSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
 import type { Adjustments } from '../../adjustments';
+import { assertAgentAdjustmentsDryRunPlanForProposal } from '../tools/agentAdjustmentApplyTool';
 import { assertAgentToneDryRunPlanForProposal } from '../tools/agentToneAdjustmentTool';
 import { buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
 import {
@@ -348,7 +349,7 @@ export const createAgentSelectedImageProposalRuntime = ({
         });
       }
       try {
-        assertAgentToneDryRunPlanForProposal({
+        const plan = {
           adjustments: command.edit.patch,
           expectedGraphRevision: command.expectedGraphRevision,
           expectedRecipeHash: command.expectedRecipeHash,
@@ -356,7 +357,12 @@ export const createAgentSelectedImageProposalRuntime = ({
           planHash: command.dryRunPlan.planHash,
           planId: command.dryRunPlan.planId,
           sessionId: command.sessionId,
-        });
+        };
+        try {
+          assertAgentAdjustmentsDryRunPlanForProposal(plan);
+        } catch {
+          assertAgentToneDryRunPlanForProposal(plan);
+        }
       } catch (error) {
         return await makeReceipt({ status: 'failed', warnings: [errorWarning(error)] });
       }
