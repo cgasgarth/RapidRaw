@@ -4,7 +4,7 @@ import { act, createElement } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot, type Root } from 'react-dom/client';
 
-import { SvgPreviewHandoff } from '../../../src/components/panel/editor/ImageCanvas.tsx';
+import { SvgPreviewHandoff } from '../../../src/components/panel/editor/SvgPreviewHandoff.tsx';
 import type { InteractivePatch } from '../../../src/store/useEditorStore.ts';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
