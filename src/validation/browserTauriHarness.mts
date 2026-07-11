@@ -78,6 +78,7 @@ const commandNames: Record<
   | 'listImagesInDir'
   | 'listImagesRecursive'
   | 'loadImage'
+  | 'configureLibraryChangefeed'
   | 'loadMetadata'
   | 'loadPresets'
   | 'loadSettings'
@@ -92,6 +93,7 @@ const commandNames: Record<
   string
 > = {
   applyAdjustments: Invokes.ApplyAdjustments,
+  configureLibraryChangefeed: Invokes.ConfigureLibraryChangefeed,
   cancelThumbnailGeneration: Invokes.CancelThumbnailGeneration,
   checkAiConnectorStatus: Invokes.CheckAIConnectorStatus,
   clearSessionCaches: Invokes.ClearSessionCaches,
@@ -226,6 +228,8 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
       });
     case commandNames.applyAdjustments:
       return Promise.resolve(decodeHarnessApplyPreview());
+    case commandNames.configureLibraryChangefeed:
+      return Promise.resolve(1);
     case commandNames.generateOriginalTransformedPreview:
       return Promise.resolve(`data:image/jpeg;base64,${harnessPreviewJpegBase64}`);
     case commandNames.generateUncroppedPreview:

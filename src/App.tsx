@@ -441,8 +441,10 @@ function App() {
 
   useSelectedFolderRefreshWatcher({
     libraryViewMode,
-    refreshAllFolderTrees: refreshAllFolderTreesVoid,
-    refreshImageList: handleLibraryRefresh,
+    reconcile: async () => {
+      await handleLibraryRefresh();
+      await refreshAllFolderTrees();
+    },
   });
 
   const handleToggleFullScreen = useCallback(() => {

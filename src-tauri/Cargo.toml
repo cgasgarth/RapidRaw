@@ -36,6 +36,7 @@ rawler = { git = "https://github.com/CyberTimon/RapidRAW-DngLab.git" }
 tokio = { version = "1", features = ["full"] }
 uuid = { version = "1.23", features = ["v4", "serde"] }
 walkdir = "2.5.0"
+notify = "8.2.0"
 imageproc = "0.27"
 opencv = { version = "0.98.2", default-features = false, features = ["imgcodecs", "imgproc", "stitching"], optional = true }
 ort = { version = "=2.0.0-rc.12", features = ["ndarray", "load-dynamic"] }
