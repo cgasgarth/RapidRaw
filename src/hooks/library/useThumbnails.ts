@@ -4,17 +4,6 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useProcessStore } from '../../store/useProcessStore';
 import { Invokes } from '../../tauri/commands';
 
-const shuffleThumbnailPaths = (paths: string[]) => {
-  for (let i = paths.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    const currentPath = paths[i];
-    const swapPath = paths[j];
-    if (currentPath === undefined || swapPath === undefined) continue;
-    paths[i] = swapPath;
-    paths[j] = currentPath;
-  }
-};
-
 export const shouldQueueThumbnailPath = (
   path: string,
   cachedThumbnails: Readonly<Record<string, string>>,
@@ -40,6 +29,7 @@ export function useThumbnails() {
   const pendingQueueRef = useRef<Set<string>>(new Set());
   const flushTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const maxFlushTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const generationRef = useRef(0);
 
   const clearScheduledFlush = useCallback(() => {
     if (flushTimerRef.current !== null) {
@@ -59,9 +49,19 @@ export function useThumbnails() {
     const pathsToSend = Array.from(pendingQueueRef.current);
     if (pathsToSend.length === 0) return;
 
-    shuffleThumbnailPaths(pathsToSend);
-
-    invoke(Invokes.UpdateThumbnailQueue, { paths: pathsToSend }).catch((err: unknown) => {
+    const generation = generationRef.current;
+    invoke(Invokes.UpdateThumbnailQueue, {
+      request: {
+        generation,
+        replacePending: true,
+        requests: pathsToSend.map((path, priority) => ({
+          demandClass: 'visible',
+          path,
+          priority,
+          sourceRevision: null,
+        })),
+      },
+    }).catch((err: unknown) => {
       console.error('Failed to update thumbnail queue:', err);
     });
 
@@ -82,6 +82,7 @@ export function useThumbnails() {
 
   const requestThumbnails = useCallback(
     (visiblePaths: string[]) => {
+      generationRef.current += 1;
       const pathsToQueue: string[] = [];
       const cachedThumbnails = useProcessStore.getState().thumbnails;
 
@@ -101,16 +102,21 @@ export function useThumbnails() {
     [scheduleQueueFlush],
   );
 
-  const markGenerated = useCallback((path: string) => {
+  const markGenerated = useCallback((path: string, generation?: number): boolean => {
+    if (generation !== undefined && generation !== generationRef.current) return false;
     generatedRef.current.add(path);
     pendingQueueRef.current.delete(path);
+    return true;
   }, []);
 
   const clearThumbnailQueue = useCallback(() => {
     generatedRef.current.clear();
+    generationRef.current += 1;
     pendingQueueRef.current.clear();
     clearScheduledFlush();
-    invoke(Invokes.UpdateThumbnailQueue, { paths: [] }).catch(console.error);
+    invoke(Invokes.UpdateThumbnailQueue, {
+      request: { generation: generationRef.current, replacePending: true, requests: [] },
+    }).catch(console.error);
   }, [clearScheduledFlush]);
 
   useEffect(() => {
