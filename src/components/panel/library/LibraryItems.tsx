@@ -24,7 +24,6 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLibraryImage } from '../../../hooks/library/useLibraryImage';
-import { useProcessStore } from '../../../store/useProcessStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useThumbnail, useThumbnailSmartPreview } from '../../../thumbnails/useThumbnail';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
@@ -764,6 +763,7 @@ const ListItemComponent = ({
       onKeyDown={handleKeyDown}
       role="button"
       tabIndex={0}
+      data-image-path={path}
     >
       <div
         style={columnWidthStyle('thumbnail')}
