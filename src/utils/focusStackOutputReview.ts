@@ -130,7 +130,8 @@ export const buildNativeFocusStackOutputReview = (
   sourcePaths: string[],
 ): FocusStackOutputReviewWorkflow => {
   const evidence = plan.focusEvidence;
-  if (!plan.accepted || evidence === null) throw new Error('focus_stack_native_evidence_required');
+  const blend = plan.nativeBlend;
+  if (!plan.accepted || evidence === null || blend === null) throw new Error('focus_stack_native_blend_required');
   const metrics = evidence.metrics;
   const warningCodes: FocusStackOutputReviewWorkflow['warningCodes'] = [
     'human_review_required',
@@ -144,8 +145,8 @@ export const buildNativeFocusStackOutputReview = (
     path: sourcePaths[source.sourceIndex] ?? source.pathHandle,
     sourceIndex: source.sourceIndex,
   }));
-  const contributions = evidence.metrics.sourceContributions;
-  const artifactPath = `focus-map:${evidence.mapArtifact.contentHash}`;
+  const contributions = blend.sourceContributions;
+  const artifactPath = `focus-preview:${blend.previewHash}`;
   const sourceContributionSummary = contributions.map((source) => ({
     sourceIndex: source.sourceIndex,
     winnerCellRatio: source.areaRatio,
@@ -154,10 +155,13 @@ export const buildNativeFocusStackOutputReview = (
     artifactId: `${artifactPath}:source-${source.sourceIndex}`,
     confidencePercent: Math.round((1 - metrics.lowConfidenceRatio) * 100),
     contributionRatio: source.areaRatio,
-    coverageCellCount: Math.max(1, source.pixelCount),
+    coverageCellCount: Math.max(
+      1,
+      Math.round(source.areaRatio * evidence.mapArtifact.width * evidence.mapArtifact.height),
+    ),
     sourceId: sourceRefs[source.sourceIndex]?.contentHash ?? `source-${source.sourceIndex}`,
     sourceIndex: source.sourceIndex,
-    warningState: metrics.transitionRiskRatio > 0.05 ? ('artifact_review_required' as const) : ('clear' as const),
+    warningState: blend.haloRiskRatio > 0.05 ? ('artifact_review_required' as const) : ('clear' as const),
   }));
   return focusStackOutputReviewWorkflowSchema.parse({
     alignmentMode: settings.alignmentMode,
@@ -166,7 +170,7 @@ export const buildNativeFocusStackOutputReview = (
       alignment: { mode: settings.alignmentMode, status: 'applied' },
       artifactHandle: {
         artifactId: artifactPath,
-        contentHash: evidence.mapArtifact.contentHash,
+        contentHash: blend.previewHash,
         dimensions: { width: evidence.mapArtifact.width, height: evidence.mapArtifact.height },
         kind: 'preview',
         storage: 'temp_cache',
@@ -186,26 +190,26 @@ export const buildNativeFocusStackOutputReview = (
     blendMethod: settings.blendMethod,
     decision: 'preview_only',
     editableHandoff: {
-      artifactHash: evidence.mapArtifact.contentHash,
+      artifactHash: blend.previewHash,
       artifactId: artifactPath,
       exportReviewArtifactId: `${artifactPath}:export-review`,
       status: 'blocked',
     },
-    haloRiskCellRatio: Math.max(metrics.transitionRiskRatio, metrics.invalidRatio),
+    haloRiskCellRatio: Math.max(blend.haloRiskRatio, metrics.invalidRatio),
     haloReview: {
-      artifactHash: evidence.mapArtifact.contentHash,
-      artifactId: `${artifactPath}:risk`,
+      artifactHash: blend.haloRiskHash,
+      artifactId: `${artifactPath}:halo-risk`,
       reviewStatus: 'review_required',
       transitionRiskRegions: [
         {
-          cellCount: Math.round(metrics.transitionRiskRatio * evidence.mapArtifact.width * evidence.mapArtifact.height),
+          cellCount: Math.round(blend.haloRiskRatio * evidence.mapArtifact.width * evidence.mapArtifact.height),
           regionId: 'native-risk-map',
-          risk: metrics.transitionRiskRatio > 0 ? 'halo_risk' : 'stable',
+          risk: blend.haloRiskRatio > 0 ? 'halo_risk' : 'stable',
           sourceIndex: plan.referenceSourceIndex,
         },
       ],
     },
-    lowConfidenceCellRatio: metrics.lowConfidenceRatio,
+    lowConfidenceCellRatio: blend.lowConfidenceRatio,
     proofLevel: 'native_measured_runtime',
     qualityPreference: settings.qualityPreference,
     retouchLayerPolicy: settings.retouchLayerPolicy,

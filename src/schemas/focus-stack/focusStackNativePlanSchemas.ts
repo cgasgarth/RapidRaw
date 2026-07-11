@@ -114,6 +114,58 @@ const previewSchema = z
     compensationApplied: z.boolean(),
   })
   .strict();
+const hashSchema = z.string().startsWith('blake3:');
+const nativeBlendSchema = z
+  .object({
+    proofLevel: z.literal('native_measured_v1'),
+    blendPolicyId: z.literal('focus_laplacian_owner_blend_v1'),
+    pyramidPolicyId: z.literal('focus_binomial_pyramid_v1'),
+    deterministicBackend: z.literal('cpu_f32_row_major_no_fast_math'),
+    pyramidLevels: z.number().int().min(5).max(8),
+    effectiveOwnerRadiusPx: z.number().int().min(0).max(8),
+    ownerExpandedPixelRatio: z.number().min(0).max(1),
+    previewDataUrl: z.string().startsWith('data:image/png;base64,'),
+    contributionOverlayDataUrl: z.string().startsWith('data:image/png;base64,'),
+    edgeOwnerOverlayDataUrl: z.string().startsWith('data:image/png;base64,'),
+    fallbackOverlayDataUrl: z.string().startsWith('data:image/png;base64,'),
+    haloRiskOverlayDataUrl: z.string().startsWith('data:image/png;base64,'),
+    previewHash: hashSchema,
+    contributionHash: hashSchema,
+    edgeOwnerHash: hashSchema,
+    fallbackHash: hashSchema,
+    haloRiskHash: hashSchema,
+    blendResultHash: hashSchema,
+    fallbackRatio: z.number().min(0).max(1),
+    lowConfidenceRatio: z.number().min(0).max(1),
+    haloRiskRatio: z.number().min(0).max(1),
+    edgeOwnerAmbiguityRatio: z.number().min(0).max(1),
+    sourceContributions: z.array(
+      z.object({ sourceIndex: z.number().int().nonnegative(), areaRatio: z.number().min(0).max(1) }).strict(),
+    ),
+    retouchSeed: z
+      .object({
+        contentHash: hashSchema,
+        regions: z.array(
+          z
+            .object({
+              x: z.number().int().nonnegative(),
+              y: z.number().int().nonnegative(),
+              width: z.number().int().positive(),
+              height: z.number().int().positive(),
+              maskHash: hashSchema,
+              currentOwnerSource: z.number().int().nonnegative(),
+              alternateSources: z.array(z.number().int().nonnegative()),
+              reasonCodes: z.array(
+                z.enum(['low_margin', 'occlusion_risk', 'alignment_risk', 'invalid_owner', 'halo_overshoot']),
+              ),
+              confidence: z.number().min(0).max(1),
+            })
+            .strict(),
+        ),
+      })
+      .strict(),
+  })
+  .strict();
 
 export const focusStackNativeInputPlanSchema = z
   .object({
@@ -134,6 +186,7 @@ export const focusStackNativeInputPlanSchema = z
         lensCorrectionIdentity: z.string(),
         neutralRawState: z.boolean(),
         orientationIdentity: z.string(),
+        haloSuppressionStrengthPercent: z.number().int().min(0).max(100),
       })
       .strict(),
     sources: z.array(sourceSchema).min(2).max(128),
@@ -147,6 +200,7 @@ export const focusStackNativeInputPlanSchema = z
     transforms: z.array(transformSchema).min(2).max(128),
     previews: z.array(previewSchema).max(128),
     focusEvidence: focusStackFocusEvidenceSchema.nullable(),
+    nativeBlend: nativeBlendSchema.nullable(),
   })
   .strict()
   .superRefine((plan, context) => {
@@ -161,6 +215,8 @@ export const focusStackNativeInputPlanSchema = z
       context.addIssue({ code: 'custom', message: 'accepted alignment requires a common crop and real previews' });
     if (plan.accepted !== (plan.focusEvidence !== null))
       context.addIssue({ code: 'custom', message: 'accepted plans must carry measured focus evidence' });
+    if (plan.accepted !== (plan.nativeBlend !== null))
+      context.addIssue({ code: 'custom', message: 'accepted plans must carry a native blend result' });
     for (const preview of plan.previews) {
       const transform = plan.transforms.find((candidate) => candidate.sourceIndex === preview.sourceIndex);
       const nonIdentity =
