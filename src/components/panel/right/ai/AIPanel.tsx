@@ -53,7 +53,6 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useContextMenu } from '../../../../context/ContextMenuContext';
 import { useAiMasking } from '../../../../hooks/ai/useAiMasking';
-import { useEditorActions } from '../../../../hooks/editor/useEditorActions';
 import { useManagedFocus } from '../../../../hooks/ui/useManagedFocus';
 import {
   AiProviderId,
@@ -68,7 +67,14 @@ import { useProcessStore } from '../../../../store/useProcessStore';
 import { useSettingsStore } from '../../../../store/useSettingsStore';
 import { useUIStore } from '../../../../store/useUIStore';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../../types/typography';
-import type { Adjustments, AiPatch } from '../../../../utils/adjustments';
+import type { AiPatch } from '../../../../utils/adjustments';
+import {
+  type AiEditCommand,
+  type AiEditSelection,
+  resolveAiEditSelection,
+  selectionAfterPatchDeletion,
+  selectionAfterSubMaskDeletion,
+} from '../../../../utils/aiEditSelection';
 import {
   cloneMaskLikeContainerForPaste,
   cloneSubMaskForPaste,
@@ -378,14 +384,13 @@ export function AIPanel() {
   const showOriginal = compare.isOriginalHeld || compare.mode === 'hold-original';
   const dispatchCompare = useEditorStore((s) => s.dispatchCompare);
   const setEditor = useEditorStore((s) => s.setEditor);
+  const applyAiEditCommand = useEditorStore((s) => s.applyAiEditCommand);
 
   const aiModelDownloadStatus = useProcessStore((s) => s.aiModelDownloadStatus);
   const setCustomEscapeHandler = useUIStore((s) => s.setCustomEscapeHandler);
 
-  const { setAdjustments } = useEditorActions();
   const {
     handleGenerativeReplace,
-    handleDeleteAiPatch,
     handleGenerateAiForegroundMask,
     handleGenerateAiPersonPartMask,
     handleGenerateAiWholePersonMask,
@@ -437,27 +442,6 @@ export function AIPanel() {
     },
     [setEditor],
   );
-  const selectBrushToolForNewMask = useCallback(() => {
-    setEditor((state) => ({
-      brushSettings: {
-        ...(state.brushSettings ?? { size: 50, feather: 50, tool: ToolType.Brush }),
-        tool: ToolType.Brush,
-      },
-    }));
-  }, [setEditor]);
-
-  const onSelectPatchContainer = useCallback(
-    (id: string | null) => {
-      setEditor({ activeAiPatchContainerId: id });
-    },
-    [setEditor],
-  );
-  const onSelectSubMask = useCallback(
-    (id: string | null) => {
-      setEditor({ activeAiSubMaskId: id });
-    },
-    [setEditor],
-  );
   const onDragStateChange = useCallback(
     (isDragging: boolean) => {
       setEditor({ isSliderDragging: isDragging });
@@ -470,7 +454,6 @@ export function AIPanel() {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [tempName, setTempName] = useState('');
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
-  const hasPerformedInitialSelection = useRef(false);
   const [analyzingSubMaskId, setAnalyzingSubMaskId] = useState<string | null>(null);
   const [copiedPatch, setCopiedPatch] = useState<AiPatch | null>(null);
   const [copiedSubMask, setCopiedSubMask] = useState<SubMask | null>(null);
@@ -483,6 +466,41 @@ export function AIPanel() {
   const { showContextMenu } = useContextMenu();
   const { setNodeRef: setRootDroppableRef, isOver: isRootOver } = useDroppable({ id: 'ai-list-root' });
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+  const commitAiEditCommand = useCallback(
+    (command: AiEditCommand, expandSelection = false): AiEditSelection | null => {
+      const selection = applyAiEditCommand(command);
+      if (expandSelection && selection?.containerId) {
+        const containerId = selection.containerId;
+        setExpandedContainers((previous) => {
+          if (previous.has(containerId)) return previous;
+          return new Set(previous).add(containerId);
+        });
+      }
+      return selection;
+    },
+    [applyAiEditCommand],
+  );
+
+  const selectAiEdit = useCallback(
+    (requested: AiEditSelection, expandSelection = false) => {
+      let selection: AiEditSelection = { containerId: null, subMaskId: null };
+      setEditor((state) => {
+        selection = resolveAiEditSelection(state.adjustments.aiPatches, requested);
+        return {
+          activeAiPatchContainerId: selection.containerId,
+          activeAiSubMaskId: selection.subMaskId,
+        };
+      });
+      if (expandSelection && selection.containerId) {
+        const containerId = selection.containerId;
+        setExpandedContainers((previous) =>
+          previous.has(containerId) ? previous : new Set(previous).add(containerId),
+        );
+      }
+    },
+    [setEditor],
+  );
 
   const activeContainer = adjustments.aiPatches.find((p) => p.id === activePatchContainerId);
   const activeSubMaskData = activeContainer?.subMasks.find((sm) => sm.id === activeSubMaskId);
@@ -550,59 +568,22 @@ export function AIPanel() {
   }, [isGeneratingAiMask, isAiMask, activeSubMaskId]);
 
   useEffect(() => {
-    if (activePatchContainerId) {
-      const patchExists = adjustments.aiPatches.some((p) => p.id === activePatchContainerId);
-      if (!patchExists) {
-        onSelectPatchContainer(null);
-        onSelectSubMask(null);
-      }
-    }
-  }, [adjustments.aiPatches, activePatchContainerId, onSelectPatchContainer, onSelectSubMask]);
-
-  useEffect(() => {
-    const syncTimer = setTimeout(() => {
-      if (activePatchContainerId) {
-        const shouldAutoExpand = !hasPerformedInitialSelection.current || activeSubMaskId;
-        if (shouldAutoExpand) {
-          setExpandedContainers((prev) => {
-            if (prev.has(activePatchContainerId)) return prev;
-            return new Set(prev).add(activePatchContainerId);
-          });
-        }
-        hasPerformedInitialSelection.current = true;
-      }
-    }, 0);
-
-    return () => {
-      clearTimeout(syncTimer);
-    };
-  }, [activePatchContainerId, activeSubMaskId]);
-
-  useEffect(() => {
     const handler = () => {
       if (renamingId) {
         setRenamingId(null);
         setTempName('');
-      } else if (activeSubMaskId) onSelectSubMask(null);
-      else if (activePatchContainerId) onSelectPatchContainer(null);
+      } else if (activeSubMaskId) selectAiEdit({ containerId: activePatchContainerId, subMaskId: null });
+      else if (activePatchContainerId) selectAiEdit({ containerId: null, subMaskId: null });
     };
     if (activePatchContainerId || renamingId) setCustomEscapeHandler(() => handler);
     else setCustomEscapeHandler(null);
     return () => {
       setCustomEscapeHandler(null);
     };
-  }, [
-    activePatchContainerId,
-    activeSubMaskId,
-    renamingId,
-    onSelectPatchContainer,
-    onSelectSubMask,
-    setCustomEscapeHandler,
-  ]);
+  }, [activePatchContainerId, activeSubMaskId, renamingId, selectAiEdit, setCustomEscapeHandler]);
 
   const handleDeselect = () => {
-    onSelectPatchContainer(null);
-    onSelectSubMask(null);
+    selectAiEdit({ containerId: null, subMaskId: null });
   };
 
   const handleToggleExpand = (id: string) => {
@@ -616,41 +597,44 @@ export function AIPanel() {
 
   const handleResetAllAiEdits = () => {
     if (isGeneratingAi) return;
-    handleDeselect();
-    setAdjustments((prev: Adjustments) => ({ ...prev, aiPatches: [] }));
+    commitAiEditCommand(() => ({
+      aiPatches: [],
+      selection: { containerId: null, subMaskId: null },
+    }));
+    setExpandedContainers(new Set());
   };
 
   const movePatchContainer = (id: string, direction: 'down' | 'up') => {
-    setAdjustments((prev: Adjustments) => {
-      const currentIndex = prev.aiPatches.findIndex((patch) => patch.id === id);
+    commitAiEditCommand(({ aiPatches, selection }) => {
+      const currentIndex = aiPatches.findIndex((patch) => patch.id === id);
       const targetIndex = currentIndex + (direction === 'up' ? -1 : 1);
-      const target = prev.aiPatches[targetIndex];
-      if (currentIndex < 0 || !target) return prev;
+      const target = aiPatches[targetIndex];
+      if (currentIndex < 0 || !target) return null;
 
-      const reorderedPatches = reorderMaskListContainers(prev.aiPatches, id, target.id);
-      return reorderedPatches ? { ...prev, aiPatches: reorderedPatches } : prev;
+      const reorderedPatches = reorderMaskListContainers(aiPatches, id, target.id);
+      return reorderedPatches ? { aiPatches: reorderedPatches, selection } : null;
     });
   };
 
   const moveSubMask = (containerId: string, subMaskId: string, direction: 'down' | 'up') => {
-    setAdjustments((prev: Adjustments) => {
-      const container = prev.aiPatches.find((patch) => patch.id === containerId);
-      if (!container) return prev;
+    commitAiEditCommand(({ aiPatches, selection }) => {
+      const container = aiPatches.find((patch) => patch.id === containerId);
+      if (!container) return null;
 
       const currentIndex = container.subMasks.findIndex((subMask) => subMask.id === subMaskId);
       const targetIndex = currentIndex + (direction === 'up' ? -1 : 1);
-      if (currentIndex < 0 || !container.subMasks[targetIndex]) return prev;
+      if (currentIndex < 0 || !container.subMasks[targetIndex]) return null;
 
       const reorderedSubMasks = [...container.subMasks];
       const [movedSubMask] = reorderedSubMasks.splice(currentIndex, 1);
-      if (!movedSubMask) return prev;
+      if (!movedSubMask) return null;
       reorderedSubMasks.splice(targetIndex, 0, movedSubMask);
 
       return {
-        ...prev,
-        aiPatches: prev.aiPatches.map((patch) =>
+        aiPatches: aiPatches.map((patch) =>
           patch.id === containerId ? { ...patch, subMasks: reorderedSubMasks } : patch,
         ),
+        selection,
       };
     });
   };
@@ -679,7 +663,7 @@ export function AIPanel() {
     const parameters = toMaskParameterRecord(subMask.parameters);
 
     const config = SUB_MASK_CONFIG[type];
-    if (config && config.parameters) {
+    if (config?.parameters) {
       config.parameters.forEach((param) => {
         parameters[param.key] = param.defaultValue / (param.multiplier || 1);
       });
@@ -733,11 +717,14 @@ export function AIPanel() {
       visible: true,
     };
 
-    setAdjustments((prev: Adjustments) => ({ ...prev, aiPatches: [...prev.aiPatches, newContainer] }));
-    onSelectPatchContainer(newContainer.id);
-    onSelectSubMask(subMask.id);
-    setExpandedContainers((prev) => new Set(prev).add(newContainer.id));
-    if (type === Mask.Brush) selectBrushToolForNewMask();
+    commitAiEditCommand(
+      ({ aiPatches }) => ({
+        aiPatches: [...aiPatches, newContainer],
+        selection: { containerId: newContainer.id, subMaskId: subMask.id },
+        selectBrushTool: type === Mask.Brush,
+      }),
+      true,
+    );
 
     if (type === Mask.AiForeground) void handleGenerateAiForegroundMask(subMask.id);
     else if (type === Mask.AiPerson && personPart !== undefined)
@@ -754,22 +741,23 @@ export function AIPanel() {
     const type = typeof maskTypeOrType === 'string' ? maskTypeOrType : maskTypeOrType.type;
     const personPart = typeof maskTypeOrType === 'string' ? undefined : maskTypeOrType.personPart;
     const subMask = createMaskLogic(type, mode, personPart);
-    setAdjustments((prev: Adjustments) => ({
-      ...prev,
-      aiPatches: prev.aiPatches.map((c: AiPatch) => {
-        if (c.id === containerId) {
-          const newSubMasks = [...c.subMasks];
-          if (insertIndex >= 0) newSubMasks.splice(insertIndex, 0, subMask);
-          else newSubMasks.push(subMask);
-          return { ...c, subMasks: newSubMasks };
-        }
-        return c;
-      }),
-    }));
-    onSelectPatchContainer(containerId);
-    onSelectSubMask(subMask.id);
-    setExpandedContainers((prev) => new Set(prev).add(containerId));
-    if (type === Mask.Brush) selectBrushToolForNewMask();
+    const committed = commitAiEditCommand(({ aiPatches }) => {
+      if (!aiPatches.some((container) => container.id === containerId)) return null;
+      return {
+        aiPatches: aiPatches.map((c: AiPatch) => {
+          if (c.id === containerId) {
+            const newSubMasks = [...c.subMasks];
+            if (insertIndex >= 0) newSubMasks.splice(insertIndex, 0, subMask);
+            else newSubMasks.push(subMask);
+            return { ...c, subMasks: newSubMasks };
+          }
+          return c;
+        }),
+        selection: { containerId, subMaskId: subMask.id },
+        selectBrushTool: type === Mask.Brush,
+      };
+    }, true);
+    if (!committed || committed.subMaskId !== subMask.id) return;
     if (type === Mask.AiForeground) void handleGenerateAiForegroundMask(subMask.id);
     else if (type === Mask.AiPerson && personPart !== undefined)
       void handleGenerateAiPersonPartMask(subMask.id, personPart);
@@ -830,35 +818,60 @@ export function AIPanel() {
   };
 
   const updatePatch = (id: string, data: Partial<AiPatch>) => {
-    setAdjustments((prev: Adjustments) => ({
-      ...prev,
-      aiPatches: prev.aiPatches.map((p) => (p.id === id ? { ...p, ...data } : p)),
-    }));
+    commitAiEditCommand(({ aiPatches, selection }) => {
+      if (!aiPatches.some((patch) => patch.id === id)) return null;
+      return {
+        aiPatches: aiPatches.map((p) => (p.id === id ? { ...p, ...data } : p)),
+        selection,
+      };
+    });
   };
 
   const updateSubMask = (id: string, data: Partial<SubMask>) => {
-    setAdjustments((prev: Adjustments) => ({
-      ...prev,
-      aiPatches: prev.aiPatches.map((p) => ({
-        ...p,
-        subMasks: p.subMasks.map((sm) => (sm.id === id ? { ...sm, ...data } : sm)),
-      })),
-    }));
+    commitAiEditCommand(({ aiPatches, selection }) => {
+      if (!aiPatches.some((patch) => patch.subMasks.some((subMask) => subMask.id === id))) return null;
+      return {
+        aiPatches: aiPatches.map((p) => ({
+          ...p,
+          subMasks: p.subMasks.map((sm) => (sm.id === id ? { ...sm, ...data } : sm)),
+        })),
+        selection,
+      };
+    });
   };
 
   const handleDeleteContainer = (id: string) => {
-    if (activePatchContainerId === id) handleDeselect();
-    handleDeleteAiPatch(id);
+    const committed = commitAiEditCommand(({ aiPatches, selection }) => {
+      if (!aiPatches.some((patch) => patch.id === id)) return null;
+      return {
+        aiPatches: aiPatches.filter((patch) => patch.id !== id),
+        selection: selectionAfterPatchDeletion(aiPatches, selection, id),
+      };
+    });
+    if (committed) {
+      setExpandedContainers((previous) => {
+        if (!previous.has(id)) return previous;
+        const next = new Set(previous);
+        next.delete(id);
+        return next;
+      });
+    }
   };
 
   const handleDeleteSubMask = (containerId: string, subMaskId: string) => {
-    if (activeSubMaskId === subMaskId) onSelectSubMask(null);
-    setAdjustments((prev: Adjustments) => ({
-      ...prev,
-      aiPatches: prev.aiPatches.map((p) =>
-        p.id === containerId ? { ...p, subMasks: p.subMasks.filter((sm) => sm.id !== subMaskId) } : p,
-      ),
-    }));
+    const nextSelection = commitAiEditCommand(({ aiPatches, selection }) => {
+      const container = aiPatches.find((patch) => patch.id === containerId);
+      if (!container?.subMasks.some((subMask) => subMask.id === subMaskId)) return null;
+      return {
+        aiPatches: aiPatches.map((p) =>
+          p.id === containerId ? { ...p, subMasks: p.subMasks.filter((sm) => sm.id !== subMaskId) } : p,
+        ),
+        selection: selectionAfterSubMaskDeletion(aiPatches, selection, containerId, subMaskId),
+      };
+    });
+    if (nextSelection?.subMaskId) {
+      setExpandedContainers((previous) => (previous.has(containerId) ? previous : new Set(previous).add(containerId)));
+    }
   };
 
   const clonePatchData = (container: AiPatch, options: { invert?: boolean; rename?: boolean } = {}): AiPatch =>
@@ -886,30 +899,29 @@ export function AIPanel() {
   };
 
   const insertPatchContainer = (container: AiPatch, insertIndex?: number) => {
-    setAdjustments((prev: Adjustments) => {
-      return { ...prev, aiPatches: insertMaskLikeContainerAt(prev.aiPatches, container, insertIndex) };
-    });
-
-    onSelectPatchContainer(container.id);
-    onSelectSubMask(null);
-    setExpandedContainers((prev) => new Set(prev).add(container.id));
+    commitAiEditCommand(
+      ({ aiPatches }) => ({
+        aiPatches: insertMaskLikeContainerAt(aiPatches, container, insertIndex),
+        selection: { containerId: container.id, subMaskId: null },
+      }),
+      true,
+    );
   };
 
   const insertSubMaskIntoContainer = (containerId: string, subMask: SubMask, insertIndex?: number) => {
-    setAdjustments((prev: Adjustments) => ({
-      ...prev,
-      aiPatches: prev.aiPatches.map((container) => {
-        if (container.id !== containerId) {
-          return container;
-        }
+    commitAiEditCommand(({ aiPatches }) => {
+      if (!aiPatches.some((candidate) => candidate.id === containerId)) return null;
+      return {
+        aiPatches: aiPatches.map((container) => {
+          if (container.id !== containerId) {
+            return container;
+          }
 
-        return { ...container, subMasks: insertSubMaskAt(container.subMasks, subMask, insertIndex) };
-      }),
-    }));
-
-    onSelectPatchContainer(containerId);
-    onSelectSubMask(subMask.id);
-    setExpandedContainers((prev) => new Set(prev).add(containerId));
+          return { ...container, subMasks: insertSubMaskAt(container.subMasks, subMask, insertIndex) };
+        }),
+        selection: { containerId, subMaskId: subMask.id },
+      };
+    }, true);
   };
 
   const clipboardActions = createMaskLikeClipboardActions({
@@ -1005,22 +1017,19 @@ export function AIPanel() {
       const overId = over?.id;
       if (!overId || active.id === overId) return;
 
-      setAdjustments((prev: Adjustments) => {
+      commitAiEditCommand(({ aiPatches, selection }) => {
         const draggedItem = dragData.item;
-        if (!draggedItem) return prev;
+        if (!draggedItem || !aiPatches.some((patch) => patch.id === draggedItem.id)) return null;
 
         let newIndex = -1;
 
-        if (overId === 'ai-list-root') newIndex = prev.aiPatches.length - 1;
-        else if (overData?.type === 'Container') newIndex = prev.aiPatches.findIndex((p) => p.id === overId);
-        else if (overData?.type === 'SubMask') newIndex = prev.aiPatches.findIndex((p) => p.id === overData.parentId);
+        if (overId === 'ai-list-root') newIndex = aiPatches.length - 1;
+        else if (overData?.type === 'Container') newIndex = aiPatches.findIndex((p) => p.id === overId);
+        else if (overData?.type === 'SubMask') newIndex = aiPatches.findIndex((p) => p.id === overData.parentId);
+        if (newIndex < 0) return null;
 
-        const reorderedPatches = reorderMaskListContainers(
-          prev.aiPatches,
-          draggedItem.id,
-          prev.aiPatches[newIndex]?.id ?? '',
-        );
-        return reorderedPatches ? { ...prev, aiPatches: reorderedPatches } : prev;
+        const reorderedPatches = reorderMaskListContainers(aiPatches, draggedItem.id, aiPatches[newIndex]?.id ?? '');
+        return reorderedPatches ? { aiPatches: reorderedPatches, selection } : null;
       });
       return;
     }
@@ -1030,12 +1039,12 @@ export function AIPanel() {
       if (!sourceContainerId) return;
 
       if (over?.id === 'ai-list-root' || !over) {
-        setAdjustments((prev: Adjustments) => {
+        commitAiEditCommand(({ aiPatches }) => {
           const draggedItem = dragData.item;
-          if (!draggedItem) return prev;
+          if (!draggedItem) return null;
 
           const result = splitSubMaskToContainer(
-            prev.aiPatches,
+            aiPatches,
             sourceContainerId,
             draggedItem.id,
             (movedSubMask, count) => ({
@@ -1049,17 +1058,14 @@ export function AIPanel() {
               visible: true,
             }),
           );
-          if (!result) return prev;
+          if (!result) return null;
 
           const { container: newContainer, containers: newPatches, subMask: movedSubMask } = result;
-
-          setTimeout(() => {
-            onSelectPatchContainer(newContainer.id);
-            onSelectSubMask(movedSubMask.id);
-            setExpandedContainers((p) => new Set(p).add(newContainer.id));
-          }, 0);
-          return { ...prev, aiPatches: newPatches };
-        });
+          return {
+            aiPatches: newPatches,
+            selection: { containerId: newContainer.id, subMaskId: movedSubMask.id },
+          };
+        }, true);
         return;
       }
 
@@ -1069,24 +1075,29 @@ export function AIPanel() {
 
       if (targetContainerId) {
         const expandedTargetContainerId = targetContainerId;
-        setAdjustments((prev: Adjustments) => {
+        const committed = commitAiEditCommand(({ aiPatches, selection }) => {
           const draggedItem = dragData.item;
-          if (!draggedItem) return prev;
+          if (!draggedItem) return null;
 
           const newPatches = moveSubMaskBetweenContainers(
-            prev.aiPatches,
+            aiPatches,
             sourceContainerId,
             expandedTargetContainerId,
             draggedItem.id,
             overData?.type === 'SubMask' ? String(over.id) : undefined,
           );
-          if (!newPatches) return prev;
-
-          if (sourceContainerId !== targetContainerId) {
-            setExpandedContainers((p) => new Set(p).add(expandedTargetContainerId));
-          }
-          return { ...prev, aiPatches: newPatches };
+          if (!newPatches) return null;
+          const movedSelection =
+            selection.subMaskId === draggedItem.id
+              ? { containerId: expandedTargetContainerId, subMaskId: draggedItem.id }
+              : selection;
+          return { aiPatches: newPatches, selection: movedSelection };
         });
+        if (committed?.containerId === expandedTargetContainerId && committed.subMaskId === dragData.item?.id) {
+          setExpandedContainers((previous) =>
+            previous.has(expandedTargetContainerId) ? previous : new Set(previous).add(expandedTargetContainerId),
+          );
+        }
       }
     }
   };
@@ -1255,11 +1266,11 @@ export function AIPanel() {
                                 moveSubMask(container.id, subMaskId, direction);
                               }}
                               onSelect={() => {
-                                onSelectPatchContainer(container.id);
-                                onSelectSubMask(null);
+                                selectAiEdit({ containerId: container.id, subMaskId: null });
                               }}
-                              onSelectContainer={onSelectPatchContainer}
-                              onSelectSubMask={onSelectSubMask}
+                              onSelectAiEdit={(subMaskId) => {
+                                selectAiEdit({ containerId: container.id, subMaskId }, subMaskId !== null);
+                              }}
                               onToggle={() => {
                                 handleToggleExpand(container.id);
                               }}
@@ -1335,8 +1346,7 @@ export function AIPanel() {
                   container={reviewContainer}
                   isShowingOriginal={showOriginal}
                   onSelect={(id) => {
-                    onSelectPatchContainer(id);
-                    onSelectSubMask(null);
+                    selectAiEdit({ containerId: id, subMaskId: null });
                   }}
                   onToggleOriginal={() => {
                     dispatchCompare({ type: 'toggle-original' });
@@ -1681,8 +1691,7 @@ interface ContainerRowProps {
   onMove: (direction: 'down' | 'up') => void;
   onMoveSubMask: (subMaskId: string, direction: 'down' | 'up') => void;
   onSelect: () => void;
-  onSelectContainer: (id: string | null) => void;
-  onSelectSubMask: (id: string | null) => void;
+  onSelectAiEdit: (subMaskId: string | null) => void;
   onToggle: () => void;
   position: number;
   renamingId: string | null;
@@ -1714,8 +1723,7 @@ function ContainerRow({
   copiedPatch,
   activeDragItem,
   activeSubMaskId,
-  onSelectContainer,
-  onSelectSubMask,
+  onSelectAiEdit,
   updateSubMask,
   handleDeleteSubMask,
   handleDuplicateSubMask,
@@ -1857,6 +1865,7 @@ function ContainerRow({
           borderClass,
         )}
         data-inpaint-edit-state={container.isLoading ? 'generating' : container.patchData ? 'generated' : 'ready'}
+        data-testid={`inpaint-edit-${container.id}`}
         onClick={(e) => {
           e.stopPropagation();
           onSelect();
@@ -2004,8 +2013,7 @@ function ContainerRow({
                   parentVisible={container.visible}
                   activeDragItem={activeDragItem}
                   onSelect={() => {
-                    onSelectContainer(container.id);
-                    onSelectSubMask(subMask.id);
+                    onSelectAiEdit(subMask.id);
                   }}
                   onMove={(direction) => {
                     onMoveSubMask(subMask.id, direction);
@@ -2206,6 +2214,7 @@ function SubMaskRow({
         total: totalCount,
       })}
       aria-pressed={isActive}
+      data-testid={`inpaint-target-${subMask.id}`}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       className={cx(
