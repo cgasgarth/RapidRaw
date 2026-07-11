@@ -20,7 +20,7 @@ import {
   hashBasicTonePreviewPixels,
   renderBasicTonePreviewPixels,
 } from '../session/agentLiveBasicTone';
-import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorState';
+import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorCoreState';
 
 export const AGENT_TONE_ADJUSTMENT_APPLY_TOOL_NAME = 'rawengine.agent.tone_adjustment.apply';
 export const AGENT_TONE_ADJUSTMENT_DRY_RUN_TOOL_NAME = 'rawengine.agent.tone_adjustment.dry_run';

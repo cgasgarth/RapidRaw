@@ -16,7 +16,7 @@ import type { Adjustments, Coord, Curves, ParametricCurve, ParametricCurveSettin
 import { ActiveChannel, getDefaultParametricCurve } from '../../adjustments';
 import { pushEditHistoryEntry } from '../../editHistory';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
-import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorState';
+import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorCoreState';
 
 export const AGENT_CURVE_LEVELS_APPLY_TOOL_NAME = 'rawengine.agent.curve_levels.apply';
 export const AGENT_CURVE_LEVELS_APPLY_INPUT_SCHEMA_NAME = 'AgentCurveLevelsApplyRequestV1';
