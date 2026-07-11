@@ -62,8 +62,6 @@ const SAFE_TOOLING_FILES = new Set([
   'src/i18n/update_translations.py',
 ]);
 
-const SAFE_FRONTEND_BENCHMARK_FILES = new Set(['tests/benchmarks/library-query.bench.ts']);
-
 const SAFE_FRONTEND_EXTENSIONS = new Set([
   '.css',
   '.d.ts',
@@ -356,6 +354,10 @@ function isSafePureTestPath(path) {
   return path.startsWith('tests/pure-ts/') && hasExtension(path, SAFE_PURE_TEST_EXTENSIONS);
 }
 
+function isSafeFrontendBenchmarkPath(path) {
+  return path.startsWith('tests/benchmarks/') && hasExtension(path, SAFE_PURE_TEST_EXTENSIONS);
+}
+
 function isSafeFixturePath(path) {
   return (
     (path.startsWith('fixtures/color/') && path.endsWith('.json')) ||
@@ -470,11 +472,11 @@ function classifyPathChange(change) {
   if (
     SAFE_ROOT_FILES.has(path) ||
     SAFE_TOOLING_FILES.has(path) ||
-    SAFE_FRONTEND_BENCHMARK_FILES.has(path) ||
     isMarkdown(path) ||
     path.startsWith('docs/') ||
     isSafeCodexConfig(path) ||
     isSafeFixturePath(path) ||
+    isSafeFrontendBenchmarkPath(path) ||
     isSafePureTestPath(path) ||
     isSafeSchemaPackagePath(path) ||
     isSafeValidationScript(path) ||
@@ -1092,9 +1094,14 @@ function runSelfTest() {
     SMOKE_MODES.NONE,
   );
   assertClassification(
-    'frontend-only library query benchmark can skip smoke',
-    ['tests/benchmarks/library-query.bench.ts'],
+    'frontend-only benchmarks can skip smoke',
+    ['tests/benchmarks/library-query.bench.ts', 'tests/benchmarks/nested/search.fixture.tsx'],
     SMOKE_MODES.NONE,
+  );
+  assertDecision(
+    'unknown benchmark extensions still fail closed',
+    ['tests/benchmarks/native-smoke.sh'],
+    SMOKE_DECISIONS.FAIL_CLOSED,
   );
   assertClassification('script policy metadata can skip smoke', ['scripts/tsconfig.json'], SMOKE_MODES.NONE);
   assertClassification('docs can skip smoke', ['RAW_EDITOR_PLAN.md', 'docs/validation.md'], SMOKE_MODES.NONE);
