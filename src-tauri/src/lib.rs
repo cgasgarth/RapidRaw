@@ -254,14 +254,17 @@ fn compute_full_transformed_res(
 }
 
 pub fn get_or_load_lut(state: &tauri::State<AppState>, path: &str) -> Result<Arc<Lut>, String> {
-    let mut cache = state.lut_cache.lock().unwrap();
-    if let Some(lut) = cache.get(path) {
-        return Ok(lut.clone());
+    if let Some(lut) = state.lut_cache.get(&path.to_string()) {
+        return Ok(lut);
     }
 
     let lut = lut_processing::parse_lut_file(path).map_err(|e| e.to_string())?;
     let arc_lut = Arc::new(lut);
-    cache.insert(path.to_string(), arc_lut.clone());
+    state.lut_cache.insert(
+        path.to_string(),
+        arc_lut.clone(),
+        (arc_lut.data.capacity() * std::mem::size_of::<f32>()) as u64,
+    );
     Ok(arc_lut)
 }
 
@@ -555,15 +558,16 @@ fn generate_export_soft_proof_preview(
     if let Some(graph_revision) = request.viewer_sample_graph_revision.as_deref()
         && let Some(proof_image) = RgbImage::from_raw(width, height, proof_pixels.clone())
     {
-        state.viewer_sample_frames.lock().unwrap().insert(
-            "softProof".to_string(),
-            CachedViewerSampleFrame {
-                graph_revision: graph_revision.to_string(),
-                image: Arc::new(DynamicImage::ImageRgb8(proof_image)),
-                image_identity: loaded_image.path.clone(),
-                space_label: format!("Soft proof · {}", proof_metadata.effective_color_profile),
-            },
-        );
+        let frame = CachedViewerSampleFrame {
+            graph_revision: graph_revision.to_string(),
+            image: Arc::new(DynamicImage::ImageRgb8(proof_image)),
+            image_identity: loaded_image.path.clone(),
+            space_label: format!("Soft proof · {}", proof_metadata.effective_color_profile),
+        };
+        let weight = frame.image.as_bytes().len() as u64;
+        state
+            .viewer_sample_frames
+            .insert("softProof".to_string(), Arc::new(frame), weight);
     }
 
     let proof_image =
@@ -900,15 +904,16 @@ fn generate_original_transformed_preview(
     };
 
     if let Some(graph_revision) = viewer_sample_graph_revision {
-        state.viewer_sample_frames.lock().unwrap().insert(
-            "original".to_string(),
-            CachedViewerSampleFrame {
-                graph_revision,
-                image: Arc::new(transformed_image.clone()),
-                image_identity: loaded_image.path,
-                space_label: "Original · Display encoded sRGB".to_string(),
-            },
-        );
+        let frame = CachedViewerSampleFrame {
+            graph_revision,
+            image: Arc::new(transformed_image.clone()),
+            image_identity: loaded_image.path,
+            space_label: "Original · Display encoded sRGB".to_string(),
+        };
+        let weight = frame.image.as_bytes().len() as u64;
+        state
+            .viewer_sample_frames
+            .insert("original".to_string(), Arc::new(frame), weight);
     }
 
     encode_jpeg_data_url(&transformed_image, 80)
@@ -1036,8 +1041,7 @@ fn sample_viewer_pixel(
     state: tauri::State<AppState>,
 ) -> serde_json::Value {
     let _geometry_epoch = request.geometry_epoch;
-    let frames = state.viewer_sample_frames.lock().unwrap();
-    let Some(frame) = frames.get(&request.target) else {
+    let Some(frame) = state.viewer_sample_frames.get(&request.target) else {
         return unavailable_viewer_sample(&request, "frameUnavailable", "Unavailable");
     };
     if frame.image_identity != request.image_identity
@@ -1045,7 +1049,7 @@ fn sample_viewer_pixel(
     {
         return unavailable_viewer_sample(&request, "staleFrame", &frame.space_label);
     }
-    sample_viewer_frame(&request, frame)
+    sample_viewer_frame(&request, frame.as_ref())
 }
 
 #[cfg(test)]
@@ -1134,15 +1138,10 @@ async fn preview_geometry_transform(
     let visual_hash = calculate_visual_hash(&loaded_image_path, &js_adjustments);
 
     let base_image_to_warp = {
-        let maybe_cached_image = state
-            .geometry_cache
-            .lock()
-            .unwrap()
-            .get(&visual_hash)
-            .cloned();
+        let maybe_cached_image = state.geometry_cache.get(&visual_hash);
 
         if let Some(cached_image) = maybe_cached_image {
-            cached_image
+            cached_image.as_ref().clone()
         } else {
             let context = get_or_init_gpu_context(&state, &app_handle)?;
 
@@ -2308,8 +2307,12 @@ async fn load_and_parse_lut(
     let lut = lut_processing::parse_lut_file(&path).map_err(|e| e.to_string())?;
     let lut_size = lut.size;
 
-    let mut cache = state.lut_cache.lock().unwrap();
-    cache.insert(path, Arc::new(lut));
+    let lut = Arc::new(lut);
+    state.lut_cache.insert(
+        path,
+        Arc::clone(&lut),
+        (lut.data.capacity() * std::mem::size_of::<f32>()) as u64,
+    );
 
     Ok(LutParseResult { size: lut_size })
 }

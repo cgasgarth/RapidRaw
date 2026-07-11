@@ -1,5 +1,6 @@
 use crate::AppState;
 use crate::raw_processing::RawDevelopmentReport;
+use crate::render::native_cache::{CacheBudgetCoordinator, CachePolicy, MemoryLruCache};
 use crate::render_caches::RenderCaches;
 use crate::source_revision::{DecodedImageKey, SourceRevision};
 use image::DynamicImage;
@@ -10,17 +11,17 @@ use std::sync::Arc;
 
 use crate::adjustment_fields;
 
-type DecodedImageCacheEntry = (
-    DecodedImageKey,
-    Arc<DynamicImage>,
-    HashMap<String, String>,
-    Option<RawDevelopmentReport>,
-);
 type DecodedImageCacheValue = (
     Arc<DynamicImage>,
-    HashMap<String, String>,
-    Option<RawDevelopmentReport>,
+    Arc<HashMap<String, String>>,
+    Option<Arc<RawDevelopmentReport>>,
 );
+
+pub struct DecodedImageEntry {
+    pub image: Arc<DynamicImage>,
+    pub exif: Arc<HashMap<String, String>>,
+    pub raw_report: Option<Arc<RawDevelopmentReport>>,
+}
 
 pub fn calculate_geometry_hash(adjustments: &serde_json::Value) -> u64 {
     let mut hasher = DefaultHasher::new();
@@ -216,67 +217,85 @@ mod tests {
 }
 
 pub struct DecodedImageCache {
-    capacity: usize,
-    items: Vec<DecodedImageCacheEntry>,
+    cache: MemoryLruCache<DecodedImageKey, DecodedImageEntry>,
 }
 
 impl DecodedImageCache {
-    pub fn new(capacity: usize) -> Self {
+    pub fn new(capacity: usize, coordinator: Arc<CacheBudgetCoordinator>) -> Self {
+        let mib = 1024 * 1024;
+        let hard = (capacity.max(1) as u64) * 160 * mib;
         Self {
-            capacity,
-            items: Vec::with_capacity(capacity),
+            cache: MemoryLruCache::new(
+                CachePolicy {
+                    name: "decoded",
+                    soft_limit_bytes: hard * 3 / 4,
+                    hard_limit_bytes: hard,
+                    max_entries: Some(capacity.max(1)),
+                },
+                coordinator,
+            ),
         }
     }
 
-    pub fn set_capacity(&mut self, capacity: usize) {
-        self.capacity = capacity;
-        while self.items.len() > self.capacity {
-            self.items.remove(0);
-        }
+    pub fn set_capacity(&self, capacity: usize) {
+        self.cache
+            .trim_to(capacity.max(1) as u64 * 120 * 1024 * 1024);
     }
 
-    pub(crate) fn get(&mut self, key: &DecodedImageKey) -> Option<DecodedImageCacheValue> {
-        if let Some(pos) = self
-            .items
-            .iter()
-            .position(|(candidate, _, _, _)| candidate == key)
-        {
-            let item = self.items.remove(pos);
-            let result = (item.1.clone(), item.2.clone(), item.3.clone());
-            self.items.push(item);
-            Some(result)
-        } else {
-            None
-        }
+    pub(crate) fn get(&self, key: &DecodedImageKey) -> Option<DecodedImageCacheValue> {
+        self.cache.get(key).map(|entry| {
+            (
+                Arc::clone(&entry.image),
+                Arc::clone(&entry.exif),
+                entry.raw_report.clone(),
+            )
+        })
     }
 
-    pub fn clear(&mut self) {
-        self.items.clear();
+    pub fn clear(&self) {
+        self.cache.clear();
+    }
+    pub fn stats(&self) -> crate::render::native_cache::CacheStats {
+        self.cache.stats()
     }
 
     pub(crate) fn insert(
-        &mut self,
+        &self,
         key: DecodedImageKey,
         image: Arc<DynamicImage>,
         exif: HashMap<String, String>,
         raw_development_report: Option<RawDevelopmentReport>,
     ) {
-        if let Some(pos) = self
-            .items
-            .iter()
-            .position(|(candidate, _, _, _)| *candidate == key)
-        {
-            self.items.remove(pos);
-        } else if self.items.len() >= self.capacity {
-            self.items.remove(0);
-        }
-        self.items.push((key, image, exif, raw_development_report));
+        let exif = Arc::new(exif);
+        let raw_report = raw_development_report.map(Arc::new);
+        let weight = image.as_bytes().len() as u64
+            + exif
+                .iter()
+                .map(|(k, v)| k.capacity() + v.capacity())
+                .sum::<usize>() as u64
+            + raw_report
+                .as_ref()
+                .map_or(0, |_| std::mem::size_of::<RawDevelopmentReport>() as u64);
+        self.cache.insert(
+            key,
+            Arc::new(DecodedImageEntry {
+                image,
+                exif,
+                raw_report,
+            }),
+            weight,
+        );
     }
 
     pub(crate) fn contains_revision(&self, revision: &SourceRevision) -> bool {
-        self.items
-            .iter()
-            .any(|(key, _, _, _)| &key.source_revision == revision)
+        let mut found = false;
+        self.cache.retain(|key, _| {
+            if &key.source_revision == revision {
+                found = true;
+            }
+            true
+        });
+        found
     }
 }
 
