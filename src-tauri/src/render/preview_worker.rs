@@ -1,6 +1,5 @@
 use std::borrow::Cow;
 use std::sync::Arc;
-use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
 
 use image::{DynamicImage, GenericImageView, ImageBuffer, Luma, RgbaImage};
@@ -11,9 +10,7 @@ use tauri::{Emitter, Manager};
 
 use crate::adjustment_utils::hydrate_adjustments;
 use crate::app_settings::load_preview_runtime_settings_or_default;
-use crate::app_state::{
-    AnalyticsConfig, AppState, CachedPreview, CachedViewerSampleFrame, PreviewJob,
-};
+use crate::app_state::{AnalyticsConfig, AppState, CachedPreview, CachedViewerSampleFrame};
 use crate::cache_utils::{calculate_full_job_hash, calculate_transform_hash};
 use crate::film_look_render::normalize_film_look_adjustments_for_render;
 use crate::generate_transformed_preview;
@@ -23,6 +20,10 @@ use crate::image_processing::{
 };
 use crate::lut_processing::Lut;
 use crate::mask_generation::{MaskDefinition, get_cached_or_generate_mask};
+use crate::preview_scheduler::{
+    PreviewAbort, PreviewCancellation, PreviewCompletion, PreviewScheduler,
+    PreviewSchedulingPolicy, PreviewStage,
+};
 use crate::{get_or_load_lut, render_caches, render_pipeline};
 
 pub(crate) struct PreviewJobConfig<'a> {
@@ -36,6 +37,44 @@ pub(crate) struct PreviewJobConfig<'a> {
     pub(crate) compute_waveform: bool,
     pub(crate) active_waveform_channel: Option<&'a str>,
     pub(crate) viewer_sample_graph_revision: Option<&'a str>,
+    pub(crate) cancellation: Option<&'a PreviewCancellation>,
+}
+
+fn cancellation_checkpoint(
+    cancellation: Option<&PreviewCancellation>,
+    stage: PreviewStage,
+) -> Result<(), String> {
+    cancellation
+        .map(|handle| handle.check(stage).map_err(format_preview_abort))
+        .unwrap_or(Ok(()))
+}
+
+fn format_preview_abort(abort: PreviewAbort) -> String {
+    match abort {
+        PreviewAbort::Superseded {
+            by_generation,
+            stage,
+        } => {
+            format!("preview_superseded:{by_generation}:{stage:?}")
+        }
+        PreviewAbort::Cancelled { stage } => format!("preview_cancelled:{stage:?}"),
+    }
+}
+
+fn abort_stage(message: &str) -> PreviewStage {
+    [
+        PreviewStage::Source,
+        PreviewStage::Geometry,
+        PreviewStage::Masks,
+        PreviewStage::CpuDetail,
+        PreviewStage::Gpu,
+        PreviewStage::Readback,
+        PreviewStage::Encode,
+        PreviewStage::Publish,
+    ]
+    .into_iter()
+    .find(|stage| message.ends_with(&format!("{stage:?}")))
+    .unwrap_or(PreviewStage::Queued)
 }
 
 pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8>, String> {
@@ -50,11 +89,14 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         compute_waveform,
         active_waveform_channel,
         viewer_sample_graph_revision,
+        cancellation,
     } = config;
 
     let fn_start = std::time::Instant::now();
+    cancellation_checkpoint(cancellation, PreviewStage::Source)?;
     let context = get_or_init_gpu_context(&state, app_handle)?;
     hydrate_adjustments(&state, &mut adjustments_json);
+    cancellation_checkpoint(cancellation, PreviewStage::Source)?;
 
     let loaded_image_guard = state.original_image.lock().unwrap();
     let loaded_image = loaded_image_guard
@@ -73,6 +115,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
             plan.plan_hash
         );
     }
+    cancellation_checkpoint(cancellation, PreviewStage::Geometry)?;
     let adjustments_clone = adjustments_json;
 
     let new_transform_hash = calculate_transform_hash(&adjustments_clone);
@@ -90,18 +133,18 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         _ => (if has_roi { 1.4_f32 } else { 1.0_f32 }, 75_u8),
     };
 
-    let mut cached_preview_lock = state.cached_preview.lock().unwrap();
+    let cached_preview = state.cached_preview.lock().unwrap().clone();
 
-    let base_valid = cached_preview_lock
+    let base_valid = cached_preview
         .as_ref()
         .is_some_and(|c| c.transform_hash == new_transform_hash && c.preview_dim == preview_dim);
     let small_valid = base_valid
-        && cached_preview_lock
+        && cached_preview
             .as_ref()
             .is_some_and(|c| c.interactive_divisor == interactive_divisor);
 
     let (final_preview_base, scale_for_gpu, unscaled_crop_offset) = if base_valid {
-        let cached = cached_preview_lock.as_ref().unwrap();
+        let cached = cached_preview.as_ref().unwrap();
         (
             Arc::clone(&cached.image),
             cached.scale,
@@ -113,9 +156,10 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
             generate_transformed_preview(&state, &loaded_image, &adjustments_clone, preview_dim)?;
         (Arc::new(base), scale, offset)
     };
+    cancellation_checkpoint(cancellation, PreviewStage::Geometry)?;
 
     let small_preview_base = if small_valid {
-        Arc::clone(&cached_preview_lock.as_ref().unwrap().small_image)
+        Arc::clone(&cached_preview.as_ref().unwrap().small_image)
     } else {
         let small = if interactive_divisor > 1.0 {
             let target_size = (preview_dim as f32 / interactive_divisor) as u32;
@@ -139,26 +183,18 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         small
     };
 
-    *cached_preview_lock = Some(CachedPreview {
-        image: Arc::clone(&final_preview_base),
-        small_image: Arc::clone(&small_preview_base),
-        transform_hash: new_transform_hash,
-        scale: scale_for_gpu,
-        unscaled_crop_offset,
-        preview_dim,
-        interactive_divisor,
-    });
-
-    drop(cached_preview_lock);
-
     let (processing_image, effective_scale, jpeg_quality) = if is_interactive {
         let orig_w = final_preview_base.width() as f32;
         let small_w = small_preview_base.width() as f32;
         let scale_factor = if orig_w > 0.0 { small_w / orig_w } else { 1.0 };
         let new_scale = scale_for_gpu * scale_factor;
-        (small_preview_base, new_scale, interactive_quality)
+        (
+            Arc::clone(&small_preview_base),
+            new_scale,
+            interactive_quality,
+        )
     } else {
-        (final_preview_base, scale_for_gpu, 94)
+        (Arc::clone(&final_preview_base), scale_for_gpu, 94)
     };
 
     let pre_gpu_detail_stage = render_pipeline::apply_pre_gpu_detail_stages(
@@ -166,6 +202,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         new_transform_hash,
         &adjustments_clone,
     );
+    cancellation_checkpoint(cancellation, PreviewStage::CpuDetail)?;
     let processing_image_ref = pre_gpu_detail_stage.image.as_ref();
 
     let (preview_width, preview_height) = processing_image_ref.dimensions();
@@ -190,26 +227,30 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         unscaled_crop_offset.1 * effective_scale,
     );
 
-    let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
-        .iter()
-        .filter_map(|def| {
-            get_cached_or_generate_mask(
-                &state,
-                def,
-                preview_width,
-                preview_height,
-                effective_scale,
-                scaled_crop_offset,
-                &adjustments_clone,
-            )
-        })
-        .collect();
+    let mut mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> =
+        Vec::with_capacity(mask_definitions.len());
+    for def in &mask_definitions {
+        cancellation_checkpoint(cancellation, PreviewStage::Masks)?;
+        if let Some(mask) = get_cached_or_generate_mask(
+            &state,
+            def,
+            preview_width,
+            preview_height,
+            effective_scale,
+            scaled_crop_offset,
+            &adjustments_clone,
+        ) {
+            mask_bitmaps.push(mask);
+        }
+    }
 
+    cancellation_checkpoint(cancellation, PreviewStage::CpuDetail)?;
     let retouched_processing_image = crate::retouch_render::apply_clone_retouch_layers(
         processing_image_ref,
         &adjustments_clone,
         &mask_bitmaps,
     );
+    cancellation_checkpoint(cancellation, PreviewStage::Gpu)?;
 
     let is_raw = loaded_image.is_raw;
     let render_adjustments = normalize_film_look_adjustments_for_render(&adjustments_clone);
@@ -271,13 +312,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
             return Err("Processing failed".to_string());
         }
     };
-
-    if !is_interactive && let Some(graph_revision) = viewer_sample_graph_revision {
-        state.viewer_sample_frames.lock().unwrap().insert(
-            "edited".to_string(),
-            settled_viewer_sample_frame(&final_processed_image, graph_revision, &loaded_image.path),
-        );
-    }
+    cancellation_checkpoint(cancellation, PreviewStage::Readback)?;
 
     if use_wgpu_renderer {
         let _ = context.device.poll(wgpu::PollType::Wait {
@@ -291,7 +326,8 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         return Ok(b"WGPU_RENDER".to_vec());
     }
 
-    encode_preview_response(
+    cancellation_checkpoint(cancellation, PreviewStage::Encode)?;
+    let bytes = encode_preview_response(
         Some(app_handle),
         final_processed_image.as_ref(),
         is_interactive,
@@ -300,7 +336,24 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         preview_height,
         jpeg_quality,
         fn_start,
-    )
+    )?;
+    cancellation_checkpoint(cancellation, PreviewStage::Publish)?;
+    *state.cached_preview.lock().unwrap() = Some(CachedPreview {
+        image: Arc::clone(&final_preview_base),
+        small_image: Arc::clone(&small_preview_base),
+        transform_hash: new_transform_hash,
+        scale: scale_for_gpu,
+        unscaled_crop_offset,
+        preview_dim,
+        interactive_divisor,
+    });
+    if !is_interactive && let Some(graph_revision) = viewer_sample_graph_revision {
+        state.viewer_sample_frames.lock().unwrap().insert(
+            "edited".to_string(),
+            settled_viewer_sample_frame(&final_processed_image, graph_revision, &loaded_image.path),
+        );
+    }
+    Ok(bytes)
 }
 
 fn settled_viewer_sample_frame(
@@ -498,37 +551,70 @@ fn to_display_preview_rgba8(_app: &tauri::AppHandle, image: &DynamicImage) -> Rg
 
 pub(crate) fn start_preview_worker(app_handle: tauri::AppHandle) {
     let state = app_handle.state::<AppState>();
-    let (tx, rx): (Sender<PreviewJob>, Receiver<PreviewJob>) = mpsc::channel();
-
-    *state.preview_worker_tx.lock().unwrap() = Some(tx);
+    let scheduler = PreviewScheduler::new(PreviewSchedulingPolicy::default());
+    *state.preview_scheduler.lock().unwrap() = Some(Arc::clone(&scheduler));
 
     thread::spawn(move || {
-        while let Ok(mut job) = rx.recv() {
-            while let Ok(latest_job) = rx.try_recv() {
-                job = latest_job;
-            }
-
+        while let Some(request) = scheduler.next() {
+            let id = request.id;
+            let quality = request.quality;
+            let queued_for = request.submitted_at.elapsed();
+            let cancellation = scheduler.cancellation(id);
+            let job = request.job;
             let state = app_handle.state::<AppState>();
             let responder = job.responder;
-            match process_preview_job(PreviewJobConfig {
-                app_handle: &app_handle,
-                state,
-                adjustments_json: job.adjustments,
-                expected_image_path: &job.expected_image_path,
-                is_interactive: job.is_interactive,
-                target_resolution: job.target_resolution,
-                roi: job.roi,
-                compute_waveform: job.compute_waveform,
-                active_waveform_channel: job.active_waveform_channel.as_deref(),
-                viewer_sample_graph_revision: job.viewer_sample_graph_revision.as_deref(),
-            }) {
-                Ok(bytes) => {
-                    let _ = responder.send(bytes);
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                process_preview_job(PreviewJobConfig {
+                    app_handle: &app_handle,
+                    state,
+                    adjustments_json: (*job.adjustments).clone(),
+                    expected_image_path: &job.expected_image_path,
+                    is_interactive: job.is_interactive,
+                    target_resolution: job.target_resolution,
+                    roi: job.roi,
+                    compute_waveform: job.compute_waveform,
+                    active_waveform_channel: job.active_waveform_channel.as_deref(),
+                    viewer_sample_graph_revision: job.viewer_sample_graph_revision.as_deref(),
+                    cancellation: Some(&cancellation),
+                })
+            }));
+            let completion = match result {
+                Ok(Ok(bytes)) => PreviewCompletion::Rendered { bytes, id },
+                Ok(Err(message)) if message.starts_with("preview_superseded") => {
+                    let by_generation = message
+                        .split(':')
+                        .nth(1)
+                        .and_then(|value| value.parse().ok())
+                        .unwrap_or_else(|| id.generation.saturating_add(1));
+                    PreviewCompletion::Superseded {
+                        by_generation,
+                        stage: abort_stage(&message),
+                    }
                 }
-                Err(e) => {
-                    log::error!("Preview worker error: {}", e);
+                Ok(Err(message)) if message.starts_with("preview_cancelled") => {
+                    PreviewCompletion::Cancelled {
+                        stage: abort_stage(&message),
+                    }
                 }
-            }
+                Ok(Err(message)) => PreviewCompletion::Failed {
+                    code: "preview_render_failed",
+                    message,
+                },
+                Err(_) => PreviewCompletion::Failed {
+                    code: "preview_render_panic",
+                    message: "Preview render panicked".to_string(),
+                },
+            };
+            let rendered = matches!(completion, PreviewCompletion::Rendered { .. });
+            let _ = responder.send(completion);
+            scheduler.finish(quality, rendered);
+            log::debug!(
+                "preview {:?} session={} generation={} queue_ms={:.1}",
+                quality,
+                id.image_session,
+                id.generation,
+                queued_for.as_secs_f64() * 1000.0
+            );
         }
     });
 }

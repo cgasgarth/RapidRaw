@@ -70,7 +70,7 @@ pub struct GpuProcessorState {
 }
 
 pub struct PreviewJob {
-    pub adjustments: serde_json::Value,
+    pub adjustments: Arc<serde_json::Value>,
     pub expected_image_path: String,
     pub is_interactive: bool,
     pub target_resolution: Option<u32>,
@@ -78,7 +78,7 @@ pub struct PreviewJob {
     pub compute_waveform: bool,
     pub active_waveform_channel: Option<String>,
     pub viewer_sample_graph_revision: Option<String>,
-    pub responder: tokio::sync::oneshot::Sender<Vec<u8>>,
+    pub responder: tokio::sync::oneshot::Sender<crate::preview_scheduler::PreviewCompletion>,
 }
 
 pub struct AnalyticsJob {
@@ -190,7 +190,7 @@ pub struct AppState {
     pub initial_file_path: Mutex<Option<String>>,
     pub thumbnail_cancellation_token: Arc<AtomicBool>,
     pub thumbnail_progress: Mutex<ThumbnailProgressTracker>,
-    pub preview_worker_tx: Mutex<Option<Sender<PreviewJob>>>,
+    pub preview_scheduler: Mutex<Option<Arc<crate::preview_scheduler::PreviewScheduler>>>,
     pub viewer_sample_frames: Mutex<HashMap<String, CachedViewerSampleFrame>>,
     pub analytics_worker_tx: Mutex<Option<Sender<AnalyticsJob>>>,
     pub mask_cache: Mutex<HashMap<u64, GrayImage>>,
@@ -242,7 +242,7 @@ impl AppState {
                 total: 0,
                 completed: 0,
             }),
-            preview_worker_tx: Mutex::new(None),
+            preview_scheduler: Mutex::new(None),
             viewer_sample_frames: Mutex::new(HashMap::new()),
             analytics_worker_tx: Mutex::new(None),
             mask_cache: Mutex::new(HashMap::new()),
