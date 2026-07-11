@@ -14,7 +14,7 @@ import { useEditorStore } from '../../../store/useEditorStore';
 import type { Adjustments } from '../../adjustments';
 import { pushEditHistoryEntry } from '../../editHistory';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
-import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorState';
+import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorCoreState';
 
 export const AGENT_GEOMETRY_APPLY_TOOL_NAME = 'rawengine.agent.geometry.apply';
 export const AGENT_GEOMETRY_APPLY_INPUT_SCHEMA_NAME = 'AgentGeometryApplyRequestV1';
