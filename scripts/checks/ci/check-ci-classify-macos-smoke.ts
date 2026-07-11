@@ -62,6 +62,8 @@ const SAFE_TOOLING_FILES = new Set([
   'src/i18n/update_translations.py',
 ]);
 
+const SAFE_FRONTEND_BENCHMARK_FILES = new Set(['tests/benchmarks/library-query.bench.ts']);
+
 const SAFE_FRONTEND_EXTENSIONS = new Set([
   '.css',
   '.d.ts',
@@ -468,6 +470,7 @@ function classifyPathChange(change) {
   if (
     SAFE_ROOT_FILES.has(path) ||
     SAFE_TOOLING_FILES.has(path) ||
+    SAFE_FRONTEND_BENCHMARK_FILES.has(path) ||
     isMarkdown(path) ||
     path.startsWith('docs/') ||
     isSafeCodexConfig(path) ||
@@ -1086,6 +1089,11 @@ function runSelfTest() {
   assertClassification(
     'typed validation script helpers can skip smoke',
     ['scripts/lib/computational/ui-api-smoke.ts'],
+    SMOKE_MODES.NONE,
+  );
+  assertClassification(
+    'frontend-only library query benchmark can skip smoke',
+    ['tests/benchmarks/library-query.bench.ts'],
     SMOKE_MODES.NONE,
   );
   assertClassification('script policy metadata can skip smoke', ['scripts/tsconfig.json'], SMOKE_MODES.NONE);
