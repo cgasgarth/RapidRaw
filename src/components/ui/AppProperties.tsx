@@ -320,6 +320,13 @@ export interface WaveformData {
   width: number;
 }
 
+export interface AnalyticsResourceDescriptor {
+  byteLen: number;
+  mimeType: string;
+  resourceId: string;
+  url: string;
+}
+
 export interface CullingSettings {
   similarityThreshold: number;
   blurThreshold: number;
