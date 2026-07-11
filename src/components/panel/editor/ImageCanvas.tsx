@@ -53,6 +53,7 @@ import {
 } from '../../../utils/mask/brushMaskCommandBridge';
 import { invokeWithSchema } from '../../../utils/tauriSchemaInvoke';
 import {
+  buildViewerSamplerIdentity,
   createViewerSampleRequest,
   isViewerSampleResultCurrent,
   LatestViewerSampleScheduler,
@@ -74,7 +75,13 @@ import type { OverlayMode } from '../right/color/CropPanel';
 import { Mask, type SubMask, ToolType } from '../right/layers/Masks';
 import { CompareOverlay } from './CompareOverlay';
 import { CropOverlaySurface } from './CropOverlaySurface';
-import { imageCanvasLayerZIndex, resolveImageCanvasPointerOwner } from './imageCanvasContracts';
+import {
+  imageCanvasLayerZIndex,
+  resolveCropPreviewVisibility,
+  resolveDisplayedMaskUrl,
+  resolveEffectiveBrushTool,
+  resolveImageCanvasPointerOwner,
+} from './imageCanvasContracts';
 import { getEdgeFadeStyle, MaskOverlay, OptimizedBrushLine } from './MaskOverlaySurface';
 import {
   type CanvasOverlayStatus,
@@ -354,9 +361,8 @@ const ImageCanvas = memo(
     const focusRetouchToolState = useUIStore((state) => state.focusRetouchToolState);
     const setUI = useUIStore((state) => state.setUI);
     const focusRetouchPoints = useRef<Array<{ x: number; y: number }>>([]);
-    const [isCropViewVisible, setIsCropViewVisible] = useState(false);
+    const [loadedCropPreviewUrl, setLoadedCropPreviewUrl] = useState<string | null>(null);
     const cropImageRef = useRef<HTMLImageElement>(null);
-    const [displayedMaskUrl, setDisplayedMaskUrl] = useState<string | null>(null);
     const [originalLoaded, setOriginalLoaded] = useState<boolean>(false);
     const [originalLoadFailed, setOriginalLoadFailed] = useState(false);
     const [localInitialDrawParams, setLocalInitialDrawParams] = useState<MaskParameters | null>(null);
@@ -480,7 +486,7 @@ const ImageCanvas = memo(
       [finalPreviewUrl, interactivePatch?.url, interactivePreviewUrlRegistry, selectedImage.thumbnailUrl],
     );
 
-    const [baseTool, setBaseTool] = useState<ToolType>(brushSettings?.tool ?? ToolType.Brush);
+    const canonicalBrushTool = brushSettings?.tool ?? ToolType.Brush;
     const [isAltPressed, setIsAltPressed] = useState(false);
     const [lastBrushCommandCapture, setLastBrushCommandCapture] = useState<BrushMaskCommandCaptureSummary | null>(null);
 
@@ -540,10 +546,6 @@ const ImageCanvas = memo(
       },
       [groupOffsetX, groupOffsetY, maxSafeScale],
     );
-
-    useEffect(() => {
-      setBaseTool(brushSettings?.tool ?? ToolType.Brush);
-    }, [brushSettings?.tool]);
 
     useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
@@ -776,7 +778,9 @@ const ImageCanvas = memo(
         activeSubMask?.type === Mask.Flow ? Math.max(0, Math.min(1, (activeLineFlow ?? 10) / 100)) : 1;
       const alpha = Math.max(0, Math.min(0.5, 0.5 * subMaskOpacity * containerOpacity * flowOpacity));
 
-      const isEraser = isAltPressed ? baseTool !== ToolType.Eraser : baseTool === ToolType.Eraser;
+      const isEraser =
+        resolveEffectiveBrushTool(canonicalBrushTool === ToolType.Eraser ? 'eraser' : 'brush', isAltPressed) ===
+        'eraser';
 
       const strokeColor = isEraser
         ? (a: number) => `rgba(244, 63, 94, ${a.toFixed(3)})`
@@ -813,7 +817,7 @@ const ImageCanvas = memo(
       activeSubMask?.type,
       brushSettings?.feather,
       brushStageSize,
-      baseTool,
+      canonicalBrushTool,
       isAltPressed,
     ]);
     const isAiSubjectActive =
@@ -824,6 +828,7 @@ const ImageCanvas = memo(
     const isInitialDrawing = (isMasking || isAiEditing) && activeSubMaskParameters?.isInitialDraw === true;
 
     const isToolActive = isBrushActive || isAiSubjectActive || isInitialDrawing || isParametricActive;
+    const effectiveMaskInteractionActive = (isMasking || isAiEditing) && isMaskInteractionActive;
     const samplerSuppressed =
       isCropping ||
       isMasking ||
@@ -832,34 +837,57 @@ const ImageCanvas = memo(
       isStraightenActive ||
       Boolean(isRotationActive) ||
       isWbPickerActive ||
-      isMaskInteractionActive ||
+      effectiveMaskInteractionActive ||
       isToolActive ||
       (viewerInputState?.activeTool !== undefined && viewerInputState.activeTool !== 'none');
-    const [viewerSampleResult, setViewerSampleResult] = useState<ViewerSampleResult | null>(null);
-    const [viewerSampleLocked, setViewerSampleLocked] = useState(false);
-    const [viewerSampleTarget, setViewerSampleTarget] = useState<ViewerSampleTarget>(
-      isExportSoftProofEnabled ? 'softProof' : 'edited',
-    );
+    interface LocalViewerSamplerState {
+      locked: boolean;
+      result: ViewerSampleResult | null;
+      target: ViewerSampleTarget;
+    }
+    const initialViewerSamplerState: LocalViewerSamplerState = {
+      locked: false,
+      result: null,
+      target: isExportSoftProofEnabled ? 'softProof' : 'edited',
+    };
+    const [viewerSampler, setViewerSampler] = useState(initialViewerSamplerState);
+    const viewerSamplerRef = useRef(viewerSampler);
+    viewerSamplerRef.current = viewerSampler;
+    const transitionViewerSamplerRef = useRef<
+      (transition: (current: LocalViewerSamplerState) => LocalViewerSamplerState) => void
+    >(() => undefined);
     const handleToggleViewerSampleLock = useCallback(() => {
-      setViewerSampleLocked((locked) => !locked);
+      transitionViewerSamplerRef.current((current) => ({ ...current, locked: !current.locked }));
     }, []);
+    const transitionViewerSampler = useCallback(
+      (transition: (current: LocalViewerSamplerState) => LocalViewerSamplerState) => {
+        const next = transition(viewerSamplerRef.current);
+        viewerSamplerRef.current = next;
+        setViewerSampler(next);
+        onViewerSamplerStateChange?.({
+          locked: next.locked,
+          onToggleLock: handleToggleViewerSampleLock,
+          result: next.result,
+          suppressed: samplerSuppressed,
+          target: next.target,
+        });
+      },
+      [handleToggleViewerSampleLock, onViewerSamplerStateChange, samplerSuppressed],
+    );
+    transitionViewerSamplerRef.current = transitionViewerSampler;
+    const viewerSampleLocked = viewerSampler.locked;
+    const viewerSamplerIdentity = buildViewerSamplerIdentity({
+      backend: wgpuPreviewVisibility.previewBackend,
+      compareDividerPosition,
+      compareMode,
+      compareOrientation,
+      geometryEpoch: overlayGeometry.geometryEpoch,
+      graphRevision: viewerSampleGraphRevision,
+      imageIdentity: selectedImage.path,
+      proofRecipeId: exportSoftProofRecipeId ?? null,
+      softProofEnabled: isExportSoftProofEnabled,
+    });
 
-    useEffect(() => {
-      onViewerSamplerStateChange?.({
-        locked: viewerSampleLocked,
-        onToggleLock: handleToggleViewerSampleLock,
-        result: viewerSampleResult,
-        suppressed: samplerSuppressed,
-        target: viewerSampleTarget,
-      });
-    }, [
-      handleToggleViewerSampleLock,
-      onViewerSamplerStateChange,
-      samplerSuppressed,
-      viewerSampleLocked,
-      viewerSampleResult,
-      viewerSampleTarget,
-    ]);
     const latestViewerSampleRequestRef = useRef<ViewerSampleRequest | null>(null);
     const executeViewerSampleRef = useRef<(request: ViewerSampleRequest) => Promise<void>>(async () => {});
     const viewerSampleSchedulerRef = useRef<LatestViewerSampleScheduler | null>(null);
@@ -872,16 +900,19 @@ const ImageCanvas = memo(
       try {
         const result = await invokeWithSchema(Invokes.SampleViewerPixel, { request }, viewerSampleResultSchema);
         if (isViewerSampleResultCurrent(result, latestViewerSampleRequestRef.current)) {
-          setViewerSampleResult(result);
+          transitionViewerSampler((current) => ({ ...current, result }));
         }
       } catch {
         if (latestViewerSampleRequestRef.current?.requestIdentity === request.requestIdentity) {
-          setViewerSampleResult({
-            status: 'unavailable',
-            requestIdentity: request.requestIdentity,
-            reason: 'frameUnavailable',
-            spaceLabel: 'Unavailable',
-          });
+          transitionViewerSampler((current) => ({
+            ...current,
+            result: {
+              status: 'unavailable',
+              requestIdentity: request.requestIdentity,
+              reason: 'frameUnavailable',
+              spaceLabel: 'Unavailable',
+            },
+          }));
         }
       }
     };
@@ -896,16 +927,10 @@ const ImageCanvas = memo(
     useEffect(() => {
       latestViewerSampleRequestRef.current = null;
       viewerSampleSchedulerRef.current?.clear();
-      setViewerSampleResult(null);
-    }, [
-      overlayGeometry.geometryEpoch,
-      selectedImage.path,
-      viewerSampleGraphRevision,
-      compareMode,
-      exportSoftProofRecipeId,
-      isExportSoftProofEnabled,
-      wgpuPreviewVisibility.previewBackend,
-    ]);
+      // Locks pin interaction, not pixels: any render identity change invalidates
+      // the result so a locked footer can never describe another frame.
+      transitionViewerSampler((current) => ({ ...current, result: null }));
+    }, [samplerSuppressed, transitionViewerSampler, viewerSamplerIdentity]);
 
     const handleViewerSamplerPointerMove = useCallback(
       (event: React.PointerEvent<HTMLDivElement>) => {
@@ -946,7 +971,7 @@ const ImageCanvas = memo(
         if (!mapped) {
           latestViewerSampleRequestRef.current = null;
           viewerSampleSchedulerRef.current?.clear();
-          setViewerSampleResult(null);
+          transitionViewerSampler((current) => ({ ...current, result: null }));
           return;
         }
         const request = createViewerSampleRequest({
@@ -959,7 +984,7 @@ const ImageCanvas = memo(
           sampleRadiusImagePx: event.altKey ? 4 : 0,
           requestedSpace: 'displayEncoded',
         });
-        setViewerSampleTarget(target);
+        transitionViewerSampler((current) => ({ ...current, target }));
         latestViewerSampleRequestRef.current = request;
         viewerSampleSchedulerRef.current?.schedule(request);
       },
@@ -984,37 +1009,39 @@ const ImageCanvas = memo(
       if (viewerSampleLocked) return;
       latestViewerSampleRequestRef.current = null;
       viewerSampleSchedulerRef.current?.clear();
-      setViewerSampleResult(null);
+      transitionViewerSampler((current) => ({ ...current, result: null }));
     }, [viewerSampleLocked]);
 
-    useEffect(() => {
-      if (maskOverlayUrl && (isMasking || isAiEditing)) {
-        setDisplayedMaskUrl(maskOverlayUrl);
-      } else {
-        setDisplayedMaskUrl(null);
-      }
-    }, [maskOverlayUrl, isMasking, isAiEditing]);
+    const displayedMaskUrl = resolveDisplayedMaskUrl({ isAiEditing, isMasking, maskOverlayUrl });
 
-    useEffect(() => {
-      if (isToolActive) {
-        return;
-      }
+    const finishCanvasToolInteraction = useCallback((_reason: string) => {
       isDrawing.current = false;
       drawingStageRef.current = null;
       dragStartPointer.current = null;
+      pointerGeometryEpochRef.current = null;
       currentLine.current = null;
       lastBrushPoint.current = null;
       setLiveBrushLine(null);
       setPreviewBox(null);
       previewBoxRef.current = null;
       setLocalInitialDrawParams(null);
-    }, [isToolActive]);
+      setIsMaskInteractionActive(false);
+      setCursorPreview((preview) => ({ ...preview, visible: false }));
+    }, []);
 
-    useEffect(() => {
-      if (!isMasking && !isAiEditing) {
-        setIsMaskInteractionActive(false);
-      }
-    }, [isMasking, isAiEditing]);
+    useEffect(
+      () => () => finishCanvasToolInteraction('tool-or-session-exit'),
+      [
+        activeAiSubMaskId,
+        activeMaskId,
+        finishCanvasToolInteraction,
+        isAiEditing,
+        isMasking,
+        isToolActive,
+        overlayGeometry.geometryEpoch,
+        selectedImage.path,
+      ],
+    );
 
     useEffect(() => {
       const clearTouchInteraction = () => {
@@ -1039,20 +1066,6 @@ const ImageCanvas = memo(
       const otherMasks = activeContainer.subMasks.filter((m: SubMask) => m.id !== activeId);
       return selectedMask ? [...otherMasks, selectedMask] : activeContainer.subMasks;
     }, [activeContainer, activeMaskId, activeAiSubMaskId, isMasking]);
-
-    useEffect(() => {
-      if (isCropping && uncroppedAdjustedPreviewUrl) {
-        const timer = setTimeout(() => {
-          setIsCropViewVisible(true);
-        }, 10);
-        return () => {
-          clearTimeout(timer);
-        };
-      } else {
-        setIsCropViewVisible(false);
-      }
-      return undefined;
-    }, [isCropping, uncroppedAdjustedPreviewUrl]);
 
     const handleWbClick = useCallback(
       (e: CanvasKonvaEvent) => {
@@ -1232,9 +1245,9 @@ const ImageCanvas = memo(
           let effectiveTool;
 
           if (isAltPressed) {
-            effectiveTool = baseTool === ToolType.Brush ? ToolType.Eraser : ToolType.Brush;
+            effectiveTool = canonicalBrushTool === ToolType.Brush ? ToolType.Eraser : ToolType.Brush;
           } else {
-            effectiveTool = baseTool;
+            effectiveTool = canonicalBrushTool;
           }
           if (isBrushActive && e.evt.shiftKey && lastBrushPoint.current) {
             const startImageSpace = lastBrushPoint.current;
@@ -1341,7 +1354,7 @@ const ImageCanvas = memo(
         isToolActive,
         brushImageSpaceSize,
         brushStageSize,
-        baseTool,
+        canonicalBrushTool,
         getCanvasPointer,
         getImageSpacePoint,
         withPointerPressure,
@@ -1378,11 +1391,7 @@ const ImageCanvas = memo(
           return;
         }
         if (!isGeometryEpochCurrent(pointerGeometryEpochRef.current, overlayGeometry)) {
-          isDrawing.current = false;
-          currentLine.current = null;
-          previewBoxRef.current = null;
-          setLiveBrushLine(null);
-          setPreviewBox(null);
+          finishCanvasToolInteraction('geometry-invalidated');
           return;
         }
 
@@ -1489,9 +1498,9 @@ const ImageCanvas = memo(
             let effectiveToolForPreview;
 
             if (isAltPressedDuringMove) {
-              effectiveToolForPreview = baseTool === ToolType.Brush ? ToolType.Eraser : ToolType.Brush;
+              effectiveToolForPreview = canonicalBrushTool === ToolType.Brush ? ToolType.Eraser : ToolType.Brush;
             } else {
-              effectiveToolForPreview = baseTool;
+              effectiveToolForPreview = canonicalBrushTool;
             }
 
             const imageSpaceLine: DrawnLine = {
@@ -1548,7 +1557,8 @@ const ImageCanvas = memo(
         isMasking,
         localInitialDrawParams,
         brushImageSpaceSize,
-        baseTool,
+        canonicalBrushTool,
+        finishCanvasToolInteraction,
         getCanvasPointer,
         getImageSpacePoint,
         withPointerPressure,
@@ -1560,17 +1570,15 @@ const ImageCanvas = memo(
         return;
       }
       if (!isGeometryEpochCurrent(pointerGeometryEpochRef.current, overlayGeometry)) {
-        isDrawing.current = false;
-        currentLine.current = null;
-        previewBoxRef.current = null;
-        setLiveBrushLine(null);
-        setPreviewBox(null);
+        finishCanvasToolInteraction('geometry-invalidated');
         return;
       }
 
       if (isInitialDrawing && localInitialDrawParams && dragStartPointer.current) {
-        if (!activeSubMask) return;
-        isDrawing.current = false;
+        if (!activeSubMask) {
+          finishCanvasToolInteraction('invalid-initial-draw');
+          return;
+        }
         const activeId = isMasking ? activeMaskId : activeAiSubMaskId;
 
         const newParams = { ...localInitialDrawParams };
@@ -1591,21 +1599,17 @@ const ImageCanvas = memo(
         }
 
         updateSubMask(activeId, { parameters: newParams });
-        setLocalInitialDrawParams(null);
-        dragStartPointer.current = null;
+        finishCanvasToolInteraction('pointer-up');
         return;
       }
 
       if (!currentLine.current && !(isAiSubjectActive && previewBoxRef.current)) {
+        finishCanvasToolInteraction('pointer-up-empty');
         return;
       }
 
       if (isAiSubjectActive && previewBoxRef.current) {
-        isDrawing.current = false;
         const box = previewBoxRef.current;
-        previewBoxRef.current = null;
-        setPreviewBox(null);
-        drawingStageRef.current = null;
 
         const activeId = isMasking ? activeMaskId : activeAiSubMaskId;
 
@@ -1635,16 +1639,14 @@ const ImageCanvas = memo(
         } else if (activeSubMask.type === Mask.AiSubject) {
           onGenerateAiMask(activeId, startPoint, endPoint);
         }
+        finishCanvasToolInteraction('pointer-up');
         return;
       }
 
-      isDrawing.current = false;
       const line = currentLine.current;
-      currentLine.current = null;
-      drawingStageRef.current = null;
-      setLiveBrushLine(null);
 
       if (!line) {
+        finishCanvasToolInteraction('pointer-up-empty');
         return;
       }
 
@@ -1653,10 +1655,10 @@ const ImageCanvas = memo(
       if (isBrushActive) {
         const wasAltPressed = window.altKeyDown || false;
         const effectiveToolForFinal = wasAltPressed
-          ? baseTool === ToolType.Brush
+          ? canonicalBrushTool === ToolType.Brush
             ? ToolType.Eraser
             : ToolType.Brush
-          : baseTool;
+          : canonicalBrushTool;
 
         const imageSpaceLine: DrawnLine = {
           brushSize: brushImageSpaceSize,
@@ -1666,7 +1668,10 @@ const ImageCanvas = memo(
           ...(activeLineFlow !== undefined ? { flow: activeLineFlow } : {}),
         };
 
-        if (!activeSubMaskParameters) return;
+        if (!activeSubMaskParameters) {
+          finishCanvasToolInteraction('invalid-brush-state');
+          return;
+        }
         const existingLines = activeSubMaskParameters.lines || [];
         const nextParameters: MaskParameters = {
           ...activeSubMaskParameters,
@@ -1683,6 +1688,7 @@ const ImageCanvas = memo(
           lastBrushPoint.current = getImageSpacePoint(lastPoint);
         }
       }
+      finishCanvasToolInteraction('pointer-up');
     }, [
       isInitialDrawing,
       activeAiSubMaskId,
@@ -1702,9 +1708,10 @@ const ImageCanvas = memo(
       effectiveImageDimensions,
       localInitialDrawParams,
       brushImageSpaceSize,
-      baseTool,
+      canonicalBrushTool,
       imageRenderSize,
       isAiSubjectActive,
+      finishCanvasToolInteraction,
     ]);
 
     const handleMouseEnter = useCallback(() => {
@@ -1730,17 +1737,31 @@ const ImageCanvas = memo(
         handleUp();
       }
 
+      function onGlobalCancel() {
+        if (!isDrawing.current) return;
+        finishCanvasToolInteraction('pointer-cancel');
+      }
+
       window.addEventListener('mousemove', onGlobalMove, { passive: false });
       window.addEventListener('mouseup', onGlobalUp);
       window.addEventListener('touchmove', onGlobalMove, { passive: false });
-      window.addEventListener('touchcancel', onGlobalUp);
+      window.addEventListener('touchcancel', onGlobalCancel);
+      window.addEventListener('pointercancel', onGlobalCancel);
       return () => {
         window.removeEventListener('mousemove', onGlobalMove);
         window.removeEventListener('mouseup', onGlobalUp);
         window.removeEventListener('touchmove', onGlobalMove);
-        window.removeEventListener('touchcancel', onGlobalUp);
+        window.removeEventListener('touchcancel', onGlobalCancel);
+        window.removeEventListener('pointercancel', onGlobalCancel);
       };
-    }, [isToolActive, handleMove, handleUp]);
+    }, [
+      finishCanvasToolInteraction,
+      handleMove,
+      handleUp,
+      isToolActive,
+      overlayGeometry.geometryEpoch,
+      selectedImage.path,
+    ]);
 
     const handleStraightenMouseDown = (e: CanvasKonvaEvent) => {
       if (isNonPrimaryButton(e)) {
@@ -2001,6 +2022,7 @@ const ImageCanvas = memo(
     );
 
     const cropPreviewUrl = uncroppedAdjustedPreviewUrl || selectedImage.thumbnailUrl;
+    const isCropViewVisible = resolveCropPreviewVisibility({ cropPreviewUrl, isCropping, loadedCropPreviewUrl });
     const originalSrc = transformedOriginalUrl;
     const canShowOriginalCompare = !!originalSrc && originalLoaded;
     const renderedPreviewWarningStatus = getRenderedPreviewWarningStatus(gamutWarningOverlay, {
@@ -2032,7 +2054,7 @@ const ImageCanvas = memo(
       isExportSoftProofEnabled,
       isGamutWarningOverlayVisible,
       isMaskControlHovered,
-      isMaskInteractionActive,
+      isMaskInteractionActive: effectiveMaskInteractionActive,
       isSliderDragging,
       showOriginal,
     });
@@ -2202,7 +2224,7 @@ const ImageCanvas = memo(
         ? 'disabled'
         : isSliderDragging
           ? 'loading'
-          : isMaskInteractionActive || liveBrushLine || previewBox
+          : effectiveMaskInteractionActive || liveBrushLine || previewBox
             ? 'drag'
             : activeRemoveSource
               ? activeRemoveSource.status === 'ready'
@@ -2215,7 +2237,7 @@ const ImageCanvas = memo(
                 : 'ready';
     const canvasPointerOwner = resolveImageCanvasPointerOwner({
       isCropping,
-      isMaskInteractionActive,
+      isMaskInteractionActive: effectiveMaskInteractionActive,
       isToolActive,
     });
 
@@ -3045,6 +3067,8 @@ const ImageCanvas = memo(
           handleCropStart={handleCropStart}
           isCropping={isCropping}
           isCropViewVisible={isCropViewVisible}
+          onCropPreviewError={() => setLoadedCropPreviewUrl(null)}
+          onCropPreviewLoad={() => setLoadedCropPreviewUrl(cropPreviewUrl)}
           isMaxZoom={isMaxZoom}
           isRotationActive={isRotationActive}
           isStraightenActive={isStraightenActive}

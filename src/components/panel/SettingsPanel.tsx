@@ -77,6 +77,17 @@ import Input from '../ui/primitives/Input';
 import Slider from '../ui/primitives/Slider';
 import Switch from '../ui/primitives/Switch';
 import UiText from '../ui/primitives/Text';
+import {
+  buildRestartSavePayload,
+  createSettingsEditSession,
+  editConnectorAddress,
+  editRestartSetting,
+  hasRestartRequiredChanges,
+  isRestartRequiredSettingKey,
+  rebaseSettingsEditSession,
+  selectProcessingBackends,
+  settingsSessionMatchesCanonical,
+} from './settingsSession';
 
 interface ConfirmModalState {
   confirmText: string;
@@ -177,7 +188,6 @@ type NumericChangeEvent = ChangeEvent<HTMLInputElement> | { target: { value: num
 const getNumericEventValue = (event: NumericChangeEvent): number => Number(event.target.value);
 const getIntegerEventValue = (event: NumericChangeEvent): number => parseInt(String(event.target.value), 10);
 const formatUnknownError = (error: unknown): string => (error instanceof Error ? error.message : String(error));
-const shouldDefaultWgpuRenderer = (_osPlatform: string): boolean => false;
 const buildProcessingSettings = (appSettings: AppSettings, osPlatform: string): ProcessingSettings => ({
   applyPreprocessingToNonRaws: appSettings.applyPreprocessingToNonRaws ?? false,
   editorPreviewResolution: appSettings.editorPreviewResolution || 1920,
@@ -195,7 +205,7 @@ const buildProcessingSettings = (appSettings: AppSettings, osPlatform: string): 
   thumbnailResolution: appSettings.thumbnailResolution || 720,
   thumbnailWorkerThreads: appSettings.thumbnailWorkerThreads ?? 4,
   useFullDpiRendering: appSettings.useFullDpiRendering ?? false,
-  useWgpuRenderer: appSettings.useWgpuRenderer ?? shouldDefaultWgpuRenderer(osPlatform),
+  useWgpuRenderer: appSettings.useWgpuRenderer ?? false,
 });
 
 const EXECUTE_TIMEOUT = 3000;
@@ -669,8 +679,6 @@ export function SettingsPanel({
   const [hasInteractedWithLivePreview, setHasInteractedWithLivePreview] = useState(false);
   const [recordingAction, setRecordingAction] = useState<string | null>(null);
 
-  const [aiProvider, setAiProvider] = useState<AiProviderIdType>(() => normalizeAiProviderId(appSettings.aiProvider));
-  const [aiConnectorAddress, setAiConnectorAddress] = useState<string>(appSettings.aiConnectorAddress || '');
   const [newShortcut, setNewShortcut] = useState('');
   const [newAiTag, setNewAiTag] = useState('');
 
@@ -680,10 +688,17 @@ export function SettingsPanel({
   const [tempLensModel, setTempLensModel] = useState<string>('');
 
   const osPlatform = useOsPlatform();
-  const [processingSettings, setProcessingSettings] = useState<ProcessingSettings>(() =>
-    buildProcessingSettings(appSettings, osPlatform),
-  );
-  const [restartRequired, setRestartRequired] = useState(false);
+  const [settingsSession, setSettingsSession] = useState(() => createSettingsEditSession(appSettings, osPlatform));
+  if (!settingsSessionMatchesCanonical(settingsSession, appSettings, osPlatform)) {
+    setSettingsSession(rebaseSettingsEditSession(settingsSession, appSettings, osPlatform));
+  }
+  const processingSettings: ProcessingSettings = {
+    ...buildProcessingSettings(appSettings, osPlatform),
+    ...settingsSession.restartDraft,
+  };
+  const restartRequired = hasRestartRequiredChanges(settingsSession);
+  const aiProvider = normalizeAiProviderId(appSettings.aiProvider);
+  const aiConnectorAddress = settingsSession.connectorAddress;
   const [activeCategory, setActiveCategory] = useState('general');
   const [isRawProcessingModeProvenanceVisible, setIsRawProcessingModeProvenanceVisible] = useState(false);
   const [logPath, setLogPath] = useState<string | null>(null);
@@ -716,18 +731,10 @@ export function SettingsPanel({
   );
 
   const filteredBackendOptions = useMemo<OptionItem<string>[]>(() => {
-    const rawOptions = [
-      { value: 'auto', label: t('settings.processing.backends.auto') },
-      { value: 'vulkan', label: t('settings.processing.backends.vulkan') },
-      { value: 'dx12', label: t('settings.processing.backends.dx12') },
-      { value: 'metal', label: t('settings.processing.backends.metal') },
-      { value: 'gl', label: t('settings.processing.backends.gl') },
-    ];
-    return rawOptions.filter((opt) => {
-      if (opt.value === 'metal' && osPlatform !== 'macos') return false;
-      if (opt.value === 'dx12' && osPlatform === 'macos') return false;
-      return true;
-    });
+    return selectProcessingBackends(osPlatform).map((value) => ({
+      value,
+      label: t(`settings.processing.backends.${value}`),
+    }));
   }, [t, osPlatform]);
 
   const rawProcessingModeOptions = useMemo<OptionItem<RawProcessingMode>[]>(
@@ -805,24 +812,6 @@ export function SettingsPanel({
   const taggingShortcuts = Array.from(new Set<string>(appSettings.taggingShortcuts || []));
 
   useEffect(() => {
-    const syncTimer = setTimeout(() => {
-      setAiConnectorAddress((current) =>
-        appSettings.aiConnectorAddress !== current ? appSettings.aiConnectorAddress || '' : current,
-      );
-      setAiProvider((current) => {
-        const nextProvider = normalizeAiProviderId(appSettings.aiProvider);
-        return nextProvider !== current ? nextProvider : current;
-      });
-      setProcessingSettings(buildProcessingSettings(appSettings, osPlatform));
-      setRestartRequired(false);
-    }, 0);
-
-    return () => {
-      clearTimeout(syncTimer);
-    };
-  }, [appSettings, osPlatform]);
-
-  useEffect(() => {
     const fetchLogPath = async () => {
       try {
         const path = await invokeWithSchema(Invokes.GetLogFilePath, {}, pathSchema);
@@ -845,15 +834,8 @@ export function SettingsPanel({
     key: K,
     value: ProcessingSettings[K],
   ) => {
-    setProcessingSettings((prev) => ({ ...prev, [key]: value }));
-
-    if (
-      key === 'processingBackend' ||
-      key === 'linuxGpuOptimization' ||
-      key === 'useWgpuRenderer' ||
-      key === 'thumbnailWorkerThreads'
-    ) {
-      setRestartRequired(true);
+    if (isRestartRequiredSettingKey(key)) {
+      setSettingsSession((session) => editRestartSetting(session, key, value));
     } else {
       await onSettingsChange({ ...appSettings, [key]: value });
       if (
@@ -879,7 +861,6 @@ export function SettingsPanel({
     if (!preset) return;
 
     const patch = buildCaptureSharpeningProcessingPatch(preset);
-    setProcessingSettings((prev) => ({ ...prev, ...patch }));
     await onSettingsChange({ ...appSettings, ...patch });
     await invokeWithSchema(Invokes.ClearImageCaches, {}, emptyResponseSchema);
   };
@@ -900,7 +881,6 @@ export function SettingsPanel({
       rawPreprocessingSharpeningRadius: patch.rawPreprocessingSharpeningRadius,
     };
     const nextSettings = { ...appSettings, ...settingsPatch, rawProcessingMode: mode };
-    setProcessingSettings((prev) => ({ ...prev, ...settingsPatch, rawProcessingMode: mode }));
     await onSettingsChange(nextSettings);
     await invokeWithSchema(Invokes.ClearImageCaches, {}, emptyResponseSchema);
   };
@@ -910,15 +890,11 @@ export function SettingsPanel({
   };
 
   const handleSaveAndRelaunch = async () => {
-    await onSettingsChange({
-      ...appSettings,
-      ...processingSettings,
-    });
+    await onSettingsChange(buildRestartSavePayload(appSettings, settingsSession));
     await relaunch();
   };
 
   const handleProviderChange = (provider: AiProviderIdType) => {
-    setAiProvider(provider);
     saveSettings({ ...appSettings, aiProvider: provider });
   };
 
@@ -1224,7 +1200,10 @@ export function SettingsPanel({
           <div className="flex items-center shrink-0">
             <Button
               className="mr-4 hover:bg-surface text-text-primary rounded-full"
-              onClick={onBack}
+              onClick={() => {
+                setSettingsSession(createSettingsEditSession(appSettings, osPlatform));
+                onBack();
+              }}
               size="icon"
               variant="ghost"
               data-tooltip={t('settings.tooltips.goHome')}
@@ -2516,7 +2495,7 @@ export function SettingsPanel({
                                     saveSettings({ ...appSettings, aiConnectorAddress: aiConnectorAddress });
                                   }}
                                   onChange={(event: ChangeEvent<HTMLInputElement>) => {
-                                    setAiConnectorAddress(event.target.value);
+                                    setSettingsSession((session) => editConnectorAddress(session, event.target.value));
                                   }}
                                   onKeyDown={(event: ReactKeyboardEvent<HTMLInputElement>) => {
                                     event.stopPropagation();
