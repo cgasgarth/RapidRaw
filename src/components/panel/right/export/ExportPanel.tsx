@@ -34,6 +34,8 @@ import { emptyTauriResponseSchema } from '../../../../schemas/tauriResponseSchem
 import { useEditorStore } from '../../../../store/useEditorStore';
 import { useProcessStore } from '../../../../store/useProcessStore';
 import { Invokes } from '../../../../tauri/commands';
+import { thumbnailCache } from '../../../../thumbnails/thumbnailCacheInstance';
+import { useThumbnailCacheRevision } from '../../../../thumbnails/useThumbnail';
 import { TextColors, TextVariants, TextWeights } from '../../../../types/typography';
 import type { Adjustments } from '../../../../utils/adjustments';
 import {
@@ -401,7 +403,7 @@ export default function ExportPanel({
       setEditor: state.setEditor,
     })),
   );
-  const thumbnailSmartPreviews = useProcessStore((state) => state.thumbnailSmartPreviews);
+  const thumbnailCacheRevision = useThumbnailCacheRevision();
 
   const [isAdvancedExpanded, setIsAdvancedExpanded] = useState(false);
   const initDone = useRef(false);
@@ -699,9 +701,11 @@ export default function ExportPanel({
   const staleSmartPreviewPaths = useMemo(
     () =>
       isLibraryContext
-        ? pathsToExport.filter((path) => hasStaleOrOfflineSmartPreview([path], thumbnailSmartPreviews))
+        ? pathsToExport.filter((path) =>
+            hasStaleOrOfflineSmartPreview([path], { [path]: thumbnailCache.get(path)?.smartPreview ?? undefined }),
+          )
         : [],
-    [isLibraryContext, pathsToExport, thumbnailSmartPreviews],
+    [isLibraryContext, pathsToExport, thumbnailCacheRevision],
   );
   const staleSmartPreviewKey = useMemo(() => staleSmartPreviewPaths.join('\n'), [staleSmartPreviewPaths]);
   const [reconnectedSmartPreviewState, setReconnectedSmartPreviewState] = useState<{
@@ -723,8 +727,12 @@ export default function ExportPanel({
   const isLibrarySmartPreviewExport = useMemo(
     () =>
       isLibraryContext &&
-      hasStaleOrOfflineSmartPreview(pathsToExport, thumbnailSmartPreviews, reconnectedSmartPreviewPaths),
-    [isLibraryContext, pathsToExport, reconnectedSmartPreviewPaths, thumbnailSmartPreviews],
+      pathsToExport.some(
+        (path) =>
+          !reconnectedSmartPreviewPaths.has(path) &&
+          hasStaleOrOfflineSmartPreview([path], { [path]: thumbnailCache.get(path)?.smartPreview ?? undefined }),
+      ),
+    [isLibraryContext, pathsToExport, reconnectedSmartPreviewPaths, thumbnailCacheRevision],
   );
   const isSmartPreviewExportBlocked = isOfflineSmartPreviewExport || isLibrarySmartPreviewExport;
 

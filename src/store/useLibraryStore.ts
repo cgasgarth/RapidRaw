@@ -51,6 +51,7 @@ interface LibraryState {
 
   // Actions
   setLibrary: (updater: Partial<LibraryState> | ((state: LibraryState) => Partial<LibraryState>)) => void;
+  setListColumnWidths: (widths: ColumnWidths) => void;
   clearSelection: () => void;
   setFilterCriteria: (criteria: Partial<FilterCriteria> | ((prev: FilterCriteria) => FilterCriteria)) => void;
   setSearchCriteria: (criteria: Partial<SearchCriteria> | ((prev: SearchCriteria) => SearchCriteria)) => void;
@@ -96,6 +97,10 @@ export const useLibraryStore = create<LibraryState>((set) => ({
 
   setLibrary: (updater) => {
     set((state) => (typeof updater === 'function' ? updater(state) : updater));
+  },
+
+  setListColumnWidths: (listColumnWidths) => {
+    set({ listColumnWidths });
   },
 
   clearSelection: () => {

@@ -24,6 +24,7 @@ import { useLibraryStore } from '../../../../store/useLibraryStore';
 import { useProcessStore } from '../../../../store/useProcessStore';
 import { useSettingsStore } from '../../../../store/useSettingsStore';
 import { Invokes } from '../../../../tauri/commands';
+import { useThumbnail } from '../../../../thumbnails/useThumbnail';
 import { TextColors, TextVariants, TextWeights } from '../../../../types/typography';
 import { COLOR_LABELS, type Color } from '../../../../utils/adjustments';
 import { buildCameraProfileProvenanceReceipt } from '../../../../utils/cameraProfileProvenanceReceipt';
@@ -563,7 +564,6 @@ export default function MetadataPanel() {
   const imageList = useLibraryStore((s) => s.imageList);
   const imageRatings = useLibraryStore((s) => s.imageRatings);
   const appSettings = useSettingsStore((s) => s.appSettings);
-  const thumbnails = useProcessStore((s) => s.thumbnails);
   const setLibrary = useLibraryStore((s) => s.setLibrary);
 
   const { handleRate, handleSetColorLabel, handleTagsChanged, handleUpdateExif } = useLibraryActions();
@@ -587,7 +587,7 @@ export default function MetadataPanel() {
     () => (selectedImage ? imageList.find((img) => img.path === selectedImage.path)?.tags || [] : []),
     [imageList, selectedImage],
   );
-  const liveThumbnailUrl = selectedImage ? thumbnails[selectedImage.path] : undefined;
+  const liveThumbnailUrl = useThumbnail(selectedImage?.path ?? '') ?? undefined;
 
   const targetPaths = multiSelectedPaths.length > 0 ? multiSelectedPaths : selectedImage ? [selectedImage.path] : [];
 

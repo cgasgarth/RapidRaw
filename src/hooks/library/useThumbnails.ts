@@ -1,12 +1,12 @@
 import { invoke } from '@tauri-apps/api/core';
 import { useCallback, useEffect, useRef } from 'react';
-import { useProcessStore } from '../../store/useProcessStore';
 import { Invokes } from '../../tauri/commands';
 import {
   ThumbnailDemandScheduler,
   type ThumbnailSchedulerMetrics,
   type ThumbnailViewportDemand,
 } from '../../thumbnails/ThumbnailDemandScheduler';
+import { thumbnailCache } from '../../thumbnails/thumbnailCacheInstance';
 
 export type ThumbnailViewportUpdate = Omit<ThumbnailViewportDemand, 'generation'> & { contextKey: string };
 
@@ -16,7 +16,7 @@ export function useThumbnails() {
   if (schedulerRef.current === null) {
     schedulerRef.current = new ThumbnailDemandScheduler({
       dispatch: (request) => invoke(Invokes.UpdateThumbnailQueue, { request }),
-      isResident: (path) => Boolean(useProcessStore.getState().thumbnails[path]),
+      isResident: (path) => thumbnailCache.has(path),
     });
   }
   const requestThumbnails = useCallback((paths: string[]) => schedulerRef.current?.requestBackground(paths), []);

@@ -25,6 +25,7 @@ import { EXPORT_LAST_USED_PRESET_ID } from '../../schemas/export/exportRecipeIds
 import { buildLibrarySessionUiCard } from '../../schemas/library/librarySessionUiSchemas';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useProcessStore } from '../../store/useProcessStore';
+import { thumbnailCache } from '../../thumbnails/thumbnailCacheInstance';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { DEFAULT_THEME_ID, THEMES, type ThemeProps } from '../../utils/themes';
 import { parseVirtualImagePath } from '../../utils/virtualImagePath';
@@ -126,7 +127,6 @@ export default function MainLibrary(props: MainLibraryProps) {
   const libraryImageList = useLibraryStore((state) => state.imageList);
   const setFilterCriteria = useLibraryStore((state) => state.setFilterCriteria);
   const sortCriteria = useLibraryStore((state) => state.sortCriteria);
-  const thumbnails = useProcessStore((state) => state.thumbnails);
   const { onRequestThumbnails } = props;
 
   const translatedRatingFilterOptions = useMemo(
@@ -264,9 +264,9 @@ export default function MainLibrary(props: MainLibraryProps) {
       label: image.is_virtual_copy
         ? t('library.header.compare.virtualCopy', { id: getVirtualCopyLabel(image.path) })
         : t('library.header.compare.original'),
-      thumbnail: thumbnails[image.path] ?? null,
+      thumbnail: thumbnailCache.get(image.path)?.url ?? null,
     }));
-  }, [props.imageList, props.multiSelectedPaths, t, thumbnails]);
+  }, [props.imageList, props.multiSelectedPaths, t]);
 
   useEffect(() => {
     if (!selectedCompareVariants) return;

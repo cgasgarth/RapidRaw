@@ -29,10 +29,16 @@ import {
 import UiText from '../../ui/primitives/Text';
 import type { ColumnWidths } from '../MainLibrary';
 import { type LibraryRow, type LibraryRowProps, Row } from './LibraryItems';
+import {
+  CORE_LIBRARY_COLUMN_KEYS,
+  type ColumnWidthKey,
+  columnWidthStyle,
+  LIBRARY_COLUMN_KEYS,
+  normalizedColumnPercentages,
+} from './libraryColumnWidths';
+import { useLibraryColumnResize } from './useLibraryColumnResize';
 
-type ColumnWidthKey = keyof ColumnWidths;
 type HeaderSortKey = SortCriteria['key'];
-type WidthUpdater = ColumnWidths | ((prev: ColumnWidths) => ColumnWidths);
 type RowRendererProps = Omit<LibraryRowProps, 'index' | 'style'>;
 type VirtualizedRowProps = RowRendererProps & {
   ariaAttributes: {
@@ -57,19 +63,17 @@ interface ImageFolderGroup {
 
 interface ListHeaderProps {
   widths: ColumnWidths;
-  setWidths: (updater: WidthUpdater) => void;
-  containerRef: React.RefObject<HTMLDivElement | null>;
+  resize: ReturnType<typeof useLibraryColumnResize>;
   sortCriteria: SortCriteria;
   onSortChange: (key: HeaderSortKey) => void;
 }
 
 interface HeaderColumnProps {
-  onResize: (event: ReactMouseEvent<HTMLDivElement>, leftCol: ColumnWidthKey, rightCol: ColumnWidthKey) => void;
+  resize: ReturnType<typeof useLibraryColumnResize>;
   onSortChange: (key: HeaderSortKey) => void;
   sortCriteria: SortCriteria;
   title: string;
-  totalRawWidth: number;
-  widths: ColumnWidths;
+  normalizedWidth: number;
   widthKey: ColumnWidthKey;
   nextKey?: ColumnWidthKey;
   sortKey?: HeaderSortKey;
@@ -99,7 +103,6 @@ interface LibraryGridProps {
   onImageDoubleClick: (path: string) => void;
   thumbnailAspectRatio: ThumbnailAspectRatio;
   imageRatings: Record<string, number>;
-  onRequestThumbnails?: (paths: string[]) => void;
   onThumbnailViewportChange?: (demand: ThumbnailViewportUpdate) => void;
   thumbnailSizeOptions: ThumbnailSizeOption[];
   onThumbnailSizeChange: (size: ThumbnailSize) => void;
@@ -112,19 +115,17 @@ const VirtualizedRow = ({ ariaAttributes: _ariaAttributes, ...rowProps }: Virtua
 );
 
 function HeaderColumn({
-  onResize,
+  resize,
   onSortChange,
   sortCriteria,
   title,
-  totalRawWidth,
-  widths,
+  normalizedWidth,
   widthKey,
   nextKey,
   sortKey,
 }: HeaderColumnProps) {
   const isSorted = sortCriteria.key === sortKey;
   const isAsc = sortCriteria.order === SortDirection.Ascending;
-  const actualWidth = `${(widths[widthKey] / totalRawWidth) * 100}%`;
   const handleSortKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (!sortKey || (event.key !== 'Enter' && event.key !== ' ')) return;
     event.preventDefault();
@@ -133,7 +134,7 @@ function HeaderColumn({
 
   return (
     <div
-      style={{ width: actualWidth }}
+      style={columnWidthStyle(widthKey)}
       className={`relative flex items-center px-3 h-full select-none ${
         sortKey ? 'cursor-pointer hover:bg-bg-primary/50 transition-colors' : ''
       }`}
@@ -162,9 +163,24 @@ function HeaderColumn({
       {nextKey && (
         <div
           className="absolute right-[-3px] top-1.5 bottom-1.5 w-[6px] cursor-col-resize z-10 group flex items-center justify-center"
-          role="presentation"
-          onMouseDown={(e) => {
-            onResize(e, widthKey, nextKey);
+          role="separator"
+          aria-orientation="vertical"
+          aria-valuemin={1}
+          aria-valuemax={99}
+          aria-valuenow={Math.round(normalizedWidth)}
+          tabIndex={0}
+          onPointerDown={(event) => resize.onPointerDown(event, widthKey, nextKey)}
+          onPointerMove={resize.onPointerMove}
+          onPointerUp={resize.onPointerUp}
+          onPointerCancel={resize.onPointerCancel}
+          onLostPointerCapture={resize.onLostPointerCapture}
+          onClick={(event) => event.stopPropagation()}
+          onKeyDown={(event) => {
+            if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+            event.preventDefault();
+            event.stopPropagation();
+            const direction = event.key === 'ArrowRight' ? 1 : -1;
+            resize.resizeWithKeyboard(widthKey, nextKey, direction * (event.shiftKey ? 5 : 0.5));
           }}
         >
           <div className="w-px h-full bg-border-color/40 group-hover:bg-accent transition-colors" />
@@ -174,74 +190,34 @@ function HeaderColumn({
   );
 }
 
-function ListHeader({ widths, setWidths, containerRef, sortCriteria, onSortChange }: ListHeaderProps) {
+function ListHeader({ widths, resize, sortCriteria, onSortChange }: ListHeaderProps) {
   const { t } = useTranslation();
   const exifOverlay = useSettingsStore((s) => s.appSettings?.exifOverlay || ExifOverlay.Off);
   const showExifCols = exifOverlay !== ExifOverlay.Off;
-  const totalRawWidth =
-    widths.thumbnail +
-    widths.name +
-    widths.date +
-    widths.rating +
-    widths.color +
-    (showExifCols ? widths.shutter + widths.aperture + widths.iso + widths.focal : 0);
-
-  const handleResize = (e: ReactMouseEvent<HTMLDivElement>, leftCol: ColumnWidthKey, rightCol: ColumnWidthKey) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const startX = e.clientX;
-    const startLeftWidth = widths[leftCol];
-    const startRightWidth = widths[rightCol];
-    const containerWidth = containerRef.current?.clientWidth || 1000;
-
-    const onMouseMove = (moveEvent: MouseEvent) => {
-      const deltaX = moveEvent.clientX - startX;
-      const deltaPercent = (deltaX / containerWidth) * 100;
-
-      let newLeft = startLeftWidth + deltaPercent;
-      let newRight = startRightWidth - deltaPercent;
-
-      if (newLeft < 1) {
-        newRight -= 1 - newLeft;
-        newLeft = 1;
-      }
-      if (newRight < 1) {
-        newLeft -= 1 - newRight;
-        newRight = 1;
-      }
-
-      setWidths((prev) => ({
-        ...prev,
-        [leftCol]: newLeft,
-        [rightCol]: newRight,
-      }));
-    };
-
-    const onMouseUp = () => {
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-    };
-
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-  };
+  const visibleColumns = showExifCols ? LIBRARY_COLUMN_KEYS : CORE_LIBRARY_COLUMN_KEYS;
+  const normalizedWidths = normalizedColumnPercentages(widths, visibleColumns);
 
   const headerColumnProps = {
-    onResize: handleResize,
+    resize,
     onSortChange,
     sortCriteria,
-    totalRawWidth,
-    widths,
   };
 
   return (
     <div className="flex items-center w-full h-9 bg-bg-secondary/80 backdrop-blur-sm border-b border-border-color/50 shrink-0">
-      <HeaderColumn {...headerColumnProps} title="" widthKey="thumbnail" nextKey="name" />
+      <HeaderColumn
+        {...headerColumnProps}
+        title=""
+        widthKey="thumbnail"
+        nextKey="name"
+        normalizedWidth={normalizedWidths.thumbnail}
+      />
       <HeaderColumn
         {...headerColumnProps}
         title={t('library.grid.columns.name')}
         widthKey="name"
         nextKey="date"
+        normalizedWidth={normalizedWidths.name}
         sortKey="name"
       />
       <HeaderColumn
@@ -249,6 +225,7 @@ function ListHeader({ widths, setWidths, containerRef, sortCriteria, onSortChang
         title={t('library.grid.columns.modified')}
         widthKey="date"
         nextKey="rating"
+        normalizedWidth={normalizedWidths.date}
         sortKey="date"
       />
       <HeaderColumn
@@ -256,6 +233,7 @@ function ListHeader({ widths, setWidths, containerRef, sortCriteria, onSortChang
         title={t('library.grid.columns.rating')}
         widthKey="rating"
         nextKey="color"
+        normalizedWidth={normalizedWidths.rating}
         sortKey="rating"
       />
       {showExifCols ? (
@@ -265,12 +243,14 @@ function ListHeader({ widths, setWidths, containerRef, sortCriteria, onSortChang
             title={t('library.grid.columns.label')}
             widthKey="color"
             nextKey="shutter"
+            normalizedWidth={normalizedWidths.color}
           />
           <HeaderColumn
             {...headerColumnProps}
             title={t('library.grid.columns.shutter')}
             widthKey="shutter"
             nextKey="aperture"
+            normalizedWidth={normalizedWidths.shutter}
             sortKey="shutter_speed"
           />
           <HeaderColumn
@@ -278,6 +258,7 @@ function ListHeader({ widths, setWidths, containerRef, sortCriteria, onSortChang
             title={t('library.grid.columns.aperture')}
             widthKey="aperture"
             nextKey="iso"
+            normalizedWidth={normalizedWidths.aperture}
             sortKey="aperture"
           />
           <HeaderColumn
@@ -285,17 +266,24 @@ function ListHeader({ widths, setWidths, containerRef, sortCriteria, onSortChang
             title={t('library.grid.columns.iso')}
             widthKey="iso"
             nextKey="focal"
+            normalizedWidth={normalizedWidths.iso}
             sortKey="iso"
           />
           <HeaderColumn
             {...headerColumnProps}
             title={t('library.grid.columns.focal')}
             widthKey="focal"
+            normalizedWidth={normalizedWidths.focal}
             sortKey="focal_length"
           />
         </>
       ) : (
-        <HeaderColumn {...headerColumnProps} title={t('library.grid.columns.label')} widthKey="color" />
+        <HeaderColumn
+          {...headerColumnProps}
+          title={t('library.grid.columns.label')}
+          widthKey="color"
+          normalizedWidth={normalizedWidths.color}
+        />
       )}
     </div>
   );
@@ -345,7 +333,7 @@ export default function LibraryGrid(props: LibraryGridProps) {
     thumbnailSizeOptions,
     onThumbnailSizeChange,
   } = props;
-  const { listColumnWidths, setLibrary, sortCriteria, setSortCriteria } = useLibraryStore();
+  const { listColumnWidths, setLibrary, setListColumnWidths, sortCriteria, setSortCriteria } = useLibraryStore();
   const [gridSize, setGridSize] = useState({ height: 0, width: 0 });
   const [listHandle, setListHandle] = useListCallbackRef();
   const [collapsedRecursiveFolders, setCollapsedRecursiveFolders] = useState<Set<string>>(new Set());
@@ -358,6 +346,15 @@ export default function LibraryGrid(props: LibraryGridProps) {
     at: performance.now(),
     direction: 'idle' as 'forward' | 'backward' | 'idle',
     velocity: 0,
+  });
+  const exifOverlay = useSettingsStore((s) => s.appSettings?.exifOverlay || ExifOverlay.Off);
+  const visibleColumns = exifOverlay === ExifOverlay.Off ? CORE_LIBRARY_COLUMN_KEYS : LIBRARY_COLUMN_KEYS;
+  const columnResize = useLibraryColumnResize({
+    committedWidths: listColumnWidths,
+    rootRef: libraryContainerRef,
+    visibleColumns,
+    commitWidths: setListColumnWidths,
+    enabled: thumbnailSize === ThumbnailSize.List,
   });
 
   useEffect(() => {
@@ -469,6 +466,7 @@ export default function LibraryGrid(props: LibraryGridProps) {
       : Math.max(1, Math.floor((availableWidth + ITEM_GAP) / (minThumbWidth + ITEM_GAP)));
     const itemWidth = isListView ? availableWidth : (availableWidth - ITEM_GAP * (columnCount - 1)) / columnCount;
 
+    // Draft resizing changes inherited cell widths only. The virtual row height updates once when the width is committed.
     const listRowHeight = Math.max(36, Math.min(300, (availableWidth * listColumnWidths.thumbnail) / 100));
     const rowHeight = isListView ? listRowHeight : itemWidth + ITEM_GAP;
     const headerHeight = 40;
@@ -645,7 +643,6 @@ export default function LibraryGrid(props: LibraryGridProps) {
       outerPadding: gridData?.OUTER_PADDING ?? 0,
       gap: gridData?.ITEM_GAP ?? 0,
       isListView: gridData?.isListView ?? false,
-      columnWidths: listColumnWidths,
       onToggleRecursiveFolder: handleToggleRecursiveFolder,
       onToggleAutoStack: handleToggleAutoStack,
     };
@@ -660,7 +657,6 @@ export default function LibraryGrid(props: LibraryGridProps) {
     handleImageLoad,
     imageRatings,
     currentFolderPath,
-    listColumnWidths,
     handleToggleRecursiveFolder,
     handleToggleAutoStack,
   ]);
@@ -700,7 +696,8 @@ export default function LibraryGrid(props: LibraryGridProps) {
   return (
     <div
       ref={libraryContainerRef}
-      className="flex-1 w-full h-full"
+      className={`flex-1 w-full h-full ${columnResize.isResizing ? 'cursor-col-resize' : ''}`}
+      data-library-column-resizing={columnResize.isResizing || undefined}
       role="presentation"
       onClick={props.onClearSelection}
       onContextMenu={props.onEmptyAreaContextMenu}
@@ -709,12 +706,7 @@ export default function LibraryGrid(props: LibraryGridProps) {
         {gridData.isListView && (
           <ListHeader
             widths={listColumnWidths}
-            setWidths={(updater) => {
-              setLibrary({
-                listColumnWidths: typeof updater === 'function' ? updater(listColumnWidths) : updater,
-              });
-            }}
-            containerRef={libraryContainerRef}
+            resize={columnResize}
             sortCriteria={sortCriteria}
             onSortChange={handleHeaderSort}
           />
