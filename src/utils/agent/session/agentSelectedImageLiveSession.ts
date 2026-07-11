@@ -9,6 +9,15 @@ import {
 import { agentReviewedAdjustmentCommandReceiptSchema } from '../../../schemas/agent/agentReviewedCommandSchemas';
 import type { RawEngineAppServerToolDispatchRequest } from '../../../schemas/agent/agentRuntimeSchemas';
 import {
+  agentSelectedImageLifecycleApprovalSchema,
+  agentSelectedImageLifecycleCommitSchema,
+  agentSelectedImageLifecycleProposalSchema,
+  agentSelectedImageLifecycleReceiptV2Schema,
+  agentSelectedImageLifecycleRevertSchema,
+  hashAgentSelectedImageLifecycleValue,
+  sealAgentSelectedImageLifecyclePhase,
+} from '../../../schemas/agent/agentSelectedImageLifecycleReceiptSchemas';
+import {
   type AgentSelectedImageProposalLineageV1,
   agentSelectedImageProposalIterationStateV1Schema,
   agentSelectedImageProposalLineageV1Schema,
@@ -57,6 +66,7 @@ import {
   type AgentSessionCheckpoint,
   agentHistoryRollbackResponseSchema,
   createAgentSessionCheckpoint,
+  rollbackAgentSessionHistory,
 } from './agentSessionHistory';
 import { createAgentTypedToolExecutionContext, dispatchAgentTypedEditorTool } from './agentTypedToolDispatch';
 
@@ -285,6 +295,7 @@ export const agentSelectedImageLiveSessionReceiptSchema = z
 export const agentSelectedImageLiveSessionAuditRecordSchema = z
   .object({
     auditEvents: z.array(selectedImageLiveSessionAuditEventSchema).min(1),
+    lifecycleReceipt: agentSelectedImageLifecycleReceiptV2Schema.optional(),
     receipt: agentSelectedImageLiveSessionReceiptSchema,
     replayState: z.enum(['replayable']),
     schemaVersion: z.literal(1),
@@ -1323,7 +1334,7 @@ export const recordAgentSelectedImageLiveSessionLateResult = (
   });
 };
 
-export const applyAgentSelectedImageLiveSession = async (
+const applyAgentSelectedImageLiveSessionUnchecked = async (
   draft: AgentSelectedImageLiveSessionDraft,
 ): Promise<AgentSelectedImageLiveSessionApplyResult> => {
   const applyRequest = {
@@ -1521,6 +1532,191 @@ export const applyAgentSelectedImageLiveSession = async (
   };
 };
 
+const selectedImageApplyTransactions = new Map<string, Promise<AgentSelectedImageLiveSessionApplyResult>>();
+const selectedImageMutationLocks = new Set<string>();
+
+export interface AgentSelectedImageApplyTransactionOptions {
+  auditStorage?: AgentSelectedImageLiveSessionAuditStorageAdapter;
+}
+
+/** Owns the mutation-to-audit boundary. No successful mutation is observable as applied until parity and audit pass. */
+export const runAgentSelectedImageApplyTransaction = (
+  draft: AgentSelectedImageLiveSessionDraft,
+  options: AgentSelectedImageApplyTransactionOptions = {},
+): Promise<AgentSelectedImageLiveSessionApplyResult> => {
+  const transactionId = `${draft.sessionId}:${draft.operationId}`;
+  const prior = selectedImageApplyTransactions.get(transactionId);
+  if (prior !== undefined) return prior;
+  if (selectedImageMutationLocks.has(draft.sessionId)) {
+    return Promise.reject(new Error('Selected-image apply rejected because another transaction is active.'));
+  }
+
+  const transaction = (async () => {
+    selectedImageMutationLocks.add(draft.sessionId);
+    const checkpoint = createAgentSessionCheckpoint(draft.sessionId);
+    const sealedHead = draft.proposalLineage.iterations.find(
+      (iteration) => iteration.iterationId === draft.proposalLineage.sealedIterationId,
+    );
+    if (draft.state === 'dry_run_ready' && (sealedHead === undefined || sealedHead.state !== 'sealed')) {
+      throw new Error('Selected-image transaction requires the authoritative sealed proposal head.');
+    }
+    let mutationStarted = false;
+    try {
+      const result = await applyAgentSelectedImageLiveSessionUnchecked(draft);
+      if (result.status !== 'applied') return result;
+      if (sealedHead === undefined || sealedHead.state !== 'sealed') {
+        throw new Error('Selected-image transaction cannot publish applied without its sealed proposal head.');
+      }
+      mutationStarted = true;
+
+      const state = useEditorStore.getState();
+      const current = buildSnapshot();
+      if (
+        state.historyIndex !== checkpoint.historyIndex + 1 ||
+        state.history.length !== checkpoint.history.length + 1
+      ) {
+        throw new Error('Selected-image commit parity rejected a non-atomic history transaction.');
+      }
+      for (const [key, expected] of Object.entries(draft.adjustments)) {
+        if (expected !== undefined && state.adjustments[key as keyof typeof state.adjustments] !== expected) {
+          throw new Error(`Selected-image commit parity rejected adjustment mismatch: ${key}.`);
+        }
+      }
+      if (
+        current.selectedImagePath !== draft.snapshot.selectedImagePath ||
+        current.graphRevision !== result.apply.appliedGraphRevision ||
+        current.recipeHash !== result.audit.receipt.finalRecipeHash
+      ) {
+        throw new Error('Selected-image commit parity rejected graph, recipe, or selected-image mismatch.');
+      }
+      if (
+        result.previewAfterHash !== result.apply.afterPreviewHash ||
+        result.previewBeforeHash !== result.apply.beforePreviewHash
+      ) {
+        throw new Error('Selected-image commit parity rejected preview identity mismatch.');
+      }
+      const proposalId = sealedHead.proposalId;
+      const proposalHash = sealedHead.proposalHash;
+      const proposalReceiptHash = await hashAgentSelectedImageLifecycleValue('proposal-receipt', sealedHead);
+      const renderSpecHash = await hashAgentSelectedImageLifecycleValue('render-spec', {
+        height: draft.snapshot.previewHeight,
+        purpose: 'medium-preview',
+        width: draft.snapshot.previewWidth,
+      });
+      const proposal = agentSelectedImageLifecycleProposalSchema.parse(
+        await sealAgentSelectedImageLifecyclePhase('proposal', {
+          afterArtifactHash: await hashAgentSelectedImageLifecycleValue('proposal-after', draft.dryRun.dryRunPlanHash),
+          beforeArtifactHash: await hashAgentSelectedImageLifecycleValue(
+            'proposal-before',
+            draft.snapshot.previewRenderHash,
+          ),
+          editGraph: draft.adjustments,
+          graphRevision: draft.snapshot.graphRevision,
+          lineage: {
+            epoch: draft.proposalLineage.epoch,
+            iterationId: sealedHead.iterationId,
+            lineageId: draft.proposalLineage.lineageId,
+            ordinal: sealedHead.ordinal,
+            proposalHash: sealedHead.proposalHash,
+            proposalId: sealedHead.proposalId,
+            state: 'sealed',
+          },
+          proposalHash,
+          proposalId,
+          receiptHash: proposalReceiptHash,
+          recipeHash: draft.snapshot.recipeHash,
+          renderSpecHash,
+          selectedImageId: sealedHead.selectedImageId,
+        }),
+      );
+      const approval = agentSelectedImageLifecycleApprovalSchema.parse(
+        await sealAgentSelectedImageLifecyclePhase('approval', {
+          actor: 'workspace-user',
+          approvalId: draft.approvalId ?? '',
+          approvedAt: new Date().toISOString(),
+          policyVersion: 'selected-image-approval.v1',
+          proposalHash,
+          proposalId,
+          receiptHash: proposalReceiptHash,
+          source: 'user',
+        }),
+      );
+      const transactionHash = (domain: string, value: unknown) => hashAgentSelectedImageLifecycleValue(domain, value);
+      const commit = agentSelectedImageLifecycleCommitSchema.parse(
+        await sealAgentSelectedImageLifecyclePhase('commit', {
+          afterGraphHash: await transactionHash('graph-after', current.graphRevision),
+          afterPreviewHash: await transactionHash('preview-after', result.previewAfterHash),
+          afterRecipeHash: await transactionHash('recipe-after', current.recipeHash),
+          beforeGraphHash: await transactionHash('graph-before', checkpoint.graphRevision),
+          beforePreviewHash: await transactionHash('preview-before', result.previewBeforeHash),
+          beforeRecipeHash: await transactionHash('recipe-before', checkpoint.previewRecipeHash),
+          history: {
+            afterDepth: state.history.length,
+            beforeDepth: checkpoint.history.length,
+            transactionId,
+          },
+          parity: { mode: 'byte_exact', result: 'passed', threshold: 0 },
+          status: 'applied',
+          toolCalls: result.audit.receipt.toolCalls.map(({ id, name }) => ({ id, name })),
+          transactionId,
+        }),
+      );
+      const lifecycleWithoutHash = {
+        approval,
+        commit,
+        createdAt: new Date().toISOString(),
+        proposal,
+        schemaVersion: 2 as const,
+        sessionId: draft.sessionId,
+      };
+      const lifecycleReceipt = agentSelectedImageLifecycleReceiptV2Schema.parse({
+        ...lifecycleWithoutHash,
+        hash: await hashAgentSelectedImageLifecycleValue('receipt', lifecycleWithoutHash),
+      });
+      result.audit = agentSelectedImageLiveSessionAuditRecordSchema.parse({
+        ...result.audit,
+        lifecycleReceipt,
+      });
+      if (options.auditStorage !== undefined) {
+        appendAgentSelectedImageLiveSessionAuditRecord(options.auditStorage, result.audit);
+      }
+      return result;
+    } catch (error) {
+      const currentState = useEditorStore.getState();
+      mutationStarted ||=
+        currentState.historyIndex !== checkpoint.historyIndex ||
+        currentState.history.length !== checkpoint.history.length;
+      if (mutationStarted) {
+        rollbackAgentSessionHistory({
+          checkpoint,
+          requestId: `${draft.requestId}-compensate`,
+          scope: 'operation',
+          sessionId: draft.sessionId,
+        });
+        const restored = useEditorStore.getState();
+        const restoredSnapshot = buildSnapshot();
+        if (
+          restored.historyIndex !== checkpoint.historyIndex ||
+          JSON.stringify(restored.history) !== JSON.stringify(checkpoint.history) ||
+          restoredSnapshot.graphRevision !== checkpoint.graphRevision ||
+          restoredSnapshot.recipeHash !== checkpoint.previewRecipeHash
+        ) {
+          draft.state = 'failed';
+          throw new Error('Selected-image compensation failed; explicit recovery is required.', { cause: error });
+        }
+      }
+      draft.state = 'failed';
+      throw error;
+    } finally {
+      selectedImageMutationLocks.delete(draft.sessionId);
+    }
+  })();
+  selectedImageApplyTransactions.set(transactionId, transaction);
+  return transaction;
+};
+
+export const applyAgentSelectedImageLiveSession = runAgentSelectedImageApplyTransaction;
+
 export const rollbackAgentSelectedImageLiveSession = async ({
   audit,
   checkpoint,
@@ -1591,6 +1787,44 @@ export const rollbackAgentSelectedImageLiveSession = async ({
           'reverted',
           { expectedEpoch: receipt.proposalLineage.epoch },
         );
+  const revertedIteration = revertedProposalLineage?.iterations.find((iteration) => iteration.state === 'reverted');
+  let lifecycleReceipt = parsedAudit.lifecycleReceipt;
+  if (lifecycleReceipt !== undefined) {
+    if (revertedProposalLineage === undefined || revertedIteration === undefined) {
+      throw new Error('Selected-image V2 revert requires authoritative reverted proposal lineage.');
+    }
+    const transactionId = lifecycleReceipt.commit?.transactionId;
+    if (transactionId === undefined)
+      throw new Error('Selected-image V2 revert requires an applied transaction receipt.');
+    const revert = agentSelectedImageLifecycleRevertSchema.parse(
+      await sealAgentSelectedImageLifecyclePhase('revert', {
+        checkpointHash: await hashAgentSelectedImageLifecycleValue('revert-checkpoint', checkpoint),
+        lineage: {
+          epoch: revertedProposalLineage.epoch,
+          iterationId: revertedIteration.iterationId,
+          lineageId: revertedProposalLineage.lineageId,
+          proposalHash: revertedIteration.proposalHash,
+          proposalId: revertedIteration.proposalId,
+          state: 'reverted',
+        },
+        parity: { mode: 'byte_exact', result: 'passed', threshold: 0 },
+        restoredGraphHash: await hashAgentSelectedImageLifecycleValue('revert-graph', restored.graphRevision),
+        restoredHistoryHash: await hashAgentSelectedImageLifecycleValue('revert-history', {
+          depth: useEditorStore.getState().history.length,
+          index: useEditorStore.getState().historyIndex,
+        }),
+        restoredPreviewHash: await hashAgentSelectedImageLifecycleValue('revert-preview', restored.previewRenderHash),
+        restoredRecipeHash: await hashAgentSelectedImageLifecycleValue('revert-recipe', restored.recipeHash),
+        status: 'reverted',
+        transactionId,
+      }),
+    );
+    const lifecycleWithoutHash = { ...lifecycleReceipt, hash: undefined, revert };
+    lifecycleReceipt = agentSelectedImageLifecycleReceiptV2Schema.parse({
+      ...lifecycleWithoutHash,
+      hash: await hashAgentSelectedImageLifecycleValue('receipt', lifecycleWithoutHash),
+    });
+  }
   return agentSelectedImageLiveSessionAuditRecordSchema.parse({
     ...parsedAudit,
     auditEvents: [
@@ -1607,6 +1841,7 @@ export const rollbackAgentSelectedImageLiveSession = async ({
         toolName: AGENT_HISTORY_ROLLBACK_TOOL_NAME,
       },
     ],
+    lifecycleReceipt,
     receipt: {
       ...parsedAudit.receipt,
       proposalLineage: revertedProposalLineage,
