@@ -22,6 +22,12 @@ export const AGENT_CURRENT_IMAGE_PREVIEW_LOOP_APPLY_REVIEW_INPUT_SCHEMA_NAME =
 export const AGENT_CURRENT_IMAGE_PREVIEW_LOOP_APPLY_REVIEW_OUTPUT_SCHEMA_NAME =
   AGENT_CURRENT_IMAGE_PREVIEW_LOOP_OUTPUT_SCHEMA_NAME;
 
+const expandProposalHash = (contentHash: string): string => {
+  const digest = contentHash.slice('sha256:'.length);
+  if (digest.length === 0) throw new Error('Proposal hash expansion requires preview content evidence.');
+  return `sha256:${digest.repeat(Math.ceil(64 / digest.length)).slice(0, 64)}`;
+};
+
 const agentLoopAdjustmentPatchSchema = z
   .object({
     exposure: z.number().min(-2).max(2).optional(),
@@ -350,6 +356,15 @@ export const agentCurrentImagePreviewLoopResultSchema = z
       })
       .strict(),
     selectedImagePath: z.string().trim().min(1),
+    sealedProposal: z
+      .object({
+        acceptedProposalHash: z.string().regex(/^sha256:[a-f0-9]{16,64}$/u),
+        acceptedProposalId: z.string().trim().min(1),
+        lineageEpoch: z.number().int().positive(),
+        lineageId: z.string().trim().min(1),
+        sealedIterationId: z.string().trim().min(1),
+      })
+      .strict(),
     status: z.enum(['needs_user_review', 'max_iterations_reached']),
     toolName: z.literal(AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME),
     userFeedback: z.string().trim().min(1).optional(),
@@ -363,8 +378,13 @@ export const agentCurrentImagePreviewLoopApplyReviewRequestSchema = z
   .object({
     acceptedPreviewArtifactId: z.string().trim().min(1),
     acceptedPreviewReceiptHash: z.string().regex(/^sha256:[a-f0-9]{16,64}$/u),
+    acceptedProposalHash: z.string().regex(/^sha256:[a-f0-9]{16,64}$/u),
+    acceptedProposalId: z.string().trim().min(1),
+    lineageEpoch: z.number().int().positive(),
+    lineageId: z.string().trim().min(1),
     request: agentCurrentImagePreviewLoopRequestSchema,
     review: agentCurrentImagePreviewLoopResultSchema,
+    sealedIterationId: z.string().trim().min(1),
   })
   .strict();
 
@@ -488,6 +508,13 @@ export const runAgentCurrentImagePreviewLoop = async (
       width: initialSnapshot.initialPreview.width,
     },
     selectedImagePath: initialSnapshot.activeImagePath,
+    sealedProposal: {
+      acceptedProposalHash: expandProposalHash(previewRefreshReceipts.at(-1)?.contentHash ?? ''),
+      acceptedProposalId: previewRefreshReceipts.at(-1)?.preview.artifactId,
+      lineageEpoch: previewRefreshReceipts.length,
+      lineageId: `lineage_${parsedRequest.sessionId}_${parsedRequest.requestId}`.replaceAll(/[^A-Za-z0-9_-]/gu, '_'),
+      sealedIterationId: `${parsedRequest.requestId}-iteration-${previewRefreshReceipts.length}`,
+    },
     status: loopResult.reviewStatus,
     toolName: AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME,
     userFeedback: parsedRequest.userFeedback,
@@ -511,6 +538,15 @@ export const applyAgentCurrentImagePreviewLoopReviewedEdit = async (
   }
   if (parsedRequest.acceptedPreviewReceiptHash !== latestPreviewReceipt.contentHash) {
     throw new Error('Agent selected-image preview loop apply rejected stale preview receipt.');
+  }
+  if (
+    parsedRequest.lineageId !== parsedRequest.review.sealedProposal.lineageId ||
+    parsedRequest.lineageEpoch !== parsedRequest.review.sealedProposal.lineageEpoch ||
+    parsedRequest.sealedIterationId !== parsedRequest.review.sealedProposal.sealedIterationId ||
+    parsedRequest.acceptedProposalId !== parsedRequest.review.sealedProposal.acceptedProposalId ||
+    parsedRequest.acceptedProposalHash !== parsedRequest.review.sealedProposal.acceptedProposalHash
+  ) {
+    throw new Error('Agent selected-image preview loop apply rejected a non-current sealed proposal head.');
   }
 
   const snapshot = buildAgentImageContextSnapshot();

@@ -14,11 +14,14 @@ export const agentSelectedImageLifecycleProposalSchema = phaseBaseSchema
     lineage: z
       .object({
         epoch: z.number().int().nonnegative(),
-        iteration: z.number().int().nonnegative(),
+        iterationId: identitySchema,
         lineageId: identitySchema,
+        ordinal: z.number().int().positive(),
+        proposalHash: sha256Schema,
+        proposalId: identitySchema,
+        state: z.literal('sealed'),
       })
-      .strict()
-      .nullable(),
+      .strict(),
     proposalHash: sha256Schema,
     proposalId: identitySchema,
     receiptHash: sha256Schema,
@@ -74,6 +77,16 @@ export const agentSelectedImageLifecycleCommitSchema = phaseBaseSchema
 export const agentSelectedImageLifecycleRevertSchema = phaseBaseSchema
   .extend({
     checkpointHash: sha256Schema,
+    lineage: z
+      .object({
+        epoch: z.number().int().nonnegative(),
+        iterationId: identitySchema,
+        lineageId: identitySchema,
+        proposalHash: sha256Schema,
+        proposalId: identitySchema,
+        state: z.literal('reverted'),
+      })
+      .strict(),
     parity: paritySchema,
     restoredGraphHash: sha256Schema,
     restoredHistoryHash: sha256Schema,
