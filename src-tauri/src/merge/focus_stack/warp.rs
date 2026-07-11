@@ -199,7 +199,7 @@ fn difference(a: [f32; 4], b: [f32; 4]) -> [f32; 4] {
         1.0,
     ]
 }
-fn encode(pixels: &[[f32; 4]], width: u32, height: u32) -> Result<Vec<u8>, String> {
+pub(super) fn encode(pixels: &[[f32; 4]], width: u32, height: u32) -> Result<Vec<u8>, String> {
     let image = RgbaImage::from_fn(width, height, |x, y| {
         let p = pixels[y as usize * width as usize + x as usize];
         Rgba([
@@ -215,7 +215,7 @@ fn encode(pixels: &[[f32; 4]], width: u32, height: u32) -> Result<Vec<u8>, Strin
         .map_err(|error| format!("focus_preview_encode_failed:{error}"))?;
     Ok(cursor.into_inner())
 }
-fn data_url(bytes: &[u8]) -> String {
+pub(super) fn data_url(bytes: &[u8]) -> String {
     format!(
         "data:image/png;base64,{}",
         base64::engine::general_purpose::STANDARD.encode(bytes)

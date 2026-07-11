@@ -1,8 +1,9 @@
 use super::{
     alignment::{self, RectF64, SimilarityTransform},
-    focus_measure, labels,
+    blend, focus_measure, labels,
     map_artifact::{self, FocusEvidenceMetrics, FocusMapArtifact},
     raw_frame::{self, DecodedFocusSource, PROXY_ID, RectU32},
+    review::{self, NativeBlendReview},
     warp::{self, SourcePreview},
 };
 
@@ -16,6 +17,11 @@ pub(crate) struct FocusStackReadinessSettings {
     pub lens_correction_identity: String,
     pub neutral_raw_state: bool,
     pub orientation_identity: String,
+    #[serde(default = "default_halo_strength")]
+    pub halo_suppression_strength_percent: u8,
+}
+fn default_halo_strength() -> u8 {
+    80
 }
 
 #[derive(Clone, Debug, serde::Serialize)]
@@ -84,6 +90,7 @@ pub(crate) struct FocusStackInputPlan {
     transforms: Vec<SimilarityTransform>,
     previews: Vec<SourcePreview>,
     focus_evidence: Option<FocusEvidence>,
+    native_blend: Option<NativeBlendReview>,
 }
 
 #[derive(Clone, Debug, serde::Serialize)]
@@ -332,7 +339,7 @@ fn finish(
     } else {
         Vec::new()
     };
-    let focus_evidence = if blocks.is_empty() {
+    let (focus_evidence, native_blend) = if blocks.is_empty() {
         let crop = common_overlap.as_ref().expect("checked common crop");
         let response = focus_measure::compute(
             &decoded,
@@ -359,16 +366,28 @@ fn finish(
             &algorithm_identity,
             decoded.len(),
         )?;
-        Some(FocusEvidence {
-            algorithm_id: focus_measure::POLICY_ID,
-            label_policy_id: labels::POLICY_ID,
-            noise_model_source: "raw_estimate_or_robust_high_pass_mad",
-            policy,
-            map_artifact,
-            metrics,
-        })
+        let blend = blend::fuse(
+            &response,
+            &maps,
+            reference_source_index,
+            settings.halo_suppression_strength_percent,
+            cancelled,
+        )?;
+        let native_blend =
+            review::build(&blend, &maps, &map_artifact.content_hash, &input_plan_hash)?;
+        (
+            Some(FocusEvidence {
+                algorithm_id: focus_measure::POLICY_ID,
+                label_policy_id: labels::POLICY_ID,
+                noise_model_source: "raw_estimate_or_robust_high_pass_mad",
+                policy,
+                map_artifact,
+                metrics,
+            }),
+            Some(native_blend),
+        )
     } else {
-        None
+        (None, None)
     };
     let preview_hashes = previews
         .iter()
@@ -377,7 +396,8 @@ fn finish(
     let evidence_hash = focus_evidence
         .as_ref()
         .map(|evidence| &evidence.map_artifact.content_hash);
-    let canonical = serde_json::json!({"inputPlanHash": input_plan_hash, "alignmentAlgorithmId": alignment::ALGORITHM_ID, "alignmentPolicyId": alignment::POLICY_ID, "interpolationPolicyId": warp::WARP_ID, "transforms": transforms, "commonOverlap": common_overlap, "previewHashes": preview_hashes, "focusEvidenceHash": evidence_hash, "warningCodes": warnings, "blockCodes": blocks});
+    let blend_hash = native_blend.as_ref().map(|blend| &blend.blend_result_hash);
+    let canonical = serde_json::json!({"inputPlanHash": input_plan_hash, "alignmentAlgorithmId": alignment::ALGORITHM_ID, "alignmentPolicyId": alignment::POLICY_ID, "interpolationPolicyId": warp::WARP_ID, "transforms": transforms, "commonOverlap": common_overlap, "previewHashes": preview_hashes, "focusEvidenceHash": evidence_hash, "blendHash": blend_hash, "warningCodes": warnings, "blockCodes": blocks});
     if cancelled() {
         return Err("focus_stack_plan_cancelled:plan_publication".to_string());
     }
@@ -409,6 +429,7 @@ fn finish(
         transforms,
         previews,
         focus_evidence,
+        native_blend,
     })
 }
 
@@ -462,6 +483,7 @@ mod tests {
             lens_correction_identity: "none".to_string(),
             neutral_raw_state: true,
             orientation_identity: "common:normal".to_string(),
+            halo_suppression_strength_percent: 80,
         }
     }
 
@@ -516,6 +538,17 @@ mod tests {
             assert_eq!(
                 first.accepted_dry_run_plan_hash,
                 second.accepted_dry_run_plan_hash
+            );
+            let first_blend = first.native_blend.as_ref().unwrap();
+            let second_blend = second.native_blend.as_ref().unwrap();
+            assert_eq!(first_blend.preview_hash, second_blend.preview_hash);
+            assert_eq!(
+                first_blend.blend_result_hash,
+                second_blend.blend_result_hash
+            );
+            assert_eq!(
+                first_blend.retouch_seed.content_hash,
+                second_blend.retouch_seed.content_hash
             );
             assert_eq!(first.sources.len(), count);
             assert!(
