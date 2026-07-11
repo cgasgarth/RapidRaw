@@ -1,6 +1,4 @@
-import cx from 'clsx';
-import { motion } from 'framer-motion';
-import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type KeyboardEvent, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useManagedFocus } from '../../../hooks/ui/useManagedFocus';
@@ -8,6 +6,7 @@ import { useModalTransition } from '../../../hooks/ui/useModalTransition';
 import { TextVariants } from '../../../types/typography';
 import { ADJUSTMENT_GROUPS } from '../../../utils/adjustments';
 import type { Preset } from '../../ui/AppProperties';
+import InspectorSegmentedControl from '../../ui/primitives/InspectorSegmentedControl';
 import Switch from '../../ui/primitives/Switch';
 import UiText from '../../ui/primitives/Text';
 
@@ -21,6 +20,10 @@ interface ConfigurePresetModalProps {
 interface PresetTypeSwitchProps {
   selectedType: 'tool' | 'style';
   onChange: (type: 'tool' | 'style') => void;
+}
+
+interface ConfigurePresetDraftProps extends Omit<ConfigurePresetModalProps, 'isOpen'> {
+  show: boolean;
 }
 
 const getConfigurePresetState = (initialPreset: Preset | null | undefined) => {
@@ -41,133 +44,75 @@ const getConfigurePresetState = (initialPreset: Preset | null | undefined) => {
 
 const PresetTypeSwitch = ({ selectedType, onChange }: PresetTypeSwitchProps) => {
   const { t } = useTranslation();
-  const [bubbleStyle, setBubbleStyle] = useState({});
-  const isInitialAnimation = useRef(true);
-
   const presetTypeOptions = useMemo(
     () => [
       {
-        id: 'style' as const,
+        value: 'style' as const,
         label: t('modals.configurePreset.typeStyleLabel'),
-        title: t('modals.configurePreset.typeStyleDesc'),
+        tooltip: t('modals.configurePreset.typeStyleDesc'),
       },
       {
-        id: 'tool' as const,
+        value: 'tool' as const,
         label: t('modals.configurePreset.typeToolLabel'),
-        title: t('modals.configurePreset.typeToolDesc'),
+        tooltip: t('modals.configurePreset.typeToolDesc'),
       },
     ],
     [t],
   );
 
-  useEffect(() => {
-    const selectedIndex = presetTypeOptions.findIndex((m) => m.id === selectedType);
-    const safeIndex = selectedIndex >= 0 ? selectedIndex : 0;
-
-    const widthPercent = 100 / presetTypeOptions.length;
-    const targetX = `${safeIndex * 100}%`;
-    const targetWidth = `${widthPercent}%`;
-
-    if (isInitialAnimation.current) {
-      const initialX = selectedType === 'style' ? '-25%' : '100%';
-
-      setBubbleStyle({
-        x: [initialX, targetX],
-        width: targetWidth,
-      });
-      isInitialAnimation.current = false;
-    } else {
-      setBubbleStyle({
-        x: targetX,
-        width: targetWidth,
-      });
-    }
-  }, [selectedType, presetTypeOptions]);
-
   return (
-    <div
-      aria-label={t('modals.configurePreset.typeLabel')}
-      className="mt-2 w-full rounded-md bg-card-active p-1.5"
-      role="radiogroup"
-    >
-      <div className="relative flex w-full">
-        <motion.div
-          className="absolute top-0 bottom-0 z-0 bg-accent"
-          style={{ borderRadius: 4 }}
-          animate={bubbleStyle}
-          transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
-        />
-        {presetTypeOptions.map((option) => (
-          <button
-            key={option.id}
-            aria-checked={selectedType === option.id}
-            data-tooltip={option.title}
-            onKeyDown={(event) => {
-              if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-              event.preventDefault();
-              onChange(option.id === 'style' ? 'tool' : 'style');
-            }}
-            onClick={(e) => {
-              e.preventDefault();
-              onChange(option.id);
-            }}
-            className={cx(
-              'relative flex-1 flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
-              {
-                'text-text-primary hover:bg-surface': selectedType !== option.id,
-                'text-button-text': selectedType === option.id,
-              },
-            )}
-            role="radio"
-            style={{ WebkitTapHighlightColor: 'transparent' }}
-            type="button"
-          >
-            <span className="relative z-10 flex items-center">{option.label}</span>
-          </button>
-        ))}
-      </div>
-    </div>
+    <InspectorSegmentedControl
+      ariaLabel={t('modals.configurePreset.typeLabel')}
+      className="mt-2 w-full"
+      onChange={onChange}
+      options={presetTypeOptions}
+      value={selectedType}
+    />
   );
 };
 
-export default function ConfigurePresetModal({ isOpen, onClose, onSave, initialPreset }: ConfigurePresetModalProps) {
-  const { t } = useTranslation();
-  const [name, setName] = useState('');
-  const [includeMasks, setIncludeMasks] = useState(false);
-  const [includeCropTransform, setIncludeCropTransform] = useState(false);
-  const [presetType, setPresetType] = useState<'tool' | 'style'>('style');
-  const [didAttemptSave, setDidAttemptSave] = useState(false);
+export default function ConfigurePresetModal(props: ConfigurePresetModalProps) {
+  const { isOpen, initialPreset } = props;
   const { isMounted, show } = useModalTransition(isOpen);
+  const epochRef = useRef(isOpen ? 1 : 0);
+  const wasOpenRef = useRef(isOpen);
+  const sessionRef = useRef(
+    isOpen ? { id: `${initialPreset?.id ?? 'new'}:${epochRef.current}`, initialPreset: initialPreset ?? null } : null,
+  );
+  if (isOpen) {
+    const identity = initialPreset?.id ?? 'new';
+    const currentIdentity = sessionRef.current?.initialPreset?.id ?? 'new';
+    if (!wasOpenRef.current || identity !== currentIdentity) {
+      epochRef.current += 1;
+      sessionRef.current = { id: `${identity}:${epochRef.current}`, initialPreset: initialPreset ?? null };
+    }
+  }
+  wasOpenRef.current = isOpen;
+  const session = sessionRef.current;
+  if (!isMounted || !session) return null;
+
+  return (
+    <ConfigurePresetDraft
+      key={session.id}
+      initialPreset={session.initialPreset}
+      onClose={props.onClose}
+      onSave={props.onSave}
+      show={show}
+    />
+  );
+}
+
+export function ConfigurePresetDraft({ onClose, onSave, initialPreset, show }: ConfigurePresetDraftProps) {
+  const { t } = useTranslation();
+  const initialDraft = useMemo(() => getConfigurePresetState(initialPreset), [initialPreset]);
+  const [name, setName] = useState(() => initialDraft.name);
+  const [includeMasks, setIncludeMasks] = useState(() => initialDraft.includeMasks);
+  const [includeCropTransform, setIncludeCropTransform] = useState(() => initialDraft.includeCropTransform);
+  const [presetType, setPresetType] = useState<'tool' | 'style'>(() => initialDraft.presetType);
+  const [didAttemptSave, setDidAttemptSave] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   useManagedFocus(nameInputRef, show);
-
-  useEffect(() => {
-    if (isOpen) {
-      const timer = window.setTimeout(() => {
-        const presetState = getConfigurePresetState(initialPreset);
-        setName(presetState.name);
-        setIncludeMasks(presetState.includeMasks);
-        setIncludeCropTransform(presetState.includeCropTransform);
-        setPresetType(presetState.presetType);
-        setDidAttemptSave(false);
-      }, 0);
-      return () => {
-        window.clearTimeout(timer);
-      };
-    }
-
-    const timer = window.setTimeout(() => {
-      setName('');
-      setIncludeMasks(false);
-      setIncludeCropTransform(false);
-      setPresetType('style');
-      setDidAttemptSave(false);
-    }, 300);
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [isOpen, initialPreset]);
 
   const handleSave = useCallback(() => {
     if (!name.trim()) {
@@ -188,10 +133,6 @@ export default function ConfigurePresetModal({ isOpen, onClose, onSave, initialP
     },
     [handleSave, onClose],
   );
-
-  if (!isMounted) {
-    return null;
-  }
 
   return (
     <div
