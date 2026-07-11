@@ -89,6 +89,8 @@ export enum Invokes {
   LoadSettings = 'load_settings',
   MoveFiles = 'move_files',
   CancelHdrPlan = 'cancel_hdr_plan',
+  CancelFocusStackPlan = 'cancel_focus_stack_plan',
+  PlanFocusStack = 'plan_focus_stack',
   PlanHdr = 'plan_hdr',
   PlanPanorama = 'plan_panorama',
   PlanSuperResolution = 'plan_super_resolution',

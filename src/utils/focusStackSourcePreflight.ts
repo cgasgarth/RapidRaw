@@ -9,6 +9,7 @@ import { parseExifDistanceMm, parseExifInteger, parseExposureEv, readExifString 
 export const focusStackSourcePreflightMetadataSchema = z
   .object({
     exif: z.record(z.string(), z.string()).nullable().optional(),
+    graphRevision: z.string().min(1).optional(),
     height: z.number().int().positive().optional(),
     imagePath: z.string().trim().min(1),
     sourceIndex: z.number().int().nonnegative(),
@@ -54,6 +55,8 @@ export const createFocusStackSourcePreflightMetadata = (
   sourcePaths: string[],
   imageRecords: Array<{
     exif?: Record<string, string> | null;
+    is_edited?: boolean;
+    modified?: number;
     path: string;
   }>,
 ): FocusStackSourcePreflightMetadata[] => {
@@ -62,6 +65,7 @@ export const createFocusStackSourcePreflightMetadata = (
     const exif = imageByPath.get(imagePath)?.exif ?? null;
     return focusStackSourcePreflightMetadataSchema.parse({
       exif,
+      graphRevision: `library:${imageByPath.get(imagePath)?.modified ?? 0}:${imageByPath.get(imagePath)?.is_edited === true ? 'edited' : 'neutral'}`,
       height: parseExifInteger(exif, ['ImageHeight', 'ExifImageHeight', 'PixelYDimension']),
       imagePath,
       sourceIndex,

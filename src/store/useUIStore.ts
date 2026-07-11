@@ -28,6 +28,7 @@ import type {
   EditorWorkspaceZoomMode,
 } from '../schemas/editorWorkspacePreferencesSchemas';
 import { editorWorkspacePreferencesSchema } from '../schemas/editorWorkspacePreferencesSchemas';
+import type { FocusStackNativeInputPlan } from '../schemas/focus-stack/focusStackNativePlanSchemas';
 import type { FocusStackOutputReviewWorkflow } from '../schemas/focus-stack/focusStackOutputReviewSchemas';
 import { DEFAULT_FOCUS_STACK_UI_SETTINGS, type FocusStackUiSettings } from '../schemas/focus-stack/focusStackUiSchemas';
 import {
@@ -203,6 +204,8 @@ export interface SuperResolutionModalState {
 }
 
 export interface FocusStackModalState {
+  error: string | null;
+  isPlanning: boolean;
   isOpen: boolean;
   lastApplyCommand?: {
     acceptedDryRunPlanHash: string;
@@ -220,6 +223,7 @@ export interface FocusStackModalState {
     toolName: string;
   };
   outputReview: FocusStackOutputReviewWorkflow | null;
+  nativeInputPlan: FocusStackNativeInputPlan | null;
   settings: FocusStackUiSettings;
   sourcePreflightMetadata: FocusStackSourcePreflightMetadata[];
   sourcePaths: Array<string>;
@@ -295,7 +299,10 @@ export const createDefaultSuperResolutionModalState = (
 export const createDefaultFocusStackModalState = (
   settings: FocusStackUiSettings = DEFAULT_FOCUS_STACK_UI_SETTINGS,
 ): FocusStackModalState => ({
+  error: null,
   isOpen: false,
+  isPlanning: false,
+  nativeInputPlan: null,
   outputReview: null,
   settings,
   sourcePreflightMetadata: [],
