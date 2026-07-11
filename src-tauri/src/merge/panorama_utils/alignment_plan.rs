@@ -136,7 +136,7 @@ pub struct CalibratedAlignmentPlan {
     pub completed_stages: Vec<String>,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct AlignmentCancellation {
     cancelled: AtomicBool,
 }
@@ -145,7 +145,7 @@ impl AlignmentCancellation {
     pub fn cancel(&self) {
         self.cancelled.store(true, Ordering::Release);
     }
-    fn check(&self, stage: &str) -> Result<(), String> {
+    pub fn check(&self, stage: &str) -> Result<(), String> {
         if self.cancelled.load(Ordering::Acquire) {
             Err(format!(
                 "Panorama alignment cancelled during {stage}; no plan was published."

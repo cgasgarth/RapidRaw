@@ -17,6 +17,7 @@ export const buildPanoramaSavedReviewSummary = ({
   sourcePaths: string[];
 }): PanoramaSavedReviewSummary =>
   panoramaSavedReviewSummarySchema.parse({
+    ...(renderedReview.alignmentPlan === null ? {} : { alignmentPlan: renderedReview.alignmentPlan }),
     boundaryFillColor: renderedReview.boundary.fillColor,
     boundaryMode: settings.boundaryMode,
     capabilityLevel: 'runtime_apply_capable',
