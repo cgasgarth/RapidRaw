@@ -1,9 +1,12 @@
 import { invoke } from '@tauri-apps/api/core';
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { useShallow } from 'zustand/react/shallow';
-import { singleImageX2PreviewSchema } from '../../schemas/computational-merge/singleImageX2Schemas';
+import {
+  singleImageX2ApplyReceiptSchema,
+  singleImageX2PreviewSchema,
+} from '../../schemas/computational-merge/singleImageX2Schemas';
 import { focusStackNativeInputPlanSchema } from '../../schemas/focus-stack/focusStackNativePlanSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
@@ -172,7 +175,9 @@ export default function AppModals(props: AppModalsProps) {
   const [hasLoadedHdrModal, setHasLoadedHdrModal] = useState(hdrModalState.isOpen);
   const [hasLoadedSuperResolutionModal, setHasLoadedSuperResolutionModal] = useState(superResolutionModalState.isOpen);
   const [singleImagePreviewRunning, setSingleImagePreviewRunning] = useState(false);
+  const [singleImageApplyRunning, setSingleImageApplyRunning] = useState(false);
   const [hasLoadedFocusStackModal, setHasLoadedFocusStackModal] = useState(focusStackModalState.isOpen);
+  const focusStackPlanRequestId = useRef(0);
 
   useEffect(() => {
     if (panoramaModalState.isOpen) setHasLoadedPanoramaModal(true);
@@ -350,6 +355,44 @@ export default function AppModals(props: AppModalsProps) {
             onOpenOutput={(path) => {
               void props.handleImageSelect(path);
             }}
+            onApplySingleImage={() => {
+              void (async () => {
+                const preview = superResolutionModalState.singleImagePreview;
+                if (preview === null) throw new Error('Enhance x2 review is required before apply.');
+                const slash = preview.sourcePath.lastIndexOf('/');
+                const destinationDirectory = slash >= 0 ? preview.sourcePath.slice(0, slash) : '.';
+                const sourceName = slash >= 0 ? preview.sourcePath.slice(slash + 1) : preview.sourcePath;
+                const sourceStem = sourceName.replace(/\.[^.]+$/, '');
+                setSingleImageApplyRunning(true);
+                try {
+                  const receipt = await invokeWithSchema(
+                    Invokes.ApplySingleImageX2,
+                    {
+                      request: {
+                        sourcePath: preview.sourcePath,
+                        graphRevision: preview.graphRevision,
+                        acceptedReviewHash: preview.review.outputHash,
+                        destinationDirectory,
+                        requestedName: `${sourceStem}-Enhanced-x2`,
+                      },
+                    },
+                    singleImageX2ApplyReceiptSchema,
+                  );
+                  setUI((state) => ({
+                    superResolutionModalState: {
+                      ...state.superResolutionModalState,
+                      singleImageApplyReceipt: receipt,
+                    },
+                  }));
+                  await props.refreshImageList();
+                  await props.handleImageSelect(receipt.payloadPath);
+                } finally {
+                  setSingleImageApplyRunning(false);
+                }
+              })().catch((error: unknown) => {
+                console.error('Single-image Enhance x2 apply failed', error);
+              });
+            }}
             onPreviewPlan={() => {
               void (async () => {
                 if (superResolutionModalState.settings.sourceMode === 'single_image_ai_x2') {
@@ -372,6 +415,7 @@ export default function AppModals(props: AppModalsProps) {
                         nativeReadiness: null,
                         outputReview: null,
                         singleImagePreview: preview,
+                        singleImageApplyReceipt: null,
                       },
                     }));
                   } finally {
@@ -402,6 +446,7 @@ export default function AppModals(props: AppModalsProps) {
                     nativeReadiness: readiness,
                     outputReview: null,
                     singleImagePreview: null,
+                    singleImageApplyReceipt: null,
                   },
                 });
               })().catch((error: unknown) => {
@@ -428,7 +473,9 @@ export default function AppModals(props: AppModalsProps) {
             }}
             outputReview={superResolutionModalState.outputReview}
             singleImagePreview={superResolutionModalState.singleImagePreview}
+            singleImageApplyReceipt={superResolutionModalState.singleImageApplyReceipt ?? null}
             singleImagePreviewRunning={singleImagePreviewRunning}
+            singleImageApplyRunning={singleImageApplyRunning}
             onCancelSingleImagePreview={() => {
               void invokeWithSchema(Invokes.CancelSingleImageX2Preview, {}, z.boolean());
             }}
@@ -456,6 +503,8 @@ export default function AppModals(props: AppModalsProps) {
                   : null
             }
             onClose={() => {
+              focusStackPlanRequestId.current += 1;
+              void invoke(Invokes.CancelFocusStackPlan);
               setUI((state) => ({
                 focusStackModalState: createDefaultFocusStackModalState(state.focusStackModalState.settings),
               }));
@@ -481,6 +530,8 @@ export default function AppModals(props: AppModalsProps) {
               });
             }}
             onPreviewPlan={() => {
+              const requestId = focusStackPlanRequestId.current + 1;
+              focusStackPlanRequestId.current = requestId;
               const lastDryRunCommand = {
                 commandType: 'computationalMerge.createFocusStack' as const,
                 dryRun: true as const,
@@ -516,11 +567,13 @@ export default function AppModals(props: AppModalsProps) {
                 focusStackNativeInputPlanSchema,
               )
                 .then((nativeInputPlan) => {
+                  if (focusStackPlanRequestId.current !== requestId) return;
                   setUI((state) => ({
                     focusStackModalState: { ...state.focusStackModalState, isPlanning: false, nativeInputPlan },
                   }));
                 })
                 .catch((error: unknown) => {
+                  if (focusStackPlanRequestId.current !== requestId) return;
                   setUI((state) => ({
                     focusStackModalState: {
                       ...state.focusStackModalState,
@@ -532,6 +585,13 @@ export default function AppModals(props: AppModalsProps) {
                 });
             }}
             onSettingsChange={(settings) => {
+              const invalidatesAlignment =
+                settings.alignmentMode !== focusStackModalState.settings.alignmentMode ||
+                settings.maxPreviewDimensionPx !== focusStackModalState.settings.maxPreviewDimensionPx;
+              if (invalidatesAlignment) {
+                focusStackPlanRequestId.current += 1;
+                void invoke(Invokes.CancelFocusStackPlan);
+              }
               setUI((state) => {
                 const {
                   lastApplyCommand: _lastApplyCommand,
@@ -542,7 +602,7 @@ export default function AppModals(props: AppModalsProps) {
                   focusStackModalState: {
                     ...focusStackModalState,
                     error: null,
-                    nativeInputPlan: null,
+                    nativeInputPlan: invalidatesAlignment ? null : focusStackModalState.nativeInputPlan,
                     outputReview: null,
                     settings,
                   },

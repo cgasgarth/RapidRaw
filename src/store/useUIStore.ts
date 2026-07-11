@@ -15,7 +15,10 @@ import {
   type PanoramaRuntimePlan,
   type PanoramaUiSettings,
 } from '../schemas/computational-merge/panoramaUiSchemas';
-import type { SingleImageX2Preview } from '../schemas/computational-merge/singleImageX2Schemas';
+import type {
+  SingleImageX2ApplyReceipt,
+  SingleImageX2Preview,
+} from '../schemas/computational-merge/singleImageX2Schemas';
 import type { SuperResolutionOutputReviewWorkflow } from '../schemas/computational-merge/superResolutionOutputReviewSchemas';
 import {
   DEFAULT_SUPER_RESOLUTION_UI_SETTINGS,
@@ -200,6 +203,7 @@ export interface SuperResolutionModalState {
   };
   outputReview: SuperResolutionOutputReviewWorkflow | null;
   singleImagePreview: SingleImageX2Preview | null;
+  singleImageApplyReceipt?: SingleImageX2ApplyReceipt | null;
   nativeReadiness?: SuperResolutionNativeReadiness | null;
   settings: SuperResolutionUiSettings;
   sourcePreflightMetadata: SuperResolutionSourcePreflightMetadata[];
@@ -296,6 +300,7 @@ export const createDefaultSuperResolutionModalState = (
   nativeReadiness: null,
   outputReview: null,
   singleImagePreview: null,
+  singleImageApplyReceipt: null,
   settings,
   sourcePreflightMetadata: [],
   sourcePaths: [],

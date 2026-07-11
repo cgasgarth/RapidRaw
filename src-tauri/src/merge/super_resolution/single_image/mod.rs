@@ -1,5 +1,7 @@
+pub(crate) mod apply;
+pub(crate) mod batch;
 mod inference;
-mod model;
+pub(crate) mod model;
 mod preprocess;
 mod review;
 
@@ -130,7 +132,7 @@ pub fn cancel_single_image_x2_preview(state: tauri::State<'_, AppState>) -> Resu
         .cancel_active_family(ComputationalMergeFamily::SuperResolution)
 }
 
-fn current_frame(
+pub(crate) fn current_frame(
     state: &AppState,
     request: &SingleImageX2PreviewRequest,
 ) -> Result<crate::app_state::CachedViewerSampleFrame, String> {

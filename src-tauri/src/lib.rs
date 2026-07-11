@@ -1794,11 +1794,12 @@ async fn plan_focus_stack(
         settings,
         || tracker.load(Ordering::SeqCst) != generation,
     )?;
+    let mut published_plan = state.focus_stack_runtime_plan.lock().unwrap();
     if tracker.load(Ordering::SeqCst) != generation {
         return Err("focus_stack_plan_cancelled:plan_publication".to_string());
     }
     if plan.accepted {
-        *state.focus_stack_runtime_plan.lock().unwrap() = Some((
+        *published_plan = Some((
             plan.accepted_dry_run_plan_id.clone(),
             plan.accepted_dry_run_plan_hash.clone(),
         ));
@@ -2859,6 +2860,8 @@ pub fn run() {
             super_resolution::cancel_super_resolution_registration,
             super_resolution::single_image::get_single_image_x2_capability,
             super_resolution::single_image::preview_single_image_x2,
+            super_resolution::single_image::apply::apply_single_image_x2,
+            super_resolution::single_image::batch::queue_single_image_x2_batch,
             super_resolution::single_image::cancel_single_image_x2_preview,
             merge::computational_job::cancel_computational_merge_job,
             panorama_stitching::plan_panorama,
