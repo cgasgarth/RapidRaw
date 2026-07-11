@@ -1,6 +1,7 @@
 mod raw_frame;
 mod registration;
 mod runtime;
+pub(crate) mod single_image;
 
 pub use raw_frame::SuperResolutionReadinessSettings;
 pub use runtime::SuperResolutionDryRunPlan;

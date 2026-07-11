@@ -21,6 +21,12 @@ pub enum ComputationalMergeFamily {
 #[serde(transparent)]
 pub struct ComputationalMergeJobId(String);
 
+impl std::fmt::Display for ComputationalMergeJobId {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ComputationalMergeProgress {

@@ -5,6 +5,7 @@ export const superResolutionDetailPolicySchema = z.enum(['conservative', 'balanc
 export const superResolutionModeSchema = z.enum(['conservative', 'standard', 'aggressive']);
 export const superResolutionQualityPreferenceSchema = z.enum(['preview', 'balanced', 'best']);
 export const superResolutionReconstructionModeSchema = z.enum(['model_detail', 'optical_flow']);
+export const superResolutionSourceModeSchema = z.enum(['multi_image', 'single_image_ai_x2']);
 
 export const superResolutionUiSettingsSchema = z
   .object({
@@ -14,7 +15,7 @@ export const superResolutionUiSettingsSchema = z
     outputScale: z.number().min(1.1).max(4),
     qualityPreference: superResolutionQualityPreferenceSchema,
     reconstructionMode: superResolutionReconstructionModeSchema,
-    sourceMode: z.literal('multi_image'),
+    sourceMode: superResolutionSourceModeSchema,
   })
   .strict();
 

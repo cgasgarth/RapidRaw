@@ -1,0 +1,6 @@
+Upstream SwinIR source code is licensed under the Apache License, Version 2.0.
+
+Canonical license text and pinned source:
+https://github.com/JingyunLiang/SwinIR/blob/6545850fbf8df298df73d81f3e8cba638787c8bd/LICENSE
+
+This pointer is not evidence that pretrained checkpoint redistribution is licensed. See NOTICE.md and export_manifest.json.
