@@ -1,5 +1,7 @@
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+#[cfg(test)]
+use std::path::PathBuf;
 
 use chrono::Utc;
 use uuid::Uuid;
@@ -88,6 +90,7 @@ pub struct HdrDryRunPlanResponse {
     pub warning_codes: Vec<String>,
 }
 
+#[cfg(test)]
 pub fn build_unique_hdr_output_path(parent_dir: &Path, stem: &str, extension: &str) -> PathBuf {
     let first_candidate = parent_dir.join(format!("{}_Hdr.{}", stem, extension));
     if !first_candidate.exists() {
@@ -154,6 +157,14 @@ pub fn build_hdr_runtime_plan(
             .iter()
             .map(|source| source.image_path.clone())
             .collect(),
+        static_radiance_hash: None,
+        deghost_radiance_hash: None,
+        motion_probability_hash: None,
+        ownership_hash: None,
+        feather_hash: None,
+        unresolved_fraction: None,
+        output_width: u64::from(output_width),
+        output_height: u64::from(output_height),
     }
 }
 

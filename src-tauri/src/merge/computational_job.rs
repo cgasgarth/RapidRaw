@@ -13,6 +13,7 @@ const DEFAULT_TERMINAL_CAPACITY: usize = 128;
 #[serde(rename_all = "snake_case")]
 pub enum ComputationalMergeFamily {
     FocusStack,
+    Hdr,
     SuperResolution,
 }
 

@@ -115,6 +115,26 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
       const { hdrModalState } = useUIStore.getState();
       const { settings } = hdrModalState;
       const { lastDryRunCommand, selectedPaths } = buildHdrDryRunActionState(paths, settings);
+      if (hdrModalState.runtimePlan?.accepted === true && hdrModalState.runtimePlan.blockCodes.length === 0) {
+        setUI((state) => ({
+          hdrModalState: {
+            ...state.hdrModalState,
+            error: null,
+            isProcessing: true,
+            progressMessage: 'Applying calibrated HDR artifacts...',
+          },
+        }));
+        void invoke(Invokes.MergeHdr, {
+          acceptedDryRunPlanHash: hdrModalState.runtimePlan.acceptedDryRunPlanHash,
+          acceptedDryRunPlanId: hdrModalState.runtimePlan.acceptedDryRunPlanId,
+          paths: selectedPaths,
+        }).catch((err: unknown) => {
+          setUI((state) => ({
+            hdrModalState: { ...state.hdrModalState, error: String(err), isProcessing: false },
+          }));
+        });
+        return;
+      }
       setUI((state) => {
         const { lastApplyCommand: _lastApplyCommand, ...hdrModalState } = state.hdrModalState;
         return {

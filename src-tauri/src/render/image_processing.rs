@@ -308,6 +308,7 @@ pub fn apply_srgb_to_linear(mut image: DynamicImage) -> DynamicImage {
     image
 }
 
+#[allow(dead_code)]
 pub fn apply_linear_to_srgb(mut image: DynamicImage) -> DynamicImage {
     let to_srgb = |x: f32| -> f32 {
         let x = x.max(0.0);
