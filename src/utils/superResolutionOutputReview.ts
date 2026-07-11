@@ -1,3 +1,4 @@
+import type { SuperResolutionNativeReadiness } from '../schemas/computational-merge/superResolutionNativeRegistrationSchemas';
 import type {
   SuperResolutionOutputReviewWorkflow,
   SuperResolutionTiledApplyReceipt,
@@ -69,6 +70,7 @@ interface BuildSuperResolutionOutputReviewOptions {
   settings: SuperResolutionUiSettings;
   sourceCount: number;
   sourcePaths?: string[];
+  nativeReadiness?: SuperResolutionNativeReadiness | null;
 }
 
 const reviewCropCount = 4;
@@ -221,6 +223,7 @@ export const buildSuperResolutionOutputReviewWorkflow = ({
   settings,
   sourceCount,
   sourcePaths = [],
+  nativeReadiness = null,
 }: BuildSuperResolutionOutputReviewOptions): SuperResolutionOutputReviewWorkflow => {
   const decision = settings.detailPolicy === 'aggressive_preview_only' ? 'preview_only' : 'human_review_required';
   const warningCodes: SuperResolutionOutputReviewWorkflow['warningCodes'] =
@@ -228,14 +231,26 @@ export const buildSuperResolutionOutputReviewWorkflow = ({
       ? ['human_review_required', 'synthetic_runtime_only', 'texture_risk', 'aggressive_preview_only']
       : ['human_review_required', 'synthetic_runtime_only', 'texture_risk'];
 
+  const nativeReconstruction = nativeReadiness?.reconstruction ?? null;
+  const nativeRegistration = nativeReadiness?.registration ?? null;
+  const nativeCoverage =
+    nativeReconstruction === null
+      ? null
+      : nativeReconstruction.planeArtifacts.reduce((sum, plane) => sum + plane.coverageRatio, 0) /
+        nativeReconstruction.planeArtifacts.length;
+  const nativeWeakSupport =
+    nativeReconstruction === null
+      ? null
+      : nativeReconstruction.planeArtifacts.reduce((sum, plane) => sum + plane.weakSupportRatio, 0) /
+        nativeReconstruction.planeArtifacts.length;
   return superResolutionOutputReviewWorkflowSchema.parse({
     alignmentMode: settings.alignmentMode,
     artifactPath,
     alignmentConfidence: null,
     cropMetrics: {
-      outputHeight: 1,
-      outputWidth: 1,
-      overlapCoverageRatio: null,
+      outputHeight: nativeReconstruction?.height ?? 1,
+      outputWidth: nativeReconstruction?.width ?? 1,
+      overlapCoverageRatio: nativeCoverage,
       reviewCropCount,
     },
     downscaleReconstructionError: null,
@@ -254,16 +269,25 @@ export const buildSuperResolutionOutputReviewWorkflow = ({
     humanReviewStatus: 'pending',
     mode: getSuperResolutionModeForDetailPolicy(settings.detailPolicy),
     modePolicyVersion: 1,
-    outputArtifactHash: 'sha256:0000000000000000000000000000000000000000000000000000000000000000',
-    outputArtifactId: artifactPath,
-    outputHeight: 1,
+    outputArtifactHash: nativeReconstruction?.preview.contentHash ?? 'unmeasured:super_resolution_preview',
+    outputArtifactId: nativeReconstruction === null ? artifactPath : 'native:super-resolution:cfa-x2-preview',
+    outputHeight: nativeReconstruction?.height ?? 1,
     outputScale: settings.outputScale,
-    outputWidth: 1,
-    overlapCoverageRatio: null,
+    outputWidth: nativeReconstruction?.width ?? 1,
+    overlapCoverageRatio: nativeCoverage,
     proofLevel: 'synthetic_runtime',
     qualityPreference: settings.qualityPreference,
     reconstructionMode: settings.reconstructionMode,
-    registrationMetrics: null,
+    registrationMetrics:
+      nativeRegistration === null
+        ? null
+        : {
+            algorithmId: 'output_lattice_phase_residual_v1',
+            averageConfidence: nativeRegistration.summary.confidence,
+            averageResidualPx: nativeRegistration.summary.p50ResidualPx,
+            maxResidualPx: nativeRegistration.summary.p95ResidualPx,
+            measuredSubpixelFrameCount: nativeRegistration.transforms.length,
+          },
     reviewArtifacts: superResolutionSyntheticReviewArtifacts,
     reviewCropCount,
     reviewPacketPath,
@@ -271,11 +295,14 @@ export const buildSuperResolutionOutputReviewWorkflow = ({
     sourceRefs: buildSourceRefsFromPaths(sourceCount, sourcePaths),
     staleState: 'unknown',
     supportMap: buildSupportMapReview({
-      artifactId: `${artifactPath}:support-map`,
-      coverageRatio: null,
+      artifactId:
+        nativeReconstruction?.planeArtifacts.map((plane) => plane.support.contentHash).join(',') ??
+        `${artifactPath}:support-map`,
+      coverageRatio: nativeCoverage,
       detailPolicy: settings.detailPolicy,
       effectiveScale: settings.outputScale,
       requestedScale: settings.outputScale,
+      ...(nativeWeakSupport === null ? {} : { weakSupportRatio: nativeWeakSupport }),
       warningCodes,
     }),
     warningCodes,

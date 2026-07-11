@@ -137,6 +137,7 @@ export function SuperResolutionModal({
   const isSourcePreflightBlocked = sourcePreflight?.status === 'blocked';
   const isSourcePreflightMissingMetadata = sourcePreflight?.status === 'metadata_missing';
   const nativeRegistration = nativeReadiness?.registration ?? null;
+  const nativeReconstruction = nativeReadiness?.reconstruction ?? null;
   const isAggressivePreviewOnly = settings.detailPolicy === 'aggressive_preview_only';
   const outputPixelMultiplier = Number((settings.outputScale * settings.outputScale).toFixed(2));
   const estimatedPreviewMegapixels = Math.round((sourceCount * settings.maxPreviewDimensionPx ** 2) / 1_000_000);
@@ -223,6 +224,7 @@ export function SuperResolutionModal({
       settings,
       sourceCount: fallbackOutputReviewSourceCount,
       sourcePaths,
+      nativeReadiness: nativeReadiness ?? null,
     });
   const hasRuntimeOutputReview = runtimeOutputReview !== null && runtimeOutputReview !== undefined;
   const derivedOutputReceipt = buildSuperResolutionDerivedOutputReceipt({
@@ -1063,6 +1065,62 @@ export function SuperResolutionModal({
                   {`${exclusion.code}${
                     exclusion.p95ResidualPx === null ? '' : ` / ${exclusion.p95ResidualPx.toFixed(3)} px p95`
                   }`}
+                </UiText>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {nativeReconstruction !== null && (
+        <section
+          className="grid gap-3 border border-border-color bg-bg-primary p-4"
+          data-capability={nativeReconstruction.capability}
+          data-decision={nativeReconstruction.decision}
+          data-testid="sr-native-cfa-reconstruction"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <UiText variant={TextVariants.heading}>Native x2 reconstruction</UiText>
+            <UiText variant={TextVariants.small} color={TextColors.secondary}>
+              {`${nativeReconstruction.width} x ${nativeReconstruction.height}`}
+            </UiText>
+          </div>
+          <div className="grid gap-3 lg:grid-cols-2">
+            <img
+              alt={t('modals.superResolution.review.artifactPreviewAlt', {
+                artifact: t('modals.superResolution.review.registration'),
+              })}
+              className="w-full border border-border-color bg-black object-contain"
+              data-preview-hash={nativeReconstruction.preview.contentHash}
+              height={nativeReconstruction.preview.height}
+              src={nativeReconstruction.preview.dataUrl}
+              width={nativeReconstruction.preview.width}
+            />
+            <img
+              alt={t('modals.superResolution.review.artifactPreviewAlt', {
+                artifact: t('modals.superResolution.review.registration'),
+              })}
+              className="w-full border border-border-color bg-black object-contain"
+              data-preview-hash={nativeReconstruction.referenceBaseline.contentHash}
+              height={nativeReconstruction.referenceBaseline.height}
+              src={nativeReconstruction.referenceBaseline.dataUrl}
+              width={nativeReconstruction.referenceBaseline.width}
+            />
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {nativeReconstruction.planeArtifacts.map((plane) => (
+              <div className="grid gap-1" data-cfa-plane={plane.class} key={plane.class}>
+                <UiText variant={TextVariants.label}>{`${plane.class} support`}</UiText>
+                <img
+                  alt={`${plane.class} measured support`}
+                  className="w-full border border-border-color bg-black object-contain"
+                  data-support-hash={plane.support.contentHash}
+                  height={plane.support.height}
+                  src={plane.support.dataUrl}
+                  width={plane.support.width}
+                />
+                <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                  {`${Math.round(plane.coverageRatio * 100)}% supported / ${Math.round(plane.weakSupportRatio * 100)}% weak`}
                 </UiText>
               </div>
             ))}

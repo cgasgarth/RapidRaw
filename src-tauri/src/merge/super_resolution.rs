@@ -1,7 +1,11 @@
+mod cfa_observations;
+mod fused_color;
 mod raw_frame;
+mod reconstruction;
 mod registration;
 mod runtime;
 pub(crate) mod single_image;
+mod support;
 
 pub use raw_frame::SuperResolutionReadinessSettings;
 pub use runtime::SuperResolutionDryRunPlan;
