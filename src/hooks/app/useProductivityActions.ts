@@ -121,7 +121,10 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
             hdrModalState: {
               ...state.hdrModalState,
               isProcessing: false,
-              progressMessage: 'HDR alignment plan ready. Radiance reconstruction is pending.',
+              progressMessage:
+                runtimePlan.readiness === 'deghost_required'
+                  ? 'Static radiance preview ready; motion review required.'
+                  : 'Static scene-linear radiance preview ready.',
               runtimePlan,
             },
           }));
