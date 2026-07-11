@@ -40,8 +40,40 @@ struct Layer {
     #[serde(default)]
     retouch_remove_source: Option<Value>,
     #[serde(default)]
-    sub_masks: Option<Vec<Value>>,
+    sub_masks: Option<Vec<BrushMaskV1>>,
     visible: bool,
+}
+
+#[derive(Debug, Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct BrushMaskV1 {
+    coordinate_space: String,
+    id: String,
+    mode: String,
+    opacity: f32,
+    radius_unit: String,
+    strokes: Vec<BrushStrokeV1>,
+    #[serde(rename = "type")]
+    mask_type: String,
+}
+
+#[derive(Debug, Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct BrushStrokeV1 {
+    flow: f32,
+    hardness: f32,
+    id: String,
+    points: Vec<BrushPointV1>,
+    radius: f32,
+}
+
+#[derive(Debug, Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
+struct BrushPointV1 {
+    #[serde(default)]
+    pressure: Option<f32>,
+    x: f32,
+    y: f32,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -156,17 +188,7 @@ fn validate_sidecar(sidecar: &LayerStackSidecar, image_path: &str) -> Result<(),
                 "layer_authority_invalid_opacity: opacity must be finite and within 0..1".into(),
             );
         }
-        if !layer.mask_ids.is_empty()
-            || layer
-                .sub_masks
-                .as_ref()
-                .is_some_and(|masks| !masks.is_empty())
-        {
-            return Err(
-                "layer_authority_unsupported_mask: the authoritative layer must be full-image"
-                    .into(),
-            );
-        }
+        validate_brush_mask(layer)?;
         if layer.retouch_clone_source.is_some() || layer.retouch_remove_source.is_some() {
             return Err(
                 "layer_authority_unsupported_retouch: retouch state is not supported".into(),
@@ -211,6 +233,54 @@ fn validate_sidecar(sidecar: &LayerStackSidecar, image_path: &str) -> Result<(),
     Ok(())
 }
 
+fn validate_brush_mask(layer: &Layer) -> Result<(), String> {
+    if layer.mask_ids.is_empty() && layer.sub_masks.as_ref().is_none_or(Vec::is_empty) {
+        return Ok(());
+    }
+    let masks = layer.sub_masks.as_ref().ok_or_else(|| {
+        "layer_authority_invalid_brush_mask: mask ids require persisted brush data".to_string()
+    })?;
+    if masks.len() != 1 || layer.mask_ids != [masks[0].id.as_str()] {
+        return Err(
+            "layer_authority_unsupported_mask_count: exactly one brush mask is supported".into(),
+        );
+    }
+    let mask = &masks[0];
+    if mask.mask_type != "brush_v1"
+        || mask.coordinate_space != "oriented_active_image_normalized_v1"
+        || mask.radius_unit != "normalized_max_dimension"
+        || mask.mode != "add"
+    {
+        return Err("layer_authority_unsupported_mask: unsupported brush contract".into());
+    }
+    if !mask.opacity.is_finite() || !(0.0..=1.0).contains(&mask.opacity) || mask.strokes.is_empty()
+    {
+        return Err("layer_authority_invalid_brush_mask: invalid opacity or empty strokes".into());
+    }
+    for stroke in &mask.strokes {
+        if stroke.points.is_empty()
+            || !stroke.radius.is_finite()
+            || !(0.0..=1.0).contains(&stroke.radius)
+            || !stroke.flow.is_finite()
+            || !(0.0..=1.0).contains(&stroke.flow)
+            || !stroke.hardness.is_finite()
+            || !(0.0..=1.0).contains(&stroke.hardness)
+            || stroke.points.iter().any(|point| {
+                !point.x.is_finite()
+                    || !(0.0..=1.0).contains(&point.x)
+                    || !point.y.is_finite()
+                    || !(0.0..=1.0).contains(&point.y)
+                    || point
+                        .pressure
+                        .is_some_and(|value| !value.is_finite() || !(0.0..=1.0).contains(&value))
+            })
+        {
+            return Err("layer_authority_invalid_brush_mask: malformed stroke geometry".into());
+        }
+    }
+    Ok(())
+}
+
 fn source_paths_match(sidecar_path: &str, render_path: &str) -> bool {
     if sidecar_path == render_path {
         return true;
@@ -223,6 +293,23 @@ fn source_paths_match(sidecar_path: &str, render_path: &str) -> bool {
 fn materialize_native_mask(layer: &Layer) -> Result<Value, String> {
     let tone = layer.adjustments.tone_color.as_ref();
     let exposure = tone.map_or(0.0, |tone| tone.exposure_ev);
+    let sub_masks = if let Some(brush) = layer.sub_masks.as_ref().and_then(|masks| masks.first()) {
+        vec![json!({
+            "id": brush.id,
+            "name": "Brush",
+            "type": "brush_v1",
+            "visible": true,
+            "invert": false,
+            "opacity": brush.opacity * 100.0,
+            "mode": "additive",
+            "parameters": { "strokes": brush.strokes }
+        })]
+    } else {
+        vec![json!({
+            "id": format!("{}_full_image", layer.id), "name": "Full image", "type": "all",
+            "visible": true, "invert": false, "opacity": 100.0, "mode": "additive", "parameters": {}
+        })]
+    };
     Ok(json!({
         "id": layer.id,
         "name": layer.name,
@@ -234,16 +321,7 @@ fn materialize_native_mask(layer: &Layer) -> Result<Value, String> {
             "exposure": exposure,
             "sectionVisibility": { "basic": true }
         },
-        "subMasks": [{
-            "id": format!("{}_full_image", layer.id),
-            "name": "Full image",
-            "type": "all",
-            "visible": true,
-            "invert": false,
-            "opacity": 100.0,
-            "mode": "additive",
-            "parameters": {}
-        }]
+        "subMasks": sub_masks
     }))
 }
 
@@ -341,5 +419,55 @@ mod tests {
             None
         );
         assert_eq!(value["masks"][0]["id"], "legacy");
+    }
+
+    #[test]
+    fn brush_mask_persisted_sidecar_materializes_native_raster_for_shared_render_path() {
+        let mut brush_layer = layer(-1.0, 0.75);
+        brush_layer["maskIds"] = json!(["brush_1"]);
+        brush_layer["subMasks"] = json!([{
+            "coordinateSpace": "oriented_active_image_normalized_v1",
+            "id": "brush_1", "mode": "add", "opacity": 0.6,
+            "radiusUnit": "normalized_max_dimension", "type": "brush_v1",
+            "strokes": [{
+                "flow": 1.0, "hardness": 0.5, "id": "stroke_1", "radius": 0.2,
+                "points": [{"x": 0.2, "y": 0.5}, {"x": 0.8, "y": 0.5}]
+            }]
+        }]);
+        let mut value = adjustments(brush_layer);
+
+        let first = apply_authoritative_layer_stack(&mut value, "/fixture.CR3")
+            .expect("supported brush plan")
+            .expect("authoritative plan");
+        assert_eq!(value["masks"][0]["subMasks"][0]["type"], "brush_v1");
+        assert!(
+            (value["masks"][0]["subMasks"][0]["opacity"]
+                .as_f64()
+                .unwrap()
+                - 60.0)
+                .abs()
+                < 0.001
+        );
+        let definition: crate::mask_generation::MaskDefinition =
+            serde_json::from_value(value["masks"][0].clone()).unwrap();
+        let bitmap = crate::mask_generation::generate_mask_bitmap(
+            &definition,
+            32,
+            16,
+            1.0,
+            (0.0, 0.0),
+            None,
+        )
+        .unwrap();
+        assert_eq!(bitmap.get_pixel(0, 0)[0], 0);
+        assert!(bitmap.get_pixel(16, 8)[0] > 100);
+
+        let mut reopened =
+            adjustments(value["rawEngineArtifacts"]["layerStackSidecars"][0]["layers"][0].clone());
+        let reopened_plan = apply_authoritative_layer_stack(&mut reopened, "/fixture.CR3")
+            .unwrap()
+            .unwrap();
+        assert_eq!(first.plan_hash, reopened_plan.plan_hash);
+        assert_eq!(value["masks"], reopened["masks"]);
     }
 }
