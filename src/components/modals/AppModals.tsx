@@ -565,6 +565,7 @@ export default function AppModals(props: AppModalsProps) {
                     lensCorrectionIdentity: 'native_lens_policy_v1',
                     neutralRawState: true,
                     orientationIdentity: 'common:decoded_orientation',
+                    haloSuppressionStrengthPercent: focusStackModalState.settings.haloSuppressionStrengthPercent,
                   },
                 },
                 focusStackNativeInputPlanSchema,
