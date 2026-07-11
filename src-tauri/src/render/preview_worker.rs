@@ -14,18 +14,18 @@ use crate::app_state::{
     AnalyticsConfig, AnalyticsFrameId, AnalyticsProducts, AppState, CachedPreview,
     CachedViewerSampleFrame,
 };
-use crate::cache_utils::calculate_transform_hash;
-use crate::film_look_render::normalize_film_look_adjustments_for_render;
 use crate::generate_transformed_preview;
 use crate::image_processing::{
-    RenderRequest, downscale_f32_image, get_all_adjustments_from_json, get_or_init_gpu_context,
+    RenderRequest, downscale_f32_image, get_or_init_gpu_context,
     process_and_get_dynamic_image_with_analytics, resolve_tonemapper_override_from_handle,
 };
-use crate::lut_processing::Lut;
-use crate::mask_generation::{MaskDefinition, get_cached_or_generate_mask};
+use crate::mask_generation::get_cached_or_generate_mask;
 use crate::preview_scheduler::{
     PreviewAbort, PreviewCancellation, PreviewCompletion, PreviewScheduler,
     PreviewSchedulingPolicy, PreviewStage,
+};
+use crate::render_plan::{
+    CompileRenderPlanContext, RenderPlanRevision, compile_render_plan_cached, content_revision,
 };
 use crate::{get_or_load_lut, render_caches, render_pipeline};
 
@@ -181,8 +181,50 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
     cancellation_checkpoint(cancellation, PreviewStage::Geometry)?;
     let adjustments_clone = adjustments_json;
 
-    let new_transform_hash = calculate_transform_hash(&adjustments_clone);
     let settings = load_preview_runtime_settings_or_default(app_handle);
+    let is_raw = loaded_image.is_raw;
+    let tm_override = resolve_tonemapper_override_from_handle(app_handle, is_raw);
+    let lut = adjustments_clone["lutPath"]
+        .as_str()
+        .and_then(|path| get_or_load_lut(&state, path).ok());
+    let settings_revision = u64::from(tm_override.unwrap_or(0));
+    let revision = viewer_sample_graph_revision.map_or_else(
+        || {
+            content_revision(
+                &adjustments_clone,
+                preview_id.image_session,
+                settings_revision,
+            )
+        },
+        |graph_revision| RenderPlanRevision {
+            image_session: preview_id.image_session,
+            adjustment_revision: hash_revision(graph_revision),
+            schema_version: 1,
+            settings_revision,
+        },
+    );
+    let render_plan = compile_render_plan_cached(
+        &adjustments_clone,
+        CompileRenderPlanContext {
+            revision,
+            is_raw,
+            tonemapper_override: tm_override,
+        },
+        lut,
+    )
+    .map_err(|error| error.to_string())?;
+    log::debug!(
+        "render_plan revision={:?} compile_us={} geometry_scale={} effective_fields={} fingerprints={:?}",
+        render_plan.revision,
+        render_plan.compile_time.as_micros(),
+        render_plan.geometry.scale,
+        render_plan
+            .effective_json
+            .as_object()
+            .map_or(0, serde_json::Map::len),
+        render_plan.fingerprints,
+    );
+    let new_transform_hash = render_plan.fingerprints.full;
     let live_quality = settings.live_preview_quality.as_str();
 
     let default_preview_dim = settings.editor_preview_resolution;
@@ -284,19 +326,14 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         None
     };
 
-    let mask_definitions: Vec<MaskDefinition> = adjustments_clone
-        .get("masks")
-        .and_then(|m| serde_json::from_value(m.clone()).ok())
-        .unwrap_or_default();
-
     let scaled_crop_offset = (
         unscaled_crop_offset.0 * effective_scale,
         unscaled_crop_offset.1 * effective_scale,
     );
 
     let mut mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> =
-        Vec::with_capacity(mask_definitions.len());
-    for def in &mask_definitions {
+        Vec::with_capacity(render_plan.masks.len());
+    for def in render_plan.masks.iter() {
         cancellation_checkpoint(cancellation, PreviewStage::Masks)?;
         if let Some(mask) = get_cached_or_generate_mask(
             &state,
@@ -319,20 +356,11 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
     );
     cancellation_checkpoint(cancellation, PreviewStage::Gpu)?;
 
-    let is_raw = loaded_image.is_raw;
-    let render_adjustments = normalize_film_look_adjustments_for_render(&adjustments_clone);
-    let tm_override = resolve_tonemapper_override_from_handle(app_handle, is_raw);
     let pre_gpu_identity = crate::gpu_processing::PreGpuImageIdentity::from_image(
         retouched_processing_image.as_ref(),
         crate::gpu_processing::PreGpuImageIdentity::source_revision(&loaded_image.path),
         pre_gpu_detail_stage.render_hash,
     );
-    let final_adjustments =
-        get_all_adjustments_from_json(render_adjustments.as_ref(), is_raw, tm_override);
-    let lut: Option<Arc<Lut>> = render_adjustments["lutPath"]
-        .as_str()
-        .and_then(|path| get_or_load_lut(&state, path).ok());
-
     let wants_analytics = !(is_interactive && pixel_roi.is_some());
     let channel_filter = if is_interactive {
         active_waveform_channel.map(str::to_string)
@@ -362,9 +390,9 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
     };
 
     let render_request = || RenderRequest {
-        adjustments: final_adjustments,
+        adjustments: render_plan.adjustments,
         mask_bitmaps: &mask_bitmaps,
-        lut: lut.clone(),
+        lut: render_plan.lut.clone(),
         roi: pixel_roi,
     };
     let presentation_identity =

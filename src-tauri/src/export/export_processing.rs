@@ -61,9 +61,10 @@ fn adjustments_with_raw_engine_artifacts(metadata: ImageMetadata) -> Value {
 use crate::lut_processing::{convert_image_to_cube_lut, generate_identity_lut_image};
 use crate::mask_generation::{MaskDefinition, generate_mask_bitmap};
 use crate::raw_processing::RawDevelopmentReport;
+use crate::render_plan::{CompileRenderPlanContext, compile_render_plan_cached, content_revision};
 use crate::{AppState, ExportJob};
 
-use crate::cache_utils::{calculate_full_job_hash, calculate_transform_hash};
+use crate::cache_utils::calculate_transform_hash;
 #[cfg(test)]
 pub(crate) use crate::export::export_color_policy::{
     ExportBlackPointCompensationStatus, ExportColorEngineId, applied_export_color_policy,
@@ -285,7 +286,7 @@ pub(crate) fn prepare_export_masks<'a>(
     let (img_w, img_h) = transformed_image.dimensions();
     let mask_definitions: Vec<MaskDefinition> = js_adjustments
         .get("masks")
-        .and_then(|m| serde_json::from_value(m.clone()).ok())
+        .and_then(|m| Vec::<MaskDefinition>::deserialize(m).ok())
         .unwrap_or_default();
     let warped_image = resolve_warped_image_for_masks(state, js_adjustments, &mask_definitions);
     let mask_bitmaps = mask_definitions
@@ -311,6 +312,14 @@ struct ExportRenderInputs {
     unique_hash: u64,
 }
 
+fn export_execution_fingerprint(path: &str, adjustments: &Value) -> u64 {
+    let revision = content_revision(adjustments, 0, 0);
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(path.as_bytes());
+    hasher.update(&revision.adjustment_revision.to_le_bytes());
+    u64::from_le_bytes(hasher.finalize().as_bytes()[..8].try_into().unwrap())
+}
+
 fn prepare_export_render_inputs(
     path: &str,
     js_adjustments: &Value,
@@ -318,22 +327,34 @@ fn prepare_export_render_inputs(
     is_raw: bool,
     tm_override: Option<u32>,
     hash_salt: u64,
-) -> ExportRenderInputs {
-    let render_adjustments = normalize_film_look_adjustments_for_render(js_adjustments);
-    let mut adjustments =
-        get_all_adjustments_from_json(render_adjustments.as_ref(), is_raw, tm_override);
-    adjustments.global.show_clipping = 0;
-    let lut = render_adjustments["lutPath"]
+) -> Result<ExportRenderInputs, String> {
+    let lut = js_adjustments["lutPath"]
         .as_str()
-        .and_then(|p| get_or_load_lut(state, p).ok());
-    let unique_hash =
-        calculate_full_job_hash(path, render_adjustments.as_ref()).wrapping_add(hash_salt);
-
-    ExportRenderInputs {
-        adjustments,
+        .and_then(|path| get_or_load_lut(state, path).ok());
+    let revision = content_revision(js_adjustments, 0, u64::from(tm_override.unwrap_or(0)));
+    let plan = compile_render_plan_cached(
+        js_adjustments,
+        CompileRenderPlanContext {
+            revision,
+            is_raw,
+            tonemapper_override: tm_override,
+        },
         lut,
+    )
+    .map_err(|error| error.to_string())?;
+    let mut adjustments = plan.adjustments;
+    adjustments.global.show_clipping = 0;
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(path.as_bytes());
+    hasher.update(&plan.fingerprints.full.to_le_bytes());
+    let unique_hash = u64::from_le_bytes(hasher.finalize().as_bytes()[..8].try_into().unwrap())
+        .wrapping_add(hash_salt);
+
+    Ok(ExportRenderInputs {
+        adjustments,
+        lut: plan.lut.clone(),
         unique_hash,
-    }
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -387,7 +408,7 @@ pub(crate) fn process_image_for_export_pipeline_with_tonemapper_override(
     mask_bitmaps: &[GrayImage],
 ) -> Result<DynamicImage, String> {
     let render_inputs =
-        prepare_export_render_inputs(path, js_adjustments, state, is_raw, tm_override, 0);
+        prepare_export_render_inputs(path, js_adjustments, state, is_raw, tm_override, 0)?;
 
     let detail_stage =
         apply_pre_gpu_detail_stages(transformed_image, render_inputs.unique_hash, js_adjustments);
@@ -1145,7 +1166,7 @@ pub async fn export_images(
                         raw_development_report,
                         Some(format!(
                             "export_job:{:016x}",
-                            calculate_full_job_hash(&source_path_str, &js_adjustments)
+                            export_execution_fingerprint(&source_path_str, &js_adjustments)
                         )),
                         Some(export_started.elapsed().as_millis()),
                     )?;
@@ -1482,7 +1503,7 @@ pub async fn estimate_export_sizes(
         let (img_w, img_h) = preview_image.dimensions();
         let mask_definitions: Vec<MaskDefinition> = adjustments_clone
             .get("masks")
-            .and_then(|m| serde_json::from_value(m.clone()).ok())
+            .and_then(|m| Vec::<MaskDefinition>::deserialize(m).ok())
             .unwrap_or_default();
 
         let scaled_crop_offset = (
@@ -1512,7 +1533,7 @@ pub async fn estimate_export_sizes(
             is_raw,
             resolve_tonemapper_override_from_handle(&app_handle, is_raw),
             1,
-        );
+        )?;
 
         let processed_preview = process_and_get_dynamic_image(
             &context,
@@ -1631,7 +1652,7 @@ pub async fn estimate_export_sizes(
 
         let mask_definitions: Vec<MaskDefinition> = js_adjustments
             .get("masks")
-            .and_then(|m| serde_json::from_value(m.clone()).ok())
+            .and_then(|m| Vec::<MaskDefinition>::deserialize(m).ok())
             .unwrap_or_default();
         let scaled_crop_offset = (
             unscaled_crop_offset.0 * gpu_scale,
@@ -1660,7 +1681,7 @@ pub async fn estimate_export_sizes(
             is_raw,
             resolve_tonemapper_override_from_handle(&app_handle, is_raw),
             1,
-        );
+        )?;
 
         let processed_preview = process_and_get_dynamic_image(
             &context,
