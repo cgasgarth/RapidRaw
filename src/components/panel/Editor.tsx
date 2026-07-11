@@ -30,12 +30,16 @@ import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
 import type { Adjustments, AiPatch, MaskContainer } from '../../utils/adjustments';
 import {
-  type CropGeometryParams,
-  didCropGeometryChange,
-  isCropChangeMeaningful,
+  activeCropDraft,
+  type CropInteraction,
+  cropGeometryIdentity,
+  getOrientedDimensions,
   isCropValidAfterRotation,
   percentCropFromPixelCrop,
+  pixelCropFromPercentCrop,
+  resolveCropForGeometryTransaction,
   resolveNextCropForGeometryChange,
+  updateCropDraft,
 } from '../../utils/cropUtils';
 import { resolveComparePaneLayout } from '../../utils/editorCompare';
 import {
@@ -237,9 +241,7 @@ export default function Editor({
     [debouncedSetHistory, setEditor],
   );
   const { handleGenerateAiMask, handleQuickErase } = useAiMasking();
-  const [crop, setCrop] = useState<Crop | null>(null);
-  const prevCropParams = useRef<CropGeometryParams | null>(null);
-  const lastValidCropRef = useRef<PercentCrop | null>(null);
+  const [cropInteraction, setCropInteraction] = useState<CropInteraction>({ kind: 'idle' });
 
   const [isMaskHovered, setIsMaskHovered] = useState(false);
   const [isMaskTouchInteracting, setIsMaskTouchInteracting] = useState(false);
@@ -382,11 +384,30 @@ export default function Editor({
     (angleCorrection: number) => {
       setAdjustments((prev: Adjustments) => {
         const newRotation = (prev.rotation || 0) + angleCorrection;
-        return { ...prev, rotation: newRotation };
+        if (!selectedImage?.width || !selectedImage.height) return { ...prev, rotation: newRotation };
+        return {
+          ...prev,
+          crop: resolveCropForGeometryTransaction(
+            prev.crop,
+            selectedImage.width,
+            selectedImage.height,
+            {
+              aspectRatio: prev.aspectRatio,
+              orientationSteps: prev.orientationSteps || 0,
+              rotation: prev.rotation || 0,
+            },
+            {
+              aspectRatio: prev.aspectRatio,
+              orientationSteps: prev.orientationSteps || 0,
+              rotation: newRotation,
+            },
+          ),
+          rotation: newRotation,
+        };
       });
       setEditor({ isStraightenActive: false });
     },
-    [setAdjustments, setEditor],
+    [selectedImage, setAdjustments, setEditor],
   );
 
   const updateSubMaskLocal = useCallback(
@@ -1495,102 +1516,59 @@ export default function Editor({
     };
   }, [showSpinner]);
 
-  useEffect(() => {
-    if (!isCropping || !selectedImage?.width) {
-      return;
-    }
-
-    const cropTimer = setTimeout(() => {
-      const { aspectRatio, orientationSteps, crop: currentAdjCrop, rotation } = adjustments;
-      const effectiveRotation = liveRotation !== null ? liveRotation : rotation;
-      const nextCropParams = { rotation, aspectRatio, orientationSteps };
-      const geometryChanged = didCropGeometryChange(prevCropParams.current, nextCropParams);
-      const isDraggingRotation = liveRotation !== null;
-      const needsRecalc = currentAdjCrop === null || geometryChanged || isDraggingRotation;
-
-      if (needsRecalc) {
-        const { nextPixelCrop, orientedWidth, orientedHeight } = resolveNextCropForGeometryChange({
-          aspectRatio,
-          currentCrop: currentAdjCrop,
-          effectiveRotation,
+  const cropSessionKey = selectedImage ? `${selectedImage.path}:${isCropping ? 'crop' : 'inactive'}` : 'no-image';
+  const cropGeometryKey = selectedImage
+    ? cropGeometryIdentity(selectedImage.path, selectedImage.width, selectedImage.height, {
+        aspectRatio: adjustments.aspectRatio,
+        orientationSteps: adjustments.orientationSteps || 0,
+        rotation: liveRotation ?? adjustments.rotation ?? 0,
+      })
+    : 'no-image';
+  const orientedCropDimensions = selectedImage
+    ? getOrientedDimensions(selectedImage.width, selectedImage.height, adjustments.orientationSteps || 0)
+    : null;
+  const displayedCanonicalPixelCrop =
+    selectedImage && liveRotation !== null
+      ? resolveNextCropForGeometryChange({
+          aspectRatio: adjustments.aspectRatio,
+          currentCrop: adjustments.crop,
+          effectiveRotation: liveRotation,
           imageHeight: selectedImage.height,
           imageWidth: selectedImage.width,
-          isDraggingRotation,
-          orientationSteps,
-          previousParams: prevCropParams.current,
-          rotation,
-        });
-
-        if (isDraggingRotation) {
-          if (nextPixelCrop) {
-            const pc = percentCropFromPixelCrop(nextPixelCrop, orientedWidth, orientedHeight);
-            setCrop(pc);
-            lastValidCropRef.current = pc;
-          }
-        } else {
-          prevCropParams.current = nextCropParams;
-
-          if (isCropChangeMeaningful(currentAdjCrop, nextPixelCrop)) {
-            setAdjustments((prev: Adjustments) => ({ ...prev, crop: nextPixelCrop }));
-          }
-        }
-      }
-    }, 0);
-
-    return () => {
-      clearTimeout(cropTimer);
-    };
-  }, [
-    adjustments.aspectRatio,
-    adjustments.crop,
-    adjustments.orientationSteps,
-    adjustments.rotation,
-    adjustments,
-    liveRotation,
-    isCropping,
-    selectedImage,
-    setAdjustments,
-  ]);
-
-  useEffect(() => {
-    const syncTimer = setTimeout(() => {
-      if (!isCropping || !selectedImage?.width) {
-        setCrop(null);
-        return;
-      }
-
-      if (liveRotation !== null) {
-        return;
-      }
-
-      const orientationSteps = adjustments.orientationSteps || 0;
-      const isSwapped = orientationSteps === 1 || orientationSteps === 3;
-      const cropBaseWidth = isSwapped ? selectedImage.height : selectedImage.width;
-      const cropBaseHeight = isSwapped ? selectedImage.width : selectedImage.height;
-
-      const { crop: pixelCrop } = adjustments;
-
-      if (pixelCrop) {
-        const pct: PercentCrop = {
-          unit: '%',
-          x: (pixelCrop.x / cropBaseWidth) * 100,
-          y: (pixelCrop.y / cropBaseHeight) * 100,
-          width: (pixelCrop.width / cropBaseWidth) * 100,
-          height: (pixelCrop.height / cropBaseHeight) * 100,
-        };
-        setCrop(pct);
-        lastValidCropRef.current = pct;
-      }
-    }, 0);
-
-    return () => {
-      clearTimeout(syncTimer);
-    };
-  }, [isCropping, adjustments, adjustments.crop, adjustments.orientationSteps, selectedImage, liveRotation]);
+          isDraggingRotation: true,
+          orientationSteps: adjustments.orientationSteps || 0,
+          previousParams: {
+            aspectRatio: adjustments.aspectRatio,
+            orientationSteps: adjustments.orientationSteps || 0,
+            rotation: adjustments.rotation || 0,
+          },
+          rotation: adjustments.rotation || 0,
+        }).nextPixelCrop
+      : adjustments.crop;
+  const canonicalPercentCrop =
+    isCropping && displayedCanonicalPixelCrop && orientedCropDimensions
+      ? percentCropFromPixelCrop(
+          displayedCanonicalPixelCrop,
+          orientedCropDimensions.width,
+          orientedCropDimensions.height,
+        )
+      : null;
+  const crop: Crop | null = activeCropDraft(cropInteraction, cropSessionKey, cropGeometryKey) ?? canonicalPercentCrop;
 
   const handleCropChange = useCallback(
     (_pixelCrop: Crop, percentCrop: PercentCrop) => {
       if (!selectedImage) return;
+
+      let lastValidPercentCrop =
+        cropInteraction.kind === 'dragging' &&
+        cropInteraction.sessionKey === cropSessionKey &&
+        cropInteraction.geometryIdentity === cropGeometryKey
+          ? cropInteraction.lastValidPercentCrop
+          : (canonicalPercentCrop ?? percentCrop);
+      const commitDraft = (nextCrop: PercentCrop) => {
+        lastValidPercentCrop = nextCrop;
+        setCropInteraction(updateCropDraft(cropSessionKey, cropGeometryKey, nextCrop, lastValidPercentCrop));
+      };
 
       const orientationSteps = adjustments.orientationSteps || 0;
       const isSwapped = orientationSteps === 1 || orientationSteps === 3;
@@ -1615,19 +1593,17 @@ export default function Editor({
       });
 
       if (isCropValidAfterRotation(toPixel(percentCrop), W, H, rotation)) {
-        setCrop(percentCrop);
-        lastValidCropRef.current = percentCrop;
+        commitDraft(percentCrop);
         return;
       }
 
-      if (!lastValidCropRef.current) {
-        setCrop(percentCrop);
-        lastValidCropRef.current = percentCrop;
+      if (!lastValidPercentCrop) {
+        commitDraft(percentCrop);
         return;
       }
 
-      if (!isCropValidAfterRotation(toPixel(lastValidCropRef.current), W, H, rotation)) {
-        const lv = lastValidCropRef.current;
+      if (!isCropValidAfterRotation(toPixel(lastValidPercentCrop), W, H, rotation)) {
+        const lv = lastValidPercentCrop;
         const cx = lv.x + lv.width / 2;
         const cy = lv.y + lv.height / 2;
         let lo = 0;
@@ -1650,10 +1626,10 @@ export default function Editor({
             lo = mid;
           }
         }
-        lastValidCropRef.current = healed;
+        lastValidPercentCrop = healed;
       }
 
-      const lastValid = lastValidCropRef.current;
+      const lastValid = lastValidPercentCrop;
       const oldL = lastValid.x;
       const oldT = lastValid.y;
       const oldR = lastValid.x + lastValid.width;
@@ -1707,8 +1683,7 @@ export default function Editor({
           applyAxis('X');
         }
 
-        setCrop(finalCrop);
-        lastValidCropRef.current = finalCrop;
+        commitDraft(finalCrop);
         return;
       }
 
@@ -1759,8 +1734,7 @@ export default function Editor({
         const isValidInitially = isCropValidAfterRotation(toPixel(targetCrop), W, H, rotation);
 
         if (newW <= oldW && isValidInitially) {
-          setCrop(targetCrop);
-          lastValidCropRef.current = targetCrop;
+          commitDraft(targetCrop);
         } else {
           let low = 0;
           let high = 1;
@@ -1783,8 +1757,7 @@ export default function Editor({
               high = mid;
             }
           }
-          setCrop(bestValid);
-          lastValidCropRef.current = bestValid;
+          commitDraft(bestValid);
         }
       } else {
         const eps = 1e-3;
@@ -1850,15 +1823,35 @@ export default function Editor({
           height: currB - currT,
         };
 
-        setCrop(finalCrop);
-        lastValidCropRef.current = finalCrop;
+        commitDraft(finalCrop);
       }
     },
-    [selectedImage, adjustments.orientationSteps, adjustments.rotation, adjustments.aspectRatio, liveRotation],
+    [
+      adjustments.aspectRatio,
+      adjustments.orientationSteps,
+      adjustments.rotation,
+      canonicalPercentCrop,
+      cropGeometryKey,
+      cropInteraction,
+      cropSessionKey,
+      liveRotation,
+      selectedImage,
+    ],
   );
 
+  const handleCropStart = useCallback(() => {
+    if (!canonicalPercentCrop) return;
+    setCropInteraction(updateCropDraft(cropSessionKey, cropGeometryKey, canonicalPercentCrop));
+  }, [canonicalPercentCrop, cropGeometryKey, cropSessionKey]);
+
   const handleCropComplete = useCallback(
-    (_crop: Crop, pc: PercentCrop) => {
+    (_crop: Crop, completedPercentCrop: PercentCrop) => {
+      const pc =
+        cropInteraction.kind === 'dragging' &&
+        cropInteraction.sessionKey === cropSessionKey &&
+        cropInteraction.geometryIdentity === cropGeometryKey
+          ? cropInteraction.lastValidPercentCrop
+          : completedPercentCrop;
       if (!pc.width || !pc.height || !selectedImage?.width) {
         return;
       }
@@ -1866,19 +1859,12 @@ export default function Editor({
         return;
       }
 
-      const orientationSteps = adjustments.orientationSteps || 0;
-      const isSwapped = orientationSteps === 1 || orientationSteps === 3;
-
-      const baseW = isSwapped ? selectedImage.height : selectedImage.width;
-      const baseH = isSwapped ? selectedImage.width : selectedImage.height;
-
-      const newPixelCrop: Crop = {
-        unit: 'px',
-        x: Math.ceil((pc.x / 100) * baseW),
-        y: Math.ceil((pc.y / 100) * baseH),
-        width: Math.floor((pc.width / 100) * baseW),
-        height: Math.floor((pc.height / 100) * baseH),
-      };
+      const dimensions = getOrientedDimensions(
+        selectedImage.width,
+        selectedImage.height,
+        adjustments.orientationSteps || 0,
+      );
+      const newPixelCrop = pixelCropFromPercentCrop(pc, dimensions.width, dimensions.height);
 
       setAdjustments((prev: Adjustments) => {
         if (JSON.stringify(newPixelCrop) !== JSON.stringify(prev.crop)) {
@@ -1886,8 +1872,17 @@ export default function Editor({
         }
         return prev;
       });
+      setCropInteraction({ kind: 'idle' });
     },
-    [selectedImage, adjustments.orientationSteps, setAdjustments, liveRotation],
+    [
+      adjustments.orientationSteps,
+      cropGeometryKey,
+      cropInteraction,
+      cropSessionKey,
+      liveRotation,
+      selectedImage,
+      setAdjustments,
+    ],
   );
 
   const handleDoubleClick = useCallback(
@@ -2078,6 +2073,7 @@ export default function Editor({
               finalPreviewUrl={finalPreviewUrl}
               gamutWarningOverlay={gamutWarningOverlay}
               handleCropComplete={handleCropComplete}
+              handleCropStart={handleCropStart}
               imageRenderSize={imageRenderSize}
               originalImageRenderSize={comparePaneLayout.original}
               overlayGeometry={overlayGeometry}

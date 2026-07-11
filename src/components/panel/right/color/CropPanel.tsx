@@ -23,6 +23,7 @@ import { useEditorStore } from '../../../../store/useEditorStore';
 import { useUIStore } from '../../../../store/useUIStore';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../../types/typography';
 import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../../utils/adjustments';
+import { resolveCropForGeometryTransaction } from '../../../../utils/cropUtils';
 import LensCorrectionModal from '../../../modals/editing/LensCorrectionModal';
 import TransformModal from '../../../modals/editing/TransformModal';
 import { Orientation, Panel } from '../../../ui/AppProperties';
@@ -183,18 +184,55 @@ export default function CropPanel() {
 
   const { aspectRatio, rotation, flipHorizontal, flipVertical, orientationSteps } = adjustments;
 
+  const setGeometryAdjustments = useCallback(
+    (update: (previous: Adjustments) => Adjustments) => {
+      setAdjustments((previous: Adjustments) => {
+        const next = update(previous);
+        if (!selectedImage?.width || !selectedImage.height) return next;
+        const previousGeometry = {
+          aspectRatio: previous.aspectRatio,
+          orientationSteps: previous.orientationSteps || 0,
+          rotation: previous.rotation || 0,
+        };
+        const nextGeometry = {
+          aspectRatio: next.aspectRatio,
+          orientationSteps: next.orientationSteps || 0,
+          rotation: next.rotation || 0,
+        };
+        if (
+          previousGeometry.aspectRatio === nextGeometry.aspectRatio &&
+          previousGeometry.orientationSteps === nextGeometry.orientationSteps &&
+          previousGeometry.rotation === nextGeometry.rotation
+        ) {
+          return next;
+        }
+        return {
+          ...next,
+          crop: resolveCropForGeometryTransaction(
+            previous.crop,
+            selectedImage.width,
+            selectedImage.height,
+            previousGeometry,
+            nextGeometry,
+          ),
+        };
+      });
+    },
+    [selectedImage, setAdjustments],
+  );
+
   useEffect(() => {
     if (!isStraightenActive) return;
 
     const syncTimer = setTimeout(() => {
       updateLocalRotation(null);
-      setAdjustments((prev: Adjustments) => ({ ...prev, rotation: 0 }));
+      setGeometryAdjustments((prev: Adjustments) => ({ ...prev, rotation: 0 }));
     }, 0);
 
     return () => {
       clearTimeout(syncTimer);
     };
-  }, [isStraightenActive, setAdjustments, updateLocalRotation]);
+  }, [isStraightenActive, setGeometryAdjustments, updateLocalRotation]);
 
   useEffect(() => {
     return () => {
@@ -294,10 +332,10 @@ export default function CropPanel() {
     if (activePreset?.value === ORIGINAL_RATIO) {
       const newOriginalRatio = getEffectiveOriginalRatio();
       if (newOriginalRatio !== null && aspectRatio && Math.abs(aspectRatio - newOriginalRatio) > RATIO_TOLERANCE) {
-        setAdjustments((prev: Adjustments) => ({ ...prev, aspectRatio: newOriginalRatio }));
+        setGeometryAdjustments((prev: Adjustments) => ({ ...prev, aspectRatio: newOriginalRatio }));
       }
     }
-  }, [orientationSteps, activePreset, aspectRatio, getEffectiveOriginalRatio, setAdjustments]);
+  }, [orientationSteps, activePreset, aspectRatio, getEffectiveOriginalRatio, setGeometryAdjustments]);
 
   const handleCustomInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -323,7 +361,7 @@ export default function CropPanel() {
       const newAspectRatio = numW / numH;
       lastSyncedRatio.current = newAspectRatio;
       if (!adjustments.aspectRatio || Math.abs(adjustments.aspectRatio - newAspectRatio) > RATIO_TOLERANCE) {
-        setAdjustments((prev: Adjustments) => ({ ...prev, aspectRatio: newAspectRatio }));
+        setGeometryAdjustments((prev: Adjustments) => ({ ...prev, aspectRatio: newAspectRatio }));
       }
     } else {
       setCustomRatioError(true);
@@ -349,7 +387,7 @@ export default function CropPanel() {
 
   const handlePresetClick = (preset: CropPreset) => {
     if (preset.value === ORIGINAL_RATIO) {
-      setAdjustments((prev: Adjustments) => ({
+      setGeometryAdjustments((prev: Adjustments) => ({
         ...prev,
         aspectRatio: getEffectiveOriginalRatio(),
       }));
@@ -360,7 +398,7 @@ export default function CropPanel() {
     if (activePreset === preset && targetRatio && targetRatio !== 1) {
       const newRatio = 1 / (adjustments.aspectRatio ? adjustments.aspectRatio : 1);
       setPreferPortrait(newRatio < 1);
-      setAdjustments((prev: Adjustments) => ({
+      setGeometryAdjustments((prev: Adjustments) => ({
         ...prev,
         aspectRatio: newRatio,
       }));
@@ -376,19 +414,19 @@ export default function CropPanel() {
       }
     }
 
-    setAdjustments((prev: Adjustments) => ({ ...prev, aspectRatio: newAspectRatio }));
+    setGeometryAdjustments((prev: Adjustments) => ({ ...prev, aspectRatio: newAspectRatio }));
   };
 
   const handleOrientationToggle = useCallback(() => {
     if (aspectRatio && aspectRatio !== 1) {
       const newRatio = 1 / aspectRatio;
       setPreferPortrait(newRatio < 1);
-      setAdjustments((prev: Adjustments) => ({
+      setGeometryAdjustments((prev: Adjustments) => ({
         ...prev,
         aspectRatio: newRatio,
       }));
     }
-  }, [aspectRatio, setAdjustments]);
+  }, [aspectRatio, setGeometryAdjustments]);
 
   const handleReset = () => {
     const originalAspectRatio =
@@ -444,13 +482,13 @@ export default function CropPanel() {
     if (isRotationActive) {
       updateLocalRotation(newFineRotation);
     } else {
-      setAdjustments((prev: Adjustments) => ({ ...prev, rotation: newFineRotation }));
+      setGeometryAdjustments((prev: Adjustments) => ({ ...prev, rotation: newFineRotation }));
     }
   };
 
   const handleStepRotate = (degrees: number) => {
     const increment = degrees > 0 ? 1 : 3;
-    setAdjustments((prev: Adjustments) => {
+    setGeometryAdjustments((prev: Adjustments) => {
       const newAspectRatio = prev.aspectRatio && prev.aspectRatio !== 0 ? 1 / prev.aspectRatio : null;
       return {
         ...prev,
@@ -463,7 +501,7 @@ export default function CropPanel() {
 
   const resetFineRotation = () => {
     updateLocalRotation(null);
-    setAdjustments((prev: Adjustments) => ({ ...prev, rotation: 0 }));
+    setGeometryAdjustments((prev: Adjustments) => ({ ...prev, rotation: 0 }));
   };
 
   const handleOverlayCycle = () => {
@@ -501,11 +539,11 @@ export default function CropPanel() {
         if (localRotationRef.current !== null) {
           const finalRot = localRotationRef.current;
           updateLocalRotation(null);
-          setAdjustments((prev: Adjustments) => ({ ...prev, rotation: finalRot }));
+          setGeometryAdjustments((prev: Adjustments) => ({ ...prev, rotation: finalRot }));
         }
       }
     },
-    [setEditor, updateLocalRotation, setAdjustments],
+    [setEditor, setGeometryAdjustments, updateLocalRotation],
   );
 
   const activeRatioLabel = activePreset?.name ?? t('editor.crop.presets.custom.name');
@@ -523,7 +561,7 @@ export default function CropPanel() {
 
     const finalRotation = localRotationRef.current;
     updateLocalRotation(null);
-    setAdjustments((prev: Adjustments) => ({ ...prev, rotation: finalRotation }));
+    setGeometryAdjustments((prev: Adjustments) => ({ ...prev, rotation: finalRotation }));
   };
 
   const handleApply = () => {
@@ -784,7 +822,7 @@ export default function CropPanel() {
                           const willBeActive = !state.isStraightenActive;
                           if (willBeActive) {
                             updateLocalRotation(null);
-                            setAdjustments((prev: Adjustments) => ({ ...prev, rotation: 0 }));
+                            setGeometryAdjustments((prev: Adjustments) => ({ ...prev, rotation: 0 }));
                           }
                           return { isStraightenActive: willBeActive };
                         });

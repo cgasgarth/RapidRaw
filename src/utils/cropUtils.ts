@@ -1,5 +1,36 @@
 import type { Crop, PercentCrop } from 'react-image-crop';
 
+export type CropInteraction =
+  | { kind: 'idle' }
+  | {
+      kind: 'dragging';
+      sessionKey: string;
+      percentCrop: PercentCrop;
+      lastValidPercentCrop: PercentCrop;
+      geometryIdentity: string;
+    };
+
+export function activeCropDraft(
+  interaction: CropInteraction,
+  sessionKey: string,
+  geometryIdentity?: string,
+): PercentCrop | null {
+  return interaction.kind === 'dragging' &&
+    interaction.sessionKey === sessionKey &&
+    (geometryIdentity === undefined || interaction.geometryIdentity === geometryIdentity)
+    ? interaction.percentCrop
+    : null;
+}
+
+export function updateCropDraft(
+  sessionKey: string,
+  geometryIdentity: string,
+  percentCrop: PercentCrop,
+  lastValidPercentCrop: PercentCrop = percentCrop,
+): CropInteraction {
+  return { kind: 'dragging', sessionKey, geometryIdentity, percentCrop, lastValidPercentCrop };
+}
+
 export function getOrientedDimensions(
   imageWidth: number,
   imageHeight: number,
@@ -117,6 +148,53 @@ export function percentCropFromPixelCrop(pixelCrop: Crop, imageWidth: number, im
     width: (pixelCrop.width / imageWidth) * 100,
     height: (pixelCrop.height / imageHeight) * 100,
   };
+}
+
+/** Convert an interaction crop back to the persisted oriented-pixel space. */
+export function pixelCropFromPercentCrop(percentCrop: PercentCrop, imageWidth: number, imageHeight: number): Crop {
+  return {
+    unit: 'px',
+    x: Math.ceil((percentCrop.x / 100) * imageWidth - 1e-9),
+    y: Math.ceil((percentCrop.y / 100) * imageHeight - 1e-9),
+    width: Math.floor((percentCrop.width / 100) * imageWidth),
+    height: Math.floor((percentCrop.height / 100) * imageHeight),
+  };
+}
+
+export function cropGeometryIdentity(
+  imagePath: string,
+  imageWidth: number,
+  imageHeight: number,
+  params: CropGeometryParams,
+): string {
+  return [
+    imagePath,
+    imageWidth,
+    imageHeight,
+    params.orientationSteps,
+    params.aspectRatio ?? 'free',
+    params.rotation,
+  ].join(':');
+}
+
+export function resolveCropForGeometryTransaction(
+  currentCrop: Crop | null,
+  imageWidth: number,
+  imageHeight: number,
+  previousParams: CropGeometryParams,
+  nextParams: CropGeometryParams,
+): Crop | null {
+  return resolveNextCropForGeometryChange({
+    aspectRatio: nextParams.aspectRatio,
+    currentCrop,
+    effectiveRotation: nextParams.rotation,
+    imageHeight,
+    imageWidth,
+    isDraggingRotation: false,
+    orientationSteps: nextParams.orientationSteps,
+    previousParams,
+    rotation: nextParams.rotation,
+  }).nextPixelCrop;
 }
 
 export function isCropChangeMeaningful(currentCrop: Crop | null, nextCrop: Crop | null): boolean {
