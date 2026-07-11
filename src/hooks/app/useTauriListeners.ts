@@ -74,7 +74,7 @@ import { thumbnailResourceCache } from '../../utils/thumbnailResources';
 interface TauriListenerProps {
   refreshAllFolderTrees: () => void;
   refreshImageList: () => void;
-  markGenerated: (path: string) => void;
+  markGenerated: (path: string, generation?: number) => boolean;
 }
 
 interface ImageAnalyticsPayload<TData> {
@@ -257,10 +257,13 @@ export function useTauriListeners({ refreshAllFolderTrees, refreshImageList, mar
       }),
       listen<unknown>(THUMBNAIL_GENERATED_EVENT, (event) => {
         if (!isEffectActive) return;
-        const { path, resource, rating, is_edited, smartPreview } = parseThumbnailGeneratedPayload(event.payload);
+        const { path, generation, resource, rating, is_edited, smartPreview } = parseThumbnailGeneratedPayload(
+          event.payload,
+        );
+
+        if (!refs.current.markGenerated(path, generation)) return;
 
         thumbnailBuffer.current[path] = thumbnailResourceCache.setProtocol(path, resource);
-        refs.current.markGenerated(path);
         if (smartPreview) {
           smartPreviewBuffer.current[path] = smartPreview;
         }
