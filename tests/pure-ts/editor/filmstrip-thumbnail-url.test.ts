@@ -14,8 +14,8 @@ import Filmstrip, {
 import { DecodedThumbnailReadinessCache } from '../../../src/components/panel/filmstripThumbnailLifecycle.ts';
 import { type ImageFile, ThumbnailAspectRatio } from '../../../src/components/ui/AppProperties.tsx';
 import en from '../../../src/i18n/locales/en.json';
-import { useProcessStore } from '../../../src/store/useProcessStore.ts';
 import { useSettingsStore } from '../../../src/store/useSettingsStore.ts';
+import { thumbnailCache } from '../../../src/thumbnails/thumbnailCacheInstance.ts';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -29,7 +29,7 @@ afterEach(() => {
     renderedRoot.container.remove();
     renderedRoot = null;
   }
-  useProcessStore.setState({ thumbnails: {} });
+  thumbnailCache.clearGeneration();
   useSettingsStore.setState({ appSettings: null });
 });
 
@@ -65,7 +65,7 @@ test('bounds decoded readiness entries and refreshes recent revisions', () => {
 describe('filmstrip thumbnail decode handoff', () => {
   test('keeps a same-path predecessor visible until the actual successor image decodes and completes opacity handoff', async () => {
     const current = image('/validation/revision.ARW');
-    useProcessStore.setState({ thumbnails: { [current.path]: 'blob:revision-one' } });
+    replaceThumbnails({ [current.path]: 'blob:revision-one' });
     const rendered = await renderThumbnail(current);
     const predecessor = requiredImage(rendered.container, 'blob:revision-one');
 
@@ -100,7 +100,7 @@ describe('filmstrip thumbnail decode handoff', () => {
 
   test('rejects stale same-path revision callbacks without removing the valid predecessor', async () => {
     const current = image('/validation/stale-revision.ARW');
-    useProcessStore.setState({ thumbnails: { [current.path]: 'blob:stale-one' } });
+    replaceThumbnails({ [current.path]: 'blob:stale-one' });
     const rendered = await renderThumbnail(current);
     const predecessor = requiredImage(rendered.container, 'blob:stale-one');
     await loadImage(predecessor);
@@ -121,7 +121,7 @@ describe('filmstrip thumbnail decode handoff', () => {
 
   test('keeps a same-path predecessor when successor decode rejects', async () => {
     const current = image('/validation/decode-error.ARW');
-    useProcessStore.setState({ thumbnails: { [current.path]: 'blob:decode-error-one' } });
+    replaceThumbnails({ [current.path]: 'blob:decode-error-one' });
     const rendered = await renderThumbnail(current);
     const predecessor = requiredImage(rendered.container, 'blob:decode-error-one');
     await loadImage(predecessor);
@@ -140,11 +140,9 @@ describe('filmstrip thumbnail decode handoff', () => {
   test('does not retain a different-path predecessor while a recycled thumbnail cell decodes', async () => {
     const previous = image('/validation/previous.ARW');
     const successor = image('/validation/successor.ARW');
-    useProcessStore.setState({
-      thumbnails: {
-        [previous.path]: 'blob:previous',
-        [successor.path]: 'blob:successor',
-      },
+    replaceThumbnails({
+      [previous.path]: 'blob:previous',
+      [successor.path]: 'blob:successor',
     });
 
     const rendered = await renderThumbnail(previous);
@@ -161,7 +159,7 @@ describe('filmstrip thumbnail decode handoff', () => {
 
   test('preserves decoded readiness across a virtualized remount without showing the placeholder', async () => {
     const current = image('/validation/warm-remount.ARW');
-    useProcessStore.setState({ thumbnails: { [current.path]: 'blob:warm-remount' } });
+    replaceThumbnails({ [current.path]: 'blob:warm-remount' });
     const rendered = await renderThumbnail(current);
     await loadImage(requiredImage(rendered.container, 'blob:warm-remount'));
 
@@ -175,11 +173,9 @@ describe('filmstrip thumbnail decode handoff', () => {
   test('uses the real Grid path without showing a different-path predecessor after its cell changes', async () => {
     const previous = image('/validation/grid-previous.ARW');
     const successor = image('/validation/grid-successor.ARW');
-    useProcessStore.setState({
-      thumbnails: {
-        [previous.path]: 'blob:grid-previous',
-        [successor.path]: 'blob:grid-successor',
-      },
+    replaceThumbnails({
+      [previous.path]: 'blob:grid-previous',
+      [successor.path]: 'blob:grid-successor',
     });
 
     const rendered = await renderFilmstrip([previous]);
@@ -195,9 +191,7 @@ describe('filmstrip thumbnail decode handoff', () => {
 
   test('keeps the real Grid anchor and virtual cell width stable through a contain switch and thumbnail decode', async () => {
     const images = Array.from({ length: 40 }, (_value, index) => image(`/validation/contain-${index}.ARW`));
-    useProcessStore.setState({
-      thumbnails: Object.fromEntries(images.map((imageFile, index) => [imageFile.path, `blob:contain-${index}`])),
-    });
+    replaceThumbnails(Object.fromEntries(images.map((imageFile, index) => [imageFile.path, `blob:contain-${index}`])));
 
     const rendered = await renderFilmstrip(images);
     const grid = requiredElement<HTMLDivElement>(rendered.container, '[role="listbox"]');
@@ -382,9 +376,14 @@ async function renderFilmstrip(
 
 async function setThumbnails(thumbnails: Record<string, string>) {
   act(() => {
-    useProcessStore.setState({ thumbnails });
+    replaceThumbnails(thumbnails);
   });
   await settleReact();
+}
+
+function replaceThumbnails(thumbnails: Record<string, string>): void {
+  thumbnailCache.clearGeneration();
+  thumbnailCache.setMany(Object.entries(thumbnails).map(([path, url]) => ({ generation: 1, path, url })));
 }
 
 async function loadImage(imageElement: HTMLImageElement) {

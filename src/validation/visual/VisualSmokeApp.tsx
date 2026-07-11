@@ -97,6 +97,7 @@ import { useLibraryStore } from '../../store/useLibraryStore';
 import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { DEFAULT_COLLAPSIBLE_SECTIONS_STATE, useUIStore } from '../../store/useUIStore';
+import { thumbnailCache } from '../../thumbnails/thumbnailCacheInstance';
 import {
   ActiveChannel,
   type Adjustments,
@@ -1107,15 +1108,16 @@ function useProfessionalFilmstripContextSmokeState() {
       },
       multiSelectedPaths: professionalFilmstripImageList.slice(0, 4).map((image) => image.path),
     });
+    thumbnailCache.setMany(
+      professionalFilmstripImageList.slice(0, 4).map((image, index) => ({
+        generation: 0,
+        path: image.path,
+        url: professionalFilmstripThumbs[index] ?? null,
+      })),
+    );
     useProcessStore.setState({
       isCopied: true,
       isPasted: true,
-      thumbnails: {
-        [professionalFilmstripImageList[0]?.path ?? '']: professionalFilmstripThumbs[0],
-        [professionalFilmstripImageList[1]?.path ?? '']: professionalFilmstripThumbs[1],
-        [professionalFilmstripImageList[2]?.path ?? '']: professionalFilmstripThumbs[2],
-        [professionalFilmstripImageList[3]?.path ?? '']: professionalFilmstripThumbs[3],
-      },
     });
   }, []);
 }
@@ -5413,7 +5415,7 @@ function CullingCompareSyncVisualSmoke() {
           onError={() => {}}
           progress={null}
           suggestions={cullingCompareSuggestions}
-          thumbnails={cullingCompareThumbnails}
+          getThumbnailUrl={(path) => cullingCompareThumbnails[path] ?? null}
         />
       </div>
     </main>

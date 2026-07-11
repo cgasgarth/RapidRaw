@@ -1,16 +1,16 @@
 import { invoke } from '@tauri-apps/api/core';
 import { useCallback, useEffect, useRef } from 'react';
 
-import { useProcessStore } from '../../store/useProcessStore';
 import { Invokes } from '../../tauri/commands';
+import { thumbnailCache } from '../../thumbnails/thumbnailCacheInstance';
 
 export const shouldQueueThumbnailPath = (
   path: string,
-  cachedThumbnails: Readonly<Record<string, string>>,
+  cachedThumbnails: { has(path: string): boolean },
   generatedPaths: Set<string>,
   pendingPaths: ReadonlySet<string>,
 ): boolean => {
-  if (cachedThumbnails[path]) {
+  if (cachedThumbnails.has(path)) {
     generatedPaths.add(path);
     return false;
   }
@@ -84,7 +84,7 @@ export function useThumbnails() {
     (visiblePaths: string[]) => {
       generationRef.current += 1;
       const pathsToQueue: string[] = [];
-      const cachedThumbnails = useProcessStore.getState().thumbnails;
+      const cachedThumbnails = thumbnailCache;
 
       visiblePaths.forEach((p) => {
         if (shouldQueueThumbnailPath(p, cachedThumbnails, generatedRef.current, pendingQueueRef.current)) {
