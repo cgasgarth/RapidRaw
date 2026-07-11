@@ -19,6 +19,10 @@ import {
   verifyAgentSelectedImageProposalReceipt,
 } from '../../../src/utils/agent/context/agentSelectedImageProposalRuntime';
 import {
+  renderAgentSelectedImageLiveSessionProposal,
+  startAgentSelectedImageLiveSessionDryRun,
+} from '../../../src/utils/agent/session/agentSelectedImageLiveSession';
+import {
   createAgentTypedToolExecutionContext,
   dispatchAgentTypedEditorTool,
 } from '../../../src/utils/agent/session/agentTypedToolDispatch';
@@ -77,6 +81,19 @@ const seedEditor = () => {
       width: 6000,
     },
     uncroppedAdjustedPreviewUrl: null,
+  });
+};
+
+const snapshotMutableEditorState = () => {
+  const state = useEditorStore.getState();
+  return structuredClone({
+    adjustments: state.adjustments,
+    finalPreviewUrl: state.finalPreviewUrl,
+    history: state.history,
+    historyIndex: state.historyIndex,
+    lastBasicToneCommand: state.lastBasicToneCommand,
+    selectedImage: state.selectedImage,
+    uncroppedAdjustedPreviewUrl: state.uncroppedAdjustedPreviewUrl,
   });
 };
 
@@ -173,6 +190,44 @@ describe('agent selected-image proposal runtime', () => {
 
   afterEach(() => {
     setAgentMediumPreviewAttachmentRendererForTest(undefined);
+  });
+
+  test('renders the live-session proposal from native JPEG bytes without editor mutation', async () => {
+    const source = await previewBytes();
+    setAgentMediumPreviewAttachmentRendererForTest(async ({ adjustments }) =>
+      adjustments === undefined ? source : previewVariant(source, 0x50),
+    );
+    const before = snapshotMutableEditorState();
+    const draft = await startAgentSelectedImageLiveSessionDryRun({
+      adjustments: { exposure: 0.32, highlights: -18, shadows: 14 },
+      operationId: 'issue-5014-live-session',
+      prompt: 'Brighten the selected RAW while preserving highlights.',
+      requestId: 'issue-5014-live-session',
+      sessionId: 'issue-5014-live-session',
+    });
+
+    const receipt = await renderAgentSelectedImageLiveSessionProposal(draft);
+
+    expect(receipt.status).toBe('ready');
+    expect(receipt.lineage).toEqual({
+      callId: 'issue-5014-live-session-proposal',
+      parentCallId: 'issue-5014-live-session-dry-run',
+    });
+    expect(receipt.dryRunPlan).toMatchObject({
+      planHash: draft.dryRun.dryRunPlanHash,
+      planId: draft.dryRun.dryRunPlanId,
+    });
+    expect(receipt.artifacts?.before.contentHash).toMatch(/^sha256:[a-f0-9]{64}$/u);
+    expect(receipt.artifacts?.after.contentHash).toMatch(/^sha256:[a-f0-9]{64}$/u);
+    expect(receipt.artifacts?.after.contentHash).not.toBe(receipt.artifacts?.before.contentHash);
+    expect(receipt.artifacts?.before.dimensions).toEqual({ height: 1024, width: 1536 });
+    expect(receipt.artifacts?.after.dimensions).toEqual({ height: 1024, width: 1536 });
+    expect(await verifyAgentSelectedImageProposalReceipt(receipt)).toBe(true);
+    expect(draft.proposal).toEqual(receipt);
+    expect(snapshotMutableEditorState()).toEqual(before);
+
+    await agentSelectedImageProposalRuntime.release(receipt.proposalId, 'released');
+    expect((await agentSelectedImageProposalRuntime.ensureReady(receipt.proposalId))?.status).toBe('released');
   });
 
   test('dispatches through the app-server host and binds the comparison UI to acquired before bytes', async () => {
