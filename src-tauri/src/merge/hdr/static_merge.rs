@@ -4,6 +4,7 @@ use base64::Engine;
 use image::{DynamicImage, ImageBuffer, ImageFormat, Rgb};
 
 use super::{
+    deghost::{AlignedPixel, DeghostPreview, reconstruct as reconstruct_deghost},
     plan::PlannedSource,
     radiance::{RADIANCE_ALGORITHM_ID, Sample, estimate},
     tone_map::{TONE_MAP_ALGORITHM_ID, render_rgb8},
@@ -32,6 +33,13 @@ pub(crate) struct StaticRadiancePreview {
     pub tone_mapped_preview_hash: String,
     pub variance_hash: String,
     pub weight_hash: String,
+}
+
+#[derive(Clone, Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct HdrPreviewArtifacts {
+    pub deghost_preview: DeghostPreview,
+    pub static_radiance_preview: StaticRadiancePreview,
 }
 
 fn hash_f32(values: impl IntoIterator<Item = f32>) -> String {
@@ -162,6 +170,90 @@ pub(crate) fn reconstruct_static_preview(
         tone_mapped_preview_hash,
         variance_hash,
         weight_hash,
+    })
+}
+
+pub(crate) fn reconstruct_previews(
+    sources: &[PlannedSource],
+    plan_hash: &str,
+    cancelled: impl Fn() -> bool + Copy,
+) -> Result<HdrPreviewArtifacts, String> {
+    let static_radiance_preview = reconstruct_static_preview(sources, plan_hash, cancelled)?;
+    let reference = sources
+        .iter()
+        .find(|source| source.is_reference)
+        .ok_or("missing_reference_source")?;
+    let width = reference.frame.color_proxy.width;
+    let height = reference.frame.color_proxy.height;
+    let reference_scale = reference.frame.exposure.exposure_scale;
+    let mut static_radiance = vec![[0.0f32; 3]; width * height];
+    let mut aligned = vec![Vec::with_capacity(sources.len()); width * height];
+    for y in 0..height {
+        if cancelled() {
+            return Err("hdr_plan_cancelled:residual_accumulation".to_string());
+        }
+        for x in 0..width {
+            let output_index = y * width + x;
+            let mut samples_by_channel = [
+                Vec::with_capacity(sources.len()),
+                Vec::with_capacity(sources.len()),
+                Vec::with_capacity(sources.len()),
+            ];
+            for source in sources {
+                let proxy_scale = source.frame.proxy.scale;
+                let shift_x = (source.alignment.matrix[2] / proxy_scale).round() as isize;
+                let shift_y = (source.alignment.matrix[5] / proxy_scale).round() as isize;
+                let sx = x as isize - shift_x;
+                let sy = y as isize - shift_y;
+                let mut pixel = AlignedPixel {
+                    alignment_confidence: source.alignment.confidence,
+                    is_reference: source.is_reference,
+                    source_index: source.frame.source_index,
+                    ..AlignedPixel::default()
+                };
+                if sx >= 0 && sy >= 0 && sx < width as isize && sy < height as isize {
+                    let index = sy as usize * width + sx as usize;
+                    for (channel, channel_samples) in samples_by_channel.iter_mut().enumerate() {
+                        let sample = Sample {
+                            clipped: source.frame.color_proxy.clipped[index][channel],
+                            exposure_scale: source.frame.exposure.exposure_scale / reference_scale,
+                            valid: source.frame.color_proxy.valid[index][channel],
+                            value: source.frame.color_proxy.pixels[index][channel],
+                        };
+                        pixel.clipped[channel] = sample.clipped;
+                        pixel.valid[channel] = sample.valid;
+                        pixel.value[channel] = if sample.exposure_scale > 0.0 {
+                            sample.value / sample.exposure_scale
+                        } else {
+                            f32::NAN
+                        };
+                        channel_samples.push(sample);
+                    }
+                } else {
+                    for samples in &mut samples_by_channel {
+                        samples.push(Sample::default());
+                    }
+                }
+                aligned[output_index].push(pixel);
+            }
+            for channel in 0..3 {
+                static_radiance[output_index][channel] =
+                    estimate(&samples_by_channel[channel]).radiance;
+            }
+        }
+    }
+    let deghost_preview = reconstruct_deghost(
+        width,
+        height,
+        &static_radiance,
+        &static_radiance_preview.radiance_hash,
+        &aligned,
+        plan_hash,
+        cancelled,
+    )?;
+    Ok(HdrPreviewArtifacts {
+        deghost_preview,
+        static_radiance_preview,
     })
 }
 
