@@ -39,6 +39,10 @@ export function useThumbnails() {
     schedulerRef.current?.clear();
   }, []);
   const invalidateThumbnails = useCallback((paths: readonly string[]) => schedulerRef.current?.invalidate(paths), []);
+  const invalidateThumbnailRevision = useCallback(
+    (path: string, sourceRevision: string) => schedulerRef.current?.invalidateRevision(path, sourceRevision),
+    [],
+  );
   const getThumbnailSchedulerMetrics = useCallback(
     (): ThumbnailSchedulerMetrics | null => schedulerRef.current?.getMetrics() ?? null,
     [],
@@ -55,6 +59,7 @@ export function useThumbnails() {
     updateThumbnailViewport,
     clearThumbnailQueue,
     invalidateThumbnails,
+    invalidateThumbnailRevision,
     markGenerated,
     getThumbnailSchedulerMetrics,
   };

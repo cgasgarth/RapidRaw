@@ -18,7 +18,7 @@ export interface ThumbnailBackendRequest {
     path: string;
     priority: number;
     demandClass: ThumbnailPriority;
-    sourceRevision: null;
+    sourceRevision: string | null;
   }>;
 }
 
@@ -100,6 +100,7 @@ export class ThumbnailDemandScheduler {
   private generation = 0;
   private sequence = 0;
   private states = new Map<string, PathState>();
+  private sourceRevisionByPath = new Map<string, string>();
   private demanded = new Set<string>();
   private visible = new Set<string>();
   private visibleSince = new Map<string, number>();
@@ -295,6 +296,11 @@ export class ThumbnailDemandScheduler {
     if (shouldFlush) this.scheduleFrame();
   }
 
+  invalidateRevision(path: string, sourceRevision: string): void {
+    this.sourceRevisionByPath.set(path, sourceRevision);
+    this.invalidate([path]);
+  }
+
   clear(): void {
     this.beginGeneration('clear');
   }
@@ -391,7 +397,7 @@ export class ThumbnailDemandScheduler {
         path,
         priority: state.priority,
         demandClass: state.demandClass,
-        sourceRevision: null,
+        sourceRevision: this.sourceRevisionByPath.get(path) ?? null,
       })),
     };
     this.replacePendingNext = false;

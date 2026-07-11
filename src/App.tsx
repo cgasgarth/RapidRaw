@@ -167,8 +167,14 @@ function App() {
   const [thumbnailSize, setThumbnailSize] = useState(defaultThumbnailSize);
   const [thumbnailAspectRatio, setThumbnailAspectRatio] = useState(ThumbnailAspectRatio.Cover);
 
-  const { requestThumbnails, updateThumbnailViewport, clearThumbnailQueue, invalidateThumbnails, markGenerated } =
-    useThumbnails();
+  const {
+    requestThumbnails,
+    updateThumbnailViewport,
+    clearThumbnailQueue,
+    invalidateThumbnails,
+    invalidateThumbnailRevision,
+    markGenerated,
+  } = useThumbnails();
 
   const transformWrapperRef = useRef<TransformController | null>(null);
   const preloadedDataRef = useRef<PreloadedAppData>({});
@@ -424,6 +430,7 @@ function App() {
   });
 
   useTauriListeners({
+    invalidateThumbnailRevision,
     refreshAllFolderTrees: refreshAllFolderTreesVoid,
     refreshImageList: () => {
       void handleLibraryRefresh();
