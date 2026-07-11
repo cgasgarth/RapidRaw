@@ -11,7 +11,7 @@ import {
 import { pushEditHistoryEntry } from '../../editHistory';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
 import { applyBasicToneToLiveEditor } from '../session/agentLiveBasicTone';
-import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorState';
+import { createLiveEditorCoreAppServerBridge } from '../session/agentLiveEditorCoreState';
 
 export const AGENT_ADJUSTMENTS_APPLY_TOOL_NAME = 'rawengine.agent.adjustments.apply';
 export const AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME = 'rawengine.agent.adjustments.dry_run';
@@ -313,7 +313,7 @@ export const dryRunAgentGlobalAdjustments = async (
     }),
     { dryRun: true },
   );
-  const bridge = createLiveEditorAppServerBridge();
+  const bridge = createLiveEditorCoreAppServerBridge();
   const dryRun = await bridge.dispatch(command);
   if (!dryRun.ok) throw new Error(`Agent basic-tone dry-run failed: ${dryRun.message}`);
   const dryRunResult = toneColorDryRunResultV1Schema.parse(dryRun.result);

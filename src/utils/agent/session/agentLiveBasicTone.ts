@@ -20,7 +20,7 @@ import {
   buildBasicToneImageCommandContext,
   type LegacyBasicToneAdjustmentPayload,
 } from '../../basicToneCommandBridge';
-import { createLiveEditorAppServerBridge } from './agentLiveEditorState';
+import { createLiveEditorCoreAppServerBridge } from './agentLiveEditorCoreState';
 
 export type AgentLiveBasicTonePixel = readonly [number, number, number];
 
@@ -263,7 +263,7 @@ export const dryRunBasicToneCommandInLiveEditor = async (
     throw new Error('Live editor typed basic-tone dry-run rejected stale graph revision.');
   }
 
-  const bridge = createLiveEditorAppServerBridge();
+  const bridge = createLiveEditorCoreAppServerBridge();
   const dryRun = await bridge.dispatch(command);
   if (!dryRun.ok) throw new Error(`Typed basic-tone dry-run failed: ${dryRun.message}`);
   return toneColorDryRunResultV1Schema.parse(dryRun.result);
@@ -287,7 +287,7 @@ export const applyBasicToneCommandToLiveEditor = async (
     throw new Error('Live editor typed basic-tone apply requires accepted dry-run plan identity.');
   }
 
-  const bridge = createLiveEditorAppServerBridge();
+  const bridge = createLiveEditorCoreAppServerBridge();
   const dryRun = await bridge.dispatch(buildTypedBasicToneDryRunCommand(command));
   if (!dryRun.ok) throw new Error(`Typed basic-tone apply preflight failed: ${dryRun.message}`);
   const dryRunResult = toneColorDryRunResultV1Schema.parse(dryRun.result);
@@ -323,7 +323,7 @@ export const applyBasicToneToLiveEditor = async ({
   const expectedGraphRevision = requestedExpectedGraphRevision ?? `history_${initialState.historyIndex}`;
   const context = buildBasicToneImageCommandContext({ expectedGraphRevision, imagePath, operationId, sessionId });
   const dryRunCommand = buildBasicToneCommandEnvelope(requestedAdjustments, context, { dryRun: true });
-  const bridge = createLiveEditorAppServerBridge();
+  const bridge = createLiveEditorCoreAppServerBridge();
   const dryRun = await bridge.dispatch(dryRunCommand);
   if (!dryRun.ok) throw new Error(`Agent basic-tone dry-run failed: ${dryRun.message}`);
 

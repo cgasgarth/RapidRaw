@@ -12,7 +12,7 @@ import { useEditorStore } from '../../../store/useEditorStore';
 import type { Adjustments } from '../../adjustments';
 import { pushEditHistoryEntry } from '../../editHistory';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
-import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorState';
+import { createLiveEditorCoreAppServerBridge } from '../session/agentLiveEditorCoreState';
 
 export const AGENT_LENS_PROFILE_APPLY_TOOL_NAME = 'rawengine.agent.lens_profile.apply';
 export const AGENT_LENS_PROFILE_APPLY_INPUT_SCHEMA_NAME = 'AgentLensProfileApplyRequestV1';
@@ -202,7 +202,7 @@ const dispatchTypedLensProfileApply = async ({
   imagePath: string;
   request: AgentLensProfileApplyRequest;
 }): Promise<LensProfileMutationResultV1> => {
-  const bridge = createLiveEditorAppServerBridge();
+  const bridge = createLiveEditorCoreAppServerBridge();
   const dryRunCommand = buildAgentLensProfileCommand({
     approval: {
       approvalClass: ApprovalClass.PreviewOnly,

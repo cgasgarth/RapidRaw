@@ -24,7 +24,7 @@ import {
   hashBasicTonePreviewPixels,
   renderBasicTonePreviewPixels,
 } from '../session/agentLiveBasicTone';
-import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorState';
+import { createLiveEditorCoreAppServerBridge } from '../session/agentLiveEditorCoreState';
 
 export type AgentCoreEditCommandBundleStep =
   | { kind: 'basic_tone'; payload: LegacyBasicToneAdjustmentPayload }
@@ -82,7 +82,7 @@ export const runAgentCoreEditCommandBundle = async ({
   if (imagePath === undefined) throw new Error('Cannot run agent command bundle without a selected image.');
   if (steps.length === 0) throw new Error('Agent command bundle requires at least one command step.');
 
-  const bridge = createLiveEditorAppServerBridge();
+  const bridge = createLiveEditorCoreAppServerBridge();
   const dryRuns: ToneColorDryRunResultV1[] = [];
   const mutations: ToneColorMutationResultV1[] = [];
   let nextAdjustments = initialState.adjustments;

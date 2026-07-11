@@ -14,7 +14,7 @@ import { useEditorStore } from '../../../store/useEditorStore';
 import type { Adjustments } from '../../adjustments';
 import { pushEditHistoryEntry } from '../../editHistory';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
-import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorState';
+import { createLiveEditorCoreAppServerBridge } from '../session/agentLiveEditorCoreState';
 
 export const AGENT_GEOMETRY_APPLY_TOOL_NAME = 'rawengine.agent.geometry.apply';
 export const AGENT_GEOMETRY_APPLY_INPUT_SCHEMA_NAME = 'AgentGeometryApplyRequestV1';
@@ -225,7 +225,7 @@ const dispatchTypedGeometryEditGraphApply = async ({
   operations: EditGraphParameterPatchOperationV1[];
   request: AgentGeometryApplyRequest;
 }): Promise<EditGraphMutationResultV1> => {
-  const bridge = createLiveEditorAppServerBridge();
+  const bridge = createLiveEditorCoreAppServerBridge();
   const dryRunCommand = buildAgentGeometryEditGraphCommand({
     commandId: `${request.operationId}_dry_run`,
     dryRun: true,

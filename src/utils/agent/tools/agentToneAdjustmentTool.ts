@@ -20,7 +20,7 @@ import {
   hashBasicTonePreviewPixels,
   renderBasicTonePreviewPixels,
 } from '../session/agentLiveBasicTone';
-import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorState';
+import { createLiveEditorCoreAppServerBridge } from '../session/agentLiveEditorCoreState';
 
 export const AGENT_TONE_ADJUSTMENT_APPLY_TOOL_NAME = 'rawengine.agent.tone_adjustment.apply';
 export const AGENT_TONE_ADJUSTMENT_DRY_RUN_TOOL_NAME = 'rawengine.agent.tone_adjustment.dry_run';
@@ -471,7 +471,7 @@ export const dryRunAgentToneAdjustment = async (
     }),
     { dryRun: true },
   );
-  const bridge = createLiveEditorAppServerBridge();
+  const bridge = createLiveEditorCoreAppServerBridge();
   const dryRun = await bridge.dispatch(command, { now: () => new Date(), requestId: parsedRequest.requestId });
   if (!dryRun.ok) throw new Error(`Agent tone adjustment dry-run failed: ${dryRun.message}`);
   const dryRunResult = toneColorDryRunResultV1Schema.parse(dryRun.result);
@@ -576,7 +576,7 @@ export const applyAgentToneAdjustment = async (
     acceptedDryRunPlanId: acceptedReceipt.basicTonePlanId,
     dryRun: false,
   });
-  const bridge = createLiveEditorAppServerBridge();
+  const bridge = createLiveEditorCoreAppServerBridge();
   const dryRun = await bridge.dispatch(dryRunCommand, {
     now: () => new Date(),
     requestId: `${parsedRequest.requestId}:preflight`,
