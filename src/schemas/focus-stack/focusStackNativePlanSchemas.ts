@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { focusStackFocusEvidenceSchema } from '../../../packages/rawengine-schema/src/focus-stack/focusStackFocusEvidence';
 
 const rectSchema = z
   .object({
@@ -145,6 +146,7 @@ export const focusStackNativeInputPlanSchema = z
     commonOverlap: floatRectSchema.nullable(),
     transforms: z.array(transformSchema).min(2).max(128),
     previews: z.array(previewSchema).max(128),
+    focusEvidence: focusStackFocusEvidenceSchema.nullable(),
   })
   .strict()
   .superRefine((plan, context) => {
@@ -157,6 +159,8 @@ export const focusStackNativeInputPlanSchema = z
       context.addIssue({ code: 'custom', message: 'transform sourceIndex is not present in sources' });
     if (plan.accepted && (plan.commonOverlap === null || plan.previews.length < 2))
       context.addIssue({ code: 'custom', message: 'accepted alignment requires a common crop and real previews' });
+    if (plan.accepted !== (plan.focusEvidence !== null))
+      context.addIssue({ code: 'custom', message: 'accepted plans must carry measured focus evidence' });
     for (const preview of plan.previews) {
       const transform = plan.transforms.find((candidate) => candidate.sourceIndex === preview.sourceIndex);
       const nonIdentity =

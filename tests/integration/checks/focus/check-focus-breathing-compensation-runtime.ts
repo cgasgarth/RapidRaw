@@ -47,6 +47,7 @@ const result = focusStackNativeInputPlanSchema.parse({
   coordinateConvention: 'full_resolution_active_area_pixel_centers',
   effectiveCalibrationIdentity: 'rendered_srgb_declared_v1',
   focusOrderSource: 'user_selection',
+  focusEvidence: evidence(),
   inputPlanHash: 'blake3:intake-plan',
   interpolationPolicyId: 'focus_inverse_bicubic_transparent_v1',
   policyId: 'focus_stack_intake_policy_v1',
@@ -79,6 +80,52 @@ try {
 if (!rejectedReceiptOnly) throw new Error('Schema accepted receipt-only breathing compensation.');
 
 console.log('Focus breathing compensation schema/runtime bridge ok');
+
+function evidence() {
+  return {
+    algorithmId: 'focus_hybrid_response_v1' as const,
+    labelPolicyId: 'focus_edge_aware_icm_v1' as const,
+    noiseModelSource: 'raw_estimate_or_robust_high_pass_mad' as const,
+    policy: {
+      clipGuard: 0.985,
+      evidenceFloor: 1.5,
+      laplacianWeight: 0.8,
+      normalizationFormula: 'response/noise',
+      scaleWeights: [0.5, 0.3, 0.2] as const,
+      sigmas: [0.7, 1.4, 2.8] as const,
+      supportRadius: 9,
+      tenengradWeight: 0.2,
+    },
+    mapArtifact: {
+      algorithmIdentity: 'focus-v1',
+      bytesBase64: 'AA==',
+      channels: Array.from({ length: 12 }, (_, index) => `channel-${index}`),
+      confidenceOverlayDataUrl: png,
+      contentHash: 'blake3:focus-map',
+      coordinateIdentity: 'crop-v1',
+      endianness: 'little' as const,
+      formatId: 'rapidraw_focus_map_v1' as const,
+      height: 69,
+      riskOverlayDataUrl: png,
+      version: 1 as const,
+      width: 92,
+      winnerOverlayDataUrl: png,
+    },
+    metrics: {
+      changedPixelCount: 4,
+      focusCoverageRatio: 0.92,
+      invalidRatio: 0.08,
+      labelFragmentation: 12,
+      labeledPixelCount: 5840,
+      lowConfidenceRatio: 0.1,
+      sourceContributions: [
+        { areaRatio: 0.46, pixelCount: 2920, sourceIndex: 0 },
+        { areaRatio: 0.46, pixelCount: 2920, sourceIndex: 1 },
+      ],
+      transitionRiskRatio: 0.06,
+    },
+  };
+}
 
 function transform(
   sourceIndex: number,
