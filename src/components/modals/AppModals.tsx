@@ -1,6 +1,8 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { z } from 'zod';
 import { useShallow } from 'zustand/react/shallow';
+import { singleImageX2PreviewSchema } from '../../schemas/computational-merge/singleImageX2Schemas';
 import { focusStackNativeInputPlanSchema } from '../../schemas/focus-stack/focusStackNativePlanSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
@@ -157,16 +159,18 @@ export default function AppModals(props: AppModalsProps) {
     })),
   );
 
-  const { selectedImage, finalPreviewUrl } = useEditorStore(
+  const { selectedImage, finalPreviewUrl, historyIndex } = useEditorStore(
     useShallow((state) => ({
       selectedImage: state.selectedImage,
       finalPreviewUrl: state.finalPreviewUrl,
+      historyIndex: state.historyIndex,
     })),
   );
 
   const [hasLoadedPanoramaModal, setHasLoadedPanoramaModal] = useState(panoramaModalState.isOpen);
   const [hasLoadedHdrModal, setHasLoadedHdrModal] = useState(hdrModalState.isOpen);
   const [hasLoadedSuperResolutionModal, setHasLoadedSuperResolutionModal] = useState(superResolutionModalState.isOpen);
+  const [singleImagePreviewRunning, setSingleImagePreviewRunning] = useState(false);
   const [hasLoadedFocusStackModal, setHasLoadedFocusStackModal] = useState(focusStackModalState.isOpen);
 
   useEffect(() => {
@@ -342,6 +346,33 @@ export default function AppModals(props: AppModalsProps) {
             }}
             onPreviewPlan={() => {
               void (async () => {
+                if (superResolutionModalState.settings.sourceMode === 'single_image_ai_x2') {
+                  if (!selectedImage) throw new Error('Single-image AI x2 requires the current image.');
+                  setSingleImagePreviewRunning(true);
+                  try {
+                    const preview = await invokeWithSchema(
+                      Invokes.PreviewSingleImageX2,
+                      {
+                        request: {
+                          sourcePath: selectedImage,
+                          graphRevision: `history_${historyIndex}`,
+                        },
+                      },
+                      singleImageX2PreviewSchema,
+                    );
+                    setUI((state) => ({
+                      superResolutionModalState: {
+                        ...state.superResolutionModalState,
+                        nativeReadiness: null,
+                        outputReview: null,
+                        singleImagePreview: preview,
+                      },
+                    }));
+                  } finally {
+                    setSingleImagePreviewRunning(false);
+                  }
+                  return;
+                }
                 const readiness = await invokeWithSchema(
                   Invokes.PlanSuperResolution,
                   {
@@ -364,6 +395,7 @@ export default function AppModals(props: AppModalsProps) {
                     lastDryRunCommand,
                     nativeReadiness: readiness,
                     outputReview: null,
+                    singleImagePreview: null,
                   },
                 });
               })().catch((error: unknown) => {
@@ -382,12 +414,18 @@ export default function AppModals(props: AppModalsProps) {
                     ...superResolutionModalState,
                     nativeReadiness: null,
                     outputReview: null,
+                    singleImagePreview: null,
                     settings,
                   },
                 };
               });
             }}
             outputReview={superResolutionModalState.outputReview}
+            singleImagePreview={superResolutionModalState.singleImagePreview}
+            singleImagePreviewRunning={singleImagePreviewRunning}
+            onCancelSingleImagePreview={() => {
+              void invokeWithSchema(Invokes.CancelSingleImageX2Preview, {}, z.boolean());
+            }}
             nativeReadiness={superResolutionModalState.nativeReadiness ?? null}
             settings={superResolutionModalState.settings}
             sourceCount={superResolutionModalState.sourcePaths.length}

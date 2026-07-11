@@ -10,6 +10,7 @@ import {
   buildSuperResolutionUiApplyCommandV1,
   buildSuperResolutionUiDryRunCommandV1,
 } from '../../../../packages/rawengine-schema/src/super-resolution/superResolutionUiControls.ts';
+import { normalizeSuperResolutionUiSettings } from '../../../../src/schemas/computational-merge/superResolutionUiSchemas.ts';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../../../src/utils/computational-merge/computationalMergeAppServerRoutePairs.ts';
 import { buildSuperResolutionDerivedOutputReceipt } from '../../../../src/utils/derivedOutputReceipt.ts';
 import { buildSuperResolutionOutputReviewFromArtifact } from '../../../../src/utils/superResolutionOutputReview.ts';
@@ -20,6 +21,19 @@ const LOW_WIDTH = 24;
 const LOW_HEIGHT = 18;
 const HIGH_WIDTH = LOW_WIDTH * SCALE;
 const HIGH_HEIGHT = LOW_HEIGHT * SCALE;
+
+const singleImageSettings = normalizeSuperResolutionUiSettings({
+  alignmentMode: 'auto',
+  detailPolicy: 'conservative',
+  maxPreviewDimensionPx: 2400,
+  outputScale: 2,
+  qualityPreference: 'best',
+  reconstructionMode: 'model_detail',
+  sourceMode: 'single_image_ai_x2',
+});
+if (singleImageSettings.sourceMode !== 'single_image_ai_x2' || singleImageSettings.outputScale !== 2) {
+  throw new Error('Single-image x2 UI mode was normalized away.');
+}
 
 const truth = createTruth();
 const frames = [

@@ -1,7 +1,12 @@
 import { motion } from 'framer-motion';
 import { AlertTriangle, CheckCircle2, Layers3, ScanSearch, ShieldCheck } from 'lucide-react';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+  type SingleImageX2Capability,
+  type SingleImageX2Preview,
+  singleImageX2CapabilitySchema,
+} from '../../../schemas/computational-merge/singleImageX2Schemas';
 import type { SuperResolutionOutputReviewWorkflow } from '../../../schemas/computational-merge/superResolutionOutputReviewSchemas';
 import type {
   SuperResolutionAlignmentMode,
@@ -15,6 +20,7 @@ import {
   getSuperResolutionModeForDetailPolicy,
 } from '../../../schemas/computational-merge/superResolutionUiSchemas';
 import { type SuperResolutionModalState, useUIStore } from '../../../store/useUIStore';
+import { Invokes } from '../../../tauri/commands';
 import { TextColors, TextVariants } from '../../../types/typography';
 import {
   buildSuperResolutionDerivedOutputReceipt,
@@ -28,6 +34,7 @@ import {
 } from '../../../utils/superResolutionOutputReview';
 import type { SuperResolutionSourcePreflightMetadata } from '../../../utils/superResolutionSourcePreflight';
 import { buildSuperResolutionSourcePreflight } from '../../../utils/superResolutionSourcePreflight';
+import { invokeWithSchema } from '../../../utils/tauriSchemaInvoke';
 import Button from '../../ui/primitives/Button';
 import Dropdown, { type OptionItem } from '../../ui/primitives/Dropdown';
 import UiText from '../../ui/primitives/Text';
@@ -48,11 +55,14 @@ interface SuperResolutionModalProps {
   onClose: () => void;
   onOpenOutput?: (path: string) => void;
   onPreviewPlan: () => void;
+  onCancelSingleImagePreview?: () => void;
   reviewArtifactPreviewUrls?: Partial<
     Record<SuperResolutionOutputReviewWorkflow['reviewArtifacts'][number]['kind'], string>
   >;
   onSettingsChange: (settings: SuperResolutionUiSettings) => void;
   outputReview?: SuperResolutionOutputReviewWorkflow | null;
+  singleImagePreview?: SingleImageX2Preview | null;
+  singleImagePreviewRunning?: boolean;
   nativeReadiness?: SuperResolutionNativeReadiness | null;
   settings: SuperResolutionUiSettings;
   sourceCount: number;
@@ -74,9 +84,12 @@ export function SuperResolutionModal({
   onClose,
   onOpenOutput,
   onPreviewPlan,
+  onCancelSingleImagePreview,
   reviewArtifactPreviewUrls = {},
   onSettingsChange,
   outputReview: runtimeOutputReview,
+  singleImagePreview = null,
+  singleImagePreviewRunning = false,
   nativeReadiness,
   settings,
   sourceCount,
@@ -84,6 +97,14 @@ export function SuperResolutionModal({
   sourcePreflightMetadata = [],
 }: SuperResolutionModalProps) {
   const { t } = useTranslation();
+  const [singleImageCapability, setSingleImageCapability] = useState<SingleImageX2Capability | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    void invokeWithSchema(Invokes.GetSingleImageX2Capability, {}, singleImageX2CapabilitySchema)
+      .then(setSingleImageCapability)
+      .catch(() => setSingleImageCapability(null));
+  }, [isOpen]);
 
   const sourcePreflight = useMemo(
     () =>
@@ -95,7 +116,10 @@ export function SuperResolutionModal({
         : null,
     [settings.outputScale, sourcePreflightMetadata],
   );
-  const canPreviewPlan = sourceCount >= 2;
+  const isSingleImageAi = settings.sourceMode === 'single_image_ai_x2';
+  const canPreviewPlan = isSingleImageAi
+    ? sourceCount === 1 && singleImageCapability?.available === true
+    : sourceCount >= 2;
   const isSourceCountValid = nativeReadiness?.accepted ?? canPreviewPlan;
   const isSourcePreflightReady = sourcePreflight?.status === 'ready';
   const isSourcePreflightBlocked = sourcePreflight?.status === 'blocked';
@@ -367,9 +391,126 @@ export function SuperResolutionModal({
               ? t('modals.superResolution.refreshPreviewPlan')
               : t('modals.superResolution.previewPlan')}
           </Button>
+          {isSingleImageAi && singleImagePreviewRunning && onCancelSingleImagePreview !== undefined && (
+            <Button onClick={onCancelSingleImagePreview} data-testid="sr-single-image-cancel-button">
+              {t('modals.hdr.cancel')}
+            </Button>
+          )}
         </>
       }
     >
+      <ComputationalSetupOptionSection title="Super-resolution workflow">
+        <div className="grid grid-cols-2 gap-2" data-testid="sr-source-mode-selector">
+          <button
+            className={`min-h-16 rounded-md border px-3 py-2 text-left ${
+              isSingleImageAi ? 'border-accent bg-accent/15' : 'border-border-color bg-bg-primary'
+            }`}
+            onClick={() =>
+              setSetting({
+                alignmentMode: 'auto',
+                detailPolicy: 'conservative',
+                outputScale: 2,
+                reconstructionMode: 'model_detail',
+                sourceMode: 'single_image_ai_x2',
+              })
+            }
+            type="button"
+          >
+            <UiText as="span" variant={TextVariants.label}>
+              Single-image AI x2
+            </UiText>
+            <UiText as="span" variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
+              Rendered RGB AI derivative
+            </UiText>
+          </button>
+          <button
+            className={`min-h-16 rounded-md border px-3 py-2 text-left ${
+              !isSingleImageAi ? 'border-accent bg-accent/15' : 'border-border-color bg-bg-primary'
+            }`}
+            onClick={() => setSetting({ sourceMode: 'multi_image' })}
+            type="button"
+          >
+            <UiText as="span" variant={TextVariants.label}>
+              Burst x2
+            </UiText>
+            <UiText as="span" variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
+              Multi-frame Bayer reconstruction
+            </UiText>
+          </button>
+        </div>
+      </ComputationalSetupOptionSection>
+
+      {isSingleImageAi && (
+        <section
+          className="rounded-md border border-border-color bg-bg-primary p-4"
+          data-capability-available={String(singleImageCapability?.available === true)}
+          data-testid="sr-single-image-ai-capability"
+        >
+          <UiText variant={TextVariants.heading}>Enhance x2 (AI)</UiText>
+          <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
+            Manual review required. Apply is disabled until durable commit support lands.
+          </UiText>
+          <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+            <ComputationalSetupStatusLine label="Model" value={singleImageCapability?.modelId ?? 'Checking'} />
+            <ComputationalSetupStatusLine
+              label="Availability"
+              value={singleImageCapability?.available ? 'Ready' : 'Blocked: model weight redistribution unverified'}
+            />
+            <ComputationalSetupStatusLine
+              label="Code license"
+              value={singleImageCapability?.codeLicense ?? 'Checking'}
+            />
+            <ComputationalSetupStatusLine label="Apply" value="durable_commit_pending" />
+          </div>
+        </section>
+      )}
+
+      {isSingleImageAi && singleImagePreview !== null && (
+        <section
+          className="rounded-md border border-border-color bg-bg-primary p-4"
+          data-review-decision={singleImagePreview.review.decision}
+          data-testid="sr-single-image-ai-review"
+        >
+          <div className="grid grid-cols-2 gap-3">
+            <figure className="min-w-0">
+              <img
+                className="aspect-[4/3] w-full object-contain"
+                src={singleImagePreview.bicubicPreviewDataUrl}
+                alt={t('modals.common.sourcePreviewAlt')}
+              />
+              <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                Bicubic x2 baseline
+              </UiText>
+            </figure>
+            <figure className="min-w-0">
+              <img
+                className="aspect-[4/3] w-full object-contain"
+                src={singleImagePreview.aiPreviewDataUrl}
+                alt={t('modals.common.sourcePreviewAlt')}
+              />
+              <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                Enhance x2 AI preview
+              </UiText>
+            </figure>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+            <ComputationalSetupStatusLine
+              label="Dimensions"
+              value={`${singleImagePreview.width}x${singleImagePreview.height}`}
+            />
+            <ComputationalSetupStatusLine
+              label="Downsample MAE"
+              value={singleImagePreview.review.downsampleMae.toFixed(6)}
+            />
+            <ComputationalSetupStatusLine
+              label="Residual mean/max"
+              value={`${singleImagePreview.review.meanAbsoluteResidual.toFixed(6)} / ${singleImagePreview.review.maxAbsoluteResidual.toFixed(6)}`}
+            />
+            <ComputationalSetupStatusLine label="Review" value="Manual review required" />
+          </div>
+        </section>
+      )}
+
       {!isSourceCountValid && (
         <ComputationalSetupSourceWarning>
           {t('modals.superResolution.sourceCountBlocked')}

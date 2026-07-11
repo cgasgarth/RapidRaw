@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "modelId": "swinir-classical-df2k-x2-medium-opset17-v1",
+  "capability": "disabled_pending_weight_redistribution_verification",
+  "upstream": {
+    "repository": "https://github.com/JingyunLiang/SwinIR",
+    "commit": "6545850fbf8df298df73d81f3e8cba638787c8bd",
+    "releaseTag": "v0.0",
+    "codeLicense": "Apache-2.0"
+  },
+  "checkpoint": {
+    "name": "001_classicalSR_DF2K_s64w8_SwinIR-M_x2.pth",
+    "url": "https://github.com/JingyunLiang/SwinIR/releases/download/v0.0/001_classicalSR_DF2K_s64w8_SwinIR-M_x2.pth",
+    "sizeBytes": 67277475,
+    "sha256": "2032ebf8f401dd3ce2fae5f3852117cb72101ec6ed8358faa64c2a3fa09ed4ac",
+    "key": "params",
+    "weightLicense": null,
+    "redistributionApproved": false,
+    "licenseFinding": "The upstream repository states an Apache-2.0 project license and publishes this release asset, but no checkpoint-specific license or explicit statement extending that license to trained weights was found. RapidRAW does not redistribute the checkpoint or an ONNX derivative until that right is verified."
+  },
+  "architecture": {
+    "task": "classical_sr",
+    "trainingDegradation": "bicubic_x2",
+    "upscale": 2,
+    "inChans": 3,
+    "windowSize": 8,
+    "imgRange": 1.0,
+    "depths": [6, 6, 6, 6, 6, 6],
+    "embedDim": 180,
+    "numHeads": [6, 6, 6, 6, 6, 6],
+    "mlpRatio": 2,
+    "upsampler": "pixelshuffle",
+    "resiConnection": "1conv"
+  },
+  "export": {
+    "python": "3.11.9",
+    "pytorch": "2.7.1",
+    "onnx": "1.18.0",
+    "opset": 17,
+    "inputName": "input",
+    "outputName": "output",
+    "inputDomain": "NCHW encoded sRGB RGB float32 [0,1]",
+    "outputDomain": "NCHW encoded sRGB RGB float32, scale 2",
+    "dynamicAxes": {
+      "input": { "2": "height", "3": "width" },
+      "output": { "2": "height_x2", "3": "width_x2" }
+    },
+    "simplified": false,
+    "onnxSha256": null
+  },
+  "validation": {
+    "status": "not_run_no_redistributable_model",
+    "maxAbsoluteDifferenceLimit": 0.00001,
+    "meanAbsoluteDifferenceLimit": 0.000001
+  }
+}

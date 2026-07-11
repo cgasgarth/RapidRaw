@@ -689,7 +689,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               },
             },
             {
-              disabled: selectionCount < 2 || selectionCount > 128,
+              disabled: selectionCount < 1 || selectionCount > 128,
               icon: ScanSearch,
               label: superResolutionLabel,
               onClick: () => {
@@ -697,6 +697,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                   superResolutionModalState: {
                     isOpen: true,
                     outputReview: null,
+                    singleImagePreview: null,
                     settings: DEFAULT_SUPER_RESOLUTION_UI_SETTINGS,
                     sourcePreflightMetadata: createSuperResolutionSourcePreflightMetadata(finalSelection, imageList),
                     sourcePaths: finalSelection,
