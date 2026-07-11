@@ -1002,6 +1002,59 @@ export async function prepareScenario(page, mode) {
     return;
   }
 
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.ColorWheelInstances) {
+    const proof = page.getByTestId('color-wheel-instance-proof');
+    const wheels = page.getByTestId('color-wheel');
+    await wheels.nth(1).waitFor({ timeout: 10_000 });
+    const rootVariables = await page.evaluate(() =>
+      [...document.documentElement.style].filter((name) => name.startsWith('--cg-')),
+    );
+    if (rootVariables.length > 0) {
+      throw new Error(`ColorWheel leaked custom properties to the document root: ${rootVariables.join(', ')}`);
+    }
+    const readVariables = async (index) =>
+      wheels.nth(index).evaluate((element) => ({
+        hue: element.style.getPropertyValue('--cg-hue'),
+        saturation: element.style.getPropertyValue('--cg-sat'),
+      }));
+    if (JSON.stringify(await readVariables(0)) !== JSON.stringify({ hue: '28', saturation: '72%' })) {
+      throw new Error('The first ColorWheel did not render its own scoped CSS values.');
+    }
+    if (JSON.stringify(await readVariables(1)) !== JSON.stringify({ hue: '208', saturation: '44%' })) {
+      throw new Error('The second ColorWheel did not render independent scoped CSS values.');
+    }
+    await page.getByTestId('color-wheel-update-values').click();
+    if (JSON.stringify(await readVariables(0)) !== JSON.stringify({ hue: '132', saturation: '88%' })) {
+      throw new Error('ColorWheel CSS values did not update in the controlled render.');
+    }
+
+    const firstWheel = page.getByTestId('color-wheel-first-slot').getByTestId('color-wheel-surface');
+    await firstWheel.hover();
+    await page.mouse.down();
+    await page.mouse.up();
+    await page.waitForFunction(
+      () =>
+        document.querySelector('[data-testid="color-wheel-instance-proof"]')?.getAttribute('data-first-events') ===
+        'true,false',
+    );
+    await firstWheel.hover();
+    await page.mouse.down();
+    await page.getByTestId('color-wheel-toggle-first').evaluate((button) => button.click());
+    await page.mouse.up();
+    await page.waitForFunction(
+      () =>
+        document.querySelector('[data-testid="color-wheel-instance-proof"]')?.getAttribute('data-first-events') ===
+        'true,false,true,false',
+    );
+    const rootVariablesAfterUnmount = await page.evaluate(() =>
+      [...document.documentElement.style].filter((name) => name.startsWith('--cg-')),
+    );
+    if (rootVariablesAfterUnmount.length > 0 || (await wheels.count()) !== 1) {
+      throw new Error('Unmounted ColorWheel left global CSS state or removed the sibling instance.');
+    }
+    return;
+  }
+
   if (
     mode === VISUAL_SMOKE_SCENARIO_IDS.AdjustmentsPanelRetune ||
     mode === VISUAL_SMOKE_SCENARIO_IDS.ProfessionalAdjustmentsCompact
