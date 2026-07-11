@@ -30,7 +30,7 @@ import {
   hashBasicTonePreviewPixels,
   renderBasicTonePreviewPixels,
 } from '../session/agentLiveBasicTone';
-import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorState';
+import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorCoreState';
 import { buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
 import {
   type AgentPreviewEnvelope,

@@ -19,6 +19,7 @@ import {
   rawEngineImageGetPreviewResponseSchema,
   renderAgentReadOnlyPreview,
 } from '../../../../src/utils/agent/context/agentReadOnlyAppServerTools.ts';
+import { AGENT_SELECTED_IMAGE_MODEL_TOOL_ALLOWLIST } from '../../../../src/utils/agent/session/agentSelectedImageModelToolLoop.ts';
 import {
   buildRawEngineAppServerAuditEntry,
   buildRawEngineAppServerRouteCatalog,
@@ -257,6 +258,15 @@ if (imagePreviewAudit.mutates || imagePreviewAudit.toolKind !== 'read') {
 }
 
 const catalog = buildRawEngineAppServerRouteCatalog();
+for (const forbidden of [
+  'rawengine.agent.adjustments.apply',
+  'rawengine.agent.history.rollback',
+  'rawengine.agent.final_export',
+]) {
+  if ((AGENT_SELECTED_IMAGE_MODEL_TOOL_ALLOWLIST as readonly string[]).includes(forbidden)) {
+    throw new Error(`production selected-image model loop exposes mutating tool ${forbidden}.`);
+  }
+}
 for (const toolName of [
   AGENT_STATE_GET_TOOL_NAME,
   AGENT_PREVIEW_RENDER_TOOL_NAME,

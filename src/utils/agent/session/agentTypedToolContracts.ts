@@ -35,6 +35,11 @@ import {
   agentAdjustmentsDryRunResponseSchema,
 } from '../tools/agentAdjustmentApplyTool';
 import {
+  AGENT_TONE_ADJUSTMENT_DRY_RUN_TOOL_NAME,
+  agentToneAdjustmentDryRunRequestSchema,
+  agentToneAdjustmentDryRunResponseSchema,
+} from '../tools/agentToneAdjustmentTool';
+import {
   AGENT_HISTORY_ROLLBACK_TOOL_NAME,
   agentHistoryRollbackRequestSchema,
   agentHistoryRollbackResponseSchema,
@@ -89,6 +94,13 @@ export const agentEditorToolContracts = {
     mutates: false,
     requestSchema: agentAdjustmentsDryRunRequestSchema,
     responseSchema: agentAdjustmentsDryRunResponseSchema,
+    schemaVersion: 1,
+  }),
+  [AGENT_TONE_ADJUSTMENT_DRY_RUN_TOOL_NAME]: defineAgentEditorToolContract({
+    isPreviewRefresh: false,
+    mutates: false,
+    requestSchema: agentToneAdjustmentDryRunRequestSchema,
+    responseSchema: agentToneAdjustmentDryRunResponseSchema,
     schemaVersion: 1,
   }),
   [AGENT_ADJUSTMENTS_APPLY_TOOL_NAME]: defineAgentEditorToolContract({

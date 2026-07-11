@@ -16,9 +16,13 @@ import {
   rollbackAgentSelectedImageLiveSession,
   startAgentSelectedImageLiveSessionDryRun,
 } from '../../../../src/utils/agent/session/agentSelectedImageLiveSession.ts';
+import { replayAgentSelectedImageModelToolLoop } from '../../../../src/utils/agent/session/agentSelectedImageModelToolLoop.ts';
 import { agentAdjustmentsApplyResponseSchema } from '../../../../src/utils/agent/tools/agentAdjustmentApplyTool.ts';
 
 const selectedPath = '/fixtures/public/agent-live-session-replay/DSC_3165.ARW';
+if (typeof replayAgentSelectedImageModelToolLoop !== 'function') {
+  throw new Error('production selected-image model/tool replay verifier is unavailable.');
+}
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 9 : 3));
 
 const seedEditor = () => {
@@ -268,16 +272,6 @@ if (finalState.historyIndex !== 0 || finalState.adjustments.exposure !== INITIAL
 }
 
 console.log('agent live session replay ok');
-
-async function expectRejects(action: () => Promise<unknown>, expectedMessage: string) {
-  try {
-    await action();
-  } catch (error) {
-    if (error instanceof Error && error.message.includes(expectedMessage)) return;
-    throw error;
-  }
-  throw new Error(`expected rejection containing ${expectedMessage}.`);
-}
 
 async function expectReplayRejects(
   audit: Parameters<typeof replayAgentSelectedImageLiveSessionAudit>[0],

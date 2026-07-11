@@ -19,6 +19,7 @@ import {
 } from '../../../schemas/agent/agentSelectedImageLifecycleReceiptSchemas';
 import {
   type AgentSelectedImageProposalLineageV1,
+  agentSelectedImageProposalIterationStateV1Schema,
   agentSelectedImageProposalLineageV1Schema,
 } from '../../../schemas/agent/agentSelectedImageProposalIterationSchemas';
 import {
@@ -359,6 +360,25 @@ export const agentSelectedImageLiveSessionAuditExportReceiptSchema = z
         rollback: z.string().trim().min(1).optional(),
       })
       .strict(),
+    proposalLineage: z
+      .object({
+        epoch: z.number().int().nonnegative(),
+        iterations: z
+          .array(
+            z
+              .object({
+                iterationId: z.string().trim().min(1),
+                proposalHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+                state: agentSelectedImageProposalIterationStateV1Schema,
+              })
+              .strict(),
+          )
+          .min(1),
+        lineageId: z.string().trim().min(1),
+        sealedIterationId: z.string().trim().min(1).optional(),
+      })
+      .strict()
+      .optional(),
     replayPreflight: agentSelectedImageLiveSessionReplayPreflightSchema,
     requestIds: z.array(z.string().trim().min(1)).min(1),
     rollbackState: z
@@ -1199,15 +1219,17 @@ export const approveAgentSelectedImageLiveSession = (
   if (draft.state !== 'approval_required') throw new Error('Selected-image live session is not awaiting approval.');
   upgradeLegacyDryRunToProposalLineage(draft);
   const head = draft.proposalLineage.iterations.at(-1);
-  if (head === undefined || head.state !== 'ready') {
+  if (head === undefined || (head.state !== 'ready' && head.state !== 'sealed')) {
     throw new Error('Selected-image live session approval requires the latest ready proposal iteration.');
   }
-  draft.proposalLineage = transitionAgentSelectedImageProposalIteration(
-    draft.proposalLineage,
-    head.iterationId,
-    'sealed',
-    { expectedEpoch: draft.proposalLineage.epoch },
-  );
+  if (head.state === 'ready') {
+    draft.proposalLineage = transitionAgentSelectedImageProposalIteration(
+      draft.proposalLineage,
+      head.iterationId,
+      'sealed',
+      { expectedEpoch: draft.proposalLineage.epoch },
+    );
+  }
   draft.approvalId = `approval_${draft.sessionId}_${draft.requestId}_${draft.dryRun.dryRunPlanId}`.replaceAll(
     /[^A-Za-z0-9_-]/gu,
     '_',
@@ -2504,6 +2526,19 @@ export const buildAgentSelectedImageLiveSessionAuditExportReceipt = ({
       })),
       rollback: receipt.rollbackReceiptPreviewHash,
     },
+    proposalLineage:
+      receipt.proposalLineage === undefined
+        ? undefined
+        : {
+            epoch: receipt.proposalLineage.epoch,
+            iterations: receipt.proposalLineage.iterations.map((iteration) => ({
+              iterationId: iteration.iterationId,
+              proposalHash: iteration.proposalHash,
+              state: iteration.state,
+            })),
+            lineageId: receipt.proposalLineage.lineageId,
+            sealedIterationId: receipt.proposalLineage.sealedIterationId,
+          },
     replayPreflight: sanitizedReplayPreflight,
     requestIds,
     rollbackState: {
