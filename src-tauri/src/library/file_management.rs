@@ -2279,6 +2279,7 @@ pub async fn reset_adjustments_for_paths(
                 path: path.clone(),
                 adjustments: persisted.adjustments,
                 revision: format!("sha256:{}", hex::encode(Sha256::digest(persisted_json))),
+                render_generation: 0,
             });
         }
 
@@ -2287,8 +2288,15 @@ pub async fn reset_adjustments_for_paths(
         state.decoded_image_cache.clear();
         state.thumbnail_geometry_cache.clear();
         state.viewer_sample_frames.clear();
-        if let Some(scheduler) = state.preview_scheduler.lock().unwrap().as_ref() {
-            scheduler.invalidate_current();
+        let render_generation = state
+            .preview_scheduler
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map(|scheduler| scheduler.invalidate_current())
+            .unwrap_or(0);
+        for result in &mut results {
+            result.render_generation = render_generation;
         }
         let thumb_cache_dir = match resolve_thumbnail_cache_dir(&app_handle) {
             Ok(dir) => dir,
@@ -2318,9 +2326,9 @@ pub async fn reset_adjustments_for_paths(
                 None,
             );
 
-            if let Some(thumbnail) = result {
-                emit_thumbnail_result(&app_handle, path_str, thumbnail);
-            }
+            let thumbnail = result
+                .ok_or_else(|| format!("Reset could not regenerate thumbnail for {path_str}"))?;
+            emit_thumbnail_result(&app_handle, path_str, thumbnail);
 
             increment_thumbnail_progress(&state, &app_handle);
         }
@@ -2336,6 +2344,8 @@ pub struct ResetAdjustmentsResult {
     pub path: String,
     pub adjustments: Value,
     pub revision: String,
+    /// Scheduler generation acknowledged after every pre-reset completion was superseded.
+    pub render_generation: u64,
 }
 
 fn load_sidecar_strict_for_reset(sidecar_path: &Path) -> Result<ImageMetadata, String> {

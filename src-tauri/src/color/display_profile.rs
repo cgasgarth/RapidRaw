@@ -158,23 +158,44 @@ pub struct DisplayPreviewTransformSnapshot {
 pub fn display_preview_transform_snapshot_for_app(
     app: &tauri::AppHandle,
 ) -> DisplayPreviewTransformSnapshot {
-    let size = DISPLAY_LUT_SIZE;
-    let resolved = (|| -> Result<(DisplayLut, Vec<u8>), String> {
+    let captured = (|| -> Result<(Option<u32>, Vec<u8>), String> {
         #[cfg(target_os = "macos")]
         {
             let display_id = macos::display_id_for_app(app).unwrap_or_else(macos::main_display_id);
             let bytes = active_display_profile_bytes_for_id(display_id)?;
-            // Metadata, LUT pixels, and the JPEG tag all derive from this one captured byte buffer.
-            let profile = active_display_profile_from_bytes(display_id, &bytes);
-            let lut = build_srgb_to_display_profile_lut_with_size(&bytes, profile, size)?;
-            validate_display_lut(&lut)?;
-            Ok((lut, bytes))
+            Ok((Some(display_id), bytes))
         }
         #[cfg(not(target_os = "macos"))]
         {
             Err("native_display_profile_unavailable".to_string())
         }
     })();
+    display_preview_transform_snapshot_from_capture(captured)
+}
+
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
+fn display_preview_transform_snapshot_from_capture(
+    captured: Result<(Option<u32>, Vec<u8>), String>,
+) -> DisplayPreviewTransformSnapshot {
+    let size = DISPLAY_LUT_SIZE;
+    let resolved = captured.and_then(|(display_id, bytes)| {
+        let profile = match display_id {
+            #[cfg(target_os = "macos")]
+            Some(id) => active_display_profile_from_bytes(id, &bytes),
+            _ => ActiveDisplayProfile {
+                cmm: "lcms2".to_string(),
+                display_id,
+                icc_sha256: Some(sha256_hex(&bytes)),
+                profile_byte_count: Some(bytes.len()),
+                source: "captured_display_profile".to_string(),
+                status: ActiveDisplayProfileStatus::ActiveProfileLoaded,
+                fallback_reason: None,
+            },
+        };
+        let lut = build_srgb_to_display_profile_lut_with_size(&bytes, profile, size)?;
+        validate_display_lut(&lut)?;
+        Ok((lut, bytes))
+    });
     let (lut, icc_bytes) = resolved.unwrap_or_else(|reason| {
         let bytes = moxcms::ColorProfile::new_srgb()
             .encode()
@@ -751,6 +772,36 @@ mod cross_platform_tests {
         let changed = display_selection_generation(&profile, "sha256:changed-test");
         assert_eq!(first, second);
         assert!(changed > second);
+    }
+
+    #[test]
+    fn captured_profile_bytes_own_both_pixel_transform_and_artifact_tag() {
+        let bytes = moxcms::ColorProfile::new_srgb().encode().unwrap();
+        let snapshot =
+            display_preview_transform_snapshot_from_capture(Ok((Some(77), bytes.clone())));
+        assert_eq!(snapshot.icc_bytes, bytes);
+        assert_eq!(snapshot.icc_sha256, sha256_hex(&snapshot.icc_bytes));
+        assert_eq!(
+            snapshot.profile.icc_sha256.as_deref(),
+            Some(snapshot.icc_sha256.as_str())
+        );
+        assert_eq!(snapshot.lut.profile.icc_sha256, snapshot.profile.icc_sha256);
+        let gray = snapshot.lut.sample_rgb([0.5; 3]);
+        assert!(gray.iter().all(|channel| (*channel - 0.5).abs() < 0.002));
+    }
+
+    #[test]
+    fn malformed_capture_falls_back_to_identity_pixels_and_srgb_tag() {
+        let snapshot =
+            display_preview_transform_snapshot_from_capture(Ok((Some(88), b"bad icc".to_vec())));
+        assert!(matches!(
+            snapshot.profile.status,
+            ActiveDisplayProfileStatus::FallbackNoActiveProfile
+        ));
+        let gray = snapshot.lut.sample_rgb([0.5; 3]);
+        assert!((gray[0] - gray[1]).abs() < 0.001 && (gray[1] - gray[2]).abs() < 0.001);
+        assert!(moxcms::ColorProfile::new_from_slice(&snapshot.icc_bytes).is_ok());
+        assert_ne!(snapshot.icc_bytes, b"bad icc");
     }
 
     #[test]

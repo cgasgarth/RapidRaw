@@ -433,6 +433,29 @@ mod tests {
     }
 
     #[test]
+    fn reset_invalidation_acknowledges_generation_and_supersedes_stale_completion() {
+        let scheduler = PreviewScheduler::new(PreviewSchedulingPolicy::default());
+        let (pending, mut rx) = job(false);
+        let id = scheduler
+            .submit(pending)
+            .ok()
+            .expect("scheduler accepts job");
+        let acknowledged_generation = scheduler.invalidate_current();
+        assert!(acknowledged_generation > id.generation);
+        assert!(matches!(
+            rx.try_recv(),
+            Ok(PreviewCompletion::Superseded { by_generation, .. })
+                if by_generation == acknowledged_generation
+        ));
+        assert!(
+            scheduler
+                .cancellation(id)
+                .check(PreviewStage::Publish)
+                .is_err()
+        );
+    }
+
+    #[test]
     fn shutdown_completes_pending_and_stops_waiter() {
         let scheduler = PreviewScheduler::new(PreviewSchedulingPolicy::default());
         let (pending, mut rx) = job(true);

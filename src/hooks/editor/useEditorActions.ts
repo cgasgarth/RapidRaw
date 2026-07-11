@@ -33,6 +33,7 @@ import {
 } from '../../utils/editorZoom';
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { globalImageCache } from '../../utils/ImageLRUCache';
+import { resolveResetTargetPaths } from '../../utils/resetAdjustments';
 import { debounce } from '../../utils/timing';
 
 export const debouncedSetHistory = debounce((newAdj: Adjustments) => {
@@ -177,15 +178,12 @@ export function useEditorActions() {
     async (paths?: string[]) => {
       const { multiSelectedPaths, libraryActivePath, setLibrary } = useLibraryStore.getState();
       const { selectedImage, resetHistory } = useEditorStore.getState();
-      const pathsToReset = paths?.length
-        ? paths
-        : multiSelectedPaths.length
-          ? multiSelectedPaths
-          : selectedImage?.path
-            ? [selectedImage.path]
-            : libraryActivePath
-              ? [libraryActivePath]
-              : [];
+      const pathsToReset = resolveResetTargetPaths(
+        paths,
+        selectedImage?.path,
+        multiSelectedPaths,
+        libraryActivePath ?? undefined,
+      );
       if (pathsToReset.length === 0) {
         toast.error('Select an image before resetting adjustments.');
         return;
@@ -197,10 +195,9 @@ export function useEditorActions() {
       debouncedSetHistory.cancel();
 
       try {
-        const results = await invoke<Array<{ path: string; adjustments: Adjustments; revision: string }>>(
-          Invokes.ResetAdjustmentsForPaths,
-          { paths: pathsToReset },
-        );
+        const results = await invoke<
+          Array<{ path: string; adjustments: Adjustments; revision: string; renderGeneration: number }>
+        >(Invokes.ResetAdjustmentsForPaths, { paths: pathsToReset });
         useProcessStore.getState().invalidateThumbnails(pathsToReset);
         if (libraryActivePath && pathsToReset.includes(libraryActivePath))
           setLibrary({ libraryActiveAdjustments: { ...INITIAL_ADJUSTMENTS } });
