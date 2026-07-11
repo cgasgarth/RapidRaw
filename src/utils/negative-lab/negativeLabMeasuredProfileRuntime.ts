@@ -23,6 +23,7 @@ import {
 } from '../../schemas/negative-lab/negativeLabPresetCatalogSchemas';
 import {
   buildNegativeLabCrosstalkProfile,
+  NEGATIVE_LAB_GENERIC_C41_CROSSTALK_PROFILE,
   NEGATIVE_LAB_IDENTITY_CROSSTALK_PROFILE,
 } from './negativeLabCrosstalkProfile';
 import { buildNegativeLabPlanHash } from './negativeLabPlanIdentity';
@@ -103,7 +104,12 @@ export const buildNegativeLabRuntimeProfileBrowserRows = (
     negativeLabRuntimeProfileBrowserRowSchema.parse({
       claimLevel: preset.claimLevel,
       claimPolicy: preset.claimPolicy,
-      crosstalkProfile: preset.filmClass === 'black_and_white_silver' ? null : NEGATIVE_LAB_IDENTITY_CROSSTALK_PROFILE,
+      crosstalkProfile:
+        preset.filmClass === 'black_and_white_silver'
+          ? null
+          : preset.processFamily === 'c41_color_negative'
+            ? NEGATIVE_LAB_GENERIC_C41_CROSSTALK_PROFILE
+            : NEGATIVE_LAB_IDENTITY_CROSSTALK_PROFILE,
       disabledReason: null,
       displayName: preset.displayName,
       doesNotProve: ['no_stock_emulation_claim', 'no_colorimetric_match_claim'],
@@ -164,7 +170,11 @@ export const resolveNegativeLabRuntimeProfile = (
       claimLevel: genericPreset.claimLevel,
       claimPolicy: genericPreset.claimPolicy,
       crosstalkProfile:
-        genericPreset.filmClass === 'black_and_white_silver' ? null : NEGATIVE_LAB_IDENTITY_CROSSTALK_PROFILE,
+        genericPreset.filmClass === 'black_and_white_silver'
+          ? null
+          : genericPreset.processFamily === 'c41_color_negative'
+            ? NEGATIVE_LAB_GENERIC_C41_CROSSTALK_PROFILE
+            : NEGATIVE_LAB_IDENTITY_CROSSTALK_PROFILE,
       displayName: genericPreset.displayName,
       doesNotProve: ['no_stock_emulation_claim', 'no_colorimetric_match_claim'],
       evidenceDigest: null,

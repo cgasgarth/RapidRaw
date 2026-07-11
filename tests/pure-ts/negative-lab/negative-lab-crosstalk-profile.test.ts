@@ -5,6 +5,7 @@ import {
   applyNegativeLabDensityCrosstalk,
   buildNegativeLabCrosstalkProfile,
   buildNegativeLabCrosstalkProfileProvenanceHash,
+  NEGATIVE_LAB_GENERIC_C41_CROSSTALK_PROFILE,
   NEGATIVE_LAB_IDENTITY_CROSSTALK_PROFILE,
   normalizeNegativeLabCrosstalkMatrixRows,
 } from '../../../src/utils/negative-lab/negativeLabCrosstalkProfile.ts';
@@ -39,6 +40,16 @@ describe('negative lab density crosstalk profiles', () => {
     expect(gray[0]).toBeCloseTo(0.42, 12);
     expect(gray[1]).toBeCloseTo(0.42, 12);
     expect(gray[2]).toBeCloseTo(0.42, 12);
+  });
+
+  test('ships a versioned generic C-41 transform that preserves neutrals and changes chroma', () => {
+    const neutral = applyNegativeLabDensityCrosstalk([0.4, 0.4, 0.4], NEGATIVE_LAB_GENERIC_C41_CROSSTALK_PROFILE);
+    const colored = applyNegativeLabDensityCrosstalk([0.18, 0.42, 0.71], NEGATIVE_LAB_GENERIC_C41_CROSSTALK_PROFILE);
+
+    expect(NEGATIVE_LAB_GENERIC_C41_CROSSTALK_PROFILE.provenance).toBe('rawengine_generic');
+    expect(NEGATIVE_LAB_GENERIC_C41_CROSSTALK_PROFILE.profileId).toContain('.generic.');
+    neutral.forEach((channel) => expect(channel).toBeCloseTo(0.4, 12));
+    expect(colored).not.toEqual([0.18, 0.42, 0.71]);
   });
 
   test('rejects malformed, non-finite, and non-normalizable profiles', () => {
@@ -86,7 +97,7 @@ describe('negative lab density crosstalk profiles', () => {
 
   test('records crosstalk provenance in the runtime profile hash', () => {
     const userProfile = resolveNegativeLabRuntimeProfile('negative_lab.user.c41.local_warm_proof.v1');
-    const identityProfile = resolveNegativeLabRuntimeProfile('negative_lab.generic.c41.neutral.v1');
+    const genericProfile = resolveNegativeLabRuntimeProfile('negative_lab.generic.c41.neutral.v1');
     const crosstalkProfile = userProfile.crosstalkProfile;
     if (crosstalkProfile === null) throw new Error('User profile crosstalk profile is missing.');
     const { provenanceHash: _provenanceHash, ...crosstalkPayload } = crosstalkProfile;
@@ -94,8 +105,9 @@ describe('negative lab density crosstalk profiles', () => {
     expect(crosstalkProfile.provenance).toBe('user_owned');
     expect(crosstalkProfile.provenanceHash).toBe(buildNegativeLabCrosstalkProfileProvenanceHash(crosstalkPayload));
     expect(buildNegativeLabRuntimeProfileProvenanceHash(userProfile)).not.toBe(
-      buildNegativeLabRuntimeProfileProvenanceHash(identityProfile),
+      buildNegativeLabRuntimeProfileProvenanceHash(genericProfile),
     );
+    expect(genericProfile.crosstalkProfile).toEqual(NEGATIVE_LAB_GENERIC_C41_CROSSTALK_PROFILE);
   });
 
   test('suppresses crosstalk controls for black-and-white profiles', () => {
