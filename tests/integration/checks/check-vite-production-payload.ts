@@ -50,6 +50,13 @@ if (failures.length > 0) {
 }
 
 console.log('production payload check ok');
+await mkdir('artifacts/bundle-report', { recursive: true });
+const archive = Bun.spawnSync({
+  cmd: ['git', 'archive', '--format=zip', '--output=artifacts/bundle-report/rapidraw-source.zip', 'HEAD'],
+  stderr: 'inherit',
+  stdout: 'inherit',
+});
+if (archive.exitCode !== 0) throw new Error(`source archive failed with exit code ${archive.exitCode}`);
 
 async function collectFailures(root: string): Promise<PayloadFailure[]> {
   const files = await listFiles(root).catch((error: unknown) => {
