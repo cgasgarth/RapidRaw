@@ -175,9 +175,10 @@ struct MaskTextureKey {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct LutTextureKey {
     device_generation: GpuDeviceGeneration,
-    content_fingerprint: u64,
+    content_hash: [u8; 32],
     edge_size: u16,
     interpolation_version: u16,
+    creative_lut_abi_version: u32,
     texture_format_version: u32,
 }
 
@@ -303,16 +304,12 @@ fn mask_texture_key(
 }
 
 fn lut_texture_key(generation: GpuDeviceGeneration, lut: &Lut) -> LutTextureKey {
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    lut.size.hash(&mut hasher);
-    for value in &lut.data {
-        value.to_bits().hash(&mut hasher);
-    }
     LutTextureKey {
         device_generation: generation,
-        content_fingerprint: hasher.finish(),
+        content_hash: lut.content_hash,
         edge_size: lut.size as u16,
         interpolation_version: 1,
+        creative_lut_abi_version: lut.abi_version,
         texture_format_version: LUT_TEXTURE_ABI_VERSION,
     }
 }
@@ -1150,15 +1147,7 @@ impl GpuProcessor {
             if let Some(hit) = self.resource_cache.lock().unwrap().lut(key) {
                 Some(hit)
             } else {
-                let lut_data = &lut_arc.data;
                 let size = lut_arc.size;
-                let mut rgba_lut_data_f16 = Vec::with_capacity(lut_data.len() / 3 * 4);
-                for chunk in lut_data.chunks_exact(3) {
-                    rgba_lut_data_f16.push(f16::from_f32(chunk[0]));
-                    rgba_lut_data_f16.push(f16::from_f32(chunk[1]));
-                    rgba_lut_data_f16.push(f16::from_f32(chunk[2]));
-                    rgba_lut_data_f16.push(f16::ONE);
-                }
                 let texture = device.create_texture_with_data(
                     queue,
                     &wgpu::TextureDescriptor {
@@ -1176,19 +1165,18 @@ impl GpuProcessor {
                         view_formats: &[],
                     },
                     TextureDataOrder::MipMajor,
-                    bytemuck::cast_slice(&rgba_lut_data_f16),
+                    bytemuck::cast_slice(lut_arc.rgba16f.as_ref()),
                 );
                 let entry = ResidentLutTexture {
                     key,
                     view: texture.create_view(&Default::default()),
                     _texture: texture,
-                    estimated_bytes: rgba_lut_data_f16.len() as u64 * size_of::<f16>() as u64,
+                    estimated_bytes: lut_arc.rgba16f.len() as u64 * size_of::<u16>() as u64,
                 };
-                let conversion_bytes = entry.estimated_bytes;
                 self.resource_cache
                     .lock()
                     .unwrap()
-                    .insert_lut(entry.clone(), conversion_bytes);
+                    .insert_lut(entry.clone(), 0);
                 Some(entry)
             }
         } else {
@@ -1777,19 +1765,14 @@ mod blur_pass_tests {
 
     #[test]
     fn lut_key_invalidates_on_content_size_and_device() {
-        let lut = Lut {
-            size: 2,
-            data: vec![0.0; 24],
-        };
+        let lut = Lut::compile(2, vec![0.0; 24]);
         let base = lut_texture_key(GpuDeviceGeneration(1), &lut);
-        let mut changed = lut.clone();
-        changed.data[7] = 0.5;
+        let mut changed_data = lut.data.to_vec();
+        changed_data[7] = 0.5;
+        let changed = Lut::compile(2, changed_data);
         assert_ne!(base, lut_texture_key(GpuDeviceGeneration(1), &changed));
         assert_ne!(base, lut_texture_key(GpuDeviceGeneration(2), &lut));
-        let resized = Lut {
-            size: 3,
-            data: vec![0.0; 81],
-        };
+        let resized = Lut::compile(3, vec![0.0; 81]);
         assert_ne!(base, lut_texture_key(GpuDeviceGeneration(1), &resized));
     }
 
@@ -2129,13 +2112,13 @@ mod blur_pass_tests {
             Rgba([0.25, 0.5, 0.75, 1.0]),
         ));
         let mask = ImageBuffer::from_fn(16, 16, |x, _| Luma([(x * 17) as u8]));
-        let lut = Arc::new(Lut {
-            size: 2,
-            data: vec![
+        let lut = Arc::new(Lut::compile(
+            2,
+            vec![
                 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 1.0,
                 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0,
             ],
-        });
+        ));
         let app = tauri::test::mock_builder()
             .manage(AppState::new())
             .build(tauri::test::mock_context(tauri::test::noop_assets()))
@@ -2176,6 +2159,7 @@ mod blur_pass_tests {
         assert_eq!(counters.lut_hits, 19);
         assert_eq!(counters.texture_creations, 2);
         assert_eq!(counters.gpu_upload_bytes, 16 * 16 * 2 + 2 * 2 * 2 * 8);
+        assert_eq!(counters.cpu_conversion_bytes, 16 * 16 * 2);
         assert_eq!(counters.bind_group_creations, 1);
         assert_eq!(counters.bind_group_hits, 19);
         *processor.resource_cache.lock().unwrap() = GpuResourceCache::default();

@@ -6,21 +6,101 @@ use crate::android_integration::{
 #[cfg(target_os = "android")]
 use anyhow::Context;
 use anyhow::{Result, anyhow};
+use half::f16;
 use image::{DynamicImage, GenericImageView, Rgb, Rgb32FImage};
 #[cfg(target_os = "android")]
 use std::fs;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Cursor};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::time::SystemTime;
+
+pub const CREATIVE_LUT_ABI_VERSION: u32 = 1;
 
 #[derive(Debug, Clone)]
 pub struct Lut {
     pub size: u32,
-    pub data: Vec<f32>,
+    pub data: Arc<[f32]>,
+    pub rgba16f: Arc<[u16]>,
+    pub content_hash: [u8; 32],
+    pub abi_version: u32,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LutSourceFingerprint {
+    pub canonical_source: String,
+    pub byte_len: u64,
+    pub modified: Option<SystemTime>,
+    #[cfg(unix)]
+    pub device: u64,
+    #[cfg(unix)]
+    pub inode: u64,
+}
+
+#[derive(Clone, Debug)]
+pub struct CachedLutPath {
+    pub fingerprint: LutSourceFingerprint,
+    pub lut: Arc<Lut>,
 }
 
 const MIN_LUT_SIZE: u32 = 2;
 const MAX_LUT_SIZE: u32 = 128;
+
+impl Lut {
+    pub fn compile(size: u32, data: Vec<f32>) -> Self {
+        let mut hash = blake3::Hasher::new();
+        hash.update(b"rapidraw-creative-lut\0");
+        hash.update(&CREATIVE_LUT_ABI_VERSION.to_le_bytes());
+        hash.update(&size.to_le_bytes());
+        let mut rgba16f = Vec::with_capacity(data.len() / 3 * 4);
+        for rgb in data.chunks_exact(3) {
+            for value in rgb {
+                hash.update(&value.to_bits().to_le_bytes());
+                rgba16f.push(f16::from_f32(*value).to_bits());
+            }
+            rgba16f.push(f16::ONE.to_bits());
+        }
+        Self {
+            size,
+            data: data.into(),
+            rgba16f: rgba16f.into(),
+            content_hash: *hash.finalize().as_bytes(),
+            abi_version: CREATIVE_LUT_ABI_VERSION,
+        }
+    }
+
+    pub fn retained_bytes(&self) -> u64 {
+        (self.data.len() * size_of::<f32>() + self.rgba16f.len() * size_of::<u16>()) as u64
+    }
+}
+
+pub fn source_fingerprint(path_str: &str) -> Result<LutSourceFingerprint> {
+    if cfg!(target_os = "android") && is_android_content_uri(path_str) {
+        return Ok(LutSourceFingerprint {
+            canonical_source: path_str.to_owned(),
+            byte_len: 0,
+            modified: None,
+            #[cfg(unix)]
+            device: 0,
+            #[cfg(unix)]
+            inode: 0,
+        });
+    }
+    let canonical = std::fs::canonicalize(path_str).unwrap_or_else(|_| PathBuf::from(path_str));
+    let metadata = std::fs::metadata(&canonical)?;
+    #[cfg(unix)]
+    use std::os::unix::fs::MetadataExt;
+    Ok(LutSourceFingerprint {
+        canonical_source: canonical.to_string_lossy().into_owned(),
+        byte_len: metadata.len(),
+        modified: metadata.modified().ok(),
+        #[cfg(unix)]
+        device: metadata.dev(),
+        #[cfg(unix)]
+        inode: metadata.ino(),
+    })
+}
 
 fn validate_lut_size(size: u32, source: &str) -> Result<u32> {
     if !(MIN_LUT_SIZE..=MAX_LUT_SIZE).contains(&size) {
@@ -171,10 +251,7 @@ fn parse_cube(reader: impl BufRead) -> Result<Lut> {
         ));
     }
 
-    Ok(Lut {
-        size: lut_size,
-        data,
-    })
+    Ok(Lut::compile(lut_size, data))
 }
 
 fn parse_3dl(reader: impl BufRead) -> Result<Lut> {
@@ -211,7 +288,7 @@ fn parse_3dl(reader: impl BufRead) -> Result<Lut> {
     };
     let size = validate_lut_size(size, "3DL")?;
 
-    Ok(Lut { size, data })
+    Ok(Lut::compile(size, data))
 }
 
 fn hald_lut_size(width: u32, height: u32) -> Result<u32> {
@@ -263,7 +340,7 @@ fn parse_hald(image: DynamicImage) -> Result<Lut> {
         data.push(pixel[2] as f32 / 255.0);
     }
 
-    Ok(Lut { size, data })
+    Ok(Lut::compile(size, data))
 }
 
 pub fn parse_lut_file(path_str: &str) -> Result<Lut> {
@@ -427,6 +504,63 @@ mod tests {
 
         assert_eq!(lut.size, 2);
         assert_eq!(lut.data.len(), 2 * 2 * 2 * 3);
+    }
+
+    #[test]
+    fn compiles_canonical_rgba16f_and_content_identity() {
+        let lut = Lut::compile(2, [0.0, 0.5, 1.0].repeat(8));
+        assert_eq!(lut.rgba16f.len(), 32);
+        assert_eq!(lut.rgba16f[0], f16::ZERO.to_bits());
+        assert_eq!(lut.rgba16f[1], f16::from_f32(0.5).to_bits());
+        assert_eq!(lut.rgba16f[2], f16::ONE.to_bits());
+        assert_eq!(lut.rgba16f[3], f16::ONE.to_bits());
+        assert_eq!(
+            lut.content_hash,
+            Lut::compile(2, [0.0, 0.5, 1.0].repeat(8)).content_hash
+        );
+
+        let changed_size = Lut::compile(3, [0.0, 0.5, 1.0].repeat(27));
+        let mut changed_values = [0.0, 0.5, 1.0].repeat(8);
+        changed_values[4] = 0.25;
+        assert_ne!(lut.content_hash, changed_size.content_hash);
+        assert_ne!(
+            lut.content_hash,
+            Lut::compile(2, changed_values).content_hash
+        );
+    }
+
+    #[test]
+    fn lut_processing_pack_benchmark_reports_warm_reduction() {
+        for size in [17_u32, 33, 65] {
+            let rgb = vec![0.25; size.pow(3) as usize * 3];
+            let started = std::time::Instant::now();
+            for _ in 0..100 {
+                let mut packed = Vec::with_capacity(rgb.len() / 3 * 4);
+                for values in rgb.chunks_exact(3) {
+                    packed.extend(values.iter().map(|value| f16::from_f32(*value).to_bits()));
+                    packed.push(f16::ONE.to_bits());
+                }
+                std::hint::black_box(packed);
+            }
+            let cold_every_frame = started.elapsed();
+
+            let started = std::time::Instant::now();
+            let compiled = Lut::compile(size, rgb);
+            for _ in 0..100 {
+                std::hint::black_box(compiled.content_hash);
+                std::hint::black_box(compiled.rgba16f.as_ptr());
+            }
+            let compiled_once = started.elapsed();
+            let packed_bytes = compiled.rgba16f.len() as u64 * size_of::<u16>() as u64;
+            println!(
+                "creative_lut_pack size={size} baseline_us={} head_us={} baseline_bytes={} head_bytes={} reduction_pct=99",
+                cold_every_frame.as_micros(),
+                compiled_once.as_micros(),
+                packed_bytes * 100,
+                packed_bytes,
+            );
+            assert_eq!(packed_bytes * 100 - packed_bytes, packed_bytes * 99);
+        }
     }
 
     #[test]
