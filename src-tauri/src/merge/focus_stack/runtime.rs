@@ -729,7 +729,13 @@ mod tests {
                 "exposureScalar": transform.exposure_normalization.scalar,
             })).collect::<Vec<_>>(),
             "previewHashes": result.previews.iter().map(|preview| preview.preview_hash.clone()).collect::<Vec<_>>(),
-            "nonClaims": ["no_focus_evidence", "no_label_map", "no_pyramid_blend", "no_durable_output"]
+            "focusEvidence": result.focus_evidence.as_ref().map(|evidence| serde_json::json!({
+                "algorithmId": evidence.algorithm_id,
+                "labelPolicyId": evidence.label_policy_id,
+                "mapHash": evidence.map_artifact.content_hash,
+                "metrics": evidence.metrics,
+            })),
+            "nonClaims": ["no_pyramid_blend", "no_durable_output"]
         });
         let output = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../private-artifacts/validation/computational-merge/focus-stack-intake/alaska-plan.json");
         std::fs::create_dir_all(output.parent().unwrap()).unwrap();
