@@ -6,6 +6,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   ColorAdjustmentDensity: 'color-adjustment-density',
   ColorWorkflow: 'color-workflow',
   ColorRangeLocalAdjustment: 'color-range-local-adjustment',
+  ColorWheelInstances: 'color-wheel-instances',
   CommandPaletteWorkflows: 'command-palette-workflows',
   CullingCompareSync: 'culling-compare-sync',
   DetailDustSpot: 'detail-dust-spot',
@@ -112,6 +113,12 @@ export const VISUAL_SMOKE_SCENARIOS = [
     marker: 'Lens correction session',
     mode: VISUAL_SMOKE_SCENARIO_IDS.LensCorrectionSession,
     outputFile: 'lens-correction-session.png',
+    sectionMinimum: 1,
+  },
+  {
+    marker: 'Color wheel instances',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.ColorWheelInstances,
+    outputFile: 'color-wheel-instances.png',
     sectionMinimum: 1,
   },
   {

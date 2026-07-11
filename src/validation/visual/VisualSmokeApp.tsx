@@ -19,6 +19,7 @@ import { useTranslation } from 'react-i18next';
 import type { Crop, PercentCrop } from 'react-image-crop';
 import AdjustmentSlider from '../../components/adjustments/AdjustmentSlider';
 import ColorPanel from '../../components/adjustments/Color';
+import ColorWheel from '../../components/adjustments/ColorWheel';
 import DetailsPanel from '../../components/adjustments/Details';
 import EffectsPanel from '../../components/adjustments/Effects';
 import FocusStackModal from '../../components/modals/computational-merge/FocusStackModal';
@@ -1954,6 +1955,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.AgentChatUi]: AgentChatVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.BrushMaskCanvasUi]: BrushMaskCanvasVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ColorRangeLocalAdjustment]: ColorRangeLocalAdjustmentVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.ColorWheelInstances]: ColorWheelInstancesVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ColorWorkflow]: ColorWorkflowVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.CommandPaletteWorkflows]: CommandPaletteWorkflowSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.CullingCompareSync]: CullingCompareSyncVisualSmoke,
@@ -3681,6 +3683,11 @@ const copy = {
   commandPaletteSelectSource: 'Select source',
   cullingCompareSync: 'Culling compare sync',
   lensCorrectionSession: 'Lens correction session',
+  colorWheelInstances: 'Color wheel instances',
+  colorWheelHighlights: 'Highlights',
+  colorWheelShadows: 'Shadows',
+  colorWheelToggleFirst: 'Toggle first',
+  colorWheelUpdateValues: 'Update values',
   filmLook: 'Film look',
   filmPreset: 'Neutral 400',
   colorRangeLocalAdjustment: 'Color Range Local Adjustment',
@@ -5476,6 +5483,78 @@ function LensCorrectionSessionVisualSmoke() {
           show
         />
       </div>
+    </main>
+  );
+}
+
+function ColorWheelInstancesVisualSmoke() {
+  const [first, setFirst] = useState({ hue: 28, luminance: 12, saturation: 72 });
+  const [second, setSecond] = useState({ hue: 208, luminance: -18, saturation: 44 });
+  const [firstEvents, setFirstEvents] = useState<boolean[]>([]);
+  const [secondEvents, setSecondEvents] = useState<boolean[]>([]);
+  const [showFirst, setShowFirst] = useState(true);
+  return (
+    <main
+      className="min-h-screen bg-[#101216] p-8 text-[#f3f4f1]"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.ColorWheelInstances}
+      data-visual-smoke-ready="true"
+    >
+      <section
+        className="mx-auto max-w-4xl rounded-xl border border-white/10 bg-[#181b20] p-6"
+        data-first-events={firstEvents.join(',')}
+        data-second-events={secondEvents.join(',')}
+        data-testid="color-wheel-instance-proof"
+        data-visual-smoke-section="color-wheel-instances"
+      >
+        <div className="mb-5 flex items-center justify-between">
+          <h1 className="text-lg font-semibold">{copy.colorWheelInstances}</h1>
+          <div className="flex gap-2">
+            <button
+              className="rounded border border-white/15 px-3 py-1.5 text-sm"
+              data-testid="color-wheel-update-values"
+              onClick={() => {
+                setFirst({ hue: 132, luminance: 24, saturation: 88 });
+                setSecond({ hue: 302, luminance: -8, saturation: 61 });
+              }}
+              type="button"
+            >
+              {copy.colorWheelUpdateValues}
+            </button>
+            <button
+              className="rounded border border-white/15 px-3 py-1.5 text-sm"
+              data-testid="color-wheel-toggle-first"
+              onClick={() => setShowFirst((visible) => !visible)}
+              type="button"
+            >
+              {copy.colorWheelToggleFirst}
+            </button>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-8">
+          <div data-testid="color-wheel-first-slot">
+            {showFirst && (
+              <ColorWheel
+                defaultValue={{ hue: 0, luminance: 0, saturation: 0 }}
+                isExpanded
+                label={copy.colorWheelShadows}
+                onChange={setFirst}
+                onDragStateChange={(active) => setFirstEvents((events) => [...events, active])}
+                value={first}
+              />
+            )}
+          </div>
+          <div data-testid="color-wheel-second-slot">
+            <ColorWheel
+              defaultValue={{ hue: 0, luminance: 0, saturation: 0 }}
+              isExpanded
+              label={copy.colorWheelHighlights}
+              onChange={setSecond}
+              onDragStateChange={(active) => setSecondEvents((events) => [...events, active])}
+              value={second}
+            />
+          </div>
+        </div>
+      </section>
     </main>
   );
 }
