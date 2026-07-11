@@ -48,6 +48,7 @@ import {
   TransformAdjustment,
 } from '../../../../utils/adjustments';
 import { getEditorClippingStatusChips } from '../../../../utils/color/runtime/gamutWarningDisplay';
+import { deriveEffectiveDisclosureState } from '../../../../utils/searchDisclosureState';
 import { getLensCorrectionAvailability } from '../../../../utils/transformLensControls';
 import AdjustmentSlider from '../../../adjustments/AdjustmentSlider';
 import BasicAdjustments from '../../../adjustments/Basic';
@@ -873,6 +874,11 @@ export default function Controls() {
     () => new Set(filteredDevelopPanelControls.map((control) => control.sectionName)),
     [filteredDevelopPanelControls],
   );
+  const effectiveCollapsibleSectionsState = useMemo(
+    () =>
+      deriveEffectiveDisclosureState(collapsibleSectionsState, isDevelopPanelSearching, matchingDevelopPanelSections),
+    [collapsibleSectionsState, isDevelopPanelSearching, matchingDevelopPanelSections],
+  );
 
   const isDevelopPanelControlPinned = useCallback(
     (controlId: string) => developPanelPinnedControlIds.includes(controlId),
@@ -975,24 +981,6 @@ export default function Controls() {
     },
     [activateDevelopPanelSearchResult],
   );
-
-  useEffect(() => {
-    if (!isDevelopPanelSearching || matchingDevelopPanelSections.size === 0) {
-      return;
-    }
-
-    setCollapsibleState((prev) => {
-      let didChange = false;
-      const nextState = { ...prev };
-      matchingDevelopPanelSections.forEach((sectionName) => {
-        if (!nextState[sectionName]) {
-          nextState[sectionName] = true;
-          didChange = true;
-        }
-      });
-      return didChange ? nextState : prev;
-    });
-  }, [isDevelopPanelSearching, matchingDevelopPanelSections, setCollapsibleState]);
 
   const handleToggleVisibility = (sectionName: AdjustmentSectionName) => {
     setAdjustments((prev: Adjustments) => {
@@ -1419,7 +1407,7 @@ export default function Controls() {
                 headerActions={sectionActions.headerActions}
                 isContentVisible={isContentVisible}
                 isDirty={hasAdjustmentValueChanges(ADJUSTMENT_SECTIONS[sectionName], adjustments)}
-                isOpen={collapsibleSectionsState[sectionName]}
+                isOpen={effectiveCollapsibleSectionsState[sectionName]}
                 onContextMenu={(event: MouseEvent<HTMLDivElement>) => {
                   handleSectionContextMenu(event, sectionName);
                 }}

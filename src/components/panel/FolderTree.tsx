@@ -42,6 +42,7 @@ import { useLibraryStore } from '../../store/useLibraryStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { Invokes } from '../../tauri/commands';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../types/typography';
+import { deriveEffectiveFolderTreeSections } from '../../utils/searchDisclosureState';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import { type AlbumItem, type FolderTreeSort, SortDirection } from '../ui/AppProperties';
 import UiText from '../ui/primitives/Text';
@@ -194,7 +195,17 @@ const getAlbumImageCount = (item: AlbumItem): number => {
   return item.children.reduce((sum, child) => sum + getAlbumImageCount(child), 0);
 };
 
-function SectionHeader({ title, isOpen, onToggle }: { title: string; isOpen: boolean; onToggle: () => void }) {
+function SectionHeader({
+  title,
+  isOpen,
+  onToggle,
+  testId,
+}: {
+  title: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  testId: string;
+}) {
   const { t } = useTranslation();
 
   return (
@@ -203,6 +214,8 @@ function SectionHeader({ title, isOpen, onToggle }: { title: string; isOpen: boo
       variant={TextVariants.small}
       weight={TextWeights.bold}
       className="flex items-center w-full px-1 py-1.5 cursor-pointer group"
+      data-testid={testId}
+      data-open={isOpen ? 'true' : 'false'}
       onClick={onToggle}
       data-tooltip={
         isOpen
@@ -797,45 +810,19 @@ export default function FolderTree({
     return new Set([...expandedAlbumGroups, ...searchAutoExpandedAlbumGroups]);
   }, [expandedAlbumGroups, searchAutoExpandedAlbumGroups]);
 
-  useEffect(() => {
-    if (isSearching && appSettings) {
-      const hasPinnedResults = filteredPinnedTrees.length > 0;
-      const hasBaseResults = filteredTrees.length > 0;
-      const hasAlbumResults = filteredAlbumTree.length > 0;
+  const effectiveOpenSections = useMemo(
+    () =>
+      deriveEffectiveFolderTreeSections(openSections, isSearching, {
+        albums: filteredAlbumTree.length > 0,
+        current: filteredTrees.length > 0,
+        pinned: filteredPinnedTrees.length > 0,
+      }),
+    [filteredAlbumTree.length, filteredPinnedTrees.length, filteredTrees.length, isSearching, openSections],
+  );
 
-      const newSections = [...openSections];
-      let changed = false;
-
-      if (hasPinnedResults && !newSections.includes('pinned')) {
-        newSections.push('pinned');
-        changed = true;
-      }
-      if (hasBaseResults && !newSections.includes('current')) {
-        newSections.push('current');
-        changed = true;
-      }
-      if (hasAlbumResults && !newSections.includes('albums')) {
-        newSections.push('albums');
-        changed = true;
-      }
-
-      if (changed) {
-        void handleSettingsChange({ ...appSettings, openTreeSections: newSections });
-      }
-    }
-  }, [
-    isSearching,
-    filteredTrees,
-    filteredPinnedTrees,
-    filteredAlbumTree,
-    openSections,
-    handleSettingsChange,
-    appSettings,
-  ]);
-
-  const isPinnedOpen = openSections.includes('pinned');
-  const isCurrentOpen = openSections.includes('current');
-  const isAlbumsOpen = openSections.includes('albums');
+  const isPinnedOpen = effectiveOpenSections.has('pinned');
+  const isCurrentOpen = effectiveOpenSections.has('current');
+  const isAlbumsOpen = effectiveOpenSections.has('albums');
 
   const hasVisiblePinnedTrees = filteredPinnedTrees.length > 0;
   const hasVisibleAlbums = filteredAlbumTree.length > 0;
@@ -892,6 +879,8 @@ export default function FolderTree({
               <div className="relative flex-1 min-w-0">
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
                 <input
+                  aria-label={t('library.folders.searchPlaceholder')}
+                  data-testid="folder-tree-search"
                   type="text"
                   placeholder={t('library.folders.searchPlaceholder')}
                   value={searchQuery}
@@ -945,6 +934,7 @@ export default function FolderTree({
               <>
                 <div>
                   <SectionHeader
+                    testId="folder-tree-section-pinned"
                     title={t('library.folders.sections.pinned')}
                     isOpen={isPinnedOpen}
                     onToggle={() => {
@@ -1008,6 +998,7 @@ export default function FolderTree({
               <>
                 <div>
                   <SectionHeader
+                    testId="folder-tree-section-albums"
                     title={t('library.folders.sections.albums')}
                     isOpen={isAlbumsOpen}
                     onToggle={() => {
@@ -1069,6 +1060,7 @@ export default function FolderTree({
               <>
                 <div>
                   <SectionHeader
+                    testId="folder-tree-section-current"
                     title={t('library.folders.sections.folders')}
                     isOpen={isCurrentOpen}
                     onToggle={() => {

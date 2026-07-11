@@ -13,9 +13,12 @@ import { INITIAL_ADJUSTMENTS, INITIAL_MASK_ADJUSTMENTS, type MaskContainer } fro
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 mock.module('@clerk/react', () => ({
-  ClerkProvider: ({ children }: { children: ReactNode }) => children,
+  ClerkProvider: ({ children }: { children?: ReactNode }) => children ?? null,
+  Show: ({ children }: { children?: ReactNode }) => children ?? null,
+  SignIn: () => null,
   useAuth: () => ({ getToken: async () => null }),
-  useUser: () => ({ isSignedIn: false, user: null }),
+  useClerk: () => ({ signOut: async () => undefined }),
+  useUser: () => ({ isLoaded: true, isSignedIn: false, user: null }),
 }));
 
 const firstMask: MaskContainer = {
