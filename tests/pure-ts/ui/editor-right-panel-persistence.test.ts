@@ -62,6 +62,7 @@ function installMemoryStorage() {
 function resetRightPanelState(panel: Panel | null = DEFAULT_EDITOR_RIGHT_PANEL) {
   useUIStore.setState({
     activeRightPanel: panel,
+    mountedKeepAlivePanels: new Set(),
     renderedRightPanel: panel,
     recentRightPanels: panel === null ? [] : [panel],
     slideDirection: 1,
@@ -156,6 +157,35 @@ describe('editor right panel persistence', () => {
 
     useUIStore.getState().setRightPanel(Panel.Export);
     expect(useUIStore.getState().recentRightPanels).toEqual([Panel.Export, Panel.Agent, Panel.Masks, Panel.Color]);
+  });
+
+  test('claims session keep-alive membership in the panel selection command', () => {
+    installMemoryStorage();
+    resetRightPanelState(Panel.Color);
+
+    useUIStore.getState().setRightPanel(Panel.Agent);
+    const selected = useUIStore.getState();
+    expect(selected.activeRightPanel).toBe(Panel.Agent);
+    expect(selected.renderedRightPanel).toBe(Panel.Color);
+    expect([...selected.mountedKeepAlivePanels]).toEqual([Panel.Agent]);
+
+    useUIStore.getState().setRightPanel(Panel.Export);
+    useUIStore.getState().setRightPanel(Panel.Agent);
+    expect([...useUIStore.getState().mountedKeepAlivePanels]).toEqual([Panel.Agent]);
+  });
+
+  test('declares each rapid selection predecessor synchronously without readiness callbacks', () => {
+    installMemoryStorage();
+    resetRightPanelState(Panel.Color);
+
+    useUIStore.getState().setRightPanel(Panel.Adjustments);
+    expect(useUIStore.getState().renderedRightPanel).toBe(Panel.Color);
+    useUIStore.getState().setRightPanel(Panel.Crop);
+    expect(useUIStore.getState().renderedRightPanel).toBe(Panel.Adjustments);
+    useUIStore.getState().setRightPanel(Panel.Metadata);
+
+    expect(useUIStore.getState().activeRightPanel).toBe(Panel.Metadata);
+    expect(useUIStore.getState().renderedRightPanel).toBe(Panel.Crop);
   });
 
   test('bounds recent panel history while preserving most recent order', () => {
