@@ -3116,7 +3116,7 @@ fn process_and_get_dynamic_image_inner(
         if presentation_is_current.is_some_and(|is_current| !is_current()) {
             return Err("presentation_stale_frame".into());
         }
-        context.presentation.publish_texture_for_frame(
+        context.presentation.present_texture_for_frame(
             processor.output_texture_view.clone(),
             [width, height],
             [processor_state.width, processor_state.height],
