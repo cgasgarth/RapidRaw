@@ -73,6 +73,7 @@ use tauri::{Emitter, Manager, ipc::Response};
 use tempfile::NamedTempFile;
 
 use crate::formats::PNG_DATA_URL_PREFIX;
+use crate::gpu_display::{DisplayTransformState, PresentationSchedulerReport};
 use crate::hdr_artifact_sidecar::write_hdr_output_sidecar;
 use crate::image_codecs::{encode_jpeg_data_url, encode_jpeg_response, encode_png_data_url};
 use crate::merge::atomic_derived_output::{AtomicDerivedOutputTransaction, DerivedOutputManifest};
@@ -330,42 +331,58 @@ pub fn get_cached_full_warped_image(
 }
 
 #[tauri::command]
-async fn update_wgpu_transform(
+fn update_wgpu_transform(
     payload: WgpuTransformPayload,
     state: tauri::State<'_, AppState>,
-) -> Result<(), String> {
+) -> Result<u64, String> {
     let context = match state.gpu_context.lock().unwrap().as_ref() {
         Some(c) => c.clone(),
-        None => return Ok(()),
+        None => return Ok(0),
     };
-
-    tokio::task::spawn_blocking(move || {
-        let mut display_lock = context.display.lock().unwrap();
-        if let Some(display) = display_lock.as_mut() {
-            display.latest_transform.rect = [payload.x, payload.y, payload.width, payload.height];
-            display.latest_transform.clip = [
+    context
+        .presentation
+        .submit_transform(DisplayTransformState {
+            rect: [payload.x, payload.y, payload.width, payload.height],
+            clip: [
                 payload.clip_x,
                 payload.clip_y,
                 payload.clip_width,
                 payload.clip_height,
-            ];
-            display.latest_transform.window = [payload.window_width, payload.window_height];
-            display.latest_transform.bg_primary = payload.bg_primary;
-            display.latest_transform.bg_secondary = payload.bg_secondary;
-            display.latest_transform.pixelated = if payload.pixelated { 1.0 } else { 0.0 };
+            ],
+            window: [payload.window_width, payload.window_height],
+            bg_primary: payload.bg_primary,
+            bg_secondary: payload.bg_secondary,
+            pixelated: payload.pixelated,
+        })
+}
 
-            context.queue.write_buffer(
-                &display.transform_buffer,
-                0,
-                bytemuck::bytes_of(&display.latest_transform),
-            );
-            display.render(&context.device, &context.queue);
-        }
-    })
-    .await
-    .map_err(|e| format!("Task panicked: {}", e))?;
+#[tauri::command]
+async fn flush_wgpu_presentation(
+    sequence: u64,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    let presentation = state
+        .gpu_context
+        .lock()
+        .unwrap()
+        .as_ref()
+        .map(|context| Arc::clone(&context.presentation));
+    match presentation {
+        Some(presentation) => presentation.flush(sequence).await,
+        None => Ok(()),
+    }
+}
 
-    Ok(())
+#[tauri::command]
+fn get_wgpu_presentation_report(
+    state: tauri::State<'_, AppState>,
+) -> Option<PresentationSchedulerReport> {
+    state
+        .gpu_context
+        .lock()
+        .unwrap()
+        .as_ref()
+        .map(|context| context.presentation.report())
 }
 
 fn start_analytics_worker(app_handle: tauri::AppHandle) {
@@ -2616,14 +2633,9 @@ pub fn run() {
         .plugin(PinchZoomDisablePlugin)
         .on_window_event(|window, event| if let tauri::WindowEvent::Resized(size) = event {
             let state = window.state::<AppState>();
-            if let Some(ctx) = state.gpu_context.lock().unwrap().as_ref()
-                && let Ok(mut display_lock) = ctx.display.try_lock()
-                    && let Some(display) = display_lock.as_mut() {
-                        display.config.width = size.width.max(1);
-                        display.config.height = size.height.max(1);
-                        display.surface.configure(&ctx.device, &display.config);
-                        display.render(&ctx.device, &ctx.queue);
-                    }
+            if let Some(ctx) = state.gpu_context.lock().unwrap().as_ref() {
+                ctx.presentation.resize(size.width, size.height);
+            }
         } else if let tauri::WindowEvent::Moved(_) = event {
             #[cfg(target_os = "macos")]
             {
@@ -2903,6 +2915,8 @@ pub fn run() {
             frontend_ready,
             cancel_thumbnail_generation,
             update_wgpu_transform,
+            flush_wgpu_presentation,
+            get_wgpu_presentation_report,
             android_integration::resolve_android_content_uri_name,
             cache_utils::clear_session_caches,
             cache_utils::clear_image_caches,
