@@ -46,7 +46,8 @@ export function useImageLoader(cachedEditStateRef: RefObject<ImageCacheEntry | n
 
       const loadMetadataEarly = async () => {
         try {
-          useEditorStore.getState().patchesSentToBackend.clear();
+          const editor = useEditorStore.getState();
+          editor.patchResidency.reset(editor.imageSessionId);
           await invoke(Invokes.ClearSessionCaches).catch((e: unknown) => {
             console.warn('Cache clear failed:', e);
           });

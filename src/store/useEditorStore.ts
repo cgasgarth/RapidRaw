@@ -7,6 +7,11 @@ import type { BaseRenderSize, ImageDimensions } from '../hooks/viewport/useImage
 import type { MaskOverlaySettings } from '../schemas/masks/maskOverlaySchemas';
 import type { GamutWarningOverlayPayload } from '../schemas/tauriEventSchemas';
 import type { PreviewQualityStatus } from '../utils/adaptivePreviewQuality';
+import {
+  type AdjustmentSnapshot,
+  PatchResidencyTracker,
+  publishAdjustmentSnapshot,
+} from '../utils/adjustmentSnapshots';
 import { type Adjustments, DisplayMode, INITIAL_ADJUSTMENTS, type MaskContainer } from '../utils/adjustments';
 import {
   applyBasicToneCommandEnvelopeToAdjustments,
@@ -38,7 +43,7 @@ export interface InteractivePatch {
   basePreviewUrl: string | null;
   fullHeight: number;
   fullWidth: number;
-  geometryIdentity: string;
+  geometryIdentity: number;
   url: string;
   normX: number;
   normY: number;
@@ -98,6 +103,11 @@ interface EditorState {
   // Core Image & Adjustments
   selectedImage: SelectedImage | null;
   adjustments: Adjustments;
+  /** Once published, this adjustment object graph is immutable for the lifetime of the snapshot. */
+  adjustmentSnapshot: AdjustmentSnapshot;
+  imageSessionId: number;
+  viewportRevision: number;
+  proofRevision: number;
   lastBasicToneCommand: BasicToneCommandEnvelope | null;
 
   // History State
@@ -165,7 +175,7 @@ interface EditorState {
   hasRenderedFirstFrame: boolean;
   wgpuFrameSerial: number;
   wgpuFailureSerial: number;
-  patchesSentToBackend: Set<string>;
+  patchResidency: PatchResidencyTracker;
 
   // Clipboard
   copiedSectionAdjustments: CopiedSectionAdjustments | null;
@@ -224,6 +234,11 @@ const historyNavigationPreviewInvalidation = {
   uncroppedAdjustedPreviewUrl: null,
 } satisfies Partial<EditorState>;
 
+const publishAdjustmentState = (state: EditorState, adjustments: Adjustments) => ({
+  adjustments,
+  adjustmentSnapshot: publishAdjustmentSnapshot(state.adjustmentSnapshot, adjustments),
+});
+
 const assertApprovedBasicToneCommand = (command: BasicToneCommandEnvelope, state: EditorState): void => {
   if (command.commandType !== 'toneColor.setBasicTone') {
     throw new Error('Editor basic-tone apply expected toneColor.setBasicTone command.');
@@ -245,11 +260,26 @@ const assertApprovedBasicToneCommand = (command: BasicToneCommandEnvelope, state
   }
 };
 
+const initialAdjustments = structuredClone(INITIAL_ADJUSTMENTS);
+const initialAdjustmentSnapshot = publishAdjustmentSnapshot(null, initialAdjustments);
+
+const viewportRevisionKeys: Array<keyof EditorState> = [
+  'baseRenderSize',
+  'displaySize',
+  'previewSize',
+  'viewportEpoch',
+  'zoomMode',
+];
+
 export const useEditorStore = create<EditorState>((set) => ({
   selectedImage: null,
-  adjustments: INITIAL_ADJUSTMENTS,
+  adjustments: initialAdjustments,
+  adjustmentSnapshot: initialAdjustmentSnapshot,
+  imageSessionId: 1,
+  viewportRevision: 1,
+  proofRevision: 1,
   lastBasicToneCommand: null,
-  history: [INITIAL_ADJUSTMENTS],
+  history: [initialAdjustments],
   historyCheckpoints: [],
   historyIndex: 0,
 
@@ -313,12 +343,30 @@ export const useEditorStore = create<EditorState>((set) => ({
   hasRenderedFirstFrame: false,
   wgpuFrameSerial: 0,
   wgpuFailureSerial: 0,
-  patchesSentToBackend: new Set<string>(),
+  patchResidency: new PatchResidencyTracker(1),
 
   setEditor: (updater) => {
     set((state) => {
       const rawUpdate = typeof updater === 'function' ? updater(state) : updater;
       const update: Partial<EditorState> = { ...rawUpdate };
+
+      if ('adjustments' in update && update.adjustments !== undefined) {
+        update.adjustmentSnapshot = publishAdjustmentSnapshot(state.adjustmentSnapshot, update.adjustments);
+        update.adjustments = update.adjustmentSnapshot.value as Adjustments;
+      }
+      if ('selectedImage' in update && update.selectedImage?.path !== state.selectedImage?.path) {
+        update.imageSessionId = state.imageSessionId + 1;
+        state.patchResidency.reset(update.imageSessionId);
+      }
+      if (viewportRevisionKeys.some((key) => key in update && update[key] !== state[key])) {
+        update.viewportRevision = state.viewportRevision + 1;
+      }
+      if (
+        ('isExportSoftProofEnabled' in update && update.isExportSoftProofEnabled !== state.isExportSoftProofEnabled) ||
+        ('exportSoftProofRecipeId' in update && update.exportSoftProofRecipeId !== state.exportSoftProofRecipeId)
+      ) {
+        update.proofRevision = state.proofRevision + 1;
+      }
 
       normalizeCompareStateUpdate(state, update);
 
@@ -376,7 +424,7 @@ export const useEditorStore = create<EditorState>((set) => ({
 
       return {
         ...historyNavigationPreviewInvalidation,
-        adjustments,
+        ...publishAdjustmentState(state, adjustments),
         history: nextHistory.history,
         historyCheckpoints: nextHistory.checkpoints,
         historyIndex: nextHistory.historyIndex,
@@ -413,7 +461,7 @@ export const useEditorStore = create<EditorState>((set) => ({
       if (nextState.historyIndex === state.historyIndex) return {};
       return {
         ...historyNavigationPreviewInvalidation,
-        adjustments: nextState.adjustments,
+        ...publishAdjustmentState(state, nextState.adjustments),
         historyIndex: nextState.historyIndex,
       };
     });
@@ -425,19 +473,19 @@ export const useEditorStore = create<EditorState>((set) => ({
       if (nextState.historyIndex === state.historyIndex) return {};
       return {
         ...historyNavigationPreviewInvalidation,
-        adjustments: nextState.adjustments,
+        ...publishAdjustmentState(state, nextState.adjustments),
         historyIndex: nextState.historyIndex,
       };
     });
   },
 
   resetHistory: (initialState) => {
-    set({
+    set((state) => ({
       history: [initialState],
       historyCheckpoints: [],
       historyIndex: 0,
-      adjustments: initialState,
-    });
+      ...publishAdjustmentState(state, initialState),
+    }));
   },
 
   goToHistoryIndex: (index) => {
@@ -446,7 +494,7 @@ export const useEditorStore = create<EditorState>((set) => ({
       if (nextState.historyIndex === state.historyIndex) return {};
       return {
         ...historyNavigationPreviewInvalidation,
-        adjustments: nextState.adjustments,
+        ...publishAdjustmentState(state, nextState.adjustments),
         historyIndex: nextState.historyIndex,
       };
     });

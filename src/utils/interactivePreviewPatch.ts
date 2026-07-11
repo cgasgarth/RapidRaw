@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import type { Adjustments } from './adjustments';
 
 export type DecodableImage = Pick<HTMLImageElement, 'decode' | 'onerror' | 'onload' | 'src'>;
 
@@ -12,12 +11,20 @@ export const interactivePreviewScopeSchema = z.object({
   backend: z.enum(['cpu', 'wgpu']),
   basePreviewUrl: z.string().nullable(),
   devicePixelRatio: finitePositiveNumberSchema,
-  geometryIdentity: z.string(),
+  adjustmentRevision: positiveSafeIntegerSchema,
+  geometryIdentity: positiveSafeIntegerSchema,
   graphIdentity: z.string().min(1),
-  roiIdentity: z.string(),
+  imageSessionId: positiveSafeIntegerSchema,
+  maskRevision: positiveSafeIntegerSchema,
+  patchRevision: positiveSafeIntegerSchema,
+  proofRevision: positiveSafeIntegerSchema,
+  roiX: z.number().nullable(),
+  roiY: z.number().nullable(),
+  roiW: z.number().nullable(),
+  roiH: z.number().nullable(),
   sourceImagePath: z.string().trim().min(1),
   targetResolution: positiveSafeIntegerSchema,
-  viewportIdentity: z.string(),
+  viewportIdentity: positiveSafeIntegerSchema,
 });
 
 export type InteractivePreviewScope = z.infer<typeof interactivePreviewScopeSchema>;
@@ -42,11 +49,19 @@ export interface InteractivePreviewSynchronization {
 
 const scopeKeys: Array<keyof InteractivePreviewScope> = [
   'backend',
+  'adjustmentRevision',
   'basePreviewUrl',
   'devicePixelRatio',
   'geometryIdentity',
   'graphIdentity',
-  'roiIdentity',
+  'imageSessionId',
+  'maskRevision',
+  'patchRevision',
+  'proofRevision',
+  'roiX',
+  'roiY',
+  'roiW',
+  'roiH',
   'sourceImagePath',
   'targetResolution',
   'viewportIdentity',
@@ -98,10 +113,20 @@ export class InteractivePreviewGenerationController {
     const invalidated = previousScope !== null && !isSameScope(previousScope, nextScope);
 
     if (previousScope !== null) {
-      if (previousScope.sourceImagePath !== nextScope.sourceImagePath) this.selectionEpoch += 1;
+      if (
+        previousScope.imageSessionId !== nextScope.imageSessionId ||
+        previousScope.sourceImagePath !== nextScope.sourceImagePath
+      )
+        this.selectionEpoch += 1;
       if (previousScope.graphIdentity !== nextScope.graphIdentity) this.graphEpoch += 1;
       if (previousScope.geometryIdentity !== nextScope.geometryIdentity) this.geometryEpoch += 1;
-      if (previousScope.roiIdentity !== nextScope.roiIdentity) this.roiEpoch += 1;
+      if (
+        previousScope.roiX !== nextScope.roiX ||
+        previousScope.roiY !== nextScope.roiY ||
+        previousScope.roiW !== nextScope.roiW ||
+        previousScope.roiH !== nextScope.roiH
+      )
+        this.roiEpoch += 1;
       if (previousScope.viewportIdentity !== nextScope.viewportIdentity) this.viewportEpoch += 1;
       if (previousScope.devicePixelRatio !== nextScope.devicePixelRatio) this.devicePixelRatioEpoch += 1;
       if (previousScope.backend !== nextScope.backend) this.backendEpoch += 1;
@@ -298,16 +323,9 @@ interface JpegDimensions {
 
 interface InteractivePatchIdentity {
   basePreviewUrl: string | null;
-  geometryIdentity: string;
+  geometryIdentity: number;
   sourceImagePath: string;
 }
-
-export const buildInteractivePreviewGeometryIdentity = (
-  adjustments: Pick<Adjustments, 'crop' | 'flipHorizontal' | 'flipVertical' | 'orientationSteps' | 'rotation'>,
-): string => {
-  const { crop, rotation, flipHorizontal, flipVertical, orientationSteps } = adjustments;
-  return JSON.stringify({ crop, rotation, flipHorizontal, flipVertical, orientationSteps });
-};
 
 export const isInteractivePreviewPatchCoherent = (
   patch: InteractivePatchIdentity,

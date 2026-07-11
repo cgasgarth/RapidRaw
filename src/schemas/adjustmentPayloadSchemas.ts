@@ -36,7 +36,7 @@ export const backendAdjustmentPayloadSchema = z
 export type BackendAdjustmentPayload = z.infer<typeof backendAdjustmentPayloadSchema>;
 
 export interface PreparedAdjustmentPayload {
-  newlySentPatchIds: Set<string>;
+  newlySentPatchIds: ReadonlySet<string>;
   payload: BackendAdjustmentPayload;
 }
 
@@ -46,21 +46,20 @@ export const prepareAdjustmentPayloadForBackend = (
   value: unknown,
   patchesSentToBackend: ReadonlySet<string>,
 ): PreparedAdjustmentPayload => {
-  const payload = backendAdjustmentPayloadSchema.parse(value);
+  const parsed = backendAdjustmentPayloadSchema.parse(value);
   const newlySentPatchIds = new Set<string>();
 
-  const processSubMasks = (subMasks: Array<z.infer<typeof backendSubMaskPayloadSchema>> | undefined) => {
-    if (!subMasks) return;
-
-    for (const subMask of subMasks) {
-      if (!subMask.id || !subMask.parameters) continue;
-
+  const processSubMasks = (subMasks: Array<z.infer<typeof backendSubMaskPayloadSchema>> | undefined) =>
+    subMasks?.map((subMask) => {
+      if (!subMask.id || !subMask.parameters) return subMask;
+      let parameters = subMask.parameters;
       let foundMaskData = false;
       for (const key of maskDataKeys) {
         if (subMask.parameters[key] !== undefined && subMask.parameters[key] !== null) {
           foundMaskData = true;
           if (patchesSentToBackend.has(subMask.id)) {
-            subMask.parameters[key] = null;
+            if (parameters === subMask.parameters) parameters = { ...parameters };
+            parameters[key] = null;
           }
         }
       }
@@ -68,24 +67,23 @@ export const prepareAdjustmentPayloadForBackend = (
       if (foundMaskData && !patchesSentToBackend.has(subMask.id)) {
         newlySentPatchIds.add(subMask.id);
       }
-    }
-  };
+      return parameters === subMask.parameters ? subMask : { ...subMask, parameters };
+    });
 
-  for (const patch of payload.aiPatches ?? []) {
+  const aiPatches = parsed.aiPatches?.map((patch) => {
+    let nextPatch = patch;
     if (patch.id && patch.patchData && !patch.isLoading) {
       if (patchesSentToBackend.has(patch.id)) {
-        patch.patchData = null;
+        nextPatch = { ...nextPatch, patchData: null };
       } else {
         newlySentPatchIds.add(patch.id);
       }
     }
-
-    processSubMasks(patch.subMasks);
-  }
-
-  for (const container of payload.masks ?? []) {
-    processSubMasks(container.subMasks);
-  }
+    const subMasks = processSubMasks(patch.subMasks);
+    return subMasks === undefined ? nextPatch : { ...nextPatch, subMasks };
+  });
+  const masks = parsed.masks?.map((container) => ({ ...container, subMasks: processSubMasks(container.subMasks) }));
+  const payload = { ...parsed, aiPatches, masks };
 
   return { newlySentPatchIds, payload };
 };
