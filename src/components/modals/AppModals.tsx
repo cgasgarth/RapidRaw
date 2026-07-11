@@ -28,7 +28,10 @@ import {
   resetHdrStateForSettingsChange,
   resetPanoramaStateForSettingsChange,
 } from '../../utils/computational-merge/computationalMergeModalState';
-import { markFocusStackOutputReviewApplyReady } from '../../utils/focusStackOutputReview';
+import {
+  buildNativeFocusStackOutputReview,
+  markFocusStackOutputReviewApplyReady,
+} from '../../utils/focusStackOutputReview';
 import { handleNegativeConversionEditorHandoff } from '../../utils/negative-lab/negativeLabEditorHandoff';
 import { superResolutionNativeRegistrationPlanSchema } from '../../utils/superResolutionNativeReadiness';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
@@ -569,7 +572,19 @@ export default function AppModals(props: AppModalsProps) {
                 .then((nativeInputPlan) => {
                   if (focusStackPlanRequestId.current !== requestId) return;
                   setUI((state) => ({
-                    focusStackModalState: { ...state.focusStackModalState, isPlanning: false, nativeInputPlan },
+                    focusStackModalState: {
+                      ...state.focusStackModalState,
+                      isPlanning: false,
+                      nativeInputPlan,
+                      outputReview:
+                        nativeInputPlan.accepted && nativeInputPlan.focusEvidence !== null
+                          ? buildNativeFocusStackOutputReview(
+                              nativeInputPlan,
+                              state.focusStackModalState.settings,
+                              state.focusStackModalState.sourcePaths,
+                            )
+                          : null,
+                    },
                   }));
                 })
                 .catch((error: unknown) => {

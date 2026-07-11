@@ -1,4 +1,5 @@
 import type { ArtifactHandleV1, FocusStackArtifactV1 } from '../../packages/rawengine-schema/src/rawEngineSchemas';
+import type { FocusStackNativeInputPlan } from '../schemas/focus-stack/focusStackNativePlanSchemas';
 import type { FocusStackOutputReviewWorkflow } from '../schemas/focus-stack/focusStackOutputReviewSchemas';
 import { focusStackOutputReviewWorkflowSchema } from '../schemas/focus-stack/focusStackOutputReviewSchemas';
 import type { FocusStackUiSettings } from '../schemas/focus-stack/focusStackUiSchemas';
@@ -119,6 +120,105 @@ export const buildFocusStackOutputReviewWorkflow = ({
     sharpnessCoverageRatio,
     sourceCount,
     sourceRefs: buildSourceRefs(sourceCount, sourcePaths),
+    warningCodes,
+  });
+};
+
+export const buildNativeFocusStackOutputReview = (
+  plan: FocusStackNativeInputPlan,
+  settings: FocusStackUiSettings,
+  sourcePaths: string[],
+): FocusStackOutputReviewWorkflow => {
+  const evidence = plan.focusEvidence;
+  if (!plan.accepted || evidence === null) throw new Error('focus_stack_native_evidence_required');
+  const metrics = evidence.metrics;
+  const warningCodes: FocusStackOutputReviewWorkflow['warningCodes'] = [
+    'human_review_required',
+    ...(metrics.transitionRiskRatio > 0 ? (['transition_halo_risk'] as const) : []),
+    ...(metrics.focusCoverageRatio < 0.9 ? (['focus_coverage_low'] as const) : []),
+    ...(metrics.transitionRiskRatio > 0.05 ? (['parallax_detected'] as const) : []),
+  ];
+  const sourceRefs = plan.sources.map((source) => ({
+    contentHash: source.contentHash,
+    graphRevision: source.graphRevision,
+    path: sourcePaths[source.sourceIndex] ?? source.pathHandle,
+    sourceIndex: source.sourceIndex,
+  }));
+  const contributions = evidence.metrics.sourceContributions;
+  const artifactPath = `focus-map:${evidence.mapArtifact.contentHash}`;
+  const sourceContributionSummary = contributions.map((source) => ({
+    sourceIndex: source.sourceIndex,
+    winnerCellRatio: source.areaRatio,
+  }));
+  const sourceContributionDetails = contributions.map((source) => ({
+    artifactId: `${artifactPath}:source-${source.sourceIndex}`,
+    confidencePercent: Math.round((1 - metrics.lowConfidenceRatio) * 100),
+    contributionRatio: source.areaRatio,
+    coverageCellCount: Math.max(1, source.pixelCount),
+    sourceId: sourceRefs[source.sourceIndex]?.contentHash ?? `source-${source.sourceIndex}`,
+    sourceIndex: source.sourceIndex,
+    warningState: metrics.transitionRiskRatio > 0.05 ? ('artifact_review_required' as const) : ('clear' as const),
+  }));
+  return focusStackOutputReviewWorkflowSchema.parse({
+    alignmentMode: settings.alignmentMode,
+    artifactPath,
+    applyReceipt: {
+      alignment: { mode: settings.alignmentMode, status: 'applied' },
+      artifactHandle: {
+        artifactId: artifactPath,
+        contentHash: evidence.mapArtifact.contentHash,
+        dimensions: { width: evidence.mapArtifact.width, height: evidence.mapArtifact.height },
+        kind: 'preview',
+        storage: 'temp_cache',
+      },
+      artifactPath,
+      outputPreviewDimensions: { width: evidence.mapArtifact.width, height: evidence.mapArtifact.height },
+      receiptId: `${artifactPath}:review`,
+      sharpnessQualitySummary: {
+        lowConfidenceCellRatio: metrics.lowConfidenceRatio,
+        qualityPreference: settings.qualityPreference,
+        sharpnessCoverageRatio: metrics.focusCoverageRatio,
+      },
+      sourceCount: plan.sources.length,
+      status: 'preview_only',
+      warnings: warningCodes,
+    },
+    blendMethod: settings.blendMethod,
+    decision: 'preview_only',
+    editableHandoff: {
+      artifactHash: evidence.mapArtifact.contentHash,
+      artifactId: artifactPath,
+      exportReviewArtifactId: `${artifactPath}:export-review`,
+      status: 'blocked',
+    },
+    haloRiskCellRatio: Math.max(metrics.transitionRiskRatio, metrics.invalidRatio),
+    haloReview: {
+      artifactHash: evidence.mapArtifact.contentHash,
+      artifactId: `${artifactPath}:risk`,
+      reviewStatus: 'review_required',
+      transitionRiskRegions: [
+        {
+          cellCount: Math.round(metrics.transitionRiskRatio * evidence.mapArtifact.width * evidence.mapArtifact.height),
+          regionId: 'native-risk-map',
+          risk: metrics.transitionRiskRatio > 0 ? 'halo_risk' : 'stable',
+          sourceIndex: plan.referenceSourceIndex,
+        },
+      ],
+    },
+    lowConfidenceCellRatio: metrics.lowConfidenceRatio,
+    proofLevel: 'native_measured_runtime',
+    qualityPreference: settings.qualityPreference,
+    retouchLayerPolicy: settings.retouchLayerPolicy,
+    reviewOverlay: {
+      confidenceMarginThreshold: 0.12,
+      mode: settings.reviewOverlayMode,
+      opacityPercent: settings.reviewOverlayOpacityPercent,
+      sourceContributionDetails,
+      sourceContributionSummary,
+    },
+    sharpnessCoverageRatio: metrics.focusCoverageRatio,
+    sourceCount: plan.sources.length,
+    sourceRefs,
     warningCodes,
   });
 };

@@ -76,6 +76,7 @@ export function FocusStackModal({
 }: FocusStackModalProps) {
   const { t } = useTranslation();
   const [registrationView, setRegistrationView] = useState<'reference' | 'overlay' | 'difference'>('overlay');
+  const [evidenceView, setEvidenceView] = useState<'winner' | 'confidence' | 'risk'>('winner');
   const [registrationSourceIndex, setRegistrationSourceIndex] = useState(0);
 
   const sourcePreflight = useMemo(
@@ -96,6 +97,12 @@ export function FocusStackModal({
       : registrationView === 'difference'
         ? selectedRegistrationPreview?.differenceDataUrl
         : selectedRegistrationPreview?.overlayDataUrl;
+  const evidencePreviewUrl =
+    evidenceView === 'confidence'
+      ? nativeInputPlan?.focusEvidence?.mapArtifact.confidenceOverlayDataUrl
+      : evidenceView === 'risk'
+        ? nativeInputPlan?.focusEvidence?.mapArtifact.riskOverlayDataUrl
+        : nativeInputPlan?.focusEvidence?.mapArtifact.winnerOverlayDataUrl;
 
   const alignmentOptions: Array<OptionItem<FocusStackAlignmentMode>> = [
     { label: t('modals.focusStack.alignmentAuto'), value: 'auto' },
@@ -391,6 +398,54 @@ export function FocusStackModal({
               })()}
             </div>
           )}
+        </section>
+      )}
+
+      {nativeInputPlan?.focusEvidence !== null && nativeInputPlan?.focusEvidence !== undefined && (
+        <section className="border border-border-color bg-bg-primary p-2" data-testid="focus-stack-evidence-preview">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="flex gap-1" role="group" aria-label={t('modals.focusStack.review.overlay')}>
+              {(['winner', 'confidence', 'risk'] as const).map((view) => (
+                <button
+                  aria-pressed={evidenceView === view}
+                  className="h-8 border border-border-color px-2 text-xs capitalize aria-pressed:bg-card-active"
+                  key={view}
+                  onClick={() => setEvidenceView(view)}
+                  type="button"
+                >
+                  {view}
+                </button>
+              ))}
+            </div>
+            <span className="text-xs text-text-secondary">{nativeInputPlan.focusEvidence.mapArtifact.contentHash}</span>
+          </div>
+          <img
+            alt={t('modals.common.sourcePreviewAlt')}
+            className="max-h-72 w-full bg-black object-contain"
+            src={evidencePreviewUrl}
+          />
+          <div className="mt-2 grid grid-cols-2 gap-2 text-xs lg:grid-cols-5">
+            <ComputationalSetupStatusLine
+              label="Coverage"
+              value={`${Math.round(nativeInputPlan.focusEvidence.metrics.focusCoverageRatio * 100)}%`}
+            />
+            <ComputationalSetupStatusLine
+              label="Low confidence"
+              value={`${Math.round(nativeInputPlan.focusEvidence.metrics.lowConfidenceRatio * 100)}%`}
+            />
+            <ComputationalSetupStatusLine
+              label="Invalid"
+              value={`${Math.round(nativeInputPlan.focusEvidence.metrics.invalidRatio * 100)}%`}
+            />
+            <ComputationalSetupStatusLine
+              label="Risk"
+              value={`${Math.round(nativeInputPlan.focusEvidence.metrics.transitionRiskRatio * 100)}%`}
+            />
+            <ComputationalSetupStatusLine
+              label="Fragmentation"
+              value={`${nativeInputPlan.focusEvidence.metrics.labelFragmentation}`}
+            />
+          </div>
         </section>
       )}
 

@@ -1,5 +1,8 @@
 #!/usr/bin/env bun
 
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import { FocusStackAppServerRuntimeToolBusV1 } from '../../../../packages/rawengine-schema/src/focus-stack/focusStackAppServerRuntime.ts';
 import {
   buildFocusStackUiApplyCommandV1,
@@ -9,6 +12,8 @@ import { sampleComputationalMergeAppServerToolManifestV1 } from '../../../../pac
 import { COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES } from '../../../../scripts/lib/computational/proof-budgets.ts';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../../../src/utils/computational-merge/computationalMergeAppServerRoutePairs.ts';
 import { buildFocusStackOutputReviewFromArtifact } from '../../../../src/utils/focusStackOutputReview.ts';
+
+const repoRoot = resolve(import.meta.dir, '../../../..');
 
 const focusRoutePair = getComputationalMergeAppServerRoutePairSummary('focus_stack');
 const WIDTH = 72;
@@ -264,3 +269,20 @@ function assertDeepEqual(actual, expected, label) {
     throw new Error(`${label}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}.`);
   }
 }
+
+const nativeAppSource = readFileSync(resolve(repoRoot, 'src/components/modals/AppModals.tsx'), 'utf8');
+const nativeModalSource = readFileSync(
+  resolve(repoRoot, 'src/components/modals/computational-merge/FocusStackModal.tsx'),
+  'utf8',
+);
+const nativeReviewSource = readFileSync(resolve(repoRoot, 'src/utils/focusStackOutputReview.ts'), 'utf8');
+if (!nativeAppSource.includes('buildNativeFocusStackOutputReview'))
+  throw new Error('Native plan does not create measured review state.');
+for (const field of ['focusCoverageRatio', 'lowConfidenceRatio', 'invalidRatio', 'transitionRiskRatio']) {
+  if (!nativeReviewSource.includes(`metrics.${field}`)) throw new Error(`Measured review omits ${field}`);
+}
+for (const view of ['winnerOverlayDataUrl', 'confidenceOverlayDataUrl', 'riskOverlayDataUrl']) {
+  if (!nativeModalSource.includes(view)) throw new Error(`Modal cannot inspect ${view}`);
+}
+
+console.log('Measured focus review metrics and numeric-map-derived overlays ok');
