@@ -149,8 +149,12 @@ export function SuperResolutionModal({
   const alignmentOptions: Array<OptionItem<SuperResolutionAlignmentMode>> = [
     { label: t('modals.superResolution.alignmentAuto'), value: 'auto' },
     { label: t('modals.superResolution.alignmentTranslation'), value: 'translation' },
-    { label: t('modals.superResolution.alignmentHomography'), value: 'homography' },
-    { label: t('modals.superResolution.alignmentOpticalFlow'), value: 'optical_flow' },
+    ...(isSingleImageAi
+      ? [
+          { label: t('modals.superResolution.alignmentHomography'), value: 'homography' as const },
+          { label: t('modals.superResolution.alignmentOpticalFlow'), value: 'optical_flow' as const },
+        ]
+      : []),
   ];
 
   const qualityOptions: Array<OptionItem<SuperResolutionQualityPreference>> = [
@@ -631,7 +635,7 @@ export function SuperResolutionModal({
           />
         </div>
         <div className="grid grid-cols-4 gap-2">
-          {scaleOptions.map((scale) => (
+          {(isSingleImageAi ? scaleOptions : ([2] as const)).map((scale) => (
             <button
               key={scale}
               className={`h-11 rounded-md border text-sm font-semibold transition-colors ${
@@ -803,6 +807,7 @@ export function SuperResolutionModal({
                   : 'border-border-color bg-bg-primary hover:bg-card-active'
               }`}
               data-sr-reconstruction-mode={mode}
+              disabled={!isSingleImageAi}
               onClick={() => {
                 setReconstructionMode(mode);
               }}
@@ -812,7 +817,7 @@ export function SuperResolutionModal({
                 {t(`modals.superResolution.reconstructionMode.${mode}.label`)}
               </UiText>
               <UiText as="span" variant={TextVariants.small} color={TextColors.secondary} className="block mt-1">
-                {status}
+                {isSingleImageAi ? status : 'Unsupported for Burst x2; native CFA fusion is fixed.'}
               </UiText>
             </button>
           ))}
@@ -1106,6 +1111,61 @@ export function SuperResolutionModal({
               src={nativeReconstruction.referenceBaseline.dataUrl}
               width={nativeReconstruction.referenceBaseline.width}
             />
+          </div>
+          <div className="grid gap-3 lg:grid-cols-2" data-testid="sr-native-motion-quality-overlays">
+            <div className="grid gap-1">
+              <UiText variant={TextVariants.label}>Motion, support, and fallback</UiText>
+              <img
+                alt={t('modals.superResolution.review.artifactPreviewAlt', {
+                  artifact: t('modals.superResolution.review.sourceSupport'),
+                })}
+                className="w-full border border-border-color bg-black object-contain"
+                data-region-hash={nativeReconstruction.regionArtifact.contentHash}
+                height={nativeReconstruction.regionArtifact.height}
+                src={nativeReconstruction.regionArtifact.dataUrl}
+                width={nativeReconstruction.regionArtifact.width}
+              />
+              <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                {`${Math.round(nativeReconstruction.fallbackRatio * 100)}% reference fallback`}
+              </UiText>
+            </div>
+            <div className="grid gap-1">
+              <UiText variant={TextVariants.label}>Bounded sharpening strength</UiText>
+              <img
+                alt={t('modals.superResolution.review.artifactPreviewAlt', {
+                  artifact: t('modals.superResolution.review.detailGain'),
+                })}
+                className="w-full border border-border-color bg-black object-contain"
+                data-sharpening-hash={nativeReconstruction.sharpeningArtifact.contentHash}
+                height={nativeReconstruction.sharpeningArtifact.height}
+                src={nativeReconstruction.sharpeningArtifact.dataUrl}
+                width={nativeReconstruction.sharpeningArtifact.width}
+              />
+              <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                {`${nativeReconstruction.quality.metrics.finalMtf50Gain.toFixed(2)}x final detail / ${(nativeReconstruction.quality.metrics.normalizedOvershoot * 100).toFixed(1)}% overshoot`}
+              </UiText>
+            </div>
+          </div>
+          <div
+            className="grid gap-2 border-t border-border-color pt-3 sm:grid-cols-2 lg:grid-cols-4"
+            data-policy-hash={nativeReconstruction.policyHash}
+            data-quality-decision={nativeReconstruction.quality.decision}
+            data-testid="sr-native-quality-gates"
+          >
+            <UiText
+              variant={TextVariants.small}
+            >{`${nativeReconstruction.quality.metrics.unsharpenedMtf50Gain.toFixed(2)}x unsharpened detail`}</UiText>
+            <UiText
+              variant={TextVariants.small}
+            >{`${nativeReconstruction.quality.metrics.downsampleReprojectionMae.toFixed(4)} reprojection MAE`}</UiText>
+            <UiText
+              variant={TextVariants.small}
+            >{`${nativeReconstruction.quality.metrics.meanDeltaE00.toFixed(2)} DeltaE00`}</UiText>
+            <UiText variant={TextVariants.small}>
+              {nativeReconstruction.quality.blockCodes.length === 0
+                ? 'Objective gates passed'
+                : nativeReconstruction.quality.blockCodes.join(', ')}
+            </UiText>
           </div>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             {nativeReconstruction.planeArtifacts.map((plane) => (

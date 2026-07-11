@@ -16,9 +16,14 @@ use super::raw_frame::{
 use super::registration::{SuperResolutionRegistrationResult, solve_global_se2_registration};
 use super::{
     cfa_observations::common_overlap,
+    fallback::compose_reference_fallback,
     fused_color::reconstruct_color,
+    motion::{RegionEvidence, classify_regions},
+    quality::{QualityDecision, evaluate},
     raw_frame::CfaClass,
     reconstruction::{OutputTile, SR_RECONSTRUCTION_ALGORITHM_ID, reconstruct_plane_tile},
+    review::{class_overlay, strength_overlay},
+    sharpen::sharpen_supported,
 };
 
 const SR_COLOR_ALGORITHM_ID: &str = "support_aware_post_fusion_rgb_v1";
@@ -54,12 +59,23 @@ pub struct SuperResolutionReconstructionResult {
     pub color_algorithm_id: &'static str,
     pub decision: &'static str,
     pub fallback_ratio: f32,
+    pub fallback_algorithm_id: &'static str,
+    pub fallback_composited: SuperResolutionNativeArtifact,
+    pub final_preview: SuperResolutionNativeArtifact,
     pub green_phase_gain: SuperResolutionGreenPhaseGain,
     pub height: u32,
     pub plane_artifacts: Vec<SuperResolutionPlaneArtifact>,
+    pub policy_hash: String,
     pub preview: SuperResolutionNativeArtifact,
+    pub quality: QualityDecision,
     pub reference_baseline: SuperResolutionNativeArtifact,
+    pub region_artifact: SuperResolutionNativeArtifact,
+    pub regions: Vec<RegionEvidence>,
+    pub motion_algorithm_id: &'static str,
     pub registration_plan_hash: String,
+    pub sharpening_artifact: SuperResolutionNativeArtifact,
+    pub sharpening_algorithm_id: &'static str,
+    pub unsharpened_preview: SuperResolutionNativeArtifact,
     pub width: u32,
 }
 
@@ -250,9 +266,9 @@ fn build_reconstruction(
         .iter()
         .find(|frame| frame.source.source_index == registration.reference_source_index)
         .ok_or_else(|| "registration_reference_identity_mismatch".to_string())?;
-    let mut rgb = vec![0u8; (tile_width * tile_height * 3) as usize];
-    let mut baseline_rgb = vec![0u8; rgb.len()];
-    let mut fallback_count = 0usize;
+    let pixel_count = (tile_width * tile_height) as usize;
+    let mut fused_linear = vec![[0.0; 3]; pixel_count];
+    let mut baseline_linear = vec![[0.0; 3]; pixel_count];
     for preview_y in 0..tile_height {
         for preview_x in 0..tile_width {
             let source_x = ((preview_x as f32 * scale).floor() as u32).min(tile.width - 1);
@@ -267,12 +283,41 @@ fn build_reconstruction(
                 baseline,
                 reference.source.calibration.white_balance,
             );
-            fallback_count += usize::from(color.fallback);
-            let output_index = ((preview_y * tile_width + preview_x) * 3) as usize;
-            encode_display_rgb(&mut rgb[output_index..output_index + 3], color.rgb);
-            encode_display_rgb(&mut baseline_rgb[output_index..output_index + 3], baseline);
+            fused_linear[sample_index] = if color.fallback { baseline } else { color.rgb };
+            baseline_linear[sample_index] = baseline;
         }
     }
+    check_cancel(cancellation_token)?;
+    let registration_uncertainty = registration.summary.p95_residual_px.max(0.01);
+    let analysis = classify_regions(&planes, registration_uncertainty);
+    let (fallback_linear, fallback_ratio) = compose_reference_fallback(
+        &fused_linear,
+        &baseline_linear,
+        &analysis.classes,
+        tile_width,
+        tile_height,
+    );
+    check_cancel(cancellation_token)?;
+    let (final_linear, strengths) = sharpen_supported(
+        &fallback_linear,
+        &analysis.classes,
+        &analysis.confidence,
+        tile_width,
+        tile_height,
+    );
+    let quality = evaluate(
+        &baseline_linear,
+        &fallback_linear,
+        &final_linear,
+        &analysis.classes,
+        tile_width,
+    );
+    let rgb = encode_linear_image(&final_linear);
+    let unsharpened_rgb = encode_linear_image(&fused_linear);
+    let fallback_rgb = encode_linear_image(&fallback_linear);
+    let baseline_rgb = encode_linear_image(&baseline_linear);
+    let region_pixels = class_overlay(&analysis.classes);
+    let sharpening_pixels = strength_overlay(&strengths);
     let mut plane_artifacts = Vec::with_capacity(4);
     for (plane_index, (_, label)) in classes.into_iter().enumerate() {
         debug_assert_eq!(planes[plane_index].width, tile.width);
@@ -331,19 +376,50 @@ fn build_reconstruction(
         algorithm_id: SR_RECONSTRUCTION_ALGORITHM_ID,
         capability: "native_burst_cfa_preview",
         color_algorithm_id: SR_COLOR_ALGORITHM_ID,
-        decision: "quality_gate_pending",
-        fallback_ratio: fallback_count as f32 / (tile_width * tile_height) as f32,
+        decision: quality.decision,
+        fallback_ratio,
+        fallback_algorithm_id: super::fallback::SR_FALLBACK_ALGORITHM_ID,
+        fallback_composited: encode_png_artifact(
+            &fallback_rgb,
+            tile_width,
+            tile_height,
+            ColorType::Rgb8,
+        )?,
+        final_preview: encode_png_artifact(&rgb, tile_width, tile_height, ColorType::Rgb8)?,
         green_phase_gain,
         height: full_height,
         plane_artifacts,
+        policy_hash: quality.policy_hash.clone(),
         preview: encode_png_artifact(&rgb, tile_width, tile_height, ColorType::Rgb8)?,
+        quality,
         reference_baseline: encode_png_artifact(
             &baseline_rgb,
             tile_width,
             tile_height,
             ColorType::Rgb8,
         )?,
+        region_artifact: encode_png_artifact(
+            &region_pixels,
+            tile_width,
+            tile_height,
+            ColorType::L8,
+        )?,
+        regions: analysis.regions,
+        motion_algorithm_id: super::motion::SR_MOTION_ALGORITHM_ID,
         registration_plan_hash: plan_hash.to_string(),
+        sharpening_artifact: encode_png_artifact(
+            &sharpening_pixels,
+            tile_width,
+            tile_height,
+            ColorType::L8,
+        )?,
+        sharpening_algorithm_id: super::sharpen::SR_SHARPEN_ALGORITHM_ID,
+        unsharpened_preview: encode_png_artifact(
+            &unsharpened_rgb,
+            tile_width,
+            tile_height,
+            ColorType::Rgb8,
+        )?,
         width: full_width,
     })
 }
@@ -452,6 +528,14 @@ fn encode_display_rgb(output: &mut [u8], rgb: [f32; 3]) {
     for (target, value) in output.iter_mut().zip(rgb) {
         *target = (value.max(0.0).powf(1.0 / 2.2).min(1.0) * 255.0).round() as u8;
     }
+}
+
+fn encode_linear_image(pixels: &[[f32; 3]]) -> Vec<u8> {
+    let mut output = vec![0; pixels.len() * 3];
+    for (index, pixel) in pixels.iter().enumerate() {
+        encode_display_rgb(&mut output[index * 3..index * 3 + 3], *pixel);
+    }
+    output
 }
 
 fn encode_png_artifact(

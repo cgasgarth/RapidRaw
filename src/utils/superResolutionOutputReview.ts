@@ -225,7 +225,13 @@ export const buildSuperResolutionOutputReviewWorkflow = ({
   sourcePaths = [],
   nativeReadiness = null,
 }: BuildSuperResolutionOutputReviewOptions): SuperResolutionOutputReviewWorkflow => {
-  const decision = settings.detailPolicy === 'aggressive_preview_only' ? 'preview_only' : 'human_review_required';
+  const nativeDecision = nativeReadiness?.reconstruction?.decision;
+  const decision =
+    nativeDecision === 'blocked'
+      ? 'blocked'
+      : nativeDecision === 'preview_only' || settings.detailPolicy === 'aggressive_preview_only'
+        ? 'preview_only'
+        : 'human_review_required';
   const warningCodes: SuperResolutionOutputReviewWorkflow['warningCodes'] =
     settings.detailPolicy === 'aggressive_preview_only'
       ? ['human_review_required', 'synthetic_runtime_only', 'texture_risk', 'aggressive_preview_only']
@@ -253,23 +259,37 @@ export const buildSuperResolutionOutputReviewWorkflow = ({
       overlapCoverageRatio: nativeCoverage,
       reviewCropCount,
     },
-    downscaleReconstructionError: null,
+    downscaleReconstructionError: nativeReconstruction?.quality.metrics.downsampleReprojectionMae ?? null,
     decision,
     detailPolicy: settings.detailPolicy,
-    detailGainRatio: null,
+    detailGainRatio: nativeReconstruction?.quality.metrics.finalMtf50Gain ?? null,
     detailReview: buildDetailReview({
       baselineArtifactId: 'artifacts/validation/sr-synthetic-output-artifact/sr-x2-baseline-crop-center.pgm',
-      detailGainRatio: null,
-      falseDetailRisk: settings.detailPolicy === 'aggressive_preview_only' ? 'high' : 'unknown',
+      detailGainRatio: nativeReconstruction?.quality.metrics.finalMtf50Gain ?? null,
+      falseDetailRisk:
+        nativeReconstruction === null
+          ? settings.detailPolicy === 'aggressive_preview_only'
+            ? 'high'
+            : 'unknown'
+          : nativeReconstruction.quality.blockCodes.includes('false_detail_consistency_failed')
+            ? 'high'
+            : 'low',
       outputArtifactId: artifactPath,
     }),
     editableGate: 'blocked_review_required',
-    falseDetailRisk: settings.detailPolicy === 'aggressive_preview_only' ? 'high' : 'unknown',
-    falseDetailRiskScore: null,
+    falseDetailRisk:
+      nativeReconstruction === null
+        ? settings.detailPolicy === 'aggressive_preview_only'
+          ? 'high'
+          : 'unknown'
+        : nativeReconstruction.quality.blockCodes.includes('false_detail_consistency_failed')
+          ? 'high'
+          : 'low',
+    falseDetailRiskScore: nativeReconstruction?.quality.metrics.falseFrequencyResponse ?? null,
     humanReviewStatus: 'pending',
     mode: getSuperResolutionModeForDetailPolicy(settings.detailPolicy),
     modePolicyVersion: 1,
-    outputArtifactHash: nativeReconstruction?.preview.contentHash ?? 'unmeasured:super_resolution_preview',
+    outputArtifactHash: nativeReconstruction?.finalPreview.contentHash ?? 'unmeasured:super_resolution_preview',
     outputArtifactId: nativeReconstruction === null ? artifactPath : 'native:super-resolution:cfa-x2-preview',
     outputHeight: nativeReconstruction?.height ?? 1,
     outputScale: settings.outputScale,

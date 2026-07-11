@@ -53,13 +53,27 @@ const superResolutionNativeArtifactSchema = z
   })
   .strict();
 
+const superResolutionNativeRegionClassSchema = z.enum([
+  'supported_static',
+  'weak_support',
+  'motion_rejected',
+  'occlusion_or_parallax',
+  'edge_risk',
+  'noise_limited',
+  'clipped_or_defective',
+  'reference_fallback',
+]);
+
 const superResolutionNativeReconstructionSchema = z
   .object({
     algorithmId: z.literal('positive_adaptive_cfa_kernel_huber2_v1'),
     capability: z.literal('native_burst_cfa_preview'),
     colorAlgorithmId: z.literal('support_aware_post_fusion_rgb_v1'),
-    decision: z.literal('quality_gate_pending'),
+    decision: z.enum(['review_required', 'preview_only', 'blocked']),
+    fallbackAlgorithmId: z.literal('reference_baseline_hard_core_taper_v1'),
+    fallbackComposited: superResolutionNativeArtifactSchema,
     fallbackRatio: z.number().min(0).max(1),
+    finalPreview: superResolutionNativeArtifactSchema,
     greenPhaseGain: z
       .object({
         accepted: z.boolean(),
@@ -85,9 +99,57 @@ const superResolutionNativeReconstructionSchema = z
           .strict(),
       )
       .length(4),
+    policyHash: blake3HashSchema,
     preview: superResolutionNativeArtifactSchema,
+    quality: z
+      .object({
+        blockCodes: z.array(z.string()),
+        decision: z.enum(['review_required', 'preview_only', 'blocked']),
+        metrics: z
+          .object({
+            downsampleReprojectionMae: z.number().nonnegative(),
+            fallbackCoverage: z.number().min(0).max(1),
+            falseFrequencyResponse: z.number().nonnegative(),
+            finalMtf50Gain: z.number().nonnegative(),
+            lumaVarianceRatio: z.number().nonnegative(),
+            meanDeltaE00: z.number().nonnegative(),
+            normalizedOvershoot: z.number().nonnegative(),
+            staticCoverage: z.number().min(0).max(1),
+            unsharpenedMtf50Gain: z.number().nonnegative(),
+            zipperFalseColorDelta: z.number().nonnegative(),
+          })
+          .strict(),
+        policyHash: blake3HashSchema,
+      })
+      .strict(),
     referenceBaseline: superResolutionNativeArtifactSchema,
+    regionArtifact: superResolutionNativeArtifactSchema,
+    regions: z.array(
+      z
+        .object({
+          bounds: z.tuple([
+            z.number().int().nonnegative(),
+            z.number().int().nonnegative(),
+            z.number().int().positive(),
+            z.number().int().positive(),
+          ]),
+          class: superResolutionNativeRegionClassSchema,
+          contributingSourceMask: z.number().int().min(0).max(255),
+          maskHash: blake3HashSchema,
+          normalizedResidualMad: z.number().nonnegative(),
+          normalizedResidualMedian: z.number().nonnegative(),
+          perPlaneSupport: z.tuple([z.number(), z.number(), z.number(), z.number()]),
+          reasonCodes: z.array(z.string()).min(1),
+          registrationUncertainty: z.number().nonnegative(),
+          selectedAction: z.enum(['retain_fused_detail', 'reference_fallback']),
+        })
+        .strict(),
+    ),
     registrationPlanHash: blake3HashSchema,
+    motionAlgorithmId: z.literal('cfa_block_residual_motion_v1'),
+    sharpeningAlgorithmId: z.literal('support_noise_unsharp_3x3_v1'),
+    sharpeningArtifact: superResolutionNativeArtifactSchema,
+    unsharpenedPreview: superResolutionNativeArtifactSchema,
     width: z.number().int().positive(),
   })
   .strict();
