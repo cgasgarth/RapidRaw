@@ -5,6 +5,7 @@ export enum Invokes {
   ApplyAutoAdjustmentsToPaths = 'apply_auto_adjustments_to_paths',
   ApplyDenoising = 'apply_denoising',
   ApplySingleImageX2 = 'apply_single_image_x2',
+  ApplyBurstSrCandidate = 'apply_burst_sr_candidate',
   AutodetectLens = 'autodetect_lens',
   BatchDenoiseImages = 'batch_denoise_images',
   CalculateAutoAdjustments = 'calculate_auto_adjustments',
