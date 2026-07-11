@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { brushMaskV1Schema } from './brushMaskV1.js';
 import { layerScopedAdjustmentStateV1Schema, layerScopedToneAdjustmentV1Schema } from './layerScopedToneSchemas.js';
 import {
   type LayerMaskCommandEnvelopeV1,
@@ -15,6 +16,23 @@ import {
   RAW_ENGINE_SCHEMA_VERSION,
 } from './rawEngineSchemas.js';
 
+const unsupportedLegacySubMaskSchema = z
+  .looseObject({
+    id: z.string().trim().min(1),
+    invert: z.boolean().optional(),
+    mode: z.string().trim().min(1).optional(),
+    name: z.string().trim().min(1).optional(),
+    opacity: z.number().min(0).max(100).optional(),
+    parameters: z.record(z.string(), z.unknown()).optional(),
+    type: z.string().trim().min(1).optional(),
+    visible: z.boolean().optional(),
+  })
+  .superRefine((subMask, context) => {
+    if (!subMask.name && !subMask.type && subMask.parameters === undefined) {
+      context.addIssue({ code: 'custom', message: 'Legacy sub-mask metadata is empty.' });
+    }
+  });
+
 export const layerStackSidecarLayerV1Schema = z
   .object({
     adjustmentPreset: z.literal('empty_adjustment_layer_v1'),
@@ -26,29 +44,7 @@ export const layerStackSidecarLayerV1Schema = z
     opacity: z.number().min(0).max(1),
     retouchCloneSource: layerMaskCloneSourceV1Schema.optional(),
     retouchRemoveSource: layerMaskRemoveSourceV1Schema.optional(),
-    subMasks: z
-      .array(
-        z
-          .looseObject({
-            id: z.string().trim().min(1),
-            invert: z.boolean().optional(),
-            mode: z.string().trim().min(1).optional(),
-            name: z.string().trim().min(1).optional(),
-            opacity: z.number().min(0).max(100).optional(),
-            parameters: z.record(z.string(), z.unknown()).optional(),
-            type: z.string().trim().min(1).optional(),
-            visible: z.boolean().optional(),
-          })
-          .superRefine((subMask, context) => {
-            if (!subMask.name && !subMask.type && subMask.parameters === undefined) {
-              context.addIssue({
-                code: 'custom',
-                message: 'Layer stack sidecar sub-mask metadata must include name, type, or parameters.',
-              });
-            }
-          }),
-      )
-      .optional(),
+    subMasks: z.array(z.union([brushMaskV1Schema, unsupportedLegacySubMaskSchema])).optional(),
     visible: z.boolean(),
   })
   .strict()
@@ -319,7 +315,13 @@ const applyCommandToLayers = (
         const nextMaskIds = command.parameters.replaceExisting
           ? [command.parameters.maskId]
           : [...layer.maskIds.filter((maskId) => maskId !== command.parameters.maskId), command.parameters.maskId];
-        return { ...layer, maskIds: nextMaskIds };
+        const nextSubMasks = command.parameters.replaceExisting
+          ? [command.parameters.brushMask]
+          : [
+              ...(layer.subMasks ?? []).filter((mask) => mask.id !== command.parameters.maskId),
+              command.parameters.brushMask,
+            ];
+        return { ...layer, maskIds: nextMaskIds, subMasks: nextSubMasks };
       });
     case 'layerMask.deleteLayer':
       layerIndex(layers, command.parameters.layerId);

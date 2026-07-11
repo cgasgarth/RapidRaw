@@ -502,6 +502,31 @@ struct BrushMaskParameters {
     lines: Vec<BrushLine>,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct NativeBrushParameters {
+    strokes: Vec<NativeBrushStroke>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NativeBrushStroke {
+    flow: f32,
+    hardness: f32,
+    id: String,
+    points: Vec<NativeBrushPoint>,
+    radius: f32,
+}
+
+#[derive(Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NativeBrushPoint {
+    #[serde(default)]
+    pressure: Option<f32>,
+    x: f32,
+    y: f32,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 struct FlowLine {
@@ -1054,6 +1079,63 @@ fn generate_brush_bitmap(
     }
 
     final_mask
+}
+
+fn generate_native_brush_bitmap(params_value: &Value, width: u32, height: u32) -> GrayImage {
+    let Ok(params) = serde_json::from_value::<NativeBrushParameters>(params_value.clone()) else {
+        return GrayImage::new(width, height);
+    };
+    let mut alpha = vec![0.0_f32; width as usize * height as usize];
+    let max_dimension = width.max(height).max(1) as f32;
+    for stroke in params.strokes {
+        let _ = &stroke.id;
+        let points = if stroke.points.len() == 1 {
+            vec![stroke.points[0].clone(), stroke.points[0].clone()]
+        } else {
+            stroke.points
+        };
+        let radius = stroke.radius * max_dimension;
+        let inner = radius * stroke.hardness;
+        for y in 0..height {
+            for x in 0..width {
+                let mut coverage = 0.0_f32;
+                for pair in points.windows(2) {
+                    let start = &pair[0];
+                    let end = &pair[1];
+                    let sx = start.x * width as f32;
+                    let sy = start.y * height as f32;
+                    let dx = end.x * width as f32 - sx;
+                    let dy = end.y * height as f32 - sy;
+                    let length2 = dx * dx + dy * dy;
+                    let t = if length2 > f32::EPSILON {
+                        (((x as f32 + 0.5 - sx) * dx + (y as f32 + 0.5 - sy) * dy) / length2)
+                            .clamp(0.0, 1.0)
+                    } else {
+                        0.0
+                    };
+                    let distance = ((x as f32 + 0.5 - (sx + dx * t)).powi(2)
+                        + (y as f32 + 0.5 - (sy + dy * t)).powi(2))
+                    .sqrt();
+                    if distance <= radius {
+                        let edge = (radius - inner).max(f32::EPSILON);
+                        let falloff = if distance <= inner {
+                            1.0
+                        } else {
+                            1.0 - (distance - inner) / edge
+                        };
+                        let pressure = start.pressure.unwrap_or(1.0)
+                            + (end.pressure.unwrap_or(1.0) - start.pressure.unwrap_or(1.0)) * t;
+                        coverage = coverage.max(falloff * stroke.flow * pressure);
+                    }
+                }
+                let index = y as usize * width as usize + x as usize;
+                alpha[index] = 1.0 - (1.0 - alpha[index]) * (1.0 - coverage.clamp(0.0, 1.0));
+            }
+        }
+    }
+    GrayImage::from_fn(width, height, |x, y| {
+        Luma([(alpha[y as usize * width as usize + x as usize] * 255.0).round() as u8])
+    })
 }
 
 fn generate_flow_bitmap(
@@ -1891,6 +1973,11 @@ fn generate_sub_mask_bitmap(
             scale,
             crop_offset,
         )),
+        "brush_v1" => Some(generate_native_brush_bitmap(
+            &sub_mask.parameters,
+            width,
+            height,
+        )),
         "flow" => Some(generate_flow_bitmap(
             &sub_mask.parameters,
             width,
@@ -2418,5 +2505,55 @@ mod tests {
 
         let empty = GrayImage::new(0, 0);
         assert_eq!(grayscale_dilate(&empty, 1).dimensions(), (0, 0));
+    }
+
+    #[test]
+    fn mask_raster_brush_v1_is_deterministic_and_preserves_feather_flow_and_opacity() {
+        let definition = MaskDefinition {
+            id: "layer".into(),
+            name: "Exposure".into(),
+            visible: true,
+            invert: false,
+            blend_mode: "normal".into(),
+            opacity: 100.0,
+            adjustments: serde_json::json!({"exposure": 1.0}),
+            sub_masks: vec![SubMask {
+                id: "brush".into(),
+                mask_type: "brush_v1".into(),
+                visible: true,
+                invert: false,
+                opacity: 50.0,
+                mode: SubMaskMode::Additive,
+                parameters: serde_json::json!({"strokes": [{
+                    "id": "stroke", "flow": 0.8, "hardness": 0.5, "radius": 0.2,
+                    "points": [{"x": 0.25, "y": 0.5, "pressure": 0.5}, {"x": 0.75, "y": 0.5, "pressure": 1.0}]
+                }]}),
+            }],
+        };
+
+        let first = generate_mask_bitmap(&definition, 20, 10, 1.0, (0.0, 0.0), None).unwrap();
+        let second = generate_mask_bitmap(&definition, 20, 10, 0.25, (99.0, 77.0), None).unwrap();
+        assert_eq!(
+            first.as_raw(),
+            second.as_raw(),
+            "normalized active-image coordinates must be scale/crop invariant"
+        );
+        assert_eq!(
+            first.get_pixel(0, 0)[0],
+            0,
+            "outside pixels remain unchanged"
+        );
+        assert!(
+            (45..=60).contains(&first.get_pixel(5, 5)[0]),
+            "pressure, flow, and mask opacity multiply coverage"
+        );
+        assert!(
+            (95..=105).contains(&first.get_pixel(14, 5)[0]),
+            "full-pressure core preserves flow and opacity"
+        );
+        assert!(
+            (1..100).contains(&first.get_pixel(14, 7)[0]),
+            "hardness produces a feathered edge"
+        );
     }
 }

@@ -2,6 +2,8 @@ import { z } from 'zod';
 import {
   ActorKind,
   ApprovalClass,
+  type BrushMaskV1,
+  brushMaskV1Schema,
   dispatchLayerStackCommand,
   type LayerBlendResolvedRemoveSource,
   type LayerMaskCommandEnvelopeV1,
@@ -10,9 +12,11 @@ import {
   type LayerStackSidecarLayerV1,
   type LayerStackSidecarV1,
   layerMaskCommandEnvelopeV1Schema,
+  layerStackSidecarLayerV1Schema,
   layerStackSidecarV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
 } from '../../../packages/rawengine-schema/src';
+import { Mask, SubMaskMode } from '../../components/panel/right/layers/Masks';
 import {
   DEFAULT_LAYER_BLEND_MODE,
   INITIAL_MASK_ADJUSTMENTS,
@@ -116,12 +120,66 @@ const clampOpacityFraction = (opacity: number): number => {
   return Math.max(0, Math.min(1, opacity / 100));
 };
 
-const toSidecarSubMask = (subMask: MaskContainer['subMasks'][number]) => ({
-  ...structuredClone(subMask),
-});
+function toBrushMaskV1(subMask: MaskContainer['subMasks'][number]): BrushMaskV1 {
+  if (subMask.type !== 'brush' && subMask.type !== 'flow') {
+    throw new Error(`Unsupported authoritative mask type ${subMask.type}.`);
+  }
+  if (subMask.invert || subMask.mode !== 'additive' || !subMask.visible) {
+    throw new Error('Authoritative brush masks currently require visible additive, non-inverted state.');
+  }
+  const parameters = subMask.parameters as {
+    flow?: number;
+    lines?: Array<{
+      brushSize?: number;
+      feather?: number;
+      flow?: number;
+      points?: Array<{ pressure?: number; x: number; y: number }>;
+      size?: number;
+      tool?: string;
+    }>;
+    rawEngine?: { height?: number; width?: number };
+  };
+  const width = parameters.rawEngine?.width;
+  const height = parameters.rawEngine?.height;
+  if (!Number.isFinite(width) || !Number.isFinite(height) || !width || !height) {
+    throw new Error('Authoritative brush mask capture requires active-image dimensions.');
+  }
+  const maximumDimension = Math.max(width, height);
+  const strokes = (parameters.lines ?? []).map((line, index) => {
+    if (line.tool === 'eraser') throw new Error('Authoritative brush masks do not support erase strokes yet.');
+    const size = line.brushSize ?? line.size;
+    if (!Number.isFinite(size) || !size) throw new Error('Authoritative brush stroke size is invalid.');
+    const feather = line.feather ?? 0;
+    const hardness = line.brushSize === undefined ? 1 - feather / 100 : 1 - feather;
+    const flow = (line.flow ?? parameters.flow ?? 100) / 100;
+    return {
+      flow,
+      hardness,
+      id: `${subMask.id}_stroke_${index + 1}`,
+      points: (line.points ?? []).map((point) => ({
+        ...(point.pressure === undefined ? {} : { pressure: point.pressure }),
+        x: point.x / width,
+        y: point.y / height,
+      })),
+      radius: size / 2 / maximumDimension,
+    };
+  });
+  return {
+    coordinateSpace: 'oriented_active_image_normalized_v1',
+    id: subMask.id,
+    mode: 'add',
+    opacity: subMask.opacity / 100,
+    radiusUnit: 'normalized_max_dimension',
+    strokes,
+    type: 'brush_v1',
+  };
+}
+
+const toPersistedSubMask = (subMask: MaskContainer['subMasks'][number]) =>
+  subMask.type === Mask.Brush || subMask.type === Mask.Flow ? toBrushMaskV1(subMask) : structuredClone(subMask);
 
 const toSidecarLayer = (layer: MaskContainer): LayerStackSidecarLayerV1 => {
-  const sidecarLayer: LayerStackSidecarLayerV1 = {
+  const sidecarLayer = {
     adjustmentPreset: 'empty_adjustment_layer_v1',
     adjustments: {
       toneColor: toLayerScopedToneAdjustment(layer.adjustments),
@@ -131,16 +189,12 @@ const toSidecarLayer = (layer: MaskContainer): LayerStackSidecarLayerV1 => {
     maskIds: layer.subMasks.map((subMask) => subMask.id),
     name: layer.name,
     opacity: clampOpacityFraction(layer.opacity),
-    subMasks: layer.subMasks.map(toSidecarSubMask),
+    retouchCloneSource: layer.retouchCloneSource,
+    retouchRemoveSource: layer.retouchRemoveSource,
+    subMasks: layer.subMasks.map(toPersistedSubMask),
     visible: layer.visible,
   };
-  if (layer.retouchCloneSource !== undefined) {
-    sidecarLayer.retouchCloneSource = layer.retouchCloneSource;
-  }
-  if (layer.retouchRemoveSource !== undefined) {
-    sidecarLayer.retouchRemoveSource = layer.retouchRemoveSource;
-  }
-  return sidecarLayer;
+  return layerStackSidecarLayerV1Schema.parse(sidecarLayer);
 };
 
 export function buildLayerStackSidecarFromMasks(
@@ -376,6 +430,7 @@ function buildLayerStackCommand(
         ...base,
         commandType: 'layerMask.attachMask',
         parameters: {
+          brushMask: toBrushMaskV1(operation.subMask),
           layerId: operation.layerId,
           maskId: operation.subMask.id,
           replaceExisting: operation.replaceExisting,
@@ -447,7 +502,36 @@ function materializeMasksFromSidecar(
           ? [operation.subMask]
           : [...previous.subMasks.filter((subMask) => subMask.id !== operation.subMask.id), operation.subMask]
         : previous.subMasks;
-    const serializedSubMasks = (layer.subMasks ?? []) as Array<MaskContainer['subMasks'][number]>;
+    const serializedSubMasks: Array<MaskContainer['subMasks'][number]> = (layer.subMasks ?? []).flatMap((candidate) => {
+      const parsed = brushMaskV1Schema.safeParse(candidate);
+      if (!parsed.success) return [];
+      const mask = parsed.data;
+      return [
+        {
+          id: mask.id,
+          invert: false,
+          mode: SubMaskMode.Additive,
+          name: 'Brush',
+          opacity: mask.opacity * 100,
+          parameters: {
+            lines: mask.strokes.map((stroke) => ({
+              feather: (1 - stroke.hardness) * 100,
+              points: stroke.points,
+              size: stroke.radius * 2,
+              tool: 'brush' as const,
+            })),
+            rawEngine: {
+              contentHash: `native:${mask.id}`,
+              coordinateSpace: mask.coordinateSpace,
+              height: 1,
+              width: 1,
+            },
+          },
+          type: Mask.Brush,
+          visible: true,
+        },
+      ];
+    });
     const availableSubMasks = [
       ...serializedSubMasks,
       ...operationSubMasks.filter(
