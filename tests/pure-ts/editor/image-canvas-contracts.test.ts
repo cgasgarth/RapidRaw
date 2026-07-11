@@ -2,6 +2,9 @@ import { describe, expect, test } from 'bun:test';
 import {
   imageCanvasLayer,
   imageCanvasLayerZIndex,
+  resolveCropPreviewVisibility,
+  resolveDisplayedMaskUrl,
+  resolveEffectiveBrushTool,
   resolveImageCanvasPointerOwner,
   resolveViewerChromeRegionContract,
 } from '../../../src/components/panel/editor/imageCanvasContracts';
@@ -53,5 +56,47 @@ describe('ImageCanvas layer and pointer contracts', () => {
         pointerButton: 1,
       }),
     ).toBe('pan-zoom');
+  });
+
+  test('derives Alt inversion from the latest canonical brush tool', () => {
+    expect(resolveEffectiveBrushTool('brush', false)).toBe('brush');
+    expect(resolveEffectiveBrushTool('brush', true)).toBe('eraser');
+    expect(resolveEffectiveBrushTool('eraser', true)).toBe('brush');
+    expect(resolveEffectiveBrushTool('eraser', false)).toBe('eraser');
+  });
+
+  test('shows crop only after the current source loads and hides stale/error sources', () => {
+    expect(
+      resolveCropPreviewVisibility({ cropPreviewUrl: 'blob:current', isCropping: true, loadedCropPreviewUrl: null }),
+    ).toBe(false);
+    expect(
+      resolveCropPreviewVisibility({
+        cropPreviewUrl: 'blob:current',
+        isCropping: true,
+        loadedCropPreviewUrl: 'blob:previous',
+      }),
+    ).toBe(false);
+    expect(
+      resolveCropPreviewVisibility({
+        cropPreviewUrl: 'blob:current',
+        isCropping: true,
+        loadedCropPreviewUrl: 'blob:current',
+      }),
+    ).toBe(true);
+    expect(
+      resolveCropPreviewVisibility({
+        cropPreviewUrl: 'blob:current',
+        isCropping: false,
+        loadedCropPreviewUrl: 'blob:current',
+      }),
+    ).toBe(false);
+  });
+
+  test('derives mask visibility from the active editing panel without retaining a stale overlay', () => {
+    expect(resolveDisplayedMaskUrl({ isAiEditing: false, isMasking: true, maskOverlayUrl: 'blob:mask' })).toBe(
+      'blob:mask',
+    );
+    expect(resolveDisplayedMaskUrl({ isAiEditing: true, isMasking: false, maskOverlayUrl: 'blob:ai' })).toBe('blob:ai');
+    expect(resolveDisplayedMaskUrl({ isAiEditing: false, isMasking: false, maskOverlayUrl: 'blob:stale' })).toBeNull();
   });
 });

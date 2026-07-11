@@ -44,6 +44,31 @@ export const viewerSampleResultSchema = z.discriminatedUnion('status', [
 
 export type ViewerSampleResult = z.infer<typeof viewerSampleResultSchema>;
 
+export interface ViewerSamplerIdentityInput {
+  backend: 'cpu' | 'cpu-fallback' | 'wgpu';
+  compareDividerPosition: number;
+  compareMode: 'off' | 'hold-original' | 'split-wipe' | 'side-by-side';
+  compareOrientation: 'horizontal' | 'vertical';
+  geometryEpoch: number;
+  graphRevision: string;
+  imageIdentity: string;
+  proofRecipeId: string | null;
+  softProofEnabled: boolean;
+}
+
+export const buildViewerSamplerIdentity = (input: ViewerSamplerIdentityInput): string =>
+  JSON.stringify([
+    input.imageIdentity,
+    input.graphRevision,
+    input.geometryEpoch,
+    input.compareMode,
+    Number(input.compareDividerPosition.toFixed(6)),
+    input.compareOrientation,
+    input.softProofEnabled,
+    input.proofRecipeId,
+    input.backend,
+  ]);
+
 const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
 
 export const buildViewerSampleRequestIdentity = (request: Omit<ViewerSampleRequest, 'requestIdentity'>): string =>
