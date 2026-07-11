@@ -3177,6 +3177,7 @@ pub fn run() {
             Ok(())
         })
         .manage(AppState::new())
+        .manage(library::changefeed::LibraryFilesystemChangefeed::default())
         .invoke_handler(tauri::generate_handler![
             apply_adjustments,
             generate_export_soft_proof_preview,
@@ -3208,6 +3209,9 @@ pub fn run() {
             get_image_dimensions,
             is_original_file_available,
             frontend_ready,
+            library::changefeed::configure_library_changefeed,
+            library::changefeed::get_library_changefeed_report,
+            library::file_management::get_library_change_rows,
             cancel_thumbnail_generation,
             update_wgpu_transform,
             flush_wgpu_presentation,
