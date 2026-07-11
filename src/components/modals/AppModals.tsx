@@ -40,9 +40,15 @@ import {
   resetHdrStateForSettingsChange,
   resetPanoramaStateForSettingsChange,
 } from '../../utils/computational-merge/computationalMergeModalState';
+import {
+  buildFocusStackDerivedOutputReceipt,
+  buildSuperResolutionDerivedOutputReceipt,
+} from '../../utils/derivedOutputReceipt';
+import { registerCurrentDerivedOutputReceipt } from '../../utils/derivedOutputReceiptRegistration';
 import { buildNativeFocusStackOutputReview } from '../../utils/focusStackOutputReview';
 import { handleNegativeConversionEditorHandoff } from '../../utils/negative-lab/negativeLabEditorHandoff';
 import { superResolutionNativeRegistrationPlanSchema } from '../../utils/superResolutionNativeReadiness';
+import { buildSuperResolutionOutputReviewWorkflow } from '../../utils/superResolutionOutputReview';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import type { AlbumItem, AppSettings } from '../ui/AppProperties';
 import CollageModal from './editing/CollageModal';
@@ -192,6 +198,7 @@ export default function AppModals(props: AppModalsProps) {
   const hasLoadedFocusStackModal = useLazyModalSlot('focusStack');
   const hasLoadedNegativeLabModal = useLazyModalSlot('negativeLab');
   const focusStackPlanRequestId = useRef(0);
+  const superResolutionPlanRequestId = useRef(0);
 
   const closeConfirmModal = () => {
     setUI((state) => ({ confirmModalState: { ...state.confirmModalState, isOpen: false } }));
@@ -345,6 +352,7 @@ export default function AppModals(props: AppModalsProps) {
                   : null
             }
             onClose={() => {
+              superResolutionPlanRequestId.current += 1;
               if (
                 superResolutionModalState.candidateJobId !== null &&
                 superResolutionModalState.candidateJobId !== undefined
@@ -465,6 +473,8 @@ export default function AppModals(props: AppModalsProps) {
             }}
             candidateJob={superResolutionModalState.candidateJob ?? null}
             onPreviewPlan={() => {
+              const requestId = superResolutionPlanRequestId.current + 1;
+              superResolutionPlanRequestId.current = requestId;
               void (async () => {
                 if (superResolutionModalState.settings.sourceMode === 'single_image_ai_x2') {
                   if (!selectedImage) throw new Error('Single-image AI x2 requires the current image.');
@@ -480,6 +490,7 @@ export default function AppModals(props: AppModalsProps) {
                       },
                       singleImageX2PreviewSchema,
                     );
+                    if (superResolutionPlanRequestId.current !== requestId) return;
                     setUI((state) => ({
                       superResolutionModalState: {
                         ...state.superResolutionModalState,
@@ -502,6 +513,7 @@ export default function AppModals(props: AppModalsProps) {
                   },
                   superResolutionNativeRegistrationPlanSchema,
                 );
+                if (superResolutionPlanRequestId.current !== requestId) return;
                 const lastDryRunCommand = {
                   commandType: 'computationalMerge.createSuperResolution' as const,
                   dryRun: true as const,
@@ -510,12 +522,31 @@ export default function AppModals(props: AppModalsProps) {
                 };
                 const { lastApplyCommand: _lastApplyCommand, ...nextSuperResolutionModalState } =
                   superResolutionModalState;
+                const outputReview = buildSuperResolutionOutputReviewWorkflow({
+                  artifactPath: superResolutionModalState.sourcePaths[0] ?? '',
+                  settings: superResolutionModalState.settings,
+                  sourceCount: Math.max(2, superResolutionModalState.sourcePaths.length),
+                  sourcePaths: superResolutionModalState.sourcePaths,
+                  nativeReadiness: readiness,
+                });
+                registerCurrentDerivedOutputReceipt({
+                  build: () =>
+                    buildSuperResolutionDerivedOutputReceipt({
+                      review: outputReview,
+                      settings: superResolutionModalState.settings,
+                    }),
+                  isCurrent: () => superResolutionPlanRequestId.current === requestId,
+                  onRegistrationError: (error) =>
+                    console.error('Super-resolution provenance registration failed', error),
+                  upsert: useUIStore.getState().upsertDerivedOutputReceipt,
+                });
+                if (superResolutionPlanRequestId.current !== requestId) return;
                 setUI({
                   superResolutionModalState: {
                     ...nextSuperResolutionModalState,
                     lastDryRunCommand,
                     nativeReadiness: readiness,
-                    outputReview: null,
+                    outputReview,
                     singleImagePreview: null,
                     singleImageApplyReceipt: null,
                   },
@@ -525,6 +556,7 @@ export default function AppModals(props: AppModalsProps) {
               });
             }}
             onSettingsChange={(settings) => {
+              superResolutionPlanRequestId.current += 1;
               setUI((state) => {
                 const {
                   lastApplyCommand: _lastApplyCommand,
@@ -704,19 +736,33 @@ export default function AppModals(props: AppModalsProps) {
               )
                 .then((nativeInputPlan) => {
                   if (focusStackPlanRequestId.current !== requestId) return;
+                  const state = useUIStore.getState().focusStackModalState;
+                  const outputReview =
+                    nativeInputPlan.accepted && nativeInputPlan.focusEvidence !== null
+                      ? buildNativeFocusStackOutputReview(nativeInputPlan, state.settings, state.sourcePaths)
+                      : null;
+                  if (outputReview !== null) {
+                    registerCurrentDerivedOutputReceipt({
+                      build: () =>
+                        buildFocusStackDerivedOutputReceipt({
+                          acceptedDryRunPlanHash: state.lastApplyCommand?.acceptedDryRunPlanHash,
+                          acceptedDryRunPlanId: state.lastApplyCommand?.acceptedDryRunPlanId,
+                          review: outputReview,
+                          settings: state.settings,
+                        }),
+                      isCurrent: () => focusStackPlanRequestId.current === requestId,
+                      onRegistrationError: (error) =>
+                        console.error('Focus-stack provenance registration failed', error),
+                      upsert: useUIStore.getState().upsertDerivedOutputReceipt,
+                    });
+                  }
+                  if (focusStackPlanRequestId.current !== requestId) return;
                   setUI((state) => ({
                     focusStackModalState: {
                       ...state.focusStackModalState,
                       isPlanning: false,
                       nativeInputPlan,
-                      outputReview:
-                        nativeInputPlan.accepted && nativeInputPlan.focusEvidence !== null
-                          ? buildNativeFocusStackOutputReview(
-                              nativeInputPlan,
-                              state.focusStackModalState.settings,
-                              state.focusStackModalState.sourcePaths,
-                            )
-                          : null,
+                      outputReview,
                     },
                   }));
                 })

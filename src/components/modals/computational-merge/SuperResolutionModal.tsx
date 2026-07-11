@@ -25,10 +25,6 @@ import {
 import { type SuperResolutionModalState, useUIStore } from '../../../store/useUIStore';
 import { Invokes } from '../../../tauri/commands';
 import { TextColors, TextVariants } from '../../../types/typography';
-import {
-  buildSuperResolutionDerivedOutputReceipt,
-  deriveDerivedOutputReceiptState,
-} from '../../../utils/derivedOutputReceipt';
 import type { SuperResolutionNativeReadiness } from '../../../utils/superResolutionNativeReadiness';
 import {
   buildSuperResolutionOutputReviewWorkflow,
@@ -241,29 +237,11 @@ export function SuperResolutionModal({
       nativeReadiness: nativeReadiness ?? null,
     });
   const hasRuntimeOutputReview = runtimeOutputReview !== null && runtimeOutputReview !== undefined;
-  const derivedOutputReceipt = buildSuperResolutionDerivedOutputReceipt({
-    acceptedDryRunPlanHash: lastApplyCommand?.acceptedDryRunPlanHash,
-    acceptedDryRunPlanId: lastApplyCommand?.acceptedDryRunPlanId,
-    review: outputReview,
-    settings,
-  });
   const matchingStoredDerivedOutputReceipt = useUIStore((state) =>
     Object.values(state.derivedOutputReceipts).find(
-      (receipt) =>
-        receipt.family === derivedOutputReceipt.family &&
-        receipt.outputArtifactId === derivedOutputReceipt.outputArtifactId,
+      (receipt) => receipt.family === 'super_resolution' && receipt.outputArtifactId === outputReview.outputArtifactId,
     ),
   );
-  const storedDerivedOutputReceipt = matchingStoredDerivedOutputReceipt ?? derivedOutputReceipt;
-  const visibleDerivedOutputReceipt = deriveDerivedOutputReceiptState({
-    current: derivedOutputReceipt,
-    receipt: storedDerivedOutputReceipt,
-  });
-  const upsertDerivedOutputReceipt = useUIStore((state) => state.upsertDerivedOutputReceipt);
-
-  useEffect(() => {
-    if (matchingStoredDerivedOutputReceipt === undefined) upsertDerivedOutputReceipt(derivedOutputReceipt);
-  }, [derivedOutputReceipt, matchingStoredDerivedOutputReceipt, upsertDerivedOutputReceipt]);
   const previewPlanStatusLabel = hasRuntimeOutputReview
     ? t('modals.superResolution.previewPlanReady')
     : t('modals.superResolution.previewPlanPending');
@@ -1250,7 +1228,9 @@ export function SuperResolutionModal({
       )}
 
       <ComputationalMergeReviewPanel
-        derivedOutputReceipt={visibleDerivedOutputReceipt}
+        {...(matchingStoredDerivedOutputReceipt === undefined
+          ? {}
+          : { derivedOutputReceipt: matchingStoredDerivedOutputReceipt })}
         {...(onOpenOutput === undefined
           ? {}
           : { onExportDerivedOutput: onOpenOutput, onOpenDerivedOutput: onOpenOutput })}
