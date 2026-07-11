@@ -466,8 +466,15 @@ export const useAgentSelectedImageWorkspaceController = ({
         status: 'completed',
         toolName: 'rawengine.agent.session.approval',
       });
-      const result = await applyAgentSelectedImageLiveSession(approvedDraft);
-      persistAuditRecord(result.audit);
+      const auditStorage = createLocalAgentSelectedImageLiveSessionAuditStorageAdapter({
+        selectedImagePath: approvedDraft.snapshot.selectedImagePath,
+        sessionId: approvedDraft.sessionId,
+      });
+      const result = await applyAgentSelectedImageLiveSession(
+        approvedDraft,
+        auditStorage === null ? {} : { auditStorage },
+      );
+      setAuditRecord(result.audit);
       if (result.status === 'blocked') {
         const message = `Selected-image live session blocked: ${result.staleReason}.`;
         setBlockedResult(result);
@@ -544,7 +551,7 @@ export const useAgentSelectedImageWorkspaceController = ({
         toolName: 'rawengine.agent.adjustments.apply',
       });
     }
-  }, [canApply, draft, persistAuditRecord, pushActivityEntry]);
+  }, [canApply, draft, pushActivityEntry]);
 
   const exportAudit = useCallback(async () => {
     if (!canExportAudit || auditRecord === null) return;
