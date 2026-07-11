@@ -188,6 +188,7 @@ export interface HdrModalState {
 }
 
 export interface SuperResolutionModalState {
+  applyReceipt?: import('../schemas/computational-merge/burstSrApplySchemas').BurstSrApplyReceipt | null;
   candidateJob?: BurstSrCandidateJobResult | null;
   candidateJobId?: string | null;
   isOpen: boolean;
@@ -313,6 +314,7 @@ export const createDefaultHdrModalState = (
 export const createDefaultSuperResolutionModalState = (
   settings: SuperResolutionUiSettings = DEFAULT_SUPER_RESOLUTION_UI_SETTINGS,
 ): SuperResolutionModalState => ({
+  applyReceipt: null,
   candidateJob: null,
   candidateJobId: null,
   isOpen: false,

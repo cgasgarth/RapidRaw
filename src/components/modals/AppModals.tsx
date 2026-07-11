@@ -3,6 +3,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { useShallow } from 'zustand/react/shallow';
+import { burstSrApplyReceiptSchema } from '../../schemas/computational-merge/burstSrApplySchemas';
 import {
   singleImageX2ApplyReceiptSchema,
   singleImageX2PreviewSchema,
@@ -340,6 +341,7 @@ export default function AppModals(props: AppModalsProps) {
       {hasLoadedSuperResolutionModal && (
         <Suspense fallback={null}>
           <SuperResolutionModal
+            applyReceipt={superResolutionModalState.applyReceipt ?? null}
             isOpen={superResolutionModalState.isOpen}
             lastApplyCommand={superResolutionModalState.lastApplyCommand}
             lastDryRunCommand={superResolutionModalState.lastDryRunCommand}
@@ -410,6 +412,37 @@ export default function AppModals(props: AppModalsProps) {
               });
             }}
             onApplyPlan={() => {
+              void (async () => {
+                const candidate = superResolutionModalState.candidateJob?.candidate;
+                const readiness = superResolutionModalState.nativeReadiness;
+                const referencePath =
+                  superResolutionModalState.sourcePaths[readiness?.registration?.referenceSourceIndex ?? 0];
+                if (candidate === null || candidate === undefined || readiness === null || referencePath === undefined)
+                  return;
+                const slash = Math.max(referencePath.lastIndexOf('/'), referencePath.lastIndexOf('\\'));
+                const destinationDirectory = slash >= 0 ? referencePath.slice(0, slash) : '.';
+                const sourceName = slash >= 0 ? referencePath.slice(slash + 1) : referencePath;
+                const sourceStem = sourceName.replace(/\.[^.]+$/, '');
+                const receipt = await invokeWithSchema(
+                  Invokes.ApplyBurstSrCandidate,
+                  {
+                    request: {
+                      candidateId: candidate.packageId,
+                      acceptedReviewHash: candidate.candidateHash,
+                      destinationDirectory,
+                      requestedName: `${sourceStem}-Burst-SR-x2`,
+                    },
+                  },
+                  burstSrApplyReceiptSchema,
+                );
+                setUI((state) => ({
+                  superResolutionModalState: { ...state.superResolutionModalState, applyReceipt: receipt },
+                }));
+                await props.refreshImageList();
+                await props.handleImageSelect(receipt.payloadPath);
+              })().catch((error: unknown) => console.error('Burst x2 apply failed', error));
+            }}
+            onPrepareCandidate={() => {
               const acceptedReviewId = superResolutionModalState.nativeReadiness?.acceptedDryRunPlanId;
               if (acceptedReviewId === undefined) return;
               void invokeWithSchema(
