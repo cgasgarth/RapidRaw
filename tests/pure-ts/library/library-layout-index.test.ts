@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import type { ImageFile } from '../../../src/components/ui/AppProperties';
 import { LibraryViewMode } from '../../../src/components/ui/AppProperties';
-import { buildLibraryLayoutIndex } from '../../../src/library/buildLibraryLayoutIndex';
+import { buildLibraryLayoutIndex, resolveLibraryPathReveal } from '../../../src/library/buildLibraryLayoutIndex';
 import {
   buildLibrarySemanticIndex,
   buildLibraryVisibleSemanticIndex,
@@ -185,4 +185,72 @@ test('list layout exposes variable header, item, footer heights and active-path 
   const rowIndex = index.getRowIndexForPath('/library/sub/a.arw');
   expect(rowIndex).toBe(3);
   expect(index.getRowOffset(rowIndex ?? -1)).toBe(200);
+});
+
+test('resolves visible, partial-row, missing, and virtual-copy paths from the compact lookup', () => {
+  const images = [
+    image('/library/a.arw', 0),
+    image('/library/b.arw', 4),
+    image('/library/c.arw', 8),
+    image('/library/c.arw?vc=1', 9),
+  ];
+  const index = layout(images, LibraryViewMode.Flat, 3);
+  expect(resolveLibraryPathReveal(index, '/library/a.arw')).toEqual({
+    status: 'visible',
+    path: '/library/a.arw',
+    rowIndex: 0,
+    slotIndex: 0,
+    top: 0,
+    bottom: 44,
+  });
+  expect(resolveLibraryPathReveal(index, '/library/c.arw?vc=1')).toMatchObject({
+    status: 'visible',
+    rowIndex: 1,
+    slotIndex: 0,
+    top: 44,
+    bottom: 88,
+  });
+  expect(resolveLibraryPathReveal(index, '/library/filtered.arw')).toEqual({
+    status: 'not-visible',
+    path: '/library/filtered.arw',
+  });
+});
+
+test('resolves collapsed stack members to covers and collapsed folder members to headers', () => {
+  const images = [
+    image('/library/burst-1.arw', 0),
+    image('/library/burst-2.arw', 1),
+    image('/library/burst-3.arw', 2),
+    image('/library/sub/single.arw', 8, '1/125'),
+  ];
+  const flat = layout(images, LibraryViewMode.Flat, 2);
+  expect(resolveLibraryPathReveal(flat, '/library/burst-2.arw')).toMatchObject({
+    status: 'representative',
+    requestedPath: '/library/burst-2.arw',
+    path: '/library/burst-1.arw',
+    rowIndex: 0,
+    slotIndex: 0,
+  });
+
+  const recursive = layout(images, LibraryViewMode.Recursive, 2, new Set(), new Set(['/library/sub']));
+  expect(resolveLibraryPathReveal(recursive, '/library/sub/single.arw')).toEqual({
+    status: 'collapsed-folder',
+    path: '/library/sub/single.arw',
+    folderPath: '/library/sub',
+    headerRowIndex: 2,
+    top: 160,
+    bottom: 200,
+  });
+});
+
+test('resolves 10,000 paths without rebuilding semantic or layout indexes', () => {
+  const images = Array.from({ length: 10_000 }, (_, index) =>
+    image(`/library/frame-${index}.arw?vc=${index}`, index % 9),
+  );
+  const index = layout(images, LibraryViewMode.Flat, 6);
+  const revision = index.revision;
+  for (let offset = 0; offset < 10_000; offset += 1) {
+    expect(resolveLibraryPathReveal(index, images[(offset * 7919) % images.length]?.path ?? '').status).toBe('visible');
+  }
+  expect(index.revision).toBe(revision);
 });

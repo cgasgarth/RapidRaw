@@ -17,6 +17,12 @@ import {
   AGENT_CURRENT_IMAGE_PREVIEW_LOOP_TOOL_NAME,
 } from '../../../../src/utils/agent/context/agentCurrentImagePreviewLoop.ts';
 import { buildAgentImageContextSnapshot } from '../../../../src/utils/agent/context/agentImageContextSnapshot.ts';
+import {
+  agentAppServerTurnTransportRequestSchema,
+  agentModelSelectionReceiptSchema,
+  buildAgentAppServerTurnTransportRequest,
+  DEFAULT_AGENT_EDITING_MODEL_SELECTION,
+} from '../../../../src/utils/agent/session/agentAppServerModelSelection.ts';
 import { createAgentTypedToolExecutionContext } from '../../../../src/utils/agent/session/agentTypedToolDispatch.ts';
 import {
   applyAgentGlobalAdjustments,
@@ -77,6 +83,8 @@ const runtimeProofReportSchema = z
     initialPreviewReceiptLongEdgePx: z.literal(1536),
     initialPreviewReceiptQuality: z.literal(0.86),
     latestPreviewReceiptHash: receiptHashSchema,
+    modelSelection: agentModelSelectionReceiptSchema,
+    modelTransport: agentAppServerTurnTransportRequestSchema,
     previewArtifactIds: z.array(z.string().trim().min(1)).length(2),
     previewPurposes: z.array(z.enum(['detail_review', 'refresh'])).length(2),
     previewReceiptHashes: z.array(receiptHashSchema).length(2),
@@ -110,6 +118,7 @@ const publicReport = publicProofReportSchema.parse({
     'Rejects stale apply-review attempts against the private RAW-derived preview review.',
     'Rolls the live editor history back to the session-start checkpoint after review.',
     'Hashes the private source RAW before and after the loop and requires no overwrite.',
+    'Records requested and effective GPT-5.6 Terra light configuration through supported app-server turn fields.',
   ],
   doesNotProve: [
     'Does not commit or publish private Alaska image pixels, RAW hashes, or per-file metadata.',
@@ -205,6 +214,7 @@ const staleApplyRejections = [
     {
       acceptedPreviewArtifactId: result.previewLineage[0]?.previewArtifactId ?? '',
       acceptedPreviewReceiptHash: latestPreviewReceiptHash,
+      ...result.sealedProposal,
       request: commandRequest,
       review: result,
     },
@@ -215,6 +225,7 @@ const staleApplyRejections = [
     {
       acceptedPreviewArtifactId: latestPreviewArtifactId,
       acceptedPreviewReceiptHash: result.previewRefreshReceipts[0]?.contentHash ?? '',
+      ...result.sealedProposal,
       request: commandRequest,
       review: result,
     },
@@ -225,6 +236,7 @@ const staleApplyRejections = [
     {
       acceptedPreviewArtifactId: latestPreviewArtifactId,
       acceptedPreviewReceiptHash: latestPreviewReceiptHash,
+      ...result.sealedProposal,
       request: commandRequest,
       review: { ...result, selectedImage: { ...result.selectedImage, width: result.selectedImage.width + 1 } },
     },
@@ -311,6 +323,12 @@ const runtimeReport = runtimeProofReportSchema.parse({
   initialPreviewReceiptLongEdgePx: result.initialPreviewReceipt.preview.longEdgePx,
   initialPreviewReceiptQuality: result.initialPreviewReceipt.preview.quality,
   latestPreviewReceiptHash,
+  modelSelection: {
+    effective: DEFAULT_AGENT_EDITING_MODEL_SELECTION,
+    requested: DEFAULT_AGENT_EDITING_MODEL_SELECTION,
+    status: 'exact',
+  },
+  modelTransport: buildAgentAppServerTurnTransportRequest(DEFAULT_AGENT_EDITING_MODEL_SELECTION),
   previewArtifactIds: result.previewRefreshReceipts.map((receipt) => receipt.preview.artifactId),
   previewPurposes: result.previewRefreshReceipts.map((receipt) => receipt.preview.purpose),
   previewReceiptHashes,
@@ -336,6 +354,8 @@ await writeFile(
 <dl>
 <dt>Selected RAW</dt><dd>${runtimeReport.selectedRawBasename}</dd>
 <dt>Source unchanged</dt><dd>${runtimeReport.sourceHashUnchanged}</dd>
+<dt>Model requested</dt><dd>${runtimeReport.modelSelection.requested.modelId} / ${runtimeReport.modelSelection.requested.reasoningTier}</dd>
+<dt>Model effective</dt><dd>${runtimeReport.modelSelection.effective?.modelId} / ${runtimeReport.modelSelection.effective?.reasoningTier}</dd>
 <dt>Tool calls</dt><dd>${runtimeReport.toolNames.join(', ')}</dd>
 <dt>Typed dispatch</dt><dd>${runtimeReport.dispatchTrace
     .map((entry) => `${entry.runtimeToolName}:${entry.outcome}:${entry.callId}`)

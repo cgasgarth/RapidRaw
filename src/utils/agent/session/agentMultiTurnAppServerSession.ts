@@ -1,8 +1,5 @@
 import { z } from 'zod';
-import {
-  type RawEngineAgentInitialPreviewReceiptV2,
-  rawEngineAgentInitialPreviewReceiptV2Schema,
-} from '../../../../packages/rawengine-schema/src/localAppServerBridge';
+import { rawEngineAgentInitialPreviewReceiptV2Schema } from '../../../../packages/rawengine-schema/src/localAppServerBridge';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
 import {
   agentInitialPromptContextSchema,
@@ -32,6 +29,14 @@ import {
   AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME,
   agentDetailEffectsApplyResponseSchema,
 } from '../tools/agentDetailEffectsApplyTool';
+import {
+  type AgentAppServerTurnTransportRequest,
+  type AgentModelSelectionReceipt,
+  agentModelSelectionReceiptSchema,
+  agentModelSelectionSchema,
+  buildAgentAppServerTurnTransportRequest,
+  DEFAULT_AGENT_EDITING_MODEL_SELECTION,
+} from './agentAppServerModelSelection';
 import { dispatchAgentLiveEditorTool } from './agentLiveToolDispatch';
 import { createAgentSessionCheckpoint } from './agentSessionHistory';
 import { createAgentTypedToolExecutionContext, dispatchAgentTypedEditorTool } from './agentTypedToolDispatch';
@@ -96,7 +101,7 @@ const sessionTurnRequestSchema = z
 
 export const agentMultiTurnAppServerSessionRequestSchema = z
   .object({
-    modelId: z.string().trim().min(1).default('gpt-5.1-codex-app-server'),
+    modelSelection: agentModelSelectionSchema.default(DEFAULT_AGENT_EDITING_MODEL_SELECTION),
     operationId: z.string().trim().min(1),
     prompt: z.string().trim().min(1),
     requestId: z.string().trim().min(1),
@@ -139,7 +144,7 @@ export const agentMultiTurnAppServerSessionResultSchema = z
     maxChannelDelta: z.number().nonnegative(),
     meanLuminanceDelta: z.number().nonnegative(),
     messages: z.array(sessionMessageSchema).min(5),
-    modelId: z.string().trim().min(1),
+    modelSelection: agentModelSelectionReceiptSchema,
     previewLineage: z
       .array(
         z
@@ -169,7 +174,8 @@ export type AgentMultiTurnAppServerSessionResult = z.infer<typeof agentMultiTurn
 
 export type AgentInitialModelInputSink = (
   input: AgentMultiTurnAppServerSessionResult['initialContext']['modelInput'],
-) => Promise<void> | void;
+  transportRequest: AgentAppServerTurnTransportRequest,
+) => AgentModelSelectionReceipt | Promise<AgentModelSelectionReceipt>;
 
 const stateRecipeHashSchema = agentStateGetResponseSchema.safeExtend({
   snapshot: z.looseObject({
@@ -250,7 +256,19 @@ export const runAgentMultiTurnAppServerSession = async (
     attachment: initialPreviewResult.attachment,
     context: initialContextBase,
   });
-  await initialModelInputSink?.(initialContext.modelInput);
+  if (initialModelInputSink === undefined) {
+    throw new Error('Selected-image model transport adapter is required; model substitution cannot be inferred.');
+  }
+  const modelSelection = agentModelSelectionReceiptSchema.parse(
+    await initialModelInputSink(
+      initialContext.modelInput,
+      buildAgentAppServerTurnTransportRequest(parsedRequest.modelSelection),
+    ),
+  );
+  if (modelSelection.status === 'rejected') {
+    releaseRawEngineImagePreviewAttachment(initialPreviewResult.receipt.attachment.artifactId);
+    throw new Error(`Selected-image model request rejected: ${modelSelection.reason}`);
+  }
   releaseRawEngineImagePreviewAttachment(initialPreviewResult.receipt.attachment.artifactId);
   const initialPreviewReceipt = initialPreviewResult.receipt;
   const messages: AgentMultiTurnAppServerSessionResult['messages'] = [
@@ -578,7 +596,7 @@ export const runAgentMultiTurnAppServerSession = async (
     maxChannelDelta,
     meanLuminanceDelta: Number((meanLuminanceDelta / parsedRequest.turns.length).toFixed(4)),
     messages,
-    modelId: parsedRequest.modelId,
+    modelSelection,
     previewLineage,
     previews,
     rollbackGraphRevision: checkpoint.graphRevision,

@@ -7,9 +7,9 @@ import { chromium, type Locator, type Page } from '@playwright/test';
 import { agentSelectedImageLiveSessionAuditExportReceiptSchema } from '../../../src/schemas/agent/agentSelectedImageAuditExportSchemas';
 
 const host = '127.0.0.1';
-const port = Number.parseInt(process.env.RAWENGINE_BROWSER_HARNESS_PORT ?? '1420', 10);
+const port = Number.parseInt(process.env.BROWSER_TAURI_HARNESS_PORT ?? '1420', 10);
 if (!Number.isInteger(port) || port < 1 || port > 65_535) {
-  throw new Error('RAWENGINE_BROWSER_HARNESS_PORT must be a valid TCP port.');
+  throw new Error('BROWSER_TAURI_HARNESS_PORT must be a valid TCP port.');
 }
 const baseUrl = `http://${host}:${port}`;
 const runAgentAuditE2e = process.env.RAWENGINE_AGENT_AUDIT_E2E === '1';
@@ -86,7 +86,7 @@ async function stopServer(server: ReturnType<typeof spawn>): Promise<void> {
 }
 
 const server = spawn('bun', ['run', 'dev', '--', '--host', host, '--port', String(port)], {
-  env: { ...process.env },
+  env: { ...process.env, VITE_RAWENGINE_AGENT_AUDIT_E2E: runAgentAuditE2e ? '1' : '0' },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 let serverOutput = '';
@@ -167,7 +167,7 @@ try {
   if (await viewerFooterOverflow.isVisible()) {
     await viewerFooterOverflow.locator('summary').click();
   }
-  await page.getByText(/1024 x 768/u).waitFor({ timeout: 10_000 });
+  await page.getByText(runAgentAuditE2e ? /4 x 4/u : /1024 x 768/u).waitFor({ timeout: 10_000 });
   await page.keyboard.press('Control+K');
   await page.getByRole('dialog', { name: /Command Palette/u }).waitFor({ timeout: 10_000 });
   await page.getByRole('button', { name: /Show crop tools/u }).click();
@@ -197,6 +197,13 @@ try {
     const exportedAudit = agentSelectedImageLiveSessionAuditExportReceiptSchema.parse(
       JSON.parse(await Bun.file(auditDownloadPath).text()),
     );
+    if (
+      exportedAudit.proposalLineage === undefined ||
+      exportedAudit.proposalLineage.iterations.length === 0 ||
+      exportedAudit.proposalLineage.iterations.some((iteration) => !iteration.proposalHash.startsWith('sha256:'))
+    ) {
+      throw new Error('Browser audit export omitted sealed proposal lineage hashes.');
+    }
     await page.getByTestId('agent-audit-export-result').waitFor({ timeout: 10_000 });
     const auditProof = await auditWorkspace.evaluate((element) => ({
       mode: element.dataset.exportMode,
@@ -298,7 +305,7 @@ try {
       !message.includes('Clerk:') &&
       !message.includes('[vite] failed to connect to websocket') &&
       !message.includes('Failed to send error to Vite server') &&
-      !message.includes("WebSocket connection to 'ws://127.0.0.1:1420/"),
+      !message.includes(`WebSocket connection to 'ws://${host}:${port}/`),
   );
   if (actionableErrors.length > 0) {
     throw new Error(`Unexpected browser harness console errors: ${actionableErrors.slice(0, 5).join(' | ')}`);

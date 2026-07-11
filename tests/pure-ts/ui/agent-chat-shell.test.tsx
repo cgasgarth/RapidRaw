@@ -111,6 +111,9 @@ describe('agent chat shell', () => {
     expect(required<HTMLElement>(container, 'h2').textContent).toBe('DSC_4850.ARW');
     expect(container.textContent).toContain('6000 x 4000');
     expect(container.querySelector('img[alt=""]')).not.toBeNull();
+    const modelConfiguration = required<HTMLElement>(container, '[data-testid="agent-model-configuration"]');
+    expect(modelConfiguration.dataset.modelId).toBe('gpt-5.6-terra');
+    expect(modelConfiguration.dataset.reasoningTier).toBe('light');
   });
 
   test('renders a compact typed preview, applies it, restores focus, and keeps lifecycle status in one surface', async () => {

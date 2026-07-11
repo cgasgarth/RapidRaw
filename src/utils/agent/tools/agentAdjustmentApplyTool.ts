@@ -58,6 +58,16 @@ export const agentAdjustmentsApplyRequestSchema = z
     approval: agentAdjustmentsApplyApprovalSchema,
     expectedGraphRevision: z.string().trim().min(1),
     expectedRecipeHash: z.string().trim().min(1),
+    proposalLineage: z
+      .object({
+        acceptedProposalHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+        acceptedProposalId: z.string().trim().min(1),
+        lineageEpoch: z.number().int().positive(),
+        lineageId: z.string().trim().min(1),
+        sealedIterationId: z.string().trim().min(1),
+      })
+      .strict()
+      .optional(),
     operationId: z.string().trim().min(1),
     requestId: z.string().trim().min(1),
     sessionId: z.string().trim().min(1),
@@ -238,6 +248,37 @@ const buildDryRunReceiptKey = ({
   planHash: string;
   planId: string;
 }) => `${expectedGraphRevision}:${planId}:${planHash}`;
+
+export const assertAgentAdjustmentsDryRunPlanForProposal = ({
+  adjustments,
+  expectedGraphRevision,
+  expectedRecipeHash,
+  operationId,
+  planHash,
+  planId,
+  sessionId,
+}: {
+  adjustments: AgentAdjustmentsDryRunRequest['adjustments'];
+  expectedGraphRevision: string;
+  expectedRecipeHash: string;
+  operationId: string;
+  planHash: string;
+  planId: string;
+  sessionId: string;
+}): void => {
+  const receipt = acceptedAdjustmentDryRunReceipts.get(
+    buildDryRunReceiptKey({ expectedGraphRevision, planHash, planId }),
+  );
+  if (receipt === undefined) throw new Error('Proposal renderer rejected missing adjustment dry-run receipt.');
+  if (
+    receipt.expectedRecipeHash !== expectedRecipeHash ||
+    receipt.operationId !== operationId ||
+    receipt.sessionId !== sessionId ||
+    JSON.stringify(receipt.adjustments) !== JSON.stringify(adjustments)
+  ) {
+    throw new Error('Proposal renderer rejected mismatched adjustment dry-run receipt.');
+  }
+};
 
 export const buildAgentAdjustmentsApplyApproval = ({
   approvalId,
