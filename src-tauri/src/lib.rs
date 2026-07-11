@@ -38,8 +38,6 @@ pub(crate) use gpu::*;
 pub(crate) use io::*;
 pub(crate) use library::*;
 pub(crate) use merge::*;
-#[cfg(any(all(test, feature = "tauri-test"), feature = "validation-harness"))]
-pub(crate) use proofs::*;
 pub(crate) use raw::*;
 pub(crate) use render::*;
 

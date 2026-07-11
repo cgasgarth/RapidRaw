@@ -138,10 +138,15 @@ export function HdrModal({
     isMergeReady,
     settings,
   });
-  const isDeghostReviewRequired = isMergeReady && settings.deghosting !== 'off';
-  const [isDeghostReviewApproved, setIsDeghostReviewApproved] = useState(false);
-  const isDeghostReviewResolved = !isDeghostReviewRequired || isDeghostReviewApproved;
-  const isApplyReady = isMergeReady && isDeghostReviewResolved;
+  const isDeghostReviewRequired =
+    isMergeReady && settings.deghosting !== 'off' && (runtimePlan?.deghostPreview?.motionCoverage ?? 1) > 0;
+  const [approvedOwnershipHash, setApprovedOwnershipHash] = useState<string | null>(null);
+  const currentOwnershipHash = runtimePlan?.deghostPreview?.ownershipHash;
+  const isDeghostReviewApproved = currentOwnershipHash !== undefined && approvedOwnershipHash === currentOwnershipHash;
+  const hasUnresolvedNativeOwnership = (runtimePlan?.deghostPreview?.unresolvedFraction ?? 0) > 0;
+  const isDeghostReviewResolved =
+    (!isDeghostReviewRequired || isDeghostReviewApproved) && !hasUnresolvedNativeOwnership;
+  const isApplyReady = isMergeReady && isDeghostReviewResolved && runtimePlan?.deghostPreview === undefined;
   const applyReadinessLabel = !isMergeReady
     ? t('modals.hdr.summaryBlocked')
     : isApplyReady
@@ -162,7 +167,7 @@ export function HdrModal({
   );
   const selectToneMappingPreset = useCallback(
     (preset: Exclude<HdrToneMappingPreset, 'custom'>) => {
-      setIsDeghostReviewApproved(false);
+      setApprovedOwnershipHash(null);
       onSettingsChange(applyHdrToneMappingPreset(settings, preset));
     },
     [onSettingsChange, settings],
@@ -657,24 +662,18 @@ export function HdrModal({
             <div className="h-full w-full bg-bg-primary" />
           )}
           <div className="absolute inset-0 bg-linear-to-t from-black/75 via-black/10 to-black/30" />
-          {isDeghostReviewRequired && (
+          {isDeghostReviewRequired && runtimePlan?.deghostPreview && (
             <div
-              className="pointer-events-none absolute inset-0"
+              className="pointer-events-none absolute inset-0 bg-black/20"
               data-motion-risk={reviewDiagnostics.deghost.motionRisk}
               data-review-approved={String(isDeghostReviewApproved)}
               data-testid="hdr-deghost-motion-overlay"
             >
-              {[
-                'left-[18%] top-[22%] h-[22%] w-[24%]',
-                'right-[20%] top-[34%] h-[18%] w-[20%]',
-                'left-[42%] bottom-[20%] h-[16%] w-[28%]',
-              ].map((className, index) => (
-                <div
-                  className={`absolute rounded border border-yellow-300/70 bg-yellow-300/15 shadow-[0_0_20px_rgba(253,224,71,0.25)] ${className}`}
-                  data-testid="hdr-deghost-motion-region"
-                  key={index}
-                />
-              ))}
+              <img
+                alt=""
+                className="h-full w-full object-contain opacity-55 mix-blend-screen"
+                src={runtimePlan.deghostPreview.motionProbabilityDataUrl}
+              />
             </div>
           )}
           <div className="absolute bottom-6 left-6 right-6">
@@ -697,7 +696,7 @@ export function HdrModal({
             </div>
             <ComputationalMergeAppServerBadge family="hdr" statusLabel={t('editor.ai.connection.ready')} />
           </div>
-          {runtimePlan?.staticRadiancePreview && runtimePlan.alignmentArtifact ? (
+          {runtimePlan?.staticRadiancePreview && runtimePlan.deghostPreview && runtimePlan.alignmentArtifact ? (
             <section
               className="mb-5 grid gap-2 border-y border-border-color py-3"
               data-alignment-artifact-handle={runtimePlan.alignmentArtifact.handle}
@@ -715,12 +714,30 @@ export function HdrModal({
               data-variance-hash={runtimePlan.staticRadiancePreview.varianceHash}
               data-weight-hash={runtimePlan.staticRadiancePreview.weightHash}
               data-testid="hdr-native-static-radiance-review"
+              data-deghost-action-state={runtimePlan.deghostPreview.actionState}
+              data-deghost-radiance-hash={runtimePlan.deghostPreview.radianceHash}
+              data-feather-hash={runtimePlan.deghostPreview.featherHash}
+              data-motion-probability-hash={runtimePlan.deghostPreview.motionProbabilityHash}
+              data-ownership-hash={runtimePlan.deghostPreview.ownershipHash}
+              data-unresolved-fraction={runtimePlan.deghostPreview.unresolvedFraction}
             >
               <img
                 alt={t('modals.hdr.title')}
                 className="max-h-64 w-full bg-black object-contain"
-                src={runtimePlan.staticRadiancePreview.toneMappedPreviewDataUrl}
+                src={runtimePlan.deghostPreview.toneMappedPreviewDataUrl}
               />
+              <div className="grid grid-cols-2 gap-2" data-testid="hdr-native-deghost-overlays">
+                <img
+                  alt=""
+                  className="max-h-32 w-full bg-black object-contain"
+                  src={runtimePlan.deghostPreview.motionProbabilityDataUrl}
+                />
+                <img
+                  alt=""
+                  className="max-h-32 w-full bg-black object-contain"
+                  src={runtimePlan.deghostPreview.ownershipDataUrl}
+                />
+              </div>
               {runtimePlan.sources.map((source) =>
                 'alignment' in source ? (
                   <div
@@ -738,9 +755,7 @@ export function HdrModal({
                 ) : null,
               )}
               <UiText variant={TextVariants.small} color={TextColors.secondary}>
-                {runtimePlan.staticRadiancePreview.actionState === 'deghost_required'
-                  ? 'Static radiance preview. Motion diagnostics require deghosting; Apply remains unavailable.'
-                  : 'Static scene-linear radiance with a separate tone-mapped review. Apply remains unavailable.'}
+                Native deghost review artifacts only. Apply, export, and durable derived output remain unavailable.
               </UiText>
             </section>
           ) : null}
@@ -1093,6 +1108,7 @@ export function HdrModal({
               data-motion-risk={reviewDiagnostics.deghost.motionRisk}
               data-review-approved={String(isDeghostReviewApproved)}
               data-review-required={String(isDeghostReviewRequired)}
+              data-unresolved-fraction={runtimePlan?.deghostPreview?.unresolvedFraction ?? 0}
               data-testid="hdr-deghost-review-gate"
             >
               <div className="mb-3 flex items-center justify-between gap-3">
@@ -1149,7 +1165,7 @@ export function HdrModal({
                 }`}
                 data-testid="hdr-deghost-review-approve"
                 onClick={() => {
-                  setIsDeghostReviewApproved((approved) => !approved);
+                  setApprovedOwnershipHash(isDeghostReviewApproved ? null : (currentOwnershipHash ?? null));
                 }}
                 type="button"
               >
@@ -1239,7 +1255,7 @@ export function HdrModal({
                       : 'border-border-color bg-surface text-text-secondary hover:bg-card-active'
                   }`}
                   onClick={() => {
-                    setIsDeghostReviewApproved(false);
+                    setApprovedOwnershipHash(null);
                     setManualSetting({ deghosting });
                   }}
                   type="button"
@@ -1257,7 +1273,7 @@ export function HdrModal({
                 }`}
                 data-testid="hdr-deghost-confidence-map-toggle"
                 onClick={() => {
-                  setIsDeghostReviewApproved(false);
+                  setApprovedOwnershipHash(null);
                   setManualSetting({ deghostConfidenceMapVisible: !settings.deghostConfidenceMapVisible });
                 }}
                 type="button"
@@ -1278,7 +1294,7 @@ export function HdrModal({
                         : 'border-border-color bg-surface text-text-secondary hover:bg-card-active'
                     }`}
                     onClick={() => {
-                      setIsDeghostReviewApproved(false);
+                      setApprovedOwnershipHash(null);
                       setManualSetting({ deghostRegionIntensityPercent });
                     }}
                     type="button"
