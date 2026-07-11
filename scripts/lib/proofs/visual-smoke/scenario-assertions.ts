@@ -963,6 +963,56 @@ async function assertEditorParityContractFixture(page) {
 }
 
 export async function prepareScenario(page, mode) {
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.TransformPreviewSession) {
+    const proof = page.getByTestId('transform-session-proof');
+    let session = page.getByTestId('transform-session');
+    await session.waitFor({ timeout: 10_000 });
+    await session.getByRole('img', { name: 'Transform Preview' }).waitFor({ timeout: 10_000 });
+    const expectDraft = async (expected) => {
+      const actual = await session.evaluate((element) => ({
+        aspect: Number(element.getAttribute('data-transform-aspect')),
+        distortion: Number(element.getAttribute('data-transform-distortion')),
+        lines: element.getAttribute('data-transform-lines'),
+        rotate: Number(element.getAttribute('data-transform-rotate')),
+        scale: Number(element.getAttribute('data-transform-scale')),
+      }));
+      if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+        throw new Error(`Transform session draft mismatch: ${JSON.stringify({ actual, expected })}`);
+      }
+    };
+    await expectDraft({ aspect: -18, distortion: 23, lines: 'false', rotate: 3.7, scale: 117 });
+
+    await session.getByTestId('transform-lines').click();
+    await page.waitForFunction(() =>
+      window.__RAWENGINE_VISUAL_SMOKE_INVOKES__?.some(
+        (entry) => entry.command === 'preview_geometry_transform' && entry.args?.showLines === true,
+      ),
+    );
+    await session.getByTestId('transform-compare').dispatchEvent('mousedown');
+    await session.getByTestId('transform-compare').dispatchEvent('mouseup');
+    await session.getByTestId('transform-reset').click();
+    await expectDraft({ aspect: 0, distortion: 0, lines: 'true', rotate: 0, scale: 100 });
+
+    await session.getByTestId('transform-cancel').click();
+    await page.getByTestId('transform-reopen').click({ force: true });
+    session = page.getByTestId('transform-session');
+    await session.waitFor({ timeout: 10_000 });
+    await expectDraft({ aspect: -18, distortion: 23, lines: 'false', rotate: 3.7, scale: 117 });
+
+    await page.getByTestId('transform-switch-source').click({ force: true });
+    session = page.getByTestId('transform-session');
+    await expectDraft({ aspect: 12, distortion: -31, lines: 'false', rotate: -2.4, scale: 91 });
+    await session.getByRole('img', { name: 'Transform Preview' }).waitFor({ timeout: 10_000 });
+    await session.getByTestId('transform-apply').evaluate((button) => {
+      button.click();
+      button.click();
+    });
+    if ((await proof.getAttribute('data-apply-count')) !== '1') {
+      throw new Error('Transform session did not submit the visible draft exactly once.');
+    }
+    return;
+  }
+
   if (mode === VISUAL_SMOKE_SCENARIO_IDS.LensCorrectionSession) {
     const session = page.getByTestId('lens-correction-session');
     await session.waitFor({ timeout: 10_000 });
