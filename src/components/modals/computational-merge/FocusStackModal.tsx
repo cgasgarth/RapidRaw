@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { AlertTriangle, Aperture, CheckCircle2, Eye, Layers3, ShieldCheck } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { FocusStackNativeInputPlan } from '../../../schemas/focus-stack/focusStackNativePlanSchemas';
 import type { FocusStackOutputReviewWorkflow } from '../../../schemas/focus-stack/focusStackOutputReviewSchemas';
@@ -12,10 +12,6 @@ import type {
 } from '../../../schemas/focus-stack/focusStackUiSchemas';
 import { type FocusStackModalState, useUIStore } from '../../../store/useUIStore';
 import { TextColors, TextVariants } from '../../../types/typography';
-import {
-  buildFocusStackDerivedOutputReceipt,
-  deriveDerivedOutputReceiptState,
-} from '../../../utils/derivedOutputReceipt';
 import { buildFocusStackOutputReviewWorkflow } from '../../../utils/focusStackOutputReview';
 import type { FocusStackSourcePreflightMetadata } from '../../../utils/focusStackSourcePreflight';
 import { buildFocusStackSourcePreflight } from '../../../utils/focusStackSourcePreflight';
@@ -187,29 +183,12 @@ export function FocusStackModal({
       sourcePaths,
     });
   const hasRuntimeOutputReview = runtimeOutputReview !== null && runtimeOutputReview !== undefined;
-  const derivedOutputReceipt = buildFocusStackDerivedOutputReceipt({
-    acceptedDryRunPlanHash: lastApplyCommand?.acceptedDryRunPlanHash,
-    acceptedDryRunPlanId: lastApplyCommand?.acceptedDryRunPlanId,
-    review: outputReview,
-    settings,
-  });
   const matchingStoredDerivedOutputReceipt = useUIStore((state) =>
     Object.values(state.derivedOutputReceipts).find(
       (receipt) =>
-        receipt.family === derivedOutputReceipt.family &&
-        receipt.outputArtifactId === derivedOutputReceipt.outputArtifactId,
+        receipt.family === 'focus_stack' && receipt.outputArtifactId === outputReview.editableHandoff.artifactId,
     ),
   );
-  const storedDerivedOutputReceipt = matchingStoredDerivedOutputReceipt ?? derivedOutputReceipt;
-  const visibleDerivedOutputReceipt = deriveDerivedOutputReceiptState({
-    current: derivedOutputReceipt,
-    receipt: storedDerivedOutputReceipt,
-  });
-  const upsertDerivedOutputReceipt = useUIStore((state) => state.upsertDerivedOutputReceipt);
-
-  useEffect(() => {
-    if (matchingStoredDerivedOutputReceipt === undefined) upsertDerivedOutputReceipt(derivedOutputReceipt);
-  }, [derivedOutputReceipt, matchingStoredDerivedOutputReceipt, upsertDerivedOutputReceipt]);
   const isApplyPlanReady =
     isPreviewPlanReady &&
     hasRuntimeOutputReview &&
@@ -1007,7 +986,9 @@ export function FocusStackModal({
       </motion.section>
 
       <ComputationalMergeReviewPanel
-        derivedOutputReceipt={visibleDerivedOutputReceipt}
+        {...(matchingStoredDerivedOutputReceipt === undefined
+          ? {}
+          : { derivedOutputReceipt: matchingStoredDerivedOutputReceipt })}
         title={t('modals.focusStack.review.title')}
         proofStatus={t('modals.focusStack.review.proofStatus')}
         limitation={t('modals.focusStack.review.limitation')}
