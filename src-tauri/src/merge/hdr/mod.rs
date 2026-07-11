@@ -1,5 +1,8 @@
 pub(crate) mod alignment;
+pub(crate) mod radiance;
 pub(crate) mod source_frame;
+pub(crate) mod static_merge;
+pub(crate) mod tone_map;
 
 mod plan;
 

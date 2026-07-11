@@ -81,9 +81,32 @@ export const hdrRuntimePlanSchema = z
       })
       .strict()
       .optional(),
-    readiness: z.literal('alignment_plan_ready').optional(),
+    readiness: z.enum(['static_radiance_preview_ready', 'deghost_required']).optional(),
     referenceSourceIndex: z.number().int().nonnegative().optional(),
     schemaVersion: z.literal(2).optional(),
+    staticRadiancePreview: z
+      .object({
+        actionState: z.enum(['static_radiance_preview_ready', 'deghost_required']),
+        colorState: z.literal('scene_linear_camera_white_balanced_uncalibrated_display_fallback'),
+        effectiveSampleMean: z.number().nonnegative(),
+        invalidOrClippedCoverage: z.number().min(0).max(1),
+        motionCoverage: z.number().min(0).max(1),
+        planHash: z.string().startsWith('blake3:'),
+        radianceAlgorithmId: z.literal('static_scene_linear_radiance_v1'),
+        radianceHandle: z.string().startsWith('native:hdr/radiance-preview/v1/'),
+        radianceHash: z.string().startsWith('blake3:'),
+        recoveredHighlightCoverage: z.number().min(0).max(1),
+        residualHash: z.string().startsWith('blake3:'),
+        supportHash: z.string().startsWith('blake3:'),
+        toneMapAlgorithmId: z.literal('global_reinhard_review_v1'),
+        toneMapExposure: z.number().positive(),
+        toneMappedPreviewDataUrl: z.string().startsWith('data:image/png;base64,'),
+        toneMappedPreviewHash: z.string().startsWith('blake3:'),
+        varianceHash: z.string().startsWith('blake3:'),
+        weightHash: z.string().startsWith('blake3:'),
+      })
+      .strict()
+      .optional(),
     sourcePaths: z.array(z.string().trim().min(1)).optional(),
     sources: z.array(
       z.union([
