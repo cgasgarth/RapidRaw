@@ -39,6 +39,10 @@ pub(crate) use io::*;
 pub(crate) use library::*;
 pub(crate) use merge::*;
 pub(crate) use raw::*;
+pub use render::resample::{
+    AxisPlan, AxisSpan, CancellationProbe, ResampleCacheMetrics, ResampleError, ResampleKey,
+    ResamplePlan, ResampledImage, cache_metrics as resample_cache_metrics, downscale_f32_image_cow,
+};
 pub(crate) use render::*;
 
 use std::collections::HashMap;
