@@ -512,6 +512,7 @@ fn build_identity_display_lut(size: u32) -> Vec<half::f16> {
     rgb_to_rgba16f(&build_lut_source_rgb(size))
 }
 
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
 fn sha256_hex(bytes: &[u8]) -> String {
     use sha2::{Digest, Sha256};
 
