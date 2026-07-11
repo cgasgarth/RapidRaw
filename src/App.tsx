@@ -54,7 +54,7 @@ import { useUIStore } from './store/useUIStore';
 import type { Adjustments } from './utils/adjustments';
 import { findAlbumById } from './utils/folderTreeUtils';
 import { getViteEnv } from './utils/frontendEnv.mjs';
-import { globalImageCache, type ImageCacheEntry } from './utils/ImageLRUCache';
+import { globalImageCache } from './utils/ImageLRUCache';
 import { getWorkspaceLeftSurface } from './utils/workspaceLeftSurface';
 import { getOptionalCurrentWindow } from './window/currentWindow';
 import TitleBar from './window/TitleBar';
@@ -153,11 +153,6 @@ function App() {
   const defaultThumbnailSize = osPlatform === 'android' ? ThumbnailSize.Small : ThumbnailSize.Medium;
   const defaultLibraryViewMode = osPlatform === 'android' ? LibraryViewMode.Recursive : LibraryViewMode.Flat;
 
-  const selectedImagePathRef = useRef<string | null>(null);
-  useEffect(() => {
-    selectedImagePathRef.current = selectedImage?.path ?? null;
-  }, [selectedImage?.path]);
-
   const prevAdjustmentsRef = useRef<PreviousAdjustments | null>(null);
 
   const viewportSize = useEditorWorkspaceViewportSubscription();
@@ -166,7 +161,6 @@ function App() {
   const previewJobIdRef = useRef<number>(0);
   const latestRenderedJobIdRef = useRef<number>(0);
   const currentResRef = useRef<number>(1280);
-  const cachedEditStateRef = useRef<ImageCacheEntry | null>(null);
 
   const [libraryViewMode, setLibraryViewMode] = useState<LibraryViewMode>(defaultLibraryViewMode);
   const [isResizing, setIsResizing] = useState(false);
@@ -283,8 +277,6 @@ function App() {
   const navigationRefs = {
     transformWrapperRef,
     preloadedDataRef,
-    cachedEditStateRef,
-    selectedImagePathRef,
     isBackendReadyRef,
     latestRenderedJobIdRef,
     previewJobIdRef,
@@ -585,7 +577,6 @@ function App() {
   return (
     <>
       <AppServices
-        imageLoader={{ cachedEditStateRef }}
         imageProcessing={{
           transformWrapperRef,
           prevAdjustmentsRef,

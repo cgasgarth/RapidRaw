@@ -100,6 +100,26 @@ export type PreviewScopeRecoveryState = 'idle' | 'loading' | 'error';
 export type PanelScopesLayout = 'overlay' | 'stacked';
 export type { EditorCompareMode } from '../utils/editorCompare';
 
+export interface EditorImageSession {
+  generation: number;
+  id: string;
+  path: string;
+  source: 'cache' | 'cold-load';
+  status: 'selecting' | 'loading' | 'ready' | 'failed';
+}
+
+export const createEditorImageSession = ({
+  generation,
+  path,
+  source,
+}: Pick<EditorImageSession, 'generation' | 'path' | 'source'>): EditorImageSession => ({
+  generation,
+  id: `editor-image-session:${String(generation)}:${path.length}:${path}`,
+  path,
+  source,
+  status: source === 'cache' ? 'ready' : 'loading',
+});
+
 interface EditorState {
   // Core Image & Adjustments
   selectedImage: SelectedImage | null;
@@ -107,6 +127,7 @@ interface EditorState {
   /** Once published, this adjustment object graph is immutable for the lifetime of the snapshot. */
   adjustmentSnapshot: AdjustmentSnapshot;
   imageSessionId: number;
+  imageSession: EditorImageSession | null;
   viewportRevision: number;
   proofRevision: number;
   lastBasicToneCommand: BasicToneCommandEnvelope | null;
@@ -293,6 +314,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   adjustments: initialAdjustments,
   adjustmentSnapshot: initialAdjustmentSnapshot,
   imageSessionId: 1,
+  imageSession: null,
   viewportRevision: 1,
   proofRevision: 1,
   lastBasicToneCommand: null,
@@ -392,8 +414,23 @@ export const useEditorStore = create<EditorState>((set) => ({
           }),
         );
       }
-      if ('selectedImage' in update && update.selectedImage?.path !== state.selectedImage?.path) {
+      if ('imageSession' in update) {
+        update.imageSessionId = update.imageSession?.generation ?? state.imageSessionId + 1;
+        state.patchResidency.reset(update.imageSessionId);
+      } else if (
+        'selectedImage' in update &&
+        update.selectedImage?.path !== state.selectedImage?.path &&
+        state.imageSession?.path !== update.selectedImage?.path
+      ) {
         update.imageSessionId = state.imageSessionId + 1;
+        update.imageSession =
+          update.selectedImage === null
+            ? null
+            : createEditorImageSession({
+                generation: update.imageSessionId,
+                path: update.selectedImage?.path ?? '',
+                source: update.selectedImage?.isReady ? 'cache' : 'cold-load',
+              });
         state.patchResidency.reset(update.imageSessionId);
       }
       if (viewportRevisionKeys.some((key) => key in update && update[key] !== state[key])) {
@@ -582,3 +619,6 @@ export const useEditorStore = create<EditorState>((set) => ({
     });
   },
 }));
+
+export const isEditorImageSessionCurrent = (sessionId: string): boolean =>
+  useEditorStore.getState().imageSession?.id === sessionId;
