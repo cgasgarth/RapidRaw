@@ -34,6 +34,7 @@ export const resetPanoramaStateForSettingsChange = (
   settings: PanoramaModalState['settings'],
 ): PanoramaModalState => ({
   ...state,
+  alignmentCancellationId: state.alignmentCancellationId,
   error: null,
   finalImageBase64: null,
   lastApplyCommand: null,

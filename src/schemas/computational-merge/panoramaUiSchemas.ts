@@ -113,6 +113,131 @@ export type PanoramaUiBlendMode = z.infer<typeof panoramaUiBlendModeSchema>;
 export type PanoramaUiExposureMode = z.infer<typeof panoramaUiExposureModeSchema>;
 export type PanoramaUiQualityPreference = z.infer<typeof panoramaUiQualityPreferenceSchema>;
 
+const panoramaAlignmentEdgeSchema = z
+  .object({
+    candidateMatchCount: z.number().int().nonnegative(),
+    inlierCount: z.number().int().nonnegative(),
+    inlierRatio: z.number().min(0).max(1),
+    matchArtifactHash: z.string().startsWith('blake3:'),
+    overlapRatio: z.number().min(0).max(1),
+    rejectionReasons: z.array(z.string()),
+    sourceIndex: z.number().int().nonnegative(),
+    spatialSupportCellCount: z.number().int().nonnegative(),
+    status: z.enum(['accepted', 'rejected']),
+    symmetricErrorP95Px: z.number().nonnegative(),
+    symmetricErrorRmsPx: z.number().nonnegative(),
+    targetIndex: z.number().int().nonnegative(),
+    transform3x3: z.tuple([
+      z.number(),
+      z.number(),
+      z.number(),
+      z.number(),
+      z.number(),
+      z.number(),
+      z.number(),
+      z.number(),
+      z.number(),
+    ]),
+    transformConditionNumber: z.number().positive().nullable(),
+    transformModel: z.enum(['deterministic_homography_ransac', 'translation_fallback_rejected']),
+    translationPx: z.tuple([z.number(), z.number()]),
+    reciprocalMatchCount: z.number().int().nonnegative(),
+    overlay: z
+      .object({
+        artifactHash: z.string().startsWith('blake3:'),
+        artifactId: z.string().min(1),
+        height: z.number().int().positive(),
+        sampledInlierCount: z.number().int().nonnegative(),
+        sampledLines: z.array(
+          z
+            .object({
+              errorPx: z.number().nonnegative(),
+              sourcePx: z.tuple([z.number(), z.number()]),
+              targetPx: z.tuple([z.number(), z.number()]),
+            })
+            .strict(),
+        ),
+        width: z.number().int().positive(),
+      })
+      .strict(),
+  })
+  .strict();
+
+export const panoramaCalibratedAlignmentPlanSchema = z
+  .object({
+    algorithmId: z.literal('rapidraw_oriented_brief_calibrated_global_pose_v1'),
+    blockedReasons: z.array(z.string()),
+    completedStages: z.array(z.string()),
+    edges: z.array(panoramaAlignmentEdgeSchema),
+    estimatedHorizontalFovDegrees: z.number().positive().max(180).nullable().optional(),
+    excludedSourceIndices: z.array(z.number().int().nonnegative()),
+    globalSolution: z
+      .object({
+        cameraPoses: z.array(
+          z
+            .object({
+              sourceIndex: z.number().int(),
+              translationPx: z.tuple([z.number(), z.number()]),
+              yawDegrees: z.number(),
+              pitchDegrees: z.number(),
+            })
+            .strict(),
+        ),
+        converged: z.boolean(),
+        cycleClosureErrorPx: z.number().nonnegative(),
+        iterations: z.number().int().positive(),
+        referenceSourceIndex: z.number().int().nonnegative(),
+        residualP95Px: z.number().nonnegative(),
+        residualRmsPx: z.number().nonnegative(),
+        robustLoss: z.literal('huber'),
+      })
+      .strict()
+      .nullable(),
+    overlapSeamHandoff: z.array(
+      z
+        .object({
+          confidence: z.enum(['high', 'medium']),
+          overlapRatio: z.number().min(0).max(1),
+          seamSearchReady: z.boolean(),
+          sourceBoundsPx: z.tuple([z.number(), z.number(), z.number(), z.number()]),
+          sourceIndex: z.number().int(),
+          targetBoundsPx: z.tuple([z.number(), z.number(), z.number(), z.number()]),
+          targetIndex: z.number().int(),
+        })
+        .strict(),
+    ),
+    planHash: z.string().startsWith('blake3:'),
+    policyHash: z.string().startsWith('blake3:'),
+    readiness: z.enum(['global_alignment_plan_ready', 'blocked']),
+    schemaVersion: z.literal('panorama_calibrated_alignment_plan_v1'),
+    sources: z.array(
+      z
+        .object({
+          calibration: z
+            .object({
+              focalLength35mm: z.number().nullable(),
+              focalLengthPx: z.number().nullable(),
+              observable: z.boolean(),
+              principalPointPx: z.tuple([z.number(), z.number()]),
+              radialK1: z.number().nullable(),
+              source: z.string(),
+            })
+            .strict(),
+          contentHash: z.string().startsWith('blake3:'),
+          featureArtifactHash: z.string().startsWith('blake3:'),
+          featureCount: z.number().int(),
+          height: z.number().int(),
+          orientation: z.number().int(),
+          sourceIndex: z.number().int(),
+          textureScore: z.number().nonnegative(),
+          width: z.number().int(),
+        })
+        .strict(),
+    ),
+    warningCodes: z.array(z.string()),
+  })
+  .strict();
+
 const panoramaPlanDimensionsSchema = z
   .object({
     height: z.number().int().positive(),
@@ -144,6 +269,7 @@ const panoramaPlanMemoryComponentsSchema = z
 
 export const panoramaRuntimePlanSchema = z
   .object({
+    alignment_plan: panoramaCalibratedAlignmentPlanSchema.optional(),
     dry_run: z.literal(true),
     family: z.literal('panorama'),
     output_dimensions: panoramaPlanDimensionsSchema,
