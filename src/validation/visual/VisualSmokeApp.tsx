@@ -28,6 +28,7 @@ import PanoramaModal from '../../components/modals/computational-merge/PanoramaM
 import SuperResolutionModal from '../../components/modals/computational-merge/SuperResolutionModal';
 import CullingModal from '../../components/modals/editing/CullingModal';
 import { LensCorrectionSession } from '../../components/modals/editing/LensCorrectionModal';
+import TransformModal from '../../components/modals/editing/TransformModal';
 import CommandPaletteModal from '../../components/modals/navigation/CommandPaletteModal';
 import { NegativeConversionModal } from '../../components/modals/negative-lab/NegativeConversionModal';
 import BottomBar from '../../components/panel/BottomBar';
@@ -1974,6 +1975,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.LayerMaskPrivateRawUi]: LayerMaskPrivateRawVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.LayerStackWorkflow]: LayerStackWorkflowVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.LensCorrectionSession]: LensCorrectionSessionVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.TransformPreviewSession]: TransformPreviewSessionVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.LibraryWorkflow]: LibraryWorkflowVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.MaskOverlayRawProof]: MaskOverlayRawProofVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.NegativeLabPublicExportReview]: NegativeLabPublicExportReviewSmoke,
@@ -3683,6 +3685,9 @@ const copy = {
   commandPaletteSelectSource: 'Select source',
   cullingCompareSync: 'Culling compare sync',
   lensCorrectionSession: 'Lens correction session',
+  transformPreviewSession: 'Transform preview session',
+  transformReopen: 'Reopen',
+  transformSwitchSource: 'Switch source',
   colorWheelInstances: 'Color wheel instances',
   colorWheelHighlights: 'Highlights',
   colorWheelShadows: 'Shadows',
@@ -5481,6 +5486,56 @@ function LensCorrectionSessionVisualSmoke() {
           onClose={() => {}}
           selectedImage={selectedImage}
           show
+        />
+      </div>
+    </main>
+  );
+}
+
+function TransformPreviewSessionVisualSmoke() {
+  const drafts = [
+    {
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      transformAspect: -18,
+      transformDistortion: 23,
+      transformRotate: 3.7,
+      transformScale: 117,
+    },
+    {
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      transformAspect: 12,
+      transformDistortion: -31,
+      transformRotate: -2.4,
+      transformScale: 91,
+    },
+  ];
+  const [isOpen, setIsOpen] = useState(true);
+  const [sourceIndex, setSourceIndex] = useState(0);
+  const [applyCount, setApplyCount] = useState(0);
+  return (
+    <main
+      className="h-screen bg-[#0f1114] text-[#f3f4f1]"
+      data-apply-count={applyCount}
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.TransformPreviewSession}
+      data-visual-smoke-ready="true"
+      data-testid="transform-session-proof"
+    >
+      <span className="sr-only">{copy.transformPreviewSession}</span>
+      <div className="fixed left-2 top-2 z-[60] flex gap-2">
+        <button data-testid="transform-reopen" onClick={() => setIsOpen((open) => !open)}>
+          {copy.transformReopen}
+        </button>
+        <button data-testid="transform-switch-source" onClick={() => setSourceIndex((index) => 1 - index)}>
+          {copy.transformSwitchSource}
+        </button>
+      </div>
+      <div className="h-full" data-visual-smoke-section="transform-preview-session">
+        <TransformModal
+          currentAdjustments={drafts[sourceIndex] ?? INITIAL_ADJUSTMENTS}
+          isOpen={isOpen}
+          onApply={() => setApplyCount((count) => count + 1)}
+          onClose={() => setIsOpen(false)}
+          sourceKey={`fixture-${sourceIndex}.ARW`}
         />
       </div>
     </main>

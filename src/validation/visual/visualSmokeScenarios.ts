@@ -25,6 +25,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   LayerMaskPrivateRawUi: 'layer-mask-private-raw-ui',
   LayerStackWorkflow: 'layer-stack-workflow',
   LensCorrectionSession: 'lens-correction-session',
+  TransformPreviewSession: 'transform-preview-session',
   LibraryWorkflow: 'library-workflow',
   MaskOverlayRawProof: 'mask-overlay-raw-proof',
   NegativeLabBatchColorWorkspace: 'negative-lab-batch-color-workspace',
@@ -113,6 +114,12 @@ export const VISUAL_SMOKE_SCENARIOS = [
     marker: 'Lens correction session',
     mode: VISUAL_SMOKE_SCENARIO_IDS.LensCorrectionSession,
     outputFile: 'lens-correction-session.png',
+    sectionMinimum: 1,
+  },
+  {
+    marker: 'Transform preview session',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.TransformPreviewSession,
+    outputFile: 'transform-preview-session.png',
     sectionMinimum: 1,
   },
   {

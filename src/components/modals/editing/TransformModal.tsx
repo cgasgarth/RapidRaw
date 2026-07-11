@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import cx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Check, Eye, EyeOff, Grid3X3, Info, LineChart, Maximize, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useModalTransition } from '../../../hooks/ui/useModalTransition';
@@ -65,9 +65,10 @@ interface TransformModalProps {
   onClose: () => void;
   onApply: (newParams: TransformParams) => void;
   currentAdjustments: Adjustments;
+  sourceKey: string;
 }
 
-const DEFAULT_PARAMS: TransformParams = {
+export const DEFAULT_TRANSFORM_PARAMS: TransformParams = {
   distortion: 0,
   vertical: 0,
   horizontal: 0,
@@ -77,6 +78,45 @@ const DEFAULT_PARAMS: TransformParams = {
   x_offset: 0,
   y_offset: 0,
 };
+
+export function buildTransformDraft(currentAdjustments: Adjustments): TransformParams {
+  return {
+    distortion: currentAdjustments.transformDistortion,
+    vertical: currentAdjustments.transformVertical,
+    horizontal: currentAdjustments.transformHorizontal,
+    rotate: currentAdjustments.transformRotate,
+    aspect: currentAdjustments.transformAspect,
+    scale: currentAdjustments.transformScale,
+    x_offset: currentAdjustments.transformXOffset,
+    y_offset: currentAdjustments.transformYOffset,
+  };
+}
+
+export interface TransformPreviewRequestGate {
+  activate: () => void;
+  begin: () => number;
+  close: () => void;
+  isCurrent: (requestId: number) => boolean;
+}
+
+export function createTransformPreviewRequestGate(): TransformPreviewRequestGate {
+  let active = true;
+  let generation = 0;
+  return {
+    activate: () => {
+      active = true;
+    },
+    begin: () => {
+      generation += 1;
+      return generation;
+    },
+    close: () => {
+      active = false;
+      generation += 1;
+    },
+    isCurrent: (requestId) => active && generation === requestId,
+  };
+}
 
 const SLIDER_DIVISOR = 100.0;
 
@@ -118,36 +158,89 @@ const CustomGrid = ({ denseVisible, ruleOfThirdsVisible }: { denseVisible: boole
   </div>
 );
 
-export default function TransformModal({ isOpen, onClose, onApply, currentAdjustments }: TransformModalProps) {
+export default function TransformModal({
+  isOpen,
+  onClose,
+  onApply,
+  currentAdjustments,
+  sourceKey,
+}: TransformModalProps) {
+  const { isMounted, show } = useModalTransition(isOpen);
+  const openEpoch = useRef(0);
+  const editGraphEpoch = useRef(0);
+  const wasOpen = useRef(false);
+  const previousAdjustments = useRef(currentAdjustments);
+  if (isOpen && !wasOpen.current) openEpoch.current += 1;
+  if (currentAdjustments !== previousAdjustments.current) {
+    if (isOpen) editGraphEpoch.current += 1;
+    previousAdjustments.current = currentAdjustments;
+  }
+  wasOpen.current = isOpen;
+
+  if (!isMounted) return null;
+
+  const sessionKey = `${openEpoch.current}:${editGraphEpoch.current}:${sourceKey}`;
+  return (
+    <div
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs transition-opacity duration-300 ${
+        show ? 'opacity-100' : 'opacity-0'
+      }`}
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <TransformSession
+        currentAdjustments={currentAdjustments}
+        isSessionOpen={isOpen}
+        key={sessionKey}
+        onApply={onApply}
+        onClose={onClose}
+        show={show}
+      />
+    </div>
+  );
+}
+
+interface TransformSessionProps extends Omit<TransformModalProps, 'isOpen' | 'sourceKey'> {
+  isSessionOpen: boolean;
+  show: boolean;
+}
+
+export function TransformSession({ currentAdjustments, isSessionOpen, onApply, onClose, show }: TransformSessionProps) {
   const { t } = useTranslation();
-  const [params, setParams] = useState<TransformParams>(DEFAULT_PARAMS);
+  const [params, setParams] = useState<TransformParams>(() => buildTransformDraft(currentAdjustments));
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isApplying, setIsApplying] = useState(false);
   const [showGrid, setShowGrid] = useState(true);
   const [showLines, setShowLines] = useState(false);
   const [isCompareActive, setIsCompareActive] = useState(false);
   const [isInteracting, setIsInteracting] = useState(false);
+  const requestGate = useRef(createTransformPreviewRequestGate());
+  const applySubmitted = useRef(false);
 
   const { containerRef, handleMouseDown, handleResetZoom, handleWheel, imageTransformStyle, zoom, zoomIn, zoomOut } =
     usePreviewViewport({ maxZoom: 8, minZoom: 0.1, zoomStep: 0.25 });
 
-  const { isMounted, show } = useModalTransition(isOpen);
+  const handleInteractionEnd = useCallback(() => {
+    setIsInteracting(false);
+  }, []);
 
   useEffect(() => {
-    const handleDragEndGlobal = () => {
-      if (isInteracting) setIsInteracting(false);
-    };
-
     if (isInteracting) {
-      window.addEventListener('mouseup', handleDragEndGlobal);
-      window.addEventListener('touchend', handleDragEndGlobal);
+      window.addEventListener('mouseup', handleInteractionEnd);
+      window.addEventListener('pointerup', handleInteractionEnd);
+      window.addEventListener('touchcancel', handleInteractionEnd);
+      window.addEventListener('touchend', handleInteractionEnd);
     }
 
     return () => {
-      window.removeEventListener('mouseup', handleDragEndGlobal);
-      window.removeEventListener('touchend', handleDragEndGlobal);
+      window.removeEventListener('mouseup', handleInteractionEnd);
+      window.removeEventListener('pointerup', handleInteractionEnd);
+      window.removeEventListener('touchcancel', handleInteractionEnd);
+      window.removeEventListener('touchend', handleInteractionEnd);
     };
-  }, [isInteracting]);
+  }, [handleInteractionEnd, isInteracting]);
 
   const handleInteractionStart = useCallback(() => {
     setIsInteracting(true);
@@ -156,6 +249,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
   const updatePreview = useMemo(
     () =>
       throttle(async (currentParams: TransformParams, linesEnabled: boolean) => {
+        const requestId = requestGate.current.begin();
         try {
           const fullParams: GeometryParams = {
             ...currentParams,
@@ -181,8 +275,10 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
             jsAdjustments: currentAdjustments,
             showLines: linesEnabled,
           });
+          if (!requestGate.current.isCurrent(requestId)) return;
           setPreviewUrl(result);
         } catch (e) {
+          if (!requestGate.current.isCurrent(requestId)) return;
           console.error('Preview transform failed', e);
         }
       }, 30),
@@ -190,57 +286,39 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
   );
 
   useEffect(() => {
-    if (isOpen) {
-      const timer = window.setTimeout(() => {
-        const initParams = {
-          distortion: currentAdjustments.transformDistortion,
-          vertical: currentAdjustments.transformVertical,
-          horizontal: currentAdjustments.transformHorizontal,
-          rotate: currentAdjustments.transformRotate,
-          aspect: currentAdjustments.transformAspect,
-          scale: currentAdjustments.transformScale,
-          x_offset: currentAdjustments.transformXOffset,
-          y_offset: currentAdjustments.transformYOffset,
-        };
-        setParams(initParams);
-        setShowLines(false);
-        handleResetZoom();
-        updatePreview(initParams, false);
-      }, 0);
-      return () => {
-        window.clearTimeout(timer);
-      };
-    }
-
-    const timer = window.setTimeout(() => {
-      setPreviewUrl(null);
-      setIsApplying(false);
-    }, 300);
+    if (!isSessionOpen) return undefined;
+    requestGate.current.activate();
+    handleResetZoom();
+    updatePreview(buildTransformDraft(currentAdjustments), false);
     return () => {
-      window.clearTimeout(timer);
+      requestGate.current.close();
+      updatePreview.cancel();
     };
-  }, [isOpen, currentAdjustments, handleResetZoom, updatePreview]);
+  }, [isSessionOpen, currentAdjustments, handleResetZoom, updatePreview]);
 
-  const handleChange = (key: keyof typeof DEFAULT_PARAMS, value: number) => {
+  const handleChange = (key: keyof TransformParams, value: number) => {
     const newParams = { ...params, [key]: value };
     setParams(newParams);
     updatePreview(newParams, showLines);
   };
 
   const handleApply = () => {
+    if (applySubmitted.current) return;
+    applySubmitted.current = true;
     setIsApplying(true);
     try {
       onApply(params);
       onClose();
     } catch (e) {
+      applySubmitted.current = false;
       console.error('Failed to apply transform', e);
       setIsApplying(false);
     }
   };
 
   const handleReset = () => {
-    setParams(DEFAULT_PARAMS);
-    updatePreview(DEFAULT_PARAMS, showLines);
+    setParams(DEFAULT_TRANSFORM_PARAMS);
+    updatePreview(DEFAULT_TRANSFORM_PARAMS, showLines);
   };
 
   const handleShowLinesToggle = () => {
@@ -249,11 +327,12 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
     updatePreview(params, newShowLines);
   };
 
-  const toggleCompare = async (active: boolean) => {
+  const toggleCompare = (active: boolean) => {
     setIsCompareActive(active);
     if (active) {
+      updatePreview.cancel();
       const fullParams: GeometryParams = {
-        ...DEFAULT_PARAMS,
+        ...DEFAULT_TRANSFORM_PARAMS,
         lens_distortion_amount: currentAdjustments.lensDistortionAmount / SLIDER_DIVISOR,
         lens_vignette_amount: currentAdjustments.lensVignetteAmount / SLIDER_DIVISOR,
         lens_tca_amount: currentAdjustments.lensTcaAmount / SLIDER_DIVISOR,
@@ -270,12 +349,18 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
         lens_tca_enabled: currentAdjustments.lensTcaEnabled,
         lens_vignette_enabled: currentAdjustments.lensVignetteEnabled,
       };
-      const result: string = await invoke(Invokes.PreviewGeometryTransform, {
+      const requestId = requestGate.current.begin();
+      void invoke<string>(Invokes.PreviewGeometryTransform, {
         params: fullParams,
         jsAdjustments: currentAdjustments,
         showLines: false,
-      });
-      setPreviewUrl(result);
+      })
+        .then((result) => {
+          if (requestGate.current.isCurrent(requestId)) setPreviewUrl(result);
+        })
+        .catch((error) => {
+          if (requestGate.current.isCurrent(requestId)) console.error('Preview transform failed', error);
+        });
     } else {
       updatePreview(params, showLines);
     }
@@ -287,6 +372,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
         <UiText variant={TextVariants.title}>{t('modals.transform.title')}</UiText>
         <button
           onClick={handleReset}
+          data-testid="transform-reset"
           data-tooltip={t('modals.transform.resetTooltip')}
           className="p-2 rounded-full hover:bg-surface transition-colors"
         >
@@ -506,6 +592,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
             </button>
             <button
               onClick={handleShowLinesToggle}
+              data-testid="transform-lines"
               className={cx(
                 'p-2 rounded-full transition-colors',
                 showLines ? 'bg-white/20 text-white' : 'text-white/60 hover:bg-white/10 hover:text-white',
@@ -561,6 +648,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
                 'p-2 rounded-full transition-colors select-none',
                 isCompareActive ? 'bg-accent text-button-text' : 'text-white/60 hover:bg-white/10 hover:text-white',
               )}
+              data-testid="transform-compare"
               data-tooltip={t('modals.transform.compareTooltip')}
             >
               {isCompareActive ? <Eye size={18} /> : <EyeOff size={18} />}
@@ -572,44 +660,38 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
     </div>
   );
 
-  if (!isMounted) return null;
-
   return (
-    <div
-      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs transition-opacity duration-300 ${
-        show ? 'opacity-100' : 'opacity-0'
-      }`}
-      role="presentation"
-      onMouseDown={onClose}
-    >
-      <AnimatePresence>
-        {show && (
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.95, opacity: 0 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
-            className="bg-surface rounded-lg shadow-xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden"
-            onMouseDown={(e) => {
-              e.stopPropagation();
-            }}
-          >
-            <div className="grow min-h-0 overflow-hidden">{renderContent()}</div>
-            <div className="shrink-0 p-4 flex justify-end gap-3 border-t border-surface bg-bg-secondary z-20">
-              <button
-                onClick={onClose}
-                className="px-4 py-2 rounded-md text-text-secondary hover:bg-surface transition-colors"
-              >
-                {t('modals.transform.cancel')}
-              </button>
-              <Button onClick={handleApply} disabled={isApplying || !previewUrl}>
-                <Check className="mr-2" size={16} />
-                {t('modals.transform.apply')}
-              </Button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+    <AnimatePresence>
+      {show && (
+        <motion.div
+          initial={{ scale: 0.95, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.95, opacity: 0 }}
+          transition={{ duration: 0.2, ease: 'easeOut' }}
+          className="bg-surface rounded-lg shadow-xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden"
+          data-transform-aspect={params.aspect}
+          data-transform-distortion={params.distortion}
+          data-transform-lines={showLines}
+          data-transform-rotate={params.rotate}
+          data-transform-scale={params.scale}
+          data-testid="transform-session"
+        >
+          <div className="grow min-h-0 overflow-hidden">{renderContent()}</div>
+          <div className="shrink-0 p-4 flex justify-end gap-3 border-t border-surface bg-bg-secondary z-20">
+            <button
+              onClick={onClose}
+              data-testid="transform-cancel"
+              className="px-4 py-2 rounded-md text-text-secondary hover:bg-surface transition-colors"
+            >
+              {t('modals.transform.cancel')}
+            </button>
+            <Button data-testid="transform-apply" onClick={handleApply} disabled={isApplying || !previewUrl}>
+              <Check className="mr-2" size={16} />
+              {t('modals.transform.apply')}
+            </Button>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

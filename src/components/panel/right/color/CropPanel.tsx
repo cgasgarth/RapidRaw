@@ -1098,6 +1098,7 @@ export default function CropPanel() {
           }));
         }}
         currentAdjustments={adjustments}
+        sourceKey={selectedImagePath ?? 'no-image'}
       />
 
       <LensCorrectionModal
