@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test';
 import { Window } from 'happy-dom';
 import i18next from 'i18next';
-import { act, createElement } from 'react';
+import { act, createElement, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { Mask } from '../../../src/components/panel/right/layers/Masks.tsx';
@@ -13,7 +13,12 @@ import { INITIAL_ADJUSTMENTS, INITIAL_MASK_ADJUSTMENTS, type MaskContainer } fro
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 mock.module('@clerk/react', () => ({
+  ClerkProvider: ({ children }: { children?: ReactNode }) => children ?? null,
+  Show: ({ children }: { children?: ReactNode }) => children ?? null,
+  SignIn: () => null,
   useAuth: () => ({ getToken: async () => null }),
+  useClerk: () => ({ signOut: async () => undefined }),
+  useUser: () => ({ isLoaded: true, isSignedIn: false, user: null }),
 }));
 
 const firstMask: MaskContainer = {
