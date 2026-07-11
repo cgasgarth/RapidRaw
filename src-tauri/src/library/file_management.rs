@@ -48,7 +48,8 @@ use crate::library_identity::{
 use crate::render_plan::{CompileRenderPlanContext, compile_render_plan_cached, content_revision};
 use crate::smart_preview_cache::{
     SMART_PREVIEW_TARGET_WIDTH, ThumbnailSmartPreviewPayload, compute_source_revision,
-    read_smart_preview_artifact, resolve_smart_preview_cache_dir, write_smart_preview_artifact,
+    enforce_smart_preview_cache_budget, read_smart_preview_artifact,
+    resolve_smart_preview_cache_dir, write_smart_preview_artifact,
 };
 use crate::smart_preview_scheduler::SmartPreviewDemandClass;
 use crate::tagging::{COLOR_TAG_PREFIX, USER_TAG_PREFIX};
@@ -1698,6 +1699,8 @@ pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
                 && smart_scheduler.is_publishable(&job)
             {
                 succeeded = true;
+                let (artifact_count, retained_bytes) =
+                    enforce_smart_preview_cache_budget(&dir, &resource.resource_id);
                 resource.generation = next_descriptor_generation();
                 let _ = smart_app.emit(
                     "smart-preview-generated",
@@ -1707,7 +1710,8 @@ pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
                         "sourceRevision": job.source_revision,
                         "resource": resource,
                         "smartPreview": payload,
-                        "state": "current"
+                        "state": "current",
+                        "storage": { "artifactCount": artifact_count, "retainedBytes": retained_bytes }
                     }),
                 );
             } else {
