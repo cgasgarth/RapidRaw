@@ -32,7 +32,11 @@ const record = {
   ],
   finalGraphRevision: 'history_1',
   initialGraphRevision: 'history_0',
-  modelId: 'gpt-5.1-codex-app-server',
+  modelSelection: {
+    effective: { modelId: 'gpt-5.6-terra', reasoningTier: 'light' },
+    requested: { modelId: 'gpt-5.6-terra', reasoningTier: 'light' },
+    status: 'exact',
+  },
   planSummary: 'Replay brightening plan.',
   prompt: 'Replay the completed edit.',
   rollbackGraphRevision: 'history_0',
@@ -89,6 +93,9 @@ if (
 }
 if (diverged.finalGraphRevision !== 'history_1' || diverged.replayedRecordCount !== 1) {
   throw new Error('Agent replay report did not preserve session replay metadata.');
+}
+if (diverged.modelSelection.requested.modelId !== 'gpt-5.6-terra') {
+  throw new Error('Agent replay did not preserve model-selection receipt.');
 }
 
 console.log('agent session replay ok (matched+diverged)');

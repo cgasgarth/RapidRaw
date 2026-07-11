@@ -7,7 +7,8 @@
     "Renders two distinct selected-image preview envelopes, including a second detail-review crop.",
     "Rejects stale apply-review attempts against the private RAW-derived preview review.",
     "Rolls the live editor history back to the session-start checkpoint after review.",
-    "Hashes the private source RAW before and after the loop and requires no overwrite."
+    "Hashes the private source RAW before and after the loop and requires no overwrite.",
+    "Records requested and effective GPT-5.6 Terra light configuration through supported app-server turn fields."
   ],
   "doesNotProve": [
     "Does not commit or publish private Alaska image pixels, RAW hashes, or per-file metadata.",

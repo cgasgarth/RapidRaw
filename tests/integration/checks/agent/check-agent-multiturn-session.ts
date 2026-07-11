@@ -16,7 +16,7 @@ const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index ===
 const mediumPreviewFixture = new Uint8Array(
   await readFile(new URL('../../../../docs/baseline/render/rapidraw-vite-empty-root-2026-06-10.jpg', import.meta.url)),
 );
-const recordedModelInputs: Array<{ attachments: unknown[] }> = [];
+const recordedModelInputs: Array<{ attachments: unknown[]; effort: string; model: string }> = [];
 
 for (let index = 0; index + 8 < mediumPreviewFixture.length; index += 1) {
   if (mediumPreviewFixture[index] !== 0xff || mediumPreviewFixture[index + 1] !== 0xc0) continue;
@@ -96,8 +96,13 @@ const result = await runAgentMultiTurnAppServerSession(
     ],
   },
   {
-    initialModelInputSink: (input) => {
-      recordedModelInputs.push({ attachments: input.attachments });
+    initialModelInputSink: (input, transportRequest) => {
+      recordedModelInputs.push({ attachments: input.attachments, ...transportRequest.params });
+      return {
+        effective: { modelId: transportRequest.params.model, reasoningTier: transportRequest.params.effort },
+        requested: { modelId: transportRequest.params.model, reasoningTier: transportRequest.params.effort },
+        status: 'exact',
+      };
     },
   },
 );
@@ -115,6 +120,8 @@ if (result.initialContext.preview.purpose !== 'initial_context' || result.previe
 if (
   recordedModelInputs.length !== 1 ||
   recordedModelInputs[0]?.attachments.length !== 1 ||
+  recordedModelInputs[0]?.model !== 'gpt-5.6-terra' ||
+  recordedModelInputs[0]?.effort !== 'light' ||
   result.initialContext.modelInput.attachments.length !== 1 ||
   result.initialContext.modelInput.attachments[0]?.attachment.artifactId !==
     result.initialPreviewReceipt.attachment.artifactId ||
@@ -123,6 +130,14 @@ if (
   throw new Error(
     'agent multi-turn session did not deliver one revision-bound image attachment to the recording sink.',
   );
+}
+if (
+  result.modelSelection.status !== 'exact' ||
+  result.modelSelection.requested.modelId !== 'gpt-5.6-terra' ||
+  result.modelSelection.requested.reasoningTier !== 'light' ||
+  result.modelSelection.effective?.modelId !== 'gpt-5.6-terra'
+) {
+  throw new Error('agent multi-turn session did not preserve requested/effective Terra light transport identity.');
 }
 if (previewPurposes.join(',') !== 'initial_context,refresh,detail_review') {
   throw new Error(`agent multi-turn session preview purposes were wrong: ${previewPurposes.join(',')}`);
@@ -174,6 +189,42 @@ if (
   result.editReview.toolReceiptCount !== 2
 ) {
   throw new Error('agent multi-turn session did not bind final review to previews and receipts.');
+}
+
+useEditorStore.getState().setEditor({
+  adjustments: INITIAL_ADJUSTMENTS,
+  history: [INITIAL_ADJUSTMENTS],
+  historyIndex: 0,
+});
+try {
+  await runAgentMultiTurnAppServerSession(
+    {
+      operationId: 'agent_multiturn_rejected',
+      prompt: 'This request must stop before editing.',
+      requestId: 'agent-multiturn-rejected',
+      sessionId: 'agent-multiturn-rejected',
+      turns: [
+        { adjustment: { exposure: 0.2 }, assistantRationale: 'Would apply exposure.' },
+        { adjustment: { shadows: 10 }, assistantRationale: 'Would apply shadows.' },
+      ],
+    },
+    {
+      initialModelInputSink: (_input, transportRequest) => ({
+        effective: null,
+        reason: 'Terra light is unavailable.',
+        requested: { modelId: transportRequest.params.model, reasoningTier: transportRequest.params.effort },
+        status: 'rejected',
+      }),
+    },
+  );
+  throw new Error('agent multi-turn session accepted a rejected model request.');
+} catch (error) {
+  if (error instanceof Error && error.message === 'agent multi-turn session accepted a rejected model request.') {
+    throw error;
+  }
+}
+if (useEditorStore.getState().historyIndex !== 0) {
+  throw new Error('rejected model transport changed selected-image edit history.');
 }
 
 console.log('agent multi-turn app-server session ok');
