@@ -14,7 +14,7 @@ use crate::cache_utils::DecodedImageCache;
 use crate::gpu_processing::GpuProcessor;
 use crate::image_processing::GpuContext;
 use crate::lens_correction::LensDatabase;
-use crate::lut_processing::Lut;
+use crate::lut_processing::{CachedLutPath, Lut};
 use crate::panorama_stitching::PendingPanoramaResult;
 use crate::render::native_cache::{CacheBudgetCoordinator, CachePolicy, MemoryLruCache};
 use crate::source_revision::FingerprintCache;
@@ -227,7 +227,8 @@ pub struct AppState {
     pub denoise_result: Arc<Mutex<Option<DynamicImage>>>,
     pub indexing_task_handle: Mutex<Option<JoinHandle<()>>>,
     pub cache_budget: Arc<CacheBudgetCoordinator>,
-    pub lut_cache: MemoryLruCache<String, Lut>,
+    pub lut_cache: MemoryLruCache<String, CachedLutPath>,
+    pub lut_content_cache: MemoryLruCache<[u8; 32], Lut>,
     pub initial_file_path: Mutex<Option<String>>,
     pub thumbnail_cancellation_token: Arc<AtomicBool>,
     pub thumbnail_progress: Mutex<ThumbnailProgressTracker>,
@@ -288,6 +289,10 @@ impl AppState {
             indexing_task_handle: Mutex::new(None),
             cache_budget: Arc::clone(&cache_budget),
             lut_cache: MemoryLruCache::new(
+                policy("lut_paths", 1, 2, Some(64)),
+                Arc::clone(&cache_budget),
+            ),
+            lut_content_cache: MemoryLruCache::new(
                 policy("lut_cpu", 64, 96, Some(32)),
                 Arc::clone(&cache_budget),
             ),
