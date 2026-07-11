@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import { AlertTriangle, Aperture, CheckCircle2, Eye, Layers3, ShieldCheck } from 'lucide-react';
 import { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { FocusStackNativeInputPlan } from '../../../schemas/focus-stack/focusStackNativePlanSchemas';
 import type { FocusStackOutputReviewWorkflow } from '../../../schemas/focus-stack/focusStackOutputReviewSchemas';
 import type {
   FocusStackAlignmentMode,
@@ -34,6 +35,9 @@ interface FocusStackModalProps {
   lastApplyCommand?: FocusStackModalState['lastApplyCommand'];
   lastDryRunCommand?: FocusStackModalState['lastDryRunCommand'];
   loadingImageUrl?: string | null;
+  nativeInputPlan?: FocusStackNativeInputPlan | null;
+  nativePlanError?: string | null;
+  isNativePlanning?: boolean;
   onApplyPlan: () => void;
   onClose: () => void;
   onPreviewPlan: () => void;
@@ -56,6 +60,9 @@ export function FocusStackModal({
   lastApplyCommand,
   lastDryRunCommand,
   loadingImageUrl,
+  nativeInputPlan = null,
+  nativePlanError = null,
+  isNativePlanning = false,
   onApplyPlan,
   onClose,
   onPreviewPlan,
@@ -74,9 +81,8 @@ export function FocusStackModal({
       sourcePreflightMetadata.length > 0 ? buildFocusStackSourcePreflight({ sources: sourcePreflightMetadata }) : null,
     [sourcePreflightMetadata],
   );
-  const isSourceCountValid = sourceCount >= 2;
-  const isSourcePreflightBlocked = sourcePreflight?.status === 'blocked';
-  const isPreviewPlanReady = isSourceCountValid && !isSourcePreflightBlocked;
+  const isSourceCountValid = sourceCount >= 2 && sourceCount <= 128;
+  const isPreviewPlanReady = nativeInputPlan?.accepted === true;
   const isDepthMapPreviewOnly = settings.blendMethod === 'depth_map';
 
   const alignmentOptions: Array<OptionItem<FocusStackAlignmentMode>> = [
@@ -250,7 +256,7 @@ export function FocusStackModal({
           >
             {t('modals.focusStack.close')}
           </button>
-          <Button onClick={onPreviewPlan} disabled={!isPreviewPlanReady}>
+          <Button onClick={onPreviewPlan} disabled={!isSourceCountValid || isNativePlanning}>
             <Layers3 className="w-4 h-4" />
             {hasRuntimeOutputReview ? t('modals.focusStack.refreshPreviewPlan') : t('modals.focusStack.previewPlan')}
           </Button>
@@ -262,7 +268,49 @@ export function FocusStackModal({
       }
     >
       {!isPreviewPlanReady && (
-        <ComputationalSetupSourceWarning>{t('modals.focusStack.sourceCountBlocked')}</ComputationalSetupSourceWarning>
+        <ComputationalSetupSourceWarning>
+          {nativePlanError ??
+            nativeInputPlan?.blockCodes.join(', ') ??
+            (isNativePlanning ? t('modals.focusStack.preflight.pending') : t('modals.focusStack.sourceCountBlocked'))}
+        </ComputationalSetupSourceWarning>
+      )}
+
+      {nativeInputPlan !== null && (
+        <section
+          className="border border-border-color bg-bg-secondary/70 p-2 text-sm"
+          data-testid="focus-stack-native-readiness"
+        >
+          <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
+            <ComputationalSetupStatusLine label="Native plan" value={nativeInputPlan.acceptedDryRunPlanId} />
+            <ComputationalSetupStatusLine label="Reference" value={`${nativeInputPlan.referenceSourceIndex + 1}`} />
+            <ComputationalSetupStatusLine label="Focus order" value={nativeInputPlan.focusOrderSource} />
+            <ComputationalSetupStatusLine
+              label="Geometry"
+              value={`${nativeInputPlan.commonGeometry.width} x ${nativeInputPlan.commonGeometry.height}`}
+            />
+            <ComputationalSetupStatusLine
+              label="Diagnostics"
+              value={nativeInputPlan.warningCodes.join(', ') || t('modals.focusStack.preflight.ready')}
+            />
+          </div>
+          <div className="mt-2 max-h-36 overflow-y-auto border-t border-border-color pt-2">
+            {nativeInputPlan.sources.map((source) => (
+              <div className="grid grid-cols-[3rem_1fr_8rem] gap-2 py-1" key={source.contentHash}>
+                <span>
+                  {source.sourceIndex + 1}
+                  {source.sourceIndex === nativeInputPlan.referenceSourceIndex ? ' *' : ''}
+                </span>
+                <span>
+                  {source.cameraMake} {source.cameraModel}
+                  {source.lensModel === null ? '' : ` / ${source.lensModel}`}
+                </span>
+                <span>
+                  {source.width} x {source.height} / {source.sourceKind === 'raw_sensor_source' ? 'RAW' : 'RGB'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
       )}
 
       <section

@@ -689,7 +689,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               },
             },
             {
-              disabled: selectionCount < 2 || selectionCount > 16,
+              disabled: selectionCount < 2 || selectionCount > 128,
               icon: ScanSearch,
               label: superResolutionLabel,
               onClick: () => {
@@ -711,7 +711,10 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               onClick: () => {
                 setUI({
                   focusStackModalState: {
+                    error: null,
                     isOpen: true,
+                    isPlanning: false,
+                    nativeInputPlan: null,
                     outputReview: null,
                     settings: DEFAULT_FOCUS_STACK_UI_SETTINGS,
                     sourcePreflightMetadata: createFocusStackSourcePreflightMetadata(finalSelection, imageList),

@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
+import { focusStackNativeInputPlanSchema } from '../../schemas/focus-stack/focusStackNativePlanSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useProcessStore } from '../../store/useProcessStore';
@@ -21,10 +22,7 @@ import {
   resetHdrStateForSettingsChange,
   resetPanoramaStateForSettingsChange,
 } from '../../utils/computational-merge/computationalMergeModalState';
-import {
-  buildFocusStackOutputReviewWorkflow,
-  markFocusStackOutputReviewApplyReady,
-} from '../../utils/focusStackOutputReview';
+import { markFocusStackOutputReviewApplyReady } from '../../utils/focusStackOutputReview';
 import { handleNegativeConversionEditorHandoff } from '../../utils/negative-lab/negativeLabEditorHandoff';
 import { superResolutionNativeRegistrationPlanSchema } from '../../utils/superResolutionNativeReadiness';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
@@ -419,10 +417,10 @@ export default function AppModals(props: AppModalsProps) {
               }));
             }}
             onApplyPlan={() => {
-              if (focusStackModalState.outputReview === null) return;
+              if (focusStackModalState.outputReview === null || focusStackModalState.nativeInputPlan?.accepted !== true)
+                return;
               const routePair = getComputationalMergeAppServerRoutePairSummary('focus_stack');
-              const acceptedDryRunPlanId = `focus_stack_plan_${focusStackModalState.sourcePaths.length}`;
-              const acceptedDryRunPlanHash = focusStackModalState.outputReview.editableHandoff.artifactHash;
+              const { acceptedDryRunPlanId, acceptedDryRunPlanHash } = focusStackModalState.nativeInputPlan;
               setUI({
                 focusStackModalState: {
                   ...focusStackModalState,
@@ -446,19 +444,48 @@ export default function AppModals(props: AppModalsProps) {
                 sources: focusStackModalState.sourcePaths.length,
                 toolName: getComputationalMergeAppServerRoutePairSummary('focus_stack').dryRunToolName,
               };
-              const { lastApplyCommand: _lastApplyCommand, ...nextFocusStackModalState } = focusStackModalState;
               setUI({
                 focusStackModalState: {
-                  ...nextFocusStackModalState,
+                  ...focusStackModalState,
+                  error: null,
+                  isPlanning: true,
                   lastDryRunCommand,
-                  outputReview: buildFocusStackOutputReviewWorkflow({
-                    artifactPath: `/tmp/rawengine-focus-stack-preview-plan-${focusStackModalState.sourcePaths.length}.tif`,
-                    settings: focusStackModalState.settings,
-                    sourceCount: focusStackModalState.sourcePaths.length,
-                    sourcePaths: focusStackModalState.sourcePaths,
-                  }),
+                  nativeInputPlan: null,
+                  outputReview: null,
                 },
               });
+              void invokeWithSchema(
+                Invokes.PlanFocusStack,
+                {
+                  graphRevisions: focusStackModalState.sourcePreflightMetadata.map(
+                    (source) => source.graphRevision ?? 'library:unknown:neutral',
+                  ),
+                  orderedSourceIds: focusStackModalState.sourcePaths.map((_, index) => `selected-source-${index}`),
+                  paths: focusStackModalState.sourcePaths,
+                  settings: {
+                    commonCropIdentity: 'common:uncropped',
+                    lensCorrectionIdentity: 'native_lens_policy_v1',
+                    neutralRawState: true,
+                    orientationIdentity: 'common:decoded_orientation',
+                  },
+                },
+                focusStackNativeInputPlanSchema,
+              )
+                .then((nativeInputPlan) => {
+                  setUI((state) => ({
+                    focusStackModalState: { ...state.focusStackModalState, isPlanning: false, nativeInputPlan },
+                  }));
+                })
+                .catch((error: unknown) => {
+                  setUI((state) => ({
+                    focusStackModalState: {
+                      ...state.focusStackModalState,
+                      error: error instanceof Error ? error.message : String(error),
+                      isPlanning: false,
+                      nativeInputPlan: null,
+                    },
+                  }));
+                });
             }}
             onSettingsChange={(settings) => {
               setUI((state) => {
@@ -470,6 +497,8 @@ export default function AppModals(props: AppModalsProps) {
                 return {
                   focusStackModalState: {
                     ...focusStackModalState,
+                    error: null,
+                    nativeInputPlan: null,
                     outputReview: null,
                     settings,
                   },
@@ -477,6 +506,9 @@ export default function AppModals(props: AppModalsProps) {
               });
             }}
             outputReview={focusStackModalState.outputReview}
+            nativeInputPlan={focusStackModalState.nativeInputPlan}
+            nativePlanError={focusStackModalState.error}
+            isNativePlanning={focusStackModalState.isPlanning}
             settings={focusStackModalState.settings}
             sourceCount={focusStackModalState.sourcePaths.length}
             sourcePaths={focusStackModalState.sourcePaths}
