@@ -1794,11 +1794,12 @@ async fn plan_focus_stack(
         settings,
         || tracker.load(Ordering::SeqCst) != generation,
     )?;
+    let mut published_plan = state.focus_stack_runtime_plan.lock().unwrap();
     if tracker.load(Ordering::SeqCst) != generation {
         return Err("focus_stack_plan_cancelled:plan_publication".to_string());
     }
     if plan.accepted {
-        *state.focus_stack_runtime_plan.lock().unwrap() = Some((
+        *published_plan = Some((
             plan.accepted_dry_run_plan_id.clone(),
             plan.accepted_dry_run_plan_hash.clone(),
         ));

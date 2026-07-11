@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { useShallow } from 'zustand/react/shallow';
@@ -173,6 +173,7 @@ export default function AppModals(props: AppModalsProps) {
   const [hasLoadedSuperResolutionModal, setHasLoadedSuperResolutionModal] = useState(superResolutionModalState.isOpen);
   const [singleImagePreviewRunning, setSingleImagePreviewRunning] = useState(false);
   const [hasLoadedFocusStackModal, setHasLoadedFocusStackModal] = useState(focusStackModalState.isOpen);
+  const focusStackPlanRequestId = useRef(0);
 
   useEffect(() => {
     if (panoramaModalState.isOpen) setHasLoadedPanoramaModal(true);
@@ -456,6 +457,8 @@ export default function AppModals(props: AppModalsProps) {
                   : null
             }
             onClose={() => {
+              focusStackPlanRequestId.current += 1;
+              void invoke(Invokes.CancelFocusStackPlan);
               setUI((state) => ({
                 focusStackModalState: createDefaultFocusStackModalState(state.focusStackModalState.settings),
               }));
@@ -481,6 +484,8 @@ export default function AppModals(props: AppModalsProps) {
               });
             }}
             onPreviewPlan={() => {
+              const requestId = focusStackPlanRequestId.current + 1;
+              focusStackPlanRequestId.current = requestId;
               const lastDryRunCommand = {
                 commandType: 'computationalMerge.createFocusStack' as const,
                 dryRun: true as const,
@@ -516,11 +521,13 @@ export default function AppModals(props: AppModalsProps) {
                 focusStackNativeInputPlanSchema,
               )
                 .then((nativeInputPlan) => {
+                  if (focusStackPlanRequestId.current !== requestId) return;
                   setUI((state) => ({
                     focusStackModalState: { ...state.focusStackModalState, isPlanning: false, nativeInputPlan },
                   }));
                 })
                 .catch((error: unknown) => {
+                  if (focusStackPlanRequestId.current !== requestId) return;
                   setUI((state) => ({
                     focusStackModalState: {
                       ...state.focusStackModalState,
@@ -532,6 +539,13 @@ export default function AppModals(props: AppModalsProps) {
                 });
             }}
             onSettingsChange={(settings) => {
+              const invalidatesAlignment =
+                settings.alignmentMode !== focusStackModalState.settings.alignmentMode ||
+                settings.maxPreviewDimensionPx !== focusStackModalState.settings.maxPreviewDimensionPx;
+              if (invalidatesAlignment) {
+                focusStackPlanRequestId.current += 1;
+                void invoke(Invokes.CancelFocusStackPlan);
+              }
               setUI((state) => {
                 const {
                   lastApplyCommand: _lastApplyCommand,
@@ -542,7 +556,7 @@ export default function AppModals(props: AppModalsProps) {
                   focusStackModalState: {
                     ...focusStackModalState,
                     error: null,
-                    nativeInputPlan: null,
+                    nativeInputPlan: invalidatesAlignment ? null : focusStackModalState.nativeInputPlan,
                     outputReview: null,
                     settings,
                   },

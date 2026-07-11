@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { AlertTriangle, Aperture, CheckCircle2, Eye, Layers3, ShieldCheck } from 'lucide-react';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { FocusStackNativeInputPlan } from '../../../schemas/focus-stack/focusStackNativePlanSchemas';
 import type { FocusStackOutputReviewWorkflow } from '../../../schemas/focus-stack/focusStackOutputReviewSchemas';
@@ -75,6 +75,8 @@ export function FocusStackModal({
   sourcePreflightMetadata = [],
 }: FocusStackModalProps) {
   const { t } = useTranslation();
+  const [registrationView, setRegistrationView] = useState<'reference' | 'overlay' | 'difference'>('overlay');
+  const [registrationSourceIndex, setRegistrationSourceIndex] = useState(0);
 
   const sourcePreflight = useMemo(
     () =>
@@ -84,6 +86,16 @@ export function FocusStackModal({
   const isSourceCountValid = sourceCount >= 2 && sourceCount <= 128;
   const isPreviewPlanReady = nativeInputPlan?.accepted === true;
   const isDepthMapPreviewOnly = settings.blendMethod === 'depth_map';
+  const selectedRegistrationPreview =
+    nativeInputPlan?.previews.find((preview) => preview.sourceIndex === registrationSourceIndex) ??
+    nativeInputPlan?.previews.find((preview) => preview.sourceIndex !== nativeInputPlan.referenceSourceIndex) ??
+    nativeInputPlan?.previews[0];
+  const registrationPreviewUrl =
+    registrationView === 'reference'
+      ? selectedRegistrationPreview?.referenceDataUrl
+      : registrationView === 'difference'
+        ? selectedRegistrationPreview?.differenceDataUrl
+        : selectedRegistrationPreview?.overlayDataUrl;
 
   const alignmentOptions: Array<OptionItem<FocusStackAlignmentMode>> = [
     { label: t('modals.focusStack.alignmentAuto'), value: 'auto' },
@@ -310,6 +322,75 @@ export function FocusStackModal({
               </div>
             ))}
           </div>
+        </section>
+      )}
+
+      {nativeInputPlan !== null && nativeInputPlan.previews.length > 0 && registrationPreviewUrl !== undefined && (
+        <section
+          className="border border-border-color bg-bg-primary p-2"
+          data-testid="focus-stack-registration-preview"
+        >
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex gap-1" role="group" aria-label={t('modals.focusStack.preflight.sources')}>
+              {nativeInputPlan.previews.map((preview) => (
+                <button
+                  aria-pressed={preview.sourceIndex === selectedRegistrationPreview?.sourceIndex}
+                  className="h-8 min-w-8 border border-border-color px-2 text-xs aria-pressed:bg-card-active"
+                  key={preview.sourceIndex}
+                  onClick={() => setRegistrationSourceIndex(preview.sourceIndex)}
+                  type="button"
+                >
+                  {preview.sourceIndex + 1}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-1" role="group" aria-label={t('modals.focusStack.review.overlay')}>
+              {(['reference', 'overlay', 'difference'] as const).map((view) => (
+                <button
+                  aria-pressed={registrationView === view}
+                  className="h-8 border border-border-color px-2 text-xs capitalize aria-pressed:bg-card-active"
+                  key={view}
+                  onClick={() => setRegistrationView(view)}
+                  type="button"
+                >
+                  {view}
+                </button>
+              ))}
+            </div>
+          </div>
+          <img
+            alt={t('modals.common.sourcePreviewAlt')}
+            className="max-h-72 w-full bg-black object-contain"
+            src={registrationPreviewUrl}
+          />
+          {selectedRegistrationPreview !== undefined && (
+            <div className="mt-2 grid grid-cols-2 gap-2 text-xs lg:grid-cols-5">
+              {(() => {
+                const transform = nativeInputPlan.transforms.find(
+                  (candidate) => candidate.sourceIndex === selectedRegistrationPreview.sourceIndex,
+                );
+                if (transform === undefined) return null;
+                return (
+                  <>
+                    <ComputationalSetupStatusLine label="Status" value={transform.status} />
+                    <ComputationalSetupStatusLine label="Scale" value={transform.scale.toFixed(6)} />
+                    <ComputationalSetupStatusLine
+                      label="Rotation"
+                      value={`${transform.rotationDegrees.toFixed(4)} deg`}
+                    />
+                    <ComputationalSetupStatusLine
+                      label="Translation"
+                      value={`${transform.translationXPx.toFixed(3)}, ${transform.translationYPx.toFixed(3)} px`}
+                    />
+                    <ComputationalSetupStatusLine
+                      label="P95 residual"
+                      value={`${transform.p95ResidualPx.toFixed(3)} px`}
+                    />
+                  </>
+                );
+              })()}
+            </div>
+          )}
         </section>
       )}
 
