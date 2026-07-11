@@ -2898,7 +2898,7 @@ mod tests {
     #[test]
     fn panorama_boundary_blocks_unsupported_projection_and_boundary_modes() {
         let unsupported_projection = PanoramaStitchOptions {
-            projection: PanoramaProjectionOption::Cylindrical,
+            projection: PanoramaProjectionOption::Spherical,
             ..PanoramaStitchOptions::default()
         };
         assert!(validate_panorama_stitch_options(&unsupported_projection).is_err());
