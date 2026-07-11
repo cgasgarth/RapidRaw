@@ -227,6 +227,7 @@ describe('agent selected-image preview-loop executable tool registry', () => {
       rawEngineLocalAppServerSelectedImagePreviewLoopApplyReviewCommandV1Schema.parse({
         acceptedPreviewArtifactId: latestPreview.previewArtifactId,
         acceptedPreviewReceiptHash: latestReceipt.contentHash,
+        ...review.sealedProposal,
         commandType: RawEngineLocalAppServerCommandType.AgentSelectedImagePreviewLoopApplyReview,
         request: {
           ...requestWithoutCommandType,

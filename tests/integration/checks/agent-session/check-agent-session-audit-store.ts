@@ -41,7 +41,12 @@ try {
     ],
     finalGraphRevision: 'history_1',
     initialGraphRevision: 'history_0',
-    modelId: 'gpt-5.1-codex-app-server',
+    modelSelection: {
+      effective: { modelId: 'gpt-5.6-terra-fallback', reasoningTier: 'low' },
+      reason: 'Terra light unavailable in fixture transport.',
+      requested: { modelId: 'gpt-5.6-terra', reasoningTier: 'light' },
+      status: 'fallback',
+    },
     planSummary: 'Brighten RAW and add contrast after approval.',
     prompt: 'Make /Users/cgas/Pictures/Capture One/Alaska/DSC_3161.ARW brighter and punchier.',
     rollbackGraphRevision: 'history_0',
@@ -115,6 +120,13 @@ try {
   }
   if (persisted.artifactLineage.length !== 2) {
     throw new Error('Audit store did not preserve every output artifact lineage entry.');
+  }
+  if (
+    persisted.modelSelection.status !== 'fallback' ||
+    persisted.modelSelection.requested.reasoningTier !== 'light' ||
+    persisted.modelSelection.effective?.reasoningTier !== 'low'
+  ) {
+    throw new Error('Audit store did not preserve explicit requested/effective model fallback.');
   }
 
   verifyAgentSessionArtifactLineage(persisted);

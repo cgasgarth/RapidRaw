@@ -121,6 +121,12 @@ describe('selected-image model-to-typed-tool proposal loop', () => {
     expect(result.budget).toMatchObject({ toolCalls: 3, turns: 2 });
     expect(result.lineage).toHaveLength(1);
     expect(result.lineage[0]).toMatchObject({ proposalId: result.sealedProposalId, state: 'sealed' });
+    expect(result.proposalLineage.iterations).toHaveLength(1);
+    expect(result.proposalLineage.iterations[0]).toMatchObject({
+      proposalId: result.sealedProposalId,
+      state: 'sealed',
+    });
+    expect(result.proposalLineage.sealedIterationId).toBe(result.proposalLineage.iterations[0]?.iterationId);
     expect(result.audit.map((event) => event.state)).toEqual([
       'acquiring_context',
       'model_running',

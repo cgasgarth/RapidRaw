@@ -25,6 +25,11 @@ import {
   agentSelectedImageModelToolLoopRequestSchema,
   agentSelectedImageModelToolLoopResultSchema,
 } from './agentSelectedImageModelToolSchemas';
+import {
+  addAgentSelectedImageProposalIteration,
+  createAgentSelectedImageProposalLineage,
+  transitionAgentSelectedImageProposalIteration,
+} from './agentSelectedImageProposalLineage';
 import { createAgentTypedToolExecutionContext, dispatchAgentTypedEditorTool } from './agentTypedToolDispatch';
 
 export const AGENT_SELECTED_IMAGE_MODEL_TOOL_ALLOWLIST = [
@@ -38,6 +43,7 @@ export interface AgentSelectedImageModelTurnRequest {
   expectedOutput: 'agent_selected_image_model_output_v1';
   lineageHead?: { proposalId: string; receiptHash: string };
   prompt: string;
+  reasoningTier: 'none' | 'minimal' | 'low' | 'light' | 'medium' | 'high' | 'xhigh';
   sessionId: string;
   turn: number;
 }
@@ -126,17 +132,27 @@ export const cancelAgentSelectedImageModelToolLoop = (sessionId: string): boolea
 
 export const replayAgentSelectedImageModelToolLoop = (
   record: unknown,
-): Pick<AgentSelectedImageModelToolLoopResult, 'budget' | 'lineage' | 'sealedProposalId' | 'sessionId' | 'state'> => {
+): Pick<
+  AgentSelectedImageModelToolLoopResult,
+  'budget' | 'lineage' | 'proposalLineage' | 'sealedProposalId' | 'sessionId' | 'state'
+> => {
   const parsed = agentSelectedImageModelToolLoopResultSchema.parse(record);
   if (parsed.state === 'approval_required') {
     const head = parsed.lineage.at(-1);
     if (head?.state !== 'sealed' || head.proposalId !== parsed.sealedProposalId) {
       throw new Error('Model-tool replay rejected a missing or stale sealed lineage head.');
     }
+    const authoritativeHead = parsed.proposalLineage.iterations.find(
+      (iteration) => iteration.iterationId === parsed.proposalLineage.sealedIterationId,
+    );
+    if (authoritativeHead?.proposalId !== parsed.sealedProposalId || authoritativeHead.state !== 'sealed') {
+      throw new Error('Model-tool replay rejected an invalid authoritative sealed lineage head.');
+    }
   }
   return structuredClone({
     budget: parsed.budget,
     lineage: parsed.lineage,
+    proposalLineage: parsed.proposalLineage,
     ...(parsed.sealedProposalId === undefined ? {} : { sealedProposalId: parsed.sealedProposalId }),
     sessionId: parsed.sessionId,
     state: parsed.state,
@@ -155,6 +171,10 @@ export const runAgentSelectedImageModelToolLoop = async (
       budget: { maxToolCalls: 2 * parsed.budget.maxTurns + 2, previewBytes: 0, toolCalls: 0, turns: 0 },
       lineage: [],
       model: { id: parsed.modelId, provider: 'unstarted', transport: 'codex_app_server', version: 'unstarted' },
+      proposalLineage: createAgentSelectedImageProposalLineage({
+        lineageId: `lineage:${parsed.sessionId}`,
+        sessionId: parsed.sessionId,
+      }),
       sessionId: parsed.sessionId,
       state: 'busy',
       stopReason: 'session_already_active',
@@ -177,6 +197,10 @@ export const runAgentSelectedImageModelToolLoop = async (
   let state: LoopState = 'queued';
   let stopReason: string | undefined;
   const baseline = buildAgentImageContextSnapshot();
+  let proposalLineage = createAgentSelectedImageProposalLineage({
+    lineageId: `lineage:${parsed.sessionId}`,
+    sessionId: parsed.sessionId,
+  });
 
   const record = async (input: Omit<AgentSelectedImageModelToolLoopResult['audit'][number], 'timestamp'>) => {
     audit.push({ ...input, timestamp: new Date().toISOString() });
@@ -252,6 +276,7 @@ export const runAgentSelectedImageModelToolLoop = async (
           turn === 1
             ? parsed.prompt
             : 'Review the verified proposal preview. Refine it with proposal_render or finalize the exact current proposalId.',
+        reasoningTier: parsed.reasoningTier,
         sessionId: parsed.sessionId,
         turn,
       };
@@ -295,6 +320,16 @@ export const runAgentSelectedImageModelToolLoop = async (
           throw new Error('Current proposal receipt is no longer ready.');
         const currentHead = lineage.at(-1);
         if (currentHead === undefined) throw new Error('Proposal lineage head is missing.');
+        const authoritativeHead = proposalLineage.iterations.at(-1);
+        if (authoritativeHead === undefined || authoritativeHead.proposalId !== head.proposalId) {
+          throw new Error('Authoritative proposal lineage head is missing.');
+        }
+        proposalLineage = transitionAgentSelectedImageProposalIteration(
+          proposalLineage,
+          authoritativeHead.iterationId,
+          'sealed',
+          { expectedEpoch: proposalLineage.epoch },
+        );
         lineage[lineage.length - 1] = { ...currentHead, state: 'sealed' };
         state = 'approval_required';
         break;
@@ -404,6 +439,47 @@ export const runAgentSelectedImageModelToolLoop = async (
         await agentSelectedImageProposalRuntime.release(head.proposalId, 'superseded');
       }
       head = render;
+      const priorIteration = proposalLineage.iterations.at(-1);
+      const iterationId = `${proposalLineage.lineageId}:iteration:${turn}`;
+      proposalLineage = addAgentSelectedImageProposalIteration(proposalLineage, {
+        afterPreviewArtifactId: render.artifacts.after.artifactId,
+        afterPreviewContentHash: render.artifacts.after.contentHash,
+        baseGraphRevision: render.base.graphRevision,
+        basePreviewArtifactId: render.base.previewArtifactId,
+        basePreviewContentHash: render.base.previewContentHash,
+        baseRecipeHash: render.base.recipeHash,
+        beforePreviewArtifactId: render.artifacts.before.artifactId,
+        beforePreviewContentHash: render.artifacts.before.contentHash,
+        cleanupStatus: 'not_required',
+        createdAt: render.createdAt,
+        expiresAt: render.expiresAt,
+        initiatingTurnId: response.modelTurnId,
+        iterationId,
+        lineageId: proposalLineage.lineageId,
+        ordinal: proposalLineage.iterations.length + 1,
+        ...(priorIteration === undefined
+          ? {}
+          : { parentIterationId: priorIteration.iterationId, parentProposalId: priorIteration.proposalId }),
+        proposalHash: render.proposalHash,
+        proposalId: render.proposalId,
+        proposalSchemaVersion: render.schemaVersion,
+        schemaVersion: 1,
+        selectedImageId: render.base.selectedImageId,
+        sessionId: parsed.sessionId,
+        state: 'draft',
+        toolCalls: [
+          { callId: dryRunCallId, ...(parentCallId === undefined ? {} : { parentCallId }), type: 'preview_acquire' },
+          { callId: renderCallId, ...(parentCallId === undefined ? {} : { parentCallId }), type: 'proposal_render' },
+        ],
+      });
+      proposalLineage = transitionAgentSelectedImageProposalIteration(proposalLineage, iterationId, 'rendering', {
+        expectedEpoch: proposalLineage.epoch,
+        now: render.createdAt,
+      });
+      proposalLineage = transitionAgentSelectedImageProposalIteration(proposalLineage, iterationId, 'ready', {
+        expectedEpoch: proposalLineage.epoch,
+        now: render.createdAt,
+      });
       lineage.push({
         epoch: lineage.length + 1,
         ...(parentCallId === undefined ? {} : { parentProposalId: lineage.at(-1)?.proposalId }),
@@ -455,6 +531,7 @@ export const runAgentSelectedImageModelToolLoop = async (
     budget: { maxToolCalls, previewBytes, toolCalls, turns },
     lineage,
     model,
+    proposalLineage,
     ...(state === 'approval_required' && head !== undefined ? { sealedProposalId: head.proposalId } : {}),
     sessionId: parsed.sessionId,
     state,

@@ -156,6 +156,7 @@ export class AgentCodexAppServerModelTransport implements AgentSelectedImageMode
           approvalPolicy: 'never',
           input,
           model: this.modelId,
+          effort: request.reasoningTier,
           outputSchema,
           sandboxPolicy: { networkAccess: false, type: 'readOnly' },
           threadId,

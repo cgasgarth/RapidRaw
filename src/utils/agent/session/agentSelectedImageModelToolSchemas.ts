@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { agentSelectedImageProposalLineageV1Schema } from '../../../schemas/agent/agentSelectedImageProposalIterationSchemas';
+
 export const AGENT_SELECTED_IMAGE_MODEL_TOOL_LOOP_SCHEMA_VERSION = 1 as const;
 
 export const agentSelectedImageModelPatchSchema = z
@@ -88,6 +90,7 @@ export const agentSelectedImageModelToolLoopRequestSchema = z
     operationId: z.string().trim().min(1),
     prompt: z.string().trim().min(1).max(16_384),
     requestId: z.string().trim().min(1),
+    reasoningTier: z.enum(['none', 'minimal', 'low', 'light', 'medium', 'high', 'xhigh']).default('light'),
     schemaVersion: z.literal(AGENT_SELECTED_IMAGE_MODEL_TOOL_LOOP_SCHEMA_VERSION),
     sessionId: z.string().trim().min(1),
   })
@@ -170,6 +173,7 @@ export const agentSelectedImageModelToolLoopResultSchema = z
         version: z.string().trim().min(1),
       })
       .strict(),
+    proposalLineage: agentSelectedImageProposalLineageV1Schema,
     sealedProposalId: z.string().trim().min(1).optional(),
     sessionId: z.string().trim().min(1),
     state: agentSelectedImageModelToolLoopStateSchema,

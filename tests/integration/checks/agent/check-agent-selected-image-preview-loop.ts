@@ -476,6 +476,7 @@ await expectDispatchRejects(
   {
     acceptedPreviewArtifactId: staleAcceptedPreview,
     acceptedPreviewReceiptHash: result.previewRefreshReceipts.at(-1)?.contentHash ?? '',
+    ...result.sealedProposal,
     request: commandRequest,
     review: result,
   },
@@ -486,6 +487,7 @@ await expectDispatchRejects(
   {
     acceptedPreviewArtifactId: latestAcceptedPreview,
     acceptedPreviewReceiptHash: result.previewRefreshReceipts[0]?.contentHash ?? '',
+    ...result.sealedProposal,
     request: commandRequest,
     review: result,
   },
@@ -496,6 +498,7 @@ await expectDispatchRejects(
   {
     acceptedPreviewArtifactId: latestAcceptedPreview,
     acceptedPreviewReceiptHash: result.previewRefreshReceipts.at(-1)?.contentHash ?? '',
+    ...result.sealedProposal,
     request: commandRequest,
     review: { ...result, selectedImage: { ...result.selectedImage, width: result.selectedImage.width + 1 } },
   },
@@ -506,6 +509,7 @@ await expectDispatchRejects(
   {
     acceptedPreviewArtifactId: latestAcceptedPreview,
     acceptedPreviewReceiptHash: result.previewRefreshReceipts.at(-1)?.contentHash ?? '',
+    ...result.sealedProposal,
     request: commandRequest,
     review: { ...result, selectedImage: { ...result.selectedImage, previewIdentity: 'blob:stale-preview' } },
   },
@@ -517,6 +521,7 @@ const acceptedApplyDispatch = await dispatchReviewedApply(
   {
     acceptedPreviewArtifactId: latestAcceptedPreview,
     acceptedPreviewReceiptHash: result.previewRefreshReceipts.at(-1)?.contentHash ?? '',
+    ...result.sealedProposal,
     request: commandRequest,
     review: result,
   },

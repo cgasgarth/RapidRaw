@@ -8,6 +8,7 @@ import { useEditorStore } from '../../../../store/useEditorStore';
 import { buildAgentImageContextSnapshot } from '../../../../utils/agent/context/agentImageContextSnapshot';
 import { renderAgentReadOnlyPreview } from '../../../../utils/agent/context/agentReadOnlyAppServerTools';
 import { agentSelectedImageProposalRuntime } from '../../../../utils/agent/context/agentSelectedImageProposalRuntime';
+import { DEFAULT_AGENT_EDITING_MODEL_SELECTION } from '../../../../utils/agent/session/agentAppServerModelSelection';
 import { createAgentSelectedImageModelTransport } from '../../../../utils/agent/session/agentCodexAppServerModelTransport';
 import {
   cancelAgentSelectedImageModelToolLoop,
@@ -331,14 +332,14 @@ function LivePromptComposer({ isContextReady, onSessionEvent }: LivePromptCompos
       const loop = await runAgentSelectedImageModelToolLoop(
         {
           deadlineAt: new Date(Date.now() + 180_000).toISOString(),
-          modelId: 'gpt-5.1-codex',
+          modelId: DEFAULT_AGENT_EDITING_MODEL_SELECTION.modelId,
           operationId,
           prompt: requestedPrompt,
           requestId,
           schemaVersion: 1,
           sessionId,
         },
-        createAgentSelectedImageModelTransport('gpt-5.1-codex'),
+        createAgentSelectedImageModelTransport(DEFAULT_AGENT_EDITING_MODEL_SELECTION.modelId),
       );
       if (operation.cancelled || activeOperationRef.current?.id !== operation.id) return;
       if (loop.state !== 'approval_required' || loop.sealedProposalId === undefined || loop.approval === undefined) {
@@ -862,6 +863,16 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
           <span className="truncate">
             {isContextReady ? transcript.sessionTitle : 'Select an image to start an edit.'}
           </span>
+        </div>
+        <div
+          className="flex items-center gap-1.5 text-[10px] leading-3 text-text-tertiary"
+          data-model-id={DEFAULT_AGENT_EDITING_MODEL_SELECTION.modelId}
+          data-reasoning-tier={DEFAULT_AGENT_EDITING_MODEL_SELECTION.reasoningTier}
+          data-testid="agent-model-configuration"
+        >
+          <span>{DEFAULT_AGENT_EDITING_MODEL_SELECTION.modelId}</span>
+          <span aria-hidden="true">/</span>
+          <span>{DEFAULT_AGENT_EDITING_MODEL_SELECTION.reasoningTier}</span>
         </div>
         {visibleToolCalls.length > 0 ? (
           <div className="flex flex-wrap gap-1" data-testid="agent-chat-tool-states">

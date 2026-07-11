@@ -1,6 +1,26 @@
 import { z } from 'zod';
+import {
+  RAW_ENGINE_AGENT_SELECTED_IMAGE_PROPOSAL_RENDER_TOOL_NAME,
+  type RawEngineAgentSelectedImageProposalReceiptV1,
+  type RawEngineAgentSelectedImageProposalRenderCommandV1,
+  rawEngineAgentSelectedImageProposalArtifactV1Schema,
+  rawEngineAgentSelectedImageProposalReceiptV1Schema,
+} from '../../../../packages/rawengine-schema/src/agentSelectedImageProposalSchemas';
 import { agentReviewedAdjustmentCommandReceiptSchema } from '../../../schemas/agent/agentReviewedCommandSchemas';
 import type { RawEngineAppServerToolDispatchRequest } from '../../../schemas/agent/agentRuntimeSchemas';
+import {
+  agentSelectedImageLifecycleApprovalSchema,
+  agentSelectedImageLifecycleCommitSchema,
+  agentSelectedImageLifecycleProposalSchema,
+  agentSelectedImageLifecycleReceiptV2Schema,
+  agentSelectedImageLifecycleRevertSchema,
+  hashAgentSelectedImageLifecycleValue,
+  sealAgentSelectedImageLifecyclePhase,
+} from '../../../schemas/agent/agentSelectedImageLifecycleReceiptSchemas';
+import {
+  type AgentSelectedImageProposalLineageV1,
+  agentSelectedImageProposalLineageV1Schema,
+} from '../../../schemas/agent/agentSelectedImageProposalIterationSchemas';
 import {
   type AgentSelectedImageRecoveryReceipt,
   type AgentSelectedImageRecoveryStaleReason,
@@ -22,6 +42,7 @@ import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnap
 import {
   AGENT_PREVIEW_RENDER_TOOL_NAME,
   agentPreviewRenderResponseSchema,
+  RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
 } from '../context/agentReadOnlyAppServerTools';
 import {
   AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
@@ -34,10 +55,17 @@ import {
   agentAdjustmentsDryRunResponseSchema,
 } from '../tools/agentAdjustmentApplyTool';
 import {
+  addAgentSelectedImageProposalIteration,
+  assertAgentSelectedImageProposalApplyable,
+  createAgentSelectedImageProposalLineage,
+  transitionAgentSelectedImageProposalIteration,
+} from './agentSelectedImageProposalLineage';
+import {
   AGENT_HISTORY_ROLLBACK_TOOL_NAME,
   type AgentSessionCheckpoint,
   agentHistoryRollbackResponseSchema,
   createAgentSessionCheckpoint,
+  rollbackAgentSessionHistory,
 } from './agentSessionHistory';
 import { createAgentTypedToolExecutionContext, dispatchAgentTypedEditorTool } from './agentTypedToolDispatch';
 
@@ -223,6 +251,7 @@ export const agentSelectedImageLiveSessionReceiptSchema = z
     initialGraphRevision: z.string().trim().min(1),
     initialRecipeHash: z.string().trim().min(1),
     operationId: z.string().trim().min(1),
+    proposalLineage: agentSelectedImageProposalLineageV1Schema.optional(),
     previewLineage: z.array(selectedImageLiveSessionPreviewLineageSchema).optional(),
     promptSummary: z.string().trim().min(1).default('Selected-image edit'),
     recoveries: z.array(agentSelectedImageRecoveryReceiptSchema).optional(),
@@ -265,6 +294,7 @@ export const agentSelectedImageLiveSessionReceiptSchema = z
 export const agentSelectedImageLiveSessionAuditRecordSchema = z
   .object({
     auditEvents: z.array(selectedImageLiveSessionAuditEventSchema).min(1),
+    lifecycleReceipt: agentSelectedImageLifecycleReceiptV2Schema.optional(),
     receipt: agentSelectedImageLiveSessionReceiptSchema,
     replayState: z.enum(['replayable']),
     schemaVersion: z.literal(1),
@@ -389,6 +419,8 @@ export interface AgentSelectedImageLiveSessionDraft {
   auditEvents: AgentSelectedImageLiveSessionAuditEvent[];
   checkpoint: AgentSessionCheckpoint;
   dryRun: AgentAdjustmentsDryRunResponse;
+  proposal?: RawEngineAgentSelectedImageProposalReceiptV1;
+  proposalLineage: AgentSelectedImageProposalLineageV1;
   operationId: string;
   prompt: string;
   recovery?: {
@@ -500,6 +532,56 @@ const stableTranscriptHash = (value: unknown): string => {
     hash = Math.imul(hash, 0x01000193);
   }
   return `sha256:${(hash >>> 0).toString(16).padStart(16, '0')}`;
+};
+
+const stableLegacySha256 = (value: unknown): `sha256:${string}` => {
+  const shortHash = stableTranscriptHash(value).slice('sha256:'.length);
+  return `sha256:${shortHash.repeat(4)}`;
+};
+
+const upgradeLegacyDryRunToProposalLineage = (draft: AgentSelectedImageLiveSessionDraft): void => {
+  if (draft.proposalLineage.iterations.length > 0) return;
+  const createdAt = new Date().toISOString();
+  const expiresAt = new Date(Date.parse(createdAt) + 5 * 60_000).toISOString();
+  const iterationId = `${draft.proposalLineage.lineageId}-iteration-1`;
+  const proposalId = `${draft.requestId}-legacy-proposal`;
+  const previewContentHash = stableLegacySha256({
+    artifactId: draft.snapshot.previewArtifactId,
+    renderHash: draft.snapshot.previewRenderHash,
+  });
+  draft.proposalLineage = addAgentSelectedImageProposalIteration(draft.proposalLineage, {
+    baseGraphRevision: draft.snapshot.graphRevision,
+    basePreviewArtifactId: draft.snapshot.previewArtifactId,
+    basePreviewContentHash: previewContentHash,
+    baseRecipeHash: draft.snapshot.recipeHash,
+    beforePreviewArtifactId: draft.snapshot.previewArtifactId,
+    beforePreviewContentHash: previewContentHash,
+    cleanupStatus: 'not_required',
+    createdAt,
+    expiresAt,
+    initiatingTurnId: `${draft.requestId}-dry-run`,
+    iterationId,
+    lineageId: draft.proposalLineage.lineageId,
+    ordinal: 1,
+    proposalHash: stableLegacySha256({ dryRunPlanHash: draft.dryRun.dryRunPlanHash, proposalId }),
+    proposalId,
+    proposalSchemaVersion: 1,
+    schemaVersion: 1,
+    selectedImageId: stableLegacySha256(draft.snapshot.selectedImagePath),
+    sessionId: draft.sessionId,
+    state: 'draft',
+    toolCalls: [{ callId: `${draft.requestId}-dry-run`, type: 'proposal_render' }],
+  });
+  draft.proposalLineage = transitionAgentSelectedImageProposalIteration(
+    draft.proposalLineage,
+    iterationId,
+    'rendering',
+    { expectedEpoch: draft.proposalLineage.epoch, now: createdAt },
+  );
+  draft.proposalLineage = transitionAgentSelectedImageProposalIteration(draft.proposalLineage, iterationId, 'ready', {
+    expectedEpoch: draft.proposalLineage.epoch,
+    now: createdAt,
+  });
 };
 
 const getPathBasename = (path: string): string => {
@@ -717,6 +799,9 @@ export const validateAgentSelectedImageApplyToolEnvelope = ({
   }
 
   const request = parsedRequest.data;
+  const sealed = draft.proposalLineage.iterations.find(
+    (iteration) => iteration.iterationId === draft.proposalLineage.sealedIterationId,
+  );
   if (
     request.acceptedPlanHash !== draft.dryRun.dryRunPlanHash ||
     request.acceptedPlanId !== draft.dryRun.dryRunPlanId ||
@@ -728,6 +813,12 @@ export const validateAgentSelectedImageApplyToolEnvelope = ({
     request.approval.approvedSessionId !== draft.sessionId ||
     request.expectedGraphRevision !== draft.dryRun.sourceGraphRevision ||
     request.expectedRecipeHash !== draft.snapshot.recipeHash ||
+    sealed === undefined ||
+    request.proposalLineage?.acceptedProposalHash !== sealed.proposalHash ||
+    request.proposalLineage?.acceptedProposalId !== sealed.proposalId ||
+    request.proposalLineage?.lineageEpoch !== draft.proposalLineage.epoch ||
+    request.proposalLineage?.lineageId !== draft.proposalLineage.lineageId ||
+    request.proposalLineage?.sealedIterationId !== sealed.iterationId ||
     request.operationId !== draft.operationId ||
     request.requestId !== requestId ||
     request.sessionId !== draft.sessionId
@@ -881,6 +972,10 @@ export const startAgentSelectedImageLiveSessionDryRun = async ({
     dryRun,
     operationId,
     prompt,
+    proposalLineage: createAgentSelectedImageProposalLineage({
+      lineageId: `lineage_${sessionId}_${requestId}`.replaceAll(/[^A-Za-z0-9_-]/gu, '_'),
+      sessionId,
+    }),
     requestId,
     reviewedCommand: agentReviewedAdjustmentCommandReceiptSchema.parse(
       reviewedCommand ??
@@ -904,6 +999,139 @@ export const startAgentSelectedImageLiveSessionDryRun = async ({
     toolName: AGENT_ADJUSTMENTS_DRY_RUN_TOOL_NAME,
   });
   return draft;
+};
+
+export const renderAgentSelectedImageLiveSessionProposal = async (
+  draft: AgentSelectedImageLiveSessionDraft,
+): Promise<RawEngineAgentSelectedImageProposalReceiptV1> => {
+  const previewRequestId = `${draft.requestId}-proposal-before`;
+  const preview = await dispatchAgentTypedEditorTool({
+    args: { expectedRecipeHash: draft.snapshot.recipeHash, requestId: previewRequestId },
+    context: createAgentTypedToolExecutionContext({
+      arguments: { expectedRecipeHash: draft.snapshot.recipeHash, requestId: previewRequestId },
+      callId: previewRequestId,
+      parentCallId: `${draft.requestId}-dry-run`,
+      requestId: previewRequestId,
+      sessionId: draft.sessionId,
+    }),
+    toolName: RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
+  });
+  const callId = `${draft.requestId}-proposal`;
+  const context = createAgentTypedToolExecutionContext({
+    arguments: {
+      expectedGraphRevision: draft.snapshot.graphRevision,
+      expectedRecipeHash: draft.snapshot.recipeHash,
+      expectedSelectedImagePath: draft.snapshot.selectedImagePath,
+    },
+    callId,
+    parentCallId: `${draft.requestId}-dry-run`,
+    requestId: callId,
+    sessionId: draft.sessionId,
+  });
+  const baseAttachment = preview.attachment.attachment;
+  const command: RawEngineAgentSelectedImageProposalRenderCommandV1 = {
+    basePreview: rawEngineAgentSelectedImageProposalArtifactV1Schema.parse({
+      accessScope: baseAttachment.accessScope,
+      artifactId: baseAttachment.artifactId,
+      byteLength: baseAttachment.byteLength,
+      colorPipeline: baseAttachment.colorPipeline,
+      contentHash: baseAttachment.contentHash,
+      dimensions: baseAttachment.dimensions,
+      encodedFormat: baseAttachment.encodedFormat,
+      expiresAt: baseAttachment.expiresAt,
+      mediaType: baseAttachment.mediaType,
+      quality: baseAttachment.quality,
+      recipeHash: baseAttachment.revision.recipeHash,
+      renderHash: baseAttachment.revision.renderHash,
+    }),
+    cancellationId: context.cancellationId,
+    commandType: RAW_ENGINE_AGENT_SELECTED_IMAGE_PROPOSAL_RENDER_TOOL_NAME,
+    deadlineAt: context.deadlineAt,
+    dryRun: true,
+    dryRunPlan: {
+      planHash: draft.dryRun.dryRunPlanHash,
+      planId: draft.dryRun.dryRunPlanId,
+      predictedGraphRevision: draft.dryRun.predictedGraphRevision,
+    },
+    edit: { kind: 'basic_tone_v1' as const, patch: draft.adjustments },
+    expectedGraphRevision: draft.snapshot.graphRevision,
+    expectedRecipeHash: draft.snapshot.recipeHash,
+    expectedRenderHash: draft.snapshot.previewRenderHash,
+    expectedSelectedImagePath: draft.snapshot.selectedImagePath,
+    idempotencyKey: context.idempotencyKey,
+    lineage: { callId, parentCallId: `${draft.requestId}-dry-run` },
+    operationId: draft.operationId,
+    requestedPreview: { longEdgePx: 1536, maxBytes: 8 * 1024 * 1024, quality: 0.86 },
+    requestId: callId,
+    sessionId: draft.sessionId,
+  };
+  const receipt = rawEngineAgentSelectedImageProposalReceiptV1Schema.parse(
+    await dispatchAgentTypedEditorTool({
+      args: command,
+      context,
+      draftSession: buildDraftSession(draft, 'active'),
+      toolName: RAW_ENGINE_AGENT_SELECTED_IMAGE_PROPOSAL_RENDER_TOOL_NAME,
+    }),
+  );
+  draft.proposal = receipt;
+  const lineageId = draft.proposalLineage.lineageId;
+  const iterationId = `${lineageId}-iteration-${draft.proposalLineage.iterations.length + 1}`;
+  const parent = draft.proposalLineage.iterations.at(-1);
+  draft.proposalLineage = addAgentSelectedImageProposalIteration(draft.proposalLineage, {
+    ...(receipt.artifacts === undefined
+      ? {}
+      : {
+          afterPreviewArtifactId: receipt.artifacts.after.artifactId,
+          afterPreviewContentHash: receipt.artifacts.after.contentHash,
+        }),
+    baseGraphRevision: receipt.base.graphRevision,
+    basePreviewArtifactId: receipt.base.previewArtifactId,
+    basePreviewContentHash: receipt.base.previewContentHash,
+    baseRecipeHash: receipt.base.recipeHash,
+    beforePreviewArtifactId: receipt.base.previewArtifactId,
+    beforePreviewContentHash: receipt.base.previewContentHash,
+    cleanupStatus: 'not_required',
+    createdAt: receipt.createdAt,
+    expiresAt: receipt.expiresAt,
+    initiatingTurnId: receipt.lineage.parentCallId ?? receipt.lineage.callId,
+    iterationId,
+    lineageId,
+    ordinal: draft.proposalLineage.iterations.length + 1,
+    ...(parent === undefined ? {} : { parentIterationId: parent.iterationId, parentProposalId: parent.proposalId }),
+    proposalHash: receipt.proposalHash,
+    proposalId: receipt.proposalId,
+    proposalSchemaVersion: receipt.schemaVersion,
+    ...(parent?.state === 'stale' ? { recoveredFromIterationId: parent.iterationId } : {}),
+    schemaVersion: 1,
+    selectedImageId: receipt.base.selectedImageId,
+    sessionId: draft.sessionId,
+    state: 'draft',
+    toolCalls: [
+      { callId: previewRequestId, parentCallId: `${draft.requestId}-dry-run`, type: 'preview_acquire' },
+      {
+        callId: receipt.lineage.callId,
+        ...(receipt.lineage.parentCallId === undefined ? {} : { parentCallId: receipt.lineage.parentCallId }),
+        type: 'proposal_render',
+      },
+    ],
+  });
+  draft.proposalLineage = transitionAgentSelectedImageProposalIteration(
+    draft.proposalLineage,
+    iterationId,
+    'rendering',
+    {
+      expectedEpoch: draft.proposalLineage.epoch,
+      now: receipt.createdAt,
+    },
+  );
+  draft.proposalLineage = transitionAgentSelectedImageProposalIteration(
+    draft.proposalLineage,
+    iterationId,
+    receipt.status === 'ready' && receipt.artifacts !== undefined ? 'ready' : 'failed',
+    { expectedEpoch: draft.proposalLineage.epoch, now: receipt.createdAt, terminalReason: receipt.status },
+  );
+  if (receipt.status !== 'ready' || receipt.artifacts === undefined) draft.state = 'failed';
+  return receipt;
 };
 
 export const recoverAgentSelectedImageLiveSessionDryRun = async ({
@@ -948,6 +1176,9 @@ export const recoverAgentSelectedImageLiveSessionDryRun = async ({
     blockedAudit: agentSelectedImageLiveSessionAuditRecordSchema.parse(blockedResult.audit),
     receipt: recoveryReceipt,
   };
+  if (blockedResult.audit.receipt.proposalLineage !== undefined) {
+    draft.proposalLineage = blockedResult.audit.receipt.proposalLineage;
+  }
   pushEvent(draft, {
     graphRevision: draft.snapshot.graphRevision,
     message: 'Recovery dry-run refreshed from the current selected-image edit graph.',
@@ -966,6 +1197,17 @@ export const approveAgentSelectedImageLiveSession = (
   draft: AgentSelectedImageLiveSessionDraft,
 ): AgentSelectedImageLiveSessionDraft => {
   if (draft.state !== 'approval_required') throw new Error('Selected-image live session is not awaiting approval.');
+  upgradeLegacyDryRunToProposalLineage(draft);
+  const head = draft.proposalLineage.iterations.at(-1);
+  if (head === undefined || head.state !== 'ready') {
+    throw new Error('Selected-image live session approval requires the latest ready proposal iteration.');
+  }
+  draft.proposalLineage = transitionAgentSelectedImageProposalIteration(
+    draft.proposalLineage,
+    head.iterationId,
+    'sealed',
+    { expectedEpoch: draft.proposalLineage.epoch },
+  );
   draft.approvalId = `approval_${draft.sessionId}_${draft.requestId}_${draft.dryRun.dryRunPlanId}`.replaceAll(
     /[^A-Za-z0-9_-]/gu,
     '_',
@@ -1010,6 +1252,15 @@ export const rejectAgentSelectedImageLiveSession = (
 export const cancelAgentSelectedImageLiveSession = (
   draft: AgentSelectedImageLiveSessionDraft,
 ): AgentSelectedImageLiveSessionAuditRecord => {
+  const head = draft.proposalLineage.iterations.at(-1);
+  if (head !== undefined && ['draft', 'rendering', 'ready', 'sealed'].includes(head.state)) {
+    draft.proposalLineage = transitionAgentSelectedImageProposalIteration(
+      draft.proposalLineage,
+      head.iterationId,
+      'cancelled',
+      { expectedEpoch: draft.proposalLineage.epoch, terminalReason: 'session_cancelled' },
+    );
+  }
   draft.state = 'cancelling';
   pushEvent(draft, {
     approvalDecision: 'cancelled',
@@ -1063,7 +1314,7 @@ export const recordAgentSelectedImageLiveSessionLateResult = (
   });
 };
 
-export const applyAgentSelectedImageLiveSession = async (
+const applyAgentSelectedImageLiveSessionUnchecked = async (
   draft: AgentSelectedImageLiveSessionDraft,
 ): Promise<AgentSelectedImageLiveSessionApplyResult> => {
   const applyRequest = {
@@ -1081,6 +1332,19 @@ export const applyAgentSelectedImageLiveSession = async (
     },
     expectedGraphRevision: draft.dryRun.sourceGraphRevision,
     expectedRecipeHash: draft.snapshot.recipeHash,
+    proposalLineage: {
+      acceptedProposalHash:
+        draft.proposalLineage.iterations.find(
+          (iteration) => iteration.iterationId === draft.proposalLineage.sealedIterationId,
+        )?.proposalHash ?? '',
+      acceptedProposalId:
+        draft.proposalLineage.iterations.find(
+          (iteration) => iteration.iterationId === draft.proposalLineage.sealedIterationId,
+        )?.proposalId ?? '',
+      lineageEpoch: draft.proposalLineage.epoch,
+      lineageId: draft.proposalLineage.lineageId,
+      sealedIterationId: draft.proposalLineage.sealedIterationId ?? '',
+    },
     operationId: draft.operationId,
     requestId: `${draft.requestId}-apply`,
     sessionId: draft.sessionId,
@@ -1092,6 +1356,20 @@ export const applyAgentSelectedImageLiveSession = async (
     runtimeToolName: AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
   });
   if (envelopeValidation.status === 'blocked') {
+    const sealed = draft.proposalLineage.iterations.find(
+      (iteration) => iteration.iterationId === draft.proposalLineage.sealedIterationId,
+    );
+    if (envelopeValidation.staleReason !== undefined && sealed !== undefined) {
+      draft.proposalLineage = transitionAgentSelectedImageProposalIteration(
+        draft.proposalLineage,
+        sealed.iterationId,
+        'stale',
+        {
+          expectedEpoch: draft.proposalLineage.epoch,
+          terminalReason: envelopeValidation.staleReason,
+        },
+      );
+    }
     draft.state = 'failed';
     pushEvent(draft, {
       approvalDecision: 'approved',
@@ -1125,6 +1403,24 @@ export const applyAgentSelectedImageLiveSession = async (
     if (envelopeValidation.staleReason !== undefined) result.staleReason = envelopeValidation.staleReason;
     return result;
   }
+
+  const sealed = draft.proposalLineage.iterations.find(
+    (iteration) => iteration.iterationId === draft.proposalLineage.sealedIterationId,
+  );
+  if (sealed === undefined) throw new Error('Selected-image apply requires a current sealed proposal head.');
+  assertAgentSelectedImageProposalApplyable({
+    acceptedProposalHash: sealed.proposalHash,
+    acceptedProposalId: sealed.proposalId,
+    baseGraphRevision: draft.snapshot.graphRevision,
+    basePreviewArtifactId: sealed.basePreviewArtifactId,
+    basePreviewContentHash: sealed.basePreviewContentHash,
+    baseRecipeHash: draft.snapshot.recipeHash,
+    expectedEpoch: draft.proposalLineage.epoch,
+    iterationId: sealed.iterationId,
+    lineage: draft.proposalLineage,
+    selectedImageId: sealed.selectedImageId,
+    sessionId: draft.sessionId,
+  });
 
   draft.state = 'applying';
   pushEvent(draft, {
@@ -1173,6 +1469,12 @@ export const applyAgentSelectedImageLiveSession = async (
     }),
   );
 
+  draft.proposalLineage = transitionAgentSelectedImageProposalIteration(
+    draft.proposalLineage,
+    sealed.iterationId,
+    'applied',
+    { expectedEpoch: draft.proposalLineage.epoch },
+  );
   draft.state = 'applied';
   pushEvent(draft, {
     approvalDecision: 'approved',
@@ -1209,6 +1511,191 @@ export const applyAgentSelectedImageLiveSession = async (
     status: 'applied',
   };
 };
+
+const selectedImageApplyTransactions = new Map<string, Promise<AgentSelectedImageLiveSessionApplyResult>>();
+const selectedImageMutationLocks = new Set<string>();
+
+export interface AgentSelectedImageApplyTransactionOptions {
+  auditStorage?: AgentSelectedImageLiveSessionAuditStorageAdapter;
+}
+
+/** Owns the mutation-to-audit boundary. No successful mutation is observable as applied until parity and audit pass. */
+export const runAgentSelectedImageApplyTransaction = (
+  draft: AgentSelectedImageLiveSessionDraft,
+  options: AgentSelectedImageApplyTransactionOptions = {},
+): Promise<AgentSelectedImageLiveSessionApplyResult> => {
+  const transactionId = `${draft.sessionId}:${draft.operationId}`;
+  const prior = selectedImageApplyTransactions.get(transactionId);
+  if (prior !== undefined) return prior;
+  if (selectedImageMutationLocks.has(draft.sessionId)) {
+    return Promise.reject(new Error('Selected-image apply rejected because another transaction is active.'));
+  }
+
+  const transaction = (async () => {
+    selectedImageMutationLocks.add(draft.sessionId);
+    const checkpoint = createAgentSessionCheckpoint(draft.sessionId);
+    const sealedHead = draft.proposalLineage.iterations.find(
+      (iteration) => iteration.iterationId === draft.proposalLineage.sealedIterationId,
+    );
+    if (draft.state === 'dry_run_ready' && (sealedHead === undefined || sealedHead.state !== 'sealed')) {
+      throw new Error('Selected-image transaction requires the authoritative sealed proposal head.');
+    }
+    let mutationStarted = false;
+    try {
+      const result = await applyAgentSelectedImageLiveSessionUnchecked(draft);
+      if (result.status !== 'applied') return result;
+      if (sealedHead === undefined || sealedHead.state !== 'sealed') {
+        throw new Error('Selected-image transaction cannot publish applied without its sealed proposal head.');
+      }
+      mutationStarted = true;
+
+      const state = useEditorStore.getState();
+      const current = buildSnapshot();
+      if (
+        state.historyIndex !== checkpoint.historyIndex + 1 ||
+        state.history.length !== checkpoint.history.length + 1
+      ) {
+        throw new Error('Selected-image commit parity rejected a non-atomic history transaction.');
+      }
+      for (const [key, expected] of Object.entries(draft.adjustments)) {
+        if (expected !== undefined && state.adjustments[key as keyof typeof state.adjustments] !== expected) {
+          throw new Error(`Selected-image commit parity rejected adjustment mismatch: ${key}.`);
+        }
+      }
+      if (
+        current.selectedImagePath !== draft.snapshot.selectedImagePath ||
+        current.graphRevision !== result.apply.appliedGraphRevision ||
+        current.recipeHash !== result.audit.receipt.finalRecipeHash
+      ) {
+        throw new Error('Selected-image commit parity rejected graph, recipe, or selected-image mismatch.');
+      }
+      if (
+        result.previewAfterHash !== result.apply.afterPreviewHash ||
+        result.previewBeforeHash !== result.apply.beforePreviewHash
+      ) {
+        throw new Error('Selected-image commit parity rejected preview identity mismatch.');
+      }
+      const proposalId = sealedHead.proposalId;
+      const proposalHash = sealedHead.proposalHash;
+      const proposalReceiptHash = await hashAgentSelectedImageLifecycleValue('proposal-receipt', sealedHead);
+      const renderSpecHash = await hashAgentSelectedImageLifecycleValue('render-spec', {
+        height: draft.snapshot.previewHeight,
+        purpose: 'medium-preview',
+        width: draft.snapshot.previewWidth,
+      });
+      const proposal = agentSelectedImageLifecycleProposalSchema.parse(
+        await sealAgentSelectedImageLifecyclePhase('proposal', {
+          afterArtifactHash: await hashAgentSelectedImageLifecycleValue('proposal-after', draft.dryRun.dryRunPlanHash),
+          beforeArtifactHash: await hashAgentSelectedImageLifecycleValue(
+            'proposal-before',
+            draft.snapshot.previewRenderHash,
+          ),
+          editGraph: draft.adjustments,
+          graphRevision: draft.snapshot.graphRevision,
+          lineage: {
+            epoch: draft.proposalLineage.epoch,
+            iterationId: sealedHead.iterationId,
+            lineageId: draft.proposalLineage.lineageId,
+            ordinal: sealedHead.ordinal,
+            proposalHash: sealedHead.proposalHash,
+            proposalId: sealedHead.proposalId,
+            state: 'sealed',
+          },
+          proposalHash,
+          proposalId,
+          receiptHash: proposalReceiptHash,
+          recipeHash: draft.snapshot.recipeHash,
+          renderSpecHash,
+          selectedImageId: sealedHead.selectedImageId,
+        }),
+      );
+      const approval = agentSelectedImageLifecycleApprovalSchema.parse(
+        await sealAgentSelectedImageLifecyclePhase('approval', {
+          actor: 'workspace-user',
+          approvalId: draft.approvalId ?? '',
+          approvedAt: new Date().toISOString(),
+          policyVersion: 'selected-image-approval.v1',
+          proposalHash,
+          proposalId,
+          receiptHash: proposalReceiptHash,
+          source: 'user',
+        }),
+      );
+      const transactionHash = (domain: string, value: unknown) => hashAgentSelectedImageLifecycleValue(domain, value);
+      const commit = agentSelectedImageLifecycleCommitSchema.parse(
+        await sealAgentSelectedImageLifecyclePhase('commit', {
+          afterGraphHash: await transactionHash('graph-after', current.graphRevision),
+          afterPreviewHash: await transactionHash('preview-after', result.previewAfterHash),
+          afterRecipeHash: await transactionHash('recipe-after', current.recipeHash),
+          beforeGraphHash: await transactionHash('graph-before', checkpoint.graphRevision),
+          beforePreviewHash: await transactionHash('preview-before', result.previewBeforeHash),
+          beforeRecipeHash: await transactionHash('recipe-before', checkpoint.previewRecipeHash),
+          history: {
+            afterDepth: state.history.length,
+            beforeDepth: checkpoint.history.length,
+            transactionId,
+          },
+          parity: { mode: 'byte_exact', result: 'passed', threshold: 0 },
+          status: 'applied',
+          toolCalls: result.audit.receipt.toolCalls.map(({ id, name }) => ({ id, name })),
+          transactionId,
+        }),
+      );
+      const lifecycleWithoutHash = {
+        approval,
+        commit,
+        createdAt: new Date().toISOString(),
+        proposal,
+        schemaVersion: 2 as const,
+        sessionId: draft.sessionId,
+      };
+      const lifecycleReceipt = agentSelectedImageLifecycleReceiptV2Schema.parse({
+        ...lifecycleWithoutHash,
+        hash: await hashAgentSelectedImageLifecycleValue('receipt', lifecycleWithoutHash),
+      });
+      result.audit = agentSelectedImageLiveSessionAuditRecordSchema.parse({
+        ...result.audit,
+        lifecycleReceipt,
+      });
+      if (options.auditStorage !== undefined) {
+        appendAgentSelectedImageLiveSessionAuditRecord(options.auditStorage, result.audit);
+      }
+      return result;
+    } catch (error) {
+      const currentState = useEditorStore.getState();
+      mutationStarted ||=
+        currentState.historyIndex !== checkpoint.historyIndex ||
+        currentState.history.length !== checkpoint.history.length;
+      if (mutationStarted) {
+        rollbackAgentSessionHistory({
+          checkpoint,
+          requestId: `${draft.requestId}-compensate`,
+          scope: 'operation',
+          sessionId: draft.sessionId,
+        });
+        const restored = useEditorStore.getState();
+        const restoredSnapshot = buildSnapshot();
+        if (
+          restored.historyIndex !== checkpoint.historyIndex ||
+          JSON.stringify(restored.history) !== JSON.stringify(checkpoint.history) ||
+          restoredSnapshot.graphRevision !== checkpoint.graphRevision ||
+          restoredSnapshot.recipeHash !== checkpoint.previewRecipeHash
+        ) {
+          draft.state = 'failed';
+          throw new Error('Selected-image compensation failed; explicit recovery is required.', { cause: error });
+        }
+      }
+      draft.state = 'failed';
+      throw error;
+    } finally {
+      selectedImageMutationLocks.delete(draft.sessionId);
+    }
+  })();
+  selectedImageApplyTransactions.set(transactionId, transaction);
+  return transaction;
+};
+
+export const applyAgentSelectedImageLiveSession = runAgentSelectedImageApplyTransaction;
 
 export const rollbackAgentSelectedImageLiveSession = async ({
   audit,
@@ -1270,6 +1757,54 @@ export const rollbackAgentSelectedImageLiveSession = async ({
     throw new Error('Selected-image live session rollback failed restored graph, recipe, or preview verification.');
   }
   const latestRecovery = receipt.recoveries?.at(-1);
+  const appliedIteration = receipt.proposalLineage?.iterations.find((iteration) => iteration.state === 'applied');
+  const revertedProposalLineage =
+    receipt.proposalLineage === undefined || appliedIteration === undefined
+      ? receipt.proposalLineage
+      : transitionAgentSelectedImageProposalIteration(
+          receipt.proposalLineage,
+          appliedIteration.iterationId,
+          'reverted',
+          { expectedEpoch: receipt.proposalLineage.epoch },
+        );
+  const revertedIteration = revertedProposalLineage?.iterations.find((iteration) => iteration.state === 'reverted');
+  let lifecycleReceipt = parsedAudit.lifecycleReceipt;
+  if (lifecycleReceipt !== undefined) {
+    if (revertedProposalLineage === undefined || revertedIteration === undefined) {
+      throw new Error('Selected-image V2 revert requires authoritative reverted proposal lineage.');
+    }
+    const transactionId = lifecycleReceipt.commit?.transactionId;
+    if (transactionId === undefined)
+      throw new Error('Selected-image V2 revert requires an applied transaction receipt.');
+    const revert = agentSelectedImageLifecycleRevertSchema.parse(
+      await sealAgentSelectedImageLifecyclePhase('revert', {
+        checkpointHash: await hashAgentSelectedImageLifecycleValue('revert-checkpoint', checkpoint),
+        lineage: {
+          epoch: revertedProposalLineage.epoch,
+          iterationId: revertedIteration.iterationId,
+          lineageId: revertedProposalLineage.lineageId,
+          proposalHash: revertedIteration.proposalHash,
+          proposalId: revertedIteration.proposalId,
+          state: 'reverted',
+        },
+        parity: { mode: 'byte_exact', result: 'passed', threshold: 0 },
+        restoredGraphHash: await hashAgentSelectedImageLifecycleValue('revert-graph', restored.graphRevision),
+        restoredHistoryHash: await hashAgentSelectedImageLifecycleValue('revert-history', {
+          depth: useEditorStore.getState().history.length,
+          index: useEditorStore.getState().historyIndex,
+        }),
+        restoredPreviewHash: await hashAgentSelectedImageLifecycleValue('revert-preview', restored.previewRenderHash),
+        restoredRecipeHash: await hashAgentSelectedImageLifecycleValue('revert-recipe', restored.recipeHash),
+        status: 'reverted',
+        transactionId,
+      }),
+    );
+    const lifecycleWithoutHash = { ...lifecycleReceipt, hash: undefined, revert };
+    lifecycleReceipt = agentSelectedImageLifecycleReceiptV2Schema.parse({
+      ...lifecycleWithoutHash,
+      hash: await hashAgentSelectedImageLifecycleValue('receipt', lifecycleWithoutHash),
+    });
+  }
   return agentSelectedImageLiveSessionAuditRecordSchema.parse({
     ...parsedAudit,
     auditEvents: [
@@ -1286,8 +1821,10 @@ export const rollbackAgentSelectedImageLiveSession = async ({
         toolName: AGENT_HISTORY_ROLLBACK_TOOL_NAME,
       },
     ],
+    lifecycleReceipt,
     receipt: {
       ...parsedAudit.receipt,
+      proposalLineage: revertedProposalLineage,
       recoveries: receipt.recoveries?.map((recovery, index, recoveries) =>
         index === recoveries.length - 1
           ? agentSelectedImageRecoveryReceiptSchema.parse({ ...recovery, status: 'rolled_back' })
@@ -1405,6 +1942,7 @@ export const buildAgentSelectedImageLiveSessionAuditRecord = (
       initialGraphRevision: draft.snapshot.graphRevision,
       initialRecipeHash: draft.snapshot.recipeHash,
       operationId: draft.operationId,
+      proposalLineage: draft.proposalLineage,
       previewLineage: [
         {
           graphRevision: draft.snapshot.graphRevision,
@@ -1634,7 +2172,7 @@ export const buildAgentSelectedImagePreviewLoopAuditRecord = ({
       name: AGENT_ADJUSTMENTS_APPLY_TOOL_NAME,
       status: 'succeeded' as const,
     })),
-    ...result.previewLineage.map((lineage, index) => ({
+    ...result.previewLineage.map((_lineage, index) => ({
       id: `${result.requestId}-preview-${index + 1}`,
       name: AGENT_PREVIEW_RENDER_TOOL_NAME,
       status: 'succeeded' as const,
