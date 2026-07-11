@@ -348,10 +348,12 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         interactive_divisor,
     });
     if !is_interactive && let Some(graph_revision) = viewer_sample_graph_revision {
-        state.viewer_sample_frames.lock().unwrap().insert(
-            "edited".to_string(),
-            settled_viewer_sample_frame(&final_processed_image, graph_revision, &loaded_image.path),
-        );
+        let frame =
+            settled_viewer_sample_frame(&final_processed_image, graph_revision, &loaded_image.path);
+        let weight = frame.image.as_bytes().len() as u64;
+        state
+            .viewer_sample_frames
+            .insert("edited".to_string(), Arc::new(frame), weight);
     }
     Ok(bytes)
 }

@@ -2221,9 +2221,8 @@ pub fn get_cached_or_generate_mask(
     let key = hasher.finish();
 
     {
-        let cache = state.mask_cache.lock().unwrap();
-        if let Some(img) = cache.get(&key) {
-            return Some(img.clone());
+        if let Some(img) = state.mask_cache.get(&key) {
+            return Some(img.as_ref().clone());
         }
     }
 
@@ -2240,11 +2239,9 @@ pub fn get_cached_or_generate_mask(
     );
 
     if let Some(img) = &generated {
-        let mut cache = state.mask_cache.lock().unwrap();
-        if cache.len() > 50 {
-            cache.clear();
-        }
-        cache.insert(key, img.clone());
+        state
+            .mask_cache
+            .insert(key, Arc::new(img.clone()), img.as_raw().len() as u64);
     }
 
     generated

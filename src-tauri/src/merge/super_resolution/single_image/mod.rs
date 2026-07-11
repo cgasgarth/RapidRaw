@@ -136,11 +136,8 @@ pub(crate) fn current_frame(
     state: &AppState,
     request: &SingleImageX2PreviewRequest,
 ) -> Result<crate::app_state::CachedViewerSampleFrame, String> {
-    let frames = state
+    let frame = state
         .viewer_sample_frames
-        .lock()
-        .map_err(|_| "single_image_x2_viewer_cache_unavailable".to_string())?;
-    let frame = frames
         .get(&request.graph_revision)
         .ok_or_else(|| "single_image_x2_stale_graph_revision".to_string())?;
     if frame.image_identity != request.source_path || frame.graph_revision != request.graph_revision
@@ -153,7 +150,7 @@ pub(crate) fn current_frame(
             frame.space_label
         ));
     }
-    Ok(frame.clone())
+    Ok(frame.as_ref().clone())
 }
 
 fn png_data_url(image: &Rgb32FImage) -> Result<String, String> {

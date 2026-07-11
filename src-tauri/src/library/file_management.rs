@@ -1006,8 +1006,8 @@ fn generate_thumbnail_data_with_target(
         let crop_data: Option<Crop> = serde_json::from_value(meta.adjustments["crop"].clone()).ok();
 
         let cached_base: Option<(DynamicImage, f32)> = {
-            let cache = state.thumbnail_geometry_cache.lock().unwrap();
-            if let Some((cached_hash, img, scale)) = cache.get(path_str) {
+            if let Some(entry) = state.thumbnail_geometry_cache.get(&path_str.to_string()) {
+                let (cached_hash, img, scale) = entry.as_ref();
                 let mut sufficient_resolution = true;
                 if let Some(c) = &crop_data
                     && c.width > 0.0
@@ -1021,7 +1021,7 @@ fn generate_thumbnail_data_with_target(
                 }
 
                 if *cached_hash == geometry_hash && sufficient_resolution {
-                    Some((img.clone(), *scale))
+                    Some((img.as_ref().clone(), *scale))
                 } else {
                     None
                 }
@@ -1122,13 +1122,10 @@ fn generate_thumbnail_data_with_target(
 
             let total_scale = gpu_scale * raw_scale_factor;
 
-            let mut cache = state.thumbnail_geometry_cache.lock().unwrap();
-            if cache.len() > 30 {
-                cache.clear();
-            }
-            cache.insert(
+            state.thumbnail_geometry_cache.insert(
                 path_str.to_string(),
-                (geometry_hash, base.clone(), total_scale),
+                Arc::new((geometry_hash, Arc::new(base.clone()), total_scale)),
+                base.as_bytes().len() as u64,
             );
 
             (base, total_scale)
@@ -1187,13 +1184,16 @@ fn generate_thumbnail_data_with_target(
         let gpu_adjustments = get_all_adjustments_from_json(&meta.adjustments, is_raw, tm_override);
         let lut_path = meta.adjustments["lutPath"].as_str();
         let lut = lut_path.and_then(|p| {
-            let mut cache = state.lut_cache.lock().unwrap();
-            if let Some(cached_lut) = cache.get(p) {
-                return Some(cached_lut.clone());
+            if let Some(cached_lut) = state.lut_cache.get(&p.to_string()) {
+                return Some(cached_lut);
             }
             if let Ok(loaded_lut) = crate::lut_processing::parse_lut_file(p) {
                 let arc_lut = Arc::new(loaded_lut);
-                cache.insert(p.to_string(), arc_lut.clone());
+                state.lut_cache.insert(
+                    p.to_string(),
+                    arc_lut.clone(),
+                    (arc_lut.data.capacity() * std::mem::size_of::<f32>()) as u64,
+                );
                 return Some(arc_lut);
             }
             None

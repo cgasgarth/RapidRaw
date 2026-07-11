@@ -17,6 +17,7 @@ use crate::image_processing::GpuContext;
 use crate::lens_correction::LensDatabase;
 use crate::lut_processing::Lut;
 use crate::panorama_stitching::PendingPanoramaResult;
+use crate::render::native_cache::{CacheBudgetCoordinator, CachePolicy, MemoryLruCache};
 use crate::source_revision::FingerprintCache;
 use crate::tethering::TetherSessionSnapshot;
 
@@ -188,22 +189,23 @@ pub struct AppState {
     pub panorama_result: Arc<Mutex<Option<PendingPanoramaResult>>>,
     pub denoise_result: Arc<Mutex<Option<DynamicImage>>>,
     pub indexing_task_handle: Mutex<Option<JoinHandle<()>>>,
-    pub lut_cache: Mutex<HashMap<String, Arc<Lut>>>,
+    pub cache_budget: Arc<CacheBudgetCoordinator>,
+    pub lut_cache: MemoryLruCache<String, Lut>,
     pub initial_file_path: Mutex<Option<String>>,
     pub thumbnail_cancellation_token: Arc<AtomicBool>,
     pub thumbnail_progress: Mutex<ThumbnailProgressTracker>,
     pub preview_scheduler: Mutex<Option<Arc<crate::preview_scheduler::PreviewScheduler>>>,
-    pub viewer_sample_frames: Mutex<HashMap<String, CachedViewerSampleFrame>>,
+    pub viewer_sample_frames: MemoryLruCache<String, CachedViewerSampleFrame>,
     pub analytics_worker_tx: Mutex<Option<Sender<AnalyticsJob>>>,
-    pub mask_cache: Mutex<HashMap<u64, GrayImage>>,
+    pub mask_cache: MemoryLruCache<u64, GrayImage>,
     pub patch_cache: Mutex<HashMap<String, serde_json::Value>>,
-    pub geometry_cache: Mutex<HashMap<u64, DynamicImage>>,
-    pub thumbnail_geometry_cache: Mutex<HashMap<String, (u64, DynamicImage, f32)>>,
+    pub geometry_cache: MemoryLruCache<u64, DynamicImage>,
+    pub thumbnail_geometry_cache: MemoryLruCache<String, (u64, Arc<DynamicImage>, f32)>,
     pub lens_db: Mutex<Option<Arc<LensDatabase>>>,
     pub load_image_generation: Arc<AtomicUsize>,
     pub full_warped_cache: Mutex<Option<(u64, Arc<DynamicImage>)>>,
     pub full_transformed_cache: Mutex<Option<TransformedImageCache>>,
-    pub decoded_image_cache: Mutex<DecodedImageCache>,
+    pub decoded_image_cache: DecodedImageCache,
     pub source_fingerprint_cache: Arc<FingerprintCache>,
     pub thumbnail_manager: Arc<ThumbnailManager>,
     pub tether_session: Mutex<Option<TetherSessionSnapshot>>,
@@ -211,6 +213,14 @@ pub struct AppState {
 
 impl AppState {
     pub fn new() -> Self {
+        let mib = 1024 * 1024;
+        let cache_budget = CacheBudgetCoordinator::new(768 * mib, 1024 * mib);
+        let policy = |name, soft, hard, max_entries| CachePolicy {
+            name,
+            soft_limit_bytes: soft * mib,
+            hard_limit_bytes: hard * mib,
+            max_entries,
+        };
         Self {
             window_setup_complete: AtomicBool::new(false),
             gpu_crash_flag_path: Mutex::new(None),
@@ -238,7 +248,11 @@ impl AppState {
             panorama_result: Arc::new(Mutex::new(None)),
             denoise_result: Arc::new(Mutex::new(None)),
             indexing_task_handle: Mutex::new(None),
-            lut_cache: Mutex::new(HashMap::new()),
+            cache_budget: Arc::clone(&cache_budget),
+            lut_cache: MemoryLruCache::new(
+                policy("lut_cpu", 64, 96, Some(32)),
+                Arc::clone(&cache_budget),
+            ),
             initial_file_path: Mutex::new(None),
             thumbnail_cancellation_token: Arc::new(AtomicBool::new(false)),
             thumbnail_progress: Mutex::new(ThumbnailProgressTracker {
@@ -246,17 +260,29 @@ impl AppState {
                 completed: 0,
             }),
             preview_scheduler: Mutex::new(None),
-            viewer_sample_frames: Mutex::new(HashMap::new()),
+            viewer_sample_frames: MemoryLruCache::new(
+                policy("viewer_samples", 96, 128, Some(8)),
+                Arc::clone(&cache_budget),
+            ),
             analytics_worker_tx: Mutex::new(None),
-            mask_cache: Mutex::new(HashMap::new()),
+            mask_cache: MemoryLruCache::new(
+                policy("masks", 96, 128, Some(64)),
+                Arc::clone(&cache_budget),
+            ),
             patch_cache: Mutex::new(HashMap::new()),
-            geometry_cache: Mutex::new(HashMap::new()),
-            thumbnail_geometry_cache: Mutex::new(HashMap::new()),
+            geometry_cache: MemoryLruCache::new(
+                policy("geometry", 256, 384, Some(16)),
+                Arc::clone(&cache_budget),
+            ),
+            thumbnail_geometry_cache: MemoryLruCache::new(
+                policy("thumbnail_geometry", 192, 256, Some(96)),
+                Arc::clone(&cache_budget),
+            ),
             lens_db: Mutex::new(None),
             load_image_generation: Arc::new(AtomicUsize::new(0)),
             full_warped_cache: Mutex::new(None),
             full_transformed_cache: Mutex::new(None),
-            decoded_image_cache: Mutex::new(DecodedImageCache::new(5)),
+            decoded_image_cache: DecodedImageCache::new(5, Arc::clone(&cache_budget)),
             source_fingerprint_cache: Arc::new(FingerprintCache::new(64)),
             thumbnail_manager: ThumbnailManager::new(),
             tether_session: Mutex::new(None),
