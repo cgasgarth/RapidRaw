@@ -7,6 +7,10 @@ import {
   singleImageX2ApplyReceiptSchema,
   singleImageX2PreviewSchema,
 } from '../../schemas/computational-merge/singleImageX2Schemas';
+import {
+  focusStackCandidateJobHandleSchema,
+  focusStackCandidateJobResultSchema,
+} from '../../schemas/focus-stack/focusStackCandidateRuntimeSchemas';
 import { focusStackNativeInputPlanSchema } from '../../schemas/focus-stack/focusStackNativePlanSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
@@ -28,10 +32,7 @@ import {
   resetHdrStateForSettingsChange,
   resetPanoramaStateForSettingsChange,
 } from '../../utils/computational-merge/computationalMergeModalState';
-import {
-  buildNativeFocusStackOutputReview,
-  markFocusStackOutputReviewApplyReady,
-} from '../../utils/focusStackOutputReview';
+import { buildNativeFocusStackOutputReview } from '../../utils/focusStackOutputReview';
 import { handleNegativeConversionEditorHandoff } from '../../utils/negative-lab/negativeLabEditorHandoff';
 import { superResolutionNativeRegistrationPlanSchema } from '../../utils/superResolutionNativeReadiness';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
@@ -507,31 +508,52 @@ export default function AppModals(props: AppModalsProps) {
             }
             onClose={() => {
               focusStackPlanRequestId.current += 1;
+              if (focusStackModalState.candidateJobId !== undefined && focusStackModalState.candidateJobId !== null)
+                void invoke(Invokes.CancelComputationalMergeJob, {
+                  jobId: focusStackModalState.candidateJobId,
+                });
               void invoke(Invokes.CancelFocusStackPlan);
               setUI((state) => ({
                 focusStackModalState: createDefaultFocusStackModalState(state.focusStackModalState.settings),
               }));
             }}
             onApplyPlan={() => {
-              if (focusStackModalState.outputReview === null || focusStackModalState.nativeInputPlan?.accepted !== true)
-                return;
-              const routePair = getComputationalMergeAppServerRoutePairSummary('focus_stack');
-              const { acceptedDryRunPlanId, acceptedDryRunPlanHash } = focusStackModalState.nativeInputPlan;
-              setUI({
-                focusStackModalState: {
-                  ...focusStackModalState,
-                  lastApplyCommand: {
-                    acceptedDryRunPlanHash,
-                    acceptedDryRunPlanId,
-                    commandType: 'computationalMerge.createFocusStack' as const,
-                    dryRun: false as const,
-                    sources: focusStackModalState.sourcePaths.length,
-                    toolName: routePair.applyToolName,
-                  },
-                  outputReview: markFocusStackOutputReviewApplyReady(focusStackModalState.outputReview),
-                },
+              return;
+            }}
+            onPrepareCandidate={() => {
+              const acceptedPreviewId = focusStackModalState.nativeInputPlan?.acceptedDryRunPlanId;
+              if (acceptedPreviewId === undefined) return;
+              void invokeWithSchema(
+                Invokes.PrepareFocusStackCandidate,
+                { acceptedPreviewId, memoryBudgetBytes: 512 * 1024 * 1024 },
+                focusStackCandidateJobHandleSchema,
+              ).then((handle) => {
+                setUI((state) => ({
+                  focusStackModalState: { ...state.focusStackModalState, candidateJobId: handle.jobId },
+                }));
+                const poll = window.setInterval(() => {
+                  void invokeWithSchema(
+                    Invokes.ReadFocusStackJob,
+                    { jobId: handle.jobId },
+                    focusStackCandidateJobResultSchema,
+                  ).then((candidateJob) => {
+                    setUI((state) => ({ focusStackModalState: { ...state.focusStackModalState, candidateJob } }));
+                    if (
+                      candidateJob.status === 'succeeded' ||
+                      candidateJob.status === 'failed' ||
+                      candidateJob.status === 'cancelled'
+                    )
+                      window.clearInterval(poll);
+                  });
+                }, 250);
               });
             }}
+            onCancelCandidate={() => {
+              const jobId = focusStackModalState.candidateJobId;
+              if (jobId !== undefined)
+                void invokeWithSchema(Invokes.CancelComputationalMergeJob, { jobId }, z.boolean());
+            }}
+            candidateJob={focusStackModalState.candidateJob}
             onPreviewPlan={() => {
               const requestId = focusStackPlanRequestId.current + 1;
               focusStackPlanRequestId.current = requestId;

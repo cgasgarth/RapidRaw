@@ -169,6 +169,9 @@ pub struct AppState {
     pub hdr_source_refs: Arc<Mutex<Vec<PendingHdrSourceRef>>>,
     pub focus_stack_plan_generation: Arc<AtomicUsize>,
     pub focus_stack_runtime_plan: Arc<Mutex<Option<(String, String)>>>,
+    pub focus_stack_accepted_runtime:
+        Arc<Mutex<Option<crate::merge::focus_stack::job::AcceptedFocusRuntime>>>,
+    pub focus_stack_job_results: crate::merge::focus_stack::job::FocusStackJobResults,
     pub panorama_result: Arc<Mutex<Option<PendingPanoramaResult>>>,
     pub denoise_result: Arc<Mutex<Option<DynamicImage>>>,
     pub indexing_task_handle: Mutex<Option<JoinHandle<()>>>,
@@ -213,6 +216,9 @@ impl AppState {
             hdr_source_refs: Arc::new(Mutex::new(Vec::new())),
             focus_stack_plan_generation: Arc::new(AtomicUsize::new(0)),
             focus_stack_runtime_plan: Arc::new(Mutex::new(None)),
+            focus_stack_accepted_runtime: Arc::new(Mutex::new(None)),
+            focus_stack_job_results: crate::merge::focus_stack::job::FocusStackJobResults::default(
+            ),
             panorama_result: Arc::new(Mutex::new(None)),
             denoise_result: Arc::new(Mutex::new(None)),
             indexing_task_handle: Mutex::new(None),

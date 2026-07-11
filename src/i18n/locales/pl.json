@@ -2666,6 +2666,7 @@
       }
     },
     "common": {
+      "cancel": "",
       "savedOutputFullPath": "Pelna sciezka zapisanych danych wyjsciowych: {{path}}",
       "savedOutputLabel": "Zapisane dane wyjsciowe: {{name}}",
       "sourcePreviewAlt": "Podglad zrodla"
@@ -3035,6 +3036,7 @@
         "workload": "Workload"
       },
       "preflightTitle": "Preflight",
+      "prepareFullResolution": "",
       "previewBudgetLabel": "Preview budget",
       "previewBudgetValue": "{{value}} px",
       "previewMemoryValue": "{{value}} MB estimated",

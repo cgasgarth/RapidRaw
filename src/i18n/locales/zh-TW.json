@@ -2404,6 +2404,7 @@
       }
     },
     "common": {
+      "cancel": "",
       "savedOutputFullPath": "",
       "savedOutputLabel": "",
       "sourcePreviewAlt": ""
@@ -2708,6 +2709,7 @@
         "workload": ""
       },
       "preflightTitle": "",
+      "prepareFullResolution": "",
       "previewBudgetLabel": "",
       "previewBudgetValue": "",
       "previewMemoryValue": "",
