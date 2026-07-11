@@ -145,6 +145,8 @@ export enum Invokes {
   SetTetherCameraControl = 'set_tether_camera_control',
   TriggerTetherCapture = 'trigger_tether_capture',
   UpdateWgpuTransform = 'update_wgpu_transform',
+  FlushWgpuPresentation = 'flush_wgpu_presentation',
+  GetWgpuPresentationReport = 'get_wgpu_presentation_report',
   UpdateThumbnailQueue = 'update_thumbnail_queue',
   UpdateExifFields = 'update_exif_fields',
   FetchCommunityPresets = 'fetch_community_presets',
