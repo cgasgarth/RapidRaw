@@ -1,0 +1,11 @@
+[agents.luna_low]
+description = "Lightweight polling, queue checks, status collection, and bounded data gathering. Do not assign implementation or architecture work."
+config_file = "agents/luna-low.toml"
+
+[agents.luna_xhigh]
+description = "Generalist implementation, testing, review fixes, and PR delivery for well-scoped product work."
+config_file = "agents/luna-xhigh.toml"
+
+[agents.sol_high]
+description = "UI implementation and validation, complex or algorithmic changes, architecture, and high-risk cross-system work."
+config_file = "agents/sol-high.toml"

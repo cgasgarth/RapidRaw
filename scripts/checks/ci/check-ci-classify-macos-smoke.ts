@@ -385,7 +385,7 @@ function isSafeValidationScript(path) {
 }
 
 function isSafeCodexConfig(path) {
-  return path.startsWith('.codex/environments/') && path.endsWith('.toml');
+  return path.startsWith('.codex/') && path.endsWith('.toml');
 }
 
 function isSafePackageJsonScriptPatch(patch) {
@@ -1106,9 +1106,20 @@ function runSelfTest() {
   assertClassification('script policy metadata can skip smoke', ['scripts/tsconfig.json'], SMOKE_MODES.NONE);
   assertClassification('docs can skip smoke', ['RAW_EDITOR_PLAN.md', 'docs/validation.md'], SMOKE_MODES.NONE);
   assertClassification(
-    'Codex local environment config can skip smoke',
-    ['.codex/environments/environment.toml'],
+    'Codex project and agent config can skip smoke',
+    [
+      '.codex/config.toml',
+      '.codex/agents/luna-low.toml',
+      '.codex/agents/luna-xhigh.toml',
+      '.codex/agents/sol-high.toml',
+      '.codex/environments/environment.toml',
+    ],
     SMOKE_MODES.NONE,
+  );
+  assertDecision(
+    'unknown Codex executable config still fails closed',
+    ['.codex/hooks/precommit.sh'],
+    SMOKE_DECISIONS.FAIL_CLOSED,
   );
   assertClassification(
     'mixed safe and workflow paths require main smoke decision',
