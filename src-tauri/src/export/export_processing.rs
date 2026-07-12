@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::{Cursor, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -20,10 +20,14 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use tauri::Emitter;
 use tauri::Manager;
+use tokio::sync::Notify;
 
 use crate::color::working_to_output_transform::WorkingColorState;
 use crate::exif_processing;
-use crate::export::batch_export_pipeline::ExportResourceBudget;
+use crate::export::batch_export_pipeline::{
+    CooperativeGpuLane, CreditedRepresentation, ExportResourceBudget, ExportStage,
+    ExportWorkEstimate, PipelineCancellation, PipelineDiagnostics, PipelineResources,
+};
 pub(crate) use crate::export::export_encoders::{
     EmbeddedSourceIccProfile, encode_image_to_bytes, encode_image_with_working_color_state,
     validate_export_file_readback_color_policy,
@@ -158,6 +162,217 @@ pub struct ExportCancellationAck {
 struct ExportJobIdentity {
     job_id: String,
     cancellation_token: Arc<AtomicBool>,
+    cancellation_notify: Arc<Notify>,
+}
+
+impl ExportJobIdentity {
+    fn pipeline_cancellation(&self) -> PipelineCancellation {
+        PipelineCancellation::from_parts(
+            Arc::clone(&self.cancellation_token),
+            Arc::clone(&self.cancellation_notify),
+        )
+    }
+}
+
+#[derive(Clone)]
+struct ExportItemPlan {
+    source_path: String,
+    sidecar_path: PathBuf,
+    output_path: PathBuf,
+    extension: String,
+    is_current_edit: bool,
+    is_raw: bool,
+    estimate: ExportWorkEstimate,
+}
+
+struct DecodedExportItem {
+    plan: ExportItemPlan,
+    adjustments: Arc<Value>,
+    base_image: DynamicImage,
+    raw_development_report: Option<RawDevelopmentReport>,
+    source_revision: Option<SourceRevision>,
+}
+
+struct RenderedExportItem {
+    decoded: DecodedExportItem,
+    output: RenderedExportOutput,
+}
+
+enum RenderedExportOutput {
+    Image(DynamicImage),
+    Lut(Vec<u8>),
+}
+
+struct EncodedExportItem {
+    decoded: DecodedExportItem,
+    encoded_bytes: Vec<u8>,
+    color_policy: Option<ExportReceiptMetadata>,
+    source_digest: Option<VerifiedSourceDigestReceipt>,
+    export_elapsed_ms: u128,
+}
+
+fn estimate_export_work(source_path: &Path, output_format: &str) -> ExportWorkEstimate {
+    let source_bytes = fs::metadata(source_path).map(|m| m.len()).unwrap_or(1);
+    let (width, height) = image::image_dimensions(source_path).unwrap_or_else(|_| {
+        // RAW containers do not all expose dimensions through `image`. Source-size based
+        // admission remains conservative while the decoded representation is measured later.
+        let pixels = source_bytes.saturating_mul(12).saturating_div(8).max(1);
+        let edge = (pixels as f64)
+            .sqrt()
+            .ceil()
+            .clamp(1.0, f64::from(u32::MAX)) as u32;
+        (edge, edge)
+    });
+    let pixels = u64::from(width).saturating_mul(u64::from(height)).max(1);
+    let decoded_bytes = pixels.saturating_mul(16);
+    let transformed_bytes = decoded_bytes.saturating_mul(2);
+    let encoder_peak_bytes = match output_format.to_ascii_lowercase().as_str() {
+        "tif" | "tiff" | "png" | "jxl" => pixels.saturating_mul(12),
+        _ => pixels.saturating_mul(4),
+    };
+    ExportWorkEstimate {
+        source_bytes,
+        decoded_bytes,
+        transformed_bytes,
+        gpu_peak_bytes: decoded_bytes.saturating_mul(2),
+        output_pixels: pixels,
+        encoder_peak_bytes,
+        cpu_weight: pixels.div_ceil(12_000_000).clamp(1, u64::from(u32::MAX)) as u32,
+    }
+}
+
+fn decode_export_item(
+    plan: ExportItemPlan,
+    current_edit_adjustments: Option<Arc<Value>>,
+    settings: &crate::AppSettings,
+    app_handle: &tauri::AppHandle,
+    cancellation: &AtomicBool,
+) -> Result<DecodedExportItem, String> {
+    if cancellation.load(Ordering::SeqCst) {
+        return Err("export_cancelled_before_decode".to_string());
+    }
+    let state = app_handle.state::<AppState>();
+    let mut adjustments = match (&current_edit_adjustments, plan.is_current_edit) {
+        (Some(adjustments), true) => adjustments.as_ref().clone(),
+        _ => adjustments_with_raw_engine_artifacts(crate::exif_processing::load_sidecar(
+            &plan.sidecar_path,
+        )),
+    };
+    hydrate_adjustments(&state, &mut adjustments);
+    if plan.extension == "cube" {
+        return Ok(DecodedExportItem {
+            plan,
+            adjustments: Arc::new(adjustments),
+            base_image: DynamicImage::new_rgb8(1, 1),
+            raw_development_report: None,
+            source_revision: None,
+        });
+    }
+
+    let effective_settings = raw_processing_settings_for_adjustments(settings, &adjustments);
+    let source_revision = plan
+        .is_raw
+        .then(|| SourceRevision::from_path(Path::new(&plan.source_path)))
+        .transpose()
+        .map_err(|error| error.to_string())?;
+    let (base_image, raw_development_report) = if plan.is_current_edit {
+        match get_full_image_for_processing(&state) {
+            Ok((orig_data, _)) => (
+                composite_patches_on_image(&orig_data, &adjustments)
+                    .map_err(|error| format!("Failed to composite AI patches: {error}"))?
+                    .into_owned(),
+                None,
+            ),
+            Err(_) => {
+                let bytes = fs::read(&plan.source_path).map_err(|error| error.to_string())?;
+                let revision = SourceRevision::from_path(Path::new(&plan.source_path))
+                    .map_err(|error| error.to_string())?;
+                state
+                    .source_fingerprint_cache
+                    .fingerprint(&revision, &bytes);
+                load_and_composite_with_report(
+                    &bytes,
+                    &plan.source_path,
+                    &adjustments,
+                    false,
+                    &effective_settings,
+                    None,
+                )
+                .map_err(|error| format!("Failed to load fallback image: {error}"))?
+            }
+        }
+    } else {
+        match read_file_mapped(Path::new(&plan.source_path)) {
+            Ok(mmap) => {
+                let revision = SourceRevision::from_path(Path::new(&plan.source_path))
+                    .map_err(|error| error.to_string())?;
+                state.source_fingerprint_cache.fingerprint(&revision, &mmap);
+                load_and_composite_with_report(
+                    &mmap,
+                    &plan.source_path,
+                    &adjustments,
+                    false,
+                    &effective_settings,
+                    None,
+                )
+                .map_err(|error| format!("Failed to load from mmap: {error}"))?
+            }
+            Err(_) => {
+                let bytes = fs::read(&plan.source_path).map_err(|error| error.to_string())?;
+                let revision = SourceRevision::from_path(Path::new(&plan.source_path))
+                    .map_err(|error| error.to_string())?;
+                state
+                    .source_fingerprint_cache
+                    .fingerprint(&revision, &bytes);
+                load_and_composite_with_report(
+                    &bytes,
+                    &plan.source_path,
+                    &adjustments,
+                    false,
+                    &effective_settings,
+                    None,
+                )
+                .map_err(|error| format!("Failed to load from bytes: {error}"))?
+            }
+        }
+    };
+    Ok(DecodedExportItem {
+        plan,
+        adjustments: Arc::new(adjustments),
+        base_image,
+        raw_development_report,
+        source_revision,
+    })
+}
+
+fn verified_source_digest(
+    item: &DecodedExportItem,
+    state: &tauri::State<AppState>,
+) -> Result<Option<VerifiedSourceDigestReceipt>, String> {
+    let Some(revision) = item.source_revision.as_ref() else {
+        return Ok(None);
+    };
+    if SourceRevision::from_path(Path::new(&item.plan.source_path))
+        .map_err(|error| error.to_string())?
+        != *revision
+    {
+        return Err("source_changed_during_export".to_string());
+    }
+    let (sha256, provenance) = match state.source_fingerprint_cache.verified_sha256(revision) {
+        Some(digest) => (digest, "verifiedRevisionCache"),
+        None => (
+            state
+                .source_fingerprint_cache
+                .fingerprint_streaming(revision, Path::new(&item.plan.source_path))?
+                .sha256,
+            "boundedStreamingFallback",
+        ),
+    };
+    Ok(Some(VerifiedSourceDigestReceipt {
+        revision: revision.clone(),
+        sha256,
+        provenance,
+    }))
 }
 
 fn claim_export_job(registry: &Mutex<Option<ExportJob>>) -> Result<ExportJobIdentity, String> {
@@ -167,15 +382,18 @@ fn claim_export_job(registry: &Mutex<Option<ExportJob>>) -> Result<ExportJobIden
     }
 
     let cancellation_token = Arc::new(AtomicBool::new(false));
+    let cancellation_notify = Arc::new(Notify::new());
     let job_id = format!("export-job:{}", uuid::Uuid::new_v4());
     *job = Some(ExportJob {
         job_id: job_id.clone(),
         cancellation_token: Arc::clone(&cancellation_token),
+        cancellation_notify: Arc::clone(&cancellation_notify),
         task_handle: None,
     });
     Ok(ExportJobIdentity {
         job_id,
         cancellation_token,
+        cancellation_notify,
     })
 }
 
@@ -193,6 +411,7 @@ fn request_export_cancellation(
     if job.cancellation_token.swap(true, Ordering::SeqCst) {
         return Err("Export cancellation is already in progress.".to_string());
     }
+    job.cancellation_notify.notify_waiters();
     Ok(ExportCancellationAck {
         active_job_id: job.job_id.clone(),
         cancellation_requested: true,
@@ -601,6 +820,47 @@ pub(crate) fn save_image_with_metadata_commit(
     export_settings: &ExportSettings,
     cancellation: Option<&AtomicBool>,
 ) -> Result<Option<OutputCommitReceipt>, String> {
+    let (image_bytes, color_policy) = encode_image_with_metadata(
+        image,
+        source_color_state,
+        output_path,
+        source_path_str,
+        export_settings,
+    )?;
+
+    #[cfg(target_os = "android")]
+    {
+        let extension = output_path
+            .extension()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+        let file_name = output_path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or_else(|| "Missing Android export file name".to_string())?;
+        crate::android_integration::save_image_bytes_to_android_gallery(
+            file_name,
+            crate::formats::export_mime_type_for_extension(&extension),
+            &image_bytes,
+        )?;
+    }
+
+    let digest = write_final_output_bytes(output_path, &image_bytes, cancellation)?;
+    Ok(digest.map(|digest| OutputCommitReceipt {
+        path: output_path.to_path_buf(),
+        digest,
+        color_policy,
+    }))
+}
+
+fn encode_image_with_metadata(
+    image: &DynamicImage,
+    source_color_state: WorkingColorState,
+    output_path: &Path,
+    source_path_str: &str,
+    export_settings: &ExportSettings,
+) -> Result<(Vec<u8>, Option<ExportReceiptMetadata>), String> {
     let extension = output_path
         .extension()
         .and_then(|s| s.to_str())
@@ -647,25 +907,7 @@ pub(crate) fn save_image_with_metadata_commit(
         source_embedded_icc.as_ref(),
     )?;
 
-    #[cfg(target_os = "android")]
-    {
-        let file_name = output_path
-            .file_name()
-            .and_then(|name| name.to_str())
-            .ok_or_else(|| "Missing Android export file name".to_string())?;
-        crate::android_integration::save_image_bytes_to_android_gallery(
-            file_name,
-            crate::formats::export_mime_type_for_extension(&extension),
-            &image_bytes,
-        )?;
-    }
-
-    let digest = write_final_output_bytes(output_path, &image_bytes, cancellation)?;
-    Ok(digest.map(|digest| OutputCommitReceipt {
-        path: output_path.to_path_buf(),
-        digest,
-        color_policy: encoded_image.color_policy,
-    }))
+    Ok((image_bytes, encoded_image.color_policy))
 }
 
 fn write_final_output_bytes(
@@ -1029,8 +1271,692 @@ fn export_adjustments_as_lut(
 }
 
 #[allow(clippy::too_many_arguments)]
+async fn run_batch_export_pipeline(
+    paths: Vec<String>,
+    output_folder_or_file: String,
+    is_explicit_file_path: bool,
+    base_origin_folders: Vec<String>,
+    export_settings: ExportSettings,
+    output_format: String,
+    current_edit_path: Option<String>,
+    current_edit_adjustments: Option<Value>,
+    context: Arc<GpuContext>,
+    app_handle: tauri::AppHandle,
+    cancellation: PipelineCancellation,
+    budget: ExportResourceBudget,
+) -> (
+    Vec<ExportItemResult>,
+    crate::export::batch_export_pipeline::BatchExportReport,
+) {
+    let total = paths.len();
+    let diagnostics = PipelineDiagnostics::default();
+    diagnostics.update(|report| {
+        report.planned = total;
+        report.current_stage = Some(ExportStage::Planned);
+    });
+    let resources = PipelineResources::new(budget, diagnostics.clone());
+    let gpu_lane = CooperativeGpuLane::new(budget.gpu_slots, diagnostics.clone());
+    let output_folder = PathBuf::from(output_folder_or_file);
+    let mut source_counts = HashMap::<String, usize>::new();
+    let mut output_paths = std::collections::HashSet::new();
+    let mut plans = Vec::with_capacity(total);
+
+    for (global_index, input_path) in paths.into_iter().enumerate() {
+        let (source_path, _) = parse_virtual_path(&input_path);
+        let source_path_string = source_path.to_string_lossy().to_string();
+        let appearance_count = source_counts.entry(source_path_string.clone()).or_default();
+        *appearance_count += 1;
+        let explicit_virtual_copy = input_path
+            .rfind("vc=")
+            .and_then(|index| input_path[index + 3..].split('&').next())
+            .and_then(|value| value.parse::<u32>().ok())
+            .or_else(|| {
+                let lower = input_path.to_ascii_lowercase();
+                lower.rfind("_vc").and_then(|index| {
+                    lower[index + 3..]
+                        .chars()
+                        .take_while(char::is_ascii_digit)
+                        .collect::<String>()
+                        .parse::<u32>()
+                        .ok()
+                })
+            });
+        let target = resolve_export_output_target(ExportOutputTargetRequest {
+            image_path: &input_path,
+            output_folder_path: &output_folder,
+            is_explicit_file_path,
+            base_origin_folders: &base_origin_folders,
+            filename_template: export_settings
+                .filename_template
+                .as_deref()
+                .unwrap_or("{original_filename}_edited"),
+            preserve_folders: export_settings.preserve_folders,
+            output_format: &output_format,
+            total_paths: total,
+            global_index,
+            appearance_count: *appearance_count,
+            explicit_virtual_copy,
+        });
+        if !output_paths.insert(target.output_path.clone()) {
+            return (
+                vec![ExportItemResult::Failed(format!(
+                    "export_preflight_output_collision:{}",
+                    target.output_path.display()
+                ))],
+                diagnostics.snapshot(),
+            );
+        }
+        let extension = output_format.to_ascii_lowercase();
+        let estimate = estimate_export_work(Path::new(&target.source_path_str), &extension);
+        plans.push(ExportItemPlan {
+            source_path: target.source_path_str.clone(),
+            sidecar_path: target.sidecar_path,
+            output_path: target.output_path,
+            extension,
+            is_current_edit: Some(&target.source_path_str) == current_edit_path.as_ref(),
+            is_raw: is_raw_file(&target.source_path_str),
+            estimate,
+        });
+    }
+
+    let (plan_tx, plan_rx) =
+        tokio::sync::mpsc::channel::<ExportItemPlan>(budget.decode_queue_capacity.max(1));
+    let (decoded_tx, decoded_rx) = tokio::sync::mpsc::channel::<
+        CreditedRepresentation<DecodedExportItem>,
+    >(budget.render_queue_capacity.max(1));
+    let (rendered_tx, rendered_rx) = tokio::sync::mpsc::channel::<
+        CreditedRepresentation<RenderedExportItem>,
+    >(budget.encode_queue_capacity.max(1));
+    let (encoded_tx, encoded_rx) = tokio::sync::mpsc::channel::<
+        CreditedRepresentation<EncodedExportItem>,
+    >(budget.commit_queue_capacity.max(1));
+    let (terminal_tx, mut terminal_rx) =
+        tokio::sync::mpsc::channel::<ExportItemResult>(budget.commit_queue_capacity.max(1));
+
+    let plan_rx = Arc::new(tokio::sync::Mutex::new(plan_rx));
+    let decoded_rx = Arc::new(tokio::sync::Mutex::new(decoded_rx));
+    let rendered_rx = Arc::new(tokio::sync::Mutex::new(rendered_rx));
+    let encoded_rx = Arc::new(tokio::sync::Mutex::new(encoded_rx));
+    let settings = Arc::new(load_settings_or_default(&app_handle));
+    let export_settings = Arc::new(export_settings);
+    let current_adjustments = current_edit_adjustments.map(Arc::new);
+
+    let mut decode_workers = tokio::task::JoinSet::new();
+    for _ in 0..budget.cpu_slots.max(1) {
+        let receiver = Arc::clone(&plan_rx);
+        let sender = decoded_tx.clone();
+        let terminal = terminal_tx.clone();
+        let resources = resources.clone();
+        let cancellation = cancellation.clone();
+        let app_handle = app_handle.clone();
+        let settings = Arc::clone(&settings);
+        let current_adjustments = current_adjustments.clone();
+        decode_workers.spawn(async move {
+            loop {
+                let plan = tokio::select! {
+                    value = async { receiver.lock().await.recv().await } => value,
+                    () = cancellation.cancelled() => None,
+                };
+                let Some(plan) = plan else { break };
+                diagnostics_stage(&resources, ExportStage::Decoding);
+                let permit = match resources
+                    .acquire_host(plan.estimate.decoded_bytes, &cancellation)
+                    .await
+                {
+                    Ok(permit) => permit,
+                    Err(_) => break,
+                };
+                let token = Arc::clone(cancellation.token());
+                let handle = app_handle.clone();
+                let settings = Arc::clone(&settings);
+                let adjustments = current_adjustments.clone();
+                let result = tokio::task::spawn_blocking(move || {
+                    decode_export_item(plan, adjustments, &settings, &handle, &token)
+                })
+                .await;
+                match result {
+                    Ok(Ok(item)) => {
+                        let envelope = CreditedRepresentation::new(item, permit);
+                        if send_or_cancel(&sender, envelope, &cancellation)
+                            .await
+                            .is_err()
+                        {
+                            break;
+                        }
+                        resources.observe_queue(
+                            ExportStage::Rendering,
+                            sender.max_capacity().saturating_sub(sender.capacity()),
+                        );
+                    }
+                    Ok(Err(error)) => {
+                        drop(permit);
+                        let _ = terminal.send(ExportItemResult::Failed(error)).await;
+                    }
+                    Err(error) => {
+                        drop(permit);
+                        let _ = terminal
+                            .send(ExportItemResult::Failed(format!(
+                                "Export decode worker crashed: {error}"
+                            )))
+                            .await;
+                    }
+                }
+            }
+        });
+    }
+    drop(decoded_tx);
+
+    let mut render_workers = tokio::task::JoinSet::new();
+    for _ in 0..budget.gpu_slots.max(1) {
+        let receiver = Arc::clone(&decoded_rx);
+        let sender = rendered_tx.clone();
+        let terminal = terminal_tx.clone();
+        let resources = resources.clone();
+        let cancellation = cancellation.clone();
+        let app_handle = app_handle.clone();
+        let context = Arc::clone(&context);
+        let gpu_lane = gpu_lane.clone();
+        let export_settings = Arc::clone(&export_settings);
+        let diagnostics = diagnostics.clone();
+        render_workers.spawn(async move {
+            loop {
+                let envelope = tokio::select! {
+                    value = async { receiver.lock().await.recv().await } => value,
+                    () = cancellation.cancelled() => None,
+                };
+                let Some(envelope) = envelope else { break };
+                diagnostics.update(|report| report.current_stage = Some(ExportStage::Rendering));
+                let gpu_permit = match resources
+                    .acquire_gpu(envelope.value().estimate_gpu_bytes(), &cancellation)
+                    .await
+                {
+                    Ok(permit) => permit,
+                    Err(_) => break,
+                };
+                let lane_permit = match gpu_lane.acquire_export(&cancellation).await {
+                    Ok(permit) => permit,
+                    Err(_) => break,
+                };
+                let context = Arc::clone(&context);
+                let app_handle = app_handle.clone();
+                let export_settings = Arc::clone(&export_settings);
+                let diagnostics_for_render = diagnostics.clone();
+                let started = Instant::now();
+                let result = tokio::task::spawn_blocking(move || {
+                    let (item, _decoded_permit) = envelope.into_parts();
+                    let state = app_handle.state::<AppState>();
+                    let output = if item.plan.extension == "cube" {
+                        export_adjustments_as_lut(
+                            &item.adjustments,
+                            &item.plan.source_path,
+                            &context,
+                            &state,
+                            &app_handle,
+                        )
+                        .map(RenderedExportOutput::Lut)
+                    } else {
+                        diagnostics_for_render.update(|report| {
+                            report.current_stage = Some(ExportStage::Postprocessing)
+                        });
+                        let mut main_adjustments = item.adjustments.as_ref().clone();
+                        if export_settings.export_masks
+                            && let Some(object) = main_adjustments.as_object_mut()
+                        {
+                            object.insert("masks".to_string(), serde_json::json!([]));
+                        }
+                        process_image_for_export(
+                            &item.plan.source_path,
+                            &item.base_image,
+                            &main_adjustments,
+                            &export_settings,
+                            &context,
+                            &state,
+                            item.plan.is_raw,
+                            &app_handle,
+                        )
+                        .map(RenderedExportOutput::Image)
+                    };
+                    (item, output)
+                })
+                .await;
+                drop(lane_permit);
+                drop(gpu_permit);
+                diagnostics.update(|report| {
+                    report.gpu_execution_ms = report
+                        .gpu_execution_ms
+                        .saturating_add(started.elapsed().as_millis() as u64)
+                });
+                match result {
+                    Ok((item, Ok(output))) => {
+                        let transformed_bytes = item.plan.estimate.transformed_bytes;
+                        let permit = match resources
+                            .acquire_host(transformed_bytes, &cancellation)
+                            .await
+                        {
+                            Ok(permit) => permit,
+                            Err(_) => break,
+                        };
+                        if send_or_cancel(
+                            &sender,
+                            CreditedRepresentation::new(
+                                RenderedExportItem {
+                                    decoded: item,
+                                    output,
+                                },
+                                permit,
+                            ),
+                            &cancellation,
+                        )
+                        .await
+                        .is_err()
+                        {
+                            break;
+                        }
+                        resources.observe_queue(
+                            ExportStage::Encoding,
+                            sender.max_capacity().saturating_sub(sender.capacity()),
+                        );
+                    }
+                    Ok((_item, Err(error))) => {
+                        let _ = terminal.send(ExportItemResult::Failed(error)).await;
+                    }
+                    Err(error) => {
+                        let _ = terminal
+                            .send(ExportItemResult::Failed(format!(
+                                "Export render worker crashed: {error}"
+                            )))
+                            .await;
+                    }
+                }
+            }
+        });
+    }
+    drop(rendered_tx);
+
+    let mut encode_workers = tokio::task::JoinSet::new();
+    for _ in 0..budget.encoder_slots.max(1) {
+        let receiver = Arc::clone(&rendered_rx);
+        let sender = encoded_tx.clone();
+        let terminal = terminal_tx.clone();
+        let resources = resources.clone();
+        let cancellation = cancellation.clone();
+        let app_handle = app_handle.clone();
+        let export_settings = Arc::clone(&export_settings);
+        let diagnostics = diagnostics.clone();
+        encode_workers.spawn(async move {
+            loop {
+                let envelope = tokio::select! {
+                    value = async { receiver.lock().await.recv().await } => value,
+                    () = cancellation.cancelled() => None,
+                };
+                let Some(envelope) = envelope else { break };
+                diagnostics.update(|report| report.current_stage = Some(ExportStage::Encoding));
+                let app_handle = app_handle.clone();
+                let export_settings = Arc::clone(&export_settings);
+                let result = tokio::task::spawn_blocking(move || {
+                    let (rendered, _rendered_permit) = envelope.into_parts();
+                    let started = Instant::now();
+                    let state = app_handle.state::<AppState>();
+                    let source_digest = verified_source_digest(&rendered.decoded, &state)?;
+                    let (encoded_bytes, color_policy) = match rendered.output {
+                        RenderedExportOutput::Image(image) => encode_image_with_metadata(
+                            &image,
+                            if rendered.decoded.plan.is_raw {
+                                WorkingColorState::AcesCgLinearV1
+                            } else {
+                                WorkingColorState::EncodedSrgbV1
+                            },
+                            &rendered.decoded.plan.output_path,
+                            &rendered.decoded.plan.source_path,
+                            &export_settings,
+                        )?,
+                        RenderedExportOutput::Lut(bytes) => (bytes, None),
+                    };
+                    Ok::<_, String>(EncodedExportItem {
+                        decoded: rendered.decoded,
+                        encoded_bytes,
+                        color_policy,
+                        source_digest,
+                        export_elapsed_ms: started.elapsed().as_millis(),
+                    })
+                })
+                .await;
+                match result {
+                    Ok(Ok(item)) => {
+                        let permit = match resources
+                            .acquire_encoder(item.encoded_bytes.len() as u64, &cancellation)
+                            .await
+                        {
+                            Ok(permit) => permit,
+                            Err(_) => break,
+                        };
+                        if send_or_cancel(
+                            &sender,
+                            CreditedRepresentation::new(item, permit),
+                            &cancellation,
+                        )
+                        .await
+                        .is_err()
+                        {
+                            break;
+                        }
+                        resources.observe_queue(
+                            ExportStage::Committing,
+                            sender.max_capacity().saturating_sub(sender.capacity()),
+                        );
+                    }
+                    Ok(Err(error)) => {
+                        let _ = terminal.send(ExportItemResult::Failed(error)).await;
+                    }
+                    Err(error) => {
+                        let _ = terminal
+                            .send(ExportItemResult::Failed(format!(
+                                "Export encode worker crashed: {error}"
+                            )))
+                            .await;
+                    }
+                }
+            }
+        });
+    }
+    drop(encoded_tx);
+
+    let mut commit_workers = tokio::task::JoinSet::new();
+    for _ in 0..budget.commit_queue_capacity.clamp(1, 2) {
+        let receiver = Arc::clone(&encoded_rx);
+        let terminal = terminal_tx.clone();
+        let cancellation = cancellation.clone();
+        let app_handle = app_handle.clone();
+        let export_settings = Arc::clone(&export_settings);
+        let context = Arc::clone(&context);
+        let gpu_lane = gpu_lane.clone();
+        let diagnostics = diagnostics.clone();
+        commit_workers.spawn(async move {
+            loop {
+                let envelope = tokio::select! {
+                    value = async { receiver.lock().await.recv().await } => value,
+                    () = cancellation.cancelled() => None,
+                };
+                let Some(envelope) = envelope else { break };
+                diagnostics.update(|report| report.current_stage = Some(ExportStage::Committing));
+                let app_handle = app_handle.clone();
+                let export_settings = Arc::clone(&export_settings);
+                let context = Arc::clone(&context);
+                let token = Arc::clone(cancellation.token());
+                let needs_mask_lane = export_settings.export_masks;
+                let lane_permit = if needs_mask_lane {
+                    gpu_lane.acquire_export(&cancellation).await.ok()
+                } else {
+                    None
+                };
+                let result = tokio::task::spawn_blocking(move || {
+                    let (item, _encoder_permit) = envelope.into_parts();
+                    if token.load(Ordering::SeqCst) {
+                        return Ok(ExportItemResult::Cancelled(None));
+                    }
+                    let digest = write_final_output_bytes(
+                        &item.decoded.plan.output_path,
+                        &item.encoded_bytes,
+                        Some(&token),
+                    )?;
+                    let Some(digest) = digest else {
+                        return Ok(ExportItemResult::Cancelled(None));
+                    };
+                    let output_commit = OutputCommitReceipt {
+                        path: item.decoded.plan.output_path.clone(),
+                        digest,
+                        color_policy: item.color_policy.clone(),
+                    };
+                    if export_settings.preserve_timestamps {
+                        set_timestamps_from_exif(
+                            Path::new(&item.decoded.plan.source_path),
+                            &item.decoded.plan.output_path,
+                        );
+                    }
+                    let mut output = export_receipt_output(
+                        &item.decoded.plan.output_path,
+                        &item.decoded.plan.source_path,
+                        &item.decoded.plan.extension,
+                        ExportReceiptContext {
+                            metadata: item.color_policy,
+                            output_commit: Some(&output_commit),
+                            source_digest: item.source_digest.as_ref(),
+                            raw_development_report: item.decoded.raw_development_report.clone(),
+                            edit_graph_revision: Some(format!(
+                                "export_job:{:016x}",
+                                export_execution_fingerprint(
+                                    &item.decoded.plan.source_path,
+                                    &item.decoded.adjustments,
+                                )
+                            )),
+                            export_elapsed_ms: Some(item.export_elapsed_ms),
+                        },
+                    )?;
+                    if export_settings.export_masks && item.decoded.plan.extension != "cube" {
+                        let state = app_handle.state::<AppState>();
+                        match export_masks_for_image(
+                            &item.decoded.base_image,
+                            &item.decoded.adjustments,
+                            &export_settings,
+                            &item.decoded.plan.output_path,
+                            &item.decoded.plan.source_path,
+                            &context,
+                            &state,
+                            item.decoded.plan.is_raw,
+                            &app_handle,
+                            &token,
+                        )? {
+                            ExportMasksResult::Completed(paths) => {
+                                output.auxiliary_output_paths.extend(paths)
+                            }
+                            ExportMasksResult::Cancelled(paths) => {
+                                output.auxiliary_output_paths.extend(paths);
+                                return Ok(ExportItemResult::Cancelled(Some(output)));
+                            }
+                        }
+                    }
+                    if token.load(Ordering::SeqCst) {
+                        Ok(ExportItemResult::Cancelled(Some(output)))
+                    } else {
+                        Ok(ExportItemResult::Completed(output))
+                    }
+                })
+                .await;
+                drop(lane_permit);
+                let item_result = match result {
+                    Ok(Ok(result)) => result,
+                    Ok(Err(error)) => ExportItemResult::Failed(error),
+                    Err(error) => {
+                        ExportItemResult::Failed(format!("Export commit worker crashed: {error}"))
+                    }
+                };
+                let _ = terminal.send(item_result).await;
+            }
+        });
+    }
+    drop(terminal_tx);
+
+    for plan in plans {
+        if send_or_cancel(&plan_tx, plan, &cancellation).await.is_err() {
+            break;
+        }
+        resources.observe_queue(
+            ExportStage::Decoding,
+            plan_tx.max_capacity().saturating_sub(plan_tx.capacity()),
+        );
+    }
+    drop(plan_tx);
+
+    let mut results = Vec::with_capacity(total);
+    while let Some(result) = terminal_rx.recv().await {
+        let current = results.len() + 1;
+        let path = match &result {
+            ExportItemResult::Completed(output) | ExportItemResult::Cancelled(Some(output)) => {
+                output.source_path.as_str()
+            }
+            _ => "",
+        };
+        let _ = app_handle.emit(
+            crate::events::BATCH_EXPORT_PROGRESS,
+            serde_json::json!({ "current": current, "total": total, "path": path }),
+        );
+        results.push(result);
+    }
+
+    for workers in [
+        &mut decode_workers,
+        &mut render_workers,
+        &mut encode_workers,
+        &mut commit_workers,
+    ] {
+        while workers.join_next().await.is_some() {}
+    }
+    resources.refresh_diagnostics();
+    diagnostics.update(|report| {
+        report.current_stage = Some(ExportStage::Finalizing);
+        report.completed = results
+            .iter()
+            .filter(|result| matches!(result, ExportItemResult::Completed(_)))
+            .count();
+        report.cancelled = results
+            .iter()
+            .filter(|result| matches!(result, ExportItemResult::Cancelled(_)))
+            .count();
+        report.failed = results
+            .iter()
+            .filter(|result| matches!(result, ExportItemResult::Failed(_)))
+            .count();
+    });
+    (results, diagnostics.snapshot())
+}
+
+fn diagnostics_stage(resources: &PipelineResources, stage: ExportStage) {
+    resources.set_stage(stage);
+    resources.refresh_diagnostics();
+}
+
+async fn send_or_cancel<T>(
+    sender: &tokio::sync::mpsc::Sender<T>,
+    value: T,
+    cancellation: &PipelineCancellation,
+) -> Result<(), ()> {
+    tokio::select! {
+        result = sender.send(value) => result.map_err(|_| ()),
+        () = cancellation.cancelled() => Err(()),
+    }
+}
+
+impl DecodedExportItem {
+    fn estimate_gpu_bytes(&self) -> u64 {
+        self.plan.estimate.gpu_peak_bytes
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn export_images(
+    paths: Vec<String>,
+    output_folder_or_file: String,
+    is_explicit_file_path: bool,
+    base_origin_folders: Vec<String>,
+    export_settings: ExportSettings,
+    output_format: String,
+    current_edit_path: Option<String>,
+    current_edit_adjustments: Option<Value>,
+    state: tauri::State<'_, AppState>,
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
+    let total_paths = paths.len();
+    let job_identity = claim_export_job(&state.export_job)?;
+    let cancellation = job_identity.pipeline_cancellation();
+    if cancellation.is_cancelled() {
+        finish_export_job(&state.export_job, &job_identity);
+        return Ok(());
+    }
+    let context = match get_or_init_gpu_context(&state, &app_handle) {
+        Ok(context) => Arc::new(context),
+        Err(error) => {
+            finish_export_job(&state.export_job, &job_identity);
+            return Err(error);
+        }
+    };
+    let available_cores = std::thread::available_parallelism()
+        .map(std::num::NonZeroUsize::get)
+        .unwrap_or(1);
+    let mut system = sysinfo::System::new();
+    system.refresh_memory();
+    let budget = ExportResourceBudget::conservative(system.available_memory(), available_cores);
+    let task_cancellation = cancellation;
+    let task_app_handle = app_handle;
+    let task_identity = job_identity.clone();
+    let task = tokio::spawn(async move {
+        let started = Instant::now();
+        let (results, mut report) = run_batch_export_pipeline(
+            paths,
+            output_folder_or_file,
+            is_explicit_file_path,
+            base_origin_folders,
+            export_settings,
+            output_format,
+            current_edit_path,
+            current_edit_adjustments,
+            context,
+            task_app_handle.clone(),
+            task_cancellation.clone(),
+            budget,
+        )
+        .await;
+        let mut outputs = Vec::new();
+        let mut errors = Vec::new();
+        for result in results {
+            match result {
+                ExportItemResult::Completed(output) | ExportItemResult::Cancelled(Some(output)) => {
+                    outputs.push(output)
+                }
+                ExportItemResult::Cancelled(None) => {}
+                ExportItemResult::Failed(error) => errors.push(error),
+            }
+        }
+        if task_cancellation.is_cancelled() {
+            report.cancellation_latency_ms = Some(started.elapsed().as_millis() as u64);
+            let _ = task_app_handle.emit(
+                crate::events::EXPORT_CANCELLED,
+                export_terminal_receipt(ExportTerminalStatus::Cancelled, outputs, total_paths),
+            );
+        } else if !errors.is_empty() {
+            for error in &errors {
+                log::error!("Export error: {error}");
+            }
+            if total_paths == 1 {
+                let _ = task_app_handle.emit(crate::events::EXPORT_ERROR, &errors[0]);
+            } else {
+                let _ = task_app_handle.emit(
+                    crate::events::EXPORT_COMPLETE_WITH_ERRORS,
+                    serde_json::json!({ "errors": errors.len(), "total": total_paths, "pipeline": report }),
+                );
+            }
+        } else {
+            let _ = task_app_handle.emit(
+                crate::events::EXPORT_COMPLETE,
+                export_terminal_receipt(ExportTerminalStatus::Completed, outputs, total_paths),
+            );
+        }
+        log::info!(
+            "batch export pipeline report: {:?}",
+            serde_json::to_value(&report)
+        );
+        finish_export_job(
+            &task_app_handle.state::<AppState>().export_job,
+            &task_identity,
+        );
+    });
+    attach_export_task(&state.export_job, &job_identity, task);
+    Ok(())
+}
+
+#[cfg(any())]
+#[allow(clippy::too_many_arguments)]
+async fn export_images_legacy(
     paths: Vec<String>,
     output_folder_or_file: String,
     is_explicit_file_path: bool,

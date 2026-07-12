@@ -30,15 +30,6 @@ pub struct ExportWorkEstimate {
     pub cpu_weight: u32,
 }
 
-impl ExportWorkEstimate {
-    pub fn host_peak_bytes(self) -> u64 {
-        self.source_bytes
-            .saturating_add(self.decoded_bytes)
-            .saturating_add(self.transformed_bytes)
-            .saturating_add(self.encoder_peak_bytes)
-    }
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ExportResourceBudget {
     pub decode_queue_capacity: usize,
@@ -90,6 +81,7 @@ impl PipelineCancellation {
         &self.cancelled
     }
 
+    #[cfg(test)]
     pub fn cancel(&self) {
         self.cancelled.store(true, Ordering::SeqCst);
         self.notify.notify_waiters();
@@ -100,10 +92,14 @@ impl PipelineCancellation {
     }
 
     pub async fn cancelled(&self) {
+        // Register the notification future before checking the flag.  Otherwise a
+        // cancellation between the check and `notified()` can be missed, leaving a
+        // credit/queue waiter asleep forever.
+        let notified = self.notify.notified();
         if self.is_cancelled() {
             return;
         }
-        self.notify.notified().await;
+        notified.await;
     }
 }
 
@@ -123,6 +119,7 @@ pub struct WeightedPermit {
 }
 
 impl WeightedPermit {
+    #[cfg(test)]
     pub fn charged_bytes(&self) -> u64 {
         self.bytes
     }
@@ -145,12 +142,11 @@ impl<T> CreditedRepresentation<T> {
         &self.value
     }
 
-    pub fn into_value(self) -> T {
-        self.value
-    }
-
-    pub fn charged_bytes(&self) -> u64 {
-        self.permit.charged_bytes()
+    /// Consume the envelope while retaining its credit permit for the caller's
+    /// whole processing stage.  The permit is released when the returned value
+    /// is dropped, so memory remains accounted for during blocking work.
+    pub fn into_parts(self) -> (T, WeightedPermit) {
+        (self.value, self.permit)
     }
 }
 
@@ -199,6 +195,7 @@ impl WeightedCredits {
         })
     }
 
+    #[cfg(test)]
     pub fn used_bytes(&self) -> u64 {
         self.used_bytes.load(Ordering::SeqCst)
     }
@@ -259,6 +256,7 @@ impl PipelineDiagnostics {
 pub struct PipelineResources {
     host: WeightedCredits,
     gpu: WeightedCredits,
+    encoder: WeightedCredits,
     diagnostics: PipelineDiagnostics,
 }
 
@@ -267,6 +265,12 @@ impl PipelineResources {
         Self {
             host: WeightedCredits::new(budget.host_memory_credits),
             gpu: WeightedCredits::new(budget.gpu_memory_credits),
+            encoder: WeightedCredits::new(
+                budget
+                    .host_memory_credits
+                    .saturating_div(3)
+                    .max(CREDIT_QUANTUM_BYTES),
+            ),
             diagnostics,
         }
     }
@@ -291,6 +295,14 @@ impl PipelineResources {
         Ok(permit)
     }
 
+    pub async fn acquire_encoder(
+        &self,
+        bytes: u64,
+        cancellation: &PipelineCancellation,
+    ) -> Result<WeightedPermit, String> {
+        self.encoder.acquire(bytes, cancellation).await
+    }
+
     pub fn refresh_diagnostics(&self) {
         self.diagnostics.update(|report| {
             report.host_credit_peak_bytes = self.host.peak_bytes();
@@ -302,10 +314,33 @@ impl PipelineResources {
         });
     }
 
+    pub fn set_stage(&self, stage: ExportStage) {
+        self.diagnostics
+            .update(|report| report.current_stage = Some(stage));
+    }
+
+    pub fn observe_queue(&self, stage: ExportStage, depth: usize) {
+        self.diagnostics.update(|report| {
+            let peak = match stage {
+                ExportStage::Decoding => &mut report.decode_queue_peak,
+                ExportStage::Rendering | ExportStage::Postprocessing => {
+                    &mut report.render_queue_peak
+                }
+                ExportStage::Encoding => &mut report.encode_queue_peak,
+                ExportStage::Committing | ExportStage::Finalizing | ExportStage::Planned => {
+                    &mut report.commit_queue_peak
+                }
+            };
+            *peak = (*peak).max(depth);
+        });
+    }
+
+    #[cfg(test)]
     pub fn host_used_bytes(&self) -> u64 {
         self.host.used_bytes()
     }
 
+    #[cfg(test)]
     pub fn gpu_used_bytes(&self) -> u64 {
         self.gpu.used_bytes()
     }
@@ -333,6 +368,7 @@ impl CooperativeGpuLane {
         }
     }
 
+    #[allow(dead_code)]
     pub fn set_interactive_waiters(&self, waiters: usize) {
         self.interactive_waiters.store(waiters, Ordering::SeqCst);
     }
