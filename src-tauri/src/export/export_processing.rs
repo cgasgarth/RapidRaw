@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fs;
-use std::io::Cursor;
+use std::io::{Cursor, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -62,6 +62,7 @@ use crate::lut_processing::{convert_image_to_cube_lut, generate_identity_lut_ima
 use crate::mask_generation::{MaskDefinition, generate_mask_bitmap};
 use crate::raw_processing::RawDevelopmentReport;
 use crate::render_plan::{CompileRenderPlanContext, compile_render_plan_cached, content_revision};
+use crate::source_revision::SourceRevision;
 use crate::{AppState, ExportJob};
 
 #[cfg(test)]
@@ -98,8 +99,10 @@ struct ExportReceiptOutput {
     format: String,
     icc_embedded: Option<bool>,
     output_path: String,
+    output_digest: Option<ProvenanceDigest>,
     policy_version: Option<String>,
     raw_provenance_sidecar_path: Option<String>,
+    raw_provenance_error: Option<String>,
     raw_development_report: Option<RawDevelopmentReport>,
     policy_status: Option<String>,
     rendering_intent: Option<String>,
@@ -221,11 +224,82 @@ struct RawExportProvenanceSidecar {
     edit_graph_revision: String,
     format: String,
     output_hash: String,
+    output_digest: ProvenanceDigest,
     output_path: String,
     raw_development_report: RawDevelopmentReport,
     schema_version: u8,
     source_hash: String,
+    source_digest: ProvenanceDigest,
+    source_revision: String,
     source_path: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ProvenanceDigest {
+    algorithm: &'static str,
+    byte_len: u64,
+    provenance: &'static str,
+    value: String,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct FinalArtifactDigest {
+    pub algorithm: &'static str,
+    pub byte_len: u64,
+    pub sha256: [u8; 32],
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct OutputCommitReceipt {
+    pub path: PathBuf,
+    pub digest: FinalArtifactDigest,
+    pub color_policy: Option<ExportReceiptMetadata>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct VerifiedSourceDigestReceipt {
+    pub revision: SourceRevision,
+    pub sha256: [u8; 32],
+    pub provenance: &'static str,
+}
+
+struct DigestingWriter<W> {
+    inner: W,
+    sha256: Sha256,
+    bytes_written: u64,
+}
+
+impl<W: Write> DigestingWriter<W> {
+    fn new(inner: W) -> Self {
+        Self {
+            inner,
+            sha256: Sha256::new(),
+            bytes_written: 0,
+        }
+    }
+
+    fn finish(mut self) -> Result<FinalArtifactDigest, String> {
+        self.inner.flush().map_err(|error| error.to_string())?;
+        Ok(FinalArtifactDigest {
+            algorithm: "sha256",
+            byte_len: self.bytes_written,
+            sha256: self.sha256.finalize().into(),
+        })
+    }
+}
+
+impl<W: Write> Write for DigestingWriter<W> {
+    fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+        let written = self.inner.write(buffer)?;
+        self.sha256.update(&buffer[..written]);
+        self.bytes_written += written as u64;
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
+    }
 }
 use crate::render_pipeline::apply_pre_gpu_detail_stages;
 use crate::{
@@ -475,6 +549,26 @@ pub(crate) fn save_image_with_metadata_and_color_state(
     source_path_str: &str,
     export_settings: &ExportSettings,
 ) -> Result<Option<ExportReceiptMetadata>, String> {
+    save_image_with_metadata_commit(
+        image,
+        source_color_state,
+        output_path,
+        source_path_str,
+        export_settings,
+        None,
+    )?
+    .map(|receipt| receipt.color_policy)
+    .ok_or_else(|| "export_cancelled_before_commit".to_string())
+}
+
+pub(crate) fn save_image_with_metadata_commit(
+    image: &DynamicImage,
+    source_color_state: WorkingColorState,
+    output_path: &Path,
+    source_path_str: &str,
+    export_settings: &ExportSettings,
+    cancellation: Option<&AtomicBool>,
+) -> Result<Option<OutputCommitReceipt>, String> {
     let extension = output_path
         .extension()
         .and_then(|s| s.to_str())
@@ -534,10 +628,71 @@ pub(crate) fn save_image_with_metadata_and_color_state(
         )?;
     }
 
-    #[cfg(not(target_os = "android"))]
-    fs::write(output_path, image_bytes).map_err(|e| e.to_string())?;
+    let digest = write_final_output_bytes(output_path, &image_bytes, cancellation)?;
+    Ok(digest.map(|digest| OutputCommitReceipt {
+        path: output_path.to_path_buf(),
+        digest,
+        color_policy: encoded_image.color_policy,
+    }))
+}
 
-    Ok(encoded_image.color_policy)
+fn write_final_output_bytes(
+    output_path: &Path,
+    bytes: &[u8],
+    cancellation: Option<&AtomicBool>,
+) -> Result<Option<FinalArtifactDigest>, String> {
+    write_final_output_bytes_observed(output_path, bytes, cancellation, None)
+}
+
+fn write_final_output_bytes_observed(
+    output_path: &Path,
+    bytes: &[u8],
+    cancellation: Option<&AtomicBool>,
+    after_chunk: Option<&dyn Fn()>,
+) -> Result<Option<FinalArtifactDigest>, String> {
+    if cancellation.is_some_and(|flag| flag.load(Ordering::SeqCst)) {
+        return Ok(None);
+    }
+    #[cfg(target_os = "android")]
+    {
+        let mut writer = DigestingWriter::new(Vec::with_capacity(bytes.len()));
+        writer.write_all(bytes).map_err(|error| error.to_string())?;
+        return Ok(Some(writer.finish()?));
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        let parent = output_path
+            .parent()
+            .ok_or_else(|| "export_output_parent_missing".to_string())?;
+        let file_name = output_path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or_else(|| "export_output_name_missing".to_string())?;
+        let temporary_path = parent.join(format!(".{file_name}.{}.tmp", uuid::Uuid::new_v4()));
+        let result = (|| {
+            let file = fs::File::create(&temporary_path).map_err(|error| error.to_string())?;
+            let mut writer = DigestingWriter::new(file);
+            for chunk in bytes.chunks(1024 * 1024) {
+                if cancellation.is_some_and(|flag| flag.load(Ordering::SeqCst)) {
+                    return Ok(None);
+                }
+                writer.write_all(chunk).map_err(|error| error.to_string())?;
+                if let Some(after_chunk) = after_chunk {
+                    after_chunk();
+                }
+            }
+            let digest = writer.finish()?;
+            if cancellation.is_some_and(|flag| flag.load(Ordering::SeqCst)) {
+                return Ok(None);
+            }
+            fs::rename(&temporary_path, output_path).map_err(|error| error.to_string())?;
+            Ok(Some(digest))
+        })();
+        if !matches!(result, Ok(Some(_))) {
+            let _ = fs::remove_file(&temporary_path);
+        }
+        result
+    }
 }
 
 fn read_embedded_source_icc_profile(
@@ -1025,11 +1180,20 @@ pub async fn export_images(
                 let effective_settings =
                     raw_processing_settings_for_adjustments(&settings, &js_adjustments);
                 let is_raw = is_raw_file(&source_path_str);
+                let source_revision = if is_raw {
+                    Some(
+                        SourceRevision::from_path(Path::new(&source_path_str))
+                            .map_err(|error| error.to_string()),
+                    )
+                } else {
+                    None
+                };
 
                 let extension = output_format.to_lowercase();
 
                 let mut committed_primary_output = None;
                 let result: Result<ExportItemResult, String> = (|| {
+                    let source_revision = source_revision.transpose()?;
                     if extension == "cube" {
                         let cube_bytes = export_adjustments_as_lut(
                             &js_adjustments,
@@ -1065,10 +1229,14 @@ pub async fn export_images(
                             &output_path,
                             &source_path_str,
                             &extension,
-                            None,
-                            None,
-                            None,
-                            None,
+                            ExportReceiptContext {
+                                metadata: None,
+                                output_commit: None,
+                                source_digest: None,
+                                raw_development_report: None,
+                                edit_graph_revision: None,
+                                export_elapsed_ms: None,
+                            },
                         )?));
                     }
 
@@ -1087,6 +1255,12 @@ pub async fn export_images(
                             Err(_) => {
                                 let bytes =
                                     fs::read(&source_path_str).map_err(|e| e.to_string())?;
+                                let revision =
+                                    SourceRevision::from_path(Path::new(&source_path_str))
+                                        .map_err(|error| error.to_string())?;
+                                state
+                                    .source_fingerprint_cache
+                                    .fingerprint(&revision, &bytes);
                                 load_and_composite_with_report(
                                     &bytes,
                                     &source_path_str,
@@ -1100,18 +1274,30 @@ pub async fn export_images(
                         }
                     } else {
                         match read_file_mapped(Path::new(&source_path_str)) {
-                            Ok(mmap) => load_and_composite_with_report(
-                                &mmap,
-                                &source_path_str,
-                                &js_adjustments,
-                                false,
-                                &effective_settings,
-                                None,
-                            )
-                            .map_err(|e| format!("Failed to load from mmap: {}", e))?,
+                            Ok(mmap) => {
+                                let revision =
+                                    SourceRevision::from_path(Path::new(&source_path_str))
+                                        .map_err(|error| error.to_string())?;
+                                state.source_fingerprint_cache.fingerprint(&revision, &mmap);
+                                load_and_composite_with_report(
+                                    &mmap,
+                                    &source_path_str,
+                                    &js_adjustments,
+                                    false,
+                                    &effective_settings,
+                                    None,
+                                )
+                                .map_err(|e| format!("Failed to load from mmap: {}", e))?
+                            }
                             Err(_) => {
                                 let bytes =
                                     fs::read(&source_path_str).map_err(|e| e.to_string())?;
+                                let revision =
+                                    SourceRevision::from_path(Path::new(&source_path_str))
+                                        .map_err(|error| error.to_string())?;
+                                state
+                                    .source_fingerprint_cache
+                                    .fingerprint(&revision, &bytes);
                                 load_and_composite_with_report(
                                     &bytes,
                                     &source_path_str,
@@ -1145,20 +1331,48 @@ pub async fn export_images(
                     if cancellation_token.load(Ordering::SeqCst) {
                         return Ok(ExportItemResult::Cancelled(None));
                     }
-                    let Some(export_color_policy) =
-                        commit_export_output(cancellation_token.as_ref(), || {
-                            save_image_with_metadata_and_color_state(
-                                &final_image,
-                                if is_raw {
-                                    WorkingColorState::AcesCgLinearV1
-                                } else {
-                                    WorkingColorState::EncodedSrgbV1
-                                },
-                                &output_path,
-                                &source_path_str,
-                                &export_settings,
-                            )
-                        })?
+                    let source_digest = match source_revision.as_ref() {
+                        Some(revision) => {
+                            if SourceRevision::from_path(Path::new(&source_path_str))
+                                .map_err(|error| error.to_string())?
+                                != *revision
+                            {
+                                return Err("source_changed_during_export".to_string());
+                            }
+                            let (sha256, provenance) =
+                                match state.source_fingerprint_cache.verified_sha256(revision) {
+                                    Some(digest) => (digest, "verifiedRevisionCache"),
+                                    None => (
+                                        state
+                                            .source_fingerprint_cache
+                                            .fingerprint_streaming(
+                                                revision,
+                                                Path::new(&source_path_str),
+                                            )?
+                                            .sha256,
+                                        "boundedStreamingFallback",
+                                    ),
+                                };
+                            Some(VerifiedSourceDigestReceipt {
+                                revision: revision.clone(),
+                                sha256,
+                                provenance,
+                            })
+                        }
+                        None => None,
+                    };
+                    let Some(output_commit) = save_image_with_metadata_commit(
+                        &final_image,
+                        if is_raw {
+                            WorkingColorState::AcesCgLinearV1
+                        } else {
+                            WorkingColorState::EncodedSrgbV1
+                        },
+                        &output_path,
+                        &source_path_str,
+                        &export_settings,
+                        Some(cancellation_token.as_ref()),
+                    )?
                     else {
                         return Ok(ExportItemResult::Cancelled(None));
                     };
@@ -1171,13 +1385,17 @@ pub async fn export_images(
                         &output_path,
                         &source_path_str,
                         &extension,
-                        export_color_policy,
-                        raw_development_report,
-                        Some(format!(
-                            "export_job:{:016x}",
-                            export_execution_fingerprint(&source_path_str, &js_adjustments)
-                        )),
-                        Some(export_started.elapsed().as_millis()),
+                        ExportReceiptContext {
+                            metadata: output_commit.color_policy.clone(),
+                            output_commit: Some(&output_commit),
+                            source_digest: source_digest.as_ref(),
+                            raw_development_report,
+                            edit_graph_revision: Some(format!(
+                                "export_job:{:016x}",
+                                export_execution_fingerprint(&source_path_str, &js_adjustments)
+                            )),
+                            export_elapsed_ms: Some(export_started.elapsed().as_millis()),
+                        },
                     )?;
                     committed_primary_output = Some(primary_output.clone());
 
@@ -1309,36 +1527,58 @@ pub async fn export_images(
     Ok(())
 }
 
+struct ExportReceiptContext<'a> {
+    metadata: Option<ExportReceiptMetadata>,
+    output_commit: Option<&'a OutputCommitReceipt>,
+    source_digest: Option<&'a VerifiedSourceDigestReceipt>,
+    raw_development_report: Option<RawDevelopmentReport>,
+    edit_graph_revision: Option<String>,
+    export_elapsed_ms: Option<u128>,
+}
+
 fn export_receipt_output(
     output_path: &Path,
     source_path: &str,
     format: &str,
-    metadata: Option<ExportReceiptMetadata>,
-    mut raw_development_report: Option<RawDevelopmentReport>,
-    edit_graph_revision: Option<String>,
-    export_elapsed_ms: Option<u128>,
+    context: ExportReceiptContext<'_>,
 ) -> Result<ExportReceiptOutput, String> {
-    let byte_size = fs::metadata(output_path)
-        .map_err(|error| error.to_string())?
-        .len();
+    let ExportReceiptContext {
+        metadata,
+        output_commit,
+        source_digest,
+        mut raw_development_report,
+        edit_graph_revision,
+        export_elapsed_ms,
+    } = context;
+    let byte_size = match output_commit {
+        Some(receipt) => receipt.digest.byte_len,
+        None => fs::metadata(output_path)
+            .map_err(|error| error.to_string())?
+            .len(),
+    };
     if let (Some(report), Some(export_elapsed_ms)) =
         (raw_development_report.as_mut(), export_elapsed_ms)
         && let Some(runtime) = report.runtime.as_mut()
     {
         runtime.export_elapsed_ms = Some(export_elapsed_ms);
     }
-    let raw_provenance_sidecar_path = match raw_development_report.as_ref() {
-        Some(report) => Some(write_raw_export_provenance_sidecar(
+    let (raw_provenance_sidecar_path, raw_provenance_error) = match raw_development_report.as_ref()
+    {
+        Some(report) => match write_raw_export_provenance_sidecar(
             output_path,
             source_path,
             format,
-            byte_size,
+            output_commit.ok_or_else(|| "raw_export_output_commit_receipt_missing".to_string())?,
+            source_digest.ok_or_else(|| "raw_export_source_digest_receipt_missing".to_string())?,
             edit_graph_revision
                 .as_deref()
                 .unwrap_or("export_job:unknown"),
             report,
-        )?),
-        None => None,
+        ) {
+            Ok(path) => (Some(path), None),
+            Err(error) => (None, Some(error)),
+        },
+        None => (None, None),
     };
 
     Ok(ExportReceiptOutput {
@@ -1361,10 +1601,17 @@ fn export_receipt_output(
         format: format.to_string(),
         icc_embedded: metadata.as_ref().map(|metadata| metadata.icc_embedded),
         output_path: output_path.to_string_lossy().to_string(),
+        output_digest: output_commit.map(|receipt| ProvenanceDigest {
+            algorithm: receipt.digest.algorithm,
+            byte_len: receipt.digest.byte_len,
+            provenance: "finalByteAtomicWriter",
+            value: format!("sha256:{}", hex::encode(receipt.digest.sha256)),
+        }),
         policy_version: metadata
             .as_ref()
             .map(|metadata| metadata.policy_version.clone()),
         raw_provenance_sidecar_path,
+        raw_provenance_error,
         raw_development_report,
         policy_status: metadata
             .as_ref()
@@ -1405,34 +1652,53 @@ fn raw_export_provenance_sidecar_path(output_path: &Path) -> PathBuf {
     ))
 }
 
-fn sha256_file(path: &Path) -> Result<String, String> {
-    let bytes = fs::read(path).map_err(|error| error.to_string())?;
-    Ok(format!("sha256:{}", hex::encode(Sha256::digest(&bytes))))
-}
-
 fn write_raw_export_provenance_sidecar(
     output_path: &Path,
     source_path: &str,
     format: &str,
-    byte_size: u64,
+    output_commit: &OutputCommitReceipt,
+    source_digest: &VerifiedSourceDigestReceipt,
     edit_graph_revision: &str,
     raw_development_report: &RawDevelopmentReport,
 ) -> Result<String, String> {
+    if output_commit.path != output_path {
+        return Err("raw_export_output_commit_path_mismatch".to_string());
+    }
+    if SourceRevision::from_path(Path::new(source_path)).map_err(|error| error.to_string())?
+        != source_digest.revision
+    {
+        return Err("source_changed_before_provenance_commit".to_string());
+    }
     let sidecar_path = raw_export_provenance_sidecar_path(output_path);
+    let output_hash = format!("sha256:{}", hex::encode(output_commit.digest.sha256));
+    let source_hash = format!("sha256:{}", hex::encode(source_digest.sha256));
     let sidecar = RawExportProvenanceSidecar {
-        byte_size,
+        byte_size: output_commit.digest.byte_len,
         completed_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
         edit_graph_revision: edit_graph_revision.to_string(),
         format: format.to_string(),
-        output_hash: sha256_file(output_path)?,
+        output_hash: output_hash.clone(),
+        output_digest: ProvenanceDigest {
+            algorithm: output_commit.digest.algorithm,
+            byte_len: output_commit.digest.byte_len,
+            provenance: "finalByteAtomicWriter",
+            value: output_hash,
+        },
         output_path: output_path.to_string_lossy().to_string(),
         raw_development_report: raw_development_report.clone(),
-        schema_version: 1,
-        source_hash: sha256_file(Path::new(source_path))?,
+        schema_version: 2,
+        source_hash: source_hash.clone(),
+        source_digest: ProvenanceDigest {
+            algorithm: "sha256",
+            byte_len: source_digest.revision.byte_len,
+            provenance: source_digest.provenance,
+            value: source_hash,
+        },
+        source_revision: source_digest.revision.identity(),
         source_path: source_path.to_string(),
     };
-    let json = serde_json::to_vec_pretty(&sidecar).map_err(|error| error.to_string())?;
-    fs::write(&sidecar_path, json).map_err(|error| error.to_string())?;
+    let json = serde_json::to_string_pretty(&sidecar).map_err(|error| error.to_string())?;
+    crate::exif_processing::write_text_file_atomic(&sidecar_path, &json)?;
     Ok(sidecar_path.to_string_lossy().to_string())
 }
 
@@ -1723,19 +1989,21 @@ pub async fn estimate_export_sizes(
 mod tests {
     use super::{
         EmbeddedSourceIccProfile, ExportBlackPointCompensationStatus, ExportColorEngineId,
-        ExportColorProfile, ExportRenderingIntent, ExportSettings, OutputSharpeningSettings,
-        applied_export_color_policy, apply_export_resize_and_watermark, claim_export_job,
-        commit_export_output, encode_icc_profile, encode_image_to_bytes,
-        encode_image_with_working_color_state, export_color_profile_receipt_label,
-        export_jpeg_rgb_pixels_and_profile, export_receipt_metadata, export_receipt_output,
-        export_rgb_pixels_and_profile, export_rgb16_pixels_and_profile,
-        export_rgb16_pixels_with_shared_conversion_core,
+        ExportColorProfile, ExportReceiptContext, ExportRenderingIntent, ExportSettings,
+        FinalArtifactDigest, OutputCommitReceipt, OutputSharpeningSettings,
+        VerifiedSourceDigestReceipt, applied_export_color_policy,
+        apply_export_resize_and_watermark, claim_export_job, commit_export_output,
+        encode_icc_profile, encode_image_to_bytes, encode_image_with_working_color_state,
+        export_color_profile_receipt_label, export_jpeg_rgb_pixels_and_profile,
+        export_receipt_metadata, export_receipt_output, export_rgb_pixels_and_profile,
+        export_rgb16_pixels_and_profile, export_rgb16_pixels_with_shared_conversion_core,
         export_soft_proof_rgb_pixels_and_profile_with_policy,
         export_soft_proof_rgb_pixels_with_working_color_state,
         export_source_precision_receipt_label, export_transform_options, finish_export_job,
         mox_rendering_intent, quantize_rgb16_to_rgb8, request_export_cancellation,
         resolve_export_color_capabilities, resolve_export_color_transform_plan,
-        should_apply_srgb_perceptual_gamut_mapping,
+        save_image_with_metadata_commit, should_apply_srgb_perceptual_gamut_mapping,
+        write_final_output_bytes_observed,
     };
     use crate::color::working_to_output_transform::WorkingColorState;
     use crate::export::export_encoders::{
@@ -1746,6 +2014,7 @@ mod tests {
     use crate::export::export_processing::save_image_with_metadata;
     use crate::gamut_mapping::ACTIVE_SRGB_OKLAB_CHROMA_REDUCE;
     use crate::raw_processing::{RawCameraProfileReport, RawDemosaicPath, RawDevelopmentReport};
+    use crate::source_revision::SourceRevision;
     use moxcms::ColorProfile;
     use sha2::{Digest, Sha256};
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -2189,15 +2458,35 @@ mod tests {
             runtime: None,
             xtrans_hq: None,
         };
+        let source_revision = SourceRevision::from_path(&source_path).unwrap();
+        let source_digest = VerifiedSourceDigestReceipt {
+            revision: source_revision,
+            sha256: Sha256::digest([1u8, 2, 3, 4]).into(),
+            provenance: "alreadyOpenBytes",
+        };
+        let output_commit = OutputCommitReceipt {
+            path: output_path.clone(),
+            digest: FinalArtifactDigest {
+                algorithm: "sha256",
+                byte_len: 1,
+                sha256: Sha256::digest([0u8]).into(),
+            },
+            color_policy: Some(metadata.clone()),
+        };
+        let report_for_failure = raw_development_report.clone();
 
         let receipt = export_receipt_output(
             &output_path,
             &source_path.to_string_lossy(),
             "tiff",
-            Some(metadata),
-            Some(raw_development_report),
-            Some("export_job:test".to_string()),
-            Some(123),
+            ExportReceiptContext {
+                metadata: Some(metadata),
+                output_commit: Some(&output_commit),
+                source_digest: Some(&source_digest),
+                raw_development_report: Some(raw_development_report),
+                edit_graph_revision: Some("export_job:test".to_string()),
+                export_elapsed_ms: Some(123),
+            },
         )
         .expect("receipt output should serialize RAW development report");
         let sidecar_path = receipt
@@ -2208,7 +2497,7 @@ mod tests {
             fs::read_to_string(sidecar_path).expect("read RAW export provenance sidecar");
         let sidecar: serde_json::Value =
             serde_json::from_str(&sidecar_json).expect("parse RAW export provenance sidecar");
-        assert_eq!(sidecar["schemaVersion"], 1);
+        assert_eq!(sidecar["schemaVersion"], 2);
         assert_eq!(sidecar["editGraphRevision"], "export_job:test");
         assert_eq!(sidecar["rawDevelopmentReport"]["demosaicPath"], "bayer_hq");
         assert!(
@@ -2221,7 +2510,57 @@ mod tests {
                 .as_str()
                 .is_some_and(|value| value.starts_with("sha256:"))
         );
+        assert_eq!(
+            sidecar["sourceDigest"]["value"],
+            format!("sha256:{}", hex::encode(Sha256::digest([1u8, 2, 3, 4])))
+        );
+        assert_eq!(
+            sidecar["outputDigest"]["value"],
+            format!("sha256:{}", hex::encode(Sha256::digest([0u8])))
+        );
+        assert_eq!(sidecar["outputDigest"]["byteLen"], 1);
+        assert_eq!(sidecar["sourceDigest"]["byteLen"], 4);
         fs::remove_file(sidecar_path).ok();
+        fs::create_dir(sidecar_path).unwrap();
+        let sidecar_failure = export_receipt_output(
+            &output_path,
+            &source_path.to_string_lossy(),
+            "tiff",
+            ExportReceiptContext {
+                metadata: output_commit.color_policy.clone(),
+                output_commit: Some(&output_commit),
+                source_digest: Some(&source_digest),
+                raw_development_report: Some(report_for_failure),
+                edit_graph_revision: Some("export_job:test-sidecar-failure".to_string()),
+                export_elapsed_ms: None,
+            },
+        )
+        .unwrap();
+        assert!(sidecar_failure.raw_provenance_sidecar_path.is_none());
+        assert!(sidecar_failure.raw_provenance_error.is_some());
+        assert!(sidecar_failure.output_digest.is_some());
+        fs::remove_dir(sidecar_path).ok();
+        fs::write(&source_path, [9u8, 8, 7, 6, 5]).unwrap();
+        let source_changed = export_receipt_output(
+            &output_path,
+            &source_path.to_string_lossy(),
+            "tiff",
+            ExportReceiptContext {
+                metadata: output_commit.color_policy.clone(),
+                output_commit: Some(&output_commit),
+                source_digest: Some(&source_digest),
+                raw_development_report: receipt.raw_development_report.clone(),
+                edit_graph_revision: Some("export_job:test-source-changed".to_string()),
+                export_elapsed_ms: None,
+            },
+        )
+        .unwrap();
+        assert!(
+            source_changed
+                .raw_provenance_error
+                .as_deref()
+                .is_some_and(|error| error.contains("source_changed_before_provenance_commit"))
+        );
         fs::remove_file(source_path).ok();
         fs::remove_file(output_path).ok();
 
@@ -3118,6 +3457,96 @@ mod tests {
     }
 
     #[test]
+    fn output_commit_receipts_hash_exact_final_bytes_for_supported_formats() {
+        let directory = tempfile::tempdir().unwrap();
+        let source_path = directory.path().join("source.jpg");
+        fs::write(&source_path, [1u8, 2, 3, 4]).unwrap();
+        let image = DynamicImage::ImageRgb8(ImageBuffer::from_fn(8, 6, |x, y| {
+            Rgb([(x * 17) as u8, (y * 23) as u8, 91])
+        }));
+        for format in ["jpg", "png", "tiff"] {
+            let output_path = directory.path().join(format!("output.{format}"));
+            let receipt = save_image_with_metadata_commit(
+                &image,
+                WorkingColorState::EncodedSrgbV1,
+                &output_path,
+                &source_path.to_string_lossy(),
+                &base_export_settings(None),
+                None,
+            )
+            .unwrap()
+            .unwrap();
+            let committed = fs::read(&output_path).unwrap();
+            assert_eq!(receipt.path, output_path);
+            assert_eq!(receipt.digest.byte_len, committed.len() as u64);
+            assert_eq!(receipt.digest.sha256, Sha256::digest(&committed).as_slice());
+        }
+        let mut srgb_settings = base_export_settings(None);
+        srgb_settings.color_profile = ExportColorProfile::Srgb;
+        let mut display_p3_settings = srgb_settings.clone();
+        display_p3_settings.color_profile = ExportColorProfile::DisplayP3;
+        let srgb = save_image_with_metadata_commit(
+            &image,
+            WorkingColorState::EncodedSrgbV1,
+            &directory.path().join("srgb.tiff"),
+            &source_path.to_string_lossy(),
+            &srgb_settings,
+            None,
+        )
+        .unwrap()
+        .unwrap();
+        let display_p3 = save_image_with_metadata_commit(
+            &image,
+            WorkingColorState::EncodedSrgbV1,
+            &directory.path().join("display-p3.tiff"),
+            &source_path.to_string_lossy(),
+            &display_p3_settings,
+            None,
+        )
+        .unwrap()
+        .unwrap();
+        assert_ne!(srgb.digest.sha256, display_p3.digest.sha256);
+    }
+
+    #[test]
+    fn cancellation_before_atomic_commit_discards_temp_and_digest() {
+        let directory = tempfile::tempdir().unwrap();
+        let output_path = directory.path().join("cancelled.jpg");
+        let source_path = directory.path().join("source.jpg");
+        fs::write(&source_path, [1u8, 2, 3, 4]).unwrap();
+        let cancellation = AtomicBool::new(true);
+        let result = save_image_with_metadata_commit(
+            &DynamicImage::new_rgb8(32, 32),
+            WorkingColorState::EncodedSrgbV1,
+            &output_path,
+            &source_path.to_string_lossy(),
+            &base_export_settings(None),
+            Some(&cancellation),
+        )
+        .unwrap();
+        assert!(result.is_none());
+        assert!(!output_path.exists());
+        assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
+    }
+
+    #[test]
+    fn cancellation_during_atomic_write_discards_partial_temp_and_digest() {
+        let directory = tempfile::tempdir().unwrap();
+        let output_path = directory.path().join("cancelled-during-write.tiff");
+        let cancellation = AtomicBool::new(false);
+        let result = write_final_output_bytes_observed(
+            &output_path,
+            &vec![19u8; 3 * 1024 * 1024],
+            Some(&cancellation),
+            Some(&|| cancellation.store(true, Ordering::SeqCst)),
+        )
+        .unwrap();
+        assert!(result.is_none());
+        assert!(!output_path.exists());
+        assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 0);
+    }
+
+    #[test]
     fn source_embedded_export_profile_requires_embedded_icc_context() {
         let image = DynamicImage::ImageRgb8(ImageBuffer::from_pixel(1, 1, Rgb([128, 64, 32])));
         let error = encode_image_with_applied_policy(
@@ -3209,10 +3638,14 @@ mod tests {
             &output_path,
             &source_path.to_string_lossy(),
             "jpg",
-            Some(metadata),
-            None,
-            None,
-            None,
+            ExportReceiptContext {
+                metadata: Some(metadata),
+                output_commit: None,
+                source_digest: None,
+                raw_development_report: None,
+                edit_graph_revision: None,
+                export_elapsed_ms: None,
+            },
         )
         .expect("build real output receipt");
         assert_eq!(receipt.color_profile.as_deref(), Some("Source embedded"));

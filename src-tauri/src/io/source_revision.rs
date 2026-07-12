@@ -1,5 +1,7 @@
+use sha2::{Digest, Sha256};
 use std::collections::{HashMap, VecDeque};
 use std::fs::Metadata;
+use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
@@ -91,6 +93,20 @@ impl SourceRevision {
             policy: SOURCE_REVISION_POLICY,
         }
     }
+
+    pub fn identity(&self) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(b"source-revision-v1\0");
+        hasher.update(self.canonical_path.to_string_lossy().as_bytes());
+        hasher.update(self.byte_len.to_le_bytes());
+        hasher.update(self.modified_ns.to_le_bytes());
+        hasher.update(self.created_ns.unwrap_or(0).to_le_bytes());
+        if let Some(file_id) = &self.file_id {
+            hasher.update(file_id.volume.to_le_bytes());
+            hasher.update(file_id.file.to_le_bytes());
+        }
+        format!("source-revision-v1:{}", hex::encode(hasher.finalize()))
+    }
 }
 
 fn absolute_path(path: &Path) -> PathBuf {
@@ -156,11 +172,18 @@ pub struct DecodedImageKey {
 pub struct VerifiedSourceFingerprint {
     pub revision: SourceRevision,
     pub blake3: blake3::Hash,
+    pub sha256: [u8; 32],
+}
+
+#[derive(Clone, Debug)]
+struct StrongDigests {
+    blake3: blake3::Hash,
+    sha256: [u8; 32],
 }
 
 enum FingerprintState {
     Computing,
-    Ready(blake3::Hash),
+    Ready(StrongDigests),
 }
 
 struct FingerprintCacheInner {
@@ -194,13 +217,14 @@ impl FingerprintCache {
         loop {
             let mut inner = self.inner.lock().unwrap();
             match inner.entries.get(revision) {
-                Some(FingerprintState::Ready(hash)) => {
-                    let hash = *hash;
+                Some(FingerprintState::Ready(digests)) => {
+                    let digests = digests.clone();
                     touch(&mut inner.lru, revision);
                     log::trace!("source_fingerprint_cache_hit bytes={}", bytes.len());
                     return VerifiedSourceFingerprint {
                         revision: revision.clone(),
-                        blake3: hash,
+                        blake3: digests.blake3,
+                        sha256: digests.sha256,
                     };
                 }
                 Some(FingerprintState::Computing) => {
@@ -220,7 +244,10 @@ impl FingerprintCache {
         let started = Instant::now();
         STRONG_HASH_COUNT.fetch_add(1, Ordering::Relaxed);
         STRONG_HASH_BYTES.fetch_add(bytes.len() as u64, Ordering::Relaxed);
-        let hash = blake3::hash(bytes);
+        let digests = StrongDigests {
+            blake3: blake3::hash(bytes),
+            sha256: Sha256::digest(bytes).into(),
+        };
         log::debug!(
             "source_strong_hash bytes={} elapsed_us={}",
             bytes.len(),
@@ -229,7 +256,7 @@ impl FingerprintCache {
         let mut inner = self.inner.lock().unwrap();
         inner
             .entries
-            .insert(revision.clone(), FingerprintState::Ready(hash));
+            .insert(revision.clone(), FingerprintState::Ready(digests.clone()));
         touch(&mut inner.lru, revision);
         while inner.lru.len() > self.capacity {
             if let Some(evicted) = inner.lru.pop_front() {
@@ -239,7 +266,99 @@ impl FingerprintCache {
         self.ready.notify_all();
         VerifiedSourceFingerprint {
             revision: revision.clone(),
-            blake3: hash,
+            blake3: digests.blake3,
+            sha256: digests.sha256,
+        }
+    }
+
+    pub fn verified_sha256(&self, revision: &SourceRevision) -> Option<[u8; 32]> {
+        let mut inner = self.inner.lock().unwrap();
+        let FingerprintState::Ready(digests) = inner.entries.get(revision)? else {
+            return None;
+        };
+        let digest = digests.sha256;
+        touch(&mut inner.lru, revision);
+        Some(digest)
+    }
+
+    pub fn fingerprint_streaming(
+        &self,
+        revision: &SourceRevision,
+        path: &Path,
+    ) -> Result<VerifiedSourceFingerprint, String> {
+        loop {
+            let mut inner = self.inner.lock().unwrap();
+            match inner.entries.get(revision) {
+                Some(FingerprintState::Ready(digests)) => {
+                    let digests = digests.clone();
+                    touch(&mut inner.lru, revision);
+                    return Ok(VerifiedSourceFingerprint {
+                        revision: revision.clone(),
+                        blake3: digests.blake3,
+                        sha256: digests.sha256,
+                    });
+                }
+                Some(FingerprintState::Computing) => {
+                    inner = self.ready.wait(inner).unwrap();
+                    drop(inner);
+                }
+                None => {
+                    inner
+                        .entries
+                        .insert(revision.clone(), FingerprintState::Computing);
+                    break;
+                }
+            }
+        }
+        let result = (|| {
+            let file = std::fs::File::open(path).map_err(|error| error.to_string())?;
+            let mut reader = BufReader::with_capacity(1024 * 1024, file);
+            let mut buffer = vec![0u8; 1024 * 1024];
+            let mut blake3 = blake3::Hasher::new();
+            let mut sha256 = Sha256::new();
+            let mut byte_len = 0u64;
+            loop {
+                let read = reader
+                    .read(&mut buffer)
+                    .map_err(|error| error.to_string())?;
+                if read == 0 {
+                    break;
+                }
+                blake3.update(&buffer[..read]);
+                sha256.update(&buffer[..read]);
+                byte_len += read as u64;
+            }
+            if byte_len != revision.byte_len
+                || SourceRevision::from_path(path).map_err(|e| e.to_string())? != *revision
+            {
+                return Err("source_changed_during_digest".to_string());
+            }
+            STRONG_HASH_COUNT.fetch_add(1, Ordering::Relaxed);
+            STRONG_HASH_BYTES.fetch_add(byte_len, Ordering::Relaxed);
+            Ok(StrongDigests {
+                blake3: blake3.finalize(),
+                sha256: sha256.finalize().into(),
+            })
+        })();
+        let mut inner = self.inner.lock().unwrap();
+        match result {
+            Ok(digests) => {
+                inner
+                    .entries
+                    .insert(revision.clone(), FingerprintState::Ready(digests.clone()));
+                touch(&mut inner.lru, revision);
+                self.ready.notify_all();
+                Ok(VerifiedSourceFingerprint {
+                    revision: revision.clone(),
+                    blake3: digests.blake3,
+                    sha256: digests.sha256,
+                })
+            }
+            Err(error) => {
+                inner.entries.remove(revision);
+                self.ready.notify_all();
+                Err(error)
+            }
         }
     }
 }
@@ -305,9 +424,84 @@ mod tests {
         let second = cache.fingerprint(&revision, b"different bytes are not rehashed");
         let after = fingerprint_metrics();
         assert_eq!(first.blake3, second.blake3);
+        assert_eq!(first.sha256, Sha256::digest(b"payload").as_slice());
         assert_eq!(first.revision, revision);
         assert_eq!(after.strong_hash_count - before.strong_hash_count, 1);
         assert_eq!(after.strong_hash_bytes - before.strong_hash_bytes, 7);
+    }
+
+    #[test]
+    fn streaming_digest_is_bounded_cached_and_rejects_changed_revision() {
+        let _guard = METRICS_TEST_LOCK.lock().unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("source.raw");
+        std::fs::write(&path, vec![7u8; 2 * 1024 * 1024 + 17]).unwrap();
+        let revision = SourceRevision::from_path(&path).unwrap();
+        let cache = FingerprintCache::new(2);
+        let before = fingerprint_metrics();
+        let digest = cache.fingerprint_streaming(&revision, &path).unwrap();
+        let after = fingerprint_metrics();
+        assert_eq!(
+            digest.sha256,
+            Sha256::digest(vec![7u8; 2 * 1024 * 1024 + 17]).as_slice()
+        );
+        assert_eq!(after.strong_hash_count - before.strong_hash_count, 1);
+        assert_eq!(
+            after.strong_hash_bytes - before.strong_hash_bytes,
+            revision.byte_len
+        );
+        std::fs::remove_file(&path).unwrap();
+        assert_eq!(
+            cache
+                .fingerprint_streaming(&revision, &path)
+                .unwrap()
+                .sha256,
+            digest.sha256
+        );
+
+        let changed_path = directory.path().join("changed.raw");
+        std::fs::write(&changed_path, b"before").unwrap();
+        let stale_revision = SourceRevision::from_path(&changed_path).unwrap();
+        std::fs::write(&changed_path, b"after-and-longer").unwrap();
+        assert_eq!(
+            cache
+                .fingerprint_streaming(&stale_revision, &changed_path)
+                .unwrap_err(),
+            "source_changed_during_digest"
+        );
+    }
+
+    #[test]
+    fn concurrent_virtual_copy_digest_requests_single_flight_physical_revision() {
+        let _guard = METRICS_TEST_LOCK.lock().unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("physical.raw");
+        std::fs::write(&path, vec![11u8; 3 * 1024 * 1024]).unwrap();
+        let revision = SourceRevision::from_path(&path).unwrap();
+        let cache = Arc::new(FingerprintCache::new(2));
+        let before = fingerprint_metrics();
+        let handles: Vec<_> = (0..4)
+            .map(|_| {
+                let cache = Arc::clone(&cache);
+                let revision = revision.clone();
+                let path = path.clone();
+                std::thread::spawn(move || {
+                    cache
+                        .fingerprint_streaming(&revision, &path)
+                        .unwrap()
+                        .sha256
+                })
+            })
+            .collect();
+        let digests: Vec<_> = handles
+            .into_iter()
+            .map(|handle| handle.join().unwrap())
+            .collect();
+        assert!(digests.windows(2).all(|pair| pair[0] == pair[1]));
+        assert_eq!(
+            fingerprint_metrics().strong_hash_count - before.strong_hash_count,
+            1
+        );
     }
 
     #[test]
