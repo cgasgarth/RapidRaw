@@ -31,6 +31,15 @@ const phase = (snapshot: StartupTraceSnapshot, name: StartupTraceSnapshot['phase
   return receipt;
 };
 
+const traceDiagnostic = (snapshot: StartupTraceSnapshot): string =>
+  JSON.stringify({
+    firstPaintBudgetMet: snapshot.firstPaintBudgetMet,
+    firstPaintBudgetMs: snapshot.firstPaintBudgetMs,
+    phases: snapshot.phases.map(({ detail, elapsedMs, phase: name, status }) => ({ detail, elapsedMs, name, status })),
+    processId: snapshot.processId,
+    traceId: snapshot.traceId,
+  });
+
 const assertTrace = (run: StartupRun): void => {
   const { kind, snapshot } = run;
   if (!snapshot.criticalPathOrderValid) throw new Error(`${kind}: native critical-path ordering failed`);
@@ -141,7 +150,12 @@ const runOnce = async ({
         `${kind}: startup report PID ${run.snapshot.processId} did not match launched child PID ${process.pid}`,
       );
     }
-    assertTrace(run);
+    try {
+      assertTrace(run);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`${message}; startup_trace=${traceDiagnostic(run.snapshot)}`, { cause: error });
+    }
     return run;
   } finally {
     await stopProcess(process);
