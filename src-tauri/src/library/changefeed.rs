@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Runtime, State};
 
 pub const LIBRARY_CHANGE_BATCH_EVENT: &str = "library-filesystem-change-batch";
+const AUTHORED_PARENT_ECHO_WINDOW: Duration = Duration::from_millis(750);
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -310,9 +311,15 @@ impl LibraryFilesystemChangefeed {
                 return Ok(());
             }
             let expires = Instant::now() + Duration::from_secs(3);
+            let parent_expires = Instant::now() + AUTHORED_PARENT_ECHO_WINDOW;
             for change in &changes {
                 for path in change_paths(change) {
                     let normalized = path.canonicalize().unwrap_or(path);
+                    if let Some(parent) = normalized.parent() {
+                        inner
+                            .authored_paths
+                            .insert(parent.to_path_buf(), parent_expires);
+                    }
                     inner.authored_paths.insert(normalized, expires);
                 }
             }
@@ -562,6 +569,21 @@ mod tests {
         assert!(!is_authored_echo(
             &LibraryPathChange::Added {
                 path: "/library/other.raw".to_string(),
+            },
+            &authored,
+        ));
+    }
+
+    #[test]
+    fn app_authored_parent_directory_echo_is_suppressed() {
+        let directory = tempfile::tempdir().unwrap();
+        let parent = directory.path().canonicalize().unwrap();
+        let authored =
+            HashMap::from([(parent.clone(), Instant::now() + AUTHORED_PARENT_ECHO_WINDOW)]);
+        assert!(is_authored_echo(
+            &LibraryPathChange::Modified {
+                path: parent.to_string_lossy().into_owned(),
+                class: LibraryChangeClass::Directory,
             },
             &authored,
         ));
