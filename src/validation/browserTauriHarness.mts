@@ -59,6 +59,7 @@ const agentAuditE2eEnabled = import.meta.env.VITE_RAWENGINE_AGENT_AUDIT_E2E === 
 const browserHarnessSettingsStorageKey = 'rawengine-browser-tauri-harness-settings-v1';
 const commandNames: Record<
   | 'cancelThumbnailGeneration'
+  | 'beginImageOpen'
   | 'checkAiConnectorStatus'
   | 'clearSessionCaches'
   | 'exportImages'
@@ -94,11 +95,13 @@ const commandNames: Record<
   | 'readExifForPaths'
   | 'saveSettings'
   | 'saveMetadataAndUpdateThumbnail'
+  | 'scheduleImagePrefetch'
   | 'startBackgroundIndexing'
   | 'testAiConnectorConnection'
   | 'updateThumbnailQueue',
   string
 > = {
+  beginImageOpen: Invokes.BeginImageOpen,
   applyAdjustments: Invokes.ApplyAdjustments,
   applyLibraryCatalogChanges: Invokes.ApplyLibraryCatalogChanges,
   configureLibraryChangefeed: Invokes.ConfigureLibraryChangefeed,
@@ -135,6 +138,7 @@ const commandNames: Record<
   readExifForPaths: Invokes.ReadExifForPaths,
   saveSettings: Invokes.SaveSettings,
   saveMetadataAndUpdateThumbnail: Invokes.SaveMetadataAndUpdateThumbnail,
+  scheduleImagePrefetch: Invokes.ScheduleImagePrefetch,
   startBackgroundIndexing: Invokes.StartBackgroundIndexing,
   testAiConnectorConnection: Invokes.TestAIConnectorConnection,
   updateThumbnailQueue: Invokes.UpdateThumbnailQueue,
@@ -239,6 +243,42 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
         is_raw: true,
         metadata: { harness: true },
         width: agentAuditE2eEnabled ? 4 : 1024,
+      });
+    case commandNames.beginImageOpen: {
+      const request = args?.['request'] as {
+        imageId?: string;
+        path?: string;
+        sessionId?: { imageSession: number; selectionGeneration: number };
+      };
+      const decoded = {
+        exif: { Make: 'RawEngine Harness', Model: 'Browser Tauri API' },
+        height: agentAuditE2eEnabled ? 4 : 768,
+        is_raw: true,
+        metadata: { adjustments: null, harness: true },
+        width: agentAuditE2eEnabled ? 4 : 1024,
+      };
+      return Promise.resolve({
+        decodeReadyMillis: 2,
+        decoded,
+        imageId: request.imageId ?? request.path ?? 'browser-harness-image',
+        joinedPrefetch: false,
+        metadataFingerprint: '0'.repeat(64),
+        metadataReadyMillis: 1,
+        sessionId: request.sessionId ?? { imageSession: 0, selectionGeneration: 0 },
+      });
+    }
+    case commandNames.scheduleImagePrefetch:
+      return Promise.resolve({
+        duplicatePrefetchDrops: 0,
+        foregroundOpens: 0,
+        metadataReads: 0,
+        peakPrefetchInFlight: 0,
+        prefetchCancelled: 0,
+        prefetchCompleted: 0,
+        prefetchPromotions: 0,
+        prefetchRequested: 0,
+        prefetchStarted: 0,
+        stalePhaseDrops: 0,
       });
     case commandNames.applyAdjustments:
       return Promise.resolve(decodeHarnessApplyPreview());

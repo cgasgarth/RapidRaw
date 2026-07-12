@@ -3,6 +3,7 @@ pub(crate) mod exif_processing;
 pub(crate) mod formats;
 pub(crate) mod image_codecs;
 pub(crate) mod image_loader;
+pub(crate) mod image_open_session;
 pub(crate) mod patch_assets;
 pub(crate) mod smart_preview_cache;
 pub(crate) mod source_revision;
