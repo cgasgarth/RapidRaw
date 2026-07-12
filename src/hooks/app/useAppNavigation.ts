@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { homeDir } from '@tauri-apps/api/path';
 import { open } from '@tauri-apps/plugin-dialog';
-import { type RefObject, useCallback } from 'react';
+import { type RefObject, useCallback, useRef } from 'react';
 import { toast } from 'react-toastify';
 import type { FolderTree } from '../../components/panel/FolderTree';
 import { type AlbumItem, type AppSettings, type ImageFile, LibraryViewMode } from '../../components/ui/AppProperties';
@@ -46,7 +46,24 @@ interface LoadedMetadata {
   adjustments?: Adjustments | null;
 }
 
-type ExifDataMap = Record<string, Record<string, string>>;
+interface CatalogImageProjection extends ImageFile {
+  imageId: string;
+  entityRevision: number;
+}
+
+interface LibraryCollectionOpened {
+  sessionId: number;
+  catalogRevision: number;
+  estimatedCount: number;
+  firstPage: CatalogImageProjection[];
+}
+
+interface LibraryCollectionPage {
+  sessionId: number;
+  catalogRevision: number;
+  rows: CatalogImageProjection[];
+  complete: boolean;
+}
 
 interface PersistedFolderState {
   activeAlbumId?: string | null;
@@ -83,6 +100,14 @@ const getNavigationSettings = (): NavigationSettings | null => useSettingsStore.
 const folderTreeContainsPath = (nodes: FolderTree[], path: string): boolean =>
   nodes.some((node) => node.path === path || folderTreeContainsPath(node.children, path));
 
+const folderTreePaths = (node: FolderTree): string[] => [node.path, ...node.children.flatMap(folderTreePaths)];
+
+const applyCatalogCounts = (node: FolderTree, counts: ReadonlyMap<string, number>): FolderTree => ({
+  ...node,
+  ...(counts.has(node.path) ? { imageCount: counts.get(node.path) } : {}),
+  children: node.children.map((child) => applyCatalogCounts(child, counts)),
+});
+
 const resolveRestoredFolderPath = (trees: FolderTree[], preferredPath: string | null, fallbackPath: string): string => {
   if (preferredPath?.startsWith('Album: ')) return preferredPath;
   if (preferredPath && folderTreeContainsPath(trees, preferredPath)) return preferredPath;
@@ -104,6 +129,7 @@ export function useAppNavigation({
     currentResRef,
     prevAdjustmentsRef,
   } = refs;
+  const collectionRequestRef = useRef(0);
 
   const handleGoHome = useCallback(() => {
     const editor = useEditorStore.getState();
@@ -400,7 +426,8 @@ export function useAppNavigation({
         rootPaths,
         selectionAnchorPath,
         setLibrary,
-        sortCriteria,
+        replaceCatalogCollection,
+        appendCatalogPage,
       } = useLibraryStore.getState();
       const { setUI } = useUIStore.getState();
       const { setProcess } = useProcessStore.getState();
@@ -469,14 +496,40 @@ export function useAppNavigation({
           resetHistory(INITIAL_ADJUSTMENTS);
         }
 
-        const command =
-          libraryViewMode === LibraryViewMode.Recursive ? Invokes.ListImagesRecursive : Invokes.ListImagesInDir;
-
         let files: ImageFile[];
+        let catalogCollection = false;
         if (preloadedImages) {
           files = preloadedImages;
         } else {
-          files = await invoke<ImageFile[]>(command, { path });
+          if (!path) {
+            files = [];
+          } else {
+            const request = ++collectionRequestRef.current;
+            const opened = await invoke<LibraryCollectionOpened>(Invokes.OpenLibraryCollection, {
+              path,
+              recursive: libraryViewMode === LibraryViewMode.Recursive,
+              requestedPageSize: 256,
+            });
+            if (request !== collectionRequestRef.current) return;
+            files = opened.firstPage;
+            catalogCollection = true;
+            replaceCatalogCollection(opened.sessionId, opened.catalogRevision, files);
+            let complete = files.length >= opened.estimatedCount;
+            while (!complete) {
+              const page = await invoke<LibraryCollectionPage>(Invokes.NextLibraryCollectionPage, {
+                sessionId: opened.sessionId,
+              });
+              if (
+                request !== collectionRequestRef.current ||
+                page.sessionId !== opened.sessionId ||
+                page.catalogRevision !== opened.catalogRevision
+              )
+                return;
+              if (!appendCatalogPage(opened.sessionId, opened.catalogRevision, page.rows)) return;
+              files = [...files, ...page.rows];
+              complete = page.complete;
+            }
+          }
         }
 
         const refreshReconciliation = preserveEditor
@@ -513,36 +566,13 @@ export function useAppNavigation({
         });
         setLibrary({ imageRatings: initialRatings });
 
-        const exifSortKeys = ['date_taken', 'iso', 'shutter_speed', 'aperture', 'focal_length'];
-        const isExifSortActive = exifSortKeys.includes(sortCriteria.key);
-
-        if (files.length > 0) {
-          const paths = files.map((f: ImageFile) => f.path);
-
-          if (isExifSortActive) {
-            const exifDataMap = await invoke<ExifDataMap>(Invokes.ReadExifForPaths, { paths });
-            const finalImageList = files.map((image) => ({
-              ...image,
-              exif: exifDataMap[image.path] || image.exif || null,
-            }));
-            setLibrary({ imageList: finalImageList });
-          } else {
-            setLibrary({ imageList: files });
-            invoke<ExifDataMap>(Invokes.ReadExifForPaths, { paths })
-              .then((exifDataMap) => {
-                setLibrary((state) => ({
-                  imageList: state.imageList.map((image) => ({
-                    ...image,
-                    exif: exifDataMap[image.path] || image.exif || null,
-                  })),
-                }));
-              })
-              .catch((err: unknown) => {
-                console.error('Failed to read EXIF data in background:', err);
-              });
-          }
-        } else {
-          setLibrary({ imageList: files });
+        if (!catalogCollection) {
+          setLibrary({
+            catalogSessionId: null,
+            catalogRevision: null,
+            catalogOrderedImageIds: [],
+            imageList: files,
+          });
         }
 
         if (!preserveEditor) {
@@ -589,6 +619,9 @@ export function useAppNavigation({
         });
 
         setLibrary({
+          catalogSessionId: null,
+          catalogRevision: null,
+          catalogOrderedImageIds: [],
           imageList: files,
           imageRatings: initialRatings,
           ...(preserveEditor ? {} : { multiSelectedPaths: [], libraryActivePath: null }),
@@ -620,6 +653,7 @@ export function useAppNavigation({
       }
 
       if (selectedPath) {
+        await handleSelectSubfolder(selectedPath, true);
         if (!rootPaths.includes(selectedPath)) {
           const newRootPaths = [...rootPaths, selectedPath];
           setLibrary({ rootPaths: newRootPaths });
@@ -630,11 +664,21 @@ export function useAppNavigation({
 
           setLibrary({ isTreeLoading: true });
           try {
-            const newTree = await invoke<FolderTree>(Invokes.GetFolderTree, {
+            let newTree = await invoke<FolderTree>(Invokes.GetFolderTree, {
               path: selectedPath,
               expandedFolders: [selectedPath],
               showImageCounts: appSettings?.enableFolderImageCounts ?? false,
             });
+            if (appSettings?.enableFolderImageCounts) {
+              const aggregates = await invoke<Array<{ path: string; recursiveImageCount: number }>>(
+                Invokes.GetLibraryFolderAggregates,
+                { paths: folderTreePaths(newTree) },
+              );
+              newTree = applyCatalogCounts(
+                newTree,
+                new Map(aggregates.map((aggregate) => [aggregate.path, aggregate.recursiveImageCount])),
+              );
+            }
             setLibrary({ folderTrees: [...folderTrees, newTree] });
           } catch (e) {
             toast.error(`Failed to load folder tree: ${formatUnknownError(e)}`);
@@ -642,7 +686,6 @@ export function useAppNavigation({
             setLibrary({ isTreeLoading: false });
           }
         }
-        await handleSelectSubfolder(selectedPath, true);
       }
     } catch (err) {
       console.error(isAndroid ? 'Failed to open Android library root:' : 'Failed to open directory dialog:', err);
@@ -706,15 +749,9 @@ export function useAppNavigation({
         setLibrary({ isTreeLoading: false });
       }
 
-      let preloadedImages: ImageFile[] | undefined;
-      if (preloadedDataRef.current.currentPath === pathToSelect && preloadedDataRef.current.images) {
-        try {
-          preloadedImages = await preloadedDataRef.current.images;
-          preloadedDataRef.current.images = undefined;
-        } catch (e) {
-          console.error('Failed to retrieve preloaded images', e);
-        }
-      }
+      // Native folder restore is catalog-authoritative. A legacy preload may have
+      // completed before cold reconciliation and must never overwrite its first page.
+      preloadedDataRef.current.images = undefined;
 
       if (pathToSelect && pathToSelect.startsWith('Album: ')) {
         const activeAlbumId = folderState?.activeAlbumId;
@@ -740,7 +777,7 @@ export function useAppNavigation({
           if (fallbackRoot) await handleSelectSubfolder(fallbackRoot, false, undefined, false);
         }
       } else {
-        await handleSelectSubfolder(pathToSelect, false, preloadedImages, false);
+        await handleSelectSubfolder(pathToSelect, false, undefined, false);
       }
     };
 

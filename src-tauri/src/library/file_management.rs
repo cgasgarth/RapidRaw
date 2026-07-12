@@ -173,13 +173,13 @@ impl fmt::Display for ReadFileError {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ImageFile {
-    path: String,
-    modified: u64,
-    is_edited: bool,
-    rating: u8,
-    tags: Option<Vec<String>>,
-    exif: Option<HashMap<String, String>>,
-    is_virtual_copy: bool,
+    pub(crate) path: String,
+    pub(crate) modified: u64,
+    pub(crate) is_edited: bool,
+    pub(crate) rating: u8,
+    pub(crate) tags: Option<Vec<String>>,
+    pub(crate) exif: Option<HashMap<String, String>>,
+    pub(crate) is_virtual_copy: bool,
 }
 
 #[derive(Serialize, Debug)]
@@ -336,7 +336,7 @@ fn virtual_path_for_copy(source_path: &Path, copy_id: Option<&str>) -> (String, 
     (virtual_image_path.to_serialized(), copy_id.is_some())
 }
 
-fn expand_image_file_rows(
+pub(crate) fn expand_image_file_rows(
     path_buf: PathBuf,
     sidecars: Vec<Option<String>>,
     settings: &AppSettings,
@@ -832,19 +832,8 @@ fn scan_dir_lazy(
                     next_prefetch,
                 )?
             } else {
-                let count = if show_image_counts {
-                    WalkDir::new(&current_path)
-                        .into_iter()
-                        .filter_map(Result::ok)
-                        .filter(|e| {
-                            e.file_type().is_file()
-                                && crate::formats::is_supported_image_file(e.path())
-                        })
-                        .count()
-                } else {
-                    0
-                };
-                (Vec::new(), count)
+                // Recursive counts are supplied by the revisioned library catalog.
+                (Vec::new(), 0)
             };
 
             let has_any_subdirs = if should_scan {
