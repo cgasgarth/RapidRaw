@@ -349,6 +349,14 @@ jobs:
           test "$(cargo metadata --format-version 1 --no-deps | jq -r '.packages[] | select(.name == "rapidraw-types") | [.dependencies[] | select(.kind == null) | .name] | sort | join(",")')" = "serde"
           test "$(cargo metadata --format-version 1 --no-deps | jq -r '.packages[] | select(.name == "RapidRAW") | any(.dependencies[]; .name == "rapidraw-types")')" = "true"
 
+      - name: Validate computational and codec leaf feature matrices
+        if: steps.rust-pr-decision.outputs.rust_ci_required == 'true'
+        run: |
+          bun tests/integration/checks/check-native-feature-leaves.ts
+          cargo test --manifest-path src-tauri/Cargo.toml --locked -p rapidraw-computational
+          cargo test --manifest-path src-tauri/Cargo.toml --locked -p rapidraw-codecs --no-default-features --features jpeg
+          cargo test --manifest-path src-tauri/Cargo.toml --locked -p rapidraw-codecs --all-features
+
       - name: Rust and Tauri IPC tests when Rust/Tauri changed
         if: steps.rust-pr-decision.outputs.rust_ci_required == 'true'
         working-directory: src-tauri

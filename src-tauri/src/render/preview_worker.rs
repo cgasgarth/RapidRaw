@@ -3,9 +3,6 @@ use std::sync::Arc;
 use std::thread;
 
 use image::{DynamicImage, GenericImageView, ImageBuffer, Luma, RgbaImage};
-use imgref::ImgRef;
-use mozjpeg_rs::{Encoder, Preset};
-use rgb::{FromSlice, RGBA8};
 use tauri::{Emitter, Manager};
 
 use crate::adjustment_utils::hydrate_adjustments;
@@ -599,20 +596,14 @@ fn encode_preview_response(
         None
     };
 
-    let raw_bytes: &[u8] = final_rgba_image.as_raw();
-    let rgba8_pixels: &[RGBA8] = raw_bytes.as_rgba();
-    let img_ref = ImgRef::new(
-        rgba8_pixels,
-        final_rgba_image.width() as usize,
-        final_rgba_image.height() as usize,
-    );
-
     let step_start = std::time::Instant::now();
-    let jpeg_bytes = Encoder::new(Preset::BaselineFastest)
-        .quality(jpeg_quality)
-        .fast_color(true)
-        .encode_imgref(img_ref)
-        .map_err(|e| format!("Failed to encode preview: {}", e))?;
+    let jpeg_bytes = rapidraw_codecs::encode_jpeg_rgba(
+        final_rgba_image.as_raw(),
+        final_rgba_image.width(),
+        final_rgba_image.height(),
+        jpeg_quality,
+    )
+    .map_err(|e| format!("Failed to encode preview: {}", e))?;
     #[cfg(target_os = "macos")]
     let jpeg_bytes = if let Some(snapshot) = display_snapshot.as_ref() {
         jpeg_with_icc_profile(&jpeg_bytes, &snapshot.icc_bytes)?
@@ -886,15 +877,13 @@ mod tests {
         } else {
             None
         };
-        let jpeg = Encoder::new(Preset::BaselineFastest)
-            .quality(jpeg_quality)
-            .fast_color(true)
-            .encode_imgref(ImgRef::new(
-                rgba.as_raw().as_slice().as_rgba(),
-                rgba.width() as usize,
-                rgba.height() as usize,
-            ))
-            .map_err(|error| format!("Failed to encode preview: {error}"))?;
+        let jpeg = rapidraw_codecs::encode_jpeg_rgba(
+            rgba.as_raw(),
+            rgba.width(),
+            rgba.height(),
+            jpeg_quality,
+        )
+        .map_err(|error| format!("Failed to encode preview: {error}"))?;
 
         if let Some((x, y, width, height)) = geometry {
             let mut response = Vec::with_capacity(24 + jpeg.len());

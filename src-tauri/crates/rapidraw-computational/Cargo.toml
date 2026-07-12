@@ -1,0 +1,19 @@
+[package]
+name = "rapidraw-computational"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+publish = false
+
+[features]
+opencv-panorama = ["dep:opencv"]
+
+[dependencies]
+blake3 = "1.8.5"
+opencv = { version = "0.98.2", default-features = false, features = ["imgcodecs", "imgproc", "stitching"], optional = true }
+rapidraw-types = { path = "../rapidraw-types" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[lints.clippy]
+all = "deny"
