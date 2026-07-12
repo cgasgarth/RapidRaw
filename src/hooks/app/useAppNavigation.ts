@@ -749,15 +749,9 @@ export function useAppNavigation({
         setLibrary({ isTreeLoading: false });
       }
 
-      let preloadedImages: ImageFile[] | undefined;
-      if (preloadedDataRef.current.currentPath === pathToSelect && preloadedDataRef.current.images) {
-        try {
-          preloadedImages = await preloadedDataRef.current.images;
-          preloadedDataRef.current.images = undefined;
-        } catch (e) {
-          console.error('Failed to retrieve preloaded images', e);
-        }
-      }
+      // Native folder restore is catalog-authoritative. A legacy preload may have
+      // completed before cold reconciliation and must never overwrite its first page.
+      preloadedDataRef.current.images = undefined;
 
       if (pathToSelect && pathToSelect.startsWith('Album: ')) {
         const activeAlbumId = folderState?.activeAlbumId;
@@ -783,7 +777,7 @@ export function useAppNavigation({
           if (fallbackRoot) await handleSelectSubfolder(fallbackRoot, false, undefined, false);
         }
       } else {
-        await handleSelectSubfolder(pathToSelect, false, preloadedImages, false);
+        await handleSelectSubfolder(pathToSelect, false, undefined, false);
       }
     };
 

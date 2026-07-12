@@ -268,6 +268,16 @@ fn change_key(change: &LibraryPathChange) -> String {
     }
 }
 
+fn coalesce_change(existing: LibraryPathChange, incoming: LibraryPathChange) -> LibraryPathChange {
+    match (&existing, &incoming) {
+        (LibraryPathChange::Removed { .. }, LibraryPathChange::Modified { .. })
+        | (LibraryPathChange::Added { .. }, LibraryPathChange::Modified { .. }) => existing,
+        (LibraryPathChange::Modified { .. }, LibraryPathChange::Removed { .. })
+        | (LibraryPathChange::Modified { .. }, LibraryPathChange::Added { .. }) => incoming,
+        _ => incoming,
+    }
+}
+
 impl LibraryFilesystemChangefeed {
     fn replace_roots(&self, app: AppHandle, roots: Vec<PathBuf>) -> Result<u64, String> {
         let canonical_roots: Vec<PathBuf> = roots
@@ -332,7 +342,12 @@ impl LibraryFilesystemChangefeed {
                                 inner.report.queue_peak.max(pending.len() + changes.len());
                         }
                         for change in changes {
-                            pending.insert(change_key(&change), change);
+                            let key = change_key(&change);
+                            if let Some(existing) = pending.remove(&key) {
+                                pending.insert(key, coalesce_change(existing, change));
+                            } else {
+                                pending.insert(key, change);
+                            }
                         }
                         deadline = Some(Instant::now() + Duration::from_millis(180));
                         if pending.len() >= 1024 {
@@ -450,6 +465,30 @@ mod tests {
             pending.insert(change_key(&change), change);
         }
         assert_eq!(pending.len(), 1);
+    }
+
+    #[test]
+    fn sidecar_echo_cannot_overwrite_source_removal() {
+        let removed = LibraryPathChange::Removed {
+            path: "/library/photo.ARW".into(),
+        };
+        let sidecar = LibraryPathChange::Modified {
+            path: "/library/photo.ARW".into(),
+            class: LibraryChangeClass::Sidecar,
+        };
+        assert_eq!(coalesce_change(removed.clone(), sidecar), removed);
+    }
+
+    #[test]
+    fn sidecar_echo_cannot_overwrite_source_addition() {
+        let added = LibraryPathChange::Added {
+            path: "/library/photo.ARW".into(),
+        };
+        let sidecar = LibraryPathChange::Modified {
+            path: "/library/photo.ARW".into(),
+            class: LibraryChangeClass::Sidecar,
+        };
+        assert_eq!(coalesce_change(added.clone(), sidecar), added);
     }
 
     #[test]
@@ -634,6 +673,70 @@ mod tests {
         assert!(
             observed,
             "native watcher did not report the temp-root image create"
+        );
+    }
+
+    #[test]
+    fn native_backend_rename_and_delete_normalize_to_bounded_catalog_changes() {
+        let root = tempfile::tempdir().expect("temp root");
+        let old_path = root.path().join("old.ARW");
+        let new_path = root.path().join("new.ARW");
+        std::fs::write(&old_path, b"fixture").expect("initial source");
+        let (sender, receiver) = mpsc::channel();
+        let mut watcher = notify::recommended_watcher(move |event| {
+            let _ = sender.send(event);
+        })
+        .expect("native watcher");
+        watcher
+            .watch(root.path(), RecursiveMode::Recursive)
+            .expect("watch root");
+        thread::sleep(Duration::from_millis(500));
+        std::fs::rename(&old_path, &new_path).expect("rename source");
+
+        let rename_deadline = Instant::now() + Duration::from_secs(5);
+        let mut rename_changes = Vec::new();
+        while Instant::now() < rename_deadline {
+            let Ok(Ok(event)) = receiver.recv_timeout(Duration::from_millis(250)) else {
+                continue;
+            };
+            eprintln!(
+                "native rename event kind={:?} paths={}",
+                event.kind,
+                event.paths.len()
+            );
+            rename_changes.extend(normalize_event(event));
+            let removed_old = rename_changes.iter().any(|change| matches!(change, LibraryPathChange::Removed { path } if path.ends_with("/old.ARW")));
+            let added_new = rename_changes.iter().any(|change| matches!(change, LibraryPathChange::Added { path } if path.ends_with("/new.ARW")));
+            let paired = rename_changes.iter().any(|change| matches!(change, LibraryPathChange::Renamed { old_path, new_path } if old_path.ends_with("/old.ARW") && new_path.ends_with("/new.ARW")));
+            if paired || (removed_old && added_new) {
+                break;
+            }
+        }
+        assert!(rename_changes.iter().any(|change| matches!(change,
+            LibraryPathChange::Renamed { old_path, new_path } if old_path.ends_with("/old.ARW") && new_path.ends_with("/new.ARW")
+        )) || (rename_changes.iter().any(|change| matches!(change, LibraryPathChange::Removed { path } if path.ends_with("/old.ARW")))
+            && rename_changes.iter().any(|change| matches!(change, LibraryPathChange::Added { path } if path.ends_with("/new.ARW")))));
+
+        std::fs::remove_file(&new_path).expect("delete source");
+        let delete_deadline = Instant::now() + Duration::from_secs(5);
+        let mut removed = false;
+        while Instant::now() < delete_deadline {
+            let Ok(Ok(event)) = receiver.recv_timeout(Duration::from_millis(250)) else {
+                continue;
+            };
+            eprintln!(
+                "native delete event kind={:?} paths={}",
+                event.kind,
+                event.paths.len()
+            );
+            if normalize_event(event).iter().any(|change| matches!(change, LibraryPathChange::Removed { path } if path.ends_with("/new.ARW"))) {
+                removed = true;
+                break;
+            }
+        }
+        assert!(
+            removed,
+            "native delete did not normalize to a catalog removal"
         );
     }
 }
