@@ -1,4 +1,5 @@
 export enum Invokes {
+  BeginImageOpen = 'begin_image_open',
   ConfigureLibraryChangefeed = 'configure_library_changefeed',
   AddTagForPaths = 'add_tag_for_paths',
   ApplyAdjustments = 'apply_adjustments',
@@ -66,6 +67,7 @@ export enum Invokes {
   GetExportColorCapabilities = 'get_export_color_capabilities',
   GetAiModelRegistryReport = 'get_ai_model_registry_report',
   GetImageDimensions = 'get_image_dimensions',
+  GetImageOpenDiagnostics = 'get_image_open_diagnostics',
   IsOriginalFileAvailable = 'is_original_file_available',
   GetFolderTree = 'get_folder_tree',
   GetFolderChildren = 'get_folder_children',
@@ -90,6 +92,7 @@ export enum Invokes {
   GetImportJobReceipt = 'get_import_job_receipt',
   ValidateImportJobResume = 'validate_import_job_resume',
   ResumeImportJob = 'resume_import_job',
+  ScheduleImagePrefetch = 'schedule_image_prefetch',
   ImportExternalEditorVariant = 'import_external_editor_variant',
   LaunchExternalEditor = 'launch_external_editor',
   InvokeGenerativeReplaceWithMaskDef = 'invoke_generative_replace_with_mask_def',
