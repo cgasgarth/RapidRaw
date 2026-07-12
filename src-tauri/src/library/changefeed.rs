@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
@@ -77,6 +77,7 @@ struct ChangefeedInner {
     generation: u64,
     revision: u64,
     report: LibraryChangefeedReport,
+    authored_paths: HashMap<PathBuf, Instant>,
 }
 
 #[derive(Clone, Default)]
@@ -279,6 +280,64 @@ fn coalesce_change(existing: LibraryPathChange, incoming: LibraryPathChange) -> 
 }
 
 impl LibraryFilesystemChangefeed {
+    pub fn publish_authored_changes(
+        &self,
+        app: &AppHandle,
+        changes: Vec<LibraryPathChange>,
+    ) -> Result<(), String> {
+        if changes.is_empty() {
+            return Ok(());
+        }
+        let batch = {
+            let mut inner = self
+                .0
+                .lock()
+                .map_err(|_| "changefeed lock poisoned".to_string())?;
+            let Some(active) = inner.active.as_ref() else {
+                return Ok(());
+            };
+            let roots = active.roots.clone();
+            let changes: Vec<_> = changes
+                .into_iter()
+                .filter(|change| {
+                    change_paths(change)
+                        .iter()
+                        .any(|path| roots.iter().any(|root| path.starts_with(root)))
+                })
+                .collect();
+            if changes.is_empty() {
+                return Ok(());
+            }
+            let expires = Instant::now() + Duration::from_secs(3);
+            for change in &changes {
+                for path in change_paths(change) {
+                    inner.authored_paths.insert(path, expires);
+                }
+            }
+            let before = inner.revision;
+            inner.revision = inner.revision.saturating_add(1);
+            inner.report.catalog_revision = inner.revision;
+            inner.report.coalesced_operations = inner
+                .report
+                .coalesced_operations
+                .saturating_add(changes.len() as u64);
+            inner.report.batches = inner.report.batches.saturating_add(1);
+            LibraryChangeBatch {
+                watch_generation: inner.generation,
+                catalog_revision_before: before,
+                catalog_revision_after: inner.revision,
+                root_id: roots
+                    .first()
+                    .map_or_else(String::new, |path| path.to_string_lossy().into_owned()),
+                changes,
+                overflowed: false,
+                requires_reconcile: false,
+            }
+        };
+        app.emit(LIBRARY_CHANGE_BATCH_EVENT, batch)
+            .map_err(|error| error.to_string())
+    }
+
     fn replace_roots(&self, app: AppHandle, roots: Vec<PathBuf>) -> Result<u64, String> {
         let canonical_roots: Vec<PathBuf> = roots
             .into_iter()
@@ -332,7 +391,7 @@ impl LibraryFilesystemChangefeed {
                 });
                 match receiver.recv_timeout(timeout) {
                     Ok(Ok(event)) => {
-                        let changes = normalize_event(event);
+                        let mut changes = normalize_event(event);
                         if let Ok(mut inner) = state.0.lock() {
                             if inner.generation != generation {
                                 break;
@@ -340,6 +399,10 @@ impl LibraryFilesystemChangefeed {
                             inner.report.raw_events = inner.report.raw_events.saturating_add(1);
                             inner.report.queue_peak =
                                 inner.report.queue_peak.max(pending.len() + changes.len());
+                            let now = Instant::now();
+                            inner.authored_paths.retain(|_, expires| *expires > now);
+                            changes
+                                .retain(|change| !is_authored_echo(change, &inner.authored_paths));
                         }
                         for change in changes {
                             let key = change_key(&change);
@@ -426,6 +489,26 @@ impl LibraryFilesystemChangefeed {
     }
 }
 
+fn change_paths(change: &LibraryPathChange) -> Vec<PathBuf> {
+    match change {
+        LibraryPathChange::Added { path }
+        | LibraryPathChange::Modified { path, .. }
+        | LibraryPathChange::Removed { path } => vec![PathBuf::from(path)],
+        LibraryPathChange::Renamed { old_path, new_path } => {
+            vec![PathBuf::from(old_path), PathBuf::from(new_path)]
+        }
+    }
+}
+
+fn is_authored_echo(
+    change: &LibraryPathChange,
+    authored_paths: &HashMap<PathBuf, Instant>,
+) -> bool {
+    change_paths(change)
+        .iter()
+        .any(|path| authored_paths.contains_key(path))
+}
+
 #[tauri::command]
 pub fn configure_library_changefeed(
     app: AppHandle,
@@ -450,6 +533,24 @@ pub fn get_library_changefeed_report(
 mod tests {
     use super::*;
     use notify::event::{CreateKind, ModifyKind};
+
+    #[test]
+    fn app_authored_destination_echo_is_suppressed() {
+        let path = PathBuf::from("/library/imported.raw");
+        let authored = HashMap::from([(path.clone(), Instant::now() + Duration::from_secs(3))]);
+        assert!(is_authored_echo(
+            &LibraryPathChange::Added {
+                path: path.to_string_lossy().into_owned(),
+            },
+            &authored,
+        ));
+        assert!(!is_authored_echo(
+            &LibraryPathChange::Added {
+                path: "/library/other.raw".to_string(),
+            },
+            &authored,
+        ));
+    }
 
     #[test]
     fn repeated_modifies_coalesce_by_path() {

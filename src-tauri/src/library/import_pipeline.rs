@@ -430,6 +430,22 @@ impl ImportPipeline {
         self.counters.copy_in_flight.fetch_sub(1, Ordering::Relaxed);
         let mut receipt = result?;
         self.persist_partial_journal(plan, &receipt);
+        let authored_changes = receipt
+            .artifacts
+            .iter()
+            .map(|artifact| super::changefeed::LibraryPathChange::Added {
+                path: artifact.destination.clone(),
+            })
+            .collect();
+        let changefeed = self
+            .app
+            .state::<super::changefeed::LibraryFilesystemChangefeed>();
+        if let Err(error) = changefeed.publish_authored_changes(&self.app, authored_changes) {
+            log::warn!(
+                "Failed to publish committed import {} to the catalog changefeed: {error}",
+                plan.item_id
+            );
+        }
         if plan.delete_source_after_commit {
             self.emit_progress(
                 ImportStage::DeletingSource,
