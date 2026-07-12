@@ -201,6 +201,12 @@ pub struct ExportJob {
     pub task_handle: Option<JoinHandle<()>>,
 }
 
+pub struct ImportJob {
+    pub job_id: String,
+    pub cancellation_token: Arc<AtomicBool>,
+    pub task_handle: Option<tauri::async_runtime::JoinHandle<()>>,
+}
+
 pub struct TransformedImageCache {
     pub identity: crate::render::artifact_identity::RenderArtifactIdentity,
     pub image: Arc<DynamicImage>,
@@ -223,6 +229,7 @@ pub struct AppState {
     pub ai_state: Mutex<Option<AiState>>,
     pub ai_init_lock: TokioMutex<()>,
     pub export_job: Mutex<Option<ExportJob>>,
+    pub import_job: Mutex<Option<ImportJob>>,
     pub computational_merge_jobs: crate::merge::computational_job::ComputationalMergeJobRegistry,
     pub hdr_result: Arc<Mutex<Option<DynamicImage>>>,
     pub hdr_runtime_plan: Arc<Mutex<Option<PendingHdrMergePlan>>>,
@@ -287,6 +294,7 @@ impl AppState {
             ai_state: Mutex::new(None),
             ai_init_lock: TokioMutex::new(()),
             export_job: Mutex::new(None),
+            import_job: Mutex::new(None),
             computational_merge_jobs:
                 crate::merge::computational_job::ComputationalMergeJobRegistry::default(),
             hdr_result: Arc::new(Mutex::new(None)),

@@ -1,3 +1,4 @@
+import type { ImportResumeValidation } from '../../schemas/fileOperationSchemas';
 import type { RawDevelopmentReport } from '../../schemas/imageLoaderSchemas';
 import {
   EXPORT_FILE_FORMATS,
@@ -149,9 +150,15 @@ export interface FileFormat {
 
 export interface ImportState {
   errorMessage: string;
+  jobId?: string;
   path?: string;
   progress?: Progress;
+  stage?: string;
+  bytesCopied?: number;
+  totalBytes?: number;
   status: Status;
+  resumeValidation?: ImportResumeValidation;
+  resumeError?: string;
 }
 
 export enum Status {

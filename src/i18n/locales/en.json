@@ -3271,6 +3271,7 @@
       "fileNaming": "File Naming",
       "folderOrganization": "Folder Organization",
       "organizeByDate": "Organize into subfolders by date",
+      "resumeImport": "Resume Import",
       "sourceFiles": "Source Files",
       "startImport": "Start Import",
       "title": "Import Settings"

@@ -3024,6 +3024,7 @@
       "fileNaming": "ファイル名の命名",
       "folderOrganization": "フォルダ構成",
       "organizeByDate": "日付ごとにサブフォルダに整理する",
+      "resumeImport": "インポートを再開",
       "sourceFiles": "ソースファイル",
       "startImport": "インポートを開始",
       "title": "インポート設定"

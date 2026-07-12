@@ -81,6 +81,7 @@ export const smartPreviewGeneratedPayloadSchema = z
 
 export const importStartPayloadSchema = z
   .object({
+    jobId: z.string().optional(),
     total: nonnegativeNumberSchema,
   })
   .loose();
@@ -91,7 +92,16 @@ export const pathProgressPayloadSchema = progressPayloadSchema
   })
   .loose();
 
-export const importProgressPayloadSchema = pathProgressPayloadSchema;
+export const importProgressPayloadSchema = pathProgressPayloadSchema.extend({
+  jobId: z.string().optional(),
+  stage: z.string().optional(),
+  committed: nonnegativeNumberSchema.optional(),
+  failed: nonnegativeNumberSchema.optional(),
+  cancelled: nonnegativeNumberSchema.optional(),
+  bytesCopied: nonnegativeNumberSchema.optional(),
+  totalBytes: nonnegativeNumberSchema.optional(),
+  committedPath: z.string().nullable().optional(),
+});
 
 export const denoiseCompletePayloadSchema = z.union([
   z.string(),
