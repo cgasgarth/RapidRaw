@@ -1568,7 +1568,11 @@ fn emit_scheduled_thumbnail_result(
             app_handle,
             &job.path,
             request,
-            SmartPreviewDemandClass::VisibleIdle,
+            if job.committed_invalidation {
+                SmartPreviewDemandClass::ExplicitBuild
+            } else {
+                SmartPreviewDemandClass::VisibleIdle
+            },
         );
     }
 }
@@ -1637,7 +1641,7 @@ pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
                         &cache_dir,
                         gpu_context.as_ref(),
                         None,
-                        false,
+                        job.committed_invalidation,
                         &app_clone,
                         &settings,
                         Some(job.cancellation.flag()),
