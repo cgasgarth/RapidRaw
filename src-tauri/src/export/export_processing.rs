@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fs;
-use std::io::{Cursor, Write};
+use std::io::{Cursor, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -187,6 +187,7 @@ impl ExportJobIdentity {
 #[derive(Clone)]
 struct ExportItemPlan {
     item_id: String,
+    input_path: String,
     source_path: String,
     source_revision: SourceRevision,
     sidecar_revision: String,
@@ -200,10 +201,11 @@ struct ExportItemPlan {
     estimate: ExportWorkEstimate,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ExportJobManifestItem {
     item_id: String,
+    input_path: String,
     source_path: String,
     source_revision: String,
     edit_revision: String,
@@ -211,15 +213,29 @@ struct ExportJobManifestItem {
     expected_dimensions: Option<(u32, u32)>,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ExportCommittedArtifact {
+    output_path: String,
+    byte_len: u64,
+    sha256: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ExportJobManifest {
     schema_version: u8,
     job_id: String,
-    status: &'static str,
+    status: String,
     updated_at: String,
+    output_folder_or_file: String,
+    is_explicit_file_path: bool,
+    base_origin_folders: Vec<String>,
+    output_format: String,
+    export_settings: ExportSettings,
+    plan_fingerprint: String,
     planned: Vec<ExportJobManifestItem>,
-    committed_output_paths: Vec<String>,
+    committed_artifacts: Vec<ExportCommittedArtifact>,
 }
 
 fn export_manifest_path(output_folder: &Path, explicit_file_path: bool, job_id: &str) -> PathBuf {
@@ -244,6 +260,206 @@ fn write_export_manifest(path: &Path, manifest: &ExportJobManifest) -> Result<()
         .map_err(|error| format!("export_manifest_write_failed:{error}"))?
         .ok_or_else(|| "export_manifest_cancelled".to_string())?;
     Ok(())
+}
+
+fn load_export_manifest(path: &Path) -> Result<ExportJobManifest, String> {
+    let bytes = fs::read(path).map_err(|error| format!("export_manifest_read_failed:{error}"))?;
+    serde_json::from_slice(&bytes).map_err(|error| format!("export_manifest_invalid:{error}"))
+}
+
+fn export_manifest_plan_fingerprint(
+    output_folder_or_file: &str,
+    is_explicit_file_path: bool,
+    base_origin_folders: &[String],
+    output_format: &str,
+    export_settings: &ExportSettings,
+) -> Result<String, String> {
+    let payload = serde_json::to_vec(&serde_json::json!({
+        "outputFolderOrFile": output_folder_or_file,
+        "isExplicitFilePath": is_explicit_file_path,
+        "baseOriginFolders": base_origin_folders,
+        "outputFormat": output_format,
+        "exportSettings": export_settings,
+    }))
+    .map_err(|error| format!("export_manifest_fingerprint_encode_failed:{error}"))?;
+    Ok(format!("sha256:{}", hex::encode(Sha256::digest(payload))))
+}
+
+fn explicit_virtual_copy_from_input(input_path: &str) -> Option<u32> {
+    input_path
+        .rfind("vc=")
+        .and_then(|index| input_path[index + 3..].split('&').next())
+        .and_then(|value| value.parse::<u32>().ok())
+        .or_else(|| {
+            let lower = input_path.to_ascii_lowercase();
+            lower.rfind("_vc").and_then(|index| {
+                lower[index + 3..]
+                    .chars()
+                    .take_while(char::is_ascii_digit)
+                    .collect::<String>()
+                    .parse::<u32>()
+                    .ok()
+            })
+        })
+}
+
+#[derive(Debug)]
+struct ValidatedExportResume {
+    all_input_paths: Vec<String>,
+    pending_count: usize,
+    committed_artifacts: Vec<ExportCommittedArtifact>,
+}
+
+fn sha256_file_for_resume(path: &Path) -> Result<(u64, String), String> {
+    let file = fs::File::open(path)
+        .map_err(|error| format!("export_resume_output_read_failed:{error}"))?;
+    let mut reader = std::io::BufReader::new(file);
+    let mut hasher = Sha256::new();
+    let mut byte_len = 0_u64;
+    let mut buffer = [0_u8; 64 * 1024];
+    loop {
+        let read = reader
+            .read(&mut buffer)
+            .map_err(|error| format!("export_resume_output_read_failed:{error}"))?;
+        if read == 0 {
+            break;
+        }
+        byte_len = byte_len.saturating_add(read as u64);
+        hasher.update(&buffer[..read]);
+    }
+    Ok((
+        byte_len,
+        format!("sha256:{}", hex::encode(hasher.finalize())),
+    ))
+}
+
+fn validate_export_manifest_for_resume(
+    manifest: &ExportJobManifest,
+) -> Result<ValidatedExportResume, String> {
+    if manifest.schema_version != 1 {
+        return Err(format!(
+            "export_manifest_schema_unsupported:{}",
+            manifest.schema_version
+        ));
+    }
+    if !matches!(
+        manifest.status.as_str(),
+        "pending" | "cancelled" | "completedWithErrors"
+    ) {
+        return Err(format!("export_manifest_not_resumable:{}", manifest.status));
+    }
+    let current_fingerprint = export_manifest_plan_fingerprint(
+        &manifest.output_folder_or_file,
+        manifest.is_explicit_file_path,
+        &manifest.base_origin_folders,
+        &manifest.output_format,
+        &manifest.export_settings,
+    )?;
+    if current_fingerprint != manifest.plan_fingerprint {
+        return Err("export_resume_output_settings_drift".to_string());
+    }
+    let committed = manifest
+        .committed_artifacts
+        .iter()
+        .map(|artifact| (artifact.output_path.as_str(), artifact))
+        .collect::<HashMap<_, _>>();
+    if committed.len() != manifest.committed_artifacts.len() {
+        return Err("export_resume_duplicate_committed_output".to_string());
+    }
+    let output_folder = PathBuf::from(&manifest.output_folder_or_file);
+    let mut source_counts = HashMap::<String, usize>::new();
+    let mut pending = Vec::new();
+    let mut planned_outputs = std::collections::HashSet::new();
+    for (index, item) in manifest.planned.iter().enumerate() {
+        let (parsed_source_path, _) = parse_virtual_path(&item.input_path);
+        if parsed_source_path.to_string_lossy() != item.source_path {
+            return Err(format!(
+                "export_resume_source_identity_drift:{}",
+                item.item_id
+            ));
+        }
+        let source_path = Path::new(&item.source_path);
+        let current_revision = SourceRevision::from_path(source_path)
+            .map_err(|error| format!("export_resume_source_revision_failed:{error}"))?;
+        if current_revision.identity() != item.source_revision {
+            return Err(format!(
+                "export_resume_source_revision_drift:{}",
+                item.item_id
+            ));
+        }
+        let appearance_count = source_counts
+            .entry(item.source_path.clone())
+            .and_modify(|count| *count += 1)
+            .or_insert(1);
+        let target = resolve_export_output_target(ExportOutputTargetRequest {
+            image_path: &item.input_path,
+            output_folder_path: &output_folder,
+            is_explicit_file_path: manifest.is_explicit_file_path,
+            base_origin_folders: &manifest.base_origin_folders,
+            filename_template: manifest
+                .export_settings
+                .filename_template
+                .as_deref()
+                .unwrap_or("{original_filename}_edited"),
+            preserve_folders: manifest.export_settings.preserve_folders,
+            output_format: &manifest.output_format,
+            total_paths: manifest.planned.len(),
+            global_index: index,
+            appearance_count: *appearance_count,
+            explicit_virtual_copy: explicit_virtual_copy_from_input(&item.input_path),
+        });
+        let resolved_output = target.output_path.to_string_lossy().to_string();
+        if resolved_output != item.output_path {
+            return Err(format!(
+                "export_resume_output_identity_drift:{}",
+                item.item_id
+            ));
+        }
+        if !planned_outputs.insert(item.output_path.as_str()) {
+            return Err(format!("export_resume_output_collision:{}", item.item_id));
+        }
+        let current_edit_revision = SourceRevision::from_path(&target.sidecar_path)
+            .map(|revision| revision.identity())
+            .unwrap_or_else(|_| "sidecar-missing-v1".to_string());
+        if current_edit_revision != item.edit_revision {
+            return Err(format!(
+                "export_resume_edit_revision_drift:{}",
+                item.item_id
+            ));
+        }
+        if let Some(expected) = item.expected_dimensions
+            && let Some(actual) = image::image_dimensions(source_path).ok()
+            && actual != expected
+        {
+            return Err(format!("export_resume_dimensions_drift:{}", item.item_id));
+        }
+        if let Some(artifact) = committed.get(item.output_path.as_str()) {
+            let (byte_len, sha256) = sha256_file_for_resume(Path::new(&item.output_path))?;
+            if byte_len != artifact.byte_len || sha256 != artifact.sha256 {
+                return Err(format!(
+                    "export_resume_committed_output_drift:{}",
+                    item.item_id
+                ));
+            }
+            continue;
+        }
+        if Path::new(&item.output_path).exists() {
+            return Err(format!("export_resume_untracked_output:{}", item.item_id));
+        }
+        pending.push(item.input_path.clone());
+    }
+    if committed.keys().any(|path| !planned_outputs.contains(path)) {
+        return Err("export_resume_unknown_committed_output".to_string());
+    }
+    Ok(ValidatedExportResume {
+        all_input_paths: manifest
+            .planned
+            .iter()
+            .map(|item| item.input_path.clone())
+            .collect(),
+        pending_count: pending.len(),
+        committed_artifacts: manifest.committed_artifacts.clone(),
+    })
 }
 
 struct DecodedExportItem {
@@ -1340,6 +1556,9 @@ fn export_adjustments_as_lut(
 #[allow(clippy::too_many_arguments)]
 async fn run_batch_export_pipeline(
     job_id: String,
+    resume_skip_output_paths: std::collections::HashSet<String>,
+    initial_committed_artifacts: Vec<ExportCommittedArtifact>,
+    resumed_manifest_items: Option<Vec<ExportJobManifestItem>>,
     paths: Vec<String>,
     output_folder_or_file: String,
     is_explicit_file_path: bool,
@@ -1357,6 +1576,10 @@ async fn run_batch_export_pipeline(
     crate::export::batch_export_pipeline::BatchExportReport,
 ) {
     let total = paths.len();
+    let manifest_output_folder_or_file = output_folder_or_file.clone();
+    let manifest_base_origin_folders = base_origin_folders.clone();
+    let manifest_output_format = output_format.clone();
+    let manifest_export_settings = export_settings.clone();
     let diagnostics = PipelineDiagnostics::default();
     diagnostics.update(|report| {
         report.planned = total;
@@ -1374,21 +1597,7 @@ async fn run_batch_export_pipeline(
         let source_path_string = source_path.to_string_lossy().to_string();
         let appearance_count = source_counts.entry(source_path_string.clone()).or_default();
         *appearance_count += 1;
-        let explicit_virtual_copy = input_path
-            .rfind("vc=")
-            .and_then(|index| input_path[index + 3..].split('&').next())
-            .and_then(|value| value.parse::<u32>().ok())
-            .or_else(|| {
-                let lower = input_path.to_ascii_lowercase();
-                lower.rfind("_vc").and_then(|index| {
-                    lower[index + 3..]
-                        .chars()
-                        .take_while(char::is_ascii_digit)
-                        .collect::<String>()
-                        .parse::<u32>()
-                        .ok()
-                })
-            });
+        let explicit_virtual_copy = explicit_virtual_copy_from_input(&input_path);
         let target = resolve_export_output_target(ExportOutputTargetRequest {
             image_path: &input_path,
             output_folder_path: &output_folder,
@@ -1405,6 +1614,9 @@ async fn run_batch_export_pipeline(
             appearance_count: *appearance_count,
             explicit_virtual_copy,
         });
+        if resume_skip_output_paths.contains(&target.output_path.to_string_lossy().to_string()) {
+            continue;
+        }
         if !output_paths.insert(target.output_path.clone()) {
             return (
                 vec![ExportItemResult::Failed(format!(
@@ -1438,6 +1650,7 @@ async fn run_batch_export_pipeline(
         );
         plans.push(ExportItemPlan {
             item_id: format!("export-item:{global_index}:{}", target.source_path_str),
+            input_path,
             source_path: target.source_path_str.clone(),
             source_revision,
             sidecar_revision,
@@ -1457,10 +1670,11 @@ async fn run_batch_export_pipeline(
     }
 
     let manifest_path = export_manifest_path(&output_folder, is_explicit_file_path, &job_id);
-    let manifest_items = plans
+    let generated_manifest_items = plans
         .iter()
         .map(|plan| ExportJobManifestItem {
             item_id: plan.item_id.clone(),
+            input_path: plan.input_path.clone(),
             source_path: plan.source_path.clone(),
             source_revision: plan.source_revision.identity(),
             edit_revision: plan.sidecar_revision.clone(),
@@ -1468,13 +1682,27 @@ async fn run_batch_export_pipeline(
             expected_dimensions: plan.expected_dimensions,
         })
         .collect::<Vec<_>>();
+    let manifest_items = resumed_manifest_items.unwrap_or(generated_manifest_items);
     let pending_manifest = ExportJobManifest {
         schema_version: 1,
         job_id: job_id.clone(),
-        status: "pending",
+        status: "pending".to_string(),
         updated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
+        output_folder_or_file: manifest_output_folder_or_file.clone(),
+        is_explicit_file_path,
+        base_origin_folders: manifest_base_origin_folders.clone(),
+        output_format: manifest_output_format.clone(),
+        export_settings: manifest_export_settings.clone(),
+        plan_fingerprint: export_manifest_plan_fingerprint(
+            &manifest_output_folder_or_file,
+            is_explicit_file_path,
+            &manifest_base_origin_folders,
+            &manifest_output_format,
+            &manifest_export_settings,
+        )
+        .unwrap_or_else(|error| format!("invalid:{error}")),
         planned: manifest_items.clone(),
-        committed_output_paths: Vec::new(),
+        committed_artifacts: initial_committed_artifacts.clone(),
     };
     if let Err(error) = write_export_manifest(&manifest_path, &pending_manifest) {
         log::warn!("{error}");
@@ -1967,29 +2195,52 @@ async fn run_batch_export_pipeline(
             })
             .count();
     });
-    let committed_output_paths = results
-        .iter()
-        .filter_map(|result| match result {
-            ExportItemResult::Completed(output) | ExportItemResult::Cancelled(Some(output)) => {
-                Some(output.output_path.clone())
-            }
-            ExportItemResult::FailedWithOutput { output, .. } => Some(output.output_path.clone()),
-            ExportItemResult::Cancelled(None) | ExportItemResult::Failed(_) => None,
-        })
-        .collect();
+    let mut committed_artifacts = initial_committed_artifacts;
+    committed_artifacts.extend(
+        results
+            .iter()
+            .filter_map(|result| match result {
+                ExportItemResult::Completed(output) | ExportItemResult::Cancelled(Some(output)) => {
+                    output
+                        .output_digest
+                        .as_ref()
+                        .map(|digest| ExportCommittedArtifact {
+                            output_path: output.output_path.clone(),
+                            byte_len: digest.byte_len,
+                            sha256: digest.value.clone(),
+                        })
+                }
+                ExportItemResult::FailedWithOutput { output, .. } => output
+                    .output_digest
+                    .as_ref()
+                    .map(|digest| ExportCommittedArtifact {
+                        output_path: output.output_path.clone(),
+                        byte_len: digest.byte_len,
+                        sha256: digest.value.clone(),
+                    }),
+                ExportItemResult::Cancelled(None) | ExportItemResult::Failed(_) => None,
+            })
+            .collect::<Vec<_>>(),
+    );
     let terminal_manifest = ExportJobManifest {
         schema_version: 1,
         job_id,
         status: if cancellation.is_cancelled() {
-            "cancelled"
+            "cancelled".to_string()
         } else if diagnostics.snapshot().failed > 0 {
-            "completedWithErrors"
+            "completedWithErrors".to_string()
         } else {
-            "completed"
+            "completed".to_string()
         },
         updated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
+        output_folder_or_file: manifest_output_folder_or_file,
+        is_explicit_file_path,
+        base_origin_folders: manifest_base_origin_folders,
+        output_format: manifest_output_format,
+        export_settings: manifest_export_settings,
+        plan_fingerprint: pending_manifest.plan_fingerprint,
         planned: manifest_items,
-        committed_output_paths,
+        committed_artifacts,
     };
     if let Err(error) = write_export_manifest(&manifest_path, &terminal_manifest) {
         log::warn!("{error}");
@@ -2065,6 +2316,9 @@ pub async fn export_images(
         let started = Instant::now();
         let (results, mut report) = run_batch_export_pipeline(
             task_identity.job_id.clone(),
+            std::collections::HashSet::new(),
+            Vec::new(),
+            None,
             paths,
             output_folder_or_file,
             is_explicit_file_path,
@@ -2127,6 +2381,112 @@ pub async fn export_images(
             "batch export pipeline report: {:?}",
             serde_json::to_value(&report)
         );
+        finish_export_job(
+            &task_app_handle.state::<AppState>().export_job,
+            &task_identity,
+        );
+    });
+    attach_export_task(&state.export_job, &job_identity, task);
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+#[tauri::command]
+pub async fn resume_export(
+    manifest_path: String,
+    state: tauri::State<'_, AppState>,
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
+    let manifest = load_export_manifest(Path::new(&manifest_path))?;
+    let validated = validate_export_manifest_for_resume(&manifest)?;
+    if validated.pending_count == 0 {
+        return Ok(());
+    }
+    let pending_count = validated.pending_count;
+    let resume_paths = validated.all_input_paths;
+    let total_paths = manifest.planned.len();
+    let committed_paths = manifest
+        .committed_artifacts
+        .iter()
+        .map(|artifact| artifact.output_path.clone())
+        .collect::<std::collections::HashSet<_>>();
+    let job_identity = claim_export_job(&state.export_job)?;
+    let cancellation = job_identity.pipeline_cancellation();
+    let context = Arc::new(
+        get_or_init_gpu_context(&state, &app_handle).inspect_err(|_| {
+            finish_export_job(&state.export_job, &job_identity);
+        })?,
+    );
+    let available_cores = std::thread::available_parallelism()
+        .map(std::num::NonZeroUsize::get)
+        .unwrap_or(1);
+    let mut system = sysinfo::System::new();
+    system.refresh_memory();
+    let budget = ExportResourceBudget::for_policy(
+        system.available_memory(),
+        available_cores,
+        pending_count,
+        ExportConcurrencyPolicy::Adaptive,
+    );
+    let task_identity = job_identity.clone();
+    let task_app_handle = app_handle;
+    let task_cancellation = cancellation;
+    let task = tokio::spawn(async move {
+        let (results, report) = run_batch_export_pipeline(
+            task_identity.job_id.clone(),
+            committed_paths.clone(),
+            validated.committed_artifacts,
+            Some(manifest.planned.clone()),
+            resume_paths,
+            manifest.output_folder_or_file,
+            manifest.is_explicit_file_path,
+            manifest.base_origin_folders,
+            manifest.export_settings,
+            manifest.output_format,
+            None,
+            None,
+            context,
+            task_app_handle.clone(),
+            task_cancellation.clone(),
+            budget,
+        )
+        .await;
+        let mut outputs = Vec::new();
+        let mut errors = Vec::new();
+        for result in results {
+            match result {
+                ExportItemResult::Completed(output) | ExportItemResult::Cancelled(Some(output)) => {
+                    outputs.push(output)
+                }
+                ExportItemResult::Cancelled(None) => {}
+                ExportItemResult::Failed(error) => errors.push(error),
+                ExportItemResult::FailedWithOutput { error, output } => {
+                    outputs.push(output);
+                    errors.push(error);
+                }
+            }
+        }
+        if task_cancellation.is_cancelled() {
+            let _ = task_app_handle.emit(
+                crate::events::EXPORT_CANCELLED,
+                export_terminal_receipt(ExportTerminalStatus::Cancelled, outputs, total_paths),
+            );
+        } else if !errors.is_empty() {
+            let _ = task_app_handle.emit(
+                crate::events::EXPORT_COMPLETE_WITH_ERRORS,
+                serde_json::json!({
+                    "errors": errors.len(),
+                    "total": total_paths,
+                    "outputs": outputs,
+                    "pipeline": report
+                }),
+            );
+        } else {
+            let _ = task_app_handle.emit(
+                crate::events::EXPORT_COMPLETE,
+                export_terminal_receipt(ExportTerminalStatus::Completed, outputs, total_paths),
+            );
+        }
         finish_export_job(
             &task_app_handle.state::<AppState>().export_job,
             &task_identity,
@@ -3142,22 +3502,24 @@ pub async fn estimate_export_sizes(
 mod tests {
     use super::{
         EmbeddedSourceIccProfile, ExportBlackPointCompensationStatus, ExportColorEngineId,
-        ExportColorProfile, ExportJobManifest, ExportJobManifestItem, ExportReceiptContext,
-        ExportRenderingIntent, ExportSettings, ExportTerminalStatus, FinalArtifactDigest,
-        OutputCommitReceipt, OutputSharpeningSettings, VerifiedSourceDigestReceipt,
-        applied_export_color_policy, apply_export_resize_and_watermark, claim_export_job,
-        commit_export_output, encode_icc_profile, encode_image_to_bytes,
-        encode_image_with_working_color_state, export_color_profile_receipt_label,
-        export_jpeg_rgb_pixels_and_profile, export_manifest_path, export_receipt_metadata,
+        ExportColorProfile, ExportCommittedArtifact, ExportJobManifest, ExportJobManifestItem,
+        ExportReceiptContext, ExportRenderingIntent, ExportSettings, ExportTerminalStatus,
+        FinalArtifactDigest, OutputCommitReceipt, OutputSharpeningSettings,
+        VerifiedSourceDigestReceipt, applied_export_color_policy,
+        apply_export_resize_and_watermark, claim_export_job, commit_export_output,
+        encode_icc_profile, encode_image_to_bytes, encode_image_with_working_color_state,
+        export_color_profile_receipt_label, export_jpeg_rgb_pixels_and_profile,
+        export_manifest_path, export_manifest_plan_fingerprint, export_receipt_metadata,
         export_receipt_output, export_rgb_pixels_and_profile, export_rgb16_pixels_and_profile,
         export_rgb16_pixels_with_shared_conversion_core,
         export_soft_proof_rgb_pixels_and_profile_with_policy,
         export_soft_proof_rgb_pixels_with_working_color_state,
         export_source_precision_receipt_label, export_terminal_receipt, export_transform_options,
-        finish_export_job, mox_rendering_intent, quantize_rgb16_to_rgb8,
+        finish_export_job, load_export_manifest, mox_rendering_intent, quantize_rgb16_to_rgb8,
         request_export_cancellation, resolve_export_color_capabilities,
         resolve_export_color_transform_plan, save_image_with_metadata_commit, send_or_cancel,
-        should_apply_srgb_perceptual_gamut_mapping, write_export_manifest,
+        sha256_file_for_resume, should_apply_srgb_perceptual_gamut_mapping,
+        validate_export_manifest_for_resume, write_export_manifest,
         write_final_output_bytes_observed,
     };
     #[cfg(feature = "tauri-test")]
@@ -3167,6 +3529,9 @@ mod tests {
         encode_image_with_applied_policy, encode_image_with_applied_policy_and_source_profile,
         validate_export_file_readback_color_policy,
     };
+    use crate::export::export_output_targets::{
+        ExportOutputTargetRequest, resolve_export_output_target,
+    };
     use crate::export::export_postprocess::OutputSharpeningTarget;
     use crate::export::export_processing::save_image_with_metadata;
     use crate::gamut_mapping::ACTIVE_SRGB_OKLAB_CHROMA_REDUCE;
@@ -3175,6 +3540,7 @@ mod tests {
     use chrono::{SecondsFormat, Utc};
     use moxcms::ColorProfile;
     use sha2::{Digest, Sha256};
+    use std::path::{Path, PathBuf};
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use std::sync::{Arc, Barrier, Mutex};
     use std::{fs, io::Cursor, thread};
@@ -3450,6 +3816,54 @@ mod tests {
             export_masks: false,
             output_sharpening,
             preserve_folders: false,
+        }
+    }
+
+    fn resumable_manifest_for_source(directory: &Path, source_path: &Path) -> ExportJobManifest {
+        let output_folder = directory.to_string_lossy().to_string();
+        let settings = base_export_settings(None);
+        let input_path = source_path.to_string_lossy().to_string();
+        let target = resolve_export_output_target(ExportOutputTargetRequest {
+            image_path: &input_path,
+            output_folder_path: directory,
+            is_explicit_file_path: false,
+            base_origin_folders: &[],
+            filename_template: "{original_filename}_edited",
+            preserve_folders: false,
+            output_format: "jpg",
+            total_paths: 1,
+            global_index: 0,
+            appearance_count: 1,
+            explicit_virtual_copy: None,
+        });
+        ExportJobManifest {
+            schema_version: 1,
+            job_id: "export-job:resume-test".to_string(),
+            status: "cancelled".to_string(),
+            updated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
+            output_folder_or_file: output_folder.clone(),
+            is_explicit_file_path: false,
+            base_origin_folders: Vec::new(),
+            output_format: "jpg".to_string(),
+            plan_fingerprint: export_manifest_plan_fingerprint(
+                &output_folder,
+                false,
+                &[],
+                "jpg",
+                &settings,
+            )
+            .unwrap(),
+            export_settings: settings,
+            planned: vec![ExportJobManifestItem {
+                item_id: format!("export-item:0:{input_path}"),
+                input_path: input_path.clone(),
+                source_path: input_path,
+                source_revision: SourceRevision::from_path(source_path).unwrap().identity(),
+                edit_revision: "sidecar-missing-v1".to_string(),
+                output_path: target.output_path.to_string_lossy().to_string(),
+                expected_dimensions: None,
+            }],
+            committed_artifacts: Vec::new(),
         }
     }
 
@@ -4864,10 +5278,24 @@ mod tests {
         let manifest = ExportJobManifest {
             schema_version: 1,
             job_id: "export-job:manifest-test".to_string(),
-            status: "pending",
+            status: "pending".to_string(),
             updated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
+            output_folder_or_file: directory.path().to_string_lossy().to_string(),
+            is_explicit_file_path: false,
+            base_origin_folders: Vec::new(),
+            output_format: "jpg".to_string(),
+            export_settings: base_export_settings(None),
+            plan_fingerprint: export_manifest_plan_fingerprint(
+                &directory.path().to_string_lossy(),
+                false,
+                &[],
+                "jpg",
+                &base_export_settings(None),
+            )
+            .unwrap(),
             planned: vec![ExportJobManifestItem {
                 item_id: "export-item:0".to_string(),
+                input_path: source_path.to_string_lossy().to_string(),
                 source_path: source_path.to_string_lossy().to_string(),
                 source_revision: revision.identity(),
                 edit_revision: "sidecar-missing-v1".to_string(),
@@ -4878,7 +5306,7 @@ mod tests {
                     .to_string(),
                 expected_dimensions: Some((2, 2)),
             }],
-            committed_output_paths: Vec::new(),
+            committed_artifacts: Vec::new(),
         };
         write_export_manifest(&manifest_path, &manifest)
             .expect("manifest should commit atomically");
@@ -4901,6 +5329,141 @@ mod tests {
         drop(receiver);
         let cancellation = crate::export::batch_export_pipeline::PipelineCancellation::default();
         assert!(send_or_cancel(&sender, 7, &cancellation).await.is_err());
+    }
+
+    #[test]
+    fn resume_manifest_rejects_source_revision_drift_before_output_work() {
+        let directory = tempfile::tempdir().unwrap();
+        let source_path = directory.path().join("source.jpg");
+        fs::write(&source_path, [1_u8, 2, 3, 4]).unwrap();
+        let manifest_path = directory.path().join("resume.json");
+        let mut manifest = resumable_manifest_for_source(directory.path(), &source_path);
+        manifest.planned[0].source_revision = "stale-source-revision".to_string();
+        write_export_manifest(&manifest_path, &manifest).unwrap();
+        let loaded = load_export_manifest(&manifest_path).unwrap();
+        let error = validate_export_manifest_for_resume(&loaded)
+            .expect_err("stale source should block resume before rendering");
+        assert!(error.contains("export_resume_source_revision_drift"));
+    }
+
+    #[test]
+    fn resume_manifest_schedules_only_pending_and_skips_exact_committed_output() {
+        let directory = tempfile::tempdir().unwrap();
+        let source_path = directory.path().join("source.jpg");
+        fs::write(&source_path, [1_u8, 2, 3, 4]).unwrap();
+        let mut manifest = resumable_manifest_for_source(directory.path(), &source_path);
+        let output_path = PathBuf::from(&manifest.planned[0].output_path);
+        fs::write(&output_path, b"already atomically committed").unwrap();
+        let (byte_len, sha256) = sha256_file_for_resume(&output_path).unwrap();
+        manifest.committed_artifacts.push(ExportCommittedArtifact {
+            output_path: output_path.to_string_lossy().to_string(),
+            byte_len,
+            sha256,
+        });
+
+        let validated = validate_export_manifest_for_resume(&manifest).unwrap();
+        assert_eq!(validated.pending_count, 0);
+        assert_eq!(
+            validated.all_input_paths,
+            vec![source_path.to_string_lossy()]
+        );
+        assert_eq!(validated.committed_artifacts, manifest.committed_artifacts);
+    }
+
+    #[test]
+    fn resume_manifest_preserves_full_order_while_one_item_remains_pending() {
+        let directory = tempfile::tempdir().unwrap();
+        let first_source = directory.path().join("first.jpg");
+        let second_source = directory.path().join("second.jpg");
+        fs::write(&first_source, [1_u8, 2, 3, 4]).unwrap();
+        fs::write(&second_source, [5_u8, 6, 7, 8]).unwrap();
+        let mut manifest = resumable_manifest_for_source(directory.path(), &first_source);
+        let second_manifest = resumable_manifest_for_source(directory.path(), &second_source);
+        manifest.planned.push(second_manifest.planned[0].clone());
+        let committed_path = PathBuf::from(&manifest.planned[0].output_path);
+        fs::write(&committed_path, b"first committed output").unwrap();
+        let (byte_len, sha256) = sha256_file_for_resume(&committed_path).unwrap();
+        manifest.committed_artifacts.push(ExportCommittedArtifact {
+            output_path: committed_path.to_string_lossy().to_string(),
+            byte_len,
+            sha256,
+        });
+
+        let validated = validate_export_manifest_for_resume(&manifest).unwrap();
+        assert_eq!(validated.pending_count, 1);
+        assert_eq!(
+            validated.all_input_paths,
+            vec![
+                first_source.to_string_lossy().to_string(),
+                second_source.to_string_lossy().to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn resume_manifest_rejects_tampered_committed_output() {
+        let directory = tempfile::tempdir().unwrap();
+        let source_path = directory.path().join("source.jpg");
+        fs::write(&source_path, [1_u8, 2, 3, 4]).unwrap();
+        let mut manifest = resumable_manifest_for_source(directory.path(), &source_path);
+        let output_path = PathBuf::from(&manifest.planned[0].output_path);
+        fs::write(&output_path, b"committed bytes").unwrap();
+        let (byte_len, sha256) = sha256_file_for_resume(&output_path).unwrap();
+        manifest.committed_artifacts.push(ExportCommittedArtifact {
+            output_path: output_path.to_string_lossy().to_string(),
+            byte_len,
+            sha256,
+        });
+        fs::write(&output_path, b"tampered bytes").unwrap();
+
+        let error = validate_export_manifest_for_resume(&manifest).unwrap_err();
+        assert!(error.contains("export_resume_committed_output_drift"));
+    }
+
+    #[test]
+    fn resume_manifest_rejects_output_settings_and_sidecar_drift() {
+        let directory = tempfile::tempdir().unwrap();
+        let source_path = directory.path().join("source.jpg");
+        fs::write(&source_path, [1_u8, 2, 3, 4]).unwrap();
+        let mut settings_drift = resumable_manifest_for_source(directory.path(), &source_path);
+        settings_drift.export_settings.jpeg_quality = 42;
+        assert_eq!(
+            validate_export_manifest_for_resume(&settings_drift).unwrap_err(),
+            "export_resume_output_settings_drift"
+        );
+
+        let sidecar_drift = resumable_manifest_for_source(directory.path(), &source_path);
+        let target = resolve_export_output_target(ExportOutputTargetRequest {
+            image_path: &source_path.to_string_lossy(),
+            output_folder_path: directory.path(),
+            is_explicit_file_path: false,
+            base_origin_folders: &[],
+            filename_template: "{original_filename}_edited",
+            preserve_folders: false,
+            output_format: "jpg",
+            total_paths: 1,
+            global_index: 0,
+            appearance_count: 1,
+            explicit_virtual_copy: None,
+        });
+        fs::write(target.sidecar_path, br#"{"exposure":1}"#).unwrap();
+        let error = validate_export_manifest_for_resume(&sidecar_drift).unwrap_err();
+        assert!(error.contains("export_resume_edit_revision_drift"));
+    }
+
+    #[test]
+    fn resume_manifest_rejects_untracked_destination_artifact() {
+        let directory = tempfile::tempdir().unwrap();
+        let source_path = directory.path().join("source.jpg");
+        fs::write(&source_path, [1_u8, 2, 3, 4]).unwrap();
+        let manifest = resumable_manifest_for_source(directory.path(), &source_path);
+        fs::write(
+            &manifest.planned[0].output_path,
+            b"not committed by this job",
+        )
+        .unwrap();
+        let error = validate_export_manifest_for_resume(&manifest).unwrap_err();
+        assert!(error.contains("export_resume_untracked_output"));
     }
 
     #[test]
