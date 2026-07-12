@@ -174,7 +174,8 @@ pub fn load_sidecar_recovering(
                     .and_then(resolve_oriented_source_dimensions)
                     .or_else(|| source_dimensions_for_sidecar(sidecar_path))
             })
-            .flatten();
+            .flatten()
+            .map(|dimensions| orient_dimensions_for_adjustments(dimensions, &meta.adjustments));
         validate_adjustments(
             &mut meta.adjustments,
             &mut quarantined_extensions,
@@ -384,6 +385,22 @@ fn oriented_dimensions(width: u32, height: u32, exif_orientation: u16) -> (u32, 
         (height, width)
     } else {
         (width, height)
+    }
+}
+
+fn orient_dimensions_for_adjustments(
+    dimensions: (u32, u32),
+    adjustments: &JsonValue,
+) -> (u32, u32) {
+    let quarter_turns = adjustments
+        .get("orientationSteps")
+        .and_then(JsonValue::as_i64)
+        .unwrap_or(0)
+        .rem_euclid(4);
+    if quarter_turns % 2 == 1 {
+        (dimensions.1, dimensions.0)
+    } else {
+        dimensions
     }
 }
 
@@ -2046,7 +2063,8 @@ pub fn save_sidecar_metadata_atomic(
     let mut disabled = Vec::new();
     let mut reasons = Vec::new();
     let mut migrated = Vec::new();
-    let dimensions = source_dimensions_for_sidecar(sidecar_path);
+    let dimensions = source_dimensions_for_sidecar(sidecar_path)
+        .map(|dimensions| orient_dimensions_for_adjustments(dimensions, &normalized.adjustments));
     validate_adjustments(
         &mut normalized.adjustments,
         &mut extensions,
@@ -2803,4 +2821,52 @@ mod crop_migration_tests {
                 .is_some_and(|path| path.exists())
         );
     }
+}
+
+#[cfg(test)]
+#[test]
+fn persisted_orientation_steps_swap_source_dimensions_only_for_odd_turns() {
+    for (steps, expected) in [
+        (0, (6000, 4000)),
+        (1, (4000, 6000)),
+        (2, (6000, 4000)),
+        (3, (4000, 6000)),
+        (-1, (4000, 6000)),
+    ] {
+        let adjustments = serde_json::json!({ "orientationSteps": steps });
+        assert_eq!(
+            orient_dimensions_for_adjustments((6000, 4000), &adjustments),
+            expected
+        );
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn save_then_load_does_not_double_swap_or_renormalize_portrait_crop() {
+    let temp = tempfile::tempdir().unwrap();
+    let source = temp.path().join("portrait.png");
+    image::RgbImage::new(600, 400).save(&source).unwrap();
+    let sidecar = get_primary_sidecar_path(&source);
+    let metadata = ImageMetadata {
+        rating: 5,
+        adjustments: serde_json::json!({
+            "orientationSteps": 1,
+            "crop": { "unit": "px", "x": 0, "y": 0, "width": 400, "height": 600 }
+        }),
+        ..ImageMetadata::default()
+    };
+
+    save_sidecar_metadata_atomic(&sidecar, &metadata).unwrap();
+    let first_bytes = fs::read(&sidecar).unwrap();
+    let loaded = load_sidecar_recovering(&sidecar, None).unwrap();
+    assert_eq!(loaded.outcome, PersistedStateOutcome::Current);
+    assert_eq!(
+        loaded.metadata.adjustments["crop"],
+        serde_json::json!({
+            "unit": "normalized", "x": 0.0, "y": 0.0, "width": 1.0, "height": 1.0
+        })
+    );
+    assert_eq!(loaded.metadata.rating, 5);
+    assert_eq!(fs::read(&sidecar).unwrap(), first_bytes);
 }
