@@ -142,6 +142,10 @@ enum ExportItemResult {
     Cancelled(Option<ExportReceiptOutput>),
     Completed(ExportReceiptOutput),
     Failed(String),
+    FailedWithOutput {
+        error: String,
+        output: ExportReceiptOutput,
+    },
 }
 
 enum ExportMasksResult {
@@ -1873,13 +1877,16 @@ async fn run_batch_export_pipeline(
                             item.decoded.plan.is_raw,
                             &app_handle,
                             &token,
-                        )? {
-                            ExportMasksResult::Completed(paths) => {
+                        ) {
+                            Ok(ExportMasksResult::Completed(paths)) => {
                                 output.auxiliary_output_paths.extend(paths)
                             }
-                            ExportMasksResult::Cancelled(paths) => {
+                            Ok(ExportMasksResult::Cancelled(paths)) => {
                                 output.auxiliary_output_paths.extend(paths);
                                 return Ok(ExportItemResult::Cancelled(Some(output)));
+                            }
+                            Err(error) => {
+                                return Ok(ExportItemResult::FailedWithOutput { error, output });
                             }
                         }
                     }
@@ -1952,7 +1959,12 @@ async fn run_batch_export_pipeline(
             .count();
         report.failed = results
             .iter()
-            .filter(|result| matches!(result, ExportItemResult::Failed(_)))
+            .filter(|result| {
+                matches!(
+                    result,
+                    ExportItemResult::Failed(_) | ExportItemResult::FailedWithOutput { .. }
+                )
+            })
             .count();
     });
     let committed_output_paths = results
@@ -1961,6 +1973,7 @@ async fn run_batch_export_pipeline(
             ExportItemResult::Completed(output) | ExportItemResult::Cancelled(Some(output)) => {
                 Some(output.output_path.clone())
             }
+            ExportItemResult::FailedWithOutput { output, .. } => Some(output.output_path.clone()),
             ExportItemResult::Cancelled(None) | ExportItemResult::Failed(_) => None,
         })
         .collect();
@@ -2075,6 +2088,10 @@ pub async fn export_images(
                 }
                 ExportItemResult::Cancelled(None) => {}
                 ExportItemResult::Failed(error) => errors.push(error),
+                ExportItemResult::FailedWithOutput { error, output } => {
+                    outputs.push(output);
+                    errors.push(error);
+                }
             }
         }
         if task_cancellation.is_cancelled() {
@@ -2092,7 +2109,12 @@ pub async fn export_images(
             } else {
                 let _ = task_app_handle.emit(
                     crate::events::EXPORT_COMPLETE_WITH_ERRORS,
-                    serde_json::json!({ "errors": errors.len(), "total": total_paths, "pipeline": report }),
+                    serde_json::json!({
+                        "errors": errors.len(),
+                        "total": total_paths,
+                        "outputs": outputs,
+                        "pipeline": report
+                    }),
                 );
             }
         } else {
