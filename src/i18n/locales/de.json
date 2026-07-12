@@ -3147,6 +3147,7 @@
       "fileNaming": "Dateibenennung",
       "folderOrganization": "Ordnerorganisation",
       "organizeByDate": "In Unterordner nach Datum organisieren",
+      "resumeImport": "Import fortsetzen",
       "sourceFiles": "Quelldateien",
       "startImport": "Import starten",
       "title": "Importeinstellungen"

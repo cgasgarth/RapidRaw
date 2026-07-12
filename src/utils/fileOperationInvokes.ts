@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import {
   type CopyMoveFilesRequest,
   type CreateFolderRequest,
@@ -10,7 +11,10 @@ import {
   fileOperationPathSchema,
   fileOperationVoidResponseSchema,
   type ImportFilesRequest,
+  type ImportResumeValidation,
   importFilesRequestSchema,
+  importJobIdSchema,
+  importResumeValidationSchema,
   type RenameFilesRequest,
   type RenameFolderRequest,
   type ResolveAndroidContentUriNameRequest,
@@ -45,8 +49,32 @@ export function renameFilesWithSchema(request: RenameFilesRequest): Promise<File
   return invokeWithSchema(Invokes.RenameFiles, args, fileOperationPathListSchema, Invokes.RenameFiles);
 }
 
-export function importFilesWithSchema(request: ImportFilesRequest): Promise<void> {
-  return invokeFileOperationVoid(Invokes.ImportFiles, importFilesRequestSchema.parse(request));
+export function importFilesWithSchema(request: ImportFilesRequest): Promise<string> {
+  return invokeWithSchema(
+    Invokes.ImportFiles,
+    importFilesRequestSchema.parse(request),
+    importJobIdSchema,
+    Invokes.ImportFiles,
+  );
+}
+
+export function cancelImportWithSchema(): Promise<boolean> {
+  return invokeWithSchema(Invokes.CancelImport, {}, z.boolean(), Invokes.CancelImport);
+}
+
+export function validateImportJobResumeWithSchema(jobId: string): Promise<ImportResumeValidation> {
+  const args = { jobId: importJobIdSchema.parse(jobId) };
+  return invokeWithSchema(
+    Invokes.ValidateImportJobResume,
+    args,
+    importResumeValidationSchema,
+    Invokes.ValidateImportJobResume,
+  );
+}
+
+export function resumeImportJobWithSchema(jobId: string): Promise<string> {
+  const args = { jobId: importJobIdSchema.parse(jobId) };
+  return invokeWithSchema(Invokes.ResumeImportJob, args, importJobIdSchema, Invokes.ResumeImportJob);
 }
 
 export function copyFilesWithSchema(request: CopyMoveFilesRequest): Promise<void> {

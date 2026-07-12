@@ -285,7 +285,8 @@ export function useFileOperations(
       if (sourcePaths.length === 0 || !destinationFolder) return;
 
       try {
-        await importFilesWithSchema({ destinationFolder, settings, sourcePaths });
+        const jobId = await importFilesWithSchema({ destinationFolder, settings, sourcePaths });
+        useProcessStore.getState().setImportState({ jobId });
       } catch (err) {
         console.error('Failed to start import:', err);
         useProcessStore
