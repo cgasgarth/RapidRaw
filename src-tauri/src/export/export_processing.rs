@@ -84,6 +84,10 @@ pub(crate) use crate::export::export_color_policy::{
     export_source_precision_receipt_label, export_source_rgb16_pixels, quantize_rgb16_to_rgb8,
     resolve_export_color_capabilities, validate_export_color_policy,
 };
+#[cfg(all(feature = "validation-harness", not(test)))]
+pub(crate) use crate::export::export_color_policy::{
+    export_jpeg_rgb_pixels_and_profile, export_soft_proof_rgb_pixels_and_profile_with_policy,
+};
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]

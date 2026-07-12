@@ -81,7 +81,9 @@ use crate::merge::focus_stack::{
 };
 use crate::merge::hdr::{ALIGNMENT_POLICY_ID, HdrAlignmentPlanResponse, build_alignment_plan};
 
-use crate::app::startup::NativeStartupPhase;
+use crate::app::startup::{
+    FrontendStartupPhase, NativeStartupPhase, mark_deferred_service_result, record_frontend_phase,
+};
 use crate::cache_utils::{
     calculate_geometry_hash, calculate_transform_hash, calculate_visual_hash,
 };
@@ -2972,11 +2974,26 @@ fn get_startup_trace(
     state.startup_trace.snapshot()
 }
 
+#[tauri::command]
+fn record_frontend_startup_phase(
+    trace_id: String,
+    phase: FrontendStartupPhase,
+    status: String,
+    detail: Option<String>,
+    state: tauri::State<'_, AppState>,
+) -> Result<crate::app::startup::StartupTraceSnapshot, String> {
+    record_frontend_phase(&state.startup_trace, &trace_id, phase, &status, detail)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg_attr(feature = "validation-harness", allow(unused_mut))]
     let mut builder = tauri::Builder::default();
 
-    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    #[cfg(all(
+        not(any(target_os = "android", target_os = "ios")),
+        not(feature = "validation-harness")
+    ))]
     {
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             log::info!(
@@ -3193,26 +3210,39 @@ pub fn run() {
                 tauri::async_runtime::spawn(async move {
                     let lens_handle = background_handle.clone();
                     let lens_result = tauri::async_runtime::spawn_blocking(move || {
+                        #[cfg(feature = "validation-harness")]
+                        if std::env::var("RAWENGINE_STARTUP_INJECT_LENSFUN_FAILURE").as_deref()
+                            == Ok("1")
+                        {
+                            return Err("injected lensfun startup failure".to_string());
+                        }
                         let lens_db = lens_correction::load_lensfun_db(&lens_handle);
                         *lens_handle.state::<AppState>().lens_db.lock().unwrap() =
                             Some(Arc::new(lens_db));
+                        Ok(())
                     })
                     .await;
                     let trace = background_handle.state::<AppState>().startup_trace.clone();
-                    match lens_result {
-                        Ok(()) => trace.mark(NativeStartupPhase::LibraryServicesReady, "ok", None),
-                        Err(error) => trace.mark(
-                            NativeStartupPhase::LibraryServicesReady,
-                            "degraded",
-                            Some(error.to_string()),
-                        ),
-                    }
+                    let lens_result =
+                        lens_result.unwrap_or_else(|error| Err(error.to_string()));
+                    mark_deferred_service_result(
+                        &trace,
+                        NativeStartupPhase::LibraryServicesReady,
+                        "lensfun",
+                        lens_result,
+                    );
                 });
 
                 let gpu_handle = app.handle().clone();
                 let gpu_trace_handle = gpu_handle.clone();
                 tauri::async_runtime::spawn(async move {
                     let result = tauri::async_runtime::spawn_blocking(move || {
+                        #[cfg(feature = "validation-harness")]
+                        if std::env::var("RAWENGINE_STARTUP_INJECT_GPU_FAILURE").as_deref()
+                            == Ok("1")
+                        {
+                            return Err("injected gpu startup failure".to_string());
+                        }
                         get_or_init_gpu_context(
                             &gpu_handle.state::<AppState>(),
                             &gpu_handle,
@@ -3221,19 +3251,13 @@ pub fn run() {
                     })
                     .await;
                     let trace = gpu_trace_handle.state::<AppState>().startup_trace.clone();
-                    match result {
-                        Ok(Ok(())) => trace.mark(NativeStartupPhase::GpuReady, "ok", None),
-                        Ok(Err(error)) => trace.mark(
-                            NativeStartupPhase::GpuReady,
-                            "degraded",
-                            Some(error),
-                        ),
-                        Err(error) => trace.mark(
-                            NativeStartupPhase::GpuReady,
-                            "degraded",
-                            Some(error.to_string()),
-                        ),
-                    }
+                    let result = result.unwrap_or_else(|error| Err(error.to_string()));
+                    mark_deferred_service_result(
+                        &trace,
+                        NativeStartupPhase::GpuReady,
+                        "gpu",
+                        result,
+                    );
                 });
 
                 preview_worker::start_preview_worker(app.handle().clone());
@@ -3370,6 +3394,7 @@ pub fn run() {
             is_original_file_available,
             frontend_ready,
             get_startup_trace,
+            record_frontend_startup_phase,
             library::changefeed::configure_library_changefeed,
             library::changefeed::get_library_changefeed_report,
             library::file_management::get_library_change_rows,

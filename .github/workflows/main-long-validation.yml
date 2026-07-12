@@ -126,8 +126,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: --verbose --ci --no-bundle --target aarch64-apple-darwin
+          args: --verbose --ci --no-bundle --target aarch64-apple-darwin --features required-ci,validation-harness
           retryAttempts: 3
+
+      - name: Run bounded native startup benchmark
+        run: bun scripts/benchmarks/startup-native.ts --binary src-tauri/target/aarch64-apple-darwin/release/RapidRAW --pairs 2
 
       - name: Collect smoke failure diagnostics
         if: ${{ failure() }}

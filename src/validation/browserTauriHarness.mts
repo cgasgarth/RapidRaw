@@ -64,6 +64,7 @@ const commandNames: Record<
   | 'exportImages'
   | 'frontendReady'
   | 'getStartupTrace'
+  | 'recordFrontendStartupPhase'
   | 'generateOriginalTransformedPreview'
   | 'generateUncroppedPreview'
   | 'generatePreviewForPath'
@@ -107,6 +108,7 @@ const commandNames: Record<
   exportImages: Invokes.ExportImages,
   frontendReady: Invokes.FrontendReady,
   getStartupTrace: Invokes.GetStartupTrace,
+  recordFrontendStartupPhase: Invokes.RecordFrontendStartupPhase,
   generateOriginalTransformedPreview: Invokes.GenerateOriginalTransformedPreview,
   generateUncroppedPreview: Invokes.GenerateUncroppedPreview,
   generatePreviewForPath: Invokes.GeneratePreviewForPath,
@@ -308,7 +310,37 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
     case commandNames.getSupportedFileTypes:
       return Promise.resolve(harnessSupportedTypes);
     case commandNames.getStartupTrace:
-      return Promise.resolve({ traceId: 'startup:browser-harness', phases: [] });
+      return Promise.resolve({
+        criticalPathOrderValid: true,
+        firstPaintBudgetMet: true,
+        firstPaintBudgetMs: 750,
+        processId: 12_345,
+        traceId: 'startup:browser-harness',
+        phases: [],
+      });
+    case commandNames.recordFrontendStartupPhase: {
+      const receiptPhase = {
+        editorReady: 'frontendEditorReady',
+        libraryReady: 'frontendLibraryReady',
+        settingsHydrated: 'frontendSettingsHydrated',
+        shellVisible: 'frontendShellVisible',
+      }[String(args?.['phase'])];
+      return Promise.resolve({
+        criticalPathOrderValid: true,
+        firstPaintBudgetMet: true,
+        firstPaintBudgetMs: 750,
+        processId: 12_345,
+        traceId: 'startup:browser-harness',
+        phases: [
+          {
+            detail: args?.['detail'] ?? null,
+            elapsedMs: 10,
+            phase: receiptPhase,
+            status: args?.['status'],
+          },
+        ],
+      });
+    }
     case commandNames.getFolderTree:
       return Promise.resolve({
         children: [],

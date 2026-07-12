@@ -215,6 +215,8 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     timeout-minutes: 10
+    outputs:
+      startup_benchmark_required: ${{ steps.startup-benchmark-files.outputs.required }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
@@ -249,6 +251,52 @@ jobs:
             echo "Unclassified path requires explicit CI routing before merge."
             exit 1
           fi
+
+      - name: Classify native startup benchmark requirement
+        id: startup-benchmark-files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if jq -r '.filename' .macos-smoke-files.ndjson | grep -Eq '^([.]github/workflows/(lint|main-long-validation)[.]yml|scripts/benchmarks/startup-native[.]ts|src-tauri/src/(app/startup|lib)[.]rs|src/hooks/app/useAppInitialization[.]ts|src/utils/startup/startupTraceReporter[.]ts|src/validation/browserTauriHarness[.]mts|tests/(integration/checks/check-browser-tauri-harness|pure-ts/app/startup-trace-reporter[.]test)[.]ts)$'; then
+            echo 'required=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'required=false' >> "$GITHUB_OUTPUT"
+          fi
+
+  macos-native-startup-benchmark:
+    name: 'macOS: native startup benchmark'
+    needs: macos-smoke-decision
+    if: needs.macos-smoke-decision.outputs.startup_benchmark_required == 'true'
+    runs-on: macos-14
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+        with:
+          rustflags: ''
+          target: aarch64-apple-darwin
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: src-tauri
+          key: v1-${{ runner.os }}-${{ runner.arch }}-startup-benchmark-aarch64-apple-darwin
+          cache-on-failure: true
+
+      - uses: ./.github/actions/setup-bun-deps
+
+      - name: Build validation-harness app
+        uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # action-v0.6.2
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          args: --debug --ci --no-bundle --target aarch64-apple-darwin --features required-ci,validation-harness
+          retryAttempts: 2
+
+      - name: Run bounded cold, warm, and degraded startup samples
+        run: bun scripts/benchmarks/startup-native.ts --binary src-tauri/target/aarch64-apple-darwin/debug/RapidRAW --pairs 2
 
   docs-check:
     name: 'docs: markdown and links'
@@ -524,6 +572,7 @@ jobs:
       - schema-command-bus
       - schema-contract-gate
       - macos-smoke-decision
+      - macos-native-startup-benchmark
       - docs-check
       - rust-fmt
       - rust-pr-clippy
@@ -545,7 +594,10 @@ jobs:
           failures="$(
             jq -r '
               to_entries[]
-              | select(.value.result != "success")
+              | select(
+                  .value.result != "success"
+                  and (.key != "macos-native-startup-benchmark" or .value.result != "skipped")
+                )
               | "\(.key)=\(.value.result)"
             ' <<< "$NEEDS_CONTEXT"
           )"
