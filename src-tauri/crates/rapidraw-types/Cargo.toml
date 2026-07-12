@@ -1,0 +1,15 @@
+[package]
+name = "rapidraw-types"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+publish = false
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1.0"
+
+[lints.clippy]
+all = "deny"

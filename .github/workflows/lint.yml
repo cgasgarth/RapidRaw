@@ -325,7 +325,7 @@ jobs:
 
       - name: Check formatting
         working-directory: src-tauri
-        run: cargo fmt -p RapidRAW -- --check
+        run: cargo fmt --all -- --check
 
   rust-pr-clippy:
     name: 'rust: clippy PR path gate'
@@ -389,6 +389,13 @@ jobs:
         if: steps.rust-pr-decision.outputs.rust_ci_required == 'true'
         working-directory: src-tauri
         run: cargo clippy --locked --all-targets --no-default-features --features required-ci -- -D warnings -W clippy::redundant_clone
+
+      - name: Enforce pure native contract dependency boundary
+        if: steps.rust-pr-decision.outputs.rust_ci_required == 'true'
+        working-directory: src-tauri
+        run: |
+          test "$(cargo metadata --format-version 1 --no-deps | jq -r '.packages[] | select(.name == "rapidraw-types") | [.dependencies[] | select(.kind == null) | .name] | sort | join(",")')" = "serde"
+          test "$(cargo metadata --format-version 1 --no-deps | jq -r '.packages[] | select(.name == "RapidRAW") | any(.dependencies[]; .name == "rapidraw-types")')" = "true"
 
       - name: Rust and Tauri IPC tests when Rust/Tauri changed
         if: steps.rust-pr-decision.outputs.rust_ci_required == 'true'

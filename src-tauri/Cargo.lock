@@ -54,6 +54,7 @@ dependencies = [
  "pollster",
  "quick-xml 0.41.0",
  "rand 0.10.1",
+ "rapidraw-types",
  "rawler",
  "rayon",
  "regex",
@@ -5270,6 +5271,14 @@ name = "range-alloc"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ca45419789ae5a7899559e9512e58ca889e41f04f1f2445e9f4b290ceccd1d08"
+
+[[package]]
+name = "rapidraw-types"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "rav1e"
