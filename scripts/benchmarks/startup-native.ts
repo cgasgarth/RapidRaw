@@ -37,7 +37,11 @@ const assertTrace = (run: StartupRun): void => {
   if (snapshot.firstPaintBudgetMs !== FIRST_PAINT_BUDGET_MS) {
     throw new Error(`${kind}: unexpected first-paint budget ${snapshot.firstPaintBudgetMs}`);
   }
-  if (snapshot.firstPaintBudgetMet !== true) throw new Error(`${kind}: first-paint budget missed`);
+  if (snapshot.firstPaintBudgetMet !== true) {
+    throw new Error(
+      `${kind}: first-paint budget missed (${phase(snapshot, 'windowVisible').elapsedMs}ms/${FIRST_PAINT_BUDGET_MS}ms)`,
+    );
+  }
 
   const ordered = [
     phase(snapshot, 'processStarted'),

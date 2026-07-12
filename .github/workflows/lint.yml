@@ -292,11 +292,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
-          args: --debug --ci --no-bundle --target aarch64-apple-darwin --features required-ci,validation-harness
+          args: --ci --no-bundle --target aarch64-apple-darwin --features required-ci,validation-harness
           retryAttempts: 2
 
       - name: Run bounded cold, warm, and degraded startup samples
-        run: bun scripts/benchmarks/startup-native.ts --binary src-tauri/target/aarch64-apple-darwin/debug/RapidRAW --pairs 2
+        run: bun scripts/benchmarks/startup-native.ts --binary src-tauri/target/aarch64-apple-darwin/release/RapidRAW --pairs 2
 
   docs-check:
     name: 'docs: markdown and links'
