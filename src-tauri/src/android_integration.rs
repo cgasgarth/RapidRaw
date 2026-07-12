@@ -7,7 +7,11 @@ use ndk_context::android_context;
 #[cfg(target_os = "android")]
 use std::fs;
 #[cfg(target_os = "android")]
-use std::path::PathBuf;
+use std::io::{BufWriter, Write};
+#[cfg(target_os = "android")]
+use std::path::{Path, PathBuf};
+#[cfg(target_os = "android")]
+use std::sync::atomic::{AtomicBool, Ordering};
 #[cfg(target_os = "android")]
 static INIT_NDK_CONTEXT: std::sync::Once = std::sync::Once::new();
 
@@ -328,6 +332,79 @@ pub fn read_android_content_uri(uri_str: &str) -> Result<Vec<u8>, String> {
         Ok(bytes)
     })();
 
+    close_android_closeable(&mut env, &input_stream);
+    result
+}
+
+#[cfg(target_os = "android")]
+pub fn stream_android_content_uri_to_path(
+    uri_str: &str,
+    destination: &Path,
+    cancellation: &AtomicBool,
+) -> Result<(u64, String), String> {
+    let vm = unsafe { JavaVM::from_raw(android_context().vm().cast()) }
+        .map_err(|error| format!("Failed to access Android JVM: {error}"))?;
+    let mut env = vm
+        .attach_current_thread()
+        .map_err(|error| format!("Failed to attach current thread to Android JVM: {error}"))?;
+    let resolver = get_android_content_resolver(&mut env)?;
+    let uri = parse_android_uri(&mut env, uri_str)?;
+    let input_stream = env
+        .call_method(
+            &resolver,
+            "openInputStream",
+            "(Landroid/net/Uri;)Ljava/io/InputStream;",
+            &[(&uri).into()],
+        )
+        .and_then(|value| value.l())
+        .map_err(|error| map_android_jni_error(&mut env, error))?;
+    if input_stream.is_null() {
+        return Err(format!("Failed to open Android content URI: {uri_str}"));
+    }
+    let result = (|| -> Result<(u64, String), String> {
+        const BUFFER_SIZE: i32 = 64 * 1024;
+        let java_buffer = env
+            .new_byte_array(BUFFER_SIZE)
+            .map_err(|error| map_android_jni_error(&mut env, error))?;
+        let mut rust_buffer = vec![0_i8; BUFFER_SIZE as usize];
+        let output = fs::File::create(destination).map_err(|error| error.to_string())?;
+        let mut writer = BufWriter::with_capacity(BUFFER_SIZE as usize, output);
+        let mut hasher = blake3::Hasher::new();
+        let mut bytes = 0_u64;
+        loop {
+            if cancellation.load(Ordering::Acquire) {
+                return Err("Android content URI copy cancelled".to_string());
+            }
+            let read_count = env
+                .call_method(&input_stream, "read", "([B)I", &[(&java_buffer).into()])
+                .and_then(|value| value.i())
+                .map_err(|error| map_android_jni_error(&mut env, error))?;
+            if read_count < 0 {
+                break;
+            }
+            if read_count == 0 {
+                continue;
+            }
+            let read_len = read_count as usize;
+            env.get_byte_array_region(&java_buffer, 0, &mut rust_buffer[..read_len])
+                .map_err(|error| map_android_jni_error(&mut env, error))?;
+            let chunk: Vec<u8> = rust_buffer[..read_len]
+                .iter()
+                .map(|byte| *byte as u8)
+                .collect();
+            writer
+                .write_all(&chunk)
+                .map_err(|error| error.to_string())?;
+            hasher.update(&chunk);
+            bytes += read_len as u64;
+        }
+        writer.flush().map_err(|error| error.to_string())?;
+        writer
+            .get_ref()
+            .sync_all()
+            .map_err(|error| error.to_string())?;
+        Ok((bytes, hasher.finalize().to_hex().to_string()))
+    })();
     close_android_closeable(&mut env, &input_stream);
     result
 }

@@ -9,6 +9,7 @@ use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 use std::time::UNIX_EPOCH;
 
 use anyhow::Result;
@@ -3020,181 +3021,89 @@ pub async fn import_files(
     destination_folder: String,
     settings: ImportSettings,
     app_handle: AppHandle,
-) -> Result<(), String> {
+) -> Result<String, String> {
     let total_files = source_paths.len();
+    if total_files == 0 {
+        return Err("Import requires at least one source".to_string());
+    }
+    let destination = PathBuf::from(&destination_folder);
+    if !destination.exists() {
+        fs::create_dir_all(&destination)
+            .map_err(|error| format!("Failed to create import destination: {error}"))?;
+    }
+    if !destination.is_dir() {
+        return Err("Import destination is not a directory".to_string());
+    }
+    let job_id = super::import_pipeline::new_job_id();
+    let cancellation = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let _ = app_handle.emit(
         crate::events::IMPORT_START,
-        serde_json::json!({ "total": total_files }),
+        serde_json::json!({ "jobId": job_id, "total": total_files }),
     );
-
-    tauri::async_runtime::spawn_blocking(move || {
-        for (i, source_path_str) in source_paths.iter().enumerate() {
-            let _ = app_handle.emit(
-                crate::events::IMPORT_PROGRESS,
-                serde_json::json!({ "current": i, "total": total_files, "path": source_path_str }),
-            );
-
-            let import_result: Result<(), String> = (|| {
-                #[cfg(target_os = "android")]
-                if is_android_content_uri(source_path_str) {
-                    let resolved_name = resolve_android_content_uri_name(source_path_str)?;
-                    let source_bytes = read_android_content_uri(source_path_str)?;
-                    let source_name_path = Path::new(&resolved_name);
-                    let file_date = exif_processing::get_creation_date_from_bytes(
-                        &resolved_name,
-                        &source_bytes,
-                    );
-
-                    let mut final_dest_folder = PathBuf::from(&destination_folder);
-                    if settings.organize_by_date {
-                        let date_format_str = settings
-                            .date_folder_format
-                            .replace("YYYY", "%Y")
-                            .replace("MM", "%m")
-                            .replace("DD", "%d");
-                        let subfolder = file_date.format(&date_format_str).to_string();
-                        final_dest_folder.push(subfolder);
-                    }
-
-                    fs::create_dir_all(&final_dest_folder)
-                        .map_err(|e| format!("Failed to create destination folder: {}", e))?;
-
-                    let new_stem = generate_filename_from_template(
-                        &settings.filename_template,
-                        source_name_path,
-                        i + 1,
-                        total_files,
-                        &file_date,
-                    );
-                    let extension = source_name_path
-                        .extension()
-                        .and_then(|s| s.to_str())
-                        .unwrap_or("");
-                    let new_filename = format!("{}.{}", new_stem, extension);
-                    let dest_file_path = final_dest_folder.join(new_filename);
-
-                    if dest_file_path.exists() {
-                        return Err(format!(
-                            "File already exists at destination: {}",
-                            dest_file_path.display()
-                        ));
-                    }
-
-                    fs::write(&dest_file_path, source_bytes).map_err(|e| e.to_string())?;
-
-                    if settings.delete_after_import {
-                        log::info!(
-                            "Skipping delete_after_import for Android content URI source: {}",
-                            source_path_str
-                        );
-                    }
-
-                    return Ok(());
-                }
-
-                let (source_path, source_sidecar) = parse_virtual_path(source_path_str);
-                if !source_path.exists() {
-                    return Err(format!("Source file not found: {}", source_path_str));
-                }
-
-                let file_date = exif_processing::get_creation_date_from_path(&source_path);
-
-                let mut final_dest_folder = PathBuf::from(&destination_folder);
-                if settings.organize_by_date {
-                    let date_format_str = settings
-                        .date_folder_format
-                        .replace("YYYY", "%Y")
-                        .replace("MM", "%m")
-                        .replace("DD", "%d");
-                    let subfolder = file_date.format(&date_format_str).to_string();
-                    final_dest_folder.push(subfolder);
-                }
-
-                fs::create_dir_all(&final_dest_folder)
-                    .map_err(|e| format!("Failed to create destination folder: {}", e))?;
-
-                let new_stem = generate_filename_from_template(
-                    &settings.filename_template,
-                    &source_path,
-                    i + 1,
-                    total_files,
-                    &file_date,
-                );
-                let extension = source_path
-                    .extension()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("");
-                let new_filename = format!("{}.{}", new_stem, extension);
-                let dest_file_path = final_dest_folder.join(new_filename);
-
-                if dest_file_path.exists() {
-                    return Err(format!(
-                        "File already exists at destination: {}",
-                        dest_file_path.display()
-                    ));
-                }
-
-                fs::copy(&source_path, &dest_file_path).map_err(|e| e.to_string())?;
-                copy_primary_sidecars(&source_path, &source_sidecar, &dest_file_path)?;
-
-                if settings.delete_after_import {
-                    #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
-                    {
-                        if let Err(trash_error) = trash::delete(&source_path) {
-                            log::warn!(
-                                "Failed to trash source file {}: {}. Deleting permanently.",
-                                source_path.display(),
-                                trash_error
-                            );
-                            fs::remove_file(&source_path).map_err(|e| e.to_string())?;
-                        }
-                        if source_sidecar.exists()
-                            && let Err(trash_error) = trash::delete(&source_sidecar)
-                        {
-                            log::warn!(
-                                "Failed to trash source sidecar {}: {}. Deleting permanently.",
-                                source_sidecar.display(),
-                                trash_error
-                            );
-                            fs::remove_file(&source_sidecar).map_err(|e| e.to_string())?;
-                        }
-                    }
-
-                    #[cfg(not(any(
-                        target_os = "windows",
-                        target_os = "macos",
-                        target_os = "linux"
-                    )))]
-                    {
-                        fs::remove_file(&source_path).map_err(|e| e.to_string())?;
-                        if source_sidecar.exists() {
-                            fs::remove_file(&source_sidecar).map_err(|e| e.to_string())?;
-                        }
-                        let _ = fs::remove_file(rrexif_sidecar_path(&source_path));
-                    }
-                }
-
-                Ok(())
-            })();
-
-            if let Err(e) = import_result {
-                eprintln!("Failed to import {}: {}", source_path_str, e);
-                let _ = app_handle.emit(crate::events::IMPORT_ERROR, e);
-                return;
-            }
+    let pipeline = super::import_pipeline::ImportPipeline::new(
+        app_handle.clone(),
+        job_id.clone(),
+        destination,
+        settings,
+        Arc::clone(&cancellation),
+    );
+    let task_app = app_handle.clone();
+    let task_job_id = job_id.clone();
+    let task_handle = tauri::async_runtime::spawn(async move {
+        let _ = pipeline.run(source_paths).await;
+        if let Ok(mut active) = task_app.state::<AppState>().import_job.lock()
+            && active.as_ref().is_some_and(|job| job.job_id == task_job_id)
+        {
+            *active = None;
         }
-
-        let _ = app_handle.emit(
-            crate::events::IMPORT_PROGRESS,
-            serde_json::json!({ "current": total_files, "total": total_files, "path": "" }),
-        );
-        let _ = app_handle.emit(crate::events::IMPORT_COMPLETE, ());
     });
-
-    Ok(())
+    let state = app_handle.state::<AppState>();
+    let mut active = state
+        .import_job
+        .lock()
+        .map_err(|_| "import job lock poisoned")?;
+    if let Some(previous) = active.as_mut() {
+        previous.cancellation_token.store(true, Ordering::Release);
+    }
+    *active = Some(crate::ImportJob {
+        job_id: job_id.clone(),
+        cancellation_token: cancellation,
+        task_handle: Some(task_handle),
+    });
+    Ok(job_id)
 }
 
-pub fn generate_filename_from_template(
+#[tauri::command]
+pub fn cancel_import(app_handle: AppHandle) -> Result<bool, String> {
+    let state = app_handle.state::<AppState>();
+    let mut active = state
+        .import_job
+        .lock()
+        .map_err(|_| "import job lock poisoned")?;
+    let Some(job) = active.as_mut() else {
+        return Ok(false);
+    };
+    job.cancellation_token.store(true, Ordering::Release);
+    Ok(true)
+}
+
+#[tauri::command]
+pub fn get_import_job_receipt(
+    job_id: String,
+    app_handle: AppHandle,
+) -> Result<super::import_pipeline::ImportJobReceipt, String> {
+    super::import_pipeline::read_job_receipt(&app_handle, &job_id)
+}
+
+#[tauri::command]
+pub fn validate_import_job_resume(
+    job_id: String,
+    app_handle: AppHandle,
+) -> Result<super::import_pipeline::ImportResumeValidation, String> {
+    super::import_pipeline::validate_job_resume(&app_handle, &job_id)
+}
+
+pub(crate) fn generate_filename_from_template(
     template: &str,
     original_path: &std::path::Path,
     sequence: usize,

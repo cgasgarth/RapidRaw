@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import {
   type CopyMoveFilesRequest,
   type CreateFolderRequest,
@@ -11,6 +12,7 @@ import {
   fileOperationVoidResponseSchema,
   type ImportFilesRequest,
   importFilesRequestSchema,
+  importJobIdSchema,
   type RenameFilesRequest,
   type RenameFolderRequest,
   type ResolveAndroidContentUriNameRequest,
@@ -45,8 +47,17 @@ export function renameFilesWithSchema(request: RenameFilesRequest): Promise<File
   return invokeWithSchema(Invokes.RenameFiles, args, fileOperationPathListSchema, Invokes.RenameFiles);
 }
 
-export function importFilesWithSchema(request: ImportFilesRequest): Promise<void> {
-  return invokeFileOperationVoid(Invokes.ImportFiles, importFilesRequestSchema.parse(request));
+export function importFilesWithSchema(request: ImportFilesRequest): Promise<string> {
+  return invokeWithSchema(
+    Invokes.ImportFiles,
+    importFilesRequestSchema.parse(request),
+    importJobIdSchema,
+    Invokes.ImportFiles,
+  );
+}
+
+export function cancelImportWithSchema(): Promise<boolean> {
+  return invokeWithSchema(Invokes.CancelImport, {}, z.boolean(), Invokes.CancelImport);
 }
 
 export function copyFilesWithSchema(request: CopyMoveFilesRequest): Promise<void> {

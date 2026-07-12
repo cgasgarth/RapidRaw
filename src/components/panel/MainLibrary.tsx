@@ -16,6 +16,7 @@ import {
   SlidersHorizontal,
   Star,
   Users,
+  XCircle,
 } from 'lucide-react';
 import type React from 'react';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
@@ -27,6 +28,7 @@ import { useLibraryStore } from '../../store/useLibraryStore';
 import { useProcessStore } from '../../store/useProcessStore';
 import { thumbnailCache } from '../../thumbnails/thumbnailCacheInstance';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
+import { cancelImportWithSchema } from '../../utils/fileOperationInvokes';
 import { DEFAULT_THEME_ID, THEMES, type ThemeProps } from '../../utils/themes';
 import { parseVirtualImagePath } from '../../utils/virtualImagePath';
 import {
@@ -571,15 +573,26 @@ export default function MainLibrary(props: MainLibraryProps) {
         </div>
         <div className="flex items-center gap-3 shrink-0">
           {props.importState.status === Status.Importing && (
-            <UiText as="div" color={TextColors.accent} className="flex items-center gap-2 animate-pulse">
-              <FolderInput size={16} />
-              <span>
-                {t('library.import.progress', {
-                  current: props.importState.progress?.current,
-                  total: props.importState.progress?.total,
-                })}
-              </span>
-            </UiText>
+            <div className="flex items-center gap-2">
+              <UiText as="div" color={TextColors.accent} className="flex items-center gap-2" aria-live="polite">
+                <FolderInput size={16} className="animate-pulse" />
+                <span>
+                  {t('library.import.progress', {
+                    current: props.importState.progress?.current,
+                    total: props.importState.progress?.total,
+                  })}
+                  {props.importState.stage ? ` · ${props.importState.stage}` : ''}
+                </span>
+              </UiText>
+              <Button
+                aria-label={t('modals.importSettings.cancel')}
+                className="h-7 px-2"
+                onClick={() => void cancelImportWithSchema()}
+                size="sm"
+              >
+                <XCircle size={14} className="mr-1" /> {t('modals.importSettings.cancel')}
+              </Button>
+            </div>
           )}
           {props.importState.status === Status.Success && (
             <UiText as="div" color={TextColors.success} className="flex items-center gap-2">

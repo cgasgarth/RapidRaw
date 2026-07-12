@@ -140,8 +140,12 @@ export interface FileFormat {
 
 export interface ImportState {
   errorMessage: string;
+  jobId?: string;
   path?: string;
   progress?: Progress;
+  stage?: string;
+  bytesCopied?: number;
+  totalBytes?: number;
   status: Status;
 }
 

@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const fileOperationPathSchema = z.string().trim().min(1);
 export const fileOperationPathListSchema = z.array(fileOperationPathSchema).min(1);
 export const fileOperationVoidResponseSchema = z.unknown().transform(() => undefined);
+export const importJobIdSchema = z.string().min(1);
 
 export const deleteFilesRequestSchema = z
   .object({
