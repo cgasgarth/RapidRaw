@@ -317,6 +317,10 @@ jobs:
           echo "rust_ci_required=false" >> "$GITHUB_OUTPUT"
           echo "rust_ci_reason=No Rust/Tauri paths changed" >> "$GITHUB_OUTPUT"
 
+      - name: Set up Bun and dependencies
+        if: steps.rust-pr-decision.outputs.rust_ci_required == 'true'
+        uses: ./.github/actions/setup-bun-deps
+
       - name: Install Tauri Linux dependencies
         if: steps.rust-pr-decision.outputs.rust_ci_required == 'true'
         uses: ./.github/actions/install-tauri-linux-deps
