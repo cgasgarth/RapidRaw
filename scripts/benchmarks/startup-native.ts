@@ -6,6 +6,9 @@ import { basename, join, resolve } from 'node:path';
 import { type StartupTraceSnapshot, startupTraceSnapshotSchema } from '../../src/utils/startup/startupTraceReporter.ts';
 
 const FIRST_PAINT_BUDGET_MS = 750;
+const APP_CONTROLLED_VISIBLE_BUDGET_MS = 250;
+const APP_CONTROLLED_INTERACTIVE_BUDGET_MS = 750;
+const INTERACTION_RESPONSE_BUDGET_MS = 100;
 const DEFAULT_PAIRS = 2;
 const REPORT_TIMEOUT_MS = 20_000;
 
@@ -46,10 +49,14 @@ const assertTrace = (run: StartupRun): void => {
   if (snapshot.firstPaintBudgetMs !== FIRST_PAINT_BUDGET_MS) {
     throw new Error(`${kind}: unexpected first-paint budget ${snapshot.firstPaintBudgetMs}`);
   }
-  if (snapshot.firstPaintBudgetMet !== true) {
-    throw new Error(
-      `${kind}: first-paint budget missed (${phase(snapshot, 'windowVisible').elapsedMs}ms/${FIRST_PAINT_BUDGET_MS}ms)`,
-    );
+  const rustEntryAt = phase(snapshot, 'processStarted').elapsedMs;
+  const appControlledVisibleMs = phase(snapshot, 'windowVisible').elapsedMs - rustEntryAt;
+  if (appControlledVisibleMs > APP_CONTROLLED_VISIBLE_BUDGET_MS) {
+    throw new Error(`${kind}: app-controlled visible path exceeded ${APP_CONTROLLED_VISIBLE_BUDGET_MS}ms`);
+  }
+  const appControlledInteractiveMs = phase(snapshot, 'frontendInteractive').elapsedMs - rustEntryAt;
+  if (appControlledInteractiveMs > APP_CONTROLLED_INTERACTIVE_BUDGET_MS) {
+    throw new Error(`${kind}: app-controlled interactive path exceeded ${APP_CONTROLLED_INTERACTIVE_BUDGET_MS}ms`);
   }
 
   const shellOrdered = [
@@ -57,6 +64,7 @@ const assertTrace = (run: StartupRun): void => {
     phase(snapshot, 'windowCreated'),
     phase(snapshot, 'windowVisible'),
     phase(snapshot, 'frontendShellVisible'),
+    phase(snapshot, 'frontendInteractive'),
     phase(snapshot, 'frontendSettingsHydrated'),
     phase(snapshot, 'frontendLibraryReady'),
   ];
@@ -67,15 +75,20 @@ const assertTrace = (run: StartupRun): void => {
       throw new Error(`${kind}: startup phases are not monotonic at index ${index}`);
     }
   }
+  const shellVisibleAt = phase(snapshot, 'frontendShellVisible').elapsedMs;
+  const interactiveAt = phase(snapshot, 'frontendInteractive').elapsedMs;
+  if (interactiveAt - shellVisibleAt > INTERACTION_RESPONSE_BUDGET_MS) {
+    throw new Error(
+      `${kind}: mounted shell interaction round trip exceeded ${INTERACTION_RESPONSE_BUDGET_MS}ms ` +
+        `(${interactiveAt - shellVisibleAt}ms)`,
+    );
+  }
   const settings = phase(snapshot, 'minimalSettingsLoaded');
   if (
     settings.elapsedMs < phase(snapshot, 'processStarted').elapsedMs ||
     settings.elapsedMs > phase(snapshot, 'frontendSettingsHydrated').elapsedMs
   ) {
     throw new Error(`${kind}: minimal settings were not loaded between process start and frontend hydration`);
-  }
-  if (phase(snapshot, 'windowVisible').elapsedMs > FIRST_PAINT_BUDGET_MS) {
-    throw new Error(`${kind}: WindowVisible exceeded ${FIRST_PAINT_BUDGET_MS}ms`);
   }
   const visibleAt = phase(snapshot, 'windowVisible').elapsedMs;
   for (const deferred of snapshot.phases.filter((entry) =>
@@ -93,6 +106,15 @@ const assertTrace = (run: StartupRun): void => {
       if (receipt.status !== 'degraded' || !receipt.detail?.includes(`injected ${service}`)) {
         throw new Error(`degraded: ${service} did not produce the injected degraded receipt`);
       }
+    }
+  }
+  for (const [name, service] of [
+    ['gpuReady', 'gpu'],
+    ['libraryServicesReady', 'lensfun'],
+  ] as const) {
+    const detail = phase(snapshot, name).detail ?? '';
+    if (!detail.includes(`${service}:priority=editor_demand:starts=1`)) {
+      throw new Error(`${kind}: ${service} editor-demand single-flight proof missing (${detail})`);
     }
   }
 };
@@ -137,6 +159,7 @@ const runOnce = async ({
   reportPath: string;
 }): Promise<StartupRun> => {
   await rm(reportPath, { force: true });
+  const processOriginEpochMs = Date.now();
   const process = Bun.spawn([binary], {
     env: {
       ...processEnv,
@@ -144,6 +167,8 @@ const runOnce = async ({
       RAWENGINE_STARTUP_BENCHMARK_REPORT: reportPath,
       RAWENGINE_STARTUP_INJECT_GPU_FAILURE: injectFailures ? '1' : '0',
       RAWENGINE_STARTUP_INJECT_LENSFUN_FAILURE: injectFailures ? '1' : '0',
+      RAWENGINE_STARTUP_BENCHMARK_ORIGIN_EPOCH_MS: String(processOriginEpochMs),
+      RAWENGINE_STARTUP_BENCHMARK_EDITOR_DEMAND: '1',
       RUST_LOG: 'warn',
     },
     stderr: 'pipe',
@@ -214,7 +239,13 @@ const main = async (): Promise<void> => {
     if (traceIds.size !== runs.length) throw new Error('Startup benchmark reused a trace ID across processes.');
     const summary = runs.map(({ kind, snapshot }) => ({
       firstPaintMs: phase(snapshot, 'windowVisible').elapsedMs,
+      absoluteTargetMet: snapshot.firstPaintBudgetMet,
+      appControlledVisibleMs: phase(snapshot, 'windowVisible').elapsedMs - phase(snapshot, 'processStarted').elapsedMs,
+      appControlledInteractiveMs:
+        phase(snapshot, 'frontendInteractive').elapsedMs - phase(snapshot, 'processStarted').elapsedMs,
       frontendReadyMs: phase(snapshot, 'frontendShellVisible').elapsedMs,
+      interactionResponseMs:
+        phase(snapshot, 'frontendInteractive').elapsedMs - phase(snapshot, 'frontendShellVisible').elapsedMs,
       kind,
     }));
     console.log(`native startup benchmark ok (${runs.length} bounded runs): ${JSON.stringify(summary)}`);

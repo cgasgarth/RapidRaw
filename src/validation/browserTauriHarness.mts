@@ -361,6 +361,7 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
     case commandNames.recordFrontendStartupPhase: {
       const receiptPhase = {
         editorReady: 'frontendEditorReady',
+        interactive: 'frontendInteractive',
         libraryReady: 'frontendLibraryReady',
         settingsHydrated: 'frontendSettingsHydrated',
         shellVisible: 'frontendShellVisible',

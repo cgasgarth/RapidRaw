@@ -11,10 +11,48 @@
       rel="stylesheet"
     />
     <title>RapidRAW</title>
+    <style>
+      /* Bootstrap chrome is intentionally self-contained: it paints before the
+         application bundle, settings, GPU, and library services are ready. */
+      #startup-shell {
+        align-items: stretch;
+        background: #0e1014;
+        color: #d9dce3;
+        display: grid;
+        font: 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        grid-template-columns: 220px 1fr;
+        height: 100%;
+      }
+      #startup-shell aside {
+        background: #15181e;
+        border-right: 1px solid #272b34;
+        padding: 22px 14px;
+      }
+      #startup-shell strong { display: block; font-size: 15px; margin: 0 10px 24px; }
+      #startup-shell nav span {
+        border-radius: 7px;
+        display: block;
+        margin: 4px 0;
+        padding: 9px 10px;
+      }
+      #startup-shell nav span:first-child { background: #282d37; }
+      #startup-shell main { display: grid; grid-template-rows: 52px 1fr; }
+      #startup-shell header { border-bottom: 1px solid #272b34; padding: 17px 20px; }
+      #startup-shell section { display: grid; place-items: center; color: #8e95a3; }
+      html, body, #root { height: 100%; margin: 0; }
+    </style>
   </head>
 
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="startup-shell" role="status" aria-label="RapidRAW library is starting">
+        <aside>
+          <strong>RapidRAW</strong>
+          <nav aria-label="Workspace"><span>Library</span><span>Albums</span><span>Folders</span></nav>
+        </aside>
+        <main><header>Library</header><section>Loading your workspace…</section></main>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

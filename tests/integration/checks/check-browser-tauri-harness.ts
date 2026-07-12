@@ -318,7 +318,7 @@ try {
     throw new Error('Frontend startup phases were not correlated after native readiness and trace acquisition.');
   }
   const startupPhases = harnessProof.startupRecords.map((args) => args?.['phase']);
-  for (const expectedPhase of ['shellVisible', 'settingsHydrated', 'libraryReady']) {
+  for (const expectedPhase of ['shellVisible', 'interactive', 'settingsHydrated', 'libraryReady']) {
     if (!startupPhases.includes(expectedPhase)) {
       throw new Error(`Browser Tauri harness did not record startup phase ${expectedPhase}.`);
     }
