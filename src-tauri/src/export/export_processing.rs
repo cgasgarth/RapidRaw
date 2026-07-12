@@ -23,6 +23,7 @@ use tauri::Manager;
 
 use crate::color::working_to_output_transform::WorkingColorState;
 use crate::exif_processing;
+use crate::export::batch_export_pipeline::ExportResourceBudget;
 pub(crate) use crate::export::export_encoders::{
     EmbeddedSourceIccProfile, encode_image_to_bytes, encode_image_with_working_color_state,
     validate_export_file_readback_color_policy,
@@ -1091,14 +1092,13 @@ pub async fn export_images(
     let mut sys = sysinfo::System::new();
     sys.refresh_memory();
 
-    let available_ram_gb = sys.available_memory() as f64 / 1024.0 / 1024.0 / 1024.0;
-
-    let ram_based_limit = (available_ram_gb / 2.5).floor() as usize;
-
+    let available_memory = sys.available_memory();
+    let available_ram_gb = available_memory as f64 / 1024.0 / 1024.0 / 1024.0;
+    let resource_budget = ExportResourceBudget::conservative(available_memory, available_cores);
     let num_threads = if paths.len() == 1 {
         1
     } else {
-        available_cores.min(ram_based_limit).clamp(1, 16)
+        resource_budget.cpu_slots
     };
 
     log::info!(
@@ -1149,7 +1149,8 @@ pub async fn export_images(
         }
 
         let semaphore = Arc::new(tokio::sync::Semaphore::new(num_threads));
-        let mut join_handles = Vec::new();
+        let mut workers = tokio::task::JoinSet::new();
+        let mut results = Vec::new();
 
         for (global_index, image_path_str, appearance_count, explicit_vc) in export_items {
             if cancellation_token.load(Ordering::SeqCst) {
@@ -1174,7 +1175,7 @@ pub async fn export_images(
             let current_edit_adjustments = current_edit_adjustments.clone();
             let settings = settings.clone();
 
-            let handle = tokio::task::spawn_blocking(move || {
+            workers.spawn_blocking(move || {
                 if cancellation_token.load(Ordering::SeqCst) {
                     return ExportItemResult::Cancelled(None);
                 }
@@ -1498,20 +1499,26 @@ pub async fn export_images(
                 result
             });
 
-            join_handles.push(handle);
-        }
-
-        let mut results = Vec::new();
-        for handle in join_handles {
-            match handle.await {
-                Ok(res) => results.push(res),
-                Err(error) => {
-                    results.push(ExportItemResult::Failed(format!("Thread crashed: {error}")))
+            if workers.len() >= num_threads
+                && let Some(result) = workers.join_next().await
+            {
+                match result {
+                    Ok(result) => results.push(result),
+                    Err(error) => results.push(ExportItemResult::Failed(format!(
+                        "Export worker crashed: {error}"
+                    ))),
                 }
             }
         }
 
-        tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+        while let Some(result) = workers.join_next().await {
+            match result {
+                Ok(result) => results.push(result),
+                Err(error) => results.push(ExportItemResult::Failed(format!(
+                    "Export worker crashed: {error}"
+                ))),
+            }
+        }
 
         let mut error_count = 0;
         let mut outputs = Vec::new();
