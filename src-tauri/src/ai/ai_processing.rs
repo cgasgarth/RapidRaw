@@ -1,7 +1,7 @@
 use std::fs;
-use std::io::{Cursor, Read};
+use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, Once};
 
 use anyhow::Result;
 use image::imageops::{self, FilterType};
@@ -16,7 +16,13 @@ use sha2::{Digest, Sha256};
 use tauri::Emitter;
 use tauri::Manager;
 use tokenizers::Tokenizer;
-use tokio::sync::Mutex as TokioMutex;
+
+use super::model_download::{
+    AiTransferProgress, cleanup_stale_download, download_verified_atomic, verify_model_file_cached,
+};
+use super::model_registry::{
+    AiCapability, AiModelId, AiModelLease, AiModelRegistry, AiSessionHandle,
+};
 
 const ENCODER_URL: &str = "https://huggingface.co/CyberTimon/RapidRAW-Models/resolve/main/sam_vit_b_01ec64_encoder.onnx?download=true";
 const DECODER_URL: &str = "https://huggingface.co/CyberTimon/RapidRAW-Models/resolve/main/sam_vit_b_01ec64_decoder.onnx?download=true";
@@ -42,6 +48,8 @@ const CLIP_MODEL_URL: &str =
 const CLIP_MODEL_FILENAME: &str = "clip_model.onnx";
 const CLIP_TOKENIZER_URL: &str = "https://huggingface.co/CyberTimon/RapidRAW-Models/resolve/main/clip_tokenizer.json?download=true";
 const CLIP_TOKENIZER_FILENAME: &str = "clip_tokenizer.json";
+const CLIP_TOKENIZER_SHA256: &str =
+    "b556ac8c99757ffb677208af34bc8c6721572114111a6e0aaf5fa69ff0b8d842";
 const CLIP_MODEL_SHA256: &str = "57879bb1c23cdeb350d23569dd251ed4b740a96d747c529e94a2bb8040ac5d00";
 
 const DENOISE_URL: &str = "https://huggingface.co/CyberTimon/RapidRAW-Models/resolve/main/nind_denoise_utnet_684.onnx?download=true";
@@ -65,12 +73,304 @@ pub const PERSON_PART_PARSER_INPUT_SIZE: u32 = 512;
 pub const PERSON_PART_PARSER_SHA256: &str =
     "a6e823a82da10ba24c29adfb544130684568c46bfac865e215bbace3b4035a71";
 
-pub struct AiModels {
-    pub sam_encoder: Mutex<Session>,
-    pub sam_decoder: Mutex<Session>,
-    pub u2netp: Mutex<Session>,
-    pub sky_seg: Mutex<Session>,
-    pub depth_anything: Mutex<Session>,
+#[derive(Clone, Copy)]
+struct AiModelDescriptor {
+    id: AiModelId,
+    filename: &'static str,
+    url: &'static str,
+    sha256: &'static str,
+    estimated_session_bytes: u64,
+}
+
+fn model_descriptor(id: AiModelId) -> AiModelDescriptor {
+    let capability = match id {
+        AiModelId::SamEncoder | AiModelId::SamDecoder => AiCapability::SamMask,
+        AiModelId::ForegroundU2Net => AiCapability::ForegroundMask,
+        AiModelId::SkyU2Net => AiCapability::SkyMask,
+        AiModelId::DepthAnything => AiCapability::DepthMask,
+        AiModelId::Denoise => AiCapability::Denoise,
+        AiModelId::Clip => AiCapability::Tagging,
+        AiModelId::Lama => AiCapability::Inpainting,
+        AiModelId::PersonPartParser => AiCapability::PersonPartMask,
+    };
+    debug_assert!(capability.dependencies().contains(&id));
+    let (filename, url, sha256, estimated_session_bytes) = match id {
+        AiModelId::SamEncoder => (ENCODER_FILENAME, ENCODER_URL, ENCODER_SHA256, 420 << 20),
+        AiModelId::SamDecoder => (DECODER_FILENAME, DECODER_URL, DECODER_SHA256, 80 << 20),
+        AiModelId::ForegroundU2Net => (U2NETP_FILENAME, U2NETP_URL, U2NETP_SHA256, 220 << 20),
+        AiModelId::SkyU2Net => (SKYSEG_FILENAME, SKYSEG_URL, SKYSEG_SHA256, 220 << 20),
+        AiModelId::DepthAnything => (DEPTH_FILENAME, DEPTH_URL, DEPTH_SHA256, 300 << 20),
+        AiModelId::Denoise => (DENOISE_FILENAME, DENOISE_URL, DENOISE_SHA256, 320 << 20),
+        AiModelId::Lama => (LAMA_FILENAME, LAMA_URL, LAMA_SHA256, 420 << 20),
+        AiModelId::PersonPartParser => (
+            PERSON_PART_PARSER_FILENAME,
+            PERSON_PART_PARSER_URL,
+            PERSON_PART_PARSER_SHA256,
+            280 << 20,
+        ),
+        AiModelId::Clip => (
+            CLIP_MODEL_FILENAME,
+            CLIP_MODEL_URL,
+            CLIP_MODEL_SHA256,
+            360 << 20,
+        ),
+    };
+    AiModelDescriptor {
+        id,
+        filename,
+        url,
+        sha256,
+        estimated_session_bytes,
+    }
+}
+
+static ORT_RUNTIME_INIT: Once = Once::new();
+
+fn build_ort_session(path: &Path) -> Result<Session> {
+    ORT_RUNTIME_INIT.call_once(|| {
+        let _ = ort::init().with_name("RawEngine AI Registry").commit();
+    });
+    Ok(Session::builder()?.commit_from_file(path)?)
+}
+
+pub async fn acquire_ort_model(
+    app_handle: &tauri::AppHandle,
+    registry: &AiModelRegistry,
+    id: AiModelId,
+) -> Result<AiModelLease> {
+    let descriptor = model_descriptor(id);
+    let app_handle = app_handle.clone();
+    let registry = registry.clone();
+    registry
+        .acquire_with(
+            descriptor.id,
+            descriptor.estimated_session_bytes,
+            move |context| async move {
+                let result: Result<AiSessionHandle, String> = async {
+                    let models_dir =
+                        get_models_dir(&app_handle).map_err(|error| error.to_string())?;
+                    let model_path = models_dir.join(descriptor.filename);
+                    let verification_path =
+                        models_dir.join(format!("{}.verified.json", descriptor.filename));
+                    cleanup_stale_download(&model_path).map_err(|error| error.to_string())?;
+                    let verified = if model_path.exists() {
+                        let _ = app_handle.emit(
+                            crate::events::AI_MODEL_DOWNLOAD_START,
+                            serde_json::json!({ "modelId": descriptor.id, "phase": "verifying" }),
+                        );
+                        let path = model_path.clone();
+                        let expected = descriptor.sha256.to_string();
+                        let verification = verification_path.clone();
+                        tokio::task::spawn_blocking(move || {
+                            verify_model_file_cached(&path, &expected, &verification)
+                        })
+                        .await
+                        .map_err(|error| error.to_string())?
+                        .is_ok()
+                    } else {
+                        false
+                    };
+                    if !verified {
+                        let _ = tokio::fs::remove_file(&model_path).await;
+                        let _ = app_handle.emit(
+                            crate::events::AI_MODEL_DOWNLOAD_START,
+                            serde_json::json!({
+                                "modelId": descriptor.id,
+                                "phase": "downloading",
+                                "bytesCurrent": 0
+                            }),
+                        );
+                        let client = reqwest::Client::new();
+                        let cancellation = context.cancellation_flag();
+                        download_verified_atomic(
+                            &client,
+                            descriptor.url,
+                            &model_path,
+                            descriptor.sha256,
+                            &cancellation,
+                            |AiTransferProgress {
+                                 bytes_current,
+                                 bytes_total,
+                             }| {
+                                let _ = app_handle.emit(
+                                    crate::events::AI_MODEL_DOWNLOAD_START,
+                                    serde_json::json!({
+                                        "modelId": descriptor.id,
+                                        "phase": "downloading",
+                                        "bytesCurrent": bytes_current,
+                                        "bytesTotal": bytes_total
+                                    }),
+                                );
+                            },
+                        )
+                        .await
+                        .map_err(|error| error.to_string())?;
+                        verify_model_file_cached(
+                            &model_path,
+                            descriptor.sha256,
+                            &verification_path,
+                        )
+                        .map_err(|error| error.to_string())?;
+                    }
+                    if context.is_cancelled() {
+                        Err("ai_model_load_cancelled".to_string())?;
+                    }
+                    let _ = app_handle.emit(
+                        crate::events::AI_MODEL_DOWNLOAD_START,
+                        serde_json::json!({ "modelId": descriptor.id, "phase": "loading" }),
+                    );
+                    let session =
+                        tokio::task::spawn_blocking(move || build_ort_session(&model_path))
+                            .await
+                            .map_err(|error| error.to_string())?
+                            .map_err(|error| error.to_string())?;
+                    crate::register_exit_handler();
+                    Ok(AiSessionHandle::Ort(Arc::new(Mutex::new(session))))
+                }
+                .await;
+                let (phase, error) = match &result {
+                    Ok(_) => ("ready", None),
+                    Err(error) => ("failed", Some(error.as_str())),
+                };
+                let _ = app_handle.emit(
+                    crate::events::AI_MODEL_DOWNLOAD_FINISH,
+                    serde_json::json!({
+                        "modelId": descriptor.id,
+                        "phase": phase,
+                        "error": error,
+                    }),
+                );
+                result
+            },
+        )
+        .await
+        .map_err(anyhow::Error::msg)
+}
+
+pub async fn acquire_clip_model(
+    app_handle: &tauri::AppHandle,
+    registry: &AiModelRegistry,
+) -> Result<AiModelLease> {
+    let descriptor = model_descriptor(AiModelId::Clip);
+    let app_handle = app_handle.clone();
+    registry
+        .acquire_with(
+            AiModelId::Clip,
+            descriptor.estimated_session_bytes,
+            move |context| async move {
+                let result: Result<AiSessionHandle, String> = async {
+                    let models_dir =
+                        get_models_dir(&app_handle).map_err(|error| error.to_string())?;
+                    let artifacts = [
+                        (descriptor.filename, descriptor.url, descriptor.sha256),
+                        (
+                            CLIP_TOKENIZER_FILENAME,
+                            CLIP_TOKENIZER_URL,
+                            CLIP_TOKENIZER_SHA256,
+                        ),
+                    ];
+                    for (filename, url, sha256) in artifacts {
+                        let path = models_dir.join(filename);
+                        let verification = models_dir.join(format!("{filename}.verified.json"));
+                        cleanup_stale_download(&path).map_err(|error| error.to_string())?;
+                        let verified = if path.exists() {
+                            let _ = app_handle.emit(
+                                crate::events::AI_MODEL_DOWNLOAD_START,
+                                serde_json::json!({
+                                    "modelId": descriptor.id,
+                                    "phase": "verifying",
+                                }),
+                            );
+                            let path_for_verify = path.clone();
+                            let verification_for_verify = verification.clone();
+                            tokio::task::spawn_blocking(move || {
+                                verify_model_file_cached(
+                                    &path_for_verify,
+                                    sha256,
+                                    &verification_for_verify,
+                                )
+                            })
+                            .await
+                            .map_err(|error| error.to_string())?
+                            .is_ok()
+                        } else {
+                            false
+                        };
+                        if !verified {
+                            let _ = tokio::fs::remove_file(&path).await;
+                            let _ = app_handle.emit(
+                                crate::events::AI_MODEL_DOWNLOAD_START,
+                                serde_json::json!({
+                                    "modelId": descriptor.id,
+                                    "phase": "downloading",
+                                    "bytesCurrent": 0,
+                                }),
+                            );
+                            let client = reqwest::Client::new();
+                            let cancellation = context.cancellation_flag();
+                            download_verified_atomic(
+                                &client,
+                                url,
+                                &path,
+                                sha256,
+                                &cancellation,
+                                |AiTransferProgress {
+                                     bytes_current,
+                                     bytes_total,
+                                 }| {
+                                    let _ = app_handle.emit(
+                                        crate::events::AI_MODEL_DOWNLOAD_START,
+                                        serde_json::json!({
+                                            "modelId": descriptor.id,
+                                            "phase": "downloading",
+                                            "bytesCurrent": bytes_current,
+                                            "bytesTotal": bytes_total,
+                                        }),
+                                    );
+                                },
+                            )
+                            .await
+                            .map_err(|error| error.to_string())?;
+                            verify_model_file_cached(&path, sha256, &verification)
+                                .map_err(|error| error.to_string())?;
+                        }
+                    }
+                    let model_path = models_dir.join(CLIP_MODEL_FILENAME);
+                    let tokenizer_path = models_dir.join(CLIP_TOKENIZER_FILENAME);
+                    let _ = app_handle.emit(
+                        crate::events::AI_MODEL_DOWNLOAD_START,
+                        serde_json::json!({ "modelId": descriptor.id, "phase": "loading" }),
+                    );
+                    let model = tokio::task::spawn_blocking(move || build_ort_session(&model_path))
+                        .await
+                        .map_err(|error| error.to_string())?
+                        .map_err(|error| error.to_string())?;
+                    let tokenizer =
+                        Tokenizer::from_file(tokenizer_path).map_err(|error| error.to_string())?;
+                    crate::register_exit_handler();
+                    Ok(AiSessionHandle::Clip(Arc::new(ClipModels {
+                        model: Mutex::new(model),
+                        tokenizer,
+                    })))
+                }
+                .await;
+                let (phase, error) = match &result {
+                    Ok(_) => ("ready", None),
+                    Err(error) => ("failed", Some(error.as_str())),
+                };
+                let _ = app_handle.emit(
+                    crate::events::AI_MODEL_DOWNLOAD_FINISH,
+                    serde_json::json!({
+                        "modelId": descriptor.id,
+                        "phase": phase,
+                        "error": error,
+                    }),
+                );
+                result
+            },
+        )
+        .await
+        .map_err(anyhow::Error::msg)
 }
 
 pub struct ClipModels {
@@ -90,16 +390,6 @@ pub struct CachedDepthMap {
     pub path_hash: String,
     pub depth_image: GrayImage,
     pub original_size: (u32, u32),
-}
-
-pub struct AiState {
-    pub models: Option<Arc<AiModels>>,
-    pub denoise_model: Option<Arc<Mutex<Session>>>,
-    pub clip_models: Option<Arc<ClipModels>>,
-    pub lama_model: Option<Arc<Mutex<Session>>>,
-    pub person_part_parser_model: Option<Arc<Mutex<Session>>>,
-    pub embeddings: Option<ImageEmbeddings>,
-    pub depth_map: Option<CachedDepthMap>,
 }
 
 fn edt_1d(f: &mut [f32], v: &mut [usize], z: &mut [f32], d: &mut [f32]) {
@@ -178,14 +468,6 @@ fn get_models_dir(app_handle: &tauri::AppHandle) -> Result<PathBuf> {
     Ok(models_dir)
 }
 
-pub(crate) async fn download_model(url: &str, dest: &Path) -> Result<()> {
-    let response = reqwest::get(url).await?;
-    let mut file = fs::File::create(dest)?;
-    let mut content = Cursor::new(response.bytes().await?);
-    std::io::copy(&mut content, &mut file)?;
-    Ok(())
-}
-
 pub(crate) fn verify_sha256(path: &Path, expected_hash: &str) -> Result<bool> {
     if !path.exists() {
         return Ok(false);
@@ -203,406 +485,6 @@ pub(crate) fn verify_sha256(path: &Path, expected_hash: &str) -> Result<bool> {
     let hash = hasher.finalize();
     let hex_hash = hex::encode(hash);
     Ok(hex_hash == expected_hash)
-}
-
-async fn download_and_verify_model(
-    app_handle: &tauri::AppHandle,
-    models_dir: &Path,
-    filename: &str,
-    url: &str,
-    expected_hash: &str,
-    model_name: &str,
-) -> Result<()> {
-    let dest_path = models_dir.join(filename);
-    let is_valid = verify_sha256(&dest_path, expected_hash)?;
-
-    if !is_valid {
-        if dest_path.exists() {
-            println!("Model {} has incorrect hash. Re-downloading.", model_name);
-            fs::remove_file(&dest_path)?;
-        }
-        let _ = app_handle.emit(crate::events::AI_MODEL_DOWNLOAD_START, model_name);
-        download_model(url, &dest_path).await?;
-        let _ = app_handle.emit(crate::events::AI_MODEL_DOWNLOAD_FINISH, model_name);
-
-        if !verify_sha256(&dest_path, expected_hash)? {
-            return Err(anyhow::anyhow!(
-                "Failed to verify model {} after download. Hash mismatch.",
-                model_name
-            ));
-        }
-    }
-    Ok(())
-}
-
-pub async fn get_or_init_ai_models(
-    app_handle: &tauri::AppHandle,
-    ai_state_mutex: &Mutex<Option<AiState>>,
-    ai_init_lock: &TokioMutex<()>,
-) -> Result<Arc<AiModels>> {
-    if let Some(models) = ai_state_mutex
-        .lock()
-        .unwrap()
-        .as_ref()
-        .and_then(|state| state.models.clone())
-    {
-        return Ok(models);
-    }
-
-    let _guard = ai_init_lock.lock().await;
-
-    if let Some(models) = ai_state_mutex
-        .lock()
-        .unwrap()
-        .as_ref()
-        .and_then(|state| state.models.clone())
-    {
-        return Ok(models);
-    }
-
-    let models_dir = get_models_dir(app_handle)?;
-
-    download_and_verify_model(
-        app_handle,
-        &models_dir,
-        ENCODER_FILENAME,
-        ENCODER_URL,
-        ENCODER_SHA256,
-        "SAM Encoder",
-    )
-    .await?;
-    download_and_verify_model(
-        app_handle,
-        &models_dir,
-        DECODER_FILENAME,
-        DECODER_URL,
-        DECODER_SHA256,
-        "SAM Decoder",
-    )
-    .await?;
-    download_and_verify_model(
-        app_handle,
-        &models_dir,
-        U2NETP_FILENAME,
-        U2NETP_URL,
-        U2NETP_SHA256,
-        "Foreground Model",
-    )
-    .await?;
-    download_and_verify_model(
-        app_handle,
-        &models_dir,
-        SKYSEG_FILENAME,
-        SKYSEG_URL,
-        SKYSEG_SHA256,
-        "Sky Model",
-    )
-    .await?;
-    download_and_verify_model(
-        app_handle,
-        &models_dir,
-        DEPTH_FILENAME,
-        DEPTH_URL,
-        DEPTH_SHA256,
-        "Depth Model",
-    )
-    .await?;
-
-    let _ = ort::init().with_name("AI").commit();
-
-    let encoder_path = models_dir.join(ENCODER_FILENAME);
-    let decoder_path = models_dir.join(DECODER_FILENAME);
-    let u2netp_path = models_dir.join(U2NETP_FILENAME);
-    let sky_seg_path = models_dir.join(SKYSEG_FILENAME);
-    let depth_path = models_dir.join(DEPTH_FILENAME);
-
-    let sam_encoder = Session::builder()?.commit_from_file(encoder_path)?;
-    let sam_decoder = Session::builder()?.commit_from_file(decoder_path)?;
-    let u2netp = Session::builder()?.commit_from_file(u2netp_path)?;
-    let sky_seg = Session::builder()?.commit_from_file(sky_seg_path)?;
-    let depth_anything = Session::builder()?.commit_from_file(depth_path)?;
-
-    crate::register_exit_handler();
-
-    let models = Arc::new(AiModels {
-        sam_encoder: Mutex::new(sam_encoder),
-        sam_decoder: Mutex::new(sam_decoder),
-        u2netp: Mutex::new(u2netp),
-        sky_seg: Mutex::new(sky_seg),
-        depth_anything: Mutex::new(depth_anything),
-    });
-
-    let mut ai_state_lock = ai_state_mutex.lock().unwrap();
-    if let Some(state) = ai_state_lock.as_mut() {
-        state.models = Some(models.clone());
-    } else {
-        *ai_state_lock = Some(AiState {
-            models: Some(models.clone()),
-            denoise_model: None,
-            clip_models: None,
-            lama_model: None,
-            person_part_parser_model: None,
-            embeddings: None,
-            depth_map: None,
-        });
-    }
-
-    Ok(models)
-}
-
-pub async fn get_or_init_denoise_model(
-    app_handle: &tauri::AppHandle,
-    ai_state_mutex: &Mutex<Option<AiState>>,
-    ai_init_lock: &TokioMutex<()>,
-) -> Result<Arc<Mutex<Session>>> {
-    if let Some(denoise_model) = ai_state_mutex
-        .lock()
-        .unwrap()
-        .as_ref()
-        .and_then(|state| state.denoise_model.clone())
-    {
-        return Ok(denoise_model);
-    }
-
-    let _guard = ai_init_lock.lock().await;
-
-    if let Some(denoise_model) = ai_state_mutex
-        .lock()
-        .unwrap()
-        .as_ref()
-        .and_then(|state| state.denoise_model.clone())
-    {
-        return Ok(denoise_model);
-    }
-
-    let models_dir = get_models_dir(app_handle)?;
-    download_and_verify_model(
-        app_handle,
-        &models_dir,
-        DENOISE_FILENAME,
-        DENOISE_URL,
-        DENOISE_SHA256,
-        "NIND Denoise Model",
-    )
-    .await?;
-
-    let _ = ort::init().with_name("AI-Denoise").commit();
-    let model_path = models_dir.join(DENOISE_FILENAME);
-    let session = Session::builder()?.commit_from_file(model_path)?;
-    let denoise_model = Arc::new(Mutex::new(session));
-
-    crate::register_exit_handler();
-
-    let mut ai_state_lock = ai_state_mutex.lock().unwrap();
-    if let Some(state) = ai_state_lock.as_mut() {
-        state.denoise_model = Some(denoise_model.clone());
-    } else {
-        *ai_state_lock = Some(AiState {
-            models: None,
-            denoise_model: Some(denoise_model.clone()),
-            clip_models: None,
-            lama_model: None,
-            person_part_parser_model: None,
-            embeddings: None,
-            depth_map: None,
-        });
-    }
-
-    Ok(denoise_model)
-}
-
-pub async fn get_or_init_clip_models(
-    app_handle: &tauri::AppHandle,
-    ai_state_mutex: &Mutex<Option<AiState>>,
-    ai_init_lock: &TokioMutex<()>,
-) -> Result<Arc<ClipModels>> {
-    if let Some(clip_models) = ai_state_mutex
-        .lock()
-        .unwrap()
-        .as_ref()
-        .and_then(|state| state.clip_models.clone())
-    {
-        return Ok(clip_models);
-    }
-
-    let _guard = ai_init_lock.lock().await;
-
-    if let Some(clip_models) = ai_state_mutex
-        .lock()
-        .unwrap()
-        .as_ref()
-        .and_then(|state| state.clip_models.clone())
-    {
-        return Ok(clip_models);
-    }
-
-    let models_dir = get_models_dir(app_handle)?;
-
-    download_and_verify_model(
-        app_handle,
-        &models_dir,
-        CLIP_MODEL_FILENAME,
-        CLIP_MODEL_URL,
-        CLIP_MODEL_SHA256,
-        "CLIP Model",
-    )
-    .await?;
-
-    let clip_tokenizer_path = models_dir.join(CLIP_TOKENIZER_FILENAME);
-    if !clip_tokenizer_path.exists() {
-        let _ = app_handle.emit(crate::events::AI_MODEL_DOWNLOAD_START, "CLIP Tokenizer");
-        download_model(CLIP_TOKENIZER_URL, &clip_tokenizer_path).await?;
-        let _ = app_handle.emit(crate::events::AI_MODEL_DOWNLOAD_FINISH, "CLIP Tokenizer");
-    }
-
-    let _ = ort::init().with_name("AI-Tagging").commit();
-    let clip_model_path = models_dir.join(CLIP_MODEL_FILENAME);
-    let model = Mutex::new(Session::builder()?.commit_from_file(clip_model_path)?);
-    let tokenizer =
-        Tokenizer::from_file(clip_tokenizer_path).map_err(|e| anyhow::anyhow!(e.to_string()))?;
-
-    crate::register_exit_handler();
-
-    let clip_models = Arc::new(ClipModels { model, tokenizer });
-
-    let mut ai_state_lock = ai_state_mutex.lock().unwrap();
-    if let Some(state) = ai_state_lock.as_mut() {
-        state.clip_models = Some(clip_models.clone());
-    } else {
-        *ai_state_lock = Some(AiState {
-            models: None,
-            denoise_model: None,
-            clip_models: Some(clip_models.clone()),
-            lama_model: None,
-            person_part_parser_model: None,
-            embeddings: None,
-            depth_map: None,
-        });
-    }
-
-    Ok(clip_models)
-}
-
-pub async fn get_or_init_lama_model(
-    app_handle: &tauri::AppHandle,
-    ai_state_mutex: &Mutex<Option<AiState>>,
-    ai_init_lock: &TokioMutex<()>,
-) -> Result<Arc<Mutex<Session>>> {
-    if let Some(lama_model) = ai_state_mutex
-        .lock()
-        .unwrap()
-        .as_ref()
-        .and_then(|state| state.lama_model.clone())
-    {
-        return Ok(lama_model);
-    }
-
-    let _guard = ai_init_lock.lock().await;
-
-    if let Some(lama_model) = ai_state_mutex
-        .lock()
-        .unwrap()
-        .as_ref()
-        .and_then(|state| state.lama_model.clone())
-    {
-        return Ok(lama_model);
-    }
-
-    let models_dir = get_models_dir(app_handle)?;
-    download_and_verify_model(
-        app_handle,
-        &models_dir,
-        LAMA_FILENAME,
-        LAMA_URL,
-        LAMA_SHA256,
-        "Inpainting Model",
-    )
-    .await?;
-
-    let _ = ort::init().with_name("AI-Inpainting").commit();
-    let model_path = models_dir.join(LAMA_FILENAME);
-    let session = Session::builder()?.commit_from_file(model_path)?;
-    let lama_model = Arc::new(Mutex::new(session));
-
-    crate::register_exit_handler();
-
-    let mut ai_state_lock = ai_state_mutex.lock().unwrap();
-    if let Some(state) = ai_state_lock.as_mut() {
-        state.lama_model = Some(lama_model.clone());
-    } else {
-        *ai_state_lock = Some(AiState {
-            models: None,
-            denoise_model: None,
-            clip_models: None,
-            lama_model: Some(lama_model.clone()),
-            person_part_parser_model: None,
-            embeddings: None,
-            depth_map: None,
-        });
-    }
-
-    Ok(lama_model)
-}
-
-pub async fn get_or_init_person_part_parser_model(
-    app_handle: &tauri::AppHandle,
-    ai_state_mutex: &Mutex<Option<AiState>>,
-    ai_init_lock: &TokioMutex<()>,
-) -> Result<Arc<Mutex<Session>>> {
-    if let Some(model) = ai_state_mutex
-        .lock()
-        .unwrap()
-        .as_ref()
-        .and_then(|state| state.person_part_parser_model.clone())
-    {
-        return Ok(model);
-    }
-
-    let _guard = ai_init_lock.lock().await;
-
-    if let Some(model) = ai_state_mutex
-        .lock()
-        .unwrap()
-        .as_ref()
-        .and_then(|state| state.person_part_parser_model.clone())
-    {
-        return Ok(model);
-    }
-
-    let models_dir = get_models_dir(app_handle)?;
-    download_and_verify_model(
-        app_handle,
-        &models_dir,
-        PERSON_PART_PARSER_FILENAME,
-        PERSON_PART_PARSER_URL,
-        PERSON_PART_PARSER_SHA256,
-        "Person Part Parser",
-    )
-    .await?;
-
-    let _ = ort::init().with_name("AI-Person-Part-Parser").commit();
-    let model_path = models_dir.join(PERSON_PART_PARSER_FILENAME);
-    let session = Session::builder()?.commit_from_file(model_path)?;
-    let model = Arc::new(Mutex::new(session));
-
-    crate::register_exit_handler();
-
-    let mut ai_state_lock = ai_state_mutex.lock().unwrap();
-    if let Some(state) = ai_state_lock.as_mut() {
-        state.person_part_parser_model = Some(model.clone());
-    } else {
-        *ai_state_lock = Some(AiState {
-            models: None,
-            denoise_model: None,
-            clip_models: None,
-            lama_model: None,
-            person_part_parser_model: Some(model.clone()),
-            embeddings: None,
-            depth_map: None,
-        });
-    }
-
-    Ok(model)
 }
 
 #[derive(Clone, Copy)]

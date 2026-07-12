@@ -3,6 +3,7 @@ export const AiAppServerToolRouteStatus = {
   Deferred: 'deferred',
   Mapped: 'mapped',
   MetadataCleanup: 'metadata_cleanup',
+  ModelLifecycle: 'model_lifecycle',
 } as const;
 
 export const AI_APP_SERVER_TOOL_ROUTE_STATUSES = [
@@ -10,6 +11,7 @@ export const AI_APP_SERVER_TOOL_ROUTE_STATUSES = [
   AiAppServerToolRouteStatus.Deferred,
   AiAppServerToolRouteStatus.ConnectorStatus,
   AiAppServerToolRouteStatus.MetadataCleanup,
+  AiAppServerToolRouteStatus.ModelLifecycle,
 ] as const;
 
 export const AiAppServerToolRouteSourceKind = {
