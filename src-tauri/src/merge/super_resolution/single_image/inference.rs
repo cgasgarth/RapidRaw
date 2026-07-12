@@ -22,7 +22,7 @@ pub struct OrtSwinIrRunner {
 
 impl OrtSwinIrRunner {
     pub fn open(path: &Path) -> Result<Self, String> {
-        let session = rapidraw_ai::build_ort_session_with_intra_threads(path, 1)
+        let session = rapidraw_ai::build_ort_session(path)
             .map_err(|error| format!("swinir_x2_session_load_failed:{error}"))?;
         validate_io_contract(&session)?;
         Ok(Self { session })

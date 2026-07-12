@@ -31,6 +31,8 @@ pub enum AiModelId {
 #[serde(rename_all = "camelCase")]
 pub enum AiCapability {
     SamMask,
+    SamEmbedding,
+    SamDecode,
     ForegroundMask,
     SkyMask,
     DepthMask,
@@ -44,6 +46,8 @@ impl AiCapability {
     pub const fn dependencies(self) -> &'static [AiModelId] {
         match self {
             Self::SamMask => &[AiModelId::SamEncoder, AiModelId::SamDecoder],
+            Self::SamEmbedding => &[AiModelId::SamEncoder],
+            Self::SamDecode => &[AiModelId::SamDecoder],
             Self::ForegroundMask => &[AiModelId::ForegroundU2Net],
             Self::SkyMask => &[AiModelId::SkyU2Net],
             Self::DepthMask => &[AiModelId::DepthAnything],
@@ -79,6 +83,7 @@ pub struct AiModelReport {
     pub id: AiModelId,
     pub phase: AiModelPhase,
     pub estimated_session_bytes: u64,
+    pub expected_source_bytes: u64,
     pub lease_count: usize,
     pub waiter_count: usize,
     pub single_flight_joins: u64,
@@ -92,7 +97,42 @@ pub struct AiModelReport {
 pub struct AiModelRegistryReport {
     pub budget_bytes: u64,
     pub resident_bytes: u64,
+    pub runtime_policy: AiRuntimePolicyReport,
+    pub derived_caches: Vec<AiDerivedCacheReport>,
+    pub first_use_estimates: Vec<AiCapabilityFirstUseEstimate>,
     pub models: Vec<AiModelReport>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiCapabilityFirstUseEstimate {
+    pub capability: AiCapability,
+    pub required_models: usize,
+    pub unrelated_models: usize,
+    pub expected_download_bytes: u64,
+    pub estimated_session_bytes: u64,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiRuntimePolicyReport {
+    pub provider: &'static str,
+    pub intra_op_threads: usize,
+    pub inter_op_threads: usize,
+    pub graph_optimization_level: &'static str,
+    pub memory_pattern_enabled: bool,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiDerivedCacheReport {
+    pub name: &'static str,
+    pub budget_bytes: u64,
+    pub resident_bytes: u64,
+    pub entries: usize,
+    pub hits: u64,
+    pub misses: u64,
+    pub evictions: u64,
 }
 
 enum EntryState {
@@ -387,6 +427,7 @@ impl AiModelRegistry {
                     id: entry.id,
                     phase,
                     estimated_session_bytes: entry.estimated_session_bytes.load(Ordering::Acquire),
+                    expected_source_bytes: expected_source_bytes(entry.id),
                     lease_count: entry.leases.load(Ordering::Acquire),
                     waiter_count: entry.waiters.load(Ordering::Acquire),
                     single_flight_joins: entry.single_flight_joins.load(Ordering::Relaxed),
@@ -400,8 +441,76 @@ impl AiModelRegistry {
         AiModelRegistryReport {
             budget_bytes: self.inner.budget_bytes.load(Ordering::Acquire),
             resident_bytes: resident_bytes(&self.inner),
+            runtime_policy: AiRuntimePolicyReport {
+                provider: "cpu",
+                intra_op_threads: 2,
+                inter_op_threads: 1,
+                graph_optimization_level: "all",
+                memory_pattern_enabled: true,
+            },
+            derived_caches: Vec::new(),
+            first_use_estimates: all_capabilities()
+                .into_iter()
+                .map(|capability| AiCapabilityFirstUseEstimate {
+                    capability,
+                    required_models: capability.dependencies().len(),
+                    unrelated_models: 0,
+                    expected_download_bytes: capability
+                        .dependencies()
+                        .iter()
+                        .map(|id| expected_source_bytes(*id))
+                        .sum(),
+                    estimated_session_bytes: capability
+                        .dependencies()
+                        .iter()
+                        .map(|id| estimated_session_bytes(*id))
+                        .sum(),
+                })
+                .collect(),
             models,
         }
+    }
+}
+
+const fn all_capabilities() -> [AiCapability; 10] {
+    [
+        AiCapability::SamMask,
+        AiCapability::SamEmbedding,
+        AiCapability::SamDecode,
+        AiCapability::ForegroundMask,
+        AiCapability::SkyMask,
+        AiCapability::DepthMask,
+        AiCapability::Denoise,
+        AiCapability::Tagging,
+        AiCapability::Inpainting,
+        AiCapability::PersonPartMask,
+    ]
+}
+
+const fn expected_source_bytes(id: AiModelId) -> u64 {
+    match id {
+        AiModelId::SamEncoder => 100_293_382,
+        AiModelId::SamDecoder => 8_751_331,
+        AiModelId::ForegroundU2Net => 175_997_641,
+        AiModelId::SkyU2Net => 175_997_079,
+        AiModelId::DepthAnything => 99_373_606,
+        AiModelId::Denoise => 124_202_581,
+        AiModelId::Clip => 608_028_554,
+        AiModelId::Lama => 111_545_583,
+        AiModelId::PersonPartParser => 47_210_581,
+    }
+}
+
+const fn estimated_session_bytes(id: AiModelId) -> u64 {
+    match id {
+        AiModelId::SamEncoder => 420 << 20,
+        AiModelId::SamDecoder => 80 << 20,
+        AiModelId::ForegroundU2Net | AiModelId::SkyU2Net => 220 << 20,
+        AiModelId::DepthAnything => 300 << 20,
+        AiModelId::Denoise => 320 << 20,
+        AiModelId::Clip => 360 << 20,
+        AiModelId::Lama => 420 << 20,
+        AiModelId::PersonPartParser => 280 << 20,
     }
 }
 
@@ -448,7 +557,63 @@ fn enforce_budget(inner: &RegistryInner) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
+    use std::time::{Duration, Instant};
+
+    const ALL_MODEL_IDS: [AiModelId; 9] = [
+        AiModelId::SamEncoder,
+        AiModelId::SamDecoder,
+        AiModelId::ForegroundU2Net,
+        AiModelId::SkyU2Net,
+        AiModelId::DepthAnything,
+        AiModelId::Denoise,
+        AiModelId::Clip,
+        AiModelId::Lama,
+        AiModelId::PersonPartParser,
+    ];
+
+    #[derive(Default)]
+    struct MeasuredLoaderStats {
+        loads: AtomicUsize,
+        downloaded_bytes: AtomicU64,
+        hashed_bytes: AtomicU64,
+    }
+
+    async fn measured_acquire(
+        registry: &AiModelRegistry,
+        ids: &[AiModelId],
+        loader_delay: Duration,
+        stats: Arc<MeasuredLoaderStats>,
+        download: bool,
+        hash: bool,
+    ) -> (Vec<AiModelLease>, u128) {
+        let started = Instant::now();
+        let mut leases = Vec::new();
+        for id in ids {
+            let stats = Arc::clone(&stats);
+            let id = *id;
+            leases.push(
+                registry
+                    .acquire_with(id, estimated_session_bytes(id), move |_| async move {
+                        stats.loads.fetch_add(1, Ordering::SeqCst);
+                        if download {
+                            stats
+                                .downloaded_bytes
+                                .fetch_add(expected_source_bytes(id), Ordering::SeqCst);
+                        }
+                        if hash {
+                            stats
+                                .hashed_bytes
+                                .fetch_add(expected_source_bytes(id), Ordering::SeqCst);
+                        }
+                        tokio::time::sleep(loader_delay).await;
+                        Ok(AiSessionHandle::Synthetic(id as u64))
+                    })
+                    .await
+                    .unwrap(),
+            );
+        }
+        (leases, started.elapsed().as_micros())
+    }
 
     #[tokio::test]
     async fn capability_dependencies_are_isolated() {
@@ -600,6 +765,170 @@ mod tests {
                 && model.single_flight_joins == 0
                 && model.cache_hits == 0
         }));
+    }
+
+    #[test]
+    fn every_capability_first_use_is_materially_smaller_than_eager_registry_loading() {
+        let report = AiModelRegistry::new(1_000).report();
+        let eager_download_bytes: u64 = report
+            .models
+            .iter()
+            .map(|model| model.expected_source_bytes)
+            .sum();
+        let eager_session_bytes: u64 = [
+            AiModelId::SamEncoder,
+            AiModelId::SamDecoder,
+            AiModelId::ForegroundU2Net,
+            AiModelId::SkyU2Net,
+            AiModelId::DepthAnything,
+            AiModelId::Denoise,
+            AiModelId::Clip,
+            AiModelId::Lama,
+            AiModelId::PersonPartParser,
+        ]
+        .into_iter()
+        .map(estimated_session_bytes)
+        .sum();
+
+        assert_eq!(report.first_use_estimates.len(), all_capabilities().len());
+        for estimate in report.first_use_estimates {
+            assert_eq!(estimate.unrelated_models, 0);
+            assert!(estimate.required_models <= 2);
+            assert!(estimate.expected_download_bytes * 2 < eager_download_bytes);
+            assert!(estimate.estimated_session_bytes * 2 < eager_session_bytes);
+        }
+    }
+
+    #[tokio::test]
+    async fn measured_first_use_receipts_cover_cold_local_warm_and_reload_for_every_capability() {
+        let eager_registry = AiModelRegistry::new(u64::MAX);
+        let eager_stats = Arc::new(MeasuredLoaderStats::default());
+        let (eager_leases, eager_latency_us) = measured_acquire(
+            &eager_registry,
+            &ALL_MODEL_IDS,
+            Duration::from_millis(5),
+            Arc::clone(&eager_stats),
+            true,
+            true,
+        )
+        .await;
+        let eager_download_bytes: u64 = ALL_MODEL_IDS.into_iter().map(expected_source_bytes).sum();
+        let eager_resident_bytes = eager_registry.report().resident_bytes;
+        assert_eq!(
+            eager_stats.loads.load(Ordering::SeqCst),
+            ALL_MODEL_IDS.len()
+        );
+        assert_eq!(
+            eager_stats.downloaded_bytes.load(Ordering::SeqCst),
+            eager_download_bytes
+        );
+        drop(eager_leases);
+
+        for capability in all_capabilities() {
+            let ids = capability.dependencies();
+            let cold_registry = AiModelRegistry::new(u64::MAX);
+            let cold_stats = Arc::new(MeasuredLoaderStats::default());
+            let (cold_leases, cold_latency_us) = measured_acquire(
+                &cold_registry,
+                ids,
+                Duration::from_millis(5),
+                Arc::clone(&cold_stats),
+                true,
+                true,
+            )
+            .await;
+            let cold_downloaded_bytes = cold_stats.downloaded_bytes.load(Ordering::SeqCst);
+            let cold_hashed_bytes = cold_stats.hashed_bytes.load(Ordering::SeqCst);
+            let cold_resident_bytes = cold_registry.report().resident_bytes;
+            assert_eq!(cold_stats.loads.load(Ordering::SeqCst), ids.len());
+            assert!(cold_latency_us < eager_latency_us);
+            assert!(cold_downloaded_bytes * 2 < eager_download_bytes);
+            assert!(cold_resident_bytes * 2 < eager_resident_bytes);
+
+            let warm_started = Instant::now();
+            for id in ids {
+                let lease = cold_registry
+                    .acquire_with(*id, estimated_session_bytes(*id), |_| async {
+                        panic!("warm acquisition must not invoke loader")
+                    })
+                    .await
+                    .unwrap();
+                drop(lease);
+            }
+            let warm_latency_us = warm_started.elapsed().as_micros();
+
+            drop(cold_leases);
+            for id in ids {
+                assert!(cold_registry.evict_idle(*id));
+            }
+            let reload_stats = Arc::new(MeasuredLoaderStats::default());
+            let (reloaded, reload_latency_us) = measured_acquire(
+                &cold_registry,
+                ids,
+                Duration::from_millis(1),
+                Arc::clone(&reload_stats),
+                false,
+                false,
+            )
+            .await;
+            assert_eq!(reload_stats.loads.load(Ordering::SeqCst), ids.len());
+            let reload_downloaded_bytes = reload_stats.downloaded_bytes.load(Ordering::SeqCst);
+            let reload_hashed_bytes = reload_stats.hashed_bytes.load(Ordering::SeqCst);
+            assert_eq!((reload_downloaded_bytes, reload_hashed_bytes), (0, 0));
+            drop(reloaded);
+
+            let local_registry = AiModelRegistry::new(u64::MAX);
+            let local_stats = Arc::new(MeasuredLoaderStats::default());
+            let (local_leases, downloaded_local_latency_us) = measured_acquire(
+                &local_registry,
+                ids,
+                Duration::from_millis(1),
+                Arc::clone(&local_stats),
+                false,
+                false,
+            )
+            .await;
+            assert_eq!(local_stats.loads.load(Ordering::SeqCst), ids.len());
+            assert_eq!(local_stats.downloaded_bytes.load(Ordering::SeqCst), 0);
+            assert_eq!(local_stats.hashed_bytes.load(Ordering::SeqCst), 0);
+            drop(local_leases);
+
+            println!(
+                "{}",
+                serde_json::json!({
+                    "capability": capability,
+                    "cold": {
+                        "elapsedUs": cold_latency_us,
+                        "requestedModels": ids.len(),
+                        "downloadedBytes": cold_downloaded_bytes,
+                        "hashedBytes": cold_hashed_bytes,
+                        "residentBytes": cold_resident_bytes,
+                        "unrelatedModels": 0,
+                    },
+                    "downloadedLocal": {
+                        "elapsedUs": downloaded_local_latency_us,
+                        "downloadedBytes": 0,
+                        "hashedBytes": 0,
+                    },
+                    "warm": {
+                        "elapsedUs": warm_latency_us,
+                        "downloadedBytes": 0,
+                        "hashedBytes": 0,
+                    },
+                    "reloadAfterEviction": {
+                        "elapsedUs": reload_latency_us,
+                        "reloads": reload_stats.loads.load(Ordering::SeqCst),
+                        "downloadedBytes": reload_downloaded_bytes,
+                        "hashedBytes": reload_hashed_bytes,
+                    },
+                    "eagerBaseline": {
+                        "elapsedUs": eager_latency_us,
+                        "downloadedBytes": eager_download_bytes,
+                        "residentBytes": eager_resident_bytes,
+                    }
+                })
+            );
+        }
     }
 
     #[tokio::test]

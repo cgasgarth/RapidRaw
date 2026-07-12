@@ -64,18 +64,13 @@ pub fn build_ort_session(path: &Path) -> Result<ort::session::Session> {
     Ok(ort::session::Session::builder()?
         .with_execution_providers([ort::ep::CPU::default().build()])
         .map_err(|error| anyhow!(error.to_string()))?
-        .commit_from_file(path)?)
-}
-
-pub fn build_ort_session_with_intra_threads(
-    path: &Path,
-    intra_threads: usize,
-) -> Result<ort::session::Session> {
-    initialize_ort_runtime()?;
-    Ok(ort::session::Session::builder()?
-        .with_execution_providers([ort::ep::CPU::default().build()])
+        .with_intra_threads(2)
         .map_err(|error| anyhow!(error.to_string()))?
-        .with_intra_threads(intra_threads)
+        .with_inter_threads(1)
+        .map_err(|error| anyhow!(error.to_string()))?
+        .with_optimization_level(ort::session::builder::GraphOptimizationLevel::All)
+        .map_err(|error| anyhow!(error.to_string()))?
+        .with_memory_pattern(true)
         .map_err(|error| anyhow!(error.to_string()))?
         .commit_from_file(path)?)
 }

@@ -27,8 +27,6 @@ dependencies = [
  "imgref",
  "include_dir",
  "jni 0.21.1",
- "jxl-encoder",
- "jxl-oxide",
  "kamadak-exif",
  "lcms2",
  "libc",
@@ -37,7 +35,6 @@ dependencies = [
  "memmap2",
  "mimalloc",
  "moxcms",
- "mozjpeg-rs",
  "nalgebra",
  "ndarray 0.17.2",
  "ndk-context",
@@ -49,11 +46,12 @@ dependencies = [
  "objc2-foundation",
  "objc2-vision",
  "once_cell",
- "opencv",
  "pollster",
  "quick-xml 0.41.0",
  "rand 0.10.1",
  "rapidraw-ai",
+ "rapidraw-codecs",
+ "rapidraw-computational",
  "rapidraw-types",
  "rawler",
  "rayon",
@@ -79,7 +77,6 @@ dependencies = [
  "uuid",
  "walkdir",
  "webkit2gtk",
- "webp",
  "wgpu",
 ]
 
@@ -5174,6 +5171,32 @@ dependencies = [
  "tempfile",
  "tokenizers",
  "tokio",
+]
+
+[[package]]
+name = "rapidraw-codecs"
+version = "0.1.0"
+dependencies = [
+ "image",
+ "imgref",
+ "jxl-encoder",
+ "jxl-oxide",
+ "mozjpeg-rs",
+ "rapidraw-types",
+ "rgb",
+ "serde_json",
+ "webp",
+]
+
+[[package]]
+name = "rapidraw-computational"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "opencv",
+ "rapidraw-types",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

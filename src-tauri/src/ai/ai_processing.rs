@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
@@ -365,6 +365,36 @@ pub async fn acquire_clip_model(
         )
         .await
         .map_err(anyhow::Error::msg)
+}
+
+pub struct AiCapabilityLeaseSet {
+    leases: Vec<AiModelLease>,
+}
+
+impl AiCapabilityLeaseSet {
+    pub fn lease(&self, id: AiModelId) -> Result<&AiModelLease, String> {
+        self.leases
+            .iter()
+            .find(|lease| lease.id() == id)
+            .ok_or_else(|| format!("ai_capability_dependency_missing:{id:?}"))
+    }
+}
+
+pub async fn acquire_capability(
+    app_handle: &tauri::AppHandle,
+    registry: &AiModelRegistry,
+    capability: AiCapability,
+) -> Result<AiCapabilityLeaseSet> {
+    let mut leases = Vec::with_capacity(capability.dependencies().len());
+    for id in capability.dependencies() {
+        let lease = if *id == AiModelId::Clip {
+            acquire_clip_model(app_handle, registry).await?
+        } else {
+            acquire_ort_model(app_handle, registry, *id).await?
+        };
+        leases.push(lease);
+    }
+    Ok(AiCapabilityLeaseSet { leases })
 }
 
 #[derive(Clone)]
