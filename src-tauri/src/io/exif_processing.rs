@@ -179,6 +179,9 @@ pub fn load_sidecar_recovering(
             &mut reasons,
             source_dimensions,
         );
+        if !migrated_fields.is_empty() && outcome == PersistedStateOutcome::Current {
+            outcome = PersistedStateOutcome::Migrated;
+        }
         validate_artifacts(
             &mut meta,
             expected_source_identity,
@@ -2684,7 +2687,7 @@ mod crop_migration_tests {
             },
             "persistedRenderState": {
                 "schemaVersion": 2,
-                "implementationRevision": 1,
+                "implementationRevision": 2,
                 "sourceIdentity": source_identity,
                 "editRevision": "sha256:legacy",
                 "userEdits": {
