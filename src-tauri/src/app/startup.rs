@@ -217,6 +217,7 @@ impl StartupTrace {
 /// Commits the native-shell visibility receipt before starting work that is
 /// allowed to complete behind that shell (notably clean-account WKWebView
 /// initialization on macOS).
+#[cfg(any(target_os = "macos", test))]
 pub fn after_native_shell_visible<T>(
     trace: &StartupTrace,
     detail: &str,
