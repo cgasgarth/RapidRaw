@@ -68,6 +68,17 @@ export const thumbnailInvalidatedPayloadSchema = z
   })
   .strict();
 
+export const smartPreviewGeneratedPayloadSchema = z
+  .object({
+    generation: nonnegativeNumberSchema,
+    path: z.string(),
+    resource: thumbnailResourceDescriptorSchema,
+    smartPreview: thumbnailSmartPreviewPayloadSchema,
+    sourceRevision: z.string(),
+    state: z.literal('current'),
+  })
+  .strict();
+
 export const importStartPayloadSchema = z
   .object({
     total: nonnegativeNumberSchema,
@@ -295,6 +306,7 @@ const toProgress = (payload: ProgressPayload): Progress => {
 export const parseProgressPayload = (value: unknown): Progress => toProgress(progressPayloadSchema.parse(value));
 export const parseThumbnailGeneratedPayload = (value: unknown) => thumbnailGeneratedPayloadSchema.parse(value);
 export const parseThumbnailInvalidatedPayload = (value: unknown) => thumbnailInvalidatedPayloadSchema.parse(value);
+export const parseSmartPreviewGeneratedPayload = (value: unknown) => smartPreviewGeneratedPayloadSchema.parse(value);
 export const parseImportStartPayload = (value: unknown) => importStartPayloadSchema.parse(value);
 export const parseImportProgressPayload = (value: unknown) => importProgressPayloadSchema.parse(value);
 export const parsePathProgressPayload = (value: unknown) => pathProgressPayloadSchema.parse(value);

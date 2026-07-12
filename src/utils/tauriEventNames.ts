@@ -31,6 +31,7 @@ export const PANORAMA_ERROR_EVENT = 'panorama-error';
 export const PANORAMA_PROGRESS_EVENT = 'panorama-progress';
 export const PERSISTED_RENDER_STATE_RECOVERED_EVENT = 'persisted-render-state-recovered';
 export const PREVIEW_UPDATE_UNCROPPED_EVENT = 'preview-update-uncropped';
+export const SMART_PREVIEW_GENERATED_EVENT = 'smart-preview-generated';
 export const THUMBNAIL_GENERATED_EVENT = 'thumbnail-generated';
 export const THUMBNAIL_GENERATION_COMPLETE_EVENT = 'thumbnail-generation-complete';
 export const THUMBNAIL_INVALIDATED_EVENT = 'thumbnail-invalidated';

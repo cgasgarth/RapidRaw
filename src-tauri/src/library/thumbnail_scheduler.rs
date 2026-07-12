@@ -93,6 +93,7 @@ pub struct ThumbnailJob {
     pub source_revision: Option<String>,
     pub attempts: u8,
     pub cancellation: ThumbnailCancellation,
+    pub committed_invalidation: bool,
 }
 
 #[derive(Clone)]
@@ -104,6 +105,7 @@ struct PendingThumbnail {
     source_revision: Option<String>,
     attempts: u8,
     not_before: Instant,
+    committed_invalidation: bool,
 }
 
 #[derive(Clone, Eq, PartialEq)]
@@ -221,7 +223,7 @@ impl ThumbnailScheduler {
             state.last_invalidation_by_path.clear();
         }
         for spec in request.requests {
-            Self::upsert_locked(&mut state, request.generation, spec);
+            Self::upsert_locked(&mut state, request.generation, spec, false);
         }
         self.enforce_bound(&mut state);
         Self::recount(&mut state);
@@ -276,6 +278,7 @@ impl ThumbnailScheduler {
                 priority,
                 source_revision: Some(source_revision),
             },
+            true,
         );
         self.enforce_bound(&mut state);
         Self::recount(&mut state);
@@ -289,6 +292,7 @@ impl ThumbnailScheduler {
         state: &mut ThumbnailSchedulerState,
         generation: ThumbnailGeneration,
         spec: ThumbnailRequestSpec,
+        committed_invalidation: bool,
     ) {
         let path: Arc<str> = Arc::from(spec.path.trim());
         if path.is_empty() {
@@ -325,6 +329,7 @@ impl ThumbnailScheduler {
             source_revision: spec.source_revision,
             attempts: 0,
             not_before: Instant::now(),
+            committed_invalidation,
         };
         state.pending_by_path.insert(path.clone(), pending.clone());
         state.heap.push(Self::entry(path, &pending));
@@ -403,6 +408,7 @@ impl ThumbnailScheduler {
                     source_revision: pending.source_revision,
                     attempts: pending.attempts,
                     cancellation: ThumbnailCancellation(Arc::new(AtomicBool::new(false))),
+                    committed_invalidation: pending.committed_invalidation,
                 };
                 state.in_flight.insert(
                     entry.path,
@@ -465,6 +471,7 @@ impl ThumbnailScheduler {
                         attempts: job.attempts + 1,
                         not_before: Instant::now()
                             + self.policy.retry_base * 2u32.pow(job.attempts as u32),
+                        committed_invalidation: job.committed_invalidation,
                     };
                     state
                         .pending_by_path
@@ -573,6 +580,7 @@ mod tests {
             ))
             .unwrap();
         let old = scheduler.claim().unwrap();
+        assert!(!old.committed_invalidation);
         scheduler
             .update(update(
                 2,
@@ -650,6 +658,7 @@ mod tests {
         assert!(old.cancellation.is_cancelled());
         assert!(!scheduler.is_publishable(&old));
         let current = scheduler.claim().unwrap();
+        assert!(current.committed_invalidation);
         assert_eq!(current.source_revision.as_deref(), Some("sidecar-b"));
         assert!(scheduler.is_publishable(&current));
         let (duplicate, _) = scheduler

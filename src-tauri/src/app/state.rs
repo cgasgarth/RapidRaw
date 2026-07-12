@@ -257,6 +257,8 @@ pub struct AppState {
     pub decoded_image_cache: DecodedImageCache,
     pub source_fingerprint_cache: Arc<FingerprintCache>,
     pub thumbnail_scheduler: Arc<crate::library::thumbnail_scheduler::ThumbnailScheduler>,
+    pub smart_preview_scheduler:
+        Arc<crate::library::smart_preview_scheduler::SmartPreviewScheduler>,
     pub tether_session: Mutex<Option<TetherSessionSnapshot>>,
 }
 
@@ -341,6 +343,8 @@ impl AppState {
             thumbnail_scheduler: crate::library::thumbnail_scheduler::ThumbnailScheduler::new(
                 Default::default(),
             ),
+            smart_preview_scheduler:
+                crate::library::smart_preview_scheduler::SmartPreviewScheduler::new(64),
             tether_session: Mutex::new(None),
         }
     }
