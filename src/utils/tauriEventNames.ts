@@ -23,6 +23,7 @@ export const IMPORT_CANCELLED_EVENT = 'import-cancelled';
 export const IMPORT_ERROR_EVENT = 'import-error';
 export const IMPORT_PROGRESS_EVENT = 'import-progress';
 export const IMPORT_START_EVENT = 'import-start';
+export const IMAGE_OPEN_UPDATE_EVENT = 'image-open-update';
 export const INDEXING_FINISHED_EVENT = 'indexing-finished';
 export const INDEXING_PROGRESS_EVENT = 'indexing-progress';
 export const INDEXING_STARTED_EVENT = 'indexing-started';

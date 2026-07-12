@@ -5,7 +5,8 @@ import { type RefObject, useCallback, useRef } from 'react';
 import { toast } from 'react-toastify';
 import type { FolderTree } from '../../components/panel/FolderTree';
 import { type AlbumItem, type AppSettings, type ImageFile, LibraryViewMode } from '../../components/ui/AppProperties';
-import type { LoadImageResult } from '../../schemas/imageLoaderSchemas';
+import { Status } from '../../components/ui/ExportImportProperties';
+import { parseLoadedMetadata } from '../../schemas/imageLoaderSchemas';
 import { createEditorImageSession, isEditorImageSessionCurrent, useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useProcessStore } from '../../store/useProcessStore';
@@ -18,6 +19,9 @@ import { formatUnknownError } from '../../utils/errorFormatting';
 import { findAlbumById } from '../../utils/folderTreeUtils';
 import { upsertReopenedDerivedOutputReceipt } from '../../utils/hdrDerivedSourceReopen';
 import { buildImageCacheEntry, globalImageCache } from '../../utils/ImageLRUCache';
+import { beginImageOpenWithSchema, scheduleImagePrefetchWithSchema } from '../../utils/imageOpenInvokes';
+import { acceptImageOpenMetadataRevision } from '../../utils/imageOpenRevisionCache';
+import { imagePrefetchScheduler } from '../../utils/imagePrefetchScheduler';
 import {
   consumePendingNegativeConversionDustHealLayers,
   consumePendingNegativeConversionSavedPositiveHandoff,
@@ -40,10 +44,6 @@ interface PreloadedNavigationData {
 interface PreviousAdjustments {
   adjustments: Adjustments;
   path: string;
-}
-
-interface LoadedMetadata {
-  adjustments?: Adjustments | null;
 }
 
 interface CatalogImageProjection extends ImageFile {
@@ -225,6 +225,23 @@ export function useAppNavigation({
       });
       const isCachedInBackend = cachedReadyEntry?.backendReady === true;
 
+      const process = useProcessStore.getState();
+      const prefetchRequest = imagePrefetchScheduler.schedule({
+        currentPath: path,
+        memoryPressure: false,
+        now: performance.now(),
+        orderedPaths: useLibraryStore.getState().imageList.map((image) => image.path),
+        workloadBusy:
+          process.exportState.status === Status.Exporting ||
+          process.importState.status === Status.Importing ||
+          process.isIndexing,
+      });
+      if (prefetchRequest.candidates.length > 0) {
+        void scheduleImagePrefetchWithSchema(prefetchRequest).catch((error: unknown) => {
+          if (isEditorImageSessionCurrent(session.id)) console.warn('Image prefetch scheduling failed:', error);
+        });
+      }
+
       const hasDifferentResolution =
         cached &&
         (useEditorStore.getState().originalSize.width !== cached.originalSize.width ||
@@ -301,13 +318,26 @@ export function useAppNavigation({
         isBackendReadyRef.current = false;
         currentResRef.current = Infinity;
 
-        invoke<LoadImageResult>(Invokes.LoadImage, { path })
-          .then((result) => {
+        const library = useLibraryStore.getState();
+        const projection = library.imageList.find((image) => image.path === path) as
+          | (ImageFile & { entityRevision?: number; imageId?: string })
+          | undefined;
+        beginImageOpenWithSchema({
+          expectedCatalogRevision: library.catalogRevision,
+          expectedEntityRevision: projection?.entityRevision ?? null,
+          imageId: projection?.imageId ?? path,
+          path,
+          sessionId: { imageSession: session.generation, selectionGeneration: session.generation },
+        })
+          .then((openResult) => {
             if (!isEditorImageSessionCurrent(session.id)) return;
-            const loadedMetadata = metadataWithNegativeLabReopenedSavedPositiveHandoff({
-              imagePath: path,
-              metadata: result.metadata,
-            });
+            const result = openResult.decoded;
+            const loadedMetadata = parseLoadedMetadata(
+              metadataWithNegativeLabReopenedSavedPositiveHandoff({
+                imagePath: path,
+                metadata: result.metadata,
+              }),
+            );
             upsertReopenedDerivedOutputReceipt({
               imagePath: path,
               metadata: loadedMetadata,
@@ -316,6 +346,13 @@ export function useAppNavigation({
             isBackendReadyRef.current = true;
             currentResRef.current = 0;
             setEditor((state) => ({
+              adjustments:
+                !isSliderDragging &&
+                acceptImageOpenMetadataRevision(path, openResult.metadataFingerprint) &&
+                loadedMetadata.adjustments &&
+                !loadedMetadata.adjustments['is_null']
+                  ? normalizeLoadedAdjustments(loadedMetadata.adjustments)
+                  : state.adjustments,
               originalSize: { width: result.width, height: result.height },
               selectedImage:
                 state.selectedImage?.path === path
@@ -331,41 +368,19 @@ export function useAppNavigation({
                     }
                   : state.selectedImage,
             }));
+            const currentAdjustments = useEditorStore.getState().adjustments;
+            resetHistory(currentAdjustments);
+            prevAdjustmentsRef.current = { path, adjustments: currentAdjustments };
+            globalImageCache.set(path, { ...cachedReadyEntry, adjustments: currentAdjustments });
+            consumePendingNegativeConversionDustHealLayers(path);
+            consumePendingNegativeConversionSavedPositiveHandoff(path);
           })
           .catch((err: unknown) => {
             if (!isEditorImageSessionCurrent(session.id)) return;
             if (String(err).includes('cancelled')) return;
-            console.error('Background load_image failed on cache hit:', err);
+            console.error('Background image-open session failed on cache hit:', err);
             isBackendReadyRef.current = true;
             currentResRef.current = 0;
-          });
-
-        invoke<LoadedMetadata>(Invokes.LoadMetadata, { path })
-          .then((metadata) => {
-            if (!isEditorImageSessionCurrent(session.id)) return;
-            let freshAdjustments: Adjustments;
-            if (metadata.adjustments && !metadata.adjustments['is_null']) {
-              freshAdjustments = normalizeLoadedAdjustments(metadata.adjustments);
-            } else {
-              freshAdjustments = { ...INITIAL_ADJUSTMENTS };
-            }
-            if (
-              !isSliderDragging &&
-              JSON.stringify(cachedReadyEntry.adjustments) !== JSON.stringify(freshAdjustments)
-            ) {
-              setEditor({ adjustments: freshAdjustments });
-              resetHistory(freshAdjustments);
-              prevAdjustmentsRef.current = { path, adjustments: freshAdjustments };
-              globalImageCache.set(path, { ...cachedReadyEntry, adjustments: freshAdjustments });
-            }
-            consumePendingNegativeConversionDustHealLayers(path);
-            consumePendingNegativeConversionSavedPositiveHandoff(path);
-          })
-          .catch((err: unknown) => {
-            if (!isEditorImageSessionCurrent(session.id)) return;
-            console.error('Failed background metadata sync on cache hit:', err);
-            consumePendingNegativeConversionDustHealLayers(path);
-            consumePendingNegativeConversionSavedPositiveHandoff(path);
           });
 
         return;

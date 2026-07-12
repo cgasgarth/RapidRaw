@@ -303,8 +303,7 @@ try {
     'record_frontend_startup_phase',
     'plugin:dialog|open',
     'get_folder_tree',
-    'load_metadata',
-    'load_image',
+    'begin_image_open',
     'apply_adjustments',
     'generate_original_transformed_preview',
   ]) {
