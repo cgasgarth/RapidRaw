@@ -1,11 +1,10 @@
-import { afterEach, describe, expect, test } from 'bun:test';
+import { afterEach, describe, expect, mock, test } from 'bun:test';
 import { Window } from 'happy-dom';
 import i18next from 'i18next';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
-import ExportPanel from '../../../src/components/panel/right/export/ExportPanel.tsx';
 import { type AppSettings, type SelectedImage, Theme } from '../../../src/components/ui/AppProperties.tsx';
 import {
   ExportColorProfile,
@@ -21,6 +20,10 @@ import { parseExportReceiptPayload } from '../../../src/schemas/tauriEventSchema
 import { useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { useProcessStore } from '../../../src/store/useProcessStore.ts';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
+
+const invoke = mock(async () => null);
+mock.module('@tauri-apps/api/core', () => ({ invoke }));
+const { default: ExportPanel } = await import('../../../src/components/panel/right/export/ExportPanel.tsx');
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -131,6 +134,7 @@ afterEach(() => {
     renderedRoot = null;
   }
   resetEditorState();
+  invoke.mockClear();
 });
 
 describe('export panel compact footer workflow', () => {
@@ -178,7 +182,33 @@ describe('export panel compact footer workflow', () => {
     const action = primaryAction(container);
     expect(workflow.dataset.exportFooterWorkflowState).toBe('running');
     expect(action.getAttribute('aria-busy')).toBe('true');
+    expect(action.getAttribute('aria-keyshortcuts')).toBe('Escape');
     expect(action.textContent).toContain('Cancel export');
+
+    await act(async () => {
+      window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape' }));
+      await Promise.resolve();
+    });
+    expect(invoke.mock.calls.some(([command]) => command === 'cancel_export')).toBe(true);
+    expect(primaryAction(container).hasAttribute('disabled')).toBe(true);
+
+    const cancelledReceipt = parseExportReceiptPayload({
+      completedAt: '2026-07-12T02:30:00.000Z',
+      outputs: [],
+      terminalStatus: 'cancelled',
+      total: 3,
+    });
+    await rerenderFooter({
+      errorMessage: '',
+      lastReceipt: cancelledReceipt,
+      progress: { current: 0, total: 3 },
+      status: Status.Cancelled,
+    });
+    expect(
+      required<HTMLElement>(container, '[data-testid="export-footer-workflow-state"]').dataset
+        .exportFooterWorkflowState,
+    ).toBe('canceled');
+    expect(primaryAction(container).textContent).toContain('Retry Export');
   });
 
   test('presents failed and cancelled exports as retry states without dropping status detail', async () => {

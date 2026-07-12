@@ -1300,7 +1300,7 @@ export default function ExportPanel({
     }
   };
 
-  const handleCancel = async () => {
+  const handleCancel = useCallback(async () => {
     if (effectiveIsCancellingExport) return;
     setIsCancellingExport(true);
     try {
@@ -1309,7 +1309,18 @@ export default function ExportPanel({
       console.error('Failed to cancel:', error);
       setIsCancellingExport(false);
     }
-  };
+  }, [effectiveIsCancellingExport]);
+
+  useEffect(() => {
+    if (!isExporting) return;
+    const handleCancellationShortcut = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      event.preventDefault();
+      void handleCancel();
+    };
+    window.addEventListener('keydown', handleCancellationShortcut);
+    return () => window.removeEventListener('keydown', handleCancellationShortcut);
+  }, [handleCancel, isExporting]);
 
   const selectedFileFormat = FILE_FORMATS.find((format) => format.id === fileFormat);
   const selectedColorProfileLabel =
@@ -2788,6 +2799,9 @@ export default function ExportPanel({
                     : 'bg-editor-primary-active text-editor-primary-active-text'
           }`}
           aria-busy={isExporting}
+          aria-keyshortcuts="Escape"
+          aria-label={isExporting ? t('export.status.cancelExport') : undefined}
+          data-testid="export-cancel-control"
           data-tooltip={isExporting ? t('export.status.cancelExport') : exportDisabledReason}
           disabled={status === Status.Exporting ? effectiveIsCancellingExport : !canExport}
           onClick={() => {
