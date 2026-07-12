@@ -64,7 +64,7 @@ use image::{DynamicImage, GenericImageView, ImageBuffer, Luma, RgbImage, Rgba};
 use imageproc::drawing::draw_line_segment_mut;
 use imageproc::edges::canny;
 use imageproc::hough::{LineDetectionOptions, detect_lines};
-use mozjpeg_rs::{Encoder, Preset};
+use rapidraw_codecs::JpegPreset;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -688,9 +688,7 @@ fn generate_export_soft_proof_preview(
         });
     }
 
-    Encoder::new(Preset::BaselineFastest)
-        .quality(86)
-        .encode_rgb(&proof_pixels, width, height)
+    rapidraw_codecs::encode_jpeg_rgb(&proof_pixels, width, height, 86, JpegPreset::Fastest, None)
         .map(Response::new)
         .map_err(|e| format!("Failed to encode export soft proof preview: {}", e))
 }
@@ -3114,7 +3112,8 @@ pub fn run() {
             preview_worker::start_preview_worker(app_handle.clone());
             start_analytics_worker(app_handle.clone());
             file_management::start_thumbnail_workers(app_handle);
-            jxl_oxide::integration::register_image_decoding_hook();
+            #[cfg(feature = "advanced-codecs")]
+            rapidraw_codecs::register_jxl_decoding_hook();
 
             let window_cfg = app.config().app.windows.first().unwrap().clone();
             let decorations = settings.decorations.unwrap_or(window_cfg.decorations);

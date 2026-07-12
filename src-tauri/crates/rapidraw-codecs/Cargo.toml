@@ -1,0 +1,27 @@
+[package]
+name = "rapidraw-codecs"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+publish = false
+
+[features]
+default = ["jpeg"]
+jpeg = ["dep:imgref", "dep:mozjpeg-rs", "dep:rgb"]
+advanced = ["dep:image", "dep:jxl-encoder", "dep:jxl-oxide", "dep:webp"]
+
+[dependencies]
+image = { version = "0.25.10", optional = true }
+imgref = { version = "1.12.1", optional = true }
+jxl-encoder = { version = "0.3.1", optional = true }
+jxl-oxide = { version = "0.12.5", features = ["image"], optional = true }
+mozjpeg-rs = { version = "0.9.2", optional = true }
+rapidraw-types = { path = "../rapidraw-types" }
+rgb = { version = "0.8.53", optional = true }
+webp = { version = "0.3", optional = true }
+
+[dev-dependencies]
+serde_json = "1.0"
+
+[lints.clippy]
+all = "deny"
