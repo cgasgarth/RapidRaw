@@ -8,7 +8,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use futures::{StreamExt, stream};
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter, Manager, Runtime};
 use tokio::sync::Semaphore;
 
 use super::file_management::{ImportSettings, generate_filename_from_template, parse_virtual_path};
@@ -20,6 +20,8 @@ const SAME_DEVICE_COPY_CONCURRENCY: usize = 2;
 const RESOURCE_BUFFER_CREDITS: usize = 8;
 const JOURNAL_SCHEMA_VERSION: u32 = 1;
 static IMPORT_TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
+#[cfg(test)]
+static TEST_COPY_CHUNK_DELAY_MILLIS: AtomicU64 = AtomicU64::new(0);
 const _: () = assert!(SAME_DEVICE_COPY_CONCURRENCY < FAST_DEVICE_COPY_CONCURRENCY);
 const _: () = assert!(FAST_DEVICE_COPY_CONCURRENCY <= RESOURCE_BUFFER_CREDITS);
 
@@ -46,7 +48,7 @@ pub struct ImportArtifactPlan {
     pub required: bool,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct SourceRevision {
     pub byte_size: u64,
@@ -162,9 +164,8 @@ struct PipelineCounters {
     progress_events: AtomicU64,
 }
 
-#[derive(Clone)]
-pub struct ImportPipeline {
-    app: AppHandle,
+pub struct ImportPipeline<R: Runtime> {
+    app: AppHandle<R>,
     job_id: String,
     destination_folder: PathBuf,
     settings: ImportSettings,
@@ -173,9 +174,23 @@ pub struct ImportPipeline {
     buffer_credits: Arc<Semaphore>,
 }
 
-impl ImportPipeline {
+impl<R: Runtime> Clone for ImportPipeline<R> {
+    fn clone(&self) -> Self {
+        Self {
+            app: self.app.clone(),
+            job_id: self.job_id.clone(),
+            destination_folder: self.destination_folder.clone(),
+            settings: self.settings.clone(),
+            cancellation: Arc::clone(&self.cancellation),
+            counters: Arc::clone(&self.counters),
+            buffer_credits: Arc::clone(&self.buffer_credits),
+        }
+    }
+}
+
+impl<R: Runtime> ImportPipeline<R> {
     pub fn new(
-        app: AppHandle,
+        app: AppHandle<R>,
         job_id: String,
         destination_folder: PathBuf,
         settings: ImportSettings,
@@ -228,15 +243,65 @@ impl ImportPipeline {
             }
         };
         let preflight_millis = preflight_started.elapsed().as_millis() as u64;
-        let total_bytes = plans.iter().map(|plan| plan.expected_bytes).sum();
-        let total_items = plans.len();
-        let copy_concurrency = copy_concurrency_for(&plans, &self.destination_folder);
-        let completed = Arc::new(Mutex::new(Vec::new()));
+        self.execute_plans(plans.clone(), plans, Vec::new(), started, preflight_millis)
+            .await
+    }
+
+    pub async fn resume(
+        app: AppHandle<R>,
+        job_id: String,
+        cancellation: Arc<AtomicBool>,
+    ) -> Result<ImportJobReceipt, String> {
+        let journal = read_job_journal(&app, &job_id)?;
+        let validation = validate_journal_resume(&journal);
+        if !validation.invalid.is_empty() {
+            return Err(format!(
+                "Import resume rejected: {} source or destination revision(s) changed",
+                validation.invalid.len()
+            ));
+        }
+        let resumable: HashSet<u64> = validation.resumable.into_iter().collect();
+        let pending_plans = journal
+            .plans
+            .iter()
+            .filter(|plan| resumable.contains(&plan.item_id))
+            .cloned()
+            .collect();
+        let pipeline = Self::new(
+            app,
+            job_id,
+            PathBuf::from(&journal.destination_folder),
+            journal.settings,
+            cancellation,
+        );
+        Ok(pipeline
+            .execute_plans(
+                journal.plans,
+                pending_plans,
+                journal.receipt.completed,
+                Instant::now(),
+                0,
+            )
+            .await)
+    }
+
+    async fn execute_plans(
+        self,
+        all_plans: Vec<ImportItemPlan>,
+        pending_plans: Vec<ImportItemPlan>,
+        verified_completed: Vec<ImportItemReceipt>,
+        started: Instant,
+        preflight_millis: u64,
+    ) -> ImportJobReceipt {
+        let total_bytes = all_plans.iter().map(|plan| plan.expected_bytes).sum();
+        let total_items = all_plans.len();
+        let copy_concurrency = copy_concurrency_for(&pending_plans, &self.destination_folder);
+        let completed = Arc::new(Mutex::new(verified_completed));
         let failed = Arc::new(Mutex::new(Vec::new()));
         let cancelled = Arc::new(Mutex::new(Vec::new()));
         let first_commit = Arc::new(Mutex::new(None::<Duration>));
 
-        stream::iter(plans.clone())
+        stream::iter(pending_plans)
             .for_each_concurrent(copy_concurrency, |plan| {
                 let pipeline = self.clone();
                 let completed = Arc::clone(&completed);
@@ -310,7 +375,7 @@ impl ImportPipeline {
             },
             terminal_stage,
         };
-        self.finish(&plans, &mut receipt);
+        self.finish(&all_plans, &mut receipt);
         receipt
     }
 
@@ -884,6 +949,10 @@ fn stream_copy_atomic(
             counters
                 .bytes_copied
                 .fetch_add(read as u64, Ordering::Relaxed);
+            #[cfg(test)]
+            std::thread::sleep(Duration::from_millis(
+                TEST_COPY_CHUNK_DELAY_MILLIS.load(Ordering::Relaxed),
+            ));
         }
         writer
             .flush()
@@ -1003,14 +1072,17 @@ fn now_millis() -> u128 {
         .as_millis()
 }
 
-fn journal_dir(app: &AppHandle) -> PathBuf {
+fn journal_dir<R: Runtime>(app: &AppHandle<R>) -> PathBuf {
     app.path()
         .app_data_dir()
         .unwrap_or_else(|_| std::env::temp_dir().join("rapidraw"))
         .join("import-jobs")
 }
 
-fn write_journal(app: &AppHandle, journal: &ImportJobJournal) -> Result<PathBuf, String> {
+fn write_journal<R: Runtime>(
+    app: &AppHandle<R>,
+    journal: &ImportJobJournal,
+) -> Result<PathBuf, String> {
     let directory = journal_dir(app);
     fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
     let final_path = directory.join(format!("{}.json", journal.job_id));
@@ -1021,12 +1093,11 @@ fn write_journal(app: &AppHandle, journal: &ImportJobJournal) -> Result<PathBuf,
     Ok(final_path)
 }
 
-pub fn read_job_receipt(app: &AppHandle, job_id: &str) -> Result<ImportJobReceipt, String> {
-    let path = journal_dir(app).join(format!("{job_id}.json"));
-    let bytes = fs::read(&path).map_err(|error| format!("{}: {error}", path.display()))?;
-    let journal: ImportJobJournal =
-        serde_json::from_slice(&bytes).map_err(|error| error.to_string())?;
-    Ok(journal.receipt)
+pub fn read_job_receipt<R: Runtime>(
+    app: &AppHandle<R>,
+    job_id: &str,
+) -> Result<ImportJobReceipt, String> {
+    Ok(read_job_journal(app, job_id)?.receipt)
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -1038,15 +1109,20 @@ pub struct ImportResumeValidation {
     pub invalid: Vec<ImportItemFailure>,
 }
 
-pub fn validate_job_resume(
-    app: &AppHandle,
+pub fn validate_job_resume<R: Runtime>(
+    app: &AppHandle<R>,
     job_id: &str,
 ) -> Result<ImportResumeValidation, String> {
+    Ok(validate_journal_resume(&read_job_journal(app, job_id)?))
+}
+
+fn read_job_journal<R: Runtime>(
+    app: &AppHandle<R>,
+    job_id: &str,
+) -> Result<ImportJobJournal, String> {
     let path = journal_dir(app).join(format!("{job_id}.json"));
     let bytes = fs::read(&path).map_err(|error| format!("{}: {error}", path.display()))?;
-    let journal: ImportJobJournal =
-        serde_json::from_slice(&bytes).map_err(|error| error.to_string())?;
-    Ok(validate_journal_resume(&journal))
+    serde_json::from_slice(&bytes).map_err(|error| error.to_string())
 }
 
 fn validate_journal_resume(journal: &ImportJobJournal) -> ImportResumeValidation {
@@ -1083,9 +1159,7 @@ fn validate_journal_resume(journal: &ImportJobJournal) -> ImportResumeValidation
             continue;
         }
         match plan.source.metadata() {
-            Ok(metadata)
-                if source_revision(&metadata).byte_size == plan.source_revision.byte_size =>
-            {
+            Ok(metadata) if source_revision(&metadata) == plan.source_revision => {
                 validation.resumable.push(plan.item_id);
             }
             _ if plan.source.to_string_lossy().starts_with("content://") => {
@@ -1128,6 +1202,9 @@ pub fn new_job_id() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "tauri-test")]
+    static IMPORT_INTEGRATION_TEST_LOCK: Mutex<()> = Mutex::new(());
 
     fn plan(source: PathBuf, destination: PathBuf) -> ImportItemPlan {
         let metadata = source.metadata().unwrap();
@@ -1378,5 +1455,174 @@ mod tests {
                 .error
                 .contains("source revision changed")
         );
+    }
+
+    #[cfg(feature = "tauri-test")]
+    #[tokio::test]
+    async fn command_import_cancel_journal_and_resume_completes_large_batch_without_duplicates() {
+        use tauri::Manager;
+
+        let _test_guard = IMPORT_INTEGRATION_TEST_LOCK.lock().unwrap();
+        let fixture = tempfile::tempdir().unwrap();
+        let sources = fixture.path().join("sources");
+        let destination = fixture.path().join("library");
+        fs::create_dir_all(&sources).unwrap();
+        fs::create_dir_all(&destination).unwrap();
+        let source_paths = (0..100)
+            .map(|index| {
+                let path = sources.join(format!("capture-{index:03}.jpg"));
+                let mut bytes = vec![index as u8; COPY_BUFFER_BYTES + 17];
+                bytes[0..8].copy_from_slice(&(index as u64).to_le_bytes());
+                fs::write(&path, bytes).unwrap();
+                path.to_string_lossy().into_owned()
+            })
+            .collect::<Vec<_>>();
+
+        let app = tauri::test::mock_builder()
+            .manage(crate::AppState::new())
+            .manage(super::super::changefeed::LibraryFilesystemChangefeed::default())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .unwrap();
+        let app_handle = app.handle().clone();
+        app_handle
+            .state::<super::super::changefeed::LibraryFilesystemChangefeed>()
+            .replace_roots(app_handle.clone(), vec![destination.clone()])
+            .unwrap();
+
+        TEST_COPY_CHUNK_DELAY_MILLIS.store(3, Ordering::Release);
+        let job_id = super::super::file_management::import_files_for_runtime(
+            source_paths.clone(),
+            destination.to_string_lossy().into_owned(),
+            ImportSettings {
+                filename_template: "{original_filename}".to_string(),
+                organize_by_date: false,
+                date_folder_format: "YYYY/MM/DD".to_string(),
+                delete_after_import: false,
+            },
+            app_handle.clone(),
+        )
+        .await
+        .unwrap();
+        let partial_path = journal_dir(&app_handle).join(format!("{job_id}.items.jsonl"));
+        tokio::time::timeout(Duration::from_secs(10), async {
+            loop {
+                if fs::read_to_string(&partial_path)
+                    .is_ok_and(|journal| journal.lines().count() >= 2)
+                {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(2)).await;
+            }
+        })
+        .await
+        .expect("at least two items commit before cancellation");
+        assert!(
+            super::super::file_management::cancel_import_for_runtime(app_handle.clone()).unwrap()
+        );
+        wait_for_import_terminal(&app_handle).await;
+        TEST_COPY_CHUNK_DELAY_MILLIS.store(0, Ordering::Release);
+
+        let cancelled = read_job_receipt(&app_handle, &job_id).unwrap();
+        assert_eq!(cancelled.terminal_stage, ImportStage::Cancelled);
+        assert!(!cancelled.completed.is_empty());
+        assert!(cancelled.completed.len() < source_paths.len());
+        assert_eq!(
+            cancelled.completed.len() + cancelled.cancelled.len(),
+            source_paths.len()
+        );
+        assert!(cancelled.failed.is_empty());
+        assert_eq!(temporary_import_artifact_count(&destination), 0);
+        assert!(source_paths.iter().all(|path| Path::new(path).exists()));
+
+        let validation = validate_job_resume(&app_handle, &job_id).unwrap();
+        assert_eq!(
+            validation.verified_completed.len(),
+            cancelled.completed.len()
+        );
+        assert_eq!(validation.resumable.len(), cancelled.cancelled.len());
+        assert!(validation.invalid.is_empty());
+        assert_eq!(
+            super::super::file_management::resume_import_job_for_runtime(
+                job_id.clone(),
+                app_handle.clone(),
+            )
+            .await
+            .unwrap(),
+            job_id
+        );
+        wait_for_import_terminal(&app_handle).await;
+
+        let completed = read_job_receipt(&app_handle, &job_id).unwrap();
+        assert_eq!(completed.terminal_stage, ImportStage::Completed);
+        assert_eq!(completed.completed.len(), source_paths.len());
+        assert!(completed.failed.is_empty());
+        assert!(completed.cancelled.is_empty());
+        let unique_item_ids = completed
+            .completed
+            .iter()
+            .map(|receipt| receipt.item_id)
+            .collect::<HashSet<_>>();
+        let unique_destinations = completed
+            .completed
+            .iter()
+            .map(|receipt| receipt.destination.as_str())
+            .collect::<HashSet<_>>();
+        assert_eq!(unique_item_ids.len(), source_paths.len());
+        assert_eq!(unique_destinations.len(), source_paths.len());
+        assert!(
+            completed
+                .completed
+                .iter()
+                .all(|receipt| Path::new(&receipt.destination).exists())
+        );
+        assert_eq!(temporary_import_artifact_count(&destination), 0);
+        assert!(source_paths.iter().all(|path| Path::new(path).exists()));
+
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        let report =
+            super::super::changefeed::get_library_changefeed_report(app_handle.state()).unwrap();
+        assert_eq!(
+            report.coalesced_operations,
+            source_paths.len() as u64,
+            "changefeed report: {report:?}"
+        );
+        assert_eq!(report.full_recursive_fallback_scans, 0);
+
+        let _ = fs::remove_file(journal_dir(&app_handle).join(format!("{job_id}.json")));
+        let _ = fs::remove_file(partial_path);
+    }
+
+    #[cfg(feature = "tauri-test")]
+    async fn wait_for_import_terminal<R: Runtime>(app_handle: &AppHandle<R>) {
+        tokio::time::timeout(Duration::from_secs(20), async {
+            loop {
+                if app_handle
+                    .state::<crate::AppState>()
+                    .import_job
+                    .lock()
+                    .unwrap()
+                    .is_none()
+                {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(2)).await;
+            }
+        })
+        .await
+        .expect("import command reaches a terminal state");
+    }
+
+    #[cfg(feature = "tauri-test")]
+    fn temporary_import_artifact_count(root: &Path) -> usize {
+        walkdir::WalkDir::new(root)
+            .into_iter()
+            .filter_map(Result::ok)
+            .filter(|entry| {
+                entry
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with(".rawengine-tmp-import-")
+            })
+            .count()
     }
 }

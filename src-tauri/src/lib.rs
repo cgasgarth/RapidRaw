@@ -3405,6 +3405,7 @@ pub fn run() {
             file_management::cancel_import,
             file_management::get_import_job_receipt,
             file_management::validate_import_job_resume,
+            file_management::resume_import_job,
             file_management::create_virtual_copy,
             album_management::get_albums,
             album_management::save_albums,

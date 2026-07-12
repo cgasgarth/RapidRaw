@@ -16,7 +16,6 @@ import {
   SlidersHorizontal,
   Star,
   Users,
-  XCircle,
 } from 'lucide-react';
 import type React from 'react';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
@@ -25,10 +24,8 @@ import type { ThumbnailViewportUpdate } from '../../hooks/library/useThumbnails'
 import { EXPORT_LAST_USED_PRESET_ID } from '../../schemas/export/exportRecipeIds';
 import { buildLibrarySessionUiCard } from '../../schemas/library/librarySessionUiSchemas';
 import { useLibraryStore } from '../../store/useLibraryStore';
-import { useProcessStore } from '../../store/useProcessStore';
 import { thumbnailCache } from '../../thumbnails/thumbnailCacheInstance';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
-import { cancelImportWithSchema } from '../../utils/fileOperationInvokes';
 import { DEFAULT_THEME_ID, THEMES, type ThemeProps } from '../../utils/themes';
 import { parseVirtualImagePath } from '../../utils/virtualImagePath';
 import {
@@ -45,6 +42,7 @@ import {
 import { type ImportState, Status } from '../ui/ExportImportProperties';
 import Button from '../ui/primitives/Button';
 import UiText from '../ui/primitives/Text';
+import { ImportCancellationButton, ImportResumeButton } from './library/ImportJobControls';
 import LibraryGrid from './library/LibraryGrid';
 import { SearchInput, ViewOptionsDropdown } from './library/LibraryHeader';
 import LibraryHeaderStatusStrip from './library/LibraryHeaderStatusStrip';
@@ -584,14 +582,7 @@ export default function MainLibrary(props: MainLibraryProps) {
                   {props.importState.stage ? ` · ${props.importState.stage}` : ''}
                 </span>
               </UiText>
-              <Button
-                aria-label={t('modals.importSettings.cancel')}
-                className="h-7 px-2"
-                onClick={() => void cancelImportWithSchema()}
-                size="sm"
-              >
-                <XCircle size={14} className="mr-1" /> {t('modals.importSettings.cancel')}
-              </Button>
+              <ImportCancellationButton />
             </div>
           )}
           {props.importState.status === Status.Success && (
@@ -606,6 +597,8 @@ export default function MainLibrary(props: MainLibraryProps) {
               <span>{t('library.import.failed')}</span>
             </UiText>
           )}
+          {(props.importState.status === Status.Cancelled || props.importState.status === Status.Error) &&
+            props.importState.jobId && <ImportResumeButton importState={props.importState} />}
           <SearchInput indexingProgress={props.indexingProgress} isIndexing={props.isIndexing} />
           <ViewOptionsDropdown
             libraryViewMode={props.libraryViewMode}

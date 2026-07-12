@@ -3113,6 +3113,7 @@
       "fileNaming": "文件命名",
       "folderOrganization": "文件夹组织",
       "organizeByDate": "按日期组织到子文件夹",
+      "resumeImport": "继续导入",
       "sourceFiles": "源文件",
       "startImport": "开始导入",
       "title": "导入设置"

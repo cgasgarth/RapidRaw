@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 use notify::event::{ModifyKind, RenameMode};
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Runtime, State};
 
 pub const LIBRARY_CHANGE_BATCH_EVENT: &str = "library-filesystem-change-batch";
 
@@ -280,9 +280,9 @@ fn coalesce_change(existing: LibraryPathChange, incoming: LibraryPathChange) -> 
 }
 
 impl LibraryFilesystemChangefeed {
-    pub fn publish_authored_changes(
+    pub fn publish_authored_changes<R: Runtime>(
         &self,
-        app: &AppHandle,
+        app: &AppHandle<R>,
         changes: Vec<LibraryPathChange>,
     ) -> Result<(), String> {
         if changes.is_empty() {
@@ -300,9 +300,10 @@ impl LibraryFilesystemChangefeed {
             let changes: Vec<_> = changes
                 .into_iter()
                 .filter(|change| {
-                    change_paths(change)
-                        .iter()
-                        .any(|path| roots.iter().any(|root| path.starts_with(root)))
+                    change_paths(change).iter().any(|path| {
+                        let normalized = path.canonicalize().unwrap_or_else(|_| path.clone());
+                        roots.iter().any(|root| normalized.starts_with(root))
+                    })
                 })
                 .collect();
             if changes.is_empty() {
@@ -311,7 +312,8 @@ impl LibraryFilesystemChangefeed {
             let expires = Instant::now() + Duration::from_secs(3);
             for change in &changes {
                 for path in change_paths(change) {
-                    inner.authored_paths.insert(path, expires);
+                    let normalized = path.canonicalize().unwrap_or(path);
+                    inner.authored_paths.insert(normalized, expires);
                 }
             }
             let before = inner.revision;
@@ -338,7 +340,11 @@ impl LibraryFilesystemChangefeed {
             .map_err(|error| error.to_string())
     }
 
-    fn replace_roots(&self, app: AppHandle, roots: Vec<PathBuf>) -> Result<u64, String> {
+    pub(crate) fn replace_roots<R: Runtime>(
+        &self,
+        app: AppHandle<R>,
+        roots: Vec<PathBuf>,
+    ) -> Result<u64, String> {
         let canonical_roots: Vec<PathBuf> = roots
             .into_iter()
             .filter_map(|root| root.canonicalize().ok())
@@ -449,7 +455,8 @@ impl LibraryFilesystemChangefeed {
                         };
                     }
                     Err(RecvTimeoutError::Timeout) if !pending.is_empty() => {
-                        let changes: Vec<_> = std::mem::take(&mut pending).into_values().collect();
+                        let mut changes: Vec<_> =
+                            std::mem::take(&mut pending).into_values().collect();
                         deadline = None;
                         let batch = {
                             let Ok(mut inner) = state.0.lock() else {
@@ -457,6 +464,13 @@ impl LibraryFilesystemChangefeed {
                             };
                             if inner.generation != generation {
                                 break;
+                            }
+                            let now = Instant::now();
+                            inner.authored_paths.retain(|_, expires| *expires > now);
+                            changes
+                                .retain(|change| !is_authored_echo(change, &inner.authored_paths));
+                            if changes.is_empty() {
+                                continue;
                             }
                             let before = inner.revision;
                             inner.revision = inner.revision.saturating_add(1);
@@ -504,9 +518,10 @@ fn is_authored_echo(
     change: &LibraryPathChange,
     authored_paths: &HashMap<PathBuf, Instant>,
 ) -> bool {
-    change_paths(change)
-        .iter()
-        .any(|path| authored_paths.contains_key(path))
+    change_paths(change).iter().any(|path| {
+        let normalized = path.canonicalize().unwrap_or_else(|_| path.clone());
+        authored_paths.contains_key(&normalized)
+    })
 }
 
 #[tauri::command]

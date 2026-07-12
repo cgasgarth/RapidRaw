@@ -85,6 +85,7 @@ export enum Invokes {
   CancelImport = 'cancel_import',
   GetImportJobReceipt = 'get_import_job_receipt',
   ValidateImportJobResume = 'validate_import_job_resume',
+  ResumeImportJob = 'resume_import_job',
   ImportExternalEditorVariant = 'import_external_editor_variant',
   LaunchExternalEditor = 'launch_external_editor',
   InvokeGenerativeReplaceWithMaskDef = 'invoke_generative_replace_with_mask_def',
