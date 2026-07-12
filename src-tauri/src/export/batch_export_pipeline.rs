@@ -43,6 +43,12 @@ pub struct ExportResourceBudget {
     pub gpu_memory_credits: u64,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ExportConcurrencyPolicy {
+    Adaptive,
+    Fixed,
+}
+
 impl ExportResourceBudget {
     pub fn conservative(available_memory: u64, cores: usize) -> Self {
         let reserved = 2_u64 * 1024 * 1024 * 1024;
@@ -63,6 +69,35 @@ impl ExportResourceBudget {
             host_memory_credits: host,
             gpu_memory_credits: 1024 * 1024 * 1024,
         }
+    }
+
+    /// Select an initial worker budget from memory headroom and pending backlog.
+    /// The fixed mode is deterministic for tests/profiling; adaptive mode avoids
+    /// creating workers that cannot make progress when the queue is small or
+    /// available memory is under pressure.
+    pub fn for_policy(
+        available_memory: u64,
+        cores: usize,
+        pending_items: usize,
+        policy: ExportConcurrencyPolicy,
+    ) -> Self {
+        let mut budget = Self::conservative(available_memory, cores);
+        if policy == ExportConcurrencyPolicy::Fixed {
+            return budget;
+        }
+
+        let backlog_slots = pending_items.clamp(1, budget.cpu_slots);
+        budget.cpu_slots = budget.cpu_slots.min(backlog_slots);
+        budget.encoder_slots = budget.encoder_slots.min(backlog_slots).max(1);
+        budget.decode_queue_capacity = budget.decode_queue_capacity.min(backlog_slots).max(1);
+        budget.encode_queue_capacity = budget.encode_queue_capacity.min(backlog_slots).max(1);
+        if available_memory < 4 * 1024 * 1024 * 1024 {
+            budget.cpu_slots = budget.cpu_slots.clamp(1, 2);
+            budget.encoder_slots = budget.encoder_slots.clamp(1, 1);
+            budget.decode_queue_capacity = budget.decode_queue_capacity.clamp(1, 2);
+            budget.encode_queue_capacity = budget.encode_queue_capacity.clamp(1, 2);
+        }
+        budget
     }
 }
 
@@ -563,6 +598,35 @@ mod tests {
         assert!(report.render_queue_peak < budget.render_queue_capacity);
         assert!(report.encode_queue_peak < budget.encode_queue_capacity);
         assert!(report.commit_queue_peak < budget.commit_queue_capacity);
+    }
+
+    #[test]
+    fn adaptive_budget_scales_to_backlog_and_memory_while_fixed_mode_is_stable() {
+        let fixed = ExportResourceBudget::for_policy(
+            16 * 1024 * 1024 * 1024,
+            8,
+            1,
+            ExportConcurrencyPolicy::Fixed,
+        );
+        let adaptive_small = ExportResourceBudget::for_policy(
+            16 * 1024 * 1024 * 1024,
+            8,
+            1,
+            ExportConcurrencyPolicy::Adaptive,
+        );
+        let adaptive_pressure = ExportResourceBudget::for_policy(
+            3 * 1024 * 1024 * 1024,
+            8,
+            10_000,
+            ExportConcurrencyPolicy::Adaptive,
+        );
+        assert_eq!(fixed.cpu_slots, 8);
+        assert_eq!(fixed.encoder_slots, 4);
+        assert_eq!(adaptive_small.cpu_slots, 1);
+        assert_eq!(adaptive_small.decode_queue_capacity, 1);
+        assert!(adaptive_pressure.cpu_slots <= 2);
+        assert!(adaptive_pressure.encoder_slots <= 1);
+        assert!(adaptive_pressure.host_memory_credits >= CREDIT_QUANTUM_BYTES);
     }
 
     #[tokio::test]

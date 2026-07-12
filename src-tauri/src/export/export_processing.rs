@@ -25,8 +25,8 @@ use tokio::sync::Notify;
 use crate::color::working_to_output_transform::WorkingColorState;
 use crate::exif_processing;
 use crate::export::batch_export_pipeline::{
-    CooperativeGpuLane, CreditedRepresentation, ExportResourceBudget, ExportStage,
-    ExportWorkEstimate, PipelineCancellation, PipelineDiagnostics, PipelineResources,
+    CooperativeGpuLane, CreditedRepresentation, ExportConcurrencyPolicy, ExportResourceBudget,
+    ExportStage, ExportWorkEstimate, PipelineCancellation, PipelineDiagnostics, PipelineResources,
 };
 pub(crate) use crate::export::export_encoders::{
     EmbeddedSourceIccProfile, encode_image_to_bytes, encode_image_with_working_color_state,
@@ -149,6 +149,12 @@ enum ExportMasksResult {
     Completed(Vec<String>),
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum AuxiliaryOutputPolicy {
+    None,
+    ReportPartialOnCancellation,
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportCancellationAck {
@@ -176,13 +182,62 @@ impl ExportJobIdentity {
 
 #[derive(Clone)]
 struct ExportItemPlan {
+    item_id: String,
     source_path: String,
+    source_revision: SourceRevision,
+    expected_dimensions: Option<(u32, u32)>,
     sidecar_path: PathBuf,
     output_path: PathBuf,
     extension: String,
     is_current_edit: bool,
     is_raw: bool,
+    auxiliary_output_policy: AuxiliaryOutputPolicy,
     estimate: ExportWorkEstimate,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ExportJobManifestItem {
+    item_id: String,
+    source_path: String,
+    source_revision: String,
+    output_path: String,
+    expected_dimensions: Option<(u32, u32)>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ExportJobManifest {
+    schema_version: u8,
+    job_id: String,
+    status: &'static str,
+    updated_at: String,
+    planned: Vec<ExportJobManifestItem>,
+    committed_output_paths: Vec<String>,
+}
+
+fn export_manifest_path(output_folder: &Path, explicit_file_path: bool, job_id: &str) -> PathBuf {
+    let parent = if explicit_file_path {
+        output_folder.parent().unwrap_or(output_folder)
+    } else {
+        output_folder
+    };
+    parent.join(format!(
+        ".rapidraw-export-{}.json",
+        job_id.replace([':', '/'], "-")
+    ))
+}
+
+fn write_export_manifest(path: &Path, manifest: &ExportJobManifest) -> Result<(), String> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| "export_manifest_parent_missing".to_string())?;
+    fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    let bytes = serde_json::to_vec_pretty(manifest).map_err(|error| error.to_string())?;
+    write_final_output_bytes(path, &bytes, None)
+        .map_err(|error| format!("export_manifest_write_failed:{error}"))?
+        .ok_or_else(|| "export_manifest_cancelled".to_string())?;
+    Ok(())
 }
 
 struct DecodedExportItem {
@@ -211,18 +266,24 @@ struct EncodedExportItem {
     export_elapsed_ms: u128,
 }
 
-fn estimate_export_work(source_path: &Path, output_format: &str) -> ExportWorkEstimate {
+fn estimate_export_work(
+    source_path: &Path,
+    output_format: &str,
+    expected_dimensions: Option<(u32, u32)>,
+) -> ExportWorkEstimate {
     let source_bytes = fs::metadata(source_path).map(|m| m.len()).unwrap_or(1);
-    let (width, height) = image::image_dimensions(source_path).unwrap_or_else(|_| {
-        // RAW containers do not all expose dimensions through `image`. Source-size based
-        // admission remains conservative while the decoded representation is measured later.
-        let pixels = source_bytes.saturating_mul(12).saturating_div(8).max(1);
-        let edge = (pixels as f64)
-            .sqrt()
-            .ceil()
-            .clamp(1.0, f64::from(u32::MAX)) as u32;
-        (edge, edge)
-    });
+    let (width, height) = expected_dimensions
+        .or_else(|| image::image_dimensions(source_path).ok())
+        .unwrap_or_else(|| {
+            // RAW containers do not all expose dimensions through `image`. Source-size based
+            // admission remains conservative while the decoded representation is measured later.
+            let pixels = source_bytes.saturating_mul(12).saturating_div(8).max(1);
+            let edge = (pixels as f64)
+                .sqrt()
+                .ceil()
+                .clamp(1.0, f64::from(u32::MAX)) as u32;
+            (edge, edge)
+        });
     let pixels = u64::from(width).saturating_mul(u64::from(height)).max(1);
     let decoded_bytes = pixels.saturating_mul(16);
     let transformed_bytes = decoded_bytes.saturating_mul(2);
@@ -270,11 +331,14 @@ fn decode_export_item(
     }
 
     let effective_settings = raw_processing_settings_for_adjustments(settings, &adjustments);
-    let source_revision = plan
-        .is_raw
-        .then(|| SourceRevision::from_path(Path::new(&plan.source_path)))
-        .transpose()
-        .map_err(|error| error.to_string())?;
+    let source_revision = if SourceRevision::from_path(Path::new(&plan.source_path))
+        .map_err(|error| error.to_string())?
+        != plan.source_revision
+    {
+        return Err("source_changed_before_decode".to_string());
+    } else {
+        Some(plan.source_revision.clone())
+    };
     let (base_image, raw_development_report) = if plan.is_current_edit {
         match get_full_image_for_processing(&state) {
             Ok((orig_data, _)) => (
@@ -1269,6 +1333,7 @@ fn export_adjustments_as_lut(
 
 #[allow(clippy::too_many_arguments)]
 async fn run_batch_export_pipeline(
+    job_id: String,
     paths: Vec<String>,
     output_folder_or_file: String,
     is_explicit_file_path: bool,
@@ -1344,16 +1409,64 @@ async fn run_batch_export_pipeline(
             );
         }
         let extension = output_format.to_ascii_lowercase();
-        let estimate = estimate_export_work(Path::new(&target.source_path_str), &extension);
+        let source_revision = match SourceRevision::from_path(Path::new(&target.source_path_str)) {
+            Ok(revision) => revision,
+            Err(error) => {
+                return (
+                    vec![ExportItemResult::Failed(format!(
+                        "export_preflight_source_revision:{}",
+                        error
+                    ))],
+                    diagnostics.snapshot(),
+                );
+            }
+        };
+        let expected_dimensions = image::image_dimensions(&target.source_path_str).ok();
+        let estimate = estimate_export_work(
+            Path::new(&target.source_path_str),
+            &extension,
+            expected_dimensions,
+        );
         plans.push(ExportItemPlan {
+            item_id: format!("export-item:{global_index}:{}", target.source_path_str),
             source_path: target.source_path_str.clone(),
+            source_revision,
+            expected_dimensions,
             sidecar_path: target.sidecar_path,
             output_path: target.output_path,
             extension,
             is_current_edit: Some(&target.source_path_str) == current_edit_path.as_ref(),
             is_raw: is_raw_file(&target.source_path_str),
+            auxiliary_output_policy: if export_settings.export_masks {
+                AuxiliaryOutputPolicy::ReportPartialOnCancellation
+            } else {
+                AuxiliaryOutputPolicy::None
+            },
             estimate,
         });
+    }
+
+    let manifest_path = export_manifest_path(&output_folder, is_explicit_file_path, &job_id);
+    let manifest_items = plans
+        .iter()
+        .map(|plan| ExportJobManifestItem {
+            item_id: plan.item_id.clone(),
+            source_path: plan.source_path.clone(),
+            source_revision: plan.source_revision.identity(),
+            output_path: plan.output_path.to_string_lossy().to_string(),
+            expected_dimensions: plan.expected_dimensions,
+        })
+        .collect::<Vec<_>>();
+    let pending_manifest = ExportJobManifest {
+        schema_version: 1,
+        job_id: job_id.clone(),
+        status: "pending",
+        updated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
+        planned: manifest_items.clone(),
+        committed_output_paths: Vec::new(),
+    };
+    if let Err(error) = write_export_manifest(&manifest_path, &pending_manifest) {
+        log::warn!("{error}");
     }
 
     let (plan_tx, plan_rx) =
@@ -1720,7 +1833,13 @@ async fn run_batch_export_pipeline(
                             source_digest: item.source_digest.as_ref(),
                             raw_development_report: item.decoded.raw_development_report.clone(),
                             edit_graph_revision: Some(format!(
-                                "export_job:{:016x}",
+                                "{}:{}:{:016x}",
+                                item.decoded.plan.item_id,
+                                item.decoded
+                                    .plan
+                                    .expected_dimensions
+                                    .map(|(width, height)| format!("{width}x{height}"))
+                                    .unwrap_or_else(|| "unknown".to_string()),
                                 export_execution_fingerprint(
                                     &item.decoded.plan.source_path,
                                     &item.decoded.adjustments,
@@ -1729,7 +1848,11 @@ async fn run_batch_export_pipeline(
                             export_elapsed_ms: Some(item.export_elapsed_ms),
                         },
                     )?;
-                    if export_settings.export_masks && item.decoded.plan.extension != "cube" {
+                    if matches!(
+                        item.decoded.plan.auxiliary_output_policy,
+                        AuxiliaryOutputPolicy::ReportPartialOnCancellation
+                    ) && item.decoded.plan.extension != "cube"
+                    {
                         let state = app_handle.state::<AppState>();
                         match export_masks_for_image(
                             &item.decoded.base_image,
@@ -1824,6 +1947,32 @@ async fn run_batch_export_pipeline(
             .filter(|result| matches!(result, ExportItemResult::Failed(_)))
             .count();
     });
+    let committed_output_paths = results
+        .iter()
+        .filter_map(|result| match result {
+            ExportItemResult::Completed(output) | ExportItemResult::Cancelled(Some(output)) => {
+                Some(output.output_path.clone())
+            }
+            ExportItemResult::Cancelled(None) | ExportItemResult::Failed(_) => None,
+        })
+        .collect();
+    let terminal_manifest = ExportJobManifest {
+        schema_version: 1,
+        job_id,
+        status: if cancellation.is_cancelled() {
+            "cancelled"
+        } else if diagnostics.snapshot().failed > 0 {
+            "completedWithErrors"
+        } else {
+            "completed"
+        },
+        updated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
+        planned: manifest_items,
+        committed_output_paths,
+    };
+    if let Err(error) = write_export_manifest(&manifest_path, &terminal_manifest) {
+        log::warn!("{error}");
+    }
     (results, diagnostics.snapshot())
 }
 
@@ -1882,13 +2031,19 @@ pub async fn export_images(
         .unwrap_or(1);
     let mut system = sysinfo::System::new();
     system.refresh_memory();
-    let budget = ExportResourceBudget::conservative(system.available_memory(), available_cores);
+    let budget = ExportResourceBudget::for_policy(
+        system.available_memory(),
+        available_cores,
+        total_paths,
+        ExportConcurrencyPolicy::Adaptive,
+    );
     let task_cancellation = cancellation;
     let task_app_handle = app_handle;
     let task_identity = job_identity.clone();
     let task = tokio::spawn(async move {
         let started = Instant::now();
         let (results, mut report) = run_batch_export_pipeline(
+            task_identity.job_id.clone(),
             paths,
             output_folder_or_file,
             is_explicit_file_path,
@@ -2957,21 +3112,23 @@ pub async fn estimate_export_sizes(
 mod tests {
     use super::{
         EmbeddedSourceIccProfile, ExportBlackPointCompensationStatus, ExportColorEngineId,
-        ExportColorProfile, ExportReceiptContext, ExportRenderingIntent, ExportSettings,
-        ExportTerminalStatus, FinalArtifactDigest, OutputCommitReceipt, OutputSharpeningSettings,
-        VerifiedSourceDigestReceipt, applied_export_color_policy,
-        apply_export_resize_and_watermark, claim_export_job, commit_export_output,
-        encode_icc_profile, encode_image_to_bytes, encode_image_with_working_color_state,
-        export_color_profile_receipt_label, export_jpeg_rgb_pixels_and_profile,
-        export_receipt_metadata, export_receipt_output, export_rgb_pixels_and_profile,
-        export_rgb16_pixels_and_profile, export_rgb16_pixels_with_shared_conversion_core,
+        ExportColorProfile, ExportJobManifest, ExportJobManifestItem, ExportReceiptContext,
+        ExportRenderingIntent, ExportSettings, ExportTerminalStatus, FinalArtifactDigest,
+        OutputCommitReceipt, OutputSharpeningSettings, VerifiedSourceDigestReceipt,
+        applied_export_color_policy, apply_export_resize_and_watermark, claim_export_job,
+        commit_export_output, encode_icc_profile, encode_image_to_bytes,
+        encode_image_with_working_color_state, export_color_profile_receipt_label,
+        export_jpeg_rgb_pixels_and_profile, export_manifest_path, export_receipt_metadata,
+        export_receipt_output, export_rgb_pixels_and_profile, export_rgb16_pixels_and_profile,
+        export_rgb16_pixels_with_shared_conversion_core,
         export_soft_proof_rgb_pixels_and_profile_with_policy,
         export_soft_proof_rgb_pixels_with_working_color_state,
         export_source_precision_receipt_label, export_terminal_receipt, export_transform_options,
         finish_export_job, mox_rendering_intent, quantize_rgb16_to_rgb8,
         request_export_cancellation, resolve_export_color_capabilities,
         resolve_export_color_transform_plan, save_image_with_metadata_commit,
-        should_apply_srgb_perceptual_gamut_mapping, write_final_output_bytes_observed,
+        should_apply_srgb_perceptual_gamut_mapping, write_export_manifest,
+        write_final_output_bytes_observed,
     };
     #[cfg(feature = "tauri-test")]
     use super::{ExportCancellationAck, attach_export_task, cancel_export};
@@ -2985,6 +3142,7 @@ mod tests {
     use crate::gamut_mapping::ACTIVE_SRGB_OKLAB_CHROMA_REDUCE;
     use crate::raw_processing::{RawCameraProfileReport, RawDemosaicPath, RawDevelopmentReport};
     use crate::source_revision::SourceRevision;
+    use chrono::{SecondsFormat, Utc};
     use moxcms::ColorProfile;
     use sha2::{Digest, Sha256};
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -4663,6 +4821,46 @@ mod tests {
         assert!(result.is_none());
         assert!(!output_path.exists());
         assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn export_manifest_is_atomic_and_records_revision_bound_plan() {
+        let directory = tempfile::tempdir().unwrap();
+        let source_path = directory.path().join("source.jpg");
+        fs::write(&source_path, [1_u8, 2, 3, 4]).unwrap();
+        let revision = SourceRevision::from_path(&source_path).unwrap();
+        let manifest_path =
+            export_manifest_path(directory.path(), false, "export-job:manifest-test");
+        let manifest = ExportJobManifest {
+            schema_version: 1,
+            job_id: "export-job:manifest-test".to_string(),
+            status: "pending",
+            updated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
+            planned: vec![ExportJobManifestItem {
+                item_id: "export-item:0".to_string(),
+                source_path: source_path.to_string_lossy().to_string(),
+                source_revision: revision.identity(),
+                output_path: directory
+                    .path()
+                    .join("out.jpg")
+                    .to_string_lossy()
+                    .to_string(),
+                expected_dimensions: Some((2, 2)),
+            }],
+            committed_output_paths: Vec::new(),
+        };
+        write_export_manifest(&manifest_path, &manifest)
+            .expect("manifest should commit atomically");
+        let value: serde_json::Value =
+            serde_json::from_slice(&fs::read(&manifest_path).expect("manifest should be readable"))
+                .unwrap();
+        assert_eq!(value["status"], "pending");
+        assert_eq!(value["planned"][0]["sourceRevision"], revision.identity());
+        assert_eq!(
+            value["planned"][0]["expectedDimensions"],
+            serde_json::json!([2, 2])
+        );
+        assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 2);
     }
 
     #[test]
