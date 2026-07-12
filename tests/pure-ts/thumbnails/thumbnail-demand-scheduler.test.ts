@@ -138,6 +138,18 @@ describe('ThumbnailDemandScheduler', () => {
     expect(harness.requests.at(-1)?.requests.map(({ path }) => path)).toEqual(['visible']);
   });
 
+  test('requeues an invalidated resident with its committed source revision', () => {
+    const harness = createHarness();
+    harness.viewport(['visible']);
+    harness.runFrame();
+    harness.scheduler.markResident('visible');
+
+    harness.scheduler.invalidateRevision('visible', 'revision-b');
+    harness.runFrame();
+    expect(harness.requests.at(-1)?.requests.map(({ path }) => path)).toEqual(['visible']);
+    expect(harness.requests.at(-1)?.requests[0]?.sourceRevision).toBe('revision-b');
+  });
+
   test('rejects stale completions and cancels old retries on generation change', () => {
     const harness = createHarness({ retryBaseMs: 10 });
     harness.viewport(['retry']);

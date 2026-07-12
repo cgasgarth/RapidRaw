@@ -19,6 +19,7 @@ import {
   parseRenderPathPayload,
   parseStringPayload,
   parseThumbnailGeneratedPayload,
+  parseThumbnailInvalidatedPayload,
   persistedRenderStateRecoveryPayloadSchema,
 } from '../../schemas/tauriEventSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
@@ -74,6 +75,7 @@ import {
   PREVIEW_UPDATE_UNCROPPED_EVENT,
   THUMBNAIL_GENERATED_EVENT,
   THUMBNAIL_GENERATION_COMPLETE_EVENT,
+  THUMBNAIL_INVALIDATED_EVENT,
   THUMBNAIL_PROGRESS_EVENT,
   WAVEFORM_UPDATE_EVENT,
   WGPU_FRAME_READY_EVENT,
@@ -81,6 +83,7 @@ import {
 import { thumbnailResourceCache } from '../../utils/thumbnailResources';
 
 interface TauriListenerProps {
+  invalidateThumbnailRevision: (path: string, sourceRevision: string) => void;
   refreshAllFolderTrees: () => void;
   refreshImageList: () => void;
   markGenerated: (path: string, generation?: number) => boolean;
@@ -147,11 +150,16 @@ const buildPreviewScopeStatus = ({
   };
 };
 
-export function useTauriListeners({ refreshAllFolderTrees, refreshImageList, markGenerated }: TauriListenerProps) {
-  const refs = useRef({ refreshAllFolderTrees, refreshImageList, markGenerated });
+export function useTauriListeners({
+  invalidateThumbnailRevision,
+  refreshAllFolderTrees,
+  refreshImageList,
+  markGenerated,
+}: TauriListenerProps) {
+  const refs = useRef({ invalidateThumbnailRevision, refreshAllFolderTrees, refreshImageList, markGenerated });
 
   useEffect(() => {
-    refs.current = { refreshAllFolderTrees, refreshImageList, markGenerated };
+    refs.current = { invalidateThumbnailRevision, refreshAllFolderTrees, refreshImageList, markGenerated };
   });
 
   const thumbnailBuffer = useRef<Map<string, ThumbnailCacheMutation>>(new Map());
@@ -367,6 +375,12 @@ export function useTauriListeners({ refreshAllFolderTrees, refreshImageList, mar
           editStatusBuffer.current[path] = is_edited;
         }
         scheduleFlush();
+      }),
+      listen<unknown>(THUMBNAIL_INVALIDATED_EVENT, (event) => {
+        if (!isEffectActive) return;
+        const { path, thumbnailRevision } = parseThumbnailInvalidatedPayload(event.payload);
+        thumbnailCache.deleteMany([path]);
+        refs.current.invalidateThumbnailRevision(path, thumbnailRevision);
       }),
       listen<unknown>(AI_MODEL_DOWNLOAD_START_EVENT, (event) => {
         if (isEffectActive)

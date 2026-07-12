@@ -59,6 +59,15 @@ export const thumbnailGeneratedPayloadSchema = z
   })
   .loose();
 
+export const thumbnailInvalidatedPayloadSchema = z
+  .object({
+    outcome: z.enum(['deferred', 'duplicate', 'scheduled']),
+    path: z.string().min(1),
+    sidecarRevision: z.string().min(1),
+    thumbnailRevision: z.string().min(1),
+  })
+  .strict();
+
 export const importStartPayloadSchema = z
   .object({
     total: nonnegativeNumberSchema,
@@ -285,6 +294,7 @@ const toProgress = (payload: ProgressPayload): Progress => {
 
 export const parseProgressPayload = (value: unknown): Progress => toProgress(progressPayloadSchema.parse(value));
 export const parseThumbnailGeneratedPayload = (value: unknown) => thumbnailGeneratedPayloadSchema.parse(value);
+export const parseThumbnailInvalidatedPayload = (value: unknown) => thumbnailInvalidatedPayloadSchema.parse(value);
 export const parseImportStartPayload = (value: unknown) => importStartPayloadSchema.parse(value);
 export const parseImportProgressPayload = (value: unknown) => importProgressPayloadSchema.parse(value);
 export const parsePathProgressPayload = (value: unknown) => pathProgressPayloadSchema.parse(value);
