@@ -12,6 +12,7 @@ const startupPhaseSchema = z.enum([
   'gpuReady',
   'optionalServicesReady',
   'frontendShellVisible',
+  'frontendInteractive',
   'frontendSettingsHydrated',
   'frontendLibraryReady',
   'frontendEditorReady',
@@ -38,7 +39,7 @@ export const startupTraceSnapshotSchema = z
   .strict();
 
 export type StartupTraceSnapshot = z.infer<typeof startupTraceSnapshotSchema>;
-export type FrontendStartupPhase = 'editorReady' | 'libraryReady' | 'settingsHydrated' | 'shellVisible';
+export type FrontendStartupPhase = 'editorReady' | 'interactive' | 'libraryReady' | 'settingsHydrated' | 'shellVisible';
 export type StartupPhaseStatus = 'degraded' | 'failed' | 'ok';
 
 type InvokeCommand = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
@@ -81,6 +82,9 @@ export const createFrontendStartupReporter = (
       .then((value) => startupTraceSnapshotSchema.parse(value))
       .then(async (snapshot) => {
         await record(snapshot.traceId, 'shellVisible', 'ok', 'react-root-mounted');
+        // A completed second frontend→native→frontend round trip proves the
+        // mounted shell is processing interaction work, not merely painted.
+        await record(snapshot.traceId, 'interactive', 'ok', 'react-ipc-round-trip');
         return snapshot.traceId;
       });
     return traceIdPromise;

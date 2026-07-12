@@ -5,12 +5,12 @@ use std::sync::{Arc, Mutex};
 
 use image::{DynamicImage, GenericImageView, GrayImage};
 use serde::{Deserialize, Serialize};
-use tokio::sync::{Mutex as TokioMutex, Notify};
+use tokio::sync::Notify;
 use tokio::task::JoinHandle;
 use wgpu::{Texture, TextureView};
 
-use crate::ai::ai_processing::AiState;
-use crate::app::startup::StartupTrace;
+use crate::ai::ai_processing::{CachedDepthMap, ImageEmbeddings};
+use crate::app::startup::{InitializationService, StartupTrace};
 use crate::cache_utils::DecodedImageCache;
 use crate::gpu_processing::GpuProcessor;
 use crate::image_processing::GpuContext;
@@ -221,6 +221,8 @@ pub struct WarpedImageCache {
 
 pub struct AppState {
     pub startup_trace: StartupTrace,
+    pub gpu_initialization: InitializationService,
+    pub lens_initialization: InitializationService,
     pub window_setup_complete: AtomicBool,
     pub gpu_crash_flag_path: Mutex<Option<PathBuf>>,
     pub original_image: Mutex<Option<LoadedImage>>,
@@ -230,8 +232,9 @@ pub struct AppState {
         Mutex<Option<Arc<crate::app::display_target::DisplayTargetCoordinator>>>,
     pub gpu_image_cache: Mutex<Option<GpuImageCache>>,
     pub gpu_processor: Mutex<Option<GpuProcessorState>>,
-    pub ai_state: Mutex<Option<AiState>>,
-    pub ai_init_lock: TokioMutex<()>,
+    pub ai_model_registry: crate::ai::model_registry::AiModelRegistry,
+    pub ai_embeddings: MemoryLruCache<String, ImageEmbeddings>,
+    pub ai_depth_maps: MemoryLruCache<String, CachedDepthMap>,
     pub export_job: Mutex<Option<ExportJob>>,
     pub import_job: Mutex<Option<ImportJob>>,
     pub computational_merge_jobs: crate::merge::computational_job::ComputationalMergeJobRegistry,
@@ -290,6 +293,8 @@ impl AppState {
         };
         Self {
             startup_trace: StartupTrace::new(),
+            gpu_initialization: InitializationService::default(),
+            lens_initialization: InitializationService::default(),
             window_setup_complete: AtomicBool::new(false),
             gpu_crash_flag_path: Mutex::new(None),
             original_image: Mutex::new(None),
@@ -298,8 +303,15 @@ impl AppState {
             display_target_coordinator: Mutex::new(None),
             gpu_image_cache: Mutex::new(None),
             gpu_processor: Mutex::new(None),
-            ai_state: Mutex::new(None),
-            ai_init_lock: TokioMutex::new(()),
+            ai_model_registry: crate::ai::model_registry::AiModelRegistry::new(1536 * 1024 * 1024),
+            ai_embeddings: MemoryLruCache::new(
+                policy("ai_embeddings", 256, 384, Some(4)),
+                Arc::clone(&cache_budget),
+            ),
+            ai_depth_maps: MemoryLruCache::new(
+                policy("ai_depth_maps", 128, 192, Some(4)),
+                Arc::clone(&cache_budget),
+            ),
             export_job: Mutex::new(None),
             import_job: Mutex::new(None),
             computational_merge_jobs:
@@ -373,5 +385,59 @@ impl AppState {
 impl Default for AppState {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod ai_cache_tests {
+    use super::*;
+    use ndarray::Array4;
+
+    #[test]
+    fn normal_app_state_construction_starts_no_ai_model_or_derived_work() {
+        let state = AppState::new();
+        let report = state.ai_model_registry.report();
+        assert_eq!(report.resident_bytes, 0);
+        assert!(report.models.iter().all(|model| {
+            model.phase == crate::ai::model_registry::AiModelPhase::Missing
+                && model.waiter_count == 0
+        }));
+        assert_eq!(state.ai_embeddings.stats().entries, 0);
+        assert_eq!(state.ai_depth_maps.stats().entries, 0);
+    }
+
+    #[test]
+    fn derived_ai_caches_are_revision_keyed_bounded_and_observable() {
+        let state = AppState::new();
+        for revision in 0..5 {
+            let key = format!("source:geometry:model:preprocess:{revision}");
+            let embedding = ImageEmbeddings {
+                path_hash: key.clone(),
+                embeddings: Array4::<f32>::zeros((1, 1, 2, 2)).into_dyn(),
+                original_size: (2, 2),
+            };
+            state
+                .ai_embeddings
+                .insert(key, Arc::new(embedding), 4 * size_of::<f32>() as u64);
+        }
+        let embedding_stats = state.ai_embeddings.stats();
+        assert_eq!(embedding_stats.entries, 4);
+        assert_eq!(embedding_stats.evictions, 1);
+        assert!(embedding_stats.bytes <= embedding_stats.soft_limit_bytes);
+
+        let depth_key = "source:geometry:depth-v2:preprocess-v1".to_string();
+        let depth = CachedDepthMap {
+            path_hash: depth_key.clone(),
+            depth_image: GrayImage::new(8, 8),
+            original_size: (8, 8),
+        };
+        state
+            .ai_depth_maps
+            .insert(depth_key.clone(), Arc::new(depth), 64);
+        assert!(state.ai_depth_maps.get(&depth_key).is_some());
+        let depth_stats = state.ai_depth_maps.stats();
+        assert_eq!(depth_stats.entries, 1);
+        assert_eq!(depth_stats.hits, 1);
+        assert!(depth_stats.bytes <= depth_stats.soft_limit_bytes);
     }
 }

@@ -60,20 +60,27 @@ pub async fn apply_denoising(
     let path_str = source_path.to_string_lossy().to_string();
 
     let mut ai_session = None;
+    let mut ai_lease = None;
     if method == "ai" {
-        let session = crate::ai::ai_processing::get_or_init_denoise_model(
+        let capability = crate::ai::ai_processing::acquire_capability(
             &app_handle,
-            &state.ai_state,
-            &state.ai_init_lock,
+            &state.ai_model_registry,
+            crate::ai::model_registry::AiCapability::Denoise,
         )
         .await
         .map_err(|e| e.to_string())?;
-        ai_session = Some(session);
+        ai_session = Some(
+            capability
+                .lease(crate::ai::model_registry::AiModelId::Denoise)?
+                .ort()?,
+        );
+        ai_lease = Some(capability);
     }
 
     let denoise_result_handle = state.denoise_result.clone();
 
     tokio::task::spawn_blocking(move || {
+        let _ai_lease = ai_lease;
         match denoise_image(path_str, intensity, method, app_handle.clone(), ai_session) {
             Ok((image, _)) => {
                 *denoise_result_handle.lock().unwrap() = Some(image);
@@ -96,18 +103,25 @@ pub async fn batch_denoise_images(
     state: tauri::State<'_, AppState>,
 ) -> Result<Vec<String>, String> {
     let mut ai_session = None;
+    let mut ai_lease = None;
     if method == "ai" {
-        let session = crate::ai::ai_processing::get_or_init_denoise_model(
+        let capability = crate::ai::ai_processing::acquire_capability(
             &app_handle,
-            &state.ai_state,
-            &state.ai_init_lock,
+            &state.ai_model_registry,
+            crate::ai::model_registry::AiCapability::Denoise,
         )
         .await
         .map_err(|e| e.to_string())?;
-        ai_session = Some(session);
+        ai_session = Some(
+            capability
+                .lease(crate::ai::model_registry::AiModelId::Denoise)?
+                .ort()?,
+        );
+        ai_lease = Some(capability);
     }
 
     tokio::task::spawn_blocking(move || {
+        let _ai_lease = ai_lease;
         let mut results = Vec::new();
 
         for (i, path_str) in paths.iter().enumerate() {

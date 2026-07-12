@@ -1,115 +1,5 @@
 use std::sync::{Arc, Mutex};
-use std::time::Instant;
-
-#[cfg(target_os = "macos")]
-use std::sync::OnceLock;
-
-#[cfg(target_os = "macos")]
-struct EarlyMacosShell {
-    started_at: Instant,
-    window: usize,
-    window_created_ms: u128,
-    window_visible_ms: u128,
-}
-
-#[cfg(target_os = "macos")]
-static EARLY_MACOS_SHELL: OnceLock<Mutex<EarlyMacosShell>> = OnceLock::new();
-
-#[cfg(target_os = "macos")]
-#[repr(C)]
-#[derive(Clone, Copy)]
-struct AppKitRect {
-    x: f64,
-    y: f64,
-    width: f64,
-    height: f64,
-}
-
-#[cfg(target_os = "macos")]
-unsafe impl objc::Encode for AppKitRect {
-    fn encode() -> objc::Encoding {
-        unsafe { objc::Encoding::from_str("{CGRect={CGPoint=dd}{CGSize=dd}}") }
-    }
-}
-
-#[cfg(target_os = "macos")]
-pub fn prepare_macos_startup_shell() {
-    use objc::runtime::Object;
-    use objc::{class, msg_send, sel, sel_impl};
-
-    if EARLY_MACOS_SHELL.get().is_some() {
-        return;
-    }
-    let started_at = Instant::now();
-    unsafe {
-        let pool: *mut Object = msg_send![class!(NSAutoreleasePool), new];
-        let application: *mut Object = msg_send![class!(NSApplication), sharedApplication];
-        let () = msg_send![application, setActivationPolicy: 0_i64];
-        let allocated: *mut Object = msg_send![class!(NSWindow), alloc];
-        let frame = AppKitRect {
-            x: 0.0,
-            y: 0.0,
-            width: 1_100.0,
-            height: 720.0,
-        };
-        let style_mask = 1_u64 | 2_u64 | 4_u64 | 8_u64;
-        let window: *mut Object = msg_send![allocated,
-            initWithContentRect: frame
-            styleMask: style_mask
-            backing: 2_u64
-            defer: false
-        ];
-        assert!(
-            !window.is_null(),
-            "AppKit failed to create early startup shell"
-        );
-        let created_ms = started_at.elapsed().as_millis();
-        let color: *mut Object = msg_send![class!(NSColor),
-            colorWithSRGBRed: 0.055_f64
-            green: 0.063_f64
-            blue: 0.078_f64
-            alpha: 1.0_f64
-        ];
-        let () = msg_send![window, setBackgroundColor: color];
-        let () = msg_send![window, setReleasedWhenClosed: false];
-        let () = msg_send![window, center];
-        let () = msg_send![window, makeKeyAndOrderFront: std::ptr::null::<Object>()];
-        let () = msg_send![window, displayIfNeeded];
-        let () = msg_send![application, activateIgnoringOtherApps: true];
-        let visible_ms = started_at.elapsed().as_millis();
-        EARLY_MACOS_SHELL
-            .set(Mutex::new(EarlyMacosShell {
-                started_at,
-                window: window as usize,
-                window_created_ms: created_ms,
-                window_visible_ms: visible_ms,
-            }))
-            .ok()
-            .expect("early AppKit startup shell initialized once");
-        let () = msg_send![pool, drain];
-    }
-}
-
-#[cfg(target_os = "macos")]
-pub fn handoff_macos_startup_shell() {
-    use objc::runtime::Object;
-    use objc::{msg_send, sel, sel_impl};
-
-    let Some(shell) = EARLY_MACOS_SHELL.get() else {
-        return;
-    };
-    let mut shell = shell.lock().unwrap();
-    if shell.window == 0 {
-        return;
-    }
-    unsafe {
-        let window = shell.window as *mut Object;
-        let () = msg_send![window, orderOut: std::ptr::null::<Object>()];
-        let () = msg_send![window, close];
-        let () = msg_send![window, release];
-    }
-    shell.window = 0;
-}
+use std::time::{Duration, Instant};
 
 #[cfg(test)]
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -121,6 +11,152 @@ pub const FIRST_PAINT_BUDGET_MS: u128 = 750;
 
 use serde::Serialize;
 use uuid::Uuid;
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum InitializationPriority {
+    IdleWarm,
+    EditorDemand,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum InitializationState {
+    Unrequested,
+    Warming,
+    Ready,
+    Degraded,
+}
+
+#[derive(Clone, Copy, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InitializationServiceSnapshot {
+    pub state: InitializationState,
+    pub priority: Option<InitializationPriority>,
+    pub starts: u64,
+    pub promotions: u64,
+}
+
+pub struct InitializationService {
+    inner: Mutex<InitializationServiceSnapshot>,
+}
+
+impl Default for InitializationService {
+    fn default() -> Self {
+        Self {
+            inner: Mutex::new(InitializationServiceSnapshot {
+                state: InitializationState::Unrequested,
+                priority: None,
+                starts: 0,
+                promotions: 0,
+            }),
+        }
+    }
+}
+
+impl InitializationService {
+    pub fn request(&self, priority: InitializationPriority) -> bool {
+        let mut inner = self.inner.lock().unwrap();
+        match inner.state {
+            InitializationState::Unrequested => {
+                inner.state = InitializationState::Warming;
+                inner.priority = Some(priority);
+                inner.starts += 1;
+                true
+            }
+            InitializationState::Warming => {
+                if inner.priority.is_none_or(|current| priority > current) {
+                    inner.priority = Some(priority);
+                    inner.promotions += 1;
+                }
+                false
+            }
+            InitializationState::Ready | InitializationState::Degraded => false,
+        }
+    }
+
+    pub fn finish(&self, result: &Result<(), String>) {
+        self.inner.lock().unwrap().state = if result.is_ok() {
+            InitializationState::Ready
+        } else {
+            InitializationState::Degraded
+        };
+    }
+
+    pub fn snapshot(&self) -> InitializationServiceSnapshot {
+        *self.inner.lock().unwrap()
+    }
+}
+
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+pub fn request_gpu_initialization(app: tauri::AppHandle, priority: InitializationPriority) {
+    use tauri::Manager;
+
+    if !app
+        .state::<crate::AppState>()
+        .gpu_initialization
+        .request(priority)
+    {
+        return;
+    }
+    let completion_app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let result = tauri::async_runtime::spawn_blocking(move || {
+            #[cfg(feature = "validation-harness")]
+            if std::env::var("RAWENGINE_STARTUP_INJECT_GPU_FAILURE").as_deref() == Ok("1") {
+                return Err("injected gpu startup failure".to_string());
+            }
+            crate::get_or_init_gpu_context(&app.state::<crate::AppState>(), &app).map(|_| ())
+        })
+        .await
+        .unwrap_or_else(|error| Err(error.to_string()));
+        let state = completion_app.state::<crate::AppState>();
+        state.gpu_initialization.finish(&result);
+        mark_initialization_service_result(
+            &state.startup_trace,
+            NativeStartupPhase::GpuReady,
+            "gpu",
+            state.gpu_initialization.snapshot(),
+            result,
+        );
+    });
+}
+
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+pub fn request_lens_initialization(app: tauri::AppHandle, priority: InitializationPriority) {
+    use tauri::Manager;
+
+    if !app
+        .state::<crate::AppState>()
+        .lens_initialization
+        .request(priority)
+    {
+        return;
+    }
+    let completion_app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let result = tauri::async_runtime::spawn_blocking(move || {
+            #[cfg(feature = "validation-harness")]
+            if std::env::var("RAWENGINE_STARTUP_INJECT_LENSFUN_FAILURE").as_deref() == Ok("1") {
+                return Err("injected lensfun startup failure".to_string());
+            }
+            let lens_db = crate::lens_correction::load_lensfun_db(&app);
+            *app.state::<crate::AppState>().lens_db.lock().unwrap() = Some(Arc::new(lens_db));
+            Ok(())
+        })
+        .await
+        .unwrap_or_else(|error| Err(error.to_string()));
+        let state = completion_app.state::<crate::AppState>();
+        state.lens_initialization.finish(&result);
+        mark_initialization_service_result(
+            &state.startup_trace,
+            NativeStartupPhase::LibraryServicesReady,
+            "lensfun",
+            state.lens_initialization.snapshot(),
+            result,
+        );
+    });
+}
 
 /// Native startup phases are intentionally independent of frontend readiness. A
 /// shell can be visible while optional services are still warming.
@@ -136,6 +172,7 @@ pub enum NativeStartupPhase {
     GpuReady,
     OptionalServicesReady,
     FrontendShellVisible,
+    FrontendInteractive,
     FrontendSettingsHydrated,
     FrontendLibraryReady,
     FrontendEditorReady,
@@ -145,6 +182,7 @@ pub enum NativeStartupPhase {
 #[serde(rename_all = "camelCase")]
 pub enum FrontendStartupPhase {
     ShellVisible,
+    Interactive,
     SettingsHydrated,
     LibraryReady,
     EditorReady,
@@ -154,6 +192,7 @@ impl From<FrontendStartupPhase> for NativeStartupPhase {
     fn from(phase: FrontendStartupPhase) -> Self {
         match phase {
             FrontendStartupPhase::ShellVisible => Self::FrontendShellVisible,
+            FrontendStartupPhase::Interactive => Self::FrontendInteractive,
             FrontendStartupPhase::SettingsHydrated => Self::FrontendSettingsHydrated,
             FrontendStartupPhase::LibraryReady => Self::FrontendLibraryReady,
             FrontendStartupPhase::EditorReady => Self::FrontendEditorReady,
@@ -198,39 +237,22 @@ impl Default for StartupTrace {
 
 impl StartupTrace {
     pub fn new() -> Self {
-        #[cfg(target_os = "macos")]
-        if let Some(shell) = EARLY_MACOS_SHELL.get() {
-            let shell = shell.lock().unwrap();
-            return Self {
-                trace_id: format!("startup:{}", Uuid::new_v4()),
-                started_at: shell.started_at,
-                phases: Arc::new(Mutex::new(vec![
-                    StartupPhaseReceipt {
-                        phase: NativeStartupPhase::ProcessStarted,
-                        elapsed_ms: 0,
-                        status: "ok",
-                        detail: Some("rust-main-entry".to_string()),
-                    },
-                    StartupPhaseReceipt {
-                        phase: NativeStartupPhase::WindowCreated,
-                        elapsed_ms: shell.window_created_ms,
-                        status: "ok",
-                        detail: Some("appkit-pre-tauri-shell".to_string()),
-                    },
-                    StartupPhaseReceipt {
-                        phase: NativeStartupPhase::WindowVisible,
-                        elapsed_ms: shell.window_visible_ms,
-                        status: "ok",
-                        detail: Some("appkit-pre-tauri-shell".to_string()),
-                    },
-                ])),
-                #[cfg(test)]
-                test_elapsed_ms: None,
-            };
-        }
+        let entry = Instant::now();
+        let started_at = std::env::var("RAWENGINE_STARTUP_BENCHMARK_ORIGIN_EPOCH_MS")
+            .ok()
+            .and_then(|value| value.parse::<u128>().ok())
+            .and_then(|origin| {
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .ok()
+                    .map(|now| now.as_millis().saturating_sub(origin))
+            })
+            .and_then(|elapsed_ms| u64::try_from(elapsed_ms).ok())
+            .and_then(|elapsed_ms| entry.checked_sub(Duration::from_millis(elapsed_ms)))
+            .unwrap_or(entry);
         Self {
             trace_id: format!("startup:{}", Uuid::new_v4()),
-            started_at: Instant::now(),
+            started_at,
             phases: Arc::new(Mutex::new(Vec::new())),
             #[cfg(test)]
             test_elapsed_ms: None,
@@ -359,23 +381,6 @@ impl StartupTrace {
     }
 }
 
-/// Commits the native-shell visibility receipt before starting work that is
-/// allowed to complete behind that shell (notably clean-account WKWebView
-/// initialization on macOS).
-#[cfg(any(target_os = "macos", test))]
-pub fn after_native_shell_visible<T>(
-    trace: &StartupTrace,
-    detail: &str,
-    initialize_deferred_ui: impl FnOnce() -> T,
-) -> T {
-    trace.mark(
-        NativeStartupPhase::WindowVisible,
-        "ok",
-        Some(detail.to_string()),
-    );
-    initialize_deferred_ui()
-}
-
 fn critical_path_order_valid(phases: &[StartupPhaseReceipt]) -> bool {
     let first_index = |phase| phases.iter().position(|receipt| receipt.phase == phase);
     let Some(process) = first_index(NativeStartupPhase::ProcessStarted) else {
@@ -390,9 +395,10 @@ fn critical_path_order_valid(phases: &[StartupPhaseReceipt]) -> bool {
     let Some(visible) = first_index(NativeStartupPhase::WindowVisible) else {
         return false;
     };
-    process < settings && process < created && created < visible
+    process < settings && settings < created && created < visible
 }
 
+#[cfg(test)]
 pub fn mark_deferred_service_result(
     trace: &StartupTrace,
     phase: NativeStartupPhase,
@@ -402,6 +408,27 @@ pub fn mark_deferred_service_result(
     match result {
         Ok(()) => trace.mark(phase, "ok", Some(service.to_string())),
         Err(error) => trace.mark(phase, "degraded", Some(format!("{service}: {error}"))),
+    }
+}
+
+fn mark_initialization_service_result(
+    trace: &StartupTrace,
+    phase: NativeStartupPhase,
+    service: &'static str,
+    snapshot: InitializationServiceSnapshot,
+    result: Result<(), String>,
+) {
+    let priority = snapshot.priority.map_or("none", |priority| match priority {
+        InitializationPriority::IdleWarm => "idle_warm",
+        InitializationPriority::EditorDemand => "editor_demand",
+    });
+    let detail = format!(
+        "{service}:priority={priority}:starts={}:promotions={}",
+        snapshot.starts, snapshot.promotions
+    );
+    match result {
+        Ok(()) => trace.mark(phase, "ok", Some(detail)),
+        Err(error) => trace.mark(phase, "degraded", Some(format!("{detail}:{error}"))),
     }
 }
 
@@ -463,48 +490,16 @@ mod tests {
     }
 
     #[test]
-    fn injected_heavy_ui_delay_cannot_move_native_shell_visibility_receipt() {
-        let clock = Arc::new(AtomicU64::new(100));
-        let trace = StartupTrace::with_test_clock(Arc::clone(&clock));
-        trace.mark(NativeStartupPhase::ProcessStarted, "ok", None);
-        trace.mark(NativeStartupPhase::MinimalSettingsLoaded, "ok", None);
-        trace.mark(NativeStartupPhase::WindowCreated, "ok", None);
-
-        super::after_native_shell_visible(&trace, "native-shell-before-webview", || {
-            // Models a clean-account WKWebView/framework initialization stall.
-            clock.store(2_100, Ordering::SeqCst);
-        });
-        trace.mark(NativeStartupPhase::CoreCommandsReady, "ok", None);
-
-        let snapshot = trace.snapshot();
-        let visible = snapshot
-            .phases
-            .iter()
-            .find(|receipt| receipt.phase == NativeStartupPhase::WindowVisible)
-            .expect("native shell visibility receipt");
-        assert_eq!(visible.elapsed_ms, 100);
-        assert_eq!(snapshot.first_paint_budget_met, Some(true));
-        assert_eq!(
-            snapshot
-                .phases
-                .iter()
-                .find(|receipt| receipt.phase == NativeStartupPhase::CoreCommandsReady)
-                .expect("post-webview receipt")
-                .elapsed_ms,
-            2_100
-        );
-    }
-
-    #[test]
-    fn pre_tauri_shell_may_precede_minimal_settings_without_weakening_required_order() {
+    fn visible_shell_requires_loaded_minimal_settings_and_mounted_webview() {
         let clock = Arc::new(AtomicU64::new(0));
         let trace = StartupTrace::with_test_clock(Arc::clone(&clock));
         for (elapsed_ms, phase) in [
             (0, NativeStartupPhase::ProcessStarted),
-            (20, NativeStartupPhase::WindowCreated),
-            (35, NativeStartupPhase::WindowVisible),
-            (80, NativeStartupPhase::MinimalSettingsLoaded),
-            (120, NativeStartupPhase::FrontendSettingsHydrated),
+            (20, NativeStartupPhase::MinimalSettingsLoaded),
+            (80, NativeStartupPhase::WindowCreated),
+            (120, NativeStartupPhase::WindowVisible),
+            (125, NativeStartupPhase::FrontendShellVisible),
+            (130, NativeStartupPhase::FrontendInteractive),
         ] {
             mark_at(&trace, &clock, elapsed_ms, phase);
         }
@@ -518,15 +513,19 @@ mod tests {
                 .find(|receipt| receipt.phase == NativeStartupPhase::WindowVisible)
                 .unwrap()
                 .elapsed_ms,
-            35
+            120
+        );
+        assert_eq!(
+            snapshot.phases.last().unwrap().phase,
+            NativeStartupPhase::FrontendInteractive
         );
     }
 
     #[test]
     fn deterministic_cold_and_warm_traces_meet_first_paint_budget_and_ordering() {
         for (label, timings) in [
-            ("cold", [0, 180, 510, 700, 710, 1_900, 2_400]),
-            ("warm", [0, 8, 25, 55, 61, 120, 160]),
+            ("cold", [0, 180, 510, 700, 710, 716, 1_900, 2_400]),
+            ("warm", [0, 8, 25, 55, 61, 64, 120, 160]),
         ] {
             let clock = Arc::new(AtomicU64::new(0));
             let trace = StartupTrace::with_test_clock(Arc::clone(&clock));
@@ -536,6 +535,7 @@ mod tests {
                 NativeStartupPhase::WindowCreated,
                 NativeStartupPhase::WindowVisible,
                 NativeStartupPhase::FrontendShellVisible,
+                NativeStartupPhase::FrontendInteractive,
                 NativeStartupPhase::LibraryServicesReady,
                 NativeStartupPhase::GpuReady,
             ]) {
@@ -671,5 +671,39 @@ mod tests {
             .unwrap_err(),
             "invalid_startup_phase_status"
         );
+    }
+
+    #[test]
+    fn editor_demand_promotes_one_in_flight_initialization_without_duplicate_start() {
+        let service = super::InitializationService::default();
+        assert!(service.request(super::InitializationPriority::IdleWarm));
+        assert!(!service.request(super::InitializationPriority::EditorDemand));
+        assert!(!service.request(super::InitializationPriority::EditorDemand));
+        let warming = service.snapshot();
+        assert_eq!(warming.state, super::InitializationState::Warming);
+        assert_eq!(
+            warming.priority,
+            Some(super::InitializationPriority::EditorDemand)
+        );
+        assert_eq!(warming.starts, 1);
+        assert_eq!(warming.promotions, 1);
+
+        service.finish(&Ok(()));
+        assert!(!service.request(super::InitializationPriority::EditorDemand));
+        assert_eq!(service.snapshot().state, super::InitializationState::Ready);
+        assert_eq!(service.snapshot().starts, 1);
+    }
+
+    #[test]
+    fn initialization_failure_is_explicitly_degraded_and_not_restarted_implicitly() {
+        let service = super::InitializationService::default();
+        assert!(service.request(super::InitializationPriority::EditorDemand));
+        service.finish(&Err("injected failure".to_string()));
+        assert_eq!(
+            service.snapshot().state,
+            super::InitializationState::Degraded
+        );
+        assert!(!service.request(super::InitializationPriority::IdleWarm));
+        assert_eq!(service.snapshot().starts, 1);
     }
 }

@@ -34,9 +34,14 @@ describe('frontend startup trace reporter', () => {
     expect(calls.filter(({ command }) => command === Invokes.FrontendReady)).toHaveLength(1);
     expect(calls.filter(({ command }) => command === Invokes.GetStartupTrace)).toHaveLength(1);
     const records = calls.filter(({ command }) => command === Invokes.RecordFrontendStartupPhase);
-    expect(records.map(({ args }) => args?.['phase'])).toEqual(['shellVisible', 'settingsHydrated', 'libraryReady']);
+    expect(records.map(({ args }) => args?.['phase'])).toEqual([
+      'shellVisible',
+      'interactive',
+      'settingsHydrated',
+      'libraryReady',
+    ]);
     expect(records.every(({ args }) => args?.['traceId'] === 'startup:trace-42')).toBe(true);
-    expect(records[2]?.args).toMatchObject({
+    expect(records[3]?.args).toMatchObject({
       detail: 'pinned-trees-unavailable',
       status: 'degraded',
     });

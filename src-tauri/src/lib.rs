@@ -81,8 +81,10 @@ use crate::merge::focus_stack::{
 };
 use crate::merge::hdr::{ALIGNMENT_POLICY_ID, HdrAlignmentPlanResponse, build_alignment_plan};
 
+use crate::app::startup::{FrontendStartupPhase, NativeStartupPhase, record_frontend_phase};
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 use crate::app::startup::{
-    FrontendStartupPhase, NativeStartupPhase, mark_deferred_service_result, record_frontend_phase,
+    InitializationPriority, request_gpu_initialization, request_lens_initialization,
 };
 use crate::cache_utils::{
     calculate_geometry_hash, calculate_transform_hash, calculate_visual_hash,
@@ -116,11 +118,6 @@ extern "C" fn force_exit(_signal: libc::c_int) {
     unsafe {
         libc::_exit(0);
     }
-}
-
-#[cfg(target_os = "macos")]
-pub fn prepare_macos_startup_shell() {
-    app::startup::prepare_macos_startup_shell();
 }
 
 #[cfg(target_os = "macos")]
@@ -3167,64 +3164,16 @@ pub fn run() {
                 .expect("Main window config not found")
                 .clone();
 
-            #[cfg(not(target_os = "macos"))]
             let mut window_builder =
                 tauri::WebviewWindowBuilder::from_config(app.handle(), &main_window_cfg)
                     .unwrap();
 
-            #[cfg(all(not(target_os = "android"), not(target_os = "macos")))]
+            #[cfg(not(target_os = "android"))]
             {
                 window_builder = window_builder.decorations(decorations).visible(false);
             }
 
-            #[cfg(not(target_os = "macos"))]
             let window = window_builder.build().expect("Failed to build window");
-
-            // WKWebView initialization can take seconds on the first launch of a
-            // clean macOS account. Create and expose the native shell first, then
-            // attach the webview to that same window. This keeps framework and
-            // frontend initialization off the first-visible critical path.
-            #[cfg(target_os = "macos")]
-            let window = {
-                let native_window =
-                    tauri::window::WindowBuilder::from_config(app.handle(), &main_window_cfg)
-                        .expect("Failed to configure native startup window")
-                        .decorations(decorations)
-                        .visible(false)
-                        .build()
-                        .expect("Failed to build native startup window");
-                app.state::<AppState>().startup_trace.mark(
-                    NativeStartupPhase::WindowCreated,
-                    "ok",
-                    None,
-                );
-
-                if let Err(error) = native_window.show() {
-                    log::error!("Failed to show startup shell: {}", error);
-                }
-                crate::app::startup::handoff_macos_startup_shell();
-                if let Err(error) = native_window.set_focus() {
-                    log::error!("Failed to focus startup shell: {}", error);
-                }
-                let size = native_window
-                    .inner_size()
-                    .expect("Failed to measure native startup window");
-                crate::app::startup::after_native_shell_visible(
-                    &app.state::<AppState>().startup_trace,
-                    "native-shell-before-webview",
-                    || {
-                        native_window.add_child(
-                            tauri::webview::WebviewBuilder::from_config(&main_window_cfg),
-                            tauri::LogicalPosition::new(0, 0),
-                            size,
-                        )
-                    },
-                )
-                    .expect("Failed to attach main webview");
-                app.get_webview_window("main")
-                    .expect("Main native window and webview labels must match")
-            };
-            #[cfg(not(target_os = "macos"))]
             app.state::<AppState>().startup_trace.mark(
                 NativeStartupPhase::WindowCreated,
                 "ok",
@@ -3273,75 +3222,40 @@ pub fn run() {
                     let _ = window.center();
                 }
 
-                // Show the shell as soon as its geometry is known. GPU, Lensfun,
-                // catalog, and optional services warm after this first frame.
-                #[cfg(not(target_os = "macos"))]
-                {
-                    if let Err(error) = window.show() {
-                        log::error!("Failed to show startup shell: {}", error);
-                    }
-                    if let Err(error) = window.set_focus() {
-                        log::error!("Failed to focus startup shell: {}", error);
-                    }
-                    app.state::<AppState>().startup_trace.mark(
-                        NativeStartupPhase::WindowVisible,
-                        "ok",
-                        Some("native-shell".to_string()),
+                if let Err(error) = window.show() {
+                    log::error!("Failed to show startup shell: {}", error);
+                }
+                if let Err(error) = window.set_focus() {
+                    log::error!("Failed to focus startup shell: {}", error);
+                }
+                app.state::<AppState>().startup_trace.mark(
+                    NativeStartupPhase::WindowVisible,
+                    "ok",
+                    Some("webview-bootstrap-chrome".to_string()),
+                );
+
+                // GPU, Lensfun, catalog, and optional services warm only after
+                // the bootstrap WebView shell has been exposed.
+                let idle_services = app.handle().clone();
+                #[cfg(feature = "validation-harness")]
+                if std::env::var("RAWENGINE_STARTUP_BENCHMARK_EDITOR_DEMAND").as_deref() == Ok("1") {
+                    image_open_session::promote_editor_initialization(&idle_services);
+                    request_lens_initialization(
+                        idle_services.clone(),
+                        InitializationPriority::IdleWarm,
+                    );
+                    request_gpu_initialization(
+                        idle_services.clone(),
+                        InitializationPriority::IdleWarm,
                     );
                 }
-
-                let background_handle = app.handle().clone();
                 tauri::async_runtime::spawn(async move {
-                    let lens_handle = background_handle.clone();
-                    let lens_result = tauri::async_runtime::spawn_blocking(move || {
-                        #[cfg(feature = "validation-harness")]
-                        if std::env::var("RAWENGINE_STARTUP_INJECT_LENSFUN_FAILURE").as_deref()
-                            == Ok("1")
-                        {
-                            return Err("injected lensfun startup failure".to_string());
-                        }
-                        let lens_db = lens_correction::load_lensfun_db(&lens_handle);
-                        *lens_handle.state::<AppState>().lens_db.lock().unwrap() =
-                            Some(Arc::new(lens_db));
-                        Ok(())
-                    })
-                    .await;
-                    let trace = background_handle.state::<AppState>().startup_trace.clone();
-                    let lens_result =
-                        lens_result.unwrap_or_else(|error| Err(error.to_string()));
-                    mark_deferred_service_result(
-                        &trace,
-                        NativeStartupPhase::LibraryServicesReady,
-                        "lensfun",
-                        lens_result,
+                    tokio::time::sleep(Duration::from_millis(1_500)).await;
+                    request_lens_initialization(
+                        idle_services.clone(),
+                        InitializationPriority::IdleWarm,
                     );
-                });
-
-                let gpu_handle = app.handle().clone();
-                let gpu_trace_handle = gpu_handle.clone();
-                tauri::async_runtime::spawn(async move {
-                    let result = tauri::async_runtime::spawn_blocking(move || {
-                        #[cfg(feature = "validation-harness")]
-                        if std::env::var("RAWENGINE_STARTUP_INJECT_GPU_FAILURE").as_deref()
-                            == Ok("1")
-                        {
-                            return Err("injected gpu startup failure".to_string());
-                        }
-                        get_or_init_gpu_context(
-                            &gpu_handle.state::<AppState>(),
-                            &gpu_handle,
-                        )
-                        .map(|_| ())
-                    })
-                    .await;
-                    let trace = gpu_trace_handle.state::<AppState>().startup_trace.clone();
-                    let result = result.unwrap_or_else(|error| Err(error.to_string()));
-                    mark_deferred_service_result(
-                        &trace,
-                        NativeStartupPhase::GpuReady,
-                        "gpu",
-                        result,
-                    );
+                    request_gpu_initialization(idle_services, InitializationPriority::IdleWarm);
                 });
 
                 preview_worker::start_preview_worker(app.handle().clone());
@@ -3506,6 +3420,9 @@ pub fn run() {
             ai::ai_commands::generate_ai_depth_mask,
             ai::ai_commands::generate_ai_whole_person_mask,
             ai::ai_commands::generate_ai_person_part_mask,
+            ai::ai_commands::get_ai_model_registry_report,
+            ai::ai_commands::cancel_ai_model_load,
+            ai::ai_commands::evict_ai_model_session,
             ai::ai_commands::check_ai_connector_status,
             ai::ai_commands::test_ai_connector_connection,
             ai::ai_commands::invoke_generative_replace_with_mask_def,
