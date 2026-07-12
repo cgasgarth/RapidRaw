@@ -1,7 +1,7 @@
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, Once};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use anyhow::Result;
 use image::imageops::{self, FilterType};
@@ -124,13 +124,58 @@ fn model_descriptor(id: AiModelId) -> AiModelDescriptor {
     }
 }
 
-static ORT_RUNTIME_INIT: Once = Once::new();
+static ORT_RUNTIME_INIT: OnceLock<Result<(), String>> = OnceLock::new();
+
+#[cfg(unix)]
+fn preflight_ort_dylib(path: &Path) -> Result<()> {
+    use std::ffi::{CStr, CString};
+    use std::os::unix::ffi::OsStrExt;
+
+    let path = CString::new(path.as_os_str().as_bytes())?;
+    // ORT owns process-global state, so this handle intentionally remains loaded for process life.
+    let handle = unsafe { libc::dlopen(path.as_ptr(), libc::RTLD_NOW | libc::RTLD_LOCAL) };
+    if handle.is_null() {
+        let message = unsafe {
+            let error = libc::dlerror();
+            if error.is_null() {
+                "unknown dlopen error".to_string()
+            } else {
+                CStr::from_ptr(error).to_string_lossy().into_owned()
+            }
+        };
+        return Err(anyhow::anyhow!("onnx_runtime_dylib_load_failed:{message}"));
+    }
+    let symbol = CString::new("OrtGetApiBase")?;
+    let get_api_base = unsafe { libc::dlsym(handle, symbol.as_ptr()) };
+    if get_api_base.is_null() {
+        return Err(anyhow::anyhow!("onnx_runtime_api_symbol_missing"));
+    }
+    Ok(())
+}
 
 fn build_ort_session(path: &Path) -> Result<Session> {
-    ORT_RUNTIME_INIT.call_once(|| {
-        let _ = ort::init().with_name("RawEngine AI Registry").commit();
-    });
-    Ok(Session::builder()?.commit_from_file(path)?)
+    ORT_RUNTIME_INIT
+        .get_or_init(|| {
+            let builder = match std::env::var_os("ORT_DYLIB_PATH") {
+                Some(runtime_path) => {
+                    #[cfg(unix)]
+                    preflight_ort_dylib(Path::new(&runtime_path))
+                        .map_err(|error| error.to_string())?;
+                    ort::init_from(runtime_path).map_err(|error| error.to_string())?
+                }
+                None => ort::init(),
+            };
+            builder.with_name("RawEngine AI Registry").commit();
+            ort::environment::Environment::current()
+                .map(|_| ())
+                .map_err(|error| error.to_string())
+        })
+        .as_ref()
+        .map_err(|error| anyhow::anyhow!("onnx_runtime_initialization_failed:{error}"))?;
+    Ok(Session::builder()?
+        .with_execution_providers([ort::ep::CPU::default().build()])
+        .map_err(|error| anyhow::anyhow!(error.to_string()))?
+        .commit_from_file(path)?)
 }
 
 pub async fn acquire_ort_model(
@@ -759,10 +804,45 @@ mod tests {
     use std::sync::Mutex;
 
     use image::{Rgb, Rgb32FImage};
-    use ort::session::Session;
+    use ndarray::Array4;
     use sha2::{Digest, Sha256};
 
-    use super::run_ai_denoise_headless;
+    use super::{ImageEmbeddings, build_ort_session, run_ai_denoise_headless, run_sam_decoder};
+
+    #[test]
+    fn sam_decoder_real_model_returns_bounded_mask_when_configured() {
+        let Some(model_path) = std::env::var_os("RAWENGINE_AI_SAM_DECODER_MODEL_PATH") else {
+            eprintln!(
+                "RAWENGINE_AI_SAM_DECODER_MODEL_PATH not set; skipping real SAM decoder smoke."
+            );
+            return;
+        };
+        let model_path = Path::new(&model_path);
+        assert!(model_path.exists(), "SAM decoder model is missing");
+        let session =
+            Mutex::new(build_ort_session(model_path).expect("load SAM decoder ONNX model"));
+        let embeddings = ImageEmbeddings {
+            path_hash: "synthetic-runtime-proof".to_string(),
+            embeddings: Array4::<f32>::zeros((1, 256, 64, 64)).into_dyn(),
+            original_size: (32, 32),
+        };
+        let output = run_sam_decoder(&session, &embeddings, (16.0, 16.0), (16.0, 16.0))
+            .expect("run real SAM decoder inference");
+        assert_eq!(output.dimensions(), (32, 32));
+        assert_eq!(output.as_raw().len(), 32 * 32);
+        assert!(output.as_raw().iter().all(|value| matches!(value, 0 | 255)));
+        let digest = hex::encode(Sha256::digest(output.as_raw()));
+        let selected_pixels = output
+            .as_raw()
+            .iter()
+            .filter(|value| **value == 255)
+            .count();
+        println!(
+            "SAM_RUNTIME_RECEIPT dimensions=32x32 bytes={} selected_pixels={} sha256={digest}",
+            output.as_raw().len(),
+            selected_pixels,
+        );
+    }
 
     #[test]
     fn ai_denoise_headless_smoke_uses_real_nind_model_when_configured() {
@@ -777,13 +857,7 @@ mod tests {
             model_path.display()
         );
 
-        let _ = ort::init().with_name("AI-Denoise-Headless-Test").commit();
-        let session = Mutex::new(
-            Session::builder()
-                .expect("create ONNX session builder")
-                .commit_from_file(model_path)
-                .expect("load NIND ONNX model"),
-        );
+        let session = Mutex::new(build_ort_session(model_path).expect("load NIND ONNX model"));
         let input = build_smoke_input();
         let output =
             run_ai_denoise_headless(&input, 0.5, &session).expect("run headless NIND denoise");
