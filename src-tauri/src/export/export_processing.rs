@@ -3592,7 +3592,8 @@ mod tests {
     use tauri::{Listener, Manager, ipc::InvokeBody, webview::InvokeRequest};
 
     use image::{
-        ColorType, DynamicImage, ImageBuffer, ImageDecoder, Rgb, Rgba,
+        ColorType, DynamicImage, GenericImageView, ImageBuffer, ImageDecoder, ImageFormat, Rgb,
+        Rgba,
         codecs::{jpeg::JpegDecoder, tiff::TiffDecoder},
     };
 
@@ -5231,6 +5232,76 @@ mod tests {
         assert!(
             error.contains("effectiveColorProfile"),
             "unexpected parity error: {error}"
+        );
+    }
+
+    #[test]
+    fn committed_tiff_readback_matches_pixels_icc_metadata_and_digest_receipt() {
+        let directory = tempfile::tempdir().unwrap();
+        let source_path = directory.path().join("source.jpg");
+        fs::write(&source_path, SOURCE_EMBEDDED_DISPLAY_P3_FIXTURE).unwrap();
+        let output_path = directory.path().join("committed-display-p3.tiff");
+        let image = DynamicImage::ImageRgb8(ImageBuffer::from_fn(4, 3, |x, y| {
+            Rgb([(x * 37) as u8, (y * 61) as u8, ((x + y) * 29) as u8])
+        }));
+        let mut settings = base_export_settings(None);
+        settings.color_profile = ExportColorProfile::DisplayP3;
+        settings.rendering_intent = ExportRenderingIntent::RelativeColorimetric;
+        let commit = save_image_with_metadata_commit(
+            &image,
+            WorkingColorState::EncodedSrgbV1,
+            &output_path,
+            &source_path.to_string_lossy(),
+            &settings,
+            None,
+        )
+        .unwrap()
+        .expect("TIFF should commit atomically");
+        let committed_bytes = fs::read(&output_path).unwrap();
+        assert_eq!(commit.digest.byte_len, committed_bytes.len() as u64);
+        assert_eq!(
+            commit.digest.sha256,
+            Sha256::digest(&committed_bytes).as_slice()
+        );
+        validate_export_file_readback_color_policy(
+            &committed_bytes,
+            "tiff",
+            commit.color_policy.as_ref(),
+            &settings.color_profile,
+            &settings.rendering_intent,
+            settings.black_point_compensation,
+            None,
+        )
+        .expect("committed ICC and receipt metadata should agree");
+        let decoded = image::load_from_memory_with_format(&committed_bytes, ImageFormat::Tiff)
+            .expect("committed TIFF should decode");
+        assert_eq!(decoded.dimensions(), image.dimensions());
+
+        let receipt = export_receipt_output(
+            &output_path,
+            &source_path.to_string_lossy(),
+            "tiff",
+            ExportReceiptContext {
+                metadata: commit.color_policy.clone(),
+                output_commit: Some(&commit),
+                source_digest: None,
+                raw_development_report: None,
+                edit_graph_revision: Some("fixture-edit-v1".to_string()),
+                export_elapsed_ms: Some(1),
+            },
+        )
+        .expect("terminal receipt should bind the committed artifact");
+        assert_eq!(receipt.byte_size, committed_bytes.len() as u64);
+        assert_eq!(
+            receipt
+                .output_digest
+                .as_ref()
+                .map(|digest| digest.value.as_str()),
+            Some(format!("sha256:{}", hex::encode(commit.digest.sha256)).as_str())
+        );
+        assert_eq!(
+            receipt.effective_color_profile.as_deref(),
+            Some("Display P3")
         );
     }
 

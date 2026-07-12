@@ -438,6 +438,145 @@ impl CooperativeGpuLane {
 mod tests {
     use super::*;
 
+    const SYNTHETIC_WORKER_COUNT: usize = 8;
+
+    #[derive(Debug)]
+    struct SyntheticBenchmarkReport {
+        item_count: usize,
+        worker_count: usize,
+        deterministic_work_ticks: u64,
+        elapsed: Duration,
+        rss_start_bytes: u64,
+        rss_peak_bytes: u64,
+        diagnostics: BatchExportReport,
+    }
+
+    impl SyntheticBenchmarkReport {
+        fn rss_growth_bytes(&self) -> u64 {
+            self.rss_peak_bytes.saturating_sub(self.rss_start_bytes)
+        }
+
+        fn deterministic_ticks_per_item(&self) -> u64 {
+            self.deterministic_work_ticks / self.item_count as u64
+        }
+
+        fn elapsed_per_item(&self) -> Duration {
+            self.elapsed / self.item_count as u32
+        }
+    }
+
+    fn process_rss_bytes() -> u64 {
+        let mut system = sysinfo::System::new();
+        let Ok(pid) = sysinfo::get_current_pid() else {
+            return 0;
+        };
+        system.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[pid]), true);
+        system.process(pid).map_or(0, sysinfo::Process::memory)
+    }
+
+    async fn run_synthetic_pipeline_benchmark(item_count: usize) -> SyntheticBenchmarkReport {
+        let budget = ExportResourceBudget {
+            decode_queue_capacity: 4,
+            render_queue_capacity: 2,
+            encode_queue_capacity: 4,
+            commit_queue_capacity: 2,
+            cpu_slots: SYNTHETIC_WORKER_COUNT,
+            encoder_slots: 4,
+            gpu_slots: 1,
+            host_memory_credits: 512 * CREDIT_QUANTUM_BYTES,
+            gpu_memory_credits: 256 * CREDIT_QUANTUM_BYTES,
+        };
+        let diagnostics = PipelineDiagnostics::default();
+        let resources = PipelineResources::new(budget, diagnostics.clone());
+        let gpu_lane = CooperativeGpuLane::new(budget.gpu_slots, diagnostics.clone());
+        let cancellation = PipelineCancellation::default();
+        let completed = Arc::new(AtomicUsize::new(0));
+        let work_ticks = Arc::new(AtomicU64::new(0));
+        let rss_peak = Arc::new(AtomicU64::new(process_rss_bytes()));
+        let rss_start = rss_peak.load(Ordering::SeqCst);
+        let started = Instant::now();
+
+        gpu_lane.set_interactive_waiters(1);
+        let resumed_lane = gpu_lane.clone();
+        let interactive_release = tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(8)).await;
+            resumed_lane.set_interactive_waiters(0);
+        });
+
+        let mut workers = Vec::with_capacity(SYNTHETIC_WORKER_COUNT);
+        for worker_index in 0..SYNTHETIC_WORKER_COUNT {
+            let resources = resources.clone();
+            let gpu_lane = gpu_lane.clone();
+            let cancellation = cancellation.clone();
+            let completed = Arc::clone(&completed);
+            let work_ticks = Arc::clone(&work_ticks);
+            let rss_peak = Arc::clone(&rss_peak);
+            workers.push(tokio::spawn(async move {
+                for index in (worker_index..item_count).step_by(SYNTHETIC_WORKER_COUNT) {
+                    let class = index % 3;
+                    let decoded_bytes = [48, 180, 400][class] * CREDIT_QUANTUM_BYTES;
+                    let gpu_bytes = [24, 90, 200][class] * CREDIT_QUANTUM_BYTES;
+                    let encoder_bytes = [12, 45, 100][class] * CREDIT_QUANTUM_BYTES;
+                    resources.observe_queue(
+                        ExportStage::Decoding,
+                        item_count
+                            .saturating_sub(index)
+                            .min(budget.decode_queue_capacity),
+                    );
+                    let decoded = resources
+                        .acquire_host(decoded_bytes, &cancellation)
+                        .await
+                        .expect("synthetic decode credits");
+                    let proxy = vec![index as u8; (class + 1) * 128 * 1024];
+                    rss_peak.fetch_max(process_rss_bytes(), Ordering::SeqCst);
+                    resources.observe_queue(ExportStage::Rendering, budget.render_queue_capacity);
+                    let gpu = resources
+                        .acquire_gpu(gpu_bytes, &cancellation)
+                        .await
+                        .expect("synthetic GPU credits");
+                    let gpu_slot = gpu_lane
+                        .acquire_export(&cancellation)
+                        .await
+                        .expect("synthetic export GPU lane");
+                    drop(gpu_slot);
+                    drop(gpu);
+                    drop(decoded);
+                    resources.observe_queue(ExportStage::Encoding, budget.encode_queue_capacity);
+                    let encoder = resources
+                        .acquire_encoder(encoder_bytes, &cancellation)
+                        .await
+                        .expect("synthetic encoder credits");
+                    std::hint::black_box(&proxy);
+                    drop(encoder);
+                    drop(proxy);
+                    resources.observe_queue(ExportStage::Committing, budget.commit_queue_capacity);
+                    // Fixed fake stage costs make throughput stability assertions
+                    // deterministic while the real coordinator owns admission.
+                    work_ticks.fetch_add(2 + 3 + 2 + 1, Ordering::SeqCst);
+                    completed.fetch_add(1, Ordering::SeqCst);
+                }
+            }));
+        }
+        assert_eq!(workers.len(), SYNTHETIC_WORKER_COUNT);
+        for worker in workers {
+            worker.await.expect("synthetic benchmark worker");
+        }
+        interactive_release.await.expect("interactive release");
+        resources.refresh_diagnostics();
+        assert_eq!(completed.load(Ordering::SeqCst), item_count);
+        assert_eq!(resources.host_used_bytes(), 0);
+        assert_eq!(resources.gpu_used_bytes(), 0);
+        SyntheticBenchmarkReport {
+            item_count,
+            worker_count: SYNTHETIC_WORKER_COUNT,
+            deterministic_work_ticks: work_ticks.load(Ordering::SeqCst),
+            elapsed: started.elapsed(),
+            rss_start_bytes: rss_start,
+            rss_peak_bytes: rss_peak.load(Ordering::SeqCst),
+            diagnostics: diagnostics.snapshot(),
+        }
+    }
+
     #[tokio::test]
     async fn weighted_credits_reconcile_and_oversized_items_do_not_deadlock() {
         let credits = WeightedCredits::new(4 * CREDIT_QUANTUM_BYTES);
@@ -467,8 +606,10 @@ mod tests {
                 .acquire(CREDIT_QUANTUM_BYTES, &waiting_cancellation)
                 .await
         });
+        let cancellation_started = Instant::now();
         cancellation.cancel();
         assert!(waiter.await.expect("waiter join").is_err());
+        assert!(cancellation_started.elapsed() < Duration::from_millis(250));
         drop(held);
         assert_eq!(credits.used_bytes(), 0);
     }
@@ -556,6 +697,51 @@ mod tests {
         assert_eq!(credits.used_bytes(), 0);
         assert!(credits.peak_bytes() <= capacity);
         assert_eq!(credits.oversized_count(), 384);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn synthetic_pipeline_benchmark_smoke_is_bounded_and_sublinear() {
+        let hundred = run_synthetic_pipeline_benchmark(100).await;
+        let thousand = run_synthetic_pipeline_benchmark(1_000).await;
+
+        for report in [&hundred, &thousand] {
+            assert_eq!(report.worker_count, SYNTHETIC_WORKER_COUNT);
+            assert_eq!(report.deterministic_ticks_per_item(), 8);
+            assert!(report.diagnostics.decode_queue_peak <= 4);
+            assert!(report.diagnostics.render_queue_peak <= 2);
+            assert!(report.diagnostics.encode_queue_peak <= 4);
+            assert!(report.diagnostics.commit_queue_peak <= 2);
+            assert!(report.diagnostics.host_credit_peak_bytes <= 512 * CREDIT_QUANTUM_BYTES);
+            assert!(report.diagnostics.gpu_credit_peak_bytes <= 256 * CREDIT_QUANTUM_BYTES);
+            assert!(report.diagnostics.interactive_preemptions > 0);
+        }
+        // Ten times the work must not produce linear retained-process growth.
+        // The allowance absorbs allocator/runtime noise on shared CI hosts.
+        assert!(
+            thousand.rss_growth_bytes()
+                <= hundred
+                    .rss_growth_bytes()
+                    .saturating_mul(2)
+                    .saturating_add(32 * CREDIT_QUANTUM_BYTES)
+        );
+        assert!(
+            thousand.elapsed_per_item() <= hundred.elapsed_per_item().saturating_mul(2),
+            "per-item throughput regressed: 100={:?}, 1000={:?}",
+            hundred.elapsed_per_item(),
+            thousand.elapsed_per_item()
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    #[ignore = "full 10k deterministic export coordinator benchmark"]
+    async fn synthetic_pipeline_benchmark_full_10k() {
+        let report = run_synthetic_pipeline_benchmark(10_000).await;
+        assert_eq!(report.worker_count, SYNTHETIC_WORKER_COUNT);
+        assert_eq!(report.deterministic_ticks_per_item(), 8);
+        assert!(report.rss_growth_bytes() <= 64 * CREDIT_QUANTUM_BYTES);
+        assert!(report.diagnostics.host_credit_peak_bytes <= 512 * CREDIT_QUANTUM_BYTES);
+        assert!(report.diagnostics.gpu_credit_peak_bytes <= 256 * CREDIT_QUANTUM_BYTES);
+        assert!(report.diagnostics.interactive_preemptions > 0);
     }
 
     #[tokio::test]
