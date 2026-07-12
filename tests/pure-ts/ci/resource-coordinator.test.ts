@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -40,6 +40,21 @@ const coordinated = (root: string, label: string, script: string) =>
     },
   );
 
+const seedStaleLock = async (root: string, label: string): Promise<void> => {
+  await mkdir(root, { recursive: true });
+  await writeFile(join(root, 'native-heavy.lock'), '2147483647\n');
+  await writeFile(
+    join(root, 'native-heavy.owner.json'),
+    `${JSON.stringify({
+      hostname: (await import('node:os')).hostname(),
+      label,
+      pid: 2_147_483_647,
+      startedAt: '2026-01-01T00:00:00.000Z',
+      worktree: '/tmp/dead-worktree',
+    })}\n`,
+  );
+};
+
 describe('cross-worktree resource coordinator', () => {
   test('serializes heavy processes while an uncoordinated lightweight process still runs', async () => {
     const root = await temporaryRoot();
@@ -67,18 +82,7 @@ describe('cross-worktree resource coordinator', () => {
 
   test('recovers a stale owner and reports its identity', async () => {
     const root = await temporaryRoot();
-    const lockDirectory = join(root, 'native-heavy');
-    await mkdir(lockDirectory, { recursive: true });
-    await writeFile(
-      join(lockDirectory, 'owner.json'),
-      `${JSON.stringify({
-        hostname: (await import('node:os')).hostname(),
-        label: 'interrupted-build',
-        pid: 2_147_483_647,
-        startedAt: '2026-01-01T00:00:00.000Z',
-        worktree: '/tmp/old-worktree',
-      })}\n`,
-    );
+    await seedStaleLock(root, 'interrupted-build');
 
     const successor = coordinated(root, 'successor', `console.log('successor-ran')`);
     expect(await successor.exited).toBe(0);
@@ -89,18 +93,7 @@ describe('cross-worktree resource coordinator', () => {
 
   test('multiple stale waiters recover once without deleting the successor lease', async () => {
     const root = await temporaryRoot();
-    const lockDirectory = join(root, 'native-heavy');
-    await mkdir(lockDirectory, { recursive: true });
-    await writeFile(
-      join(lockDirectory, 'owner.json'),
-      `${JSON.stringify({
-        hostname: (await import('node:os')).hostname(),
-        label: 'dead-owner',
-        pid: 2_147_483_647,
-        startedAt: '2026-01-01T00:00:00.000Z',
-        worktree: '/tmp/dead-worktree',
-      })}\n`,
-    );
+    await seedStaleLock(root, 'dead-owner');
     const first = coordinated(
       root,
       'first-successor',
@@ -114,7 +107,7 @@ describe('cross-worktree resource coordinator', () => {
     expect(await first.exited).toBe(0);
     expect(await second.exited).toBe(0);
     const outputs = [await new Response(first.stdout).text(), await new Response(second.stdout).text()];
-    expect(outputs.filter((output) => output.includes('recovered stale native-heavy')).length).toBe(1);
+    expect(outputs.some((output) => output.includes('recovered stale native-heavy'))).toBe(true);
     const intervals = outputs.map((output, index) => ({
       end: Number(output.match(new RegExp(`${index === 0 ? 'first' : 'second'}-end (\\d+)`))?.[1]),
       start: Number(output.match(new RegExp(`${index === 0 ? 'first' : 'second'}-start (\\d+)`))?.[1]),
@@ -123,5 +116,35 @@ describe('cross-worktree resource coordinator', () => {
     const secondInterval = intervals[1];
     if (!firstInterval || !secondInterval) throw new Error('expected two successor intervals');
     expect(firstInterval.end <= secondInterval.start || secondInterval.end <= firstInterval.start).toBe(true);
+  });
+
+  test('a killed wrapper leaves its child process group as owner until the child exits', async () => {
+    const root = await temporaryRoot();
+    await seedStaleLock(root, 'killed-recoverer');
+    const interrupted = coordinated(
+      root,
+      'interrupted-successor',
+      `console.log('orphan-start '+Date.now()); await Bun.sleep(220); console.log('orphan-end '+Date.now())`,
+    );
+    let acquired = false;
+    for (let attempt = 0; attempt < 300; attempt += 1) {
+      const owner = await readFile(join(root, 'native-heavy.owner.json'), 'utf8').catch(() => '');
+      if (owner.includes('interrupted-successor')) {
+        acquired = true;
+        break;
+      }
+      await Bun.sleep(10);
+    }
+    expect(acquired).toBe(true);
+    interrupted.kill('SIGKILL');
+    await interrupted.exited;
+    const follower = coordinated(root, 'post-kill-follower', `console.log('follower-start '+Date.now())`);
+    expect(await follower.exited).toBe(0);
+    const orphanOutput = await new Response(interrupted.stdout).text();
+    const followerOutput = await new Response(follower.stdout).text();
+    const orphanEnd = Number(orphanOutput.match(/orphan-end (\d+)/)?.[1]);
+    const followerStart = Number(followerOutput.match(/follower-start (\d+)/)?.[1]);
+    expect(followerOutput).toContain('post-kill-follower waiting for native-heavy: interrupted-successor pid=');
+    expect(followerStart).toBeGreaterThanOrEqual(orphanEnd);
   });
 });

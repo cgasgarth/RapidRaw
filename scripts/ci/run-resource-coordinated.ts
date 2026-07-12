@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { withResourceLease } from '../lib/ci/resource-coordinator';
+import { acquireResourceLease } from '../lib/ci/resource-coordinator';
 
 const args = process.argv.slice(2);
 const separator = args.indexOf('--');
@@ -15,8 +15,18 @@ if (!resource || !label || separator < 0 || separator === args.length - 1) {
   process.exit(1);
 }
 const command = args.slice(separator + 1);
-const exitCode = await withResourceLease({ label, resource }, async () => {
-  const child = Bun.spawn(command, { stderr: 'inherit', stdout: 'inherit' });
-  return await child.exited;
-});
+const lease = await acquireResourceLease({ label, resource });
+const child = Bun.spawn(command, { detached: true, stderr: 'inherit', stdout: 'inherit' });
+await lease.updateOwnerPid(child.pid);
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.on(signal, () => {
+    try {
+      process.kill(-child.pid, signal);
+    } catch {
+      child.kill(signal);
+    }
+  });
+}
+const exitCode = await child.exited;
+await lease.release();
 process.exit(exitCode);

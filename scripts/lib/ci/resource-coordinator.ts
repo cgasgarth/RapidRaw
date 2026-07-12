@@ -1,4 +1,4 @@
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { hostname } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 
@@ -15,6 +15,11 @@ export interface ResourceLeaseOptions {
   resource: string;
   timeoutMs?: number;
   pollMs?: number;
+}
+
+export interface ResourceLease {
+  release: () => Promise<void>;
+  updateOwnerPid: (pid: number) => Promise<void>;
 }
 
 const compactOwner = (owner: LeaseOwner | null): string =>
@@ -51,60 +56,64 @@ const readOwner = async (path: string): Promise<LeaseOwner | null> => {
   }
 };
 
-export async function acquireResourceLease(options: ResourceLeaseOptions): Promise<() => Promise<void>> {
+const replaceFile = async (path: string, contents: string): Promise<void> => {
+  const candidate = `${path}.${process.pid}.${crypto.randomUUID()}.tmp`;
+  await writeFile(candidate, contents, 'utf8');
+  await rename(candidate, path);
+};
+
+export async function acquireResourceLease(options: ResourceLeaseOptions): Promise<ResourceLease> {
   const timeoutMs = options.timeoutMs ?? Number(Bun.env.RAWENGINE_RESOURCE_WAIT_TIMEOUT_MS ?? 30 * 60_000);
   const pollMs = options.pollMs ?? Number(Bun.env.RAWENGINE_RESOURCE_WAIT_POLL_MS ?? 250);
   const root = coordinatorRoot();
-  const lockDirectory = join(root, options.resource);
-  const recoveryDirectory = join(root, `${options.resource}.recovery`);
-  const ownerPath = join(lockDirectory, 'owner.json');
+  const lockPath = join(root, `${options.resource}.lock`);
+  const ownerPath = join(root, `${options.resource}.owner.json`);
   await mkdir(root, { recursive: true });
   const waitStartedAt = Date.now();
   let lastDiagnosticAt = 0;
 
   while (true) {
     try {
-      await mkdir(lockDirectory);
-      const owner: LeaseOwner = {
+      const priorOwner = await readOwner(ownerPath);
+      const result = Bun.spawnSync(['/usr/bin/shlock', '-p', String(process.pid), '-f', lockPath], {
+        stderr: 'pipe',
+        stdout: 'pipe',
+      });
+      if (result.exitCode !== 0) throw Object.assign(new Error('resource_busy'), { code: 'EEXIST' });
+      if (priorOwner && !processIsAlive(priorOwner.pid)) {
+        console.log(`${options.label} recovered stale ${options.resource}: ${compactOwner(priorOwner)}`);
+      }
+      let owner: LeaseOwner = {
         hostname: hostname(),
         label: options.label,
         pid: process.pid,
         startedAt: new Date().toISOString(),
         worktree: process.cwd(),
       };
-      await writeFile(ownerPath, `${JSON.stringify(owner)}\n`, 'utf8');
+      await replaceFile(ownerPath, `${JSON.stringify(owner)}\n`);
       const waitedMs = Date.now() - waitStartedAt;
       if (waitedMs >= pollMs) console.log(`${options.label} acquired ${options.resource} after ${waitedMs}ms`);
       let released = false;
-      return async () => {
-        if (released) return;
-        released = true;
-        const current = await readOwner(ownerPath);
-        if (current?.pid === process.pid) await rm(lockDirectory, { recursive: true, force: true });
+      return {
+        release: async () => {
+          if (released) return;
+          released = true;
+          const currentPid = Number((await readFile(lockPath, 'utf8').catch(() => '')).trim());
+          if (currentPid === owner.pid) {
+            await rm(ownerPath, { force: true });
+            await rm(lockPath, { force: true });
+          }
+        },
+        updateOwnerPid: async (pid: number) => {
+          owner = { ...owner, pid };
+          await replaceFile(lockPath, `${pid}\n`);
+          await replaceFile(ownerPath, `${JSON.stringify(owner)}\n`);
+        },
       };
     } catch (error) {
       const code = error instanceof Error && 'code' in error ? error.code : undefined;
       if (code !== 'EEXIST') throw error;
       const owner = await readOwner(ownerPath);
-      if (owner && owner.hostname === hostname() && !processIsAlive(owner.pid)) {
-        let ownsRecovery = false;
-        try {
-          await mkdir(recoveryDirectory);
-          ownsRecovery = true;
-          const currentOwner = await readOwner(ownerPath);
-          if (currentOwner && currentOwner.hostname === hostname() && !processIsAlive(currentOwner.pid)) {
-            await rm(lockDirectory, { recursive: true, force: true });
-            console.log(`${options.label} recovered stale ${options.resource}: ${compactOwner(currentOwner)}`);
-          }
-        } catch (recoveryError) {
-          const recoveryCode =
-            recoveryError instanceof Error && 'code' in recoveryError ? recoveryError.code : undefined;
-          if (recoveryCode !== 'EEXIST') throw recoveryError;
-        } finally {
-          if (ownsRecovery) await rm(recoveryDirectory, { recursive: true, force: true });
-        }
-        continue;
-      }
       const waitedMs = Date.now() - waitStartedAt;
       if (waitedMs >= timeoutMs) {
         throw new Error(
@@ -117,14 +126,5 @@ export async function acquireResourceLease(options: ResourceLeaseOptions): Promi
       }
       await Bun.sleep(pollMs);
     }
-  }
-}
-
-export async function withResourceLease<T>(options: ResourceLeaseOptions, operation: () => Promise<T>): Promise<T> {
-  const release = await acquireResourceLease(options);
-  try {
-    return await operation();
-  } finally {
-    await release();
   }
 }

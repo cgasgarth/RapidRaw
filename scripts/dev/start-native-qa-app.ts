@@ -2,7 +2,6 @@
 
 import { mkdir, rm } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import { withResourceLease } from '../lib/ci/resource-coordinator';
 
 const sourceAppPath = 'src-tauri/target/debug/bundle/macos/RapidRAW.app';
 const qaAppPath = 'src-tauri/target/debug/bundle/macos/RawEngine QA Current.app';
@@ -34,12 +33,26 @@ async function run(command: string, commandArgs: string[], label: string, allowe
 }
 
 if (shouldBuild) {
-  await withResourceLease({ label: 'native-qa-build', resource: 'native-heavy' }, async () =>
-    run(
+  await run(
+    'bun',
+    [
+      'scripts/ci/run-resource-coordinated.ts',
+      '--resource',
+      'native-heavy',
+      '--label',
+      'native-qa-build',
+      '--',
       'bun',
-      ['tauri', 'build', '--debug', '--ci', '--bundles', 'app', '--features', buildFeatures],
-      'native qa app build',
-    ),
+      'tauri',
+      'build',
+      '--debug',
+      '--ci',
+      '--bundles',
+      'app',
+      '--features',
+      buildFeatures,
+    ],
+    'native qa app build',
   );
 }
 
