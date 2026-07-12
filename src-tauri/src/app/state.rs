@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 
 use image::{DynamicImage, GenericImageView, GrayImage};
 use serde::{Deserialize, Serialize};
-use tokio::sync::Mutex as TokioMutex;
+use tokio::sync::{Mutex as TokioMutex, Notify};
 use tokio::task::JoinHandle;
 use wgpu::{Texture, TextureView};
 
@@ -197,6 +197,7 @@ pub struct ThumbnailProgressTracker {
 pub struct ExportJob {
     pub job_id: String,
     pub cancellation_token: Arc<AtomicBool>,
+    pub cancellation_notify: Arc<Notify>,
     pub task_handle: Option<JoinHandle<()>>,
 }
 

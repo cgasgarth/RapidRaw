@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -84,6 +82,14 @@ pub struct PipelineCancellation {
 }
 
 impl PipelineCancellation {
+    pub fn from_parts(cancelled: Arc<AtomicBool>, notify: Arc<Notify>) -> Self {
+        Self { cancelled, notify }
+    }
+
+    pub fn token(&self) -> &Arc<AtomicBool> {
+        &self.cancelled
+    }
+
     pub fn cancel(&self) {
         self.cancelled.store(true, Ordering::SeqCst);
         self.notify.notify_waiters();
@@ -114,6 +120,38 @@ pub struct WeightedPermit {
     _permit: OwnedSemaphorePermit,
     bytes: u64,
     used_bytes: Arc<AtomicU64>,
+}
+
+impl WeightedPermit {
+    pub fn charged_bytes(&self) -> u64 {
+        self.bytes
+    }
+}
+
+/// Couples an in-memory representation to the credit that makes it admissible.
+/// Moving the envelope through a channel transfers ownership; dropping it on
+/// cancellation or error releases the credit without a separate cleanup path.
+pub struct CreditedRepresentation<T> {
+    value: T,
+    permit: WeightedPermit,
+}
+
+impl<T> CreditedRepresentation<T> {
+    pub fn new(value: T, permit: WeightedPermit) -> Self {
+        Self { value, permit }
+    }
+
+    pub fn value(&self) -> &T {
+        &self.value
+    }
+
+    pub fn into_value(self) -> T {
+        self.value
+    }
+
+    pub fn charged_bytes(&self) -> u64 {
+        self.permit.charged_bytes()
+    }
 }
 
 impl Drop for WeightedPermit {
@@ -218,6 +256,62 @@ impl PipelineDiagnostics {
 }
 
 #[derive(Clone)]
+pub struct PipelineResources {
+    host: WeightedCredits,
+    gpu: WeightedCredits,
+    diagnostics: PipelineDiagnostics,
+}
+
+impl PipelineResources {
+    pub fn new(budget: ExportResourceBudget, diagnostics: PipelineDiagnostics) -> Self {
+        Self {
+            host: WeightedCredits::new(budget.host_memory_credits),
+            gpu: WeightedCredits::new(budget.gpu_memory_credits),
+            diagnostics,
+        }
+    }
+
+    pub async fn acquire_host(
+        &self,
+        bytes: u64,
+        cancellation: &PipelineCancellation,
+    ) -> Result<WeightedPermit, String> {
+        let permit = self.host.acquire(bytes, cancellation).await?;
+        self.refresh_diagnostics();
+        Ok(permit)
+    }
+
+    pub async fn acquire_gpu(
+        &self,
+        bytes: u64,
+        cancellation: &PipelineCancellation,
+    ) -> Result<WeightedPermit, String> {
+        let permit = self.gpu.acquire(bytes, cancellation).await?;
+        self.refresh_diagnostics();
+        Ok(permit)
+    }
+
+    pub fn refresh_diagnostics(&self) {
+        self.diagnostics.update(|report| {
+            report.host_credit_peak_bytes = self.host.peak_bytes();
+            report.gpu_credit_peak_bytes = self.gpu.peak_bytes();
+            report.oversized_item_mode_count = self
+                .host
+                .oversized_count()
+                .saturating_add(self.gpu.oversized_count());
+        });
+    }
+
+    pub fn host_used_bytes(&self) -> u64 {
+        self.host.used_bytes()
+    }
+
+    pub fn gpu_used_bytes(&self) -> u64 {
+        self.gpu.used_bytes()
+    }
+}
+
+#[derive(Clone)]
 pub struct CooperativeGpuLane {
     export_slots: Arc<Semaphore>,
     interactive_waiters: Arc<AtomicUsize>,
@@ -305,6 +399,59 @@ mod tests {
         cancellation.cancel();
         assert!(waiter.await.expect("waiter join").is_err());
         drop(held);
+        assert_eq!(credits.used_bytes(), 0);
+    }
+
+    #[tokio::test]
+    async fn representation_credits_are_owned_and_released_independently() {
+        let budget = ExportResourceBudget {
+            host_memory_credits: 8 * CREDIT_QUANTUM_BYTES,
+            gpu_memory_credits: 4 * CREDIT_QUANTUM_BYTES,
+            ..ExportResourceBudget::conservative(8 * 1024 * 1024 * 1024, 4)
+        };
+        let diagnostics = PipelineDiagnostics::default();
+        let resources = PipelineResources::new(budget, diagnostics.clone());
+        let cancellation = PipelineCancellation::default();
+
+        let decoded = resources
+            .acquire_host(3 * CREDIT_QUANTUM_BYTES, &cancellation)
+            .await
+            .expect("decoded representation credit");
+        let texture = resources
+            .acquire_gpu(2 * CREDIT_QUANTUM_BYTES, &cancellation)
+            .await
+            .expect("GPU representation credit");
+        assert_eq!(decoded.charged_bytes(), 3 * CREDIT_QUANTUM_BYTES);
+        assert_eq!(resources.host_used_bytes(), 3 * CREDIT_QUANTUM_BYTES);
+        assert_eq!(resources.gpu_used_bytes(), 2 * CREDIT_QUANTUM_BYTES);
+
+        drop(texture);
+        assert_eq!(resources.gpu_used_bytes(), 0);
+        assert_eq!(resources.host_used_bytes(), 3 * CREDIT_QUANTUM_BYTES);
+        drop(decoded);
+        assert_eq!(resources.host_used_bytes(), 0);
+
+        let report = diagnostics.snapshot();
+        assert_eq!(report.host_credit_peak_bytes, 3 * CREDIT_QUANTUM_BYTES);
+        assert_eq!(report.gpu_credit_peak_bytes, 2 * CREDIT_QUANTUM_BYTES);
+    }
+
+    #[tokio::test]
+    async fn channel_drop_releases_the_representation_credit() {
+        let credits = WeightedCredits::new(2 * CREDIT_QUANTUM_BYTES);
+        let cancellation = PipelineCancellation::default();
+        let permit = credits
+            .acquire(2 * CREDIT_QUANTUM_BYTES, &cancellation)
+            .await
+            .expect("representation permit");
+        let (sender, receiver) = tokio::sync::mpsc::channel(1);
+        sender
+            .send(CreditedRepresentation::new(vec![0_u8; 16], permit))
+            .await
+            .expect("bounded channel send");
+        drop(sender);
+        assert_eq!(credits.used_bytes(), 2 * CREDIT_QUANTUM_BYTES);
+        drop(receiver);
         assert_eq!(credits.used_bytes(), 0);
     }
 }
