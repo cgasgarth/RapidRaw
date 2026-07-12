@@ -43,6 +43,7 @@ export enum Invokes {
   SuggestNegativeLabShadowPatchBlackPoint = 'suggest_negative_lab_shadow_patch_black_point',
   EstimateExportSizes = 'estimate_export_sizes',
   ExportImages = 'export_images',
+  ResumeExport = 'resume_export',
   FrontendLog = 'frontend_log',
   FrontendReady = 'frontend_ready',
   GenerateAiForegroundMask = 'generate_ai_foreground_mask',
