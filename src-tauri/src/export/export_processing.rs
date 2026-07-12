@@ -237,6 +237,47 @@ fn export_terminal_receipt(
     }
 }
 
+async fn admit_export_job<R: tauri::Runtime>(
+    total_paths: usize,
+    registry: &Mutex<Option<ExportJob>>,
+    app_handle: &tauri::AppHandle<R>,
+) -> Result<Option<ExportJobIdentity>, String> {
+    let job_identity = claim_export_job(registry)?;
+    let cancellation_token = Arc::clone(&job_identity.cancellation_token);
+
+    // Keep a small asynchronous admission window so the cancel command can
+    // linearize before GPU initialization or worker scheduling begins.
+    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    if cancellation_token.load(Ordering::SeqCst) {
+        let _ = app_handle.emit(
+            crate::events::EXPORT_CANCELLED,
+            export_terminal_receipt(ExportTerminalStatus::Cancelled, Vec::new(), total_paths),
+        );
+        finish_export_job(registry, &job_identity);
+        return Ok(None);
+    }
+
+    Ok(Some(job_identity))
+}
+
+#[cfg(all(test, feature = "tauri-test"))]
+#[tauri::command]
+async fn export_images_cancellation_boundary(
+    paths: Vec<String>,
+    output_folder_or_file: String,
+    state: tauri::State<'_, AppState>,
+    app_handle: tauri::AppHandle<tauri::test::MockRuntime>,
+) -> Result<(), String> {
+    let _output_folder_or_file = output_folder_or_file;
+    let Some(job_identity) = admit_export_job(paths.len(), &state.export_job, &app_handle).await?
+    else {
+        return Ok(());
+    };
+
+    finish_export_job(&state.export_job, &job_identity);
+    Err("cancellation boundary test reached runnable export work".to_string())
+}
+
 fn commit_export_output<T>(
     cancellation_token: &AtomicBool,
     write: impl FnOnce() -> Result<T, String>,
@@ -1042,17 +1083,11 @@ pub async fn export_images(
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
     let total_paths = paths.len();
-    let job_identity = claim_export_job(&state.export_job)?;
-    let cancellation_token = Arc::clone(&job_identity.cancellation_token);
-    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-    if cancellation_token.load(Ordering::SeqCst) {
-        let _ = app_handle.emit(
-            crate::events::EXPORT_CANCELLED,
-            export_terminal_receipt(ExportTerminalStatus::Cancelled, Vec::new(), total_paths),
-        );
-        finish_export_job(&state.export_job, &job_identity);
+    let Some(job_identity) = admit_export_job(total_paths, &state.export_job, &app_handle).await?
+    else {
         return Ok(());
-    }
+    };
+    let cancellation_token = Arc::clone(&job_identity.cancellation_token);
 
     let context = match get_or_init_gpu_context(&state, &app_handle) {
         Ok(context) => context,
@@ -2044,7 +2079,10 @@ mod tests {
         should_apply_srgb_perceptual_gamut_mapping, write_final_output_bytes_observed,
     };
     #[cfg(feature = "tauri-test")]
-    use super::{ExportCancellationAck, attach_export_task, cancel_export};
+    use super::{
+        ExportCancellationAck, attach_export_task, cancel_export,
+        export_images_cancellation_boundary,
+    };
     use crate::color::working_to_output_transform::WorkingColorState;
     use crate::export::export_encoders::{
         encode_image_with_applied_policy, encode_image_with_applied_policy_and_source_profile,
@@ -2061,7 +2099,7 @@ mod tests {
     use std::sync::{Arc, Barrier, Mutex};
     use std::{fs, io::Cursor, thread};
     #[cfg(feature = "tauri-test")]
-    use tauri::{Manager, ipc::InvokeBody, webview::InvokeRequest};
+    use tauri::{Listener, Manager, ipc::InvokeBody, webview::InvokeRequest};
 
     use image::{
         ColorType, DynamicImage, ImageBuffer, ImageDecoder, Rgb, Rgba,
@@ -2255,6 +2293,110 @@ mod tests {
             .recv_timeout(std::time::Duration::from_secs(1))
             .expect("the concurrently running task must observe cancellation");
         finish_export_job(&state.export_job, &identity);
+    }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
+    fn tauri_ipc_export_cancel_is_terminal_for_an_oversized_batch() {
+        let app = tauri::test::mock_builder()
+            .manage(crate::app_state::AppState::new())
+            .invoke_handler(tauri::generate_handler![
+                export_images_cancellation_boundary,
+                cancel_export
+            ])
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .unwrap();
+        let webview = tauri::WebviewWindowBuilder::new(&app, "main", Default::default())
+            .build()
+            .unwrap();
+        let output_dir = tempfile::tempdir().expect("temporary export directory should exist");
+        let source =
+            std::env::temp_dir().join(format!("rapidraw-ipc-cancel-{}.jpg", uuid::Uuid::new_v4()));
+        image::RgbImage::from_pixel(8, 8, image::Rgb([64, 96, 128]))
+            .save(&source)
+            .expect("synthetic source should be writable");
+        let total = 32usize;
+        let paths = vec![source.to_string_lossy().to_string(); total];
+        let (receipt_sender, receipt_receiver) = std::sync::mpsc::sync_channel(1);
+        let _listener = app.listen(crate::events::EXPORT_CANCELLED, move |event| {
+            let payload = event.payload().to_string();
+            let _ = receipt_sender.send(payload);
+        });
+
+        let export_request = InvokeRequest {
+            cmd: "export_images_cancellation_boundary".into(),
+            callback: tauri::ipc::CallbackFn(0),
+            error: tauri::ipc::CallbackFn(1),
+            url: "tauri://localhost".parse().unwrap(),
+            body: serde_json::json!({
+                "paths": paths,
+                "outputFolderOrFile": output_dir.path().to_string_lossy(),
+            })
+            .into(),
+            headers: Default::default(),
+            invoke_key: tauri::test::INVOKE_KEY.to_string(),
+        };
+        let export_webview = webview.clone();
+        let export_thread =
+            thread::spawn(move || tauri::test::get_ipc_response(&export_webview, export_request));
+        let expected_job_id = (0..100)
+            .find_map(|_| {
+                let active_job_id = app
+                    .state::<crate::app_state::AppState>()
+                    .export_job
+                    .lock()
+                    .unwrap()
+                    .as_ref()
+                    .map(|job| job.job_id.clone());
+                if active_job_id.is_none() {
+                    thread::sleep(std::time::Duration::from_millis(1));
+                }
+                active_job_id
+            })
+            .expect("export IPC must admit a job before cancellation is requested");
+
+        let cancel_response = tauri::test::get_ipc_response(
+            &webview,
+            InvokeRequest {
+                cmd: "cancel_export".into(),
+                callback: tauri::ipc::CallbackFn(2),
+                error: tauri::ipc::CallbackFn(3),
+                url: "tauri://localhost".parse().unwrap(),
+                body: InvokeBody::default(),
+                headers: Default::default(),
+                invoke_key: tauri::test::INVOKE_KEY.to_string(),
+            },
+        )
+        .expect("cancel IPC should return a typed acknowledgement");
+        let acknowledgement = cancel_response
+            .deserialize::<ExportCancellationAck>()
+            .unwrap();
+        assert_eq!(acknowledgement.active_job_id, expected_job_id);
+        assert!(acknowledgement.cancellation_requested);
+        assert!(acknowledgement.active_job_id.starts_with("export-job:"));
+        assert!(acknowledgement.task_attached || acknowledgement.token_observed);
+        export_thread
+            .join()
+            .unwrap()
+            .expect("export command should terminate cleanly");
+
+        let receipt = receipt_receiver
+            .recv_timeout(std::time::Duration::from_secs(2))
+            .expect("cancelled export must emit a terminal receipt");
+        let receipt: serde_json::Value = serde_json::from_str(&receipt).unwrap();
+        assert_eq!(receipt["terminalStatus"], "cancelled");
+        assert_eq!(receipt["total"], total);
+        assert!(receipt["outputs"].as_array().unwrap().is_empty());
+        assert!(fs::read_dir(output_dir.path()).unwrap().next().is_none());
+        assert!(
+            app.state::<crate::app_state::AppState>()
+                .export_job
+                .lock()
+                .unwrap()
+                .is_none(),
+            "terminal receipt must release the exact acknowledged job"
+        );
+        let _ = fs::remove_file(source);
     }
 
     #[test]

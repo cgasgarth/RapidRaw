@@ -64,7 +64,7 @@ jobs:
 
       - name: Cargo test
         working-directory: src-tauri
-        run: cargo test --quiet --locked --all-targets --no-default-features --features required-ci --no-fail-fast
+        run: cargo test --quiet --locked --all-targets --no-default-features --features required-ci,tauri-test --no-fail-fast
 
   main-macos-app-build:
     name: macOS app no-bundle smoke

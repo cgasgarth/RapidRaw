@@ -342,6 +342,11 @@ jobs:
         working-directory: src-tauri
         run: cargo clippy --locked --all-targets --no-default-features --features required-ci -- -D warnings -W clippy::redundant_clone
 
+      - name: Rust and Tauri IPC tests when Rust/Tauri changed
+        if: steps.rust-pr-decision.outputs.rust_ci_required == 'true'
+        working-directory: src-tauri
+        run: cargo test --quiet --locked --lib --no-default-features --features required-ci,tauri-test --no-fail-fast
+
       - name: Skip summary
         if: steps.rust-pr-decision.outputs.rust_ci_required != 'true'
         run: |
