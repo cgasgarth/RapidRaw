@@ -303,19 +303,32 @@ jobs:
           )"
 
           if [[ -z "$paths" ]]; then
-            echo "rust_ci_required=true" >> "$GITHUB_OUTPUT"
-            echo "rust_ci_reason=no changed files reported; fail closed" >> "$GITHUB_OUTPUT"
+            {
+              echo "rust_ci_required=true"
+              echo "rust_ci_reason=no changed files reported; fail closed"
+              echo "export_pipeline_tests_required=true"
+            } >> "$GITHUB_OUTPUT"
             exit 0
+          fi
+
+          if grep -Eq '^(src-tauri/src/export/(batch_export_pipeline|export_processing)[.]rs|[.]github/workflows/lint[.]yml)$' <<< "$paths"; then
+            echo "export_pipeline_tests_required=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "export_pipeline_tests_required=false" >> "$GITHUB_OUTPUT"
           fi
 
           if grep -Eq '^(src-tauri/|[.]cargo/|[.]github/workflows/lint[.]yml$|Cargo[.]toml$|Cargo[.]lock$|rust-toolchain[.]toml$|rustfmt[.]toml$)' <<< "$paths"; then
-            echo "rust_ci_required=true" >> "$GITHUB_OUTPUT"
-            echo "rust_ci_reason=Rust/Tauri paths changed" >> "$GITHUB_OUTPUT"
+            {
+              echo "rust_ci_required=true"
+              echo "rust_ci_reason=Rust/Tauri paths changed"
+            } >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          echo "rust_ci_required=false" >> "$GITHUB_OUTPUT"
-          echo "rust_ci_reason=No Rust/Tauri paths changed" >> "$GITHUB_OUTPUT"
+          {
+            echo "rust_ci_required=false"
+            echo "rust_ci_reason=No Rust/Tauri paths changed"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Install Tauri Linux dependencies
         if: steps.rust-pr-decision.outputs.rust_ci_required == 'true'
@@ -341,6 +354,13 @@ jobs:
         if: steps.rust-pr-decision.outputs.rust_ci_required == 'true'
         working-directory: src-tauri
         run: cargo clippy --locked --all-targets --no-default-features --features required-ci -- -D warnings -W clippy::redundant_clone
+
+      - name: Export pipeline resource and resume tests
+        if: steps.rust-pr-decision.outputs.export_pipeline_tests_required == 'true'
+        working-directory: src-tauri
+        run: |
+          cargo test --locked --no-default-features --features required-ci --lib export::batch_export_pipeline::tests
+          cargo test --locked --no-default-features --features required-ci --lib resume_manifest
 
       - name: Skip summary
         if: steps.rust-pr-decision.outputs.rust_ci_required != 'true'
