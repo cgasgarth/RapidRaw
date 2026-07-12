@@ -356,7 +356,6 @@ jobs:
           cargo test --manifest-path src-tauri/Cargo.toml --locked -p rapidraw-computational
           cargo test --manifest-path src-tauri/Cargo.toml --locked -p rapidraw-codecs --no-default-features --features jpeg
           cargo test --manifest-path src-tauri/Cargo.toml --locked -p rapidraw-codecs --all-features
-
       - name: Rust and Tauri IPC tests when Rust/Tauri changed
         if: steps.rust-pr-decision.outputs.rust_ci_required == 'true'
         working-directory: src-tauri
