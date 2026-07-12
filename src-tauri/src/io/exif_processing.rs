@@ -9,7 +9,7 @@ use crate::image_processing::{
     PersistedStateRecoveryReceipt,
 };
 use chrono::{DateTime, NaiveDateTime, Utc};
-use exif::{Exif, In, Value};
+use exif::{Exif, In, Tag, Value};
 use little_exif::exif_tag::ExifTag;
 use little_exif::filetype::FileExtension;
 use little_exif::metadata::Metadata;
@@ -62,7 +62,7 @@ pub struct PersistedStateLoad {
     pub reason_codes: Vec<String>,
 }
 
-const PERSISTED_STATE_IMPLEMENTATION_REVISION: u32 = 1;
+const PERSISTED_STATE_IMPLEMENTATION_REVISION: u32 = 2;
 const MAX_QUARANTINE_BACKUPS: usize = 3;
 
 pub fn load_sidecar(sidecar_path: &Path) -> ImageMetadata {
@@ -95,6 +95,7 @@ pub fn load_sidecar_recovering(
 
     let mut reasons = Vec::new();
     let mut disabled_fields = Vec::new();
+    let mut migrated_fields = Vec::new();
     let mut quarantined_extensions = Map::new();
     let mut outcome = PersistedStateOutcome::Current;
     let parsed = content
@@ -155,6 +156,9 @@ pub fn load_sidecar_recovering(
                 .persisted_render_state
                 .as_ref()
                 .is_some_and(|state| state.user_edits.is_none())
+            || meta.persisted_render_state.as_ref().is_some_and(|state| {
+                state.implementation_revision < PERSISTED_STATE_IMPLEMENTATION_REVISION
+            })
             || expected_source_identity.is_some_and(|_| {
                 meta.persisted_render_state
                     .as_ref()
@@ -164,10 +168,16 @@ pub fn load_sidecar_recovering(
             outcome = PersistedStateOutcome::Migrated;
             reasons.push("legacy_render_state_migrated".to_string());
         }
+        let source_dimensions = crop_requires_unit_migration(&meta.adjustments)
+            .then(|| expected_source_identity.and_then(resolve_oriented_source_dimensions))
+            .flatten();
         validate_adjustments(
             &mut meta.adjustments,
             &mut quarantined_extensions,
             &mut disabled_fields,
+            &mut migrated_fields,
+            &mut reasons,
+            source_dimensions,
         );
         validate_artifacts(
             &mut meta,
@@ -218,6 +228,7 @@ pub fn load_sidecar_recovering(
         source_identity: source_identity.clone(),
         previous_edit_revision: previous_revision,
         disabled_fields,
+        migrated_fields,
         reason_codes: reasons.clone(),
     };
     let mut receipts = meta
@@ -282,10 +293,215 @@ fn quarantine_all_render_state(meta: &mut ImageMetadata, extensions: &mut Map<St
     }
 }
 
+fn crop_requires_unit_migration(adjustments: &JsonValue) -> bool {
+    adjustments
+        .get("crop")
+        .and_then(JsonValue::as_object)
+        .is_some_and(|crop| {
+            matches!(
+                crop.get("unit").and_then(JsonValue::as_str),
+                Some("px" | "%")
+            ) || crop
+                .values()
+                .filter_map(JsonValue::as_f64)
+                .any(|value| value > 1.0)
+        })
+}
+
+fn resolve_oriented_source_dimensions(source_identity: &str) -> Option<(u32, u32)> {
+    let source_path = crate::file_management::parse_virtual_path(source_identity).0;
+    if is_raw_file(&source_path) {
+        let bytes = fs::read(&source_path).ok()?;
+        let source = rawler::rawsource::RawSource::new_from_slice(&bytes);
+        let decoder = rawler::get_decoder(&source).ok()?;
+        let raw = decoder
+            .raw_image(&source, &rawler::decoders::RawDecodeParams::default(), true)
+            .ok()?;
+        let active_dimensions = raw
+            .active_area
+            .map(|area| (area.d.w, area.d.h))
+            .unwrap_or((raw.width, raw.height));
+        let developed_dimensions = raw
+            .crop_area
+            .map(|mut crop| {
+                if let Some(active_area) = raw.active_area {
+                    crop = crop.intersection(&active_area).adapt(&active_area);
+                }
+                if crop.is_empty() {
+                    active_dimensions
+                } else {
+                    (crop.d.w, crop.d.h)
+                }
+            })
+            .unwrap_or(active_dimensions);
+        let orientation = decoder
+            .raw_metadata(&source, &Default::default())
+            .ok()
+            .and_then(|metadata| metadata.exif.orientation)
+            .unwrap_or(1);
+        return Some(oriented_dimensions(
+            developed_dimensions.0 as u32,
+            developed_dimensions.1 as u32,
+            orientation,
+        ));
+    }
+
+    let (width, height) = image::image_dimensions(&source_path).ok()?;
+    let orientation = fs::read(&source_path)
+        .ok()
+        .and_then(|bytes| read_exif(&bytes))
+        .and_then(|exif| {
+            exif.get_field(Tag::Orientation, In::PRIMARY)?
+                .value
+                .get_uint(0)
+        })
+        .unwrap_or(1) as u16;
+    Some(oriented_dimensions(width, height, orientation))
+}
+
+fn source_dimensions_for_sidecar(sidecar_path: &Path) -> Option<(u32, u32)> {
+    let name = sidecar_path.file_name()?.to_string_lossy();
+    let without_sidecar = name.strip_suffix(".rrdata")?;
+    let mut candidate = sidecar_path.with_file_name(without_sidecar);
+    if !candidate.exists() {
+        candidate = candidate.with_extension("");
+    }
+    candidate
+        .exists()
+        .then(|| resolve_oriented_source_dimensions(&candidate.to_string_lossy()))
+        .flatten()
+}
+
+fn oriented_dimensions(width: u32, height: u32, exif_orientation: u16) -> (u32, u32) {
+    if matches!(exif_orientation, 5..=8) {
+        (height, width)
+    } else {
+        (width, height)
+    }
+}
+
+fn migrate_crop_to_normalized(
+    adjustments: &mut Map<String, JsonValue>,
+    extensions: &mut Map<String, JsonValue>,
+    disabled: &mut Vec<String>,
+    migrated: &mut Vec<String>,
+    reasons: &mut Vec<String>,
+    oriented_source_dimensions: Option<(u32, u32)>,
+) {
+    let Some(crop_value) = adjustments.get("crop").cloned() else {
+        return;
+    };
+    let Some(crop) = crop_value.as_object() else {
+        quarantine_crop(
+            adjustments,
+            extensions,
+            disabled,
+            reasons,
+            crop_value,
+            "crop_shape_invalid",
+        );
+        return;
+    };
+    let unit = crop.get("unit").and_then(JsonValue::as_str);
+    let values =
+        ["x", "y", "width", "height"].map(|field| crop.get(field).and_then(JsonValue::as_f64));
+    let [Some(x), Some(y), Some(width), Some(height)] = values else {
+        quarantine_crop(
+            adjustments,
+            extensions,
+            disabled,
+            reasons,
+            crop_value,
+            "crop_shape_invalid",
+        );
+        return;
+    };
+    let normalized = match unit {
+        Some("normalized") | None if [x, y, width, height].iter().all(|value| *value <= 1.0) => {
+            [x, y, width, height]
+        }
+        Some("%") => [x / 100.0, y / 100.0, width / 100.0, height / 100.0],
+        Some("px") | None => {
+            let Some((source_width, source_height)) = oriented_source_dimensions else {
+                quarantine_crop(
+                    adjustments,
+                    extensions,
+                    disabled,
+                    reasons,
+                    crop_value,
+                    "crop_dimensions_unavailable",
+                );
+                return;
+            };
+            [
+                x / f64::from(source_width),
+                y / f64::from(source_height),
+                width / f64::from(source_width),
+                height / f64::from(source_height),
+            ]
+        }
+        _ => {
+            quarantine_crop(
+                adjustments,
+                extensions,
+                disabled,
+                reasons,
+                crop_value,
+                "crop_unit_unsupported",
+            );
+            return;
+        }
+    };
+    let [x, y, width, height] = normalized;
+    let valid = [x, y, width, height]
+        .iter()
+        .all(|value| value.is_finite() && (0.0..=1.0).contains(value))
+        && width > 0.0
+        && height > 0.0
+        && x + width <= 1.0 + 1.0e-9
+        && y + height <= 1.0 + 1.0e-9;
+    if !valid {
+        quarantine_crop(
+            adjustments,
+            extensions,
+            disabled,
+            reasons,
+            crop_value,
+            "crop_bounds_invalid",
+        );
+        return;
+    }
+    if unit != Some("normalized") {
+        adjustments.insert(
+            "crop".to_string(),
+            serde_json::json!({ "x": x, "y": y, "width": width, "height": height, "unit": "normalized" }),
+        );
+        migrated.push("adjustments.crop".to_string());
+        reasons.push("crop_units_normalized".to_string());
+    }
+}
+
+fn quarantine_crop(
+    adjustments: &mut Map<String, JsonValue>,
+    extensions: &mut Map<String, JsonValue>,
+    disabled: &mut Vec<String>,
+    reasons: &mut Vec<String>,
+    crop: JsonValue,
+    reason: &str,
+) {
+    adjustments.remove("crop");
+    extensions.insert("rejectedCrop".to_string(), crop);
+    disabled.push("adjustments.crop".to_string());
+    reasons.push(reason.to_string());
+}
+
 fn validate_adjustments(
     adjustments: &mut JsonValue,
     extensions: &mut Map<String, JsonValue>,
     disabled: &mut Vec<String>,
+    migrated: &mut Vec<String>,
+    reasons: &mut Vec<String>,
+    oriented_source_dimensions: Option<(u32, u32)>,
 ) {
     let Some(object) = adjustments.as_object_mut() else {
         if !adjustments.is_null() {
@@ -298,6 +514,14 @@ fn validate_adjustments(
         *adjustments = serde_json::json!({});
         return;
     };
+    migrate_crop_to_normalized(
+        object,
+        extensions,
+        disabled,
+        migrated,
+        reasons,
+        oriented_source_dimensions,
+    );
     const FORBIDDEN: &[&str] = &[
         "displayIcc",
         "displayLut",
@@ -1813,8 +2037,17 @@ pub fn save_sidecar_metadata_atomic(
         .map(|state| std::mem::take(&mut state.quarantined_extensions))
         .unwrap_or_default();
     let mut disabled = Vec::new();
-    validate_adjustments(&mut normalized.adjustments, &mut extensions, &mut disabled);
     let mut reasons = Vec::new();
+    let mut migrated = Vec::new();
+    let dimensions = source_dimensions_for_sidecar(sidecar_path);
+    validate_adjustments(
+        &mut normalized.adjustments,
+        &mut extensions,
+        &mut disabled,
+        &mut migrated,
+        &mut reasons,
+        dimensions,
+    );
     validate_artifacts(&mut normalized, None, &mut disabled, &mut reasons);
     if !disabled.is_empty() {
         return Err(format!(
@@ -2325,5 +2558,242 @@ mod tests {
                 .expect("FocalLengthIn35mmFilm should parse as a positive number");
             assert!(parsed_focal_length_35mm > 0.0);
         }
+    }
+}
+
+#[cfg(test)]
+mod crop_migration_tests {
+    use super::*;
+
+    fn migrate_crop_fixture(
+        crop: JsonValue,
+        dimensions: Option<(u32, u32)>,
+    ) -> (JsonValue, Vec<String>, Vec<String>) {
+        let mut adjustments = serde_json::json!({ "crop": crop, "exposure": 0.25 });
+        let mut extensions = Map::new();
+        let mut disabled = Vec::new();
+        let mut migrated = Vec::new();
+        let mut reasons = Vec::new();
+        validate_adjustments(
+            &mut adjustments,
+            &mut extensions,
+            &mut disabled,
+            &mut migrated,
+            &mut reasons,
+            dimensions,
+        );
+        (adjustments, migrated, reasons)
+    }
+
+    #[test]
+    fn pixel_crop_migration_handles_landscape_portrait_and_nontrivial_bounds() {
+        for (crop, dimensions, expected) in [
+            (
+                serde_json::json!({ "unit": "px", "x": 0, "y": 0, "width": 6000, "height": 4000 }),
+                (6000, 4000),
+                serde_json::json!({ "unit": "normalized", "x": 0.0, "y": 0.0, "width": 1.0, "height": 1.0 }),
+            ),
+            (
+                serde_json::json!({ "unit": "px", "x": 0, "y": 0, "width": 4000, "height": 6000 }),
+                (4000, 6000),
+                serde_json::json!({ "unit": "normalized", "x": 0.0, "y": 0.0, "width": 1.0, "height": 1.0 }),
+            ),
+            (
+                serde_json::json!({ "unit": "px", "x": 600, "y": 400, "width": 3000, "height": 2000 }),
+                (6000, 4000),
+                serde_json::json!({ "unit": "normalized", "x": 0.1, "y": 0.1, "width": 0.5, "height": 0.5 }),
+            ),
+        ] {
+            let (adjustments, migrated, reasons) = migrate_crop_fixture(crop, Some(dimensions));
+            assert_eq!(adjustments["crop"], expected);
+            assert_eq!(migrated, ["adjustments.crop"]);
+            assert_eq!(reasons, ["crop_units_normalized"]);
+        }
+    }
+
+    #[test]
+    fn percent_crop_migration_is_idempotent() {
+        let (mut adjustments, migrated, _) = migrate_crop_fixture(
+            serde_json::json!({ "unit": "%", "x": 10, "y": 20, "width": 50, "height": 60 }),
+            None,
+        );
+        assert_eq!(
+            adjustments["crop"],
+            serde_json::json!({
+                "unit": "normalized", "x": 0.1, "y": 0.2, "width": 0.5, "height": 0.6
+            })
+        );
+        assert_eq!(migrated, ["adjustments.crop"]);
+
+        let mut extensions = Map::new();
+        let mut disabled = Vec::new();
+        let mut second_migrated = Vec::new();
+        let mut reasons = Vec::new();
+        validate_adjustments(
+            &mut adjustments,
+            &mut extensions,
+            &mut disabled,
+            &mut second_migrated,
+            &mut reasons,
+            None,
+        );
+        assert!(second_migrated.is_empty());
+        assert!(reasons.is_empty());
+    }
+
+    #[test]
+    fn pixel_crop_without_dimensions_is_disabled_and_quarantined() {
+        let mut adjustments = serde_json::json!({
+            "crop": { "unit": "px", "x": 0, "y": 0, "width": 6000, "height": 4000 },
+            "exposure": 0.25
+        });
+        let mut extensions = Map::new();
+        let mut disabled = Vec::new();
+        let mut migrated = Vec::new();
+        let mut reasons = Vec::new();
+        validate_adjustments(
+            &mut adjustments,
+            &mut extensions,
+            &mut disabled,
+            &mut migrated,
+            &mut reasons,
+            None,
+        );
+        assert!(adjustments.get("crop").is_none());
+        assert_eq!(adjustments["exposure"], 0.25);
+        assert_eq!(extensions["rejectedCrop"]["unit"], "px");
+        assert_eq!(disabled, ["adjustments.crop"]);
+        assert_eq!(reasons, ["crop_dimensions_unavailable"]);
+    }
+
+    #[test]
+    fn version_two_pixel_crop_recovers_at_production_boundary_and_is_idempotent() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = temp.path().join("landscape.png");
+        image::RgbImage::new(600, 400).save(&source).unwrap();
+        let sidecar = get_primary_sidecar_path(&source);
+        let source_identity = source.to_string_lossy().into_owned();
+        let legacy = serde_json::json!({
+            "version": 2,
+            "rating": 4,
+            "tags": ["user:alaska"],
+            "exif": { "Camera": "Migration Fixture" },
+            "adjustments": {
+                "crop": { "unit": "px", "x": 60, "y": 40, "width": 300, "height": 200 },
+                "exposure": 0.25
+            },
+            "persistedRenderState": {
+                "schemaVersion": 2,
+                "implementationRevision": 1,
+                "sourceIdentity": source_identity,
+                "editRevision": "sha256:legacy",
+                "userEdits": {
+                    "crop": { "unit": "px", "x": 60, "y": 40, "width": 300, "height": 200 },
+                    "exposure": 0.25
+                },
+                "defaultsPolicyRevision": 1
+            }
+        });
+        fs::write(&sidecar, serde_json::to_vec_pretty(&legacy).unwrap()).unwrap();
+
+        let first = load_sidecar_recovering(&sidecar, Some(&source_identity)).unwrap();
+        assert_eq!(first.outcome, PersistedStateOutcome::Migrated);
+        assert_eq!(first.metadata.rating, 4);
+        assert_eq!(
+            first.metadata.tags.as_deref(),
+            Some(["user:alaska".to_string()].as_slice())
+        );
+        assert_eq!(
+            first.metadata.exif.as_ref().unwrap()["Camera"],
+            "Migration Fixture"
+        );
+        assert_eq!(
+            first.metadata.adjustments["crop"],
+            serde_json::json!({
+                "unit": "normalized", "x": 0.1, "y": 0.1, "width": 0.5, "height": 0.5
+            })
+        );
+        let compiled = crate::render_plan::compile_render_plan(
+            &first.metadata.adjustments,
+            crate::render_plan::CompileRenderPlanContext {
+                revision: crate::render_plan::RenderPlanRevision {
+                    image_session: 1,
+                    source_revision: 1,
+                    adjustment_revision: 1,
+                    schema_version: 1,
+                    settings_revision: 0,
+                },
+                is_raw: true,
+                tonemapper_override: None,
+            },
+            None,
+        )
+        .expect("migrated crop must compile into the native render plan");
+        assert_eq!(compiled.crop.unwrap().width, 0.5);
+        let state = first.metadata.persisted_render_state.as_ref().unwrap();
+        assert_eq!(state.implementation_revision, 2);
+        assert_eq!(
+            state.recovery_receipts.last().unwrap().migrated_fields,
+            ["adjustments.crop"]
+        );
+        assert!(first.backup_path.as_ref().is_some_and(|path| path.exists()));
+
+        let repaired_bytes = fs::read(&sidecar).unwrap();
+        let second = load_sidecar_recovering(&sidecar, Some(&source_identity)).unwrap();
+        assert_eq!(second.outcome, PersistedStateOutcome::Current);
+        assert!(second.backup_path.is_none());
+        assert_eq!(fs::read(&sidecar).unwrap(), repaired_bytes);
+    }
+
+    #[test]
+    fn pixel_crop_with_missing_source_is_quarantined_without_losing_metadata() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = temp.path().join("missing.arw");
+        let sidecar = get_primary_sidecar_path(&source);
+        let source_identity = source.to_string_lossy().into_owned();
+        let legacy = serde_json::json!({
+            "version": 2,
+            "rating": 5,
+            "tags": ["user:keeper"],
+            "exif": { "Camera": "Unavailable Source Fixture" },
+            "adjustments": {
+                "crop": { "unit": "px", "x": 0, "y": 0, "width": 6000, "height": 4000 },
+                "contrast": 12
+            },
+            "persistedRenderState": {
+                "schemaVersion": 2,
+                "implementationRevision": 1,
+                "sourceIdentity": source_identity,
+                "editRevision": "sha256:legacy",
+                "userEdits": {
+                    "crop": { "unit": "px", "x": 0, "y": 0, "width": 6000, "height": 4000 },
+                    "contrast": 12
+                },
+                "defaultsPolicyRevision": 1
+            }
+        });
+        fs::write(&sidecar, serde_json::to_vec_pretty(&legacy).unwrap()).unwrap();
+
+        let recovered = load_sidecar_recovering(&sidecar, Some(&source_identity)).unwrap();
+        assert_eq!(recovered.outcome, PersistedStateOutcome::Recovered);
+        assert_eq!(recovered.metadata.rating, 5);
+        assert_eq!(recovered.metadata.adjustments["contrast"], 12);
+        assert!(recovered.metadata.adjustments.get("crop").is_none());
+        let state = recovered.metadata.persisted_render_state.as_ref().unwrap();
+        assert_eq!(state.quarantined_extensions["rejectedCrop"]["unit"], "px");
+        let receipt = state.recovery_receipts.last().unwrap();
+        assert_eq!(receipt.disabled_fields, ["adjustments.crop"]);
+        assert!(
+            receipt
+                .reason_codes
+                .iter()
+                .any(|reason| reason == "crop_dimensions_unavailable")
+        );
+        assert!(
+            recovered
+                .backup_path
+                .as_ref()
+                .is_some_and(|path| path.exists())
+        );
     }
 }
