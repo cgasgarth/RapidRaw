@@ -2,6 +2,7 @@ pub(crate) mod catalog;
 pub(crate) mod changefeed;
 pub(crate) mod delete_plan;
 pub(crate) mod file_management;
+pub(crate) mod import_pipeline;
 pub(crate) mod library_identity;
 pub(crate) mod smart_preview_scheduler;
 pub(crate) mod tethering;

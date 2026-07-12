@@ -24,7 +24,6 @@ import type { ThumbnailViewportUpdate } from '../../hooks/library/useThumbnails'
 import { EXPORT_LAST_USED_PRESET_ID } from '../../schemas/export/exportRecipeIds';
 import { buildLibrarySessionUiCard } from '../../schemas/library/librarySessionUiSchemas';
 import { useLibraryStore } from '../../store/useLibraryStore';
-import { useProcessStore } from '../../store/useProcessStore';
 import { thumbnailCache } from '../../thumbnails/thumbnailCacheInstance';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { DEFAULT_THEME_ID, THEMES, type ThemeProps } from '../../utils/themes';
@@ -43,6 +42,7 @@ import {
 import { type ImportState, Status } from '../ui/ExportImportProperties';
 import Button from '../ui/primitives/Button';
 import UiText from '../ui/primitives/Text';
+import { ImportCancellationButton, ImportResumeButton } from './library/ImportJobControls';
 import LibraryGrid from './library/LibraryGrid';
 import { SearchInput, ViewOptionsDropdown } from './library/LibraryHeader';
 import LibraryHeaderStatusStrip from './library/LibraryHeaderStatusStrip';
@@ -571,15 +571,19 @@ export default function MainLibrary(props: MainLibraryProps) {
         </div>
         <div className="flex items-center gap-3 shrink-0">
           {props.importState.status === Status.Importing && (
-            <UiText as="div" color={TextColors.accent} className="flex items-center gap-2 animate-pulse">
-              <FolderInput size={16} />
-              <span>
-                {t('library.import.progress', {
-                  current: props.importState.progress?.current,
-                  total: props.importState.progress?.total,
-                })}
-              </span>
-            </UiText>
+            <div className="flex items-center gap-2">
+              <UiText as="div" color={TextColors.accent} className="flex items-center gap-2" aria-live="polite">
+                <FolderInput size={16} className="animate-pulse" />
+                <span>
+                  {t('library.import.progress', {
+                    current: props.importState.progress?.current,
+                    total: props.importState.progress?.total,
+                  })}
+                  {props.importState.stage ? ` · ${props.importState.stage}` : ''}
+                </span>
+              </UiText>
+              <ImportCancellationButton />
+            </div>
           )}
           {props.importState.status === Status.Success && (
             <UiText as="div" color={TextColors.success} className="flex items-center gap-2">
@@ -593,6 +597,8 @@ export default function MainLibrary(props: MainLibraryProps) {
               <span>{t('library.import.failed')}</span>
             </UiText>
           )}
+          {(props.importState.status === Status.Cancelled || props.importState.status === Status.Error) &&
+            props.importState.jobId && <ImportResumeButton importState={props.importState} />}
           <SearchInput indexingProgress={props.indexingProgress} isIndexing={props.isIndexing} />
           <ViewOptionsDropdown
             libraryViewMode={props.libraryViewMode}

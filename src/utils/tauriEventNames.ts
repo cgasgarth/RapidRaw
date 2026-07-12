@@ -19,6 +19,7 @@ export const HDR_PROGRESS_EVENT = 'hdr-progress';
 export const GAMUT_WARNING_UPDATE_EVENT = 'gamut-warning-update';
 export const HISTOGRAM_UPDATE_EVENT = 'histogram-update';
 export const IMPORT_COMPLETE_EVENT = 'import-complete';
+export const IMPORT_CANCELLED_EVENT = 'import-cancelled';
 export const IMPORT_ERROR_EVENT = 'import-error';
 export const IMPORT_PROGRESS_EVENT = 'import-progress';
 export const IMPORT_START_EVENT = 'import-start';
