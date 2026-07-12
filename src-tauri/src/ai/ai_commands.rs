@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::io::Cursor;
+use std::sync::Arc;
 use std::time::Instant;
 
 use base64::{Engine as _, engine::general_purpose};
@@ -14,11 +15,13 @@ use super::ai_connector;
 use crate::adjustment_fields::GEOMETRY_KEYS;
 use crate::ai::ai_processing::{
     self, AiDepthMaskParameters, AiForegroundMaskParameters, AiSkyMaskParameters,
-    AiSubjectMaskParameters, CachedDepthMap, ImageEmbeddings, acquire_ort_model,
+    AiSubjectMaskParameters, CachedDepthMap, ImageEmbeddings, acquire_capability,
     generate_image_embeddings, run_depth_anything_model, run_sam_decoder, run_sky_seg_model,
     run_u2netp_model,
 };
-use crate::ai::model_registry::{AiModelId, AiModelRegistryReport};
+use crate::ai::model_registry::{
+    AiCapability, AiDerivedCacheReport, AiModelId, AiModelRegistryReport,
+};
 use crate::app_settings::load_settings_or_default;
 use crate::app_state::AppState;
 use crate::formats::png_data_url;
@@ -40,7 +43,21 @@ fn encode_to_base64_png(image: &GrayImage) -> Result<String, String> {
 
 #[tauri::command]
 pub fn get_ai_model_registry_report(state: tauri::State<'_, AppState>) -> AiModelRegistryReport {
-    state.ai_model_registry.report()
+    let mut report = state.ai_model_registry.report();
+    let embedding_stats = state.ai_embeddings.stats();
+    let depth_stats = state.ai_depth_maps.stats();
+    report.derived_caches = [embedding_stats, depth_stats]
+        .map(|stats| AiDerivedCacheReport {
+            name: stats.name,
+            budget_bytes: stats.soft_limit_bytes,
+            resident_bytes: stats.bytes,
+            entries: stats.entries,
+            hits: stats.hits,
+            misses: stats.misses,
+            evictions: stats.evictions,
+        })
+        .to_vec();
+    report
 }
 
 #[tauri::command]
@@ -77,10 +94,17 @@ struct SamPromptGeometry {
     image_height: u32,
 }
 
-fn sam_path_hash(path: &str, js_adjustments: &Value) -> String {
+fn derived_cache_key(
+    model_preprocess_revision: &[u8],
+    path: &str,
+    js_adjustments: &Value,
+) -> Result<String, String> {
+    let (source_path, _) = crate::file_management::parse_virtual_path(path);
+    let source_revision = crate::source_revision::SourceRevision::from_path(&source_path)
+        .map_err(|error| error.to_string())?;
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"sam-vit-b-01ec64:preprocess-v1");
-    hasher.update(path.as_bytes());
+    hasher.update(model_preprocess_revision);
+    hasher.update(source_revision.identity().as_bytes());
     let mut geo_hasher = DefaultHasher::new();
     for key in GEOMETRY_KEYS {
         if let Some(val) = js_adjustments.get(key) {
@@ -89,7 +113,11 @@ fn sam_path_hash(path: &str, js_adjustments: &Value) -> String {
         }
     }
     hasher.update(&geo_hasher.finish().to_le_bytes());
-    hasher.finalize().to_hex().to_string()
+    Ok(hasher.finalize().to_hex().to_string())
+}
+
+fn sam_path_hash(path: &str, js_adjustments: &Value) -> Result<String, String> {
+    derived_cache_key(b"sam-vit-b-01ec64:preprocess-v1", path, js_adjustments)
 }
 
 fn unwarp_sam_prompt(
@@ -173,12 +201,9 @@ fn get_cached_or_generate_sam_embeddings(
     js_adjustments: &Value,
     path_hash: &str,
 ) -> Result<(ImageEmbeddings, Option<f64>), String> {
-    let mut embeddings_cache = state.ai_embeddings.lock().unwrap();
-
-    if let Some(cached_embeddings) = embeddings_cache.as_ref()
-        && cached_embeddings.path_hash == path_hash
-    {
-        return Ok((cached_embeddings.clone(), None));
+    let cache_key = path_hash.to_string();
+    if let Some(cached_embeddings) = state.ai_embeddings.get(&cache_key) {
+        return Ok((cached_embeddings.as_ref().clone(), None));
     }
 
     let embedding_start = Instant::now();
@@ -187,7 +212,10 @@ fn get_cached_or_generate_sam_embeddings(
         generate_image_embeddings(warped_image.as_ref(), sam_encoder).map_err(|e| e.to_string())?;
     new_embeddings.path_hash = path_hash.to_string();
     let embedding_latency_ms = embedding_start.elapsed().as_secs_f64() * 1000.0;
-    *embeddings_cache = Some(new_embeddings.clone());
+    let retained_bytes = (new_embeddings.embeddings.len() * size_of::<f32>()) as u64;
+    state
+        .ai_embeddings
+        .insert(cache_key, Arc::new(new_embeddings.clone()), retained_bytes);
     Ok((new_embeddings, Some(embedding_latency_ms)))
 }
 
@@ -201,14 +229,14 @@ pub async fn generate_ai_foreground_mask(
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<AiForegroundMaskParameters, String> {
-    let model = acquire_ort_model(
+    let capability = acquire_capability(
         &app_handle,
         &state.ai_model_registry,
-        AiModelId::ForegroundU2Net,
+        AiCapability::ForegroundMask,
     )
     .await
     .map_err(|e| e.to_string())?;
-    let session = model.ort()?;
+    let session = capability.lease(AiModelId::ForegroundU2Net)?.ort()?;
 
     let warped_image = get_cached_full_warped_image(&state, &js_adjustments)?;
 
@@ -236,10 +264,11 @@ pub async fn generate_ai_sky_mask(
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<AiSkyMaskParameters, String> {
-    let model = acquire_ort_model(&app_handle, &state.ai_model_registry, AiModelId::SkyU2Net)
-        .await
-        .map_err(|e| e.to_string())?;
-    let session = model.ort()?;
+    let capability =
+        acquire_capability(&app_handle, &state.ai_model_registry, AiCapability::SkyMask)
+            .await
+            .map_err(|e| e.to_string())?;
+    let session = capability.lease(AiModelId::SkyU2Net)?.ort()?;
 
     let warped_image = get_cached_full_warped_image(&state, &js_adjustments)?;
 
@@ -300,14 +329,14 @@ pub async fn generate_ai_person_part_mask(
             crate::ai::person_segmentation::generate_whole_person_mask(warped_image.as_ref())?
         }
         "clothing" | "hair" => {
-            let parser_lease = acquire_ort_model(
+            let capability = acquire_capability(
                 &app_handle,
                 &state.ai_model_registry,
-                AiModelId::PersonPartParser,
+                AiCapability::PersonPartMask,
             )
             .await
             .map_err(|error| error.to_string())?;
-            let parser = parser_lease.ort()?;
+            let parser = capability.lease(AiModelId::PersonPartParser)?.ort()?;
             let target = if part == "hair" {
                 crate::ai::person_part_parser::PersonPartMaskTarget::Hair
             } else {
@@ -366,58 +395,36 @@ pub async fn generate_ai_depth_mask(
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<AiDepthMaskParameters, String> {
-    let depth_lease = acquire_ort_model(
+    let capability = acquire_capability(
         &app_handle,
         &state.ai_model_registry,
-        AiModelId::DepthAnything,
+        AiCapability::DepthMask,
     )
     .await
     .map_err(|e| e.to_string())?;
-    let depth_session = depth_lease.ort()?;
+    let depth_session = capability.lease(AiModelId::DepthAnything)?.ort()?;
 
-    let path_hash = {
-        let mut hasher = blake3::Hasher::new();
-        hasher.update(b"depth-anything-v2-vits:preprocess-v1");
-        hasher.update(path.as_bytes());
-        let mut geo_hasher = DefaultHasher::new();
-        for key in GEOMETRY_KEYS {
-            if let Some(val) = js_adjustments.get(key) {
-                key.hash(&mut geo_hasher);
-                val.to_string().hash(&mut geo_hasher);
-            }
-        }
-        hasher.update(&geo_hasher.finish().to_le_bytes());
-        hasher.finalize().to_hex().to_string()
-    };
+    let path_hash = derived_cache_key(
+        b"depth-anything-v2-vits:preprocess-v1",
+        &path,
+        &js_adjustments,
+    )?;
 
-    let cached_depth = {
-        let mut depth_cache = state.ai_depth_map.lock().unwrap();
-
-        if let Some(cached) = depth_cache.as_ref() {
-            if cached.path_hash == path_hash {
-                cached.clone()
-            } else {
-                let warped_image = get_cached_full_warped_image(&state, &js_adjustments)?;
-                let depth_img = run_depth_anything_model(warped_image.as_ref(), &depth_session)
-                    .map_err(|e| e.to_string())?;
-                let new_cache = CachedDepthMap {
-                    path_hash,
-                    depth_image: depth_img,
-                    original_size: (warped_image.width(), warped_image.height()),
-                };
-                *depth_cache = Some(new_cache.clone());
-                new_cache
-            }
-        } else {
+    let cached_depth = match state.ai_depth_maps.get(&path_hash) {
+        Some(cached) => cached,
+        None => {
             let warped_image = get_cached_full_warped_image(&state, &js_adjustments)?;
             let depth_img = run_depth_anything_model(warped_image.as_ref(), &depth_session)
                 .map_err(|e| e.to_string())?;
-            let new_cache = CachedDepthMap {
-                path_hash,
+            let retained_bytes = depth_img.as_raw().capacity() as u64;
+            let new_cache = Arc::new(CachedDepthMap {
+                path_hash: path_hash.clone(),
                 depth_image: depth_img,
                 original_size: (warped_image.width(), warped_image.height()),
-            };
-            *depth_cache = Some(new_cache.clone());
+            });
+            state
+                .ai_depth_maps
+                .insert(path_hash, Arc::clone(&new_cache), retained_bytes);
             new_cache
         }
     };
@@ -459,18 +466,14 @@ pub async fn generate_ai_subject_mask(
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<AiSubjectMaskParameters, String> {
-    let encoder_lease =
-        acquire_ort_model(&app_handle, &state.ai_model_registry, AiModelId::SamEncoder)
+    let capability =
+        acquire_capability(&app_handle, &state.ai_model_registry, AiCapability::SamMask)
             .await
             .map_err(|e| e.to_string())?;
-    let decoder_lease =
-        acquire_ort_model(&app_handle, &state.ai_model_registry, AiModelId::SamDecoder)
-            .await
-            .map_err(|e| e.to_string())?;
-    let encoder = encoder_lease.ort()?;
-    let decoder = decoder_lease.ort()?;
+    let encoder = capability.lease(AiModelId::SamEncoder)?.ort()?;
+    let decoder = capability.lease(AiModelId::SamDecoder)?.ort()?;
 
-    let path_hash = sam_path_hash(&path, &js_adjustments);
+    let path_hash = sam_path_hash(&path, &js_adjustments)?;
     let (embeddings, _) =
         get_cached_or_generate_sam_embeddings(&state, &encoder, &js_adjustments, &path_hash)?;
     let (img_w, img_h) = embeddings.original_size;
@@ -524,17 +527,13 @@ pub async fn generate_ai_object_mask_proposal(
     app_handle: tauri::AppHandle,
 ) -> Result<AiObjectMaskProposal, String> {
     let total_start = Instant::now();
-    let encoder_lease =
-        acquire_ort_model(&app_handle, &state.ai_model_registry, AiModelId::SamEncoder)
+    let capability =
+        acquire_capability(&app_handle, &state.ai_model_registry, AiCapability::SamMask)
             .await
             .map_err(|e| e.to_string())?;
-    let decoder_lease =
-        acquire_ort_model(&app_handle, &state.ai_model_registry, AiModelId::SamDecoder)
-            .await
-            .map_err(|e| e.to_string())?;
-    let encoder = encoder_lease.ort()?;
-    let decoder = decoder_lease.ort()?;
-    let path_hash = sam_path_hash(&path, &js_adjustments);
+    let encoder = capability.lease(AiModelId::SamEncoder)?.ort()?;
+    let decoder = capability.lease(AiModelId::SamDecoder)?.ort()?;
+    let path_hash = sam_path_hash(&path, &js_adjustments)?;
     let (embeddings, embedding_latency_ms) =
         get_cached_or_generate_sam_embeddings(&state, &encoder, &js_adjustments, &path_hash)?;
     let (image_width, image_height) = embeddings.original_size;
@@ -589,19 +588,18 @@ pub async fn precompute_ai_subject_mask(
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
-    let encoder_lease =
-        acquire_ort_model(&app_handle, &state.ai_model_registry, AiModelId::SamEncoder)
-            .await
-            .map_err(|e| e.to_string())?;
-    let encoder = encoder_lease.ort()?;
+    let capability = acquire_capability(
+        &app_handle,
+        &state.ai_model_registry,
+        AiCapability::SamEmbedding,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+    let encoder = capability.lease(AiModelId::SamEncoder)?.ort()?;
 
-    let path_hash = sam_path_hash(&path, &js_adjustments);
+    let path_hash = sam_path_hash(&path, &js_adjustments)?;
 
-    let mut embeddings_cache = state.ai_embeddings.lock().unwrap();
-
-    if let Some(cached_embeddings) = embeddings_cache.as_ref()
-        && cached_embeddings.path_hash == path_hash
-    {
+    if state.ai_embeddings.get(&path_hash).is_some() {
         return Ok(());
     }
 
@@ -609,8 +607,11 @@ pub async fn precompute_ai_subject_mask(
     let mut new_embeddings =
         generate_image_embeddings(warped_image.as_ref(), &encoder).map_err(|e| e.to_string())?;
 
-    new_embeddings.path_hash = path_hash;
-    *embeddings_cache = Some(new_embeddings);
+    new_embeddings.path_hash = path_hash.clone();
+    let retained_bytes = (new_embeddings.embeddings.len() * size_of::<f32>()) as u64;
+    state
+        .ai_embeddings
+        .insert(path_hash, Arc::new(new_embeddings), retained_bytes);
 
     Ok(())
 }
@@ -697,14 +698,14 @@ pub async fn invoke_generative_replace_with_mask_def(
     let mask_bitmap = unwarped_dynamic.to_luma8();
 
     let patch_rgba = if use_fast_inpaint {
-        let lama_lease = ai_processing::acquire_ort_model(
+        let capability = ai_processing::acquire_capability(
             &app_handle,
             &state.ai_model_registry,
-            AiModelId::Lama,
+            AiCapability::Inpainting,
         )
         .await
         .map_err(|e| e.to_string())?;
-        let lama_model = lama_lease.ort()?;
+        let lama_model = capability.lease(AiModelId::Lama)?.ort()?;
 
         ai_processing::run_lama_inpainting(&source_image, &mask_bitmap, &lama_model)
             .map_err(|e| e.to_string())?
@@ -813,4 +814,53 @@ pub async fn invoke_generative_replace_with_mask_def(
     .to_string();
 
     Ok(result_json)
+}
+
+#[cfg(test)]
+mod derived_cache_key_tests {
+    use super::*;
+
+    #[test]
+    fn physical_source_mutation_invalidates_sam_and_depth_keys() {
+        let directory = tempfile::tempdir().unwrap();
+        let source = directory.path().join("source.raw");
+        std::fs::write(&source, b"revision-one").unwrap();
+        let path = source.to_string_lossy();
+        let adjustments = serde_json::json!({ "rotation": 0 });
+        let sam_before = sam_path_hash(&path, &adjustments).unwrap();
+        let depth_before =
+            derived_cache_key(b"depth-anything-v2-vits:preprocess-v1", &path, &adjustments)
+                .unwrap();
+
+        let replacement = directory.path().join("replacement.raw");
+        std::fs::write(&replacement, b"revision-two").unwrap();
+        std::fs::rename(&replacement, &source).unwrap();
+
+        assert_ne!(sam_path_hash(&path, &adjustments).unwrap(), sam_before);
+        assert_ne!(
+            derived_cache_key(b"depth-anything-v2-vits:preprocess-v1", &path, &adjustments,)
+                .unwrap(),
+            depth_before
+        );
+    }
+
+    #[test]
+    fn virtual_copies_reuse_physical_revision_until_geometry_changes() {
+        let directory = tempfile::tempdir().unwrap();
+        let source = directory.path().join("source.raw");
+        std::fs::write(&source, b"same physical source").unwrap();
+        let primary = source.to_string_lossy().to_string();
+        let virtual_copy = format!("{primary}?vc=alternate-edit");
+        let base_adjustments = serde_json::json!({ "transformRotate": 0 });
+        let changed_geometry = serde_json::json!({ "transformRotate": 90 });
+
+        assert_eq!(
+            sam_path_hash(&primary, &base_adjustments).unwrap(),
+            sam_path_hash(&virtual_copy, &base_adjustments).unwrap()
+        );
+        assert_ne!(
+            sam_path_hash(&virtual_copy, &base_adjustments).unwrap(),
+            sam_path_hash(&virtual_copy, &changed_geometry).unwrap()
+        );
+    }
 }

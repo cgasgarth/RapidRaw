@@ -62,15 +62,19 @@ pub async fn apply_denoising(
     let mut ai_session = None;
     let mut ai_lease = None;
     if method == "ai" {
-        let lease = crate::ai::ai_processing::acquire_ort_model(
+        let capability = crate::ai::ai_processing::acquire_capability(
             &app_handle,
             &state.ai_model_registry,
-            crate::ai::model_registry::AiModelId::Denoise,
+            crate::ai::model_registry::AiCapability::Denoise,
         )
         .await
         .map_err(|e| e.to_string())?;
-        ai_session = Some(lease.ort()?);
-        ai_lease = Some(lease);
+        ai_session = Some(
+            capability
+                .lease(crate::ai::model_registry::AiModelId::Denoise)?
+                .ort()?,
+        );
+        ai_lease = Some(capability);
     }
 
     let denoise_result_handle = state.denoise_result.clone();
@@ -101,15 +105,19 @@ pub async fn batch_denoise_images(
     let mut ai_session = None;
     let mut ai_lease = None;
     if method == "ai" {
-        let lease = crate::ai::ai_processing::acquire_ort_model(
+        let capability = crate::ai::ai_processing::acquire_capability(
             &app_handle,
             &state.ai_model_registry,
-            crate::ai::model_registry::AiModelId::Denoise,
+            crate::ai::model_registry::AiCapability::Denoise,
         )
         .await
         .map_err(|e| e.to_string())?;
-        ai_session = Some(lease.ort()?);
-        ai_lease = Some(lease);
+        ai_session = Some(
+            capability
+                .lease(crate::ai::model_registry::AiModelId::Denoise)?
+                .ort()?,
+        );
+        ai_lease = Some(capability);
     }
 
     tokio::task::spawn_blocking(move || {

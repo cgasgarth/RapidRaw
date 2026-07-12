@@ -9,7 +9,7 @@ use image::{
     DynamicImage, GenericImageView, GrayImage, ImageBuffer, Luma, Rgb, Rgb32FImage, Rgba, RgbaImage,
 };
 use ndarray::{Array, Array4, IxDyn};
-use ort::session::Session;
+use ort::session::{Session, builder::GraphOptimizationLevel};
 use ort::value::Tensor;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -153,7 +153,7 @@ fn preflight_ort_dylib(path: &Path) -> Result<()> {
     Ok(())
 }
 
-fn build_ort_session(path: &Path) -> Result<Session> {
+pub(crate) fn build_ort_session(path: &Path) -> Result<Session> {
     ORT_RUNTIME_INIT
         .get_or_init(|| {
             let builder = match std::env::var_os("ORT_DYLIB_PATH") {
@@ -174,6 +174,14 @@ fn build_ort_session(path: &Path) -> Result<Session> {
         .map_err(|error| anyhow::anyhow!("onnx_runtime_initialization_failed:{error}"))?;
     Ok(Session::builder()?
         .with_execution_providers([ort::ep::CPU::default().build()])
+        .map_err(|error| anyhow::anyhow!(error.to_string()))?
+        .with_intra_threads(2)
+        .map_err(|error| anyhow::anyhow!(error.to_string()))?
+        .with_inter_threads(1)
+        .map_err(|error| anyhow::anyhow!(error.to_string()))?
+        .with_optimization_level(GraphOptimizationLevel::All)
+        .map_err(|error| anyhow::anyhow!(error.to_string()))?
+        .with_memory_pattern(true)
         .map_err(|error| anyhow::anyhow!(error.to_string()))?
         .commit_from_file(path)?)
 }
@@ -416,6 +424,36 @@ pub async fn acquire_clip_model(
         )
         .await
         .map_err(anyhow::Error::msg)
+}
+
+pub struct AiCapabilityLeaseSet {
+    leases: Vec<AiModelLease>,
+}
+
+impl AiCapabilityLeaseSet {
+    pub fn lease(&self, id: AiModelId) -> Result<&AiModelLease, String> {
+        self.leases
+            .iter()
+            .find(|lease| lease.id() == id)
+            .ok_or_else(|| format!("ai_capability_dependency_missing:{id:?}"))
+    }
+}
+
+pub async fn acquire_capability(
+    app_handle: &tauri::AppHandle,
+    registry: &AiModelRegistry,
+    capability: AiCapability,
+) -> Result<AiCapabilityLeaseSet> {
+    let mut leases = Vec::with_capacity(capability.dependencies().len());
+    for id in capability.dependencies() {
+        let lease = if *id == AiModelId::Clip {
+            acquire_clip_model(app_handle, registry).await?
+        } else {
+            acquire_ort_model(app_handle, registry, *id).await?
+        };
+        leases.push(lease);
+    }
+    Ok(AiCapabilityLeaseSet { leases })
 }
 
 pub struct ClipModels {

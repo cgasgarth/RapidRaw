@@ -271,16 +271,21 @@ pub async fn start_background_indexing(
     let custom_ai_tags = settings.custom_ai_tags.clone();
     let ai_tag_count = settings.ai_tag_count.unwrap_or(10) as usize;
 
-    let clip_lease =
-        crate::ai::ai_processing::acquire_clip_model(&app_handle, &state.ai_model_registry)
-            .await
-            .map_err(|e| e.to_string())?;
-    let clip_models = clip_lease.clip()?;
+    let capability = crate::ai::ai_processing::acquire_capability(
+        &app_handle,
+        &state.ai_model_registry,
+        crate::ai::model_registry::AiCapability::Tagging,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+    let clip_models = capability
+        .lease(crate::ai::model_registry::AiModelId::Clip)?
+        .clip()?;
 
     let app_handle_clone = app_handle.clone();
 
     let task: JoinHandle<()> = tokio::spawn(async move {
-        let _clip_lease = clip_lease;
+        let _capability = capability;
         let _ = app_handle_clone.emit(crate::events::INDEXING_STARTED, ());
         println!("Starting background indexing for: {}", folder_path);
         println!(
