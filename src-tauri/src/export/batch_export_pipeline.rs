@@ -490,4 +490,128 @@ mod tests {
         drop(receiver);
         assert_eq!(credits.used_bytes(), 0);
     }
+
+    #[tokio::test]
+    async fn bounded_credit_stress_reconciles_one_thousand_mixed_items() {
+        let capacity = 8 * CREDIT_QUANTUM_BYTES;
+        let credits = WeightedCredits::new(capacity);
+        let cancellation = PipelineCancellation::default();
+        let mut workers = Vec::with_capacity(1_000);
+        for index in 0..1_000 {
+            let credits = credits.clone();
+            let cancellation = cancellation.clone();
+            workers.push(tokio::spawn(async move {
+                let requested = ((index % 13) as u64 + 1) * CREDIT_QUANTUM_BYTES;
+                let permit = credits
+                    .acquire(requested, &cancellation)
+                    .await
+                    .expect("mixed item should be admitted");
+                tokio::task::yield_now().await;
+                drop(permit);
+            }));
+        }
+        for worker in workers {
+            worker.await.expect("stress worker should finish");
+        }
+        assert_eq!(credits.used_bytes(), 0);
+        assert!(credits.peak_bytes() <= capacity);
+        assert_eq!(credits.oversized_count(), 384);
+    }
+
+    #[tokio::test]
+    async fn oversized_admission_does_not_starve_waiting_small_work() {
+        let credits = WeightedCredits::new(4 * CREDIT_QUANTUM_BYTES);
+        let cancellation = PipelineCancellation::default();
+        let oversized = credits
+            .acquire(32 * CREDIT_QUANTUM_BYTES, &cancellation)
+            .await
+            .expect("oversized work should use bounded admission mode");
+        let waiting_credits = credits.clone();
+        let waiting_cancellation = cancellation.clone();
+        let waiter = tokio::spawn(async move {
+            waiting_credits
+                .acquire(CREDIT_QUANTUM_BYTES, &waiting_cancellation)
+                .await
+        });
+        tokio::task::yield_now().await;
+        drop(oversized);
+        let small = tokio::time::timeout(Duration::from_secs(1), waiter)
+            .await
+            .expect("small work should not remain queued")
+            .expect("small worker should finish")
+            .expect("small work should be admitted after oversized release");
+        drop(small);
+        assert_eq!(credits.used_bytes(), 0);
+    }
+
+    #[test]
+    fn queue_peak_diagnostics_remain_bounded_for_large_batches() {
+        let diagnostics = PipelineDiagnostics::default();
+        let budget = ExportResourceBudget::conservative(16 * 1024 * 1024 * 1024, 12);
+        let resources = PipelineResources::new(budget, diagnostics.clone());
+        for index in 0..1_000 {
+            resources.observe_queue(ExportStage::Decoding, index % budget.decode_queue_capacity);
+            resources.observe_queue(ExportStage::Rendering, index % budget.render_queue_capacity);
+            resources.observe_queue(ExportStage::Encoding, index % budget.encode_queue_capacity);
+            resources.observe_queue(
+                ExportStage::Committing,
+                index % budget.commit_queue_capacity,
+            );
+        }
+        let report = diagnostics.snapshot();
+        assert!(report.decode_queue_peak < budget.decode_queue_capacity);
+        assert!(report.render_queue_peak < budget.render_queue_capacity);
+        assert!(report.encode_queue_peak < budget.encode_queue_capacity);
+        assert!(report.commit_queue_peak < budget.commit_queue_capacity);
+    }
+
+    #[tokio::test]
+    async fn interactive_gpu_preemption_is_observable_and_cancellation_wakes_waiter() {
+        let diagnostics = PipelineDiagnostics::default();
+        let lane = CooperativeGpuLane::new(1, diagnostics.clone());
+        lane.set_interactive_waiters(1);
+        let cancellation = PipelineCancellation::default();
+        let waiting_lane = lane.clone();
+        let waiting_cancellation = cancellation.clone();
+        let waiter = tokio::spawn(async move {
+            waiting_lane
+                .acquire_export(&waiting_cancellation)
+                .await
+                .map(|_| ())
+        });
+        tokio::time::sleep(Duration::from_millis(12)).await;
+        cancellation.cancel();
+        assert!(
+            tokio::time::timeout(Duration::from_secs(1), waiter)
+                .await
+                .expect("GPU waiter should wake")
+                .expect("GPU waiter should join")
+                .is_err()
+        );
+        assert!(diagnostics.snapshot().interactive_preemptions > 0);
+    }
+
+    #[tokio::test]
+    async fn interactive_gpu_preemption_resumes_when_interactive_waiter_clears() {
+        let diagnostics = PipelineDiagnostics::default();
+        let lane = CooperativeGpuLane::new(1, diagnostics.clone());
+        lane.set_interactive_waiters(1);
+        let cancellation = PipelineCancellation::default();
+        let waiting_lane = lane.clone();
+        let waiting_cancellation = cancellation.clone();
+        let waiter = tokio::spawn(async move {
+            waiting_lane
+                .acquire_export(&waiting_cancellation)
+                .await
+                .expect("GPU lane should resume")
+        });
+        tokio::time::sleep(Duration::from_millis(12)).await;
+        lane.set_interactive_waiters(0);
+        let permit = tokio::time::timeout(Duration::from_secs(1), waiter)
+            .await
+            .expect("GPU waiter should resume")
+            .expect("GPU waiter should join");
+        drop(permit);
+        assert!(diagnostics.snapshot().interactive_preemptions > 0);
+    }
 }

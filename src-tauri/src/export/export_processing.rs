@@ -1187,26 +1187,23 @@ fn export_masks_for_image(
             if cancellation_token.load(Ordering::SeqCst) {
                 return Ok(ExportMasksResult::Cancelled(committed_paths));
             }
-            if commit_export_output(cancellation_token, || {
-                #[cfg(target_os = "android")]
-                {
-                    let file_name = mask_alpha_path
-                        .file_name()
-                        .and_then(|name| name.to_str())
-                        .ok_or_else(|| "Missing Android mask export file name".to_string())?;
-                    crate::android_integration::save_image_bytes_to_android_gallery(
-                        file_name,
-                        crate::formats::IMAGE_MIME_PNG,
-                        &alpha_bytes,
-                    )?;
-                }
-
-                #[cfg(not(target_os = "android"))]
-                fs::write(&mask_alpha_path, &alpha_bytes).map_err(|e| e.to_string())?;
+            #[cfg(target_os = "android")]
+            let alpha_commit = commit_export_output(cancellation_token, || {
+                let file_name = mask_alpha_path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .ok_or_else(|| "Missing Android mask export file name".to_string())?;
+                crate::android_integration::save_image_bytes_to_android_gallery(
+                    file_name,
+                    crate::formats::IMAGE_MIME_PNG,
+                    &alpha_bytes,
+                )?;
                 Ok(())
-            })?
-            .is_none()
-            {
+            })?;
+            #[cfg(not(target_os = "android"))]
+            let alpha_commit =
+                write_final_output_bytes(&mask_alpha_path, &alpha_bytes, Some(cancellation_token))?;
+            if alpha_commit.is_none() {
                 return Ok(ExportMasksResult::Cancelled(committed_paths));
             }
             committed_paths.push(mask_alpha_path.to_string_lossy().to_string());
