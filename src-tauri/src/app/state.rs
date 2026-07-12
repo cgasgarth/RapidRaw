@@ -246,6 +246,7 @@ pub struct AppState {
     pub thumbnail_cancellation_token: Arc<AtomicBool>,
     pub thumbnail_progress: Mutex<ThumbnailProgressTracker>,
     pub preview_scheduler: Mutex<Option<Arc<crate::preview_scheduler::PreviewScheduler>>>,
+    pub export_interactive_gpu_waiters: Arc<AtomicUsize>,
     pub viewer_sample_frames: MemoryLruCache<String, CachedViewerSampleFrame>,
     pub analytics_scheduler: Mutex<Option<Arc<crate::analytics_scheduler::AnalyticsScheduler>>>,
     pub mask_cache: MemoryLruCache<u64, GrayImage>,
@@ -318,6 +319,7 @@ impl AppState {
                 completed: 0,
             }),
             preview_scheduler: Mutex::new(None),
+            export_interactive_gpu_waiters: Arc::new(AtomicUsize::new(0)),
             viewer_sample_frames: MemoryLruCache::new(
                 policy("viewer_samples", 96, 128, Some(8)),
                 Arc::clone(&cache_budget),

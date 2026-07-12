@@ -755,7 +755,10 @@ fn to_display_preview_rgba8(_app: &tauri::AppHandle, image: &DynamicImage) -> Rg
 
 pub(crate) fn start_preview_worker(app_handle: tauri::AppHandle) {
     let state = app_handle.state::<AppState>();
-    let scheduler = PreviewScheduler::new(PreviewSchedulingPolicy::default());
+    let scheduler = PreviewScheduler::new_with_export_gpu_pressure(
+        PreviewSchedulingPolicy::default(),
+        Some(Arc::clone(&state.export_interactive_gpu_waiters)),
+    );
     *state.preview_scheduler.lock().unwrap() = Some(Arc::clone(&scheduler));
 
     thread::spawn(move || {

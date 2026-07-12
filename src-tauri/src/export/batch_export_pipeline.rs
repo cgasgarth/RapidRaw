@@ -396,9 +396,17 @@ impl Default for CooperativeGpuLane {
 
 impl CooperativeGpuLane {
     pub fn new(slots: usize, diagnostics: PipelineDiagnostics) -> Self {
+        Self::with_interactive_waiters(slots, diagnostics, Arc::new(AtomicUsize::new(0)))
+    }
+
+    pub fn with_interactive_waiters(
+        slots: usize,
+        diagnostics: PipelineDiagnostics,
+        interactive_waiters: Arc<AtomicUsize>,
+    ) -> Self {
         Self {
             export_slots: Arc::new(Semaphore::new(slots.max(1))),
-            interactive_waiters: Arc::new(AtomicUsize::new(0)),
+            interactive_waiters,
             diagnostics,
         }
     }

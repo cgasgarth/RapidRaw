@@ -1627,7 +1627,16 @@ async fn run_batch_export_pipeline(
         report.current_stage = Some(ExportStage::Planned);
     });
     let resources = PipelineResources::new(budget, diagnostics.clone());
-    let gpu_lane = CooperativeGpuLane::new(budget.gpu_slots, diagnostics.clone());
+    let interactive_gpu_waiters = Arc::clone(
+        &app_handle
+            .state::<AppState>()
+            .export_interactive_gpu_waiters,
+    );
+    let gpu_lane = CooperativeGpuLane::with_interactive_waiters(
+        budget.gpu_slots,
+        diagnostics.clone(),
+        interactive_gpu_waiters,
+    );
     let output_folder = PathBuf::from(output_folder_or_file);
     let mut source_counts = HashMap::<String, usize>::new();
     let mut output_paths = std::collections::HashSet::new();
