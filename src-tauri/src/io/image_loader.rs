@@ -857,25 +857,15 @@ pub async fn load_image(
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<LoadImageResult, String> {
-    let my_generation = state.load_image_generation.fetch_add(1, Ordering::SeqCst) + 1;
-    let generation_tracker = state.load_image_generation.clone();
-    let cancel_token = Some((generation_tracker.clone(), my_generation));
+    let metadata = load_image_open_metadata(&path)?;
+    load_image_prepared(path, state.inner(), app_handle, metadata, true, None).await
+}
 
-    {
-        RenderCaches::new(state.inner()).clear_active_image_render_state();
-
-        *state.denoise_result.lock().unwrap() = None;
-        *state.hdr_result.lock().unwrap() = None;
-        *state.hdr_runtime_plan.lock().unwrap() = None;
-        state.hdr_source_refs.lock().unwrap().clear();
-        *state.panorama_result.lock().unwrap() = None;
-    }
-
-    let (source_path, sidecar_path) = parse_virtual_path(&path);
+pub(crate) fn load_image_open_metadata(path: &str) -> Result<ImageMetadata, String> {
+    let (source_path, sidecar_path) = parse_virtual_path(path);
     let source_path_str = source_path.to_string_lossy().to_string();
-
     let mut metadata: ImageMetadata =
-        crate::exif_processing::load_sidecar_recovering(&sidecar_path, Some(&path))?.metadata;
+        crate::exif_processing::load_sidecar_recovering(&sidecar_path, Some(path))?.metadata;
     let mut should_save_sidecar = false;
     if is_raw_file(&source_path_str)
         && crate::exif_processing::repair_raw_sidecar_camera_metadata(&source_path, &mut metadata)
@@ -891,6 +881,50 @@ pub async fn load_image(
     if should_save_sidecar {
         crate::exif_processing::save_sidecar_metadata_atomic(&sidecar_path, &metadata)?;
     }
+    Ok(metadata)
+}
+
+pub(crate) async fn prefetch_image(
+    path: String,
+    state: &AppState,
+    app_handle: tauri::AppHandle,
+    cancellation: Option<(Arc<AtomicUsize>, usize)>,
+) -> Result<LoadImageResult, String> {
+    let metadata = load_image_open_metadata(&path)?;
+    load_image_prepared(path, state, app_handle, metadata, false, cancellation).await
+}
+
+pub(crate) async fn load_image_prepared(
+    path: String,
+    state: &AppState,
+    app_handle: tauri::AppHandle,
+    metadata: ImageMetadata,
+    install_active: bool,
+    cancellation: Option<(Arc<AtomicUsize>, usize)>,
+) -> Result<LoadImageResult, String> {
+    let (generation_tracker, my_generation) = if let Some(cancellation) = cancellation {
+        cancellation
+    } else if install_active {
+        let generation = state.load_image_generation.fetch_add(1, Ordering::SeqCst) + 1;
+        (Arc::clone(&state.load_image_generation), generation)
+    } else {
+        let generation = state.load_image_generation.load(Ordering::SeqCst);
+        (Arc::clone(&state.load_image_generation), generation)
+    };
+    let cancel_token = Some((generation_tracker.clone(), my_generation));
+
+    if install_active {
+        RenderCaches::new(state).clear_active_image_render_state();
+
+        *state.denoise_result.lock().unwrap() = None;
+        *state.hdr_result.lock().unwrap() = None;
+        *state.hdr_runtime_plan.lock().unwrap() = None;
+        state.hdr_source_refs.lock().unwrap().clear();
+        *state.panorama_result.lock().unwrap() = None;
+    }
+
+    let (source_path, _) = parse_virtual_path(&path);
+    let source_path_str = source_path.to_string_lossy().to_string();
 
     let settings = load_settings_or_default(&app_handle);
     let effective_settings =
@@ -958,16 +992,17 @@ pub async fn load_image(
             (Arc::new(smart_preview), exif_data_loaded, None)
         } else {
             let decode_started = Instant::now();
+            let decode_generation_tracker = Arc::clone(&generation_tracker);
             let (pristine_img, exif_data_loaded, raw_development_report) =
             tokio::task::spawn_blocking(move || {
-                if generation_tracker.load(Ordering::SeqCst) != my_generation {
+                if decode_generation_tracker.load(Ordering::SeqCst) != my_generation {
                     return Err("Load cancelled".to_string());
                 }
 
                 let result: Result<LoadedBaseImageWithExif, String> =
                     (|| match read_file_mapped(Path::new(&path_clone)) {
                     Ok(mmap) => {
-                        if generation_tracker.load(Ordering::SeqCst) != my_generation {
+                        if decode_generation_tracker.load(Ordering::SeqCst) != my_generation {
                             return Err("Load cancelled".to_string());
                         }
 
@@ -1020,7 +1055,7 @@ pub async fn load_image(
                         let fingerprint = fingerprint_cache.fingerprint(&expected_revision, &bytes);
                         log::trace!("decoded_source_fingerprint={}", fingerprint.blake3.to_hex());
 
-                        if generation_tracker.load(Ordering::SeqCst) != my_generation {
+                        if decode_generation_tracker.load(Ordering::SeqCst) != my_generation {
                             return Err("Load cancelled".to_string());
                         }
 
@@ -1094,26 +1129,28 @@ pub async fn load_image(
             (arc_img, exif_data_loaded, raw_development_report)
         };
 
-    if state.load_image_generation.load(Ordering::SeqCst) != my_generation {
+    if generation_tracker.load(Ordering::SeqCst) != my_generation {
         return Err("Load cancelled".to_string());
     }
 
     let is_raw = is_raw_file(&source_path_str);
     let loaded_is_raw = is_raw && !is_offline_smart_preview;
 
-    if state.load_image_generation.load(Ordering::SeqCst) != my_generation {
+    if generation_tracker.load(Ordering::SeqCst) != my_generation {
         return Err("Load cancelled".to_string());
     }
 
     let (orig_width, orig_height) = pristine_arc.dimensions();
 
-    state.viewer_sample_frames.clear();
-    *state.original_image.lock().unwrap() = Some(LoadedImage {
-        path,
-        image: pristine_arc,
-        is_raw: loaded_is_raw,
-        artifact_source,
-    });
+    if install_active {
+        state.viewer_sample_frames.clear();
+        *state.original_image.lock().unwrap() = Some(LoadedImage {
+            path,
+            image: pristine_arc,
+            is_raw: loaded_is_raw,
+            artifact_source,
+        });
+    }
 
     Ok(LoadImageResult {
         width: orig_width,

@@ -230,8 +230,72 @@ export const loadImageResultSchema = z
   })
   .loose();
 
+export const imageOpenSessionIdSchema = z
+  .object({
+    imageSession: z.number().int().nonnegative(),
+    selectionGeneration: z.number().int().nonnegative(),
+  })
+  .strict();
+
+export const beginImageOpenRequestSchema = z
+  .object({
+    expectedCatalogRevision: z.number().int().nonnegative().nullable(),
+    expectedEntityRevision: z.number().int().nonnegative().nullable(),
+    imageId: z.string().min(1),
+    path: z.string().min(1),
+    sessionId: imageOpenSessionIdSchema,
+  })
+  .strict();
+
+export const beginImageOpenResultSchema = z
+  .object({
+    decodeReadyMillis: z.number().int().nonnegative(),
+    decoded: loadImageResultSchema,
+    imageId: z.string().min(1),
+    joinedPrefetch: z.boolean(),
+    metadataFingerprint: z.string().regex(/^[0-9a-f]{64}$/u),
+    metadataReadyMillis: z.number().int().nonnegative(),
+    sessionId: imageOpenSessionIdSchema,
+  })
+  .strict();
+
+export const imageOpenUpdateSchema = z.discriminatedUnion('phase', [
+  z
+    .object({
+      imageId: z.string().min(1),
+      metadata: loadedMetadataSchema,
+      metadataFingerprint: z.string().regex(/^[0-9a-f]{64}$/u),
+      path: z.string().min(1),
+      phase: z.literal('metadataReady'),
+      sessionId: imageOpenSessionIdSchema,
+    })
+    .strict(),
+  z
+    .object({
+      height: z.number().int().nonnegative(),
+      imageId: z.string().min(1),
+      isRaw: z.boolean(),
+      path: z.string().min(1),
+      phase: z.literal('decodeReady'),
+      sessionId: imageOpenSessionIdSchema,
+      width: z.number().int().nonnegative(),
+    })
+    .strict(),
+  z
+    .object({
+      imageId: z.string().min(1),
+      path: z.string().min(1),
+      phase: z.literal('superseded'),
+      sessionId: imageOpenSessionIdSchema,
+    })
+    .strict(),
+]);
+
 export type LoadedMetadata = z.infer<typeof loadedMetadataSchema>;
 export type LoadImageResult = z.infer<typeof loadImageResultSchema>;
+export type BeginImageOpenRequest = z.infer<typeof beginImageOpenRequestSchema>;
+export type BeginImageOpenResult = z.infer<typeof beginImageOpenResultSchema>;
+export type ImageOpenUpdate = z.infer<typeof imageOpenUpdateSchema>;
 export type RawCameraProfileProvenanceReceipt = z.infer<typeof rawCameraProfileProvenanceReceiptSchema>;
 export type RawDevelopmentReport = z.infer<typeof rawDevelopmentReportSchema>;
 
@@ -243,3 +307,6 @@ export const isNullAdjustmentSnapshot = (
 export const parseLoadedMetadata = (value: unknown): LoadedMetadata => loadedMetadataSchema.parse(value);
 
 export const parseLoadImageResult = (value: unknown): LoadImageResult => loadImageResultSchema.parse(value);
+export const parseBeginImageOpenResult = (value: unknown): BeginImageOpenResult =>
+  beginImageOpenResultSchema.parse(value);
+export const parseImageOpenUpdate = (value: unknown): ImageOpenUpdate => imageOpenUpdateSchema.parse(value);
