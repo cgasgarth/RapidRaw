@@ -52,21 +52,27 @@ const assertTrace = (run: StartupRun): void => {
     );
   }
 
-  const ordered = [
+  const shellOrdered = [
     phase(snapshot, 'processStarted'),
-    phase(snapshot, 'minimalSettingsLoaded'),
     phase(snapshot, 'windowCreated'),
     phase(snapshot, 'windowVisible'),
     phase(snapshot, 'frontendShellVisible'),
     phase(snapshot, 'frontendSettingsHydrated'),
     phase(snapshot, 'frontendLibraryReady'),
   ];
-  for (let index = 1; index < ordered.length; index += 1) {
-    const previous = ordered[index - 1];
-    const current = ordered[index];
+  for (let index = 1; index < shellOrdered.length; index += 1) {
+    const previous = shellOrdered[index - 1];
+    const current = shellOrdered[index];
     if (!previous || !current || previous.elapsedMs > current.elapsedMs) {
       throw new Error(`${kind}: startup phases are not monotonic at index ${index}`);
     }
+  }
+  const settings = phase(snapshot, 'minimalSettingsLoaded');
+  if (
+    settings.elapsedMs < phase(snapshot, 'processStarted').elapsedMs ||
+    settings.elapsedMs > phase(snapshot, 'frontendSettingsHydrated').elapsedMs
+  ) {
+    throw new Error(`${kind}: minimal settings were not loaded between process start and frontend hydration`);
   }
   if (phase(snapshot, 'windowVisible').elapsedMs > FIRST_PAINT_BUDGET_MS) {
     throw new Error(`${kind}: WindowVisible exceeded ${FIRST_PAINT_BUDGET_MS}ms`);

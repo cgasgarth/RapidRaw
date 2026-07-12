@@ -1,6 +1,116 @@
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
+#[cfg(target_os = "macos")]
+use std::sync::OnceLock;
+
+#[cfg(target_os = "macos")]
+struct EarlyMacosShell {
+    started_at: Instant,
+    window: usize,
+    window_created_ms: u128,
+    window_visible_ms: u128,
+}
+
+#[cfg(target_os = "macos")]
+static EARLY_MACOS_SHELL: OnceLock<Mutex<EarlyMacosShell>> = OnceLock::new();
+
+#[cfg(target_os = "macos")]
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct AppKitRect {
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+}
+
+#[cfg(target_os = "macos")]
+unsafe impl objc::Encode for AppKitRect {
+    fn encode() -> objc::Encoding {
+        unsafe { objc::Encoding::from_str("{CGRect={CGPoint=dd}{CGSize=dd}}") }
+    }
+}
+
+#[cfg(target_os = "macos")]
+pub fn prepare_macos_startup_shell() {
+    use objc::runtime::Object;
+    use objc::{class, msg_send, sel, sel_impl};
+
+    if EARLY_MACOS_SHELL.get().is_some() {
+        return;
+    }
+    let started_at = Instant::now();
+    unsafe {
+        let pool: *mut Object = msg_send![class!(NSAutoreleasePool), new];
+        let application: *mut Object = msg_send![class!(NSApplication), sharedApplication];
+        let () = msg_send![application, setActivationPolicy: 0_i64];
+        let allocated: *mut Object = msg_send![class!(NSWindow), alloc];
+        let frame = AppKitRect {
+            x: 0.0,
+            y: 0.0,
+            width: 1_100.0,
+            height: 720.0,
+        };
+        let style_mask = 1_u64 | 2_u64 | 4_u64 | 8_u64;
+        let window: *mut Object = msg_send![allocated,
+            initWithContentRect: frame
+            styleMask: style_mask
+            backing: 2_u64
+            defer: false
+        ];
+        assert!(
+            !window.is_null(),
+            "AppKit failed to create early startup shell"
+        );
+        let created_ms = started_at.elapsed().as_millis();
+        let color: *mut Object = msg_send![class!(NSColor),
+            colorWithSRGBRed: 0.055_f64
+            green: 0.063_f64
+            blue: 0.078_f64
+            alpha: 1.0_f64
+        ];
+        let () = msg_send![window, setBackgroundColor: color];
+        let () = msg_send![window, setReleasedWhenClosed: false];
+        let () = msg_send![window, center];
+        let () = msg_send![window, makeKeyAndOrderFront: std::ptr::null::<Object>()];
+        let () = msg_send![window, displayIfNeeded];
+        let () = msg_send![application, activateIgnoringOtherApps: true];
+        let visible_ms = started_at.elapsed().as_millis();
+        EARLY_MACOS_SHELL
+            .set(Mutex::new(EarlyMacosShell {
+                started_at,
+                window: window as usize,
+                window_created_ms: created_ms,
+                window_visible_ms: visible_ms,
+            }))
+            .ok()
+            .expect("early AppKit startup shell initialized once");
+        let () = msg_send![pool, drain];
+    }
+}
+
+#[cfg(target_os = "macos")]
+pub fn handoff_macos_startup_shell() {
+    use objc::runtime::Object;
+    use objc::{msg_send, sel, sel_impl};
+
+    let Some(shell) = EARLY_MACOS_SHELL.get() else {
+        return;
+    };
+    let mut shell = shell.lock().unwrap();
+    if shell.window == 0 {
+        return;
+    }
+    unsafe {
+        let window = shell.window as *mut Object;
+        let () = msg_send![window, orderOut: std::ptr::null::<Object>()];
+        let () = msg_send![window, close];
+        let () = msg_send![window, release];
+    }
+    shell.window = 0;
+}
+
 #[cfg(test)]
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -88,6 +198,36 @@ impl Default for StartupTrace {
 
 impl StartupTrace {
     pub fn new() -> Self {
+        #[cfg(target_os = "macos")]
+        if let Some(shell) = EARLY_MACOS_SHELL.get() {
+            let shell = shell.lock().unwrap();
+            return Self {
+                trace_id: format!("startup:{}", Uuid::new_v4()),
+                started_at: shell.started_at,
+                phases: Arc::new(Mutex::new(vec![
+                    StartupPhaseReceipt {
+                        phase: NativeStartupPhase::ProcessStarted,
+                        elapsed_ms: 0,
+                        status: "ok",
+                        detail: Some("rust-main-entry".to_string()),
+                    },
+                    StartupPhaseReceipt {
+                        phase: NativeStartupPhase::WindowCreated,
+                        elapsed_ms: shell.window_created_ms,
+                        status: "ok",
+                        detail: Some("appkit-pre-tauri-shell".to_string()),
+                    },
+                    StartupPhaseReceipt {
+                        phase: NativeStartupPhase::WindowVisible,
+                        elapsed_ms: shell.window_visible_ms,
+                        status: "ok",
+                        detail: Some("appkit-pre-tauri-shell".to_string()),
+                    },
+                ])),
+                #[cfg(test)]
+                test_elapsed_ms: None,
+            };
+        }
         Self {
             trace_id: format!("startup:{}", Uuid::new_v4()),
             started_at: Instant::now(),
@@ -112,6 +252,10 @@ impl StartupTrace {
     }
 
     pub fn mark(&self, phase: NativeStartupPhase, status: &'static str, detail: Option<String>) {
+        let mut phases = self.phases.lock().unwrap();
+        if phases.iter().any(|receipt| receipt.phase == phase) {
+            return;
+        }
         let receipt = StartupPhaseReceipt {
             phase,
             elapsed_ms: self.elapsed_ms(),
@@ -136,7 +280,8 @@ impl StartupTrace {
             receipt.elapsed_ms,
             receipt.detail
         );
-        self.phases.lock().unwrap().push(receipt);
+        phases.push(receipt);
+        drop(phases);
         #[cfg(feature = "validation-harness")]
         self.write_benchmark_report_if_ready();
     }
@@ -233,19 +378,19 @@ pub fn after_native_shell_visible<T>(
 
 fn critical_path_order_valid(phases: &[StartupPhaseReceipt]) -> bool {
     let first_index = |phase| phases.iter().position(|receipt| receipt.phase == phase);
-    let ordered = [
-        NativeStartupPhase::ProcessStarted,
-        NativeStartupPhase::MinimalSettingsLoaded,
-        NativeStartupPhase::WindowCreated,
-        NativeStartupPhase::WindowVisible,
-    ];
-    ordered
-        .windows(2)
-        .all(|pair| match (first_index(pair[0]), first_index(pair[1])) {
-            (Some(left), Some(right)) => left < right,
-            (_, None) => true,
-            (None, Some(_)) => false,
-        })
+    let Some(process) = first_index(NativeStartupPhase::ProcessStarted) else {
+        return false;
+    };
+    let Some(settings) = first_index(NativeStartupPhase::MinimalSettingsLoaded) else {
+        return false;
+    };
+    let Some(created) = first_index(NativeStartupPhase::WindowCreated) else {
+        return false;
+    };
+    let Some(visible) = first_index(NativeStartupPhase::WindowVisible) else {
+        return false;
+    };
+    process < settings && process < created && created < visible
 }
 
 pub fn mark_deferred_service_result(
@@ -347,6 +492,33 @@ mod tests {
                 .expect("post-webview receipt")
                 .elapsed_ms,
             2_100
+        );
+    }
+
+    #[test]
+    fn pre_tauri_shell_may_precede_minimal_settings_without_weakening_required_order() {
+        let clock = Arc::new(AtomicU64::new(0));
+        let trace = StartupTrace::with_test_clock(Arc::clone(&clock));
+        for (elapsed_ms, phase) in [
+            (0, NativeStartupPhase::ProcessStarted),
+            (20, NativeStartupPhase::WindowCreated),
+            (35, NativeStartupPhase::WindowVisible),
+            (80, NativeStartupPhase::MinimalSettingsLoaded),
+            (120, NativeStartupPhase::FrontendSettingsHydrated),
+        ] {
+            mark_at(&trace, &clock, elapsed_ms, phase);
+        }
+        let snapshot = trace.snapshot();
+        assert!(snapshot.critical_path_order_valid);
+        assert_eq!(snapshot.first_paint_budget_met, Some(true));
+        assert_eq!(
+            snapshot
+                .phases
+                .iter()
+                .find(|receipt| receipt.phase == NativeStartupPhase::WindowVisible)
+                .unwrap()
+                .elapsed_ms,
+            35
         );
     }
 

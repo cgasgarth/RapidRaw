@@ -119,6 +119,11 @@ extern "C" fn force_exit(_signal: libc::c_int) {
 }
 
 #[cfg(target_os = "macos")]
+pub fn prepare_macos_startup_shell() {
+    app::startup::prepare_macos_startup_shell();
+}
+
+#[cfg(target_os = "macos")]
 pub fn register_exit_handler() {
     unsafe {
         libc::signal(libc::SIGABRT, force_exit as *const () as libc::sighandler_t);
@@ -3191,6 +3196,7 @@ pub fn run() {
                 if let Err(error) = native_window.show() {
                     log::error!("Failed to show startup shell: {}", error);
                 }
+                crate::app::startup::handoff_macos_startup_shell();
                 if let Err(error) = native_window.set_focus() {
                     log::error!("Failed to focus startup shell: {}", error);
                 }
