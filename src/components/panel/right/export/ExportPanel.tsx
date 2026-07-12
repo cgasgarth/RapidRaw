@@ -48,7 +48,11 @@ import {
 } from '../../../../utils/color/runtime/gamutWarningDisplay';
 import { buildColorStackPreviewExportParityReceipt } from '../../../../utils/colorStackPreviewExportParityReceipt';
 import { formatUnknownError } from '../../../../utils/errorFormatting';
-import { resolveExportCancellationPending } from '../../../../utils/export/exportCancellationState';
+import {
+  type ExportCancellationAck,
+  exportCancellationAckSchema,
+  resolveExportCancellationPending,
+} from '../../../../utils/export/exportCancellationState';
 import {
   getBlackPointCompensationStatus,
   getExportColorCapability,
@@ -428,6 +432,7 @@ export default function ExportPanel({
   const [estimatedSize, setEstimatedSize] = useState<number | null>(null);
   const [isEstimating, setIsEstimating] = useState<boolean>(false);
   const [isCancellingExport, setIsCancellingExport] = useState(false);
+  const [cancellationAck, setCancellationAck] = useState<ExportCancellationAck | null>(null);
   const [externalVariantStatus, setExternalVariantStatus] = useState<{
     embeddedIccProfile: boolean | null;
     error: string | null;
@@ -1269,6 +1274,7 @@ export default function ExportPanel({
           status: Status.Exporting,
         });
         setIsCancellingExport(false);
+        setCancellationAck(null);
         await invoke(Invokes.ExportImages, {
           paths: pathsToExport,
           outputFolderOrFile: outputFolderOrFile,
@@ -1304,7 +1310,13 @@ export default function ExportPanel({
     if (effectiveIsCancellingExport) return;
     setIsCancellingExport(true);
     try {
-      await invoke(Invokes.CancelExport);
+      const acknowledgement = await invokeWithSchema(
+        Invokes.CancelExport,
+        {},
+        exportCancellationAckSchema,
+        'cancel_export acknowledgement',
+      );
+      setCancellationAck(acknowledgement);
     } catch (error) {
       console.error('Failed to cancel:', error);
       setIsCancellingExport(false);
@@ -2802,6 +2814,9 @@ export default function ExportPanel({
           aria-keyshortcuts="Escape"
           aria-label={isExporting ? t('export.status.cancelExport') : undefined}
           data-testid="export-cancel-control"
+          data-cancel-active-job-id={cancellationAck?.activeJobId}
+          data-cancel-task-attached={cancellationAck?.taskAttached}
+          data-cancel-token-observed={cancellationAck?.tokenObserved}
           data-tooltip={isExporting ? t('export.status.cancelExport') : exportDisabledReason}
           disabled={status === Status.Exporting ? effectiveIsCancellingExport : !canExport}
           onClick={() => {

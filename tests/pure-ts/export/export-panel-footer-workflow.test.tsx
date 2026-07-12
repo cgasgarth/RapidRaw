@@ -171,6 +171,16 @@ describe('export panel compact footer workflow', () => {
   });
 
   test('keeps the cancel action dominant while export is in progress', async () => {
+    invoke.mockImplementation(async (command) =>
+      command === 'cancel_export'
+        ? {
+            activeJobId: 'export-job:test',
+            cancellationRequested: true,
+            taskAttached: true,
+            tokenObserved: true,
+          }
+        : null,
+    );
     setProofState(true);
     const { container } = await renderFooter({
       errorMessage: '',
@@ -190,7 +200,11 @@ describe('export panel compact footer workflow', () => {
       await Promise.resolve();
     });
     expect(invoke.mock.calls.some(([command]) => command === 'cancel_export')).toBe(true);
-    expect(primaryAction(container).hasAttribute('disabled')).toBe(true);
+    const cancellingAction = primaryAction(container);
+    expect(cancellingAction.hasAttribute('disabled')).toBe(true);
+    expect(cancellingAction.dataset.cancelActiveJobId).toBe('export-job:test');
+    expect(cancellingAction.dataset.cancelTaskAttached).toBe('true');
+    expect(cancellingAction.dataset.cancelTokenObserved).toBe('true');
 
     const cancelledReceipt = parseExportReceiptPayload({
       completedAt: '2026-07-12T02:30:00.000Z',
