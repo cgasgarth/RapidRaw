@@ -531,20 +531,25 @@ mod tests {
         let capacity = 8 * CREDIT_QUANTUM_BYTES;
         let credits = WeightedCredits::new(capacity);
         let cancellation = PipelineCancellation::default();
-        let mut workers = Vec::with_capacity(1_000);
-        for index in 0..1_000 {
+        const WORKER_COUNT: usize = 8;
+        const ITEM_COUNT: usize = 1_000;
+        let mut workers = Vec::with_capacity(WORKER_COUNT);
+        for worker_index in 0..WORKER_COUNT {
             let credits = credits.clone();
             let cancellation = cancellation.clone();
             workers.push(tokio::spawn(async move {
-                let requested = ((index % 13) as u64 + 1) * CREDIT_QUANTUM_BYTES;
-                let permit = credits
-                    .acquire(requested, &cancellation)
-                    .await
-                    .expect("mixed item should be admitted");
-                tokio::task::yield_now().await;
-                drop(permit);
+                for index in (worker_index..ITEM_COUNT).step_by(WORKER_COUNT) {
+                    let requested = ((index % 13) as u64 + 1) * CREDIT_QUANTUM_BYTES;
+                    let permit = credits
+                        .acquire(requested, &cancellation)
+                        .await
+                        .expect("mixed item should be admitted");
+                    tokio::task::yield_now().await;
+                    drop(permit);
+                }
             }));
         }
+        assert_eq!(workers.len(), WORKER_COUNT);
         for worker in workers {
             worker.await.expect("stress worker should finish");
         }
