@@ -363,7 +363,6 @@ jobs:
       - name: Build fast-dev and full native capability profiles
         if: steps.rust-pr-decision.outputs.rust_ci_required == 'true'
         run: bun run check:native-profiles
-
       - name: Rust and Tauri IPC tests when Rust/Tauri changed
         if: steps.rust-pr-decision.outputs.rust_ci_required == 'true'
         working-directory: src-tauri
