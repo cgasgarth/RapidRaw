@@ -5,6 +5,10 @@ authors = ["Timon Käch"]
 edition = "2024"
 rust-version = "1.95"
 
+[workspace]
+members = [".", "crates/rapidraw-types"]
+resolver = "2"
+
 [lib]
 name = "rapidraw_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
@@ -17,6 +21,7 @@ tauri-test = ["tauri/test"]
 validation-harness = []
 
 [dependencies]
+rapidraw-types = { path = "crates/rapidraw-types" }
 tauri = { version = "2.11", features = [ "macos-private-api", "rustls-tls" ] }
 tauri-plugin-dialog = "2.7.1"
 serde = { version = "1.0", features = ["derive"] }

@@ -21,7 +21,7 @@
     "check:types": "bun run typecheck",
     "typecheck": "bun scripts/ci/run-compact-command.ts --label typecheck -- bun node_modules/typescript/bin/tsc --noEmit --pretty false --checkers 4",
     "check:rust": "bun run check:rust:fmt && bun run check:rust:clippy",
-    "check:rust:fmt": "bun scripts/ci/run-compact-command.ts --label rust:fmt --cwd src-tauri -- cargo fmt -p RapidRAW -- --check",
+    "check:rust:fmt": "bun scripts/ci/run-compact-command.ts --label rust:fmt --cwd src-tauri -- cargo fmt --all -- --check",
     "check:rust:clippy": "bun scripts/ci/run-resource-coordinated.ts --resource native-heavy --label rust-clippy -- bun scripts/ci/run-compact-command.ts --label rust:clippy --cwd src-tauri -- cargo clippy --locked --all-targets --no-default-features --features required-ci -- -D warnings -W clippy::redundant_clone",
     "check:browser-harness": "bun scripts/ci/run-resource-coordinated.ts --resource native-heavy --label browser-harness -- bun tests/integration/checks/check-browser-tauri-harness.ts",
     "check:bundle": "bun run build && bun tests/integration/checks/check-vite-product-bundle-guard.ts && bun tests/integration/checks/check-vite-production-payload.ts && bun tests/integration/checks/check-vite-bundle-budget.ts && bun scripts/ci/generate-vite-bundle-report.ts",

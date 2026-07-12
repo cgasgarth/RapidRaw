@@ -3,6 +3,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+pub use rapidraw_types::ImageOpenSessionId;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::sync::Notify;
@@ -15,13 +16,6 @@ use crate::image_loader::{
 pub const IMAGE_OPEN_UPDATE_EVENT: &str = "image-open-update";
 const MAX_PREFETCH_IN_FLIGHT: usize = 2;
 const MAX_PREFETCH_CANDIDATES: usize = 3;
-
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
-#[serde(rename_all = "camelCase")]
-pub struct ImageOpenSessionId {
-    pub selection_generation: u64,
-    pub image_session: u64,
-}
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
