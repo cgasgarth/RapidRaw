@@ -29,6 +29,7 @@ import { useProcessStore } from '../../store/useProcessStore';
 import { useUIStore } from '../../store/useUIStore';
 import type { ThumbnailCacheMutation, ThumbnailSmartPreviewState } from '../../thumbnails/ThumbnailCache';
 import { thumbnailCache } from '../../thumbnails/thumbnailCacheInstance';
+import { formatAiModelProgress, parseAiModelProgress, updateAiModelProgress } from '../../utils/aiModelProgress';
 import {
   buildHdrApplyCommandState,
   buildPanoramaApplyCommandState,
@@ -397,11 +398,22 @@ export function useTauriListeners({
         scheduleFlush();
       }),
       listen<unknown>(AI_MODEL_DOWNLOAD_START_EVENT, (event) => {
-        if (isEffectActive)
-          useProcessStore.getState().setProcess({ aiModelDownloadStatus: parseStringPayload(event.payload) });
+        if (!isEffectActive) return;
+        const update = parseAiModelProgress(event.payload);
+        if (!update) return;
+        useProcessStore.getState().setProcess((state) => {
+          const aiModelDownloads = updateAiModelProgress(state.aiModelDownloads, update);
+          return { aiModelDownloads, aiModelDownloadStatus: formatAiModelProgress(aiModelDownloads) };
+        });
       }),
-      listen(AI_MODEL_DOWNLOAD_FINISH_EVENT, () => {
-        if (isEffectActive) useProcessStore.getState().setProcess({ aiModelDownloadStatus: null });
+      listen<unknown>(AI_MODEL_DOWNLOAD_FINISH_EVENT, (event) => {
+        if (!isEffectActive) return;
+        const update = parseAiModelProgress(event.payload);
+        if (!update) return;
+        useProcessStore.getState().setProcess((state) => {
+          const aiModelDownloads = updateAiModelProgress(state.aiModelDownloads, update);
+          return { aiModelDownloads, aiModelDownloadStatus: formatAiModelProgress(aiModelDownloads) };
+        });
       }),
       listen(INDEXING_STARTED_EVENT, () => {
         if (isEffectActive)
