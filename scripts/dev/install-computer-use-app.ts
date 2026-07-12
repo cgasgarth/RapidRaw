@@ -77,6 +77,13 @@ if (shouldBuild) {
   await run(
     'bun',
     [
+      'scripts/ci/run-resource-coordinated.ts',
+      '--resource',
+      'native-heavy',
+      '--label',
+      'computer-use-release-build',
+      '--',
+      'bun',
       'tauri',
       'build',
       ...(shouldUseVerboseBuildLogs ? ['--verbose'] : []),
