@@ -1990,7 +1990,7 @@ mod tests {
     use super::{
         EmbeddedSourceIccProfile, ExportBlackPointCompensationStatus, ExportColorEngineId,
         ExportColorProfile, ExportReceiptContext, ExportRenderingIntent, ExportSettings,
-        FinalArtifactDigest, OutputCommitReceipt, OutputSharpeningSettings,
+        ExportTerminalStatus, FinalArtifactDigest, OutputCommitReceipt, OutputSharpeningSettings,
         VerifiedSourceDigestReceipt, applied_export_color_policy,
         apply_export_resize_and_watermark, claim_export_job, commit_export_output,
         encode_icc_profile, encode_image_to_bytes, encode_image_with_working_color_state,
@@ -1999,11 +1999,11 @@ mod tests {
         export_rgb16_pixels_and_profile, export_rgb16_pixels_with_shared_conversion_core,
         export_soft_proof_rgb_pixels_and_profile_with_policy,
         export_soft_proof_rgb_pixels_with_working_color_state,
-        export_source_precision_receipt_label, export_transform_options, finish_export_job,
-        mox_rendering_intent, quantize_rgb16_to_rgb8, request_export_cancellation,
-        resolve_export_color_capabilities, resolve_export_color_transform_plan,
-        save_image_with_metadata_commit, should_apply_srgb_perceptual_gamut_mapping,
-        write_final_output_bytes_observed,
+        export_source_precision_receipt_label, export_terminal_receipt, export_transform_options,
+        finish_export_job, mox_rendering_intent, quantize_rgb16_to_rgb8,
+        request_export_cancellation, resolve_export_color_capabilities,
+        resolve_export_color_transform_plan, save_image_with_metadata_commit,
+        should_apply_srgb_perceptual_gamut_mapping, write_final_output_bytes_observed,
     };
     use crate::color::working_to_output_transform::WorkingColorState;
     use crate::export::export_encoders::{
@@ -2093,6 +2093,51 @@ mod tests {
             registry.lock().unwrap().is_none(),
             "terminal cancellation must release job ownership"
         );
+    }
+
+    #[test]
+    fn command_cancellation_before_atomic_commit_publishes_no_admitted_item() {
+        let admitted_workers = 16;
+        let total_items = 24;
+        let registry = Arc::new(Mutex::new(None));
+        let cancellation = claim_export_job(&registry).unwrap();
+        let encoded = Arc::new(Barrier::new(admitted_workers + 1));
+        let release_commit = Arc::new(Barrier::new(admitted_workers + 1));
+        let committed = Arc::new(AtomicUsize::new(0));
+        let mut workers = Vec::new();
+
+        for _ in 0..admitted_workers {
+            let cancellation = Arc::clone(&cancellation);
+            let encoded = Arc::clone(&encoded);
+            let release_commit = Arc::clone(&release_commit);
+            let committed = Arc::clone(&committed);
+            workers.push(thread::spawn(move || {
+                encoded.wait();
+                release_commit.wait();
+                let published = commit_export_output(cancellation.as_ref(), || {
+                    committed.fetch_add(1, Ordering::SeqCst);
+                    Ok(())
+                })
+                .unwrap();
+                assert!(published.is_none());
+            }));
+        }
+
+        encoded.wait();
+        request_export_cancellation(&registry).unwrap();
+        release_commit.wait();
+        for worker in workers {
+            worker.join().unwrap();
+        }
+        assert_eq!(committed.load(Ordering::SeqCst), 0);
+        let receipt =
+            export_terminal_receipt(ExportTerminalStatus::Cancelled, Vec::new(), total_items);
+        assert_eq!(receipt.terminal_status, ExportTerminalStatus::Cancelled);
+        assert_eq!(receipt.outputs.len(), 0);
+        assert_eq!(receipt.total, total_items);
+        finish_export_job(&registry, &cancellation);
+        assert!(registry.lock().unwrap().is_none());
+        assert!(total_items > admitted_workers);
     }
 
     #[test]
