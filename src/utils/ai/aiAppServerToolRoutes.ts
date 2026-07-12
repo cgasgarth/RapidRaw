@@ -169,6 +169,24 @@ export const AI_APP_SERVER_TOOL_ROUTE_MANIFEST = aiAppServerToolRouteManifestSch
       status: AiAppServerToolRouteStatus.ConnectorStatus,
     },
     {
+      reason: 'Model-load cancellation controls native lifecycle work and does not apply an image edit.',
+      sourceKind: AiAppServerToolRouteSourceKind.TauriInvoke,
+      sourceOperation: 'cancel_ai_model_load',
+      status: AiAppServerToolRouteStatus.ModelLifecycle,
+    },
+    {
+      reason: 'Idle-session eviction controls the native model cache and does not apply an image edit.',
+      sourceKind: AiAppServerToolRouteSourceKind.TauriInvoke,
+      sourceOperation: 'evict_ai_model_session',
+      status: AiAppServerToolRouteStatus.ModelLifecycle,
+    },
+    {
+      reason: 'Registry diagnostics report native model lifecycle state and do not apply an image edit.',
+      sourceKind: AiAppServerToolRouteSourceKind.TauriInvoke,
+      sourceOperation: 'get_ai_model_registry_report',
+      status: AiAppServerToolRouteStatus.ModelLifecycle,
+    },
+    {
       reason: 'AI tag cleanup mutates library metadata and is tracked outside image-edit app-server tools.',
       sourceKind: AiAppServerToolRouteSourceKind.TauriInvoke,
       sourceOperation: 'clear_ai_tags',

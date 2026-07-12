@@ -45,6 +45,21 @@ pub fn generate_ai_person_part_mask() -> Result<serde_json::Value, CapabilityUna
 }
 
 #[tauri::command]
+pub fn get_ai_model_registry_report() -> Result<serde_json::Value, CapabilityUnavailable> {
+    ai_unavailable()
+}
+
+#[tauri::command]
+pub fn cancel_ai_model_load() -> Result<serde_json::Value, CapabilityUnavailable> {
+    ai_unavailable()
+}
+
+#[tauri::command]
+pub fn evict_ai_model_session() -> Result<serde_json::Value, CapabilityUnavailable> {
+    ai_unavailable()
+}
+
+#[tauri::command]
 pub fn check_ai_connector_status() -> Result<serde_json::Value, CapabilityUnavailable> {
     ai_unavailable()
 }
@@ -75,6 +90,9 @@ mod tests {
             generate_ai_depth_mask().unwrap_err(),
             generate_ai_whole_person_mask().unwrap_err(),
             generate_ai_person_part_mask().unwrap_err(),
+            get_ai_model_registry_report().unwrap_err(),
+            cancel_ai_model_load().unwrap_err(),
+            evict_ai_model_session().unwrap_err(),
             check_ai_connector_status().unwrap_err(),
             test_ai_connector_connection().unwrap_err(),
             invoke_generative_replace_with_mask_def().unwrap_err(),

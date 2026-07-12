@@ -22,12 +22,7 @@ pub struct OrtSwinIrRunner {
 
 impl OrtSwinIrRunner {
     pub fn open(path: &Path) -> Result<Self, String> {
-        let _ = ort::init().with_name("SwinIR-x2-CPU").commit();
-        let session = Session::builder()
-            .map_err(|error| format!("swinir_x2_session_builder_failed:{error}"))?
-            .with_intra_threads(1)
-            .map_err(|error| format!("swinir_x2_session_threads_failed:{error}"))?
-            .commit_from_file(path)
+        let session = crate::ai::ai_processing::build_ort_session(path)
             .map_err(|error| format!("swinir_x2_session_load_failed:{error}"))?;
         validate_io_contract(&session)?;
         Ok(Self { session })
