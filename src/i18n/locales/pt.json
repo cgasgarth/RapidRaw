@@ -3159,6 +3159,7 @@
       "fileNaming": "Nomeação de Arquivos",
       "folderOrganization": "Organização de Pastas",
       "organizeByDate": "Organizar em subpastas por data",
+      "resumeImport": "Retomar importação",
       "sourceFiles": "Arquivos de Origem",
       "startImport": "Iniciar Importação",
       "title": "Configurações de Importação"

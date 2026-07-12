@@ -61,6 +61,7 @@ import {
   HDR_ERROR_EVENT,
   HDR_PROGRESS_EVENT,
   HISTOGRAM_UPDATE_EVENT,
+  IMPORT_CANCELLED_EVENT,
   IMPORT_COMPLETE_EVENT,
   IMPORT_ERROR_EVENT,
   IMPORT_PROGRESS_EVENT,
@@ -464,6 +465,7 @@ export function useTauriListeners({
         if (isEffectActive)
           useProcessStore.getState().setImportState({
             errorMessage: '',
+            ...(payload.jobId ? { jobId: payload.jobId } : {}),
             path: '',
             progress: { current: 0, total: payload.total },
             status: Status.Importing,
@@ -475,7 +477,16 @@ export function useTauriListeners({
           useProcessStore.getState().setImportState({
             path: payload.path,
             progress: { current: payload.current, total: payload.total },
+            ...(payload.stage ? { stage: payload.stage } : {}),
+            ...(payload.bytesCopied !== undefined ? { bytesCopied: payload.bytesCopied } : {}),
+            ...(payload.totalBytes !== undefined ? { totalBytes: payload.totalBytes } : {}),
           });
+        if (isEffectActive && payload.committedPath) {
+          refs.current.refreshImageList();
+        }
+      }),
+      listen(IMPORT_CANCELLED_EVENT, () => {
+        if (isEffectActive) useProcessStore.getState().setImportState({ status: Status.Cancelled });
       }),
       listen(IMPORT_COMPLETE_EVENT, () => {
         if (isEffectActive) {

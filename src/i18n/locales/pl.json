@@ -3313,6 +3313,7 @@
       "fileNaming": "Nazewnictwo plików",
       "folderOrganization": "Organizacja folderów",
       "organizeByDate": "Organizuj w podfolderach według daty",
+      "resumeImport": "Wznów importowanie",
       "sourceFiles": "Pliki źródłowe",
       "startImport": "Rozpocznij import",
       "title": "Ustawienia importu"

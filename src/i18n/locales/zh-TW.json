@@ -2944,6 +2944,7 @@
       "fileNaming": "檔案命名",
       "folderOrganization": "資料夾組織",
       "organizeByDate": "按日期組織到子資料夾",
+      "resumeImport": "繼續匯入",
       "sourceFiles": "原始檔",
       "startImport": "開始匯入",
       "title": "匯入設定"

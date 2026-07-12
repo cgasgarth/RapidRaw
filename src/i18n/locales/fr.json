@@ -3160,6 +3160,7 @@
       "fileNaming": "Nommage des fichiers",
       "folderOrganization": "Organisation des dossiers",
       "organizeByDate": "Organiser dans des sous-dossiers par date",
+      "resumeImport": "Reprendre l’importation",
       "sourceFiles": "Fichiers sources",
       "startImport": "Démarrer l'importation",
       "title": "Paramètres d'importation"

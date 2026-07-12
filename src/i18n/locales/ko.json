@@ -1394,6 +1394,7 @@
       "fileNaming": "파일 이름 지정",
       "folderOrganization": "폴더 정리",
       "organizeByDate": "날짜별 하위 폴더로 정리",
+      "resumeImport": "가져오기 재개",
       "sourceFiles": "원본 파일",
       "startImport": "가져오기 시작",
       "title": "가져오기 설정"
