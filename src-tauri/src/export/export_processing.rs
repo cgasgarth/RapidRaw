@@ -1736,13 +1736,8 @@ fn write_raw_export_provenance_sidecar(
 #[tauri::command]
 pub async fn cancel_export(
     state: tauri::State<'_, AppState>,
-    app_handle: tauri::AppHandle,
 ) -> Result<ExportCancellationAck, String> {
     let acknowledgement = request_export_cancellation(&state.export_job)?;
-    let _ = app_handle.emit(
-        crate::events::EXPORT_CANCELLATION_ACKNOWLEDGED,
-        &acknowledgement,
-    );
     log::info!(
         "Export cancellation acknowledged: job={}, attached={}, token_observed={}",
         acknowledgement.active_job_id,

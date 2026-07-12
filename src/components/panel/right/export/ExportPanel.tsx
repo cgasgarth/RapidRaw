@@ -1,5 +1,4 @@
 import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { TFunction } from 'i18next';
@@ -84,7 +83,6 @@ import {
 } from '../../../../utils/export/exportSoftProofProfileCompare';
 import { resolveExportTargetPaths } from '../../../../utils/export/exportTargetPaths';
 import { buildRawWarningChips } from '../../../../utils/rawWarningReceipts';
-import { EXPORT_CANCELLATION_ACKNOWLEDGED_EVENT } from '../../../../utils/tauriEventNames';
 import { invokeWithSchema } from '../../../../utils/tauriSchemaInvoke';
 import { debounce } from '../../../../utils/timing';
 import type { AppSettings, SelectedImage } from '../../../ui/AppProperties';
@@ -1335,27 +1333,6 @@ export default function ExportPanel({
     window.addEventListener('keydown', handleCancellationShortcut);
     return () => window.removeEventListener('keydown', handleCancellationShortcut);
   }, [handleCancel, isExporting]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !(('__TAURI_INTERNALS__' as string) in window)) return;
-    let disposed = false;
-    let unlisten: (() => void) | undefined;
-    try {
-      void listen<unknown>(EXPORT_CANCELLATION_ACKNOWLEDGED_EVENT, (event) => {
-        const acknowledgement = exportCancellationAckSchema.safeParse(event.payload);
-        if (acknowledgement.success) setCancellationAck(acknowledgement.data);
-      }).then((cleanup) => {
-        if (disposed) cleanup();
-        else unlisten = cleanup;
-      });
-    } catch {
-      // Unit-test and non-Tauri renders do not expose the event bridge.
-    }
-    return () => {
-      disposed = true;
-      unlisten?.();
-    };
-  }, []);
 
   const selectedFileFormat = FILE_FORMATS.find((format) => format.id === fileFormat);
   const selectedColorProfileLabel =

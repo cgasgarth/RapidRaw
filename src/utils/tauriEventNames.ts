@@ -11,7 +11,6 @@ export const DENOISE_COMPLETE_EVENT = 'denoise-complete';
 export const DENOISE_ERROR_EVENT = 'denoise-error';
 export const DENOISE_PROGRESS_EVENT = 'denoise-progress';
 export const EXPORT_CANCELLED_EVENT = 'export-cancelled';
-export const EXPORT_CANCELLATION_ACKNOWLEDGED_EVENT = 'export-cancellation-acknowledged';
 export const EXPORT_COMPLETE_EVENT = 'export-complete';
 export const EXPORT_ERROR_EVENT = 'export-error';
 export const HDR_COMPLETE_EVENT = 'hdr-complete';
