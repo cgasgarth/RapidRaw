@@ -2955,6 +2955,33 @@ mod tests {
     }
 
     #[test]
+    fn png_export_converts_float_rgba_with_clamped_range_and_preserved_alpha() {
+        let image = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(2, 1, |x, _| {
+            if x == 0 {
+                Rgba([1.25, -0.25, 0.5, 0.25])
+            } else {
+                Rgba([0.0, 0.25, 1.0, 1.0])
+            }
+        }));
+        let encoded = encode_image_with_applied_policy(
+            &image,
+            "png",
+            90,
+            &ExportColorProfile::Srgb,
+            &ExportRenderingIntent::RelativeColorimetric,
+            false,
+        )
+        .expect("float RGBA PNG export should convert to supported 16-bit pixels");
+        let decoded = image::load_from_memory_with_format(&encoded.bytes, image::ImageFormat::Png)
+            .expect("encoded PNG should decode")
+            .to_rgba16();
+
+        assert_eq!(decoded.get_pixel(0, 0).0, [u16::MAX, 0, 32768, 16384]);
+        assert_eq!(decoded.get_pixel(1, 0).0, [0, 16384, u16::MAX, u16::MAX]);
+        assert!(encoded.color_policy.is_none());
+    }
+
+    #[test]
     fn jpeg_export_embeds_srgb_icc_profile() {
         let image = DynamicImage::ImageRgb8(ImageBuffer::from_pixel(2, 2, Rgb([128, 64, 32])));
         let bytes = encode_image_to_bytes(
