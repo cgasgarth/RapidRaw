@@ -153,7 +153,7 @@ fn run_private_layer_mask_real_raw_proof(
         artifact_source: crate::render::artifact_identity::SourceArtifactIdentity {
             canonical_identity: source_path_string.clone(),
             physical_identity: source_path_string.clone(),
-            revision: crate::source_revision::SourceRevision::from_path(source_path)
+            revision: crate::source_revision::SourceRevision::from_path(&source_path)
                 .map_err(|error| error.to_string())?,
             decode_contract: 0,
         },

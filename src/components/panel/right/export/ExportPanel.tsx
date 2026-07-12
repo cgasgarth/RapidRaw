@@ -48,7 +48,11 @@ import {
 } from '../../../../utils/color/runtime/gamutWarningDisplay';
 import { buildColorStackPreviewExportParityReceipt } from '../../../../utils/colorStackPreviewExportParityReceipt';
 import { formatUnknownError } from '../../../../utils/errorFormatting';
-import { resolveExportCancellationPending } from '../../../../utils/export/exportCancellationState';
+import {
+  type ExportCancellationAck,
+  exportCancellationAckSchema,
+  resolveExportCancellationPending,
+} from '../../../../utils/export/exportCancellationState';
 import {
   getBlackPointCompensationStatus,
   getExportColorCapability,
@@ -428,6 +432,7 @@ export default function ExportPanel({
   const [estimatedSize, setEstimatedSize] = useState<number | null>(null);
   const [isEstimating, setIsEstimating] = useState<boolean>(false);
   const [isCancellingExport, setIsCancellingExport] = useState(false);
+  const [cancellationAck, setCancellationAck] = useState<ExportCancellationAck | null>(null);
   const [externalVariantStatus, setExternalVariantStatus] = useState<{
     embeddedIccProfile: boolean | null;
     error: string | null;
@@ -1269,6 +1274,7 @@ export default function ExportPanel({
           status: Status.Exporting,
         });
         setIsCancellingExport(false);
+        setCancellationAck(null);
         await invoke(Invokes.ExportImages, {
           paths: pathsToExport,
           outputFolderOrFile: outputFolderOrFile,
@@ -1300,16 +1306,33 @@ export default function ExportPanel({
     }
   };
 
-  const handleCancel = async () => {
+  const handleCancel = useCallback(async () => {
     if (effectiveIsCancellingExport) return;
     setIsCancellingExport(true);
     try {
-      await invoke(Invokes.CancelExport);
+      const acknowledgement = await invokeWithSchema(
+        Invokes.CancelExport,
+        {},
+        exportCancellationAckSchema,
+        'cancel_export acknowledgement',
+      );
+      setCancellationAck(acknowledgement);
     } catch (error) {
       console.error('Failed to cancel:', error);
       setIsCancellingExport(false);
     }
-  };
+  }, [effectiveIsCancellingExport]);
+
+  useEffect(() => {
+    if (!isExporting) return;
+    const handleCancellationShortcut = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      event.preventDefault();
+      void handleCancel();
+    };
+    window.addEventListener('keydown', handleCancellationShortcut);
+    return () => window.removeEventListener('keydown', handleCancellationShortcut);
+  }, [handleCancel, isExporting]);
 
   const selectedFileFormat = FILE_FORMATS.find((format) => format.id === fileFormat);
   const selectedColorProfileLabel =
@@ -2788,6 +2811,12 @@ export default function ExportPanel({
                     : 'bg-editor-primary-active text-editor-primary-active-text'
           }`}
           aria-busy={isExporting}
+          aria-keyshortcuts="Escape"
+          aria-label={isExporting ? t('export.status.cancelExport') : undefined}
+          data-testid="export-cancel-control"
+          data-cancel-active-job-id={cancellationAck?.activeJobId}
+          data-cancel-task-attached={cancellationAck?.taskAttached}
+          data-cancel-token-observed={cancellationAck?.tokenObserved}
           data-tooltip={isExporting ? t('export.status.cancelExport') : exportDisabledReason}
           disabled={status === Status.Exporting ? effectiveIsCancellingExport : !canExport}
           onClick={() => {
@@ -2833,6 +2862,16 @@ export default function ExportPanel({
             </>
           )}
         </Button>
+        {cancellationAck ? (
+          <span
+            aria-hidden="true"
+            className="sr-only"
+            data-cancel-active-job-id={cancellationAck.activeJobId}
+            data-cancel-task-attached={cancellationAck.taskAttached}
+            data-cancel-token-observed={cancellationAck.tokenObserved}
+            data-testid="export-cancellation-ack"
+          />
+        ) : null}
       </div>
     </div>
   );
