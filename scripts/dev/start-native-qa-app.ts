@@ -35,7 +35,23 @@ async function run(command: string, commandArgs: string[], label: string, allowe
 if (shouldBuild) {
   await run(
     'bun',
-    ['tauri', 'build', '--debug', '--ci', '--bundles', 'app', '--features', buildFeatures],
+    [
+      'scripts/ci/run-resource-coordinated.ts',
+      '--resource',
+      'native-heavy',
+      '--label',
+      'native-qa-build',
+      '--',
+      'bun',
+      'tauri',
+      'build',
+      '--debug',
+      '--ci',
+      '--bundles',
+      'app',
+      '--features',
+      buildFeatures,
+    ],
     'native qa app build',
   );
 }
