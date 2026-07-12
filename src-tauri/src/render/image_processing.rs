@@ -17,6 +17,8 @@ pub struct PersistedStateRecoveryReceipt {
     pub source_identity: String,
     pub previous_edit_revision: Option<String>,
     pub disabled_fields: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub migrated_fields: Vec<String>,
     pub reason_codes: Vec<String>,
 }
 
