@@ -3156,7 +3156,7 @@ mod tests {
         export_source_precision_receipt_label, export_terminal_receipt, export_transform_options,
         finish_export_job, mox_rendering_intent, quantize_rgb16_to_rgb8,
         request_export_cancellation, resolve_export_color_capabilities,
-        resolve_export_color_transform_plan, save_image_with_metadata_commit,
+        resolve_export_color_transform_plan, save_image_with_metadata_commit, send_or_cancel,
         should_apply_srgb_perceptual_gamut_mapping, write_export_manifest,
         write_final_output_bytes_observed,
     };
@@ -4893,6 +4893,14 @@ mod tests {
             serde_json::json!([2, 2])
         );
         assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 2);
+    }
+
+    #[tokio::test]
+    async fn downstream_channel_failure_wakes_sender_without_retaining_work() {
+        let (sender, receiver) = tokio::sync::mpsc::channel::<u8>(1);
+        drop(receiver);
+        let cancellation = crate::export::batch_export_pipeline::PipelineCancellation::default();
+        assert!(send_or_cancel(&sender, 7, &cancellation).await.is_err());
     }
 
     #[test]
