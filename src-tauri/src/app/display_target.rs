@@ -32,7 +32,12 @@ pub struct ResolvedDisplayTarget {
 impl ResolvedDisplayTarget {
     #[cfg(not(any(target_os = "android", target_os = "linux")))]
     fn materialize(mut self) -> Result<Self, String> {
-        if self.snapshot.is_some() {
+        if let Some(snapshot) = &self.snapshot {
+            validate_color_contract(
+                &self.identity.profile_sha256,
+                &snapshot.icc_sha256,
+                snapshot.encoding_contract,
+            )?;
             return Ok(self);
         }
         let snapshot = Arc::new(
@@ -83,6 +88,12 @@ pub struct DisplayTargetReport {
     pub color_contract: Option<String>,
     pub pending: bool,
     pub building: bool,
+    pub injected_cross_display_transition_verified: bool,
+    pub atomic_generation_swap_verified: bool,
+    pub old_resource_lease_preserved: bool,
+    pub mismatched_publish_excluded: bool,
+    pub export_lease_preserved: bool,
+    pub interaction_churn_duration_micros: u64,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -204,7 +215,7 @@ impl DisplayTargetCoordinator {
         true
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "validation-harness"))]
     fn current_resources_for_test(&self) -> Option<Arc<DisplayResources>> {
         self.shared.state.lock().unwrap().current.clone()
     }
@@ -382,6 +393,7 @@ pub fn resolve_for_app(app: &tauri::AppHandle) -> Result<ResolvedDisplayTarget, 
     })
 }
 
+#[cfg(any(test, not(any(target_os = "android", target_os = "linux"))))]
 fn validate_color_contract(
     target_profile_sha256: &str,
     snapshot_profile_sha256: &str,
@@ -408,6 +420,91 @@ pub fn get_display_target_report(state: tauri::State<'_, crate::AppState>) -> Di
         })
 }
 
+#[cfg(all(feature = "validation-harness", target_os = "macos"))]
+fn validate_injected_cross_display_transition(report: &mut DisplayTargetReport) {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::mpsc;
+
+    let started_at = Instant::now();
+    let transition = Arc::new(AtomicU64::new(0));
+    let resolver_transition = Arc::clone(&transition);
+    let (published_tx, published_rx) = mpsc::channel();
+    let coordinator = DisplayTargetCoordinator::new_with_publisher(
+        Duration::ZERO,
+        move |_| {
+            let second = resolver_transition.load(Ordering::SeqCst) != 0;
+            let (display_id, bytes) = if second {
+                (202, moxcms::ColorProfile::new_display_p3().encode())
+            } else {
+                (101, moxcms::ColorProfile::new_srgb().encode())
+            };
+            let bytes = bytes.map_err(|error| error.to_string())?;
+            Ok(ResolvedDisplayTarget {
+                identity: DisplayTargetIdentity {
+                    display_id: Some(display_id),
+                    profile_sha256: crate::display_profile::sha256_hex(&bytes),
+                    scale_factor_bits: 2.0_f64.to_bits(),
+                    color_space: DisplayColorSpace::DisplayEncodedSrgb,
+                },
+                color_contract: "pixels_and_jpeg_icc_from_same_snapshot".to_string(),
+                capture: Ok((Some(display_id), bytes)),
+                snapshot: None,
+            })
+        },
+        move |change| {
+            let _ = published_tx.send(change);
+        },
+    );
+    coordinator.request_refresh(77);
+    if !coordinator.wait_for_idle(Duration::from_secs(5)) {
+        return;
+    }
+    let first = coordinator.current_resources_for_test();
+    let first_publish = published_rx.recv_timeout(Duration::from_secs(1)).ok();
+    transition.store(1, Ordering::SeqCst);
+    coordinator.request_refresh(77);
+    if !coordinator.wait_for_idle(Duration::from_secs(5)) {
+        return;
+    }
+    let second = coordinator.current_resources_for_test();
+    let second_publish = published_rx.recv_timeout(Duration::from_secs(1)).ok();
+    if let (Some(first), Some(second), Some(first_publish), Some(second_publish)) =
+        (first, second, first_publish, second_publish)
+    {
+        report.injected_cross_display_transition_verified = first.target.identity.display_id
+            == Some(101)
+            && second.target.identity.display_id == Some(202)
+            && first.target.identity.profile_sha256 != second.target.identity.profile_sha256;
+        report.atomic_generation_swap_verified = first.generation == 1
+            && second.generation == 2
+            && first_publish.display_resource_generation == 1
+            && second_publish.display_resource_generation == 2;
+        report.old_resource_lease_preserved =
+            Arc::strong_count(&first) >= 1 && first.device_generation == second.device_generation;
+        report.export_lease_preserved = report.old_resource_lease_preserved
+            && report.in_flight_jobs_cancelled_from_display_events == 0;
+    }
+
+    let bad_snapshot =
+        crate::display_profile::display_preview_transform_snapshot_from_capture(Ok((
+            Some(303),
+            moxcms::ColorProfile::new_srgb().encode().unwrap(),
+        )));
+    let bad = ResolvedDisplayTarget {
+        identity: DisplayTargetIdentity {
+            display_id: Some(303),
+            profile_sha256: "mismatched-profile-hash".to_string(),
+            scale_factor_bits: 2.0_f64.to_bits(),
+            color_space: DisplayColorSpace::DisplayEncodedSrgb,
+        },
+        color_contract: "pixels_and_jpeg_icc_from_same_snapshot".to_string(),
+        capture: Err("unused".to_string()),
+        snapshot: Some(Arc::new(bad_snapshot)),
+    };
+    report.mismatched_publish_excluded = bad.materialize().is_err();
+    report.interaction_churn_duration_micros = started_at.elapsed().as_micros() as u64;
+}
+
 #[cfg(feature = "validation-harness")]
 pub fn start_validation_benchmark(app: tauri::AppHandle) {
     let Some(report_path) = std::env::var_os("RAWENGINE_DISPLAY_TARGET_BENCHMARK_REPORT") else {
@@ -429,7 +526,9 @@ pub fn start_validation_benchmark(app: tauri::AppHandle) {
                 log::error!("display target validation did not become idle");
                 return;
             }
-            let report = coordinator.report();
+            let mut report = coordinator.report();
+            #[cfg(target_os = "macos")]
+            validate_injected_cross_display_transition(&mut report);
             let report_path = std::path::PathBuf::from(report_path);
             let temporary = report_path.with_extension("tmp");
             let result = serde_json::to_vec_pretty(&report)
@@ -456,6 +555,15 @@ mod tests {
     use super::*;
 
     fn target(display_id: u32, profile: &str) -> ResolvedDisplayTarget {
+        #[cfg(not(any(target_os = "android", target_os = "linux")))]
+        let snapshot = {
+            let mut snapshot =
+                crate::display_profile::display_preview_transform_snapshot_from_capture(Err(
+                    "synthetic_test_fallback".to_string(),
+                ));
+            snapshot.icc_sha256 = profile.to_string();
+            Arc::new(snapshot)
+        };
         ResolvedDisplayTarget {
             identity: DisplayTargetIdentity {
                 display_id: Some(display_id),
@@ -467,11 +575,7 @@ mod tests {
             #[cfg(not(any(target_os = "android", target_os = "linux")))]
             capture: Err("synthetic_test_fallback".to_string()),
             #[cfg(not(any(target_os = "android", target_os = "linux")))]
-            snapshot: Some(Arc::new(
-                crate::display_profile::display_preview_transform_snapshot_from_capture(Err(
-                    "synthetic_test_fallback".to_string(),
-                )),
-            )),
+            snapshot: Some(snapshot),
         }
     }
 
@@ -599,6 +703,17 @@ mod tests {
         assert_eq!(
             validate_color_contract("profile-a", "profile-a", "independent_profile_lookup"),
             Err("display_target_color_contract_mismatch".to_string())
+        );
+    }
+
+    #[cfg(not(any(target_os = "android", target_os = "linux")))]
+    #[test]
+    fn prebuilt_mismatched_snapshot_is_rejected_before_publication() {
+        let mut mismatched = target(5, "snapshot-profile");
+        mismatched.identity.profile_sha256 = "target-profile".to_string();
+        assert_eq!(
+            mismatched.materialize().err().as_deref(),
+            Some("display_target_profile_snapshot_mismatch")
         );
     }
 

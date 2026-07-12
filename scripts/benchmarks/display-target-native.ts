@@ -13,6 +13,7 @@ const binary = resolve(args[binaryIndex + 1]);
 const reportSchema = z
   .object({
     blankFramesFromDisplayEvents: z.literal(0),
+    atomicGenerationSwapVerified: z.literal(true),
     building: z.literal(false),
     coalescedEvents: z.number().int().min(999),
     colorContract: z.literal('pixels_and_jpeg_icc_from_same_snapshot'),
@@ -21,6 +22,11 @@ const reportSchema = z
     displayResourceBuilds: z.number().int().min(1).max(2),
     displayResourceGeneration: z.number().int().min(1).max(2),
     inFlightJobsCancelledFromDisplayEvents: z.literal(0),
+    injectedCrossDisplayTransitionVerified: z.literal(true),
+    interactionChurnDurationMicros: z.number().int().positive().max(250_000),
+    mismatchedPublishExcluded: z.literal(true),
+    oldResourceLeasePreserved: z.literal(true),
+    exportLeasePreserved: z.literal(true),
     pending: z.literal(false),
     processId: z.number().int().positive(),
     rawEvents: z.number().int().min(1_001),
@@ -67,6 +73,8 @@ const main = async (): Promise<void> => {
             builds: report.displayResourceBuilds,
             coalesced: report.coalescedEvents,
             generation: report.displayResourceGeneration,
+            injectedCrossDisplay: report.injectedCrossDisplayTransitionVerified,
+            interactionChurnMicros: report.interactionChurnDurationMicros,
             rawEvents: report.rawEvents,
             resolutions: report.resolutions,
           })}`,
