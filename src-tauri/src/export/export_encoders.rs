@@ -110,26 +110,33 @@ pub(crate) fn encode_image_with_working_color_state(
     match normalized_format.as_str() {
         "jxl" => {
             #[cfg(not(feature = "advanced-codecs"))]
-            return Err(advanced_codecs_unavailable());
+            {
+                return Err(advanced_codecs_unavailable());
+            }
             #[cfg(feature = "advanced-codecs")]
-            let jxl_data = rapidraw_codecs::encode_jxl(image, jpeg_quality)
-                .map_err(|error| format!("Failed to encode JXL: {error}"))?;
-
-            return Ok(EncodedExportImage {
-                bytes: jxl_data,
-                color_policy: None,
-            });
+            {
+                let jxl_data = rapidraw_codecs::encode_jxl(image, jpeg_quality)
+                    .map_err(|error| format!("Failed to encode JXL: {error}"))?;
+                return Ok(EncodedExportImage {
+                    bytes: jxl_data,
+                    color_policy: None,
+                });
+            }
         }
         "webp" => {
             #[cfg(not(feature = "advanced-codecs"))]
-            return Err(advanced_codecs_unavailable());
+            {
+                return Err(advanced_codecs_unavailable());
+            }
             #[cfg(feature = "advanced-codecs")]
-            let webp_mem = rapidraw_codecs::encode_webp(image, jpeg_quality)
-                .map_err(|error| format!("Failed to encode WebP: {error}"))?;
-            return Ok(EncodedExportImage {
-                bytes: webp_mem,
-                color_policy: None,
-            });
+            {
+                let webp_mem = rapidraw_codecs::encode_webp(image, jpeg_quality)
+                    .map_err(|error| format!("Failed to encode WebP: {error}"))?;
+                return Ok(EncodedExportImage {
+                    bytes: webp_mem,
+                    color_policy: None,
+                });
+            }
         }
         "jpg" | "jpeg" => {
             let bytes = encode_jpeg_to_bytes(

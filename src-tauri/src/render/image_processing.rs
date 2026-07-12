@@ -245,9 +245,11 @@ pub fn apply_orientation(image: DynamicImage, orientation: Orientation) -> Dynam
     }
 }
 
+#[cfg(feature = "ai")]
+pub use crate::geometry::apply_unwarp_geometry;
 pub use crate::geometry::{
     apply_coarse_rotation, apply_crop, apply_flip, apply_geometry_warp, apply_rotation,
-    apply_unwarp_geometry, is_geometry_identity, warp_image_geometry,
+    is_geometry_identity, warp_image_geometry,
 };
 
 use crate::adjustments::abi::GpuMat3;

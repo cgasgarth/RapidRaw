@@ -71,6 +71,7 @@ const commandNames: Record<
   | 'applyLibraryCatalogChanges'
   | 'getLensfunMakers'
   | 'getLogFilePath'
+  | 'getNativeCapabilities'
   | 'getAlbumImages'
   | 'getFolderTree'
   | 'getFolderRefreshSnapshot'
@@ -113,6 +114,7 @@ const commandNames: Record<
   generatePreviewForPath: Invokes.GeneratePreviewForPath,
   getLensfunMakers: Invokes.GetLensfunMakers,
   getLogFilePath: Invokes.GetLogFilePath,
+  getNativeCapabilities: Invokes.GetNativeCapabilities,
   getAlbumImages: Invokes.GetAlbumImages,
   getFolderTree: Invokes.GetFolderTree,
   getFolderRefreshSnapshot: Invokes.GetFolderRefreshSnapshot,
@@ -205,6 +207,14 @@ export const installBrowserTauriHarness = (): void => {
 
 const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unknown>): Promise<unknown> => {
   switch (command) {
+    case commandNames.getNativeCapabilities:
+      return Promise.resolve({
+        schemaVersion: 1,
+        buildProfile: 'full',
+        ai: true,
+        advancedCodecs: true,
+        computational: true,
+      });
     case commandNames.loadSettings:
       harnessSettings = readPersistedHarnessSettings();
       return Promise.resolve(harnessSettings);

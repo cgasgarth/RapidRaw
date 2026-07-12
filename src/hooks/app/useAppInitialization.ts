@@ -14,8 +14,10 @@ import {
   type ThumbnailAspectRatio,
   ThumbnailSize,
 } from '../../components/ui/AppProperties';
+import { nativeCapabilityManifestSchema } from '../../schemas/nativeCapabilitySchemas';
 import { type PanelScopesLayout, useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
+import { useNativeCapabilityStore } from '../../store/useNativeCapabilityStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
@@ -144,6 +146,7 @@ export const useAppInitialization = ({
   );
 
   const isAndroid = osPlatform === 'android';
+  const setNativeCapabilityManifest = useNativeCapabilityStore((state) => state.setManifest);
   const defaultThumbnailSize = isAndroid ? ThumbnailSize.Small : ThumbnailSize.Medium;
   const defaultLibraryViewMode = isAndroid ? LibraryViewMode.Recursive : LibraryViewMode.Flat;
   const persistSettings = useCallback(
@@ -158,6 +161,14 @@ export const useAppInitialization = ({
   useEffect(() => {
     initPlatform();
   }, [initPlatform]);
+
+  useEffect(() => {
+    invoke(Invokes.GetNativeCapabilities)
+      .then((payload) => setNativeCapabilityManifest(nativeCapabilityManifestSchema.parse(payload)))
+      .catch((error: unknown) => {
+        console.error('Failed to load native capability manifest:', error);
+      });
+  }, [setNativeCapabilityManifest]);
 
   useEffect(() => {
     invoke<SupportedTypes>(Invokes.GetSupportedFileTypes)

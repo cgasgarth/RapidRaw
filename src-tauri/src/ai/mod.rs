@@ -1,3 +1,4 @@
+#[cfg(feature = "ai")]
 pub(crate) mod ai_commands;
 pub(crate) mod ai_connector;
 pub(crate) mod ai_processing;

@@ -5,6 +5,7 @@ import { useShallow } from 'zustand/react/shallow';
 
 import { parseAiConnectorStatusPayload } from '../../schemas/tauriEventSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
+import { useNativeCapabilityStore } from '../../store/useNativeCapabilityStore';
 import { Invokes } from '../../tauri/commands';
 import { AI_CONNECTOR_STATUS_UPDATE_EVENT } from '../../utils/tauriEventNames';
 
@@ -19,6 +20,7 @@ const logAiConnectorStatusError = (message: string, error: unknown): void => {
 };
 
 export const useAiConnectorStatus = (): void => {
+  const aiAvailable = useNativeCapabilityStore((state) => state.manifest?.ai);
   const { setEditor } = useEditorStore(
     useShallow((state) => ({
       setEditor: state.setEditor,
@@ -26,6 +28,11 @@ export const useAiConnectorStatus = (): void => {
   );
 
   useEffect(() => {
+    if (aiAvailable === undefined) return;
+    if (!aiAvailable) {
+      setEditor({ isAIConnectorConnected: false });
+      return;
+    }
     let isActive = true;
 
     const unlisten = listen<unknown>(AI_CONNECTOR_STATUS_UPDATE_EVENT, (event) => {
@@ -56,5 +63,5 @@ export const useAiConnectorStatus = (): void => {
           logAiConnectorStatusError('Failed to remove AI connector status listener:', error);
         });
     };
-  }, [setEditor]);
+  }, [aiAvailable, setEditor]);
 };

@@ -19,10 +19,13 @@ name = "rapidraw_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [features]
-default = ["required-ci"]
+default = ["full", "required-ci"]
 advanced-codecs = ["rapidraw-codecs/advanced"]
+ai = []
+fast-dev = []
+full = ["advanced-codecs", "ai"]
 panorama-opencv-spike = ["rapidraw-computational/opencv-panorama"]
-required-ci = ["advanced-codecs"]
+required-ci = ["full"]
 tauri-test = ["tauri/test"]
 validation-harness = []
 

@@ -75,6 +75,7 @@ export enum Invokes {
   GetLibraryFolderAggregates = 'get_library_folder_aggregates',
   GetExternalEditorFileWatchSnapshot = 'get_external_editor_file_watch_snapshot',
   GetLogFilePath = 'get_log_file_path',
+  GetNativeCapabilities = 'get_native_capabilities',
   GetLensDistortionParams = 'get_lens_distortion_params',
   GetOrCreateInternalLibraryRoot = 'get_or_create_internal_library_root',
   GetLensfunLensesForMaker = 'get_lensfun_lenses_for_maker',

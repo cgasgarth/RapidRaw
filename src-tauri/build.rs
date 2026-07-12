@@ -123,10 +123,16 @@ fn main() {
     fs::create_dir_all(&dest_dir).unwrap();
     let dest_path = dest_dir.join(lib_name);
     let required_ci_feature_enabled = env::var_os("CARGO_FEATURE_REQUIRED_CI").is_some();
+    let fast_dev_feature_enabled = env::var_os("CARGO_FEATURE_FAST_DEV").is_some();
 
-    if required_ci_feature_enabled && target_os != "android" {
+    if (required_ci_feature_enabled || fast_dev_feature_enabled) && target_os != "android" {
+        let profile = if fast_dev_feature_enabled {
+            "fast-dev"
+        } else {
+            "required-ci"
+        };
         println!(
-            "cargo:warning=required-ci feature enabled; skipping ONNX Runtime download for compile-only checks."
+            "cargo:warning={profile} feature enabled; skipping ONNX Runtime download for this build."
         );
         println!("cargo:rerun-if-changed=build.rs");
         tauri_build::build();
