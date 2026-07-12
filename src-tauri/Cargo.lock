@@ -24,11 +24,8 @@ dependencies = [
  "image-hdr",
  "image_hasher",
  "imageproc",
- "imgref",
  "include_dir",
  "jni 0.21.1",
- "jxl-encoder",
- "jxl-oxide",
  "kamadak-exif",
  "lcms2",
  "libc",
@@ -37,7 +34,6 @@ dependencies = [
  "memmap2",
  "mimalloc",
  "moxcms",
- "mozjpeg-rs",
  "nalgebra",
  "ndarray 0.17.2",
  "ndk-context",
@@ -49,17 +45,17 @@ dependencies = [
  "objc2-foundation",
  "objc2-vision",
  "once_cell",
- "opencv",
  "ort",
  "pollster",
  "quick-xml 0.41.0",
  "rand 0.10.1",
+ "rapidraw-codecs",
+ "rapidraw-computational",
  "rapidraw-types",
  "rawler",
  "rayon",
  "regex",
  "reqwest",
- "rgb",
  "rusqlite",
  "serde",
  "serde_json",
@@ -80,7 +76,6 @@ dependencies = [
  "uuid",
  "walkdir",
  "webkit2gtk",
- "webp",
  "wgpu",
 ]
 
@@ -5271,6 +5266,32 @@ name = "range-alloc"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ca45419789ae5a7899559e9512e58ca889e41f04f1f2445e9f4b290ceccd1d08"
+
+[[package]]
+name = "rapidraw-codecs"
+version = "0.1.0"
+dependencies = [
+ "image",
+ "imgref",
+ "jxl-encoder",
+ "jxl-oxide",
+ "mozjpeg-rs",
+ "rapidraw-types",
+ "rgb",
+ "serde_json",
+ "webp",
+]
+
+[[package]]
+name = "rapidraw-computational"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "opencv",
+ "rapidraw-types",
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "rapidraw-types"

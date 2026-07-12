@@ -3,21 +3,12 @@
 //! This module must stay behind `panorama-opencv-spike` until packaging,
 //! notarization, runtime fallback, and validation gates promote it.
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OpenCvPanoramaSpikeReport {
-    pub backend_id: &'static str,
-    pub crate_version: &'static str,
-    pub feature_enabled: bool,
-}
+pub use rapidraw_computational::OpenCvPanoramaSpikeReport;
 
 pub fn build_spike_report() -> OpenCvPanoramaSpikeReport {
-    let _mat_size_probe = std::mem::size_of::<opencv::core::Mat>();
-
-    OpenCvPanoramaSpikeReport {
-        backend_id: "opencv-panorama-spike",
-        crate_version: env!("CARGO_PKG_VERSION"),
-        feature_enabled: true,
-    }
+    rapidraw_computational::require_opencv_panorama_backend()
+        .expect("panorama OpenCV module only compiles with its capability enabled");
+    rapidraw_computational::build_opencv_panorama_spike_report(env!("CARGO_PKG_VERSION"))
 }
 
 #[cfg(test)]
