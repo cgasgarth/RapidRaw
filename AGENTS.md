@@ -7,6 +7,7 @@ North star: `RAW_EDITOR_PLAN.md` drives a macOS-first, Capture One/Lightroom-cla
 - Preflight each turn/worktree: repo root, branch/worktree, deps, remotes, GitHub repo, and PR queue. GitHub repo must be `cgasgarth/RapidRaw`; if not, run `bun run repo:fix-gh-resolution`. `origin` is the fork; `upstream` is `CyberTimon/RapidRAW`.
 - Create worktrees with `bun run worktree:create -- --branch codex/name`; fix the helper if incomplete. Keep at most four active PRs, enable auto-merge when safe, and give every PR a disposition: merge, fix, close, or explicit deferral. Never push to protected `main`, leave stale PRs, or force-push healthy waiting PRs.
 - Orchestrator owns task routing, integration judgment, PR queue health, merge decisions, and user-facing status. Work through the existing, already-refined GitHub backlog milestone by milestone. Keep four independent implementation PR streams active when issues and dependency safety permit; enable auto-merge on each dependency-safe PR so passing work does not sit idle. If blocked, move another implementation or validation stream.
+- Keep exactly three implementation subagents working in parallel at all times while actionable backlog remains. CI polling, passive waiting, planning, or status gathering does not count as an implementation stream: rotate a waiting worker immediately into dependency-safe implementation work while it monitors its PR asynchronously. Restore any dropped worker session promptly on its existing worktree and profile.
 
 ## Model Routing
 
