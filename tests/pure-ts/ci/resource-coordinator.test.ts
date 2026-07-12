@@ -86,4 +86,42 @@ describe('cross-worktree resource coordinator', () => {
     expect(output).toContain('successor recovered stale native-heavy: interrupted-build pid=2147483647');
     expect(output).toContain('successor-ran');
   });
+
+  test('multiple stale waiters recover once without deleting the successor lease', async () => {
+    const root = await temporaryRoot();
+    const lockDirectory = join(root, 'native-heavy');
+    await mkdir(lockDirectory, { recursive: true });
+    await writeFile(
+      join(lockDirectory, 'owner.json'),
+      `${JSON.stringify({
+        hostname: (await import('node:os')).hostname(),
+        label: 'dead-owner',
+        pid: 2_147_483_647,
+        startedAt: '2026-01-01T00:00:00.000Z',
+        worktree: '/tmp/dead-worktree',
+      })}\n`,
+    );
+    const first = coordinated(
+      root,
+      'first-successor',
+      `console.log('first-start '+Date.now()); await Bun.sleep(120); console.log('first-end '+Date.now())`,
+    );
+    const second = coordinated(
+      root,
+      'second-successor',
+      `console.log('second-start '+Date.now()); await Bun.sleep(120); console.log('second-end '+Date.now())`,
+    );
+    expect(await first.exited).toBe(0);
+    expect(await second.exited).toBe(0);
+    const outputs = [await new Response(first.stdout).text(), await new Response(second.stdout).text()];
+    expect(outputs.filter((output) => output.includes('recovered stale native-heavy')).length).toBe(1);
+    const intervals = outputs.map((output, index) => ({
+      end: Number(output.match(new RegExp(`${index === 0 ? 'first' : 'second'}-end (\\d+)`))?.[1]),
+      start: Number(output.match(new RegExp(`${index === 0 ? 'first' : 'second'}-start (\\d+)`))?.[1]),
+    }));
+    const firstInterval = intervals[0];
+    const secondInterval = intervals[1];
+    if (!firstInterval || !secondInterval) throw new Error('expected two successor intervals');
+    expect(firstInterval.end <= secondInterval.start || secondInterval.end <= firstInterval.start).toBe(true);
+  });
 });

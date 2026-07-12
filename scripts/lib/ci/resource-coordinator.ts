@@ -56,6 +56,7 @@ export async function acquireResourceLease(options: ResourceLeaseOptions): Promi
   const pollMs = options.pollMs ?? Number(Bun.env.RAWENGINE_RESOURCE_WAIT_POLL_MS ?? 250);
   const root = coordinatorRoot();
   const lockDirectory = join(root, options.resource);
+  const recoveryDirectory = join(root, `${options.resource}.recovery`);
   const ownerPath = join(lockDirectory, 'owner.json');
   await mkdir(root, { recursive: true });
   const waitStartedAt = Date.now();
@@ -86,8 +87,22 @@ export async function acquireResourceLease(options: ResourceLeaseOptions): Promi
       if (code !== 'EEXIST') throw error;
       const owner = await readOwner(ownerPath);
       if (owner && owner.hostname === hostname() && !processIsAlive(owner.pid)) {
-        await rm(lockDirectory, { recursive: true, force: true });
-        console.log(`${options.label} recovered stale ${options.resource}: ${compactOwner(owner)}`);
+        let ownsRecovery = false;
+        try {
+          await mkdir(recoveryDirectory);
+          ownsRecovery = true;
+          const currentOwner = await readOwner(ownerPath);
+          if (currentOwner && currentOwner.hostname === hostname() && !processIsAlive(currentOwner.pid)) {
+            await rm(lockDirectory, { recursive: true, force: true });
+            console.log(`${options.label} recovered stale ${options.resource}: ${compactOwner(currentOwner)}`);
+          }
+        } catch (recoveryError) {
+          const recoveryCode =
+            recoveryError instanceof Error && 'code' in recoveryError ? recoveryError.code : undefined;
+          if (recoveryCode !== 'EEXIST') throw recoveryError;
+        } finally {
+          if (ownsRecovery) await rm(recoveryDirectory, { recursive: true, force: true });
+        }
         continue;
       }
       const waitedMs = Date.now() - waitStartedAt;
