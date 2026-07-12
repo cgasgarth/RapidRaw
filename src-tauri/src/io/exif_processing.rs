@@ -169,7 +169,11 @@ pub fn load_sidecar_recovering(
             reasons.push("legacy_render_state_migrated".to_string());
         }
         let source_dimensions = crop_requires_unit_migration(&meta.adjustments)
-            .then(|| expected_source_identity.and_then(resolve_oriented_source_dimensions))
+            .then(|| {
+                expected_source_identity
+                    .and_then(resolve_oriented_source_dimensions)
+                    .or_else(|| source_dimensions_for_sidecar(sidecar_path))
+            })
             .flatten();
         validate_adjustments(
             &mut meta.adjustments,
@@ -2699,7 +2703,7 @@ mod crop_migration_tests {
         });
         fs::write(&sidecar, serde_json::to_vec_pretty(&legacy).unwrap()).unwrap();
 
-        let first = load_sidecar_recovering(&sidecar, Some(&source_identity)).unwrap();
+        let first = load_sidecar_recovering(&sidecar, None).unwrap();
         assert_eq!(first.outcome, PersistedStateOutcome::Migrated);
         assert_eq!(first.metadata.rating, 4);
         assert_eq!(
@@ -2742,7 +2746,7 @@ mod crop_migration_tests {
         assert!(first.backup_path.as_ref().is_some_and(|path| path.exists()));
 
         let repaired_bytes = fs::read(&sidecar).unwrap();
-        let second = load_sidecar_recovering(&sidecar, Some(&source_identity)).unwrap();
+        let second = load_sidecar_recovering(&sidecar, None).unwrap();
         assert_eq!(second.outcome, PersistedStateOutcome::Current);
         assert!(second.backup_path.is_none());
         assert_eq!(fs::read(&sidecar).unwrap(), repaired_bytes);
