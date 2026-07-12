@@ -190,10 +190,10 @@ pub(crate) fn encode_image_with_working_color_state(
             });
         }
         "png" => {
-            let image_to_encode = if image.as_rgb32f().is_some() {
-                DynamicImage::ImageRgb16(image.to_rgb16())
-            } else {
-                image.clone()
+            let image_to_encode = match image {
+                DynamicImage::ImageRgb32F(_) => DynamicImage::ImageRgb16(image.to_rgb16()),
+                DynamicImage::ImageRgba32F(_) => DynamicImage::ImageRgba16(image.to_rgba16()),
+                _ => image.clone(),
             };
 
             image_to_encode

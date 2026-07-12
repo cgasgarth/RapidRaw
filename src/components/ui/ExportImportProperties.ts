@@ -117,10 +117,12 @@ export interface ExportReceiptOutput {
   format: string;
   iccEmbedded?: boolean | null | undefined;
   outputPath: string;
+  outputDigest?: ExportReceiptDigest | null | undefined;
   policyStatus?: string | null | undefined;
   policyVersion?: string | null | undefined;
   rawDevelopmentReport?: RawDevelopmentReport | null | undefined;
   rawProvenanceSidecarPath?: string | null | undefined;
+  rawProvenanceError?: string | null | undefined;
   renderingIntent?: string | null | undefined;
   requestedColorProfile?: string | null | undefined;
   requestedRenderingIntent?: string | null | undefined;
@@ -131,6 +133,13 @@ export interface ExportReceiptOutput {
   sourcePrecisionPath?: string | null | undefined;
   transformPolicyFingerprint?: string | null | undefined;
   transformApplied?: boolean | null | undefined;
+}
+
+export interface ExportReceiptDigest {
+  algorithm: 'sha256';
+  byteLen: number;
+  provenance: 'finalByteAtomicWriter';
+  value: string;
 }
 
 export interface FileFormat {
