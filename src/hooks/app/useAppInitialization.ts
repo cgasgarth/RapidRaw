@@ -44,6 +44,11 @@ interface NavigatorWithUserLanguage extends Navigator {
   userLanguage?: string;
 }
 
+interface StartupTraceSnapshot {
+  traceId: string;
+  phases: Array<{ phase: string; elapsedMs: number; status: string; detail?: string | null }>;
+}
+
 interface UseAppInitializationProps {
   thumbnailSize: ThumbnailSize;
   setThumbnailSize: (size: ThumbnailSize) => void;
@@ -159,6 +164,21 @@ export const useAppInitialization = ({
     initPlatform();
   }, [initPlatform]);
 
+  // Signal native readiness from the mounted shell. Settings and filesystem
+  // hydration remain opportunistic and must not gate the first paint.
+  useEffect(() => {
+    void invoke(Invokes.FrontendReady).catch((err: unknown) => {
+      console.error('Failed to notify backend of readiness:', err);
+    });
+    void invoke<StartupTraceSnapshot>(Invokes.GetStartupTrace)
+      .then((trace) => {
+        console.info('[startup-trace]', trace.traceId, trace.phases);
+      })
+      .catch((err: unknown) => {
+        console.error('Failed to read startup trace:', err);
+      });
+  }, []);
+
   useEffect(() => {
     invoke<SupportedTypes>(Invokes.GetSupportedFileTypes)
       .then((types) => {
@@ -223,17 +243,19 @@ export const useAppInitialization = ({
         setThumbnailSize(settings.thumbnailSize ?? defaultThumbnailSize);
         if (settings.thumbnailAspectRatio) setThumbnailAspectRatio(settings.thumbnailAspectRatio);
 
+        // The shell and command bridge are usable before pinned/NAS tree scans.
+        // Hydrate those roots opportunistically so a slow/offline mount cannot
+        // hold the first-paint readiness boundary.
         if (settings.pinnedFolders && settings.pinnedFolders.length > 0) {
-          try {
-            const trees = await invoke<FolderTree[]>(Invokes.GetPinnedFolderTrees, {
-              paths: settings.pinnedFolders,
-              expandedFolders: settings.lastFolderState?.expandedFolders || [],
-              showImageCounts: settings.enableFolderImageCounts ?? false,
+          void invoke<FolderTree[]>(Invokes.GetPinnedFolderTrees, {
+            paths: settings.pinnedFolders,
+            expandedFolders: settings.lastFolderState?.expandedFolders || [],
+            showImageCounts: settings.enableFolderImageCounts ?? false,
+          })
+            .then((trees) => setLibrary({ pinnedFolderTrees: trees }))
+            .catch((err: unknown) => {
+              console.error('Failed to load pinned folder trees:', err);
             });
-            setLibrary({ pinnedFolderTrees: trees });
-          } catch (err) {
-            console.error('Failed to load pinned folder trees:', err);
-          }
         }
 
         if (settings.lastFolderState) {
@@ -242,10 +264,6 @@ export const useAppInitialization = ({
             expandedAlbumGroups: new Set(settings.lastFolderState.expandedAlbumGroups || []),
           });
         }
-
-        invoke(Invokes.FrontendReady).catch((e: unknown) => {
-          console.error('Failed to notify backend of readiness:', e);
-        });
       })
       .catch((err: unknown) => {
         console.error('Failed to load settings:', err);

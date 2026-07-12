@@ -81,6 +81,7 @@ use crate::merge::focus_stack::{
 };
 use crate::merge::hdr::{ALIGNMENT_POLICY_ID, HdrAlignmentPlanResponse, build_alignment_plan};
 
+use crate::app::startup::NativeStartupPhase;
 use crate::cache_utils::{
     calculate_geometry_hash, calculate_transform_hash, calculate_visual_hash,
 };
@@ -2964,6 +2965,13 @@ fn frontend_ready(
     Ok(())
 }
 
+#[tauri::command]
+fn get_startup_trace(
+    state: tauri::State<'_, AppState>,
+) -> crate::app::startup::StartupTraceSnapshot {
+    state.startup_trace.snapshot()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default();
@@ -3033,6 +3041,9 @@ pub fn run() {
             }
 
             let app_handle = app.handle().clone();
+            app.state::<AppState>()
+                .startup_trace
+                .mark(NativeStartupPhase::ProcessStarted, "ok", None);
             let config_dir = app_handle.path().app_config_dir().expect("Failed to get config dir");
             let crash_flag_path = config_dir.join(".gpu_init_crash_flag");
 
@@ -3042,6 +3053,11 @@ pub fn run() {
             }
 
             let mut settings: AppSettings = load_settings_or_default(&app_handle);
+            app.state::<AppState>().startup_trace.mark(
+                NativeStartupPhase::MinimalSettingsLoaded,
+                "ok",
+                None,
+            );
 
             {
                 let state = app.state::<AppState>();
@@ -3055,10 +3071,6 @@ pub fn run() {
                 let _ = crate::save_settings(settings.clone(), app_handle.clone());
                 let _ = std::fs::remove_file(&crash_flag_path);
             }
-
-            let lens_db = lens_correction::load_lensfun_db(&app_handle);
-            let state = app.state::<AppState>();
-            *state.lens_db.lock().unwrap() = Some(Arc::new(lens_db));
 
             unsafe {
                 if let Some(backend) = &settings.processing_backend
@@ -3111,9 +3123,6 @@ pub fn run() {
                 }
             }
 
-            preview_worker::start_preview_worker(app_handle.clone());
-            start_analytics_worker(app_handle.clone());
-            file_management::start_thumbnail_workers(app_handle);
             jxl_oxide::integration::register_image_decoding_hook();
 
             let window_cfg = app.config().app.windows.first().unwrap().clone();
@@ -3140,20 +3149,17 @@ pub fn run() {
             }
 
             let window = window_builder.build().expect("Failed to build window");
+            app.state::<AppState>().startup_trace.mark(
+                NativeStartupPhase::WindowCreated,
+                "ok",
+                None,
+            );
 
             #[cfg(target_os = "android")]
             android_integration::initialize_android(&window);
 
             #[cfg(not(target_os = "android"))]
             {
-                let app_state = app.state::<AppState>();
-                if let Err(error) = get_or_init_gpu_context(&app_state, app.handle()) {
-                    log::warn!(
-                        "GPU pre-initialization failed (editing and thumbnails may be degraded): {}",
-                        error
-                    );
-                }
-
                 if let Ok(config_dir) = app.path().app_config_dir() {
                     let path = config_dir.join("window_state.json");
                     if let Ok(contents) = std::fs::read_to_string(&path) {
@@ -3168,6 +3174,76 @@ pub fn run() {
                 } else {
                     let _ = window.center();
                 }
+
+                // Show the shell as soon as its geometry is known. GPU, Lensfun,
+                // catalog, and optional services warm after this first frame.
+                if let Err(error) = window.show() {
+                    log::error!("Failed to show startup shell: {}", error);
+                }
+                if let Err(error) = window.set_focus() {
+                    log::error!("Failed to focus startup shell: {}", error);
+                }
+                app.state::<AppState>().startup_trace.mark(
+                    NativeStartupPhase::WindowVisible,
+                    "ok",
+                    Some("native-shell".to_string()),
+                );
+
+                let background_handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    let lens_handle = background_handle.clone();
+                    let lens_result = tauri::async_runtime::spawn_blocking(move || {
+                        let lens_db = lens_correction::load_lensfun_db(&lens_handle);
+                        *lens_handle.state::<AppState>().lens_db.lock().unwrap() =
+                            Some(Arc::new(lens_db));
+                    })
+                    .await;
+                    let trace = background_handle.state::<AppState>().startup_trace.clone();
+                    match lens_result {
+                        Ok(()) => trace.mark(NativeStartupPhase::LibraryServicesReady, "ok", None),
+                        Err(error) => trace.mark(
+                            NativeStartupPhase::LibraryServicesReady,
+                            "degraded",
+                            Some(error.to_string()),
+                        ),
+                    }
+                });
+
+                let gpu_handle = app.handle().clone();
+                let gpu_trace_handle = gpu_handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    let result = tauri::async_runtime::spawn_blocking(move || {
+                        get_or_init_gpu_context(
+                            &gpu_handle.state::<AppState>(),
+                            &gpu_handle,
+                        )
+                        .map(|_| ())
+                    })
+                    .await;
+                    let trace = gpu_trace_handle.state::<AppState>().startup_trace.clone();
+                    match result {
+                        Ok(Ok(())) => trace.mark(NativeStartupPhase::GpuReady, "ok", None),
+                        Ok(Err(error)) => trace.mark(
+                            NativeStartupPhase::GpuReady,
+                            "degraded",
+                            Some(error),
+                        ),
+                        Err(error) => trace.mark(
+                            NativeStartupPhase::GpuReady,
+                            "degraded",
+                            Some(error.to_string()),
+                        ),
+                    }
+                });
+
+                preview_worker::start_preview_worker(app.handle().clone());
+                start_analytics_worker(app.handle().clone());
+                file_management::start_thumbnail_workers(app.handle().clone());
+                app.state::<AppState>().startup_trace.mark(
+                    NativeStartupPhase::CoreCommandsReady,
+                    "ok",
+                    Some("background-services-scheduled".to_string()),
+                );
 
                 let window_failsafe = window.clone();
                 tauri::async_runtime::spawn(async move {
@@ -3293,6 +3369,7 @@ pub fn run() {
             get_image_dimensions,
             is_original_file_available,
             frontend_ready,
+            get_startup_trace,
             library::changefeed::configure_library_changefeed,
             library::changefeed::get_library_changefeed_report,
             library::file_management::get_library_change_rows,

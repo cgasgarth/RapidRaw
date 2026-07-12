@@ -10,6 +10,7 @@ use tokio::task::JoinHandle;
 use wgpu::{Texture, TextureView};
 
 use crate::ai::ai_processing::AiState;
+use crate::app::startup::StartupTrace;
 use crate::cache_utils::DecodedImageCache;
 use crate::gpu_processing::GpuProcessor;
 use crate::image_processing::GpuContext;
@@ -211,6 +212,7 @@ pub struct WarpedImageCache {
 }
 
 pub struct AppState {
+    pub startup_trace: StartupTrace,
     pub window_setup_complete: AtomicBool,
     pub gpu_crash_flag_path: Mutex<Option<PathBuf>>,
     pub original_image: Mutex<Option<LoadedImage>>,
@@ -274,6 +276,7 @@ impl AppState {
             max_entries,
         };
         Self {
+            startup_trace: StartupTrace::new(),
             window_setup_complete: AtomicBool::new(false),
             gpu_crash_flag_path: Mutex::new(None),
             original_image: Mutex::new(None),

@@ -63,6 +63,7 @@ const commandNames: Record<
   | 'clearSessionCaches'
   | 'exportImages'
   | 'frontendReady'
+  | 'getStartupTrace'
   | 'generateOriginalTransformedPreview'
   | 'generateUncroppedPreview'
   | 'generatePreviewForPath'
@@ -105,6 +106,7 @@ const commandNames: Record<
   clearSessionCaches: Invokes.ClearSessionCaches,
   exportImages: Invokes.ExportImages,
   frontendReady: Invokes.FrontendReady,
+  getStartupTrace: Invokes.GetStartupTrace,
   generateOriginalTransformedPreview: Invokes.GenerateOriginalTransformedPreview,
   generateUncroppedPreview: Invokes.GenerateUncroppedPreview,
   generatePreviewForPath: Invokes.GeneratePreviewForPath,
@@ -305,6 +307,8 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
       return Promise.resolve(null);
     case commandNames.getSupportedFileTypes:
       return Promise.resolve(harnessSupportedTypes);
+    case commandNames.getStartupTrace:
+      return Promise.resolve({ traceId: 'startup:browser-harness', phases: [] });
     case commandNames.getFolderTree:
       return Promise.resolve({
         children: [],
