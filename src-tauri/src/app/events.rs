@@ -10,6 +10,7 @@ pub const DENOISE_PROGRESS: &str = "denoise-progress";
 pub const EXPORT_COMPLETE: &str = "export-complete";
 pub const EXPORT_COMPLETE_WITH_ERRORS: &str = "export-complete-with-errors";
 pub const EXPORT_CANCELLED: &str = "export-cancelled";
+pub const EXPORT_CANCELLATION_ACKNOWLEDGED: &str = "export-cancellation-acknowledged";
 pub const EXPORT_ERROR: &str = "export-error";
 pub const HDR_COMPLETE: &str = "hdr-complete";
 pub const HDR_PROGRESS: &str = "hdr-progress";
