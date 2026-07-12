@@ -1,6 +1,9 @@
 import { expect, test } from 'bun:test';
 
-import { parseThumbnailGeneratedPayload } from '../../../src/schemas/tauriEventSchemas';
+import {
+  parseSmartPreviewGeneratedPayload,
+  parseThumbnailGeneratedPayload,
+} from '../../../src/schemas/tauriEventSchemas';
 
 const resource = {
   byteLen: 1024,
@@ -42,4 +45,26 @@ test('thumbnail descriptor is valid without smart preview metadata', () => {
   });
 
   expect(payload.smartPreview).toBeUndefined();
+});
+
+test('smart preview completion has an independent revision-safe event', () => {
+  const payload = parseSmartPreviewGeneratedPayload({
+    generation: 7,
+    path: '/photos/a.raf',
+    resource: { ...resource, generation: 9, source: 'smartPreview' },
+    smartPreview: {
+      colorProfile: 'srgb',
+      height: 1707,
+      source: 'rendered',
+      sourceAvailable: true,
+      sourceRevision: 'source-revision-7',
+      stale: false,
+      width: 2560,
+    },
+    sourceRevision: 'source-revision-7',
+    state: 'current',
+  });
+
+  expect(payload.resource.generation).toBe(9);
+  expect(payload.smartPreview.width).toBe(2560);
 });

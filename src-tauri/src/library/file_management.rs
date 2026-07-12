@@ -48,8 +48,10 @@ use crate::library_identity::{
 use crate::render_plan::{CompileRenderPlanContext, compile_render_plan_cached, content_revision};
 use crate::smart_preview_cache::{
     SMART_PREVIEW_TARGET_WIDTH, ThumbnailSmartPreviewPayload, compute_source_revision,
-    read_smart_preview_artifact, resolve_smart_preview_cache_dir, write_smart_preview_artifact,
+    enforce_smart_preview_cache_budget, read_smart_preview_artifact,
+    resolve_smart_preview_cache_dir, write_smart_preview_artifact,
 };
+use crate::smart_preview_scheduler::SmartPreviewDemandClass;
 use crate::tagging::{COLOR_TAG_PREFIX, USER_TAG_PREFIX};
 use crate::thumbnail_resources::{
     ThumbnailResourceDescriptor, ThumbnailResourceSource, descriptor_from_manifest,
@@ -109,16 +111,25 @@ struct ThumbnailResult {
     rating: u8,
     smart_preview: Option<ThumbnailSmartPreviewPayload>,
     smart_preview_resource: Option<ThumbnailResourceDescriptor>,
+    smart_preview_request: Option<SmartPreviewRequest>,
 }
 
-fn generate_and_write_smart_preview_artifact(
-    smart_preview_dir: &Path,
+#[derive(Debug, Clone)]
+struct SmartPreviewRequest {
+    adjustments: Vec<u8>,
+    source_revision: String,
+}
+
+fn generate_smart_preview_data(
     path_str: &str,
     gpu_context: Option<&GpuContext>,
     preloaded_image: Option<&DynamicImage>,
     app_handle: &AppHandle,
-    adjustments_bytes: &[u8],
-) -> Option<(ThumbnailSmartPreviewPayload, ThumbnailResourceDescriptor)> {
+    cancellation: &std::sync::atomic::AtomicBool,
+) -> Option<(Vec<u8>, u32, u32)> {
+    if cancellation.load(std::sync::atomic::Ordering::Acquire) {
+        return None;
+    }
     let smart_image = generate_thumbnail_data_with_target(
         path_str,
         gpu_context,
@@ -127,16 +138,16 @@ fn generate_and_write_smart_preview_artifact(
         Some(SMART_PREVIEW_TARGET_WIDTH),
     )
     .ok()?;
-    let (smart_data, width, height) =
-        encode_thumbnail(&smart_image, SMART_PREVIEW_TARGET_WIDTH, app_handle, None).ok()?;
-    write_smart_preview_artifact(
-        smart_preview_dir,
-        path_str,
-        &smart_data,
-        width,
-        height,
-        adjustments_bytes,
+    if cancellation.load(std::sync::atomic::Ordering::Acquire) {
+        return None;
+    }
+    encode_thumbnail(
+        &smart_image,
+        SMART_PREVIEW_TARGET_WIDTH,
+        app_handle,
+        Some(cancellation),
     )
+    .ok()
 }
 
 #[derive(Debug)]
@@ -1401,6 +1412,7 @@ fn generate_single_thumbnail_and_cache(
             is_edited,
             smart_preview: Some(smart_preview),
             smart_preview_resource: None,
+            smart_preview_request: None,
         });
     }
 
@@ -1416,20 +1428,8 @@ fn generate_single_thumbnail_and_cache(
         )
     {
         let smart_preview_artifact = smart_preview_dir.as_deref().and_then(|dir| {
-            if let Some((descriptor, existing)) =
-                read_smart_preview_artifact(dir, path_str, Some(&adjustments_bytes))
-            {
-                Some((existing, descriptor))
-            } else {
-                generate_and_write_smart_preview_artifact(
-                    dir,
-                    path_str,
-                    gpu_context,
-                    preloaded_image,
-                    app_handle,
-                    &adjustments_bytes,
-                )
-            }
+            read_smart_preview_artifact(dir, path_str, Some(&adjustments_bytes))
+                .map(|(descriptor, existing)| (existing, descriptor))
         });
         return Some(ThumbnailResult {
             resource,
@@ -1439,6 +1439,7 @@ fn generate_single_thumbnail_and_cache(
                 .as_ref()
                 .map(|(payload, _)| payload.clone()),
             smart_preview_resource: smart_preview_artifact.map(|(_, descriptor)| descriptor),
+            smart_preview_request: None,
         });
     }
 
@@ -1472,30 +1473,14 @@ fn generate_single_thumbnail_and_cache(
             0,
             ThumbnailResourceSource::Generated,
         )?;
-        let smart_preview_artifact = smart_preview_dir
-            .as_deref()
-            .and_then(|dir| {
-                generate_and_write_smart_preview_artifact(
-                    dir,
-                    path_str,
-                    gpu_context,
-                    preloaded_image,
-                    app_handle,
-                    &adjustments_bytes,
-                )
-            })
-            .or_else(|| {
-                smart_preview_dir.as_deref().and_then(|dir| {
-                    write_smart_preview_artifact(
-                        dir,
-                        path_str,
-                        &thumb_data,
-                        width,
-                        height,
-                        &adjustments_bytes,
-                    )
-                })
-            });
+        let smart_preview_artifact = smart_preview_dir.as_deref().and_then(|dir| {
+            read_smart_preview_artifact(dir, path_str, Some(&adjustments_bytes))
+                .map(|(descriptor, existing)| (existing, descriptor))
+        });
+        let smart_preview_request = force_regenerate.then(|| SmartPreviewRequest {
+            source_revision: compute_source_revision(path_str, &adjustments_bytes),
+            adjustments: adjustments_bytes,
+        });
         return Some(ThumbnailResult {
             resource,
             rating,
@@ -1504,6 +1489,7 @@ fn generate_single_thumbnail_and_cache(
                 .as_ref()
                 .map(|(payload, _)| payload.clone()),
             smart_preview_resource: smart_preview_artifact.map(|(_, descriptor)| descriptor),
+            smart_preview_request,
         });
     }
     None
@@ -1511,6 +1497,13 @@ fn generate_single_thumbnail_and_cache(
 
 fn emit_thumbnail_result(app_handle: &AppHandle, path: &str, mut thumbnail: ThumbnailResult) {
     let generation = next_descriptor_generation();
+    let smart_preview_status = if thumbnail.smart_preview.is_some() {
+        "current"
+    } else if thumbnail.smart_preview_request.is_some() {
+        "queued"
+    } else {
+        "missing"
+    };
     thumbnail.resource.generation = generation;
     if let Some(resource) = thumbnail.smart_preview_resource.as_mut() {
         resource.generation = generation;
@@ -1523,9 +1516,18 @@ fn emit_thumbnail_result(app_handle: &AppHandle, path: &str, mut thumbnail: Thum
             "rating": thumbnail.rating,
             "is_edited": thumbnail.is_edited,
             "smartPreview": thumbnail.smart_preview,
-            "smartPreviewResource": thumbnail.smart_preview_resource
+            "smartPreviewResource": thumbnail.smart_preview_resource,
+            "smartPreviewStatus": smart_preview_status
         }),
     );
+    if let Some(request) = thumbnail.smart_preview_request {
+        schedule_smart_preview(
+            app_handle,
+            path,
+            request,
+            SmartPreviewDemandClass::ExplicitBuild,
+        );
+    }
 }
 
 fn emit_scheduled_thumbnail_result(
@@ -1534,6 +1536,13 @@ fn emit_scheduled_thumbnail_result(
     mut thumbnail: ThumbnailResult,
 ) {
     let descriptor_generation = next_descriptor_generation();
+    let smart_preview_status = if thumbnail.smart_preview.is_some() {
+        "current"
+    } else if thumbnail.smart_preview_request.is_some() {
+        "queued"
+    } else {
+        "missing"
+    };
     thumbnail.resource.generation = descriptor_generation;
     if let Some(resource) = thumbnail.smart_preview_resource.as_mut() {
         resource.generation = descriptor_generation;
@@ -1550,8 +1559,44 @@ fn emit_scheduled_thumbnail_result(
             "rating": thumbnail.rating,
             "is_edited": thumbnail.is_edited,
             "smartPreview": thumbnail.smart_preview,
-            "smartPreviewResource": thumbnail.smart_preview_resource
+            "smartPreviewResource": thumbnail.smart_preview_resource,
+            "smartPreviewStatus": smart_preview_status
         }),
+    );
+    if let Some(request) = thumbnail.smart_preview_request {
+        schedule_smart_preview(
+            app_handle,
+            &job.path,
+            request,
+            if job.committed_invalidation {
+                SmartPreviewDemandClass::ExplicitBuild
+            } else {
+                SmartPreviewDemandClass::VisibleIdle
+            },
+        );
+    }
+}
+
+fn schedule_smart_preview(
+    app_handle: &AppHandle,
+    path: &str,
+    request: SmartPreviewRequest,
+    demand_class: SmartPreviewDemandClass,
+) {
+    let state = app_handle.state::<AppState>();
+    let generation = state.smart_preview_scheduler.enqueue(
+        path.to_string(),
+        request.source_revision,
+        request.adjustments,
+        demand_class,
+    );
+    let _ = app_handle.emit(
+        "smart-preview-status",
+        serde_json::json!({ "path": path, "generation": generation, "state": "queued" }),
+    );
+    let _ = app_handle.emit(
+        "smart-preview-progress",
+        state.smart_preview_scheduler.progress(),
     );
 }
 
@@ -1596,7 +1641,7 @@ pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
                         &cache_dir,
                         gpu_context.as_ref(),
                         None,
-                        false,
+                        job.committed_invalidation,
                         &app_clone,
                         &settings,
                         Some(job.cancellation.flag()),
@@ -1619,6 +1664,75 @@ pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
             }
         });
     }
+
+    let smart_app = app_handle;
+    let smart_scheduler = smart_app
+        .state::<crate::AppState>()
+        .smart_preview_scheduler
+        .clone();
+    std::thread::spawn(move || {
+        loop {
+            let job = smart_scheduler.claim();
+            let state = smart_app.state::<crate::AppState>();
+            let gpu_context =
+                crate::gpu_processing::get_or_init_gpu_context(&state, &smart_app).ok();
+            let artifact = resolve_smart_preview_cache_dir(&smart_app)
+                .ok()
+                .and_then(|dir| {
+                    generate_smart_preview_data(
+                        &job.path,
+                        gpu_context.as_ref(),
+                        None,
+                        &smart_app,
+                        job.cancellation.flag(),
+                    )
+                    .map(|encoded| (dir, encoded))
+                });
+            let mut succeeded = false;
+            if let Some((dir, (jpeg, width, height))) = artifact
+                && smart_scheduler.is_publishable(&job)
+                && compute_source_revision(&job.path, &job.adjustments) == job.source_revision
+                && let Some((payload, mut resource)) = write_smart_preview_artifact(
+                    &dir,
+                    &job.path,
+                    &jpeg,
+                    width,
+                    height,
+                    &job.adjustments,
+                )
+                && smart_scheduler.is_publishable(&job)
+            {
+                succeeded = true;
+                let (artifact_count, retained_bytes) =
+                    enforce_smart_preview_cache_budget(&dir, &resource.resource_id);
+                resource.generation = next_descriptor_generation();
+                let _ = smart_app.emit(
+                    "smart-preview-generated",
+                    serde_json::json!({
+                        "path": job.path,
+                        "generation": job.generation,
+                        "sourceRevision": job.source_revision,
+                        "resource": resource,
+                        "smartPreview": payload,
+                        "state": "current",
+                        "storage": { "artifactCount": artifact_count, "retainedBytes": retained_bytes }
+                    }),
+                );
+            } else {
+                let state = if job.cancellation.is_cancelled() {
+                    "cancelled"
+                } else {
+                    "failed"
+                };
+                let _ = smart_app.emit(
+                "smart-preview-status",
+                serde_json::json!({ "path": job.path, "generation": job.generation, "state": state }),
+            );
+            }
+            let progress = smart_scheduler.finish(&job, succeeded);
+            let _ = smart_app.emit("smart-preview-progress", progress);
+        }
+    });
 }
 
 #[tauri::command]

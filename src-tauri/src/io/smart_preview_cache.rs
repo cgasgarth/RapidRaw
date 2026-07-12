@@ -15,6 +15,8 @@ use crate::thumbnail_resources::{
 const SMART_PREVIEW_SCHEMA_VERSION: u8 = 3;
 const SMART_PREVIEW_COLOR_PROFILE: &str = "srgb";
 pub const SMART_PREVIEW_TARGET_WIDTH: u32 = 2560;
+pub const SMART_PREVIEW_CACHE_MAX_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+pub const SMART_PREVIEW_CACHE_MAX_ARTIFACTS: usize = 2_000;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -158,6 +160,60 @@ pub fn write_smart_preview_artifact(
     ))
 }
 
+pub fn enforce_smart_preview_cache_budget(
+    smart_preview_dir: &Path,
+    preserve_resource_id: &str,
+) -> (usize, u64) {
+    enforce_smart_preview_cache_budget_with_limits(
+        smart_preview_dir,
+        preserve_resource_id,
+        SMART_PREVIEW_CACHE_MAX_ARTIFACTS,
+        SMART_PREVIEW_CACHE_MAX_BYTES,
+    )
+}
+
+fn enforce_smart_preview_cache_budget_with_limits(
+    smart_preview_dir: &Path,
+    preserve_resource_id: &str,
+    max_artifacts: usize,
+    max_bytes: u64,
+) -> (usize, u64) {
+    let mut artifacts = fs::read_dir(smart_preview_dir)
+        .ok()
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|entry| {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let resource_id = name.strip_suffix(".resource.json")?.to_string();
+            let jpeg = smart_preview_dir.join(format!("{resource_id}.jpg"));
+            let metadata = fs::metadata(&jpeg).ok()?;
+            Some((
+                resource_id,
+                metadata.len(),
+                metadata.modified().unwrap_or(std::time::UNIX_EPOCH),
+            ))
+        })
+        .collect::<Vec<_>>();
+    artifacts.sort_by_key(|(_, _, modified)| *modified);
+    let mut total_bytes = artifacts.iter().map(|(_, bytes, _)| bytes).sum::<u64>();
+    let mut total_count = artifacts.len();
+    for (resource_id, bytes, _) in artifacts {
+        if total_count <= max_artifacts && total_bytes <= max_bytes {
+            break;
+        }
+        if resource_id == preserve_resource_id {
+            continue;
+        }
+        for suffix in ["jpg", "resource.json", "json"] {
+            let _ = fs::remove_file(smart_preview_dir.join(format!("{resource_id}.{suffix}")));
+        }
+        total_count = total_count.saturating_sub(1);
+        total_bytes = total_bytes.saturating_sub(bytes);
+    }
+    (total_count, total_bytes)
+}
+
 pub fn read_smart_preview_artifact(
     smart_preview_dir: &Path,
     path_str: &str,
@@ -250,6 +306,32 @@ mod tests {
         assert!(read_payload.stale);
         assert!(!read_payload.source_available);
         assert_eq!(read_payload.source, "smartPreview");
+    }
+
+    #[test]
+    fn smart_preview_budget_evicts_old_artifacts_but_preserves_current() {
+        let temp = tempfile::tempdir().unwrap();
+        for (resource_id, bytes) in [("a", 8_usize), ("b", 8), ("c", 8)] {
+            fs::write(
+                temp.path().join(format!("{resource_id}.jpg")),
+                vec![0; bytes],
+            )
+            .unwrap();
+            fs::write(
+                temp.path().join(format!("{resource_id}.resource.json")),
+                b"{}",
+            )
+            .unwrap();
+            fs::write(temp.path().join(format!("{resource_id}.json")), b"{}").unwrap();
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
+
+        let (count, bytes) =
+            enforce_smart_preview_cache_budget_with_limits(temp.path(), "a", 2, 16);
+        assert_eq!((count, bytes), (2, 16));
+        assert!(temp.path().join("a.jpg").exists());
+        assert!(!temp.path().join("b.jpg").exists());
+        assert!(temp.path().join("c.jpg").exists());
     }
 
     #[test]
