@@ -181,6 +181,9 @@ fn claim_export_job(registry: &Mutex<Option<ExportJob>>) -> Result<ExportJobIden
 fn request_export_cancellation(
     registry: &Mutex<Option<ExportJob>>,
 ) -> Result<ExportCancellationAck, String> {
+    // Keep the registry guard through the token swap and acknowledgement read. This
+    // makes the request linearize against task completion/next-job admission: an
+    // acknowledgement can never describe a job that has already been replaced.
     let job = registry.lock().unwrap();
     let Some(job) = job.as_ref() else {
         return Err("No export task is currently running.".to_string());
