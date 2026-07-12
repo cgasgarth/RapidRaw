@@ -73,7 +73,7 @@ struct PendingPreviewSlots {
     interactive: Option<PreviewRequest>,
     settled: Option<PreviewRequest>,
     shutdown: bool,
-    active: bool,
+    active_quality: Option<PreviewQuality>,
     last_interactive_submission: Option<Instant>,
 }
 
@@ -94,6 +94,7 @@ pub struct PreviewScheduler {
     current_generation: AtomicU64,
     current_session: AtomicU64,
     current_path: Mutex<Option<String>>,
+    export_interactive_gpu_waiters: Option<Arc<AtomicUsize>>,
     policy: PreviewSchedulingPolicy,
     pub metrics: PreviewSchedulerMetrics,
 }
@@ -105,16 +106,30 @@ impl PreviewScheduler {
         let mut slots = self.pending.lock().unwrap();
         supersede_slot(slots.interactive.take(), generation);
         supersede_slot(slots.settled.take(), generation);
+        if let Some(waiters) = self.export_interactive_gpu_waiters.as_ref() {
+            waiters.store(
+                usize::from(slots.active_quality == Some(PreviewQuality::Interactive)),
+                Ordering::Release,
+            );
+        }
         generation
     }
 
     pub fn new(policy: PreviewSchedulingPolicy) -> Arc<Self> {
+        Self::new_with_export_gpu_pressure(policy, None)
+    }
+
+    pub fn new_with_export_gpu_pressure(
+        policy: PreviewSchedulingPolicy,
+        export_interactive_gpu_waiters: Option<Arc<AtomicUsize>>,
+    ) -> Arc<Self> {
         Arc::new(Self {
             pending: Mutex::new(PendingPreviewSlots::default()),
             wake: Condvar::new(),
             current_generation: AtomicU64::new(0),
             current_session: AtomicU64::new(0),
             current_path: Mutex::new(None),
+            export_interactive_gpu_waiters,
             policy,
             metrics: PreviewSchedulerMetrics::default(),
         })
@@ -157,6 +172,9 @@ impl PreviewScheduler {
         };
         let displaced = match quality {
             PreviewQuality::Interactive => {
+                if let Some(waiters) = self.export_interactive_gpu_waiters.as_ref() {
+                    waiters.store(1, Ordering::Release);
+                }
                 self.metrics
                     .interactive_submissions
                     .fetch_add(1, Ordering::Relaxed);
@@ -176,7 +194,7 @@ impl PreviewScheduler {
                 .fetch_add(1, Ordering::Relaxed);
         }
         supersede_slot(displaced, generation);
-        let resident = usize::from(slots.active)
+        let resident = usize::from(slots.active_quality.is_some())
             + usize::from(slots.interactive.is_some())
             + usize::from(slots.settled.is_some());
         self.metrics
@@ -193,7 +211,7 @@ impl PreviewScheduler {
                 return None;
             }
             if let Some(request) = slots.interactive.take() {
-                slots.active = true;
+                slots.active_quality = Some(request.quality);
                 return Some(request);
             }
             if slots.settled.is_some() {
@@ -212,15 +230,23 @@ impl PreviewScheduler {
                     supersede_slot(stale, self.current_generation.load(Ordering::Acquire));
                     continue;
                 }
-                slots.active = true;
-                return slots.settled.take();
+                let request = slots.settled.take();
+                slots.active_quality = request.as_ref().map(|request| request.quality);
+                return request;
             }
             slots = self.wake.wait(slots).unwrap();
         }
     }
 
     pub fn finish(&self, quality: PreviewQuality, rendered: bool) {
-        self.pending.lock().unwrap().active = false;
+        let mut slots = self.pending.lock().unwrap();
+        slots.active_quality = None;
+        if quality == PreviewQuality::Interactive
+            && let Some(waiters) = self.export_interactive_gpu_waiters.as_ref()
+        {
+            waiters.store(usize::from(slots.interactive.is_some()), Ordering::Release);
+        }
+        drop(slots);
         if !rendered {
             return;
         }
@@ -248,6 +274,9 @@ impl PreviewScheduler {
         slots.shutdown = true;
         stop_slot(slots.interactive.take());
         stop_slot(slots.settled.take());
+        if let Some(waiters) = self.export_interactive_gpu_waiters.as_ref() {
+            waiters.store(0, Ordering::Release);
+        }
         self.wake.notify_all();
     }
 
@@ -390,6 +419,29 @@ mod tests {
         let (settled, _) = job(false);
         assert!(scheduler.submit(settled).is_ok());
         assert_eq!(scheduler.next().unwrap().quality, PreviewQuality::Settled);
+    }
+
+    #[test]
+    fn interactive_lifecycle_drives_shared_export_gpu_pressure() {
+        let pressure = Arc::new(AtomicUsize::new(0));
+        let scheduler = PreviewScheduler::new_with_export_gpu_pressure(
+            PreviewSchedulingPolicy::default(),
+            Some(Arc::clone(&pressure)),
+        );
+        assert!(scheduler.submit(job(true).0).is_ok());
+        assert_eq!(pressure.load(Ordering::Acquire), 1);
+        let active = scheduler.next().expect("interactive request");
+        assert!(scheduler.submit(job(true).0).is_ok());
+        scheduler.finish(active.quality, true);
+        assert_eq!(pressure.load(Ordering::Acquire), 1);
+        let replacement = scheduler.next().expect("replacement request");
+        scheduler.finish(replacement.quality, true);
+        assert_eq!(pressure.load(Ordering::Acquire), 0);
+
+        assert!(scheduler.submit(job(false).0).is_ok());
+        assert_eq!(pressure.load(Ordering::Acquire), 0);
+        scheduler.shutdown();
+        assert_eq!(pressure.load(Ordering::Acquire), 0);
     }
 
     #[test]
