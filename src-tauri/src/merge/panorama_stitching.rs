@@ -2192,29 +2192,21 @@ fn estimate_legacy_panorama_peak_memory_bytes(
     output_width: u32,
     output_height: u32,
 ) -> u64 {
-    const RGB32F_BYTES_PER_PIXEL: u64 = 12;
-    const MASK_BYTES_PER_PIXEL: u64 = 1;
-
-    let source_decode_bytes: u64 = sources
+    let source_dimensions = sources
         .iter()
-        .map(|source| source.width as u64 * source.height as u64 * RGB32F_BYTES_PER_PIXEL)
-        .sum();
-    let source_mask_bytes: u64 = sources
-        .iter()
-        .map(|source| source.width as u64 * source.height as u64 * MASK_BYTES_PER_PIXEL)
-        .sum();
-    let output_pixels = output_width as u64 * output_height as u64;
-    let output_canvas_bytes = output_pixels * RGB32F_BYTES_PER_PIXEL;
-    let output_mask_bytes = output_pixels * MASK_BYTES_PER_PIXEL;
-    let seam_workspace_bytes = output_pixels * 4;
-    let overhead_bytes = (source_decode_bytes + output_canvas_bytes) / 10;
-
-    source_decode_bytes
-        + source_mask_bytes
-        + output_canvas_bytes
-        + output_mask_bytes
-        + seam_workspace_bytes
-        + overhead_bytes
+        .map(|source| rapidraw_computational::PanoramaSourceDimensions {
+            width: source.width,
+            height: source.height,
+        })
+        .collect::<Vec<_>>();
+    let estimate = rapidraw_computational::estimate_panorama_memory(
+        &source_dimensions,
+        output_width,
+        output_height,
+        output_width.max(output_height),
+    )
+    .expect("validated panorama dimensions produce a memory estimate");
+    estimate.total_estimated_peak_bytes - estimate.preview_bytes
 }
 
 fn estimate_panorama_plan_from_sources(
@@ -2337,60 +2329,30 @@ fn estimate_panorama_memory_components(
     output_height: u32,
     max_preview_dimension_px: u32,
 ) -> PanoramaMemoryComponents {
-    const RGB32F_BYTES_PER_PIXEL: u64 = 12;
-    const MASK_BYTES_PER_PIXEL: u64 = 1;
-    const RGB8_BYTES_PER_PIXEL: u64 = 3;
-
-    let source_decode_bytes: u64 = sources
+    let source_dimensions = sources
         .iter()
-        .map(|source| source.width as u64 * source.height as u64 * RGB32F_BYTES_PER_PIXEL)
-        .sum();
-    let low_detail_mask_bytes: u64 = sources
-        .iter()
-        .map(|source| source.width as u64 * source.height as u64 * MASK_BYTES_PER_PIXEL)
-        .sum();
-    let output_pixels = output_width as u64 * output_height as u64;
-    let output_canvas_bytes = output_pixels * RGB32F_BYTES_PER_PIXEL;
-    let output_mask_bytes = output_pixels * MASK_BYTES_PER_PIXEL;
-    let seam_workspace_bytes = output_pixels * 4;
-    let preview_pixels =
-        estimate_preview_pixel_count(output_width, output_height, max_preview_dimension_px);
-    let preview_bytes = preview_pixels * RGB8_BYTES_PER_PIXEL;
-    let overhead_bytes = (source_decode_bytes + output_canvas_bytes) / 10;
-    let total_estimated_peak_bytes = source_decode_bytes
-        + low_detail_mask_bytes
-        + output_canvas_bytes
-        + output_mask_bytes
-        + overhead_bytes
-        + preview_bytes
-        + seam_workspace_bytes;
-
+        .map(|source| rapidraw_computational::PanoramaSourceDimensions {
+            width: source.width,
+            height: source.height,
+        })
+        .collect::<Vec<_>>();
+    let estimate = rapidraw_computational::estimate_panorama_memory(
+        &source_dimensions,
+        output_width,
+        output_height,
+        max_preview_dimension_px,
+    )
+    .expect("validated panorama dimensions produce a memory estimate");
     PanoramaMemoryComponents {
-        low_detail_mask_bytes,
-        output_canvas_bytes,
-        output_mask_bytes,
-        overhead_bytes,
-        preview_bytes,
-        seam_workspace_bytes,
-        source_decode_bytes,
-        total_estimated_peak_bytes,
+        low_detail_mask_bytes: estimate.low_detail_mask_bytes,
+        output_canvas_bytes: estimate.output_canvas_bytes,
+        output_mask_bytes: estimate.output_mask_bytes,
+        overhead_bytes: estimate.overhead_bytes,
+        preview_bytes: estimate.preview_bytes,
+        seam_workspace_bytes: estimate.seam_workspace_bytes,
+        source_decode_bytes: estimate.source_decode_bytes,
+        total_estimated_peak_bytes: estimate.total_estimated_peak_bytes,
     }
-}
-
-fn estimate_preview_pixel_count(
-    output_width: u32,
-    output_height: u32,
-    max_preview_dimension_px: u32,
-) -> u64 {
-    let largest_dimension = output_width.max(output_height);
-    if largest_dimension <= max_preview_dimension_px {
-        return output_width as u64 * output_height as u64;
-    }
-
-    let scale = max_preview_dimension_px as f64 / largest_dimension as f64;
-    let preview_width = (output_width as f64 * scale).round().max(1.0) as u64;
-    let preview_height = (output_height as f64 * scale).round().max(1.0) as u64;
-    preview_width * preview_height
 }
 
 struct Dsu {
