@@ -2,30 +2,49 @@ pub mod candidates;
 pub mod hierarchy;
 
 use anyhow::Result;
+#[cfg(feature = "ai")]
 use futures::stream::{self, StreamExt};
 use image::{DynamicImage, imageops::FilterType};
+#[cfg(feature = "ai")]
 use ndarray::{Array, Axis};
-use ort::session::Session;
-use ort::value::Tensor;
+#[cfg(feature = "ai")]
+use rapidraw_ai::ort::session::Session;
+#[cfg(feature = "ai")]
+use rapidraw_ai::ort::value::Tensor;
+#[cfg(feature = "ai")]
+use rapidraw_ai::tokenizers::Tokenizer;
 use rayon::prelude::*;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
+#[cfg(feature = "ai")]
+use std::collections::HashSet;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+#[cfg(feature = "ai")]
+use std::path::PathBuf;
+#[cfg(feature = "ai")]
 use std::sync::{Arc, Mutex};
-use tauri::{AppHandle, Emitter, Manager, State};
-use tokenizers::Tokenizer;
+use tauri::{AppHandle, State};
+#[cfg(feature = "ai")]
+use tauri::{Emitter, Manager};
+#[cfg(feature = "ai")]
 use tokio::task::JoinHandle;
 use walkdir::WalkDir;
 
+#[cfg(feature = "ai")]
 use self::candidates::TAG_CANDIDATES;
+#[cfg(feature = "ai")]
 use self::hierarchy::TAG_HIERARCHY;
 use crate::AppState;
-use crate::file_management::{self, parse_virtual_path};
+#[cfg(feature = "ai")]
+use crate::file_management;
+use crate::file_management::parse_virtual_path;
+#[cfg(feature = "ai")]
 use crate::formats::is_supported_image_file;
 
 pub const COLOR_TAG_PREFIX: &str = "color:";
 pub const USER_TAG_PREFIX: &str = "user:";
 
+#[cfg(feature = "ai")]
 fn preprocess_clip_image(image: &DynamicImage) -> Array<f32, ndarray::Dim<[usize; 4]>> {
     let input_size = 224;
     let resized = image.resize_to_fill(input_size, input_size, FilterType::Triangle);
@@ -43,6 +62,7 @@ fn preprocess_clip_image(image: &DynamicImage) -> Array<f32, ndarray::Dim<[usize
     array
 }
 
+#[cfg(feature = "ai")]
 fn softmax(array: &Array<f32, ndarray::Dim<[usize; 2]>>) -> Array<f32, ndarray::Dim<[usize; 2]>> {
     let mut new_array = array.clone();
     for mut row in new_array.axis_iter_mut(Axis(0)) {
@@ -145,6 +165,7 @@ pub fn extract_color_tags(image: &DynamicImage) -> Vec<String> {
     }
 }
 
+#[cfg(feature = "ai")]
 pub fn generate_tags_with_clip(
     image: &DynamicImage,
     clip_session_mutex: &Mutex<Session>,
@@ -206,7 +227,7 @@ pub fn generate_tags_with_clip(
     let mask_val = Tensor::from_array(mask_layout.into_owned())?;
 
     let mut clip_session = clip_session_mutex.lock().unwrap();
-    let outputs = clip_session.run(ort::inputs![ids_val, image_val, mask_val])?;
+    let outputs = clip_session.run(rapidraw_ai::ort::inputs![ids_val, image_val, mask_val])?;
 
     let logits_dyn = outputs[0].try_extract_array::<f32>()?.to_owned();
     let logits = logits_dyn.into_dimensionality::<ndarray::Dim<[usize; 2]>>()?;
@@ -257,164 +278,175 @@ pub async fn start_background_indexing(
     app_handle: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    if let Some(handle) = state.indexing_task_handle.lock().unwrap().take() {
-        println!("Cancelling previous indexing task.");
-        handle.abort();
+    #[cfg(not(feature = "ai"))]
+    {
+        let _ = (folder_path, app_handle, state);
+        Err("ai_tagging_unavailable:build_without_ai_feature".to_string())
     }
 
-    let settings = crate::load_settings(app_handle.clone())?;
-    if !settings.enable_ai_tagging.unwrap_or(false) {
-        return Ok(());
-    }
+    #[cfg(feature = "ai")]
+    {
+        if let Some(handle) = state.indexing_task_handle.lock().unwrap().take() {
+            println!("Cancelling previous indexing task.");
+            handle.abort();
+        }
 
-    let max_concurrent_tasks = settings.tagging_thread_count.unwrap_or(3).max(1) as usize;
-    let custom_ai_tags = settings.custom_ai_tags.clone();
-    let ai_tag_count = settings.ai_tag_count.unwrap_or(10) as usize;
+        let settings = crate::load_settings(app_handle.clone())?;
+        if !settings.enable_ai_tagging.unwrap_or(false) {
+            return Ok(());
+        }
 
-    let clip_lease =
-        crate::ai::ai_processing::acquire_clip_model(&app_handle, &state.ai_model_registry)
-            .await
-            .map_err(|e| e.to_string())?;
-    let clip_models = clip_lease.clip()?;
+        let max_concurrent_tasks = settings.tagging_thread_count.unwrap_or(3).max(1) as usize;
+        let custom_ai_tags = settings.custom_ai_tags.clone();
+        let ai_tag_count = settings.ai_tag_count.unwrap_or(10) as usize;
 
-    let app_handle_clone = app_handle.clone();
+        let clip_lease =
+            crate::ai::ai_processing::acquire_clip_model(&app_handle, &state.ai_model_registry)
+                .await
+                .map_err(|e| e.to_string())?;
+        let clip_models = clip_lease.clip()?;
 
-    let task: JoinHandle<()> = tokio::spawn(async move {
-        let _clip_lease = clip_lease;
-        let _ = app_handle_clone.emit(crate::events::INDEXING_STARTED, ());
-        println!("Starting background indexing for: {}", folder_path);
-        println!(
-            "Using {} concurrent threads for AI tagging.",
-            max_concurrent_tasks
-        );
+        let app_handle_clone = app_handle.clone();
 
-        let state_clone = app_handle_clone.state::<AppState>();
-        let gpu_context =
-            crate::gpu_processing::get_or_init_gpu_context(&state_clone, &app_handle).ok();
+        let task: JoinHandle<()> = tokio::spawn(async move {
+            let _clip_lease = clip_lease;
+            let _ = app_handle_clone.emit(crate::events::INDEXING_STARTED, ());
+            println!("Starting background indexing for: {}", folder_path);
+            println!(
+                "Using {} concurrent threads for AI tagging.",
+                max_concurrent_tasks
+            );
 
-        let image_paths: Vec<PathBuf> = match fs::read_dir(&folder_path) {
-            Ok(entries) => entries
-                .filter_map(Result::ok)
-                .map(|entry| entry.path())
-                .filter(|path| {
-                    path.is_file() && is_supported_image_file(path.to_string_lossy().as_ref())
-                })
-                .collect(),
-            Err(e) => {
-                eprintln!("Failed to read directory '{}': {}", folder_path, e);
-                let _ = app_handle_clone.emit(
-                    crate::events::INDEXING_ERROR,
-                    format!("Failed to read directory: {}", e),
-                );
-                *app_handle_clone
-                    .state::<AppState>()
-                    .indexing_task_handle
-                    .lock()
-                    .unwrap() = None;
-                return;
-            }
-        };
+            let state_clone = app_handle_clone.state::<AppState>();
+            let gpu_context =
+                crate::gpu_processing::get_or_init_gpu_context(&state_clone, &app_handle).ok();
 
-        println!(
-            "Found {} images to process in {}",
-            image_paths.len(),
-            folder_path
-        );
-        let total_images = image_paths.len();
-        let processed_count = Arc::new(Mutex::new(0));
-        let custom_ai_tags_shared = Arc::new(custom_ai_tags);
+            let image_paths: Vec<PathBuf> = match fs::read_dir(&folder_path) {
+                Ok(entries) => entries
+                    .filter_map(Result::ok)
+                    .map(|entry| entry.path())
+                    .filter(|path| {
+                        path.is_file() && is_supported_image_file(path.to_string_lossy().as_ref())
+                    })
+                    .collect(),
+                Err(e) => {
+                    eprintln!("Failed to read directory '{}': {}", folder_path, e);
+                    let _ = app_handle_clone.emit(
+                        crate::events::INDEXING_ERROR,
+                        format!("Failed to read directory: {}", e),
+                    );
+                    *app_handle_clone
+                        .state::<AppState>()
+                        .indexing_task_handle
+                        .lock()
+                        .unwrap() = None;
+                    return;
+                }
+            };
 
-        stream::iter(image_paths)
-            .for_each_concurrent(max_concurrent_tasks, |path| {
-                let app_handle_inner = app_handle_clone.clone();
-                let clip_models_inner = clip_models.clone();
-                let gpu_context_inner = gpu_context.clone();
-                let processed_count_inner = Arc::clone(&processed_count);
-                let tags_inner = Arc::clone(&custom_ai_tags_shared);
+            println!(
+                "Found {} images to process in {}",
+                image_paths.len(),
+                folder_path
+            );
+            let total_images = image_paths.len();
+            let processed_count = Arc::new(Mutex::new(0));
+            let custom_ai_tags_shared = Arc::new(custom_ai_tags);
 
-                async move {
-                    let path_str = path.to_string_lossy().to_string();
-                    let (_, sidecar_path) = parse_virtual_path(&path_str);
+            stream::iter(image_paths)
+                .for_each_concurrent(max_concurrent_tasks, |path| {
+                    let app_handle_inner = app_handle_clone.clone();
+                    let clip_models_inner = clip_models.clone();
+                    let gpu_context_inner = gpu_context.clone();
+                    let processed_count_inner = Arc::clone(&processed_count);
+                    let tags_inner = Arc::clone(&custom_ai_tags_shared);
 
-                    let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
+                    async move {
+                        let path_str = path.to_string_lossy().to_string();
+                        let (_, sidecar_path) = parse_virtual_path(&path_str);
 
-                    let should_generate_tags = match &metadata.tags {
-                        None => true,
-                        Some(tags) => !tags.iter().any(|tag| {
-                            !tag.starts_with(COLOR_TAG_PREFIX) && !tag.starts_with(USER_TAG_PREFIX)
-                        }),
-                    };
+                        let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
 
-                    if should_generate_tags {
-                        match file_management::get_cached_or_generate_thumbnail_image(
-                            &path_str,
-                            &app_handle_inner,
-                            gpu_context_inner.as_ref(),
-                        ) {
-                            Ok(image) => {
-                                if let Ok(ai_tags) = generate_tags_with_clip(
-                                    &image,
-                                    &clip_models_inner.model,
-                                    &clip_models_inner.tokenizer,
-                                    (*tags_inner).clone(),
-                                    ai_tag_count,
-                                ) {
-                                    println!("Found AI tags for {}: {:?}", path_str, ai_tags);
+                        let should_generate_tags = match &metadata.tags {
+                            None => true,
+                            Some(tags) => !tags.iter().any(|tag| {
+                                !tag.starts_with(COLOR_TAG_PREFIX)
+                                    && !tag.starts_with(USER_TAG_PREFIX)
+                            }),
+                        };
 
-                                    let mut existing_tags: HashSet<String> =
-                                        metadata.tags.unwrap_or_default().into_iter().collect();
+                        if should_generate_tags {
+                            match file_management::get_cached_or_generate_thumbnail_image(
+                                &path_str,
+                                &app_handle_inner,
+                                gpu_context_inner.as_ref(),
+                            ) {
+                                Ok(image) => {
+                                    if let Ok(ai_tags) = generate_tags_with_clip(
+                                        &image,
+                                        &clip_models_inner.model,
+                                        &clip_models_inner.tokenizer,
+                                        (*tags_inner).clone(),
+                                        ai_tag_count,
+                                    ) {
+                                        println!("Found AI tags for {}: {:?}", path_str, ai_tags);
 
-                                    for tag in ai_tags {
-                                        existing_tags.insert(tag);
-                                    }
+                                        let mut existing_tags: HashSet<String> =
+                                            metadata.tags.unwrap_or_default().into_iter().collect();
 
-                                    let mut final_tags: Vec<String> =
-                                        existing_tags.into_iter().collect();
-                                    final_tags.sort_unstable();
+                                        for tag in ai_tags {
+                                            existing_tags.insert(tag);
+                                        }
 
-                                    metadata.tags = Some(final_tags);
+                                        let mut final_tags: Vec<String> =
+                                            existing_tags.into_iter().collect();
+                                        final_tags.sort_unstable();
 
-                                    if let Ok(json_string) = serde_json::to_string_pretty(&metadata)
-                                    {
-                                        let _ = fs::write(sidecar_path, json_string);
+                                        metadata.tags = Some(final_tags);
+
+                                        if let Ok(json_string) =
+                                            serde_json::to_string_pretty(&metadata)
+                                        {
+                                            let _ = fs::write(sidecar_path, json_string);
+                                        }
                                     }
                                 }
-                            }
-                            Err(e) => {
-                                eprintln!(
-                                    "Could not get or generate image for tagging {}: {}",
-                                    path_str, e
-                                );
+                                Err(e) => {
+                                    eprintln!(
+                                        "Could not get or generate image for tagging {}: {}",
+                                        path_str, e
+                                    );
+                                }
                             }
                         }
+
+                        let mut count = processed_count_inner.lock().unwrap();
+                        *count += 1;
+                        let _ = app_handle_inner.emit(
+                            "indexing-progress",
+                            serde_json::json!({
+                                "current": *count,
+                                "total": total_images
+                            }),
+                        );
                     }
+                })
+                .await;
 
-                    let mut count = processed_count_inner.lock().unwrap();
-                    *count += 1;
-                    let _ = app_handle_inner.emit(
-                        "indexing-progress",
-                        serde_json::json!({
-                            "current": *count,
-                            "total": total_images
-                        }),
-                    );
-                }
-            })
-            .await;
+            println!("Background indexing finished for: {}", folder_path);
+            let _ = app_handle_clone.emit(crate::events::INDEXING_FINISHED, ());
 
-        println!("Background indexing finished for: {}", folder_path);
-        let _ = app_handle_clone.emit(crate::events::INDEXING_FINISHED, ());
+            *app_handle_clone
+                .state::<AppState>()
+                .indexing_task_handle
+                .lock()
+                .unwrap() = None;
+        });
 
-        *app_handle_clone
-            .state::<AppState>()
-            .indexing_task_handle
-            .lock()
-            .unwrap() = None;
-    });
+        *state.indexing_task_handle.lock().unwrap() = Some(task);
 
-    *state.indexing_task_handle.lock().unwrap() = Some(task);
-
-    Ok(())
+        Ok(())
+    }
 }
 
 fn modify_tags_for_path(

@@ -1,11 +1,13 @@
 pub(crate) mod apply;
 pub(crate) mod batch;
+#[cfg(feature = "ai")]
 mod inference;
 pub(crate) mod model;
 mod preprocess;
 mod review;
 
 use std::io::Cursor;
+#[cfg(feature = "ai")]
 use std::path::PathBuf;
 
 use base64::{Engine, engine::general_purpose::STANDARD};
@@ -15,12 +17,18 @@ use serde::{Deserialize, Serialize};
 use crate::app_state::AppState;
 use crate::merge::computational_job::ComputationalMergeFamily;
 
+#[cfg(feature = "ai")]
 use self::inference::{OrtSwinIrRunner, run_tiled_x2};
-use self::model::{SwinIrCapability, capability};
+use self::model::SwinIrCapability;
+#[cfg(feature = "ai")]
+use self::model::capability;
+#[cfg(feature = "ai")]
 use self::preprocess::{
     apply_highlight_safe_residual, bicubic_scene_linear_x2, scene_linear_to_encoded_srgb,
 };
-use self::review::{SingleImageX2Review, build_review};
+use self::review::SingleImageX2Review;
+#[cfg(feature = "ai")]
+use self::review::build_review;
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -48,6 +56,18 @@ pub struct SingleImageX2Preview {
 
 #[tauri::command]
 pub fn get_single_image_x2_capability() -> SwinIrCapability {
+    #[cfg(not(feature = "ai"))]
+    return SwinIrCapability {
+        schema_version: 1,
+        available: false,
+        model_id: model::MODEL_ID,
+        model_size_bytes: 0,
+        source_url: "https://github.com/JingyunLiang/SwinIR/releases/tag/v0.0",
+        code_license: "Apache-2.0",
+        weight_license_status: "redistribution_unverified",
+        reason: Some("ai_capability_unavailable:build_without_ai_feature"),
+    };
+    #[cfg(feature = "ai")]
     capability(
         std::env::var_os("RAWENGINE_SWINIR_X2_MODEL_PATH")
             .map(PathBuf::from)
@@ -60,69 +80,77 @@ pub async fn preview_single_image_x2(
     request: SingleImageX2PreviewRequest,
     state: tauri::State<'_, AppState>,
 ) -> Result<SingleImageX2Preview, String> {
-    let model_path = std::env::var_os("RAWENGINE_SWINIR_X2_MODEL_PATH")
-        .map(PathBuf::from)
-        .ok_or_else(|| "swinir_x2_disabled_weight_redistribution_unverified".to_string())?;
-    model::verify_provisioned_model(&model_path)?;
-    let frame = current_frame(&state, &request)?;
-    let source = frame.pixels.image().to_rgb32f();
-    let tile_count =
-        inference::tile_count(source.width(), source.height(), request.memory_budget_bytes)?;
-    let job = state.computational_merge_jobs.begin(
-        ComputationalMergeFamily::SuperResolution,
-        "single_image_x2_inference",
-        tile_count,
-        tile_count,
-    )?;
-    let job_id = job.job_id.to_string();
-    let token = job.cancellation_token.clone();
-    let graph_revision = request.graph_revision.clone();
-    let source_path = request.source_path.clone();
-    let model_path_for_run = model_path.clone();
-    let memory_budget = request.memory_budget_bytes;
-    let result = tokio::task::spawn_blocking(move || {
-        let mut runner = OrtSwinIrRunner::open(&model_path_for_run)?;
-        let encoded = scene_linear_to_encoded_srgb(&source);
-        let ai_encoded = run_tiled_x2(&encoded, memory_budget, &token, &mut runner)?;
-        let baseline = bicubic_scene_linear_x2(&source);
-        let output = apply_highlight_safe_residual(&source, &baseline, &ai_encoded);
-        let review = build_review(
-            &source,
-            &baseline,
-            &output,
-            &ai_encoded,
-            &model_path_for_run,
-        )?;
-        Ok::<_, String>((baseline, output, review))
-    })
-    .await
-    .map_err(|error| format!("single_image_x2_worker_failed:{error}"))?;
-
-    let (baseline, output, review) = match result {
-        Ok(value) => value,
-        Err(error) => {
-            let _ = state.computational_merge_jobs.fail(&job.job_id);
-            return Err(error);
-        }
-    };
-    job.cancellation_token.checkpoint()?;
-    current_frame(&state, &request)?;
-    if !state.computational_merge_jobs.finish(&job.job_id)? {
-        return Err("single_image_x2_cancelled_before_publish".to_string());
+    #[cfg(not(feature = "ai"))]
+    {
+        let _ = (request, state);
+        Err("ai_super_resolution_unavailable:build_without_ai_feature".to_string())
     }
-    Ok(SingleImageX2Preview {
-        schema_version: 1,
-        job_id,
-        source_path,
-        graph_revision,
-        width: output.width(),
-        height: output.height(),
-        ai_preview_data_url: png_data_url(&output)?,
-        bicubic_preview_data_url: png_data_url(&baseline)?,
-        review,
-        apply_status: "durable_commit_pending",
-        derivative_kind: "rendered_rgb_ai_derivative",
-    })
+    #[cfg(feature = "ai")]
+    {
+        let model_path = std::env::var_os("RAWENGINE_SWINIR_X2_MODEL_PATH")
+            .map(PathBuf::from)
+            .ok_or_else(|| "swinir_x2_disabled_weight_redistribution_unverified".to_string())?;
+        model::verify_provisioned_model(&model_path)?;
+        let frame = current_frame(&state, &request)?;
+        let source = frame.pixels.image().to_rgb32f();
+        let tile_count =
+            inference::tile_count(source.width(), source.height(), request.memory_budget_bytes)?;
+        let job = state.computational_merge_jobs.begin(
+            ComputationalMergeFamily::SuperResolution,
+            "single_image_x2_inference",
+            tile_count,
+            tile_count,
+        )?;
+        let job_id = job.job_id.to_string();
+        let token = job.cancellation_token.clone();
+        let graph_revision = request.graph_revision.clone();
+        let source_path = request.source_path.clone();
+        let model_path_for_run = model_path.clone();
+        let memory_budget = request.memory_budget_bytes;
+        let result = tokio::task::spawn_blocking(move || {
+            let mut runner = OrtSwinIrRunner::open(&model_path_for_run)?;
+            let encoded = scene_linear_to_encoded_srgb(&source);
+            let ai_encoded = run_tiled_x2(&encoded, memory_budget, &token, &mut runner)?;
+            let baseline = bicubic_scene_linear_x2(&source);
+            let output = apply_highlight_safe_residual(&source, &baseline, &ai_encoded);
+            let review = build_review(
+                &source,
+                &baseline,
+                &output,
+                &ai_encoded,
+                &model_path_for_run,
+            )?;
+            Ok::<_, String>((baseline, output, review))
+        })
+        .await
+        .map_err(|error| format!("single_image_x2_worker_failed:{error}"))?;
+
+        let (baseline, output, review) = match result {
+            Ok(value) => value,
+            Err(error) => {
+                let _ = state.computational_merge_jobs.fail(&job.job_id);
+                return Err(error);
+            }
+        };
+        job.cancellation_token.checkpoint()?;
+        current_frame(&state, &request)?;
+        if !state.computational_merge_jobs.finish(&job.job_id)? {
+            return Err("single_image_x2_cancelled_before_publish".to_string());
+        }
+        Ok(SingleImageX2Preview {
+            schema_version: 1,
+            job_id,
+            source_path,
+            graph_revision,
+            width: output.width(),
+            height: output.height(),
+            ai_preview_data_url: png_data_url(&output)?,
+            bicubic_preview_data_url: png_data_url(&baseline)?,
+            review,
+            apply_status: "durable_commit_pending",
+            derivative_kind: "rendered_rgb_ai_derivative",
+        })
+    }
 }
 
 #[tauri::command]

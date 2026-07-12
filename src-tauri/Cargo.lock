@@ -50,10 +50,10 @@ dependencies = [
  "objc2-vision",
  "once_cell",
  "opencv",
- "ort",
  "pollster",
  "quick-xml 0.41.0",
  "rand 0.10.1",
+ "rapidraw-ai",
  "rapidraw-types",
  "rawler",
  "rayon",
@@ -74,7 +74,6 @@ dependencies = [
  "tauri-plugin-shell",
  "tauri-plugin-single-instance",
  "tempfile",
- "tokenizers",
  "tokio",
  "trash",
  "uuid",
@@ -5159,6 +5158,23 @@ name = "range-alloc"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ca45419789ae5a7899559e9512e58ca889e41f04f1f2445e9f4b290ceccd1d08"
+
+[[package]]
+name = "rapidraw-ai"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "hex",
+ "libc",
+ "ort",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "tempfile",
+ "tokenizers",
+ "tokio",
+]
 
 [[package]]
 name = "rapidraw-types"

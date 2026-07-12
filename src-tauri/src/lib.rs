@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "ai"), allow(dead_code))]
+
 #[cfg(not(all(target_os = "windows", target_arch = "aarch64")))]
 use mimalloc::MiMalloc;
 

@@ -1,0 +1,32 @@
+[package]
+name = "rapidraw-ai"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+license = "AGPL-3.0-or-later"
+
+[features]
+compile-only = []
+
+[dependencies]
+anyhow = "1.0.102"
+hex = "0.4"
+libc = "0.2.186"
+ort = { version = "=2.0.0-rc.12", default-features = false, features = ["std", "ndarray", "load-dynamic", "api-21"] }
+reqwest = { version = "0.13", default-features = false, features = ["rustls"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.11"
+tokio = { version = "1", features = ["fs", "io-util", "macros", "rt", "sync", "time"] }
+tokenizers = "0.23.1"
+
+[build-dependencies]
+hex = "0.4"
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls"] }
+sha2 = "0.11"
+
+[dev-dependencies]
+tempfile = "3.27.0"
+
+[lints.clippy]
+all = "deny"

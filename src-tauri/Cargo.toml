@@ -6,7 +6,7 @@ edition = "2024"
 rust-version = "1.95"
 
 [workspace]
-members = [".", "crates/rapidraw-types"]
+members = [".", "crates/rapidraw-ai", "crates/rapidraw-types"]
 resolver = "2"
 
 [lib]
@@ -14,14 +14,16 @@ name = "rapidraw_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [features]
-default = ["required-ci"]
+default = ["required-ci", "ai"]
+ai = ["dep:rapidraw-ai"]
 panorama-opencv-spike = ["dep:opencv"]
-required-ci = []
+required-ci = ["rapidraw-ai?/compile-only"]
 tauri-test = ["tauri/test"]
 validation-harness = []
 
 [dependencies]
 rapidraw-types = { path = "crates/rapidraw-types" }
+rapidraw-ai = { path = "crates/rapidraw-ai", optional = true }
 tauri = { version = "2.11", features = [ "macos-private-api", "rustls-tls" ] }
 tauri-plugin-dialog = "2.7.1"
 serde = { version = "1.0", features = ["derive"] }
@@ -45,7 +47,6 @@ walkdir = "2.5.0"
 notify = "8.2.0"
 imageproc = "0.27"
 opencv = { version = "0.98.2", default-features = false, features = ["imgcodecs", "imgproc", "stitching"], optional = true }
-ort = { version = "=2.0.0-rc.12", default-features = false, features = ["std", "ndarray", "load-dynamic", "api-21"] }
 ndarray = "0.17"
 tauri-plugin-process = "2.3.1"
 tauri-plugin-os = "2.3.2"
@@ -53,7 +54,6 @@ log = "0.4"
 fern = "0.7"
 little_exif = "0.6.23"
 chrono = "0.4"
-tokenizers = "0.23.1"
 once_cell = "1.21"
 futures = "0.3.32"
 sha2 = "0.11"
@@ -108,9 +108,6 @@ webkit2gtk = "=2.0.2"
 
 [build-dependencies]
 tauri-build = { version = "2.6", features = [] }
-sha2 = "0.11"
-reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls"] }
-hex = "0.4"
 
 [package.metadata.cargo-machete]
 ignored = ["tauri-build"]
