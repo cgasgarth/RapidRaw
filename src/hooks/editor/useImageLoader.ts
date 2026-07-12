@@ -1,23 +1,26 @@
-import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { useEffect } from 'react';
 import { toast } from 'react-toastify';
 
-import { isNullAdjustmentSnapshot, parseLoadedMetadata, parseLoadImageResult } from '../../schemas/imageLoaderSchemas';
+import { isNullAdjustmentSnapshot, parseImageOpenUpdate } from '../../schemas/imageLoaderSchemas';
 import { isEditorImageSessionCurrent, useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
-import { Invokes } from '../../tauri/commands';
 import { INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../../utils/adjustments';
 import { isSelectedImageLoadErrorCurrent } from '../../utils/editorImageLoadError';
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { upsertReopenedDerivedOutputReceipt } from '../../utils/hdrDerivedSourceReopen';
+import { beginImageOpenWithSchema } from '../../utils/imageOpenInvokes';
+import { isImageOpenUpdateCurrent } from '../../utils/imageOpenPhaseCurrentness';
+import { acceptImageOpenMetadataRevision } from '../../utils/imageOpenRevisionCache';
 import { hydrateLayerStackMasksFromMetadata } from '../../utils/layers/layerStackSidecarAdjustments';
 import {
   consumePendingNegativeConversionDustHealLayers,
   consumePendingNegativeConversionSavedPositiveHandoff,
 } from '../../utils/negative-lab/negativeLabEditorHandoff';
 import { metadataWithNegativeLabReopenedSavedPositiveHandoff } from '../../utils/negative-lab/negativeLabSavedPositiveReopen';
+import { IMAGE_OPEN_UPDATE_EVENT } from '../../utils/tauriEventNames';
 
 export function useImageLoader() {
   const selectedImage = useEditorStore((s) => s.selectedImage);
@@ -34,40 +37,56 @@ export function useImageLoader() {
     if (selectedImagePath && !selectedImageIsReady && imageSession?.path === selectedImagePath) {
       const sessionId = imageSession.id;
 
-      const loadMetadataEarly = async () => {
-        try {
-          const editor = useEditorStore.getState();
-          editor.patchResidency.reset(editor.imageSessionId);
-          await invoke(Invokes.ClearSessionCaches).catch((e: unknown) => {
-            if (isEditorImageSessionCurrent(sessionId)) console.warn('Cache clear failed:', e);
-          });
-
-          const metadata = parseLoadedMetadata(
-            await invoke<unknown>(Invokes.LoadMetadata, { path: selectedImagePath }),
-          );
-          if (!isEditorImageSessionCurrent(sessionId)) return;
-
-          let initialAdjusts;
-          if (metadata.adjustments && !isNullAdjustmentSnapshot(metadata.adjustments)) {
-            initialAdjusts = normalizeLoadedAdjustments(metadata.adjustments);
-          } else {
-            initialAdjusts = { ...INITIAL_ADJUSTMENTS };
-          }
-
-          const hydratedAdjustments = hydrateLayerStackMasksFromMetadata(initialAdjusts, metadata, selectedImagePath);
-
-          setEditor({ adjustments: hydratedAdjustments });
-          resetHistory(hydratedAdjustments);
-        } catch (err) {
-          if (isEditorImageSessionCurrent(sessionId)) console.error('Failed to load metadata early:', err);
-        }
+      let disposed = false;
+      let unlisten: (() => void) | undefined;
+      const publishMetadataPhase = (metadata: ReturnType<typeof parseImageOpenUpdate> & { phase: 'metadataReady' }) => {
+        if (!isEditorImageSessionCurrent(sessionId) || metadata.path !== selectedImagePath) return;
+        acceptImageOpenMetadataRevision(metadata.path, metadata.metadataFingerprint);
+        const initialAdjusts =
+          metadata.metadata.adjustments && !isNullAdjustmentSnapshot(metadata.metadata.adjustments)
+            ? normalizeLoadedAdjustments(metadata.metadata.adjustments)
+            : { ...INITIAL_ADJUSTMENTS };
+        const hydratedAdjustments = hydrateLayerStackMasksFromMetadata(
+          initialAdjusts,
+          metadata.metadata,
+          selectedImagePath,
+        );
+        setEditor({ adjustments: hydratedAdjustments });
+        resetHistory(hydratedAdjustments);
       };
 
-      const loadFullImageData = async () => {
+      const loadImageSession = async () => {
         try {
-          const loadImageResult = parseLoadImageResult(
-            await invoke<unknown>(Invokes.LoadImage, { path: selectedImagePath }),
-          );
+          unlisten = await listen<unknown>(IMAGE_OPEN_UPDATE_EVENT, (event) => {
+            const update = parseImageOpenUpdate(event.payload);
+            if (
+              update.phase === 'metadataReady' &&
+              isImageOpenUpdateCurrent(update, { generation: imageSession.generation, path: selectedImagePath })
+            ) {
+              publishMetadataPhase(update);
+            }
+          });
+          if (disposed) {
+            unlisten();
+            return;
+          }
+          const editor = useEditorStore.getState();
+          editor.patchResidency.reset(editor.imageSessionId);
+          const library = useLibraryStore.getState();
+          const projection = library.imageList.find((image) => image.path === selectedImagePath) as
+            | ((typeof library.imageList)[number] & { entityRevision?: number; imageId?: string })
+            | undefined;
+          const openResult = await beginImageOpenWithSchema({
+            expectedCatalogRevision: library.catalogRevision,
+            expectedEntityRevision: projection?.entityRevision ?? null,
+            imageId: projection?.imageId ?? selectedImagePath,
+            path: selectedImagePath,
+            sessionId: {
+              imageSession: imageSession.generation,
+              selectionGeneration: imageSession.generation,
+            },
+          });
+          const loadImageResult = openResult.decoded;
           if (!isEditorImageSessionCurrent(sessionId)) return;
           const loadedMetadata = metadataWithNegativeLabReopenedSavedPositiveHandoff({
             imagePath: selectedImagePath,
@@ -80,8 +99,7 @@ export function useImageLoader() {
             metadata: loadedMetadata,
             upsert: useUIStore.getState().upsertDerivedOutputReceipt,
           });
-          setEditor({ originalSize: { width, height } });
-
+          let previewSize = { width: 0, height: 0 };
           if (appSettings?.editorPreviewResolution) {
             const maxSize = appSettings.editorPreviewResolution;
             const aspectRatio = width / height;
@@ -89,20 +107,24 @@ export function useImageLoader() {
             if (width > height) {
               const pWidth = Math.min(width, maxSize);
               const pHeight = Math.round(pWidth / aspectRatio);
-              setEditor({ previewSize: { width: pWidth, height: pHeight } });
+              previewSize = { width: pWidth, height: pHeight };
             } else {
               const pHeight = Math.min(height, maxSize);
               const pWidth = Math.round(pHeight * aspectRatio);
-              setEditor({ previewSize: { width: pWidth, height: pHeight } });
+              previewSize = { width: pWidth, height: pHeight };
             }
-          } else {
-            setEditor({ previewSize: { width: 0, height: 0 } });
           }
 
           setEditor((state) => {
             if (state.imageSession?.id === sessionId && state.selectedImage?.path === selectedImagePath) {
               return {
+                adjustments:
+                  !state.adjustments.aspectRatio && !state.adjustments.crop
+                    ? { ...state.adjustments, aspectRatio: loadImageResult.width / loadImageResult.height }
+                    : state.adjustments,
                 imageSession: { ...state.imageSession, status: 'ready' },
+                originalSize: { width, height },
+                previewSize,
                 selectedImage: {
                   ...state.selectedImage,
                   exif: loadImageResult.exif ?? null,
@@ -115,15 +137,6 @@ export function useImageLoader() {
                   rawDevelopmentReport: loadImageResult.raw_development_report ?? null,
                   width: loadImageResult.width,
                 },
-              };
-            }
-            return state;
-          });
-
-          setEditor((state) => {
-            if (!state.adjustments.aspectRatio && !state.adjustments.crop) {
-              return {
-                adjustments: { ...state.adjustments, aspectRatio: loadImageResult.width / loadImageResult.height },
               };
             }
             return state;
@@ -161,22 +174,19 @@ export function useImageLoader() {
             }
           }
         } finally {
+          unlisten?.();
           if (isEditorImageSessionCurrent(sessionId)) {
             setLibrary({ isViewLoading: false });
           }
         }
       };
 
-      const loadAll = async () => {
-        await loadMetadataEarly();
-        if (isEditorImageSessionCurrent(sessionId)) {
-          await loadFullImageData();
-        }
+      void loadImageSession();
+
+      return () => {
+        disposed = true;
+        unlisten?.();
       };
-
-      void loadAll();
-
-      return undefined;
     }
     return undefined;
   }, [

@@ -200,6 +200,37 @@ fn schema_sql() -> &'static str {
 }
 
 impl LibraryCatalog {
+    pub(crate) fn validates_open_revision(
+        &self,
+        app: &AppHandle,
+        image_id: &str,
+        expected_catalog_revision: Option<u64>,
+        expected_entity_revision: Option<u64>,
+    ) -> Result<bool, String> {
+        self.with_inner(app, |inner| {
+            if expected_catalog_revision
+                .is_some_and(|expected| catalog_revision(inner).ok() != Some(expected))
+            {
+                return Ok(false);
+            }
+            let Some(expected_entity_revision) = expected_entity_revision else {
+                return Ok(true);
+            };
+            let actual = inner
+                .connection
+                .as_ref()
+                .expect("initialized catalog")
+                .query_row(
+                    "SELECT entity_revision FROM entities WHERE image_id=?1",
+                    params![image_id],
+                    |row| row.get::<_, i64>(0),
+                )
+                .optional()
+                .map_err(|error| error.to_string())?;
+            Ok(actual == Some(expected_entity_revision as i64))
+        })
+    }
+
     fn with_inner<T>(
         &self,
         app: &AppHandle,
