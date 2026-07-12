@@ -51,6 +51,62 @@ test('export receipt remains compatible with outputs without image metadata', ()
   expect(receipt.outputs[0]?.renderingIntent).toBeUndefined();
 });
 
+test('export receipt accepts exact final-byte digest evidence', () => {
+  const digest = `sha256:${'a'.repeat(64)}`;
+  const receipt = parseExportReceiptPayload({
+    completedAt: '2026-07-12T01:27:38.025Z',
+    outputs: [
+      {
+        byteSize: 3_337_245,
+        format: 'jpg',
+        outputDigest: {
+          algorithm: 'sha256',
+          byteLen: 3_337_245,
+          provenance: 'finalByteAtomicWriter',
+          value: digest,
+        },
+        outputPath: '/tmp/alaska.jpg',
+        rawProvenanceError: null,
+        rawProvenanceSidecarPath: '/tmp/alaska.jpg.rawengine-provenance.json',
+        sourcePath: '/tmp/alaska.arw',
+      },
+    ],
+    terminalStatus: 'completed',
+    total: 1,
+  });
+
+  expect(receipt.outputs[0]?.outputDigest?.value).toBe(digest);
+  expect(receipt.outputs[0]?.outputDigest?.byteLen).toBe(3_337_245);
+  expect(receipt.outputs[0]?.rawProvenanceError).toBeNull();
+});
+
+test('export receipt preserves truthful provenance-sidecar failure', () => {
+  const receipt = parseExportReceiptPayload({
+    completedAt: '2026-07-12T01:27:38.025Z',
+    outputs: [
+      {
+        byteSize: 3_337_245,
+        format: 'jpg',
+        outputDigest: {
+          algorithm: 'sha256',
+          byteLen: 3_337_245,
+          provenance: 'finalByteAtomicWriter',
+          value: `sha256:${'b'.repeat(64)}`,
+        },
+        outputPath: '/tmp/alaska.jpg',
+        rawProvenanceError: 'source_changed_before_provenance_commit',
+        rawProvenanceSidecarPath: null,
+        sourcePath: '/tmp/alaska.arw',
+      },
+    ],
+    terminalStatus: 'completed',
+    total: 1,
+  });
+
+  expect(receipt.outputs[0]?.rawProvenanceSidecarPath).toBeNull();
+  expect(receipt.outputs[0]?.rawProvenanceError).toBe('source_changed_before_provenance_commit');
+});
+
 test('source-embedded export receipt preserves passthrough and ICC identity evidence', () => {
   const sourceIccProfileHash = 'sha256:d2ff5597fd937a24f90548f5e85803545334fcfd480601d19c3bc225d7355733';
   const transformPolicyFingerprint = 'sha256:9b6445d090788179c63331baf27476d9f4542c37fb84b757509fa8a1ed5db01e';
