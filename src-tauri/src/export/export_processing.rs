@@ -185,6 +185,7 @@ struct ExportItemPlan {
     item_id: String,
     source_path: String,
     source_revision: SourceRevision,
+    sidecar_revision: String,
     expected_dimensions: Option<(u32, u32)>,
     sidecar_path: PathBuf,
     output_path: PathBuf,
@@ -201,6 +202,7 @@ struct ExportJobManifestItem {
     item_id: String,
     source_path: String,
     source_revision: String,
+    edit_revision: String,
     output_path: String,
     expected_dimensions: Option<(u32, u32)>,
 }
@@ -1422,6 +1424,9 @@ async fn run_batch_export_pipeline(
             }
         };
         let expected_dimensions = image::image_dimensions(&target.source_path_str).ok();
+        let sidecar_revision = SourceRevision::from_path(&target.sidecar_path)
+            .map(|revision| revision.identity())
+            .unwrap_or_else(|_| "sidecar-missing-v1".to_string());
         let estimate = estimate_export_work(
             Path::new(&target.source_path_str),
             &extension,
@@ -1431,6 +1436,7 @@ async fn run_batch_export_pipeline(
             item_id: format!("export-item:{global_index}:{}", target.source_path_str),
             source_path: target.source_path_str.clone(),
             source_revision,
+            sidecar_revision,
             expected_dimensions,
             sidecar_path: target.sidecar_path,
             output_path: target.output_path,
@@ -1453,6 +1459,7 @@ async fn run_batch_export_pipeline(
             item_id: plan.item_id.clone(),
             source_path: plan.source_path.clone(),
             source_revision: plan.source_revision.identity(),
+            edit_revision: plan.sidecar_revision.clone(),
             output_path: plan.output_path.to_string_lossy().to_string(),
             expected_dimensions: plan.expected_dimensions,
         })
@@ -1833,13 +1840,14 @@ async fn run_batch_export_pipeline(
                             source_digest: item.source_digest.as_ref(),
                             raw_development_report: item.decoded.raw_development_report.clone(),
                             edit_graph_revision: Some(format!(
-                                "{}:{}:{:016x}",
+                                "{}:{}:{}:{:016x}",
                                 item.decoded.plan.item_id,
                                 item.decoded
                                     .plan
                                     .expected_dimensions
                                     .map(|(width, height)| format!("{width}x{height}"))
                                     .unwrap_or_else(|| "unknown".to_string()),
+                                item.decoded.plan.sidecar_revision,
                                 export_execution_fingerprint(
                                     &item.decoded.plan.source_path,
                                     &item.decoded.adjustments,
@@ -4840,6 +4848,7 @@ mod tests {
                 item_id: "export-item:0".to_string(),
                 source_path: source_path.to_string_lossy().to_string(),
                 source_revision: revision.identity(),
+                edit_revision: "sidecar-missing-v1".to_string(),
                 output_path: directory
                     .path()
                     .join("out.jpg")
@@ -4856,6 +4865,7 @@ mod tests {
                 .unwrap();
         assert_eq!(value["status"], "pending");
         assert_eq!(value["planned"][0]["sourceRevision"], revision.identity());
+        assert_eq!(value["planned"][0]["editRevision"], "sidecar-missing-v1");
         assert_eq!(
             value["planned"][0]["expectedDimensions"],
             serde_json::json!([2, 2])
