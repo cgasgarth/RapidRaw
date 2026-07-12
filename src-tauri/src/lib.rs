@@ -3261,6 +3261,7 @@ pub fn run() {
         })
         .manage(AppState::new())
         .manage(library::changefeed::LibraryFilesystemChangefeed::default())
+        .manage(library::catalog::LibraryCatalog::default())
         .invoke_handler(tauri::generate_handler![
             apply_adjustments,
             generate_export_soft_proof_preview,
@@ -3295,6 +3296,12 @@ pub fn run() {
             library::changefeed::configure_library_changefeed,
             library::changefeed::get_library_changefeed_report,
             library::file_management::get_library_change_rows,
+            library::catalog::open_library_collection,
+            library::catalog::next_library_collection_page,
+            library::catalog::reconcile_library_catalog,
+            library::catalog::apply_library_catalog_changes,
+            library::catalog::get_library_catalog_report,
+            library::catalog::get_library_folder_aggregates,
             cancel_thumbnail_generation,
             update_wgpu_transform,
             flush_wgpu_presentation,

@@ -67,16 +67,21 @@ const commandNames: Record<
   | 'generateUncroppedPreview'
   | 'generatePreviewForPath'
   | 'applyAdjustments'
+  | 'applyLibraryCatalogChanges'
   | 'getLensfunMakers'
   | 'getLogFilePath'
   | 'getAlbumImages'
   | 'getFolderTree'
   | 'getFolderRefreshSnapshot'
+  | 'getLibraryFolderAggregates'
   | 'getPinnedFolderTrees'
   | 'getSupportedFileTypes'
   | 'isImageCached'
   | 'listImagesInDir'
   | 'listImagesRecursive'
+  | 'openLibraryCollection'
+  | 'nextLibraryCollectionPage'
+  | 'reconcileLibraryCatalog'
   | 'loadImage'
   | 'configureLibraryChangefeed'
   | 'loadMetadata'
@@ -93,6 +98,7 @@ const commandNames: Record<
   string
 > = {
   applyAdjustments: Invokes.ApplyAdjustments,
+  applyLibraryCatalogChanges: Invokes.ApplyLibraryCatalogChanges,
   configureLibraryChangefeed: Invokes.ConfigureLibraryChangefeed,
   cancelThumbnailGeneration: Invokes.CancelThumbnailGeneration,
   checkAiConnectorStatus: Invokes.CheckAIConnectorStatus,
@@ -107,11 +113,15 @@ const commandNames: Record<
   getAlbumImages: Invokes.GetAlbumImages,
   getFolderTree: Invokes.GetFolderTree,
   getFolderRefreshSnapshot: Invokes.GetFolderRefreshSnapshot,
+  getLibraryFolderAggregates: Invokes.GetLibraryFolderAggregates,
   getPinnedFolderTrees: Invokes.GetPinnedFolderTrees,
   getSupportedFileTypes: Invokes.GetSupportedFileTypes,
   isImageCached: Invokes.IsImageCached,
   listImagesInDir: Invokes.ListImagesInDir,
   listImagesRecursive: Invokes.ListImagesRecursive,
+  openLibraryCollection: Invokes.OpenLibraryCollection,
+  nextLibraryCollectionPage: Invokes.NextLibraryCollectionPage,
+  reconcileLibraryCatalog: Invokes.ReconcileLibraryCatalog,
   loadImage: Invokes.LoadImage,
   loadMetadata: Invokes.LoadMetadata,
   loadPresets: Invokes.LoadPresets,
@@ -310,6 +320,16 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
         path: getStringArg(args, 'path') ?? browserHarnessRoot,
         recursive: getBooleanArg(args, 'recursive'),
       });
+    case commandNames.getLibraryFolderAggregates:
+      return Promise.resolve(
+        getStringArrayArg(args, 'paths').map((path) => ({
+          path,
+          directImageCount: harnessImages.length,
+          recursiveImageCount: harnessImages.length,
+          childFolderCount: 0,
+          catalogRevision: folderRevision,
+        })),
+      );
     case commandNames.getPinnedFolderTrees:
       return Promise.resolve(getStringArrayArg(args, 'paths').map(createHarnessFolderTree));
     case commandNames.getLensfunMakers:
@@ -319,6 +339,20 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
     case commandNames.listImagesInDir:
     case commandNames.listImagesRecursive:
       return Promise.resolve(harnessImages.map((image) => ({ ...image })));
+    case commandNames.openLibraryCollection:
+      return Promise.resolve({
+        sessionId: 1,
+        catalogRevision: folderRevision,
+        estimatedCount: harnessImages.length,
+        firstPage: harnessImages.map((image, index) => ({ ...image, imageId: image.path, entityRevision: index + 1 })),
+        indexingState: 'current',
+      });
+    case commandNames.nextLibraryCollectionPage:
+      return Promise.resolve({ sessionId: 1, catalogRevision: folderRevision, rows: [], complete: true });
+    case commandNames.reconcileLibraryCatalog:
+      return Promise.resolve({ catalogRevision: ++folderRevision });
+    case commandNames.applyLibraryCatalogChanges:
+      return Promise.resolve({ catalogRevision: ++folderRevision, upserted: [], removedImageIds: [] });
     case commandNames.readExifForPaths:
       return Promise.resolve({});
     case commandNames.getAlbumImages:

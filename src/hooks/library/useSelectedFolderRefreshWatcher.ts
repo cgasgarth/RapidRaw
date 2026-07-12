@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import { z } from 'zod';
 import { useShallow } from 'zustand/react/shallow';
 import type { FolderTree } from '../../components/panel/FolderTree';
-import { type ImageFile, LibraryViewMode } from '../../components/ui/AppProperties';
+import type { ImageFile, LibraryViewMode } from '../../components/ui/AppProperties';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { Invokes } from '../../tauri/commands';
 import { parseVirtualImagePath } from '../../utils/virtualImagePath';
@@ -32,11 +32,11 @@ export const libraryChangeBatchSchema = z
   })
   .strict();
 
-const pathIsInCollection = (path: string, folder: string, recursive: boolean): boolean => {
-  const prefix = folder.endsWith('/') ? folder : `${folder}/`;
-  if (!path.startsWith(prefix)) return false;
-  return recursive || !path.slice(prefix.length).includes('/');
-};
+interface CatalogChangeApplied {
+  catalogRevision: number;
+  upserted: ImageFile[];
+  removedImageIds: string[];
+}
 
 export const applyLibraryChangeRows = (
   current: readonly ImageFile[],
@@ -69,6 +69,26 @@ export const applyFolderCountDeltas = (
       ...(tree.imageCount === undefined ? {} : { imageCount: Math.max(0, tree.imageCount + delta) }),
     };
   });
+
+const applyCatalogFolderCounts = (trees: readonly FolderTree[], counts: ReadonlyMap<string, number>): FolderTree[] =>
+  trees.map((tree) => ({
+    ...tree,
+    ...(counts.has(tree.path) ? { imageCount: counts.get(tree.path) } : {}),
+    children: applyCatalogFolderCounts(tree.children, counts),
+  }));
+
+const affectedFolderPaths = (paths: readonly string[], root: string): string[] => {
+  const folders = new Set<string>([root]);
+  for (const value of paths) {
+    let folder = value.slice(0, value.lastIndexOf('/'));
+    while (folder.startsWith(root)) {
+      folders.add(folder);
+      if (folder === root) break;
+      folder = folder.slice(0, folder.lastIndexOf('/'));
+    }
+  }
+  return [...folders];
+};
 
 export function useSelectedFolderRefreshWatcher({
   libraryViewMode,
@@ -114,51 +134,41 @@ export function useSelectedFolderRefreshWatcher({
       if (batch.watchGeneration !== generationRef.current || batch.catalogRevisionAfter <= revisionRef.current) return;
       if (revisionRef.current !== 0 && batch.catalogRevisionBefore !== revisionRef.current) return;
       revisionRef.current = batch.catalogRevisionAfter;
-      if (batch.requiresReconcile) {
-        await reconcileRef.current();
-        return;
-      }
 
       const state = useLibraryStore.getState();
       const folder = state.currentFolderPath;
       if (!folder || folder.startsWith('Album: ')) return;
-      const recursive = libraryViewMode === LibraryViewMode.Recursive;
-      const removed = new Set<string>();
-      const refresh = new Set<string>();
-      const countDeltas = new Map<string, number>();
-      const addCountDelta = (path: string, delta: number) =>
-        countDeltas.set(path, (countDeltas.get(path) ?? 0) + delta);
-      for (const change of batch.changes) {
-        if (change.kind === 'removed') {
-          removed.add(change.path);
-          addCountDelta(change.path, -1);
-        } else if (change.kind === 'renamed') {
-          removed.add(change.oldPath);
-          refresh.add(change.newPath);
-          addCountDelta(change.oldPath, -1);
-          addCountDelta(change.newPath, 1);
-        } else if (change.kind === 'added') {
-          refresh.add(change.path);
-          addCountDelta(change.path, 1);
-        } else if (change.class !== 'directory') refresh.add(change.path);
+      const root = rootPaths.find((candidate) => folder === candidate || folder.startsWith(`${candidate}/`)) ?? folder;
+      if (batch.requiresReconcile || batch.overflowed) {
+        await invoke(Invokes.ReconcileLibraryCatalog, { path: root });
+        if (!active || batch.watchGeneration !== generationRef.current) return;
+        await reconcileRef.current();
+      } else {
+        const applied = await invoke<CatalogChangeApplied>(Invokes.ApplyLibraryCatalogChanges, {
+          root,
+          changes: batch.changes,
+        });
+        if (!active || batch.watchGeneration !== generationRef.current) return;
+        useLibraryStore
+          .getState()
+          .applyCatalogDelta(applied.catalogRevision, applied.upserted, applied.removedImageIds);
+        const changedPaths = batch.changes.flatMap((change) =>
+          change.kind === 'renamed' ? [change.oldPath, change.newPath] : [change.path],
+        );
+        const aggregates = await invoke<Array<{ path: string; recursiveImageCount: number }>>(
+          Invokes.GetLibraryFolderAggregates,
+          { paths: affectedFolderPaths(changedPaths, root) },
+        );
+        const counts = new Map(aggregates.map((aggregate) => [aggregate.path, aggregate.recursiveImageCount]));
+        useLibraryStore.getState().setLibrary((current) => ({
+          folderTrees: applyCatalogFolderCounts(current.folderTrees, counts),
+          pinnedFolderTrees: applyCatalogFolderCounts(current.pinnedFolderTrees, counts),
+        }));
       }
-      const relevantRefresh = [...refresh].filter((path) => pathIsInCollection(path, folder, recursive));
-      const rows =
-        relevantRefresh.length === 0
-          ? []
-          : await invoke<ImageFile[]>(Invokes.GetLibraryChangeRows, { paths: relevantRefresh });
-      if (!active || batch.watchGeneration !== generationRef.current) return;
-      useLibraryStore.getState().setLibrary((current) => {
-        return {
-          imageList: applyLibraryChangeRows(current.imageList, removed, rows),
-          folderTrees: applyFolderCountDeltas(current.folderTrees, countDeltas),
-          pinnedFolderTrees: applyFolderCountDeltas(current.pinnedFolderTrees, countDeltas),
-        };
-      });
     });
     return () => {
       active = false;
       void unlistenPromise.then((unlisten) => unlisten());
     };
-  }, [libraryViewMode]);
+  }, [libraryViewMode, rootPaths]);
 }
