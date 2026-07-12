@@ -208,9 +208,20 @@ export const exportReceiptPayloadSchema = z
           format: z.string().trim().min(1),
           iccEmbedded: z.boolean().optional().nullable(),
           outputPath: z.string().trim().min(1),
+          outputDigest: z
+            .object({
+              algorithm: z.literal('sha256'),
+              byteLen: z.number().int().nonnegative(),
+              provenance: z.literal('finalByteAtomicWriter'),
+              value: z.string().regex(/^sha256:[0-9a-f]{64}$/u),
+            })
+            .strict()
+            .optional()
+            .nullable(),
           policyStatus: z.string().trim().min(1).optional().nullable(),
           policyVersion: z.string().trim().min(1).optional().nullable(),
           rawProvenanceSidecarPath: z.string().trim().min(1).optional().nullable(),
+          rawProvenanceError: z.string().trim().min(1).optional().nullable(),
           rawDevelopmentReport: rawDevelopmentReportSchema.optional().nullable(),
           renderingIntent: z.string().trim().min(1).optional().nullable(),
           requestedColorProfile: z.string().trim().min(1).optional().nullable(),

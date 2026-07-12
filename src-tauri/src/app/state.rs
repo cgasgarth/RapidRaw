@@ -196,6 +196,7 @@ pub struct ThumbnailProgressTracker {
 }
 
 pub struct ExportJob {
+    pub job_id: String,
     pub cancellation_token: Arc<AtomicBool>,
     pub task_handle: Option<JoinHandle<()>>,
 }
