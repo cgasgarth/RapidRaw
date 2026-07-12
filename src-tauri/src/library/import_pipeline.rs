@@ -19,6 +19,7 @@ const FAST_DEVICE_COPY_CONCURRENCY: usize = 4;
 const SAME_DEVICE_COPY_CONCURRENCY: usize = 2;
 const RESOURCE_BUFFER_CREDITS: usize = 8;
 const JOURNAL_SCHEMA_VERSION: u32 = 1;
+static IMPORT_TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 const _: () = assert!(SAME_DEVICE_COPY_CONCURRENCY < FAST_DEVICE_COPY_CONCURRENCY);
 const _: () = assert!(FAST_DEVICE_COPY_CONCURRENCY <= RESOURCE_BUFFER_CREDITS);
 
@@ -825,10 +826,12 @@ fn stream_copy_atomic(
     cancellation: &AtomicBool,
     counters: &PipelineCounters,
 ) -> Result<ImportArtifactReceipt, (ImportStage, String)> {
+    let temp_sequence = IMPORT_TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
     let temp = destination.with_file_name(format!(
-        ".rawengine-tmp-import-{}-{}",
+        ".rawengine-tmp-import-{}-{}-{}",
         std::process::id(),
-        now_millis()
+        now_millis(),
+        temp_sequence,
     ));
     let result = (|| {
         #[cfg(target_os = "android")]
@@ -1242,6 +1245,55 @@ mod tests {
                     .file_name()
                     .to_string_lossy()
                     .starts_with(".rawengine-tmp"))
+                .count(),
+            0
+        );
+    }
+
+    #[test]
+    fn concurrent_atomic_copies_do_not_share_temp_paths() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = temp.path().join("source.raw");
+        fs::write(&source, vec![0x4a; COPY_BUFFER_BYTES]).unwrap();
+        let cancellation = AtomicBool::new(false);
+        let counters = PipelineCounters::default();
+        let results = std::thread::scope(|scope| {
+            let handles = (0..32)
+                .map(|index| {
+                    let source = source.clone();
+                    let destination = temp.path().join(format!("destination-{index}.raw"));
+                    let cancellation = &cancellation;
+                    let counters = &counters;
+                    scope.spawn(move || {
+                        stream_copy_atomic(&source, &destination, cancellation, counters)
+                    })
+                })
+                .collect::<Vec<_>>();
+            handles
+                .into_iter()
+                .map(|handle| handle.join().unwrap())
+                .collect::<Vec<_>>()
+        });
+        assert!(results.iter().all(Result::is_ok));
+        assert_eq!(
+            fs::read_dir(temp.path())
+                .unwrap()
+                .filter_map(Result::ok)
+                .filter(|entry| entry
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with("destination-"))
+                .count(),
+            32
+        );
+        assert_eq!(
+            fs::read_dir(temp.path())
+                .unwrap()
+                .filter_map(Result::ok)
+                .filter(|entry| entry
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with(".rawengine-tmp-import-"))
                 .count(),
             0
         );
