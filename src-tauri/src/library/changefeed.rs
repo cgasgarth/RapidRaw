@@ -120,6 +120,54 @@ fn is_ignored(path: &Path) -> bool {
 fn normalize_event(event: Event) -> Vec<LibraryPathChange> {
     if matches!(
         event.kind,
+        EventKind::Modify(ModifyKind::Name(RenameMode::From))
+    ) {
+        return event
+            .paths
+            .into_iter()
+            .filter(|path| !is_ignored(path))
+            .map(|path| {
+                let class = classify(&path);
+                let path = super::file_management::source_path_for_library_event(&path)
+                    .to_string_lossy()
+                    .into_owned();
+                match class {
+                    Some(class @ (LibraryChangeClass::Sidecar | LibraryChangeClass::Xmp)) => {
+                        LibraryPathChange::Modified { path, class }
+                    }
+                    _ => LibraryPathChange::Removed { path },
+                }
+            })
+            .collect();
+    }
+    if matches!(
+        event.kind,
+        EventKind::Modify(ModifyKind::Name(RenameMode::To))
+    ) {
+        return event
+            .paths
+            .into_iter()
+            .filter(|path| !is_ignored(path))
+            .filter_map(|path| {
+                let class = classify(&path)?;
+                let path = super::file_management::source_path_for_library_event(&path)
+                    .to_string_lossy()
+                    .into_owned();
+                Some(
+                    if matches!(
+                        class,
+                        LibraryChangeClass::Source | LibraryChangeClass::Directory
+                    ) {
+                        LibraryPathChange::Added { path }
+                    } else {
+                        LibraryPathChange::Modified { path, class }
+                    },
+                )
+            })
+            .collect();
+    }
+    if matches!(
+        event.kind,
         EventKind::Modify(ModifyKind::Name(RenameMode::Both))
     ) && event.paths.len() >= 2
     {
@@ -411,6 +459,45 @@ mod tests {
             vec![LibraryPathChange::Renamed {
                 old_path: "/library/old.jpg".into(),
                 new_path: "/library/new.jpg".into(),
+            }]
+        );
+    }
+
+    #[test]
+    fn split_native_rename_removes_old_source_and_adds_new_source() {
+        let from = normalize_event(
+            Event::new(EventKind::Modify(ModifyKind::Name(RenameMode::From)))
+                .add_path(PathBuf::from("/library/old.ARW")),
+        );
+        let to = normalize_event(
+            Event::new(EventKind::Modify(ModifyKind::Name(RenameMode::To)))
+                .add_path(PathBuf::from("/library/new.ARW")),
+        );
+        assert_eq!(
+            from,
+            vec![LibraryPathChange::Removed {
+                path: "/library/old.ARW".into()
+            }]
+        );
+        assert_eq!(
+            to,
+            vec![LibraryPathChange::Added {
+                path: "/library/new.ARW".into()
+            }]
+        );
+    }
+
+    #[test]
+    fn split_sidecar_rename_refreshes_source_instead_of_removing_it() {
+        let from = normalize_event(
+            Event::new(EventKind::Modify(ModifyKind::Name(RenameMode::From)))
+                .add_path(PathBuf::from("/library/photo.ARW.rrdata")),
+        );
+        assert_eq!(
+            from,
+            vec![LibraryPathChange::Modified {
+                path: "/library/photo.ARW".into(),
+                class: LibraryChangeClass::Sidecar,
             }]
         );
     }
