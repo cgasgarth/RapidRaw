@@ -2862,6 +2862,16 @@ export default function ExportPanel({
             </>
           )}
         </Button>
+        {cancellationAck ? (
+          <span
+            aria-hidden="true"
+            className="sr-only"
+            data-cancel-active-job-id={cancellationAck.activeJobId}
+            data-cancel-task-attached={cancellationAck.taskAttached}
+            data-cancel-token-observed={cancellationAck.tokenObserved}
+            data-testid="export-cancellation-ack"
+          />
+        ) : null}
       </div>
     </div>
   );

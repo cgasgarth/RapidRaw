@@ -6,14 +6,18 @@
         "hasSubdirs": false,
         "imageCount": 12,
         "isDir": true,
+        "modified": 1710000000,
         "name": "Selects",
-        "path": "/Volumes/Photos/Selects"
+        "path": "/Volumes/Photos/Selects",
+        "created": 1700000000
       }
     ],
     "hasSubdirs": true,
     "imageCount": 48,
     "isDir": true,
+    "modified": 1710000000,
     "name": "Photos",
-    "path": "/Volumes/Photos"
+    "path": "/Volumes/Photos",
+    "created": 1700000000
   }
 ]

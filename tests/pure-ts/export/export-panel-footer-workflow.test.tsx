@@ -205,6 +205,9 @@ describe('export panel compact footer workflow', () => {
     expect(cancellingAction.dataset.cancelActiveJobId).toBe('export-job:test');
     expect(cancellingAction.dataset.cancelTaskAttached).toBe('true');
     expect(cancellingAction.dataset.cancelTokenObserved).toBe('true');
+    const cancellationReceipt = required<HTMLElement>(container, '[data-testid="export-cancellation-ack"]');
+    expect(cancellationReceipt.dataset.cancelActiveJobId).toBe('export-job:test');
+    expect(cancellationReceipt.dataset.cancelTokenObserved).toBe('true');
 
     const cancelledReceipt = parseExportReceiptPayload({
       completedAt: '2026-07-12T02:30:00.000Z',

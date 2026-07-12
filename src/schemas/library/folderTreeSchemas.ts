@@ -5,8 +5,10 @@ export interface FolderTreePayload {
   hasSubdirs?: boolean | undefined;
   imageCount?: number | undefined;
   isDir: boolean;
+  modified: number;
   name: string;
   path: string;
+  created: number;
 }
 
 export const folderTreeSchema: z.ZodType<FolderTreePayload> = z.lazy(() =>
@@ -16,8 +18,10 @@ export const folderTreeSchema: z.ZodType<FolderTreePayload> = z.lazy(() =>
       hasSubdirs: z.boolean().optional(),
       imageCount: z.number().int().nonnegative().optional(),
       isDir: z.boolean(),
+      modified: z.number().int().nonnegative(),
       name: z.string(),
       path: z.string(),
+      created: z.number().int().nonnegative(),
     })
     .strict(),
 );
