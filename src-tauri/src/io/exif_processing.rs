@@ -415,6 +415,9 @@ fn migrate_crop_to_normalized(
     let Some(crop_value) = adjustments.get("crop").cloned() else {
         return;
     };
+    if crop_value.is_null() {
+        return;
+    }
     let Some(crop) = crop_value.as_object() else {
         quarantine_crop(
             adjustments,
@@ -493,6 +496,16 @@ fn migrate_crop_to_normalized(
             crop_value,
             "crop_bounds_invalid",
         );
+        return;
+    }
+    let full_frame = x.abs() <= 1.0e-9
+        && y.abs() <= 1.0e-9
+        && (width - 1.0).abs() <= 1.0e-9
+        && (height - 1.0).abs() <= 1.0e-9;
+    if full_frame {
+        adjustments.remove("crop");
+        migrated.push("adjustments.crop".to_string());
+        reasons.push("crop_full_frame_removed".to_string());
         return;
     }
     if unit != Some("normalized") {
@@ -2612,28 +2625,31 @@ mod crop_migration_tests {
 
     #[test]
     fn pixel_crop_migration_handles_landscape_portrait_and_nontrivial_bounds() {
-        for (crop, dimensions, expected) in [
-            (
-                serde_json::json!({ "unit": "px", "x": 0, "y": 0, "width": 6000, "height": 4000 }),
-                (6000, 4000),
-                serde_json::json!({ "unit": "normalized", "x": 0.0, "y": 0.0, "width": 1.0, "height": 1.0 }),
-            ),
-            (
-                serde_json::json!({ "unit": "px", "x": 0, "y": 0, "width": 4000, "height": 6000 }),
-                (4000, 6000),
-                serde_json::json!({ "unit": "normalized", "x": 0.0, "y": 0.0, "width": 1.0, "height": 1.0 }),
-            ),
-            (
-                serde_json::json!({ "unit": "px", "x": 600, "y": 400, "width": 3000, "height": 2000 }),
-                (6000, 4000),
-                serde_json::json!({ "unit": "normalized", "x": 0.1, "y": 0.1, "width": 0.5, "height": 0.5 }),
-            ),
-        ] {
-            let (adjustments, migrated, reasons) = migrate_crop_fixture(crop, Some(dimensions));
-            assert_eq!(adjustments["crop"], expected);
+        for dimensions in [(6000, 4000), (4000, 6000)] {
+            let (adjustments, migrated, reasons) = migrate_crop_fixture(
+                serde_json::json!({
+                    "unit": "px", "x": 0, "y": 0,
+                    "width": dimensions.0, "height": dimensions.1
+                }),
+                Some(dimensions),
+            );
+            assert!(adjustments.get("crop").is_none());
             assert_eq!(migrated, ["adjustments.crop"]);
-            assert_eq!(reasons, ["crop_units_normalized"]);
+            assert_eq!(reasons, ["crop_full_frame_removed"]);
         }
+
+        let (adjustments, migrated, reasons) = migrate_crop_fixture(
+            serde_json::json!({ "unit": "px", "x": 600, "y": 400, "width": 3000, "height": 2000 }),
+            Some((6000, 4000)),
+        );
+        assert_eq!(
+            adjustments["crop"],
+            serde_json::json!({
+                "unit": "normalized", "x": 0.1, "y": 0.1, "width": 0.5, "height": 0.5
+            })
+        );
+        assert_eq!(migrated, ["adjustments.crop"]);
+        assert_eq!(reasons, ["crop_units_normalized"]);
     }
 
     #[test]
@@ -2664,6 +2680,28 @@ mod crop_migration_tests {
         );
         assert!(second_migrated.is_empty());
         assert!(reasons.is_empty());
+    }
+
+    #[test]
+    fn null_crop_is_a_valid_no_op_and_normalized_full_frame_is_removed() {
+        let (adjustments, migrated, reasons) = migrate_crop_fixture(JsonValue::Null, None);
+        assert!(adjustments["crop"].is_null());
+        assert!(migrated.is_empty());
+        assert!(reasons.is_empty());
+
+        let (adjustments, migrated, reasons) = migrate_crop_fixture(
+            serde_json::json!({
+                "unit": "normalized",
+                "x": 0.0000000001,
+                "y": 0.0,
+                "width": 0.9999999999,
+                "height": 1.0
+            }),
+            None,
+        );
+        assert!(adjustments.get("crop").is_none());
+        assert_eq!(migrated, ["adjustments.crop"]);
+        assert_eq!(reasons, ["crop_full_frame_removed"]);
     }
 
     #[test]
@@ -2861,12 +2899,7 @@ fn save_then_load_does_not_double_swap_or_renormalize_portrait_crop() {
     let first_bytes = fs::read(&sidecar).unwrap();
     let loaded = load_sidecar_recovering(&sidecar, None).unwrap();
     assert_eq!(loaded.outcome, PersistedStateOutcome::Current);
-    assert_eq!(
-        loaded.metadata.adjustments["crop"],
-        serde_json::json!({
-            "unit": "normalized", "x": 0.0, "y": 0.0, "width": 1.0, "height": 1.0
-        })
-    );
+    assert!(loaded.metadata.adjustments.get("crop").is_none());
     assert_eq!(loaded.metadata.rating, 5);
     assert_eq!(fs::read(&sidecar).unwrap(), first_bytes);
 }
