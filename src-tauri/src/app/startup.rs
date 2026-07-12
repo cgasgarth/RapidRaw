@@ -214,6 +214,22 @@ impl StartupTrace {
     }
 }
 
+/// Commits the native-shell visibility receipt before starting work that is
+/// allowed to complete behind that shell (notably clean-account WKWebView
+/// initialization on macOS).
+pub fn after_native_shell_visible<T>(
+    trace: &StartupTrace,
+    detail: &str,
+    initialize_deferred_ui: impl FnOnce() -> T,
+) -> T {
+    trace.mark(
+        NativeStartupPhase::WindowVisible,
+        "ok",
+        Some(detail.to_string()),
+    );
+    initialize_deferred_ui()
+}
+
 fn critical_path_order_valid(phases: &[StartupPhaseReceipt]) -> bool {
     let first_index = |phase| phases.iter().position(|receipt| receipt.phase == phase);
     let ordered = [
@@ -298,6 +314,39 @@ mod tests {
         assert_eq!(snapshot.process_id, std::process::id());
         assert!(phases[0].elapsed_ms <= phases[1].elapsed_ms);
         assert_eq!(phases[1].detail.as_deref(), Some("shell"));
+    }
+
+    #[test]
+    fn injected_heavy_ui_delay_cannot_move_native_shell_visibility_receipt() {
+        let clock = Arc::new(AtomicU64::new(100));
+        let trace = StartupTrace::with_test_clock(Arc::clone(&clock));
+        trace.mark(NativeStartupPhase::ProcessStarted, "ok", None);
+        trace.mark(NativeStartupPhase::MinimalSettingsLoaded, "ok", None);
+        trace.mark(NativeStartupPhase::WindowCreated, "ok", None);
+
+        super::after_native_shell_visible(&trace, "native-shell-before-webview", || {
+            // Models a clean-account WKWebView/framework initialization stall.
+            clock.store(2_100, Ordering::SeqCst);
+        });
+        trace.mark(NativeStartupPhase::CoreCommandsReady, "ok", None);
+
+        let snapshot = trace.snapshot();
+        let visible = snapshot
+            .phases
+            .iter()
+            .find(|receipt| receipt.phase == NativeStartupPhase::WindowVisible)
+            .expect("native shell visibility receipt");
+        assert_eq!(visible.elapsed_ms, 100);
+        assert_eq!(snapshot.first_paint_budget_met, Some(true));
+        assert_eq!(
+            snapshot
+                .phases
+                .iter()
+                .find(|receipt| receipt.phase == NativeStartupPhase::CoreCommandsReady)
+                .expect("post-webview receipt")
+                .elapsed_ms,
+            2_100
+        );
     }
 
     #[test]

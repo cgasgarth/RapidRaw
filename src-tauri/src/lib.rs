@@ -3156,16 +3156,63 @@ pub fn run() {
                 .expect("Main window config not found")
                 .clone();
 
+            #[cfg(not(target_os = "macos"))]
             let mut window_builder =
                 tauri::WebviewWindowBuilder::from_config(app.handle(), &main_window_cfg)
                     .unwrap();
 
-            #[cfg(not(target_os = "android"))]
+            #[cfg(all(not(target_os = "android"), not(target_os = "macos")))]
             {
                 window_builder = window_builder.decorations(decorations).visible(false);
             }
 
+            #[cfg(not(target_os = "macos"))]
             let window = window_builder.build().expect("Failed to build window");
+
+            // WKWebView initialization can take seconds on the first launch of a
+            // clean macOS account. Create and expose the native shell first, then
+            // attach the webview to that same window. This keeps framework and
+            // frontend initialization off the first-visible critical path.
+            #[cfg(target_os = "macos")]
+            let window = {
+                let native_window =
+                    tauri::window::WindowBuilder::from_config(app.handle(), &main_window_cfg)
+                        .expect("Failed to configure native startup window")
+                        .decorations(decorations)
+                        .visible(false)
+                        .build()
+                        .expect("Failed to build native startup window");
+                app.state::<AppState>().startup_trace.mark(
+                    NativeStartupPhase::WindowCreated,
+                    "ok",
+                    None,
+                );
+
+                if let Err(error) = native_window.show() {
+                    log::error!("Failed to show startup shell: {}", error);
+                }
+                if let Err(error) = native_window.set_focus() {
+                    log::error!("Failed to focus startup shell: {}", error);
+                }
+                let size = native_window
+                    .inner_size()
+                    .expect("Failed to measure native startup window");
+                crate::app::startup::after_native_shell_visible(
+                    &app.state::<AppState>().startup_trace,
+                    "native-shell-before-webview",
+                    || {
+                        native_window.add_child(
+                            tauri::webview::WebviewBuilder::from_config(&main_window_cfg),
+                            tauri::LogicalPosition::new(0, 0),
+                            size,
+                        )
+                    },
+                )
+                    .expect("Failed to attach main webview");
+                app.get_webview_window("main")
+                    .expect("Main native window and webview labels must match")
+            };
+            #[cfg(not(target_os = "macos"))]
             app.state::<AppState>().startup_trace.mark(
                 NativeStartupPhase::WindowCreated,
                 "ok",
@@ -3194,17 +3241,20 @@ pub fn run() {
 
                 // Show the shell as soon as its geometry is known. GPU, Lensfun,
                 // catalog, and optional services warm after this first frame.
-                if let Err(error) = window.show() {
-                    log::error!("Failed to show startup shell: {}", error);
+                #[cfg(not(target_os = "macos"))]
+                {
+                    if let Err(error) = window.show() {
+                        log::error!("Failed to show startup shell: {}", error);
+                    }
+                    if let Err(error) = window.set_focus() {
+                        log::error!("Failed to focus startup shell: {}", error);
+                    }
+                    app.state::<AppState>().startup_trace.mark(
+                        NativeStartupPhase::WindowVisible,
+                        "ok",
+                        Some("native-shell".to_string()),
+                    );
                 }
-                if let Err(error) = window.set_focus() {
-                    log::error!("Failed to focus startup shell: {}", error);
-                }
-                app.state::<AppState>().startup_trace.mark(
-                    NativeStartupPhase::WindowVisible,
-                    "ok",
-                    Some("native-shell".to_string()),
-                );
 
                 let background_handle = app.handle().clone();
                 tauri::async_runtime::spawn(async move {
