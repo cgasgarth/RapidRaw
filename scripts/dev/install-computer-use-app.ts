@@ -2,6 +2,7 @@
 
 import { access, mkdir, rm } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
+import { withResourceLease } from '../lib/ci/resource-coordinator';
 
 const sourceAppPath = resolve('src-tauri/target/release/bundle/macos/RapidRAW.app');
 const defaultInstallPath = '/Applications/RapidRAW.app';
@@ -74,21 +75,23 @@ async function assertExists(path: string, label: string): Promise<void> {
 }
 
 if (shouldBuild) {
-  await run(
-    'bun',
-    [
-      'tauri',
-      'build',
-      ...(shouldUseVerboseBuildLogs ? ['--verbose'] : []),
-      '--ci',
-      '--bundles',
-      'app',
-      '--features',
-      'required-ci',
-    ],
-    'computer-use release app build',
-    [0],
-    shouldUseVerboseBuildLogs ? { CARGO_TERM_VERBOSE: 'true' } : {},
+  await withResourceLease({ label: 'computer-use-release-build', resource: 'native-heavy' }, async () =>
+    run(
+      'bun',
+      [
+        'tauri',
+        'build',
+        ...(shouldUseVerboseBuildLogs ? ['--verbose'] : []),
+        '--ci',
+        '--bundles',
+        'app',
+        '--features',
+        'required-ci',
+      ],
+      'computer-use release app build',
+      [0],
+      shouldUseVerboseBuildLogs ? { CARGO_TERM_VERBOSE: 'true' } : {},
+    ),
   );
 }
 
