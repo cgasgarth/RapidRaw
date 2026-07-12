@@ -141,6 +141,10 @@ pub fn get_or_init_gpu_context(
         presentation: Arc::new(presentation),
     };
     *context_lock = Some(new_context.clone());
+    drop(context_lock);
+    if let Some(coordinator) = state.display_target_coordinator.lock().unwrap().as_ref() {
+        coordinator.request_refresh(new_context.generation);
+    }
     Ok(new_context)
 }
 
@@ -190,5 +194,9 @@ pub fn get_or_init_compute_gpu_context_for_tests(
         presentation: Arc::new(WgpuPresentationScheduler::new(None, device, queue)),
     };
     *context_lock = Some(new_context.clone());
+    drop(context_lock);
+    if let Some(coordinator) = state.display_target_coordinator.lock().unwrap().as_ref() {
+        coordinator.request_refresh(new_context.generation);
+    }
     Ok(new_context)
 }

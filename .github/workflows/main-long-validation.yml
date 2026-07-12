@@ -132,6 +132,9 @@ jobs:
       - name: Run bounded native startup benchmark
         run: bun scripts/benchmarks/startup-native.ts --binary src-tauri/target/aarch64-apple-darwin/release/RapidRAW --pairs 2
 
+      - name: Run native display-target coalescing and resource-generation proof
+        run: bun scripts/benchmarks/display-target-native.ts --binary src-tauri/target/aarch64-apple-darwin/release/RapidRAW
+
       - name: Collect smoke failure diagnostics
         if: ${{ failure() }}
         shell: bash

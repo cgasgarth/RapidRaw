@@ -3042,12 +3042,19 @@ pub fn run() {
             if let Some(ctx) = state.gpu_context.lock().unwrap().as_ref() {
                 ctx.presentation.resize(size.width, size.height);
             }
+            #[cfg(target_os = "macos")]
+            crate::app::display_target::request_for_state(&state);
         } else if let tauri::WindowEvent::Moved(_) = event {
             #[cfg(target_os = "macos")]
             {
                 let state = window.state::<AppState>();
-                // Recreate presentation resources so a cross-display move cannot retain the old ICC LUT.
-                *state.gpu_context.lock().unwrap() = None;
+                crate::app::display_target::request_for_state(&state);
+            }
+        } else if let tauri::WindowEvent::Focused(true) = event {
+            #[cfg(target_os = "macos")]
+            {
+                let state = window.state::<AppState>();
+                crate::app::display_target::request_for_state(&state);
             }
         })
         .setup(|app| {
@@ -3223,6 +3230,28 @@ pub fn run() {
                 "ok",
                 None,
             );
+
+            #[cfg(target_os = "macos")]
+            {
+                let resolver_app = app.handle().clone();
+                let publisher_app = app.handle().clone();
+                let coordinator = crate::app::display_target::DisplayTargetCoordinator::new_with_publisher(
+                    Duration::from_millis(120),
+                    move |_| crate::app::display_target::resolve_for_app(&resolver_app),
+                    move |change| {
+                        if let Err(error) = publisher_app.emit("display-target-changed", change) {
+                            log::warn!("failed to publish display target change: {error}");
+                        }
+                    },
+                );
+                coordinator.request_refresh(0);
+                *app.state::<AppState>()
+                    .display_target_coordinator
+                    .lock()
+                    .unwrap() = Some(coordinator);
+                #[cfg(feature = "validation-harness")]
+                crate::app::display_target::start_validation_benchmark(app.handle().clone());
+            }
 
             #[cfg(target_os = "android")]
             android_integration::initialize_android(&window);
@@ -3463,6 +3492,7 @@ pub fn run() {
             update_wgpu_transform,
             flush_wgpu_presentation,
             get_wgpu_presentation_report,
+            app::display_target::get_display_target_report,
             android_integration::resolve_android_content_uri_name,
             cache_utils::clear_session_caches,
             cache_utils::clear_image_caches,
