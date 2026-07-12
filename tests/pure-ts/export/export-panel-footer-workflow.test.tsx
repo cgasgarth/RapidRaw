@@ -17,6 +17,7 @@ import {
 import { ContextMenuProvider } from '../../../src/context/ContextMenuContext.tsx';
 import en from '../../../src/i18n/locales/en.json';
 import { EXPORT_LAST_USED_PRESET_ID } from '../../../src/schemas/export/exportRecipeIds.ts';
+import { parseExportReceiptPayload } from '../../../src/schemas/tauriEventSchemas.ts';
 import { useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { useProcessStore } from '../../../src/store/useProcessStore.ts';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
@@ -86,7 +87,7 @@ const consistentProofTransform = {
   transformApplied: true,
   transformPolicyFingerprint: 'sha256:export-footer-workflow-test',
 };
-const completedReceipt = {
+const completedReceipt = parseExportReceiptPayload({
   completedAt: '2026-07-10T12:00:00.000Z',
   outputs: [
     {
@@ -99,6 +100,12 @@ const completedReceipt = {
       format: 'tiff',
       iccEmbedded: true,
       outputPath: '/tmp/export-footer-workflow.tif',
+      outputDigest: {
+        algorithm: 'sha256',
+        byteLen: 2_048,
+        provenance: 'finalByteAtomicWriter',
+        value: `sha256:${'c'.repeat(64)}`,
+      },
       policyStatus: 'applied',
       policyVersion: 'export-footer-workflow-test',
       renderingIntent: 'Relative colorimetric',
@@ -109,9 +116,9 @@ const completedReceipt = {
       transformPolicyFingerprint: 'sha256:export-footer-workflow-receipt',
     },
   ],
-  terminalStatus: 'completed' as const,
+  terminalStatus: 'completed',
   total: 1,
-};
+});
 
 let renderedRoot: { container: HTMLDivElement; root: Root } | null = null;
 
@@ -211,6 +218,7 @@ describe('export panel compact footer workflow', () => {
     expect(workflow.dataset.exportFooterCanOpen).toBe('true');
     expect(workflow.dataset.exportFooterCanImportLinkedVariant).toBe('true');
     expect(container.querySelector('[data-testid="export-success-receipt"]')).not.toBeNull();
+    expect(completedReceipt.outputs[0]?.outputDigest?.provenance).toBe('finalByteAtomicWriter');
     expect(container.querySelector('[data-testid="export-success-import-linked-variant"]')).not.toBeNull();
     expect(container.querySelector('[data-testid="export-success-open-in-editor"]')).not.toBeNull();
     expect(container.querySelector('[data-testid="export-success-show-in-finder"]')).not.toBeNull();
