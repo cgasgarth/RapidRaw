@@ -117,7 +117,46 @@ fn is_ignored(path: &Path) -> bool {
         .is_some_and(|name| name == ".DS_Store" || name.starts_with(".rawengine-tmp"))
 }
 
+fn normalize_ambiguous_rename(
+    paths: Vec<PathBuf>,
+    exists: impl Fn(&Path) -> bool,
+) -> Vec<LibraryPathChange> {
+    paths
+        .into_iter()
+        .filter(|path| !is_ignored(path))
+        .filter_map(|path| {
+            let class = classify(&path);
+            let normalized = super::file_management::source_path_for_library_event(&path)
+                .to_string_lossy()
+                .into_owned();
+            match class {
+                Some(class @ (LibraryChangeClass::Sidecar | LibraryChangeClass::Xmp)) => {
+                    Some(LibraryPathChange::Modified {
+                        path: normalized,
+                        class,
+                    })
+                }
+                Some(LibraryChangeClass::Source | LibraryChangeClass::Directory) => {
+                    Some(if exists(&path) {
+                        LibraryPathChange::Added { path: normalized }
+                    } else {
+                        LibraryPathChange::Removed { path: normalized }
+                    })
+                }
+                None if !exists(&path) => Some(LibraryPathChange::Removed { path: normalized }),
+                None => None,
+            }
+        })
+        .collect()
+}
+
 fn normalize_event(event: Event) -> Vec<LibraryPathChange> {
+    if matches!(
+        event.kind,
+        EventKind::Modify(ModifyKind::Name(RenameMode::Any | RenameMode::Other))
+    ) {
+        return normalize_ambiguous_rename(event.paths, Path::exists);
+    }
     if matches!(
         event.kind,
         EventKind::Modify(ModifyKind::Name(RenameMode::From))
@@ -498,6 +537,55 @@ mod tests {
             vec![LibraryPathChange::Modified {
                 path: "/library/photo.ARW".into(),
                 class: LibraryChangeClass::Sidecar,
+            }]
+        );
+    }
+
+    #[test]
+    fn ambiguous_paired_rename_uses_existence_to_remove_old_and_add_new() {
+        let changes = normalize_ambiguous_rename(
+            vec![
+                PathBuf::from("/library/old.ARW"),
+                PathBuf::from("/library/new.ARW"),
+            ],
+            |path| path.ends_with("new.ARW"),
+        );
+        assert_eq!(
+            changes,
+            vec![
+                LibraryPathChange::Removed {
+                    path: "/library/old.ARW".into(),
+                },
+                LibraryPathChange::Added {
+                    path: "/library/new.ARW".into(),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn ambiguous_sidecar_rename_refreshes_source_regardless_of_existence() {
+        let changes =
+            normalize_ambiguous_rename(vec![PathBuf::from("/library/photo.ARW.rrdata")], |_| false);
+        assert_eq!(
+            changes,
+            vec![LibraryPathChange::Modified {
+                path: "/library/photo.ARW".into(),
+                class: LibraryChangeClass::Sidecar,
+            }]
+        );
+    }
+
+    #[test]
+    fn native_source_delete_is_a_catalog_removal() {
+        let changes = normalize_event(
+            Event::new(EventKind::Remove(notify::event::RemoveKind::File))
+                .add_path(PathBuf::from("/library/deleted.ARW")),
+        );
+        assert_eq!(
+            changes,
+            vec![LibraryPathChange::Removed {
+                path: "/library/deleted.ARW".into(),
             }]
         );
     }
