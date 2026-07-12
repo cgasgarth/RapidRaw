@@ -221,48 +221,7 @@ impl ThumbnailScheduler {
             state.last_invalidation_by_path.clear();
         }
         for spec in request.requests {
-            let path: Arc<str> = Arc::from(spec.path.trim());
-            if path.is_empty() {
-                continue;
-            }
-            state
-                .demanded_by_path
-                .insert(path.clone(), (spec.priority, spec.demand_class));
-            let was_tracked =
-                state.pending_by_path.contains_key(&path) || state.in_flight.contains_key(&path);
-            if let Some(item) = state.in_flight.get_mut(&path) {
-                if item.job.generation == request.generation
-                    && item.job.source_revision == spec.source_revision
-                {
-                    item.demand_class = item.demand_class.min(spec.demand_class);
-                    item.job.priority = item.job.priority.min(spec.priority);
-                    continue;
-                }
-                item.job.cancellation.cancel();
-            }
-            let is_new = !was_tracked;
-            state.next_revision += 1;
-            let revision = state.next_revision;
-            let sequence = if let Some(old) = state.pending_by_path.get(&path) {
-                old.sequence
-            } else {
-                state.next_sequence += 1;
-                state.next_sequence
-            };
-            let pending = PendingThumbnail {
-                priority: spec.priority,
-                demand_class: spec.demand_class,
-                sequence,
-                revision,
-                source_revision: spec.source_revision,
-                attempts: 0,
-                not_before: Instant::now(),
-            };
-            state.pending_by_path.insert(path.clone(), pending.clone());
-            state.heap.push(Self::entry(path, &pending));
-            if is_new {
-                state.progress.requested_unique += 1;
-            }
+            Self::upsert_locked(&mut state, request.generation, spec);
         }
         self.enforce_bound(&mut state);
         Self::recount(&mut state);
@@ -281,46 +240,97 @@ impl ThumbnailScheduler {
         if path.is_empty() {
             return Err("thumbnail_path_empty");
         }
-        let (generation, priority, demand_class) = {
-            let mut state = self.state.lock().unwrap();
-            let key: Arc<str> = Arc::from(path);
-            let Some((priority, demand_class)) = state.demanded_by_path.get(&key).copied() else {
-                return Ok((InvalidationOutcome::Deferred, state.progress.clone()));
-            };
-            if state
-                .last_invalidation_by_path
-                .get(&key)
-                .is_some_and(|revision| revision == &source_revision)
-            {
-                return Ok((InvalidationOutcome::Duplicate, state.progress.clone()));
-            }
-            let duplicate_pending = state
-                .pending_by_path
-                .get(&key)
-                .is_some_and(|item| item.source_revision.as_deref() == Some(&source_revision));
-            let duplicate_in_flight = state
-                .in_flight
-                .get(&key)
-                .is_some_and(|item| item.job.source_revision.as_deref() == Some(&source_revision));
-            if duplicate_pending || duplicate_in_flight {
-                return Ok((InvalidationOutcome::Duplicate, state.progress.clone()));
-            }
-            state
-                .last_invalidation_by_path
-                .insert(key, source_revision.clone());
-            (state.active_generation, priority, demand_class)
+        let mut state = self.state.lock().unwrap();
+        let key: Arc<str> = Arc::from(path);
+        let Some((priority, demand_class)) = state.demanded_by_path.get(&key).copied() else {
+            return Ok((InvalidationOutcome::Deferred, state.progress.clone()));
         };
-        let progress = self.update(UpdateThumbnailQueueRequest {
+        if state
+            .last_invalidation_by_path
+            .get(&key)
+            .is_some_and(|revision| revision == &source_revision)
+        {
+            return Ok((InvalidationOutcome::Duplicate, state.progress.clone()));
+        }
+        let duplicate_pending = state
+            .pending_by_path
+            .get(&key)
+            .is_some_and(|item| item.source_revision.as_deref() == Some(&source_revision));
+        let duplicate_in_flight = state
+            .in_flight
+            .get(&key)
+            .is_some_and(|item| item.job.source_revision.as_deref() == Some(&source_revision));
+        if duplicate_pending || duplicate_in_flight {
+            return Ok((InvalidationOutcome::Duplicate, state.progress.clone()));
+        }
+        let generation = state.active_generation;
+        state
+            .last_invalidation_by_path
+            .insert(key, source_revision.clone());
+        Self::upsert_locked(
+            &mut state,
             generation,
-            replace_pending: false,
-            requests: vec![ThumbnailRequestSpec {
+            ThumbnailRequestSpec {
                 demand_class,
                 path: path.to_string(),
                 priority,
                 source_revision: Some(source_revision),
-            }],
-        })?;
+            },
+        );
+        self.enforce_bound(&mut state);
+        Self::recount(&mut state);
+        let progress = state.progress.clone();
+        drop(state);
+        self.wake.notify_all();
         Ok((InvalidationOutcome::Scheduled, progress))
+    }
+
+    fn upsert_locked(
+        state: &mut ThumbnailSchedulerState,
+        generation: ThumbnailGeneration,
+        spec: ThumbnailRequestSpec,
+    ) {
+        let path: Arc<str> = Arc::from(spec.path.trim());
+        if path.is_empty() {
+            return;
+        }
+        state
+            .demanded_by_path
+            .insert(path.clone(), (spec.priority, spec.demand_class));
+        let was_tracked =
+            state.pending_by_path.contains_key(&path) || state.in_flight.contains_key(&path);
+        if let Some(item) = state.in_flight.get_mut(&path) {
+            if item.job.generation == generation && item.job.source_revision == spec.source_revision
+            {
+                item.demand_class = item.demand_class.min(spec.demand_class);
+                item.job.priority = item.job.priority.min(spec.priority);
+                return;
+            }
+            item.job.cancellation.cancel();
+        }
+        let is_new = !was_tracked;
+        state.next_revision += 1;
+        let revision = state.next_revision;
+        let sequence = if let Some(old) = state.pending_by_path.get(&path) {
+            old.sequence
+        } else {
+            state.next_sequence += 1;
+            state.next_sequence
+        };
+        let pending = PendingThumbnail {
+            priority: spec.priority,
+            demand_class: spec.demand_class,
+            sequence,
+            revision,
+            source_revision: spec.source_revision,
+            attempts: 0,
+            not_before: Instant::now(),
+        };
+        state.pending_by_path.insert(path.clone(), pending.clone());
+        state.heap.push(Self::entry(path, &pending));
+        if is_new {
+            state.progress.requested_unique += 1;
+        }
     }
 
     fn entry(path: Arc<str>, pending: &PendingThumbnail) -> HeapEntry {
@@ -709,6 +719,39 @@ mod tests {
         assert_eq!((scheduled, deferred), (32, 968));
         assert_eq!(progress.requested_unique, 32);
         assert_eq!(progress.pending, 32);
+    }
+
+    #[test]
+    fn generation_replacement_clears_revision_marker_with_demand_atomically() {
+        let scheduler = ThumbnailScheduler::new(Default::default());
+        scheduler
+            .update(update(
+                8,
+                vec![spec("visible", 0, ThumbnailDemandClass::Visible)],
+            ))
+            .unwrap();
+        assert_eq!(
+            scheduler
+                .invalidate_if_demanded("visible", "revision-b".into())
+                .unwrap()
+                .0,
+            InvalidationOutcome::Scheduled
+        );
+
+        scheduler
+            .update(update(
+                9,
+                vec![spec("visible", 0, ThumbnailDemandClass::Visible)],
+            ))
+            .unwrap();
+        let (outcome, progress) = scheduler
+            .invalidate_if_demanded("visible", "revision-b".into())
+            .unwrap();
+        assert_eq!(outcome, InvalidationOutcome::Scheduled);
+        assert_eq!(progress.generation.0, 9);
+        let current = scheduler.claim().unwrap();
+        assert_eq!(current.generation.0, 9);
+        assert_eq!(current.source_revision.as_deref(), Some("revision-b"));
     }
 
     #[test]
