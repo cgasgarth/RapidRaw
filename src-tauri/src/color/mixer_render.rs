@@ -431,7 +431,7 @@ mod gpu_runtime_tests {
     use crate::AppState;
     use crate::adjustments::parse::get_all_adjustments_from_json;
     use crate::gpu_processing::{
-        RenderRequest, Roi, get_or_init_compute_gpu_context_for_tests,
+        RenderRequest, Roi, acquire_gpu_test_lock, get_or_init_compute_gpu_context_for_tests,
         process_and_get_dynamic_image, process_and_get_unclamped_dynamic_image,
     };
 
@@ -468,6 +468,7 @@ mod gpu_runtime_tests {
             2,
             Rgba([0.68, 0.48, 0.34, 1.0]),
         ));
+        let _gpu_test_guard = acquire_gpu_test_lock();
         let recipe = json!({
             "colorBalanceRgb": {
                 "enabled": true,

@@ -42,10 +42,10 @@ export function buildRawWarningChips(input: RawWarningReceiptInput, t: TFunction
   if (report?.demosaicPath === 'fast' || report?.demosaicPath === 'linear_bypass') {
     addChip(chips, `demosaic_${report.demosaicPath}`, report.demosaicPath, 'caution');
   }
-  for (const warningCode of report?.highlightReconstruction.warningCodes ?? []) {
+  for (const warningCode of report?.highlightReconstruction?.warningCodes ?? []) {
     addChip(chips, warningCode, warningCode, 'warning');
   }
-  if ((report?.highlightReconstruction.unrecoverableSamples ?? 0) > 0) {
+  if ((report?.highlightReconstruction?.unrecoverableSamples ?? 0) > 0) {
     addChip(chips, 'unrecoverable_sensor_highlights', 'unrecoverable sensor highlights', 'warning');
   }
   if (input.policyStatus && input.policyStatus !== 'applied') {

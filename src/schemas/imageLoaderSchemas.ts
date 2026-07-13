@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { rawInputTransformReceiptV2Schema } from '../../packages/rawengine-schema/src/color/rawInputTransformSchemas';
 import type { Adjustments } from '../utils/adjustments';
 
 const legacyAdjustmentSnapshotSchema = z.custom<Partial<Adjustments>>(
@@ -26,6 +27,24 @@ export const rawCameraProfileStatusSchema = z.enum([
   'single_illuminant',
   'unavailable',
 ]);
+
+export const rawCameraProfileAlgorithmIdSchema = z.enum([
+  'dual_illuminant_mired_v1',
+  'dual_illuminant_camera_neutral_mired_v2',
+]);
+
+export const rawIlluminantEstimateMethodSchema = z.enum([
+  'as_shot_white_xy',
+  'camera_neutral_iterative',
+  'wb_coeff_ratio',
+  'fallback',
+  'camera_neutral_profile_projection',
+  'white_balance_plan_v1',
+]);
+
+const rawProfileIlluminantXySchema = z
+  .tuple([z.number().positive().max(1), z.number().positive().max(1)])
+  .refine(([x, y]) => x + y < 1, 'Chromaticity x + y must be less than 1.');
 
 export const rawCameraProfileColorCheckerGateStatusSchema = z.enum([
   'gated_fail',
@@ -73,7 +92,7 @@ export const rawCameraProfileColorCheckerGateSchema = z
 
 export const rawCameraProfileReportSchema = z
   .object({
-    algorithmId: z.string().trim().min(1),
+    algorithmId: rawCameraProfileAlgorithmIdSchema,
     cameraModel: z.string().trim().min(1).nullable().optional(),
     candidateCount: z.number().int().nonnegative(),
     cctClamped: z.boolean().nullable().optional(),
@@ -83,14 +102,21 @@ export const rawCameraProfileReportSchema = z
     estimatedCctKelvin: z.number().positive().nullable().optional(),
     fallbackReason: z.string().trim().min(1).nullable().optional(),
     illuminantEstimateConfidence: z.enum(['high', 'medium', 'low']),
-    illuminantEstimateMethod: z.enum(['as_shot_white_xy', 'camera_neutral_iterative', 'wb_coeff_ratio', 'fallback']),
+    illuminantEstimateMethod: rawIlluminantEstimateMethodSchema,
     matrixHash: z
       .string()
       .regex(/^(?:blake3|sha256):[0-9a-f]+$/u)
       .nullable()
       .optional(),
+    profileIlluminantDuv: z.number().finite().min(-0.05).max(0.05).nullable().optional(),
+    profileIlluminantXy: rawProfileIlluminantXySchema.nullable().optional(),
     status: rawCameraProfileStatusSchema,
     warmIlluminant: z.string().trim().min(1).nullable().optional(),
+    whiteBalancePlanFingerprint: z
+      .string()
+      .regex(/^blake3:[0-9a-f]{64}$/u)
+      .nullable()
+      .optional(),
     warningCodes: z.array(z.string().trim().min(1)),
   })
   .strict();
@@ -128,36 +154,7 @@ export const rawDevelopmentReportSchema = z
   .object({
     cameraProfile: rawCameraProfileReportSchema,
     selectedCameraProfile: selectedCameraProfileReceiptSchema.nullable().optional(),
-    inputTransform: z
-      .object({
-        asShotCameraWbGains: z.tuple([z.number().positive(), z.number().positive(), z.number().positive()]),
-        cameraMakeModelId: z.string().trim().min(1),
-        chromaticAdaptation: z.enum(['none_same_white', 'bradford_v1', 'already_adapted']),
-        contract: z.literal('rapidraw.raw_input_transform.v2'),
-        destinationDomain: z.literal('acescg_linear_v1'),
-        destinationWhiteXy: z.tuple([z.literal(0.32168), z.literal(0.33767)]),
-        greaterThanOneAp1ComponentCount: z.number().int().nonnegative(),
-        invariantPolicyVersion: z.literal('camera_input_physical_invariants_v1'),
-        limitationCodes: z.array(z.string().trim().min(1)),
-        negativeAp1ComponentCount: z.number().int().nonnegative(),
-        nonFiniteCount: z.literal(0),
-        numericPolicyVersion: z.string().trim().min(1),
-        outcome: z.literal('primary_calibrated_ap1'),
-        outcomeReason: z.literal('validated_camera_profile'),
-        profileSource: z.enum(['raw_metadata', 'project_profile']),
-        resolverAlgorithmId: z.literal('dual_illuminant_mired_v1'),
-        selectedCalibrationWhiteXy: z.tuple([z.number().positive(), z.number().positive()]),
-        selectedMatrixDirection: z.literal('xyz_to_camera'),
-        selectedMatrixSha256: z.string().regex(/^blake3:[0-9a-f]+$/u),
-        sensorFloorCount: z.number().int().nonnegative(),
-        sourceDomain: z.literal('linear_camera_rgb_v1'),
-        transformContentSha256: z.string().regex(/^blake3:[0-9a-f]+$/u),
-        workingPixelsBlake3: z.string().regex(/^blake3:[0-9a-f]+$/u),
-        xyzToAp1MatrixVersion: z.string().trim().min(1),
-      })
-      .strict()
-      .nullable()
-      .optional(),
+    inputTransform: rawInputTransformReceiptV2Schema.nullable().optional(),
     demosaicAlgorithmId: z.string().trim().min(1).nullable().optional(),
     demosaicPath: rawDemosaicPathSchema,
     highlightReconstruction: z
@@ -194,7 +191,8 @@ export const rawDevelopmentReportSchema = z
         unrecoverableSamples: z.number().int().nonnegative(),
         warningCodes: z.array(z.string().trim().min(1)),
       })
-      .strict(),
+      .strict()
+      .optional(),
     processingProfile: rawProcessingProfileSchema,
     runtime: z
       .object({
@@ -243,7 +241,16 @@ export const rawDevelopmentReportSchema = z
       .nullable()
       .optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((report, context) => {
+    if (report.inputTransform && report.cameraProfile.algorithmId !== report.inputTransform.resolverAlgorithmId) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Camera-profile and input-transform resolver algorithm IDs must match.',
+        path: ['inputTransform', 'resolverAlgorithmId'],
+      });
+    }
+  });
 
 export const rawCameraProfileProvenanceReceiptSchema = z
   .object({

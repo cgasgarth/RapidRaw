@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+export const rawInputTransformResolverAlgorithmIdSchema = z.enum([
+  'dual_illuminant_mired_v1',
+  'dual_illuminant_camera_neutral_mired_v2',
+]);
+
 export const rawInputTransformReceiptV2Schema = z
   .object({
     asShotCameraWbGains: z.tuple([z.number().positive(), z.number().positive(), z.number().positive()]),
@@ -17,7 +22,7 @@ export const rawInputTransformReceiptV2Schema = z
     outcome: z.literal('primary_calibrated_ap1'),
     outcomeReason: z.literal('validated_camera_profile'),
     profileSource: z.enum(['raw_metadata', 'project_profile']),
-    resolverAlgorithmId: z.literal('dual_illuminant_mired_v1'),
+    resolverAlgorithmId: rawInputTransformResolverAlgorithmIdSchema,
     selectedCalibrationWhiteXy: z.tuple([z.number().positive(), z.number().positive()]),
     selectedMatrixDirection: z.literal('xyz_to_camera'),
     selectedMatrixSha256: z.string().regex(/^blake3:[0-9a-f]+$/u),
