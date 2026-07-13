@@ -11,23 +11,44 @@ use crate::app_state::{AnalyticsFrameId, AnalyticsJob, AnalyticsProducts};
 const SCOPE_SIZE: usize = 256;
 const GAMUT_MAX: u32 = 512;
 const MAX_POOLED_SCOPE_BINS: usize = 6;
-static SCOPE_BIN_POOL: OnceLock<Mutex<Vec<Vec<u32>>>> = OnceLock::new();
+static SCOPE_BIN_POOL: OnceLock<ScopeBinPool> = OnceLock::new();
 
-fn scope_bins() -> Vec<u32> {
-    SCOPE_BIN_POOL
-        .get_or_init(Default::default)
-        .lock()
-        .unwrap()
-        .pop()
-        .unwrap_or_else(|| vec![0; SCOPE_SIZE * SCOPE_SIZE])
+#[derive(Default)]
+struct ScopeBinPool {
+    bins: Mutex<Vec<Vec<u32>>>,
 }
 
-fn return_scope_bins(mut bins: Vec<u32>) {
-    bins.fill(0);
-    let mut pool = SCOPE_BIN_POOL.get_or_init(Default::default).lock().unwrap();
-    if pool.len() < MAX_POOLED_SCOPE_BINS {
-        pool.push(bins);
+impl ScopeBinPool {
+    fn take(&self) -> Vec<u32> {
+        self.bins
+            .lock()
+            .unwrap()
+            .pop()
+            .unwrap_or_else(|| vec![0; SCOPE_SIZE * SCOPE_SIZE])
     }
+
+    fn return_bins(&self, mut bins: Vec<u32>) {
+        bins.fill(0);
+        let mut pool = self.bins.lock().unwrap();
+        if pool.len() < MAX_POOLED_SCOPE_BINS {
+            pool.push(bins);
+        }
+    }
+
+    #[cfg(test)]
+    fn retained(&self) -> usize {
+        self.bins.lock().unwrap().len()
+    }
+}
+
+fn scope_bins() -> Vec<u32> {
+    SCOPE_BIN_POOL.get_or_init(Default::default).take()
+}
+
+fn return_scope_bins(bins: Vec<u32>) {
+    SCOPE_BIN_POOL
+        .get_or_init(Default::default)
+        .return_bins(bins);
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq)]
@@ -699,15 +720,48 @@ mod tests {
 
     #[test]
     fn scope_pool_is_bounded_and_reused_after_completion() {
-        let image = DynamicImage::new_rgb8(4, 4);
-        calculate(&compat_job(&image, AnalyticsProducts::all()), || true).unwrap();
-        let retained = SCOPE_BIN_POOL.get().unwrap().lock().unwrap().len();
-        assert_eq!(retained, MAX_POOLED_SCOPE_BINS);
-        calculate(&compat_job(&image, AnalyticsProducts::WAVEFORM), || true).unwrap();
-        assert_eq!(
-            SCOPE_BIN_POOL.get().unwrap().lock().unwrap().len(),
-            retained
-        );
+        let pool = ScopeBinPool::default();
+        let bins = (0..MAX_POOLED_SCOPE_BINS + 2)
+            .map(|_| pool.take())
+            .collect::<Vec<_>>();
+        assert_eq!(pool.retained(), 0);
+        for bins in bins {
+            pool.return_bins(bins);
+        }
+        assert_eq!(pool.retained(), MAX_POOLED_SCOPE_BINS);
+
+        let reused = pool.take();
+        assert_eq!(pool.retained(), MAX_POOLED_SCOPE_BINS - 1);
+        assert!(reused.iter().all(|value| *value == 0));
+        pool.return_bins(reused);
+        assert_eq!(pool.retained(), MAX_POOLED_SCOPE_BINS);
+    }
+
+    #[test]
+    fn independent_scope_pools_do_not_contaminate_concurrent_accounting() {
+        let primary = Arc::new(ScopeBinPool::default());
+        let unrelated = Arc::new(ScopeBinPool::default());
+        let primary_worker = Arc::clone(&primary);
+        let unrelated_worker = Arc::clone(&unrelated);
+        let primary_thread = std::thread::spawn(move || {
+            for _ in 0..100 {
+                let bins = primary_worker.take();
+                primary_worker.return_bins(bins);
+            }
+        });
+        let unrelated_thread = std::thread::spawn(move || {
+            let held = (0..MAX_POOLED_SCOPE_BINS)
+                .map(|_| unrelated_worker.take())
+                .collect::<Vec<_>>();
+            for bins in held.into_iter().take(2) {
+                unrelated_worker.return_bins(bins);
+            }
+        });
+        primary_thread.join().unwrap();
+        unrelated_thread.join().unwrap();
+
+        assert_eq!(primary.retained(), 1);
+        assert_eq!(unrelated.retained(), 2);
     }
 
     #[test]
