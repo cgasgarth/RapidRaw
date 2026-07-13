@@ -39,7 +39,7 @@ import {
 } from '../utils/editorCompare';
 import { DEFAULT_EDITOR_ZOOM_MODE, type EditorZoomMode } from '../utils/editorZoom';
 import { loadMaskOverlaySettingsPreference } from '../utils/mask/maskOverlayPreferences';
-import type { ReferenceMatchGroup, ReferenceMatchReference } from '../utils/referenceMatch';
+import type { ReferenceMatchGroup, ReferenceMatchReference, ReferenceSpatialAnalysis } from '../utils/referenceMatch';
 import { PANEL_SCOPES_HEIGHT } from '../utils/waveformSizing';
 import type { WhiteBalancePickerRuntimeReceipt } from '../utils/whiteBalancePicker';
 
@@ -176,6 +176,7 @@ interface EditorState {
 
   // Analytics
   histogram: ChannelConfig | null;
+  referenceMatchSpatialAnalysis: ReferenceSpatialAnalysis | null;
   waveform: WaveformData | null;
   previewScopeStatus: PreviewScopeStatus | null;
   previewScopeRecoveryRequestId: number;
@@ -370,6 +371,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   lastReferenceMatchApplicationReceipt: null,
   referenceMatchPreview: null,
   histogram: null,
+  referenceMatchSpatialAnalysis: null,
   waveform: null,
   previewScopeStatus: null,
   previewScopeRecoveryRequestId: 0,

@@ -32,6 +32,7 @@ export default function ReferenceMatchPanel() {
     histogram,
     proofRevision,
     references,
+    spatialAnalysis,
     selectedImage,
     setReferences,
     setEditor,
@@ -44,6 +45,7 @@ export default function ReferenceMatchPanel() {
       histogram: state.histogram,
       proofRevision: state.proofRevision,
       references: state.referenceMatchReferences,
+      spatialAnalysis: state.referenceMatchSpatialAnalysis,
       selectedImage: state.selectedImage,
       setReferences: state.setReferenceMatchReferences,
       setEditor: state.setEditor,
@@ -52,7 +54,11 @@ export default function ReferenceMatchPanel() {
   const [proposal, setProposal] = useState<ReferenceMatchProposal | null>(null);
   const [impact, setImpact] = useState(100);
   const [enabledGroups, setEnabledGroups] = useState<Set<ReferenceMatchGroup>>(() => new Set(GROUPS));
-  const targetSummary = useMemo(() => summarizeReferenceHistogram(histogram), [histogram]);
+  const targetSummary = useMemo(
+    () =>
+      summarizeReferenceHistogram(histogram, spatialAnalysis?.path === selectedImage?.path ? spatialAnalysis : null),
+    [histogram, selectedImage?.path, spatialAnalysis],
+  );
   const currentRenderUrl = finalPreviewUrl ?? selectedImage?.originalUrl ?? null;
   const isCurrentReference = references.some((reference) => reference.path === selectedImage?.path);
   const canCapture = Boolean(

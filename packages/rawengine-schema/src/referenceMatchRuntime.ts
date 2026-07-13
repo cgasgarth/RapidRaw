@@ -41,6 +41,23 @@ export const referenceDistributionSummaryV1Schema = z
     lumaSpread: z.number().min(0).max(0.5),
     redMean: z.number().min(0).max(1),
     sampleCount: z.number().int().positive(),
+    spatialTiles: z
+      .array(
+        z
+          .object({
+            blueMean: z.number().min(0).max(1),
+            clippedFraction: z.number().min(0).max(1),
+            greenMean: z.number().min(0).max(1),
+            lumaMean: z.number().min(0).max(1),
+            lumaSpread: z.number().min(0).max(0.5),
+            redMean: z.number().min(0).max(1),
+            sampleCount: z.number().int().nonnegative(),
+            x: z.number().int().nonnegative(),
+            y: z.number().int().nonnegative(),
+          })
+          .strict(),
+      )
+      .max(64),
   })
   .strict();
 

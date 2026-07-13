@@ -19,6 +19,27 @@ export interface ReferenceHistogramSummary {
   lumaSpread: number;
   redMean: number;
   sampleCount: number;
+  spatialTiles: ReferenceSpatialTileSummary[];
+}
+
+export interface ReferenceSpatialTileSummary {
+  blueMean: number;
+  clippedFraction: number;
+  greenMean: number;
+  lumaMean: number;
+  lumaSpread: number;
+  redMean: number;
+  sampleCount: number;
+  x: number;
+  y: number;
+}
+
+export interface ReferenceSpatialAnalysis {
+  frameId: { graphRevision: number; imageSession: number; previewGeneration: number };
+  gridHeight: number;
+  gridWidth: number;
+  path: string;
+  tiles: ReferenceSpatialTileSummary[];
 }
 
 export interface ReferenceMatchReference {
@@ -161,7 +182,10 @@ const channelMoments = (bins: number[] | undefined): { mean: number; spread: num
   return { count, mean, spread: Math.sqrt(variance) };
 };
 
-export const summarizeReferenceHistogram = (histogram: MatchHistogram | null): ReferenceHistogramSummary | null => {
+export const summarizeReferenceHistogram = (
+  histogram: MatchHistogram | null,
+  spatial: ReferenceSpatialAnalysis | null = null,
+): ReferenceHistogramSummary | null => {
   if (!histogram) return null;
   const lumaBins = histogram.luma.data;
   const luma = channelMoments(lumaBins);
@@ -178,6 +202,7 @@ export const summarizeReferenceHistogram = (histogram: MatchHistogram | null): R
     lumaSpread: luma.spread,
     redMean: red.mean,
     sampleCount: Math.min(luma.count, red.count, green.count, blue.count),
+    spatialTiles: spatial?.tiles ?? [],
   };
 };
 
@@ -198,7 +223,31 @@ export const combineReferenceSummaries = (
     lumaSpread: weighted((summary) => summary.lumaSpread),
     redMean: weighted((summary) => summary.redMean),
     sampleCount: Math.round(weighted((summary) => summary.sampleCount)),
+    spatialTiles: valid.every(
+      (reference) => reference.summary.spatialTiles.length === valid[0]?.summary.spatialTiles.length,
+    )
+      ? (valid[0]?.summary.spatialTiles.map((tile, index) => ({
+          ...tile,
+          blueMean: weighted((summary) => summary.spatialTiles[index]?.blueMean ?? tile.blueMean),
+          clippedFraction: weighted((summary) => summary.spatialTiles[index]?.clippedFraction ?? tile.clippedFraction),
+          greenMean: weighted((summary) => summary.spatialTiles[index]?.greenMean ?? tile.greenMean),
+          lumaMean: weighted((summary) => summary.spatialTiles[index]?.lumaMean ?? tile.lumaMean),
+          lumaSpread: weighted((summary) => summary.spatialTiles[index]?.lumaSpread ?? tile.lumaSpread),
+          redMean: weighted((summary) => summary.spatialTiles[index]?.redMean ?? tile.redMean),
+          sampleCount: Math.round(weighted((summary) => summary.spatialTiles[index]?.sampleCount ?? tile.sampleCount)),
+        })) ?? [])
+      : [],
   };
+};
+
+const hasLocalizedMismatch = (target: ReferenceHistogramSummary, reference: ReferenceHistogramSummary): boolean => {
+  if (target.spatialTiles.length < 4 || target.spatialTiles.length !== reference.spatialTiles.length) return false;
+  const deltas = target.spatialTiles.map(
+    (tile, index) => (reference.spatialTiles[index]?.lumaMean ?? 0) - tile.lumaMean,
+  );
+  const mean = deltas.reduce((sum, value) => sum + value, 0) / deltas.length;
+  const disagreement = deltas.reduce((sum, value) => sum + Math.abs(value - mean), 0) / deltas.length;
+  return disagreement > Math.max(0.06, Math.abs(mean) * 1.25);
 };
 
 const colorfulness = (summary: ReferenceHistogramSummary): number =>
@@ -302,6 +351,7 @@ export const createReferenceMatchProposal = ({
     predicted.greenMean = clamp(target.greenMean + tintDelta, 0, 1);
   }
   const residualAfter = summaryDistance(predicted, reference);
+  const localizedMismatch = hasLocalizedMismatch(target, reference);
   const warnings = [
     ...(references.some((item) => item.path.length === 0) ? ['Reference source identity is incomplete.'] : []),
     ...(reference.clippedFraction > 0.02 || target.clippedFraction > 0.02
@@ -314,7 +364,11 @@ export const createReferenceMatchProposal = ({
       ? ['Reference and target camera profiles differ; profile replacement is excluded.']
       : []),
     ...(target.sampleCount < 256 ? ['Target histogram has limited sample support.'] : []),
-    'Global histogram analysis cannot distinguish localized subject differences; inspect the compare view before apply.',
+    ...(localizedMismatch
+      ? ['Spatial tiles disagree with a global match; localized subject differences reduce reliability.']
+      : target.spatialTiles.length === 0 || reference.spatialTiles.length === 0
+        ? ['Spatial analysis is unavailable; inspect localized subject differences before apply.']
+        : []),
   ];
   const recommendedDiffs = diffs.filter((diff) => Math.abs(diff.proposed - diff.current) >= 0.005);
   if (recommendedDiffs.length === 0) return null;
@@ -327,7 +381,8 @@ export const createReferenceMatchProposal = ({
     JSON.stringify({ diffs: recommendedDiffs, effectiveReferences, mode, targetAnalysisFingerprint }),
   );
   return matchLookProposalV1Schema.parse({
-    confidence: clamp(Math.min(target.sampleCount, reference.sampleCount) / 4096, 0.2, 0.98),
+    confidence:
+      clamp(Math.min(target.sampleCount, reference.sampleCount) / 4096, 0.2, 0.98) * (localizedMismatch ? 0.55 : 1),
     diffs: recommendedDiffs,
     effectiveReferences,
     mode,
