@@ -34,6 +34,7 @@ pub enum FixtureDomain {
     SpatialLinear,
     PqAbsoluteLuminance,
     HlgSceneLinear,
+    Rec2100AbsoluteRgb,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -45,6 +46,7 @@ pub enum FixtureUnits {
     RelativeLinearLightPerPixel,
     AbsoluteNitsAndPqSignal,
     HlgSceneLinearAndSignal,
+    AbsoluteNits,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -78,6 +80,7 @@ pub enum FixtureId {
     Spatial(SpatialPattern),
     PqRamp,
     HlgRamp,
+    Rec2100HdrColors,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -308,7 +311,37 @@ pub fn generate_fixture_packs() -> Result<Vec<FixturePack>, ReferenceError> {
         },
         FixtureData::Transfer(hlg),
     ));
+    let hdr_colors = rec2100_hdr_colors();
+    packs.push(pack(
+        FixtureId::Rec2100HdrColors,
+        FixtureDomain::Rec2100AbsoluteRgb,
+        FixtureUnits::AbsoluteNits,
+        FixtureShape {
+            width: hdr_colors.len(),
+            height: 1,
+            channels: 3,
+            samples: hdr_colors.len(),
+        },
+        FixtureData::Rgb(hdr_colors),
+    ));
     Ok(packs)
+}
+
+fn rec2100_hdr_colors() -> Vec<RgbSample> {
+    [
+        [0.0, 0.0, 0.0],
+        [0.1, 0.1, 0.1],
+        [100.0, 100.0, 100.0],
+        [203.0, 203.0, 203.0],
+        [1_000.0, 1_000.0, 1_000.0],
+        [10_000.0, 10_000.0, 10_000.0],
+        [1_000.0, 0.0, 0.0],
+        [0.0, 1_000.0, 0.0],
+        [0.0, 0.0, 1_000.0],
+        [600.0, 120.0, 20.0],
+    ]
+    .map(|[red, green, blue]| RgbSample { red, green, blue })
+    .to_vec()
 }
 
 fn pack(
@@ -525,6 +558,7 @@ fn fixture_id_tag(id: FixtureId) -> u8 {
         FixtureId::Spatial(_) => 5,
         FixtureId::PqRamp => 6,
         FixtureId::HlgRamp => 7,
+        FixtureId::Rec2100HdrColors => 8,
     }
 }
 

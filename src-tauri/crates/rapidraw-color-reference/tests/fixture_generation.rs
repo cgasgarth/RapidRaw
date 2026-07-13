@@ -31,7 +31,7 @@ fn fixture_generation_is_bit_deterministic_and_manifests_are_complete() {
     let first = generate_fixture_packs().unwrap();
     let second = generate_fixture_packs().unwrap();
     assert_eq!(first, second);
-    assert_eq!(first.len(), 14);
+    assert_eq!(first.len(), 15);
     assert_eq!(
         first[0].manifest.content_hash.to_hex(),
         "dc6cde97ae4f9c2f18fbf114e894852cf70c654cd156559502eab7588b4bdf0a"
@@ -113,6 +113,23 @@ fn extended_color_fixtures_cover_negative_highlight_and_semantic_cloud_domains()
             assert!(samples.iter().any(|sample| sample.rgb.green < 0.0));
         }
     }
+}
+
+#[test]
+fn rec2100_hdr_fixture_covers_absolute_neutrals_primaries_and_mixed_color() {
+    let FixtureData::Rgb(samples) = fixture(FixtureId::Rec2100HdrColors).data else {
+        panic!("Rec.2100 HDR fixture must contain RGB samples");
+    };
+    assert_eq!(samples.len(), 10);
+    assert!(samples.iter().any(|sample| sample.red == 10_000.0));
+    assert!(
+        samples
+            .iter()
+            .any(|sample| { sample.red == 1_000.0 && sample.green == 0.0 && sample.blue == 0.0 })
+    );
+    assert!(samples.iter().any(|sample| {
+        sample.red != sample.green && sample.green != sample.blue && sample.blue != sample.red
+    }));
 }
 
 #[test]
