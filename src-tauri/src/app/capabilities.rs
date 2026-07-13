@@ -32,6 +32,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(feature = "full")]
     fn required_ci_reports_full_product_capabilities() {
         let manifest = get_native_capabilities();
         assert_eq!(manifest.schema_version, 1);
@@ -42,9 +43,10 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "full"))]
     fn fast_dev_reports_only_always_available_capabilities() {
         assert_eq!(
-            build_native_capabilities(false, false, false),
+            get_native_capabilities(),
             NativeCapabilityManifest {
                 schema_version: 1,
                 build_profile: NativeBuildProfile::FastDev,
