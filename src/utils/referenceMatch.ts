@@ -501,6 +501,24 @@ export const applyReferenceMatchProposal = ({
   return next;
 };
 
+export const createReferenceMatchAppliedDiffs = ({
+  adjustments,
+  enabledGroups,
+  impact,
+  proposal,
+}: {
+  adjustments: Adjustments;
+  enabledGroups: ReadonlySet<ReferenceMatchGroup>;
+  impact: number;
+  proposal: ReferenceMatchProposal;
+}): MatchLookApplicationReceiptV1['appliedDiffs'] => {
+  const applied = applyReferenceMatchProposal({ adjustments, enabledGroups, impact, proposal });
+  return proposal.diffs
+    .filter((diff) => enabledGroups.has(diff.group) && applied[diff.key] !== adjustments[diff.key])
+    .map((diff) => ({ after: applied[diff.key], before: adjustments[diff.key], key: diff.key }))
+    .sort((left, right) => left.key.localeCompare(right.key));
+};
+
 export const resolveReferenceMatchRenderAdjustments = ({
   adjustmentRevision,
   committed,
