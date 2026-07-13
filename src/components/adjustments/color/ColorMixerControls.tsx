@@ -58,6 +58,7 @@ export const enableBlackWhiteMixer = (
 
 export const isBlackWhiteMixerModified = (settings: BlackWhiteMixerSettings): boolean =>
   settings.enabled !== INITIAL_ADJUSTMENTS.blackWhiteMixer.enabled ||
+  settings.process !== INITIAL_ADJUSTMENTS.blackWhiteMixer.process ||
   Object.keys(settings.weights).some(
     (channel) =>
       settings.weights[channel as BlackWhiteMixerChannel] !==

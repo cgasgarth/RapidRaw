@@ -34,16 +34,26 @@ const rgbToHueDegrees = ({ blue, green, red }: RgbPixel) => {
 };
 
 const rec709Luminance = ({ blue, green, red }: RgbPixel) => 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+const acesCgLuminance = ({ blue, green, red }: RgbPixel) => 0.27222872 * red + 0.67408174 * green + 0.05368952 * blue;
 
 export function applyBlackWhiteMixerToRgbPixel(pixel: RgbPixel, value: unknown): BlackWhiteMixerRuntimeResult {
   const settings = parseBlackWhiteMixerSettings(value);
-  const luminance = rec709Luminance(pixel);
+  const luminance = settings.process === 'neutral_panchromatic_v1' ? acesCgLuminance(pixel) : rec709Luminance(pixel);
 
   if (!settings.enabled) {
     return {
       influence: {},
       luminance,
       outputRgb: { ...pixel },
+      weightedAdjustment: 0,
+    };
+  }
+
+  if (settings.process === 'neutral_panchromatic_v1') {
+    return {
+      influence: {},
+      luminance,
+      outputRgb: { blue: luminance, green: luminance, red: luminance },
       weightedAdjustment: 0,
     };
   }
