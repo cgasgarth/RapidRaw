@@ -2,6 +2,10 @@ use crate::color::camera_input_transform::{
     AcesCgLinearV1, CameraInputTransform, CameraRgbWhiteBalanceGains, RawInputTransformReceiptV1,
     RawWorkingImageV1, XyzToCameraMatrix, apply_camera_input_transform,
 };
+use crate::color::camera_profile::{
+    CAMERA_PROFILE_CONTRACT, CameraProfileReceiptV1, execute::compile_camera_profile,
+    registry::resolve_managed_profile,
+};
 #[cfg(test)]
 use crate::color::white_balance::{
     WhiteBalanceModeV1, WhiteBalancePlanInputV1, compile_white_balance_plan,
@@ -92,6 +96,7 @@ pub(crate) enum RawDemosaicPath {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct RawCameraProfileReport {
     pub algorithm_id: &'static str,
+    pub camera_model: Option<String>,
     pub candidate_count: usize,
     pub cct_clamped: Option<bool>,
     pub cool_illuminant: Option<String>,
@@ -113,6 +118,7 @@ impl RawCameraProfileReport {
     fn unavailable(reason: &'static str, candidate_count: usize) -> Self {
         Self {
             algorithm_id: CAMERA_PROFILE_RESOLVER_ALGORITHM_ID,
+            camera_model: None,
             candidate_count,
             cct_clamped: None,
             cool_illuminant: None,
@@ -149,10 +155,24 @@ pub(crate) struct RawDevelopmentReport {
     pub demosaic_algorithm_id: Option<&'static str>,
     pub processing_profile: RawProcessingProfile,
     pub camera_profile: RawCameraProfileReport,
+    pub selected_camera_profile: Option<CameraProfileReceiptV1>,
     pub input_transform: Option<RawInputTransformReceiptV1>,
     pub highlight_reconstruction: HighlightReconstructionReportV2,
     pub runtime: Option<RawRuntimeReport>,
     pub xtrans_hq: Option<XTransHqDevelopmentReport>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct CameraProfileSelectionV1 {
+    pub id: String,
+    pub creative_amount: f32,
+    pub managed_root: std::path::PathBuf,
+}
+
+#[derive(Debug, Clone, Default)]
+pub(crate) struct RawTechnicalPlansV1 {
+    pub white_balance: Option<WhiteBalancePlanV1>,
+    pub camera_profile: Option<CameraProfileSelectionV1>,
 }
 
 pub(crate) fn develop_raw_image_with_report(
@@ -184,7 +204,7 @@ pub(crate) fn develop_raw_image_with_report_and_white_balance(
     highlight_compression: f32,
     linear_mode: String,
     cancel_token: Option<(Arc<AtomicUsize>, usize)>,
-    white_balance_plan: WhiteBalancePlanV1,
+    technical_plans: RawTechnicalPlansV1,
 ) -> Result<(DynamicImage, RawDevelopmentReport)> {
     #[cfg(test)]
     RAW_DEVELOPMENT_INVOCATIONS.fetch_add(1, Ordering::SeqCst);
@@ -196,7 +216,8 @@ pub(crate) fn develop_raw_image_with_report_and_white_balance(
         linear_mode,
         cancel_token,
         RawDefectDevelopmentOptions {
-            white_balance_plan: Some(white_balance_plan),
+            white_balance_plan: technical_plans.white_balance,
+            camera_profile_selection: technical_plans.camera_profile,
             ..RawDefectDevelopmentOptions::default()
         },
     )?;
@@ -232,7 +253,7 @@ pub(crate) fn develop_raw_source_with_report_and_white_balance(
     highlight_compression: f32,
     linear_mode: String,
     cancel_token: Option<(Arc<AtomicUsize>, usize)>,
-    white_balance_plan: WhiteBalancePlanV1,
+    technical_plans: RawTechnicalPlansV1,
 ) -> Result<(DynamicImage, RawDevelopmentReport)> {
     #[cfg(test)]
     RAW_DEVELOPMENT_INVOCATIONS.fetch_add(1, Ordering::SeqCst);
@@ -244,7 +265,8 @@ pub(crate) fn develop_raw_source_with_report_and_white_balance(
         linear_mode,
         cancel_token,
         RawDefectDevelopmentOptions {
-            white_balance_plan: Some(white_balance_plan),
+            white_balance_plan: technical_plans.white_balance,
+            camera_profile_selection: technical_plans.camera_profile,
             ..RawDefectDevelopmentOptions::default()
         },
     )?;
@@ -257,6 +279,7 @@ struct RawDefectDevelopmentOptions {
     inject_test_defects: bool,
     repair_sensor_defects: bool,
     white_balance_plan: Option<WhiteBalancePlanV1>,
+    camera_profile_selection: Option<CameraProfileSelectionV1>,
 }
 
 impl Default for RawDefectDevelopmentOptions {
@@ -266,6 +289,7 @@ impl Default for RawDefectDevelopmentOptions {
             inject_test_defects: false,
             repair_sensor_defects: true,
             white_balance_plan: None,
+            camera_profile_selection: None,
         }
     }
 }
@@ -1019,6 +1043,7 @@ fn resolve_camera_color_profile(
             },
             report: RawCameraProfileReport {
                 algorithm_id: CAMERA_PROFILE_RESOLVER_ALGORITHM_ID,
+                camera_model: None,
                 candidate_count,
                 cct_clamped: None,
                 cool_illuminant: None,
@@ -1071,6 +1096,7 @@ fn resolve_camera_color_profile(
                 calibration_white_xy: profile_illuminant_xy,
                 report: RawCameraProfileReport {
                     algorithm_id: CAMERA_PROFILE_RESOLVER_ALGORITHM_ID,
+                    camera_model: None,
                     candidate_count,
                     cct_clamped: Some(cct_estimate.clamped),
                     cool_illuminant: Some(illuminant_label(cool.0)),
@@ -1096,6 +1122,7 @@ fn resolve_camera_color_profile(
             calibration_white_xy: profile_illuminant_xy,
             report: RawCameraProfileReport {
                 algorithm_id: CAMERA_PROFILE_RESOLVER_ALGORITHM_ID,
+                camera_model: None,
                 candidate_count,
                 cct_clamped: Some(cct_estimate.clamped),
                 cool_illuminant: Some(illuminant_label(warm.0)),
@@ -1130,6 +1157,7 @@ fn resolve_camera_color_profile(
         }),
         report: RawCameraProfileReport {
             algorithm_id: CAMERA_PROFILE_RESOLVER_ALGORITHM_ID,
+            camera_model: None,
             candidate_count,
             cct_clamped: Some(cct_estimate.clamped),
             cool_illuminant: candidates
@@ -1174,7 +1202,18 @@ fn apply_dual_illuminant_camera_profile(
     } else {
         raw_image.wb_coeffs
     };
-    let resolution = resolve_camera_color_profile(&raw_image.color_matrix, wb, white_balance_plan);
+    let mut resolution =
+        resolve_camera_color_profile(&raw_image.color_matrix, wb, white_balance_plan);
+    let camera_model = format!(
+        "{} {}",
+        raw_image.clean_make.trim(),
+        raw_image.clean_model.trim()
+    )
+    .trim()
+    .to_string();
+    if !camera_model.is_empty() {
+        resolution.report.camera_model = Some(camera_model);
+    }
     if let Some(color_matrix) = resolution.matrix.clone() {
         raw_image.color_matrix.clear();
         raw_image.color_matrix.insert(Illuminant::D65, color_matrix);
@@ -1431,7 +1470,7 @@ fn develop_internal_from_source(
         );
     }
 
-    let profile_resolution = if apply_calibration {
+    let mut profile_resolution = if apply_calibration {
         apply_dual_illuminant_camera_profile(
             &mut raw_image,
             defect_options.white_balance_plan.as_ref(),
@@ -1446,6 +1485,56 @@ fn develop_internal_from_source(
             ),
         }
     };
+    let camera_id = format!(
+        "{} {}",
+        raw_image.clean_make.trim(),
+        raw_image.clean_model.trim()
+    );
+    let selected_profile_plan_result =
+        defect_options
+            .camera_profile_selection
+            .as_ref()
+            .map(|selection| -> Result<_> {
+                let (profile, source) =
+                    resolve_managed_profile(&selection.id, &selection.managed_root)
+                        .ok_or_else(|| anyhow!("selected_camera_profile_missing"))?;
+                compile_camera_profile(
+                    &profile,
+                    source,
+                    Some(camera_id.trim()),
+                    raw_image
+                        .dng_tags
+                        .get(&50_931)
+                        .and_then(|value| value.as_string())
+                        .map(String::as_str),
+                    defect_options
+                        .white_balance_plan
+                        .as_ref()
+                        .and_then(WhiteBalancePlanV1::camera_profile_illuminant),
+                    selection.creative_amount,
+                )
+            });
+    let selected_profile_plan = match selected_profile_plan_result {
+        Some(Ok(plan)) => Some(plan),
+        Some(Err(error)) => {
+            let reason = selected_profile_fallback_reason(&error);
+            profile_resolution.report.status = "fallback";
+            profile_resolution.report.fallback_reason = Some(reason);
+            profile_resolution.report.warning_codes.push(reason);
+            None
+        }
+        None => None,
+    };
+    if let Some(plan) = &selected_profile_plan {
+        profile_resolution.matrix = Some(plan.xyz_to_camera_row_major()?);
+        profile_resolution.calibration_white_xy = Some([0.34567, 0.35850]);
+        profile_resolution.report.algorithm_id = CAMERA_PROFILE_CONTRACT;
+        profile_resolution.report.camera_model = Some(camera_id.trim().to_owned());
+        profile_resolution.report.matrix_hash = Some(plan.receipt.profile_sha256.clone());
+        profile_resolution.report.status = "selected_dcp";
+        profile_resolution.report.fallback_reason = None;
+        profile_resolution.report.warning_codes = plan.receipt.limitation_codes.clone();
+    }
     let camera_profile = profile_resolution.report.clone();
     if apply_calibration && is_linear_format {
         return Err(anyhow!("raw_input_transform_unsupported_linear_raw"));
@@ -1585,11 +1674,6 @@ fn develop_internal_from_source(
             .as_deref()
             .ok_or_else(|| anyhow!("raw_input_transform_missing_matrix_hash"))?;
         let wb = CameraRgbWhiteBalanceGains::from_rawler(raw_image.wb_coeffs)?;
-        let camera_id = format!(
-            "{} {}",
-            raw_image.clean_make.trim(),
-            raw_image.clean_model.trim()
-        );
         Some(apply_camera_input_transform(
             &mut pixels.data,
             CameraInputTransform {
@@ -1605,6 +1689,13 @@ fn develop_internal_from_source(
     } else {
         None
     };
+    if let (Some(plan), Intermediate::ThreeColor(pixels)) =
+        (&selected_profile_plan, &mut developed_intermediate)
+    {
+        pixels.data.iter_mut().for_each(|pixel| {
+            *pixel = plan.apply_creative(plan.apply_technical(*pixel));
+        });
+    }
     drop(raw_image);
 
     let (width, height) = {
@@ -1655,12 +1746,21 @@ fn develop_internal_from_source(
             },
             processing_profile: profile,
             camera_profile,
+            selected_camera_profile: selected_profile_plan.map(|plan| plan.receipt),
             input_transform,
             highlight_reconstruction: highlight_reconstruction_report,
             runtime: None,
             xtrans_hq: xtrans_hq_report,
         },
     ))
+}
+
+fn selected_profile_fallback_reason(error: &anyhow::Error) -> &'static str {
+    match error.root_cause().to_string().as_str() {
+        "selected_camera_profile_missing" => "selected_camera_profile_missing",
+        "camera_profile_camera_mismatch" => "selected_camera_profile_incompatible",
+        _ => "selected_camera_profile_invalid",
+    }
 }
 
 pub fn get_fast_demosaic_scale_factor(
@@ -1689,6 +1789,22 @@ pub fn get_fast_demosaic_scale_factor(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn selected_profile_fallback_distinguishes_missing_incompatible_and_invalid() {
+        assert_eq!(
+            selected_profile_fallback_reason(&anyhow!("selected_camera_profile_missing")),
+            "selected_camera_profile_missing"
+        );
+        assert_eq!(
+            selected_profile_fallback_reason(&anyhow!("camera_profile_camera_mismatch")),
+            "selected_camera_profile_incompatible"
+        );
+        assert_eq!(
+            selected_profile_fallback_reason(&anyhow!("camera_profile_singular_matrix")),
+            "selected_camera_profile_invalid"
+        );
+    }
     use serde::Deserialize;
     use std::{fs, path::Path};
 
@@ -2109,6 +2225,7 @@ mod tests {
             inject_test_defects: true,
             repair_sensor_defects: false,
             white_balance_plan: None,
+            camera_profile_selection: None,
         };
         let (uncorrected, uncorrected_orientation, _) = develop_internal_with_options(
             &file_bytes,

@@ -238,6 +238,7 @@ mod tests {
             highlight_compression_bits: 0,
             color_nr_bits: 0,
             sharpening_bits: [0; 4],
+            technical_plan_fingerprint: "blake3:technical-plan".into(),
             camera_profile_resolver_version: "1",
             reconstruction_version: "1",
             demosaic_plan_version: "1",
