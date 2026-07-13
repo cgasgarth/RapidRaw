@@ -79,9 +79,9 @@ describe('four-minute PR CI contract', () => {
       ].map((job) => [job, 'skipped']),
     );
     const jsSuccess = Object.fromEntries(PR_REQUIRED_JOBS.js.map((job) => [job, 'success']));
-    expect(verifyRequiredResults({ ...jsSuccess, ...skipped, 'fast-unit-3': 'failure' }, selected, 60)).toContain(
-      'fast-unit-3=failure',
-    );
+    expect(
+      verifyRequiredResults({ ...jsSuccess, ...skipped, 'fast-contract-tests': 'failure' }, selected, 60),
+    ).toContain('fast-contract-tests=failure');
     expect(verifyRequiredResults({ ...jsSuccess, ...skipped }, selected, PR_REQUIRED_BUDGET_SECONDS + 1)).toContain(
       'required validation exceeded 240s (241s)',
     );
