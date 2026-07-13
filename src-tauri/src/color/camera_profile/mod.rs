@@ -82,12 +82,19 @@ pub(crate) enum CameraIdentityMatch {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub(crate) struct CameraProfileReceiptV1 {
     pub contract: &'static str,
+    pub implementation_version: u32,
+    pub profile_name: String,
     pub profile_sha256: String,
     pub source: CameraProfileSource,
     pub camera_match: CameraIdentityMatch,
     pub illuminant_weight: f64,
     pub technical_table_applied: bool,
     pub creative_table_applied: bool,
+    pub tone_curve_applied: bool,
+    pub creative_amount: f32,
     pub baseline_exposure_ev: f32,
+    pub default_black_render: Option<u32>,
+    pub embed_policy: Option<u32>,
+    pub unsupported_tag_ids: Vec<u16>,
     pub limitation_codes: Vec<&'static str>,
 }

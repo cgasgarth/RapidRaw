@@ -3623,6 +3623,9 @@ pub fn run() {
             }
 
             let app_handle = app.handle().clone();
+            if let Err(error) = color::camera_profile::registry::managed_profile_root(&app_handle) {
+                log::warn!("camera_profile_registry_root_unavailable: {error}");
+            }
             app.state::<AppState>()
                 .startup_trace
                 .mark(NativeStartupPhase::ProcessStarted, "ok", None);

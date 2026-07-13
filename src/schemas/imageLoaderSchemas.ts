@@ -108,12 +108,19 @@ const selectedCameraProfileReceiptSchema = z
       'unsupported_channels',
     ]),
     contract: z.literal('rapidraw.camera_profile.v1'),
+    creativeAmount: z.number().min(0).max(1),
     creativeTableApplied: z.boolean(),
+    defaultBlackRender: z.number().int().min(0).max(1).nullable().optional(),
+    embedPolicy: z.number().int().min(0).max(3).nullable().optional(),
     illuminantWeight: z.number().min(0).max(1),
+    implementationVersion: z.literal(1),
     limitationCodes: z.array(z.string().trim().min(1)),
+    profileName: z.string().trim().min(1),
     profileSha256: z.string().regex(/^sha256:[0-9a-f]{64}$/u),
     source: z.enum(['embedded', 'open', 'user', 'generated', 'matrix_fallback']),
     technicalTableApplied: z.boolean(),
+    toneCurveApplied: z.boolean(),
+    unsupportedTagIds: z.array(z.number().int().min(0).max(65535)),
   })
   .strict();
 

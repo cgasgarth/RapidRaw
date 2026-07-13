@@ -26,6 +26,7 @@ pub(crate) fn compile_camera_profile(
     profile: &DcpProfileV1,
     source: CameraProfileSource,
     camera_model: Option<&str>,
+    camera_calibration_signature: Option<&str>,
     illuminant: Option<ProfileIlluminantV1<'_>>,
     creative_amount: f32,
 ) -> Result<CompiledCameraProfilePlanV1> {
@@ -48,8 +49,17 @@ pub(crate) fn compile_camera_profile(
     });
     let color_matrix = interpolate_optional_matrices(profile.color_matrices, weight)
         .expect("parser requires primary matrix");
-    let camera_calibration = interpolate_optional_matrices(profile.camera_calibrations, weight)
-        .unwrap_or(IDENTITY_MATRIX);
+    let calibration_signature_matches = profile
+        .calibration_signature
+        .as_deref()
+        .zip(camera_calibration_signature)
+        .is_some_and(|(profile_signature, camera_signature)| profile_signature == camera_signature);
+    let camera_calibration = if calibration_signature_matches {
+        interpolate_optional_matrices(profile.camera_calibrations, weight)
+            .unwrap_or(IDENTITY_MATRIX)
+    } else {
+        IDENTITY_MATRIX
+    };
     let forward_matrix = interpolate_optional_matrices(profile.forward_matrices, weight);
     let calibrated_camera = multiply(diagonal(profile.analog_balance), camera_calibration);
     let matrix = if let Some(forward) = forward_matrix {
@@ -76,13 +86,20 @@ pub(crate) fn compile_camera_profile(
         creative_amount,
         receipt: CameraProfileReceiptV1 {
             contract: CAMERA_PROFILE_CONTRACT,
+            implementation_version: 1,
+            profile_name: profile.name.clone(),
             profile_sha256: profile.content_sha256.clone(),
             source,
             camera_match,
             illuminant_weight: weight,
             technical_table_applied: technical_table.is_some(),
             creative_table_applied: creative_table.is_some() && creative_amount > 0.0,
+            tone_curve_applied: !profile.tone_curve.is_empty() && creative_amount > 0.0,
+            creative_amount,
             baseline_exposure_ev: profile.baseline_exposure_ev,
+            default_black_render: profile.default_black_render,
+            embed_policy: profile.embed_policy,
+            unsupported_tag_ids: profile.unsupported_tag_ids.clone(),
             limitation_codes: {
                 let mut codes = Vec::new();
                 if illuminant.is_none()
@@ -93,6 +110,11 @@ pub(crate) fn compile_camera_profile(
                 }
                 if profile.reduction_matrices.iter().any(Option::is_some) {
                     codes.push("profile_reduction_matrix_not_required_for_three_channels");
+                }
+                if profile.camera_calibrations.iter().any(Option::is_some)
+                    && !calibration_signature_matches
+                {
+                    codes.push("profile_camera_calibration_signature_mismatch_ignored");
                 }
                 codes
             },
@@ -405,12 +427,17 @@ mod tests {
             CameraProfileSource::User,
             Some("SONY_ILCE-7RM4"),
             None,
+            None,
             0.0,
         )
         .unwrap();
         let rgb = [0.2, 0.4, 0.8];
         assert_eq!(plan.apply_creative(rgb), rgb);
         assert_eq!(plan.apply_technical(rgb), [0.4, 0.8, 1.6]);
+        assert_eq!(plan.receipt.implementation_version, 1);
+        assert_eq!(plan.receipt.profile_name, "test");
+        assert_eq!(plan.receipt.creative_amount, 0.0);
+        assert!(!plan.receipt.tone_curve_applied);
     }
     #[test]
     fn rejects_wrong_camera_and_amount() {
@@ -419,6 +446,7 @@ mod tests {
                 &profile(),
                 CameraProfileSource::User,
                 Some("NIKON Z 8"),
+                None,
                 None,
                 0.5
             )
@@ -430,9 +458,54 @@ mod tests {
                 CameraProfileSource::User,
                 Some("Sony ILCE 7RM4"),
                 None,
+                None,
                 1.1
             )
             .is_err()
+        );
+    }
+
+    #[test]
+    fn camera_calibration_requires_exact_signature_match() {
+        let mut profile = profile();
+        profile.camera_calibrations[0] = Some([[1.1, 0.0, 0.0], [0.0, 0.9, 0.0], [0.0, 0.0, 1.0]]);
+        profile.calibration_signature = Some("reference-camera-v1".into());
+
+        let ignored = compile_camera_profile(
+            &profile,
+            CameraProfileSource::User,
+            Some("Sony ILCE 7RM4"),
+            Some("different-reference-camera"),
+            None,
+            0.0,
+        )
+        .unwrap();
+        assert_eq!(ignored.camera_calibration, IDENTITY_MATRIX);
+        assert!(
+            ignored
+                .receipt
+                .limitation_codes
+                .contains(&"profile_camera_calibration_signature_mismatch_ignored")
+        );
+
+        let applied = compile_camera_profile(
+            &profile,
+            CameraProfileSource::User,
+            Some("Sony ILCE 7RM4"),
+            Some("reference-camera-v1"),
+            None,
+            0.0,
+        )
+        .unwrap();
+        assert_eq!(
+            applied.camera_calibration,
+            profile.camera_calibrations[0].unwrap()
+        );
+        assert!(
+            !applied
+                .receipt
+                .limitation_codes
+                .contains(&"profile_camera_calibration_signature_mismatch_ignored")
         );
     }
     #[test]
@@ -491,6 +564,7 @@ mod tests {
             &profile,
             CameraProfileSource::User,
             Some("Sony ILCE 7RM4"),
+            None,
             Some(warm),
             0.0,
         )
@@ -499,6 +573,7 @@ mod tests {
             &profile,
             CameraProfileSource::User,
             Some("Sony ILCE 7RM4"),
+            None,
             Some(cool),
             0.0,
         )
@@ -540,6 +615,7 @@ mod tests {
             CameraProfileSource::User,
             Some("Sony ILCE 7RM4"),
             None,
+            None,
             1.0,
         )
         .unwrap();
@@ -562,6 +638,7 @@ mod tests {
                 &profile,
                 CameraProfileSource::User,
                 Some("Sony ILCE 7RM4"),
+                None,
                 None,
                 (index % 101) as f32 / 100.0,
             )

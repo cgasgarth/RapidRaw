@@ -3,8 +3,8 @@ use crate::color::camera_input_transform::{
     RawWorkingImageV1, XyzToCameraMatrix, apply_camera_input_transform,
 };
 use crate::color::camera_profile::{
-    CAMERA_PROFILE_CONTRACT, CameraProfileReceiptV1, CameraProfileSource,
-    execute::compile_camera_profile, registry::resolve_cached_profile,
+    CAMERA_PROFILE_CONTRACT, CameraProfileReceiptV1, execute::compile_camera_profile,
+    registry::resolve_managed_profile,
 };
 #[cfg(test)]
 use crate::color::white_balance::{
@@ -160,6 +160,7 @@ pub(crate) struct RawDevelopmentReport {
 pub(crate) struct CameraProfileSelectionV1 {
     pub id: String,
     pub creative_amount: f32,
+    pub managed_root: std::path::PathBuf,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -1443,24 +1444,41 @@ fn develop_internal_from_source(
         raw_image.clean_make.trim(),
         raw_image.clean_model.trim()
     );
-    let selected_profile_plan =
+    let selected_profile_plan_result =
         defect_options
             .camera_profile_selection
             .as_ref()
-            .and_then(|selection| {
-                let profile = resolve_cached_profile(&selection.id)?;
+            .map(|selection| -> Result<_> {
+                let (profile, source) =
+                    resolve_managed_profile(&selection.id, &selection.managed_root)
+                        .ok_or_else(|| anyhow!("selected_camera_profile_missing"))?;
                 compile_camera_profile(
                     &profile,
-                    CameraProfileSource::User,
+                    source,
                     Some(camera_id.trim()),
+                    raw_image
+                        .dng_tags
+                        .get(&50_931)
+                        .and_then(|value| value.as_string())
+                        .map(String::as_str),
                     defect_options
                         .white_balance_plan
                         .as_ref()
                         .and_then(WhiteBalancePlanV1::camera_profile_illuminant),
                     selection.creative_amount,
                 )
-                .ok()
             });
+    let selected_profile_plan = match selected_profile_plan_result {
+        Some(Ok(plan)) => Some(plan),
+        Some(Err(error)) => {
+            let reason = selected_profile_fallback_reason(&error);
+            profile_resolution.report.status = "fallback";
+            profile_resolution.report.fallback_reason = Some(reason);
+            profile_resolution.report.warning_codes.push(reason);
+            None
+        }
+        None => None,
+    };
     if let Some(plan) = &selected_profile_plan {
         profile_resolution.matrix = Some(plan.xyz_to_camera_row_major()?);
         profile_resolution.calibration_white_xy = Some([0.34567, 0.35850]);
@@ -1676,6 +1694,14 @@ fn develop_internal_from_source(
     ))
 }
 
+fn selected_profile_fallback_reason(error: &anyhow::Error) -> &'static str {
+    match error.root_cause().to_string().as_str() {
+        "selected_camera_profile_missing" => "selected_camera_profile_missing",
+        "camera_profile_camera_mismatch" => "selected_camera_profile_incompatible",
+        _ => "selected_camera_profile_invalid",
+    }
+}
+
 pub fn get_fast_demosaic_scale_factor(
     file_bytes: &[u8],
     decoded_width: u32,
@@ -1702,6 +1728,22 @@ pub fn get_fast_demosaic_scale_factor(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn selected_profile_fallback_distinguishes_missing_incompatible_and_invalid() {
+        assert_eq!(
+            selected_profile_fallback_reason(&anyhow!("selected_camera_profile_missing")),
+            "selected_camera_profile_missing"
+        );
+        assert_eq!(
+            selected_profile_fallback_reason(&anyhow!("camera_profile_camera_mismatch")),
+            "selected_camera_profile_incompatible"
+        );
+        assert_eq!(
+            selected_profile_fallback_reason(&anyhow!("camera_profile_singular_matrix")),
+            "selected_camera_profile_invalid"
+        );
+    }
     use serde::Deserialize;
     use std::{fs, path::Path};
 

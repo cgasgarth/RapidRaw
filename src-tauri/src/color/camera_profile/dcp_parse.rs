@@ -32,6 +32,19 @@ const TAG_BASELINE_EXPOSURE_OFFSET: u16 = 51_135;
 const TAG_DEFAULT_BLACK_RENDER: u16 = 51_110;
 const TAG_HUE_SAT_ENCODING: u16 = 51_107;
 const TAG_LOOK_ENCODING: u16 = 51_108;
+const EXECUTION_UNSUPPORTED_TAGS: &[u16] = &[
+    52_529, // CalibrationIlluminant3
+    52_530, // CameraCalibration3
+    52_531, // ColorMatrix3
+    52_532, // ForwardMatrix3
+    52_533, // IlluminantData1
+    52_534, // IlluminantData2
+    52_535, // IlluminantData3
+    52_537, // ProfileHueSatMapData3
+    52_538, // ReductionMatrix3
+    52_543, // RGBTables
+    52_551, // ProfileDynamicRange
+];
 
 const SUPPORTED_TAGS: &[u16] = &[
     TAG_UNIQUE_CAMERA_MODEL,
@@ -165,6 +178,12 @@ pub(crate) fn parse_dcp(bytes: &[u8], limits: DcpParseLimits) -> Result<DcpProfi
         });
     }
     let field = |tag| fields.iter().find(|candidate| candidate.tag == tag);
+    ensure!(
+        fields
+            .iter()
+            .all(|candidate| !EXECUTION_UNSUPPORTED_TAGS.contains(&candidate.tag)),
+        "dcp_render_authoritative_tag_unsupported"
+    );
     let dims = parse_dims(field(TAG_HUE_SAT_DIMS), endian, limits)?;
     let look_dims = parse_dims(field(TAG_LOOK_DIMS), endian, limits)?;
     let hue_encoding = parse_encoding(field(TAG_HUE_SAT_ENCODING), endian)?;
@@ -249,7 +268,7 @@ pub(crate) fn parse_dcp(bytes: &[u8], limits: DcpParseLimits) -> Result<DcpProfi
             .calibration_illuminants
             .iter()
             .flatten()
-            .all(|value| *value <= 24 || *value == 255),
+            .all(|value| *value <= 24),
         "dcp_unsupported_calibration_illuminant"
     );
     ensure!(
@@ -341,6 +360,15 @@ fn parse_table(
         );
         entries.push(delta);
     }
+    let saturation_divisions = dims[1];
+    ensure!(
+        entries
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| index % saturation_divisions == 0)
+            .all(|(_, delta)| (delta.value_scale - 1.0).abs() <= f32::EPSILON),
+        "dcp_zero_saturation_value_scale_not_identity"
+    );
     Ok(Some(ProfileTable {
         dimensions: dims,
         encoding,
@@ -413,6 +441,12 @@ fn parse_tone_curve(
         );
         points.push(point);
     }
+    let first = points.first().expect("minimum count checked");
+    let last = points.last().expect("minimum count checked");
+    ensure!(
+        first.input == 0.0 && first.output == 0.0 && last.input == 1.0 && last.output == 1.0,
+        "dcp_sdr_tone_curve_endpoints_invalid"
+    );
     Ok(points)
 }
 
@@ -617,6 +651,54 @@ mod tests {
                 .unwrap_err()
                 .to_string()
                 .contains("non_finite")
+        );
+    }
+
+    #[test]
+    fn rejects_non_identity_neutral_axis_and_invalid_sdr_curve_endpoints() {
+        let invalid_neutral_table = fixture(&[
+            (TAG_COLOR_MATRIX_1, 11, matrix()),
+            (
+                TAG_HUE_SAT_DIMS,
+                4,
+                [1u32, 2, 1]
+                    .into_iter()
+                    .flat_map(u32::to_le_bytes)
+                    .collect(),
+            ),
+            (
+                TAG_HUE_SAT_DATA_1,
+                11,
+                floats(&[0.0, 1.0, 0.5, 0.0, 1.0, 1.0]),
+            ),
+        ]);
+        assert!(
+            parse_dcp(&invalid_neutral_table, DcpParseLimits::default())
+                .unwrap_err()
+                .to_string()
+                .contains("zero_saturation")
+        );
+
+        let invalid_curve = fixture(&[
+            (TAG_COLOR_MATRIX_1, 11, matrix()),
+            (TAG_TONE_CURVE, 11, floats(&[0.0, 0.0, 0.5, 0.4, 1.0, 0.9])),
+        ]);
+        assert!(
+            parse_dcp(&invalid_curve, DcpParseLimits::default())
+                .unwrap_err()
+                .to_string()
+                .contains("tone_curve_endpoints")
+        );
+
+        let hdr_profile = fixture(&[
+            (TAG_COLOR_MATRIX_1, 11, matrix()),
+            (52_551, 7, vec![1, 0, 1, 0, 0, 0, 128, 64]),
+        ]);
+        assert!(
+            parse_dcp(&hdr_profile, DcpParseLimits::default())
+                .unwrap_err()
+                .to_string()
+                .contains("render_authoritative_tag_unsupported")
         );
     }
 

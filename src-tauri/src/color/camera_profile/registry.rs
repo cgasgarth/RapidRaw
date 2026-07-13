@@ -12,6 +12,7 @@ use walkdir::WalkDir;
 
 const MAX_PARSED_PROFILE_CACHE_ENTRIES: usize = 128;
 static PARSED_PROFILE_CACHE: OnceLock<Mutex<BTreeMap<String, DcpProfileV1>>> = OnceLock::new();
+static MANAGED_PROFILE_ROOT: OnceLock<PathBuf> = OnceLock::new();
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -156,19 +157,6 @@ impl CameraProfileRegistry {
     }
 }
 
-pub(crate) fn resolve_cached_profile(id: &str) -> Option<DcpProfileV1> {
-    let digest = id.strip_prefix("dcp:")?;
-    if digest.len() != 64 || !digest.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-        return None;
-    }
-    PARSED_PROFILE_CACHE
-        .get()?
-        .lock()
-        .ok()?
-        .get(&format!("sha256:{}", digest.to_ascii_lowercase()))
-        .cloned()
-}
-
 fn parse_profile_cached(bytes: &[u8], limits: DcpParseLimits) -> Result<DcpProfileV1> {
     use sha2::{Digest, Sha256};
     let hash = format!("sha256:{}", hex::encode(Sha256::digest(bytes)));
@@ -196,13 +184,49 @@ fn read_profile_bytes(path: &Path, limits: DcpParseLimits) -> Result<Vec<u8>> {
     fs::read(path).context("camera_profile_read_failed")
 }
 
-fn managed_profile_root(app: &tauri::AppHandle) -> Result<PathBuf> {
+pub(crate) fn managed_profile_root(app: &tauri::AppHandle) -> Result<PathBuf> {
     use tauri::Manager;
-    Ok(app
+    let root = app
         .path()
         .app_data_dir()
         .context("camera_profile_app_data_dir_unavailable")?
-        .join("camera-profiles"))
+        .join("camera-profiles");
+    let _ = MANAGED_PROFILE_ROOT.set(root.clone());
+    Ok(root)
+}
+
+pub(crate) fn resolve_managed_profile(
+    id: &str,
+    root: &Path,
+) -> Option<(DcpProfileV1, CameraProfileSource)> {
+    let root = if root.as_os_str().is_empty() {
+        MANAGED_PROFILE_ROOT.get()?.as_path()
+    } else {
+        root
+    };
+    let digest = id.strip_prefix("dcp:")?;
+    if digest.len() != 64
+        || !digest
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+    {
+        return None;
+    }
+    let expected_hash = format!("sha256:{digest}");
+    for (directory, source) in [
+        ("user", CameraProfileSource::User),
+        ("open", CameraProfileSource::Open),
+        ("generated", CameraProfileSource::Generated),
+    ] {
+        let path = root.join(directory).join(format!("{}.dcp", digest));
+        if let Ok(bytes) = read_profile_bytes(&path, DcpParseLimits::default())
+            && let Ok(profile) = parse_profile_cached(&bytes, DcpParseLimits::default())
+            && profile.content_sha256 == expected_hash
+        {
+            return Some((profile, source));
+        }
+    }
+    None
 }
 
 #[tauri::command]
@@ -476,5 +500,26 @@ mod tests {
         assert_eq!(report.entries[0].display_name, "Open Neutral");
         assert!(report.entries[0].compatible);
         assert_eq!(report.entries[0].source, CameraProfileSource::Open);
+    }
+
+    #[test]
+    fn managed_profile_resolution_reopens_canonical_profile_from_disk() {
+        let root = tempfile::tempdir().unwrap();
+        let bytes = minimal_dcp("Restart Safe Neutral", "SONY ILCE-7RM4");
+        let parsed = parse_dcp(&bytes, DcpParseLimits::default()).unwrap();
+        let digest = parsed.content_sha256.trim_start_matches("sha256:");
+        let open_root = root.path().join("open");
+        fs::create_dir_all(&open_root).unwrap();
+        fs::write(open_root.join(format!("{digest}.dcp")), &bytes).unwrap();
+
+        let id = format!("dcp:{digest}");
+        let (resolved, source) = resolve_managed_profile(&id, root.path()).unwrap();
+        assert_eq!(resolved.content_sha256, parsed.content_sha256);
+        assert_eq!(source, CameraProfileSource::Open);
+        assert!(resolve_managed_profile(&id.to_ascii_uppercase(), root.path()).is_none());
+
+        let mismatched_id = format!("dcp:{}", "f".repeat(64));
+        fs::write(open_root.join(format!("{}.dcp", "f".repeat(64))), &bytes).unwrap();
+        assert!(resolve_managed_profile(&mismatched_id, root.path()).is_none());
     }
 }
