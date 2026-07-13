@@ -596,6 +596,7 @@ fn validate_adjustments(
         "curveMode",
         "rawProcessingModeOverride",
         "rawEngineEditGraphVersion",
+        "referenceMatchApplicationReceipt",
         "deblurEnabled",
         "deblurSigmaPx",
         "deblurStrength",
@@ -766,6 +767,16 @@ fn validate_adjustments(
         disabled.push("adjustments.perspectiveCorrection".to_string());
         reasons.push("perspective_correction_contract_invalid".to_string());
     }
+    let invalid_reference_match_receipt = object
+        .get("referenceMatchApplicationReceipt")
+        .is_some_and(|value| !value.is_null() && !valid_reference_match_application_receipt(value));
+    if invalid_reference_match_receipt
+        && let Some(value) = object.remove("referenceMatchApplicationReceipt")
+    {
+        extensions.insert("referenceMatchApplicationReceipt".to_string(), value);
+        disabled.push("adjustments.referenceMatchApplicationReceipt".to_string());
+        reasons.push("reference_match_application_receipt_invalid".to_string());
+    }
     let invalid_numeric: Vec<String> = object
         .iter()
         .filter(|(_, value)| contains_extreme_number(value))
@@ -812,6 +823,79 @@ fn validate_adjustments(
         object.insert("lutIntensity".to_string(), JsonValue::from(0));
         disabled.push("adjustments.lutContentIdentity".to_string());
     }
+}
+
+fn valid_reference_match_application_receipt(value: &JsonValue) -> bool {
+    const REQUIRED: &[&str] = &[
+        "appliedAt",
+        "destination",
+        "enabledGroups",
+        "historyEntriesAdded",
+        "impact",
+        "proposalFingerprint",
+        "resultingGraphFingerprint",
+        "schemaVersion",
+        "targetAnalysisFingerprint",
+    ];
+    const OPTIONAL: &[&str] = &["layerId"];
+    let Some(receipt) = value.as_object() else {
+        return false;
+    };
+    if REQUIRED.iter().any(|field| !receipt.contains_key(*field))
+        || receipt
+            .keys()
+            .any(|field| !REQUIRED.contains(&field.as_str()) && !OPTIONAL.contains(&field.as_str()))
+    {
+        return false;
+    }
+    let valid_fingerprint = |field: &str| {
+        receipt
+            .get(field)
+            .and_then(JsonValue::as_str)
+            .is_some_and(|value| {
+                value.len() == 24
+                    && value.starts_with("fnv1a64:")
+                    && value[8..]
+                        .bytes()
+                        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+            })
+    };
+    let valid_groups = receipt
+        .get("enabledGroups")
+        .and_then(JsonValue::as_array)
+        .is_some_and(|groups| {
+            !groups.is_empty()
+                && groups.iter().all(|group| {
+                    group
+                        .as_str()
+                        .is_some_and(|group| matches!(group, "tone" | "color" | "presence"))
+                })
+        });
+    let destination = receipt.get("destination").and_then(JsonValue::as_str);
+    let layer_id = receipt.get("layerId").and_then(JsonValue::as_str);
+    let valid_destination = match destination {
+        Some("global-adjustments") => layer_id.is_none(),
+        Some("adjustment-layer") => layer_id.is_some_and(|value| !value.trim().is_empty()),
+        _ => false,
+    };
+    receipt.get("schemaVersion").and_then(JsonValue::as_u64) == Some(1)
+        && receipt
+            .get("historyEntriesAdded")
+            .and_then(JsonValue::as_u64)
+            == Some(1)
+        && receipt
+            .get("impact")
+            .and_then(JsonValue::as_f64)
+            .is_some_and(|impact| (0.0..=100.0).contains(&impact))
+        && receipt
+            .get("appliedAt")
+            .and_then(JsonValue::as_str)
+            .is_some_and(|value| chrono::DateTime::parse_from_rfc3339(value).is_ok())
+        && valid_groups
+        && valid_destination
+        && valid_fingerprint("proposalFingerprint")
+        && valid_fingerprint("resultingGraphFingerprint")
+        && valid_fingerprint("targetAnalysisFingerprint")
 }
 
 fn contains_extreme_number(value: &JsonValue) -> bool {
@@ -2571,6 +2655,65 @@ mod tests {
         );
         assert_eq!(reloaded.adjustments["toneMapper"], "rapidView");
         assert_eq!(reloaded.adjustments["viewTransform"]["contrast"], 1.15);
+    }
+
+    #[test]
+    fn save_sidecar_roundtrips_reference_match_application_receipt() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let sidecar_path = temp_dir.path().join("image.arw.rrdata");
+        let receipt = serde_json::json!({
+            "appliedAt": "2026-07-13T21:30:00Z",
+            "destination": "global-adjustments",
+            "enabledGroups": ["tone", "color"],
+            "historyEntriesAdded": 1,
+            "impact": 80,
+            "proposalFingerprint": "fnv1a64:0123456789abcdef",
+            "resultingGraphFingerprint": "fnv1a64:1111111111111111",
+            "schemaVersion": 1,
+            "targetAnalysisFingerprint": "fnv1a64:fedcba9876543210"
+        });
+        let metadata = ImageMetadata {
+            adjustments: serde_json::json!({
+                "exposure": 0.5,
+                "referenceMatchApplicationReceipt": receipt
+            }),
+            ..Default::default()
+        };
+
+        save_sidecar_metadata_atomic(&sidecar_path, &metadata)
+            .expect("current reference-match receipt should persist atomically");
+        let reloaded = load_sidecar(&sidecar_path);
+        assert_eq!(
+            reloaded.adjustments["referenceMatchApplicationReceipt"],
+            receipt
+        );
+    }
+
+    #[test]
+    fn save_sidecar_rejects_invalid_reference_match_application_receipt() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let sidecar_path = temp_dir.path().join("image.arw.rrdata");
+        let metadata = ImageMetadata {
+            adjustments: serde_json::json!({
+                "referenceMatchApplicationReceipt": {
+                    "appliedAt": "not-a-timestamp",
+                    "destination": "global-adjustments",
+                    "enabledGroups": [],
+                    "historyEntriesAdded": 2,
+                    "impact": 101,
+                    "proposalFingerprint": "invalid",
+                    "resultingGraphFingerprint": "fnv1a64:1111111111111111",
+                    "schemaVersion": 2,
+                    "targetAnalysisFingerprint": "fnv1a64:fedcba9876543210"
+                }
+            }),
+            ..Default::default()
+        };
+
+        let error = save_sidecar_metadata_atomic(&sidecar_path, &metadata)
+            .expect_err("invalid reference-match receipt must fail closed");
+        assert!(error.contains("adjustments.referenceMatchApplicationReceipt"));
+        assert!(!sidecar_path.exists());
     }
 
     #[test]
