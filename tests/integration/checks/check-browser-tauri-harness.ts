@@ -138,6 +138,12 @@ try {
     .getByRole('button', { name: /browser-harness\.ARW/u })
     .first()
     .dblclick();
+  const provisionalBadge = page.getByTestId('embedded-preview-provisional-badge');
+  await provisionalBadge.waitFor({ state: 'visible', timeout: 10_000 });
+  if (!(await provisionalBadge.textContent())?.includes('Camera preview')) {
+    throw new Error('Embedded RAW preview was not visibly labeled as provisional.');
+  }
+  await provisionalBadge.waitFor({ state: 'hidden', timeout: 10_000 });
   await page.getByRole('main', { name: 'Editor workspace' }).waitFor({ timeout: 10_000 });
   await page.getByRole('region', { name: 'Editor preview' }).waitFor({ timeout: 10_000 });
   await page.getByRole('region', { name: 'Image preview' }).waitFor({ timeout: 10_000 });

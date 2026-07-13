@@ -1819,6 +1819,9 @@
       "exit": "Exit preview mode",
       "label": "Preview only"
     },
+    "provisionalCameraPreview": "Предпросмотр камеры — проявка RAW",
+    "provisionalCameraPreviewFailed": "Предпросмотр камеры — ошибка проявки RAW",
+    "provisionalLibraryPreview": "Предпросмотр библиотеки — проявка RAW",
     "switcher": {
       "search": {
         "close": "Close panel search",

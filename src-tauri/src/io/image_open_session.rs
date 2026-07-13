@@ -1,9 +1,10 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 pub use rapidraw_types::ImageOpenSessionId;
+use rawler::rawsource::RawSource;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::sync::Notify;
@@ -12,10 +13,17 @@ use crate::app_state::AppState;
 use crate::image_loader::{
     LoadImageResult, load_image_open_metadata, load_image_prepared, prefetch_image,
 };
+use crate::raw::embedded_preview::{
+    ExtractedEmbeddedPreview, ImageFrameQuality, ProgressiveImageFrameReceipt,
+    extract_embedded_preview_from_source, with_provisional_thread_priority,
+};
 
 pub const IMAGE_OPEN_UPDATE_EVENT: &str = "image-open-update";
 const MAX_PREFETCH_IN_FLIGHT: usize = 2;
 const MAX_PREFETCH_CANDIDATES: usize = 3;
+const EMBEDDED_PREVIEW_CACHE_BUDGET_BYTES: usize = 64 * 1024 * 1024;
+const EMBEDDED_PREVIEW_POLICY_VERSION: &str = "embedded-preview-v1";
+const EMBEDDED_PREVIEW_LATENCY_BUDGET: Duration = Duration::from_millis(250);
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -49,6 +57,15 @@ pub struct ImageOpenDiagnostics {
     pub prefetch_promotions: u64,
     pub duplicate_prefetch_drops: u64,
     pub peak_prefetch_in_flight: usize,
+    pub embedded_preview_attempted: u64,
+    pub embedded_preview_published: u64,
+    pub embedded_preview_rejected: u64,
+    pub embedded_preview_stale_suppressed: u64,
+    pub embedded_preview_encoded_bytes: u64,
+    pub embedded_preview_elapsed_millis: u64,
+    pub embedded_preview_cache_hits: u64,
+    pub last_embedded_candidate_width: u32,
+    pub last_embedded_candidate_height: u32,
 }
 
 #[derive(Serialize)]
@@ -80,6 +97,20 @@ enum ImageOpenUpdate {
         width: u32,
         height: u32,
         is_raw: bool,
+        receipt: ProgressiveImageFrameReceipt,
+    },
+    FrameReady {
+        session_id: ImageOpenSessionId,
+        image_id: String,
+        path: String,
+        data_url: String,
+        receipt: ProgressiveImageFrameReceipt,
+    },
+    FallbackFrameReady {
+        session_id: ImageOpenSessionId,
+        image_id: String,
+        path: String,
+        receipt: ProgressiveImageFrameReceipt,
     },
     Superseded {
         session_id: ImageOpenSessionId,
@@ -91,9 +122,14 @@ enum ImageOpenUpdate {
 #[derive(Default)]
 struct CoordinatorInner {
     active_session: Option<(ImageOpenSessionId, String)>,
+    frame_generation: u64,
+    settled_frame_published: bool,
     collection_generation: u64,
     in_flight: HashMap<String, Arc<Notify>>,
     diagnostics: ImageOpenDiagnostics,
+    embedded_preview_cache: HashMap<String, Arc<ExtractedEmbeddedPreview>>,
+    embedded_preview_cache_order: VecDeque<String>,
+    embedded_preview_cache_bytes: usize,
 }
 
 #[derive(Clone)]
@@ -130,6 +166,8 @@ impl ImageOpenCoordinator {
             return Err("image_open_superseded".to_string());
         }
         inner.active_session = Some((session.clone(), path.to_string()));
+        inner.frame_generation = 0;
+        inner.settled_frame_published = false;
         inner.diagnostics.foreground_opens += 1;
         inner.diagnostics.metadata_reads += 1;
         let joined = inner.in_flight.get(&prefetch_key(path)).cloned();
@@ -148,6 +186,121 @@ impl ImageOpenCoordinator {
                 .as_ref()
                 .is_some_and(|(active, active_path)| active == session && active_path == path)
         })
+    }
+
+    fn claim_frame(
+        &self,
+        session: &ImageOpenSessionId,
+        path: &str,
+        quality: ImageFrameQuality,
+    ) -> Option<u64> {
+        let mut inner = self.inner.lock().ok()?;
+        let current = inner
+            .active_session
+            .as_ref()
+            .is_some_and(|(active, active_path)| active == session && active_path == path);
+        if !current
+            || (inner.settled_frame_published && quality != ImageFrameQuality::SettledDeveloped)
+        {
+            if quality != ImageFrameQuality::SettledDeveloped {
+                inner.diagnostics.embedded_preview_stale_suppressed += 1;
+            } else {
+                inner.diagnostics.stale_phase_drops += 1;
+            }
+            return None;
+        }
+        inner.frame_generation += 1;
+        if quality == ImageFrameQuality::SettledDeveloped {
+            inner.settled_frame_published = true;
+        }
+        Some(inner.frame_generation)
+    }
+
+    fn record_embedded_attempt(&self) {
+        self.inner
+            .lock()
+            .unwrap()
+            .diagnostics
+            .embedded_preview_attempted += 1;
+    }
+
+    fn record_embedded_rejection(&self) {
+        self.inner
+            .lock()
+            .unwrap()
+            .diagnostics
+            .embedded_preview_rejected += 1;
+    }
+
+    fn record_embedded_publish(
+        &self,
+        elapsed_millis: u64,
+        encoded_bytes: usize,
+        candidate_width: u32,
+        candidate_height: u32,
+    ) {
+        let mut inner = self.inner.lock().unwrap();
+        inner.diagnostics.embedded_preview_published += 1;
+        inner.diagnostics.embedded_preview_elapsed_millis += elapsed_millis;
+        inner.diagnostics.embedded_preview_encoded_bytes += encoded_bytes as u64;
+        inner.diagnostics.last_embedded_candidate_width = candidate_width;
+        inner.diagnostics.last_embedded_candidate_height = candidate_height;
+    }
+
+    fn embedded_cache_key(path: &std::path::Path) -> Option<String> {
+        crate::source_revision::SourceRevision::from_path(path)
+            .ok()
+            .map(|revision| format!("{EMBEDDED_PREVIEW_POLICY_VERSION}:{}", revision.identity()))
+    }
+
+    fn cached_embedded_preview(
+        &self,
+        path: &std::path::Path,
+    ) -> Option<Arc<ExtractedEmbeddedPreview>> {
+        let key = Self::embedded_cache_key(path)?;
+        let mut inner = self.inner.lock().ok()?;
+        let preview = Arc::clone(inner.embedded_preview_cache.get(&key)?);
+        inner.diagnostics.embedded_preview_cache_hits += 1;
+        Some(preview)
+    }
+
+    fn cache_embedded_preview(
+        &self,
+        path: &std::path::Path,
+        preview: ExtractedEmbeddedPreview,
+    ) -> Arc<ExtractedEmbeddedPreview> {
+        let Some(key) = Self::embedded_cache_key(path) else {
+            return Arc::new(preview);
+        };
+        let preview = Arc::new(preview);
+        let mut inner = self.inner.lock().unwrap();
+        let retained_bytes = preview.data_url.len();
+        if let Some(replaced) = inner.embedded_preview_cache.remove(&key) {
+            inner.embedded_preview_cache_bytes = inner
+                .embedded_preview_cache_bytes
+                .saturating_sub(replaced.data_url.len());
+            inner
+                .embedded_preview_cache_order
+                .retain(|entry| entry != &key);
+        }
+        while inner.embedded_preview_cache_bytes + retained_bytes
+            > EMBEDDED_PREVIEW_CACHE_BUDGET_BYTES
+        {
+            let Some(oldest) = inner.embedded_preview_cache_order.pop_front() else {
+                break;
+            };
+            if let Some(removed) = inner.embedded_preview_cache.remove(&oldest) {
+                inner.embedded_preview_cache_bytes = inner
+                    .embedded_preview_cache_bytes
+                    .saturating_sub(removed.data_url.len());
+            }
+        }
+        inner.embedded_preview_cache_bytes += retained_bytes;
+        inner.embedded_preview_cache_order.push_back(key.clone());
+        inner
+            .embedded_preview_cache
+            .insert(key, Arc::clone(&preview));
+        preview
     }
 
     fn schedule(
@@ -270,6 +423,131 @@ pub async fn begin_image_open(
             metadata: Box::new(metadata.clone()),
         },
     );
+    let (source_path, _) = crate::file_management::parse_virtual_path(&request.path);
+    let prepared_raw_source = if crate::formats::is_raw_file(&request.path) {
+        Some(Arc::new(
+            RawSource::new(&source_path).map_err(|error| error.to_string())?,
+        ))
+    } else {
+        None
+    };
+    if crate::formats::is_raw_file(&request.path) {
+        let preview_coordinator = state.image_open_coordinator.clone();
+        preview_coordinator.record_embedded_attempt();
+        let preview_source_path = source_path.clone();
+        let preview_session = request.session_id.clone();
+        let preview_request_path = request.path.clone();
+        let preview_image_id = request.image_id.clone();
+        let preview_source = Arc::clone(
+            prepared_raw_source
+                .as_ref()
+                .expect("RAW source prepared for embedded extraction"),
+        );
+        let preview_app = app.clone();
+        let preview_budget = EMBEDDED_PREVIEW_LATENCY_BUDGET.saturating_sub(started.elapsed());
+        tauri::async_runtime::spawn(async move {
+            let cached = preview_coordinator.cached_embedded_preview(&preview_source_path);
+            let extraction = if let Some(preview) = cached {
+                Ok(preview)
+            } else {
+                let extraction_coordinator = preview_coordinator.clone();
+                let extraction_session = preview_session.clone();
+                let extraction_request_path = preview_request_path.clone();
+                let extraction_source_path = preview_source_path.clone();
+                match tokio::time::timeout(
+                    preview_budget,
+                    tokio::task::spawn_blocking(move || {
+                        with_provisional_thread_priority(|| {
+                            extract_embedded_preview_from_source(
+                                &preview_source,
+                                &extraction_source_path,
+                                extraction_session.image_session,
+                                extraction_session.selection_generation,
+                                0,
+                                || {
+                                    !extraction_coordinator
+                                        .is_current(&extraction_session, &extraction_request_path)
+                                },
+                            )
+                        })
+                    }),
+                )
+                .await
+                {
+                    Ok(Ok(Ok(preview))) => {
+                        Ok(preview_coordinator
+                            .cache_embedded_preview(&preview_source_path, preview))
+                    }
+                    _ => Err(()),
+                }
+            };
+            let Ok(preview) = extraction else {
+                preview_coordinator.record_embedded_rejection();
+                if let Some(frame_generation) = preview_coordinator.claim_frame(
+                    &preview_session,
+                    &preview_request_path,
+                    ImageFrameQuality::FastDeveloped,
+                ) {
+                    let source_revision =
+                        crate::source_revision::SourceRevision::from_path(&preview_source_path)
+                            .map(|revision| revision.identity())
+                            .unwrap_or_else(|_| "source-revision-v1:unavailable".to_string());
+                    let _ = preview_app.emit(
+                        IMAGE_OPEN_UPDATE_EVENT,
+                        ImageOpenUpdate::FallbackFrameReady {
+                            session_id: preview_session.clone(),
+                            image_id: preview_image_id.clone(),
+                            path: preview_request_path.clone(),
+                            receipt: ProgressiveImageFrameReceipt {
+                                image_session: preview_session.image_session,
+                                selection_generation: preview_session.selection_generation,
+                                source_revision,
+                                frame_generation,
+                                quality: ImageFrameQuality::FastDeveloped,
+                                width: 0,
+                                height: 0,
+                                orientation_applied: false,
+                                source_kind: "current_thumbnail_or_smart_preview".to_string(),
+                                color_assumption: "artifact_declared_or_srgb_fallback".to_string(),
+                                provisional_reason: Some(
+                                    "embedded preview unavailable; non-authoritative library artifact"
+                                        .to_string(),
+                                ),
+                            },
+                        },
+                    );
+                }
+                return;
+            };
+            let Some(frame_generation) = preview_coordinator.claim_frame(
+                &preview_session,
+                &preview_request_path,
+                ImageFrameQuality::EmbeddedProvisional,
+            ) else {
+                return;
+            };
+            let mut receipt = preview.receipt.clone();
+            receipt.image_session = preview_session.image_session;
+            receipt.selection_generation = preview_session.selection_generation;
+            receipt.frame_generation = frame_generation;
+            preview_coordinator.record_embedded_publish(
+                preview.elapsed_millis,
+                preview.encoded_bytes,
+                preview.candidate_width,
+                preview.candidate_height,
+            );
+            let _ = preview_app.emit(
+                IMAGE_OPEN_UPDATE_EVENT,
+                ImageOpenUpdate::FrameReady {
+                    session_id: preview_session,
+                    image_id: preview_image_id,
+                    path: preview_request_path,
+                    data_url: preview.data_url.clone(),
+                    receipt,
+                },
+            );
+        });
+    }
     if !state
         .image_open_coordinator
         .is_current(&request.session_id, &request.path)
@@ -283,6 +561,7 @@ pub async fn begin_image_open(
         metadata,
         true,
         None,
+        prepared_raw_source,
     )
     .await?;
     if !state
@@ -292,6 +571,17 @@ pub async fn begin_image_open(
         return Err("image_open_superseded".to_string());
     }
     let decode_ready_millis = started.elapsed().as_millis() as u64;
+    let frame_generation = state
+        .image_open_coordinator
+        .claim_frame(
+            &request.session_id,
+            &request.path,
+            ImageFrameQuality::SettledDeveloped,
+        )
+        .ok_or_else(|| "image_open_superseded".to_string())?;
+    let source_revision = crate::source_revision::SourceRevision::from_path(&source_path)
+        .map_err(|error| error.to_string())?
+        .identity();
     let _ = app.emit(
         IMAGE_OPEN_UPDATE_EVENT,
         ImageOpenUpdate::DecodeReady {
@@ -301,6 +591,24 @@ pub async fn begin_image_open(
             width: decoded.width,
             height: decoded.height,
             is_raw: decoded.is_raw,
+            receipt: ProgressiveImageFrameReceipt {
+                image_session: request.session_id.image_session,
+                selection_generation: request.session_id.selection_generation,
+                source_revision,
+                frame_generation,
+                quality: ImageFrameQuality::SettledDeveloped,
+                width: decoded.width,
+                height: decoded.height,
+                orientation_applied: true,
+                source_kind: if decoded.is_raw {
+                    "raw_developed"
+                } else {
+                    "non_raw"
+                }
+                .to_string(),
+                color_assumption: "rapidraw_working_color_pipeline".to_string(),
+                provisional_reason: None,
+            },
         },
     );
     Ok(BeginImageOpenResult {
@@ -469,5 +777,140 @@ mod tests {
                 .unwrap()
                 .is_some()
         );
+    }
+
+    #[test]
+    fn frame_sequence_is_monotonic_and_settled_blocks_late_provisional() {
+        let coordinator = ImageOpenCoordinator::default();
+        let session = ImageOpenSessionId {
+            selection_generation: 7,
+            image_session: 7,
+        };
+        coordinator.begin_foreground(&session, "a.raw").unwrap();
+        assert_eq!(
+            coordinator.claim_frame(&session, "a.raw", ImageFrameQuality::EmbeddedProvisional),
+            Some(1)
+        );
+        assert_eq!(
+            coordinator.claim_frame(&session, "a.raw", ImageFrameQuality::SettledDeveloped),
+            Some(2)
+        );
+        assert_eq!(
+            coordinator.claim_frame(&session, "a.raw", ImageFrameQuality::EmbeddedProvisional),
+            None
+        );
+        assert_eq!(coordinator.report().embedded_preview_stale_suppressed, 1);
+    }
+
+    #[test]
+    fn superseded_session_cannot_publish_any_frame() {
+        let coordinator = ImageOpenCoordinator::default();
+        let old = ImageOpenSessionId {
+            selection_generation: 1,
+            image_session: 1,
+        };
+        let current = ImageOpenSessionId {
+            selection_generation: 2,
+            image_session: 2,
+        };
+        coordinator.begin_foreground(&old, "a.raw").unwrap();
+        coordinator.begin_foreground(&current, "b.raw").unwrap();
+        assert_eq!(
+            coordinator.claim_frame(&old, "a.raw", ImageFrameQuality::EmbeddedProvisional),
+            None
+        );
+        assert_eq!(
+            coordinator.claim_frame(&old, "a.raw", ImageFrameQuality::SettledDeveloped),
+            None
+        );
+    }
+
+    #[test]
+    fn injected_slow_provisional_cannot_publish_after_fast_settled() {
+        let coordinator = ImageOpenCoordinator::default();
+        let session = ImageOpenSessionId {
+            selection_generation: 9,
+            image_session: 9,
+        };
+        coordinator.begin_foreground(&session, "race.raw").unwrap();
+        let worker = coordinator.clone();
+        let worker_session = session.clone();
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        let provisional = std::thread::spawn(move || {
+            release_rx.recv().unwrap();
+            worker.claim_frame(
+                &worker_session,
+                "race.raw",
+                ImageFrameQuality::EmbeddedProvisional,
+            )
+        });
+        assert_eq!(
+            coordinator.claim_frame(&session, "race.raw", ImageFrameQuality::SettledDeveloped),
+            Some(1)
+        );
+        release_tx.send(()).unwrap();
+        assert_eq!(provisional.join().unwrap(), None);
+    }
+
+    #[test]
+    fn injected_fast_provisional_is_followed_by_newer_slow_settled() {
+        let coordinator = ImageOpenCoordinator::default();
+        let session = ImageOpenSessionId {
+            selection_generation: 10,
+            image_session: 10,
+        };
+        coordinator.begin_foreground(&session, "race.raw").unwrap();
+        assert_eq!(
+            coordinator.claim_frame(&session, "race.raw", ImageFrameQuality::EmbeddedProvisional,),
+            Some(1)
+        );
+        let worker = coordinator;
+        let worker_session = session;
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        let settled = std::thread::spawn(move || {
+            release_rx.recv().unwrap();
+            worker.claim_frame(
+                &worker_session,
+                "race.raw",
+                ImageFrameQuality::SettledDeveloped,
+            )
+        });
+        release_tx.send(()).unwrap();
+        assert_eq!(settled.join().unwrap(), Some(2));
+    }
+
+    #[test]
+    fn embedded_cache_is_revision_keyed_and_shared_by_virtual_copies() {
+        let file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(file.path(), b"revision-a").unwrap();
+        let coordinator = ImageOpenCoordinator::default();
+        let preview = ExtractedEmbeddedPreview {
+            candidate_height: 768,
+            candidate_width: 1024,
+            data_url: "data:image/jpeg;base64,AAAA".to_string(),
+            receipt: ProgressiveImageFrameReceipt {
+                image_session: 1,
+                selection_generation: 1,
+                source_revision: crate::source_revision::SourceRevision::from_path(file.path())
+                    .unwrap()
+                    .identity(),
+                frame_generation: 1,
+                quality: ImageFrameQuality::EmbeddedProvisional,
+                width: 1024,
+                height: 768,
+                orientation_applied: false,
+                source_kind: "fixture".to_string(),
+                color_assumption: "encoded_srgb_vendor_preview".to_string(),
+                provisional_reason: Some("not authoritative".to_string()),
+            },
+            elapsed_millis: 1,
+            encoded_bytes: 4,
+        };
+        coordinator.cache_embedded_preview(file.path(), preview);
+        assert!(coordinator.cached_embedded_preview(file.path()).is_some());
+        assert_eq!(coordinator.report().embedded_preview_cache_hits, 1);
+
+        std::fs::write(file.path(), b"revision-b-is-different").unwrap();
+        assert!(coordinator.cached_embedded_preview(file.path()).is_none());
     }
 }
