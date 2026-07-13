@@ -116,9 +116,23 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
     historyEntriesAdded: 1,
     impact: 100,
   });
+  expect(useEditorStore.getState().adjustments.referenceMatchApplicationReceipt).toEqual(
+    useEditorStore.getState().lastReferenceMatchApplicationReceipt,
+  );
   expect(useEditorStore.getState().adjustments.exposure).not.toBe(INITIAL_ADJUSTMENTS.exposure);
   expect(useEditorStore.getState().adjustments.cameraProfile).toBe(INITIAL_ADJUSTMENTS.cameraProfile);
   expect(useEditorStore.getState().referenceMatchPreview).toBeNull();
+  const appliedReceipt = useEditorStore.getState().adjustments.referenceMatchApplicationReceipt;
+  await act(async () => {
+    useEditorStore.getState().undo();
+    await flushPromises();
+  });
+  expect(useEditorStore.getState().adjustments.referenceMatchApplicationReceipt).toBeNull();
+  await act(async () => {
+    useEditorStore.getState().redo();
+    await flushPromises();
+  });
+  expect(useEditorStore.getState().adjustments.referenceMatchApplicationReceipt).toEqual(appliedReceipt);
 });
 
 async function click(container: Element, selector: string) {

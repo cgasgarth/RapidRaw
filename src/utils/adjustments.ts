@@ -1,4 +1,8 @@
 import type { Crop } from 'react-image-crop';
+import {
+  type MatchLookApplicationReceiptV1,
+  matchLookApplicationReceiptV1Schema,
+} from '../../packages/rawengine-schema/src/referenceMatchRuntime';
 import { Mask, type SubMask, SubMaskMode } from '../components/panel/right/layers/Masks';
 import type { LevelsSettings } from '../schemas/color/levelsSchemas';
 import {
@@ -246,6 +250,7 @@ export interface Adjustments {
   rawProcessingModeOverride: RawProcessingModeOverride;
   /** Persisted native edit-graph process version; legacy sidecars default to v1. */
   rawEngineEditGraphVersion: number;
+  referenceMatchApplicationReceipt: MatchLookApplicationReceiptV1 | null;
   crop: Crop | null;
   deblurEnabled: boolean;
   deblurSigmaPx: number;
@@ -831,6 +836,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   curveMode: 'point',
   rawProcessingModeOverride: null,
   rawEngineEditGraphVersion: 1,
+  referenceMatchApplicationReceipt: null,
   deblurEnabled: false,
   deblurSigmaPx: 0.8,
   deblurStrength: 0,
@@ -1034,6 +1040,9 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
   );
 
   const parsedTechnicalWhiteBalance = technicalWhiteBalanceSchema.safeParse(loadedAdjustments.whiteBalanceTechnical);
+  const parsedReferenceMatchReceipt = matchLookApplicationReceiptV1Schema.safeParse(
+    loadedAdjustments.referenceMatchApplicationReceipt,
+  );
   const isLegacyWhiteBalance = !parsedTechnicalWhiteBalance.success;
   const loadedCameraProfileAmount = loadedAdjustments.cameraProfileAmount;
   const cameraProfileAmount =
@@ -1060,6 +1069,7 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
       ? parsedTechnicalWhiteBalance.data
       : structuredClone(INITIAL_TECHNICAL_WHITE_BALANCE),
     whiteBalanceMigration: isLegacyWhiteBalance ? 'legacy_creative_temperature_tint_v1' : 'native_v1',
+    referenceMatchApplicationReceipt: parsedReferenceMatchReceipt.success ? parsedReferenceMatchReceipt.data : null,
     lensCorrectionMode: loadedAdjustments.lensCorrectionMode || 'manual',
     lensMaker: loadedAdjustments.lensMaker ?? INITIAL_ADJUSTMENTS.lensMaker,
     lensModel: loadedAdjustments.lensModel ?? INITIAL_ADJUSTMENTS.lensModel,
