@@ -436,6 +436,129 @@ export const qaScenarios: readonly QaScenario[] = [
   },
   {
     ...browserDefaults,
+    id: 'browser.jobs.mixed-batch-export',
+    tags: ['browser', 'jobs', 'export', 'batch'],
+    dependencies: [],
+    fixture: { id: 'library' },
+    isolation: 'fresh-context',
+    timeoutMs: 60_000,
+    async run({ page }) {
+      await openLibraryFixture(page);
+      const thumbnails = page.getByTestId('library-thumbnail');
+      await thumbnails.nth(0).click();
+      await thumbnails.nth(1).click({ modifiers: ['Meta'] });
+      await thumbnails.nth(2).click({ modifiers: ['Meta'] });
+      await page.getByRole('button', { name: 'Export' }).click();
+      const exportAction = page.getByTestId('export-cancel-control');
+      await exportAction.waitFor();
+      await exportAction.click();
+      const receipt = page.getByTestId('export-success-receipt');
+      await receipt.waitFor();
+      if ((await receipt.getAttribute('data-export-receipt-total')) !== '3')
+        throw new Error('Mixed export terminal receipt did not commit all three outputs.');
+      const exportCall = await page.evaluate(() =>
+        (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? []).findLast(
+          ({ command }) => command === 'export_images',
+        ),
+      );
+      const paths = exportCall?.args?.paths;
+      if (!Array.isArray(paths) || paths.length !== 3)
+        throw new Error('Mixed export command did not carry the three selected source identities.');
+    },
+  },
+  {
+    ...browserDefaults,
+    id: 'browser.jobs.import-batch',
+    tags: ['browser', 'jobs', 'import', 'batch'],
+    dependencies: [],
+    fixture: { id: 'library' },
+    isolation: 'fresh-context',
+    timeoutMs: 60_000,
+    async run({ page }) {
+      await openLibraryFixture(page);
+      const gridBounds = await page.getByTestId('library-virtualized-grid').boundingBox();
+      if (gridBounds === null) throw new Error('Import journey has no library bounds.');
+      await page.mouse.click(gridBounds.x + gridBounds.width - 8, gridBounds.y + gridBounds.height - 8, {
+        button: 'right',
+      });
+      await page.getByText('Import Images', { exact: true }).click();
+      const modal = page.getByRole('dialog');
+      await modal.getByRole('button', { name: 'Start Import' }).click();
+      await page.getByText('Import Complete!', { exact: true }).waitFor();
+      const importCall = await page.evaluate(() =>
+        (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? []).findLast(({ command }) => command === 'import_files'),
+      );
+      const sourcePaths = importCall?.args?.sourcePaths;
+      if (!Array.isArray(sourcePaths) || sourcePaths.length !== 6)
+        throw new Error('Import terminal receipt did not account for the six-source bounded batch.');
+      await page.getByRole('button', { name: /import-source-1\.ARW/u }).waitFor();
+    },
+  },
+  {
+    ...browserDefaults,
+    id: 'browser.jobs.ai-capability-first-use',
+    tags: ['browser', 'jobs', 'ai', 'first-use'],
+    dependencies: [],
+    fixture: { id: 'library' },
+    isolation: 'fresh-context',
+    timeoutMs: 60_000,
+    async run({ page }) {
+      await openLibraryFixture(page);
+      await page.locator('button[data-tooltip="Go to Home"]').click();
+      await page.getByRole('button', { name: 'Settings', exact: true }).click();
+      await page.getByTestId('settings-category-processing').click();
+      await page.getByRole('button', { name: 'AI Connector' }).click();
+      await page.locator('#ai-connector-address').fill('127.0.0.1:8188');
+      await page.getByRole('button', { name: 'Test', exact: true }).click();
+      await page.getByText('Connection successful!', { exact: true }).waitFor();
+      const calls = await page.evaluate(
+        () =>
+          (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? []).filter(
+            ({ command }) => command === 'test_ai_connector_connection',
+          ).length,
+      );
+      if (calls !== 1) throw new Error(`AI capability first use invoked ${calls} connector probes instead of one.`);
+    },
+  },
+  {
+    ...browserDefaults,
+    id: 'browser.jobs.hdr-merge',
+    tags: ['browser', 'jobs', 'computational-merge', 'hdr'],
+    dependencies: [],
+    fixture: { id: 'library' },
+    isolation: 'fresh-context',
+    timeoutMs: 60_000,
+    async run({ page }) {
+      await openLibraryFixture(page);
+      const thumbnails = page.getByTestId('library-thumbnail');
+      await thumbnails.nth(0).click();
+      await thumbnails.nth(1).click({ modifiers: ['Meta'] });
+      await thumbnails.nth(2).click({ modifiers: ['Meta'] });
+      await openCommandPalette(page);
+      const palette = page.getByRole('dialog', { name: /Command Palette/u });
+      await palette.getByLabel(/Search commands/u).fill('hdr');
+      await palette.getByRole('button', { name: /Open HDR merge/u }).click();
+      await page.getByRole('button', { name: 'Off', exact: true }).click();
+      await page.getByRole('button', { name: 'Required', exact: true }).click();
+      const start = page.getByTestId('merge-start-action');
+      await start.click();
+      await page.waitForFunction(() =>
+        document.querySelector('[data-testid="merge-start-action"]')?.textContent?.includes('Build HDR'),
+      );
+      await start.click();
+      const apply = page.getByTestId('hdr-apply-command-state');
+      await apply.waitFor();
+      if ((await apply.getAttribute('data-source-count')) !== '3')
+        throw new Error('HDR terminal receipt did not retain its three bounded source identities.');
+      const commands = await page.evaluate(() =>
+        (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? []).map(({ command }) => command),
+      );
+      for (const command of ['plan_hdr', 'merge_hdr'])
+        if (!commands.includes(command)) throw new Error(`HDR journey omitted ${command}.`);
+    },
+  },
+  {
+    ...browserDefaults,
     id: 'browser.harness.command-contract',
     tags: ['browser', 'terminal-proof'],
     dependencies: [],

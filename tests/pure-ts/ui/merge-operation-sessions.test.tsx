@@ -62,6 +62,7 @@ test('HDR same-source reopen creates a fresh keyed session', async () => {
   );
   const paths = ['/hdr/a.ARW', '/hdr/b.ARW'];
   await view.render(true, paths);
+  expect(requiredButton(view.container).disabled).toBe(false);
   const firstId = operationId(view.container);
   await view.render(false, paths);
   await view.render(true, paths);

@@ -1418,7 +1418,7 @@ function HdrMergeSession({
         finalImageBase64={finalImageBase64}
         isProcessing={isProcessing}
         isSaving={isSaving}
-        isSourceCountValid={isApplyReady}
+        isSourceCountValid={runtimePlan === null ? isMergeReady : isApplyReady}
         labels={{
           cancel: t('modals.hdr.cancel'),
           close: t('modals.hdr.close'),

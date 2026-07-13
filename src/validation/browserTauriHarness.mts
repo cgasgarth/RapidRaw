@@ -92,6 +92,7 @@ const commandNames: Record<
   | 'getLibraryFolderAggregates'
   | 'getPinnedFolderTrees'
   | 'getSupportedFileTypes'
+  | 'importFiles'
   | 'isImageCached'
   | 'listImagesInDir'
   | 'listImagesRecursive'
@@ -103,7 +104,9 @@ const commandNames: Record<
   | 'loadMetadata'
   | 'loadPresets'
   | 'loadSettings'
+  | 'mergeHdr'
   | 'previewNegativeConversion'
+  | 'planHdr'
   | 'renderNegativeLabDryRunPreviewArtifact'
   | 'readExifForPaths'
   | 'saveSettings'
@@ -138,6 +141,7 @@ const commandNames: Record<
   getLibraryFolderAggregates: Invokes.GetLibraryFolderAggregates,
   getPinnedFolderTrees: Invokes.GetPinnedFolderTrees,
   getSupportedFileTypes: Invokes.GetSupportedFileTypes,
+  importFiles: Invokes.ImportFiles,
   isImageCached: Invokes.IsImageCached,
   listImagesInDir: Invokes.ListImagesInDir,
   listImagesRecursive: Invokes.ListImagesRecursive,
@@ -148,7 +152,9 @@ const commandNames: Record<
   loadMetadata: Invokes.LoadMetadata,
   loadPresets: Invokes.LoadPresets,
   loadSettings: Invokes.LoadSettings,
+  mergeHdr: Invokes.MergeHdr,
   previewNegativeConversion: Invokes.PreviewNegativeConversion,
+  planHdr: Invokes.PlanHdr,
   renderNegativeLabDryRunPreviewArtifact: Invokes.RenderNegativeLabDryRunPreviewArtifact,
   readExifForPaths: Invokes.ReadExifForPaths,
   saveSettings: Invokes.SaveSettings,
@@ -302,6 +308,86 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
     case commandNames.exportImages:
       dispatchBrowserHarnessEvent('export-complete', createHarnessExportReceipt(args));
       return Promise.resolve(null);
+    case commandNames.importFiles: {
+      const sourcePaths = getStringArrayArg(args, 'sourcePaths');
+      const destinationFolder = getStringArg(args, 'destinationFolder') ?? browserHarnessRoot;
+      const jobId = 'browser-harness-import-job';
+      window.setTimeout(() => dispatchBrowserHarnessEvent('import-start', { jobId, total: sourcePaths.length }), 0);
+      sourcePaths.forEach((sourcePath, index) => {
+        const importedPath = `${destinationFolder}/${sourcePath.split('/').at(-1) ?? `import-${index + 1}.ARW`}`;
+        if (!harnessImages.some(({ path }) => path === importedPath)) {
+          harnessImages.push({
+            exif: null,
+            is_edited: false,
+            is_virtual_copy: false,
+            modified: folderRevision + index + 1,
+            path: importedPath,
+            rating: 0,
+            tags: null,
+          });
+        }
+        window.setTimeout(
+          () =>
+            dispatchBrowserHarnessEvent('import-progress', {
+              bytesCopied: (index + 1) * 24_000_000,
+              committedPath: importedPath,
+              current: index + 1,
+              path: importedPath,
+              stage: 'copy',
+              total: sourcePaths.length,
+              totalBytes: sourcePaths.length * 24_000_000,
+            }),
+          20 * (index + 1),
+        );
+      });
+      folderRevision += sourcePaths.length;
+      window.setTimeout(() => dispatchBrowserHarnessEvent('import-complete', { jobId }), 20 * (sourcePaths.length + 1));
+      return Promise.resolve(jobId);
+    }
+    case commandNames.planHdr: {
+      const paths = getStringArrayArg(args, 'paths');
+      return Promise.resolve({
+        accepted: true,
+        acceptedDryRunPlanHash: 'blake3:browser-harness-hdr-plan',
+        acceptedDryRunPlanId: 'hdr_runtime_plan_browser_harness',
+        blockCodes: [],
+        bracketCount: paths.length,
+        previewDimensions: { height: 768, width: 1024 },
+        readiness: 'static_radiance_preview_ready',
+        sourcePaths: paths,
+        sources: paths.map((path, sourceIndex) => ({
+          contentHash: `blake3:browser-harness-hdr-source-${sourceIndex}`,
+          dimensions: { height: 768, width: 1024 },
+          exposure: { exposureEv: sourceIndex - 1, exposureTimeSeconds: 0.008 * 2 ** sourceIndex, iso: 100 },
+          path,
+          sourceIndex,
+        })),
+        warningCodes: [],
+      });
+    }
+    case commandNames.mergeHdr: {
+      const paths = getStringArrayArg(args, 'paths');
+      dispatchBrowserHarnessEvent('hdr-complete', {
+        base64: `data:image/jpeg;base64,${harnessPreviewJpegBase64}`,
+        receipt: {
+          acceptedDryRunPlanHash: getStringArg(args, 'acceptedDryRunPlanHash') ?? 'blake3:browser-harness-hdr-plan',
+          acceptedDryRunPlanId: getStringArg(args, 'acceptedDryRunPlanId') ?? 'hdr_runtime_plan_browser_harness',
+          mergeMethod: 'exposure_weighted_radiance',
+          mergeVersion: 'browser-harness-v1',
+          outputContentHash: 'blake3:browser-harness-hdr-output',
+          outputHandle: 'memory:browser-harness-hdr-output',
+          previewDimensions: { height: 768, width: 1024 },
+          sourceRoles: paths.map((_, sourceIndex) => ({
+            exposureEv: sourceIndex - 1,
+            role: sourceIndex === 0 ? 'under_exposed' : sourceIndex === paths.length - 1 ? 'over_exposed' : 'reference',
+            sourceIndex,
+          })),
+          sourcePaths: paths,
+          warningCodes: [],
+        },
+      });
+      return Promise.resolve(null);
+    }
     case commandNames.isImageCached:
       return Promise.resolve(false);
     case commandNames.loadMetadata:
@@ -576,8 +662,14 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
     case 'plugin:app|get_version':
     case 'plugin:app|version':
       return Promise.resolve('0.0.0-browser-harness');
-    case 'plugin:dialog|open':
-      return Promise.resolve(browserHarnessRoot);
+    case 'plugin:dialog|open': {
+      const options = args?.['options'];
+      return Promise.resolve(
+        options && typeof options === 'object' && Reflect.get(options, 'multiple') === true
+          ? [1, 2, 3, 4, 5, 6].map((index) => `${browserHarnessRoot}/import-source-${index}.ARW`)
+          : browserHarnessRoot,
+      );
+    }
     case 'plugin:dialog|save':
       return Promise.resolve(`${browserHarnessRoot}/export.tif`);
     case 'plugin:event|listen':
@@ -637,50 +729,59 @@ const dispatchBrowserHarnessEvent = (event: string, payload: unknown): void => {
 
 const createHarnessExportReceipt = (args: Record<string, unknown> | undefined) => {
   const paths = getStringArrayArg(args, 'paths');
-  const sourcePath = paths[0] ?? `${browserHarnessRoot}/browser-harness.ARW`;
   const outputPath = getStringArg(args, 'outputFolderOrFile') ?? `${browserHarnessRoot}/export.tif`;
   const outputFormat = getStringArg(args, 'outputFormat') ?? 'tif';
-  const exportedImage: BrowserHarnessImage = {
-    exif: null,
-    is_edited: false,
-    is_virtual_copy: false,
-    modified: folderRevision,
-    path: outputPath,
-    rating: 0,
-    tags: null,
-  };
-
-  if (!harnessImages.some((image) => image.path === outputPath)) {
-    harnessImages.push(exportedImage);
-    folderRevision += 1;
-  }
+  const sourcePaths = paths.length > 0 ? paths : [`${browserHarnessRoot}/browser-harness.ARW`];
+  const outputs = sourcePaths.map((sourcePath, index) => {
+    const resolvedOutputPath =
+      sourcePaths.length === 1
+        ? outputPath
+        : `${outputPath}/${
+            sourcePath
+              .split('/')
+              .at(-1)
+              ?.replace(/\.[^.]+$/u, '') ?? `export-${index + 1}`
+          }.${outputFormat}`;
+    if (!harnessImages.some((image) => image.path === resolvedOutputPath)) {
+      harnessImages.push({
+        exif: null,
+        is_edited: false,
+        is_virtual_copy: false,
+        modified: folderRevision + index + 1,
+        path: resolvedOutputPath,
+        rating: 0,
+        tags: null,
+      });
+    }
+    return {
+      bitDepth: 16,
+      blackPointCompensation: 'enabled',
+      byteSize: 143_654_912,
+      cmm: 'lcms2',
+      colorManagedTransform: 'display-p3 -> srgb',
+      colorProfile: 'srgb',
+      effectiveColorProfile: 'srgb',
+      format: outputFormat,
+      iccEmbedded: true,
+      outputPath: resolvedOutputPath,
+      policyStatus: 'applied',
+      policyVersion: 'browser-harness-export-policy-v1',
+      renderingIntent: 'relativeColorimetric',
+      requestedColorProfile: 'srgb',
+      requestedRenderingIntent: 'relativeColorimetric',
+      resolvedDisabledReason: null,
+      effectiveRenderingIntent: 'relativeColorimetric',
+      sourcePath,
+      transformApplied: true,
+    };
+  });
+  folderRevision += outputs.length;
 
   return {
     completedAt: new Date('2026-06-24T00:00:00.000Z').toISOString(),
-    outputs: [
-      {
-        bitDepth: 16,
-        blackPointCompensation: 'enabled',
-        byteSize: 143_654_912,
-        cmm: 'lcms2',
-        colorManagedTransform: 'display-p3 -> srgb',
-        colorProfile: 'srgb',
-        effectiveColorProfile: 'srgb',
-        format: outputFormat,
-        iccEmbedded: true,
-        outputPath,
-        policyStatus: 'applied',
-        policyVersion: 'browser-harness-export-policy-v1',
-        renderingIntent: 'relativeColorimetric',
-        requestedColorProfile: 'srgb',
-        requestedRenderingIntent: 'relativeColorimetric',
-        resolvedDisabledReason: null,
-        effectiveRenderingIntent: 'relativeColorimetric',
-        sourcePath,
-        transformApplied: true,
-      },
-    ],
-    total: 1,
+    outputs,
+    terminalStatus: 'completed',
+    total: outputs.length,
   };
 };
 

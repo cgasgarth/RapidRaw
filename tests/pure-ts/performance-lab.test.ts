@@ -107,6 +107,11 @@ describe('performance lab runner', () => {
       'browser.library-thumbnail-scroll',
       'browser.library-sidecar-change',
       'browser.library-folder-tree-expand',
+      'jobs.export-mixed-batch',
+      'jobs.import-batch',
+      'jobs.ai-capability-first-use-cold',
+      'jobs.ai-capability-first-use-warm',
+      'jobs.computational-hdr-merge',
       'native.startup-shell-cold',
       'native.startup-shell-warm',
       'native.editor-raw-open-cold',
@@ -115,9 +120,11 @@ describe('performance lab runner', () => {
     expect(performanceScenarios.every(({ version, measuredRuns }) => version > 0 && measuredRuns >= 5)).toBeTrue();
     expect(
       new Set(
-        performanceScenarios.filter(({ id }) => id.startsWith('browser.')).map(({ fixtureDigest }) => fixtureDigest),
+        performanceScenarios
+          .filter(({ id }) => id.startsWith('browser.') || id.startsWith('jobs.'))
+          .map(({ cacheMode, fixtureDigest }) => `${fixtureDigest}:${cacheMode}`),
       ).size,
-    ).toBe(performanceScenarios.filter(({ id }) => id.startsWith('browser.')).length);
+    ).toBe(performanceScenarios.filter(({ id }) => id.startsWith('browser.') || id.startsWith('jobs.')).length);
   });
 
   test('preview scheduling records CPU, memory, filesystem, and work metrics', async () => {

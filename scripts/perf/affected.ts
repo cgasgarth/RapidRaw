@@ -36,6 +36,24 @@ const ownership: readonly { pattern: RegExp; scenarioIds: readonly string[] }[] 
     scenarioIds: ['browser.editor-copy-paste-settings'],
   },
   {
+    pattern: /(?:src\/components\/panel\/right\/export|src-tauri\/src\/export)/u,
+    scenarioIds: ['jobs.export-mixed-batch'],
+  },
+  {
+    pattern:
+      /(?:src\/components\/modals\/navigation\/ImportSettingsModal|src\/hooks\/library\/useFileOperations|src-tauri\/src\/.*import)/u,
+    scenarioIds: ['jobs.import-batch'],
+  },
+  {
+    pattern: /(?:src\/components\/panel\/SettingsPanel|src\/hooks\/ai\/useAiConnectorStatus|src-tauri\/src\/ai)/u,
+    scenarioIds: ['jobs.ai-capability-first-use-cold', 'jobs.ai-capability-first-use-warm'],
+  },
+  {
+    pattern:
+      /(?:src\/components\/modals\/computational-merge\/HdrModal|src\/hooks\/app\/useProductivityActions|src-tauri\/src\/.*hdr)/u,
+    scenarioIds: ['jobs.computational-hdr-merge'],
+  },
+  {
     pattern: /(?:src\/components\/panel\/MainLibrary|src\/components\/library|src\/store\/library)/u,
     scenarioIds: [
       'browser.library-open',

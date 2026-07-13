@@ -308,6 +308,25 @@ exit 1
       ).scenarioIds,
     ).toEqual(['browser.editor-copy-paste-settings']);
     expect(
+      selectAffectedPerformanceScenarios(['src/components/panel/right/export/ExportPanel.tsx'], performanceScenarios)
+        .scenarioIds,
+    ).toEqual(['jobs.export-mixed-batch']);
+    expect(
+      selectAffectedPerformanceScenarios(
+        ['src/components/modals/navigation/ImportSettingsModal.tsx'],
+        performanceScenarios,
+      ).scenarioIds,
+    ).toEqual(['jobs.import-batch']);
+    expect(
+      selectAffectedPerformanceScenarios(['src/hooks/ai/useAiConnectorStatus.ts'], performanceScenarios).scenarioIds,
+    ).toEqual(['jobs.ai-capability-first-use-cold', 'jobs.ai-capability-first-use-warm']);
+    expect(
+      selectAffectedPerformanceScenarios(
+        ['src/components/modals/computational-merge/HdrModal.tsx'],
+        performanceScenarios,
+      ).scenarioIds,
+    ).toEqual(['jobs.computational-hdr-merge']);
+    expect(
       selectAffectedPerformanceScenarios(['src/components/panel/MainLibrary.tsx'], performanceScenarios).scenarioIds,
     ).toEqual([
       'browser.library-folder-tree-expand',
@@ -342,6 +361,11 @@ exit 1
         'browser.library-sidecar-change',
         'browser.library-thumbnail-scroll',
         'editor.preview-scheduling',
+        'jobs.ai-capability-first-use-cold',
+        'jobs.ai-capability-first-use-warm',
+        'jobs.computational-hdr-merge',
+        'jobs.export-mixed-batch',
+        'jobs.import-batch',
         'native.editor-raw-open-cold',
         'native.editor-raw-open-warm',
         'native.startup-shell-cold',
