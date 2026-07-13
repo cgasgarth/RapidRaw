@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 
 const LEDGER_PATH = 'docs/security/rust-advisory-waivers.json';
 const PACKAGE_PATH = 'package.json';
-const WORKFLOW_PATH = '.github/workflows/lint.yml';
+const WORKFLOW_PATH = '.github/workflows/main-long-validation.yml';
 const UPCOMING_REVIEW_DAYS = 30;
 const REQUIRED_FIELDS = [
   'advisoryId',
