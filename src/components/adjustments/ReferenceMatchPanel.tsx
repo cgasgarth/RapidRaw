@@ -592,6 +592,7 @@ export default function ReferenceMatchPanel() {
                   });
                   const receipt = matchLookApplicationReceiptV1Schema.parse({
                     appliedAt: new Date().toISOString(),
+                    baseGraphFingerprint: fingerprintReferenceMatchValue(JSON.stringify(current)),
                     destination: 'adjustment-layer',
                     effectiveReferences: proposal.effectiveReferences,
                     enabledGroups: [...enabledGroups].sort(),
@@ -641,6 +642,7 @@ export default function ReferenceMatchPanel() {
                   });
                   const receipt = matchLookApplicationReceiptV1Schema.parse({
                     appliedAt: new Date().toISOString(),
+                    baseGraphFingerprint: fingerprintReferenceMatchValue(JSON.stringify(current)),
                     destination: 'global-adjustments',
                     effectiveReferences: proposal.effectiveReferences,
                     enabledGroups: [...enabledGroups].sort(),
