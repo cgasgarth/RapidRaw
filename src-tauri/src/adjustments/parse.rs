@@ -1,9 +1,13 @@
 use crate::adjustments::abi::{
     AllAdjustments, BlackWhiteMixerSettings, ChannelMixerRow, ChannelMixerSettings,
     ColorBalanceRgbSettings, ColorCalibrationSettings, ColorGradeSettings, GlobalAdjustments,
-    HslColor, LevelsSettings, MAX_MASKS, MaskAdjustments, Point,
+    GpuMat3, HslColor, LevelsSettings, MAX_MASKS, MaskAdjustments, Point,
 };
 use crate::adjustments::scales::SCALES;
+use crate::color::view_transform::{
+    ViewTransformPlanV1, ViewTransformProcess, ViewTransformSettingsV1,
+};
+use crate::color::white_balance::{WhiteBalancePlanInputV1, compile_white_balance_plan};
 use crate::image_processing::calculate_agx_matrices;
 use crate::mask_generation::MaskDefinition;
 use serde::Deserialize;
@@ -31,6 +35,32 @@ fn scaled_section_value(
         default as f32 / scale
     } else {
         0.0
+    }
+}
+
+fn technical_white_balance_from_json(value: &JsonValue) -> GpuMat3 {
+    if !section_is_visible(value, "color") {
+        return GpuMat3::default();
+    }
+    let Some(settings) = value
+        .get("whiteBalanceTechnical")
+        .and_then(JsonValue::as_object)
+    else {
+        return GpuMat3::default();
+    };
+    let Ok(input) =
+        serde_json::from_value::<WhiteBalancePlanInputV1>(JsonValue::Object(settings.clone()))
+    else {
+        return GpuMat3::default();
+    };
+    let Ok(plan) = compile_white_balance_plan(input) else {
+        return GpuMat3::default();
+    };
+    let rows = plan.ap1_matrix;
+    GpuMat3 {
+        col0: [rows[0][0], rows[1][0], rows[2][0], 0.0],
+        col1: [rows[0][1], rows[1][1], rows[2][1], 0.0],
+        col2: [rows[0][2], rows[1][2], rows[2][2], 0.0],
     }
 }
 
@@ -278,6 +308,27 @@ fn get_global_adjustments_from_json(
 
     let tone_mapper = js_adjustments["toneMapper"].as_str().unwrap_or("basic");
     let (pipe_to_rendering, rendering_to_pipe) = calculate_agx_matrices();
+    let mut rapid_view_settings = ViewTransformSettingsV1::default();
+    if let Some(view) = js_adjustments.get("viewTransform") {
+        let number = |key: &str, fallback: f64| view[key].as_f64().unwrap_or(fallback);
+        rapid_view_settings.middle_grey = number("middleGrey", rapid_view_settings.middle_grey);
+        rapid_view_settings.source_black_ev =
+            number("sourceBlackEv", rapid_view_settings.source_black_ev);
+        rapid_view_settings.source_white_ev =
+            number("sourceWhiteEv", rapid_view_settings.source_white_ev);
+        rapid_view_settings.contrast = number("contrast", rapid_view_settings.contrast);
+        rapid_view_settings.latitude = number("latitude", rapid_view_settings.latitude);
+        rapid_view_settings.toe = number("toe", rapid_view_settings.toe);
+        rapid_view_settings.shoulder = number("shoulder", rapid_view_settings.shoulder);
+        rapid_view_settings.chroma_compression =
+            number("chromaCompression", rapid_view_settings.chroma_compression);
+    }
+    rapid_view_settings.process = ViewTransformProcess::RapidViewV1;
+    let rapid_view = ViewTransformPlanV1::compile(rapid_view_settings).unwrap_or_else(|_| {
+        ViewTransformPlanV1::compile(ViewTransformSettingsV1::default())
+            .expect("built-in Rapid View settings must compile")
+    });
+    let rapid_view_parameters = rapid_view.gpu_parameters();
     let (has_lut, lut_intensity) = if section_is_visible(js_adjustments, "effects") {
         (
             u32::from(js_adjustments["lutPath"].is_string()),
@@ -317,16 +368,32 @@ fn get_global_adjustments_from_json(
         temperature: scaled_section_value(
             js_adjustments,
             "color",
-            "temperature",
+            if js_adjustments.get("whiteBalanceTechnical").is_some() {
+                "creativeTemperature"
+            } else {
+                "temperature"
+            },
             SCALES.temperature,
             None,
         ),
-        tint: scaled_section_value(js_adjustments, "color", "tint", SCALES.tint, None),
+        tint: scaled_section_value(
+            js_adjustments,
+            "color",
+            if js_adjustments.get("whiteBalanceTechnical").is_some() {
+                "creativeTint"
+            } else {
+                "tint"
+            },
+            SCALES.tint,
+            None,
+        ),
         vibrance: scaled_section_value(js_adjustments, "color", "vibrance", SCALES.vibrance, None),
         hue: scaled_section_value(js_adjustments, "color", "hue", 1.0, None),
         _pad_color1: 0.0,
         _pad_color2: 0.0,
         _pad_color3: 0.0,
+        _pad_color4: 0.0,
+        technical_white_balance: technical_white_balance_from_json(js_adjustments),
         sharpness: scaled_section_value(
             js_adjustments,
             "details",
@@ -426,8 +493,11 @@ fn get_global_adjustments_from_json(
         _pad_ca1: 0.0,
         has_lut,
         lut_intensity,
-        tonemapper_mode: tonemapper_override
-            .unwrap_or_else(|| if tone_mapper == "agx" { 1 } else { 0 }),
+        tonemapper_mode: tonemapper_override.unwrap_or(match tone_mapper {
+            "agx" => 1,
+            "rapidView" => 2,
+            _ => 0,
+        }),
         _pad_lut2: 0.0,
         _pad_lut3: 0.0,
         _pad_lut4: 0.0,
@@ -435,8 +505,14 @@ fn get_global_adjustments_from_json(
         _pad_agx1: 0.0,
         _pad_agx2: 0.0,
         _pad_agx3: 0.0,
+        _pad_wgsl_agx_align1: 0.0,
+        _pad_wgsl_agx_align2: 0.0,
+        _pad_wgsl_agx_align3: 0.0,
         agx_pipe_to_rendering_matrix: pipe_to_rendering,
         agx_rendering_to_pipe_matrix: rendering_to_pipe,
+        rapid_view_parameters0: rapid_view_parameters[0],
+        rapid_view_parameters1: rapid_view_parameters[1],
+        rapid_view_parameters2: rapid_view_parameters[2],
         _pad_cg1: 0.0,
         _pad_cg2: 0.0,
         _pad_cg3: 0.0,
@@ -768,5 +844,100 @@ mod tests {
         assert_eq!(parsed.mask_adjustments[1].blend_mode, 1.0);
         assert_eq!(parsed.mask_adjustments[2].blend_mode, 2.0);
         assert_eq!(parsed.mask_adjustments[3].blend_mode, 0.0);
+    }
+
+    #[test]
+    fn parses_technical_white_balance_separately_from_creative_offsets() {
+        let native = json!({
+            "creativeTemperature": 25.0,
+            "creativeTint": -10.0,
+            "temperature": 99.0,
+            "tint": 99.0,
+            "whiteBalanceTechnical": {
+                "mode": "kelvin_tint",
+                "kelvin": 3200.0,
+                "duv": 0.008
+            }
+        });
+        let parsed = get_all_adjustments_from_json(&native, true, None);
+        assert_eq!(parsed.global.temperature, 1.0);
+        assert_eq!(parsed.global.tint, -0.1);
+        assert_ne!(
+            parsed.global.technical_white_balance.col0,
+            [1.0, 0.0, 0.0, 0.0]
+        );
+
+        let legacy = get_all_adjustments_from_json(
+            &json!({ "temperature": 25.0, "tint": -10.0 }),
+            true,
+            None,
+        );
+        assert_eq!(legacy.global.temperature, 1.0);
+        assert_eq!(legacy.global.tint, -0.1);
+        assert_eq!(
+            legacy.global.technical_white_balance.col0,
+            [1.0, 0.0, 0.0, 0.0]
+        );
+    }
+
+    #[test]
+    fn local_masks_cannot_override_the_global_technical_illuminant() {
+        let adjustments = json!({
+            "whiteBalanceTechnical": { "mode": "kelvin_tint", "kelvin": 7500.0, "duv": -0.004 },
+            "masks": [{
+                "id": "mask",
+                "name": "Local creative color",
+                "visible": true,
+                "invert": false,
+                "opacity": 100,
+                "adjustments": {
+                    "temperature": 50.0,
+                    "tint": 20.0,
+                    "whiteBalanceTechnical": { "mode": "kelvin_tint", "kelvin": 1800.0, "duv": 0.04 }
+                },
+                "subMasks": []
+            }]
+        });
+        let parsed = get_all_adjustments_from_json(&adjustments, true, None);
+        assert_eq!(parsed.mask_count, 1);
+        assert_eq!(parsed.mask_adjustments[0].temperature, 2.0);
+        assert_eq!(parsed.mask_adjustments[0].tint, 0.2);
+        assert_ne!(
+            parsed.global.technical_white_balance.col0,
+            [1.0, 0.0, 0.0, 0.0]
+        );
+    }
+
+    #[test]
+    fn view_process_versions_preserve_legacy_missing_state_and_compile_rapid_view() {
+        let missing_legacy = get_all_adjustments_from_json(&json!({}), true, None);
+        let basic = get_all_adjustments_from_json(&json!({ "toneMapper": "basic" }), true, None);
+        let agx = get_all_adjustments_from_json(&json!({ "toneMapper": "agx" }), true, None);
+        let rapid =
+            get_all_adjustments_from_json(&json!({ "toneMapper": "rapidView" }), true, None);
+        let customized = get_all_adjustments_from_json(
+            &json!({
+                "toneMapper": "rapidView",
+                "viewTransform": { "contrast": 1.6, "shoulder": 0.8, "toe": 0.7 }
+            }),
+            true,
+            None,
+        );
+
+        assert_eq!(missing_legacy.global.tonemapper_mode, 0);
+        assert_eq!(basic.global.tonemapper_mode, 0);
+        assert_eq!(agx.global.tonemapper_mode, 1);
+        assert_eq!(rapid.global.tonemapper_mode, 2);
+        assert_eq!(rapid.global.rapid_view_parameters0[0], 0.18);
+        assert!(rapid.global.rapid_view_parameters2[0].is_finite());
+        assert_ne!(rapid.global.rapid_view_parameters2[2].to_bits(), 0);
+        assert_ne!(
+            customized.global.rapid_view_parameters1,
+            rapid.global.rapid_view_parameters1
+        );
+        assert_ne!(
+            customized.global.rapid_view_parameters2[2].to_bits(),
+            rapid.global.rapid_view_parameters2[2].to_bits()
+        );
     }
 }

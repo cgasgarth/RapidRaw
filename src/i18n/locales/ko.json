@@ -7,15 +7,19 @@
       "evShift": "EV 시프트",
       "exposure": "노출",
       "highlights": "하이라이트",
+      "highlightRolloff": "하이라이트 롤오프",
       "mappers": {
         "agx": "AgX",
         "agxDesc": "필름 같은 톤 매핑",
         "basic": "기본",
-        "basicDesc": "표준 톤 매핑"
+        "basicDesc": "표준 톤 매핑",
+        "rapidView": "Rapid View"
       },
       "reset": "초기화",
       "shadows": "섀도우",
+      "shadowRolloff": "섀도 롤오프",
       "toneMapper": "톤 매퍼",
+      "viewContrast": "보기 대비",
       "whites": "화이트"
     },
     "color": {
@@ -75,6 +79,14 @@
         "workingSpace": ""
       },
       "saturation": "채도",
+      "auto": "자동",
+      "creativeTint": "크리에이티브 색조",
+      "creativeWarmth": "크리에이티브 온기",
+      "duv": "색조 (Duv)",
+      "illuminantMode": "광원",
+      "kelvin": "켈빈",
+      "kelvinTint": "켈빈 + 색조",
+      "preset": "프리셋",
       "temperature": "색온도",
       "tint": "틴트",
       "toggleSliders": "슬라이더 전환",
@@ -1846,7 +1858,8 @@
         "title": "이미지 전처리",
         "tonemapperOptions": {
           "agx": "AgX",
-          "basic": "기본"
+          "basic": "기본",
+          "rapidView": "Rapid View"
         },
         "tonemapperOverride": "전역 톤매퍼 재정의",
         "tonemapperOverrideDesc": "모든 이미지에 특정 톤매퍼를 전역으로 강제 적용하고, 조정 패널에서 톤매퍼 전환을 숨깁니다."

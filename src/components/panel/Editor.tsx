@@ -89,7 +89,13 @@ import {
   getNegativeLabSourceReadiness,
 } from '../../utils/negative-lab/negativeLabSourceReadiness';
 import { debounce } from '../../utils/timing';
-import type { WhiteBalancePickerRuntimeReceipt } from '../../utils/whiteBalancePicker';
+import {
+  applyWhiteBalancePickerHoverPreview,
+  cancelWhiteBalancePickerPreview,
+  createWhiteBalancePickerPreviewSession,
+  type WhiteBalancePickerPreviewSession,
+  type WhiteBalancePickerRuntimeReceipt,
+} from '../../utils/whiteBalancePicker';
 import { Panel } from '../ui/AppProperties';
 import { editorChromeTokens } from '../ui/editorChromeTokens';
 import EditorToolbar from './editor/EditorToolbar';
@@ -169,11 +175,13 @@ export default function Editor({
   const setEditorLightsOutLevel = useUIStore((s) => s.setEditorLightsOutLevel);
   const isLoading = useLibraryStore((s) => s.isViewLoading);
   const selectedImage = useEditorStore((s) => s.selectedImage);
+  const imageSessionStatus = useEditorStore((s) => s.imageSession?.status ?? null);
   const adjustments = useEditorStore((s) => s.adjustments);
   const adjustmentGeometryRevision = useEditorStore((s) => s.adjustmentSnapshot.geometryRevision);
   const adjustmentsHistory = useEditorStore((s) => s.history);
   const adjustmentsHistoryIndex = useEditorStore((s) => s.historyIndex);
   const finalPreviewUrl = useEditorStore((s) => s.finalPreviewUrl);
+  const provisionalPreviewFrame = useEditorStore((s) => s.provisionalPreviewFrame);
   const uncroppedAdjustedPreviewUrl = useEditorStore((s) => s.uncroppedAdjustedPreviewUrl);
   const transformedOriginalUrl = useEditorStore((s) => s.transformedOriginalUrl);
   const interactivePatch = useEditorStore((s) => s.interactivePatch);
@@ -201,6 +209,7 @@ export default function Editor({
   const isStraightenActive = useEditorStore((s) => s.isStraightenActive);
   const isWbPickerActive = useEditorStore((s) => s.isWbPickerActive);
   const lastWhiteBalancePickerReceipt = useEditorStore((s) => s.lastWhiteBalancePickerReceipt);
+  const wbPickerPreviewSessionRef = useRef<WhiteBalancePickerPreviewSession | null>(null);
   const liveRotation = useEditorStore((s) => s.liveRotation);
   const brushSettings = useEditorStore((s) => s.brushSettings);
   const activeMaskContainerId = useEditorStore((s) => s.activeMaskContainerId);
@@ -426,6 +435,7 @@ export default function Editor({
 
   const handleWbPicked = useCallback(
     (receipt: WhiteBalancePickerRuntimeReceipt, nextAdjustments: Adjustments) => {
+      wbPickerPreviewSessionRef.current = null;
       setEditor({
         adjustments: nextAdjustments,
         exportSoftProofTransform: null,
@@ -442,6 +452,61 @@ export default function Editor({
     },
     [pushHistory, setEditor],
   );
+
+  const handleWbPreview = useCallback(
+    (receipt: WhiteBalancePickerRuntimeReceipt, nextAdjustments: Adjustments) => {
+      const session = wbPickerPreviewSessionRef.current;
+      if (!session || !selectedImage) return;
+      if (receipt.selectedImagePath !== selectedImage.path) return;
+      const preview = applyWhiteBalancePickerHoverPreview(session, nextAdjustments, receipt);
+      wbPickerPreviewSessionRef.current = preview.session;
+      setEditor({
+        adjustments: preview.adjustments,
+        finalPreviewUrl: null,
+        interactivePatch: null,
+        transformedOriginalUrl: null,
+        uncroppedAdjustedPreviewUrl: null,
+      });
+    },
+    [selectedImage, setEditor],
+  );
+
+  const handleWbPreviewCancel = useCallback(() => {
+    const session = wbPickerPreviewSessionRef.current;
+    if (!session?.previewActive || !selectedImage || session.sourceIdentity !== selectedImage.path) return;
+    const baseAdjustments = cancelWhiteBalancePickerPreview(session, selectedImage.path);
+    wbPickerPreviewSessionRef.current = { ...session, lastPreviewIdentity: null, previewActive: false };
+    setEditor({
+      adjustments: baseAdjustments,
+      finalPreviewUrl: null,
+      interactivePatch: null,
+      transformedOriginalUrl: null,
+      uncroppedAdjustedPreviewUrl: null,
+    });
+  }, [selectedImage, setEditor]);
+
+  useEffect(() => {
+    if (isWbPickerActive) {
+      if (
+        selectedImage &&
+        (!wbPickerPreviewSessionRef.current || wbPickerPreviewSessionRef.current.sourceIdentity !== selectedImage.path)
+      ) {
+        wbPickerPreviewSessionRef.current = createWhiteBalancePickerPreviewSession(adjustments, selectedImage.path);
+      }
+      return;
+    }
+    const session = wbPickerPreviewSessionRef.current;
+    if (session?.previewActive && selectedImage && session.sourceIdentity === selectedImage.path) {
+      setEditor({
+        adjustments: cancelWhiteBalancePickerPreview(session, selectedImage.path),
+        finalPreviewUrl: null,
+        interactivePatch: null,
+        transformedOriginalUrl: null,
+        uncroppedAdjustedPreviewUrl: null,
+      });
+    }
+    wbPickerPreviewSessionRef.current = null;
+  }, [adjustments, isWbPickerActive, selectedImage, setEditor]);
 
   useEffect(() => {
     if (previousFullScreenRef.current === isFullScreen) return;
@@ -2068,6 +2133,7 @@ export default function Editor({
               exportSoftProofRecipeId={exportSoftProofRecipeId}
               exportSoftProofTransform={exportSoftProofTransform}
               finalPreviewUrl={finalPreviewUrl}
+              provisionalPreviewUrl={provisionalPreviewFrame?.url ?? null}
               gamutWarningOverlay={gamutWarningOverlay}
               handleCropComplete={handleCropComplete}
               handleCropStart={handleCropStart}
@@ -2122,6 +2188,9 @@ export default function Editor({
               isWbPickerActive={isWbPickerActive}
               lastWhiteBalancePickerReceipt={lastWhiteBalancePickerReceipt}
               onWbPicked={handleWbPicked}
+              onWbPreview={handleWbPreview}
+              onWbPreviewCancel={handleWbPreviewCancel}
+              wbPickerBaseAdjustments={wbPickerPreviewSessionRef.current?.baseAdjustments ?? adjustments}
               setAdjustments={setAdjustments}
               overlayRotation={overlayRotation}
               overlayMode={overlayMode}
@@ -2137,6 +2206,20 @@ export default function Editor({
               viewerSampleGraphRevision={viewerSampleGraphRevision}
               onViewerSamplerStateChange={setViewerSamplerState}
             />
+            {provisionalPreviewFrame !== null && !selectedImage.isReady && (
+              <div
+                className="pointer-events-none absolute right-3 top-3 rounded bg-black/70 px-2 py-1 text-xs text-white"
+                data-testid="embedded-preview-provisional-badge"
+              >
+                {t(
+                  imageSessionStatus === 'failed'
+                    ? 'editor.provisionalCameraPreviewFailed'
+                    : provisionalPreviewFrame.receipt.quality === 'fastDeveloped'
+                      ? 'editor.provisionalLibraryPreview'
+                      : 'editor.provisionalCameraPreview',
+                )}
+              </div>
+            )}
             {activeObjectPromptState !== null && (
               <div className="pointer-events-none absolute inset-0" data-testid="object-prompt-canvas-overlay">
                 {activeObjectPromptState.pointPrompts.map((point, index) => (

@@ -14,7 +14,9 @@ interface BrowserTauriInternals {
 interface BrowserTauriInvokeCall {
   args?: Record<string, unknown> | undefined;
   command: string;
+  endedAtMs: number | null;
   options?: unknown;
+  startedAtMs: number;
 }
 
 interface BrowserHarnessImage {
@@ -41,7 +43,16 @@ declare global {
     __RAWENGINE_BROWSER_TAURI_HARNESS__?: {
       calls: Array<BrowserTauriInvokeCall>;
       enabled: boolean;
+      emitEvent: (event: string, payload: unknown) => void;
       failNextSettingsSave: boolean;
+    };
+    __RAWENGINE_QA_PERFORMANCE_TRACE__?: {
+      callIndex: number;
+      firstMutationMs: number | null;
+      lastMutationMs: number | null;
+      mutationCount: number;
+      observer: MutationObserver;
+      startedAtMs: number;
     };
     __TAURI_INTERNALS__?: BrowserTauriInternals;
     isTauri?: boolean;
@@ -67,18 +78,21 @@ const commandNames: Record<
   | 'getStartupTrace'
   | 'recordFrontendStartupPhase'
   | 'generateOriginalTransformedPreview'
+  | 'generateMaskOverlay'
   | 'generateUncroppedPreview'
   | 'generatePreviewForPath'
   | 'applyAdjustments'
   | 'applyLibraryCatalogChanges'
   | 'getLensfunMakers'
   | 'getLogFilePath'
+  | 'getNativeCapabilities'
   | 'getAlbumImages'
   | 'getFolderTree'
   | 'getFolderRefreshSnapshot'
   | 'getLibraryFolderAggregates'
   | 'getPinnedFolderTrees'
   | 'getSupportedFileTypes'
+  | 'importFiles'
   | 'isImageCached'
   | 'listImagesInDir'
   | 'listImagesRecursive'
@@ -90,7 +104,9 @@ const commandNames: Record<
   | 'loadMetadata'
   | 'loadPresets'
   | 'loadSettings'
+  | 'mergeHdr'
   | 'previewNegativeConversion'
+  | 'planHdr'
   | 'renderNegativeLabDryRunPreviewArtifact'
   | 'readExifForPaths'
   | 'saveSettings'
@@ -113,16 +129,19 @@ const commandNames: Record<
   getStartupTrace: Invokes.GetStartupTrace,
   recordFrontendStartupPhase: Invokes.RecordFrontendStartupPhase,
   generateOriginalTransformedPreview: Invokes.GenerateOriginalTransformedPreview,
+  generateMaskOverlay: Invokes.GenerateMaskOverlay,
   generateUncroppedPreview: Invokes.GenerateUncroppedPreview,
   generatePreviewForPath: Invokes.GeneratePreviewForPath,
   getLensfunMakers: Invokes.GetLensfunMakers,
   getLogFilePath: Invokes.GetLogFilePath,
+  getNativeCapabilities: Invokes.GetNativeCapabilities,
   getAlbumImages: Invokes.GetAlbumImages,
   getFolderTree: Invokes.GetFolderTree,
   getFolderRefreshSnapshot: Invokes.GetFolderRefreshSnapshot,
   getLibraryFolderAggregates: Invokes.GetLibraryFolderAggregates,
   getPinnedFolderTrees: Invokes.GetPinnedFolderTrees,
   getSupportedFileTypes: Invokes.GetSupportedFileTypes,
+  importFiles: Invokes.ImportFiles,
   isImageCached: Invokes.IsImageCached,
   listImagesInDir: Invokes.ListImagesInDir,
   listImagesRecursive: Invokes.ListImagesRecursive,
@@ -133,7 +152,9 @@ const commandNames: Record<
   loadMetadata: Invokes.LoadMetadata,
   loadPresets: Invokes.LoadPresets,
   loadSettings: Invokes.LoadSettings,
+  mergeHdr: Invokes.MergeHdr,
   previewNegativeConversion: Invokes.PreviewNegativeConversion,
+  planHdr: Invokes.PlanHdr,
   renderNegativeLabDryRunPreviewArtifact: Invokes.RenderNegativeLabDryRunPreviewArtifact,
   readExifForPaths: Invokes.ReadExifForPaths,
   saveSettings: Invokes.SaveSettings,
@@ -165,13 +186,33 @@ let callbackId = 0;
 const callbacks = new Map<number, (event: unknown) => void>();
 const eventListeners = new Map<string, Set<number>>();
 let folderRevision = 1;
-const harnessImages: BrowserHarnessImage[] = [
+let catalogCursor = 0;
+let catalogPageSize = 256;
+let harnessImages: BrowserHarnessImage[] = [
   {
     exif: null,
     is_edited: false,
     is_virtual_copy: false,
     modified: 0,
     path: `${browserHarnessRoot}/browser-harness.ARW`,
+    rating: 0,
+    tags: null,
+  },
+  {
+    exif: null,
+    is_edited: false,
+    is_virtual_copy: false,
+    modified: 1_000_000,
+    path: `${browserHarnessRoot}/browser-harness-2.ARW`,
+    rating: 0,
+    tags: null,
+  },
+  {
+    exif: null,
+    is_edited: false,
+    is_virtual_copy: false,
+    modified: 2_000_000,
+    path: `${browserHarnessRoot}/browser-harness-3.ARW`,
     rating: 0,
     tags: null,
   },
@@ -182,8 +223,28 @@ const isBrowserTauriEventCallback = (value: unknown): value is BrowserTauriEvent
 export const installBrowserTauriHarness = (): void => {
   if (!harnessEnabled || window.__TAURI_INTERNALS__ !== undefined) return;
 
+  const requestedImageCount = Number.parseInt(new URL(window.location.href).searchParams.get('qaImages') ?? '', 10);
+  if (Number.isInteger(requestedImageCount) && requestedImageCount >= 1 && requestedImageCount <= 100_000) {
+    harnessImages = Array.from({ length: requestedImageCount }, (_, index) => ({
+      exif: null,
+      is_edited: false,
+      is_virtual_copy: false,
+      modified: index * 1_000_000,
+      path:
+        index === 0
+          ? `${browserHarnessRoot}/browser-harness.ARW`
+          : `${browserHarnessRoot}/browser-harnessz-${String(index + 1).padStart(6, '0')}.ARW`,
+      rating: 0,
+      tags: null,
+    }));
+  }
+
   const calls: Array<BrowserTauriInvokeCall> = [];
-  window.__RAWENGINE_BROWSER_TAURI_HARNESS__ = { calls, enabled: true, failNextSettingsSave: false };
+  const emitEvent = (event: string, payload: unknown) => {
+    for (const callbackId of eventListeners.get(event) ?? [])
+      callbacks.get(callbackId)?.({ event, id: callbackId, payload });
+  };
+  window.__RAWENGINE_BROWSER_TAURI_HARNESS__ = { calls, emitEvent, enabled: true, failNextSettingsSave: false };
   window.isTauri = true;
   window.__TAURI_EVENT_PLUGIN_INTERNALS__ = {
     unregisterListener: () => {},
@@ -191,8 +252,17 @@ export const installBrowserTauriHarness = (): void => {
   window.__TAURI_INTERNALS__ = {
     convertFileSrc: (filePath) => filePath,
     invoke: (command, args, options) => {
-      calls.push({ args, command, options });
-      return handleBrowserHarnessInvoke(command, args);
+      const call: BrowserTauriInvokeCall = {
+        args,
+        command,
+        endedAtMs: null,
+        options,
+        startedAtMs: performance.now(),
+      };
+      calls.push(call);
+      return handleBrowserHarnessInvoke(command, args).finally(() => {
+        call.endedAtMs = performance.now();
+      });
     },
     transformCallback: (callback) => {
       callbackId += 1;
@@ -209,6 +279,14 @@ export const installBrowserTauriHarness = (): void => {
 
 const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unknown>): Promise<unknown> => {
   switch (command) {
+    case commandNames.getNativeCapabilities:
+      return Promise.resolve({
+        schemaVersion: 1,
+        buildProfile: 'full',
+        ai: true,
+        advancedCodecs: true,
+        computational: true,
+      });
     case commandNames.loadSettings:
       harnessSettings = readPersistedHarnessSettings();
       return Promise.resolve(harnessSettings);
@@ -230,6 +308,86 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
     case commandNames.exportImages:
       dispatchBrowserHarnessEvent('export-complete', createHarnessExportReceipt(args));
       return Promise.resolve(null);
+    case commandNames.importFiles: {
+      const sourcePaths = getStringArrayArg(args, 'sourcePaths');
+      const destinationFolder = getStringArg(args, 'destinationFolder') ?? browserHarnessRoot;
+      const jobId = 'browser-harness-import-job';
+      window.setTimeout(() => dispatchBrowserHarnessEvent('import-start', { jobId, total: sourcePaths.length }), 0);
+      sourcePaths.forEach((sourcePath, index) => {
+        const importedPath = `${destinationFolder}/${sourcePath.split('/').at(-1) ?? `import-${index + 1}.ARW`}`;
+        if (!harnessImages.some(({ path }) => path === importedPath)) {
+          harnessImages.push({
+            exif: null,
+            is_edited: false,
+            is_virtual_copy: false,
+            modified: folderRevision + index + 1,
+            path: importedPath,
+            rating: 0,
+            tags: null,
+          });
+        }
+        window.setTimeout(
+          () =>
+            dispatchBrowserHarnessEvent('import-progress', {
+              bytesCopied: (index + 1) * 24_000_000,
+              committedPath: importedPath,
+              current: index + 1,
+              path: importedPath,
+              stage: 'copy',
+              total: sourcePaths.length,
+              totalBytes: sourcePaths.length * 24_000_000,
+            }),
+          20 * (index + 1),
+        );
+      });
+      folderRevision += sourcePaths.length;
+      window.setTimeout(() => dispatchBrowserHarnessEvent('import-complete', { jobId }), 20 * (sourcePaths.length + 1));
+      return Promise.resolve(jobId);
+    }
+    case commandNames.planHdr: {
+      const paths = getStringArrayArg(args, 'paths');
+      return Promise.resolve({
+        accepted: true,
+        acceptedDryRunPlanHash: 'blake3:browser-harness-hdr-plan',
+        acceptedDryRunPlanId: 'hdr_runtime_plan_browser_harness',
+        blockCodes: [],
+        bracketCount: paths.length,
+        previewDimensions: { height: 768, width: 1024 },
+        readiness: 'static_radiance_preview_ready',
+        sourcePaths: paths,
+        sources: paths.map((path, sourceIndex) => ({
+          contentHash: `blake3:browser-harness-hdr-source-${sourceIndex}`,
+          dimensions: { height: 768, width: 1024 },
+          exposure: { exposureEv: sourceIndex - 1, exposureTimeSeconds: 0.008 * 2 ** sourceIndex, iso: 100 },
+          path,
+          sourceIndex,
+        })),
+        warningCodes: [],
+      });
+    }
+    case commandNames.mergeHdr: {
+      const paths = getStringArrayArg(args, 'paths');
+      dispatchBrowserHarnessEvent('hdr-complete', {
+        base64: `data:image/jpeg;base64,${harnessPreviewJpegBase64}`,
+        receipt: {
+          acceptedDryRunPlanHash: getStringArg(args, 'acceptedDryRunPlanHash') ?? 'blake3:browser-harness-hdr-plan',
+          acceptedDryRunPlanId: getStringArg(args, 'acceptedDryRunPlanId') ?? 'hdr_runtime_plan_browser_harness',
+          mergeMethod: 'exposure_weighted_radiance',
+          mergeVersion: 'browser-harness-v1',
+          outputContentHash: 'blake3:browser-harness-hdr-output',
+          outputHandle: 'memory:browser-harness-hdr-output',
+          previewDimensions: { height: 768, width: 1024 },
+          sourceRoles: paths.map((_, sourceIndex) => ({
+            exposureEv: sourceIndex - 1,
+            role: sourceIndex === 0 ? 'under_exposed' : sourceIndex === paths.length - 1 ? 'over_exposed' : 'reference',
+            sourceIndex,
+          })),
+          sourcePaths: paths,
+          warningCodes: [],
+        },
+      });
+      return Promise.resolve(null);
+    }
     case commandNames.isImageCached:
       return Promise.resolve(false);
     case commandNames.loadMetadata:
@@ -257,14 +415,38 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
         metadata: { adjustments: null, harness: true },
         width: agentAuditE2eEnabled ? 4 : 1024,
       };
-      return Promise.resolve({
-        decodeReadyMillis: 2,
-        decoded,
+      dispatchBrowserHarnessEvent('image-open-update', {
+        dataUrl: `data:image/jpeg;base64,${harnessPreviewJpegBase64}`,
         imageId: request.imageId ?? request.path ?? 'browser-harness-image',
-        joinedPrefetch: false,
-        metadataFingerprint: '0'.repeat(64),
-        metadataReadyMillis: 1,
+        path: request.path ?? '/tmp/rawengine-browser-harness/image.raw',
+        phase: 'frameReady',
+        receipt: {
+          colorAssumption: 'encoded_srgb_vendor_preview',
+          frameGeneration: 1,
+          height: decoded.height,
+          imageSession: request.sessionId?.imageSession ?? 0,
+          orientationApplied: false,
+          provisionalReason: 'camera-rendered latency bridge; not authoritative pixels',
+          quality: 'embeddedProvisional',
+          selectionGeneration: request.sessionId?.selectionGeneration ?? 0,
+          sourceKind: 'browser_harness_raw',
+          sourceRevision: `source-revision-v1:${'0'.repeat(64)}`,
+          width: decoded.width,
+        },
         sessionId: request.sessionId ?? { imageSession: 0, selectionGeneration: 0 },
+      });
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          resolve({
+            decodeReadyMillis: 250,
+            decoded,
+            imageId: request.imageId ?? request.path ?? 'browser-harness-image',
+            joinedPrefetch: false,
+            metadataFingerprint: '0'.repeat(64),
+            metadataReadyMillis: 1,
+            sessionId: request.sessionId ?? { imageSession: 0, selectionGeneration: 0 },
+          });
+        }, 250);
       });
     }
     case commandNames.scheduleImagePrefetch:
@@ -285,6 +467,7 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
     case commandNames.configureLibraryChangefeed:
       return Promise.resolve(1);
     case commandNames.generateOriginalTransformedPreview:
+    case commandNames.generateMaskOverlay:
       return Promise.resolve(`data:image/jpeg;base64,${harnessPreviewJpegBase64}`);
     case commandNames.generateUncroppedPreview:
       return Promise.resolve(null);
@@ -363,6 +546,7 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
         editorReady: 'frontendEditorReady',
         interactive: 'frontendInteractive',
         libraryReady: 'frontendLibraryReady',
+        libraryViewportVisible: 'frontendLibraryViewportVisible',
         settingsHydrated: 'frontendSettingsHydrated',
         shellVisible: 'frontendShellVisible',
       }[String(args?.['phase'])];
@@ -384,8 +568,24 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
     }
     case commandNames.getFolderTree:
       return Promise.resolve({
-        children: [],
-        imageCount: 1,
+        children: [
+          {
+            children: [
+              {
+                children: [],
+                imageCount: 2,
+                isDir: true,
+                name: 'Selects',
+                path: `${browserHarnessRoot}/Alaska/Selects`,
+              },
+            ],
+            imageCount: 3,
+            isDir: true,
+            name: 'Alaska',
+            path: `${browserHarnessRoot}/Alaska`,
+          },
+        ],
+        imageCount: harnessImages.length,
         isDir: true,
         name: browserHarnessRoot.split('/').at(-1) ?? browserHarnessRoot,
         path: browserHarnessRoot,
@@ -417,15 +617,40 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
     case commandNames.listImagesRecursive:
       return Promise.resolve(harnessImages.map((image) => ({ ...image })));
     case commandNames.openLibraryCollection:
+      catalogCursor = 0;
+      {
+        const requestedPageSize = args?.['requestedPageSize'];
+        catalogPageSize = Math.max(
+          1,
+          Math.min(
+            1_024,
+            typeof requestedPageSize === 'number' && Number.isInteger(requestedPageSize) ? requestedPageSize : 256,
+          ),
+        );
+        catalogCursor = Math.min(catalogPageSize, harnessImages.length);
+        return Promise.resolve({
+          sessionId: 1,
+          catalogRevision: folderRevision,
+          estimatedCount: harnessImages.length,
+          firstPage: harnessImages
+            .slice(0, catalogCursor)
+            .map((image, index) => ({ ...image, imageId: image.path, entityRevision: index + 1 })),
+          indexingState: 'current',
+        });
+      }
+    case commandNames.nextLibraryCollectionPage: {
+      const start = catalogCursor;
+      const end = Math.min(start + catalogPageSize, harnessImages.length);
+      catalogCursor = end;
       return Promise.resolve({
         sessionId: 1,
         catalogRevision: folderRevision,
-        estimatedCount: harnessImages.length,
-        firstPage: harnessImages.map((image, index) => ({ ...image, imageId: image.path, entityRevision: index + 1 })),
-        indexingState: 'current',
+        rows: harnessImages
+          .slice(start, end)
+          .map((image, index) => ({ ...image, imageId: image.path, entityRevision: start + index + 1 })),
+        complete: end >= harnessImages.length,
       });
-    case commandNames.nextLibraryCollectionPage:
-      return Promise.resolve({ sessionId: 1, catalogRevision: folderRevision, rows: [], complete: true });
+    }
     case commandNames.reconcileLibraryCatalog:
       return Promise.resolve({ catalogRevision: ++folderRevision });
     case commandNames.applyLibraryCatalogChanges:
@@ -438,8 +663,14 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
     case 'plugin:app|get_version':
     case 'plugin:app|version':
       return Promise.resolve('0.0.0-browser-harness');
-    case 'plugin:dialog|open':
-      return Promise.resolve(browserHarnessRoot);
+    case 'plugin:dialog|open': {
+      const options = args?.['options'];
+      return Promise.resolve(
+        options && typeof options === 'object' && Reflect.get(options, 'multiple') === true
+          ? [1, 2, 3, 4, 5, 6].map((index) => `${browserHarnessRoot}/import-source-${index}.ARW`)
+          : browserHarnessRoot,
+      );
+    }
     case 'plugin:dialog|save':
       return Promise.resolve(`${browserHarnessRoot}/export.tif`);
     case 'plugin:event|listen':
@@ -499,50 +730,59 @@ const dispatchBrowserHarnessEvent = (event: string, payload: unknown): void => {
 
 const createHarnessExportReceipt = (args: Record<string, unknown> | undefined) => {
   const paths = getStringArrayArg(args, 'paths');
-  const sourcePath = paths[0] ?? `${browserHarnessRoot}/browser-harness.ARW`;
   const outputPath = getStringArg(args, 'outputFolderOrFile') ?? `${browserHarnessRoot}/export.tif`;
   const outputFormat = getStringArg(args, 'outputFormat') ?? 'tif';
-  const exportedImage: BrowserHarnessImage = {
-    exif: null,
-    is_edited: false,
-    is_virtual_copy: false,
-    modified: folderRevision,
-    path: outputPath,
-    rating: 0,
-    tags: null,
-  };
-
-  if (!harnessImages.some((image) => image.path === outputPath)) {
-    harnessImages.push(exportedImage);
-    folderRevision += 1;
-  }
+  const sourcePaths = paths.length > 0 ? paths : [`${browserHarnessRoot}/browser-harness.ARW`];
+  const outputs = sourcePaths.map((sourcePath, index) => {
+    const resolvedOutputPath =
+      sourcePaths.length === 1
+        ? outputPath
+        : `${outputPath}/${
+            sourcePath
+              .split('/')
+              .at(-1)
+              ?.replace(/\.[^.]+$/u, '') ?? `export-${index + 1}`
+          }.${outputFormat}`;
+    if (!harnessImages.some((image) => image.path === resolvedOutputPath)) {
+      harnessImages.push({
+        exif: null,
+        is_edited: false,
+        is_virtual_copy: false,
+        modified: folderRevision + index + 1,
+        path: resolvedOutputPath,
+        rating: 0,
+        tags: null,
+      });
+    }
+    return {
+      bitDepth: 16,
+      blackPointCompensation: 'enabled',
+      byteSize: 143_654_912,
+      cmm: 'lcms2',
+      colorManagedTransform: 'display-p3 -> srgb',
+      colorProfile: 'srgb',
+      effectiveColorProfile: 'srgb',
+      format: outputFormat,
+      iccEmbedded: true,
+      outputPath: resolvedOutputPath,
+      policyStatus: 'applied',
+      policyVersion: 'browser-harness-export-policy-v1',
+      renderingIntent: 'relativeColorimetric',
+      requestedColorProfile: 'srgb',
+      requestedRenderingIntent: 'relativeColorimetric',
+      resolvedDisabledReason: null,
+      effectiveRenderingIntent: 'relativeColorimetric',
+      sourcePath,
+      transformApplied: true,
+    };
+  });
+  folderRevision += outputs.length;
 
   return {
     completedAt: new Date('2026-06-24T00:00:00.000Z').toISOString(),
-    outputs: [
-      {
-        bitDepth: 16,
-        blackPointCompensation: 'enabled',
-        byteSize: 143_654_912,
-        cmm: 'lcms2',
-        colorManagedTransform: 'display-p3 -> srgb',
-        colorProfile: 'srgb',
-        effectiveColorProfile: 'srgb',
-        format: outputFormat,
-        iccEmbedded: true,
-        outputPath,
-        policyStatus: 'applied',
-        policyVersion: 'browser-harness-export-policy-v1',
-        renderingIntent: 'relativeColorimetric',
-        requestedColorProfile: 'srgb',
-        requestedRenderingIntent: 'relativeColorimetric',
-        resolvedDisabledReason: null,
-        effectiveRenderingIntent: 'relativeColorimetric',
-        sourcePath,
-        transformApplied: true,
-      },
-    ],
-    total: 1,
+    outputs,
+    terminalStatus: 'completed',
+    total: outputs.length,
   };
 };
 

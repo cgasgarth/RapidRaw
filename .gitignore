@@ -15,6 +15,7 @@ dist-ssr
 # Generated local validation/proof artifacts
 artifacts/
 private-artifacts/
+.rapidraw/
 private-fixtures/
 .rawengine-private-root/
 docs/validation/local/

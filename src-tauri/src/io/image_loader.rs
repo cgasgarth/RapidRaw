@@ -1,6 +1,9 @@
 use crate::Cursor;
 use crate::app_settings::{AppSettings, load_settings_or_default};
 use crate::app_state::{AppState, LoadedImage};
+use crate::color::white_balance::{
+    WhiteBalancePlanInputV1, WhiteBalancePlanV1, compile_white_balance_plan,
+};
 use crate::exif_processing;
 use crate::file_management::{parse_virtual_path, read_file_mapped};
 use crate::formats::is_raw_file;
@@ -9,7 +12,8 @@ use crate::mask_generation::SubMask;
 use crate::patch_assets::{CompositeResult, composite_patches};
 use crate::raw_processing::{
     RawDemosaicPath, RawDevelopmentReport, RawProcessingProfile, RawRuntimeReport,
-    develop_raw_image_with_report,
+    develop_raw_image_with_report, develop_raw_image_with_report_and_white_balance,
+    develop_raw_source_with_report_and_white_balance,
 };
 use crate::render_caches::RenderCaches;
 use crate::source_revision::{DecodedImageKey, RawProcessingProfileKey, SourceRevision};
@@ -18,6 +22,7 @@ use base64::{Engine as _, engine::general_purpose};
 use exif::{Reader as ExifReader, Tag};
 use image::{DynamicImage, GenericImageView, ImageFormat, ImageReader, imageops};
 use rawler::Orientation;
+use rawler::rawsource::RawSource;
 use serde::Deserialize;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -103,7 +108,7 @@ enum DemosaicSharpeningPath {
 }
 
 const RAW_CACHE_CAMERA_PROFILE_RESOLVER_VERSION: &str = "dual_illuminant_mired_v2";
-const RAW_CACHE_RECONSTRUCTION_VERSION: &str = "raw_reconstruction_v4";
+const RAW_CACHE_RECONSTRUCTION_VERSION: &str = "raw_reconstruction_v5_highlight_v2";
 
 fn normalize_raw_processing_mode(mode: Option<&str>) -> &'static str {
     match mode {
@@ -372,17 +377,27 @@ pub(crate) fn load_and_composite_with_report(
     settings: &AppSettings,
     cancel_token: Option<(Arc<AtomicUsize>, usize)>,
 ) -> Result<(DynamicImage, Option<RawDevelopmentReport>)> {
-    let (base_image, raw_development_report) = load_base_image_from_bytes_with_report(
+    let white_balance_plan = technical_white_balance_plan_from_adjustments(adjustments);
+    let (base_image, raw_development_report) = load_base_image_from_bytes_with_report_and_plan(
         base_image,
         path,
         use_fast_raw_dev,
         settings,
         cancel_token,
+        white_balance_plan,
     )?;
     Ok((
         composite_patches_on_image(&base_image, adjustments)?.into_owned(),
         raw_development_report,
     ))
+}
+
+fn technical_white_balance_plan_from_adjustments(
+    adjustments: &Value,
+) -> Option<WhiteBalancePlanV1> {
+    let settings = adjustments.get("whiteBalanceTechnical")?.clone();
+    let input = serde_json::from_value::<WhiteBalancePlanInputV1>(settings).ok()?;
+    compile_white_balance_plan(input).ok()
 }
 
 pub fn load_base_image_from_bytes(
@@ -408,6 +423,63 @@ pub(crate) fn load_base_image_from_bytes_with_report(
     use_fast_raw_dev: bool,
     settings: &AppSettings,
     cancel_token: Option<(Arc<AtomicUsize>, usize)>,
+) -> Result<(DynamicImage, Option<RawDevelopmentReport>)> {
+    load_base_image_from_source_with_report(
+        bytes,
+        path_for_ext_check,
+        use_fast_raw_dev,
+        settings,
+        cancel_token,
+        None,
+        None,
+    )
+}
+
+fn load_base_image_from_bytes_with_report_and_plan(
+    bytes: &[u8],
+    path_for_ext_check: &str,
+    use_fast_raw_dev: bool,
+    settings: &AppSettings,
+    cancel_token: Option<(Arc<AtomicUsize>, usize)>,
+    white_balance_plan: Option<WhiteBalancePlanV1>,
+) -> Result<(DynamicImage, Option<RawDevelopmentReport>)> {
+    load_base_image_from_source_with_report(
+        bytes,
+        path_for_ext_check,
+        use_fast_raw_dev,
+        settings,
+        cancel_token,
+        None,
+        white_balance_plan,
+    )
+}
+
+fn load_base_image_from_prepared_raw_source_with_report(
+    source: &RawSource,
+    path_for_ext_check: &str,
+    use_fast_raw_dev: bool,
+    settings: &AppSettings,
+    cancel_token: Option<(Arc<AtomicUsize>, usize)>,
+) -> Result<(DynamicImage, Option<RawDevelopmentReport>)> {
+    load_base_image_from_source_with_report(
+        source.buf(),
+        path_for_ext_check,
+        use_fast_raw_dev,
+        settings,
+        cancel_token,
+        Some(source),
+        None,
+    )
+}
+
+fn load_base_image_from_source_with_report(
+    bytes: &[u8],
+    path_for_ext_check: &str,
+    use_fast_raw_dev: bool,
+    settings: &AppSettings,
+    cancel_token: Option<(Arc<AtomicUsize>, usize)>,
+    prepared_raw_source: Option<&RawSource>,
+    white_balance_plan: Option<WhiteBalancePlanV1>,
 ) -> Result<(DynamicImage, Option<RawDevelopmentReport>)> {
     let raw_processing_mode = settings.raw_processing_mode.as_deref();
     let recipe = raw_processing_mode_recipe(raw_processing_mode);
@@ -450,14 +522,47 @@ pub(crate) fn load_base_image_from_bytes_with_report(
     if is_raw_file(path_for_ext_check) {
         let profile = RawProcessingProfile::from_mode(raw_processing_mode.unwrap_or("balanced"));
         match panic::catch_unwind(move || {
-            develop_raw_image_with_report(
-                bytes,
-                use_fast_raw_dev,
-                profile,
-                highlight_compression,
-                linear_mode,
-                cancel_token,
-            )
+            if let Some(source) = prepared_raw_source {
+                match white_balance_plan {
+                    Some(plan) => develop_raw_source_with_report_and_white_balance(
+                        source,
+                        use_fast_raw_dev,
+                        profile,
+                        highlight_compression,
+                        linear_mode,
+                        cancel_token,
+                        plan,
+                    ),
+                    None => crate::raw_processing::develop_raw_source_with_report(
+                        source,
+                        use_fast_raw_dev,
+                        profile,
+                        highlight_compression,
+                        linear_mode,
+                        cancel_token,
+                    ),
+                }
+            } else {
+                match white_balance_plan {
+                    Some(plan) => develop_raw_image_with_report_and_white_balance(
+                        bytes,
+                        use_fast_raw_dev,
+                        profile,
+                        highlight_compression,
+                        linear_mode,
+                        cancel_token,
+                        plan,
+                    ),
+                    None => develop_raw_image_with_report(
+                        bytes,
+                        use_fast_raw_dev,
+                        profile,
+                        highlight_compression,
+                        linear_mode,
+                        cancel_token,
+                    ),
+                }
+            }
         }) {
             Ok(Ok((mut image, report))) => {
                 let sharpening_settings = resolve_capture_pre_sharpening_settings(
@@ -551,6 +656,24 @@ fn add_raw_development_report_exif(
     if let Some(value) = &profile.matrix_hash {
         exif.insert(
             "RawEngineCameraProfileMatrixHash".to_string(),
+            value.clone(),
+        );
+    }
+    if let Some(value) = profile.profile_illuminant_xy {
+        exif.insert(
+            "RawEngineCameraProfileIlluminantXy".to_string(),
+            format!("{:.8},{:.8}", value[0], value[1]),
+        );
+    }
+    if let Some(value) = profile.profile_illuminant_duv {
+        exif.insert(
+            "RawEngineCameraProfileIlluminantDuv".to_string(),
+            format!("{value:.8}"),
+        );
+    }
+    if let Some(value) = &profile.white_balance_plan_fingerprint {
+        exif.insert(
+            "RawEngineCameraProfileWhiteBalancePlanFingerprint".to_string(),
             value.clone(),
         );
     }
@@ -858,7 +981,7 @@ pub async fn load_image(
     app_handle: tauri::AppHandle,
 ) -> Result<LoadImageResult, String> {
     let metadata = load_image_open_metadata(&path)?;
-    load_image_prepared(path, state.inner(), app_handle, metadata, true, None).await
+    load_image_prepared(path, state.inner(), app_handle, metadata, true, None, None).await
 }
 
 pub(crate) fn load_image_open_metadata(path: &str) -> Result<ImageMetadata, String> {
@@ -891,7 +1014,7 @@ pub(crate) async fn prefetch_image(
     cancellation: Option<(Arc<AtomicUsize>, usize)>,
 ) -> Result<LoadImageResult, String> {
     let metadata = load_image_open_metadata(&path)?;
-    load_image_prepared(path, state, app_handle, metadata, false, cancellation).await
+    load_image_prepared(path, state, app_handle, metadata, false, cancellation, None).await
 }
 
 pub(crate) async fn load_image_prepared(
@@ -901,6 +1024,7 @@ pub(crate) async fn load_image_prepared(
     metadata: ImageMetadata,
     install_active: bool,
     cancellation: Option<(Arc<AtomicUsize>, usize)>,
+    prepared_raw_source: Option<Arc<RawSource>>,
 ) -> Result<LoadImageResult, String> {
     let (generation_tracker, my_generation) = if let Some(cancellation) = cancellation {
         cancellation
@@ -993,14 +1117,55 @@ pub(crate) async fn load_image_prepared(
         } else {
             let decode_started = Instant::now();
             let decode_generation_tracker = Arc::clone(&generation_tracker);
+            let prepared_raw_source = prepared_raw_source.clone();
             let (pristine_img, exif_data_loaded, raw_development_report) =
             tokio::task::spawn_blocking(move || {
                 if decode_generation_tracker.load(Ordering::SeqCst) != my_generation {
                     return Err("Load cancelled".to_string());
                 }
 
-                let result: Result<LoadedBaseImageWithExif, String> =
-                    (|| match read_file_mapped(Path::new(&path_clone)) {
+                let result: Result<LoadedBaseImageWithExif, String> = (|| {
+                    if let Some(source) = prepared_raw_source {
+                        let bytes = source.buf();
+                        let fingerprint = fingerprint_cache.fingerprint(&expected_revision, bytes);
+                        log::trace!("decoded_source_fingerprint={}", fingerprint.blake3.to_hex());
+                        let (img, raw_development_report) =
+                            load_base_image_from_prepared_raw_source_with_report(
+                                &source,
+                                &path_clone,
+                                false,
+                                &effective_settings,
+                                cancel_token.clone(),
+                            )
+                            .map_err(|error| error.to_string())?;
+                        let mut exif = exif_processing::read_exif_data(&path_clone, bytes);
+                        exif.insert(
+                            "RawEngineRawProcessingMode".to_string(),
+                            effective_settings
+                                .raw_processing_mode
+                                .clone()
+                                .unwrap_or_else(|| "balanced".to_string()),
+                        );
+                        exif.insert(
+                            "RawEngineRawProcessingProvenance".to_string(),
+                            raw_processing_mode_recipe(
+                                effective_settings.raw_processing_mode.as_deref(),
+                            )
+                            .provenance
+                            .to_string(),
+                        );
+                        if let Some(report) = &raw_development_report {
+                            add_raw_development_report_exif(&mut exif, report);
+                        }
+                        if SourceRevision::from_path(Path::new(&path_clone))
+                            .map_err(|error| error.to_string())?
+                            != expected_revision
+                        {
+                            return Err("source_changed_during_decode".to_string());
+                        }
+                        return Ok((img, exif, raw_development_report));
+                    }
+                    match read_file_mapped(Path::new(&path_clone)) {
                     Ok(mmap) => {
                         if decode_generation_tracker.load(Ordering::SeqCst) != my_generation {
                             return Err("Load cancelled".to_string());
@@ -1093,6 +1258,7 @@ pub(crate) async fn load_image_prepared(
                             return Err("source_changed_during_decode".to_string());
                         }
                         Ok((img, exif, raw_development_report))
+                    }
                     }
                 })();
                 result
@@ -1375,7 +1541,7 @@ mod tests {
         );
         assert_eq!(
             resolved_cache_key.reconstruction_version,
-            "raw_reconstruction_v4"
+            "raw_reconstruction_v5_highlight_v2"
         );
         assert_eq!(
             resolved_cache_key.highlight_compression_bits,
@@ -1771,5 +1937,65 @@ mod tests {
             serde_json::to_vec_pretty(&report).expect("serialize report"),
         )
         .expect("write capture sharpening proof report");
+    }
+
+    #[test]
+    fn private_white_balance_plan_profile_runtime_proof_when_enabled() {
+        if std::env::var("RAWENGINE_RUN_PRIVATE_WHITE_BALANCE_PLAN_PROOF")
+            .ok()
+            .as_deref()
+            != Some("1")
+        {
+            return;
+        }
+
+        let source_path = std::env::var("RAWENGINE_PRIVATE_RAW_SOURCE")
+            .expect("RAWENGINE_PRIVATE_RAW_SOURCE must point to a private RAW");
+        let source_bytes = fs::read(&source_path).expect("read private RAW");
+        let settings = AppSettings::default();
+        let render = |kelvin: f64, duv: f64| {
+            let adjustments = serde_json::json!({
+                "whiteBalanceTechnical": {
+                    "mode": "kelvin_tint",
+                    "kelvin": kelvin,
+                    "duv": duv
+                }
+            });
+            let (image, report) = load_and_composite_with_report(
+                &source_bytes,
+                &source_path,
+                &adjustments,
+                false,
+                &settings,
+                None,
+            )
+            .expect("adjustment-aware private RAW decode succeeds");
+            let report = report.expect("private RAW emits development report");
+            let pixel_hash = format!("blake3:{}", blake3::hash(image.as_bytes()).to_hex());
+            (image.dimensions(), pixel_hash, report.camera_profile)
+        };
+
+        let tungsten = render(2_856.0, 0.012);
+        let tungsten_repeat = render(2_856.0, 0.012);
+        let daylight = render(6_004.0, -0.004);
+
+        assert_eq!(tungsten.0, tungsten_repeat.0);
+        assert_eq!(tungsten.1, tungsten_repeat.1);
+        assert_eq!(
+            tungsten.2.white_balance_plan_fingerprint,
+            tungsten_repeat.2.white_balance_plan_fingerprint
+        );
+        assert_eq!(
+            tungsten.2.illuminant_estimate_method,
+            "white_balance_plan_v1"
+        );
+        assert_eq!(tungsten.2.profile_illuminant_duv, Some(0.012));
+        assert_eq!(daylight.2.profile_illuminant_duv, Some(-0.004));
+        assert_ne!(
+            tungsten.2.white_balance_plan_fingerprint,
+            daylight.2.white_balance_plan_fingerprint
+        );
+        assert_ne!(tungsten.2.matrix_hash, daylight.2.matrix_hash);
+        assert_ne!(tungsten.1, daylight.1);
     }
 }

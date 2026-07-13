@@ -561,7 +561,7 @@ impl Default for AppSettings {
             #[cfg(not(target_os = "android"))]
             image_cache_size: Some(5),
             tonemapper_override_enabled: Some(false),
-            default_raw_tonemapper: Some("agx".to_string()),
+            default_raw_tonemapper: Some("rapidView".to_string()),
             default_non_raw_tonemapper: Some("basic".to_string()),
             enable_focus_mode: Some(false),
             external_editor_path: None,
@@ -704,6 +704,28 @@ pub fn load_settings(app_handle: AppHandle) -> Result<AppSettings, String> {
 
     if settings_modified && let Ok(json_string) = serde_json::to_string_pretty(&settings) {
         let _ = fs::write(&path, json_string);
+    }
+
+    #[cfg(feature = "validation-harness")]
+    if let Some(folder) = std::env::var_os("RAWENGINE_STARTUP_BENCHMARK_LAST_FOLDER") {
+        let folder = folder.to_string_lossy().into_owned();
+        settings.last_root_path = Some(folder.clone());
+        settings.root_folders = vec![folder.clone()];
+        settings.last_folder_state = Some(LastFolderState {
+            current_folder_path: Some(folder.clone()),
+            expanded_folders: vec![folder],
+            active_album_id: None,
+            expanded_album_groups: Vec::new(),
+        });
+        let visibility = settings
+            .ui_visibility
+            .get_or_insert_with(|| serde_json::json!({}));
+        if let Some(object) = visibility.as_object_mut() {
+            object.insert(
+                "startupBenchmarkAutoContinue".to_string(),
+                serde_json::Value::Bool(true),
+            );
+        }
     }
 
     Ok(settings)

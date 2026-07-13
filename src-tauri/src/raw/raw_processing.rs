@@ -2,6 +2,18 @@ use crate::color::camera_input_transform::{
     AcesCgLinearV1, CameraInputTransform, CameraRgbWhiteBalanceGains, RawInputTransformReceiptV1,
     RawWorkingImageV1, XyzToCameraMatrix, apply_camera_input_transform,
 };
+#[cfg(test)]
+use crate::color::white_balance::{
+    WhiteBalanceModeV1, WhiteBalancePlanInputV1, compile_white_balance_plan,
+};
+use crate::color::white_balance::{
+    WhiteBalancePlanV1, camera_white_chroma, neutral_chroma_from_wb, project_neutral_mired_weight,
+};
+use crate::highlight_reconstruction::{
+    CfaKind, CfaTopology, HighlightReconstructionMode, HighlightReconstructionOutput,
+    HighlightReconstructionReportV2, SensorReconstructionInput,
+    apply_post_demosaic_chroma_fallback, reconstruct_integer_sensor,
+};
 use crate::image_processing::apply_orientation;
 use anyhow::{Result, anyhow};
 use image::{DynamicImage, ImageBuffer, Rgba};
@@ -21,7 +33,15 @@ use std::{
     time::Instant,
 };
 
-const CAMERA_PROFILE_RESOLVER_ALGORITHM_ID: &str = "dual_illuminant_mired_v1";
+const CAMERA_PROFILE_RESOLVER_ALGORITHM_ID: &str = "dual_illuminant_camera_neutral_mired_v2";
+#[cfg(test)]
+static RAW_DEVELOPMENT_INVOCATIONS: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(0);
+
+#[cfg(test)]
+pub(crate) fn raw_development_invocations() -> u64 {
+    RAW_DEVELOPMENT_INVOCATIONS.load(Ordering::SeqCst)
+}
 
 /// Sensor-domain decode used by computational RAW workflows before demosaic or rendering.
 /// Callers own calibration and must not treat this as a developed RGB image.
@@ -82,8 +102,11 @@ pub(crate) struct RawCameraProfileReport {
     pub illuminant_estimate_confidence: &'static str,
     pub illuminant_estimate_method: &'static str,
     pub matrix_hash: Option<String>,
+    pub profile_illuminant_duv: Option<f64>,
+    pub profile_illuminant_xy: Option<[f64; 2]>,
     pub status: &'static str,
     pub warm_illuminant: Option<String>,
+    pub white_balance_plan_fingerprint: Option<String>,
     pub warning_codes: Vec<&'static str>,
 }
 
@@ -100,8 +123,11 @@ impl RawCameraProfileReport {
             illuminant_estimate_confidence: "low",
             illuminant_estimate_method: "fallback",
             matrix_hash: None,
+            profile_illuminant_duv: None,
+            profile_illuminant_xy: None,
             status: "unavailable",
             warm_illuminant: None,
+            white_balance_plan_fingerprint: None,
             warning_codes: vec![reason],
         }
     }
@@ -126,6 +152,7 @@ pub(crate) struct RawDevelopmentReport {
     pub camera_profile: RawCameraProfileReport,
     pub input_transform: Option<RawInputTransformReceiptV1>,
     pub stage_samples: Vec<RawDevelopmentStageSamples>,
+    pub highlight_reconstruction: HighlightReconstructionReportV2,
     pub runtime: Option<RawRuntimeReport>,
     pub xtrans_hq: Option<XTransHqDevelopmentReport>,
 }
@@ -199,6 +226,8 @@ pub(crate) fn develop_raw_image_with_report(
     linear_mode: String,
     cancel_token: Option<(Arc<AtomicUsize>, usize)>,
 ) -> Result<(DynamicImage, RawDevelopmentReport)> {
+    #[cfg(test)]
+    RAW_DEVELOPMENT_INVOCATIONS.fetch_add(1, Ordering::SeqCst);
     let (developed_image, orientation, report) = develop_internal_with_options(
         file_bytes,
         fast_demosaic,
@@ -211,11 +240,86 @@ pub(crate) fn develop_raw_image_with_report(
     Ok((apply_orientation(developed_image, orientation), report))
 }
 
-#[derive(Debug, Clone, Copy)]
+pub(crate) fn develop_raw_image_with_report_and_white_balance(
+    file_bytes: &[u8],
+    fast_demosaic: bool,
+    profile: RawProcessingProfile,
+    highlight_compression: f32,
+    linear_mode: String,
+    cancel_token: Option<(Arc<AtomicUsize>, usize)>,
+    white_balance_plan: WhiteBalancePlanV1,
+) -> Result<(DynamicImage, RawDevelopmentReport)> {
+    #[cfg(test)]
+    RAW_DEVELOPMENT_INVOCATIONS.fetch_add(1, Ordering::SeqCst);
+    let (developed_image, orientation, report) = develop_internal_with_options(
+        file_bytes,
+        fast_demosaic,
+        profile,
+        highlight_compression,
+        linear_mode,
+        cancel_token,
+        RawDefectDevelopmentOptions {
+            white_balance_plan: Some(white_balance_plan),
+            ..RawDefectDevelopmentOptions::default()
+        },
+    )?;
+    Ok((apply_orientation(developed_image, orientation), report))
+}
+
+pub(crate) fn develop_raw_source_with_report(
+    source: &RawSource,
+    fast_demosaic: bool,
+    profile: RawProcessingProfile,
+    highlight_compression: f32,
+    linear_mode: String,
+    cancel_token: Option<(Arc<AtomicUsize>, usize)>,
+) -> Result<(DynamicImage, RawDevelopmentReport)> {
+    #[cfg(test)]
+    RAW_DEVELOPMENT_INVOCATIONS.fetch_add(1, Ordering::SeqCst);
+    let (developed_image, orientation, report) = develop_internal_from_source(
+        source,
+        fast_demosaic,
+        profile,
+        highlight_compression,
+        linear_mode,
+        cancel_token,
+        RawDefectDevelopmentOptions::default(),
+    )?;
+    Ok((apply_orientation(developed_image, orientation), report))
+}
+
+pub(crate) fn develop_raw_source_with_report_and_white_balance(
+    source: &RawSource,
+    fast_demosaic: bool,
+    profile: RawProcessingProfile,
+    highlight_compression: f32,
+    linear_mode: String,
+    cancel_token: Option<(Arc<AtomicUsize>, usize)>,
+    white_balance_plan: WhiteBalancePlanV1,
+) -> Result<(DynamicImage, RawDevelopmentReport)> {
+    #[cfg(test)]
+    RAW_DEVELOPMENT_INVOCATIONS.fetch_add(1, Ordering::SeqCst);
+    let (developed_image, orientation, report) = develop_internal_from_source(
+        source,
+        fast_demosaic,
+        profile,
+        highlight_compression,
+        linear_mode,
+        cancel_token,
+        RawDefectDevelopmentOptions {
+            white_balance_plan: Some(white_balance_plan),
+            ..RawDefectDevelopmentOptions::default()
+        },
+    )?;
+    Ok((apply_orientation(developed_image, orientation), report))
+}
+
+#[derive(Debug, Clone)]
 struct RawDefectDevelopmentOptions {
     #[cfg(test)]
     inject_test_defects: bool,
     repair_sensor_defects: bool,
+    white_balance_plan: Option<WhiteBalancePlanV1>,
 }
 
 impl Default for RawDefectDevelopmentOptions {
@@ -224,6 +328,7 @@ impl Default for RawDefectDevelopmentOptions {
             #[cfg(test)]
             inject_test_defects: false,
             repair_sensor_defects: true,
+            white_balance_plan: None,
         }
     }
 }
@@ -262,8 +367,9 @@ struct RawDefectCorrectionReport {
     dead_pixels: usize,
 }
 
+#[cfg(test)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-struct HighlightReconstructionReport {
+struct HighlightReconstructionReportV1 {
     candidate_pixels: usize,
     reconstructed_channels: usize,
     reconstructed_pixels: usize,
@@ -533,13 +639,13 @@ fn repair_raw_sensor_defects(
     let cfa_colors = (0..cfa_height)
         .flat_map(|row| (0..cfa_width).map(move |col| config.cfa.color_at(row, col)))
         .collect();
-    let black_levels = raw_image
+    let black_levels: Vec<f32> = raw_image
         .blacklevel
         .levels
         .iter()
         .map(|level| level.as_f32())
         .collect();
-    let white_levels = raw_image
+    let white_levels: Vec<f32> = raw_image
         .whitelevel
         .0
         .iter()
@@ -569,6 +675,7 @@ fn repair_raw_sensor_defects(
     }
 }
 
+#[cfg(test)]
 fn saturation_threshold(context: &RawDefectCorrectionContext, x: usize, y: usize) -> f32 {
     let black = context.black_level_at(x, y).clamp(0.0, u16::MAX as f32);
     let white = context
@@ -578,6 +685,7 @@ fn saturation_threshold(context: &RawDefectCorrectionContext, x: usize, y: usize
     white - 2.0_f32.max(range * 0.005)
 }
 
+#[cfg(test)]
 fn same_cfa_unclipped_neighbor_signals(
     pixels: &[u16],
     context: &RawDefectCorrectionContext,
@@ -622,10 +730,11 @@ fn same_cfa_unclipped_neighbor_signals(
     values
 }
 
-fn reconstruct_integer_cfa_highlights(
+#[cfg(test)]
+fn reconstruct_integer_cfa_highlights_v1(
     pixels: &mut [u16],
     context: RawDefectCorrectionContext,
-) -> HighlightReconstructionReport {
+) -> HighlightReconstructionReportV1 {
     let RawDefectImageBounds {
         active_bounds,
         cfa_height,
@@ -641,7 +750,7 @@ fn reconstruct_integer_cfa_highlights(
         || cfa_height == 0
         || context.white_levels.is_empty()
     {
-        return HighlightReconstructionReport::default();
+        return HighlightReconstructionReportV1::default();
     }
 
     let (left, top, right, bottom) = active_bounds;
@@ -650,12 +759,12 @@ fn reconstruct_integer_cfa_highlights(
     let right = right.saturating_sub(cfa_width * 2).min(width);
     let bottom = bottom.saturating_sub(cfa_height * 2).min(height);
     if left >= right || top >= bottom {
-        return HighlightReconstructionReport::default();
+        return HighlightReconstructionReportV1::default();
     }
 
     let original = pixels.to_vec();
     let mut replacements = Vec::new();
-    let mut report = HighlightReconstructionReport::default();
+    let mut report = HighlightReconstructionReportV1::default();
 
     for y in top..bottom {
         for x in left..right {
@@ -702,16 +811,27 @@ fn reconstruct_integer_cfa_highlights(
     report
 }
 
-fn reconstruct_raw_sensor_highlights(raw_image: &mut RawImage) -> HighlightReconstructionReport {
+fn reconstruct_raw_sensor_highlights(
+    raw_image: &mut RawImage,
+    mode: HighlightReconstructionMode,
+    check_cancel: impl FnMut() -> Result<()>,
+) -> Result<HighlightReconstructionOutput> {
     let RawPhotometricInterpretation::Cfa(config) = &raw_image.photometric else {
-        return HighlightReconstructionReport::default();
+        return Ok(HighlightReconstructionOutput {
+            report: HighlightReconstructionReportV2::bypassed(mode, CfaKind::Unsupported),
+            confidence: Vec::new(),
+            unrecoverable_sensor_indices: Vec::new(),
+        });
     };
 
-    if raw_image.cpp != 1
-        || !config.cfa.is_rgb()
-        || (config.cfa.width == 6 && config.cfa.height == 6)
-    {
-        return HighlightReconstructionReport::default();
+    if raw_image.cpp != 1 || !config.cfa.is_rgb() {
+        let mut report = HighlightReconstructionReportV2::bypassed(mode, CfaKind::Unsupported);
+        report.warning_codes.push("unsupported_cfa_pixel_layout");
+        return Ok(HighlightReconstructionOutput {
+            report,
+            confidence: Vec::new(),
+            unrecoverable_sensor_indices: Vec::new(),
+        });
     }
 
     let width = raw_image.width;
@@ -722,39 +842,48 @@ fn reconstruct_raw_sensor_highlights(raw_image: &mut RawImage) -> HighlightRecon
     let cfa_colors = (0..cfa_height)
         .flat_map(|row| (0..cfa_width).map(move |col| config.cfa.color_at(row, col)))
         .collect();
-    let black_levels = raw_image
+    let black_levels: Vec<f32> = raw_image
         .blacklevel
         .levels
         .iter()
         .map(|level| level.as_f32())
         .collect();
-    let white_levels = raw_image
+    let white_levels: Vec<f32> = raw_image
         .whitelevel
         .0
         .iter()
         .map(|level| *level as f32)
         .collect();
 
+    let topology = CfaTopology::new(cfa_width, cfa_height, cfa_colors);
     match &mut raw_image.data {
-        RawImageData::Integer(pixels) => reconstruct_integer_cfa_highlights(
+        RawImageData::Integer(pixels) => reconstruct_integer_sensor(
             pixels,
-            RawDefectCorrectionContext {
-                bounds: RawDefectImageBounds {
-                    active_bounds: active,
-                    cfa_height,
-                    cfa_width,
-                    height,
-                    width,
-                },
-                black_cpp: raw_image.blacklevel.cpp,
-                black_height: raw_image.blacklevel.height,
-                black_levels,
+            &SensorReconstructionInput {
+                width,
+                height,
+                active_bounds: active,
+                topology,
+                black_levels: &black_levels,
                 black_width: raw_image.blacklevel.width,
-                cfa_colors,
-                white_levels,
+                black_height: raw_image.blacklevel.height,
+                black_cpp: raw_image.blacklevel.cpp,
+                white_levels: &white_levels,
             },
+            mode,
+            check_cancel,
         ),
-        RawImageData::Float(_) => HighlightReconstructionReport::default(),
+        RawImageData::Float(_) => {
+            let mut report = HighlightReconstructionReportV2::bypassed(mode, topology.kind);
+            report
+                .warning_codes
+                .push("float_cfa_sensor_data_unsupported");
+            Ok(HighlightReconstructionOutput {
+                report,
+                confidence: Vec::new(),
+                unrecoverable_sensor_indices: Vec::new(),
+            })
+        }
     }
 }
 
@@ -798,21 +927,36 @@ struct SceneCctEstimate {
     method: &'static str,
 }
 
-fn estimate_scene_cct_from_wb(wb: [f32; 4]) -> Option<SceneCctEstimate> {
-    let [red, _green, blue, _extra] = wb;
-    if !red.is_finite() || !blue.is_finite() || red <= f32::EPSILON || blue <= f32::EPSILON {
-        return None;
-    }
-
-    let blue_to_red = blue / red;
-    let clamped_blue_to_red = blue_to_red.clamp(0.44, 2.28);
-    let unclamped_cct = 6_504.0 / clamped_blue_to_red;
-    let cct_kelvin = unclamped_cct.clamp(2_856.0, 8_000.0);
+fn estimate_scene_cct_from_camera_neutral(
+    wb: [f32; 4],
+    candidates: &[(Illuminant, f32, &[f32])],
+) -> Option<SceneCctEstimate> {
+    let observed = neutral_chroma_from_wb(wb)?;
+    let warm = candidates.first()?;
+    let cool = candidates.last()?;
+    let warm_white = illuminant_white_xy(warm.0)?;
+    let cool_white = illuminant_white_xy(cool.0)?;
+    let warm_chroma = camera_white_chroma(warm.2, warm_white)?;
+    let cool_chroma = camera_white_chroma(cool.2, cool_white)?;
+    let cool_weight = project_neutral_mired_weight(observed, warm_chroma, cool_chroma)?;
+    let inverse_cct = (1.0 - cool_weight) / f64::from(warm.1) + cool_weight / f64::from(cool.1);
+    let cct_kelvin = (1.0 / inverse_cct) as f32;
+    let projected = [
+        warm_chroma[0].mul_add(1.0 - cool_weight, cool_chroma[0] * cool_weight),
+        warm_chroma[1].mul_add(1.0 - cool_weight, cool_chroma[1] * cool_weight),
+    ];
+    let residual = (projected[0] - observed[0]).hypot(projected[1] - observed[1]);
     Some(SceneCctEstimate {
         cct_kelvin,
-        clamped: blue_to_red != clamped_blue_to_red || unclamped_cct != cct_kelvin,
-        confidence: "low",
-        method: "wb_coeff_ratio",
+        clamped: cool_weight <= f64::EPSILON || cool_weight >= 1.0 - f64::EPSILON,
+        confidence: if residual < 0.08 {
+            "high"
+        } else if residual < 0.2 {
+            "medium"
+        } else {
+            "low"
+        },
+        method: "camera_neutral_profile_projection",
     })
 }
 
@@ -890,19 +1034,10 @@ fn illuminant_white_xy(illuminant: Illuminant) -> Option<[f64; 2]> {
     }
 }
 
-fn interpolate_white_xy(warm: Illuminant, cool: Illuminant, cool_weight: f32) -> Option<[f64; 2]> {
-    let warm = illuminant_white_xy(warm)?;
-    let cool = illuminant_white_xy(cool)?;
-    let weight = f64::from(cool_weight);
-    Some([
-        warm[0] * (1.0 - weight) + cool[0] * weight,
-        warm[1] * (1.0 - weight) + cool[1] * weight,
-    ])
-}
-
 fn resolve_camera_color_profile(
     color_matrices: &HashMap<Illuminant, Vec<f32>>,
     wb: [f32; 4],
+    white_balance_plan: Option<&WhiteBalancePlanV1>,
 ) -> CameraProfileResolution {
     let d65 = color_matrices
         .get(&Illuminant::D65)
@@ -924,7 +1059,20 @@ fn resolve_camera_color_profile(
 
     let candidate_count = candidates.len();
 
-    let Some(cct_estimate) = estimate_scene_cct_from_wb(wb) else {
+    let plan_illuminant =
+        white_balance_plan.and_then(WhiteBalancePlanV1::camera_profile_illuminant);
+    let cct_estimate = plan_illuminant.map_or_else(
+        || estimate_scene_cct_from_camera_neutral(wb, &candidates),
+        |illuminant| {
+            Some(SceneCctEstimate {
+                cct_kelvin: illuminant.cct_kelvin as f32,
+                clamped: false,
+                confidence: "high",
+                method: "white_balance_plan_v1",
+            })
+        },
+    );
+    let Some(cct_estimate) = cct_estimate else {
         let selected = d65.cloned().or_else(|| {
             candidates
                 .first()
@@ -955,17 +1103,26 @@ fn resolve_camera_color_profile(
                 illuminant_estimate_confidence: "low",
                 illuminant_estimate_method: "fallback",
                 matrix_hash: selected.as_deref().map(camera_matrix_hash),
+                profile_illuminant_duv: None,
+                profile_illuminant_xy: None,
                 status: if selected.is_some() {
                     "fallback"
                 } else {
                     "unavailable"
                 },
                 warm_illuminant: None,
+                white_balance_plan_fingerprint: None,
                 warning_codes: vec![fallback_reason],
             },
         };
     };
     let target_cct = cct_estimate.cct_kelvin;
+    let profile_illuminant_xy = plan_illuminant
+        .map(|illuminant| illuminant.xy)
+        .or_else(|| cct_to_xy(target_cct));
+    let profile_illuminant_duv = plan_illuminant.map(|illuminant| illuminant.duv);
+    let white_balance_plan_fingerprint =
+        plan_illuminant.map(|illuminant| illuminant.fingerprint.to_string());
 
     if candidates.len() >= 2 {
         let warm = candidates
@@ -986,7 +1143,7 @@ fn resolve_camera_color_profile(
             let cool_weight = interpolation_weight_for_cct(target_cct, warm.1, cool.1);
             let matrix = interpolate_color_matrix(warm.2, cool.2, cool_weight);
             return CameraProfileResolution {
-                calibration_white_xy: interpolate_white_xy(warm.0, cool.0, cool_weight),
+                calibration_white_xy: profile_illuminant_xy,
                 report: RawCameraProfileReport {
                     algorithm_id: CAMERA_PROFILE_RESOLVER_ALGORITHM_ID,
                     candidate_count,
@@ -998,8 +1155,11 @@ fn resolve_camera_color_profile(
                     illuminant_estimate_confidence: cct_estimate.confidence,
                     illuminant_estimate_method: cct_estimate.method,
                     matrix_hash: Some(camera_matrix_hash(&matrix)),
+                    profile_illuminant_duv,
+                    profile_illuminant_xy,
                     status: "interpolated",
                     warm_illuminant: Some(illuminant_label(warm.0)),
+                    white_balance_plan_fingerprint,
                     warning_codes: Vec::new(),
                 },
                 matrix: Some(matrix),
@@ -1008,7 +1168,7 @@ fn resolve_camera_color_profile(
 
         let matrix = warm.2.to_vec();
         return CameraProfileResolution {
-            calibration_white_xy: illuminant_white_xy(warm.0),
+            calibration_white_xy: profile_illuminant_xy,
             report: RawCameraProfileReport {
                 algorithm_id: CAMERA_PROFILE_RESOLVER_ALGORITHM_ID,
                 candidate_count,
@@ -1020,8 +1180,11 @@ fn resolve_camera_color_profile(
                 illuminant_estimate_confidence: cct_estimate.confidence,
                 illuminant_estimate_method: cct_estimate.method,
                 matrix_hash: Some(camera_matrix_hash(&matrix)),
+                profile_illuminant_duv,
+                profile_illuminant_xy,
                 status: "single_illuminant",
                 warm_illuminant: Some(illuminant_label(warm.0)),
+                white_balance_plan_fingerprint,
                 warning_codes: Vec::new(),
             },
             matrix: Some(matrix),
@@ -1035,9 +1198,11 @@ fn resolve_camera_color_profile(
     });
     CameraProfileResolution {
         matrix: selected.clone(),
-        calibration_white_xy: candidates
-            .first()
-            .and_then(|candidate| illuminant_white_xy(candidate.0)),
+        calibration_white_xy: profile_illuminant_xy.or_else(|| {
+            candidates
+                .first()
+                .and_then(|candidate| illuminant_white_xy(candidate.0))
+        }),
         report: RawCameraProfileReport {
             algorithm_id: CAMERA_PROFILE_RESOLVER_ALGORITHM_ID,
             candidate_count,
@@ -1055,6 +1220,8 @@ fn resolve_camera_color_profile(
             illuminant_estimate_confidence: cct_estimate.confidence,
             illuminant_estimate_method: cct_estimate.method,
             matrix_hash: selected.as_deref().map(camera_matrix_hash),
+            profile_illuminant_duv,
+            profile_illuminant_xy,
             status: if selected.is_some() {
                 "single_illuminant"
             } else {
@@ -1063,6 +1230,7 @@ fn resolve_camera_color_profile(
             warm_illuminant: candidates
                 .first()
                 .map(|candidate| illuminant_label(candidate.0)),
+            white_balance_plan_fingerprint,
             warning_codes: if selected.is_some() {
                 vec!["single_valid_camera_matrix"]
             } else {
@@ -1077,7 +1245,7 @@ pub(super) fn resolve_camera_color_profile_for_test(
     color_matrices: &HashMap<Illuminant, Vec<f32>>,
     wb: [f32; 4],
 ) -> (Option<Vec<f32>>, Option<[f64; 2]>, RawCameraProfileReport) {
-    let resolved = resolve_camera_color_profile(color_matrices, wb);
+    let resolved = resolve_camera_color_profile(color_matrices, wb, None);
     (
         resolved.matrix,
         resolved.calibration_white_xy,
@@ -1085,13 +1253,16 @@ pub(super) fn resolve_camera_color_profile_for_test(
     )
 }
 
-fn apply_dual_illuminant_camera_profile(raw_image: &mut RawImage) -> CameraProfileResolution {
+fn apply_dual_illuminant_camera_profile(
+    raw_image: &mut RawImage,
+    white_balance_plan: Option<&WhiteBalancePlanV1>,
+) -> CameraProfileResolution {
     let wb = if raw_image.wb_coeffs[0].is_nan() {
         [1.0, 1.0, 1.0, 1.0]
     } else {
         raw_image.wb_coeffs
     };
-    let resolution = resolve_camera_color_profile(&raw_image.color_matrix, wb);
+    let resolution = resolve_camera_color_profile(&raw_image.color_matrix, wb, white_balance_plan);
     if let Some(color_matrix) = resolution.matrix.clone() {
         raw_image.color_matrix.clear();
         raw_image.color_matrix.insert(Illuminant::D65, color_matrix);
@@ -1234,6 +1405,27 @@ fn develop_internal_with_options(
     cancel_token: Option<(Arc<AtomicUsize>, usize)>,
     defect_options: RawDefectDevelopmentOptions,
 ) -> Result<(DynamicImage, Orientation, RawDevelopmentReport)> {
+    let source = RawSource::new_from_slice(file_bytes);
+    develop_internal_from_source(
+        &source,
+        fast_demosaic,
+        profile,
+        highlight_compression,
+        linear_mode,
+        cancel_token,
+        defect_options,
+    )
+}
+
+fn develop_internal_from_source(
+    source: &RawSource,
+    fast_demosaic: bool,
+    profile: RawProcessingProfile,
+    highlight_compression: f32,
+    linear_mode: String,
+    cancel_token: Option<(Arc<AtomicUsize>, usize)>,
+    defect_options: RawDefectDevelopmentOptions,
+) -> Result<(DynamicImage, Orientation, RawDevelopmentReport)> {
     let decode_started = Instant::now();
     let check_cancel = || -> Result<()> {
         if let Some((tracker, generation)) = &cancel_token
@@ -1246,13 +1438,12 @@ fn develop_internal_with_options(
 
     check_cancel()?;
 
-    let source = RawSource::new_from_slice(file_bytes);
-    let decoder = rawler::get_decoder(&source)?;
+    let decoder = rawler::get_decoder(source)?;
 
     check_cancel()?;
-    let mut raw_image: RawImage = decoder.raw_image(&source, &RawDecodeParams::default(), false)?;
+    let mut raw_image: RawImage = decoder.raw_image(source, &RawDecodeParams::default(), false)?;
 
-    let metadata = decoder.raw_metadata(&source, &RawDecodeParams::default())?;
+    let metadata = decoder.raw_metadata(source, &RawDecodeParams::default())?;
     let raw_decode_elapsed_ms = decode_started.elapsed().as_secs_f64() * 1_000.0;
     let orientation = metadata
         .exif
@@ -1307,18 +1498,34 @@ fn develop_internal_with_options(
     }
 
     let highlight_started = Instant::now();
-    let highlight_reconstruction_report =
-        if profile != RawProcessingProfile::Fast && apply_calibration {
-            reconstruct_raw_sensor_highlights(&mut raw_image)
-        } else {
-            HighlightReconstructionReport::default()
-        };
-    if highlight_reconstruction_report.reconstructed_pixels > 0 {
+    let highlight_mode = if !apply_calibration || profile == RawProcessingProfile::Fast {
+        HighlightReconstructionMode::Off
+    } else if profile == RawProcessingProfile::Maximum {
+        HighlightReconstructionMode::Strong
+    } else if highlight_compression <= 1.5 {
+        HighlightReconstructionMode::Conservative
+    } else {
+        HighlightReconstructionMode::Auto
+    };
+    let highlight_reconstruction =
+        reconstruct_raw_sensor_highlights(&mut raw_image, highlight_mode, &check_cancel)?;
+    let highlight_confidence_peak = highlight_reconstruction
+        .confidence
+        .iter()
+        .copied()
+        .fold(0.0_f32, f32::max);
+    let mut highlight_reconstruction_report = highlight_reconstruction.report;
+    let unrecoverable_highlight_indices = highlight_reconstruction.unrecoverable_sensor_indices;
+    if highlight_reconstruction_report.reconstructed_samples > 0
+        || highlight_reconstruction_report.partially_reconstructed_samples > 0
+    {
         log::debug!(
-            "Reconstructed RAW sensor highlights before demosaic: candidates={}, pixels={}, channels={}",
-            highlight_reconstruction_report.candidate_pixels,
-            highlight_reconstruction_report.reconstructed_pixels,
-            highlight_reconstruction_report.reconstructed_channels
+            "Reconstructed RAW sensor highlights before demosaic: clipped={}, reconstructed={}, partial={}, unrecoverable={}, confidence_peak={:.3}",
+            highlight_reconstruction_report.clipped_samples,
+            highlight_reconstruction_report.reconstructed_samples,
+            highlight_reconstruction_report.partially_reconstructed_samples,
+            highlight_reconstruction_report.unrecoverable_samples,
+            highlight_confidence_peak
         );
     }
     stage_samples.push(RawDevelopmentStageSamples {
@@ -1330,7 +1537,10 @@ fn develop_internal_with_options(
     });
 
     let profile_resolution = if apply_calibration {
-        apply_dual_illuminant_camera_profile(&mut raw_image)
+        apply_dual_illuminant_camera_profile(
+            &mut raw_image,
+            defect_options.white_balance_plan.as_ref(),
+        )
     } else {
         CameraProfileResolution {
             matrix: None,
@@ -1433,11 +1643,25 @@ fn develop_internal_with_options(
                 *p = linear_val.clamp(0.0, clamp_limit);
             });
         }
-        Intermediate::ThreeColor(pixels) => pixels.data.iter_mut().for_each(|p| {
-            p[0] *= rescale_factor;
-            p[1] *= rescale_factor;
-            p[2] *= rescale_factor;
-        }),
+        Intermediate::ThreeColor(pixels) => {
+            pixels.data.iter_mut().for_each(|p| {
+                p[0] *= rescale_factor;
+                p[1] *= rescale_factor;
+                p[2] *= rescale_factor;
+            });
+            if matches!(
+                highlight_mode,
+                HighlightReconstructionMode::Auto | HighlightReconstructionMode::Strong
+            ) {
+                apply_post_demosaic_chroma_fallback(
+                    &mut pixels.data,
+                    pixels.width,
+                    pixels.height,
+                    &unrecoverable_highlight_indices,
+                    &mut highlight_reconstruction_report,
+                );
+            }
+        }
         Intermediate::FourColor(pixels) => {
             pixels.data.iter_mut().for_each(|p| {
                 p.iter_mut().for_each(|c| {
@@ -1558,6 +1782,7 @@ fn develop_internal_with_options(
             camera_profile,
             input_transform,
             stage_samples,
+            highlight_reconstruction: highlight_reconstruction_report,
             runtime: None,
             xtrans_hq: xtrans_hq_report,
         },
@@ -1633,23 +1858,44 @@ mod tests {
     }
 
     #[test]
-    fn scene_cct_from_wb_tracks_blue_red_ratio() {
-        let daylight = estimate_scene_cct_from_wb([1.0, 1.0, 1.0, f32::NAN]).unwrap();
-        let tungsten = estimate_scene_cct_from_wb([1.0, 1.0, 2.28, f32::NAN]).unwrap();
+    fn scene_cct_uses_camera_neutral_and_calibration_responses() {
+        let matrix = vec![1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0];
+        let candidates = [
+            (Illuminant::A, 2_856.0, matrix.as_slice()),
+            (Illuminant::D65, 6_504.0, matrix.as_slice()),
+        ];
+        let warm =
+            camera_white_chroma(&matrix, illuminant_white_xy(Illuminant::A).unwrap()).unwrap();
+        let cool =
+            camera_white_chroma(&matrix, illuminant_white_xy(Illuminant::D65).unwrap()).unwrap();
+        let observed = [
+            warm[0] * 0.75 + cool[0] * 0.25,
+            warm[1] * 0.75 + cool[1] * 0.25,
+        ];
+        let wb = [
+            (-observed[0]).exp() as f32,
+            1.0,
+            (-observed[1]).exp() as f32,
+            f32::NAN,
+        ];
+        let estimate = estimate_scene_cct_from_camera_neutral(wb, &candidates).unwrap();
 
-        assert!((daylight.cct_kelvin - 6_504.0).abs() < 0.1);
-        assert!((tungsten.cct_kelvin - 2_856.0).abs() < 0.1);
-        assert_eq!(daylight.method, "wb_coeff_ratio");
-        assert_eq!(daylight.confidence, "low");
-        assert!(!daylight.clamped);
-    }
-
-    #[test]
-    fn scene_cct_from_wb_reports_clamping() {
-        let clamped = estimate_scene_cct_from_wb([1.0, 1.0, 9.0, f32::NAN]).unwrap();
-
-        assert!((clamped.cct_kelvin - 2_856.0).abs() < 0.1);
-        assert!(clamped.clamped);
+        assert_eq!(estimate.method, "camera_neutral_profile_projection");
+        assert_eq!(estimate.confidence, "high");
+        assert!(!estimate.clamped);
+        let expected_reciprocal_temperature =
+            1.0 / (0.75 / candidates[0].1 + 0.25 / candidates[1].1);
+        assert!(
+            (estimate.cct_kelvin - expected_reciprocal_temperature).abs() < 0.01,
+            "{estimate:?}"
+        );
+        assert!(
+            (interpolation_weight_for_cct(estimate.cct_kelvin, candidates[0].1, candidates[1].1,)
+                - 0.25)
+                .abs()
+                < 0.000_01,
+            "{estimate:?}"
+        );
     }
 
     #[test]
@@ -1668,9 +1914,7 @@ mod tests {
     fn interpolates_dual_illuminant_matrices_for_warm_white_balance() {
         let warm = vec![0.80, -0.20, 0.10, -0.30, 1.20, 0.20, -0.04, 0.08, 0.66];
         let cool = vec![0.60, -0.10, 0.04, -0.20, 1.05, 0.14, -0.02, 0.05, 0.52];
-        let target_cct = estimate_scene_cct_from_wb([1.0, 1.0, 1.5, f32::NAN])
-            .unwrap()
-            .cct_kelvin;
+        let target_cct = 4_000.0;
         let cool_weight = interpolation_weight_for_cct(target_cct, 2_856.0, 6_504.0);
         let interpolated = interpolate_color_matrix(&warm, &cool, cool_weight);
 
@@ -1683,13 +1927,27 @@ mod tests {
 
     #[test]
     fn camera_matrix_selection_interpolates_a_to_d65() {
-        let warm = vec![0.80, -0.20, 0.10, -0.30, 1.20, 0.20, -0.04, 0.08, 0.66];
-        let cool = vec![0.60, -0.10, 0.04, -0.20, 1.05, 0.14, -0.02, 0.05, 0.52];
+        let warm = vec![1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0];
+        let cool = vec![0.95, 0.01, 0.0, 0.0, 1.02, 0.0, 0.0, 0.01, 0.94];
         let mut color_matrices = HashMap::new();
         color_matrices.insert(Illuminant::A, warm.clone());
         color_matrices.insert(Illuminant::D65, cool.clone());
+        let warm_chroma =
+            camera_white_chroma(&warm, illuminant_white_xy(Illuminant::A).unwrap()).unwrap();
+        let cool_chroma =
+            camera_white_chroma(&cool, illuminant_white_xy(Illuminant::D65).unwrap()).unwrap();
+        let observed = [
+            (warm_chroma[0] + cool_chroma[0]) * 0.5,
+            (warm_chroma[1] + cool_chroma[1]) * 0.5,
+        ];
+        let wb = [
+            (-observed[0]).exp() as f32,
+            1.0,
+            (-observed[1]).exp() as f32,
+            f32::NAN,
+        ];
 
-        let resolution = resolve_camera_color_profile(&color_matrices, [1.0, 1.0, 1.5, f32::NAN]);
+        let resolution = resolve_camera_color_profile(&color_matrices, wb, None);
         let selected = resolution.matrix.unwrap();
 
         assert_eq!(selected.len(), warm.len());
@@ -1704,9 +1962,9 @@ mod tests {
         assert_eq!(resolution.report.candidate_count, 2);
         assert_eq!(
             resolution.report.illuminant_estimate_method,
-            "wb_coeff_ratio"
+            "camera_neutral_profile_projection"
         );
-        assert_eq!(resolution.report.illuminant_estimate_confidence, "low");
+        assert_eq!(resolution.report.illuminant_estimate_confidence, "high");
         assert_eq!(resolution.report.cct_clamped, Some(false));
         assert!(resolution.report.cool_weight.unwrap() > 0.0);
         assert!(
@@ -1719,6 +1977,80 @@ mod tests {
     }
 
     #[test]
+    fn explicit_white_balance_plan_is_camera_profile_interpolation_authority() {
+        let warm = vec![1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0];
+        let cool = vec![0.8, 0.02, 0.0, 0.0, 1.1, 0.0, 0.0, 0.01, 0.7];
+        let color_matrices = HashMap::from([
+            (Illuminant::A, warm.clone()),
+            (Illuminant::D65, cool.clone()),
+        ]);
+        let plan = compile_white_balance_plan(WhiteBalancePlanInputV1 {
+            mode: WhiteBalanceModeV1::KelvinTint,
+            kelvin: 4_200.0,
+            duv: 0.012,
+            x: None,
+            y: None,
+            input_semantics: Default::default(),
+            camera_channel_gains: None,
+        })
+        .unwrap();
+
+        let first = resolve_camera_color_profile(
+            &color_matrices,
+            [f32::NAN, 1.0, f32::NAN, f32::NAN],
+            Some(&plan),
+        );
+        let second =
+            resolve_camera_color_profile(&color_matrices, [8.0, 1.0, 0.125, f32::NAN], Some(&plan));
+        let daylight_plan = compile_white_balance_plan(WhiteBalancePlanInputV1 {
+            mode: WhiteBalanceModeV1::Preset,
+            kelvin: 6_000.0,
+            duv: -0.004,
+            x: None,
+            y: None,
+            input_semantics: Default::default(),
+            camera_channel_gains: None,
+        })
+        .unwrap();
+        let daylight = resolve_camera_color_profile(
+            &color_matrices,
+            [8.0, 1.0, 0.125, f32::NAN],
+            Some(&daylight_plan),
+        );
+
+        assert_eq!(
+            first.matrix, second.matrix,
+            "metadata WB cannot override the explicit plan"
+        );
+        assert_eq!(
+            first.report.illuminant_estimate_method,
+            "white_balance_plan_v1"
+        );
+        assert_eq!(first.report.estimated_cct_kelvin, Some(4_200.0));
+        assert_eq!(first.report.profile_illuminant_duv, Some(0.012));
+        assert_eq!(
+            first.report.profile_illuminant_xy,
+            Some(plan.source_illuminant.xy)
+        );
+        assert_eq!(
+            first.report.white_balance_plan_fingerprint.as_deref(),
+            Some(plan.fingerprint.as_str())
+        );
+        assert_eq!(first.calibration_white_xy, Some(plan.source_illuminant.xy));
+        assert_ne!(first.matrix, Some(warm));
+        assert_ne!(first.matrix, Some(cool));
+        assert_ne!(first.matrix, daylight.matrix);
+        assert_ne!(
+            first.report.white_balance_plan_fingerprint,
+            daylight.report.white_balance_plan_fingerprint
+        );
+        assert_eq!(
+            daylight.report.profile_illuminant_xy,
+            Some(daylight_plan.source_illuminant.xy)
+        );
+    }
+
+    #[test]
     fn camera_matrix_selection_keeps_d65_fallback_when_wb_is_invalid() {
         let warm = vec![0.80, -0.20, 0.10, -0.30, 1.20, 0.20, -0.04, 0.08, 0.66];
         let cool = vec![0.60, -0.10, 0.04, -0.20, 1.05, 0.14, -0.02, 0.05, 0.52];
@@ -1727,7 +2059,7 @@ mod tests {
         color_matrices.insert(Illuminant::D65, cool.clone());
 
         let resolution =
-            resolve_camera_color_profile(&color_matrices, [f32::NAN, 1.0, 1.0, f32::NAN]);
+            resolve_camera_color_profile(&color_matrices, [f32::NAN, 1.0, 1.0, f32::NAN], None);
         let selected = resolution.matrix.unwrap();
 
         assert_eq!(selected, cool);
@@ -1846,7 +2178,7 @@ mod tests {
         }
         pixels[8 * width + 8] = 16_000;
 
-        let report = reconstruct_integer_cfa_highlights(
+        let report = reconstruct_integer_cfa_highlights_v1(
             &mut pixels,
             bayer_context_with_levels(
                 width,
@@ -1870,7 +2202,7 @@ mod tests {
         let mut pixels = bayer_pixels(width, height, 8_000);
         pixels[8 * width + 8] = 16_000;
 
-        let report = reconstruct_integer_cfa_highlights(
+        let report = reconstruct_integer_cfa_highlights_v1(
             &mut pixels,
             bayer_context_with_levels(
                 width,
@@ -1902,6 +2234,7 @@ mod tests {
         let proof_options = RawDefectDevelopmentOptions {
             inject_test_defects: true,
             repair_sensor_defects: false,
+            white_balance_plan: None,
         };
         let (uncorrected, uncorrected_orientation, _) = develop_internal_with_options(
             &file_bytes,
@@ -1910,7 +2243,7 @@ mod tests {
             2.5,
             "default".to_string(),
             None,
-            proof_options,
+            proof_options.clone(),
         )
         .expect("develop private RAW with injected defects");
         let uncorrected = apply_orientation(uncorrected, uncorrected_orientation);
@@ -2022,7 +2355,13 @@ mod tests {
         let mut raw_image = decoder
             .raw_image(&source, &RawDecodeParams::default(), false)
             .expect("decode private Bayer RAW for suppression proof");
-        let highlight_reconstruction_report = reconstruct_raw_sensor_highlights(&mut raw_image);
+        let highlight_reconstruction_report = reconstruct_raw_sensor_highlights(
+            &mut raw_image,
+            HighlightReconstructionMode::Strong,
+            || Ok(()),
+        )
+        .expect("run sensor highlight reconstruction proof")
+        .report;
         let (_, bayer_hq_report) =
             develop_bayer_hq_intermediate(&raw_image).expect("run Bayer HQ suppression proof path");
         let suppression_report = bayer_hq_report.artifact_suppression;
@@ -2076,7 +2415,7 @@ mod tests {
             .expect("write Bayer HQ TIFF");
 
         let report = serde_json::json!({
-            "issues": [3239, 3241, 3242],
+            "issues": [3239, 3241, 3242, 5410],
             "proofBoundary": "private_bayer_hq_runtime_output",
             "sourcePath": source_path,
             "dimensions": {
@@ -2100,11 +2439,15 @@ mod tests {
                     "adjustedPixelRatio": suppression_adjusted_ratio,
                 },
                 "highlightReconstruction": {
-                    "algorithm": "sensor_linear_same_phase_headroom_v1",
+                    "algorithm": highlight_reconstruction_report.algorithm_id,
+                    "implementationVersion": highlight_reconstruction_report.implementation_version,
                     "stage": "pre_demosaic_integer_cfa",
-                    "candidatePixels": highlight_reconstruction_report.candidate_pixels,
-                    "reconstructedPixels": highlight_reconstruction_report.reconstructed_pixels,
-                    "reconstructedChannels": highlight_reconstruction_report.reconstructed_channels,
+                    "clippedSamples": highlight_reconstruction_report.clipped_samples,
+                    "reconstructedSamples": highlight_reconstruction_report.reconstructed_samples,
+                    "partiallyReconstructedSamples": highlight_reconstruction_report.partially_reconstructed_samples,
+                    "unrecoverableSamples": highlight_reconstruction_report.unrecoverable_samples,
+                    "methodCounts": highlight_reconstruction_report.method_counts,
+                    "confidencePercentiles": highlight_reconstruction_report.confidence_percentiles,
                 },
             },
             "outputDiff": {

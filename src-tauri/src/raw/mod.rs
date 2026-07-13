@@ -3,6 +3,8 @@ pub(crate) mod bayer_hq;
 mod camera_illuminant_conformance_tests;
 #[cfg(feature = "validation-harness")]
 pub(crate) mod color_graph_trace;
+pub(crate) mod embedded_preview;
+pub(crate) mod highlight_reconstruction;
 pub(crate) mod negative_conversion;
 #[cfg(all(test, feature = "tauri-test"))]
 pub(crate) mod private_decode_raw_proof;

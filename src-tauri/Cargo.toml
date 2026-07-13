@@ -21,11 +21,13 @@ name = "rapidraw_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [features]
-default = ["required-ci", "ai"]
+default = ["full", "required-ci"]
 ai = ["dep:rapidraw-ai"]
 advanced-codecs = ["rapidraw-codecs/advanced"]
+fast-dev = []
+full = ["advanced-codecs", "ai"]
 panorama-opencv-spike = ["rapidraw-computational/opencv-panorama"]
-required-ci = ["advanced-codecs", "rapidraw-ai?/compile-only"]
+required-ci = ["full", "rapidraw-ai?/compile-only"]
 tauri-test = ["tauri/test"]
 validation-harness = []
 
@@ -127,6 +129,22 @@ incremental = true
 
 [profile.dev.package."*"]
 opt-level = 3
+
+# Fast edit-to-test profile for workspace crates and focused CI partitions.
+[profile.rapid-dev-fast]
+inherits = "dev"
+opt-level = 0
+debug = 0
+incremental = true
+codegen-units = 256
+
+# Runtime-representative development profile for performance validation without release LTO cost.
+[profile.rapid-dev-perf]
+inherits = "dev"
+opt-level = 2
+debug = 1
+incremental = true
+codegen-units = 64
 
 [profile.release]
 codegen-units = 1

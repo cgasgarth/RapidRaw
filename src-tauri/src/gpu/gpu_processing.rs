@@ -781,6 +781,8 @@ pub struct GpuProcessor {
     resource_cache: Mutex<GpuResourceCache>,
     main_bind_group_cache: Mutex<Option<CachedMainBindGroup>>,
     blur_surface_cache: Mutex<BlurSurfaceCache>,
+    last_execution_receipt: Mutex<Option<GpuExecutionReceipt>>,
+    execution_sequence: AtomicU64,
     blur_bgl: wgpu::BindGroupLayout,
     h_blur_pipeline: wgpu::ComputePipeline,
     v_blur_pipeline: wgpu::ComputePipeline,
@@ -821,6 +823,14 @@ const FLARE_MAP_SIZE: u32 = 512;
 impl GpuProcessor {
     pub fn resource_cache_counters(&self) -> GpuResourceCacheCounters {
         self.resource_cache.lock().unwrap().counters
+    }
+
+    pub fn last_execution_receipt(&self) -> Option<GpuExecutionReceipt> {
+        *self.last_execution_receipt.lock().unwrap()
+    }
+
+    pub fn execution_sequence(&self) -> u64 {
+        self.execution_sequence.load(Ordering::Acquire)
     }
 
     pub fn new(context: GpuContext, max_width: u32, max_height: u32) -> Result<Self, String> {
@@ -1277,6 +1287,8 @@ impl GpuProcessor {
             }),
             main_bind_group_cache: Mutex::new(None),
             blur_surface_cache: Mutex::new(BlurSurfaceCache::default()),
+            last_execution_receipt: Mutex::new(None),
+            execution_sequence: AtomicU64::new(0),
             blur_bgl,
             h_blur_pipeline,
             v_blur_pipeline,
@@ -2051,6 +2063,8 @@ impl GpuProcessor {
             estimated_peak_resource_bytes: graph.estimated_peak_resource_bytes,
             cpu_encode_time,
         };
+        *self.last_execution_receipt.lock().unwrap() = Some(receipt);
+        self.execution_sequence.fetch_add(1, Ordering::Release);
         log::debug!("GPU execution receipt: {receipt:?}");
 
         Ok((final_pixels, out_width, out_height, bounds.x, bounds.y))
@@ -2479,6 +2493,88 @@ mod blur_pass_tests {
 
     #[cfg(feature = "tauri-test")]
     #[test]
+    fn rapid_view_production_wgpu_matches_cpu_preview_export_reference() {
+        use image::{DynamicImage, ImageBuffer, Rgba};
+        use tauri::Manager;
+
+        use crate::color::view_transform::{ViewTransformPlanV1, ViewTransformSettingsV1};
+
+        let _test_guard = GPU_TEST_LOCK.lock().unwrap();
+        let vectors = [
+            [0.08, 0.18, 0.9, 1.0],
+            [0.18, 0.18, 0.18, 1.0],
+            [0.9, 0.4, 0.08, 1.0],
+            [0.02, 0.8, 0.35, 1.0],
+            [1.0, 0.2, 0.02, 1.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ];
+        let source = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(3, 2, |x, y| {
+            Rgba(vectors[(y * 3 + x) as usize])
+        }));
+        let mut cpu = source.clone();
+        crate::image_processing::apply_cpu_rapid_view(&mut cpu);
+
+        let plan = ViewTransformPlanV1::compile(ViewTransformSettingsV1::default()).unwrap();
+        let parameters = plan.gpu_parameters();
+        let mut adjustments = AllAdjustments::default();
+        adjustments.global.is_raw_image = 1;
+        adjustments.global.tonemapper_mode = 2;
+        adjustments.global.rapid_view_parameters0 = parameters[0];
+        adjustments.global.rapid_view_parameters1 = parameters[1];
+        adjustments.global.rapid_view_parameters2 = parameters[2];
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock Tauri app builds");
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state)
+            .expect("compute-only GPU context initializes");
+        let render = || {
+            process_and_get_unclamped_dynamic_image(
+                &context,
+                &state,
+                &source,
+                PreGpuImageIdentity::for_source(&source, "rapid_view_parity"),
+                RenderRequest {
+                    adjustments,
+                    mask_bitmaps: &[],
+                    lut: None,
+                    roi: None,
+                },
+                "rapid_view_parity",
+            )
+            .expect("Rapid View WGPU render succeeds")
+        };
+        let preview = render().to_rgba32f();
+        let export = render().to_rgba32f();
+        let cpu = cpu.to_rgba32f();
+        let mut max_cpu_gpu_delta = 0.0_f32;
+        let mut max_preview_export_delta = 0.0_f32;
+        let mut worst = ([0.0; 3], [0.0; 3]);
+        for ((cpu, preview), export) in cpu.pixels().zip(preview.pixels()).zip(export.pixels()) {
+            for channel in 0..3 {
+                let delta = (cpu[channel] - preview[channel]).abs();
+                if delta > max_cpu_gpu_delta {
+                    max_cpu_gpu_delta = delta;
+                    worst = (
+                        [cpu[0], cpu[1], cpu[2]],
+                        [preview[0], preview[1], preview[2]],
+                    );
+                }
+                max_preview_export_delta =
+                    max_preview_export_delta.max((preview[channel] - export[channel]).abs());
+            }
+        }
+        assert_eq!(max_preview_export_delta, 0.0);
+        assert!(
+            max_cpu_gpu_delta <= 0.008,
+            "Rapid View CPU/WGPU delta {max_cpu_gpu_delta} exceeds RGBA16F budget: {worst:?}"
+        );
+        assert!(preview.get_pixel(1, 0)[0] > 0.0);
+    }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
     fn one_hundred_warm_edits_reuse_input_upload_and_blur_surface() {
         use image::{ImageBuffer, Rgba};
         use tauri::Manager;
@@ -2538,6 +2634,77 @@ mod blur_pass_tests {
         assert_eq!(blur.cache_hits, 99);
         assert_eq!(blur.dispatches, 2);
         assert_eq!(blur.submissions, 100);
+    }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
+    fn production_wgpu_applies_technical_white_balance_and_creative_node() {
+        use image::{ImageBuffer, Rgba};
+        use tauri::Manager;
+
+        let _test_guard = GPU_TEST_LOCK.lock().unwrap();
+        let source = DynamicImage::ImageRgba32F(ImageBuffer::from_pixel(
+            16,
+            16,
+            Rgba([0.18, 0.32, 0.54, 1.0]),
+        ));
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock Tauri app builds");
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state)
+            .expect("compute-only GPU context initializes");
+        let identity = PreGpuImageIdentity::for_source(&source, "technical_white_balance");
+        let render = |adjustments| {
+            process_and_get_unclamped_dynamic_image(
+                &context,
+                &state,
+                &source,
+                identity,
+                RenderRequest {
+                    adjustments,
+                    mask_bitmaps: &[],
+                    lut: None,
+                    roi: None,
+                },
+                "technical_white_balance",
+            )
+            .expect("GPU render succeeds")
+            .to_rgba32f()
+            .get_pixel(0, 0)
+            .0
+        };
+        let baseline = render(crate::adjustments::parse::get_all_adjustments_from_json(
+            &serde_json::json!({}),
+            true,
+            Some(1),
+        ));
+        let adjusted = render(crate::adjustments::parse::get_all_adjustments_from_json(
+            &serde_json::json!({
+                "creativeTemperature": 40.0,
+                "creativeTint": -20.0,
+                "exposure": -8.0,
+                "whiteBalanceTechnical": {
+                    "mode": "kelvin_tint",
+                    "kelvin": 2856.0,
+                    "duv": 0.018
+                }
+            }),
+            true,
+            Some(1),
+        ));
+        assert!(
+            baseline[..3].iter().any(|channel| *channel < 0.95),
+            "neutral RAW AgX render unexpectedly clipped: {baseline:?}"
+        );
+        assert!(
+            baseline[..3]
+                .iter()
+                .zip(&adjusted[..3])
+                .any(|(before, after)| (before - after).abs() > 0.001),
+            "baseline={baseline:?} adjusted={adjusted:?}"
+        );
     }
 
     #[cfg(feature = "tauri-test")]

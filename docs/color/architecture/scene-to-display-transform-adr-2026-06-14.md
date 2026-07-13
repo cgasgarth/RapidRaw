@@ -1,13 +1,51 @@
 # ADR: Scene-To-Display Transform Strategy
 
 - Issue: #85 `color(adr): decide scene-to-display transform strategy`
-- Status: accepted for next implementation phase
-- Scope: architecture decision only; no runtime pixel changes
+- Status: superseded for new edits by #5401; retained as the legacy-process record
+- Scope: scene-to-display architecture and process-version compatibility
 - Consult: aligned with the 2026-06-14 RapidRaw ChatGPT Pro Extended
   color-space consult recommendation to keep AgX as a display-rendering
   transform, not the working space.
 
 ## Decision
+
+### 2026-07-13 implementation update (#5401)
+
+Issue #5401 adds transform-specific scientific and runtime gates, so new edits
+use the independently implemented `rawengine_rapid_view_v1` process. Existing recipes without an
+explicit process keep `legacyBasicV1`; explicit `rawengine_agx_v1` recipes keep
+`legacyAgxV1`. No existing sidecar or preset is silently upgraded.
+
+Rapid View uses a smooth, bounded log2 scene-exposure coordinate. Softplus toe
+and shoulder terms give continuous value and first derivative, while an output
+power places 18% scene grey at 18% display-linear. AP1 luminance-ratio scaling
+preserves channel relationships; a highlight-dependent chroma compression is
+applied around the mapped luminance without clamping individual channels. Final
+target-gamut fitting remains a separate output stage.
+
+The alternatives considered were:
+
+- a generalized log-logistic sigmoid, rejected for V1 because its skew and
+  contrast parameters couple grey placement to both endpoints;
+- a piecewise polynomial filmic curve, rejected because join continuity and
+  parameter fitting add more failure surfaces;
+- OpenAgX/ACES output transforms, retained as comparison references rather
+  than names or compatibility claims because Rapid View does not implement
+  those public contracts.
+
+The compiled plan records implementation version, stable settings fingerprint,
+scene EV bounds, target range, and color strategy. The CPU reference,
+production CPU path, and production WGPU shader share the resolved coefficients.
+Focused tests cover finite negative and over-range AP1 values, neutral-axis and
+middle-grey preservation, monotonicity, join continuity, legacy reopening,
+cache invalidation, CPU/WGPU tolerance, and preview/export identity. The private
+RAW validation spine additionally records the receipt in the sidecar/proof
+artifact and verifies TIFF reopen and soft-proof parity.
+
+This decision is SDR-only. HDR/EDR targets extend the declared target range in
+their own issue; they do not reinterpret V1.
+
+### Original phase decision
 
 RawEngine will keep the existing AgX path as the default scene-to-display
 rendering transform for RAW images during the next implementation phase, while

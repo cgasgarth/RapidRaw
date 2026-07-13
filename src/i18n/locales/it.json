@@ -6,16 +6,20 @@
       "contrast": "Contrasto",
       "evShift": "Compensazione EV",
       "exposure": "Esposizione",
+      "highlightRolloff": "Rolloff alte luci",
       "highlights": "Luci",
       "mappers": {
         "agx": "AgX",
         "agxDesc": "Tonemapping stile pellicola",
         "basic": "Base",
-        "basicDesc": "Tonemapping Standard"
+        "basicDesc": "Tonemapping Standard",
+        "rapidView": "Rapid View"
       },
       "reset": "Ripristina",
+      "shadowRolloff": "Rolloff ombre",
       "shadows": "Ombre",
       "toneMapper": "Tone Mapper",
+      "viewContrast": "Contrasto vista",
       "whites": "Bianchi"
     },
     "color": {
@@ -30,6 +34,7 @@
       },
       "ariaSelectColor": "Seleziona il colore {{name}}",
       "asShot": "As Shot",
+      "auto": "Auto",
       "blackWhiteMixer": {
         "ariaSelectChannel": "",
         "contribution": "",
@@ -92,7 +97,10 @@
       "colorRangeLocalAdjustmentLayerName": "{{range}} local adjustment",
       "colorRangeLocalAdjustmentMaskName": "{{range}} range mask",
       "createLocalAdjustmentFromRange": "Create local adjustment",
+      "creativeTint": "Tinta creativa",
+      "creativeWarmth": "Calore creativo",
       "defaultState": "Default",
+      "duv": "Tinta (Duv)",
       "falloffSmoothness": "",
       "gamutWarning": {
         "coverage": "",
@@ -116,6 +124,9 @@
         "threeWayTab": "Three-way color grading"
       },
       "hue": "Tonalità",
+      "illuminantMode": "Illuminante",
+      "kelvin": "Kelvin",
+      "kelvinTint": "Kelvin + tinta",
       "levels": {
         "disabled": "Off",
         "enabled": "On",
@@ -148,6 +159,7 @@
         "yellows": "Gialli"
       },
       "presence": "Presenza",
+      "preset": "Predefinito",
       "previewMode": "",
       "profileTone": {
         "cameraProfile": "",
@@ -190,6 +202,7 @@
       },
       "rangeCenter": "",
       "rangeWidth": "",
+      "renderedWhiteBalanceLimit": "",
       "resetActiveRange": "",
       "resetLocalColorBalance": "Reset local color balance",
       "resetWhiteBalanceAsShot": "Reset white balance to as shot",
@@ -1481,6 +1494,8 @@
         "demosaicProvenance": "Demosaic",
         "estimatedCct": "Estimated CCT",
         "fallbackReason": "Fallback",
+        "highlightReconstruction": "Highlight recovery",
+        "highlightReconstructionSummary": "{{mode}} · {{recovered}} recovered · {{partial}} partial · {{unrecoverable}} unrecoverable",
         "illuminants": "Illuminants",
         "matrixHash": "Matrix hash",
         "notApplicable": "N/A",
@@ -1770,6 +1785,9 @@
       "exit": "Exit preview mode",
       "label": "Preview only"
     },
+    "provisionalCameraPreview": "Anteprima fotocamera — sviluppo RAW",
+    "provisionalCameraPreviewFailed": "Anteprima fotocamera — sviluppo RAW non riuscito",
+    "provisionalLibraryPreview": "Anteprima libreria — sviluppo RAW",
     "switcher": {
       "search": {
         "close": "Close panel search",
@@ -4299,7 +4317,8 @@
         "title": "Pre-elaborazione Immagine",
         "tonemapperOptions": {
           "agx": "AgX",
-          "basic": "Base"
+          "basic": "Base",
+          "rapidView": "Rapid View"
         },
         "tonemapperOverride": "Sovrascrittura Tonemapper Globale",
         "tonemapperOverrideDesc": "Forza un tonemapper specifico globalmente per tutte le immagini, nascondendo il selettore del tonemapper dal pannello delle regolazioni."

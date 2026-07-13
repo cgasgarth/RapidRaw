@@ -6,16 +6,20 @@
       "contrast": "Контрастность",
       "evShift": "Сдвиг экспозиции",
       "exposure": "Экспозиция",
+      "highlightRolloff": "Спад светов",
       "highlights": "Света",
       "mappers": {
         "agx": "AgX",
         "agxDesc": "Кинематографическое тональное отображение",
         "basic": "Стандартное",
-        "basicDesc": "Стандартное тональное отображение"
+        "basicDesc": "Стандартное тональное отображение",
+        "rapidView": "Rapid View"
       },
       "reset": "Сбросить",
+      "shadowRolloff": "Спад теней",
       "shadows": "Тени",
       "toneMapper": "Тональное отображение",
+      "viewContrast": "Контраст отображения",
       "whites": "Светлые тона"
     },
     "color": {
@@ -30,6 +34,7 @@
       },
       "ariaSelectColor": "Выбрать цвет: {{name}}",
       "asShot": "As Shot",
+      "auto": "Авто",
       "blackWhiteMixer": {
         "ariaSelectChannel": "",
         "contribution": "",
@@ -92,7 +97,10 @@
       "colorRangeLocalAdjustmentLayerName": "{{range}} local adjustment",
       "colorRangeLocalAdjustmentMaskName": "{{range}} range mask",
       "createLocalAdjustmentFromRange": "Create local adjustment",
+      "creativeTint": "Творческий оттенок",
+      "creativeWarmth": "Творческое тепло",
       "defaultState": "Default",
+      "duv": "Оттенок (Duv)",
       "falloffSmoothness": "",
       "gamutWarning": {
         "coverage": "",
@@ -116,6 +124,9 @@
         "threeWayTab": "Three-way color grading"
       },
       "hue": "Цветовой тон",
+      "illuminantMode": "Источник света",
+      "kelvin": "Кельвин",
+      "kelvinTint": "Кельвин + оттенок",
       "levels": {
         "disabled": "Off",
         "enabled": "On",
@@ -148,6 +159,7 @@
         "yellows": "Желтые"
       },
       "presence": "Внешний вид",
+      "preset": "Предустановка",
       "previewMode": "",
       "profileTone": {
         "cameraProfile": "",
@@ -190,6 +202,7 @@
       },
       "rangeCenter": "",
       "rangeWidth": "",
+      "renderedWhiteBalanceLimit": "",
       "resetActiveRange": "",
       "resetLocalColorBalance": "Reset local color balance",
       "resetWhiteBalanceAsShot": "Reset white balance to as shot",
@@ -1520,6 +1533,8 @@
         "demosaicProvenance": "Demosaic",
         "estimatedCct": "Estimated CCT",
         "fallbackReason": "Fallback",
+        "highlightReconstruction": "Highlight recovery",
+        "highlightReconstructionSummary": "{{mode}} · {{recovered}} recovered · {{partial}} partial · {{unrecoverable}} unrecoverable",
         "illuminants": "Illuminants",
         "matrixHash": "Matrix hash",
         "notApplicable": "N/A",
@@ -1819,6 +1834,9 @@
       "exit": "Exit preview mode",
       "label": "Preview only"
     },
+    "provisionalCameraPreview": "Предпросмотр камеры — проявка RAW",
+    "provisionalCameraPreviewFailed": "Предпросмотр камеры — ошибка проявки RAW",
+    "provisionalLibraryPreview": "Предпросмотр библиотеки — проявка RAW",
     "switcher": {
       "search": {
         "close": "Close panel search",
@@ -4406,7 +4424,8 @@
         "title": "Предварительная обработка снимков",
         "tonemapperOptions": {
           "agx": "AgX",
-          "basic": "Стандартный"
+          "basic": "Стандартный",
+          "rapidView": "Rapid View"
         },
         "tonemapperOverride": "Глобальный принудительный тон-маппер",
         "tonemapperOverrideDesc": "Принудительно задействовать выбранный тип тонального отображения для всех снимков, скрыв переключатель тон-маппера на боковой панели настроек."

@@ -13,6 +13,22 @@ permissions:
   pull-requests: read
 
 jobs:
+  validation-plan:
+    name: 'validation: affected DAG plan'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup-bun-deps
+
+      - name: Plan affected validation from the shared manifest
+        env:
+          VALIDATION_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: bun scripts/validation/run.ts --mode pr --base "$VALIDATION_BASE" --plan-only --explain-cache
+
   frontend-build:
     name: 'frontend: install, build, i18n check'
     runs-on: ubuntu-latest
@@ -418,11 +434,143 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
+  native-feedback-classify:
+    name: 'native: feedback partition decision'
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 10
+    outputs:
+      core_required: ${{ steps.partition.outputs.core_required }}
+      full_required: ${{ steps.partition.outputs.full_required }}
+      leaf_crates: ${{ steps.partition.outputs.leaf_crates }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: ./.github/actions/setup-bun-deps
+
+      - name: Collect changed paths
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api \
+            "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files?per_page=100" \
+            --paginate \
+            --jq '.[].filename' > .native-feedback-paths
+
+      - name: Select native feedback partitions
+        id: partition
+        run: bun scripts/native-feedback/workflow-selection.ts --paths-file .native-feedback-paths
+
+      - name: Enforce selection, cache identity, and threshold regression contracts
+        run: bun test tests/pure-ts/native-feedback.test.ts
+
+  native-leaf-feedback:
+    name: 'native: focused leaf feedback'
+    runs-on: ubuntu-latest
+    needs: native-feedback-classify
+    if: always() && github.event_name == 'pull_request'
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+        if: needs.native-feedback-classify.outputs.leaf_crates != '[]'
+        with:
+          cache: false
+          rustflags: ''
+          rust-src-dir: src-tauri
+
+      - name: Restore dependency-aware leaf cache
+        if: needs.native-feedback-classify.outputs.leaf_crates != '[]'
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: src-tauri
+          key: v2-${{ runner.os }}-${{ runner.arch }}-rapid-dev-fast-leaves-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml', 'src-tauri/crates/**/*.rs') }}
+          cache-on-failure: false
+
+      - name: Test affected workspace leaves
+        if: needs.native-feedback-classify.outputs.leaf_crates != '[]'
+        working-directory: src-tauri
+        env:
+          LEAF_CRATES: ${{ needs.native-feedback-classify.outputs.leaf_crates }}
+        run: |
+          jq -r '.[]' <<< "$LEAF_CRATES" | while read -r crate; do
+            cargo test --locked --profile rapid-dev-fast -p "$crate"
+          done
+
+      - name: Record leaf skip
+        if: needs.native-feedback-classify.outputs.leaf_crates == '[]'
+        run: echo 'No affected workspace leaf.'
+
+  native-core-feedback:
+    name: 'native: focused core feedback'
+    runs-on: ubuntu-latest
+    needs: native-feedback-classify
+    if: always() && github.event_name == 'pull_request'
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: ./.github/actions/install-tauri-linux-deps
+        if: needs.native-feedback-classify.outputs.core_required == 'true'
+
+      - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+        if: needs.native-feedback-classify.outputs.core_required == 'true'
+        with:
+          cache: false
+          rustflags: ''
+          rust-src-dir: src-tauri
+
+      - name: Restore dependency-aware core cache
+        if: needs.native-feedback-classify.outputs.core_required == 'true'
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: src-tauri
+          key: v2-${{ runner.os }}-${{ runner.arch }}-rapid-dev-fast-core-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml', 'src-tauri/src/**/*.rs', 'src-tauri/crates/**/*.rs') }}
+          cache-on-failure: false
+
+      - name: Test root native library
+        if: needs.native-feedback-classify.outputs.core_required == 'true'
+        working-directory: src-tauri
+        run: cargo test --locked --lib --profile rapid-dev-fast --no-default-features --features required-ci,tauri-test
+
+      - name: Record core skip
+        if: needs.native-feedback-classify.outputs.core_required != 'true'
+        run: echo 'No root/core native input changed.'
+
+  native-full-required:
+    name: 'native: full required closure'
+    runs-on: ubuntu-latest
+    needs: native-feedback-classify
+    if: always() && github.event_name == 'pull_request'
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: ./.github/actions/install-tauri-linux-deps
+        if: needs.native-feedback-classify.outputs.full_required == 'true'
+
+      - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+        if: needs.native-feedback-classify.outputs.full_required == 'true'
+        with:
+          cache: false
+          rustflags: ''
+          rust-src-dir: src-tauri
+
+      - name: Run uncached full native validation
+        if: needs.native-feedback-classify.outputs.full_required == 'true'
+        working-directory: src-tauri
+        run: cargo test --locked --all-targets --no-default-features --features required-ci,tauri-test --no-fail-fast
+
+      - name: Record full skip
+        if: needs.native-feedback-classify.outputs.full_required != 'true'
+        run: echo 'No native input changed; full native closure not required.'
+
   rust-pr-clippy:
     name: 'rust: clippy PR path gate'
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
-    timeout-minutes: 45
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
@@ -499,6 +647,9 @@ jobs:
           cargo test --manifest-path src-tauri/Cargo.toml --locked -p rapidraw-computational
           cargo test --manifest-path src-tauri/Cargo.toml --locked -p rapidraw-codecs --no-default-features --features jpeg
           cargo test --manifest-path src-tauri/Cargo.toml --locked -p rapidraw-codecs --all-features
+      - name: Build fast-dev and full native capability profiles
+        if: steps.rust-pr-decision.outputs.rust_ci_required == 'true'
+        run: bun run check:native-profiles
       - name: Rust and Tauri IPC tests when Rust/Tauri changed
         if: steps.rust-pr-decision.outputs.rust_ci_required == 'true'
         working-directory: src-tauri
@@ -686,12 +837,17 @@ jobs:
       - docs-check
       - rust-fmt
       - color-lab-fast
+      - native-feedback-classify
+      - native-leaf-feedback
+      - native-core-feedback
+      - native-full-required
       - rust-pr-clippy
       - actions-lint
       - actions-pins
       - dependency-security-js
       - dependency-security-rust
       - dependency-license-rust
+      - validation-plan
     if: always() && github.event_name == 'pull_request'
     timeout-minutes: 10
     steps:

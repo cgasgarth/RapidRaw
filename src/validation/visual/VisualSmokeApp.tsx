@@ -279,7 +279,7 @@ const adjustmentsPanelRetuneRawImage: SelectedImage = {
   path: '/visual-smoke/adjustments-panel-retune.ARW',
   rawDevelopmentReport: {
     cameraProfile: {
-      algorithmId: 'visual-smoke-camera-profile-v1',
+      algorithmId: 'dual_illuminant_mired_v1',
       candidateCount: 1,
       colorCheckerGate: {
         status: 'gated_pass',
@@ -291,6 +291,23 @@ const adjustmentsPanelRetuneRawImage: SelectedImage = {
     },
     demosaicAlgorithmId: 'visual-smoke-demosaic-v1',
     demosaicPath: 'standard',
+    highlightReconstruction: {
+      algorithmId: 'sensor_linear_confidence_hierarchy_v2',
+      cfaKind: 'bayer',
+      clippedSamples: 0,
+      confidencePercentiles: [0, 0, 0, 0, 0],
+      implementationVersion: 2,
+      invalidSamples: 0,
+      largestClippedRegion: 0,
+      methodCounts: {},
+      mode: 'auto',
+      nearClippedSamples: 0,
+      partiallyReconstructedSamples: 0,
+      postDemosaicFallbackSamples: 0,
+      reconstructedSamples: 0,
+      unrecoverableSamples: 0,
+      warningCodes: [],
+    },
     processingProfile: 'balanced',
     stageSamples: [],
     runtime: {

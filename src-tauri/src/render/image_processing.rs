@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::Arc;
 
+use crate::color::view_transform::{ViewTransformPlanV1, ViewTransformSettingsV1};
+
 pub const PERSISTED_RENDER_STATE_SCHEMA_VERSION: u32 = 2;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -245,10 +247,11 @@ pub fn apply_orientation(image: DynamicImage, orientation: Orientation) -> Dynam
     }
 }
 
-#[cfg_attr(not(feature = "ai"), allow(unused_imports))]
+#[cfg(feature = "ai")]
+pub use crate::geometry::apply_unwarp_geometry;
 pub use crate::geometry::{
     apply_coarse_rotation, apply_crop, apply_flip, apply_geometry_warp, apply_rotation,
-    apply_unwarp_geometry, is_geometry_identity, warp_image_geometry,
+    is_geometry_identity, warp_image_geometry,
 };
 
 use crate::adjustments::abi::GpuMat3;
@@ -357,14 +360,21 @@ pub fn resolve_tonemapper_override(settings: &crate::AppSettings, is_raw: bool) 
         return None;
     }
     let tm = if is_raw {
-        settings.default_raw_tonemapper.as_deref().unwrap_or("agx")
+        settings
+            .default_raw_tonemapper
+            .as_deref()
+            .unwrap_or("rapidView")
     } else {
         settings
             .default_non_raw_tonemapper
             .as_deref()
             .unwrap_or("basic")
     };
-    Some(if tm == "agx" { 1 } else { 0 })
+    Some(match tm {
+        "agx" => 1,
+        "rapidView" => 2,
+        _ => 0,
+    })
 }
 
 pub fn resolve_tonemapper_override_from_handle(
@@ -483,6 +493,25 @@ pub fn apply_cpu_agx_tonemap(image: &mut DynamicImage) {
         pixel_chunk[2] = final_color.z.clamp(0.0, 1.0);
     });
 
+    *image = DynamicImage::ImageRgb32F(f32_image);
+}
+
+pub fn apply_cpu_rapid_view(image: &mut DynamicImage) {
+    let plan = ViewTransformPlanV1::compile(ViewTransformSettingsV1::default())
+        .expect("built-in Rapid View settings must compile");
+    let mut f32_image = image.to_rgb32f();
+    f32_image.par_chunks_mut(3).for_each(|pixel| {
+        let mapped = plan.apply_rgb([pixel[0], pixel[1], pixel[2]]);
+        for (destination, value) in pixel.iter_mut().zip(mapped) {
+            let magnitude = value.abs();
+            let encoded = if magnitude <= 0.003_130_8 {
+                magnitude * 12.92
+            } else {
+                1.055 * magnitude.powf(1.0 / 2.4) - 0.055
+            };
+            *destination = value.signum() * encoded;
+        }
+    });
     *image = DynamicImage::ImageRgb32F(f32_image);
 }
 

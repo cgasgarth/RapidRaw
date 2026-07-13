@@ -6,16 +6,20 @@
       "contrast": "对比度",
       "evShift": "EV 偏移",
       "exposure": "曝光",
+      "highlightRolloff": "高光滚降",
       "highlights": "高光",
       "mappers": {
         "agx": "AgX",
         "agxDesc": "电影感色调映射",
         "basic": "基础",
-        "basicDesc": "标准色调映射"
+        "basicDesc": "标准色调映射",
+        "rapidView": "Rapid View"
       },
       "reset": "重置",
+      "shadowRolloff": "阴影滚降",
       "shadows": "阴影",
       "toneMapper": "色调映射",
+      "viewContrast": "视图对比度",
       "whites": "白色"
     },
     "color": {
@@ -30,6 +34,7 @@
       },
       "ariaSelectColor": "选择 {{name}} 颜色",
       "asShot": "As Shot",
+      "auto": "自动",
       "blackWhiteMixer": {
         "ariaSelectChannel": "选择 {{name}} 黑白通道",
         "contribution": "{{name}} 贡献",
@@ -92,7 +97,10 @@
       "colorRangeLocalAdjustmentLayerName": "{{range}} local adjustment",
       "colorRangeLocalAdjustmentMaskName": "{{range}} range mask",
       "createLocalAdjustmentFromRange": "Create local adjustment",
+      "creativeTint": "创意色调",
+      "creativeWarmth": "创意暖调",
       "defaultState": "Default",
+      "duv": "色调 (Duv)",
       "falloffSmoothness": "过渡",
       "gamutWarning": {
         "coverage": "",
@@ -122,6 +130,9 @@
         "threeWayTab": "Three-way color grading"
       },
       "hue": "色相",
+      "illuminantMode": "光源",
+      "kelvin": "开尔文",
+      "kelvinTint": "开尔文 + 色调",
       "levels": {
         "disabled": "Off",
         "enabled": "On",
@@ -154,6 +165,7 @@
         "yellows": "黄色"
       },
       "presence": "质感",
+      "preset": "预设",
       "previewMode": "",
       "profileTone": {
         "cameraProfile": "相机配置",
@@ -196,6 +208,7 @@
       },
       "rangeCenter": "范围中心",
       "rangeWidth": "范围宽度",
+      "renderedWhiteBalanceLimit": "",
       "resetActiveRange": "Reset active range",
       "resetLocalColorBalance": "Reset local color balance",
       "resetWhiteBalanceAsShot": "Reset white balance to as shot",
@@ -1489,6 +1502,8 @@
         "demosaicProvenance": "Demosaic",
         "estimatedCct": "Estimated CCT",
         "fallbackReason": "Fallback",
+        "highlightReconstruction": "Highlight recovery",
+        "highlightReconstructionSummary": "{{mode}} · {{recovered}} recovered · {{partial}} partial · {{unrecoverable}} unrecoverable",
         "illuminants": "Illuminants",
         "matrixHash": "Matrix hash",
         "notApplicable": "N/A",
@@ -1765,6 +1780,9 @@
       "exit": "Exit preview mode",
       "label": "Preview only"
     },
+    "provisionalCameraPreview": "相机预览 — 正在处理 RAW",
+    "provisionalCameraPreviewFailed": "相机预览 — RAW 处理失败",
+    "provisionalLibraryPreview": "图库预览 — 正在处理 RAW",
     "switcher": {
       "search": {
         "close": "Close panel search",
@@ -4281,7 +4299,8 @@
         "title": "图像预处理",
         "tonemapperOptions": {
           "agx": "AgX",
-          "basic": "基础"
+          "basic": "基础",
+          "rapidView": "Rapid View"
         },
         "tonemapperOverride": "全局色调映射覆盖",
         "tonemapperOverrideDesc": "为所有图像全局强制使用特定的色调映射器，从调整面板中隐藏色调映射器开关。"

@@ -73,11 +73,9 @@ use crate::{AppState, ExportJob};
 #[cfg(test)]
 pub(crate) use crate::export::export_color_policy::{
     ExportBlackPointCompensationStatus, ExportColorEngineId, applied_export_color_policy,
-    export_color_profile_receipt_label, export_jpeg_rgb_pixels_and_profile,
-    export_rgb_pixels_and_profile, export_rgb16_pixels_and_profile,
-    export_rgb16_pixels_with_shared_conversion_core,
-    export_soft_proof_rgb_pixels_and_profile_with_policy, export_transform_options,
-    mox_rendering_intent, resolve_export_color_transform_plan,
+    export_color_profile_receipt_label, export_rgb_pixels_and_profile,
+    export_rgb16_pixels_and_profile, export_rgb16_pixels_with_shared_conversion_core,
+    export_transform_options, mox_rendering_intent, resolve_export_color_transform_plan,
     should_apply_srgb_perceptual_gamut_mapping,
 };
 pub use crate::export::export_color_policy::{
@@ -89,7 +87,7 @@ pub(crate) use crate::export::export_color_policy::{
     export_source_precision_receipt_label, export_source_rgb16_pixels, quantize_rgb16_to_rgb8,
     resolve_export_color_capabilities, validate_export_color_policy,
 };
-#[cfg(all(feature = "validation-harness", not(test)))]
+#[cfg(any(test, feature = "validation-harness"))]
 pub(crate) use crate::export::export_color_policy::{
     export_jpeg_rgb_pixels_and_profile, export_soft_proof_rgb_pixels_and_profile_with_policy,
 };
@@ -4313,8 +4311,11 @@ mod tests {
                 illuminant_estimate_confidence: "low",
                 illuminant_estimate_method: "wb_coeff_ratio",
                 matrix_hash: Some("blake3:abcdef0123456789".to_string()),
+                profile_illuminant_duv: None,
+                profile_illuminant_xy: None,
                 status: "interpolated",
                 warm_illuminant: Some("StandardLightA".to_string()),
+                white_balance_plan_fingerprint: None,
                 warning_codes: Vec::new(),
             },
             demosaic_algorithm_id: None,
@@ -4322,6 +4323,8 @@ mod tests {
             processing_profile: crate::raw_processing::RawProcessingProfile::Maximum,
             input_transform: None,
             stage_samples: Vec::new(),
+            highlight_reconstruction:
+                crate::highlight_reconstruction::HighlightReconstructionReportV2::default(),
             runtime: None,
             xtrans_hq: None,
         };

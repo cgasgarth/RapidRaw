@@ -674,6 +674,7 @@ export default function MetadataPanel() {
   const megapixels = selectedImage ? ((selectedImage.width * selectedImage.height) / 1000000).toFixed(1) : null;
   const rawDevelopmentReport = selectedImage?.rawDevelopmentReport ?? null;
   const cameraProfileReport = rawDevelopmentReport?.cameraProfile ?? null;
+  const highlightReconstructionReport = rawDevelopmentReport?.highlightReconstruction ?? null;
   const cameraProfileReceipt =
     rawDevelopmentReport === null ? null : buildCameraProfileProvenanceReceipt(rawDevelopmentReport);
   const negativeLabPositiveStatus = useMemo(
@@ -1241,6 +1242,36 @@ export default function MetadataPanel() {
                     {' / '}
                     {formatRawReceiptToken(rawDevelopmentReport.demosaicPath)}
                   </UiText>
+                  {highlightReconstructionReport !== null && (
+                    <>
+                      <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                        {t('editor.metadata.cameraProfile.highlightReconstruction')}
+                      </UiText>
+                      <UiText
+                        variant={TextVariants.small}
+                        color={TextColors.primary}
+                        className="truncate text-right"
+                        data-algorithm-id={highlightReconstructionReport.algorithmId}
+                        data-cfa-kind={highlightReconstructionReport.cfaKind}
+                        data-clipped-samples={highlightReconstructionReport.clippedSamples}
+                        data-confidence-p50={highlightReconstructionReport.confidencePercentiles[2]}
+                        data-mode={highlightReconstructionReport.mode}
+                        data-partially-reconstructed-samples={
+                          highlightReconstructionReport.partiallyReconstructedSamples
+                        }
+                        data-reconstructed-samples={highlightReconstructionReport.reconstructedSamples}
+                        data-testid="metadata-raw-highlight-reconstruction"
+                        data-unrecoverable-samples={highlightReconstructionReport.unrecoverableSamples}
+                      >
+                        {t('editor.metadata.cameraProfile.highlightReconstructionSummary', {
+                          mode: formatRawReceiptToken(highlightReconstructionReport.mode),
+                          partial: highlightReconstructionReport.partiallyReconstructedSamples,
+                          recovered: highlightReconstructionReport.reconstructedSamples,
+                          unrecoverable: highlightReconstructionReport.unrecoverableSamples,
+                        })}
+                      </UiText>
+                    </>
+                  )}
                   <UiText variant={TextVariants.small} color={TextColors.secondary}>
                     {t('editor.metadata.cameraProfile.demosaicProvenance')}
                   </UiText>

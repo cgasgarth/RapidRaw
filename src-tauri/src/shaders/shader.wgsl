@@ -99,6 +99,8 @@ struct GlobalAdjustments {
     _pad_color1: f32,
     _pad_color2: f32,
     _pad_color3: f32,
+    _pad_color4: f32,
+    technical_white_balance: mat3x3<f32>,
 
     sharpness: f32,
     luma_noise_reduction: f32,
@@ -134,6 +136,9 @@ struct GlobalAdjustments {
     _pad_agx3: f32,
     agx_pipe_to_rendering_matrix: mat3x3<f32>,
     agx_rendering_to_pipe_matrix: mat3x3<f32>,
+    rapid_view_parameters0: vec4<f32>,
+    rapid_view_parameters1: vec4<f32>,
+    rapid_view_parameters2: vec4<f32>,
 
     _pad_cg1: f32,
     _pad_cg2: f32,
@@ -1416,6 +1421,60 @@ fn agx_full_transform(color_in: vec3<f32>) -> vec3<f32> {
     return final_color;
 }
 
+fn rapid_view_softplus(value: f32, width: f32) -> f32 {
+    let scaled = value / width;
+    if (scaled > 16.0) { return value; }
+    if (scaled < -16.0) { return width * exp(scaled); }
+    return width * log(1.0 + exp(scaled));
+}
+
+fn rapid_view_bounded_ev(ev: f32, black: f32, white: f32, toe_width: f32, shoulder_width: f32) -> f32 {
+    if (ev > (black + white) * 0.5) {
+        return white - rapid_view_softplus(white - ev, shoulder_width)
+            + rapid_view_softplus(black - ev, toe_width);
+    }
+    return black + rapid_view_softplus(ev - black, toe_width)
+        - rapid_view_softplus(ev - white, shoulder_width);
+}
+
+fn rapid_view_scalar(value: f32) -> f32 {
+    let p0 = adjustments.global.rapid_view_parameters0;
+    let p1 = adjustments.global.rapid_view_parameters1;
+    let p2 = adjustments.global.rapid_view_parameters2;
+    if (value == 0.0) { return p0.w; }
+    let value_sign = sign(value);
+    let ev = log2(abs(value) / p0.x);
+    let scaled_ev = ev * p1.w;
+    var q: f32;
+    if (scaled_ev <= p0.y - 16.0 * p1.y) { q = 0.0; }
+    else if (scaled_ev >= p0.z + 16.0 * p1.z) { q = 1.0; }
+    else {
+        let bounded = rapid_view_bounded_ev(scaled_ev, p0.y, p0.z, p1.y, p1.z);
+        q = (bounded - p0.y) / (p0.z - p0.y);
+    }
+    return value_sign * (p0.w + (p1.x - p0.w) * pow(q, p2.x));
+}
+
+fn rapid_view_transform(color: vec3<f32>) -> vec3<f32> {
+    if (!all(color == color) || !all(abs(color) < vec3<f32>(3.0e38))) { return vec3<f32>(0.0); }
+    let luma = dot(color, vec3<f32>(0.27222872, 0.67408174, 0.05368952));
+    if (luma <= 1.0e-8) {
+        return vec3<f32>(rapid_view_scalar(color.x), rapid_view_scalar(color.y), rapid_view_scalar(color.z));
+    }
+    let mapped = rapid_view_scalar(luma);
+    let scaled = color * (mapped / luma);
+    let headroom = clamp(mapped / adjustments.global.rapid_view_parameters1.x, 0.0, 1.0);
+    let compression = adjustments.global.rapid_view_parameters2.y * smoothstep(0.65, 1.0, headroom);
+    return mix(scaled, vec3<f32>(mapped), compression);
+}
+
+fn rapid_view_encode_signed(color: vec3<f32>) -> vec3<f32> {
+    let magnitude = abs(color);
+    let higher = 1.055 * pow(magnitude, vec3<f32>(1.0 / 2.4)) - 0.055;
+    let lower = magnitude * 12.92;
+    return sign(color) * select(higher, lower, magnitude <= vec3<f32>(0.0031308));
+}
+
 fn legacy_tonemap(c: vec3<f32>) -> vec3<f32> {
     const a: f32 = 2.51;
     const b: f32 = 0.03;
@@ -1706,6 +1765,10 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     } else {
         initial_linear_rgb = color_from_texture;
     }
+    // Technical illuminant correction is the first scene-linear color node.
+    // Legacy temperature/tint remains a later creative operation and masks
+    // never mutate this matrix.
+    initial_linear_rgb = adjustments.global.technical_white_balance * initial_linear_rgb;
 
     var t_exposure = adjustments.global.exposure;
     var t_brightness = adjustments.global.brightness;
@@ -1922,7 +1985,9 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     }
 
     var base_srgb: vec3<f32>;
-    if (adjustments.global.tonemapper_mode == 1u) {
+    if (adjustments.global.tonemapper_mode == 2u) {
+        base_srgb = rapid_view_encode_signed(rapid_view_transform(composite_rgb_linear));
+    } else if (adjustments.global.tonemapper_mode == 1u) {
         base_srgb = agx_full_transform(composite_rgb_linear);
     } else if (is_raw == 1u) {
         var srgb_emulated = linear_to_srgb(composite_rgb_linear);
