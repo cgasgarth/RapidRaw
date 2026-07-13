@@ -3777,6 +3777,13 @@ mod tests {
         let v2_recipe = recipe(2);
         let preview = render(&v2_recipe, "edit_graph_v2_private_raw_preview");
         let export = render(&v2_recipe, "edit_graph_v2_private_raw_export");
+        let v2_receipt = state
+            .gpu_processor
+            .lock()
+            .unwrap()
+            .as_ref()
+            .and_then(|processor| processor.processor.last_execution_receipt())
+            .expect("real RAW v2 render publishes a GPU execution receipt");
         let legacy = render(&recipe(1), "edit_graph_v1_private_raw_migration_baseline");
         let preview_pixels = preview.to_rgba16().into_raw();
         let export_pixels = export.to_rgba16().into_raw();
@@ -3792,11 +3799,18 @@ mod tests {
         assert!(changed > preview_pixels.len() / 100);
         let digest = Sha256::digest(bytemuck::cast_slice::<u16, u8>(&preview_pixels));
         println!(
-            "edit_graph_v2_private_raw_proof dimensions={}x{} migration_changed_channels={} preview_export_sha256={}",
+            "edit_graph_v2_private_raw_proof dimensions={}x{} migration_changed_channels={} preview_export_sha256={} phase_dispatches={} command_buffers={} queue_submits={} cache_hits={} cache_misses={} cpu_encode_ms={:.3} wall_ms={:.3}",
             preview.width(),
             preview.height(),
             changed,
-            hex::encode(digest)
+            hex::encode(digest),
+            v2_receipt.phase_dispatch_count,
+            v2_receipt.command_buffer_count,
+            v2_receipt.queue_submit_count,
+            v2_receipt.cache_hits,
+            v2_receipt.cache_misses,
+            v2_receipt.cpu_encode_time.as_secs_f64() * 1000.0,
+            v2_receipt.wall_time.as_secs_f64() * 1000.0,
         );
     }
 

@@ -776,6 +776,144 @@ mod tests {
     }
 
     #[test]
+    fn v2_owns_masked_scene_and_display_payloads_in_their_physical_domains() {
+        let raw = json!({
+            "rawEngineEditGraphVersion": 2,
+            "masks": [{
+                "id": "owned-local", "name": "Owned local", "visible": true,
+                "invert": false, "opacity": 100, "blendMode": "screen",
+                "subMasks": [],
+                "adjustments": {
+                    "exposure": 12,
+                    "curves": {
+                        "luma": [
+                            {"x": 0, "y": 0},
+                            {"x": 128, "y": 144},
+                            {"x": 255, "y": 255}
+                        ]
+                    }
+                }
+            }]
+        });
+        let plan = compile_render_plan(&raw, context(76), None).unwrap();
+        assert_eq!(
+            bytes_of(&plan.edit_graph.shader_abi()),
+            bytes_of(&plan.adjustments),
+            "the graph owns an immutable execution ABI snapshot"
+        );
+        assert_eq!(
+            plan.edit_graph.receipt.ordered_node_ids.as_ref(),
+            [
+                "camera_input_boundary",
+                "scene_global_color_tone",
+                "local_scene_composition",
+                "scene_to_view_transform",
+                "display_creative",
+                "render_transport"
+            ]
+        );
+        let diagnostic = plan.edit_graph.diagnostic_receipt();
+        let nodes = diagnostic["nodes"].as_array().unwrap();
+        let local_scene = nodes
+            .iter()
+            .find(|node| node["id"] == "local_scene_composition")
+            .unwrap();
+        let local_display = nodes
+            .iter()
+            .find(|node| node["id"] == "display_creative")
+            .unwrap();
+        assert_eq!(
+            local_scene["inputDomain"],
+            "acescg_scene_linear_extended_v1"
+        );
+        assert_eq!(local_scene["payload"]["layers"][0]["exposure"], 15.0);
+        assert!(local_scene["payload"]["layers"][0].get("curves").is_none());
+        assert_eq!(local_display["inputDomain"], "display_encoded_srgb_v1");
+        assert_eq!(
+            local_display["payload"]["localDisplayLayers"][0]["curveCounts"][0],
+            3
+        );
+        assert!(
+            local_display["payload"]["localDisplayLayers"][0]
+                .get("exposure")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn v2_payload_fingerprints_invalidate_only_the_owning_physical_domain() {
+        let base = json!({
+            "rawEngineEditGraphVersion": 2,
+            "exposure": 10,
+            "curves": {
+                "luma": [
+                    {"x": 0, "y": 0},
+                    {"x": 128, "y": 136},
+                    {"x": 255, "y": 255}
+                ]
+            }
+        });
+        let exposure = json!({
+            "rawEngineEditGraphVersion": 2,
+            "exposure": 14,
+            "curves": base["curves"].clone()
+        });
+        let display_curve = json!({
+            "rawEngineEditGraphVersion": 2,
+            "exposure": 10,
+            "curves": {
+                "luma": [
+                    {"x": 0, "y": 0},
+                    {"x": 128, "y": 148},
+                    {"x": 255, "y": 255}
+                ]
+            }
+        });
+        let compile = |raw: &serde_json::Value| {
+            compile_render_plan(raw, context(77), None)
+                .unwrap()
+                .edit_graph
+        };
+        let base = compile(&base);
+        let exposure = compile(&exposure);
+        let display_curve = compile(&display_curve);
+        let fingerprint = |graph: &crate::edit_graph::CompiledEditGraph, id| {
+            graph
+                .nodes
+                .iter()
+                .find(|node| node.kind.stable_id() == id)
+                .unwrap()
+                .payload_fingerprint
+        };
+
+        for stable in [
+            "scene_to_view_transform",
+            "display_creative",
+            "render_transport",
+        ] {
+            assert_eq!(fingerprint(&base, stable), fingerprint(&exposure, stable));
+        }
+        assert_ne!(
+            fingerprint(&base, "scene_global_color_tone"),
+            fingerprint(&exposure, "scene_global_color_tone")
+        );
+        for stable in [
+            "scene_global_color_tone",
+            "scene_to_view_transform",
+            "render_transport",
+        ] {
+            assert_eq!(
+                fingerprint(&base, stable),
+                fingerprint(&display_curve, stable)
+            );
+        }
+        assert_ne!(
+            fingerprint(&base, "display_creative"),
+            fingerprint(&display_curve, "display_creative")
+        );
+    }
+
+    #[test]
     fn source_fingerprint_scopes_plan_cache_and_full_fingerprint() {
         let raw = json!({"exposure": 12});
         let first = compile_render_plan_cached(&raw, context(90), None).unwrap();

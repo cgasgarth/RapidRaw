@@ -706,9 +706,9 @@ pub fn get_all_adjustments_from_json_with_masks(
         tile_offset_y: 0,
         mask_atlas_cols: 1,
         blur_pass_flags: 0,
-        _pad_blur_flags1: 0,
-        _pad_blur_flags2: 0,
-        _pad_blur_flags3: 0,
+        execution_phase: 0,
+        source_width: 0,
+        source_height: 0,
     }
 }
 

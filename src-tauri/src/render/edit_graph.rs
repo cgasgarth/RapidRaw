@@ -1,14 +1,17 @@
 //! Versioned execution contract for the production edit pipeline.
 //!
-//! The current GPU shader remains a fused compatibility executor. This graph is
-//! authoritative for ordering, domains, cache identity, and whether that fused
-//! executor is legal for a compiled render plan.
+//! The graph is authoritative for ordering, domains, cache identity, and the
+//! deliberate scene-linear and view/display GPU execution boundaries.
 
 use std::sync::Arc;
 
 use bytemuck::bytes_of;
 
-use crate::adjustments::abi::AllAdjustments;
+use crate::adjustments::abi::{
+    AllAdjustments, BlackWhiteMixerSettings, ChannelMixerSettings, ColorBalanceRgbSettings,
+    ColorCalibrationSettings, ColorGradeSettings, GpuMat3, HslColor, LevelsSettings,
+    MaskAdjustments, Point,
+};
 
 pub const EDIT_GRAPH_SCHEMA_VERSION: u32 = 1;
 pub const LEGACY_PIPELINE_VERSION: u32 = 1;
@@ -116,7 +119,7 @@ pub struct NodeDependencies {
     pub output: bool,
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct CompiledEditNode {
     pub kind: EditNodeKind,
     pub schema_version: u32,
@@ -133,6 +136,325 @@ pub struct CompiledEditNode {
     pub cpu_implementation: Option<&'static str>,
     pub wgpu_implementation: Option<&'static str>,
     pub payload_fingerprint: u64,
+    pub payload: CompiledNodePayload,
+}
+
+#[derive(Clone, Debug)]
+pub enum CompiledNodePayload {
+    InputBoundary { source_fingerprint: u64 },
+    GeometryRetouch { geometry: u64, retouch: u64 },
+    PreGpuSpatialDetail { detail_fingerprint: u64 },
+    LegacyShaderAbi(Box<AllAdjustments>),
+    SceneGlobal(Box<SceneGlobalPayload>),
+    LocalScene(LocalScenePayload),
+    ViewTransform(ViewTransformPayload),
+    DisplayCreative(Box<DisplayCreativePayload>),
+    ClippingOverlay { enabled: bool },
+    RenderTransport { output_fingerprint: u64 },
+}
+
+impl CompiledNodePayload {
+    pub fn kind_id(&self) -> &'static str {
+        match self {
+            Self::InputBoundary { .. } => "input_boundary_v1",
+            Self::GeometryRetouch { .. } => "geometry_retouch_v1",
+            Self::PreGpuSpatialDetail { .. } => "pre_gpu_spatial_detail_v1",
+            Self::LegacyShaderAbi(_) => "legacy_all_adjustments_shader_abi_v1",
+            Self::SceneGlobal(_) => "scene_global_typed_v2",
+            Self::LocalScene(_) => "local_scene_typed_v2",
+            Self::ViewTransform(_) => "view_transform_typed_v2",
+            Self::DisplayCreative(_) => "display_creative_typed_v2",
+            Self::ClippingOverlay { .. } => "clipping_overlay_v1",
+            Self::RenderTransport { .. } => "render_transport_v1",
+        }
+    }
+
+    fn belongs_to(&self, kind: EditNodeKind) -> bool {
+        matches!(
+            (self, kind),
+            (
+                Self::InputBoundary { .. },
+                EditNodeKind::CameraInputBoundary
+            ) | (Self::GeometryRetouch { .. }, EditNodeKind::GeometryRetouch)
+                | (
+                    Self::PreGpuSpatialDetail { .. },
+                    EditNodeKind::PreGpuSpatialDetail
+                )
+                | (
+                    Self::LegacyShaderAbi(_),
+                    EditNodeKind::LegacyGpuSceneViewPass
+                )
+                | (Self::SceneGlobal(_), EditNodeKind::SceneGlobalColorTone)
+                | (Self::LocalScene(_), EditNodeKind::LocalSceneComposition)
+                | (Self::ViewTransform(_), EditNodeKind::SceneToViewTransform)
+                | (Self::DisplayCreative(_), EditNodeKind::DisplayCreative)
+                | (Self::ClippingOverlay { .. }, EditNodeKind::ClippingOverlay)
+                | (Self::RenderTransport { .. }, EditNodeKind::RenderTransport)
+        )
+    }
+
+    fn diagnostic(&self) -> serde_json::Value {
+        match self {
+            Self::InputBoundary { source_fingerprint } => serde_json::json!({
+                "sourceFingerprint": format!("{source_fingerprint:016x}"),
+            }),
+            Self::GeometryRetouch { geometry, retouch } => serde_json::json!({
+                "geometryFingerprint": format!("{geometry:016x}"),
+                "retouchFingerprint": format!("{retouch:016x}"),
+            }),
+            Self::PreGpuSpatialDetail { detail_fingerprint } => serde_json::json!({
+                "detailFingerprint": format!("{detail_fingerprint:016x}"),
+            }),
+            Self::LegacyShaderAbi(adjustments) => serde_json::json!({
+                "compatibilityAbiBytes": bytes_of(adjustments.as_ref()).len(),
+            }),
+            Self::SceneGlobal(scene) => serde_json::json!({
+                "exposure": scene.exposure, "brightness": scene.brightness,
+                "contrast": scene.contrast, "highlights": scene.highlights,
+                "shadows": scene.shadows, "whites": scene.whites,
+                "blacks": scene.blacks, "saturation": scene.saturation,
+                "temperature": scene.temperature, "tint": scene.tint,
+                "vibrance": scene.vibrance, "hue": scene.hue,
+                "sharpness": scene.sharpness, "sharpnessThreshold": scene.sharpness_threshold,
+                "lumaNoiseReduction": scene.luma_noise_reduction,
+                "colorNoiseReduction": scene.color_noise_reduction,
+                "clarity": scene.clarity, "dehaze": scene.dehaze,
+                "structure": scene.structure, "centre": scene.centre,
+                "chromaticAberration": scene.chromatic_aberration,
+                "glow": scene.glow, "halation": scene.halation, "flare": scene.flare,
+                "vignette": scene.vignette,
+                "colorCalibration": scene.color_calibration,
+                "colorBalanceRgb": scene.color_balance_rgb,
+                "channelMixer": scene.channel_mixer,
+                "blackWhiteMixer": scene.black_white_mixer,
+                "levels": scene.levels, "hsl": scene.hsl, "grading": scene.grading,
+                "gradingBlending": scene.grading_blending,
+                "gradingBalance": scene.grading_balance,
+            }),
+            Self::LocalScene(local) => serde_json::json!({
+                "layerCount": local.layers.len(),
+                "layers": local.layers.iter().map(LocalSceneLayerPayload::diagnostic).collect::<Vec<_>>(),
+            }),
+            Self::ViewTransform(view) => serde_json::json!({
+                "tonemapperMode": view.tonemapper_mode, "isRaw": view.is_raw,
+                "pipeToRendering": view.pipe_to_rendering,
+                "renderingToPipe": view.rendering_to_pipe,
+            }),
+            Self::DisplayCreative(display) => serde_json::json!({
+                "curves": display.curves, "curveCounts": display.curve_counts,
+                "lutEnabled": display.lut_enabled, "lutIntensity": display.lut_intensity,
+                "grain": display.grain,
+                "localDisplayLayers": display.local_layers.iter()
+                    .map(LocalDisplayLayerPayload::diagnostic).collect::<Vec<_>>(),
+            }),
+            Self::ClippingOverlay { enabled } => serde_json::json!({ "enabled": enabled }),
+            Self::RenderTransport { output_fingerprint } => serde_json::json!({
+                "outputFingerprint": format!("{output_fingerprint:016x}"),
+            }),
+        }
+    }
+
+    fn fingerprint(&self) -> u64 {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"rapidraw.compiled-edit-node-payload.v1");
+        hasher.update(self.kind_id().as_bytes());
+        match self {
+            Self::LegacyShaderAbi(adjustments) => {
+                hasher.update(bytes_of(adjustments.as_ref()));
+            }
+            _ => {
+                let diagnostic = serde_json::to_vec(&self.diagnostic())
+                    .expect("compiled edit-node diagnostics are serializable");
+                hasher.update(&diagnostic);
+            }
+        }
+        u64::from_le_bytes(hasher.finalize().as_bytes()[..8].try_into().unwrap())
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct SceneGlobalPayload {
+    pub exposure: f32,
+    pub brightness: f32,
+    pub contrast: f32,
+    pub highlights: f32,
+    pub shadows: f32,
+    pub whites: f32,
+    pub blacks: f32,
+    pub saturation: f32,
+    pub temperature: f32,
+    pub tint: f32,
+    pub vibrance: f32,
+    pub hue: f32,
+    pub sharpness: f32,
+    pub sharpness_threshold: f32,
+    pub luma_noise_reduction: f32,
+    pub color_noise_reduction: f32,
+    pub clarity: f32,
+    pub dehaze: f32,
+    pub structure: f32,
+    pub centre: f32,
+    pub chromatic_aberration: [f32; 2],
+    pub glow: f32,
+    pub halation: f32,
+    pub flare: f32,
+    pub vignette: [f32; 4],
+    pub color_calibration: ColorCalibrationSettings,
+    pub color_balance_rgb: ColorBalanceRgbSettings,
+    pub channel_mixer: ChannelMixerSettings,
+    pub black_white_mixer: BlackWhiteMixerSettings,
+    pub levels: LevelsSettings,
+    pub hsl: [HslColor; 8],
+    pub grading: [ColorGradeSettings; 4],
+    pub grading_blending: f32,
+    pub grading_balance: f32,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct LocalSceneLayerPayload {
+    pub exposure: f32,
+    pub brightness: f32,
+    pub contrast: f32,
+    pub highlights: f32,
+    pub shadows: f32,
+    pub whites: f32,
+    pub blacks: f32,
+    pub saturation: f32,
+    pub temperature: f32,
+    pub tint: f32,
+    pub vibrance: f32,
+    pub sharpness: f32,
+    pub sharpness_threshold: f32,
+    pub luma_noise_reduction: f32,
+    pub color_noise_reduction: f32,
+    pub clarity: f32,
+    pub dehaze: f32,
+    pub structure: f32,
+    pub glow: f32,
+    pub halation: f32,
+    pub flare: f32,
+    pub hue: f32,
+    pub blend_mode: f32,
+    pub hsl: [HslColor; 8],
+    pub grading: [ColorGradeSettings; 4],
+    pub grading_blending: f32,
+    pub grading_balance: f32,
+}
+
+impl LocalSceneLayerPayload {
+    fn from_abi(layer: MaskAdjustments) -> Self {
+        Self {
+            exposure: layer.exposure,
+            brightness: layer.brightness,
+            contrast: layer.contrast,
+            highlights: layer.highlights,
+            shadows: layer.shadows,
+            whites: layer.whites,
+            blacks: layer.blacks,
+            saturation: layer.saturation,
+            temperature: layer.temperature,
+            tint: layer.tint,
+            vibrance: layer.vibrance,
+            sharpness: layer.sharpness,
+            sharpness_threshold: layer.sharpness_threshold,
+            luma_noise_reduction: layer.luma_noise_reduction,
+            color_noise_reduction: layer.color_noise_reduction,
+            clarity: layer.clarity,
+            dehaze: layer.dehaze,
+            structure: layer.structure,
+            glow: layer.glow_amount,
+            halation: layer.halation_amount,
+            flare: layer.flare_amount,
+            hue: layer.hue,
+            blend_mode: layer.blend_mode,
+            hsl: layer.hsl,
+            grading: [
+                layer.color_grading_shadows,
+                layer.color_grading_midtones,
+                layer.color_grading_highlights,
+                layer.color_grading_global,
+            ],
+            grading_blending: layer.color_grading_blending,
+            grading_balance: layer.color_grading_balance,
+        }
+    }
+
+    fn diagnostic(&self) -> serde_json::Value {
+        serde_json::json!({
+            "exposure": self.exposure, "brightness": self.brightness,
+            "contrast": self.contrast, "highlights": self.highlights,
+            "shadows": self.shadows, "whites": self.whites, "blacks": self.blacks,
+            "saturation": self.saturation, "temperature": self.temperature,
+            "tint": self.tint, "vibrance": self.vibrance, "hue": self.hue,
+            "sharpness": self.sharpness, "sharpnessThreshold": self.sharpness_threshold,
+            "lumaNoiseReduction": self.luma_noise_reduction,
+            "colorNoiseReduction": self.color_noise_reduction,
+            "clarity": self.clarity, "dehaze": self.dehaze,
+            "structure": self.structure, "glow": self.glow,
+            "halation": self.halation, "flare": self.flare,
+            "blendMode": self.blend_mode, "hsl": self.hsl,
+            "grading": self.grading, "gradingBlending": self.grading_blending,
+            "gradingBalance": self.grading_balance,
+        })
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct LocalScenePayload {
+    pub layers: Arc<[LocalSceneLayerPayload]>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct ViewTransformPayload {
+    pub tonemapper_mode: u32,
+    pub is_raw: bool,
+    pub pipe_to_rendering: GpuMat3,
+    pub rendering_to_pipe: GpuMat3,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct LocalDisplayLayerPayload {
+    pub curves: [[Point; 16]; 4],
+    pub curve_counts: [u32; 4],
+    pub blend_mode: f32,
+}
+
+impl LocalDisplayLayerPayload {
+    fn from_abi(layer: MaskAdjustments) -> Self {
+        Self {
+            curves: [
+                layer.luma_curve,
+                layer.red_curve,
+                layer.green_curve,
+                layer.blue_curve,
+            ],
+            curve_counts: [
+                layer.luma_curve_count,
+                layer.red_curve_count,
+                layer.green_curve_count,
+                layer.blue_curve_count,
+            ],
+            blend_mode: layer.blend_mode,
+        }
+    }
+
+    fn diagnostic(&self) -> serde_json::Value {
+        serde_json::json!({
+            "curves": self.curves,
+            "curveCounts": self.curve_counts,
+            "blendMode": self.blend_mode,
+        })
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct DisplayCreativePayload {
+    pub curves: [[Point; 16]; 4],
+    pub curve_counts: [u32; 4],
+    pub lut_enabled: bool,
+    pub lut_intensity: f32,
+    pub grain: [f32; 3],
+    pub local_layers: Arc<[LocalDisplayLayerPayload]>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -154,7 +476,7 @@ pub enum EditGraphMigration {
     SceneReferredV2Explicit,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct CompiledEditGraph {
     pub schema_version: u32,
     pub pipeline_version: u32,
@@ -163,6 +485,7 @@ pub struct CompiledEditGraph {
     pub execution_abi_fingerprint: u64,
     pub has_user_edits: bool,
     pub receipt: EditGraphReceipt,
+    compiled_shader_abi: AllAdjustments,
 }
 
 #[derive(Clone, Copy)]
@@ -291,7 +614,7 @@ impl CompiledEditGraph {
                         ..NodeDependencies::default()
                     },
                     Some("edit_graph_cpu_reference_v2"),
-                    Some("shader_wgsl_scene_referred_v2"),
+                    Some("shader_wgsl_scene_phase_v2"),
                     inputs.color_fingerprint,
                 ));
             } else {
@@ -313,7 +636,7 @@ impl CompiledEditGraph {
                         ..NodeDependencies::default()
                     },
                     Some("edit_graph_cpu_reference_v2"),
-                    Some("shader_wgsl_scene_referred_v2"),
+                    Some("shader_wgsl_scene_phase_v2"),
                     combine(&[inputs.color_fingerprint, u64::from(inputs.has_masks)]),
                 ));
             } else {
@@ -324,7 +647,7 @@ impl CompiledEditGraph {
                 ColorDomain::AcesCgSceneLinearExtended,
                 ColorDomain::ViewEncoded,
                 EditStageClass::ViewTransform,
-                ValueRangePolicy::PreserveFiniteExtended,
+                ValueRangePolicy::BoundForOutputEncoding,
                 SpatialSupport::Pointwise,
                 LocalAdjustmentPolicy::GlobalOnly,
                 NodeDependencies {
@@ -333,7 +656,7 @@ impl CompiledEditGraph {
                     ..NodeDependencies::default()
                 },
                 Some("edit_graph_cpu_reference_v2"),
-                Some("shader_wgsl_scene_referred_v2"),
+                Some("shader_wgsl_view_display_phase_v2"),
                 inputs.output_fingerprint,
             ));
             if display_creative_active(
@@ -356,7 +679,7 @@ impl CompiledEditGraph {
                         ..NodeDependencies::default()
                     },
                     Some("edit_graph_cpu_reference_v2"),
-                    Some("shader_wgsl_scene_referred_v2"),
+                    Some("shader_wgsl_view_display_phase_v2"),
                     combine(&[inputs.color_fingerprint, u64::from(inputs.has_lut)]),
                 ));
             } else {
@@ -406,17 +729,55 @@ impl CompiledEditGraph {
                 .windows(2)
                 .all(|pair| pair[0].stage_class <= pair[1].stage_class)
         );
+        for node in &mut nodes {
+            node.payload = compile_node_payload(node.kind, &inputs);
+            node.payload_fingerprint = node.payload.fingerprint();
+        }
         let fingerprint = graph_fingerprint(inputs.pipeline_version, &nodes);
         let ordered_node_ids: Arc<[_]> = nodes.iter().map(|node| node.kind.stable_id()).collect();
-        let fused_gpu_groups: Arc<[Arc<[&'static str]>]> = vec![
-            nodes
-                .iter()
-                .filter(|node| node.wgpu_implementation.is_some())
-                .map(|node| node.kind.stable_id())
+        let fused_gpu_groups: Arc<[Arc<[&'static str]>]> =
+            if inputs.pipeline_version == SCENE_REFERRED_PIPELINE_VERSION {
+                [
+                    nodes
+                        .iter()
+                        .filter(|node| {
+                            node.wgpu_implementation.is_some()
+                                && node.stage_class <= EditStageClass::LocalComposition
+                        })
+                        .map(|node| node.kind.stable_id())
+                        .collect::<Vec<_>>(),
+                    nodes
+                        .iter()
+                        .filter(|node| {
+                            node.wgpu_implementation.is_some()
+                                && node.stage_class == EditStageClass::ViewTransform
+                        })
+                        .map(|node| node.kind.stable_id())
+                        .collect::<Vec<_>>(),
+                    nodes
+                        .iter()
+                        .filter(|node| {
+                            node.wgpu_implementation.is_some()
+                                && node.stage_class >= EditStageClass::DisplayAdjustment
+                        })
+                        .map(|node| node.kind.stable_id())
+                        .collect::<Vec<_>>(),
+                ]
+                .into_iter()
+                .filter(|group| !group.is_empty())
+                .map(Arc::from)
                 .collect::<Vec<_>>()
-                .into(),
-        ]
-        .into();
+                .into()
+            } else {
+                vec![Arc::from(
+                    nodes
+                        .iter()
+                        .filter(|node| node.wgpu_implementation.is_some())
+                        .map(|node| node.kind.stable_id())
+                        .collect::<Vec<_>>(),
+                )]
+                .into()
+            };
         Self {
             schema_version: EDIT_GRAPH_SCHEMA_VERSION,
             pipeline_version: inputs.pipeline_version,
@@ -447,7 +808,12 @@ impl CompiledEditGraph {
                 input_domain: ColorDomain::AcesCgSceneLinearExtended,
                 output_domain: ColorDomain::RenderTransportEncoded,
             },
+            compiled_shader_abi: *inputs.adjustments,
         }
+    }
+
+    pub fn shader_abi(&self) -> AllAdjustments {
+        self.compiled_shader_abi
     }
 
     pub fn validate_gpu_execution(
@@ -512,6 +878,13 @@ impl CompiledEditGraph {
         }
         if self
             .nodes
+            .iter()
+            .any(|node| !node.payload.belongs_to(node.kind))
+        {
+            return Err("edit_graph.node_payload_kind_mismatch");
+        }
+        if self
+            .nodes
             .windows(2)
             .any(|pair| pair[0].stage_class > pair[1].stage_class)
         {
@@ -558,6 +931,8 @@ impl CompiledEditGraph {
                 },
                 "cpuImplementation": node.cpu_implementation,
                 "wgpuImplementation": node.wgpu_implementation,
+                "payloadType": node.payload.kind_id(),
+                "payload": node.payload.diagnostic(),
                 "payloadFingerprint": format!("{:016x}", node.payload_fingerprint),
             })).collect::<Vec<_>>(),
             "omittedNoOpNodes": self.receipt.omitted_no_op_node_ids.as_ref(),
@@ -586,6 +961,139 @@ fn display_creative_active(
         || bytes_of(&global.red_curve) != bytes_of(&neutral.red_curve)
         || bytes_of(&global.green_curve) != bytes_of(&neutral.green_curve)
         || bytes_of(&global.blue_curve) != bytes_of(&neutral.blue_curve)
+        || adjustments.mask_adjustments[..adjustments.mask_count as usize]
+            .iter()
+            .any(|layer| {
+                layer.luma_curve_count > 0
+                    || layer.red_curve_count > 0
+                    || layer.green_curve_count > 0
+                    || layer.blue_curve_count > 0
+            })
+}
+
+fn compile_node_payload(
+    kind: EditNodeKind,
+    inputs: &EditGraphCompileInputs<'_>,
+) -> CompiledNodePayload {
+    let global = inputs.adjustments.global;
+    match kind {
+        EditNodeKind::CameraInputBoundary => CompiledNodePayload::InputBoundary {
+            source_fingerprint: inputs.source_fingerprint,
+        },
+        EditNodeKind::GeometryRetouch => CompiledNodePayload::GeometryRetouch {
+            geometry: inputs.geometry_fingerprint,
+            retouch: inputs.retouch_fingerprint,
+        },
+        EditNodeKind::PreGpuSpatialDetail => CompiledNodePayload::PreGpuSpatialDetail {
+            detail_fingerprint: inputs.detail_fingerprint,
+        },
+        EditNodeKind::LegacyGpuSceneViewPass => {
+            CompiledNodePayload::LegacyShaderAbi(Box::new(*inputs.adjustments))
+        }
+        EditNodeKind::SceneGlobalColorTone => {
+            CompiledNodePayload::SceneGlobal(Box::new(SceneGlobalPayload {
+                exposure: global.exposure,
+                brightness: global.brightness,
+                contrast: global.contrast,
+                highlights: global.highlights,
+                shadows: global.shadows,
+                whites: global.whites,
+                blacks: global.blacks,
+                saturation: global.saturation,
+                temperature: global.temperature,
+                tint: global.tint,
+                vibrance: global.vibrance,
+                hue: global.hue,
+                sharpness: global.sharpness,
+                sharpness_threshold: global.sharpness_threshold,
+                luma_noise_reduction: global.luma_noise_reduction,
+                color_noise_reduction: global.color_noise_reduction,
+                clarity: global.clarity,
+                dehaze: global.dehaze,
+                structure: global.structure,
+                centre: global.centré,
+                chromatic_aberration: [
+                    global.chromatic_aberration_red_cyan,
+                    global.chromatic_aberration_blue_yellow,
+                ],
+                glow: global.glow_amount,
+                halation: global.halation_amount,
+                flare: global.flare_amount,
+                vignette: [
+                    global.vignette_amount,
+                    global.vignette_midpoint,
+                    global.vignette_roundness,
+                    global.vignette_feather,
+                ],
+                color_calibration: global.color_calibration,
+                color_balance_rgb: global.color_balance_rgb,
+                channel_mixer: global.channel_mixer,
+                black_white_mixer: global.black_white_mixer,
+                levels: global.levels,
+                hsl: global.hsl,
+                grading: [
+                    global.color_grading_shadows,
+                    global.color_grading_midtones,
+                    global.color_grading_highlights,
+                    global.color_grading_global,
+                ],
+                grading_blending: global.color_grading_blending,
+                grading_balance: global.color_grading_balance,
+            }))
+        }
+        EditNodeKind::LocalSceneComposition => CompiledNodePayload::LocalScene(LocalScenePayload {
+            layers: inputs.adjustments.mask_adjustments[..inputs.adjustments.mask_count as usize]
+                .iter()
+                .copied()
+                .map(LocalSceneLayerPayload::from_abi)
+                .collect::<Vec<_>>()
+                .into(),
+        }),
+        EditNodeKind::SceneToViewTransform => {
+            CompiledNodePayload::ViewTransform(ViewTransformPayload {
+                tonemapper_mode: global.tonemapper_mode,
+                is_raw: global.is_raw_image != 0,
+                pipe_to_rendering: global.agx_pipe_to_rendering_matrix,
+                rendering_to_pipe: global.agx_rendering_to_pipe_matrix,
+            })
+        }
+        EditNodeKind::DisplayCreative => {
+            CompiledNodePayload::DisplayCreative(Box::new(DisplayCreativePayload {
+                curves: [
+                    global.luma_curve,
+                    global.red_curve,
+                    global.green_curve,
+                    global.blue_curve,
+                ],
+                curve_counts: [
+                    global.luma_curve_count,
+                    global.red_curve_count,
+                    global.green_curve_count,
+                    global.blue_curve_count,
+                ],
+                lut_enabled: inputs.has_lut,
+                lut_intensity: global.lut_intensity,
+                grain: [
+                    global.grain_amount,
+                    global.grain_size,
+                    global.grain_roughness,
+                ],
+                local_layers: inputs.adjustments.mask_adjustments
+                    [..inputs.adjustments.mask_count as usize]
+                    .iter()
+                    .copied()
+                    .map(LocalDisplayLayerPayload::from_abi)
+                    .collect::<Vec<_>>()
+                    .into(),
+            }))
+        }
+        EditNodeKind::ClippingOverlay => CompiledNodePayload::ClippingOverlay {
+            enabled: inputs.show_clipping,
+        },
+        EditNodeKind::RenderTransport => CompiledNodePayload::RenderTransport {
+            output_fingerprint: inputs.output_fingerprint,
+        },
+    }
 }
 
 pub fn gpu_execution_fingerprint(adjustments: &AllAdjustments, has_lut: bool) -> u64 {
@@ -626,6 +1134,9 @@ fn node(
         cpu_implementation,
         wgpu_implementation,
         payload_fingerprint,
+        payload: CompiledNodePayload::InputBoundary {
+            source_fingerprint: 0,
+        },
     }
 }
 
@@ -646,6 +1157,7 @@ fn graph_fingerprint(pipeline_version: u32, nodes: &[CompiledEditNode]) -> u64 {
         hasher.update(node.kind.stable_id().as_bytes());
         hasher.update(&node.schema_version.to_le_bytes());
         hasher.update(&node.implementation_version.to_le_bytes());
+        hasher.update(node.payload.kind_id().as_bytes());
         hasher.update(&node.payload_fingerprint.to_le_bytes());
         hasher.update(node.input_domain.contract_id().as_bytes());
         hasher.update(node.output_domain.contract_id().as_bytes());

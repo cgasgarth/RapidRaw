@@ -13,6 +13,18 @@ use crate::edit_graph::CompiledEditGraph;
 use crate::lut_processing::Lut;
 use crate::mixer_render::{apply_black_white_mixer, apply_channel_mixer, apply_color_balance_rgb};
 
+thread_local! {
+    static SCENE_REFERRED_V2_LUMA: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+struct SceneLumaGuard(bool);
+
+impl Drop for SceneLumaGuard {
+    fn drop(&mut self) {
+        SCENE_REFERRED_V2_LUMA.set(self.0);
+    }
+}
+
 #[derive(Clone, Copy)]
 struct EffectiveAdjustments {
     exposure: f32,
@@ -46,9 +58,11 @@ pub(crate) fn execute_cpu_edit_graph(
     graph: &CompiledEditGraph,
 ) -> Result<DynamicImage, &'static str> {
     graph.validate_contract()?;
-    if graph.pipeline_version as f32 != adjustments.global.edit_graph_version {
-        return Err("edit_graph.cpu_reference_version_mismatch");
-    }
+    graph.validate_gpu_execution(adjustments, lut.is_some(), mask_bitmaps.len())?;
+    let authoritative_adjustments = graph.shader_abi();
+    let adjustments = &authoritative_adjustments;
+    let previous_luma_model = SCENE_REFERRED_V2_LUMA.replace(graph.pipeline_version >= 2);
+    let _luma_guard = SceneLumaGuard(previous_luma_model);
     let global = &adjustments.global;
 
     let preserve_extended = graph.pipeline_version >= 2;
@@ -286,6 +300,11 @@ pub(crate) fn execute_cpu_edit_graph(
             preserve_extended,
         ));
         color = apply_vignette(color, x, y, width, height, adjustments);
+        if preserve_extended {
+            // V2 crosses a real RGBA16F scene intermediate before the view
+            // dispatch. Mirror its finite storage range in the CPU reference.
+            color = color.map(round_rgba16f_storage);
+        }
         color = if adjustments.global.tonemapper_mode == 1 {
             agx_full_transform(color, adjustments)
         } else if adjustments.global.is_raw_image == 1 {
@@ -302,6 +321,11 @@ pub(crate) fn execute_cpu_edit_graph(
         } else {
             linear_to_srgb(color)
         };
+        if preserve_extended {
+            // The view dispatch writes another RGBA16F intermediate consumed
+            // by display curves, LUTs, and grain.
+            color = color.map(round_rgba16f_storage);
+        }
         color = apply_all_curves(color, adjustments, preserve_extended);
         color = apply_local_curves(color, adjustments, mask_bitmaps, x, y, preserve_extended);
         if let Some(lut) = lut {
@@ -401,6 +425,10 @@ fn round_f16(value: f32) -> f32 {
     half::f16::from_f32(value).to_f32()
 }
 
+fn round_rgba16f_storage(value: f32) -> f32 {
+    round_f16(value.clamp(-65_504.0, 65_504.0))
+}
+
 fn gaussian_blur(source: &[Vec3], width: u32, height: u32, radius: u32) -> Vec<Vec3> {
     let sigma = radius as f32 / 2.0;
     let weights = (-(radius as i32)..=radius as i32)
@@ -489,13 +517,13 @@ fn apply_local_contrast(
     if amount < 0.0 {
         return color.lerp(blurred, -amount * if mode == 0 { 0.5 } else { 1.0 });
     }
-    let center_luma = get_luma(color);
+    let center_luma = scene_luminance(color);
     let midtone_mask = smoothstep(0.0, if is_raw { 0.1 } else { 0.03 }, center_luma)
         * (1.0 - smoothstep(0.9, 1.0, center_luma));
     if midtone_mask < 0.001 {
         return color;
     }
-    let log_ratio = (center_luma.max(0.0001) / get_luma(blurred).max(0.0001)).log2();
+    let log_ratio = (center_luma.max(0.0001) / scene_luminance(blurred).max(0.0001)).log2();
     let effective = if mode == 0 {
         let edge = log_ratio.abs();
         amount
@@ -604,15 +632,16 @@ fn apply_dehaze(color: Vec3, blurred: Vec3, is_raw: bool, amount: f32) -> Vec3 {
     }
     let pixel_dark = color.min_element();
     let regional_dark = blurred.min_element();
-    let edge =
-        (get_luma(color.max(Vec3::ZERO)).sqrt() - get_luma(blurred.max(Vec3::ZERO)).sqrt()).abs();
+    let edge = (scene_luminance(color.max(Vec3::ZERO)).sqrt()
+        - scene_luminance(blurred.max(Vec3::ZERO)).sqrt())
+    .abs();
     let spatial_dark = regional_dark + (pixel_dark - regional_dark) * smoothstep(0.02, 0.15, edge);
     let safe_dark = (spatial_dark - 0.02).max(0.0);
     let transmission = (1.0 - amount * (safe_dark / (safe_dark + 0.2)) * 0.85).max(0.15);
     let mut recovered = (color - atmosphere) / transmission + atmosphere;
-    let recovered_luma = get_luma(recovered.max(Vec3::ZERO));
+    let recovered_luma = scene_luminance(recovered.max(Vec3::ZERO));
     recovered += Vec3::splat(smoothstep(0.1, 0.0, recovered_luma) * (1.0 - transmission) * 0.15);
-    let final_luma = get_luma(recovered.max(Vec3::ZERO));
+    let final_luma = scene_luminance(recovered.max(Vec3::ZERO));
     Vec3::splat(final_luma)
         .lerp(recovered, 1.0 + (1.0 - transmission) * 0.5)
         .max(Vec3::ZERO)
@@ -645,7 +674,7 @@ fn apply_glow_bloom(
         return color;
     }
     let linear = prepared_effect_blur(blurred, is_raw, exposure, brightness, whites);
-    let linear_luma = get_luma(linear.max(Vec3::ZERO));
+    let linear_luma = scene_luminance(linear.max(Vec3::ZERO));
     let perceptual = if linear_luma <= 1.0 {
         linear_luma.max(0.0).powf(1.0 / 2.2)
     } else {
@@ -661,7 +690,11 @@ fn apply_glow_bloom(
     };
     bloom *=
         intensity * linear_luma.powf(0.6) * cutoff_fade * smoothstep(0.0, 0.5, linear_luma).sqrt();
-    color + bloom * amount * 3.8 * (1.0 - smoothstep(1.0, 2.2, get_luma(color.max(Vec3::ZERO))))
+    color
+        + bloom
+            * amount
+            * 3.8
+            * (1.0 - smoothstep(1.0, 2.2, scene_luminance(color.max(Vec3::ZERO))))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -678,7 +711,7 @@ fn apply_halation(
         return color;
     }
     let linear = prepared_effect_blur(blurred, is_raw, exposure, brightness, whites);
-    let linear_luma = get_luma(linear.max(Vec3::ZERO));
+    let linear_luma = scene_luminance(linear.max(Vec3::ZERO));
     let perceptual = if linear_luma <= 1.0 {
         linear_luma.max(0.0).powf(1.0 / 2.2)
     } else {
@@ -691,7 +724,7 @@ fn apply_halation(
     let mask = smoothstep(0.0, (1.5 - cutoff).max(0.1) * 0.6, perceptual - cutoff);
     let tint =
         Vec3::new(1.0, 0.32, 0.1).lerp(Vec3::new(1.0, 0.15, 0.03), smoothstep(0.0, 0.7, mask));
-    let luma = get_luma(color.max(Vec3::ZERO));
+    let luma = scene_luminance(color.max(Vec3::ZERO));
     let affected = color.lerp(Vec3::splat(luma), mask * 0.12);
     Vec3::splat(0.5).lerp(affected, 1.0 - mask * 0.06) + tint * mask * linear_luma * amount * 2.5
 }
@@ -720,7 +753,7 @@ fn flare_filmic_exposure(color: Vec3, brightness: f32) -> Vec3 {
     if brightness == 0.0 {
         return color;
     }
-    let luma = get_luma(color);
+    let luma = scene_luminance(color);
     if luma.abs() < 0.000_01 {
         return color;
     }
@@ -757,7 +790,7 @@ fn build_flare_threshold(
             if global.whites != 0.0 {
                 linear /= (1.0 - global.whites * 0.25).max(0.01);
             }
-            let true_luma = get_luma(linear);
+            let true_luma = scene_luminance(linear);
             let threshold_value = 0.88 + (0.5 - 0.88) * global.flare_amount.clamp(0.0, 1.0);
             let contribution_input = true_luma.min(1.0) - threshold_value + 0.15;
             let contribution = if contribution_input <= 0.0 {
@@ -1033,7 +1066,7 @@ fn apply_flare(
         glam::Vec2::new(x as f32 / width as f32, y as f32 / height as f32),
     ) * 1.4;
     flare *= flare;
-    let luma = get_luma(color.max(Vec3::ZERO));
+    let luma = scene_luminance(color.max(Vec3::ZERO));
     let perceptual = if luma <= 1.0 {
         luma.max(0.0).powf(1.0 / 2.2)
     } else {
@@ -1060,7 +1093,7 @@ fn apply_noise_reduction(
     if luma_amount < 0.001 && color_amount < 0.001 {
         return center;
     }
-    let center_luma = get_luma(center.max(Vec3::ZERO));
+    let center_luma = scene_luminance(center.max(Vec3::ZERO));
     let center_chroma = center - Vec3::splat(center_luma);
     let resolution = scale.sqrt().clamp(0.5, 2.0);
     let sample = |sample_x: i32, sample_y: i32| {
@@ -1100,7 +1133,7 @@ fn apply_noise_reduction(
                     x as i32 + (dx as f32 * grow + jitter_x).round() as i32,
                     y as i32 + (dy as f32 * grow + jitter_y).round() as i32,
                 );
-                let luma = get_luma(sampled.max(Vec3::ZERO));
+                let luma = scene_luminance(sampled.max(Vec3::ZERO));
                 lumas[index] = luma;
                 spatial_weights[index] = ((dx * dx + dy * dy) as f32 * spatial_normalizer).exp();
                 minimum = minimum.min(luma);
@@ -1184,7 +1217,7 @@ fn apply_noise_reduction(
                     x as i32 + (dx as f32 * stride + jitter_x).round() as i32,
                     y as i32 + (dy as f32 * stride + jitter_y).round() as i32,
                 );
-                let sampled_luma = get_luma(sampled.max(Vec3::ZERO));
+                let sampled_luma = scene_luminance(sampled.max(Vec3::ZERO));
                 let red = sampled.x - sampled_luma;
                 let blue = sampled.z - sampled_luma;
                 let spatial_weight = ((dx * dx + dy * dy) as f32 * spatial_normalizer).exp();
@@ -1200,7 +1233,8 @@ fn apply_noise_reduction(
         }
         let red = center_red + (red_sum / weight_sum.max(1.0e-6) - center_red) * color_amount;
         let blue = center_blue + (blue_sum / weight_sum.max(1.0e-6) - center_blue) * color_amount;
-        let green = -(0.2126 * red + 0.0722 * blue) / 0.7152;
+        let coefficients = scene_luminance_coefficients();
+        let green = -(coefficients.x * red + coefficients.z * blue) / coefficients.y;
         new_chroma = Vec3::new(red, green, blue);
     }
     Vec3::splat(new_luma) + new_chroma
@@ -1285,7 +1319,21 @@ fn apply_local_curves(
     color
 }
 
-fn get_luma(color: Vec3) -> f32 {
+fn scene_luminance(color: Vec3) -> f32 {
+    color.dot(scene_luminance_coefficients())
+}
+
+fn scene_luminance_coefficients() -> Vec3 {
+    SCENE_REFERRED_V2_LUMA.with(|v2| {
+        if v2.get() {
+            Vec3::new(0.272_228_72, 0.674_081_74, 0.053_689_52)
+        } else {
+            Vec3::new(0.2126, 0.7152, 0.0722)
+        }
+    })
+}
+
+fn view_encoded_luma(color: Vec3) -> f32 {
     color.dot(Vec3::new(0.2126, 0.7152, 0.0722))
 }
 
@@ -1331,7 +1379,7 @@ fn apply_filmic_exposure(color: Vec3, brightness: f32) -> Vec3 {
     if brightness == 0.0 {
         return color;
     }
-    let original_luma = get_luma(color);
+    let original_luma = scene_luminance(color);
     if original_luma.abs() < 0.000_01 {
         return color;
     }
@@ -1354,7 +1402,7 @@ fn apply_filmic_exposure(color: Vec3, brightness: f32) -> Vec3 {
 }
 
 fn apply_creative_color(color: Vec3, saturation: f32, vibrance: f32) -> Vec3 {
-    let luma = get_luma(color);
+    let luma = scene_luminance(color);
     let mut processed = Vec3::splat(luma).lerp(color, 1.0 + saturation);
     let c_max = processed.max_element();
     let c_min = processed.min_element();
@@ -1390,8 +1438,8 @@ fn apply_tonal_adjustments(
         color *= multiplier;
         blurred *= multiplier;
     }
-    let pixel_luma = get_luma(color.max(Vec3::ZERO)).max(0.0001);
-    let blurred_luma = get_luma(blurred.max(Vec3::ZERO)).max(0.0001);
+    let pixel_luma = scene_luminance(color.max(Vec3::ZERO)).max(0.0001);
+    let blurred_luma = scene_luminance(blurred.max(Vec3::ZERO)).max(0.0001);
     if shadows != 0.0 || blacks != 0.0 {
         let edge_difference = (pixel_luma.sqrt() - blurred_luma.sqrt()).abs();
         let halo = smoothstep(0.05, 0.25, edge_difference);
@@ -1437,8 +1485,11 @@ fn apply_highlights_adjustment(color: Vec3, highlights: f32) -> Vec3 {
     if highlights == 0.0 {
         return color;
     }
-    let luma = get_luma(color.max(Vec3::ZERO));
-    let mask = smoothstep(0.3, 0.95, (luma.max(0.0001) * 1.5).tanh());
+    let luma = scene_luminance(color.max(Vec3::ZERO));
+    // Keep the transcendental in its useful domain. Scene-linear values may be far above
+    // display white, where tanh is already saturated but backend approximations can diverge.
+    let mask_input = (luma.max(0.0001) * 1.5).min(8.0).tanh();
+    let mask = smoothstep(0.3, 0.95, mask_input);
     if mask < 0.001 {
         return color;
     }
@@ -1474,7 +1525,7 @@ fn apply_color_calibration(color: Vec3, settings: ColorCalibrationSettings) -> V
         1.0 - settings.blue_hue.abs(),
     );
     let mut calibrated = glam::Mat3::from_cols(red, green, blue) * color;
-    let luma = get_luma(calibrated.max(Vec3::ZERO));
+    let luma = scene_luminance(calibrated.max(Vec3::ZERO));
     let saturation_vector = calibrated - Vec3::splat(luma);
     let sum = calibrated.element_sum();
     let masks = if sum > 0.001 {
@@ -1489,7 +1540,7 @@ fn apply_color_calibration(color: Vec3, settings: ColorCalibrationSettings) -> V
             settings.blue_saturation,
         ));
     if settings.shadows_tint.abs() > 0.001 {
-        let mask = 1.0 - smoothstep(0.0, 0.3, get_luma(calibrated.max(Vec3::ZERO)));
+        let mask = 1.0 - smoothstep(0.0, 0.3, scene_luminance(calibrated.max(Vec3::ZERO)));
         let tint = Vec3::new(
             1.0 + settings.shadows_tint * 0.25,
             1.0 - settings.shadows_tint * 0.25,
@@ -1520,16 +1571,23 @@ fn apply_hsl_panel(color: Vec3, settings: [HslColor; 8]) -> Vec3 {
         (280.0, 55.0),
         (330.0, 50.0),
     ];
+    let negative_residual = SCENE_REFERRED_V2_LUMA.with(|v2| {
+        if v2.get() {
+            color.min(Vec3::ZERO)
+        } else {
+            Vec3::ZERO
+        }
+    });
     let safe = color.max(Vec3::ZERO);
     if (safe.x - safe.y).abs() < 0.001 && (safe.y - safe.z).abs() < 0.001 {
-        return safe;
+        return safe + negative_residual;
     }
     let original_hsv = rgb_to_hsv(safe);
-    let original_luma = get_luma(safe);
+    let original_luma = scene_luminance(safe);
     let saturation_mask = smoothstep(0.05, 0.2, original_hsv.y);
     let luminance_weight = smoothstep(0.0, 1.0, original_hsv.y);
     if saturation_mask < 0.001 && luminance_weight < 0.001 {
-        return safe;
+        return safe + negative_residual;
     }
     let influences = RANGES.map(|(center, width)| {
         let distance = (original_hsv.x - center)
@@ -1548,19 +1606,19 @@ fn apply_hsl_panel(color: Vec3, settings: [HslColor; 8]) -> Vec3 {
         luminance += settings[index].luminance * influence * luminance_weight;
     }
     if original_hsv.y * (1.0 + saturation) < 0.0001 {
-        return Vec3::splat(original_luma * (1.0 + luminance));
+        return Vec3::splat(original_luma * (1.0 + luminance)) + negative_residual;
     }
     let shifted = hsv_to_rgb(Vec3::new(
         (original_hsv.x + hue_shift + 360.0) % 360.0,
         (original_hsv.y * (1.0 + saturation)).clamp(0.0, 1.0),
         original_hsv.z,
     ));
-    let new_luma = get_luma(shifted);
+    let new_luma = scene_luminance(shifted);
     let target = original_luma * (1.0 + luminance);
     if new_luma < 0.0001 {
-        Vec3::splat(target.max(0.0))
+        Vec3::splat(target.max(0.0)) + negative_residual
     } else {
-        shifted * (target / new_luma)
+        shifted * (target / new_luma) + negative_residual
     }
 }
 
@@ -1568,13 +1626,26 @@ fn apply_luma_levels(color: Vec3, settings: LevelsSettings, preserve_extended: b
     if settings.enabled == 0 {
         return color;
     }
-    let source_luma = get_luma(color).max(0.0);
+    let source_luma = if preserve_extended {
+        scene_luminance(color)
+    } else {
+        scene_luminance(color).max(0.0)
+    };
     let input_range = (settings.input_white - settings.input_black).max(0.0001);
-    let normalized = ((source_luma - settings.input_black) / input_range).clamp(0.0, 1.0);
-    let gamma = normalized.powf(1.0 / settings.gamma.max(0.0001));
-    let output_luma =
-        settings.output_black + (settings.output_white - settings.output_black) * gamma;
-    if source_luma <= 0.0001 {
+    let normalized = (source_luma - settings.input_black) / input_range;
+    let output_range = settings.output_white - settings.output_black;
+    let output_luma = if preserve_extended && normalized < 0.0 {
+        settings.output_black + normalized * output_range
+    } else if preserve_extended && normalized > 1.0 {
+        settings.output_white + (normalized - 1.0) * output_range
+    } else {
+        settings.output_black
+            + output_range
+                * normalized
+                    .clamp(0.0, 1.0)
+                    .powf(1.0 / settings.gamma.max(0.0001))
+    };
+    if source_luma.abs() <= 0.0001 {
         return Vec3::splat(output_luma);
     }
     let adjusted = color * (output_luma / source_luma);
@@ -1594,7 +1665,7 @@ fn apply_color_grading(
     blending: f32,
     balance: f32,
 ) -> Vec3 {
-    let luma = get_luma(color.max(Vec3::ZERO));
+    let luma = scene_luminance(color.max(Vec3::ZERO));
     let shadow_crossover = 0.1 + (-balance).max(0.0) * 0.5;
     let highlight_crossover = 0.5 - balance.max(0.0) * 0.5;
     let feather = 0.2 * blending;
@@ -1698,25 +1769,30 @@ fn apply_curve_set(
     }
     if !rgb_active {
         return Vec3::new(
-            apply_curve(color.x, luma_curve, luma_count),
-            apply_curve(color.y, luma_curve, luma_count),
-            apply_curve(color.z, luma_curve, luma_count),
+            apply_curve(color.x, luma_curve, luma_count, preserve_extended),
+            apply_curve(color.y, luma_curve, luma_count, preserve_extended),
+            apply_curve(color.z, luma_curve, luma_count, preserve_extended),
         );
     }
     let graded = Vec3::new(
-        apply_curve(color.x, red_curve, red_count),
-        apply_curve(color.y, green_curve, green_count),
-        apply_curve(color.z, blue_curve, blue_count),
+        apply_curve(color.x, red_curve, red_count, preserve_extended),
+        apply_curve(color.y, green_curve, green_count, preserve_extended),
+        apply_curve(color.z, blue_curve, blue_count, preserve_extended),
     );
-    let target_luma = apply_curve(get_luma(color), luma_curve, luma_count);
-    let graded_luma = get_luma(graded);
+    let target_luma = apply_curve(
+        view_encoded_luma(color),
+        luma_curve,
+        luma_count,
+        preserve_extended,
+    );
+    let graded_luma = view_encoded_luma(graded);
     let mut result = if graded_luma > 0.001 {
         graded * (target_luma / graded_luma)
     } else {
         Vec3::splat(target_luma)
     };
     let maximum = result.max_element();
-    if maximum > 1.0 {
+    if !preserve_extended && maximum > 1.0 {
         result /= maximum;
     }
     result
@@ -1736,17 +1812,25 @@ fn is_default_curve(points: &[Point; 16], count: u32) -> bool {
             .is_some_and(|point| (point.x - 255.0).abs() < 0.1 && (point.y - 255.0).abs() < 0.1)
 }
 
-fn apply_curve(value: f32, points: &[Point; 16], count: u32) -> f32 {
+fn apply_curve(value: f32, points: &[Point; 16], count: u32, preserve_extended: bool) -> f32 {
     if count < 2 {
         return value;
     }
     let count = count as usize;
     let x = value * 255.0;
     if x <= points[0].x {
-        return points[0].y / 255.0;
+        return if preserve_extended {
+            value + (points[0].y - points[0].x) / 255.0
+        } else {
+            points[0].y / 255.0
+        };
     }
     if x >= points[count - 1].x {
-        return points[count - 1].y / 255.0;
+        return if preserve_extended {
+            value + (points[count - 1].y - points[count - 1].x) / 255.0
+        } else {
+            points[count - 1].y / 255.0
+        };
     }
     for index in 0..count - 1 {
         let first = points[index];
@@ -1786,7 +1870,11 @@ fn apply_curve(value: f32, points: &[Point; 16], count: u32) -> f32 {
             + (t3 - 2.0 * t2 + t) * tangent_first * delta
             + (-2.0 * t3 + 3.0 * t2) * second.y
             + (t3 - t2) * tangent_second * delta;
-        return (result / 255.0).clamp(0.0, 1.0);
+        return if preserve_extended {
+            result / 255.0
+        } else {
+            (result / 255.0).clamp(0.0, 1.0)
+        };
     }
     points[count - 1].y / 255.0
 }
@@ -1805,7 +1893,7 @@ fn apply_grain(
     }
     let scale = (width.min(height) as f32 / 1080.0).max(0.1);
     let frequency = (1.0 / adjustments.global.grain_size.max(0.1)) / scale;
-    let luma = get_luma(color).max(0.0);
+    let luma = view_encoded_luma(color).max(0.0);
     let luma_mask = smoothstep(0.0, 0.15, luma) * (1.0 - smoothstep(0.6, 1.0, luma));
     let base = gradient_noise(x as f32 * frequency, y as f32 * frequency);
     let rough = gradient_noise(

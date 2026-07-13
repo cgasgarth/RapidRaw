@@ -15,6 +15,9 @@ use crate::adjustments::abi::{
 const REC709_RED: f32 = 0.2126;
 const REC709_GREEN: f32 = 0.7152;
 const REC709_BLUE: f32 = 0.0722;
+const ACESCG_RED: f32 = 0.272_228_72;
+const ACESCG_GREEN: f32 = 0.674_081_74;
+const ACESCG_BLUE: f32 = 0.053_689_52;
 
 const BLACK_WHITE_MIXER_RANGE_CENTERS: [f32; 8] =
     [358.0, 25.0, 60.0, 115.0, 180.0, 225.0, 280.0, 330.0];
@@ -70,7 +73,7 @@ pub(crate) fn apply_color_balance_rgb(
         return color;
     }
 
-    let source_luma = rec709_luma(color);
+    let source_luma = scene_luminance(color, preserve_extended);
     let [shadows, midtones, highlights] = color_balance_rgb_weights(source_luma);
     let offset = [
         (settings.shadows[0] * shadows
@@ -131,7 +134,7 @@ pub(crate) fn apply_channel_mixer(
         return mixed;
     }
 
-    let source_luma = rec709_luma(color);
+    let source_luma = scene_luminance(color, preserve_extended);
     if source_luma <= 0.0 {
         return mixed;
     }
@@ -157,7 +160,7 @@ pub(crate) fn apply_black_white_mixer(
         return color;
     }
 
-    let luma = rec709_luma(color);
+    let luma = scene_luminance(color, preserve_extended);
     let Some(hue) = rgb_to_hue_degrees(color) else {
         return [luma; 3];
     };
@@ -204,7 +207,7 @@ fn preserve_color_balance_luminance(
     source_luma: f32,
     preserve_extended: bool,
 ) -> [f32; 3] {
-    let output_luma = rec709_luma(color);
+    let output_luma = scene_luminance(color, preserve_extended);
     if output_luma <= 0.0 {
         return color;
     }
@@ -217,8 +220,13 @@ fn preserve_color_balance_luminance(
     }
 }
 
-fn rec709_luma(color: [f32; 3]) -> f32 {
-    color[0] * REC709_RED + color[1] * REC709_GREEN + color[2] * REC709_BLUE
+fn scene_luminance(color: [f32; 3], scene_referred_v2: bool) -> f32 {
+    let coefficients = if scene_referred_v2 {
+        [ACESCG_RED, ACESCG_GREEN, ACESCG_BLUE]
+    } else {
+        [REC709_RED, REC709_GREEN, REC709_BLUE]
+    };
+    color[0] * coefficients[0] + color[1] * coefficients[1] + color[2] * coefficients[2]
 }
 
 fn rgb_to_hue_degrees(color: [f32; 3]) -> Option<f32> {
