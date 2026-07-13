@@ -260,6 +260,39 @@ export const rawOpenEditExportAdjustHslCommandSchema = z
   })
   .strict();
 
+export const rawOpenEditExportWhiteBalanceCommandSchema = z
+  .object({
+    actor: jsonObjectSchema,
+    approval: z
+      .object({
+        approvalClass: z.literal('edit_apply'),
+        reason: z.string().trim().min(1),
+        state: z.literal('approved'),
+      })
+      .strict(),
+    colorPipeline: colorPipelineSchema,
+    commandId: z.string().trim().min(1),
+    commandType: z.literal('toneColor.setWhiteBalance'),
+    correlationId: z.string().trim().min(1),
+    dryRun: z.literal(false),
+    expectedGraphRevision: z.string().regex(/^graph-rev\.[a-z0-9.-]+\.v[0-9]+$/u),
+    idempotencyKey: z.string().trim().min(1).optional(),
+    parameters: z
+      .object({
+        acceptedDryRunPlanHash: z.string().trim().min(1),
+        acceptedDryRunPlanId: z.string().trim().min(1),
+        creativeTemperature: z.number().min(-100).max(100),
+        creativeTint: z.number().min(-100).max(100),
+        duv: z.number().min(-0.05).max(0.05),
+        exposureEv: z.number().min(-10).max(10),
+        kelvin: z.number().min(1667).max(25000),
+      })
+      .strict(),
+    schemaVersion: z.literal(1),
+    target: targetJsonObjectSchema,
+  })
+  .strict();
+
 export const rawOpenEditExportSkinToneUniformityCommandSchema = z
   .object({
     actor: jsonObjectSchema,
@@ -296,6 +329,7 @@ export const rawOpenEditExportSkinToneUniformityCommandSchema = z
 
 export const rawOpenEditExportCommandSchema = z.discriminatedUnion('commandType', [
   rawOpenEditExportBasicToneCommandSchema,
+  rawOpenEditExportWhiteBalanceCommandSchema,
   rawOpenEditExportAdjustHslCommandSchema,
   rawOpenEditExportSkinToneUniformityCommandSchema,
 ]);

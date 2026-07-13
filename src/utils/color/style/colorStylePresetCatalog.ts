@@ -14,8 +14,8 @@ export const COLOR_STYLE_PRESET_CATALOG = {
       createdAt: '2026-06-11T00:00:00.000Z',
       updatedAt: '2026-06-11T00:00:00.000Z',
       adjustmentPatch: {
-        temperature: 4,
-        tint: 2,
+        creativeTemperature: 4,
+        creativeTint: 2,
         vibrance: 8,
         saturation: -3,
         colorGrading: {
@@ -65,8 +65,8 @@ export const COLOR_STYLE_PRESET_CATALOG = {
       createdAt: '2026-06-11T00:00:00.000Z',
       updatedAt: '2026-06-11T00:00:00.000Z',
       adjustmentPatch: {
-        temperature: 0,
-        tint: 0,
+        creativeTemperature: 0,
+        creativeTint: 0,
         vibrance: 0,
         saturation: -2,
         curveMode: 'parametric',
@@ -82,8 +82,8 @@ export const COLOR_STYLE_PRESET_CATALOG = {
       createdAt: '2026-06-20T00:00:00.000Z',
       updatedAt: '2026-06-20T00:00:00.000Z',
       adjustmentPatch: {
-        temperature: 5,
-        tint: 1,
+        creativeTemperature: 5,
+        creativeTint: 1,
         vibrance: 10,
         saturation: 2,
         hsl: {

@@ -3,6 +3,8 @@ import {
   assertColdWarmInteractiveRegression,
   assertResponseDistribution,
   resolveStartupHardwarePolicy,
+  StartupDistributionRegression,
+  shouldRetryStartupDistribution,
 } from '../../../scripts/benchmarks/startup-hardware-class';
 
 describe('startup hardware class policy', () => {
@@ -13,6 +15,7 @@ describe('startup hardware class policy', () => {
       firstPaintMs: 750,
       hardwareClass: 'default-macos-arm64',
       interactionResponseMs: 100,
+      maxDistributionAttempts: 1,
       maxColdToWarmInteractiveRatio: null,
       maxColdToWarmInteractiveSlackMs: 0,
     });
@@ -24,6 +27,7 @@ describe('startup hardware class policy', () => {
     expect(policy.appControlledVisibleMs).toBe(250);
     expect(policy.firstPaintMs).toBe(750);
     expect(policy.interactionResponseMs).toBe(100);
+    expect(policy.maxDistributionAttempts).toBe(2);
     expect(() => resolveStartupHardwarePolicy('generic-ci')).toThrow();
     expect(() => resolveStartupHardwarePolicy('')).toThrow();
   });
@@ -40,5 +44,17 @@ describe('startup hardware class policy', () => {
     expect(policy.hardwareClass).toBe('github-hosted-macos-arm64');
     expect(() => assertColdWarmInteractiveRegression(1_700, 1_300, policy)).not.toThrow();
     expect(() => assertColdWarmInteractiveRegression(1_800, 1_300, policy)).toThrow('warm-relative limit');
+  });
+
+  test('repeats one independent hosted cohort without weakening either budget', () => {
+    const hosted = resolveStartupHardwarePolicy('github-hosted-macos-arm64');
+    const local = resolveStartupHardwarePolicy('default-macos-arm64');
+    const regression = new StartupDistributionRegression('p95 exceeded the unchanged 2000ms budget');
+
+    expect(shouldRetryStartupDistribution(regression, 1, hosted)).toBe(true);
+    expect(shouldRetryStartupDistribution(regression, 2, hosted)).toBe(false);
+    expect(shouldRetryStartupDistribution(regression, 1, local)).toBe(false);
+    expect(shouldRetryStartupDistribution(new Error('invalid trace'), 1, hosted)).toBe(false);
+    expect(hosted.appControlledInteractiveMs).toBe(2_000);
   });
 });

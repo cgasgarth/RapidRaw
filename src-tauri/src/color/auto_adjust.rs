@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::AppState;
+use crate::color::white_balance::{WHITE_BALANCE_CONTRACT, estimate_cct_duv_from_xy};
 use crate::image_processing::downscale_f32_image;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -16,6 +17,13 @@ pub struct AutoAdjustmentResults {
     pub vignette_amount: f64,
     pub temperature: f64,
     pub tint: f64,
+    pub wb_kelvin: f64,
+    pub wb_duv: f64,
+    pub wb_x: f64,
+    pub wb_y: f64,
+    pub wb_confidence: f64,
+    pub wb_accepted_samples: u64,
+    pub wb_rejected_samples: u64,
     pub dehaze: f64,
     pub clarity: f64,
     pub centre: f64,
@@ -75,6 +83,7 @@ pub fn perform_auto_analysis(image: &DynamicImage) -> AutoAdjustmentResults {
 
     let analysis_preview = downscale_f32_image(image, ANALYSIS_MAX_DIM, ANALYSIS_MAX_DIM);
     let rgb_image = analysis_preview.to_rgb8();
+    let auto_white_balance = estimate_auto_white_balance(&rgb_image);
     let total_pixels = (rgb_image.width() * rgb_image.height()) as f64;
 
     let (width, height) = rgb_image.dimensions();
@@ -238,6 +247,13 @@ pub fn perform_auto_analysis(image: &DynamicImage) -> AutoAdjustmentResults {
         vignette_amount: vignette_amount.clamp(-100.0, 100.0),
         temperature: 0.0,
         tint: 0.0,
+        wb_kelvin: auto_white_balance.kelvin,
+        wb_duv: auto_white_balance.duv,
+        wb_x: auto_white_balance.xy[0],
+        wb_y: auto_white_balance.xy[1],
+        wb_confidence: auto_white_balance.confidence,
+        wb_accepted_samples: auto_white_balance.accepted_samples,
+        wb_rejected_samples: auto_white_balance.rejected_samples,
         dehaze: dehaze.clamp(-100.0, 100.0),
         clarity: clarity.clamp(-100.0, 100.0),
         centre: centre.clamp(-100.0, 100.0),
@@ -259,6 +275,19 @@ pub fn auto_results_to_json(results: &AutoAdjustmentResults) -> serde_json::Valu
         "centré": results.centre,
 
         "dehaze": results.dehaze,
+        "whiteBalanceTechnical": {
+            "contract": WHITE_BALANCE_CONTRACT,
+            "mode": "auto",
+            "kelvin": results.wb_kelvin,
+            "duv": results.wb_duv,
+            "x": results.wb_x,
+            "y": results.wb_y,
+            "adaptation": "cat16_v1",
+            "source": "auto",
+            "confidence": results.wb_confidence,
+            "sampleCount": results.wb_accepted_samples
+        },
+        "whiteBalanceMigration": "native_v1",
         "sectionVisibility": {
             "basic": true,
             "color": true,
@@ -267,6 +296,86 @@ pub fn auto_results_to_json(results: &AutoAdjustmentResults) -> serde_json::Valu
         "whites": results.whites,
         "blacks": results.blacks
     })
+}
+
+#[derive(Debug, Clone, Copy)]
+struct AutoWhiteBalanceEstimate {
+    kelvin: f64,
+    duv: f64,
+    xy: [f64; 2],
+    confidence: f64,
+    accepted_samples: u64,
+    rejected_samples: u64,
+}
+
+fn srgb_to_linear(value: f64) -> f64 {
+    if value <= 0.04045 {
+        value / 12.92
+    } else {
+        ((value + 0.055) / 1.055).powf(2.4)
+    }
+}
+
+fn estimate_auto_white_balance(image: &image::RgbImage) -> AutoWhiteBalanceEstimate {
+    let mut samples = Vec::new();
+    let mut rejected = 0_u64;
+    for pixel in image.pixels().step_by(4) {
+        let rgb = pixel.0.map(|value| f64::from(value) / 255.0);
+        let max = rgb.into_iter().fold(f64::NEG_INFINITY, f64::max);
+        let min = rgb.into_iter().fold(f64::INFINITY, f64::min);
+        let luma = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+        let saturation = if max > 1e-9 { (max - min) / max } else { 1.0 };
+        if !(0.04..=0.96).contains(&luma) || saturation > 0.28 || max >= 0.995 || min <= 0.005 {
+            rejected += 1;
+            continue;
+        }
+        let linear = rgb.map(srgb_to_linear);
+        samples.push(linear);
+    }
+    if samples.len() < 16 {
+        return AutoWhiteBalanceEstimate {
+            kelvin: 6_004.0,
+            duv: 0.0,
+            xy: [0.32168, 0.33767],
+            confidence: 0.0,
+            accepted_samples: samples.len() as u64,
+            rejected_samples: rejected,
+        };
+    }
+    let mut channels: [Vec<f64>; 3] = std::array::from_fn(|_| Vec::with_capacity(samples.len()));
+    for sample in &samples {
+        for channel in 0..3 {
+            channels[channel].push(sample[channel]);
+        }
+    }
+    for channel in &mut channels {
+        channel.sort_by(f64::total_cmp);
+    }
+    let median = channels.map(|channel| channel[channel.len() / 2]);
+    let xyz = [
+        0.412_456_4 * median[0] + 0.357_576_1 * median[1] + 0.180_437_5 * median[2],
+        0.212_672_9 * median[0] + 0.715_152_2 * median[1] + 0.072_175_0 * median[2],
+        0.019_333_9 * median[0] + 0.119_192_0 * median[1] + 0.950_304_1 * median[2],
+    ];
+    let sum = xyz.into_iter().sum::<f64>();
+    let xy = if sum > 1e-12 {
+        [xyz[0] / sum, xyz[1] / sum]
+    } else {
+        [0.32168, 0.33767]
+    };
+    let coordinates = estimate_cct_duv_from_xy(xy).unwrap_or_else(|_| {
+        estimate_cct_duv_from_xy([0.32168, 0.33767]).expect("D60 coordinates must be valid")
+    });
+    let accepted = samples.len() as u64;
+    let acceptance = accepted as f64 / (accepted + rejected).max(1) as f64;
+    AutoWhiteBalanceEstimate {
+        kelvin: coordinates.cct_kelvin,
+        duv: coordinates.duv,
+        xy: coordinates.xy,
+        confidence: (acceptance * (1.0 - coordinates.duv.abs() / 0.05)).clamp(0.0, 1.0),
+        accepted_samples: accepted,
+        rejected_samples: rejected,
+    }
 }
 
 #[tauri::command]
@@ -303,6 +412,13 @@ mod tests {
             vignette_amount: -5.0,
             temperature: 0.0,
             tint: 0.0,
+            wb_kelvin: 6_504.0,
+            wb_duv: 0.0,
+            wb_x: 0.31271,
+            wb_y: 0.32902,
+            wb_confidence: 0.75,
+            wb_accepted_samples: 128,
+            wb_rejected_samples: 16,
             dehaze: 3.0,
             clarity: 4.0,
             centre: 2.0,
@@ -316,6 +432,14 @@ mod tests {
         assert_eq!(json["vibrance"], serde_json::json!(20.0));
         assert_eq!(json["vignetteAmount"], serde_json::json!(-5.0));
         assert_eq!(json["centré"], serde_json::json!(2.0));
+        assert_eq!(
+            json["whiteBalanceTechnical"]["mode"],
+            serde_json::json!("auto")
+        );
+        assert_eq!(
+            json["whiteBalanceTechnical"]["sampleCount"],
+            serde_json::json!(128)
+        );
         assert_eq!(json["sectionVisibility"]["basic"], serde_json::json!(true));
     }
 
@@ -340,5 +464,24 @@ mod tests {
         ] {
             assert!((-100.0..=100.0).contains(&value));
         }
+    }
+
+    #[test]
+    fn auto_white_balance_rejects_clipped_pixels_and_fails_safe() {
+        let image = image::RgbImage::from_pixel(16, 16, image::Rgb([255, 255, 255]));
+        let estimate = estimate_auto_white_balance(&image);
+        assert_eq!(estimate.accepted_samples, 0);
+        assert!(estimate.rejected_samples > 0);
+        assert_eq!(estimate.confidence, 0.0);
+        assert_eq!(estimate.xy, [0.32168, 0.33767]);
+    }
+
+    #[test]
+    fn auto_white_balance_recovers_neutral_patch_with_receipt_counts() {
+        let image = image::RgbImage::from_pixel(32, 32, image::Rgb([160, 160, 160]));
+        let estimate = estimate_auto_white_balance(&image);
+        assert!(estimate.accepted_samples >= 16);
+        assert!(estimate.kelvin > 5_000.0);
+        assert!(estimate.confidence > 0.5);
     }
 }
