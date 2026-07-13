@@ -6,16 +6,20 @@
       "contrast": "Contraste",
       "evShift": "Décalage EV",
       "exposure": "Exposition",
+      "highlightRolloff": "Atténuation des hautes lumières",
       "highlights": "Hautes lumières",
       "mappers": {
         "agx": "AgX",
         "agxDesc": "Mappage des tons type film",
         "basic": "Standard",
-        "basicDesc": "Mappage des tons standard"
+        "basicDesc": "Mappage des tons standard",
+        "rapidView": "Rapid View"
       },
       "reset": "Réinitialiser",
+      "shadowRolloff": "Atténuation des ombres",
       "shadows": "Ombres",
       "toneMapper": "Mappeur de tons",
+      "viewContrast": "Contraste d’affichage",
       "whites": "Blancs"
     },
     "color": {
@@ -4303,7 +4307,8 @@
         "title": "Prétraitement de l'image",
         "tonemapperOptions": {
           "agx": "AgX",
-          "basic": "Standard"
+          "basic": "Standard",
+          "rapidView": "Rapid View"
         },
         "tonemapperOverride": "Surcharge globale du mappeur de tons",
         "tonemapperOverrideDesc": "Forcer un mappeur de tons spécifique de manière globale pour toutes les images, masquant le sélecteur de mappeur de tons dans le panneau des ajustements."
