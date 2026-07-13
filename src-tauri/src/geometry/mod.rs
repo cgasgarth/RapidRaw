@@ -7,6 +7,8 @@ use serde_json::Value;
 use std::borrow::Cow;
 use std::f32::consts::PI;
 
+pub mod perspective;
+
 pub trait IntoCowImage<'a> {
     fn into_cow(self) -> Cow<'a, DynamicImage>;
 }
@@ -67,6 +69,7 @@ pub struct GeometryParams {
     pub vig_k1: f32,
     pub vig_k2: f32,
     pub vig_k3: f32,
+    pub perspective_source_to_corrected: [f32; 9],
 }
 
 impl Default for GeometryParams {
@@ -95,6 +98,7 @@ impl Default for GeometryParams {
             vig_k1: 0.0,
             vig_k2: 0.0,
             vig_k3: 0.0,
+            perspective_source_to_corrected: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
         }
     }
 }
@@ -191,6 +195,8 @@ struct RawGeometryAdjustments {
     lens_vignette_enabled: bool,
     #[serde(default)]
     lens_distortion_params: RawLensDistortionParams,
+    #[serde(default)]
+    perspective_correction: perspective::PerspectiveCorrectionSettingsV1,
 }
 
 impl Default for RawGeometryAdjustments {
@@ -211,6 +217,7 @@ impl Default for RawGeometryAdjustments {
             lens_tca_enabled: default_lens_enabled(),
             lens_vignette_enabled: default_lens_enabled(),
             lens_distortion_params: RawLensDistortionParams::default(),
+            perspective_correction: perspective::PerspectiveCorrectionSettingsV1::default(),
         }
     }
 }
@@ -218,6 +225,15 @@ impl Default for RawGeometryAdjustments {
 pub fn get_geometry_params_from_json(adjustments: &serde_json::Value) -> GeometryParams {
     let raw = serde_json::from_value::<RawGeometryAdjustments>(adjustments.clone())
         .unwrap_or_else(|_| RawGeometryAdjustments::default());
+
+    let perspective_source_to_corrected =
+        perspective::compile_perspective_plan(&raw.perspective_correction)
+            .map(|receipt| {
+                std::array::from_fn(|index| {
+                    receipt.plan.source_to_corrected[index / 3][index % 3] as f32
+                })
+            })
+            .unwrap_or([1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]);
 
     GeometryParams {
         distortion: raw.transform_distortion,
@@ -243,6 +259,7 @@ pub fn get_geometry_params_from_json(adjustments: &serde_json::Value) -> Geometr
         vig_k1: raw.lens_distortion_params.vig_k1,
         vig_k2: raw.lens_distortion_params.vig_k2,
         vig_k3: raw.lens_distortion_params.vig_k3,
+        perspective_source_to_corrected,
     }
 }
 
@@ -340,7 +357,13 @@ fn build_transform_matrices(
     );
     let m_offset = NaMatrix3::new(1.0, 0.0, off_x, 0.0, 1.0, off_y, 0.0, 0.0, 1.0);
 
-    let forward = t_center * m_offset * m_perspective * m_rotate * m_scale * t_uncenter;
+    let normalized_to_pixels = NaMatrix3::new(width, 0.0, 0.0, 0.0, height, 0.0, 0.0, 0.0, 1.0);
+    let pixels_to_normalized =
+        NaMatrix3::new(1.0 / width, 0.0, 0.0, 0.0, 1.0 / height, 0.0, 0.0, 0.0, 1.0);
+    let perspective = NaMatrix3::from_row_slice(&params.perspective_source_to_corrected);
+    let perspective_pixels = normalized_to_pixels * perspective * pixels_to_normalized;
+    let forward =
+        t_center * m_offset * m_perspective * m_rotate * m_scale * t_uncenter * perspective_pixels;
     let half_diagonal =
         ((width as f64 * width as f64 + height as f64 * height as f64).sqrt()) / 2.0;
 
@@ -1152,6 +1175,7 @@ pub fn is_geometry_identity(params: &GeometryParams) -> bool {
     params.distortion == 0.0
         && params.vertical == 0.0
         && params.horizontal == 0.0
+        && params.perspective_source_to_corrected == [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
         && params.rotate == 0.0
         && params.aspect == 0.0
         && params.scale == 100.0
