@@ -161,7 +161,7 @@ mod macos {
     }
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(all(target_os = "macos", any(feature = "ai", test)))]
 pub use macos::{generate_face_mask, generate_whole_person_mask};
 
 #[cfg(not(target_os = "macos"))]

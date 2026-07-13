@@ -518,6 +518,8 @@ bun install --frozen-lockfile
 bun run start
 ```
 
+Contributors can use the supported [fast-dev and full native profiles](docs/development/native-profiles.md) to avoid compiling optional heavy capabilities during ordinary shell, library, editor, preview, and basic-export work.
+
 ## System Requirements
 
 RapidRAW is built to be lightweight and cross-platform. The minimum (tested) requirements are:
@@ -569,6 +571,8 @@ See [#306](https://github.com/CyberTimon/RapidRAW/issues/306) for more informati
 </details>
 
 ## Contributing
+
+For the native editor's provisional-frame contract, see the [embedded RAW preview policy](docs/development/embedded-raw-previews.md).
 
 I’m really grateful for any contributions you make to RapidRAW! Whether you’re reporting a bug, suggesting a new feature, or submitting a pull request - your input helps shape the project and makes it better for everyone. Don’t hesitate to open an issue or share your ideas.
 

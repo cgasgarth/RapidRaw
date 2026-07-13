@@ -18,6 +18,7 @@ use base64::{Engine as _, engine::general_purpose};
 use exif::{Reader as ExifReader, Tag};
 use image::{DynamicImage, GenericImageView, ImageFormat, ImageReader, imageops};
 use rawler::Orientation;
+use rawler::rawsource::RawSource;
 use serde::Deserialize;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -409,6 +410,41 @@ pub(crate) fn load_base_image_from_bytes_with_report(
     settings: &AppSettings,
     cancel_token: Option<(Arc<AtomicUsize>, usize)>,
 ) -> Result<(DynamicImage, Option<RawDevelopmentReport>)> {
+    load_base_image_from_source_with_report(
+        bytes,
+        path_for_ext_check,
+        use_fast_raw_dev,
+        settings,
+        cancel_token,
+        None,
+    )
+}
+
+fn load_base_image_from_prepared_raw_source_with_report(
+    source: &RawSource,
+    path_for_ext_check: &str,
+    use_fast_raw_dev: bool,
+    settings: &AppSettings,
+    cancel_token: Option<(Arc<AtomicUsize>, usize)>,
+) -> Result<(DynamicImage, Option<RawDevelopmentReport>)> {
+    load_base_image_from_source_with_report(
+        source.buf(),
+        path_for_ext_check,
+        use_fast_raw_dev,
+        settings,
+        cancel_token,
+        Some(source),
+    )
+}
+
+fn load_base_image_from_source_with_report(
+    bytes: &[u8],
+    path_for_ext_check: &str,
+    use_fast_raw_dev: bool,
+    settings: &AppSettings,
+    cancel_token: Option<(Arc<AtomicUsize>, usize)>,
+    prepared_raw_source: Option<&RawSource>,
+) -> Result<(DynamicImage, Option<RawDevelopmentReport>)> {
     let raw_processing_mode = settings.raw_processing_mode.as_deref();
     let recipe = raw_processing_mode_recipe(raw_processing_mode);
     let use_fast_raw_dev = use_fast_raw_dev || recipe.force_fast_demosaic;
@@ -450,14 +486,25 @@ pub(crate) fn load_base_image_from_bytes_with_report(
     if is_raw_file(path_for_ext_check) {
         let profile = RawProcessingProfile::from_mode(raw_processing_mode.unwrap_or("balanced"));
         match panic::catch_unwind(move || {
-            develop_raw_image_with_report(
-                bytes,
-                use_fast_raw_dev,
-                profile,
-                highlight_compression,
-                linear_mode,
-                cancel_token,
-            )
+            if let Some(source) = prepared_raw_source {
+                crate::raw_processing::develop_raw_source_with_report(
+                    source,
+                    use_fast_raw_dev,
+                    profile,
+                    highlight_compression,
+                    linear_mode,
+                    cancel_token,
+                )
+            } else {
+                develop_raw_image_with_report(
+                    bytes,
+                    use_fast_raw_dev,
+                    profile,
+                    highlight_compression,
+                    linear_mode,
+                    cancel_token,
+                )
+            }
         }) {
             Ok(Ok((mut image, report))) => {
                 let sharpening_settings = resolve_capture_pre_sharpening_settings(
@@ -858,7 +905,7 @@ pub async fn load_image(
     app_handle: tauri::AppHandle,
 ) -> Result<LoadImageResult, String> {
     let metadata = load_image_open_metadata(&path)?;
-    load_image_prepared(path, state.inner(), app_handle, metadata, true, None).await
+    load_image_prepared(path, state.inner(), app_handle, metadata, true, None, None).await
 }
 
 pub(crate) fn load_image_open_metadata(path: &str) -> Result<ImageMetadata, String> {
@@ -891,7 +938,7 @@ pub(crate) async fn prefetch_image(
     cancellation: Option<(Arc<AtomicUsize>, usize)>,
 ) -> Result<LoadImageResult, String> {
     let metadata = load_image_open_metadata(&path)?;
-    load_image_prepared(path, state, app_handle, metadata, false, cancellation).await
+    load_image_prepared(path, state, app_handle, metadata, false, cancellation, None).await
 }
 
 pub(crate) async fn load_image_prepared(
@@ -901,6 +948,7 @@ pub(crate) async fn load_image_prepared(
     metadata: ImageMetadata,
     install_active: bool,
     cancellation: Option<(Arc<AtomicUsize>, usize)>,
+    prepared_raw_source: Option<Arc<RawSource>>,
 ) -> Result<LoadImageResult, String> {
     let (generation_tracker, my_generation) = if let Some(cancellation) = cancellation {
         cancellation
@@ -993,14 +1041,55 @@ pub(crate) async fn load_image_prepared(
         } else {
             let decode_started = Instant::now();
             let decode_generation_tracker = Arc::clone(&generation_tracker);
+            let prepared_raw_source = prepared_raw_source.clone();
             let (pristine_img, exif_data_loaded, raw_development_report) =
             tokio::task::spawn_blocking(move || {
                 if decode_generation_tracker.load(Ordering::SeqCst) != my_generation {
                     return Err("Load cancelled".to_string());
                 }
 
-                let result: Result<LoadedBaseImageWithExif, String> =
-                    (|| match read_file_mapped(Path::new(&path_clone)) {
+                let result: Result<LoadedBaseImageWithExif, String> = (|| {
+                    if let Some(source) = prepared_raw_source {
+                        let bytes = source.buf();
+                        let fingerprint = fingerprint_cache.fingerprint(&expected_revision, bytes);
+                        log::trace!("decoded_source_fingerprint={}", fingerprint.blake3.to_hex());
+                        let (img, raw_development_report) =
+                            load_base_image_from_prepared_raw_source_with_report(
+                                &source,
+                                &path_clone,
+                                false,
+                                &effective_settings,
+                                cancel_token.clone(),
+                            )
+                            .map_err(|error| error.to_string())?;
+                        let mut exif = exif_processing::read_exif_data(&path_clone, bytes);
+                        exif.insert(
+                            "RawEngineRawProcessingMode".to_string(),
+                            effective_settings
+                                .raw_processing_mode
+                                .clone()
+                                .unwrap_or_else(|| "balanced".to_string()),
+                        );
+                        exif.insert(
+                            "RawEngineRawProcessingProvenance".to_string(),
+                            raw_processing_mode_recipe(
+                                effective_settings.raw_processing_mode.as_deref(),
+                            )
+                            .provenance
+                            .to_string(),
+                        );
+                        if let Some(report) = &raw_development_report {
+                            add_raw_development_report_exif(&mut exif, report);
+                        }
+                        if SourceRevision::from_path(Path::new(&path_clone))
+                            .map_err(|error| error.to_string())?
+                            != expected_revision
+                        {
+                            return Err("source_changed_during_decode".to_string());
+                        }
+                        return Ok((img, exif, raw_development_report));
+                    }
+                    match read_file_mapped(Path::new(&path_clone)) {
                     Ok(mmap) => {
                         if decode_generation_tracker.load(Ordering::SeqCst) != my_generation {
                             return Err("Load cancelled".to_string());
@@ -1093,6 +1182,7 @@ pub(crate) async fn load_image_prepared(
                             return Err("source_changed_during_decode".to_string());
                         }
                         Ok((img, exif, raw_development_report))
+                    }
                     }
                 })();
                 result

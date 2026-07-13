@@ -1677,6 +1677,9 @@
       "exit": "Exit preview mode",
       "label": "Preview only"
     },
+    "provisionalCameraPreview": "相機預覽 — 正在處理 RAW",
+    "provisionalCameraPreviewFailed": "相機預覽 — RAW 處理失敗",
+    "provisionalLibraryPreview": "圖庫預覽 — 正在處理 RAW",
     "switcher": {
       "search": {
         "close": "Close panel search",
