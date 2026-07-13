@@ -1696,7 +1696,19 @@ mod tests {
         assert_eq!(estimate.method, "camera_neutral_profile_projection");
         assert_eq!(estimate.confidence, "high");
         assert!(!estimate.clamped);
-        assert!((estimate.cct_kelvin - 3_493.0).abs() < 2.0, "{estimate:?}");
+        let expected_reciprocal_temperature =
+            1.0 / (0.75 / candidates[0].1 + 0.25 / candidates[1].1);
+        assert!(
+            (estimate.cct_kelvin - expected_reciprocal_temperature).abs() < 0.01,
+            "{estimate:?}"
+        );
+        assert!(
+            (interpolation_weight_for_cct(estimate.cct_kelvin, candidates[0].1, candidates[1].1,)
+                - 0.25)
+                .abs()
+                < 0.000_01,
+            "{estimate:?}"
+        );
     }
 
     #[test]
