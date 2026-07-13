@@ -352,6 +352,7 @@ fn write_visual_artifact(
     Ok(format!("sha256:{}", hex::encode(Sha256::digest(bytes))))
 }
 
+#[cfg(target_os = "macos")]
 #[test]
 fn native_colorsync_edr_hdr_contract_and_visual_artifact_are_bound_and_numeric() {
     let display_started = Instant::now();
@@ -501,6 +502,36 @@ fn native_colorsync_edr_hdr_contract_and_visual_artifact_are_bound_and_numeric()
     assert!(!report.graph_binding.graph_fingerprint.is_empty());
     let report_bytes = serde_json::to_vec_pretty(&report).expect("display HDR report serializes");
     std::fs::write(&report_path, report_bytes).expect("display HDR report writes outside repo");
+}
+
+#[cfg(not(target_os = "macos"))]
+#[test]
+fn non_macos_hdr_contract_uses_explicit_deterministic_capability_fallback() {
+    let profile = crate::display_profile::active_display_profile()
+        .expect("unsupported platforms must return a typed display-profile fallback");
+    assert!(profile.display_id.is_none());
+    assert!(profile.icc_sha256.is_none());
+    assert!(profile.profile_byte_count.is_none());
+
+    let fallback = query_edr_capability();
+    assert!(fallback.current_headroom.is_none());
+    assert!(fallback.potential_headroom.is_none());
+    assert!(fallback.reference_headroom.is_none());
+    assert_eq!(
+        fallback.disposition,
+        "explicit_capability_fallback_non_macos"
+    );
+
+    validate_display_contract(&DisplayContract {
+        mode: DisplayMode::Sdr,
+        display_profile_sha256: "unsupported_platform".to_string(),
+        snapshot_profile_sha256: "unsupported_platform".to_string(),
+        output_transfer_count: 1,
+        metadata: None,
+    })
+    .expect("non-macOS fallback still enforces the single-transfer SDR contract");
+    assert!(!pq_pairs().expect("PQ fallback vectors").is_empty());
+    assert!(!hlg_pairs().expect("HLG fallback vectors").is_empty());
 }
 
 #[test]

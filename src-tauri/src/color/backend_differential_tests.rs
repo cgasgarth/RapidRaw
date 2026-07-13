@@ -1323,6 +1323,10 @@ fn tolerance(operation: Operation, storage: StorageKind) -> f64 {
         (Operation::PqInverseEotf, StorageKind::Buffer32) => 2.0e-5,
         (Operation::HlgOetf, StorageKind::Buffer32) => 3.0e-6,
         (Operation::DcpHueSatMap, StorageKind::Buffer32) => 3.0e-5,
+        // The coordinate hash intentionally amplifies f32 rounding into visible
+        // stochastic variation. This bound covers two f32 rounding steps while
+        // the injected tile-local-coordinate defect below remains mandatory.
+        (Operation::Grain, StorageKind::Buffer32) => 1.6e-4,
         (
             Operation::ToneCurve
             | Operation::Levels
@@ -1341,8 +1345,7 @@ fn tolerance(operation: Operation, storage: StorageKind) -> f64 {
             | Operation::Flare
             | Operation::ColorCalibration
             | Operation::FilmicBrightness
-            | Operation::Vignette
-            | Operation::Grain,
+            | Operation::Vignette,
             StorageKind::Buffer32,
         ) => 8.0e-5,
         (Operation::DcpHueSatMap, StorageKind::Rgba16Float) => 2.0e-2,

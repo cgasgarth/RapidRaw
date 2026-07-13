@@ -3594,7 +3594,7 @@ mod blur_pass_tests {
         assert_eq!(receipt.render_pass_count, 12);
     }
 
-    #[cfg(feature = "tauri-test")]
+    #[cfg(all(feature = "tauri-test", target_os = "macos"))]
     #[test]
     fn cpu_reference_matches_metal_for_global_local_lut_and_spatial_graph() {
         use image::{DynamicImage, ImageBuffer, Luma, Rgba};
@@ -3725,7 +3725,7 @@ mod blur_pass_tests {
         assert!(maximum.0 <= 0.035, "maximum CPU/GPU mismatch={maximum:?}");
     }
 
-    #[cfg(feature = "tauri-test")]
+    #[cfg(all(feature = "tauri-test", target_os = "macos"))]
     #[test]
     fn cpu_reference_stage_matrix_matches_metal_without_cross_stage_cancellation() {
         use image::{DynamicImage, ImageBuffer, Rgba};
