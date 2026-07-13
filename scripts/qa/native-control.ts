@@ -127,7 +127,8 @@ export async function requestNativeQaControl(
       return await request();
     } catch (error) {
       const transientConnectFailure =
-        error instanceof Error && /(?:ECONNREFUSED|EAGAIN|Resource temporarily unavailable)/u.test(error.message);
+        error instanceof Error &&
+        /(?:ECONNREFUSED|EAGAIN|ENOENT|Resource temporarily unavailable)/u.test(error.message);
       if (!transientConnectFailure || attempt >= 4) throw error;
       await Bun.sleep(20 * (attempt + 1));
     }

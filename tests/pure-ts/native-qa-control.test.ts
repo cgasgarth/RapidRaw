@@ -120,6 +120,39 @@ describe('native QA control contracts', () => {
     }
   });
 
+  test('retries a bounded transient listener-startup refusal', async () => {
+    const directory = await mkdtemp(resolve(tmpdir(), 'rapidraw-native-control-retry-'));
+    directories.push(directory);
+    const socketPath = resolve(directory, 'control.sock');
+    const record: NativeQaControlRecord = {
+      schemaVersion: 1,
+      pid: process.pid,
+      processStartToken: (await processStartToken(process.pid)) ?? 'unavailable',
+      socketPath,
+      token: 'b'.repeat(64),
+      logPath: '/tmp/native-retry.log',
+      identity: { worktree: '/repo', build: 'build-retry' },
+    };
+    const pending = requestNativeQaControl(record, 'health');
+    await Bun.sleep(5);
+    const server = createServer((socket) => {
+      socket.setEncoding('utf8');
+      socket.once('data', (line) => {
+        const request = z
+          .object({ id: z.string() })
+          .passthrough()
+          .parse(JSON.parse(String(line).trim()));
+        socket.end(`${JSON.stringify({ id: request.id, ok: true, result: { ready: true }, error: null })}\n`);
+      });
+    });
+    await new Promise<void>((ready) => server.listen(socketPath, ready));
+    try {
+      await expect(pending).resolves.toMatchObject({ ok: true, result: { ready: true } });
+    } finally {
+      await new Promise<void>((done) => server.close(() => done()));
+    }
+  });
+
   test('defines reset modes and the inert production frontend event contract', () => {
     expect(NATIVE_QA_RESET_EVENT).toBe('rawengine-qa-reset');
     expect(NATIVE_QA_OPEN_FIXTURE_EVENT).toBe('rawengine-qa-open-fixture');
