@@ -1,8 +1,5 @@
 #[cfg(feature = "ai")]
 pub(crate) mod ai_commands;
-#[cfg(not(feature = "ai"))]
-#[path = "ai_commands_unavailable.rs"]
-pub(crate) mod ai_commands;
 pub(crate) mod ai_connector;
 #[cfg(feature = "ai")]
 pub(crate) mod ai_processing;
