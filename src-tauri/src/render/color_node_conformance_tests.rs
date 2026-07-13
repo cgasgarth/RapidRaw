@@ -370,9 +370,10 @@ fn production_cpu_and_wgpu_nodes_execute_identity_and_non_default_vectors() {
     for contract in COLOR_NODE_REGISTRY {
         let output = match contract.backend {
             ColorNodeBackend::Cpu => {
-                let neutral = apply_pre_gpu_detail_stages(&source, 1, &serde_json::json!({}));
+                let neutral =
+                    apply_pre_gpu_detail_stages(&source, 1, &serde_json::json!({}), false);
                 assert!(matches!(neutral.image, Cow::Borrowed(_)));
-                apply_pre_gpu_detail_stages(&source, 1, &detail_json(contract.id))
+                apply_pre_gpu_detail_stages(&source, 1, &detail_json(contract.id), false)
                     .image
                     .into_owned()
             }
@@ -637,9 +638,9 @@ fn global_abi_coverage_tripwire(global: GlobalAdjustments) {
         vibrance,
         hue,
         edit_graph_version,
-        _pad_color2,
-        _pad_color3,
-        _pad_color4,
+        dehaze_atmosphere_r,
+        dehaze_atmosphere_g,
+        dehaze_atmosphere_b,
         technical_white_balance,
         sharpness,
         luma_noise_reduction,
@@ -659,7 +660,7 @@ fn global_abi_coverage_tripwire(global: GlobalAdjustments) {
         chromatic_aberration_blue_yellow,
         show_clipping,
         is_raw_image,
-        _pad_ca1,
+        dehaze_atmosphere_confidence,
         has_lut,
         lut_intensity,
         tonemapper_mode,
@@ -727,9 +728,9 @@ fn global_abi_coverage_tripwire(global: GlobalAdjustments) {
         vibrance,
         hue,
         edit_graph_version,
-        _pad_color2,
-        _pad_color3,
-        _pad_color4,
+        dehaze_atmosphere_r,
+        dehaze_atmosphere_g,
+        dehaze_atmosphere_b,
         technical_white_balance,
         sharpness,
         luma_noise_reduction,
@@ -749,7 +750,7 @@ fn global_abi_coverage_tripwire(global: GlobalAdjustments) {
         chromatic_aberration_blue_yellow,
         show_clipping,
         is_raw_image,
-        _pad_ca1,
+        dehaze_atmosphere_confidence,
         has_lut,
         lut_intensity,
         tonemapper_mode,

@@ -40,6 +40,10 @@ const DETAIL_FINGERPRINT_FIELDS: &[&str] = &[
     "sharpnessThreshold",
     "lumaNoiseReduction",
     "colorNoiseReduction",
+    "denoiseContrastProtection",
+    "denoiseDetail",
+    "denoiseNaturalGrain",
+    "denoiseShadowBias",
     "clarity",
     "dehaze",
     "structure",
@@ -807,6 +811,19 @@ mod tests {
             crate::edit_graph::EditGraphMigration::LegacyV1Explicit
         );
         assert_eq!(explicit.effective_json["rawEngineEditGraphVersion"], 1);
+
+        let implicit_dehaze =
+            compile_render_plan(&json!({"dehaze": 20}), context(76), None).unwrap();
+        let explicit_dehaze = compile_render_plan(
+            &json!({"dehaze": 20, "rawEngineEditGraphVersion": 1}),
+            context(77),
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            implicit_dehaze.edit_graph.fingerprint,
+            explicit_dehaze.edit_graph.fingerprint
+        );
 
         let v2 = compile_render_plan(
             &json!({"rawEngineEditGraphVersion": 2, "exposure": 10}),
