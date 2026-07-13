@@ -356,21 +356,22 @@ export default function ReferenceMatchPanel() {
                   impact,
                   proposal,
                 });
-                setAdjustments(applied);
+                const receipt = matchLookApplicationReceiptV1Schema.parse({
+                  appliedAt: new Date().toISOString(),
+                  destination: 'global-adjustments',
+                  enabledGroups: [...enabledGroups].sort(),
+                  historyEntriesAdded: 1,
+                  impact,
+                  proposalFingerprint: proposal.proposalFingerprint,
+                  resultingGraphFingerprint: fingerprintReferenceMatchValue(
+                    JSON.stringify(proposal.diffs.map((diff) => [diff.key, applied[diff.key]])),
+                  ),
+                  schemaVersion: 1,
+                  targetAnalysisFingerprint: proposal.targetAnalysisFingerprint,
+                });
+                setAdjustments({ ...applied, referenceMatchApplicationReceipt: receipt });
                 setEditor({
-                  lastReferenceMatchApplicationReceipt: matchLookApplicationReceiptV1Schema.parse({
-                    appliedAt: new Date().toISOString(),
-                    destination: 'global-adjustments',
-                    enabledGroups: [...enabledGroups].sort(),
-                    historyEntriesAdded: 1,
-                    impact,
-                    proposalFingerprint: proposal.proposalFingerprint,
-                    resultingGraphFingerprint: fingerprintReferenceMatchValue(
-                      JSON.stringify(proposal.diffs.map((diff) => [diff.key, applied[diff.key]])),
-                    ),
-                    schemaVersion: 1,
-                    targetAnalysisFingerprint: proposal.targetAnalysisFingerprint,
-                  }),
+                  lastReferenceMatchApplicationReceipt: receipt,
                 });
                 setProposal(null);
               }}
