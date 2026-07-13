@@ -78,8 +78,8 @@ struct BlackWhiteMixerSettings {
     purples: f32,
     magentas: f32,
     enabled: u32,
-    _pad1: u32,
-    _pad2: u32,
+    process: u32,
+    implementation_version: u32,
     _pad3: u32,
 }
 
@@ -801,6 +801,11 @@ fn rgb_to_hue_degrees(color: vec3<f32>) -> f32 {
 fn apply_black_white_mixer(color: vec3<f32>, settings: BlackWhiteMixerSettings, preserve_extended: bool) -> vec3<f32> {
     if (settings.enabled == 0u) {
         return color;
+    }
+
+    if (settings.process == 1u && settings.implementation_version == 1u) {
+        let storage_safe = clamp(color, vec3<f32>(-65504.0), vec3<f32>(65504.0));
+        return vec3<f32>(dot(storage_safe, ACESCG_LUMINANCE_COEFF));
     }
 
     let hue = rgb_to_hue_degrees(color);
