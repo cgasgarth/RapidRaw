@@ -4,8 +4,12 @@ The QA harness runs independently registered browser scenarios against one Vite 
 
 ```bash
 bun qa run --scenario browser.editor.compare
+bun qa run --persistent --scenario browser.editor.compare
 bun qa run --tag crop --shard-index 0 --shard-total 2
 bun qa impacted --base origin/main
+bun qa daemon health
+bun qa daemon shutdown
+bun qa benchmark --scenario browser.library.open
 bun qa --list
 ```
 
@@ -16,3 +20,7 @@ Receipts under `private-artifacts/qa/<run>/run.json` bind results to the Git SHA
 The native QA launcher separately hashes native, frontend, bundle configuration, scenarios, features, and worktree identity. Scenario-only changes avoid rebuilding, copying, and signing. Frontend-only changes can reuse a validation-harness app with `--dev-server`; native, bundle, feature, or worktree changes force isolated deployment. `--clean` preserves full release-style proof.
 
 CI remains deterministic: omit watch/headed options and select explicit scenarios or shards. Unknown changed paths conservatively select all scenarios; recognized compare, crop, negative-lab, global UI, Tauri, or dependency changes select their owned scenario tags.
+
+`--persistent` starts or reconnects to a worktree-owned daemon through a mode-`0600` Unix socket. The daemon verifies its PID start token and worktree before reuse, keeps one Vite/Chromium lifecycle per configuration identity, warms HMR after source identity changes, and restarts for lock/configuration or headed-mode changes. Every job still receives a fresh context; receipts count created, closed, and leaked contexts. Signals, explicit shutdown, and stale ownership recovery close browser contexts, Chromium, Vite, the socket, and state record.
+
+`bun qa benchmark` executes the same scenario through one-shot, persistent-cold, and persistent-warm modes. It proves result equivalence, balanced context accounting, retained process identities, and a warm edit-to-result budget rather than using a synthetic command.

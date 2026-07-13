@@ -1,4 +1,5 @@
 import type { BrowserContext, Page } from '@playwright/test';
+import type { QaDaemonMetrics } from './daemon-model';
 
 export type QaIsolation = 'fresh-page' | 'fresh-context' | 'fresh-app-session' | 'exclusive-native';
 
@@ -26,8 +27,8 @@ export interface QaScenarioResult {
   id: string;
   status: 'passed' | 'failed';
   durationMs: number;
-  error?: string;
-  screenshot?: string;
+  error?: string | undefined;
+  screenshot?: string | undefined;
 }
 
 export interface QaRunReceipt {
@@ -43,5 +44,6 @@ export interface QaRunReceipt {
   startedAt: string;
   endedAt: string;
   scenarios: QaScenarioResult[];
+  metrics: QaDaemonMetrics;
   rerunCommand: string;
 }
