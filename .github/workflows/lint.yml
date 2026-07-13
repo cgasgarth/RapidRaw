@@ -258,7 +258,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          if jq -r '.filename' .macos-smoke-files.ndjson | grep -Eq '^([.]github/workflows/(lint|main-long-validation)[.]yml|scripts/benchmarks/(startup-native|display-target-native)[.]ts|src-tauri/src/(app/(startup|display_target)|lib)[.]rs|src/hooks/(app/useAppInitialization|editor/useImageProcessing)[.]ts|src/(schemas/tauriEventSchemas|utils/(startup/startupTraceReporter|displayTargetChange|tauriEventNames))[.]ts|src/validation/browserTauriHarness[.]mts|tests/(integration/checks/check-browser-tauri-harness|pure-ts/(app/startup-trace-reporter|editor/display-target-change)[.]test)[.]ts)$'; then
+          if jq -r '.filename' .macos-smoke-files.ndjson | grep -Eq '^([.]github/workflows/(lint|main-long-validation)[.]yml|index[.]html|scripts/benchmarks/startup-native[.]ts|src-tauri/src/(app/startup|lib)[.]rs|src/(main|mainApp)[.](ts|tsx)|src/hooks/app/useAppInitialization[.]ts|src/product/startupBootstrap[.]ts|src/utils/startup/startupTraceReporter[.]ts|src/validation/browserTauriHarness[.]mts|tests/(integration/checks/(check-browser-tauri-harness|check-startup-entry)|pure-ts/app/startup-(shell-handoff|trace-reporter)[.]test)[.](ts|tsx))$'; then
             echo 'required=true' >> "$GITHUB_OUTPUT"
           else
             echo 'required=false' >> "$GITHUB_OUTPUT"
@@ -292,14 +292,20 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
-          args: --ci --no-bundle --target aarch64-apple-darwin --features required-ci,validation-harness
+          args: --ci --bundles app --target aarch64-apple-darwin --features required-ci,validation-harness
           retryAttempts: 2
 
-      - name: Upload optimized validation binary
+      - name: Verify optimized validation app layout
+        run: |
+          find src-tauri/target/aarch64-apple-darwin/release/bundle/macos -maxdepth 3 -print
+          test -d src-tauri/target/aarch64-apple-darwin/release/bundle/macos/RapidRAW.app
+          test -f src-tauri/target/aarch64-apple-darwin/release/bundle/macos/RapidRAW.app.tar.gz
+
+      - name: Upload optimized validation app
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: native-startup-${{ github.run_id }}-${{ github.run_attempt }}
-          path: src-tauri/target/aarch64-apple-darwin/release/RapidRAW
+          path: src-tauri/target/aarch64-apple-darwin/release/bundle/macos/RapidRAW.app.tar.gz
           if-no-files-found: error
           retention-days: 1
 
@@ -322,14 +328,18 @@ jobs:
           name: native-startup-${{ github.run_id }}-${{ github.run_attempt }}
           path: native-startup
 
-      - name: Prepare native executable
-        run: chmod +x native-startup/RapidRAW
+      - name: Prepare native app
+        run: |
+          tar -xzf native-startup/RapidRAW.app.tar.gz -C native-startup
+          test -x native-startup/RapidRAW.app/Contents/MacOS/RapidRAW
+          xattr -cr native-startup/RapidRAW.app
+          codesign --force --deep --sign - --timestamp=none native-startup/RapidRAW.app
+          codesign --verify --deep --strict native-startup/RapidRAW.app
 
       - name: Run bounded cold, warm, and degraded startup samples
-        run: bun scripts/benchmarks/startup-native.ts --binary native-startup/RapidRAW --pairs 5
-
-      - name: Run native display-target coalescing and resource-generation proof
-        run: bun scripts/benchmarks/display-target-native.ts --binary src-tauri/target/aarch64-apple-darwin/release/RapidRAW
+        env:
+          RAWENGINE_STARTUP_HARDWARE_CLASS: github-hosted-macos-arm64
+        run: bun scripts/benchmarks/startup-native.ts --binary native-startup/RapidRAW.app/Contents/MacOS/RapidRAW --pairs 30
 
   docs-check:
     name: 'docs: markdown and links'

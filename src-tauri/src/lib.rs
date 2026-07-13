@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "ai"), allow(dead_code))]
+
 #[cfg(not(all(target_os = "windows", target_arch = "aarch64")))]
 use mimalloc::MiMalloc;
 
@@ -81,7 +83,10 @@ use crate::merge::focus_stack::{
 };
 use crate::merge::hdr::{ALIGNMENT_POLICY_ID, HdrAlignmentPlanResponse, build_alignment_plan};
 
-use crate::app::startup::{FrontendStartupPhase, NativeStartupPhase, record_frontend_phase};
+use crate::app::startup::{
+    FrontendStartupPhase, NativeStartupPhase, frontend_ready_manages_native_window,
+    record_frontend_phase_with_followup,
+};
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 use crate::app::startup::{
     InitializationPriority, request_gpu_initialization, request_lens_initialization,
@@ -2940,11 +2945,13 @@ fn frontend_ready(
             }
         }
 
-        if let Err(e) = window.show() {
-            log::error!("Failed to show window: {}", e);
-        }
-        if let Err(e) = window.set_focus() {
-            log::error!("Failed to focus window: {}", e);
+        if frontend_ready_manages_native_window(std::env::consts::OS) {
+            if let Err(e) = window.show() {
+                log::error!("Failed to show window: {}", e);
+            }
+            if let Err(e) = window.set_focus() {
+                log::error!("Failed to focus window: {}", e);
+            }
         }
         #[cfg(any(windows, target_os = "linux"))]
         if is_first_run {
@@ -2981,8 +2988,37 @@ fn record_frontend_startup_phase(
     status: String,
     detail: Option<String>,
     state: tauri::State<'_, AppState>,
+    _app: tauri::AppHandle,
 ) -> Result<crate::app::startup::StartupTraceSnapshot, String> {
-    record_frontend_phase(&state.startup_trace, &trace_id, phase, &status, detail)
+    record_frontend_phase_with_followup(
+        &state.startup_trace,
+        &trace_id,
+        phase,
+        &status,
+        detail,
+        |_snapshot| {
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
+            if state.startup_trace.arm_idle_warm_after(phase) {
+                let idle_services = _app.clone();
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(Duration::from_millis(1_500)).await;
+                    request_lens_initialization(
+                        idle_services.clone(),
+                        InitializationPriority::IdleWarm,
+                    );
+                    request_gpu_initialization(idle_services, InitializationPriority::IdleWarm);
+                });
+            }
+            #[cfg(feature = "validation-harness")]
+            if phase == FrontendStartupPhase::Interactive
+                && std::env::var("RAWENGINE_STARTUP_BENCHMARK_EDITOR_DEMAND").as_deref() == Ok("1")
+            {
+                image_open_session::promote_editor_initialization(&_app);
+                request_lens_initialization(_app.clone(), InitializationPriority::IdleWarm);
+                request_gpu_initialization(_app, InitializationPriority::IdleWarm);
+            }
+        },
+    )
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -3184,15 +3220,16 @@ pub fn run() {
             {
                 let resolver_app = app.handle().clone();
                 let publisher_app = app.handle().clone();
-                let coordinator = crate::app::display_target::DisplayTargetCoordinator::new_with_publisher(
-                    Duration::from_millis(120),
-                    move |_| crate::app::display_target::resolve_for_app(&resolver_app),
-                    move |change| {
-                        if let Err(error) = publisher_app.emit("display-target-changed", change) {
-                            log::warn!("failed to publish display target change: {error}");
-                        }
-                    },
-                );
+                let coordinator =
+                    crate::app::display_target::DisplayTargetCoordinator::new_with_publisher(
+                        Duration::from_millis(120),
+                        move |_| crate::app::display_target::resolve_for_app(&resolver_app),
+                        move |change| {
+                            if let Err(error) = publisher_app.emit("display-target-changed", change) {
+                                log::warn!("failed to publish display target change: {error}");
+                            }
+                        },
+                    );
                 coordinator.request_refresh(0);
                 *app.state::<AppState>()
                     .display_target_coordinator
@@ -3233,30 +3270,6 @@ pub fn run() {
                     "ok",
                     Some("webview-bootstrap-chrome".to_string()),
                 );
-
-                // GPU, Lensfun, catalog, and optional services warm only after
-                // the bootstrap WebView shell has been exposed.
-                let idle_services = app.handle().clone();
-                #[cfg(feature = "validation-harness")]
-                if std::env::var("RAWENGINE_STARTUP_BENCHMARK_EDITOR_DEMAND").as_deref() == Ok("1") {
-                    image_open_session::promote_editor_initialization(&idle_services);
-                    request_lens_initialization(
-                        idle_services.clone(),
-                        InitializationPriority::IdleWarm,
-                    );
-                    request_gpu_initialization(
-                        idle_services.clone(),
-                        InitializationPriority::IdleWarm,
-                    );
-                }
-                tauri::async_runtime::spawn(async move {
-                    tokio::time::sleep(Duration::from_millis(1_500)).await;
-                    request_lens_initialization(
-                        idle_services.clone(),
-                        InitializationPriority::IdleWarm,
-                    );
-                    request_gpu_initialization(idle_services, InitializationPriority::IdleWarm);
-                });
 
                 preview_worker::start_preview_worker(app.handle().clone());
                 start_analytics_worker(app.handle().clone());

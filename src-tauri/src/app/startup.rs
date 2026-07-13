@@ -1,13 +1,18 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 #[cfg(test)]
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::AtomicU64;
 
 /// Target from process start through native shell visibility. The shell still
 /// remains usable if a host exceeds this budget; the trace makes the miss
 /// actionable without turning optional services into a startup failure.
 pub const FIRST_PAINT_BUDGET_MS: u128 = 750;
+
+pub const fn frontend_ready_manages_native_window(platform: &str) -> bool {
+    matches!(platform.as_bytes(), b"windows" | b"linux")
+}
 
 use serde::Serialize;
 use uuid::Uuid;
@@ -222,6 +227,7 @@ pub struct StartupTraceSnapshot {
 
 #[derive(Clone)]
 pub struct StartupTrace {
+    idle_warm_armed: Arc<AtomicBool>,
     trace_id: String,
     started_at: Instant,
     phases: Arc<Mutex<Vec<StartupPhaseReceipt>>>,
@@ -251,6 +257,7 @@ impl StartupTrace {
             .and_then(|elapsed_ms| entry.checked_sub(Duration::from_millis(elapsed_ms)))
             .unwrap_or(entry);
         Self {
+            idle_warm_armed: Arc::new(AtomicBool::new(false)),
             trace_id: format!("startup:{}", Uuid::new_v4()),
             started_at,
             phases: Arc::new(Mutex::new(Vec::new())),
@@ -262,6 +269,7 @@ impl StartupTrace {
     #[cfg(test)]
     fn with_test_clock(test_elapsed_ms: Arc<AtomicU64>) -> Self {
         Self {
+            idle_warm_armed: Arc::new(AtomicBool::new(false)),
             trace_id: format!("startup:{}", Uuid::new_v4()),
             started_at: Instant::now(),
             phases: Arc::new(Mutex::new(Vec::new())),
@@ -271,6 +279,14 @@ impl StartupTrace {
 
     pub fn trace_id(&self) -> &str {
         &self.trace_id
+    }
+
+    pub fn arm_idle_warm_after(&self, phase: FrontendStartupPhase) -> bool {
+        phase == FrontendStartupPhase::Interactive
+            && self
+                .idle_warm_armed
+                .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+                .is_ok()
     }
 
     pub fn mark(&self, phase: NativeStartupPhase, status: &'static str, detail: Option<String>) {
@@ -452,11 +468,24 @@ pub fn record_frontend_phase(
     Ok(trace.snapshot())
 }
 
+pub fn record_frontend_phase_with_followup(
+    trace: &StartupTrace,
+    trace_id: &str,
+    phase: FrontendStartupPhase,
+    status: &str,
+    detail: Option<String>,
+    followup: impl FnOnce(&StartupTraceSnapshot),
+) -> Result<StartupTraceSnapshot, String> {
+    let snapshot = record_frontend_phase(trace, trace_id, phase, status, detail)?;
+    followup(&snapshot);
+    Ok(snapshot)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
         FIRST_PAINT_BUDGET_MS, FrontendStartupPhase, NativeStartupPhase, StartupTrace,
-        mark_deferred_service_result, record_frontend_phase,
+        mark_deferred_service_result, record_frontend_phase, record_frontend_phase_with_followup,
     };
     use std::sync::Arc;
     use std::sync::atomic::{AtomicU64, Ordering};
@@ -692,6 +721,57 @@ mod tests {
         assert!(!service.request(super::InitializationPriority::EditorDemand));
         assert_eq!(service.snapshot().state, super::InitializationState::Ready);
         assert_eq!(service.snapshot().starts, 1);
+    }
+
+    #[test]
+    fn interactive_receipt_precedes_nonblocking_editor_demand_followup() {
+        let trace = StartupTrace::new();
+        let service = super::InitializationService::default();
+        let trace_id = trace.trace_id().to_string();
+
+        let returned = record_frontend_phase_with_followup(
+            &trace,
+            &trace_id,
+            FrontendStartupPhase::Interactive,
+            "ok",
+            Some("static-shell-handlers-and-ipc-ready".to_string()),
+            |snapshot| {
+                assert_eq!(
+                    snapshot.phases.last().map(|receipt| receipt.phase),
+                    Some(NativeStartupPhase::FrontendInteractive)
+                );
+                assert!(service.request(super::InitializationPriority::EditorDemand));
+                assert!(!service.request(super::InitializationPriority::IdleWarm));
+            },
+        )
+        .unwrap();
+
+        assert_eq!(
+            returned.phases.last().map(|receipt| receipt.phase),
+            Some(NativeStartupPhase::FrontendInteractive)
+        );
+        let warming = service.snapshot();
+        assert_eq!(warming.starts, 1);
+        assert_eq!(warming.promotions, 0);
+        assert_eq!(warming.state, super::InitializationState::Warming);
+        service.finish(&Ok(()));
+        assert_eq!(service.snapshot().state, super::InitializationState::Ready);
+    }
+
+    #[test]
+    fn idle_warm_arms_once_only_after_interactive_receipt() {
+        let trace = StartupTrace::new();
+        assert!(!trace.arm_idle_warm_after(FrontendStartupPhase::ShellVisible));
+        assert!(!trace.arm_idle_warm_after(FrontendStartupPhase::LibraryReady));
+        assert!(trace.arm_idle_warm_after(FrontendStartupPhase::Interactive));
+        assert!(!trace.arm_idle_warm_after(FrontendStartupPhase::Interactive));
+    }
+
+    #[test]
+    fn macos_bootstrap_ready_does_not_repeat_visible_window_mutations() {
+        assert!(!super::frontend_ready_manages_native_window("macos"));
+        assert!(super::frontend_ready_manages_native_window("windows"));
+        assert!(super::frontend_ready_manages_native_window("linux"));
     }
 
     #[test]

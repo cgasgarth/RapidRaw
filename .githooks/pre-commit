@@ -45,6 +45,7 @@ run_gate bundle bun run check:bundle
 run_gate actions bun run check:actions
 run_gate action-pins bun tests/integration/checks/check-github-action-pins.ts
 run_gate security bun run check:security
+run_gate license-rust bun scripts/ci/run-compact-command.ts --label license:rust --cwd src-tauri -- cargo deny check licenses
 run_gate browser-harness bun run check:browser-harness
 run_gate tauri-commands bun tests/integration/checks/tauri/check-tauri-command-registration.ts
 run_gate tauri-schemas bun tests/integration/checks/tauri/check-tauri-schema-validation.ts

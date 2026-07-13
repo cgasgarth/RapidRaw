@@ -4,12 +4,15 @@ import { access, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { type StartupTraceSnapshot, startupTraceSnapshotSchema } from '../../src/utils/startup/startupTraceReporter.ts';
+import {
+  assertColdWarmInteractiveRegression,
+  assertResponseDistribution,
+  percentile95,
+  resolveStartupHardwarePolicy,
+} from './startup-hardware-class.ts';
 
 const FIRST_PAINT_BUDGET_MS = 750;
-const APP_CONTROLLED_VISIBLE_BUDGET_MS = 250;
-const APP_CONTROLLED_INTERACTIVE_BUDGET_MS = 750;
-const INTERACTION_RESPONSE_BUDGET_MS = 100;
-const DEFAULT_PAIRS = 2;
+const DEFAULT_PAIRS = 30;
 const REPORT_TIMEOUT_MS = 20_000;
 
 interface StartupRun {
@@ -26,7 +29,10 @@ const binaryArg = valueAfter('--binary');
 if (!binaryArg) throw new Error('Missing --binary <RapidRAW executable>.');
 const binary = resolve(binaryArg);
 const pairs = Number.parseInt(valueAfter('--pairs') ?? String(DEFAULT_PAIRS), 10);
-if (!Number.isInteger(pairs) || pairs < 1 || pairs > 5) throw new Error('--pairs must be an integer from 1 through 5.');
+if (!Number.isInteger(pairs) || pairs < 30 || pairs > 30) throw new Error('--pairs must be exactly 30.');
+const hardwarePolicy = resolveStartupHardwarePolicy(
+  valueAfter('--hardware-class') ?? process.env.RAWENGINE_STARTUP_HARDWARE_CLASS,
+);
 
 const phase = (snapshot: StartupTraceSnapshot, name: StartupTraceSnapshot['phases'][number]['phase']) => {
   const receipt = snapshot.phases.find((entry) => entry.phase === name);
@@ -49,15 +55,6 @@ const assertTrace = (run: StartupRun): void => {
   if (snapshot.firstPaintBudgetMs !== FIRST_PAINT_BUDGET_MS) {
     throw new Error(`${kind}: unexpected first-paint budget ${snapshot.firstPaintBudgetMs}`);
   }
-  const rustEntryAt = phase(snapshot, 'processStarted').elapsedMs;
-  const appControlledVisibleMs = phase(snapshot, 'windowVisible').elapsedMs - rustEntryAt;
-  if (appControlledVisibleMs > APP_CONTROLLED_VISIBLE_BUDGET_MS) {
-    throw new Error(`${kind}: app-controlled visible path exceeded ${APP_CONTROLLED_VISIBLE_BUDGET_MS}ms`);
-  }
-  const appControlledInteractiveMs = phase(snapshot, 'frontendInteractive').elapsedMs - rustEntryAt;
-  if (appControlledInteractiveMs > APP_CONTROLLED_INTERACTIVE_BUDGET_MS) {
-    throw new Error(`${kind}: app-controlled interactive path exceeded ${APP_CONTROLLED_INTERACTIVE_BUDGET_MS}ms`);
-  }
 
   const shellOrdered = [
     phase(snapshot, 'processStarted'),
@@ -75,14 +72,6 @@ const assertTrace = (run: StartupRun): void => {
       throw new Error(`${kind}: startup phases are not monotonic at index ${index}`);
     }
   }
-  const shellVisibleAt = phase(snapshot, 'frontendShellVisible').elapsedMs;
-  const interactiveAt = phase(snapshot, 'frontendInteractive').elapsedMs;
-  if (interactiveAt - shellVisibleAt > INTERACTION_RESPONSE_BUDGET_MS) {
-    throw new Error(
-      `${kind}: mounted shell interaction round trip exceeded ${INTERACTION_RESPONSE_BUDGET_MS}ms ` +
-        `(${interactiveAt - shellVisibleAt}ms)`,
-    );
-  }
   const settings = phase(snapshot, 'minimalSettingsLoaded');
   if (
     settings.elapsedMs < phase(snapshot, 'processStarted').elapsedMs ||
@@ -90,11 +79,19 @@ const assertTrace = (run: StartupRun): void => {
   ) {
     throw new Error(`${kind}: minimal settings were not loaded between process start and frontend hydration`);
   }
+  const shellDetail = phase(snapshot, 'frontendShellVisible').detail ?? '';
+  const frontendReadyMatch = shellDetail.match(/frontend_ready_ms=(\d+)/u);
+  const frontendReadyMs = frontendReadyMatch?.[1] === undefined ? Number.NaN : Number(frontendReadyMatch[1]);
+  if (!Number.isFinite(frontendReadyMs)) throw new Error(`${kind}: frontend_ready response receipt is missing`);
   const visibleAt = phase(snapshot, 'windowVisible').elapsedMs;
+  const interactiveAt = phase(snapshot, 'frontendInteractive').elapsedMs;
   for (const deferred of snapshot.phases.filter((entry) =>
     ['gpuReady', 'libraryServicesReady'].includes(entry.phase),
   )) {
     if (deferred.elapsedMs < visibleAt) throw new Error(`${kind}: ${deferred.phase} ran before WindowVisible`);
+    if (deferred.elapsedMs < interactiveAt) {
+      throw new Error(`${kind}: ${deferred.phase} completion gated the interactive shell receipt`);
+    }
   }
 
   if (kind === 'degraded') {
@@ -119,6 +116,55 @@ const assertTrace = (run: StartupRun): void => {
   }
 };
 
+const assertHardwareClassDistribution = (runs: StartupRun[]): void => {
+  const samples = runs
+    .filter(({ kind }) => kind !== 'degraded')
+    .map(({ kind, snapshot }) => {
+      const rustEntryAt = phase(snapshot, 'processStarted').elapsedMs;
+      return {
+        appControlledInteractiveMs: phase(snapshot, 'frontendInteractive').elapsedMs - rustEntryAt,
+        appControlledVisibleMs: phase(snapshot, 'windowVisible').elapsedMs - rustEntryAt,
+        firstPaintMs: phase(snapshot, 'windowVisible').elapsedMs,
+        frontendReadyResponseMs: Number(
+          phase(snapshot, 'frontendShellVisible').detail?.match(/frontend_ready_ms=(\d+)/u)?.[1],
+        ),
+        interactionResponseMs:
+          phase(snapshot, 'frontendInteractive').elapsedMs - phase(snapshot, 'frontendShellVisible').elapsedMs,
+        kind,
+      };
+    });
+  const distributions = new Map<'cold' | 'warm', { appControlledInteractiveMs: number }>();
+  for (const kind of ['cold', 'warm'] as const) {
+    const kindSamples = samples.filter((sample) => sample.kind === kind);
+    if (kindSamples.length < 30) throw new Error(`${kind}: expected at least 30 startup samples`);
+    const p95 = {
+      appControlledInteractiveMs: percentile95(kindSamples.map((sample) => sample.appControlledInteractiveMs)),
+      appControlledVisibleMs: percentile95(kindSamples.map((sample) => sample.appControlledVisibleMs)),
+      firstPaintMs: percentile95(kindSamples.map((sample) => sample.firstPaintMs)),
+      frontendReadyResponseMs: assertResponseDistribution(
+        kindSamples.map((sample) => sample.frontendReadyResponseMs),
+        hardwarePolicy.interactionResponseMs,
+      ),
+      interactionResponseMs: percentile95(kindSamples.map((sample) => sample.interactionResponseMs)),
+    };
+    if (
+      p95.firstPaintMs > hardwarePolicy.firstPaintMs ||
+      p95.appControlledVisibleMs > hardwarePolicy.appControlledVisibleMs ||
+      p95.appControlledInteractiveMs > hardwarePolicy.appControlledInteractiveMs ||
+      p95.interactionResponseMs > hardwarePolicy.interactionResponseMs
+    ) {
+      throw new Error(
+        `${kind}: p95 startup distribution failed; p95=${JSON.stringify(p95)}; samples=${JSON.stringify(kindSamples)}`,
+      );
+    }
+    distributions.set(kind, p95);
+  }
+  const cold = distributions.get('cold');
+  const warm = distributions.get('warm');
+  if (!cold || !warm) throw new Error('startup cold/warm distributions are incomplete');
+  assertColdWarmInteractiveRegression(cold.appControlledInteractiveMs, warm.appControlledInteractiveMs, hardwarePolicy);
+};
+
 const waitForReport = async (path: string, process: Bun.Subprocess): Promise<StartupTraceSnapshot> => {
   const deadline = Date.now() + REPORT_TIMEOUT_MS;
   while (Date.now() < deadline) {
@@ -126,15 +172,24 @@ const waitForReport = async (path: string, process: Bun.Subprocess): Promise<Sta
       return startupTraceSnapshotSchema.parse(JSON.parse(await readFile(path, 'utf8')));
     } catch (error) {
       if (process.exitCode !== null) {
-        const stderr = process.stderr instanceof ReadableStream ? await new Response(process.stderr).text() : '';
-        throw new Error(`RapidRAW exited before startup report (${process.exitCode}): ${stderr.slice(-2_000)}`, {
-          cause: error,
-        });
+        throw new Error(`RapidRAW exited before startup report (${process.exitCode})`, { cause: error });
       }
       await Bun.sleep(25);
     }
   }
   throw new Error(`Timed out after ${REPORT_TIMEOUT_MS}ms waiting for ${basename(path)}.`);
+};
+
+const collectOutput = async (stream: ReadableStream<Uint8Array> | number | undefined): Promise<string> => {
+  if (!(stream instanceof ReadableStream)) return '';
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let output = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) return `${output}${decoder.decode()}`.slice(-4_000);
+    output = `${output}${decoder.decode(value, { stream: true })}`.slice(-4_000);
+  }
 };
 
 const stopProcess = async (process: Bun.Subprocess): Promise<void> => {
@@ -172,8 +227,10 @@ const runOnce = async ({
       RUST_LOG: 'warn',
     },
     stderr: 'pipe',
-    stdout: 'ignore',
+    stdout: 'pipe',
   });
+  const stderr = collectOutput(process.stderr);
+  const stdout = collectOutput(process.stdout);
   try {
     const run = { kind, snapshot: await waitForReport(reportPath, process) };
     if (run.snapshot.processId !== process.pid) {
@@ -188,8 +245,17 @@ const runOnce = async ({
       throw new Error(`${message}; startup_trace=${traceDiagnostic(run.snapshot)}`, { cause: error });
     }
     return run;
+  } catch (error) {
+    await stopProcess(process);
+    const [capturedStdout, capturedStderr] = await Promise.all([stdout, stderr]);
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `${message}; child_stdout=${JSON.stringify(capturedStdout)}; child_stderr=${JSON.stringify(capturedStderr)}`,
+      { cause: error },
+    );
   } finally {
     await stopProcess(process);
+    await Promise.all([stdout, stderr]);
   }
 };
 
@@ -235,6 +301,8 @@ const main = async (): Promise<void> => {
       }),
     );
 
+    assertHardwareClassDistribution(runs);
+
     const traceIds = new Set(runs.map(({ snapshot }) => snapshot.traceId));
     if (traceIds.size !== runs.length) throw new Error('Startup benchmark reused a trace ID across processes.');
     const summary = runs.map(({ kind, snapshot }) => ({
@@ -248,7 +316,9 @@ const main = async (): Promise<void> => {
         phase(snapshot, 'frontendInteractive').elapsedMs - phase(snapshot, 'frontendShellVisible').elapsedMs,
       kind,
     }));
-    console.log(`native startup benchmark ok (${runs.length} bounded runs): ${JSON.stringify(summary)}`);
+    console.log(
+      `native startup benchmark ok (${runs.length} bounded runs; hardware_class=${hardwarePolicy.hardwareClass}): ${JSON.stringify(summary)}`,
+    );
   } finally {
     await rm(root, { force: true, recursive: true });
   }

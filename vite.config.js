@@ -17,7 +17,13 @@ const hmrPort =
 
 // https://vitejs.dev/config/
 export default defineConfig(async ({ command }) => ({
-  plugins: [createViteProductBundleGuardPlugin(), browserTauriHarnessDevPlugin(command), tailwindcss(), react()],
+  plugins: [
+    createViteProductBundleGuardPlugin(),
+    startupPrebootOrderingPlugin(),
+    browserTauriHarnessDevPlugin(command),
+    tailwindcss(),
+    react(),
+  ],
   define: {
     __RAWENGINE_BROWSER_TAURI_HARNESS__: JSON.stringify(
       command === 'serve' || process.env.VITE_RAWENGINE_BROWSER_TAURI_HARNESS === '1',
@@ -44,11 +50,28 @@ export default defineConfig(async ({ command }) => ({
   envPrefix: ['VITE_', 'TAURI_ENV_*'],
   build: {
     cssMinify: 'esbuild',
+    manifest: true,
     minify: 'oxc',
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
     chunkSizeWarningLimit: getViteChunkSizeWarningLimitKb(),
   },
 }));
+
+function startupPrebootOrderingPlugin() {
+  return {
+    name: 'rapidraw-startup-preboot-ordering',
+    enforce: 'post',
+    transformIndexHtml: {
+      order: 'post',
+      handler(html) {
+        const prebootOffset = html.indexOf('data-rawengine-startup-preboot');
+        const moduleMatch = html.match(/\s*<script type="module"[^>]*src="[^"]+"[^>]*><\/script>/u);
+        if (!moduleMatch || prebootOffset < 0 || (moduleMatch.index ?? 0) > prebootOffset) return html;
+        return html.replace(moduleMatch[0], '').replace('</body>', `${moduleMatch[0].trim()}\n  </body>`);
+      },
+    },
+  };
+}
 
 function browserTauriHarnessDevPlugin(command) {
   return {
@@ -65,8 +88,8 @@ function browserTauriHarnessDevPlugin(command) {
       ].join('\n');
 
       return html.replace(
-        '    <script type="module" src="/src/main.tsx"></script>',
-        [harnessScript, '    <script type="module" src="/src/main.tsx"></script>'].join('\n'),
+        '    <script type="module" src="/src/main.ts"></script>',
+        [harnessScript, '    <script type="module" src="/src/main.ts"></script>'].join('\n'),
       );
     },
   };
