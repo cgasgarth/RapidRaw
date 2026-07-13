@@ -10,6 +10,7 @@ export enum Invokes {
   ApplySingleImageX2 = 'apply_single_image_x2',
   ApplyBurstSrCandidate = 'apply_burst_sr_candidate',
   AutodetectLens = 'autodetect_lens',
+  AnalyzePerspectiveCorrection = 'analyze_perspective_correction',
   BatchDenoiseImages = 'batch_denoise_images',
   CalculateAutoAdjustments = 'calculate_auto_adjustments',
   CancelAiModelLoad = 'cancel_ai_model_load',

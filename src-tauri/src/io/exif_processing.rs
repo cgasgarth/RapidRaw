@@ -564,7 +564,6 @@ fn validate_adjustments(
         "displayLut",
         "displayProfile",
         "outputTransform",
-        "viewTransform",
         "cameraToWorkingMatrix",
         "cameraWhiteBalance",
         "legacyWhiteBalance",
@@ -581,18 +580,22 @@ fn validate_adjustments(
         "chromaticAberrationRedCyan",
         "blackWhiteMixer",
         "cameraProfile",
+        "cameraProfileAmount",
         "colorBalanceRgb",
         "channelMixer",
         "colorCalibration",
         "colorGrading",
         "colorNoiseReduction",
         "contrast",
+        "creativeTemperature",
+        "creativeTint",
         "crop",
         "curves",
         "pointCurves",
         "parametricCurve",
         "curveMode",
         "rawProcessingModeOverride",
+        "rawEngineEditGraphVersion",
         "deblurEnabled",
         "deblurSigmaPx",
         "deblurStrength",
@@ -641,6 +644,7 @@ fn validate_adjustments(
         "lutSize",
         "masks",
         "orientationSteps",
+        "perspectiveCorrection",
         "rotation",
         "saturation",
         "sectionVisibility",
@@ -674,6 +678,9 @@ fn validate_adjustments(
         "softProof",
         "panorama",
         "hdrMerge",
+        "viewTransform",
+        "whiteBalanceMigration",
+        "whiteBalanceTechnical",
     ];
     for field in FORBIDDEN {
         if let Some(value) = object.remove(*field) {
@@ -717,7 +724,7 @@ fn validate_adjustments(
             "rawProcessingModeOverride",
             &["fast", "balanced", "maximum"][..],
         ),
-        ("toneMapper", &["agx", "basic"][..]),
+        ("toneMapper", &["agx", "basic", "rapidView"][..]),
     ] {
         let invalid = object.get(field).is_some_and(|value| {
             !value.is_null()
@@ -747,6 +754,17 @@ fn validate_adjustments(
             extensions.insert(field.to_string(), value);
             disabled.push(format!("adjustments.{field}"));
         }
+    }
+    let invalid_perspective = object.get("perspectiveCorrection").is_some_and(|value| {
+        serde_json::from_value::<crate::geometry::perspective::PerspectiveCorrectionSettingsV1>(
+            value.clone(),
+        )
+        .is_err()
+    });
+    if invalid_perspective && let Some(value) = object.remove("perspectiveCorrection") {
+        extensions.insert("perspectiveCorrection".to_string(), value);
+        disabled.push("adjustments.perspectiveCorrection".to_string());
+        reasons.push("perspective_correction_contract_invalid".to_string());
     }
     let invalid_numeric: Vec<String> = object
         .iter()
@@ -2508,6 +2526,73 @@ mod tests {
             reloaded.exif.as_ref().and_then(|exif| exif.get("Artist")),
             Some(&"RawEngine".to_string())
         );
+    }
+
+    #[test]
+    fn save_sidecar_accepts_current_color_and_perspective_contracts() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let sidecar_path = temp_dir.path().join("image.arw.rrdata");
+        let metadata = ImageMetadata {
+            adjustments: serde_json::json!({
+                "cameraProfileAmount": 100,
+                "creativeTemperature": 0,
+                "creativeTint": 0,
+                "perspectiveCorrection": {
+                    "amount": 62.5,
+                    "cropPolicy": "auto_crop",
+                    "guides": [{
+                        "id": "vertical-1",
+                        "class": "vertical",
+                        "endpointsSourceNormalized": [[0.2, 0.1], [0.3, 0.9]],
+                        "weight": 1.0
+                    }],
+                    "mode": "guided",
+                    "resolvedPlan": null
+                },
+                "rawEngineEditGraphVersion": 1,
+                "toneMapper": "rapidView",
+                "viewTransform": {
+                    "contrast": 1.15,
+                    "middleGrey": 0.18
+                },
+                "whiteBalanceMigration": "native_v1",
+                "whiteBalanceTechnical": { "mode": "as_shot" }
+            }),
+            ..Default::default()
+        };
+
+        save_sidecar_metadata_atomic(&sidecar_path, &metadata)
+            .expect("current render contracts should persist atomically");
+
+        let reloaded = load_sidecar(&sidecar_path);
+        assert_eq!(
+            reloaded.adjustments["perspectiveCorrection"]["mode"],
+            "guided"
+        );
+        assert_eq!(reloaded.adjustments["toneMapper"], "rapidView");
+        assert_eq!(reloaded.adjustments["viewTransform"]["contrast"], 1.15);
+    }
+
+    #[test]
+    fn save_sidecar_rejects_invalid_perspective_contract() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let sidecar_path = temp_dir.path().join("image.arw.rrdata");
+        let metadata = ImageMetadata {
+            adjustments: serde_json::json!({
+                "perspectiveCorrection": {
+                    "amount": 100,
+                    "cropPolicy": "auto_crop",
+                    "guides": [],
+                    "mode": "not_a_mode"
+                }
+            }),
+            ..Default::default()
+        };
+
+        let error = save_sidecar_metadata_atomic(&sidecar_path, &metadata)
+            .expect_err("invalid perspective state must fail closed");
+        assert!(error.contains("adjustments.perspectiveCorrection"));
+        assert!(!sidecar_path.exists());
     }
 
     #[test]
