@@ -11,12 +11,12 @@ use crate::app_state::{
     AnalyticsConfig, AnalyticsFrameId, AnalyticsProducts, AppState, CachedPreview,
     CachedViewerSampleFrame,
 };
-use crate::generate_transformed_preview;
+use crate::generate_transformed_preview_cancellable;
 use crate::image_processing::{
     RenderRequest, downscale_f32_image, get_or_init_gpu_context,
     process_and_get_dynamic_image_with_analytics, resolve_tonemapper_override_from_handle,
 };
-use crate::mask_generation::get_cached_or_generate_mask;
+use crate::mask_generation::get_cached_or_generate_preview_mask;
 use crate::preview_scheduler::{
     PreviewAbort, PreviewCancellation, PreviewCompletion, PreviewScheduler,
     PreviewSchedulingPolicy, PreviewStage,
@@ -273,8 +273,14 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         )
     } else {
         render_caches::RenderCaches::new(&state).clear_gpu_image_cache();
-        let (base, scale, offset) =
-            generate_transformed_preview(&state, &loaded_image, &adjustments_clone, preview_dim)?;
+        let geometry_checkpoint = || cancellation_checkpoint(cancellation, PreviewStage::Geometry);
+        let (base, scale, offset) = generate_transformed_preview_cancellable(
+            &state,
+            &loaded_image,
+            &adjustments_clone,
+            preview_dim,
+            Some(&geometry_checkpoint),
+        )?;
         (Arc::new(base), scale, offset)
     };
     cancellation_checkpoint(cancellation, PreviewStage::Geometry)?;
@@ -347,7 +353,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         Vec::with_capacity(render_plan.masks.len());
     for def in render_plan.masks.iter() {
         cancellation_checkpoint(cancellation, PreviewStage::Masks)?;
-        if let Some(mask) = get_cached_or_generate_mask(
+        if let Some(mask) = get_cached_or_generate_preview_mask(
             &state,
             def,
             preview_width,
@@ -355,6 +361,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
             effective_scale,
             scaled_crop_offset,
             &adjustments_clone,
+            processing_image_ref,
         ) {
             mask_bitmaps.push(mask);
         }

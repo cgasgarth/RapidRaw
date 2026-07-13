@@ -4,6 +4,9 @@ use crate::adjustments::abi::{
     HslColor, LevelsSettings, MAX_MASKS, MaskAdjustments, Point,
 };
 use crate::adjustments::scales::SCALES;
+use crate::color::view_transform::{
+    ViewTransformPlanV1, ViewTransformProcess, ViewTransformSettingsV1,
+};
 use crate::image_processing::calculate_agx_matrices;
 use crate::mask_generation::MaskDefinition;
 #[cfg(test)]
@@ -279,6 +282,27 @@ fn get_global_adjustments_from_json(
 
     let tone_mapper = js_adjustments["toneMapper"].as_str().unwrap_or("basic");
     let (pipe_to_rendering, rendering_to_pipe) = calculate_agx_matrices();
+    let mut rapid_view_settings = ViewTransformSettingsV1::default();
+    if let Some(view) = js_adjustments.get("viewTransform") {
+        let number = |key: &str, fallback: f64| view[key].as_f64().unwrap_or(fallback);
+        rapid_view_settings.middle_grey = number("middleGrey", rapid_view_settings.middle_grey);
+        rapid_view_settings.source_black_ev =
+            number("sourceBlackEv", rapid_view_settings.source_black_ev);
+        rapid_view_settings.source_white_ev =
+            number("sourceWhiteEv", rapid_view_settings.source_white_ev);
+        rapid_view_settings.contrast = number("contrast", rapid_view_settings.contrast);
+        rapid_view_settings.latitude = number("latitude", rapid_view_settings.latitude);
+        rapid_view_settings.toe = number("toe", rapid_view_settings.toe);
+        rapid_view_settings.shoulder = number("shoulder", rapid_view_settings.shoulder);
+        rapid_view_settings.chroma_compression =
+            number("chromaCompression", rapid_view_settings.chroma_compression);
+    }
+    rapid_view_settings.process = ViewTransformProcess::RapidViewV1;
+    let rapid_view = ViewTransformPlanV1::compile(rapid_view_settings).unwrap_or_else(|_| {
+        ViewTransformPlanV1::compile(ViewTransformSettingsV1::default())
+            .expect("built-in Rapid View settings must compile")
+    });
+    let rapid_view_parameters = rapid_view.gpu_parameters();
     let (has_lut, lut_intensity) = if section_is_visible(js_adjustments, "effects") {
         (
             u32::from(js_adjustments["lutPath"].is_string()),
@@ -427,8 +451,11 @@ fn get_global_adjustments_from_json(
         _pad_ca1: 0.0,
         has_lut,
         lut_intensity,
-        tonemapper_mode: tonemapper_override
-            .unwrap_or_else(|| if tone_mapper == "agx" { 1 } else { 0 }),
+        tonemapper_mode: tonemapper_override.unwrap_or(match tone_mapper {
+            "agx" => 1,
+            "rapidView" => 2,
+            _ => 0,
+        }),
         _pad_lut2: 0.0,
         _pad_lut3: 0.0,
         _pad_lut4: 0.0,
@@ -438,6 +465,9 @@ fn get_global_adjustments_from_json(
         _pad_agx3: 0.0,
         agx_pipe_to_rendering_matrix: pipe_to_rendering,
         agx_rendering_to_pipe_matrix: rendering_to_pipe,
+        rapid_view_parameters0: rapid_view_parameters[0],
+        rapid_view_parameters1: rapid_view_parameters[1],
+        rapid_view_parameters2: rapid_view_parameters[2],
         _pad_cg1: 0.0,
         _pad_cg2: 0.0,
         _pad_cg3: 0.0,
@@ -770,5 +800,38 @@ mod tests {
         assert_eq!(parsed.mask_adjustments[1].blend_mode, 1.0);
         assert_eq!(parsed.mask_adjustments[2].blend_mode, 2.0);
         assert_eq!(parsed.mask_adjustments[3].blend_mode, 0.0);
+    }
+
+    #[test]
+    fn view_process_versions_preserve_legacy_missing_state_and_compile_rapid_view() {
+        let missing_legacy = get_all_adjustments_from_json(&json!({}), true, None);
+        let basic = get_all_adjustments_from_json(&json!({ "toneMapper": "basic" }), true, None);
+        let agx = get_all_adjustments_from_json(&json!({ "toneMapper": "agx" }), true, None);
+        let rapid =
+            get_all_adjustments_from_json(&json!({ "toneMapper": "rapidView" }), true, None);
+        let customized = get_all_adjustments_from_json(
+            &json!({
+                "toneMapper": "rapidView",
+                "viewTransform": { "contrast": 1.6, "shoulder": 0.8, "toe": 0.7 }
+            }),
+            true,
+            None,
+        );
+
+        assert_eq!(missing_legacy.global.tonemapper_mode, 0);
+        assert_eq!(basic.global.tonemapper_mode, 0);
+        assert_eq!(agx.global.tonemapper_mode, 1);
+        assert_eq!(rapid.global.tonemapper_mode, 2);
+        assert_eq!(rapid.global.rapid_view_parameters0[0], 0.18);
+        assert!(rapid.global.rapid_view_parameters2[0].is_finite());
+        assert_ne!(rapid.global.rapid_view_parameters2[2].to_bits(), 0);
+        assert_ne!(
+            customized.global.rapid_view_parameters1,
+            rapid.global.rapid_view_parameters1
+        );
+        assert_ne!(
+            customized.global.rapid_view_parameters2[2].to_bits(),
+            rapid.global.rapid_view_parameters2[2].to_bits()
+        );
     }
 }

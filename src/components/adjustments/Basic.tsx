@@ -39,6 +39,10 @@ const ToneMapperSwitch = ({ selectedMapper, onMapperChange, onReset }: ToneMappe
   const toneMapperOptions = useMemo(
     () => [
       {
+        label: t('adjustments.basic.mappers.rapidView'),
+        value: 'rapidView' as const,
+      },
+      {
         label: t('adjustments.basic.mappers.basic'),
         value: 'basic' as const,
       },
@@ -118,8 +122,14 @@ export default function BasicAdjustments({
   const handleToneMapperReset = () => {
     setAdjustments((prev: Adjustments) => ({
       ...prev,
-      exposure: INITIAL_ADJUSTMENTS.exposure,
       toneMapper: INITIAL_ADJUSTMENTS.toneMapper,
+    }));
+  };
+
+  const handleViewSettingChange = (key: keyof Adjustments['viewTransform'], value: number) => {
+    setAdjustments((prev: Adjustments) => ({
+      ...prev,
+      viewTransform: { ...prev.viewTransform, [key]: value },
     }));
   };
 
@@ -158,6 +168,44 @@ export default function BasicAdjustments({
           onReset={handleToneMapperReset}
         />
       )}
+
+      {!hideToneMapper && adjustments.toneMapper === 'rapidView' ? (
+        <div className="border-b border-editor-divider pb-1" data-testid="rapid-view-controls">
+          <AdjustmentSlider
+            defaultValue={INITIAL_ADJUSTMENTS.viewTransform.contrast}
+            density="compact"
+            label={t('adjustments.basic.viewContrast')}
+            max={2}
+            min={0.5}
+            onValueChange={(value) => handleViewSettingChange('contrast', value)}
+            step={0.01}
+            testId="rapid-view-contrast"
+            value={adjustments.viewTransform.contrast}
+          />
+          <AdjustmentSlider
+            defaultValue={INITIAL_ADJUSTMENTS.viewTransform.shoulder}
+            density="compact"
+            label={t('adjustments.basic.highlightRolloff')}
+            max={1}
+            min={0}
+            onValueChange={(value) => handleViewSettingChange('shoulder', value)}
+            step={0.01}
+            testId="rapid-view-shoulder"
+            value={adjustments.viewTransform.shoulder}
+          />
+          <AdjustmentSlider
+            defaultValue={INITIAL_ADJUSTMENTS.viewTransform.toe}
+            density="compact"
+            label={t('adjustments.basic.shadowRolloff')}
+            max={1}
+            min={0}
+            onValueChange={(value) => handleViewSettingChange('toe', value)}
+            step={0.01}
+            testId="rapid-view-toe"
+            value={adjustments.viewTransform.toe}
+          />
+        </div>
+      ) : null}
 
       {renderSlider(BasicAdjustment.Exposure, t('adjustments.basic.evShift'), {
         max: 5,

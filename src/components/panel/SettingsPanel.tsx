@@ -763,6 +763,10 @@ export function SettingsPanel({
 
   const tonemapperOptions = useMemo<OptionItem<string>[]>(
     () => [
+      {
+        value: 'rapidView',
+        label: t('settings.processing.preprocessing.tonemapperOptions.rapidView'),
+      },
       { value: 'agx', label: t('settings.processing.preprocessing.tonemapperOptions.agx') },
       { value: 'basic', label: t('settings.processing.preprocessing.tonemapperOptions.basic') },
     ],
@@ -2409,7 +2413,7 @@ export function SettingsPanel({
                                     saveSettings({ ...appSettings, defaultRawTonemapper: value });
                                   }}
                                   options={tonemapperOptions}
-                                  value={appSettings.defaultRawTonemapper || 'agx'}
+                                  value={appSettings.defaultRawTonemapper || 'rapidView'}
                                   triggerClassName="bg-bg-primary"
                                 />
                               </SettingItem>

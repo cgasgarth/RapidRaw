@@ -165,7 +165,11 @@ export const rawEngineColorDomainV1Schema = z.enum([
 
 export const rawEngineWorkingColorSpaceV1Schema = z.enum(['acescg_linear_v1']);
 
-export const rawEngineSceneToDisplayTransformV1Schema = z.enum(['rawengine_agx_v1', 'rawengine_basic_v1']);
+export const rawEngineSceneToDisplayTransformV1Schema = z.enum([
+  'rawengine_agx_v1',
+  'rawengine_basic_v1',
+  'rawengine_rapid_view_v1',
+]);
 
 export const rawEngineOutputProfileV1Schema = z.enum(['srgb', 'display_p3']);
 
