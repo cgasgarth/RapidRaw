@@ -692,6 +692,7 @@
         "impact": "",
         "layerUnsupported": "",
         "matchLook": "",
+        "missingCachedReference": "",
         "newLayerDestination": "",
         "normalize": "",
         "residualSummary": "",
@@ -699,6 +700,7 @@
         "setCurrent": "",
         "sourceRevision": "",
         "title": "",
+        "unknownReferenceAvailability": "",
         "weight": ""
       },
       "scopedSections": {

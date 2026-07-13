@@ -695,6 +695,7 @@
         "impact": "Impact",
         "layerUnsupported": "Layer apply unavailable for selected nodes: {{nodes}}. Disable those groups or apply globally.",
         "matchLook": "Match Look",
+        "missingCachedReference": "Original missing · cached preview only",
         "newLayerDestination": "New layer",
         "normalize": "Normalize",
         "residualSummary": "Residual {{before}} → {{after}} · profile, WB, geometry and detail remain unchanged",
@@ -702,6 +703,7 @@
         "setCurrent": "Set current",
         "sourceRevision": "CM preview · r{{revision}}",
         "title": "Reference Match",
+        "unknownReferenceAvailability": "Source availability unknown",
         "weight": "Weight"
       },
       "scopedSections": {

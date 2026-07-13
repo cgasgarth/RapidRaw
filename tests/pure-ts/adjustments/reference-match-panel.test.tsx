@@ -96,6 +96,17 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
     selectionAnchorPath: '/photos/reference.ARW',
   });
   expect(useUIStore.getState().activeView).toBe('library');
+  await act(async () => {
+    useEditorStore
+      .getState()
+      .setReferenceMatchReferences((current) =>
+        current.map((reference) => ({ ...reference, availability: 'missing' })),
+      );
+    await flushPromises();
+  });
+  expect(container.querySelector('[data-testid="reference-match-availability"]')?.textContent).toContain(
+    'cached preview only',
+  );
 
   await click(container, '[data-testid="reference-match-compare"]');
   expect(useEditorStore.getState().compare).toMatchObject({
