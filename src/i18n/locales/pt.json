@@ -1770,6 +1770,9 @@
       "exit": "Exit preview mode",
       "label": "Preview only"
     },
+    "provisionalCameraPreview": "Pré-visualização da câmara — revelando RAW",
+    "provisionalCameraPreviewFailed": "Pré-visualização da câmara — falha ao revelar RAW",
+    "provisionalLibraryPreview": "Pré-visualização da biblioteca — revelando RAW",
     "switcher": {
       "search": {
         "close": "Close panel search",
