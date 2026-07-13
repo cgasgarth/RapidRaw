@@ -1435,6 +1435,8 @@
         "demosaicProvenance": "Demosaic",
         "estimatedCct": "",
         "fallbackReason": "",
+        "highlightReconstruction": "Highlight recovery",
+        "highlightReconstructionSummary": "{{mode}} · {{recovered}} recovered · {{partial}} partial · {{unrecoverable}} unrecoverable",
         "illuminants": "",
         "matrixHash": "",
         "notApplicable": "N/A",
