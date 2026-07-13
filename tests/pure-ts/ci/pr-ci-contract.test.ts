@@ -54,7 +54,7 @@ describe('four-minute PR CI contract', () => {
     });
   });
 
-  test('measures selected execution from plan start without charging aggregate queue delay', () => {
+  test('measures the parallel critical path without charging runner or aggregate queue delay', () => {
     const jobs = parseWorkflowJobTimings({
       jobs: [
         {
@@ -84,7 +84,7 @@ describe('four-minute PR CI contract', () => {
         workflow: false,
         docs: false,
       }),
-    ).toBe(83);
+    ).toBe(67);
   });
 
   test('fails closed on missing selected timings and preserves the 240-second execution budget', () => {
@@ -107,7 +107,7 @@ describe('four-minute PR CI contract', () => {
       [
         plan,
         {
-          completedAt: '2026-07-13T23:27:32.000Z',
+          completedAt: '2026-07-13T23:27:48.000Z',
           name: 'pr fast: affected native feedback',
           startedAt: '2026-07-13T23:24:05.000Z',
         },
