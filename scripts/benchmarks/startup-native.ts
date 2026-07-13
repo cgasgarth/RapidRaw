@@ -126,15 +126,24 @@ const waitForReport = async (path: string, process: Bun.Subprocess): Promise<Sta
       return startupTraceSnapshotSchema.parse(JSON.parse(await readFile(path, 'utf8')));
     } catch (error) {
       if (process.exitCode !== null) {
-        const stderr = process.stderr instanceof ReadableStream ? await new Response(process.stderr).text() : '';
-        throw new Error(`RapidRAW exited before startup report (${process.exitCode}): ${stderr.slice(-2_000)}`, {
-          cause: error,
-        });
+        throw new Error(`RapidRAW exited before startup report (${process.exitCode})`, { cause: error });
       }
       await Bun.sleep(25);
     }
   }
   throw new Error(`Timed out after ${REPORT_TIMEOUT_MS}ms waiting for ${basename(path)}.`);
+};
+
+const collectOutput = async (stream: ReadableStream<Uint8Array> | number | undefined): Promise<string> => {
+  if (!(stream instanceof ReadableStream)) return '';
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let output = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) return `${output}${decoder.decode()}`.slice(-4_000);
+    output = `${output}${decoder.decode(value, { stream: true })}`.slice(-4_000);
+  }
 };
 
 const stopProcess = async (process: Bun.Subprocess): Promise<void> => {
@@ -172,8 +181,10 @@ const runOnce = async ({
       RUST_LOG: 'warn',
     },
     stderr: 'pipe',
-    stdout: 'ignore',
+    stdout: 'pipe',
   });
+  const stderr = collectOutput(process.stderr);
+  const stdout = collectOutput(process.stdout);
   try {
     const run = { kind, snapshot: await waitForReport(reportPath, process) };
     if (run.snapshot.processId !== process.pid) {
@@ -188,8 +199,17 @@ const runOnce = async ({
       throw new Error(`${message}; startup_trace=${traceDiagnostic(run.snapshot)}`, { cause: error });
     }
     return run;
+  } catch (error) {
+    await stopProcess(process);
+    const [capturedStdout, capturedStderr] = await Promise.all([stdout, stderr]);
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `${message}; child_stdout=${JSON.stringify(capturedStdout)}; child_stderr=${JSON.stringify(capturedStderr)}`,
+      { cause: error },
+    );
   } finally {
     await stopProcess(process);
+    await Promise.all([stdout, stderr]);
   }
 };
 

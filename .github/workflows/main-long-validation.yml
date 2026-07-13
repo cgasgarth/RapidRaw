@@ -121,19 +121,19 @@ jobs:
         uses: ./.github/actions/setup-bun-deps
 
       - id: tauri-build
-        name: Build no-bundle app smoke
+        name: Build app smoke
         uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # action-v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: --verbose --ci --no-bundle --target aarch64-apple-darwin --features required-ci,validation-harness
+          args: --verbose --ci --bundles app --target aarch64-apple-darwin --features required-ci,validation-harness
           retryAttempts: 3
 
-      - name: Upload optimized validation binary
+      - name: Upload optimized validation app
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: main-native-startup-${{ github.run_id }}-${{ github.run_attempt }}
-          path: src-tauri/target/aarch64-apple-darwin/release/RapidRAW
+          path: src-tauri/target/aarch64-apple-darwin/release/bundle/macos/RapidRAW.app
           if-no-files-found: error
           retention-days: 1
 
@@ -205,5 +205,7 @@ jobs:
 
       - name: Run bounded native startup benchmark
         run: |
-          chmod +x native-startup/RapidRAW
-          bun scripts/benchmarks/startup-native.ts --binary native-startup/RapidRAW --pairs 5
+          xattr -cr native-startup/RapidRAW.app
+          codesign --force --deep --sign - --timestamp=none native-startup/RapidRAW.app
+          codesign --verify --deep --strict native-startup/RapidRAW.app
+          bun scripts/benchmarks/startup-native.ts --binary native-startup/RapidRAW.app/Contents/MacOS/RapidRAW --pairs 5
