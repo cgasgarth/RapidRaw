@@ -15,6 +15,7 @@ interface LeaseWaiter extends LeaseOwner {
 }
 
 export interface ResourceLeaseOptions {
+  capacity?: number;
   label: string;
   resource: string;
   timeoutMs?: number;
@@ -119,11 +120,18 @@ const liveWaiters = async (queuePath: string): Promise<Array<{ path: string; wai
 };
 
 export async function acquireResourceLease(options: ResourceLeaseOptions): Promise<ResourceLease> {
+  const capacity = options.capacity ?? 1;
+  if (!Number.isSafeInteger(capacity) || capacity < 1) throw new Error(`invalid resource capacity: ${capacity}`);
   const timeoutMs = options.timeoutMs ?? Number(Bun.env.RAWENGINE_RESOURCE_WAIT_TIMEOUT_MS ?? 30 * 60_000);
   const pollMs = options.pollMs ?? Number(Bun.env.RAWENGINE_RESOURCE_WAIT_POLL_MS ?? 250);
   const root = coordinatorRoot(options.root);
-  const lockPath = join(root, `${options.resource}.lock`);
-  const ownerPath = join(root, `${options.resource}.owner.json`);
+  const slotSuffix = (slot: number): string => (capacity === 1 ? '' : `.slot-${slot}`);
+  const lockPaths = Array.from({ length: capacity }, (_, slot) =>
+    join(root, `${options.resource}${slotSuffix(slot)}.lock`),
+  );
+  const ownerPaths = Array.from({ length: capacity }, (_, slot) =>
+    join(root, `${options.resource}${slotSuffix(slot)}.owner.json`),
+  );
   const queuePath = join(root, `${options.resource}.queue`);
   const queueMutexPath = join(root, `${options.resource}.queue.lock`);
   const ticketPath = join(root, `${options.resource}.ticket`);
@@ -158,12 +166,19 @@ export async function acquireResourceLease(options: ResourceLeaseOptions): Promi
       try {
         const acquired = await withQueueMutex(queueMutexPath, pollMs, async () => {
           const queue = await liveWaiters(queuePath);
-          if (queue[0]?.waiter.ticket !== waiter.value.ticket)
+          const queuePosition = queue.findIndex((entry) => entry.waiter.ticket === waiter.value.ticket);
+          if (queuePosition < 0 || queuePosition >= capacity)
             return { acquired: false, priorOwner: queue[0]?.waiter ?? null };
-          const priorOwner = await readOwner(ownerPath);
-          if (!shlock(lockPath, process.pid)) return { acquired: false, priorOwner };
-          await rm(waiter.path, { force: true });
-          return { acquired: true, priorOwner };
+          for (let slot = 0; slot < capacity; slot += 1) {
+            const lockPath = lockPaths[slot];
+            const ownerPath = ownerPaths[slot];
+            if (!lockPath || !ownerPath) throw new Error(`missing resource slot ${slot}`);
+            const priorOwner = await readOwner(ownerPath);
+            if (!shlock(lockPath, process.pid)) continue;
+            await rm(waiter.path, { force: true });
+            return { acquired: true, lockPath, ownerPath, priorOwner };
+          }
+          return { acquired: false, priorOwner: await readOwner(ownerPaths[0] ?? '') };
         });
         if (!acquired.acquired)
           throw Object.assign(new Error('resource_busy'), { blocker: acquired.priorOwner, code: 'EEXIST' });
@@ -177,6 +192,7 @@ export async function acquireResourceLease(options: ResourceLeaseOptions): Promi
           startedAt: new Date().toISOString(),
           worktree: process.cwd(),
         };
+        const { lockPath, ownerPath } = acquired;
         await replaceFile(ownerPath, `${JSON.stringify(owner)}\n`);
         const waitedMs = Date.now() - waitStartedAt;
         if (waitedMs >= pollMs) console.log(`${options.label} acquired ${options.resource} after ${waitedMs}ms`);
@@ -201,7 +217,10 @@ export async function acquireResourceLease(options: ResourceLeaseOptions): Promi
         const code = error instanceof Error && 'code' in error ? error.code : undefined;
         if (code !== 'EEXIST') throw error;
         const blocker = error instanceof Error && 'blocker' in error ? (error.blocker as LeaseOwner | null) : null;
-        const owner = blocker ?? (await readOwner(ownerPath));
+        let owner = blocker;
+        for (const ownerPath of ownerPaths) {
+          owner ??= await readOwner(ownerPath);
+        }
         const waitedMs = Date.now() - waitStartedAt;
         if (waitedMs >= timeoutMs) {
           throw new Error(
