@@ -18,6 +18,10 @@ static NEXT_DEVICE_GENERATION: AtomicU64 = AtomicU64::new(1);
 #[cfg(all(test, feature = "tauri-test"))]
 static GPU_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
+#[cfg(all(test, feature = "tauri-test"))]
+static GPU_TEST_CONTEXT: std::sync::OnceLock<Result<GpuContext, String>> =
+    std::sync::OnceLock::new();
+
 /// Software WGPU adapters such as lavapipe are not reliable when separate test
 /// devices execute compute workloads concurrently. Keep only GPU-owning tests
 /// mutually exclusive; CPU tests continue to use Cargo's normal parallelism.
@@ -170,46 +174,82 @@ pub fn get_or_init_compute_gpu_context_for_tests(
         return Ok(context.clone());
     }
 
-    let instance =
-        wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle_from_env());
-    let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-        power_preference: wgpu::PowerPreference::HighPerformance,
-        compatible_surface: None,
-        ..Default::default()
-    }))
-    .map_err(|error| format!("Failed to find a wgpu adapter: {}", error))?;
+    // Reuse one process-wide compute device across test AppStates. Software
+    // Vulkan adapters can retire a dropped device after the next one starts,
+    // leaving otherwise serialized compute output unwritten. Product state and
+    // processors remain isolated; only the adapter/device/queue are shared.
+    let new_context = GPU_TEST_CONTEXT
+        .get_or_init(|| {
+            let instance = wgpu::Instance::new(
+                wgpu::InstanceDescriptor::new_without_display_handle_from_env(),
+            );
+            let adapter =
+                pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
+                    power_preference: wgpu::PowerPreference::HighPerformance,
+                    compatible_surface: None,
+                    ..Default::default()
+                }))
+                .map_err(|error| format!("Failed to find a wgpu adapter: {error}"))?;
 
-    let mut required_features = wgpu::Features::empty();
-    if adapter
-        .features()
-        .contains(wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES)
-    {
-        required_features |= wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES;
-    }
-    let limits = adapter.limits();
-    let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
-        label: Some("Processing Device"),
-        required_features,
-        required_limits: limits.clone(),
-        experimental_features: wgpu::ExperimentalFeatures::default(),
-        memory_hints: wgpu::MemoryHints::Performance,
-        trace: wgpu::Trace::Off,
-    }))
-    .map_err(|error| error.to_string())?;
+            let mut required_features = wgpu::Features::empty();
+            if adapter
+                .features()
+                .contains(wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES)
+            {
+                required_features |= wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES;
+            }
+            let limits = adapter.limits();
+            let (device, queue) =
+                pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
+                    label: Some("Shared Test Processing Device"),
+                    required_features,
+                    required_limits: limits.clone(),
+                    experimental_features: wgpu::ExperimentalFeatures::default(),
+                    memory_hints: wgpu::MemoryHints::Performance,
+                    trace: wgpu::Trace::Off,
+                }))
+                .map_err(|error| error.to_string())?;
 
-    let device = Arc::new(device);
-    let queue = Arc::new(queue);
-    let new_context = GpuContext {
-        generation: NEXT_DEVICE_GENERATION.fetch_add(1, Ordering::Relaxed),
-        device: Arc::clone(&device),
-        queue: Arc::clone(&queue),
-        limits,
-        presentation: Arc::new(WgpuPresentationScheduler::new(None, device, queue)),
-    };
+            let device = Arc::new(device);
+            let queue = Arc::new(queue);
+            Ok(GpuContext {
+                generation: NEXT_DEVICE_GENERATION.fetch_add(1, Ordering::Relaxed),
+                device: Arc::clone(&device),
+                queue: Arc::clone(&queue),
+                limits,
+                presentation: Arc::new(WgpuPresentationScheduler::new(None, device, queue)),
+            })
+        })
+        .clone()?;
     *context_lock = Some(new_context.clone());
     drop(context_lock);
     if let Some(coordinator) = state.display_target_coordinator.lock().unwrap().as_ref() {
         coordinator.request_refresh(new_context.generation);
     }
     Ok(new_context)
+}
+
+#[cfg(all(test, feature = "tauri-test"))]
+mod tests {
+    use super::*;
+    use tauri::Manager;
+
+    #[test]
+    fn compute_test_context_reuses_one_device_across_isolated_app_states() {
+        let _guard = acquire_gpu_test_lock();
+        let first_app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .unwrap();
+        let second_app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .unwrap();
+        let first = get_or_init_compute_gpu_context_for_tests(&first_app.state()).unwrap();
+        let second = get_or_init_compute_gpu_context_for_tests(&second_app.state()).unwrap();
+
+        assert!(Arc::ptr_eq(&first.device, &second.device));
+        assert!(Arc::ptr_eq(&first.queue, &second.queue));
+        assert_eq!(first.generation, second.generation);
+    }
 }
