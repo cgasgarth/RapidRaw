@@ -9,6 +9,7 @@ const FIRST_PAINT_BUDGET_MS = 750;
 const APP_CONTROLLED_VISIBLE_BUDGET_MS = 250;
 const APP_CONTROLLED_INTERACTIVE_BUDGET_MS = 750;
 const INTERACTION_RESPONSE_BUDGET_MS = 100;
+const FRONTEND_READY_RESPONSE_BUDGET_MS = 100;
 const DEFAULT_PAIRS = 30;
 const REPORT_TIMEOUT_MS = 20_000;
 
@@ -72,6 +73,14 @@ const assertTrace = (run: StartupRun): void => {
     settings.elapsedMs > phase(snapshot, 'frontendSettingsHydrated').elapsedMs
   ) {
     throw new Error(`${kind}: minimal settings were not loaded between process start and frontend hydration`);
+  }
+  const shellDetail = phase(snapshot, 'frontendShellVisible').detail ?? '';
+  const frontendReadyMatch = shellDetail.match(/frontend_ready_ms=(\d+)/u);
+  const frontendReadyMs = frontendReadyMatch?.[1] === undefined ? Number.NaN : Number(frontendReadyMatch[1]);
+  if (!Number.isFinite(frontendReadyMs) || frontendReadyMs > FRONTEND_READY_RESPONSE_BUDGET_MS) {
+    throw new Error(
+      `${kind}: frontend_ready response ${frontendReadyMs}ms exceeded ${FRONTEND_READY_RESPONSE_BUDGET_MS}ms`,
+    );
   }
   const visibleAt = phase(snapshot, 'windowVisible').elapsedMs;
   const interactiveAt = phase(snapshot, 'frontendInteractive').elapsedMs;

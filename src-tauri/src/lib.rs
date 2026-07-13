@@ -84,7 +84,8 @@ use crate::merge::focus_stack::{
 use crate::merge::hdr::{ALIGNMENT_POLICY_ID, HdrAlignmentPlanResponse, build_alignment_plan};
 
 use crate::app::startup::{
-    FrontendStartupPhase, NativeStartupPhase, record_frontend_phase_with_followup,
+    FrontendStartupPhase, NativeStartupPhase, frontend_ready_manages_native_window,
+    record_frontend_phase_with_followup,
 };
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 use crate::app::startup::{
@@ -2944,11 +2945,13 @@ fn frontend_ready(
             }
         }
 
-        if let Err(e) = window.show() {
-            log::error!("Failed to show window: {}", e);
-        }
-        if let Err(e) = window.set_focus() {
-            log::error!("Failed to focus window: {}", e);
+        if frontend_ready_manages_native_window(std::env::consts::OS) {
+            if let Err(e) = window.show() {
+                log::error!("Failed to show window: {}", e);
+            }
+            if let Err(e) = window.set_focus() {
+                log::error!("Failed to focus window: {}", e);
+            }
         }
         #[cfg(any(windows, target_os = "linux"))]
         if is_first_run {

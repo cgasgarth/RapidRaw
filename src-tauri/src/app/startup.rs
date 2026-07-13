@@ -10,6 +10,10 @@ use std::sync::atomic::AtomicU64;
 /// actionable without turning optional services into a startup failure.
 pub const FIRST_PAINT_BUDGET_MS: u128 = 750;
 
+pub const fn frontend_ready_manages_native_window(platform: &str) -> bool {
+    matches!(platform.as_bytes(), b"windows" | b"linux")
+}
+
 use serde::Serialize;
 use uuid::Uuid;
 
@@ -761,6 +765,13 @@ mod tests {
         assert!(!trace.arm_idle_warm_after(FrontendStartupPhase::LibraryReady));
         assert!(trace.arm_idle_warm_after(FrontendStartupPhase::Interactive));
         assert!(!trace.arm_idle_warm_after(FrontendStartupPhase::Interactive));
+    }
+
+    #[test]
+    fn macos_bootstrap_ready_does_not_repeat_visible_window_mutations() {
+        assert!(!super::frontend_ready_manages_native_window("macos"));
+        assert!(super::frontend_ready_manages_native_window("windows"));
+        assert!(super::frontend_ready_manages_native_window("linux"));
     }
 
     #[test]

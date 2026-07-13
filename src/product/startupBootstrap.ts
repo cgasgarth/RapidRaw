@@ -59,9 +59,16 @@ const attachIntent = (id: string, intent: 'add-folder' | 'settings'): void => {
 export const completeStaticStartup = async (): Promise<string> => {
   attachIntent('startup-add-folder', 'add-folder');
   attachIntent('startup-settings', 'settings');
+  const frontendReadyStartedAt = performance.now();
   await invoke<void>(commands.frontendReady);
+  const frontendReadyMs = Math.ceil(performance.now() - frontendReadyStartedAt);
   const snapshot = snapshotIdentity(await invoke<unknown>(commands.getTrace));
-  await record(snapshot.traceId, 'shellVisible', 'ok', 'static-library-shell-visible');
+  await record(
+    snapshot.traceId,
+    'shellVisible',
+    'ok',
+    `static-library-shell-visible:frontend_ready_ms=${frontendReadyMs}`,
+  );
   await record(snapshot.traceId, 'interactive', 'ok', 'static-shell-handlers-and-ipc-ready');
   return snapshot.traceId;
 };

@@ -84,7 +84,9 @@
           return window.__TAURI_INTERNALS__.invoke;
         };
         state.receipt = bridge().then(async (invoke) => {
+          const frontendReadyStartedAt = performance.now();
           await invoke("frontend_ready");
+          const frontendReadyMs = Math.ceil(performance.now() - frontendReadyStartedAt);
           const snapshot = await invoke("get_startup_trace");
           if (typeof snapshot?.traceId !== "string" || !snapshot.traceId.startsWith("startup:")) {
             throw new Error("startup_trace_invalid_identity");
@@ -98,7 +100,7 @@
             });
             if (response?.traceId !== snapshot.traceId) throw new Error("startup_trace_correlation_mismatch");
           };
-          await record("shellVisible", "static-library-shell-visible");
+          await record("shellVisible", `static-library-shell-visible:frontend_ready_ms=${frontendReadyMs}`);
           await record("interactive", "static-shell-handlers-and-ipc-ready");
           return snapshot.traceId;
         });
