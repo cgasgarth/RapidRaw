@@ -78,6 +78,7 @@ const commandNames: Record<
   | 'getStartupTrace'
   | 'recordFrontendStartupPhase'
   | 'generateOriginalTransformedPreview'
+  | 'generateMaskOverlay'
   | 'generateUncroppedPreview'
   | 'generatePreviewForPath'
   | 'applyAdjustments'
@@ -125,6 +126,7 @@ const commandNames: Record<
   getStartupTrace: Invokes.GetStartupTrace,
   recordFrontendStartupPhase: Invokes.RecordFrontendStartupPhase,
   generateOriginalTransformedPreview: Invokes.GenerateOriginalTransformedPreview,
+  generateMaskOverlay: Invokes.GenerateMaskOverlay,
   generateUncroppedPreview: Invokes.GenerateUncroppedPreview,
   generatePreviewForPath: Invokes.GeneratePreviewForPath,
   getLensfunMakers: Invokes.GetLensfunMakers,
@@ -379,6 +381,7 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
     case commandNames.configureLibraryChangefeed:
       return Promise.resolve(1);
     case commandNames.generateOriginalTransformedPreview:
+    case commandNames.generateMaskOverlay:
       return Promise.resolve(`data:image/jpeg;base64,${harnessPreviewJpegBase64}`);
     case commandNames.generateUncroppedPreview:
       return Promise.resolve(null);

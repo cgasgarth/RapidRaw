@@ -95,6 +95,7 @@ describe('performance lab runner', () => {
       'browser.editor-culling-navigation',
       'browser.editor-exposure-flood',
       'browser.editor-pan-zoom',
+      'browser.editor-local-mask',
       'browser.editor-compare',
       'browser.editor-crop',
       'browser.editor-copy-paste-settings',

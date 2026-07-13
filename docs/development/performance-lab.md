@@ -12,6 +12,7 @@ bun perf run browser.editor-navigation
 bun perf run browser.editor-culling-navigation
 bun perf run browser.editor-exposure-flood
 bun perf run browser.editor-pan-zoom
+bun perf run browser.editor-local-mask
 bun perf run browser.editor-compare
 bun perf run browser.editor-crop
 bun perf run browser.editor-copy-paste-settings

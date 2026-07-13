@@ -697,6 +697,7 @@ export const performanceScenarios: readonly PerformanceScenario[] = [
   browserQaScenario('browser.editor-culling-navigation', 'browser.editor.culling-navigation'),
   browserQaScenario('browser.editor-exposure-flood', 'browser.editor.exposure-flood'),
   browserQaScenario('browser.editor-pan-zoom', 'browser.editor.pan-zoom'),
+  browserQaScenario('browser.editor-local-mask', 'browser.editor.local-mask'),
   browserQaScenario('browser.editor-compare', 'browser.editor.compare'),
   browserQaScenario('browser.editor-crop', 'browser.editor.crop'),
   browserQaScenario('browser.editor-copy-paste-settings', 'browser.editor.copy-paste-settings'),

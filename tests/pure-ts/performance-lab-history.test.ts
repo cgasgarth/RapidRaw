@@ -329,6 +329,7 @@ exit 1
         'browser.editor-crop',
         'browser.editor-culling-navigation',
         'browser.editor-exposure-flood',
+        'browser.editor-local-mask',
         'browser.editor-navigation',
         'browser.editor-open',
         'browser.editor-pan-zoom',

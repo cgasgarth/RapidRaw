@@ -25,7 +25,11 @@ const ownership: readonly { pattern: RegExp; scenarioIds: readonly string[] }[] 
   },
   {
     pattern: /(?:src\/components\/adjustments\/Basic|src\/hooks\/editor\/.*[Aa]djustment)/u,
-    scenarioIds: ['browser.editor-exposure-flood'],
+    scenarioIds: ['browser.editor-exposure-flood', 'browser.editor-local-mask'],
+  },
+  {
+    pattern: /(?:src\/components\/panel\/right\/layers|src\/utils\/(?:layers|mask))/u,
+    scenarioIds: ['browser.editor-local-mask'],
   },
   {
     pattern: /src\/components\/modals\/navigation\/CopyPasteSettingsModal/u,

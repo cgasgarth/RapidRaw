@@ -319,6 +319,42 @@ export const qaScenarios: readonly QaScenario[] = [
   },
   {
     ...browserDefaults,
+    id: 'browser.editor.local-mask',
+    tags: ['browser', 'editor', 'mask', 'local-adjustment'],
+    dependencies: [],
+    fixture: { id: 'editor' },
+    isolation: 'fresh-context',
+    timeoutMs: 45_000,
+    async run({ page }) {
+      await openEditorFixture(page);
+      await page.locator('[data-panel-id="masks"]').first().click();
+      await page.getByTestId('mask-creation-linear').click();
+      await page.getByTestId('linear-gradient-mask-controls').waitFor();
+      await page.getByTestId('mask-panel-mask-count').getByText('1', { exact: true }).waitFor();
+      const beforeCalls = await page.evaluate(
+        () =>
+          (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? []).filter(
+            ({ command }) => command === 'apply_adjustments',
+          ).length,
+      );
+      const exposure = page.getByTestId('basic-control-exposure-range');
+      await exposure.fill('0.35');
+      await page.waitForFunction(
+        (prior) =>
+          (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [])
+            .filter(({ command }) => command === 'apply_adjustments')
+            .slice(prior)
+            .some(({ args }) => {
+              const payload = JSON.stringify(args ?? null);
+              return payload.includes('"type":"linear"') && payload.includes('"exposure":0.35');
+            }),
+        beforeCalls,
+      );
+      if ((await exposure.inputValue()) !== '0.35') throw new Error('Local mask exposure did not settle.');
+    },
+  },
+  {
+    ...browserDefaults,
     id: 'browser.editor.compare',
     tags: ['browser', 'editor', 'compare'],
     dependencies: [],
