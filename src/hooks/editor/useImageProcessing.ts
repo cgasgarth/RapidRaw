@@ -1,7 +1,9 @@
+import { listen } from '@tauri-apps/api/event';
 import type React from 'react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { z } from 'zod';
 import { Panel } from '../../components/ui/AppProperties';
+import { displayTargetChangePayloadSchema } from '../../schemas/tauriEventSchemas';
 import { emptyTauriResponseSchema } from '../../schemas/tauriResponseSchemas';
 import { type ExportSoftProofTransformState, useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
@@ -26,6 +28,7 @@ import {
   logAppOperationFailure,
   logAppOperationSuccess,
 } from '../../utils/appEventLogger';
+import { isNewDisplayResourceGeneration } from '../../utils/displayTargetChange';
 import { resolveEditorPreviewSource } from '../../utils/editorImagePreviewSource';
 import { getEditorZoomDpr, getEditorZoomSourceSize, resolveEditorZoom } from '../../utils/editorZoom';
 import { globalImageCache } from '../../utils/ImageLRUCache';
@@ -38,6 +41,7 @@ import {
   parseInteractivePreviewPatchPayload,
 } from '../../utils/interactivePreviewPatch';
 import { PreparedAdjustmentPayloadCache } from '../../utils/preparedAdjustmentPayloadCache';
+import { DISPLAY_TARGET_CHANGED_EVENT } from '../../utils/tauriEventNames';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import { debounce } from '../../utils/timing';
 import { debouncedSave } from './useEditorActions';
@@ -774,6 +778,30 @@ export function useImageProcessing(
     handledScopeRecoveryRequestIdRef.current = previewScopeRecoveryRequestId;
     applyAdjustments(adjustments, false, undefined, true);
   }, [adjustments, applyAdjustments, previewScopeRecoveryRequestId]);
+
+  const displayResourceGenerationRef = useRef(0);
+  useEffect(() => {
+    let active = true;
+    let unlisten: (() => void) | undefined;
+    void listen<unknown>(DISPLAY_TARGET_CHANGED_EVENT, (event) => {
+      if (!active) return;
+      const parsed = displayTargetChangePayloadSchema.safeParse(event.payload);
+      if (
+        !parsed.success ||
+        !isNewDisplayResourceGeneration(displayResourceGenerationRef.current, parsed.data.displayResourceGeneration)
+      )
+        return;
+      displayResourceGenerationRef.current = parsed.data.displayResourceGeneration;
+      applyAdjustments(useEditorStore.getState().adjustments, false);
+    }).then((stop) => {
+      if (active) unlisten = stop;
+      else stop();
+    });
+    return () => {
+      active = false;
+      unlisten?.();
+    };
+  }, [applyAdjustments]);
 
   const generateUncroppedPreview = useCallback(
     (currentAdjustments: Adjustments) => {

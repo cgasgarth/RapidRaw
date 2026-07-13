@@ -40,3 +40,4 @@ export const THUMBNAIL_INVALIDATED_EVENT = 'thumbnail-invalidated';
 export const THUMBNAIL_PROGRESS_EVENT = 'thumbnail-progress';
 export const WAVEFORM_UPDATE_EVENT = 'waveform-update';
 export const WGPU_FRAME_READY_EVENT = 'wgpu-frame-ready';
+export const DISPLAY_TARGET_CHANGED_EVENT = 'display-target-changed';
