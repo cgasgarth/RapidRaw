@@ -1,16 +1,9 @@
 #!/usr/bin/env bun
 
+import { z } from 'zod';
 import { classesForPath } from '../validation/ownership';
 
 export const PR_REQUIRED_BUDGET_SECONDS = 240;
-
-export const resolveWorkflowStartedEpoch = (value: string | undefined, nowEpoch: number): number => {
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed <= 0 || parsed > nowEpoch) {
-    throw new Error('workflow start epoch must come from the Actions run_started_at timestamp');
-  }
-  return parsed;
-};
 
 export type PrFastLane = 'js' | 'frontend' | 'schema' | 'dependencies' | 'rust' | 'workflow' | 'docs';
 
@@ -22,6 +15,69 @@ export const PR_REQUIRED_JOBS: Readonly<Record<PrFastLane, readonly string[]>> =
   rust: ['fast-rust'],
   workflow: ['fast-workflow'],
   docs: ['fast-docs'],
+};
+
+export const PR_REQUIRED_JOB_NAMES: Readonly<Record<string, string>> = {
+  'fast-build-i18n': 'pr fast: frontend build and i18n',
+  'fast-contract-tests': 'pr fast: affected contract tests',
+  'fast-docs': 'pr fast: documentation contracts',
+  'fast-format': 'pr fast: format',
+  'fast-js-security': 'pr fast: JavaScript audit',
+  'fast-lint': 'pr fast: lint',
+  'fast-rust': 'pr fast: affected native feedback',
+  'fast-schema': 'pr fast: schema contracts',
+  'fast-typecheck': 'pr fast: typecheck',
+  'fast-unsafe-unused': 'pr fast: unsafe and unused dependency policy',
+  'fast-visual': 'pr fast: visual smoke',
+  'fast-workflow': 'pr fast: workflow contracts',
+};
+
+const workflowJobsSchema = z.object({
+  jobs: z.array(
+    z.object({
+      completed_at: z.string().datetime().nullable(),
+      name: z.string(),
+      started_at: z.string().datetime(),
+    }),
+  ),
+});
+
+export interface WorkflowJobTiming {
+  completedAt: string | null;
+  name: string;
+  startedAt: string;
+}
+
+export const parseWorkflowJobTimings = (value: unknown): WorkflowJobTiming[] =>
+  workflowJobsSchema.parse(value).jobs.map((job) => ({
+    completedAt: job.completed_at,
+    name: job.name,
+    startedAt: job.started_at,
+  }));
+
+export const requiredExecutionElapsedSeconds = (
+  jobs: readonly WorkflowJobTiming[],
+  selected: Readonly<Record<PrFastLane, boolean>>,
+): number => {
+  const plan = jobs.find((job) => job.name === 'validation: affected fast-lane plan');
+  if (!plan) throw new Error('required validation plan timing is missing');
+  const planStartedAt = Date.parse(plan.startedAt);
+  const selectedJobNames = Object.entries(PR_REQUIRED_JOBS).flatMap(([lane, jobIds]) =>
+    selected[lane as PrFastLane] ? jobIds.map((jobId) => PR_REQUIRED_JOB_NAMES[jobId]) : [],
+  );
+  if (selectedJobNames.some((name) => name === undefined)) throw new Error('required job name mapping is incomplete');
+  const selectedJobs = selectedJobNames.map((name) => jobs.find((job) => job.name === name));
+  if (selectedJobs.some((job) => job === undefined || job.completedAt === null)) {
+    throw new Error('selected required job timing is missing or incomplete');
+  }
+  const completedAt = Math.max(
+    ...selectedJobs.map((job) => Date.parse(job?.completedAt ?? '')),
+    Date.parse(plan.completedAt ?? plan.startedAt),
+  );
+  if (!Number.isFinite(planStartedAt) || !Number.isFinite(completedAt) || completedAt < planStartedAt) {
+    throw new Error('required validation timing is invalid');
+  }
+  return Math.ceil((completedAt - planStartedAt) / 1000);
 };
 
 export interface PrValidationPlan {
@@ -90,8 +146,8 @@ if (import.meta.main) {
   if (process.argv.includes('--verify')) {
     const needs = JSON.parse(process.env.NEEDS_CONTEXT ?? '{}') as Record<string, { result?: string }>;
     const plan = JSON.parse(process.env.PLAN_JSON ?? '{}') as PrValidationPlan;
-    const startedEpoch = Number(process.env.STARTED_EPOCH);
-    const elapsedSeconds = Math.max(0, Math.floor(Date.now() / 1000) - startedEpoch);
+    const jobs = parseWorkflowJobTimings(JSON.parse(process.env.JOBS_CONTEXT ?? '{}'));
+    const elapsedSeconds = requiredExecutionElapsedSeconds(jobs, plan.lanes);
     const failures = verifyRequiredResults(
       Object.fromEntries(Object.entries(needs).map(([job, value]) => [job, value.result ?? 'missing'])),
       plan.lanes,
@@ -117,14 +173,11 @@ if (import.meta.main) {
   const pathsFile = valueAfter('--paths-file');
   if (!pathsFile) throw new Error('--paths-file is required');
   const plan = planPrValidation((await Bun.file(pathsFile).text()).split(/\r?\n/));
-  const nowEpoch = Math.floor(Date.now() / 1000);
-  const startedEpoch = resolveWorkflowStartedEpoch(process.env.WORKFLOW_STARTED_EPOCH, nowEpoch);
   const output = process.env.GITHUB_OUTPUT;
   if (output) {
     const lines = [
       ...Object.entries(plan.lanes).map(([lane, selected]) => `${lane}=${selected}`),
       `plan_json=${JSON.stringify(plan)}`,
-      `started_epoch=${startedEpoch}`,
     ];
     await Bun.write(
       output,
