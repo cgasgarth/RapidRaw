@@ -26,6 +26,7 @@ export * from './focus-stack/focusStackRetouch.js';
 export * from './focus-stack/focusStackRuntimePlan.js';
 export * from './focus-stack/focusStackSourceValidation.js';
 export * from './focus-stack/focusStackWeightedBlend.js';
+export * from './geometry/perspective/perspectiveSchemas.js';
 export * from './hdr/hdrAlignmentRuntime.js';
 export * from './hdr/hdrAppServerRuntime.js';
 export * from './hdr/hdrBracketDetection.js';
