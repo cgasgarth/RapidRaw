@@ -21,7 +21,6 @@ use crate::gpu_textures::{
 };
 use crate::image_processing::{AllAdjustments, GpuContext, MAX_MASKS};
 use crate::lut_processing::Lut;
-use crate::mixer_render::apply_native_color_mixer_adjustments_for_graph;
 use crate::render_caches::RenderCaches;
 use crate::{AppState, GpuImageCache};
 
@@ -745,7 +744,7 @@ pub enum EditGraphExecutionAuthority {
     TestOnlyLegacy,
 }
 
-fn validate_edit_graph_request(request: &RenderRequest<'_>, oversized: bool) -> Result<(), String> {
+fn validate_edit_graph_request(request: &RenderRequest<'_>) -> Result<(), String> {
     match &request.edit_graph {
         EditGraphExecutionAuthority::Compiled(edit_graph) => {
             edit_graph
@@ -755,11 +754,6 @@ fn validate_edit_graph_request(request: &RenderRequest<'_>, oversized: bool) -> 
                     request.mask_bitmaps.len(),
                 )
                 .map_err(str::to_owned)?;
-            if oversized {
-                return Err(
-                    "edit_graph.cpu_reference_executor_required_for_oversized_frame".into(),
-                );
-            }
         }
         #[cfg(all(test, feature = "tauri-test"))]
         EditGraphExecutionAuthority::TestOnlyLegacy => {}
@@ -2228,7 +2222,7 @@ mod blur_pass_tests {
     }
 
     #[test]
-    fn compiled_graph_fails_safe_when_only_the_partial_cpu_fallback_is_available() {
+    fn compiled_graph_contract_is_valid_for_cpu_fallback_admission() {
         let raw = serde_json::json!({"rawEngineEditGraphVersion": 1, "exposure": 20});
         let revision = crate::render_plan::content_revision(&raw, 1, 2, 3);
         let plan = crate::render_plan::compile_render_plan(
@@ -2248,10 +2242,7 @@ mod blur_pass_tests {
             roi: None,
             edit_graph: EditGraphExecutionAuthority::Compiled(Arc::clone(&plan.edit_graph)),
         };
-        assert_eq!(
-            validate_edit_graph_request(&request, true),
-            Err("edit_graph.cpu_reference_executor_required_for_oversized_frame".into())
-        );
+        assert_eq!(validate_edit_graph_request(&request), Ok(()));
     }
 
     #[test]
@@ -2552,7 +2543,18 @@ mod blur_pass_tests {
             )
             .unwrap();
             assert_eq!(plan.adjustments.global.edit_graph_version, version as f32);
-            process_and_get_unclamped_dynamic_image(
+            let cpu = crate::cpu_edit_graph::execute_cpu_edit_graph(
+                &source,
+                &plan.adjustments,
+                &[],
+                None,
+                &plan.edit_graph,
+            )
+            .unwrap()
+            .to_rgba32f()
+            .get_pixel(1, 1)
+            .0;
+            let gpu = process_and_get_unclamped_dynamic_image(
                 &context,
                 &state,
                 &source,
@@ -2569,7 +2571,14 @@ mod blur_pass_tests {
             .unwrap()
             .to_rgba32f()
             .get_pixel(1, 1)
-            .0
+            .0;
+            for channel in 0..3 {
+                assert!(
+                    (cpu[channel] - gpu[channel]).abs() <= 0.01,
+                    "CPU/GPU v{version} channel {channel}: cpu={cpu:?} gpu={gpu:?}"
+                );
+            }
+            gpu
         };
 
         let legacy = render(1);
@@ -2582,6 +2591,121 @@ mod blur_pass_tests {
         assert!(v2[0] > 1.0, "v2 red should retain over-range: {v2:?}");
         assert!(v2[2] < 0.0, "v2 blue should retain negative values: {v2:?}");
         assert_ne!(legacy, v2);
+    }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
+    fn cpu_reference_matches_metal_for_nonspatial_global_local_and_lut_graph() {
+        use image::{DynamicImage, ImageBuffer, Luma, Rgba};
+        use serde_json::json;
+        use tauri::Manager;
+
+        let _test_guard = GPU_TEST_LOCK.lock().unwrap();
+        let source = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(8, 8, |x, y| {
+            Rgba([
+                0.12 + x as f32 * 0.08,
+                0.18 + y as f32 * 0.07,
+                0.64 - x as f32 * 0.035,
+                1.0,
+            ])
+        }));
+        let mask = ImageBuffer::<Luma<u8>, Vec<u8>>::from_fn(8, 8, |x, _| {
+            Luma([((x as f32 / 7.0) * 255.0).round() as u8])
+        });
+        let raw = json!({
+            "rawEngineEditGraphVersion": 2,
+            "exposure": 18,
+            "brightness": -8,
+            "temperature": 12,
+            "tint": -7,
+            "contrast": 9,
+            "highlights": -12,
+            "shadows": 8,
+            "whites": 5,
+            "blacks": -4,
+            "saturation": 11,
+            "vibrance": 7,
+            "hue": 5,
+            "vignetteAmount": -12,
+            "grainAmount": 4,
+            "grainSize": 40,
+            "grainRoughness": 25,
+            "lutPath": "synthetic-cpu-parity.cube",
+            "lutIntensity": 100,
+            "levels": {
+                "enabled": true, "inputBlack": 2, "inputWhite": 98,
+                "gamma": 1.08, "outputBlack": 1, "outputWhite": 99
+            },
+            "masks": [{
+                "id":"cpu-parity-mask", "name":"CPU parity", "visible":true,
+                "invert":false, "opacity":100, "blendMode":"normal",
+                "adjustments":{"exposure":9,"contrast":-6,"saturation":8},
+                "subMasks":[]
+            }]
+        });
+        let lut = Arc::new(Lut::compile(
+            2,
+            vec![
+                0.02, 0.01, 0.0, 0.98, 0.03, 0.02, 0.01, 0.97, 0.04, 0.97, 0.96, 0.06, 0.03, 0.04,
+                0.95, 0.95, 0.97, 0.08, 0.06, 0.95, 0.97, 0.94, 0.96, 0.98,
+            ],
+        ));
+        let plan = crate::render_plan::compile_render_plan(
+            &raw,
+            crate::render_plan::CompileRenderPlanContext {
+                revision: crate::render_plan::content_revision(&raw, 1, 2, 3),
+                is_raw: false,
+                tonemapper_override: Some(0),
+            },
+            Some(Arc::clone(&lut)),
+        )
+        .unwrap();
+        let cpu = crate::cpu_edit_graph::execute_cpu_edit_graph(
+            &source,
+            &plan.adjustments,
+            std::slice::from_ref(&mask),
+            Some(&lut),
+            &plan.edit_graph,
+        )
+        .unwrap()
+        .to_rgba32f();
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .unwrap();
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state).unwrap();
+        let gpu = process_and_get_unclamped_dynamic_image(
+            &context,
+            &state,
+            &source,
+            PreGpuImageIdentity::for_source(&source, "cpu-reference-nonspatial"),
+            RenderRequest {
+                adjustments: plan.adjustments,
+                mask_bitmaps: std::slice::from_ref(&mask),
+                lut: Some(lut),
+                roi: None,
+                edit_graph: EditGraphExecutionAuthority::Compiled(plan.edit_graph),
+            },
+            "cpu_reference_nonspatial",
+        )
+        .unwrap()
+        .to_rgba32f();
+
+        let mut maximum = (0.0_f32, 0_u32, 0_u32, [0.0; 4], [0.0; 4]);
+        for y in 0..8 {
+            for x in 0..8 {
+                let cpu_pixel = cpu.get_pixel(x, y).0;
+                let gpu_pixel = gpu.get_pixel(x, y).0;
+                let error = (0..3)
+                    .map(|channel| (cpu_pixel[channel] - gpu_pixel[channel]).abs())
+                    .fold(0.0_f32, f32::max);
+                if error > maximum.0 {
+                    maximum = (error, x, y, cpu_pixel, gpu_pixel);
+                }
+            }
+        }
+        assert!(maximum.0 <= 0.035, "maximum CPU/GPU mismatch={maximum:?}");
     }
 
     #[cfg(feature = "tauri-test")]
@@ -2999,20 +3123,31 @@ fn process_and_get_dynamic_image_inner(
     let device_generation = context.generation;
 
     let max_dim = context.limits.max_texture_dimension_2d;
-    validate_edit_graph_request(&request, width > max_dim || height > max_dim)?;
+    validate_edit_graph_request(&request)?;
     if width > max_dim || height > max_dim {
         log::warn!(
-            "Image dimensions ({}x{}) exceed GPU limits ({}). Bypassing GPU processing and returning unprocessed image to prevent a crash. Try upgrading your GPU :)",
+            "Image dimensions ({}x{}) exceed GPU limits ({}); executing the compiled CPU reference graph",
             width,
             height,
             max_dim
         );
-        return Ok(apply_native_color_mixer_adjustments_for_graph(
-            std::borrow::Cow::Borrowed(base_image),
-            &request.adjustments.global,
-            request.adjustments.global.edit_graph_version >= 2.0,
+        #[cfg(not(all(test, feature = "tauri-test")))]
+        let EditGraphExecutionAuthority::Compiled(edit_graph) = &request.edit_graph;
+        #[cfg(all(test, feature = "tauri-test"))]
+        let edit_graph = match &request.edit_graph {
+            EditGraphExecutionAuthority::Compiled(edit_graph) => edit_graph,
+            EditGraphExecutionAuthority::TestOnlyLegacy => {
+                return Err("edit_graph.cpu_reference_requires_compiled_authority".into());
+            }
+        };
+        return crate::cpu_edit_graph::execute_cpu_edit_graph(
+            base_image,
+            &request.adjustments,
+            request.mask_bitmaps,
+            request.lut.as_deref(),
+            edit_graph,
         )
-        .into_owned());
+        .map_err(str::to_owned);
     }
 
     let mut old_processor = None;

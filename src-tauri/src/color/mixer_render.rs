@@ -1,11 +1,15 @@
+#[cfg(test)]
 use std::borrow::Cow;
 
+#[cfg(test)]
 use image::{DynamicImage, ImageBuffer, Rgba};
+#[cfg(test)]
 use rayon::prelude::*;
 
+#[cfg(test)]
+use crate::adjustments::abi::GlobalAdjustments;
 use crate::adjustments::abi::{
     BlackWhiteMixerSettings, ChannelMixerRow, ChannelMixerSettings, ColorBalanceRgbSettings,
-    GlobalAdjustments,
 };
 
 const REC709_RED: f32 = 0.2126;
@@ -24,6 +28,7 @@ pub(crate) fn apply_native_color_mixer_adjustments<'a>(
     apply_native_color_mixer_adjustments_for_graph(image, global, false)
 }
 
+#[cfg(test)]
 pub(crate) fn apply_native_color_mixer_adjustments_for_graph<'a>(
     image: Cow<'a, DynamicImage>,
     global: &GlobalAdjustments,
@@ -49,13 +54,14 @@ pub(crate) fn apply_native_color_mixer_adjustments_for_graph<'a>(
     Cow::Owned(DynamicImage::ImageRgba32F(rendered))
 }
 
+#[cfg(test)]
 pub(crate) fn has_active_native_color_mixer_adjustments(global: &GlobalAdjustments) -> bool {
     global.color_balance_rgb.enabled != 0
         || global.channel_mixer.enabled != 0
         || global.black_white_mixer.enabled != 0
 }
 
-fn apply_color_balance_rgb(
+pub(crate) fn apply_color_balance_rgb(
     color: [f32; 3],
     settings: ColorBalanceRgbSettings,
     preserve_extended: bool,
@@ -106,7 +112,7 @@ fn color_balance_rgb_weights(luma: f32) -> [f32; 3] {
     [shadows / total, midtones / total, highlights / total]
 }
 
-fn apply_channel_mixer(
+pub(crate) fn apply_channel_mixer(
     color: [f32; 3],
     settings: ChannelMixerSettings,
     preserve_extended: bool,
@@ -142,7 +148,7 @@ fn apply_channel_mixer_row(color: [f32; 3], row: ChannelMixerRow, preserve_exten
     }
 }
 
-fn apply_black_white_mixer(
+pub(crate) fn apply_black_white_mixer(
     color: [f32; 3],
     settings: BlackWhiteMixerSettings,
     preserve_extended: bool,
