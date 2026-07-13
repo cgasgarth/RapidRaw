@@ -63,3 +63,6 @@ export const reconcileReferenceMatchReceiptsAfterEdit = (previous: Adjustments, 
   }
   return reconciledMasks === reconciled.masks ? reconciled : { ...reconciled, masks: reconciledMasks };
 };
+
+export const buildReceiptSafePresetApplication = (current: Adjustments, patch: Partial<Adjustments>): Adjustments =>
+  reconcileReferenceMatchReceiptsAfterEdit(current, { ...current, ...patch });
