@@ -320,6 +320,9 @@ pub(crate) fn execute_cpu_edit_graph(
             preserve_extended,
         ));
         color = apply_vignette(color, x, y, width, height, adjustments);
+        if let Some(curve) = graph.scene_curve() {
+            color = Vec3::from_array(curve.evaluate_rgb(color.to_array()));
+        }
         if preserve_extended {
             // V2 crosses a real RGBA16F scene intermediate before the view
             // dispatch. Mirror its finite storage range in the CPU reference.
@@ -358,6 +361,9 @@ pub(crate) fn execute_cpu_edit_graph(
             );
         }
         color = apply_grain(color, x, y, width, height, adjustments);
+        if let Some(curve) = graph.output_curve() {
+            color = Vec3::from_array(curve.evaluate_rgb(color.to_array()));
+        }
 
         if adjustments.global.show_clipping == 1 {
             if color.cmpgt(Vec3::splat(0.998)).any() {
