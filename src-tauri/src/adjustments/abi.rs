@@ -128,8 +128,8 @@ pub struct BlackWhiteMixerSettings {
     pub purples: f32,
     pub magentas: f32,
     pub enabled: u32,
-    pub(crate) _pad1: u32,
-    pub(crate) _pad2: u32,
+    pub(crate) process: u32,
+    pub(crate) implementation_version: u32,
     pub(crate) _pad3: u32,
 }
 
