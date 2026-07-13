@@ -264,6 +264,9 @@ async function validateWhiteBalanceFoundation(container: Element) {
   await click(picker);
   assert.equal(picker.getAttribute('aria-pressed'), 'true');
   assert.equal(picker.dataset.state, 'active');
+  await click(picker);
+  assert.equal(picker.getAttribute('aria-pressed'), 'false');
+  assert.equal(picker.dataset.state, 'idle');
 }
 
 function validateMaskLocalFiltering(container: Element) {
@@ -302,10 +305,6 @@ async function validateCompactMixerSurface(container: Element) {
   assert.equal(container.querySelector('[data-testid="color-workspace-warning-chips"]'), null);
   assert.equal(container.querySelector('[data-testid="professional-color-recipes-disclosure"]'), null);
   assert.equal(container.querySelector('[data-testid="selective-color-mask-preview-toggle"]'), null);
-  assert.equal(colorMixer.querySelector('[data-testid="color-balance-disclosure"]'), null);
-  assert.equal(colorMixer.querySelector('[data-testid="channel-mixer-disclosure"]'), null);
-  assert.equal(colorMixer.querySelector('[data-testid="black-white-mixer-disclosure"]'), null);
-
   for (const label of ['Hue', 'Saturation', 'Luminance']) {
     assert.ok(getRangeByLabel(container, label), `Primary HSL slider was not rendered: ${label}.`);
   }

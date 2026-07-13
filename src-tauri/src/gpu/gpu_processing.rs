@@ -2579,23 +2579,35 @@ mod blur_pass_tests {
             .get_pixel(0, 0)
             .0
         };
-        let baseline = render(AllAdjustments::default());
-        let mut adjusted = AllAdjustments::default();
-        let rows = crate::color::white_balance::technical_ap1_matrix(2_856.0, 0.018).unwrap();
-        adjusted.global.technical_white_balance = crate::adjustments::abi::GpuMat3 {
-            col0: [rows[0][0], rows[1][0], rows[2][0], 0.0],
-            col1: [rows[0][1], rows[1][1], rows[2][1], 0.0],
-            col2: [rows[0][2], rows[1][2], rows[2][2], 0.0],
-        };
-        adjusted.global.temperature = 1.6;
-        adjusted.global.tint = -0.2;
-        let changed = render(adjusted);
+        let baseline = render(crate::adjustments::parse::get_all_adjustments_from_json(
+            &serde_json::json!({}),
+            true,
+            Some(1),
+        ));
+        let adjusted = render(crate::adjustments::parse::get_all_adjustments_from_json(
+            &serde_json::json!({
+                "creativeTemperature": 40.0,
+                "creativeTint": -20.0,
+                "exposure": -8.0,
+                "whiteBalanceTechnical": {
+                    "mode": "kelvin_tint",
+                    "kelvin": 2856.0,
+                    "duv": 0.018
+                }
+            }),
+            true,
+            Some(1),
+        ));
+        assert!(
+            baseline[..3].iter().any(|channel| *channel < 0.95),
+            "neutral RAW AgX render unexpectedly clipped: {baseline:?}"
+        );
         assert!(
             baseline[..3]
                 .iter()
-                .zip(&changed[..3])
+                .zip(&adjusted[..3])
                 .any(|(before, after)| (before - after).abs() > 0.001),
-            "baseline={baseline:?} changed={changed:?}"
+            "baseline={baseline:?} adjusted={adjusted:?}"
         );
     }
 

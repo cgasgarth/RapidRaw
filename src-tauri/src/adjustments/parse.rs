@@ -502,6 +502,9 @@ fn get_global_adjustments_from_json(
         _pad_agx1: 0.0,
         _pad_agx2: 0.0,
         _pad_agx3: 0.0,
+        _pad_wgsl_agx_align1: 0.0,
+        _pad_wgsl_agx_align2: 0.0,
+        _pad_wgsl_agx_align3: 0.0,
         agx_pipe_to_rendering_matrix: pipe_to_rendering,
         agx_rendering_to_pipe_matrix: rendering_to_pipe,
         _pad_cg1: 0.0,
@@ -606,9 +609,6 @@ fn get_global_adjustments_from_json(
             SCALES.sharpness_threshold,
             Some(15.0),
         ),
-        _pad_wgsl_tail1: 0.0,
-        _pad_wgsl_tail2: 0.0,
-        _pad_wgsl_tail3: 0.0,
     }
 }
 
