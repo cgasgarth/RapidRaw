@@ -6,6 +6,8 @@ import type { AnalyticsResourceDescriptor, WaveformData } from '../../components
 import { Status } from '../../components/ui/ExportImportProperties';
 import {
   gamutWarningOverlayPayloadSchema,
+  nativeQaOpenFixturePayloadSchema,
+  nativeQaResetPayloadSchema,
   parseCountPayload,
   parseCullingProgressPayload,
   parseCullingSuggestionsPayload,
@@ -42,6 +44,7 @@ import {
   hasCommittedExportOutputs,
   shouldRefreshLibraryForExportReceipt,
 } from '../../utils/export/exportTerminalReceipt';
+import { applyNativeQaOpenFixture, applyNativeQaReset } from '../../utils/nativeQaControlEvents';
 import {
   AI_MODEL_DOWNLOAD_FINISH_EVENT,
   AI_MODEL_DOWNLOAD_START_EVENT,
@@ -70,6 +73,8 @@ import {
   INDEXING_FINISHED_EVENT,
   INDEXING_PROGRESS_EVENT,
   INDEXING_STARTED_EVENT,
+  NATIVE_QA_OPEN_FIXTURE_EVENT,
+  NATIVE_QA_RESET_EVENT,
   OPEN_WITH_FILE_EVENT,
   PANORAMA_COMPLETE_EVENT,
   PANORAMA_ERROR_EVENT,
@@ -88,9 +93,12 @@ import { thumbnailResourceCache } from '../../utils/thumbnailResources';
 
 interface TauriListenerProps {
   invalidateThumbnailRevision: (path: string, sourceRevision: string) => void;
+  openImagePath: (path: string) => void;
   refreshAllFolderTrees: () => void;
   refreshImageList: () => void;
   markGenerated: (path: string, generation?: number) => boolean;
+  resetToEmpty: () => void;
+  resetToLibrary: () => void;
 }
 
 interface ImageAnalyticsPayload<TData> {
@@ -156,9 +164,12 @@ const buildPreviewScopeStatus = ({
 
 export function useTauriListeners({
   invalidateThumbnailRevision,
+  openImagePath,
   refreshAllFolderTrees,
   refreshImageList,
   markGenerated,
+  resetToEmpty,
+  resetToLibrary,
 }: TauriListenerProps) {
   const refs = useRef({ invalidateThumbnailRevision, refreshAllFolderTrees, refreshImageList, markGenerated });
 
@@ -326,8 +337,17 @@ export function useTauriListeners({
         }
       }),
       listen<unknown>(OPEN_WITH_FILE_EVENT, (event) => {
-        if (isEffectActive)
-          useProcessStore.getState().setProcess({ initialFileToOpen: parseStringPayload(event.payload) });
+        if (isEffectActive) openImagePath(parseStringPayload(event.payload));
+      }),
+      listen<unknown>(NATIVE_QA_RESET_EVENT, (event) => {
+        if (!isEffectActive) return;
+        const payload = nativeQaResetPayloadSchema.parse(event.payload);
+        applyNativeQaReset(payload, { openImagePath, resetToEmpty, resetToLibrary });
+      }),
+      listen<unknown>(NATIVE_QA_OPEN_FIXTURE_EVENT, (event) => {
+        if (!isEffectActive) return;
+        const payload = nativeQaOpenFixturePayloadSchema.parse(event.payload);
+        applyNativeQaOpenFixture(payload, { openImagePath, resetToEmpty, resetToLibrary });
       }),
       listen<ImageAnalyticsPayload<WaveformData>>(WAVEFORM_UPDATE_EVENT, (event) => {
         if (isEffectActive && event.payload.path === useEditorStore.getState().selectedImage?.path) {

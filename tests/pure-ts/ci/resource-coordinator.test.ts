@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -13,6 +13,33 @@ const temporaryRoot = async (): Promise<string> => {
   const root = await mkdtemp(join(tmpdir(), 'rapidraw-resource-coordinator-'));
   temporaryRoots.push(root);
   return root;
+};
+
+const waitFor = async (condition: () => Promise<boolean>, message: string): Promise<void> => {
+  for (let attempt = 0; attempt < 500; attempt += 1) {
+    if (await condition()) return;
+    await Bun.sleep(10);
+  }
+  throw new Error(message);
+};
+
+const queuedLabels = async (root: string): Promise<string[]> => {
+  const queue = join(root, 'native-heavy.queue');
+  const entries = await readdir(queue).catch(() => []);
+  return await Promise.all(
+    entries
+      .filter((entry) => entry.endsWith('.json'))
+      .map(async (entry) => JSON.parse(await readFile(join(queue, entry), 'utf8')).label as string),
+  );
+};
+
+const directLease = (root: string, script: string) => {
+  const modulePath = join(import.meta.dir, '../../../scripts/lib/ci/resource-coordinator.ts');
+  return Bun.spawn(['bun', '-e', `import { acquireResourceLease } from ${JSON.stringify(modulePath)};${script}`], {
+    env: { ...Bun.env, RAWENGINE_RESOURCE_COORDINATOR_ROOT: root, RAWENGINE_RESOURCE_WAIT_POLL_MS: '10' },
+    stderr: 'pipe',
+    stdout: 'pipe',
+  });
 };
 
 const coordinated = (root: string, label: string, script: string) =>
@@ -56,6 +83,78 @@ const seedStaleLock = async (root: string, label: string): Promise<void> => {
 };
 
 describe('cross-worktree resource coordinator', () => {
+  test('hands a released lease to the oldest waiter before an immediate reacquirer', async () => {
+    const root = await temporaryRoot();
+    const releaseFirst = join(root, 'release-first');
+    const benchmark = directLease(
+      root,
+      `const first=await acquireResourceLease({resource:'native-heavy',label:'benchmark'});
+console.log('benchmark-first '+Date.now());
+while(!(await Bun.file(${JSON.stringify(releaseFirst)}).exists())) await Bun.sleep(10);
+await first.release();
+const second=await acquireResourceLease({resource:'native-heavy',label:'benchmark-reacquire'});
+console.log('benchmark-second '+Date.now());
+await second.release();`,
+    );
+    await waitFor(
+      async () => (await readFile(join(root, 'native-heavy.owner.json'), 'utf8').catch(() => '')).includes('benchmark'),
+      'benchmark never acquired the initial lease',
+    );
+    const publish = directLease(
+      root,
+      `const lease=await acquireResourceLease({resource:'native-heavy',label:'publish-waiter'});
+console.log('publish '+Date.now());
+await Bun.sleep(50);
+await lease.release();`,
+    );
+    await waitFor(async () => (await queuedLabels(root)).includes('publish-waiter'), 'publish waiter never queued');
+    await writeFile(releaseFirst, 'release\n');
+    expect(await benchmark.exited).toBe(0);
+    expect(await publish.exited).toBe(0);
+    const benchmarkOutput = await new Response(benchmark.stdout).text();
+    const publishOutput = await new Response(publish.stdout).text();
+    const secondAt = Number(benchmarkOutput.match(/benchmark-second (\d+)/)?.[1]);
+    const publishAt = Number(publishOutput.match(/publish (\d+)/)?.[1]);
+    expect(publishAt).toBeLessThanOrEqual(secondAt);
+    expect(benchmarkOutput).toContain('benchmark-reacquire waiting for native-heavy: publish-waiter pid=');
+    expect(await queuedLabels(root)).toEqual([]);
+  });
+
+  test('reaps a killed oldest waiter without skipping the next live ticket', async () => {
+    const root = await temporaryRoot();
+    const releaseHolder = join(root, 'release-holder');
+    const holder = directLease(
+      root,
+      `const lease=await acquireResourceLease({resource:'native-heavy',label:'holder'});
+while(!(await Bun.file(${JSON.stringify(releaseHolder)}).exists())) await Bun.sleep(10);
+await lease.release();`,
+    );
+    await waitFor(
+      async () => (await readFile(join(root, 'native-heavy.owner.json'), 'utf8').catch(() => '')).includes('holder'),
+      'holder never acquired its lease',
+    );
+    const killed = directLease(
+      root,
+      `const lease=await acquireResourceLease({resource:'native-heavy',label:'killed-waiter'});await lease.release();`,
+    );
+    await waitFor(async () => (await queuedLabels(root)).includes('killed-waiter'), 'killed waiter never queued');
+    killed.kill('SIGKILL');
+    await killed.exited;
+    const follower = directLease(
+      root,
+      `const lease=await acquireResourceLease({resource:'native-heavy',label:'live-follower'});
+console.log('follower-acquired');
+await lease.release();`,
+    );
+    await waitFor(async () => (await queuedLabels(root)).includes('live-follower'), 'live follower never queued');
+    await writeFile(releaseHolder, 'release\n');
+    expect(await holder.exited).toBe(0);
+    expect(await follower.exited).toBe(0);
+    expect(await new Response(follower.stdout).text()).toContain('follower-acquired');
+    expect(await queuedLabels(root)).toEqual([]);
+    expect(await Bun.file(join(root, 'native-heavy.lock')).exists()).toBeFalse();
+  });
+
   test('serializes heavy processes while an uncoordinated lightweight process still runs', async () => {
     const root = await temporaryRoot();
     const first = coordinated(
@@ -144,7 +243,9 @@ describe('cross-worktree resource coordinator', () => {
     const followerOutput = await new Response(follower.stdout).text();
     const orphanEnd = Number(orphanOutput.match(/orphan-end (\d+)/)?.[1]);
     const followerStart = Number(followerOutput.match(/follower-start (\d+)/)?.[1]);
-    expect(followerOutput).toContain('post-kill-follower waiting for native-heavy: interrupted-successor pid=');
+    expect(followerOutput).toMatch(
+      /post-kill-follower (?:waiting for native-heavy:|recovered stale native-heavy:) interrupted-successor pid=/u,
+    );
     expect(followerStart).toBeGreaterThanOrEqual(orphanEnd);
   });
 });
