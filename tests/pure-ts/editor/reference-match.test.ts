@@ -272,6 +272,7 @@ describe('color-managed reference matching', () => {
         proposal,
       }),
       appliedAt: '2026-07-13T12:00:00.000Z',
+      baseGraphFingerprint: fingerprintReferenceMatchValue('reference-layer-base-graph'),
       destination: 'adjustment-layer',
       effectiveReferences: proposal.effectiveReferences,
       enabledGroups: ['tone'],

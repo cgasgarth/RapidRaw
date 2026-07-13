@@ -140,6 +140,7 @@ export const matchLookApplicationReceiptV1Schema = z
   .object({
     appliedDiffs: z.array(appliedNodeDiffV1Schema).min(1).max(6),
     appliedAt: z.string().datetime(),
+    baseGraphFingerprint: fingerprintSchema,
     destination: z.enum(['global-adjustments', 'adjustment-layer']),
     effectiveReferences: effectiveReferenceSetV1Schema,
     enabledGroups: z.array(referenceMatchGroupV1Schema).min(1),

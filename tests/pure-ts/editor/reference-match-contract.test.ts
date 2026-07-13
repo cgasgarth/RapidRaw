@@ -41,6 +41,7 @@ describe('reference match runtime contracts', () => {
       matchLookApplicationReceiptV1Schema.parse({
         appliedDiffs: [{ after: 0.8, before: 0, key: 'exposure' }],
         appliedAt: '2026-07-13T19:00:00.000Z',
+        baseGraphFingerprint: fingerprint('0'),
         destination: 'global-adjustments',
         effectiveReferences: proposal.effectiveReferences,
         enabledGroups: ['tone'],
@@ -93,6 +94,7 @@ describe('reference match runtime contracts', () => {
     const baseReceipt = {
       appliedDiffs: [{ after: 0.5, before: 0, key: 'exposure' }],
       appliedAt: '2026-07-13T19:00:00.000Z',
+      baseGraphFingerprint: fingerprint('0'),
       effectiveReferences: [{ role: 'technical', sourceFingerprint: fingerprint('4'), weight: 1 }],
       enabledGroups: ['tone'],
       historyEntriesAdded: 1,
