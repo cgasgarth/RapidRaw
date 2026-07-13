@@ -369,6 +369,18 @@ fn prefetch_key(path: &str) -> String {
         .into_owned()
 }
 
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+pub(crate) fn promote_editor_initialization(app: &AppHandle) {
+    crate::app::startup::request_gpu_initialization(
+        app.clone(),
+        crate::app::startup::InitializationPriority::EditorDemand,
+    );
+    crate::app::startup::request_lens_initialization(
+        app.clone(),
+        crate::app::startup::InitializationPriority::EditorDemand,
+    );
+}
+
 #[tauri::command]
 pub async fn begin_image_open(
     request: BeginImageOpenRequest,
@@ -387,6 +399,8 @@ pub async fn begin_image_open(
     {
         return Err("image_open_revision_mismatch".to_string());
     }
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    promote_editor_initialization(&app);
     let joined = state
         .image_open_coordinator
         .begin_foreground(&request.session_id, &request.path)?;

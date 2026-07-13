@@ -121,13 +121,27 @@ jobs:
         uses: ./.github/actions/setup-bun-deps
 
       - id: tauri-build
-        name: Build no-bundle app smoke
+        name: Build app smoke
         uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # action-v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: --verbose --ci --no-bundle --target aarch64-apple-darwin
+          args: --verbose --ci --bundles app --target aarch64-apple-darwin --features required-ci,validation-harness
           retryAttempts: 3
+
+      - name: Verify optimized validation app layout
+        run: |
+          find src-tauri/target/aarch64-apple-darwin/release/bundle/macos -maxdepth 3 -print
+          test -d src-tauri/target/aarch64-apple-darwin/release/bundle/macos/RapidRAW.app
+          test -f src-tauri/target/aarch64-apple-darwin/release/bundle/macos/RapidRAW.app.tar.gz
+
+      - name: Upload optimized validation app
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: main-native-startup-${{ github.run_id }}-${{ github.run_attempt }}
+          path: src-tauri/target/aarch64-apple-darwin/release/bundle/macos/RapidRAW.app.tar.gz
+          if-no-files-found: error
+          retention-days: 1
 
       - name: Collect smoke failure diagnostics
         if: ${{ failure() }}
@@ -177,3 +191,31 @@ jobs:
           retention-days: 7
           compression-level: 6
           if-no-files-found: warn
+
+  main-macos-startup-runtime:
+    name: macOS app startup runtime
+    needs: main-macos-app-build
+    if: ${{ always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && needs.main-macos-app-build.result == 'success' }}
+    runs-on: macos-14
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: ./.github/actions/setup-bun-deps
+
+      - name: Download optimized validation binary on a clean runtime runner
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.0
+        with:
+          name: main-native-startup-${{ github.run_id }}-${{ github.run_attempt }}
+          path: native-startup
+
+      - name: Run bounded native startup benchmark
+        env:
+          RAWENGINE_STARTUP_HARDWARE_CLASS: github-hosted-macos-arm64
+        run: |
+          tar -xzf native-startup/RapidRAW.app.tar.gz -C native-startup
+          test -x native-startup/RapidRAW.app/Contents/MacOS/RapidRAW
+          xattr -cr native-startup/RapidRAW.app
+          codesign --force --deep --sign - --timestamp=none native-startup/RapidRAW.app
+          codesign --verify --deep --strict native-startup/RapidRAW.app
+          bun scripts/benchmarks/startup-native.ts --binary native-startup/RapidRAW.app/Contents/MacOS/RapidRAW --pairs 30

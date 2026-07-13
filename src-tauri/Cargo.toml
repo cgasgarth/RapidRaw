@@ -20,11 +20,13 @@ name = "rapidraw_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [features]
-default = ["required-ci", "ai"]
+default = ["full", "required-ci"]
 ai = ["dep:rapidraw-ai"]
 advanced-codecs = ["rapidraw-codecs/advanced"]
+fast-dev = []
+full = ["advanced-codecs", "ai"]
 panorama-opencv-spike = ["rapidraw-computational/opencv-panorama"]
-required-ci = ["advanced-codecs", "rapidraw-ai?/compile-only"]
+required-ci = ["full", "rapidraw-ai?/compile-only"]
 tauri-test = ["tauri/test"]
 validation-harness = []
 
@@ -33,7 +35,7 @@ rapidraw-types = { path = "crates/rapidraw-types" }
 rapidraw-ai = { path = "crates/rapidraw-ai", optional = true }
 rapidraw-codecs = { path = "crates/rapidraw-codecs", default-features = false, features = ["jpeg"] }
 rapidraw-computational = { path = "crates/rapidraw-computational" }
-tauri = { version = "2.11", features = [ "macos-private-api", "rustls-tls" ] }
+tauri = { version = "2.11", features = [ "macos-private-api", "rustls-tls", "unstable" ] }
 tauri-plugin-dialog = "2.7.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

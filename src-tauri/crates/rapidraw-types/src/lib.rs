@@ -36,6 +36,23 @@ pub enum CapabilityUnavailableCode {
     CapabilityUnavailable,
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum NativeBuildProfile {
+    FastDev,
+    Full,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct NativeCapabilityManifest {
+    pub schema_version: u32,
+    pub build_profile: NativeBuildProfile,
+    pub ai: bool,
+    pub advanced_codecs: bool,
+    pub computational: bool,
+}
+
 impl CapabilityUnavailable {
     #[must_use]
     pub const fn new(capability: NativeCapability) -> Self {
@@ -70,6 +87,27 @@ mod tests {
             serde_json::json!({
                 "code": "capability_unavailable",
                 "capability": "advancedCodecs"
+            })
+        );
+    }
+
+    #[test]
+    fn capability_manifest_has_stable_frontend_wire_shape() {
+        assert_eq!(
+            serde_json::to_value(NativeCapabilityManifest {
+                schema_version: 1,
+                build_profile: NativeBuildProfile::FastDev,
+                ai: false,
+                advanced_codecs: false,
+                computational: true,
+            })
+            .unwrap(),
+            serde_json::json!({
+                "schemaVersion": 1,
+                "buildProfile": "fast_dev",
+                "ai": false,
+                "advancedCodecs": false,
+                "computational": true
             })
         );
     }
