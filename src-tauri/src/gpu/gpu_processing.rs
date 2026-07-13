@@ -82,27 +82,16 @@ pub fn gpu_input_cache_counters() -> GpuInputCacheCounters {
     }
 }
 
-#[cfg(all(test, feature = "tauri-test"))]
-pub fn reset_gpu_input_cache_counters() {
-    for counter in [
-        &INPUT_CACHE_HITS,
-        &INPUT_CACHE_MISSES,
-        &INPUT_IDENTITY_MISSES,
-        &INPUT_DIMENSION_MISSES,
-        &INPUT_DEVICE_MISSES,
-        &TO_RGBA_F16_CALLS,
-        &CONVERTED_BYTES,
-        &UPLOADED_BYTES,
-        &INPUT_TEXTURE_ALLOCATIONS,
-        &INPUT_VIEW_ALLOCATIONS,
-        &PIXEL_REVISION_VERIFY_CALLS,
-        &PIXEL_REVISION_VERIFY_BYTES,
-        &PIXEL_REVISION_VERIFY_MICROS,
-        &PIXEL_REVISION_DISAGREEMENTS,
-        &PIXEL_REVISION_CONSTRUCTIONS,
-    ] {
-        counter.store(0, Ordering::Relaxed);
-    }
+#[cfg(test)]
+pub fn gpu_input_cache_counters_for_state(state: &AppState) -> GpuInputCacheCounters {
+    *state.gpu_input_cache_counters.lock().unwrap()
+}
+
+fn update_state_gpu_input_cache_counters(
+    state: &AppState,
+    update: impl FnOnce(&mut GpuInputCacheCounters),
+) {
+    update(&mut state.gpu_input_cache_counters.lock().unwrap());
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -2556,6 +2545,38 @@ mod blur_pass_tests {
     }
 
     #[test]
+    fn state_scoped_input_counters_ignore_concurrent_unrelated_gpu_activity() {
+        let primary = Arc::new(AppState::new());
+        let unrelated = Arc::new(AppState::new());
+        let primary_worker = Arc::clone(&primary);
+        let unrelated_worker = Arc::clone(&unrelated);
+        let primary_thread = std::thread::spawn(move || {
+            for _ in 0..1_000 {
+                update_state_gpu_input_cache_counters(&primary_worker, |counters| {
+                    counters.hits += 1;
+                });
+            }
+        });
+        let unrelated_thread = std::thread::spawn(move || {
+            for _ in 0..2_000 {
+                update_state_gpu_input_cache_counters(&unrelated_worker, |counters| {
+                    counters.hits += 1;
+                    counters.to_rgba_f16_calls += 1;
+                });
+            }
+        });
+        primary_thread.join().unwrap();
+        unrelated_thread.join().unwrap();
+
+        let primary = gpu_input_cache_counters_for_state(&primary);
+        let unrelated = gpu_input_cache_counters_for_state(&unrelated);
+        assert_eq!(primary.hits, 1_000);
+        assert_eq!(primary.to_rgba_f16_calls, 0);
+        assert_eq!(unrelated.hits, 2_000);
+        assert_eq!(unrelated.to_rgba_f16_calls, 2_000);
+    }
+
+    #[test]
     fn no_op_preserves_revision_and_semantic_transform_derives_a_new_one() {
         use image::{ImageBuffer, Rgba};
 
@@ -2945,7 +2966,6 @@ mod blur_pass_tests {
         use tauri::Manager;
 
         let _test_guard = GPU_TEST_LOCK.lock().unwrap();
-        reset_gpu_input_cache_counters();
         let source = DynamicImage::ImageRgba32F(ImageBuffer::from_pixel(
             16,
             16,
@@ -2992,7 +3012,7 @@ mod blur_pass_tests {
             }
         }
 
-        let counters = gpu_input_cache_counters();
+        let counters = gpu_input_cache_counters_for_state(&state);
         assert_eq!(counters.to_rgba_f16_calls, 1);
         assert_eq!(counters.texture_allocations, 1);
         assert_eq!(counters.view_allocations, 1);
@@ -3031,7 +3051,6 @@ mod blur_pass_tests {
         use tauri::Manager;
 
         let _test_guard = GPU_TEST_LOCK.lock().unwrap();
-        reset_gpu_input_cache_counters();
         let source_path = std::env::var("RAWENGINE_PRIVATE_RAW_SOURCE")
             .expect("RAWENGINE_PRIVATE_RAW_SOURCE must select a private RAW");
         let bytes = std::fs::read(&source_path).expect("read private RAW bytes");
@@ -3081,7 +3100,7 @@ mod blur_pass_tests {
         let first = render(0.0).to_rgba16().into_raw();
         let changed = render(0.75).to_rgba16().into_raw();
         let repeated = render(0.0).to_rgba16().into_raw();
-        let counters = gpu_input_cache_counters();
+        let counters = gpu_input_cache_counters_for_state(&state);
 
         assert_ne!(first, changed);
         assert_eq!(first, repeated);
@@ -3439,10 +3458,19 @@ fn process_and_get_dynamic_image_inner(
     if let Some(cache) = state.gpu_image_cache.lock().unwrap().as_ref() {
         if cache.device_generation != device_generation {
             INPUT_DEVICE_MISSES.fetch_add(1, Ordering::Relaxed);
+            update_state_gpu_input_cache_counters(state, |counters| {
+                counters.device_misses += 1;
+            });
         } else if cache.width != width || cache.height != height {
             INPUT_DIMENSION_MISSES.fetch_add(1, Ordering::Relaxed);
+            update_state_gpu_input_cache_counters(state, |counters| {
+                counters.dimension_misses += 1;
+            });
         } else if cache.pre_gpu_identity != pre_gpu_identity {
             INPUT_IDENTITY_MISSES.fetch_add(1, Ordering::Relaxed);
+            update_state_gpu_input_cache_counters(state, |counters| {
+                counters.identity_misses += 1;
+            });
         }
     }
     RenderCaches::new(state).clear_stale_gpu_image_cache(
@@ -3461,6 +3489,12 @@ fn process_and_get_dynamic_image_inner(
         let rgba32f_temporary_bytes = u64::from(width) * u64::from(height) * 4 * 4;
         CONVERTED_BYTES.fetch_add(rgba32f_temporary_bytes + upload_bytes, Ordering::Relaxed);
         UPLOADED_BYTES.fetch_add(upload_bytes, Ordering::Relaxed);
+        update_state_gpu_input_cache_counters(state, |counters| {
+            counters.misses += 1;
+            counters.to_rgba_f16_calls += 1;
+            counters.converted_bytes += rgba32f_temporary_bytes + upload_bytes;
+            counters.uploaded_bytes += upload_bytes;
+        });
         let texture_size = wgpu::Extent3d {
             width,
             height,
@@ -3484,6 +3518,10 @@ fn process_and_get_dynamic_image_inner(
         INPUT_TEXTURE_ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
         let texture_view = texture.create_view(&Default::default());
         INPUT_VIEW_ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
+        update_state_gpu_input_cache_counters(state, |counters| {
+            counters.texture_allocations += 1;
+            counters.view_allocations += 1;
+        });
 
         *cache_lock = Some(GpuImageCache {
             texture,
@@ -3495,6 +3533,9 @@ fn process_and_get_dynamic_image_inner(
         });
     } else {
         INPUT_CACHE_HITS.fetch_add(1, Ordering::Relaxed);
+        update_state_gpu_input_cache_counters(state, |counters| {
+            counters.hits += 1;
+        });
     }
     log::debug!("GPU input cache counters: {:?}", gpu_input_cache_counters());
 
