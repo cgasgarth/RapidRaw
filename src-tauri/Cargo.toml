@@ -10,6 +10,7 @@ members = [
   ".",
   "crates/rapidraw-ai",
   "crates/rapidraw-codecs",
+  "crates/rapidraw-color-reference",
   "crates/rapidraw-computational",
   "crates/rapidraw-types",
 ]
@@ -114,6 +115,7 @@ tauri-build = { version = "2.6", features = [] }
 
 [dev-dependencies]
 image-hdr = { version = "0.6.0", default-features = false }
+rapidraw-color-reference = { path = "crates/rapidraw-color-reference" }
 
 [package.metadata.cargo-machete]
 ignored = ["tauri-build"]

@@ -292,6 +292,7 @@ const adjustmentsPanelRetuneRawImage: SelectedImage = {
     demosaicAlgorithmId: 'visual-smoke-demosaic-v1',
     demosaicPath: 'standard',
     processingProfile: 'balanced',
+    stageSamples: [],
     runtime: {
       cacheHit: true,
       decodeElapsedMs: 12,

@@ -1,6 +1,7 @@
 pub(crate) mod analytics_resources;
 pub(crate) mod analytics_scheduler;
 pub(crate) mod artifact_identity;
+pub(crate) mod color_node_registry;
 pub(crate) mod culling;
 pub(crate) mod film_look_render;
 pub(crate) mod image_analytics;
@@ -13,3 +14,6 @@ pub(crate) mod render_caches;
 pub(crate) mod render_pipeline;
 pub(crate) mod render_plan;
 pub(crate) mod resample;
+
+#[cfg(all(test, feature = "tauri-test"))]
+mod color_node_conformance_tests;

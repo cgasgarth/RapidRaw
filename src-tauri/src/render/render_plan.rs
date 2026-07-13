@@ -25,6 +25,27 @@ use crate::mask_generation::MaskDefinition;
 const PLAN_SCHEMA_VERSION: u32 = 1;
 const FINGERPRINT_VERSION: u32 = 1;
 const MAX_CACHED_PLANS: usize = 24;
+const DETAIL_FINGERPRINT_FIELDS: &[&str] = &[
+    "deblurEnabled",
+    "deblurStrength",
+    "deblurSigmaPx",
+    "waveletDetailEnabled",
+    "waveletDetailCoarse",
+    "waveletDetailFine",
+    "waveletDetailMedium",
+    "waveletDetailEdgeThreshold",
+    "waveletDetailHaloSuppression",
+    "sharpness",
+    "sharpnessThreshold",
+    "lumaNoiseReduction",
+    "colorNoiseReduction",
+    "clarity",
+    "dehaze",
+    "structure",
+    "centré",
+    "chromaticAberrationRedCyan",
+    "chromaticAberrationBlueYellow",
+];
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct RenderPlanRevision {
@@ -282,31 +303,8 @@ fn fingerprints(
     ]);
     let masks_fingerprint = hash_json(effective.get("masks").unwrap_or(&Value::Null));
     let retouch = hash_json(effective.get("aiPatches").unwrap_or(&Value::Null));
-    let detail = hash_selected(
-        effective,
-        &[
-            "sharpness",
-            "sharpnessThreshold",
-            "lumaNoiseReduction",
-            "colorNoiseReduction",
-            "clarity",
-            "dehaze",
-            "structure",
-            "centré",
-            "chromaticAberrationRedCyan",
-            "chromaticAberrationBlueYellow",
-        ],
-    );
-    let mut color_hasher = blake3::Hasher::new();
-    color_hasher.update(b"color");
-    color_hasher.update(&FINGERPRINT_VERSION.to_le_bytes());
-    color_hasher.update(bytes_of(adjustments));
-    if let Some(lut) = lut {
-        color_hasher.update(&(lut.size as u64).to_le_bytes());
-        color_hasher.update(&lut.abi_version.to_le_bytes());
-        color_hasher.update(&lut.content_hash);
-    }
-    let color = first_u64(color_hasher.finalize());
+    let detail = hash_selected(effective, DETAIL_FINGERPRINT_FIELDS);
+    let color = color_fingerprint(adjustments, lut);
     let output = hash_parts(&[
         b"output",
         &FINGERPRINT_VERSION.to_le_bytes(),
@@ -333,6 +331,25 @@ fn fingerprints(
         output,
         full,
     }
+}
+
+fn color_fingerprint(adjustments: &AllAdjustments, lut: Option<&Lut>) -> u64 {
+    let mut color_hasher = blake3::Hasher::new();
+    color_hasher.update(b"color");
+    color_hasher.update(&FINGERPRINT_VERSION.to_le_bytes());
+    crate::render::color_node_registry::update_contract_hash(&mut color_hasher);
+    color_hasher.update(bytes_of(adjustments));
+    if let Some(lut) = lut {
+        color_hasher.update(&(lut.size as u64).to_le_bytes());
+        color_hasher.update(&lut.abi_version.to_le_bytes());
+        color_hasher.update(&lut.content_hash);
+    }
+    first_u64(color_hasher.finalize())
+}
+
+#[cfg(all(test, feature = "tauri-test"))]
+pub(super) fn color_fingerprint_for_test(adjustments: &AllAdjustments, lut: Option<&Lut>) -> u64 {
+    color_fingerprint(adjustments, lut)
 }
 
 fn geometry_bytes(params: &GeometryParams, crop: Option<Crop>) -> Vec<u8> {
@@ -552,6 +569,47 @@ mod tests {
         assert!(!Arc::ptr_eq(&first, &second));
         assert_ne!(first.fingerprints.source, second.fingerprints.source);
         assert_ne!(first.fingerprints.full, second.fingerprints.full);
+    }
+
+    #[test]
+    fn every_pre_gpu_detail_parameter_invalidates_detail_and_full_fingerprints() {
+        let base = compile_render_plan(&json!({}), context(7_701), None).unwrap();
+        for &field in DETAIL_FINGERPRINT_FIELDS {
+            let value = if field.ends_with("Enabled") {
+                Value::Bool(true)
+            } else {
+                json!(17)
+            };
+            let changed = compile_render_plan(
+                &Value::Object(serde_json::Map::from_iter([(field.to_owned(), value)])),
+                context(7_702),
+                None,
+            )
+            .unwrap();
+            assert_ne!(
+                base.fingerprints.detail, changed.fingerprints.detail,
+                "{field} must invalidate the pre-GPU detail fingerprint"
+            );
+            assert_ne!(
+                base.fingerprints.full, changed.fingerprints.full,
+                "{field} must invalidate the full render fingerprint"
+            );
+        }
+    }
+
+    #[test]
+    fn every_gpu_adjustment_abi_byte_invalidates_the_color_fingerprint() {
+        let baseline = AllAdjustments::default();
+        let baseline_fingerprint = color_fingerprint(&baseline, None);
+        for byte_index in 0..bytes_of(&baseline).len() {
+            let mut changed = baseline;
+            bytemuck::bytes_of_mut(&mut changed)[byte_index] ^= 1;
+            assert_ne!(
+                color_fingerprint(&changed, None),
+                baseline_fingerprint,
+                "GPU adjustment ABI byte {byte_index} escaped the color fingerprint"
+            );
+        }
     }
 
     #[test]

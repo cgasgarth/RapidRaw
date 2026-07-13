@@ -124,6 +124,17 @@ export const rawDevelopmentReportSchema = z
     demosaicAlgorithmId: z.string().trim().min(1).nullable().optional(),
     demosaicPath: rawDemosaicPathSchema,
     processingProfile: rawProcessingProfileSchema,
+    stageSamples: z.array(
+      z
+        .object({
+          domain: z.string().trim().min(1),
+          elapsedMs: z.number().nonnegative(),
+          nodeId: z.string().trim().min(1),
+          samples: z.array(z.tuple([z.number(), z.number(), z.number(), z.number()])),
+          version: z.number().int().positive(),
+        })
+        .strict(),
+    ),
     runtime: z
       .object({
         cacheHit: z.boolean(),

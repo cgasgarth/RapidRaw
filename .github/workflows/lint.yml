@@ -370,6 +370,54 @@ jobs:
         working-directory: src-tauri
         run: cargo fmt --all -- --check
 
+  color-lab-fast:
+    name: 'color: affected reference lab'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+        with:
+          rustflags: ''
+          rust-src-dir: src-tauri
+
+      - name: Compute affected color graph identity
+        id: color-graph
+        shell: bash
+        run: |
+          set -euo pipefail
+          graph_fingerprint="$(git ls-files -s src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/src/color src-tauri/src/raw src-tauri/src/render src-tauri/src/export src-tauri/crates/rapidraw-color-reference | shasum -a 256 | cut -d ' ' -f 1)"
+          echo "graph_fingerprint=$graph_fingerprint" >> "$GITHUB_OUTPUT"
+
+      - name: Restore content-addressed color lab cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/color-lab-cache
+          key: color-lab-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.color-graph.outputs.graph_fingerprint }}
+
+      - name: Execute affected color lab
+        shell: bash
+        env:
+          GRAPH_FINGERPRINT: ${{ steps.color-graph.outputs.graph_fingerprint }}
+        run: |
+          set -euo pipefail
+          cargo run --locked --manifest-path src-tauri/Cargo.toml -p rapidraw-color-reference --bin rapidraw-color-lab -- \
+            run --affected --graph "$GRAPH_FINGERPRINT" --output artifacts/color-lab-fast --cache "$RUNNER_TEMP/color-lab-cache"
+          jq -e \
+            --arg graph "$GRAPH_FINGERPRINT" \
+            '.contract_id == "rapidraw.color-lab.v1" and .tier == "fast" and .passed == true and (.cache == "miss" or .cache == "hit") and .cache_identity.graph_fingerprint == $graph and .cache_identity.hardware.backend == "reference-cpu"' \
+            artifacts/color-lab-fast/color-lab-report.json
+
+      - name: Upload affected color lab reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: color-lab-fast-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/color-lab-fast/**
+          retention-days: 14
+          if-no-files-found: error
+
   rust-pr-clippy:
     name: 'rust: clippy PR path gate'
     runs-on: ubuntu-latest
@@ -637,6 +685,7 @@ jobs:
       - macos-native-startup-benchmark
       - docs-check
       - rust-fmt
+      - color-lab-fast
       - rust-pr-clippy
       - actions-lint
       - actions-pins
