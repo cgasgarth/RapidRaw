@@ -7,6 +7,7 @@ export type ReferenceMatchGroup = 'color' | 'presence' | 'tone';
 export interface ReferenceHistogramSummary {
   analysisBasis: 'color-managed-editor-preview';
   blueMean: number;
+  clippedFraction: number;
   greenMean: number;
   lumaMean: number;
   lumaSpread: number;
@@ -16,6 +17,7 @@ export interface ReferenceHistogramSummary {
 
 export interface ReferenceMatchReference {
   adjustmentRevision: number;
+  cameraProfile: string;
   geometryFingerprint: string;
   geometryRevision: number;
   graphFingerprint: string;
@@ -60,6 +62,12 @@ export interface ReferenceMatchProposal {
   warnings: string[];
 }
 
+export interface ReferenceMatchPreviewCandidate {
+  adjustments: Adjustments;
+  baseAdjustmentRevision: number;
+  targetPath: string;
+}
+
 interface HistogramChannel {
   data: number[] | undefined;
 }
@@ -92,7 +100,8 @@ const channelMoments = (bins: number[] | undefined): { mean: number; spread: num
 
 export const summarizeReferenceHistogram = (histogram: MatchHistogram | null): ReferenceHistogramSummary | null => {
   if (!histogram) return null;
-  const luma = channelMoments(histogram.luma.data);
+  const lumaBins = histogram.luma.data;
+  const luma = channelMoments(lumaBins);
   const red = channelMoments(histogram.red.data);
   const green = channelMoments(histogram.green.data);
   const blue = channelMoments(histogram.blue.data);
@@ -100,6 +109,7 @@ export const summarizeReferenceHistogram = (histogram: MatchHistogram | null): R
   return {
     analysisBasis: 'color-managed-editor-preview',
     blueMean: blue.mean,
+    clippedFraction: ((lumaBins?.[0] ?? 0) + (lumaBins?.[lumaBins.length - 1] ?? 0)) / luma.count,
     greenMean: green.mean,
     lumaMean: luma.mean,
     lumaSpread: luma.spread,
@@ -119,6 +129,7 @@ export const combineReferenceSummaries = (
   return {
     analysisBasis: 'color-managed-editor-preview',
     blueMean: weighted((summary) => summary.blueMean),
+    clippedFraction: weighted((summary) => summary.clippedFraction),
     greenMean: weighted((summary) => summary.greenMean),
     lumaMean: weighted((summary) => summary.lumaMean),
     lumaSpread: weighted((summary) => summary.lumaSpread),
@@ -144,11 +155,15 @@ export const createReferenceMatchProposal = ({
   mode,
   references,
   target,
+  targetProfile,
+  targetProofFingerprint,
 }: {
   adjustments: Adjustments;
   mode: ReferenceMatchMode;
   references: readonly ReferenceMatchReference[];
   target: ReferenceHistogramSummary;
+  targetProfile?: string;
+  targetProofFingerprint?: string;
 }): ReferenceMatchProposal | null => {
   const reference = combineReferenceSummaries(references);
   if (!reference) return null;
@@ -226,7 +241,17 @@ export const createReferenceMatchProposal = ({
   const residualAfter = summaryDistance(predicted, reference);
   const warnings = [
     ...(references.some((item) => item.path.length === 0) ? ['Reference source identity is incomplete.'] : []),
+    ...(reference.clippedFraction > 0.02 || target.clippedFraction > 0.02
+      ? ['Clipped histogram endpoints reduce match reliability.']
+      : []),
+    ...(targetProofFingerprint && references.some((item) => item.proofFingerprint !== targetProofFingerprint)
+      ? ['Reference and target proof identities differ.']
+      : []),
+    ...(targetProfile && references.some((item) => item.cameraProfile !== targetProfile)
+      ? ['Reference and target camera profiles differ; profile replacement is excluded.']
+      : []),
     ...(target.sampleCount < 256 ? ['Target histogram has limited sample support.'] : []),
+    'Global histogram analysis cannot distinguish localized subject differences; inspect the compare view before apply.',
   ];
   const recommendedDiffs = diffs.filter((diff) => Math.abs(diff.proposed - diff.current) >= 0.005);
   if (recommendedDiffs.length === 0) return null;
@@ -272,3 +297,18 @@ export const applyReferenceMatchProposal = ({
   }
   return next;
 };
+
+export const resolveReferenceMatchRenderAdjustments = ({
+  adjustmentRevision,
+  committed,
+  preview,
+  targetPath,
+}: {
+  adjustmentRevision: number;
+  committed: Adjustments;
+  preview: ReferenceMatchPreviewCandidate | null;
+  targetPath: string | null;
+}): Adjustments =>
+  preview?.baseAdjustmentRevision === adjustmentRevision && preview.targetPath === targetPath
+    ? preview.adjustments
+    : committed;

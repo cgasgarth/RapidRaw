@@ -89,6 +89,7 @@ import {
   getNegativeLabDisabledReasonKey,
   getNegativeLabSourceReadiness,
 } from '../../utils/negative-lab/negativeLabSourceReadiness';
+import { resolveReferenceMatchRenderAdjustments } from '../../utils/referenceMatch';
 import { debounce } from '../../utils/timing';
 import {
   applyWhiteBalancePickerHoverPreview,
@@ -179,6 +180,14 @@ export default function Editor({
   const imageSessionStatus = useEditorStore((s) => s.imageSession?.status ?? null);
   const adjustments = useEditorStore((s) => s.adjustments);
   const adjustmentGeometryRevision = useEditorStore((s) => s.adjustmentSnapshot.geometryRevision);
+  const adjustmentRevision = useEditorStore((s) => s.adjustmentSnapshot.adjustmentRevision);
+  const referenceMatchPreview = useEditorStore((s) => s.referenceMatchPreview);
+  const renderAdjustments = resolveReferenceMatchRenderAdjustments({
+    adjustmentRevision,
+    committed: adjustments,
+    preview: referenceMatchPreview,
+    targetPath: selectedImage?.path ?? null,
+  });
   const adjustmentsHistory = useEditorStore((s) => s.history);
   const adjustmentsHistoryIndex = useEditorStore((s) => s.historyIndex);
   const finalPreviewUrl = useEditorStore((s) => s.finalPreviewUrl);
@@ -195,6 +204,12 @@ export default function Editor({
     exportSoftProofRecipeId,
     historyIndex: adjustmentsHistoryIndex,
     isExportSoftProofEnabled,
+    referenceMatchPreview: referenceMatchPreview
+      ? {
+          impact: referenceMatchPreview.impact,
+          proposalFingerprint: referenceMatchPreview.proposalFingerprint,
+        }
+      : null,
   });
   const compare = useEditorStore((s) => s.compare);
   const referenceMatchReferences = useEditorStore((s) => s.referenceMatchReferences);
@@ -2139,7 +2154,7 @@ export default function Editor({
               activeAiSubMaskId={activeAiSubMaskId}
               activeMaskContainerId={activeMaskContainerId}
               activeMaskId={activeMaskId}
-              adjustments={adjustments}
+              adjustments={renderAdjustments}
               adjustmentGeometryRevision={adjustmentGeometryRevision}
               brushSettings={brushSettings}
               crop={crop}

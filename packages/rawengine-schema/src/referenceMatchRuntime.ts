@@ -35,6 +35,7 @@ export const referenceDistributionSummaryV1Schema = z
   .object({
     analysisBasis: z.literal('color-managed-editor-preview'),
     blueMean: z.number().min(0).max(1),
+    clippedFraction: z.number().min(0).max(1),
     greenMean: z.number().min(0).max(1),
     lumaMean: z.number().min(0).max(1),
     lumaSpread: z.number().min(0).max(0.5),
