@@ -11,7 +11,7 @@ use crate::app_state::{
     AnalyticsConfig, AnalyticsFrameId, AnalyticsProducts, AppState, CachedPreview,
     CachedViewerSampleFrame,
 };
-use crate::generate_transformed_preview;
+use crate::generate_transformed_preview_cancellable;
 use crate::image_processing::{
     RenderRequest, downscale_f32_image, get_or_init_gpu_context,
     process_and_get_dynamic_image_with_analytics, resolve_tonemapper_override_from_handle,
@@ -273,8 +273,14 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         )
     } else {
         render_caches::RenderCaches::new(&state).clear_gpu_image_cache();
-        let (base, scale, offset) =
-            generate_transformed_preview(&state, &loaded_image, &adjustments_clone, preview_dim)?;
+        let geometry_checkpoint = || cancellation_checkpoint(cancellation, PreviewStage::Geometry);
+        let (base, scale, offset) = generate_transformed_preview_cancellable(
+            &state,
+            &loaded_image,
+            &adjustments_clone,
+            preview_dim,
+            Some(&geometry_checkpoint),
+        )?;
         (Arc::new(base), scale, offset)
     };
     cancellation_checkpoint(cancellation, PreviewStage::Geometry)?;

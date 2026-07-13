@@ -62,9 +62,10 @@ use std::time::Duration;
 
 use base64::{Engine as _, engine::general_purpose};
 use image::codecs::jpeg::JpegEncoder;
-use image::{DynamicImage, GenericImageView, ImageBuffer, Luma, RgbImage, Rgba};
+use image::{DynamicImage, GenericImageView, ImageBuffer, Luma, Rgb32FImage, RgbImage, Rgba};
 use imageproc::drawing::draw_line_segment_mut;
 use imageproc::edges::canny;
+use imageproc::geometric_transformations::{Border, Interpolation, warp_into_with};
 use imageproc::hough::{LineDetectionOptions, detect_lines};
 use rapidraw_codecs::JpegPreset;
 
@@ -198,69 +199,461 @@ pub struct WgpuTransformPayload {
     pub pixelated: bool,
 }
 
+#[derive(Clone, Copy, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+enum PreviewGeometryQuality {
+    Interactive,
+    Settled,
+}
+
+#[derive(Clone, Copy, serde::Deserialize)]
+#[serde(tag = "kind", rename_all = "kebab-case")]
+enum PreviewGeometryTarget {
+    EditorSetting {
+        quality: PreviewGeometryQuality,
+    },
+    LongEdge {
+        #[serde(rename = "longEdgePx")]
+        long_edge_px: u32,
+        quality: PreviewGeometryQuality,
+    },
+}
+
+impl PreviewGeometryTarget {
+    fn resolve_long_edge(self, editor_preview_resolution: u32) -> u32 {
+        match self {
+            Self::EditorSetting { quality } => match quality {
+                PreviewGeometryQuality::Interactive => {
+                    (editor_preview_resolution as f32 / 1.5).round() as u32
+                }
+                PreviewGeometryQuality::Settled => editor_preview_resolution,
+            },
+            Self::LongEdge {
+                long_edge_px,
+                quality,
+            } => match quality {
+                PreviewGeometryQuality::Interactive | PreviewGeometryQuality::Settled => {
+                    long_edge_px
+                }
+            },
+        }
+        .clamp(64, 8192)
+    }
+}
+
 pub fn generate_transformed_preview(
     state: &tauri::State<AppState>,
     loaded_image: &LoadedImage,
     adjustments: &serde_json::Value,
     preview_dim: u32,
 ) -> Result<(DynamicImage, f32, (f32, f32)), String> {
-    let transform_hash = calculate_transform_hash(adjustments);
-    let identity = crate::render::artifact_identity::RenderArtifactIdentity::source_geometry(
-        &loaded_image.artifact_source,
-        state.load_image_generation.load(Ordering::SeqCst) as u64,
-        transform_hash,
-        loaded_image.artifact_source.source_fingerprint(),
-        calculate_geometry_hash(adjustments),
-        loaded_image.image.width(),
-        loaded_image.image.height(),
-    );
-
-    let (transformed_full_res, unscaled_crop_offset) = {
-        let mut cache_lock = state.full_transformed_cache.lock().unwrap();
-        if let Some(cached) = cache_lock.as_ref() {
-            if cached.identity == identity {
-                (Arc::clone(&cached.image), cached.offset)
-            } else {
-                let (arc_img, offset) = compute_full_transformed_res(loaded_image, adjustments)?;
-                *cache_lock = Some(TransformedImageCache {
-                    identity,
-                    image: Arc::clone(&arc_img),
-                    offset,
-                });
-                (arc_img, offset)
-            }
-        } else {
-            let (arc_img, offset) = compute_full_transformed_res(loaded_image, adjustments)?;
-            *cache_lock = Some(TransformedImageCache {
-                identity,
-                image: Arc::clone(&arc_img),
-                offset,
-            });
-            (arc_img, offset)
-        }
-    };
-
-    let (full_res_w, full_res_h) = transformed_full_res.dimensions();
-
-    let final_preview_base = if full_res_w > preview_dim || full_res_h > preview_dim {
-        downscale_f32_image(&transformed_full_res, preview_dim, preview_dim)
-    } else {
-        (*transformed_full_res).clone()
-    };
-
-    let scale_for_gpu = if full_res_w > 0 {
-        final_preview_base.width() as f32 / full_res_w as f32
-    } else {
-        1.0
-    };
-
-    Ok((final_preview_base, scale_for_gpu, unscaled_crop_offset))
+    generate_transformed_preview_cancellable(state, loaded_image, adjustments, preview_dim, None)
 }
 
-fn compute_full_transformed_res(
+pub(crate) fn generate_transformed_preview_cancellable(
+    state: &tauri::State<AppState>,
+    loaded_image: &LoadedImage,
+    adjustments: &serde_json::Value,
+    preview_dim: u32,
+    cancellation: Option<&dyn Fn() -> Result<(), String>>,
+) -> Result<(DynamicImage, f32, (f32, f32)), String> {
+    compute_preview_transformed_for_state(
+        state,
+        loaded_image.image.as_ref(),
+        adjustments,
+        preview_dim,
+        cancellation,
+    )
+}
+
+fn compute_preview_transformed_for_state(
+    _state: &AppState,
+    source: &DynamicImage,
+    adjustments: &serde_json::Value,
+    preview_dim: u32,
+    cancellation: Option<&dyn Fn() -> Result<(), String>>,
+) -> Result<(DynamicImage, f32, (f32, f32)), String> {
+    compute_preview_transformed(source, adjustments, preview_dim, cancellation)
+}
+
+pub struct PreviewGeometryRequest<'a> {
+    pub source: &'a DynamicImage,
+    pub adjustments: &'a serde_json::Value,
+    pub target_long_edge: u32,
+    pub cancellation: Option<&'a dyn Fn() -> Result<(), String>>,
+}
+
+pub struct PreviewGeometryReceipt {
+    pub source_pixel_count: u64,
+    pub working_pixel_count: u64,
+    pub output_pixel_count: u64,
+    pub full_resolution_transform_allocations: u32,
+    pub direct_crop: bool,
+}
+
+pub struct PreviewGeometryResult {
+    pub image: DynamicImage,
+    pub effective_scale: f32,
+    pub unscaled_crop_offset: (f32, f32),
+    pub receipt: PreviewGeometryReceipt,
+}
+
+pub struct PreviewGeometryPipeline;
+
+impl PreviewGeometryPipeline {
+    pub fn execute(request: PreviewGeometryRequest<'_>) -> Result<PreviewGeometryResult, String> {
+        let source = request.source;
+        let adjustments = request.adjustments;
+        let preview_dim = request.target_long_edge.max(1);
+        if let Some(check) = request.cancellation {
+            check()?;
+        }
+        if let Some(result) = compute_direct_crop_preview(source, adjustments, preview_dim) {
+            if let Some(check) = request.cancellation {
+                check()?;
+            }
+            return Ok(result);
+        }
+        let source_scale = preview_geometry_source_scale(
+            source.width(),
+            source.height(),
+            adjustments,
+            preview_dim,
+        );
+        let working_source = if source_scale < 1.0 {
+            let width = ((source.width() as f32 * source_scale).round() as u32).max(1);
+            let height = ((source.height() as f32 * source_scale).round() as u32).max(1);
+            Cow::Owned(downscale_f32_image(source, width, height))
+        } else {
+            Cow::Borrowed(source)
+        };
+        if let Some(check) = request.cancellation {
+            check()?;
+        }
+        let working_pixel_count =
+            u64::from(working_source.width()) * u64::from(working_source.height());
+        let preview_adjustments = scale_preview_geometry_adjustments(adjustments, source_scale);
+        let patched_source =
+            composite_patches_on_image(working_source.as_ref(), &preview_adjustments)
+                .map_err(|error| format!("Failed to composite preview patches: {error}"))?;
+        if let Some(check) = request.cancellation {
+            check()?;
+        }
+        let (transformed, scaled_crop_offset) =
+            apply_all_transformations(patched_source, &preview_adjustments);
+        if let Some(check) = request.cancellation {
+            check()?;
+        }
+        let (working_w, working_h) = transformed.dimensions();
+        let final_preview_base = if working_w > preview_dim || working_h > preview_dim {
+            downscale_f32_image(&transformed, preview_dim, preview_dim)
+        } else {
+            transformed.into_owned()
+        };
+
+        let post_transform_scale = if working_w > 0 {
+            final_preview_base.width() as f32 / working_w as f32
+        } else {
+            1.0
+        };
+        let effective_scale = source_scale * post_transform_scale;
+        let unscaled_crop_offset = if source_scale > 0.0 {
+            (
+                scaled_crop_offset.0 / source_scale,
+                scaled_crop_offset.1 / source_scale,
+            )
+        } else {
+            scaled_crop_offset
+        };
+        let output_pixel_count =
+            u64::from(final_preview_base.width()) * u64::from(final_preview_base.height());
+
+        Ok(PreviewGeometryResult {
+            image: final_preview_base,
+            effective_scale,
+            unscaled_crop_offset,
+            receipt: PreviewGeometryReceipt {
+                source_pixel_count: u64::from(source.width()) * u64::from(source.height()),
+                working_pixel_count,
+                output_pixel_count,
+                full_resolution_transform_allocations: 0,
+                direct_crop: false,
+            },
+        })
+    }
+}
+
+fn compute_preview_transformed(
+    source: &DynamicImage,
+    adjustments: &serde_json::Value,
+    preview_dim: u32,
+    cancellation: Option<&dyn Fn() -> Result<(), String>>,
+) -> Result<(DynamicImage, f32, (f32, f32)), String> {
+    let result = PreviewGeometryPipeline::execute(PreviewGeometryRequest {
+        source,
+        adjustments,
+        target_long_edge: preview_dim,
+        cancellation,
+    })?;
+    Ok((
+        result.image,
+        result.effective_scale,
+        result.unscaled_crop_offset,
+    ))
+}
+
+fn compute_direct_crop_preview(
+    source: &DynamicImage,
+    adjustments: &serde_json::Value,
+    preview_dim: u32,
+) -> Option<PreviewGeometryResult> {
+    let crop = serde_json::from_value::<Crop>(adjustments[adjustment_fields::CROP].clone()).ok()?;
+    let has_patches = adjustments
+        .get(adjustment_fields::AI_PATCHES)
+        .and_then(serde_json::Value::as_array)
+        .is_some_and(|patches| !patches.is_empty());
+    let rotation = adjustments[adjustment_fields::ROTATION]
+        .as_f64()
+        .unwrap_or(0.0);
+    let orientation = adjustments[adjustment_fields::ORIENTATION_STEPS]
+        .as_u64()
+        .unwrap_or(0);
+    if has_patches
+        || !crate::geometry::is_geometry_identity(&crate::geometry::get_geometry_params_from_json(
+            adjustments,
+        ))
+    {
+        return None;
+    }
+
+    let (oriented_width, oriented_height) = if orientation % 2 == 1 {
+        (source.height(), source.width())
+    } else {
+        source.dimensions()
+    };
+    let mut x = crop.x.round().max(0.0) as u32;
+    let mut y = crop.y.round().max(0.0) as u32;
+    if x >= oriented_width || y >= oriented_height {
+        return None;
+    }
+    let mut width = (crop.width.round().max(1.0) as u32).min(oriented_width - x);
+    let mut height = (crop.height.round().max(1.0) as u32).min(oriented_height - y);
+    if rotation.rem_euclid(360.0).abs() > f64::EPSILON {
+        return render_rotated_crop_preview(
+            source,
+            AffineCropPreviewPlan {
+                crop,
+                crop_bounds: (x, y, width, height),
+                orientation: orientation as u8,
+                flip_horizontal: adjustments[adjustment_fields::FLIP_HORIZONTAL]
+                    .as_bool()
+                    .unwrap_or(false),
+                flip_vertical: adjustments[adjustment_fields::FLIP_VERTICAL]
+                    .as_bool()
+                    .unwrap_or(false),
+                rotation_degrees: rotation as f32,
+                preview_dim,
+            },
+        );
+    }
+    if adjustments[adjustment_fields::FLIP_HORIZONTAL]
+        .as_bool()
+        .unwrap_or(false)
+    {
+        x = oriented_width - x - width;
+    }
+    if adjustments[adjustment_fields::FLIP_VERTICAL]
+        .as_bool()
+        .unwrap_or(false)
+    {
+        y = oriented_height - y - height;
+    }
+    let (source_x, source_y, source_crop_width, source_crop_height) = match orientation % 4 {
+        1 => (y, source.height() - x - width, height, width),
+        2 => (
+            source.width() - x - width,
+            source.height() - y - height,
+            width,
+            height,
+        ),
+        3 => (source.width() - y - height, x, height, width),
+        _ => (x, y, width, height),
+    };
+    let cropped = source.crop_imm(source_x, source_y, source_crop_width, source_crop_height);
+    let oriented = apply_coarse_rotation(Cow::Owned(cropped), orientation as u8);
+    let transformed_crop = apply_flip(
+        oriented,
+        adjustments[adjustment_fields::FLIP_HORIZONTAL]
+            .as_bool()
+            .unwrap_or(false),
+        adjustments[adjustment_fields::FLIP_VERTICAL]
+            .as_bool()
+            .unwrap_or(false),
+    )
+    .into_owned();
+    width = transformed_crop.width();
+    height = transformed_crop.height();
+    let preview = if width > preview_dim || height > preview_dim {
+        downscale_f32_image(&transformed_crop, preview_dim, preview_dim)
+    } else {
+        transformed_crop
+    };
+    let effective_scale = preview.width() as f32 / width as f32;
+    let output_pixel_count = u64::from(preview.width()) * u64::from(preview.height());
+    Some(PreviewGeometryResult {
+        image: preview,
+        effective_scale,
+        unscaled_crop_offset: (crop.x as f32, crop.y as f32),
+        receipt: PreviewGeometryReceipt {
+            source_pixel_count: u64::from(source.width()) * u64::from(source.height()),
+            working_pixel_count: u64::from(source_crop_width) * u64::from(source_crop_height),
+            output_pixel_count,
+            full_resolution_transform_allocations: 0,
+            direct_crop: true,
+        },
+    })
+}
+
+struct AffineCropPreviewPlan {
+    crop: Crop,
+    crop_bounds: (u32, u32, u32, u32),
+    orientation: u8,
+    flip_horizontal: bool,
+    flip_vertical: bool,
+    rotation_degrees: f32,
+    preview_dim: u32,
+}
+
+fn render_rotated_crop_preview(
+    source: &DynamicImage,
+    plan: AffineCropPreviewPlan,
+) -> Option<PreviewGeometryResult> {
+    let DynamicImage::ImageRgb32F(source_rgb) = source else {
+        return None;
+    };
+    let (crop_x, crop_y, crop_width, crop_height) = plan.crop_bounds;
+    let output_scale = (plan.preview_dim as f32 / crop_width.max(crop_height) as f32).min(1.0);
+    let output_width = ((crop_width as f32 * output_scale).round() as u32).max(1);
+    let output_height = ((crop_height as f32 * output_scale).round() as u32).max(1);
+    let mut output = Rgb32FImage::new(output_width, output_height);
+    let (coarse_width, coarse_height) = if plan.orientation % 2 == 1 {
+        (source.height(), source.width())
+    } else {
+        source.dimensions()
+    };
+    let center_x = coarse_width as f32 / 2.0;
+    let center_y = coarse_height as f32 / 2.0;
+    let (sin, cos) = plan.rotation_degrees.to_radians().sin_cos();
+    let orientation = plan.orientation;
+    let flip_horizontal = plan.flip_horizontal;
+    let flip_vertical = plan.flip_vertical;
+    let crop_offset = (plan.crop.x as f32, plan.crop.y as f32);
+
+    warp_into_with(
+        source_rgb,
+        move |output_x, output_y| {
+            let rotated_x = crop_x as f32 + output_x / output_scale;
+            let rotated_y = crop_y as f32 + output_y / output_scale;
+            let dx = rotated_x - center_x;
+            let dy = rotated_y - center_y;
+            let mut coarse_x = center_x + cos * dx + sin * dy;
+            let mut coarse_y = center_y - sin * dx + cos * dy;
+            if flip_horizontal {
+                coarse_x = coarse_width as f32 - 1.0 - coarse_x;
+            }
+            if flip_vertical {
+                coarse_y = coarse_height as f32 - 1.0 - coarse_y;
+            }
+            match orientation % 4 {
+                1 => (coarse_y, source.height() as f32 - 1.0 - coarse_x),
+                2 => (
+                    source.width() as f32 - 1.0 - coarse_x,
+                    source.height() as f32 - 1.0 - coarse_y,
+                ),
+                3 => (source.width() as f32 - 1.0 - coarse_y, coarse_x),
+                _ => (coarse_x, coarse_y),
+            }
+        },
+        Interpolation::Bilinear,
+        Border::Constant(image::Rgb([0.0, 0.0, 0.0])),
+        &mut output,
+    );
+    let output_pixel_count = u64::from(output_width) * u64::from(output_height);
+    Some(PreviewGeometryResult {
+        image: DynamicImage::ImageRgb32F(output),
+        effective_scale: output_scale,
+        unscaled_crop_offset: crop_offset,
+        receipt: PreviewGeometryReceipt {
+            source_pixel_count: u64::from(source.width()) * u64::from(source.height()),
+            working_pixel_count: output_pixel_count,
+            output_pixel_count,
+            full_resolution_transform_allocations: 0,
+            direct_crop: true,
+        },
+    })
+}
+
+fn preview_geometry_source_scale(
+    source_width: u32,
+    source_height: u32,
+    adjustments: &serde_json::Value,
+    preview_dim: u32,
+) -> f32 {
+    let orientation_steps = adjustments[adjustment_fields::ORIENTATION_STEPS]
+        .as_u64()
+        .unwrap_or(0) as u8;
+    let (oriented_width, oriented_height) = if orientation_steps % 2 == 1 {
+        (source_height, source_width)
+    } else {
+        (source_width, source_height)
+    };
+    let target_long_edge =
+        serde_json::from_value::<Crop>(adjustments[adjustment_fields::CROP].clone())
+            .ok()
+            .map(|crop| crop.width.max(crop.height) as f32)
+            .filter(|dimension| dimension.is_finite() && *dimension > 0.0)
+            .unwrap_or_else(|| oriented_width.max(oriented_height) as f32);
+
+    if target_long_edge <= preview_dim.max(1) as f32 {
+        1.0
+    } else {
+        preview_dim.max(1) as f32 / target_long_edge
+    }
+}
+
+fn scale_preview_geometry_adjustments(
+    adjustments: &serde_json::Value,
+    source_scale: f32,
+) -> serde_json::Value {
+    if source_scale >= 1.0 {
+        return adjustments.clone();
+    }
+    let mut scaled = adjustments.clone();
+    if let Some(crop_value) = scaled.get_mut(adjustment_fields::CROP)
+        && let Ok(mut crop) = serde_json::from_value::<Crop>(crop_value.clone())
+    {
+        let scale = f64::from(source_scale);
+        crop.x *= scale;
+        crop.y *= scale;
+        crop.width *= scale;
+        crop.height *= scale;
+        *crop_value = serde_json::to_value(crop).unwrap_or(serde_json::Value::Null);
+    }
+    scaled
+}
+
+/// Authoritative full-resolution geometry/retouch path for export and pixel-critical operations.
+/// Normal editor previews must use [`generate_transformed_preview`] instead.
+#[cfg(test)]
+static FULL_TRANSFORM_INVOCATIONS: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
+
+pub fn compute_full_transformed_res(
     loaded_image: &LoadedImage,
     adjustments: &serde_json::Value,
 ) -> Result<(Arc<DynamicImage>, (f32, f32)), String> {
+    #[cfg(test)]
+    FULL_TRANSFORM_INVOCATIONS.fetch_add(1, Ordering::Relaxed);
     let has_patches = adjustments
         .get("aiPatches")
         .and_then(|v| v.as_array())
@@ -1526,6 +1919,7 @@ async fn preview_geometry_transform(
     params: GeometryParams,
     js_adjustments: serde_json::Value,
     show_lines: bool,
+    target: Option<PreviewGeometryTarget>,
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<String, String> {
@@ -1535,7 +1929,14 @@ async fn preview_geometry_transform(
         (loaded.path.clone(), loaded.is_raw)
     };
 
-    let visual_hash = calculate_visual_hash(&loaded_image_path, &js_adjustments);
+    let settings = load_settings_or_default(&app_handle);
+    let target = target.unwrap_or(PreviewGeometryTarget::EditorSetting {
+        quality: PreviewGeometryQuality::Interactive,
+    });
+    let target_dim = target.resolve_long_edge(settings.editor_preview_resolution.unwrap_or(1920));
+    let visual_hash = calculate_visual_hash(&loaded_image_path, &js_adjustments)
+        .wrapping_mul(31)
+        .wrapping_add(u64::from(target_dim));
 
     let base_image_to_warp = {
         let maybe_cached_image = state.geometry_cache.get(&visual_hash);
@@ -1550,11 +1951,6 @@ async fn preview_geometry_transform(
                 let loaded = guard.as_ref().ok_or("No image loaded")?;
                 loaded.image.clone()
             };
-
-            let settings = load_settings_or_default(&app_handle);
-            let interactive_divisor = 1.5;
-            let final_preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
-            let target_dim = (final_preview_dim as f32 / interactive_divisor) as u32;
 
             let preview_base = tokio::task::spawn_blocking(move || -> DynamicImage {
                 downscale_f32_image(&original_image, target_dim, target_dim)
@@ -3596,6 +3992,278 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use image::{GrayImage, ImageFormat};
+    use serde_json::json;
+
+    fn encoded_preview_fixture(image: DynamicImage) -> String {
+        let mut bytes = Cursor::new(Vec::new());
+        image.write_to(&mut bytes, ImageFormat::Png).unwrap();
+        general_purpose::STANDARD.encode(bytes.into_inner())
+    }
+
+    #[test]
+    fn preview_geometry_scale_is_crop_aware_without_undersampling_narrow_crops() {
+        assert_eq!(
+            preview_geometry_source_scale(10_000, 8_000, &json!({}), 2_000),
+            0.2
+        );
+        assert_eq!(
+            preview_geometry_source_scale(
+                10_000,
+                8_000,
+                &json!({"crop": {"x": 4_000.0, "y": 3_000.0, "width": 2_000.0, "height": 1_500.0}}),
+                2_000,
+            ),
+            1.0
+        );
+        assert_eq!(
+            preview_geometry_source_scale(
+                10_000,
+                8_000,
+                &json!({"crop": {"x": 2_000.0, "y": 2_000.0, "width": 4_000.0, "height": 3_000.0}}),
+                2_000,
+            ),
+            0.5
+        );
+    }
+
+    #[test]
+    fn preview_geometry_target_resolves_interactive_and_explicit_long_edges() {
+        assert_eq!(
+            PreviewGeometryTarget::EditorSetting {
+                quality: PreviewGeometryQuality::Interactive,
+            }
+            .resolve_long_edge(3000),
+            2000
+        );
+        assert_eq!(
+            PreviewGeometryTarget::LongEdge {
+                long_edge_px: 4096,
+                quality: PreviewGeometryQuality::Settled,
+            }
+            .resolve_long_edge(1920),
+            4096
+        );
+    }
+
+    #[test]
+    fn preview_geometry_samples_plain_narrow_crop_without_transforming_full_source() {
+        let source = DynamicImage::ImageRgb32F(image::ImageBuffer::from_fn(1000, 800, |x, y| {
+            image::Rgb([x as f32 / 999.0, y as f32 / 799.0, 0.25])
+        }));
+        let adjustments = json!({
+            "crop": {"x": 400.0, "y": 300.0, "width": 200.0, "height": 100.0},
+        });
+        let result = compute_direct_crop_preview(&source, &adjustments, 100).unwrap();
+        let preview = result.image;
+
+        assert_eq!(preview.dimensions(), (100, 50));
+        assert!((result.effective_scale - 0.5).abs() < 1e-6);
+        assert_eq!(result.unscaled_crop_offset, (400.0, 300.0));
+        assert_eq!(result.receipt.source_pixel_count, 800_000);
+        assert_eq!(result.receipt.working_pixel_count, 20_000);
+        assert_eq!(result.receipt.output_pixel_count, 5_000);
+        assert_eq!(result.receipt.full_resolution_transform_allocations, 0);
+        assert!(result.receipt.direct_crop);
+        let center = preview.to_rgb32f().get_pixel(50, 25).0;
+        assert!((center[0] - 0.5).abs() < 0.01);
+        assert!((center[1] - 0.438).abs() < 0.01);
+    }
+
+    #[test]
+    fn direct_crop_maps_orientation_and_flip_back_to_source_roi() {
+        let source = DynamicImage::ImageRgb32F(image::ImageBuffer::from_fn(300, 200, |x, y| {
+            image::Rgb([x as f32 / 299.0, y as f32 / 199.0, 0.5])
+        }));
+        let adjustments = json!({
+            "orientationSteps": 1,
+            "flipHorizontal": true,
+            "crop": {"x": 40.0, "y": 80.0, "width": 100.0, "height": 120.0},
+        });
+        let (full, _) = apply_all_transformations(&source, &adjustments);
+        let reference = downscale_f32_image(&full, 50, 50).to_rgb32f();
+        let result = compute_direct_crop_preview(&source, &adjustments, 50).unwrap();
+        let preview = result.image.to_rgb32f();
+
+        assert_eq!(preview.dimensions(), reference.dimensions());
+        assert_eq!(result.receipt.working_pixel_count, 12_000);
+        let max_error = preview
+            .as_raw()
+            .iter()
+            .zip(reference.as_raw())
+            .map(|(actual, expected)| (actual - expected).abs())
+            .fold(0.0_f32, f32::max);
+        assert!(max_error < 1e-5, "orientation/flip max error {max_error}");
+    }
+
+    #[test]
+    fn rotated_narrow_crop_inverse_samples_source_into_preview_only() {
+        let source = DynamicImage::ImageRgb32F(image::ImageBuffer::from_fn(600, 400, |x, y| {
+            image::Rgb([x as f32 / 599.0, y as f32 / 399.0, 0.5])
+        }));
+        let adjustments = json!({
+            "rotation": 7.0,
+            "orientationSteps": 1,
+            "flipVertical": true,
+            "crop": {"x": 100.0, "y": 160.0, "width": 200.0, "height": 240.0},
+        });
+        let (full, _) = apply_all_transformations(&source, &adjustments);
+        let reference = downscale_f32_image(&full, 100, 100).to_rgb32f();
+        let result = compute_direct_crop_preview(&source, &adjustments, 100).unwrap();
+        let preview = result.image.to_rgb32f();
+
+        assert_eq!(preview.dimensions(), reference.dimensions());
+        assert_eq!(result.receipt.working_pixel_count, 8_300);
+        assert_eq!(result.receipt.full_resolution_transform_allocations, 0);
+        let mean_error = preview
+            .as_raw()
+            .iter()
+            .zip(reference.as_raw())
+            .map(|(actual, expected)| (actual - expected).abs() as f64)
+            .sum::<f64>()
+            / preview.as_raw().len() as f64;
+        assert!(mean_error < 0.01, "rotated crop mean error {mean_error}");
+    }
+
+    #[test]
+    fn normal_preview_does_not_invoke_full_resolution_transform() {
+        let state = AppState::new();
+        let source = DynamicImage::new_rgb32f(400, 300);
+        let full_transform_count = FULL_TRANSFORM_INVOCATIONS.load(Ordering::Relaxed);
+        let (preview, _, _) =
+            compute_preview_transformed_for_state(&state, &source, &json!({}), 100, None).unwrap();
+
+        assert_eq!(preview.dimensions(), (100, 75));
+        assert_eq!(
+            FULL_TRANSFORM_INVOCATIONS.load(Ordering::Relaxed),
+            full_transform_count
+        );
+    }
+
+    #[test]
+    fn preview_geometry_receipt_proves_work_scales_with_target_not_source_area() {
+        let source = DynamicImage::new_rgb32f(1000, 800);
+        let result = PreviewGeometryPipeline::execute(PreviewGeometryRequest {
+            source: &source,
+            adjustments: &json!({}),
+            target_long_edge: 100,
+            cancellation: None,
+        })
+        .unwrap();
+
+        assert_eq!(result.image.dimensions(), (100, 80));
+        assert_eq!(result.receipt.source_pixel_count, 800_000);
+        assert_eq!(result.receipt.working_pixel_count, 8_000);
+        assert_eq!(result.receipt.output_pixel_count, 8_000);
+        assert_eq!(result.receipt.full_resolution_transform_allocations, 0);
+        assert!(!result.receipt.direct_crop);
+    }
+
+    #[test]
+    fn preview_geometry_cancels_between_bounded_pipeline_stages() {
+        let source = DynamicImage::new_rgb32f(1000, 800);
+        let checks = std::sync::atomic::AtomicUsize::new(0);
+        let cancellation = || {
+            if checks.fetch_add(1, Ordering::Relaxed) >= 1 {
+                Err("preview_cancelled:Geometry".to_string())
+            } else {
+                Ok(())
+            }
+        };
+        let error = PreviewGeometryPipeline::execute(PreviewGeometryRequest {
+            source: &source,
+            adjustments: &json!({}),
+            target_long_edge: 100,
+            cancellation: Some(&cancellation),
+        })
+        .err()
+        .expect("second checkpoint should stop obsolete preview work");
+
+        assert_eq!(error, "preview_cancelled:Geometry");
+        assert_eq!(checks.load(Ordering::Relaxed), 2);
+    }
+
+    #[test]
+    fn preview_geometry_scales_pixel_crop_coordinates_once() {
+        let adjustments = json!({
+            "crop": {"x": 1200.0, "y": 800.0, "width": 4000.0, "height": 3000.0},
+            "rotation": 1.5,
+            "transformVertical": 12.0,
+        });
+        let scaled = scale_preview_geometry_adjustments(&adjustments, 0.25);
+        assert_eq!(
+            scaled["crop"],
+            json!({"x": 300.0, "y": 200.0, "width": 1000.0, "height": 750.0})
+        );
+        assert_eq!(scaled["rotation"], adjustments["rotation"]);
+        assert_eq!(
+            scaled["transformVertical"],
+            adjustments["transformVertical"]
+        );
+    }
+
+    #[test]
+    fn preview_geometry_matches_full_transform_reference_with_bounded_working_output() {
+        let source = DynamicImage::ImageRgb32F(image::ImageBuffer::from_fn(400, 300, |x, y| {
+            image::Rgb([x as f32 / 399.0, y as f32 / 299.0, (x + y) as f32 / 698.0])
+        }));
+        let adjustments = json!({
+            "rotation": 2.0,
+            "flipHorizontal": true,
+            "crop": {"x": 100.0, "y": 75.0, "width": 200.0, "height": 150.0},
+        });
+
+        let (full, offset) = apply_all_transformations(&source, &adjustments);
+        let reference = downscale_f32_image(&full, 100, 100).to_rgb32f();
+        let (preview, effective_scale, preview_offset) =
+            compute_preview_transformed(&source, &adjustments, 100, None).unwrap();
+        let preview = preview.to_rgb32f();
+
+        assert_eq!(preview.dimensions(), reference.dimensions());
+        assert!(preview.width() <= 100 && preview.height() <= 100);
+        assert!((effective_scale - 0.5).abs() < 1e-6);
+        assert_eq!(preview_offset, offset);
+
+        let mean_absolute_error = preview
+            .as_raw()
+            .iter()
+            .zip(reference.as_raw())
+            .map(|(actual, expected)| (actual - expected).abs() as f64)
+            .sum::<f64>()
+            / preview.as_raw().len() as f64;
+        assert!(
+            mean_absolute_error < 0.015,
+            "preview/reference mean absolute error {mean_absolute_error} exceeded tolerance"
+        );
+    }
+
+    #[test]
+    fn preview_geometry_prepares_patch_assets_at_preview_resolution() {
+        let source = DynamicImage::new_rgb32f(400, 300);
+        let mask = GrayImage::from_pixel(400, 300, Luma([255]));
+        let color = RgbImage::from_pixel(400, 300, image::Rgb([255, 0, 0]));
+        let adjustments = json!({
+            "aiPatches": [{
+                "id": "preview-patch",
+                "revision": 1,
+                "visible": true,
+                "patchData": {
+                    "mask": encoded_preview_fixture(DynamicImage::ImageLuma8(mask)),
+                    "color": encoded_preview_fixture(DynamicImage::ImageRgb8(color)),
+                },
+                "subMasks": [],
+            }],
+        });
+
+        let (preview, effective_scale, _) =
+            compute_preview_transformed(&source, &adjustments, 100, None).unwrap();
+        let preview = preview.to_rgb32f();
+        let center = preview.get_pixel(preview.width() / 2, preview.height() / 2);
+
+        assert_eq!(preview.dimensions(), (100, 75));
+        assert!((effective_scale - 0.25).abs() < 1e-6);
+        assert!(center[0] > 0.99 && center[1] < 0.01 && center[2] < 0.01);
+    }
 
     fn write_test_lut(path: &std::path::Path, middle: f32) {
         let mut cube = String::from("LUT_3D_SIZE 2\n");
