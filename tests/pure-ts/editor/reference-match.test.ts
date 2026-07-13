@@ -10,6 +10,7 @@ import {
   combineReferenceSummaries,
   createReferenceMatchAdjustmentLayer,
   createReferenceMatchProposal,
+  describeReferenceMatchSource,
   fingerprintReferenceMatchValue,
   getReferenceMatchLayerCompatibility,
   mergeReferenceSourceIdentities,
@@ -57,6 +58,18 @@ const reference = (
 });
 
 describe('color-managed reference matching', () => {
+  test('presents physical and virtual-copy sources without leaking the serialized suffix into the filename', () => {
+    expect(describeReferenceMatchSource('/photos/reference.ARW')).toEqual({
+      label: 'reference.ARW',
+      sourcePath: '/photos/reference.ARW',
+      virtualCopyId: null,
+    });
+    expect(describeReferenceMatchSource('/photos/reference.ARW?vc=look-2')).toEqual({
+      label: 'reference.ARW',
+      sourcePath: '/photos/reference.ARW',
+      virtualCopyId: 'look-2',
+    });
+  });
   test('summarizes real histogram bins and rejects incomplete analysis inputs', () => {
     const bins = (peak: number) => Array.from({ length: 256 }, (_, index) => (index === peak ? 1_000 : 0));
     const result = summarizeReferenceHistogram({

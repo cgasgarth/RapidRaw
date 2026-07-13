@@ -62,6 +62,23 @@ export interface ReferenceMatchReference {
   weight: number;
 }
 
+export interface ReferenceMatchSourcePresentation {
+  label: string;
+  sourcePath: string;
+  virtualCopyId: string | null;
+}
+
+export const describeReferenceMatchSource = (path: string): ReferenceMatchSourcePresentation => {
+  const virtualCopyMarker = path.lastIndexOf('?vc=');
+  const sourcePath = virtualCopyMarker >= 0 ? path.slice(0, virtualCopyMarker) : path;
+  const virtualCopyId = virtualCopyMarker >= 0 ? path.slice(virtualCopyMarker + 4) || null : null;
+  return {
+    label: sourcePath.split(/[\\/]/).pop() || sourcePath,
+    sourcePath,
+    virtualCopyId,
+  };
+};
+
 export interface ReferencePhysicalSourceIdentity {
   available: boolean;
   sourceRevision: string | null;
