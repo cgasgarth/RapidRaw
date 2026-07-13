@@ -1,10 +1,12 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { readFile, stat } from 'node:fs/promises';
-import { isAbsolute, resolve } from 'node:path';
+import { access, mkdir, mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { isAbsolute, join, resolve } from 'node:path';
 import { z } from 'zod';
 import { publishAdjustmentSnapshot } from '../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../src/utils/adjustments';
+import { type StartupTraceSnapshot, startupTraceSnapshotSchema } from '../../src/utils/startup/startupTraceReporter';
 import { requestQaDaemon } from '../qa/daemon-client';
 import { type QaDaemonMetrics, qaDaemonMetricsSchema } from '../qa/daemon-model';
 import { readLiveDaemonState } from '../qa/daemon-state';
@@ -319,6 +321,138 @@ const browserQaScenario = (
   };
 };
 
+const startupBinary = process.env.RAWENGINE_PERF_STARTUP_BINARY;
+const startupFixtureDigest = `sha256:${createHash('sha256')
+  .update(`native-startup-v1:${startupBinary ?? 'unconfigured'}`)
+  .digest('hex')}` as const;
+
+const startupPhase = (snapshot: StartupTraceSnapshot, name: StartupTraceSnapshot['phases'][number]['phase']) => {
+  const phase = snapshot.phases.find(({ phase: candidate }) => candidate === name);
+  if (phase === undefined) throw new Error(`${snapshot.traceId} omitted startup phase ${name}.`);
+  return phase;
+};
+
+const stopStartupProcess = async (process: ReturnType<typeof Bun.spawn>): Promise<void> => {
+  if (process.exitCode !== null) return;
+  process.kill('SIGTERM');
+  if (await Promise.race([process.exited.then(() => true), Bun.sleep(2_000).then(() => false)])) return;
+  process.kill('SIGKILL');
+  await process.exited;
+};
+
+const nativeStartupScenario = (cacheMode: 'cold' | 'warm'): PerformanceScenario => {
+  let root: string | undefined;
+  return {
+    id: `native.startup-shell-${cacheMode}`,
+    version: 1,
+    fixtureDigest: startupFixtureDigest,
+    cacheMode,
+    warmupRuns: 1,
+    measuredRuns: 5,
+    budgets: {
+      firstPaintMs: { absolute: 100, relative: 0.15 },
+      interactiveMs: { absolute: 150, relative: 0.15 },
+    },
+    maxRelativeMad: 0.5,
+    metricUnits: {
+      degradedPhaseCount: 'count',
+      editorDemandReadyMs: 'ms',
+      firstPaintMs: 'ms',
+      frontendReadyResponseMs: 'ms',
+      interactiveMs: 'ms',
+      phaseCount: 'count',
+      shellVisibleMs: 'ms',
+    },
+    async beforeAll() {
+      if (startupBinary === undefined || !isAbsolute(startupBinary))
+        throw new Error('RAWENGINE_PERF_STARTUP_BINARY must be an absolute executable path.');
+      await access(startupBinary);
+      root = await mkdtemp(join(tmpdir(), 'rawengine-perf-startup-'));
+    },
+    async afterAll() {
+      if (root !== undefined) await rm(root, { force: true, recursive: true });
+    },
+    async runSample(run) {
+      if (startupBinary === undefined || root === undefined) throw new Error('Native startup fixture is unavailable.');
+      const home = join(root, cacheMode === 'cold' ? `cold-${run}` : 'warm-home');
+      const reportPath = join(root, `${cacheMode}-${run}.json`);
+      await mkdir(home, { recursive: true });
+      await rm(reportPath, { force: true });
+      const process = Bun.spawn([startupBinary], {
+        env: {
+          ...Bun.env,
+          HOME: home,
+          RAWENGINE_STARTUP_BENCHMARK_EDITOR_DEMAND: '1',
+          RAWENGINE_STARTUP_BENCHMARK_ORIGIN_EPOCH_MS: String(Date.now()),
+          RAWENGINE_STARTUP_BENCHMARK_REPORT: reportPath,
+          RUST_LOG: 'warn',
+        },
+        stderr: 'ignore',
+        stdout: 'ignore',
+      });
+      let snapshot: StartupTraceSnapshot | undefined;
+      try {
+        for (let attempt = 0; attempt < 1_200; attempt += 1) {
+          snapshot = await readFile(reportPath, 'utf8')
+            .then((value) => startupTraceSnapshotSchema.parse(JSON.parse(value)))
+            .catch(() => undefined);
+          if (snapshot !== undefined) break;
+          if (process.exitCode !== null)
+            throw new Error(`Startup process exited before its report (${process.exitCode}).`);
+          await Bun.sleep(25);
+        }
+      } finally {
+        await stopStartupProcess(process);
+      }
+      if (snapshot === undefined) throw new Error('Native startup report did not become authoritative.');
+      if (snapshot.processId !== process.pid || !snapshot.criticalPathOrderValid)
+        throw new Error('Native startup trace identity or critical ordering failed.');
+      const ordered = [
+        startupPhase(snapshot, 'processStarted'),
+        startupPhase(snapshot, 'windowCreated'),
+        startupPhase(snapshot, 'windowVisible'),
+        startupPhase(snapshot, 'frontendShellVisible'),
+        startupPhase(snapshot, 'frontendInteractive'),
+      ];
+      for (let index = 1; index < ordered.length; index += 1)
+        if ((ordered[index - 1]?.elapsedMs ?? 0) > (ordered[index]?.elapsedMs ?? 0))
+          throw new Error(`Native startup phases are non-monotonic at ${index}.`);
+      if (ordered.some(({ status }) => status === 'failed'))
+        throw new Error('Native startup trace contains a failed phase.');
+      const processStartedMs = startupPhase(snapshot, 'processStarted').elapsedMs;
+      const firstPaintMs = startupPhase(snapshot, 'windowVisible').elapsedMs - processStartedMs;
+      const shellVisibleMs = startupPhase(snapshot, 'frontendShellVisible').elapsedMs - processStartedMs;
+      const interactiveMs = startupPhase(snapshot, 'frontendInteractive').elapsedMs - processStartedMs;
+      const editorDemandPhases = [startupPhase(snapshot, 'gpuReady'), startupPhase(snapshot, 'libraryServicesReady')];
+      for (const phase of editorDemandPhases)
+        if (!phase.detail?.includes('priority=editor_demand:starts=1'))
+          throw new Error(`${phase.phase} omitted editor-demand single-flight proof.`);
+      const editorDemandReadyMs = Math.max(...editorDemandPhases.map(({ elapsedMs }) => elapsedMs)) - processStartedMs;
+      const frontendReadyDetail = startupPhase(snapshot, 'frontendShellVisible').detail ?? '';
+      const frontendReadyResponseMs = Number(frontendReadyDetail.match(/frontend_ready_ms=(\d+)/u)?.[1]);
+      if (!Number.isFinite(frontendReadyResponseMs)) throw new Error('Startup frontend-ready IPC receipt is missing.');
+      return {
+        assertions: 8,
+        metrics: {
+          degradedPhaseCount: snapshot.phases.filter(({ status }) => status === 'degraded').length,
+          editorDemandReadyMs,
+          firstPaintMs,
+          frontendReadyResponseMs,
+          interactiveMs,
+          phaseCount: snapshot.phases.length,
+          shellVisibleMs,
+        },
+        spans: snapshot.phases.map((phase) => ({
+          durationMs: 0,
+          source: phase.phase.startsWith('frontend') ? ('frontend' as const) : ('native' as const),
+          stage: `startup.${phase.phase}`,
+          startOffsetMs: Math.max(0, phase.elapsedMs - processStartedMs),
+        })),
+      };
+    },
+  };
+};
+
 const nativeResourceSchema = z.object({
   peakResidentBytes: z.number().nonnegative(),
   filesystemReadOps: z.number().nonnegative(),
@@ -574,6 +708,8 @@ export const performanceScenarios: readonly PerformanceScenario[] = [
   browserQaScenario('browser.library-thumbnail-scroll', 'browser.library.thumbnail-scroll', 'warm'),
   browserQaScenario('browser.library-sidecar-change', 'browser.library.sidecar-change', 'warm'),
   browserQaScenario('browser.library-folder-tree-expand', 'browser.library.folder-tree-expand', 'warm'),
+  nativeStartupScenario('cold'),
+  nativeStartupScenario('warm'),
   nativeRawOpenScenario('cold'),
   nativeRawOpenScenario('warm'),
 ];

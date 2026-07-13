@@ -343,6 +343,8 @@ exit 1
         'editor.preview-scheduling',
         'native.editor-raw-open-cold',
         'native.editor-raw-open-warm',
+        'native.startup-shell-cold',
+        'native.startup-shell-warm',
       ],
       conservativeFallback: true,
     });

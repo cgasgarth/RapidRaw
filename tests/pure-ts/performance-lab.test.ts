@@ -106,6 +106,8 @@ describe('performance lab runner', () => {
       'browser.library-thumbnail-scroll',
       'browser.library-sidecar-change',
       'browser.library-folder-tree-expand',
+      'native.startup-shell-cold',
+      'native.startup-shell-warm',
       'native.editor-raw-open-cold',
       'native.editor-raw-open-warm',
     ]);
@@ -137,6 +139,16 @@ describe('performance lab runner', () => {
     expect(receipt).toMatchObject({
       status: 'invalid',
       invalidReason: expect.stringContaining('RAWENGINE_PERF_NATIVE_FIXTURE'),
+    });
+  });
+
+  test('native startup scenarios fail closed without an absolute executable', async () => {
+    const startup = performanceScenarios.find(({ id }) => id === 'native.startup-shell-cold');
+    if (startup === undefined) throw new Error('native startup performance scenario missing');
+    const receipt = await runPerformanceScenario({ scenario: startup, identity, now: clock() });
+    expect(receipt).toMatchObject({
+      status: 'invalid',
+      invalidReason: expect.stringContaining('RAWENGINE_PERF_STARTUP_BINARY'),
     });
   });
 

@@ -178,6 +178,13 @@ jobs:
           RAWENGINE_PERF_NATIVE_NO_BUILD: '1'
         run: bun perf run native.editor-raw-open-warm --profile native-dedicated --output artifacts/performance-lab/native.editor-raw-open-warm.json
 
+      - name: Run native cold and warm startup scenarios
+        env:
+          RAWENGINE_PERF_STARTUP_BINARY: ${{ github.workspace }}/src-tauri/target/debug/bundle/macos/RawEngine QA Current.app/Contents/MacOS/RapidRAW
+        run: |
+          bun perf run native.startup-shell-cold --profile native-dedicated --output artifacts/performance-lab/native.startup-shell-cold.json
+          bun perf run native.startup-shell-warm --profile native-dedicated --output artifacts/performance-lab/native.startup-shell-warm.json
+
       - name: Upload native performance receipts
         if: ${{ always() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

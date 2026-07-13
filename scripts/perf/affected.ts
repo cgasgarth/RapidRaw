@@ -48,6 +48,10 @@ const ownership: readonly { pattern: RegExp; scenarioIds: readonly string[] }[] 
     pattern: /src-tauri\/src\/(?:gpu|io|raw|render)\//u,
     scenarioIds: ['native.editor-raw-open-cold', 'native.editor-raw-open-warm'],
   },
+  {
+    pattern: /(?:src-tauri\/src\/app\/startup|src\/utils\/startup|src\/product\/startupBootstrap)/u,
+    scenarioIds: ['native.startup-shell-cold', 'native.startup-shell-warm'],
+  },
   { pattern: /(?:scripts\/perf\/|package\.json|bun\.lock)/u, scenarioIds: ['*'] },
 ];
 

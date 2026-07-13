@@ -25,6 +25,8 @@ bun perf run browser.library-sidecar-change
 bun perf run browser.library-folder-tree-expand
 RAWENGINE_PERF_NATIVE_FIXTURE=/absolute/private/image.ARW bun perf run native.editor-raw-open-cold
 RAWENGINE_PERF_NATIVE_FIXTURE=/absolute/private/image.ARW RAWENGINE_PERF_NATIVE_NO_BUILD=1 bun perf run native.editor-raw-open-warm
+RAWENGINE_PERF_STARTUP_BINARY=/absolute/RapidRAW bun perf run native.startup-shell-cold
+RAWENGINE_PERF_STARTUP_BINARY=/absolute/RapidRAW bun perf run native.startup-shell-warm
 bun perf run editor.preview-scheduling --baseline private-artifacts/perf/baseline.json
 bun perf baseline-add private-artifacts/perf/history.json private-artifacts/perf/baseline.json --actor reviewer-name --reason "reviewed stable local run" --signing-key private-artifacts/perf/reviewer-ed25519.pem
 bun perf baseline-export private-artifacts/perf/history.json private-artifacts/perf/canonical-history.json
@@ -50,6 +52,8 @@ Browser fixture digests bind the scenario ID plus the actual QA scenario and gen
 Browser scenarios calibrate a page-monotonic trace at document initialization. Their receipts aggregate React-owned DOM mutation windows and frontend-to-Tauri invocation intervals by command, retaining exact work counts without emitting one span per call. `reactMutationCount` and `ipcCallCount` are trendable work-amplification metrics, while the frontend and `tauri-ipc` spans share the scenario run and measured-sample identity.
 
 `native.editor-raw-open-cold` and `native.editor-raw-open-warm` run only with an absolute private RAW supplied through `RAWENGINE_PERF_NATIVE_FIXTURE`. They launch the validation-only authenticated native control plane, reset and set cache policy, open the RAW to an authoritative preview, and retain native scheduler, process CPU/RSS/filesystem, cache, source-byte, dimensions, and actual GPU execution receipt counters (passes, command buffers, queue submissions, resource estimate, backend generation). Native, GPU command-encode, and I/O observation spans share the performance run identity. The launcher rebuilds when identity requires it; `RAWENGINE_PERF_NATIVE_NO_BUILD=1` fails closed on stale deployment. The manual dedicated job targets a labeled self-hosted Apple Silicon runner and runs cold then warm against the same validated build. Private paths and RAWs never enter receipts or artifacts; only the fixture digest does.
+
+`native.startup-shell-cold` uses a fresh home for every repetition; `native.startup-shell-warm` reuses one home after its warmup. Both require `RAWENGINE_PERF_STARTUP_BINARY`, launch a real app process, correlate the report PID and trace ID, validate monotonic process/window/frontend phases, retain first-paint/shell/interactive/frontend-ready IPC metrics, and require GPU plus library services to prove one editor-demand single-flight start. The dedicated native job runs them against the same bundle used for RAW validation.
 
 Comparisons require the same scenario/version, fixture digest, cache mode, hardware class, and build profile. A latency gate regresses only when its p95 exceeds both relative and absolute thresholds. Raw samples, median, p90, p95, MAD, IQR, and a fixed-seed 2,000-resample bootstrap 95% median interval remain available for reproducible trend inspection.
 
