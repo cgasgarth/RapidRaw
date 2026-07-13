@@ -244,6 +244,25 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
   });
   expect(layerState.adjustments.masks[0]?.adjustments.exposure).not.toBe(0);
   expect(layerState.activeMaskContainerId).toBe(layerState.adjustments.masks[0]?.id);
+
+  await act(async () => {
+    useEditorStore
+      .getState()
+      .setReferenceMatchReferences((current) =>
+        current.map((reference) => ({ ...reference, role: 'technical', weight: 2 })),
+      );
+    await flushPromises();
+  });
+  const priorSourceFingerprint = useEditorStore.getState().referenceMatchReferences[0]?.sourceFingerprint;
+  await click(container, '[data-testid="reference-match-replace"]');
+  expect(useEditorStore.getState().referenceMatchReferences).toHaveLength(1);
+  expect(useEditorStore.getState().referenceMatchReferences[0]).toMatchObject({
+    label: 'target.ARW',
+    path: '/photos/target.ARW',
+    role: 'technical',
+    weight: 2,
+  });
+  expect(useEditorStore.getState().referenceMatchReferences[0]?.sourceFingerprint).not.toBe(priorSourceFingerprint);
 });
 
 async function click(container: Element, selector: string) {

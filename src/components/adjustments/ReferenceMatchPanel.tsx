@@ -1,4 +1,4 @@
-import { FolderSearch, GitCompareArrows, Plus, Trash2, X } from 'lucide-react';
+import { FolderSearch, GitCompareArrows, Plus, RefreshCw, Trash2, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
@@ -93,6 +93,7 @@ export default function ReferenceMatchPanel() {
   const canCapture = Boolean(
     selectedImage?.isReady && currentRenderUrl && targetSummary && references.length < 8 && !isCurrentReference,
   );
+  const canReplace = Boolean(selectedImage?.isReady && currentRenderUrl && targetSummary && !isCurrentReference);
   const candidateReferences = selectedImage
     ? references.filter((reference) => reference.path !== selectedImage.path && reference.availability === 'available')
     : [];
@@ -156,40 +157,46 @@ export default function ReferenceMatchPanel() {
     [],
   );
 
-  const captureCurrent = async () => {
-    if (!selectedImage || !currentRenderUrl || !targetSummary || !canCapture) return;
+  const captureCurrent = async (replaceId?: string) => {
+    if (!selectedImage || !currentRenderUrl || !targetSummary || (replaceId ? !canReplace : !canCapture)) return;
     const sourceIdentity = await resolveSourceIdentity(selectedImage.path);
     if (!sourceIdentity?.available || sourceIdentity.sourceRevision === null) return;
     const sourceRevision = sourceIdentity.sourceRevision;
-    setReferences((current) => [
-      ...current,
-      {
-        availability: 'available',
-        adjustmentRevision: adjustmentSnapshot.adjustmentRevision,
-        cameraProfile: adjustments.cameraProfile,
-        geometryFingerprint: fingerprintReferenceMatchValue(
-          `${selectedImage.path}:geometry:${String(adjustmentSnapshot.geometryRevision)}`,
-        ),
-        geometryRevision: adjustmentSnapshot.geometryRevision,
-        graphFingerprint: fingerprintReferenceMatchValue(
-          `${selectedImage.path}:graph:${String(adjustmentSnapshot.adjustmentRevision)}`,
-        ),
-        id: `${selectedImage.path}:${String(adjustmentSnapshot.adjustmentRevision)}:${String(proofRevision)}`,
-        label: describeReferenceMatchSource(selectedImage.path).label,
-        path: selectedImage.path,
-        proofFingerprint: fingerprintReferenceMatchValue(`proof:${String(proofRevision)}`),
-        proofRevision,
-        renderUrl: currentRenderUrl,
-        role: 'creative',
-        sourceFingerprint: fingerprintReferenceMatchValue(sourceRevision),
-        sourceRevision,
-        summary: targetSummary,
-        viewFingerprint: fingerprintReferenceMatchValue(
-          JSON.stringify({ toneMapper: adjustments.toneMapper, viewTransform: adjustments.viewTransform }),
-        ),
-        weight: 1,
-      },
-    ]);
+    const captured = {
+      availability: 'available',
+      adjustmentRevision: adjustmentSnapshot.adjustmentRevision,
+      cameraProfile: adjustments.cameraProfile,
+      geometryFingerprint: fingerprintReferenceMatchValue(
+        `${selectedImage.path}:geometry:${String(adjustmentSnapshot.geometryRevision)}`,
+      ),
+      geometryRevision: adjustmentSnapshot.geometryRevision,
+      graphFingerprint: fingerprintReferenceMatchValue(
+        `${selectedImage.path}:graph:${String(adjustmentSnapshot.adjustmentRevision)}`,
+      ),
+      id: `${selectedImage.path}:${String(adjustmentSnapshot.adjustmentRevision)}:${String(proofRevision)}`,
+      label: describeReferenceMatchSource(selectedImage.path).label,
+      path: selectedImage.path,
+      proofFingerprint: fingerprintReferenceMatchValue(`proof:${String(proofRevision)}`),
+      proofRevision,
+      renderUrl: currentRenderUrl,
+      role: 'creative',
+      sourceFingerprint: fingerprintReferenceMatchValue(sourceRevision),
+      sourceRevision,
+      summary: targetSummary,
+      viewFingerprint: fingerprintReferenceMatchValue(
+        JSON.stringify({ toneMapper: adjustments.toneMapper, viewTransform: adjustments.viewTransform }),
+      ),
+      weight: 1,
+    } as const;
+    setReferences((current) => {
+      if (!replaceId) return [...current, captured];
+      return current.map((reference) =>
+        reference.id === replaceId ? { ...captured, role: reference.role, weight: reference.weight } : reference,
+      );
+    });
+    if (replaceId && useEditorStore.getState().compare.source.identity === replaceId) {
+      dispatchCompare({ identity: captured.id, label: captured.label, type: 'set-reference-source' });
+    }
     setProposal(null);
   };
 
@@ -286,7 +293,7 @@ export default function ReferenceMatchPanel() {
         <div className="space-y-1" data-testid="reference-match-tray">
           {references.map((reference) => (
             <div
-              className="grid grid-cols-[2.5rem_minmax(0,1fr)_2.75rem_1.5rem_4rem_1.25rem] items-center gap-1 rounded border border-editor-border bg-editor-panel px-1.5 py-1"
+              className="grid grid-cols-[2.5rem_minmax(0,1fr)_2.75rem_1.5rem_1.5rem_4rem_1.25rem] items-center gap-1 rounded border border-editor-border bg-editor-panel px-1.5 py-1"
               data-reference-path={reference.path}
               key={reference.id}
             >
@@ -384,6 +391,19 @@ export default function ReferenceMatchPanel() {
                 type="button"
               >
                 <FolderSearch aria-hidden="true" size={12} />
+              </button>
+              <button
+                aria-label={`Replace ${reference.label} with current image`}
+                className="text-text-tertiary enabled:hover:text-text-primary disabled:opacity-40"
+                data-testid="reference-match-replace"
+                disabled={!canReplace}
+                onClick={() => void captureCurrent(reference.id)}
+                title={t('editor.adjustments.referenceMatch.replaceReference', {
+                  defaultValue: 'Replace with current image',
+                })}
+                type="button"
+              >
+                <RefreshCw aria-hidden="true" size={12} />
               </button>
               <label className="flex items-center gap-1 text-[9px] text-text-secondary">
                 {t('editor.adjustments.referenceMatch.weight', { defaultValue: 'Weight' })}
