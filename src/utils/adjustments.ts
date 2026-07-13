@@ -239,6 +239,8 @@ export interface Adjustments {
   parametricCurve?: ParametricCurve;
   curveMode?: 'point' | 'parametric';
   rawProcessingModeOverride: RawProcessingModeOverride;
+  /** Persisted native edit-graph process version; legacy sidecars default to v1. */
+  rawEngineEditGraphVersion: number;
   crop: Crop | null;
   deblurEnabled: boolean;
   deblurSigmaPx: number;
@@ -817,6 +819,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   parametricCurve: getDefaultParametricCurve(),
   curveMode: 'point',
   rawProcessingModeOverride: null,
+  rawEngineEditGraphVersion: 1,
   deblurEnabled: false,
   deblurSigmaPx: 0.8,
   deblurStrength: 0,

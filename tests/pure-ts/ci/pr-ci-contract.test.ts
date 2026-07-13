@@ -25,6 +25,7 @@ describe('four-minute PR CI contract', () => {
     const plan = planPrValidation(paths);
     expect(plan.lanes).toEqual(expected);
     expect(plan.deferredToMain).toContain('full native required closure');
+    expect(plan.deferredToMain).toContain('native optional-dependency boundary and system-library closure');
     expect(plan.deferredToMain).toContain('exhaustive dependency security and license audits');
   });
 
