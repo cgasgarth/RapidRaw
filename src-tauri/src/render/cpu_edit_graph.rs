@@ -50,14 +50,6 @@ pub(crate) fn execute_cpu_edit_graph(
         return Err("edit_graph.cpu_reference_version_mismatch");
     }
     let global = &adjustments.global;
-    if global.flare_amount != 0.0
-        || adjustments.mask_adjustments
-            [..(adjustments.mask_count as usize).min(adjustments.mask_adjustments.len())]
-            .iter()
-            .any(|mask| mask.flare_amount != 0.0)
-    {
-        return Err("edit_graph.cpu_reference_flare_pending");
-    }
 
     let preserve_extended = graph.pipeline_version >= 2;
     let source = base_image.to_rgba32f();
@@ -127,6 +119,8 @@ pub(crate) fn execute_cpu_edit_graph(
                 .any(|mask| mask.structure != 0.0 || mask.dehaze != 0.0 || mask.glow_amount > 0.0),
         40.0,
     );
+    let flare_map =
+        (global.flare_amount > 0.0).then(|| build_flare_map(&input, width, height, adjustments));
     let mut output = ImageBuffer::<Rgba<f32>, Vec<f32>>::new(width, height);
     for (x, y, target) in output.enumerate_pixels_mut() {
         let source_pixel = source.get_pixel(x, y).0;
@@ -228,6 +222,15 @@ pub(crate) fn execute_cpu_edit_graph(
             effective.brightness,
             effective.whites,
         );
+        color = apply_flare(
+            color,
+            flare_map.as_deref(),
+            x,
+            y,
+            width,
+            height,
+            effective.flare,
+        );
         color = apply_dehaze(
             color,
             structure_surface,
@@ -316,7 +319,12 @@ pub(crate) fn execute_cpu_edit_graph(
                 color = Vec3::Z;
             }
         }
-        *target = Rgba([color.x, color.y, color.z, round_f16(source_pixel[3])]);
+        *target = Rgba([
+            round_f16(color.x),
+            round_f16(color.y),
+            round_f16(color.z),
+            round_f16(source_pixel[3]),
+        ]);
     }
     Ok(DynamicImage::ImageRgba32F(output))
 }
@@ -686,6 +694,352 @@ fn apply_halation(
     let luma = get_luma(color.max(Vec3::ZERO));
     let affected = color.lerp(Vec3::splat(luma), mask * 0.12);
     Vec3::splat(0.5).lerp(affected, 1.0 - mask * 0.06) + tint * mask * linear_luma * amount * 2.5
+}
+
+const FLARE_MAP_EDGE: u32 = 512;
+
+fn sample_bilinear_grid(source: &[Vec3], width: u32, height: u32, uv: glam::Vec2) -> Vec3 {
+    let uv = uv.clamp(glam::Vec2::ZERO, glam::Vec2::ONE);
+    let position = uv * glam::Vec2::new(width as f32, height as f32) - glam::Vec2::splat(0.5);
+    let base_x = position.x.floor() as i32;
+    let base_y = position.y.floor() as i32;
+    let fraction = position - position.floor();
+    let fetch = |x: i32, y: i32| {
+        source[(y.clamp(0, height as i32 - 1) as u32 * width + x.clamp(0, width as i32 - 1) as u32)
+            as usize]
+    };
+    fetch(base_x, base_y)
+        .lerp(fetch(base_x + 1, base_y), fraction.x)
+        .lerp(
+            fetch(base_x, base_y + 1).lerp(fetch(base_x + 1, base_y + 1), fraction.x),
+            fraction.y,
+        )
+}
+
+fn flare_filmic_exposure(color: Vec3, brightness: f32) -> Vec3 {
+    if brightness == 0.0 {
+        return color;
+    }
+    let luma = get_luma(color);
+    if luma.abs() < 0.000_01 {
+        return color;
+    }
+    let scale = 2.0_f32.powf(brightness * 0.05);
+    let k = 2.0_f32.powf(-brightness * 0.95 * 1.2);
+    let absolute = luma.abs();
+    let floor = absolute.floor();
+    let fraction = absolute - floor;
+    let shaped = fraction / (fraction + (1.0 - fraction) * k);
+    let next_luma = luma.signum() * (floor + shaped) * scale;
+    Vec3::splat(next_luma) + (color - Vec3::splat(luma)) * (next_luma / luma).powf(0.8)
+}
+
+fn build_flare_threshold(
+    input: &[Vec3],
+    width: u32,
+    height: u32,
+    adjustments: &AllAdjustments,
+) -> Vec<Vec3> {
+    let global = &adjustments.global;
+    let mut threshold = vec![Vec3::ZERO; (FLARE_MAP_EDGE * FLARE_MAP_EDGE) as usize];
+    for y in 0..FLARE_MAP_EDGE {
+        for x in 0..FLARE_MAP_EDGE {
+            let uv = (glam::Vec2::new(x as f32, y as f32) + glam::Vec2::splat(0.5))
+                / FLARE_MAP_EDGE as f32;
+            let sampled = sample_bilinear_grid(input, width, height, uv);
+            let mut linear = if global.is_raw_image == 1 {
+                sampled
+            } else {
+                srgb_to_linear(sampled)
+            };
+            linear *= 2.0_f32.powf(global.exposure);
+            linear = flare_filmic_exposure(linear, global.brightness);
+            if global.whites != 0.0 {
+                linear /= (1.0 - global.whites * 0.25).max(0.01);
+            }
+            let true_luma = get_luma(linear);
+            let threshold_value = 0.88 + (0.5 - 0.88) * global.flare_amount.clamp(0.0, 1.0);
+            let contribution_input = true_luma.min(1.0) - threshold_value + 0.15;
+            let contribution = if contribution_input <= 0.0 {
+                0.0
+            } else if contribution_input < 0.3 {
+                contribution_input * contribution_input / 0.6
+            } else {
+                contribution_input - 0.15
+            };
+            threshold[(y * FLARE_MAP_EDGE + x) as usize] =
+                (linear * (contribution / true_luma.max(0.001))).map(round_f16);
+        }
+    }
+    threshold
+}
+
+fn uv_inside(uv: glam::Vec2) -> bool {
+    uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0
+}
+
+fn flare_direction(spike: u32, aspect: f32) -> glam::Vec2 {
+    let angle = spike as f32 * std::f32::consts::PI / 6.0 + std::f32::consts::FRAC_PI_6;
+    glam::Vec2::new(angle.cos() / aspect, angle.sin()).normalize()
+}
+
+fn starburst_rays(threshold: &[Vec3], uv: glam::Vec2, aspect: f32) -> Vec3 {
+    let mut result = Vec3::ZERO;
+    for spike in 0..6 {
+        let direction = flare_direction(spike, aspect);
+        let mut ray = Vec3::ZERO;
+        let mut weight_sum = 0.0;
+        for index in 1..=24 {
+            let t = index as f32 / 24.0;
+            let distance = t * t * 0.65;
+            let weight = (-distance * 2.5).exp() + 0.4 * (-distance * 0.8).exp();
+            for sign in [-1.0_f32, 1.0] {
+                let sample_uv = uv + direction * distance * sign;
+                if !uv_inside(sample_uv) {
+                    continue;
+                }
+                let red_uv = uv + direction * distance * 1.01 * sign;
+                let blue_uv = uv + direction * distance * 0.99 * sign;
+                ray.x += sample_bilinear_grid(threshold, FLARE_MAP_EDGE, FLARE_MAP_EDGE, red_uv).x
+                    * weight;
+                ray.y += sample_bilinear_grid(threshold, FLARE_MAP_EDGE, FLARE_MAP_EDGE, sample_uv)
+                    .y
+                    * weight;
+                ray.z += sample_bilinear_grid(threshold, FLARE_MAP_EDGE, FLARE_MAP_EDGE, blue_uv).z
+                    * weight;
+                weight_sum += weight;
+            }
+        }
+        if weight_sum > 0.0 {
+            result += ray / weight_sum;
+        }
+    }
+    result * 0.5
+}
+
+fn starburst_inner(threshold: &[Vec3], uv: glam::Vec2, aspect: f32) -> Vec3 {
+    let mut result = Vec3::ZERO;
+    for spike in 0..6 {
+        let direction = flare_direction(spike, aspect);
+        let mut ray = Vec3::ZERO;
+        let mut weight_sum = 0.0;
+        for index in 1..=16 {
+            let distance = index as f32 / 16.0 * 0.2;
+            let weight = (-distance * 8.0).exp();
+            for sign in [-1.0_f32, 1.0] {
+                let sample_uv = uv + direction * distance * sign;
+                if uv_inside(sample_uv) {
+                    ray +=
+                        sample_bilinear_grid(threshold, FLARE_MAP_EDGE, FLARE_MAP_EDGE, sample_uv)
+                            * weight;
+                    weight_sum += weight;
+                }
+            }
+        }
+        if weight_sum > 0.0 {
+            result += ray / weight_sum;
+        }
+    }
+    result / 3.0
+}
+
+fn radial_glow(threshold: &[Vec3], uv: glam::Vec2, aspect: f32) -> Vec3 {
+    let mut result = sample_bilinear_grid(threshold, FLARE_MAP_EDGE, FLARE_MAP_EDGE, uv) * 2.0;
+    let mut weight_sum = 2.0;
+    for ring in 1..=3 {
+        let radius = ring as f32 / 3.0 * 0.08;
+        let weight = (-radius * radius * 200.0).exp();
+        for sample in 0..12 {
+            let angle = sample as f32 * std::f32::consts::TAU / 12.0 + ring as f32 * 0.5;
+            let offset = glam::Vec2::new(angle.cos() * radius / aspect, angle.sin() * radius);
+            if uv_inside(uv + offset) {
+                result +=
+                    sample_bilinear_grid(threshold, FLARE_MAP_EDGE, FLARE_MAP_EDGE, uv + offset)
+                        * weight;
+                weight_sum += weight;
+            }
+        }
+    }
+    result / weight_sum
+}
+
+fn iris_pattern(threshold: &[Vec3], uv: glam::Vec2, aspect: f32) -> Vec3 {
+    let distance = ((uv - glam::Vec2::splat(0.5)) * glam::Vec2::new(aspect, 1.0)).length();
+    let angle_vector = (uv - glam::Vec2::splat(0.5)) * glam::Vec2::new(aspect, 1.0);
+    let angle = angle_vector.y.atan2(angle_vector.x);
+    let modulation = 0.9 + 0.1 * (angle * 3.0).cos().abs().powi(4);
+    let source = sample_bilinear_grid(
+        threshold,
+        FLARE_MAP_EDGE,
+        FLARE_MAP_EDGE,
+        glam::Vec2::ONE - uv,
+    );
+    let mut result = Vec3::ZERO;
+    for (radius, width, intensity) in [
+        (0.15_f32, 0.02_f32, 0.4_f32),
+        (0.25, 0.025, 0.3),
+        (0.35, 0.03, 0.2),
+        (0.48, 0.035, 0.15),
+    ] {
+        result += source * (-((distance - radius) / width).powi(2)).exp() * intensity * modulation;
+    }
+    result * Vec3::new(0.7, 0.8, 1.0)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn add_flare_ghost(
+    flare: &mut Vec3,
+    threshold: &[Vec3],
+    uv: glam::Vec2,
+    tint: Vec3,
+    intensity: f32,
+    aspect: f32,
+    vignette_start: f32,
+    vignette_end: f32,
+) {
+    let distance = ((uv - glam::Vec2::splat(0.5)) * glam::Vec2::new(aspect, 1.0)).length();
+    *flare += sample_bilinear_grid(threshold, FLARE_MAP_EDGE, FLARE_MAP_EDGE, uv)
+        * tint
+        * intensity
+        * (1.0 - smoothstep(vignette_start, vignette_end, distance));
+}
+
+fn flare_ghost_pixel(threshold: &[Vec3], uv: glam::Vec2, aspect: f32) -> Vec3 {
+    let mut flare = starburst_rays(threshold, uv, aspect) * Vec3::new(1.0, 0.95, 0.85) * 3.5;
+    flare += starburst_inner(threshold, uv, aspect) * Vec3::new(1.0, 0.9, 0.8) * 1.5;
+    flare += radial_glow(threshold, uv, aspect) * Vec3::new(1.0, 0.95, 0.9) * 0.4;
+    flare += iris_pattern(threshold, uv, aspect) * 0.2;
+    let flipped = glam::Vec2::ONE - uv;
+    for (scale, tint, intensity, start, end) in [
+        (0.75, Vec3::new(1.0, 0.92, 0.85), 0.05, 0.15, 0.6),
+        (0.4, Vec3::new(0.92, 1.0, 0.95), 0.07, 0.1, 0.45),
+        (0.2, Vec3::new(0.95, 0.97, 1.0), 0.08, 0.08, 0.35),
+        (0.12, Vec3::new(1.0, 1.0, 0.97), 0.07, 0.05, 0.25),
+        (0.55, Vec3::new(0.97, 0.95, 1.0), 0.04, 0.2, 0.5),
+    ] {
+        let ghost_uv = glam::Vec2::splat(0.5) + (flipped - glam::Vec2::splat(0.5)) * scale;
+        add_flare_ghost(
+            &mut flare, threshold, ghost_uv, tint, intensity, aspect, start, end,
+        );
+    }
+    let outward = glam::Vec2::splat(0.5) + (uv - glam::Vec2::splat(0.5)) * 1.8;
+    if uv_inside(outward) {
+        add_flare_ghost(
+            &mut flare,
+            threshold,
+            outward,
+            Vec3::new(0.85, 0.9, 1.0),
+            0.03,
+            aspect,
+            0.25,
+            0.75,
+        );
+    }
+    let outer_flipped = glam::Vec2::splat(0.5) + (flipped - glam::Vec2::splat(0.5)) * 1.3;
+    if uv_inside(outer_flipped) {
+        add_flare_ghost(
+            &mut flare,
+            threshold,
+            outer_flipped,
+            Vec3::new(1.0, 0.9, 0.95),
+            0.03,
+            aspect,
+            0.2,
+            0.55,
+        );
+    }
+    let halo = sample_bilinear_grid(threshold, FLARE_MAP_EDGE, FLARE_MAP_EDGE, flipped);
+    let center_distance = ((uv - glam::Vec2::splat(0.5)) * glam::Vec2::new(aspect, 1.0)).length();
+    for (radius, width, tint, intensity) in [
+        (0.4, 0.05, Vec3::new(0.85, 0.92, 1.0), 0.07),
+        (0.22, 0.035, Vec3::new(0.92, 0.88, 1.0), 0.05),
+        (0.55, 0.06, Vec3::new(0.85, 0.95, 0.97), 0.03),
+    ] {
+        flare += halo * tint * (-((center_distance - radius) / width).powi(2)).exp() * intensity;
+    }
+    let streak_length = 0.4 / aspect;
+    let mut streak = Vec3::ZERO;
+    let mut total_weight = 0.0;
+    for index in 0..64 {
+        let t = index as f32 / 63.0 * 2.0 - 1.0;
+        let offset = t * streak_length;
+        let sample_uv = glam::Vec2::new(uv.x + offset, uv.y);
+        let weight = (-t * t * 3.5).exp();
+        total_weight += weight;
+        if sample_uv.x > 0.0 && sample_uv.x < 1.0 {
+            streak.x += sample_bilinear_grid(
+                threshold,
+                FLARE_MAP_EDGE,
+                FLARE_MAP_EDGE,
+                glam::Vec2::new(uv.x + offset * 1.015, uv.y),
+            )
+            .x * weight;
+            streak.y += sample_bilinear_grid(threshold, FLARE_MAP_EDGE, FLARE_MAP_EDGE, sample_uv)
+                .y
+                * weight;
+            streak.z += sample_bilinear_grid(
+                threshold,
+                FLARE_MAP_EDGE,
+                FLARE_MAP_EDGE,
+                glam::Vec2::new(uv.x + offset * 0.985, uv.y),
+            )
+            .z * weight;
+        }
+    }
+    flare + streak / total_weight * Vec3::new(0.85, 0.92, 1.0)
+}
+
+fn build_flare_map(
+    input: &[Vec3],
+    width: u32,
+    height: u32,
+    adjustments: &AllAdjustments,
+) -> Vec<Vec3> {
+    let threshold = build_flare_threshold(input, width, height, adjustments);
+    let aspect = width as f32 / height as f32;
+    let mut output = vec![Vec3::ZERO; threshold.len()];
+    for y in 0..FLARE_MAP_EDGE {
+        for x in 0..FLARE_MAP_EDGE {
+            let uv = (glam::Vec2::new(x as f32, y as f32) + glam::Vec2::splat(0.5))
+                / FLARE_MAP_EDGE as f32;
+            output[(y * FLARE_MAP_EDGE + x) as usize] =
+                (flare_ghost_pixel(&threshold, uv, aspect) * adjustments.global.flare_amount * 1.5)
+                    .map(round_f16);
+        }
+    }
+    output
+}
+
+#[allow(clippy::too_many_arguments)]
+fn apply_flare(
+    color: Vec3,
+    flare_map: Option<&[Vec3]>,
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+    amount: f32,
+) -> Vec3 {
+    if amount <= 0.0 {
+        return color;
+    }
+    let Some(flare_map) = flare_map else {
+        return color;
+    };
+    let mut flare = sample_bilinear_grid(
+        flare_map,
+        FLARE_MAP_EDGE,
+        FLARE_MAP_EDGE,
+        glam::Vec2::new(x as f32 / width as f32, y as f32 / height as f32),
+    ) * 1.4;
+    flare *= flare;
+    let luma = get_luma(color.max(Vec3::ZERO));
+    let perceptual = if luma <= 1.0 {
+        luma.max(0.0).powf(1.0 / 2.2)
+    } else {
+        1.0 + (luma - 1.0).powf(1.0 / 2.2)
+    };
+    color + flare * amount * (1.0 - smoothstep(0.7, 1.8, perceptual))
 }
 
 #[allow(clippy::too_many_arguments)]

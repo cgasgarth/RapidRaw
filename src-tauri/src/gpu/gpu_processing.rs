@@ -2652,6 +2652,7 @@ mod blur_pass_tests {
                 "lumaNoiseReduction": 10, "colorNoiseReduction": 8,
                 "clarity": 9, "structure": 7, "dehaze": 6, "centré": 5,
                 "glowAmount": 4, "halationAmount": 3,
+                "flareAmount": 12,
                 "chromaticAberrationRedCyan": 2, "chromaticAberrationBlueYellow": -2
             })
             .as_object()
@@ -2721,6 +2722,121 @@ mod blur_pass_tests {
             }
         }
         assert!(maximum.0 <= 0.035, "maximum CPU/GPU mismatch={maximum:?}");
+    }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
+    fn cpu_reference_stage_matrix_matches_metal_without_cross_stage_cancellation() {
+        use image::{DynamicImage, ImageBuffer, Rgba};
+        use serde_json::json;
+        use tauri::Manager;
+
+        let _test_guard = GPU_TEST_LOCK.lock().unwrap();
+        let source = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(12, 10, |x, y| {
+            let checker = if (x / 2 + y / 2) % 2 == 0 { 0.18 } else { 0.72 };
+            Rgba([
+                checker + x as f32 * 0.01,
+                0.12 + y as f32 * 0.075,
+                0.82 - x as f32 * 0.045,
+                1.0,
+            ])
+        }));
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .unwrap();
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state).unwrap();
+        let cases = [
+            ("luma_nr", json!({"lumaNoiseReduction": 35})),
+            ("color_nr", json!({"colorNoiseReduction": 40})),
+            (
+                "sharpness",
+                json!({"sharpness": 35, "sharpnessThreshold": 12}),
+            ),
+            (
+                "clarity_structure",
+                json!({"clarity": 24, "structure": -18}),
+            ),
+            ("dehaze_centre", json!({"dehaze": 20, "centré": 16})),
+            (
+                "glow_halation",
+                json!({"glowAmount": 18, "halationAmount": 14}),
+            ),
+            (
+                "chromatic_aberration",
+                json!({
+                    "chromaticAberrationRedCyan": 18,
+                    "chromaticAberrationBlueYellow": -16
+                }),
+            ),
+            (
+                "flare",
+                json!({"flareAmount": 24, "exposure": 30, "whites": 18}),
+            ),
+        ];
+        for (case_index, (label, mut raw)) in cases.into_iter().enumerate() {
+            raw.as_object_mut()
+                .unwrap()
+                .insert("rawEngineEditGraphVersion".into(), json!(2));
+            let plan = crate::render_plan::compile_render_plan(
+                &raw,
+                crate::render_plan::CompileRenderPlanContext {
+                    revision: crate::render_plan::content_revision(&raw, 3, 7, case_index as u64),
+                    is_raw: false,
+                    tonemapper_override: Some(0),
+                },
+                None,
+            )
+            .unwrap();
+            let cpu = crate::cpu_edit_graph::execute_cpu_edit_graph(
+                &source,
+                &plan.adjustments,
+                &[],
+                None,
+                &plan.edit_graph,
+            )
+            .unwrap()
+            .to_rgba32f();
+            let gpu = process_and_get_unclamped_dynamic_image(
+                &context,
+                &state,
+                &source,
+                PreGpuImageIdentity::for_source(&source, label),
+                RenderRequest {
+                    adjustments: plan.adjustments,
+                    mask_bitmaps: &[],
+                    lut: None,
+                    roi: None,
+                    edit_graph: EditGraphExecutionAuthority::Compiled(plan.edit_graph),
+                },
+                label,
+            )
+            .unwrap()
+            .to_rgba32f();
+            let mut maximum = (0.0_f32, 0_u32, 0_u32, [0.0; 4], [0.0; 4]);
+            for y in 0..10 {
+                for x in 0..12 {
+                    let cpu_pixel = cpu.get_pixel(x, y).0;
+                    let gpu_pixel = gpu.get_pixel(x, y).0;
+                    let normalized_error = (0..3)
+                        .map(|channel| {
+                            let absolute = (cpu_pixel[channel] - gpu_pixel[channel]).abs();
+                            let extended_scale =
+                                cpu_pixel[channel].abs().max(gpu_pixel[channel].abs());
+                            absolute / (extended_scale * 0.001).max(0.035)
+                        })
+                        .fold(0.0_f32, f32::max);
+                    if normalized_error > maximum.0 {
+                        maximum = (normalized_error, x, y, cpu_pixel, gpu_pixel);
+                    }
+                }
+            }
+            assert!(
+                maximum.0 <= 1.0,
+                "stage {label} CPU/GPU exceeded abs=0.035 or rel=0.1% tolerance: {maximum:?}"
+            );
+        }
     }
 
     #[cfg(feature = "tauri-test")]
