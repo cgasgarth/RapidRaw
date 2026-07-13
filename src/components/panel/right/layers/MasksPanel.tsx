@@ -3857,7 +3857,20 @@ function SettingsPanel({
 
     switch (sectionName) {
       case 'basic':
-        return <BasicAdjustments {...sharedProps} appSettings={appSettings} />;
+        return (
+          <BasicAdjustments
+            {...sharedProps}
+            appSettings={appSettings}
+            onRequireEditGraphV2={() => {
+              const editor = useEditorStore.getState();
+              if (editor.adjustments.rawEngineEditGraphVersion < 2) {
+                editor.setEditor((state) => ({
+                  adjustments: { ...state.adjustments, rawEngineEditGraphVersion: 2 },
+                }));
+              }
+            }}
+          />
+        );
       case 'curves':
         return (
           <CurveGraph

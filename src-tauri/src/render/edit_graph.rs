@@ -10,7 +10,7 @@ use bytemuck::bytes_of;
 use crate::adjustments::abi::{
     AllAdjustments, BlackWhiteMixerSettings, ChannelMixerSettings, ColorBalanceRgbSettings,
     ColorCalibrationSettings, ColorGradeSettings, GpuMat3, HslColor, LevelsSettings,
-    MaskAdjustments, Point,
+    MaskAdjustments, Point, ToneEqualizerGpuSettings,
 };
 use crate::tone::curves::CompiledCurvePlanV1;
 use crate::tone::output_curves::CompiledOutputCurvePlanV1;
@@ -242,6 +242,7 @@ impl CompiledNodePayload {
                 "levels": scene.levels, "hsl": scene.hsl, "grading": scene.grading,
                 "gradingBlending": scene.grading_blending,
                 "gradingBalance": scene.grading_balance,
+                "toneEqualizer": scene.tone_equalizer,
             }),
             Self::SceneCurve(curve) => serde_json::json!({
                 "domain": format!("{:?}", curve.domain),
@@ -337,6 +338,7 @@ pub struct SceneGlobalPayload {
     pub grading: [ColorGradeSettings; 4],
     pub grading_blending: f32,
     pub grading_balance: f32,
+    pub tone_equalizer: ToneEqualizerGpuSettings,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -368,6 +370,7 @@ pub struct LocalSceneLayerPayload {
     pub grading: [ColorGradeSettings; 4],
     pub grading_blending: f32,
     pub grading_balance: f32,
+    pub tone_equalizer: ToneEqualizerGpuSettings,
 }
 
 impl LocalSceneLayerPayload {
@@ -405,6 +408,7 @@ impl LocalSceneLayerPayload {
             ],
             grading_blending: layer.color_grading_blending,
             grading_balance: layer.color_grading_balance,
+            tone_equalizer: layer.tone_equalizer,
         }
     }
 
@@ -424,6 +428,7 @@ impl LocalSceneLayerPayload {
             "blendMode": self.blend_mode, "hsl": self.hsl,
             "grading": self.grading, "gradingBlending": self.grading_blending,
             "gradingBalance": self.grading_balance,
+            "toneEqualizer": self.tone_equalizer,
         })
     }
 }
@@ -1138,6 +1143,7 @@ fn compile_node_payload(
                 ],
                 grading_blending: global.color_grading_blending,
                 grading_balance: global.color_grading_balance,
+                tone_equalizer: global.tone_equalizer,
             }))
         }
         EditNodeKind::SceneCurve => CompiledNodePayload::SceneCurve(

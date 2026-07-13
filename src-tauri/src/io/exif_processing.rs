@@ -532,6 +532,96 @@ fn quarantine_crop(
     reasons.push(reason.to_string());
 }
 
+fn number_in_range(value: Option<&JsonValue>, min: f64, max: f64) -> bool {
+    value
+        .and_then(JsonValue::as_f64)
+        .is_some_and(|value| value.is_finite() && (min..=max).contains(&value))
+}
+
+fn is_valid_view_transform(value: &JsonValue) -> bool {
+    let Some(object) = value.as_object() else {
+        return false;
+    };
+    const FIELDS: &[&str] = &[
+        "chromaCompression",
+        "contrast",
+        "latitude",
+        "middleGrey",
+        "shoulder",
+        "sourceBlackEv",
+        "sourceWhiteEv",
+        "toe",
+    ];
+    object.len() == FIELDS.len()
+        && object.keys().all(|key| FIELDS.contains(&key.as_str()))
+        && number_in_range(object.get("chromaCompression"), 0.0, 1.0)
+        && number_in_range(object.get("contrast"), 0.5, 2.0)
+        && number_in_range(object.get("latitude"), 0.0, 1.0)
+        && number_in_range(object.get("middleGrey"), 0.08, 0.3)
+        && number_in_range(object.get("shoulder"), 0.0, 1.0)
+        && number_in_range(object.get("sourceBlackEv"), -32.0, 32.0)
+        && object["sourceBlackEv"]
+            .as_f64()
+            .is_some_and(|value| value < -1.0)
+        && number_in_range(object.get("sourceWhiteEv"), -32.0, 32.0)
+        && object["sourceWhiteEv"]
+            .as_f64()
+            .is_some_and(|value| value > 1.0)
+        && number_in_range(object.get("toe"), 0.0, 1.0)
+        && object["sourceWhiteEv"].as_f64().unwrap_or_default()
+            - object["sourceBlackEv"].as_f64().unwrap_or_default()
+            >= 6.0
+}
+
+fn is_valid_tone_equalizer(value: &JsonValue) -> bool {
+    let Some(object) = value.as_object() else {
+        return false;
+    };
+    const FIELDS: &[&str] = &[
+        "autoPlacement",
+        "bandEv",
+        "detailPreservation",
+        "edgeRefinement",
+        "enabled",
+        "maskExposureCompensation",
+        "pivotEv",
+        "previewMode",
+        "rangeEv",
+        "selectedBand",
+        "smoothingRadius",
+    ];
+    let valid_bands = object
+        .get("bandEv")
+        .and_then(JsonValue::as_array)
+        .is_some_and(|bands| {
+            bands.len() == 9
+                && bands
+                    .iter()
+                    .all(|band| number_in_range(Some(band), -4.0, 4.0))
+        });
+    object.len() == FIELDS.len()
+        && object.keys().all(|key| FIELDS.contains(&key.as_str()))
+        && object
+            .get("autoPlacement")
+            .is_some_and(JsonValue::is_boolean)
+        && valid_bands
+        && number_in_range(object.get("detailPreservation"), 0.0, 1.0)
+        && number_in_range(object.get("edgeRefinement"), 0.0, 8.0)
+        && object.get("enabled").is_some_and(JsonValue::is_boolean)
+        && number_in_range(object.get("maskExposureCompensation"), -4.0, 4.0)
+        && number_in_range(object.get("pivotEv"), -8.0, 8.0)
+        && object
+            .get("previewMode")
+            .and_then(JsonValue::as_u64)
+            .is_some_and(|value| value <= 4)
+        && number_in_range(object.get("rangeEv"), 4.0, 24.0)
+        && object
+            .get("selectedBand")
+            .and_then(JsonValue::as_u64)
+            .is_some_and(|value| value < 9)
+        && number_in_range(object.get("smoothingRadius"), 4.0, 64.0)
+}
+
 fn validate_adjustments(
     adjustments: &mut JsonValue,
     extensions: &mut Map<String, JsonValue>,
@@ -658,6 +748,8 @@ fn validate_adjustments(
         "temperature",
         "tint",
         "toneMapper",
+        "toneEqualizer",
+        "viewTransform",
         "toneCurve",
         "transformDistortion",
         "transformVertical",
@@ -734,6 +826,33 @@ fn validate_adjustments(
                     .is_none_or(|value| !supported.contains(&value))
         });
         if invalid && let Some(value) = object.remove(field) {
+            extensions.insert(field.to_string(), value);
+            disabled.push(format!("adjustments.{field}"));
+        }
+    }
+    for (field, valid) in [
+        (
+            "rawEngineEditGraphVersion",
+            object.get("rawEngineEditGraphVersion").is_none_or(|value| {
+                value
+                    .as_u64()
+                    .is_some_and(|version| matches!(version, 1 | 2))
+            }),
+        ),
+        (
+            "toneEqualizer",
+            object
+                .get("toneEqualizer")
+                .is_none_or(is_valid_tone_equalizer),
+        ),
+        (
+            "viewTransform",
+            object
+                .get("viewTransform")
+                .is_none_or(is_valid_view_transform),
+        ),
+    ] {
+        if !valid && let Some(value) = object.remove(field) {
             extensions.insert(field.to_string(), value);
             disabled.push(format!("adjustments.{field}"));
         }
@@ -2776,6 +2895,54 @@ mod tests {
     }
 
     #[test]
+    fn save_sidecar_roundtrips_versioned_tone_and_view_authority() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let sidecar_path = temp_dir.path().join("image.arw.rrdata");
+        let adjustments = serde_json::json!({
+            "rawEngineEditGraphVersion": 2,
+            "toneMapper": "rapidView",
+            "toneEqualizer": {
+                "autoPlacement": true,
+                "bandEv": [-1.0, -0.75, -0.5, -0.25, 0.0, 0.25, 0.5, 0.75, 1.0],
+                "detailPreservation": 0.65,
+                "edgeRefinement": 2.0,
+                "enabled": true,
+                "maskExposureCompensation": 0.25,
+                "pivotEv": -0.5,
+                "previewMode": 3,
+                "rangeEv": 16.0,
+                "selectedBand": 6,
+                "smoothingRadius": 32.0
+            },
+            "viewTransform": {
+                "chromaCompression": 0.25,
+                "contrast": 1.15,
+                "latitude": 0.55,
+                "middleGrey": 0.18,
+                "shoulder": 0.5,
+                "sourceBlackEv": -10.0,
+                "sourceWhiteEv": 6.5,
+                "toe": 0.35
+            }
+        });
+        let metadata = ImageMetadata {
+            adjustments: adjustments.clone(),
+            ..Default::default()
+        };
+
+        save_sidecar_metadata_atomic(&sidecar_path, &metadata).expect("persist render authority");
+
+        let reloaded = load_sidecar(&sidecar_path);
+        assert_eq!(reloaded.adjustments, adjustments);
+        assert_eq!(
+            reloaded
+                .persisted_render_state
+                .and_then(|state| state.user_edits),
+            adjustments.as_object().cloned()
+        );
+    }
+
+    #[test]
     fn save_sidecar_rejects_invalid_reference_match_application_receipt() {
         let temp_dir = tempfile::tempdir().expect("tempdir");
         let sidecar_path = temp_dir.path().join("image.arw.rrdata");
@@ -2825,6 +2992,54 @@ mod tests {
             .expect_err("invalid perspective state must fail closed");
         assert!(error.contains("adjustments.perspectiveCorrection"));
         assert!(!sidecar_path.exists());
+    }
+
+    #[test]
+    fn save_sidecar_rejects_corrupt_tone_or_view_authority() {
+        for (field, corrupt) in [
+            ("rawEngineEditGraphVersion", serde_json::json!(99)),
+            (
+                "toneEqualizer",
+                serde_json::json!({
+                    "autoPlacement": false,
+                    "bandEv": [0.0, 0.0],
+                    "detailPreservation": 0.65,
+                    "edgeRefinement": 2.0,
+                    "enabled": true,
+                    "maskExposureCompensation": 0.0,
+                    "pivotEv": 0.0,
+                    "previewMode": 0,
+                    "rangeEv": 16.0,
+                    "selectedBand": 4,
+                    "smoothingRadius": 32.0
+                }),
+            ),
+            (
+                "viewTransform",
+                serde_json::json!({
+                    "chromaCompression": 0.25,
+                    "contrast": 1.15,
+                    "latitude": 0.55,
+                    "middleGrey": 0.18,
+                    "shoulder": 0.5,
+                    "sourceBlackEv": -2.0,
+                    "sourceWhiteEv": 2.0,
+                    "toe": 0.35
+                }),
+            ),
+        ] {
+            let temp_dir = tempfile::tempdir().expect("tempdir");
+            let sidecar_path = temp_dir.path().join("image.arw.rrdata");
+            let metadata = ImageMetadata {
+                adjustments: JsonValue::Object(Map::from_iter([(field.to_string(), corrupt)])),
+                ..Default::default()
+            };
+
+            let error = save_sidecar_metadata_atomic(&sidecar_path, &metadata)
+                .expect_err("corrupt render authority must not persist");
+            assert!(error.contains(&format!("adjustments.{field}")));
+            assert!(!sidecar_path.exists());
+        }
     }
 
     #[test]

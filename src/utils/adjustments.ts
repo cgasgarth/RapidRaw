@@ -3,6 +3,7 @@ import {
   type MatchLookApplicationReceiptV1,
   matchLookApplicationReceiptV1Schema,
 } from '../../packages/rawengine-schema/src/referenceMatchRuntime';
+import { toneEqualizerSettingsV1Schema } from '../../packages/rawengine-schema/src/tone/toneEqualizerSchemas';
 import { Mask, type SubMask, SubMaskMode } from '../components/panel/right/layers/Masks';
 import type { LevelsSettings } from '../schemas/color/levelsSchemas';
 import type { PerspectiveCorrectionSettings } from '../schemas/geometry/perspectiveSchemas';
@@ -328,6 +329,7 @@ export interface Adjustments {
   whiteBalanceTechnical: TechnicalWhiteBalance;
   whiteBalanceMigration: 'native_v1' | 'legacy_creative_temperature_tint_v1';
   toneMapper: 'agx' | 'basic' | 'rapidView';
+  toneEqualizer: ToneEqualizerSettingsV1;
   viewTransform: ViewTransformSettingsV1;
   toneCurve: ToneCurveId;
   transformDistortion: number;
@@ -356,6 +358,20 @@ export interface ViewTransformSettingsV1 {
   sourceBlackEv: number;
   sourceWhiteEv: number;
   toe: number;
+}
+
+export interface ToneEqualizerSettingsV1 {
+  autoPlacement: boolean;
+  bandEv: [number, number, number, number, number, number, number, number, number];
+  detailPreservation: number;
+  edgeRefinement: number;
+  enabled: boolean;
+  maskExposureCompensation: number;
+  pivotEv: number;
+  previewMode: 0 | 1 | 2 | 3 | 4;
+  rangeEv: number;
+  selectedBand: number;
+  smoothingRadius: number;
 }
 
 export interface SkinToneUniformitySettings {
@@ -509,6 +525,7 @@ export interface MaskAdjustments {
   structure: number;
   temperature: number;
   tint: number;
+  toneEqualizer: ToneEqualizerSettingsV1;
   vibrance: number;
   whites: number;
 }
@@ -757,6 +774,32 @@ export const getDefaultCurves = (): Curves => ({
 
 export const DEFAULT_PARAMETRIC_CURVE = getDefaultParametricCurve();
 
+export const INITIAL_TONE_EQUALIZER: ToneEqualizerSettingsV1 = {
+  autoPlacement: false,
+  bandEv: [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  detailPreservation: 0.65,
+  edgeRefinement: 2,
+  enabled: false,
+  maskExposureCompensation: 0,
+  pivotEv: 0,
+  previewMode: 0,
+  rangeEv: 16,
+  selectedBand: 4,
+  smoothingRadius: 32,
+};
+
+const normalizeToneEqualizer = (
+  value: Partial<ToneEqualizerSettingsV1> | null | undefined,
+): ToneEqualizerSettingsV1 => {
+  const candidate = {
+    ...INITIAL_TONE_EQUALIZER,
+    ...(value || {}),
+    bandEv: [...(value?.bandEv || INITIAL_TONE_EQUALIZER.bandEv)],
+  };
+  const parsed = toneEqualizerSettingsV1Schema.safeParse(candidate);
+  return parsed.success ? parsed.data : structuredClone(INITIAL_TONE_EQUALIZER);
+};
+
 export const INITIAL_MASK_ADJUSTMENTS: MaskAdjustments = {
   blacks: 0,
   brightness: 0,
@@ -801,6 +844,7 @@ export const INITIAL_MASK_ADJUSTMENTS: MaskAdjustments = {
   structure: 0,
   temperature: 0,
   tint: 0,
+  toneEqualizer: structuredClone(INITIAL_TONE_EQUALIZER),
   vibrance: 0,
   whites: 0,
 };
@@ -930,6 +974,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   whiteBalanceTechnical: structuredClone(INITIAL_TECHNICAL_WHITE_BALANCE),
   whiteBalanceMigration: 'native_v1',
   toneMapper: 'rapidView',
+  toneEqualizer: structuredClone(INITIAL_TONE_EQUALIZER),
   viewTransform: {
     chromaCompression: 0.25,
     contrast: 1.15,
@@ -1040,6 +1085,7 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
           ...containerAdjustments.sectionVisibility,
         },
         sharpnessThreshold: containerAdjustments.sharpnessThreshold,
+        toneEqualizer: normalizeToneEqualizer(containerAdjustments.toneEqualizer),
       },
       subMasks: normalizedSubMasks,
     };
@@ -1120,6 +1166,7 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
     cameraProfile: loadedAdjustments.cameraProfile ?? INITIAL_ADJUSTMENTS.cameraProfile,
     cameraProfileAmount,
     toneMapper: loadedAdjustments.toneMapper ?? 'basic',
+    toneEqualizer: normalizeToneEqualizer(loadedAdjustments.toneEqualizer),
     viewTransform: {
       ...INITIAL_ADJUSTMENTS.viewTransform,
       ...(loadedAdjustments.viewTransform || {}),
