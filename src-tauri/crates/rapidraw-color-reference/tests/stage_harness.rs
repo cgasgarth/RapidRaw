@@ -177,6 +177,26 @@ fn hdr_metric_dispatch_preserves_typed_ictcp_pairs() {
 }
 
 #[test]
+fn rec2100_absolute_stage_produces_typed_ictcp_with_auditable_domains() {
+    let result = execute_reference_stage(&request(
+        ReferenceOperation::Rec2100NitsToICtCpV1,
+        vec![StageSample::Rgb([100.0, 100.0, 100.0])],
+    ))
+    .unwrap();
+    assert_eq!(
+        result.receipt.input_domain,
+        StageDomain::LinearRec2100Absolute
+    );
+    assert_eq!(result.receipt.output_domain, StageDomain::ICtCp);
+    assert_eq!(result.receipt.operation_id, "rec2100-nits-to-ictcp.v1");
+    assert!(matches!(
+        result.output[0],
+        StageSample::ICtCp(value)
+            if value.intensity > 0.0 && value.tritan.abs() < 2.0e-15 && value.protan.abs() < 2.0e-15
+    ));
+}
+
+#[test]
 fn every_declared_transform_dispatches_with_its_typed_domain() {
     let cases = [
         request(

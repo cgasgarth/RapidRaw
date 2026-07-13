@@ -46,6 +46,8 @@ pub enum StageDomain {
     CieLabPair,
     ICtCpPair,
     ScalarMetric,
+    LinearRec2100Absolute,
+    ICtCp,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -59,6 +61,7 @@ pub enum ReferenceOperation {
     HlgInverseOetfV1,
     DeltaE2000V1,
     DeltaEItpV1,
+    Rec2100NitsToICtCpV1,
 }
 
 impl ReferenceOperation {
@@ -74,6 +77,7 @@ impl ReferenceOperation {
             Self::HlgInverseOetfV1 => "hlg-inverse-oetf.v1",
             Self::DeltaE2000V1 => "delta-e-2000.v1",
             Self::DeltaEItpV1 => "delta-e-itp.v1",
+            Self::Rec2100NitsToICtCpV1 => "rec2100-nits-to-ictcp.v1",
         }
     }
 
@@ -89,6 +93,7 @@ impl ReferenceOperation {
             Self::HlgInverseOetfV1 => (StageDomain::HlgSignal, StageDomain::HlgSceneLinear),
             Self::DeltaE2000V1 => (StageDomain::CieLabPair, StageDomain::ScalarMetric),
             Self::DeltaEItpV1 => (StageDomain::ICtCpPair, StageDomain::ScalarMetric),
+            Self::Rec2100NitsToICtCpV1 => (StageDomain::LinearRec2100Absolute, StageDomain::ICtCp),
         }
     }
 }
@@ -99,6 +104,7 @@ pub enum StageSample {
     Scalar(f64),
     LabPair(CieLab, CieLab),
     ICtCpPair(ICtCp, ICtCp),
+    ICtCp(ICtCp),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -107,6 +113,7 @@ enum StageSampleKind {
     Scalar,
     LabPair,
     ICtCpPair,
+    ICtCp,
 }
 
 impl StageSample {
@@ -116,6 +123,7 @@ impl StageSample {
             Self::Scalar(_) => StageSampleKind::Scalar,
             Self::LabPair(_, _) => StageSampleKind::LabPair,
             Self::ICtCpPair(_, _) => StageSampleKind::ICtCpPair,
+            Self::ICtCp(_) => StageSampleKind::ICtCp,
         }
     }
 }
@@ -340,6 +348,9 @@ fn dispatch(
         (ReferenceOperation::DeltaEItpV1, StageSample::ICtCpPair(left, right)) => {
             Ok(StageSample::Scalar(delta_e_itp(left, right)?.value()))
         }
+        (ReferenceOperation::Rec2100NitsToICtCpV1, StageSample::Rgb(rgb)) => Ok(
+            StageSample::ICtCp(crate::hdr::rec2100_linear_nits_to_ictcp(rgb)?),
+        ),
         _ => Err(ReferenceError::MismatchedSampleKind),
     }
 }
@@ -366,6 +377,9 @@ fn scalar_components(samples: &[StageSample]) -> Vec<f64> {
                 right.tritan,
                 right.protan,
             ]),
+            StageSample::ICtCp(value) => {
+                values.extend([value.intensity, value.tritan, value.protan]);
+            }
         }
     }
     values

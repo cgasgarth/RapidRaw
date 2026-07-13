@@ -527,6 +527,9 @@ fn append_samples(values: &mut Vec<f64>, samples: &[StageSample]) {
                 right.tritan,
                 right.protan,
             ]),
+            StageSample::ICtCp(value) => {
+                values.extend([value.intensity, value.tritan, value.protan]);
+            }
         }
     }
 }
