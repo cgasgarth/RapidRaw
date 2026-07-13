@@ -1038,6 +1038,7 @@ impl GpuProcessor {
             immediate_size: 0,
         });
 
+        let pipeline_started = Instant::now();
         let h_blur_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
             label: Some("Horizontal Blur Pipeline"),
             layout: Some(&blur_pipeline_layout),
@@ -1046,7 +1047,10 @@ impl GpuProcessor {
             compilation_options: Default::default(),
             cache: pipeline_cache,
         });
+        pipeline_registry
+            .record_pipeline_creation("Horizontal Blur Pipeline", pipeline_started.elapsed());
 
+        let pipeline_started = Instant::now();
         let v_blur_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
             label: Some("Vertical Blur Pipeline"),
             layout: Some(&blur_pipeline_layout),
@@ -1055,6 +1059,8 @@ impl GpuProcessor {
             compilation_options: Default::default(),
             cache: pipeline_cache,
         });
+        pipeline_registry
+            .record_pipeline_creation("Vertical Blur Pipeline", pipeline_started.elapsed());
 
         let blur_params_buffers = std::array::from_fn(|index| {
             device.create_buffer(&wgpu::BufferDescriptor {
@@ -1205,6 +1211,7 @@ impl GpuProcessor {
             immediate_size: 0,
         });
 
+        let pipeline_started = Instant::now();
         let main_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
             label: Some("Compute Pipeline"),
             layout: Some(&pipeline_layout),
@@ -1213,6 +1220,8 @@ impl GpuProcessor {
             compilation_options: Default::default(),
             cache: pipeline_cache,
         });
+        pipeline_registry
+            .record_pipeline_creation("Main Image Pipeline", pipeline_started.elapsed());
 
         let adjustments_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Adjustments Buffer"),

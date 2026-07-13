@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -58,6 +57,7 @@ const PIPELINE_MANIFEST: &[(&str, &str, &str, &str)] = &[
 pub struct PipelineCacheIdentity {
     pub shader_manifest_sha256: String,
     pub shader_abi_version: u32,
+    pub app_version: String,
     pub wgpu_version: String,
     pub backend: String,
     pub adapter_vendor: u32,
@@ -78,6 +78,7 @@ impl PipelineCacheIdentity {
         Self {
             shader_manifest_sha256: shader_manifest_sha256(),
             shader_abi_version: SHADER_ABI_VERSION,
+            app_version: env!("CARGO_PKG_VERSION").to_string(),
             wgpu_version: WGPU_VERSION.to_string(),
             backend: format!("{:?}", adapter_info.backend),
             adapter_vendor: adapter_info.vendor,
@@ -148,6 +149,33 @@ struct RegistryState {
     warmup_started: Option<Instant>,
 }
 
+#[derive(Default)]
+struct PersistenceState {
+    in_flight: bool,
+    dirty: bool,
+}
+
+impl PersistenceState {
+    fn request(&mut self) -> bool {
+        self.dirty = true;
+        if self.in_flight {
+            return false;
+        }
+        self.in_flight = true;
+        true
+    }
+
+    fn take_pass(&mut self) -> bool {
+        if self.dirty {
+            self.dirty = false;
+            true
+        } else {
+            self.in_flight = false;
+            false
+        }
+    }
+}
+
 pub struct GpuPipelineRegistry {
     identity: PipelineCacheIdentity,
     cache_path: Option<PathBuf>,
@@ -155,7 +183,7 @@ pub struct GpuPipelineRegistry {
     state: Mutex<RegistryState>,
     warmup_complete: Condvar,
     warmup_pipelines: Mutex<Vec<wgpu::ComputePipeline>>,
-    persist_in_flight: AtomicBool,
+    persistence: Mutex<PersistenceState>,
 }
 
 impl GpuPipelineRegistry {
@@ -245,7 +273,7 @@ impl GpuPipelineRegistry {
             }),
             warmup_complete: Condvar::new(),
             warmup_pipelines: Mutex::new(Vec::new()),
-            persist_in_flight: AtomicBool::new(false),
+            persistence: Mutex::new(PersistenceState::default()),
         })
     }
 
@@ -355,29 +383,33 @@ impl GpuPipelineRegistry {
     }
 
     pub fn persist_after_pipeline_update(self: &Arc<Self>) {
-        if self.persist_in_flight.swap(true, Ordering::AcqRel) {
+        if !self.persistence.lock().unwrap().request() {
             return;
         }
         let Some(cache) = self.pipeline_cache.clone() else {
-            self.persist_in_flight.store(false, Ordering::Release);
+            *self.persistence.lock().unwrap() = PersistenceState::default();
             return;
         };
         let Some(path) = self.cache_path.clone() else {
-            self.persist_in_flight.store(false, Ordering::Release);
+            *self.persistence.lock().unwrap() = PersistenceState::default();
             return;
         };
         let identity = self.identity.clone();
         let registry = Arc::clone(self);
         std::thread::spawn(move || {
-            let Some(data) = cache.get_data() else {
-                registry.persist_in_flight.store(false, Ordering::Release);
-                return;
-            };
-            match persist_artifact(&path, &identity, &data) {
-                Ok(()) => registry.state.lock().unwrap().report.cache_bytes_written = data.len(),
-                Err(error) => registry.state.lock().unwrap().report.rejection_reason = Some(error),
+            while registry.persistence.lock().unwrap().take_pass() {
+                let Some(data) = cache.get_data() else {
+                    continue;
+                };
+                match persist_artifact(&path, &identity, &data) {
+                    Ok(()) => {
+                        registry.state.lock().unwrap().report.cache_bytes_written = data.len()
+                    }
+                    Err(error) => {
+                        registry.state.lock().unwrap().report.rejection_reason = Some(error)
+                    }
+                }
             }
-            registry.persist_in_flight.store(false, Ordering::Release);
         });
     }
 }
@@ -454,15 +486,25 @@ fn persist_artifact(
 }
 
 fn atomic_write(path: &Path, bytes: &[u8]) -> Result<(), String> {
-    let temporary = path.with_extension(format!("tmp-{}", std::process::id()));
-    let mut file = OpenOptions::new()
-        .create_new(true)
-        .write(true)
-        .open(&temporary)
-        .map_err(|error| error.to_string())?;
-    file.write_all(bytes).map_err(|error| error.to_string())?;
-    file.sync_all().map_err(|error| error.to_string())?;
-    fs::rename(&temporary, path).map_err(|error| error.to_string())
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let temporary = path.with_extension(format!("tmp-{}-{nonce}", std::process::id()));
+    let result = (|| {
+        let mut file = OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(&temporary)
+            .map_err(|error| error.to_string())?;
+        file.write_all(bytes).map_err(|error| error.to_string())?;
+        file.sync_all().map_err(|error| error.to_string())?;
+        fs::rename(&temporary, path).map_err(|error| error.to_string())
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(temporary);
+    }
+    result
 }
 
 fn quarantine_cache(path: &Path) {
@@ -496,10 +538,43 @@ fn retain_recent_identities(root: &Path, current: &str, retain: usize) {
 mod tests {
     use super::*;
 
+    fn registry_without_device() -> Arc<GpuPipelineRegistry> {
+        let identity = identity("shader-a");
+        Arc::new(GpuPipelineRegistry {
+            cache_path: None,
+            pipeline_cache: None,
+            state: Mutex::new(RegistryState {
+                report: GpuPipelineReport {
+                    device_generation: 7,
+                    identity_sha256: identity.digest(),
+                    backend: identity.backend.clone(),
+                    adapter_sha256: identity.adapter_name_sha256.clone(),
+                    driver_sha256: identity.driver_info_sha256.clone(),
+                    cache_status: PipelineCacheStatus::Unsupported,
+                    cache_bytes_read: 0,
+                    cache_bytes_written: 0,
+                    rejection_reason: None,
+                    warmup_status: PipelineWarmupStatus::Unrequested,
+                    warmup_millis: None,
+                    foreground_wait_millis: 0,
+                    core_pipeline_count: 3,
+                    optional_pipeline_count: 2,
+                    pipeline_creation_millis: BTreeMap::new(),
+                },
+                warmup_started: None,
+            }),
+            identity,
+            warmup_complete: Condvar::new(),
+            warmup_pipelines: Mutex::new(Vec::new()),
+            persistence: Mutex::new(PersistenceState::default()),
+        })
+    }
+
     fn identity(seed: &str) -> PipelineCacheIdentity {
         PipelineCacheIdentity {
             shader_manifest_sha256: sha256_hex(seed.as_bytes()),
             shader_abi_version: SHADER_ABI_VERSION,
+            app_version: env!("CARGO_PKG_VERSION").to_string(),
             wgpu_version: WGPU_VERSION.to_string(),
             backend: "Vulkan".to_string(),
             adapter_vendor: 1,
@@ -549,6 +624,15 @@ mod tests {
     }
 
     #[test]
+    fn failed_atomic_publish_removes_its_temporary_artifact() {
+        let directory = tempfile::tempdir().unwrap();
+        let target = directory.path().join("occupied");
+        fs::create_dir(&target).unwrap();
+        assert!(atomic_write(&target, b"cache").is_err());
+        assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
+    }
+
+    #[test]
     fn oversized_metadata_is_rejected_before_artifact_allocation() {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("cache");
@@ -578,6 +662,9 @@ mod tests {
         let mut variants = Vec::new();
         let mut value = base.clone();
         value.shader_abi_version += 1;
+        variants.push(value);
+        let mut value = base.clone();
+        value.app_version.push_str("-next");
         variants.push(value);
         let mut value = base.clone();
         value.wgpu_version.push_str("-next");
@@ -664,5 +751,36 @@ mod tests {
         retain_recent_identities(root.path(), "current", 3);
         assert!(root.path().join("current").is_dir());
         assert_eq!(fs::read_dir(root.path()).unwrap().count(), 3);
+    }
+
+    #[test]
+    fn persistence_requests_during_a_write_schedule_another_pass() {
+        let mut state = PersistenceState::default();
+        assert!(state.request());
+        assert!(state.take_pass());
+        assert!(!state.request());
+        assert!(state.take_pass());
+        assert!(!state.take_pass());
+        assert!(!state.in_flight);
+    }
+
+    #[test]
+    fn concurrent_warmup_callers_join_one_owner_and_failure_degrades() {
+        let registry = registry_without_device();
+        assert!(registry.begin_warmup());
+        assert!(!registry.begin_warmup());
+        let waiter_registry = Arc::clone(&registry);
+        let (finished_tx, finished_rx) = std::sync::mpsc::channel();
+        let waiter = std::thread::spawn(move || {
+            waiter_registry.wait_for_core_warmup();
+            finished_tx.send(()).unwrap();
+        });
+        assert!(finished_rx.recv_timeout(Duration::from_millis(20)).is_err());
+        registry.finish_warmup(Err("compile failed".to_string()), Duration::ZERO);
+        finished_rx.recv_timeout(Duration::from_secs(1)).unwrap();
+        waiter.join().unwrap();
+        let report = registry.report();
+        assert_eq!(report.warmup_status, PipelineWarmupStatus::FailedDegraded);
+        assert_eq!(report.rejection_reason.as_deref(), Some("compile failed"));
     }
 }

@@ -148,7 +148,7 @@ pub fn get_or_init_gpu_context(
             &device,
             &queue,
             &window,
-            pipeline_registry.pipeline_cache(),
+            &pipeline_registry,
         )
     });
 
