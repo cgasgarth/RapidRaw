@@ -190,6 +190,7 @@ jobs:
         run: |
           cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
           cargo metadata --manifest-path src-tauri/Cargo.toml --locked --no-deps --format-version 1 > /dev/null
+          cargo fetch --manifest-path src-tauri/Cargo.toml --locked
           bun test tests/pure-ts/native-feedback.test.ts
           bun tests/integration/checks/check-native-feature-leaves.ts
           bun tests/integration/checks/check-native-contract-boundary.ts
