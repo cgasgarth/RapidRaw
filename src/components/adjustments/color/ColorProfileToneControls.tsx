@@ -2,6 +2,7 @@ import cx from 'clsx';
 import type { TFunction } from 'i18next';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useCameraProfileRegistry } from '../../../hooks/editor/useCameraProfileRegistry';
 import type { CameraProfileId, ToneCurveId } from '../../../schemas/color/profileToneSchemas';
 import type { RawDevelopmentReport } from '../../../schemas/imageLoaderSchemas';
 import { TextVariants } from '../../../types/typography';
@@ -11,19 +12,14 @@ import {
   DEFAULT_PARAMETRIC_CURVE,
   INITIAL_ADJUSTMENTS,
 } from '../../../utils/adjustments';
+import { applyCameraProfileIdentity } from '../../../utils/color/profile/cameraProfileBrowserRuntime';
 import { TONE_CURVE_PARAMETRIC_PRESETS } from '../../../utils/profileTonePresets';
 import CompactInspectorSectionHeader from '../../ui/CompactInspectorSectionHeader';
 import { editorChromeTokens } from '../../ui/editorChromeTokens';
 import UiText from '../../ui/primitives/Text';
+import { CameraProfileBrowser } from './CameraProfileBrowser';
 import type { ColorPanelGroupProps } from './types';
 
-const CAMERA_PROFILE_IDS = [
-  'camera_standard',
-  'camera_neutral',
-  'camera_portrait',
-  'camera_landscape',
-  'linear_raw',
-] satisfies Array<CameraProfileId>;
 const TONE_CURVE_IDS = [
   'auto_filmic',
   'linear',
@@ -31,9 +27,6 @@ const TONE_CURVE_IDS = [
   'high_contrast',
   'shadow_lift',
 ] satisfies Array<ToneCurveId>;
-
-const parseCameraProfileId = (value: string): CameraProfileId =>
-  CAMERA_PROFILE_IDS.find((cameraProfile) => cameraProfile === value) ?? 'camera_standard';
 
 const parseToneCurveId = (value: string): ToneCurveId =>
   TONE_CURVE_IDS.find((toneCurve) => toneCurve === value) ?? 'auto_filmic';
@@ -50,9 +43,11 @@ export const ColorProfileToneControls = ({
   setAdjustments,
 }: ColorProfileToneControlsProps) => {
   const { t } = useTranslation();
+  const profileRegistry = useCameraProfileRegistry(rawDevelopmentReport?.cameraProfile.cameraModel ?? null);
   const profileToneLabels = getProfileToneLabels(adjustments, t);
   const isModified =
     adjustments.cameraProfile !== INITIAL_ADJUSTMENTS.cameraProfile ||
+    adjustments.cameraProfileAmount !== INITIAL_ADJUSTMENTS.cameraProfileAmount ||
     adjustments.toneCurve !== INITIAL_ADJUSTMENTS.toneCurve;
   const cameraProfileOptions = useMemo(
     () =>
@@ -87,7 +82,10 @@ export const ColorProfileToneControls = ({
     : null;
 
   const handleCameraProfileChange = (cameraProfile: CameraProfileId) => {
-    setAdjustments((previous) => ({ ...previous, cameraProfile }));
+    setAdjustments((previous) => applyCameraProfileIdentity(previous, cameraProfile));
+  };
+  const handleCameraProfileAmountChange = (cameraProfileAmount: number) => {
+    setAdjustments((previous) => ({ ...previous, cameraProfileAmount }));
   };
 
   const handleToneCurveChange = (toneCurve: ToneCurveId) => {
@@ -166,25 +164,25 @@ export const ColorProfileToneControls = ({
           </div>
         </div>
         {adjustmentVisibility[ColorAdjustment.CameraProfile] !== false && (
-          <label className="grid min-w-0 grid-cols-[5.75rem_minmax(0,1fr)] items-center gap-2">
+          <div className="grid min-w-0 grid-cols-[5.75rem_minmax(0,1fr)] items-center gap-2">
             <UiText variant={TextVariants.label} className="truncate text-[10px] leading-4 text-text-secondary">
               {t('adjustments.color.profileTone.profilePreset')}
             </UiText>
-            <select
-              aria-label={t('adjustments.color.profileTone.profilePreset')}
-              className={cx(editorChromeTokens.input.base, editorChromeTokens.input.compact, 'w-full')}
-              onChange={(event) => {
-                handleCameraProfileChange(parseCameraProfileId(event.target.value));
-              }}
-              value={adjustments.cameraProfile}
-            >
-              {cameraProfileOptions.map((option) => (
-                <option key={option.key} value={option.key}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
+            <CameraProfileBrowser
+              amount={adjustments.cameraProfileAmount}
+              builtIns={cameraProfileOptions.map((option) => ({ id: option.key, label: option.label }))}
+              entries={profileRegistry.entries}
+              errorCode={profileRegistry.errorCode}
+              label={t('adjustments.color.profileTone.profilePreset')}
+              loading={profileRegistry.loading}
+              onAmountChange={handleCameraProfileAmountChange}
+              onImport={() => void profileRegistry.importProfile()}
+              onRemove={(id) => void profileRegistry.removeProfile(id)}
+              onReveal={(id) => void profileRegistry.revealProfile(id)}
+              onSelect={handleCameraProfileChange}
+              selected={adjustments.cameraProfile}
+            />
+          </div>
         )}
         {adjustmentVisibility[ColorAdjustment.ToneCurve] !== false && (
           <label className="grid min-w-0 grid-cols-[5.75rem_minmax(0,1fr)] items-center gap-2">

@@ -4495,6 +4495,7 @@ mod tests {
         let raw_development_report = RawDevelopmentReport {
             camera_profile: RawCameraProfileReport {
                 algorithm_id: "dual_illuminant_mired_v1",
+                camera_model: None,
                 candidate_count: 2,
                 cct_clamped: Some(false),
                 cool_illuminant: Some("D65".to_string()),
@@ -4511,6 +4512,7 @@ mod tests {
                 white_balance_plan_fingerprint: None,
                 warning_codes: Vec::new(),
             },
+            selected_camera_profile: None,
             demosaic_algorithm_id: None,
             demosaic_path: RawDemosaicPath::BayerHq,
             processing_profile: crate::raw_processing::RawProcessingProfile::Maximum,

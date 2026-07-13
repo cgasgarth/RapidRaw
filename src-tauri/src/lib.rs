@@ -3623,6 +3623,9 @@ pub fn run() {
             }
 
             let app_handle = app.handle().clone();
+            if let Err(error) = color::camera_profile::registry::managed_profile_root(&app_handle) {
+                log::warn!("camera_profile_registry_root_unavailable: {error}");
+            }
             app.state::<AppState>()
                 .startup_trace
                 .mark(NativeStartupPhase::ProcessStarted, "ok", None);
@@ -3970,6 +3973,10 @@ pub fn run() {
             denoising::save_denoised_image,
             display_profile::get_active_display_profile,
             display_profile::get_display_preview_lut_status,
+            color::camera_profile::registry::list_camera_profiles,
+            color::camera_profile::registry::import_camera_profile,
+            color::camera_profile::registry::remove_camera_profile,
+            color::camera_profile::registry::reveal_camera_profile,
             image_loader::compare_raw_reconstruction_modes,
             image_loader::load_image,
             image_open_session::begin_image_open,

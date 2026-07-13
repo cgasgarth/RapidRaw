@@ -11,8 +11,9 @@ use crate::image_processing::{ImageMetadata, apply_orientation};
 use crate::mask_generation::SubMask;
 use crate::patch_assets::{CompositeResult, composite_patches};
 use crate::raw_processing::{
-    RawDemosaicPath, RawDevelopmentReport, RawProcessingProfile, RawRuntimeReport,
-    develop_raw_image_with_report, develop_raw_image_with_report_and_white_balance,
+    CameraProfileSelectionV1, RawDemosaicPath, RawDevelopmentReport, RawProcessingProfile,
+    RawRuntimeReport, RawTechnicalPlansV1, develop_raw_image_with_report,
+    develop_raw_image_with_report_and_white_balance,
     develop_raw_source_with_report_and_white_balance,
 };
 use crate::render_caches::RenderCaches;
@@ -28,7 +29,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::fs;
 use std::panic;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{
     Arc,
     atomic::{AtomicUsize, Ordering},
@@ -289,7 +290,15 @@ pub(crate) fn raw_processing_settings_for_adjustments(
     }
 }
 
-pub(crate) fn raw_processing_profile_key(settings: &AppSettings) -> RawProcessingProfileKey {
+#[cfg(test)]
+fn raw_processing_profile_key(settings: &AppSettings) -> RawProcessingProfileKey {
+    raw_processing_profile_key_with_plans(settings, &RawTechnicalPlansV1::default())
+}
+
+fn raw_processing_profile_key_with_plans(
+    settings: &AppSettings,
+    technical_plans: &RawTechnicalPlansV1,
+) -> RawProcessingProfileKey {
     let mode = normalize_raw_processing_mode(settings.raw_processing_mode.as_deref());
     let recipe = raw_processing_mode_recipe(Some(mode));
     let highlight_compression = settings
@@ -319,6 +328,7 @@ pub(crate) fn raw_processing_profile_key(settings: &AppSettings) -> RawProcessin
             sharpening.edge_masking.to_bits(),
             sharpening.radius_px.to_bits(),
         ],
+        technical_plan_fingerprint: technical_plan_fingerprint(technical_plans),
         camera_profile_resolver_version: RAW_CACHE_CAMERA_PROFILE_RESOLVER_VERSION,
         reconstruction_version: RAW_CACHE_RECONSTRUCTION_VERSION,
         demosaic_plan_version: recipe.provenance,
@@ -329,13 +339,30 @@ pub(crate) fn raw_processing_profile_key(settings: &AppSettings) -> RawProcessin
     }
 }
 
-pub(crate) fn raw_processing_mode_cache_key(
+fn technical_plan_fingerprint(plans: &RawTechnicalPlansV1) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"rapidraw.raw_technical_plans.v1");
+    if let Some(white_balance) = &plans.white_balance {
+        hasher.update(b"\0white_balance\0");
+        hasher.update(white_balance.fingerprint.as_bytes());
+    }
+    if let Some(profile) = &plans.camera_profile {
+        hasher.update(b"\0camera_profile\0");
+        hasher.update(profile.id.as_bytes());
+        hasher.update(b"\0creative_amount_f32_le\0");
+        hasher.update(&profile.creative_amount.to_bits().to_le_bytes());
+    }
+    format!("blake3:{}", hasher.finalize().to_hex())
+}
+
+fn raw_processing_mode_cache_key_with_plans(
     source_path: &Path,
     settings: &AppSettings,
+    technical_plans: &RawTechnicalPlansV1,
 ) -> Result<DecodedImageKey, crate::source_revision::SourceRevisionError> {
     Ok(DecodedImageKey {
         source_revision: SourceRevision::from_path(source_path)?,
-        processing_profile: raw_processing_profile_key(settings),
+        processing_profile: raw_processing_profile_key_with_plans(settings, technical_plans),
     })
 }
 
@@ -378,18 +405,43 @@ pub(crate) fn load_and_composite_with_report(
     cancel_token: Option<(Arc<AtomicUsize>, usize)>,
 ) -> Result<(DynamicImage, Option<RawDevelopmentReport>)> {
     let white_balance_plan = technical_white_balance_plan_from_adjustments(adjustments);
+    let camera_profile_selection = camera_profile_selection_from_adjustments(adjustments);
     let (base_image, raw_development_report) = load_base_image_from_bytes_with_report_and_plan(
         base_image,
         path,
         use_fast_raw_dev,
         settings,
         cancel_token,
-        white_balance_plan,
+        RawTechnicalPlansV1 {
+            white_balance: white_balance_plan,
+            camera_profile: camera_profile_selection,
+        },
     )?;
     Ok((
         composite_patches_on_image(&base_image, adjustments)?.into_owned(),
         raw_development_report,
     ))
+}
+
+fn camera_profile_selection_from_adjustments(
+    adjustments: &Value,
+) -> Option<CameraProfileSelectionV1> {
+    let id = adjustments.get("cameraProfile")?.as_str()?;
+    let digest = id.strip_prefix("dcp:")?;
+    if digest.len() != 64 || !digest.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return None;
+    }
+    let creative_amount = adjustments
+        .get("cameraProfileAmount")
+        .and_then(Value::as_f64)
+        .unwrap_or(100.0)
+        .clamp(0.0, 100.0) as f32
+        / 100.0;
+    Some(CameraProfileSelectionV1 {
+        id: format!("dcp:{}", digest.to_ascii_lowercase()),
+        creative_amount,
+        managed_root: PathBuf::new(),
+    })
 }
 
 fn technical_white_balance_plan_from_adjustments(
@@ -431,7 +483,7 @@ pub(crate) fn load_base_image_from_bytes_with_report(
         settings,
         cancel_token,
         None,
-        None,
+        RawTechnicalPlansV1::default(),
     )
 }
 
@@ -441,7 +493,7 @@ fn load_base_image_from_bytes_with_report_and_plan(
     use_fast_raw_dev: bool,
     settings: &AppSettings,
     cancel_token: Option<(Arc<AtomicUsize>, usize)>,
-    white_balance_plan: Option<WhiteBalancePlanV1>,
+    technical_plans: RawTechnicalPlansV1,
 ) -> Result<(DynamicImage, Option<RawDevelopmentReport>)> {
     load_base_image_from_source_with_report(
         bytes,
@@ -450,7 +502,7 @@ fn load_base_image_from_bytes_with_report_and_plan(
         settings,
         cancel_token,
         None,
-        white_balance_plan,
+        technical_plans,
     )
 }
 
@@ -460,6 +512,7 @@ fn load_base_image_from_prepared_raw_source_with_report(
     use_fast_raw_dev: bool,
     settings: &AppSettings,
     cancel_token: Option<(Arc<AtomicUsize>, usize)>,
+    technical_plans: RawTechnicalPlansV1,
 ) -> Result<(DynamicImage, Option<RawDevelopmentReport>)> {
     load_base_image_from_source_with_report(
         source.buf(),
@@ -468,7 +521,7 @@ fn load_base_image_from_prepared_raw_source_with_report(
         settings,
         cancel_token,
         Some(source),
-        None,
+        technical_plans,
     )
 }
 
@@ -479,7 +532,7 @@ fn load_base_image_from_source_with_report(
     settings: &AppSettings,
     cancel_token: Option<(Arc<AtomicUsize>, usize)>,
     prepared_raw_source: Option<&RawSource>,
-    white_balance_plan: Option<WhiteBalancePlanV1>,
+    technical_plans: RawTechnicalPlansV1,
 ) -> Result<(DynamicImage, Option<RawDevelopmentReport>)> {
     let raw_processing_mode = settings.raw_processing_mode.as_deref();
     let recipe = raw_processing_mode_recipe(raw_processing_mode);
@@ -523,44 +576,50 @@ fn load_base_image_from_source_with_report(
         let profile = RawProcessingProfile::from_mode(raw_processing_mode.unwrap_or("balanced"));
         match panic::catch_unwind(move || {
             if let Some(source) = prepared_raw_source {
-                match white_balance_plan {
-                    Some(plan) => develop_raw_source_with_report_and_white_balance(
+                if technical_plans.white_balance.is_some()
+                    || technical_plans.camera_profile.is_some()
+                {
+                    develop_raw_source_with_report_and_white_balance(
                         source,
                         use_fast_raw_dev,
                         profile,
                         highlight_compression,
                         linear_mode,
                         cancel_token,
-                        plan,
-                    ),
-                    None => crate::raw_processing::develop_raw_source_with_report(
+                        technical_plans,
+                    )
+                } else {
+                    crate::raw_processing::develop_raw_source_with_report(
                         source,
                         use_fast_raw_dev,
                         profile,
                         highlight_compression,
                         linear_mode,
                         cancel_token,
-                    ),
+                    )
                 }
             } else {
-                match white_balance_plan {
-                    Some(plan) => develop_raw_image_with_report_and_white_balance(
+                if technical_plans.white_balance.is_some()
+                    || technical_plans.camera_profile.is_some()
+                {
+                    develop_raw_image_with_report_and_white_balance(
                         bytes,
                         use_fast_raw_dev,
                         profile,
                         highlight_compression,
                         linear_mode,
                         cancel_token,
-                        plan,
-                    ),
-                    None => develop_raw_image_with_report(
+                        technical_plans,
+                    )
+                } else {
+                    develop_raw_image_with_report(
                         bytes,
                         use_fast_raw_dev,
                         profile,
                         highlight_compression,
                         linear_mode,
                         cancel_token,
-                    ),
+                    )
                 }
             }
         }) {
@@ -1053,8 +1112,23 @@ pub(crate) async fn load_image_prepared(
     let settings = load_settings_or_default(&app_handle);
     let effective_settings =
         raw_processing_settings_for_adjustments(&settings, &metadata.adjustments);
-    let raw_processing_cache_key = raw_processing_mode_cache_key(&source_path, &effective_settings)
-        .map_err(|error| error.to_string())?;
+    let technical_plans = RawTechnicalPlansV1 {
+        white_balance: technical_white_balance_plan_from_adjustments(&metadata.adjustments),
+        camera_profile: camera_profile_selection_from_adjustments(&metadata.adjustments).map(
+            |mut selection| {
+                selection.managed_root =
+                    crate::color::camera_profile::registry::managed_profile_root(&app_handle)
+                        .unwrap_or_default();
+                selection
+            },
+        ),
+    };
+    let raw_processing_cache_key = raw_processing_mode_cache_key_with_plans(
+        &source_path,
+        &effective_settings,
+        &technical_plans,
+    )
+    .map_err(|error| error.to_string())?;
     let artifact_source =
         crate::render::artifact_identity::SourceArtifactIdentity::from_decoded_key(
             path.clone(),
@@ -1136,6 +1210,7 @@ pub(crate) async fn load_image_prepared(
                                 false,
                                 &effective_settings,
                                 cancel_token.clone(),
+                                technical_plans.clone(),
                             )
                             .map_err(|error| error.to_string())?;
                         let mut exif = exif_processing::read_exif_data(&path_clone, bytes);
@@ -1173,14 +1248,16 @@ pub(crate) async fn load_image_prepared(
 
                         let fingerprint = fingerprint_cache.fingerprint(&expected_revision, &mmap);
                         log::trace!("decoded_source_fingerprint={}", fingerprint.blake3.to_hex());
-                        let (img, raw_development_report) = load_base_image_from_bytes_with_report(
-                            &mmap,
-                            &path_clone,
-                            false,
-                            &effective_settings,
-                            cancel_token.clone(),
-                        )
-                        .map_err(|e| e.to_string())?;
+                        let (img, raw_development_report) =
+                            load_base_image_from_bytes_with_report_and_plan(
+                                &mmap,
+                                &path_clone,
+                                false,
+                                &effective_settings,
+                                cancel_token.clone(),
+                                technical_plans.clone(),
+                            )
+                            .map_err(|e| e.to_string())?;
                         let mut exif = exif_processing::read_exif_data(&path_clone, &mmap);
                         exif.insert(
                             "RawEngineRawProcessingMode".to_string(),
@@ -1224,14 +1301,16 @@ pub(crate) async fn load_image_prepared(
                             return Err("Load cancelled".to_string());
                         }
 
-                        let (img, raw_development_report) = load_base_image_from_bytes_with_report(
-                            &bytes,
-                            &path_clone,
-                            false,
-                            &effective_settings,
-                            cancel_token.clone(),
-                        )
-                        .map_err(|e| e.to_string())?;
+                        let (img, raw_development_report) =
+                            load_base_image_from_bytes_with_report_and_plan(
+                                &bytes,
+                                &path_clone,
+                                false,
+                                &effective_settings,
+                                cancel_token.clone(),
+                                technical_plans.clone(),
+                            )
+                            .map_err(|e| e.to_string())?;
                         let mut exif = exif_processing::read_exif_data(&path_clone, &bytes);
                         exif.insert(
                             "RawEngineRawProcessingMode".to_string(),
@@ -1585,6 +1664,48 @@ mod tests {
         assert_ne!(base_key, raw_processing_profile_key(&highlight_changed));
         assert_ne!(base_key, raw_processing_profile_key(&linear_mode_changed));
         assert_ne!(base_key, raw_processing_profile_key(&sharpening_changed));
+    }
+
+    #[test]
+    fn raw_cache_key_tracks_selected_camera_profile_and_creative_amount() {
+        let settings = AppSettings::default();
+        let plans = |digest: char, creative_amount: f32| RawTechnicalPlansV1 {
+            white_balance: None,
+            camera_profile: Some(CameraProfileSelectionV1 {
+                id: format!("dcp:{}", digest.to_string().repeat(64)),
+                creative_amount,
+                managed_root: PathBuf::from("/private/profile-root-is-not-cache-authority"),
+            }),
+        };
+
+        let default_key = raw_processing_profile_key(&settings);
+        let neutral_key = raw_processing_profile_key_with_plans(&settings, &plans('a', 1.0));
+        let different_profile_key =
+            raw_processing_profile_key_with_plans(&settings, &plans('b', 1.0));
+        let different_amount_key =
+            raw_processing_profile_key_with_plans(&settings, &plans('a', 0.5));
+
+        assert_eq!(
+            default_key.technical_plan_fingerprint,
+            technical_plan_fingerprint(&RawTechnicalPlansV1::default())
+        );
+        assert_ne!(
+            default_key.technical_plan_fingerprint,
+            neutral_key.technical_plan_fingerprint
+        );
+        assert_ne!(neutral_key, different_profile_key);
+        assert_ne!(neutral_key, different_amount_key);
+        let mut relocated_plan = plans('a', 1.0);
+        relocated_plan.camera_profile.as_mut().unwrap().managed_root =
+            PathBuf::from("/different/private/profile-root");
+        assert_eq!(
+            neutral_key,
+            raw_processing_profile_key_with_plans(&settings, &relocated_plan)
+        );
+        assert_eq!(
+            neutral_key,
+            raw_processing_profile_key_with_plans(&settings, &plans('a', 1.0))
+        );
     }
 
     #[test]
