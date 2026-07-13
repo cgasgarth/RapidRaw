@@ -30,6 +30,7 @@
       },
       "ariaSelectColor": "Seleziona il colore {{name}}",
       "asShot": "As Shot",
+      "auto": "Auto",
       "blackWhiteMixer": {
         "ariaSelectChannel": "",
         "contribution": "",
@@ -92,7 +93,10 @@
       "colorRangeLocalAdjustmentLayerName": "{{range}} local adjustment",
       "colorRangeLocalAdjustmentMaskName": "{{range}} range mask",
       "createLocalAdjustmentFromRange": "Create local adjustment",
+      "creativeTint": "Tinta creativa",
+      "creativeWarmth": "Calore creativo",
       "defaultState": "Default",
+      "duv": "Tinta (Duv)",
       "falloffSmoothness": "",
       "gamutWarning": {
         "coverage": "",
@@ -116,6 +120,9 @@
         "threeWayTab": "Three-way color grading"
       },
       "hue": "Tonalità",
+      "illuminantMode": "Illuminante",
+      "kelvin": "Kelvin",
+      "kelvinTint": "Kelvin + tinta",
       "levels": {
         "disabled": "Off",
         "enabled": "On",
@@ -148,6 +155,7 @@
         "yellows": "Gialli"
       },
       "presence": "Presenza",
+      "preset": "Predefinito",
       "previewMode": "",
       "profileTone": {
         "cameraProfile": "",

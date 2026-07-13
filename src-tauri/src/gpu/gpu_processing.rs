@@ -2542,6 +2542,65 @@ mod blur_pass_tests {
 
     #[cfg(feature = "tauri-test")]
     #[test]
+    fn production_wgpu_applies_technical_white_balance_and_creative_node() {
+        use image::{ImageBuffer, Rgba};
+        use tauri::Manager;
+
+        let _test_guard = GPU_TEST_LOCK.lock().unwrap();
+        let source = DynamicImage::ImageRgba32F(ImageBuffer::from_pixel(
+            16,
+            16,
+            Rgba([0.18, 0.32, 0.54, 1.0]),
+        ));
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock Tauri app builds");
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state)
+            .expect("compute-only GPU context initializes");
+        let identity = PreGpuImageIdentity::for_source(&source, "technical_white_balance");
+        let render = |adjustments| {
+            process_and_get_unclamped_dynamic_image(
+                &context,
+                &state,
+                &source,
+                identity,
+                RenderRequest {
+                    adjustments,
+                    mask_bitmaps: &[],
+                    lut: None,
+                    roi: None,
+                },
+                "technical_white_balance",
+            )
+            .expect("GPU render succeeds")
+            .to_rgba32f()
+            .get_pixel(0, 0)
+            .0
+        };
+        let baseline = render(AllAdjustments::default());
+        let mut adjusted = AllAdjustments::default();
+        let rows = crate::color::white_balance::technical_ap1_matrix(2_856.0, 0.018).unwrap();
+        adjusted.global.technical_white_balance = crate::adjustments::abi::GpuMat3 {
+            col0: [rows[0][0], rows[1][0], rows[2][0], 0.0],
+            col1: [rows[0][1], rows[1][1], rows[2][1], 0.0],
+            col2: [rows[0][2], rows[1][2], rows[2][2], 0.0],
+        };
+        adjusted.global.temperature = 1.6;
+        adjusted.global.tint = -0.2;
+        let changed = render(adjusted);
+        assert!(
+            baseline[..3]
+                .iter()
+                .zip(&changed[..3])
+                .any(|(before, after)| (before - after).abs() > 0.001),
+            "baseline={baseline:?} changed={changed:?}"
+        );
+    }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
     fn warm_adjustment_frames_reuse_mask_lut_and_main_bind_group_with_cold_parity() {
         use image::{ImageBuffer, Rgba};
         use tauri::Manager;

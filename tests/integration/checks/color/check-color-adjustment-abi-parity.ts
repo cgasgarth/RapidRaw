@@ -66,8 +66,10 @@ const parseRustFields = (structName) =>
     .split(/\r?\n/u)
     .map((line) => line.trim().replace(/,$/u, ''))
     .filter(Boolean)
+    .filter((line) => !line.startsWith('///'))
     .map((line) => line.replace(/^pub(?:\([^)]*\))?\s+/u, ''))
     .filter((line) => !line.startsWith('#['))
+    .filter((line) => !line.startsWith('_pad_wgsl_tail'))
     .map((line) => {
       const match = line.match(/^([A-Za-z0-9_é]+)\s*:\s*(.+)$/u);
       if (!match) throw new Error(`Unable to parse Rust field in ${structName}: ${line}`);

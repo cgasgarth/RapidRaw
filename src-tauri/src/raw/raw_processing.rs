@@ -2,6 +2,9 @@ use crate::color::camera_input_transform::{
     AcesCgLinearV1, CameraInputTransform, CameraRgbWhiteBalanceGains, RawInputTransformReceiptV1,
     RawWorkingImageV1, XyzToCameraMatrix, apply_camera_input_transform,
 };
+use crate::color::white_balance::{
+    camera_white_chroma, neutral_chroma_from_wb, project_neutral_mired_weight,
+};
 use crate::image_processing::apply_orientation;
 use anyhow::{Result, anyhow};
 use image::{DynamicImage, ImageBuffer, Rgba};
@@ -20,7 +23,7 @@ use std::{
     },
 };
 
-const CAMERA_PROFILE_RESOLVER_ALGORITHM_ID: &str = "dual_illuminant_mired_v1";
+const CAMERA_PROFILE_RESOLVER_ALGORITHM_ID: &str = "dual_illuminant_camera_neutral_mired_v2";
 #[cfg(test)]
 static RAW_DEVELOPMENT_INVOCATIONS: std::sync::atomic::AtomicU64 =
     std::sync::atomic::AtomicU64::new(0);
@@ -755,21 +758,36 @@ struct SceneCctEstimate {
     method: &'static str,
 }
 
-fn estimate_scene_cct_from_wb(wb: [f32; 4]) -> Option<SceneCctEstimate> {
-    let [red, _green, blue, _extra] = wb;
-    if !red.is_finite() || !blue.is_finite() || red <= f32::EPSILON || blue <= f32::EPSILON {
-        return None;
-    }
-
-    let blue_to_red = blue / red;
-    let clamped_blue_to_red = blue_to_red.clamp(0.44, 2.28);
-    let unclamped_cct = 6_504.0 / clamped_blue_to_red;
-    let cct_kelvin = unclamped_cct.clamp(2_856.0, 8_000.0);
+fn estimate_scene_cct_from_camera_neutral(
+    wb: [f32; 4],
+    candidates: &[(Illuminant, f32, &[f32])],
+) -> Option<SceneCctEstimate> {
+    let observed = neutral_chroma_from_wb(wb)?;
+    let warm = candidates.first()?;
+    let cool = candidates.last()?;
+    let warm_white = illuminant_white_xy(warm.0)?;
+    let cool_white = illuminant_white_xy(cool.0)?;
+    let warm_chroma = camera_white_chroma(warm.2, warm_white)?;
+    let cool_chroma = camera_white_chroma(cool.2, cool_white)?;
+    let cool_weight = project_neutral_mired_weight(observed, warm_chroma, cool_chroma)?;
+    let inverse_cct = (1.0 - cool_weight) / f64::from(warm.1) + cool_weight / f64::from(cool.1);
+    let cct_kelvin = (1.0 / inverse_cct) as f32;
+    let projected = [
+        warm_chroma[0].mul_add(1.0 - cool_weight, cool_chroma[0] * cool_weight),
+        warm_chroma[1].mul_add(1.0 - cool_weight, cool_chroma[1] * cool_weight),
+    ];
+    let residual = (projected[0] - observed[0]).hypot(projected[1] - observed[1]);
     Some(SceneCctEstimate {
         cct_kelvin,
-        clamped: blue_to_red != clamped_blue_to_red || unclamped_cct != cct_kelvin,
-        confidence: "low",
-        method: "wb_coeff_ratio",
+        clamped: cool_weight <= f64::EPSILON || cool_weight >= 1.0 - f64::EPSILON,
+        confidence: if residual < 0.08 {
+            "high"
+        } else if residual < 0.2 {
+            "medium"
+        } else {
+            "low"
+        },
+        method: "camera_neutral_profile_projection",
     })
 }
 
@@ -881,7 +899,7 @@ fn resolve_camera_color_profile(
 
     let candidate_count = candidates.len();
 
-    let Some(cct_estimate) = estimate_scene_cct_from_wb(wb) else {
+    let Some(cct_estimate) = estimate_scene_cct_from_camera_neutral(wb, &candidates) else {
         let selected = d65.cloned().or_else(|| {
             candidates
                 .first()
@@ -1559,23 +1577,32 @@ mod tests {
     }
 
     #[test]
-    fn scene_cct_from_wb_tracks_blue_red_ratio() {
-        let daylight = estimate_scene_cct_from_wb([1.0, 1.0, 1.0, f32::NAN]).unwrap();
-        let tungsten = estimate_scene_cct_from_wb([1.0, 1.0, 2.28, f32::NAN]).unwrap();
+    fn scene_cct_uses_camera_neutral_and_calibration_responses() {
+        let matrix = vec![1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0];
+        let candidates = [
+            (Illuminant::A, 2_856.0, matrix.as_slice()),
+            (Illuminant::D65, 6_504.0, matrix.as_slice()),
+        ];
+        let warm =
+            camera_white_chroma(&matrix, illuminant_white_xy(Illuminant::A).unwrap()).unwrap();
+        let cool =
+            camera_white_chroma(&matrix, illuminant_white_xy(Illuminant::D65).unwrap()).unwrap();
+        let observed = [
+            warm[0] * 0.75 + cool[0] * 0.25,
+            warm[1] * 0.75 + cool[1] * 0.25,
+        ];
+        let wb = [
+            (-observed[0]).exp() as f32,
+            1.0,
+            (-observed[1]).exp() as f32,
+            f32::NAN,
+        ];
+        let estimate = estimate_scene_cct_from_camera_neutral(wb, &candidates).unwrap();
 
-        assert!((daylight.cct_kelvin - 6_504.0).abs() < 0.1);
-        assert!((tungsten.cct_kelvin - 2_856.0).abs() < 0.1);
-        assert_eq!(daylight.method, "wb_coeff_ratio");
-        assert_eq!(daylight.confidence, "low");
-        assert!(!daylight.clamped);
-    }
-
-    #[test]
-    fn scene_cct_from_wb_reports_clamping() {
-        let clamped = estimate_scene_cct_from_wb([1.0, 1.0, 9.0, f32::NAN]).unwrap();
-
-        assert!((clamped.cct_kelvin - 2_856.0).abs() < 0.1);
-        assert!(clamped.clamped);
+        assert_eq!(estimate.method, "camera_neutral_profile_projection");
+        assert_eq!(estimate.confidence, "high");
+        assert!(!estimate.clamped);
+        assert!((estimate.cct_kelvin - 3_493.0).abs() < 2.0, "{estimate:?}");
     }
 
     #[test]
@@ -1594,9 +1621,7 @@ mod tests {
     fn interpolates_dual_illuminant_matrices_for_warm_white_balance() {
         let warm = vec![0.80, -0.20, 0.10, -0.30, 1.20, 0.20, -0.04, 0.08, 0.66];
         let cool = vec![0.60, -0.10, 0.04, -0.20, 1.05, 0.14, -0.02, 0.05, 0.52];
-        let target_cct = estimate_scene_cct_from_wb([1.0, 1.0, 1.5, f32::NAN])
-            .unwrap()
-            .cct_kelvin;
+        let target_cct = 4_000.0;
         let cool_weight = interpolation_weight_for_cct(target_cct, 2_856.0, 6_504.0);
         let interpolated = interpolate_color_matrix(&warm, &cool, cool_weight);
 
@@ -1609,13 +1634,27 @@ mod tests {
 
     #[test]
     fn camera_matrix_selection_interpolates_a_to_d65() {
-        let warm = vec![0.80, -0.20, 0.10, -0.30, 1.20, 0.20, -0.04, 0.08, 0.66];
-        let cool = vec![0.60, -0.10, 0.04, -0.20, 1.05, 0.14, -0.02, 0.05, 0.52];
+        let warm = vec![1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0];
+        let cool = vec![0.95, 0.01, 0.0, 0.0, 1.02, 0.0, 0.0, 0.01, 0.94];
         let mut color_matrices = HashMap::new();
         color_matrices.insert(Illuminant::A, warm.clone());
         color_matrices.insert(Illuminant::D65, cool.clone());
+        let warm_chroma =
+            camera_white_chroma(&warm, illuminant_white_xy(Illuminant::A).unwrap()).unwrap();
+        let cool_chroma =
+            camera_white_chroma(&cool, illuminant_white_xy(Illuminant::D65).unwrap()).unwrap();
+        let observed = [
+            (warm_chroma[0] + cool_chroma[0]) * 0.5,
+            (warm_chroma[1] + cool_chroma[1]) * 0.5,
+        ];
+        let wb = [
+            (-observed[0]).exp() as f32,
+            1.0,
+            (-observed[1]).exp() as f32,
+            f32::NAN,
+        ];
 
-        let resolution = resolve_camera_color_profile(&color_matrices, [1.0, 1.0, 1.5, f32::NAN]);
+        let resolution = resolve_camera_color_profile(&color_matrices, wb);
         let selected = resolution.matrix.unwrap();
 
         assert_eq!(selected.len(), warm.len());
@@ -1630,9 +1669,9 @@ mod tests {
         assert_eq!(resolution.report.candidate_count, 2);
         assert_eq!(
             resolution.report.illuminant_estimate_method,
-            "wb_coeff_ratio"
+            "camera_neutral_profile_projection"
         );
-        assert_eq!(resolution.report.illuminant_estimate_confidence, "low");
+        assert_eq!(resolution.report.illuminant_estimate_confidence, "high");
         assert_eq!(resolution.report.cct_clamped, Some(false));
         assert!(resolution.report.cool_weight.unwrap() > 0.0);
         assert!(

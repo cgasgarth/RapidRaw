@@ -30,6 +30,7 @@
       },
       "ariaSelectColor": "Выбрать цвет: {{name}}",
       "asShot": "As Shot",
+      "auto": "Авто",
       "blackWhiteMixer": {
         "ariaSelectChannel": "",
         "contribution": "",
@@ -92,7 +93,10 @@
       "colorRangeLocalAdjustmentLayerName": "{{range}} local adjustment",
       "colorRangeLocalAdjustmentMaskName": "{{range}} range mask",
       "createLocalAdjustmentFromRange": "Create local adjustment",
+      "creativeTint": "Творческий оттенок",
+      "creativeWarmth": "Творческое тепло",
       "defaultState": "Default",
+      "duv": "Оттенок (Duv)",
       "falloffSmoothness": "",
       "gamutWarning": {
         "coverage": "",
@@ -116,6 +120,9 @@
         "threeWayTab": "Three-way color grading"
       },
       "hue": "Цветовой тон",
+      "illuminantMode": "Источник света",
+      "kelvin": "Кельвин",
+      "kelvinTint": "Кельвин + оттенок",
       "levels": {
         "disabled": "Off",
         "enabled": "On",
@@ -148,6 +155,7 @@
         "yellows": "Желтые"
       },
       "presence": "Внешний вид",
+      "preset": "Предустановка",
       "previewMode": "",
       "profileTone": {
         "cameraProfile": "",

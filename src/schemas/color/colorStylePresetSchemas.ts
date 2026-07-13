@@ -24,6 +24,8 @@ export const colorStylePresetCategorySchema = z.enum([
 export const colorStylePresetAdjustmentKeySchema = z.enum([
   'colorCalibration',
   'colorGrading',
+  'creativeTemperature',
+  'creativeTint',
   'curveMode',
   'curves',
   'cameraProfile',

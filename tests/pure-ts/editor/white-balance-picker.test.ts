@@ -54,8 +54,11 @@ describe('white balance picker runtime command path', () => {
 
     expect(command.nextAdjustments.temperature).toBe(expectedAdjustment.temperature);
     expect(command.nextAdjustments.tint).toBe(expectedAdjustment.tint);
+    expect(command.nextAdjustments.whiteBalanceTechnical.mode).toBe('chromaticity');
+    expect(command.nextAdjustments.whiteBalanceTechnical.source).toBe('picker');
     expect(command.nextAdjustments.exposure).toBe(currentAdjustments.exposure);
-    expect(command.receipt).toEqual({
+    expect(command.receipt).toMatchObject({
+      algorithm: 'neutral_patch_scene_linear_chromaticity_v1',
       averageRgb,
       coordinates: { imageX: 128.25, imageY: 64.5, previewPixelX: 257, previewPixelY: 129 },
       previewIdentity: 'blob:runtime-preview-4746',
@@ -63,6 +66,8 @@ describe('white balance picker runtime command path', () => {
       resultingTint: expectedAdjustment.tint,
       selectedImagePath: '/Users/cgas/Pictures/Capture One/Alaska/sample.RAF',
     });
+    expect(command.receipt.confidence).toBeGreaterThanOrEqual(0);
+    expect(command.receipt.estimatedKelvin).toBeGreaterThanOrEqual(1667);
   });
 
   test('commits one undoable picker adjustment and preserves receipt data for QA', () => {

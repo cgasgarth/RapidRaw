@@ -7,4 +7,5 @@ pub(crate) mod gamut_mapping;
 pub(crate) mod lens_correction;
 pub(crate) mod lut_processing;
 pub(crate) mod mixer_render;
+pub(crate) mod white_balance;
 pub(crate) mod working_to_output_transform;

@@ -2,6 +2,7 @@ import cx from 'clsx';
 import { Pipette, RotateCcw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ColorAdjustment, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
+import { buildTechnicalWhiteBalance, type WhiteBalanceMode } from '../../../utils/color/whiteBalance';
 import CompactInspectorSectionHeader from '../../ui/CompactInspectorSectionHeader';
 import { professionalInspectorDensityTokens } from '../../ui/inspectorTokens';
 import AdjustmentSlider from '../AdjustmentSlider';
@@ -26,8 +27,11 @@ export const ColorQuickControls = ({
   const { t } = useTranslation();
   const density = professionalInspectorDensityTokens;
   const modifiedLabel = t('ui.collapsibleSection.dirtyBadge', { defaultValue: 'Edited' });
-  const isWhiteBalanceModified =
-    adjustments.temperature !== INITIAL_ADJUSTMENTS.temperature || adjustments.tint !== INITIAL_ADJUSTMENTS.tint;
+  const isWhiteBalanceModified = isForMask
+    ? adjustments.temperature !== INITIAL_ADJUSTMENTS.temperature || adjustments.tint !== INITIAL_ADJUSTMENTS.tint
+    : adjustments.whiteBalanceTechnical.mode !== 'as_shot' ||
+      adjustments.creativeTemperature !== INITIAL_ADJUSTMENTS.creativeTemperature ||
+      adjustments.creativeTint !== INITIAL_ADJUSTMENTS.creativeTint;
   const isPresenceModified =
     adjustments.vibrance !== INITIAL_ADJUSTMENTS.vibrance ||
     adjustments.saturation !== INITIAL_ADJUSTMENTS.saturation ||
@@ -40,8 +44,27 @@ export const ColorQuickControls = ({
   const resetWhiteBalance = () => {
     setAdjustments((prev) => ({
       ...prev,
-      temperature: INITIAL_ADJUSTMENTS.temperature,
-      tint: INITIAL_ADJUSTMENTS.tint,
+      ...(isForMask
+        ? { temperature: INITIAL_ADJUSTMENTS.temperature, tint: INITIAL_ADJUSTMENTS.tint }
+        : {
+            whiteBalanceTechnical: structuredClone(INITIAL_ADJUSTMENTS.whiteBalanceTechnical),
+            creativeTemperature: INITIAL_ADJUSTMENTS.creativeTemperature,
+            creativeTint: INITIAL_ADJUSTMENTS.creativeTint,
+            whiteBalanceMigration: 'native_v1' as const,
+          }),
+    }));
+  };
+
+  const updateTechnicalWhiteBalance = (mode: WhiteBalanceMode, kelvin: number, duv: number) => {
+    setAdjustments((previous) => ({
+      ...previous,
+      whiteBalanceTechnical: buildTechnicalWhiteBalance(
+        mode,
+        kelvin,
+        duv,
+        mode === 'preset' ? 'preset' : mode === 'auto' ? 'auto' : mode === 'as_shot' ? 'as_shot' : 'user',
+      ),
+      whiteBalanceMigration: 'native_v1',
     }));
   };
 
@@ -109,7 +132,9 @@ export const ColorQuickControls = ({
           summary={
             <span data-testid="color-quick-white-balance-summary">
               {isWhiteBalanceModified
-                ? `${adjustments.temperature || 0} / ${adjustments.tint || 0}`
+                ? isForMask
+                  ? `${adjustments.temperature || 0} / ${adjustments.tint || 0}`
+                  : `${adjustments.whiteBalanceTechnical.mode === 'as_shot' ? t('adjustments.color.asShot') : `${Math.round(adjustments.whiteBalanceTechnical.kelvin)} K`} · ${adjustments.whiteBalanceTechnical.duv.toFixed(3)}`
                 : isForMask
                   ? t('adjustments.color.defaultState')
                   : t('adjustments.color.asShot')}
@@ -117,34 +142,126 @@ export const ColorQuickControls = ({
           }
           title={isForMask ? t('adjustments.color.localColorBalance') : t('adjustments.color.whiteBalance')}
         />
-        <AdjustmentSlider
-          defaultValue={0}
-          density="compact"
-          label={t('adjustments.color.temperature')}
-          max={100}
-          min={-100}
-          onValueChange={(value) => {
-            handleGlobalChange(ColorAdjustment.Temperature, value);
-          }}
-          step={1}
-          value={adjustments.temperature || 0}
-          trackClassName="temperature-gradient-track"
-          onDragStateChange={onDragStateChange}
-        />
-        <AdjustmentSlider
-          defaultValue={0}
-          density="compact"
-          label={t('adjustments.color.tint')}
-          max={100}
-          min={-100}
-          onValueChange={(value) => {
-            handleGlobalChange(ColorAdjustment.Tint, value);
-          }}
-          step={1}
-          value={adjustments.tint || 0}
-          trackClassName="tint-gradient-track"
-          onDragStateChange={onDragStateChange}
-        />
+        {isForMask ? (
+          <>
+            <AdjustmentSlider
+              defaultValue={0}
+              density="compact"
+              label={t('adjustments.color.creativeWarmth', { defaultValue: 'Creative Warmth' })}
+              max={100}
+              min={-100}
+              onValueChange={(value) => handleGlobalChange(ColorAdjustment.Temperature, value)}
+              step={1}
+              value={adjustments.temperature || 0}
+              trackClassName="temperature-gradient-track"
+              onDragStateChange={onDragStateChange}
+            />
+            <AdjustmentSlider
+              defaultValue={0}
+              density="compact"
+              label={t('adjustments.color.creativeTint', { defaultValue: 'Creative Tint' })}
+              max={100}
+              min={-100}
+              onValueChange={(value) => handleGlobalChange(ColorAdjustment.Tint, value)}
+              step={1}
+              value={adjustments.tint || 0}
+              trackClassName="tint-gradient-track"
+              onDragStateChange={onDragStateChange}
+            />
+          </>
+        ) : (
+          <>
+            <label className="flex items-center justify-between gap-2 py-1 text-xs text-text-secondary">
+              <span>{t('adjustments.color.illuminantMode', { defaultValue: 'Illuminant' })}</span>
+              <select
+                className="h-6 rounded border border-editor-border bg-editor-panel px-1.5 text-xs text-text-primary"
+                data-testid="color-white-balance-mode"
+                onChange={(event) =>
+                  updateTechnicalWhiteBalance(
+                    event.target.value as WhiteBalanceMode,
+                    adjustments.whiteBalanceTechnical.kelvin,
+                    adjustments.whiteBalanceTechnical.duv,
+                  )
+                }
+                value={adjustments.whiteBalanceTechnical.mode}
+              >
+                <option value="as_shot">{t('adjustments.color.asShot')}</option>
+                <option value="auto">{t('adjustments.color.auto', { defaultValue: 'Auto' })}</option>
+                <option value="kelvin_tint">
+                  {t('adjustments.color.kelvinTint', { defaultValue: 'Kelvin + Tint' })}
+                </option>
+                <option value="preset">{t('adjustments.color.preset', { defaultValue: 'Preset' })}</option>
+              </select>
+            </label>
+            {adjustments.whiteBalanceTechnical.mode !== 'as_shot' &&
+            adjustments.whiteBalanceTechnical.mode !== 'auto' ? (
+              <>
+                <label className="flex items-center justify-between gap-2 py-1 text-xs text-text-secondary">
+                  <span>{t('adjustments.color.kelvin', { defaultValue: 'Kelvin' })}</span>
+                  <input
+                    aria-label={t('adjustments.color.kelvin', { defaultValue: 'Kelvin' })}
+                    className="h-6 w-24 rounded border border-editor-border bg-editor-panel px-1.5 text-right text-xs text-text-primary"
+                    data-testid="color-white-balance-kelvin"
+                    max={25000}
+                    min={1667}
+                    onChange={(event) =>
+                      updateTechnicalWhiteBalance(
+                        adjustments.whiteBalanceTechnical.mode,
+                        Number(event.target.value),
+                        adjustments.whiteBalanceTechnical.duv,
+                      )
+                    }
+                    step={10}
+                    type="number"
+                    value={adjustments.whiteBalanceTechnical.kelvin}
+                  />
+                </label>
+                <AdjustmentSlider
+                  defaultValue={0}
+                  density="compact"
+                  label={t('adjustments.color.duv', { defaultValue: 'Tint (Duv)' })}
+                  max={0.05}
+                  min={-0.05}
+                  onValueChange={(value) =>
+                    updateTechnicalWhiteBalance(
+                      adjustments.whiteBalanceTechnical.mode,
+                      adjustments.whiteBalanceTechnical.kelvin,
+                      value,
+                    )
+                  }
+                  step={0.001}
+                  value={adjustments.whiteBalanceTechnical.duv}
+                  trackClassName="tint-gradient-track"
+                  onDragStateChange={onDragStateChange}
+                />
+              </>
+            ) : null}
+            <AdjustmentSlider
+              defaultValue={0}
+              density="compact"
+              label={t('adjustments.color.creativeWarmth', { defaultValue: 'Creative Warmth' })}
+              max={100}
+              min={-100}
+              onValueChange={(value) => setAdjustments((previous) => ({ ...previous, creativeTemperature: value }))}
+              step={1}
+              value={adjustments.creativeTemperature}
+              trackClassName="temperature-gradient-track"
+              onDragStateChange={onDragStateChange}
+            />
+            <AdjustmentSlider
+              defaultValue={0}
+              density="compact"
+              label={t('adjustments.color.creativeTint', { defaultValue: 'Creative Tint' })}
+              max={100}
+              min={-100}
+              onValueChange={(value) => setAdjustments((previous) => ({ ...previous, creativeTint: value }))}
+              step={1}
+              value={adjustments.creativeTint}
+              trackClassName="tint-gradient-track"
+              onDragStateChange={onDragStateChange}
+            />
+          </>
+        )}
       </section>
 
       <section className="border-b border-editor-border pb-1.5 pt-0.5" data-testid="color-quick-presence">

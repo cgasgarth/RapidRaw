@@ -244,18 +244,21 @@ function validateFoundationHierarchy(container: Element) {
 
 async function validateWhiteBalanceFoundation(container: Element) {
   const whiteBalance = getByTestId(container, 'color-quick-white-balance');
-  const temperature = getRangeByLabel(whiteBalance, 'Temperature');
+  const mode = getByTestId<HTMLSelectElement>(whiteBalance, 'color-white-balance-mode');
   const reset = getByTestId<HTMLButtonElement>(whiteBalance, 'color-white-balance-as-shot');
   const picker = getByTestId<HTMLButtonElement>(whiteBalance, 'color-white-balance-picker');
-  assert.ok(temperature);
+  assert.equal(mode.value, 'as_shot');
   assert.equal(whiteBalance.dataset.whiteBalanceState, 'as-shot');
   assert.equal(reset.disabled, true);
 
-  await changeRange(temperature, 18);
+  await changeSelect(mode, 'kelvin_tint');
+  const kelvin = getByTestId<HTMLInputElement>(whiteBalance, 'color-white-balance-kelvin');
+  await changeInput(kelvin, 3200);
   assert.equal(whiteBalance.dataset.whiteBalanceState, 'custom');
   assert.equal(reset.disabled, false);
   await click(reset);
-  assert.equal(temperature.value, '0');
+  assert.equal(mode.value, 'as_shot');
+  assert.equal(whiteBalance.querySelector('[data-testid="color-white-balance-kelvin"]'), null);
   assert.equal(whiteBalance.dataset.whiteBalanceState, 'as-shot');
 
   await click(picker);
@@ -372,6 +375,14 @@ async function changeSelect(select: HTMLSelectElement, value: string) {
 }
 
 async function changeRange(input: HTMLInputElement, value: number) {
+  await act(async () => {
+    input.value = String(value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushPromises();
+  });
+}
+
+async function changeInput(input: HTMLInputElement, value: number) {
   await act(async () => {
     input.value = String(value);
     input.dispatchEvent(new Event('input', { bubbles: true }));

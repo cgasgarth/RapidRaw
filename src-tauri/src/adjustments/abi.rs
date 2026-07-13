@@ -169,6 +169,8 @@ pub struct GlobalAdjustments {
     pub(crate) _pad_color1: f32,
     pub(crate) _pad_color2: f32,
     pub(crate) _pad_color3: f32,
+    pub(crate) _pad_color4: f32,
+    pub technical_white_balance: GpuMat3,
     pub sharpness: f32,
     pub luma_noise_reduction: f32,
     pub color_noise_reduction: f32,
@@ -234,6 +236,10 @@ pub struct GlobalAdjustments {
     pub halation_amount: f32,
     pub flare_amount: f32,
     pub sharpness_threshold: f32,
+    /// Explicit Rust representation of WGSL's implicit 16-byte struct tail alignment.
+    pub(crate) _pad_wgsl_tail1: f32,
+    pub(crate) _pad_wgsl_tail2: f32,
+    pub(crate) _pad_wgsl_tail3: f32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable, Default)]

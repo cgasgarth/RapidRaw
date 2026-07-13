@@ -30,6 +30,7 @@
       },
       "ariaSelectColor": "選擇 {{name}} 顏色",
       "asShot": "As Shot",
+      "auto": "自動",
       "blackWhiteMixer": {
         "ariaSelectChannel": "",
         "contribution": "",
@@ -92,7 +93,10 @@
       "colorRangeLocalAdjustmentLayerName": "{{range}} local adjustment",
       "colorRangeLocalAdjustmentMaskName": "{{range}} range mask",
       "createLocalAdjustmentFromRange": "Create local adjustment",
+      "creativeTint": "創意色調",
+      "creativeWarmth": "創意暖調",
       "defaultState": "Default",
+      "duv": "色調 (Duv)",
       "falloffSmoothness": "",
       "gamutWarning": {
         "coverage": "",
@@ -116,6 +120,9 @@
         "threeWayTab": ""
       },
       "hue": "色相",
+      "illuminantMode": "光源",
+      "kelvin": "開爾文",
+      "kelvinTint": "開爾文 + 色調",
       "levels": {
         "disabled": "",
         "enabled": "",
@@ -148,6 +155,7 @@
         "yellows": "黃色"
       },
       "presence": "質感",
+      "preset": "預設",
       "previewMode": "",
       "profileTone": {
         "cameraProfile": "",
