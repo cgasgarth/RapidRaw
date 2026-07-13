@@ -1,5 +1,6 @@
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { dirname, join, relative, resolve } from 'node:path';
+import { readBoundedStream, writeBoundedOutput } from '../lib/ci/compact-output.ts';
 import { acquireResourceLease, type ResourceLease } from '../lib/ci/resource-coordinator';
 import type { ResourceClass, ValidationMode, ValidationNode } from './manifest';
 import { classesForPath } from './ownership';
@@ -170,6 +171,29 @@ export interface NodeMetrics {
   peakRssBytes: number;
 }
 
+export interface ProcessTermination {
+  reason:
+    | 'completed'
+    | 'nonzero-exit'
+    | 'timeout'
+    | 'interrupted'
+    | 'possible-oom-or-external-sigkill'
+    | 'external-signal';
+  signal?: 'SIGINT' | 'SIGKILL' | 'SIGTERM';
+}
+
+export const classifyProcessTermination = (
+  exitCode: number,
+  context: { interrupted: boolean; timedOut: boolean },
+): ProcessTermination => {
+  if (context.timedOut) return { reason: 'timeout', signal: exitCode === 137 ? 'SIGKILL' : 'SIGTERM' };
+  if (context.interrupted) return { reason: 'interrupted', signal: 'SIGINT' };
+  if (exitCode === 137) return { reason: 'possible-oom-or-external-sigkill', signal: 'SIGKILL' };
+  if (exitCode === 130) return { reason: 'external-signal', signal: 'SIGINT' };
+  if (exitCode === 143) return { reason: 'external-signal', signal: 'SIGTERM' };
+  return { reason: exitCode === 0 ? 'completed' : 'nonzero-exit' };
+};
+
 const parseTimeMetrics = (stderr: string): NodeMetrics => {
   const macUser = Number(stderr.match(/\n\s*([\d.]+)\s+real\s+([\d.]+)\s+user\s+([\d.]+)\s+sys/)?.[2] ?? 0);
   const macSystem = Number(stderr.match(/\n\s*([\d.]+)\s+real\s+([\d.]+)\s+user\s+([\d.]+)\s+sys/)?.[3] ?? 0);
@@ -238,6 +262,7 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
         child.kill('SIGTERM');
       }
       setTimeout(() => {
+        if (!children.has(child)) return;
         try {
           process.kill(-child.pid, 'SIGKILL');
         } catch {
@@ -282,9 +307,10 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
     const dependencyKeys = node.dependencies.map((id) => completed.get(id)?.key ?? 'missing');
     const key = await nodeCacheKey(node, options.root, dependencyKeys, undefined, snapshot);
     const recordPath = join(cacheDirectory, `${node.id}-${key}.json`);
-    const exclusiveClass = ['native-heavy', 'browser', 'network'].includes(node.resourceClass);
-    const classLease = exclusiveClass
+    const coordinatedClass = ['cpu-heavy', 'native-heavy', 'browser', 'network'].includes(node.resourceClass);
+    const classLease = coordinatedClass
       ? await acquireResourceLease({
+          capacity: capacities[node.resourceClass],
           label: `validation-class-${node.resourceClass}:${node.id}`,
           resource: `validation-class-${node.resourceClass}`,
           root: options.resourceCoordinatorRoot,
@@ -326,6 +352,7 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
         env: process.env,
         detached: true,
       });
+      let timedOut = false;
       children.add(child);
       await cacheLease?.updateOwnerPid(child.pid);
       await classLease?.updateOwnerPid(child.pid);
@@ -337,18 +364,22 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
         }
       };
       const timeout = setTimeout(() => {
+        timedOut = true;
         killGroup('SIGTERM');
-        setTimeout(() => killGroup('SIGKILL'), 1500).unref();
+        setTimeout(() => {
+          if (children.has(child)) killGroup('SIGKILL');
+        }, 1500).unref();
       }, node.timeoutMs);
       const [stdout, stderr, exitCode] = await Promise.all([
-        new Response(child.stdout).text(),
-        new Response(child.stderr).text(),
+        readBoundedStream(child.stdout),
+        readBoundedStream(child.stderr),
         child.exited,
       ]);
       clearTimeout(timeout);
       children.delete(child);
       const durationMs = Math.round(performance.now() - started);
       const metrics = parseTimeMetrics(stderr);
+      const termination = classifyProcessTermination(exitCode, { interrupted, timedOut });
       const after = Bun.spawnSync(['git', 'status', '--porcelain=v1', '--untracked-files=no'], {
         cwd: options.root,
         stdout: 'pipe',
@@ -357,10 +388,10 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
       if (!ok) {
         failed = true;
         console.error(
-          `FAIL ${node.id} (${durationMs}ms exit=${exitCode} trackedMutation=${before !== after}) reproduce: ${node.command.join(' ')}`,
+          `FAIL ${node.id} (${durationMs}ms exit=${exitCode} signal=${termination.signal ?? 'none'} termination=${termination.reason} cpu=${metrics.cpuMs}ms rss=${metrics.peakRssBytes} trackedMutation=${before !== after}) reproduce: ${node.command.join(' ')}`,
         );
-        console.error((stderr || stdout).split('\n').slice(-20).join('\n'));
-        if (options.mode === 'commit' || options.mode === 'push') terminateChildren();
+        writeBoundedOutput(`${node.id} stdout`, stdout);
+        writeBoundedOutput(`${node.id} stderr`, stderr);
       } else {
         console.log(`PASS ${node.id} (${durationMs}ms cpu=${metrics.cpuMs}ms rss=${metrics.peakRssBytes})`);
         if (node.cachePolicy !== 'none') {
@@ -398,7 +429,6 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
         .catch((error) => {
           console.error(`FAIL ${id} (runner error: ${error instanceof Error ? error.message : String(error)})`);
           failed = true;
-          terminateChildren();
           completed.set(id, { ok: false, key: 'runner-error' });
         })
         .finally(() => {

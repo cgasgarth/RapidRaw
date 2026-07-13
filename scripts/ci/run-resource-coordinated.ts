@@ -16,17 +16,23 @@ if (!resource || !label || separator < 0 || separator === args.length - 1) {
 }
 const command = args.slice(separator + 1);
 const lease = await acquireResourceLease({ label, resource });
-const child = Bun.spawn(command, { detached: true, stderr: 'inherit', stdout: 'inherit' });
-await lease.updateOwnerPid(child.pid);
-for (const signal of ['SIGINT', 'SIGTERM'] as const) {
-  process.on(signal, () => {
+try {
+  const child = Bun.spawn(command, { detached: true, stderr: 'inherit', stdout: 'inherit' });
+  await lease.updateOwnerPid(child.pid);
+  const forwardSignal = (signal: 'SIGINT' | 'SIGTERM'): void => {
     try {
       process.kill(-child.pid, signal);
     } catch {
       child.kill(signal);
     }
-  });
+  };
+  const onInterrupt = (): void => forwardSignal('SIGINT');
+  const onTerminate = (): void => forwardSignal('SIGTERM');
+  process.once('SIGINT', onInterrupt);
+  process.once('SIGTERM', onTerminate);
+  process.exitCode = await child.exited;
+  process.off('SIGINT', onInterrupt);
+  process.off('SIGTERM', onTerminate);
+} finally {
+  await lease.release();
 }
-const exitCode = await child.exited;
-await lease.release();
-process.exit(exitCode);
