@@ -284,7 +284,20 @@
       "resetAllParametric": "重置所有參數曲線",
       "resetAllPoint": "重置所有點曲線",
       "resetParametric": "重置 {{channel}} 參數曲線",
-      "resetPoint": "重置 {{channel}} 點曲線"
+      "resetPoint": "重置 {{channel}} 點曲線",
+      "typed": {
+        "addPoint": "",
+        "channelMode": "",
+        "legacyTab": "",
+        "linkedRgb": "",
+        "luminancePreserving": "",
+        "outputAxis": "",
+        "outputTab": "",
+        "outputTitle": "",
+        "sceneAxis": "",
+        "sceneTab": "",
+        "sceneTitle": ""
+      }
     },
     "details": {
       "amount": "",
@@ -414,6 +427,9 @@
       "resetSolved": "Reset solved correction",
       "retainedArea": "Retained area"
     }
+  },
+  "common": {
+    "reset": ""
   },
   "contextMenus": {
     "album": {

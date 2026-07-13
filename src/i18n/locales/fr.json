@@ -284,7 +284,20 @@
       "resetAllParametric": "Réinitialiser toutes les courbes paramétriques",
       "resetAllPoint": "Réinitialiser toutes les courbes à points",
       "resetParametric": "Réinitialiser la courbe paramétrique {{channel}}",
-      "resetPoint": "Réinitialiser la courbe à points {{channel}}"
+      "resetPoint": "Réinitialiser la courbe à points {{channel}}",
+      "typed": {
+        "addPoint": "",
+        "channelMode": "",
+        "legacyTab": "",
+        "linkedRgb": "",
+        "luminancePreserving": "",
+        "outputAxis": "",
+        "outputTab": "",
+        "outputTitle": "",
+        "sceneAxis": "",
+        "sceneTab": "",
+        "sceneTitle": ""
+      }
     },
     "details": {
       "amount": "",
@@ -420,6 +433,9 @@
       "resetSolved": "Reset solved correction",
       "retainedArea": "Retained area"
     }
+  },
+  "common": {
+    "reset": ""
   },
   "contextMenus": {
     "album": {
