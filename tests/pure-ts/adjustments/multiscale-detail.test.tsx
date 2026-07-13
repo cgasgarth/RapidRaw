@@ -7,7 +7,13 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import DetailsPanel from '../../../src/components/adjustments/Details';
 import en from '../../../src/i18n/locales/en.json';
-import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../../../src/utils/adjustments';
+import {
+  ADJUSTMENT_SECTIONS,
+  type Adjustments,
+  INITIAL_ADJUSTMENTS,
+  normalizeLoadedAdjustments,
+  pickAdjustmentValues,
+} from '../../../src/utils/adjustments';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const happyWindow = new Window({ url: 'http://localhost/' });
@@ -70,6 +76,28 @@ test('multiscale switch reveals the advanced equalizer and commits one settings 
   expect(rendered.textContent).toContain('Advanced detail equalizer');
   expect(rendered.textContent).toContain('Noise protection');
   expect(rendered.textContent).toContain('Texture');
+});
+
+test('detail copy paste and atomic section reset own the full multiscale process object', () => {
+  const edited = structuredClone(INITIAL_ADJUSTMENTS);
+  edited.multiscaleDetail = {
+    ...edited.multiscaleDetail,
+    chromaDetail: 18,
+    coarse: -23,
+    finest: 41,
+    process: 'multiscale_v1',
+    texture: 36,
+  };
+  const copied = pickAdjustmentValues(ADJUSTMENT_SECTIONS.details, edited);
+  expect(copied.multiscaleDetail).toEqual(edited.multiscaleDetail);
+  expect(copied.multiscaleDetail).not.toBe(edited.multiscaleDetail);
+
+  const pasted = { ...structuredClone(INITIAL_ADJUSTMENTS), ...copied };
+  expect(pasted.multiscaleDetail).toEqual(edited.multiscaleDetail);
+  const resetValues = pickAdjustmentValues(ADJUSTMENT_SECTIONS.details, INITIAL_ADJUSTMENTS);
+  const reset = { ...pasted, ...resetValues };
+  expect(reset.multiscaleDetail).toEqual(INITIAL_ADJUSTMENTS.multiscaleDetail);
+  expect(reset.multiscaleDetail.process).toBe('legacy_v1');
 });
 
 function Harness({ onChange }: { onChange: (adjustments: Adjustments) => void }) {
