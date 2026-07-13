@@ -43,7 +43,7 @@ export interface ReferenceSpatialAnalysis {
 }
 
 export interface ReferenceMatchReference {
-  availability: 'available' | 'missing' | 'unknown';
+  availability: 'available' | 'missing' | 'replaced' | 'unknown';
   adjustmentRevision: number;
   cameraProfile: string;
   geometryFingerprint: string;
@@ -56,19 +56,31 @@ export interface ReferenceMatchReference {
   proofRevision: number;
   renderUrl: string;
   sourceFingerprint: string;
+  sourceRevision: string;
   summary: ReferenceHistogramSummary;
   viewFingerprint: string;
   weight: number;
 }
 
-export const mergeReferenceAvailability = (
+export interface ReferencePhysicalSourceIdentity {
+  available: boolean;
+  sourceRevision: string | null;
+}
+
+export const mergeReferenceSourceIdentities = (
   references: readonly ReferenceMatchReference[],
-  availabilityByPath: ReadonlyMap<string, boolean | null>,
+  identityByPath: ReadonlyMap<string, ReferencePhysicalSourceIdentity | null>,
 ): ReferenceMatchReference[] =>
   references.map((reference) => {
-    const available = availabilityByPath.get(reference.path);
+    const identity = identityByPath.get(reference.path);
     const availability =
-      available === undefined || available === null ? 'unknown' : available ? 'available' : 'missing';
+      identity === undefined || identity === null
+        ? 'unknown'
+        : !identity.available
+          ? 'missing'
+          : identity.sourceRevision === reference.sourceRevision
+            ? 'available'
+            : 'replaced';
     return reference.availability === availability ? reference : { ...reference, availability };
   });
 
