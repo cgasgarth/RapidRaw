@@ -12,6 +12,7 @@ pub mod dcp;
 pub mod difference;
 pub mod fixtures;
 pub mod harness;
+pub mod hdr;
 pub mod lab;
 pub mod matrix;
 pub mod metrics;
