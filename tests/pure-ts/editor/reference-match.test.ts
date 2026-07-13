@@ -9,6 +9,7 @@ import {
   applyReferenceMatchProposal,
   combineReferenceSummaries,
   createReferenceMatchAdjustmentLayer,
+  createReferenceMatchAppliedDiffs,
   createReferenceMatchProposal,
   describeReferenceMatchSource,
   fingerprintReferenceMatchValue,
@@ -264,6 +265,12 @@ describe('color-managed reference matching', () => {
     if (!proposal) throw new Error('Expected proposal');
     const groups = new Set<ReferenceMatchGroup>(['tone']);
     const receipt = matchLookApplicationReceiptV1Schema.parse({
+      appliedDiffs: createReferenceMatchAppliedDiffs({
+        adjustments: INITIAL_ADJUSTMENTS,
+        enabledGroups: groups,
+        impact: 40,
+        proposal,
+      }),
       appliedAt: '2026-07-13T12:00:00.000Z',
       baseGraphFingerprint: fingerprintReferenceMatchValue('reference-layer-base-graph'),
       destination: 'adjustment-layer',
@@ -277,6 +284,16 @@ describe('color-managed reference matching', () => {
       schemaVersion: 1,
       targetAnalysisFingerprint: proposal.targetAnalysisFingerprint,
     });
+    expect(receipt.appliedDiffs).toEqual(
+      proposal.diffs
+        .filter((diff) => diff.group === 'tone')
+        .map((diff) => ({
+          after: INITIAL_ADJUSTMENTS[diff.key] + (diff.proposed - diff.current) * 0.4,
+          before: INITIAL_ADJUSTMENTS[diff.key],
+          key: diff.key,
+        }))
+        .sort((left, right) => left.key.localeCompare(right.key)),
+    );
     const layer = createReferenceMatchAdjustmentLayer({
       enabledGroups: groups,
       id: 'reference-layer',

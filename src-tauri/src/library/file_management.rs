@@ -2365,20 +2365,8 @@ pub async fn apply_adjustments_to_paths(
 
                 let mut existing_metadata = crate::exif_processing::load_sidecar(&sidecar_path);
 
-                let mut new_adjustments = existing_metadata.adjustments;
-                if new_adjustments.is_null() {
-                    new_adjustments = serde_json::json!({});
-                }
-
-                let pasted_adjustments = white_balance_adjustments_for_batch_target(&adjustments);
-                if let (Some(new_map), Some(pasted_map)) = (
-                    new_adjustments.as_object_mut(),
-                    pasted_adjustments.as_object(),
-                ) {
-                    for (k, v) in pasted_map {
-                        new_map.insert(k.clone(), v.clone());
-                    }
-                }
+                let mut new_adjustments =
+                    merge_adjustments_for_batch_target(existing_metadata.adjustments, &adjustments);
 
                 resolve_lens_params_in_adjustments(
                     &mut new_adjustments,
@@ -2438,6 +2426,19 @@ fn white_balance_adjustments_for_batch_target(adjustments: &Value) -> Value {
         map.remove("whiteBalanceTechnical");
     }
     prepared
+}
+
+fn merge_adjustments_for_batch_target(mut existing: Value, adjustments: &Value) -> Value {
+    if existing.is_null() {
+        existing = serde_json::json!({});
+    }
+    let prepared = white_balance_adjustments_for_batch_target(adjustments);
+    if let (Some(existing), Some(prepared)) = (existing.as_object_mut(), prepared.as_object()) {
+        for (key, value) in prepared {
+            existing.insert(key.clone(), value.clone());
+        }
+    }
+    existing
 }
 
 #[tauri::command]
@@ -4181,6 +4182,21 @@ mod tests {
             }
         });
         assert_eq!(white_balance_adjustments_for_batch_target(&locked), locked);
+    }
+
+    #[test]
+    fn batch_adjustment_merge_clears_stale_reference_match_provenance() {
+        let existing = serde_json::json!({
+            "exposure": 0.5,
+            "referenceMatchApplicationReceipt": { "proposalFingerprint": "stale" }
+        });
+        let patch = serde_json::json!({
+            "exposure": 1.25,
+            "referenceMatchApplicationReceipt": null
+        });
+        let merged = merge_adjustments_for_batch_target(existing, &patch);
+        assert_eq!(merged["exposure"], 1.25);
+        assert!(merged["referenceMatchApplicationReceipt"].is_null());
     }
 
     #[test]
