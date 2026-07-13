@@ -561,7 +561,7 @@ impl Default for AppSettings {
             #[cfg(not(target_os = "android"))]
             image_cache_size: Some(5),
             tonemapper_override_enabled: Some(false),
-            default_raw_tonemapper: Some("agx".to_string()),
+            default_raw_tonemapper: Some("rapidView".to_string()),
             default_non_raw_tonemapper: Some("basic".to_string()),
             enable_focus_mode: Some(false),
             external_editor_path: None,
