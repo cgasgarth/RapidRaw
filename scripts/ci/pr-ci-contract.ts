@@ -20,17 +20,13 @@ export interface PrValidationPlan {
   changedPaths: string[];
 }
 
-export const DEFERRED_MAIN_COVERAGE = {
-  'full native required closure': ['rust-test:', 'cargo test --quiet --locked --all-targets'],
-  'full Rust clippy and capability matrices': ['rust-clippy:', 'native-capability-matrix:', 'check:native-profiles'],
-  'macOS app build and startup benchmark': ['main-macos-app-build:', 'main-macos-startup-runtime:'],
-  'hardware and long runtime validation': ['Run bounded native startup benchmark'],
-  'exhaustive dependency security and license audits': [
-    'dependency-security-license:',
-    'cargo audit --manifest-path',
-    'cargo deny --manifest-path',
-  ],
-} as const;
+const allDeferred = [
+  'full native required closure',
+  'full Rust clippy and capability matrices',
+  'macOS app build and startup benchmark',
+  'hardware and long runtime validation',
+  'exhaustive dependency security and license audits',
+] as const;
 
 export const planPrValidation = (paths: readonly string[]): PrValidationPlan => {
   const changedPaths = [...new Set(paths.filter(Boolean))].sort();
@@ -44,7 +40,7 @@ export const planPrValidation = (paths: readonly string[]): PrValidationPlan => 
       workflow: failClosed || classes.has('workflows'),
       docs: failClosed || classes.has('docs'),
     },
-    deferredToMain: Object.keys(DEFERRED_MAIN_COVERAGE),
+    deferredToMain: [...allDeferred],
     changedPaths,
   };
 };

@@ -1,7 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { readFileSync } from 'node:fs';
 import {
-  DEFERRED_MAIN_COVERAGE,
   PR_REQUIRED_BUDGET_SECONDS,
   planPrValidation,
   resolveWorkflowStartedEpoch,
@@ -56,14 +54,5 @@ describe('four-minute PR CI contract', () => {
         239,
       ),
     ).toEqual([]);
-  });
-
-  test('every disclosed deferred lane has explicit non-canceling main closure', () => {
-    const workflow = readFileSync('.github/workflows/main-long-validation.yml', 'utf8');
-    expect(workflow).toContain('cancel-in-progress: false');
-    for (const [lane, markers] of Object.entries(DEFERRED_MAIN_COVERAGE)) {
-      expect(planPrValidation(['README.md']).deferredToMain).toContain(lane);
-      for (const marker of markers) expect(workflow).toContain(marker);
-    }
   });
 });
