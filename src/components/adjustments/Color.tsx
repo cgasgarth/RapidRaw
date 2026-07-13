@@ -1,17 +1,22 @@
+import { invoke } from '@tauri-apps/api/core';
 import cx from 'clsx';
 import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'react-toastify';
 import { debouncedSave } from '../../hooks/editor/useEditorActions';
 import type { BlackWhiteMixerChannel } from '../../schemas/color/blackWhiteMixerSchemas';
 import type { ChannelMixerOutput } from '../../schemas/color/channelMixerSchemas';
 import type { ColorBalanceRgbRange } from '../../schemas/color/colorBalanceRgbSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
+import { Invokes } from '../../tauri/commands';
 import { type Adjustments, ColorAdjustment } from '../../utils/adjustments';
 import {
   getRenderedPreviewWarningStatus,
   isCurrentExportSoftProofGamutWarningOverlay,
 } from '../../utils/color/runtime/gamutWarningDisplay';
+import { technicalWhiteBalanceFromAutoAdjustments } from '../../utils/color/whiteBalance';
 import { COLOR_OUTPUT_FOCUS_EVENT, COLOR_WORKSPACE_TAB_SESSION_KEY } from '../../utils/colorWorkspaceNavigation';
+import { formatUnknownError } from '../../utils/errorFormatting';
 import {
   applyColorRangeLocalAdjustmentLayerFlow,
   buildColorRangeProposalSourcePixels,
@@ -139,6 +144,23 @@ export default function ColorPanel({
   const isColorCalibrationVisible = (adjustmentVisibility as { colorCalibration?: boolean }).colorCalibration !== false;
   const isLevelsVisible = adjustmentVisibility[ColorAdjustment.Levels] !== false;
   const isWgpuEnabled = appSettings?.useWgpuRenderer !== false;
+  const resolveAutoWhiteBalance = useCallback(async () => {
+    if (!selectedImage?.isReady) return;
+    try {
+      const autoAdjustments = await invoke<unknown>(Invokes.CalculateAutoAdjustments);
+      const technical = technicalWhiteBalanceFromAutoAdjustments(
+        autoAdjustments,
+        selectedImage.rawDevelopmentReport ? 'raw_scene_linear' : 'rendered_scene_linear_approximation',
+      );
+      setAdjustments((previous) => ({
+        ...previous,
+        whiteBalanceTechnical: technical,
+        whiteBalanceMigration: 'native_v1',
+      }));
+    } catch (error) {
+      toast.error(`Failed to calculate Auto white balance: ${formatUnknownError(error)}`);
+    }
+  }, [selectedImage, setAdjustments]);
   const isCurrentGamutWarningOverlay = isCurrentExportSoftProofGamutWarningOverlay(gamutWarningOverlay, {
     exportSoftProofRecipeId,
     exportSoftProofTransform,
@@ -266,7 +288,13 @@ export default function ColorPanel({
               isForMask={isForMask}
               isWbPickerActive={isWbPickerActive}
               isWgpuEnabled={isWgpuEnabled}
+              inputSemantics={
+                selectedImage?.rawDevelopmentReport ? 'raw_scene_linear' : 'rendered_scene_linear_approximation'
+              }
               onDragStateChange={onDragStateChange}
+              resolveAutoWhiteBalance={() => {
+                void resolveAutoWhiteBalance();
+              }}
               setAdjustments={setAdjustments}
               {...(toggleWbPicker ? { toggleWbPicker } : {})}
             />
@@ -373,6 +401,7 @@ export default function ColorPanel({
     levelsClippingWarnings,
     onDragStateChange,
     renderedPreviewWarningStatus,
+    resolveAutoWhiteBalance,
     selectedImage,
     setAdjustments,
     setEditor,

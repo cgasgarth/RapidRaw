@@ -246,8 +246,14 @@ const applyColorPatchToAdjustments = (
   { includeSelectiveColor }: { includeSelectiveColor: boolean } = { includeSelectiveColor: true },
 ): Adjustments => {
   const next: Adjustments = { ...base };
-  if (patch.temperature !== undefined) next.temperature = patch.temperature;
-  if (patch.tint !== undefined) next.tint = patch.tint;
+  if (patch.temperature !== undefined) {
+    next.temperature = patch.temperature;
+    next.creativeTemperature = patch.temperature;
+  }
+  if (patch.tint !== undefined) {
+    next.tint = patch.tint;
+    next.creativeTint = patch.tint;
+  }
   if (patch.vibrance !== undefined) next.vibrance = patch.vibrance;
   if (patch.saturation !== undefined) next.saturation = patch.saturation;
   if (patch.cameraProfile !== undefined) next.cameraProfile = patch.cameraProfile;
