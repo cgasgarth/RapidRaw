@@ -1904,70 +1904,12 @@ fn is_default_curve(points: &[Point; 16], count: u32) -> bool {
 }
 
 fn apply_curve(value: f32, points: &[Point; 16], count: u32, preserve_extended: bool) -> f32 {
-    if count < 2 {
-        return value;
-    }
-    let count = count as usize;
-    let x = value * 255.0;
-    if x <= points[0].x {
-        return if preserve_extended {
-            value + (points[0].y - points[0].x) / 255.0
-        } else {
-            points[0].y / 255.0
-        };
-    }
-    if x >= points[count - 1].x {
-        return if preserve_extended {
-            value + (points[count - 1].y - points[count - 1].x) / 255.0
-        } else {
-            points[count - 1].y / 255.0
-        };
-    }
-    for index in 0..count - 1 {
-        let first = points[index];
-        let second = points[index + 1];
-        if x > second.x {
-            continue;
-        }
-        let previous = points[index.saturating_sub(1)];
-        let next = points[(index + 2).min(count - 1)];
-        let before = (first.y - previous.y) / (first.x - previous.x).max(0.001);
-        let current = (second.y - first.y) / (second.x - first.x).max(0.001);
-        let after = (next.y - second.y) / (next.x - second.x).max(0.001);
-        let mut tangent_first = if index == 0 || before * current <= 0.0 {
-            if index == 0 { current } else { 0.0 }
-        } else {
-            (before + current) * 0.5
-        };
-        let mut tangent_second = if index + 1 == count - 1 || current * after <= 0.0 {
-            if index + 1 == count - 1 { current } else { 0.0 }
-        } else {
-            (current + after) * 0.5
-        };
-        if current != 0.0 {
-            let alpha = tangent_first / current;
-            let beta = tangent_second / current;
-            if alpha * alpha + beta * beta > 9.0 {
-                let tau = 3.0 / (alpha * alpha + beta * beta).sqrt();
-                tangent_first *= tau;
-                tangent_second *= tau;
-            }
-        }
-        let delta = second.x - first.x;
-        let t = (x - first.x) / delta;
-        let t2 = t * t;
-        let t3 = t2 * t;
-        let result = (2.0 * t3 - 3.0 * t2 + 1.0) * first.y
-            + (t3 - 2.0 * t2 + t) * tangent_first * delta
-            + (-2.0 * t3 + 3.0 * t2) * second.y
-            + (t3 - t2) * tangent_second * delta;
-        return if preserve_extended {
-            result / 255.0
-        } else {
-            (result / 255.0).clamp(0.0, 1.0)
-        };
-    }
-    points[count - 1].y / 255.0
+    crate::tone::legacy_curves::evaluate_legacy_display_curve_v1(
+        value,
+        points,
+        count,
+        preserve_extended,
+    )
 }
 
 fn apply_grain(
