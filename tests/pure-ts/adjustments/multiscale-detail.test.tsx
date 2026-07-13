@@ -11,6 +11,7 @@ import {
   ADJUSTMENT_SECTIONS,
   type Adjustments,
   INITIAL_ADJUSTMENTS,
+  INITIAL_MASK_CONTAINER,
   normalizeLoadedAdjustments,
   pickAdjustmentValues,
 } from '../../../src/utils/adjustments';
@@ -98,6 +99,34 @@ test('detail copy paste and atomic section reset own the full multiscale process
   const reset = { ...pasted, ...resetValues };
   expect(reset.multiscaleDetail).toEqual(INITIAL_ADJUSTMENTS.multiscaleDetail);
   expect(reset.multiscaleDetail.process).toBe('legacy_v1');
+});
+
+test('masked multiscale state reopens with the same process and band gains', () => {
+  const reopened = normalizeLoadedAdjustments({
+    masks: [
+      {
+        ...INITIAL_MASK_CONTAINER,
+        adjustments: {
+          ...INITIAL_MASK_CONTAINER.adjustments,
+          multiscaleDetail: {
+            ...INITIAL_ADJUSTMENTS.multiscaleDetail,
+            fine: 27,
+            medium: -14,
+            process: 'multiscale_v1',
+          },
+        },
+        id: 'masked-detail-proof',
+        name: 'Masked detail proof',
+        subMasks: [],
+      },
+    ],
+  });
+  expect(reopened.masks).toHaveLength(1);
+  expect(reopened.masks[0]?.adjustments.multiscaleDetail).toMatchObject({
+    fine: 27,
+    medium: -14,
+    process: 'multiscale_v1',
+  });
 });
 
 function Harness({ onChange }: { onChange: (adjustments: Adjustments) => void }) {
