@@ -4,6 +4,12 @@ use std::time::{Duration, Instant};
 
 use serde::Serialize;
 
+#[cfg(any(test, feature = "validation-harness"))]
+use super::hdr_display_capability::EdrHeadroomSample;
+use super::hdr_display_capability::{
+    HdrDisplayCapabilityV1, compile_hdr_display_capability, query_edr_headroom,
+};
+
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DisplayColorSpace {
@@ -17,12 +23,14 @@ pub struct DisplayTargetIdentity {
     pub profile_sha256: String,
     pub scale_factor_bits: u64,
     pub color_space: DisplayColorSpace,
+    pub hdr_capability_fingerprint: u64,
 }
 
 #[derive(Clone)]
 pub struct ResolvedDisplayTarget {
     pub identity: DisplayTargetIdentity,
     pub color_contract: String,
+    pub hdr_capability: HdrDisplayCapabilityV1,
     #[cfg(not(any(target_os = "android", target_os = "linux")))]
     capture: Result<(Option<u32>, Vec<u8>), String>,
     #[cfg(not(any(target_os = "android", target_os = "linux")))]
@@ -32,6 +40,7 @@ pub struct ResolvedDisplayTarget {
 impl ResolvedDisplayTarget {
     #[cfg(not(any(target_os = "android", target_os = "linux")))]
     fn materialize(mut self) -> Result<Self, String> {
+        validate_hdr_capability_contract(&self.identity, &self.hdr_capability)?;
         if let Some(snapshot) = &self.snapshot {
             validate_color_contract(
                 &self.identity.profile_sha256,
@@ -56,6 +65,7 @@ impl ResolvedDisplayTarget {
 
     #[cfg(any(target_os = "android", target_os = "linux"))]
     fn materialize(self) -> Result<Self, String> {
+        validate_hdr_capability_contract(&self.identity, &self.hdr_capability)?;
         Ok(self)
     }
 }
@@ -86,6 +96,7 @@ pub struct DisplayTargetReport {
     pub display_resource_generation: Option<u64>,
     pub target: Option<DisplayTargetIdentity>,
     pub color_contract: Option<String>,
+    pub hdr_capability: Option<HdrDisplayCapabilityV1>,
     pub pending: bool,
     pub building: bool,
     pub injected_cross_display_transition_verified: bool,
@@ -335,6 +346,7 @@ fn resolver_loop(shared: Arc<CoordinatorShared>) {
                     state.report.display_resource_generation = Some(generation);
                     state.report.target = Some(target.identity);
                     state.report.color_contract = Some(target.color_contract);
+                    state.report.hdr_capability = Some(target.hdr_capability);
                     published_change =
                         state
                             .report
@@ -384,10 +396,21 @@ pub fn resolve_for_app(app: &tauri::AppHandle) -> Result<ResolvedDisplayTarget, 
         profile_sha256,
         scale_factor_bits: scale_factor.to_bits(),
         color_space: DisplayColorSpace::DisplayEncodedSrgb,
+        hdr_capability_fingerprint: 0,
+    };
+    let hdr_capability = compile_hdr_display_capability(
+        identity.profile_sha256.clone(),
+        query_edr_headroom(display_id),
+        false,
+    );
+    let identity = DisplayTargetIdentity {
+        hdr_capability_fingerprint: hdr_capability.fingerprint,
+        ..identity
     };
     Ok(ResolvedDisplayTarget {
         identity,
         color_contract: "pixels_and_jpeg_icc_from_same_snapshot".to_string(),
+        hdr_capability,
         capture,
         snapshot: None,
     })
@@ -404,6 +427,19 @@ fn validate_color_contract(
     }
     if encoding_contract != "pixels_and_jpeg_icc_from_same_snapshot" {
         return Err("display_target_color_contract_mismatch".to_string());
+    }
+    Ok(())
+}
+
+fn validate_hdr_capability_contract(
+    identity: &DisplayTargetIdentity,
+    capability: &HdrDisplayCapabilityV1,
+) -> Result<(), String> {
+    if identity.profile_sha256 != capability.display_profile_sha256 {
+        return Err("display_target_hdr_profile_mismatch".to_string());
+    }
+    if identity.hdr_capability_fingerprint != capability.fingerprint {
+        return Err("display_target_hdr_capability_identity_mismatch".to_string());
     }
     Ok(())
 }
@@ -439,14 +475,22 @@ fn validate_injected_cross_display_transition(report: &mut DisplayTargetReport) 
                 (101, moxcms::ColorProfile::new_srgb().encode())
             };
             let bytes = bytes.map_err(|error| error.to_string())?;
+            let profile_sha256 = crate::display_profile::sha256_hex(&bytes);
+            let hdr_capability = compile_hdr_display_capability(
+                profile_sha256.clone(),
+                EdrHeadroomSample::default(),
+                false,
+            );
             Ok(ResolvedDisplayTarget {
                 identity: DisplayTargetIdentity {
                     display_id: Some(display_id),
-                    profile_sha256: crate::display_profile::sha256_hex(&bytes),
+                    profile_sha256,
                     scale_factor_bits: 2.0_f64.to_bits(),
                     color_space: DisplayColorSpace::DisplayEncodedSrgb,
+                    hdr_capability_fingerprint: hdr_capability.fingerprint,
                 },
                 color_contract: "pixels_and_jpeg_icc_from_same_snapshot".to_string(),
+                hdr_capability,
                 capture: Ok((Some(display_id), bytes)),
                 snapshot: None,
             })
@@ -490,14 +534,21 @@ fn validate_injected_cross_display_transition(report: &mut DisplayTargetReport) 
             Some(303),
             moxcms::ColorProfile::new_srgb().encode().unwrap(),
         )));
+    let bad_hdr_capability = compile_hdr_display_capability(
+        "mismatched-profile-hash".to_string(),
+        EdrHeadroomSample::default(),
+        false,
+    );
     let bad = ResolvedDisplayTarget {
         identity: DisplayTargetIdentity {
             display_id: Some(303),
             profile_sha256: "mismatched-profile-hash".to_string(),
             scale_factor_bits: 2.0_f64.to_bits(),
             color_space: DisplayColorSpace::DisplayEncodedSrgb,
+            hdr_capability_fingerprint: bad_hdr_capability.fingerprint,
         },
         color_contract: "pixels_and_jpeg_icc_from_same_snapshot".to_string(),
+        hdr_capability: bad_hdr_capability,
         capture: Err("unused".to_string()),
         snapshot: Some(Arc::new(bad_snapshot)),
     };
@@ -564,14 +615,21 @@ mod tests {
             snapshot.icc_sha256 = profile.to_string();
             Arc::new(snapshot)
         };
+        let hdr_capability = compile_hdr_display_capability(
+            profile.to_string(),
+            EdrHeadroomSample::default(),
+            false,
+        );
         ResolvedDisplayTarget {
             identity: DisplayTargetIdentity {
                 display_id: Some(display_id),
                 profile_sha256: profile.to_string(),
                 scale_factor_bits: 2.0_f64.to_bits(),
                 color_space: DisplayColorSpace::DisplayEncodedSrgb,
+                hdr_capability_fingerprint: hdr_capability.fingerprint,
             },
             color_contract: "pixels_and_jpeg_icc_from_same_snapshot".to_string(),
+            hdr_capability,
             #[cfg(not(any(target_os = "android", target_os = "linux")))]
             capture: Err("synthetic_test_fallback".to_string()),
             #[cfg(not(any(target_os = "android", target_os = "linux")))]
@@ -662,6 +720,45 @@ mod tests {
     }
 
     #[test]
+    fn hdr_capability_change_rebuilds_only_display_resources_and_updates_report() {
+        let headroom = Arc::new(AtomicU64::new(1.0_f64.to_bits()));
+        let resolver_headroom = Arc::clone(&headroom);
+        let coordinator = DisplayTargetCoordinator::new(Duration::ZERO, move |_| {
+            let mut resolved = target(4, "profile-hdr");
+            resolved.hdr_capability = compile_hdr_display_capability(
+                resolved.identity.profile_sha256.clone(),
+                EdrHeadroomSample {
+                    current: Some(1.0),
+                    potential: Some(f64::from_bits(resolver_headroom.load(Ordering::SeqCst))),
+                    reference: Some(1.0),
+                },
+                false,
+            );
+            resolved.identity.hdr_capability_fingerprint = resolved.hdr_capability.fingerprint;
+            Ok(resolved)
+        });
+        coordinator.request_refresh(22);
+        assert!(coordinator.wait_for_idle(Duration::from_secs(1)));
+        headroom.store(4.0_f64.to_bits(), Ordering::SeqCst);
+        coordinator.request_refresh(22);
+        assert!(coordinator.wait_for_idle(Duration::from_secs(1)));
+
+        let report = coordinator.report();
+        let capability = report.hdr_capability.expect("published HDR capability");
+        assert_eq!(report.device_generation, Some(22));
+        assert_eq!(report.display_resource_generation, Some(2));
+        assert_eq!(report.display_resource_builds, 2);
+        assert_eq!(report.compute_context_resets_from_display_events, 0);
+        assert_eq!(capability.display_potential_peak_nits, 812.0);
+        assert_eq!(capability.headroom_stops, 2.0);
+        assert!(!capability.authoritative_hdr_preview);
+        assert_eq!(
+            capability.fallback_reason.as_deref(),
+            Some("hdr_surface_contract_not_accepted")
+        );
+    }
+
+    #[test]
     fn device_generation_change_is_distinct_and_old_display_resources_remain_leased() {
         let coordinator =
             DisplayTargetCoordinator::new(Duration::ZERO, move |_| Ok(target(8, "stable-profile")));
@@ -706,11 +803,40 @@ mod tests {
         );
     }
 
+    #[test]
+    fn display_hdr_contract_rejects_stale_or_cross_profile_capability() {
+        let capability = compile_hdr_display_capability(
+            "profile-a".to_string(),
+            EdrHeadroomSample::default(),
+            false,
+        );
+        let mut identity = target(5, "profile-a").identity;
+        assert!(validate_hdr_capability_contract(&identity, &capability).is_ok());
+
+        identity.profile_sha256 = "profile-b".to_string();
+        assert_eq!(
+            validate_hdr_capability_contract(&identity, &capability),
+            Err("display_target_hdr_profile_mismatch".to_string())
+        );
+        identity.profile_sha256 = "profile-a".to_string();
+        identity.hdr_capability_fingerprint ^= 1;
+        assert_eq!(
+            validate_hdr_capability_contract(&identity, &capability),
+            Err("display_target_hdr_capability_identity_mismatch".to_string())
+        );
+    }
+
     #[cfg(not(any(target_os = "android", target_os = "linux")))]
     #[test]
     fn prebuilt_mismatched_snapshot_is_rejected_before_publication() {
         let mut mismatched = target(5, "snapshot-profile");
         mismatched.identity.profile_sha256 = "target-profile".to_string();
+        mismatched.hdr_capability = compile_hdr_display_capability(
+            "target-profile".to_string(),
+            EdrHeadroomSample::default(),
+            false,
+        );
+        mismatched.identity.hdr_capability_fingerprint = mismatched.hdr_capability.fingerprint;
         assert_eq!(
             mismatched.materialize().err().as_deref(),
             Some("display_target_profile_snapshot_mismatch")
