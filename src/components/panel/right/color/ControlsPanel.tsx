@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/core';
 import cx from 'clsx';
 import type { TFunction } from 'i18next';
 import {
@@ -26,10 +27,20 @@ import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 
 import { useContextMenu } from '../../../../context/ContextMenuContext';
-import { useEditorActions } from '../../../../hooks/editor/useEditorActions';
+import { debouncedSave, useEditorActions } from '../../../../hooks/editor/useEditorActions';
+import {
+  type AppliedAutoEditV1,
+  type AutoEditGroup,
+  type AutoEditPreviewV1,
+  type AutoEditProposalV1,
+  appliedAutoEditV1Schema,
+  autoEditPreviewV1Schema,
+  autoEditProposalV1Schema,
+} from '../../../../schemas/autoEditSchemas';
 import { type CopiedSectionAdjustments, useEditorStore } from '../../../../store/useEditorStore';
 import { useSettingsStore } from '../../../../store/useSettingsStore';
 import { type CollapsibleSectionsState, useUIStore } from '../../../../store/useUIStore';
+import { Invokes } from '../../../../tauri/commands';
 import { TextVariants } from '../../../../types/typography';
 import {
   ActiveChannel,
@@ -47,10 +58,18 @@ import {
   pickAdjustmentValues,
   TransformAdjustment,
 } from '../../../../utils/adjustments';
+import {
+  highConfidenceAutoEditGroups,
+  isCurrentAutoEditCompletion,
+  recommendedAutoEditGroups,
+  toggleAutoEditGroup,
+} from '../../../../utils/autoEditWorkflow';
 import { getEditorClippingStatusChips } from '../../../../utils/color/runtime/gamutWarningDisplay';
+import { formatUnknownError } from '../../../../utils/errorFormatting';
 import { deriveEffectiveDisclosureState } from '../../../../utils/searchDisclosureState';
 import { getLensCorrectionAvailability } from '../../../../utils/transformLensControls';
 import AdjustmentSlider from '../../../adjustments/AdjustmentSlider';
+import { AutoEditReviewPopover } from '../../../adjustments/AutoEditReviewPopover';
 import BasicAdjustments from '../../../adjustments/Basic';
 import CurveGraph from '../../../adjustments/Curves';
 import DetailsPanel from '../../../adjustments/Details';
@@ -181,8 +200,23 @@ export default function Controls() {
   const { t } = useTranslation();
   const density = professionalInspectorDensityTokens;
   const { showContextMenu } = useContextMenu();
-  const { setAdjustments, handleAutoAdjustments, handleLutSelect } = useEditorActions();
+  const { setAdjustments, handleLutSelect } = useEditorActions();
   const [developPanelSearchQuery, setDevelopPanelSearchQuery] = useState('');
+  const [autoEditProposal, setAutoEditProposal] = useState<AutoEditProposalV1 | null>(null);
+  const [autoEditSelectedGroups, setAutoEditSelectedGroups] = useState<Set<AutoEditGroup>>(new Set());
+  const [autoEditImpact, setAutoEditImpact] = useState(1);
+  const [autoEditError, setAutoEditError] = useState<string | null>(null);
+  const [isAutoEditOpen, setIsAutoEditOpen] = useState(false);
+  const [isAutoEditAnalyzing, setIsAutoEditAnalyzing] = useState(false);
+  const [isAutoEditApplying, setIsAutoEditApplying] = useState(false);
+  const autoEditRequestSerial = useRef(0);
+  const autoEditPreviewRef = useRef<Adjustments | null>(null);
+  const autoEditBaseRef = useRef<{
+    adjustments: Adjustments;
+    graphRevision: string;
+    imageSessionId: string;
+    path: string;
+  } | null>(null);
   const developPanelScrollRootRef = useRef<HTMLDivElement | null>(null);
 
   const { appSettings, theme } = useSettingsStore(
@@ -215,6 +249,188 @@ export default function Controls() {
       setEditor: state.setEditor,
     })),
   );
+
+  const mergeAutoEditAdjustments = useCallback(
+    (base: Adjustments, payload: Record<string, unknown>): Adjustments => ({ ...base, ...payload }) as Adjustments,
+    [],
+  );
+
+  const previewAutoEdit = useCallback(
+    async (proposal: AutoEditProposalV1, groups: Set<AutoEditGroup>, impact: number) => {
+      const base = autoEditBaseRef.current;
+      if (!base) return;
+      const serial = ++autoEditRequestSerial.current;
+      try {
+        const rawPreview = await invoke<unknown>(Invokes.PreviewAutoEditProposal, {
+          request: {
+            expectedImagePath: base.path,
+            expectedImageSessionId: base.imageSessionId,
+            expectedGraphRevision: base.graphRevision,
+            resultingGraphRevision: `history_${String(useEditorStore.getState().historyIndex + 1)}`,
+            currentAdjustments: base.adjustments,
+            proposal,
+            selectedGroups: [...groups],
+            impact,
+          },
+        });
+        const preview: AutoEditPreviewV1 = autoEditPreviewV1Schema.parse(rawPreview);
+        const state = useEditorStore.getState();
+        if (
+          serial !== autoEditRequestSerial.current ||
+          !isCurrentAutoEditCompletion(
+            base.imageSessionId,
+            base.graphRevision,
+            state.imageSession?.id ?? null,
+            `history_${String(state.historyIndex)}`,
+          )
+        ) {
+          return;
+        }
+        const previewAdjustments = mergeAutoEditAdjustments(base.adjustments, preview.adjustments);
+        autoEditPreviewRef.current = previewAdjustments;
+        setEditor({ adjustments: previewAdjustments });
+      } catch (error) {
+        if (serial === autoEditRequestSerial.current) setAutoEditError(formatUnknownError(error));
+      }
+    },
+    [mergeAutoEditAdjustments, setEditor],
+  );
+
+  const beginAutoEdit = useCallback(async () => {
+    const state = useEditorStore.getState();
+    const image = state.selectedImage;
+    const imageSessionId = state.imageSession?.id;
+    if (!image?.isReady || !imageSessionId) return;
+    const graphRevision = `history_${String(state.historyIndex)}`;
+    const base = { adjustments: state.adjustments, graphRevision, imageSessionId, path: image.path };
+    autoEditBaseRef.current = base;
+    autoEditPreviewRef.current = null;
+    setIsAutoEditOpen(true);
+    setIsAutoEditAnalyzing(true);
+    setAutoEditError(null);
+    setAutoEditProposal(null);
+    const serial = ++autoEditRequestSerial.current;
+    try {
+      const rawProposal = await invoke<unknown>(Invokes.AnalyzeAutoEdit, {
+        request: {
+          expectedImagePath: image.path,
+          imageSessionId,
+          graphRevision,
+          currentAdjustments: base.adjustments,
+          cameraProfileIdentity: image.rawDevelopmentReport?.cameraProfile ?? null,
+        },
+      });
+      const proposal = autoEditProposalV1Schema.parse(rawProposal);
+      const current = useEditorStore.getState();
+      if (
+        serial !== autoEditRequestSerial.current ||
+        !isCurrentAutoEditCompletion(
+          imageSessionId,
+          graphRevision,
+          current.imageSession?.id ?? null,
+          `history_${String(current.historyIndex)}`,
+        )
+      ) {
+        return;
+      }
+      const groups = recommendedAutoEditGroups(proposal);
+      setAutoEditProposal(proposal);
+      setAutoEditSelectedGroups(groups);
+      setAutoEditImpact(proposal.impact);
+      await previewAutoEdit(proposal, groups, proposal.impact);
+    } catch (error) {
+      if (serial === autoEditRequestSerial.current) setAutoEditError(formatUnknownError(error));
+    } finally {
+      if (serial === autoEditRequestSerial.current) setIsAutoEditAnalyzing(false);
+    }
+  }, [previewAutoEdit]);
+
+  const cancelAutoEdit = useCallback(() => {
+    autoEditRequestSerial.current += 1;
+    void invoke(Invokes.CancelAutoEditAnalysis);
+    const base = autoEditBaseRef.current;
+    const state = useEditorStore.getState();
+    if (
+      base &&
+      base.imageSessionId === state.imageSession?.id &&
+      base.graphRevision === `history_${String(state.historyIndex)}`
+    ) {
+      setEditor({ adjustments: base.adjustments });
+    }
+    autoEditBaseRef.current = null;
+    autoEditPreviewRef.current = null;
+    setAutoEditProposal(null);
+    setAutoEditSelectedGroups(new Set());
+    setAutoEditError(null);
+    setIsAutoEditOpen(false);
+    setIsAutoEditAnalyzing(false);
+    setIsAutoEditApplying(false);
+  }, [setEditor]);
+
+  const applyAutoEdit = useCallback(
+    async (groups = autoEditSelectedGroups) => {
+      const base = autoEditBaseRef.current;
+      const proposal = autoEditProposal;
+      if (!base || !proposal || groups.size === 0) return;
+      setIsAutoEditApplying(true);
+      setAutoEditError(null);
+      const serial = ++autoEditRequestSerial.current;
+      try {
+        const resultingGraphRevision = `history_${String(useEditorStore.getState().historyIndex + 1)}`;
+        const rawApplied = await invoke<unknown>(Invokes.ApplyAutoEditProposal, {
+          request: {
+            expectedImagePath: base.path,
+            expectedImageSessionId: base.imageSessionId,
+            expectedGraphRevision: base.graphRevision,
+            resultingGraphRevision,
+            currentAdjustments: base.adjustments,
+            proposal,
+            selectedGroups: [...groups],
+            impact: autoEditImpact,
+          },
+        });
+        const applied: AppliedAutoEditV1 = appliedAutoEditV1Schema.parse(rawApplied);
+        const state = useEditorStore.getState();
+        if (
+          serial !== autoEditRequestSerial.current ||
+          !isCurrentAutoEditCompletion(
+            base.imageSessionId,
+            base.graphRevision,
+            state.imageSession?.id ?? null,
+            `history_${String(state.historyIndex)}`,
+          )
+        ) {
+          return;
+        }
+        const nextAdjustments = mergeAutoEditAdjustments(base.adjustments, applied.adjustments);
+        setEditor({ adjustments: nextAdjustments });
+        useEditorStore.getState().pushHistory(nextAdjustments);
+        debouncedSave(base.path, nextAdjustments);
+        autoEditBaseRef.current = null;
+        autoEditPreviewRef.current = null;
+        setAutoEditProposal(null);
+        setIsAutoEditOpen(false);
+      } catch (error) {
+        if (serial === autoEditRequestSerial.current) setAutoEditError(formatUnknownError(error));
+      } finally {
+        if (serial === autoEditRequestSerial.current) setIsAutoEditApplying(false);
+      }
+    },
+    [autoEditImpact, autoEditProposal, autoEditSelectedGroups, mergeAutoEditAdjustments, setEditor],
+  );
+
+  useEffect(() => {
+    const base = autoEditBaseRef.current;
+    if (base && selectedImage?.path !== base.path) {
+      autoEditRequestSerial.current += 1;
+      autoEditBaseRef.current = null;
+      autoEditPreviewRef.current = null;
+      setAutoEditProposal(null);
+      setIsAutoEditOpen(false);
+      setIsAutoEditAnalyzing(false);
+      setIsAutoEditApplying(false);
+    }
+  }, [selectedImage?.path]);
 
   const activeClippingStatusChips = useMemo(
     () => getEditorClippingStatusChips(adjustments).filter((chip) => chip.active),
@@ -1210,15 +1426,60 @@ export default function Controls() {
           <button
             aria-label={t('editor.adjustments.tooltips.autoAdjust')}
             className={density.frame.actionButton}
-            disabled={!selectedImage?.isReady}
+            disabled={!selectedImage?.isReady || isAutoEditAnalyzing}
             onClick={() => {
-              void handleAutoAdjustments();
+              void beginAutoEdit();
             }}
+            aria-expanded={isAutoEditOpen}
+            aria-haspopup="dialog"
             data-tooltip={t('editor.adjustments.tooltips.autoAdjust')}
             type="button"
           >
             <Aperture size={PANEL_ACTION_ICON_SIZE} />
           </button>
+          {isAutoEditOpen && (
+            <AutoEditReviewPopover
+              error={autoEditError}
+              impact={autoEditImpact}
+              isAnalyzing={isAutoEditAnalyzing}
+              isApplying={isAutoEditApplying}
+              onApply={() => {
+                void applyAutoEdit();
+              }}
+              onApplyHighConfidence={() => {
+                if (!autoEditProposal) return;
+                const groups = highConfidenceAutoEditGroups(autoEditProposal);
+                setAutoEditSelectedGroups(groups);
+                void applyAutoEdit(groups);
+              }}
+              onCancel={cancelAutoEdit}
+              onCompareEnd={() => {
+                if (autoEditPreviewRef.current) setEditor({ adjustments: autoEditPreviewRef.current });
+              }}
+              onCompareStart={() => {
+                if (autoEditBaseRef.current) setEditor({ adjustments: autoEditBaseRef.current.adjustments });
+              }}
+              onImpactChange={(impact) => {
+                setAutoEditImpact(impact);
+                if (autoEditProposal) void previewAutoEdit(autoEditProposal, autoEditSelectedGroups, impact);
+              }}
+              onResetProposal={() => {
+                if (!autoEditProposal) return;
+                const groups = recommendedAutoEditGroups(autoEditProposal);
+                setAutoEditSelectedGroups(groups);
+                setAutoEditImpact(autoEditProposal.impact);
+                void previewAutoEdit(autoEditProposal, groups, autoEditProposal.impact);
+              }}
+              onToggleGroup={(group) => {
+                if (!autoEditProposal) return;
+                const groups = toggleAutoEditGroup(autoEditSelectedGroups, group);
+                setAutoEditSelectedGroups(groups);
+                void previewAutoEdit(autoEditProposal, groups, autoEditImpact);
+              }}
+              proposal={autoEditProposal}
+              selectedGroups={autoEditSelectedGroups}
+            />
+          )}
           <button
             aria-label={t('editor.adjustments.tooltips.resetAdjustments')}
             className={density.frame.actionButton}

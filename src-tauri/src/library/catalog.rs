@@ -208,26 +208,12 @@ impl LibraryCatalog {
         expected_entity_revision: Option<u64>,
     ) -> Result<bool, String> {
         self.with_inner(app, |inner| {
-            if expected_catalog_revision
-                .is_some_and(|expected| catalog_revision(inner).ok() != Some(expected))
-            {
-                return Ok(false);
-            }
-            let Some(expected_entity_revision) = expected_entity_revision else {
-                return Ok(true);
-            };
-            let actual = inner
-                .connection
-                .as_ref()
-                .expect("initialized catalog")
-                .query_row(
-                    "SELECT entity_revision FROM entities WHERE image_id=?1",
-                    params![image_id],
-                    |row| row.get::<_, i64>(0),
-                )
-                .optional()
-                .map_err(|error| error.to_string())?;
-            Ok(actual == Some(expected_entity_revision as i64))
+            validates_open_revision_inner(
+                inner,
+                image_id,
+                expected_catalog_revision,
+                expected_entity_revision,
+            )
         })
     }
 
@@ -309,6 +295,34 @@ impl LibraryCatalog {
             })
         })
     }
+}
+
+fn validates_open_revision_inner(
+    inner: &mut CatalogInner,
+    image_id: &str,
+    expected_catalog_revision: Option<u64>,
+    expected_entity_revision: Option<u64>,
+) -> Result<bool, String> {
+    if let Some(expected_entity_revision) = expected_entity_revision {
+        let actual = inner
+            .connection
+            .as_ref()
+            .expect("initialized catalog")
+            .query_row(
+                "SELECT entity_revision FROM entities WHERE image_id=?1",
+                params![image_id],
+                |row| row.get::<_, i64>(0),
+            )
+            .optional()
+            .map_err(|error| error.to_string())?;
+        // The entity revision is the narrow authority for the selected image.
+        // An unrelated catalog delta must not invalidate an otherwise-current
+        // selection between the library click and the native open command.
+        return Ok(actual == Some(expected_entity_revision as i64));
+    }
+
+    Ok(expected_catalog_revision
+        .is_none_or(|expected| catalog_revision(inner).ok() == Some(expected)))
 }
 
 fn initialize(inner: &mut CatalogInner, app: &AppHandle) -> Result<(), String> {
@@ -1115,6 +1129,68 @@ mod tests {
         connection.execute_batch(schema_sql()).expect("schema");
         let tables: i64 = connection.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('roots','sources','entities','folders')", [], |row| row.get(0)).expect("table count");
         assert_eq!(tables, 4);
+    }
+
+    #[test]
+    fn image_open_uses_entity_revision_across_unrelated_catalog_deltas() {
+        let connection = Connection::open_in_memory().expect("memory catalog");
+        connection.execute_batch(schema_sql()).expect("schema");
+        connection
+            .execute(
+                "INSERT INTO catalog_meta(key,value) VALUES ('catalog_revision','41')",
+                [],
+            )
+            .expect("catalog revision");
+        connection
+            .execute(
+                "INSERT INTO entities(image_id,source_path,root_path,folder_path,entity_json,entity_revision,seen_generation) VALUES (?1,?1,'/library','/library','{}',7,1)",
+                params!["/library/current.raw"],
+            )
+            .expect("catalog entity");
+        let mut inner = CatalogInner {
+            connection: Some(connection),
+            ..CatalogInner::default()
+        };
+
+        assert!(
+            validates_open_revision_inner(&mut inner, "/library/current.raw", Some(41), Some(7),)
+                .expect("initial entity validation")
+        );
+        inner
+            .connection
+            .as_ref()
+            .expect("catalog")
+            .execute(
+                "UPDATE catalog_meta SET value='42' WHERE key='catalog_revision'",
+                [],
+            )
+            .expect("unrelated catalog delta");
+        assert!(
+            validates_open_revision_inner(&mut inner, "/library/current.raw", Some(41), Some(7),)
+                .expect("current entity survives unrelated delta")
+        );
+        assert!(
+            !validates_open_revision_inner(&mut inner, "/library/current.raw", Some(42), Some(6),)
+                .expect("stale entity validation")
+        );
+        assert!(
+            !validates_open_revision_inner(&mut inner, "/library/current.raw", Some(41), None,)
+                .expect("catalog-only stale validation")
+        );
+
+        inner
+            .connection
+            .as_ref()
+            .expect("catalog")
+            .execute(
+                "DELETE FROM entities WHERE image_id=?1",
+                params!["/library/current.raw"],
+            )
+            .expect("remove selected entity");
+        assert!(
+            !validates_open_revision_inner(&mut inner, "/library/current.raw", Some(42), Some(7),)
+                .expect("removed entity validation")
+        );
     }
 
     #[test]
