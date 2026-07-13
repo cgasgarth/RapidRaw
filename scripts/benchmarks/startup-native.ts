@@ -4,12 +4,14 @@ import { access, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { type StartupTraceSnapshot, startupTraceSnapshotSchema } from '../../src/utils/startup/startupTraceReporter.ts';
+import {
+  assertColdWarmInteractiveRegression,
+  assertResponseDistribution,
+  percentile95,
+  resolveStartupHardwarePolicy,
+} from './startup-hardware-class.ts';
 
 const FIRST_PAINT_BUDGET_MS = 750;
-const APP_CONTROLLED_VISIBLE_BUDGET_MS = 250;
-const APP_CONTROLLED_INTERACTIVE_BUDGET_MS = 750;
-const INTERACTION_RESPONSE_BUDGET_MS = 100;
-const FRONTEND_READY_RESPONSE_BUDGET_MS = 100;
 const DEFAULT_PAIRS = 30;
 const REPORT_TIMEOUT_MS = 20_000;
 
@@ -28,6 +30,9 @@ if (!binaryArg) throw new Error('Missing --binary <RapidRAW executable>.');
 const binary = resolve(binaryArg);
 const pairs = Number.parseInt(valueAfter('--pairs') ?? String(DEFAULT_PAIRS), 10);
 if (!Number.isInteger(pairs) || pairs < 30 || pairs > 30) throw new Error('--pairs must be exactly 30.');
+const hardwarePolicy = resolveStartupHardwarePolicy(
+  valueAfter('--hardware-class') ?? process.env.RAWENGINE_STARTUP_HARDWARE_CLASS,
+);
 
 const phase = (snapshot: StartupTraceSnapshot, name: StartupTraceSnapshot['phases'][number]['phase']) => {
   const receipt = snapshot.phases.find((entry) => entry.phase === name);
@@ -77,11 +82,7 @@ const assertTrace = (run: StartupRun): void => {
   const shellDetail = phase(snapshot, 'frontendShellVisible').detail ?? '';
   const frontendReadyMatch = shellDetail.match(/frontend_ready_ms=(\d+)/u);
   const frontendReadyMs = frontendReadyMatch?.[1] === undefined ? Number.NaN : Number(frontendReadyMatch[1]);
-  if (!Number.isFinite(frontendReadyMs) || frontendReadyMs > FRONTEND_READY_RESPONSE_BUDGET_MS) {
-    throw new Error(
-      `${kind}: frontend_ready response ${frontendReadyMs}ms exceeded ${FRONTEND_READY_RESPONSE_BUDGET_MS}ms`,
-    );
-  }
+  if (!Number.isFinite(frontendReadyMs)) throw new Error(`${kind}: frontend_ready response receipt is missing`);
   const visibleAt = phase(snapshot, 'windowVisible').elapsedMs;
   const interactiveAt = phase(snapshot, 'frontendInteractive').elapsedMs;
   for (const deferred of snapshot.phases.filter((entry) =>
@@ -116,12 +117,6 @@ const assertTrace = (run: StartupRun): void => {
 };
 
 const assertHardwareClassDistribution = (runs: StartupRun[]): void => {
-  const percentile95 = (values: number[]): number => {
-    const sorted = values.toSorted((left, right) => left - right);
-    const value = sorted[Math.ceil(sorted.length * 0.95) - 1];
-    if (value === undefined) throw new Error('startup distribution has no samples');
-    return value;
-  };
   const samples = runs
     .filter(({ kind }) => kind !== 'degraded')
     .map(({ kind, snapshot }) => {
@@ -130,11 +125,15 @@ const assertHardwareClassDistribution = (runs: StartupRun[]): void => {
         appControlledInteractiveMs: phase(snapshot, 'frontendInteractive').elapsedMs - rustEntryAt,
         appControlledVisibleMs: phase(snapshot, 'windowVisible').elapsedMs - rustEntryAt,
         firstPaintMs: phase(snapshot, 'windowVisible').elapsedMs,
+        frontendReadyResponseMs: Number(
+          phase(snapshot, 'frontendShellVisible').detail?.match(/frontend_ready_ms=(\d+)/u)?.[1],
+        ),
         interactionResponseMs:
           phase(snapshot, 'frontendInteractive').elapsedMs - phase(snapshot, 'frontendShellVisible').elapsedMs,
         kind,
       };
     });
+  const distributions = new Map<'cold' | 'warm', { appControlledInteractiveMs: number }>();
   for (const kind of ['cold', 'warm'] as const) {
     const kindSamples = samples.filter((sample) => sample.kind === kind);
     if (kindSamples.length < 30) throw new Error(`${kind}: expected at least 30 startup samples`);
@@ -142,19 +141,28 @@ const assertHardwareClassDistribution = (runs: StartupRun[]): void => {
       appControlledInteractiveMs: percentile95(kindSamples.map((sample) => sample.appControlledInteractiveMs)),
       appControlledVisibleMs: percentile95(kindSamples.map((sample) => sample.appControlledVisibleMs)),
       firstPaintMs: percentile95(kindSamples.map((sample) => sample.firstPaintMs)),
+      frontendReadyResponseMs: assertResponseDistribution(
+        kindSamples.map((sample) => sample.frontendReadyResponseMs),
+        hardwarePolicy.interactionResponseMs,
+      ),
       interactionResponseMs: percentile95(kindSamples.map((sample) => sample.interactionResponseMs)),
     };
     if (
-      p95.firstPaintMs > FIRST_PAINT_BUDGET_MS ||
-      p95.appControlledVisibleMs > APP_CONTROLLED_VISIBLE_BUDGET_MS ||
-      p95.appControlledInteractiveMs > APP_CONTROLLED_INTERACTIVE_BUDGET_MS ||
-      p95.interactionResponseMs > INTERACTION_RESPONSE_BUDGET_MS
+      p95.firstPaintMs > hardwarePolicy.firstPaintMs ||
+      p95.appControlledVisibleMs > hardwarePolicy.appControlledVisibleMs ||
+      p95.appControlledInteractiveMs > hardwarePolicy.appControlledInteractiveMs ||
+      p95.interactionResponseMs > hardwarePolicy.interactionResponseMs
     ) {
       throw new Error(
         `${kind}: p95 startup distribution failed; p95=${JSON.stringify(p95)}; samples=${JSON.stringify(kindSamples)}`,
       );
     }
+    distributions.set(kind, p95);
   }
+  const cold = distributions.get('cold');
+  const warm = distributions.get('warm');
+  if (!cold || !warm) throw new Error('startup cold/warm distributions are incomplete');
+  assertColdWarmInteractiveRegression(cold.appControlledInteractiveMs, warm.appControlledInteractiveMs, hardwarePolicy);
 };
 
 const waitForReport = async (path: string, process: Bun.Subprocess): Promise<StartupTraceSnapshot> => {
@@ -308,7 +316,9 @@ const main = async (): Promise<void> => {
         phase(snapshot, 'frontendInteractive').elapsedMs - phase(snapshot, 'frontendShellVisible').elapsedMs,
       kind,
     }));
-    console.log(`native startup benchmark ok (${runs.length} bounded runs): ${JSON.stringify(summary)}`);
+    console.log(
+      `native startup benchmark ok (${runs.length} bounded runs; hardware_class=${hardwarePolicy.hardwareClass}): ${JSON.stringify(summary)}`,
+    );
   } finally {
     await rm(root, { force: true, recursive: true });
   }

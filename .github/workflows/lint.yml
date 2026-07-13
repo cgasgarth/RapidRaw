@@ -337,6 +337,8 @@ jobs:
           codesign --verify --deep --strict native-startup/RapidRAW.app
 
       - name: Run bounded cold, warm, and degraded startup samples
+        env:
+          RAWENGINE_STARTUP_HARDWARE_CLASS: github-hosted-macos-arm64
         run: bun scripts/benchmarks/startup-native.ts --binary native-startup/RapidRAW.app/Contents/MacOS/RapidRAW --pairs 30
 
   docs-check:

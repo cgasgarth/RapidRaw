@@ -210,6 +210,8 @@ jobs:
           path: native-startup
 
       - name: Run bounded native startup benchmark
+        env:
+          RAWENGINE_STARTUP_HARDWARE_CLASS: github-hosted-macos-arm64
         run: |
           tar -xzf native-startup/RapidRAW.app.tar.gz -C native-startup
           test -x native-startup/RapidRAW.app/Contents/MacOS/RapidRAW
