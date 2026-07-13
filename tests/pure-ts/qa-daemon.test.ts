@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { connect } from 'node:net';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
+import { qaDaemonLeaseForState } from '../../scripts/qa/daemon-client';
 import { QaDaemonEngine, type QaLifecycleAdapter } from '../../scripts/qa/daemon-engine';
 import type { QaDaemonIdentity, QaDaemonMetrics, QaDaemonResponse } from '../../scripts/qa/daemon-model';
 import { qaDaemonPaths, readLiveDaemonState } from '../../scripts/qa/daemon-state';
@@ -84,6 +85,19 @@ async function socketRequest(socketPath: string, value: unknown): Promise<QaDaem
 }
 
 describe('QA daemon lifecycle', () => {
+  test('only grants shutdown ownership to the process that won daemon publication', () => {
+    const state = {
+      schemaVersion: 1 as const,
+      pid: 202,
+      worktree: '/tmp/winner',
+      socketPath: '/tmp/winner.sock',
+      startedAt: '2026-01-01T00:00:00.000Z',
+      processStartToken: 'winner-token',
+    };
+    expect(qaDaemonLeaseForState(state, 101)).toEqual({ state, startedByCaller: false });
+    expect(qaDaemonLeaseForState(state, 202)).toEqual({ state, startedByCaller: true });
+  });
+
   test('reuses source changes but restarts configuration changes with fresh-context accounting', async () => {
     const worktree = await temporaryDirectory();
     const events: string[] = [];

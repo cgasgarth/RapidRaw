@@ -7,9 +7,8 @@ import { z } from 'zod';
 import { publishAdjustmentSnapshot } from '../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../src/utils/adjustments';
 import { type StartupTraceSnapshot, startupTraceSnapshotSchema } from '../../src/utils/startup/startupTraceReporter';
-import { requestQaDaemon } from '../qa/daemon-client';
+import { acquireQaDaemon, type QaDaemonLease, requestQaDaemon, shutdownQaDaemonLease } from '../qa/daemon-client';
 import { type QaDaemonMetrics, qaDaemonMetricsSchema } from '../qa/daemon-model';
-import { readLiveDaemonState } from '../qa/daemon-state';
 import {
   type NativeQaControlRecord,
   readLiveNativeQaControlRecord,
@@ -188,8 +187,7 @@ const browserQaScenario = (
   extraMetricUnits: Readonly<Record<string, 'ms' | 'bytes' | 'count' | 'per-second'>> = {},
 ): PerformanceScenario => {
   const worktree = process.cwd();
-  let daemonProcess: ReturnType<typeof Bun.spawn> | undefined;
-  let startedDaemon = false;
+  let daemonLease: QaDaemonLease | undefined;
   let previousMetrics = emptyDaemonMetrics();
   return {
     id,
@@ -219,32 +217,13 @@ const browserQaScenario = (
       ...extraMetricUnits,
     },
     async beforeAll() {
-      if ((await readLiveDaemonState(worktree)) === undefined) {
-        daemonProcess = Bun.spawn(['bun', 'scripts/qa/daemon.ts'], {
-          cwd: worktree,
-          stderr: 'ignore',
-          stdout: 'ignore',
-        });
-        startedDaemon = true;
-        for (let attempt = 0; attempt < 200 && (await readLiveDaemonState(worktree)) === undefined; attempt += 1)
-          await Bun.sleep(25);
-        if ((await readLiveDaemonState(worktree)) === undefined) throw new Error('Persistent QA daemon did not start.');
-      }
+      daemonLease = await acquireQaDaemon(worktree);
       const health = await requestQaDaemon(worktree, { id: crypto.randomUUID(), method: 'health' });
       if (!health.ok) throw new Error(health.error ?? 'Persistent QA daemon health failed.');
       previousMetrics = daemonHealthSchema.parse(health.result).metrics;
     },
     async afterAll() {
-      if (!startedDaemon) return;
-      const shutdown = await requestQaDaemon(worktree, { id: crypto.randomUUID(), method: 'shutdown' });
-      if (!shutdown.ok) throw new Error(shutdown.error ?? 'Persistent QA daemon shutdown failed.');
-      if (daemonProcess !== undefined)
-        await Promise.race([
-          daemonProcess.exited,
-          Bun.sleep(15_000).then(() => {
-            throw new Error('Persistent QA daemon did not exit after shutdown.');
-          }),
-        ]);
+      if (daemonLease !== undefined) await shutdownQaDaemonLease(worktree, daemonLease);
     },
     async runSample() {
       const started = performance.now();
