@@ -1169,8 +1169,12 @@ fn render_processed_export_soft_proof_preview(
     let transform_hash = calculate_transform_hash(adjustments);
     let (preview_image, scale, unscaled_crop_offset) =
         generate_transformed_preview(state, loaded_image, adjustments, preview_dim)?;
-    let detail_stage =
-        render_pipeline::apply_pre_gpu_detail_stages(&preview_image, transform_hash, adjustments);
+    let detail_stage = render_pipeline::apply_pre_gpu_detail_stages(
+        &preview_image,
+        transform_hash,
+        adjustments,
+        loaded_image.is_raw,
+    );
     let processing_image = detail_stage.image.as_ref();
     let (preview_width, preview_height) = processing_image.dimensions();
     let mask_definitions: Vec<MaskDefinition> = adjustments
@@ -1211,6 +1215,8 @@ fn render_processed_export_soft_proof_preview(
         tm_override,
         lut,
     )?;
+    let mut gpu_adjustments = render_plan.adjustments;
+    render_pipeline::suppress_legacy_global_denoise(&mut gpu_adjustments);
     process_and_get_dynamic_image(
         &context,
         state,
@@ -1225,7 +1231,7 @@ fn render_processed_export_soft_proof_preview(
             ]),
         ),
         RenderRequest {
-            adjustments: render_plan.adjustments,
+            adjustments: gpu_adjustments,
             mask_bitmaps: &mask_bitmaps,
             lut: render_plan.lut.clone(),
             roi: None,
@@ -1371,19 +1377,26 @@ fn generate_uncropped_preview(
                 return;
             }
         };
-        let pre_gpu_revision = calculate_transform_hash(&adjustments_clone);
+        let detail_stage = render_pipeline::apply_pre_gpu_detail_stages(
+            &processing_base,
+            calculate_transform_hash(render_adjustments.as_ref()),
+            render_adjustments.as_ref(),
+            is_raw,
+        );
+        let mut gpu_adjustments = render_plan.adjustments;
+        render_pipeline::suppress_legacy_global_denoise(&mut gpu_adjustments);
         if let Ok(processed_image) = process_and_get_dynamic_image(
             &context,
             &state,
-            &processing_base,
+            detail_stage.image.as_ref(),
             crate::gpu_processing::PreGpuImageIdentity::for_stage(
-                &processing_base,
+                detail_stage.image.as_ref(),
                 loaded_image.artifact_source.source_fingerprint(),
-                pre_gpu_revision,
-                pre_gpu_revision,
+                detail_stage.render_hash,
+                detail_stage.render_hash,
             ),
             RenderRequest {
-                adjustments: render_plan.adjustments,
+                adjustments: gpu_adjustments,
                 mask_bitmaps: &mask_bitmaps,
                 lut: render_plan.lut.clone(),
                 roi: None,
@@ -2288,19 +2301,26 @@ fn generate_preset_preview(
         tm_override,
         lut,
     )?;
-    let pre_gpu_revision = calculate_transform_hash(&js_adjustments);
+    let detail_stage = render_pipeline::apply_pre_gpu_detail_stages(
+        &preview_image,
+        calculate_transform_hash(render_adjustments.as_ref()),
+        render_adjustments.as_ref(),
+        is_raw,
+    );
+    let mut gpu_adjustments = render_plan.adjustments;
+    render_pipeline::suppress_legacy_global_denoise(&mut gpu_adjustments);
     let processed_image = process_and_get_dynamic_image(
         &context,
         &state,
-        &preview_image,
+        detail_stage.image.as_ref(),
         crate::gpu_processing::PreGpuImageIdentity::for_stage(
-            &preview_image,
+            detail_stage.image.as_ref(),
             loaded_image.artifact_source.source_fingerprint(),
-            pre_gpu_revision,
-            pre_gpu_revision,
+            detail_stage.render_hash,
+            detail_stage.render_hash,
         ),
         RenderRequest {
-            adjustments: render_plan.adjustments,
+            adjustments: gpu_adjustments,
             mask_bitmaps: &mask_bitmaps,
             lut: render_plan.lut.clone(),
             roi: None,
@@ -3196,7 +3216,10 @@ fn generate_preview_for_path(
         transformed_image.as_ref(),
         pre_gpu_stage_hash,
         render_adjustments.as_ref(),
+        is_raw,
     );
+    let mut gpu_adjustments = render_plan.adjustments;
+    render_pipeline::suppress_legacy_global_denoise(&mut gpu_adjustments);
     let final_image = process_and_get_dynamic_image(
         &context,
         &state,
@@ -3208,7 +3231,7 @@ fn generate_preview_for_path(
             detail_stage.render_hash,
         ),
         RenderRequest {
-            adjustments: render_plan.adjustments,
+            adjustments: gpu_adjustments,
             mask_bitmaps: &mask_bitmaps,
             lut: render_plan.lut.clone(),
             roi: None,

@@ -370,9 +370,10 @@ fn production_cpu_and_wgpu_nodes_execute_identity_and_non_default_vectors() {
     for contract in COLOR_NODE_REGISTRY {
         let output = match contract.backend {
             ColorNodeBackend::Cpu => {
-                let neutral = apply_pre_gpu_detail_stages(&source, 1, &serde_json::json!({}));
+                let neutral =
+                    apply_pre_gpu_detail_stages(&source, 1, &serde_json::json!({}), false);
                 assert!(matches!(neutral.image, Cow::Borrowed(_)));
-                apply_pre_gpu_detail_stages(&source, 1, &detail_json(contract.id))
+                apply_pre_gpu_detail_stages(&source, 1, &detail_json(contract.id), false)
                     .image
                     .into_owned()
             }

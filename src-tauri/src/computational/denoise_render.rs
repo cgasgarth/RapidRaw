@@ -7,29 +7,44 @@ const DENOISE_RENDER_REVISION_ABI: u32 = 1;
 use image::DynamicImage;
 use serde_json::Value;
 
-use crate::denoise_cpu_reference::{DenoiseCpuReferenceSettings, apply_cpu_reference_denoise};
+use crate::denoise_cpu_reference::{
+    DenoiseCpuReferenceSettings, DenoiseSourceClass, analyze_noise_profile,
+    apply_cpu_reference_denoise_with_profile,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DenoiseRenderControls {
     pub chroma_strength: f32,
+    pub contrast_protection: f32,
+    pub detail: f32,
     pub luma_strength: f32,
+    pub natural_grain: f32,
+    pub shadow_bias: f32,
+}
+
+fn normalized_control(adjustments: &Value, key: &str, fallback: f32) -> f32 {
+    adjustments
+        .get(key)
+        .and_then(Value::as_f64)
+        .map(|value| (value as f32 / 100.0).clamp(0.0, 1.0))
+        .unwrap_or(fallback)
 }
 
 pub fn parse_denoise_render_controls(adjustments: &Value) -> DenoiseRenderControls {
-    let luma_strength = adjustments
-        .get("lumaNoiseReduction")
-        .and_then(Value::as_f64)
-        .map(|value| (value as f32 / 100.0).clamp(0.0, 1.0))
-        .unwrap_or(0.0);
-    let chroma_strength = adjustments
-        .get("colorNoiseReduction")
-        .and_then(Value::as_f64)
-        .map(|value| (value as f32 / 100.0).clamp(0.0, 1.0))
-        .unwrap_or(0.0);
+    let luma_strength = normalized_control(adjustments, "lumaNoiseReduction", 0.0);
+    let chroma_strength = normalized_control(adjustments, "colorNoiseReduction", 0.0);
 
     DenoiseRenderControls {
         chroma_strength,
+        contrast_protection: normalized_control(adjustments, "denoiseContrastProtection", 0.5),
+        detail: normalized_control(adjustments, "denoiseDetail", 0.5),
         luma_strength,
+        natural_grain: normalized_control(adjustments, "denoiseNaturalGrain", 0.0),
+        shadow_bias: adjustments
+            .get("denoiseShadowBias")
+            .and_then(Value::as_f64)
+            .map(|value| (value as f32 / 100.0).clamp(-1.0, 1.0))
+            .unwrap_or(0.0),
     }
 }
 
@@ -40,12 +55,25 @@ pub fn calculate_denoise_render_hash(base_hash: u64, adjustments: &Value) -> u64
     base_hash.hash(&mut hasher);
     controls.luma_strength.to_bits().hash(&mut hasher);
     controls.chroma_strength.to_bits().hash(&mut hasher);
+    controls.detail.to_bits().hash(&mut hasher);
+    controls.natural_grain.to_bits().hash(&mut hasher);
+    controls.contrast_protection.to_bits().hash(&mut hasher);
+    controls.shadow_bias.to_bits().hash(&mut hasher);
     hasher.finish()
 }
 
+#[cfg(test)]
 pub fn apply_denoise_stage<'a>(
     image: &'a DynamicImage,
     adjustments: &Value,
+) -> Cow<'a, DynamicImage> {
+    apply_denoise_stage_for_source(image, adjustments, DenoiseSourceClass::EncodedRgb)
+}
+
+pub fn apply_denoise_stage_for_source<'a>(
+    image: &'a DynamicImage,
+    adjustments: &Value,
+    source_class: DenoiseSourceClass,
 ) -> Cow<'a, DynamicImage> {
     let controls = parse_denoise_render_controls(adjustments);
     if controls.luma_strength <= f32::EPSILON && controls.chroma_strength <= f32::EPSILON {
@@ -55,16 +83,23 @@ pub fn apply_denoise_stage<'a>(
     let strength = controls.luma_strength.max(controls.chroma_strength);
     let settings = DenoiseCpuReferenceSettings {
         chroma_strength: controls.chroma_strength * 0.52,
+        contrast_protection: controls.contrast_protection,
+        detail: controls.detail,
         edge_threshold: 0.018 + (1.0 - strength) * 0.045,
         luma_strength: controls.luma_strength * 0.32,
+        natural_grain: controls.natural_grain,
+        shadow_bias: controls.shadow_bias,
     };
-    let output = apply_cpu_reference_denoise(&image.to_rgb32f(), settings);
+    let source = image.to_rgb32f();
+    let profile = analyze_noise_profile(&source, source_class);
+    let output = apply_cpu_reference_denoise_with_profile(&source, settings, &profile);
     Cow::Owned(DynamicImage::ImageRgb32F(output))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::denoise_cpu_reference::apply_cpu_reference_denoise;
     use image::{ImageBuffer, Rgb, Rgb32FImage};
     use serde_json::json;
     use std::fs;
@@ -178,8 +213,12 @@ mod tests {
             &image.to_rgb32f(),
             DenoiseCpuReferenceSettings {
                 chroma_strength: 0.70 * 0.52,
+                contrast_protection: 0.5,
+                detail: 0.5,
                 edge_threshold: 0.018 + (1.0 - 0.70) * 0.045,
                 luma_strength: 0.45 * 0.32,
+                natural_grain: 0.0,
+                shadow_bias: 0.0,
             },
         );
 
@@ -219,6 +258,43 @@ mod tests {
             calculate_denoise_render_hash(42, &disabled),
             calculate_denoise_render_hash(42, &enabled)
         );
+    }
+
+    #[test]
+    fn professional_denoise_controls_are_independent_render_authority() {
+        let base = json!({
+            "colorNoiseReduction": 65,
+            "denoiseContrastProtection": 50,
+            "denoiseDetail": 50,
+            "denoiseNaturalGrain": 0,
+            "denoiseShadowBias": 0,
+            "lumaNoiseReduction": 55
+        });
+        for (key, value) in [
+            ("denoiseContrastProtection", 75),
+            ("denoiseDetail", 75),
+            ("denoiseNaturalGrain", 75),
+            ("denoiseShadowBias", 75),
+        ] {
+            let mut changed = base.clone();
+            changed[key] = json!(value);
+            assert_ne!(
+                calculate_denoise_render_hash(42, &base),
+                calculate_denoise_render_hash(42, &changed),
+                "{key} must invalidate denoise render identity"
+            );
+        }
+
+        let parsed = parse_denoise_render_controls(&json!({
+            "denoiseContrastProtection": 70,
+            "denoiseDetail": 80,
+            "denoiseNaturalGrain": 40,
+            "denoiseShadowBias": -25
+        }));
+        assert_eq!(parsed.contrast_protection, 0.7);
+        assert_eq!(parsed.detail, 0.8);
+        assert_eq!(parsed.natural_grain, 0.4);
+        assert_eq!(parsed.shadow_bias, -0.25);
     }
 
     #[test]

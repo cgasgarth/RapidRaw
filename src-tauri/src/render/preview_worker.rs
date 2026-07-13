@@ -357,6 +357,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         processing_image.as_ref(),
         processing_revision.construction_generation,
         &adjustments_clone,
+        is_raw,
     );
     cancellation_checkpoint(cancellation, PreviewStage::CpuDetail)?;
     let processing_image_ref = pre_gpu_detail_stage.image.as_ref();
@@ -456,7 +457,11 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
     };
 
     let render_request = || RenderRequest {
-        adjustments: render_plan.adjustments,
+        adjustments: {
+            let mut adjustments = render_plan.adjustments;
+            render_pipeline::suppress_legacy_global_denoise(&mut adjustments);
+            adjustments
+        },
         mask_bitmaps: &mask_bitmaps,
         lut: render_plan.lut.clone(),
         roi: pixel_roi,

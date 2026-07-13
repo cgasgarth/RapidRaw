@@ -15,7 +15,11 @@ use std::sync::Arc;
 #[cfg(feature = "ai")]
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicI64, AtomicUsize, Ordering as AtomicOrdering};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
+
+use super::denoise_artifact::{
+    EnhancedDenoiseArtifactV1, EnhancedDenoiseBuildOutput, EnhancedDenoisePlanV1, SceneRangeCounts,
+};
 
 #[cfg(feature = "ai")]
 type AiSession = Arc<Mutex<rapidraw_ai::ort::session::Session>>;
@@ -65,6 +69,8 @@ pub async fn apply_denoising(
 ) -> Result<(), String> {
     let (source_path, _) = parse_virtual_path(&path);
     let path_str = source_path.to_string_lossy().to_string();
+    let plan = EnhancedDenoisePlanV1::legacy_adapter(&source_path, &method, intensity)?;
+    let cache_root = enhanced_cache_root(&app_handle)?;
 
     #[cfg(feature = "ai")]
     let mut ai_session: Option<AiSession> = None;
@@ -91,13 +97,25 @@ pub async fn apply_denoising(
         }
     }
 
-    let denoise_result_handle = state.denoise_result.clone();
+    let artifact_store = Arc::clone(&state.denoise_artifacts);
+    let active_artifact = Arc::clone(&state.active_denoise_artifact);
 
     tokio::task::spawn_blocking(move || {
         let _ai_lease = ai_lease;
-        match denoise_image(path_str, intensity, method, app_handle.clone(), ai_session) {
-            Ok((image, _)) => {
-                *denoise_result_handle.lock().unwrap() = Some(image);
+        match artifact_store.get_or_build(&cache_root, plan, || {
+            denoise_image(
+                path_str.clone(),
+                intensity,
+                method,
+                app_handle.clone(),
+                ai_session,
+            )
+        }) {
+            Ok(artifact) => {
+                *active_artifact.lock().unwrap() = Some(Arc::clone(&artifact));
+                if let Err(error) = emit_denoise_complete(&artifact, &path_str, &app_handle) {
+                    let _ = app_handle.emit(crate::events::DENOISE_ERROR, error);
+                }
             }
             Err(e) => {
                 let _ = app_handle.emit(crate::events::DENOISE_ERROR, e);
@@ -120,8 +138,6 @@ pub async fn batch_denoise_images(
     let mut ai_session: Option<AiSession> = None;
     #[cfg(not(feature = "ai"))]
     let ai_session: Option<AiSession> = None;
-    #[cfg(not(feature = "ai"))]
-    let _ = &state;
     #[cfg(feature = "ai")]
     let mut ai_lease = None;
     #[cfg(not(feature = "ai"))]
@@ -143,6 +159,8 @@ pub async fn batch_denoise_images(
         }
     }
 
+    let artifact_store = Arc::clone(&state.denoise_artifacts);
+    let cache_root = enhanced_cache_root(&app_handle)?;
     tokio::task::spawn_blocking(move || {
         let _ai_lease = ai_lease;
         let mut results = Vec::new();
@@ -161,17 +179,28 @@ pub async fn batch_denoise_images(
                 crate::file_management::parse_virtual_path(path_str);
             let real_path = source_path.to_string_lossy().to_string();
 
-            match crate::denoising::denoise_image(
-                real_path.clone(),
-                intensity,
-                method.clone(),
-                app_handle.clone(),
-                #[cfg(feature = "ai")]
-                ai_session.clone(),
-                #[cfg(not(feature = "ai"))]
-                ai_session,
-            ) {
-                Ok((image, _)) => {
+            let plan = match EnhancedDenoisePlanV1::legacy_adapter(&source_path, &method, intensity)
+            {
+                Ok(plan) => plan,
+                Err(error) => {
+                    let _ = app_handle.emit(crate::events::DENOISE_ERROR, error);
+                    continue;
+                }
+            };
+            match artifact_store.get_or_build(&cache_root, plan, || {
+                crate::denoising::denoise_image(
+                    real_path.clone(),
+                    intensity,
+                    method.clone(),
+                    app_handle.clone(),
+                    #[cfg(feature = "ai")]
+                    ai_session.clone(),
+                    #[cfg(not(feature = "ai"))]
+                    ai_session,
+                )
+            }) {
+                Ok(artifact) => {
+                    let image = &artifact.image;
                     let is_raw = crate::formats::is_raw_file(&real_path);
                     let parent_dir = source_path.parent().unwrap_or(std::path::Path::new(""));
                     let stem = source_path
@@ -234,15 +263,26 @@ pub async fn save_denoised_image(
     original_path_str: String,
     state: tauri::State<'_, AppState>,
 ) -> Result<String, String> {
-    let denoised_image = state.denoise_result.lock().unwrap().take().ok_or_else(|| {
-        "No denoised image found in memory. It might have already been saved or cleared."
-            .to_string()
-    })?;
+    let artifact = state
+        .active_denoise_artifact
+        .lock()
+        .unwrap()
+        .clone()
+        .ok_or_else(|| {
+            "No enhanced denoise artifact is active for the current source.".to_string()
+        })?;
 
     let is_raw = crate::formats::is_raw_file(&original_path_str);
 
     let (first_path, source_sidecar_path) =
         crate::file_management::parse_virtual_path(&original_path_str);
+    let requested_source = first_path
+        .canonicalize()
+        .map_err(|error| format!("Could not resolve denoise source: {error}"))?;
+    if requested_source.to_string_lossy() != artifact.manifest.plan.source_revision.canonical_path {
+        return Err("Active denoise artifact belongs to a different physical source".to_string());
+    }
+    let denoised_image = &artifact.image;
     let parent_dir = first_path
         .parent()
         .ok_or_else(|| "Could not determine parent directory.".to_string())?;
@@ -340,7 +380,7 @@ fn denoise_image(
     method: String,
     app_handle: AppHandle,
     ai_session: Option<AiSession>,
-) -> Result<(DynamicImage, String), String> {
+) -> Result<EnhancedDenoiseBuildOutput, String> {
     #[cfg(not(feature = "ai"))]
     let _ = &ai_session;
     let path = Path::new(&path_str);
@@ -364,6 +404,7 @@ fn denoise_image(
     }
 
     let rgb_img_for_denoiser = dynamic_img.to_rgb32f();
+    let input_range = SceneRangeCounts::measure(&rgb_img_for_denoiser);
 
     let out_dynamic = if method == "ai" {
         #[cfg(not(feature = "ai"))]
@@ -384,9 +425,22 @@ fn denoise_image(
     };
 
     let _ = app_handle.emit(crate::events::DENOISE_PROGRESS, "Finalizing data...");
-    let _ = app_handle.emit(crate::events::DENOISE_PROGRESS, "Generating previews...");
+    Ok(EnhancedDenoiseBuildOutput {
+        image: out_dynamic,
+        input_range,
+    })
+}
 
-    let (w, h) = out_dynamic.dimensions();
+fn enhanced_cache_root(app_handle: &AppHandle) -> Result<std::path::PathBuf, String> {
+    app_handle
+        .path()
+        .app_cache_dir()
+        .map(|root| root.join("enhanced-denoise-v1"))
+        .map_err(|error| format!("denoise_cache_root_unavailable:{error}"))
+}
+
+fn encode_denoise_preview(image: &DynamicImage) -> Result<String, String> {
+    let (w, h) = image.dimensions();
     let (new_w, new_h) = if w > h {
         if w > 4000 {
             (4000, (4000.0 * h as f32 / w as f32).round() as u32)
@@ -401,43 +455,47 @@ fn denoise_image(
         }
     };
 
-    let denoised_preview = if new_w != w {
-        out_dynamic.resize(new_w, new_h, image::imageops::FilterType::Lanczos3)
+    let preview = if new_w != w || new_h != h {
+        image.resize(new_w, new_h, image::imageops::FilterType::Lanczos3)
     } else {
-        out_dynamic.clone()
+        image.clone()
     };
-
-    let mut buf_denoised = Cursor::new(Vec::new());
-    denoised_preview
+    let mut buffer = Cursor::new(Vec::new());
+    preview
         .to_rgb8()
-        .write_to(&mut buf_denoised, ImageFormat::Png)
+        .write_to(&mut buffer, ImageFormat::Png)
         .map_err(|e| format!("Failed to encode preview: {}", e))?;
-    let base64_str_denoised = general_purpose::STANDARD.encode(buf_denoised.get_ref());
-    let data_url_denoised = png_data_url(base64_str_denoised);
+    Ok(png_data_url(
+        general_purpose::STANDARD.encode(buffer.get_ref()),
+    ))
+}
 
-    let original_dynamic = DynamicImage::ImageRgb32F(rgb_img_for_denoiser);
-    let original_preview = if new_w != w {
-        original_dynamic.resize(new_w, new_h, image::imageops::FilterType::Lanczos3)
-    } else {
-        original_dynamic
-    };
-
-    let mut buf_orig = Cursor::new(Vec::new());
-    original_preview
-        .to_rgb8()
-        .write_to(&mut buf_orig, ImageFormat::Png)
-        .map_err(|e| format!("Failed to encode original preview: {}", e))?;
-    let base64_str_orig = general_purpose::STANDARD.encode(buf_orig.get_ref());
-    let data_url_orig = png_data_url(base64_str_orig);
+fn emit_denoise_complete(
+    artifact: &EnhancedDenoiseArtifactV1,
+    path_str: &str,
+    app_handle: &AppHandle,
+) -> Result<(), String> {
+    let settings = load_settings_or_default(app_handle);
+    let file_bytes = fs::read(path_str).map_err(|error| error.to_string())?;
+    let mut original = load_base_image_from_bytes(&file_bytes, path_str, false, &settings, None)
+        .map_err(|error| error.to_string())?;
+    if is_raw_file(path_str) {
+        apply_cpu_default_raw_processing(&mut original);
+    }
+    let data_url_denoised = encode_denoise_preview(&artifact.image)?;
+    let data_url_orig = encode_denoise_preview(&original)?;
 
     let payload = serde_json::json!({
         "denoised": data_url_denoised,
-        "original": data_url_orig
+        "original": data_url_orig,
+        "artifactId": artifact.manifest.artifact_id,
+        "cacheIdentity": artifact.manifest.plan_fingerprint,
+        "qualityReceipt": artifact.manifest.quality_receipt,
     });
 
-    let _ = app_handle.emit(crate::events::DENOISE_COMPLETE, &payload);
-
-    Ok((out_dynamic, data_url_denoised))
+    app_handle
+        .emit(crate::events::DENOISE_COMPLETE, &payload)
+        .map_err(|error| format!("Failed to emit denoise completion: {error}"))
 }
 
 fn rgb_to_ycbcr(r: &[f32], g: &[f32], b: &[f32]) -> (Vec<f32>, Vec<f32>, Vec<f32>) {

@@ -1456,13 +1456,21 @@ export const detailDeblurDryRunResultV1Schema = z
 export const detailDenoiseControlsV1Schema = z
   .object({
     chromaStrength: z.number().min(0).max(1),
+    contrastProtection: z.number().min(0).max(1).default(0.5),
+    detail: z.number().min(0).max(1).default(0.5),
     lumaStrength: z.number().min(0).max(1),
+    naturalGrain: z.number().min(0).max(1).default(0),
+    shadowBias: z.number().min(-1).max(1).default(0),
   })
   .strict();
 
 export const detailDenoiseUiControlsV1Schema = z
   .object({
     colorNoiseReduction: z.number().int().min(0).max(100),
+    denoiseContrastProtection: z.number().int().min(0).max(100).default(50),
+    denoiseDetail: z.number().int().min(0).max(100).default(50),
+    denoiseNaturalGrain: z.number().int().min(0).max(100).default(0),
+    denoiseShadowBias: z.number().int().min(-100).max(100).default(0),
     lumaNoiseReduction: z.number().int().min(0).max(100),
   })
   .strict();
@@ -1471,11 +1479,16 @@ export const toDetailDenoiseControlsV1 = (
   controls: z.infer<typeof detailDenoiseUiControlsV1Schema>,
 ): z.infer<typeof detailDenoiseControlsV1Schema> => ({
   chromaStrength: controls.colorNoiseReduction / 100,
+  contrastProtection: controls.denoiseContrastProtection / 100,
+  detail: controls.denoiseDetail / 100,
   lumaStrength: controls.lumaNoiseReduction / 100,
+  naturalGrain: controls.denoiseNaturalGrain / 100,
+  shadowBias: controls.denoiseShadowBias / 100,
 });
 
 export const detailDenoiseSkipReasonV1Schema = z.enum([
   'disabled',
+  'dry_run',
   'preview_export_not_proven',
   'preview_not_wired',
   'runtime_not_available',
@@ -1574,6 +1587,10 @@ export const detailEffectsPatchV1Schema = z
     deblurEnabled: z.boolean().optional(),
     deblurSigmaPx: z.number().min(0.45).max(1.35).optional(),
     deblurStrength: z.number().min(0).max(100).optional(),
+    denoiseContrastProtection: z.number().min(0).max(100).optional(),
+    denoiseDetail: z.number().min(0).max(100).optional(),
+    denoiseNaturalGrain: z.number().min(0).max(100).optional(),
+    denoiseShadowBias: z.number().min(-100).max(100).optional(),
     dehaze: z.number().min(-100).max(100).optional(),
     dustSpotMinRadiusPx: z.number().int().min(1).max(12).optional(),
     dustSpotOverlayEnabled: z.boolean().optional(),

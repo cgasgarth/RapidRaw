@@ -1,11 +1,45 @@
 use image::Rgb32FImage;
 use rayon::prelude::*;
+use serde::Serialize;
+
+const DENOISE_IMPLEMENTATION_VERSION: u32 = 2;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DenoiseSourceClass {
+    BayerRaw,
+    EncodedRgb,
+    LinearRaw,
+    XTransRaw,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoiseBandEstimates {
+    pub highlights: f32,
+    pub midtones: f32,
+    pub shadows: f32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoiseProfilePlanV1 {
+    pub confidence: f32,
+    pub implementation_version: u32,
+    pub measured_noise_by_exposure_band: NoiseBandEstimates,
+    pub sample_count: u32,
+    pub source_class: DenoiseSourceClass,
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct DenoiseCpuReferenceSettings {
     pub luma_strength: f32,
     pub chroma_strength: f32,
     pub edge_threshold: f32,
+    pub contrast_protection: f32,
+    pub detail: f32,
+    pub natural_grain: f32,
+    pub shadow_bias: f32,
 }
 
 impl DenoiseCpuReferenceSettings {
@@ -15,6 +49,10 @@ impl DenoiseCpuReferenceSettings {
             luma_strength: strength * 0.32,
             chroma_strength: strength * 0.52,
             edge_threshold: 0.018 + (1.0 - strength) * 0.045,
+            contrast_protection: 0.5,
+            detail: 0.5,
+            natural_grain: 0.0,
+            shadow_bias: 0.0,
         }
     }
 }
@@ -26,9 +64,102 @@ struct YcPixel {
     cr: f32,
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+struct NoiseAccumulator {
+    count: u32,
+    residual_sum_sq: f64,
+}
+
+impl NoiseAccumulator {
+    fn add(&mut self, residual: f32) {
+        self.count = self.count.saturating_add(1);
+        self.residual_sum_sq += f64::from(residual * residual);
+    }
+
+    fn sigma(self, fallback: f32) -> f32 {
+        if self.count == 0 {
+            return fallback;
+        }
+        (self.residual_sum_sq / f64::from(self.count)).sqrt() as f32
+    }
+}
+
+pub fn analyze_noise_profile(
+    image: &Rgb32FImage,
+    source_class: DenoiseSourceClass,
+) -> NoiseProfilePlanV1 {
+    let width = image.width() as usize;
+    let height = image.height() as usize;
+    if width < 3 || height < 3 {
+        return NoiseProfilePlanV1 {
+            confidence: 0.0,
+            implementation_version: DENOISE_IMPLEMENTATION_VERSION,
+            measured_noise_by_exposure_band: NoiseBandEstimates {
+                highlights: 0.01,
+                midtones: 0.012,
+                shadows: 0.018,
+            },
+            sample_count: 0,
+            source_class,
+        };
+    }
+
+    let source = image
+        .pixels()
+        .map(|pixel| rgb_to_yc(pixel[0], pixel[1], pixel[2]))
+        .collect::<Vec<_>>();
+    let mut bands = [NoiseAccumulator::default(); 3];
+    for y in 1..height - 1 {
+        for x in 1..width - 1 {
+            let index = y * width + x;
+            let center = source[index].y;
+            let left = source[index - 1].y;
+            let right = source[index + 1].y;
+            let top = source[index - width].y;
+            let bottom = source[index + width].y;
+            let gradient = (right - left).abs().max((bottom - top).abs());
+            if gradient > 0.035 {
+                continue;
+            }
+            let local_mean = (left + right + top + bottom) * 0.25;
+            let band = if center < 0.18 {
+                0
+            } else if center < 0.65 {
+                1
+            } else {
+                2
+            };
+            bands[band].add(center - local_mean);
+        }
+    }
+
+    let sample_count = bands.iter().map(|band| band.count).sum::<u32>();
+    let target_samples = ((width * height) as f32 * 0.08).max(32.0);
+    NoiseProfilePlanV1 {
+        confidence: (sample_count as f32 / target_samples).clamp(0.0, 1.0),
+        implementation_version: DENOISE_IMPLEMENTATION_VERSION,
+        measured_noise_by_exposure_band: NoiseBandEstimates {
+            highlights: bands[2].sigma(0.01),
+            midtones: bands[1].sigma(0.012),
+            shadows: bands[0].sigma(0.018),
+        },
+        sample_count,
+        source_class,
+    }
+}
+
 pub fn apply_cpu_reference_denoise(
     image: &Rgb32FImage,
     settings: DenoiseCpuReferenceSettings,
+) -> Rgb32FImage {
+    let profile = analyze_noise_profile(image, DenoiseSourceClass::EncodedRgb);
+    apply_cpu_reference_denoise_with_profile(image, settings, &profile)
+}
+
+pub fn apply_cpu_reference_denoise_with_profile(
+    image: &Rgb32FImage,
+    settings: DenoiseCpuReferenceSettings,
+    profile: &NoiseProfilePlanV1,
 ) -> Rgb32FImage {
     let width = image.width() as usize;
     let height = image.height() as usize;
@@ -52,18 +183,38 @@ pub fn apply_cpu_reference_denoise(
             let x = index % width;
             let y = index / width;
             let center = source[index];
-            let filtered = edge_aware_average(&source, width, height, x, y, settings);
-            let edge_guard =
-                local_edge_guard(&source, width, height, x, y, settings.edge_threshold);
-            let luma_mix = settings.luma_strength * (1.0 - 0.85 * edge_guard);
-            let chroma_mix = settings.chroma_strength * (1.0 - 0.55 * edge_guard);
-            let out_y = lerp(center.y, filtered.y, luma_mix);
+            let noise_sigma = noise_sigma_for_luma(profile, center.y);
+            let filtered = edge_aware_average(&source, width, height, x, y, settings, noise_sigma);
+            let edge_guard = local_edge_guard(
+                &source,
+                width,
+                height,
+                x,
+                y,
+                settings.edge_threshold.max(noise_sigma * 2.5),
+            );
+            let detail_protection = (0.35 + settings.detail.clamp(0.0, 1.0) * 0.6)
+                * settings.contrast_protection.clamp(0.0, 1.0);
+            let shadow_weight = 1.0
+                + settings.shadow_bias.clamp(-1.0, 1.0) * (1.0 - smoothstep(0.08, 0.55, center.y));
+            let luma_mix =
+                (settings.luma_strength * shadow_weight * (1.0 - detail_protection * edge_guard))
+                    .clamp(0.0, 1.0);
+            let chroma_mix =
+                (settings.chroma_strength * shadow_weight * 0.6 * (1.0 - 0.55 * edge_guard))
+                    .clamp(0.0, 1.0);
+            let denoised_y = lerp(center.y, filtered.y, luma_mix);
+            let out_y = lerp(
+                denoised_y,
+                center.y,
+                settings.natural_grain.clamp(0.0, 1.0) * settings.luma_strength.clamp(0.0, 1.0),
+            );
             let out_cb = lerp(center.cb, filtered.cb, chroma_mix);
             let out_cr = lerp(center.cr, filtered.cr, chroma_mix);
             let (r, g, b) = yc_to_rgb(out_y, out_cb, out_cr);
-            out[0] = r.clamp(0.0, 1.0);
-            out[1] = g.clamp(0.0, 1.0);
-            out[2] = b.clamp(0.0, 1.0);
+            out[0] = r;
+            out[1] = g;
+            out[2] = b;
         });
 
     Rgb32FImage::from_raw(image.width(), image.height(), output).unwrap_or_else(|| image.clone())
@@ -76,10 +227,11 @@ fn edge_aware_average(
     x: usize,
     y: usize,
     settings: DenoiseCpuReferenceSettings,
+    noise_sigma: f32,
 ) -> YcPixel {
     let center = source[y * width + x];
     let radius = 2_i32;
-    let sigma_y = settings.edge_threshold.max(0.006);
+    let sigma_y = settings.edge_threshold.max(noise_sigma * 2.5).max(0.006);
     let inv_two_sigma_y_sq = 1.0 / (2.0 * sigma_y * sigma_y);
     let mut y_sum = 0.0;
     let mut cb_sum = 0.0;
@@ -119,6 +271,21 @@ fn edge_aware_average(
         cb: cb_sum * inv,
         cr: cr_sum * inv,
     }
+}
+
+fn noise_sigma_for_luma(profile: &NoiseProfilePlanV1, luma: f32) -> f32 {
+    if luma < 0.18 {
+        profile.measured_noise_by_exposure_band.shadows
+    } else if luma < 0.65 {
+        profile.measured_noise_by_exposure_band.midtones
+    } else {
+        profile.measured_noise_by_exposure_band.highlights
+    }
+}
+
+fn smoothstep(edge0: f32, edge1: f32, value: f32) -> f32 {
+    let t = ((value - edge0) / (edge1 - edge0)).clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
 }
 
 fn local_edge_guard(
@@ -527,5 +694,100 @@ mod tests {
         let output =
             apply_cpu_reference_denoise(&image, DenoiseCpuReferenceSettings::from_intensity(0.0));
         assert_eq!(image.as_raw(), output.as_raw());
+    }
+
+    #[test]
+    fn noise_profile_is_deterministic_and_measures_noisier_shadows() {
+        let image = Rgb32FImage::from_fn(24, 12, |x, y| {
+            let shadow = x < 12;
+            let base = if shadow { 0.12 } else { 0.78 };
+            let amplitude = if shadow { 0.025 } else { 0.004 };
+            let noise = (((x * 7 + y * 11) % 9) as f32 - 4.0) * amplitude;
+            Rgb([base + noise, base - noise * 0.4, base + noise * 0.25])
+        });
+
+        let first = analyze_noise_profile(&image, DenoiseSourceClass::BayerRaw);
+        let second = analyze_noise_profile(&image, DenoiseSourceClass::BayerRaw);
+
+        assert_eq!(first, second);
+        assert_eq!(first.implementation_version, 2);
+        assert!(first.confidence > 0.0);
+        assert!(
+            first.measured_noise_by_exposure_band.shadows
+                > first.measured_noise_by_exposure_band.highlights
+        );
+    }
+
+    #[test]
+    fn scene_linear_negative_and_over_range_values_are_not_clamped() {
+        let image = Rgb32FImage::from_pixel(5, 5, Rgb([1.25, -0.2, 0.55]));
+        let output =
+            apply_cpu_reference_denoise(&image, DenoiseCpuReferenceSettings::from_intensity(0.8));
+        let pixel = output.get_pixel(2, 2);
+
+        assert!(pixel[0] > 1.0);
+        assert!(pixel[1] < 0.0);
+        assert!(pixel.0.iter().all(|channel| channel.is_finite()));
+    }
+
+    #[test]
+    fn natural_grain_restores_luma_residual_without_restoring_chroma_strength() {
+        let image = Rgb32FImage::from_fn(16, 16, |x, y| {
+            let base = 0.35 + x as f32 * 0.008;
+            let luma_noise = (((x * 13 + y * 5) % 7) as f32 - 3.0) * 0.012;
+            let chroma_noise = (((x * 3 + y * 17) % 11) as f32 - 5.0) * 0.008;
+            Rgb([
+                base + luma_noise + chroma_noise,
+                base + luma_noise,
+                base + luma_noise - chroma_noise,
+            ])
+        });
+        let smooth = DenoiseCpuReferenceSettings {
+            luma_strength: 0.8,
+            chroma_strength: 0.8,
+            edge_threshold: 0.03,
+            contrast_protection: 0.5,
+            detail: 0.5,
+            natural_grain: 0.0,
+            shadow_bias: 0.0,
+        };
+        let restored = DenoiseCpuReferenceSettings {
+            natural_grain: 0.8,
+            ..smooth
+        };
+        let profile = analyze_noise_profile(&image, DenoiseSourceClass::EncodedRgb);
+        let smooth_output = apply_cpu_reference_denoise_with_profile(&image, smooth, &profile);
+        let restored_output = apply_cpu_reference_denoise_with_profile(&image, restored, &profile);
+        let smooth_luma_delta = image
+            .pixels()
+            .zip(smooth_output.pixels())
+            .map(|(source, output)| {
+                (rgb_to_yc(source[0], source[1], source[2]).y
+                    - rgb_to_yc(output[0], output[1], output[2]).y)
+                    .abs()
+            })
+            .sum::<f32>();
+        let restored_luma_delta = image
+            .pixels()
+            .zip(restored_output.pixels())
+            .map(|(source, output)| {
+                (rgb_to_yc(source[0], source[1], source[2]).y
+                    - rgb_to_yc(output[0], output[1], output[2]).y)
+                    .abs()
+            })
+            .sum::<f32>();
+        let output_chroma_delta = smooth_output
+            .pixels()
+            .zip(restored_output.pixels())
+            .map(|(smooth_pixel, restored_pixel)| {
+                let smooth_yc = rgb_to_yc(smooth_pixel[0], smooth_pixel[1], smooth_pixel[2]);
+                let restored_yc =
+                    rgb_to_yc(restored_pixel[0], restored_pixel[1], restored_pixel[2]);
+                (smooth_yc.cb - restored_yc.cb).abs() + (smooth_yc.cr - restored_yc.cr).abs()
+            })
+            .sum::<f32>();
+
+        assert!(restored_luma_delta < smooth_luma_delta * 0.5);
+        assert!(output_chroma_delta < 1e-4);
     }
 }
