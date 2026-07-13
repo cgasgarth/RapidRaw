@@ -5,6 +5,7 @@ pub(crate) mod image_codecs;
 pub(crate) mod image_loader;
 pub(crate) mod image_open_session;
 pub(crate) mod patch_assets;
+pub(crate) mod reference_source_identity;
 pub(crate) mod smart_preview_cache;
 pub(crate) mod source_revision;
 pub(crate) mod thumbnail_resources;

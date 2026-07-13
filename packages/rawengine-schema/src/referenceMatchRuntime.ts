@@ -1,6 +1,19 @@
 import { z } from 'zod';
 
 const fingerprintSchema = z.string().regex(/^fnv1a64:[0-9a-f]{16}$/);
+const sourceRevisionSchema = z.string().regex(/^source-revision-v1:[0-9a-f]{64}$/);
+
+export const referencePhysicalSourceIdentityV1Schema = z
+  .object({
+    available: z.boolean(),
+    sourceRevision: sourceRevisionSchema.nullable(),
+  })
+  .strict()
+  .superRefine((identity, context) => {
+    if (identity.available !== (identity.sourceRevision !== null)) {
+      context.addIssue({ code: 'custom', message: 'Available sources require a source revision.' });
+    }
+  });
 
 export const referenceMatchModeV1Schema = z.enum(['normalize', 'match-look']);
 export const referenceMatchGroupV1Schema = z.enum(['tone', 'color', 'presence']);
@@ -12,6 +25,7 @@ export const referenceSourceV1Schema = z
     proofFingerprint: fingerprintSchema,
     role: z.enum(['creative', 'technical']),
     sourceFingerprint: fingerprintSchema,
+    sourceRevision: sourceRevisionSchema,
     viewFingerprint: fingerprintSchema,
     weight: z.number().positive().max(10),
   })

@@ -119,6 +119,28 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
     source: { kind: 'reference', label: 'reference.ARW' },
   });
 
+  expect(container.querySelector<HTMLButtonElement>('[data-testid="reference-match-propose"]')?.disabled).toBe(true);
+  await act(async () => {
+    useEditorStore
+      .getState()
+      .setReferenceMatchReferences((current) =>
+        current.map((reference) => ({ ...reference, availability: 'replaced' })),
+      );
+    await flushPromises();
+  });
+  expect(container.querySelector('[data-testid="reference-match-availability"]')?.textContent).toContain(
+    'excluded from matching',
+  );
+  expect(container.querySelector<HTMLButtonElement>('[data-testid="reference-match-normalize"]')?.disabled).toBe(true);
+  await act(async () => {
+    useEditorStore
+      .getState()
+      .setReferenceMatchReferences((current) =>
+        current.map((reference) => ({ ...reference, availability: 'available' })),
+      );
+    await flushPromises();
+  });
+
   const historyBeforeProposal = useEditorStore.getState().historyIndex;
   await click(container, '[data-testid="reference-match-propose"]');
   expect(container.querySelector('[data-testid="reference-match-proposal"]')?.textContent).toContain(

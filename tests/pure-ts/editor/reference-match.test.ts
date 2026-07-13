@@ -12,7 +12,7 @@ import {
   createReferenceMatchProposal,
   fingerprintReferenceMatchValue,
   getReferenceMatchLayerCompatibility,
-  mergeReferenceAvailability,
+  mergeReferenceSourceIdentities,
   type ReferenceHistogramSummary,
   type ReferenceMatchReference,
   resolveReferenceMatchRenderAdjustments,
@@ -52,6 +52,7 @@ const reference = (
   renderUrl: `blob:${id}:render`,
   role: 'creative',
   sourceFingerprint: fingerprintReferenceMatchValue(id),
+  sourceRevision: `source-revision-v1:${id.charCodeAt(0).toString(16).padStart(2, '0').repeat(32)}`,
   summary: histogramSummary,
   viewFingerprint: `fnv1a64:${'4'.repeat(16)}`,
   weight,
@@ -124,12 +125,26 @@ describe('color-managed reference matching', () => {
     ]);
   });
 
-  test('updates exact source availability without discarding the cached reference artifact identity', () => {
+  test('detects same-path source replacement without discarding the cached reference artifact identity', () => {
     const source = reference('offline', 1, summary());
-    const [missing] = mergeReferenceAvailability([source], new Map([[source.path, false]]));
+    const [replaced] = mergeReferenceSourceIdentities(
+      [source],
+      new Map([[source.path, { available: true, sourceRevision: `source-revision-v1:${'f'.repeat(64)}` }]]),
+    );
+    expect(replaced).toMatchObject({ availability: 'replaced', id: source.id, renderUrl: source.renderUrl });
+    const [missing] = mergeReferenceSourceIdentities(
+      [source],
+      new Map([[source.path, { available: false, sourceRevision: null }]]),
+    );
     expect(missing).toMatchObject({ availability: 'missing', id: source.id, renderUrl: source.renderUrl });
     if (!missing) throw new Error('Expected reference');
-    expect(mergeReferenceAvailability([missing], new Map([[source.path, null]]))[0]?.availability).toBe('unknown');
+    expect(mergeReferenceSourceIdentities([missing], new Map([[source.path, null]]))[0]?.availability).toBe('unknown');
+    expect(
+      mergeReferenceSourceIdentities(
+        [source],
+        new Map([[source.path, { available: true, sourceRevision: source.sourceRevision }]]),
+      )[0]?.availability,
+    ).toBe('available');
   });
 
   test('keeps Normalize technical and exposes a broader allow-listed Match Look proposal', () => {

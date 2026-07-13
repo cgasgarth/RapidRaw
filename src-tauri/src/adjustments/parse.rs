@@ -135,6 +135,10 @@ fn parse_channel_mixer_settings(js_channel_mixer: &JsonValue) -> ChannelMixerSet
 }
 
 fn parse_black_white_mixer_settings(js_black_white_mixer: &JsonValue) -> BlackWhiteMixerSettings {
+    let process = match js_black_white_mixer["process"].as_str() {
+        Some("neutral_panchromatic_v1") => crate::monochrome::NEUTRAL_PANCHROMATIC_V1,
+        _ => crate::monochrome::LEGACY_FIXED_BAND_V1,
+    };
     BlackWhiteMixerSettings {
         reds: js_black_white_mixer["weights"]["reds"]
             .as_f64()
@@ -169,8 +173,8 @@ fn parse_black_white_mixer_settings(js_black_white_mixer: &JsonValue) -> BlackWh
             .unwrap_or(0.0) as f32
             / 100.0,
         enabled: u32::from(js_black_white_mixer["enabled"].as_bool().unwrap_or(false)),
-        _pad1: 0,
-        _pad2: 0,
+        process,
+        implementation_version: crate::monochrome::MONOCHROME_IMPLEMENTATION_VERSION_V1,
         _pad3: 0,
     }
 }
