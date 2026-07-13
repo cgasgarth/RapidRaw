@@ -118,10 +118,17 @@ describe('performance lab runner', () => {
 
   test('excludes warmups, retains raw metrics, and proves every measured run', async () => {
     const runs: number[] = [];
+    const lifecycle: string[] = [];
     const executable = scenario([99, 10, 11, 12]);
     const receipt = await runPerformanceScenario({
       scenario: {
         ...executable,
+        async afterAll() {
+          lifecycle.push('after');
+        },
+        async beforeAll() {
+          lifecycle.push('before');
+        },
         async runSample(run) {
           runs.push(run);
           return await executable.runSample(run);
@@ -131,6 +138,7 @@ describe('performance lab runner', () => {
       now: clock(),
     });
     expect(runs).toEqual([0, 1, 2, 3]);
+    expect(lifecycle).toEqual(['before', 'after']);
     expect(receipt.status).toBe('pass');
     expect(receipt.correctness).toEqual({ assertions: 3, passed: true });
     expect(receipt.samples.filter(({ metric }) => metric === 'latencyMs').map(({ value }) => value)).toEqual([
@@ -176,6 +184,20 @@ describe('performance lab runner', () => {
       now: clock(),
     });
     expect(traced).toMatchObject({ status: 'invalid', invalidReason: expect.stringContaining('exceeds its sample') });
+    const cleanupFailure = await runPerformanceScenario({
+      scenario: {
+        ...scenario([0, 10]),
+        async afterAll() {
+          throw new Error('cleanup proof');
+        },
+      },
+      identity,
+      now: clock(),
+    });
+    expect(cleanupFailure).toMatchObject({
+      status: 'invalid',
+      invalidReason: expect.stringContaining('Scenario cleanup failed: cleanup proof'),
+    });
   });
 
   test('compares only compatible identities and produces a regression result', async () => {

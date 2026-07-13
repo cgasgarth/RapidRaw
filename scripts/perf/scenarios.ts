@@ -5,6 +5,9 @@ import { resolve } from 'node:path';
 import { z } from 'zod';
 import { publishAdjustmentSnapshot } from '../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../src/utils/adjustments';
+import { requestQaDaemon } from '../qa/daemon-client';
+import { type QaDaemonMetrics, qaDaemonMetricsSchema } from '../qa/daemon-model';
+import { readLiveDaemonState } from '../qa/daemon-state';
 import type { PerformanceScenario } from './model';
 
 const DISPATCHES = 20_000;
@@ -97,6 +100,7 @@ const previewScheduling: PerformanceScenario = {
 };
 
 const qaReceiptSchema = z.object({
+  metrics: qaDaemonMetricsSchema,
   scenarios: z
     .array(
       z.object({
@@ -109,69 +113,174 @@ const qaReceiptSchema = z.object({
     .length(1),
 });
 
-const browserFixtureSources = ['../qa/scenarios.ts', '../../src/validation/browserTauriHarness.mts'].map((path) =>
-  readFileSync(resolve(import.meta.dir, path)),
-);
+const daemonHealthSchema = z.object({ metrics: qaDaemonMetricsSchema });
+const emptyDaemonMetrics = (): QaDaemonMetrics => ({
+  artifactBytes: 0,
+  browserStarts: 0,
+  browserStartsAvoided: 0,
+  configurationRestarts: 0,
+  contextsClosed: 0,
+  contextsCreated: 0,
+  jobs: 0,
+  leakedContexts: 0,
+  scenarioMs: 0,
+  serverStarts: 0,
+  serverStartsAvoided: 0,
+  sessionRecoveries: 0,
+  setupMs: 0,
+  sourceRefreshes: 0,
+  sourceReuses: 0,
+  worktreeWaitMs: 0,
+});
+const subtractDaemonMetrics = (current: QaDaemonMetrics, prior: QaDaemonMetrics): QaDaemonMetrics => ({
+  artifactBytes: Math.max(0, current.artifactBytes - prior.artifactBytes),
+  browserStarts: Math.max(0, current.browserStarts - prior.browserStarts),
+  browserStartsAvoided: Math.max(0, current.browserStartsAvoided - prior.browserStartsAvoided),
+  configurationRestarts: Math.max(0, current.configurationRestarts - prior.configurationRestarts),
+  contextsClosed: Math.max(0, current.contextsClosed - prior.contextsClosed),
+  contextsCreated: Math.max(0, current.contextsCreated - prior.contextsCreated),
+  jobs: Math.max(0, current.jobs - prior.jobs),
+  leakedContexts: Math.max(0, current.leakedContexts - prior.leakedContexts),
+  scenarioMs: Math.max(0, current.scenarioMs - prior.scenarioMs),
+  serverStarts: Math.max(0, current.serverStarts - prior.serverStarts),
+  serverStartsAvoided: Math.max(0, current.serverStartsAvoided - prior.serverStartsAvoided),
+  sessionRecoveries: Math.max(0, current.sessionRecoveries - prior.sessionRecoveries),
+  setupMs: Math.max(0, current.setupMs - prior.setupMs),
+  sourceRefreshes: Math.max(0, current.sourceRefreshes - prior.sourceRefreshes),
+  sourceReuses: Math.max(0, current.sourceReuses - prior.sourceReuses),
+  worktreeWaitMs: Math.max(0, current.worktreeWaitMs - prior.worktreeWaitMs),
+});
+
+const browserFixtureSources = [
+  '../qa/fixtures.ts',
+  '../qa/scenarios.ts',
+  '../../src/validation/browserTauriHarness.mts',
+].map((path) => readFileSync(resolve(import.meta.dir, path)));
 const browserFixtureDigest = (scenarioId: string) => {
   const hash = createHash('sha256').update(`browser-qa-fixture-v2:${scenarioId}\0`);
   for (const source of browserFixtureSources) hash.update(source).update('\0');
   return `sha256:${hash.digest('hex')}` as const;
 };
 
-const browserQaScenario = (id: string, qaScenarioId: string): PerformanceScenario => ({
-  id,
-  version: 1,
-  fixtureDigest: browserFixtureDigest(qaScenarioId),
-  cacheMode: 'cold',
-  warmupRuns: 1,
-  measuredRuns: 5,
-  budgets: { interactionMs: { absolute: 200, relative: 0.15 } },
-  maxRelativeMad: 0.35,
-  metricUnits: { harnessSetupMs: 'ms', interactionMs: 'ms', processStarts: 'count' },
-  async runSample() {
-    const started = performance.now();
-    const child = Bun.spawn(['bun', 'qa', 'run', '--scenario', qaScenarioId], {
-      cwd: process.cwd(),
-      stderr: 'pipe',
-      stdout: 'pipe',
-    });
-    const [stdout, stderr, exitCode] = await Promise.all([
-      new Response(child.stdout).text(),
-      new Response(child.stderr).text(),
-      child.exited,
-    ]);
-    if (exitCode !== 0) throw new Error(`${qaScenarioId} failed:\n${`${stdout}\n${stderr}`.trim().slice(-8_000)}`);
-    const receiptPath = stdout.match(/^receipt (.+)$/mu)?.[1];
-    if (receiptPath === undefined) throw new Error(`${qaScenarioId} did not emit a QA receipt path.`);
-    const receipt = qaReceiptSchema.parse(JSON.parse(await readFile(resolve(receiptPath), 'utf8')));
-    const result = receipt.scenarios[0];
-    if (result?.id !== qaScenarioId || result.status !== 'passed')
-      throw new Error(`${qaScenarioId} terminal correctness failed: ${result?.error ?? result?.status ?? 'missing'}`);
-    const elapsedMs = performance.now() - started;
-    return {
-      assertions: 3,
-      metrics: {
-        harnessSetupMs: Math.max(0, elapsedMs - result.durationMs),
-        interactionMs: result.durationMs,
-        processStarts: 2,
-      },
-      spans: [
-        {
-          source: 'runner',
-          stage: 'qa.harness-setup',
-          startOffsetMs: 0,
-          durationMs: Math.max(0, elapsedMs - result.durationMs),
+const browserQaScenario = (id: string, qaScenarioId: string): PerformanceScenario => {
+  const worktree = process.cwd();
+  let daemonProcess: ReturnType<typeof Bun.spawn> | undefined;
+  let startedDaemon = false;
+  let previousMetrics = emptyDaemonMetrics();
+  return {
+    id,
+    version: 1,
+    fixtureDigest: browserFixtureDigest(qaScenarioId),
+    cacheMode: 'cold',
+    warmupRuns: 1,
+    measuredRuns: 5,
+    budgets: { interactionMs: { absolute: 200, relative: 0.15 } },
+    maxRelativeMad: 0.35,
+    metricUnits: {
+      artifactBytes: 'bytes',
+      contextsClosed: 'count',
+      contextsCreated: 'count',
+      harnessSetupMs: 'ms',
+      interactionMs: 'ms',
+      leakedContexts: 'count',
+      processStarts: 'count',
+      processStartsAvoided: 'count',
+      runnerOverheadMs: 'ms',
+      sessionRecoveries: 'count',
+      sourceRefreshes: 'count',
+      sourceReuses: 'count',
+      worktreeWaitMs: 'ms',
+    },
+    async beforeAll() {
+      if ((await readLiveDaemonState(worktree)) === undefined) {
+        daemonProcess = Bun.spawn(['bun', 'scripts/qa/daemon.ts'], {
+          cwd: worktree,
+          stderr: 'ignore',
+          stdout: 'ignore',
+        });
+        startedDaemon = true;
+        for (let attempt = 0; attempt < 200 && (await readLiveDaemonState(worktree)) === undefined; attempt += 1)
+          await Bun.sleep(25);
+        if ((await readLiveDaemonState(worktree)) === undefined) throw new Error('Persistent QA daemon did not start.');
+      }
+      const health = await requestQaDaemon(worktree, { id: crypto.randomUUID(), method: 'health' });
+      if (!health.ok) throw new Error(health.error ?? 'Persistent QA daemon health failed.');
+      previousMetrics = daemonHealthSchema.parse(health.result).metrics;
+    },
+    async afterAll() {
+      if (!startedDaemon) return;
+      const shutdown = await requestQaDaemon(worktree, { id: crypto.randomUUID(), method: 'shutdown' });
+      if (!shutdown.ok) throw new Error(shutdown.error ?? 'Persistent QA daemon shutdown failed.');
+      if (daemonProcess !== undefined)
+        await Promise.race([
+          daemonProcess.exited,
+          Bun.sleep(15_000).then(() => {
+            throw new Error('Persistent QA daemon did not exit after shutdown.');
+          }),
+        ]);
+    },
+    async runSample() {
+      const started = performance.now();
+      const child = Bun.spawn(['bun', 'qa', 'run', '--persistent', '--scenario', qaScenarioId], {
+        cwd: process.cwd(),
+        stderr: 'pipe',
+        stdout: 'pipe',
+      });
+      const [stdout, stderr, exitCode] = await Promise.all([
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+        child.exited,
+      ]);
+      if (exitCode !== 0) throw new Error(`${qaScenarioId} failed:\n${`${stdout}\n${stderr}`.trim().slice(-8_000)}`);
+      const receiptPath = stdout.match(/^receipt (.+?)(?: starts=|$)/mu)?.[1];
+      if (receiptPath === undefined) throw new Error(`${qaScenarioId} did not emit a QA receipt path.`);
+      const receipt = qaReceiptSchema.parse(JSON.parse(await readFile(resolve(receiptPath), 'utf8')));
+      const result = receipt.scenarios[0];
+      if (result?.id !== qaScenarioId || result.status !== 'passed')
+        throw new Error(`${qaScenarioId} terminal correctness failed: ${result?.error ?? result?.status ?? 'missing'}`);
+      const elapsedMs = performance.now() - started;
+      const metrics = subtractDaemonMetrics(receipt.metrics, previousMetrics);
+      previousMetrics = receipt.metrics;
+      if (metrics.contextsCreated !== metrics.contextsClosed || metrics.leakedContexts !== 0)
+        throw new Error(
+          `${qaScenarioId} leaked browser contexts: ${metrics.contextsClosed}/${metrics.contextsCreated}, leaked=${metrics.leakedContexts}.`,
+        );
+      const harnessSetupMs = metrics.setupMs;
+      return {
+        assertions: 5,
+        metrics: {
+          artifactBytes: metrics.artifactBytes,
+          contextsClosed: metrics.contextsClosed,
+          contextsCreated: metrics.contextsCreated,
+          harnessSetupMs,
+          interactionMs: result.durationMs,
+          leakedContexts: metrics.leakedContexts,
+          processStarts: metrics.serverStarts + metrics.browserStarts,
+          processStartsAvoided: metrics.serverStartsAvoided + metrics.browserStartsAvoided,
+          runnerOverheadMs: Math.max(0, elapsedMs - result.durationMs - harnessSetupMs),
+          sessionRecoveries: metrics.sessionRecoveries,
+          sourceRefreshes: metrics.sourceRefreshes,
+          sourceReuses: metrics.sourceReuses,
+          worktreeWaitMs: metrics.worktreeWaitMs,
         },
-        {
-          source: 'qa-browser',
-          stage: qaScenarioId,
-          startOffsetMs: Math.max(0, elapsedMs - result.durationMs),
-          durationMs: result.durationMs,
-        },
-      ],
-    };
-  },
-});
+        spans: [
+          {
+            source: 'runner',
+            stage: 'qa.harness-setup',
+            startOffsetMs: 0,
+            durationMs: harnessSetupMs,
+          },
+          {
+            source: 'qa-browser',
+            stage: qaScenarioId,
+            startOffsetMs: harnessSetupMs,
+            durationMs: result.durationMs,
+          },
+        ],
+      };
+    },
+  };
+};
 
 export const performanceScenarios: readonly PerformanceScenario[] = [
   previewScheduling,

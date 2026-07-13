@@ -67,7 +67,9 @@ export async function runPerformanceScenario(options: {
   const samples: MetricSample[] = [];
   const spans: PerformanceSpan[] = [];
   let assertions = 0;
+  let receipt: PerformanceRunReceipt;
   try {
+    await scenario.beforeAll?.();
     for (let run = 0; run < scenario.warmupRuns + scenario.measuredRuns; run += 1) {
       const sampleStarted = performance.now();
       const result = await scenario.runSample(run);
@@ -124,13 +126,13 @@ export async function runPerformanceScenario(options: {
     }
     const comparison =
       options.baseline === undefined ? [] : comparePerformanceReceipts(options.baseline, draft, scenario.budgets);
-    return performanceRunReceiptSchema.parse({
+    receipt = performanceRunReceiptSchema.parse({
       ...draft,
       comparison,
       status: comparison.some(({ regressed }) => regressed) ? 'regression' : 'pass',
     });
   } catch (error) {
-    return performanceRunReceiptSchema.parse({
+    receipt = performanceRunReceiptSchema.parse({
       schemaVersion: 1,
       runId,
       scenario: {
@@ -152,6 +154,21 @@ export async function runPerformanceScenario(options: {
       rerunCommand,
     });
   }
+  try {
+    await scenario.afterAll?.();
+  } catch (error) {
+    receipt = performanceRunReceiptSchema.parse({
+      ...receipt,
+      correctness: { assertions, passed: false },
+      status: 'invalid',
+      invalidReason: [
+        ...(receipt.status === 'invalid' && receipt.invalidReason !== undefined ? [receipt.invalidReason] : []),
+        `Scenario cleanup failed: ${error instanceof Error ? error.message : String(error)}`,
+      ].join('; '),
+      endedAt: now().toISOString(),
+    });
+  }
+  return receipt;
 }
 
 export const bisectExitCode = (status: PerformanceRunReceipt['status']): 0 | 1 | 125 =>

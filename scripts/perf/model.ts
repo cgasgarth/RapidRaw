@@ -133,6 +133,8 @@ export interface PerformanceScenario {
   budgets: Readonly<Record<string, { absolute: number; relative: number }>>;
   maxRelativeMad: number;
   metricUnits: Readonly<Record<string, MetricSample['unit']>>;
+  beforeAll?(): Promise<void>;
+  afterAll?(): Promise<void>;
   runSample(run: number): Promise<{
     assertions: number;
     metrics: Readonly<Record<string, number>>;
