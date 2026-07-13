@@ -12,6 +12,13 @@ interface ManifestChunk {
 }
 
 const root = process.argv[2] ?? 'dist';
+const indexHtml = await readFile(join(root, 'index.html'), 'utf8');
+const startupEntryOffset = indexHtml.search(/<script[^>]+src="[^"]+"/u);
+if (startupEntryOffset < 0) throw new Error('startup module script missing from production index');
+const blockingPrefix = indexHtml.slice(0, startupEntryOffset);
+if (/<(?:link|script)[^>]+(?:href|src)="https?:\/\//iu.test(blockingPrefix)) {
+  throw new Error('startup document has a blocking remote dependency before its module entry');
+}
 const manifest = JSON.parse(await readFile(join(root, '.vite/manifest.json'), 'utf8')) as Record<string, ManifestChunk>;
 const entry = Object.values(manifest).find((chunk) => chunk.isEntry && chunk.src === 'index.html');
 if (!entry) throw new Error('startup entry missing from Vite manifest');

@@ -1,8 +1,9 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 #[cfg(test)]
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::AtomicU64;
 
 /// Target from process start through native shell visibility. The shell still
 /// remains usable if a host exceeds this budget; the trace makes the miss
@@ -222,6 +223,7 @@ pub struct StartupTraceSnapshot {
 
 #[derive(Clone)]
 pub struct StartupTrace {
+    idle_warm_armed: Arc<AtomicBool>,
     trace_id: String,
     started_at: Instant,
     phases: Arc<Mutex<Vec<StartupPhaseReceipt>>>,
@@ -251,6 +253,7 @@ impl StartupTrace {
             .and_then(|elapsed_ms| entry.checked_sub(Duration::from_millis(elapsed_ms)))
             .unwrap_or(entry);
         Self {
+            idle_warm_armed: Arc::new(AtomicBool::new(false)),
             trace_id: format!("startup:{}", Uuid::new_v4()),
             started_at,
             phases: Arc::new(Mutex::new(Vec::new())),
@@ -262,6 +265,7 @@ impl StartupTrace {
     #[cfg(test)]
     fn with_test_clock(test_elapsed_ms: Arc<AtomicU64>) -> Self {
         Self {
+            idle_warm_armed: Arc::new(AtomicBool::new(false)),
             trace_id: format!("startup:{}", Uuid::new_v4()),
             started_at: Instant::now(),
             phases: Arc::new(Mutex::new(Vec::new())),
@@ -271,6 +275,14 @@ impl StartupTrace {
 
     pub fn trace_id(&self) -> &str {
         &self.trace_id
+    }
+
+    pub fn arm_idle_warm_after(&self, phase: FrontendStartupPhase) -> bool {
+        phase == FrontendStartupPhase::Interactive
+            && self
+                .idle_warm_armed
+                .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+                .is_ok()
     }
 
     pub fn mark(&self, phase: NativeStartupPhase, status: &'static str, detail: Option<String>) {
@@ -740,6 +752,15 @@ mod tests {
         assert_eq!(warming.state, super::InitializationState::Warming);
         service.finish(&Ok(()));
         assert_eq!(service.snapshot().state, super::InitializationState::Ready);
+    }
+
+    #[test]
+    fn idle_warm_arms_once_only_after_interactive_receipt() {
+        let trace = StartupTrace::new();
+        assert!(!trace.arm_idle_warm_after(FrontendStartupPhase::ShellVisible));
+        assert!(!trace.arm_idle_warm_after(FrontendStartupPhase::LibraryReady));
+        assert!(trace.arm_idle_warm_after(FrontendStartupPhase::Interactive));
+        assert!(!trace.arm_idle_warm_after(FrontendStartupPhase::Interactive));
     }
 
     #[test]

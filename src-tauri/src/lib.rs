@@ -2994,6 +2994,18 @@ fn record_frontend_startup_phase(
         &status,
         detail,
         |_snapshot| {
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
+            if state.startup_trace.arm_idle_warm_after(phase) {
+                let idle_services = _app.clone();
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(Duration::from_millis(1_500)).await;
+                    request_lens_initialization(
+                        idle_services.clone(),
+                        InitializationPriority::IdleWarm,
+                    );
+                    request_gpu_initialization(idle_services, InitializationPriority::IdleWarm);
+                });
+            }
             #[cfg(feature = "validation-harness")]
             if phase == FrontendStartupPhase::Interactive
                 && std::env::var("RAWENGINE_STARTUP_BENCHMARK_EDITOR_DEMAND").as_deref() == Ok("1")
@@ -3225,18 +3237,6 @@ pub fn run() {
                     "ok",
                     Some("webview-bootstrap-chrome".to_string()),
                 );
-
-                // GPU, Lensfun, catalog, and optional services warm only after
-                // the bootstrap WebView shell has been exposed.
-                let idle_services = app.handle().clone();
-                tauri::async_runtime::spawn(async move {
-                    tokio::time::sleep(Duration::from_millis(1_500)).await;
-                    request_lens_initialization(
-                        idle_services.clone(),
-                        InitializationPriority::IdleWarm,
-                    );
-                    request_gpu_initialization(idle_services, InitializationPriority::IdleWarm);
-                });
 
                 preview_worker::start_preview_worker(app.handle().clone());
                 start_analytics_worker(app.handle().clone());
