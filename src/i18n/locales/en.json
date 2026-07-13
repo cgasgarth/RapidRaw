@@ -701,6 +701,7 @@
         "newLayerDestination": "New layer",
         "normalize": "Normalize",
         "replacedCachedReference": "Source replaced · cached preview excluded from matching",
+        "replaceReference": "Replace with current image",
         "residualSummary": "Residual {{before}} → {{after}} · profile, WB, geometry and detail remain unchanged",
         "revealReferenceInLibrary": "Reveal in library",
         "role": "Role",
