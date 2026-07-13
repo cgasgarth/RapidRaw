@@ -51,6 +51,7 @@ dependencies = [
  "rand 0.10.1",
  "rapidraw-ai",
  "rapidraw-codecs",
+ "rapidraw-color-reference",
  "rapidraw-computational",
  "rapidraw-types",
  "rawler",
@@ -5186,6 +5187,16 @@ dependencies = [
  "rgb",
  "serde_json",
  "webp",
+]
+
+[[package]]
+name = "rapidraw-color-reference"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "tempfile",
 ]
 
 [[package]]

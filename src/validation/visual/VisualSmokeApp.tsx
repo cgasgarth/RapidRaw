@@ -309,6 +309,7 @@ const adjustmentsPanelRetuneRawImage: SelectedImage = {
       warningCodes: [],
     },
     processingProfile: 'balanced',
+    stageSamples: [],
     runtime: {
       cacheHit: true,
       decodeElapsedMs: 12,

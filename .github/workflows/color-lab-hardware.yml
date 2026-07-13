@@ -1,0 +1,59 @@
+name: Color Lab Hardware Validation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  color-lab-hardware:
+    name: 'color: hardware-bound reference lab'
+    runs-on: macos-14
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+        with:
+          rustflags: ''
+          rust-src-dir: src-tauri
+
+      - name: Measure native backend identity and differential tolerances
+        env:
+          RAWENGINE_COLOR_BACKEND_PROOF_PATH: artifacts/color-lab-hardware/backend-differential.json
+        run: >-
+          cargo test --locked --manifest-path src-tauri/Cargo.toml --lib
+          --features validation-harness
+          color::backend_differential_tests::native_cpu_wgpu_backend_differential_matches_independent_f64_oracle
+          -- --exact --nocapture
+
+      - name: Execute color lab with measured hardware identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          backend="$(jq -r '.backend' artifacts/color-lab-hardware/backend-differential.json)"
+          vendor="$(jq -r '.vendor | tostring' artifacts/color-lab-hardware/backend-differential.json)"
+          device="$(jq -r '.adapter_name' artifacts/color-lab-hardware/backend-differential.json)"
+          driver="$(jq -r '[.driver, .driver_info] | join(":")' artifacts/color-lab-hardware/backend-differential.json)"
+          graph_fingerprint="$(git ls-files -s src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/src/color src-tauri/src/raw src-tauri/src/render src-tauri/src/export src-tauri/crates/rapidraw-color-reference | shasum -a 256 | cut -d ' ' -f 1)"
+          cargo run --locked --manifest-path src-tauri/Cargo.toml -p rapidraw-color-reference --bin rapidraw-color-lab -- \
+            run --hardware --no-cache --graph "$graph_fingerprint" --output artifacts/color-lab-hardware \
+            --backend "$backend" --vendor "$vendor" --device "$device" --driver "$driver"
+          jq -e \
+            --arg graph "$graph_fingerprint" \
+            --arg backend "$backend" \
+            --arg vendor "$vendor" \
+            --arg device "$device" \
+            --arg driver "$driver" \
+            '.contract_id == "rapidraw.color-lab.v1" and .tier == "hardware" and .passed == true and .cache == "bypassed" and .cache_identity.graph_fingerprint == $graph and .cache_identity.hardware == {backend: $backend, vendor: $vendor, device: $device, driver: $driver}' \
+            artifacts/color-lab-hardware/color-lab-report.json
+
+      - name: Upload hardware-bound color lab reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: color-lab-hardware-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/color-lab-hardware/**
+          retention-days: 30
+          if-no-files-found: error

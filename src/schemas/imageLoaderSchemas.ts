@@ -194,6 +194,19 @@ export const rawDevelopmentReportSchema = z
       .strict()
       .optional(),
     processingProfile: rawProcessingProfileSchema,
+    stageSamples: z
+      .array(
+        z
+          .object({
+            domain: z.string().trim().min(1),
+            elapsedMs: z.number().nonnegative(),
+            nodeId: z.string().trim().min(1),
+            samples: z.array(z.tuple([z.number(), z.number(), z.number(), z.number()])),
+            version: z.number().int().positive(),
+          })
+          .strict(),
+      )
+      .default([]),
     runtime: z
       .object({
         cacheHit: z.boolean(),

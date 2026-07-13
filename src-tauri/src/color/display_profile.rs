@@ -203,7 +203,7 @@ pub(crate) fn display_preview_transform_snapshot_from_capture(
         Ok((lut, bytes))
     });
     let (lut, icc_bytes) = resolved.unwrap_or_else(|reason| {
-        let bytes = moxcms::ColorProfile::new_srgb()
+        let bytes = crate::color::icc_profiles::standardized_srgb_profile()
             .encode()
             .expect("built-in sRGB profile must encode");
         (fallback_display_lut(size, reason), bytes)

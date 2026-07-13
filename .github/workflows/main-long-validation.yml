@@ -127,6 +127,56 @@ jobs:
           cargo audit --manifest-path src-tauri/Cargo.toml --ignore RUSTSEC-2024-0429 --ignore RUSTSEC-2026-0194 --ignore RUSTSEC-2026-0195
           cargo deny --manifest-path src-tauri/Cargo.toml check licenses
 
+  color-lab-reference:
+    name: 'color: standards reference lab'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+        with:
+          rustflags: ''
+          rust-src-dir: src-tauri
+      - name: Compute color graph identity
+        id: color-graph
+        shell: bash
+        run: |
+          set -euo pipefail
+          graph_fingerprint="$(git ls-files -s src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/src/color src-tauri/src/raw src-tauri/src/render src-tauri/src/export src-tauri/crates/rapidraw-color-reference | shasum -a 256 | cut -d ' ' -f 1)"
+          echo "graph_fingerprint=$graph_fingerprint" >> "$GITHUB_OUTPUT"
+      - name: Restore content-addressed color lab cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/color-lab-cache
+          key: color-lab-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.color-graph.outputs.graph_fingerprint }}
+      - name: Execute standards reference lab
+        shell: bash
+        env:
+          GRAPH_FINGERPRINT: ${{ steps.color-graph.outputs.graph_fingerprint }}
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            cargo run --locked --manifest-path src-tauri/Cargo.toml -p rapidraw-color-reference --bin rapidraw-color-lab -- \
+              run --affected --graph "$GRAPH_FINGERPRINT" --output artifacts/color-lab --cache "$RUNNER_TEMP/color-lab-cache"
+            jq -e --arg graph "$GRAPH_FINGERPRINT" \
+              '.contract_id == "rapidraw.color-lab.v1" and .tier == "fast" and .passed == true and (.cache == "miss" or .cache == "hit") and .cache_identity.graph_fingerprint == $graph and .cache_identity.hardware.backend == "reference-cpu"' \
+              artifacts/color-lab/color-lab-report.json
+          else
+            cargo run --locked --manifest-path src-tauri/Cargo.toml -p rapidraw-color-reference --bin rapidraw-color-lab -- \
+              run --full --no-cache --graph "$GRAPH_FINGERPRINT" --output artifacts/color-lab
+            jq -e --arg graph "$GRAPH_FINGERPRINT" \
+              '.contract_id == "rapidraw.color-lab.v1" and .tier == "full" and .passed == true and .cache == "bypassed" and .cache_identity.graph_fingerprint == $graph' \
+              artifacts/color-lab/color-lab-report.json
+          fi
+      - name: Upload color lab reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: color-lab-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/color-lab/**
+          retention-days: 30
+          if-no-files-found: error
+
   rust-clippy:
     name: 'rust: clippy baseline Linux'
     runs-on: ubuntu-latest

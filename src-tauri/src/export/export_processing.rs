@@ -1255,6 +1255,16 @@ fn write_final_output_bytes(
     write_final_output_bytes_observed(output_path, bytes, cancellation, None)
 }
 
+#[cfg(test)]
+pub(crate) fn commit_color_conformance_bytes(
+    output_path: &Path,
+    bytes: &[u8],
+) -> Result<(), String> {
+    write_final_output_bytes(output_path, bytes, None)?
+        .ok_or_else(|| "color_conformance_commit_cancelled".to_string())?;
+    Ok(())
+}
+
 fn write_final_output_bytes_observed(
     output_path: &Path,
     bytes: &[u8],
@@ -4517,6 +4527,7 @@ mod tests {
             demosaic_path: RawDemosaicPath::BayerHq,
             processing_profile: crate::raw_processing::RawProcessingProfile::Maximum,
             input_transform: None,
+            stage_samples: Vec::new(),
             highlight_reconstruction:
                 crate::highlight_reconstruction::HighlightReconstructionReportV2::default(),
             runtime: None,
