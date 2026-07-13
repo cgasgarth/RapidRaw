@@ -2,7 +2,7 @@ use std::io::Cursor;
 
 use base64::{Engine as _, engine::general_purpose};
 use image::{DynamicImage, GenericImageView, ImageFormat};
-use mozjpeg_rs::{Encoder, Preset};
+use rapidraw_codecs::JpegPreset;
 use tauri::ipc::Response;
 
 use crate::formats::{jpeg_data_url, png_data_url};
@@ -10,10 +10,15 @@ use crate::formats::{jpeg_data_url, png_data_url};
 pub(crate) fn encode_jpeg_bytes(image: &DynamicImage, quality: u8) -> Result<Vec<u8>, String> {
     let (width, height) = image.dimensions();
     let rgb_pixels = image.to_rgb8().into_vec();
-    Encoder::new(Preset::BaselineFastest)
-        .quality(quality)
-        .encode_rgb(&rgb_pixels, width, height)
-        .map_err(|e| format!("Failed to encode JPEG preview with mozjpeg-rs: {}", e))
+    rapidraw_codecs::encode_jpeg_rgb(
+        &rgb_pixels,
+        width,
+        height,
+        quality,
+        JpegPreset::Fastest,
+        None,
+    )
+    .map_err(|e| format!("Failed to encode JPEG preview with mozjpeg-rs: {}", e))
 }
 
 pub(crate) fn encode_jpeg_data_url(image: &DynamicImage, quality: u8) -> Result<String, String> {

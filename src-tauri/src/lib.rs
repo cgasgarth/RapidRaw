@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "ai"), allow(dead_code))]
+
 #[cfg(not(all(target_os = "windows", target_arch = "aarch64")))]
 use mimalloc::MiMalloc;
 
@@ -64,7 +66,7 @@ use image::{DynamicImage, GenericImageView, ImageBuffer, Luma, RgbImage, Rgba};
 use imageproc::drawing::draw_line_segment_mut;
 use imageproc::edges::canny;
 use imageproc::hough::{LineDetectionOptions, detect_lines};
-use mozjpeg_rs::{Encoder, Preset};
+use rapidraw_codecs::JpegPreset;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -688,9 +690,7 @@ fn generate_export_soft_proof_preview(
         });
     }
 
-    Encoder::new(Preset::BaselineFastest)
-        .quality(86)
-        .encode_rgb(&proof_pixels, width, height)
+    rapidraw_codecs::encode_jpeg_rgb(&proof_pixels, width, height, 86, JpegPreset::Fastest, None)
         .map(Response::new)
         .map_err(|e| format!("Failed to encode export soft proof preview: {}", e))
 }
@@ -3114,7 +3114,8 @@ pub fn run() {
             preview_worker::start_preview_worker(app_handle.clone());
             start_analytics_worker(app_handle.clone());
             file_management::start_thumbnail_workers(app_handle);
-            jxl_oxide::integration::register_image_decoding_hook();
+            #[cfg(feature = "advanced-codecs")]
+            rapidraw_codecs::register_jxl_decoding_hook();
 
             let window_cfg = app.config().app.windows.first().unwrap().clone();
             let decorations = settings.decorations.unwrap_or(window_cfg.decorations);
@@ -3319,6 +3320,9 @@ pub fn run() {
             ai::ai_commands::generate_ai_depth_mask,
             ai::ai_commands::generate_ai_whole_person_mask,
             ai::ai_commands::generate_ai_person_part_mask,
+            ai::ai_commands::get_ai_model_registry_report,
+            ai::ai_commands::cancel_ai_model_load,
+            ai::ai_commands::evict_ai_model_session,
             ai::ai_commands::check_ai_connector_status,
             ai::ai_commands::test_ai_connector_connection,
             ai::ai_commands::invoke_generative_replace_with_mask_def,

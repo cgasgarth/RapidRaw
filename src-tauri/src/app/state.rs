@@ -5,11 +5,12 @@ use std::sync::{Arc, Mutex};
 
 use image::{DynamicImage, GenericImageView, GrayImage};
 use serde::{Deserialize, Serialize};
-use tokio::sync::{Mutex as TokioMutex, Notify};
+use tokio::sync::Notify;
 use tokio::task::JoinHandle;
 use wgpu::{Texture, TextureView};
 
-use crate::ai::ai_processing::AiState;
+#[cfg(feature = "ai")]
+use crate::ai::ai_processing::{CachedDepthMap, ImageEmbeddings};
 use crate::cache_utils::DecodedImageCache;
 use crate::gpu_processing::GpuProcessor;
 use crate::image_processing::GpuContext;
@@ -226,8 +227,12 @@ pub struct AppState {
     pub gpu_context: Mutex<Option<GpuContext>>,
     pub gpu_image_cache: Mutex<Option<GpuImageCache>>,
     pub gpu_processor: Mutex<Option<GpuProcessorState>>,
-    pub ai_state: Mutex<Option<AiState>>,
-    pub ai_init_lock: TokioMutex<()>,
+    #[cfg(feature = "ai")]
+    pub ai_model_registry: crate::ai::model_registry::AiModelRegistry,
+    #[cfg(feature = "ai")]
+    pub ai_embeddings: MemoryLruCache<String, ImageEmbeddings>,
+    #[cfg(feature = "ai")]
+    pub ai_depth_maps: MemoryLruCache<String, CachedDepthMap>,
     pub export_job: Mutex<Option<ExportJob>>,
     pub import_job: Mutex<Option<ImportJob>>,
     pub computational_merge_jobs: crate::merge::computational_job::ComputationalMergeJobRegistry,
@@ -292,8 +297,18 @@ impl AppState {
             gpu_context: Mutex::new(None),
             gpu_image_cache: Mutex::new(None),
             gpu_processor: Mutex::new(None),
-            ai_state: Mutex::new(None),
-            ai_init_lock: TokioMutex::new(()),
+            #[cfg(feature = "ai")]
+            ai_model_registry: crate::ai::model_registry::AiModelRegistry::new(1536 * 1024 * 1024),
+            #[cfg(feature = "ai")]
+            ai_embeddings: MemoryLruCache::new(
+                policy("ai_embeddings", 256, 384, Some(4)),
+                Arc::clone(&cache_budget),
+            ),
+            #[cfg(feature = "ai")]
+            ai_depth_maps: MemoryLruCache::new(
+                policy("ai_depth_maps", 128, 192, Some(4)),
+                Arc::clone(&cache_budget),
+            ),
             export_job: Mutex::new(None),
             import_job: Mutex::new(None),
             computational_merge_jobs:

@@ -2,8 +2,8 @@ use std::path::Path;
 
 use image::{Rgb, Rgb32FImage};
 use ndarray::{Array4, Ix4};
-use ort::session::Session;
-use ort::value::Tensor;
+use rapidraw_ai::ort::session::Session;
+use rapidraw_ai::ort::value::Tensor;
 
 use crate::merge::computational_job::ComputationalMergeCancellationToken;
 use crate::merge::tile_runtime::{TileHalo, TilePlanRequest, plan_tiles};
@@ -22,12 +22,7 @@ pub struct OrtSwinIrRunner {
 
 impl OrtSwinIrRunner {
     pub fn open(path: &Path) -> Result<Self, String> {
-        let _ = ort::init().with_name("SwinIR-x2-CPU").commit();
-        let session = Session::builder()
-            .map_err(|error| format!("swinir_x2_session_builder_failed:{error}"))?
-            .with_intra_threads(1)
-            .map_err(|error| format!("swinir_x2_session_threads_failed:{error}"))?
-            .commit_from_file(path)
+        let session = rapidraw_ai::build_ort_session(path)
             .map_err(|error| format!("swinir_x2_session_load_failed:{error}"))?;
         validate_io_contract(&session)?;
         Ok(Self { session })
@@ -48,7 +43,7 @@ impl SwinIrRunner for OrtSwinIrRunner {
             .map_err(|error| format!("swinir_x2_input_tensor_failed:{error}"))?;
         let outputs = self
             .session
-            .run(ort::inputs!["input" => tensor])
+            .run(rapidraw_ai::ort::inputs!["input" => tensor])
             .map_err(|error| format!("swinir_x2_inference_failed:{error}"))?;
         let output = outputs["output"]
             .try_extract_array::<f32>()

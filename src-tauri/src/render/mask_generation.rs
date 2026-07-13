@@ -1,4 +1,4 @@
-use crate::ai::ai_processing::{
+use crate::ai::types::{
     AiDepthMaskParameters, AiForegroundMaskParameters, AiSkyMaskParameters, AiSubjectMaskParameters,
 };
 use base64::{Engine as _, engine::general_purpose};

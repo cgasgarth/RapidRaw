@@ -1,14 +1,13 @@
 use std::io::Cursor;
 
 use image::{
-    DynamicImage, ExtendedColorType, GenericImageView, ImageDecoder, ImageEncoder, ImageFormat,
+    DynamicImage, ExtendedColorType, ImageDecoder, ImageEncoder, ImageFormat,
     codecs::{
         jpeg::JpegDecoder,
         tiff::{TiffDecoder, TiffEncoder},
     },
 };
-use jxl_encoder::{LosslessConfig, LossyConfig, PixelLayout};
-use mozjpeg_rs::{Encoder as MozJpegEncoder, Preset};
+use rapidraw_codecs::JpegPreset;
 use sha2::{Digest, Sha256};
 
 use crate::color::working_to_output_transform::WorkingColorState;
@@ -110,51 +109,34 @@ pub(crate) fn encode_image_with_working_color_state(
 
     match normalized_format.as_str() {
         "jxl" => {
-            let (width, height) = image.dimensions();
-            let has_alpha = image.color().has_alpha();
-
-            let jxl_data = if jpeg_quality == 100 {
-                if has_alpha {
-                    let rgba = image.to_rgba8();
-                    LosslessConfig::new()
-                        .encode(rgba.as_raw(), width, height, PixelLayout::Rgba8)
-                        .map_err(|e| format!("Failed to encode lossless JXL: {}", e))?
-                } else {
-                    let rgb = image.to_rgb8();
-                    LosslessConfig::new()
-                        .encode(rgb.as_raw(), width, height, PixelLayout::Rgb8)
-                        .map_err(|e| format!("Failed to encode lossless JXL: {}", e))?
-                }
-            } else {
-                let distance = (100.0 - jpeg_quality as f32) / 10.0;
-                let distance = distance.max(0.01);
-
-                if has_alpha {
-                    let rgba = image.to_rgba8();
-                    LossyConfig::new(distance)
-                        .encode(rgba.as_raw(), width, height, PixelLayout::Rgba8)
-                        .map_err(|e| format!("Failed to encode lossy JXL: {}", e))?
-                } else {
-                    let rgb = image.to_rgb8();
-                    LossyConfig::new(distance)
-                        .encode(rgb.as_raw(), width, height, PixelLayout::Rgb8)
-                        .map_err(|e| format!("Failed to encode lossy JXL: {}", e))?
-                }
-            };
-
-            return Ok(EncodedExportImage {
-                bytes: jxl_data,
-                color_policy: None,
-            });
+            #[cfg(not(feature = "advanced-codecs"))]
+            {
+                return Err(advanced_codecs_unavailable());
+            }
+            #[cfg(feature = "advanced-codecs")]
+            {
+                let jxl_data = rapidraw_codecs::encode_jxl(image, jpeg_quality)
+                    .map_err(|error| format!("Failed to encode JXL: {error}"))?;
+                return Ok(EncodedExportImage {
+                    bytes: jxl_data,
+                    color_policy: None,
+                });
+            }
         }
         "webp" => {
-            let encoder = webp::Encoder::from_image(image)
-                .map_err(|_| "Failed to create WebP encoder".to_string())?;
-            let webp_mem = encoder.encode(jpeg_quality as f32);
-            return Ok(EncodedExportImage {
-                bytes: webp_mem.to_vec(),
-                color_policy: None,
-            });
+            #[cfg(not(feature = "advanced-codecs"))]
+            {
+                return Err(advanced_codecs_unavailable());
+            }
+            #[cfg(feature = "advanced-codecs")]
+            {
+                let webp_mem = rapidraw_codecs::encode_webp(image, jpeg_quality)
+                    .map_err(|error| format!("Failed to encode WebP: {error}"))?;
+                return Ok(EncodedExportImage {
+                    bytes: webp_mem,
+                    color_policy: None,
+                });
+            }
         }
         "jpg" | "jpeg" => {
             let bytes = encode_jpeg_to_bytes(
@@ -541,9 +523,20 @@ fn encode_jpeg_to_bytes(
             )
         };
 
-    MozJpegEncoder::new(Preset::BaselineBalanced)
-        .quality(jpeg_quality.clamp(1, 100))
-        .icc_profile(icc_profile)
-        .encode_rgb(&rgb_pixels, width, height)
-        .map_err(|e| format!("Failed to encode JPEG: {}", e))
+    rapidraw_codecs::encode_jpeg_rgb(
+        &rgb_pixels,
+        width,
+        height,
+        jpeg_quality,
+        JpegPreset::Balanced,
+        Some(icc_profile),
+    )
+    .map_err(|e| format!("Failed to encode JPEG: {}", e))
+}
+
+#[cfg(not(feature = "advanced-codecs"))]
+fn advanced_codecs_unavailable() -> String {
+    let unavailable = rapidraw_codecs::require_advanced_codecs()
+        .expect_err("advanced codec fallback only runs when the capability is disabled");
+    serde_json::to_string(&unavailable).expect("capability-unavailable contract serializes")
 }
