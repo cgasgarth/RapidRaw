@@ -36,6 +36,11 @@ export interface ViewportPoint {
   y: number;
 }
 
+export interface ImageViewportRect extends ViewportPoint {
+  height: number;
+  width: number;
+}
+
 export interface ReconcileViewportTransformInput {
   contextChanged: boolean;
   current: ViewportSnapshot;
@@ -102,6 +107,13 @@ export const getImageTransformBounds = ({
 
   return { minX: horizontal.min, maxX: horizontal.max, minY: vertical.min, maxY: vertical.max };
 };
+
+export const getImageViewportRect = (renderSize: RenderSize, transform: ViewportTransform): ImageViewportRect => ({
+  height: renderSize.height * transform.scale,
+  width: renderSize.width * transform.scale,
+  x: transform.positionX + renderSize.offsetX * transform.scale,
+  y: transform.positionY + renderSize.offsetY * transform.scale,
+});
 
 const isValidSnapshot = (snapshot: ViewportSnapshot | null): snapshot is ViewportSnapshot =>
   snapshot !== null &&
