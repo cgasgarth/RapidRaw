@@ -21,3 +21,15 @@ export const loadStartupApp = async <T>(loader: () => Promise<T>): Promise<Start
     return { error: error instanceof Error ? error : new Error(String(error)), status: 'failed' };
   }
 };
+
+export const loadStartupAppAfterShellReceipt = async <T>(
+  shellReceipt: Promise<unknown>,
+  loader: () => Promise<T>,
+): Promise<StartupAppLoadResult<T>> => {
+  try {
+    await shellReceipt;
+  } catch {
+    // Trace reporting must never prevent the recoverable full-app handoff.
+  }
+  return loadStartupApp(loader);
+};

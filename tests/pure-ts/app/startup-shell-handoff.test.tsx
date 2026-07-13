@@ -4,10 +4,37 @@ import { StartupShell } from '../../../src/product/StartupShell';
 import {
   consumeStartupShellIntent,
   loadStartupApp,
+  loadStartupAppAfterShellReceipt,
   queueStartupShellIntent,
 } from '../../../src/product/startupShellHandoff';
 
 describe('startup shell handoff', () => {
+  test('does not evaluate the full app until the interactive shell receipt settles', async () => {
+    let resolveReceipt: (() => void) | undefined;
+    let loaderCalls = 0;
+    const receipt = new Promise<void>((resolve) => {
+      resolveReceipt = resolve;
+    });
+    const loading = loadStartupAppAfterShellReceipt(receipt, async () => {
+      loaderCalls += 1;
+      return 'full-app';
+    });
+
+    await Promise.resolve();
+    expect(loaderCalls).toBe(0);
+    resolveReceipt?.();
+    expect(await loading).toEqual({ module: 'full-app', status: 'ready' });
+    expect(loaderCalls).toBe(1);
+  });
+
+  test('still evaluates the recoverable full app when trace reporting fails', async () => {
+    const result = await loadStartupAppAfterShellReceipt(
+      Promise.reject(new Error('trace unavailable')),
+      async () => 'full-app',
+    );
+    expect(result).toEqual({ module: 'full-app', status: 'ready' });
+  });
+
   test('preserves queued input until the full application chunk is ready', async () => {
     queueStartupShellIntent('settings');
     let resolveModule: ((module: { default: string }) => void) | undefined;
