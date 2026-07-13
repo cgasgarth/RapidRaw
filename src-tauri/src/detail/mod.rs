@@ -302,7 +302,7 @@ pub fn apply_luma_reference(
     for index in 0..4 {
         let gain = (direct[index] + macro_gains[index]) * settings.overall_amount;
         let mut confidence = 1.0;
-        if index < 2 && gain > 0.0 {
+        if index < 3 && gain > 0.0 {
             let signal = bands[index].abs();
             let floor = 0.0001 + settings.noise_protection * 0.02;
             confidence = ((signal - floor) / (floor * 2.0).max(0.001)).clamp(0.0, 1.0);
@@ -431,7 +431,7 @@ pub fn apply_rgb_reference(
     for index in 0..4 {
         let gain = (direct[index] + macro_gains[index]) * settings.overall_amount;
         let mut confidence = 1.0;
-        if index < 2 && gain > 0.0 {
+        if index < 3 && gain > 0.0 {
             let floor = 0.0001 + settings.noise_protection * 0.02;
             confidence = smoothstep(floor, floor * 3.0, bands[index].abs());
             let shadow_confidence = smoothstep(0.015, 0.165, source_luma);

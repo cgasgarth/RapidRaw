@@ -2255,10 +2255,16 @@ mod blur_pass_tests {
         adjustments.mask_adjustments[0]
             .multiscale_detail
             .process_version = 1;
+        adjustments.mask_adjustments[0]
+            .multiscale_detail
+            .overall_amount = 1.0;
         adjustments.mask_adjustments[0].multiscale_detail.medium = -0.4;
         adjustments.mask_adjustments[1]
             .multiscale_detail
             .process_version = 1;
+        adjustments.mask_adjustments[1]
+            .multiscale_detail
+            .overall_amount = 1.0;
         adjustments.mask_adjustments[1].multiscale_detail.coarse = 0.6;
         let graph = compile_gpu_render_graph(&adjustments, false, 2, 1920, 1080);
         assert_eq!(graph.blur_products.len(), 4);
@@ -2707,6 +2713,94 @@ mod blur_pass_tests {
             local_pixels, first_pixels,
             "full mask must match global band math"
         );
+    }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
+    fn production_wgpu_multiscale_detail_reduces_shadow_noise_and_edge_overshoot_vs_legacy_stack() {
+        use image::{DynamicImage, ImageBuffer, Rgba};
+        use tauri::Manager;
+
+        let _test_guard = GPU_TEST_LOCK.lock().unwrap();
+        let width = 128;
+        let height = 64;
+        let source = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(width, height, |x, y| {
+            let shadow_noise = if (x + y) % 2 == 0 { 0.009 } else { -0.009 };
+            let value = if x < width / 2 {
+                0.035 + shadow_noise
+            } else {
+                0.68
+            };
+            Rgba([value, value * 0.82, value * 0.61, 1.0])
+        }));
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock Tauri app builds");
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state)
+            .expect("compute-only GPU context initializes");
+        let identity = PreGpuImageIdentity::for_source(&source, "multiscale_detail_quality");
+        let render = |adjustments| {
+            process_and_get_dynamic_image(
+                &context,
+                &state,
+                &source,
+                identity,
+                RenderRequest {
+                    adjustments,
+                    mask_bitmaps: &[],
+                    lut: None,
+                    roi: None,
+                },
+                "multiscale_detail_quality",
+            )
+            .expect("quality comparison WGPU render succeeds")
+            .to_rgb16()
+        };
+        let baseline = render(AllAdjustments::default());
+        let mut legacy = AllAdjustments::default();
+        legacy.global.sharpness = 0.65;
+        legacy.global.sharpness_threshold = 0.0;
+        let legacy = render(legacy);
+        let mut multiscale = AllAdjustments::default();
+        multiscale.global.sharpness = 0.65;
+        multiscale.global.multiscale_detail.process_version = 1;
+        multiscale.global.multiscale_detail.overall_amount = 1.0;
+        multiscale.global.multiscale_detail.noise_protection = 1.0;
+        multiscale.global.multiscale_detail.halo_suppression = 1.0;
+        multiscale.global.multiscale_detail.ringing_suppression = 1.0;
+        let multiscale = render(multiscale);
+
+        let mean_delta =
+            |image: &image::ImageBuffer<image::Rgb<u16>, Vec<u16>>, x_start: u32, x_end: u32| {
+                let mut total = 0.0;
+                let mut count = 0_u64;
+                for y in 0..height {
+                    for x in x_start..x_end {
+                        for channel in 0..3 {
+                            total += (f64::from(image.get_pixel(x, y)[channel])
+                                - f64::from(baseline.get_pixel(x, y)[channel]))
+                            .abs();
+                            count += 1;
+                        }
+                    }
+                }
+                total / count as f64
+            };
+        let legacy_shadow_noise = mean_delta(&legacy, 4, 48);
+        let multiscale_shadow_noise = mean_delta(&multiscale, 4, 48);
+        let legacy_edge_overshoot = mean_delta(&legacy, 58, 70);
+        let multiscale_edge_overshoot = mean_delta(&multiscale, 58, 70);
+        assert!(
+            multiscale_shadow_noise < legacy_shadow_noise,
+            "shadow noise: multiscale={multiscale_shadow_noise} legacy={legacy_shadow_noise}"
+        );
+        assert!(
+            multiscale_edge_overshoot < legacy_edge_overshoot,
+            "edge overshoot: multiscale={multiscale_edge_overshoot} legacy={legacy_edge_overshoot}"
+        );
+        assert_ne!(multiscale.into_raw(), baseline.into_raw());
     }
 
     #[cfg(feature = "tauri-test")]

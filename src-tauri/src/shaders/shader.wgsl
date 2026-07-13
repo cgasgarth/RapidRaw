@@ -1087,7 +1087,7 @@ fn apply_multiscale_detail(
     for (var band_index = 0u; band_index < 4u; band_index += 1u) {
         let gain = gains[band_index] * settings.overall_amount;
         var confidence = 1.0;
-        if (band_index < 2u && gain > 0.0) {
+        if (band_index < 3u && gain > 0.0) {
             let floor = 0.0001 + settings.noise_protection * 0.02;
             confidence = smoothstep(floor, floor * 3.0, abs(bands[band_index]));
             let shadow_confidence = smoothstep(0.015, 0.165, source_luma);
