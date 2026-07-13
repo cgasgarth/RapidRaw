@@ -1,4 +1,3 @@
-import { invoke } from '@tauri-apps/api/core';
 import cx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Check, Eye, EyeOff, Grid3X3, Info, LineChart, Maximize, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
@@ -7,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useModalTransition } from '../../../hooks/ui/useModalTransition';
 import { usePreviewViewport } from '../../../hooks/viewport/usePreviewViewport';
-import { Invokes } from '../../../tauri/commands';
+import { type PreviewGeometryParams, requestPreviewGeometry } from '../../../tauri/previewGeometry';
 import { TextColors, TextVariants } from '../../../types/typography';
 import type { Adjustments } from '../../../utils/adjustments';
 import { throttle } from '../../../utils/timing';
@@ -15,34 +14,8 @@ import Button from '../../ui/primitives/Button';
 import Slider from '../../ui/primitives/Slider';
 import UiText from '../../ui/primitives/Text';
 
-interface GeometryParams {
-  distortion: number;
-  vertical: number;
-  horizontal: number;
-  rotate: number;
-  aspect: number;
-  scale: number;
-  x_offset: number;
-  y_offset: number;
-  lens_distortion_amount: number;
-  lens_vignette_amount: number;
-  lens_tca_amount: number;
-  lens_dist_k1: number;
-  lens_dist_k2: number;
-  lens_dist_k3: number;
-  lens_model: number;
-  tca_vr: number;
-  tca_vb: number;
-  vig_k1: number;
-  vig_k2: number;
-  vig_k3: number;
-  lens_distortion_enabled: boolean;
-  lens_tca_enabled: boolean;
-  lens_vignette_enabled: boolean;
-}
-
 type TransformParams = Omit<
-  GeometryParams,
+  PreviewGeometryParams,
   | 'lens_distortion_amount'
   | 'lens_vignette_amount'
   | 'lens_tca_amount'
@@ -197,17 +170,25 @@ export default function TransformModal({
         onApply={onApply}
         onClose={onClose}
         show={show}
+        sourceKey={sourceKey}
       />
     </div>
   );
 }
 
-interface TransformSessionProps extends Omit<TransformModalProps, 'isOpen' | 'sourceKey'> {
+interface TransformSessionProps extends Omit<TransformModalProps, 'isOpen'> {
   isSessionOpen: boolean;
   show: boolean;
 }
 
-export function TransformSession({ currentAdjustments, isSessionOpen, onApply, onClose, show }: TransformSessionProps) {
+export function TransformSession({
+  currentAdjustments,
+  isSessionOpen,
+  onApply,
+  onClose,
+  show,
+  sourceKey,
+}: TransformSessionProps) {
   const { t } = useTranslation();
   const [params, setParams] = useState<TransformParams>(() => buildTransformDraft(currentAdjustments));
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -251,7 +232,7 @@ export function TransformSession({ currentAdjustments, isSessionOpen, onApply, o
       throttle(async (currentParams: TransformParams, linesEnabled: boolean) => {
         const requestId = requestGate.current.begin();
         try {
-          const fullParams: GeometryParams = {
+          const fullParams: PreviewGeometryParams = {
             ...currentParams,
             lens_distortion_amount: currentAdjustments.lensDistortionAmount / SLIDER_DIVISOR,
             lens_vignette_amount: currentAdjustments.lensVignetteAmount / SLIDER_DIVISOR,
@@ -270,13 +251,14 @@ export function TransformSession({ currentAdjustments, isSessionOpen, onApply, o
             lens_vignette_enabled: currentAdjustments.lensVignetteEnabled,
           };
 
-          const result: string = await invoke(Invokes.PreviewGeometryTransform, {
+          const result = await requestPreviewGeometry({
+            sourceIdentity: sourceKey,
             params: fullParams,
-            jsAdjustments: currentAdjustments,
+            adjustments: currentAdjustments,
             showLines: linesEnabled,
           });
           if (!requestGate.current.isCurrent(requestId)) return;
-          setPreviewUrl(result);
+          setPreviewUrl(result.dataUrl);
         } catch (e) {
           if (!requestGate.current.isCurrent(requestId)) return;
           console.error('Preview transform failed', e);
@@ -331,7 +313,7 @@ export function TransformSession({ currentAdjustments, isSessionOpen, onApply, o
     setIsCompareActive(active);
     if (active) {
       updatePreview.cancel();
-      const fullParams: GeometryParams = {
+      const fullParams: PreviewGeometryParams = {
         ...DEFAULT_TRANSFORM_PARAMS,
         lens_distortion_amount: currentAdjustments.lensDistortionAmount / SLIDER_DIVISOR,
         lens_vignette_amount: currentAdjustments.lensVignetteAmount / SLIDER_DIVISOR,
@@ -350,13 +332,14 @@ export function TransformSession({ currentAdjustments, isSessionOpen, onApply, o
         lens_vignette_enabled: currentAdjustments.lensVignetteEnabled,
       };
       const requestId = requestGate.current.begin();
-      void invoke<string>(Invokes.PreviewGeometryTransform, {
+      void requestPreviewGeometry({
+        sourceIdentity: sourceKey,
         params: fullParams,
-        jsAdjustments: currentAdjustments,
+        adjustments: currentAdjustments,
         showLines: false,
       })
         .then((result) => {
-          if (requestGate.current.isCurrent(requestId)) setPreviewUrl(result);
+          if (requestGate.current.isCurrent(requestId)) setPreviewUrl(result.dataUrl);
         })
         .catch((error) => {
           if (requestGate.current.isCurrent(requestId)) console.error('Preview transform failed', error);
