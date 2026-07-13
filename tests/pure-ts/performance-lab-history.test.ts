@@ -201,7 +201,7 @@ describe('performance regression diagnosis and routing', () => {
     expect(renderBisectPlan(plan)[1]).toContain("'/tmp/perf history.json'");
   });
 
-  test('executes git bisect and locates a known synthetic regression', async () => {
+  test('executes git bisect and reports exact or skipped-candidate synthetic regressions', async () => {
     const directory = await mkdtemp(resolve(tmpdir(), 'rapidraw-perf-bisect-'));
     const environment = isolatedGitEnvironment();
     const git = (...args: string[]) => {
@@ -220,7 +220,12 @@ describe('performance regression diagnosis and routing', () => {
       git('config', 'user.name', 'Performance Lab');
       await writeFile(
         resolve(directory, 'evaluate.sh'),
-        '#!/bin/sh\nvalue="$(cat value)"\nif [ "$value" -lt 3 ]; then exit 0; fi\nexit 1\n',
+        `#!/bin/sh
+value="$(cat value)"
+if [ "\${1:-}" = "$value" ]; then exit 125; fi
+if [ "$value" -lt 3 ]; then exit 0; fi
+exit 1
+`,
         { mode: 0o755 },
       );
       const commits: string[] = [];
@@ -241,7 +246,15 @@ describe('performance regression diagnosis and routing', () => {
         bad,
         evaluator: { command: './evaluate.sh', args: [] },
       });
-      expect(report).toMatchObject({ good, bad, firstBadCommit: firstBad });
+      expect(report).toMatchObject({ good, bad, firstBadCommit: firstBad, candidateCommits: [firstBad] });
+      const skipped = await executePerformanceBisect({
+        cwd: directory,
+        good,
+        bad,
+        evaluator: { command: './evaluate.sh', args: ['2'] },
+      });
+      expect(skipped).toMatchObject({ good, bad, candidateCommits: [commits[2], firstBad] });
+      expect(skipped.firstBadCommit).toBeUndefined();
       expect(git('rev-parse', 'HEAD')).toBe(bad);
       expect(git('status', '--porcelain=v1')).toBe('');
     } finally {

@@ -19,7 +19,8 @@ export const performanceBisectReportSchema = z.object({
   schemaVersion: z.literal(1),
   good: shaSchema,
   bad: shaSchema,
-  firstBadCommit: shaSchema,
+  firstBadCommit: shaSchema.optional(),
+  candidateCommits: z.array(shaSchema).min(1),
   evaluator: z.object({ command: z.string().min(1), args: z.array(z.string()) }),
   outputTail: z.string(),
 });
@@ -60,16 +61,20 @@ export async function executePerformanceBisect(options: {
   } finally {
     await run(parsed.cwd, 'git', ['bisect', 'reset']);
   }
-  if (evaluated === undefined || evaluated.exitCode !== 0)
-    throw new Error(`git bisect run failed:\n${evaluated?.output.slice(-8_000) ?? 'no evaluator output'}`);
+  if (evaluated === undefined) throw new Error('git bisect run did not produce an evaluator result.');
   const firstBadCommit = evaluated.output.match(/([0-9a-f]{40}) is the first '?bad'? commit/u)?.[1];
-  if (firstBadCommit === undefined)
-    throw new Error(`git bisect did not identify a first bad commit:\n${evaluated.output}`);
+  const ambiguousBlock = evaluated.output.match(
+    /The first 'bad' commit could be any of:\s*\n((?:[0-9a-f]{40}\s*\n?)+)/u,
+  )?.[1];
+  const candidateCommits =
+    firstBadCommit === undefined ? (ambiguousBlock?.match(/[0-9a-f]{40}/gu) ?? []) : [firstBadCommit];
+  if (candidateCommits.length === 0) throw new Error(`git bisect run failed:\n${evaluated.output.slice(-8_000)}`);
   return performanceBisectReportSchema.parse({
     schemaVersion: 1,
     good: parsed.good,
     bad: parsed.bad,
     firstBadCommit,
+    candidateCommits,
     evaluator: options.evaluator,
     outputTail: evaluated.output.slice(-8_000),
   });
