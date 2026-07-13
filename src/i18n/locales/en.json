@@ -675,6 +675,7 @@
         "newLayerDestination": "New layer",
         "normalize": "Normalize",
         "residualSummary": "Residual {{before}} → {{after}} · profile, WB, geometry and detail remain unchanged",
+        "revealReferenceInLibrary": "Reveal in library",
         "setCurrent": "Set current",
         "sourceRevision": "CM preview · r{{revision}}",
         "title": "Reference Match",

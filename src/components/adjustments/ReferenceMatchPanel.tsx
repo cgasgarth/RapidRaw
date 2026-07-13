@@ -1,4 +1,4 @@
-import { GitCompareArrows, Plus, Trash2, X } from 'lucide-react';
+import { FolderSearch, GitCompareArrows, Plus, Trash2, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
@@ -6,6 +6,8 @@ import { matchLookApplicationReceiptV1Schema } from '../../../packages/rawengine
 
 import { useEditorActions } from '../../hooks/editor/useEditorActions';
 import { useEditorStore } from '../../store/useEditorStore';
+import { useLibraryStore } from '../../store/useLibraryStore';
+import { useUIStore } from '../../store/useUIStore';
 import {
   applyReferenceMatchProposal,
   createReferenceMatchAdjustmentLayer,
@@ -197,7 +199,7 @@ export default function ReferenceMatchPanel() {
         <div className="space-y-1" data-testid="reference-match-tray">
           {references.map((reference) => (
             <div
-              className="grid grid-cols-[minmax(0,1fr)_2.75rem_4rem_1.25rem] items-center gap-1 rounded border border-editor-border bg-editor-panel px-1.5 py-1"
+              className="grid grid-cols-[minmax(0,1fr)_2.75rem_1.5rem_4rem_1.25rem] items-center gap-1 rounded border border-editor-border bg-editor-panel px-1.5 py-1"
               data-reference-path={reference.path}
               key={reference.id}
             >
@@ -220,6 +222,25 @@ export default function ReferenceMatchPanel() {
                 type="button"
               >
                 {t('editor.adjustments.referenceMatch.compare', { defaultValue: 'Compare' })}
+              </button>
+              <button
+                aria-label={`Reveal ${reference.label} in library`}
+                className="text-text-tertiary hover:text-text-primary"
+                data-testid="reference-match-reveal"
+                onClick={() => {
+                  useLibraryStore.getState().setLibrary({
+                    libraryActivePath: reference.path,
+                    multiSelectedPaths: [reference.path],
+                    selectionAnchorPath: reference.path,
+                  });
+                  useUIStore.getState().setUI({ activeView: 'library' });
+                }}
+                title={t('editor.adjustments.referenceMatch.revealReferenceInLibrary', {
+                  defaultValue: 'Reveal in library',
+                })}
+                type="button"
+              >
+                <FolderSearch aria-hidden="true" size={12} />
               </button>
               <label className="flex items-center gap-1 text-[9px] text-text-secondary">
                 {t('editor.adjustments.referenceMatch.weight', { defaultValue: 'Weight' })}

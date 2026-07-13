@@ -9,6 +9,8 @@ import ReferenceMatchPanel from '../../../src/components/adjustments/ReferenceMa
 import type { SelectedImage } from '../../../src/components/ui/AppProperties.tsx';
 import en from '../../../src/i18n/locales/en.json';
 import { useEditorStore } from '../../../src/store/useEditorStore.ts';
+import { useLibraryStore } from '../../../src/store/useLibraryStore.ts';
+import { useUIStore } from '../../../src/store/useUIStore.ts';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 
@@ -85,6 +87,15 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
     await flushPromises();
   });
   expect(container.querySelector('[data-reference-path="/photos/reference.ARW"]')).not.toBeNull();
+
+  useUIStore.getState().setUI({ activeView: 'editor' });
+  await click(container, '[data-testid="reference-match-reveal"]');
+  expect(useLibraryStore.getState()).toMatchObject({
+    libraryActivePath: '/photos/reference.ARW',
+    multiSelectedPaths: ['/photos/reference.ARW'],
+    selectionAnchorPath: '/photos/reference.ARW',
+  });
+  expect(useUIStore.getState().activeView).toBe('library');
 
   await click(container, '[data-testid="reference-match-compare"]');
   expect(useEditorStore.getState().compare).toMatchObject({
