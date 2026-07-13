@@ -119,6 +119,21 @@ interface AnalyticsResultPayload {
     vectorscope: AnalyticsResourceDescriptor | null;
     width: number;
   } | null;
+  spatial: {
+    gridHeight: number;
+    gridWidth: number;
+    tiles: Array<{
+      blueMean: number;
+      clippedFraction: number;
+      greenMean: number;
+      lumaMean: number;
+      lumaSpread: number;
+      redMean: number;
+      sampleCount: number;
+      x: number;
+      y: number;
+    }>;
+  } | null;
 }
 
 const analyticsFrameByPath = new Map<string, { imageSession: number; previewGeneration: number }>();
@@ -299,6 +314,9 @@ export function useTauriListeners({
           : null;
         useEditorStore.getState().setEditor({
           histogram,
+          referenceMatchSpatialAnalysis: result.spatial
+            ? { ...result.spatial, frameId: result.frameId, path: result.path }
+            : null,
           previewScopeRecoveryState: 'idle',
           previewScopeStatus: buildPreviewScopeStatus({
             histogramReady: histogram !== null,
@@ -316,6 +334,7 @@ export function useTauriListeners({
         if (isEffectActive && event.payload.path === useEditorStore.getState().selectedImage?.path) {
           useEditorStore.getState().setEditor((state) => ({
             histogram: event.payload.data,
+            referenceMatchSpatialAnalysis: null,
             previewScopeStatus: buildPreviewScopeStatus({
               histogramReady: true,
               path: event.payload.path,

@@ -113,7 +113,32 @@ pub struct AnalyticsResult {
     pub histogram: Option<HistogramData>,
     pub gamut: Option<GamutWarningData>,
     pub scopes: Option<ScopeData>,
+    pub spatial: Option<SpatialSummary>,
     pub timing: AnalyticsTiming,
+}
+
+const SPATIAL_GRID: usize = 4;
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SpatialTileSummary {
+    pub blue_mean: f32,
+    pub clipped_fraction: f32,
+    pub green_mean: f32,
+    pub luma_mean: f32,
+    pub luma_spread: f32,
+    pub red_mean: f32,
+    pub sample_count: u64,
+    pub x: u32,
+    pub y: u32,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SpatialSummary {
+    pub grid_height: u32,
+    pub grid_width: u32,
+    pub tiles: Vec<SpatialTileSummary>,
 }
 
 #[derive(Clone)]
@@ -184,6 +209,18 @@ struct Accumulator {
     gamut_min: u8,
     gamut_max: u8,
     reads: u64,
+    spatial: Option<Box<[SpatialTileAccumulator; SPATIAL_GRID * SPATIAL_GRID]>>,
+}
+
+#[derive(Clone, Copy, Default)]
+struct SpatialTileAccumulator {
+    blue_sum: u64,
+    clipped: u64,
+    count: u64,
+    green_sum: u64,
+    luma_squared_sum: u64,
+    luma_sum: u64,
+    red_sum: u64,
 }
 
 impl Accumulator {
@@ -193,6 +230,9 @@ impl Accumulator {
             histogram: products
                 .contains(AnalyticsProducts::HISTOGRAM)
                 .then(|| Box::new([[0; 256]; 4])),
+            spatial: products.contains(AnalyticsProducts::HISTOGRAM).then(|| {
+                Box::new([SpatialTileAccumulator::default(); SPATIAL_GRID * SPATIAL_GRID])
+            }),
             rgb: (waveform && active_channel != Some("luma"))
                 .then(|| [scope_bins(), scope_bins(), scope_bins()]),
             luma: waveform.then(scope_bins),
@@ -221,6 +261,20 @@ impl Accumulator {
             h[1][g as usize] += 1;
             h[2][b as usize] += 1;
             h[3][l] += 1;
+            if let Some(spatial) = self.spatial.as_mut() {
+                let tile_x =
+                    (x as usize * SPATIAL_GRID / plan.width.max(1) as usize).min(SPATIAL_GRID - 1);
+                let tile_y =
+                    (y as usize * SPATIAL_GRID / plan.height.max(1) as usize).min(SPATIAL_GRID - 1);
+                let tile = &mut spatial[tile_y * SPATIAL_GRID + tile_x];
+                tile.blue_sum += u64::from(b);
+                tile.clipped += if l == 0 || l == 255 { 1 } else { 0 };
+                tile.count += 1;
+                tile.green_sum += u64::from(g);
+                tile.luma_squared_sum += (l * l) as u64;
+                tile.luma_sum += l as u64;
+                tile.red_sum += u64::from(r);
+            }
         }
         let xb = plan.x_bucket[x as usize];
         if let Some(bins) = self.rgb.as_mut() {
@@ -406,6 +460,7 @@ pub fn calculate(
     }
     let finish = Instant::now();
     let histogram = acc.histogram.take().map(|h| histogram_from_counts(*h));
+    let spatial = acc.spatial.take().map(|tiles| spatial_summary(*tiles));
     let identity = serde_json::to_vec(&job.frame_id).unwrap_or_default();
     if !current() {
         return Err("superseded".into());
@@ -480,6 +535,7 @@ pub fn calculate(
         histogram,
         gamut,
         scopes: has_scopes.then_some(scopes),
+        spatial,
         timing: AnalyticsTiming {
             sampling_ms,
             finishing_ms: finish.elapsed().as_secs_f64() * 1000.0,
@@ -487,6 +543,33 @@ pub fn calculate(
             full_image_conversions: 0,
         },
     })
+}
+
+fn spatial_summary(tiles: [SpatialTileAccumulator; SPATIAL_GRID * SPATIAL_GRID]) -> SpatialSummary {
+    SpatialSummary {
+        grid_height: SPATIAL_GRID as u32,
+        grid_width: SPATIAL_GRID as u32,
+        tiles: tiles
+            .into_iter()
+            .enumerate()
+            .map(|(index, tile)| {
+                let count = tile.count.max(1) as f32;
+                let luma_mean = tile.luma_sum as f32 / count / 255.0;
+                let luma_second_moment = tile.luma_squared_sum as f32 / count / (255.0 * 255.0);
+                SpatialTileSummary {
+                    blue_mean: tile.blue_sum as f32 / count / 255.0,
+                    clipped_fraction: tile.clipped as f32 / count,
+                    green_mean: tile.green_sum as f32 / count / 255.0,
+                    luma_mean,
+                    luma_spread: (luma_second_moment - luma_mean * luma_mean).max(0.0).sqrt(),
+                    red_mean: tile.red_sum as f32 / count / 255.0,
+                    sample_count: tile.count,
+                    x: (index % SPATIAL_GRID) as u32,
+                    y: (index / SPATIAL_GRID) as u32,
+                }
+            })
+            .collect(),
+    }
 }
 
 fn histogram_from_counts(h: [[u32; 256]; 4]) -> HistogramData {
@@ -716,6 +799,24 @@ mod tests {
         assert!(result.histogram.is_some());
         assert!(result.gamut.is_none());
         assert!(result.scopes.is_none());
+        assert!(result.spatial.is_some());
+    }
+
+    #[test]
+    fn spatial_summary_preserves_local_luma_structure() {
+        let image = DynamicImage::ImageRgb8(ImageBuffer::from_fn(16, 16, |x, _| {
+            let value = if x < 8 { 32 } else { 224 };
+            image::Rgb([value, value, value])
+        }));
+        let result = calculate(&compat_job(&image, AnalyticsProducts::HISTOGRAM), || true).unwrap();
+        let spatial = result
+            .spatial
+            .expect("histogram analytics must include spatial summary");
+        assert_eq!((spatial.grid_width, spatial.grid_height), (4, 4));
+        assert_eq!(spatial.tiles.len(), 16);
+        assert!(spatial.tiles[0].luma_mean < 0.2);
+        assert!(spatial.tiles[3].luma_mean > 0.8);
+        assert!(spatial.tiles.iter().all(|tile| tile.sample_count > 0));
     }
 
     #[test]

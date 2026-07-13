@@ -3,6 +3,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   matchLookApplicationReceiptV1Schema,
   matchLookProposalV1Schema,
+  referenceDistributionSummaryV1Schema,
   referenceSourceSetV1Schema,
 } from '../../../packages/rawengine-schema/src/referenceMatchRuntime';
 
@@ -112,5 +113,33 @@ describe('reference match runtime contracts', () => {
         layerId: 'reference-layer',
       }).success,
     ).toBe(false);
+  });
+
+  test('bounds privacy-safe coarse spatial analysis summaries', () => {
+    expect(
+      referenceDistributionSummaryV1Schema.parse({
+        analysisBasis: 'color-managed-editor-preview',
+        blueMean: 0.3,
+        clippedFraction: 0,
+        greenMean: 0.4,
+        lumaMean: 0.45,
+        lumaSpread: 0.1,
+        redMean: 0.5,
+        sampleCount: 1024,
+        spatialTiles: [
+          {
+            blueMean: 0.3,
+            clippedFraction: 0,
+            greenMean: 0.4,
+            lumaMean: 0.45,
+            lumaSpread: 0.1,
+            redMean: 0.5,
+            sampleCount: 64,
+            x: 0,
+            y: 0,
+          },
+        ],
+      }).spatialTiles,
+    ).toHaveLength(1);
   });
 });
