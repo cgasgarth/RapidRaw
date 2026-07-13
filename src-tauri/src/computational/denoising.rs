@@ -11,9 +11,16 @@ use std::cmp::Ordering;
 use std::fs;
 use std::io::Cursor;
 use std::path::Path;
+use std::sync::Arc;
+#[cfg(feature = "ai")]
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicI64, AtomicUsize, Ordering as AtomicOrdering};
-use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
+
+#[cfg(feature = "ai")]
+type AiSession = Arc<Mutex<rapidraw_ai::ort::session::Session>>;
+#[cfg(not(feature = "ai"))]
+type AiSession = ();
 
 struct ProgressReporter<'a> {
     counter: &'a Arc<AtomicUsize>,
@@ -59,22 +66,29 @@ pub async fn apply_denoising(
     let (source_path, _) = parse_virtual_path(&path);
     let path_str = source_path.to_string_lossy().to_string();
 
-    let mut ai_session = None;
+    #[cfg(feature = "ai")]
+    let mut ai_session: Option<AiSession> = None;
+    #[cfg(not(feature = "ai"))]
+    let ai_session: Option<AiSession> = None;
+    #[cfg(feature = "ai")]
     let mut ai_lease = None;
+    #[cfg(not(feature = "ai"))]
+    let ai_lease: Option<()> = None;
     if method == "ai" {
-        let capability = crate::ai::ai_processing::acquire_capability(
-            &app_handle,
-            &state.ai_model_registry,
-            crate::ai::model_registry::AiCapability::Denoise,
-        )
-        .await
-        .map_err(|e| e.to_string())?;
-        ai_session = Some(
-            capability
-                .lease(crate::ai::model_registry::AiModelId::Denoise)?
-                .ort()?,
-        );
-        ai_lease = Some(capability);
+        #[cfg(not(feature = "ai"))]
+        return Err("ai_denoise_unavailable:build_without_ai_feature".to_string());
+        #[cfg(feature = "ai")]
+        {
+            let lease = crate::ai::ai_processing::acquire_ort_model(
+                &app_handle,
+                &state.ai_model_registry,
+                crate::ai::model_registry::AiModelId::Denoise,
+            )
+            .await
+            .map_err(|e| e.to_string())?;
+            ai_session = Some(lease.ort()?);
+            ai_lease = Some(lease);
+        }
     }
 
     let denoise_result_handle = state.denoise_result.clone();
@@ -102,22 +116,31 @@ pub async fn batch_denoise_images(
     app_handle: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<Vec<String>, String> {
-    let mut ai_session = None;
+    #[cfg(feature = "ai")]
+    let mut ai_session: Option<AiSession> = None;
+    #[cfg(not(feature = "ai"))]
+    let ai_session: Option<AiSession> = None;
+    #[cfg(not(feature = "ai"))]
+    let _ = &state;
+    #[cfg(feature = "ai")]
     let mut ai_lease = None;
+    #[cfg(not(feature = "ai"))]
+    let ai_lease: Option<()> = None;
     if method == "ai" {
-        let capability = crate::ai::ai_processing::acquire_capability(
-            &app_handle,
-            &state.ai_model_registry,
-            crate::ai::model_registry::AiCapability::Denoise,
-        )
-        .await
-        .map_err(|e| e.to_string())?;
-        ai_session = Some(
-            capability
-                .lease(crate::ai::model_registry::AiModelId::Denoise)?
-                .ort()?,
-        );
-        ai_lease = Some(capability);
+        #[cfg(not(feature = "ai"))]
+        return Err("ai_denoise_unavailable:build_without_ai_feature".to_string());
+        #[cfg(feature = "ai")]
+        {
+            let lease = crate::ai::ai_processing::acquire_ort_model(
+                &app_handle,
+                &state.ai_model_registry,
+                crate::ai::model_registry::AiModelId::Denoise,
+            )
+            .await
+            .map_err(|e| e.to_string())?;
+            ai_session = Some(lease.ort()?);
+            ai_lease = Some(lease);
+        }
     }
 
     tokio::task::spawn_blocking(move || {
@@ -143,7 +166,10 @@ pub async fn batch_denoise_images(
                 intensity,
                 method.clone(),
                 app_handle.clone(),
+                #[cfg(feature = "ai")]
                 ai_session.clone(),
+                #[cfg(not(feature = "ai"))]
+                ai_session,
             ) {
                 Ok((image, _)) => {
                     let is_raw = crate::formats::is_raw_file(&real_path);
@@ -313,8 +339,10 @@ fn denoise_image(
     intensity: f32,
     method: String,
     app_handle: AppHandle,
-    ai_session: Option<Arc<Mutex<ort::session::Session>>>,
+    ai_session: Option<AiSession>,
 ) -> Result<(DynamicImage, String), String> {
+    #[cfg(not(feature = "ai"))]
+    let _ = &ai_session;
     let path = Path::new(&path_str);
     if !path.exists() {
         return Err("File not found".to_string());
@@ -338,14 +366,19 @@ fn denoise_image(
     let rgb_img_for_denoiser = dynamic_img.to_rgb32f();
 
     let out_dynamic = if method == "ai" {
-        let session_arc = ai_session.ok_or_else(|| "AI Session not provided".to_string())?;
-        crate::ai::ai_processing::run_ai_denoise(
-            &rgb_img_for_denoiser,
-            intensity,
-            &session_arc,
-            &app_handle,
-        )
-        .map_err(|e| e.to_string())?
+        #[cfg(not(feature = "ai"))]
+        return Err("ai_denoise_unavailable:build_without_ai_feature".to_string());
+        #[cfg(feature = "ai")]
+        {
+            let session_arc = ai_session.ok_or_else(|| "AI Session not provided".to_string())?;
+            crate::ai::ai_processing::run_ai_denoise(
+                &rgb_img_for_denoiser,
+                intensity,
+                &session_arc,
+                &app_handle,
+            )
+            .map_err(|e| e.to_string())?
+        }
     } else {
         run_bm3d(&rgb_img_for_denoiser, intensity, &app_handle)?
     };

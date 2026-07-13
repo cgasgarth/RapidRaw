@@ -8,6 +8,7 @@ rust-version = "1.95"
 [workspace]
 members = [
   ".",
+  "crates/rapidraw-ai",
   "crates/rapidraw-codecs",
   "crates/rapidraw-computational",
   "crates/rapidraw-types",
@@ -19,15 +20,17 @@ name = "rapidraw_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [features]
-default = ["required-ci"]
+default = ["required-ci", "ai"]
+ai = ["dep:rapidraw-ai"]
 advanced-codecs = ["rapidraw-codecs/advanced"]
 panorama-opencv-spike = ["rapidraw-computational/opencv-panorama"]
-required-ci = ["advanced-codecs"]
+required-ci = ["advanced-codecs", "rapidraw-ai?/compile-only"]
 tauri-test = ["tauri/test"]
 validation-harness = []
 
 [dependencies]
 rapidraw-types = { path = "crates/rapidraw-types" }
+rapidraw-ai = { path = "crates/rapidraw-ai", optional = true }
 rapidraw-codecs = { path = "crates/rapidraw-codecs", default-features = false, features = ["jpeg"] }
 rapidraw-computational = { path = "crates/rapidraw-computational" }
 tauri = { version = "2.11", features = [ "macos-private-api", "rustls-tls", "unstable" ] }
@@ -52,7 +55,6 @@ uuid = { version = "1.23", features = ["v4", "serde"] }
 walkdir = "2.5.0"
 notify = "8.2.0"
 imageproc = "0.27"
-ort = { version = "=2.0.0-rc.12", default-features = false, features = ["std", "ndarray", "load-dynamic", "api-21"] }
 ndarray = "0.17"
 tauri-plugin-process = "2.3.1"
 tauri-plugin-os = "2.3.2"
@@ -60,7 +62,6 @@ log = "0.4"
 fern = "0.7"
 little_exif = "0.6.23"
 chrono = "0.4"
-tokenizers = "0.23.1"
 once_cell = "1.21"
 futures = "0.3.32"
 sha2 = "0.11"
@@ -80,6 +81,8 @@ fuzzy-matcher = "0.3.7"
 moxcms = "0.8.1"
 filetime = "0.2"
 libc = "0.2.186"
+rgb = "0.8.53"
+imgref = "1.12.1"
 sysinfo = "0.39.3"
 lcms2 = { version = "6.1.1", features = ["static"] }
 
@@ -108,9 +111,6 @@ webkit2gtk = "=2.0.2"
 
 [build-dependencies]
 tauri-build = { version = "2.6", features = [] }
-sha2 = "0.11"
-reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls"] }
-hex = "0.4"
 
 [dev-dependencies]
 image-hdr = { version = "0.6.0", default-features = false }

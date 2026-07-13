@@ -14,7 +14,9 @@ interface CargoDependency {
 interface CargoPackage {
   dependencies: CargoDependency[];
   features: Record<string, string[]>;
+  license: string | null;
   name: string;
+  publish: string[] | null;
 }
 const packages = (JSON.parse(metadataResult.stdout.toString()) as { packages: CargoPackage[] }).packages;
 const packageNamed = (name: string): CargoPackage => {
@@ -24,8 +26,12 @@ const packageNamed = (name: string): CargoPackage => {
 };
 
 const app = packageNamed('RapidRAW');
+const ai = packageNamed('rapidraw-ai');
 const codecs = packageNamed('rapidraw-codecs');
 const computational = packageNamed('rapidraw-computational');
+if (ai.license !== 'AGPL-3.0-or-later' || !Array.isArray(ai.publish) || ai.publish.length !== 0) {
+  throw new Error('rapidraw-ai must remain private and explicitly AGPL-3.0-or-later licensed.');
+}
 const heavyCodecPackages = new Set(['jxl-encoder', 'jxl-oxide', 'mozjpeg-rs', 'webp']);
 const leakedToApp = app.dependencies.filter((dependency) => heavyCodecPackages.has(dependency.name));
 if (leakedToApp.length > 0) {

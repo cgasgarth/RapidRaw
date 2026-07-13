@@ -1,7 +1,17 @@
+#[cfg(feature = "ai")]
+pub(crate) mod ai_commands;
+#[cfg(not(feature = "ai"))]
+#[path = "ai_commands_unavailable.rs"]
 pub(crate) mod ai_commands;
 pub(crate) mod ai_connector;
+#[cfg(feature = "ai")]
 pub(crate) mod ai_processing;
+#[cfg(feature = "ai")]
 pub(crate) mod model_download;
+#[cfg(feature = "ai")]
 pub(crate) mod model_registry;
+#[cfg(feature = "ai")]
 pub(crate) mod person_part_parser;
+#[cfg(feature = "ai")]
 pub(crate) mod person_segmentation;
+pub(crate) mod types;
