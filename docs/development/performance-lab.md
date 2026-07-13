@@ -33,7 +33,7 @@ Baseline history is an append-only signed review ledger. Every passing approval 
 
 History export uses sorted-key canonical JSON, so repeated verified import/export is byte-identical. `baseline-import` never overwrites a corrupt payload: invalid JSON, schema, hash chain, provenance, or signature is copied with mode `0600` to a digest-addressed private quarantine and exits invalid; the source remains untouched.
 
-For `git bisect run`, the normal runner returns `0` for pass, `1` for regression, and `125` for an invalid measurement. `bisect-plan` only prints validated commands. `bisect` requires a clean worktree, executes the same evaluator across the requested ancestry, records the first bad commit and bounded output, and always resets the checkout before returning. Baselines never update themselves; an approved receipt remains immutable input with exact commit provenance.
+For `git bisect run`, the normal runner returns `0` for pass, `1` for regression, and `125` for an invalid measurement. `bisect-plan` only prints validated commands. `bisect` requires a clean worktree, executes the same evaluator across the requested ancestry, records either the exact first bad commit or the bounded candidate range left by skipped invalid commits, and always resets the checkout before returning. Baselines never update themselves; an approved receipt remains immutable input with exact commit provenance.
 
 The `affected` command emits the versioned `performance-scenarios` JSON contract consumed by affected-validation selection. Known preview scheduling sources select the focused scenario; performance infrastructure or unknown paths conservatively select the full registered lab.
 
