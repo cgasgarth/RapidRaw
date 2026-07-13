@@ -174,11 +174,35 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
     'creativeTemperature',
   );
 
+  const capturedSourceRevision = useEditorStore.getState().referenceMatchReferences[0]?.sourceRevision;
+  if (!capturedSourceRevision) throw new Error('Expected captured source revision');
+  await act(async () => {
+    useEditorStore
+      .getState()
+      .setReferenceMatchReferences((current) =>
+        current.map((reference) => ({ ...reference, sourceRevision: `source-revision-v1:${'f'.repeat(64)}` })),
+      );
+    await flushPromises();
+  });
+  await click(container, '[data-testid="reference-match-apply"]');
+  expect(container.querySelector('[data-testid="reference-match-apply-abstention"]')?.textContent).toContain(
+    'changed after analysis',
+  );
+  expect(useEditorStore.getState().historyIndex).toBe(historyBeforeProposal);
+  await act(async () => {
+    useEditorStore
+      .getState()
+      .setReferenceMatchReferences((current) =>
+        current.map((reference) => ({ ...reference, sourceRevision: capturedSourceRevision })),
+      );
+    await flushPromises();
+  });
   await click(container, '[data-testid="reference-match-apply"]');
   expect(useEditorStore.getState().historyIndex).toBe(historyBeforeProposal + 1);
   expect(useEditorStore.getState().lastReferenceMatchApplicationReceipt).toMatchObject({
     baseGraphFingerprint: expect.stringMatching(/^fnv1a64:/),
     destination: 'global-adjustments',
+    effectiveReferences: [{ role: 'creative', weight: 1 }],
     historyEntriesAdded: 1,
     impact: 100,
   });
@@ -219,6 +243,7 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
     referenceMatchApplicationReceipt: {
       baseGraphFingerprint: expect.stringMatching(/^fnv1a64:/),
       destination: 'adjustment-layer',
+      effectiveReferences: [{ role: 'creative', weight: 1 }],
       enabledGroups: ['tone'],
       historyEntriesAdded: 1,
       impact: 100,

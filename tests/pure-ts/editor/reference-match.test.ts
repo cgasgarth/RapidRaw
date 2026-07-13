@@ -19,6 +19,7 @@ import {
   resolveReferenceMatchRenderAdjustments,
   selectReferenceMatchReferences,
   summarizeReferenceHistogram,
+  validateReferenceMatchApplicationIdentities,
 } from '../../../src/utils/referenceMatch';
 
 const summary = (overrides: Partial<ReferenceHistogramSummary> = {}): ReferenceHistogramSummary => ({
@@ -160,6 +161,36 @@ describe('color-managed reference matching', () => {
     ).toBe('available');
   });
 
+  test('revalidates every effective physical source identity immediately before Apply', () => {
+    const source = reference('apply-source', 1, summary());
+    const proposal = createReferenceMatchProposal({
+      adjustments: INITIAL_ADJUSTMENTS,
+      mode: 'match-look',
+      references: [source],
+      target: summary({ lumaMean: 0.2, redMean: 0.2 }),
+    });
+    if (!proposal) throw new Error('Expected proposal');
+
+    expect(
+      validateReferenceMatchApplicationIdentities(
+        proposal,
+        [source],
+        new Map([[source.path, { available: true, sourceRevision: source.sourceRevision }]]),
+      ),
+    ).toEqual({ failure: null, valid: true });
+    expect(
+      validateReferenceMatchApplicationIdentities(
+        proposal,
+        [source],
+        new Map([[source.path, { available: true, sourceRevision: `source-revision-v1:${'f'.repeat(64)}` }]]),
+      ),
+    ).toEqual({ failure: 'reference-replaced', valid: false });
+    expect(validateReferenceMatchApplicationIdentities(proposal, [], new Map())).toEqual({
+      failure: 'reference-set-changed',
+      valid: false,
+    });
+  });
+
   test('keeps Normalize technical and exposes a broader allow-listed Match Look proposal', () => {
     const target = summary({ blueMean: 0.45, greenMean: 0.4, lumaMean: 0.25, lumaSpread: 0.08, redMean: 0.35 });
     const warmReference = reference(
@@ -236,6 +267,7 @@ describe('color-managed reference matching', () => {
       appliedAt: '2026-07-13T12:00:00.000Z',
       baseGraphFingerprint: fingerprintReferenceMatchValue('reference-layer-base-graph'),
       destination: 'adjustment-layer',
+      effectiveReferences: proposal.effectiveReferences,
       enabledGroups: ['tone'],
       historyEntriesAdded: 1,
       impact: 40,

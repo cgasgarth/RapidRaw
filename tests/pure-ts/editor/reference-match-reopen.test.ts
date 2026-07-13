@@ -7,6 +7,10 @@ const receipt = matchLookApplicationReceiptV1Schema.parse({
   appliedAt: '2026-07-13T20:00:00.000Z',
   baseGraphFingerprint: `fnv1a64:${'0'.repeat(16)}`,
   destination: 'global-adjustments',
+  effectiveReferences: [
+    { role: 'creative', sourceFingerprint: `fnv1a64:${'4'.repeat(16)}`, weight: 0.75 },
+    { role: 'creative', sourceFingerprint: `fnv1a64:${'5'.repeat(16)}`, weight: 0.25 },
+  ],
   enabledGroups: ['color', 'tone'],
   historyEntriesAdded: 1,
   impact: 75,
@@ -25,6 +29,7 @@ test('reference match provenance round-trips through sidecar normalization and c
   const reopened = normalizeLoadedAdjustments(JSON.parse(saved));
   expect(reopened.exposure).toBe(0.75);
   expect(reopened.referenceMatchApplicationReceipt).toEqual(receipt);
+  expect(reopened.referenceMatchApplicationReceipt?.effectiveReferences).toEqual(receipt.effectiveReferences);
 
   const corrupt = normalizeLoadedAdjustments({
     ...INITIAL_ADJUSTMENTS,
@@ -35,6 +40,12 @@ test('reference match provenance round-trips through sidecar normalization and c
     normalizeLoadedAdjustments({
       ...INITIAL_ADJUSTMENTS,
       referenceMatchApplicationReceipt: { ...receipt, baseGraphFingerprint: undefined },
+    }).referenceMatchApplicationReceipt,
+  ).toBeNull();
+  expect(
+    normalizeLoadedAdjustments({
+      ...INITIAL_ADJUSTMENTS,
+      referenceMatchApplicationReceipt: { ...receipt, effectiveReferences: [] },
     }).referenceMatchApplicationReceipt,
   ).toBeNull();
 });

@@ -84,25 +84,27 @@ export const matchLookNodeDiffV1Schema = z
   })
   .strict();
 
+const effectiveReferenceSetV1Schema = z
+  .array(
+    z
+      .object({
+        role: z.enum(['creative', 'technical']),
+        sourceFingerprint: fingerprintSchema,
+        weight: z.number().positive().max(1),
+      })
+      .strict(),
+  )
+  .min(1)
+  .max(8)
+  .refine((references) => Math.abs(references.reduce((sum, reference) => sum + reference.weight, 0) - 1) < 1e-6, {
+    message: 'Effective reference weights must be normalized.',
+  });
+
 export const matchLookProposalV1Schema = z
   .object({
     confidence: z.number().min(0).max(1),
     diffs: z.array(matchLookNodeDiffV1Schema).min(1).max(6),
-    effectiveReferences: z
-      .array(
-        z
-          .object({
-            role: z.enum(['creative', 'technical']),
-            sourceFingerprint: fingerprintSchema,
-            weight: z.number().positive().max(1),
-          })
-          .strict(),
-      )
-      .min(1)
-      .max(8)
-      .refine((references) => Math.abs(references.reduce((sum, reference) => sum + reference.weight, 0) - 1) < 1e-6, {
-        message: 'Effective reference weights must be normalized.',
-      }),
+    effectiveReferences: effectiveReferenceSetV1Schema,
     mode: referenceMatchModeV1Schema,
     processVersion: z.literal('rapidraw-reference-match-v1'),
     proposalFingerprint: fingerprintSchema,
@@ -131,6 +133,7 @@ export const matchLookApplicationReceiptV1Schema = z
     appliedAt: z.string().datetime(),
     baseGraphFingerprint: fingerprintSchema,
     destination: z.enum(['global-adjustments', 'adjustment-layer']),
+    effectiveReferences: effectiveReferenceSetV1Schema,
     enabledGroups: z.array(referenceMatchGroupV1Schema).min(1),
     historyEntriesAdded: z.literal(1),
     impact: z.number().min(0).max(100),
