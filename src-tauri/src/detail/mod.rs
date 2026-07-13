@@ -76,6 +76,13 @@ pub struct CpuDetailDecompositionV1 {
     low_passes: [Vec<[f32; 3]>; 4],
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct CpuDetailLocalLayerV1<'a> {
+    pub influence: &'a [f32],
+    pub settings: MultiscaleDetailSettingsV1,
+    pub macro_gains: [f32; 4],
+}
+
 impl CpuDetailDecompositionV1 {
     pub fn low_passes_at(&self, index: usize) -> [[f32; 3]; 4] {
         std::array::from_fn(|band| self.low_passes[band][index])
@@ -350,6 +357,49 @@ pub fn apply_cpu_detail(
                 settings,
                 macro_gains,
             )
+        })
+        .collect())
+}
+
+/// Applies global and local creative detail from one shared decomposition.
+///
+/// Local layers contribute a source-relative delta, matching the WGPU mask path:
+/// mask opacity scales detail contribution and never changes decomposition input.
+pub fn apply_cpu_detail_layers(
+    source: &[[f32; 3]],
+    decomposition: &CpuDetailDecompositionV1,
+    global_settings: MultiscaleDetailSettingsV1,
+    global_macro_gains: [f32; 4],
+    local_layers: &[CpuDetailLocalLayerV1<'_>],
+) -> Result<Vec<[f32; 3]>, &'static str> {
+    if source.len() != decomposition.low_passes[0].len() {
+        return Err("detail source and decomposition lengths differ");
+    }
+    if local_layers
+        .iter()
+        .any(|layer| layer.influence.len() != source.len())
+    {
+        return Err("detail mask and source lengths differ");
+    }
+    Ok(source
+        .iter()
+        .enumerate()
+        .map(|(index, source)| {
+            let low_passes = decomposition.low_passes_at(index);
+            let mut output =
+                apply_rgb_reference(*source, low_passes, global_settings, global_macro_gains);
+            for layer in local_layers {
+                let influence = layer.influence[index].clamp(0.0, 1.0);
+                if influence == 0.0 {
+                    continue;
+                }
+                let local =
+                    apply_rgb_reference(*source, low_passes, layer.settings, layer.macro_gains);
+                for channel in 0..3 {
+                    output[channel] += (local[channel] - source[channel]) * influence;
+                }
+            }
+            output
         })
         .collect())
 }
@@ -767,6 +817,70 @@ mod tests {
             .flat_map(|(left, right)| (0..3).map(|channel| (left[channel] - right[channel]).abs()))
             .fold(0.0_f32, f32::max);
         assert!(seam_error <= 0.000_001, "tile seam error {seam_error}");
+    }
+
+    #[test]
+    fn cpu_global_and_local_layers_share_decomposition_and_match_wgpu_delta_composition() {
+        let width = 65;
+        let height = 49;
+        let source = synthetic_rgb(width, height, |x, y| {
+            let edge = if x > width / 2 { 0.48 } else { 0.12 };
+            let texture = if (x + y) % 3 == 0 { 0.025 } else { -0.012 };
+            [edge + texture, edge * 0.8 + texture, edge * 0.55 + texture]
+        });
+        let decomposition = build_cpu_detail_decomposition(&source, width, height).unwrap();
+        let mut global = enabled();
+        global.fine = 0.35;
+        let mut local = enabled();
+        local.medium = -0.25;
+        local.coarse = 0.45;
+        let influence = (0..source.len())
+            .map(|index| if index % 5 == 0 { 0.6 } else { 0.0 })
+            .collect::<Vec<_>>();
+        let global_macro = compile_macro_gains(0.25, 0.2, 0.0, 0.0);
+        let local_macro = compile_macro_gains(0.0, 0.0, 0.3, 0.15);
+        let layered = apply_cpu_detail_layers(
+            &source,
+            &decomposition,
+            global,
+            global_macro,
+            &[CpuDetailLocalLayerV1 {
+                influence: &influence,
+                settings: local,
+                macro_gains: local_macro,
+            }],
+        )
+        .unwrap();
+        let global_only = apply_cpu_detail(&source, &decomposition, global, global_macro).unwrap();
+        for index in 0..source.len() {
+            let local_output = apply_rgb_reference(
+                source[index],
+                decomposition.low_passes_at(index),
+                local,
+                local_macro,
+            );
+            for channel in 0..3 {
+                let expected = global_only[index][channel]
+                    + (local_output[channel] - source[index][channel]) * influence[index];
+                assert!((layered[index][channel] - expected).abs() <= f32::EPSILON);
+            }
+        }
+
+        let invalid_mask = [0.5];
+        assert_eq!(
+            apply_cpu_detail_layers(
+                &source,
+                &decomposition,
+                global,
+                global_macro,
+                &[CpuDetailLocalLayerV1 {
+                    influence: &invalid_mask,
+                    settings: local,
+                    macro_gains: local_macro,
+                }],
+            ),
+            Err("detail mask and source lengths differ")
+        );
     }
 
     #[test]
