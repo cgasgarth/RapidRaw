@@ -96,6 +96,11 @@ describe('performance lab runner', () => {
       'browser.library-open',
     ]);
     expect(performanceScenarios.every(({ version, measuredRuns }) => version > 0 && measuredRuns >= 5)).toBeTrue();
+    expect(
+      new Set(
+        performanceScenarios.filter(({ id }) => id.startsWith('browser.')).map(({ fixtureDigest }) => fixtureDigest),
+      ).size,
+    ).toBe(performanceScenarios.filter(({ id }) => id.startsWith('browser.')).length);
   });
 
   test('preview scheduling records CPU, memory, filesystem, and work metrics', async () => {

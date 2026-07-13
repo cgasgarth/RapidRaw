@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { z } from 'zod';
@@ -108,8 +109,14 @@ const qaReceiptSchema = z.object({
     .length(1),
 });
 
-const browserFixtureDigest = (scenarioId: string) =>
-  `sha256:${createHash('sha256').update(`browser-qa-fixture-v1:${scenarioId}`).digest('hex')}` as const;
+const browserFixtureSources = ['../qa/scenarios.ts', '../../src/validation/browserTauriHarness.mts'].map((path) =>
+  readFileSync(resolve(import.meta.dir, path)),
+);
+const browserFixtureDigest = (scenarioId: string) => {
+  const hash = createHash('sha256').update(`browser-qa-fixture-v2:${scenarioId}\0`);
+  for (const source of browserFixtureSources) hash.update(source).update('\0');
+  return `sha256:${hash.digest('hex')}` as const;
+};
 
 const browserQaScenario = (id: string, qaScenarioId: string): PerformanceScenario => ({
   id,
