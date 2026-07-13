@@ -73,6 +73,10 @@ use serde_json::Value;
 use tauri::{Emitter, Manager, ipc::Response};
 use tempfile::NamedTempFile;
 
+#[cfg(feature = "ai")]
+use crate::ai::ai_commands as build_ai_commands;
+#[cfg(not(feature = "ai"))]
+use crate::app::disabled_commands as build_ai_commands;
 use crate::formats::PNG_DATA_URL_PREFIX;
 use crate::gpu_display::{DisplayTransformState, PresentationSchedulerReport};
 use crate::hdr_artifact_sidecar::write_hdr_output_sidecar;
@@ -83,6 +87,14 @@ use crate::merge::focus_stack::{
 };
 use crate::merge::hdr::{ALIGNMENT_POLICY_ID, HdrAlignmentPlanResponse, build_alignment_plan};
 
+use crate::app::startup::{
+    FrontendStartupPhase, NativeStartupPhase, frontend_ready_manages_native_window,
+    record_frontend_phase_with_followup,
+};
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+use crate::app::startup::{
+    InitializationPriority, request_gpu_initialization, request_lens_initialization,
+};
 use crate::cache_utils::{
     calculate_geometry_hash, calculate_transform_hash, calculate_visual_hash,
 };
@@ -2937,11 +2949,13 @@ fn frontend_ready(
             }
         }
 
-        if let Err(e) = window.show() {
-            log::error!("Failed to show window: {}", e);
-        }
-        if let Err(e) = window.set_focus() {
-            log::error!("Failed to focus window: {}", e);
+        if frontend_ready_manages_native_window(std::env::consts::OS) {
+            if let Err(e) = window.show() {
+                log::error!("Failed to show window: {}", e);
+            }
+            if let Err(e) = window.set_focus() {
+                log::error!("Failed to focus window: {}", e);
+            }
         }
         #[cfg(any(windows, target_os = "linux"))]
         if is_first_run {
@@ -2964,11 +2978,62 @@ fn frontend_ready(
     Ok(())
 }
 
+#[tauri::command]
+fn get_startup_trace(
+    state: tauri::State<'_, AppState>,
+) -> crate::app::startup::StartupTraceSnapshot {
+    state.startup_trace.snapshot()
+}
+
+#[tauri::command]
+fn record_frontend_startup_phase(
+    trace_id: String,
+    phase: FrontendStartupPhase,
+    status: String,
+    detail: Option<String>,
+    state: tauri::State<'_, AppState>,
+    _app: tauri::AppHandle,
+) -> Result<crate::app::startup::StartupTraceSnapshot, String> {
+    record_frontend_phase_with_followup(
+        &state.startup_trace,
+        &trace_id,
+        phase,
+        &status,
+        detail,
+        |_snapshot| {
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
+            if state.startup_trace.arm_idle_warm_after(phase) {
+                let idle_services = _app.clone();
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(Duration::from_millis(1_500)).await;
+                    request_lens_initialization(
+                        idle_services.clone(),
+                        InitializationPriority::IdleWarm,
+                    );
+                    request_gpu_initialization(idle_services, InitializationPriority::IdleWarm);
+                });
+            }
+            #[cfg(feature = "validation-harness")]
+            if phase == FrontendStartupPhase::Interactive
+                && std::env::var("RAWENGINE_STARTUP_BENCHMARK_EDITOR_DEMAND").as_deref() == Ok("1")
+            {
+                image_open_session::promote_editor_initialization(&_app);
+                request_lens_initialization(_app.clone(), InitializationPriority::IdleWarm);
+                request_gpu_initialization(_app, InitializationPriority::IdleWarm);
+            }
+        },
+    )
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg_attr(feature = "validation-harness", allow(unused_mut))]
     let mut builder = tauri::Builder::default();
 
-    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    #[cfg(all(
+        not(any(target_os = "android", target_os = "ios")),
+        not(feature = "validation-harness")
+    ))]
     {
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             log::info!(
@@ -3014,12 +3079,19 @@ pub fn run() {
             if let Some(ctx) = state.gpu_context.lock().unwrap().as_ref() {
                 ctx.presentation.resize(size.width, size.height);
             }
+            #[cfg(target_os = "macos")]
+            crate::app::display_target::request_for_state(&state);
         } else if let tauri::WindowEvent::Moved(_) = event {
             #[cfg(target_os = "macos")]
             {
                 let state = window.state::<AppState>();
-                // Recreate presentation resources so a cross-display move cannot retain the old ICC LUT.
-                *state.gpu_context.lock().unwrap() = None;
+                crate::app::display_target::request_for_state(&state);
+            }
+        } else if let tauri::WindowEvent::Focused(true) = event {
+            #[cfg(target_os = "macos")]
+            {
+                let state = window.state::<AppState>();
+                crate::app::display_target::request_for_state(&state);
             }
         })
         .setup(|app| {
@@ -3033,6 +3105,9 @@ pub fn run() {
             }
 
             let app_handle = app.handle().clone();
+            app.state::<AppState>()
+                .startup_trace
+                .mark(NativeStartupPhase::ProcessStarted, "ok", None);
             let config_dir = app_handle.path().app_config_dir().expect("Failed to get config dir");
             let crash_flag_path = config_dir.join(".gpu_init_crash_flag");
 
@@ -3042,6 +3117,11 @@ pub fn run() {
             }
 
             let mut settings: AppSettings = load_settings_or_default(&app_handle);
+            app.state::<AppState>().startup_trace.mark(
+                NativeStartupPhase::MinimalSettingsLoaded,
+                "ok",
+                None,
+            );
 
             {
                 let state = app.state::<AppState>();
@@ -3055,10 +3135,6 @@ pub fn run() {
                 let _ = crate::save_settings(settings.clone(), app_handle.clone());
                 let _ = std::fs::remove_file(&crash_flag_path);
             }
-
-            let lens_db = lens_correction::load_lensfun_db(&app_handle);
-            let state = app.state::<AppState>();
-            *state.lens_db.lock().unwrap() = Some(Arc::new(lens_db));
 
             unsafe {
                 if let Some(backend) = &settings.processing_backend
@@ -3111,9 +3187,6 @@ pub fn run() {
                 }
             }
 
-            preview_worker::start_preview_worker(app_handle.clone());
-            start_analytics_worker(app_handle.clone());
-            file_management::start_thumbnail_workers(app_handle);
             #[cfg(feature = "advanced-codecs")]
             rapidraw_codecs::register_jxl_decoding_hook();
 
@@ -3141,20 +3214,40 @@ pub fn run() {
             }
 
             let window = window_builder.build().expect("Failed to build window");
+            app.state::<AppState>().startup_trace.mark(
+                NativeStartupPhase::WindowCreated,
+                "ok",
+                None,
+            );
+
+            #[cfg(target_os = "macos")]
+            {
+                let resolver_app = app.handle().clone();
+                let publisher_app = app.handle().clone();
+                let coordinator =
+                    crate::app::display_target::DisplayTargetCoordinator::new_with_publisher(
+                        Duration::from_millis(120),
+                        move |_| crate::app::display_target::resolve_for_app(&resolver_app),
+                        move |change| {
+                            if let Err(error) = publisher_app.emit("display-target-changed", change) {
+                                log::warn!("failed to publish display target change: {error}");
+                            }
+                        },
+                    );
+                coordinator.request_refresh(0);
+                *app.state::<AppState>()
+                    .display_target_coordinator
+                    .lock()
+                    .unwrap() = Some(coordinator);
+                #[cfg(feature = "validation-harness")]
+                crate::app::display_target::start_validation_benchmark(app.handle().clone());
+            }
 
             #[cfg(target_os = "android")]
             android_integration::initialize_android(&window);
 
             #[cfg(not(target_os = "android"))]
             {
-                let app_state = app.state::<AppState>();
-                if let Err(error) = get_or_init_gpu_context(&app_state, app.handle()) {
-                    log::warn!(
-                        "GPU pre-initialization failed (editing and thumbnails may be degraded): {}",
-                        error
-                    );
-                }
-
                 if let Ok(config_dir) = app.path().app_config_dir() {
                     let path = config_dir.join("window_state.json");
                     if let Ok(contents) = std::fs::read_to_string(&path) {
@@ -3169,6 +3262,27 @@ pub fn run() {
                 } else {
                     let _ = window.center();
                 }
+
+                if let Err(error) = window.show() {
+                    log::error!("Failed to show startup shell: {}", error);
+                }
+                if let Err(error) = window.set_focus() {
+                    log::error!("Failed to focus startup shell: {}", error);
+                }
+                app.state::<AppState>().startup_trace.mark(
+                    NativeStartupPhase::WindowVisible,
+                    "ok",
+                    Some("webview-bootstrap-chrome".to_string()),
+                );
+
+                preview_worker::start_preview_worker(app.handle().clone());
+                start_analytics_worker(app.handle().clone());
+                file_management::start_thumbnail_workers(app.handle().clone());
+                app.state::<AppState>().startup_trace.mark(
+                    NativeStartupPhase::CoreCommandsReady,
+                    "ok",
+                    Some("background-services-scheduled".to_string()),
+                );
 
                 let window_failsafe = window.clone();
                 tauri::async_runtime::spawn(async move {
@@ -3294,6 +3408,8 @@ pub fn run() {
             get_image_dimensions,
             is_original_file_available,
             frontend_ready,
+            get_startup_trace,
+            record_frontend_startup_phase,
             library::changefeed::configure_library_changefeed,
             library::changefeed::get_library_changefeed_report,
             library::file_management::get_library_change_rows,
@@ -3307,25 +3423,27 @@ pub fn run() {
             update_wgpu_transform,
             flush_wgpu_presentation,
             get_wgpu_presentation_report,
+            app::display_target::get_display_target_report,
             android_integration::resolve_android_content_uri_name,
             cache_utils::clear_session_caches,
             cache_utils::clear_image_caches,
             app_settings::load_settings,
             app_settings::save_settings,
-            ai::ai_commands::generate_ai_subject_mask,
-            ai::ai_commands::generate_ai_object_mask_proposal,
-            ai::ai_commands::precompute_ai_subject_mask,
-            ai::ai_commands::generate_ai_foreground_mask,
-            ai::ai_commands::generate_ai_sky_mask,
-            ai::ai_commands::generate_ai_depth_mask,
-            ai::ai_commands::generate_ai_whole_person_mask,
-            ai::ai_commands::generate_ai_person_part_mask,
-            ai::ai_commands::get_ai_model_registry_report,
-            ai::ai_commands::cancel_ai_model_load,
-            ai::ai_commands::evict_ai_model_session,
-            ai::ai_commands::check_ai_connector_status,
-            ai::ai_commands::test_ai_connector_connection,
-            ai::ai_commands::invoke_generative_replace_with_mask_def,
+            app::capabilities::get_native_capabilities,
+            build_ai_commands::generate_ai_subject_mask,
+            build_ai_commands::generate_ai_object_mask_proposal,
+            build_ai_commands::precompute_ai_subject_mask,
+            build_ai_commands::generate_ai_foreground_mask,
+            build_ai_commands::generate_ai_sky_mask,
+            build_ai_commands::generate_ai_depth_mask,
+            build_ai_commands::generate_ai_whole_person_mask,
+            build_ai_commands::generate_ai_person_part_mask,
+            build_ai_commands::get_ai_model_registry_report,
+            build_ai_commands::cancel_ai_model_load,
+            build_ai_commands::evict_ai_model_session,
+            build_ai_commands::check_ai_connector_status,
+            build_ai_commands::test_ai_connector_connection,
+            build_ai_commands::invoke_generative_replace_with_mask_def,
             denoise_api::dry_run_denoise_controls,
             denoising::apply_denoising,
             denoising::batch_denoise_images,
