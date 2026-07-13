@@ -31,8 +31,17 @@ export const performanceIdentitySchema = z.object({
 });
 
 export const metricSummarySchema = z.object({
+  iqr: z.number().nonnegative().optional(),
   mad: z.number().nonnegative(),
   median: z.number().nonnegative(),
+  medianConfidence95: z
+    .object({
+      lower: z.number().nonnegative(),
+      method: z.literal('deterministic-bootstrap-2000'),
+      upper: z.number().nonnegative(),
+    })
+    .optional(),
+  p90: z.number().nonnegative().optional(),
   p95: z.number().nonnegative(),
   samples: z.number().int().positive(),
 });

@@ -1,8 +1,11 @@
 import type { MetricSample, PerformanceRunReceipt } from './model';
 
 export interface MetricSummary {
+  iqr: number;
   mad: number;
   median: number;
+  medianConfidence95: { lower: number; method: 'deterministic-bootstrap-2000'; upper: number };
+  p90: number;
   p95: number;
   samples: number;
 }
@@ -19,14 +22,36 @@ const quantile = (values: readonly number[], probability: number): number => {
   return lower + (upper - lower) * (position - lowerIndex);
 };
 
+const bootstrapMedianConfidence95 = (values: readonly number[]): { lower: number; upper: number } => {
+  let state = values.reduce(
+    (hash, value) => Math.imul(hash ^ Math.round(value * 1_000_000), 16_777_619) >>> 0,
+    2_166_136_261,
+  );
+  const next = (): number => {
+    state = (Math.imul(state, 1_664_525) + 1_013_904_223) >>> 0;
+    return state / 2 ** 32;
+  };
+  const medians = Array.from({ length: 2_000 }, () =>
+    quantile(
+      Array.from({ length: values.length }, () => values[Math.floor(next() * values.length)] ?? values[0] ?? 0),
+      0.5,
+    ),
+  );
+  return { lower: quantile(medians, 0.025), upper: quantile(medians, 0.975) };
+};
+
 export function summarizeMetric(values: readonly number[]): MetricSummary {
   const median = quantile(values, 0.5);
+  const confidence = bootstrapMedianConfidence95(values);
   return {
+    iqr: quantile(values, 0.75) - quantile(values, 0.25),
     mad: quantile(
       values.map((value) => Math.abs(value - median)),
       0.5,
     ),
     median,
+    medianConfidence95: { ...confidence, method: 'deterministic-bootstrap-2000' },
+    p90: quantile(values, 0.9),
     p95: quantile(values, 0.95),
     samples: values.length,
   };

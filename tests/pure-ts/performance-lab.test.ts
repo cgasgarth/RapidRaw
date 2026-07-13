@@ -40,8 +40,18 @@ const scenario = (values: readonly number[], assertions = 1): PerformanceScenari
 });
 
 describe('performance lab statistics', () => {
-  test('retains robust median, p95, and median absolute deviation', () => {
-    expect(summarizeMetric([1, 2, 3, 4, 5])).toEqual({ mad: 1, median: 3, p95: 4.8, samples: 5 });
+  test('retains robust percentiles, dispersion, and deterministic median confidence', () => {
+    const first = summarizeMetric([1, 2, 3, 4, 5]);
+    expect(first).toEqual({
+      iqr: 2,
+      mad: 1,
+      median: 3,
+      medianConfidence95: { lower: 1, method: 'deterministic-bootstrap-2000', upper: 5 },
+      p90: 4.6,
+      p95: 4.8,
+      samples: 5,
+    });
+    expect(summarizeMetric([1, 2, 3, 4, 5])).toEqual(first);
   });
 
   test('requires both absolute and relative p95 regression thresholds', () => {
@@ -137,6 +147,14 @@ describe('performance lab runner', () => {
     const candidate = await runPerformanceScenario({ scenario: scenario([0, 14, 14, 14]), identity, now: clock() });
     const comparison = comparePerformanceReceipts(baseline, candidate, scenario([0, 1]).budgets);
     expect(comparison.find(({ metric }) => metric === 'latencyMs')?.regressed).toBe(true);
+    const legacyComparison = comparison.map(({ baseline: left, candidate: right, ...entry }) => ({
+      ...entry,
+      baseline: { mad: left.mad, median: left.median, p95: left.p95, samples: left.samples },
+      candidate: { mad: right.mad, median: right.median, p95: right.p95, samples: right.samples },
+    }));
+    expect(
+      performanceRunReceiptSchema.parse({ ...candidate, comparison: legacyComparison, status: 'regression' }).status,
+    ).toBe('regression');
     expect(() =>
       assertComparableReceipts(baseline, {
         ...candidate,
