@@ -212,7 +212,7 @@ pub(crate) const COLOR_NODE_REGISTRY: &[ColorNodeContract] = &[
     },
     ColorNodeContract {
         id: "black_white_mixer",
-        version: 1,
+        version: 2,
         order: 420,
         input_domain: SCENE_LINEAR,
         output_domain: SCENE_LINEAR,
