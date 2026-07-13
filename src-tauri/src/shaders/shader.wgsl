@@ -1055,7 +1055,11 @@ fn apply_local_contrast(
         let edge_magnitude = abs(log_ratio);
         let normalized_edge = clamp(edge_magnitude / 3.0, 0.0, 1.0);
         let edge_dampener = 1.0 - pow(normalized_edge, 0.5);
-        let edge_mask = smoothstep(threshold * 0.5, threshold * 1.5, edge_magnitude);
+        let edge_mask = select(
+            smoothstep(threshold * 0.5, threshold * 1.5, edge_magnitude),
+            1.0,
+            threshold <= 0.0,
+        );
         effective_amount = amount * edge_dampener * edge_mask * 0.8;
     } else {
         effective_amount = amount;

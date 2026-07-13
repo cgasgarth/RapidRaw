@@ -239,6 +239,7 @@ impl CompiledNodePayload {
                 "tonemapperMode": view.tonemapper_mode, "isRaw": view.is_raw,
                 "pipeToRendering": view.pipe_to_rendering,
                 "renderingToPipe": view.rendering_to_pipe,
+                "rapidViewParameters": view.rapid_view_parameters,
             }),
             Self::DisplayCreative(display) => serde_json::json!({
                 "curves": display.curves, "curveCounts": display.curve_counts,
@@ -410,6 +411,7 @@ pub struct ViewTransformPayload {
     pub is_raw: bool,
     pub pipe_to_rendering: GpuMat3,
     pub rendering_to_pipe: GpuMat3,
+    pub rapid_view_parameters: [[f32; 4]; 3],
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1055,6 +1057,11 @@ fn compile_node_payload(
                 is_raw: global.is_raw_image != 0,
                 pipe_to_rendering: global.agx_pipe_to_rendering_matrix,
                 rendering_to_pipe: global.agx_rendering_to_pipe_matrix,
+                rapid_view_parameters: [
+                    global.rapid_view_parameters0,
+                    global.rapid_view_parameters1,
+                    global.rapid_view_parameters2,
+                ],
             })
         }
         EditNodeKind::DisplayCreative => {

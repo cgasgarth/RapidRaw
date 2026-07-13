@@ -3154,6 +3154,17 @@ mod blur_pass_tests {
                     "chromaticAberrationBlueYellow": -16
                 }),
             ),
+            (
+                "rapid_view",
+                json!({
+                    "toneMapper": "rapidView",
+                    "viewTransform": {
+                        "contrast": 1.35, "latitude": 0.6,
+                        "toe": 0.45, "shoulder": 0.7,
+                        "chromaCompression": 0.3
+                    }
+                }),
+            ),
             ("exposure", json!({"exposure": 18})),
             ("negative_highlights", json!({"highlights": -12})),
             (
@@ -3283,7 +3294,7 @@ mod blur_pass_tests {
                 crate::render_plan::CompileRenderPlanContext {
                     revision: crate::render_plan::content_revision(&raw, 3, 7, case_index as u64),
                     is_raw: false,
-                    tonemapper_override: Some(0),
+                    tonemapper_override: (label != "rapid_view").then_some(0),
                 },
                 None,
             )
@@ -3476,6 +3487,7 @@ mod blur_pass_tests {
                     mask_bitmaps: &[],
                     lut: None,
                     roi: None,
+                    edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
                 },
                 "rapid_view_parity",
             )

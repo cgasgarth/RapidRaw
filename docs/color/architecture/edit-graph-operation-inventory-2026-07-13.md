@@ -18,7 +18,7 @@ ownership without duplicating the ABI field schema.
 | Color balance RGB, channel mixer, levels, B&W mixer | scene global; AP1 scene-linear | `color/mixer_render.rs`, `shaders/shader.wgsl`, `render/cpu_edit_graph.rs` | AP1 luminance; no v2 0..1 output clamp | `SceneGlobalPayload` |
 | Color grading and masked layer blending | scene global/local composition; AP1 scene-linear | `shaders/shader.wgsl`, `render/cpu_edit_graph.rs` | mask influence bounded; same math and placement globally/locally | `SceneGlobalPayload`, `LocalScene` |
 | Film emulation/look inputs | scene/look contract; AP1 scene-linear | film render-plan integration and LUT compiler | declared film/LUT ABI; no hidden JSON reparse | graph/output fingerprints; coordinated with film issues |
-| Basic/AgX view transform | scene-to-view; AP1 scene-linear → view encoded | second v2 WGPU dispatch, `render/cpu_edit_graph.rs` | explicit extended transfer/view transform | `ViewTransformPayload` |
+| Basic/AgX/Rapid View transform | scene-to-view; AP1 scene-linear → view encoded | second v2 WGPU dispatch, `color/view_transform/mod.rs`, `render/cpu_edit_graph.rs` | explicit extended transfer/view transform | `ViewTransformPayload` |
 | Tone/RGB curves, creative LUT, grain | display creative; view encoded | third v2 WGPU dispatch, `render/cpu_edit_graph.rs` | view-encoded luma; tetrahedral LUT input rules; grain mask bounds | `DisplayCreativePayload`, local curve payloads |
 | Clipping/gamut warning | display overlay; view encoded | `shaders/shader.wgsl`, proof/gamut modules | explicit display thresholds only | `ClippingOverlay` |
 | Display profile and native presentation | output/display transform | `color/working_to_output_transform.rs`, `gpu/gpu_display.rs` | output gamut/profile conversion | view/output identity |
@@ -38,7 +38,7 @@ rejected before CPU or WGPU execution.
 | --- | --- | --- |
 | `SceneGlobalPayload` | exposure; brightness; contrast; highlights; shadows; whites; blacks; saturation; temperature; tint; vibrance; hue; sharpness + threshold; luma/chroma NR; clarity; dehaze; structure; centre; CA red/cyan + blue/yellow; glow; halation; flare; vignette; calibration; color-balance RGB; channel mixer; B&W mixer; levels; eight HSL bands; four grading wheels + blending/balance | AP1 scene-global dispatch |
 | `LocalScenePayload` | per-layer exposure/basic tone; WB; saturation/vibrance/hue; detail/NR; glow/halation/flare; eight HSL bands; four grading wheels; blend mode | AP1 local composition in the scene dispatch |
-| `ViewTransformPayload` | tone-mapper mode; RAW/non-RAW behavior; AgX pipe/rendering matrices | scene-to-view dispatch |
+| `ViewTransformPayload` | tone-mapper mode; RAW/non-RAW behavior; AgX pipe/rendering matrices; Rapid View compiled parameters and fingerprint | scene-to-view dispatch |
 | `DisplayCreativePayload` | global and per-layer luma/R/G/B curves; LUT enabled/intensity; grain amount/size/roughness; per-layer blend mode | view-encoded display dispatch |
 | `ClippingOverlay` | clipping-warning enable | display dispatch |
 | `RenderTransport` | view/output identity, absolute-coordinate dither, final transport | display/output dispatch |

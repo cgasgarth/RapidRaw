@@ -126,6 +126,7 @@ pub const FIELD_OWNERSHIP: &[(&str, RenderStage, &str)] = &[
     ("lutPath/lutIntensity", RenderStage::Color, "none/100"),
     ("showClipping", RenderStage::Output, "false"),
     ("toneMapper", RenderStage::Output, "basic"),
+    ("viewTransform", RenderStage::Output, "Rapid View defaults"),
 ];
 
 #[derive(Default)]
@@ -900,6 +901,19 @@ mod tests {
                 ]
             }
         });
+        let rapid_default = json!({
+            "rawEngineEditGraphVersion": 2,
+            "toneMapper": "rapidView",
+            "exposure": 10,
+            "curves": base["curves"].clone()
+        });
+        let rapid_custom = json!({
+            "rawEngineEditGraphVersion": 2,
+            "toneMapper": "rapidView",
+            "viewTransform": {"contrast": 1.6, "shoulder": 0.8, "toe": 0.7},
+            "exposure": 10,
+            "curves": base["curves"].clone()
+        });
         let compile = |raw: &serde_json::Value| {
             compile_render_plan(raw, context(77), None)
                 .unwrap()
@@ -908,6 +922,8 @@ mod tests {
         let base = compile(&base);
         let exposure = compile(&exposure);
         let display_curve = compile(&display_curve);
+        let rapid_default = compile(&rapid_default);
+        let rapid_custom = compile(&rapid_custom);
         let fingerprint = |graph: &crate::edit_graph::CompiledEditGraph, id| {
             graph
                 .nodes
@@ -941,6 +957,20 @@ mod tests {
         assert_ne!(
             fingerprint(&base, "display_creative"),
             fingerprint(&display_curve, "display_creative")
+        );
+        for stable in [
+            "scene_global_color_tone",
+            "display_creative",
+            "render_transport",
+        ] {
+            assert_eq!(
+                fingerprint(&rapid_default, stable),
+                fingerprint(&rapid_custom, stable)
+            );
+        }
+        assert_ne!(
+            fingerprint(&rapid_default, "scene_to_view_transform"),
+            fingerprint(&rapid_custom, "scene_to_view_transform")
         );
     }
 

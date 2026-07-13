@@ -9,6 +9,9 @@ use image::{DynamicImage, ImageBuffer, Luma, Rgba};
 use crate::adjustments::abi::{
     AllAdjustments, ColorCalibrationSettings, ColorGradeSettings, HslColor, LevelsSettings, Point,
 };
+use crate::color::view_transform::{
+    RAPID_VIEW_IMPLEMENTATION_VERSION, ViewColorStrategy, ViewTransformPlanV1, ViewTransformProcess,
+};
 use crate::edit_graph::CompiledEditGraph;
 use crate::lut_processing::Lut;
 use crate::mixer_render::{apply_black_white_mixer, apply_channel_mixer, apply_color_balance_rgb};
@@ -305,7 +308,10 @@ pub(crate) fn execute_cpu_edit_graph(
             // dispatch. Mirror its finite storage range in the CPU reference.
             color = color.map(round_rgba16f_storage);
         }
-        color = if adjustments.global.tonemapper_mode == 1 {
+        color = if adjustments.global.tonemapper_mode == 2 {
+            let mapped = rapid_view_plan(adjustments).apply_rgb(color.to_array());
+            linear_to_srgb_extended(Vec3::from_array(mapped))
+        } else if adjustments.global.tonemapper_mode == 1 {
             agx_full_transform(color, adjustments)
         } else if adjustments.global.is_raw_image == 1 {
             let encoded = if preserve_extended {
@@ -526,10 +532,12 @@ fn apply_local_contrast(
     let log_ratio = (center_luma.max(0.0001) / scene_luminance(blurred).max(0.0001)).log2();
     let effective = if mode == 0 {
         let edge = log_ratio.abs();
-        amount
-            * (1.0 - (edge / 3.0).clamp(0.0, 1.0).sqrt())
-            * smoothstep(threshold * 0.5, threshold * 1.5, edge)
-            * 0.8
+        let edge_mask = if threshold <= 0.0 {
+            1.0
+        } else {
+            smoothstep(threshold * 0.5, threshold * 1.5, edge)
+        };
+        amount * (1.0 - (edge / 3.0).clamp(0.0, 1.0).sqrt()) * edge_mask * 0.8
     } else {
         amount
     };
@@ -1355,6 +1363,28 @@ fn linear_to_srgb(color: Vec3) -> Vec3 {
 
 fn linear_to_srgb_extended(color: Vec3) -> Vec3 {
     color.map(|channel| channel.signum() * srgb_encode_magnitude(channel.abs()))
+}
+
+fn rapid_view_plan(adjustments: &AllAdjustments) -> ViewTransformPlanV1 {
+    let p0 = adjustments.global.rapid_view_parameters0;
+    let p1 = adjustments.global.rapid_view_parameters1;
+    let p2 = adjustments.global.rapid_view_parameters2;
+    ViewTransformPlanV1 {
+        process: ViewTransformProcess::RapidViewV1,
+        scene_grey: p0[0],
+        source_black_ev: p0[1],
+        source_white_ev: p0[2],
+        target_black_linear: p0[3],
+        target_white_linear: p1[0],
+        toe_width_ev: p1[1],
+        shoulder_width_ev: p1[2],
+        exposure_scale: p1[3],
+        output_power: p2[0],
+        chroma_compression: p2[1],
+        color_strategy: ViewColorStrategy::LuminanceRatio,
+        fingerprint: u64::from(p2[2].to_bits()) | (u64::from(p2[3].to_bits()) << 32),
+        implementation_version: RAPID_VIEW_IMPLEMENTATION_VERSION,
+    }
 }
 
 fn srgb_encode_magnitude(channel: f32) -> f32 {
