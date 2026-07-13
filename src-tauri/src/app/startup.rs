@@ -180,6 +180,7 @@ pub enum NativeStartupPhase {
     FrontendInteractive,
     FrontendSettingsHydrated,
     FrontendLibraryReady,
+    FrontendLibraryViewportVisible,
     FrontendEditorReady,
 }
 
@@ -190,6 +191,7 @@ pub enum FrontendStartupPhase {
     Interactive,
     SettingsHydrated,
     LibraryReady,
+    LibraryViewportVisible,
     EditorReady,
 }
 
@@ -200,6 +202,7 @@ impl From<FrontendStartupPhase> for NativeStartupPhase {
             FrontendStartupPhase::Interactive => Self::FrontendInteractive,
             FrontendStartupPhase::SettingsHydrated => Self::FrontendSettingsHydrated,
             FrontendStartupPhase::LibraryReady => Self::FrontendLibraryReady,
+            FrontendStartupPhase::LibraryViewportVisible => Self::FrontendLibraryViewportVisible,
             FrontendStartupPhase::EditorReady => Self::FrontendEditorReady,
         }
     }
@@ -361,6 +364,20 @@ impl StartupTrace {
             })
         };
         if !has_phase(NativeStartupPhase::FrontendLibraryReady, None) {
+            return;
+        }
+        if std::env::var_os("RAWENGINE_STARTUP_BENCHMARK_LAST_FOLDER").is_some()
+            && !has_phase(
+                NativeStartupPhase::FrontendLibraryViewportVisible,
+                Some("ok"),
+            )
+        {
+            return;
+        }
+        if std::env::var("RAWENGINE_STARTUP_BENCHMARK_EDITOR_DEMAND").as_deref() == Ok("1")
+            && (!has_phase(NativeStartupPhase::GpuReady, None)
+                || !has_phase(NativeStartupPhase::LibraryServicesReady, None))
+        {
             return;
         }
         if std::env::var("RAWENGINE_STARTUP_INJECT_GPU_FAILURE").as_deref() == Ok("1")
@@ -676,6 +693,23 @@ mod tests {
         assert_eq!(
             snapshot.phases.last().unwrap().phase,
             NativeStartupPhase::FrontendShellVisible
+        );
+
+        let viewport = record_frontend_phase(
+            &trace,
+            &trace_id,
+            FrontendStartupPhase::LibraryViewportVisible,
+            "ok",
+            Some("last-folder-first-viewport:images=1".to_string()),
+        )
+        .unwrap();
+        assert_eq!(
+            viewport.phases.last().unwrap().phase,
+            NativeStartupPhase::FrontendLibraryViewportVisible
+        );
+        assert_eq!(
+            viewport.phases.last().unwrap().detail.as_deref(),
+            Some("last-folder-first-viewport:images=1")
         );
 
         assert_eq!(

@@ -9,6 +9,7 @@ export interface StartupHardwarePolicy {
   firstPaintMs: number;
   hardwareClass: StartupHardwareClass;
   interactionResponseMs: number;
+  maxDistributionAttempts: number;
   maxColdToWarmInteractiveRatio: number | null;
   maxColdToWarmInteractiveSlackMs: number;
 }
@@ -20,6 +21,7 @@ const policies: Record<StartupHardwareClass, StartupHardwarePolicy> = {
     firstPaintMs: 750,
     hardwareClass: 'default-macos-arm64',
     interactionResponseMs: 100,
+    maxDistributionAttempts: 1,
     maxColdToWarmInteractiveRatio: null,
     maxColdToWarmInteractiveSlackMs: 0,
   },
@@ -29,10 +31,19 @@ const policies: Record<StartupHardwareClass, StartupHardwarePolicy> = {
     firstPaintMs: 750,
     hardwareClass: 'github-hosted-macos-arm64',
     interactionResponseMs: 100,
+    maxDistributionAttempts: 2,
     maxColdToWarmInteractiveRatio: 1.25,
     maxColdToWarmInteractiveSlackMs: 100,
   },
 };
+
+export class StartupDistributionRegression extends Error {}
+
+export const shouldRetryStartupDistribution = (
+  error: unknown,
+  completedAttempts: number,
+  policy: StartupHardwarePolicy,
+): boolean => error instanceof StartupDistributionRegression && completedAttempts < policy.maxDistributionAttempts;
 
 export const resolveStartupHardwarePolicy = (value: string | undefined): StartupHardwarePolicy => {
   const hardwareClass = startupHardwareClassSchema.parse(value ?? 'default-macos-arm64');
@@ -48,7 +59,9 @@ export const percentile95 = (values: number[]): number => {
 
 export const assertResponseDistribution = (values: number[], budgetMs: number): number => {
   const p95 = percentile95(values);
-  if (p95 > budgetMs) throw new Error(`startup response p95 ${p95}ms exceeded ${budgetMs}ms`);
+  if (p95 > budgetMs) {
+    throw new StartupDistributionRegression(`startup response p95 ${p95}ms exceeded ${budgetMs}ms`);
+  }
   return p95;
 };
 
@@ -60,7 +73,7 @@ export const assertColdWarmInteractiveRegression = (
   if (policy.maxColdToWarmInteractiveRatio === null) return;
   const limit = warmP95 * policy.maxColdToWarmInteractiveRatio + policy.maxColdToWarmInteractiveSlackMs;
   if (coldP95 > limit) {
-    throw new Error(
+    throw new StartupDistributionRegression(
       `${policy.hardwareClass}: cold interactive p95 ${coldP95}ms exceeded warm-relative limit ${limit}ms`,
     );
   }

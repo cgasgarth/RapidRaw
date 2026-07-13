@@ -1,17 +1,126 @@
 name: Performance Regression
 
 on:
+  pull_request:
+    paths:
+      - '.github/workflows/performance.yml'
+      - 'scripts/perf/**'
+      - 'scripts/qa/**'
+      - 'src/components/modals/computational-merge/**'
+      - 'src/components/modals/navigation/ImportSettingsModal.tsx'
+      - 'src/components/panel/MainLibrary.tsx'
+      - 'src/components/panel/editor/**'
+      - 'src/components/panel/right/export/**'
+      - 'src/hooks/ai/useAiConnectorStatus.ts'
+      - 'src/hooks/library/useFileOperations.ts'
+      - 'src/utils/adjustmentSnapshots.ts'
+      - 'src/validation/browserTauriHarness.mts'
+      - 'tests/pure-ts/performance-lab*.test.ts'
+  schedule:
+    - cron: '17 8 * * 2'
   workflow_dispatch:
     inputs:
       ref:
         description: Branch, tag, or commit SHA to validate.
         required: true
         default: main
+      baseline-history-path:
+        description: Optional checked-out append-only baseline history JSON; when set, the trend gate is fail-closed.
+        required: false
+        default: ''
+      native-fixture-path:
+        description: Absolute private RAW path on the dedicated macOS performance runner.
+        required: false
+        default: ''
 
 permissions:
   contents: read
 
 jobs:
+  performance-lab:
+    name: performance lab / ${{ matrix.scenario }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario:
+          - editor.preview-scheduling
+          - browser.editor-open
+          - browser.editor-compare
+          - browser.editor-crop
+          - browser.library-open
+          - jobs.export-mixed-batch
+          - jobs.import-batch
+          - jobs.ai-capability-first-use-cold
+          - jobs.ai-capability-first-use-warm
+          - jobs.computational-hdr-merge
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 1
+
+      - uses: ./.github/actions/setup-bun-deps
+
+      - name: Install Chromium for end-to-end scenarios
+        if: ${{ startsWith(matrix.scenario, 'browser.') || startsWith(matrix.scenario, 'jobs.') }}
+        run: bunx playwright install --with-deps chromium
+
+      - name: Run versioned end-to-end performance scenario
+        env:
+          PERF_SCENARIO: ${{ matrix.scenario }}
+        run: bun perf run "$PERF_SCENARIO" --profile ci --output "artifacts/performance-lab/$PERF_SCENARIO.json"
+
+      - name: Enforce approved trend baseline
+        if: ${{ always() && inputs.baseline-history-path != '' }}
+        env:
+          BASELINE_HISTORY_PATH: ${{ inputs.baseline-history-path }}
+          PERF_SCENARIO: ${{ matrix.scenario }}
+        run: bun perf ci-gate --history "$BASELINE_HISTORY_PATH" --candidate "artifacts/performance-lab/$PERF_SCENARIO.json" --output "artifacts/performance-lab/$PERF_SCENARIO.gate.json"
+
+      - name: Build performance artifact upload manifest
+        if: ${{ always() }}
+        shell: bash
+        env:
+          PERF_SCENARIO: ${{ matrix.scenario }}
+        run: |
+          set -euo pipefail
+          candidate="artifacts/performance-lab/$PERF_SCENARIO.json"
+          gate="artifacts/performance-lab/$PERF_SCENARIO.gate.json"
+          files=(--file "$candidate")
+          if [[ -f "$gate" ]]; then
+            files+=(--file "$gate")
+          fi
+          bun perf artifact-manifest --receipt "$candidate" "${files[@]}" --output "artifacts/performance-lab/$PERF_SCENARIO.manifest.json"
+
+      - name: Summarize performance lab
+        if: ${{ always() }}
+        shell: bash
+        env:
+          BASELINE_HISTORY_PATH: ${{ inputs.baseline-history-path }}
+          PERF_SCENARIO: ${{ matrix.scenario }}
+        run: |
+          set -euo pipefail
+          baseline_label="${BASELINE_HISTORY_PATH:-trend-only (no gate)}"
+          {
+            echo "### Performance lab"
+            echo "- Scenario: \`$PERF_SCENARIO\`"
+            echo "- Baseline history: \`$baseline_label\`"
+            if [[ -f "artifacts/performance-lab/$PERF_SCENARIO.gate.json" ]]; then
+              echo "- Gate: \`$(jq -r .status "artifacts/performance-lab/$PERF_SCENARIO.gate.json")\`"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload performance lab artifacts
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: performance-lab-${{ matrix.scenario }}
+          path: artifacts/performance-lab/**
+          retention-days: 30
+          if-no-files-found: error
+
   performance-smoke:
     name: performance smoke
     runs-on: ubuntu-latest
@@ -19,7 +128,7 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ inputs.ref || github.sha }}
           fetch-depth: 1
 
       - uses: ./.github/actions/setup-bun-deps
@@ -56,36 +165,42 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
 
-  readiness:
-    name: performance readiness / ${{ matrix.lane }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - lane: preview-latency
-            anchor: 'Slider preview update'
-          - lane: large-image-memory
-            anchor: 'Large panorama memory behavior'
+  native-performance-lab:
+    name: native performance lab
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.native-fixture-path != '' }}
+    runs-on: [self-hosted, macOS, ARM64]
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ inputs.ref || github.sha }}
           fetch-depth: 1
 
-      - name: Verify planned performance lane
-        shell: bash
+      - uses: ./.github/actions/setup-bun-deps
+
+      - name: Run cold native RAW scenario
+        env:
+          RAWENGINE_PERF_NATIVE_FIXTURE: ${{ inputs.native-fixture-path }}
+        run: bun perf run native.editor-raw-open-cold --profile native-dedicated --output artifacts/performance-lab/native.editor-raw-open-cold.json
+
+      - name: Run warm native RAW scenario with the validated build
+        env:
+          RAWENGINE_PERF_NATIVE_FIXTURE: ${{ inputs.native-fixture-path }}
+          RAWENGINE_PERF_NATIVE_NO_BUILD: '1'
+        run: bun perf run native.editor-raw-open-warm --profile native-dedicated --output artifacts/performance-lab/native.editor-raw-open-warm.json
+
+      - name: Run native cold and warm startup scenarios
+        env:
+          RAWENGINE_PERF_STARTUP_BINARY: ${{ github.workspace }}/src-tauri/target/debug/bundle/macos/RawEngine QA Current.app/Contents/MacOS/RapidRAW
         run: |
-          set -euo pipefail
+          bun perf run native.startup-shell-cold --profile native-dedicated --output artifacts/performance-lab/native.startup-shell-cold.json
+          bun perf run native.startup-shell-warm --profile native-dedicated --output artifacts/performance-lab/native.startup-shell-warm.json
 
-          grep -Fq "#### Performance Regression" RAW_EDITOR_PLAN.md
-          grep -Fq "${{ matrix.anchor }}" RAW_EDITOR_PLAN.md
-
-          {
-            echo "### Performance readiness"
-            echo "- Lane: \`${{ matrix.lane }}\`"
-            echo "- Tracking anchor: \`${{ matrix.anchor }}\`"
-            echo "- Status: topology scaffold only; this does not claim runtime performance coverage yet."
-            echo "- Promotion path: replace this readiness lane with a real benchmark command when the linked validation issue lands."
-          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload native performance receipts
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-performance-lab
+          path: artifacts/performance-lab/native.*.json
+          retention-days: 30
+          if-no-files-found: error

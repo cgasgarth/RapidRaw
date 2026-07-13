@@ -953,6 +953,8 @@ pub struct GpuProcessor {
     resource_cache: Mutex<GpuResourceCache>,
     main_bind_group_cache: Mutex<Option<CachedMainBindGroup>>,
     blur_surface_cache: Mutex<BlurSurfaceCache>,
+    last_execution_receipt: Mutex<Option<GpuExecutionReceipt>>,
+    execution_sequence: AtomicU64,
     blur_bgl: wgpu::BindGroupLayout,
     h_blur_pipeline: wgpu::ComputePipeline,
     v_blur_pipeline: wgpu::ComputePipeline,
@@ -993,6 +995,14 @@ const FLARE_MAP_SIZE: u32 = 512;
 impl GpuProcessor {
     pub fn resource_cache_counters(&self) -> GpuResourceCacheCounters {
         self.resource_cache.lock().unwrap().counters
+    }
+
+    pub fn last_execution_receipt(&self) -> Option<GpuExecutionReceipt> {
+        *self.last_execution_receipt.lock().unwrap()
+    }
+
+    pub fn execution_sequence(&self) -> u64 {
+        self.execution_sequence.load(Ordering::Acquire)
     }
 
     pub fn new(context: GpuContext, max_width: u32, max_height: u32) -> Result<Self, String> {
@@ -1449,6 +1459,8 @@ impl GpuProcessor {
             }),
             main_bind_group_cache: Mutex::new(None),
             blur_surface_cache: Mutex::new(BlurSurfaceCache::default()),
+            last_execution_receipt: Mutex::new(None),
+            execution_sequence: AtomicU64::new(0),
             blur_bgl,
             h_blur_pipeline,
             v_blur_pipeline,
@@ -2223,6 +2235,8 @@ impl GpuProcessor {
             estimated_peak_resource_bytes: graph.estimated_peak_resource_bytes,
             cpu_encode_time,
         };
+        *self.last_execution_receipt.lock().unwrap() = Some(receipt);
+        self.execution_sequence.fetch_add(1, Ordering::Release);
         log::debug!("GPU execution receipt: {receipt:?}");
 
         Ok((final_pixels, out_width, out_height, bounds.x, bounds.y))
