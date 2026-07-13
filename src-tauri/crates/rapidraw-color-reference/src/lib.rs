@@ -17,6 +17,7 @@ pub mod lab;
 pub mod matrix;
 pub mod metrics;
 pub mod output;
+pub mod perceptual;
 pub mod transfer;
 pub mod types;
 
