@@ -32,6 +32,23 @@ const fixture = rawDevelopmentReportSchema.parse({
     warningCodes: [],
   },
   demosaicPath: 'bayer_hq',
+  highlightReconstruction: {
+    algorithmId: 'sensor_linear_confidence_hierarchy_v2',
+    cfaKind: 'bayer',
+    clippedSamples: 12,
+    confidencePercentiles: [0.2, 0.45, 0.7, 0.9, 1],
+    implementationVersion: 2,
+    invalidSamples: 0,
+    largestClippedRegion: 5,
+    methodCounts: { cross_channel_ratio: 8, same_channel_spatial: 4 },
+    mode: 'strong',
+    nearClippedSamples: 7,
+    partiallyReconstructedSamples: 1,
+    postDemosaicFallbackSamples: 0,
+    reconstructedSamples: 11,
+    unrecoverableSamples: 1,
+    warningCodes: ['highlight_reconstruction_partial'],
+  },
   processingProfile: 'maximum',
   runtime: {
     cacheHit: false,
@@ -71,6 +88,7 @@ const requiredMarkers: Array<[keyof typeof files, string]> = [
   ['metadataPanel', 'data-testid="metadata-camera-profile-provenance-receipt"'],
   ['metadataPanel', 'data-testid="metadata-raw-processing-mode"'],
   ['metadataPanel', 'data-testid="metadata-raw-demosaic-provenance"'],
+  ['metadataPanel', 'data-testid="metadata-raw-highlight-reconstruction"'],
   ['metadataPanel', 'data-testid="metadata-raw-runtime-receipt"'],
   ['metadataPanel', 'data-testid="metadata-raw-warning-chips"'],
   ['metadataPanel', "data-raw-warning-codes={rawWarningChips.map((chip) => chip.code).join(',')}"],
@@ -99,6 +117,14 @@ if (missing.length > 0) {
 
 if (fixture.cameraProfile.status !== 'interpolated' || fixture.cameraProfile.matrixHash === null) {
   console.error('camera profile provenance fixture did not parse expected interpolated report');
+  process.exit(1);
+}
+if (
+  fixture.highlightReconstruction.algorithmId !== 'sensor_linear_confidence_hierarchy_v2' ||
+  fixture.highlightReconstruction.reconstructedSamples !== 11 ||
+  fixture.highlightReconstruction.unrecoverableSamples !== 1
+) {
+  console.error('highlight reconstruction provenance fixture did not preserve the strict V2 receipt');
   process.exit(1);
 }
 const receipt = buildCameraProfileProvenanceReceipt(fixture);
