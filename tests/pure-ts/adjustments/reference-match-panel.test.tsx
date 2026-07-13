@@ -94,6 +94,11 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
   expect(container.querySelector('[data-testid="reference-match-thumbnail"]')?.getAttribute('alt')).toContain(
     'reference.ARW',
   );
+  await changeSelect(container, '[data-testid="reference-match-role"]', 'technical');
+  expect(useEditorStore.getState().referenceMatchReferences[0]?.role).toBe('technical');
+  expect(container.querySelector<HTMLButtonElement>('[data-testid="reference-match-normalize"]')?.disabled).toBe(false);
+  expect(container.querySelector<HTMLButtonElement>('[data-testid="reference-match-propose"]')?.disabled).toBe(true);
+  await changeSelect(container, '[data-testid="reference-match-role"]', 'creative');
 
   useUIStore.getState().setUI({ activeView: 'editor' });
   await click(container, '[data-testid="reference-match-reveal"]');
@@ -150,6 +155,9 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
   );
   expect(container.querySelector('[data-testid="reference-match-proposal"]')?.textContent).toContain(
     'creativeTemperature',
+  );
+  expect(container.querySelector('[data-testid="reference-match-effective-references"]')?.textContent).toContain(
+    'Creative 100%',
   );
   expect(useEditorStore.getState().historyIndex).toBe(historyBeforeProposal);
   expect(useEditorStore.getState().adjustments).toEqual(initial);
@@ -220,6 +228,16 @@ async function click(container: Element, selector: string) {
   if (!element) throw new Error(`Missing ${selector}`);
   await act(async () => {
     element.click();
+    await flushPromises();
+  });
+}
+
+async function changeSelect(container: Element, selector: string, value: string) {
+  const element = container.querySelector<HTMLSelectElement>(selector);
+  if (!element) throw new Error(`Missing ${selector}`);
+  await act(async () => {
+    element.value = value;
+    element.dispatchEvent(new window.Event('change', { bubbles: true }));
     await flushPromises();
   });
 }
