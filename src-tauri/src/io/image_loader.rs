@@ -1938,4 +1938,64 @@ mod tests {
         )
         .expect("write capture sharpening proof report");
     }
+
+    #[test]
+    fn private_white_balance_plan_profile_runtime_proof_when_enabled() {
+        if std::env::var("RAWENGINE_RUN_PRIVATE_WHITE_BALANCE_PLAN_PROOF")
+            .ok()
+            .as_deref()
+            != Some("1")
+        {
+            return;
+        }
+
+        let source_path = std::env::var("RAWENGINE_PRIVATE_RAW_SOURCE")
+            .expect("RAWENGINE_PRIVATE_RAW_SOURCE must point to a private RAW");
+        let source_bytes = fs::read(&source_path).expect("read private RAW");
+        let settings = AppSettings::default();
+        let render = |kelvin: f64, duv: f64| {
+            let adjustments = serde_json::json!({
+                "whiteBalanceTechnical": {
+                    "mode": "kelvin_tint",
+                    "kelvin": kelvin,
+                    "duv": duv
+                }
+            });
+            let (image, report) = load_and_composite_with_report(
+                &source_bytes,
+                &source_path,
+                &adjustments,
+                false,
+                &settings,
+                None,
+            )
+            .expect("adjustment-aware private RAW decode succeeds");
+            let report = report.expect("private RAW emits development report");
+            let pixel_hash = format!("blake3:{}", blake3::hash(image.as_bytes()).to_hex());
+            (image.dimensions(), pixel_hash, report.camera_profile)
+        };
+
+        let tungsten = render(2_856.0, 0.012);
+        let tungsten_repeat = render(2_856.0, 0.012);
+        let daylight = render(6_004.0, -0.004);
+
+        assert_eq!(tungsten.0, tungsten_repeat.0);
+        assert_eq!(tungsten.1, tungsten_repeat.1);
+        assert_eq!(
+            tungsten.2.white_balance_plan_fingerprint,
+            tungsten_repeat.2.white_balance_plan_fingerprint
+        );
+        assert_eq!(
+            tungsten.2.illuminant_estimate_method,
+            "white_balance_plan_v1"
+        );
+        assert_eq!(tungsten.2.profile_illuminant_duv, Some(0.012));
+        assert_eq!(daylight.2.profile_illuminant_duv, Some(-0.004));
+        assert_ne!(
+            tungsten.2.white_balance_plan_fingerprint,
+            daylight.2.white_balance_plan_fingerprint
+        );
+        assert_ne!(tungsten.2.matrix_hash, daylight.2.matrix_hash);
+        assert_ne!(tungsten.1, daylight.1);
+    }
 }
