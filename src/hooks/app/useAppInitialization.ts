@@ -20,7 +20,7 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
 import { COPYABLE_ADJUSTMENT_KEYS, DisplayMode, PasteMode } from '../../utils/adjustments';
-import { createFrontendStartupReporter } from '../../utils/startup/startupTraceReporter';
+import { frontendStartupReporter } from '../../utils/startup/startupTraceReporter';
 import { DEFAULT_THEME_ID, THEMES, type ThemeProps } from '../../utils/themes';
 import { clampPanelScopesHeight } from '../../utils/waveformSizing';
 
@@ -83,9 +83,7 @@ export const useAppInitialization = ({
   setLibraryViewMode,
 }: UseAppInitializationProps) => {
   const isInitialMount = useRef(true);
-  const startupReporterRef = useRef<ReturnType<typeof createFrontendStartupReporter> | null>(null);
-  startupReporterRef.current ??= createFrontendStartupReporter();
-  const startupReporter = startupReporterRef.current;
+  const startupReporter = frontendStartupReporter;
   const { i18n } = useTranslation();
 
   const {

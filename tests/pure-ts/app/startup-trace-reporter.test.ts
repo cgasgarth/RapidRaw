@@ -15,6 +15,40 @@ const snapshot = (traceId = 'startup:trace-42'): StartupTraceSnapshot => ({
 });
 
 describe('frontend startup trace reporter', () => {
+  test('publishes interactive receipts only after both measured native round trips complete', async () => {
+    let resolveFrontendReady: (() => void) | undefined;
+    let resolveStartupTrace: ((value: StartupTraceSnapshot) => void) | undefined;
+    const calls: string[] = [];
+    const reporter = createFrontendStartupReporter(async <T>(command: string) => {
+      calls.push(command);
+      if (command === Invokes.FrontendReady) {
+        return new Promise<void>((resolve) => {
+          resolveFrontendReady = resolve;
+        }) as Promise<T>;
+      }
+      if (command === Invokes.GetStartupTrace) {
+        return new Promise<StartupTraceSnapshot>((resolve) => {
+          resolveStartupTrace = resolve;
+        }) as Promise<T>;
+      }
+      if (command === Invokes.RecordFrontendStartupPhase) return snapshot() as T;
+      return undefined as T;
+    });
+
+    const started = reporter.start();
+    await Promise.resolve();
+    expect(calls).toEqual([Invokes.FrontendReady]);
+
+    resolveFrontendReady?.();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(calls).toEqual([Invokes.FrontendReady, Invokes.GetStartupTrace]);
+
+    resolveStartupTrace?.(snapshot());
+    await started;
+    expect(calls.slice(2)).toEqual([Invokes.RecordFrontendStartupPhase, Invokes.RecordFrontendStartupPhase]);
+  });
+
   test('correlates shell and hydration phases to one native trace in command order', async () => {
     const calls: Array<{ args?: Record<string, unknown>; command: string }> = [];
     const reporter = createFrontendStartupReporter(async <T>(command: string, args?: Record<string, unknown>) => {

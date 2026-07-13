@@ -81,10 +81,14 @@ export const createFrontendStartupReporter = (
       .then(() => invokeCommand<unknown>(Invokes.GetStartupTrace))
       .then((value) => startupTraceSnapshotSchema.parse(value))
       .then(async (snapshot) => {
-        await record(snapshot.traceId, 'shellVisible', 'ok', 'react-root-mounted');
-        // A completed second frontend→native→frontend round trip proves the
-        // mounted shell is processing interaction work, not merely painted.
-        await record(snapshot.traceId, 'interactive', 'ok', 'react-ipc-round-trip');
+        // FrontendReady and GetStartupTrace have already completed two full
+        // frontend→native→frontend round trips. Publish the resulting mounted
+        // and interactive receipts together so trace bookkeeping does not add
+        // another serialized IPC interval to the measured response.
+        await Promise.all([
+          record(snapshot.traceId, 'shellVisible', 'ok', 'react-root-mounted'),
+          record(snapshot.traceId, 'interactive', 'ok', 'react-ipc-round-trips-complete'),
+        ]);
         return snapshot.traceId;
       });
     return traceIdPromise;
@@ -95,3 +99,5 @@ export const createFrontendStartupReporter = (
     start,
   };
 };
+
+export const frontendStartupReporter = createFrontendStartupReporter();
