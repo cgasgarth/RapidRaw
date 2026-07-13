@@ -337,7 +337,7 @@ jobs:
           codesign --verify --deep --strict native-startup/RapidRAW.app
 
       - name: Run bounded cold, warm, and degraded startup samples
-        run: bun scripts/benchmarks/startup-native.ts --binary native-startup/RapidRAW.app/Contents/MacOS/RapidRAW --pairs 5
+        run: bun scripts/benchmarks/startup-native.ts --binary native-startup/RapidRAW.app/Contents/MacOS/RapidRAW --pairs 30
 
   docs-check:
     name: 'docs: markdown and links'

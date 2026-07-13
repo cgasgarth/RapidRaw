@@ -216,4 +216,4 @@ jobs:
           xattr -cr native-startup/RapidRAW.app
           codesign --force --deep --sign - --timestamp=none native-startup/RapidRAW.app
           codesign --verify --deep --strict native-startup/RapidRAW.app
-          bun scripts/benchmarks/startup-native.ts --binary native-startup/RapidRAW.app/Contents/MacOS/RapidRAW --pairs 5
+          bun scripts/benchmarks/startup-native.ts --binary native-startup/RapidRAW.app/Contents/MacOS/RapidRAW --pairs 30

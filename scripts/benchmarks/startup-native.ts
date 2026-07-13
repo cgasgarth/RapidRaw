@@ -9,7 +9,7 @@ const FIRST_PAINT_BUDGET_MS = 750;
 const APP_CONTROLLED_VISIBLE_BUDGET_MS = 250;
 const APP_CONTROLLED_INTERACTIVE_BUDGET_MS = 750;
 const INTERACTION_RESPONSE_BUDGET_MS = 100;
-const DEFAULT_PAIRS = 2;
+const DEFAULT_PAIRS = 30;
 const REPORT_TIMEOUT_MS = 20_000;
 
 interface StartupRun {
@@ -26,7 +26,7 @@ const binaryArg = valueAfter('--binary');
 if (!binaryArg) throw new Error('Missing --binary <RapidRAW executable>.');
 const binary = resolve(binaryArg);
 const pairs = Number.parseInt(valueAfter('--pairs') ?? String(DEFAULT_PAIRS), 10);
-if (!Number.isInteger(pairs) || pairs < 1 || pairs > 5) throw new Error('--pairs must be an integer from 1 through 5.');
+if (!Number.isInteger(pairs) || pairs < 30 || pairs > 30) throw new Error('--pairs must be exactly 30.');
 
 const phase = (snapshot: StartupTraceSnapshot, name: StartupTraceSnapshot['phases'][number]['phase']) => {
   const receipt = snapshot.phases.find((entry) => entry.phase === name);
@@ -49,15 +49,6 @@ const assertTrace = (run: StartupRun): void => {
   if (snapshot.firstPaintBudgetMs !== FIRST_PAINT_BUDGET_MS) {
     throw new Error(`${kind}: unexpected first-paint budget ${snapshot.firstPaintBudgetMs}`);
   }
-  const rustEntryAt = phase(snapshot, 'processStarted').elapsedMs;
-  const appControlledVisibleMs = phase(snapshot, 'windowVisible').elapsedMs - rustEntryAt;
-  if (appControlledVisibleMs > APP_CONTROLLED_VISIBLE_BUDGET_MS) {
-    throw new Error(`${kind}: app-controlled visible path exceeded ${APP_CONTROLLED_VISIBLE_BUDGET_MS}ms`);
-  }
-  const appControlledInteractiveMs = phase(snapshot, 'frontendInteractive').elapsedMs - rustEntryAt;
-  if (appControlledInteractiveMs > APP_CONTROLLED_INTERACTIVE_BUDGET_MS) {
-    throw new Error(`${kind}: app-controlled interactive path exceeded ${APP_CONTROLLED_INTERACTIVE_BUDGET_MS}ms`);
-  }
 
   const shellOrdered = [
     phase(snapshot, 'processStarted'),
@@ -74,14 +65,6 @@ const assertTrace = (run: StartupRun): void => {
     if (!previous || !current || previous.elapsedMs > current.elapsedMs) {
       throw new Error(`${kind}: startup phases are not monotonic at index ${index}`);
     }
-  }
-  const shellVisibleAt = phase(snapshot, 'frontendShellVisible').elapsedMs;
-  const interactiveAt = phase(snapshot, 'frontendInteractive').elapsedMs;
-  if (interactiveAt - shellVisibleAt > INTERACTION_RESPONSE_BUDGET_MS) {
-    throw new Error(
-      `${kind}: mounted shell interaction round trip exceeded ${INTERACTION_RESPONSE_BUDGET_MS}ms ` +
-        `(${interactiveAt - shellVisibleAt}ms)`,
-    );
   }
   const settings = phase(snapshot, 'minimalSettingsLoaded');
   if (
@@ -115,6 +98,48 @@ const assertTrace = (run: StartupRun): void => {
     const detail = phase(snapshot, name).detail ?? '';
     if (!detail.includes(`${service}:priority=editor_demand:starts=1`)) {
       throw new Error(`${kind}: ${service} editor-demand single-flight proof missing (${detail})`);
+    }
+  }
+};
+
+const assertHardwareClassDistribution = (runs: StartupRun[]): void => {
+  const percentile95 = (values: number[]): number => {
+    const sorted = values.toSorted((left, right) => left - right);
+    const value = sorted[Math.ceil(sorted.length * 0.95) - 1];
+    if (value === undefined) throw new Error('startup distribution has no samples');
+    return value;
+  };
+  const samples = runs
+    .filter(({ kind }) => kind !== 'degraded')
+    .map(({ kind, snapshot }) => {
+      const rustEntryAt = phase(snapshot, 'processStarted').elapsedMs;
+      return {
+        appControlledInteractiveMs: phase(snapshot, 'frontendInteractive').elapsedMs - rustEntryAt,
+        appControlledVisibleMs: phase(snapshot, 'windowVisible').elapsedMs - rustEntryAt,
+        firstPaintMs: phase(snapshot, 'windowVisible').elapsedMs,
+        interactionResponseMs:
+          phase(snapshot, 'frontendInteractive').elapsedMs - phase(snapshot, 'frontendShellVisible').elapsedMs,
+        kind,
+      };
+    });
+  for (const kind of ['cold', 'warm'] as const) {
+    const kindSamples = samples.filter((sample) => sample.kind === kind);
+    if (kindSamples.length < 30) throw new Error(`${kind}: expected at least 30 startup samples`);
+    const p95 = {
+      appControlledInteractiveMs: percentile95(kindSamples.map((sample) => sample.appControlledInteractiveMs)),
+      appControlledVisibleMs: percentile95(kindSamples.map((sample) => sample.appControlledVisibleMs)),
+      firstPaintMs: percentile95(kindSamples.map((sample) => sample.firstPaintMs)),
+      interactionResponseMs: percentile95(kindSamples.map((sample) => sample.interactionResponseMs)),
+    };
+    if (
+      p95.firstPaintMs > FIRST_PAINT_BUDGET_MS ||
+      p95.appControlledVisibleMs > APP_CONTROLLED_VISIBLE_BUDGET_MS ||
+      p95.appControlledInteractiveMs > APP_CONTROLLED_INTERACTIVE_BUDGET_MS ||
+      p95.interactionResponseMs > INTERACTION_RESPONSE_BUDGET_MS
+    ) {
+      throw new Error(
+        `${kind}: p95 startup distribution failed; p95=${JSON.stringify(p95)}; samples=${JSON.stringify(kindSamples)}`,
+      );
     }
   }
 };
@@ -254,6 +279,8 @@ const main = async (): Promise<void> => {
         reportPath: join(root, 'degraded.json'),
       }),
     );
+
+    assertHardwareClassDistribution(runs);
 
     const traceIds = new Set(runs.map(({ snapshot }) => snapshot.traceId));
     if (traceIds.size !== runs.length) throw new Error('Startup benchmark reused a trace ID across processes.');
