@@ -1,9 +1,11 @@
 import { FolderSearch, GitCompareArrows, Plus, Trash2, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { z } from 'zod';
 import { useShallow } from 'zustand/react/shallow';
-import { matchLookApplicationReceiptV1Schema } from '../../../packages/rawengine-schema/src/referenceMatchRuntime';
+import {
+  matchLookApplicationReceiptV1Schema,
+  referencePhysicalSourceIdentityV1Schema,
+} from '../../../packages/rawengine-schema/src/referenceMatchRuntime';
 
 import { useEditorActions } from '../../hooks/editor/useEditorActions';
 import { useEditorStore } from '../../store/useEditorStore';
@@ -16,9 +18,10 @@ import {
   createReferenceMatchProposal,
   fingerprintReferenceMatchValue,
   getReferenceMatchLayerCompatibility,
-  mergeReferenceAvailability,
+  mergeReferenceSourceIdentities,
   type ReferenceMatchGroup,
   type ReferenceMatchProposal,
+  type ReferencePhysicalSourceIdentity,
   summarizeReferenceHistogram,
 } from '../../utils/referenceMatch';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
@@ -26,6 +29,24 @@ import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 const GROUPS: ReferenceMatchGroup[] = ['tone', 'color', 'presence'];
 
 const fileLabel = (path: string): string => path.split(/[\\/]/).pop() || path;
+
+const browserSourceIdentity = (path: string): ReferencePhysicalSourceIdentity => ({
+  available: true,
+  sourceRevision: `source-revision-v1:${fingerprintReferenceMatchValue(path).slice('fnv1a64:'.length).repeat(4)}`,
+});
+
+const resolveSourceIdentity = async (path: string): Promise<ReferencePhysicalSourceIdentity | null> => {
+  if (typeof window === 'undefined' || !('__TAURI_INTERNALS__' in window)) return browserSourceIdentity(path);
+  try {
+    return await invokeWithSchema(
+      Invokes.ResolveOriginalSourceIdentity,
+      { path },
+      referencePhysicalSourceIdentityV1Schema,
+    );
+  } catch {
+    return null;
+  }
+};
 
 export default function ReferenceMatchPanel() {
   const { t } = useTranslation();
@@ -71,7 +92,9 @@ export default function ReferenceMatchPanel() {
     selectedImage?.isReady && currentRenderUrl && targetSummary && references.length < 8 && !isCurrentReference,
   );
   const canAnalyze = Boolean(
-    targetSummary && selectedImage && references.some((reference) => reference.path !== selectedImage.path),
+    targetSummary &&
+      selectedImage &&
+      references.some((reference) => reference.path !== selectedImage.path && reference.availability === 'available'),
   );
   const layerCompatibility = useMemo(
     () => (proposal ? getReferenceMatchLayerCompatibility(proposal, enabledGroups) : null),
@@ -85,18 +108,14 @@ export default function ReferenceMatchPanel() {
     const snapshot = useEditorStore.getState().referenceMatchReferences;
     let cancelled = false;
     void Promise.all(
-      snapshot.map(async (reference): Promise<[string, boolean | null]> => {
-        try {
-          return [
-            reference.path,
-            await invokeWithSchema(Invokes.IsOriginalFileAvailable, { path: reference.path }, z.boolean()),
-          ];
-        } catch {
-          return [reference.path, null];
-        }
-      }),
+      snapshot.map(
+        async (reference): Promise<[string, ReferencePhysicalSourceIdentity | null]> => [
+          reference.path,
+          await resolveSourceIdentity(reference.path),
+        ],
+      ),
     ).then((results) => {
-      if (!cancelled) setReferences((current) => mergeReferenceAvailability(current, new Map(results)));
+      if (!cancelled) setReferences((current) => mergeReferenceSourceIdentities(current, new Map(results)));
     });
     return () => {
       cancelled = true;
@@ -131,8 +150,11 @@ export default function ReferenceMatchPanel() {
     [],
   );
 
-  const captureCurrent = () => {
+  const captureCurrent = async () => {
     if (!selectedImage || !currentRenderUrl || !targetSummary || !canCapture) return;
+    const sourceIdentity = await resolveSourceIdentity(selectedImage.path);
+    if (!sourceIdentity?.available || sourceIdentity.sourceRevision === null) return;
+    const sourceRevision = sourceIdentity.sourceRevision;
     setReferences((current) => [
       ...current,
       {
@@ -152,7 +174,8 @@ export default function ReferenceMatchPanel() {
         proofFingerprint: fingerprintReferenceMatchValue(`proof:${String(proofRevision)}`),
         proofRevision,
         renderUrl: currentRenderUrl,
-        sourceFingerprint: fingerprintReferenceMatchValue(selectedImage.path),
+        sourceFingerprint: fingerprintReferenceMatchValue(sourceRevision),
+        sourceRevision,
         summary: targetSummary,
         viewFingerprint: fingerprintReferenceMatchValue(
           JSON.stringify({ toneMapper: adjustments.toneMapper, viewTransform: adjustments.viewTransform }),
@@ -168,7 +191,9 @@ export default function ReferenceMatchPanel() {
     const nextProposal = createReferenceMatchProposal({
       adjustments,
       mode,
-      references: references.filter((reference) => reference.path !== selectedImage.path),
+      references: references.filter(
+        (reference) => reference.path !== selectedImage.path && reference.availability === 'available',
+      ),
       target: targetSummary,
       targetProfile: adjustments.cameraProfile,
       targetProofFingerprint: fingerprintReferenceMatchValue(`proof:${String(proofRevision)}`),
@@ -208,7 +233,7 @@ export default function ReferenceMatchPanel() {
             className="inline-flex items-center gap-1 rounded border border-editor-border px-1.5 py-1 text-[11px] text-text-secondary enabled:hover:border-editor-focus-ring enabled:hover:text-text-primary disabled:opacity-40"
             data-testid="reference-match-capture"
             disabled={!canCapture}
-            onClick={captureCurrent}
+            onClick={() => void captureCurrent()}
             title={isCurrentReference ? 'This image is already pinned as a reference' : 'Pin current rendered look'}
             type="button"
           >
@@ -247,9 +272,13 @@ export default function ReferenceMatchPanel() {
                       ? t('editor.adjustments.referenceMatch.missingCachedReference', {
                           defaultValue: 'Original missing · cached preview only',
                         })
-                      : t('editor.adjustments.referenceMatch.unknownReferenceAvailability', {
-                          defaultValue: 'Source availability unknown',
-                        })}
+                      : reference.availability === 'replaced'
+                        ? t('editor.adjustments.referenceMatch.replacedCachedReference', {
+                            defaultValue: 'Source replaced · cached preview excluded from matching',
+                          })
+                        : t('editor.adjustments.referenceMatch.unknownReferenceAvailability', {
+                            defaultValue: 'Source availability unknown',
+                          })}
                   </div>
                 )}
               </div>
