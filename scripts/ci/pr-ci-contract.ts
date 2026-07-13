@@ -32,6 +32,7 @@ export interface PrValidationPlan {
 
 const allDeferred = [
   'environment-sensitive full unit suite',
+  'validation DAG resource-coordinator suite tracked by #5440',
   'full native required closure',
   'full Rust clippy and capability matrices',
   'macOS app build and startup benchmark',

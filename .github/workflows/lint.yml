@@ -102,8 +102,8 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: ./.github/actions/setup-bun-deps
-      - name: Run bounded CI and affected-DAG contract tests
-        run: bun test tests/pure-ts/ci/pr-ci-contract.test.ts tests/pure-ts/native-feedback.test.ts tests/pure-ts/validation-dag.test.ts
+      - name: Run bounded CI planner and native feedback contract tests
+        run: bun test tests/pure-ts/ci/pr-ci-contract.test.ts tests/pure-ts/native-feedback.test.ts
 
   fast-format:
     name: 'pr fast: format'
