@@ -22,8 +22,8 @@ use crate::geometry::{Crop, GeometryParams, get_geometry_params_from_json};
 use crate::lut_processing::Lut;
 use crate::mask_generation::MaskDefinition;
 
-const PLAN_SCHEMA_VERSION: u32 = 1;
-const FINGERPRINT_VERSION: u32 = 1;
+const PLAN_SCHEMA_VERSION: u32 = 2;
+const FINGERPRINT_VERSION: u32 = 2;
 const MAX_CACHED_PLANS: usize = 24;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -292,6 +292,7 @@ fn fingerprints(
             "clarity",
             "dehaze",
             "structure",
+            "multiscaleDetail",
             "centré",
             "chromaticAberrationRedCyan",
             "chromaticAberrationBlueYellow",
@@ -493,7 +494,7 @@ mod tests {
                 image_session: 7,
                 source_revision: 19,
                 adjustment_revision: revision,
-                schema_version: 1,
+                schema_version: PLAN_SCHEMA_VERSION,
                 settings_revision: 0,
             },
             is_raw: false,
@@ -527,6 +528,15 @@ mod tests {
         let detail = compile_render_plan(&json!({"sharpness": 30}), context(4), None).unwrap();
         assert_ne!(base.fingerprints.detail, detail.fingerprints.detail);
         assert_eq!(base.fingerprints.geometry, detail.fingerprints.geometry);
+
+        let multiscale = compile_render_plan(
+            &json!({"multiscaleDetail": {"process": "multiscale_v1", "finest": 25}}),
+            context(40),
+            None,
+        )
+        .unwrap();
+        assert_ne!(base.fingerprints.detail, multiscale.fingerprints.detail);
+        assert_eq!(base.fingerprints.geometry, multiscale.fingerprints.geometry);
 
         let patches = compile_render_plan(
             &json!({"aiPatches":[{"id":"heal-1","visible":true,"patchDataBase64":"abc"}]}),

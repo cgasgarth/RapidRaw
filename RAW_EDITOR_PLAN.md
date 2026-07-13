@@ -4078,6 +4078,13 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `detail(wavelet): implement detail-by-scale controls`
   - Adds a CPU runtime wavelet detail helper, Zod recipe schema, fixture
     contract, and `bun run check:wavelet-detail` gate.
+  - Issue #5411 adds the versioned production `multiscale_v1` path: four
+    reconstruction-safe, resolution-normalized bands shared by global and
+    masked WGPU execution; legacy edits remain explicit `legacy_v1` nodes.
+    The compact UI exposes Texture and protection controls, with direct band,
+    halo, ringing, amount, and conservative chroma controls under Advanced.
+    Scalar artifact bounds, Metal output/cache/local parity, strict sidecar
+    recovery, and private real-RAW preview/export evidence are required gates.
 - `detail(noise): separate chroma and luma noise`
 - `validation(noise): add high ISO fixture set`
 - `validation(raw): add private real RAW crop evidence ledger`

@@ -18,6 +18,7 @@ const STRUCTS = [
   'BlackWhiteMixerSettings',
   'LevelsSettings',
   'ColorBalanceRgbSettings',
+  'MultiscaleDetailSettingsV1',
   'GlobalAdjustments',
   'MaskAdjustments',
   'AllAdjustments',

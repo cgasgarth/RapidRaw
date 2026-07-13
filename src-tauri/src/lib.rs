@@ -17,6 +17,7 @@ mod app_state;
 mod color;
 mod community_presets;
 mod computational;
+pub mod detail;
 mod events;
 mod export;
 mod geometry;

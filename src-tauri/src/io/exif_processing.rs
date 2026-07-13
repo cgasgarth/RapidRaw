@@ -636,6 +636,7 @@ fn validate_adjustments(
         "lutPath",
         "lutSize",
         "masks",
+        "multiscaleDetail",
         "orientationSteps",
         "rotation",
         "saturation",
@@ -744,6 +745,44 @@ fn validate_adjustments(
             disabled.push(format!("adjustments.{field}"));
         }
     }
+    let invalid_multiscale_detail = object.get("multiscaleDetail").is_some_and(|value| {
+        let Some(detail) = value.as_object() else {
+            return true;
+        };
+        if detail
+            .get("process")
+            .and_then(JsonValue::as_str)
+            .is_none_or(|process| !["legacy_v1", "multiscale_v1"].contains(&process))
+        {
+            return true;
+        }
+        ["finest", "fine", "medium", "coarse", "texture"]
+            .iter()
+            .any(|field| {
+                detail
+                    .get(*field)
+                    .and_then(JsonValue::as_f64)
+                    .is_none_or(|value| !(-100.0..=100.0).contains(&value))
+            })
+            || [
+                "overallAmount",
+                "noiseProtection",
+                "haloSuppression",
+                "ringingSuppression",
+                "chromaDetail",
+            ]
+            .iter()
+            .any(|field| {
+                detail
+                    .get(*field)
+                    .and_then(JsonValue::as_f64)
+                    .is_none_or(|value| !(0.0..=100.0).contains(&value))
+            })
+    });
+    if invalid_multiscale_detail && let Some(value) = object.remove("multiscaleDetail") {
+        extensions.insert("multiscaleDetail".to_string(), value);
+        disabled.push("adjustments.multiscaleDetail".to_string());
+    }
     let invalid_numeric: Vec<String> = object
         .iter()
         .filter(|(_, value)| contains_extreme_number(value))
@@ -800,6 +839,65 @@ fn contains_extreme_number(value: &JsonValue) -> bool {
         JsonValue::Array(values) => values.iter().any(contains_extreme_number),
         JsonValue::Object(values) => values.values().any(contains_extreme_number),
         _ => false,
+    }
+}
+
+#[cfg(test)]
+mod multiscale_detail_sidecar_tests {
+    use super::*;
+
+    fn validate(detail: JsonValue) -> (JsonValue, Map<String, JsonValue>, Vec<String>) {
+        let mut adjustments = serde_json::json!({ "multiscaleDetail": detail });
+        let mut extensions = Map::new();
+        let mut disabled = Vec::new();
+        validate_adjustments(
+            &mut adjustments,
+            &mut extensions,
+            &mut disabled,
+            &mut Vec::new(),
+            &mut Vec::new(),
+            Some((6000, 4000)),
+        );
+        (adjustments, extensions, disabled)
+    }
+
+    #[test]
+    fn valid_multiscale_detail_state_remains_render_authoritative() {
+        let detail = serde_json::json!({
+            "process": "multiscale_v1",
+            "finest": 30,
+            "fine": -12,
+            "medium": 8,
+            "coarse": 14,
+            "texture": 16,
+            "overallAmount": 100,
+            "noiseProtection": 70,
+            "haloSuppression": 55,
+            "ringingSuppression": 60
+            ,"chromaDetail": 0
+        });
+        let (adjustments, extensions, disabled) = validate(detail.clone());
+        assert_eq!(adjustments["multiscaleDetail"], detail);
+        assert!(extensions.is_empty());
+        assert!(disabled.is_empty());
+    }
+
+    #[test]
+    fn corrupt_multiscale_detail_state_is_quarantined_atomically() {
+        for detail in [
+            serde_json::json!({ "process": "future_v9" }),
+            serde_json::json!({
+                "process": "multiscale_v1", "finest": 101, "fine": 0,
+                "medium": 0, "coarse": 0, "texture": 0, "overallAmount": 100,
+                "noiseProtection": 50, "haloSuppression": 50, "ringingSuppression": 50,
+                "chromaDetail": 0
+            }),
+        ] {
+            let (adjustments, extensions, disabled) = validate(detail.clone());
+            assert!(adjustments.get("multiscaleDetail").is_none());
+            assert_eq!(extensions["multiscaleDetail"], detail);
+            assert_eq!(disabled, ["adjustments.multiscaleDetail"]);
+        }
     }
 }
 

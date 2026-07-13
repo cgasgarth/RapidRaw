@@ -292,6 +292,7 @@ export interface Adjustments {
   lutPath?: string | null;
   lutSize?: number;
   masks: Array<MaskContainer>;
+  multiscaleDetail: MultiscaleDetailSettingsV1;
   orientationSteps: number;
   rotation: number;
   saturation: number;
@@ -339,6 +340,34 @@ export interface ViewTransformSettingsV1 {
   sourceWhiteEv: number;
   toe: number;
 }
+
+export interface MultiscaleDetailSettingsV1 {
+  chromaDetail: number;
+  coarse: number;
+  fine: number;
+  finest: number;
+  haloSuppression: number;
+  medium: number;
+  noiseProtection: number;
+  overallAmount: number;
+  process: 'legacy_v1' | 'multiscale_v1';
+  ringingSuppression: number;
+  texture: number;
+}
+
+export const INITIAL_MULTISCALE_DETAIL: MultiscaleDetailSettingsV1 = {
+  chromaDetail: 0,
+  coarse: 0,
+  fine: 0,
+  finest: 0,
+  haloSuppression: 50,
+  medium: 0,
+  noiseProtection: 50,
+  overallAmount: 100,
+  process: 'legacy_v1',
+  ringingSuppression: 50,
+  texture: 0,
+};
 
 export interface SkinToneUniformitySettings {
   enabled: boolean;
@@ -481,6 +510,7 @@ export interface MaskAdjustments {
   hsl: Hsl;
   id?: string;
   lumaNoiseReduction: number;
+  multiscaleDetail: MultiscaleDetailSettingsV1;
   saturation: number;
   sectionVisibility: SectionVisibility;
   shadows: number;
@@ -765,6 +795,7 @@ export const INITIAL_MASK_ADJUSTMENTS: MaskAdjustments = {
   },
   selectiveColorRangeControls: structuredClone(DEFAULT_SELECTIVE_COLOR_RANGE_CONTROLS),
   lumaNoiseReduction: 0,
+  multiscaleDetail: structuredClone(INITIAL_MULTISCALE_DETAIL),
   saturation: 0,
   sectionVisibility: {
     basic: true,
@@ -869,6 +900,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   lutPath: null,
   lutSize: 0,
   masks: [],
+  multiscaleDetail: structuredClone(INITIAL_MULTISCALE_DETAIL),
   orientationSteps: 0,
   rotation: 0,
   saturation: 0,
@@ -988,6 +1020,10 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
         halationAmount: containerAdjustments.halationAmount,
         colorGrading: { ...INITIAL_MASK_ADJUSTMENTS.colorGrading, ...containerAdjustments.colorGrading },
         hsl: { ...INITIAL_MASK_ADJUSTMENTS.hsl, ...containerAdjustments.hsl },
+        multiscaleDetail: {
+          ...INITIAL_MULTISCALE_DETAIL,
+          ...(containerAdjustments.multiscaleDetail || {}),
+        },
         curves: deepCloneCurves(containerAdjustments.curves),
         pointCurves: containerAdjustments.pointCurves
           ? deepCloneCurves(containerAdjustments.pointCurves)
@@ -1051,6 +1087,10 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
     localContrastMidtoneMask:
       loadedAdjustments.localContrastMidtoneMask ?? INITIAL_ADJUSTMENTS.localContrastMidtoneMask,
     localContrastRadiusPx: loadedAdjustments.localContrastRadiusPx ?? INITIAL_ADJUSTMENTS.localContrastRadiusPx,
+    multiscaleDetail: {
+      ...INITIAL_MULTISCALE_DETAIL,
+      ...(loadedAdjustments.multiscaleDetail || {}),
+    },
     transformDistortion: loadedAdjustments.transformDistortion ?? INITIAL_ADJUSTMENTS.transformDistortion,
     transformVertical: loadedAdjustments.transformVertical ?? INITIAL_ADJUSTMENTS.transformVertical,
     transformHorizontal: loadedAdjustments.transformHorizontal ?? INITIAL_ADJUSTMENTS.transformHorizontal,
@@ -1198,7 +1238,7 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
     },
     {
       label: 'modals.copyPaste.groups.sharpness',
-      keys: [DetailsAdjustment.Sharpness, DetailsAdjustment.SharpnessThreshold],
+      keys: [DetailsAdjustment.Sharpness, DetailsAdjustment.SharpnessThreshold, 'multiscaleDetail'],
     },
     {
       label: 'modals.copyPaste.groups.noiseReduction',
@@ -1355,6 +1395,7 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     DetailsAdjustment.Centré,
     DetailsAdjustment.Sharpness,
     DetailsAdjustment.SharpnessThreshold,
+    'multiscaleDetail',
     DetailsAdjustment.LumaNoiseReduction,
     DetailsAdjustment.ColorNoiseReduction,
     DetailsAdjustment.DustSpotOverlayEnabled,

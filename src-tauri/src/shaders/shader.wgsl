@@ -83,6 +83,21 @@ struct BlackWhiteMixerSettings {
     _pad3: u32,
 }
 
+struct MultiscaleDetailSettingsV1 {
+    process_version: u32,
+    finest: f32,
+    fine: f32,
+    medium: f32,
+    coarse: f32,
+    texture: f32,
+    overall_amount: f32,
+    noise_protection: f32,
+    halo_suppression: f32,
+    ringing_suppression: f32,
+    chroma_detail: f32,
+    _pad1: f32,
+}
+
 struct GlobalAdjustments {
     exposure: f32,
     brightness: f32,
@@ -177,6 +192,7 @@ struct GlobalAdjustments {
     halation_amount: f32,
     flare_amount: f32,
     sharpness_threshold: f32,
+    multiscale_detail: MultiscaleDetailSettingsV1,
 }
 
 struct MaskAdjustments {
@@ -229,6 +245,7 @@ struct MaskAdjustments {
     _pad_end5: f32,
     _pad_end6: f32,
     _pad_end7: f32,
+    multiscale_detail: MultiscaleDetailSettingsV1,
 }
 
 struct AllAdjustments {
@@ -1025,6 +1042,71 @@ fn apply_local_contrast(
     return mix(processed_color_linear, final_color, midtone_mask);
 }
 
+fn detail_low_pass(color: vec3<f32>, is_raw: u32) -> vec3<f32> {
+    return select(srgb_to_linear(color), color, is_raw == 1u);
+}
+
+fn detail_scene_luma(color: vec3<f32>) -> f32 {
+    return dot(color, vec3<f32>(0.27222872, 0.67408174, 0.05368952));
+}
+
+fn apply_multiscale_detail(
+    source: vec3<f32>,
+    sharpness_blur: vec3<f32>,
+    tonal_blur: vec3<f32>,
+    clarity_blur: vec3<f32>,
+    structure_blur: vec3<f32>,
+    settings: MultiscaleDetailSettingsV1,
+    macro_sharpness: f32,
+    macro_clarity: f32,
+    macro_structure: f32,
+    is_raw: u32
+) -> vec3<f32> {
+    if (settings.process_version != 1u) {
+        return source;
+    }
+    let low0 = max(detail_low_pass(sharpness_blur, is_raw), vec3<f32>(0.0));
+    let low1 = max(detail_low_pass(tonal_blur, is_raw), vec3<f32>(0.0));
+    let low2 = max(detail_low_pass(clarity_blur, is_raw), vec3<f32>(0.0));
+    let low3 = max(detail_low_pass(structure_blur, is_raw), vec3<f32>(0.0));
+    let source_luma = detail_scene_luma(max(source, vec3<f32>(0.0)));
+    let l0 = detail_scene_luma(low0);
+    let l1 = detail_scene_luma(low1);
+    let l2 = detail_scene_luma(low2);
+    let l3 = detail_scene_luma(low3);
+    let bands = array<f32, 4>(source_luma - l0, l0 - l1, l1 - l2, l2 - l3);
+    let rgb_bands = array<vec3<f32>, 4>(source - low0, low0 - low1, low1 - low2, low2 - low3);
+    let gains = array<f32, 4>(
+        settings.finest + macro_sharpness * 0.72,
+        settings.fine + macro_sharpness * 0.28 + settings.texture * 0.6,
+        settings.medium + macro_clarity * 0.68 + settings.texture * 0.4,
+        settings.coarse + macro_clarity * 0.32 + macro_structure
+    );
+    var delta = 0.0;
+    var rgb_delta = vec3<f32>(0.0);
+    for (var band_index = 0u; band_index < 4u; band_index += 1u) {
+        let gain = gains[band_index] * settings.overall_amount;
+        var confidence = 1.0;
+        if (band_index < 2u && gain > 0.0) {
+            let floor = 0.0001 + settings.noise_protection * 0.02;
+            confidence = smoothstep(floor, floor * 3.0, abs(bands[band_index]));
+            let shadow_confidence = smoothstep(0.015, 0.165, source_luma);
+            confidence *= 1.0 - settings.noise_protection * (1.0 - shadow_confidence);
+        }
+        delta += bands[band_index] * gain * confidence;
+        rgb_delta += rgb_bands[band_index] * gain * confidence;
+    }
+    let halo_limit = max(0.01, abs(source_luma) * 0.5)
+        * (1.0 - clamp(settings.halo_suppression, 0.0, 1.0) * 0.8)
+        * (1.0 - clamp(settings.ringing_suppression, 0.0, 1.0) * 0.5);
+    let output_luma = max(0.0, source_luma + clamp(delta, -halo_limit, halo_limit));
+    let ratio = output_luma / max(source_luma, 0.00001);
+    let luma_only = max(vec3<f32>(0.0), source * ratio);
+    var chroma_candidate = max(vec3<f32>(0.0), source + clamp(rgb_delta, vec3<f32>(-halo_limit), vec3<f32>(halo_limit)));
+    chroma_candidate *= output_luma / max(detail_scene_luma(chroma_candidate), 0.00001);
+    return mix(luma_only, chroma_candidate, clamp(settings.chroma_detail, 0.0, 1.0) * 0.2);
+}
+
 fn apply_centre_local_contrast(
     color_in: vec3<f32>,
     centre_amount: f32,
@@ -1783,13 +1865,13 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     var t_vibrance = adjustments.global.vibrance;
     var t_luma_nr = adjustments.global.luma_noise_reduction;
     var t_color_nr = adjustments.global.color_noise_reduction;
-    var t_clarity = adjustments.global.clarity;
+    var t_clarity = select(adjustments.global.clarity, 0.0, adjustments.global.multiscale_detail.process_version == 1u);
     var t_dehaze = adjustments.global.dehaze;
-    var t_structure = adjustments.global.structure;
+    var t_structure = select(adjustments.global.structure, 0.0, adjustments.global.multiscale_detail.process_version == 1u);
     var t_glow = adjustments.global.glow_amount;
     var t_halation = adjustments.global.halation_amount;
     var t_flare = adjustments.global.flare_amount;
-    var t_sharpness = adjustments.global.sharpness;
+    var t_sharpness = select(adjustments.global.sharpness, 0.0, adjustments.global.multiscale_detail.process_version == 1u);
     var t_hue = adjustments.global.hue;
 
     var h0_h = adjustments.global.hsl[0].hue; var h0_s = adjustments.global.hsl[0].saturation; var h0_l = adjustments.global.hsl[0].luminance;
@@ -1821,9 +1903,11 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 
             t_luma_nr += m.luma_noise_reduction * influence;
             t_color_nr += m.color_noise_reduction * influence;
-            t_clarity += m.clarity * influence;
+            if (m.multiscale_detail.process_version != 1u) {
+                t_clarity += m.clarity * influence;
+                t_structure += m.structure * influence;
+            }
             t_dehaze += m.dehaze * influence;
-            t_structure += m.structure * influence;
 
             t_glow += m.glow_amount * influence;
             t_halation += m.halation_amount * influence;
@@ -1872,6 +1956,43 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 
     var locally_contrasted_rgb = initial_linear_rgb;
 
+    locally_contrasted_rgb = apply_multiscale_detail(
+        locally_contrasted_rgb,
+        sharpness_blurred,
+        tonal_blurred,
+        clarity_blurred,
+        structure_blurred,
+        adjustments.global.multiscale_detail,
+        adjustments.global.sharpness,
+        adjustments.global.clarity,
+        adjustments.global.structure,
+        is_raw
+    );
+
+    var local_multiscale_delta = vec3<f32>(0.0);
+    for (var i = 0u; i < adjustments.mask_count; i = i + 1u) {
+        let influence = get_mask_influence(i, absolute_coord);
+        if (influence > 0.001) {
+            let m = adjustments.mask_adjustments[i];
+            if (m.multiscale_detail.process_version == 1u) {
+                let local_detail = apply_multiscale_detail(
+                    initial_linear_rgb,
+                    sharpness_blurred,
+                    tonal_blurred,
+                    clarity_blurred,
+                    structure_blurred,
+                    m.multiscale_detail,
+                    m.sharpness,
+                    m.clarity,
+                    m.structure,
+                    is_raw
+                );
+                local_multiscale_delta += (local_detail - initial_linear_rgb) * influence;
+            }
+        }
+    }
+    locally_contrasted_rgb += local_multiscale_delta;
+
     locally_contrasted_rgb = apply_local_contrast(
         locally_contrasted_rgb, sharpness_blurred,
         t_sharpness, is_raw, 0u, adjustments.global.sharpness_threshold
@@ -1882,7 +2003,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         let influence = get_mask_influence(i, absolute_coord);
         if (influence > 0.001) {
             let m = adjustments.mask_adjustments[i];
-            if (abs(m.sharpness) > 0.001) {
+            if (m.multiscale_detail.process_version != 1u && abs(m.sharpness) > 0.001) {
                 let local_sharp_result = apply_local_contrast(
                     initial_linear_rgb, sharpness_blurred,
                     m.sharpness, is_raw, 0u, m.sharpness_threshold

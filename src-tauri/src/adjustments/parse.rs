@@ -1,7 +1,8 @@
 use crate::adjustments::abi::{
     AllAdjustments, BlackWhiteMixerSettings, ChannelMixerRow, ChannelMixerSettings,
     ColorBalanceRgbSettings, ColorCalibrationSettings, ColorGradeSettings, GlobalAdjustments,
-    GpuMat3, HslColor, LevelsSettings, MAX_MASKS, MaskAdjustments, Point,
+    GpuMat3, HslColor, LevelsSettings, MAX_MASKS, MaskAdjustments, MultiscaleDetailSettingsV1,
+    Point,
 };
 use crate::adjustments::scales::SCALES;
 use crate::color::view_transform::{
@@ -35,6 +36,31 @@ fn scaled_section_value(
         default as f32 / scale
     } else {
         0.0
+    }
+}
+
+fn parse_multiscale_detail(value: &JsonValue) -> MultiscaleDetailSettingsV1 {
+    if !section_is_visible(value, "details") {
+        return MultiscaleDetailSettingsV1::default();
+    }
+    let detail = &value["multiscaleDetail"];
+    let normalized = |key: &str, default: f64| {
+        (detail[key].as_f64().unwrap_or(default) as f32 / 100.0).clamp(-1.0, 1.0)
+    };
+    let protection = |key: &str, default: f64| normalized(key, default).clamp(0.0, 1.0);
+    MultiscaleDetailSettingsV1 {
+        process_version: u32::from(detail["process"].as_str() == Some("multiscale_v1")),
+        finest: normalized("finest", 0.0),
+        fine: normalized("fine", 0.0),
+        medium: normalized("medium", 0.0),
+        coarse: normalized("coarse", 0.0),
+        texture: normalized("texture", 0.0),
+        overall_amount: protection("overallAmount", 100.0),
+        noise_protection: protection("noiseProtection", 50.0),
+        halo_suppression: protection("haloSuppression", 50.0),
+        ringing_suppression: protection("ringingSuppression", 50.0),
+        chroma_detail: protection("chromaDetail", 0.0),
+        _pad1: 0.0,
     }
 }
 
@@ -615,6 +641,7 @@ fn get_global_adjustments_from_json(
             SCALES.sharpness_threshold,
             Some(15.0),
         ),
+        multiscale_detail: parse_multiscale_detail(js_adjustments),
     }
 }
 
@@ -731,6 +758,7 @@ fn get_mask_adjustments_from_json(adj: &JsonValue, blend_mode: &str) -> MaskAdju
         _pad_end5: 0.0,
         _pad_end6: 0.0,
         _pad_end7: 0.0,
+        multiscale_detail: parse_multiscale_detail(adj),
     }
 }
 
@@ -844,6 +872,45 @@ mod tests {
         assert_eq!(parsed.mask_adjustments[1].blend_mode, 1.0);
         assert_eq!(parsed.mask_adjustments[2].blend_mode, 2.0);
         assert_eq!(parsed.mask_adjustments[3].blend_mode, 0.0);
+    }
+
+    #[test]
+    fn parses_versioned_multiscale_detail_for_global_and_mask_paths() {
+        let detail = json!({
+            "process": "multiscale_v1",
+            "finest": 30,
+            "fine": -20,
+            "medium": 10,
+            "coarse": 5,
+            "texture": 16,
+            "overallAmount": 80,
+            "noiseProtection": 70,
+            "haloSuppression": 60,
+            "ringingSuppression": 40
+            ,"chromaDetail": 0
+        });
+        let parsed = get_all_adjustments_from_json(
+            &json!({
+                "multiscaleDetail": detail,
+                "masks": [{
+                    "id": "detail-mask", "name": "Detail", "visible": true,
+                    "invert": false, "opacity": 100,
+                    "adjustments": { "multiscaleDetail": detail }, "subMasks": []
+                }]
+            }),
+            true,
+            None,
+        );
+        for settings in [
+            parsed.global.multiscale_detail,
+            parsed.mask_adjustments[0].multiscale_detail,
+        ] {
+            assert_eq!(settings.process_version, 1);
+            assert_eq!(settings.finest, 0.3);
+            assert_eq!(settings.fine, -0.2);
+            assert_eq!(settings.overall_amount, 0.8);
+            assert_eq!(settings.noise_protection, 0.7);
+        }
     }
 
     #[test]

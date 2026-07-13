@@ -151,6 +151,25 @@ impl Default for GpuMat3 {
     }
 }
 
+/// Storage-buffer form of the versioned creative multiscale detail process.
+/// All user-facing gains/protections are normalized to `-1..1` / `0..1`.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable, Default)]
+#[repr(C)]
+pub struct MultiscaleDetailSettingsV1 {
+    pub process_version: u32,
+    pub finest: f32,
+    pub fine: f32,
+    pub medium: f32,
+    pub coarse: f32,
+    pub texture: f32,
+    pub overall_amount: f32,
+    pub noise_protection: f32,
+    pub halo_suppression: f32,
+    pub ringing_suppression: f32,
+    pub chroma_detail: f32,
+    pub(crate) _pad1: f32,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable, Default)]
 #[repr(C)]
 pub struct GlobalAdjustments {
@@ -243,6 +262,7 @@ pub struct GlobalAdjustments {
     pub halation_amount: f32,
     pub flare_amount: f32,
     pub sharpness_threshold: f32,
+    pub multiscale_detail: MultiscaleDetailSettingsV1,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable, Default)]
@@ -293,6 +313,7 @@ pub struct MaskAdjustments {
     pub(crate) _pad_end5: f32,
     pub(crate) _pad_end6: f32,
     pub(crate) _pad_end7: f32,
+    pub multiscale_detail: MultiscaleDetailSettingsV1,
 }
 
 pub const MAX_MASKS: usize = 32;
@@ -319,6 +340,9 @@ mod tests {
 
     #[test]
     fn global_matrix_offsets_match_wgsl_storage_layout() {
+        assert_eq!(size_of::<MultiscaleDetailSettingsV1>(), 48);
+        assert_eq!(size_of::<GlobalAdjustments>() % 16, 0);
+        assert_eq!(size_of::<MaskAdjustments>() % 16, 0);
         assert_eq!(offset_of!(GlobalAdjustments, technical_white_balance), 64);
         assert_eq!(
             offset_of!(GlobalAdjustments, agx_pipe_to_rendering_matrix),

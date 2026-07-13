@@ -151,8 +151,8 @@ const BLUR_FLAG_TONAL: u32 = 1 << 1;
 const BLUR_FLAG_CLARITY: u32 = 1 << 2;
 const BLUR_FLAG_STRUCTURE: u32 = 1 << 3;
 const BLUR_ABI_VERSION: u32 = 1;
-const GPU_RENDER_GRAPH_VERSION: u32 = 1;
-const GPU_SHADER_LAYOUT_VERSION: u32 = 1;
+const GPU_RENDER_GRAPH_VERSION: u32 = 2;
+const GPU_SHADER_LAYOUT_VERSION: u32 = 2;
 static NEXT_PROCESSOR_GENERATION: AtomicU64 = AtomicU64::new(1);
 
 bitflags::bitflags! {
@@ -213,11 +213,15 @@ pub struct GpuExecutionReceipt {
     pub queue_submit_count: u32,
     pub estimated_peak_resource_bytes: u64,
     pub cpu_encode_time: Duration,
+    pub detail_process_version: u32,
+    pub detail_effective_radii_px: [u32; 4],
+    pub source_dimensions: [u32; 2],
+    pub target_dimensions: [u32; 2],
 }
 
 const MASK_TEXTURE_ABI_VERSION: u32 = 1;
 const LUT_TEXTURE_ABI_VERSION: u32 = 1;
-const MAIN_BIND_GROUP_ABI_VERSION: u32 = 1;
+const MAIN_BIND_GROUP_ABI_VERSION: u32 = 2;
 const MAX_RESIDENT_MASKS: usize = 8;
 const MAX_RESIDENT_LUTS: usize = 4;
 
@@ -466,27 +470,58 @@ impl BlurPassNeeds {
 
 fn resolve_blur_pass_needs(adjustments: &AllAdjustments) -> BlurPassNeeds {
     let global = &adjustments.global;
+    let global_multiscale = global.multiscale_detail.process_version == 1
+        && global.multiscale_detail.overall_amount != 0.0
+        && (global.multiscale_detail.finest != 0.0
+            || global.multiscale_detail.fine != 0.0
+            || global.multiscale_detail.medium != 0.0
+            || global.multiscale_detail.coarse != 0.0
+            || global.multiscale_detail.texture != 0.0
+            || global.sharpness != 0.0
+            || global.clarity != 0.0
+            || global.structure != 0.0);
     let mut needs = BlurPassNeeds {
-        sharpness: global.sharpness != 0.0,
+        sharpness: global.sharpness != 0.0 || global_multiscale,
         tonal: global.contrast != 0.0
             || global.highlights != 0.0
             || global.shadows != 0.0
             || global.whites != 0.0
-            || global.blacks != 0.0,
-        clarity: global.clarity != 0.0 || global.centré != 0.0 || global.halation_amount > 0.0,
-        structure: global.structure != 0.0 || global.dehaze != 0.0 || global.glow_amount > 0.0,
+            || global.blacks != 0.0
+            || global_multiscale,
+        clarity: global.clarity != 0.0
+            || global.centré != 0.0
+            || global.halation_amount > 0.0
+            || global_multiscale,
+        structure: global.structure != 0.0
+            || global.dehaze != 0.0
+            || global.glow_amount > 0.0
+            || global_multiscale,
     };
 
     let mask_count = (adjustments.mask_count as usize).min(MAX_MASKS);
     for mask in &adjustments.mask_adjustments[..mask_count] {
-        needs.sharpness |= mask.sharpness.abs() > 0.001;
+        let mask_multiscale = mask.multiscale_detail.process_version == 1
+            && mask.multiscale_detail.overall_amount != 0.0
+            && (mask.multiscale_detail.finest != 0.0
+                || mask.multiscale_detail.fine != 0.0
+                || mask.multiscale_detail.medium != 0.0
+                || mask.multiscale_detail.coarse != 0.0
+                || mask.multiscale_detail.texture != 0.0
+                || mask.sharpness.abs() > 0.001
+                || mask.clarity.abs() > 0.001
+                || mask.structure.abs() > 0.001);
+        needs.sharpness |= mask.sharpness.abs() > 0.001 || mask_multiscale;
         needs.tonal |= mask.contrast != 0.0
             || mask.highlights != 0.0
             || mask.shadows != 0.0
             || mask.whites != 0.0
-            || mask.blacks != 0.0;
-        needs.clarity |= mask.clarity != 0.0 || mask.halation_amount > 0.0;
-        needs.structure |= mask.structure != 0.0 || mask.dehaze != 0.0 || mask.glow_amount > 0.0;
+            || mask.blacks != 0.0
+            || mask_multiscale;
+        needs.clarity |= mask.clarity != 0.0 || mask.halation_amount > 0.0 || mask_multiscale;
+        needs.structure |= mask.structure != 0.0
+            || mask.dehaze != 0.0
+            || mask.glow_amount > 0.0
+            || mask_multiscale;
     }
     needs
 }
@@ -2053,6 +2088,15 @@ impl GpuProcessor {
             cache.totals.cache_misses += blur_counters.cache_misses;
         }
         log::debug!("blur passes: needs={blur_pass_needs:?} counters={blur_counters:?}");
+        let detail_scale = crate::detail::compile_scale_mapping(width, height);
+        let detail_process_version = adjustments.mask_adjustments
+            [..(adjustments.mask_count as usize).min(MAX_MASKS)]
+            .iter()
+            .map(|mask| mask.multiscale_detail.process_version)
+            .fold(
+                adjustments.global.multiscale_detail.process_version,
+                u32::max,
+            );
         let receipt = GpuExecutionReceipt {
             graph_fingerprint: graph.fingerprint,
             stages: graph.flags,
@@ -2062,6 +2106,10 @@ impl GpuProcessor {
             queue_submit_count: blur_counters.submissions,
             estimated_peak_resource_bytes: graph.estimated_peak_resource_bytes,
             cpu_encode_time,
+            detail_process_version,
+            detail_effective_radii_px: detail_scale.effective_radii_px.map(|radius| radius as u32),
+            source_dimensions: [input.identity.width, input.identity.height],
+            target_dimensions: [out_width, out_height],
         };
         *self.last_execution_receipt.lock().unwrap() = Some(receipt);
         self.execution_sequence.fetch_add(1, Ordering::Release);
@@ -2175,6 +2223,46 @@ mod blur_pass_tests {
         let mut adjustments = AllAdjustments::default();
         adjustments.global.exposure = 1.0;
         assert_eq!(needs(adjustments), BlurPassNeeds::default());
+    }
+
+    #[test]
+    fn multiscale_detail_activates_one_shared_decomposition_only_when_nonzero() {
+        let mut adjustments = AllAdjustments::default();
+        adjustments.global.multiscale_detail.process_version = 1;
+        assert_eq!(needs(adjustments), BlurPassNeeds::default());
+
+        adjustments.global.multiscale_detail.finest = 0.25;
+        assert_eq!(needs(adjustments), BlurPassNeeds::default());
+        adjustments.global.multiscale_detail.overall_amount = 1.0;
+        assert_eq!(
+            needs(adjustments),
+            BlurPassNeeds {
+                sharpness: true,
+                tonal: true,
+                clarity: true,
+                structure: true,
+            }
+        );
+        let graph = compile_gpu_render_graph(&adjustments, false, 0, 6000, 4000);
+        assert_eq!(graph.blur_products.len(), 4);
+        assert_eq!(graph.tile_halo, 149);
+    }
+
+    #[test]
+    fn masked_multiscale_detail_reuses_the_global_blur_products() {
+        let mut adjustments = AllAdjustments::default();
+        adjustments.mask_count = 2;
+        adjustments.mask_adjustments[0]
+            .multiscale_detail
+            .process_version = 1;
+        adjustments.mask_adjustments[0].multiscale_detail.medium = -0.4;
+        adjustments.mask_adjustments[1]
+            .multiscale_detail
+            .process_version = 1;
+        adjustments.mask_adjustments[1].multiscale_detail.coarse = 0.6;
+        let graph = compile_gpu_render_graph(&adjustments, false, 2, 1920, 1080);
+        assert_eq!(graph.blur_products.len(), 4);
+        assert_eq!(graph.tile_halo, 40);
     }
 
     #[test]
@@ -2489,6 +2577,136 @@ mod blur_pass_tests {
             "gpu graph benchmark: selective={selective_elapsed:?} forced_full={full_elapsed:?}"
         );
         FORCE_DISABLE_BLUR_CACHE.store(false, Ordering::Relaxed);
+    }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
+    fn production_wgpu_multiscale_detail_is_identity_at_zero_and_reuses_decomposition() {
+        use image::{DynamicImage, ImageBuffer, Rgba};
+        use tauri::Manager;
+
+        let _test_guard = GPU_TEST_LOCK.lock().unwrap();
+        let source = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(48, 32, |x, y| {
+            let checker = if (x / 3 + y / 3) % 2 == 0 {
+                0.08
+            } else {
+                -0.08
+            };
+            let base = 0.15 + x as f32 / 96.0;
+            Rgba([
+                base + checker,
+                base * 0.8 + checker,
+                base * 0.55 + checker,
+                1.0,
+            ])
+        }));
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock Tauri app builds");
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state)
+            .expect("compute-only GPU context initializes");
+        let identity = PreGpuImageIdentity::for_source(&source, "multiscale_detail_v1");
+        let render = |adjustments, mask_bitmaps: &[image::GrayImage]| {
+            process_and_get_unclamped_dynamic_image(
+                &context,
+                &state,
+                &source,
+                identity,
+                RenderRequest {
+                    adjustments,
+                    mask_bitmaps,
+                    lut: None,
+                    roi: None,
+                },
+                "multiscale_detail_v1",
+            )
+            .expect("multiscale WGPU render succeeds")
+            .to_rgba16()
+            .into_raw()
+        };
+
+        let baseline = render(AllAdjustments::default(), &[]);
+        let mut zero = AllAdjustments::default();
+        zero.global.multiscale_detail.process_version = 1;
+        zero.global.multiscale_detail.overall_amount = 1.0;
+        assert_eq!(
+            render(zero, &[]),
+            baseline,
+            "zero-gain process must be pixel identity"
+        );
+
+        let mut first = zero;
+        first.global.multiscale_detail.finest = 0.45;
+        first.global.multiscale_detail.fine = 0.2;
+        first.global.multiscale_detail.noise_protection = 0.35;
+        let first_pixels = render(first, &[]);
+        assert_ne!(
+            first_pixels, baseline,
+            "positive detail gains must alter pixels"
+        );
+        let before = state
+            .gpu_processor
+            .lock()
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .processor
+            .blur_surface_cache
+            .lock()
+            .unwrap()
+            .totals;
+
+        let mut second = first;
+        second.global.multiscale_detail.finest = -0.3;
+        second.global.multiscale_detail.coarse = 0.6;
+        let second_pixels = render(second, &[]);
+        assert_ne!(second_pixels, first_pixels);
+        let after = state
+            .gpu_processor
+            .lock()
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .processor
+            .blur_surface_cache
+            .lock()
+            .unwrap()
+            .totals;
+        assert_eq!(after.cache_misses, before.cache_misses);
+        assert_eq!(after.cache_hits - before.cache_hits, 4);
+        let receipt = state
+            .gpu_processor
+            .lock()
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .processor
+            .last_execution_receipt()
+            .unwrap();
+        assert_eq!(receipt.detail_process_version, 1);
+        assert_eq!(receipt.detail_effective_radii_px, [1, 1, 1, 2]);
+        assert_eq!(receipt.source_dimensions, [48, 32]);
+        assert_eq!(receipt.target_dimensions, [48, 32]);
+
+        let mut chroma = first;
+        chroma.global.multiscale_detail.chroma_detail = 1.0;
+        let chroma_pixels = render(chroma, &[]);
+        assert_ne!(
+            chroma_pixels, first_pixels,
+            "opt-in chroma detail must be observable"
+        );
+
+        let mask = image::GrayImage::from_pixel(48, 32, image::Luma([255]));
+        let mut local = AllAdjustments::default();
+        local.mask_count = 1;
+        local.mask_adjustments[0].multiscale_detail = first.global.multiscale_detail;
+        let local_pixels = render(local, &[mask]);
+        assert_eq!(
+            local_pixels, first_pixels,
+            "full mask must match global band math"
+        );
     }
 
     #[cfg(feature = "tauri-test")]

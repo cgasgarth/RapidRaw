@@ -165,6 +165,146 @@ export default function DetailsPanel({
           <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
             {t('adjustments.details.sharpening')}
           </UiText>
+          <Switch
+            chrome="editor"
+            checked={adjustments.multiscaleDetail.process === 'multiscale_v1'}
+            label={t('adjustments.details.multiscaleDetail')}
+            onChange={(checked) => {
+              setAdjustments((prev: Adjustments) => ({
+                ...prev,
+                multiscaleDetail: {
+                  ...prev.multiscaleDetail,
+                  process: checked ? 'multiscale_v1' : 'legacy_v1',
+                },
+              }));
+            }}
+          />
+          {adjustments.multiscaleDetail.process === 'multiscale_v1' && (
+            <>
+              <AdjustmentSlider
+                density="compact"
+                label={t('adjustments.details.texture')}
+                max={100}
+                min={-100}
+                onValueChange={(value) => {
+                  setAdjustments((prev: Adjustments) => ({
+                    ...prev,
+                    multiscaleDetail: { ...prev.multiscaleDetail, texture: Math.trunc(value) },
+                  }));
+                }}
+                step={1}
+                value={adjustments.multiscaleDetail.texture}
+                onDragStateChange={onDragStateChange}
+              />
+              <AdjustmentSlider
+                density="compact"
+                label={t('adjustments.details.noiseProtection')}
+                max={100}
+                min={0}
+                onValueChange={(value) => {
+                  setAdjustments((prev: Adjustments) => ({
+                    ...prev,
+                    multiscaleDetail: { ...prev.multiscaleDetail, noiseProtection: Math.trunc(value) },
+                  }));
+                }}
+                step={1}
+                value={adjustments.multiscaleDetail.noiseProtection}
+                onDragStateChange={onDragStateChange}
+                defaultValue={50}
+                fillOrigin="min"
+              />
+              <details className="mt-1 rounded border border-editor-border px-1.5 py-1">
+                <summary className="cursor-pointer text-[11px] text-text-secondary">
+                  {t('adjustments.details.advancedEqualizer')}
+                </summary>
+                {(['finest', 'fine', 'medium', 'coarse'] as const).map((band) => (
+                  <AdjustmentSlider
+                    density="compact"
+                    key={band}
+                    label={t(`adjustments.details.band.${band}`)}
+                    max={100}
+                    min={-100}
+                    onValueChange={(value) => {
+                      setAdjustments((prev: Adjustments) => ({
+                        ...prev,
+                        multiscaleDetail: { ...prev.multiscaleDetail, [band]: Math.trunc(value) },
+                      }));
+                    }}
+                    step={1}
+                    value={adjustments.multiscaleDetail[band]}
+                    onDragStateChange={onDragStateChange}
+                  />
+                ))}
+                <AdjustmentSlider
+                  density="compact"
+                  label={t('adjustments.details.overallDetailAmount')}
+                  max={100}
+                  min={0}
+                  onValueChange={(value) => {
+                    setAdjustments((prev: Adjustments) => ({
+                      ...prev,
+                      multiscaleDetail: { ...prev.multiscaleDetail, overallAmount: Math.trunc(value) },
+                    }));
+                  }}
+                  step={1}
+                  value={adjustments.multiscaleDetail.overallAmount}
+                  onDragStateChange={onDragStateChange}
+                  defaultValue={100}
+                  fillOrigin="min"
+                />
+                <AdjustmentSlider
+                  density="compact"
+                  label={t('adjustments.details.haloSuppression')}
+                  max={100}
+                  min={0}
+                  onValueChange={(value) => {
+                    setAdjustments((prev: Adjustments) => ({
+                      ...prev,
+                      multiscaleDetail: { ...prev.multiscaleDetail, haloSuppression: Math.trunc(value) },
+                    }));
+                  }}
+                  step={1}
+                  value={adjustments.multiscaleDetail.haloSuppression}
+                  onDragStateChange={onDragStateChange}
+                  defaultValue={50}
+                  fillOrigin="min"
+                />
+                <AdjustmentSlider
+                  density="compact"
+                  label={t('adjustments.details.ringingSuppression')}
+                  max={100}
+                  min={0}
+                  onValueChange={(value) => {
+                    setAdjustments((prev: Adjustments) => ({
+                      ...prev,
+                      multiscaleDetail: { ...prev.multiscaleDetail, ringingSuppression: Math.trunc(value) },
+                    }));
+                  }}
+                  step={1}
+                  value={adjustments.multiscaleDetail.ringingSuppression}
+                  onDragStateChange={onDragStateChange}
+                  defaultValue={50}
+                  fillOrigin="min"
+                />
+                <AdjustmentSlider
+                  density="compact"
+                  label={t('adjustments.details.chromaDetail')}
+                  max={100}
+                  min={0}
+                  onValueChange={(value) => {
+                    setAdjustments((prev: Adjustments) => ({
+                      ...prev,
+                      multiscaleDetail: { ...prev.multiscaleDetail, chromaDetail: Math.trunc(value) },
+                    }));
+                  }}
+                  step={1}
+                  value={adjustments.multiscaleDetail.chromaDetail}
+                  onDragStateChange={onDragStateChange}
+                  fillOrigin="min"
+                />
+              </details>
+            </>
+          )}
           <AdjustmentSlider
             density="compact"
             label={t('adjustments.details.sharpness')}
