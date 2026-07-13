@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'bun:test';
-import { mkdir, mkdtemp, readdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { isolatedGitEnvironment } from '../../scripts/lib/ci/git-environment';
 import {
   freezeValidationSnapshot,
   nodeCacheKey,
@@ -13,19 +14,23 @@ import {
 import { type ValidationNode, validationManifest } from '../../scripts/validation/manifest';
 import { classesForPath } from '../../scripts/validation/ownership';
 
-const isolatedGitEnvironment = (): Record<string, string> =>
-  Object.fromEntries(
-    Object.entries(process.env).filter(
-      (entry): entry is [string, string] => !entry[0].startsWith('GIT_') && entry[1] !== undefined,
-    ),
-  );
-const initFixtureRepository = (root: string): void => {
-  const result = Bun.spawnSync(['git', 'init', '-q'], { cwd: root, env: isolatedGitEnvironment(), stderr: 'pipe' });
-  if (result.exitCode !== 0) throw new Error(result.stderr.toString());
+const initFixtureRepository = async (
+  root: string,
+  environment: NodeJS.ProcessEnv = process.env,
+  injectedExitCode = 0,
+): Promise<{ exitCode: number; stderr: string }> => {
+  const child = Bun.spawn(['/bin/sh', '-c', `git init -q; exit ${injectedExitCode}`], {
+    cwd: root,
+    env: isolatedGitEnvironment(environment),
+    stderr: 'pipe',
+    stdout: 'ignore',
+  });
+  const [exitCode, stderr] = await Promise.all([child.exited, new Response(child.stderr).text()]);
+  return { exitCode, stderr };
 };
 
 describe('affected validation DAG', () => {
-  test('fixture git init cannot rewrite the real worktree config under hook-scoped Git variables', async () => {
+  test('concurrent fixture git children cannot rewrite parent config under hook-scoped variables or failure', async () => {
     const repositoryRoot = join(import.meta.dir, '../..');
     const commonDirectory = Bun.spawnSync(['git', 'rev-parse', '--path-format=absolute', '--git-common-dir'], {
       cwd: repositoryRoot,
@@ -33,41 +38,68 @@ describe('affected validation DAG', () => {
     })
       .stdout.toString()
       .trim();
-    const before = Bun.spawnSync(['git', 'config', '--local', '--get', 'core.bare'], {
+    const gitDirectory = Bun.spawnSync(['git', 'rev-parse', '--path-format=absolute', '--git-dir'], {
       cwd: repositoryRoot,
       stdout: 'pipe',
     })
       .stdout.toString()
       .trim();
-    const priorDir = process.env.GIT_DIR;
-    const priorWorkTree = process.env.GIT_WORK_TREE;
-    process.env.GIT_DIR = commonDirectory;
-    process.env.GIT_WORK_TREE = repositoryRoot;
+    const readParentState = async () => ({
+      bare: Bun.spawnSync(['git', 'config', '--local', '--get', 'core.bare'], {
+        cwd: repositoryRoot,
+        stdout: 'pipe',
+      })
+        .stdout.toString()
+        .trim(),
+      config: await readFile(join(commonDirectory, 'config')),
+      gitDirectory: Bun.spawnSync(['git', 'rev-parse', '--path-format=absolute', '--git-dir'], {
+        cwd: repositoryRoot,
+        stdout: 'pipe',
+      })
+        .stdout.toString()
+        .trim(),
+      status: Bun.spawnSync(['git', 'status', '--porcelain=v1', '--untracked-files=no'], {
+        cwd: repositoryRoot,
+        stdout: 'pipe',
+      }).stdout.toString(),
+    });
+    const before = await readParentState();
+    const successFixture = await mkdtemp(join(tmpdir(), 'rapidraw-isolated-git-success-'));
+    const independentFixture = await mkdtemp(join(tmpdir(), 'rapidraw-isolated-git-concurrent-'));
+    const failedFixture = await mkdtemp(join(tmpdir(), 'rapidraw-isolated-git-failure-'));
+    const hookEnvironment = { ...process.env, GIT_DIR: commonDirectory, GIT_WORK_TREE: repositoryRoot };
     try {
-      const fixture = await mkdtemp(join(tmpdir(), 'rapidraw-isolated-git-init-'));
-      initFixtureRepository(fixture);
-      expect(
-        Bun.spawnSync(['git', 'config', '--get', 'core.bare'], {
-          cwd: fixture,
-          env: isolatedGitEnvironment(),
-          stdout: 'pipe',
-        })
-          .stdout.toString()
-          .trim(),
-      ).toBe('false');
+      const [success, independent, failed] = await Promise.all([
+        initFixtureRepository(successFixture, hookEnvironment),
+        initFixtureRepository(independentFixture),
+        initFixtureRepository(failedFixture, hookEnvironment, 23),
+      ]);
+      expect(success).toEqual({ exitCode: 0, stderr: '' });
+      expect(independent).toEqual({ exitCode: 0, stderr: '' });
+      expect(failed).toEqual({ exitCode: 23, stderr: '' });
+      for (const fixture of [successFixture, independentFixture, failedFixture]) {
+        expect(
+          Bun.spawnSync(['git', 'config', '--get', 'core.bare'], {
+            cwd: fixture,
+            env: isolatedGitEnvironment(),
+            stdout: 'pipe',
+          })
+            .stdout.toString()
+            .trim(),
+        ).toBe('false');
+      }
     } finally {
-      if (priorDir === undefined) delete process.env.GIT_DIR;
-      else process.env.GIT_DIR = priorDir;
-      if (priorWorkTree === undefined) delete process.env.GIT_WORK_TREE;
-      else process.env.GIT_WORK_TREE = priorWorkTree;
+      await Promise.all(
+        [successFixture, independentFixture, failedFixture].map((fixture) => rm(fixture, { recursive: true })),
+      );
     }
-    const after = Bun.spawnSync(['git', 'config', '--local', '--get', 'core.bare'], {
-      cwd: repositoryRoot,
-      stdout: 'pipe',
-    })
-      .stdout.toString()
-      .trim();
-    expect(after).toBe(before);
+    const after = await readParentState();
+    expect(after.bare).toBe('false');
+    expect(after.bare).toBe(before.bare);
+    expect(after.config.equals(before.config)).toBeTrue();
+    expect(after.gitDirectory).toBe(gitDirectory);
+    expect(after.gitDirectory).toBe(before.gitDirectory);
+    expect(after.status).toBe(before.status);
   });
 
   test.each([

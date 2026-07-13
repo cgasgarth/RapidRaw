@@ -20,6 +20,7 @@ import {
   consumePendingNegativeConversionSavedPositiveHandoff,
 } from '../../utils/negative-lab/negativeLabEditorHandoff';
 import { metadataWithNegativeLabReopenedSavedPositiveHandoff } from '../../utils/negative-lab/negativeLabSavedPositiveReopen';
+import { canPublishProvisionalFrame } from '../../utils/progressiveImageFrame';
 import { IMAGE_OPEN_UPDATE_EVENT } from '../../utils/tauriEventNames';
 
 export function useImageLoader() {
@@ -64,6 +65,30 @@ export function useImageLoader() {
               isImageOpenUpdateCurrent(update, { generation: imageSession.generation, path: selectedImagePath })
             ) {
               publishMetadataPhase(update);
+            }
+            if (
+              (update.phase === 'frameReady' || update.phase === 'fallbackFrameReady') &&
+              isImageOpenUpdateCurrent(update, { generation: imageSession.generation, path: selectedImagePath })
+            ) {
+              setEditor((state) => {
+                const current = state.provisionalPreviewFrame?.receipt ?? null;
+                if (
+                  state.imageSession?.id !== sessionId ||
+                  !canPublishProvisionalFrame({
+                    current,
+                    expectedGeneration: imageSession.generation,
+                    incoming: update.receipt,
+                  })
+                ) {
+                  return {};
+                }
+                return {
+                  provisionalPreviewFrame: {
+                    receipt: update.receipt,
+                    url: update.phase === 'frameReady' ? update.dataUrl : (state.selectedImage?.thumbnailUrl ?? ''),
+                  },
+                };
+              });
             }
           });
           if (disposed) {
@@ -125,6 +150,7 @@ export function useImageLoader() {
                 imageSession: { ...state.imageSession, status: 'ready' },
                 originalSize: { width, height },
                 previewSize,
+                provisionalPreviewFrame: null,
                 selectedImage: {
                   ...state.selectedImage,
                   exif: loadImageResult.exif ?? null,

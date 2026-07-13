@@ -1783,6 +1783,9 @@
       "exit": "Exit preview mode",
       "label": "Preview only"
     },
+    "provisionalCameraPreview": "Kameravorschau — RAW wird entwickelt",
+    "provisionalCameraPreviewFailed": "Kameravorschau — RAW-Entwicklung fehlgeschlagen",
+    "provisionalLibraryPreview": "Bibliotheksvorschau — RAW wird entwickelt",
     "switcher": {
       "search": {
         "close": "Close panel search",

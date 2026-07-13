@@ -4,6 +4,7 @@ import type { OverlayMode } from '../components/panel/right/color/CropPanel';
 import { ToolType } from '../components/panel/right/layers/Masks';
 import type { BrushSettings, SelectedImage, WaveformData } from '../components/ui/AppProperties';
 import type { BaseRenderSize, ImageDimensions } from '../hooks/viewport/useImageRenderSize';
+import type { ProgressiveImageFrameReceipt } from '../schemas/imageLoaderSchemas';
 import type { MaskOverlaySettings } from '../schemas/masks/maskOverlaySchemas';
 import type { GamutWarningOverlayPayload } from '../schemas/tauriEventSchemas';
 import type { PreviewQualityStatus } from '../utils/adaptivePreviewQuality';
@@ -127,6 +128,11 @@ export interface NavigatorPreviewArtifact {
   url: string;
 }
 
+export interface ProvisionalPreviewFrame {
+  receipt: ProgressiveImageFrameReceipt;
+  url: string;
+}
+
 interface EditorState {
   // Core Image & Adjustments
   selectedImage: SelectedImage | null;
@@ -146,6 +152,7 @@ interface EditorState {
 
   // Previews & Overlays
   finalPreviewUrl: string | null;
+  provisionalPreviewFrame: ProvisionalPreviewFrame | null;
   navigatorPreviewArtifact: NavigatorPreviewArtifact | null;
   uncroppedAdjustedPreviewUrl: string | null;
   transformedOriginalUrl: string | null;
@@ -254,6 +261,7 @@ const createSessionCheckpointId = (historyIndex: number): string => {
 const historyNavigationPreviewInvalidation = {
   exportSoftProofTransform: null,
   finalPreviewUrl: null,
+  provisionalPreviewFrame: null,
   navigatorPreviewArtifact: null,
   gamutWarningOverlay: null,
   interactivePatch: null,
@@ -332,6 +340,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   historyIndex: 0,
 
   finalPreviewUrl: null,
+  provisionalPreviewFrame: null,
   navigatorPreviewArtifact: null,
   uncroppedAdjustedPreviewUrl: null,
   compare: DEFAULT_EDITOR_COMPARE_STATE,
@@ -427,6 +436,7 @@ export const useEditorStore = create<EditorState>((set) => ({
       if ('imageSession' in update) {
         update.imageSessionId = update.imageSession?.generation ?? state.imageSessionId + 1;
         update.navigatorPreviewArtifact = null;
+        update.provisionalPreviewFrame = null;
         state.patchResidency.reset(update.imageSessionId);
       } else if (
         'selectedImage' in update &&
