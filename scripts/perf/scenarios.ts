@@ -33,11 +33,16 @@ const previewScheduling: PerformanceScenario = {
   maxRelativeMad: 0.35,
   metricUnits: {
     controlDispatchMs: 'ms',
+    cpuMs: 'ms',
     dispatches: 'count',
+    filesystemReadOps: 'count',
+    filesystemWriteOps: 'count',
     interactionDispatchMs: 'ms',
+    residentBytes: 'bytes',
     snapshotInstrumentationOverheadMs: 'ms',
   },
   async runSample(run) {
+    const resourceBefore = process.resourceUsage();
     let controlSink = 0;
     const controlStarted = performance.now();
     for (let index = 0; index < DISPATCHES; index += 1)
@@ -58,6 +63,7 @@ const previewScheduling: PerformanceScenario = {
     if (sink !== expected || controlSink !== expected)
       throw new Error(`Preview scheduling correctness sink mismatch: ${sink}/${controlSink} != ${expected}.`);
     const snapshotInstrumentationOverheadMs = Math.max(0, interactionDispatchMs - controlDispatchMs);
+    const resourceAfter = process.resourceUsage();
     if (snapshotInstrumentationOverheadMs > MAX_LIGHT_INSTRUMENTATION_OVERHEAD_MS)
       throw new Error(
         `Light snapshot instrumentation overhead ${snapshotInstrumentationOverheadMs.toFixed(3)}ms exceeded ${MAX_LIGHT_INSTRUMENTATION_OVERHEAD_MS}ms.`,
@@ -66,8 +72,14 @@ const previewScheduling: PerformanceScenario = {
       assertions: 2,
       metrics: {
         controlDispatchMs,
+        cpuMs:
+          Math.max(0, resourceAfter.userCPUTime - resourceBefore.userCPUTime) / 1_000 +
+          Math.max(0, resourceAfter.systemCPUTime - resourceBefore.systemCPUTime) / 1_000,
         dispatches: DISPATCHES,
+        filesystemReadOps: Math.max(0, resourceAfter.fsRead - resourceBefore.fsRead),
+        filesystemWriteOps: Math.max(0, resourceAfter.fsWrite - resourceBefore.fsWrite),
         interactionDispatchMs,
+        residentBytes: process.memoryUsage().rss,
         snapshotInstrumentationOverheadMs,
       },
       spans: [

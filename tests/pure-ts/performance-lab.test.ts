@@ -97,6 +97,19 @@ describe('performance lab runner', () => {
     expect(performanceScenarios.every(({ version, measuredRuns }) => version > 0 && measuredRuns >= 5)).toBeTrue();
   });
 
+  test('preview scheduling records CPU, memory, filesystem, and work metrics', async () => {
+    const preview = performanceScenarios.find(({ id }) => id === 'editor.preview-scheduling');
+    if (preview === undefined) throw new Error('preview performance scenario missing');
+    const result = await preview.runSample(0);
+    expect(result.metrics).toMatchObject({
+      cpuMs: expect.any(Number),
+      dispatches: 20_000,
+      filesystemReadOps: expect.any(Number),
+      filesystemWriteOps: expect.any(Number),
+      residentBytes: expect.any(Number),
+    });
+  });
+
   test('excludes warmups, retains raw metrics, and proves every measured run', async () => {
     const runs: number[] = [];
     const executable = scenario([99, 10, 11, 12]);
