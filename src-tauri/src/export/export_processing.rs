@@ -4356,6 +4356,8 @@ mod tests {
             demosaic_path: RawDemosaicPath::BayerHq,
             processing_profile: crate::raw_processing::RawProcessingProfile::Maximum,
             input_transform: None,
+            highlight_reconstruction:
+                crate::highlight_reconstruction::HighlightReconstructionReportV2::default(),
             runtime: None,
             xtrans_hq: None,
         };
