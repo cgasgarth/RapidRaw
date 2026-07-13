@@ -1,0 +1,29 @@
+# Native feedback profiles and CI partitions
+
+The native feedback lab measures clean, no-op, representative leaf edit, and root-core edit cycles under one declared toolchain/hardware/source identity. It retains raw wall time, critical path, rebuild count, link time, peak RSS, artifact bytes, and time-to-test samples rather than treating command timeout as performance proof.
+
+```bash
+bun native-feedback profiles
+bun native-feedback benchmark-plan --profile rapid-dev-fast
+bun native-feedback measure --scope core --profile dev-baseline --output private-artifacts/native-feedback/core-baseline.json
+bun native-feedback measure --scope core --profile rapid-dev-fast --output private-artifacts/native-feedback/core-after.json
+bun native-feedback compare private-artifacts/native-feedback/core-baseline.json private-artifacts/native-feedback/core-after.json
+bun native-feedback measure --scope leaf --profile rapid-dev-fast --output private-artifacts/native-feedback/leaf.json
+bun native-feedback benchmark --profile rapid-dev-fast --input private-artifacts/native-feedback/samples.json --output private-artifacts/native-feedback/receipt.json
+bun native-feedback compare private-artifacts/native-feedback/baseline.json private-artifacts/native-feedback/candidate.json
+bun native-feedback plan --mode pr --path src-tauri/crates/rapidraw-types/src/lib.rs
+```
+
+`measure` is the acceptance path: it acquires the repository-wide `native-heavy` lease, copies the exact current source (including intended uncommitted changes) into a disposable workspace, uses an isolated Cargo target directory, compiles the real test executables with `--no-run`, reads Cargo's timing graph and compiler artifacts, and captures macOS peak RSS. The separately required CI closure executes the tests; keeping execution out of this benchmark isolates edit-to-runnable-test latency. Representative edits can therefore never modify the working tree even if the outer command is terminated abruptly. The runner also restores its disposable source edits in a `finally` block. An interrupt aborts the Cargo child, quarantines the incomplete target, and never publishes a partial receipt; successful receipts are published with an atomic rename. `leaf` measures the partitioned `rapidraw-types` feedback loop. `core` retains clean/root-edit coverage through the required-feature root library while routing common no-op and representative leaf-edit feedback through the affected leaf command. Its candidate clean sample sequentially builds the root and then the exact standalone leaf command, counting both costs, so later samples measure warm incremental feedback rather than first-use target creation. `dev-baseline` deliberately uses the monolithic root command for the same samples. `benchmark --input` imports externally collected raw samples and is not runtime proof by itself.
+
+`dev-baseline` captures the pre-tuning `dev` contract. `rapid-dev-fast` uses unoptimized workspace code, omits debug info, applies high codegen parallelism, and prefers dynamic Rust linkage for edit-to-test work; the focused CI jobs use the same declared flags. `rapid-dev-perf` retains optimization and debug info for runtime-representative local validation without paying release LTO. All preserve incremental compilation and optimized third-party dependencies inherited from `dev`. Promotion comparison permits the declared `dev-baseline` → `rapid-dev-fast` pair only on the same Rust toolchain and hardware class.
+
+The partition planner emits the versioned `validation-nodes` contract expected by the affected-validation engine and `performance-artifact-inputs` producer IDs expected by the performance lab. A leaf change receives an early crate-focused node; root native inputs receive a core-library node. PR, full, and release modes always append the uncached `native-full:required` closure, so affected routing accelerates feedback without weakening merge confidence.
+
+Pull-request Actions apply the same topology. The classifier fails closed when GitHub returns no paths, focused leaf and core jobs use source- and dependency-aware caches, and every PR retains the full required job without a Rust build cache. All three jobs remain explicit dependencies of `PR CI / required`, so a classifier failure or full native failure cannot be hidden by path gating. The classifier also runs the selection, cache-identity, and comparison-threshold regression suite.
+
+Cache keys bind the planner version, exact command/profile, Cargo lock and workspace manifest identities, source tree identity, Rust toolchain, environment, and dependency node identities. Merely enabling a compiler cache or linker is not accepted as evidence: comparison exits success only when both common focused no-op and representative affected leaf-edit medians improve by more than 30% and 2 seconds inside the repeated root-core protocol, and it separately fails any clean/no-op/leaf/core regression above 10% and 1 second.
+
+## Promotion evidence
+
+The three-run macOS ARM64 acceptance pair on Rust 1.95.0 compared `dev-baseline` run `2026-07-13T09-01-15-091Z-973df859-dev-baseline` with `rapid-dev-fast` run `2026-07-13T09-27-14-929Z-973df859-rapid-dev-fast`. Median edit-to-runnable-test time changed as follows: clean 156.032s → 136.295s (-12.65%), no-op 3.794s → 0.164s (-95.68%), representative leaf edit 3.693s → 0.264s (-92.86%), and root-core edit 3.623s → 4.101s (+0.478s). Both common paths clear the unchanged 30% and two-second promotion thresholds, while every scenario remains within the unchanged regression guard. The comparison artifact digest is `e6d62b1ecf639e17f698d98c6c50627d49dce97ce353764318524c8deae0c5f1`; raw receipts remain private runtime artifacts rather than repository content.
