@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, readdir, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  freezeValidationSnapshot,
   nodeCacheKey,
   planValidation,
   readCacheRecord,
@@ -152,6 +153,18 @@ describe('affected validation DAG', () => {
     );
     expect(await readCacheRecord(record, 'other')).toBeUndefined();
     expect(await readCacheRecord(record, 'key', 1000)).toBeUndefined();
+  });
+
+  test('frozen snapshot excludes declared output roots but detects adjacent source mutation', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'rapidraw-validation-snapshot-'));
+    await mkdir(join(root, 'private-artifacts'), { recursive: true });
+    await writeFile(join(root, 'source.ts'), 'export const source = 1;\n');
+    await writeFile(join(root, 'private-artifacts', 'receipt.json'), '{"revision":1}\n');
+    const initial = await freezeValidationSnapshot(root);
+    await writeFile(join(root, 'private-artifacts', 'receipt.json'), '{"revision":2}\n');
+    expect((await freezeValidationSnapshot(root)).identity).toBe(initial.identity);
+    await writeFile(join(root, 'source.ts'), 'export const source = 2;\n');
+    expect((await freezeValidationSnapshot(root)).identity).not.toBe(initial.identity);
   });
 
   test('shared producer artifact is generated once and reused by its consumer', async () => {

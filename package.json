@@ -40,7 +40,7 @@
     "validate:full": "bun scripts/validation/run.ts --mode full --no-cache",
     "validate:release": "bun scripts/validation/run.ts --mode release --no-cache",
     "validate:benchmark": "bun scripts/validation/benchmark.ts",
-    "validate:benchmark:real": "bun scripts/validation/benchmark.ts --real",
+    "validate:benchmark:real": "bun scripts/validation/benchmark.ts --real-only",
     "worktree:create": "bun scripts/dev/create-codex-worktree.ts",
     "hooks:install": "git config core.hooksPath .githooks"
   },

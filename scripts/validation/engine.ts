@@ -85,7 +85,12 @@ export const planValidation = (
 const walkFiles = async (root: string, directory = root): Promise<string[]> => {
   const result: string[] = [];
   for (const entry of await readdir(directory, { withFileTypes: true })) {
-    if (['.git', 'node_modules', 'target', 'dist', '.validation-cache'].includes(entry.name)) continue;
+    if (
+      ['.git', 'node_modules', 'target', 'dist', 'artifacts', 'private-artifacts', '.validation-cache'].includes(
+        entry.name,
+      )
+    )
+      continue;
     const path = join(directory, entry.name);
     if (entry.isDirectory()) result.push(...(await walkFiles(root, path)));
     else if (entry.isFile()) result.push(relative(root, path));
@@ -419,7 +424,10 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
   process.off('SIGTERM', onInterrupt);
   const finalSnapshot = await freezeValidationSnapshot(options.root);
   if (finalSnapshot.identity !== snapshot.identity) {
-    console.error(`FAIL frozen-snapshot (tracked inputs changed during validation)`);
+    const changed = [...new Set([...snapshot.files, ...finalSnapshot.files])]
+      .filter((path) => snapshot.digests.get(path) !== finalSnapshot.digests.get(path))
+      .slice(0, 20);
+    console.error(`FAIL frozen-snapshot (inputs changed during validation: ${changed.join(', ')})`);
     return 1;
   }
   if (interrupted) return 130;
