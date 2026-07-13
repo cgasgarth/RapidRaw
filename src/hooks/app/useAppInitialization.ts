@@ -20,6 +20,7 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
 import { COPYABLE_ADJUSTMENT_KEYS, DisplayMode, PasteMode } from '../../utils/adjustments';
+import { frontendStartupReporter } from '../../utils/startup/startupTraceReporter';
 import { DEFAULT_THEME_ID, THEMES, type ThemeProps } from '../../utils/themes';
 import { clampPanelScopesHeight } from '../../utils/waveformSizing';
 
@@ -82,6 +83,7 @@ export const useAppInitialization = ({
   setLibraryViewMode,
 }: UseAppInitializationProps) => {
   const isInitialMount = useRef(true);
+  const startupReporter = frontendStartupReporter;
   const { i18n } = useTranslation();
 
   const {
@@ -159,6 +161,19 @@ export const useAppInitialization = ({
     initPlatform();
   }, [initPlatform]);
 
+  // Signal native readiness from the mounted shell. Settings and filesystem
+  // hydration remain opportunistic and must not gate the first paint.
+  useEffect(() => {
+    void startupReporter
+      .start()
+      .then((traceId) => {
+        console.info('[startup-trace]', traceId, 'frontend shell visible');
+      })
+      .catch((err: unknown) => {
+        console.error('Failed to correlate frontend startup trace:', err);
+      });
+  }, [startupReporter]);
+
   useEffect(() => {
     invoke<SupportedTypes>(Invokes.GetSupportedFileTypes)
       .then((types) => {
@@ -222,18 +237,33 @@ export const useAppInitialization = ({
         setLibraryViewMode(settings.libraryViewMode ?? defaultLibraryViewMode);
         setThumbnailSize(settings.thumbnailSize ?? defaultThumbnailSize);
         if (settings.thumbnailAspectRatio) setThumbnailAspectRatio(settings.thumbnailAspectRatio);
+        void startupReporter
+          .mark('settingsHydrated', 'ok', 'settings-and-workspace')
+          .catch((err: unknown) => console.error('Failed to report settings startup phase:', err));
 
+        // The shell and command bridge are usable before pinned/NAS tree scans.
+        // Hydrate those roots opportunistically so a slow/offline mount cannot
+        // hold the first-paint readiness boundary.
         if (settings.pinnedFolders && settings.pinnedFolders.length > 0) {
-          try {
-            const trees = await invoke<FolderTree[]>(Invokes.GetPinnedFolderTrees, {
-              paths: settings.pinnedFolders,
-              expandedFolders: settings.lastFolderState?.expandedFolders || [],
-              showImageCounts: settings.enableFolderImageCounts ?? false,
+          void invoke<FolderTree[]>(Invokes.GetPinnedFolderTrees, {
+            paths: settings.pinnedFolders,
+            expandedFolders: settings.lastFolderState?.expandedFolders || [],
+            showImageCounts: settings.enableFolderImageCounts ?? false,
+          })
+            .then((trees) => {
+              setLibrary({ pinnedFolderTrees: trees });
+              return startupReporter.mark('libraryReady', 'ok', 'pinned-trees-hydrated');
+            })
+            .catch((err: unknown) => {
+              console.error('Failed to load pinned folder trees:', err);
+              void startupReporter
+                .mark('libraryReady', 'degraded', 'pinned-trees-unavailable')
+                .catch((reportError: unknown) => console.error('Failed to report library startup phase:', reportError));
             });
-            setLibrary({ pinnedFolderTrees: trees });
-          } catch (err) {
-            console.error('Failed to load pinned folder trees:', err);
-          }
+        } else {
+          void startupReporter
+            .mark('libraryReady', 'ok', 'no-pinned-trees')
+            .catch((err: unknown) => console.error('Failed to report library startup phase:', err));
         }
 
         if (settings.lastFolderState) {
@@ -242,10 +272,6 @@ export const useAppInitialization = ({
             expandedAlbumGroups: new Set(settings.lastFolderState.expandedAlbumGroups || []),
           });
         }
-
-        invoke(Invokes.FrontendReady).catch((e: unknown) => {
-          console.error('Failed to notify backend of readiness:', e);
-        });
       })
       .catch((err: unknown) => {
         console.error('Failed to load settings:', err);
@@ -255,6 +281,9 @@ export const useAppInitialization = ({
           thumbnailSize: defaultThumbnailSize,
           libraryViewMode: defaultLibraryViewMode,
         });
+        void startupReporter
+          .mark('settingsHydrated', 'degraded', 'settings-fallback')
+          .catch((reportError: unknown) => console.error('Failed to report settings startup phase:', reportError));
       })
       .finally(() => {
         isInitialMount.current = false;
@@ -276,6 +305,7 @@ export const useAppInitialization = ({
     setThumbnailAspectRatio,
     handleSettingsChange,
     i18n,
+    startupReporter,
   ]);
 
   useEffect(() => {

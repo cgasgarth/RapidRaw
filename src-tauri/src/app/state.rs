@@ -11,6 +11,7 @@ use wgpu::{Texture, TextureView};
 
 #[cfg(feature = "ai")]
 use crate::ai::ai_processing::{CachedDepthMap, ImageEmbeddings};
+use crate::app::startup::{InitializationService, StartupTrace};
 use crate::cache_utils::DecodedImageCache;
 use crate::gpu_processing::GpuProcessor;
 use crate::image_processing::GpuContext;
@@ -220,6 +221,9 @@ pub struct WarpedImageCache {
 }
 
 pub struct AppState {
+    pub startup_trace: StartupTrace,
+    pub gpu_initialization: InitializationService,
+    pub lens_initialization: InitializationService,
     pub window_setup_complete: AtomicBool,
     pub gpu_crash_flag_path: Mutex<Option<PathBuf>>,
     pub original_image: Mutex<Option<LoadedImage>>,
@@ -290,6 +294,9 @@ impl AppState {
             max_entries,
         };
         Self {
+            startup_trace: StartupTrace::new(),
+            gpu_initialization: InitializationService::default(),
+            lens_initialization: InitializationService::default(),
             window_setup_complete: AtomicBool::new(false),
             gpu_crash_flag_path: Mutex::new(None),
             original_image: Mutex::new(None),
