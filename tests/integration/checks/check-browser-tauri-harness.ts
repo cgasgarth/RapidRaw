@@ -378,6 +378,16 @@ async function verifyPreviewBoundsScenario(page: Page, samples: BoundsSample[]):
   samples.push(await collectBoundsSample(page, 'fit-after-image-select'));
   await assertLatestBoundsSample(samples);
 
+  await zoomSelector.selectOption('0.5');
+  await assertRenderedImageGeometry(page, { height: 384, label: 'selector-zoom-50', width: 512 });
+  samples.push(await collectBoundsSample(page, 'selector-zoom-50'));
+  await assertLatestBoundsSample(samples);
+
+  await zoomSelector.selectOption('1');
+  await assertRenderedImageGeometry(page, { height: 768, label: 'selector-zoom-100', width: 1024 });
+  samples.push(await collectBoundsSample(page, 'selector-zoom-100'));
+  await assertLatestBoundsSample(samples);
+
   await page.keyboard.press('Meta+=');
   await waitForStablePreview(page);
   samples.push(await collectBoundsSample(page, 'keyboard-zoom-in'));
@@ -389,16 +399,53 @@ async function verifyPreviewBoundsScenario(page: Page, samples: BoundsSample[]):
   await assertLatestBoundsSample(samples);
 
   await zoomSelector.selectOption('2');
-  await waitForStablePreview(page);
+  await assertRenderedImageGeometry(page, { height: 1536, label: 'selector-zoom-200', width: 2048 });
   samples.push(await collectBoundsSample(page, 'selector-zoom-200'));
   await assertLatestBoundsSample(samples);
 
+  const zoomedFrame = await readBounds(page.locator('[data-editor-image-frame="edited"]').first());
+  const panel = await readBounds(previewPanel);
+  if (zoomedFrame.width <= panel.width || zoomedFrame.height <= panel.height) {
+    throw new Error(
+      `selector-zoom-200 left the full frame visible (${zoomedFrame.width}x${zoomedFrame.height} inside ${panel.width}x${panel.height}).`,
+    );
+  }
+
   await zoomSelector.selectOption('fit');
-  await waitForStablePreview(page);
+  await assertRenderedImageGeometry(page, { height: 397, label: 'reset-to-fit', width: 529.33 });
   samples.push(await collectBoundsSample(page, 'reset-to-fit'));
   await assertLatestBoundsSample(samples);
 
+  await zoomSelector.selectOption('2');
+  await assertRenderedImageGeometry(page, { height: 1536, label: 'repeated-selector-zoom-200', width: 2048 });
+  await zoomSelector.selectOption('fit');
+  await assertRenderedImageGeometry(page, { height: 397, label: 'repeated-reset-to-fit', width: 529.33 });
+
   await writeBoundsReport('passed');
+}
+
+async function assertRenderedImageGeometry(
+  page: Page,
+  expected: { height: number; label: string; width: number },
+): Promise<void> {
+  const frame = page.locator('[data-editor-image-frame="edited"]').first();
+  await frame.waitFor({ timeout: 10_000 });
+  await page.waitForFunction(
+    ({ expectedHeight, expectedWidth }) => {
+      const element = document.querySelector<HTMLElement>('[data-editor-image-frame="edited"]');
+      if (!element) return false;
+      const bounds = element.getBoundingClientRect();
+      return Math.abs(bounds.width - expectedWidth) <= 1 && Math.abs(bounds.height - expectedHeight) <= 1;
+    },
+    { expectedHeight: expected.height, expectedWidth: expected.width },
+    { timeout: 10_000 },
+  );
+  const actual = await readBounds(frame);
+  if (Math.abs(actual.width - expected.width) > 1 || Math.abs(actual.height - expected.height) > 1) {
+    throw new Error(
+      `${expected.label} rendered ${actual.width}x${actual.height}; expected ${expected.width}x${expected.height}.`,
+    );
+  }
 }
 
 async function waitForStablePreview(page: Page): Promise<void> {

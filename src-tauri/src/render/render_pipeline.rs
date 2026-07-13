@@ -69,7 +69,7 @@ mod tests {
             42,
             &json!({
                 "waveletDetailEnabled": true,
-                "waveletFineAmount": 35.0
+                "waveletDetailFine": 35.0
             }),
         );
 

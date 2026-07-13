@@ -228,6 +228,7 @@ export interface Adjustments {
   chromaticAberrationRedCyan: number;
   blackWhiteMixer: BlackWhiteMixerSettings;
   cameraProfile: CameraProfileId;
+  cameraProfileAmount: number;
   colorBalanceRgb: ColorBalanceRgbSettings;
   channelMixer: ChannelMixerSettings;
   colorCalibration: ColorCalibration;
@@ -239,6 +240,8 @@ export interface Adjustments {
   parametricCurve?: ParametricCurve;
   curveMode?: 'point' | 'parametric';
   rawProcessingModeOverride: RawProcessingModeOverride;
+  /** Persisted native edit-graph process version; legacy sidecars default to v1. */
+  rawEngineEditGraphVersion: number;
   crop: Crop | null;
   deblurEnabled: boolean;
   deblurSigmaPx: number;
@@ -441,7 +444,8 @@ export type CameraProfileId =
   | 'camera_neutral'
   | 'camera_portrait'
   | 'camera_landscape'
-  | 'linear_raw';
+  | 'linear_raw'
+  | `dcp:${string}`;
 export type ToneCurveId = 'auto_filmic' | 'linear' | 'soft_contrast' | 'high_contrast' | 'shadow_lift';
 
 export interface ChannelMixerRow {
@@ -805,6 +809,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   chromaticAberrationRedCyan: 0,
   blackWhiteMixer: structuredClone(INITIAL_BLACK_WHITE_MIXER),
   cameraProfile: 'camera_standard',
+  cameraProfileAmount: 100,
   colorBalanceRgb: structuredClone(INITIAL_COLOR_BALANCE_RGB),
   channelMixer: structuredClone(INITIAL_CHANNEL_MIXER),
   colorCalibration: { ...INITIAL_COLOR_CALIBRATION },
@@ -817,6 +822,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   parametricCurve: getDefaultParametricCurve(),
   curveMode: 'point',
   rawProcessingModeOverride: null,
+  rawEngineEditGraphVersion: 1,
   deblurEnabled: false,
   deblurSigmaPx: 0.8,
   deblurStrength: 0,
@@ -1017,6 +1023,11 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
 
   const parsedTechnicalWhiteBalance = technicalWhiteBalanceSchema.safeParse(loadedAdjustments.whiteBalanceTechnical);
   const isLegacyWhiteBalance = !parsedTechnicalWhiteBalance.success;
+  const loadedCameraProfileAmount = loadedAdjustments.cameraProfileAmount;
+  const cameraProfileAmount =
+    loadedCameraProfileAmount !== undefined && Number.isFinite(loadedCameraProfileAmount)
+      ? Math.min(100, Math.max(0, loadedCameraProfileAmount))
+      : INITIAL_ADJUSTMENTS.cameraProfileAmount;
 
   return {
     ...INITIAL_ADJUSTMENTS,
@@ -1060,6 +1071,7 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
     transformXOffset: loadedAdjustments.transformXOffset ?? INITIAL_ADJUSTMENTS.transformXOffset,
     transformYOffset: loadedAdjustments.transformYOffset ?? INITIAL_ADJUSTMENTS.transformYOffset,
     cameraProfile: loadedAdjustments.cameraProfile ?? INITIAL_ADJUSTMENTS.cameraProfile,
+    cameraProfileAmount,
     toneMapper: loadedAdjustments.toneMapper ?? 'basic',
     viewTransform: {
       ...INITIAL_ADJUSTMENTS.viewTransform,

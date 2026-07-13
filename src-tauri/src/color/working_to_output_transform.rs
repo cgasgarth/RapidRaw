@@ -155,6 +155,7 @@ fn prophoto_encode(value: f64) -> f64 {
 mod tests {
     use super::*;
     use image::{ImageBuffer, Rgba};
+    use rapidraw_color_reference::transfer::linear_to_srgb_channel;
 
     fn fixture(pixel: [f32; 3]) -> DynamicImage {
         DynamicImage::ImageRgba32F(ImageBuffer::from_pixel(
@@ -162,6 +163,13 @@ mod tests {
             1,
             Rgba([pixel[0], pixel[1], pixel[2], 1.0]),
         ))
+    }
+
+    #[test]
+    fn srgb_cpu_stage_matches_independent_f64_reference() {
+        for value in [-0.1, 0.0, 0.003_130_8, 0.18, 1.0, 2.0] {
+            assert_eq!(srgb_encode(value), linear_to_srgb_channel(value));
+        }
     }
 
     #[test]

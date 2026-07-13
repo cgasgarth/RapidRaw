@@ -162,6 +162,14 @@
       "preset": "預設",
       "previewMode": "",
       "profileTone": {
+        "browser": {
+          "builtIn": "Built-in",
+          "compatibleOnly": "Compatible with this camera",
+          "importDcp": "Import DCP…",
+          "noMatches": "No matching profiles",
+          "registryError": "Profile registry: {{errorCode}}",
+          "scanning": "Scanning profiles…"
+        },
         "cameraProfile": "",
         "cameraProfiles": {
           "camera_landscape": "",

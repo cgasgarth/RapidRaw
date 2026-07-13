@@ -110,8 +110,8 @@ use crate::image_loader::{
 use crate::image_processing::{
     Crop, GeometryParams, RenderRequest, apply_coarse_rotation, apply_cpu_default_raw_processing,
     apply_flip, apply_geometry_warp, apply_srgb_to_linear, downscale_f32_image,
-    get_all_adjustments_from_json, get_or_init_gpu_context, process_and_get_dynamic_image,
-    resolve_tonemapper_override, resolve_tonemapper_override_from_handle, warp_image_geometry,
+    get_or_init_gpu_context, process_and_get_dynamic_image, resolve_tonemapper_override,
+    resolve_tonemapper_override_from_handle, warp_image_geometry,
 };
 use crate::lut_processing::Lut;
 use crate::mask_generation::{
@@ -1212,16 +1212,17 @@ fn render_processed_export_soft_proof_preview(
         adjustments,
         &mask_bitmaps,
     );
-    let render_adjustments = normalize_film_look_adjustments_for_render(adjustments);
     let tm_override = resolve_tonemapper_override_from_handle(app_handle, loaded_image.is_raw);
-    let final_adjustments = get_all_adjustments_from_json(
-        render_adjustments.as_ref(),
-        loaded_image.is_raw,
-        tm_override,
-    );
-    let lut: Option<Arc<Lut>> = render_adjustments["lutPath"]
+    let lut: Option<Arc<Lut>> = adjustments["lutPath"]
         .as_str()
         .and_then(|path| get_or_load_lut(state, path).ok());
+    let render_plan = compile_consumer_render_plan(
+        adjustments,
+        &loaded_image.path,
+        loaded_image.is_raw,
+        tm_override,
+        lut,
+    )?;
     process_and_get_dynamic_image(
         &context,
         state,
@@ -1232,13 +1233,41 @@ fn render_processed_export_soft_proof_preview(
             detail_stage.render_hash,
         ),
         RenderRequest {
-            adjustments: final_adjustments,
+            adjustments: render_plan.adjustments,
             mask_bitmaps: &mask_bitmaps,
-            lut,
+            lut: render_plan.lut.clone(),
             roi: None,
+            edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(Arc::clone(
+                &render_plan.edit_graph,
+            )),
         },
         "export_soft_proof_preview",
     )
+}
+
+fn compile_consumer_render_plan(
+    adjustments: &Value,
+    source_identity: &str,
+    is_raw: bool,
+    tonemapper_override: Option<u32>,
+    lut: Option<Arc<Lut>>,
+) -> Result<Arc<render_plan::CompiledRenderPlan>, String> {
+    let revision = render_plan::content_revision(
+        adjustments,
+        0,
+        render::artifact_identity::source_fingerprint_for_path(source_identity),
+        u64::from(tonemapper_override.unwrap_or(0)),
+    );
+    render_plan::compile_render_plan_cached(
+        adjustments,
+        render_plan::CompileRenderPlanContext {
+            revision,
+            is_raw,
+            tonemapper_override,
+        },
+        lut,
+    )
+    .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -1335,10 +1364,21 @@ fn generate_uncropped_preview(
 
         let tm_override = resolve_tonemapper_override_from_handle(&app_handle, is_raw);
         let render_adjustments = normalize_film_look_adjustments_for_render(&adjustments_clone);
-        let uncropped_adjustments =
-            get_all_adjustments_from_json(render_adjustments.as_ref(), is_raw, tm_override);
         let lut_path = render_adjustments["lutPath"].as_str();
         let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
+        let render_plan = match compile_consumer_render_plan(
+            render_adjustments.as_ref(),
+            &loaded_image.path,
+            is_raw,
+            tm_override,
+            lut,
+        ) {
+            Ok(plan) => plan,
+            Err(error) => {
+                log::error!("uncropped preview edit graph compilation failed: {error}");
+                return;
+            }
+        };
         if let Ok(processed_image) = process_and_get_dynamic_image(
             &context,
             &state,
@@ -1348,10 +1388,13 @@ fn generate_uncropped_preview(
                 &loaded_image.path,
             ),
             RenderRequest {
-                adjustments: uncropped_adjustments,
+                adjustments: render_plan.adjustments,
                 mask_bitmaps: &mask_bitmaps,
-                lut,
+                lut: render_plan.lut.clone(),
                 roi: None,
+                edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
+                    Arc::clone(&render_plan.edit_graph),
+                ),
             },
             "generate_uncropped_preview",
         ) {
@@ -2042,10 +2085,15 @@ async fn preview_geometry_transform(
             }
 
             let tm_override = resolve_tonemapper_override_from_handle(&app_handle, is_raw);
-            let all_adjustments =
-                get_all_adjustments_from_json(&temp_adjustments, is_raw, tm_override);
             let lut_path = temp_adjustments["lutPath"].as_str();
             let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
+            let render_plan = compile_consumer_render_plan(
+                &temp_adjustments,
+                &loaded_image_path,
+                is_raw,
+                tm_override,
+                lut,
+            )?;
             let mask_bitmaps = Vec::new();
 
             let processed_base = process_and_get_dynamic_image(
@@ -2057,10 +2105,13 @@ async fn preview_geometry_transform(
                     &loaded_image_path,
                 ),
                 RenderRequest {
-                    adjustments: all_adjustments,
+                    adjustments: render_plan.adjustments,
                     mask_bitmaps: &mask_bitmaps,
-                    lut,
+                    lut: render_plan.lut.clone(),
                     roi: None,
+                    edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
+                        Arc::clone(&render_plan.edit_graph),
+                    ),
                 },
                 "preview_geometry_transform_base_gen",
             )?;
@@ -2226,20 +2277,28 @@ fn generate_preset_preview(
 
     let tm_override = resolve_tonemapper_override_from_handle(&app_handle, is_raw);
     let render_adjustments = normalize_film_look_adjustments_for_render(&js_adjustments);
-    let all_adjustments =
-        get_all_adjustments_from_json(render_adjustments.as_ref(), is_raw, tm_override);
     let lut_path = render_adjustments["lutPath"].as_str();
     let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
+    let render_plan = compile_consumer_render_plan(
+        render_adjustments.as_ref(),
+        &loaded_image.path,
+        is_raw,
+        tm_override,
+        lut,
+    )?;
     let processed_image = process_and_get_dynamic_image(
         &context,
         &state,
         &preview_image,
         crate::gpu_processing::PreGpuImageIdentity::for_source(&preview_image, &loaded_image.path),
         RenderRequest {
-            adjustments: all_adjustments,
+            adjustments: render_plan.adjustments,
             mask_bitmaps: &mask_bitmaps,
-            lut,
+            lut: render_plan.lut.clone(),
             roi: None,
+            edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(Arc::clone(
+                &render_plan.edit_graph,
+            )),
         },
         "generate_preset_preview",
     )?;
@@ -2365,10 +2424,15 @@ async fn generate_all_community_previews(
             let tm_override = resolve_tonemapper_override_from_handle(&app_handle, *is_raw);
             let render_adjustments =
                 normalize_film_look_adjustments_for_render(&scaled_adjustments);
-            let all_adjustments =
-                get_all_adjustments_from_json(render_adjustments.as_ref(), *is_raw, tm_override);
             let lut_path = render_adjustments["lutPath"].as_str();
             let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
+            let render_plan = compile_consumer_render_plan(
+                render_adjustments.as_ref(),
+                &preset.name,
+                *is_raw,
+                tm_override,
+                lut,
+            )?;
 
             let processed_image_dynamic = crate::image_processing::process_and_get_dynamic_image(
                 &context,
@@ -2379,10 +2443,13 @@ async fn generate_all_community_previews(
                     &preset.name,
                 ),
                 RenderRequest {
-                    adjustments: all_adjustments,
+                    adjustments: render_plan.adjustments,
                     mask_bitmaps: &mask_bitmaps,
-                    lut,
+                    lut: render_plan.lut.clone(),
                     roi: None,
+                    edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
+                        Arc::clone(&render_plan.edit_graph),
+                    ),
                 },
                 "generate_all_community_previews",
             )?;
@@ -3092,10 +3159,15 @@ fn generate_preview_for_path(
 
     let tm_override = resolve_tonemapper_override(&settings, is_raw);
     let render_adjustments = normalize_film_look_adjustments_for_render(&js_adjustments);
-    let all_adjustments =
-        get_all_adjustments_from_json(render_adjustments.as_ref(), is_raw, tm_override);
     let lut_path = render_adjustments["lutPath"].as_str();
     let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
+    let render_plan = compile_consumer_render_plan(
+        render_adjustments.as_ref(),
+        &source_path_str,
+        is_raw,
+        tm_override,
+        lut,
+    )?;
     let pre_gpu_stage_hash = calculate_transform_hash(render_adjustments.as_ref());
     let detail_stage = render_pipeline::apply_pre_gpu_detail_stages(
         transformed_image.as_ref(),
@@ -3112,10 +3184,13 @@ fn generate_preview_for_path(
             detail_stage.render_hash,
         ),
         RenderRequest {
-            adjustments: all_adjustments,
+            adjustments: render_plan.adjustments,
             mask_bitmaps: &mask_bitmaps,
-            lut,
+            lut: render_plan.lut.clone(),
             roi: None,
+            edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(Arc::clone(
+                &render_plan.edit_graph,
+            )),
         },
         "generate_preview_for_path",
     )?;
@@ -3560,6 +3635,9 @@ pub fn run() {
             }
 
             let app_handle = app.handle().clone();
+            if let Err(error) = color::camera_profile::registry::managed_profile_root(&app_handle) {
+                log::warn!("camera_profile_registry_root_unavailable: {error}");
+            }
             app.state::<AppState>()
                 .startup_trace
                 .mark(NativeStartupPhase::ProcessStarted, "ok", None);
@@ -3908,6 +3986,10 @@ pub fn run() {
             denoising::save_denoised_image,
             display_profile::get_active_display_profile,
             display_profile::get_display_preview_lut_status,
+            color::camera_profile::registry::list_camera_profiles,
+            color::camera_profile::registry::import_camera_profile,
+            color::camera_profile::registry::remove_camera_profile,
+            color::camera_profile::registry::reveal_camera_profile,
             image_loader::compare_raw_reconstruction_modes,
             image_loader::load_image,
             image_open_session::begin_image_open,

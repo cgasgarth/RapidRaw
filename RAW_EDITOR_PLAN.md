@@ -2021,6 +2021,7 @@ Required ADR fleet:
 - `ADR-003: Versioned non-destructive edit graph`
   - Decision: originals are immutable; sidecars store versioned graph operations.
   - Validation: original hash tests, sidecar roundtrip, migration tests.
+  - Runtime decision: [ADR-GRAPH-001](docs/color/architecture/versioned-edit-graph-adr-2026-07-13.md) defines the compiled legacy-v1 execution, currentness, and migration contract implemented by #5399.
 - `ADR-004: Scene-referred color pipeline`
   - Decision: internal editing defaults to scene-referred processing with explicit display/output transforms.
   - Validation: ColorChecker metrics, CPU/GPU parity, gamut tests, clipping tests.
@@ -2057,6 +2058,7 @@ Contract-freeze ADRs to add before major feature implementation:
 - `ADR-GRAPH-001: Edit graph schema, migration, and replay contract`
   - Decision: graph operations are discriminated, versioned, migratable, and replayable across UI, CLI, tests, and app-server tools.
   - Validation: sidecar roundtrip, migration fixture, graph replay smoke, revision-conflict test, and schema-diff failure on unreviewed changes.
+  - Accepted runtime ADR: [versioned edit graph execution contract](docs/color/architecture/versioned-edit-graph-adr-2026-07-13.md).
 - `ADR-COLOR-001: Working-space, display-transform, and proofing policy`
   - Decision: RawEngine names its internal working space, scene/display boundary, display proofing policy, export profile behavior, and out-of-gamut warning semantics.
   - Validation: ColorChecker metrics, neutral drift, gamut warnings, macOS display-profile smoke, and CPU/GPU parity fixtures.
