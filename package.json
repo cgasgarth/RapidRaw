@@ -19,7 +19,7 @@
     "install:computer-use": "bun scripts/dev/install-computer-use-app.ts",
     "start:native-qa": "bun scripts/dev/start-native-qa-app.ts",
     "test": "bun run test:unit && bun run test:e2e",
-    "test:unit": "bun test --reporter=dot tests/pure-ts",
+    "test:unit": "bun test --max-concurrency 1 --reporter=dot tests/pure-ts",
     "test:e2e": "bun scripts/proofs/capture-visual-smoke.ts --scenario empty-library && bun run check:browser-harness",
     "check": "bun run lint && bun run format:check && bun run typecheck && bun run test && bun run check:rust",
     "check:ci": "bun run check && bun run check:bundle && bun run check:schema && bun run check:docs && bun run check:security && bun run check:actions",
