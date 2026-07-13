@@ -1,5 +1,6 @@
 import type { TransformState } from '../components/ui/AppProperties';
 import type { RenderSize } from '../hooks/viewport/useImageRenderSize';
+import { getImageViewportRect } from './editorViewportBounds';
 
 export type RgbaColor = [number, number, number, number];
 
@@ -83,17 +84,25 @@ export const buildVisibleWgpuTransformPayload = (
   isCropViewVisible: boolean,
 ): WgpuTransformPayload => {
   const clip = buildClipRect(geometry.containerRect, geometry.dpr);
-  const { scale, positionX, positionY } = geometry.transformState;
+  const { scale } = geometry.transformState;
   const { imageRenderSize } = geometry;
-  const offsetX = imageRenderSize.width > 0 ? imageRenderSize.offsetX : 0;
-  const offsetY = imageRenderSize.height > 0 ? imageRenderSize.offsetY : 0;
   const baseW = imageRenderSize.width > 0 ? imageRenderSize.width : geometry.containerRect.width;
   const baseH = imageRenderSize.height > 0 ? imageRenderSize.height : geometry.containerRect.height;
+  const presentationRect = getImageViewportRect(
+    {
+      ...imageRenderSize,
+      height: baseH,
+      offsetX: imageRenderSize.width > 0 ? imageRenderSize.offsetX : 0,
+      offsetY: imageRenderSize.height > 0 ? imageRenderSize.offsetY : 0,
+      width: baseW,
+    },
+    geometry.transformState,
+  );
 
-  let screenX = (geometry.containerRect.left + positionX + offsetX * scale) * geometry.dpr || 0;
-  let screenY = (geometry.containerRect.top + positionY + offsetY * scale) * geometry.dpr || 0;
-  let screenW = baseW * scale * geometry.dpr || MIN_WGPU_SURFACE_SIZE;
-  let screenH = baseH * scale * geometry.dpr || MIN_WGPU_SURFACE_SIZE;
+  let screenX = (geometry.containerRect.left + presentationRect.x) * geometry.dpr || 0;
+  let screenY = (geometry.containerRect.top + presentationRect.y) * geometry.dpr || 0;
+  let screenW = presentationRect.width * geometry.dpr || MIN_WGPU_SURFACE_SIZE;
+  let screenH = presentationRect.height * geometry.dpr || MIN_WGPU_SURFACE_SIZE;
 
   if (isCropViewVisible) {
     screenX = WGPU_HIDDEN_COORDINATE;

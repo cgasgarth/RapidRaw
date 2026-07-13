@@ -20,7 +20,13 @@ export const rawDemosaicPathSchema = z.enum(['bayer_hq', 'fast', 'linear_bypass'
 
 export const rawProcessingProfileSchema = z.enum(['balanced', 'fast', 'maximum']);
 
-export const rawCameraProfileStatusSchema = z.enum(['fallback', 'interpolated', 'single_illuminant', 'unavailable']);
+export const rawCameraProfileStatusSchema = z.enum([
+  'fallback',
+  'interpolated',
+  'selected_dcp',
+  'single_illuminant',
+  'unavailable',
+]);
 
 export const rawCameraProfileAlgorithmIdSchema = z.enum([
   'dual_illuminant_mired_v1',
@@ -87,6 +93,7 @@ export const rawCameraProfileColorCheckerGateSchema = z
 export const rawCameraProfileReportSchema = z
   .object({
     algorithmId: rawCameraProfileAlgorithmIdSchema,
+    cameraModel: z.string().trim().min(1).nullable().optional(),
     candidateCount: z.number().int().nonnegative(),
     cctClamped: z.boolean().nullable().optional(),
     colorCheckerGate: rawCameraProfileColorCheckerGateSchema.nullable().optional(),
@@ -98,7 +105,7 @@ export const rawCameraProfileReportSchema = z
     illuminantEstimateMethod: rawIlluminantEstimateMethodSchema,
     matrixHash: z
       .string()
-      .regex(/^blake3:[0-9a-f]+$/u)
+      .regex(/^(?:blake3|sha256):[0-9a-f]+$/u)
       .nullable()
       .optional(),
     profileIlluminantDuv: z.number().finite().min(-0.05).max(0.05).nullable().optional(),
@@ -114,9 +121,39 @@ export const rawCameraProfileReportSchema = z
   })
   .strict();
 
+const selectedCameraProfileReceiptSchema = z
+  .object({
+    baselineExposureEv: z.number().finite(),
+    cameraMatch: z.enum([
+      'exact',
+      'unrestricted',
+      'compatible_alias',
+      'user_forced_compatible',
+      'user_forced_unverified',
+      'matrix_fallback',
+      'unsupported_channels',
+    ]),
+    contract: z.literal('rapidraw.camera_profile.v1'),
+    creativeAmount: z.number().min(0).max(1),
+    creativeTableApplied: z.boolean(),
+    defaultBlackRender: z.number().int().min(0).max(1).nullable().optional(),
+    embedPolicy: z.number().int().min(0).max(3).nullable().optional(),
+    illuminantWeight: z.number().min(0).max(1),
+    implementationVersion: z.literal(1),
+    limitationCodes: z.array(z.string().trim().min(1)),
+    profileName: z.string().trim().min(1),
+    profileSha256: z.string().regex(/^sha256:[0-9a-f]{64}$/u),
+    source: z.enum(['embedded', 'open', 'user', 'generated', 'matrix_fallback']),
+    technicalTableApplied: z.boolean(),
+    toneCurveApplied: z.boolean(),
+    unsupportedTagIds: z.array(z.number().int().min(0).max(65535)),
+  })
+  .strict();
+
 export const rawDevelopmentReportSchema = z
   .object({
     cameraProfile: rawCameraProfileReportSchema,
+    selectedCameraProfile: selectedCameraProfileReceiptSchema.nullable().optional(),
     inputTransform: rawInputTransformReceiptV2Schema.nullable().optional(),
     demosaicAlgorithmId: z.string().trim().min(1).nullable().optional(),
     demosaicPath: rawDemosaicPathSchema,
@@ -157,6 +194,19 @@ export const rawDevelopmentReportSchema = z
       .strict()
       .optional(),
     processingProfile: rawProcessingProfileSchema,
+    stageSamples: z
+      .array(
+        z
+          .object({
+            domain: z.string().trim().min(1),
+            elapsedMs: z.number().nonnegative(),
+            nodeId: z.string().trim().min(1),
+            samples: z.array(z.tuple([z.number(), z.number(), z.number(), z.number()])),
+            version: z.number().int().positive(),
+          })
+          .strict(),
+      )
+      .default([]),
     runtime: z
       .object({
         cacheHit: z.boolean(),

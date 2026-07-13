@@ -167,6 +167,30 @@ mod tests {
     }
 
     #[test]
+    fn production_stage_matches_independent_cpu_reference_settings_exactly() {
+        let image = separated_luma_chroma_noise_image();
+        let adjustments = json!({
+            "colorNoiseReduction": 70,
+            "lumaNoiseReduction": 45
+        });
+        let production = apply_denoise_stage(&image, &adjustments);
+        let expected = apply_cpu_reference_denoise(
+            &image.to_rgb32f(),
+            DenoiseCpuReferenceSettings {
+                chroma_strength: 0.70 * 0.52,
+                edge_threshold: 0.018 + (1.0 - 0.70) * 0.045,
+                luma_strength: 0.45 * 0.32,
+            },
+        );
+
+        assert_eq!(
+            max_delta(production.as_ref(), &DynamicImage::ImageRgb32F(expected)),
+            0.0,
+            "production render must remain bound to the governed denoise CPU reference"
+        );
+    }
+
+    #[test]
     fn same_input_produces_preview_export_parity() {
         let image = noisy_patch_image();
         let adjustments = json!({

@@ -10,6 +10,7 @@ use crate::color::view_transform::{
 use crate::color::white_balance::{WhiteBalancePlanInputV1, compile_white_balance_plan};
 use crate::image_processing::calculate_agx_matrices;
 use crate::mask_generation::MaskDefinition;
+#[cfg(test)]
 use serde::Deserialize;
 
 type JsonValue = serde_json::Value;
@@ -389,10 +390,10 @@ fn get_global_adjustments_from_json(
         ),
         vibrance: scaled_section_value(js_adjustments, "color", "vibrance", SCALES.vibrance, None),
         hue: scaled_section_value(js_adjustments, "color", "hue", 1.0, None),
-        _pad_color1: 0.0,
-        _pad_color2: 0.0,
-        _pad_color3: 0.0,
-        _pad_color4: 0.0,
+        edit_graph_version: 0.0,
+        dehaze_atmosphere_r: 0.0,
+        dehaze_atmosphere_g: 0.0,
+        dehaze_atmosphere_b: 0.0,
         technical_white_balance: technical_white_balance_from_json(js_adjustments),
         sharpness: scaled_section_value(
             js_adjustments,
@@ -490,7 +491,7 @@ fn get_global_adjustments_from_json(
         ),
         show_clipping: u32::from(js_adjustments["showClipping"].as_bool().unwrap_or(false)),
         is_raw_image: u32::from(is_raw),
-        _pad_ca1: 0.0,
+        dehaze_atmosphere_confidence: 0.0,
         has_lut,
         lut_intensity,
         tonemapper_mode: tonemapper_override.unwrap_or(match tone_mapper {
@@ -734,6 +735,7 @@ fn get_mask_adjustments_from_json(adj: &JsonValue, blend_mode: &str) -> MaskAdju
     }
 }
 
+#[cfg(test)]
 pub fn get_all_adjustments_from_json(
     js_adjustments: &JsonValue,
     is_raw: bool,
@@ -780,9 +782,9 @@ pub fn get_all_adjustments_from_json_with_masks(
         tile_offset_y: 0,
         mask_atlas_cols: 1,
         blur_pass_flags: 0,
-        _pad_blur_flags1: 0,
-        _pad_blur_flags2: 0,
-        _pad_blur_flags3: 0,
+        execution_phase: 0,
+        source_width: 0,
+        source_height: 0,
     }
 }
 

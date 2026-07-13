@@ -6,7 +6,7 @@ struct FlareParams {
     contrast: f32,
     whites: f32,
     aspect_ratio: f32,
-    _pad: f32,
+    edit_graph_version: f32,
 }
 
 @group(0) @binding(0) var input_texture: texture_2d<f32>;
@@ -14,8 +14,13 @@ struct FlareParams {
 @group(0) @binding(2) var<uniform> params: FlareParams;
 @group(0) @binding(3) var input_sampler: sampler;
 
-fn get_luma(c: vec3<f32>) -> f32 {
-    return dot(c, vec3<f32>(0.2126, 0.7152, 0.0722));
+fn scene_luminance(c: vec3<f32>) -> f32 {
+    let coefficients = select(
+        vec3<f32>(0.2126, 0.7152, 0.0722),
+        vec3<f32>(0.27222872, 0.67408174, 0.05368952),
+        params.edit_graph_version >= 2.0,
+    );
+    return dot(c, coefficients);
 }
 
 fn srgb_to_linear(c: vec3<f32>) -> vec3<f32> {
@@ -40,7 +45,7 @@ fn apply_filmic_exposure(color_in: vec3<f32>, brightness_adj: f32) -> vec3<f32> 
     }
     const RATIONAL_CURVE_MIX: f32 = 0.95;
     const MIDTONE_STRENGTH: f32 = 1.2;
-    let original_luma = get_luma(color_in);
+    let original_luma = scene_luminance(color_in);
     if (abs(original_luma) < 0.00001) {
         return color_in;
     }
@@ -93,7 +98,7 @@ fn threshold_main(@builtin(global_invocation_id) id: vec3<u32>) {
     linear_color = apply_filmic_exposure(linear_color, params.brightness);
     linear_color = apply_tonal_adjustments(linear_color, params.contrast, params.whites);
 
-    let true_luma = get_luma(linear_color);
+    let true_luma = scene_luminance(linear_color);
     let luma_for_threshold = min(true_luma, 1.0);
 
     let threshold_val = mix(0.88, 0.50, clamp(params.amount, 0.0, 1.0));

@@ -235,8 +235,9 @@ mod tests {
     use super::{
         ACTIVE_SRGB_OKLAB_CHROMA_REDUCE, CHROMA_MONOTONIC_EPSILON, SRGB_OKLAB_CHROMA_REDUCE_V1,
         SRGB_OKLAB_CHROMA_REDUCE_V2, SRGB_OKLAB_CHROMA_REDUCE_V3, SRGB_OKLAB_CHROMA_REDUCE_V4,
-        linear_srgb_to_oklab, map_srgb_oklab_chroma_reduce_v1, map_srgb_oklab_chroma_reduce_v2,
-        map_srgb_oklab_chroma_reduce_v3, map_srgb_oklab_chroma_reduce_v4, oklab_chroma,
+        is_in_srgb_gamut, linear_srgb_to_oklab, map_srgb_oklab_chroma_reduce_v1,
+        map_srgb_oklab_chroma_reduce_v2, map_srgb_oklab_chroma_reduce_v3,
+        map_srgb_oklab_chroma_reduce_v4, oklab_chroma,
     };
 
     fn assert_in_gamut(rgb: [f32; 3]) {
@@ -342,6 +343,33 @@ mod tests {
         assert!(
             mapped_chroma <= clipped_chroma,
             "v4 should avoid fitted chroma when it risks exceeding relative clipping"
+        );
+    }
+
+    #[test]
+    fn active_mapper_contains_a_wide_rgb_lattice_and_preserves_neutrals() {
+        let samples = [-0.5, -0.1, 0.0, 0.1, 0.5, 0.9, 1.0, 1.1, 2.0];
+        for red in samples {
+            for green in samples {
+                for blue in samples {
+                    let mapped = map_srgb_oklab_chroma_reduce_v4([red, green, blue]);
+                    assert!(
+                        is_in_srgb_gamut(mapped),
+                        "mapped [{red}, {green}, {blue}] outside sRGB: {mapped:?}"
+                    );
+                }
+            }
+        }
+
+        for neutral in samples {
+            let mapped = map_srgb_oklab_chroma_reduce_v4([neutral; 3]);
+            assert!((mapped[0] - mapped[1]).abs() <= 1.0e-5);
+            assert!((mapped[1] - mapped[2]).abs() <= 1.0e-5);
+        }
+
+        assert!(
+            !is_in_srgb_gamut([1.01, 0.5, 0.5]),
+            "containment predicate must reject an injected overflow"
         );
     }
 }

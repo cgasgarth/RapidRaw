@@ -465,23 +465,40 @@ fn encode_tiff16_to_bytes(
                 )?;
             (pixels, width, height, encode_icc_profile(&output_profile)?)
         };
+    encode_rgb16_tiff_with_icc(&pixels, width, height, icc_profile)
+}
+
+fn encode_rgb16_tiff_with_icc(
+    pixels: &[u16],
+    width: u32,
+    height: u32,
+    icc_profile: Vec<u8>,
+) -> Result<Vec<u8>, String> {
     let mut image_bytes = Vec::new();
     let mut cursor = Cursor::new(&mut image_bytes);
     let mut encoder = TiffEncoder::new(&mut cursor);
-
     encoder
         .set_icc_profile(icc_profile)
-        .map_err(|e| format!("Failed to attach TIFF ICC profile: {}", e))?;
+        .map_err(|error| format!("Failed to attach TIFF ICC profile: {error}"))?;
     encoder
         .write_image(
-            bytemuck::cast_slice(&pixels),
+            bytemuck::cast_slice(pixels),
             width,
             height,
             ExtendedColorType::Rgb16,
         )
-        .map_err(|e| format!("Failed to encode 16-bit TIFF: {}", e))?;
-
+        .map_err(|error| format!("Failed to encode 16-bit TIFF: {error}"))?;
     Ok(image_bytes)
+}
+
+#[cfg(test)]
+pub(crate) fn encode_controlled_icc_tiff16(
+    pixels: &[u16],
+    width: u32,
+    height: u32,
+    icc_profile: Vec<u8>,
+) -> Result<Vec<u8>, String> {
+    encode_rgb16_tiff_with_icc(pixels, width, height, icc_profile)
 }
 
 fn encode_jpeg_to_bytes(

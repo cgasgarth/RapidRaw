@@ -48,7 +48,7 @@ use crate::image_loader::{
 };
 use crate::image_processing::{
     AllAdjustments, Crop, GpuContext, ImageMetadata, RenderRequest, downscale_f32_image,
-    get_all_adjustments_from_json, get_or_init_gpu_context, process_and_get_dynamic_image,
+    get_or_init_gpu_context, process_and_get_dynamic_image,
     process_and_get_unclamped_dynamic_image, resolve_tonemapper_override_from_handle,
 };
 
@@ -963,6 +963,7 @@ struct ExportRenderInputs {
     adjustments: AllAdjustments,
     lut: Option<Arc<crate::lut_processing::Lut>>,
     pre_gpu_revision: u64,
+    edit_graph: Arc<crate::edit_graph::CompiledEditGraph>,
 }
 
 fn export_execution_fingerprint(path: &str, adjustments: &Value) -> u64 {
@@ -986,17 +987,22 @@ fn prepare_export_render_inputs(
     tm_override: Option<u32>,
     hash_salt: u64,
 ) -> Result<ExportRenderInputs, String> {
-    let lut = js_adjustments["lutPath"]
+    let mut effective_adjustments = js_adjustments.clone();
+    effective_adjustments
+        .as_object_mut()
+        .ok_or_else(|| "export adjustments must be an object".to_string())?
+        .insert("showClipping".into(), Value::Bool(false));
+    let lut = effective_adjustments["lutPath"]
         .as_str()
         .and_then(|path| get_or_load_lut(state, path).ok());
     let revision = content_revision(
-        js_adjustments,
+        &effective_adjustments,
         0,
         crate::render::artifact_identity::source_fingerprint_for_path(path),
         u64::from(tm_override.unwrap_or(0)),
     );
     let plan = compile_render_plan_cached(
-        js_adjustments,
+        &effective_adjustments,
         CompileRenderPlanContext {
             revision,
             is_raw,
@@ -1005,8 +1011,6 @@ fn prepare_export_render_inputs(
         lut,
     )
     .map_err(|error| error.to_string())?;
-    let mut adjustments = plan.adjustments;
-    adjustments.global.show_clipping = 0;
     let mut hasher = blake3::Hasher::new();
     hasher.update(path.as_bytes());
     hasher.update(&plan.fingerprints.pre_gpu_base.to_le_bytes());
@@ -1015,11 +1019,11 @@ fn prepare_export_render_inputs(
     hasher.update(&hash_salt.to_le_bytes());
     let pre_gpu_revision =
         u64::from_le_bytes(hasher.finalize().as_bytes()[..8].try_into().unwrap());
-
     Ok(ExportRenderInputs {
-        adjustments,
+        adjustments: plan.adjustments,
         lut: plan.lut.clone(),
         pre_gpu_revision,
+        edit_graph: Arc::clone(&plan.edit_graph),
     })
 }
 
@@ -1111,6 +1115,9 @@ pub(crate) fn process_image_for_export_pipeline_with_tonemapper_override(
             mask_bitmaps,
             lut: render_inputs.lut,
             roi: None,
+            edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
+                render_inputs.edit_graph,
+            ),
         },
         debug_tag,
     )
@@ -1267,6 +1274,16 @@ fn write_final_output_bytes(
     write_final_output_bytes_observed(output_path, bytes, cancellation, None)
 }
 
+#[cfg(test)]
+pub(crate) fn commit_color_conformance_bytes(
+    output_path: &Path,
+    bytes: &[u8],
+) -> Result<(), String> {
+    write_final_output_bytes(output_path, bytes, None)?
+        .ok_or_else(|| "color_conformance_commit_cancelled".to_string())?;
+    Ok(())
+}
+
 fn write_final_output_bytes_observed(
     output_path: &Path,
     bytes: &[u8],
@@ -1400,26 +1417,6 @@ fn process_image_for_export(
     apply_export_resize_and_watermark(processed_image, export_settings)
 }
 
-fn build_single_mask_adjustments(all: &AllAdjustments, mask_index: usize) -> AllAdjustments {
-    let mut single = AllAdjustments {
-        global: all.global,
-        mask_adjustments: all.mask_adjustments,
-        mask_count: 1,
-        tile_offset_x: all.tile_offset_x,
-        tile_offset_y: all.tile_offset_y,
-        mask_atlas_cols: all.mask_atlas_cols,
-        blur_pass_flags: all.blur_pass_flags,
-        _pad_blur_flags1: 0,
-        _pad_blur_flags2: 0,
-        _pad_blur_flags3: 0,
-    };
-    single.mask_adjustments[0] = all.mask_adjustments[mask_index];
-    for i in 1..single.mask_adjustments.len() {
-        single.mask_adjustments[i] = Default::default();
-    }
-    single
-}
-
 fn encode_grayscale_to_png(bitmap: &GrayImage) -> Result<Vec<u8>, String> {
     let mut buf = Vec::new();
     let mut cursor = Cursor::new(&mut buf);
@@ -1453,10 +1450,10 @@ fn export_masks_for_image(
     if !mask_bitmaps.is_empty() {
         let tm_override = resolve_tonemapper_override_from_handle(app_handle, is_raw);
         let render_adjustments = normalize_film_look_adjustments_for_render(js_adjustments);
-        let all_adjustments =
-            get_all_adjustments_from_json(render_adjustments.as_ref(), is_raw, tm_override);
-        let lut_path = render_adjustments["lutPath"].as_str();
-        let lut = lut_path.and_then(|p| get_or_load_lut(state, p).ok());
+        let mask_values = render_adjustments["masks"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
         let output_dir = output_path_obj.parent().unwrap_or(output_path_obj);
         let stem = output_path_obj
             .file_stem()
@@ -1479,7 +1476,22 @@ fn export_masks_for_image(
                 return Ok(ExportMasksResult::Cancelled(committed_paths));
             }
 
-            let single_adjustments = build_single_mask_adjustments(&all_adjustments, i);
+            let mut single_adjustments = render_adjustments.as_ref().clone();
+            single_adjustments
+                .as_object_mut()
+                .ok_or_else(|| "mask export adjustments must be an object".to_string())?
+                .insert(
+                    "masks".into(),
+                    Value::Array(mask_values.get(i).cloned().into_iter().collect()),
+                );
+            let render_inputs = prepare_export_render_inputs(
+                source_path_str,
+                &single_adjustments,
+                state,
+                is_raw,
+                tm_override,
+                i as u64,
+            )?;
             let full_white_mask = ImageBuffer::from_fn(img_w, img_h, |_, _| Luma([255u8]));
             let single_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = vec![full_white_mask];
 
@@ -1494,10 +1506,13 @@ fn export_masks_for_image(
                     pre_gpu_revision,
                 ),
                 RenderRequest {
-                    adjustments: single_adjustments,
+                    adjustments: render_inputs.adjustments,
                     mask_bitmaps: &single_bitmaps,
-                    lut: lut.clone(),
+                    lut: render_inputs.lut,
                     roi: None,
+                    edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
+                        render_inputs.edit_graph,
+                    ),
                 },
                 "export_mask_image",
             )?;
@@ -1586,27 +1601,36 @@ fn export_adjustments_as_lut(
 
     let tm_override = resolve_tonemapper_override_from_handle(app_handle, false);
     let render_adjustments = normalize_film_look_adjustments_for_render(js_adjustments);
-    let mut all_adjustments =
-        get_all_adjustments_from_json(render_adjustments.as_ref(), false, tm_override);
-
-    all_adjustments.global.show_clipping = 0;
-    all_adjustments.global.vignette_amount = 0.0;
-    all_adjustments.global.grain_amount = 0.0;
-    all_adjustments.global.sharpness = 0.0;
-    all_adjustments.global.clarity = 0.0;
-    all_adjustments.global.dehaze = 0.0;
-    all_adjustments.global.structure = 0.0;
-    all_adjustments.global.centré = 0.0;
-    all_adjustments.global.glow_amount = 0.0;
-    all_adjustments.global.halation_amount = 0.0;
-    all_adjustments.global.flare_amount = 0.0;
-    all_adjustments.global.luma_noise_reduction = 0.0;
-    all_adjustments.global.color_noise_reduction = 0.0;
-    all_adjustments.global.chromatic_aberration_red_cyan = 0.0;
-    all_adjustments.global.chromatic_aberration_blue_yellow = 0.0;
-
-    let lut_path = render_adjustments["lutPath"].as_str();
-    let lut = lut_path.and_then(|p| get_or_load_lut(state, p).ok());
+    let mut lut_adjustments = render_adjustments.into_owned();
+    let object = lut_adjustments
+        .as_object_mut()
+        .ok_or_else(|| "LUT export adjustments must be an object".to_string())?;
+    for key in [
+        "vignetteAmount",
+        "grainAmount",
+        "sharpness",
+        "clarity",
+        "dehaze",
+        "structure",
+        "centré",
+        "glowAmount",
+        "halationAmount",
+        "flareAmount",
+        "lumaNoiseReduction",
+        "colorNoiseReduction",
+        "chromaticAberrationRedCyan",
+        "chromaticAberrationBlueYellow",
+    ] {
+        object.insert(key.into(), serde_json::json!(0));
+    }
+    let render_inputs = prepare_export_render_inputs(
+        source_path_str,
+        &lut_adjustments,
+        state,
+        false,
+        tm_override,
+        0,
+    )?;
 
     let processed_lut = process_and_get_dynamic_image(
         context,
@@ -1619,10 +1643,13 @@ fn export_adjustments_as_lut(
             0,
         ),
         RenderRequest {
-            adjustments: all_adjustments,
+            adjustments: render_inputs.adjustments,
             mask_bitmaps: &[],
-            lut,
+            lut: render_inputs.lut,
             roi: None,
+            edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
+                render_inputs.edit_graph,
+            ),
         },
         "export_lut",
     )?;
@@ -3402,6 +3429,9 @@ pub async fn estimate_export_sizes(
                 mask_bitmaps: &mask_bitmaps,
                 lut: render_inputs.lut,
                 roi: None,
+                edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
+                    render_inputs.edit_graph,
+                ),
             },
             "estimate_export_size",
         )?;
@@ -3558,6 +3588,9 @@ pub async fn estimate_export_sizes(
                 mask_bitmaps: &mask_bitmaps,
                 lut: render_inputs.lut,
                 roi: None,
+                edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
+                    render_inputs.edit_graph,
+                ),
             },
             "estimate_batch_export_size",
         )?;
@@ -3621,7 +3654,7 @@ mod tests {
     #[cfg(feature = "tauri-test")]
     use super::{
         ExportCancellationAck, attach_export_task, cancel_export,
-        export_images_cancellation_boundary,
+        export_images_cancellation_boundary, prepare_export_render_inputs,
     };
     use crate::color::working_to_output_transform::WorkingColorState;
     use crate::export::export_encoders::{
@@ -3658,6 +3691,186 @@ mod tests {
         "b4f03738f6bdd7be65bd5b8afbd1448b0e57b207776c2fc016bd81d9c49986d6";
     const SOURCE_EMBEDDED_DISPLAY_P3_ICC_SHA256: &str =
         "sha256:d2ff5597fd937a24f90548f5e85803545334fcfd480601d19c3bc225d7355733";
+
+    #[test]
+    #[cfg(feature = "tauri-test")]
+    fn preview_and_export_execute_the_same_current_edit_graph_pixels() {
+        use crate::gpu_processing::{
+            PreGpuImageIdentity, RenderRequest, acquire_gpu_test_lock,
+            get_or_init_compute_gpu_context_for_tests, process_and_get_dynamic_image,
+        };
+        use crate::render_plan::{
+            CompileRenderPlanContext, compile_render_plan_cached, content_revision,
+        };
+        use serde_json::json;
+
+        let _gpu_test_guard = acquire_gpu_test_lock();
+        let source = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(12, 8, |x, y| {
+            Rgba([x as f32 / 11.0, y as f32 / 7.0, 0.25, 1.0])
+        }));
+        let adjustments = json!({
+            "rawEngineEditGraphVersion": 1,
+            "exposure": 18,
+            "contrast": 12,
+            "showClipping": false
+        });
+        let app = tauri::test::mock_builder()
+            .manage(crate::AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock Tauri app builds");
+        let state = app.state::<crate::AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state)
+            .expect("compute-only GPU context initializes");
+        let source_id = "edit-graph-preview-export-parity.synthetic";
+        let revision = content_revision(&adjustments, 0, 17, 0);
+        let preview_plan = compile_render_plan_cached(
+            &adjustments,
+            CompileRenderPlanContext {
+                revision,
+                is_raw: false,
+                tonemapper_override: None,
+            },
+            None,
+        )
+        .expect("preview plan compiles");
+        let export_plan =
+            prepare_export_render_inputs(source_id, &adjustments, &state, false, None, 0)
+                .expect("export plan compiles");
+
+        let render = |adjustments, edit_graph| {
+            process_and_get_dynamic_image(
+                &context,
+                &state,
+                &source,
+                PreGpuImageIdentity::for_source(&source, source_id),
+                RenderRequest {
+                    adjustments,
+                    mask_bitmaps: &[],
+                    lut: None,
+                    roi: None,
+                    edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
+                        edit_graph,
+                    ),
+                },
+                "edit_graph_preview_export_parity",
+            )
+            .expect("graph-authoritative GPU render succeeds")
+        };
+        let preview = render(
+            preview_plan.adjustments,
+            Arc::clone(&preview_plan.edit_graph),
+        );
+        let exported = render(export_plan.adjustments, export_plan.edit_graph);
+        assert_eq!(
+            preview.to_rgba16().into_raw(),
+            exported.to_rgba16().into_raw()
+        );
+        assert_eq!(preview_plan.edit_graph.pipeline_version, 1);
+    }
+
+    #[test]
+    #[cfg(feature = "tauri-test")]
+    fn private_real_raw_v2_preview_export_and_legacy_delta_proof_when_enabled() {
+        if std::env::var("RAWENGINE_RUN_PRIVATE_EDIT_GRAPH_REAL_RAW_PROOF").as_deref() != Ok("1") {
+            return;
+        }
+        use crate::gpu_processing::{
+            acquire_gpu_test_lock, get_or_init_compute_gpu_context_for_tests,
+        };
+        use serde_json::json;
+        use sha2::{Digest, Sha256};
+        use tauri::Manager;
+
+        let _gpu_test_guard = acquire_gpu_test_lock();
+        let source_path = std::env::var("RAWENGINE_PRIVATE_RAW_SOURCE")
+            .expect("RAWENGINE_PRIVATE_RAW_SOURCE points to a private Alaska RAW");
+        let source_bytes = std::fs::read(&source_path).expect("private RAW bytes read");
+        let settings = crate::app_settings::AppSettings::default();
+        let base = crate::image_loader::load_base_image_from_bytes(
+            &source_bytes,
+            &source_path,
+            false,
+            &settings,
+            None,
+        )
+        .expect("production RAW loader decodes private source");
+        let app = tauri::test::mock_builder()
+            .manage(crate::AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock Tauri app builds");
+        let state = app.state::<crate::AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state)
+            .expect("real Metal compute context initializes");
+        let recipe = |version| {
+            json!({
+                "rawEngineEditGraphVersion": version,
+                "exposure": 16,
+                "contrast": 10,
+                "highlights": -14,
+                "vibrance": 9,
+                "channelMixer": {
+                    "enabled": true,
+                    "preserveLuminance": false,
+                    "red": { "red": 100, "green": 0, "blue": 0, "constant": 18 },
+                    "green": { "red": 0, "green": 100, "blue": 0, "constant": 0 },
+                    "blue": { "red": 0, "green": 0, "blue": 100, "constant": -12 }
+                }
+            })
+        };
+        let render = |adjustments: &serde_json::Value, caller: &str| {
+            super::process_image_for_export_pipeline_with_tonemapper_override(
+                &source_path,
+                &base,
+                adjustments,
+                &context,
+                &state,
+                true,
+                crate::gpu_processing::PreGpuImageIdentity::source_revision(&source_path),
+                caller,
+                Some(0),
+                &[],
+            )
+            .expect("graph-authoritative real RAW render succeeds")
+        };
+        let v2_recipe = recipe(2);
+        let preview = render(&v2_recipe, "edit_graph_v2_private_raw_preview");
+        let export = render(&v2_recipe, "edit_graph_v2_private_raw_export");
+        let v2_receipt = state
+            .gpu_processor
+            .lock()
+            .unwrap()
+            .as_ref()
+            .and_then(|processor| processor.processor.last_execution_receipt())
+            .expect("real RAW v2 render publishes a GPU execution receipt");
+        let legacy = render(&recipe(1), "edit_graph_v1_private_raw_migration_baseline");
+        let preview_pixels = preview.to_rgba16().into_raw();
+        let export_pixels = export.to_rgba16().into_raw();
+        let legacy_pixels = legacy.to_rgba16().into_raw();
+        assert_eq!(preview.dimensions(), base.dimensions());
+        assert_eq!(preview_pixels, export_pixels);
+        assert_ne!(preview_pixels, legacy_pixels);
+        let changed = preview_pixels
+            .iter()
+            .zip(&legacy_pixels)
+            .filter(|(v2, v1)| v2 != v1)
+            .count();
+        assert!(changed > preview_pixels.len() / 100);
+        let digest = Sha256::digest(bytemuck::cast_slice::<u16, u8>(&preview_pixels));
+        println!(
+            "edit_graph_v2_private_raw_proof dimensions={}x{} migration_changed_channels={} preview_export_sha256={} phase_dispatches={} command_buffers={} queue_submits={} cache_hits={} cache_misses={} cpu_encode_ms={:.3} wall_ms={:.3}",
+            preview.width(),
+            preview.height(),
+            changed,
+            hex::encode(digest),
+            v2_receipt.phase_dispatch_count,
+            v2_receipt.command_buffer_count,
+            v2_receipt.queue_submit_count,
+            v2_receipt.cache_hits,
+            v2_receipt.cache_misses,
+            v2_receipt.cpu_encode_time.as_secs_f64() * 1000.0,
+            v2_receipt.wall_time.as_secs_f64() * 1000.0,
+        );
+    }
 
     #[test]
     fn cancellation_claimed_before_gpu_initialization_prevents_runnable_export_work() {
@@ -4336,6 +4549,7 @@ mod tests {
         let raw_development_report = RawDevelopmentReport {
             camera_profile: RawCameraProfileReport {
                 algorithm_id: "dual_illuminant_mired_v1",
+                camera_model: None,
                 candidate_count: 2,
                 cct_clamped: Some(false),
                 cool_illuminant: Some("D65".to_string()),
@@ -4352,10 +4566,12 @@ mod tests {
                 white_balance_plan_fingerprint: None,
                 warning_codes: Vec::new(),
             },
+            selected_camera_profile: None,
             demosaic_algorithm_id: None,
             demosaic_path: RawDemosaicPath::BayerHq,
             processing_profile: crate::raw_processing::RawProcessingProfile::Maximum,
             input_transform: None,
+            stage_samples: Vec::new(),
             highlight_reconstruction:
                 crate::highlight_reconstruction::HighlightReconstructionReportV2::default(),
             runtime: None,
