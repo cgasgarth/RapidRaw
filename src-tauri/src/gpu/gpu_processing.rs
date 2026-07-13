@@ -3141,7 +3141,7 @@ mod blur_pass_tests {
         let state = app.state::<AppState>();
         let context = get_or_init_compute_gpu_context_for_tests(&state)
             .expect("compute-only GPU context initializes");
-        let identity = PreGpuImageIdentity::for_source(&source, "technical_white_balance");
+        let identity = PreGpuImageIdentity::for_test_source(&source, "technical_white_balance");
         let render = |adjustments| {
             process_and_get_unclamped_dynamic_image(
                 &context,
