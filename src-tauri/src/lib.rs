@@ -813,7 +813,9 @@ fn render_processed_export_soft_proof_preview(
             mask_bitmaps: &mask_bitmaps,
             lut: render_plan.lut.clone(),
             roi: None,
-            edit_graph: Some(Arc::clone(&render_plan.edit_graph)),
+            edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(Arc::clone(
+                &render_plan.edit_graph,
+            )),
         },
         "export_soft_proof_preview",
     )
@@ -966,7 +968,9 @@ fn generate_uncropped_preview(
                 mask_bitmaps: &mask_bitmaps,
                 lut: render_plan.lut.clone(),
                 roi: None,
-                edit_graph: Some(Arc::clone(&render_plan.edit_graph)),
+                edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
+                    Arc::clone(&render_plan.edit_graph),
+                ),
             },
             "generate_uncropped_preview",
         ) {
@@ -1678,7 +1682,9 @@ async fn preview_geometry_transform(
                     mask_bitmaps: &mask_bitmaps,
                     lut: render_plan.lut.clone(),
                     roi: None,
-                    edit_graph: Some(Arc::clone(&render_plan.edit_graph)),
+                    edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
+                        Arc::clone(&render_plan.edit_graph),
+                    ),
                 },
                 "preview_geometry_transform_base_gen",
             )?;
@@ -1863,7 +1869,9 @@ fn generate_preset_preview(
             mask_bitmaps: &mask_bitmaps,
             lut: render_plan.lut.clone(),
             roi: None,
-            edit_graph: Some(Arc::clone(&render_plan.edit_graph)),
+            edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(Arc::clone(
+                &render_plan.edit_graph,
+            )),
         },
         "generate_preset_preview",
     )?;
@@ -2012,7 +2020,9 @@ async fn generate_all_community_previews(
                     mask_bitmaps: &mask_bitmaps,
                     lut: render_plan.lut.clone(),
                     roi: None,
-                    edit_graph: Some(Arc::clone(&render_plan.edit_graph)),
+                    edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
+                        Arc::clone(&render_plan.edit_graph),
+                    ),
                 },
                 "generate_all_community_previews",
             )?;
@@ -2751,7 +2761,9 @@ fn generate_preview_for_path(
             mask_bitmaps: &mask_bitmaps,
             lut: render_plan.lut.clone(),
             roi: None,
-            edit_graph: Some(Arc::clone(&render_plan.edit_graph)),
+            edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(Arc::clone(
+                &render_plan.edit_graph,
+            )),
         },
         "generate_preview_for_path",
     )?;

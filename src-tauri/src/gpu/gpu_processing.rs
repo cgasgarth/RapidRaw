@@ -736,23 +736,33 @@ pub struct RenderRequest<'a> {
     pub mask_bitmaps: &'a [ImageBuffer<Luma<u8>, Vec<u8>>],
     pub lut: Option<Arc<Lut>>,
     pub roi: Option<Roi>,
-    /// Canonical plan contract. `None` is reserved for compatibility callers
-    /// that have not yet migrated to `CompiledRenderPlan`.
-    pub edit_graph: Option<Arc<crate::edit_graph::CompiledEditGraph>>,
+    pub edit_graph: EditGraphExecutionAuthority,
+}
+
+pub enum EditGraphExecutionAuthority {
+    Compiled(Arc<crate::edit_graph::CompiledEditGraph>),
+    #[cfg(all(test, feature = "tauri-test"))]
+    TestOnlyLegacy,
 }
 
 fn validate_edit_graph_request(request: &RenderRequest<'_>, oversized: bool) -> Result<(), String> {
-    if let Some(edit_graph) = request.edit_graph.as_deref() {
-        edit_graph
-            .validate_gpu_execution(
-                &request.adjustments,
-                request.lut.is_some(),
-                request.mask_bitmaps.len(),
-            )
-            .map_err(str::to_owned)?;
-        if oversized {
-            return Err("edit_graph.cpu_reference_executor_required_for_oversized_frame".into());
+    match &request.edit_graph {
+        EditGraphExecutionAuthority::Compiled(edit_graph) => {
+            edit_graph
+                .validate_gpu_execution(
+                    &request.adjustments,
+                    request.lut.is_some(),
+                    request.mask_bitmaps.len(),
+                )
+                .map_err(str::to_owned)?;
+            if oversized {
+                return Err(
+                    "edit_graph.cpu_reference_executor_required_for_oversized_frame".into(),
+                );
+            }
         }
+        #[cfg(all(test, feature = "tauri-test"))]
+        EditGraphExecutionAuthority::TestOnlyLegacy => {}
     }
     Ok(())
 }
@@ -2236,7 +2246,7 @@ mod blur_pass_tests {
             mask_bitmaps: &[],
             lut: None,
             roi: None,
-            edit_graph: Some(Arc::clone(&plan.edit_graph)),
+            edit_graph: EditGraphExecutionAuthority::Compiled(Arc::clone(&plan.edit_graph)),
         };
         assert_eq!(
             validate_edit_graph_request(&request, true),
@@ -2481,7 +2491,7 @@ mod blur_pass_tests {
                 mask_bitmaps: &[],
                 lut: None,
                 roi: None,
-                edit_graph: Some(Arc::clone(&plan.edit_graph)),
+                edit_graph: EditGraphExecutionAuthority::Compiled(Arc::clone(&plan.edit_graph)),
             },
             "compiled_edit_graph_gpu",
         )
@@ -2555,7 +2565,7 @@ mod blur_pass_tests {
                         mask_bitmaps: &[],
                         lut: None,
                         roi: None,
-                        edit_graph: None,
+                        edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
                     },
                     "blur_pass_parity",
                 )
@@ -2621,7 +2631,7 @@ mod blur_pass_tests {
                     mask_bitmaps: &[],
                     lut: None,
                     roi: None,
-                    edit_graph: None,
+                    edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
                 },
                 "exposure_reuse",
             )
@@ -2691,7 +2701,7 @@ mod blur_pass_tests {
                     mask_bitmaps: std::slice::from_ref(&mask),
                     lut: Some(lut.clone()),
                     roi: None,
-                    edit_graph: None,
+                    edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
                 },
                 "resource_reuse",
             )
@@ -2759,7 +2769,7 @@ mod blur_pass_tests {
                     mask_bitmaps: masks,
                     lut: None,
                     roi: None,
-                    edit_graph: None,
+                    edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
                 },
                 "partial_mask_upload",
             )

@@ -384,7 +384,7 @@ mod gpu_runtime_tests {
             mask_bitmaps: &[],
             lut: None,
             roi,
-            edit_graph: None,
+            edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::TestOnlyLegacy,
         }
     }
 

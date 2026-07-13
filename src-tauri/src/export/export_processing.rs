@@ -1096,7 +1096,9 @@ pub(crate) fn process_image_for_export_pipeline_with_tonemapper_override(
             mask_bitmaps,
             lut: render_inputs.lut,
             roi: None,
-            edit_graph: Some(render_inputs.edit_graph),
+            edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
+                render_inputs.edit_graph,
+            ),
         },
         debug_tag,
     )
@@ -1470,7 +1472,9 @@ fn export_masks_for_image(
                     mask_bitmaps: &single_bitmaps,
                     lut: render_inputs.lut,
                     roi: None,
-                    edit_graph: Some(render_inputs.edit_graph),
+                    edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
+                        render_inputs.edit_graph,
+                    ),
                 },
                 "export_mask_image",
             )?;
@@ -1600,7 +1604,9 @@ fn export_adjustments_as_lut(
             mask_bitmaps: &[],
             lut: render_inputs.lut,
             roi: None,
-            edit_graph: Some(render_inputs.edit_graph),
+            edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
+                render_inputs.edit_graph,
+            ),
         },
         "export_lut",
     )?;
@@ -3378,7 +3384,9 @@ pub async fn estimate_export_sizes(
                 mask_bitmaps: &mask_bitmaps,
                 lut: render_inputs.lut,
                 roi: None,
-                edit_graph: Some(render_inputs.edit_graph),
+                edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
+                    render_inputs.edit_graph,
+                ),
             },
             "estimate_export_size",
         )?;
@@ -3527,7 +3535,9 @@ pub async fn estimate_export_sizes(
                 mask_bitmaps: &mask_bitmaps,
                 lut: render_inputs.lut,
                 roi: None,
-                edit_graph: Some(render_inputs.edit_graph),
+                edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
+                    render_inputs.edit_graph,
+                ),
             },
             "estimate_batch_export_size",
         )?;
@@ -3684,7 +3694,9 @@ mod tests {
                     mask_bitmaps: &[],
                     lut: None,
                     roi: None,
-                    edit_graph: Some(edit_graph),
+                    edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
+                        edit_graph,
+                    ),
                 },
                 "edit_graph_preview_export_parity",
             )
