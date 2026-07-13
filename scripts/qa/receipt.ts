@@ -28,6 +28,7 @@ const scenarioResultSchema = z.object({
       }),
     )
     .optional(),
+  performanceMetrics: z.record(z.string(), z.number().finite().nonnegative()).optional(),
 });
 
 export const qaRunReceiptSchema = z

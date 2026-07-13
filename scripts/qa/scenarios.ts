@@ -474,7 +474,7 @@ export const qaScenarios: readonly QaScenario[] = [
     fixture: { id: 'library' },
     isolation: 'fresh-context',
     timeoutMs: 60_000,
-    async run({ page }) {
+    async run({ page, recordPerformanceMetric }) {
       await openLibraryFixture(page);
       const gridBounds = await page.getByTestId('library-virtualized-grid').boundingBox();
       if (gridBounds === null) throw new Error('Import journey has no library bounds.');
@@ -483,15 +483,35 @@ export const qaScenarios: readonly QaScenario[] = [
       });
       await page.getByText('Import Images', { exact: true }).click();
       const modal = page.getByRole('dialog');
+      const importStartedAt = performance.now();
       await modal.getByRole('button', { name: 'Start Import' }).click();
-      await page.getByText('Import Complete!', { exact: true }).waitFor();
+      await page.getByRole('button', { name: /import-source-1\.ARW/u }).waitFor();
+      const firstVisibleMs = performance.now() - importStartedAt;
+      const terminalReceipt = page.getByTestId('import-success-receipt');
+      await terminalReceipt.waitFor();
+      const completedMs = performance.now() - importStartedAt;
       const importCall = await page.evaluate(() =>
         (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? []).findLast(({ command }) => command === 'import_files'),
       );
       const sourcePaths = importCall?.args?.sourcePaths;
       if (!Array.isArray(sourcePaths) || sourcePaths.length !== 6)
         throw new Error('Import terminal receipt did not account for the six-source bounded batch.');
-      await page.getByRole('button', { name: /import-source-1\.ARW/u }).waitFor();
+      const receiptCurrent = Number(await terminalReceipt.getAttribute('data-import-receipt-current'));
+      const receiptTotal = Number(await terminalReceipt.getAttribute('data-import-receipt-total'));
+      const copiedBytes = Number(await terminalReceipt.getAttribute('data-import-receipt-bytes'));
+      const totalBytes = Number(await terminalReceipt.getAttribute('data-import-receipt-total-bytes'));
+      if (
+        receiptCurrent !== sourcePaths.length ||
+        receiptTotal !== sourcePaths.length ||
+        !Number.isFinite(copiedBytes) ||
+        copiedBytes <= 0 ||
+        copiedBytes !== totalBytes
+      )
+        throw new Error('Import terminal receipt omitted authoritative image or byte totals.');
+      recordPerformanceMetric('importTimeToFirstVisibleMs', firstVisibleMs);
+      recordPerformanceMetric('importImagesPerSecond', (receiptCurrent * 1_000) / completedMs);
+      recordPerformanceMetric('importMegabytesPerSecond', (totalBytes / 1_000_000 / completedMs) * 1_000);
+      recordPerformanceMetric('importTotalBytes', totalBytes);
     },
   },
   {

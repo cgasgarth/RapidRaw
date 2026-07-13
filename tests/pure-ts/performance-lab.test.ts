@@ -140,6 +140,21 @@ describe('performance lab runner', () => {
     });
   });
 
+  test('import throughput and warm last-folder startup declare their terminal metrics', () => {
+    const importBatch = performanceScenarios.find(({ id }) => id === 'jobs.import-batch');
+    const warmStartup = performanceScenarios.find(({ id }) => id === 'native.startup-shell-warm');
+    expect(importBatch?.metricUnits).toMatchObject({
+      importImagesPerSecond: 'per-second',
+      importMegabytesPerSecond: 'per-second',
+      importTimeToFirstVisibleMs: 'ms',
+      importTotalBytes: 'bytes',
+    });
+    expect(warmStartup).toMatchObject({
+      version: 2,
+      metricUnits: { lastFolderFirstViewportMs: 'ms' },
+    });
+  });
+
   test('native scenarios fail closed without an absolute private RAW fixture', async () => {
     const native = performanceScenarios.find(({ id }) => id === 'native.editor-raw-open-cold');
     if (native === undefined) throw new Error('native performance scenario missing');

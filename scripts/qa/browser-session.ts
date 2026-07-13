@@ -120,6 +120,7 @@ export const browserJobResultSchema: z.ZodType<BrowserJobResult> = z.object({
           }),
         )
         .optional(),
+      performanceMetrics: z.record(z.string(), z.number().finite().nonnegative()).optional(),
       artifacts: z
         .array(
           z.object({
@@ -287,6 +288,7 @@ export function createBrowserLifecycleAdapter(
         );
         const started = performance.now();
         const artifacts: QaArtifactRecord[] = [];
+        const performanceMetrics: Record<string, number> = {};
         let result: QaScenarioResult | undefined;
         try {
           await withTimeout(
@@ -296,6 +298,10 @@ export function createBrowserLifecycleAdapter(
               page,
               recordArtifact(artifact) {
                 artifacts.push(artifact);
+              },
+              recordPerformanceMetric(metric, value) {
+                if (!Number.isFinite(value) || value < 0) throw new Error(`Invalid performance metric ${metric}.`);
+                performanceMetrics[metric] = value;
               },
             }),
             scenario.timeoutMs,
@@ -308,6 +314,7 @@ export function createBrowserLifecycleAdapter(
             status: 'passed',
             durationMs: Math.round(performance.now() - started),
             artifacts,
+            performanceMetrics,
             performanceSpans,
           };
           results.push(result);

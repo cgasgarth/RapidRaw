@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { access, mkdir, mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 import { z } from 'zod';
@@ -126,6 +126,7 @@ const qaReceiptSchema = z.object({
             }),
           )
           .default([]),
+        performanceMetrics: z.record(z.string(), z.number().finite().nonnegative()).default({}),
       }),
     )
     .length(1),
@@ -184,6 +185,7 @@ const browserQaScenario = (
   id: string,
   qaScenarioId: string,
   cacheMode: PerformanceScenario['cacheMode'] = 'cold',
+  extraMetricUnits: Readonly<Record<string, 'ms' | 'bytes' | 'count' | 'per-second'>> = {},
 ): PerformanceScenario => {
   const worktree = process.cwd();
   let daemonProcess: ReturnType<typeof Bun.spawn> | undefined;
@@ -214,6 +216,7 @@ const browserQaScenario = (
       sourceRefreshes: 'count',
       sourceReuses: 'count',
       worktreeWaitMs: 'ms',
+      ...extraMetricUnits,
     },
     async beforeAll() {
       if ((await readLiveDaemonState(worktree)) === undefined) {
@@ -279,8 +282,11 @@ const browserQaScenario = (
       const reactMutationCount = result.performanceSpans
         .filter(({ source }) => source === 'frontend')
         .reduce((sum, { workCount }) => sum + (workCount ?? 1), 0);
+      for (const metric of Object.keys(extraMetricUnits))
+        if (result.performanceMetrics[metric] === undefined)
+          throw new Error(`${qaScenarioId} omitted required performance metric ${metric}.`);
       return {
-        assertions: 7,
+        assertions: 7 + Object.keys(extraMetricUnits).length,
         metrics: {
           artifactBytes: metrics.artifactBytes,
           contextsClosed: metrics.contextsClosed,
@@ -297,6 +303,7 @@ const browserQaScenario = (
           sourceRefreshes: metrics.sourceRefreshes,
           sourceReuses: metrics.sourceReuses,
           worktreeWaitMs: metrics.worktreeWaitMs,
+          ...result.performanceMetrics,
         },
         spans: [
           {
@@ -323,8 +330,12 @@ const browserQaScenario = (
 
 const startupBinary = process.env.RAWENGINE_PERF_STARTUP_BINARY;
 const startupFixtureDigest = `sha256:${createHash('sha256')
-  .update(`native-startup-v1:${startupBinary ?? 'unconfigured'}`)
+  .update(`native-startup-v2:${startupBinary ?? 'unconfigured'}`)
   .digest('hex')}` as const;
+const startupViewportJpeg = Buffer.from(
+  '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAAEAAQDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAX/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAH/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAEFAqf/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAEDAQE/ASP/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAECAQE/ASP/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAY/Al//xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAE/IV//2gAMAwEAAgADAAAAEP/EABQRAQAAAAAAAAAAAAAAAAAAABD/2gAIAQMBAT8QH//EABQRAQAAAAAAAAAAAAAAAAAAABD/2gAIAQIBAT8QH//EABQQAQAAAAAAAAAAAAAAAAAAABD/2gAIAQEAAT8QH//Z',
+  'base64',
+);
 
 const startupPhase = (snapshot: StartupTraceSnapshot, name: StartupTraceSnapshot['phases'][number]['phase']) => {
   const phase = snapshot.phases.find(({ phase: candidate }) => candidate === name);
@@ -342,9 +353,10 @@ const stopStartupProcess = async (process: ReturnType<typeof Bun.spawn>): Promis
 
 const nativeStartupScenario = (cacheMode: 'cold' | 'warm'): PerformanceScenario => {
   let root: string | undefined;
+  let lastFolder: string | undefined;
   return {
     id: `native.startup-shell-${cacheMode}`,
-    version: 1,
+    version: 2,
     fixtureDigest: startupFixtureDigest,
     cacheMode,
     warmupRuns: 1,
@@ -362,18 +374,23 @@ const nativeStartupScenario = (cacheMode: 'cold' | 'warm'): PerformanceScenario 
       interactiveMs: 'ms',
       phaseCount: 'count',
       shellVisibleMs: 'ms',
+      ...(cacheMode === 'warm' ? { lastFolderFirstViewportMs: 'ms' as const } : {}),
     },
     async beforeAll() {
       if (startupBinary === undefined || !isAbsolute(startupBinary))
         throw new Error('RAWENGINE_PERF_STARTUP_BINARY must be an absolute executable path.');
       await access(startupBinary);
       root = await mkdtemp(join(tmpdir(), 'rawengine-perf-startup-'));
+      lastFolder = join(root, 'last-folder');
+      await mkdir(lastFolder, { recursive: true });
+      await writeFile(join(lastFolder, 'startup-viewport.jpg'), startupViewportJpeg);
     },
     async afterAll() {
       if (root !== undefined) await rm(root, { force: true, recursive: true });
     },
     async runSample(run) {
-      if (startupBinary === undefined || root === undefined) throw new Error('Native startup fixture is unavailable.');
+      if (startupBinary === undefined || root === undefined || lastFolder === undefined)
+        throw new Error('Native startup fixture is unavailable.');
       const home = join(root, cacheMode === 'cold' ? `cold-${run}` : 'warm-home');
       const reportPath = join(root, `${cacheMode}-${run}.json`);
       await mkdir(home, { recursive: true });
@@ -383,6 +400,7 @@ const nativeStartupScenario = (cacheMode: 'cold' | 'warm'): PerformanceScenario 
           ...Bun.env,
           HOME: home,
           RAWENGINE_STARTUP_BENCHMARK_EDITOR_DEMAND: '1',
+          ...(cacheMode === 'warm' ? { RAWENGINE_STARTUP_BENCHMARK_LAST_FOLDER: lastFolder } : {}),
           RAWENGINE_STARTUP_BENCHMARK_ORIGIN_EPOCH_MS: String(Date.now()),
           RAWENGINE_STARTUP_BENCHMARK_REPORT: reportPath,
           RUST_LOG: 'warn',
@@ -423,6 +441,15 @@ const nativeStartupScenario = (cacheMode: 'cold' | 'warm'): PerformanceScenario 
       const firstPaintMs = startupPhase(snapshot, 'windowVisible').elapsedMs - processStartedMs;
       const shellVisibleMs = startupPhase(snapshot, 'frontendShellVisible').elapsedMs - processStartedMs;
       const interactiveMs = startupPhase(snapshot, 'frontendInteractive').elapsedMs - processStartedMs;
+      const lastFolderViewportPhase =
+        cacheMode === 'warm' ? startupPhase(snapshot, 'frontendLibraryViewportVisible') : null;
+      if (
+        lastFolderViewportPhase !== null &&
+        !lastFolderViewportPhase.detail?.startsWith('last-folder-first-viewport:images=')
+      )
+        throw new Error('Warm startup omitted seeded last-folder first-viewport proof.');
+      const lastFolderFirstViewportMs =
+        lastFolderViewportPhase === null ? null : lastFolderViewportPhase.elapsedMs - processStartedMs;
       const editorDemandPhases = [startupPhase(snapshot, 'gpuReady'), startupPhase(snapshot, 'libraryServicesReady')];
       for (const phase of editorDemandPhases)
         if (!phase.detail?.includes('priority=editor_demand:starts=1'))
@@ -432,7 +459,7 @@ const nativeStartupScenario = (cacheMode: 'cold' | 'warm'): PerformanceScenario 
       const frontendReadyResponseMs = Number(frontendReadyDetail.match(/frontend_ready_ms=(\d+)/u)?.[1]);
       if (!Number.isFinite(frontendReadyResponseMs)) throw new Error('Startup frontend-ready IPC receipt is missing.');
       return {
-        assertions: 8,
+        assertions: cacheMode === 'warm' ? 10 : 8,
         metrics: {
           degradedPhaseCount: snapshot.phases.filter(({ status }) => status === 'degraded').length,
           editorDemandReadyMs,
@@ -441,6 +468,7 @@ const nativeStartupScenario = (cacheMode: 'cold' | 'warm'): PerformanceScenario 
           interactiveMs,
           phaseCount: snapshot.phases.length,
           shellVisibleMs,
+          ...(lastFolderFirstViewportMs === null ? {} : { lastFolderFirstViewportMs }),
         },
         spans: snapshot.phases.map((phase) => ({
           durationMs: 0,
@@ -710,7 +738,12 @@ export const performanceScenarios: readonly PerformanceScenario[] = [
   browserQaScenario('browser.library-sidecar-change', 'browser.library.sidecar-change', 'warm'),
   browserQaScenario('browser.library-folder-tree-expand', 'browser.library.folder-tree-expand', 'warm'),
   browserQaScenario('jobs.export-mixed-batch', 'browser.jobs.mixed-batch-export', 'warm'),
-  browserQaScenario('jobs.import-batch', 'browser.jobs.import-batch', 'cold'),
+  browserQaScenario('jobs.import-batch', 'browser.jobs.import-batch', 'cold', {
+    importImagesPerSecond: 'per-second',
+    importMegabytesPerSecond: 'per-second',
+    importTimeToFirstVisibleMs: 'ms',
+    importTotalBytes: 'bytes',
+  }),
   browserQaScenario('jobs.ai-capability-first-use-cold', 'browser.jobs.ai-capability-first-use', 'cold'),
   browserQaScenario('jobs.ai-capability-first-use-warm', 'browser.jobs.ai-capability-first-use', 'warm'),
   browserQaScenario('jobs.computational-hdr-merge', 'browser.jobs.hdr-merge', 'warm'),

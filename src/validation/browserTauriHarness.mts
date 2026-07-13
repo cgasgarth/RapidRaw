@@ -546,6 +546,7 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
         editorReady: 'frontendEditorReady',
         interactive: 'frontendInteractive',
         libraryReady: 'frontendLibraryReady',
+        libraryViewportVisible: 'frontendLibraryViewportVisible',
         settingsHydrated: 'frontendSettingsHydrated',
         shellVisible: 'frontendShellVisible',
       }[String(args?.['phase'])];
