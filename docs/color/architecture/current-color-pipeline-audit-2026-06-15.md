@@ -2,9 +2,10 @@
 
 Issue: #83 `color(audit): audit current RapidRAW color pipeline`
 
-Runtime status: audit-only. This PR documents current behavior and adds a doc
-guard; it does not change preview pixels, export pixels, RAW development, WGSL,
-or color-science math.
+Runtime status: historical audit. Camera input transforms, illuminant-based
+white balance, working/output transforms, and preview/export proof were added
+after this snapshot; current ADRs and runtime validation documents supersede
+the gaps below.
 
 ## Sources Audited
 
