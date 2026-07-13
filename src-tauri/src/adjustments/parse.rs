@@ -325,7 +325,7 @@ fn get_global_adjustments_from_json(
         tint: scaled_section_value(js_adjustments, "color", "tint", SCALES.tint, None),
         vibrance: scaled_section_value(js_adjustments, "color", "vibrance", SCALES.vibrance, None),
         hue: scaled_section_value(js_adjustments, "color", "hue", 1.0, None),
-        _pad_color1: 0.0,
+        edit_graph_version: 0.0,
         _pad_color2: 0.0,
         _pad_color3: 0.0,
         sharpness: scaled_section_value(

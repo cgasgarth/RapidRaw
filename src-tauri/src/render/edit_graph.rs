@@ -12,6 +12,9 @@ use crate::adjustments::abi::AllAdjustments;
 
 pub const EDIT_GRAPH_SCHEMA_VERSION: u32 = 1;
 pub const LEGACY_PIPELINE_VERSION: u32 = 1;
+pub const SCENE_REFERRED_PIPELINE_VERSION: u32 = 2;
+pub const SUPPORTED_PIPELINE_VERSIONS: &[u32] =
+    &[LEGACY_PIPELINE_VERSION, SCENE_REFERRED_PIPELINE_VERSION];
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum ColorDomain {
@@ -35,6 +38,9 @@ pub enum EditStageClass {
     InputTransform,
     SceneTechnical,
     SpatialDetail,
+    SceneCreative,
+    LocalComposition,
+    ViewTransform,
     LegacyFusedSceneView,
     DisplayAdjustment,
     OutputTransform,
@@ -74,6 +80,10 @@ pub enum EditNodeKind {
     CameraInputBoundary,
     GeometryRetouch,
     PreGpuSpatialDetail,
+    SceneGlobalColorTone,
+    LocalSceneComposition,
+    SceneToViewTransform,
+    DisplayCreative,
     LegacyGpuSceneViewPass,
     ClippingOverlay,
     RenderTransport,
@@ -85,6 +95,10 @@ impl EditNodeKind {
             Self::CameraInputBoundary => "camera_input_boundary",
             Self::GeometryRetouch => "geometry_retouch",
             Self::PreGpuSpatialDetail => "pre_gpu_spatial_detail",
+            Self::SceneGlobalColorTone => "scene_global_color_tone",
+            Self::LocalSceneComposition => "local_scene_composition",
+            Self::SceneToViewTransform => "scene_to_view_transform",
+            Self::DisplayCreative => "display_creative",
             Self::LegacyGpuSceneViewPass => "legacy_gpu_scene_view_pass",
             Self::ClippingOverlay => "clipping_overlay",
             Self::RenderTransport => "render_transport",
@@ -137,6 +151,7 @@ pub struct EditGraphReceipt {
 pub enum EditGraphMigration {
     LegacyV1Defaulted,
     LegacyV1Explicit,
+    SceneReferredV2Explicit,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -236,29 +251,118 @@ impl CompiledEditGraph {
             != bytes_of(inputs.neutral_adjustments)
             || inputs.has_masks
             || inputs.has_lut;
-        nodes.push(node(
-            EditNodeKind::LegacyGpuSceneViewPass,
-            ColorDomain::AcesCgSceneLinearExtended,
-            ColorDomain::ViewEncoded,
-            EditStageClass::LegacyFusedSceneView,
-            ValueRangePolicy::LegacyImplementationDefined,
-            SpatialSupport::BoundedHalo { pixels: 64 },
-            LocalAdjustmentPolicy::GlobalAndLocalSameDomain,
-            NodeDependencies {
-                source: true,
-                masks: inputs.has_masks,
-                view: true,
-                adjustments: true,
-                ..NodeDependencies::default()
-            },
-            Some("native_color_mixer_post_wgpu_v1"),
-            Some("shader_wgsl_legacy_scene_view_v1"),
-            combine(&[
-                inputs.color_fingerprint,
+        if inputs.pipeline_version == LEGACY_PIPELINE_VERSION {
+            nodes.push(node(
+                EditNodeKind::LegacyGpuSceneViewPass,
+                ColorDomain::AcesCgSceneLinearExtended,
+                ColorDomain::ViewEncoded,
+                EditStageClass::LegacyFusedSceneView,
+                ValueRangePolicy::LegacyImplementationDefined,
+                SpatialSupport::BoundedHalo { pixels: 64 },
+                LocalAdjustmentPolicy::GlobalAndLocalSameDomain,
+                NodeDependencies {
+                    source: true,
+                    masks: inputs.has_masks,
+                    view: true,
+                    adjustments: true,
+                    ..NodeDependencies::default()
+                },
+                Some("native_color_mixer_post_wgpu_v1"),
+                Some("shader_wgsl_legacy_scene_view_v1"),
+                combine(&[
+                    inputs.color_fingerprint,
+                    inputs.output_fingerprint,
+                    u64::from(gpu_adjustments_active),
+                ]),
+            ));
+        } else {
+            if gpu_adjustments_active {
+                nodes.push(node(
+                    EditNodeKind::SceneGlobalColorTone,
+                    ColorDomain::AcesCgSceneLinearExtended,
+                    ColorDomain::AcesCgSceneLinearExtended,
+                    EditStageClass::SceneCreative,
+                    ValueRangePolicy::PreserveFiniteExtended,
+                    SpatialSupport::BoundedHalo { pixels: 64 },
+                    LocalAdjustmentPolicy::GlobalOnly,
+                    NodeDependencies {
+                        source: true,
+                        adjustments: true,
+                        ..NodeDependencies::default()
+                    },
+                    Some("edit_graph_cpu_reference_v2"),
+                    Some("shader_wgsl_scene_referred_v2"),
+                    inputs.color_fingerprint,
+                ));
+            } else {
+                omitted.push(EditNodeKind::SceneGlobalColorTone.stable_id());
+            }
+            if inputs.has_masks {
+                nodes.push(node(
+                    EditNodeKind::LocalSceneComposition,
+                    ColorDomain::AcesCgSceneLinearExtended,
+                    ColorDomain::AcesCgSceneLinearExtended,
+                    EditStageClass::LocalComposition,
+                    ValueRangePolicy::PreserveFiniteExtended,
+                    SpatialSupport::BoundedHalo { pixels: 64 },
+                    LocalAdjustmentPolicy::GlobalAndLocalSameDomain,
+                    NodeDependencies {
+                        source: true,
+                        adjustments: true,
+                        masks: true,
+                        ..NodeDependencies::default()
+                    },
+                    Some("edit_graph_cpu_reference_v2"),
+                    Some("shader_wgsl_scene_referred_v2"),
+                    combine(&[inputs.color_fingerprint, u64::from(inputs.has_masks)]),
+                ));
+            } else {
+                omitted.push(EditNodeKind::LocalSceneComposition.stable_id());
+            }
+            nodes.push(node(
+                EditNodeKind::SceneToViewTransform,
+                ColorDomain::AcesCgSceneLinearExtended,
+                ColorDomain::ViewEncoded,
+                EditStageClass::ViewTransform,
+                ValueRangePolicy::PreserveFiniteExtended,
+                SpatialSupport::Pointwise,
+                LocalAdjustmentPolicy::GlobalOnly,
+                NodeDependencies {
+                    view: true,
+                    adjustments: true,
+                    ..NodeDependencies::default()
+                },
+                Some("edit_graph_cpu_reference_v2"),
+                Some("shader_wgsl_scene_referred_v2"),
                 inputs.output_fingerprint,
-                u64::from(gpu_adjustments_active),
-            ]),
-        ));
+            ));
+            if display_creative_active(
+                inputs.adjustments,
+                inputs.neutral_adjustments,
+                inputs.has_lut,
+            ) {
+                nodes.push(node(
+                    EditNodeKind::DisplayCreative,
+                    ColorDomain::ViewEncoded,
+                    ColorDomain::ViewEncoded,
+                    EditStageClass::DisplayAdjustment,
+                    ValueRangePolicy::PreserveFiniteExtended,
+                    SpatialSupport::Pointwise,
+                    LocalAdjustmentPolicy::GlobalAndLocalSameDomain,
+                    NodeDependencies {
+                        adjustments: true,
+                        masks: inputs.has_masks,
+                        view: true,
+                        ..NodeDependencies::default()
+                    },
+                    Some("edit_graph_cpu_reference_v2"),
+                    Some("shader_wgsl_scene_referred_v2"),
+                    combine(&[inputs.color_fingerprint, u64::from(inputs.has_lut)]),
+                ));
+            } else {
+                omitted.push(EditNodeKind::DisplayCreative.stable_id());
+            }
+        }
         if inputs.show_clipping {
             nodes.push(node(
                 EditNodeKind::ClippingOverlay,
@@ -304,11 +408,14 @@ impl CompiledEditGraph {
         );
         let fingerprint = graph_fingerprint(inputs.pipeline_version, &nodes);
         let ordered_node_ids: Arc<[_]> = nodes.iter().map(|node| node.kind.stable_id()).collect();
-        let fused_gpu_groups: Arc<[Arc<[&'static str]>]> = vec![Arc::from([
-            "legacy_gpu_scene_view_pass",
-            "clipping_overlay",
-            "render_transport",
-        ])]
+        let fused_gpu_groups: Arc<[Arc<[&'static str]>]> = vec![
+            nodes
+                .iter()
+                .filter(|node| node.wgpu_implementation.is_some())
+                .map(|node| node.kind.stable_id())
+                .collect::<Vec<_>>()
+                .into(),
+        ]
         .into();
         Self {
             schema_version: EDIT_GRAPH_SCHEMA_VERSION,
@@ -326,10 +433,13 @@ impl CompiledEditGraph {
             receipt: EditGraphReceipt {
                 schema_version: EDIT_GRAPH_SCHEMA_VERSION,
                 pipeline_version: inputs.pipeline_version,
-                migration: if inputs.version_was_explicit {
-                    EditGraphMigration::LegacyV1Explicit
-                } else {
-                    EditGraphMigration::LegacyV1Defaulted
+                migration: match (inputs.pipeline_version, inputs.version_was_explicit) {
+                    (SCENE_REFERRED_PIPELINE_VERSION, true) => {
+                        EditGraphMigration::SceneReferredV2Explicit
+                    }
+                    (LEGACY_PIPELINE_VERSION, true) => EditGraphMigration::LegacyV1Explicit,
+                    (LEGACY_PIPELINE_VERSION, false) => EditGraphMigration::LegacyV1Defaulted,
+                    _ => unreachable!("render-plan validation admits supported explicit versions"),
                 },
                 ordered_node_ids,
                 omitted_no_op_node_ids: omitted.into(),
@@ -346,12 +456,24 @@ impl CompiledEditGraph {
         has_lut: bool,
         mask_count: usize,
     ) -> Result<(), &'static str> {
-        let has_fused = self
+        self.validate_contract()?;
+        let has_legacy_fused = self
             .nodes
             .iter()
             .any(|node| node.kind == EditNodeKind::LegacyGpuSceneViewPass);
-        if (has_lut || mask_count > 0) && !has_fused {
+        let has_local = self
+            .nodes
+            .iter()
+            .any(|node| node.kind == EditNodeKind::LocalSceneComposition);
+        let has_display_creative = self
+            .nodes
+            .iter()
+            .any(|node| node.kind == EditNodeKind::DisplayCreative);
+        if mask_count > 0 && !has_legacy_fused && !has_local {
             return Err("edit_graph.missing_legacy_gpu_scene_view_pass");
+        }
+        if has_lut && !has_legacy_fused && !has_display_creative {
+            return Err("edit_graph.missing_display_creative");
         }
         if self.execution_abi_fingerprint != gpu_execution_fingerprint(adjustments, has_lut) {
             return Err("edit_graph.stale_gpu_execution_abi");
@@ -365,6 +487,42 @@ impl CompiledEditGraph {
             != Some(ColorDomain::RenderTransportEncoded)
         {
             return Err("edit_graph.invalid_output_domain");
+        }
+        Ok(())
+    }
+
+    pub fn validate_contract(&self) -> Result<(), &'static str> {
+        if self.schema_version == 0
+            || self
+                .nodes
+                .iter()
+                .any(|node| node.schema_version == 0 || node.implementation_version == 0)
+        {
+            return Err("edit_graph.invalid_node_version");
+        }
+        if self.nodes.is_empty() {
+            return Err("edit_graph.empty");
+        }
+        if self
+            .nodes
+            .iter()
+            .any(|node| node.cpu_implementation.is_none() && node.wgpu_implementation.is_none())
+        {
+            return Err("edit_graph.missing_node_implementation");
+        }
+        if self
+            .nodes
+            .windows(2)
+            .any(|pair| pair[0].stage_class > pair[1].stage_class)
+        {
+            return Err("edit_graph.invalid_stage_order");
+        }
+        if self
+            .nodes
+            .windows(2)
+            .any(|pair| pair[0].output_domain != pair[1].input_domain)
+        {
+            return Err("edit_graph.invalid_domain_transition");
         }
         Ok(())
     }
@@ -407,6 +565,27 @@ impl CompiledEditGraph {
                 .map(|group| group.as_ref()).collect::<Vec<_>>(),
         })
     }
+}
+
+fn display_creative_active(
+    adjustments: &AllAdjustments,
+    neutral: &AllAdjustments,
+    has_lut: bool,
+) -> bool {
+    let global = &adjustments.global;
+    let neutral = &neutral.global;
+    has_lut
+        || global.grain_amount != neutral.grain_amount
+        || global.grain_size != neutral.grain_size
+        || global.grain_roughness != neutral.grain_roughness
+        || global.luma_curve_count != neutral.luma_curve_count
+        || global.red_curve_count != neutral.red_curve_count
+        || global.green_curve_count != neutral.green_curve_count
+        || global.blue_curve_count != neutral.blue_curve_count
+        || bytes_of(&global.luma_curve) != bytes_of(&neutral.luma_curve)
+        || bytes_of(&global.red_curve) != bytes_of(&neutral.red_curve)
+        || bytes_of(&global.green_curve) != bytes_of(&neutral.green_curve)
+        || bytes_of(&global.blue_curve) != bytes_of(&neutral.blue_curve)
 }
 
 pub fn gpu_execution_fingerprint(adjustments: &AllAdjustments, has_lut: bool) -> u64 {

@@ -96,7 +96,7 @@ struct GlobalAdjustments {
     tint: f32,
     vibrance: f32,
     hue: f32,
-    _pad_color1: f32,
+    edit_graph_version: f32,
     _pad_color2: f32,
     _pad_color3: f32,
 
@@ -328,12 +328,12 @@ fn linear_to_srgb(c: vec3<f32>) -> vec3<f32> {
 }
 
 fn linear_to_srgb_extended(c: vec3<f32>) -> vec3<f32> {
-    let safe_c = max(c, vec3<f32>(0.0));
+    let magnitude = abs(c);
     let cutoff = vec3<f32>(0.0031308);
     let a = vec3<f32>(0.055);
-    let higher = (1.0 + a) * pow(safe_c, vec3<f32>(1.0 / 2.4)) - a;
-    let lower = safe_c * 12.92;
-    return select(higher, lower, safe_c <= cutoff);
+    let higher = (1.0 + a) * pow(magnitude, vec3<f32>(1.0 / 2.4)) - a;
+    let lower = magnitude * 12.92;
+    return sign(c) * select(higher, lower, magnitude <= cutoff);
 }
 
 fn rgb_to_hsv(c: vec3<f32>) -> vec3<f32> {
@@ -718,19 +718,20 @@ fn apply_creative_color(color: vec3<f32>, sat: f32, vib: f32) -> vec3<f32> {
     return processed;
 }
 
-fn apply_channel_mixer_row(color: vec3<f32>, row: ChannelMixerRow) -> f32 {
-    return clamp(dot(color, vec3<f32>(row.red, row.green, row.blue)) + row.constant, 0.0, 1.0);
+fn apply_channel_mixer_row(color: vec3<f32>, row: ChannelMixerRow, preserve_extended: bool) -> f32 {
+    let mixed = dot(color, vec3<f32>(row.red, row.green, row.blue)) + row.constant;
+    return select(clamp(mixed, 0.0, 1.0), mixed, preserve_extended);
 }
 
-fn apply_channel_mixer(color: vec3<f32>, settings: ChannelMixerSettings) -> vec3<f32> {
+fn apply_channel_mixer(color: vec3<f32>, settings: ChannelMixerSettings, preserve_extended: bool) -> vec3<f32> {
     if (settings.enabled == 0u) {
         return color;
     }
 
     var mixed = vec3<f32>(
-        apply_channel_mixer_row(color, settings.red),
-        apply_channel_mixer_row(color, settings.green),
-        apply_channel_mixer_row(color, settings.blue),
+        apply_channel_mixer_row(color, settings.red, preserve_extended),
+        apply_channel_mixer_row(color, settings.green, preserve_extended),
+        apply_channel_mixer_row(color, settings.blue, preserve_extended),
     );
 
     if (settings.preserve_luminance == 0u) {
@@ -743,7 +744,10 @@ fn apply_channel_mixer(color: vec3<f32>, settings: ChannelMixerSettings) -> vec3
         return mixed;
     }
 
-    mixed = clamp(mixed * (source_luma / mixed_luma), vec3<f32>(0.0), vec3<f32>(1.0));
+    mixed *= source_luma / mixed_luma;
+    if (!preserve_extended) {
+        mixed = clamp(mixed, vec3<f32>(0.0), vec3<f32>(1.0));
+    }
     return mixed;
 }
 
@@ -769,7 +773,7 @@ fn rgb_to_hue_degrees(color: vec3<f32>) -> f32 {
     return ((color.r - color.g) / chroma) * 60.0 + 240.0;
 }
 
-fn apply_black_white_mixer(color: vec3<f32>, settings: BlackWhiteMixerSettings) -> vec3<f32> {
+fn apply_black_white_mixer(color: vec3<f32>, settings: BlackWhiteMixerSettings, preserve_extended: bool) -> vec3<f32> {
     if (settings.enabled == 0u) {
         return color;
     }
@@ -808,7 +812,8 @@ fn apply_black_white_mixer(color: vec3<f32>, settings: BlackWhiteMixerSettings) 
     if (influence_total > 0.0) {
         weighted_adjustment = weighted_adjustment / influence_total;
     }
-    let mixed = clamp(luma * (1.0 + weighted_adjustment * 0.5), 0.0, 1.0);
+    let adjusted = luma * (1.0 + weighted_adjustment * 0.5);
+    let mixed = select(clamp(adjusted, 0.0, 1.0), adjusted, preserve_extended);
     return vec3<f32>(mixed);
 }
 
@@ -823,7 +828,7 @@ fn color_balance_rgb_weights(luma: f32) -> vec3<f32> {
     return vec3<f32>(shadows, midtones, highlights) / total;
 }
 
-fn apply_color_balance_rgb(color: vec3<f32>, settings: ColorBalanceRgbSettings) -> vec3<f32> {
+fn apply_color_balance_rgb(color: vec3<f32>, settings: ColorBalanceRgbSettings, preserve_extended: bool) -> vec3<f32> {
     if (settings.enabled == 0u) {
         return color;
     }
@@ -835,7 +840,10 @@ fn apply_color_balance_rgb(color: vec3<f32>, settings: ColorBalanceRgbSettings) 
         settings.midtones.rgb * weights.y +
         settings.highlights.rgb * weights.z
     ) / 400.0;
-    var balanced = clamp(color + offset, vec3<f32>(0.0), vec3<f32>(1.0));
+    var balanced = color + offset;
+    if (!preserve_extended) {
+        balanced = clamp(balanced, vec3<f32>(0.0), vec3<f32>(1.0));
+    }
 
     if (settings.preserve_luminance == 0u) {
         return balanced;
@@ -846,11 +854,14 @@ fn apply_color_balance_rgb(color: vec3<f32>, settings: ColorBalanceRgbSettings) 
         return balanced;
     }
 
-    balanced = clamp(balanced * (source_luma / balanced_luma), vec3<f32>(0.0), vec3<f32>(1.0));
+    balanced *= source_luma / balanced_luma;
+    if (!preserve_extended) {
+        balanced = clamp(balanced, vec3<f32>(0.0), vec3<f32>(1.0));
+    }
     return balanced;
 }
 
-fn apply_luma_levels(color: vec3<f32>, settings: LevelsSettings) -> vec3<f32> {
+fn apply_luma_levels(color: vec3<f32>, settings: LevelsSettings, preserve_extended: bool) -> vec3<f32> {
     if (settings.enabled == 0u) {
         return color;
     }
@@ -865,7 +876,8 @@ fn apply_luma_levels(color: vec3<f32>, settings: LevelsSettings) -> vec3<f32> {
         return vec3<f32>(output_luma);
     }
 
-    return clamp(color * (output_luma / source_luma), vec3<f32>(0.0), vec3<f32>(1.0));
+    let adjusted = color * (output_luma / source_luma);
+    return select(clamp(adjusted, vec3<f32>(0.0), vec3<f32>(1.0)), adjusted, preserve_extended);
 }
 
 fn apply_hsl_panel(color: vec3<f32>, hsl_adjustments: array<HslColor, 8>, coords_i: vec2<i32>) -> vec3<f32> {
@@ -1458,11 +1470,16 @@ fn is_default_curve(points: array<Point, 16>, count: u32) -> bool {
     return is_identity && p0_is_origin && p_last_is_end;
 }
 
-fn apply_all_curves(color: vec3<f32>, luma_curve: array<Point, 16>, luma_curve_count: u32, red_curve: array<Point, 16>, red_curve_count: u32, green_curve: array<Point, 16>, green_curve_count: u32, blue_curve: array<Point, 16>, blue_curve_count: u32) -> vec3<f32> {
+fn apply_all_curves(color: vec3<f32>, luma_curve: array<Point, 16>, luma_curve_count: u32, red_curve: array<Point, 16>, red_curve_count: u32, green_curve: array<Point, 16>, green_curve_count: u32, blue_curve: array<Point, 16>, blue_curve_count: u32, preserve_extended: bool) -> vec3<f32> {
+    let luma_is_default = is_default_curve(luma_curve, luma_curve_count);
     let red_is_default = is_default_curve(red_curve, red_curve_count);
     let green_is_default = is_default_curve(green_curve, green_curve_count);
     let blue_is_default = is_default_curve(blue_curve, blue_curve_count);
     let rgb_curves_are_active = !red_is_default || !green_is_default || !blue_is_default;
+
+    if (preserve_extended && luma_is_default && !rgb_curves_are_active) {
+        return color;
+    }
 
     if (rgb_curves_are_active) {
         let color_graded = vec3<f32>(apply_curve(color.r, red_curve, red_curve_count), apply_curve(color.g, green_curve, green_curve_count), apply_curve(color.b, blue_curve, blue_curve_count));
@@ -1701,6 +1718,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 
     var initial_linear_rgb: vec3<f32>;
     let is_raw = adjustments.global.is_raw_image;
+    let preserve_scene_extended = adjustments.global.edit_graph_version >= 2.0;
     if (is_raw == 0u) {
         initial_linear_rgb = srgb_to_linear(color_from_texture);
     } else {
@@ -1874,9 +1892,9 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     composite_rgb_linear = apply_hsl_panel(composite_rgb_linear, final_hsl, absolute_coord_i);
     composite_rgb_linear = apply_hue_shift(composite_rgb_linear, t_hue);
     composite_rgb_linear = apply_creative_color(composite_rgb_linear, t_saturation, t_vibrance);
-    composite_rgb_linear = apply_color_balance_rgb(composite_rgb_linear, adjustments.global.color_balance_rgb);
-    composite_rgb_linear = apply_channel_mixer(composite_rgb_linear, adjustments.global.channel_mixer);
-    composite_rgb_linear = apply_luma_levels(composite_rgb_linear, adjustments.global.levels);
+    composite_rgb_linear = apply_color_balance_rgb(composite_rgb_linear, adjustments.global.color_balance_rgb, preserve_scene_extended);
+    composite_rgb_linear = apply_channel_mixer(composite_rgb_linear, adjustments.global.channel_mixer, preserve_scene_extended);
+    composite_rgb_linear = apply_luma_levels(composite_rgb_linear, adjustments.global.levels, preserve_scene_extended);
 
     composite_rgb_linear = apply_color_grading(
         composite_rgb_linear,
@@ -1900,7 +1918,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         }
     }
 
-    composite_rgb_linear = apply_black_white_mixer(composite_rgb_linear, adjustments.global.black_white_mixer);
+    composite_rgb_linear = apply_black_white_mixer(composite_rgb_linear, adjustments.global.black_white_mixer, preserve_scene_extended);
 
     if (adjustments.global.vignette_amount != 0.0) {
         let full_dims_f = vec2<f32>(textureDimensions(input_texture));
@@ -1925,21 +1943,30 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     if (adjustments.global.tonemapper_mode == 1u) {
         base_srgb = agx_full_transform(composite_rgb_linear);
     } else if (is_raw == 1u) {
-        var srgb_emulated = linear_to_srgb(composite_rgb_linear);
+        var srgb_emulated = select(
+            linear_to_srgb(composite_rgb_linear),
+            linear_to_srgb_extended(composite_rgb_linear),
+            preserve_scene_extended,
+        );
         const BRIGHTNESS_GAMMA: f32 = 1.1;
         srgb_emulated = pow(srgb_emulated, vec3<f32>(1.0 / BRIGHTNESS_GAMMA));
         const CONTRAST_MIX: f32 = 0.75;
         let contrast_curve = srgb_emulated * srgb_emulated * (3.0 - 2.0 * srgb_emulated);
         base_srgb = mix(srgb_emulated, contrast_curve, CONTRAST_MIX);
     } else {
-        base_srgb = linear_to_srgb(composite_rgb_linear);
+        base_srgb = select(
+            linear_to_srgb(composite_rgb_linear),
+            linear_to_srgb_extended(composite_rgb_linear),
+            preserve_scene_extended,
+        );
     }
 
     var final_rgb = apply_all_curves(base_srgb,
         adjustments.global.luma_curve, adjustments.global.luma_curve_count,
         adjustments.global.red_curve, adjustments.global.red_curve_count,
         adjustments.global.green_curve, adjustments.global.green_curve_count,
-        adjustments.global.blue_curve, adjustments.global.blue_curve_count
+        adjustments.global.blue_curve, adjustments.global.blue_curve_count,
+        preserve_scene_extended
     );
 
     for (var i = 0u; i < adjustments.mask_count; i = i + 1u) {
@@ -1950,7 +1977,8 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
                 m.luma_curve, m.luma_curve_count,
                 m.red_curve, m.red_curve_count,
                 m.green_curve, m.green_curve_count,
-                m.blue_curve, m.blue_curve_count
+                m.blue_curve, m.blue_curve_count,
+                preserve_scene_extended
             );
             final_rgb = blend_mask_layer(final_rgb, mask_curved_srgb, influence, m.blend_mode);
         }

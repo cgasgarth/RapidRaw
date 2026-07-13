@@ -21,7 +21,7 @@ use crate::gpu_textures::{
 };
 use crate::image_processing::{AllAdjustments, GpuContext, MAX_MASKS};
 use crate::lut_processing::Lut;
-use crate::mixer_render::apply_native_color_mixer_adjustments;
+use crate::mixer_render::apply_native_color_mixer_adjustments_for_graph;
 use crate::render_caches::RenderCaches;
 use crate::{AppState, GpuImageCache};
 
@@ -2512,6 +2512,80 @@ mod blur_pass_tests {
 
     #[cfg(feature = "tauri-test")]
     #[test]
+    fn scene_referred_v2_preserves_extended_values_and_has_an_explicit_pixel_delta() {
+        use image::{DynamicImage, ImageBuffer, Rgba};
+        use serde_json::json;
+        use tauri::Manager;
+
+        let _test_guard = GPU_TEST_LOCK.lock().unwrap();
+        let source =
+            DynamicImage::ImageRgba32F(ImageBuffer::from_pixel(4, 4, Rgba([0.25, 0.5, 0.75, 1.0])));
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock Tauri app builds");
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state)
+            .expect("compute-only GPU context initializes");
+        let recipe = |version| {
+            json!({
+                "rawEngineEditGraphVersion": version,
+                "channelMixer": {
+                    "enabled": true,
+                    "preserveLuminance": false,
+                    "red": { "red": 100, "green": 0, "blue": 0, "constant": 100 },
+                    "green": { "red": 0, "green": 100, "blue": 0, "constant": 0 },
+                    "blue": { "red": 0, "green": 0, "blue": 100, "constant": -100 }
+                }
+            })
+        };
+        let render = |version| {
+            let raw = recipe(version);
+            let plan = crate::render_plan::compile_render_plan(
+                &raw,
+                crate::render_plan::CompileRenderPlanContext {
+                    revision: crate::render_plan::content_revision(&raw, 1, 2, version),
+                    is_raw: false,
+                    tonemapper_override: Some(0),
+                },
+                None,
+            )
+            .unwrap();
+            assert_eq!(plan.adjustments.global.edit_graph_version, version as f32);
+            process_and_get_unclamped_dynamic_image(
+                &context,
+                &state,
+                &source,
+                PreGpuImageIdentity::for_source(&source, &format!("v{version}")),
+                RenderRequest {
+                    adjustments: plan.adjustments,
+                    mask_bitmaps: &[],
+                    lut: None,
+                    roi: None,
+                    edit_graph: EditGraphExecutionAuthority::Compiled(plan.edit_graph),
+                },
+                "scene_referred_v2_delta",
+            )
+            .unwrap()
+            .to_rgba32f()
+            .get_pixel(1, 1)
+            .0
+        };
+
+        let legacy = render(1);
+        let v2 = render(2);
+        assert!(
+            legacy[..3]
+                .iter()
+                .all(|channel| (0.0..=1.01).contains(channel))
+        );
+        assert!(v2[0] > 1.0, "v2 red should retain over-range: {v2:?}");
+        assert!(v2[2] < 0.0, "v2 blue should retain negative values: {v2:?}");
+        assert_ne!(legacy, v2);
+    }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
     fn selective_blurs_match_the_always_blur_gpu_path() {
         use image::{DynamicImage, ImageBuffer, Rgba};
         use tauri::Manager;
@@ -2933,9 +3007,10 @@ fn process_and_get_dynamic_image_inner(
             height,
             max_dim
         );
-        return Ok(apply_native_color_mixer_adjustments(
+        return Ok(apply_native_color_mixer_adjustments_for_graph(
             std::borrow::Cow::Borrowed(base_image),
             &request.adjustments.global,
+            request.adjustments.global.edit_graph_version >= 2.0,
         )
         .into_owned());
     }

@@ -224,7 +224,7 @@ pub fn compile_render_plan(
             });
         }
     };
-    if pipeline_version != crate::edit_graph::LEGACY_PIPELINE_VERSION {
+    if !crate::edit_graph::SUPPORTED_PIPELINE_VERSIONS.contains(&pipeline_version) {
         return Err(RenderPlanError {
             code: "render_plan.unsupported_edit_graph_version",
             field: "rawEngineEditGraphVersion",
@@ -261,12 +261,13 @@ pub fn compile_render_plan(
             message: "crop coordinates and dimensions must be in 0..=1".into(),
         });
     }
-    let adjustments = get_all_adjustments_from_json_with_masks(
+    let mut adjustments = get_all_adjustments_from_json_with_masks(
         &effective,
         context.is_raw,
         context.tonemapper_override,
         &masks,
     );
+    adjustments.global.edit_graph_version = pipeline_version as f32;
     let geometry = get_geometry_params_from_json(&effective);
     let mut fingerprints = fingerprints(
         context.revision.source_revision,
@@ -278,12 +279,13 @@ pub fn compile_render_plan(
         lut.as_deref(),
     );
     let neutral_json = Value::Object(serde_json::Map::new());
-    let neutral_adjustments = get_all_adjustments_from_json_with_masks(
+    let mut neutral_adjustments = get_all_adjustments_from_json_with_masks(
         &neutral_json,
         context.is_raw,
         context.tonemapper_override,
         &[],
     );
+    neutral_adjustments.global.edit_graph_version = pipeline_version as f32;
     let neutral_detail = hash_selected(&neutral_json, DETAIL_FIELDS);
     let default_geometry = GeometryParams::default();
     let has_geometry = geometry_bytes(&geometry, crop) != geometry_bytes(&default_geometry, None);
@@ -622,6 +624,10 @@ mod tests {
                 "render_transport"
             ]
         );
+        assert_eq!(
+            neutral.edit_graph.receipt.fused_gpu_groups[0].as_ref(),
+            ["legacy_gpu_scene_view_pass", "render_transport"]
+        );
 
         let active = compile_render_plan(
             &json!({
@@ -674,7 +680,52 @@ mod tests {
     }
 
     #[test]
-    fn persisted_edit_graph_version_defaults_to_legacy_and_fails_closed() {
+    fn edit_graph_contract_rejects_unversioned_unimplemented_and_illegal_ordering() {
+        let plan = compile_render_plan(&json!({"showClipping": true}), context(75), None).unwrap();
+        plan.edit_graph.validate_contract().unwrap();
+        assert_eq!(
+            plan.edit_graph.receipt.fused_gpu_groups[0].as_ref(),
+            [
+                "legacy_gpu_scene_view_pass",
+                "clipping_overlay",
+                "render_transport"
+            ]
+        );
+
+        let mut invalid = (*plan.edit_graph).clone();
+        Arc::make_mut(&mut invalid.nodes)[0].implementation_version = 0;
+        assert_eq!(
+            invalid.validate_contract(),
+            Err("edit_graph.invalid_node_version")
+        );
+
+        let mut invalid = (*plan.edit_graph).clone();
+        let node = &mut Arc::make_mut(&mut invalid.nodes)[0];
+        node.cpu_implementation = None;
+        node.wgpu_implementation = None;
+        assert_eq!(
+            invalid.validate_contract(),
+            Err("edit_graph.missing_node_implementation")
+        );
+
+        let mut invalid = (*plan.edit_graph).clone();
+        Arc::make_mut(&mut invalid.nodes).swap(0, 1);
+        assert_eq!(
+            invalid.validate_contract(),
+            Err("edit_graph.invalid_stage_order")
+        );
+
+        let mut invalid = (*plan.edit_graph).clone();
+        Arc::make_mut(&mut invalid.nodes)[1].input_domain =
+            crate::edit_graph::ColorDomain::ViewEncoded;
+        assert_eq!(
+            invalid.validate_contract(),
+            Err("edit_graph.invalid_domain_transition")
+        );
+    }
+
+    #[test]
+    fn persisted_edit_graph_version_defaults_to_legacy_and_requires_explicit_v2() {
         let implicit = compile_render_plan(&json!({"exposure": 10}), context(72), None).unwrap();
         let explicit = compile_render_plan(
             &json!({"exposure": 10, "rawEngineEditGraphVersion": 1}),
@@ -696,8 +747,29 @@ mod tests {
         );
         assert_eq!(explicit.effective_json["rawEngineEditGraphVersion"], 1);
 
+        let v2 = compile_render_plan(
+            &json!({"rawEngineEditGraphVersion": 2, "exposure": 10}),
+            context(74),
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            v2.edit_graph.receipt.migration,
+            crate::edit_graph::EditGraphMigration::SceneReferredV2Explicit
+        );
+        assert_eq!(
+            v2.edit_graph.receipt.ordered_node_ids.as_ref(),
+            [
+                "camera_input_boundary",
+                "scene_global_color_tone",
+                "scene_to_view_transform",
+                "render_transport"
+            ]
+        );
+        assert_ne!(v2.edit_graph.fingerprint, explicit.edit_graph.fingerprint);
+
         let error =
-            compile_render_plan(&json!({"rawEngineEditGraphVersion": 2}), context(74), None)
+            compile_render_plan(&json!({"rawEngineEditGraphVersion": 3}), context(75), None)
                 .err()
                 .unwrap();
         assert_eq!(error.code, "render_plan.unsupported_edit_graph_version");
@@ -723,7 +795,9 @@ mod tests {
             "masks":[{"id":"m1","name":"Local","visible":true,"invert":false,"opacity":80,
                 "blendMode":"multiply","adjustments":{"contrast":15},"subMasks":[]}]
         });
-        let legacy = crate::adjustments::parse::get_all_adjustments_from_json(&raw, true, Some(1));
+        let mut legacy =
+            crate::adjustments::parse::get_all_adjustments_from_json(&raw, true, Some(1));
+        legacy.global.edit_graph_version = crate::edit_graph::LEGACY_PIPELINE_VERSION as f32;
         let compiled = compile_render_plan(
             &raw,
             CompileRenderPlanContext {

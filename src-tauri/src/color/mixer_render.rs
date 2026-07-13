@@ -16,9 +16,18 @@ const BLACK_WHITE_MIXER_RANGE_CENTERS: [f32; 8] =
     [358.0, 25.0, 60.0, 115.0, 180.0, 225.0, 280.0, 330.0];
 const BLACK_WHITE_MIXER_RANGE_WIDTHS: [f32; 8] = [35.0, 45.0, 40.0, 90.0, 60.0, 60.0, 55.0, 50.0];
 
+#[cfg(test)]
 pub(crate) fn apply_native_color_mixer_adjustments<'a>(
     image: Cow<'a, DynamicImage>,
     global: &GlobalAdjustments,
+) -> Cow<'a, DynamicImage> {
+    apply_native_color_mixer_adjustments_for_graph(image, global, false)
+}
+
+pub(crate) fn apply_native_color_mixer_adjustments_for_graph<'a>(
+    image: Cow<'a, DynamicImage>,
+    global: &GlobalAdjustments,
+    preserve_extended: bool,
 ) -> Cow<'a, DynamicImage> {
     if !has_active_native_color_mixer_adjustments(global) {
         return image;
@@ -29,9 +38,9 @@ pub(crate) fn apply_native_color_mixer_adjustments<'a>(
 
     pixels.par_chunks_exact_mut(4).for_each(|pixel| {
         let mut color = [pixel[0], pixel[1], pixel[2]];
-        color = apply_color_balance_rgb(color, global.color_balance_rgb);
-        color = apply_channel_mixer(color, global.channel_mixer);
-        color = apply_black_white_mixer(color, global.black_white_mixer);
+        color = apply_color_balance_rgb(color, global.color_balance_rgb, preserve_extended);
+        color = apply_channel_mixer(color, global.channel_mixer, preserve_extended);
+        color = apply_black_white_mixer(color, global.black_white_mixer, preserve_extended);
         pixel[..3].copy_from_slice(&color);
     });
 
@@ -46,7 +55,11 @@ pub(crate) fn has_active_native_color_mixer_adjustments(global: &GlobalAdjustmen
         || global.black_white_mixer.enabled != 0
 }
 
-fn apply_color_balance_rgb(color: [f32; 3], settings: ColorBalanceRgbSettings) -> [f32; 3] {
+fn apply_color_balance_rgb(
+    color: [f32; 3],
+    settings: ColorBalanceRgbSettings,
+    preserve_extended: bool,
+) -> [f32; 3] {
     if settings.enabled == 0 {
         return color;
     }
@@ -67,13 +80,17 @@ fn apply_color_balance_rgb(color: [f32; 3], settings: ColorBalanceRgbSettings) -
             + settings.highlights[2] * highlights)
             / 400.0,
     ];
-    let balanced = clamp_rgb(add_rgb(color, offset));
+    let balanced = if preserve_extended {
+        add_rgb(color, offset)
+    } else {
+        clamp_rgb(add_rgb(color, offset))
+    };
 
     if settings.preserve_luminance == 0 {
         return balanced;
     }
 
-    preserve_color_balance_luminance(balanced, source_luma)
+    preserve_color_balance_luminance(balanced, source_luma, preserve_extended)
 }
 
 fn color_balance_rgb_weights(luma: f32) -> [f32; 3] {
@@ -89,15 +106,19 @@ fn color_balance_rgb_weights(luma: f32) -> [f32; 3] {
     [shadows / total, midtones / total, highlights / total]
 }
 
-fn apply_channel_mixer(color: [f32; 3], settings: ChannelMixerSettings) -> [f32; 3] {
+fn apply_channel_mixer(
+    color: [f32; 3],
+    settings: ChannelMixerSettings,
+    preserve_extended: bool,
+) -> [f32; 3] {
     if settings.enabled == 0 {
         return color;
     }
 
     let mixed = [
-        apply_channel_mixer_row(color, settings.red),
-        apply_channel_mixer_row(color, settings.green),
-        apply_channel_mixer_row(color, settings.blue),
+        apply_channel_mixer_row(color, settings.red, preserve_extended),
+        apply_channel_mixer_row(color, settings.green, preserve_extended),
+        apply_channel_mixer_row(color, settings.blue, preserve_extended),
     ];
 
     if settings.preserve_luminance == 0 {
@@ -109,14 +130,23 @@ fn apply_channel_mixer(color: [f32; 3], settings: ChannelMixerSettings) -> [f32;
         return mixed;
     }
 
-    preserve_color_balance_luminance(mixed, source_luma)
+    preserve_color_balance_luminance(mixed, source_luma, preserve_extended)
 }
 
-fn apply_channel_mixer_row(color: [f32; 3], row: ChannelMixerRow) -> f32 {
-    (color[0] * row.red + color[1] * row.green + color[2] * row.blue + row.constant).clamp(0.0, 1.0)
+fn apply_channel_mixer_row(color: [f32; 3], row: ChannelMixerRow, preserve_extended: bool) -> f32 {
+    let mixed = color[0] * row.red + color[1] * row.green + color[2] * row.blue + row.constant;
+    if preserve_extended {
+        mixed
+    } else {
+        mixed.clamp(0.0, 1.0)
+    }
 }
 
-fn apply_black_white_mixer(color: [f32; 3], settings: BlackWhiteMixerSettings) -> [f32; 3] {
+fn apply_black_white_mixer(
+    color: [f32; 3],
+    settings: BlackWhiteMixerSettings,
+    preserve_extended: bool,
+) -> [f32; 3] {
     if settings.enabled == 0 {
         return color;
     }
@@ -154,17 +184,31 @@ fn apply_black_white_mixer(color: [f32; 3], settings: BlackWhiteMixerSettings) -
         weighted_adjustment /= influence_total;
     }
 
-    let mixed = (luma * (1.0 + weighted_adjustment * 0.5)).clamp(0.0, 1.0);
+    let adjusted = luma * (1.0 + weighted_adjustment * 0.5);
+    let mixed = if preserve_extended {
+        adjusted
+    } else {
+        adjusted.clamp(0.0, 1.0)
+    };
     [mixed; 3]
 }
 
-fn preserve_color_balance_luminance(color: [f32; 3], source_luma: f32) -> [f32; 3] {
+fn preserve_color_balance_luminance(
+    color: [f32; 3],
+    source_luma: f32,
+    preserve_extended: bool,
+) -> [f32; 3] {
     let output_luma = rec709_luma(color);
     if output_luma <= 0.0 {
         return color;
     }
 
-    clamp_rgb(scale_rgb(color, source_luma / output_luma))
+    let scaled = scale_rgb(color, source_luma / output_luma);
+    if preserve_extended {
+        scaled
+    } else {
+        clamp_rgb(scaled)
+    }
 }
 
 fn rec709_luma(color: [f32; 3]) -> f32 {
@@ -286,10 +330,12 @@ mod tests {
         let source = [0.68, 0.48, 0.34];
         let expected = apply_black_white_mixer(
             apply_channel_mixer(
-                apply_color_balance_rgb(source, adjustments.global.color_balance_rgb),
+                apply_color_balance_rgb(source, adjustments.global.color_balance_rgb, false),
                 adjustments.global.channel_mixer,
+                false,
             ),
             adjustments.global.black_white_mixer,
+            false,
         );
 
         let rendered =
@@ -333,7 +379,7 @@ mod tests {
         let luma = 0.9 * 0.2126;
         let expected = (luma * 1.5_f32).clamp(0.0, 1.0);
 
-        let result = apply_black_white_mixer(source, adjustments.global.black_white_mixer);
+        let result = apply_black_white_mixer(source, adjustments.global.black_white_mixer, false);
 
         assert!((result[0] - expected).abs() < 0.000_001);
         assert_eq!(result, [result[0]; 3]);
@@ -356,7 +402,7 @@ mod tests {
         );
 
         assert_eq!(
-            apply_color_balance_rgb([0.0, 0.0, 0.0], settings.global.color_balance_rgb),
+            apply_color_balance_rgb([0.0, 0.0, 0.0], settings.global.color_balance_rgb, false),
             [0.0, 0.0, 0.0]
         );
     }

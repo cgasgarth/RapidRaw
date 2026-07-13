@@ -166,7 +166,7 @@ pub struct GlobalAdjustments {
     pub tint: f32,
     pub vibrance: f32,
     pub hue: f32,
-    pub(crate) _pad_color1: f32,
+    pub edit_graph_version: f32,
     pub(crate) _pad_color2: f32,
     pub(crate) _pad_color3: f32,
     pub sharpness: f32,
