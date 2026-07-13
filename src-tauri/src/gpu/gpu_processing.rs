@@ -2237,13 +2237,19 @@ impl GpuProcessor {
                     tile_command_buffers.push(encoder.finish());
                 }
                 let tile_command_buffer_count = tile_command_buffers.len() as u32;
-                queue.submit(
-                    flare_command_buffer
-                        .take()
-                        .into_iter()
-                        .chain(tile_command_buffers),
-                );
-                blur_counters.record_command_buffer();
+                // A single Queue::submit containing several command buffers did
+                // not make the storage-write -> sampled-read transition visible
+                // between phase buffers on software Vulkan. Ordered submits are
+                // still asynchronous, while giving wgpu an explicit submission
+                // boundary for each render-authoritative phase dependency.
+                for command_buffer in flare_command_buffer
+                    .take()
+                    .into_iter()
+                    .chain(tile_command_buffers)
+                {
+                    queue.submit(std::iter::once(command_buffer));
+                    blur_counters.record_command_buffer();
+                }
                 command_buffer_count += tile_command_buffer_count;
                 phase_dispatch_count += if split_scene_view_display { 3 } else { 1 };
                 cpu_encode_time += encode_started.elapsed();
@@ -3021,7 +3027,7 @@ mod blur_pass_tests {
             .expect("v2 GPU execution publishes a runtime receipt");
         assert_eq!(receipt.phase_dispatch_count, 3);
         assert_eq!(receipt.command_buffer_count, 3);
-        assert_eq!(receipt.queue_submit_count, 1);
+        assert_eq!(receipt.queue_submit_count, 3);
         assert!(receipt.cache_hits >= 3, "receipt={receipt:?}");
         assert_eq!(receipt.domain_conversions.len(), 2);
         assert!(
