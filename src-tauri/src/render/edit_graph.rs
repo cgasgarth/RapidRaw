@@ -12,6 +12,8 @@ use crate::adjustments::abi::{
     ColorCalibrationSettings, ColorGradeSettings, GpuMat3, HslColor, LevelsSettings,
     MaskAdjustments, Point,
 };
+use crate::tone::curves::CompiledCurvePlanV1;
+use crate::tone::output_curves::CompiledOutputCurvePlanV1;
 
 pub const EDIT_GRAPH_SCHEMA_VERSION: u32 = 1;
 pub const LEGACY_PIPELINE_VERSION: u32 = 1;
@@ -84,9 +86,11 @@ pub enum EditNodeKind {
     GeometryRetouch,
     PreGpuSpatialDetail,
     SceneGlobalColorTone,
+    SceneCurve,
     LocalSceneComposition,
     SceneToViewTransform,
     DisplayCreative,
+    OutputCurve,
     LegacyGpuSceneViewPass,
     ClippingOverlay,
     RenderTransport,
@@ -99,9 +103,11 @@ impl EditNodeKind {
             Self::GeometryRetouch => "geometry_retouch",
             Self::PreGpuSpatialDetail => "pre_gpu_spatial_detail",
             Self::SceneGlobalColorTone => "scene_global_color_tone",
+            Self::SceneCurve => "scene_curve_v1",
             Self::LocalSceneComposition => "local_scene_composition",
             Self::SceneToViewTransform => "scene_to_view_transform",
             Self::DisplayCreative => "display_creative",
+            Self::OutputCurve => "output_curve_v1",
             Self::LegacyGpuSceneViewPass => "legacy_gpu_scene_view_pass",
             Self::ClippingOverlay => "clipping_overlay",
             Self::RenderTransport => "render_transport",
@@ -146,9 +152,11 @@ pub enum CompiledNodePayload {
     PreGpuSpatialDetail { detail_fingerprint: u64 },
     LegacyShaderAbi(Box<AllAdjustments>),
     SceneGlobal(Box<SceneGlobalPayload>),
+    SceneCurve(CompiledCurvePlanV1),
     LocalScene(LocalScenePayload),
     ViewTransform(ViewTransformPayload),
     DisplayCreative(Box<DisplayCreativePayload>),
+    OutputCurve(CompiledOutputCurvePlanV1),
     ClippingOverlay { enabled: bool },
     RenderTransport { output_fingerprint: u64 },
 }
@@ -161,9 +169,11 @@ impl CompiledNodePayload {
             Self::PreGpuSpatialDetail { .. } => "pre_gpu_spatial_detail_v1",
             Self::LegacyShaderAbi(_) => "legacy_all_adjustments_shader_abi_v1",
             Self::SceneGlobal(_) => "scene_global_typed_v2",
+            Self::SceneCurve(_) => "scene_curve_typed_v1",
             Self::LocalScene(_) => "local_scene_typed_v2",
             Self::ViewTransform(_) => "view_transform_typed_v2",
             Self::DisplayCreative(_) => "display_creative_typed_v2",
+            Self::OutputCurve(_) => "output_curve_typed_v1",
             Self::ClippingOverlay { .. } => "clipping_overlay_v1",
             Self::RenderTransport { .. } => "render_transport_v1",
         }
@@ -185,9 +195,11 @@ impl CompiledNodePayload {
                     EditNodeKind::LegacyGpuSceneViewPass
                 )
                 | (Self::SceneGlobal(_), EditNodeKind::SceneGlobalColorTone)
+                | (Self::SceneCurve(_), EditNodeKind::SceneCurve)
                 | (Self::LocalScene(_), EditNodeKind::LocalSceneComposition)
                 | (Self::ViewTransform(_), EditNodeKind::SceneToViewTransform)
                 | (Self::DisplayCreative(_), EditNodeKind::DisplayCreative)
+                | (Self::OutputCurve(_), EditNodeKind::OutputCurve)
                 | (Self::ClippingOverlay { .. }, EditNodeKind::ClippingOverlay)
                 | (Self::RenderTransport { .. }, EditNodeKind::RenderTransport)
         )
@@ -231,6 +243,14 @@ impl CompiledNodePayload {
                 "gradingBlending": scene.grading_blending,
                 "gradingBalance": scene.grading_balance,
             }),
+            Self::SceneCurve(curve) => serde_json::json!({
+                "domain": format!("{:?}", curve.domain),
+                "channelMode": format!("{:?}", curve.channel_mode),
+                "middleGrey": curve.middle_grey,
+                "points": curve.points.iter().map(|point| [point.x_ev, point.y_ev]).collect::<Vec<_>>(),
+                "fingerprint": format!("{:016x}", curve.fingerprint),
+                "implementationVersion": curve.implementation_version,
+            }),
             Self::LocalScene(local) => serde_json::json!({
                 "layerCount": local.layers.len(),
                 "layers": local.layers.iter().map(LocalSceneLayerPayload::diagnostic).collect::<Vec<_>>(),
@@ -247,6 +267,14 @@ impl CompiledNodePayload {
                 "grain": display.grain,
                 "localDisplayLayers": display.local_layers.iter()
                     .map(LocalDisplayLayerPayload::diagnostic).collect::<Vec<_>>(),
+            }),
+            Self::OutputCurve(curve) => serde_json::json!({
+                "domain": format!("{:?}", curve.target.domain),
+                "sdrReferenceWhiteNits": curve.target.sdr_reference_white_nits,
+                "peakNits": curve.target.peak_nits,
+                "points": curve.points.iter().map(|point| [point.input, point.output]).collect::<Vec<_>>(),
+                "fingerprint": format!("{:016x}", curve.fingerprint),
+                "implementationVersion": curve.implementation_version,
             }),
             Self::ClippingOverlay { enabled } => serde_json::json!({ "enabled": enabled }),
             Self::RenderTransport { output_fingerprint } => serde_json::json!({
@@ -502,6 +530,8 @@ pub struct EditGraphCompileInputs<'a> {
     pub output_fingerprint: u64,
     pub adjustments: &'a AllAdjustments,
     pub neutral_adjustments: &'a AllAdjustments,
+    pub scene_curve: Option<&'a CompiledCurvePlanV1>,
+    pub output_curve: Option<&'a CompiledOutputCurvePlanV1>,
     pub has_geometry_or_retouch: bool,
     pub has_detail: bool,
     pub has_masks: bool,
@@ -644,6 +674,26 @@ impl CompiledEditGraph {
             } else {
                 omitted.push(EditNodeKind::LocalSceneComposition.stable_id());
             }
+            if let Some(scene_curve) = inputs.scene_curve {
+                nodes.push(node(
+                    EditNodeKind::SceneCurve,
+                    ColorDomain::AcesCgSceneLinearExtended,
+                    ColorDomain::AcesCgSceneLinearExtended,
+                    EditStageClass::LocalComposition,
+                    ValueRangePolicy::PreserveFiniteExtended,
+                    SpatialSupport::Pointwise,
+                    LocalAdjustmentPolicy::GlobalOnly,
+                    NodeDependencies {
+                        adjustments: true,
+                        ..NodeDependencies::default()
+                    },
+                    Some("scene_curve_cpu_v1"),
+                    None,
+                    scene_curve.fingerprint,
+                ));
+            } else {
+                omitted.push(EditNodeKind::SceneCurve.stable_id());
+            }
             nodes.push(node(
                 EditNodeKind::SceneToViewTransform,
                 ColorDomain::AcesCgSceneLinearExtended,
@@ -686,6 +736,28 @@ impl CompiledEditGraph {
                 ));
             } else {
                 omitted.push(EditNodeKind::DisplayCreative.stable_id());
+            }
+            if let Some(output_curve) = inputs.output_curve {
+                nodes.push(node(
+                    EditNodeKind::OutputCurve,
+                    ColorDomain::ViewEncoded,
+                    ColorDomain::ViewEncoded,
+                    EditStageClass::DisplayAdjustment,
+                    ValueRangePolicy::PreserveFiniteExtended,
+                    SpatialSupport::Pointwise,
+                    LocalAdjustmentPolicy::GlobalOnly,
+                    NodeDependencies {
+                        adjustments: true,
+                        view: true,
+                        output: true,
+                        ..NodeDependencies::default()
+                    },
+                    Some("output_curve_cpu_v1"),
+                    None,
+                    output_curve.fingerprint,
+                ));
+            } else {
+                omitted.push(EditNodeKind::OutputCurve.stable_id());
             }
         }
         if inputs.show_clipping {
@@ -792,6 +864,8 @@ impl CompiledEditGraph {
             has_user_edits: inputs.has_geometry_or_retouch
                 || inputs.has_detail
                 || gpu_adjustments_active
+                || inputs.scene_curve.is_some()
+                || inputs.output_curve.is_some()
                 || inputs.show_clipping
                 // Choosing the scene-referred process is itself a persisted,
                 // render-authoritative edit even when every numeric control is
@@ -821,6 +895,24 @@ impl CompiledEditGraph {
 
     pub fn shader_abi(&self) -> AllAdjustments {
         self.compiled_shader_abi
+    }
+
+    pub fn scene_curve(&self) -> Option<&CompiledCurvePlanV1> {
+        self.nodes.iter().find_map(|node| match &node.payload {
+            CompiledNodePayload::SceneCurve(curve) => Some(curve),
+            _ => None,
+        })
+    }
+
+    pub fn output_curve(&self) -> Option<&CompiledOutputCurvePlanV1> {
+        self.nodes.iter().find_map(|node| match &node.payload {
+            CompiledNodePayload::OutputCurve(curve) => Some(curve),
+            _ => None,
+        })
+    }
+
+    pub fn has_typed_curves(&self) -> bool {
+        self.scene_curve().is_some() || self.output_curve().is_some()
     }
 
     pub fn validate_gpu_execution(
@@ -1048,6 +1140,12 @@ fn compile_node_payload(
                 grading_balance: global.color_grading_balance,
             }))
         }
+        EditNodeKind::SceneCurve => CompiledNodePayload::SceneCurve(
+            inputs
+                .scene_curve
+                .expect("scene curve node requires compiled payload")
+                .clone(),
+        ),
         EditNodeKind::LocalSceneComposition => CompiledNodePayload::LocalScene(LocalScenePayload {
             layers: inputs.adjustments.mask_adjustments[..inputs.adjustments.mask_count as usize]
                 .iter()
@@ -1099,6 +1197,12 @@ fn compile_node_payload(
                     .into(),
             }))
         }
+        EditNodeKind::OutputCurve => CompiledNodePayload::OutputCurve(
+            inputs
+                .output_curve
+                .expect("output curve node requires compiled payload")
+                .clone(),
+        ),
         EditNodeKind::ClippingOverlay => CompiledNodePayload::ClippingOverlay {
             enabled: inputs.show_clipping,
         },

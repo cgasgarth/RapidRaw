@@ -940,6 +940,16 @@ pub enum EditGraphExecutionAuthority {
     TestOnlyLegacy,
 }
 
+impl EditGraphExecutionAuthority {
+    fn compiled(&self) -> Option<&Arc<crate::edit_graph::CompiledEditGraph>> {
+        match self {
+            Self::Compiled(graph) => Some(graph),
+            #[cfg(all(test, feature = "tauri-test"))]
+            Self::TestOnlyLegacy => None,
+        }
+    }
+}
+
 fn validate_edit_graph_request(request: &RenderRequest<'_>) -> Result<(), String> {
     match &request.edit_graph {
         EditGraphExecutionAuthority::Compiled(edit_graph) => {
@@ -3326,6 +3336,77 @@ mod blur_pass_tests {
 
     #[cfg(feature = "tauri-test")]
     #[test]
+    fn typed_curve_graph_routes_to_authoritative_cpu_until_dynamic_gpu_bindings_exist() {
+        use image::{DynamicImage, ImageBuffer, Rgba};
+        use serde_json::json;
+        use tauri::Manager;
+
+        let _test_guard = acquire_gpu_test_lock();
+        let source =
+            DynamicImage::ImageRgba32F(ImageBuffer::from_pixel(2, 2, Rgba([0.18, 0.3, 1.5, 0.75])));
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock Tauri app builds");
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state)
+            .expect("compute-only GPU context initializes");
+        let adjustments = json!({
+            "rawEngineEditGraphVersion": 2,
+            "sceneCurveV1": {
+                "middleGrey": 0.18,
+                "channelMode": "luminance_preserving",
+                "points": [
+                    {"xEv": -16, "yEv": -16},
+                    {"xEv": 0, "yEv": 1},
+                    {"xEv": 16, "yEv": 16}
+                ]
+            }
+        });
+        let plan = crate::render_plan::compile_render_plan(
+            &adjustments,
+            crate::render_plan::CompileRenderPlanContext {
+                revision: crate::render_plan::content_revision(&adjustments, 1, 2, 3),
+                is_raw: true,
+                tonemapper_override: None,
+            },
+            None,
+        )
+        .unwrap();
+        let expected = crate::cpu_edit_graph::execute_cpu_edit_graph(
+            &source,
+            &plan.adjustments,
+            &[],
+            None,
+            &plan.edit_graph,
+        )
+        .unwrap()
+        .to_rgba32f()
+        .into_raw();
+        let actual = process_and_get_unclamped_dynamic_image(
+            &context,
+            &state,
+            &source,
+            PreGpuImageIdentity::for_source(&source, "typed_curve_cpu_route"),
+            RenderRequest {
+                adjustments: plan.adjustments,
+                mask_bitmaps: &[],
+                lut: None,
+                roi: None,
+                edit_graph: EditGraphExecutionAuthority::Compiled(plan.edit_graph),
+            },
+            "typed_curve_cpu_route",
+        )
+        .unwrap()
+        .to_rgba32f()
+        .into_raw();
+
+        assert_eq!(actual, expected);
+        assert!(state.gpu_processor.lock().unwrap().is_none());
+    }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
     fn scene_referred_v2_preserves_extended_values_and_has_an_explicit_pixel_delta() {
         use image::{DynamicImage, ImageBuffer, Rgba};
         use serde_json::json;
@@ -4852,6 +4933,24 @@ fn process_and_get_dynamic_image_inner(
 
     let max_dim = context.limits.max_texture_dimension_2d;
     validate_edit_graph_request(&request)?;
+    if request
+        .edit_graph
+        .compiled()
+        .is_some_and(|graph| graph.has_typed_curves())
+    {
+        let graph = request
+            .edit_graph
+            .compiled()
+            .expect("typed curve authority is compiled");
+        return crate::cpu_edit_graph::execute_cpu_edit_graph(
+            base_image,
+            &request.adjustments,
+            request.mask_bitmaps,
+            request.lut.as_deref(),
+            graph,
+        )
+        .map_err(str::to_owned);
+    }
     if width > max_dim || height > max_dim {
         log::warn!(
             "Image dimensions ({}x{}) exceed GPU limits ({}); executing the compiled CPU reference graph",
