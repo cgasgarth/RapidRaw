@@ -22,6 +22,10 @@ on:
         description: Optional checked-out append-only baseline history JSON; when set, the trend gate is fail-closed.
         required: false
         default: ''
+      native-fixture-path:
+        description: Absolute private RAW path on the dedicated macOS performance runner.
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -149,3 +153,36 @@ jobs:
           path: artifacts/performance-smoke/performance-smoke-report.json
           retention-days: 14
           if-no-files-found: warn
+
+  native-performance-lab:
+    name: native performance lab
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.native-fixture-path != '' }}
+    runs-on: [self-hosted, macOS, ARM64]
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 1
+
+      - uses: ./.github/actions/setup-bun-deps
+
+      - name: Run cold native RAW scenario
+        env:
+          RAWENGINE_PERF_NATIVE_FIXTURE: ${{ inputs.native-fixture-path }}
+        run: bun perf run native.editor-raw-open-cold --profile native-dedicated --output artifacts/performance-lab/native.editor-raw-open-cold.json
+
+      - name: Run warm native RAW scenario with the validated build
+        env:
+          RAWENGINE_PERF_NATIVE_FIXTURE: ${{ inputs.native-fixture-path }}
+          RAWENGINE_PERF_NATIVE_NO_BUILD: '1'
+        run: bun perf run native.editor-raw-open-warm --profile native-dedicated --output artifacts/performance-lab/native.editor-raw-open-warm.json
+
+      - name: Upload native performance receipts
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-performance-lab
+          path: artifacts/performance-lab/native.*.json
+          retention-days: 30
+          if-no-files-found: error

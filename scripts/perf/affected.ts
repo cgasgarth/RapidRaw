@@ -22,6 +22,10 @@ const ownership: readonly { pattern: RegExp; scenarioIds: readonly string[] }[] 
     pattern: /(?:src\/components\/panel\/MainLibrary|src\/components\/library|src\/store\/library)/u,
     scenarioIds: ['browser.library-open'],
   },
+  {
+    pattern: /src-tauri\/src\/(?:gpu|io|raw|render)\//u,
+    scenarioIds: ['native.editor-raw-open-cold', 'native.editor-raw-open-warm'],
+  },
   { pattern: /(?:scripts\/perf\/|package\.json|bun\.lock)/u, scenarioIds: ['*'] },
 ];
 

@@ -94,6 +94,8 @@ describe('performance lab runner', () => {
       'browser.editor-compare',
       'browser.editor-crop',
       'browser.library-open',
+      'native.editor-raw-open-cold',
+      'native.editor-raw-open-warm',
     ]);
     expect(performanceScenarios.every(({ version, measuredRuns }) => version > 0 && measuredRuns >= 5)).toBeTrue();
     expect(
@@ -113,6 +115,16 @@ describe('performance lab runner', () => {
       filesystemReadOps: expect.any(Number),
       filesystemWriteOps: expect.any(Number),
       residentBytes: expect.any(Number),
+    });
+  });
+
+  test('native scenarios fail closed without an absolute private RAW fixture', async () => {
+    const native = performanceScenarios.find(({ id }) => id === 'native.editor-raw-open-cold');
+    if (native === undefined) throw new Error('native performance scenario missing');
+    const receipt = await runPerformanceScenario({ scenario: native, identity, now: clock() });
+    expect(receipt).toMatchObject({
+      status: 'invalid',
+      invalidReason: expect.stringContaining('RAWENGINE_PERF_NATIVE_FIXTURE'),
     });
   });
 

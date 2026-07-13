@@ -194,6 +194,95 @@ fn operation_allowed_before_ready(operation: &QaOperation) -> bool {
     )
 }
 
+#[cfg(unix)]
+fn process_resource_usage() -> Value {
+    let mut usage = std::mem::MaybeUninit::<libc::rusage>::zeroed();
+    // SAFETY: getrusage initializes the provided rusage for the current process on success.
+    let result = unsafe { libc::getrusage(libc::RUSAGE_SELF, usage.as_mut_ptr()) };
+    if result != 0 {
+        return Value::Null;
+    }
+    // SAFETY: the successful getrusage call above initialized every field.
+    let usage = unsafe { usage.assume_init() };
+    #[cfg(target_os = "macos")]
+    let resident_bytes = usage.ru_maxrss.max(0) as u64;
+    #[cfg(not(target_os = "macos"))]
+    let resident_bytes = (usage.ru_maxrss.max(0) as u64).saturating_mul(1024);
+    let micros = |seconds: i64, microseconds: i64| {
+        (seconds.max(0) as u64)
+            .saturating_mul(1_000_000)
+            .saturating_add(microseconds.max(0) as u64)
+    };
+    json!({
+        "peakResidentBytes": resident_bytes,
+        "filesystemReadOps": usage.ru_inblock.max(0) as u64,
+        "filesystemWriteOps": usage.ru_oublock.max(0) as u64,
+        "userCpuMicros": micros(
+            usage.ru_utime.tv_sec,
+            i64::from(usage.ru_utime.tv_usec),
+        ),
+        "systemCpuMicros": micros(
+            usage.ru_stime.tv_sec,
+            i64::from(usage.ru_stime.tv_usec),
+        ),
+    })
+}
+
+#[cfg(not(unix))]
+fn process_resource_usage() -> Value {
+    Value::Null
+}
+
+fn scheduler_metrics(app_state: &AppState) -> Value {
+    app_state
+        .preview_scheduler
+        .lock()
+        .ok()
+        .and_then(|scheduler| {
+            scheduler.as_ref().map(|scheduler| {
+                json!({
+                    "interactiveSubmissions": scheduler.metrics.interactive_submissions.load(Ordering::Acquire),
+                    "settledSubmissions": scheduler.metrics.settled_submissions.load(Ordering::Acquire),
+                    "pendingReplacements": scheduler.metrics.pending_replacements.load(Ordering::Acquire),
+                    "activeCancellations": scheduler.metrics.active_cancellations.load(Ordering::Acquire),
+                    "renderedInteractive": scheduler.metrics.rendered_interactive.load(Ordering::Acquire),
+                    "renderedSettled": scheduler.metrics.rendered_settled.load(Ordering::Acquire),
+                    "maxResidentRequests": scheduler.metrics.max_resident_requests.load(Ordering::Acquire),
+                })
+            })
+        })
+        .unwrap_or(Value::Null)
+}
+
+fn gpu_execution_receipt(app_state: &AppState) -> Value {
+    app_state
+        .gpu_processor
+        .lock()
+        .ok()
+        .and_then(|processor| {
+            processor.as_ref().and_then(|processor| {
+                processor
+                    .processor
+                    .last_execution_receipt()
+                    .map(|receipt| (processor.processor.execution_sequence(), receipt))
+            })
+        })
+        .map(|(execution_sequence, receipt)| {
+            json!({
+                "executionSequence": execution_sequence,
+                "graphFingerprint": receipt.graph_fingerprint,
+                "stageBits": receipt.stages.bits(),
+                "blurDispatchCount": receipt.blur_dispatch_count,
+                "renderPassCount": receipt.render_pass_count,
+                "commandBufferCount": receipt.command_buffer_count,
+                "queueSubmitCount": receipt.queue_submit_count,
+                "estimatedPeakResourceBytes": receipt.estimated_peak_resource_bytes,
+                "cpuEncodeMicros": receipt.cpu_encode_time.as_micros().min(u64::MAX as u128) as u64,
+            })
+        })
+        .unwrap_or(Value::Null)
+}
+
 fn diagnostics(state: &QaControlState, app_state: &AppState) -> Value {
     let active_native_source = app_state
         .original_image
@@ -227,6 +316,9 @@ fn diagnostics(state: &QaControlState, app_state: &AppState) -> Value {
         "preview": preview,
         "cacheMode": state.cache_mode.lock().map(|mode| *mode).unwrap_or(QaCacheMode::Cold),
         "cache": cache_report,
+        "processResources": process_resource_usage(),
+        "scheduler": scheduler_metrics(app_state),
+        "gpuExecution": gpu_execution_receipt(app_state),
     })
 }
 
@@ -699,6 +791,27 @@ mod tests {
                 .unwrap()
                 .extend(operation.as_object().unwrap().clone());
             serde_json::from_value::<QaRequest>(request).expect("protocol operation must parse");
+        }
+    }
+
+    #[test]
+    fn process_resource_usage_is_nonnegative_when_supported() {
+        let usage = process_resource_usage();
+        if cfg!(unix) {
+            for key in [
+                "peakResidentBytes",
+                "filesystemReadOps",
+                "filesystemWriteOps",
+                "userCpuMicros",
+                "systemCpuMicros",
+            ] {
+                assert!(
+                    usage.get(key).and_then(Value::as_u64).is_some(),
+                    "missing {key}"
+                );
+            }
+        } else {
+            assert!(usage.is_null());
         }
     }
 }

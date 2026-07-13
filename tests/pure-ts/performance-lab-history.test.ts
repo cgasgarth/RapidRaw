@@ -299,6 +299,9 @@ exit 1
     expect(
       selectAffectedPerformanceScenarios(['src/components/panel/MainLibrary.tsx'], performanceScenarios).scenarioIds,
     ).toEqual(['browser.library-open']);
+    expect(
+      selectAffectedPerformanceScenarios(['src-tauri/src/gpu/gpu_processing.rs'], performanceScenarios).scenarioIds,
+    ).toEqual(['native.editor-raw-open-cold', 'native.editor-raw-open-warm']);
     expect(selectAffectedPerformanceScenarios(['unknown/new-file.ts'], performanceScenarios)).toMatchObject({
       scenarioIds: [
         'browser.editor-compare',
@@ -306,6 +309,8 @@ exit 1
         'browser.editor-open',
         'browser.library-open',
         'editor.preview-scheduling',
+        'native.editor-raw-open-cold',
+        'native.editor-raw-open-warm',
       ],
       conservativeFallback: true,
     });

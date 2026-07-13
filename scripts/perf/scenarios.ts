@@ -1,13 +1,18 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { readFile, stat } from 'node:fs/promises';
+import { isAbsolute, resolve } from 'node:path';
 import { z } from 'zod';
 import { publishAdjustmentSnapshot } from '../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../src/utils/adjustments';
 import { requestQaDaemon } from '../qa/daemon-client';
 import { type QaDaemonMetrics, qaDaemonMetricsSchema } from '../qa/daemon-model';
 import { readLiveDaemonState } from '../qa/daemon-state';
+import {
+  type NativeQaControlRecord,
+  readLiveNativeQaControlRecord,
+  requestNativeQaControl,
+} from '../qa/native-control';
 import type { PerformanceScenario } from './model';
 
 const DISPATCHES = 20_000;
@@ -282,12 +287,251 @@ const browserQaScenario = (id: string, qaScenarioId: string): PerformanceScenari
   };
 };
 
+const nativeResourceSchema = z.object({
+  peakResidentBytes: z.number().nonnegative(),
+  filesystemReadOps: z.number().nonnegative(),
+  filesystemWriteOps: z.number().nonnegative(),
+  userCpuMicros: z.number().nonnegative(),
+  systemCpuMicros: z.number().nonnegative(),
+});
+const nativeSchedulerSchema = z.object({
+  interactiveSubmissions: z.number().nonnegative(),
+  settledSubmissions: z.number().nonnegative(),
+  pendingReplacements: z.number().nonnegative(),
+  activeCancellations: z.number().nonnegative(),
+  renderedInteractive: z.number().nonnegative(),
+  renderedSettled: z.number().nonnegative(),
+  maxResidentRequests: z.number().nonnegative(),
+});
+const nativeDiagnosticsSchema = z.object({
+  activeNativeSource: z.string().nullable(),
+  cache: z.object({ total_known_cpu_cache_bytes: z.number().nonnegative() }),
+  cacheMode: z.enum(['cold', 'warm']),
+  processResources: nativeResourceSchema,
+  scheduler: nativeSchedulerSchema.nullable(),
+  sessionRevision: z.number().int().nonnegative(),
+  renderRevision: z.number().int().nonnegative(),
+  preview: z
+    .object({
+      backendGeneration: z.number().nonnegative(),
+      height: z.number().positive(),
+      imageSession: z.number().int().positive(),
+      source: z.string().min(1),
+      width: z.number().positive(),
+    })
+    .nullable(),
+  gpuExecution: z
+    .object({
+      blurDispatchCount: z.number().nonnegative(),
+      commandBufferCount: z.number().nonnegative(),
+      cpuEncodeMicros: z.number().nonnegative(),
+      estimatedPeakResourceBytes: z.number().nonnegative(),
+      executionSequence: z.number().int().nonnegative(),
+      graphFingerprint: z.number().nonnegative(),
+      queueSubmitCount: z.number().nonnegative(),
+      renderPassCount: z.number().nonnegative(),
+      stageBits: z.number().nonnegative(),
+    })
+    .nullable(),
+});
+
+const subtractNativeResources = (
+  current: z.infer<typeof nativeResourceSchema>,
+  prior: z.infer<typeof nativeResourceSchema>,
+) => ({
+  filesystemReadOps: Math.max(0, current.filesystemReadOps - prior.filesystemReadOps),
+  filesystemWriteOps: Math.max(0, current.filesystemWriteOps - prior.filesystemWriteOps),
+  peakResidentBytes: current.peakResidentBytes,
+  systemCpuMicros: Math.max(0, current.systemCpuMicros - prior.systemCpuMicros),
+  userCpuMicros: Math.max(0, current.userCpuMicros - prior.userCpuMicros),
+});
+
+const subtractNativeScheduler = (
+  current: z.infer<typeof nativeSchedulerSchema> | null,
+  prior: z.infer<typeof nativeSchedulerSchema> | null,
+) => {
+  const empty = {
+    activeCancellations: 0,
+    interactiveSubmissions: 0,
+    maxResidentRequests: 0,
+    pendingReplacements: 0,
+    renderedInteractive: 0,
+    renderedSettled: 0,
+    settledSubmissions: 0,
+  };
+  const after = current ?? empty;
+  const before = prior ?? empty;
+  return {
+    activeCancellations: Math.max(0, after.activeCancellations - before.activeCancellations),
+    interactiveSubmissions: Math.max(0, after.interactiveSubmissions - before.interactiveSubmissions),
+    maxResidentRequests: after.maxResidentRequests,
+    pendingReplacements: Math.max(0, after.pendingReplacements - before.pendingReplacements),
+    renderedInteractive: Math.max(0, after.renderedInteractive - before.renderedInteractive),
+    renderedSettled: Math.max(0, after.renderedSettled - before.renderedSettled),
+    settledSubmissions: Math.max(0, after.settledSubmissions - before.settledSubmissions),
+  };
+};
+
+const nativeFixture = process.env.RAWENGINE_PERF_NATIVE_FIXTURE;
+const nativeFixtureDigest = `sha256:${createHash('sha256')
+  .update(
+    nativeFixture !== undefined && isAbsolute(nativeFixture)
+      ? readFileSync(nativeFixture)
+      : Buffer.from('native-private-fixture-unconfigured'),
+  )
+  .digest('hex')}` as const;
+
+const nativeRawOpenScenario = (cacheMode: 'cold' | 'warm'): PerformanceScenario => {
+  const worktree = process.cwd();
+  const recordPath = resolve('private-artifacts/qa/native-control.json');
+  let record: NativeQaControlRecord | undefined;
+  const required = async (method: string, parameters: Readonly<Record<string, unknown>> = {}) => {
+    if (record === undefined) throw new Error('Native performance control record is unavailable.');
+    const response = await requestNativeQaControl(record, method, parameters);
+    if (!response.ok) throw new Error(`${method} failed: ${response.error ?? 'unknown error'}`);
+    return response.result;
+  };
+  return {
+    id: `native.editor-raw-open-${cacheMode}`,
+    version: 1,
+    fixtureDigest: nativeFixtureDigest,
+    cacheMode,
+    warmupRuns: 1,
+    measuredRuns: 5,
+    budgets: { interactionMs: { absolute: 250, relative: 0.15 } },
+    maxRelativeMad: 0.5,
+    metricUnits: {
+      activeCancellations: 'count',
+      backendGeneration: 'count',
+      cacheKnownCpuBytes: 'bytes',
+      commandBufferCount: 'count',
+      cpuMs: 'ms',
+      estimatedGpuResourceBytes: 'bytes',
+      filesystemReadOps: 'count',
+      filesystemWriteOps: 'count',
+      interactionMs: 'ms',
+      pendingReplacements: 'count',
+      pixels: 'count',
+      queueSubmitCount: 'count',
+      renderPassCount: 'count',
+      peakResidentBytes: 'bytes',
+      sourceBytes: 'bytes',
+    },
+    async beforeAll() {
+      if (nativeFixture === undefined || !isAbsolute(nativeFixture))
+        throw new Error('RAWENGINE_PERF_NATIVE_FIXTURE must be an absolute private RAW path.');
+      await stat(nativeFixture);
+      const launcherArgs = ['scripts/dev/start-native-qa-app.ts', '--validation-harness'];
+      if (process.env.RAWENGINE_PERF_NATIVE_NO_BUILD === '1') launcherArgs.push('--no-build');
+      const launcher = Bun.spawn(['bun', ...launcherArgs], {
+        cwd: worktree,
+        stderr: 'pipe',
+        stdout: 'pipe',
+      });
+      const [stdout, stderr, exitCode] = await Promise.all([
+        new Response(launcher.stdout).text(),
+        new Response(launcher.stderr).text(),
+        launcher.exited,
+      ]);
+      if (exitCode !== 0)
+        throw new Error(`Native performance launcher failed:\n${`${stdout}\n${stderr}`.trim().slice(-8_000)}`);
+      record = await readLiveNativeQaControlRecord(recordPath, worktree);
+      if (record === undefined) throw new Error('Native performance control record did not become live.');
+      for (let attempt = 0; attempt < 200; attempt += 1) {
+        const health = await requestNativeQaControl(record, 'health').catch(() => undefined);
+        if (health?.ok && z.object({ ready: z.literal(true) }).safeParse(health.result).success) {
+          await Bun.sleep(500);
+          return;
+        }
+        await Bun.sleep(50);
+      }
+      throw new Error('Native performance app did not become frontend-ready.');
+    },
+    async afterAll() {
+      if (record === undefined) return;
+      await required('shutdown');
+      for (let attempt = 0; attempt < 400; attempt += 1) {
+        if ((await readLiveNativeQaControlRecord(recordPath, worktree)) === undefined) return;
+        await Bun.sleep(25);
+      }
+      throw new Error('Native performance app did not shut down cleanly.');
+    },
+    async runSample() {
+      if (nativeFixture === undefined) throw new Error('Native performance fixture missing.');
+      await required('reset', { mode: 'empty' });
+      await required('setCacheMode', { mode: cacheMode });
+      const before = nativeDiagnosticsSchema.parse(await required('diagnostics'));
+      const started = performance.now();
+      const opened = z
+        .object({ path: z.string(), sessionRevision: z.number().int().positive() })
+        .parse(await required('openFixture', { path: nativeFixture }));
+      let after: z.infer<typeof nativeDiagnosticsSchema> | undefined;
+      for (let attempt = 0; attempt < 800; attempt += 1) {
+        after = nativeDiagnosticsSchema.parse(await required('diagnostics'));
+        if (
+          after.activeNativeSource === opened.path &&
+          after.preview?.source === opened.path &&
+          (after.gpuExecution?.executionSequence ?? 0) > (before.gpuExecution?.executionSequence ?? 0) &&
+          after.gpuExecution !== null
+        )
+          break;
+        await Bun.sleep(25);
+      }
+      const interactionMs = performance.now() - started;
+      if (
+        after === undefined ||
+        after.activeNativeSource !== opened.path ||
+        after.preview?.source !== opened.path ||
+        after.gpuExecution === null ||
+        after.gpuExecution.executionSequence <= (before.gpuExecution?.executionSequence ?? 0)
+      )
+        throw new Error('Native RAW open did not reach an authoritative preview with a GPU execution receipt.');
+      const resources = subtractNativeResources(after.processResources, before.processResources);
+      const scheduler = subtractNativeScheduler(after.scheduler, before.scheduler);
+      const sourceBytes = (await stat(nativeFixture)).size;
+      const gpu = after.gpuExecution;
+      return {
+        assertions: 6,
+        metrics: {
+          activeCancellations: scheduler.activeCancellations,
+          backendGeneration: after.preview.backendGeneration,
+          cacheKnownCpuBytes: after.cache.total_known_cpu_cache_bytes,
+          commandBufferCount: gpu.commandBufferCount,
+          cpuMs: (resources.userCpuMicros + resources.systemCpuMicros) / 1_000,
+          estimatedGpuResourceBytes: gpu.estimatedPeakResourceBytes,
+          filesystemReadOps: resources.filesystemReadOps,
+          filesystemWriteOps: resources.filesystemWriteOps,
+          interactionMs,
+          pendingReplacements: scheduler.pendingReplacements,
+          pixels: after.preview.width * after.preview.height,
+          queueSubmitCount: gpu.queueSubmitCount,
+          renderPassCount: gpu.renderPassCount,
+          peakResidentBytes: resources.peakResidentBytes,
+          sourceBytes,
+        },
+        spans: [
+          { source: 'native', stage: 'raw-open-to-authoritative-preview', startOffsetMs: 0, durationMs: interactionMs },
+          {
+            source: 'gpu',
+            stage: 'command-encode',
+            startOffsetMs: Math.max(0, interactionMs - gpu.cpuEncodeMicros / 1_000),
+            durationMs: gpu.cpuEncodeMicros / 1_000,
+          },
+          { source: 'io', stage: 'source-observed', startOffsetMs: 0, durationMs: 0 },
+        ],
+      };
+    },
+  };
+};
+
 export const performanceScenarios: readonly PerformanceScenario[] = [
   previewScheduling,
   browserQaScenario('browser.editor-open', 'browser.editor.chrome'),
   browserQaScenario('browser.editor-compare', 'browser.editor.compare'),
   browserQaScenario('browser.editor-crop', 'browser.editor.crop'),
   browserQaScenario('browser.library-open', 'browser.library.open'),
+  nativeRawOpenScenario('cold'),
+  nativeRawOpenScenario('warm'),
 ];
 
 export function getPerformanceScenario(id: string): PerformanceScenario {
