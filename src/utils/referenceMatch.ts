@@ -9,6 +9,7 @@ import {
 
 export type ReferenceMatchMode = 'match-look' | 'normalize';
 export type ReferenceMatchGroup = 'color' | 'presence' | 'tone';
+export type ReferenceMatchRole = 'creative' | 'technical';
 
 export interface ReferenceHistogramSummary {
   analysisBasis: 'color-managed-editor-preview';
@@ -55,6 +56,7 @@ export interface ReferenceMatchReference {
   proofFingerprint: string;
   proofRevision: number;
   renderUrl: string;
+  role: ReferenceMatchRole;
   sourceFingerprint: string;
   summary: ReferenceHistogramSummary;
   viewFingerprint: string;
@@ -90,7 +92,7 @@ export interface ReferenceMatchDiff {
 export interface ReferenceMatchProposal {
   confidence: number;
   diffs: ReferenceMatchDiff[];
-  effectiveReferences: Array<{ sourceFingerprint: string; weight: number }>;
+  effectiveReferences: Array<{ role: ReferenceMatchRole; sourceFingerprint: string; weight: number }>;
   mode: ReferenceMatchMode;
   processVersion: 'rapidraw-reference-match-v1';
   proposalFingerprint: string;
@@ -252,6 +254,15 @@ export const combineReferenceSummaries = (
   };
 };
 
+export const selectReferenceMatchReferences = (
+  references: readonly ReferenceMatchReference[],
+  mode: ReferenceMatchMode,
+): ReferenceMatchReference[] => {
+  if (mode === 'match-look') return references.filter((reference) => reference.role === 'creative');
+  const technical = references.filter((reference) => reference.role === 'technical');
+  return technical.length > 0 ? technical : [...references];
+};
+
 const hasLocalizedMismatch = (target: ReferenceHistogramSummary, reference: ReferenceHistogramSummary): boolean => {
   if (target.spatialTiles.length < 4 || target.spatialTiles.length !== reference.spatialTiles.length) return false;
   const deltas = target.spatialTiles.map(
@@ -289,7 +300,8 @@ export const createReferenceMatchProposal = ({
   targetProfile?: string;
   targetProofFingerprint?: string;
 }): ReferenceMatchProposal | null => {
-  const reference = combineReferenceSummaries(references);
+  const selectedReferences = selectReferenceMatchReferences(references, mode);
+  const reference = combineReferenceSummaries(selectedReferences);
   if (!reference) return null;
   const exposureDelta = clamp(Math.log2((reference.lumaMean + 1 / 255) / (target.lumaMean + 1 / 255)), -2, 2);
   const contrastDelta = clamp((reference.lumaSpread - target.lumaSpread) * 180, -35, 35);
@@ -365,14 +377,14 @@ export const createReferenceMatchProposal = ({
   const residualAfter = summaryDistance(predicted, reference);
   const localizedMismatch = hasLocalizedMismatch(target, reference);
   const warnings = [
-    ...(references.some((item) => item.path.length === 0) ? ['Reference source identity is incomplete.'] : []),
+    ...(selectedReferences.some((item) => item.path.length === 0) ? ['Reference source identity is incomplete.'] : []),
     ...(reference.clippedFraction > 0.02 || target.clippedFraction > 0.02
       ? ['Clipped histogram endpoints reduce match reliability.']
       : []),
-    ...(targetProofFingerprint && references.some((item) => item.proofFingerprint !== targetProofFingerprint)
+    ...(targetProofFingerprint && selectedReferences.some((item) => item.proofFingerprint !== targetProofFingerprint)
       ? ['Reference and target proof identities differ.']
       : []),
-    ...(targetProfile && references.some((item) => item.cameraProfile !== targetProfile)
+    ...(targetProfile && selectedReferences.some((item) => item.cameraProfile !== targetProfile)
       ? ['Reference and target camera profiles differ; profile replacement is excluded.']
       : []),
     ...(target.sampleCount < 256 ? ['Target histogram has limited sample support.'] : []),
@@ -384,9 +396,14 @@ export const createReferenceMatchProposal = ({
   ];
   const recommendedDiffs = diffs.filter((diff) => Math.abs(diff.proposed - diff.current) >= 0.005);
   if (recommendedDiffs.length === 0) return null;
-  const effectiveReferences = references
+  const effectiveWeight = selectedReferences.reduce((sum, item) => sum + item.weight, 0);
+  const effectiveReferences = selectedReferences
     .filter((item) => item.weight > 0)
-    .map((item) => ({ sourceFingerprint: item.sourceFingerprint, weight: item.weight }))
+    .map((item) => ({
+      role: item.role,
+      sourceFingerprint: item.sourceFingerprint,
+      weight: item.weight / effectiveWeight,
+    }))
     .sort((left, right) => left.sourceFingerprint.localeCompare(right.sourceFingerprint));
   const targetAnalysisFingerprint = fingerprintReferenceMatchValue(JSON.stringify(target));
   const proposalFingerprint = fingerprintReferenceMatchValue(

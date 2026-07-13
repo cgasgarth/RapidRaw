@@ -26,7 +26,7 @@ describe('reference match runtime contracts', () => {
     const proposal = matchLookProposalV1Schema.parse({
       confidence: 0.9,
       diffs: [{ current: 0, group: 'tone', key: 'exposure', proposed: 0.5 }],
-      effectiveReferences: [{ sourceFingerprint: source.sourceFingerprint, weight: 1 }],
+      effectiveReferences: [{ role: 'creative', sourceFingerprint: source.sourceFingerprint, weight: 1 }],
       mode: 'match-look',
       processVersion: 'rapidraw-reference-match-v1',
       proposalFingerprint: fingerprint('6'),
@@ -72,7 +72,7 @@ describe('reference match runtime contracts', () => {
       matchLookProposalV1Schema.safeParse({
         confidence: 0.8,
         diffs: [{ current: 0, group: 'color', key: 'creativeTint', proposed: 10 }],
-        effectiveReferences: [{ sourceFingerprint: source.sourceFingerprint, weight: 1 }],
+        effectiveReferences: [{ role: 'technical', sourceFingerprint: source.sourceFingerprint, weight: 1 }],
         mode: 'normalize',
         processVersion: 'rapidraw-reference-match-v1',
         proposalFingerprint: fingerprint('6'),

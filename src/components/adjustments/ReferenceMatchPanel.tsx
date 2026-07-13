@@ -19,6 +19,7 @@ import {
   mergeReferenceAvailability,
   type ReferenceMatchGroup,
   type ReferenceMatchProposal,
+  selectReferenceMatchReferences,
   summarizeReferenceHistogram,
 } from '../../utils/referenceMatch';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
@@ -70,8 +71,14 @@ export default function ReferenceMatchPanel() {
   const canCapture = Boolean(
     selectedImage?.isReady && currentRenderUrl && targetSummary && references.length < 8 && !isCurrentReference,
   );
-  const canAnalyze = Boolean(
-    targetSummary && selectedImage && references.some((reference) => reference.path !== selectedImage.path),
+  const candidateReferences = selectedImage
+    ? references.filter((reference) => reference.path !== selectedImage.path)
+    : [];
+  const canNormalize = Boolean(
+    targetSummary && selectReferenceMatchReferences(candidateReferences, 'normalize').length > 0,
+  );
+  const canMatchLook = Boolean(
+    targetSummary && selectReferenceMatchReferences(candidateReferences, 'match-look').length > 0,
   );
   const layerCompatibility = useMemo(
     () => (proposal ? getReferenceMatchLayerCompatibility(proposal, enabledGroups) : null),
@@ -152,6 +159,7 @@ export default function ReferenceMatchPanel() {
         proofFingerprint: fingerprintReferenceMatchValue(`proof:${String(proofRevision)}`),
         proofRevision,
         renderUrl: currentRenderUrl,
+        role: 'creative',
         sourceFingerprint: fingerprintReferenceMatchValue(selectedImage.path),
         summary: targetSummary,
         viewFingerprint: fingerprintReferenceMatchValue(
@@ -168,7 +176,7 @@ export default function ReferenceMatchPanel() {
     const nextProposal = createReferenceMatchProposal({
       adjustments,
       mode,
-      references: references.filter((reference) => reference.path !== selectedImage.path),
+      references: candidateReferences,
       target: targetSummary,
       targetProfile: adjustments.cameraProfile,
       targetProofFingerprint: fingerprintReferenceMatchValue(`proof:${String(proofRevision)}`),
@@ -241,6 +249,29 @@ export default function ReferenceMatchPanel() {
                     revision: reference.adjustmentRevision,
                   })}
                 </div>
+                <label className="mt-0.5 flex items-center gap-1 text-[9px] text-text-secondary">
+                  {t('editor.adjustments.referenceMatch.role', { defaultValue: 'Role' })}
+                  <select
+                    aria-label={`Role for ${reference.label}`}
+                    className="min-w-0 rounded border border-editor-border bg-editor-panel-well px-1 py-0.5 text-[9px] text-text-primary"
+                    data-testid="reference-match-role"
+                    onChange={(event) => {
+                      const role = event.currentTarget.value === 'technical' ? 'technical' : 'creative';
+                      setReferences((current) =>
+                        current.map((item) => (item.id === reference.id ? { ...item, role } : item)),
+                      );
+                      setProposal(null);
+                    }}
+                    value={reference.role}
+                  >
+                    <option value="creative">
+                      {t('editor.adjustments.referenceMatch.creativeRole', { defaultValue: 'Creative' })}
+                    </option>
+                    <option value="technical">
+                      {t('editor.adjustments.referenceMatch.technicalRole', { defaultValue: 'Technical authority' })}
+                    </option>
+                  </select>
+                </label>
                 {reference.availability !== 'available' && (
                   <div className="truncate text-[9px] text-editor-warning" data-testid="reference-match-availability">
                     {reference.availability === 'missing'
@@ -327,7 +358,7 @@ export default function ReferenceMatchPanel() {
         <button
           className="rounded border border-editor-border px-2 py-1 text-[11px] font-medium text-text-secondary enabled:hover:border-editor-focus-ring enabled:hover:text-text-primary disabled:opacity-40"
           data-testid="reference-match-normalize"
-          disabled={!canAnalyze}
+          disabled={!canNormalize}
           onClick={() => analyze('normalize')}
           type="button"
         >
@@ -336,7 +367,7 @@ export default function ReferenceMatchPanel() {
         <button
           className="rounded border border-editor-focus-ring bg-editor-selected-quiet px-2 py-1 text-[11px] font-medium text-editor-selected-quiet-text disabled:opacity-40"
           data-testid="reference-match-propose"
-          disabled={!canAnalyze}
+          disabled={!canMatchLook}
           onClick={() => analyze('match-look')}
           type="button"
         >
@@ -354,6 +385,20 @@ export default function ReferenceMatchPanel() {
                 percent: Math.round(proposal.confidence * 100),
               })}
             </span>
+          </div>
+          <div className="text-[9px] text-text-tertiary" data-testid="reference-match-effective-references">
+            {proposal.effectiveReferences
+              .map((reference) =>
+                t('editor.adjustments.referenceMatch.effectiveReferenceContribution', {
+                  defaultValue: '{{role}} {{percent}}%',
+                  percent: Math.round(reference.weight * 100),
+                  role:
+                    reference.role === 'technical'
+                      ? t('editor.adjustments.referenceMatch.technicalRole', { defaultValue: 'Technical authority' })
+                      : t('editor.adjustments.referenceMatch.creativeRole', { defaultValue: 'Creative' }),
+                }),
+              )
+              .join(' · ')}
           </div>
           <div className="flex flex-wrap gap-1">
             {GROUPS.filter((group) => proposal.diffs.some((diff) => diff.group === group)).map((group) => (

@@ -75,9 +75,20 @@ export const matchLookProposalV1Schema = z
     confidence: z.number().min(0).max(1),
     diffs: z.array(matchLookNodeDiffV1Schema).min(1).max(6),
     effectiveReferences: z
-      .array(z.object({ sourceFingerprint: fingerprintSchema, weight: z.number().positive().max(10) }).strict())
+      .array(
+        z
+          .object({
+            role: z.enum(['creative', 'technical']),
+            sourceFingerprint: fingerprintSchema,
+            weight: z.number().positive().max(1),
+          })
+          .strict(),
+      )
       .min(1)
-      .max(8),
+      .max(8)
+      .refine((references) => Math.abs(references.reduce((sum, reference) => sum + reference.weight, 0) - 1) < 1e-6, {
+        message: 'Effective reference weights must be normalized.',
+      }),
     mode: referenceMatchModeV1Schema,
     processVersion: z.literal('rapidraw-reference-match-v1'),
     proposalFingerprint: fingerprintSchema,
