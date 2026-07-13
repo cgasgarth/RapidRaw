@@ -89,7 +89,13 @@ import {
   getNegativeLabSourceReadiness,
 } from '../../utils/negative-lab/negativeLabSourceReadiness';
 import { debounce } from '../../utils/timing';
-import type { WhiteBalancePickerRuntimeReceipt } from '../../utils/whiteBalancePicker';
+import {
+  applyWhiteBalancePickerHoverPreview,
+  cancelWhiteBalancePickerPreview,
+  createWhiteBalancePickerPreviewSession,
+  type WhiteBalancePickerPreviewSession,
+  type WhiteBalancePickerRuntimeReceipt,
+} from '../../utils/whiteBalancePicker';
 import { Panel } from '../ui/AppProperties';
 import { editorChromeTokens } from '../ui/editorChromeTokens';
 import EditorToolbar from './editor/EditorToolbar';
@@ -203,6 +209,7 @@ export default function Editor({
   const isStraightenActive = useEditorStore((s) => s.isStraightenActive);
   const isWbPickerActive = useEditorStore((s) => s.isWbPickerActive);
   const lastWhiteBalancePickerReceipt = useEditorStore((s) => s.lastWhiteBalancePickerReceipt);
+  const wbPickerPreviewSessionRef = useRef<WhiteBalancePickerPreviewSession | null>(null);
   const liveRotation = useEditorStore((s) => s.liveRotation);
   const brushSettings = useEditorStore((s) => s.brushSettings);
   const activeMaskContainerId = useEditorStore((s) => s.activeMaskContainerId);
@@ -428,6 +435,7 @@ export default function Editor({
 
   const handleWbPicked = useCallback(
     (receipt: WhiteBalancePickerRuntimeReceipt, nextAdjustments: Adjustments) => {
+      wbPickerPreviewSessionRef.current = null;
       setEditor({
         adjustments: nextAdjustments,
         exportSoftProofTransform: null,
@@ -444,6 +452,61 @@ export default function Editor({
     },
     [pushHistory, setEditor],
   );
+
+  const handleWbPreview = useCallback(
+    (receipt: WhiteBalancePickerRuntimeReceipt, nextAdjustments: Adjustments) => {
+      const session = wbPickerPreviewSessionRef.current;
+      if (!session || !selectedImage) return;
+      if (receipt.selectedImagePath !== selectedImage.path) return;
+      const preview = applyWhiteBalancePickerHoverPreview(session, nextAdjustments, receipt);
+      wbPickerPreviewSessionRef.current = preview.session;
+      setEditor({
+        adjustments: preview.adjustments,
+        finalPreviewUrl: null,
+        interactivePatch: null,
+        transformedOriginalUrl: null,
+        uncroppedAdjustedPreviewUrl: null,
+      });
+    },
+    [selectedImage, setEditor],
+  );
+
+  const handleWbPreviewCancel = useCallback(() => {
+    const session = wbPickerPreviewSessionRef.current;
+    if (!session?.previewActive || !selectedImage || session.sourceIdentity !== selectedImage.path) return;
+    const baseAdjustments = cancelWhiteBalancePickerPreview(session, selectedImage.path);
+    wbPickerPreviewSessionRef.current = { ...session, lastPreviewIdentity: null, previewActive: false };
+    setEditor({
+      adjustments: baseAdjustments,
+      finalPreviewUrl: null,
+      interactivePatch: null,
+      transformedOriginalUrl: null,
+      uncroppedAdjustedPreviewUrl: null,
+    });
+  }, [selectedImage, setEditor]);
+
+  useEffect(() => {
+    if (isWbPickerActive) {
+      if (
+        selectedImage &&
+        (!wbPickerPreviewSessionRef.current || wbPickerPreviewSessionRef.current.sourceIdentity !== selectedImage.path)
+      ) {
+        wbPickerPreviewSessionRef.current = createWhiteBalancePickerPreviewSession(adjustments, selectedImage.path);
+      }
+      return;
+    }
+    const session = wbPickerPreviewSessionRef.current;
+    if (session?.previewActive && selectedImage && session.sourceIdentity === selectedImage.path) {
+      setEditor({
+        adjustments: cancelWhiteBalancePickerPreview(session, selectedImage.path),
+        finalPreviewUrl: null,
+        interactivePatch: null,
+        transformedOriginalUrl: null,
+        uncroppedAdjustedPreviewUrl: null,
+      });
+    }
+    wbPickerPreviewSessionRef.current = null;
+  }, [adjustments, isWbPickerActive, selectedImage, setEditor]);
 
   useEffect(() => {
     if (previousFullScreenRef.current === isFullScreen) return;
@@ -2125,6 +2188,9 @@ export default function Editor({
               isWbPickerActive={isWbPickerActive}
               lastWhiteBalancePickerReceipt={lastWhiteBalancePickerReceipt}
               onWbPicked={handleWbPicked}
+              onWbPreview={handleWbPreview}
+              onWbPreviewCancel={handleWbPreviewCancel}
+              wbPickerBaseAdjustments={wbPickerPreviewSessionRef.current?.baseAdjustments ?? adjustments}
               setAdjustments={setAdjustments}
               overlayRotation={overlayRotation}
               overlayMode={overlayMode}
