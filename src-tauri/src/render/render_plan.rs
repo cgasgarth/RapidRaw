@@ -309,17 +309,7 @@ pub fn compile_render_plan(
         show_clipping: adjustments.global.show_clipping != 0,
     }));
     fingerprints.full = edit_graph.fingerprint;
-    log::debug!(
-        "compiled_edit_graph schema={} pipeline={} migration={:?} fingerprint={:016x} execution_abi={:016x} nodes={:?} omitted={:?} fused={:?}",
-        edit_graph.schema_version,
-        edit_graph.pipeline_version,
-        edit_graph.receipt.migration,
-        edit_graph.fingerprint,
-        edit_graph.execution_abi_fingerprint,
-        edit_graph.nodes,
-        edit_graph.receipt.omitted_no_op_node_ids,
-        edit_graph.receipt.fused_gpu_groups,
-    );
+    log::debug!("compiled_edit_graph {}", edit_graph.diagnostic_receipt());
     Ok(CompiledRenderPlan {
         revision: context.revision,
         adjustments,
@@ -667,6 +657,16 @@ mod tests {
             Err("edit_graph.stale_gpu_execution_abi")
         );
         assert_eq!(active.fingerprints.full, active.edit_graph.fingerprint);
+        let diagnostic = active.edit_graph.diagnostic_receipt();
+        assert_eq!(diagnostic["pipelineVersion"], 1);
+        assert_eq!(
+            diagnostic["nodes"][0]["inputDomain"],
+            "acescg_scene_linear_extended_v1"
+        );
+        assert_eq!(
+            diagnostic["nodes"].as_array().unwrap().last().unwrap()["outputDomain"],
+            "render_transport_encoded_v1"
+        );
         assert_ne!(
             neutral.edit_graph.fingerprint,
             active.edit_graph.fingerprint

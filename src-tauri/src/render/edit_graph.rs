@@ -363,6 +363,45 @@ impl CompiledEditGraph {
         }
         Ok(())
     }
+
+    pub fn diagnostic_receipt(&self) -> serde_json::Value {
+        serde_json::json!({
+            "schemaVersion": self.schema_version,
+            "pipelineVersion": self.pipeline_version,
+            "migration": format!("{:?}", self.receipt.migration),
+            "fingerprint": format!("{:016x}", self.fingerprint),
+            "executionAbiFingerprint": format!("{:016x}", self.execution_abi_fingerprint),
+            "inputDomain": self.receipt.input_domain.contract_id(),
+            "outputDomain": self.receipt.output_domain.contract_id(),
+            "nodes": self.nodes.iter().map(|node| serde_json::json!({
+                "id": node.kind.stable_id(),
+                "schemaVersion": node.schema_version,
+                "implementationVersion": node.implementation_version,
+                "inputDomain": node.input_domain.contract_id(),
+                "outputDomain": node.output_domain.contract_id(),
+                "stageClass": format!("{:?}", node.stage_class),
+                "rangePolicy": format!("{:?}", node.range_policy),
+                "alphaPolicy": format!("{:?}", node.alpha_policy),
+                "precision": format!("{:?}", node.precision),
+                "spatialSupport": format!("{:?}", node.spatial_support),
+                "localAdjustmentPolicy": format!("{:?}", node.local_adjustment_policy),
+                "dependencies": {
+                    "source": node.dependencies.source,
+                    "adjustments": node.dependencies.adjustments,
+                    "geometry": node.dependencies.geometry,
+                    "masks": node.dependencies.masks,
+                    "view": node.dependencies.view,
+                    "output": node.dependencies.output,
+                },
+                "cpuImplementation": node.cpu_implementation,
+                "wgpuImplementation": node.wgpu_implementation,
+                "payloadFingerprint": format!("{:016x}", node.payload_fingerprint),
+            })).collect::<Vec<_>>(),
+            "omittedNoOpNodes": self.receipt.omitted_no_op_node_ids.as_ref(),
+            "fusedGpuGroups": self.receipt.fused_gpu_groups.iter()
+                .map(|group| group.as_ref()).collect::<Vec<_>>(),
+        })
+    }
 }
 
 pub fn gpu_execution_fingerprint(adjustments: &AllAdjustments, has_lut: bool) -> u64 {
