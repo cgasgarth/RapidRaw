@@ -28,6 +28,8 @@ mod merge;
 mod preset_converter;
 mod presets;
 mod proofs;
+#[cfg(all(feature = "validation-harness", unix))]
+mod qa_control;
 mod raw;
 mod render;
 mod tagging;
@@ -3302,8 +3304,29 @@ fn restore_window_state(window: &tauri::WebviewWindow, state: &WindowState) {
     )));
 }
 
+#[cfg(all(feature = "validation-harness", unix))]
 #[tauri::command]
 fn frontend_ready(
+    app_handle: tauri::AppHandle,
+    window: tauri::Window,
+    state: tauri::State<AppState>,
+    qa_control_state: tauri::State<qa_control::QaControlState>,
+) -> Result<(), String> {
+    qa_control_state.mark_ready();
+    frontend_ready_impl(app_handle, window, state)
+}
+
+#[cfg(not(all(feature = "validation-harness", unix)))]
+#[tauri::command]
+fn frontend_ready(
+    app_handle: tauri::AppHandle,
+    window: tauri::Window,
+    state: tauri::State<AppState>,
+) -> Result<(), String> {
+    frontend_ready_impl(app_handle, window, state)
+}
+
+fn frontend_ready_impl(
     app_handle: tauri::AppHandle,
     window: tauri::Window,
     state: tauri::State<AppState>,
@@ -3444,6 +3467,11 @@ fn record_frontend_startup_phase(
 pub fn run() {
     #[cfg_attr(feature = "validation-harness", allow(unused_mut))]
     let mut builder = tauri::Builder::default();
+
+    #[cfg(all(feature = "validation-harness", unix))]
+    {
+        builder = builder.manage(qa_control::QaControlState::from_environment());
+    }
 
     #[cfg(all(
         not(any(target_os = "android", target_os = "ios")),
@@ -3787,6 +3815,8 @@ pub fn run() {
             }
 
             crate::register_exit_handler();
+            #[cfg(all(feature = "validation-harness", unix))]
+            qa_control::start(app.handle().clone()).map_err(std::io::Error::other)?;
             Ok(())
         })
         .manage(AppState::new())
