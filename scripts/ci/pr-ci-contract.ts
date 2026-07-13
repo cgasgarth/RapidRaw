@@ -15,7 +15,7 @@ export const resolveWorkflowStartedEpoch = (value: string | undefined, nowEpoch:
 export type PrFastLane = 'js' | 'frontend' | 'schema' | 'dependencies' | 'rust' | 'workflow' | 'docs';
 
 export const PR_REQUIRED_JOBS: Readonly<Record<PrFastLane, readonly string[]>> = {
-  js: ['fast-lint', 'fast-typecheck', 'fast-unit', 'fast-format'],
+  js: ['fast-lint', 'fast-typecheck', 'fast-unit-1', 'fast-unit-2', 'fast-unit-3', 'fast-unit-4', 'fast-format'],
   frontend: ['fast-build-i18n', 'fast-unsafe-unused', 'fast-visual'],
   schema: ['fast-schema'],
   dependencies: ['fast-js-security'],

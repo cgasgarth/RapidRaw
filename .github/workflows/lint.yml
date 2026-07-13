@@ -93,16 +93,49 @@ jobs:
       - uses: ./.github/actions/setup-bun-deps
       - run: bun run check:schema
 
-  fast-unit:
-    name: 'pr fast: unit tests'
+  fast-unit-1:
+    name: 'pr fast: unit shard 1/4'
     needs: plan
     if: needs.plan.outputs.js == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 2
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: ./.github/actions/setup-bun-deps
-      - run: bun run test:unit
+      - run: bun scripts/ci/run-unit-test-shard.ts 1 4
+
+  fast-unit-2:
+    name: 'pr fast: unit shard 2/4'
+    needs: plan
+    if: needs.plan.outputs.js == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup-bun-deps
+      - run: bun scripts/ci/run-unit-test-shard.ts 2 4
+
+  fast-unit-3:
+    name: 'pr fast: unit shard 3/4'
+    needs: plan
+    if: needs.plan.outputs.js == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup-bun-deps
+      - run: bun scripts/ci/run-unit-test-shard.ts 3 4
+
+  fast-unit-4:
+    name: 'pr fast: unit shard 4/4'
+    needs: plan
+    if: needs.plan.outputs.js == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup-bun-deps
+      - run: bun scripts/ci/run-unit-test-shard.ts 4 4
 
   fast-format:
     name: 'pr fast: format'
@@ -232,7 +265,10 @@ jobs:
       - fast-lint
       - fast-typecheck
       - fast-schema
-      - fast-unit
+      - fast-unit-1
+      - fast-unit-2
+      - fast-unit-3
+      - fast-unit-4
       - fast-format
       - fast-build-i18n
       - fast-unsafe-unused
@@ -260,7 +296,7 @@ jobs:
               . as $needs
               |
               {
-                js: ["fast-lint", "fast-typecheck", "fast-unit", "fast-format"],
+                js: ["fast-lint", "fast-typecheck", "fast-unit-1", "fast-unit-2", "fast-unit-3", "fast-unit-4", "fast-format"],
                 frontend: ["fast-build-i18n", "fast-unsafe-unused", "fast-visual"],
                 schema: ["fast-schema"],
                 dependencies: ["fast-js-security"],
