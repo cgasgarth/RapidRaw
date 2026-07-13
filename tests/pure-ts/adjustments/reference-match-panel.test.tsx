@@ -1,10 +1,13 @@
 import { afterEach, expect, test } from 'bun:test';
 import { Window } from 'happy-dom';
+import i18next from 'i18next';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import ReferenceMatchPanel from '../../../src/components/adjustments/ReferenceMatchPanel.tsx';
 import type { SelectedImage } from '../../../src/components/ui/AppProperties.tsx';
+import en from '../../../src/i18n/locales/en.json';
 import { useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
@@ -59,9 +62,16 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
   document.body.append(container);
   const root = createRoot(container);
   rendered = { container, root };
+  const i18n = i18next.createInstance();
+  await i18n.use(initReactI18next).init({
+    interpolation: { escapeValue: false },
+    lng: 'en',
+    react: { useSuspense: false },
+    resources: { en: { translation: en } },
+  });
 
   await act(async () => {
-    root.render(createElement(ReferenceMatchPanel));
+    root.render(createElement(I18nextProvider, { i18n }, createElement(ReferenceMatchPanel)));
     await flushPromises();
   });
   await click(container, '[data-testid="reference-match-capture"]');
@@ -91,6 +101,13 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
     'creativeTemperature',
   );
   expect(useEditorStore.getState().historyIndex).toBe(historyBeforeProposal);
+  expect(useEditorStore.getState().adjustments).toEqual(initial);
+  expect(useEditorStore.getState().referenceMatchPreview).toMatchObject({
+    baseAdjustmentRevision: useEditorStore.getState().adjustmentSnapshot.adjustmentRevision,
+    impact: 100,
+    targetPath: '/photos/target.ARW',
+  });
+  expect(useEditorStore.getState().referenceMatchPreview?.adjustments.exposure).not.toBe(initial.exposure);
 
   await click(container, '[data-testid="reference-match-apply"]');
   expect(useEditorStore.getState().historyIndex).toBe(historyBeforeProposal + 1);
@@ -101,6 +118,7 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
   });
   expect(useEditorStore.getState().adjustments.exposure).not.toBe(INITIAL_ADJUSTMENTS.exposure);
   expect(useEditorStore.getState().adjustments.cameraProfile).toBe(INITIAL_ADJUSTMENTS.cameraProfile);
+  expect(useEditorStore.getState().referenceMatchPreview).toBeNull();
 });
 
 async function click(container: Element, selector: string) {

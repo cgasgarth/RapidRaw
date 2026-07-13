@@ -62,7 +62,31 @@ export default function ReferenceMatchPanel() {
 
   useEffect(() => {
     setProposal(null);
-  }, [adjustmentSnapshot.adjustmentRevision, selectedImage?.path, targetSummary]);
+  }, [adjustmentSnapshot.adjustmentRevision, selectedImage?.path]);
+
+  useEffect(() => {
+    if (!proposal || !selectedImage) {
+      setEditor({ referenceMatchPreview: null });
+      return;
+    }
+    setEditor({
+      referenceMatchPreview: {
+        adjustments: applyReferenceMatchProposal({ adjustments, enabledGroups, impact, proposal }),
+        baseAdjustmentRevision: adjustmentSnapshot.adjustmentRevision,
+        enabledGroups: [...enabledGroups].sort(),
+        impact,
+        proposalFingerprint: proposal.proposalFingerprint,
+        targetPath: selectedImage.path,
+      },
+    });
+  }, [adjustmentSnapshot.adjustmentRevision, adjustments, enabledGroups, impact, proposal, selectedImage, setEditor]);
+
+  useEffect(
+    () => () => {
+      useEditorStore.getState().setEditor({ referenceMatchPreview: null });
+    },
+    [],
+  );
 
   const captureCurrent = () => {
     if (!selectedImage || !currentRenderUrl || !targetSummary || !canCapture) return;
@@ -70,6 +94,7 @@ export default function ReferenceMatchPanel() {
       ...current,
       {
         adjustmentRevision: adjustmentSnapshot.adjustmentRevision,
+        cameraProfile: adjustments.cameraProfile,
         geometryFingerprint: fingerprintReferenceMatchValue(
           `${selectedImage.path}:geometry:${String(adjustmentSnapshot.geometryRevision)}`,
         ),
@@ -80,7 +105,7 @@ export default function ReferenceMatchPanel() {
         id: `${selectedImage.path}:${String(adjustmentSnapshot.adjustmentRevision)}:${String(proofRevision)}`,
         label: fileLabel(selectedImage.path),
         path: selectedImage.path,
-        proofFingerprint: fingerprintReferenceMatchValue(`${selectedImage.path}:proof:${String(proofRevision)}`),
+        proofFingerprint: fingerprintReferenceMatchValue(`proof:${String(proofRevision)}`),
         proofRevision,
         renderUrl: currentRenderUrl,
         sourceFingerprint: fingerprintReferenceMatchValue(selectedImage.path),
@@ -102,6 +127,8 @@ export default function ReferenceMatchPanel() {
         mode,
         references: references.filter((reference) => reference.path !== selectedImage.path),
         target: targetSummary,
+        targetProfile: adjustments.cameraProfile,
+        targetProofFingerprint: fingerprintReferenceMatchValue(`proof:${String(proofRevision)}`),
       }),
     );
     setImpact(100);

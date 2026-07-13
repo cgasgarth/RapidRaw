@@ -41,6 +41,7 @@ import {
   parseInteractivePreviewPatchPayload,
 } from '../../utils/interactivePreviewPatch';
 import { PreparedAdjustmentPayloadCache } from '../../utils/preparedAdjustmentPayloadCache';
+import { resolveReferenceMatchRenderAdjustments } from '../../utils/referenceMatch';
 import { DISPLAY_TARGET_CHANGED_EVENT } from '../../utils/tauriEventNames';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import { debounce } from '../../utils/timing';
@@ -132,7 +133,8 @@ export function useImageProcessing(
   const { previewJobIdRef, latestRenderedJobIdRef, currentResRef } = renderRefs;
 
   const selectedImage = useEditorStore((state) => state.selectedImage);
-  const adjustments = useEditorStore((state) => state.adjustments);
+  const committedAdjustments = useEditorStore((state) => state.adjustments);
+  const referenceMatchPreview = useEditorStore((state) => state.referenceMatchPreview);
   const isWaveformVisible = useEditorStore((state) => state.isWaveformVisible);
   const activeWaveformChannel = useEditorStore((state) => state.activeWaveformChannel);
   const displaySize = useEditorStore((state) => state.displaySize);
@@ -141,6 +143,12 @@ export function useImageProcessing(
   const zoomMode = useEditorStore((state) => state.zoomMode);
   const historyIndex = useEditorStore((state) => state.historyIndex);
   const adjustmentSnapshot = useEditorStore((state) => state.adjustmentSnapshot);
+  const adjustments = resolveReferenceMatchRenderAdjustments({
+    adjustmentRevision: adjustmentSnapshot.adjustmentRevision,
+    committed: committedAdjustments,
+    preview: referenceMatchPreview,
+    targetPath: selectedImage?.path ?? null,
+  });
   const imageSessionId = useEditorStore((state) => state.imageSessionId);
   const proofRevision = useEditorStore((state) => state.proofRevision);
   const hasRenderedFirstFrame = useEditorStore((state) => state.hasRenderedFirstFrame);
@@ -163,7 +171,7 @@ export function useImageProcessing(
         : undefined,
     [appSettings?.exportPresets, exportSoftProofRecipeId, isExportSoftProofEnabled],
   );
-  const viewerSampleGraphRevision = `${String(imageSessionId)}:${String(adjustmentSnapshot.adjustmentRevision)}:${String(proofRevision)}`;
+  const viewerSampleGraphRevision = `${String(imageSessionId)}:${String(adjustmentSnapshot.adjustmentRevision)}:${referenceMatchPreview?.proposalFingerprint ?? 'committed'}:${String(proofRevision)}`;
 
   const latestInteractiveRequestIdRef = useRef(0);
   const executeInteractiveRenderRef = useRef<(request: InteractivePreviewRequest) => Promise<void>>(async () => {});

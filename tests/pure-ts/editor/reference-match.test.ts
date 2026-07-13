@@ -8,12 +8,14 @@ import {
   fingerprintReferenceMatchValue,
   type ReferenceHistogramSummary,
   type ReferenceMatchReference,
+  resolveReferenceMatchRenderAdjustments,
   summarizeReferenceHistogram,
 } from '../../../src/utils/referenceMatch';
 
 const summary = (overrides: Partial<ReferenceHistogramSummary> = {}): ReferenceHistogramSummary => ({
   analysisBasis: 'color-managed-editor-preview',
   blueMean: 0.4,
+  clippedFraction: 0,
   greenMean: 0.4,
   lumaMean: 0.4,
   lumaSpread: 0.15,
@@ -28,6 +30,7 @@ const reference = (
   histogramSummary: ReferenceHistogramSummary,
 ): ReferenceMatchReference => ({
   adjustmentRevision: 4,
+  cameraProfile: 'camera_standard',
   geometryFingerprint: `fnv1a64:${'1'.repeat(16)}`,
   geometryRevision: 2,
   graphFingerprint: `fnv1a64:${'2'.repeat(16)}`,
@@ -141,5 +144,63 @@ describe('color-managed reference matching', () => {
     expect(toneOnly.creativeTemperature).toBe(INITIAL_ADJUSTMENTS.creativeTemperature);
     expect(toneOnly.cameraProfile).toBe(INITIAL_ADJUSTMENTS.cameraProfile);
     expect(toneOnly.crop).toBe(INITIAL_ADJUSTMENTS.crop);
+  });
+
+  test('renders a preview only for its exact target and committed graph revision', () => {
+    const previewAdjustments = { ...INITIAL_ADJUSTMENTS, exposure: 1.25 };
+    const preview = {
+      adjustments: previewAdjustments,
+      baseAdjustmentRevision: 7,
+      targetPath: '/photos/target.ARW',
+    };
+    expect(
+      resolveReferenceMatchRenderAdjustments({
+        adjustmentRevision: 7,
+        committed: INITIAL_ADJUSTMENTS,
+        preview,
+        targetPath: '/photos/target.ARW',
+      }),
+    ).toBe(previewAdjustments);
+    expect(
+      resolveReferenceMatchRenderAdjustments({
+        adjustmentRevision: 8,
+        committed: INITIAL_ADJUSTMENTS,
+        preview,
+        targetPath: '/photos/target.ARW',
+      }),
+    ).toBe(INITIAL_ADJUSTMENTS);
+    expect(
+      resolveReferenceMatchRenderAdjustments({
+        adjustmentRevision: 7,
+        committed: INITIAL_ADJUSTMENTS,
+        preview,
+        targetPath: '/photos/other.ARW',
+      }),
+    ).toBe(INITIAL_ADJUSTMENTS);
+  });
+
+  test('reports clipping, proof/profile incompatibility, and localized-analysis limits without replacing profile', () => {
+    const incompatible = {
+      ...reference('incompatible', 1, summary({ clippedFraction: 0.08, lumaMean: 0.7, redMean: 0.65 })),
+      cameraProfile: 'camera_portrait',
+      proofFingerprint: fingerprintReferenceMatchValue('proof:other'),
+    };
+    const proposal = createReferenceMatchProposal({
+      adjustments: INITIAL_ADJUSTMENTS,
+      mode: 'match-look',
+      references: [incompatible],
+      target: summary(),
+      targetProfile: INITIAL_ADJUSTMENTS.cameraProfile,
+      targetProofFingerprint: fingerprintReferenceMatchValue('proof:target'),
+    });
+    expect(proposal?.warnings).toEqual(
+      expect.arrayContaining([
+        'Clipped histogram endpoints reduce match reliability.',
+        'Reference and target proof identities differ.',
+        'Reference and target camera profiles differ; profile replacement is excluded.',
+        'Global histogram analysis cannot distinguish localized subject differences; inspect the compare view before apply.',
+      ]),
+    );
+    expect(proposal?.diffs.some((diff) => diff.key === 'cameraProfile')).toBe(false);
   });
 });

@@ -39,7 +39,7 @@ import {
 } from '../utils/editorCompare';
 import { DEFAULT_EDITOR_ZOOM_MODE, type EditorZoomMode } from '../utils/editorZoom';
 import { loadMaskOverlaySettingsPreference } from '../utils/mask/maskOverlayPreferences';
-import type { ReferenceMatchReference } from '../utils/referenceMatch';
+import type { ReferenceMatchGroup, ReferenceMatchReference } from '../utils/referenceMatch';
 import { PANEL_SCOPES_HEIGHT } from '../utils/waveformSizing';
 import type { WhiteBalancePickerRuntimeReceipt } from '../utils/whiteBalancePicker';
 
@@ -135,6 +135,15 @@ export interface ProvisionalPreviewFrame {
   url: string;
 }
 
+export interface ReferenceMatchPreview {
+  adjustments: Adjustments;
+  baseAdjustmentRevision: number;
+  enabledGroups: ReferenceMatchGroup[];
+  impact: number;
+  proposalFingerprint: string;
+  targetPath: string;
+}
+
 interface EditorState {
   // Core Image & Adjustments
   selectedImage: SelectedImage | null;
@@ -163,6 +172,7 @@ interface EditorState {
   compare: EditorCompareState;
   referenceMatchReferences: ReferenceMatchReference[];
   lastReferenceMatchApplicationReceipt: MatchLookApplicationReceiptV1 | null;
+  referenceMatchPreview: ReferenceMatchPreview | null;
 
   // Analytics
   histogram: ChannelConfig | null;
@@ -261,6 +271,7 @@ const normalizeCompareStateUpdate = (state: EditorState, update: Partial<EditorS
     update.transformedOriginalUrl = null;
     update.previewQualityStatus = null;
     update.lastReferenceMatchApplicationReceipt = null;
+    update.referenceMatchPreview = null;
   }
 };
 
@@ -357,6 +368,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   compare: DEFAULT_EDITOR_COMPARE_STATE,
   referenceMatchReferences: [],
   lastReferenceMatchApplicationReceipt: null,
+  referenceMatchPreview: null,
   histogram: null,
   waveform: null,
   previewScopeStatus: null,
@@ -422,6 +434,7 @@ export const useEditorStore = create<EditorState>((set) => ({
       const update: Partial<EditorState> = { ...rawUpdate };
 
       if ('adjustments' in update && update.adjustments !== undefined) {
+        update.referenceMatchPreview = null;
         update.adjustmentSnapshot = publishAdjustmentSnapshot(state.adjustmentSnapshot, update.adjustments);
         update.adjustments = update.adjustmentSnapshot.value as Adjustments;
         Object.assign(
