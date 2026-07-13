@@ -21,7 +21,6 @@ use crate::gpu_textures::{
 };
 use crate::image_processing::{AllAdjustments, GpuContext, MAX_MASKS};
 use crate::lut_processing::Lut;
-use crate::mixer_render::apply_native_color_mixer_adjustments;
 use crate::render_caches::RenderCaches;
 use crate::{AppState, GpuImageCache};
 
@@ -151,8 +150,8 @@ const BLUR_FLAG_TONAL: u32 = 1 << 1;
 const BLUR_FLAG_CLARITY: u32 = 1 << 2;
 const BLUR_FLAG_STRUCTURE: u32 = 1 << 3;
 const BLUR_ABI_VERSION: u32 = 1;
-const GPU_RENDER_GRAPH_VERSION: u32 = 1;
-const GPU_SHADER_LAYOUT_VERSION: u32 = 1;
+const GPU_RENDER_GRAPH_VERSION: u32 = 2;
+const GPU_SHADER_LAYOUT_VERSION: u32 = 2;
 static NEXT_PROCESSOR_GENERATION: AtomicU64 = AtomicU64::new(1);
 
 bitflags::bitflags! {
@@ -213,6 +212,12 @@ pub struct GpuExecutionReceipt {
     pub queue_submit_count: u32,
     pub estimated_peak_resource_bytes: u64,
     pub cpu_encode_time: Duration,
+    pub wall_time: Duration,
+    pub phase_dispatch_count: u32,
+    pub cache_hits: u64,
+    pub cache_misses: u64,
+    pub domain_conversions: &'static [&'static str],
+    pub declared_clamps: &'static [&'static str],
 }
 
 const MASK_TEXTURE_ABI_VERSION: u32 = 1;
@@ -560,6 +565,11 @@ pub fn compile_gpu_render_graph(
         .unwrap_or(0);
     let tile_edge = 2048_u64 + u64::from(tile_halo) * 2;
     let live_blur_surfaces = blur_products.len() as u64 + u64::from(!blur_products.is_empty());
+    let execution_phase_count = if adjustments.global.edit_graph_version >= 2.0 {
+        3
+    } else {
+        1
+    };
     let estimated_peak_resource_bytes = tile_edge * tile_edge * 8 * (2 + live_blur_surfaces);
     let mut hasher = DefaultHasher::new();
     GPU_RENDER_GRAPH_VERSION.hash(&mut hasher);
@@ -568,6 +578,7 @@ pub fn compile_gpu_render_graph(
     blur_products.hash(&mut hasher);
     active_masks.hash(&mut hasher);
     tile_halo.hash(&mut hasher);
+    execution_phase_count.hash(&mut hasher);
     let fingerprint = hasher.finish();
 
     GpuRenderGraphPlan {
@@ -736,6 +747,30 @@ pub struct RenderRequest<'a> {
     pub mask_bitmaps: &'a [ImageBuffer<Luma<u8>, Vec<u8>>],
     pub lut: Option<Arc<Lut>>,
     pub roi: Option<Roi>,
+    pub edit_graph: EditGraphExecutionAuthority,
+}
+
+pub enum EditGraphExecutionAuthority {
+    Compiled(Arc<crate::edit_graph::CompiledEditGraph>),
+    #[cfg(all(test, feature = "tauri-test"))]
+    TestOnlyLegacy,
+}
+
+fn validate_edit_graph_request(request: &RenderRequest<'_>) -> Result<(), String> {
+    match &request.edit_graph {
+        EditGraphExecutionAuthority::Compiled(edit_graph) => {
+            edit_graph
+                .validate_gpu_execution(
+                    &request.adjustments,
+                    request.lut.is_some(),
+                    request.mask_bitmaps.len(),
+                )
+                .map_err(str::to_owned)?;
+        }
+        #[cfg(all(test, feature = "tauri-test"))]
+        EditGraphExecutionAuthority::TestOnlyLegacy => {}
+    }
+    Ok(())
 }
 
 struct InputTextureRef<'a> {
@@ -772,14 +807,17 @@ struct FlareParams {
     contrast: f32,
     whites: f32,
     aspect_ratio: f32,
-    _pad: f32,
+    edit_graph_version: f32,
 }
 
 pub struct GpuProcessor {
     context: GpuContext,
     generation: u64,
     resource_cache: Mutex<GpuResourceCache>,
+    last_execution_receipt: Mutex<Option<GpuExecutionReceipt>>,
     main_bind_group_cache: Mutex<Option<CachedMainBindGroup>>,
+    view_bind_group_cache: Mutex<Option<CachedMainBindGroup>>,
+    display_bind_group_cache: Mutex<Option<CachedMainBindGroup>>,
     blur_surface_cache: Mutex<BlurSurfaceCache>,
     blur_bgl: wgpu::BindGroupLayout,
     h_blur_pipeline: wgpu::ComputePipeline,
@@ -799,6 +837,8 @@ pub struct GpuProcessor {
     main_bgl: wgpu::BindGroupLayout,
     main_pipeline: wgpu::ComputePipeline,
     adjustments_buffer: wgpu::Buffer,
+    view_adjustments_buffer: wgpu::Buffer,
+    display_adjustments_buffer: wgpu::Buffer,
     dummy_blur_view: wgpu::TextureView,
     dummy_lut_view: wgpu::TextureView,
     dummy_lut_sampler: wgpu::Sampler,
@@ -821,6 +861,10 @@ const FLARE_MAP_SIZE: u32 = 512;
 impl GpuProcessor {
     pub fn resource_cache_counters(&self) -> GpuResourceCacheCounters {
         self.resource_cache.lock().unwrap().counters
+    }
+
+    pub fn last_execution_receipt(&self) -> Option<GpuExecutionReceipt> {
+        *self.last_execution_receipt.lock().unwrap()
     }
 
     pub fn new(context: GpuContext, max_width: u32, max_height: u32) -> Result<Self, String> {
@@ -1199,6 +1243,18 @@ impl GpuProcessor {
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
+        let view_adjustments_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("View Adjustments Buffer"),
+            size: std::mem::size_of::<AllAdjustments>() as u64,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let display_adjustments_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Display Adjustments Buffer"),
+            size: std::mem::size_of::<AllAdjustments>() as u64,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
 
         let dummy_blur_view = create_dummy_rgba16f_texture_view(device);
         let dummy_lut_view = create_dummy_lut_texture_view(device);
@@ -1249,7 +1305,6 @@ impl GpuProcessor {
             max_tile_size,
             blur_texture_usage | wgpu::TextureUsages::COPY_SRC,
         );
-
         let display_output_texture_usage =
             blur_texture_usage | wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::COPY_SRC;
         let (working_texture, working_texture_view) = create_rgba16f_texture_with_view(
@@ -1275,7 +1330,10 @@ impl GpuProcessor {
                 },
                 ..Default::default()
             }),
+            last_execution_receipt: Mutex::new(None),
             main_bind_group_cache: Mutex::new(None),
+            view_bind_group_cache: Mutex::new(None),
+            display_bind_group_cache: Mutex::new(None),
             blur_surface_cache: Mutex::new(BlurSurfaceCache::default()),
             blur_bgl,
             h_blur_pipeline,
@@ -1293,6 +1351,8 @@ impl GpuProcessor {
             main_bgl,
             main_pipeline,
             adjustments_buffer,
+            view_adjustments_buffer,
+            display_adjustments_buffer,
             dummy_blur_view,
             dummy_lut_view,
             dummy_lut_sampler,
@@ -1319,6 +1379,8 @@ impl GpuProcessor {
         skip_cpu_readback: bool,
         output_to_display: bool,
     ) -> Result<(Vec<u8>, u32, u32, u32, u32), String> {
+        let execution_started = Instant::now();
+        let cache_before = self.resource_cache_counters();
         let device = &self.context.device;
         let queue = &self.context.queue;
         let input_texture_view = input.view;
@@ -1513,7 +1575,11 @@ impl GpuProcessor {
             .as_ref()
             .map_or(&self.dummy_lut_view, |entry| &entry.view);
 
-        let mut adjustments = request.adjustments;
+        let mut adjustments = match &request.edit_graph {
+            EditGraphExecutionAuthority::Compiled(edit_graph) => edit_graph.shader_abi(),
+            #[cfg(all(test, feature = "tauri-test"))]
+            EditGraphExecutionAuthority::TestOnlyLegacy => request.adjustments,
+        };
         let graph = compile_gpu_render_graph(
             &adjustments,
             request.lut.is_some(),
@@ -1552,7 +1618,7 @@ impl GpuProcessor {
                 contrast: adjustments.global.contrast,
                 whites: adjustments.global.whites,
                 aspect_ratio,
-                _pad: 0.0,
+                edit_graph_version: adjustments.global.edit_graph_version,
             };
             queue.write_buffer(&self.flare_params_buffer, 0, bytemuck::bytes_of(&f_params));
 
@@ -1827,6 +1893,10 @@ impl GpuProcessor {
                 let mut tile_adjustments = adjustments;
                 tile_adjustments.tile_offset_x = input_x_start;
                 tile_adjustments.tile_offset_y = input_y_start;
+                tile_adjustments.source_width = width;
+                tile_adjustments.source_height = height;
+                let split_scene_view_display = adjustments.global.edit_graph_version >= 2.0;
+                tile_adjustments.execution_phase = u32::from(split_scene_view_display);
                 queue.write_buffer(
                     &self.adjustments_buffer,
                     0,
@@ -1840,9 +1910,11 @@ impl GpuProcessor {
                     },
                     wgpu::BindGroupEntry {
                         binding: MAIN_BINDING_OUTPUT_TEXTURE,
-                        resource: wgpu::BindingResource::TextureView(
-                            &self.tile_output_texture_view,
-                        ),
+                        resource: wgpu::BindingResource::TextureView(if split_scene_view_display {
+                            &self.working_texture_view
+                        } else {
+                            &self.tile_output_texture_view
+                        }),
                     },
                     wgpu::BindGroupEntry {
                         binding: MAIN_BINDING_ADJUSTMENTS,
@@ -1920,7 +1992,7 @@ impl GpuProcessor {
                         | (u32::from(did_create_clarity_blur) * BLUR_FLAG_CLARITY)
                         | (u32::from(did_create_structure_blur) * BLUR_FLAG_STRUCTURE),
                     flare_enabled: use_flare,
-                    abi_version: MAIN_BIND_GROUP_ABI_VERSION,
+                    abi_version: MAIN_BIND_GROUP_ABI_VERSION + u32::from(split_scene_view_display),
                 };
                 let bind_group = {
                     let mut cached = self.main_bind_group_cache.lock().unwrap();
@@ -1944,10 +2016,133 @@ impl GpuProcessor {
                     }
                 };
 
+                let view_bind_group = if split_scene_view_display {
+                    let mut view_adjustments = tile_adjustments;
+                    view_adjustments.execution_phase = 2;
+                    queue.write_buffer(
+                        &self.view_adjustments_buffer,
+                        0,
+                        bytemuck::bytes_of(&view_adjustments),
+                    );
+                    let mut view_entries = vec![
+                        wgpu::BindGroupEntry {
+                            binding: MAIN_BINDING_INPUT_TEXTURE,
+                            resource: wgpu::BindingResource::TextureView(
+                                &self.working_texture_view,
+                            ),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: MAIN_BINDING_OUTPUT_TEXTURE,
+                            resource: wgpu::BindingResource::TextureView(&self.output_texture_view),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: MAIN_BINDING_ADJUSTMENTS,
+                            resource: self.view_adjustments_buffer.as_entire_binding(),
+                        },
+                    ];
+                    view_entries.extend(bind_group_entries.iter().skip(3).cloned());
+                    let mut cached = self.view_bind_group_cache.lock().unwrap();
+                    Some(
+                        if let Some(hit) =
+                            cached.as_ref().filter(|entry| entry.key == bind_group_key)
+                        {
+                            self.resource_cache.lock().unwrap().counters.bind_group_hits += 1;
+                            hit.bind_group.clone()
+                        } else {
+                            let created = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                                label: Some("Cached View-pass Bind Group"),
+                                layout: &self.main_bgl,
+                                entries: &view_entries,
+                            });
+                            *cached = Some(CachedMainBindGroup {
+                                key: bind_group_key,
+                                bind_group: created.clone(),
+                            });
+                            let mut resources = self.resource_cache.lock().unwrap();
+                            resources.counters.bind_group_misses += 1;
+                            resources.counters.bind_group_creations += 1;
+                            created
+                        },
+                    )
+                } else {
+                    None
+                };
+                let display_bind_group = if split_scene_view_display {
+                    let mut display_adjustments = tile_adjustments;
+                    display_adjustments.execution_phase = 3;
+                    queue.write_buffer(
+                        &self.display_adjustments_buffer,
+                        0,
+                        bytemuck::bytes_of(&display_adjustments),
+                    );
+                    let mut display_entries = vec![
+                        wgpu::BindGroupEntry {
+                            binding: MAIN_BINDING_INPUT_TEXTURE,
+                            resource: wgpu::BindingResource::TextureView(&self.output_texture_view),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: MAIN_BINDING_OUTPUT_TEXTURE,
+                            resource: wgpu::BindingResource::TextureView(
+                                &self.tile_output_texture_view,
+                            ),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: MAIN_BINDING_ADJUSTMENTS,
+                            resource: self.display_adjustments_buffer.as_entire_binding(),
+                        },
+                    ];
+                    display_entries.extend(bind_group_entries.iter().skip(3).cloned());
+                    let mut cached = self.display_bind_group_cache.lock().unwrap();
+                    Some(
+                        if let Some(hit) =
+                            cached.as_ref().filter(|entry| entry.key == bind_group_key)
+                        {
+                            self.resource_cache.lock().unwrap().counters.bind_group_hits += 1;
+                            hit.bind_group.clone()
+                        } else {
+                            let created = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                                label: Some("Cached Display-pass Bind Group"),
+                                layout: &self.main_bgl,
+                                entries: &display_entries,
+                            });
+                            *cached = Some(CachedMainBindGroup {
+                                key: bind_group_key,
+                                bind_group: created.clone(),
+                            });
+                            let mut resources = self.resource_cache.lock().unwrap();
+                            resources.counters.bind_group_misses += 1;
+                            resources.counters.bind_group_creations += 1;
+                            created
+                        },
+                    )
+                } else {
+                    None
+                };
+
                 {
                     let mut compute_pass = main_encoder.begin_compute_pass(&Default::default());
                     compute_pass.set_pipeline(&self.main_pipeline);
                     compute_pass.set_bind_group(0, &bind_group, &[]);
+                    compute_pass.dispatch_workgroups(
+                        input_width.div_ceil(8),
+                        input_height.div_ceil(8),
+                        1,
+                    );
+                }
+                if let Some(view_bind_group) = view_bind_group.as_ref() {
+                    let mut compute_pass = main_encoder.begin_compute_pass(&Default::default());
+                    compute_pass.set_pipeline(&self.main_pipeline);
+                    compute_pass.set_bind_group(0, view_bind_group, &[]);
+                    compute_pass.dispatch_workgroups(
+                        input_width.div_ceil(8),
+                        input_height.div_ceil(8),
+                        1,
+                    );
+                }
+                if let Some(display_bind_group) = display_bind_group.as_ref() {
+                    let mut compute_pass = main_encoder.begin_compute_pass(&Default::default());
+                    compute_pass.set_pipeline(&self.main_pipeline);
+                    compute_pass.set_bind_group(0, display_bind_group, &[]);
                     compute_pass.dispatch_workgroups(
                         input_width.div_ceil(8),
                         input_height.div_ceil(8),
@@ -2041,17 +2236,48 @@ impl GpuProcessor {
             cache.totals.cache_misses += blur_counters.cache_misses;
         }
         log::debug!("blur passes: needs={blur_pass_needs:?} counters={blur_counters:?}");
+        let split_scene_view_display = adjustments.global.edit_graph_version >= 2.0;
+        let cache_after = self.resource_cache_counters();
         let receipt = GpuExecutionReceipt {
             graph_fingerprint: graph.fingerprint,
             stages: graph.flags,
             blur_dispatch_count: blur_counters.dispatches,
-            render_pass_count: blur_counters.dispatches + blur_counters.submissions,
+            render_pass_count: blur_counters.dispatches
+                + command_buffer_count * if split_scene_view_display { 3 } else { 1 },
             command_buffer_count,
             queue_submit_count: blur_counters.submissions,
             estimated_peak_resource_bytes: graph.estimated_peak_resource_bytes,
             cpu_encode_time,
+            wall_time: execution_started.elapsed(),
+            phase_dispatch_count: command_buffer_count
+                * if split_scene_view_display { 3 } else { 1 },
+            cache_hits: (cache_after.mask_hits - cache_before.mask_hits)
+                + (cache_after.lut_hits - cache_before.lut_hits)
+                + (cache_after.bind_group_hits - cache_before.bind_group_hits),
+            cache_misses: (cache_after.mask_misses - cache_before.mask_misses)
+                + (cache_after.lut_misses - cache_before.lut_misses)
+                + (cache_after.bind_group_misses - cache_before.bind_group_misses),
+            domain_conversions: if split_scene_view_display {
+                &[
+                    "acescg_scene_linear_extended_v1->display_encoded_srgb_v1",
+                    "display_encoded_srgb_v1->render_transport_encoded_v1",
+                ]
+            } else {
+                &["legacy_fused_scene_view_output_v1"]
+            },
+            declared_clamps: if split_scene_view_display {
+                &[
+                    "algorithm_local_hsv_saturation",
+                    "algorithm_local_mask_influence",
+                    "display_clipping_overlay_threshold",
+                    "final_output_quantization_only",
+                ]
+            } else {
+                &["legacy_implementation_defined"]
+            },
         };
         log::debug!("GPU execution receipt: {receipt:?}");
+        *self.last_execution_receipt.lock().unwrap() = Some(receipt);
 
         Ok((final_pixels, out_width, out_height, bounds.x, bounds.y))
     }
@@ -2196,6 +2422,103 @@ mod blur_pass_tests {
         assert_eq!(graph.tile_halo, 16);
         assert!(graph.estimated_peak_resource_bytes > 0);
         assert_ne!(graph.fingerprint, exposure.fingerprint);
+    }
+
+    #[test]
+    fn representative_mp_graph_compile_benchmark_and_resource_model() {
+        let dimensions = [
+            (6000, 4000, "24MP"),
+            (8256, 5504, "45MP"),
+            (11664, 8576, "100MP"),
+        ];
+        let mut workloads = Vec::new();
+        workloads.push(("default", AllAdjustments::default(), false, 0));
+        let mut tonal = AllAdjustments::default();
+        tonal.global.exposure = 0.3;
+        tonal.global.contrast = 0.2;
+        tonal.global.highlights = -0.1;
+        workloads.push(("tonal", tonal, false, 0));
+        let mut complex = tonal;
+        complex.global.color_grading_midtones.saturation = 0.2;
+        complex.global.hsl[2].hue = 12.0;
+        complex.global.clarity = 0.2;
+        complex.global.structure = 0.15;
+        workloads.push(("complex-grading-hsl", complex, false, 0));
+        let mut five_masks = complex;
+        five_masks.mask_count = 5;
+        workloads.push(("five-local-masks", five_masks, false, 5));
+        let mut twenty_masks = complex;
+        twenty_masks.mask_count = 20;
+        workloads.push(("twenty-local-masks", twenty_masks, false, 20));
+        let mut film_lut = tonal;
+        film_lut.global.grain_amount = 0.1;
+        workloads.push(("film-lut", film_lut, true, 0));
+        let mut proof_export = tonal;
+        proof_export.global.show_clipping = 1;
+        workloads.push(("proof-export", proof_export, false, 0));
+
+        let started = Instant::now();
+        let mut compiles = 0_u32;
+        for (width, height, class) in dimensions {
+            for (workload, baseline, has_lut, masks) in &workloads {
+                let mut legacy = *baseline;
+                legacy.global.edit_graph_version = 1.0;
+                let mut v2 = *baseline;
+                v2.global.edit_graph_version = 2.0;
+                let legacy_plan =
+                    compile_gpu_render_graph(&legacy, *has_lut, *masks, width, height);
+                let v2_plan = compile_gpu_render_graph(&v2, *has_lut, *masks, width, height);
+                assert_eq!(
+                    legacy_plan.estimated_peak_resource_bytes,
+                    v2_plan.estimated_peak_resource_bytes,
+                    "v2 reuses existing transport surfaces for {class}/{workload}"
+                );
+                assert_ne!(legacy_plan.fingerprint, v2_plan.fingerprint);
+                for _ in 0..1_000 {
+                    std::hint::black_box(compile_gpu_render_graph(
+                        std::hint::black_box(&v2),
+                        *has_lut,
+                        *masks,
+                        width,
+                        height,
+                    ));
+                    compiles += 1;
+                }
+            }
+        }
+        let elapsed = started.elapsed();
+        let nanos_per_compile = elapsed.as_nanos() / u128::from(compiles);
+        assert!(
+            nanos_per_compile < 100_000,
+            "{nanos_per_compile} ns/compile"
+        );
+        println!(
+            "edit_graph_compile_benchmark classes=24MP,45MP,100MP workloads=default,tonal,complex-grading-hsl,five-local-masks,twenty-local-masks,film-lut,proof-export compiles={compiles} ns_per_compile={nanos_per_compile}"
+        );
+    }
+
+    #[test]
+    fn compiled_graph_contract_is_valid_for_cpu_fallback_admission() {
+        let raw = serde_json::json!({"rawEngineEditGraphVersion": 1, "exposure": 20});
+        let revision = crate::render_plan::content_revision(&raw, 1, 2, 3);
+        let plan = crate::render_plan::compile_render_plan(
+            &raw,
+            crate::render_plan::CompileRenderPlanContext {
+                revision,
+                is_raw: false,
+                tonemapper_override: None,
+            },
+            None,
+        )
+        .unwrap();
+        let request = RenderRequest {
+            adjustments: plan.adjustments,
+            mask_bitmaps: &[],
+            lut: None,
+            roi: None,
+            edit_graph: EditGraphExecutionAuthority::Compiled(Arc::clone(&plan.edit_graph)),
+        };
+        assert_eq!(validate_edit_graph_request(&request), Ok(()));
     }
 
     #[test]
@@ -2394,6 +2717,643 @@ mod blur_pass_tests {
 
     #[cfg(feature = "tauri-test")]
     #[test]
+    fn compiled_edit_graph_contract_executes_on_the_real_gpu_path() {
+        use image::{DynamicImage, GenericImageView, ImageBuffer, Rgba};
+        use serde_json::json;
+        use tauri::Manager;
+
+        let _test_guard = GPU_TEST_LOCK.lock().unwrap();
+        let source = DynamicImage::ImageRgba32F(ImageBuffer::from_pixel(
+            8,
+            8,
+            Rgba([0.18, 0.24, 0.36, 1.0]),
+        ));
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock Tauri app builds");
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state)
+            .expect("compute-only GPU context initializes");
+        let adjustments = json!({"rawEngineEditGraphVersion": 1, "exposure": 35});
+        let revision = crate::render_plan::content_revision(&adjustments, 1, 2, 3);
+        let plan = crate::render_plan::compile_render_plan(
+            &adjustments,
+            crate::render_plan::CompileRenderPlanContext {
+                revision,
+                is_raw: false,
+                tonemapper_override: None,
+            },
+            None,
+        )
+        .expect("typed edit graph compiles");
+
+        let rendered = process_and_get_dynamic_image(
+            &context,
+            &state,
+            &source,
+            PreGpuImageIdentity::for_source(&source, "compiled_edit_graph_gpu"),
+            RenderRequest {
+                adjustments: plan.adjustments,
+                mask_bitmaps: &[],
+                lut: None,
+                roi: None,
+                edit_graph: EditGraphExecutionAuthority::Compiled(Arc::clone(&plan.edit_graph)),
+            },
+            "compiled_edit_graph_gpu",
+        )
+        .expect("real GPU executor accepts the compiled graph contract");
+
+        assert_eq!(rendered.dimensions(), source.dimensions());
+        assert_ne!(
+            rendered.to_rgba16().into_raw(),
+            source.to_rgba16().into_raw()
+        );
+        assert!(
+            plan.edit_graph
+                .receipt
+                .ordered_node_ids
+                .contains(&"legacy_gpu_scene_view_pass")
+        );
+    }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
+    fn scene_referred_v2_preserves_extended_values_and_has_an_explicit_pixel_delta() {
+        use image::{DynamicImage, ImageBuffer, Rgba};
+        use serde_json::json;
+        use tauri::Manager;
+
+        let _test_guard = GPU_TEST_LOCK.lock().unwrap();
+        let source =
+            DynamicImage::ImageRgba32F(ImageBuffer::from_pixel(4, 4, Rgba([0.25, 0.5, 0.75, 1.0])));
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock Tauri app builds");
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state)
+            .expect("compute-only GPU context initializes");
+        let recipe = |version| {
+            json!({
+                "rawEngineEditGraphVersion": version,
+                "channelMixer": {
+                    "enabled": true,
+                    "preserveLuminance": false,
+                    "red": { "red": 100, "green": 0, "blue": 0, "constant": 100 },
+                    "green": { "red": 0, "green": 100, "blue": 0, "constant": 0 },
+                    "blue": { "red": 0, "green": 0, "blue": 100, "constant": -100 }
+                },
+                "curves": {
+                    "luma": [
+                        { "x": 0, "y": 0 },
+                        { "x": 128, "y": 140 },
+                        { "x": 255, "y": 255 }
+                    ]
+                }
+            })
+        };
+        let render = |version| {
+            let raw = recipe(version);
+            let plan = crate::render_plan::compile_render_plan(
+                &raw,
+                crate::render_plan::CompileRenderPlanContext {
+                    revision: crate::render_plan::content_revision(&raw, 1, 2, version),
+                    is_raw: false,
+                    tonemapper_override: Some(0),
+                },
+                None,
+            )
+            .unwrap();
+            assert_eq!(plan.adjustments.global.edit_graph_version, version as f32);
+            let cpu = crate::cpu_edit_graph::execute_cpu_edit_graph(
+                &source,
+                &plan.adjustments,
+                &[],
+                None,
+                &plan.edit_graph,
+            )
+            .unwrap()
+            .to_rgba32f()
+            .get_pixel(1, 1)
+            .0;
+            let gpu = process_and_get_unclamped_dynamic_image(
+                &context,
+                &state,
+                &source,
+                PreGpuImageIdentity::for_source(&source, &format!("v{version}")),
+                RenderRequest {
+                    adjustments: plan.adjustments,
+                    mask_bitmaps: &[],
+                    lut: None,
+                    roi: None,
+                    edit_graph: EditGraphExecutionAuthority::Compiled(plan.edit_graph),
+                },
+                "scene_referred_v2_delta",
+            )
+            .unwrap()
+            .to_rgba32f()
+            .get_pixel(1, 1)
+            .0;
+            for channel in 0..3 {
+                assert!(
+                    (cpu[channel] - gpu[channel]).abs() <= 0.01,
+                    "CPU/GPU v{version} channel {channel}: cpu={cpu:?} gpu={gpu:?}"
+                );
+            }
+            gpu
+        };
+
+        let legacy = render(1);
+        let v2 = render(2);
+        assert!(
+            legacy[..3]
+                .iter()
+                .all(|channel| (0.0..=1.01).contains(channel))
+        );
+        assert!(v2[0] > 1.0, "v2 red should retain over-range: {v2:?}");
+        assert!(v2[2] < 0.0, "v2 blue should retain negative values: {v2:?}");
+        assert_ne!(legacy, v2);
+    }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
+    fn scene_referred_v2_uses_ap1_luminance_while_legacy_keeps_view_luma() {
+        use image::{DynamicImage, ImageBuffer, Rgba};
+        use serde_json::json;
+        use tauri::Manager;
+
+        let _test_guard = GPU_TEST_LOCK.lock().unwrap();
+        let source =
+            DynamicImage::ImageRgba32F(ImageBuffer::from_pixel(4, 4, Rgba([1.0, 0.0, 0.0, 1.0])));
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock Tauri app builds");
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state)
+            .expect("compute-only GPU context initializes");
+        let render = |version: u64| {
+            let raw = json!({
+                "rawEngineEditGraphVersion": version,
+                "blackWhiteMixer": {
+                    "enabled": true,
+                    "weights": {
+                        "reds": 0, "oranges": 0, "yellows": 0, "greens": 0,
+                        "aquas": 0, "blues": 0, "purples": 0, "magentas": 0
+                    }
+                }
+            });
+            let plan = crate::render_plan::compile_render_plan(
+                &raw,
+                crate::render_plan::CompileRenderPlanContext {
+                    revision: crate::render_plan::content_revision(&raw, 1, 2, version),
+                    is_raw: false,
+                    tonemapper_override: Some(0),
+                },
+                None,
+            )
+            .unwrap();
+            let cpu = crate::cpu_edit_graph::execute_cpu_edit_graph(
+                &source,
+                &plan.adjustments,
+                &[],
+                None,
+                &plan.edit_graph,
+            )
+            .unwrap()
+            .to_rgba32f()
+            .get_pixel(1, 1)
+            .0[0];
+            let gpu = process_and_get_unclamped_dynamic_image(
+                &context,
+                &state,
+                &source,
+                PreGpuImageIdentity::for_source(&source, &format!("luma-v{version}")),
+                RenderRequest {
+                    adjustments: plan.adjustments,
+                    mask_bitmaps: &[],
+                    lut: None,
+                    roi: None,
+                    edit_graph: EditGraphExecutionAuthority::Compiled(plan.edit_graph),
+                },
+                "scene_luminance_domain",
+            )
+            .unwrap()
+            .to_rgba32f()
+            .get_pixel(1, 1)
+            .0[0];
+            assert!((cpu - gpu).abs() <= 0.01, "v{version}: cpu={cpu} gpu={gpu}");
+            gpu
+        };
+
+        let legacy = render(1);
+        let scene_referred = render(2);
+        let scene_referred_warm = render(2);
+        let encode = |linear: f32| 1.055 * linear.powf(1.0 / 2.4) - 0.055;
+        assert!((legacy - encode(0.2126)).abs() <= 0.01, "legacy={legacy}");
+        assert!(
+            (scene_referred - encode(0.272_228_72)).abs() <= 0.01,
+            "scene_referred={scene_referred}"
+        );
+        assert!(scene_referred > legacy + 0.05);
+        assert_eq!(scene_referred, scene_referred_warm);
+        let processor = state.gpu_processor.lock().unwrap();
+        let receipt = processor
+            .as_ref()
+            .unwrap()
+            .processor
+            .last_execution_receipt()
+            .expect("v2 GPU execution publishes a runtime receipt");
+        assert_eq!(receipt.phase_dispatch_count, 3);
+        assert_eq!(receipt.command_buffer_count, 1);
+        assert_eq!(receipt.queue_submit_count, 1);
+        assert!(receipt.cache_hits >= 3, "receipt={receipt:?}");
+        assert_eq!(receipt.domain_conversions.len(), 2);
+        assert!(
+            receipt
+                .declared_clamps
+                .contains(&"final_output_quantization_only")
+        );
+    }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
+    fn cpu_reference_matches_metal_for_global_local_lut_and_spatial_graph() {
+        use image::{DynamicImage, ImageBuffer, Luma, Rgba};
+        use serde_json::json;
+        use tauri::Manager;
+
+        let _test_guard = GPU_TEST_LOCK.lock().unwrap();
+        let source = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(8, 8, |x, y| {
+            Rgba([
+                0.12 + x as f32 * 0.08,
+                0.18 + y as f32 * 0.07,
+                0.64 - x as f32 * 0.035,
+                1.0,
+            ])
+        }));
+        let mask = ImageBuffer::<Luma<u8>, Vec<u8>>::from_fn(8, 8, |x, _| {
+            Luma([((x as f32 / 7.0) * 255.0).round() as u8])
+        });
+        let mut raw = json!({
+            "rawEngineEditGraphVersion": 2,
+            "exposure": 18,
+            "brightness": -8,
+            "temperature": 12,
+            "tint": -7,
+            "contrast": 9,
+            "highlights": -12,
+            "shadows": 8,
+            "whites": 5,
+            "blacks": -4,
+            "saturation": 11,
+            "vibrance": 7,
+            "hue": 5,
+            "vignetteAmount": -12,
+            "grainAmount": 4,
+            "grainSize": 40,
+            "grainRoughness": 25,
+            "lutPath": "synthetic-cpu-parity.cube",
+            "lutIntensity": 100,
+            "levels": {
+                "enabled": true, "inputBlack": 2, "inputWhite": 98,
+                "gamma": 1.08, "outputBlack": 1, "outputWhite": 99
+            },
+            "masks": [{
+                "id":"cpu-parity-mask", "name":"CPU parity", "visible":true,
+                "invert":false, "opacity":100, "blendMode":"normal",
+                "adjustments":{
+                    "exposure":9,"contrast":-6,"saturation":8,"sharpness":5,
+                    "clarity":-4,"structure":3,"dehaze":2,"glowAmount":2,"halationAmount":1
+                },
+                "subMasks":[]
+            }]
+        });
+        raw.as_object_mut().unwrap().extend(
+            json!({
+                "sharpness": 14, "sharpnessThreshold": 8,
+                "lumaNoiseReduction": 10, "colorNoiseReduction": 8,
+                "clarity": 9, "structure": 7, "dehaze": 6, "centré": 5,
+                "glowAmount": 4, "halationAmount": 3,
+                "flareAmount": 12,
+                "chromaticAberrationRedCyan": 2, "chromaticAberrationBlueYellow": -2
+            })
+            .as_object()
+            .unwrap()
+            .clone(),
+        );
+        let lut = Arc::new(Lut::compile(
+            2,
+            vec![
+                0.02, 0.01, 0.0, 0.98, 0.03, 0.02, 0.01, 0.97, 0.04, 0.97, 0.96, 0.06, 0.03, 0.04,
+                0.95, 0.95, 0.97, 0.08, 0.06, 0.95, 0.97, 0.94, 0.96, 0.98,
+            ],
+        ));
+        let plan = crate::render_plan::compile_render_plan(
+            &raw,
+            crate::render_plan::CompileRenderPlanContext {
+                revision: crate::render_plan::content_revision(&raw, 1, 2, 3),
+                is_raw: false,
+                tonemapper_override: Some(0),
+            },
+            Some(Arc::clone(&lut)),
+        )
+        .unwrap();
+        let cpu = crate::cpu_edit_graph::execute_cpu_edit_graph(
+            &source,
+            &plan.adjustments,
+            std::slice::from_ref(&mask),
+            Some(&lut),
+            &plan.edit_graph,
+        )
+        .unwrap()
+        .to_rgba32f();
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .unwrap();
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state).unwrap();
+        let gpu = process_and_get_unclamped_dynamic_image(
+            &context,
+            &state,
+            &source,
+            PreGpuImageIdentity::for_source(&source, "cpu-reference-nonspatial"),
+            RenderRequest {
+                adjustments: plan.adjustments,
+                mask_bitmaps: std::slice::from_ref(&mask),
+                lut: Some(lut),
+                roi: None,
+                edit_graph: EditGraphExecutionAuthority::Compiled(plan.edit_graph),
+            },
+            "cpu_reference_nonspatial",
+        )
+        .unwrap()
+        .to_rgba32f();
+
+        let mut maximum = (0.0_f32, 0_u32, 0_u32, [0.0; 4], [0.0; 4]);
+        for y in 0..8 {
+            for x in 0..8 {
+                let cpu_pixel = cpu.get_pixel(x, y).0;
+                let gpu_pixel = gpu.get_pixel(x, y).0;
+                let error = (0..3)
+                    .map(|channel| (cpu_pixel[channel] - gpu_pixel[channel]).abs())
+                    .fold(0.0_f32, f32::max);
+                if error > maximum.0 {
+                    maximum = (error, x, y, cpu_pixel, gpu_pixel);
+                }
+            }
+        }
+        assert!(maximum.0 <= 0.035, "maximum CPU/GPU mismatch={maximum:?}");
+    }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
+    fn cpu_reference_stage_matrix_matches_metal_without_cross_stage_cancellation() {
+        use image::{DynamicImage, ImageBuffer, Rgba};
+        use serde_json::json;
+        use tauri::Manager;
+
+        let _test_guard = GPU_TEST_LOCK.lock().unwrap();
+        let source = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(12, 10, |x, y| {
+            let checker = if (x / 2 + y / 2) % 2 == 0 { 0.18 } else { 0.72 };
+            Rgba([
+                checker + x as f32 * 0.01,
+                0.12 + y as f32 * 0.075,
+                0.82 - x as f32 * 0.045,
+                1.0,
+            ])
+        }));
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .unwrap();
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state).unwrap();
+        let cases = [
+            ("luma_nr", json!({"lumaNoiseReduction": 35})),
+            ("color_nr", json!({"colorNoiseReduction": 40})),
+            (
+                "sharpness",
+                json!({"sharpness": 35, "sharpnessThreshold": 12}),
+            ),
+            (
+                "clarity_structure",
+                json!({"clarity": 24, "structure": -18}),
+            ),
+            ("dehaze_centre", json!({"dehaze": 20, "centré": 16})),
+            (
+                "glow_halation",
+                json!({"glowAmount": 18, "halationAmount": 14}),
+            ),
+            (
+                "chromatic_aberration",
+                json!({
+                    "chromaticAberrationRedCyan": 18,
+                    "chromaticAberrationBlueYellow": -16
+                }),
+            ),
+            (
+                "rapid_view",
+                json!({
+                    "toneMapper": "rapidView",
+                    "viewTransform": {
+                        "contrast": 1.35, "latitude": 0.6,
+                        "toe": 0.45, "shoulder": 0.7,
+                        "chromaCompression": 0.3
+                    }
+                }),
+            ),
+            ("exposure", json!({"exposure": 18})),
+            ("negative_highlights", json!({"highlights": -12})),
+            (
+                "exposure_negative_highlights",
+                json!({"exposure": 18, "highlights": -12}),
+            ),
+            ("whites", json!({"whites": 5})),
+            (
+                "exposure_whites_negative_highlights",
+                json!({"exposure": 18, "whites": 5, "highlights": -12}),
+            ),
+            (
+                "basic_tone_stack",
+                json!({
+                    "exposure": 18, "brightness": -8, "contrast": 9,
+                    "highlights": -12, "shadows": 8, "whites": 5, "blacks": -4
+                }),
+            ),
+            (
+                "tone_color_stack",
+                json!({
+                    "exposure": 18, "brightness": -8, "contrast": 9,
+                    "highlights": -12, "shadows": 8, "whites": 5, "blacks": -4,
+                    "temperature": 12, "tint": -7, "saturation": 11,
+                    "vibrance": 7, "hue": 5
+                }),
+            ),
+            (
+                "tone_color_levels_stack",
+                json!({
+                    "exposure": 18, "brightness": -8, "contrast": 9,
+                    "highlights": -12, "shadows": 8, "whites": 5, "blacks": -4,
+                    "temperature": 12, "tint": -7, "saturation": 11,
+                    "vibrance": 7, "hue": 5,
+                    "levels": {
+                        "enabled": true, "inputBlack": 2, "inputWhite": 98,
+                        "gamma": 1.08, "outputBlack": 1, "outputWhite": 99
+                    }
+                }),
+            ),
+            (
+                "tone_color_levels_spatial_stack",
+                json!({
+                    "exposure": 18, "brightness": -8, "contrast": 9,
+                    "highlights": -12, "shadows": 8, "whites": 5, "blacks": -4,
+                    "temperature": 12, "tint": -7, "saturation": 11,
+                    "vibrance": 7, "hue": 5,
+                    "levels": {
+                        "enabled": true, "inputBlack": 2, "inputWhite": 98,
+                        "gamma": 1.08, "outputBlack": 1, "outputWhite": 99
+                    },
+                    "sharpness": 14, "sharpnessThreshold": 8,
+                    "lumaNoiseReduction": 10, "colorNoiseReduction": 8,
+                    "clarity": 9, "structure": 7, "dehaze": 6, "centré": 5,
+                    "glowAmount": 4, "halationAmount": 3
+                }),
+            ),
+            (
+                "flare",
+                json!({"flareAmount": 24, "exposure": 30, "whites": 18}),
+            ),
+            (
+                "flare_highlight_compression",
+                json!({
+                    "flareAmount": 24, "exposure": 30, "whites": 18,
+                    "highlights": -12
+                }),
+            ),
+            (
+                "flare_basic_tone_stack",
+                json!({
+                    "flareAmount": 24, "exposure": 30, "brightness": -8,
+                    "contrast": 9, "highlights": -12, "shadows": 8,
+                    "whites": 18, "blacks": -4
+                }),
+            ),
+            (
+                "flare_color_stack",
+                json!({
+                    "flareAmount": 24, "exposure": 30, "brightness": -8,
+                    "contrast": 9, "highlights": -12, "shadows": 8,
+                    "whites": 18, "blacks": -4, "temperature": 12,
+                    "tint": -7, "saturation": 11, "vibrance": 7, "hue": 5
+                }),
+            ),
+            (
+                "flare_levels_stack",
+                json!({
+                    "flareAmount": 24, "exposure": 30, "brightness": -8,
+                    "contrast": 9, "highlights": -12, "shadows": 8,
+                    "whites": 18, "blacks": -4, "temperature": 12,
+                    "tint": -7, "saturation": 11, "vibrance": 7, "hue": 5,
+                    "levels": {
+                        "enabled": true, "inputBlack": 2, "inputWhite": 98,
+                        "gamma": 1.08, "outputBlack": 1, "outputWhite": 99
+                    }
+                }),
+            ),
+            (
+                "combined_global_stack",
+                json!({
+                    "exposure": 18, "brightness": -8, "temperature": 12,
+                    "tint": -7, "contrast": 9, "highlights": -12,
+                    "shadows": 8, "whites": 5, "blacks": -4,
+                    "saturation": 11, "vibrance": 7, "hue": 5,
+                    "vignetteAmount": -12, "grainAmount": 4,
+                    "grainSize": 40, "grainRoughness": 25,
+                    "levels": {
+                        "enabled": true, "inputBlack": 2, "inputWhite": 98,
+                        "gamma": 1.08, "outputBlack": 1, "outputWhite": 99
+                    },
+                    "sharpness": 14, "sharpnessThreshold": 8,
+                    "lumaNoiseReduction": 10, "colorNoiseReduction": 8,
+                    "clarity": 9, "structure": 7, "dehaze": 6, "centré": 5,
+                    "glowAmount": 4, "halationAmount": 3,
+                    "chromaticAberrationRedCyan": 2,
+                    "chromaticAberrationBlueYellow": -2
+                }),
+            ),
+        ];
+        for (case_index, (label, mut raw)) in cases.into_iter().enumerate() {
+            raw.as_object_mut()
+                .unwrap()
+                .insert("rawEngineEditGraphVersion".into(), json!(2));
+            let plan = crate::render_plan::compile_render_plan(
+                &raw,
+                crate::render_plan::CompileRenderPlanContext {
+                    revision: crate::render_plan::content_revision(&raw, 3, 7, case_index as u64),
+                    is_raw: false,
+                    tonemapper_override: (label != "rapid_view").then_some(0),
+                },
+                None,
+            )
+            .unwrap();
+            let cpu = crate::cpu_edit_graph::execute_cpu_edit_graph(
+                &source,
+                &plan.adjustments,
+                &[],
+                None,
+                &plan.edit_graph,
+            )
+            .unwrap()
+            .to_rgba32f();
+            let gpu = process_and_get_unclamped_dynamic_image(
+                &context,
+                &state,
+                &source,
+                PreGpuImageIdentity::for_source(&source, label),
+                RenderRequest {
+                    adjustments: plan.adjustments,
+                    mask_bitmaps: &[],
+                    lut: None,
+                    roi: None,
+                    edit_graph: EditGraphExecutionAuthority::Compiled(plan.edit_graph),
+                },
+                label,
+            )
+            .unwrap()
+            .to_rgba32f();
+            let mut maximum = (0.0_f32, 0_u32, 0_u32, [0.0; 4], [0.0; 4]);
+            for y in 0..10 {
+                for x in 0..12 {
+                    let cpu_pixel = cpu.get_pixel(x, y).0;
+                    let gpu_pixel = gpu.get_pixel(x, y).0;
+                    let normalized_error = (0..3)
+                        .map(|channel| {
+                            let absolute = (cpu_pixel[channel] - gpu_pixel[channel]).abs();
+                            let extended_scale =
+                                cpu_pixel[channel].abs().max(gpu_pixel[channel].abs());
+                            let rounded = f16::from_f32(extended_scale);
+                            let next = f16::from_bits(rounded.to_bits().saturating_add(1));
+                            let storage_ulp = (next.to_f32() - rounded.to_f32()).abs();
+                            absolute / (extended_scale * 0.001).max(storage_ulp * 2.0).max(0.035)
+                        })
+                        .fold(0.0_f32, f32::max);
+                    if normalized_error > maximum.0 {
+                        maximum = (normalized_error, x, y, cpu_pixel, gpu_pixel);
+                    }
+                }
+            }
+            assert!(
+                maximum.0 <= 1.0,
+                "stage {label} CPU/GPU exceeded abs=0.035, rel=0.1%, and two-f16-ULP tolerance: {maximum:?}"
+            );
+        }
+    }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
     fn selective_blurs_match_the_always_blur_gpu_path() {
         use image::{DynamicImage, ImageBuffer, Rgba};
         use tauri::Manager;
@@ -2447,6 +3407,7 @@ mod blur_pass_tests {
                         mask_bitmaps: &[],
                         lut: None,
                         roi: None,
+                        edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
                     },
                     "blur_pass_parity",
                 )
@@ -2526,6 +3487,7 @@ mod blur_pass_tests {
                     mask_bitmaps: &[],
                     lut: None,
                     roi: None,
+                    edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
                 },
                 "rapid_view_parity",
             )
@@ -2594,6 +3556,7 @@ mod blur_pass_tests {
                     mask_bitmaps: &[],
                     lut: None,
                     roi: None,
+                    edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
                 },
                 "exposure_reuse",
             )
@@ -2734,6 +3697,7 @@ mod blur_pass_tests {
                     mask_bitmaps: std::slice::from_ref(&mask),
                     lut: Some(lut.clone()),
                     roi: None,
+                    edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
                 },
                 "resource_reuse",
             )
@@ -2801,6 +3765,7 @@ mod blur_pass_tests {
                     mask_bitmaps: masks,
                     lut: None,
                     roi: None,
+                    edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
                 },
                 "partial_mask_upload",
             )
@@ -2956,18 +3921,31 @@ fn process_and_get_dynamic_image_inner(
     let device_generation = context.generation;
 
     let max_dim = context.limits.max_texture_dimension_2d;
+    validate_edit_graph_request(&request)?;
     if width > max_dim || height > max_dim {
         log::warn!(
-            "Image dimensions ({}x{}) exceed GPU limits ({}). Bypassing GPU processing and returning unprocessed image to prevent a crash. Try upgrading your GPU :)",
+            "Image dimensions ({}x{}) exceed GPU limits ({}); executing the compiled CPU reference graph",
             width,
             height,
             max_dim
         );
-        return Ok(apply_native_color_mixer_adjustments(
-            std::borrow::Cow::Borrowed(base_image),
-            &request.adjustments.global,
+        #[cfg(not(all(test, feature = "tauri-test")))]
+        let EditGraphExecutionAuthority::Compiled(edit_graph) = &request.edit_graph;
+        #[cfg(all(test, feature = "tauri-test"))]
+        let edit_graph = match &request.edit_graph {
+            EditGraphExecutionAuthority::Compiled(edit_graph) => edit_graph,
+            EditGraphExecutionAuthority::TestOnlyLegacy => {
+                return Err("edit_graph.cpu_reference_requires_compiled_authority".into());
+            }
+        };
+        return crate::cpu_edit_graph::execute_cpu_edit_graph(
+            base_image,
+            &request.adjustments,
+            request.mask_bitmaps,
+            request.lut.as_deref(),
+            edit_graph,
         )
-        .into_owned());
+        .map_err(str::to_owned);
     }
 
     let mut old_processor = None;

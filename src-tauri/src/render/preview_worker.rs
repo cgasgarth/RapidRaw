@@ -413,6 +413,9 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         mask_bitmaps: &mask_bitmaps,
         lut: render_plan.lut.clone(),
         roi: pixel_roi,
+        edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(Arc::clone(
+            &render_plan.edit_graph,
+        )),
     };
     let presentation_identity =
         use_wgpu_renderer.then_some(crate::gpu_display::NativeFrameIdentity {
