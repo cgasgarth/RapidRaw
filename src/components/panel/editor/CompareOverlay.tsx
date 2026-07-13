@@ -12,6 +12,7 @@ interface CompareOverlayProps {
   canShowOriginalCompare: boolean;
   compareDividerPosition: number;
   compareLabelsVisible: boolean;
+  comparisonLabel?: string | null;
   compareOrientation: EditorCompareOrientation;
   compareOverlayDisabled: boolean;
   editedImageRect: RenderSize;
@@ -30,6 +31,7 @@ export function CompareOverlay({
   canShowOriginalCompare,
   compareDividerPosition,
   compareLabelsVisible,
+  comparisonLabel = null,
   compareOrientation,
   compareOverlayDisabled,
   editedImageRect,
@@ -134,7 +136,7 @@ export function CompareOverlay({
       )}
       {compareLabelsVisible && showSplitCompare && (
         <>
-          {label(t('editor.canvas.compare.before'), editedImageRect, 'left')}
+          {label(comparisonLabel ?? t('editor.canvas.compare.before'), editedImageRect, 'left')}
           {label(t('editor.canvas.compare.after'), editedImageRect, 'right')}
         </>
       )}
@@ -146,7 +148,8 @@ export function CompareOverlay({
           data-testid="editor-compare-side-by-side-preview"
           style={{ zIndex: imageCanvasLayerZIndex('viewerHud') }}
         >
-          {compareLabelsVisible && label(t('editor.canvas.compare.before'), originalImageRect, 'left')}
+          {compareLabelsVisible &&
+            label(comparisonLabel ?? t('editor.canvas.compare.before'), originalImageRect, 'left')}
           {compareLabelsVisible && label(t('editor.canvas.compare.after'), editedImageRect, 'left')}
         </div>
       )}

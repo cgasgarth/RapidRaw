@@ -635,6 +635,22 @@
         "running": "Comparing crops...",
         "title": "100% RAW crop comparison"
       },
+      "referenceMatch": {
+        "apply": "",
+        "cancel": "",
+        "clear": "",
+        "compare": "",
+        "confidence": "",
+        "empty": "",
+        "impact": "",
+        "matchLook": "",
+        "normalize": "",
+        "residualSummary": "",
+        "setCurrent": "",
+        "sourceRevision": "",
+        "title": "",
+        "weight": ""
+      },
       "scopedSections": {
         "basic": "Light",
         "curves": "Curve",

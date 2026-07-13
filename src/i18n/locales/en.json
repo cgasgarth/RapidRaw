@@ -636,6 +636,22 @@
         "running": "Comparing crops...",
         "title": "100% RAW crop comparison"
       },
+      "referenceMatch": {
+        "apply": "Apply once",
+        "cancel": "Cancel",
+        "clear": "Clear",
+        "compare": "Compare",
+        "confidence": "{{percent}}% confidence",
+        "empty": "Pin a finished image, navigate to a target, then normalize tone or propose an inspectable look match.",
+        "impact": "Impact",
+        "matchLook": "Match Look",
+        "normalize": "Normalize",
+        "residualSummary": "Residual {{before}} → {{after}} · profile, WB, geometry and detail remain unchanged",
+        "setCurrent": "Set current",
+        "sourceRevision": "CM preview · r{{revision}}",
+        "title": "Reference Match",
+        "weight": "Weight"
+      },
       "scopedSections": {
         "basic": "Light",
         "curves": "Curve",

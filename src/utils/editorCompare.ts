@@ -24,6 +24,7 @@ export type EditorCompareCommand =
   | { type: 'toggle-original' }
   | { type: 'reset-divider' }
   | { identity: string | null; type: 'set-original-source' }
+  | { identity: string; label: string; type: 'set-reference-source' }
   | { type: 'exit' };
 
 export const DEFAULT_EDITOR_COMPARE_STATE: EditorCompareState = {
@@ -57,6 +58,8 @@ export const reduceEditorCompare = (state: EditorCompareState, command: EditorCo
       return { ...state, dividerPosition: 0.5 };
     case 'set-original-source':
       return { ...state, source: { identity: command.identity, kind: 'original' } };
+    case 'set-reference-source':
+      return { ...state, source: { identity: command.identity, kind: 'reference', label: command.label } };
     case 'exit':
       return { ...state, isOriginalHeld: false, mode: 'off' };
   }

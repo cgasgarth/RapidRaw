@@ -50,6 +50,7 @@ export * from './panorama/panoramaRuntimePlan.js';
 export * from './panorama/panoramaSyntheticStitch.js';
 export * from './rangeMaskCommandRuntime.js';
 export * from './rawEngineSchemas.js';
+export * from './referenceMatchRuntime.js';
 export * from './retouchRemoveRuntime.js';
 export * from './super-resolution/superResolutionAlignmentDiagnostics.js';
 export * from './super-resolution/superResolutionAppServerRuntime.js';
