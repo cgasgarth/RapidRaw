@@ -4044,6 +4044,12 @@ mod tests {
             ),
             0.5
         );
+        let hundred_mp_scale = preview_geometry_source_scale(12_500, 8_000, &json!({}), 1_920);
+        let hundred_mp_working_pixels = (12_500.0 * hundred_mp_scale).round() as u64
+            * (8_000.0 * hundred_mp_scale).round() as u64;
+        assert!((hundred_mp_scale - 0.1536).abs() < 1e-6);
+        assert!(hundred_mp_working_pixels < 2_400_000);
+        assert!(hundred_mp_working_pixels * 40 < 100_000_000);
     }
 
     #[test]
@@ -4203,6 +4209,69 @@ mod tests {
 
         assert_eq!(error, "preview_cancelled:Geometry");
         assert_eq!(checks.load(Ordering::Relaxed), 3);
+    }
+
+    #[test]
+    fn private_raw_preview_geometry_is_target_bounded_when_enabled() {
+        if std::env::var("RAWENGINE_RUN_PRIVATE_PREVIEW_GEOMETRY_PROOF").as_deref() != Ok("1") {
+            return;
+        }
+        let source_path = std::env::var("RAWENGINE_PRIVATE_RAW_SOURCE")
+            .expect("RAWENGINE_PRIVATE_RAW_SOURCE must select a private RAW");
+        let bytes = std::fs::read(&source_path).expect("read private RAW bytes");
+        let decoded =
+            load_base_image_from_bytes(&bytes, &source_path, false, &AppSettings::default(), None)
+                .expect("decode private RAW");
+        let (width, height) = decoded.dimensions();
+        let crop_width = (width / 3).max(1);
+        let crop_height = (height / 3).max(1);
+        let adjustments = json!({
+            "transformVertical": 11.0,
+            "transformHorizontal": -6.0,
+            "transformDistortion": 4.0,
+            "rotation": 2.5,
+            "crop": {
+                "x": (width - crop_width) / 2,
+                "y": (height - crop_height) / 2,
+                "width": crop_width,
+                "height": crop_height,
+            },
+        });
+        let started = std::time::Instant::now();
+        let result = PreviewGeometryPipeline::execute(PreviewGeometryRequest {
+            source: &decoded,
+            adjustments: &adjustments,
+            target_long_edge: 1920,
+            cancellation: None,
+        })
+        .expect("render private RAW preview geometry");
+        let elapsed = started.elapsed();
+        eprintln!(
+            "private_raw_preview_geometry_proof source={}x{} output={}x{} source_pixels={} working_pixels={} tiles={} elapsed_ms={}",
+            width,
+            height,
+            result.image.width(),
+            result.image.height(),
+            result.receipt.source_pixel_count,
+            result.receipt.working_pixel_count,
+            result.receipt.tile_count,
+            elapsed.as_millis(),
+        );
+
+        assert_eq!(result.image.width().max(result.image.height()), 1920);
+        assert_eq!(result.receipt.full_resolution_transform_allocations, 0);
+        assert_eq!(
+            result.receipt.working_pixel_count,
+            result.receipt.output_pixel_count
+        );
+        assert!(result.receipt.tile_count > 1);
+        assert!(
+            result.receipt.working_pixel_count * 8 < result.receipt.source_pixel_count,
+            "preview work should be far below decoded RAW area: {:?} vs {:?}",
+            result.receipt.working_pixel_count,
+            result.receipt.source_pixel_count
+        );
+        assert!(elapsed < Duration::from_secs(10));
     }
 
     #[test]
