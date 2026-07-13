@@ -4,8 +4,8 @@ use anyhow::{Result, anyhow};
 use image::imageops::{self, FilterType};
 use image::{DynamicImage, GenericImageView, GrayImage, Luma};
 use ndarray::{Array, Array4, ArrayViewD};
-use ort::session::Session;
-use ort::value::Tensor;
+use rapidraw_ai::ort::session::Session;
+use rapidraw_ai::ort::value::Tensor;
 use serde::Serialize;
 
 use crate::ai::ai_processing::{
@@ -41,7 +41,7 @@ pub fn run_person_part_parser_model(
     let input_tensor = build_person_part_input_tensor(image);
     let t_input = Tensor::from_array(input_tensor.into_dyn().as_standard_layout().into_owned())?;
     let mut session = session.lock().unwrap();
-    let outputs = session.run(ort::inputs![t_input])?;
+    let outputs = session.run(rapidraw_ai::ort::inputs![t_input])?;
     let output_tensor = outputs[0].try_extract_array::<f32>()?.to_owned();
     let classes = class_map_from_output(output_tensor.view())?;
     let mask = mask_from_class_map(&classes, target)?;

@@ -41,9 +41,10 @@ pub fn verify_provisioned_model(path: &Path) -> Result<(), String> {
     if MODEL_SHA256.starts_with("UNPUBLISHED_") {
         return Err("swinir_x2_disabled_no_approved_model_hash".to_string());
     }
-    if !crate::ai::ai_processing::verify_sha256(path, MODEL_SHA256)
-        .map_err(|error| format!("swinir_x2_model_hash_failed:{error}"))?
-    {
+    let bytes =
+        std::fs::read(path).map_err(|error| format!("swinir_x2_model_hash_failed:{error}"))?;
+    use sha2::{Digest, Sha256};
+    if hex::encode(Sha256::digest(bytes)) != MODEL_SHA256 {
         return Err("swinir_x2_model_hash_mismatch".to_string());
     }
     Ok(())

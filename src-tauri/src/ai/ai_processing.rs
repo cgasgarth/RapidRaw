@@ -1,7 +1,6 @@
 use std::fs;
-use std::io::Read;
-use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
 use image::imageops::{self, FilterType};
@@ -9,19 +8,20 @@ use image::{
     DynamicImage, GenericImageView, GrayImage, ImageBuffer, Luma, Rgb, Rgb32FImage, Rgba, RgbaImage,
 };
 use ndarray::{Array, Array4, IxDyn};
-use ort::session::{Session, builder::GraphOptimizationLevel};
-use ort::value::Tensor;
-use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
+use rapidraw_ai::ort::session::Session;
+use rapidraw_ai::ort::value::Tensor;
+use rapidraw_ai::tokenizers::Tokenizer;
 use tauri::Emitter;
 use tauri::Manager;
-use tokenizers::Tokenizer;
 
 use super::model_download::{
     AiTransferProgress, cleanup_stale_download, download_verified_atomic, verify_model_file_cached,
 };
 use super::model_registry::{
-    AiCapability, AiModelId, AiModelLease, AiModelRegistry, AiSessionHandle,
+    AiCapability, AiModelId, AiModelLease, AiModelRegistry, AiSessionHandle, ClipModels,
+};
+pub use super::types::{
+    AiDepthMaskParameters, AiForegroundMaskParameters, AiSkyMaskParameters, AiSubjectMaskParameters,
 };
 
 const ENCODER_URL: &str = "https://huggingface.co/CyberTimon/RapidRAW-Models/resolve/main/sam_vit_b_01ec64_encoder.onnx?download=true";
@@ -124,68 +124,6 @@ fn model_descriptor(id: AiModelId) -> AiModelDescriptor {
     }
 }
 
-static ORT_RUNTIME_INIT: OnceLock<Result<(), String>> = OnceLock::new();
-
-#[cfg(unix)]
-fn preflight_ort_dylib(path: &Path) -> Result<()> {
-    use std::ffi::{CStr, CString};
-    use std::os::unix::ffi::OsStrExt;
-
-    let path = CString::new(path.as_os_str().as_bytes())?;
-    // ORT owns process-global state, so this handle intentionally remains loaded for process life.
-    let handle = unsafe { libc::dlopen(path.as_ptr(), libc::RTLD_NOW | libc::RTLD_LOCAL) };
-    if handle.is_null() {
-        let message = unsafe {
-            let error = libc::dlerror();
-            if error.is_null() {
-                "unknown dlopen error".to_string()
-            } else {
-                CStr::from_ptr(error).to_string_lossy().into_owned()
-            }
-        };
-        return Err(anyhow::anyhow!("onnx_runtime_dylib_load_failed:{message}"));
-    }
-    let symbol = CString::new("OrtGetApiBase")?;
-    let get_api_base = unsafe { libc::dlsym(handle, symbol.as_ptr()) };
-    if get_api_base.is_null() {
-        return Err(anyhow::anyhow!("onnx_runtime_api_symbol_missing"));
-    }
-    Ok(())
-}
-
-pub(crate) fn build_ort_session(path: &Path) -> Result<Session> {
-    ORT_RUNTIME_INIT
-        .get_or_init(|| {
-            let builder = match std::env::var_os("ORT_DYLIB_PATH") {
-                Some(runtime_path) => {
-                    #[cfg(unix)]
-                    preflight_ort_dylib(Path::new(&runtime_path))
-                        .map_err(|error| error.to_string())?;
-                    ort::init_from(runtime_path).map_err(|error| error.to_string())?
-                }
-                None => ort::init(),
-            };
-            builder.with_name("RawEngine AI Registry").commit();
-            ort::environment::Environment::current()
-                .map(|_| ())
-                .map_err(|error| error.to_string())
-        })
-        .as_ref()
-        .map_err(|error| anyhow::anyhow!("onnx_runtime_initialization_failed:{error}"))?;
-    Ok(Session::builder()?
-        .with_execution_providers([ort::ep::CPU::default().build()])
-        .map_err(|error| anyhow::anyhow!(error.to_string()))?
-        .with_intra_threads(2)
-        .map_err(|error| anyhow::anyhow!(error.to_string()))?
-        .with_inter_threads(1)
-        .map_err(|error| anyhow::anyhow!(error.to_string()))?
-        .with_optimization_level(GraphOptimizationLevel::All)
-        .map_err(|error| anyhow::anyhow!(error.to_string()))?
-        .with_memory_pattern(true)
-        .map_err(|error| anyhow::anyhow!(error.to_string()))?
-        .commit_from_file(path)?)
-}
-
 pub async fn acquire_ort_model(
     app_handle: &tauri::AppHandle,
     registry: &AiModelRegistry,
@@ -272,11 +210,12 @@ pub async fn acquire_ort_model(
                         crate::events::AI_MODEL_DOWNLOAD_START,
                         serde_json::json!({ "modelId": descriptor.id, "phase": "loading" }),
                     );
-                    let session =
-                        tokio::task::spawn_blocking(move || build_ort_session(&model_path))
-                            .await
-                            .map_err(|error| error.to_string())?
-                            .map_err(|error| error.to_string())?;
+                    let session = tokio::task::spawn_blocking(move || {
+                        rapidraw_ai::build_ort_session(&model_path)
+                    })
+                    .await
+                    .map_err(|error| error.to_string())?
+                    .map_err(|error| error.to_string())?;
                     crate::register_exit_handler();
                     Ok(AiSessionHandle::Ort(Arc::new(Mutex::new(session))))
                 }
@@ -394,10 +333,12 @@ pub async fn acquire_clip_model(
                         crate::events::AI_MODEL_DOWNLOAD_START,
                         serde_json::json!({ "modelId": descriptor.id, "phase": "loading" }),
                     );
-                    let model = tokio::task::spawn_blocking(move || build_ort_session(&model_path))
-                        .await
-                        .map_err(|error| error.to_string())?
-                        .map_err(|error| error.to_string())?;
+                    let model = tokio::task::spawn_blocking(move || {
+                        rapidraw_ai::build_ort_session(&model_path)
+                    })
+                    .await
+                    .map_err(|error| error.to_string())?
+                    .map_err(|error| error.to_string())?;
                     let tokenizer =
                         Tokenizer::from_file(tokenizer_path).map_err(|error| error.to_string())?;
                     crate::register_exit_handler();
@@ -454,11 +395,6 @@ pub async fn acquire_capability(
         leases.push(lease);
     }
     Ok(AiCapabilityLeaseSet { leases })
-}
-
-pub struct ClipModels {
-    pub model: Mutex<Session>,
-    pub tokenizer: Tokenizer,
 }
 
 #[derive(Clone)]
@@ -549,25 +485,6 @@ fn get_models_dir(app_handle: &tauri::AppHandle) -> Result<PathBuf> {
         fs::create_dir_all(&models_dir)?;
     }
     Ok(models_dir)
-}
-
-pub(crate) fn verify_sha256(path: &Path, expected_hash: &str) -> Result<bool> {
-    if !path.exists() {
-        return Ok(false);
-    }
-    let mut file = fs::File::open(path)?;
-    let mut hasher = Sha256::new();
-    let mut buffer = [0; 8192];
-    loop {
-        let n = file.read(&mut buffer)?;
-        if n == 0 {
-            break;
-        }
-        hasher.update(&buffer[..n]);
-    }
-    let hash = hasher.finalize();
-    let hex_hash = hex::encode(hash);
-    Ok(hex_hash == expected_hash)
 }
 
 #[derive(Clone, Copy)]
@@ -731,7 +648,7 @@ fn run_native_denoise(
 
         let out = {
             let mut sess = session.lock().unwrap();
-            let outputs = sess.run(ort::inputs![t_input])?;
+            let outputs = sess.run(rapidraw_ai::ort::inputs![t_input])?;
             let arr = outputs[0].try_extract_array::<f32>()?.to_owned();
             arr.into_dimensionality::<ndarray::Ix4>()
                 .map_err(|e| anyhow::anyhow!("Unexpected output shape: {}", e))?
@@ -845,7 +762,7 @@ mod tests {
     use ndarray::Array4;
     use sha2::{Digest, Sha256};
 
-    use super::{ImageEmbeddings, build_ort_session, run_ai_denoise_headless, run_sam_decoder};
+    use super::{ImageEmbeddings, run_ai_denoise_headless, run_sam_decoder};
 
     #[test]
     fn sam_decoder_real_model_returns_bounded_mask_when_configured() {
@@ -857,8 +774,9 @@ mod tests {
         };
         let model_path = Path::new(&model_path);
         assert!(model_path.exists(), "SAM decoder model is missing");
-        let session =
-            Mutex::new(build_ort_session(model_path).expect("load SAM decoder ONNX model"));
+        let session = Mutex::new(
+            rapidraw_ai::build_ort_session(model_path).expect("load SAM decoder ONNX model"),
+        );
         let embeddings = ImageEmbeddings {
             path_hash: "synthetic-runtime-proof".to_string(),
             embeddings: Array4::<f32>::zeros((1, 256, 64, 64)).into_dyn(),
@@ -895,7 +813,8 @@ mod tests {
             model_path.display()
         );
 
-        let session = Mutex::new(build_ort_session(model_path).expect("load NIND ONNX model"));
+        let session =
+            Mutex::new(rapidraw_ai::build_ort_session(model_path).expect("load NIND ONNX model"));
         let input = build_smoke_input();
         let output =
             run_ai_denoise_headless(&input, 0.5, &session).expect("run headless NIND denoise");
@@ -1028,7 +947,7 @@ pub fn run_lama_inpainting(
 
     let output_tensor = {
         let mut session = lama_session.lock().unwrap();
-        let outputs = session.run(ort::inputs!["image" => t_img, "mask" => t_msk])?;
+        let outputs = session.run(rapidraw_ai::ort::inputs!["image" => t_img, "mask" => t_msk])?;
         outputs[0].try_extract_array::<f32>()?.to_owned()
     };
 
@@ -1105,7 +1024,7 @@ pub fn generate_image_embeddings(
     let input_values = input_tensor_dyn.as_standard_layout();
     let input_tensor_ort = Tensor::from_array(input_values.into_owned())?;
     let mut session = encoder.lock().unwrap();
-    let outputs = session.run(ort::inputs![input_tensor_ort])?;
+    let outputs = session.run(rapidraw_ai::ort::inputs![input_tensor_ort])?;
 
     let embeddings = outputs[0].try_extract_array::<f32>()?.to_owned();
 
@@ -1190,7 +1109,7 @@ pub fn run_sam_decoder(
 
         let mask_tensor = {
             let mut session = decoder.lock().unwrap();
-            let outputs = session.run(ort::inputs![
+            let outputs = session.run(rapidraw_ai::ort::inputs![
                 t_embeddings,
                 t_point_coords,
                 t_point_labels,
@@ -1389,7 +1308,7 @@ pub fn run_sky_seg_model(
     let t_input = Tensor::from_array(input_tensor_dyn.as_standard_layout().into_owned())?;
 
     let mut session = sky_seg_session.lock().unwrap();
-    let outputs = session.run(ort::inputs![t_input])?;
+    let outputs = session.run(rapidraw_ai::ort::inputs![t_input])?;
     let output_tensor = outputs[0].try_extract_array::<f32>()?.to_owned();
     let out_slice = output_tensor.as_slice().unwrap();
 
@@ -1470,7 +1389,7 @@ pub fn run_u2netp_model(
     let t_input = Tensor::from_array(input_tensor_dyn.as_standard_layout().into_owned())?;
 
     let mut session = u2netp_session.lock().unwrap();
-    let outputs = session.run(ort::inputs![t_input])?;
+    let outputs = session.run(rapidraw_ai::ort::inputs![t_input])?;
     let output_tensor = outputs[0].try_extract_array::<f32>()?.to_owned();
     let out_slice = output_tensor.as_slice().unwrap();
 
@@ -1549,7 +1468,7 @@ pub fn run_depth_anything_model(
     let t_input = Tensor::from_array(input_tensor_dyn.as_standard_layout().into_owned())?;
 
     let mut session = depth_session.lock().unwrap();
-    let outputs = session.run(ort::inputs![t_input])?;
+    let outputs = session.run(rapidraw_ai::ort::inputs![t_input])?;
     let output_tensor = outputs[0].try_extract_array::<f32>()?.to_owned();
     let out_slice = output_tensor.as_slice().unwrap();
 
@@ -1590,88 +1509,4 @@ pub fn run_depth_anything_model(
         .ok_or_else(|| anyhow::anyhow!("Failed to create mask from Depth output"))?;
 
     Ok(depth_map)
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct AiSubjectMaskParameters {
-    pub start_x: f64,
-    pub start_y: f64,
-    pub end_x: f64,
-    pub end_y: f64,
-    #[serde(default)]
-    pub mask_data_base64: Option<String>,
-    #[serde(default)]
-    pub rotation: Option<f32>,
-    #[serde(default)]
-    pub flip_horizontal: Option<bool>,
-    #[serde(default)]
-    pub flip_vertical: Option<bool>,
-    #[serde(default)]
-    pub orientation_steps: Option<u8>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct AiSkyMaskParameters {
-    #[serde(default)]
-    pub mask_data_base64: Option<String>,
-    #[serde(default)]
-    pub rotation: Option<f32>,
-    #[serde(default)]
-    pub flip_horizontal: Option<bool>,
-    #[serde(default)]
-    pub flip_vertical: Option<bool>,
-    #[serde(default)]
-    pub orientation_steps: Option<u8>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct AiForegroundMaskParameters {
-    #[serde(default)]
-    pub mask_data_base64: Option<String>,
-    #[serde(default)]
-    pub class_ids: Option<Vec<u8>>,
-    #[serde(default)]
-    pub rotation: Option<f32>,
-    #[serde(default)]
-    pub flip_horizontal: Option<bool>,
-    #[serde(default)]
-    pub flip_vertical: Option<bool>,
-    #[serde(default)]
-    pub orientation_steps: Option<u8>,
-    #[serde(default)]
-    pub model_id: Option<String>,
-    #[serde(default)]
-    pub model_sha256: Option<String>,
-    #[serde(default)]
-    pub provider_id: Option<String>,
-    #[serde(default)]
-    pub target_part: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct AiDepthMaskParameters {
-    #[serde(default)]
-    pub min_depth: f32,
-    #[serde(default)]
-    pub max_depth: f32,
-    #[serde(default)]
-    pub min_fade: f32,
-    #[serde(default)]
-    pub max_fade: f32,
-    #[serde(default)]
-    pub feather: f32,
-    #[serde(default)]
-    pub mask_data_base64: Option<String>,
-    #[serde(default)]
-    pub rotation: Option<f32>,
-    #[serde(default)]
-    pub flip_horizontal: Option<bool>,
-    #[serde(default)]
-    pub flip_vertical: Option<bool>,
-    #[serde(default)]
-    pub orientation_steps: Option<u8>,
 }
