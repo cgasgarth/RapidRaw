@@ -25,6 +25,23 @@ const currentReport = {
   },
   demosaicAlgorithmId: 'bayer_hq_v1',
   demosaicPath: 'bayer_hq',
+  highlightReconstruction: {
+    algorithmId: 'sensor_linear_confidence_hierarchy_v2',
+    cfaKind: 'bayer',
+    clippedSamples: 0,
+    confidencePercentiles: [0, 0, 0, 0, 0],
+    implementationVersion: 2,
+    invalidSamples: 0,
+    largestClippedRegion: 0,
+    methodCounts: {},
+    mode: 'auto',
+    nearClippedSamples: 0,
+    partiallyReconstructedSamples: 0,
+    postDemosaicFallbackSamples: 0,
+    reconstructedSamples: 0,
+    unrecoverableSamples: 0,
+    warningCodes: [],
+  },
   inputTransform: {
     asShotCameraWbGains: [2.1, 1, 1.4],
     cameraMakeModelId: 'Sony ILCE-7RM5',
@@ -70,6 +87,7 @@ const legacyReport = {
     ...currentReport.inputTransform,
     resolverAlgorithmId: 'dual_illuminant_mired_v1',
   },
+  highlightReconstruction: undefined,
 } as const;
 
 describe('RAW development report compatibility boundary', () => {
@@ -78,12 +96,14 @@ describe('RAW development report compatibility boundary', () => {
     expect(parsed.cameraProfile.illuminantEstimateMethod).toBe('white_balance_plan_v1');
     expect(parsed.inputTransform?.resolverAlgorithmId).toBe('dual_illuminant_camera_neutral_mired_v2');
     expect(parsed.cameraProfile.profileIlluminantXy).toEqual([0.34567, 0.3585]);
+    expect(parsed.highlightReconstruction).toEqual(currentReport.highlightReconstruction);
   });
 
   test('accepts the supported legacy report without changing its provenance', () => {
     const parsed = rawDevelopmentReportSchema.parse(legacyReport);
     expect(parsed.cameraProfile.illuminantEstimateMethod).toBe('wb_coeff_ratio');
     expect(parsed.inputTransform?.resolverAlgorithmId).toBe('dual_illuminant_mired_v1');
+    expect(parsed.highlightReconstruction).toBeUndefined();
   });
 
   test('crosses the exact begin_image_open decoded IPC envelope', () => {
@@ -105,6 +125,9 @@ describe('RAW development report compatibility boundary', () => {
     });
     expect(result.decoded.raw_development_report?.cameraProfile.algorithmId).toBe(
       'dual_illuminant_camera_neutral_mired_v2',
+    );
+    expect(result.decoded.raw_development_report?.highlightReconstruction).toEqual(
+      currentReport.highlightReconstruction,
     );
   });
 
