@@ -295,11 +295,17 @@ jobs:
           args: --ci --bundles app --target aarch64-apple-darwin --features required-ci,validation-harness
           retryAttempts: 2
 
+      - name: Verify optimized validation app layout
+        run: |
+          find src-tauri/target/aarch64-apple-darwin/release/bundle/macos -maxdepth 3 -print
+          test -d src-tauri/target/aarch64-apple-darwin/release/bundle/macos/RapidRAW.app
+          test -f src-tauri/target/aarch64-apple-darwin/release/bundle/macos/RapidRAW.app.tar.gz
+
       - name: Upload optimized validation app
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: native-startup-${{ github.run_id }}-${{ github.run_attempt }}
-          path: src-tauri/target/aarch64-apple-darwin/release/bundle/macos/RapidRAW.app
+          path: src-tauri/target/aarch64-apple-darwin/release/bundle/macos/RapidRAW.app.tar.gz
           if-no-files-found: error
           retention-days: 1
 
@@ -324,6 +330,8 @@ jobs:
 
       - name: Prepare native app
         run: |
+          tar -xzf native-startup/RapidRAW.app.tar.gz -C native-startup
+          test -x native-startup/RapidRAW.app/Contents/MacOS/RapidRAW
           xattr -cr native-startup/RapidRAW.app
           codesign --force --deep --sign - --timestamp=none native-startup/RapidRAW.app
           codesign --verify --deep --strict native-startup/RapidRAW.app
