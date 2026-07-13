@@ -27,6 +27,7 @@ const summary = (overrides: Partial<ReferenceHistogramSummary> = {}): ReferenceH
   lumaSpread: 0.15,
   redMean: 0.4,
   sampleCount: 8192,
+  spatialTiles: [],
   ...overrides,
 });
 
@@ -277,9 +278,34 @@ describe('color-managed reference matching', () => {
         'Clipped histogram endpoints reduce match reliability.',
         'Reference and target proof identities differ.',
         'Reference and target camera profiles differ; profile replacement is excluded.',
-        'Global histogram analysis cannot distinguish localized subject differences; inspect the compare view before apply.',
+        'Spatial analysis is unavailable; inspect localized subject differences before apply.',
       ]),
     );
     expect(proposal?.diffs.some((diff) => diff.key === 'cameraProfile')).toBe(false);
+  });
+
+  test('uses coarse spatial tiles to warn when a localized mismatch is unsafe to fit globally', () => {
+    const tiles = (values: number[]) =>
+      values.map((lumaMean, index) => ({
+        blueMean: lumaMean,
+        clippedFraction: 0,
+        greenMean: lumaMean,
+        lumaMean,
+        lumaSpread: 0.05,
+        redMean: lumaMean,
+        sampleCount: 512,
+        x: index % 4,
+        y: Math.floor(index / 4),
+      }));
+    const localized = createReferenceMatchProposal({
+      adjustments: INITIAL_ADJUSTMENTS,
+      mode: 'normalize',
+      references: [reference('localized', 1, summary({ lumaMean: 0.5, spatialTiles: tiles([0.9, 0.1, 0.1, 0.1]) }))],
+      target: summary({ lumaMean: 0.3, spatialTiles: tiles([0.3, 0.3, 0.3, 0.3]) }),
+    });
+    expect(localized?.warnings).toContain(
+      'Spatial tiles disagree with a global match; localized subject differences reduce reliability.',
+    );
+    expect(localized?.confidence).toBeLessThan(0.98);
   });
 });
