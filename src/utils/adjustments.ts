@@ -89,6 +89,10 @@ export enum DetailsAdjustment {
   DeblurEnabled = 'deblurEnabled',
   DeblurSigmaPx = 'deblurSigmaPx',
   DeblurStrength = 'deblurStrength',
+  DenoiseContrastProtection = 'denoiseContrastProtection',
+  DenoiseDetail = 'denoiseDetail',
+  DenoiseNaturalGrain = 'denoiseNaturalGrain',
+  DenoiseShadowBias = 'denoiseShadowBias',
   DustSpotOverlayEnabled = 'dustSpotOverlayEnabled',
   DustSpotSensitivity = 'dustSpotSensitivity',
   DustSpotMinRadiusPx = 'dustSpotMinRadiusPx',
@@ -246,6 +250,10 @@ export interface Adjustments {
   deblurEnabled: boolean;
   deblurSigmaPx: number;
   deblurStrength: number;
+  denoiseContrastProtection: number;
+  denoiseDetail: number;
+  denoiseNaturalGrain: number;
+  denoiseShadowBias: number;
   dustSpotMinRadiusPx: number;
   dustSpotOverlayEnabled: boolean;
   dustSpotSensitivity: number;
@@ -826,6 +834,10 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   deblurEnabled: false,
   deblurSigmaPx: 0.8,
   deblurStrength: 0,
+  denoiseContrastProtection: 50,
+  denoiseDetail: 50,
+  denoiseNaturalGrain: 0,
+  denoiseShadowBias: 0,
   dustSpotMinRadiusPx: 2,
   dustSpotOverlayEnabled: false,
   dustSpotSensitivity: 50,

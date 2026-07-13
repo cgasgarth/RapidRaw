@@ -27,6 +27,10 @@ const agentDetailEffectsPatchSchema = z
     deblurEnabled: z.boolean().optional(),
     deblurSigmaPx: z.number().min(0.45).max(1.35).optional(),
     deblurStrength: z.number().min(0).max(100).optional(),
+    denoiseContrastProtection: z.number().min(0).max(100).optional(),
+    denoiseDetail: z.number().min(0).max(100).optional(),
+    denoiseNaturalGrain: z.number().min(0).max(100).optional(),
+    denoiseShadowBias: z.number().min(-100).max(100).optional(),
     dehaze: z.number().min(-100).max(100).optional(),
     dustSpotMinRadiusPx: z.number().int().min(1).max(12).optional(),
     dustSpotOverlayEnabled: z.boolean().optional(),
@@ -111,6 +115,10 @@ const DETAIL_EFFECTS_PATCH_KEYS = [
   'deblurEnabled',
   'deblurSigmaPx',
   'deblurStrength',
+  'denoiseContrastProtection',
+  'denoiseDetail',
+  'denoiseNaturalGrain',
+  'denoiseShadowBias',
   'dehaze',
   'dustSpotMinRadiusPx',
   'dustSpotOverlayEnabled',
@@ -145,6 +153,10 @@ const applyDetailEffectsPatchToAdjustments = (base: Adjustments, patch: AgentDet
   if (patch.deblurEnabled !== undefined) next.deblurEnabled = patch.deblurEnabled;
   if (patch.deblurSigmaPx !== undefined) next.deblurSigmaPx = patch.deblurSigmaPx;
   if (patch.deblurStrength !== undefined) next.deblurStrength = patch.deblurStrength;
+  if (patch.denoiseContrastProtection !== undefined) next.denoiseContrastProtection = patch.denoiseContrastProtection;
+  if (patch.denoiseDetail !== undefined) next.denoiseDetail = patch.denoiseDetail;
+  if (patch.denoiseNaturalGrain !== undefined) next.denoiseNaturalGrain = patch.denoiseNaturalGrain;
+  if (patch.denoiseShadowBias !== undefined) next.denoiseShadowBias = patch.denoiseShadowBias;
   if (patch.dehaze !== undefined) next.dehaze = patch.dehaze;
   if (patch.dustSpotMinRadiusPx !== undefined) next.dustSpotMinRadiusPx = patch.dustSpotMinRadiusPx;
   if (patch.dustSpotOverlayEnabled !== undefined) next.dustSpotOverlayEnabled = patch.dustSpotOverlayEnabled;

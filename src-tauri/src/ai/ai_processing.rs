@@ -548,80 +548,38 @@ fn extract_tile_mirror(img: &Rgb32FImage, x0: i32, y0: i32, cs: usize) -> Array4
     arr
 }
 
-struct SeamlessBlend {
-    ud0: usize,
-    ud1: usize,
-    ud2: usize,
-    ud3: usize,
-    absx0: usize,
-    absy0: usize,
-    fswidth: usize,
-    fsheight: usize,
+fn raised_cosine_axis_weight(
+    offset: usize,
+    length: usize,
     overlap: usize,
-}
-
-fn apply_seamless(tile: &mut Array4<f32>, blend: &SeamlessBlend) {
-    let SeamlessBlend {
-        ud0,
-        ud1,
-        ud2,
-        ud3,
-        absx0,
-        absy0,
-        fswidth,
-        fsheight,
-        overlap,
-    } = *blend;
-    let ol = overlap;
-    if absx0 > 0 {
-        for c in 0..3 {
-            for y in ud1..ud3 {
-                for x in ud0..(ud0 + ol).min(ud2) {
-                    tile[[0, c, y, x]] *= 0.5;
-                }
-            }
-        }
+    has_before: bool,
+    has_after: bool,
+) -> f32 {
+    if overlap == 0 {
+        return 1.0;
     }
-    if absy0 > 0 {
-        for c in 0..3 {
-            for y in ud1..(ud1 + ol).min(ud3) {
-                for x in ud0..ud2 {
-                    tile[[0, c, y, x]] *= 0.5;
-                }
-            }
-        }
+    if has_before && offset < overlap {
+        let phase = (offset as f32 + 0.5) / overlap as f32;
+        return (phase * std::f32::consts::FRAC_PI_2).sin().powi(2);
     }
-    if absx0 + (ud2 - ud0) < fswidth && ol > 0 {
-        let right_start = (ud2 as i32 - ol as i32).max(ud0 as i32) as usize;
-        for c in 0..3 {
-            for y in ud1..ud3 {
-                for x in right_start..ud2 {
-                    tile[[0, c, y, x]] *= 0.5;
-                }
-            }
-        }
+    if has_after && offset >= length.saturating_sub(overlap) {
+        let from_edge = (length - offset) as f32 - 0.5;
+        let phase = from_edge / overlap as f32;
+        return (phase * std::f32::consts::FRAC_PI_2).sin().powi(2);
     }
-    if absy0 + (ud3 - ud1) < fsheight && ol > 0 {
-        let bottom_start = (ud3 as i32 - ol as i32).max(ud1 as i32) as usize;
-        for c in 0..3 {
-            for y in bottom_start..ud3 {
-                for x in ud0..ud2 {
-                    tile[[0, c, y, x]] *= 0.5;
-                }
-            }
-        }
-    }
+    1.0
 }
 
 fn run_native_denoise(
     img: &Rgb32FImage,
     session: &Mutex<Session>,
     accumulator: &mut [f32],
-    width: usize,
-    height: usize,
+    weight_accumulator: &mut [f32],
     progress: &dyn Fn(String),
     params: TileParams,
 ) -> Result<()> {
+    let width = img.width() as usize;
+    let height = img.height() as usize;
     let w = width as i32;
     let h = height as i32;
     let step = params.ucs.saturating_sub(params.overlap).max(1);
@@ -663,31 +621,34 @@ fn run_native_denoise(
         let absx0 = (x0 + params.pad as i32).max(0) as usize;
         let absy0 = (y0 + params.pad as i32).max(0) as usize;
 
-        let mut tile = out;
-        apply_seamless(
-            &mut tile,
-            &SeamlessBlend {
-                ud0,
-                ud1,
-                ud2,
-                ud3,
-                absx0,
-                absy0,
-                fswidth: width,
-                fsheight: height,
-                overlap: params.overlap,
-            },
-        );
+        let tile = out;
+        let usable_width = ud2 - ud0;
+        let usable_height = ud3 - ud1;
+        let has_left = absx0 > 0;
+        let has_top = absy0 > 0;
+        let has_right = absx0 + usable_width < width;
+        let has_bottom = absy0 + usable_height < height;
 
-        for cy in 0..(ud3 - ud1) {
-            for cx in 0..(ud2 - ud0) {
+        for cy in 0..usable_height {
+            let wy =
+                raised_cosine_axis_weight(cy, usable_height, params.overlap, has_top, has_bottom);
+            for cx in 0..usable_width {
                 let gx = absx0 + cx;
                 let gy = absy0 + cy;
                 if gx < width && gy < height {
                     let base = (gy * width + gx) * 3;
-                    accumulator[base] += tile[[0, 0, ud1 + cy, ud0 + cx]].clamp(0.0, 1.0);
-                    accumulator[base + 1] += tile[[0, 1, ud1 + cy, ud0 + cx]].clamp(0.0, 1.0);
-                    accumulator[base + 2] += tile[[0, 2, ud1 + cy, ud0 + cx]].clamp(0.0, 1.0);
+                    let weight = wy
+                        * raised_cosine_axis_weight(
+                            cx,
+                            usable_width,
+                            params.overlap,
+                            has_left,
+                            has_right,
+                        );
+                    accumulator[base] += tile[[0, 0, ud1 + cy, ud0 + cx]] * weight;
+                    accumulator[base + 1] += tile[[0, 1, ud1 + cy, ud0 + cx]] * weight;
+                    accumulator[base + 2] += tile[[0, 2, ud1 + cy, ud0 + cx]] * weight;
+                    weight_accumulator[gy * width + gx] += weight;
                 }
             }
         }
@@ -695,17 +656,30 @@ fn run_native_denoise(
     Ok(())
 }
 
-fn accumulator_to_rgb32f(acc: &[f32], width: u32, height: u32) -> Rgb32FImage {
+fn accumulator_to_rgb32f(acc: &[f32], weights: &[f32], width: u32, height: u32) -> Rgb32FImage {
     let mut out = Rgb32FImage::new(width, height);
     for (i, p) in out.pixels_mut().enumerate() {
         let i3 = i * 3;
-        *p = Rgb([
-            acc[i3].clamp(0.0, 1.0),
-            acc[i3 + 1].clamp(0.0, 1.0),
-            acc[i3 + 2].clamp(0.0, 1.0),
-        ]);
+        let weight = weights[i].max(f32::EPSILON);
+        *p = Rgb([acc[i3] / weight, acc[i3 + 1] / weight, acc[i3 + 2] / weight]);
     }
     out
+}
+
+fn restore_scene_range(
+    output: &mut Rgb32FImage,
+    original: &Rgb32FImage,
+    bounded_input: &Rgb32FImage,
+) {
+    for ((output, original), bounded) in output
+        .pixels_mut()
+        .zip(original.pixels())
+        .zip(bounded_input.pixels())
+    {
+        for channel in 0..3 {
+            output[channel] += original[channel] - bounded[channel];
+        }
+    }
 }
 
 pub fn run_ai_denoise(
@@ -738,18 +712,29 @@ fn run_ai_denoise_with_progress(
     let params = select_tile_params(intensity);
 
     progress("Denoising (AI NIND)...".to_string());
+    // NIND consumes bounded RGB. Preserve scene-linear headroom as an explicit
+    // residual and add it back after inference instead of clipping it away.
+    let model_input = Rgb32FImage::from_fn(width, height, |x, y| {
+        let pixel = rgb_img.get_pixel(x, y);
+        Rgb([
+            pixel[0].clamp(0.0, 1.0),
+            pixel[1].clamp(0.0, 1.0),
+            pixel[2].clamp(0.0, 1.0),
+        ])
+    });
     let mut accumulator = vec![0.0f32; width as usize * height as usize * 3];
+    let mut weights = vec![0.0f32; width as usize * height as usize];
     run_native_denoise(
-        rgb_img,
+        &model_input,
         session,
         &mut accumulator,
-        width as usize,
-        height as usize,
+        &mut weights,
         progress,
         params,
     )?;
 
-    let out_img_buffer = accumulator_to_rgb32f(&accumulator, width, height);
+    let mut out_img_buffer = accumulator_to_rgb32f(&accumulator, &weights, width, height);
+    restore_scene_range(&mut out_img_buffer, rgb_img, &model_input);
     Ok(DynamicImage::ImageRgb32F(out_img_buffer))
 }
 
@@ -763,7 +748,64 @@ mod tests {
     use ndarray::Array4;
     use sha2::{Digest, Sha256};
 
-    use super::{ImageEmbeddings, run_ai_denoise_headless, run_sam_decoder};
+    use super::{
+        ImageEmbeddings, accumulator_to_rgb32f, raised_cosine_axis_weight, restore_scene_range,
+        run_ai_denoise_headless, run_sam_decoder,
+    };
+
+    #[test]
+    fn raised_cosine_reconstruction_is_normalized_and_traversal_independent() {
+        fn reconstruct(
+            starts: &[usize],
+            length: usize,
+            tile_length: usize,
+            overlap: usize,
+        ) -> Vec<f32> {
+            let mut accum = vec![0.0; length * 3];
+            let mut weights = vec![0.0; length];
+            for &start in starts {
+                let visible = tile_length.min(length - start);
+                for offset in 0..visible {
+                    let global = start + offset;
+                    let weight = raised_cosine_axis_weight(
+                        offset,
+                        visible,
+                        overlap,
+                        start > 0,
+                        start + visible < length,
+                    );
+                    for channel in 0..3 {
+                        accum[global * 3 + channel] += 0.625 * weight;
+                    }
+                    weights[global] += weight;
+                }
+            }
+            accumulator_to_rgb32f(&accum, &weights, length as u32, 1)
+                .as_raw()
+                .clone()
+        }
+
+        let forward = reconstruct(&[0, 8, 16], 20, 12, 4);
+        let reverse = reconstruct(&[16, 8, 0], 20, 12, 4);
+        let alternate = reconstruct(&[0, 6, 12, 18], 20, 8, 2);
+        assert!(forward.iter().all(|value| (*value - 0.625).abs() < 1e-6));
+        assert_eq!(forward, reverse);
+        assert!(
+            forward
+                .iter()
+                .zip(alternate)
+                .all(|(left, right)| (*left - right).abs() < 1e-6)
+        );
+    }
+
+    #[test]
+    fn model_domain_shaper_restores_negative_and_over_range_scene_values() {
+        let original = Rgb32FImage::from_pixel(1, 1, Rgb([-0.25, 0.4, 1.75]));
+        let bounded = Rgb32FImage::from_pixel(1, 1, Rgb([0.0, 0.4, 1.0]));
+        let mut model_output = Rgb32FImage::from_pixel(1, 1, Rgb([0.05, 0.35, 0.9]));
+        restore_scene_range(&mut model_output, &original, &bounded);
+        assert_eq!(model_output.get_pixel(0, 0).0, [-0.2, 0.35, 1.65]);
+    }
 
     #[test]
     fn sam_decoder_real_model_returns_bounded_mask_when_configured() {
