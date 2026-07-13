@@ -6,6 +6,7 @@ use crate::adjustments::abi::{
 use crate::adjustments::scales::SCALES;
 use crate::image_processing::calculate_agx_matrices;
 use crate::mask_generation::MaskDefinition;
+#[cfg(test)]
 use serde::Deserialize;
 
 type JsonValue = serde_json::Value;
@@ -658,6 +659,7 @@ fn get_mask_adjustments_from_json(adj: &JsonValue, blend_mode: &str) -> MaskAdju
     }
 }
 
+#[cfg(test)]
 pub fn get_all_adjustments_from_json(
     js_adjustments: &JsonValue,
     is_raw: bool,

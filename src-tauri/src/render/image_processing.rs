@@ -136,7 +136,9 @@ impl Default for ImageMetadata {
     }
 }
 
-pub use crate::geometry::{Crop, GeometryParams, get_geometry_params_from_json};
+#[cfg(test)]
+pub use crate::geometry::get_geometry_params_from_json;
+pub use crate::geometry::{Crop, GeometryParams};
 
 pub use crate::render::resample::downscale_f32_image_cow;
 
@@ -249,11 +251,12 @@ pub fn apply_orientation(image: DynamicImage, orientation: Orientation) -> Dynam
 pub use crate::geometry::apply_unwarp_geometry;
 pub use crate::geometry::{
     apply_coarse_rotation, apply_crop, apply_flip, apply_geometry_warp, apply_rotation,
-    is_geometry_identity, warp_image_geometry,
+    warp_image_geometry,
 };
 
 use crate::adjustments::abi::GpuMat3;
 pub use crate::adjustments::abi::{AllAdjustments, MAX_MASKS};
+#[cfg(test)]
 pub use crate::adjustments::parse::get_all_adjustments_from_json;
 
 const WP_D65: Vec2 = Vec2::new(0.3127, 0.3290);
@@ -495,68 +498,20 @@ pub fn is_image_edited(
     if adj.is_null() || adj.as_object().is_none() {
         return false;
     }
-
-    if let Some(patches) = adj.get("aiPatches").and_then(|v| v.as_array())
-        && !patches.is_empty()
-    {
-        return true;
-    }
-    if let Some(masks) = adj.get("masks").and_then(|v| v.as_array())
-        && !masks.is_empty()
-    {
-        return true;
-    }
-
-    if let Some(crop_val) = adj.get("crop")
-        && !crop_val.is_null()
-        && let Ok(crop) = serde_json::from_value::<Crop>(crop_val.clone())
-        && (crop.x.abs() > 0.1 || crop.y.abs() > 0.1)
-    {
-        return true;
-    }
-
-    if adj
-        .get("orientationSteps")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(0)
-        != 0
-    {
-        return true;
-    }
-    if adj
-        .get("rotation")
-        .and_then(|v| v.as_f64())
-        .unwrap_or(0.0)
-        .abs()
-        > 0.001
-    {
-        return true;
-    }
-    if adj
-        .get("flipHorizontal")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false)
-    {
-        return true;
-    }
-    if adj
-        .get("flipVertical")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false)
-    {
-        return true;
-    }
-
-    let geo = get_geometry_params_from_json(adj);
-    if !is_geometry_identity(&geo) {
-        return true;
-    }
-
-    let current_adj = get_all_adjustments_from_json(adj, is_raw, tonemapper_override);
-    let default_adj =
-        get_all_adjustments_from_json(&serde_json::json!({}), is_raw, tonemapper_override);
-
-    bytemuck::bytes_of(&current_adj) != bytemuck::bytes_of(&default_adj)
+    let revision = crate::render_plan::content_revision(adj, 0, 0, 0);
+    crate::render_plan::compile_render_plan(
+        adj,
+        crate::render_plan::CompileRenderPlanContext {
+            revision,
+            is_raw,
+            tonemapper_override,
+        },
+        None,
+    )
+    .map(|plan| plan.edit_graph.has_user_edits)
+    // Invalid persisted edits are not neutral; callers must not silently treat
+    // them as unedited and discard/quarantine their sidecar state.
+    .unwrap_or(true)
 }
 
 #[derive(Clone)]
@@ -971,7 +926,7 @@ mod tests {
     use super::{
         CapturePreSharpeningSettings, GeometryParams, ImageMetadata, RawEngineArtifacts,
         WaveletDetailSettings, apply_wavelet_detail_by_scale, get_geometry_params_from_json,
-        remove_raw_artifacts_and_enhance_with_settings,
+        is_image_edited, remove_raw_artifacts_and_enhance_with_settings,
     };
     use crate::image_analytics::calculate_gamut_warning_overlay_from_image;
     use image::{DynamicImage, ImageBuffer, Rgb, Rgb32FImage, Rgba, RgbaImage};
@@ -1011,6 +966,17 @@ mod tests {
         assert_eq!(params.lens_dist_k1, 0.0);
         assert_eq!(params.tca_vr, 1.0);
         assert_eq!(params.tca_vb, 1.0);
+    }
+
+    #[test]
+    fn edited_status_consumes_the_canonical_graph_and_fails_safe() {
+        assert!(!is_image_edited(&json!({}), false, None));
+        assert!(is_image_edited(&json!({"exposure": 10}), false, None));
+        assert!(is_image_edited(
+            &json!({"rawEngineEditGraphVersion": 2}),
+            false,
+            None
+        ));
     }
 
     #[test]

@@ -146,6 +146,7 @@ pub struct CompiledEditGraph {
     pub nodes: Arc<[CompiledEditNode]>,
     pub fingerprint: u64,
     pub execution_abi_fingerprint: u64,
+    pub has_user_edits: bool,
     pub receipt: EditGraphReceipt,
 }
 
@@ -318,6 +319,10 @@ impl CompiledEditGraph {
                 inputs.adjustments,
                 inputs.has_lut,
             ),
+            has_user_edits: inputs.has_geometry_or_retouch
+                || inputs.has_detail
+                || gpu_adjustments_active
+                || inputs.show_clipping,
             receipt: EditGraphReceipt {
                 schema_version: EDIT_GRAPH_SCHEMA_VERSION,
                 pipeline_version: inputs.pipeline_version,
