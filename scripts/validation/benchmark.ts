@@ -2,16 +2,16 @@
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { isolatedGitEnvironment } from '../lib/ci/git-environment';
 import { planValidation, runValidation } from './engine';
 import { type InputClass, type ValidationNode, validationManifest } from './manifest';
 
 const root = await mkdtemp(join(tmpdir(), 'rapidraw-validation-replay-'));
-const isolatedGitEnvironment = Object.fromEntries(
-  Object.entries(process.env).filter(
-    (entry): entry is [string, string] => !entry[0].startsWith('GIT_') && entry[1] !== undefined,
-  ),
-);
-const fixtureInit = Bun.spawnSync(['git', 'init', '-q'], { cwd: root, env: isolatedGitEnvironment, stderr: 'pipe' });
+const fixtureInit = Bun.spawnSync(['git', 'init', '-q'], {
+  cwd: root,
+  env: isolatedGitEnvironment(),
+  stderr: 'pipe',
+});
 if (fixtureInit.exitCode !== 0) throw new Error(fixtureInit.stderr.toString());
 const scenarios = [
   ['docs-only', 'guide.md', 'docs'],
