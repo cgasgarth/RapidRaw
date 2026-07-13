@@ -138,6 +138,8 @@ impl PreGpuImageIdentity {
 }
 
 #[cfg(all(test, feature = "tauri-test"))]
+pub(crate) use crate::gpu_context::acquire_gpu_test_lock;
+#[cfg(all(test, feature = "tauri-test"))]
 pub use crate::gpu_context::get_or_init_compute_gpu_context_for_tests;
 pub use crate::gpu_context::get_or_init_gpu_context;
 
@@ -2348,9 +2350,6 @@ impl GpuProcessor {
 mod blur_pass_tests {
     use super::*;
 
-    #[cfg(feature = "tauri-test")]
-    static GPU_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-
     fn surface_key() -> BlurSurfaceKey {
         BlurSurfaceKey {
             processor_generation: 1,
@@ -2782,7 +2781,7 @@ mod blur_pass_tests {
         use serde_json::json;
         use tauri::Manager;
 
-        let _test_guard = GPU_TEST_LOCK.lock().unwrap();
+        let _test_guard = acquire_gpu_test_lock();
         let source = DynamicImage::ImageRgba32F(ImageBuffer::from_pixel(
             8,
             8,
@@ -2844,7 +2843,7 @@ mod blur_pass_tests {
         use serde_json::json;
         use tauri::Manager;
 
-        let _test_guard = GPU_TEST_LOCK.lock().unwrap();
+        let _test_guard = acquire_gpu_test_lock();
         let source =
             DynamicImage::ImageRgba32F(ImageBuffer::from_pixel(4, 4, Rgba([0.25, 0.5, 0.75, 1.0])));
         let app = tauri::test::mock_builder()
@@ -2943,7 +2942,7 @@ mod blur_pass_tests {
         use serde_json::json;
         use tauri::Manager;
 
-        let _test_guard = GPU_TEST_LOCK.lock().unwrap();
+        let _test_guard = acquire_gpu_test_lock();
         let source =
             DynamicImage::ImageRgba32F(ImageBuffer::from_pixel(4, 4, Rgba([1.0, 0.0, 0.0, 1.0])));
         let app = tauri::test::mock_builder()
@@ -3044,7 +3043,6 @@ mod blur_pass_tests {
         use serde_json::json;
         use tauri::Manager;
 
-        let _test_guard = GPU_TEST_LOCK.lock().unwrap();
         let source = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(8, 8, |x, y| {
             Rgba([
                 0.12 + x as f32 * 0.08,
@@ -3129,6 +3127,7 @@ mod blur_pass_tests {
         )
         .unwrap()
         .to_rgba32f();
+        let _test_guard = acquire_gpu_test_lock();
         let app = tauri::test::mock_builder()
             .manage(AppState::new())
             .build(tauri::test::mock_context(tauri::test::noop_assets()))
@@ -3175,7 +3174,7 @@ mod blur_pass_tests {
         use serde_json::json;
         use tauri::Manager;
 
-        let _test_guard = GPU_TEST_LOCK.lock().unwrap();
+        let _test_guard = acquire_gpu_test_lock();
         let source = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(12, 10, |x, y| {
             let checker = if (x / 2 + y / 2) % 2 == 0 { 0.18 } else { 0.72 };
             Rgba([
@@ -3418,7 +3417,7 @@ mod blur_pass_tests {
         use image::{DynamicImage, ImageBuffer, Rgba};
         use tauri::Manager;
 
-        let _test_guard = GPU_TEST_LOCK.lock().unwrap();
+        let _test_guard = acquire_gpu_test_lock();
         let source = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(32, 24, |x, y| {
             Rgba([x as f32 / 31.0, y as f32 / 23.0, (x + y) as f32 / 54.0, 1.0])
         }));
@@ -3506,7 +3505,7 @@ mod blur_pass_tests {
 
         use crate::color::view_transform::{ViewTransformPlanV1, ViewTransformSettingsV1};
 
-        let _test_guard = GPU_TEST_LOCK.lock().unwrap();
+        let _test_guard = acquire_gpu_test_lock();
         let vectors = [
             [0.08, 0.18, 0.9, 1.0],
             [0.18, 0.18, 0.18, 1.0],
@@ -3587,7 +3586,7 @@ mod blur_pass_tests {
         use image::{ImageBuffer, Rgba};
         use tauri::Manager;
 
-        let _test_guard = GPU_TEST_LOCK.lock().unwrap();
+        let _test_guard = acquire_gpu_test_lock();
         reset_gpu_input_cache_counters();
         let source = DynamicImage::ImageRgba32F(ImageBuffer::from_pixel(
             16,
@@ -3651,7 +3650,7 @@ mod blur_pass_tests {
         use image::{ImageBuffer, Rgba};
         use tauri::Manager;
 
-        let _test_guard = GPU_TEST_LOCK.lock().unwrap();
+        let _test_guard = acquire_gpu_test_lock();
         let source = DynamicImage::ImageRgba32F(ImageBuffer::from_pixel(
             16,
             16,
@@ -3723,7 +3722,7 @@ mod blur_pass_tests {
         use image::{ImageBuffer, Rgba};
         use tauri::Manager;
 
-        let _test_guard = GPU_TEST_LOCK.lock().unwrap();
+        let _test_guard = acquire_gpu_test_lock();
         let source = DynamicImage::ImageRgba32F(ImageBuffer::from_pixel(
             16,
             16,
@@ -3795,7 +3794,7 @@ mod blur_pass_tests {
         use image::{ImageBuffer, Rgba};
         use tauri::Manager;
 
-        let _test_guard = GPU_TEST_LOCK.lock().unwrap();
+        let _test_guard = acquire_gpu_test_lock();
         let source = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(16, 16, |x, y| {
             Rgba([x as f32 / 15.0, y as f32 / 15.0, 0.25, 1.0])
         }));

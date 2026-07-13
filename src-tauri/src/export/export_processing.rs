@@ -3643,14 +3643,15 @@ mod tests {
     #[cfg(feature = "tauri-test")]
     fn preview_and_export_execute_the_same_current_edit_graph_pixels() {
         use crate::gpu_processing::{
-            PreGpuImageIdentity, RenderRequest, get_or_init_compute_gpu_context_for_tests,
-            process_and_get_dynamic_image,
+            PreGpuImageIdentity, RenderRequest, acquire_gpu_test_lock,
+            get_or_init_compute_gpu_context_for_tests, process_and_get_dynamic_image,
         };
         use crate::render_plan::{
             CompileRenderPlanContext, compile_render_plan_cached, content_revision,
         };
         use serde_json::json;
 
+        let _gpu_test_guard = acquire_gpu_test_lock();
         let source = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(12, 8, |x, y| {
             Rgba([x as f32 / 11.0, y as f32 / 7.0, 0.25, 1.0])
         }));
@@ -3720,11 +3721,14 @@ mod tests {
         if std::env::var("RAWENGINE_RUN_PRIVATE_EDIT_GRAPH_REAL_RAW_PROOF").as_deref() != Ok("1") {
             return;
         }
-        use crate::gpu_processing::get_or_init_compute_gpu_context_for_tests;
+        use crate::gpu_processing::{
+            acquire_gpu_test_lock, get_or_init_compute_gpu_context_for_tests,
+        };
         use serde_json::json;
         use sha2::{Digest, Sha256};
         use tauri::Manager;
 
+        let _gpu_test_guard = acquire_gpu_test_lock();
         let source_path = std::env::var("RAWENGINE_PRIVATE_RAW_SOURCE")
             .expect("RAWENGINE_PRIVATE_RAW_SOURCE points to a private Alaska RAW");
         let source_bytes = std::fs::read(&source_path).expect("private RAW bytes read");

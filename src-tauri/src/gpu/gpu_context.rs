@@ -15,6 +15,19 @@ use crate::image_processing::GpuContext;
 
 static NEXT_DEVICE_GENERATION: AtomicU64 = AtomicU64::new(1);
 
+#[cfg(all(test, feature = "tauri-test"))]
+static GPU_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// Software WGPU adapters such as lavapipe are not reliable when separate test
+/// devices execute compute workloads concurrently. Keep only GPU-owning tests
+/// mutually exclusive; CPU tests continue to use Cargo's normal parallelism.
+#[cfg(all(test, feature = "tauri-test"))]
+pub(crate) fn acquire_gpu_test_lock() -> std::sync::MutexGuard<'static, ()> {
+    GPU_TEST_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
 pub fn get_or_init_gpu_context(
     state: &tauri::State<AppState>,
     _app_handle: &tauri::AppHandle,
