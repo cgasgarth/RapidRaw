@@ -48,6 +48,8 @@ pub enum StageDomain {
     ScalarMetric,
     LinearRec2100Absolute,
     ICtCp,
+    CieXyzD50,
+    CieLab,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -62,6 +64,7 @@ pub enum ReferenceOperation {
     DeltaE2000V1,
     DeltaEItpV1,
     Rec2100NitsToICtCpV1,
+    XyzD50ToLabV1,
 }
 
 impl ReferenceOperation {
@@ -78,6 +81,7 @@ impl ReferenceOperation {
             Self::DeltaE2000V1 => "delta-e-2000.v1",
             Self::DeltaEItpV1 => "delta-e-itp.v1",
             Self::Rec2100NitsToICtCpV1 => "rec2100-nits-to-ictcp.v1",
+            Self::XyzD50ToLabV1 => "xyz-d50-to-lab.v1",
         }
     }
 
@@ -94,6 +98,7 @@ impl ReferenceOperation {
             Self::DeltaE2000V1 => (StageDomain::CieLabPair, StageDomain::ScalarMetric),
             Self::DeltaEItpV1 => (StageDomain::ICtCpPair, StageDomain::ScalarMetric),
             Self::Rec2100NitsToICtCpV1 => (StageDomain::LinearRec2100Absolute, StageDomain::ICtCp),
+            Self::XyzD50ToLabV1 => (StageDomain::CieXyzD50, StageDomain::CieLab),
         }
     }
 }
@@ -105,6 +110,7 @@ pub enum StageSample {
     LabPair(CieLab, CieLab),
     ICtCpPair(ICtCp, ICtCp),
     ICtCp(ICtCp),
+    Lab(CieLab),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -114,6 +120,7 @@ enum StageSampleKind {
     LabPair,
     ICtCpPair,
     ICtCp,
+    Lab,
 }
 
 impl StageSample {
@@ -124,6 +131,7 @@ impl StageSample {
             Self::LabPair(_, _) => StageSampleKind::LabPair,
             Self::ICtCpPair(_, _) => StageSampleKind::ICtCpPair,
             Self::ICtCp(_) => StageSampleKind::ICtCp,
+            Self::Lab(_) => StageSampleKind::Lab,
         }
     }
 }
@@ -351,6 +359,11 @@ fn dispatch(
         (ReferenceOperation::Rec2100NitsToICtCpV1, StageSample::Rgb(rgb)) => Ok(
             StageSample::ICtCp(crate::hdr::rec2100_linear_nits_to_ictcp(rgb)?),
         ),
+        (ReferenceOperation::XyzD50ToLabV1, StageSample::Rgb(xyz)) => {
+            let white = crate::types::WhitePointXyz::new(0.96422, 1.0, 0.82521)?;
+            let xyz = crate::types::CieXyz::new(xyz[0], xyz[1], xyz[2])?;
+            Ok(StageSample::Lab(crate::perceptual::xyz_to_lab(xyz, white)?))
+        }
         _ => Err(ReferenceError::MismatchedSampleKind),
     }
 }
@@ -380,6 +393,7 @@ fn scalar_components(samples: &[StageSample]) -> Vec<f64> {
             StageSample::ICtCp(value) => {
                 values.extend([value.intensity, value.tritan, value.protan]);
             }
+            StageSample::Lab(value) => values.extend([value.lightness, value.a, value.b]),
         }
     }
     values

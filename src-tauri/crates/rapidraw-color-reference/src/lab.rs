@@ -534,6 +534,7 @@ fn append_samples(values: &mut Vec<f64>, samples: &[StageSample]) {
             StageSample::ICtCp(value) => {
                 values.extend([value.intensity, value.tritan, value.protan]);
             }
+            StageSample::Lab(value) => values.extend([value.lightness, value.a, value.b]),
         }
     }
 }

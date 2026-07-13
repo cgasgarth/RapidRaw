@@ -197,6 +197,29 @@ fn rec2100_absolute_stage_produces_typed_ictcp_with_auditable_domains() {
 }
 
 #[test]
+fn d50_xyz_stage_produces_typed_lab_without_hidden_clamps() {
+    let result = execute_reference_stage(&request(
+        ReferenceOperation::XyzD50ToLabV1,
+        vec![
+            StageSample::Rgb([0.96422, 1.0, 0.82521]),
+            StageSample::Rgb([-0.01, 0.02, 0.1]),
+        ],
+    ))
+    .unwrap();
+    assert_eq!(result.receipt.input_domain, StageDomain::CieXyzD50);
+    assert_eq!(result.receipt.output_domain, StageDomain::CieLab);
+    assert!(matches!(
+        result.output[0],
+        StageSample::Lab(value)
+            if (value.lightness - 100.0).abs() < 1.0e-12
+                && value.a.abs() < 1.0e-12
+                && value.b.abs() < 1.0e-12
+    ));
+    assert_eq!(result.receipt.diagnostics.negative_input_components, 1);
+    assert_eq!(result.receipt.diagnostics.clamps_applied, 0);
+}
+
+#[test]
 fn every_declared_transform_dispatches_with_its_typed_domain() {
     let cases = [
         request(
