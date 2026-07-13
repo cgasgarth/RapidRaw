@@ -125,11 +125,18 @@ pub struct CompiledEditNode {
 pub struct EditGraphReceipt {
     pub schema_version: u32,
     pub pipeline_version: u32,
+    pub migration: EditGraphMigration,
     pub ordered_node_ids: Arc<[&'static str]>,
     pub omitted_no_op_node_ids: Arc<[&'static str]>,
     pub fused_gpu_groups: Arc<[Arc<[&'static str]>]>,
     pub input_domain: ColorDomain,
     pub output_domain: ColorDomain,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum EditGraphMigration {
+    LegacyV1Defaulted,
+    LegacyV1Explicit,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -138,12 +145,14 @@ pub struct CompiledEditGraph {
     pub pipeline_version: u32,
     pub nodes: Arc<[CompiledEditNode]>,
     pub fingerprint: u64,
+    pub execution_abi_fingerprint: u64,
     pub receipt: EditGraphReceipt,
 }
 
 #[derive(Clone, Copy)]
 pub struct EditGraphCompileInputs<'a> {
     pub pipeline_version: u32,
+    pub version_was_explicit: bool,
     pub source_fingerprint: u64,
     pub geometry_fingerprint: u64,
     pub retouch_fingerprint: u64,
@@ -305,9 +314,18 @@ impl CompiledEditGraph {
             pipeline_version: inputs.pipeline_version,
             nodes: nodes.into(),
             fingerprint,
+            execution_abi_fingerprint: gpu_execution_fingerprint(
+                inputs.adjustments,
+                inputs.has_lut,
+            ),
             receipt: EditGraphReceipt {
                 schema_version: EDIT_GRAPH_SCHEMA_VERSION,
                 pipeline_version: inputs.pipeline_version,
+                migration: if inputs.version_was_explicit {
+                    EditGraphMigration::LegacyV1Explicit
+                } else {
+                    EditGraphMigration::LegacyV1Defaulted
+                },
                 ordered_node_ids,
                 omitted_no_op_node_ids: omitted.into(),
                 fused_gpu_groups,
@@ -319,6 +337,7 @@ impl CompiledEditGraph {
 
     pub fn validate_gpu_execution(
         &self,
+        adjustments: &AllAdjustments,
         has_lut: bool,
         mask_count: usize,
     ) -> Result<(), &'static str> {
@@ -328,6 +347,9 @@ impl CompiledEditGraph {
             .any(|node| node.kind == EditNodeKind::LegacyGpuSceneViewPass);
         if (has_lut || mask_count > 0) && !has_fused {
             return Err("edit_graph.missing_legacy_gpu_scene_view_pass");
+        }
+        if self.execution_abi_fingerprint != gpu_execution_fingerprint(adjustments, has_lut) {
+            return Err("edit_graph.stale_gpu_execution_abi");
         }
         if self.nodes.first().map(|node| node.input_domain)
             != Some(ColorDomain::AcesCgSceneLinearExtended)
@@ -341,6 +363,14 @@ impl CompiledEditGraph {
         }
         Ok(())
     }
+}
+
+pub fn gpu_execution_fingerprint(adjustments: &AllAdjustments, has_lut: bool) -> u64 {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"rapidraw.edit-graph.gpu-execution-abi.v1");
+    hasher.update(bytes_of(adjustments));
+    hasher.update(&[u8::from(has_lut)]);
+    u64::from_le_bytes(hasher.finalize().as_bytes()[..8].try_into().unwrap())
 }
 
 #[allow(clippy::too_many_arguments)]

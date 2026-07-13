@@ -10,4 +10,11 @@ describe('persisted edit graph version', () => {
   test('preserves an explicit version for the native fail-closed compiler', () => {
     expect(normalizeLoadedAdjustments({ rawEngineEditGraphVersion: 2 }).rawEngineEditGraphVersion).toBe(2);
   });
+
+  test('survives the sidecar JSON round trip without reinterpretation', () => {
+    const saved = JSON.stringify(normalizeLoadedAdjustments({ exposure: 14, rawEngineEditGraphVersion: 1 }));
+    const reopened = normalizeLoadedAdjustments(JSON.parse(saved));
+    expect(reopened.rawEngineEditGraphVersion).toBe(1);
+    expect(reopened.exposure).toBe(14);
+  });
 });

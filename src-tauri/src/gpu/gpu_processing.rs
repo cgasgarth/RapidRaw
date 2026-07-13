@@ -1519,7 +1519,11 @@ impl GpuProcessor {
         let mut adjustments = request.adjustments;
         if let Some(edit_graph) = request.edit_graph.as_deref() {
             edit_graph
-                .validate_gpu_execution(request.lut.is_some(), request.mask_bitmaps.len())
+                .validate_gpu_execution(
+                    &adjustments,
+                    request.lut.is_some(),
+                    request.mask_bitmaps.len(),
+                )
                 .map_err(str::to_owned)?;
         }
         let graph = compile_gpu_render_graph(

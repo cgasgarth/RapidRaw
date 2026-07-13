@@ -201,6 +201,7 @@ pub fn compile_render_plan(
     }
     validate_finite(raw, "$")?;
     let effective = normalize_film_look_adjustments_for_render(raw).into_owned();
+    let version_was_explicit = effective.get("rawEngineEditGraphVersion").is_some();
     let pipeline_version = match effective.get("rawEngineEditGraphVersion") {
         None => crate::edit_graph::LEGACY_PIPELINE_VERSION,
         Some(Value::Number(version)) => {
@@ -292,6 +293,7 @@ pub fn compile_render_plan(
         .is_some_and(|patches| !patches.is_empty());
     let edit_graph = Arc::new(CompiledEditGraph::compile(EditGraphCompileInputs {
         pipeline_version,
+        version_was_explicit,
         source_fingerprint: fingerprints.source,
         geometry_fingerprint: fingerprints.geometry,
         retouch_fingerprint: fingerprints.retouch,
@@ -308,10 +310,12 @@ pub fn compile_render_plan(
     }));
     fingerprints.full = edit_graph.fingerprint;
     log::debug!(
-        "compiled_edit_graph schema={} pipeline={} fingerprint={:016x} nodes={:?} omitted={:?} fused={:?}",
+        "compiled_edit_graph schema={} pipeline={} migration={:?} fingerprint={:016x} execution_abi={:016x} nodes={:?} omitted={:?} fused={:?}",
         edit_graph.schema_version,
         edit_graph.pipeline_version,
+        edit_graph.receipt.migration,
         edit_graph.fingerprint,
+        edit_graph.execution_abi_fingerprint,
         edit_graph.nodes,
         edit_graph.receipt.omitted_no_op_node_ids,
         edit_graph.receipt.fused_gpu_groups,
@@ -652,8 +656,16 @@ mod tests {
         );
         active
             .edit_graph
-            .validate_gpu_execution(false, active.masks.len())
+            .validate_gpu_execution(&active.adjustments, false, active.masks.len())
             .unwrap();
+        let mut stale_adjustments = active.adjustments;
+        stale_adjustments.global.exposure += 0.1;
+        assert_eq!(
+            active
+                .edit_graph
+                .validate_gpu_execution(&stale_adjustments, false, active.masks.len()),
+            Err("edit_graph.stale_gpu_execution_abi")
+        );
         assert_eq!(active.fingerprints.full, active.edit_graph.fingerprint);
         assert_ne!(
             neutral.edit_graph.fingerprint,
@@ -673,6 +685,14 @@ mod tests {
         assert_eq!(
             implicit.edit_graph.fingerprint,
             explicit.edit_graph.fingerprint
+        );
+        assert_eq!(
+            implicit.edit_graph.receipt.migration,
+            crate::edit_graph::EditGraphMigration::LegacyV1Defaulted
+        );
+        assert_eq!(
+            explicit.edit_graph.receipt.migration,
+            crate::edit_graph::EditGraphMigration::LegacyV1Explicit
         );
         assert_eq!(explicit.effective_json["rawEngineEditGraphVersion"], 1);
 
