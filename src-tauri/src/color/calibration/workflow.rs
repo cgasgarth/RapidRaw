@@ -194,12 +194,7 @@ pub(crate) async fn combine_color_chart_calibrations(
 ) -> Result<DualCalibrationJobResult, String> {
     let managed_root = managed_profile_root(&app).map_err(|error| error.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
-        if (input.warm.quality_status == CalibrationQualityStatus::WarningPublishable
-            || input.cool.quality_status == CalibrationQualityStatus::WarningPublishable)
-            && !input.confirm_warning
-        {
-            return Err("chart_calibration_warning_confirmation_required".to_string());
-        }
+        validate_dual_endpoints(&input.warm, &input.cool, input.confirm_warning)?;
         let bytes = encode_generated_dual_matrix_dcp(&input.warm, &input.cool, &input.profile_name)
             .map_err(|error| error.to_string())?;
         let warm_solver_fingerprint = input.warm.solver_fingerprint.clone();
@@ -220,6 +215,39 @@ pub(crate) async fn combine_color_chart_calibrations(
     })
     .await
     .map_err(|error| error.to_string())?
+}
+
+fn validate_dual_endpoints(
+    warm: &super::CalibrationFitReceipt,
+    cool: &super::CalibrationFitReceipt,
+    confirm_warning: bool,
+) -> Result<(), String> {
+    if !warm.quality_status.publishable() || !cool.quality_status.publishable() {
+        return Err("chart_calibration_quality_not_publishable".into());
+    }
+    if (warm.quality_status == CalibrationQualityStatus::WarningPublishable
+        || cool.quality_status == CalibrationQualityStatus::WarningPublishable)
+        && !confirm_warning
+    {
+        return Err("chart_calibration_warning_confirmation_required".into());
+    }
+    if warm.camera_identity != cool.camera_identity {
+        return Err("chart_calibration_dual_camera_mismatch".into());
+    }
+    if warm.raw_processing_profile != cool.raw_processing_profile {
+        return Err("chart_calibration_dual_decode_mismatch".into());
+    }
+    if warm.chart_id != cool.chart_id || warm.chart_version != cool.chart_version {
+        return Err("chart_calibration_dual_chart_mismatch".into());
+    }
+    if warm.contract != cool.contract || warm.implementation_version != cool.implementation_version
+    {
+        return Err("chart_calibration_dual_solver_mismatch".into());
+    }
+    if warm.solver_fingerprint == cool.solver_fingerprint {
+        return Err("chart_calibration_dual_duplicate_endpoint".into());
+    }
+    Ok(())
 }
 
 fn publish_generated_profile(
@@ -287,8 +315,7 @@ mod tests {
     };
     use crate::color::camera_profile::registry::resolve_managed_profile;
 
-    #[test]
-    fn publish_is_atomic_registry_compatible_and_provenance_sidecar_is_restart_safe() {
+    fn fixture_receipt() -> CalibrationFitReceipt {
         let metrics = ColorErrorMetrics {
             mean_delta_e00: 0.5,
             median_delta_e00: 0.4,
@@ -297,7 +324,7 @@ mod tests {
             neutral_axis_error: 0.2,
             skin_mean_delta_e00: Some(0.6),
         };
-        let receipt = CalibrationFitReceipt {
+        CalibrationFitReceipt {
             contract: CALIBRATION_CONTRACT.into(),
             implementation_version: CALIBRATION_SOLVER_VERSION,
             camera_identity: "Synthetic Camera".into(),
@@ -328,7 +355,12 @@ mod tests {
             quality_status: CalibrationQualityStatus::Excellent,
             warning_codes: Vec::new(),
             solver_fingerprint: "blake3:test".into(),
-        };
+        }
+    }
+
+    #[test]
+    fn publish_is_atomic_registry_compatible_and_provenance_sidecar_is_restart_safe() {
+        let receipt = fixture_receipt();
         let root = tempfile::tempdir().unwrap();
         let id = publish_generated_profile(root.path(), &receipt, "Generated Neutral").unwrap();
         let (profile, source) = resolve_managed_profile(&id, root.path()).unwrap();
@@ -358,5 +390,39 @@ mod tests {
         cancel_color_chart_calibration("calibration-cancel-test".into()).unwrap();
         ChartCalibrationJob::begin("calibration-cancel-test".into())
             .expect("completed job identity can be reused");
+    }
+
+    #[test]
+    fn dual_endpoints_require_publishable_compatible_independent_receipts() {
+        let warm = fixture_receipt();
+        let mut cool = fixture_receipt();
+        cool.illuminant.cct_kelvin = Some(2850.0);
+        cool.solver_fingerprint = "blake3:cool".into();
+        assert!(validate_dual_endpoints(&warm, &cool, false).is_ok());
+
+        let mut mismatch = cool.clone();
+        mismatch.camera_identity = "Other Camera".into();
+        assert_eq!(
+            validate_dual_endpoints(&warm, &mismatch, false).unwrap_err(),
+            "chart_calibration_dual_camera_mismatch"
+        );
+        mismatch = cool.clone();
+        mismatch.raw_processing_profile = "other-decode".into();
+        assert_eq!(
+            validate_dual_endpoints(&warm, &mismatch, false).unwrap_err(),
+            "chart_calibration_dual_decode_mismatch"
+        );
+        mismatch = cool.clone();
+        mismatch.quality_status = CalibrationQualityStatus::FailedValidationOverfit;
+        assert_eq!(
+            validate_dual_endpoints(&warm, &mismatch, true).unwrap_err(),
+            "chart_calibration_quality_not_publishable"
+        );
+        mismatch = cool;
+        mismatch.quality_status = CalibrationQualityStatus::WarningPublishable;
+        assert_eq!(
+            validate_dual_endpoints(&warm, &mismatch, false).unwrap_err(),
+            "chart_calibration_warning_confirmation_required"
+        );
     }
 }
