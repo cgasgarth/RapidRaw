@@ -209,12 +209,6 @@ pub struct ImportJob {
     pub task_handle: Option<tauri::async_runtime::JoinHandle<()>>,
 }
 
-pub struct TransformedImageCache {
-    pub identity: crate::render::artifact_identity::RenderArtifactIdentity,
-    pub image: Arc<DynamicImage>,
-    pub offset: (f32, f32),
-}
-
 pub struct WarpedImageCache {
     pub identity: crate::render::artifact_identity::RenderArtifactIdentity,
     pub image: Arc<DynamicImage>,
@@ -275,7 +269,6 @@ pub struct AppState {
     pub load_image_generation: Arc<AtomicUsize>,
     pub image_open_coordinator: crate::image_open_session::ImageOpenCoordinator,
     pub full_warped_cache: Mutex<Option<WarpedImageCache>>,
-    pub full_transformed_cache: Mutex<Option<TransformedImageCache>>,
     pub decoded_image_cache: DecodedImageCache,
     pub source_fingerprint_cache: Arc<FingerprintCache>,
     pub thumbnail_scheduler: Arc<crate::library::thumbnail_scheduler::ThumbnailScheduler>,
@@ -376,7 +369,6 @@ impl AppState {
             load_image_generation: Arc::new(AtomicUsize::new(0)),
             image_open_coordinator: crate::image_open_session::ImageOpenCoordinator::default(),
             full_warped_cache: Mutex::new(None),
-            full_transformed_cache: Mutex::new(None),
             decoded_image_cache: DecodedImageCache::new(5, Arc::clone(&cache_budget)),
             source_fingerprint_cache: Arc::new(FingerprintCache::new(64)),
             thumbnail_scheduler: crate::library::thumbnail_scheduler::ThumbnailScheduler::new(
