@@ -21,6 +21,23 @@ const fixtureReport = {
     warningCodes: [],
   },
   demosaicPath: 'bayer_hq',
+  highlightReconstruction: {
+    algorithmId: 'sensor_linear_confidence_hierarchy_v2',
+    cfaKind: 'bayer',
+    clippedSamples: 12,
+    confidencePercentiles: [0.2, 0.45, 0.7, 0.9, 1],
+    implementationVersion: 2,
+    invalidSamples: 0,
+    largestClippedRegion: 5,
+    methodCounts: { cross_channel_ratio: 8, same_channel_spatial: 4 },
+    mode: 'strong',
+    nearClippedSamples: 7,
+    partiallyReconstructedSamples: 1,
+    postDemosaicFallbackSamples: 0,
+    reconstructedSamples: 11,
+    unrecoverableSamples: 1,
+    warningCodes: ['highlight_reconstruction_partial'],
+  },
   processingProfile: 'maximum',
 };
 
@@ -45,6 +62,9 @@ const failures = [
   rawReport?.cameraProfile.status === 'interpolated' ? null : 'export receipt did not parse interpolated report',
   rawReport?.cameraProfile.matrixHash === 'blake3:abcdef0123456789' ? null : 'export receipt lost matrix hash',
   rawReport?.processingProfile === 'maximum' ? null : 'export receipt lost RAW processing profile',
+  rawReport?.highlightReconstruction.reconstructedSamples === 11
+    ? null
+    : 'export receipt lost highlight reconstruction report',
   receipt.outputs[0]?.rawProvenanceSidecarPath?.endsWith('.rawengine-provenance.json')
     ? null
     : 'export receipt lost RAW provenance sidecar path',
