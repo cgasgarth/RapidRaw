@@ -4083,8 +4083,12 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
     masked WGPU execution; legacy edits remain explicit `legacy_v1` nodes.
     The compact UI exposes Texture and protection controls, with direct band,
     halo, ringing, amount, and conservative chroma controls under Advanced.
-    Scalar artifact bounds, Metal output/cache/local parity, strict sidecar
-    recovery, and private real-RAW preview/export evidence are required gates.
+    CPU/WGPU artifact bounds, exact halo-aware tiled CPU execution, Metal
+    output/cache/local parity, distinct capture/creative/output stage
+    identities, strict sidecar recovery, and private real-RAW preview/export
+    evidence are required gates. The production-loader Alaska comparison is
+    programmatic and private-only; final app preview/export proof remains a
+    release gate rather than being inferred from control visibility.
 - `detail(noise): separate chroma and luma noise`
 - `validation(noise): add high ISO fixture set`
 - `validation(raw): add private real RAW crop evidence ledger`
