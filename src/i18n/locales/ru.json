@@ -396,6 +396,32 @@
       "roundness": "Округлость",
       "size": "Размер",
       "vignette": "Виньетирование"
+    },
+    "perspective": {
+      "addHorizontalGuide": "Add horizontal guide",
+      "addVerticalGuide": "Add vertical guide",
+      "amount": "Correction amount",
+      "analyze": "Analyze / refresh",
+      "confidence": "Confidence",
+      "crop": {
+        "autoCrop": "Auto crop",
+        "constrain": "Constrain",
+        "manualAfter": "Manual crop after correction",
+        "preserveCurrent": "Preserve current crop",
+        "showAll": "Show all"
+      },
+      "heading": "Perspective correction",
+      "modes": {
+        "autoFull": "Auto full",
+        "autoHorizontal": "Auto horizontal",
+        "autoLevel": "Auto level",
+        "autoVertical": "Auto vertical",
+        "guided": "Guided",
+        "manualLegacy": "Manual legacy",
+        "off": "Off"
+      },
+      "resetSolved": "Reset solved correction",
+      "retainedArea": "Retained area"
     }
   },
   "contextMenus": {

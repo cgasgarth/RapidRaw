@@ -1,8 +1,13 @@
 import { invoke } from '@tauri-apps/api/core';
 import cx from 'clsx';
-import { Aperture, CircleDashed, Loader, SquareDashed, Wand2 } from 'lucide-react';
+import { Aperture, CircleDashed, Grid3X3, Loader, Plus, SquareDashed, Trash2, Wand2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-
+import { useTranslation } from 'react-i18next';
+import {
+  type PerspectiveCorrectionMode,
+  type PerspectiveCropPolicy,
+  perspectiveAnalysisResultSchema,
+} from '../../schemas/geometry/perspectiveSchemas';
 import { Invokes } from '../../tauri/commands';
 import { TextVariants } from '../../types/typography';
 import type { Adjustments } from '../../utils/adjustments';
@@ -23,6 +28,7 @@ type LensCorrectionMode = Adjustments['lensCorrectionMode'];
 type ExifData = Record<string, string | number | null | undefined>;
 type AutodetectLensResult = [string, string] | { maker: string; model: string };
 type DetectionStatus = 'idle' | 'detecting' | 'success' | 'not_found' | 'error';
+type PerspectiveStatus = 'idle' | 'analyzing' | 'ready' | 'abstained' | 'error';
 
 interface TransformLensProps {
   adjustments: Adjustments;
@@ -80,7 +86,10 @@ const normalizeAutodetectLensResult = (value: AutodetectLensResult | null): { ma
   return value.maker.length > 0 && value.model.length > 0 ? value : null;
 };
 
-const toOptions = (values: string[]): Array<OptionItem<string>> => values.map((value) => ({ label: value, value }));
+const toOptions = (values: unknown): Array<OptionItem<string>> =>
+  Array.isArray(values)
+    ? values.filter((value): value is string => typeof value === 'string').map((value) => ({ label: value, value }))
+    : [];
 
 export default function TransformLens({
   adjustments,
@@ -88,9 +97,12 @@ export default function TransformLens({
   selectedImage,
   setAdjustments,
 }: TransformLensProps) {
+  const { t } = useTranslation();
   const [makers, setMakers] = useState<string[]>([]);
   const [lenses, setLenses] = useState<string[]>([]);
   const [detectionStatus, setDetectionStatus] = useState<DetectionStatus>('idle');
+  const [perspectiveStatus, setPerspectiveStatus] = useState<PerspectiveStatus>('idle');
+  const [perspectiveMessage, setPerspectiveMessage] = useState<string | null>(null);
 
   const selectedExif = selectedImage?.exif as ExifData | null | undefined;
   const focalLength = useMemo(
@@ -239,6 +251,107 @@ export default function TransformLens({
     ],
     [],
   );
+  const perspectiveModeOptions = useMemo<Array<OptionItem<PerspectiveCorrectionMode>>>(
+    () => [
+      { label: t('adjustments.perspective.modes.off'), value: 'off' },
+      { label: t('adjustments.perspective.modes.autoLevel'), value: 'auto_level' },
+      { label: t('adjustments.perspective.modes.autoVertical'), value: 'auto_vertical' },
+      { label: t('adjustments.perspective.modes.autoHorizontal'), value: 'auto_horizontal' },
+      { label: t('adjustments.perspective.modes.autoFull'), value: 'auto_full' },
+      { label: t('adjustments.perspective.modes.guided'), value: 'guided' },
+      { label: t('adjustments.perspective.modes.manualLegacy'), value: 'manual_legacy' },
+    ],
+    [t],
+  );
+  const perspectiveCropOptions = useMemo<Array<OptionItem<PerspectiveCropPolicy>>>(
+    () => [
+      { label: t('adjustments.perspective.crop.autoCrop'), value: 'auto_crop' },
+      { label: t('adjustments.perspective.crop.constrain'), value: 'constrain' },
+      { label: t('adjustments.perspective.crop.showAll'), value: 'show_all' },
+      { label: t('adjustments.perspective.crop.preserveCurrent'), value: 'preserve_current_crop' },
+      { label: t('adjustments.perspective.crop.manualAfter'), value: 'manual_after_correction' },
+    ],
+    [t],
+  );
+
+  const updatePerspective = (next: Partial<Adjustments['perspectiveCorrection']>) => {
+    setAdjustments((prev) => ({
+      ...prev,
+      perspectiveCorrection: { ...prev.perspectiveCorrection, ...next },
+    }));
+  };
+
+  const analyzePerspective = async () => {
+    setPerspectiveStatus('analyzing');
+    try {
+      const raw = await invoke<unknown>(Invokes.AnalyzePerspectiveCorrection, {
+        adjustments,
+        settings: { ...adjustments.perspectiveCorrection, amount: 100, resolvedPlan: null },
+      });
+      const result = perspectiveAnalysisResultSchema.parse(raw);
+      updatePerspective({ resolvedPlan: result.receipt.plan });
+      setPerspectiveStatus(result.receipt.abstentionReason === null ? 'ready' : 'abstained');
+      setPerspectiveMessage(result.receipt.abstentionReason ?? result.receipt.plan.warningCodes[0] ?? null);
+    } catch (error) {
+      setPerspectiveStatus('error');
+      setPerspectiveMessage('perspective.analysis_failed');
+      console.error('Failed to analyze perspective', error);
+    }
+  };
+
+  const addGuide = (className: 'horizontal' | 'vertical') => {
+    setAdjustments((prev) => {
+      const familyCount = prev.perspectiveCorrection.guides.filter((guide) => guide.class === className).length;
+      if (familyCount >= 2) return prev;
+      const position = familyCount === 0 ? 0.25 : 0.75;
+      const endpointsSourceNormalized: [[number, number], [number, number]] =
+        className === 'horizontal'
+          ? [
+              [0.15, position],
+              [0.85, position],
+            ]
+          : [
+              [position, 0.15],
+              [position, 0.85],
+            ];
+      return {
+        ...prev,
+        perspectiveCorrection: {
+          ...prev.perspectiveCorrection,
+          guides: [
+            ...prev.perspectiveCorrection.guides,
+            {
+              class: className,
+              endpointsSourceNormalized,
+              id: crypto.randomUUID(),
+              weight: 1,
+            },
+          ],
+          resolvedPlan: null,
+        },
+      };
+    });
+  };
+
+  const updateGuideCoordinate = (id: string, endpoint: 0 | 1, axis: 0 | 1, value: number) => {
+    if (!Number.isFinite(value)) return;
+    setAdjustments((prev) => ({
+      ...prev,
+      perspectiveCorrection: {
+        ...prev.perspectiveCorrection,
+        guides: prev.perspectiveCorrection.guides.map((guide) => {
+          if (guide.id !== id) return guide;
+          const endpoints = guide.endpointsSourceNormalized.map((point) => [...point]) as [
+            [number, number],
+            [number, number],
+          ];
+          endpoints[endpoint][axis] = Math.min(1, Math.max(0, value));
+          return { ...guide, endpointsSourceNormalized: endpoints };
+        }),
+        resolvedPlan: null,
+      },
+    }));
+  };
   const detectionLabel =
     detectionStatus === 'detecting'
       ? copy.detecting
@@ -252,6 +365,170 @@ export default function TransformLens({
 
   return (
     <div className="space-y-2" data-testid="transform-lens-inspector">
+      <section className="space-y-1.5" data-testid="perspective-correction-controls">
+        <div className="flex items-center justify-between gap-2">
+          <UiText variant={TextVariants.label} className="text-[11px] font-semibold uppercase text-text-secondary">
+            {t('adjustments.perspective.heading')}
+          </UiText>
+          <span className={cx(statusChipClassName, 'bg-editor-panel text-text-secondary')}>
+            {perspectiveStatus === 'analyzing' ? <Loader className="animate-spin" size={11} /> : <Grid3X3 size={11} />}
+            {perspectiveStatus}
+          </span>
+        </div>
+        <div className="space-y-1.5 rounded border border-editor-border bg-editor-panel-well p-1.5">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+            <Dropdown
+              chrome="editor"
+              onChange={(mode) => {
+                updatePerspective({ mode, resolvedPlan: null });
+                setPerspectiveStatus('idle');
+                setPerspectiveMessage(null);
+              }}
+              options={perspectiveModeOptions}
+              value={adjustments.perspectiveCorrection.mode}
+            />
+            <button
+              aria-label={t('adjustments.perspective.analyze')}
+              className="inline-flex h-7 w-8 items-center justify-center rounded border border-editor-border text-text-secondary hover:bg-editor-selected-quiet disabled:opacity-45"
+              disabled={
+                perspectiveStatus === 'analyzing' || !adjustments.perspectiveCorrection.mode.startsWith('auto_')
+              }
+              onClick={() => void analyzePerspective()}
+              type="button"
+            >
+              {perspectiveStatus === 'analyzing' ? <Loader className="animate-spin" size={14} /> : <Wand2 size={14} />}
+            </button>
+          </div>
+          {adjustments.perspectiveCorrection.mode !== 'off' &&
+            adjustments.perspectiveCorrection.mode !== 'manual_legacy' && (
+              <>
+                <AdjustmentSlider
+                  density="compact"
+                  fillOrigin="min"
+                  label={t('adjustments.perspective.amount')}
+                  max={100}
+                  min={0}
+                  onDragStateChange={onDragStateChange}
+                  onValueChange={(amount) => updatePerspective({ amount })}
+                  step={1}
+                  suffix="%"
+                  value={adjustments.perspectiveCorrection.amount}
+                />
+                <Dropdown
+                  chrome="editor"
+                  onChange={(cropPolicy) => updatePerspective({ cropPolicy })}
+                  options={perspectiveCropOptions}
+                  value={adjustments.perspectiveCorrection.cropPolicy}
+                />
+              </>
+            )}
+          {adjustments.perspectiveCorrection.resolvedPlan && (
+            <div
+              className="grid grid-cols-2 gap-1 text-[10px] text-text-secondary"
+              data-testid="perspective-evidence-summary"
+            >
+              <span>
+                {t('adjustments.perspective.confidence')}:{' '}
+                {Math.round(adjustments.perspectiveCorrection.resolvedPlan.confidence * 100)}%
+              </span>
+              <span>
+                {t('adjustments.perspective.retainedArea')}:{' '}
+                {Math.round(adjustments.perspectiveCorrection.resolvedPlan.retainedArea * 100)}%
+              </span>
+            </div>
+          )}
+          {perspectiveMessage && (
+            <div
+              className="rounded border border-editor-warning bg-editor-warning-surface px-1.5 py-1 text-[10px] text-text-secondary"
+              role="status"
+            >
+              {perspectiveMessage}
+            </div>
+          )}
+          {adjustments.perspectiveCorrection.resolvedPlan && (
+            <button
+              className="w-full rounded border border-editor-border px-1.5 py-1 text-[10px] text-text-secondary hover:bg-editor-selected-quiet"
+              onClick={() => {
+                updatePerspective({ resolvedPlan: null });
+                setPerspectiveStatus('idle');
+                setPerspectiveMessage(null);
+              }}
+              type="button"
+            >
+              {t('adjustments.perspective.resetSolved')}
+            </button>
+          )}
+          {adjustments.perspectiveCorrection.mode === 'guided' && (
+            <div className="space-y-1" data-testid="perspective-guide-list">
+              <div className="grid grid-cols-2 gap-1">
+                <button
+                  className="inline-flex items-center justify-center gap-1 rounded border border-editor-border p-1 text-[10px]"
+                  onClick={() => addGuide('horizontal')}
+                  type="button"
+                >
+                  <Plus size={10} />
+                  {t('adjustments.perspective.addHorizontalGuide')}
+                </button>
+                <button
+                  className="inline-flex items-center justify-center gap-1 rounded border border-editor-border p-1 text-[10px]"
+                  onClick={() => addGuide('vertical')}
+                  type="button"
+                >
+                  <Plus size={10} />
+                  {t('adjustments.perspective.addVerticalGuide')}
+                </button>
+              </div>
+              {adjustments.perspectiveCorrection.guides.map((guide, index) => (
+                <div className="space-y-1 rounded border border-editor-border px-1.5 py-1 text-[10px]" key={guide.id}>
+                  <div className="flex items-center justify-between">
+                    <span>
+                      {guide.class} {index + 1}
+                    </span>
+                    <button
+                      aria-label={`Delete ${guide.class} guide`}
+                      onClick={() =>
+                        updatePerspective({
+                          guides: adjustments.perspectiveCorrection.guides.filter(
+                            (candidate) => candidate.id !== guide.id,
+                          ),
+                          resolvedPlan: null,
+                        })
+                      }
+                      type="button"
+                    >
+                      <Trash2 size={11} />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-4 gap-1">
+                    {guide.endpointsSourceNormalized.flatMap((point, endpoint) =>
+                      point.map((coordinate, axis) => (
+                        <input
+                          aria-label={`${guide.class} guide ${index + 1} endpoint ${endpoint + 1} ${axis === 0 ? 'x' : 'y'}`}
+                          className="min-w-0 rounded border border-editor-border bg-editor-panel px-1 py-0.5"
+                          key={`${endpoint}-${axis}`}
+                          max={1}
+                          min={0}
+                          onChange={(event) =>
+                            updateGuideCoordinate(
+                              guide.id,
+                              endpoint as 0 | 1,
+                              axis as 0 | 1,
+                              event.currentTarget.valueAsNumber,
+                            )
+                          }
+                          step={0.001}
+                          type="number"
+                          value={coordinate}
+                        />
+                      )),
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
       <section className="space-y-1.5">
         <UiText variant={TextVariants.label} className="text-[11px] font-semibold uppercase text-text-secondary">
           {copy.transformHeading}

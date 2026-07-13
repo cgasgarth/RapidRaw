@@ -19,6 +19,7 @@ import {
   type PreviewQualityStatus,
   type PreviewRoi,
 } from '../../utils/adaptivePreviewQuality';
+import { decideAdjustmentPersistence } from '../../utils/adjustmentPersistence';
 import type { AdjustmentSnapshot } from '../../utils/adjustmentSnapshots';
 import { type Adjustments, COPYABLE_ADJUSTMENT_KEYS } from '../../utils/adjustments';
 import { areAdjustmentsEqual } from '../../utils/adjustmentsSnapshot';
@@ -1002,9 +1003,15 @@ export function useImageProcessing(
   useEffect(() => {
     if (!selectedImage?.isReady) return;
     const previous = prevAdjustmentsRef.current;
-    if (previous?.path === selectedImage.path && areAdjustmentsEqual(previous.adjustments, adjustments)) {
+    const persistence = decideAdjustmentPersistence(previous, selectedImage.path, adjustments, areAdjustmentsEqual);
+    if (persistence.action === 'prime') {
+      // A newly selected image can become preview-ready before its metadata phase
+      // hydrates the editor store. Prime the comparison snapshot without writing so
+      // INITIAL_ADJUSTMENTS cannot race and replace the image's persisted edits.
+      prevAdjustmentsRef.current = persistence.snapshot;
       return;
     }
+    if (persistence.action === 'unchanged') return;
 
     if (persistIdleTimer.current) clearTimeout(persistIdleTimer.current);
 

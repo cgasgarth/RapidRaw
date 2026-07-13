@@ -283,6 +283,7 @@ pub fn compile_render_plan(
         &masks,
     );
     adjustments.global.edit_graph_version = pipeline_version as f32;
+    validate_perspective_analysis_currentness(&effective, context.revision.source_revision)?;
     let geometry = get_geometry_params_from_json(&effective);
     let mut fingerprints = fingerprints(
         context.revision.source_revision,
@@ -339,6 +340,53 @@ pub fn compile_render_plan(
         effective_json: Arc::new(effective),
         compile_time: started.elapsed(),
     })
+}
+
+fn validate_perspective_analysis_currentness(
+    effective: &Value,
+    source_revision: u64,
+) -> Result<(), RenderPlanError> {
+    let Some(identity) = effective
+        .get("perspectiveCorrection")
+        .and_then(|settings| settings.get("resolvedPlan"))
+        .and_then(|plan| plan.get("analysisIdentity"))
+        .filter(|identity| !identity.is_null())
+    else {
+        return Ok(());
+    };
+    let orientation = effective
+        .get("orientationSteps")
+        .and_then(Value::as_u64)
+        .unwrap_or_default();
+    let lens_contract = serde_json::to_string(
+        effective
+            .get("lensDistortionParams")
+            .unwrap_or(&Value::Null),
+    )
+    .unwrap_or_default();
+    let current = [
+        source_revision,
+        crate::render::artifact_identity::stable_hash(&orientation),
+        crate::render::artifact_identity::stable_hash(&lens_contract),
+    ];
+    let persisted = [
+        identity.get("sourceRevision").and_then(Value::as_u64),
+        identity
+            .get("orientationFingerprint")
+            .and_then(Value::as_u64),
+        identity
+            .get("lensGeometryFingerprint")
+            .and_then(Value::as_u64),
+    ];
+    if persisted != current.map(Some) {
+        return Err(RenderPlanError {
+            code: "render_plan.stale_perspective_analysis",
+            field: "perspectiveCorrection.resolvedPlan.analysisIdentity",
+            message: "perspective evidence does not match source, orientation, or lens geometry"
+                .to_string(),
+        });
+    }
+    Ok(())
 }
 
 pub fn content_revision(
@@ -515,6 +563,9 @@ fn geometry_bytes(params: &GeometryParams, crop: Option<Crop>) -> Vec<u8> {
     f!(params.vig_k1);
     f!(params.vig_k2);
     f!(params.vig_k3);
+    for value in params.perspective_source_to_corrected {
+        f!(value);
+    }
     if let Some(crop) = crop {
         for value in [crop.x, crop.y, crop.width, crop.height] {
             out.extend_from_slice(&canonical_f64(value).to_le_bytes());
@@ -1164,6 +1215,43 @@ mod tests {
         assert!(!Arc::ptr_eq(&first, &second));
         assert_ne!(first.fingerprints.source, second.fingerprints.source);
         assert_ne!(first.fingerprints.full, second.fingerprints.full);
+    }
+
+    #[test]
+    fn perspective_analysis_rejects_stale_source_orientation_or_lens_identity() {
+        let source_revision = 77;
+        let orientation = 2_u64;
+        let lens = json!({"k1": 0.1});
+        let lens_contract = serde_json::to_string(&lens).unwrap();
+        let effective = json!({
+            "orientationSteps": orientation,
+            "lensDistortionParams": lens,
+            "perspectiveCorrection": {
+                "resolvedPlan": {
+                    "analysisIdentity": {
+                        "sourceRevision": source_revision,
+                        "orientationFingerprint": crate::render::artifact_identity::stable_hash(&orientation),
+                        "lensGeometryFingerprint": crate::render::artifact_identity::stable_hash(&lens_contract)
+                    }
+                }
+            }
+        });
+        validate_perspective_analysis_currentness(&effective, source_revision).unwrap();
+        assert_eq!(
+            validate_perspective_analysis_currentness(&effective, source_revision + 1)
+                .unwrap_err()
+                .code,
+            "render_plan.stale_perspective_analysis"
+        );
+        let mut changed_orientation = effective.clone();
+        changed_orientation["orientationSteps"] = json!(3);
+        assert!(
+            validate_perspective_analysis_currentness(&changed_orientation, source_revision)
+                .is_err()
+        );
+        let mut changed_lens = effective;
+        changed_lens["lensDistortionParams"] = json!({"k1": 0.2});
+        assert!(validate_perspective_analysis_currentness(&changed_lens, source_revision).is_err());
     }
 
     #[test]
