@@ -2805,6 +2805,206 @@ mod blur_pass_tests {
 
     #[cfg(feature = "tauri-test")]
     #[test]
+    fn private_alaska_raw_multiscale_detail_writes_numeric_quality_report_when_enabled() {
+        use image::imageops::FilterType;
+        use sha2::{Digest, Sha256};
+        use std::fs;
+        use std::path::PathBuf;
+        use tauri::Manager;
+
+        if std::env::var("RAWENGINE_RUN_PRIVATE_MULTISCALE_DETAIL_PROOF")
+            .ok()
+            .as_deref()
+            != Some("1")
+        {
+            eprintln!("skipping private Alaska multiscale detail proof");
+            return;
+        }
+        let source_path = PathBuf::from(
+            std::env::var("RAWENGINE_PRIVATE_RAW_SOURCE")
+                .expect("RAWENGINE_PRIVATE_RAW_SOURCE must select a private Alaska RAW"),
+        );
+        let private_root = PathBuf::from(
+            std::env::var("RAWENGINE_PRIVATE_RAW_ROOT")
+                .expect("RAWENGINE_PRIVATE_RAW_ROOT must select a private artifact root"),
+        );
+        let output_dir =
+            private_root.join("private-artifacts/validation/detail-multiscale-real-raw");
+        fs::create_dir_all(&output_dir).expect("private detail artifact directory is created");
+        let source_bytes = fs::read(&source_path).expect("private RAW can be read");
+        let source_hash_before = Sha256::digest(&source_bytes);
+        let decoded = crate::image_loader::load_base_image_from_bytes(
+            &source_bytes,
+            &source_path.to_string_lossy(),
+            false,
+            &crate::app_settings::AppSettings::default(),
+            None,
+        )
+        .expect("private RAW decodes through the production loader");
+        let source = decoded.resize(1200, 1200, FilterType::Lanczos3);
+
+        let _test_guard = GPU_TEST_LOCK.lock().unwrap();
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock Tauri app builds");
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state)
+            .expect("compute-only GPU context initializes");
+        let identity = PreGpuImageIdentity::for_source(&source, "private_alaska_multiscale_detail");
+        let render = |adjustments| {
+            process_and_get_dynamic_image(
+                &context,
+                &state,
+                &source,
+                identity,
+                RenderRequest {
+                    adjustments,
+                    mask_bitmaps: &[],
+                    lut: None,
+                    roi: None,
+                },
+                "private_alaska_multiscale_detail",
+            )
+            .expect("private RAW WGPU render succeeds")
+            .to_rgb16()
+        };
+        let mut neutral_settings = AllAdjustments::default();
+        neutral_settings.global.is_raw_image = 1;
+        let baseline = render(neutral_settings);
+        let mut legacy_settings = AllAdjustments::default();
+        legacy_settings.global.is_raw_image = 1;
+        legacy_settings.global.sharpness = 0.65;
+        legacy_settings.global.sharpness_threshold = 0.0;
+        let legacy = render(legacy_settings);
+        let mut multiscale_settings = AllAdjustments::default();
+        multiscale_settings.global.is_raw_image = 1;
+        multiscale_settings.global.sharpness = 0.65;
+        multiscale_settings.global.multiscale_detail.process_version = 1;
+        multiscale_settings.global.multiscale_detail.overall_amount = 1.0;
+        multiscale_settings
+            .global
+            .multiscale_detail
+            .noise_protection = 1.0;
+        multiscale_settings
+            .global
+            .multiscale_detail
+            .halo_suppression = 1.0;
+        multiscale_settings
+            .global
+            .multiscale_detail
+            .ringing_suppression = 1.0;
+        let multiscale = render(multiscale_settings);
+        let (width, height) = baseline.dimensions();
+        let luma = |pixel: &image::Rgb<u16>| {
+            f64::from(pixel[0]) * 0.272_228_72
+                + f64::from(pixel[1]) * 0.674_081_74
+                + f64::from(pixel[2]) * 0.053_689_52
+        };
+        let mut legacy_shadow_delta = 0.0;
+        let mut multiscale_shadow_delta = 0.0;
+        let mut shadow_count = 0_u64;
+        let mut legacy_edge_delta = 0.0;
+        let mut multiscale_edge_delta = 0.0;
+        let mut edge_count = 0_u64;
+        let mut changed_pixels = 0_u64;
+        for y in 1..height - 1 {
+            for x in 1..width - 1 {
+                let center = baseline.get_pixel(x, y);
+                let gradient =
+                    (luma(baseline.get_pixel(x + 1, y)) - luma(baseline.get_pixel(x - 1, y))).abs()
+                        + (luma(baseline.get_pixel(x, y + 1)) - luma(baseline.get_pixel(x, y - 1)))
+                            .abs();
+                let delta = |edited: &image::Rgb<u16>| {
+                    (0..3)
+                        .map(|channel| {
+                            (f64::from(edited[channel]) - f64::from(center[channel])).abs()
+                        })
+                        .sum::<f64>()
+                        / 3.0
+                };
+                let legacy_delta = delta(legacy.get_pixel(x, y));
+                let multiscale_delta = delta(multiscale.get_pixel(x, y));
+                if multiscale_delta > 0.5 {
+                    changed_pixels += 1;
+                }
+                if luma(center) < 12_000.0 && gradient < 700.0 {
+                    legacy_shadow_delta += legacy_delta;
+                    multiscale_shadow_delta += multiscale_delta;
+                    shadow_count += 1;
+                }
+                if gradient > 4_000.0 {
+                    legacy_edge_delta += legacy_delta;
+                    multiscale_edge_delta += multiscale_delta;
+                    edge_count += 1;
+                }
+            }
+        }
+        assert!(
+            shadow_count > 100,
+            "private RAW must provide shadow-flat samples"
+        );
+        assert!(
+            edge_count > 100,
+            "private RAW must provide strong-edge samples"
+        );
+        let legacy_shadow_delta = legacy_shadow_delta / shadow_count as f64;
+        let multiscale_shadow_delta = multiscale_shadow_delta / shadow_count as f64;
+        let legacy_edge_delta = legacy_edge_delta / edge_count as f64;
+        let multiscale_edge_delta = multiscale_edge_delta / edge_count as f64;
+        let evaluated_pixels = u64::from((width - 2) * (height - 2));
+        let changed_pixel_ratio = changed_pixels as f64 / evaluated_pixels as f64;
+        assert!(changed_pixel_ratio > 0.01);
+        assert!(multiscale_shadow_delta < legacy_shadow_delta);
+        assert!(multiscale_edge_delta < legacy_edge_delta);
+
+        baseline
+            .save(output_dir.join("alaska-detail-neutral.tiff"))
+            .expect("neutral private TIFF is written");
+        legacy
+            .save(output_dir.join("alaska-detail-legacy.tiff"))
+            .expect("legacy private TIFF is written");
+        multiscale
+            .save(output_dir.join("alaska-detail-multiscale.tiff"))
+            .expect("multiscale private TIFF is written");
+        let report = serde_json::json!({
+            "fixtureId": "validation.detail.multiscale-real-raw.alaska.v1",
+            "issue": 5411,
+            "metrics": {
+                "changedPixelRatio": changed_pixel_ratio,
+                "legacyEdgeDelta": legacy_edge_delta,
+                "legacyShadowDelta": legacy_shadow_delta,
+                "multiscaleEdgeDelta": multiscale_edge_delta,
+                "multiscaleShadowDelta": multiscale_shadow_delta,
+            },
+            "outputDimensions": [width, height],
+            "privateArtifacts": [
+                "alaska-detail-neutral.tiff",
+                "alaska-detail-legacy.tiff",
+                "alaska-detail-multiscale.tiff",
+            ],
+            "proofClaims": [
+                "production_private_raw_decode",
+                "production_wgpu_detail_output",
+                "legacy_relative_shadow_noise_reduction",
+                "legacy_relative_edge_overshoot_reduction",
+                "source_raw_not_mutated",
+            ],
+            "sourceHash": format!("sha256:{}", hex::encode(&source_hash_before)),
+        });
+        fs::write(
+            output_dir.join("alaska-detail-multiscale-report.json"),
+            serde_json::to_vec_pretty(&report).unwrap(),
+        )
+        .expect("private detail report is written");
+        assert_eq!(
+            source_hash_before,
+            Sha256::digest(fs::read(&source_path).unwrap())
+        );
+    }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
     fn rapid_view_production_wgpu_matches_cpu_preview_export_reference() {
         use image::{DynamicImage, ImageBuffer, Rgba};
         use tauri::Manager;
