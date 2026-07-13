@@ -6,6 +6,32 @@ const browserDefaults = {
   requiredCapabilities: ['browser-tauri-harness'],
 } as const;
 
+const libraryScaleScenario = (imageCount: 10_000 | 50_000 | 100_000): QaScenario => ({
+  ...browserDefaults,
+  id: `browser.library.open-${imageCount / 1_000}k`,
+  tags: ['browser', 'library', 'scale'],
+  dependencies: [],
+  fixture: { id: 'library' },
+  isolation: 'fresh-context',
+  timeoutMs: 120_000,
+  async run({ page }) {
+    await openLibraryFixture(page, imageCount);
+    const plainCount = String(imageCount);
+    const groupedCount = imageCount.toLocaleString('en-US');
+    await page.getByText(new RegExp(`^(?:${plainCount}|${groupedCount}) assets$`, 'u')).waitFor({ timeout: 90_000 });
+    await page.getByTestId('library-header-workflow-status').waitFor();
+    const pageCalls = await page.evaluate(
+      () =>
+        (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? []).filter(
+          ({ command }) => command === 'next_library_collection_page',
+        ).length,
+    );
+    const expectedPageCalls = Math.ceil(imageCount / 256) - 1;
+    if (pageCalls !== expectedPageCalls)
+      throw new Error(`Catalog pagination mismatch: ${pageCalls} != ${expectedPageCalls} for ${imageCount} images.`);
+  },
+});
+
 export const qaScenarios: readonly QaScenario[] = [
   {
     ...browserDefaults,
@@ -19,6 +45,7 @@ export const qaScenarios: readonly QaScenario[] = [
       await openLibraryFixture(page);
     },
   },
+  ...([10_000, 50_000, 100_000] as const).map(libraryScaleScenario),
   {
     ...browserDefaults,
     id: 'browser.editor.chrome',

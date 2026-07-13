@@ -178,7 +178,11 @@ const browserFixtureDigest = (scenarioId: string) => {
   return `sha256:${hash.digest('hex')}` as const;
 };
 
-const browserQaScenario = (id: string, qaScenarioId: string): PerformanceScenario => {
+const browserQaScenario = (
+  id: string,
+  qaScenarioId: string,
+  cacheMode: PerformanceScenario['cacheMode'] = 'cold',
+): PerformanceScenario => {
   const worktree = process.cwd();
   let daemonProcess: ReturnType<typeof Bun.spawn> | undefined;
   let startedDaemon = false;
@@ -187,7 +191,7 @@ const browserQaScenario = (id: string, qaScenarioId: string): PerformanceScenari
     id,
     version: 1,
     fixtureDigest: browserFixtureDigest(qaScenarioId),
-    cacheMode: 'cold',
+    cacheMode,
     warmupRuns: 1,
     measuredRuns: 5,
     budgets: { interactionMs: { absolute: 200, relative: 0.15 } },
@@ -563,6 +567,9 @@ export const performanceScenarios: readonly PerformanceScenario[] = [
   browserQaScenario('browser.editor-crop', 'browser.editor.crop'),
   browserQaScenario('browser.editor-copy-paste-settings', 'browser.editor.copy-paste-settings'),
   browserQaScenario('browser.library-open', 'browser.library.open'),
+  browserQaScenario('browser.library-open-10k', 'browser.library.open-10k', 'warm'),
+  browserQaScenario('browser.library-open-50k', 'browser.library.open-50k', 'warm'),
+  browserQaScenario('browser.library-open-100k', 'browser.library.open-100k', 'warm'),
   nativeRawOpenScenario('cold'),
   nativeRawOpenScenario('warm'),
 ];

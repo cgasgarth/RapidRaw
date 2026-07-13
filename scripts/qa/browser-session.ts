@@ -58,6 +58,9 @@ const launchBrowser = (headed: boolean): Promise<Browser> =>
     headless: !headed,
   });
 
+const isExpectedOfflineHarnessMessage = (message: string): boolean =>
+  message.includes('Clerk: Failed to load Clerk ') || message.includes('Clerk has been loaded with development keys');
+
 async function installHarnessHtmlRoute(
   context: Awaited<ReturnType<Browser['newContext']>>,
   baseUrl: string,
@@ -272,9 +275,12 @@ export function createBrowserLifecycleAdapter(
         const page = await context.newPage();
         const video = page.video();
         const errors: string[] = [];
-        page.on('pageerror', (error) => errors.push(error.message));
+        page.on('pageerror', (error) => {
+          if (!isExpectedOfflineHarnessMessage(error.message)) errors.push(error.message);
+        });
         page.on('console', (message) => {
-          if (message.type() === 'error') errors.push(message.text());
+          if (message.type() === 'error' && !isExpectedOfflineHarnessMessage(message.text()))
+            errors.push(message.text());
         });
         await page.route('https://api.github.com/repos/CyberTimon/RapidRAW/releases/latest', (route) =>
           route.fulfill({ json: { tag_name: 'v0.0.0-qa' }, status: 200 }),

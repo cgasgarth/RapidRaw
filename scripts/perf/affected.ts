@@ -33,7 +33,12 @@ const ownership: readonly { pattern: RegExp; scenarioIds: readonly string[] }[] 
   },
   {
     pattern: /(?:src\/components\/panel\/MainLibrary|src\/components\/library|src\/store\/library)/u,
-    scenarioIds: ['browser.library-open'],
+    scenarioIds: [
+      'browser.library-open',
+      'browser.library-open-10k',
+      'browser.library-open-50k',
+      'browser.library-open-100k',
+    ],
   },
   {
     pattern: /src-tauri\/src\/(?:gpu|io|raw|render)\//u,

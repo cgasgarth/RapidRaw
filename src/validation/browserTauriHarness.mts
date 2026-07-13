@@ -177,7 +177,9 @@ let callbackId = 0;
 const callbacks = new Map<number, (event: unknown) => void>();
 const eventListeners = new Map<string, Set<number>>();
 let folderRevision = 1;
-const harnessImages: BrowserHarnessImage[] = [
+let catalogCursor = 0;
+let catalogPageSize = 256;
+let harnessImages: BrowserHarnessImage[] = [
   {
     exif: null,
     is_edited: false,
@@ -211,6 +213,22 @@ const isBrowserTauriEventCallback = (value: unknown): value is BrowserTauriEvent
 
 export const installBrowserTauriHarness = (): void => {
   if (!harnessEnabled || window.__TAURI_INTERNALS__ !== undefined) return;
+
+  const requestedImageCount = Number.parseInt(new URL(window.location.href).searchParams.get('qaImages') ?? '', 10);
+  if (Number.isInteger(requestedImageCount) && requestedImageCount >= 1 && requestedImageCount <= 100_000) {
+    harnessImages = Array.from({ length: requestedImageCount }, (_, index) => ({
+      exif: null,
+      is_edited: false,
+      is_virtual_copy: false,
+      modified: index * 1_000_000,
+      path:
+        index === 0
+          ? `${browserHarnessRoot}/browser-harness.ARW`
+          : `${browserHarnessRoot}/browser-harnessz-${String(index + 1).padStart(6, '0')}.ARW`,
+      rating: 0,
+      tags: null,
+    }));
+  }
 
   const calls: Array<BrowserTauriInvokeCall> = [];
   window.__RAWENGINE_BROWSER_TAURI_HARNESS__ = { calls, enabled: true, failNextSettingsSave: false };
@@ -488,15 +506,40 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
     case commandNames.listImagesRecursive:
       return Promise.resolve(harnessImages.map((image) => ({ ...image })));
     case commandNames.openLibraryCollection:
+      catalogCursor = 0;
+      {
+        const requestedPageSize = args?.['requestedPageSize'];
+        catalogPageSize = Math.max(
+          1,
+          Math.min(
+            1_024,
+            typeof requestedPageSize === 'number' && Number.isInteger(requestedPageSize) ? requestedPageSize : 256,
+          ),
+        );
+        catalogCursor = Math.min(catalogPageSize, harnessImages.length);
+        return Promise.resolve({
+          sessionId: 1,
+          catalogRevision: folderRevision,
+          estimatedCount: harnessImages.length,
+          firstPage: harnessImages
+            .slice(0, catalogCursor)
+            .map((image, index) => ({ ...image, imageId: image.path, entityRevision: index + 1 })),
+          indexingState: 'current',
+        });
+      }
+    case commandNames.nextLibraryCollectionPage: {
+      const start = catalogCursor;
+      const end = Math.min(start + catalogPageSize, harnessImages.length);
+      catalogCursor = end;
       return Promise.resolve({
         sessionId: 1,
         catalogRevision: folderRevision,
-        estimatedCount: harnessImages.length,
-        firstPage: harnessImages.map((image, index) => ({ ...image, imageId: image.path, entityRevision: index + 1 })),
-        indexingState: 'current',
+        rows: harnessImages
+          .slice(start, end)
+          .map((image, index) => ({ ...image, imageId: image.path, entityRevision: start + index + 1 })),
+        complete: end >= harnessImages.length,
       });
-    case commandNames.nextLibraryCollectionPage:
-      return Promise.resolve({ sessionId: 1, catalogRevision: folderRevision, rows: [], complete: true });
+    }
     case commandNames.reconcileLibraryCatalog:
       return Promise.resolve({ catalogRevision: ++folderRevision });
     case commandNames.applyLibraryCatalogChanges:

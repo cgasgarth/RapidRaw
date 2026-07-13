@@ -16,6 +16,9 @@ bun perf run browser.editor-compare
 bun perf run browser.editor-crop
 bun perf run browser.editor-copy-paste-settings
 bun perf run browser.library-open
+bun perf run browser.library-open-10k
+bun perf run browser.library-open-50k
+bun perf run browser.library-open-100k
 RAWENGINE_PERF_NATIVE_FIXTURE=/absolute/private/image.ARW bun perf run native.editor-raw-open-cold
 RAWENGINE_PERF_NATIVE_FIXTURE=/absolute/private/image.ARW RAWENGINE_PERF_NATIVE_NO_BUILD=1 bun perf run native.editor-raw-open-warm
 bun perf run editor.preview-scheduling --baseline private-artifacts/perf/baseline.json

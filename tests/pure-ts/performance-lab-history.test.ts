@@ -309,7 +309,12 @@ exit 1
     ).toEqual(['browser.editor-copy-paste-settings']);
     expect(
       selectAffectedPerformanceScenarios(['src/components/panel/MainLibrary.tsx'], performanceScenarios).scenarioIds,
-    ).toEqual(['browser.library-open']);
+    ).toEqual([
+      'browser.library-open',
+      'browser.library-open-100k',
+      'browser.library-open-10k',
+      'browser.library-open-50k',
+    ]);
     expect(
       selectAffectedPerformanceScenarios(['src-tauri/src/gpu/gpu_processing.rs'], performanceScenarios).scenarioIds,
     ).toEqual(['native.editor-raw-open-cold', 'native.editor-raw-open-warm']);
@@ -324,6 +329,9 @@ exit 1
         'browser.editor-open',
         'browser.editor-pan-zoom',
         'browser.library-open',
+        'browser.library-open-100k',
+        'browser.library-open-10k',
+        'browser.library-open-50k',
         'editor.preview-scheduling',
         'native.editor-raw-open-cold',
         'native.editor-raw-open-warm',

@@ -99,6 +99,9 @@ describe('performance lab runner', () => {
       'browser.editor-crop',
       'browser.editor-copy-paste-settings',
       'browser.library-open',
+      'browser.library-open-10k',
+      'browser.library-open-50k',
+      'browser.library-open-100k',
       'native.editor-raw-open-cold',
       'native.editor-raw-open-warm',
     ]);
