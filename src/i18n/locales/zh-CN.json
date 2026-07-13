@@ -34,6 +34,7 @@
       },
       "ariaSelectColor": "选择 {{name}} 颜色",
       "asShot": "As Shot",
+      "auto": "自动",
       "blackWhiteMixer": {
         "ariaSelectChannel": "选择 {{name}} 黑白通道",
         "contribution": "{{name}} 贡献",
@@ -96,7 +97,10 @@
       "colorRangeLocalAdjustmentLayerName": "{{range}} local adjustment",
       "colorRangeLocalAdjustmentMaskName": "{{range}} range mask",
       "createLocalAdjustmentFromRange": "Create local adjustment",
+      "creativeTint": "创意色调",
+      "creativeWarmth": "创意暖调",
       "defaultState": "Default",
+      "duv": "色调 (Duv)",
       "falloffSmoothness": "过渡",
       "gamutWarning": {
         "coverage": "",
@@ -126,6 +130,9 @@
         "threeWayTab": "Three-way color grading"
       },
       "hue": "色相",
+      "illuminantMode": "光源",
+      "kelvin": "开尔文",
+      "kelvinTint": "开尔文 + 色调",
       "levels": {
         "disabled": "Off",
         "enabled": "On",
@@ -158,6 +165,7 @@
         "yellows": "黄色"
       },
       "presence": "质感",
+      "preset": "预设",
       "previewMode": "",
       "profileTone": {
         "cameraProfile": "相机配置",
@@ -200,6 +208,7 @@
       },
       "rangeCenter": "范围中心",
       "rangeWidth": "范围宽度",
+      "renderedWhiteBalanceLimit": "",
       "resetActiveRange": "Reset active range",
       "resetLocalColorBalance": "Reset local color balance",
       "resetWhiteBalanceAsShot": "Reset white balance to as shot",

@@ -35,15 +35,15 @@
       "blue": 0.7
     },
     "expectedRgb": {
-      "red": 0.33620432510087556,
-      "green": 0.5843761499703998,
-      "blue": 0.4727781757197891
+      "red": 0.33536340840333495,
+      "green": 0.5843351887911845,
+      "blue": 0.4736700201774611
     },
     "expected": {
-      "deltaTemperature": 80.315598,
-      "deltaTint": -78.140341,
-      "temperature": 80.315598,
-      "tint": -78.140341
+      "deltaTemperature": 79.24629524294303,
+      "deltaTint": -78.35270385220598,
+      "temperature": 79.24629524294303,
+      "tint": -78.35270385220598
     },
     "tolerance": 0.000001
   },
@@ -69,8 +69,8 @@
       "blue": 0.30600000000000005
     },
     "expected": {
-      "deltaTemperature": -104.527626,
-      "deltaTint": -259.944238,
+      "deltaTemperature": -103.92472642712484,
+      "deltaTint": -258.49756888863465,
       "temperature": -100,
       "tint": -100
     },

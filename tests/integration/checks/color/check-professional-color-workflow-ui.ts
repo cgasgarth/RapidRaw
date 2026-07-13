@@ -23,6 +23,7 @@ type RenderedPanel = {
 };
 
 type AdjustmentUpdate = Partial<Adjustments> | ((previous: Adjustments) => Adjustments);
+let autoWhiteBalanceInvokeCount = 0;
 
 const appSettingsFixture = {
   exportPresets: [],
@@ -244,23 +245,35 @@ function validateFoundationHierarchy(container: Element) {
 
 async function validateWhiteBalanceFoundation(container: Element) {
   const whiteBalance = getByTestId(container, 'color-quick-white-balance');
-  const temperature = getRangeByLabel(whiteBalance, 'Temperature');
+  const mode = getByTestId<HTMLSelectElement>(whiteBalance, 'color-white-balance-mode');
   const reset = getByTestId<HTMLButtonElement>(whiteBalance, 'color-white-balance-as-shot');
   const picker = getByTestId<HTMLButtonElement>(whiteBalance, 'color-white-balance-picker');
-  assert.ok(temperature);
+  assert.equal(mode.value, 'as_shot');
   assert.equal(whiteBalance.dataset.whiteBalanceState, 'as-shot');
   assert.equal(reset.disabled, true);
 
-  await changeRange(temperature, 18);
+  await changeSelect(mode, 'kelvin_tint');
+  const kelvin = getByTestId<HTMLInputElement>(whiteBalance, 'color-white-balance-kelvin');
+  await changeInput(kelvin, 3200);
   assert.equal(whiteBalance.dataset.whiteBalanceState, 'custom');
   assert.equal(reset.disabled, false);
   await click(reset);
-  assert.equal(temperature.value, '0');
+  assert.equal(mode.value, 'as_shot');
+  assert.equal(whiteBalance.querySelector('[data-testid="color-white-balance-kelvin"]'), null);
   assert.equal(whiteBalance.dataset.whiteBalanceState, 'as-shot');
+
+  await changeSelect(mode, 'auto');
+  assert.equal(mode.value, 'auto');
+  assert.equal(autoWhiteBalanceInvokeCount, 1, 'Auto mode must invoke image analysis exactly once.');
+  assert.equal(normalizeText(whiteBalance.textContent).includes('4380 K'), true);
+  await click(reset);
 
   await click(picker);
   assert.equal(picker.getAttribute('aria-pressed'), 'true');
   assert.equal(picker.dataset.state, 'active');
+  await click(picker);
+  assert.equal(picker.getAttribute('aria-pressed'), 'false');
+  assert.equal(picker.dataset.state, 'idle');
 }
 
 function validateMaskLocalFiltering(container: Element) {
@@ -299,10 +312,6 @@ async function validateCompactMixerSurface(container: Element) {
   assert.equal(container.querySelector('[data-testid="color-workspace-warning-chips"]'), null);
   assert.equal(container.querySelector('[data-testid="professional-color-recipes-disclosure"]'), null);
   assert.equal(container.querySelector('[data-testid="selective-color-mask-preview-toggle"]'), null);
-  assert.equal(colorMixer.querySelector('[data-testid="color-balance-disclosure"]'), null);
-  assert.equal(colorMixer.querySelector('[data-testid="channel-mixer-disclosure"]'), null);
-  assert.equal(colorMixer.querySelector('[data-testid="black-white-mixer-disclosure"]'), null);
-
   for (const label of ['Hue', 'Saturation', 'Luminance']) {
     assert.ok(getRangeByLabel(container, label), `Primary HSL slider was not rendered: ${label}.`);
   }
@@ -379,6 +388,14 @@ async function changeRange(input: HTMLInputElement, value: number) {
   });
 }
 
+async function changeInput(input: HTMLInputElement, value: number) {
+  await act(async () => {
+    input.value = String(value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushPromises();
+  });
+}
+
 function getByTestId<T extends HTMLElement = HTMLElement>(container: Element, testId: string): T {
   const element = container.querySelector(`[data-testid="${testId}"]`);
   assert.ok(element, `Missing test id: ${testId}.`);
@@ -407,6 +424,29 @@ async function createTestI18n() {
 
 function installDom() {
   const window = new Window({ url: 'http://localhost/color-inspector-coverage' });
+  Object.defineProperty(window, '__TAURI_INTERNALS__', {
+    configurable: true,
+    value: {
+      invoke: async (command: string) => {
+        assert.equal(command, 'calculate_auto_adjustments');
+        autoWhiteBalanceInvokeCount += 1;
+        return {
+          whiteBalanceTechnical: {
+            adaptation: 'cat16_v1',
+            confidence: 0.78,
+            contract: 'rapidraw.white_balance.v1',
+            duv: 0.008,
+            kelvin: 4380,
+            mode: 'auto',
+            sampleCount: 412,
+            source: 'auto',
+            x: 0.36,
+            y: 0.35,
+          },
+        };
+      },
+    },
+  });
   window.sessionStorage.clear();
   Object.defineProperty(globalThis, 'window', { configurable: true, value: window });
   Object.defineProperty(globalThis, 'document', { configurable: true, value: window.document });

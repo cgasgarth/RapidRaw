@@ -143,6 +143,19 @@ pub struct RawOpenEditExportBasicToneParameters {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
+pub struct RawOpenEditExportWhiteBalanceParameters {
+    pub accepted_dry_run_plan_hash: String,
+    pub accepted_dry_run_plan_id: String,
+    pub creative_temperature: f64,
+    pub creative_tint: f64,
+    pub duv: f64,
+    pub exposure_ev: f64,
+    pub kelvin: f64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct RawOpenEditExportSelectiveColorParameters {
     pub band: String,
     pub hue_shift_degrees: f64,
@@ -827,14 +840,50 @@ fn edit_command_adjustments(command: &RawOpenEditExportCommand) -> Result<Value,
 
     match command.command_type.as_str() {
         "toneColor.setBasicTone" => basic_tone_adjustments(&command.parameters),
+        "toneColor.setWhiteBalance" => white_balance_adjustments(&command.parameters),
         "toneColor.adjustHsl" => selective_color_adjustments(&command.parameters),
         "toneColor.adjustSkinToneUniformity" => {
             skin_tone_uniformity_adjustments(&command.parameters)
         }
         _ => Err(
-            "editCommand.commandType must be toneColor.setBasicTone, toneColor.adjustHsl, or toneColor.adjustSkinToneUniformity.".to_string(),
+            "editCommand.commandType must be toneColor.setBasicTone, toneColor.setWhiteBalance, toneColor.adjustHsl, or toneColor.adjustSkinToneUniformity.".to_string(),
         ),
     }
+}
+
+fn white_balance_adjustments(parameters: &Value) -> Result<Value, String> {
+    let parameters: RawOpenEditExportWhiteBalanceParameters =
+        serde_json::from_value(parameters.clone()).map_err(|error| error.to_string())?;
+    if parameters.accepted_dry_run_plan_hash.trim().is_empty()
+        || parameters.accepted_dry_run_plan_id.trim().is_empty()
+    {
+        return Err(
+            "editCommand.parameters accepted dry-run plan identity is required.".to_string(),
+        );
+    }
+    let coordinates =
+        crate::color::white_balance::cct_duv_to_coordinates(parameters.kelvin, parameters.duv)
+            .map_err(|error| error.to_string())?;
+    Ok(json!({
+        "creativeTemperature": parameters.creative_temperature,
+        "creativeTint": parameters.creative_tint,
+        "exposure": parameters.exposure_ev,
+        "temperature": 0.0,
+        "tint": 0.0,
+        "whiteBalanceMigration": "native_v1",
+        "whiteBalanceTechnical": {
+            "contract": crate::color::white_balance::WHITE_BALANCE_CONTRACT,
+            "mode": "kelvin_tint",
+            "kelvin": coordinates.cct_kelvin,
+            "duv": coordinates.duv,
+            "x": coordinates.xy[0],
+            "y": coordinates.xy[1],
+            "adaptation": "cat16_v1",
+            "source": "user",
+            "confidence": null,
+            "sampleCount": null
+        }
+    }))
 }
 
 fn basic_tone_adjustments(parameters: &Value) -> Result<Value, String> {
@@ -2059,6 +2108,29 @@ mod tests {
                 .metrics
                 .iter()
                 .any(|metric| metric.name == "sourceHashUnchanged" && metric.passed)
+        );
+    }
+
+    #[test]
+    fn white_balance_command_compiles_physical_and_creative_gpu_parameters() {
+        let adjustments = white_balance_adjustments(&json!({
+            "acceptedDryRunPlanHash": "sha256:test",
+            "acceptedDryRunPlanId": "dryrun_test",
+            "creativeTemperature": 40.0,
+            "creativeTint": -20.0,
+            "duv": 0.018,
+            "exposureEv": -8.0,
+            "kelvin": 2856.0
+        }))
+        .unwrap();
+        let parsed =
+            crate::adjustments::parse::get_all_adjustments_from_json(&adjustments, true, None);
+        assert_eq!(parsed.global.exposure, -8.0);
+        assert_eq!(parsed.global.temperature, 1.6);
+        assert_eq!(parsed.global.tint, -0.2);
+        assert_ne!(
+            parsed.global.technical_white_balance.col0,
+            [1.0, 0.0, 0.0, 0.0]
         );
     }
 

@@ -1,12 +1,13 @@
 use crate::adjustments::abi::{
     AllAdjustments, BlackWhiteMixerSettings, ChannelMixerRow, ChannelMixerSettings,
     ColorBalanceRgbSettings, ColorCalibrationSettings, ColorGradeSettings, GlobalAdjustments,
-    HslColor, LevelsSettings, MAX_MASKS, MaskAdjustments, Point,
+    GpuMat3, HslColor, LevelsSettings, MAX_MASKS, MaskAdjustments, Point,
 };
 use crate::adjustments::scales::SCALES;
 use crate::color::view_transform::{
     ViewTransformPlanV1, ViewTransformProcess, ViewTransformSettingsV1,
 };
+use crate::color::white_balance::{WhiteBalancePlanInputV1, compile_white_balance_plan};
 use crate::image_processing::calculate_agx_matrices;
 use crate::mask_generation::MaskDefinition;
 use serde::Deserialize;
@@ -34,6 +35,32 @@ fn scaled_section_value(
         default as f32 / scale
     } else {
         0.0
+    }
+}
+
+fn technical_white_balance_from_json(value: &JsonValue) -> GpuMat3 {
+    if !section_is_visible(value, "color") {
+        return GpuMat3::default();
+    }
+    let Some(settings) = value
+        .get("whiteBalanceTechnical")
+        .and_then(JsonValue::as_object)
+    else {
+        return GpuMat3::default();
+    };
+    let Ok(input) =
+        serde_json::from_value::<WhiteBalancePlanInputV1>(JsonValue::Object(settings.clone()))
+    else {
+        return GpuMat3::default();
+    };
+    let Ok(plan) = compile_white_balance_plan(input) else {
+        return GpuMat3::default();
+    };
+    let rows = plan.ap1_matrix;
+    GpuMat3 {
+        col0: [rows[0][0], rows[1][0], rows[2][0], 0.0],
+        col1: [rows[0][1], rows[1][1], rows[2][1], 0.0],
+        col2: [rows[0][2], rows[1][2], rows[2][2], 0.0],
     }
 }
 
@@ -341,16 +368,32 @@ fn get_global_adjustments_from_json(
         temperature: scaled_section_value(
             js_adjustments,
             "color",
-            "temperature",
+            if js_adjustments.get("whiteBalanceTechnical").is_some() {
+                "creativeTemperature"
+            } else {
+                "temperature"
+            },
             SCALES.temperature,
             None,
         ),
-        tint: scaled_section_value(js_adjustments, "color", "tint", SCALES.tint, None),
+        tint: scaled_section_value(
+            js_adjustments,
+            "color",
+            if js_adjustments.get("whiteBalanceTechnical").is_some() {
+                "creativeTint"
+            } else {
+                "tint"
+            },
+            SCALES.tint,
+            None,
+        ),
         vibrance: scaled_section_value(js_adjustments, "color", "vibrance", SCALES.vibrance, None),
         hue: scaled_section_value(js_adjustments, "color", "hue", 1.0, None),
         _pad_color1: 0.0,
         _pad_color2: 0.0,
         _pad_color3: 0.0,
+        _pad_color4: 0.0,
+        technical_white_balance: technical_white_balance_from_json(js_adjustments),
         sharpness: scaled_section_value(
             js_adjustments,
             "details",
@@ -462,6 +505,9 @@ fn get_global_adjustments_from_json(
         _pad_agx1: 0.0,
         _pad_agx2: 0.0,
         _pad_agx3: 0.0,
+        _pad_wgsl_agx_align1: 0.0,
+        _pad_wgsl_agx_align2: 0.0,
+        _pad_wgsl_agx_align3: 0.0,
         agx_pipe_to_rendering_matrix: pipe_to_rendering,
         agx_rendering_to_pipe_matrix: rendering_to_pipe,
         rapid_view_parameters0: rapid_view_parameters[0],
@@ -798,6 +844,68 @@ mod tests {
         assert_eq!(parsed.mask_adjustments[1].blend_mode, 1.0);
         assert_eq!(parsed.mask_adjustments[2].blend_mode, 2.0);
         assert_eq!(parsed.mask_adjustments[3].blend_mode, 0.0);
+    }
+
+    #[test]
+    fn parses_technical_white_balance_separately_from_creative_offsets() {
+        let native = json!({
+            "creativeTemperature": 25.0,
+            "creativeTint": -10.0,
+            "temperature": 99.0,
+            "tint": 99.0,
+            "whiteBalanceTechnical": {
+                "mode": "kelvin_tint",
+                "kelvin": 3200.0,
+                "duv": 0.008
+            }
+        });
+        let parsed = get_all_adjustments_from_json(&native, true, None);
+        assert_eq!(parsed.global.temperature, 1.0);
+        assert_eq!(parsed.global.tint, -0.1);
+        assert_ne!(
+            parsed.global.technical_white_balance.col0,
+            [1.0, 0.0, 0.0, 0.0]
+        );
+
+        let legacy = get_all_adjustments_from_json(
+            &json!({ "temperature": 25.0, "tint": -10.0 }),
+            true,
+            None,
+        );
+        assert_eq!(legacy.global.temperature, 1.0);
+        assert_eq!(legacy.global.tint, -0.1);
+        assert_eq!(
+            legacy.global.technical_white_balance.col0,
+            [1.0, 0.0, 0.0, 0.0]
+        );
+    }
+
+    #[test]
+    fn local_masks_cannot_override_the_global_technical_illuminant() {
+        let adjustments = json!({
+            "whiteBalanceTechnical": { "mode": "kelvin_tint", "kelvin": 7500.0, "duv": -0.004 },
+            "masks": [{
+                "id": "mask",
+                "name": "Local creative color",
+                "visible": true,
+                "invert": false,
+                "opacity": 100,
+                "adjustments": {
+                    "temperature": 50.0,
+                    "tint": 20.0,
+                    "whiteBalanceTechnical": { "mode": "kelvin_tint", "kelvin": 1800.0, "duv": 0.04 }
+                },
+                "subMasks": []
+            }]
+        });
+        let parsed = get_all_adjustments_from_json(&adjustments, true, None);
+        assert_eq!(parsed.mask_count, 1);
+        assert_eq!(parsed.mask_adjustments[0].temperature, 2.0);
+        assert_eq!(parsed.mask_adjustments[0].tint, 0.2);
+        assert_ne!(
+            parsed.global.technical_white_balance.col0,
+            [1.0, 0.0, 0.0, 0.0]
+        );
     }
 
     #[test]
