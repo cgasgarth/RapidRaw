@@ -310,10 +310,14 @@ exit 1
     expect(
       selectAffectedPerformanceScenarios(['src/components/panel/MainLibrary.tsx'], performanceScenarios).scenarioIds,
     ).toEqual([
+      'browser.library-folder-tree-expand',
       'browser.library-open',
       'browser.library-open-100k',
       'browser.library-open-10k',
       'browser.library-open-50k',
+      'browser.library-search-filter-sort',
+      'browser.library-sidecar-change',
+      'browser.library-thumbnail-scroll',
     ]);
     expect(
       selectAffectedPerformanceScenarios(['src-tauri/src/gpu/gpu_processing.rs'], performanceScenarios).scenarioIds,
@@ -328,10 +332,14 @@ exit 1
         'browser.editor-navigation',
         'browser.editor-open',
         'browser.editor-pan-zoom',
+        'browser.library-folder-tree-expand',
         'browser.library-open',
         'browser.library-open-100k',
         'browser.library-open-10k',
         'browser.library-open-50k',
+        'browser.library-search-filter-sort',
+        'browser.library-sidecar-change',
+        'browser.library-thumbnail-scroll',
         'editor.preview-scheduling',
         'native.editor-raw-open-cold',
         'native.editor-raw-open-warm',

@@ -43,6 +43,7 @@ declare global {
     __RAWENGINE_BROWSER_TAURI_HARNESS__?: {
       calls: Array<BrowserTauriInvokeCall>;
       enabled: boolean;
+      emitEvent: (event: string, payload: unknown) => void;
       failNextSettingsSave: boolean;
     };
     __RAWENGINE_QA_PERFORMANCE_TRACE__?: {
@@ -231,7 +232,11 @@ export const installBrowserTauriHarness = (): void => {
   }
 
   const calls: Array<BrowserTauriInvokeCall> = [];
-  window.__RAWENGINE_BROWSER_TAURI_HARNESS__ = { calls, enabled: true, failNextSettingsSave: false };
+  const emitEvent = (event: string, payload: unknown) => {
+    for (const callbackId of eventListeners.get(event) ?? [])
+      callbacks.get(callbackId)?.({ event, id: callbackId, payload });
+  };
+  window.__RAWENGINE_BROWSER_TAURI_HARNESS__ = { calls, emitEvent, enabled: true, failNextSettingsSave: false };
   window.isTauri = true;
   window.__TAURI_EVENT_PLUGIN_INTERNALS__ = {
     unregisterListener: () => {},
@@ -473,8 +478,24 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
     }
     case commandNames.getFolderTree:
       return Promise.resolve({
-        children: [],
-        imageCount: 1,
+        children: [
+          {
+            children: [
+              {
+                children: [],
+                imageCount: 2,
+                isDir: true,
+                name: 'Selects',
+                path: `${browserHarnessRoot}/Alaska/Selects`,
+              },
+            ],
+            imageCount: 3,
+            isDir: true,
+            name: 'Alaska',
+            path: `${browserHarnessRoot}/Alaska`,
+          },
+        ],
+        imageCount: harnessImages.length,
         isDir: true,
         name: browserHarnessRoot.split('/').at(-1) ?? browserHarnessRoot,
         path: browserHarnessRoot,

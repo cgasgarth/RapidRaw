@@ -19,6 +19,10 @@ bun perf run browser.library-open
 bun perf run browser.library-open-10k
 bun perf run browser.library-open-50k
 bun perf run browser.library-open-100k
+bun perf run browser.library-search-filter-sort
+bun perf run browser.library-thumbnail-scroll
+bun perf run browser.library-sidecar-change
+bun perf run browser.library-folder-tree-expand
 RAWENGINE_PERF_NATIVE_FIXTURE=/absolute/private/image.ARW bun perf run native.editor-raw-open-cold
 RAWENGINE_PERF_NATIVE_FIXTURE=/absolute/private/image.ARW RAWENGINE_PERF_NATIVE_NO_BUILD=1 bun perf run native.editor-raw-open-warm
 bun perf run editor.preview-scheduling --baseline private-artifacts/perf/baseline.json

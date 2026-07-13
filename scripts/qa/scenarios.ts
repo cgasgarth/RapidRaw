@@ -48,6 +48,122 @@ export const qaScenarios: readonly QaScenario[] = [
   ...([10_000, 50_000, 100_000] as const).map(libraryScaleScenario),
   {
     ...browserDefaults,
+    id: 'browser.library.search-filter-sort',
+    tags: ['browser', 'library', 'search', 'filter', 'sort'],
+    dependencies: [],
+    fixture: { id: 'library' },
+    isolation: 'fresh-context',
+    timeoutMs: 60_000,
+    async run({ page }) {
+      await openLibraryFixture(page, 10_000);
+      const search = page.locator('header input[type="text"]');
+      await search.focus();
+      await search.fill('browser-harnessz-010000');
+      await page.getByRole('button', { name: /browser-harnessz-010000\.ARW/u }).waitFor();
+      await search.fill('');
+      await page.locator('button[aria-haspopup="true"]').click();
+      const dateSort = page.getByRole('menuitem', { name: 'Date Modified' });
+      await dateSort.click();
+      if (!(await dateSort.getAttribute('class'))?.includes('bg-card-active'))
+        throw new Error('Library sort did not settle on Date Modified.');
+      await page.locator('button[data-tooltip="5 only"]').click();
+      await page.getByText('No images found that match your filter.', { exact: true }).waitFor();
+    },
+  },
+  {
+    ...browserDefaults,
+    id: 'browser.library.thumbnail-scroll',
+    tags: ['browser', 'library', 'scroll', 'thumbnail'],
+    dependencies: [],
+    fixture: { id: 'library' },
+    isolation: 'fresh-context',
+    timeoutMs: 60_000,
+    async run({ page }) {
+      await openLibraryFixture(page, 10_000);
+      const grid = page.getByTestId('library-virtualized-grid');
+      const scrollResult = await grid.evaluate(async (root) => {
+        const scroller = [...root.querySelectorAll('div')].find(
+          (element): element is HTMLDivElement =>
+            element instanceof HTMLDivElement && element.scrollHeight > element.clientHeight,
+        );
+        if (scroller === undefined) throw new Error('Virtualized library scroll surface missing.');
+        for (const fraction of [0.2, 0.55, 0.9, 1]) {
+          scroller.scrollTop = (scroller.scrollHeight - scroller.clientHeight) * fraction;
+          scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
+          await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+        }
+        return {
+          clientHeight: scroller.clientHeight,
+          scrollHeight: scroller.scrollHeight,
+          scrollTop: scroller.scrollTop,
+        };
+      });
+      if (scrollResult.scrollTop <= 0 || scrollResult.scrollHeight <= scrollResult.clientHeight)
+        throw new Error('High-velocity library scroll did not reach a later viewport.');
+      await page.waitForFunction(() =>
+        [...document.querySelectorAll('[data-image-path]')].some((element) =>
+          /browser-harnessz-0(?:9\d{4}|10000)\.ARW$/u.test(element.getAttribute('data-image-path') ?? ''),
+        ),
+      );
+    },
+  },
+  {
+    ...browserDefaults,
+    id: 'browser.library.sidecar-change',
+    tags: ['browser', 'library', 'sidecar', 'changefeed'],
+    dependencies: [],
+    fixture: { id: 'library' },
+    isolation: 'fresh-context',
+    timeoutMs: 45_000,
+    async run({ page }) {
+      await openLibraryFixture(page);
+      await page.waitForFunction(() =>
+        (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? []).some(
+          ({ command }) => command === 'configure_library_changefeed',
+        ),
+      );
+      await page.evaluate(() => {
+        window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.emitEvent('library-filesystem-change-batch', {
+          catalogRevisionAfter: 2,
+          catalogRevisionBefore: 0,
+          changes: [
+            {
+              class: 'sidecar',
+              kind: 'modified',
+              path: '/tmp/rawengine-browser-harness/browser-harness.ARW.xmp',
+            },
+          ],
+          overflowed: false,
+          requiresReconcile: false,
+          rootId: '/tmp/rawengine-browser-harness',
+          watchGeneration: 1,
+        });
+      });
+      await page.waitForFunction(() => {
+        const commands = (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? []).map(({ command }) => command);
+        return commands.includes('apply_library_catalog_changes') && commands.includes('get_library_folder_aggregates');
+      });
+    },
+  },
+  {
+    ...browserDefaults,
+    id: 'browser.library.folder-tree-expand',
+    tags: ['browser', 'library', 'folder-tree'],
+    dependencies: [],
+    fixture: { id: 'library' },
+    isolation: 'fresh-context',
+    timeoutMs: 45_000,
+    async run({ page }) {
+      await openLibraryFixture(page);
+      await page
+        .getByRole('button', { name: /Expand folder Alaska/u })
+        .first()
+        .click();
+      await page.getByRole('button', { name: /Select folder Selects/u }).waitFor();
+    },
+  },
+  {
+    ...browserDefaults,
     id: 'browser.editor.chrome',
     tags: ['browser', 'editor', 'accessibility'],
     dependencies: [],

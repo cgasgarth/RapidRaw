@@ -38,6 +38,10 @@ const ownership: readonly { pattern: RegExp; scenarioIds: readonly string[] }[] 
       'browser.library-open-10k',
       'browser.library-open-50k',
       'browser.library-open-100k',
+      'browser.library-search-filter-sort',
+      'browser.library-thumbnail-scroll',
+      'browser.library-sidecar-change',
+      'browser.library-folder-tree-expand',
     ],
   },
   {
