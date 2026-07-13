@@ -37,7 +37,31 @@ const receipt = {
   rerunCommand: 'placeholder',
   runId: 'run-1',
   scenarios: [
-    { durationMs: 10, id: 'browser.pass', status: 'passed' as const },
+    {
+      durationMs: 10,
+      id: 'browser.pass',
+      performanceSpans: [
+        {
+          durationMs: 4,
+          source: 'frontend' as const,
+          stage: 'react-dom-mutation-window',
+          startOffsetMs: 1,
+          workCount: 12,
+        },
+        {
+          durationMs: 2,
+          source: 'tauri-ipc' as const,
+          stage: 'invoke.apply_adjustments',
+          startOffsetMs: 3,
+          workCount: 8,
+        },
+      ],
+      performanceMetrics: {
+        importImagesPerSecond: 12.5,
+        importTimeToFirstVisibleMs: 84,
+      },
+      status: 'passed' as const,
+    },
     {
       durationMs: 12,
       error: 'failure',
@@ -59,6 +83,11 @@ const receipt = {
 describe('QA harness reproduction receipt', () => {
   test('validates bounded identity, execution, shard, and scenario fields', () => {
     expect(qaRunReceiptSchema.parse(receipt).seed).toBe(42);
+    expect(qaRunReceiptSchema.parse(receipt).scenarios[0]?.performanceSpans).toHaveLength(2);
+    expect(qaRunReceiptSchema.parse(receipt).scenarios[0]?.performanceMetrics).toEqual({
+      importImagesPerSecond: 12.5,
+      importTimeToFirstVisibleMs: 84,
+    });
     expect(qaRunReceiptSchema.parse(receipt).scenarios[1]).toMatchObject({
       log: 'vite log',
       screenshot: '/tmp/failure.png',
@@ -70,6 +99,12 @@ describe('QA harness reproduction receipt', () => {
       'index must be less than total',
     );
     expect(() => qaRunReceiptSchema.parse({ ...receipt, scenarios: [] })).toThrow();
+    expect(() =>
+      qaRunReceiptSchema.parse({
+        ...receipt,
+        scenarios: [{ ...receipt.scenarios[0], performanceMetrics: { importTimeToFirstVisibleMs: -1 } }],
+      }),
+    ).toThrow();
   });
 
   test('reproduces only failures with the recorded seed and execution mode', () => {

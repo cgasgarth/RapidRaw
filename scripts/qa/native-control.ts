@@ -52,6 +52,14 @@ const nativeQaControlOperationSchema = z.discriminatedUnion('method', [
 ]);
 
 const MAX_RESPONSE_BYTES = 1024 * 1024;
+const MAX_TRANSIENT_ATTEMPTS = 8;
+const transientBackoffMs = (attempt: number): number => Math.min(25 * 2 ** attempt, 250);
+
+const isTransientTransportFailure = (error: unknown): error is Error =>
+  error instanceof Error &&
+  /(?:ECONNREFUSED|ECONNRESET|EAGAIN|ENOENT|EPIPE|Resource temporarily unavailable|closed before a response)/u.test(
+    error.message,
+  );
 
 export async function readNativeQaControlRecord(path: string): Promise<NativeQaControlRecord | undefined> {
   try {
@@ -98,6 +106,12 @@ export async function requestNativeQaControl(
     new Promise<z.infer<typeof responseSchema>>((resolveResponse, reject) => {
       const socket = connect(record.socketPath);
       let buffer = '';
+      let settled = false;
+      const fail = (error: Error) => {
+        if (settled) return;
+        settled = true;
+        reject(error);
+      };
       socket.setEncoding('utf8');
       socket.setTimeout(60_000, () => socket.destroy(new Error(`Native QA ${method} timed out.`)));
       socket.once('connect', () =>
@@ -111,6 +125,7 @@ export async function requestNativeQaControl(
         }
         const newline = buffer.indexOf('\n');
         if (newline < 0) return;
+        settled = true;
         socket.end();
         try {
           const response = responseSchema.parse(JSON.parse(buffer.slice(0, newline)));
@@ -120,17 +135,23 @@ export async function requestNativeQaControl(
           reject(error);
         }
       });
-      socket.once('error', reject);
+      socket.once('end', () => fail(new Error(`Native QA ${method} transport closed before a response.`)));
+      socket.once('close', () => fail(new Error(`Native QA ${method} transport closed before a response.`)));
+      socket.once('error', fail);
     });
-  for (let attempt = 0; ; attempt += 1) {
+  const startedAt = performance.now();
+  for (let attempt = 0; attempt < MAX_TRANSIENT_ATTEMPTS; attempt += 1) {
     try {
       return await request();
     } catch (error) {
-      const transientConnectFailure =
-        error instanceof Error &&
-        /(?:ECONNREFUSED|EAGAIN|ENOENT|Resource temporarily unavailable)/u.test(error.message);
-      if (!transientConnectFailure || attempt >= 4) throw error;
-      await Bun.sleep(20 * (attempt + 1));
+      if (!isTransientTransportFailure(error)) throw error;
+      if (attempt + 1 === MAX_TRANSIENT_ATTEMPTS)
+        throw new Error(
+          `Native QA ${method} transport unavailable after ${MAX_TRANSIENT_ATTEMPTS} attempts in ${Math.round(performance.now() - startedAt)}ms: ${error.message}`,
+          { cause: error },
+        );
+      await Bun.sleep(transientBackoffMs(attempt));
     }
   }
+  throw new Error(`Native QA ${method} transport retry invariant failed.`);
 }
