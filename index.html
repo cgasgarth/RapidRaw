@@ -66,6 +66,44 @@
         </main>
       </div>
     </div>
+    <script data-rawengine-startup-preboot>
+      // WKWebView can defer module evaluation while its module loader starts.
+      // This dependency-free preboot makes the painted shell interactive and
+      // completes the native handshake during HTML parsing instead.
+      (() => {
+        const state = { intent: null, receipt: null };
+        window.__RAWENGINE_STATIC_STARTUP__ = state;
+        document.getElementById("startup-add-folder").addEventListener("click", () => { state.intent = "add-folder"; });
+        document.getElementById("startup-settings").addEventListener("click", () => { state.intent = "settings"; });
+        const bridge = async () => {
+          const deadline = Date.now() + 2000;
+          while (!window.__TAURI_INTERNALS__?.invoke) {
+            if (Date.now() >= deadline) throw new Error("startup_tauri_bridge_unavailable");
+            await new Promise((resolve) => setTimeout(resolve, 0));
+          }
+          return window.__TAURI_INTERNALS__.invoke;
+        };
+        state.receipt = bridge().then(async (invoke) => {
+          await invoke("frontend_ready");
+          const snapshot = await invoke("get_startup_trace");
+          if (typeof snapshot?.traceId !== "string" || !snapshot.traceId.startsWith("startup:")) {
+            throw new Error("startup_trace_invalid_identity");
+          }
+          if (!Number.isInteger(snapshot.processId) || snapshot.processId <= 0) {
+            throw new Error("startup_trace_invalid_process");
+          }
+          const record = async (phase, detail) => {
+            const response = await invoke("record_frontend_startup_phase", {
+              detail, phase, status: "ok", traceId: snapshot.traceId,
+            });
+            if (response?.traceId !== snapshot.traceId) throw new Error("startup_trace_correlation_mismatch");
+          };
+          await record("shellVisible", "static-library-shell-visible");
+          await record("interactive", "static-shell-handlers-and-ipc-ready");
+          return snapshot.traceId;
+        });
+      })();
+    </script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

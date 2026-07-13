@@ -2,13 +2,26 @@ export type StartupShellIntent = 'add-folder' | 'settings';
 
 let pendingIntent: StartupShellIntent | null = null;
 
+interface StaticStartupState {
+  intent: StartupShellIntent | null;
+  receipt: Promise<string> | null;
+}
+
+export const staticStartupState = (): StaticStartupState | undefined =>
+  (globalThis as typeof globalThis & { __RAWENGINE_STATIC_STARTUP__?: StaticStartupState })
+    .__RAWENGINE_STATIC_STARTUP__;
+
 export const queueStartupShellIntent = (intent: StartupShellIntent): void => {
   pendingIntent = intent;
+  const state = staticStartupState();
+  if (state) state.intent = intent;
 };
 
 export const consumeStartupShellIntent = (): StartupShellIntent | null => {
-  const intent = pendingIntent;
+  const state = staticStartupState();
+  const intent = pendingIntent ?? state?.intent ?? null;
   pendingIntent = null;
+  if (state) state.intent = null;
   return intent;
 };
 

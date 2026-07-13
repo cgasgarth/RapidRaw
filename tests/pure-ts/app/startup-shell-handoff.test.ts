@@ -29,12 +29,39 @@ const trace = (traceId = 'startup:trace-42') => ({ processId: 4242, traceId });
 afterEach(() => {
   Reflect.deleteProperty(globalThis, 'window');
   Reflect.deleteProperty(globalThis, 'document');
+  Reflect.deleteProperty(globalThis, '__RAWENGINE_STATIC_STARTUP__');
   while (consumeStartupShellIntent() !== null) {
     // Drain input state shared with the deferred application chunk.
   }
 });
 
 describe('static startup shell handoff', () => {
+  test('adopts an existing classic-preboot receipt without repeating native setup', async () => {
+    const invoke = mock(async <T>() => trace() as T);
+    installShell(invoke);
+    let releaseReceipt: ((traceId: string) => void) | undefined;
+    const receipt = new Promise<string>((resolve) => {
+      releaseReceipt = resolve;
+    });
+    Object.defineProperty(globalThis, '__RAWENGINE_STATIC_STARTUP__', {
+      configurable: true,
+      value: { intent: 'settings', receipt },
+    });
+    const mount = mock(() => undefined);
+    const load = mock(async () => ({ mountApplication: mount }));
+
+    const startup = startApplication(load);
+    await Bun.sleep(0);
+    expect(invoke).not.toHaveBeenCalled();
+    expect(load).not.toHaveBeenCalled();
+    expect(consumeStartupShellIntent()).toBe('settings');
+    releaseReceipt?.('startup:classic-preboot');
+    await startup;
+
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(mount).toHaveBeenCalledTimes(1);
+  });
+
   test('is interactive before native receipts and loads React only after their correlation completes', async () => {
     const calls: Array<{ args?: Record<string, unknown>; command: string }> = [];
     let releaseInteractive: (() => void) | undefined;

@@ -1,4 +1,4 @@
-import { queueStartupShellIntent } from './startupShellHandoff';
+import { queueStartupShellIntent, staticStartupState } from './startupShellHandoff';
 
 type StartupPhase = 'interactive' | 'shellVisible';
 type StartupStatus = 'failed' | 'ok';
@@ -61,17 +61,15 @@ export const completeStaticStartup = async (): Promise<string> => {
   attachIntent('startup-settings', 'settings');
   await invoke<void>(commands.frontendReady);
   const snapshot = snapshotIdentity(await invoke<unknown>(commands.getTrace));
-  await Promise.all([
-    record(snapshot.traceId, 'shellVisible', 'ok', 'static-library-shell-visible'),
-    record(snapshot.traceId, 'interactive', 'ok', 'static-shell-handlers-and-ipc-ready'),
-  ]);
+  await record(snapshot.traceId, 'shellVisible', 'ok', 'static-library-shell-visible');
+  await record(snapshot.traceId, 'interactive', 'ok', 'static-shell-handlers-and-ipc-ready');
   return snapshot.traceId;
 };
 
 let staticStartupPromise: Promise<string> | null = null;
 
 export const beginStaticStartup = (): Promise<string> => {
-  staticStartupPromise ??= completeStaticStartup();
+  staticStartupPromise ??= staticStartupState()?.receipt ?? completeStaticStartup();
   return staticStartupPromise;
 };
 
