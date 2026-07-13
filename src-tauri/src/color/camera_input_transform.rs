@@ -459,6 +459,16 @@ mod tests {
     }
 
     #[test]
+    fn equal_white_chromatic_adaptation_is_identity() {
+        let adaptation = bradford_adaptation(ACES_WHITE_XY, ACES_WHITE_XY).unwrap();
+        for (row, expected_row) in adaptation.iter().zip(identity()) {
+            for (actual, expected) in row.iter().zip(expected_row) {
+                assert!((actual - expected).abs() <= 2.0e-7);
+            }
+        }
+    }
+
+    #[test]
     fn xyz_to_camera_row_scale_cannot_become_false_image_chroma() {
         // DNG/rawler matrices encode camera-channel row scale. Before v2 the
         // direct inverse leaked those scales into every pixel (the magenta RAW

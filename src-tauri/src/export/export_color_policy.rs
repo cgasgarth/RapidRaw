@@ -7,6 +7,7 @@ use moxcms::{ColorProfile, Layout, RenderingIntent as MoxRenderingIntent, Transf
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use crate::color::icc_profiles::{standardized_display_p3_profile, standardized_srgb_profile};
 use crate::color::working_to_output_transform::{
     WorkingColorState, transform_acescg_image_to_output_rgb16,
 };
@@ -335,17 +336,30 @@ fn transform_rgb16_with_lcms(
     rendering_intent: &ExportRenderingIntent,
     black_point_compensation: bool,
 ) -> Result<Vec<u16>, String> {
+    let output_icc = encode_icc_profile(output_profile)?;
+    transform_rgb16_with_lcms_icc(
+        pixels,
+        &output_icc,
+        rendering_intent,
+        black_point_compensation,
+        &export_color_profile_receipt_label(color_profile),
+    )
+}
+
+fn transform_rgb16_with_lcms_icc(
+    pixels: &[u16],
+    output_icc: &[u8],
+    rendering_intent: &ExportRenderingIntent,
+    black_point_compensation: bool,
+    profile_label: &str,
+) -> Result<Vec<u16>, String> {
     if !pixels.len().is_multiple_of(3) {
         return Err("RGB16 export pixel buffer is not divisible by three channels.".to_string());
     }
 
     let src_profile = LcmsProfile::new_srgb();
-    let output_icc = encode_icc_profile(output_profile)?;
-    let dst_profile = LcmsProfile::new_icc(&output_icc).map_err(|error| {
-        format!(
-            "Failed to open {} output ICC for LittleCMS: {error}",
-            export_color_profile_receipt_label(color_profile)
-        )
+    let dst_profile = LcmsProfile::new_icc(output_icc).map_err(|error| {
+        format!("Failed to open {profile_label} output ICC for LittleCMS: {error}")
     })?;
     let flags = if black_point_compensation {
         LcmsFlags::BLACKPOINT_COMPENSATION | LcmsFlags::NO_CACHE
@@ -361,10 +375,7 @@ fn transform_rgb16_with_lcms(
         flags,
     )
     .map_err(|error| {
-        format!(
-            "Failed to build LittleCMS {} export transform: {error}",
-            export_color_profile_receipt_label(color_profile)
-        )
+        format!("Failed to build LittleCMS {profile_label} export transform: {error}")
     })?;
     let source_pixels: Vec<[u16; 3]> = pixels
         .chunks_exact(3)
@@ -376,17 +387,33 @@ fn transform_rgb16_with_lcms(
     Ok(transformed.into_iter().flatten().collect())
 }
 
+#[cfg(test)]
+pub(crate) fn transform_rgb16_with_controlled_icc(
+    pixels: &[u16],
+    output_icc: &[u8],
+    rendering_intent: &ExportRenderingIntent,
+    black_point_compensation: bool,
+) -> Result<Vec<u16>, String> {
+    transform_rgb16_with_lcms_icc(
+        pixels,
+        output_icc,
+        rendering_intent,
+        black_point_compensation,
+        "controlled test profile",
+    )
+}
+
 pub(crate) fn output_color_profile(
     color_profile: &ExportColorProfile,
 ) -> Result<ColorProfile, String> {
     match color_profile {
         ExportColorProfile::AdobeRgb1998 => Ok(ColorProfile::new_adobe_rgb()),
-        ExportColorProfile::DisplayP3 => Ok(ColorProfile::new_display_p3()),
+        ExportColorProfile::DisplayP3 => Ok(standardized_display_p3_profile()),
         ExportColorProfile::ProPhotoRgb => Ok(ColorProfile::new_pro_photo_rgb()),
         ExportColorProfile::SourceEmbedded => {
             Err("Source embedded export profile is not implemented yet.".to_string())
         }
-        ExportColorProfile::Srgb => Ok(ColorProfile::new_srgb()),
+        ExportColorProfile::Srgb => Ok(standardized_srgb_profile()),
     }
 }
 

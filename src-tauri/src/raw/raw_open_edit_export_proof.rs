@@ -1,12 +1,12 @@
 use std::fs;
 use std::io::Cursor;
 use std::path::{Component, Path, PathBuf};
+use std::time::Instant;
 
 use chrono::{SecondsFormat, Utc};
 use image::{
     ColorType, DynamicImage, ImageDecoder, ImageFormat, RgbImage, codecs::tiff::TiffDecoder,
 };
-use moxcms::ColorProfile;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -23,10 +23,14 @@ use crate::export::export_processing::{
 };
 use crate::formats::is_raw_file;
 use crate::gamut_mapping::{ACTIVE_SRGB_OKLAB_CHROMA_REDUCE, map_srgb_oklab_chroma_reduce_v4};
-use crate::image_loader::load_base_image_from_bytes;
+use crate::image_loader::load_base_image_from_bytes_with_report;
 use crate::image_processing::{
     GpuContext, ImageMetadata, get_or_init_gpu_context, resolve_tonemapper_override,
 };
+use crate::raw::color_graph_trace::{
+    ColorGraphTrace, ColorGraphTraceInputs, build_color_graph_trace,
+};
+use crate::render_plan::{CompileRenderPlanContext, compile_render_plan, content_revision};
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
@@ -292,6 +296,7 @@ pub struct RawOpenEditExportFinalFileProof {
     pub bit_depth: u32,
     pub black_point_compensation: String,
     pub cmm: String,
+    pub committed_sample_pixels: Vec<[f32; 4]>,
     pub embedded_icc_profile_hash: String,
     pub expected_output_profile_hash: String,
     pub final_file_format: String,
@@ -316,6 +321,7 @@ pub struct RawOpenEditExportProofReport {
     pub edit_graph_revision: String,
     pub fixture_id: String,
     pub final_file: RawOpenEditExportFinalFileProof,
+    pub graph_trace: ColorGraphTrace,
     pub generated_at: String,
     pub metrics: Vec<RawOpenEditExportProofMetric>,
     pub preview_after: RawOpenEditExportProofHashedPath,
@@ -357,9 +363,16 @@ fn run_raw_open_edit_export_proof_with_context(
     let source_hash_before = sha256_file(&source_path)?;
     let source_bytes = fs::read(&source_path).map_err(|error| error.to_string())?;
     let source_path_string = source_path.to_string_lossy().to_string();
-    let base_image =
-        load_base_image_from_bytes(&source_bytes, &source_path_string, false, settings, None)
-            .map_err(|error| error.to_string())?;
+    let (base_image, raw_development) = load_base_image_from_bytes_with_report(
+        &source_bytes,
+        &source_path_string,
+        false,
+        settings,
+        None,
+    )
+    .map_err(|error| error.to_string())?;
+    let raw_development = raw_development
+        .ok_or_else(|| "RAW graph trace requires a RawDevelopmentReport".to_string())?;
 
     let empty_adjustments = json!({});
     let is_raw = is_raw_file(&source_path_string);
@@ -376,6 +389,7 @@ fn run_raw_open_edit_export_proof_with_context(
         tm_override,
         &[],
     )?;
+    let preview_started = Instant::now();
     let preview_after = process_image_for_export_pipeline_with_tonemapper_override(
         &source_path_string,
         &base_image,
@@ -387,6 +401,8 @@ fn run_raw_open_edit_export_proof_with_context(
         tm_override,
         &[],
     )?;
+    let preview_elapsed_ms = preview_started.elapsed().as_secs_f64() * 1_000.0;
+    let export_started = Instant::now();
     let export_after = process_image_for_export_pipeline_with_tonemapper_override(
         &source_path_string,
         &base_image,
@@ -398,10 +414,32 @@ fn run_raw_open_edit_export_proof_with_context(
         tm_override,
         &[],
     )?;
+    let export_elapsed_ms = export_started.elapsed().as_secs_f64() * 1_000.0;
+    let source_revision =
+        crate::render::artifact_identity::source_fingerprint_for_path(&source_path_string);
+    let plan_revision = content_revision(&adjustments, 1, source_revision, 1);
+    let cpu_plan = compile_render_plan(
+        &adjustments,
+        CompileRenderPlanContext {
+            revision: plan_revision,
+            is_raw,
+            tonemapper_override: tm_override,
+        },
+        None,
+    )
+    .map_err(|error| error.to_string())?;
+    let gpu_plan = crate::gpu_processing::compile_gpu_render_graph(
+        &cpu_plan.adjustments,
+        cpu_plan.lut.is_some(),
+        cpu_plan.masks.len(),
+        base_image.width(),
+        base_image.height(),
+    );
     let export_color_profile =
         export_color_profile_for_proof(&request.edit_command.color_pipeline.render_target)?;
     let export_rendering_intent =
         export_rendering_intent_for_proof(&request.edit_command.color_pipeline.render_target)?;
+    let output_started = Instant::now();
     let (soft_proof_after_pixels, soft_proof_after_width, soft_proof_after_height, _) =
         export_soft_proof_rgb_pixels_and_profile_with_policy(
             &preview_after,
@@ -422,6 +460,7 @@ fn run_raw_open_edit_export_proof_with_context(
     }
     let soft_proof_export_rgb8_mean_abs_delta =
         mean_abs_delta_rgb8(&soft_proof_after_pixels, &export_rgb8_pixels)?;
+    let output_elapsed_ms = output_started.elapsed().as_secs_f64() * 1_000.0;
 
     let slug = slug_from_fixture_id(&request.fixture_id);
     let preview_before_relative = format!(
@@ -516,6 +555,29 @@ fn run_raw_open_edit_export_proof_with_context(
         soft_proof_after_width,
         soft_proof_after_height,
     )?;
+    let graph_trace = build_color_graph_trace(ColorGraphTraceInputs {
+        development: &raw_development,
+        preview_after: &preview_after,
+        committed_export_samples: &final_file.committed_sample_pixels,
+        soft_proof_rgb8: &soft_proof_after_pixels,
+        soft_proof_width: soft_proof_after_width,
+        soft_proof_height: soft_proof_after_height,
+        source_sha256: &source_hash_before,
+        cpu_render_plan_fingerprint: cpu_plan.fingerprints.full,
+        wgpu_graph_fingerprint: gpu_plan.fingerprint,
+        wgpu_device_generation: context.generation,
+        edit_revision: &request.edit_command.expected_graph_revision,
+        view_identity: &request
+            .edit_command
+            .color_pipeline
+            .render_target
+            .view_transform,
+        output_profile_identity: export_color_profile_label(&export_color_profile),
+        export_policy_fingerprint: &export_receipt.transform_policy_fingerprint,
+        preview_elapsed_ms,
+        export_elapsed_ms,
+        output_elapsed_ms,
+    })?;
     let black_point_policy_handled = final_file.black_point_compensation
         == "Enabled via LittleCMS relative colorimetric transform"
         || final_file.black_point_compensation == "Requested but disabled for this export path";
@@ -564,6 +626,7 @@ fn run_raw_open_edit_export_proof_with_context(
         edit_graph_revision: request.edit_command.expected_graph_revision,
         fixture_id: request.fixture_id,
         final_file: final_file.clone(),
+        graph_trace,
         generated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
         metrics: vec![
             metric(
@@ -785,6 +848,7 @@ fn inspect_final_tiff_export(
         bit_depth,
         black_point_compensation: color_receipt.black_point_compensation.clone(),
         cmm: color_receipt.cmm.clone(),
+        committed_sample_pixels: rgb16_trace_samples(&reopened),
         embedded_icc_profile_hash: sha256_bytes(&embedded_icc),
         expected_output_profile_hash: sha256_bytes(&expected_icc),
         final_file_format: "tiff".to_string(),
@@ -801,10 +865,36 @@ fn inspect_final_tiff_export(
     })
 }
 
+fn rgb16_trace_samples(image: &image::ImageBuffer<image::Rgb<u16>, Vec<u16>>) -> Vec<[f32; 4]> {
+    let (width, height) = image.dimensions();
+    let last_x = width.saturating_sub(1);
+    let last_y = height.saturating_sub(1);
+    [
+        (0, 0),
+        (last_x / 4, last_y / 4),
+        (last_x / 2, last_y / 2),
+        (last_x.saturating_mul(3) / 4, last_y.saturating_mul(3) / 4),
+        (last_x, last_y),
+    ]
+    .into_iter()
+    .map(|(x, y)| {
+        let pixel = image.get_pixel(x, y).0;
+        [
+            pixel[0] as f32 / u16::MAX as f32,
+            pixel[1] as f32 / u16::MAX as f32,
+            pixel[2] as f32 / u16::MAX as f32,
+            1.0,
+        ]
+    })
+    .collect()
+}
+
 fn expected_output_profile_bytes(color_profile: &ExportColorProfile) -> Result<Vec<u8>, String> {
     let profile = match color_profile {
-        ExportColorProfile::DisplayP3 => ColorProfile::new_display_p3(),
-        ExportColorProfile::Srgb => ColorProfile::new_srgb(),
+        ExportColorProfile::DisplayP3 => {
+            crate::color::icc_profiles::standardized_display_p3_profile()
+        }
+        ExportColorProfile::Srgb => crate::color::icc_profiles::standardized_srgb_profile(),
         ExportColorProfile::AdobeRgb1998
         | ExportColorProfile::ProPhotoRgb
         | ExportColorProfile::SourceEmbedded => {
@@ -1950,6 +2040,7 @@ mod tests {
                 black_point_compensation: "Enabled via LittleCMS relative colorimetric transform"
                     .to_string(),
                 cmm: "lcms2".to_string(),
+                committed_sample_pixels: vec![[0.5, 0.25, 0.125, 1.0]],
                 embedded_icc_profile_hash:
                     "sha256:0000000000000000000000000000000000000000000000000000000000000000"
                         .to_string(),
@@ -1973,6 +2064,7 @@ mod tests {
                         .to_string(),
                 writer_id: "export_processing::save_image_with_metadata".to_string(),
             },
+            graph_trace: crate::raw::color_graph_trace::synthetic_color_graph_trace_fixture(),
             generated_at: "2026-06-17T00:00:00Z".to_string(),
             metrics: Vec::new(),
             preview_after: asset.clone(),
@@ -2047,6 +2139,200 @@ mod tests {
 
         assert!(!expectation.passed);
         assert_eq!(expectation.threshold, 1.0);
+    }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
+    fn synthetic_extended_range_fixture_runs_real_gpu_graph_and_committed_export_trace() {
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock tauri app builds");
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state)
+            .expect("compute-only GPU context initializes");
+        let source = DynamicImage::ImageRgba32F(image::ImageBuffer::from_fn(4, 4, |x, y| {
+            let index = (y * 4 + x) as f32;
+            Rgba([
+                -0.2 + index * 0.12,
+                0.18 + index * 0.08,
+                1.4 - index * 0.04,
+                1.0,
+            ])
+        }));
+        let adjustments = json!({
+            "exposure": 0.35,
+            "contrast": 8.0,
+            "highlights": -12.0,
+            "shadows": 9.0,
+            "saturation": 5.0,
+        });
+        let preview = process_image_for_export_pipeline_with_tonemapper_override(
+            "synthetic-extended-range.ARW",
+            &source,
+            &adjustments,
+            &context,
+            &state,
+            true,
+            "color_graph_trace_synthetic_preview",
+            Some(2),
+            &[],
+        )
+        .expect("synthetic fixture runs real WGPU preview graph");
+        let export = process_image_for_export_pipeline_with_tonemapper_override(
+            "synthetic-extended-range.ARW",
+            &source,
+            &adjustments,
+            &context,
+            &state,
+            true,
+            "color_graph_trace_synthetic_export",
+            Some(2),
+            &[],
+        )
+        .expect("synthetic fixture runs real WGPU export graph");
+        assert_eq!(mean_abs_delta(&preview, &export), 0.0);
+
+        let profile = ExportColorProfile::DisplayP3;
+        let intent = ExportRenderingIntent::RelativeColorimetric;
+        let (soft_proof, width, height, _) =
+            export_soft_proof_rgb_pixels_and_profile_with_policy(&preview, &profile, &intent, true)
+                .expect("synthetic fixture soft proof runs production output transform");
+        let settings = ExportSettings {
+            black_point_compensation: true,
+            color_profile: profile.clone(),
+            rendering_intent: intent,
+            jpeg_quality: 95,
+            resize: None,
+            keep_metadata: false,
+            preserve_timestamps: false,
+            strip_gps: true,
+            filename_template: None,
+            watermark: None,
+            export_masks: false,
+            output_sharpening: None,
+            preserve_folders: false,
+        };
+        let directory = tempfile::tempdir().expect("tempdir");
+        let output = directory.path().join("synthetic-trace.tiff");
+        let receipt =
+            save_image_with_metadata(&export, &output, "synthetic-extended-range.ARW", &settings)
+                .expect("synthetic fixture commits TIFF")
+                .expect("synthetic fixture has export receipt");
+        let committed = inspect_final_tiff_export(
+            &output,
+            &profile,
+            &settings,
+            &receipt,
+            &soft_proof,
+            width,
+            height,
+        )
+        .expect("synthetic committed bytes reopen and match soft proof");
+        assert_eq!(committed.pixel_max_abs_delta, 0.0);
+
+        let revision = content_revision(&adjustments, 1, 99, 1);
+        let cpu_plan = compile_render_plan(
+            &adjustments,
+            CompileRenderPlanContext {
+                revision,
+                is_raw: true,
+                tonemapper_override: Some(2),
+            },
+            None,
+        )
+        .expect("synthetic CPU render plan compiles");
+        let gpu_plan = crate::gpu_processing::compile_gpu_render_graph(
+            &cpu_plan.adjustments,
+            false,
+            0,
+            source.width(),
+            source.height(),
+        );
+        let fixture_samples = vec![[-0.2, 0.18, 1.4, 1.0], [1.6, 1.3, 0.8, 1.0]];
+        let development = crate::raw_processing::RawDevelopmentReport {
+            demosaic_path: crate::raw_processing::RawDemosaicPath::Standard,
+            demosaic_algorithm_id: None,
+            processing_profile: crate::raw_processing::RawProcessingProfile::Balanced,
+            camera_profile: crate::raw_processing::RawCameraProfileReport {
+                algorithm_id: "synthetic_exact_v1",
+                candidate_count: 1,
+                cct_clamped: Some(false),
+                cool_illuminant: None,
+                cool_weight: None,
+                estimated_cct_kelvin: Some(6_500.0),
+                fallback_reason: None,
+                illuminant_estimate_confidence: "exact",
+                illuminant_estimate_method: "synthetic_fixture",
+                matrix_hash: Some("sha256:synthetic-profile-v1".to_string()),
+                status: "synthetic_exact",
+                warm_illuminant: None,
+                warning_codes: Vec::new(),
+            },
+            input_transform: None,
+            stage_samples: [
+                ("sensor_decode", "sensor_mosaic_normalized_linear"),
+                (
+                    "highlight_reconstruction",
+                    "sensor_mosaic_highlight_reconstructed_linear",
+                ),
+                ("demosaic_rescale", "camera_rgb_linear"),
+                ("white_balance_profile_input", "acescg_linear_v1"),
+            ]
+            .into_iter()
+            .map(
+                |(node_id, domain)| crate::raw_processing::RawDevelopmentStageSamples {
+                    node_id,
+                    version: 1,
+                    domain,
+                    samples: fixture_samples.clone(),
+                    elapsed_ms: 0.01,
+                },
+            )
+            .collect(),
+            runtime: None,
+            xtrans_hq: None,
+        };
+        let trace = build_color_graph_trace(ColorGraphTraceInputs {
+            development: &development,
+            preview_after: &preview,
+            committed_export_samples: &committed.committed_sample_pixels,
+            soft_proof_rgb8: &soft_proof,
+            soft_proof_width: width,
+            soft_proof_height: height,
+            source_sha256: "sha256:synthetic-extended-range-v1",
+            cpu_render_plan_fingerprint: cpu_plan.fingerprints.full,
+            wgpu_graph_fingerprint: gpu_plan.fingerprint,
+            wgpu_device_generation: context.generation,
+            edit_revision: "synthetic-edit-v1",
+            view_identity: "rawengine_agx_v1",
+            output_profile_identity: "display_p3",
+            export_policy_fingerprint: &receipt.transform_policy_fingerprint,
+            preview_elapsed_ms: 0.0,
+            export_elapsed_ms: 0.0,
+            output_elapsed_ms: 0.0,
+        })
+        .expect("real synthetic end-to-end graph trace validates");
+        assert_eq!(trace.validation_status, "passed");
+        assert_eq!(
+            trace.preview_graph_fingerprint,
+            trace.export_graph_fingerprint
+        );
+        assert!(
+            trace.nodes[0]
+                .samples
+                .iter()
+                .flatten()
+                .any(|value| *value < 0.0)
+        );
+        assert_eq!(
+            trace
+                .nodes
+                .iter()
+                .map(|node| node.output_transfer_application_count)
+                .sum::<u32>(),
+            1
+        );
     }
 
     #[cfg(feature = "tauri-test")]

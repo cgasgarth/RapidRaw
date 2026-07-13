@@ -34,6 +34,7 @@ use std::{
         Arc,
         atomic::{AtomicUsize, Ordering},
     },
+    time::Instant,
 };
 
 const CAMERA_PROFILE_RESOLVER_ALGORITHM_ID: &str = "dual_illuminant_camera_neutral_mired_v2";
@@ -157,9 +158,71 @@ pub(crate) struct RawDevelopmentReport {
     pub camera_profile: RawCameraProfileReport,
     pub selected_camera_profile: Option<CameraProfileReceiptV1>,
     pub input_transform: Option<RawInputTransformReceiptV1>,
+    pub stage_samples: Vec<RawDevelopmentStageSamples>,
     pub highlight_reconstruction: HighlightReconstructionReportV2,
     pub runtime: Option<RawRuntimeReport>,
     pub xtrans_hq: Option<XTransHqDevelopmentReport>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct RawDevelopmentStageSamples {
+    pub node_id: &'static str,
+    pub version: u32,
+    pub domain: &'static str,
+    pub samples: Vec<[f32; 4]>,
+    pub elapsed_ms: f64,
+}
+
+fn sensor_trace_samples(raw_image: &RawImage, black_level: f32, white_level: f32) -> Vec<[f32; 4]> {
+    let values = raw_image.data.as_f32();
+    let denominator = (white_level - black_level).max(1.0);
+    trace_indices(values.len())
+        .into_iter()
+        .map(|index| {
+            let value = (values[index] - black_level) / denominator;
+            [value, value, value, 1.0]
+        })
+        .collect()
+}
+
+fn intermediate_trace_samples(intermediate: &Intermediate) -> Vec<[f32; 4]> {
+    match intermediate {
+        Intermediate::ThreeColor(pixels) => trace_indices(pixels.data.len())
+            .into_iter()
+            .map(|index| {
+                let pixel = pixels.data[index];
+                [pixel[0], pixel[1], pixel[2], 1.0]
+            })
+            .collect(),
+        Intermediate::Monochrome(pixels) => trace_indices(pixels.data.len())
+            .into_iter()
+            .map(|index| {
+                let value = pixels.data[index];
+                [value, value, value, 1.0]
+            })
+            .collect(),
+        Intermediate::FourColor(pixels) => trace_indices(pixels.data.len())
+            .into_iter()
+            .map(|index| pixels.data[index])
+            .collect(),
+    }
+}
+
+fn trace_indices(length: usize) -> Vec<usize> {
+    if length == 0 {
+        return Vec::new();
+    }
+    [
+        0,
+        length / 4,
+        length / 2,
+        length.saturating_mul(3) / 4,
+        length - 1,
+    ]
+    .into_iter()
+    .map(|index| index.min(length - 1))
+    .collect()
 }
 
 #[derive(Debug, Clone)]
@@ -848,6 +911,20 @@ fn reconstruct_raw_sensor_highlights(
     }
 }
 
+#[cfg(all(test, feature = "tauri-test"))]
+pub(super) fn reconstruct_raw_sensor_highlights_for_test(
+    raw_image: &mut RawImage,
+) -> (usize, usize, usize) {
+    let output =
+        reconstruct_raw_sensor_highlights(raw_image, HighlightReconstructionMode::Auto, || Ok(()))
+            .expect("test highlight reconstruction");
+    (
+        output.report.clipped_samples as usize,
+        output.report.reconstructed_samples as usize,
+        output.report.reconstructed_samples as usize,
+    )
+}
+
 fn illuminant_cct_kelvin(illuminant: Illuminant) -> Option<f32> {
     match illuminant {
         Illuminant::A | Illuminant::Tungsten | Illuminant::IsoStudioTungsten => Some(2_856.0),
@@ -1193,6 +1270,19 @@ fn resolve_camera_color_profile(
     }
 }
 
+#[cfg(all(test, feature = "tauri-test"))]
+pub(super) fn resolve_camera_color_profile_for_test(
+    color_matrices: &HashMap<Illuminant, Vec<f32>>,
+    wb: [f32; 4],
+) -> (Option<Vec<f32>>, Option<[f64; 2]>, RawCameraProfileReport) {
+    let resolved = resolve_camera_color_profile(color_matrices, wb, None);
+    (
+        resolved.matrix,
+        resolved.calibration_white_xy,
+        resolved.report,
+    )
+}
+
 fn apply_dual_illuminant_camera_profile(
     raw_image: &mut RawImage,
     white_balance_plan: Option<&WhiteBalancePlanV1>,
@@ -1377,6 +1467,7 @@ fn develop_internal_from_source(
     cancel_token: Option<(Arc<AtomicUsize>, usize)>,
     defect_options: RawDefectDevelopmentOptions,
 ) -> Result<(DynamicImage, Orientation, RawDevelopmentReport)> {
+    let decode_started = Instant::now();
     let check_cancel = || -> Result<()> {
         if let Some((tracker, generation)) = &cancel_token
             && tracker.load(Ordering::SeqCst) != *generation
@@ -1394,6 +1485,7 @@ fn develop_internal_from_source(
     let mut raw_image: RawImage = decoder.raw_image(source, &RawDecodeParams::default(), false)?;
 
     let metadata = decoder.raw_metadata(source, &RawDecodeParams::default())?;
+    let raw_decode_elapsed_ms = decode_started.elapsed().as_secs_f64() * 1_000.0;
     let orientation = metadata
         .exif
         .orientation
@@ -1421,6 +1513,13 @@ fn develop_internal_from_source(
         .first()
         .map(|r| r.as_f32())
         .unwrap_or(0.0);
+    let mut stage_samples = vec![RawDevelopmentStageSamples {
+        node_id: "sensor_decode",
+        version: 1,
+        domain: "sensor_mosaic_normalized_linear",
+        samples: sensor_trace_samples(&raw_image, original_black_level, original_white_level),
+        elapsed_ms: raw_decode_elapsed_ms,
+    }];
 
     #[cfg(test)]
     if defect_options.inject_test_defects {
@@ -1439,6 +1538,7 @@ fn develop_internal_from_source(
         }
     }
 
+    let highlight_started = Instant::now();
     let highlight_mode = if !apply_calibration || profile == RawProcessingProfile::Fast {
         HighlightReconstructionMode::Off
     } else if profile == RawProcessingProfile::Maximum {
@@ -1469,6 +1569,13 @@ fn develop_internal_from_source(
             highlight_confidence_peak
         );
     }
+    stage_samples.push(RawDevelopmentStageSamples {
+        node_id: "highlight_reconstruction",
+        version: 1,
+        domain: "sensor_mosaic_highlight_reconstructed_linear",
+        samples: sensor_trace_samples(&raw_image, original_black_level, original_white_level),
+        elapsed_ms: highlight_started.elapsed().as_secs_f64() * 1_000.0,
+    });
 
     let mut profile_resolution = if apply_calibration {
         apply_dual_illuminant_camera_profile(
@@ -1591,6 +1698,7 @@ fn develop_internal_from_source(
     }
 
     check_cancel()?;
+    let demosaic_started = Instant::now();
     let mut xtrans_hq_report = None;
     let mut developed_intermediate = if use_bayer_hq {
         develop_bayer_hq_intermediate(&raw_image)?.0
@@ -1657,7 +1765,15 @@ fn develop_internal_from_source(
             });
         }
     }
+    stage_samples.push(RawDevelopmentStageSamples {
+        node_id: "demosaic_rescale",
+        version: 1,
+        domain: "camera_rgb_linear",
+        samples: intermediate_trace_samples(&developed_intermediate),
+        elapsed_ms: demosaic_started.elapsed().as_secs_f64() * 1_000.0,
+    });
 
+    let input_transform_started = Instant::now();
     let input_transform = if apply_calibration {
         let Intermediate::ThreeColor(pixels) = &mut developed_intermediate else {
             return Err(anyhow!("raw_input_transform_unsupported_pixel_domain"));
@@ -1689,6 +1805,17 @@ fn develop_internal_from_source(
     } else {
         None
     };
+    stage_samples.push(RawDevelopmentStageSamples {
+        node_id: "white_balance_profile_input",
+        version: 1,
+        domain: if input_transform.is_some() {
+            "acescg_linear_v1"
+        } else {
+            "uncalibrated_linear_rgb"
+        },
+        samples: intermediate_trace_samples(&developed_intermediate),
+        elapsed_ms: input_transform_started.elapsed().as_secs_f64() * 1_000.0,
+    });
     if let (Some(plan), Intermediate::ThreeColor(pixels)) =
         (&selected_profile_plan, &mut developed_intermediate)
     {
@@ -1748,6 +1875,7 @@ fn develop_internal_from_source(
             camera_profile,
             selected_camera_profile: selected_profile_plan.map(|plan| plan.receipt),
             input_transform,
+            stage_samples,
             highlight_reconstruction: highlight_reconstruction_report,
             runtime: None,
             xtrans_hq: xtrans_hq_report,
