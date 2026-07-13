@@ -168,6 +168,14 @@
       "preset": "Ustawienie",
       "previewMode": "",
       "profileTone": {
+        "browser": {
+          "builtIn": "Built-in",
+          "compatibleOnly": "Compatible with this camera",
+          "importDcp": "Import DCP…",
+          "noMatches": "No matching profiles",
+          "registryError": "Profile registry: {{errorCode}}",
+          "scanning": "Scanning profiles…"
+        },
         "cameraProfile": "Profil aparatu",
         "cameraProfiles": {
           "camera_landscape": "Krajobraz",
@@ -1605,6 +1613,7 @@
         "status": {
           "fallback": "Fallback",
           "interpolated": "Interpolated",
+          "selected_dcp": "Selected DCP",
           "single_illuminant": "Single illuminant",
           "unavailable": "Unavailable"
         },

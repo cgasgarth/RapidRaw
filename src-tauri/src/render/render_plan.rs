@@ -355,6 +355,7 @@ fn fingerprints(
         b"source",
         &FINGERPRINT_VERSION.to_le_bytes(),
         &source_revision.to_le_bytes(),
+        &hash_json(effective.get("cameraProfile").unwrap_or(&Value::Null)).to_le_bytes(),
     ]);
     let geometry = hash_parts(&[
         b"geometry",
@@ -368,6 +369,9 @@ fn fingerprints(
     color_hasher.update(b"color");
     color_hasher.update(&FINGERPRINT_VERSION.to_le_bytes());
     color_hasher.update(bytes_of(adjustments));
+    color_hasher.update(
+        &hash_json(effective.get("cameraProfileAmount").unwrap_or(&Value::Null)).to_le_bytes(),
+    );
     if let Some(lut) = lut {
         color_hasher.update(&(lut.size as u64).to_le_bytes());
         color_hasher.update(&lut.abi_version.to_le_bytes());
@@ -805,6 +809,38 @@ mod tests {
                 .err()
                 .unwrap();
         assert_eq!(error.code, "render_plan.unsupported_edit_graph_version");
+    }
+
+    #[test]
+    fn dcp_identity_and_creative_amount_invalidate_their_owning_domains() {
+        let first = format!("dcp:{}", "a".repeat(64));
+        let second = format!("dcp:{}", "b".repeat(64));
+        let compile = |profile: &str, amount: u32| {
+            compile_render_plan(
+                &json!({
+                    "rawEngineEditGraphVersion": 2,
+                    "cameraProfile": profile,
+                    "cameraProfileAmount": amount,
+                }),
+                context(79),
+                None,
+            )
+            .unwrap()
+        };
+        let base = compile(&first, 100);
+        let changed_profile = compile(&second, 100);
+        let changed_amount = compile(&first, 40);
+        assert_ne!(
+            base.fingerprints.source,
+            changed_profile.fingerprints.source
+        );
+        assert_eq!(base.fingerprints.source, changed_amount.fingerprints.source);
+        assert_ne!(base.fingerprints.color, changed_amount.fingerprints.color);
+        assert_eq!(
+            base.fingerprints.geometry,
+            changed_profile.fingerprints.geometry
+        );
+        assert_eq!(base.fingerprints.output, changed_amount.fingerprints.output);
     }
 
     #[test]

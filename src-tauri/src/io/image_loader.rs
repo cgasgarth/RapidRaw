@@ -11,8 +11,9 @@ use crate::image_processing::{ImageMetadata, apply_orientation};
 use crate::mask_generation::SubMask;
 use crate::patch_assets::{CompositeResult, composite_patches};
 use crate::raw_processing::{
-    RawDemosaicPath, RawDevelopmentReport, RawProcessingProfile, RawRuntimeReport,
-    develop_raw_image_with_report, develop_raw_image_with_report_and_white_balance,
+    CameraProfileSelectionV1, RawDemosaicPath, RawDevelopmentReport, RawProcessingProfile,
+    RawRuntimeReport, RawTechnicalPlansV1, develop_raw_image_with_report,
+    develop_raw_image_with_report_and_white_balance,
     develop_raw_source_with_report_and_white_balance,
 };
 use crate::render_caches::RenderCaches;
@@ -378,18 +379,42 @@ pub(crate) fn load_and_composite_with_report(
     cancel_token: Option<(Arc<AtomicUsize>, usize)>,
 ) -> Result<(DynamicImage, Option<RawDevelopmentReport>)> {
     let white_balance_plan = technical_white_balance_plan_from_adjustments(adjustments);
+    let camera_profile_selection = camera_profile_selection_from_adjustments(adjustments);
     let (base_image, raw_development_report) = load_base_image_from_bytes_with_report_and_plan(
         base_image,
         path,
         use_fast_raw_dev,
         settings,
         cancel_token,
-        white_balance_plan,
+        RawTechnicalPlansV1 {
+            white_balance: white_balance_plan,
+            camera_profile: camera_profile_selection,
+        },
     )?;
     Ok((
         composite_patches_on_image(&base_image, adjustments)?.into_owned(),
         raw_development_report,
     ))
+}
+
+fn camera_profile_selection_from_adjustments(
+    adjustments: &Value,
+) -> Option<CameraProfileSelectionV1> {
+    let id = adjustments.get("cameraProfile")?.as_str()?;
+    let digest = id.strip_prefix("dcp:")?;
+    if digest.len() != 64 || !digest.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return None;
+    }
+    let creative_amount = adjustments
+        .get("cameraProfileAmount")
+        .and_then(Value::as_f64)
+        .unwrap_or(100.0)
+        .clamp(0.0, 100.0) as f32
+        / 100.0;
+    Some(CameraProfileSelectionV1 {
+        id: format!("dcp:{}", digest.to_ascii_lowercase()),
+        creative_amount,
+    })
 }
 
 fn technical_white_balance_plan_from_adjustments(
@@ -431,7 +456,7 @@ pub(crate) fn load_base_image_from_bytes_with_report(
         settings,
         cancel_token,
         None,
-        None,
+        RawTechnicalPlansV1::default(),
     )
 }
 
@@ -441,7 +466,7 @@ fn load_base_image_from_bytes_with_report_and_plan(
     use_fast_raw_dev: bool,
     settings: &AppSettings,
     cancel_token: Option<(Arc<AtomicUsize>, usize)>,
-    white_balance_plan: Option<WhiteBalancePlanV1>,
+    technical_plans: RawTechnicalPlansV1,
 ) -> Result<(DynamicImage, Option<RawDevelopmentReport>)> {
     load_base_image_from_source_with_report(
         bytes,
@@ -450,7 +475,7 @@ fn load_base_image_from_bytes_with_report_and_plan(
         settings,
         cancel_token,
         None,
-        white_balance_plan,
+        technical_plans,
     )
 }
 
@@ -468,7 +493,7 @@ fn load_base_image_from_prepared_raw_source_with_report(
         settings,
         cancel_token,
         Some(source),
-        None,
+        RawTechnicalPlansV1::default(),
     )
 }
 
@@ -479,7 +504,7 @@ fn load_base_image_from_source_with_report(
     settings: &AppSettings,
     cancel_token: Option<(Arc<AtomicUsize>, usize)>,
     prepared_raw_source: Option<&RawSource>,
-    white_balance_plan: Option<WhiteBalancePlanV1>,
+    technical_plans: RawTechnicalPlansV1,
 ) -> Result<(DynamicImage, Option<RawDevelopmentReport>)> {
     let raw_processing_mode = settings.raw_processing_mode.as_deref();
     let recipe = raw_processing_mode_recipe(raw_processing_mode);
@@ -523,44 +548,50 @@ fn load_base_image_from_source_with_report(
         let profile = RawProcessingProfile::from_mode(raw_processing_mode.unwrap_or("balanced"));
         match panic::catch_unwind(move || {
             if let Some(source) = prepared_raw_source {
-                match white_balance_plan {
-                    Some(plan) => develop_raw_source_with_report_and_white_balance(
+                if technical_plans.white_balance.is_some()
+                    || technical_plans.camera_profile.is_some()
+                {
+                    develop_raw_source_with_report_and_white_balance(
                         source,
                         use_fast_raw_dev,
                         profile,
                         highlight_compression,
                         linear_mode,
                         cancel_token,
-                        plan,
-                    ),
-                    None => crate::raw_processing::develop_raw_source_with_report(
+                        technical_plans,
+                    )
+                } else {
+                    crate::raw_processing::develop_raw_source_with_report(
                         source,
                         use_fast_raw_dev,
                         profile,
                         highlight_compression,
                         linear_mode,
                         cancel_token,
-                    ),
+                    )
                 }
             } else {
-                match white_balance_plan {
-                    Some(plan) => develop_raw_image_with_report_and_white_balance(
+                if technical_plans.white_balance.is_some()
+                    || technical_plans.camera_profile.is_some()
+                {
+                    develop_raw_image_with_report_and_white_balance(
                         bytes,
                         use_fast_raw_dev,
                         profile,
                         highlight_compression,
                         linear_mode,
                         cancel_token,
-                        plan,
-                    ),
-                    None => develop_raw_image_with_report(
+                        technical_plans,
+                    )
+                } else {
+                    develop_raw_image_with_report(
                         bytes,
                         use_fast_raw_dev,
                         profile,
                         highlight_compression,
                         linear_mode,
                         cancel_token,
-                    ),
+                    )
                 }
             }
         }) {

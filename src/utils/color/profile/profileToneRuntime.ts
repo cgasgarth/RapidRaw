@@ -1,4 +1,8 @@
-import { type CameraProfileId, parseProfileToneSettings } from '../../../schemas/color/profileToneSchemas';
+import {
+  type BuiltInCameraProfileId,
+  type CameraProfileId,
+  parseProfileToneSettings,
+} from '../../../schemas/color/profileToneSchemas';
 import { TONE_CURVE_PARAMETRIC_PRESETS } from '../../profileTonePresets';
 
 export interface RgbPixel {
@@ -14,13 +18,14 @@ export interface ProfileToneRuntimeResult {
   toneDelta: number;
 }
 
-const CAMERA_PROFILE_MULTIPLIERS: Record<CameraProfileId, RgbPixel> = {
+const CAMERA_PROFILE_MULTIPLIERS: Record<BuiltInCameraProfileId, RgbPixel> = {
   camera_landscape: { blue: 1.04, green: 1.02, red: 1.01 },
   camera_neutral: { blue: 0.99, green: 1, red: 0.99 },
   camera_portrait: { blue: 0.98, green: 1, red: 1.03 },
   camera_standard: { blue: 1, green: 1, red: 1 },
   linear_raw: { blue: 1, green: 1, red: 1 },
 };
+const isBuiltInCameraProfile = (id: CameraProfileId): id is BuiltInCameraProfileId => !id.startsWith('dcp:');
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 const rec709Luminance = ({ blue, green, red }: RgbPixel) => 0.2126 * red + 0.7152 * green + 0.0722 * blue;
@@ -59,7 +64,12 @@ const scaleToLuminance = (pixel: RgbPixel, targetLuminance: number) => {
 
 export function applyProfileToneToRgbPixel(pixel: RgbPixel, value: unknown): ProfileToneRuntimeResult {
   const settings = parseProfileToneSettings(value);
-  const profile = CAMERA_PROFILE_MULTIPLIERS[settings.cameraProfile];
+  // DCP execution is native and source-aware. This small TypeScript reference
+  // keeps custom profiles neutral rather than pretending a preset multiplier
+  // is the parsed DCP transform.
+  const profile = isBuiltInCameraProfile(settings.cameraProfile)
+    ? CAMERA_PROFILE_MULTIPLIERS[settings.cameraProfile]
+    : CAMERA_PROFILE_MULTIPLIERS.linear_raw;
   const profiled = {
     blue: clamp01(pixel.blue * profile.blue),
     green: clamp01(pixel.green * profile.green),
