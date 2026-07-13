@@ -326,6 +326,48 @@ await lease.release();`;
     expect(receipt.waitedMs).toBeGreaterThanOrEqual(120);
   });
 
+  test('full unit suites are exclusive across worktrees while other CPU work stays parallel', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'rapidraw-validation-suite-exclusive-'));
+    const firstWorktree = join(root, 'one');
+    const secondWorktree = join(root, 'two');
+    const coordinator = join(root, 'locks');
+    const sentinel = join(root, 'shared-suite-state');
+    await Promise.all([mkdir(firstWorktree), mkdir(secondWorktree)]);
+    await Promise.all([
+      writeFile(join(firstWorktree, 'input.ts'), 'export const input = 1;\n'),
+      writeFile(join(secondWorktree, 'input.ts'), 'export const input = 2;\n'),
+    ]);
+    const command = [
+      'bun',
+      '-e',
+      `import {rm} from 'node:fs/promises';const p=${JSON.stringify(sentinel)};if(await Bun.file(p).exists())process.exit(9);await Bun.write(p,String(process.pid));await Bun.sleep(180);await rm(p,{force:true})`,
+    ];
+    const suite: ValidationNode = {
+      id: 'unit-suite',
+      command,
+      dependencies: [],
+      inputs: ['frontend'],
+      resourceClass: 'suite-exclusive',
+      cachePolicy: 'none',
+      modes: ['commit'],
+      timeoutMs: 2_000,
+    };
+    const options = (worktree: string) => ({
+      mode: 'commit' as const,
+      changedPaths: ['input.ts'],
+      noCache: true,
+      verifyCache: false,
+      explainCache: false,
+      root: worktree,
+      resourceCoordinatorRoot: coordinator,
+    });
+    const first = runValidation([suite], options(firstWorktree));
+    await Bun.sleep(25);
+    const second = runValidation([suite], options(secondWorktree));
+    expect(await Promise.all([first, second])).toEqual([0, 0]);
+    expect(validationManifest.find((node) => node.id === 'unit')?.resourceClass).toBe('suite-exclusive');
+  });
+
   test('commit failure preserves an independent active node disposition and returns deterministic nonzero', async () => {
     const root = await mkdtemp(join(tmpdir(), 'rapidraw-validation-fail-fast-'));
     initFixtureRepository(root);
