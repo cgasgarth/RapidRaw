@@ -687,6 +687,7 @@
       },
       "referenceMatch": {
         "apply": "Apply once",
+        "applyIdentityChanged": "A reference changed after analysis. Re-analyze before applying.",
         "cancel": "Cancel",
         "clear": "Clear",
         "compare": "Compare",

@@ -684,6 +684,7 @@
       },
       "referenceMatch": {
         "apply": "",
+        "applyIdentityChanged": "",
         "cancel": "",
         "clear": "",
         "compare": "",

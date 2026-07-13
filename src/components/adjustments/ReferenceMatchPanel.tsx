@@ -25,6 +25,7 @@ import {
   type ReferencePhysicalSourceIdentity,
   selectReferenceMatchReferences,
   summarizeReferenceHistogram,
+  validateReferenceMatchApplicationIdentities,
 } from '../../utils/referenceMatch';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 
@@ -81,6 +82,7 @@ export default function ReferenceMatchPanel() {
   const [proposal, setProposal] = useState<ReferenceMatchProposal | null>(null);
   const [impact, setImpact] = useState(100);
   const [enabledGroups, setEnabledGroups] = useState<Set<ReferenceMatchGroup>>(() => new Set(GROUPS));
+  const [applyAbstention, setApplyAbstention] = useState<string | null>(null);
   const targetSummary = useMemo(
     () =>
       summarizeReferenceHistogram(histogram, spatialAnalysis?.path === selectedImage?.path ? spatialAnalysis : null),
@@ -204,6 +206,33 @@ export default function ReferenceMatchPanel() {
     setProposal(nextProposal);
     setEnabledGroups(new Set(nextProposal?.diffs.map((diff) => diff.group) ?? []));
     setImpact(100);
+    setApplyAbstention(null);
+  };
+
+  const revalidateBeforeApply = async (): Promise<boolean> => {
+    if (!proposal) return false;
+    const snapshot = useEditorStore.getState().referenceMatchReferences;
+    const effectiveFingerprints = new Set(proposal.effectiveReferences.map((reference) => reference.sourceFingerprint));
+    const effectiveSources = snapshot.filter((reference) => effectiveFingerprints.has(reference.sourceFingerprint));
+    const resolved = await Promise.all(
+      effectiveSources.map(
+        async (reference): Promise<[string, ReferencePhysicalSourceIdentity | null]> => [
+          reference.path,
+          await resolveSourceIdentity(reference.path),
+        ],
+      ),
+    );
+    const validation = validateReferenceMatchApplicationIdentities(proposal, snapshot, new Map(resolved));
+    if (!validation.valid) {
+      setApplyAbstention(
+        t('editor.adjustments.referenceMatch.applyIdentityChanged', {
+          defaultValue: 'A reference changed after analysis. Re-analyze before applying.',
+        }),
+      );
+      return false;
+    }
+    setApplyAbstention(null);
+    return true;
   };
 
   return (
@@ -496,6 +525,11 @@ export default function ReferenceMatchPanel() {
               {warning}
             </div>
           ))}
+          {applyAbstention && (
+            <div className="text-[9px] text-editor-warning" data-testid="reference-match-apply-abstention" role="alert">
+              {applyAbstention}
+            </div>
+          )}
           {layerCompatibility && !layerCompatibility.supported && (
             <div
               className="text-[9px] text-editor-warning"
@@ -524,45 +558,48 @@ export default function ReferenceMatchPanel() {
               disabled={
                 enabledGroups.size === 0 || proposal.diffs.length === 0 || layerCompatibility?.supported !== true
               }
-              onClick={() => {
-                const current = useEditorStore.getState().adjustments;
-                const layerId = crypto.randomUUID();
-                const layerWithoutReceipt = createReferenceMatchAdjustmentLayer({
-                  enabledGroups,
-                  id: layerId,
-                  impact,
-                  name: proposal.mode === 'normalize' ? 'Reference Normalize' : 'Reference Match',
-                  proposal,
-                });
-                const receipt = matchLookApplicationReceiptV1Schema.parse({
-                  appliedAt: new Date().toISOString(),
-                  destination: 'adjustment-layer',
-                  enabledGroups: [...enabledGroups].sort(),
-                  historyEntriesAdded: 1,
-                  impact,
-                  layerId,
-                  proposalFingerprint: proposal.proposalFingerprint,
-                  resultingGraphFingerprint: fingerprintReferenceMatchValue(
-                    JSON.stringify({
-                      adjustments: layerWithoutReceipt.adjustments,
-                      opacity: layerWithoutReceipt.opacity,
-                    }),
-                  ),
-                  schemaVersion: 1,
-                  targetAnalysisFingerprint: proposal.targetAnalysisFingerprint,
-                });
-                const layer = createReferenceMatchAdjustmentLayer({
-                  enabledGroups,
-                  id: layerId,
-                  impact,
-                  name: layerWithoutReceipt.name,
-                  proposal,
-                  receipt,
-                });
-                setAdjustments({ masks: [layer, ...current.masks] });
-                setEditor({ activeMaskContainerId: layerId, lastReferenceMatchApplicationReceipt: receipt });
-                setProposal(null);
-              }}
+              onClick={() =>
+                void (async () => {
+                  if (!(await revalidateBeforeApply())) return;
+                  const current = useEditorStore.getState().adjustments;
+                  const layerId = crypto.randomUUID();
+                  const layerWithoutReceipt = createReferenceMatchAdjustmentLayer({
+                    enabledGroups,
+                    id: layerId,
+                    impact,
+                    name: proposal.mode === 'normalize' ? 'Reference Normalize' : 'Reference Match',
+                    proposal,
+                  });
+                  const receipt = matchLookApplicationReceiptV1Schema.parse({
+                    appliedAt: new Date().toISOString(),
+                    destination: 'adjustment-layer',
+                    enabledGroups: [...enabledGroups].sort(),
+                    historyEntriesAdded: 1,
+                    impact,
+                    layerId,
+                    proposalFingerprint: proposal.proposalFingerprint,
+                    resultingGraphFingerprint: fingerprintReferenceMatchValue(
+                      JSON.stringify({
+                        adjustments: layerWithoutReceipt.adjustments,
+                        opacity: layerWithoutReceipt.opacity,
+                      }),
+                    ),
+                    schemaVersion: 1,
+                    targetAnalysisFingerprint: proposal.targetAnalysisFingerprint,
+                  });
+                  const layer = createReferenceMatchAdjustmentLayer({
+                    enabledGroups,
+                    id: layerId,
+                    impact,
+                    name: layerWithoutReceipt.name,
+                    proposal,
+                    receipt,
+                  });
+                  setAdjustments({ masks: [layer, ...current.masks] });
+                  setEditor({ activeMaskContainerId: layerId, lastReferenceMatchApplicationReceipt: receipt });
+                  setProposal(null);
+                })()
+              }
               type="button"
             >
               {t('editor.adjustments.referenceMatch.newLayerDestination', { defaultValue: 'New layer' })}
@@ -571,33 +608,36 @@ export default function ReferenceMatchPanel() {
               className="rounded bg-editor-accent px-2 py-1 text-[11px] font-semibold text-editor-accent-text disabled:opacity-40"
               data-testid="reference-match-apply"
               disabled={enabledGroups.size === 0 || proposal.diffs.length === 0}
-              onClick={() => {
-                const current = useEditorStore.getState().adjustments;
-                const applied = applyReferenceMatchProposal({
-                  adjustments: current,
-                  enabledGroups,
-                  impact,
-                  proposal,
-                });
-                const receipt = matchLookApplicationReceiptV1Schema.parse({
-                  appliedAt: new Date().toISOString(),
-                  destination: 'global-adjustments',
-                  enabledGroups: [...enabledGroups].sort(),
-                  historyEntriesAdded: 1,
-                  impact,
-                  proposalFingerprint: proposal.proposalFingerprint,
-                  resultingGraphFingerprint: fingerprintReferenceMatchValue(
-                    JSON.stringify(proposal.diffs.map((diff) => [diff.key, applied[diff.key]])),
-                  ),
-                  schemaVersion: 1,
-                  targetAnalysisFingerprint: proposal.targetAnalysisFingerprint,
-                });
-                setAdjustments({ ...applied, referenceMatchApplicationReceipt: receipt });
-                setEditor({
-                  lastReferenceMatchApplicationReceipt: receipt,
-                });
-                setProposal(null);
-              }}
+              onClick={() =>
+                void (async () => {
+                  if (!(await revalidateBeforeApply())) return;
+                  const current = useEditorStore.getState().adjustments;
+                  const applied = applyReferenceMatchProposal({
+                    adjustments: current,
+                    enabledGroups,
+                    impact,
+                    proposal,
+                  });
+                  const receipt = matchLookApplicationReceiptV1Schema.parse({
+                    appliedAt: new Date().toISOString(),
+                    destination: 'global-adjustments',
+                    enabledGroups: [...enabledGroups].sort(),
+                    historyEntriesAdded: 1,
+                    impact,
+                    proposalFingerprint: proposal.proposalFingerprint,
+                    resultingGraphFingerprint: fingerprintReferenceMatchValue(
+                      JSON.stringify(proposal.diffs.map((diff) => [diff.key, applied[diff.key]])),
+                    ),
+                    schemaVersion: 1,
+                    targetAnalysisFingerprint: proposal.targetAnalysisFingerprint,
+                  });
+                  setAdjustments({ ...applied, referenceMatchApplicationReceipt: receipt });
+                  setEditor({
+                    lastReferenceMatchApplicationReceipt: receipt,
+                  });
+                  setProposal(null);
+                })()
+              }
               type="button"
             >
               {t('editor.adjustments.referenceMatch.apply', { defaultValue: 'Apply once' })}
