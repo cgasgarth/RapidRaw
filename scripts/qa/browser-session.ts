@@ -6,8 +6,8 @@ import { z } from 'zod';
 import { allocateFreeTcpPort } from '../lib/dev-server-port';
 import type { QaDaemonJob, QaLifecycleAdapter } from './daemon-engine';
 import type { QaDaemonMetrics } from './daemon-model';
-import type { QaScenarioResult } from './model';
-import { selectScenarios, shardScenarios } from './planner';
+import type { QaArtifactRecord, QaScenarioResult } from './model';
+import { selectScenarios, shardScenarios, validateScenarioArtifacts, validateScenarioCapabilities } from './planner';
 import { qaScenarios } from './scenarios';
 
 interface BrowserSession {
@@ -58,6 +58,15 @@ export const browserJobResultSchema: z.ZodType<BrowserJobResult> = z.object({
       durationMs: z.number().nonnegative(),
       error: z.string().optional(),
       screenshot: z.string().optional(),
+      artifacts: z
+        .array(
+          z.object({
+            id: z.string(),
+            kind: z.enum(['download', 'json-report', 'screenshot', 'terminal-assertion']),
+            path: z.string().optional(),
+          }),
+        )
+        .optional(),
     }),
   ),
 });
@@ -164,6 +173,7 @@ export function createBrowserLifecycleAdapter(
       await mkdir(artifactRoot, { recursive: true });
       for (const scenario of selected) {
         signal.throwIfAborted();
+        validateScenarioCapabilities(scenario, new Set(['browser-tauri-harness']));
         const context = await session.browser.newContext({
           baseURL: session.baseUrl,
           viewport: { height: 720, width: 1280 },
@@ -182,10 +192,27 @@ export function createBrowserLifecycleAdapter(
           route.fulfill({ json: { tag_name: 'v0.0.0-qa' }, status: 200 }),
         );
         const started = performance.now();
+        const artifacts: QaArtifactRecord[] = [];
         try {
-          await withTimeout(scenario.run({ baseUrl: session.baseUrl, context, page }), scenario.timeoutMs);
+          await withTimeout(
+            scenario.run({
+              baseUrl: session.baseUrl,
+              context,
+              page,
+              recordArtifact(artifact) {
+                artifacts.push(artifact);
+              },
+            }),
+            scenario.timeoutMs,
+          );
+          validateScenarioArtifacts(scenario, artifacts);
           if (errors.length > 0) throw new Error(`Browser errors:\n${errors.join('\n')}`);
-          results.push({ id: scenario.id, status: 'passed', durationMs: Math.round(performance.now() - started) });
+          results.push({
+            id: scenario.id,
+            status: 'passed',
+            durationMs: Math.round(performance.now() - started),
+            artifacts,
+          });
         } catch (error) {
           const screenshot = resolve(artifactRoot, `${scenario.id}-${Date.now()}.png`);
           await page.screenshot({ path: screenshot, fullPage: true }).catch(() => undefined);
@@ -198,6 +225,7 @@ export function createBrowserLifecycleAdapter(
             durationMs: Math.round(performance.now() - started),
             error: `${error instanceof Error ? error.message : String(error)}\nHarness state: ${harnessCalls?.slice(-4_000) ?? 'unavailable'}`,
             screenshot,
+            artifacts,
           });
         } finally {
           signal.removeEventListener('abort', abort);

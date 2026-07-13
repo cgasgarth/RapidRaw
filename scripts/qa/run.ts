@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { createHash } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { type BrowserJobResult, browserJobResultSchema, createBrowserLifecycleAdapter } from './browser-session';
 import { requestQaDaemon } from './daemon-client';
@@ -11,7 +11,9 @@ import { readLiveDaemonState } from './daemon-state';
 import { createQaDaemonIdentity } from './identity';
 import { selectImpactedScenarioIds } from './impacted';
 import type { QaRunReceipt } from './model';
-import { selectScenarios, shardScenarios } from './planner';
+import { readLiveNativeQaControlRecord, requestNativeQaControl } from './native-control';
+import { selectScenarios } from './planner';
+import { assertQaReproductionIdentity, buildQaRerunArgs, buildQaRerunCommand, qaRunReceiptSchema } from './receipt';
 import { qaScenarios } from './scenarios';
 
 const args = process.argv.slice(2);
@@ -22,6 +24,28 @@ const value = (flag: string) => {
 };
 const list = (flag: string) =>
   args.flatMap((arg, index) => (arg === flag ? [args[index + 1] ?? ''] : [])).filter(Boolean);
+
+if (args[0] === 'reproduce') {
+  const receiptPath = args[1];
+  if (receiptPath === undefined) throw new Error('Usage: bun qa reproduce /absolute/or/relative/run.json');
+  const receipt = qaRunReceiptSchema.parse(JSON.parse(await readFile(resolve(receiptPath), 'utf8')));
+  const currentGitSha = Bun.spawnSync(['git', 'rev-parse', 'HEAD']).stdout.toString().trim();
+  const currentDirty = Bun.spawnSync(['git', 'status', '--porcelain=v1']).stdout.toString();
+  const currentIdentity = await createQaDaemonIdentity(worktree, false);
+  assertQaReproductionIdentity(receipt, {
+    buildIdentity: currentIdentity.configuration,
+    dirtyDigest: createHash('sha256').update(currentDirty).digest('hex'),
+    gitSha: currentGitSha,
+    platform: `${process.platform}-${process.arch}`,
+    worktree: resolve(worktree),
+  });
+  const child = Bun.spawn(['bun', 'scripts/qa/run.ts', ...buildQaRerunArgs(receipt)], {
+    cwd: worktree,
+    stderr: 'inherit',
+    stdout: 'inherit',
+  });
+  process.exit(await child.exited);
+}
 
 if (args.includes('--list')) {
   for (const scenario of qaScenarios) console.log(`${scenario.id}\t${scenario.tags.join(',')}\t${scenario.isolation}`);
@@ -49,8 +73,26 @@ if (args[0] === 'benchmark') {
   process.exit(await child.exited);
 }
 
+if (args[0] === 'native') {
+  const recordPath = resolve(value('--record') ?? 'private-artifacts/qa/native-control.json');
+  const record = await readLiveNativeQaControlRecord(recordPath, worktree);
+  if (record === undefined) throw new Error(`Native QA control record is unavailable: ${recordPath}`);
+  const method = args[1] ?? 'health';
+  const parameters: Record<string, unknown> = {};
+  if (method === 'reset') parameters.mode = args[2] ?? 'empty';
+  if (method === 'openFixture' || method === 'screenshot') parameters.path = resolve(args[2] ?? '');
+  if (method === 'setCacheMode') parameters.mode = args[2] ?? 'warm';
+  const response = await requestNativeQaControl(record, method, parameters);
+  console.log(JSON.stringify(response.result));
+  if (!response.ok) throw new Error(response.error ?? `Native QA ${method} failed.`);
+  process.exit(0);
+}
+
 const total = Number(value('--shard-total') ?? '1');
 const index = Number(value('--shard-index') ?? '0');
+const seed = Number(value('--seed') ?? '0');
+if (!Number.isSafeInteger(seed) || seed < 0 || seed > 0xffff_ffff)
+  throw new Error(`QA seed must be a uint32, received ${String(value('--seed'))}.`);
 const gitSha = Bun.spawnSync(['git', 'rev-parse', 'HEAD']).stdout.toString().trim();
 const dirty = Bun.spawnSync(['git', 'status', '--porcelain=v1']).stdout.toString();
 const startedAt = new Date();
@@ -70,7 +112,6 @@ const selection = selectScenarios(qaScenarios, {
   ids: [...list('--scenario'), ...impactedIds],
   tags: list('--tag'),
 });
-const selected = shardScenarios(selection, index, total);
 const scenarioIds = selection.map(({ id }) => id);
 const identity = await createQaDaemonIdentity(worktree, args.includes('--headed'));
 const runId = `${startedAt.toISOString().replaceAll(/[:.]/gu, '-')}-${gitSha.slice(0, 8)}-s${index}`;
@@ -111,7 +152,8 @@ if (args.includes('--persistent')) {
 }
 
 const failedIds = jobResult.results.filter(({ status }) => status === 'failed').map(({ id }) => id);
-const receipt: QaRunReceipt = {
+const persistent = args.includes('--persistent');
+const receiptWithoutCommand: Omit<QaRunReceipt, 'rerunCommand'> = {
   schemaVersion: 1,
   runId,
   gitSha,
@@ -121,11 +163,20 @@ const receipt: QaRunReceipt = {
   browserVersion: jobResult.browserVersion,
   platform: `${process.platform}-${process.arch}`,
   shard: { index, total },
+  seed,
+  persistent,
   startedAt: startedAt.toISOString(),
   endedAt: new Date().toISOString(),
   scenarios: jobResult.results,
   metrics,
-  rerunCommand: `bun qa run ${args.includes('--persistent') ? '--persistent ' : ''}${(failedIds.length > 0 ? failedIds : selected.map(({ id }) => id)).map((id) => `--scenario ${id}`).join(' ')}`,
+};
+const receipt: QaRunReceipt = {
+  ...receiptWithoutCommand,
+  rerunCommand: buildQaRerunCommand({
+    persistent,
+    scenarios: failedIds.length > 0 ? jobResult.results.filter(({ id }) => failedIds.includes(id)) : jobResult.results,
+    seed,
+  }),
 };
 const receiptPath = resolve(artifactRoot, 'run.json');
 await writeFile(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);

@@ -11,14 +11,31 @@ export interface QaScenarioContext {
   baseUrl: string;
   context: BrowserContext;
   page: Page;
+  recordArtifact(artifact: QaArtifactRecord): void;
+}
+
+export type QaArtifactKind = 'download' | 'json-report' | 'screenshot' | 'terminal-assertion';
+
+export interface QaArtifactContract {
+  id: string;
+  kind: QaArtifactKind;
+  required: boolean;
+}
+
+export interface QaArtifactRecord {
+  id: string;
+  kind: QaArtifactKind;
+  path?: string | undefined;
 }
 
 export interface QaScenario {
   id: string;
   tags: readonly string[];
   dependencies: readonly string[];
+  artifactContracts: readonly QaArtifactContract[];
   fixture: QaFixtureSpec;
   isolation: QaIsolation;
+  requiredCapabilities: readonly string[];
   timeoutMs: number;
   run(context: QaScenarioContext): Promise<void>;
 }
@@ -29,6 +46,7 @@ export interface QaScenarioResult {
   durationMs: number;
   error?: string | undefined;
   screenshot?: string | undefined;
+  artifacts?: QaArtifactRecord[] | undefined;
 }
 
 export interface QaRunReceipt {
@@ -41,6 +59,8 @@ export interface QaRunReceipt {
   browserVersion: string;
   platform: string;
   shard: { index: number; total: number };
+  seed: number;
+  persistent: boolean;
   startedAt: string;
   endedAt: string;
   scenarios: QaScenarioResult[];
