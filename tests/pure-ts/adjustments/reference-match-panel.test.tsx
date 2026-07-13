@@ -201,6 +201,7 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
   expect(useEditorStore.getState().historyIndex).toBe(historyBeforeProposal + 1);
   expect(useEditorStore.getState().lastReferenceMatchApplicationReceipt).toMatchObject({
     destination: 'global-adjustments',
+    effectiveReferences: [{ role: 'creative', weight: 1 }],
     historyEntriesAdded: 1,
     impact: 100,
   });
@@ -237,6 +238,7 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
     opacity: 100,
     referenceMatchApplicationReceipt: {
       destination: 'adjustment-layer',
+      effectiveReferences: [{ role: 'creative', weight: 1 }],
       enabledGroups: ['tone'],
       historyEntriesAdded: 1,
       impact: 100,

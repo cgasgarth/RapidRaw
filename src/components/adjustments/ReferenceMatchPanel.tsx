@@ -593,6 +593,7 @@ export default function ReferenceMatchPanel() {
                   const receipt = matchLookApplicationReceiptV1Schema.parse({
                     appliedAt: new Date().toISOString(),
                     destination: 'adjustment-layer',
+                    effectiveReferences: proposal.effectiveReferences,
                     enabledGroups: [...enabledGroups].sort(),
                     historyEntriesAdded: 1,
                     impact,
@@ -641,6 +642,7 @@ export default function ReferenceMatchPanel() {
                   const receipt = matchLookApplicationReceiptV1Schema.parse({
                     appliedAt: new Date().toISOString(),
                     destination: 'global-adjustments',
+                    effectiveReferences: proposal.effectiveReferences,
                     enabledGroups: [...enabledGroups].sort(),
                     historyEntriesAdded: 1,
                     impact,
