@@ -700,6 +700,7 @@
         "missingCachedReference": "Original missing · cached preview only",
         "newLayerDestination": "New layer",
         "normalize": "Normalize",
+        "referencePreviewAlt": "Cached reference preview for {{name}}",
         "replacedCachedReference": "Source replaced · cached preview excluded from matching",
         "replaceReference": "Replace with current image",
         "residualSummary": "Residual {{before}} → {{after}} · profile, WB, geometry and detail remain unchanged",
@@ -710,6 +711,7 @@
         "technicalRole": "Technical authority",
         "title": "Reference Match",
         "unknownReferenceAvailability": "Source availability unknown",
+        "virtualCopyState": "Virtual copy · {{copy}}",
         "weight": "Weight"
       },
       "scopedSections": {

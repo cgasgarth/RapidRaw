@@ -697,6 +697,7 @@
         "missingCachedReference": "",
         "newLayerDestination": "",
         "normalize": "",
+        "referencePreviewAlt": "",
         "replacedCachedReference": "",
         "replaceReference": "",
         "residualSummary": "",
@@ -707,6 +708,7 @@
         "technicalRole": "",
         "title": "",
         "unknownReferenceAvailability": "",
+        "virtualCopyState": "",
         "weight": ""
       },
       "scopedSections": {

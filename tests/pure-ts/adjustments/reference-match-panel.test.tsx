@@ -52,6 +52,7 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
   useEditorStore.setState({
     adjustmentSnapshot: publishAdjustmentSnapshot(null, initial),
     adjustments: initial,
+    finalPreviewUrl: null,
     histogram: histogram(180, 200, 170, 120),
     history: [initial],
     historyIndex: 0,
@@ -87,6 +88,12 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
     await flushPromises();
   });
   expect(container.querySelector('[data-reference-path="/photos/reference.ARW"]')).not.toBeNull();
+  expect(container.querySelector('[data-testid="reference-match-thumbnail"]')?.getAttribute('src')).toBe(
+    'blob:/photos/reference.ARW:original',
+  );
+  expect(container.querySelector('[data-testid="reference-match-thumbnail"]')?.getAttribute('alt')).toContain(
+    'reference.ARW',
+  );
   await changeSelect(container, '[data-testid="reference-match-role"]', 'technical');
   expect(useEditorStore.getState().referenceMatchReferences[0]?.role).toBe('technical');
   expect(container.querySelector<HTMLButtonElement>('[data-testid="reference-match-normalize"]')?.disabled).toBe(false);

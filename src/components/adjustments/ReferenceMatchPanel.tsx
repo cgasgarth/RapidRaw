@@ -16,6 +16,7 @@ import {
   applyReferenceMatchProposal,
   createReferenceMatchAdjustmentLayer,
   createReferenceMatchProposal,
+  describeReferenceMatchSource,
   fingerprintReferenceMatchValue,
   getReferenceMatchLayerCompatibility,
   mergeReferenceSourceIdentities,
@@ -28,8 +29,6 @@ import {
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 
 const GROUPS: ReferenceMatchGroup[] = ['tone', 'color', 'presence'];
-
-const fileLabel = (path: string): string => path.split(/[\\/]/).pop() || path;
 
 const browserSourceIdentity = (path: string): ReferencePhysicalSourceIdentity => ({
   available: true,
@@ -173,7 +172,7 @@ export default function ReferenceMatchPanel() {
         `${selectedImage.path}:graph:${String(adjustmentSnapshot.adjustmentRevision)}`,
       ),
       id: `${selectedImage.path}:${String(adjustmentSnapshot.adjustmentRevision)}:${String(proofRevision)}`,
-      label: fileLabel(selectedImage.path),
+      label: describeReferenceMatchSource(selectedImage.path).label,
       path: selectedImage.path,
       proofFingerprint: fingerprintReferenceMatchValue(`proof:${String(proofRevision)}`),
       proofRevision,
@@ -265,10 +264,20 @@ export default function ReferenceMatchPanel() {
         <div className="space-y-1" data-testid="reference-match-tray">
           {references.map((reference) => (
             <div
-              className="grid grid-cols-[minmax(0,1fr)_2.75rem_1.5rem_1.5rem_4rem_1.25rem] items-center gap-1 rounded border border-editor-border bg-editor-panel px-1.5 py-1"
+              className="grid grid-cols-[2.5rem_minmax(0,1fr)_2.75rem_1.5rem_1.5rem_4rem_1.25rem] items-center gap-1 rounded border border-editor-border bg-editor-panel px-1.5 py-1"
               data-reference-path={reference.path}
               key={reference.id}
             >
+              <img
+                alt={t('editor.adjustments.referenceMatch.referencePreviewAlt', {
+                  defaultValue: 'Cached reference preview for {{name}}',
+                  name: reference.label,
+                })}
+                className="h-9 w-10 rounded border border-editor-border bg-editor-panel-well object-cover"
+                data-testid="reference-match-thumbnail"
+                draggable={false}
+                src={reference.renderUrl}
+              />
               <div className="min-w-0">
                 <div className="truncate text-[11px] font-medium text-text-primary">{reference.label}</div>
                 <div className="truncate font-mono text-[9px] text-text-tertiary">
@@ -277,6 +286,14 @@ export default function ReferenceMatchPanel() {
                     revision: reference.adjustmentRevision,
                   })}
                 </div>
+                {describeReferenceMatchSource(reference.path).virtualCopyId && (
+                  <div className="truncate text-[9px] text-editor-accent" data-testid="reference-match-virtual-copy">
+                    {t('editor.adjustments.referenceMatch.virtualCopyState', {
+                      copy: describeReferenceMatchSource(reference.path).virtualCopyId,
+                      defaultValue: 'Virtual copy · {{copy}}',
+                    })}
+                  </div>
+                )}
                 <label className="mt-0.5 flex items-center gap-1 text-[9px] text-text-secondary">
                   {t('editor.adjustments.referenceMatch.role', { defaultValue: 'Role' })}
                   <select
