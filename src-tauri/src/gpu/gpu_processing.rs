@@ -814,11 +814,12 @@ pub struct GpuProcessor {
     context: GpuContext,
     generation: u64,
     resource_cache: Mutex<GpuResourceCache>,
-    last_execution_receipt: Mutex<Option<GpuExecutionReceipt>>,
     main_bind_group_cache: Mutex<Option<CachedMainBindGroup>>,
     view_bind_group_cache: Mutex<Option<CachedMainBindGroup>>,
     display_bind_group_cache: Mutex<Option<CachedMainBindGroup>>,
     blur_surface_cache: Mutex<BlurSurfaceCache>,
+    last_execution_receipt: Mutex<Option<GpuExecutionReceipt>>,
+    execution_sequence: AtomicU64,
     blur_bgl: wgpu::BindGroupLayout,
     h_blur_pipeline: wgpu::ComputePipeline,
     v_blur_pipeline: wgpu::ComputePipeline,
@@ -865,6 +866,10 @@ impl GpuProcessor {
 
     pub fn last_execution_receipt(&self) -> Option<GpuExecutionReceipt> {
         *self.last_execution_receipt.lock().unwrap()
+    }
+
+    pub fn execution_sequence(&self) -> u64 {
+        self.execution_sequence.load(Ordering::Acquire)
     }
 
     pub fn new(context: GpuContext, max_width: u32, max_height: u32) -> Result<Self, String> {
@@ -1330,11 +1335,12 @@ impl GpuProcessor {
                 },
                 ..Default::default()
             }),
-            last_execution_receipt: Mutex::new(None),
             main_bind_group_cache: Mutex::new(None),
             view_bind_group_cache: Mutex::new(None),
             display_bind_group_cache: Mutex::new(None),
             blur_surface_cache: Mutex::new(BlurSurfaceCache::default()),
+            last_execution_receipt: Mutex::new(None),
+            execution_sequence: AtomicU64::new(0),
             blur_bgl,
             h_blur_pipeline,
             v_blur_pipeline,
@@ -2322,6 +2328,8 @@ impl GpuProcessor {
                 &["legacy_implementation_defined"]
             },
         };
+        *self.last_execution_receipt.lock().unwrap() = Some(receipt);
+        self.execution_sequence.fetch_add(1, Ordering::Release);
         log::debug!("GPU execution receipt: {receipt:?}");
         *self.last_execution_receipt.lock().unwrap() = Some(receipt);
 
