@@ -26,6 +26,7 @@ pub const TRANSFORM_ASPECT: &str = "transformAspect";
 pub const TRANSFORM_SCALE: &str = "transformScale";
 pub const TRANSFORM_X_OFFSET: &str = "transformXOffset";
 pub const TRANSFORM_Y_OFFSET: &str = "transformYOffset";
+pub const PERSPECTIVE_CORRECTION: &str = "perspectiveCorrection";
 
 pub const LENS_DISTORTION_AMOUNT: &str = "lensDistortionAmount";
 pub const LENS_VIGNETTE_AMOUNT: &str = "lensVignetteAmount";
@@ -46,6 +47,7 @@ pub const GEOMETRY_KEYS: &[&str] = &[
     TRANSFORM_SCALE,
     TRANSFORM_X_OFFSET,
     TRANSFORM_Y_OFFSET,
+    PERSPECTIVE_CORRECTION,
     LENS_DISTORTION_AMOUNT,
     LENS_VIGNETTE_AMOUNT,
     LENS_TCA_AMOUNT,

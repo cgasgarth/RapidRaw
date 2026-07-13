@@ -5,6 +5,7 @@ import {
 } from '../../packages/rawengine-schema/src/referenceMatchRuntime';
 import { Mask, type SubMask, SubMaskMode } from '../components/panel/right/layers/Masks';
 import type { LevelsSettings } from '../schemas/color/levelsSchemas';
+import type { PerspectiveCorrectionSettings } from '../schemas/geometry/perspectiveSchemas';
 import {
   INITIAL_TECHNICAL_WHITE_BALANCE,
   type TechnicalWhiteBalance,
@@ -337,6 +338,7 @@ export interface Adjustments {
   transformScale: number;
   transformXOffset: number;
   transformYOffset: number;
+  perspectiveCorrection: PerspectiveCorrectionSettings;
   vibrance: number;
   vignetteAmount: number;
   vignetteFeather: number;
@@ -945,6 +947,13 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   transformScale: 100,
   transformXOffset: 0,
   transformYOffset: 0,
+  perspectiveCorrection: {
+    amount: 100,
+    cropPolicy: 'auto_crop',
+    guides: [],
+    mode: 'off',
+    resolvedPlan: null,
+  },
   vibrance: 0,
   vignetteAmount: 0,
   vignetteFeather: 50,
@@ -1105,6 +1114,7 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
     transformScale: loadedAdjustments.transformScale ?? INITIAL_ADJUSTMENTS.transformScale,
     transformXOffset: loadedAdjustments.transformXOffset ?? INITIAL_ADJUSTMENTS.transformXOffset,
     transformYOffset: loadedAdjustments.transformYOffset ?? INITIAL_ADJUSTMENTS.transformYOffset,
+    perspectiveCorrection: loadedAdjustments.perspectiveCorrection ?? INITIAL_ADJUSTMENTS.perspectiveCorrection,
     cameraProfile: loadedAdjustments.cameraProfile ?? INITIAL_ADJUSTMENTS.cameraProfile,
     cameraProfileAmount,
     toneMapper: loadedAdjustments.toneMapper ?? 'basic',

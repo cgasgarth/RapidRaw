@@ -2,19 +2,18 @@ import { listen } from '@tauri-apps/api/event';
 import { useEffect } from 'react';
 import { toast } from 'react-toastify';
 
-import { isNullAdjustmentSnapshot, parseImageOpenUpdate } from '../../schemas/imageLoaderSchemas';
+import { parseImageOpenUpdate, parseLoadedMetadata } from '../../schemas/imageLoaderSchemas';
 import { isEditorImageSessionCurrent, useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
-import { INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../../utils/adjustments';
 import { isSelectedImageLoadErrorCurrent } from '../../utils/editorImageLoadError';
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { upsertReopenedDerivedOutputReceipt } from '../../utils/hdrDerivedSourceReopen';
+import { hydrateImageOpenAdjustments } from '../../utils/imageOpenAdjustmentHydration';
 import { beginImageOpenWithSchema } from '../../utils/imageOpenInvokes';
 import { isImageOpenUpdateCurrent } from '../../utils/imageOpenPhaseCurrentness';
 import { acceptImageOpenMetadataRevision } from '../../utils/imageOpenRevisionCache';
-import { hydrateLayerStackMasksFromMetadata } from '../../utils/layers/layerStackSidecarAdjustments';
 import {
   consumePendingNegativeConversionDustHealLayers,
   consumePendingNegativeConversionSavedPositiveHandoff,
@@ -43,15 +42,7 @@ export function useImageLoader() {
       const publishMetadataPhase = (metadata: ReturnType<typeof parseImageOpenUpdate> & { phase: 'metadataReady' }) => {
         if (!isEditorImageSessionCurrent(sessionId) || metadata.path !== selectedImagePath) return;
         acceptImageOpenMetadataRevision(metadata.path, metadata.metadataFingerprint);
-        const initialAdjusts =
-          metadata.metadata.adjustments && !isNullAdjustmentSnapshot(metadata.metadata.adjustments)
-            ? normalizeLoadedAdjustments(metadata.metadata.adjustments)
-            : { ...INITIAL_ADJUSTMENTS };
-        const hydratedAdjustments = hydrateLayerStackMasksFromMetadata(
-          initialAdjusts,
-          metadata.metadata,
-          selectedImagePath,
-        );
+        const hydratedAdjustments = hydrateImageOpenAdjustments(metadata.metadata, selectedImagePath);
         setEditor({ adjustments: hydratedAdjustments });
         resetHistory(hydratedAdjustments);
       };
@@ -113,10 +104,19 @@ export function useImageLoader() {
           });
           const loadImageResult = openResult.decoded;
           if (!isEditorImageSessionCurrent(sessionId)) return;
-          const loadedMetadata = metadataWithNegativeLabReopenedSavedPositiveHandoff({
-            imagePath: selectedImagePath,
-            metadata: loadImageResult.metadata,
-          });
+          const loadedMetadata = parseLoadedMetadata(
+            metadataWithNegativeLabReopenedSavedPositiveHandoff({
+              imagePath: selectedImagePath,
+              metadata: loadImageResult.metadata,
+            }),
+          );
+          const shouldHydrateDecodedMetadata = acceptImageOpenMetadataRevision(
+            selectedImagePath,
+            openResult.metadataFingerprint,
+          );
+          const decodedAdjustments = shouldHydrateDecodedMetadata
+            ? hydrateImageOpenAdjustments(loadedMetadata, selectedImagePath)
+            : null;
 
           const { width, height } = loadImageResult;
           upsertReopenedDerivedOutputReceipt({
@@ -144,9 +144,10 @@ export function useImageLoader() {
             if (state.imageSession?.id === sessionId && state.selectedImage?.path === selectedImagePath) {
               return {
                 adjustments:
-                  !state.adjustments.aspectRatio && !state.adjustments.crop
+                  decodedAdjustments ??
+                  (!state.adjustments.aspectRatio && !state.adjustments.crop
                     ? { ...state.adjustments, aspectRatio: loadImageResult.width / loadImageResult.height }
-                    : state.adjustments,
+                    : state.adjustments),
                 imageSession: { ...state.imageSession, status: 'ready' },
                 originalSize: { width, height },
                 previewSize,
