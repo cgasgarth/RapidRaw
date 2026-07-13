@@ -827,8 +827,11 @@ fn validate_adjustments(
 
 fn valid_reference_match_application_receipt(value: &JsonValue) -> bool {
     const REQUIRED: &[&str] = &[
+        "appliedDiffs",
         "appliedAt",
+        "baseGraphFingerprint",
         "destination",
+        "effectiveReferences",
         "enabledGroups",
         "historyEntriesAdded",
         "impact",
@@ -848,18 +851,91 @@ fn valid_reference_match_application_receipt(value: &JsonValue) -> bool {
     {
         return false;
     }
-    let valid_fingerprint = |field: &str| {
-        receipt
-            .get(field)
-            .and_then(JsonValue::as_str)
-            .is_some_and(|value| {
-                value.len() == 24
-                    && value.starts_with("fnv1a64:")
-                    && value[8..]
-                        .bytes()
-                        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-            })
+    let valid_fingerprint_value = |value: &JsonValue| {
+        value.as_str().is_some_and(|value| {
+            value.len() == 24
+                && value.starts_with("fnv1a64:")
+                && value[8..]
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        })
     };
+    let valid_fingerprint = |field: &str| receipt.get(field).is_some_and(valid_fingerprint_value);
+    let valid_applied_diffs = receipt
+        .get("appliedDiffs")
+        .and_then(JsonValue::as_array)
+        .is_some_and(|diffs| {
+            (1..=6).contains(&diffs.len())
+                && diffs.iter().all(|diff| {
+                    let Some(diff) = diff.as_object() else {
+                        return false;
+                    };
+                    diff.len() == 3
+                        && diff
+                            .keys()
+                            .all(|key| matches!(key.as_str(), "after" | "before" | "key"))
+                        && ["after", "before"].iter().all(|key| {
+                            diff.get(*key)
+                                .and_then(JsonValue::as_f64)
+                                .is_some_and(f64::is_finite)
+                        })
+                        && diff
+                            .get("key")
+                            .and_then(JsonValue::as_str)
+                            .is_some_and(|key| {
+                                matches!(
+                                    key,
+                                    "exposure"
+                                        | "contrast"
+                                        | "creativeTemperature"
+                                        | "creativeTint"
+                                        | "saturation"
+                                        | "vibrance"
+                                )
+                            })
+                })
+                && diffs
+                    .iter()
+                    .filter_map(|diff| diff.get("key").and_then(JsonValue::as_str))
+                    .collect::<std::collections::HashSet<_>>()
+                    .len()
+                    == diffs.len()
+        });
+    let valid_effective_references = receipt
+        .get("effectiveReferences")
+        .and_then(JsonValue::as_array)
+        .is_some_and(|references| {
+            (1..=8).contains(&references.len())
+                && references.iter().all(|reference| {
+                    let Some(reference) = reference.as_object() else {
+                        return false;
+                    };
+                    reference.len() == 3
+                        && reference.keys().all(|key| {
+                            matches!(key.as_str(), "role" | "sourceFingerprint" | "weight")
+                        })
+                        && reference
+                            .get("role")
+                            .and_then(JsonValue::as_str)
+                            .is_some_and(|role| matches!(role, "creative" | "technical"))
+                        && reference
+                            .get("sourceFingerprint")
+                            .is_some_and(valid_fingerprint_value)
+                        && reference
+                            .get("weight")
+                            .and_then(JsonValue::as_f64)
+                            .is_some_and(|weight| {
+                                weight.is_finite() && weight > 0.0 && weight <= 1.0
+                            })
+                })
+                && (references
+                    .iter()
+                    .filter_map(|reference| reference.get("weight").and_then(JsonValue::as_f64))
+                    .sum::<f64>()
+                    - 1.0)
+                    .abs()
+                    < 1e-6
+        });
     let valid_groups = receipt
         .get("enabledGroups")
         .and_then(JsonValue::as_array)
@@ -892,7 +968,10 @@ fn valid_reference_match_application_receipt(value: &JsonValue) -> bool {
             .and_then(JsonValue::as_str)
             .is_some_and(|value| chrono::DateTime::parse_from_rfc3339(value).is_ok())
         && valid_groups
+        && valid_applied_diffs
+        && valid_effective_references
         && valid_destination
+        && valid_fingerprint("baseGraphFingerprint")
         && valid_fingerprint("proposalFingerprint")
         && valid_fingerprint("resultingGraphFingerprint")
         && valid_fingerprint("targetAnalysisFingerprint")
@@ -2662,8 +2741,15 @@ mod tests {
         let temp_dir = tempfile::tempdir().expect("tempdir");
         let sidecar_path = temp_dir.path().join("image.arw.rrdata");
         let receipt = serde_json::json!({
+            "appliedDiffs": [{ "after": 0.5, "before": 0.0, "key": "exposure" }],
             "appliedAt": "2026-07-13T21:30:00Z",
+            "baseGraphFingerprint": "fnv1a64:0000000000000000",
             "destination": "global-adjustments",
+            "effectiveReferences": [{
+                "role": "creative",
+                "sourceFingerprint": "fnv1a64:2222222222222222",
+                "weight": 1.0
+            }],
             "enabledGroups": ["tone", "color"],
             "historyEntriesAdded": 1,
             "impact": 80,
@@ -2696,8 +2782,11 @@ mod tests {
         let metadata = ImageMetadata {
             adjustments: serde_json::json!({
                 "referenceMatchApplicationReceipt": {
+                    "appliedDiffs": [],
                     "appliedAt": "not-a-timestamp",
+                    "baseGraphFingerprint": "invalid",
                     "destination": "global-adjustments",
+                    "effectiveReferences": [],
                     "enabledGroups": [],
                     "historyEntriesAdded": 2,
                     "impact": 101,

@@ -33,6 +33,10 @@ import {
 } from '../../utils/editorZoom';
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { globalImageCache } from '../../utils/ImageLRUCache';
+import {
+  acceptReferenceMatchAdjustmentTransfer,
+  reconcileReferenceMatchReceiptsAfterEdit,
+} from '../../utils/referenceMatchTransfer';
 import { resolveResetTargetPaths } from '../../utils/resetAdjustments';
 import { debounce } from '../../utils/timing';
 
@@ -67,7 +71,8 @@ export function useEditorActions() {
     (value: Partial<Adjustments> | ((prev: Adjustments) => Adjustments)) => {
       const state = useEditorStore.getState();
       const prev = state.adjustments;
-      const newAdjustments = typeof value === 'function' ? value(prev) : { ...prev, ...value };
+      const proposedAdjustments = typeof value === 'function' ? value(prev) : { ...prev, ...value };
+      const newAdjustments = reconcileReferenceMatchReceiptsAfterEdit(prev, proposedAdjustments);
       const expectedGraphRevision = `history_${state.historyIndex + 1}`;
       const commandContext =
         state.selectedImage?.path && hasBasicToneAdjustmentChange(prev, newAdjustments)
@@ -263,10 +268,14 @@ export function useEditorActions() {
         mode: PasteMode.Merge,
         includedAdjustments: COPYABLE_ADJUSTMENT_KEYS,
       };
-      const adjustmentsToApply = pickAdjustmentValues(includedAdjustments, copiedAdjustments, {
+      const selectedAdjustmentsToApply = pickAdjustmentValues(includedAdjustments, copiedAdjustments, {
         requireExistingKey: true,
         skipDefaultValues: mode === PasteMode.Merge,
       });
+      const adjustmentsToApply = acceptReferenceMatchAdjustmentTransfer({
+        adjustments: selectedAdjustmentsToApply,
+        transferMode: 'copy-paste',
+      }).adjustments;
 
       if (includedAdjustments.includes(LensAdjustment.LensMaker)) {
         if (!adjustmentsToApply[LensAdjustment.LensMaker]) {
