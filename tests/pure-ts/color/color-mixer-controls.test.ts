@@ -63,6 +63,9 @@ describe('Advanced mixer view models', () => {
     expect(isChannelMixerModified(INITIAL_ADJUSTMENTS.channelMixer)).toBe(false);
 
     expect(isBlackWhiteMixerModified({ ...INITIAL_ADJUSTMENTS.blackWhiteMixer, enabled: true })).toBe(true);
+    expect(
+      isBlackWhiteMixerModified({ ...INITIAL_ADJUSTMENTS.blackWhiteMixer, process: 'neutral_panchromatic_v1' }),
+    ).toBe(true);
     expect(isColorBalanceRgbModified({ ...INITIAL_ADJUSTMENTS.colorBalanceRgb, preserveLuminance: false })).toBe(true);
     expect(
       isChannelMixerModified({
