@@ -428,6 +428,7 @@ interface Hsl {
 
 export interface BlackWhiteMixerSettings {
   enabled: boolean;
+  process: 'legacy_fixed_band_v1' | 'neutral_panchromatic_v1';
   weights: {
     aquas: number;
     blues: number;
@@ -678,6 +679,7 @@ const INITIAL_COLOR_CALIBRATION: ColorCalibration = {
 
 const INITIAL_BLACK_WHITE_MIXER: BlackWhiteMixerSettings = {
   enabled: false,
+  process: 'legacy_fixed_band_v1',
   weights: {
     aquas: 0,
     blues: 0,

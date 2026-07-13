@@ -11,6 +11,7 @@ use crate::adjustments::abi::GlobalAdjustments;
 use crate::adjustments::abi::{
     BlackWhiteMixerSettings, ChannelMixerRow, ChannelMixerSettings, ColorBalanceRgbSettings,
 };
+use crate::monochrome::{NEUTRAL_PANCHROMATIC_V1, neutral_panchromatic_v1};
 
 const REC709_RED: f32 = 0.2126;
 const REC709_GREEN: f32 = 0.7152;
@@ -160,6 +161,13 @@ pub(crate) fn apply_black_white_mixer(
         return color;
     }
 
+    if settings.process == NEUTRAL_PANCHROMATIC_V1
+        && settings.implementation_version
+            == crate::monochrome::MONOCHROME_IMPLEMENTATION_VERSION_V1
+    {
+        return neutral_panchromatic_v1(color);
+    }
+
     let luma = scene_luminance(color, preserve_extended);
     let Some(hue) = rgb_to_hue_degrees(color) else {
         return [luma; 3];
@@ -281,6 +289,9 @@ mod tests {
         apply_native_color_mixer_adjustments,
     };
     use crate::adjustments::parse::get_all_adjustments_from_json;
+    use crate::monochrome::{
+        LEGACY_FIXED_BAND_V1, MONOCHROME_IMPLEMENTATION_VERSION_V1, NEUTRAL_PANCHROMATIC_V1,
+    };
 
     fn source_image() -> DynamicImage {
         DynamicImage::ImageRgba32F(ImageBuffer::from_pixel(
@@ -397,6 +408,73 @@ mod tests {
 
         assert!((result[0] - expected).abs() < 0.000_001);
         assert_eq!(result, [result[0]; 3]);
+    }
+
+    #[test]
+    fn missing_process_keeps_legacy_fixed_band_v1_pixel_stable() {
+        let adjustments = get_all_adjustments_from_json(
+            &json!({
+                "blackWhiteMixer": {
+                    "enabled": true,
+                    "weights": {
+                        "reds": 35, "oranges": -12, "yellows": 18, "greens": -20,
+                        "aquas": 7, "blues": -31, "purples": 22, "magentas": 14
+                    }
+                }
+            }),
+            false,
+            None,
+        );
+        let settings = adjustments.global.black_white_mixer;
+        assert_eq!(settings.process, LEGACY_FIXED_BAND_V1);
+        assert_eq!(
+            settings.implementation_version,
+            MONOCHROME_IMPLEMENTATION_VERSION_V1
+        );
+
+        for (source, expected) in [
+            ([0.9, 0.15, 0.05], 0.334_111_24),
+            ([0.3, 0.72, 0.18], 0.532_548),
+            ([0.12, 0.28, 0.95], 0.248_732_5),
+            ([1.4, 0.2, 0.7], 0.525_605_4),
+        ] {
+            let output = apply_black_white_mixer(source, settings, false);
+            assert!(
+                (output[0] - expected).abs() <= 2.0e-7,
+                "{source:?}: {output:?}"
+            );
+            assert_eq!(output, [output[0]; 3]);
+        }
+    }
+
+    #[test]
+    fn neutral_process_is_versioned_and_ignores_legacy_band_weights() {
+        let adjustments = get_all_adjustments_from_json(
+            &json!({
+                "blackWhiteMixer": {
+                    "enabled": true,
+                    "process": "neutral_panchromatic_v1",
+                    "weights": {
+                        "reds": 100, "oranges": -100, "yellows": 100, "greens": -100,
+                        "aquas": 100, "blues": -100, "purples": 100, "magentas": -100
+                    }
+                }
+            }),
+            false,
+            None,
+        );
+        let settings = adjustments.global.black_white_mixer;
+        assert_eq!(settings.process, NEUTRAL_PANCHROMATIC_V1);
+        assert_eq!(
+            settings.implementation_version,
+            MONOCHROME_IMPLEMENTATION_VERSION_V1
+        );
+        let output = apply_black_white_mixer([4.0, 2.0, 0.5], settings, false);
+        assert!(
+            output[0] > 1.0,
+            "neutral scene process must not apply an SDR clamp"
+        );
+        assert_eq!(output, [output[0]; 3]);
     }
 
     #[test]
@@ -570,6 +648,111 @@ mod gpu_runtime_tests {
         assert!(
             max_rgb_delta(&preview, &disabled) > 0.05,
             "large enabled mixer controls must visibly change the render"
+        );
+    }
+
+    #[test]
+    fn neutral_scene_monochrome_matches_cpu_wgpu_and_preserves_output_headroom() {
+        let source = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(4, 4, |x, y| {
+            let scale = 1.0 + (x + y) as f32 * 0.1;
+            Rgba([2.4 * scale, 0.7 * scale, 0.2 * scale, 0.63])
+        }));
+        let raw = json!({
+            "rawEngineEditGraphVersion": 2,
+            "blackWhiteMixer": {
+                "enabled": true,
+                "process": "neutral_panchromatic_v1",
+                "weights": {
+                    "reds": 0, "oranges": 0, "yellows": 0, "greens": 0,
+                    "aquas": 0, "blues": 0, "purples": 0, "magentas": 0
+                }
+            }
+        });
+        let plan = crate::render_plan::compile_render_plan(
+            &raw,
+            crate::render_plan::CompileRenderPlanContext {
+                revision: crate::render_plan::content_revision(&raw, 1, 2, 3),
+                is_raw: false,
+                tonemapper_override: Some(0),
+            },
+            None,
+        )
+        .expect("neutral monochrome plan compiles");
+        assert_eq!(plan.adjustments.global.black_white_mixer.process, 1);
+
+        let legacy_raw = json!({
+            "rawEngineEditGraphVersion": 2,
+            "blackWhiteMixer": {
+                "enabled": true,
+                "process": "legacy_fixed_band_v1",
+                "weights": {
+                    "reds": 1, "oranges": 0, "yellows": 0, "greens": 0,
+                    "aquas": 0, "blues": 0, "purples": 0, "magentas": 0
+                }
+            }
+        });
+        let legacy_plan = crate::render_plan::compile_render_plan(
+            &legacy_raw,
+            crate::render_plan::CompileRenderPlanContext {
+                revision: crate::render_plan::content_revision(&legacy_raw, 1, 2, 3),
+                is_raw: false,
+                tonemapper_override: Some(0),
+            },
+            None,
+        )
+        .expect("legacy monochrome plan compiles");
+        assert_ne!(plan.fingerprints.color, legacy_plan.fingerprints.color);
+
+        let cpu = crate::cpu_edit_graph::execute_cpu_edit_graph(
+            &source,
+            &plan.adjustments,
+            &[],
+            None,
+            &plan.edit_graph,
+        )
+        .expect("CPU neutral monochrome render succeeds");
+
+        let _gpu_test_guard = acquire_gpu_test_lock();
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock Tauri app builds");
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state)
+            .expect("compute-only GPU context initializes");
+        let gpu = process_and_get_unclamped_dynamic_image(
+            &context,
+            &state,
+            &source,
+            crate::gpu_processing::PreGpuImageIdentity::for_test_source(
+                &source,
+                "neutral_scene_monochrome_v1",
+            ),
+            RenderRequest {
+                adjustments: plan.adjustments,
+                mask_bitmaps: &[],
+                lut: None,
+                roi: None,
+                edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
+                    plan.edit_graph,
+                ),
+            },
+            "neutral_scene_monochrome_v1",
+        )
+        .expect("WGPU neutral monochrome render succeeds");
+
+        assert!(
+            max_rgb_delta(&cpu, &gpu) <= 0.004,
+            "CPU/WGPU neutral process diverged"
+        );
+        for pixel in gpu.to_rgba32f().pixels() {
+            assert!((pixel[0] - pixel[1]).abs() <= 0.002);
+            assert!((pixel[1] - pixel[2]).abs() <= 0.002);
+            assert!((pixel[3] - 0.63).abs() <= 0.002);
+        }
+        assert!(
+            gpu.to_rgba32f().pixels().any(|pixel| pixel[0] > 1.0),
+            "unclamped output proof must retain scene headroom"
         );
     }
 }
