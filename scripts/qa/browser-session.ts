@@ -1,5 +1,5 @@
 import { type ChildProcess, spawn } from 'node:child_process';
-import { mkdir, rm } from 'node:fs/promises';
+import { mkdir, rm, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { type Browser, chromium } from '@playwright/test';
 import { z } from 'zod';
@@ -257,6 +257,20 @@ export function createBrowserLifecycleAdapter(
           const videoPath = await video?.path().catch(() => undefined);
           if (result?.status === 'failed') result.video = videoPath;
           else if (videoPath !== undefined) await rm(videoPath, { force: true });
+          if (result !== undefined) {
+            const paths = new Set([
+              result.screenshot,
+              result.trace,
+              result.video,
+              ...(result.artifacts ?? []).map(({ path }) => path),
+            ]);
+            for (const path of paths) {
+              if (path === undefined) continue;
+              metrics.artifactBytes += await stat(path)
+                .then(({ size }) => size)
+                .catch(() => 0);
+            }
+          }
         }
       }
       const liveContexts = session.browser.contexts().length;

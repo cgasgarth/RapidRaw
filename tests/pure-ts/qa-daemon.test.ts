@@ -101,6 +101,8 @@ describe('QA daemon lifecycle', () => {
     expect(engine.metrics).toMatchObject({
       serverStarts: 2,
       browserStarts: 2,
+      serverStartsAvoided: 1,
+      browserStartsAvoided: 1,
       sourceReuses: 1,
       configurationRestarts: 1,
       jobs: 3,
@@ -117,6 +119,30 @@ describe('QA daemon lifecycle', () => {
     const job = { scenarioIds: ['compare', 'crop'], shard: { index: 0, total: 1 } } as const;
     expect(await persistent.run(identity(worktree), job)).toEqual(await oneShot.run(identity(worktree), job));
     await Promise.all([persistent.close(), oneShot.close()]);
+  });
+
+  test('accounts for serialized worktree wait and avoided process starts', async () => {
+    const worktree = await temporaryDirectory();
+    let releaseFirst!: () => void;
+    let runs = 0;
+    const adapter = fakeAdapter([]);
+    const run = adapter.run;
+    adapter.run = async (...parameters) => {
+      runs += 1;
+      if (runs === 1) await new Promise<void>((ready) => (releaseFirst = ready));
+      return await run(...parameters);
+    };
+    const engine = new QaDaemonEngine(worktree, adapter);
+    const job = { scenarioIds: ['compare'], shard: { index: 0, total: 1 } } as const;
+    const first = engine.run(identity(worktree), job);
+    while (runs === 0) await Bun.sleep(1);
+    const second = engine.run(identity(worktree), job);
+    await Bun.sleep(10);
+    releaseFirst();
+    await Promise.all([first, second]);
+    expect(engine.metrics).toMatchObject({ browserStartsAvoided: 1, serverStartsAvoided: 1 });
+    expect(engine.metrics.worktreeWaitMs).toBeGreaterThan(0);
+    await engine.close();
   });
 
   test('rejects a request from another worktree', async () => {

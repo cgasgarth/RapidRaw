@@ -16,9 +16,15 @@ export interface QaLifecycleAdapter<Session, Result> {
 const emptyMetrics = (): QaDaemonMetrics => ({
   serverStarts: 0,
   browserStarts: 0,
+  serverStartsAvoided: 0,
+  browserStartsAvoided: 0,
   sourceReuses: 0,
   configurationRestarts: 0,
   jobs: 0,
+  setupMs: 0,
+  scenarioMs: 0,
+  worktreeWaitMs: 0,
+  artifactBytes: 0,
   contextsCreated: 0,
   contextsClosed: 0,
   leakedContexts: 0,
@@ -44,7 +50,9 @@ export class QaDaemonEngine<Session, Result> {
     this.#queue = new Promise<void>((done) => {
       release = done;
     });
+    const queuedAt = performance.now();
     await previous;
+    this.metrics.worktreeWaitMs += Math.round(performance.now() - queuedAt);
     try {
       const active = this.#active;
       const requiresRestart =
@@ -57,14 +65,22 @@ export class QaDaemonEngine<Session, Result> {
           this.#active = undefined;
           this.metrics.configurationRestarts += 1;
         }
+        const setupStarted = performance.now();
         const session = await this.adapter.start(identity);
+        this.metrics.setupMs += Math.round(performance.now() - setupStarted);
         this.metrics.serverStarts += 1;
         this.metrics.browserStarts += 1;
         this.#active = { identity, session };
       } else if (active.identity.source !== identity.source) {
+        const setupStarted = performance.now();
         await this.adapter.refresh?.(active.session, identity, this.metrics);
+        this.metrics.setupMs += Math.round(performance.now() - setupStarted);
         this.metrics.sourceReuses += 1;
         active.identity = identity;
+      }
+      if (!requiresRestart) {
+        this.metrics.serverStartsAvoided += 1;
+        this.metrics.browserStartsAvoided += 1;
       }
       this.metrics.jobs += 1;
       const current = this.#active;
@@ -72,7 +88,12 @@ export class QaDaemonEngine<Session, Result> {
       const controller = new AbortController();
       this.#activeJob = controller;
       try {
-        return await this.adapter.run(current.session, job, this.metrics, controller.signal);
+        const scenarioStarted = performance.now();
+        try {
+          return await this.adapter.run(current.session, job, this.metrics, controller.signal);
+        } finally {
+          this.metrics.scenarioMs += Math.round(performance.now() - scenarioStarted);
+        }
       } finally {
         if (this.#activeJob === controller) this.#activeJob = undefined;
       }

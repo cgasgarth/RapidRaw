@@ -10,9 +10,15 @@ export interface QaDaemonIdentity {
 export interface QaDaemonMetrics {
   serverStarts: number;
   browserStarts: number;
+  serverStartsAvoided: number;
+  browserStartsAvoided: number;
   sourceReuses: number;
   configurationRestarts: number;
   jobs: number;
+  setupMs: number;
+  scenarioMs: number;
+  worktreeWaitMs: number;
+  artifactBytes: number;
   contextsCreated: number;
   contextsClosed: number;
   leakedContexts: number;
@@ -83,9 +89,15 @@ export const qaDaemonStateSchema: z.ZodType<QaDaemonStateRecord> = z.object({
 export const qaDaemonMetricsSchema: z.ZodType<QaDaemonMetrics> = z.object({
   serverStarts: z.number().int().nonnegative(),
   browserStarts: z.number().int().nonnegative(),
+  serverStartsAvoided: z.number().int().nonnegative(),
+  browserStartsAvoided: z.number().int().nonnegative(),
   sourceReuses: z.number().int().nonnegative(),
   configurationRestarts: z.number().int().nonnegative(),
   jobs: z.number().int().nonnegative(),
+  setupMs: z.number().int().nonnegative(),
+  scenarioMs: z.number().int().nonnegative(),
+  worktreeWaitMs: z.number().int().nonnegative(),
+  artifactBytes: z.number().int().nonnegative(),
   contextsCreated: z.number().int().nonnegative(),
   contextsClosed: z.number().int().nonnegative(),
   leakedContexts: z.number().int().nonnegative(),

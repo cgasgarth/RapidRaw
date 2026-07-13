@@ -8,6 +8,12 @@ import {
 
 const metrics = {
   browserStarts: 1,
+  browserStartsAvoided: 2,
+  serverStartsAvoided: 2,
+  setupMs: 100,
+  scenarioMs: 200,
+  worktreeWaitMs: 5,
+  artifactBytes: 4_096,
   configurationRestarts: 0,
   contextsClosed: 2,
   contextsCreated: 2,
