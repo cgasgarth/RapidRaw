@@ -43,6 +43,7 @@ export interface ReferenceSpatialAnalysis {
 }
 
 export interface ReferenceMatchReference {
+  availability: 'available' | 'missing' | 'unknown';
   adjustmentRevision: number;
   cameraProfile: string;
   geometryFingerprint: string;
@@ -59,6 +60,17 @@ export interface ReferenceMatchReference {
   viewFingerprint: string;
   weight: number;
 }
+
+export const mergeReferenceAvailability = (
+  references: readonly ReferenceMatchReference[],
+  availabilityByPath: ReadonlyMap<string, boolean | null>,
+): ReferenceMatchReference[] =>
+  references.map((reference) => {
+    const available = availabilityByPath.get(reference.path);
+    const availability =
+      available === undefined || available === null ? 'unknown' : available ? 'available' : 'missing';
+    return reference.availability === availability ? reference : { ...reference, availability };
+  });
 
 export type ReferenceMatchAdjustmentKey =
   | 'contrast'

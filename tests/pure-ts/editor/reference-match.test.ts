@@ -12,6 +12,7 @@ import {
   createReferenceMatchProposal,
   fingerprintReferenceMatchValue,
   getReferenceMatchLayerCompatibility,
+  mergeReferenceAvailability,
   type ReferenceHistogramSummary,
   type ReferenceMatchReference,
   resolveReferenceMatchRenderAdjustments,
@@ -36,6 +37,7 @@ const reference = (
   weight: number,
   histogramSummary: ReferenceHistogramSummary,
 ): ReferenceMatchReference => ({
+  availability: 'available',
   adjustmentRevision: 4,
   cameraProfile: 'camera_standard',
   geometryFingerprint: `fnv1a64:${'1'.repeat(16)}`,
@@ -88,6 +90,14 @@ describe('color-managed reference matching', () => {
     expect(first).toEqual(reversed);
     expect(first?.lumaMean).toBeCloseTo(0.65, 8);
     expect(first?.redMean).toBeCloseTo(0.6, 8);
+  });
+
+  test('updates exact source availability without discarding the cached reference artifact identity', () => {
+    const source = reference('offline', 1, summary());
+    const [missing] = mergeReferenceAvailability([source], new Map([[source.path, false]]));
+    expect(missing).toMatchObject({ availability: 'missing', id: source.id, renderUrl: source.renderUrl });
+    if (!missing) throw new Error('Expected reference');
+    expect(mergeReferenceAvailability([missing], new Map([[source.path, null]]))[0]?.availability).toBe('unknown');
   });
 
   test('keeps Normalize technical and exposes a broader allow-listed Match Look proposal', () => {

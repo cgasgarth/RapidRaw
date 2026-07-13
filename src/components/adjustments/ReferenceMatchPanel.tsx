@@ -1,6 +1,7 @@
 import { FolderSearch, GitCompareArrows, Plus, Trash2, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { z } from 'zod';
 import { useShallow } from 'zustand/react/shallow';
 import { matchLookApplicationReceiptV1Schema } from '../../../packages/rawengine-schema/src/referenceMatchRuntime';
 
@@ -8,16 +9,19 @@ import { useEditorActions } from '../../hooks/editor/useEditorActions';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useUIStore } from '../../store/useUIStore';
+import { Invokes } from '../../tauri/commands';
 import {
   applyReferenceMatchProposal,
   createReferenceMatchAdjustmentLayer,
   createReferenceMatchProposal,
   fingerprintReferenceMatchValue,
   getReferenceMatchLayerCompatibility,
+  mergeReferenceAvailability,
   type ReferenceMatchGroup,
   type ReferenceMatchProposal,
   summarizeReferenceHistogram,
 } from '../../utils/referenceMatch';
+import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 
 const GROUPS: ReferenceMatchGroup[] = ['tone', 'color', 'presence'];
 
@@ -73,6 +77,31 @@ export default function ReferenceMatchPanel() {
     () => (proposal ? getReferenceMatchLayerCompatibility(proposal, enabledGroups) : null),
     [enabledGroups, proposal],
   );
+  const referenceAvailabilityKey = references.map((reference) => `${reference.id}:${reference.path}`).join('|');
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('__TAURI_INTERNALS__' in window) || referenceAvailabilityKey.length === 0)
+      return;
+    const snapshot = useEditorStore.getState().referenceMatchReferences;
+    let cancelled = false;
+    void Promise.all(
+      snapshot.map(async (reference): Promise<[string, boolean | null]> => {
+        try {
+          return [
+            reference.path,
+            await invokeWithSchema(Invokes.IsOriginalFileAvailable, { path: reference.path }, z.boolean()),
+          ];
+        } catch {
+          return [reference.path, null];
+        }
+      }),
+    ).then((results) => {
+      if (!cancelled) setReferences((current) => mergeReferenceAvailability(current, new Map(results)));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [referenceAvailabilityKey, setReferences]);
 
   useEffect(() => {
     setProposal(null);
@@ -107,6 +136,7 @@ export default function ReferenceMatchPanel() {
     setReferences((current) => [
       ...current,
       {
+        availability: 'available',
         adjustmentRevision: adjustmentSnapshot.adjustmentRevision,
         cameraProfile: adjustments.cameraProfile,
         geometryFingerprint: fingerprintReferenceMatchValue(
@@ -211,6 +241,17 @@ export default function ReferenceMatchPanel() {
                     revision: reference.adjustmentRevision,
                   })}
                 </div>
+                {reference.availability !== 'available' && (
+                  <div className="truncate text-[9px] text-editor-warning" data-testid="reference-match-availability">
+                    {reference.availability === 'missing'
+                      ? t('editor.adjustments.referenceMatch.missingCachedReference', {
+                          defaultValue: 'Original missing · cached preview only',
+                        })
+                      : t('editor.adjustments.referenceMatch.unknownReferenceAvailability', {
+                          defaultValue: 'Source availability unknown',
+                        })}
+                  </div>
+                )}
               </div>
               <button
                 className="rounded border border-editor-border px-1 py-0.5 text-[9px] text-text-secondary hover:border-editor-focus-ring hover:text-text-primary"
