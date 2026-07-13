@@ -13,6 +13,22 @@ permissions:
   pull-requests: read
 
 jobs:
+  validation-plan:
+    name: 'validation: affected DAG plan'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup-bun-deps
+
+      - name: Plan affected validation from the shared manifest
+        env:
+          VALIDATION_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: bun scripts/validation/run.ts --mode pr --base "$VALIDATION_BASE" --plan-only --explain-cache
+
   frontend-build:
     name: 'frontend: install, build, i18n check'
     runs-on: ubuntu-latest
@@ -374,7 +390,7 @@ jobs:
     name: 'rust: clippy PR path gate'
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
-    timeout-minutes: 45
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
@@ -451,6 +467,9 @@ jobs:
           cargo test --manifest-path src-tauri/Cargo.toml --locked -p rapidraw-computational
           cargo test --manifest-path src-tauri/Cargo.toml --locked -p rapidraw-codecs --no-default-features --features jpeg
           cargo test --manifest-path src-tauri/Cargo.toml --locked -p rapidraw-codecs --all-features
+      - name: Build fast-dev and full native capability profiles
+        if: steps.rust-pr-decision.outputs.rust_ci_required == 'true'
+        run: bun run check:native-profiles
       - name: Rust and Tauri IPC tests when Rust/Tauri changed
         if: steps.rust-pr-decision.outputs.rust_ci_required == 'true'
         working-directory: src-tauri
@@ -643,6 +662,7 @@ jobs:
       - dependency-security-js
       - dependency-security-rust
       - dependency-license-rust
+      - validation-plan
     if: always() && github.event_name == 'pull_request'
     timeout-minutes: 10
     steps:
