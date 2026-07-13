@@ -166,10 +166,10 @@ pub struct GlobalAdjustments {
     pub tint: f32,
     pub vibrance: f32,
     pub hue: f32,
+    pub edit_graph_version: f32,
     pub(crate) dehaze_atmosphere_r: f32,
     pub(crate) dehaze_atmosphere_g: f32,
     pub(crate) dehaze_atmosphere_b: f32,
-    pub(crate) dehaze_atmosphere_confidence: f32,
     pub technical_white_balance: GpuMat3,
     pub sharpness: f32,
     pub luma_noise_reduction: f32,
@@ -189,7 +189,7 @@ pub struct GlobalAdjustments {
     pub chromatic_aberration_blue_yellow: f32,
     pub show_clipping: u32,
     pub is_raw_image: u32,
-    pub(crate) _pad_ca1: f32,
+    pub(crate) dehaze_atmosphere_confidence: f32,
     pub has_lut: u32,
     pub lut_intensity: f32,
     pub tonemapper_mode: u32,
@@ -307,9 +307,9 @@ pub struct AllAdjustments {
     pub tile_offset_y: u32,
     pub mask_atlas_cols: u32,
     pub blur_pass_flags: u32,
-    pub(crate) _pad_blur_flags1: u32,
-    pub(crate) _pad_blur_flags2: u32,
-    pub(crate) _pad_blur_flags3: u32,
+    pub(crate) execution_phase: u32,
+    pub(crate) source_width: u32,
+    pub(crate) source_height: u32,
 }
 
 #[cfg(test)]

@@ -2,10 +2,51 @@ import { describe, expect, test } from 'bun:test';
 import {
   getImageSpacePointAtViewportPoint,
   getImageTransformBounds,
+  getImageViewportRect,
   reconcileViewportTransform,
 } from '../../../src/utils/editorViewportBounds';
+import { resolveEditorZoom } from '../../../src/utils/editorZoom';
 
 describe('editor viewport bounds', () => {
+  test('resolves Fit, 50%, 100%, and 200% into authoritative rendered frame geometry', () => {
+    const renderSize = { width: 1200, height: 800, offsetX: 0, offsetY: 0, scale: 0.2 };
+    const resolveScale = (devicePixelsPerImagePixel: number) =>
+      resolveEditorZoom({
+        devicePixelRatio: 2,
+        mode: { devicePixelsPerImagePixel, kind: 'ratio' },
+        renderSize,
+        sourceSize: { width: 6000, height: 4000 },
+        viewportSize: { width: 1200, height: 800 },
+      }).transformScale;
+
+    expect(getImageViewportRect(renderSize, { scale: 1, positionX: 0, positionY: 0 })).toEqual({
+      height: 800,
+      width: 1200,
+      x: 0,
+      y: 0,
+    });
+    expect(getImageViewportRect(renderSize, { scale: resolveScale(0.5), positionX: -150, positionY: -100 })).toEqual({
+      height: 1000,
+      width: 1500,
+      x: -150,
+      y: -100,
+    });
+    expect(getImageViewportRect(renderSize, { scale: resolveScale(1), positionX: -900, positionY: -600 })).toEqual({
+      height: 2000,
+      width: 3000,
+      x: -900,
+      y: -600,
+    });
+    const twoHundredPercent = getImageViewportRect(renderSize, {
+      scale: resolveScale(2),
+      positionX: -2400,
+      positionY: -1600,
+    });
+    expect(twoHundredPercent).toEqual({ height: 4000, width: 6000, x: -2400, y: -1600 });
+    expect(twoHundredPercent.width).toBeGreaterThan(1200);
+    expect(twoHundredPercent.height).toBeGreaterThan(800);
+  });
+
   test('keeps a fit-to-window portrait image centered in its rendered image rect', () => {
     const bounds = getImageTransformBounds({
       containerWidth: 1000,

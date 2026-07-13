@@ -17,6 +17,7 @@ use serde_json::Value;
 
 use crate::adjustments::abi::AllAdjustments;
 use crate::adjustments::parse::get_all_adjustments_from_json_with_masks;
+use crate::edit_graph::{CompiledEditGraph, EditGraphCompileInputs};
 use crate::film_look_render::normalize_film_look_adjustments_for_render;
 use crate::geometry::{Crop, GeometryParams, get_geometry_params_from_json};
 use crate::lut_processing::Lut;
@@ -25,6 +26,18 @@ use crate::mask_generation::MaskDefinition;
 const PLAN_SCHEMA_VERSION: u32 = 1;
 const FINGERPRINT_VERSION: u32 = 1;
 const MAX_CACHED_PLANS: usize = 24;
+const DETAIL_FIELDS: &[&str] = &[
+    "sharpness",
+    "sharpnessThreshold",
+    "lumaNoiseReduction",
+    "colorNoiseReduction",
+    "clarity",
+    "dehaze",
+    "structure",
+    "centré",
+    "chromaticAberrationRedCyan",
+    "chromaticAberrationBlueYellow",
+];
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct RenderPlanRevision {
@@ -54,6 +67,7 @@ pub struct CompiledRenderPlan {
     pub crop: Option<Crop>,
     pub masks: Arc<[MaskDefinition]>,
     pub lut: Option<Arc<Lut>>,
+    pub edit_graph: Arc<CompiledEditGraph>,
     pub fingerprints: StageFingerprints,
     /// Compatibility input for transformation and patch executors not yet typed.
     pub effective_json: Arc<Value>,
@@ -112,6 +126,7 @@ pub const FIELD_OWNERSHIP: &[(&str, RenderStage, &str)] = &[
     ("lutPath/lutIntensity", RenderStage::Color, "none/100"),
     ("showClipping", RenderStage::Output, "false"),
     ("toneMapper", RenderStage::Output, "basic"),
+    ("viewTransform", RenderStage::Output, "Rapid View defaults"),
 ];
 
 #[derive(Default)]
@@ -187,6 +202,36 @@ pub fn compile_render_plan(
     }
     validate_finite(raw, "$")?;
     let effective = normalize_film_look_adjustments_for_render(raw).into_owned();
+    let version_was_explicit = effective.get("rawEngineEditGraphVersion").is_some();
+    let pipeline_version = match effective.get("rawEngineEditGraphVersion") {
+        None => crate::edit_graph::LEGACY_PIPELINE_VERSION,
+        Some(Value::Number(version)) => {
+            u32::try_from(version.as_u64().ok_or_else(|| RenderPlanError {
+                code: "render_plan.invalid_edit_graph_version",
+                field: "rawEngineEditGraphVersion",
+                message: "edit graph version must be an unsigned integer".into(),
+            })?)
+            .map_err(|_| RenderPlanError {
+                code: "render_plan.invalid_edit_graph_version",
+                field: "rawEngineEditGraphVersion",
+                message: "edit graph version exceeds u32".into(),
+            })?
+        }
+        Some(_) => {
+            return Err(RenderPlanError {
+                code: "render_plan.invalid_edit_graph_version",
+                field: "rawEngineEditGraphVersion",
+                message: "edit graph version must be an unsigned integer".into(),
+            });
+        }
+    };
+    if !crate::edit_graph::SUPPORTED_PIPELINE_VERSIONS.contains(&pipeline_version) {
+        return Err(RenderPlanError {
+            code: "render_plan.unsupported_edit_graph_version",
+            field: "rawEngineEditGraphVersion",
+            message: format!("unsupported edit graph version {pipeline_version}"),
+        });
+    }
     let masks = match effective.get("masks") {
         Some(value) => {
             Vec::<MaskDefinition>::deserialize(value).map_err(|error| RenderPlanError {
@@ -217,14 +262,15 @@ pub fn compile_render_plan(
             message: "crop coordinates and dimensions must be in 0..=1".into(),
         });
     }
-    let adjustments = get_all_adjustments_from_json_with_masks(
+    let mut adjustments = get_all_adjustments_from_json_with_masks(
         &effective,
         context.is_raw,
         context.tonemapper_override,
         &masks,
     );
+    adjustments.global.edit_graph_version = pipeline_version as f32;
     let geometry = get_geometry_params_from_json(&effective);
-    let fingerprints = fingerprints(
+    let mut fingerprints = fingerprints(
         context.revision.source_revision,
         &effective,
         &adjustments,
@@ -233,6 +279,40 @@ pub fn compile_render_plan(
         &masks,
         lut.as_deref(),
     );
+    let neutral_json = Value::Object(serde_json::Map::new());
+    let mut neutral_adjustments = get_all_adjustments_from_json_with_masks(
+        &neutral_json,
+        context.is_raw,
+        context.tonemapper_override,
+        &[],
+    );
+    neutral_adjustments.global.edit_graph_version = pipeline_version as f32;
+    let neutral_detail = hash_selected(&neutral_json, DETAIL_FIELDS);
+    let default_geometry = GeometryParams::default();
+    let has_geometry = geometry_bytes(&geometry, crop) != geometry_bytes(&default_geometry, None);
+    let has_retouch = effective
+        .get("aiPatches")
+        .and_then(Value::as_array)
+        .is_some_and(|patches| !patches.is_empty());
+    let edit_graph = Arc::new(CompiledEditGraph::compile(EditGraphCompileInputs {
+        pipeline_version,
+        version_was_explicit,
+        source_fingerprint: fingerprints.source,
+        geometry_fingerprint: fingerprints.geometry,
+        retouch_fingerprint: fingerprints.retouch,
+        detail_fingerprint: fingerprints.detail,
+        color_fingerprint: fingerprints.color,
+        output_fingerprint: fingerprints.output,
+        adjustments: &adjustments,
+        neutral_adjustments: &neutral_adjustments,
+        has_geometry_or_retouch: has_geometry || has_retouch,
+        has_detail: fingerprints.detail != neutral_detail,
+        has_masks: !masks.is_empty(),
+        has_lut: lut.is_some(),
+        show_clipping: adjustments.global.show_clipping != 0,
+    }));
+    fingerprints.full = edit_graph.fingerprint;
+    log::debug!("compiled_edit_graph {}", edit_graph.diagnostic_receipt());
     Ok(CompiledRenderPlan {
         revision: context.revision,
         adjustments,
@@ -240,6 +320,7 @@ pub fn compile_render_plan(
         crop,
         masks: masks.into(),
         lut,
+        edit_graph,
         fingerprints,
         effective_json: Arc::new(effective),
         compile_time: started.elapsed(),
@@ -274,6 +355,7 @@ fn fingerprints(
         b"source",
         &FINGERPRINT_VERSION.to_le_bytes(),
         &source_revision.to_le_bytes(),
+        &hash_json(effective.get("cameraProfile").unwrap_or(&Value::Null)).to_le_bytes(),
     ]);
     let geometry = hash_parts(&[
         b"geometry",
@@ -282,25 +364,14 @@ fn fingerprints(
     ]);
     let masks_fingerprint = hash_json(effective.get("masks").unwrap_or(&Value::Null));
     let retouch = hash_json(effective.get("aiPatches").unwrap_or(&Value::Null));
-    let detail = hash_selected(
-        effective,
-        &[
-            "sharpness",
-            "sharpnessThreshold",
-            "lumaNoiseReduction",
-            "colorNoiseReduction",
-            "clarity",
-            "dehaze",
-            "structure",
-            "centré",
-            "chromaticAberrationRedCyan",
-            "chromaticAberrationBlueYellow",
-        ],
-    );
+    let detail = hash_selected(effective, DETAIL_FIELDS);
     let mut color_hasher = blake3::Hasher::new();
     color_hasher.update(b"color");
     color_hasher.update(&FINGERPRINT_VERSION.to_le_bytes());
     color_hasher.update(bytes_of(adjustments));
+    color_hasher.update(
+        &hash_json(effective.get("cameraProfileAmount").unwrap_or(&Value::Null)).to_le_bytes(),
+    );
     if let Some(lut) = lut {
         color_hasher.update(&(lut.size as u64).to_le_bytes());
         color_hasher.update(&lut.abi_version.to_le_bytes());
@@ -574,6 +645,385 @@ mod tests {
     }
 
     #[test]
+    fn compiled_edit_graph_omits_neutral_nodes_and_executes_active_legacy_fusion() {
+        let neutral = compile_render_plan(&json!({}), context(70), None).unwrap();
+        assert_eq!(neutral.edit_graph.pipeline_version, 1);
+        assert_eq!(
+            neutral.edit_graph.receipt.input_domain.contract_id(),
+            "acescg_scene_linear_extended_v1"
+        );
+        assert_eq!(
+            neutral.edit_graph.receipt.ordered_node_ids.as_ref(),
+            [
+                "camera_input_boundary",
+                "legacy_gpu_scene_view_pass",
+                "render_transport"
+            ]
+        );
+        assert_eq!(
+            neutral.edit_graph.receipt.fused_gpu_groups[0].as_ref(),
+            ["legacy_gpu_scene_view_pass", "render_transport"]
+        );
+
+        let active = compile_render_plan(
+            &json!({
+                "rawEngineEditGraphVersion": 1,
+                "exposure": 20,
+                "masks": [{
+                    "id":"m1", "name":"Local", "visible":true, "invert":false,
+                    "opacity":100, "blendMode":"normal", "adjustments":{"contrast":15},
+                    "subMasks":[]
+                }]
+            }),
+            context(71),
+            None,
+        )
+        .unwrap();
+        assert!(
+            active
+                .edit_graph
+                .receipt
+                .ordered_node_ids
+                .contains(&"legacy_gpu_scene_view_pass")
+        );
+        active
+            .edit_graph
+            .validate_gpu_execution(&active.adjustments, false, active.masks.len())
+            .unwrap();
+        let mut stale_adjustments = active.adjustments;
+        stale_adjustments.global.exposure += 0.1;
+        assert_eq!(
+            active
+                .edit_graph
+                .validate_gpu_execution(&stale_adjustments, false, active.masks.len()),
+            Err("edit_graph.stale_gpu_execution_abi")
+        );
+        assert_eq!(active.fingerprints.full, active.edit_graph.fingerprint);
+        let diagnostic = active.edit_graph.diagnostic_receipt();
+        assert_eq!(diagnostic["pipelineVersion"], 1);
+        assert_eq!(
+            diagnostic["nodes"][0]["inputDomain"],
+            "acescg_scene_linear_extended_v1"
+        );
+        assert_eq!(
+            diagnostic["nodes"].as_array().unwrap().last().unwrap()["outputDomain"],
+            "render_transport_encoded_v1"
+        );
+        assert_ne!(
+            neutral.edit_graph.fingerprint,
+            active.edit_graph.fingerprint
+        );
+    }
+
+    #[test]
+    fn edit_graph_contract_rejects_unversioned_unimplemented_and_illegal_ordering() {
+        let plan = compile_render_plan(&json!({"showClipping": true}), context(75), None).unwrap();
+        plan.edit_graph.validate_contract().unwrap();
+        assert_eq!(
+            plan.edit_graph.receipt.fused_gpu_groups[0].as_ref(),
+            [
+                "legacy_gpu_scene_view_pass",
+                "clipping_overlay",
+                "render_transport"
+            ]
+        );
+
+        let mut invalid = (*plan.edit_graph).clone();
+        Arc::make_mut(&mut invalid.nodes)[0].implementation_version = 0;
+        assert_eq!(
+            invalid.validate_contract(),
+            Err("edit_graph.invalid_node_version")
+        );
+
+        let mut invalid = (*plan.edit_graph).clone();
+        let node = &mut Arc::make_mut(&mut invalid.nodes)[0];
+        node.cpu_implementation = None;
+        node.wgpu_implementation = None;
+        assert_eq!(
+            invalid.validate_contract(),
+            Err("edit_graph.missing_node_implementation")
+        );
+
+        let mut invalid = (*plan.edit_graph).clone();
+        Arc::make_mut(&mut invalid.nodes).swap(0, 1);
+        assert_eq!(
+            invalid.validate_contract(),
+            Err("edit_graph.invalid_stage_order")
+        );
+
+        let mut invalid = (*plan.edit_graph).clone();
+        Arc::make_mut(&mut invalid.nodes)[1].input_domain =
+            crate::edit_graph::ColorDomain::ViewEncoded;
+        assert_eq!(
+            invalid.validate_contract(),
+            Err("edit_graph.invalid_domain_transition")
+        );
+    }
+
+    #[test]
+    fn persisted_edit_graph_version_defaults_to_legacy_and_requires_explicit_v2() {
+        let implicit = compile_render_plan(&json!({"exposure": 10}), context(72), None).unwrap();
+        let explicit = compile_render_plan(
+            &json!({"exposure": 10, "rawEngineEditGraphVersion": 1}),
+            context(73),
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            implicit.edit_graph.fingerprint,
+            explicit.edit_graph.fingerprint
+        );
+        assert_eq!(
+            implicit.edit_graph.receipt.migration,
+            crate::edit_graph::EditGraphMigration::LegacyV1Defaulted
+        );
+        assert_eq!(
+            explicit.edit_graph.receipt.migration,
+            crate::edit_graph::EditGraphMigration::LegacyV1Explicit
+        );
+        assert_eq!(explicit.effective_json["rawEngineEditGraphVersion"], 1);
+
+        let implicit_dehaze =
+            compile_render_plan(&json!({"dehaze": 20}), context(76), None).unwrap();
+        let explicit_dehaze = compile_render_plan(
+            &json!({"dehaze": 20, "rawEngineEditGraphVersion": 1}),
+            context(77),
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            implicit_dehaze.edit_graph.fingerprint,
+            explicit_dehaze.edit_graph.fingerprint
+        );
+
+        let v2 = compile_render_plan(
+            &json!({"rawEngineEditGraphVersion": 2, "exposure": 10}),
+            context(74),
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            v2.edit_graph.receipt.migration,
+            crate::edit_graph::EditGraphMigration::SceneReferredV2Explicit
+        );
+        assert_eq!(
+            v2.edit_graph.receipt.ordered_node_ids.as_ref(),
+            [
+                "camera_input_boundary",
+                "scene_global_color_tone",
+                "scene_to_view_transform",
+                "render_transport"
+            ]
+        );
+        assert_ne!(v2.edit_graph.fingerprint, explicit.edit_graph.fingerprint);
+
+        let error =
+            compile_render_plan(&json!({"rawEngineEditGraphVersion": 3}), context(75), None)
+                .err()
+                .unwrap();
+        assert_eq!(error.code, "render_plan.unsupported_edit_graph_version");
+    }
+
+    #[test]
+    fn dcp_identity_and_creative_amount_invalidate_their_owning_domains() {
+        let first = format!("dcp:{}", "a".repeat(64));
+        let second = format!("dcp:{}", "b".repeat(64));
+        let compile = |profile: &str, amount: u32| {
+            compile_render_plan(
+                &json!({
+                    "rawEngineEditGraphVersion": 2,
+                    "cameraProfile": profile,
+                    "cameraProfileAmount": amount,
+                }),
+                context(79),
+                None,
+            )
+            .unwrap()
+        };
+        let base = compile(&first, 100);
+        let changed_profile = compile(&second, 100);
+        let changed_amount = compile(&first, 40);
+        assert_ne!(
+            base.fingerprints.source,
+            changed_profile.fingerprints.source
+        );
+        assert_eq!(base.fingerprints.source, changed_amount.fingerprints.source);
+        assert_ne!(base.fingerprints.color, changed_amount.fingerprints.color);
+        assert_eq!(
+            base.fingerprints.geometry,
+            changed_profile.fingerprints.geometry
+        );
+        assert_eq!(base.fingerprints.output, changed_amount.fingerprints.output);
+    }
+
+    #[test]
+    fn v2_owns_masked_scene_and_display_payloads_in_their_physical_domains() {
+        let raw = json!({
+            "rawEngineEditGraphVersion": 2,
+            "masks": [{
+                "id": "owned-local", "name": "Owned local", "visible": true,
+                "invert": false, "opacity": 100, "blendMode": "screen",
+                "subMasks": [],
+                "adjustments": {
+                    "exposure": 12,
+                    "curves": {
+                        "luma": [
+                            {"x": 0, "y": 0},
+                            {"x": 128, "y": 144},
+                            {"x": 255, "y": 255}
+                        ]
+                    }
+                }
+            }]
+        });
+        let plan = compile_render_plan(&raw, context(76), None).unwrap();
+        assert_eq!(
+            bytes_of(&plan.edit_graph.shader_abi()),
+            bytes_of(&plan.adjustments),
+            "the graph owns an immutable execution ABI snapshot"
+        );
+        assert_eq!(
+            plan.edit_graph.receipt.ordered_node_ids.as_ref(),
+            [
+                "camera_input_boundary",
+                "scene_global_color_tone",
+                "local_scene_composition",
+                "scene_to_view_transform",
+                "display_creative",
+                "render_transport"
+            ]
+        );
+        let diagnostic = plan.edit_graph.diagnostic_receipt();
+        let nodes = diagnostic["nodes"].as_array().unwrap();
+        let local_scene = nodes
+            .iter()
+            .find(|node| node["id"] == "local_scene_composition")
+            .unwrap();
+        let local_display = nodes
+            .iter()
+            .find(|node| node["id"] == "display_creative")
+            .unwrap();
+        assert_eq!(
+            local_scene["inputDomain"],
+            "acescg_scene_linear_extended_v1"
+        );
+        assert_eq!(local_scene["payload"]["layers"][0]["exposure"], 15.0);
+        assert!(local_scene["payload"]["layers"][0].get("curves").is_none());
+        assert_eq!(local_display["inputDomain"], "display_encoded_srgb_v1");
+        assert_eq!(
+            local_display["payload"]["localDisplayLayers"][0]["curveCounts"][0],
+            3
+        );
+        assert!(
+            local_display["payload"]["localDisplayLayers"][0]
+                .get("exposure")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn v2_payload_fingerprints_invalidate_only_the_owning_physical_domain() {
+        let base = json!({
+            "rawEngineEditGraphVersion": 2,
+            "exposure": 10,
+            "curves": {
+                "luma": [
+                    {"x": 0, "y": 0},
+                    {"x": 128, "y": 136},
+                    {"x": 255, "y": 255}
+                ]
+            }
+        });
+        let exposure = json!({
+            "rawEngineEditGraphVersion": 2,
+            "exposure": 14,
+            "curves": base["curves"].clone()
+        });
+        let display_curve = json!({
+            "rawEngineEditGraphVersion": 2,
+            "exposure": 10,
+            "curves": {
+                "luma": [
+                    {"x": 0, "y": 0},
+                    {"x": 128, "y": 148},
+                    {"x": 255, "y": 255}
+                ]
+            }
+        });
+        let rapid_default = json!({
+            "rawEngineEditGraphVersion": 2,
+            "toneMapper": "rapidView",
+            "exposure": 10,
+            "curves": base["curves"].clone()
+        });
+        let rapid_custom = json!({
+            "rawEngineEditGraphVersion": 2,
+            "toneMapper": "rapidView",
+            "viewTransform": {"contrast": 1.6, "shoulder": 0.8, "toe": 0.7},
+            "exposure": 10,
+            "curves": base["curves"].clone()
+        });
+        let compile = |raw: &serde_json::Value| {
+            compile_render_plan(raw, context(77), None)
+                .unwrap()
+                .edit_graph
+        };
+        let base = compile(&base);
+        let exposure = compile(&exposure);
+        let display_curve = compile(&display_curve);
+        let rapid_default = compile(&rapid_default);
+        let rapid_custom = compile(&rapid_custom);
+        let fingerprint = |graph: &crate::edit_graph::CompiledEditGraph, id| {
+            graph
+                .nodes
+                .iter()
+                .find(|node| node.kind.stable_id() == id)
+                .unwrap()
+                .payload_fingerprint
+        };
+
+        for stable in [
+            "scene_to_view_transform",
+            "display_creative",
+            "render_transport",
+        ] {
+            assert_eq!(fingerprint(&base, stable), fingerprint(&exposure, stable));
+        }
+        assert_ne!(
+            fingerprint(&base, "scene_global_color_tone"),
+            fingerprint(&exposure, "scene_global_color_tone")
+        );
+        for stable in [
+            "scene_global_color_tone",
+            "scene_to_view_transform",
+            "render_transport",
+        ] {
+            assert_eq!(
+                fingerprint(&base, stable),
+                fingerprint(&display_curve, stable)
+            );
+        }
+        assert_ne!(
+            fingerprint(&base, "display_creative"),
+            fingerprint(&display_curve, "display_creative")
+        );
+        for stable in [
+            "scene_global_color_tone",
+            "display_creative",
+            "render_transport",
+        ] {
+            assert_eq!(
+                fingerprint(&rapid_default, stable),
+                fingerprint(&rapid_custom, stable)
+            );
+        }
+        assert_ne!(
+            fingerprint(&rapid_default, "scene_to_view_transform"),
+            fingerprint(&rapid_custom, "scene_to_view_transform")
+        );
+    }
+
+    #[test]
     fn source_fingerprint_scopes_plan_cache_and_full_fingerprint() {
         let raw = json!({"exposure": 12});
         let first = compile_render_plan_cached(&raw, context(90), None).unwrap();
@@ -593,7 +1043,9 @@ mod tests {
             "masks":[{"id":"m1","name":"Local","visible":true,"invert":false,"opacity":80,
                 "blendMode":"multiply","adjustments":{"contrast":15},"subMasks":[]}]
         });
-        let legacy = crate::adjustments::parse::get_all_adjustments_from_json(&raw, true, Some(1));
+        let mut legacy =
+            crate::adjustments::parse::get_all_adjustments_from_json(&raw, true, Some(1));
+        legacy.global.edit_graph_version = crate::edit_graph::LEGACY_PIPELINE_VERSION as f32;
         let compiled = compile_render_plan(
             &raw,
             CompileRenderPlanContext {

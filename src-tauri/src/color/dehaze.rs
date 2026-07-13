@@ -1,8 +1,10 @@
 use std::collections::VecDeque;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock, Mutex};
 
-use image::DynamicImage;
+use image::{DynamicImage, GenericImageView};
 use serde::{Deserialize, Serialize};
+
+use crate::adjustments::abi::{AllAdjustments, MAX_MASKS};
 
 pub const DEHAZE_ANALYSIS_IMPLEMENTATION_VERSION: u32 = 1;
 pub const DEHAZE_RENDER_IMPLEMENTATION_VERSION: u32 = 1;
@@ -140,6 +142,54 @@ pub fn compile_dehaze_plan(
         fingerprint,
         implementation_version: DEHAZE_RENDER_IMPLEMENTATION_VERSION,
     }
+}
+
+pub fn scene_dehaze_is_active(adjustments: &AllAdjustments) -> bool {
+    if adjustments.global.edit_graph_version < 2.0 {
+        return false;
+    }
+    let mask_count = (adjustments.mask_count as usize).min(MAX_MASKS);
+    adjustments.global.dehaze != 0.0
+        || adjustments.mask_adjustments[..mask_count]
+            .iter()
+            .any(|mask| mask.dehaze != 0.0)
+}
+
+pub fn apply_analysis_to_adjustments(
+    analysis: &HazeAnalysisPlanV1,
+    adjustments: &mut AllAdjustments,
+) -> CompiledDehazePlanV1 {
+    let plan = compile_dehaze_plan(
+        analysis,
+        DehazeSettingsV1 {
+            amount: (adjustments.global.dehaze * 7.5).clamp(-1.0, 1.0),
+            atmospheric_light_mode: AtmosphericLightMode::Auto,
+            ..Default::default()
+        },
+    );
+    adjustments.global.dehaze_atmosphere_r = plan.atmospheric_light[0];
+    adjustments.global.dehaze_atmosphere_g = plan.atmospheric_light[1];
+    adjustments.global.dehaze_atmosphere_b = plan.atmospheric_light[2];
+    adjustments.global.dehaze_atmosphere_confidence = plan.confidence;
+    plan
+}
+
+static CPU_HAZE_ANALYSIS_CACHE: LazyLock<Mutex<HazeAnalysisCache>> =
+    LazyLock::new(|| Mutex::new(HazeAnalysisCache::new(4)));
+
+pub fn prepare_cpu_dehaze(image: &DynamicImage, adjustments: &mut AllAdjustments) {
+    if !scene_dehaze_is_active(adjustments) {
+        return;
+    }
+    let (width, height) = image.dimensions();
+    let digest = blake3::hash(image.as_bytes());
+    let fingerprint = u64::from_le_bytes(digest.as_bytes()[..8].try_into().unwrap());
+    let identity = HazeAnalysisIdentityV1::new(fingerprint, fingerprint, 0, width, height);
+    let (analysis, _) = CPU_HAZE_ANALYSIS_CACHE
+        .lock()
+        .unwrap()
+        .get_or_analyze(image, identity);
+    apply_analysis_to_adjustments(&analysis, adjustments);
 }
 
 pub fn analyze_haze(image: &DynamicImage, identity: HazeAnalysisIdentityV1) -> HazeAnalysisPlanV1 {
@@ -407,5 +457,15 @@ mod tests {
         let (_, changed_source_hit) = cache.get_or_analyze(&image, identity(2));
         assert!(!changed_source_hit);
         assert_eq!(cache.counters(), (1, 2));
+    }
+
+    #[test]
+    fn source_analysis_is_opt_in_for_scene_graph_v2_and_legacy_never_builds_it() {
+        let mut adjustments = AllAdjustments::default();
+        adjustments.global.dehaze = 0.1;
+        adjustments.global.edit_graph_version = 1.0;
+        assert!(!scene_dehaze_is_active(&adjustments));
+        adjustments.global.edit_graph_version = 2.0;
+        assert!(scene_dehaze_is_active(&adjustments));
     }
 }

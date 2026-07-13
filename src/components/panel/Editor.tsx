@@ -57,6 +57,7 @@ import { createEditorOverlayGeometry, overlayPoint, overlayRect } from '../../ut
 import { createEditorPresentationDescriptor } from '../../utils/editorPresentationDescriptor';
 import { getEditorPreviewDimensions } from '../../utils/editorPreviewDimensions';
 import {
+  getImageViewportRect,
   reconcileViewportTransform,
   type ViewportFocalPoint,
   type ViewportSnapshot,
@@ -756,9 +757,14 @@ export default function Editor({
       const ratio = newScale / current.scale;
       const x = anchor.x - (anchor.x - current.positionX) * ratio;
       const y = anchor.y - (anchor.y - current.positionY) * ratio;
-      animateTransform(x, y, newScale, duration);
+      if (duration > 0) {
+        animateTransform(x, y, newScale, duration);
+      } else {
+        const bounded = clampToBounds(x, y, newScale);
+        applyTransform(bounded.x, bounded.y, bounded.scale);
+      }
     },
-    [animateTransform, captureFocalPoint, transformStateRef],
+    [animateTransform, applyTransform, captureFocalPoint, clampToBounds, transformStateRef],
   );
 
   useImperativeHandle(
@@ -794,7 +800,7 @@ export default function Editor({
     [animateTransform, applyTransform, captureFocalPoint, clampToBounds, transformStateRef, zoomToCenter],
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!transformWrapperRef.current || !imageRenderSize.width || !imageRenderSize.height) return;
 
     const currentScale = transformStateRef.current.scale || 1;
@@ -802,10 +808,10 @@ export default function Editor({
     pendingZoomAnchorRef.current = null;
     if (Math.abs(currentScale - resolvedZoom.transformScale) < 0.001) return;
     if (anchor) {
-      zoomToAnchor(anchor, resolvedZoom.transformScale, 200);
+      zoomToAnchor(anchor, resolvedZoom.transformScale, 0);
       return;
     }
-    zoomToCenter(resolvedZoom.transformScale, 200);
+    zoomToCenter(resolvedZoom.transformScale, 0);
   }, [
     imageRenderSize.height,
     imageRenderSize.width,
@@ -1330,14 +1336,15 @@ export default function Editor({
       setViewportLayoutEpoch(viewportLayoutEpochRef.current);
     }
     if (layoutChanged || contextChanged) {
+      const presentationRect = getImageViewportRect(imageRenderSize, nextTransform);
       handleDisplaySizeChange({
         containerHeight: currentSnapshot.containerHeight,
         containerWidth: currentSnapshot.containerWidth,
-        height: imageRenderSize.height * nextTransform.scale,
+        height: presentationRect.height,
         offsetX: imageRenderSize.offsetX,
         offsetY: imageRenderSize.offsetY,
         scale: nextTransform.scale,
-        width: imageRenderSize.width * nextTransform.scale,
+        width: presentationRect.width,
       });
     }
 
@@ -1364,9 +1371,10 @@ export default function Editor({
   useEffect(() => {
     const timer = setTimeout(() => {
       if (imageRenderSize.width > 0) {
+        const presentationRect = getImageViewportRect(imageRenderSize, transformState);
         const currentDisplaySize = {
-          width: imageRenderSize.width * transformState.scale,
-          height: imageRenderSize.height * transformState.scale,
+          width: presentationRect.width,
+          height: presentationRect.height,
           scale: transformState.scale,
           offsetX: imageRenderSize.offsetX,
           offsetY: imageRenderSize.offsetY,
