@@ -21,6 +21,7 @@ import type React from 'react';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ThumbnailViewportUpdate } from '../../hooks/library/useThumbnails';
+import { consumeStartupShellIntent } from '../../product/startupShellHandoff';
 import { EXPORT_LAST_USED_PRESET_ID } from '../../schemas/export/exportRecipeIds';
 import { buildLibrarySessionUiCard } from '../../schemas/library/librarySessionUiSchemas';
 import { useLibraryStore } from '../../store/useLibraryStore';
@@ -121,6 +122,12 @@ export default function MainLibrary(props: MainLibraryProps) {
   const [latestVersion, setLatestVersion] = useState('');
   const [isBusyDelayed, setIsBusyDelayed] = useState(false);
   const [isProgressHovered, setIsProgressHovered] = useState(false);
+
+  useEffect(() => {
+    const intent = consumeStartupShellIntent();
+    if (intent === 'settings') setShowSettings(true);
+    if (intent === 'add-folder') props.onOpenFolder();
+  }, [props.onOpenFolder]);
 
   const searchCriteria = useLibraryStore((state) => state.searchCriteria);
   const filterCriteria = useLibraryStore((state) => state.filterCriteria);

@@ -754,7 +754,7 @@ function App() {
   );
 }
 
-const AppWrapper = () => (
+export const AppWrapper = () => (
   <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} routerPush={(_to) => {}} routerReplace={(_to) => {}}>
     <ContextMenuProvider>
       <App />

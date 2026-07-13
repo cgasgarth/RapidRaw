@@ -48,6 +48,8 @@ export enum Invokes {
   ResumeExport = 'resume_export',
   FrontendLog = 'frontend_log',
   FrontendReady = 'frontend_ready',
+  GetStartupTrace = 'get_startup_trace',
+  RecordFrontendStartupPhase = 'record_frontend_startup_phase',
   GenerateAiForegroundMask = 'generate_ai_foreground_mask',
   GenerateAiWholePersonMask = 'generate_ai_whole_person_mask',
   GenerateAiPersonPartMask = 'generate_ai_person_part_mask',
