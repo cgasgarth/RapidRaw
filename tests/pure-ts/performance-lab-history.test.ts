@@ -43,9 +43,9 @@ const scenario = (latency: number): PerformanceScenario => ({
   measuredRuns: 3,
   budgets: { latencyMs: { absolute: 2, relative: 0.15 } },
   maxRelativeMad: 0.2,
-  metricUnits: { latencyMs: 'ms' },
+  metricUnits: { latencyMs: 'ms', work: 'count' },
   async runSample() {
-    return { assertions: 1, metrics: { latencyMs: latency } };
+    return { assertions: 1, metrics: { latencyMs: latency, work: latency } };
   },
 });
 
@@ -167,11 +167,20 @@ describe('performance regression diagnosis and routing', () => {
       now: clock('2026-01-02T00:00:00.000Z'),
     });
     expect(candidate.status).toBe('regression');
-    const artifact = createRegressionArtifact(baseline, candidate, {
+    const withStage = (receipt: typeof baseline, durationMs: number) => ({
+      ...receipt,
+      observability: {
+        clock: { domain: 'runner-monotonic' as const, unit: 'ms' as const },
+        spans: [{ durationMs, run: 0, source: 'frontend' as const, stage: 'preview.render', startOffsetMs: 0 }],
+      },
+    });
+    const artifact = createRegressionArtifact(withStage(baseline, 10), withStage(candidate, 14), {
       flag: '--baseline',
       path: "/tmp/baseline's receipt.json",
     });
     expect(performanceRegressionArtifactSchema.parse(artifact).likelyDivergentMetric).toBe('latencyMs');
+    expect(artifact.likelyDivergentStage).toMatchObject({ source: 'frontend', stage: 'preview.render' });
+    expect(artifact.likelyWorkAmplification).toMatchObject({ metric: 'work', unit: 'count' });
     expect(artifact.bisectPlanCommand).toContain("'\\''");
   });
 
