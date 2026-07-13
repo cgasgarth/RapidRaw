@@ -5,6 +5,14 @@ const ownership: readonly { pattern: RegExp; scenarioIds: readonly string[] }[] 
     pattern: /(?:src\/utils\/(?:adjustmentSnapshots|adjustments)|editor-preview-scheduling)/u,
     scenarioIds: ['editor.preview-scheduling'],
   },
+  {
+    pattern: /(?:src\/components\/panel\/editor\/Compare|src\/utils\/editorCompare)/u,
+    scenarioIds: ['browser.editor-compare'],
+  },
+  {
+    pattern: /(?:src\/components\/panel\/MainLibrary|src\/components\/library|src\/store\/library)/u,
+    scenarioIds: ['browser.library-open'],
+  },
   { pattern: /(?:scripts\/perf\/|package\.json|bun\.lock)/u, scenarioIds: ['*'] },
 ];
 

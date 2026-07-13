@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import type { PerformanceIdentity, PerformanceScenario } from '../../scripts/perf/model';
 import { performanceRunReceiptSchema } from '../../scripts/perf/model';
 import { bisectExitCode, comparePerformanceReceipts, runPerformanceScenario } from '../../scripts/perf/runner';
+import { performanceScenarios } from '../../scripts/perf/scenarios';
 import {
   assertComparableReceipts,
   assertStableMetric,
@@ -12,8 +13,8 @@ import {
 const identity: PerformanceIdentity = {
   git: { commit: 'a'.repeat(40), dirtyDigest: 'b'.repeat(64) },
   build: { profile: 'test', runtime: 'bun-test' },
-  hardware: { classId: 'c'.repeat(64), cpuCores: 8 },
-  environment: { arch: 'arm64', os: 'test-os' },
+  hardware: { classId: 'c'.repeat(64), cpuCores: 8, cpuModelHash: 'd'.repeat(64), memoryGiB: 16 },
+  environment: { arch: 'arm64', bun: 'test', os: 'test-os' },
 };
 
 const clock = () => {
@@ -59,6 +60,15 @@ describe('performance lab statistics', () => {
 });
 
 describe('performance lab runner', () => {
+  test('registers versioned synthetic and end-to-end browser scenarios', () => {
+    expect(performanceScenarios.map(({ id }) => id)).toEqual([
+      'editor.preview-scheduling',
+      'browser.editor-compare',
+      'browser.library-open',
+    ]);
+    expect(performanceScenarios.every(({ version, measuredRuns }) => version > 0 && measuredRuns >= 5)).toBeTrue();
+  });
+
   test('excludes warmups, retains raw metrics, and proves every measured run', async () => {
     const runs: number[] = [];
     const executable = scenario([99, 10, 11, 12]);

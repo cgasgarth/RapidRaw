@@ -1,10 +1,11 @@
 import { describe, expect, test } from 'bun:test';
 import { generateKeyPairSync } from 'node:crypto';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
+import { isolatedGitEnvironment } from '../../scripts/lib/ci/git-environment';
 import { selectAffectedPerformanceScenarios } from '../../scripts/perf/affected';
-import { createPerformanceBisectPlan, renderBisectPlan } from '../../scripts/perf/bisect';
+import { createPerformanceBisectPlan, executePerformanceBisect, renderBisectPlan } from '../../scripts/perf/bisect';
 import {
   appendApprovedBaseline,
   comparePerformanceTrend,
@@ -29,8 +30,8 @@ const approval = (reason: string, approvedAt: string) => ({
 const identity = (commit: string): PerformanceIdentity => ({
   git: { commit, dirtyDigest: 'b'.repeat(64) },
   build: { profile: 'test', runtime: 'bun-test' },
-  hardware: { classId: 'c'.repeat(64), cpuCores: 8 },
-  environment: { arch: 'arm64', os: 'test-os' },
+  hardware: { classId: 'c'.repeat(64), cpuCores: 8, cpuModelHash: 'd'.repeat(64), memoryGiB: 16 },
+  environment: { arch: 'arm64', bun: 'test', os: 'test-os' },
 });
 
 const scenario = (latency: number): PerformanceScenario => ({
@@ -200,6 +201,54 @@ describe('performance regression diagnosis and routing', () => {
     expect(renderBisectPlan(plan)[1]).toContain("'/tmp/perf history.json'");
   });
 
+  test('executes git bisect and locates a known synthetic regression', async () => {
+    const directory = await mkdtemp(resolve(tmpdir(), 'rapidraw-perf-bisect-'));
+    const environment = isolatedGitEnvironment();
+    const git = (...args: string[]) => {
+      const result = Bun.spawnSync(['git', ...args], {
+        cwd: directory,
+        env: environment,
+        stderr: 'pipe',
+        stdout: 'pipe',
+      });
+      if (result.exitCode !== 0) throw new Error(result.stderr.toString());
+      return result.stdout.toString().trim();
+    };
+    try {
+      git('init', '--quiet');
+      git('config', 'user.email', 'performance-lab@example.invalid');
+      git('config', 'user.name', 'Performance Lab');
+      await writeFile(
+        resolve(directory, 'evaluate.sh'),
+        '#!/bin/sh\nvalue="$(cat value)"\nif [ "$value" -lt 3 ]; then exit 0; fi\nexit 1\n',
+        { mode: 0o755 },
+      );
+      const commits: string[] = [];
+      for (let value = 0; value < 5; value += 1) {
+        await writeFile(resolve(directory, 'value'), `${value}\n`);
+        git('add', '.');
+        git('commit', '--quiet', '-m', `value ${value}`);
+        commits.push(git('rev-parse', 'HEAD'));
+      }
+      const good = commits[0];
+      const firstBad = commits[3];
+      const bad = commits[4];
+      if (good === undefined || firstBad === undefined || bad === undefined)
+        throw new Error('Synthetic commits missing.');
+      const report = await executePerformanceBisect({
+        cwd: directory,
+        good,
+        bad,
+        evaluator: { command: './evaluate.sh', args: [] },
+      });
+      expect(report).toMatchObject({ good, bad, firstBadCommit: firstBad });
+      expect(git('rev-parse', 'HEAD')).toBe(bad);
+      expect(git('status', '--porcelain=v1')).toBe('');
+    } finally {
+      await rm(directory, { force: true, recursive: true });
+    }
+  });
+
   test('publishes a conservative affected-validation contract for #5396', () => {
     expect(selectAffectedPerformanceScenarios(['src/utils/adjustmentSnapshots.ts'], performanceScenarios)).toEqual({
       schemaVersion: 1,
@@ -214,8 +263,15 @@ describe('performance regression diagnosis and routing', () => {
       ],
       conservativeFallback: false,
     });
+    expect(
+      selectAffectedPerformanceScenarios(['src/components/panel/editor/CompareOverlay.tsx'], performanceScenarios)
+        .scenarioIds,
+    ).toEqual(['browser.editor-compare']);
+    expect(
+      selectAffectedPerformanceScenarios(['src/components/panel/MainLibrary.tsx'], performanceScenarios).scenarioIds,
+    ).toEqual(['browser.library-open']);
     expect(selectAffectedPerformanceScenarios(['unknown/new-file.ts'], performanceScenarios)).toMatchObject({
-      scenarioIds: ['editor.preview-scheduling'],
+      scenarioIds: ['browser.editor-compare', 'browser.library-open', 'editor.preview-scheduling'],
       conservativeFallback: true,
     });
     expect(selectAffectedPerformanceScenarios([], performanceScenarios).scenarioIds).toEqual([]);

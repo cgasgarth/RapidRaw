@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isolatedGitEnvironment } from '../lib/ci/git-environment';
 
 const shaSchema = z.string().regex(/^[0-9a-f]{40}$/u);
 
@@ -13,6 +14,66 @@ export const performanceBisectPlanSchema = z.object({
 });
 
 export type PerformanceBisectPlan = z.infer<typeof performanceBisectPlanSchema>;
+
+export const performanceBisectReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  good: shaSchema,
+  bad: shaSchema,
+  firstBadCommit: shaSchema,
+  evaluator: z.object({ command: z.string().min(1), args: z.array(z.string()) }),
+  outputTail: z.string(),
+});
+
+export type PerformanceBisectReport = z.infer<typeof performanceBisectReportSchema>;
+
+const run = async (cwd: string, command: string, args: readonly string[]) => {
+  const child = Bun.spawn([command, ...args], {
+    cwd,
+    env: isolatedGitEnvironment(),
+    stderr: 'pipe',
+    stdout: 'pipe',
+  });
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+    child.exited,
+  ]);
+  return { exitCode, output: `${stdout}\n${stderr}`.trim() };
+};
+
+export async function executePerformanceBisect(options: {
+  cwd: string;
+  good: string;
+  bad: string;
+  evaluator: { command: string; args: string[] };
+}): Promise<PerformanceBisectReport> {
+  const parsed = z
+    .object({ cwd: z.string().startsWith('/'), good: shaSchema, bad: shaSchema })
+    .parse({ cwd: options.cwd, good: options.good, bad: options.bad });
+  const status = await run(parsed.cwd, 'git', ['status', '--porcelain=v1']);
+  if (status.exitCode !== 0 || status.output !== '') throw new Error('Performance bisect requires a clean worktree.');
+  const started = await run(parsed.cwd, 'git', ['bisect', 'start', parsed.bad, parsed.good]);
+  if (started.exitCode !== 0) throw new Error(`git bisect start failed:\n${started.output.slice(-8_000)}`);
+  let evaluated: Awaited<ReturnType<typeof run>> | undefined;
+  try {
+    evaluated = await run(parsed.cwd, 'git', ['bisect', 'run', options.evaluator.command, ...options.evaluator.args]);
+  } finally {
+    await run(parsed.cwd, 'git', ['bisect', 'reset']);
+  }
+  if (evaluated === undefined || evaluated.exitCode !== 0)
+    throw new Error(`git bisect run failed:\n${evaluated?.output.slice(-8_000) ?? 'no evaluator output'}`);
+  const firstBadCommit = evaluated.output.match(/([0-9a-f]{40}) is the first '?bad'? commit/u)?.[1];
+  if (firstBadCommit === undefined)
+    throw new Error(`git bisect did not identify a first bad commit:\n${evaluated.output}`);
+  return performanceBisectReportSchema.parse({
+    schemaVersion: 1,
+    good: parsed.good,
+    bad: parsed.bad,
+    firstBadCommit,
+    evaluator: options.evaluator,
+    outputTail: evaluated.output.slice(-8_000),
+  });
+}
 
 export function createPerformanceBisectPlan(options: {
   good: string;

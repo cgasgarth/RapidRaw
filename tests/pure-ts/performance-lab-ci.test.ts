@@ -29,8 +29,17 @@ afterEach(async () => {
 const identity = (hardware: string): PerformanceIdentity => ({
   git: { commit: 'a'.repeat(40), dirtyDigest: 'b'.repeat(64) },
   build: { profile: 'ci', runtime: 'bun-test' },
-  hardware: { classId: hardware.repeat(64), cpuCores: 8 },
-  environment: { arch: hardware === 'c' ? 'arm64' : 'x64', os: hardware === 'c' ? 'darwin' : 'linux' },
+  hardware: {
+    classId: hardware.repeat(64),
+    cpuCores: 8,
+    cpuModelHash: hardware.repeat(64),
+    memoryGiB: 16,
+  },
+  environment: {
+    arch: hardware === 'c' ? 'arm64' : 'x64',
+    bun: 'test',
+    os: hardware === 'c' ? 'darwin' : 'linux',
+  },
 });
 
 const scenario = (value: number, unit: 'ms' | 'count' = 'ms'): PerformanceScenario => ({

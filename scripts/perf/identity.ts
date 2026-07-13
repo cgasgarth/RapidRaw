@@ -26,7 +26,12 @@ export function capturePerformanceIdentity(profile = 'development'): Performance
       dirtyDigest: digest(command(['git', 'status', '--porcelain=v1'])),
     },
     build: { profile, runtime: `bun-${Bun.version}` },
-    hardware: { classId: digest(hardwareClass), cpuCores: cpu.length },
-    environment: { arch: arch(), os: `${platform()}-${release()}` },
+    hardware: {
+      classId: digest(hardwareClass),
+      cpuCores: cpu.length,
+      cpuModelHash: digest(cpu[0]?.model.trim().replaceAll(/\s+/gu, ' ') ?? 'unknown'),
+      memoryGiB,
+    },
+    environment: { arch: arch(), bun: Bun.version, os: `${platform()}-${release()}` },
   };
 }

@@ -8,7 +8,7 @@ import {
   performanceArtifactIndexSchema,
   planPerformanceArtifactRetention,
 } from './artifacts';
-import { createPerformanceBisectPlan, renderBisectPlan } from './bisect';
+import { createPerformanceBisectPlan, executePerformanceBisect, renderBisectPlan } from './bisect';
 import { ciTrendGateExitCode, createPerformanceCiTrendGate } from './ci';
 import {
   appendApprovedBaseline,
@@ -23,6 +23,7 @@ import { performanceRunReceiptSchema } from './model';
 import { createRegressionArtifact } from './regression';
 import { bisectExitCode, comparePerformanceReceipts, runPerformanceScenario } from './runner';
 import { getPerformanceScenario, performanceScenarios } from './scenarios';
+import { groupMetricSamples, summarizeMetric } from './statistics';
 
 const args = process.argv.slice(2);
 const value = (flag: string): string | undefined => {
@@ -241,6 +242,51 @@ if (args[0] === 'bisect-plan') {
   process.exit(0);
 }
 
+if (args[0] === 'bisect') {
+  const scenarioId = value('--scenario');
+  const good = value('--good');
+  const bad = value('--bad');
+  const baselinePath = value('--baseline');
+  const historyPath = value('--history');
+  if (
+    scenarioId === undefined ||
+    good === undefined ||
+    bad === undefined ||
+    (baselinePath === undefined) === (historyPath === undefined)
+  )
+    throw new Error(
+      'Usage: bun perf bisect --scenario <id> --good <sha> --bad <sha> (--baseline <receipt> | --history <history>) [--output report.json]',
+    );
+  getPerformanceScenario(scenarioId);
+  const baselineSource =
+    historyPath === undefined
+      ? { flag: '--baseline' as const, path: resolve(baselinePath ?? '') }
+      : { flag: '--history' as const, path: resolve(historyPath) };
+  if (baselineSource.flag === '--baseline') await readReceipt(baselineSource.path);
+  else await readHistory(baselineSource.path);
+  const report = await executePerformanceBisect({
+    cwd: resolve('.'),
+    good,
+    bad,
+    evaluator: {
+      command: 'bun',
+      args: [
+        'perf',
+        'run',
+        scenarioId,
+        baselineSource.flag,
+        baselineSource.path,
+        '--profile',
+        value('--profile') ?? 'development',
+      ],
+    },
+  });
+  const output = value('--output');
+  if (output !== undefined) await writeJsonAtomic(output, report);
+  console.log(JSON.stringify({ ...report, output: output === undefined ? null : resolve(output) }));
+  process.exit(0);
+}
+
 if (args[0] === 'compare' || args[0] === 'bisect-evaluate') {
   const baselinePath = args[1];
   const candidatePath = args[2];
@@ -313,8 +359,15 @@ if (receipt.status === 'regression' && baseline !== undefined) {
       : { flag: '--history' as const, path: resolve(historyPath) };
   await writeJsonAtomic(regressionPath, createRegressionArtifact(baseline, receipt, source));
 }
-const latency = receipt.samples.filter(({ unit }) => unit === 'ms').map(({ value }) => value);
+const units = new Map(receipt.samples.map(({ metric, unit }) => [metric, unit]));
+const latency = [...groupMetricSamples(receipt.samples)]
+  .filter(([metric]) => units.get(metric) === 'ms')
+  .map(([metric, samples]) => {
+    const summary = summarizeMetric(samples);
+    return `${metric}:median=${summary.median.toFixed(3)}ms,p95=${summary.p95.toFixed(3)}ms`;
+  })
+  .join(';');
 console.log(
-  `${receipt.status.toUpperCase()} ${scenario.id} samples=${scenario.measuredRuns} range=${latency.length === 0 ? 'n/a' : `${Math.min(...latency).toFixed(3)}-${Math.max(...latency).toFixed(3)}ms`} receipt=${outputPath}`,
+  `${receipt.status.toUpperCase()} ${scenario.id} samples=${scenario.measuredRuns} metrics=${latency || 'none'} receipt=${outputPath}`,
 );
 process.exit(bisectExitCode(receipt.status));

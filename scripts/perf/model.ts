@@ -13,8 +13,13 @@ export const performanceIdentitySchema = z.object({
     dirtyDigest: z.string().regex(/^[0-9a-f]{64}$/u),
   }),
   build: z.object({ profile: z.string().min(1), runtime: z.string().min(1) }),
-  hardware: z.object({ classId: z.string().regex(/^[0-9a-f]{64}$/u), cpuCores: z.number().int().positive() }),
-  environment: z.object({ arch: z.string().min(1), os: z.string().min(1) }),
+  hardware: z.object({
+    classId: z.string().regex(/^[0-9a-f]{64}$/u),
+    cpuCores: z.number().int().positive(),
+    cpuModelHash: z.string().regex(/^[0-9a-f]{64}$/u),
+    memoryGiB: z.number().int().positive(),
+  }),
+  environment: z.object({ arch: z.string().min(1), bun: z.string().min(1), os: z.string().min(1) }),
 });
 
 export const metricSummarySchema = z.object({

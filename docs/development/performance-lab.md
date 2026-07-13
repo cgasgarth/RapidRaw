@@ -5,6 +5,8 @@ The executable lab records repeated metrics from versioned scenarios with correc
 ```bash
 bun perf list
 bun perf run editor.preview-scheduling
+bun perf run browser.editor-compare
+bun perf run browser.library-open
 bun perf run editor.preview-scheduling --baseline private-artifacts/perf/baseline.json
 bun perf baseline-add private-artifacts/perf/history.json private-artifacts/perf/baseline.json --actor reviewer-name --reason "reviewed stable local run" --signing-key private-artifacts/perf/reviewer-ed25519.pem
 bun perf baseline-export private-artifacts/perf/history.json private-artifacts/perf/canonical-history.json
@@ -14,13 +16,16 @@ bun perf trend private-artifacts/perf/history.json private-artifacts/perf/candid
 bun perf compare private-artifacts/perf/baseline.json private-artifacts/perf/candidate.json
 bun perf bisect-evaluate private-artifacts/perf/baseline.json private-artifacts/perf/candidate.json
 bun perf bisect-plan --scenario editor.preview-scheduling --good <sha> --bad <sha> --history private-artifacts/perf/history.json
+bun perf bisect --scenario editor.preview-scheduling --good <sha> --bad <sha> --history private-artifacts/perf/history.json --output private-artifacts/perf/bisect.json
 bun perf affected --base origin/main
 bun perf ci-gate --history private-artifacts/perf/history.json --candidate private-artifacts/perf/candidate.json --output artifacts/performance-lab/trend-gate.json
 bun perf artifact-manifest --receipt private-artifacts/perf/candidate.json --file private-artifacts/perf/candidate.json --output artifacts/performance-lab/upload-manifest.json
 bun perf retention-plan --history private-artifacts/perf/history.json --index private-artifacts/perf/artifact-index.json
 ```
 
-`editor.preview-scheduling` executes the adjustment-snapshot scheduling hot path directly. Setup is excluded, two warmups precede nine retained samples, and every retained run proves its deterministic dispatch sink before it can be valid. Receipts remain under ignored `private-artifacts/perf` unless `--output` selects another location.
+`editor.preview-scheduling` executes the adjustment-snapshot scheduling hot path directly. Setup is excluded, two warmups precede nine retained samples, and every retained run proves both control and instrumented dispatch sinks before it can be valid. It records control cost and light snapshot-instrumentation overhead separately and invalidates a run above the documented 5 ms overhead ceiling. Receipts remain under ignored `private-artifacts/perf` unless `--output` selects another location.
+
+`browser.editor-compare` and `browser.library-open` execute the repository-owned Playwright/Tauri browser scenarios end to end. Each retained sample validates the terminal QA receipt before recording interaction latency separately from Vite/Chromium harness setup and explicit process-start work. One warmup precedes five measured runs. The manual performance workflow runs all three real scenario definitions in independent lanes; the former readiness-only scaffold no longer counts as runtime coverage.
 
 Comparisons require the same scenario/version, fixture digest, cache mode, hardware class, and build profile. A latency gate regresses only when its p95 exceeds both relative and absolute thresholds. Raw samples, median, p95, and MAD remain available for trend inspection.
 
@@ -28,7 +33,7 @@ Baseline history is an append-only signed review ledger. Every passing approval 
 
 History export uses sorted-key canonical JSON, so repeated verified import/export is byte-identical. `baseline-import` never overwrites a corrupt payload: invalid JSON, schema, hash chain, provenance, or signature is copied with mode `0600` to a digest-addressed private quarantine and exits invalid; the source remains untouched.
 
-For `git bisect run`, the generated plan uses the normal runner, which returns `0` for pass, `1` for regression, and `125` for an invalid measurement. `bisect-plan` only prints validated commands; it never changes the current checkout. Baselines never update themselves; an approved receipt remains immutable input with exact commit provenance.
+For `git bisect run`, the normal runner returns `0` for pass, `1` for regression, and `125` for an invalid measurement. `bisect-plan` only prints validated commands. `bisect` requires a clean worktree, executes the same evaluator across the requested ancestry, records the first bad commit and bounded output, and always resets the checkout before returning. Baselines never update themselves; an approved receipt remains immutable input with exact commit provenance.
 
 The `affected` command emits the versioned `performance-scenarios` JSON contract consumed by affected-validation selection. Known preview scheduling sources select the focused scenario; performance infrastructure or unknown paths conservatively select the full registered lab.
 
