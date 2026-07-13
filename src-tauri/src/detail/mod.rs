@@ -454,6 +454,86 @@ pub fn apply_cpu_detail_tiled(
     Ok(output)
 }
 
+pub fn apply_cpu_detail_layers_tiled(
+    source: &[[f32; 3]],
+    width: u32,
+    height: u32,
+    tile_edge: u32,
+    global_settings: MultiscaleDetailSettingsV1,
+    global_macro_gains: [f32; 4],
+    local_layers: &[CpuDetailLocalLayerV1<'_>],
+) -> Result<Vec<[f32; 3]>, &'static str> {
+    validate_cpu_surface(source, width, height)?;
+    if tile_edge == 0 {
+        return Err("detail tile edge must be nonzero");
+    }
+    if local_layers
+        .iter()
+        .any(|layer| layer.influence.len() != source.len())
+    {
+        return Err("detail mask and source lengths differ");
+    }
+    let radii = compile_scale_mapping(width, height)
+        .effective_radii_px
+        .map(|radius| radius as u32);
+    let halo = radii[3];
+    let mut output = vec![[0.0; 3]; source.len()];
+    for tile_y in (0..height).step_by(tile_edge as usize) {
+        for tile_x in (0..width).step_by(tile_edge as usize) {
+            let tile_end_x = (tile_x + tile_edge).min(width);
+            let tile_end_y = (tile_y + tile_edge).min(height);
+            let input_x = tile_x.saturating_sub(halo);
+            let input_y = tile_y.saturating_sub(halo);
+            let input_end_x = (tile_end_x + halo).min(width);
+            let input_end_y = (tile_end_y + halo).min(height);
+            let input_width = input_end_x - input_x;
+            let input_height = input_end_y - input_y;
+            let mut tile_source = Vec::with_capacity((input_width * input_height) as usize);
+            let mut tile_influences = local_layers
+                .iter()
+                .map(|_| Vec::with_capacity((input_width * input_height) as usize))
+                .collect::<Vec<_>>();
+            for y in input_y..input_end_y {
+                let start = (y * width + input_x) as usize;
+                let end = start + input_width as usize;
+                tile_source.extend_from_slice(&source[start..end]);
+                for (tile_influence, layer) in tile_influences.iter_mut().zip(local_layers) {
+                    tile_influence.extend_from_slice(&layer.influence[start..end]);
+                }
+            }
+            let decomposition = build_cpu_detail_decomposition_with_radii(
+                &tile_source,
+                input_width,
+                input_height,
+                radii,
+            )?;
+            let tile_layers = local_layers
+                .iter()
+                .zip(&tile_influences)
+                .map(|(layer, influence)| CpuDetailLocalLayerV1 {
+                    influence,
+                    settings: layer.settings,
+                    macro_gains: layer.macro_gains,
+                })
+                .collect::<Vec<_>>();
+            let processed = apply_cpu_detail_layers(
+                &tile_source,
+                &decomposition,
+                global_settings,
+                global_macro_gains,
+                &tile_layers,
+            )?;
+            for y in tile_y..tile_end_y {
+                for x in tile_x..tile_end_x {
+                    let source_index = ((y - input_y) * input_width + (x - input_x)) as usize;
+                    output[(y * width + x) as usize] = processed[source_index];
+                }
+            }
+        }
+    }
+    Ok(output)
+}
+
 pub fn apply_rgb_reference(
     source: [f32; 3],
     low_passes: [[f32; 3]; 4],
@@ -880,6 +960,32 @@ mod tests {
                 }],
             ),
             Err("detail mask and source lengths differ")
+        );
+
+        let tiled = apply_cpu_detail_layers_tiled(
+            &source,
+            width,
+            height,
+            19,
+            global,
+            global_macro,
+            &[CpuDetailLocalLayerV1 {
+                influence: &influence,
+                settings: local,
+                macro_gains: local_macro,
+            }],
+        )
+        .unwrap();
+        let seam_error = layered
+            .iter()
+            .zip(tiled)
+            .flat_map(|(full, tile)| {
+                (0..3).map(move |channel| (full[channel] - tile[channel]).abs())
+            })
+            .fold(0.0_f32, f32::max);
+        assert!(
+            seam_error <= 0.000_001,
+            "masked tile seam error {seam_error}"
         );
     }
 
