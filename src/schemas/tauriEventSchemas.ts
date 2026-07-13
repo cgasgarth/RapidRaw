@@ -10,6 +10,21 @@ type CullingProgressPayload = Progress & { stage: string };
 export const stringPayloadSchema = z.string();
 export const countPayloadSchema = nonnegativeNumberSchema;
 
+export const displayTargetChangePayloadSchema = z
+  .object({
+    deviceGeneration: nonnegativeNumberSchema,
+    displayResourceGeneration: nonnegativeNumberSchema,
+    target: z
+      .object({
+        colorSpace: z.literal('display_encoded_srgb'),
+        displayId: z.number().int().nonnegative().nullable(),
+        profileSha256: z.string().min(1),
+        scaleFactorBits: nonnegativeNumberSchema,
+      })
+      .strict(),
+  })
+  .strict();
+
 export const progressPayloadSchema = z
   .object({
     completed: nonnegativeNumberSchema.optional(),
@@ -352,4 +367,15 @@ export const persistedRenderStateRecoveryPayloadSchema = z.object({
   outcome: z.enum(['migrated', 'recovered', 'quarantined', 'unsupported']),
   path: z.string(),
   reasonCodes: z.array(z.string()),
+});
+
+export const nativeQaResetPayloadSchema = z.object({
+  mode: z.enum(['empty', 'library', 'editor']),
+  sessionRevision: z.number().int().positive(),
+  sourcePath: z.string().nullable(),
+});
+
+export const nativeQaOpenFixturePayloadSchema = z.object({
+  path: z.string().min(1),
+  sessionRevision: z.number().int().positive(),
 });

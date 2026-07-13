@@ -11,6 +11,7 @@ use wgpu::{Texture, TextureView};
 
 #[cfg(feature = "ai")]
 use crate::ai::ai_processing::{CachedDepthMap, ImageEmbeddings};
+use crate::app::startup::{InitializationService, StartupTrace};
 use crate::cache_utils::DecodedImageCache;
 use crate::gpu_processing::GpuProcessor;
 use crate::image_processing::GpuContext;
@@ -208,23 +209,22 @@ pub struct ImportJob {
     pub task_handle: Option<tauri::async_runtime::JoinHandle<()>>,
 }
 
-pub struct TransformedImageCache {
-    pub identity: crate::render::artifact_identity::RenderArtifactIdentity,
-    pub image: Arc<DynamicImage>,
-    pub offset: (f32, f32),
-}
-
 pub struct WarpedImageCache {
     pub identity: crate::render::artifact_identity::RenderArtifactIdentity,
     pub image: Arc<DynamicImage>,
 }
 
 pub struct AppState {
+    pub startup_trace: StartupTrace,
+    pub gpu_initialization: InitializationService,
+    pub lens_initialization: InitializationService,
     pub window_setup_complete: AtomicBool,
     pub gpu_crash_flag_path: Mutex<Option<PathBuf>>,
     pub original_image: Mutex<Option<LoadedImage>>,
     pub cached_preview: Mutex<Option<CachedPreview>>,
     pub gpu_context: Mutex<Option<GpuContext>>,
+    pub display_target_coordinator:
+        Mutex<Option<Arc<crate::app::display_target::DisplayTargetCoordinator>>>,
     pub gpu_image_cache: Mutex<Option<GpuImageCache>>,
     pub gpu_processor: Mutex<Option<GpuProcessorState>>,
     #[cfg(feature = "ai")]
@@ -269,7 +269,6 @@ pub struct AppState {
     pub load_image_generation: Arc<AtomicUsize>,
     pub image_open_coordinator: crate::image_open_session::ImageOpenCoordinator,
     pub full_warped_cache: Mutex<Option<WarpedImageCache>>,
-    pub full_transformed_cache: Mutex<Option<TransformedImageCache>>,
     pub decoded_image_cache: DecodedImageCache,
     pub source_fingerprint_cache: Arc<FingerprintCache>,
     pub thumbnail_scheduler: Arc<crate::library::thumbnail_scheduler::ThumbnailScheduler>,
@@ -290,11 +289,15 @@ impl AppState {
             max_entries,
         };
         Self {
+            startup_trace: StartupTrace::new(),
+            gpu_initialization: InitializationService::default(),
+            lens_initialization: InitializationService::default(),
             window_setup_complete: AtomicBool::new(false),
             gpu_crash_flag_path: Mutex::new(None),
             original_image: Mutex::new(None),
             cached_preview: Mutex::new(None),
             gpu_context: Mutex::new(None),
+            display_target_coordinator: Mutex::new(None),
             gpu_image_cache: Mutex::new(None),
             gpu_processor: Mutex::new(None),
             #[cfg(feature = "ai")]
@@ -366,7 +369,6 @@ impl AppState {
             load_image_generation: Arc::new(AtomicUsize::new(0)),
             image_open_coordinator: crate::image_open_session::ImageOpenCoordinator::default(),
             full_warped_cache: Mutex::new(None),
-            full_transformed_cache: Mutex::new(None),
             decoded_image_cache: DecodedImageCache::new(5, Arc::clone(&cache_budget)),
             source_fingerprint_cache: Arc::new(FingerprintCache::new(64)),
             thumbnail_scheduler: crate::library::thumbnail_scheduler::ThumbnailScheduler::new(

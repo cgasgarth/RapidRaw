@@ -6,16 +6,21 @@
       "contrast": "Contrast",
       "evShift": "EV Shift",
       "exposure": "Exposure",
+      "highlightRolloff": "Highlight roll-off",
       "highlights": "Highlights",
       "mappers": {
         "agx": "AgX",
         "agxDesc": "Film-like Tonemapping",
         "basic": "Basic",
-        "basicDesc": "Standard Tonemapping"
+        "basicDesc": "Standard Tonemapping",
+        "rapidView": "Rapid View",
+        "rapidViewDesc": "Natural scene-to-display rendering"
       },
       "reset": "Reset",
+      "shadowRolloff": "Shadow roll-off",
       "shadows": "Shadows",
       "toneMapper": "Tone Mapper",
+      "viewContrast": "View contrast",
       "whites": "Whites"
     },
     "color": {
@@ -1827,6 +1832,9 @@
       "exit": "Exit preview",
       "label": "Preview only"
     },
+    "provisionalCameraPreview": "Camera preview — developing RAW",
+    "provisionalCameraPreviewFailed": "Camera preview — RAW development failed",
+    "provisionalLibraryPreview": "Library preview — developing RAW",
     "switcher": {
       "search": {
         "close": "Close panel search",
@@ -4521,7 +4529,8 @@
         "title": "Image Preprocessing",
         "tonemapperOptions": {
           "agx": "AgX",
-          "basic": "Basic"
+          "basic": "Basic",
+          "rapidView": "Rapid View"
         },
         "tonemapperOverride": "Global Tonemapper Override",
         "tonemapperOverrideDesc": "Force a specific tonemapper globally for all images, hiding the tonemapper switch from the adjustments panel."

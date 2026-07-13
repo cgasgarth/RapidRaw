@@ -103,7 +103,6 @@ function App() {
     libraryWorkspacePreferences,
     rightPanelWidth,
     compactEditorPanelHeightOverride,
-    activeRightPanel,
     setUI,
     setEditorRegionSize,
     setEditorRegionVisibility,
@@ -124,7 +123,6 @@ function App() {
       libraryWorkspacePreferences: state.libraryWorkspacePreferences,
       rightPanelWidth: state.rightPanelWidth,
       compactEditorPanelHeightOverride: state.compactEditorPanelHeightOverride,
-      activeRightPanel: state.activeRightPanel,
       setUI: state.setUI,
       setEditorRegionSize: state.setEditorRegionSize,
       setEditorRegionVisibility: state.setEditorRegionVisibility,
@@ -142,11 +140,10 @@ function App() {
     })),
   );
 
-  const { selectedImage, hasRenderedFirstFrame, setEditor } = useEditorStore(
+  const { selectedImage, hasRenderedFirstFrame } = useEditorStore(
     useShallow((state) => ({
       selectedImage: state.selectedImage,
       hasRenderedFirstFrame: state.hasRenderedFirstFrame,
-      setEditor: state.setEditor,
     })),
   );
 
@@ -431,11 +428,14 @@ function App() {
 
   useTauriListeners({
     invalidateThumbnailRevision,
+    openImagePath: handleImageSelectVoid,
     refreshAllFolderTrees: refreshAllFolderTreesVoid,
     refreshImageList: () => {
       void handleLibraryRefresh();
     },
     markGenerated,
+    resetToEmpty: handleGoHome,
+    resetToLibrary: handleBackToLibrary,
   });
 
   useSelectedFolderRefreshWatcher({
@@ -754,7 +754,7 @@ function App() {
   );
 }
 
-const AppWrapper = () => (
+export const AppWrapper = () => (
   <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} routerPush={(_to) => {}} routerReplace={(_to) => {}}>
     <ContextMenuProvider>
       <App />

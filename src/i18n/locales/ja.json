@@ -6,16 +6,20 @@
       "contrast": "コントラスト",
       "evShift": "露出補正",
       "exposure": "露光量",
+      "highlightRolloff": "ハイライトのロールオフ",
       "highlights": "ハイライト",
       "mappers": {
         "agx": "AgX",
         "agxDesc": "フィルム調トーンマッピング",
         "basic": "標準",
-        "basicDesc": "標準トーンマッピング"
+        "basicDesc": "標準トーンマッピング",
+        "rapidView": "Rapid View"
       },
       "reset": "リセット",
+      "shadowRolloff": "シャドウのロールオフ",
       "shadows": "シャドウ",
       "toneMapper": "トーンマッパー",
+      "viewContrast": "ビューコントラスト",
       "whites": "白レベル"
     },
     "color": {
@@ -1694,6 +1698,9 @@
       "exit": "Exit preview mode",
       "label": "Preview only"
     },
+    "provisionalCameraPreview": "カメラプレビュー — RAWを現像中",
+    "provisionalCameraPreviewFailed": "カメラプレビュー — RAW現像に失敗しました",
+    "provisionalLibraryPreview": "ライブラリプレビュー — RAWを現像中",
     "switcher": {
       "search": {
         "close": "Close panel search",
@@ -4132,7 +4139,8 @@
         "title": "画像の事前処理",
         "tonemapperOptions": {
           "agx": "AgX",
-          "basic": "標準"
+          "basic": "標準",
+          "rapidView": "Rapid View"
         },
         "tonemapperOverride": "グローバルトーンマッパー上書き",
         "tonemapperOverrideDesc": "すべての画像に対して指定したトーンマッパーを強制適用し、調整パネル内の切り替えスイッチを非表示にします。"

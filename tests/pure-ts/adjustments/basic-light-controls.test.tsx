@@ -7,7 +7,7 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import BasicAdjustments from '../../../src/components/adjustments/Basic';
 import en from '../../../src/i18n/locales/en.json';
-import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../../../src/utils/adjustments';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -57,6 +57,17 @@ test('tone mapper switching preserves tone values and exposes edited/reset state
   const mapperRow = getRequiredElement<HTMLDivElement>(container, '[data-testid="basic-tone-mapper"]');
   const agx = getRequiredElement<HTMLButtonElement>(mapperRow, '[role="radio"]:last-child');
 
+  expect(container.querySelector('[data-testid="rapid-view-controls"]')?.textContent).toContain('View contrast');
+  expect(container.querySelector('[data-testid="rapid-view-controls"]')?.textContent).toContain('Highlight roll-off');
+  expect(container.querySelector('[data-testid="rapid-view-controls"]')?.textContent).toContain('Shadow roll-off');
+  const contrastRange = getRequiredElement<HTMLInputElement>(container, '[data-testid="rapid-view-contrast-range"]');
+  await act(async () => {
+    contrastRange.value = '1.35';
+    contrastRange.dispatchEvent(new window.Event('input', { bubbles: true }));
+    await flushPromises();
+  });
+  expect(getAdjustments().viewTransform.contrast).toBe(1.35);
+
   await act(async () => {
     agx.click();
     await flushPromises();
@@ -64,13 +75,19 @@ test('tone mapper switching preserves tone values and exposes edited/reset state
 
   expect(getAdjustments()).toMatchObject({ brightness: 0.4, contrast: 18, exposure: 0.65, toneMapper: 'agx' });
   expect(mapperRow.dataset.modified).toBe('true');
+  expect(container.querySelector('[data-testid="rapid-view-controls"]')).toBeNull();
 
   await act(async () => {
     getRequiredElement<HTMLButtonElement>(mapperRow, '[data-testid="basic-tone-mapper-label"]').click();
     await flushPromises();
   });
 
-  expect(getAdjustments()).toMatchObject({ brightness: 0.4, contrast: 18, exposure: 0, toneMapper: 'basic' });
+  expect(getAdjustments()).toMatchObject({
+    brightness: 0.4,
+    contrast: 18,
+    exposure: 0.65,
+    toneMapper: 'rapidView',
+  });
   expect(mapperRow.dataset.modified).toBe('false');
 });
 
@@ -85,6 +102,25 @@ test('mask and forced tone-mapper contexts omit only the global process selector
   expect(
     overrideRender.container.querySelectorAll('[data-density="compact"][data-testid^="basic-control-"]'),
   ).toHaveLength(7);
+});
+
+test('legacy sidecars retain Basic while explicit Rapid View settings round-trip', () => {
+  expect(normalizeLoadedAdjustments({}).toneMapper).toBe('basic');
+
+  const reopened = normalizeLoadedAdjustments({
+    toneMapper: 'rapidView',
+    viewTransform: {
+      ...INITIAL_ADJUSTMENTS.viewTransform,
+      contrast: 1.37,
+      shoulder: 0.72,
+    },
+  });
+  expect(reopened.toneMapper).toBe('rapidView');
+  expect(reopened.viewTransform).toEqual({
+    ...INITIAL_ADJUSTMENTS.viewTransform,
+    contrast: 1.37,
+    shoulder: 0.72,
+  });
 });
 
 function BasicHarness({

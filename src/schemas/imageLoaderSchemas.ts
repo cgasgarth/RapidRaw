@@ -237,6 +237,22 @@ export const imageOpenSessionIdSchema = z
   })
   .strict();
 
+export const progressiveImageFrameReceiptSchema = z
+  .object({
+    colorAssumption: z.string().min(1),
+    frameGeneration: z.number().int().positive(),
+    height: z.number().int().nonnegative(),
+    imageSession: z.number().int().nonnegative(),
+    orientationApplied: z.boolean(),
+    provisionalReason: z.string().min(1).nullable(),
+    quality: z.enum(['embeddedProvisional', 'fastDeveloped', 'settledDeveloped']),
+    selectionGeneration: z.number().int().nonnegative(),
+    sourceKind: z.string().min(1),
+    sourceRevision: z.string().startsWith('source-revision-v1:'),
+    width: z.number().int().nonnegative(),
+  })
+  .strict();
+
 export const beginImageOpenRequestSchema = z
   .object({
     expectedCatalogRevision: z.number().int().nonnegative().nullable(),
@@ -272,13 +288,33 @@ export const imageOpenUpdateSchema = z.discriminatedUnion('phase', [
     .strict(),
   z
     .object({
+      imageId: z.string().min(1),
+      path: z.string().min(1),
+      phase: z.literal('fallbackFrameReady'),
+      receipt: progressiveImageFrameReceiptSchema,
+      sessionId: imageOpenSessionIdSchema,
+    })
+    .strict(),
+  z
+    .object({
       height: z.number().int().nonnegative(),
       imageId: z.string().min(1),
       isRaw: z.boolean(),
       path: z.string().min(1),
       phase: z.literal('decodeReady'),
+      receipt: progressiveImageFrameReceiptSchema,
       sessionId: imageOpenSessionIdSchema,
       width: z.number().int().nonnegative(),
+    })
+    .strict(),
+  z
+    .object({
+      dataUrl: z.string().startsWith('data:image/jpeg;base64,'),
+      imageId: z.string().min(1),
+      path: z.string().min(1),
+      phase: z.literal('frameReady'),
+      receipt: progressiveImageFrameReceiptSchema,
+      sessionId: imageOpenSessionIdSchema,
     })
     .strict(),
   z
@@ -296,6 +332,7 @@ export type LoadImageResult = z.infer<typeof loadImageResultSchema>;
 export type BeginImageOpenRequest = z.infer<typeof beginImageOpenRequestSchema>;
 export type BeginImageOpenResult = z.infer<typeof beginImageOpenResultSchema>;
 export type ImageOpenUpdate = z.infer<typeof imageOpenUpdateSchema>;
+export type ProgressiveImageFrameReceipt = z.infer<typeof progressiveImageFrameReceiptSchema>;
 export type RawCameraProfileProvenanceReceipt = z.infer<typeof rawCameraProfileProvenanceReceiptSchema>;
 export type RawDevelopmentReport = z.infer<typeof rawDevelopmentReportSchema>;
 

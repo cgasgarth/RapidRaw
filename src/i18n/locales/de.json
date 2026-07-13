@@ -6,16 +6,20 @@
       "contrast": "Kontrast",
       "evShift": "EV-Korrektur",
       "exposure": "Belichtung",
+      "highlightRolloff": "Lichter-Rolloff",
       "highlights": "Lichter",
       "mappers": {
         "agx": "AgX",
         "agxDesc": "Filmähnliches Tonemapping",
         "basic": "Standard",
-        "basicDesc": "Standard-Tonemapping"
+        "basicDesc": "Standard-Tonemapping",
+        "rapidView": "Rapid View"
       },
       "reset": "Zurücksetzen",
+      "shadowRolloff": "Schatten-Rolloff",
       "shadows": "Tiefen",
       "toneMapper": "Tonemapper",
+      "viewContrast": "Ansichtskontrast",
       "whites": "Weiß"
     },
     "color": {
@@ -1783,6 +1787,9 @@
       "exit": "Exit preview mode",
       "label": "Preview only"
     },
+    "provisionalCameraPreview": "Kameravorschau — RAW wird entwickelt",
+    "provisionalCameraPreviewFailed": "Kameravorschau — RAW-Entwicklung fehlgeschlagen",
+    "provisionalLibraryPreview": "Bibliotheksvorschau — RAW wird entwickelt",
     "switcher": {
       "search": {
         "close": "Close panel search",
@@ -4328,7 +4335,8 @@
         "title": "Bildvorverarbeitung",
         "tonemapperOptions": {
           "agx": "AgX",
-          "basic": "Standard"
+          "basic": "Standard",
+          "rapidView": "Rapid View"
         },
         "tonemapperOverride": "Globaler Tonemapper-Override",
         "tonemapperOverrideDesc": "Erzwingt einen spezifischen Tonemapper global für alle Bilder."

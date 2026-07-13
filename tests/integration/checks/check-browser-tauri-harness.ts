@@ -138,6 +138,12 @@ try {
     .getByRole('button', { name: /browser-harness\.ARW/u })
     .first()
     .dblclick();
+  const provisionalBadge = page.getByTestId('embedded-preview-provisional-badge');
+  await provisionalBadge.waitFor({ state: 'visible', timeout: 10_000 });
+  if (!(await provisionalBadge.textContent())?.includes('Camera preview')) {
+    throw new Error('Embedded RAW preview was not visibly labeled as provisional.');
+  }
+  await provisionalBadge.waitFor({ state: 'hidden', timeout: 10_000 });
   await page.getByRole('main', { name: 'Editor workspace' }).waitFor({ timeout: 10_000 });
   await page.getByRole('region', { name: 'Editor preview' }).waitFor({ timeout: 10_000 });
   await page.getByRole('region', { name: 'Image preview' }).waitFor({ timeout: 10_000 });
@@ -287,6 +293,10 @@ try {
     calls: window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.map((call) => call.command) ?? [],
     enabled: window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.enabled === true,
     hasTauriInternals: window.__TAURI_INTERNALS__ !== undefined,
+    startupRecords:
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+        .filter((call) => call.command === 'record_frontend_startup_phase')
+        .map((call) => call.args) ?? [],
   }));
   if (!harnessProof.enabled || !harnessProof.hasTauriInternals) {
     throw new Error('Browser Tauri harness was not installed.');
@@ -294,6 +304,9 @@ try {
   for (const requiredCommand of [
     'load_settings',
     'get_supported_file_types',
+    'frontend_ready',
+    'get_startup_trace',
+    'record_frontend_startup_phase',
     'plugin:dialog|open',
     'get_folder_tree',
     'begin_image_open',
@@ -302,6 +315,18 @@ try {
   ]) {
     if (!harnessProof.calls.includes(requiredCommand)) {
       throw new Error(`Browser Tauri harness did not record ${requiredCommand}.`);
+    }
+  }
+  const frontendReadyIndex = harnessProof.calls.indexOf('frontend_ready');
+  const getTraceIndex = harnessProof.calls.indexOf('get_startup_trace');
+  const firstPhaseIndex = harnessProof.calls.indexOf('record_frontend_startup_phase');
+  if (!(frontendReadyIndex < getTraceIndex && getTraceIndex < firstPhaseIndex)) {
+    throw new Error('Frontend startup phases were not correlated after native readiness and trace acquisition.');
+  }
+  const startupPhases = harnessProof.startupRecords.map((args) => args?.['phase']);
+  for (const expectedPhase of ['shellVisible', 'interactive', 'settingsHydrated', 'libraryReady']) {
+    if (!startupPhases.includes(expectedPhase)) {
+      throw new Error(`Browser Tauri harness did not record startup phase ${expectedPhase}.`);
     }
   }
   const actionableErrors = consoleErrors.filter(

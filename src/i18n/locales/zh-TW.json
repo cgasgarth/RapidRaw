@@ -6,16 +6,20 @@
       "contrast": "對比",
       "evShift": "EV 偏移",
       "exposure": "曝光",
+      "highlightRolloff": "高光滾降",
       "highlights": "亮部",
       "mappers": {
         "agx": "AgX",
         "agxDesc": "電影感色調映射",
         "basic": "基礎",
-        "basicDesc": "標準色調映射"
+        "basicDesc": "標準色調映射",
+        "rapidView": "Rapid View"
       },
       "reset": "重置",
+      "shadowRolloff": "陰影滾降",
       "shadows": "陰影",
       "toneMapper": "色調映射",
+      "viewContrast": "顯示對比",
       "whites": "白色"
     },
     "color": {
@@ -1677,6 +1681,9 @@
       "exit": "Exit preview mode",
       "label": "Preview only"
     },
+    "provisionalCameraPreview": "相機預覽 — 正在處理 RAW",
+    "provisionalCameraPreviewFailed": "相機預覽 — RAW 處理失敗",
+    "provisionalLibraryPreview": "圖庫預覽 — 正在處理 RAW",
     "switcher": {
       "search": {
         "close": "Close panel search",
@@ -3975,7 +3982,8 @@
         "title": "影像預處理",
         "tonemapperOptions": {
           "agx": "AgX",
-          "basic": "基礎"
+          "basic": "基礎",
+          "rapidView": "Rapid View"
         },
         "tonemapperOverride": "全域色調映射覆蓋",
         "tonemapperOverrideDesc": "為所有影像全域強制使用特定的色調映射器，從調整面板中隱藏色調映射器開關。"

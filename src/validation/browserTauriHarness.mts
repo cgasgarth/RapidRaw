@@ -64,6 +64,8 @@ const commandNames: Record<
   | 'clearSessionCaches'
   | 'exportImages'
   | 'frontendReady'
+  | 'getStartupTrace'
+  | 'recordFrontendStartupPhase'
   | 'generateOriginalTransformedPreview'
   | 'generateUncroppedPreview'
   | 'generatePreviewForPath'
@@ -71,6 +73,7 @@ const commandNames: Record<
   | 'applyLibraryCatalogChanges'
   | 'getLensfunMakers'
   | 'getLogFilePath'
+  | 'getNativeCapabilities'
   | 'getAlbumImages'
   | 'getFolderTree'
   | 'getFolderRefreshSnapshot'
@@ -108,11 +111,14 @@ const commandNames: Record<
   clearSessionCaches: Invokes.ClearSessionCaches,
   exportImages: Invokes.ExportImages,
   frontendReady: Invokes.FrontendReady,
+  getStartupTrace: Invokes.GetStartupTrace,
+  recordFrontendStartupPhase: Invokes.RecordFrontendStartupPhase,
   generateOriginalTransformedPreview: Invokes.GenerateOriginalTransformedPreview,
   generateUncroppedPreview: Invokes.GenerateUncroppedPreview,
   generatePreviewForPath: Invokes.GeneratePreviewForPath,
   getLensfunMakers: Invokes.GetLensfunMakers,
   getLogFilePath: Invokes.GetLogFilePath,
+  getNativeCapabilities: Invokes.GetNativeCapabilities,
   getAlbumImages: Invokes.GetAlbumImages,
   getFolderTree: Invokes.GetFolderTree,
   getFolderRefreshSnapshot: Invokes.GetFolderRefreshSnapshot,
@@ -205,6 +211,14 @@ export const installBrowserTauriHarness = (): void => {
 
 const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unknown>): Promise<unknown> => {
   switch (command) {
+    case commandNames.getNativeCapabilities:
+      return Promise.resolve({
+        schemaVersion: 1,
+        buildProfile: 'full',
+        ai: true,
+        advancedCodecs: true,
+        computational: true,
+      });
     case commandNames.loadSettings:
       harnessSettings = readPersistedHarnessSettings();
       return Promise.resolve(harnessSettings);
@@ -253,14 +267,38 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
         metadata: { adjustments: null, harness: true },
         width: agentAuditE2eEnabled ? 4 : 1024,
       };
-      return Promise.resolve({
-        decodeReadyMillis: 2,
-        decoded,
+      dispatchBrowserHarnessEvent('image-open-update', {
+        dataUrl: `data:image/jpeg;base64,${harnessPreviewJpegBase64}`,
         imageId: request.imageId ?? request.path ?? 'browser-harness-image',
-        joinedPrefetch: false,
-        metadataFingerprint: '0'.repeat(64),
-        metadataReadyMillis: 1,
+        path: request.path ?? '/tmp/rawengine-browser-harness/image.raw',
+        phase: 'frameReady',
+        receipt: {
+          colorAssumption: 'encoded_srgb_vendor_preview',
+          frameGeneration: 1,
+          height: decoded.height,
+          imageSession: request.sessionId?.imageSession ?? 0,
+          orientationApplied: false,
+          provisionalReason: 'camera-rendered latency bridge; not authoritative pixels',
+          quality: 'embeddedProvisional',
+          selectionGeneration: request.sessionId?.selectionGeneration ?? 0,
+          sourceKind: 'browser_harness_raw',
+          sourceRevision: `source-revision-v1:${'0'.repeat(64)}`,
+          width: decoded.width,
+        },
         sessionId: request.sessionId ?? { imageSession: 0, selectionGeneration: 0 },
+      });
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          resolve({
+            decodeReadyMillis: 250,
+            decoded,
+            imageId: request.imageId ?? request.path ?? 'browser-harness-image',
+            joinedPrefetch: false,
+            metadataFingerprint: '0'.repeat(64),
+            metadataReadyMillis: 1,
+            sessionId: request.sessionId ?? { imageSession: 0, selectionGeneration: 0 },
+          });
+        }, 250);
       });
     }
     case commandNames.scheduleImagePrefetch:
@@ -345,6 +383,39 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
       return Promise.resolve(null);
     case commandNames.getSupportedFileTypes:
       return Promise.resolve(harnessSupportedTypes);
+    case commandNames.getStartupTrace:
+      return Promise.resolve({
+        criticalPathOrderValid: true,
+        firstPaintBudgetMet: true,
+        firstPaintBudgetMs: 750,
+        processId: 12_345,
+        traceId: 'startup:browser-harness',
+        phases: [],
+      });
+    case commandNames.recordFrontendStartupPhase: {
+      const receiptPhase = {
+        editorReady: 'frontendEditorReady',
+        interactive: 'frontendInteractive',
+        libraryReady: 'frontendLibraryReady',
+        settingsHydrated: 'frontendSettingsHydrated',
+        shellVisible: 'frontendShellVisible',
+      }[String(args?.['phase'])];
+      return Promise.resolve({
+        criticalPathOrderValid: true,
+        firstPaintBudgetMet: true,
+        firstPaintBudgetMs: 750,
+        processId: 12_345,
+        traceId: 'startup:browser-harness',
+        phases: [
+          {
+            detail: args?.['detail'] ?? null,
+            elapsedMs: 10,
+            phase: receiptPhase,
+            status: args?.['status'],
+          },
+        ],
+      });
+    }
     case commandNames.getFolderTree:
       return Promise.resolve({
         children: [],

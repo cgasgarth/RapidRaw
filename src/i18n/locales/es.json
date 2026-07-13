@@ -6,16 +6,20 @@
       "contrast": "Contraste",
       "evShift": "Compensación EV",
       "exposure": "Exposición",
+      "highlightRolloff": "Transición de luces",
       "highlights": "Iluminaciones",
       "mappers": {
         "agx": "AgX",
         "agxDesc": "Mapeo de tonos estilo película",
         "basic": "Básico",
-        "basicDesc": "Mapeo de tonos estándar"
+        "basicDesc": "Mapeo de tonos estándar",
+        "rapidView": "Rapid View"
       },
       "reset": "Restablecer",
+      "shadowRolloff": "Transición de sombras",
       "shadows": "Sombras",
       "toneMapper": "Mapeador de tonos",
+      "viewContrast": "Contraste de vista",
       "whites": "Blancos"
     },
     "color": {
@@ -1770,6 +1774,9 @@
       "exit": "Exit preview mode",
       "label": "Preview only"
     },
+    "provisionalCameraPreview": "Vista previa de cámara — revelando RAW",
+    "provisionalCameraPreviewFailed": "Vista previa de cámara — falló el revelado RAW",
+    "provisionalLibraryPreview": "Vista previa de biblioteca — revelando RAW",
     "switcher": {
       "search": {
         "close": "Close panel search",
@@ -4305,7 +4312,8 @@
         "title": "Preprocesamiento de imágenes",
         "tonemapperOptions": {
           "agx": "AgX",
-          "basic": "Básico"
+          "basic": "Básico",
+          "rapidView": "Rapid View"
         },
         "tonemapperOverride": "Anulación global del mapeador de tonos",
         "tonemapperOverrideDesc": "Forzar un mapeador de tonos específico a nivel global para todas las imágenes, ocultando el interruptor del mapeador del panel de ajustes."
