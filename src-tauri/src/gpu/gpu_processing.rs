@@ -439,12 +439,27 @@ struct MainBindGroupKey {
     lut: Option<LutTextureKey>,
     blur_flags: u32,
     flare_enabled: bool,
+    scene_curve: u64,
+    output_curve: u64,
     abi_version: u32,
 }
 
 struct CachedMainBindGroup {
     key: MainBindGroupKey,
     bind_group: wgpu::BindGroup,
+}
+
+fn curve_gpu_payload(plan: Option<&crate::tone::curves::CompiledCurvePlanV1>) -> Vec<f32> {
+    plan.map_or_else(
+        || {
+            let mut payload = vec![0.0; crate::tone::curves::CURVE_GPU_HEADER_FLOATS + 2];
+            payload[5] = 1.0;
+            payload[6] = 2.0;
+            payload[crate::tone::curves::CURVE_GPU_HEADER_FLOATS + 1] = 1.0;
+            payload
+        },
+        crate::tone::curves::CompiledCurvePlanV1::gpu_storage_payload,
+    )
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -722,6 +737,8 @@ const MAIN_BINDING_CLARITY_BLUR: u32 = MAIN_BINDING_TONAL_BLUR + 1;
 const MAIN_BINDING_STRUCTURE_BLUR: u32 = MAIN_BINDING_CLARITY_BLUR + 1;
 const MAIN_BINDING_FLARE_TEXTURE: u32 = MAIN_BINDING_STRUCTURE_BLUR + 1;
 const MAIN_BINDING_FLARE_SAMPLER: u32 = MAIN_BINDING_FLARE_TEXTURE + 1;
+const MAIN_BINDING_SCENE_CURVE: u32 = MAIN_BINDING_FLARE_SAMPLER + 1;
+const MAIN_BINDING_OUTPUT_CURVE: u32 = MAIN_BINDING_SCENE_CURVE + 1;
 
 // Keep these Rust bindings in sync with blur.wgsl and flare.wgsl.
 const BLUR_BINDING_INPUT_TEXTURE: u32 = 0;
@@ -1221,6 +1238,18 @@ impl GpuProcessor {
             ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
             count: None,
         });
+        for binding in [MAIN_BINDING_SCENE_CURVE, MAIN_BINDING_OUTPUT_CURVE] {
+            bind_group_layout_entries.push(wgpu::BindGroupLayoutEntry {
+                binding,
+                visibility: wgpu::ShaderStages::COMPUTE,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Storage { read_only: true },
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            });
+        }
 
         let main_bgl = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Main BGL"),
@@ -1581,11 +1610,27 @@ impl GpuProcessor {
             .as_ref()
             .map_or(&self.dummy_lut_view, |entry| &entry.view);
 
-        let mut adjustments = match &request.edit_graph {
-            EditGraphExecutionAuthority::Compiled(edit_graph) => edit_graph.shader_abi(),
+        let (mut adjustments, scene_curve, output_curve) = match &request.edit_graph {
+            EditGraphExecutionAuthority::Compiled(edit_graph) => (
+                edit_graph.shader_abi(),
+                edit_graph.scene_curve_plan(),
+                edit_graph.output_curve_plan(),
+            ),
             #[cfg(all(test, feature = "tauri-test"))]
-            EditGraphExecutionAuthority::TestOnlyLegacy => request.adjustments,
+            EditGraphExecutionAuthority::TestOnlyLegacy => (request.adjustments, None, None),
         };
+        let scene_curve_payload = curve_gpu_payload(scene_curve);
+        let output_curve_payload = curve_gpu_payload(output_curve);
+        let scene_curve_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Scene Curve LUT V1"),
+            contents: bytemuck::cast_slice(&scene_curve_payload),
+            usage: wgpu::BufferUsages::STORAGE,
+        });
+        let output_curve_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Output Curve LUT V1"),
+            contents: bytemuck::cast_slice(&output_curve_payload),
+            usage: wgpu::BufferUsages::STORAGE,
+        });
         let graph = compile_gpu_render_graph(
             &adjustments,
             request.lut.is_some(),
@@ -1987,6 +2032,14 @@ impl GpuProcessor {
                     binding: MAIN_BINDING_FLARE_SAMPLER,
                     resource: wgpu::BindingResource::Sampler(&self.flare_sampler),
                 });
+                bind_group_entries.push(wgpu::BindGroupEntry {
+                    binding: MAIN_BINDING_SCENE_CURVE,
+                    resource: scene_curve_buffer.as_entire_binding(),
+                });
+                bind_group_entries.push(wgpu::BindGroupEntry {
+                    binding: MAIN_BINDING_OUTPUT_CURVE,
+                    resource: output_curve_buffer.as_entire_binding(),
+                });
 
                 let bind_group_key = MainBindGroupKey {
                     device_generation,
@@ -1999,6 +2052,8 @@ impl GpuProcessor {
                         | (u32::from(did_create_clarity_blur) * BLUR_FLAG_CLARITY)
                         | (u32::from(did_create_structure_blur) * BLUR_FLAG_STRUCTURE),
                     flare_enabled: use_flare,
+                    scene_curve: scene_curve.map_or(0, |curve| curve.fingerprint),
+                    output_curve: output_curve.map_or(0, |curve| curve.fingerprint),
                     abi_version: MAIN_BIND_GROUP_ABI_VERSION + u32::from(split_scene_view_display),
                 };
                 let bind_group = {
@@ -2934,6 +2989,93 @@ mod blur_pass_tests {
         assert!(v2[0] > 1.0, "v2 red should retain over-range: {v2:?}");
         assert!(v2[2] < 0.0, "v2 blue should retain negative values: {v2:?}");
         assert_ne!(legacy, v2);
+    }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
+    fn professional_scene_and_output_curves_match_cpu_on_the_real_gpu_path() {
+        use image::{DynamicImage, ImageBuffer, Rgba};
+        use serde_json::json;
+        use tauri::Manager;
+
+        let _test_guard = GPU_TEST_LOCK.lock().unwrap();
+        let source = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(8, 2, |x, _| {
+            let value = 0.03 + x as f32 * 0.18;
+            Rgba([value, value * 0.72, value * 0.38, 1.0])
+        }));
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock Tauri app builds");
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state)
+            .expect("compute-only GPU context initializes");
+        let raw = json!({
+            "rawEngineEditGraphVersion": 2,
+            "sceneCurve": {
+                "enabled": true,
+                "channelMode": "luminance_preserving",
+                "middleGrey": 0.18,
+                "points": [{"xEv": -16, "yEv": -16}, {"xEv": 0, "yEv": 0}, {"xEv": 3, "yEv": 2.2}, {"xEv": 16, "yEv": 14}]
+            },
+            "outputCurve": {
+                "enabled": true,
+                "domain": "view_encoded",
+                "channelMode": "linked_rgb",
+                "points": [{"x": 0, "y": 0}, {"x": 0.5, "y": 0.42}, {"x": 1, "y": 1}]
+            }
+        });
+        let plan = crate::render_plan::compile_render_plan(
+            &raw,
+            crate::render_plan::CompileRenderPlanContext {
+                revision: crate::render_plan::content_revision(&raw, 91, 92, 93),
+                is_raw: false,
+                tonemapper_override: Some(0),
+            },
+            None,
+        )
+        .unwrap();
+        let cpu = crate::cpu_edit_graph::execute_cpu_edit_graph(
+            &source,
+            &plan.adjustments,
+            &[],
+            None,
+            &plan.edit_graph,
+        )
+        .unwrap()
+        .to_rgba32f();
+        let gpu = process_and_get_unclamped_dynamic_image(
+            &context,
+            &state,
+            &source,
+            PreGpuImageIdentity::for_source(&source, "professional_curves_gpu"),
+            RenderRequest {
+                adjustments: plan.adjustments,
+                mask_bitmaps: &[],
+                lut: None,
+                roi: None,
+                edit_graph: EditGraphExecutionAuthority::Compiled(Arc::clone(&plan.edit_graph)),
+            },
+            "professional_curves_gpu",
+        )
+        .unwrap()
+        .to_rgba32f();
+        for (cpu_pixel, gpu_pixel) in cpu.pixels().zip(gpu.pixels()) {
+            for channel in 0..3 {
+                assert!(
+                    (cpu_pixel[channel] - gpu_pixel[channel]).abs() <= 0.012,
+                    "curve CPU/GPU channel {channel}: cpu={cpu_pixel:?} gpu={gpu_pixel:?}"
+                );
+            }
+        }
+        assert!(plan.edit_graph.nodes.iter().any(|node| {
+            node.kind == crate::edit_graph::EditNodeKind::SceneCurve
+                && node.wgpu_implementation == Some("shader_wgsl_scene_curve_lut_v1")
+        }));
+        assert!(plan.edit_graph.nodes.iter().any(|node| {
+            node.kind == crate::edit_graph::EditNodeKind::OutputCurve
+                && node.wgpu_implementation == Some("shader_wgsl_output_curve_lut_v1")
+        }));
     }
 
     #[cfg(feature = "tauri-test")]

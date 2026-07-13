@@ -17,6 +17,7 @@ import { useContextMenu } from '../../context/ContextMenuContext';
 import { ActiveChannel, type Adjustments, type Coord, type ParametricCurveSettings } from '../../utils/adjustments';
 import { OPTION_SEPARATOR, Theme } from '../ui/AppProperties';
 import AdjustmentSlider from './AdjustmentSlider';
+import ProfessionalCurves from './ProfessionalCurves';
 
 let curveClipboard: Array<Coord> | null = null;
 let parametricClipboard: ParametricCurveSettings | null = null;
@@ -396,6 +397,7 @@ export default function CurveGraph({
   adjustments,
   setAdjustments,
   histogram,
+  isForMask,
   theme,
   onDragStateChange,
 }: CurveGraphProps) {
@@ -967,6 +969,14 @@ export default function CurveGraph({
 
   return (
     <div className="select-none touch-none pt-1" ref={containerRef} data-testid="curves-editor">
+      {!isForMask && (
+        <ProfessionalCurves
+          adjustments={adjustments}
+          histogram={histogram}
+          onDragStateChange={onDragStateChange}
+          setAdjustments={setAdjustments}
+        />
+      )}
       <div className="mb-1.5 flex items-center gap-1">
         <div
           className="flex min-w-0 flex-1 items-center rounded bg-surface-secondary p-0.5"

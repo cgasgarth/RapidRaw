@@ -250,6 +250,7 @@
       }
     },
     "curves": {
+      "channelMode": "",
       "channels": {
         "blue": "ブルー",
         "green": "グリーン",
@@ -260,6 +261,10 @@
       "copyParametric": "{{channel}} パラメトリックカーブをコピー",
       "copyPoint": "{{channel}} ポイントカーブをコピー",
       "curveDataUnavailable": "カーブデータがありません。",
+      "output": {
+        "hdrRange": "",
+        "title": ""
+      },
       "parametricCurve": "パラメトリックカーブ",
       "params": {
         "blackLevel": "黒レベル",
@@ -276,7 +281,11 @@
       "resetAllParametric": "すべてのパラメトリックカーブをリセット",
       "resetAllPoint": "すべてのポイントカーブをリセット",
       "resetParametric": "{{channel}} パラメトリックカーブをリセット",
-      "resetPoint": "{{channel}} ポイントカーブをリセット"
+      "resetPoint": "{{channel}} ポイントカーブをリセット",
+      "scene": {
+        "title": ""
+      },
+      "targeted": ""
     },
     "details": {
       "amount": "",
@@ -376,6 +385,10 @@
       "size": "サイズ",
       "vignette": "周辺光量補正"
     }
+  },
+  "common": {
+    "delete": "",
+    "reset": ""
   },
   "contextMenus": {
     "album": {

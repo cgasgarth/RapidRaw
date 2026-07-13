@@ -271,6 +271,7 @@
       }
     },
     "curves": {
+      "channelMode": "",
       "channels": {
         "blue": "Niebieski",
         "green": "Zielony",
@@ -281,6 +282,10 @@
       "copyParametric": "Kopiuj krzywą parametryczną ({{channel}})",
       "copyPoint": "Kopiuj krzywą punktową ({{channel}})",
       "curveDataUnavailable": "Dane krzywej są niedostępne.",
+      "output": {
+        "hdrRange": "",
+        "title": ""
+      },
       "parametricCurve": "Krzywa parametryczna",
       "params": {
         "blackLevel": "Poziom czerni",
@@ -297,7 +302,11 @@
       "resetAllParametric": "Resetuj wszystkie krzywe parametryczne",
       "resetAllPoint": "Resetuj wszystkie krzywe punktowe",
       "resetParametric": "Resetuj krzywą parametryczną ({{channel}})",
-      "resetPoint": "Resetuj krzywą punktową ({{channel}})"
+      "resetPoint": "Resetuj krzywą punktową ({{channel}})",
+      "scene": {
+        "title": ""
+      },
+      "targeted": ""
     },
     "details": {
       "amount": "Ilość",
@@ -412,6 +421,10 @@
       "size": "Rozmiar",
       "vignette": "Winieta"
     }
+  },
+  "common": {
+    "delete": "",
+    "reset": ""
   },
   "contextMenus": {
     "album": {

@@ -12,6 +12,7 @@ use crate::adjustments::abi::{
     ColorCalibrationSettings, ColorGradeSettings, GpuMat3, HslColor, LevelsSettings,
     MaskAdjustments, Point,
 };
+use crate::tone::curves::{CompiledCurvePlanV1, CurveDomain as ToneCurveDomain};
 
 pub const EDIT_GRAPH_SCHEMA_VERSION: u32 = 1;
 pub const LEGACY_PIPELINE_VERSION: u32 = 1;
@@ -84,8 +85,10 @@ pub enum EditNodeKind {
     GeometryRetouch,
     PreGpuSpatialDetail,
     SceneGlobalColorTone,
+    SceneCurve,
     LocalSceneComposition,
     SceneToViewTransform,
+    OutputCurve,
     DisplayCreative,
     LegacyGpuSceneViewPass,
     ClippingOverlay,
@@ -99,8 +102,10 @@ impl EditNodeKind {
             Self::GeometryRetouch => "geometry_retouch",
             Self::PreGpuSpatialDetail => "pre_gpu_spatial_detail",
             Self::SceneGlobalColorTone => "scene_global_color_tone",
+            Self::SceneCurve => "scene_curve_v1",
             Self::LocalSceneComposition => "local_scene_composition",
             Self::SceneToViewTransform => "scene_to_view_transform",
+            Self::OutputCurve => "output_curve_v1",
             Self::DisplayCreative => "display_creative",
             Self::LegacyGpuSceneViewPass => "legacy_gpu_scene_view_pass",
             Self::ClippingOverlay => "clipping_overlay",
@@ -146,8 +151,10 @@ pub enum CompiledNodePayload {
     PreGpuSpatialDetail { detail_fingerprint: u64 },
     LegacyShaderAbi(Box<AllAdjustments>),
     SceneGlobal(Box<SceneGlobalPayload>),
+    SceneCurve(Arc<CompiledCurvePlanV1>),
     LocalScene(LocalScenePayload),
     ViewTransform(ViewTransformPayload),
+    OutputCurve(Arc<CompiledCurvePlanV1>),
     DisplayCreative(Box<DisplayCreativePayload>),
     ClippingOverlay { enabled: bool },
     RenderTransport { output_fingerprint: u64 },
@@ -161,8 +168,10 @@ impl CompiledNodePayload {
             Self::PreGpuSpatialDetail { .. } => "pre_gpu_spatial_detail_v1",
             Self::LegacyShaderAbi(_) => "legacy_all_adjustments_shader_abi_v1",
             Self::SceneGlobal(_) => "scene_global_typed_v2",
+            Self::SceneCurve(_) => "scene_curve_plan_v1",
             Self::LocalScene(_) => "local_scene_typed_v2",
             Self::ViewTransform(_) => "view_transform_typed_v2",
+            Self::OutputCurve(_) => "output_curve_plan_v1",
             Self::DisplayCreative(_) => "display_creative_typed_v2",
             Self::ClippingOverlay { .. } => "clipping_overlay_v1",
             Self::RenderTransport { .. } => "render_transport_v1",
@@ -185,8 +194,10 @@ impl CompiledNodePayload {
                     EditNodeKind::LegacyGpuSceneViewPass
                 )
                 | (Self::SceneGlobal(_), EditNodeKind::SceneGlobalColorTone)
+                | (Self::SceneCurve(_), EditNodeKind::SceneCurve)
                 | (Self::LocalScene(_), EditNodeKind::LocalSceneComposition)
                 | (Self::ViewTransform(_), EditNodeKind::SceneToViewTransform)
+                | (Self::OutputCurve(_), EditNodeKind::OutputCurve)
                 | (Self::DisplayCreative(_), EditNodeKind::DisplayCreative)
                 | (Self::ClippingOverlay { .. }, EditNodeKind::ClippingOverlay)
                 | (Self::RenderTransport { .. }, EditNodeKind::RenderTransport)
@@ -231,6 +242,7 @@ impl CompiledNodePayload {
                 "gradingBlending": scene.grading_blending,
                 "gradingBalance": scene.grading_balance,
             }),
+            Self::SceneCurve(curve) | Self::OutputCurve(curve) => curve_diagnostic(curve),
             Self::LocalScene(local) => serde_json::json!({
                 "layerCount": local.layers.len(),
                 "layers": local.layers.iter().map(LocalSceneLayerPayload::diagnostic).collect::<Vec<_>>(),
@@ -271,6 +283,21 @@ impl CompiledNodePayload {
         }
         u64::from_le_bytes(hasher.finalize().as_bytes()[..8].try_into().unwrap())
     }
+}
+
+fn curve_diagnostic(curve: &CompiledCurvePlanV1) -> serde_json::Value {
+    let domain = match &curve.domain {
+        ToneCurveDomain::SceneLog2Ev => "scene_log2_ev",
+        ToneCurveDomain::ViewEncoded => "view_encoded",
+        ToneCurveDomain::OutputEncoded { .. } => "output_encoded",
+    };
+    serde_json::json!({
+        "domain": domain,
+        "implementationVersion": curve.implementation_version,
+        "pointCount": curve.points.len(),
+        "lutSize": curve.lut.len(),
+        "fingerprint": format!("{:016x}", curve.fingerprint),
+    })
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -502,6 +529,8 @@ pub struct EditGraphCompileInputs<'a> {
     pub output_fingerprint: u64,
     pub adjustments: &'a AllAdjustments,
     pub neutral_adjustments: &'a AllAdjustments,
+    pub scene_curve: Option<&'a Arc<CompiledCurvePlanV1>>,
+    pub output_curve: Option<&'a Arc<CompiledCurvePlanV1>>,
     pub has_geometry_or_retouch: bool,
     pub has_detail: bool,
     pub has_masks: bool,
@@ -622,6 +651,26 @@ impl CompiledEditGraph {
             } else {
                 omitted.push(EditNodeKind::SceneGlobalColorTone.stable_id());
             }
+            if let Some(curve) = inputs.scene_curve {
+                nodes.push(node(
+                    EditNodeKind::SceneCurve,
+                    ColorDomain::AcesCgSceneLinearExtended,
+                    ColorDomain::AcesCgSceneLinearExtended,
+                    EditStageClass::SceneCreative,
+                    ValueRangePolicy::PreserveFiniteExtended,
+                    SpatialSupport::Pointwise,
+                    LocalAdjustmentPolicy::GlobalOnly,
+                    NodeDependencies {
+                        adjustments: true,
+                        ..NodeDependencies::default()
+                    },
+                    Some("scene_curve_cpu_v1"),
+                    Some("shader_wgsl_scene_curve_lut_v1"),
+                    curve.fingerprint,
+                ));
+            } else {
+                omitted.push(EditNodeKind::SceneCurve.stable_id());
+            }
             if inputs.has_masks {
                 nodes.push(node(
                     EditNodeKind::LocalSceneComposition,
@@ -661,6 +710,27 @@ impl CompiledEditGraph {
                 Some("shader_wgsl_view_display_phase_v2"),
                 inputs.output_fingerprint,
             ));
+            if let Some(curve) = inputs.output_curve {
+                nodes.push(node(
+                    EditNodeKind::OutputCurve,
+                    ColorDomain::ViewEncoded,
+                    ColorDomain::ViewEncoded,
+                    EditStageClass::DisplayAdjustment,
+                    ValueRangePolicy::PreserveFiniteExtended,
+                    SpatialSupport::Pointwise,
+                    LocalAdjustmentPolicy::GlobalOnly,
+                    NodeDependencies {
+                        adjustments: true,
+                        output: true,
+                        ..NodeDependencies::default()
+                    },
+                    Some("output_curve_cpu_v1"),
+                    Some("shader_wgsl_output_curve_lut_v1"),
+                    curve.fingerprint,
+                ));
+            } else {
+                omitted.push(EditNodeKind::OutputCurve.stable_id());
+            }
             if display_creative_active(
                 inputs.adjustments,
                 inputs.neutral_adjustments,
@@ -792,6 +862,8 @@ impl CompiledEditGraph {
             has_user_edits: inputs.has_geometry_or_retouch
                 || inputs.has_detail
                 || gpu_adjustments_active
+                || inputs.scene_curve.is_some()
+                || inputs.output_curve.is_some()
                 || inputs.show_clipping
                 // Choosing the scene-referred process is itself a persisted,
                 // render-authoritative edit even when every numeric control is
@@ -821,6 +893,20 @@ impl CompiledEditGraph {
 
     pub fn shader_abi(&self) -> AllAdjustments {
         self.compiled_shader_abi
+    }
+
+    pub fn scene_curve_plan(&self) -> Option<&CompiledCurvePlanV1> {
+        self.nodes.iter().find_map(|node| match &node.payload {
+            CompiledNodePayload::SceneCurve(curve) => Some(curve.as_ref()),
+            _ => None,
+        })
+    }
+
+    pub fn output_curve_plan(&self) -> Option<&CompiledCurvePlanV1> {
+        self.nodes.iter().find_map(|node| match &node.payload {
+            CompiledNodePayload::OutputCurve(curve) => Some(curve.as_ref()),
+            _ => None,
+        })
     }
 
     pub fn validate_gpu_execution(
@@ -1048,6 +1134,11 @@ fn compile_node_payload(
                 grading_balance: global.color_grading_balance,
             }))
         }
+        EditNodeKind::SceneCurve => CompiledNodePayload::SceneCurve(Arc::clone(
+            inputs
+                .scene_curve
+                .expect("scene curve node requires a plan"),
+        )),
         EditNodeKind::LocalSceneComposition => CompiledNodePayload::LocalScene(LocalScenePayload {
             layers: inputs.adjustments.mask_adjustments[..inputs.adjustments.mask_count as usize]
                 .iter()
@@ -1069,6 +1160,11 @@ fn compile_node_payload(
                 ],
             })
         }
+        EditNodeKind::OutputCurve => CompiledNodePayload::OutputCurve(Arc::clone(
+            inputs
+                .output_curve
+                .expect("output curve node requires a plan"),
+        )),
         EditNodeKind::DisplayCreative => {
             CompiledNodePayload::DisplayCreative(Box::new(DisplayCreativePayload {
                 curves: [

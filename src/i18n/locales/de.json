@@ -271,6 +271,7 @@
       }
     },
     "curves": {
+      "channelMode": "",
       "channels": {
         "blue": "Blau",
         "green": "Grün",
@@ -281,6 +282,10 @@
       "copyParametric": "Parametrische {{channel}}-Kurve kopieren",
       "copyPoint": "Punktkurve ({{channel}}) kopieren",
       "curveDataUnavailable": "Kurvendaten nicht verfügbar.",
+      "output": {
+        "hdrRange": "",
+        "title": ""
+      },
       "parametricCurve": "Parametrische Kurve",
       "params": {
         "blackLevel": "Schwarzpunkt",
@@ -297,7 +302,11 @@
       "resetAllParametric": "Alle parametrischen Kurven zurücksetzen",
       "resetAllPoint": "Alle Punktkurven zurücksetzen",
       "resetParametric": "Parametrische {{channel}}-Kurve zurücksetzen",
-      "resetPoint": "Punktkurve ({{channel}}) zurücksetzen"
+      "resetPoint": "Punktkurve ({{channel}}) zurücksetzen",
+      "scene": {
+        "title": ""
+      },
+      "targeted": ""
     },
     "details": {
       "amount": "Betrag",
@@ -406,6 +415,10 @@
       "size": "Größe",
       "vignette": "Vignettierung"
     }
+  },
+  "common": {
+    "delete": "",
+    "reset": ""
   },
   "contextMenus": {
     "album": {

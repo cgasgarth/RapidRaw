@@ -308,9 +308,112 @@ const BLACK_WHITE_MIXER_RANGE_WIDTHS: array<f32, 8> = array<f32, 8>(
 
 @group(0) @binding(10) var flare_texture: texture_2d<f32>;
 @group(0) @binding(11) var flare_sampler: sampler;
+@group(0) @binding(12) var<storage, read> scene_curve: array<f32>;
+@group(0) @binding(13) var<storage, read> output_curve: array<f32>;
 
 const ACESCG_LUMINANCE_COEFF = vec3<f32>(0.27222872, 0.67408174, 0.05368952);
 const VIEW_ENCODED_LUMA_COEFF = vec3<f32>(0.2126, 0.7152, 0.0722);
+const CURVE_HEADER_FLOATS: u32 = 20u;
+
+fn curve_finite(value: f32) -> bool {
+    return value == value && abs(value) <= 3.402823e38;
+}
+
+fn curve_data(curve_id: u32, index: u32) -> f32 {
+    if (curve_id == 0u) {
+        return scene_curve[index];
+    }
+    return output_curve[index];
+}
+
+fn curve_extrapolate(curve_id: u32, x: f32, high: bool) -> f32 {
+    let base = select(8u, 11u, high);
+    let mode_base = select(14u, 16u, high);
+    let point_x = curve_data(curve_id, base);
+    let point_y = curve_data(curve_id, base + 1u);
+    let tangent = curve_data(curve_id, base + 2u);
+    let mode = u32(curve_data(curve_id, mode_base));
+    let distance = x - point_x;
+    if (mode == 1u) {
+        return point_y;
+    }
+    if (mode == 2u) {
+        let strength = max(curve_data(curve_id, mode_base + 1u), 0.000001);
+        return point_y + tangent * sign(distance) * log(1.0 + abs(distance) * strength) / strength;
+    }
+    return point_y + tangent * distance;
+}
+
+fn evaluate_compiled_curve(curve_id: u32, x: f32) -> f32 {
+    if (!curve_finite(x)) {
+        return x;
+    }
+    let first_x = curve_data(curve_id, 8u);
+    let last_x = curve_data(curve_id, 11u);
+    if (x < first_x) {
+        return curve_extrapolate(curve_id, x, false);
+    }
+    if (x > last_x) {
+        return curve_extrapolate(curve_id, x, true);
+    }
+    let lut_min = curve_data(curve_id, 4u);
+    let lut_max = curve_data(curve_id, 5u);
+    let lut_length = u32(curve_data(curve_id, 6u));
+    let normalized = clamp((x - lut_min) / (lut_max - lut_min), 0.0, 1.0);
+    let position = normalized * f32(lut_length - 1u);
+    let left = u32(floor(position));
+    let right = min(left + 1u, lut_length - 1u);
+    return mix(
+        curve_data(curve_id, CURVE_HEADER_FLOATS + left),
+        curve_data(curve_id, CURVE_HEADER_FLOATS + right),
+        position - f32(left),
+    );
+}
+
+fn apply_scene_curve_channel(curve_id: u32, channel: f32) -> f32 {
+    if (channel <= 0.0) {
+        return channel;
+    }
+    let middle_grey = curve_data(curve_id, 3u);
+    let ev = log2(channel / middle_grey);
+    return middle_grey * exp2(evaluate_compiled_curve(curve_id, ev));
+}
+
+fn apply_compiled_curve(curve_id: u32, rgb: vec3<f32>) -> vec3<f32> {
+    if (curve_data(curve_id, 0u) < 0.5 || !curve_finite(rgb.r) || !curve_finite(rgb.g) || !curve_finite(rgb.b)) {
+        return rgb;
+    }
+    let domain = u32(curve_data(curve_id, 1u));
+    let mode = u32(curve_data(curve_id, 2u));
+    if (domain == 0u && mode == 0u) {
+        let luminance = dot(rgb, ACESCG_LUMINANCE_COEFF);
+        if (luminance <= 0.000000000001) {
+            return rgb;
+        }
+        let reference = select(luminance, max(max(rgb.r, rgb.g), max(rgb.b, 0.000000000001)), u32(curve_data(curve_id, 7u)) == 1u);
+        let middle_grey = curve_data(curve_id, 3u);
+        let mapped = middle_grey * exp2(evaluate_compiled_curve(curve_id, log2(reference / middle_grey)));
+        return rgb * max(mapped / reference, 0.0);
+    }
+    if (domain != 0u && mode == 0u) {
+        let luminance = dot(rgb, VIEW_ENCODED_LUMA_COEFF);
+        if (abs(luminance) <= 0.000000000001) {
+            return rgb;
+        }
+        return rgb * (evaluate_compiled_curve(curve_id, luminance) / luminance);
+    }
+    var mapped = rgb;
+    if (mode == 1u || mode == 2u || mode == 3u) {
+        mapped.r = select(evaluate_compiled_curve(curve_id, rgb.r), apply_scene_curve_channel(curve_id, rgb.r), domain == 0u);
+    }
+    if (mode == 1u || mode == 2u || mode == 4u) {
+        mapped.g = select(evaluate_compiled_curve(curve_id, rgb.g), apply_scene_curve_channel(curve_id, rgb.g), domain == 0u);
+    }
+    if (mode == 1u || mode == 2u || mode == 5u) {
+        mapped.b = select(evaluate_compiled_curve(curve_id, rgb.b), apply_scene_curve_channel(curve_id, rgb.b), domain == 0u);
+    }
+    return mapped;
+}
 
 fn scene_luminance_coefficients() -> vec3<f32> {
     return select(
@@ -2052,6 +2155,10 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     }
     }
 
+    if (scene_input_phase) {
+        composite_rgb_linear = apply_compiled_curve(0u, composite_rgb_linear);
+    }
+
     if (adjustments.execution_phase == 1u) {
         textureStore(output_texture, id.xy, vec4<f32>(composite_rgb_linear, original_alpha));
         return;
@@ -2086,6 +2193,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         return;
     }
 
+    base_srgb = apply_compiled_curve(1u, base_srgb);
     var final_rgb = apply_all_curves(base_srgb,
         adjustments.global.luma_curve, adjustments.global.luma_curve_count,
         adjustments.global.red_curve, adjustments.global.red_curve_count,

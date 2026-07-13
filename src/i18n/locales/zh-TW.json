@@ -250,6 +250,7 @@
       }
     },
     "curves": {
+      "channelMode": "",
       "channels": {
         "blue": "藍色",
         "green": "綠色",
@@ -260,6 +261,10 @@
       "copyParametric": "複製 {{channel}} 參數曲線",
       "copyPoint": "複製 {{channel}} 點曲線",
       "curveDataUnavailable": "曲線資料不可用。",
+      "output": {
+        "hdrRange": "",
+        "title": ""
+      },
       "parametricCurve": "參數曲線",
       "params": {
         "blackLevel": "黑色色階",
@@ -276,7 +281,11 @@
       "resetAllParametric": "重置所有參數曲線",
       "resetAllPoint": "重置所有點曲線",
       "resetParametric": "重置 {{channel}} 參數曲線",
-      "resetPoint": "重置 {{channel}} 點曲線"
+      "resetPoint": "重置 {{channel}} 點曲線",
+      "scene": {
+        "title": ""
+      },
+      "targeted": ""
     },
     "details": {
       "amount": "",
@@ -376,6 +385,10 @@
       "size": "大小",
       "vignette": "暗角"
     }
+  },
+  "common": {
+    "delete": "",
+    "reset": ""
   },
   "contextMenus": {
     "album": {

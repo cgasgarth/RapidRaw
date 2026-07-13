@@ -266,6 +266,69 @@ test('parametric split pointer cancellation uses the same exact finish path', as
   expect(dragStates).toEqual([true, false]);
 });
 
+test('scene and output curve surfaces persist explicit domains and HDR range', async () => {
+  const changes: Adjustments[] = [];
+  const { container } = await renderCurveEditor(changes);
+  expect(container.querySelector('[data-testid="professional-curves"]')).not.toBeNull();
+  expect(container.querySelector('svg[aria-label="Scene EV curve editor"]')).not.toBeNull();
+
+  const channel = container.querySelector<HTMLSelectElement>('select[aria-label="Curve channel mode"]');
+  if (!channel) throw new Error('Expected professional curve channel selector.');
+  channel.value = 'red';
+  await act(async () => {
+    channel.dispatchEvent(new window.Event('change', { bubbles: true }));
+    await flushPromises();
+  });
+  expect(changes.at(-1)?.sceneCurve?.channelMode).toBe('red');
+  expect(changes.at(-1)?.rawEngineEditGraphVersion).toBe(2);
+
+  await click(getButton(container, 'Output Curve'));
+  const hdr = container.querySelector<HTMLInputElement>('input[type="checkbox"]');
+  if (!hdr) throw new Error('Expected HDR range control.');
+  await act(async () => {
+    hdr.click();
+    await flushPromises();
+  });
+  expect(changes.at(-1)?.outputCurve?.maximumValue).toBe(4);
+  expect(changes.at(-1)?.outputCurve?.points.at(-1)).toEqual({ x: 4, y: 4 });
+  expect(container.querySelector('svg[aria-label="Output curve editor"]')).not.toBeNull();
+});
+
+test('targeted scene editing adds, numerically moves, and deletes one valid point', async () => {
+  const changes: Adjustments[] = [];
+  const { container } = await renderCurveEditor(changes);
+  const professional = container.querySelector<HTMLElement>('[data-testid="professional-curves"]');
+  const graph = professional?.querySelector<SVGSVGElement>('svg[aria-label="Scene EV curve editor"]');
+  const targeted = professional?.querySelector<HTMLButtonElement>('button[title="Targeted adjustment"]');
+  if (!professional || !graph || !targeted) throw new Error('Expected targeted scene curve controls.');
+
+  Object.defineProperty(graph, 'getBoundingClientRect', {
+    value: () => ({ bottom: 256, height: 256, left: 0, right: 256, top: 0, width: 256, x: 0, y: 0 }),
+  });
+  await click(targeted);
+  expect(targeted.getAttribute('aria-pressed')).toBe('true');
+  await act(async () => {
+    graph.dispatchEvent(new window.PointerEvent('pointerdown', { bubbles: true, clientX: 192, clientY: 64 }));
+    await flushPromises();
+  });
+  expect(changes.at(-1)?.sceneCurve?.points).toContainEqual({ xEv: 8, yEv: 8 });
+  expect(targeted.getAttribute('aria-pressed')).toBe('false');
+
+  const yInput = professional.querySelectorAll<HTMLInputElement>('input[type="number"]')[1];
+  if (!yInput) throw new Error('Expected selected scene point Y input.');
+  const valueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+  if (!valueSetter) throw new Error('Expected native input value setter.');
+  valueSetter.call(yInput, '7');
+  await act(async () => {
+    yInput.dispatchEvent(new window.InputEvent('input', { bubbles: true, inputType: 'insertText' }));
+    await flushPromises();
+  });
+  expect(changes.at(-1)?.sceneCurve?.points).toContainEqual({ xEv: 8, yEv: 7 });
+
+  await click(getButton(professional, 'Delete'));
+  expect(changes.at(-1)?.sceneCurve?.points).not.toContainEqual({ xEv: 8, yEv: 7 });
+});
+
 function CurveHarness({
   changes,
   dragStates,

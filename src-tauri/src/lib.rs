@@ -33,6 +33,7 @@ mod qa_control;
 mod raw;
 mod render;
 mod tagging;
+mod tone;
 mod window_customizer;
 
 pub(crate) use color::*;

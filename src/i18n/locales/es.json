@@ -250,6 +250,7 @@
       }
     },
     "curves": {
+      "channelMode": "",
       "channels": {
         "blue": "Azul",
         "green": "Verde",
@@ -260,6 +261,10 @@
       "copyParametric": "Copiar curva paramétrica de {{channel}}",
       "copyPoint": "Copiar curva de puntos de {{channel}}",
       "curveDataUnavailable": "Datos de curva no disponibles.",
+      "output": {
+        "hdrRange": "",
+        "title": ""
+      },
       "parametricCurve": "Curva paramétrica",
       "params": {
         "blackLevel": "Nivel de negro",
@@ -276,7 +281,11 @@
       "resetAllParametric": "Restablecer todas las curvas paramétricas",
       "resetAllPoint": "Restablecer todas las curvas de puntos",
       "resetParametric": "Restablecer curva paramétrica de {{channel}}",
-      "resetPoint": "Restablecer curva de puntos de {{channel}}"
+      "resetPoint": "Restablecer curva de puntos de {{channel}}",
+      "scene": {
+        "title": ""
+      },
+      "targeted": ""
     },
     "details": {
       "amount": "",
@@ -382,6 +391,10 @@
       "size": "Tamaño",
       "vignette": "Viñeteado"
     }
+  },
+  "common": {
+    "delete": "",
+    "reset": ""
   },
   "contextMenus": {
     "album": {

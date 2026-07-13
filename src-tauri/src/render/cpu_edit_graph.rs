@@ -303,6 +303,9 @@ pub(crate) fn execute_cpu_edit_graph(
             preserve_extended,
         ));
         color = apply_vignette(color, x, y, width, height, adjustments);
+        if let Some(curve) = graph.scene_curve_plan() {
+            color = Vec3::from_array(curve.apply_rgb(color.to_array()));
+        }
         if preserve_extended {
             // V2 crosses a real RGBA16F scene intermediate before the view
             // dispatch. Mirror its finite storage range in the CPU reference.
@@ -331,6 +334,9 @@ pub(crate) fn execute_cpu_edit_graph(
             // The view dispatch writes another RGBA16F intermediate consumed
             // by display curves, LUTs, and grain.
             color = color.map(round_rgba16f_storage);
+        }
+        if let Some(curve) = graph.output_curve_plan() {
+            color = Vec3::from_array(curve.apply_rgb(color.to_array()));
         }
         color = apply_all_curves(color, adjustments, preserve_extended);
         color = apply_local_curves(color, adjustments, mask_bitmaps, x, y, preserve_extended);

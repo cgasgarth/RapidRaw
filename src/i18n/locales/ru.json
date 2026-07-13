@@ -250,6 +250,7 @@
       }
     },
     "curves": {
+      "channelMode": "",
       "channels": {
         "blue": "Синий",
         "green": "Зеленый",
@@ -260,6 +261,10 @@
       "copyParametric": "Копировать параметрическую кривую ({{channel}})",
       "copyPoint": "Копировать точечную кривую ({{channel}})",
       "curveDataUnavailable": "Данные кривой недоступны.",
+      "output": {
+        "hdrRange": "",
+        "title": ""
+      },
       "parametricCurve": "Параметрическая кривая",
       "params": {
         "blackLevel": "Точка черного",
@@ -276,7 +281,11 @@
       "resetAllParametric": "Сбросить все параметрические кривые",
       "resetAllPoint": "Сбросить все точечные кривые",
       "resetParametric": "Сбросить параметрическую кривую {{channel}}",
-      "resetPoint": "Сбросить точечную кривую {{channel}}"
+      "resetPoint": "Сбросить точечную кривую {{channel}}",
+      "scene": {
+        "title": ""
+      },
+      "targeted": ""
     },
     "details": {
       "amount": "",
@@ -385,6 +394,10 @@
       "size": "Размер",
       "vignette": "Виньетирование"
     }
+  },
+  "common": {
+    "delete": "",
+    "reset": ""
   },
   "contextMenus": {
     "album": {

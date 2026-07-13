@@ -216,6 +216,49 @@ export interface ParametricCurve {
   red: ParametricCurveSettings;
 }
 
+export type ProfessionalCurveChannelMode =
+  | 'luminance_preserving'
+  | 'linked_rgb'
+  | 'independent_rgb'
+  | 'red'
+  | 'green'
+  | 'blue';
+
+export interface SceneCurvePoint {
+  xEv: number;
+  yEv: number;
+}
+
+export interface OutputCurvePoint {
+  x: number;
+  y: number;
+}
+
+export interface SceneCurveAdjustment {
+  enabled: boolean;
+  channelMode: ProfessionalCurveChannelMode;
+  interpolation: 'monotone_cubic' | 'linear';
+  middleGrey: number;
+  points: Array<SceneCurvePoint>;
+  lowExtrapolation: 'linear_tangent' | 'constant';
+  highExtrapolation: 'linear_tangent' | 'constant';
+  preserveColor: 'luminance_ratio' | 'max_rgb_ratio' | 'none';
+}
+
+export interface OutputCurveAdjustment {
+  enabled: boolean;
+  domain: 'view_encoded' | 'output_encoded';
+  outputProfileId: string;
+  referenceWhite: number;
+  maximumValue: number;
+  channelMode: ProfessionalCurveChannelMode;
+  interpolation: 'monotone_cubic' | 'linear';
+  points: Array<OutputCurvePoint>;
+  lowExtrapolation: 'linear_tangent' | 'constant';
+  highExtrapolation: 'linear_tangent' | 'constant';
+  preserveColor: 'luminance_ratio' | 'max_rgb_ratio' | 'none';
+}
+
 export interface Adjustments {
   [index: string]: unknown;
   aiPatches: Array<AiPatch>;
@@ -238,6 +281,8 @@ export interface Adjustments {
   pointCurves?: Curves;
   parametricCurve?: ParametricCurve;
   curveMode?: 'point' | 'parametric';
+  sceneCurve?: SceneCurveAdjustment;
+  outputCurve?: OutputCurveAdjustment;
   rawProcessingModeOverride: RawProcessingModeOverride;
   /** Persisted native edit-graph process version; legacy sidecars default to v1. */
   rawEngineEditGraphVersion: number;
@@ -733,6 +778,38 @@ export const getDefaultCurves = (): Curves => ({
     { x: 0, y: 0 },
     { x: 255, y: 255 },
   ],
+});
+
+export const getDefaultSceneCurve = (): SceneCurveAdjustment => ({
+  enabled: false,
+  channelMode: 'luminance_preserving',
+  interpolation: 'monotone_cubic',
+  middleGrey: 0.18,
+  points: [
+    { xEv: -16, yEv: -16 },
+    { xEv: 0, yEv: 0 },
+    { xEv: 16, yEv: 16 },
+  ],
+  lowExtrapolation: 'linear_tangent',
+  highExtrapolation: 'linear_tangent',
+  preserveColor: 'luminance_ratio',
+});
+
+export const getDefaultOutputCurve = (): OutputCurveAdjustment => ({
+  enabled: false,
+  domain: 'output_encoded',
+  outputProfileId: 'current_output',
+  referenceWhite: 1,
+  maximumValue: 1,
+  channelMode: 'linked_rgb',
+  interpolation: 'monotone_cubic',
+  points: [
+    { x: 0, y: 0 },
+    { x: 1, y: 1 },
+  ],
+  lowExtrapolation: 'linear_tangent',
+  highExtrapolation: 'linear_tangent',
+  preserveColor: 'none',
 });
 
 export const DEFAULT_PARAMETRIC_CURVE = getDefaultParametricCurve();

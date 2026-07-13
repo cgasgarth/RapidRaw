@@ -272,6 +272,7 @@
       }
     },
     "curves": {
+      "channelMode": "Curve channel mode",
       "channels": {
         "blue": "Blue",
         "green": "Green",
@@ -282,6 +283,10 @@
       "copyParametric": "Copy {{channel}} Parametric Curve",
       "copyPoint": "Copy {{channel}} Point Curve",
       "curveDataUnavailable": "Curve data not available.",
+      "output": {
+        "hdrRange": "HDR 4×",
+        "title": "Output Curve"
+      },
       "parametricCurve": "Parametric Curve",
       "params": {
         "blackLevel": "Black Level",
@@ -298,7 +303,11 @@
       "resetAllParametric": "Reset All Parametric Curves",
       "resetAllPoint": "Reset All Point Curves",
       "resetParametric": "Reset {{channel}} Parametric Curve",
-      "resetPoint": "Reset {{channel}} Point Curve"
+      "resetPoint": "Reset {{channel}} Point Curve",
+      "scene": {
+        "title": "Scene Curve"
+      },
+      "targeted": "Targeted adjustment"
     },
     "details": {
       "amount": "Amount",
@@ -407,6 +416,10 @@
       "size": "Size",
       "vignette": "Vignette"
     }
+  },
+  "common": {
+    "delete": "Delete",
+    "reset": "Reset"
   },
   "contextMenus": {
     "album": {

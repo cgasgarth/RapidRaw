@@ -22,6 +22,9 @@ use crate::film_look_render::normalize_film_look_adjustments_for_render;
 use crate::geometry::{Crop, GeometryParams, get_geometry_params_from_json};
 use crate::lut_processing::Lut;
 use crate::mask_generation::MaskDefinition;
+use crate::tone::curves::{
+    compile_output_curve_from_adjustments, compile_scene_curve_from_adjustments,
+};
 
 const PLAN_SCHEMA_VERSION: u32 = 1;
 const FINGERPRINT_VERSION: u32 = 1;
@@ -287,6 +290,20 @@ pub fn compile_render_plan(
         &[],
     );
     neutral_adjustments.global.edit_graph_version = pipeline_version as f32;
+    let scene_curve = compile_scene_curve_from_adjustments(&effective)
+        .map_err(|error| RenderPlanError {
+            code: "render_plan.invalid_curve",
+            field: "sceneCurve",
+            message: error.to_string(),
+        })?
+        .map(Arc::new);
+    let output_curve = compile_output_curve_from_adjustments(&effective)
+        .map_err(|error| RenderPlanError {
+            code: "render_plan.invalid_curve",
+            field: "outputCurve",
+            message: error.to_string(),
+        })?
+        .map(Arc::new);
     let neutral_detail = hash_selected(&neutral_json, DETAIL_FIELDS);
     let default_geometry = GeometryParams::default();
     let has_geometry = geometry_bytes(&geometry, crop) != geometry_bytes(&default_geometry, None);
@@ -305,6 +322,8 @@ pub fn compile_render_plan(
         output_fingerprint: fingerprints.output,
         adjustments: &adjustments,
         neutral_adjustments: &neutral_adjustments,
+        scene_curve: scene_curve.as_ref(),
+        output_curve: output_curve.as_ref(),
         has_geometry_or_retouch: has_geometry || has_retouch,
         has_detail: fingerprints.detail != neutral_detail,
         has_masks: !masks.is_empty(),
@@ -368,6 +387,8 @@ fn fingerprints(
     color_hasher.update(b"color");
     color_hasher.update(&FINGERPRINT_VERSION.to_le_bytes());
     color_hasher.update(bytes_of(adjustments));
+    color_hasher
+        .update(&hash_json(effective.get("sceneCurve").unwrap_or(&Value::Null)).to_le_bytes());
     if let Some(lut) = lut {
         color_hasher.update(&(lut.size as u64).to_le_bytes());
         color_hasher.update(&lut.abi_version.to_le_bytes());
@@ -379,6 +400,7 @@ fn fingerprints(
         &FINGERPRINT_VERSION.to_le_bytes(),
         &adjustments.global.show_clipping.to_le_bytes(),
         &adjustments.global.tonemapper_mode.to_le_bytes(),
+        &hash_json(effective.get("outputCurve").unwrap_or(&Value::Null)).to_le_bytes(),
     ]);
     let full = hash_parts(&[
         &source.to_le_bytes(),
@@ -869,6 +891,114 @@ mod tests {
             local_display["payload"]["localDisplayLayers"][0]
                 .get("exposure")
                 .is_none()
+        );
+    }
+
+    #[test]
+    fn v2_places_scene_and_output_curves_on_opposite_sides_of_the_view_transform() {
+        let plan = compile_render_plan(
+            &json!({
+                "rawEngineEditGraphVersion": 2,
+                "sceneCurve": {
+                    "enabled": true,
+                    "middleGrey": 0.18,
+                    "points": [{"xEv": -16, "yEv": -16}, {"xEv": 0, "yEv": 0}, {"xEv": 16, "yEv": 16}]
+                },
+                "outputCurve": {
+                    "enabled": true,
+                    "domain": "output_encoded",
+                    "outputProfileId": "display-p3-hdr",
+                    "referenceWhite": 1,
+                    "maximumValue": 4,
+                    "points": [{"x": 0, "y": 0}, {"x": 1, "y": 1}, {"x": 4, "y": 3.5}]
+                }
+            }),
+            context(761),
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            plan.edit_graph.receipt.ordered_node_ids.as_ref(),
+            [
+                "camera_input_boundary",
+                "scene_curve_v1",
+                "scene_to_view_transform",
+                "output_curve_v1",
+                "render_transport"
+            ]
+        );
+        assert!(plan.edit_graph.scene_curve_plan().is_some());
+        assert!(plan.edit_graph.output_curve_plan().is_some());
+        assert!(plan.edit_graph.has_user_edits);
+
+        let invalid = compile_render_plan(
+            &json!({
+                "rawEngineEditGraphVersion": 2,
+                "sceneCurve": {"enabled": true, "points": [{"xEv": 0, "yEv": 0}]}
+            }),
+            context(762),
+            None,
+        )
+        .err()
+        .expect("invalid scene curve must fail compilation");
+        assert_eq!(invalid.code, "render_plan.invalid_curve");
+        assert_eq!(invalid.field, "sceneCurve");
+    }
+
+    #[test]
+    fn cpu_output_proof_applies_new_curves_and_keeps_legacy_sidecars_exact() {
+        let source = image::DynamicImage::ImageRgba32F(image::ImageBuffer::from_pixel(
+            2,
+            1,
+            image::Rgba([0.25, 0.25, 0.25, 1.0]),
+        ));
+        let neutral_v2 =
+            compile_render_plan(&json!({"rawEngineEditGraphVersion": 2}), context(763), None)
+                .unwrap();
+        let curved_v2 = compile_render_plan(
+            &json!({
+                "rawEngineEditGraphVersion": 2,
+                "outputCurve": {
+                    "enabled": true,
+                    "domain": "view_encoded",
+                    "points": [{"x": 0, "y": 0}, {"x": 0.5, "y": 0.2}, {"x": 1, "y": 1}]
+                }
+            }),
+            context(764),
+            None,
+        )
+        .unwrap();
+        let legacy_with_new_field = compile_render_plan(
+            &json!({
+                "outputCurve": {
+                    "enabled": true,
+                    "domain": "view_encoded",
+                    "points": [{"x": 0, "y": 0}, {"x": 0.5, "y": 0.2}, {"x": 1, "y": 1}]
+                }
+            }),
+            context(765),
+            None,
+        )
+        .unwrap();
+        let neutral_legacy = compile_render_plan(&json!({}), context(766), None).unwrap();
+        let render = |plan: &CompiledRenderPlan| {
+            crate::cpu_edit_graph::execute_cpu_edit_graph(
+                &source,
+                &plan.adjustments,
+                &[],
+                None,
+                &plan.edit_graph,
+            )
+            .unwrap()
+            .to_rgba32f()
+        };
+        let neutral_v2_output = render(&neutral_v2);
+        let curved_v2_output = render(&curved_v2);
+        assert!(curved_v2_output.get_pixel(0, 0)[0] < neutral_v2_output.get_pixel(0, 0)[0]);
+        assert_eq!(
+            render(&legacy_with_new_field).into_raw(),
+            render(&neutral_legacy).into_raw(),
+            "legacy v1 ignores new typed fields and remains bit-exact"
         );
     }
 
