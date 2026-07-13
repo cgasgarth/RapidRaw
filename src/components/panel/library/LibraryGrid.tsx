@@ -706,6 +706,7 @@ export default function LibraryGrid(props: LibraryGridProps) {
       ref={libraryContainerRef}
       className={`flex-1 w-full h-full ${columnResize.isResizing ? 'cursor-col-resize' : ''}`}
       data-library-column-resizing={columnResize.isResizing || undefined}
+      data-testid="library-virtualized-grid"
       role="presentation"
       onFocusCapture={(event) => {
         if (event.target instanceof HTMLElement) {

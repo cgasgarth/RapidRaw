@@ -16,6 +16,7 @@ const startupPhaseSchema = z.enum([
   'frontendInteractive',
   'frontendSettingsHydrated',
   'frontendLibraryReady',
+  'frontendLibraryViewportVisible',
   'frontendEditorReady',
 ]);
 
@@ -40,7 +41,13 @@ export const startupTraceSnapshotSchema = z
   .strict();
 
 export type StartupTraceSnapshot = z.infer<typeof startupTraceSnapshotSchema>;
-export type FrontendStartupPhase = 'editorReady' | 'interactive' | 'libraryReady' | 'settingsHydrated' | 'shellVisible';
+export type FrontendStartupPhase =
+  | 'editorReady'
+  | 'interactive'
+  | 'libraryReady'
+  | 'libraryViewportVisible'
+  | 'settingsHydrated'
+  | 'shellVisible';
 export type StartupPhaseStatus = 'degraded' | 'failed' | 'ok';
 
 type InvokeCommand = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;

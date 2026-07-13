@@ -153,6 +153,47 @@ describe('native QA control contracts', () => {
     }
   });
 
+  test('recovers when accepted transports close before a response', async () => {
+    const directory = await mkdtemp(resolve(tmpdir(), 'rapidraw-native-control-early-close-'));
+    directories.push(directory);
+    const socketPath = resolve(directory, 'control.sock');
+    const record: NativeQaControlRecord = {
+      schemaVersion: 1,
+      pid: process.pid,
+      processStartToken: (await processStartToken(process.pid)) ?? 'unavailable',
+      socketPath,
+      token: 'c'.repeat(64),
+      logPath: '/tmp/native-early-close.log',
+      identity: { worktree: '/repo', build: 'build-early-close' },
+    };
+    let connections = 0;
+    const server = createServer((socket) => {
+      connections += 1;
+      if (connections <= 3) {
+        socket.end();
+        return;
+      }
+      socket.setEncoding('utf8');
+      socket.once('data', (line) => {
+        const request = z
+          .object({ id: z.string() })
+          .passthrough()
+          .parse(JSON.parse(String(line).trim()));
+        socket.end(`${JSON.stringify({ id: request.id, ok: true, result: { ready: true }, error: null })}\n`);
+      });
+    });
+    await new Promise<void>((ready) => server.listen(socketPath, ready));
+    try {
+      await expect(requestNativeQaControl(record, 'health')).resolves.toMatchObject({
+        ok: true,
+        result: { ready: true },
+      });
+      expect(connections).toBe(4);
+    } finally {
+      await new Promise<void>((done) => server.close(() => done()));
+    }
+  });
+
   test('defines reset modes and the inert production frontend event contract', () => {
     expect(NATIVE_QA_RESET_EVENT).toBe('rawengine-qa-reset');
     expect(NATIVE_QA_OPEN_FIXTURE_EVENT).toBe('rawengine-qa-open-fixture');
