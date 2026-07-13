@@ -754,6 +754,7 @@ fn run_ai_denoise_with_progress(
 }
 
 #[cfg(test)]
+#[allow(clippy::items_after_test_module)]
 mod tests {
     use std::path::Path;
     use std::sync::Mutex;
