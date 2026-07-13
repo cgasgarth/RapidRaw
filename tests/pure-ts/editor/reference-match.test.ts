@@ -16,6 +16,7 @@ import {
   type ReferenceHistogramSummary,
   type ReferenceMatchReference,
   resolveReferenceMatchRenderAdjustments,
+  selectReferenceMatchReferences,
   summarizeReferenceHistogram,
 } from '../../../src/utils/referenceMatch';
 
@@ -49,6 +50,7 @@ const reference = (
   proofFingerprint: `fnv1a64:${'3'.repeat(16)}`,
   proofRevision: 1,
   renderUrl: `blob:${id}:render`,
+  role: 'creative',
   sourceFingerprint: fingerprintReferenceMatchValue(id),
   sourceRevision: `source-revision-v1:${id.charCodeAt(0).toString(16).padStart(2, '0').repeat(32)}`,
   summary: histogramSummary,
@@ -91,6 +93,36 @@ describe('color-managed reference matching', () => {
     expect(first).toEqual(reversed);
     expect(first?.lumaMean).toBeCloseTo(0.65, 8);
     expect(first?.redMean).toBeCloseTo(0.6, 8);
+  });
+
+  test('uses an explicit technical authority for Normalize and normalized creative contributions for Match Look', () => {
+    const technical = { ...reference('technical', 9, summary({ lumaMean: 0.2 })), role: 'technical' as const };
+    const creative = reference('creative', 3, summary({ lumaMean: 0.7, redMean: 0.7 }));
+    const secondCreative = reference('second', 1, summary({ lumaMean: 0.5, redMean: 0.6 }));
+
+    expect(selectReferenceMatchReferences([creative, technical], 'normalize')).toEqual([technical]);
+    expect(selectReferenceMatchReferences([technical], 'match-look')).toEqual([]);
+
+    const normalize = createReferenceMatchProposal({
+      adjustments: INITIAL_ADJUSTMENTS,
+      mode: 'normalize',
+      references: [creative, technical],
+      target: summary({ lumaMean: 0.4 }),
+    });
+    expect(normalize?.effectiveReferences).toEqual([
+      { role: 'technical', sourceFingerprint: technical.sourceFingerprint, weight: 1 },
+    ]);
+
+    const match = createReferenceMatchProposal({
+      adjustments: INITIAL_ADJUSTMENTS,
+      mode: 'match-look',
+      references: [creative, technical, secondCreative],
+      target: summary({ lumaMean: 0.3, redMean: 0.3 }),
+    });
+    expect(match?.effectiveReferences.map(({ role, weight }) => ({ role, weight }))).toEqual([
+      { role: 'creative', weight: 0.75 },
+      { role: 'creative', weight: 0.25 },
+    ]);
   });
 
   test('detects same-path source replacement without discarding the cached reference artifact identity', () => {
