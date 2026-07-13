@@ -15,6 +15,7 @@ import { Invokes } from '../../tauri/commands';
 import {
   applyReferenceMatchProposal,
   createReferenceMatchAdjustmentLayer,
+  createReferenceMatchAppliedDiffs,
   createReferenceMatchProposal,
   describeReferenceMatchSource,
   fingerprintReferenceMatchValue,
@@ -591,6 +592,12 @@ export default function ReferenceMatchPanel() {
                     proposal,
                   });
                   const receipt = matchLookApplicationReceiptV1Schema.parse({
+                    appliedDiffs: createReferenceMatchAppliedDiffs({
+                      adjustments: current,
+                      enabledGroups,
+                      impact,
+                      proposal,
+                    }),
                     appliedAt: new Date().toISOString(),
                     destination: 'adjustment-layer',
                     effectiveReferences: proposal.effectiveReferences,
@@ -640,6 +647,12 @@ export default function ReferenceMatchPanel() {
                     proposal,
                   });
                   const receipt = matchLookApplicationReceiptV1Schema.parse({
+                    appliedDiffs: createReferenceMatchAppliedDiffs({
+                      adjustments: current,
+                      enabledGroups,
+                      impact,
+                      proposal,
+                    }),
                     appliedAt: new Date().toISOString(),
                     destination: 'global-adjustments',
                     effectiveReferences: proposal.effectiveReferences,

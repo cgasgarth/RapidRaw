@@ -4,6 +4,7 @@ import { matchLookApplicationReceiptV1Schema } from '../../../packages/rawengine
 import { INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../../../src/utils/adjustments';
 
 const receipt = matchLookApplicationReceiptV1Schema.parse({
+  appliedDiffs: [{ after: 0.75, before: 0, key: 'exposure' }],
   appliedAt: '2026-07-13T20:00:00.000Z',
   destination: 'global-adjustments',
   effectiveReferences: [
@@ -29,12 +30,28 @@ test('reference match provenance round-trips through sidecar normalization and c
   expect(reopened.exposure).toBe(0.75);
   expect(reopened.referenceMatchApplicationReceipt).toEqual(receipt);
   expect(reopened.referenceMatchApplicationReceipt?.effectiveReferences).toEqual(receipt.effectiveReferences);
+  expect(reopened.referenceMatchApplicationReceipt?.appliedDiffs).toEqual(receipt.appliedDiffs);
 
   const corrupt = normalizeLoadedAdjustments({
     ...INITIAL_ADJUSTMENTS,
     referenceMatchApplicationReceipt: { ...receipt, historyEntriesAdded: 3 },
   });
   expect(corrupt.referenceMatchApplicationReceipt).toBeNull();
+  expect(
+    normalizeLoadedAdjustments({
+      ...INITIAL_ADJUSTMENTS,
+      referenceMatchApplicationReceipt: { ...receipt, appliedDiffs: [] },
+    }).referenceMatchApplicationReceipt,
+  ).toBeNull();
+  expect(
+    normalizeLoadedAdjustments({
+      ...INITIAL_ADJUSTMENTS,
+      referenceMatchApplicationReceipt: {
+        ...receipt,
+        appliedDiffs: [receipt.appliedDiffs[0], receipt.appliedDiffs[0]],
+      },
+    }).referenceMatchApplicationReceipt,
+  ).toBeNull();
   expect(
     normalizeLoadedAdjustments({
       ...INITIAL_ADJUSTMENTS,
