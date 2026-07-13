@@ -1306,14 +1306,22 @@ fn generate_thumbnail_data_with_target(
 
     if adjustments.is_null() {
         let default_tm = if is_raw {
-            settings.default_raw_tonemapper.as_deref().unwrap_or("agx")
+            settings
+                .default_raw_tonemapper
+                .as_deref()
+                .unwrap_or("rapidView")
         } else {
             settings
                 .default_non_raw_tonemapper
                 .as_deref()
                 .unwrap_or("basic")
         };
-        if default_tm == "agx" {
+        if default_tm == "rapidView" {
+            if !is_raw {
+                final_image = crate::image_processing::apply_srgb_to_linear(final_image);
+            }
+            crate::image_processing::apply_cpu_rapid_view(&mut final_image);
+        } else if default_tm == "agx" {
             if !is_raw {
                 final_image = crate::image_processing::apply_srgb_to_linear(final_image);
             }

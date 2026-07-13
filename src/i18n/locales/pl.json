@@ -6,16 +6,20 @@
       "contrast": "Kontrast",
       "evShift": "Przesunięcie EV",
       "exposure": "Ekspozycja",
+      "highlightRolloff": "Łagodne światła",
       "highlights": "Światła",
       "mappers": {
         "agx": "AgX",
         "agxDesc": "Mapowanie tonów w stylu filmowym",
         "basic": "Podstawowe",
-        "basicDesc": "Standardowe mapowanie tonów"
+        "basicDesc": "Standardowe mapowanie tonów",
+        "rapidView": "Rapid View"
       },
       "reset": "Resetuj",
+      "shadowRolloff": "Łagodne cienie",
       "shadows": "Cienie",
       "toneMapper": "Mapowanie tonów",
+      "viewContrast": "Kontrast widoku",
       "whites": "Biele"
     },
     "color": {
@@ -4548,7 +4552,8 @@
         "title": "Wstępne przetwarzanie obrazu",
         "tonemapperOptions": {
           "agx": "AgX",
-          "basic": "Podstawowe"
+          "basic": "Podstawowe",
+          "rapidView": "Rapid View"
         },
         "tonemapperOverride": "Globalne nadpisywanie mapowania tonów",
         "tonemapperOverrideDesc": "Wymusza konkretne mapowanie tonów globalnie dla wszystkich obrazów, ukrywając pole wyboru mapera z panelu edycji."

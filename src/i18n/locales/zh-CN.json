@@ -6,16 +6,20 @@
       "contrast": "对比度",
       "evShift": "EV 偏移",
       "exposure": "曝光",
+      "highlightRolloff": "高光滚降",
       "highlights": "高光",
       "mappers": {
         "agx": "AgX",
         "agxDesc": "电影感色调映射",
         "basic": "基础",
-        "basicDesc": "标准色调映射"
+        "basicDesc": "标准色调映射",
+        "rapidView": "Rapid View"
       },
       "reset": "重置",
+      "shadowRolloff": "阴影滚降",
       "shadows": "阴影",
       "toneMapper": "色调映射",
+      "viewContrast": "视图对比度",
       "whites": "白色"
     },
     "color": {
@@ -4293,7 +4297,8 @@
         "title": "图像预处理",
         "tonemapperOptions": {
           "agx": "AgX",
-          "basic": "基础"
+          "basic": "基础",
+          "rapidView": "Rapid View"
         },
         "tonemapperOverride": "全局色调映射覆盖",
         "tonemapperOverrideDesc": "为所有图像全局强制使用特定的色调映射器，从调整面板中隐藏色调映射器开关。"

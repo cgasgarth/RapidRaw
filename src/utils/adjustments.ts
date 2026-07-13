@@ -310,7 +310,8 @@ export interface Adjustments {
   creativeTint: number;
   whiteBalanceTechnical: TechnicalWhiteBalance;
   whiteBalanceMigration: 'native_v1' | 'legacy_creative_temperature_tint_v1';
-  toneMapper: 'agx' | 'basic';
+  toneMapper: 'agx' | 'basic' | 'rapidView';
+  viewTransform: ViewTransformSettingsV1;
   toneCurve: ToneCurveId;
   transformDistortion: number;
   transformVertical: number;
@@ -326,6 +327,17 @@ export interface Adjustments {
   vignetteMidpoint: number;
   vignetteRoundness: number;
   whites: number;
+}
+
+export interface ViewTransformSettingsV1 {
+  chromaCompression: number;
+  contrast: number;
+  latitude: number;
+  middleGrey: number;
+  shoulder: number;
+  sourceBlackEv: number;
+  sourceWhiteEv: number;
+  toe: number;
 }
 
 export interface SkinToneUniformitySettings {
@@ -888,7 +900,17 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   creativeTint: 0,
   whiteBalanceTechnical: structuredClone(INITIAL_TECHNICAL_WHITE_BALANCE),
   whiteBalanceMigration: 'native_v1',
-  toneMapper: 'basic',
+  toneMapper: 'rapidView',
+  viewTransform: {
+    chromaCompression: 0.25,
+    contrast: 1.15,
+    latitude: 0.55,
+    middleGrey: 0.18,
+    shoulder: 0.5,
+    sourceBlackEv: -10,
+    sourceWhiteEv: 6.5,
+    toe: 0.35,
+  },
   toneCurve: 'auto_filmic',
   transformDistortion: 0,
   transformVertical: 0,
@@ -1038,6 +1060,11 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
     transformXOffset: loadedAdjustments.transformXOffset ?? INITIAL_ADJUSTMENTS.transformXOffset,
     transformYOffset: loadedAdjustments.transformYOffset ?? INITIAL_ADJUSTMENTS.transformYOffset,
     cameraProfile: loadedAdjustments.cameraProfile ?? INITIAL_ADJUSTMENTS.cameraProfile,
+    toneMapper: loadedAdjustments.toneMapper ?? 'basic',
+    viewTransform: {
+      ...INITIAL_ADJUSTMENTS.viewTransform,
+      ...(loadedAdjustments.viewTransform || {}),
+    },
     toneCurve: loadedAdjustments.toneCurve ?? INITIAL_ADJUSTMENTS.toneCurve,
     blackWhiteMixer: {
       ...INITIAL_ADJUSTMENTS.blackWhiteMixer,
