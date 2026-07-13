@@ -14,7 +14,9 @@ interface BrowserTauriInternals {
 interface BrowserTauriInvokeCall {
   args?: Record<string, unknown> | undefined;
   command: string;
+  endedAtMs: number | null;
   options?: unknown;
+  startedAtMs: number;
 }
 
 interface BrowserHarnessImage {
@@ -42,6 +44,14 @@ declare global {
       calls: Array<BrowserTauriInvokeCall>;
       enabled: boolean;
       failNextSettingsSave: boolean;
+    };
+    __RAWENGINE_QA_PERFORMANCE_TRACE__?: {
+      callIndex: number;
+      firstMutationMs: number | null;
+      lastMutationMs: number | null;
+      mutationCount: number;
+      observer: MutationObserver;
+      startedAtMs: number;
     };
     __TAURI_INTERNALS__?: BrowserTauriInternals;
     isTauri?: boolean;
@@ -211,8 +221,17 @@ export const installBrowserTauriHarness = (): void => {
   window.__TAURI_INTERNALS__ = {
     convertFileSrc: (filePath) => filePath,
     invoke: (command, args, options) => {
-      calls.push({ args, command, options });
-      return handleBrowserHarnessInvoke(command, args);
+      const call: BrowserTauriInvokeCall = {
+        args,
+        command,
+        endedAtMs: null,
+        options,
+        startedAtMs: performance.now(),
+      };
+      calls.push(call);
+      return handleBrowserHarnessInvoke(command, args).finally(() => {
+        call.endedAtMs = performance.now();
+      });
     },
     transformCallback: (callback) => {
       callbackId += 1;

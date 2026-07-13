@@ -113,6 +113,17 @@ const qaReceiptSchema = z.object({
         status: z.enum(['passed', 'failed']),
         durationMs: z.number().int().positive(),
         error: z.string().optional(),
+        performanceSpans: z
+          .array(
+            z.object({
+              durationMs: z.number().nonnegative(),
+              source: z.enum(['frontend', 'tauri-ipc']),
+              stage: z.string().min(1),
+              startOffsetMs: z.number().nonnegative(),
+              workCount: z.number().int().positive().optional(),
+            }),
+          )
+          .default([]),
       }),
     )
     .length(1),
@@ -187,9 +198,11 @@ const browserQaScenario = (id: string, qaScenarioId: string): PerformanceScenari
       contextsCreated: 'count',
       harnessSetupMs: 'ms',
       interactionMs: 'ms',
+      ipcCallCount: 'count',
       leakedContexts: 'count',
       processStarts: 'count',
       processStartsAvoided: 'count',
+      reactMutationCount: 'count',
       runnerOverheadMs: 'ms',
       sessionRecoveries: 'count',
       sourceRefreshes: 'count',
@@ -243,6 +256,9 @@ const browserQaScenario = (id: string, qaScenarioId: string): PerformanceScenari
       const result = receipt.scenarios[0];
       if (result?.id !== qaScenarioId || result.status !== 'passed')
         throw new Error(`${qaScenarioId} terminal correctness failed: ${result?.error ?? result?.status ?? 'missing'}`);
+      for (const source of ['frontend', 'tauri-ipc'] as const)
+        if (!result.performanceSpans.some((span) => span.source === source))
+          throw new Error(`${qaScenarioId} did not emit a ${source} monotonic span.`);
       const elapsedMs = performance.now() - started;
       const metrics = subtractDaemonMetrics(receipt.metrics, previousMetrics);
       previousMetrics = receipt.metrics;
@@ -251,17 +267,25 @@ const browserQaScenario = (id: string, qaScenarioId: string): PerformanceScenari
           `${qaScenarioId} leaked browser contexts: ${metrics.contextsClosed}/${metrics.contextsCreated}, leaked=${metrics.leakedContexts}.`,
         );
       const harnessSetupMs = metrics.setupMs;
+      const ipcCallCount = result.performanceSpans
+        .filter(({ source }) => source === 'tauri-ipc')
+        .reduce((sum, { workCount }) => sum + (workCount ?? 1), 0);
+      const reactMutationCount = result.performanceSpans
+        .filter(({ source }) => source === 'frontend')
+        .reduce((sum, { workCount }) => sum + (workCount ?? 1), 0);
       return {
-        assertions: 5,
+        assertions: 7,
         metrics: {
           artifactBytes: metrics.artifactBytes,
           contextsClosed: metrics.contextsClosed,
           contextsCreated: metrics.contextsCreated,
           harnessSetupMs,
           interactionMs: result.durationMs,
+          ipcCallCount,
           leakedContexts: metrics.leakedContexts,
           processStarts: metrics.serverStarts + metrics.browserStarts,
           processStartsAvoided: metrics.serverStartsAvoided + metrics.browserStartsAvoided,
+          reactMutationCount,
           runnerOverheadMs: Math.max(0, elapsedMs - result.durationMs - harnessSetupMs),
           sessionRecoveries: metrics.sessionRecoveries,
           sourceRefreshes: metrics.sourceRefreshes,
@@ -281,6 +305,10 @@ const browserQaScenario = (id: string, qaScenarioId: string): PerformanceScenari
             startOffsetMs: harnessSetupMs,
             durationMs: result.durationMs,
           },
+          ...result.performanceSpans.map((span) => ({
+            ...span,
+            startOffsetMs: harnessSetupMs + span.startOffsetMs,
+          })),
         ],
       };
     },

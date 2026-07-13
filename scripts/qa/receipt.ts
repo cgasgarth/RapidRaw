@@ -17,6 +17,17 @@ const scenarioResultSchema = z.object({
   trace: z.string().min(1).optional(),
   video: z.string().min(1).optional(),
   artifacts: z.array(artifactSchema).optional(),
+  performanceSpans: z
+    .array(
+      z.object({
+        durationMs: z.number().nonnegative(),
+        source: z.enum(['frontend', 'tauri-ipc']),
+        stage: z.string().min(1),
+        startOffsetMs: z.number().nonnegative(),
+        workCount: z.number().int().positive().optional(),
+      }),
+    )
+    .optional(),
 });
 
 export const qaRunReceiptSchema = z

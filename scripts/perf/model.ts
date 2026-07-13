@@ -9,10 +9,11 @@ export const metricSampleSchema = z.object({
 
 export const performanceSpanSchema = z.object({
   run: z.number().int().nonnegative(),
-  source: z.enum(['runner', 'frontend', 'qa-browser', 'native', 'gpu', 'io']),
+  source: z.enum(['runner', 'frontend', 'tauri-ipc', 'qa-browser', 'native', 'gpu', 'io']),
   stage: z.string().min(1),
   startOffsetMs: z.number().finite().nonnegative(),
   durationMs: z.number().finite().nonnegative(),
+  workCount: z.number().int().positive().optional(),
 });
 
 export const performanceIdentitySchema = z.object({

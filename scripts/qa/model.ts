@@ -50,6 +50,15 @@ export interface QaScenarioResult {
   trace?: string | undefined;
   video?: string | undefined;
   artifacts?: QaArtifactRecord[] | undefined;
+  performanceSpans?: QaPerformanceSpan[] | undefined;
+}
+
+export interface QaPerformanceSpan {
+  durationMs: number;
+  source: 'frontend' | 'tauri-ipc';
+  stage: string;
+  startOffsetMs: number;
+  workCount?: number | undefined;
 }
 
 export interface QaRunReceipt {

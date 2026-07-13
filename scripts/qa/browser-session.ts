@@ -1,12 +1,12 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import { mkdir, rm, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { type Browser, chromium } from '@playwright/test';
+import { type Browser, chromium, type Page } from '@playwright/test';
 import { z } from 'zod';
 import { allocateFreeTcpPort } from '../lib/dev-server-port';
 import type { QaDaemonJob, QaLifecycleAdapter } from './daemon-engine';
 import type { QaDaemonMetrics } from './daemon-model';
-import type { QaArtifactRecord, QaScenarioResult } from './model';
+import type { QaArtifactRecord, QaPerformanceSpan, QaScenarioResult } from './model';
 import { selectScenarios, shardScenarios, validateScenarioArtifacts, validateScenarioCapabilities } from './planner';
 import { qaScenarios } from './scenarios';
 
@@ -16,6 +16,41 @@ interface BrowserSession {
   baseUrl: string;
   log: string;
 }
+
+const collectPerformanceSpans = async (page: Page): Promise<QaPerformanceSpan[]> =>
+  page.evaluate(() => {
+    const trace = window.__RAWENGINE_QA_PERFORMANCE_TRACE__;
+    if (trace === undefined) return [];
+    trace.observer.disconnect();
+    const spans: QaPerformanceSpan[] = [];
+    if (trace.firstMutationMs !== null && trace.lastMutationMs !== null)
+      spans.push({
+        durationMs: Math.max(0, trace.lastMutationMs - trace.firstMutationMs),
+        source: 'frontend',
+        stage: 'react-dom-mutation-window',
+        startOffsetMs: Math.max(0, trace.firstMutationMs - trace.startedAtMs),
+        workCount: trace.mutationCount,
+      });
+    const callsByCommand = new Map<string, { count: number; endedAtMs: number; startedAtMs: number }>();
+    for (const call of (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? []).slice(trace.callIndex)) {
+      const endedAtMs = call.endedAtMs ?? performance.now();
+      const existing = callsByCommand.get(call.command);
+      callsByCommand.set(call.command, {
+        count: (existing?.count ?? 0) + 1,
+        endedAtMs: Math.max(existing?.endedAtMs ?? endedAtMs, endedAtMs),
+        startedAtMs: Math.min(existing?.startedAtMs ?? call.startedAtMs, call.startedAtMs),
+      });
+    }
+    for (const [command, calls] of callsByCommand)
+      spans.push({
+        durationMs: Math.max(0, calls.endedAtMs - calls.startedAtMs),
+        source: 'tauri-ipc',
+        stage: `invoke.${command}`,
+        startOffsetMs: Math.max(0, calls.startedAtMs - trace.startedAtMs),
+        workCount: calls.count,
+      });
+    return spans;
+  });
 
 const launchBrowser = (headed: boolean): Promise<Browser> =>
   chromium.launch({
@@ -71,6 +106,17 @@ export const browserJobResultSchema: z.ZodType<BrowserJobResult> = z.object({
       screenshot: z.string().optional(),
       trace: z.string().optional(),
       video: z.string().optional(),
+      performanceSpans: z
+        .array(
+          z.object({
+            durationMs: z.number().nonnegative(),
+            source: z.enum(['frontend', 'tauri-ipc']),
+            stage: z.string().min(1),
+            startOffsetMs: z.number().nonnegative(),
+            workCount: z.number().int().positive().optional(),
+          }),
+        )
+        .optional(),
       artifacts: z
         .array(
           z.object({
@@ -198,6 +244,25 @@ export function createBrowserLifecycleAdapter(
           scenario.timeoutMs,
         );
         metrics.contextsCreated += 1;
+        await context.addInitScript(() => {
+          const startedAtMs = performance.now();
+          const trace = {
+            callIndex: window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.length ?? 0,
+            firstMutationMs: null,
+            lastMutationMs: null,
+            mutationCount: 0,
+            observer: new MutationObserver((records) => {
+              if (records.length === 0) return;
+              const now = performance.now();
+              trace.firstMutationMs ??= now;
+              trace.lastMutationMs = now;
+              trace.mutationCount += records.length;
+            }),
+            startedAtMs,
+          };
+          trace.observer.observe(document, { attributes: true, characterData: true, childList: true, subtree: true });
+          window.__RAWENGINE_QA_PERFORMANCE_TRACE__ = trace;
+        });
         const scenarioDeadline = setTimeout(() => void context.close(), scenario.timeoutMs);
         await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
         let tracingStopped = false;
@@ -231,11 +296,13 @@ export function createBrowserLifecycleAdapter(
           );
           validateScenarioArtifacts(scenario, artifacts);
           if (errors.length > 0) throw new Error(`Browser errors:\n${errors.join('\n')}`);
+          const performanceSpans = await collectPerformanceSpans(page);
           result = {
             id: scenario.id,
             status: 'passed',
             durationMs: Math.round(performance.now() - started),
             artifacts,
+            performanceSpans,
           };
           results.push(result);
         } catch (error) {
