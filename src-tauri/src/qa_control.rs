@@ -537,6 +537,13 @@ fn dispatch(
 
 #[cfg(unix)]
 fn handle_stream(stream: UnixStream, token: &str, app: &tauri::AppHandle) -> Result<bool, String> {
+    // A listener must stay nonblocking so shutdown remains observable, but accepted
+    // streams can inherit O_NONBLOCK on macOS. The client writes after connect, so an
+    // immediate read on an inherited nonblocking stream can spuriously fail with
+    // EAGAIN and strand the client without a response.
+    stream
+        .set_nonblocking(false)
+        .map_err(|error| error.to_string())?;
     stream
         .set_read_timeout(Some(Duration::from_secs(5)))
         .map_err(|error| error.to_string())?;
