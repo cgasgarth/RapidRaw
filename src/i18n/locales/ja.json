@@ -1694,6 +1694,9 @@
       "exit": "Exit preview mode",
       "label": "Preview only"
     },
+    "provisionalCameraPreview": "カメラプレビュー — RAWを現像中",
+    "provisionalCameraPreviewFailed": "カメラプレビュー — RAW現像に失敗しました",
+    "provisionalLibraryPreview": "ライブラリプレビュー — RAWを現像中",
     "switcher": {
       "search": {
         "close": "Close panel search",

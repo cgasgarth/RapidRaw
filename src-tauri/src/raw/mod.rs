@@ -1,4 +1,5 @@
 pub(crate) mod bayer_hq;
+pub(crate) mod embedded_preview;
 pub(crate) mod negative_conversion;
 #[cfg(all(test, feature = "tauri-test"))]
 pub(crate) mod private_decode_raw_proof;

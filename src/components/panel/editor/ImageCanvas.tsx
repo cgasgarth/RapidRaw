@@ -230,6 +230,7 @@ interface ImageCanvasProps {
   exportSoftProofRecipeId: string | null;
   exportSoftProofTransform: ExportSoftProofTransformState | null;
   finalPreviewUrl: string | null;
+  provisionalPreviewUrl?: string | null;
   gamutWarningOverlay: GamutWarningOverlayPayload | null;
   handleCropComplete: (c: Crop, cp: PercentCrop) => void;
   handleCropStart?: () => void;
@@ -301,6 +302,7 @@ const ImageCanvas = memo(
     exportSoftProofRecipeId,
     exportSoftProofTransform,
     finalPreviewUrl,
+    provisionalPreviewUrl = null,
     gamutWarningOverlay,
     handleCropComplete,
     handleCropStart = () => undefined,
@@ -423,6 +425,7 @@ const ImageCanvas = memo(
     const previewSource = resolveEditorPreviewSource({
       finalPreviewUrl,
       isReady: selectedImage.isReady,
+      provisionalPreviewUrl,
       thumbnailUrl: selectedImage.thumbnailUrl,
     });
     const presentationDescriptor = useMemo(
