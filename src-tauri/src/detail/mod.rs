@@ -194,24 +194,28 @@ pub fn validate_detail_pipeline_placement(
         (
             placement.capture,
             DetailStageClass::CaptureCorrection,
+            "capture_correction_detail_v1",
             "highlight_reconstruction",
             "primary_denoise",
         ),
         (
             placement.creative,
             DetailStageClass::CreativeDetail,
+            "creative_multiscale_detail_v1",
             "primary_denoise",
             "scene_global_color_tone",
         ),
         (
             placement.output,
             DetailStageClass::OutputSharpening,
+            "output_sharpen_after_resize_v1",
             "final_resize",
             "output_encoding",
         ),
     ];
-    for (stage, class, input, output) in expected {
+    for (stage, class, stable_node_id, input, output) in expected {
         if stage.stage_class != class
+            || stage.stable_node_id != stable_node_id
             || stage.input_anchor != input
             || stage.output_anchor != output
         {
@@ -713,6 +717,10 @@ mod tests {
         placement =
             compile_detail_pipeline_placement([6000, 4000], [1800, 1200], [3000, 2000], 1).unwrap();
         placement.output.stable_node_id = placement.creative.stable_node_id;
+        assert!(validate_detail_pipeline_placement(&placement).is_err());
+        placement =
+            compile_detail_pipeline_placement([6000, 4000], [1800, 1200], [3000, 2000], 1).unwrap();
+        placement.capture.stable_node_id = "arbitrary_capture_detail";
         assert!(validate_detail_pipeline_placement(&placement).is_err());
     }
 
