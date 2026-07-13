@@ -37,6 +37,7 @@ function fakeAdapter(events: string[]): QaLifecycleAdapter<FakeSession, string[]
     },
     async refresh(session) {
       events.push(`refresh:${session.generation}`);
+      return undefined;
     },
     async run(session, job, metrics: QaDaemonMetrics) {
       metrics.contextsCreated += job.scenarioIds.length;
@@ -121,6 +122,26 @@ describe('QA daemon lifecycle', () => {
     await Promise.all([persistent.close(), oneShot.close()]);
   });
 
+  test('discards a failed session before the next isolated job', async () => {
+    const worktree = await temporaryDirectory();
+    const events: string[] = [];
+    const adapter = fakeAdapter(events);
+    const run = adapter.run;
+    let attempts = 0;
+    adapter.run = async (...parameters) => {
+      attempts += 1;
+      if (attempts === 1) throw new Error('session poisoned');
+      return await run(...parameters);
+    };
+    const engine = new QaDaemonEngine(worktree, adapter);
+    const job = { scenarioIds: ['compare'], shard: { index: 0, total: 1 } } as const;
+    await expect(engine.run(identity(worktree), job)).rejects.toThrow('session poisoned');
+    expect(await engine.run(identity(worktree), job)).toEqual(['2:compare']);
+    expect(events).toEqual(['start:1', 'stop:1', 'start:2']);
+    expect(engine.metrics.sessionRecoveries).toBe(1);
+    await engine.close();
+  });
+
   test('accounts for serialized worktree wait and avoided process starts', async () => {
     const worktree = await temporaryDirectory();
     let releaseFirst!: () => void;
@@ -142,6 +163,29 @@ describe('QA daemon lifecycle', () => {
     await Promise.all([first, second]);
     expect(engine.metrics).toMatchObject({ browserStartsAvoided: 1, serverStartsAvoided: 1 });
     expect(engine.metrics.worktreeWaitMs).toBeGreaterThan(0);
+    await engine.close();
+  });
+
+  test('accounts for a source refresh restart without claiming process reuse', async () => {
+    const worktree = await temporaryDirectory();
+    const adapter = fakeAdapter([]);
+    adapter.refresh = async (_session, _identity, metrics) => {
+      metrics.browserStarts += 1;
+      metrics.serverStarts += 1;
+      return { browserRestarted: true, serverRestarted: true };
+    };
+    const engine = new QaDaemonEngine(worktree, adapter);
+    const job = { scenarioIds: ['compare'], shard: { index: 0, total: 1 } } as const;
+    await engine.run(identity(worktree), job);
+    await engine.run(identity(worktree, 'a'.repeat(64), 'c'.repeat(64)), job);
+    expect(engine.metrics).toMatchObject({
+      browserStarts: 2,
+      browserStartsAvoided: 0,
+      serverStarts: 2,
+      serverStartsAvoided: 0,
+      sourceRefreshes: 1,
+      sourceReuses: 0,
+    });
     await engine.close();
   });
 

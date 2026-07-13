@@ -15,12 +15,14 @@ const metrics = {
   worktreeWaitMs: 5,
   artifactBytes: 4_096,
   configurationRestarts: 0,
+  sessionRecoveries: 0,
   contextsClosed: 2,
   contextsCreated: 2,
   jobs: 1,
   leakedContexts: 0,
   serverStarts: 1,
   sourceReuses: 0,
+  sourceRefreshes: 0,
 };
 
 const receipt = {

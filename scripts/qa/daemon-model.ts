@@ -13,7 +13,9 @@ export interface QaDaemonMetrics {
   serverStartsAvoided: number;
   browserStartsAvoided: number;
   sourceReuses: number;
+  sourceRefreshes: number;
   configurationRestarts: number;
+  sessionRecoveries: number;
   jobs: number;
   setupMs: number;
   scenarioMs: number;
@@ -92,7 +94,9 @@ export const qaDaemonMetricsSchema: z.ZodType<QaDaemonMetrics> = z.object({
   serverStartsAvoided: z.number().int().nonnegative(),
   browserStartsAvoided: z.number().int().nonnegative(),
   sourceReuses: z.number().int().nonnegative(),
+  sourceRefreshes: z.number().int().nonnegative(),
   configurationRestarts: z.number().int().nonnegative(),
+  sessionRecoveries: z.number().int().nonnegative(),
   jobs: z.number().int().nonnegative(),
   setupMs: z.number().int().nonnegative(),
   scenarioMs: z.number().int().nonnegative(),

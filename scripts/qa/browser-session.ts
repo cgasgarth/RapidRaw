@@ -17,12 +17,18 @@ interface BrowserSession {
   log: string;
 }
 
+const launchBrowser = (headed: boolean): Promise<Browser> =>
+  chromium.launch({
+    args: ['--disable-features=LocalNetworkAccessChecks'],
+    headless: !headed,
+  });
+
 async function installHarnessHtmlRoute(
   context: Awaited<ReturnType<Browser['newContext']>>,
   baseUrl: string,
 ): Promise<void> {
   await context.route(`${baseUrl}/`, async (route) => {
-    const response = await route.fetch();
+    const response = await fetch(route.request().url());
     let body = await response.text();
     if (!body.includes('installBrowserTauriHarness')) {
       const main = /<script type="module" src="\/src\/main\.tsx[^>]*><\/script>/u;
@@ -37,9 +43,13 @@ async function installHarnessHtmlRoute(
       body = body.replace(match, `${harness}\n${match}`);
     }
     await route.fulfill({
-      response,
+      status: response.status,
       body,
-      headers: { ...response.headers(), 'content-length': String(Buffer.byteLength(body)) },
+      headers: {
+        'cache-control': 'no-cache',
+        'content-length': String(Buffer.byteLength(body)),
+        'content-type': response.headers.get('content-type') ?? 'text/html; charset=utf-8',
+      },
     });
   });
 }
@@ -100,6 +110,8 @@ const withTimeout = async <T>(task: Promise<T>, timeoutMs: number): Promise<T> =
   }
 };
 
+const CLEANUP_TIMEOUT_MS = 10_000;
+
 export function createBrowserLifecycleAdapter(
   artifactRoot: string,
 ): QaLifecycleAdapter<BrowserSession, BrowserJobResult> {
@@ -116,10 +128,7 @@ export function createBrowserLifecycleAdapter(
       });
       let browser: Browser | undefined;
       try {
-        browser = await chromium.launch({
-          args: ['--disable-features=LocalNetworkAccessChecks'],
-          headless: !identity.headed,
-        });
+        browser = await launchBrowser(identity.headed);
       } catch (error) {
         await terminate(server);
         throw error;
@@ -148,23 +157,23 @@ export function createBrowserLifecycleAdapter(
       }
     },
     async stop(session) {
-      await Promise.allSettled([session.browser.close(), terminate(session.server)]);
+      await Promise.allSettled([withTimeout(session.browser.close(), CLEANUP_TIMEOUT_MS), terminate(session.server)]);
       session.server.stdout?.destroy();
       session.server.stderr?.destroy();
     },
-    async refresh(session, _identity, metrics) {
-      const context = await session.browser.newContext({ baseURL: session.baseUrl });
-      metrics.contextsCreated += 1;
-      try {
-        await installHarnessHtmlRoute(context, session.baseUrl);
-        const page = await context.newPage();
-        await page.goto('/', { waitUntil: 'networkidle', timeout: 30_000 });
-        await page.getByRole('heading', { name: 'RapidRAW' }).waitFor({ timeout: 30_000 });
-        await Bun.sleep(100);
-      } finally {
-        await context.close();
-        metrics.contextsClosed += 1;
-      }
+    async refresh(session, identity, metrics) {
+      await Promise.allSettled([withTimeout(session.browser.close(), CLEANUP_TIMEOUT_MS), terminate(session.server)]);
+      session.server.stdout?.destroy();
+      session.server.stderr?.destroy();
+      await Bun.sleep(500);
+      const replacement = await createBrowserLifecycleAdapter(artifactRoot).start(identity);
+      session.browser = replacement.browser;
+      session.server = replacement.server;
+      session.baseUrl = replacement.baseUrl;
+      session.log = replacement.log;
+      metrics.serverStarts += 1;
+      metrics.browserStarts += 1;
+      return { browserRestarted: true, serverRestarted: true };
     },
     async run(session, job: QaDaemonJob, metrics: QaDaemonMetrics, signal: AbortSignal) {
       const selected = shardScenarios(
@@ -178,12 +187,18 @@ export function createBrowserLifecycleAdapter(
       for (const scenario of selected) {
         signal.throwIfAborted();
         validateScenarioCapabilities(scenario, new Set(['browser-tauri-harness']));
-        const context = await session.browser.newContext({
-          baseURL: session.baseUrl,
-          recordVideo: { dir: videoRoot, size: { height: 720, width: 1280 } },
-          viewport: { height: 720, width: 1280 },
-        });
+        const context = await withTimeout(
+          session.browser.newContext({
+            baseURL: session.baseUrl,
+            ...(process.env.RAWENGINE_QA_VIDEO === '1'
+              ? { recordVideo: { dir: videoRoot, size: { height: 720, width: 1280 } } }
+              : {}),
+            viewport: { height: 720, width: 1280 },
+          }),
+          scenario.timeoutMs,
+        );
         metrics.contextsCreated += 1;
+        const scenarioDeadline = setTimeout(() => void context.close(), scenario.timeoutMs);
         await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
         let tracingStopped = false;
         await installHarnessHtmlRoute(context, session.baseUrl);
@@ -230,8 +245,7 @@ export function createBrowserLifecycleAdapter(
             .then(() => screenshotPath)
             .catch(() => undefined);
           const tracePath = resolve(artifactRoot, `${scenario.id}-${Date.now()}.zip`);
-          const trace = await context.tracing
-            .stop({ path: tracePath })
+          const trace = await withTimeout(context.tracing.stop({ path: tracePath }), CLEANUP_TIMEOUT_MS)
             .then(() => tracePath)
             .catch(() => undefined);
           tracingStopped = true;
@@ -250,11 +264,13 @@ export function createBrowserLifecycleAdapter(
           };
           results.push(result);
         } finally {
+          clearTimeout(scenarioDeadline);
           signal.removeEventListener('abort', abort);
-          if (!tracingStopped) await context.tracing.stop().catch(() => undefined);
-          await context.close();
+          if (!tracingStopped) await withTimeout(context.tracing.stop(), CLEANUP_TIMEOUT_MS).catch(() => undefined);
+          await withTimeout(context.close(), CLEANUP_TIMEOUT_MS);
           metrics.contextsClosed += 1;
-          const videoPath = await video?.path().catch(() => undefined);
+          const videoPath =
+            video === null ? undefined : await withTimeout(video.path(), CLEANUP_TIMEOUT_MS).catch(() => undefined);
           if (result?.status === 'failed') result.video = videoPath;
           else if (videoPath !== undefined) await rm(videoPath, { force: true });
           if (result !== undefined) {

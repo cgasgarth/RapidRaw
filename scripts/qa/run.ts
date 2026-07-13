@@ -18,6 +18,15 @@ import { qaScenarios } from './scenarios';
 
 const args = process.argv.slice(2);
 const worktree = Bun.spawnSync(['git', 'rev-parse', '--show-toplevel']).stdout.toString().trim();
+
+if (args.includes('--watch')) {
+  const child = Bun.spawn(['bun', 'scripts/qa/watch.ts', ...args], {
+    cwd: worktree,
+    stderr: 'inherit',
+    stdout: 'inherit',
+  });
+  process.exit(await child.exited);
+}
 const value = (flag: string) => {
   const index = args.indexOf(flag);
   return index < 0 ? undefined : args[index + 1];

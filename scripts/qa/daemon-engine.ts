@@ -9,7 +9,11 @@ export interface QaDaemonJob {
 export interface QaLifecycleAdapter<Session, Result> {
   start(identity: QaDaemonIdentity): Promise<Session>;
   stop(session: Session): Promise<void>;
-  refresh?(session: Session, identity: QaDaemonIdentity, metrics: QaDaemonMetrics): Promise<void>;
+  refresh?(
+    session: Session,
+    identity: QaDaemonIdentity,
+    metrics: QaDaemonMetrics,
+  ): Promise<{ browserRestarted: boolean; serverRestarted: boolean } | undefined>;
   run(session: Session, job: QaDaemonJob, metrics: QaDaemonMetrics, signal: AbortSignal): Promise<Result>;
 }
 
@@ -19,7 +23,9 @@ const emptyMetrics = (): QaDaemonMetrics => ({
   serverStartsAvoided: 0,
   browserStartsAvoided: 0,
   sourceReuses: 0,
+  sourceRefreshes: 0,
   configurationRestarts: 0,
+  sessionRecoveries: 0,
   jobs: 0,
   setupMs: 0,
   scenarioMs: 0,
@@ -55,6 +61,7 @@ export class QaDaemonEngine<Session, Result> {
     this.metrics.worktreeWaitMs += Math.round(performance.now() - queuedAt);
     try {
       const active = this.#active;
+      let refreshResult: { browserRestarted: boolean; serverRestarted: boolean } | undefined;
       const requiresRestart =
         active === undefined ||
         active.identity.configuration !== identity.configuration ||
@@ -73,14 +80,15 @@ export class QaDaemonEngine<Session, Result> {
         this.#active = { identity, session };
       } else if (active.identity.source !== identity.source) {
         const setupStarted = performance.now();
-        await this.adapter.refresh?.(active.session, identity, this.metrics);
+        refreshResult = await this.adapter.refresh?.(active.session, identity, this.metrics);
         this.metrics.setupMs += Math.round(performance.now() - setupStarted);
-        this.metrics.sourceReuses += 1;
+        if (refreshResult?.serverRestarted) this.metrics.sourceRefreshes += 1;
+        else this.metrics.sourceReuses += 1;
         active.identity = identity;
       }
       if (!requiresRestart) {
-        this.metrics.serverStartsAvoided += 1;
-        this.metrics.browserStartsAvoided += 1;
+        if (!refreshResult?.serverRestarted) this.metrics.serverStartsAvoided += 1;
+        if (!refreshResult?.browserRestarted) this.metrics.browserStartsAvoided += 1;
       }
       this.metrics.jobs += 1;
       const current = this.#active;
@@ -94,6 +102,13 @@ export class QaDaemonEngine<Session, Result> {
         } finally {
           this.metrics.scenarioMs += Math.round(performance.now() - scenarioStarted);
         }
+      } catch (error) {
+        if (this.#active?.session === current.session) {
+          await this.adapter.stop(current.session).catch(() => undefined);
+          if (this.#active?.session === current.session) this.#active = undefined;
+          this.metrics.sessionRecoveries += 1;
+        }
+        throw error;
       } finally {
         if (this.#activeJob === controller) this.#activeJob = undefined;
       }
