@@ -2367,9 +2367,11 @@ pub async fn apply_adjustments_to_paths(
                     new_adjustments = serde_json::json!({});
                 }
 
-                if let (Some(new_map), Some(pasted_map)) =
-                    (new_adjustments.as_object_mut(), adjustments.as_object())
-                {
+                let pasted_adjustments = white_balance_adjustments_for_batch_target(&adjustments);
+                if let (Some(new_map), Some(pasted_map)) = (
+                    new_adjustments.as_object_mut(),
+                    pasted_adjustments.as_object(),
+                ) {
                     for (k, v) in pasted_map {
                         new_map.insert(k.clone(), v.clone());
                     }
@@ -2408,6 +2410,31 @@ pub async fn apply_adjustments_to_paths(
     })
     .await
     .map_err(|error| format!("Adjustment paste worker failed: {error}"))?
+}
+
+/// Per-image As Shot/Auto estimates belong to the target source and must not be
+/// copied as if they were a fixed illuminant. A locked reference explicitly
+/// opts into copying the resolved physical coordinates to every target.
+fn white_balance_adjustments_for_batch_target(adjustments: &Value) -> Value {
+    let mut prepared = adjustments.clone();
+    let should_retain_target = prepared
+        .get("whiteBalanceTechnical")
+        .and_then(Value::as_object)
+        .is_some_and(|white_balance| {
+            matches!(
+                white_balance.get("mode").and_then(Value::as_str),
+                Some("as_shot" | "auto")
+            ) && white_balance
+                .get("synchronization")
+                .and_then(|value| value.get("mode"))
+                .and_then(Value::as_str)
+                .unwrap_or("per_image")
+                == "per_image"
+        });
+    if should_retain_target && let Some(map) = prepared.as_object_mut() {
+        map.remove("whiteBalanceTechnical");
+    }
+    prepared
 }
 
 #[tauri::command]
@@ -4111,6 +4138,47 @@ pub fn sync_metadata_to_xmp(source_path: &Path, metadata: &ImageMetadata, create
 mod tests {
     use super::*;
     use image::{ImageEncoder, codecs::tiff::TiffEncoder};
+
+    #[test]
+    fn thumbnail_artifact_identity_tracks_technical_white_balance() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let image_path = temp_dir.path().join("image.raf");
+        fs::write(&image_path, b"raw").expect("source image");
+        let path = image_path.to_string_lossy();
+        let as_shot = br#"{"whiteBalanceTechnical":{"mode":"as_shot"}}"#;
+        let daylight = br#"{"whiteBalanceTechnical":{"mode":"preset","kelvin":5503,"duv":0}}"#;
+        assert_ne!(
+            compute_thumbnail_cache_hash(&path, as_shot),
+            compute_thumbnail_cache_hash(&path, daylight)
+        );
+    }
+
+    #[test]
+    fn batch_white_balance_respects_per_image_and_locked_reference_modes() {
+        let per_image = serde_json::json!({
+            "exposure": 0.5,
+            "whiteBalanceTechnical": {
+                "mode": "auto",
+                "synchronization": { "mode": "per_image", "referenceSourceIdentity": null }
+            }
+        });
+        let prepared = white_balance_adjustments_for_batch_target(&per_image);
+        assert_eq!(prepared["exposure"], 0.5);
+        assert!(prepared.get("whiteBalanceTechnical").is_none());
+
+        let locked = serde_json::json!({
+            "whiteBalanceTechnical": {
+                "mode": "auto",
+                "kelvin": 4870,
+                "duv": -0.003,
+                "synchronization": {
+                    "mode": "locked_reference",
+                    "referenceSourceIdentity": "blake3:reference"
+                }
+            }
+        });
+        assert_eq!(white_balance_adjustments_for_batch_target(&locked), locked);
+    }
 
     #[test]
     fn virtual_image_path_parses_primary_path() {

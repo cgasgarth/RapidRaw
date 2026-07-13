@@ -1,34 +1,49 @@
-# White Balance Picker Validation
+# White Balance Runtime Validation
 
-- Issue: #91 `color(wb): add white balance picker tests`
-- Scope: runtime picker math extraction and fixture validation
-- Status: implementation-backed validation
+- Issues: #91, #5402
+- Contract: `rapidraw.white_balance.v1`
+- Status: runtime implementation with programmatic fixtures
 
-## Contract
+## Runtime Contract
 
-The white balance picker samples a local RGB patch, converts the averaged sRGB
-values to linear light, computes temperature and tint corrections, and clamps
-the resulting sliders to the existing `-100..100` adjustment range.
+Technical white balance is stored as an illuminant, not a red/blue slider:
 
-The picker math is centralized in `src/utils/whiteBalancePicker.ts` so UI clicks
-and validation fixtures exercise the same implementation path.
+- modes: As Shot, Auto, Kelvin/Duv, chromaticity picker, and preset;
+- coordinates: Kelvin, signed CIE 1960 UCS Duv, and CIE 1931 xy;
+- adaptation: CAT16 compiled in `f64` to an AP1 scene-linear matrix;
+- placement: the technical matrix is the first scene-linear shader color node;
+- creative warmth/tint: a later node, including lossless migration of legacy
+  `temperature` and `tint` sidecars.
 
-## Fixture Coverage
+The neutral picker uses the IEC sRGB transfer function, maps the sampled patch
+to chromaticity, resolves its nearest Planckian CCT/Duv, and writes a typed
+technical-WB command. Its receipt records coordinates, preview identity,
+clipped channels, sample count, and confidence. Auto WB robustly rejects dark,
+clipped, and saturated samples before estimating a median neutral.
 
-`fixtures/color/adjustments/white-balance-picker-fixtures.json` covers:
+Camera dual-illuminant interpolation uses the same physical model. It projects
+the camera neutral implied by as-shot gains between the calibration matrices'
+predicted white responses in log-chroma space; the former blue/red ratio CCT
+authority is removed.
 
-- neutral gray samples that leave sliders unchanged;
-- blue-biased samples that produce a warm correction;
-- warm magenta samples that clamp both sliders at the lower bound.
+## Programmatic Proof
 
-## Validation
+- TS fixtures cover A, D50, D55, D65, D75, off-locus Duv, identity, legacy
+  migration, picker diagnostics, and clipped confidence.
+- Rust tests cover CAT16/AP1 identity and finiteness, camera-neutral projection,
+  invalid fail-safe behavior, robust Auto sample rejection, and typed receipts.
+- The production WGSL ABI test and native shader construction cover the exact
+  matrix carried by preview and export; both use `AllAdjustments` parsing.
+- Adjustment fingerprints include the nested technical state, invalidating
+  preview/export/thumbnail artifacts when illuminant identity changes.
 
-Run:
+Run focused proof with:
 
 ```sh
-bun run check:white-balance-picker
+bun test tests/pure-ts/color/white-balance-illuminant.test.ts
+bun tests/integration/checks/check-white-balance-picker-fixtures.ts
+cargo test --manifest-path src-tauri/Cargo.toml --features required-ci,tauri-test,validation-harness white_balance --lib
 ```
 
-The check uses Zod schemas for fixture shape and picker input validation, then
-compares computed temperature, tint, and diagnostic deltas against committed
-expected values.
+Private Alaska RAW validation is runtime-only and writes reports outside the
+repository. Source RAW files and generated artifacts must never be committed.

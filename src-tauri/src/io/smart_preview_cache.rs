@@ -285,6 +285,20 @@ mod tests {
     }
 
     #[test]
+    fn smart_preview_revision_invalidates_for_technical_white_balance() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let image_path = temp_dir.path().join("image.raf");
+        fs::write(&image_path, b"raw").expect("source image");
+        let path = image_path.to_string_lossy();
+        let as_shot = br#"{"whiteBalanceTechnical":{"mode":"as_shot"}}"#;
+        let daylight = br#"{"whiteBalanceTechnical":{"mode":"preset","kelvin":5503,"duv":0}}"#;
+        assert_ne!(
+            compute_source_revision(&path, as_shot),
+            compute_source_revision(&path, daylight)
+        );
+    }
+
+    #[test]
     fn smart_preview_artifact_reports_stale_when_source_disappears() {
         let temp_dir = tempfile::tempdir().expect("tempdir");
         let image_path = temp_dir.path().join("image.raf");
