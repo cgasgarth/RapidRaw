@@ -281,10 +281,18 @@ exit 1
         .scenarioIds,
     ).toEqual(['browser.editor-compare']);
     expect(
+      selectAffectedPerformanceScenarios(['src/utils/progressiveImageFrame.ts'], performanceScenarios).scenarioIds,
+    ).toEqual(['browser.editor-open']);
+    expect(
       selectAffectedPerformanceScenarios(['src/components/panel/MainLibrary.tsx'], performanceScenarios).scenarioIds,
     ).toEqual(['browser.library-open']);
     expect(selectAffectedPerformanceScenarios(['unknown/new-file.ts'], performanceScenarios)).toMatchObject({
-      scenarioIds: ['browser.editor-compare', 'browser.library-open', 'editor.preview-scheduling'],
+      scenarioIds: [
+        'browser.editor-compare',
+        'browser.editor-open',
+        'browser.library-open',
+        'editor.preview-scheduling',
+      ],
       conservativeFallback: true,
     });
     expect(selectAffectedPerformanceScenarios([], performanceScenarios).scenarioIds).toEqual([]);

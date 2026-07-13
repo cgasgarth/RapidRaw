@@ -10,6 +10,11 @@ const ownership: readonly { pattern: RegExp; scenarioIds: readonly string[] }[] 
     scenarioIds: ['browser.editor-compare'],
   },
   {
+    pattern:
+      /(?:src\/components\/panel\/Editor|src\/hooks\/editor\/useImageLoader|src\/utils\/(?:editorImagePreviewSource|progressiveImageFrame)|src-tauri\/src\/(?:io\/image_(?:loader|open_session)|raw\/(?:embedded_preview|raw_processing)))/u,
+    scenarioIds: ['browser.editor-open'],
+  },
+  {
     pattern: /(?:src\/components\/panel\/MainLibrary|src\/components\/library|src\/store\/library)/u,
     scenarioIds: ['browser.library-open'],
   },

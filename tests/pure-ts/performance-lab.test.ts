@@ -63,6 +63,7 @@ describe('performance lab runner', () => {
   test('registers versioned synthetic and end-to-end browser scenarios', () => {
     expect(performanceScenarios.map(({ id }) => id)).toEqual([
       'editor.preview-scheduling',
+      'browser.editor-open',
       'browser.editor-compare',
       'browser.library-open',
     ]);

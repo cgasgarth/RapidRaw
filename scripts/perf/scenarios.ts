@@ -133,6 +133,7 @@ const browserQaScenario = (id: string, qaScenarioId: string): PerformanceScenari
 
 export const performanceScenarios: readonly PerformanceScenario[] = [
   previewScheduling,
+  browserQaScenario('browser.editor-open', 'browser.editor.chrome'),
   browserQaScenario('browser.editor-compare', 'browser.editor.compare'),
   browserQaScenario('browser.library-open', 'browser.library.open'),
 ];

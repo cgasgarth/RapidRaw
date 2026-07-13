@@ -36,6 +36,7 @@ jobs:
       matrix:
         scenario:
           - editor.preview-scheduling
+          - browser.editor-open
           - browser.editor-compare
           - browser.library-open
     steps:
