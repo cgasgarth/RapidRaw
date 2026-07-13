@@ -86,6 +86,33 @@ export interface ReferencePhysicalSourceIdentity {
   sourceRevision: string | null;
 }
 
+export type ReferenceMatchApplicationIdentityFailure =
+  | 'reference-missing'
+  | 'reference-replaced'
+  | 'reference-set-changed'
+  | 'reference-status-unknown';
+
+export interface ReferenceMatchApplicationIdentityValidation {
+  failure: ReferenceMatchApplicationIdentityFailure | null;
+  valid: boolean;
+}
+
+export const validateReferenceMatchApplicationIdentities = (
+  proposal: Pick<ReferenceMatchProposal, 'effectiveReferences'>,
+  references: readonly ReferenceMatchReference[],
+  identityByPath: ReadonlyMap<string, ReferencePhysicalSourceIdentity | null>,
+): ReferenceMatchApplicationIdentityValidation => {
+  for (const effective of proposal.effectiveReferences) {
+    const reference = references.find((candidate) => candidate.sourceFingerprint === effective.sourceFingerprint);
+    if (!reference) return { failure: 'reference-set-changed', valid: false };
+    const identity = identityByPath.get(reference.path);
+    if (identity === undefined || identity === null) return { failure: 'reference-status-unknown', valid: false };
+    if (!identity.available || identity.sourceRevision === null) return { failure: 'reference-missing', valid: false };
+    if (identity.sourceRevision !== reference.sourceRevision) return { failure: 'reference-replaced', valid: false };
+  }
+  return { failure: null, valid: true };
+};
+
 export const mergeReferenceSourceIdentities = (
   references: readonly ReferenceMatchReference[],
   identityByPath: ReadonlyMap<string, ReferencePhysicalSourceIdentity | null>,
