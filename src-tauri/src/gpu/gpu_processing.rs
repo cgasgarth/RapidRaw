@@ -1714,6 +1714,7 @@ impl GpuProcessor {
         ];
         let mut cpu_encode_time = Duration::ZERO;
         let mut command_buffer_count = u32::from(flare_command_buffer.is_some());
+        let mut phase_dispatch_count = 0_u32;
 
         let start_tile_x = bounds.x / TILE_SIZE;
         let start_tile_y = bounds.y / TILE_SIZE;
@@ -2129,31 +2130,10 @@ impl GpuProcessor {
                         1,
                     );
                 }
-                if let Some(view_bind_group) = view_bind_group.as_ref() {
-                    let mut compute_pass = main_encoder.begin_compute_pass(&Default::default());
-                    compute_pass.set_pipeline(&self.main_pipeline);
-                    compute_pass.set_bind_group(0, view_bind_group, &[]);
-                    compute_pass.dispatch_workgroups(
-                        input_width.div_ceil(8),
-                        input_height.div_ceil(8),
-                        1,
-                    );
-                }
-                if let Some(display_bind_group) = display_bind_group.as_ref() {
-                    let mut compute_pass = main_encoder.begin_compute_pass(&Default::default());
-                    compute_pass.set_pipeline(&self.main_pipeline);
-                    compute_pass.set_bind_group(0, display_bind_group, &[]);
-                    compute_pass.dispatch_workgroups(
-                        input_width.div_ceil(8),
-                        input_height.div_ceil(8),
-                        1,
-                    );
-                }
-
                 let crop_x_start = x_start - input_x_start;
                 let crop_y_start = y_start - input_y_start;
 
-                if output_to_display {
+                if output_to_display && !split_scene_view_display {
                     main_encoder.copy_texture_to_texture(
                         wgpu::TexelCopyTextureInfo {
                             texture: &self.tile_output_texture,
@@ -2183,15 +2163,83 @@ impl GpuProcessor {
                     );
                 }
 
-                let tile_command_buffer = main_encoder.finish();
+                // Use distinct command buffers for scene, view and display so
+                // storage-write -> sampled-read dependencies are explicit on
+                // every backend, including software Vulkan adapters.
+                let mut tile_command_buffers = vec![main_encoder.finish()];
+                if let Some(view_bind_group) = view_bind_group.as_ref() {
+                    let mut encoder =
+                        device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                            label: Some("GPU view-phase encoder"),
+                        });
+                    {
+                        let mut compute_pass = encoder.begin_compute_pass(&Default::default());
+                        compute_pass.set_pipeline(&self.main_pipeline);
+                        compute_pass.set_bind_group(0, view_bind_group, &[]);
+                        compute_pass.dispatch_workgroups(
+                            input_width.div_ceil(8),
+                            input_height.div_ceil(8),
+                            1,
+                        );
+                    }
+                    tile_command_buffers.push(encoder.finish());
+                }
+                if let Some(display_bind_group) = display_bind_group.as_ref() {
+                    let mut encoder =
+                        device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                            label: Some("GPU display-phase encoder"),
+                        });
+                    {
+                        let mut compute_pass = encoder.begin_compute_pass(&Default::default());
+                        compute_pass.set_pipeline(&self.main_pipeline);
+                        compute_pass.set_bind_group(0, display_bind_group, &[]);
+                        compute_pass.dispatch_workgroups(
+                            input_width.div_ceil(8),
+                            input_height.div_ceil(8),
+                            1,
+                        );
+                    }
+                    if output_to_display {
+                        encoder.copy_texture_to_texture(
+                            wgpu::TexelCopyTextureInfo {
+                                texture: &self.tile_output_texture,
+                                mip_level: 0,
+                                origin: wgpu::Origin3d {
+                                    x: crop_x_start,
+                                    y: crop_y_start,
+                                    z: 0,
+                                },
+                                aspect: wgpu::TextureAspect::All,
+                            },
+                            wgpu::TexelCopyTextureInfo {
+                                texture: &self.working_texture,
+                                mip_level: 0,
+                                origin: wgpu::Origin3d {
+                                    x: x_start,
+                                    y: y_start,
+                                    z: 0,
+                                },
+                                aspect: wgpu::TextureAspect::All,
+                            },
+                            wgpu::Extent3d {
+                                width: tile_width,
+                                height: tile_height,
+                                depth_or_array_layers: 1,
+                            },
+                        );
+                    }
+                    tile_command_buffers.push(encoder.finish());
+                }
+                let tile_command_buffer_count = tile_command_buffers.len() as u32;
                 queue.submit(
                     flare_command_buffer
                         .take()
                         .into_iter()
-                        .chain(std::iter::once(tile_command_buffer)),
+                        .chain(tile_command_buffers),
                 );
                 blur_counters.record_command_buffer();
-                command_buffer_count += 1;
+                command_buffer_count += tile_command_buffer_count;
+                phase_dispatch_count += if split_scene_view_display { 3 } else { 1 };
                 cpu_encode_time += encode_started.elapsed();
 
                 if !skip_cpu_readback {
@@ -2242,15 +2290,13 @@ impl GpuProcessor {
             graph_fingerprint: graph.fingerprint,
             stages: graph.flags,
             blur_dispatch_count: blur_counters.dispatches,
-            render_pass_count: blur_counters.dispatches
-                + command_buffer_count * if split_scene_view_display { 3 } else { 1 },
+            render_pass_count: blur_counters.dispatches + phase_dispatch_count,
             command_buffer_count,
             queue_submit_count: blur_counters.submissions,
             estimated_peak_resource_bytes: graph.estimated_peak_resource_bytes,
             cpu_encode_time,
             wall_time: execution_started.elapsed(),
-            phase_dispatch_count: command_buffer_count
-                * if split_scene_view_display { 3 } else { 1 },
+            phase_dispatch_count,
             cache_hits: (cache_after.mask_hits - cache_before.mask_hits)
                 + (cache_after.lut_hits - cache_before.lut_hits)
                 + (cache_after.bind_group_hits - cache_before.bind_group_hits),
@@ -2966,7 +3012,7 @@ mod blur_pass_tests {
             .last_execution_receipt()
             .expect("v2 GPU execution publishes a runtime receipt");
         assert_eq!(receipt.phase_dispatch_count, 3);
-        assert_eq!(receipt.command_buffer_count, 1);
+        assert_eq!(receipt.command_buffer_count, 3);
         assert_eq!(receipt.queue_submit_count, 1);
         assert!(receipt.cache_hits >= 3, "receipt={receipt:?}");
         assert_eq!(receipt.domain_conversions.len(), 2);

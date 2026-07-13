@@ -792,7 +792,12 @@ impl CompiledEditGraph {
             has_user_edits: inputs.has_geometry_or_retouch
                 || inputs.has_detail
                 || gpu_adjustments_active
-                || inputs.show_clipping,
+                || inputs.show_clipping
+                // Choosing the scene-referred process is itself a persisted,
+                // render-authoritative edit even when every numeric control is
+                // neutral. Cleanup must not discard that process choice.
+                || (inputs.version_was_explicit
+                    && inputs.pipeline_version == SCENE_REFERRED_PIPELINE_VERSION),
             receipt: EditGraphReceipt {
                 schema_version: EDIT_GRAPH_SCHEMA_VERSION,
                 pipeline_version: inputs.pipeline_version,
