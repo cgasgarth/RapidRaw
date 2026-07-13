@@ -17,6 +17,7 @@ describe('reference match runtime contracts', () => {
       proofFingerprint: fingerprint('3'),
       role: 'creative' as const,
       sourceFingerprint: fingerprint('4'),
+      sourceRevision: `source-revision-v1:${'4'.repeat(64)}`,
       viewFingerprint: fingerprint('5'),
       weight: 1,
     };
@@ -58,6 +59,7 @@ describe('reference match runtime contracts', () => {
       proofFingerprint: fingerprint('3'),
       role: 'technical' as const,
       sourceFingerprint: fingerprint('4'),
+      sourceRevision: `source-revision-v1:${'4'.repeat(64)}`,
       viewFingerprint: fingerprint('5'),
       weight: 1,
     };
