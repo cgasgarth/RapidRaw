@@ -2,6 +2,8 @@
 
 The executable lab records repeated metrics from versioned scenarios with correctness assertions, fixture identity, source/build identity, privacy-filtered hardware class, raw samples, robust summaries, and exact rerun commands.
 
+Every valid receipt also carries monotonic per-sample spans under its run identity. The runner bounds every child span to the measured sample; preview scenarios identify frontend control and instrumented dispatch stages, while browser scenarios separate harness setup from the terminal QA interaction. Missing or impossible trace spans invalidate the run instead of producing a speed claim.
+
 ```bash
 bun perf list
 bun perf run editor.preview-scheduling
