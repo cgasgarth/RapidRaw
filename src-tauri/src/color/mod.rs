@@ -7,6 +7,7 @@ pub(crate) mod camera_input_transform;
 pub(crate) mod camera_profile;
 #[cfg(test)]
 pub(crate) mod controlled_profiles;
+pub(crate) mod dehaze;
 #[cfg(test)]
 mod display_hdr_hardware_tests;
 pub(crate) mod display_profile;

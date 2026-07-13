@@ -11,6 +11,10 @@ use half::f16;
 use image::{DynamicImage, GenericImageView, ImageBuffer, Luma};
 use wgpu::util::{DeviceExt, TextureDataOrder};
 
+use crate::color::dehaze::{
+    HazeAnalysisCache, HazeAnalysisIdentityV1, apply_analysis_to_adjustments,
+    scene_dehaze_is_active,
+};
 use crate::gpu_readback::{
     RGBA16_FLOAT_BYTES_PER_PIXEL, read_texture_data_roi_with_bytes_per_pixel,
     rgba16float_readback_to_dynamic_image, rgba16float_readback_to_unclamped_dynamic_image,
@@ -817,6 +821,7 @@ pub struct GpuProcessor {
     context: GpuContext,
     generation: u64,
     resource_cache: Mutex<GpuResourceCache>,
+    dehaze_analysis_cache: Mutex<HazeAnalysisCache>,
     main_bind_group_cache: Mutex<Option<CachedMainBindGroup>>,
     view_bind_group_cache: Mutex<Option<CachedMainBindGroup>>,
     display_bind_group_cache: Mutex<Option<CachedMainBindGroup>>,
@@ -1338,6 +1343,7 @@ impl GpuProcessor {
                 },
                 ..Default::default()
             }),
+            dehaze_analysis_cache: Mutex::new(HazeAnalysisCache::new(4)),
             main_bind_group_cache: Mutex::new(None),
             view_bind_group_cache: Mutex::new(None),
             display_bind_group_cache: Mutex::new(None),
@@ -1377,6 +1383,30 @@ impl GpuProcessor {
             output_texture,
             output_texture_view,
         })
+    }
+
+    fn prepare_dehaze_plan(
+        &self,
+        image: &DynamicImage,
+        identity: PreGpuImageIdentity,
+        adjustments: &mut AllAdjustments,
+    ) {
+        if !scene_dehaze_is_active(adjustments) {
+            return;
+        }
+        let analysis_identity = HazeAnalysisIdentityV1::new(
+            identity.source_revision,
+            identity.pixel_fingerprint,
+            identity.stage_revision,
+            identity.width,
+            identity.height,
+        );
+        let (analysis, _) = self
+            .dehaze_analysis_cache
+            .lock()
+            .unwrap()
+            .get_or_analyze(image, analysis_identity);
+        apply_analysis_to_adjustments(&analysis, adjustments);
     }
 
     fn run(
@@ -1585,7 +1615,20 @@ impl GpuProcessor {
             .map_or(&self.dummy_lut_view, |entry| &entry.view);
 
         let mut adjustments = match &request.edit_graph {
-            EditGraphExecutionAuthority::Compiled(edit_graph) => edit_graph.shader_abi(),
+            EditGraphExecutionAuthority::Compiled(edit_graph) => {
+                let mut authoritative = edit_graph.shader_abi();
+                // Source analysis is render-ephemeral: the graph owns all user edits while
+                // these four fields carry the source-bound compiled Dehaze artifact.
+                authoritative.global.dehaze_atmosphere_r =
+                    request.adjustments.global.dehaze_atmosphere_r;
+                authoritative.global.dehaze_atmosphere_g =
+                    request.adjustments.global.dehaze_atmosphere_g;
+                authoritative.global.dehaze_atmosphere_b =
+                    request.adjustments.global.dehaze_atmosphere_b;
+                authoritative.global.dehaze_atmosphere_confidence =
+                    request.adjustments.global.dehaze_atmosphere_confidence;
+                authoritative
+            }
             #[cfg(all(test, feature = "tauri-test"))]
             EditGraphExecutionAuthority::TestOnlyLegacy => request.adjustments,
         };
@@ -3253,6 +3296,7 @@ mod blur_pass_tests {
         let state = app.state::<AppState>();
         let context = get_or_init_compute_gpu_context_for_tests(&state).unwrap();
         let cases = [
+            ("legacy_dehaze", json!({"dehaze": 20})),
             ("luma_nr", json!({"lumaNoiseReduction": 35})),
             ("color_nr", json!({"colorNoiseReduction": 40})),
             (
@@ -3407,9 +3451,11 @@ mod blur_pass_tests {
             ),
         ];
         for (case_index, (label, mut raw)) in cases.into_iter().enumerate() {
-            raw.as_object_mut()
-                .unwrap()
-                .insert("rawEngineEditGraphVersion".into(), json!(2));
+            if label != "legacy_dehaze" {
+                raw.as_object_mut()
+                    .unwrap()
+                    .insert("rawEngineEditGraphVersion".into(), json!(2));
+            }
             let plan = crate::render_plan::compile_render_plan(
                 &raw,
                 crate::render_plan::CompileRenderPlanContext {
@@ -3557,6 +3603,75 @@ mod blur_pass_tests {
             "gpu graph benchmark: selective={selective_elapsed:?} forced_full={full_elapsed:?}"
         );
         FORCE_DISABLE_BLUR_CACHE.store(false, Ordering::Relaxed);
+    }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
+    fn dehaze_wgpu_uses_source_analysis_and_reuses_it_for_amount_only_changes() {
+        use image::{DynamicImage, ImageBuffer, Rgba};
+        use tauri::Manager;
+
+        let _test_guard = acquire_gpu_test_lock();
+        let atmosphere = [0.72, 0.84, 1.08];
+        let source = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(32, 24, |x, y| {
+            let radiance = [0.03 + x as f32 / 80.0, 0.08 + y as f32 / 100.0, 0.16];
+            let transmission = 0.25 + y as f32 / 48.0;
+            Rgba([
+                radiance[0] * transmission + atmosphere[0] * (1.0 - transmission),
+                radiance[1] * transmission + atmosphere[1] * (1.0 - transmission),
+                radiance[2] * transmission + atmosphere[2] * (1.0 - transmission),
+                1.0,
+            ])
+        }));
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock Tauri app builds");
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state)
+            .expect("compute-only GPU context initializes");
+        let identity = PreGpuImageIdentity::for_source(&source, "dehaze_source_analysis");
+        let render = |amount| {
+            let mut adjustments = AllAdjustments::default();
+            adjustments.global.dehaze = amount;
+            adjustments.global.edit_graph_version = 2.0;
+            process_and_get_unclamped_dynamic_image(
+                &context,
+                &state,
+                &source,
+                identity,
+                RenderRequest {
+                    adjustments,
+                    mask_bitmaps: &[],
+                    lut: None,
+                    roi: None,
+                    edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
+                },
+                "dehaze_source_analysis",
+            )
+            .expect("GPU dehaze render succeeds")
+            .to_rgba32f()
+        };
+
+        let low = render(0.04);
+        let high = render(0.12);
+        assert!(
+            high.pixels()
+                .all(|pixel| pixel.0[..3].iter().all(|channel| channel.is_finite()))
+        );
+        assert!(low.pixels().zip(high.pixels()).any(|(left, right)| {
+            left.0[..3]
+                .iter()
+                .zip(&right.0[..3])
+                .any(|(before, after)| (before - after).abs() > 0.001)
+        }));
+
+        let processor_guard = state.gpu_processor.lock().unwrap();
+        let processor = &processor_guard.as_ref().unwrap().processor;
+        assert_eq!(
+            processor.dehaze_analysis_cache.lock().unwrap().counters(),
+            (1, 1)
+        );
     }
 
     #[cfg(feature = "tauri-test")]
@@ -4022,7 +4137,7 @@ fn process_and_get_dynamic_image_inner(
     state: &tauri::State<AppState>,
     base_image: &DynamicImage,
     pre_gpu_identity: PreGpuImageIdentity,
-    request: RenderRequest,
+    mut request: RenderRequest,
     caller_id: &str,
     output_to_display: bool,
     presentation_identity: Option<crate::gpu_display::NativeFrameIdentity>,
@@ -4141,6 +4256,7 @@ fn process_and_get_dynamic_image_inner(
         width,
         height,
     );
+    processor.prepare_dehaze_plan(base_image, pre_gpu_identity, &mut request.adjustments);
 
     let mut cache_lock = state.gpu_image_cache.lock().unwrap();
     if cache_lock.is_none() {

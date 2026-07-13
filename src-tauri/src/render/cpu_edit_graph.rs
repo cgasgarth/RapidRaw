@@ -9,6 +9,7 @@ use image::{DynamicImage, ImageBuffer, Luma, Rgba};
 use crate::adjustments::abi::{
     AllAdjustments, ColorCalibrationSettings, ColorGradeSettings, HslColor, LevelsSettings, Point,
 };
+use crate::color::dehaze::prepare_cpu_dehaze;
 use crate::color::view_transform::{
     RAPID_VIEW_IMPLEMENTATION_VERSION, ViewColorStrategy, ViewTransformPlanV1, ViewTransformProcess,
 };
@@ -62,7 +63,8 @@ pub(crate) fn execute_cpu_edit_graph(
 ) -> Result<DynamicImage, &'static str> {
     graph.validate_contract()?;
     graph.validate_gpu_execution(adjustments, lut.is_some(), mask_bitmaps.len())?;
-    let authoritative_adjustments = graph.shader_abi();
+    let mut authoritative_adjustments = graph.shader_abi();
+    prepare_cpu_dehaze(base_image, &mut authoritative_adjustments);
     let adjustments = &authoritative_adjustments;
     let previous_luma_model = SCENE_REFERRED_V2_LUMA.replace(graph.pipeline_version >= 2);
     let _luma_guard = SceneLumaGuard(previous_luma_model);
@@ -248,12 +250,27 @@ pub(crate) fn execute_cpu_edit_graph(
             height,
             effective.flare,
         );
-        color = apply_dehaze(
-            color,
-            structure_surface,
-            adjustments.global.is_raw_image == 1,
-            effective.dehaze,
-        );
+        color = if graph.pipeline_version >= 2 {
+            apply_scene_dehaze_v1(
+                color,
+                structure_surface,
+                adjustments.global.is_raw_image == 1,
+                effective.dehaze,
+                Vec3::new(
+                    global.dehaze_atmosphere_r,
+                    global.dehaze_atmosphere_g,
+                    global.dehaze_atmosphere_b,
+                ),
+                global.dehaze_atmosphere_confidence,
+            )
+        } else {
+            legacy_fixed_atmosphere_dehaze_v1(
+                color,
+                structure_surface,
+                adjustments.global.is_raw_image == 1,
+                effective.dehaze,
+            )
+        };
         color = apply_centre_tonal_and_color(color, global.centré, x, y, width, height);
         color = apply_white_balance(color, effective.temperature, effective.tint);
         color = apply_filmic_exposure(color, effective.brightness);
@@ -627,7 +644,12 @@ fn blur_to_linear(color: Vec3, is_raw: bool) -> Vec3 {
     if is_raw { color } else { srgb_to_linear(color) }
 }
 
-fn apply_dehaze(color: Vec3, blurred: Vec3, is_raw: bool, amount: f32) -> Vec3 {
+fn legacy_fixed_atmosphere_dehaze_v1(
+    color: Vec3,
+    blurred: Vec3,
+    is_raw: bool,
+    amount: f32,
+) -> Vec3 {
     if amount == 0.0 {
         return color;
     }
@@ -653,6 +675,39 @@ fn apply_dehaze(color: Vec3, blurred: Vec3, is_raw: bool, amount: f32) -> Vec3 {
     Vec3::splat(final_luma)
         .lerp(recovered, 1.0 + (1.0 - transmission) * 0.5)
         .max(Vec3::ZERO)
+}
+
+fn apply_scene_dehaze_v1(
+    color: Vec3,
+    blurred: Vec3,
+    is_raw: bool,
+    amount: f32,
+    atmospheric_light: Vec3,
+    atmosphere_confidence: f32,
+) -> Vec3 {
+    if amount == 0.0 {
+        return color;
+    }
+    let blurred = blur_to_linear(blurred, is_raw);
+    let atmosphere = atmospheric_light.max(Vec3::splat(0.01));
+    let pixel_dark = (color / atmosphere).min_element();
+    let regional_dark = (blurred / atmosphere).min_element();
+    let pixel_luma = scene_luminance(color.max(Vec3::ZERO));
+    let blurred_luma = scene_luminance(blurred.max(Vec3::ZERO));
+    let edge = (pixel_luma.sqrt() - blurred_luma.sqrt()).abs();
+    let guided_dark = regional_dark + (pixel_dark - regional_dark) * smoothstep(0.02, 0.15, edge);
+    let transmission = (1.0 - 0.95 * guided_dark).clamp(0.08, 1.0);
+    let confidence_weight = 0.35 + 0.65 * atmosphere_confidence.clamp(0.0, 1.0);
+    let strength = (amount.abs() * 7.5).clamp(0.0, 1.0) * confidence_weight;
+    let effective_transmission = 1.0 + (transmission - 1.0) * strength;
+    if amount < 0.0 {
+        return color * effective_transmission + atmosphere * (1.0 - effective_transmission);
+    }
+    let recovered = (color - atmosphere) / effective_transmission + atmosphere;
+    let atmosphere_luma = scene_luminance(atmosphere);
+    let highlight_protection =
+        smoothstep(atmosphere_luma * 0.75, atmosphere_luma * 1.25, pixel_luma);
+    recovered.lerp(color, highlight_protection * 0.65)
 }
 
 fn prepared_effect_blur(
