@@ -67,37 +67,35 @@ const checkProfile = async (profile: 'fast-dev' | 'full'): Promise<number> => {
     const output = `${result.stdout.toString()}\n${result.stderr.toString()}`.trim().split('\n').slice(-80).join('\n');
     throw new Error(`${profile} native profile failed:\n${output}`);
   }
-  if (profile === 'fast-dev') {
-    const tests = Bun.spawnSync(
-      [
-        'cargo',
-        'test',
-        '--locked',
-        '--manifest-path',
-        manifest,
-        '--target-dir',
-        targetDir,
-        '-p',
-        'RapidRAW',
-        '--lib',
-        '--no-default-features',
-        '--features',
-        features,
-        'app::',
-      ],
-      { cwd: root, stderr: 'pipe', stdout: 'pipe' },
-    );
-    if (tests.exitCode !== 0) {
-      const output = `${tests.stdout.toString()}\n${tests.stderr.toString()}`.trim().split('\n').slice(-80).join('\n');
-      throw new Error(`fast-dev capability runtime tests failed:\n${output}`);
-    }
+  const tests = Bun.spawnSync(
+    [
+      'cargo',
+      'test',
+      '--locked',
+      '--manifest-path',
+      manifest,
+      '--target-dir',
+      targetDir,
+      '-p',
+      'RapidRAW',
+      '--lib',
+      '--no-default-features',
+      '--features',
+      features,
+      'app::',
+    ],
+    { cwd: root, stderr: 'pipe', stdout: 'pipe' },
+  );
+  if (tests.exitCode !== 0) {
+    const output = `${tests.stdout.toString()}\n${tests.stderr.toString()}`.trim().split('\n').slice(-80).join('\n');
+    throw new Error(`${profile} capability runtime tests failed:\n${output}`);
   }
   return Math.round(performance.now() - started);
 };
 
 const fastDependencies = dependencySet('fast-dev');
 const fullDependencies = dependencySet('full,required-ci');
-for (const dependency of ['jxl-encoder', 'webp']) {
+for (const dependency of ['jxl-encoder', 'webp', 'rapidraw-ai', 'ort', 'ort-sys', 'tokenizers']) {
   if (fastDependencies.has(dependency)) throw new Error(`${dependency} leaked into fast-dev dependency graph.`);
   if (!fullDependencies.has(dependency)) throw new Error(`${dependency} missing from full dependency graph.`);
 }
