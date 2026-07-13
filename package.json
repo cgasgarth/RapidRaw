@@ -34,6 +34,13 @@
     "format": "bun scripts/ci/run-compact-command.ts --label format -- biome format --write .",
     "format:check": "bun scripts/ci/run-compact-command.ts --label format -- biome ci --linter-enabled=false --assist-enabled=false .",
     "precommit": "sh .githooks/pre-commit --run",
+    "validate:commit": "bun scripts/validation/run.ts --mode commit --staged",
+    "validate:push": "bun scripts/validation/run.ts --mode push --base origin/main",
+    "validate:pr": "bun scripts/validation/run.ts --mode pr --base origin/main",
+    "validate:full": "bun scripts/validation/run.ts --mode full --no-cache",
+    "validate:release": "bun scripts/validation/run.ts --mode release --no-cache",
+    "validate:benchmark": "bun scripts/validation/benchmark.ts",
+    "validate:benchmark:real": "bun scripts/validation/benchmark.ts --real",
     "worktree:create": "bun scripts/dev/create-codex-worktree.ts",
     "hooks:install": "git config core.hooksPath .githooks"
   },
