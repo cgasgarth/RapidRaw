@@ -741,6 +741,22 @@ pub struct RenderRequest<'a> {
     pub edit_graph: Option<Arc<crate::edit_graph::CompiledEditGraph>>,
 }
 
+fn validate_edit_graph_request(request: &RenderRequest<'_>, oversized: bool) -> Result<(), String> {
+    if let Some(edit_graph) = request.edit_graph.as_deref() {
+        edit_graph
+            .validate_gpu_execution(
+                &request.adjustments,
+                request.lut.is_some(),
+                request.mask_bitmaps.len(),
+            )
+            .map_err(str::to_owned)?;
+        if oversized {
+            return Err("edit_graph.cpu_reference_executor_required_for_oversized_frame".into());
+        }
+    }
+    Ok(())
+}
+
 struct InputTextureRef<'a> {
     view: &'a wgpu::TextureView,
     identity: PreGpuImageIdentity,
@@ -1517,15 +1533,6 @@ impl GpuProcessor {
             .map_or(&self.dummy_lut_view, |entry| &entry.view);
 
         let mut adjustments = request.adjustments;
-        if let Some(edit_graph) = request.edit_graph.as_deref() {
-            edit_graph
-                .validate_gpu_execution(
-                    &adjustments,
-                    request.lut.is_some(),
-                    request.mask_bitmaps.len(),
-                )
-                .map_err(str::to_owned)?;
-        }
         let graph = compile_gpu_render_graph(
             &adjustments,
             request.lut.is_some(),
@@ -2211,6 +2218,33 @@ mod blur_pass_tests {
     }
 
     #[test]
+    fn compiled_graph_fails_safe_when_only_the_partial_cpu_fallback_is_available() {
+        let raw = serde_json::json!({"rawEngineEditGraphVersion": 1, "exposure": 20});
+        let revision = crate::render_plan::content_revision(&raw, 1, 2, 3);
+        let plan = crate::render_plan::compile_render_plan(
+            &raw,
+            crate::render_plan::CompileRenderPlanContext {
+                revision,
+                is_raw: false,
+                tonemapper_override: None,
+            },
+            None,
+        )
+        .unwrap();
+        let request = RenderRequest {
+            adjustments: plan.adjustments,
+            mask_bitmaps: &[],
+            lut: None,
+            roi: None,
+            edit_graph: Some(Arc::clone(&plan.edit_graph)),
+        };
+        assert_eq!(
+            validate_edit_graph_request(&request, true),
+            Err("edit_graph.cpu_reference_executor_required_for_oversized_frame".into())
+        );
+    }
+
+    #[test]
     fn graph_compiler_deduplicates_consumers_and_scales_largest_radius() {
         let mut adjustments = AllAdjustments::default();
         adjustments.global.structure = 0.2;
@@ -2881,6 +2915,7 @@ fn process_and_get_dynamic_image_inner(
     let device_generation = context.generation;
 
     let max_dim = context.limits.max_texture_dimension_2d;
+    validate_edit_graph_request(&request, width > max_dim || height > max_dim)?;
     if width > max_dim || height > max_dim {
         log::warn!(
             "Image dimensions ({}x{}) exceed GPU limits ({}). Bypassing GPU processing and returning unprocessed image to prevent a crash. Try upgrading your GPU :)",
