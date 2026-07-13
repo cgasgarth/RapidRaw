@@ -87,16 +87,25 @@ export const matchLookProposalV1Schema = z
 export const matchLookApplicationReceiptV1Schema = z
   .object({
     appliedAt: z.string().datetime(),
-    destination: z.literal('global-adjustments'),
+    destination: z.enum(['global-adjustments', 'adjustment-layer']),
     enabledGroups: z.array(referenceMatchGroupV1Schema).min(1),
     historyEntriesAdded: z.literal(1),
     impact: z.number().min(0).max(100),
+    layerId: z.string().trim().min(1).optional(),
     proposalFingerprint: fingerprintSchema,
     resultingGraphFingerprint: fingerprintSchema,
     schemaVersion: z.literal(1),
     targetAnalysisFingerprint: fingerprintSchema,
   })
-  .strict();
+  .strict()
+  .superRefine((receipt, context) => {
+    if (receipt.destination === 'adjustment-layer' && receipt.layerId === undefined) {
+      context.addIssue({ code: 'custom', message: 'Layer destination requires a layer ID.', path: ['layerId'] });
+    }
+    if (receipt.destination === 'global-adjustments' && receipt.layerId !== undefined) {
+      context.addIssue({ code: 'custom', message: 'Global destination cannot declare a layer ID.', path: ['layerId'] });
+    }
+  });
 
 export type ReferenceSourceSetV1 = z.infer<typeof referenceSourceSetV1Schema>;
 export type MatchLookProposalV1 = z.infer<typeof matchLookProposalV1Schema>;
