@@ -91,8 +91,13 @@ describe('performance lab runner', () => {
     expect(performanceScenarios.map(({ id }) => id)).toEqual([
       'editor.preview-scheduling',
       'browser.editor-open',
+      'browser.editor-navigation',
+      'browser.editor-culling-navigation',
+      'browser.editor-exposure-flood',
+      'browser.editor-pan-zoom',
       'browser.editor-compare',
       'browser.editor-crop',
+      'browser.editor-copy-paste-settings',
       'browser.library-open',
       'native.editor-raw-open-cold',
       'native.editor-raw-open-warm',

@@ -177,6 +177,24 @@ const harnessImages: BrowserHarnessImage[] = [
     rating: 0,
     tags: null,
   },
+  {
+    exif: null,
+    is_edited: false,
+    is_virtual_copy: false,
+    modified: 1_000_000,
+    path: `${browserHarnessRoot}/browser-harness-2.ARW`,
+    rating: 0,
+    tags: null,
+  },
+  {
+    exif: null,
+    is_edited: false,
+    is_virtual_copy: false,
+    modified: 2_000_000,
+    path: `${browserHarnessRoot}/browser-harness-3.ARW`,
+    rating: 0,
+    tags: null,
+  },
 ];
 
 const isBrowserTauriEventCallback = (value: unknown): value is BrowserTauriEventCallback => typeof value === 'function';

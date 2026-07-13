@@ -64,6 +64,118 @@ export const qaScenarios: readonly QaScenario[] = [
   },
   {
     ...browserDefaults,
+    id: 'browser.editor.culling-navigation',
+    tags: ['browser', 'editor', 'navigation', 'culling'],
+    dependencies: [],
+    fixture: { id: 'editor' },
+    isolation: 'fresh-context',
+    timeoutMs: 45_000,
+    async run({ page }) {
+      await openEditorFixture(page);
+      const summary = page.getByTestId('filmstrip-selection-summary');
+      const waitForActive = (filename: string) =>
+        page.waitForFunction(
+          (expected) =>
+            document
+              .querySelector('[data-testid="filmstrip-selection-summary"]')
+              ?.getAttribute('data-active-filename') === expected,
+          filename,
+        );
+      await waitForActive('browser-harness.ARW');
+      await page.keyboard.press('ArrowRight');
+      await waitForActive('browser-harness-2.ARW');
+      await page.keyboard.press('ArrowRight');
+      await waitForActive('browser-harness-3.ARW');
+      await page.keyboard.press('ArrowLeft');
+      await waitForActive('browser-harness-2.ARW');
+      if ((await summary.getAttribute('data-selected-count')) !== '1')
+        throw new Error('Sequential navigation did not retain a single active selection.');
+      const loadPaths = await page.evaluate(() =>
+        (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [])
+          .filter(({ command }) => command === 'begin_image_open')
+          .map(({ args }) => {
+            const request = args?.request;
+            return typeof request === 'object' && request !== null && 'path' in request
+              ? Reflect.get(request, 'path')
+              : undefined;
+          }),
+      );
+      for (const suffix of ['browser-harness-2.ARW', 'browser-harness-3.ARW'])
+        if (!loadPaths.some((path) => typeof path === 'string' && path.endsWith(suffix)))
+          throw new Error(`Sequential navigation did not load ${suffix}.`);
+    },
+  },
+  {
+    ...browserDefaults,
+    id: 'browser.editor.exposure-flood',
+    tags: ['browser', 'editor', 'adjustments', 'exposure'],
+    dependencies: [],
+    fixture: { id: 'editor' },
+    isolation: 'fresh-context',
+    timeoutMs: 45_000,
+    async run({ page }) {
+      await openEditorFixture(page);
+      await page.locator('[data-panel-id="adjustments"]').first().click();
+      const exposure = page.getByTestId('basic-control-exposure-range');
+      await exposure.waitFor();
+      for (const value of ['0.1', '0.25', '0.5', '0.8', '1', '0.65', '0.35', '0.15']) await exposure.fill(value);
+      if ((await exposure.inputValue()) !== '0.15')
+        throw new Error('Exposure flood did not settle on its terminal value.');
+      await page.waitForFunction(() =>
+        (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? []).some(
+          ({ command }) => command === 'apply_adjustments',
+        ),
+      );
+      const adjustmentCalls = await page.evaluate(
+        () =>
+          (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? []).filter(
+            ({ command }) => command === 'apply_adjustments',
+          ).length,
+      );
+      if (adjustmentCalls === 0) throw new Error('Exposure flood produced no preview adjustment work.');
+    },
+  },
+  {
+    ...browserDefaults,
+    id: 'browser.editor.pan-zoom',
+    tags: ['browser', 'editor', 'presentation', 'pan-zoom'],
+    dependencies: [],
+    fixture: { id: 'editor' },
+    isolation: 'fresh-context',
+    timeoutMs: 45_000,
+    async run({ page }) {
+      await openEditorFixture(page);
+      const preview = page.getByTestId('editor-image-preview-panel');
+      const initialScale = Number(await preview.getAttribute('data-editor-transform-scale'));
+      await page.keyboard.press('ArrowUp');
+      await page.waitForFunction(
+        (scale) =>
+          Number(
+            document
+              .querySelector('[data-testid="editor-image-preview-panel"]')
+              ?.getAttribute('data-editor-transform-scale'),
+          ) > scale,
+        initialScale,
+      );
+      const box = await preview.boundingBox();
+      if (box === null) throw new Error('Editor preview has no presentation bounds.');
+      await page.keyboard.down('Space');
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(box.x + box.width / 2 + 40, box.y + box.height / 2 + 24, { steps: 4 });
+      await page.mouse.up();
+      await page.keyboard.up('Space');
+      const position = await preview.evaluate((element) => ({
+        x: Number(element.getAttribute('data-editor-transform-position-x')),
+        y: Number(element.getAttribute('data-editor-transform-position-y')),
+      }));
+      if (position.x === 0 && position.y === 0) throw new Error('Pan gesture did not move the zoomed preview.');
+      if ((await preview.getAttribute('data-viewer-gesture-state')) !== 'idle')
+        throw new Error('Pan/zoom presentation did not settle after the gesture.');
+    },
+  },
+  {
+    ...browserDefaults,
     id: 'browser.editor.compare',
     tags: ['browser', 'editor', 'compare'],
     dependencies: [],

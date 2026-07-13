@@ -16,7 +16,20 @@ const ownership: readonly { pattern: RegExp; scenarioIds: readonly string[] }[] 
   {
     pattern:
       /(?:src\/components\/panel\/Editor|src\/hooks\/editor\/useImageLoader|src\/utils\/(?:editorImagePreviewSource|progressiveImageFrame)|src-tauri\/src\/(?:io\/image_(?:loader|open_session)|raw\/(?:embedded_preview|raw_processing)))/u,
-    scenarioIds: ['browser.editor-open'],
+    scenarioIds: [
+      'browser.editor-culling-navigation',
+      'browser.editor-navigation',
+      'browser.editor-open',
+      'browser.editor-pan-zoom',
+    ],
+  },
+  {
+    pattern: /(?:src\/components\/adjustments\/Basic|src\/hooks\/editor\/.*[Aa]djustment)/u,
+    scenarioIds: ['browser.editor-exposure-flood'],
+  },
+  {
+    pattern: /src\/components\/modals\/navigation\/CopyPasteSettingsModal/u,
+    scenarioIds: ['browser.editor-copy-paste-settings'],
   },
   {
     pattern: /(?:src\/components\/panel\/MainLibrary|src\/components\/library|src\/store\/library)/u,

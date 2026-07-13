@@ -295,7 +295,18 @@ exit 1
     ).toEqual(['browser.editor-crop']);
     expect(
       selectAffectedPerformanceScenarios(['src/utils/progressiveImageFrame.ts'], performanceScenarios).scenarioIds,
-    ).toEqual(['browser.editor-open']);
+    ).toEqual([
+      'browser.editor-culling-navigation',
+      'browser.editor-navigation',
+      'browser.editor-open',
+      'browser.editor-pan-zoom',
+    ]);
+    expect(
+      selectAffectedPerformanceScenarios(
+        ['src/components/modals/navigation/CopyPasteSettingsModal.tsx'],
+        performanceScenarios,
+      ).scenarioIds,
+    ).toEqual(['browser.editor-copy-paste-settings']);
     expect(
       selectAffectedPerformanceScenarios(['src/components/panel/MainLibrary.tsx'], performanceScenarios).scenarioIds,
     ).toEqual(['browser.library-open']);
@@ -305,8 +316,13 @@ exit 1
     expect(selectAffectedPerformanceScenarios(['unknown/new-file.ts'], performanceScenarios)).toMatchObject({
       scenarioIds: [
         'browser.editor-compare',
+        'browser.editor-copy-paste-settings',
         'browser.editor-crop',
+        'browser.editor-culling-navigation',
+        'browser.editor-exposure-flood',
+        'browser.editor-navigation',
         'browser.editor-open',
+        'browser.editor-pan-zoom',
         'browser.library-open',
         'editor.preview-scheduling',
         'native.editor-raw-open-cold',

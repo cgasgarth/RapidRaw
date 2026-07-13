@@ -8,8 +8,13 @@ Every valid receipt also carries monotonic per-sample spans under its run identi
 bun perf list
 bun perf run editor.preview-scheduling
 bun perf run browser.editor-open
+bun perf run browser.editor-navigation
+bun perf run browser.editor-culling-navigation
+bun perf run browser.editor-exposure-flood
+bun perf run browser.editor-pan-zoom
 bun perf run browser.editor-compare
 bun perf run browser.editor-crop
+bun perf run browser.editor-copy-paste-settings
 bun perf run browser.library-open
 RAWENGINE_PERF_NATIVE_FIXTURE=/absolute/private/image.ARW bun perf run native.editor-raw-open-cold
 RAWENGINE_PERF_NATIVE_FIXTURE=/absolute/private/image.ARW RAWENGINE_PERF_NATIVE_NO_BUILD=1 bun perf run native.editor-raw-open-warm
