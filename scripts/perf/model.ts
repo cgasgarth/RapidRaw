@@ -25,9 +25,30 @@ export const performanceIdentitySchema = z.object({
     classId: z.string().regex(/^[0-9a-f]{64}$/u),
     cpuCores: z.number().int().positive(),
     cpuModelHash: z.string().regex(/^[0-9a-f]{64}$/u),
+    displayClassHash: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/u)
+      .optional(),
+    gpuClassHash: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/u)
+      .optional(),
     memoryGiB: z.number().int().positive(),
+    storageClassHash: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/u)
+      .optional(),
   }),
-  environment: z.object({ arch: z.string().min(1), bun: z.string().min(1), os: z.string().min(1) }),
+  environment: z.object({
+    arch: z.string().min(1),
+    bun: z.string().min(1),
+    loadAverage1m: z.number().finite().nonnegative().optional(),
+    node: z.string().min(1).optional(),
+    os: z.string().min(1),
+    powerSource: z.string().min(1).optional(),
+    rustc: z.string().min(1).optional(),
+    thermalState: z.string().min(1).optional(),
+  }),
 });
 
 export const metricSummarySchema = z.object({

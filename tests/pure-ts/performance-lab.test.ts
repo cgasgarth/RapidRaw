@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { capturePerformanceIdentity } from '../../scripts/perf/identity';
 import type { PerformanceIdentity, PerformanceScenario } from '../../scripts/perf/model';
 import { performanceRunReceiptSchema } from '../../scripts/perf/model';
 import { bisectExitCode, comparePerformanceReceipts, runPerformanceScenario } from '../../scripts/perf/runner';
@@ -40,6 +41,22 @@ const scenario = (values: readonly number[], assertions = 1): PerformanceScenari
 });
 
 describe('performance lab statistics', () => {
+  test('captures privacy-filtered hardware and runtime identity', () => {
+    const captured = capturePerformanceIdentity('test');
+    expect(captured.hardware).toMatchObject({
+      displayClassHash: expect.stringMatching(/^[0-9a-f]{64}$/u),
+      gpuClassHash: expect.stringMatching(/^[0-9a-f]{64}$/u),
+      storageClassHash: expect.stringMatching(/^[0-9a-f]{64}$/u),
+    });
+    expect(captured.environment).toMatchObject({
+      loadAverage1m: expect.any(Number),
+      node: expect.any(String),
+      powerSource: expect.any(String),
+      rustc: expect.any(String),
+      thermalState: expect.any(String),
+    });
+  });
+
   test('retains robust percentiles, dispersion, and deterministic median confidence', () => {
     const first = summarizeMetric([1, 2, 3, 4, 5]);
     expect(first).toEqual({
