@@ -2,11 +2,15 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 
 import { useEditorStore } from '../../../src/store/useEditorStore';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { buildTechnicalWhiteBalance } from '../../../src/utils/color/whiteBalance';
 import {
   analyzeWhiteBalancePickerRgbaSample,
+  applyWhiteBalancePickerHoverPreview,
   averageWhiteBalancePickerRgbaSample,
   buildWhiteBalancePickerAdjustmentCommand,
   calculateWhiteBalancePickerAdjustment,
+  cancelWhiteBalancePickerPreview,
+  createWhiteBalancePickerPreviewSession,
 } from '../../../src/utils/whiteBalancePicker';
 
 describe('white balance picker runtime command path', () => {
@@ -160,5 +164,35 @@ describe('white balance picker runtime command path', () => {
     expect(state.historyIndex).toBe(1);
     expect(state.adjustments.temperature).toBe(command.receipt.resultingTemperature);
     expect(state.adjustments.tint).toBe(command.receipt.resultingTint);
+  });
+
+  test('hover preview is history-free, cancellable, and source-revision safe', () => {
+    const base = { ...INITIAL_ADJUSTMENTS, exposure: 0.25 };
+    const previewAdjustments = {
+      ...base,
+      whiteBalanceTechnical: buildTechnicalWhiteBalance('chromaticity', 4100, 0.01),
+    };
+    let session = createWhiteBalancePickerPreviewSession(base, 'source:a');
+    useEditorStore.setState({ adjustments: base, history: [base], historyIndex: 0 });
+
+    const preview = applyWhiteBalancePickerHoverPreview(session, previewAdjustments, {
+      previewIdentity: 'preview:1',
+      selectedImagePath: 'source:a',
+    });
+    session = preview.session;
+    useEditorStore.getState().setEditor({ adjustments: preview.adjustments });
+    expect(useEditorStore.getState().history).toHaveLength(1);
+    expect(useEditorStore.getState().adjustments.whiteBalanceTechnical.mode).toBe('chromaticity');
+
+    expect(session.lastPreviewIdentity).toBe('preview:1');
+    useEditorStore.getState().setEditor({ adjustments: cancelWhiteBalancePickerPreview(session, 'source:a') });
+    expect(useEditorStore.getState().adjustments).toEqual(base);
+    expect(() =>
+      applyWhiteBalancePickerHoverPreview(session, previewAdjustments, {
+        previewIdentity: 'preview:2',
+        selectedImagePath: 'source:b',
+      }),
+    ).toThrow('white_balance_picker_stale_preview');
+    expect(() => cancelWhiteBalancePickerPreview(session, 'source:b')).toThrow('white_balance_picker_stale_preview');
   });
 });

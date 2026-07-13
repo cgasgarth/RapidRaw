@@ -272,6 +272,9 @@ interface ImageCanvasProps {
   isWbPickerActive?: boolean;
   lastWhiteBalancePickerReceipt?: WhiteBalancePickerRuntimeReceipt | null;
   onWbPicked?: (receipt: WhiteBalancePickerRuntimeReceipt, nextAdjustments: Adjustments) => void;
+  onWbPreview?: (receipt: WhiteBalancePickerRuntimeReceipt, nextAdjustments: Adjustments) => void;
+  onWbPreviewCancel?: () => void;
+  wbPickerBaseAdjustments?: Adjustments;
   setAdjustments: (fn: (prev: Adjustments) => Adjustments) => void;
   overlayMode?: OverlayMode;
   overlayRotation?: number;
@@ -344,6 +347,9 @@ const ImageCanvas = memo(
     isWbPickerActive = false,
     lastWhiteBalancePickerReceipt,
     onWbPicked,
+    onWbPreview,
+    onWbPreviewCancel,
+    wbPickerBaseAdjustments = adjustments,
     setAdjustments,
     overlayRotation,
     overlayMode,
@@ -856,7 +862,11 @@ const ImageCanvas = memo(
     const [viewerSampler, setViewerSampler] = useState(initialViewerSamplerState);
     const viewerSamplerRef = useRef(viewerSampler);
     const whiteBalancePreviewIdentityRef = useRef(finalPreviewUrl);
+    const whiteBalancePickerActiveRef = useRef(isWbPickerActive);
+    const whiteBalanceSampleSequenceRef = useRef(0);
+    const lastWhiteBalanceHoverSampleAtRef = useRef(0);
     whiteBalancePreviewIdentityRef.current = finalPreviewUrl;
+    whiteBalancePickerActiveRef.current = isWbPickerActive;
     viewerSamplerRef.current = viewerSampler;
     const transitionViewerSamplerRef = useRef<
       (transition: (current: LocalViewerSamplerState) => LocalViewerSamplerState) => void
@@ -1072,9 +1082,9 @@ const ImageCanvas = memo(
       return selectedMask ? [...otherMasks, selectedMask] : activeContainer.subMasks;
     }, [activeContainer, activeMaskId, activeAiSubMaskId, isMasking]);
 
-    const handleWbClick = useCallback(
-      (e: CanvasKonvaEvent) => {
-        if (!isWbPickerActive || !finalPreviewUrl || !onWbPicked) return;
+    const handleWbSample = useCallback(
+      (e: CanvasKonvaEvent, commit: boolean) => {
+        if (!isWbPickerActive || !finalPreviewUrl || (commit ? !onWbPicked : !onWbPreview)) return;
 
         const stage = e.target.getStage();
         const pointerPos = getCanvasPointer(stage);
@@ -1086,6 +1096,7 @@ const ImageCanvas = memo(
         const imgLogicalWidth = overlayGeometry.cropRectInOrientedPixels.width;
         const imgLogicalHeight = overlayGeometry.cropRectInOrientedPixels.height;
         const sampleGeometryEpoch = captureGeometryEpoch(overlayGeometry);
+        const sampleSequence = ++whiteBalanceSampleSequenceRef.current;
 
         if (x < 0 || x > imgLogicalWidth || y < 0 || y > imgLogicalHeight) return;
 
@@ -1094,7 +1105,12 @@ const ImageCanvas = memo(
         img.src = finalPreviewUrl;
 
         img.onload = () => {
-          if (!isGeometryEpochCurrent(sampleGeometryEpoch, overlayGeometry)) return;
+          if (
+            !whiteBalancePickerActiveRef.current ||
+            sampleSequence !== whiteBalanceSampleSequenceRef.current ||
+            !isGeometryEpochCurrent(sampleGeometryEpoch, overlayGeometry)
+          )
+            return;
           const radius = 5;
           const side = radius * 2 + 1;
 
@@ -1132,24 +1148,38 @@ const ImageCanvas = memo(
               previewPixelX: srcX,
               previewPixelY: srcY,
             },
-            currentAdjustments: adjustments,
+            currentAdjustments: wbPickerBaseAdjustments,
             currentPreviewIdentity: whiteBalancePreviewIdentityRef.current,
             previewIdentity: finalPreviewUrl,
             selectedImagePath: selectedImage.path,
           });
 
-          onWbPicked(command.receipt, command.nextAdjustments);
+          if (commit) onWbPicked?.(command.receipt, command.nextAdjustments);
+          else onWbPreview?.(command.receipt, command.nextAdjustments);
         };
       },
       [
-        adjustments,
         finalPreviewUrl,
         isWbPickerActive,
         onWbPicked,
+        onWbPreview,
         overlayGeometry,
         selectedImage.path,
+        wbPickerBaseAdjustments,
         getCanvasPointer,
       ],
+    );
+
+    const handleWbClick = useCallback((event: CanvasKonvaEvent) => handleWbSample(event, true), [handleWbSample]);
+
+    const handleWbHover = useCallback(
+      (event: CanvasKonvaEvent) => {
+        const now = performance.now();
+        if (now - lastWhiteBalanceHoverSampleAtRef.current < 150) return;
+        lastWhiteBalanceHoverSampleAtRef.current = now;
+        handleWbSample(event, false);
+      },
+      [handleWbSample],
     );
 
     const handleStart = useCallback(
@@ -1371,6 +1401,7 @@ const ImageCanvas = memo(
     const handleMove = useCallback(
       (e: CanvasMoveEvent) => {
         if (isWbPickerActive) {
+          if (isKonvaEvent(e)) handleWbHover(e);
           return;
         }
 
@@ -1546,6 +1577,7 @@ const ImageCanvas = memo(
       [
         isToolActive,
         isWbPickerActive,
+        handleWbHover,
         isInitialDrawing,
         activeMaskId,
         activeAiSubMaskId,
@@ -1729,7 +1761,11 @@ const ImageCanvas = memo(
 
     const handleMouseLeave = useCallback(() => {
       setCursorPreview((p: CursorPreview) => ({ ...p, visible: false }));
-    }, []);
+      if (isWbPickerActive) {
+        whiteBalanceSampleSequenceRef.current += 1;
+        onWbPreviewCancel?.();
+      }
+    }, [isWbPickerActive, onWbPreviewCancel]);
 
     useEffect(() => {
       if (!isToolActive) return;

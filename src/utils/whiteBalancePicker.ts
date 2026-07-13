@@ -86,6 +86,47 @@ export class WhiteBalancePickerSampleError extends Error {
   }
 }
 
+export interface WhiteBalancePickerPreviewSession {
+  baseAdjustments: Adjustments;
+  lastPreviewIdentity: string | null;
+  previewActive: boolean;
+  sourceIdentity: string;
+}
+
+export const createWhiteBalancePickerPreviewSession = (
+  baseAdjustments: Adjustments,
+  sourceIdentity: string,
+): WhiteBalancePickerPreviewSession => ({
+  baseAdjustments: structuredClone(baseAdjustments),
+  lastPreviewIdentity: null,
+  previewActive: false,
+  sourceIdentity,
+});
+
+export const applyWhiteBalancePickerHoverPreview = (
+  session: WhiteBalancePickerPreviewSession,
+  nextAdjustments: Adjustments,
+  receipt: Pick<WhiteBalancePickerRuntimeReceipt, 'previewIdentity' | 'selectedImagePath'>,
+): { adjustments: Adjustments; session: WhiteBalancePickerPreviewSession } => {
+  if (session.sourceIdentity !== receipt.selectedImagePath) throw new WhiteBalancePickerSampleError('stale_preview');
+  return {
+    adjustments: nextAdjustments,
+    session: {
+      ...session,
+      lastPreviewIdentity: receipt.previewIdentity,
+      previewActive: true,
+    },
+  };
+};
+
+export const cancelWhiteBalancePickerPreview = (
+  session: WhiteBalancePickerPreviewSession,
+  currentSourceIdentity: string,
+): Adjustments => {
+  if (session.sourceIdentity !== currentSourceIdentity) throw new WhiteBalancePickerSampleError('stale_preview');
+  return structuredClone(session.baseAdjustments);
+};
+
 export interface RgbPixel {
   blue: number;
   green: number;

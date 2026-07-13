@@ -2,8 +2,12 @@ use crate::color::camera_input_transform::{
     AcesCgLinearV1, CameraInputTransform, CameraRgbWhiteBalanceGains, RawInputTransformReceiptV1,
     RawWorkingImageV1, XyzToCameraMatrix, apply_camera_input_transform,
 };
+#[cfg(test)]
 use crate::color::white_balance::{
-    camera_white_chroma, neutral_chroma_from_wb, project_neutral_mired_weight,
+    WhiteBalanceModeV1, WhiteBalancePlanInputV1, compile_white_balance_plan,
+};
+use crate::color::white_balance::{
+    WhiteBalancePlanV1, camera_white_chroma, neutral_chroma_from_wb, project_neutral_mired_weight,
 };
 use crate::image_processing::apply_orientation;
 use anyhow::{Result, anyhow};
@@ -92,8 +96,11 @@ pub(crate) struct RawCameraProfileReport {
     pub illuminant_estimate_confidence: &'static str,
     pub illuminant_estimate_method: &'static str,
     pub matrix_hash: Option<String>,
+    pub profile_illuminant_duv: Option<f64>,
+    pub profile_illuminant_xy: Option<[f64; 2]>,
     pub status: &'static str,
     pub warm_illuminant: Option<String>,
+    pub white_balance_plan_fingerprint: Option<String>,
     pub warning_codes: Vec<&'static str>,
 }
 
@@ -110,8 +117,11 @@ impl RawCameraProfileReport {
             illuminant_estimate_confidence: "low",
             illuminant_estimate_method: "fallback",
             matrix_hash: None,
+            profile_illuminant_duv: None,
+            profile_illuminant_xy: None,
             status: "unavailable",
             warm_illuminant: None,
+            white_balance_plan_fingerprint: None,
             warning_codes: vec![reason],
         }
     }
@@ -161,6 +171,32 @@ pub(crate) fn develop_raw_image_with_report(
     Ok((apply_orientation(developed_image, orientation), report))
 }
 
+pub(crate) fn develop_raw_image_with_report_and_white_balance(
+    file_bytes: &[u8],
+    fast_demosaic: bool,
+    profile: RawProcessingProfile,
+    highlight_compression: f32,
+    linear_mode: String,
+    cancel_token: Option<(Arc<AtomicUsize>, usize)>,
+    white_balance_plan: WhiteBalancePlanV1,
+) -> Result<(DynamicImage, RawDevelopmentReport)> {
+    #[cfg(test)]
+    RAW_DEVELOPMENT_INVOCATIONS.fetch_add(1, Ordering::SeqCst);
+    let (developed_image, orientation, report) = develop_internal_with_options(
+        file_bytes,
+        fast_demosaic,
+        profile,
+        highlight_compression,
+        linear_mode,
+        cancel_token,
+        RawDefectDevelopmentOptions {
+            white_balance_plan: Some(white_balance_plan),
+            ..RawDefectDevelopmentOptions::default()
+        },
+    )?;
+    Ok((apply_orientation(developed_image, orientation), report))
+}
+
 pub(crate) fn develop_raw_source_with_report(
     source: &RawSource,
     fast_demosaic: bool,
@@ -183,11 +219,38 @@ pub(crate) fn develop_raw_source_with_report(
     Ok((apply_orientation(developed_image, orientation), report))
 }
 
-#[derive(Debug, Clone, Copy)]
+pub(crate) fn develop_raw_source_with_report_and_white_balance(
+    source: &RawSource,
+    fast_demosaic: bool,
+    profile: RawProcessingProfile,
+    highlight_compression: f32,
+    linear_mode: String,
+    cancel_token: Option<(Arc<AtomicUsize>, usize)>,
+    white_balance_plan: WhiteBalancePlanV1,
+) -> Result<(DynamicImage, RawDevelopmentReport)> {
+    #[cfg(test)]
+    RAW_DEVELOPMENT_INVOCATIONS.fetch_add(1, Ordering::SeqCst);
+    let (developed_image, orientation, report) = develop_internal_from_source(
+        source,
+        fast_demosaic,
+        profile,
+        highlight_compression,
+        linear_mode,
+        cancel_token,
+        RawDefectDevelopmentOptions {
+            white_balance_plan: Some(white_balance_plan),
+            ..RawDefectDevelopmentOptions::default()
+        },
+    )?;
+    Ok((apply_orientation(developed_image, orientation), report))
+}
+
+#[derive(Debug, Clone)]
 struct RawDefectDevelopmentOptions {
     #[cfg(test)]
     inject_test_defects: bool,
     repair_sensor_defects: bool,
+    white_balance_plan: Option<WhiteBalancePlanV1>,
 }
 
 impl Default for RawDefectDevelopmentOptions {
@@ -196,6 +259,7 @@ impl Default for RawDefectDevelopmentOptions {
             #[cfg(test)]
             inject_test_defects: false,
             repair_sensor_defects: true,
+            white_balance_plan: None,
         }
     }
 }
@@ -865,19 +929,10 @@ fn illuminant_white_xy(illuminant: Illuminant) -> Option<[f64; 2]> {
     }
 }
 
-fn interpolate_white_xy(warm: Illuminant, cool: Illuminant, cool_weight: f32) -> Option<[f64; 2]> {
-    let warm = illuminant_white_xy(warm)?;
-    let cool = illuminant_white_xy(cool)?;
-    let weight = f64::from(cool_weight);
-    Some([
-        warm[0] * (1.0 - weight) + cool[0] * weight,
-        warm[1] * (1.0 - weight) + cool[1] * weight,
-    ])
-}
-
 fn resolve_camera_color_profile(
     color_matrices: &HashMap<Illuminant, Vec<f32>>,
     wb: [f32; 4],
+    white_balance_plan: Option<&WhiteBalancePlanV1>,
 ) -> CameraProfileResolution {
     let d65 = color_matrices
         .get(&Illuminant::D65)
@@ -899,7 +954,20 @@ fn resolve_camera_color_profile(
 
     let candidate_count = candidates.len();
 
-    let Some(cct_estimate) = estimate_scene_cct_from_camera_neutral(wb, &candidates) else {
+    let plan_illuminant =
+        white_balance_plan.and_then(WhiteBalancePlanV1::camera_profile_illuminant);
+    let cct_estimate = plan_illuminant.map_or_else(
+        || estimate_scene_cct_from_camera_neutral(wb, &candidates),
+        |illuminant| {
+            Some(SceneCctEstimate {
+                cct_kelvin: illuminant.cct_kelvin as f32,
+                clamped: false,
+                confidence: "high",
+                method: "white_balance_plan_v1",
+            })
+        },
+    );
+    let Some(cct_estimate) = cct_estimate else {
         let selected = d65.cloned().or_else(|| {
             candidates
                 .first()
@@ -930,17 +998,26 @@ fn resolve_camera_color_profile(
                 illuminant_estimate_confidence: "low",
                 illuminant_estimate_method: "fallback",
                 matrix_hash: selected.as_deref().map(camera_matrix_hash),
+                profile_illuminant_duv: None,
+                profile_illuminant_xy: None,
                 status: if selected.is_some() {
                     "fallback"
                 } else {
                     "unavailable"
                 },
                 warm_illuminant: None,
+                white_balance_plan_fingerprint: None,
                 warning_codes: vec![fallback_reason],
             },
         };
     };
     let target_cct = cct_estimate.cct_kelvin;
+    let profile_illuminant_xy = plan_illuminant
+        .map(|illuminant| illuminant.xy)
+        .or_else(|| cct_to_xy(target_cct));
+    let profile_illuminant_duv = plan_illuminant.map(|illuminant| illuminant.duv);
+    let white_balance_plan_fingerprint =
+        plan_illuminant.map(|illuminant| illuminant.fingerprint.to_string());
 
     if candidates.len() >= 2 {
         let warm = candidates
@@ -961,7 +1038,7 @@ fn resolve_camera_color_profile(
             let cool_weight = interpolation_weight_for_cct(target_cct, warm.1, cool.1);
             let matrix = interpolate_color_matrix(warm.2, cool.2, cool_weight);
             return CameraProfileResolution {
-                calibration_white_xy: interpolate_white_xy(warm.0, cool.0, cool_weight),
+                calibration_white_xy: profile_illuminant_xy,
                 report: RawCameraProfileReport {
                     algorithm_id: CAMERA_PROFILE_RESOLVER_ALGORITHM_ID,
                     candidate_count,
@@ -973,8 +1050,11 @@ fn resolve_camera_color_profile(
                     illuminant_estimate_confidence: cct_estimate.confidence,
                     illuminant_estimate_method: cct_estimate.method,
                     matrix_hash: Some(camera_matrix_hash(&matrix)),
+                    profile_illuminant_duv,
+                    profile_illuminant_xy,
                     status: "interpolated",
                     warm_illuminant: Some(illuminant_label(warm.0)),
+                    white_balance_plan_fingerprint,
                     warning_codes: Vec::new(),
                 },
                 matrix: Some(matrix),
@@ -983,7 +1063,7 @@ fn resolve_camera_color_profile(
 
         let matrix = warm.2.to_vec();
         return CameraProfileResolution {
-            calibration_white_xy: illuminant_white_xy(warm.0),
+            calibration_white_xy: profile_illuminant_xy,
             report: RawCameraProfileReport {
                 algorithm_id: CAMERA_PROFILE_RESOLVER_ALGORITHM_ID,
                 candidate_count,
@@ -995,8 +1075,11 @@ fn resolve_camera_color_profile(
                 illuminant_estimate_confidence: cct_estimate.confidence,
                 illuminant_estimate_method: cct_estimate.method,
                 matrix_hash: Some(camera_matrix_hash(&matrix)),
+                profile_illuminant_duv,
+                profile_illuminant_xy,
                 status: "single_illuminant",
                 warm_illuminant: Some(illuminant_label(warm.0)),
+                white_balance_plan_fingerprint,
                 warning_codes: Vec::new(),
             },
             matrix: Some(matrix),
@@ -1010,9 +1093,11 @@ fn resolve_camera_color_profile(
     });
     CameraProfileResolution {
         matrix: selected.clone(),
-        calibration_white_xy: candidates
-            .first()
-            .and_then(|candidate| illuminant_white_xy(candidate.0)),
+        calibration_white_xy: profile_illuminant_xy.or_else(|| {
+            candidates
+                .first()
+                .and_then(|candidate| illuminant_white_xy(candidate.0))
+        }),
         report: RawCameraProfileReport {
             algorithm_id: CAMERA_PROFILE_RESOLVER_ALGORITHM_ID,
             candidate_count,
@@ -1030,6 +1115,8 @@ fn resolve_camera_color_profile(
             illuminant_estimate_confidence: cct_estimate.confidence,
             illuminant_estimate_method: cct_estimate.method,
             matrix_hash: selected.as_deref().map(camera_matrix_hash),
+            profile_illuminant_duv,
+            profile_illuminant_xy,
             status: if selected.is_some() {
                 "single_illuminant"
             } else {
@@ -1038,6 +1125,7 @@ fn resolve_camera_color_profile(
             warm_illuminant: candidates
                 .first()
                 .map(|candidate| illuminant_label(candidate.0)),
+            white_balance_plan_fingerprint,
             warning_codes: if selected.is_some() {
                 vec!["single_valid_camera_matrix"]
             } else {
@@ -1047,13 +1135,16 @@ fn resolve_camera_color_profile(
     }
 }
 
-fn apply_dual_illuminant_camera_profile(raw_image: &mut RawImage) -> CameraProfileResolution {
+fn apply_dual_illuminant_camera_profile(
+    raw_image: &mut RawImage,
+    white_balance_plan: Option<&WhiteBalancePlanV1>,
+) -> CameraProfileResolution {
     let wb = if raw_image.wb_coeffs[0].is_nan() {
         [1.0, 1.0, 1.0, 1.0]
     } else {
         raw_image.wb_coeffs
     };
-    let resolution = resolve_camera_color_profile(&raw_image.color_matrix, wb);
+    let resolution = resolve_camera_color_profile(&raw_image.color_matrix, wb, white_balance_plan);
     if let Some(color_matrix) = resolution.matrix.clone() {
         raw_image.color_matrix.clear();
         raw_image.color_matrix.insert(Illuminant::D65, color_matrix);
@@ -1295,7 +1386,10 @@ fn develop_internal_from_source(
     }
 
     let profile_resolution = if apply_calibration {
-        apply_dual_illuminant_camera_profile(&mut raw_image)
+        apply_dual_illuminant_camera_profile(
+            &mut raw_image,
+            defect_options.white_balance_plan.as_ref(),
+        )
     } else {
         CameraProfileResolution {
             matrix: None,
@@ -1654,7 +1748,7 @@ mod tests {
             f32::NAN,
         ];
 
-        let resolution = resolve_camera_color_profile(&color_matrices, wb);
+        let resolution = resolve_camera_color_profile(&color_matrices, wb, None);
         let selected = resolution.matrix.unwrap();
 
         assert_eq!(selected.len(), warm.len());
@@ -1684,6 +1778,80 @@ mod tests {
     }
 
     #[test]
+    fn explicit_white_balance_plan_is_camera_profile_interpolation_authority() {
+        let warm = vec![1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0];
+        let cool = vec![0.8, 0.02, 0.0, 0.0, 1.1, 0.0, 0.0, 0.01, 0.7];
+        let color_matrices = HashMap::from([
+            (Illuminant::A, warm.clone()),
+            (Illuminant::D65, cool.clone()),
+        ]);
+        let plan = compile_white_balance_plan(WhiteBalancePlanInputV1 {
+            mode: WhiteBalanceModeV1::KelvinTint,
+            kelvin: 4_200.0,
+            duv: 0.012,
+            x: None,
+            y: None,
+            input_semantics: Default::default(),
+            camera_channel_gains: None,
+        })
+        .unwrap();
+
+        let first = resolve_camera_color_profile(
+            &color_matrices,
+            [f32::NAN, 1.0, f32::NAN, f32::NAN],
+            Some(&plan),
+        );
+        let second =
+            resolve_camera_color_profile(&color_matrices, [8.0, 1.0, 0.125, f32::NAN], Some(&plan));
+        let daylight_plan = compile_white_balance_plan(WhiteBalancePlanInputV1 {
+            mode: WhiteBalanceModeV1::Preset,
+            kelvin: 6_000.0,
+            duv: -0.004,
+            x: None,
+            y: None,
+            input_semantics: Default::default(),
+            camera_channel_gains: None,
+        })
+        .unwrap();
+        let daylight = resolve_camera_color_profile(
+            &color_matrices,
+            [8.0, 1.0, 0.125, f32::NAN],
+            Some(&daylight_plan),
+        );
+
+        assert_eq!(
+            first.matrix, second.matrix,
+            "metadata WB cannot override the explicit plan"
+        );
+        assert_eq!(
+            first.report.illuminant_estimate_method,
+            "white_balance_plan_v1"
+        );
+        assert_eq!(first.report.estimated_cct_kelvin, Some(4_200.0));
+        assert_eq!(first.report.profile_illuminant_duv, Some(0.012));
+        assert_eq!(
+            first.report.profile_illuminant_xy,
+            Some(plan.source_illuminant.xy)
+        );
+        assert_eq!(
+            first.report.white_balance_plan_fingerprint.as_deref(),
+            Some(plan.fingerprint.as_str())
+        );
+        assert_eq!(first.calibration_white_xy, Some(plan.source_illuminant.xy));
+        assert_ne!(first.matrix, Some(warm));
+        assert_ne!(first.matrix, Some(cool));
+        assert_ne!(first.matrix, daylight.matrix);
+        assert_ne!(
+            first.report.white_balance_plan_fingerprint,
+            daylight.report.white_balance_plan_fingerprint
+        );
+        assert_eq!(
+            daylight.report.profile_illuminant_xy,
+            Some(daylight_plan.source_illuminant.xy)
+        );
+    }
+
+    #[test]
     fn camera_matrix_selection_keeps_d65_fallback_when_wb_is_invalid() {
         let warm = vec![0.80, -0.20, 0.10, -0.30, 1.20, 0.20, -0.04, 0.08, 0.66];
         let cool = vec![0.60, -0.10, 0.04, -0.20, 1.05, 0.14, -0.02, 0.05, 0.52];
@@ -1692,7 +1860,7 @@ mod tests {
         color_matrices.insert(Illuminant::D65, cool.clone());
 
         let resolution =
-            resolve_camera_color_profile(&color_matrices, [f32::NAN, 1.0, 1.0, f32::NAN]);
+            resolve_camera_color_profile(&color_matrices, [f32::NAN, 1.0, 1.0, f32::NAN], None);
         let selected = resolution.matrix.unwrap();
 
         assert_eq!(selected, cool);
@@ -1867,6 +2035,7 @@ mod tests {
         let proof_options = RawDefectDevelopmentOptions {
             inject_test_defects: true,
             repair_sensor_defects: false,
+            white_balance_plan: None,
         };
         let (uncorrected, uncorrected_orientation, _) = develop_internal_with_options(
             &file_bytes,
@@ -1875,7 +2044,7 @@ mod tests {
             2.5,
             "default".to_string(),
             None,
-            proof_options,
+            proof_options.clone(),
         )
         .expect("develop private RAW with injected defects");
         let uncorrected = apply_orientation(uncorrected, uncorrected_orientation);

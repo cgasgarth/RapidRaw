@@ -1,6 +1,9 @@
 use crate::Cursor;
 use crate::app_settings::{AppSettings, load_settings_or_default};
 use crate::app_state::{AppState, LoadedImage};
+use crate::color::white_balance::{
+    WhiteBalancePlanInputV1, WhiteBalancePlanV1, compile_white_balance_plan,
+};
 use crate::exif_processing;
 use crate::file_management::{parse_virtual_path, read_file_mapped};
 use crate::formats::is_raw_file;
@@ -9,7 +12,8 @@ use crate::mask_generation::SubMask;
 use crate::patch_assets::{CompositeResult, composite_patches};
 use crate::raw_processing::{
     RawDemosaicPath, RawDevelopmentReport, RawProcessingProfile, RawRuntimeReport,
-    develop_raw_image_with_report,
+    develop_raw_image_with_report, develop_raw_image_with_report_and_white_balance,
+    develop_raw_source_with_report_and_white_balance,
 };
 use crate::render_caches::RenderCaches;
 use crate::source_revision::{DecodedImageKey, RawProcessingProfileKey, SourceRevision};
@@ -373,17 +377,27 @@ pub(crate) fn load_and_composite_with_report(
     settings: &AppSettings,
     cancel_token: Option<(Arc<AtomicUsize>, usize)>,
 ) -> Result<(DynamicImage, Option<RawDevelopmentReport>)> {
-    let (base_image, raw_development_report) = load_base_image_from_bytes_with_report(
+    let white_balance_plan = technical_white_balance_plan_from_adjustments(adjustments);
+    let (base_image, raw_development_report) = load_base_image_from_bytes_with_report_and_plan(
         base_image,
         path,
         use_fast_raw_dev,
         settings,
         cancel_token,
+        white_balance_plan,
     )?;
     Ok((
         composite_patches_on_image(&base_image, adjustments)?.into_owned(),
         raw_development_report,
     ))
+}
+
+fn technical_white_balance_plan_from_adjustments(
+    adjustments: &Value,
+) -> Option<WhiteBalancePlanV1> {
+    let settings = adjustments.get("whiteBalanceTechnical")?.clone();
+    let input = serde_json::from_value::<WhiteBalancePlanInputV1>(settings).ok()?;
+    compile_white_balance_plan(input).ok()
 }
 
 pub fn load_base_image_from_bytes(
@@ -417,6 +431,26 @@ pub(crate) fn load_base_image_from_bytes_with_report(
         settings,
         cancel_token,
         None,
+        None,
+    )
+}
+
+fn load_base_image_from_bytes_with_report_and_plan(
+    bytes: &[u8],
+    path_for_ext_check: &str,
+    use_fast_raw_dev: bool,
+    settings: &AppSettings,
+    cancel_token: Option<(Arc<AtomicUsize>, usize)>,
+    white_balance_plan: Option<WhiteBalancePlanV1>,
+) -> Result<(DynamicImage, Option<RawDevelopmentReport>)> {
+    load_base_image_from_source_with_report(
+        bytes,
+        path_for_ext_check,
+        use_fast_raw_dev,
+        settings,
+        cancel_token,
+        None,
+        white_balance_plan,
     )
 }
 
@@ -434,6 +468,7 @@ fn load_base_image_from_prepared_raw_source_with_report(
         settings,
         cancel_token,
         Some(source),
+        None,
     )
 }
 
@@ -444,6 +479,7 @@ fn load_base_image_from_source_with_report(
     settings: &AppSettings,
     cancel_token: Option<(Arc<AtomicUsize>, usize)>,
     prepared_raw_source: Option<&RawSource>,
+    white_balance_plan: Option<WhiteBalancePlanV1>,
 ) -> Result<(DynamicImage, Option<RawDevelopmentReport>)> {
     let raw_processing_mode = settings.raw_processing_mode.as_deref();
     let recipe = raw_processing_mode_recipe(raw_processing_mode);
@@ -487,23 +523,45 @@ fn load_base_image_from_source_with_report(
         let profile = RawProcessingProfile::from_mode(raw_processing_mode.unwrap_or("balanced"));
         match panic::catch_unwind(move || {
             if let Some(source) = prepared_raw_source {
-                crate::raw_processing::develop_raw_source_with_report(
-                    source,
-                    use_fast_raw_dev,
-                    profile,
-                    highlight_compression,
-                    linear_mode,
-                    cancel_token,
-                )
+                match white_balance_plan {
+                    Some(plan) => develop_raw_source_with_report_and_white_balance(
+                        source,
+                        use_fast_raw_dev,
+                        profile,
+                        highlight_compression,
+                        linear_mode,
+                        cancel_token,
+                        plan,
+                    ),
+                    None => crate::raw_processing::develop_raw_source_with_report(
+                        source,
+                        use_fast_raw_dev,
+                        profile,
+                        highlight_compression,
+                        linear_mode,
+                        cancel_token,
+                    ),
+                }
             } else {
-                develop_raw_image_with_report(
-                    bytes,
-                    use_fast_raw_dev,
-                    profile,
-                    highlight_compression,
-                    linear_mode,
-                    cancel_token,
-                )
+                match white_balance_plan {
+                    Some(plan) => develop_raw_image_with_report_and_white_balance(
+                        bytes,
+                        use_fast_raw_dev,
+                        profile,
+                        highlight_compression,
+                        linear_mode,
+                        cancel_token,
+                        plan,
+                    ),
+                    None => develop_raw_image_with_report(
+                        bytes,
+                        use_fast_raw_dev,
+                        profile,
+                        highlight_compression,
+                        linear_mode,
+                        cancel_token,
+                    ),
+                }
             }
         }) {
             Ok(Ok((mut image, report))) => {
@@ -598,6 +656,24 @@ fn add_raw_development_report_exif(
     if let Some(value) = &profile.matrix_hash {
         exif.insert(
             "RawEngineCameraProfileMatrixHash".to_string(),
+            value.clone(),
+        );
+    }
+    if let Some(value) = profile.profile_illuminant_xy {
+        exif.insert(
+            "RawEngineCameraProfileIlluminantXy".to_string(),
+            format!("{:.8},{:.8}", value[0], value[1]),
+        );
+    }
+    if let Some(value) = profile.profile_illuminant_duv {
+        exif.insert(
+            "RawEngineCameraProfileIlluminantDuv".to_string(),
+            format!("{value:.8}"),
+        );
+    }
+    if let Some(value) = &profile.white_balance_plan_fingerprint {
+        exif.insert(
+            "RawEngineCameraProfileWhiteBalancePlanFingerprint".to_string(),
             value.clone(),
         );
     }

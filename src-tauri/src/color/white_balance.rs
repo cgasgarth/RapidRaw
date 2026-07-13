@@ -64,6 +64,28 @@ pub(crate) struct WhiteBalancePlanV1 {
     pub fingerprint: String,
 }
 
+impl WhiteBalancePlanV1 {
+    /// Explicit technical modes are the authority for camera-profile
+    /// interpolation. As-shot intentionally returns `None`: its illuminant is
+    /// resolved from the camera neutral and profile matrices during RAW decode.
+    pub(crate) fn camera_profile_illuminant(&self) -> Option<ProfileIlluminantV1<'_>> {
+        (self.mode != WhiteBalanceModeV1::AsShot).then_some(ProfileIlluminantV1 {
+            cct_kelvin: self.source_illuminant.cct_kelvin,
+            duv: self.source_illuminant.duv,
+            fingerprint: &self.fingerprint,
+            xy: self.source_illuminant.xy,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ProfileIlluminantV1<'a> {
+    pub cct_kelvin: f64,
+    pub duv: f64,
+    pub fingerprint: &'a str,
+    pub xy: [f64; 2],
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct WhiteBalanceFingerprintV1 {
