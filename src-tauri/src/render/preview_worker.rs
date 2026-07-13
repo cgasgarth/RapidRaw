@@ -556,8 +556,17 @@ fn encode_preview_response(
     fn_start: std::time::Instant,
 ) -> Result<Vec<u8>, String> {
     #[cfg(not(any(target_os = "android", target_os = "linux")))]
-    let display_snapshot =
-        app_handle.map(crate::display_profile::display_preview_transform_snapshot_for_app);
+    let display_snapshot = app_handle.map(|app| {
+        app.state::<AppState>()
+            .display_target_coordinator
+            .lock()
+            .unwrap()
+            .as_ref()
+            .and_then(|coordinator| coordinator.current_snapshot())
+            .unwrap_or_else(|| {
+                Arc::new(crate::display_profile::display_preview_transform_snapshot_for_app(app))
+            })
+    });
     #[cfg(not(any(target_os = "android", target_os = "linux")))]
     if let Some(snapshot) = display_snapshot.as_ref() {
         log::debug!(

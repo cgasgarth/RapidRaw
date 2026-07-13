@@ -10,6 +10,21 @@ type CullingProgressPayload = Progress & { stage: string };
 export const stringPayloadSchema = z.string();
 export const countPayloadSchema = nonnegativeNumberSchema;
 
+export const displayTargetChangePayloadSchema = z
+  .object({
+    deviceGeneration: nonnegativeNumberSchema,
+    displayResourceGeneration: nonnegativeNumberSchema,
+    target: z
+      .object({
+        colorSpace: z.literal('display_encoded_srgb'),
+        displayId: z.number().int().nonnegative().nullable(),
+        profileSha256: z.string().min(1),
+        scaleFactorBits: nonnegativeNumberSchema,
+      })
+      .strict(),
+  })
+  .strict();
+
 export const progressPayloadSchema = z
   .object({
     completed: nonnegativeNumberSchema.optional(),
