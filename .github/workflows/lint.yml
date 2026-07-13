@@ -27,7 +27,6 @@ jobs:
       workflow: ${{ steps.plan.outputs.workflow }}
       docs: ${{ steps.plan.outputs.docs }}
       plan_json: ${{ steps.plan.outputs.plan_json }}
-      started_epoch: ${{ steps.plan.outputs.started_epoch }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -37,17 +36,12 @@ jobs:
         with:
           bun-version-file: package.json
 
-      - name: Collect changed paths and authoritative workflow start
-        id: workflow-start
+      - name: Collect changed paths
         env:
-          GH_TOKEN: ${{ github.token }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
-          run_started_at="$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}" --jq .run_started_at)"
-          started_epoch="$(date -u -d "$run_started_at" +%s)"
-          echo "started_epoch=$started_epoch" >> "$GITHUB_OUTPUT"
           if [[ -n "$BASE_SHA" ]]; then
             git diff --name-only --diff-filter=ACMR "$BASE_SHA...$HEAD_SHA" > .pr-paths
           else
@@ -56,8 +50,6 @@ jobs:
 
       - name: Plan affected fast lanes and disclose deferred closure
         id: plan
-        env:
-          WORKFLOW_STARTED_EPOCH: ${{ steps.workflow-start.outputs.started_epoch }}
         run: bun scripts/ci/pr-ci-contract.ts --paths-file .pr-paths
 
   fast-lint:
@@ -243,51 +235,18 @@ jobs:
       - fast-docs
     if: always() && github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 1
+    timeout-minutes: 2
     steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup-bun-deps
       - name: Fail closed on lane failure, unexpected skip, or budget overrun
         shell: bash
         env:
+          GH_TOKEN: ${{ github.token }}
           NEEDS_CONTEXT: ${{ toJSON(needs) }}
           PLAN_JSON: ${{ needs.plan.outputs.plan_json }}
-          STARTED_EPOCH: ${{ needs.plan.outputs.started_epoch }}
         run: |
           set -euo pipefail
-          now_epoch="$(date +%s)"
-          elapsed="$((now_epoch - STARTED_EPOCH))"
-          failures="$(
-            jq -r --argjson plan "$PLAN_JSON" '
-              . as $needs
-              |
-              {
-                js: ["fast-lint", "fast-typecheck", "fast-contract-tests", "fast-format"],
-                frontend: ["fast-build-i18n", "fast-unsafe-unused", "fast-visual"],
-                schema: ["fast-schema"],
-                dependencies: ["fast-js-security"],
-                rust: ["fast-rust"],
-                workflow: ["fast-workflow"],
-                docs: ["fast-docs"]
-              }
-              | to_entries[] as $lane
-              | $lane.value[] as $job
-              | ($needs[$job].result // "missing") as $result
-              | (if ($plan.lanes | has($lane.key)) then $plan.lanes[$lane.key] else true end) as $selected
-              | select(($selected and $result != "success") or (($selected | not) and $result != "skipped"))
-              | "\($job)=\($result)"
-            ' <<< "$NEEDS_CONTEXT"
-          )"
-          if (( elapsed < 0 || elapsed > 240 )); then
-            failures="${failures}${failures:+$'\n'}required validation elapsed=${elapsed}s budget=240s"
-          fi
-          deferred="$(jq -r '.deferredToMain | join("; ")' <<< "$PLAN_JSON")"
-          {
-            echo '## Required aggregate'
-            echo
-            echo "- Elapsed: ${elapsed}s / 240s"
-            echo "- Deferred to non-canceling main: ${deferred}"
-          } >> "$GITHUB_STEP_SUMMARY"
-          if [[ -n "$failures" ]]; then
-            echo "$failures"
-            exit 1
-          fi
-          echo "PR CI / required ok (${elapsed}s)"
+          JOBS_CONTEXT="$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?filter=latest&per_page=100")"
+          export JOBS_CONTEXT
+          bun scripts/ci/pr-ci-contract.ts --verify
