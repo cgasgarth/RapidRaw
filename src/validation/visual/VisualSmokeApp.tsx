@@ -279,7 +279,7 @@ const adjustmentsPanelRetuneRawImage: SelectedImage = {
   path: '/visual-smoke/adjustments-panel-retune.ARW',
   rawDevelopmentReport: {
     cameraProfile: {
-      algorithmId: 'visual-smoke-camera-profile-v1',
+      algorithmId: 'dual_illuminant_mired_v1',
       candidateCount: 1,
       colorCheckerGate: {
         status: 'gated_pass',
