@@ -235,6 +235,7 @@ describe('color-managed reference matching', () => {
     const receipt = matchLookApplicationReceiptV1Schema.parse({
       appliedAt: '2026-07-13T12:00:00.000Z',
       destination: 'adjustment-layer',
+      effectiveReferences: proposal.effectiveReferences,
       enabledGroups: ['tone'],
       historyEntriesAdded: 1,
       impact: 40,
