@@ -2,6 +2,8 @@ use std::borrow::Cow;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
+const DENOISE_RENDER_REVISION_ABI: u32 = 1;
+
 use image::DynamicImage;
 use serde_json::Value;
 
@@ -34,6 +36,7 @@ pub fn parse_denoise_render_controls(adjustments: &Value) -> DenoiseRenderContro
 pub fn calculate_denoise_render_hash(base_hash: u64, adjustments: &Value) -> u64 {
     let controls = parse_denoise_render_controls(adjustments);
     let mut hasher = DefaultHasher::new();
+    DENOISE_RENDER_REVISION_ABI.hash(&mut hasher);
     base_hash.hash(&mut hasher);
     controls.luma_strength.to_bits().hash(&mut hasher);
     controls.chroma_strength.to_bits().hash(&mut hasher);

@@ -41,8 +41,8 @@ pub struct LoadedImage {
 
 #[derive(Clone)]
 pub struct CachedPreview {
-    pub image: Arc<DynamicImage>,
-    pub small_image: Arc<DynamicImage>,
+    pub image: crate::gpu_processing::RevisionedImage,
+    pub small_image: crate::gpu_processing::RevisionedImage,
     pub identity: crate::render::artifact_identity::RenderArtifactIdentity,
     pub scale: f32,
     pub unscaled_crop_offset: (f32, f32),

@@ -39,6 +39,7 @@ pub struct RenderPlanRevision {
 pub struct StageFingerprints {
     pub source: u64,
     pub geometry: u64,
+    pub pre_gpu_base: u64,
     pub masks: u64,
     pub retouch: u64,
     pub detail: u64,
@@ -280,8 +281,25 @@ fn fingerprints(
         &FINGERPRINT_VERSION.to_le_bytes(),
         &geometry_bytes(geometry, crop),
     ]);
+    let pre_gpu_color = hash_selected(
+        effective,
+        crate::adjustment_fields::CPU_COLOR_RENDER_HASH_KEYS,
+    );
+    let color_section_visibility = hash_json(
+        effective
+            .get("sectionVisibility")
+            .and_then(|visibility| visibility.get("color"))
+            .unwrap_or(&Value::Bool(true)),
+    );
+    let pre_gpu_base = hash_parts(&[
+        b"pre-gpu-base",
+        &FINGERPRINT_VERSION.to_le_bytes(),
+        &geometry.to_le_bytes(),
+        &pre_gpu_color.to_le_bytes(),
+        &color_section_visibility.to_le_bytes(),
+    ]);
     let masks_fingerprint = hash_json(effective.get("masks").unwrap_or(&Value::Null));
-    let retouch = hash_json(effective.get("aiPatches").unwrap_or(&Value::Null));
+    let retouch = pre_gpu_retouch_fingerprint(effective);
     let detail = hash_selected(
         effective,
         &[
@@ -326,6 +344,7 @@ fn fingerprints(
     StageFingerprints {
         source,
         geometry,
+        pre_gpu_base,
         masks: masks_fingerprint,
         retouch,
         detail,
@@ -333,6 +352,35 @@ fn fingerprints(
         output,
         full,
     }
+}
+
+fn pre_gpu_retouch_fingerprint(effective: &Value) -> u64 {
+    let mut cpu_retouch_layers = effective
+        .get("masks")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter(|layer| {
+            layer
+                .get("retouchCloneSource")
+                .is_some_and(|value| !value.is_null())
+                || layer
+                    .get("retouchRemoveSource")
+                    .is_some_and(|value| !value.is_null())
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    if let Some(legacy_patches) = effective.get("aiPatches")
+        && !legacy_patches.is_null()
+    {
+        cpu_retouch_layers.push(legacy_patches.clone());
+    }
+    let content = hash_json(&Value::Array(cpu_retouch_layers));
+    hash_parts(&[
+        b"pre-gpu-retouch",
+        &FINGERPRINT_VERSION.to_le_bytes(),
+        &content.to_le_bytes(),
+    ])
 }
 
 fn geometry_bytes(params: &GeometryParams, crop: Option<Crop>) -> Vec<u8> {
@@ -515,7 +563,23 @@ mod tests {
         let base = compile_render_plan(&json!({}), context(1), None).unwrap();
         let exposure = compile_render_plan(&json!({"exposure": 20}), context(2), None).unwrap();
         assert_eq!(base.fingerprints.geometry, exposure.fingerprints.geometry);
+        assert_eq!(
+            base.fingerprints.pre_gpu_base,
+            exposure.fingerprints.pre_gpu_base
+        );
+        assert_eq!(base.fingerprints.detail, exposure.fingerprints.detail);
+        assert_eq!(base.fingerprints.retouch, exposure.fingerprints.retouch);
         assert_ne!(base.fingerprints.color, exposure.fingerprints.color);
+        let cpu_color = compile_render_plan(
+            &json!({"channelMixer":{"red":[100,0,0],"green":[0,100,0],"blue":[0,0,100]}}),
+            context(7),
+            None,
+        )
+        .unwrap();
+        assert_ne!(
+            base.fingerprints.pre_gpu_base,
+            cpu_color.fingerprints.pre_gpu_base
+        );
         let crop = compile_render_plan(
             &json!({"crop":{"x":0.1,"y":0.0,"width":0.9,"height":1.0}}),
             context(3),
@@ -523,10 +587,18 @@ mod tests {
         )
         .unwrap();
         assert_ne!(base.fingerprints.geometry, crop.fingerprints.geometry);
+        assert_ne!(
+            base.fingerprints.pre_gpu_base,
+            crop.fingerprints.pre_gpu_base
+        );
 
         let detail = compile_render_plan(&json!({"sharpness": 30}), context(4), None).unwrap();
         assert_ne!(base.fingerprints.detail, detail.fingerprints.detail);
         assert_eq!(base.fingerprints.geometry, detail.fingerprints.geometry);
+        assert_eq!(
+            base.fingerprints.pre_gpu_base,
+            detail.fingerprints.pre_gpu_base
+        );
 
         let patches = compile_render_plan(
             &json!({"aiPatches":[{"id":"heal-1","visible":true,"patchDataBase64":"abc"}]}),
@@ -540,6 +612,36 @@ mod tests {
         let clipping =
             compile_render_plan(&json!({"showClipping":true}), context(6), None).unwrap();
         assert_ne!(base.fingerprints.output, clipping.fingerprints.output);
+    }
+
+    #[test]
+    fn gpu_only_masks_do_not_invalidate_pre_gpu_pixels_but_retouch_masks_do() {
+        let ordinary_a = json!({"masks":[{
+            "id":"local","visible":true,"opacity":100,"adjustments":{"exposure":10},
+            "subMasks":[]
+        }]});
+        let ordinary_b = json!({"masks":[{
+            "id":"local","visible":true,"opacity":100,"adjustments":{"exposure":30},
+            "subMasks":[]
+        }]});
+        assert_eq!(
+            pre_gpu_retouch_fingerprint(&ordinary_a),
+            pre_gpu_retouch_fingerprint(&ordinary_b),
+            "a mask consumed only as GPU uniforms must preserve uploaded pixels"
+        );
+
+        let retouch_a = json!({"masks":[{
+            "id":"clone","visible":true,"opacity":100,"adjustments":{},
+            "retouchCloneSource":{"retouchMode":"clone","sourcePoint":{"x":0.1,"y":0.2},
+                "targetPoint":{"x":0.8,"y":0.7},"radiusPx":12},"subMasks":[]
+        }]});
+        let mut retouch_b = retouch_a.clone();
+        retouch_b["masks"][0]["retouchCloneSource"]["sourcePoint"]["x"] = json!(0.3);
+        assert_ne!(
+            pre_gpu_retouch_fingerprint(&retouch_a),
+            pre_gpu_retouch_fingerprint(&retouch_b),
+            "a CPU retouch source change must invalidate uploaded pixels"
+        );
     }
 
     #[test]

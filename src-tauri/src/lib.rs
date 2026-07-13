@@ -788,10 +788,14 @@ fn render_processed_export_soft_proof_preview(
         &context,
         state,
         retouched_image.as_ref(),
-        crate::gpu_processing::PreGpuImageIdentity::from_image(
+        crate::gpu_processing::PreGpuImageIdentity::for_stage(
             retouched_image.as_ref(),
-            crate::gpu_processing::PreGpuImageIdentity::source_revision(&loaded_image.path),
+            loaded_image.artifact_source.source_fingerprint(),
             detail_stage.render_hash,
+            crate::gpu_processing::PixelBufferRevision::combine_generations(&[
+                detail_stage.render_hash,
+                calculate_geometry_hash(adjustments),
+            ]),
         ),
         RenderRequest {
             adjustments: final_adjustments,
@@ -901,13 +905,16 @@ fn generate_uncropped_preview(
             get_all_adjustments_from_json(render_adjustments.as_ref(), is_raw, tm_override);
         let lut_path = render_adjustments["lutPath"].as_str();
         let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
+        let pre_gpu_revision = calculate_transform_hash(&adjustments_clone);
         if let Ok(processed_image) = process_and_get_dynamic_image(
             &context,
             &state,
             &processing_base,
-            crate::gpu_processing::PreGpuImageIdentity::for_source(
+            crate::gpu_processing::PreGpuImageIdentity::for_stage(
                 &processing_base,
-                &loaded_image.path,
+                loaded_image.artifact_source.source_fingerprint(),
+                pre_gpu_revision,
+                pre_gpu_revision,
             ),
             RenderRequest {
                 adjustments: uncropped_adjustments,
@@ -1521,10 +1528,14 @@ async fn preview_geometry_transform(
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<String, String> {
-    let (loaded_image_path, is_raw) = {
+    let (loaded_image_path, loaded_source_revision, is_raw) = {
         let guard = state.original_image.lock().unwrap();
         let loaded = guard.as_ref().ok_or("No image loaded")?;
-        (loaded.path.clone(), loaded.is_raw)
+        (
+            loaded.path.clone(),
+            loaded.artifact_source.source_fingerprint(),
+            loaded.is_raw,
+        )
     };
 
     let visual_hash = calculate_visual_hash(&loaded_image_path, &js_adjustments);
@@ -1606,14 +1617,17 @@ async fn preview_geometry_transform(
             let lut_path = temp_adjustments["lutPath"].as_str();
             let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
             let mask_bitmaps = Vec::new();
+            let pre_gpu_revision = calculate_transform_hash(&temp_adjustments);
 
             let processed_base = process_and_get_dynamic_image(
                 &context,
                 &state,
                 &preview_base,
-                crate::gpu_processing::PreGpuImageIdentity::for_source(
+                crate::gpu_processing::PreGpuImageIdentity::for_stage(
                     &preview_base,
-                    &loaded_image_path,
+                    loaded_source_revision,
+                    pre_gpu_revision,
+                    pre_gpu_revision,
                 ),
                 RenderRequest {
                     adjustments: all_adjustments,
@@ -1789,11 +1803,17 @@ fn generate_preset_preview(
         get_all_adjustments_from_json(render_adjustments.as_ref(), is_raw, tm_override);
     let lut_path = render_adjustments["lutPath"].as_str();
     let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
+    let pre_gpu_revision = calculate_transform_hash(&js_adjustments);
     let processed_image = process_and_get_dynamic_image(
         &context,
         &state,
         &preview_image,
-        crate::gpu_processing::PreGpuImageIdentity::for_source(&preview_image, &loaded_image.path),
+        crate::gpu_processing::PreGpuImageIdentity::for_stage(
+            &preview_image,
+            loaded_image.artifact_source.source_fingerprint(),
+            pre_gpu_revision,
+            pre_gpu_revision,
+        ),
         RenderRequest {
             adjustments: all_adjustments,
             mask_bitmaps: &mask_bitmaps,
@@ -1844,7 +1864,7 @@ async fn generate_all_community_previews(
 
     let settings = load_settings_or_default(&app_handle);
 
-    let mut base_thumbnails: Vec<(DynamicImage, bool, f32)> = Vec::new();
+    let mut base_thumbnails: Vec<(DynamicImage, bool, f32, u64)> = Vec::new();
     for image_path in image_paths.iter() {
         let (source_path, _) = parse_virtual_path(image_path);
         let source_path_str = source_path.to_string_lossy().to_string();
@@ -1868,14 +1888,22 @@ async fn generate_all_community_previews(
             (original_image, 1.0)
         };
 
-        base_thumbnails.push((base_image, is_raw, base_scale));
+        base_thumbnails.push((
+            base_image,
+            is_raw,
+            base_scale,
+            crate::render::artifact_identity::stable_hash(&(
+                crate::gpu_processing::PreGpuImageIdentity::source_revision(image_path),
+                crate::image_loader::raw_processing_profile_key(&settings),
+            )),
+        ));
     }
 
     for preset in presets.iter() {
         let mut processed_tiles: Vec<RgbImage> = Vec::new();
         let js_adjustments = &preset.adjustments;
 
-        for (base_image, is_raw, base_scale) in &base_thumbnails {
+        for (base_image, is_raw, base_scale, source_revision) in &base_thumbnails {
             let mut scaled_adjustments = js_adjustments.clone();
             if let Some(crop_val) = scaled_adjustments.get_mut(adjustment_fields::CROP)
                 && let Ok(c) = serde_json::from_value::<Crop>(crop_val.clone())
@@ -1928,14 +1956,17 @@ async fn generate_all_community_previews(
                 get_all_adjustments_from_json(render_adjustments.as_ref(), *is_raw, tm_override);
             let lut_path = render_adjustments["lutPath"].as_str();
             let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
+            let pre_gpu_revision = calculate_transform_hash(&scaled_adjustments);
 
             let processed_image_dynamic = crate::image_processing::process_and_get_dynamic_image(
                 &context,
                 &state,
                 transformed_image.as_ref(),
-                crate::gpu_processing::PreGpuImageIdentity::for_source(
+                crate::gpu_processing::PreGpuImageIdentity::for_stage(
                     transformed_image.as_ref(),
-                    &preset.name,
+                    *source_revision,
+                    pre_gpu_revision,
+                    pre_gpu_revision,
                 ),
                 RenderRequest {
                     adjustments: all_adjustments,
@@ -2656,6 +2687,10 @@ fn generate_preview_for_path(
     let lut_path = render_adjustments["lutPath"].as_str();
     let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
     let pre_gpu_stage_hash = calculate_transform_hash(render_adjustments.as_ref());
+    let source_revision = crate::render::artifact_identity::stable_hash(&(
+        crate::gpu_processing::PreGpuImageIdentity::source_revision(&source_path_str),
+        crate::image_loader::raw_processing_profile_key(&settings),
+    ));
     let detail_stage = render_pipeline::apply_pre_gpu_detail_stages(
         transformed_image.as_ref(),
         pre_gpu_stage_hash,
@@ -2665,9 +2700,10 @@ fn generate_preview_for_path(
         &context,
         &state,
         detail_stage.image.as_ref(),
-        crate::gpu_processing::PreGpuImageIdentity::from_image(
+        crate::gpu_processing::PreGpuImageIdentity::for_stage(
             detail_stage.image.as_ref(),
-            crate::gpu_processing::PreGpuImageIdentity::source_revision(&source_path_str),
+            source_revision,
+            detail_stage.render_hash,
             detail_stage.render_hash,
         ),
         RenderRequest {

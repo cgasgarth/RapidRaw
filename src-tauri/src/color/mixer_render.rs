@@ -451,7 +451,7 @@ mod gpu_runtime_tests {
             &context,
             &state,
             &source,
-            crate::gpu_processing::PreGpuImageIdentity::for_source(&source, "mixer_preview"),
+            crate::gpu_processing::PreGpuImageIdentity::for_test_source(&source, "mixer_preview"),
             render_request(adjustments, None),
             "color_mixer_preview",
         )
@@ -460,7 +460,7 @@ mod gpu_runtime_tests {
             &context,
             &state,
             &source,
-            crate::gpu_processing::PreGpuImageIdentity::for_source(&source, "mixer_preview"),
+            crate::gpu_processing::PreGpuImageIdentity::for_test_source(&source, "mixer_preview"),
             render_request(
                 adjustments,
                 Some(Roi {
@@ -477,7 +477,7 @@ mod gpu_runtime_tests {
             &context,
             &state,
             &source,
-            crate::gpu_processing::PreGpuImageIdentity::for_source(&source, "mixer_preview"),
+            crate::gpu_processing::PreGpuImageIdentity::for_test_source(&source, "mixer_preview"),
             render_request(adjustments, None),
             "color_mixer_export",
         )
@@ -486,7 +486,7 @@ mod gpu_runtime_tests {
             &context,
             &state,
             &source,
-            crate::gpu_processing::PreGpuImageIdentity::for_source(&source, "mixer_disabled"),
+            crate::gpu_processing::PreGpuImageIdentity::for_test_source(&source, "mixer_disabled"),
             render_request(disabled_adjustments, None),
             "color_mixer_disabled",
         )

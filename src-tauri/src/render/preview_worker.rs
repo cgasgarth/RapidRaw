@@ -223,7 +223,6 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
             .map_or(0, serde_json::Map::len),
         render_plan.fingerprints,
     );
-    let new_transform_hash = render_plan.fingerprints.full;
     let live_quality = settings.live_preview_quality.as_str();
 
     let default_preview_dim = settings.editor_preview_resolution;
@@ -264,23 +263,42 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
             .as_ref()
             .is_some_and(|c| c.interactive_divisor == interactive_divisor);
 
-    let (final_preview_base, scale_for_gpu, unscaled_crop_offset) = if base_valid {
-        let cached = cached_preview.as_ref().unwrap();
-        (
-            Arc::clone(&cached.image),
-            cached.scale,
-            cached.unscaled_crop_offset,
-        )
-    } else {
-        render_caches::RenderCaches::new(&state).clear_gpu_image_cache();
-        let (base, scale, offset) =
-            generate_transformed_preview(&state, &loaded_image, &adjustments_clone, preview_dim)?;
-        (Arc::new(base), scale, offset)
-    };
+    let (final_preview_base, final_preview_revision, scale_for_gpu, unscaled_crop_offset) =
+        if base_valid {
+            let cached = cached_preview.as_ref().unwrap();
+            (
+                cached.image.shared_image(),
+                cached.image.pixels(),
+                cached.scale,
+                cached.unscaled_crop_offset,
+            )
+        } else {
+            render_caches::RenderCaches::new(&state).clear_gpu_image_cache();
+            let (base, scale, offset) = generate_transformed_preview(
+                &state,
+                &loaded_image,
+                &adjustments_clone,
+                preview_dim,
+            )?;
+            let base = Arc::new(base);
+            let revision = crate::gpu_processing::PixelBufferRevision::constructed(
+                loaded_image.artifact_source.source_fingerprint(),
+                render_plan.fingerprints.pre_gpu_base,
+                render_plan.fingerprints.pre_gpu_base,
+                base.width(),
+                base.height(),
+                base.color(),
+            );
+            (base, revision, scale, offset)
+        };
     cancellation_checkpoint(cancellation, PreviewStage::Geometry)?;
 
-    let small_preview_base = if small_valid {
-        Arc::clone(&cached_preview.as_ref().unwrap().small_image)
+    let (small_preview_base, small_preview_revision) = if small_valid {
+        let cached = cached_preview.as_ref().unwrap();
+        (
+            cached.small_image.shared_image(),
+            cached.small_image.pixels(),
+        )
     } else {
         let small = if interactive_divisor > 1.0 {
             let target_size = (preview_dim as f32 / interactive_divisor) as u32;
@@ -301,30 +319,53 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
             render_caches::RenderCaches::new(&state).clear_gpu_image_cache();
         }
 
-        small
+        let revision = crate::gpu_processing::PixelBufferRevision::constructed(
+            loaded_image.artifact_source.source_fingerprint(),
+            render_plan.fingerprints.pre_gpu_base,
+            render_plan.fingerprints.pre_gpu_base,
+            small.width(),
+            small.height(),
+            small.color(),
+        );
+        (small, revision)
     };
 
-    let (processing_image, effective_scale, jpeg_quality) = if is_interactive {
+    let (processing_image, processing_revision, effective_scale, jpeg_quality) = if is_interactive {
         let orig_w = final_preview_base.width() as f32;
         let small_w = small_preview_base.width() as f32;
         let scale_factor = if orig_w > 0.0 { small_w / orig_w } else { 1.0 };
         let new_scale = scale_for_gpu * scale_factor;
         (
             Arc::clone(&small_preview_base),
+            small_preview_revision,
             new_scale,
             interactive_quality,
         )
     } else {
-        (Arc::clone(&final_preview_base), scale_for_gpu, 94)
+        (
+            Arc::clone(&final_preview_base),
+            final_preview_revision,
+            scale_for_gpu,
+            94,
+        )
     };
 
     let pre_gpu_detail_stage = render_pipeline::apply_pre_gpu_detail_stages(
         processing_image.as_ref(),
-        new_transform_hash,
+        processing_revision.construction_generation,
         &adjustments_clone,
     );
     cancellation_checkpoint(cancellation, PreviewStage::CpuDetail)?;
     let processing_image_ref = pre_gpu_detail_stage.image.as_ref();
+    let detail_revision = if matches!(&pre_gpu_detail_stage.image, Cow::Borrowed(_)) {
+        processing_revision
+    } else {
+        processing_revision.transformed(
+            pre_gpu_detail_stage.render_hash,
+            render_plan.fingerprints.detail,
+            processing_image_ref,
+        )
+    };
 
     let (preview_width, preview_height) = processing_image_ref.dimensions();
     let pixel_roi = if is_interactive {
@@ -368,10 +409,19 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
     );
     cancellation_checkpoint(cancellation, PreviewStage::Gpu)?;
 
-    let pre_gpu_identity = crate::gpu_processing::PreGpuImageIdentity::from_image(
+    let retouch_generation = render_plan.fingerprints.retouch;
+    let final_revision = if matches!(&retouched_processing_image, Cow::Borrowed(_)) {
+        detail_revision
+    } else {
+        detail_revision.transformed(
+            retouch_generation,
+            retouch_generation,
+            retouched_processing_image.as_ref(),
+        )
+    };
+    let pre_gpu_identity = crate::gpu_processing::PreGpuImageIdentity::from_revision(
         retouched_processing_image.as_ref(),
-        loaded_image.artifact_source.source_fingerprint(),
-        pre_gpu_detail_stage.render_hash,
+        final_revision,
     );
     let wants_analytics = !(is_interactive && pixel_roi.is_some());
     let channel_filter = if is_interactive {
@@ -497,8 +547,14 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
     )?;
     cancellation_checkpoint(cancellation, PreviewStage::Publish)?;
     *state.cached_preview.lock().unwrap() = Some(CachedPreview {
-        image: Arc::clone(&final_preview_base),
-        small_image: Arc::clone(&small_preview_base),
+        image: crate::gpu_processing::RevisionedImage::new(
+            Arc::clone(&final_preview_base),
+            final_preview_revision,
+        ),
+        small_image: crate::gpu_processing::RevisionedImage::new(
+            Arc::clone(&small_preview_base),
+            small_preview_revision,
+        ),
         identity: preview_identity.clone(),
         scale: scale_for_gpu,
         unscaled_crop_offset,
