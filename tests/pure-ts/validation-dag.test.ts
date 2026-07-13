@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { isolatedGitEnvironment } from '../../scripts/lib/ci/git-environment';
 import {
+  classifyProcessTermination,
   freezeValidationSnapshot,
   nodeCacheKey,
   planValidation,
@@ -30,6 +31,19 @@ const initFixtureRepository = async (
 };
 
 describe('affected validation DAG', () => {
+  test('classifies nonzero, signal, timeout, and possible OOM exits exactly', () => {
+    expect(classifyProcessTermination(1, { interrupted: false, timedOut: false })).toEqual({
+      reason: 'nonzero-exit',
+    });
+    expect(classifyProcessTermination(137, { interrupted: false, timedOut: false })).toEqual({
+      reason: 'possible-oom-or-external-sigkill',
+      signal: 'SIGKILL',
+    });
+    expect(classifyProcessTermination(143, { interrupted: false, timedOut: true })).toEqual({
+      reason: 'timeout',
+      signal: 'SIGTERM',
+    });
+  });
   test('concurrent fixture git children cannot rewrite parent config under hook-scoped variables or failure', async () => {
     const repositoryRoot = join(import.meta.dir, '../..');
     const commonDirectory = Bun.spawnSync(['git', 'rev-parse', '--path-format=absolute', '--git-common-dir'], {
@@ -305,7 +319,7 @@ await lease.release();`;
     expect(receipt.waitedMs).toBeGreaterThanOrEqual(120);
   });
 
-  test('commit failure cancels an independent active node and returns deterministic nonzero', async () => {
+  test('commit failure preserves an independent active node disposition and returns deterministic nonzero', async () => {
     const root = await mkdtemp(join(tmpdir(), 'rapidraw-validation-fail-fast-'));
     initFixtureRepository(root);
     await writeFile(join(root, 'input.ts'), 'export const input = true;\n');
@@ -322,7 +336,7 @@ await lease.release();`;
     const slow: ValidationNode = {
       ...base,
       id: 'slow',
-      command: ['/bin/sh', '-c', 'mkdir -p dist; sleep 5; touch dist/should-not-exist'],
+      command: ['/bin/sh', '-c', 'mkdir -p dist; sleep 0.15; touch dist/independent-completed'],
     };
     const result = await runValidation([base, slow], {
       mode: 'commit',
@@ -334,7 +348,24 @@ await lease.release();`;
       resourceCoordinatorRoot: join(root, 'locks'),
     });
     expect(result).toBe(1);
-    expect(await Bun.file(join(root, 'dist', 'should-not-exist')).exists()).toBeFalse();
+    expect(await Bun.file(join(root, 'dist', 'independent-completed')).exists()).toBeTrue();
+  });
+
+  test('failed child diagnostics retain bounded stdout, stderr, exit, signal, RSS, and reason', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'rapidraw-validation-diagnostics-'));
+    initFixtureRepository(root);
+    await writeFile(join(root, 'input.ts'), 'export const input = true;\n');
+    const enginePath = join(import.meta.dir, '../../scripts/validation/engine.ts');
+    const script = `import { runValidation } from ${JSON.stringify(enginePath)};
+const node={id:'diagnostic',command:['/bin/sh','-c','echo retained-stdout; echo retained-stderr >&2; exit 23'],dependencies:[],inputs:['frontend'],resourceClass:'light',cachePolicy:'none',modes:['commit'],timeoutMs:5000};
+process.exit(await runValidation([node],{mode:'commit',changedPaths:['input.ts'],noCache:true,verifyCache:false,explainCache:false,root:process.cwd(),resourceCoordinatorRoot:process.cwd()+'/locks'}));`;
+    const child = Bun.spawn(['bun', '-e', script], { cwd: root, stdout: 'pipe', stderr: 'pipe' });
+    const [exitCode, stderr] = await Promise.all([child.exited, new Response(child.stderr).text()]);
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain('exit=23 signal=none termination=nonzero-exit');
+    expect(stderr).toMatch(/cpu=\d+ms rss=\d+/u);
+    expect(stderr).toContain('retained-stdout');
+    expect(stderr).toContain('retained-stderr');
   });
 
   test('SIGINT exits 130, kills the process group, and leaves no resource lease', async () => {

@@ -33,13 +33,19 @@ const queuedLabels = async (root: string): Promise<string[]> => {
   );
 };
 
-const directLease = (root: string, script: string) => {
+const directLease = (root: string, script: string, cwd?: string) => {
   const modulePath = join(import.meta.dir, '../../../scripts/lib/ci/resource-coordinator.ts');
   return Bun.spawn(['bun', '-e', `import { acquireResourceLease } from ${JSON.stringify(modulePath)};${script}`], {
     env: { ...Bun.env, RAWENGINE_RESOURCE_COORDINATOR_ROOT: root, RAWENGINE_RESOURCE_WAIT_POLL_MS: '10' },
+    cwd,
     stderr: 'pipe',
     stdout: 'pipe',
   });
+};
+
+const expectSuccessfulExit = async (child: ReturnType<typeof Bun.spawn>): Promise<void> => {
+  const [exitCode, stderr] = await Promise.all([child.exited, new Response(child.stderr).text()]);
+  expect(exitCode, stderr).toBe(0);
 };
 
 const coordinated = (root: string, label: string, script: string) =>
@@ -83,6 +89,37 @@ const seedStaleLock = async (root: string, label: string): Promise<void> => {
 };
 
 describe('cross-worktree resource coordinator', () => {
+  test('bounds memory-heavy lanes across worktrees without serializing safe parallel work', async () => {
+    const root = await temporaryRoot();
+    const worktrees = [join(root, 'one'), join(root, 'two'), join(root, 'three')];
+    await Promise.all(worktrees.map((worktree) => mkdir(worktree)));
+    const script = (label: string) =>
+      `const lease=await acquireResourceLease({resource:'cpu-heavy',capacity:2,label:${JSON.stringify(label)}});
+const pressure=new Uint8Array(32*1024*1024); pressure.fill(1);
+console.log('start '+Date.now()); await Bun.sleep(180); console.log('end '+Date.now()+' '+pressure[0]); await lease.release();`;
+    const first = directLease(root, script('first'), worktrees[0]);
+    const second = directLease(root, script('second'), worktrees[1]);
+    await Bun.sleep(25);
+    const third = directLease(root, script('third'), worktrees[2]);
+    const processes = [first, second, third];
+    await Promise.all(processes.map(expectSuccessfulExit));
+    const intervals = await Promise.all(
+      processes.map(async (process) => {
+        const output = await new Response(process.stdout).text();
+        return {
+          end: Number(output.match(/end (\d+)/u)?.[1]),
+          start: Number(output.match(/start (\d+)/u)?.[1]),
+        };
+      }),
+    );
+    const thirdInterval = intervals[2];
+    const firstInterval = intervals[0];
+    const secondInterval = intervals[1];
+    if (!firstInterval || !secondInterval || !thirdInterval) throw new Error('expected three intervals');
+    expect(firstInterval.start).toBeLessThan(secondInterval.end);
+    expect(secondInterval.start).toBeLessThan(firstInterval.end);
+    expect(thirdInterval.start).toBeGreaterThanOrEqual(Math.min(firstInterval.end, secondInterval.end));
+  });
   test('hands a released lease to the oldest waiter before an immediate reacquirer', async () => {
     const root = await temporaryRoot();
     const releaseFirst = join(root, 'release-first');
@@ -169,8 +206,8 @@ await lease.release();`,
     expect(await lightweight.exited).toBe(0);
     expect(Date.now() - lightweightStartedAt).toBeLessThan(250);
 
-    expect(await first.exited).toBe(0);
-    expect(await second.exited).toBe(0);
+    await expectSuccessfulExit(first);
+    await expectSuccessfulExit(second);
     const firstOutput = await new Response(first.stdout).text();
     const secondOutput = await new Response(second.stdout).text();
     const firstEnd = Number(firstOutput.match(/first-end (\d+)/)?.[1]);
@@ -203,8 +240,8 @@ await lease.release();`,
       'second-successor',
       `console.log('second-start '+Date.now()); await Bun.sleep(120); console.log('second-end '+Date.now())`,
     );
-    expect(await first.exited).toBe(0);
-    expect(await second.exited).toBe(0);
+    await expectSuccessfulExit(first);
+    await expectSuccessfulExit(second);
     const outputs = [await new Response(first.stdout).text(), await new Response(second.stdout).text()];
     expect(outputs.some((output) => output.includes('recovered stale native-heavy'))).toBe(true);
     const intervals = outputs.map((output, index) => ({
@@ -219,16 +256,18 @@ await lease.release();`,
 
   test('a killed wrapper leaves its child process group as owner until the child exits', async () => {
     const root = await temporaryRoot();
+    const orphanStartedPath = join(root, 'orphan-started');
+    const orphanEndPath = join(root, 'orphan-end');
     await seedStaleLock(root, 'killed-recoverer');
     const interrupted = coordinated(
       root,
       'interrupted-successor',
-      `console.log('orphan-start '+Date.now()); await Bun.sleep(220); console.log('orphan-end '+Date.now())`,
+      `await Bun.write(${JSON.stringify(orphanStartedPath)},'started'); await Bun.sleep(220); await Bun.write(${JSON.stringify(orphanEndPath)},String(Date.now()))`,
     );
     let acquired = false;
     for (let attempt = 0; attempt < 300; attempt += 1) {
       const owner = await readFile(join(root, 'native-heavy.owner.json'), 'utf8').catch(() => '');
-      if (owner.includes('interrupted-successor')) {
+      if (owner.includes('interrupted-successor') && (await Bun.file(orphanStartedPath).exists())) {
         acquired = true;
         break;
       }
@@ -239,9 +278,8 @@ await lease.release();`,
     await interrupted.exited;
     const follower = coordinated(root, 'post-kill-follower', `console.log('follower-start '+Date.now())`);
     expect(await follower.exited).toBe(0);
-    const orphanOutput = await new Response(interrupted.stdout).text();
     const followerOutput = await new Response(follower.stdout).text();
-    const orphanEnd = Number(orphanOutput.match(/orphan-end (\d+)/)?.[1]);
+    const orphanEnd = Number(await readFile(orphanEndPath, 'utf8'));
     const followerStart = Number(followerOutput.match(/follower-start (\d+)/)?.[1]);
     expect(followerOutput).toMatch(
       /post-kill-follower (?:waiting for native-heavy:|recovered stale native-heavy:) interrupted-successor pid=/u,
