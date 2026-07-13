@@ -12,6 +12,7 @@ export interface QaScenarioContext {
   context: BrowserContext;
   page: Page;
   recordArtifact(artifact: QaArtifactRecord): void;
+  recordPerformanceMetric(metric: string, value: number): void;
 }
 
 export type QaArtifactKind = 'download' | 'json-report' | 'screenshot' | 'terminal-assertion';
@@ -50,6 +51,16 @@ export interface QaScenarioResult {
   trace?: string | undefined;
   video?: string | undefined;
   artifacts?: QaArtifactRecord[] | undefined;
+  performanceSpans?: QaPerformanceSpan[] | undefined;
+  performanceMetrics?: Record<string, number> | undefined;
+}
+
+export interface QaPerformanceSpan {
+  durationMs: number;
+  source: 'frontend' | 'tauri-ipc';
+  stage: string;
+  startOffsetMs: number;
+  workCount?: number | undefined;
 }
 
 export interface QaRunReceipt {

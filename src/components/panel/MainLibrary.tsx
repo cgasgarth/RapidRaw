@@ -18,7 +18,7 @@ import {
   Users,
 } from 'lucide-react';
 import type React from 'react';
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ThumbnailViewportUpdate } from '../../hooks/library/useThumbnails';
 import { consumeStartupShellIntent } from '../../product/startupShellHandoff';
@@ -27,6 +27,7 @@ import { buildLibrarySessionUiCard } from '../../schemas/library/librarySessionU
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { thumbnailCache } from '../../thumbnails/thumbnailCacheInstance';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
+import { frontendStartupReporter } from '../../utils/startup/startupTraceReporter';
 import { DEFAULT_THEME_ID, THEMES, type ThemeProps } from '../../utils/themes';
 import { parseVirtualImagePath } from '../../utils/virtualImagePath';
 import {
@@ -122,12 +123,38 @@ export default function MainLibrary(props: MainLibraryProps) {
   const [latestVersion, setLatestVersion] = useState('');
   const [isBusyDelayed, setIsBusyDelayed] = useState(false);
   const [isProgressHovered, setIsProgressHovered] = useState(false);
+  const benchmarkRestoreStarted = useRef(false);
+  const benchmarkViewportReported = useRef(false);
+  const startupBenchmarkAutoContinue =
+    typeof props.appSettings?.uiVisibility === 'object' &&
+    props.appSettings.uiVisibility !== null &&
+    Reflect.get(props.appSettings.uiVisibility, 'startupBenchmarkAutoContinue') === true;
 
   useEffect(() => {
     const intent = consumeStartupShellIntent();
     if (intent === 'settings') setShowSettings(true);
     if (intent === 'add-folder') props.onOpenFolder();
   }, [props.onOpenFolder]);
+
+  useEffect(() => {
+    if (!startupBenchmarkAutoContinue || benchmarkRestoreStarted.current) return;
+    benchmarkRestoreStarted.current = true;
+    props.onContinueSession();
+  }, [props.onContinueSession, startupBenchmarkAutoContinue]);
+
+  useEffect(() => {
+    if (
+      !startupBenchmarkAutoContinue ||
+      benchmarkViewportReported.current ||
+      props.currentFolderPath === null ||
+      props.imageList.length === 0
+    )
+      return;
+    benchmarkViewportReported.current = true;
+    void frontendStartupReporter
+      .mark('libraryViewportVisible', 'ok', `last-folder-first-viewport:images=${props.imageList.length}`)
+      .catch((error: unknown) => console.error('Failed to report startup library viewport:', error));
+  }, [props.currentFolderPath, props.imageList.length, startupBenchmarkAutoContinue]);
 
   const searchCriteria = useLibraryStore((state) => state.searchCriteria);
   const filterCriteria = useLibraryStore((state) => state.filterCriteria);
@@ -593,7 +620,16 @@ export default function MainLibrary(props: MainLibraryProps) {
             </div>
           )}
           {props.importState.status === Status.Success && (
-            <UiText as="div" color={TextColors.success} className="flex items-center gap-2">
+            <UiText
+              as="div"
+              color={TextColors.success}
+              className="flex items-center gap-2"
+              data-testid="import-success-receipt"
+              data-import-receipt-current={props.importState.progress?.current}
+              data-import-receipt-total={props.importState.progress?.total}
+              data-import-receipt-bytes={props.importState.bytesCopied}
+              data-import-receipt-total-bytes={props.importState.totalBytes}
+            >
               <Check size={16} />
               <span>{t('library.import.complete')}</span>
             </UiText>

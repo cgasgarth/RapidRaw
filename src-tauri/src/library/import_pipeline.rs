@@ -478,6 +478,18 @@ impl<R: Runtime> ImportPipeline<R> {
             total_bytes,
             None,
         );
+        // Register the final destinations before the filesystem mutation. The
+        // watcher can otherwise observe the atomic-copy temp file or rename
+        // before `publish_authored_changes` records the committed paths.
+        self.app
+            .state::<super::changefeed::LibraryFilesystemChangefeed>()
+            .register_authored_paths(
+                std::iter::once(plan.destination.clone()).chain(
+                    plan.artifacts
+                        .iter()
+                        .map(|artifact| artifact.destination.clone()),
+                ),
+            );
         let plan_owned = plan.clone();
         let cancellation = Arc::clone(&self.cancellation);
         let counters = Arc::clone(&self.counters);

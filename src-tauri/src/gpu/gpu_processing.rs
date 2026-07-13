@@ -814,11 +814,12 @@ pub struct GpuProcessor {
     context: GpuContext,
     generation: u64,
     resource_cache: Mutex<GpuResourceCache>,
-    last_execution_receipt: Mutex<Option<GpuExecutionReceipt>>,
     main_bind_group_cache: Mutex<Option<CachedMainBindGroup>>,
     view_bind_group_cache: Mutex<Option<CachedMainBindGroup>>,
     display_bind_group_cache: Mutex<Option<CachedMainBindGroup>>,
     blur_surface_cache: Mutex<BlurSurfaceCache>,
+    last_execution_receipt: Mutex<Option<GpuExecutionReceipt>>,
+    execution_sequence: AtomicU64,
     blur_bgl: wgpu::BindGroupLayout,
     h_blur_pipeline: wgpu::ComputePipeline,
     v_blur_pipeline: wgpu::ComputePipeline,
@@ -865,6 +866,10 @@ impl GpuProcessor {
 
     pub fn last_execution_receipt(&self) -> Option<GpuExecutionReceipt> {
         *self.last_execution_receipt.lock().unwrap()
+    }
+
+    pub fn execution_sequence(&self) -> u64 {
+        self.execution_sequence.load(Ordering::Acquire)
     }
 
     pub fn new(context: GpuContext, max_width: u32, max_height: u32) -> Result<Self, String> {
@@ -1330,11 +1335,12 @@ impl GpuProcessor {
                 },
                 ..Default::default()
             }),
-            last_execution_receipt: Mutex::new(None),
             main_bind_group_cache: Mutex::new(None),
             view_bind_group_cache: Mutex::new(None),
             display_bind_group_cache: Mutex::new(None),
             blur_surface_cache: Mutex::new(BlurSurfaceCache::default()),
+            last_execution_receipt: Mutex::new(None),
+            execution_sequence: AtomicU64::new(0),
             blur_bgl,
             h_blur_pipeline,
             v_blur_pipeline,
@@ -2231,13 +2237,19 @@ impl GpuProcessor {
                     tile_command_buffers.push(encoder.finish());
                 }
                 let tile_command_buffer_count = tile_command_buffers.len() as u32;
-                queue.submit(
-                    flare_command_buffer
-                        .take()
-                        .into_iter()
-                        .chain(tile_command_buffers),
-                );
-                blur_counters.record_command_buffer();
+                // A single Queue::submit containing several command buffers did
+                // not make the storage-write -> sampled-read transition visible
+                // between phase buffers on software Vulkan. Ordered submits are
+                // still asynchronous, while giving wgpu an explicit submission
+                // boundary for each render-authoritative phase dependency.
+                for command_buffer in flare_command_buffer
+                    .take()
+                    .into_iter()
+                    .chain(tile_command_buffers)
+                {
+                    queue.submit(std::iter::once(command_buffer));
+                    blur_counters.record_command_buffer();
+                }
                 command_buffer_count += tile_command_buffer_count;
                 phase_dispatch_count += if split_scene_view_display { 3 } else { 1 };
                 cpu_encode_time += encode_started.elapsed();
@@ -2322,6 +2334,8 @@ impl GpuProcessor {
                 &["legacy_implementation_defined"]
             },
         };
+        *self.last_execution_receipt.lock().unwrap() = Some(receipt);
+        self.execution_sequence.fetch_add(1, Ordering::Release);
         log::debug!("GPU execution receipt: {receipt:?}");
         *self.last_execution_receipt.lock().unwrap() = Some(receipt);
 
@@ -3013,7 +3027,7 @@ mod blur_pass_tests {
             .expect("v2 GPU execution publishes a runtime receipt");
         assert_eq!(receipt.phase_dispatch_count, 3);
         assert_eq!(receipt.command_buffer_count, 3);
-        assert_eq!(receipt.queue_submit_count, 1);
+        assert_eq!(receipt.queue_submit_count, 3);
         assert!(receipt.cache_hits >= 3, "receipt={receipt:?}");
         assert_eq!(receipt.domain_conversions.len(), 2);
         assert!(

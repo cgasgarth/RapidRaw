@@ -280,7 +280,33 @@ fn coalesce_change(existing: LibraryPathChange, incoming: LibraryPathChange) -> 
     }
 }
 
+fn normalize_changefeed_path(path: &Path) -> PathBuf {
+    path.canonicalize().unwrap_or_else(|_| {
+        path.parent()
+            .and_then(|parent| parent.canonicalize().ok())
+            .and_then(|parent| path.file_name().map(|name| parent.join(name)))
+            .unwrap_or_else(|| path.to_path_buf())
+    })
+}
+
 impl LibraryFilesystemChangefeed {
+    pub(crate) fn register_authored_paths(&self, paths: impl IntoIterator<Item = PathBuf>) {
+        let Ok(mut inner) = self.0.lock() else {
+            return;
+        };
+        let expires = Instant::now() + Duration::from_secs(3);
+        let parent_expires = Instant::now() + AUTHORED_PARENT_ECHO_WINDOW;
+        for path in paths {
+            let normalized = normalize_changefeed_path(&path);
+            if let Some(parent) = normalized.parent() {
+                inner
+                    .authored_paths
+                    .insert(parent.to_path_buf(), parent_expires);
+            }
+            inner.authored_paths.insert(normalized, expires);
+        }
+    }
+
     pub fn publish_authored_changes<R: Runtime>(
         &self,
         app: &AppHandle<R>,
@@ -302,7 +328,7 @@ impl LibraryFilesystemChangefeed {
                 .into_iter()
                 .filter(|change| {
                     change_paths(change).iter().any(|path| {
-                        let normalized = path.canonicalize().unwrap_or_else(|_| path.clone());
+                        let normalized = normalize_changefeed_path(path);
                         roots.iter().any(|root| normalized.starts_with(root))
                     })
                 })
@@ -314,7 +340,7 @@ impl LibraryFilesystemChangefeed {
             let parent_expires = Instant::now() + AUTHORED_PARENT_ECHO_WINDOW;
             for change in &changes {
                 for path in change_paths(change) {
-                    let normalized = path.canonicalize().unwrap_or(path);
+                    let normalized = normalize_changefeed_path(&path);
                     if let Some(parent) = normalized.parent() {
                         inner
                             .authored_paths
@@ -526,7 +552,7 @@ fn is_authored_echo(
     authored_paths: &HashMap<PathBuf, Instant>,
 ) -> bool {
     change_paths(change).iter().any(|path| {
-        let normalized = path.canonicalize().unwrap_or_else(|_| path.clone());
+        let normalized = normalize_changefeed_path(path);
         authored_paths.contains_key(&normalized)
     })
 }
@@ -559,7 +585,10 @@ mod tests {
     #[test]
     fn app_authored_destination_echo_is_suppressed() {
         let path = PathBuf::from("/library/imported.raw");
-        let authored = HashMap::from([(path.clone(), Instant::now() + Duration::from_secs(3))]);
+        let authored = HashMap::from([(
+            normalize_changefeed_path(&path),
+            Instant::now() + Duration::from_secs(3),
+        )]);
         assert!(is_authored_echo(
             &LibraryPathChange::Added {
                 path: path.to_string_lossy().into_owned(),
@@ -586,6 +615,29 @@ mod tests {
                 class: LibraryChangeClass::Directory,
             },
             &authored,
+        ));
+    }
+
+    #[test]
+    fn authored_intent_is_registered_before_filesystem_mutation() {
+        let directory = tempfile::tempdir().unwrap();
+        let destination = directory.path().join("imported.raw");
+        let feed = LibraryFilesystemChangefeed::default();
+        feed.register_authored_paths([destination.clone()]);
+
+        let inner = feed.0.lock().unwrap();
+        assert!(is_authored_echo(
+            &LibraryPathChange::Added {
+                path: destination.to_string_lossy().into_owned(),
+            },
+            &inner.authored_paths,
+        ));
+        assert!(is_authored_echo(
+            &LibraryPathChange::Modified {
+                path: directory.path().to_string_lossy().into_owned(),
+                class: LibraryChangeClass::Directory,
+            },
+            &inner.authored_paths,
         ));
     }
 

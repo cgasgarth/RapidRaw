@@ -1,13 +1,13 @@
 import type { Page } from '@playwright/test';
 
-export async function openEmptyFixture(page: Page): Promise<void> {
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
+export async function openEmptyFixture(page: Page, query = ''): Promise<void> {
+  await page.goto(`/${query}`, { waitUntil: 'domcontentloaded' });
   await page.getByRole('heading', { name: 'RapidRAW' }).waitFor({ timeout: 30_000 });
 }
 
-export async function openLibraryFixture(page: Page): Promise<void> {
-  await openEmptyFixture(page);
-  await page.getByRole('button', { name: /Open Folder/u }).click();
+export async function openLibraryFixture(page: Page, imageCount?: number): Promise<void> {
+  await openEmptyFixture(page, imageCount === undefined ? '' : `?qaImages=${imageCount}`);
+  await page.getByRole('button', { name: /Open Folder/u }).click({ noWaitAfter: true, timeout: 90_000 });
   await page
     .getByRole('button', { name: /browser-harness\.ARW/u })
     .first()
