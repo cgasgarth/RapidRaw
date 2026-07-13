@@ -3662,6 +3662,7 @@ mod blur_pass_tests {
                     mask_bitmaps: &[],
                     lut: None,
                     roi: None,
+                    edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
                 },
                 "technical_white_balance",
             )
