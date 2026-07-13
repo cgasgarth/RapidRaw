@@ -6,22 +6,4 @@ runs:
   steps:
     - name: Install Tauri Linux dependencies
       shell: bash
-      run: |
-        set -euo pipefail
-
-        export DEBIAN_FRONTEND=noninteractive
-
-        packages=(
-          libwebkit2gtk-4.1-dev
-          build-essential
-          curl
-          wget
-          file
-          libssl-dev
-          libayatana-appindicator3-dev
-          librsvg2-dev
-          patchelf
-        )
-
-        sudo timeout 10m apt-get update -o DPkg::Lock::Timeout=120
-        sudo timeout 10m apt-get install -y --no-install-recommends -o DPkg::Lock::Timeout=120 "${packages[@]}"
+      run: bash "${GITHUB_ACTION_PATH}/install.sh"
