@@ -2,10 +2,15 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 
 import { useEditorStore } from '../../../src/store/useEditorStore';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { buildTechnicalWhiteBalance } from '../../../src/utils/color/whiteBalance';
 import {
+  analyzeWhiteBalancePickerRgbaSample,
+  applyWhiteBalancePickerHoverPreview,
   averageWhiteBalancePickerRgbaSample,
   buildWhiteBalancePickerAdjustmentCommand,
   calculateWhiteBalancePickerAdjustment,
+  cancelWhiteBalancePickerPreview,
+  createWhiteBalancePickerPreviewSession,
 } from '../../../src/utils/whiteBalancePicker';
 
 describe('white balance picker runtime command path', () => {
@@ -54,8 +59,11 @@ describe('white balance picker runtime command path', () => {
 
     expect(command.nextAdjustments.temperature).toBe(expectedAdjustment.temperature);
     expect(command.nextAdjustments.tint).toBe(expectedAdjustment.tint);
+    expect(command.nextAdjustments.whiteBalanceTechnical.mode).toBe('chromaticity');
+    expect(command.nextAdjustments.whiteBalanceTechnical.source).toBe('picker');
     expect(command.nextAdjustments.exposure).toBe(currentAdjustments.exposure);
-    expect(command.receipt).toEqual({
+    expect(command.receipt).toMatchObject({
+      algorithm: 'neutral_patch_scene_linear_chromaticity_v1',
       averageRgb,
       coordinates: { imageX: 128.25, imageY: 64.5, previewPixelX: 257, previewPixelY: 129 },
       previewIdentity: 'blob:runtime-preview-4746',
@@ -63,6 +71,47 @@ describe('white balance picker runtime command path', () => {
       resultingTint: expectedAdjustment.tint,
       selectedImagePath: '/Users/cgas/Pictures/Capture One/Alaska/sample.RAF',
     });
+    expect(command.receipt.confidence).toBeGreaterThanOrEqual(0);
+    expect(command.receipt.estimatedKelvin).toBeGreaterThanOrEqual(1667);
+  });
+
+  test('records patch statistics and rejects clipped, mixed, and stale samples', () => {
+    const uniform = analyzeWhiteBalancePickerRgbaSample(
+      new Uint8ClampedArray([120, 130, 140, 255, 122, 131, 139, 255, 121, 129, 141, 255]),
+    );
+    expect(uniform).not.toBeNull();
+    expect(uniform?.patchPixelCount).toBe(3);
+    expect(uniform?.spatialVariance).toBeLessThan(0.001);
+
+    const base = {
+      coordinates: { imageX: 1, imageY: 2, previewPixelX: 3, previewPixelY: 4 },
+      currentAdjustments: INITIAL_ADJUSTMENTS,
+      previewIdentity: 'preview:new',
+      selectedImagePath: '/tmp/source.raw',
+    };
+    expect(() =>
+      buildWhiteBalancePickerAdjustmentCommand({
+        ...base,
+        averageRgb: { red: 120, green: 130, blue: 140 },
+        currentPreviewIdentity: 'preview:old',
+      }),
+    ).toThrow('white_balance_picker_stale_preview');
+    expect(() =>
+      buildWhiteBalancePickerAdjustmentCommand({
+        ...base,
+        averageRgb: { red: 120, green: 130, blue: 140 },
+        patchPixelCount: 10,
+        rejectedClippedPixels: 2,
+      }),
+    ).toThrow('white_balance_picker_clipped_patch');
+    expect(() =>
+      buildWhiteBalancePickerAdjustmentCommand({
+        ...base,
+        averageRgb: { red: 120, green: 130, blue: 140 },
+        patchPixelCount: 121,
+        spatialVariance: 0.03,
+      }),
+    ).toThrow('white_balance_picker_non_uniform_patch');
   });
 
   test('commits one undoable picker adjustment and preserves receipt data for QA', () => {
@@ -115,5 +164,35 @@ describe('white balance picker runtime command path', () => {
     expect(state.historyIndex).toBe(1);
     expect(state.adjustments.temperature).toBe(command.receipt.resultingTemperature);
     expect(state.adjustments.tint).toBe(command.receipt.resultingTint);
+  });
+
+  test('hover preview is history-free, cancellable, and source-revision safe', () => {
+    const base = { ...INITIAL_ADJUSTMENTS, exposure: 0.25 };
+    const previewAdjustments = {
+      ...base,
+      whiteBalanceTechnical: buildTechnicalWhiteBalance('chromaticity', 4100, 0.01),
+    };
+    let session = createWhiteBalancePickerPreviewSession(base, 'source:a');
+    useEditorStore.setState({ adjustments: base, history: [base], historyIndex: 0 });
+
+    const preview = applyWhiteBalancePickerHoverPreview(session, previewAdjustments, {
+      previewIdentity: 'preview:1',
+      selectedImagePath: 'source:a',
+    });
+    session = preview.session;
+    useEditorStore.getState().setEditor({ adjustments: preview.adjustments });
+    expect(useEditorStore.getState().history).toHaveLength(1);
+    expect(useEditorStore.getState().adjustments.whiteBalanceTechnical.mode).toBe('chromaticity');
+
+    expect(session.lastPreviewIdentity).toBe('preview:1');
+    useEditorStore.getState().setEditor({ adjustments: cancelWhiteBalancePickerPreview(session, 'source:a') });
+    expect(useEditorStore.getState().adjustments).toEqual(base);
+    expect(() =>
+      applyWhiteBalancePickerHoverPreview(session, previewAdjustments, {
+        previewIdentity: 'preview:2',
+        selectedImagePath: 'source:b',
+      }),
+    ).toThrow('white_balance_picker_stale_preview');
+    expect(() => cancelWhiteBalancePickerPreview(session, 'source:b')).toThrow('white_balance_picker_stale_preview');
   });
 });
