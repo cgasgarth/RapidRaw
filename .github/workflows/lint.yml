@@ -271,7 +271,7 @@ jobs:
               | to_entries[] as $lane
               | $lane.value[] as $job
               | ($needs[$job].result // "missing") as $result
-              | ($plan.lanes[$lane.key] // true) as $selected
+              | (if ($plan.lanes | has($lane.key)) then $plan.lanes[$lane.key] else true end) as $selected
               | select(($selected and $result != "success") or (($selected | not) and $result != "skipped"))
               | "\($job)=\($result)"
             ' <<< "$NEEDS_CONTEXT"

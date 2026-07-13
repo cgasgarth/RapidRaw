@@ -40,6 +40,18 @@ describe('four-minute PR CI contract', () => {
     });
   });
 
+  test('dependency changes select JavaScript, schema, native, and audit closure', () => {
+    expect(planPrValidation(['src-tauri/Cargo.lock']).lanes).toEqual({
+      js: true,
+      frontend: true,
+      schema: true,
+      dependencies: true,
+      rust: true,
+      workflow: false,
+      docs: false,
+    });
+  });
+
   test('uses the Actions run_started_at epoch and rejects late or invalid substitutes', () => {
     expect(resolveWorkflowStartedEpoch('100', 120)).toBe(100);
     expect(() => resolveWorkflowStartedEpoch('121', 120)).toThrow('Actions run_started_at');

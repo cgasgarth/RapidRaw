@@ -47,7 +47,7 @@ export const planPrValidation = (paths: readonly string[]): PrValidationPlan => 
     lanes: {
       js: failClosed || dependencies || classes.has('frontend') || classes.has('schema') || classes.has('scripts'),
       frontend: failClosed || dependencies || classes.has('frontend') || classes.has('schema'),
-      schema: failClosed || classes.has('schema') || classes.has('frontend'),
+      schema: failClosed || dependencies || classes.has('schema') || classes.has('frontend'),
       dependencies: failClosed || dependencies,
       rust: failClosed || dependencies || classes.has('rust'),
       workflow: failClosed || classes.has('workflows'),
