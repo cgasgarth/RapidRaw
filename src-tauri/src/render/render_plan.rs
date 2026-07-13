@@ -540,6 +540,37 @@ mod tests {
         let clipping =
             compile_render_plan(&json!({"showClipping":true}), context(6), None).unwrap();
         assert_ne!(base.fingerprints.output, clipping.fingerprints.output);
+
+        let rapid_view = compile_render_plan(
+            &json!({
+                "toneMapper": "rapidView",
+                "viewTransform": {"contrast": 1.15, "shoulder": 0.5, "toe": 0.35}
+            }),
+            context(7),
+            None,
+        )
+        .unwrap();
+        let adjusted_rapid_view = compile_render_plan(
+            &json!({
+                "toneMapper": "rapidView",
+                "viewTransform": {"contrast": 1.35, "shoulder": 0.5, "toe": 0.35}
+            }),
+            context(8),
+            None,
+        )
+        .unwrap();
+        assert_ne!(
+            rapid_view.fingerprints.color,
+            adjusted_rapid_view.fingerprints.color
+        );
+        assert_ne!(
+            rapid_view.fingerprints.full,
+            adjusted_rapid_view.fingerprints.full
+        );
+        assert_eq!(
+            rapid_view.fingerprints.geometry,
+            adjusted_rapid_view.fingerprints.geometry
+        );
     }
 
     #[test]

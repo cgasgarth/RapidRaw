@@ -34,6 +34,20 @@ const artifactKindSchema = z.enum([
 ]);
 const outputProfileSchema = z.enum(['display_p3', 'srgb']);
 const renderingIntentSchema = z.enum(['perceptual', 'relative_colorimetric']);
+const viewTransformSchema = z.enum(['rawengine_agx_v1', 'rawengine_basic_v1', 'rawengine_rapid_view_v1']);
+const viewTransformReceiptSchema = z
+  .object({
+    colorStrategy: z.literal('luminanceRatio'),
+    contract: z.literal('rapidraw.view-transform-receipt.v1'),
+    fingerprint: z.string().regex(/^[a-f0-9]{16}$/u),
+    implementationVersion: z.literal(1),
+    process: z.literal('rapidViewV1'),
+    sourceBlackEv: z.number().finite(),
+    sourceWhiteEv: z.number().finite(),
+    targetBlackLinear: z.number().finite(),
+    targetWhiteLinear: z.number().finite(),
+  })
+  .strict();
 
 const whitePointSchema = z
   .object({
@@ -61,13 +75,22 @@ const colorPipelineSchema = z
         embedIcc: z.literal(true),
         intent: renderingIntentSchema,
         outputProfile: outputProfileSchema,
-        viewTransform: z.literal('rawengine_agx_v1'),
+        viewTransform: viewTransformSchema,
       })
       .strict(),
-    sceneToDisplayTransform: z.literal('rawengine_agx_v1'),
+    sceneToDisplayTransform: viewTransformSchema,
     workingSpace: z.literal('acescg_linear_v1'),
   })
-  .strict();
+  .strict()
+  .superRefine((pipeline, context) => {
+    if (pipeline.sceneToDisplayTransform !== pipeline.renderTarget.viewTransform) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Scene-to-display and render-target view transform must match.',
+        path: ['renderTarget', 'viewTransform'],
+      });
+    }
+  });
 
 const colorManagementProofSchema = z
   .object({
@@ -128,9 +151,10 @@ const colorManagementProofSchema = z
         operationDomain: z.literal('linear_srgb_d65_observed'),
         outputProfile: outputProfileSchema,
         renderingIntentApplied: z.literal(true),
-        sceneToDisplayTransform: z.literal('rawengine_agx_v1'),
+        sceneToDisplayTransform: viewTransformSchema,
         transferStatus: z.string().trim().min(1),
-        viewTransform: z.literal('rawengine_agx_v1'),
+        viewTransform: viewTransformSchema,
+        viewTransformReceipt: viewTransformReceiptSchema.nullable().optional(),
         workingBuffer: z.literal('linear_srgb_d65_observed'),
       })
       .strict(),

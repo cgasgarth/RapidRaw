@@ -13,6 +13,9 @@ use sha2::{Digest, Sha256};
 
 use crate::app_settings::{AppSettings, load_settings_or_default};
 use crate::app_state::AppState;
+use crate::color::view_transform::{
+    ViewTransformPlanV1, ViewTransformReceiptV1, ViewTransformSettingsV1,
+};
 use crate::export::export_processing::{
     ExportColorProfile, ExportReceiptMetadata, ExportRenderingIntent, ExportSettings,
     export_jpeg_rgb_pixels_and_profile, export_soft_proof_rgb_pixels_and_profile_with_policy,
@@ -219,6 +222,7 @@ pub struct RawOpenEditExportObservedColorPipeline {
     pub scene_to_display_transform: String,
     pub transfer_status: String,
     pub view_transform: String,
+    pub view_transform_receipt: Option<ViewTransformReceiptV1>,
     pub working_buffer: String,
 }
 
@@ -954,6 +958,12 @@ fn color_management_proof(
     } else {
         "not_proven".to_string()
     };
+    let view_transform_receipt = (tonemapper_override_for_proof(pipeline) == Some(2))
+        .then(|| ViewTransformPlanV1::compile(ViewTransformSettingsV1::default()))
+        .transpose()
+        .ok()
+        .flatten()
+        .map(ViewTransformPlanV1::receipt);
     RawOpenEditExportColorManagementProof {
         conformance: "partial".to_string(),
         decoder_trace: RawOpenEditExportDecoderTrace {
@@ -993,6 +1003,7 @@ fn color_management_proof(
             scene_to_display_transform: pipeline.scene_to_display_transform.clone(),
             transfer_status: color_receipt.color_managed_transform.clone(),
             view_transform: pipeline.render_target.view_transform.clone(),
+            view_transform_receipt,
             working_buffer: "linear_srgb_d65_observed".to_string(),
         },
         proof_level: "private_raw_runtime_color_management_metadata".to_string(),
@@ -1050,12 +1061,13 @@ fn trace_status_not_surfaced() -> RawOpenEditExportTraceStatus {
 }
 
 fn tonemapper_override_for_proof(pipeline: &RawOpenEditExportColorPipeline) -> Option<u32> {
-    if pipeline.scene_to_display_transform == "rawengine_agx_v1"
-        && pipeline.render_target.view_transform == "rawengine_agx_v1"
-    {
-        Some(1)
-    } else {
-        None
+    match (
+        pipeline.scene_to_display_transform.as_str(),
+        pipeline.render_target.view_transform.as_str(),
+    ) {
+        ("rawengine_agx_v1", "rawengine_agx_v1") => Some(1),
+        ("rawengine_rapid_view_v1", "rawengine_rapid_view_v1") => Some(2),
+        _ => None,
     }
 }
 
@@ -1616,6 +1628,17 @@ mod tests {
     }
 
     #[test]
+    fn rapid_view_pipeline_resolves_versioned_runtime_mode_without_reinterpreting_legacy() {
+        let mut pipeline = sample_color_pipeline();
+        assert_eq!(tonemapper_override_for_proof(&pipeline), Some(1));
+        pipeline.scene_to_display_transform = "rawengine_rapid_view_v1".to_string();
+        pipeline.render_target.view_transform = "rawengine_rapid_view_v1".to_string();
+        assert_eq!(tonemapper_override_for_proof(&pipeline), Some(2));
+        pipeline.render_target.view_transform = "rawengine_basic_v1".to_string();
+        assert_eq!(tonemapper_override_for_proof(&pipeline), None);
+    }
+
+    #[test]
     fn private_paths_reject_absolute_and_traversal() {
         let root = Path::new("/tmp/rawengine-private-root");
 
@@ -1640,7 +1663,16 @@ mod tests {
 
     #[test]
     fn sidecar_json_preserves_edit_graph_revision() {
-        let request = sample_request();
+        let mut request = sample_request();
+        request
+            .edit_command
+            .color_pipeline
+            .scene_to_display_transform = "rawengine_rapid_view_v1".to_string();
+        request
+            .edit_command
+            .color_pipeline
+            .render_target
+            .view_transform = "rawengine_rapid_view_v1".to_string();
         let adjustments = edit_command_adjustments(&request.edit_command).expect("basic tone maps");
         let decoded_image = DynamicImage::new_rgba8(2, 3);
         let color_management = color_management_proof(
@@ -1687,6 +1719,16 @@ mod tests {
         assert_eq!(
             sidecar["rawOpenEditExportProof"]["colorManagement"]["observedColorPipeline"]["bitDepth"],
             json!(16)
+        );
+        assert_eq!(
+            sidecar["rawOpenEditExportProof"]["colorManagement"]["observedColorPipeline"]["viewTransformReceipt"]
+                ["contract"],
+            json!("rapidraw.view-transform-receipt.v1")
+        );
+        assert_eq!(
+            sidecar["rawOpenEditExportProof"]["colorManagement"]["observedColorPipeline"]["viewTransformReceipt"]
+                ["implementationVersion"],
+            json!(1)
         );
     }
 
