@@ -7,11 +7,73 @@ on:
         description: Branch, tag, or commit SHA to validate.
         required: true
         default: main
+      baseline-history-path:
+        description: Optional checked-out append-only baseline history JSON; when set, the trend gate is fail-closed.
+        required: false
+        default: ''
 
 permissions:
   contents: read
 
 jobs:
+  performance-lab:
+    name: performance lab / preview scheduling
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 1
+
+      - uses: ./.github/actions/setup-bun-deps
+
+      - name: Run versioned preview scheduling scenario
+        run: bun perf run editor.preview-scheduling --profile ci --output artifacts/performance-lab/candidate.json
+
+      - name: Enforce approved trend baseline
+        if: ${{ always() && inputs.baseline-history-path != '' }}
+        env:
+          BASELINE_HISTORY_PATH: ${{ inputs.baseline-history-path }}
+        run: bun perf ci-gate --history "$BASELINE_HISTORY_PATH" --candidate artifacts/performance-lab/candidate.json --output artifacts/performance-lab/trend-gate.json
+
+      - name: Build performance artifact upload manifest
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(--file artifacts/performance-lab/candidate.json)
+          if [[ -f artifacts/performance-lab/trend-gate.json ]]; then
+            files+=(--file artifacts/performance-lab/trend-gate.json)
+          fi
+          bun perf artifact-manifest --receipt artifacts/performance-lab/candidate.json "${files[@]}" --output artifacts/performance-lab/upload-manifest.json
+
+      - name: Summarize performance lab
+        if: ${{ always() }}
+        shell: bash
+        env:
+          BASELINE_HISTORY_PATH: ${{ inputs.baseline-history-path }}
+        run: |
+          set -euo pipefail
+          baseline_label="${BASELINE_HISTORY_PATH:-trend-only (no gate)}"
+          {
+            echo "### Performance lab"
+            echo "- Scenario: \`editor.preview-scheduling\`"
+            echo "- Baseline history: \`$baseline_label\`"
+            if [[ -f artifacts/performance-lab/trend-gate.json ]]; then
+              echo "- Gate: \`$(jq -r .status artifacts/performance-lab/trend-gate.json)\`"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload performance lab artifacts
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: performance-lab-preview-scheduling
+          path: artifacts/performance-lab/**
+          retention-days: 30
+          if-no-files-found: error
+
   performance-smoke:
     name: performance smoke
     runs-on: ubuntu-latest
