@@ -70,6 +70,15 @@ const previewScheduling: PerformanceScenario = {
         interactionDispatchMs,
         snapshotInstrumentationOverheadMs,
       },
+      spans: [
+        { source: 'frontend', stage: 'preview.control-dispatch', startOffsetMs: 0, durationMs: controlDispatchMs },
+        {
+          source: 'frontend',
+          stage: 'preview.instrumented-dispatch',
+          startOffsetMs: controlDispatchMs,
+          durationMs: interactionDispatchMs,
+        },
+      ],
     };
   },
 };
@@ -127,6 +136,20 @@ const browserQaScenario = (id: string, qaScenarioId: string): PerformanceScenari
         interactionMs: result.durationMs,
         processStarts: 2,
       },
+      spans: [
+        {
+          source: 'runner',
+          stage: 'qa.harness-setup',
+          startOffsetMs: 0,
+          durationMs: Math.max(0, elapsedMs - result.durationMs),
+        },
+        {
+          source: 'qa-browser',
+          stage: qaScenarioId,
+          startOffsetMs: Math.max(0, elapsedMs - result.durationMs),
+          durationMs: result.durationMs,
+        },
+      ],
     };
   },
 });

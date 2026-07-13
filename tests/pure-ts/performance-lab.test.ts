@@ -91,6 +91,9 @@ describe('performance lab runner', () => {
       10, 11, 12,
     ]);
     expect(receipt.samples.every(({ run }) => run >= 0 && run < 3)).toBe(true);
+    expect(receipt.observability?.clock).toEqual({ domain: 'runner-monotonic', unit: 'ms' });
+    expect(receipt.observability?.spans).toHaveLength(3);
+    expect(receipt.observability?.spans.every(({ run }) => run >= 0 && run < 3)).toBeTrue();
   });
 
   test('marks broken correctness or undeclared metrics invalid for bisect', async () => {
@@ -111,6 +114,22 @@ describe('performance lab runner', () => {
       now: clock(),
     });
     expect(noisy).toMatchObject({ status: 'invalid', invalidReason: expect.stringContaining('too noisy') });
+    const invalidTrace = scenario([0, 10]);
+    const traced = await runPerformanceScenario({
+      scenario: {
+        ...invalidTrace,
+        async runSample(run) {
+          const result = await invalidTrace.runSample(run);
+          return {
+            ...result,
+            spans: [{ source: 'frontend' as const, stage: 'impossible', startOffsetMs: 0, durationMs: 60_000 }],
+          };
+        },
+      },
+      identity,
+      now: clock(),
+    });
+    expect(traced).toMatchObject({ status: 'invalid', invalidReason: expect.stringContaining('exceeds its sample') });
   });
 
   test('compares only compatible identities and produces a regression result', async () => {

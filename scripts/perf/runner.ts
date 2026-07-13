@@ -1,4 +1,10 @@
-import type { MetricSample, PerformanceIdentity, PerformanceRunReceipt, PerformanceScenario } from './model';
+import type {
+  MetricSample,
+  PerformanceIdentity,
+  PerformanceRunReceipt,
+  PerformanceScenario,
+  PerformanceSpan,
+} from './model';
 import { performanceRunReceiptSchema } from './model';
 import {
   assertComparableReceipts,
@@ -59,16 +65,34 @@ export async function runPerformanceScenario(options: {
   const runId = `${startedAt.toISOString().replaceAll(/[:.]/gu, '-')}-${options.identity.git.commit.slice(0, 8)}-${scenario.id}`;
   const rerunCommand = ['bun', 'perf', 'run', scenario.id].map(quote).join(' ');
   const samples: MetricSample[] = [];
+  const spans: PerformanceSpan[] = [];
   let assertions = 0;
   try {
     for (let run = 0; run < scenario.warmupRuns + scenario.measuredRuns; run += 1) {
+      const sampleStarted = performance.now();
       const result = await scenario.runSample(run);
+      const sampleDurationMs = performance.now() - sampleStarted;
       if (run < scenario.warmupRuns) continue;
+      const measuredRun = run - scenario.warmupRuns;
       assertions += result.assertions;
       for (const [metric, value] of Object.entries(result.metrics)) {
         const unit = scenario.metricUnits[metric];
         if (unit === undefined) throw new Error(`Scenario ${scenario.id} emitted undeclared metric ${metric}.`);
-        samples.push({ metric, run: run - scenario.warmupRuns, unit, value });
+        samples.push({ metric, run: measuredRun, unit, value });
+      }
+      spans.push({
+        run: measuredRun,
+        source: 'runner',
+        stage: 'scenario.sample',
+        startOffsetMs: 0,
+        durationMs: sampleDurationMs,
+      });
+      for (const span of result.spans ?? []) {
+        if (span.startOffsetMs + span.durationMs > sampleDurationMs + 1)
+          throw new Error(
+            `Scenario ${scenario.id} trace span ${span.stage} exceeds its sample (${span.startOffsetMs + span.durationMs} > ${sampleDurationMs}).`,
+          );
+        spans.push({ ...span, run: measuredRun });
       }
     }
     const draft: PerformanceRunReceipt = {
@@ -83,6 +107,7 @@ export async function runPerformanceScenario(options: {
       identity: options.identity,
       protocol: { warmupRuns: scenario.warmupRuns, measuredRuns: scenario.measuredRuns },
       samples,
+      observability: { clock: { domain: 'runner-monotonic', unit: 'ms' }, spans },
       correctness: { assertions, passed: assertions >= scenario.measuredRuns },
       comparison: [],
       status: 'pass',
@@ -117,6 +142,7 @@ export async function runPerformanceScenario(options: {
       identity: options.identity,
       protocol: { warmupRuns: scenario.warmupRuns, measuredRuns: scenario.measuredRuns },
       samples,
+      observability: { clock: { domain: 'runner-monotonic', unit: 'ms' }, spans },
       correctness: { assertions, passed: false },
       comparison: [],
       status: 'invalid',

@@ -7,6 +7,14 @@ export const metricSampleSchema = z.object({
   unit: z.enum(['ms', 'bytes', 'count', 'per-second']),
 });
 
+export const performanceSpanSchema = z.object({
+  run: z.number().int().nonnegative(),
+  source: z.enum(['runner', 'frontend', 'qa-browser', 'native', 'gpu', 'io']),
+  stage: z.string().min(1),
+  startOffsetMs: z.number().finite().nonnegative(),
+  durationMs: z.number().finite().nonnegative(),
+});
+
 export const performanceIdentitySchema = z.object({
   git: z.object({
     commit: z.string().regex(/^[0-9a-f]{40}$/u),
@@ -52,6 +60,12 @@ export const performanceRunReceiptSchema = z
     identity: performanceIdentitySchema,
     protocol: z.object({ warmupRuns: z.number().int().nonnegative(), measuredRuns: z.number().int().positive() }),
     samples: z.array(metricSampleSchema),
+    observability: z
+      .object({
+        clock: z.object({ domain: z.literal('runner-monotonic'), unit: z.literal('ms') }),
+        spans: z.array(performanceSpanSchema),
+      })
+      .optional(),
     correctness: z.object({ assertions: z.number().int().nonnegative(), passed: z.boolean() }),
     comparison: z.array(metricComparisonSchema),
     status: z.enum(['pass', 'regression', 'invalid']),
@@ -63,6 +77,11 @@ export const performanceRunReceiptSchema = z
   .superRefine((receipt, context) => {
     if (receipt.status !== 'invalid' && (receipt.samples.length === 0 || !receipt.correctness.passed))
       context.addIssue({ code: 'custom', message: 'Valid performance runs require samples and correctness proof.' });
+    if (
+      receipt.status !== 'invalid' &&
+      (receipt.observability === undefined || receipt.observability.spans.length === 0)
+    )
+      context.addIssue({ code: 'custom', message: 'Valid performance runs require monotonic trace spans.' });
     if (receipt.status === 'invalid' && receipt.invalidReason === undefined)
       context.addIssue({ code: 'custom', message: 'Invalid performance runs require a reason.' });
   });
@@ -70,6 +89,9 @@ export const performanceRunReceiptSchema = z
 export type PerformanceIdentity = z.infer<typeof performanceIdentitySchema>;
 export type PerformanceRunReceipt = z.infer<typeof performanceRunReceiptSchema>;
 export type MetricSample = z.infer<typeof metricSampleSchema>;
+export type PerformanceSpan = z.infer<typeof performanceSpanSchema>;
+
+export type SamplePerformanceSpan = Omit<PerformanceSpan, 'run' | 'startOffsetMs'> & { startOffsetMs: number };
 
 export interface PerformanceScenario {
   id: string;
@@ -81,5 +103,9 @@ export interface PerformanceScenario {
   budgets: Readonly<Record<string, { absolute: number; relative: number }>>;
   maxRelativeMad: number;
   metricUnits: Readonly<Record<string, MetricSample['unit']>>;
-  runSample(run: number): Promise<{ assertions: number; metrics: Readonly<Record<string, number>> }>;
+  runSample(run: number): Promise<{
+    assertions: number;
+    metrics: Readonly<Record<string, number>>;
+    spans?: readonly SamplePerformanceSpan[];
+  }>;
 }
