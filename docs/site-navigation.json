@@ -95,6 +95,10 @@
           "path": "docs/color/architecture/scene-to-display-transform-adr-2026-06-14.md"
         },
         {
+          "title": "Illuminant-based white balance ADR",
+          "path": "docs/color/architecture/white-balance-illuminant-adr-2026-07-13.md"
+        },
+        {
           "title": "Camera profile strategy ADR",
           "path": "docs/color/architecture/camera-profile-strategy-adr-2026-06-14.md"
         },
@@ -107,7 +111,7 @@
           "path": "docs/color/architecture/current-color-pipeline-audit-2026-06-15.md"
         },
         {
-          "title": "White balance picker validation",
+          "title": "White balance runtime validation",
           "path": "docs/color/runtime/white-balance-picker-validation-2026-06-14.md"
         },
         {

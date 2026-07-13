@@ -34,6 +34,7 @@
       },
       "ariaSelectColor": "{{name}}-Farbe auswählen",
       "asShot": "As Shot",
+      "auto": "Automatisch",
       "blackWhiteMixer": {
         "ariaSelectChannel": "{{name}} Schwarzweißkanal auswählen",
         "contribution": "{{name}} Beitrag",
@@ -96,7 +97,10 @@
       "colorRangeLocalAdjustmentLayerName": "{{range}} local adjustment",
       "colorRangeLocalAdjustmentMaskName": "{{range}} range mask",
       "createLocalAdjustmentFromRange": "Create local adjustment",
+      "creativeTint": "Kreativer Farbton",
+      "creativeWarmth": "Kreative Wärme",
       "defaultState": "Default",
+      "duv": "Farbton (Duv)",
       "falloffSmoothness": "Falloff",
       "gamutWarning": {
         "coverage": "",
@@ -126,6 +130,9 @@
         "threeWayTab": "Three-way color grading"
       },
       "hue": "Farbton",
+      "illuminantMode": "Lichtquelle",
+      "kelvin": "Kelvin",
+      "kelvinTint": "Kelvin + Farbton",
       "levels": {
         "disabled": "Off",
         "enabled": "On",
@@ -158,6 +165,7 @@
         "yellows": "Gelb"
       },
       "presence": "Präsenz",
+      "preset": "Vorgabe",
       "previewMode": "",
       "profileTone": {
         "cameraProfile": "Kameraprofil",
@@ -200,6 +208,7 @@
       },
       "rangeCenter": "Bereichsmitte",
       "rangeWidth": "Bereichsbreite",
+      "renderedWhiteBalanceLimit": "",
       "resetActiveRange": "Reset active range",
       "resetLocalColorBalance": "Reset local color balance",
       "resetWhiteBalanceAsShot": "Reset white balance to as shot",
