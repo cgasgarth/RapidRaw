@@ -94,31 +94,42 @@ export async function requestNativeQaControl(
   for (const key of ['id', 'token', 'expectedIdentity', 'method'])
     if (Object.hasOwn(parameters, key)) throw new Error(`Native QA parameters cannot override reserved field ${key}.`);
   const operation = nativeQaControlOperationSchema.parse({ ...parameters, method });
-  return await new Promise((resolveResponse, reject) => {
-    const socket = connect(record.socketPath);
-    let buffer = '';
-    socket.setEncoding('utf8');
-    socket.setTimeout(60_000, () => socket.destroy(new Error(`Native QA ${method} timed out.`)));
-    socket.once('connect', () =>
-      socket.write(`${JSON.stringify({ id, token, expectedIdentity: record.identity, ...operation })}\n`),
-    );
-    socket.on('data', (chunk) => {
-      buffer += chunk;
-      if (Buffer.byteLength(buffer) > MAX_RESPONSE_BYTES) {
-        socket.destroy(new Error(`Native QA ${method} response exceeded ${MAX_RESPONSE_BYTES} bytes.`));
-        return;
-      }
-      const newline = buffer.indexOf('\n');
-      if (newline < 0) return;
-      socket.end();
-      try {
-        const response = responseSchema.parse(JSON.parse(buffer.slice(0, newline)));
-        if (response.id !== id) throw new Error(`Native QA response ID mismatch: ${response.id}`);
-        resolveResponse(response);
-      } catch (error) {
-        reject(error);
-      }
+  const request = () =>
+    new Promise<z.infer<typeof responseSchema>>((resolveResponse, reject) => {
+      const socket = connect(record.socketPath);
+      let buffer = '';
+      socket.setEncoding('utf8');
+      socket.setTimeout(60_000, () => socket.destroy(new Error(`Native QA ${method} timed out.`)));
+      socket.once('connect', () =>
+        socket.write(`${JSON.stringify({ id, token, expectedIdentity: record.identity, ...operation })}\n`),
+      );
+      socket.on('data', (chunk) => {
+        buffer += chunk;
+        if (Buffer.byteLength(buffer) > MAX_RESPONSE_BYTES) {
+          socket.destroy(new Error(`Native QA ${method} response exceeded ${MAX_RESPONSE_BYTES} bytes.`));
+          return;
+        }
+        const newline = buffer.indexOf('\n');
+        if (newline < 0) return;
+        socket.end();
+        try {
+          const response = responseSchema.parse(JSON.parse(buffer.slice(0, newline)));
+          if (response.id !== id) throw new Error(`Native QA response ID mismatch: ${response.id}`);
+          resolveResponse(response);
+        } catch (error) {
+          reject(error);
+        }
+      });
+      socket.once('error', reject);
     });
-    socket.once('error', reject);
-  });
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await request();
+    } catch (error) {
+      const transientConnectFailure =
+        error instanceof Error && /(?:ECONNREFUSED|EAGAIN|Resource temporarily unavailable)/u.test(error.message);
+      if (!transientConnectFailure || attempt >= 4) throw error;
+      await Bun.sleep(20 * (attempt + 1));
+    }
+  }
 }
