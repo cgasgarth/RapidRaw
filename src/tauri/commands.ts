@@ -169,6 +169,7 @@ export enum Invokes {
   UpdateWgpuTransform = 'update_wgpu_transform',
   FlushWgpuPresentation = 'flush_wgpu_presentation',
   GetWgpuPresentationReport = 'get_wgpu_presentation_report',
+  GetDisplayTargetReport = 'get_display_target_report',
   UpdateThumbnailQueue = 'update_thumbnail_queue',
   UpdateExifFields = 'update_exif_fields',
   FetchCommunityPresets = 'fetch_community_presets',

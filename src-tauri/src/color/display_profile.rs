@@ -158,7 +158,14 @@ pub struct DisplayPreviewTransformSnapshot {
 pub fn display_preview_transform_snapshot_for_app(
     app: &tauri::AppHandle,
 ) -> DisplayPreviewTransformSnapshot {
-    let captured = (|| -> Result<(Option<u32>, Vec<u8>), String> {
+    display_preview_transform_snapshot_from_capture(display_preview_transform_capture_for_app(app))
+}
+
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
+pub(crate) fn display_preview_transform_capture_for_app(
+    app: &tauri::AppHandle,
+) -> Result<(Option<u32>, Vec<u8>), String> {
+    (|| -> Result<(Option<u32>, Vec<u8>), String> {
         #[cfg(target_os = "macos")]
         {
             let display_id = macos::display_id_for_app(app).unwrap_or_else(macos::main_display_id);
@@ -169,12 +176,11 @@ pub fn display_preview_transform_snapshot_for_app(
         {
             Err("native_display_profile_unavailable".to_string())
         }
-    })();
-    display_preview_transform_snapshot_from_capture(captured)
+    })()
 }
 
 #[cfg(not(any(target_os = "android", target_os = "linux")))]
-fn display_preview_transform_snapshot_from_capture(
+pub(crate) fn display_preview_transform_snapshot_from_capture(
     captured: Result<(Option<u32>, Vec<u8>), String>,
 ) -> DisplayPreviewTransformSnapshot {
     let size = DISPLAY_LUT_SIZE;
@@ -513,7 +519,7 @@ fn build_identity_display_lut(size: u32) -> Vec<half::f16> {
 }
 
 #[cfg(not(any(target_os = "android", target_os = "linux")))]
-fn sha256_hex(bytes: &[u8]) -> String {
+pub(crate) fn sha256_hex(bytes: &[u8]) -> String {
     use sha2::{Digest, Sha256};
 
     let digest = Sha256::digest(bytes);
