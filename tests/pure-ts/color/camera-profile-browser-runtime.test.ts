@@ -1,10 +1,10 @@
 import { describe, expect, test } from 'bun:test';
-import type { CameraProfileBrowserEntry } from '../src/schemas/color/cameraProfileBrowserSchemas';
+import type { CameraProfileBrowserEntry } from '../../../src/schemas/color/cameraProfileBrowserSchemas';
 import {
   applyCameraProfileIdentity,
   groupCameraProfiles,
   queryCameraProfiles,
-} from '../src/utils/color/profile/cameraProfileBrowserRuntime';
+} from '../../../src/utils/color/profile/cameraProfileBrowserRuntime';
 
 const hash = (character: string) => `sha256:${character.repeat(64)}`;
 const entries = [
