@@ -570,6 +570,29 @@
         "pasteSettings": "貼上設定",
         "resetSectionSettings": "重置 {{section}} 設定"
       },
+      "autoEdit": {
+        "analyzing": "",
+        "apply": "",
+        "cancelLabel": "",
+        "description": "",
+        "groups": {
+          "atmosphere": "",
+          "color": "",
+          "detail": "",
+          "geometry": "",
+          "light": "",
+          "whiteBalance": ""
+        },
+        "groupsLabel": "",
+        "highConfidenceOnly": "",
+        "holdBefore": "",
+        "impact": "",
+        "impactLabel": "",
+        "resetProposal": "",
+        "reviewLabel": "",
+        "title": "",
+        "unavailable": ""
+      },
       "clippingWarning": {
         "action": "重置端點",
         "title": "裁切風險"

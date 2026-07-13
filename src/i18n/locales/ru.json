@@ -614,6 +614,29 @@
         "pasteSettings": "Вставить настройки",
         "resetSectionSettings": "Сбросить настройки раздела «{{section}}»"
       },
+      "autoEdit": {
+        "analyzing": "",
+        "apply": "",
+        "cancelLabel": "",
+        "description": "",
+        "groups": {
+          "atmosphere": "",
+          "color": "",
+          "detail": "",
+          "geometry": "",
+          "light": "",
+          "whiteBalance": ""
+        },
+        "groupsLabel": "",
+        "highConfidenceOnly": "",
+        "holdBefore": "",
+        "impact": "",
+        "impactLabel": "",
+        "resetProposal": "",
+        "reviewLabel": "",
+        "title": "",
+        "unavailable": ""
+      },
       "clippingWarning": {
         "action": "Сбросить точки",
         "title": "Риск клиппинга"

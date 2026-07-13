@@ -1,6 +1,7 @@
 export * from './agentColorEditWorkflow.js';
 export * from './agentSelectedImageProposalSchemas.js';
 export * from './appServerCommandSchemas.js';
+export * from './auto-edit/autoEditSchemas.js';
 export * from './brushMaskCommandRuntime.js';
 export * from './brushMaskV1.js';
 export * from './color/rawInputTransformSchemas.js';

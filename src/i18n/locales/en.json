@@ -602,6 +602,29 @@
         "pasteSettings": "Paste Settings",
         "resetSectionSettings": "Reset {{section}} Settings"
       },
+      "autoEdit": {
+        "analyzing": "Analyzing authoritative scene pixels…",
+        "apply": "Apply",
+        "cancelLabel": "Cancel Auto Adjust",
+        "description": "Review scene-referred recommendations before applying.",
+        "groups": {
+          "atmosphere": "Atmosphere",
+          "color": "Color",
+          "detail": "Detail",
+          "geometry": "Geometry",
+          "light": "Light",
+          "whiteBalance": "White Balance"
+        },
+        "groupsLabel": "Auto adjustment groups",
+        "highConfidenceOnly": "High confidence only",
+        "holdBefore": "Hold for Before",
+        "impact": "Impact",
+        "impactLabel": "Auto Adjust impact",
+        "resetProposal": "Reset Proposal",
+        "reviewLabel": "Auto Adjust review",
+        "title": "Auto Adjust",
+        "unavailable": "Not enough evidence or capability unavailable"
+      },
       "clippingWarning": {
         "action": "Reset endpoints",
         "title": "Clipping risk"

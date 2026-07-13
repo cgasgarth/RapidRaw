@@ -641,6 +641,29 @@
         "pasteSettings": "Wklej ustawienia",
         "resetSectionSettings": "Resetuj ustawienia sekcji {{section}}"
       },
+      "autoEdit": {
+        "analyzing": "",
+        "apply": "",
+        "cancelLabel": "",
+        "description": "",
+        "groups": {
+          "atmosphere": "",
+          "color": "",
+          "detail": "",
+          "geometry": "",
+          "light": "",
+          "whiteBalance": ""
+        },
+        "groupsLabel": "",
+        "highConfidenceOnly": "",
+        "holdBefore": "",
+        "impact": "",
+        "impactLabel": "",
+        "resetProposal": "",
+        "reviewLabel": "",
+        "title": "",
+        "unavailable": ""
+      },
       "clippingWarning": {
         "action": "Resetuj punkty",
         "title": "Ryzyko przycięcia"

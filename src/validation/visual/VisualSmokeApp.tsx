@@ -18,6 +18,7 @@ import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Crop, PercentCrop } from 'react-image-crop';
 import AdjustmentSlider from '../../components/adjustments/AdjustmentSlider';
+import { AutoEditReviewPopover } from '../../components/adjustments/AutoEditReviewPopover';
 import ColorPanel from '../../components/adjustments/Color';
 import ColorWheel from '../../components/adjustments/ColorWheel';
 import DetailsPanel from '../../components/adjustments/Details';
@@ -68,6 +69,7 @@ import Input from '../../components/ui/primitives/Input';
 import InspectorSegmentedControl from '../../components/ui/primitives/InspectorSegmentedControl';
 import Switch from '../../components/ui/primitives/Switch';
 import { ContextMenuProvider } from '../../context/ContextMenuContext';
+import type { AutoEditProposalV1 } from '../../schemas/autoEditSchemas';
 import {
   DEFAULT_HDR_MERGE_UI_SETTINGS,
   type HdrMergeUiSettings,
@@ -394,6 +396,131 @@ function AdjustmentsPanelRetuneVisualSmoke() {
             <ControlsPanel />
           </ContextMenuProvider>
         </div>
+      </section>
+    </main>
+  );
+}
+
+const autoEditReviewProposalFixture: AutoEditProposalV1 = {
+  analysisIdentity: {
+    analysisDomain: 'raw_scene_linear',
+    analysisResolution: [1024, 683],
+    cameraProfileFingerprint: 'u64:0000000000000002',
+    decodePlanFingerprint: 'u64:0000000000000001',
+    geometryFingerprint: 'u64:0000000000000003',
+    implementationVersion: 1,
+    sourceIdentity: '/fixtures/landscape.raw',
+    sourceRevision: `source-revision-v1:${'a'.repeat(64)}`,
+    whiteBalanceFingerprint: 'u64:0000000000000004',
+  },
+  baseGraphFingerprint: `blake3:${'b'.repeat(64)}`,
+  baseGraphRevision: 'history_2',
+  contract: 'rapidraw.auto_edit.v1',
+  defaultEnabledGroups: ['technical_white_balance', 'light', 'color'],
+  imageSessionId: 'editor-image-session:4:landscape',
+  impact: 1,
+  implementationVersion: 1,
+  proposalId: `blake3:${'c'.repeat(64)}`,
+  recommendations: [
+    {
+      confidence: 0.91,
+      evidenceCodes: ['neutral_candidates', 'spatial_neutral_coverage'],
+      expectedEffect: 'technical_correction',
+      group: 'technical_white_balance',
+      proposedParameters: {},
+      safeToBatch: true,
+      state: 'recommended',
+      target: 'whiteBalanceTechnical',
+    },
+    {
+      confidence: 0.88,
+      evidenceCodes: ['scene_ev_percentiles', 'specular_fraction'],
+      expectedEffect: 'scene_light',
+      group: 'light',
+      proposedParameters: { exposure: 0.72, highlights: -12 },
+      safeToBatch: true,
+      state: 'recommended',
+      target: 'sceneToneV1',
+    },
+    {
+      confidence: 0.72,
+      evidenceCodes: ['scene_chroma_distribution', 'target_gamut_guard'],
+      expectedEffect: 'conservative_color',
+      group: 'color',
+      proposedParameters: { vibrance: 4 },
+      safeToBatch: false,
+      state: 'recommended',
+      target: 'vibrance',
+    },
+    {
+      confidence: 0.31,
+      evidenceCodes: ['dehaze_service_v1'],
+      expectedEffect: 'atmospheric_correction',
+      group: 'atmosphere',
+      proposedParameters: null,
+      safeToBatch: false,
+      state: 'disabled_low_confidence',
+      target: 'dehazeV1',
+    },
+    {
+      confidence: 0,
+      evidenceCodes: ['detail_capability_unavailable'],
+      expectedEffect: 'detail_recovery',
+      group: 'detail',
+      proposedParameters: null,
+      safeToBatch: false,
+      state: 'not_applicable',
+      target: 'detailCapability',
+    },
+    {
+      confidence: 0,
+      evidenceCodes: ['geometry_capability_unavailable'],
+      expectedEffect: 'geometry_correction',
+      group: 'geometry',
+      proposedParameters: null,
+      safeToBatch: false,
+      state: 'not_applicable',
+      target: 'geometryCapability',
+    },
+  ],
+};
+
+function AutoEditReviewVisualSmoke() {
+  const [selectedGroups, setSelectedGroups] = useState(new Set(autoEditReviewProposalFixture.defaultEnabledGroups));
+  const [impact, setImpact] = useState(0.84);
+  return (
+    <main
+      className="relative grid min-h-screen place-items-center bg-[#111316] text-[#f3f4f1]"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.AutoEditReview}
+      data-visual-smoke-ready="true"
+    >
+      <section
+        className="relative h-[34rem] w-[24rem] rounded border border-white/10 bg-editor-panel"
+        data-visual-smoke-section="auto-edit-review"
+      >
+        <AutoEditReviewPopover
+          error={null}
+          impact={impact}
+          isAnalyzing={false}
+          isApplying={false}
+          onApply={() => {}}
+          onApplyHighConfidence={() => {}}
+          onCancel={() => {}}
+          onCompareEnd={() => {}}
+          onCompareStart={() => {}}
+          onImpactChange={setImpact}
+          onResetProposal={() => {}}
+          onToggleGroup={(group) => {
+            setSelectedGroups((current) => {
+              const next = new Set(current);
+              if (next.has(group)) next.delete(group);
+              else next.add(group);
+              return next;
+            });
+          }}
+          proposal={autoEditReviewProposalFixture}
+          selectedGroups={selectedGroups}
+        />
       </section>
     </main>
   );
@@ -1972,6 +2099,7 @@ function ProfessionalEditorCompactPortraitVisualSmoke() {
 
 const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.AdjustmentsPanelRetune]: AdjustmentsPanelRetuneVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.AutoEditReview]: AutoEditReviewVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.AgentChatUi]: AgentChatVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.BrushMaskCanvasUi]: BrushMaskCanvasVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ColorRangeLocalAdjustment]: ColorRangeLocalAdjustmentVisualSmoke,
