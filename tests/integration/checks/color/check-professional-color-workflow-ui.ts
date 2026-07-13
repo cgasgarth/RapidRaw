@@ -42,6 +42,23 @@ const rawDevelopmentReportFixture = {
     warningCodes: ['profile_fallback'],
   },
   demosaicPath: 'bayer_hq' as const,
+  highlightReconstruction: {
+    algorithmId: 'sensor_linear_confidence_hierarchy_v2' as const,
+    cfaKind: 'bayer' as const,
+    clippedSamples: 0,
+    confidencePercentiles: [0, 0, 0, 0, 0] as const,
+    implementationVersion: 2 as const,
+    invalidSamples: 0,
+    largestClippedRegion: 0,
+    methodCounts: {},
+    mode: 'auto' as const,
+    nearClippedSamples: 0,
+    partiallyReconstructedSamples: 0,
+    postDemosaicFallbackSamples: 0,
+    reconstructedSamples: 0,
+    unrecoverableSamples: 0,
+    warningCodes: [],
+  },
   processingProfile: 'balanced' as const,
 };
 

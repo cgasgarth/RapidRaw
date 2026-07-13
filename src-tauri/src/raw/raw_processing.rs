@@ -2,6 +2,11 @@ use crate::color::camera_input_transform::{
     AcesCgLinearV1, CameraInputTransform, CameraRgbWhiteBalanceGains, RawInputTransformReceiptV1,
     RawWorkingImageV1, XyzToCameraMatrix, apply_camera_input_transform,
 };
+use crate::highlight_reconstruction::{
+    CfaKind, CfaTopology, HighlightReconstructionMode, HighlightReconstructionOutput,
+    HighlightReconstructionReportV2, SensorReconstructionInput,
+    apply_post_demosaic_chroma_fallback, reconstruct_integer_sensor,
+};
 use crate::image_processing::apply_orientation;
 use anyhow::{Result, anyhow};
 use image::{DynamicImage, ImageBuffer, Rgba};
@@ -132,6 +137,7 @@ pub(crate) struct RawDevelopmentReport {
     pub processing_profile: RawProcessingProfile,
     pub camera_profile: RawCameraProfileReport,
     pub input_transform: Option<RawInputTransformReceiptV1>,
+    pub highlight_reconstruction: HighlightReconstructionReportV2,
     pub runtime: Option<RawRuntimeReport>,
     pub xtrans_hq: Option<XTransHqDevelopmentReport>,
 }
@@ -231,8 +237,9 @@ struct RawDefectCorrectionReport {
     dead_pixels: usize,
 }
 
+#[cfg(test)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-struct HighlightReconstructionReport {
+struct HighlightReconstructionReportV1 {
     candidate_pixels: usize,
     reconstructed_channels: usize,
     reconstructed_pixels: usize,
@@ -502,13 +509,13 @@ fn repair_raw_sensor_defects(
     let cfa_colors = (0..cfa_height)
         .flat_map(|row| (0..cfa_width).map(move |col| config.cfa.color_at(row, col)))
         .collect();
-    let black_levels = raw_image
+    let black_levels: Vec<f32> = raw_image
         .blacklevel
         .levels
         .iter()
         .map(|level| level.as_f32())
         .collect();
-    let white_levels = raw_image
+    let white_levels: Vec<f32> = raw_image
         .whitelevel
         .0
         .iter()
@@ -538,6 +545,7 @@ fn repair_raw_sensor_defects(
     }
 }
 
+#[cfg(test)]
 fn saturation_threshold(context: &RawDefectCorrectionContext, x: usize, y: usize) -> f32 {
     let black = context.black_level_at(x, y).clamp(0.0, u16::MAX as f32);
     let white = context
@@ -547,6 +555,7 @@ fn saturation_threshold(context: &RawDefectCorrectionContext, x: usize, y: usize
     white - 2.0_f32.max(range * 0.005)
 }
 
+#[cfg(test)]
 fn same_cfa_unclipped_neighbor_signals(
     pixels: &[u16],
     context: &RawDefectCorrectionContext,
@@ -591,10 +600,11 @@ fn same_cfa_unclipped_neighbor_signals(
     values
 }
 
-fn reconstruct_integer_cfa_highlights(
+#[cfg(test)]
+fn reconstruct_integer_cfa_highlights_v1(
     pixels: &mut [u16],
     context: RawDefectCorrectionContext,
-) -> HighlightReconstructionReport {
+) -> HighlightReconstructionReportV1 {
     let RawDefectImageBounds {
         active_bounds,
         cfa_height,
@@ -610,7 +620,7 @@ fn reconstruct_integer_cfa_highlights(
         || cfa_height == 0
         || context.white_levels.is_empty()
     {
-        return HighlightReconstructionReport::default();
+        return HighlightReconstructionReportV1::default();
     }
 
     let (left, top, right, bottom) = active_bounds;
@@ -619,12 +629,12 @@ fn reconstruct_integer_cfa_highlights(
     let right = right.saturating_sub(cfa_width * 2).min(width);
     let bottom = bottom.saturating_sub(cfa_height * 2).min(height);
     if left >= right || top >= bottom {
-        return HighlightReconstructionReport::default();
+        return HighlightReconstructionReportV1::default();
     }
 
     let original = pixels.to_vec();
     let mut replacements = Vec::new();
-    let mut report = HighlightReconstructionReport::default();
+    let mut report = HighlightReconstructionReportV1::default();
 
     for y in top..bottom {
         for x in left..right {
@@ -671,16 +681,27 @@ fn reconstruct_integer_cfa_highlights(
     report
 }
 
-fn reconstruct_raw_sensor_highlights(raw_image: &mut RawImage) -> HighlightReconstructionReport {
+fn reconstruct_raw_sensor_highlights(
+    raw_image: &mut RawImage,
+    mode: HighlightReconstructionMode,
+    check_cancel: impl FnMut() -> Result<()>,
+) -> Result<HighlightReconstructionOutput> {
     let RawPhotometricInterpretation::Cfa(config) = &raw_image.photometric else {
-        return HighlightReconstructionReport::default();
+        return Ok(HighlightReconstructionOutput {
+            report: HighlightReconstructionReportV2::bypassed(mode, CfaKind::Unsupported),
+            confidence: Vec::new(),
+            unrecoverable_sensor_indices: Vec::new(),
+        });
     };
 
-    if raw_image.cpp != 1
-        || !config.cfa.is_rgb()
-        || (config.cfa.width == 6 && config.cfa.height == 6)
-    {
-        return HighlightReconstructionReport::default();
+    if raw_image.cpp != 1 || !config.cfa.is_rgb() {
+        let mut report = HighlightReconstructionReportV2::bypassed(mode, CfaKind::Unsupported);
+        report.warning_codes.push("unsupported_cfa_pixel_layout");
+        return Ok(HighlightReconstructionOutput {
+            report,
+            confidence: Vec::new(),
+            unrecoverable_sensor_indices: Vec::new(),
+        });
     }
 
     let width = raw_image.width;
@@ -691,39 +712,48 @@ fn reconstruct_raw_sensor_highlights(raw_image: &mut RawImage) -> HighlightRecon
     let cfa_colors = (0..cfa_height)
         .flat_map(|row| (0..cfa_width).map(move |col| config.cfa.color_at(row, col)))
         .collect();
-    let black_levels = raw_image
+    let black_levels: Vec<f32> = raw_image
         .blacklevel
         .levels
         .iter()
         .map(|level| level.as_f32())
         .collect();
-    let white_levels = raw_image
+    let white_levels: Vec<f32> = raw_image
         .whitelevel
         .0
         .iter()
         .map(|level| *level as f32)
         .collect();
 
+    let topology = CfaTopology::new(cfa_width, cfa_height, cfa_colors);
     match &mut raw_image.data {
-        RawImageData::Integer(pixels) => reconstruct_integer_cfa_highlights(
+        RawImageData::Integer(pixels) => reconstruct_integer_sensor(
             pixels,
-            RawDefectCorrectionContext {
-                bounds: RawDefectImageBounds {
-                    active_bounds: active,
-                    cfa_height,
-                    cfa_width,
-                    height,
-                    width,
-                },
-                black_cpp: raw_image.blacklevel.cpp,
-                black_height: raw_image.blacklevel.height,
-                black_levels,
+            &SensorReconstructionInput {
+                width,
+                height,
+                active_bounds: active,
+                topology,
+                black_levels: &black_levels,
                 black_width: raw_image.blacklevel.width,
-                cfa_colors,
-                white_levels,
+                black_height: raw_image.blacklevel.height,
+                black_cpp: raw_image.blacklevel.cpp,
+                white_levels: &white_levels,
             },
+            mode,
+            check_cancel,
         ),
-        RawImageData::Float(_) => HighlightReconstructionReport::default(),
+        RawImageData::Float(_) => {
+            let mut report = HighlightReconstructionReportV2::bypassed(mode, topology.kind);
+            report
+                .warning_codes
+                .push("float_cfa_sensor_data_unsupported");
+            Ok(HighlightReconstructionOutput {
+                report,
+                confidence: Vec::new(),
+                unrecoverable_sensor_indices: Vec::new(),
+            })
+        }
     }
 }
 
@@ -1261,18 +1291,34 @@ fn develop_internal_from_source(
         }
     }
 
-    let highlight_reconstruction_report =
-        if profile != RawProcessingProfile::Fast && apply_calibration {
-            reconstruct_raw_sensor_highlights(&mut raw_image)
-        } else {
-            HighlightReconstructionReport::default()
-        };
-    if highlight_reconstruction_report.reconstructed_pixels > 0 {
+    let highlight_mode = if !apply_calibration || profile == RawProcessingProfile::Fast {
+        HighlightReconstructionMode::Off
+    } else if profile == RawProcessingProfile::Maximum {
+        HighlightReconstructionMode::Strong
+    } else if highlight_compression <= 1.5 {
+        HighlightReconstructionMode::Conservative
+    } else {
+        HighlightReconstructionMode::Auto
+    };
+    let highlight_reconstruction =
+        reconstruct_raw_sensor_highlights(&mut raw_image, highlight_mode, &check_cancel)?;
+    let highlight_confidence_peak = highlight_reconstruction
+        .confidence
+        .iter()
+        .copied()
+        .fold(0.0_f32, f32::max);
+    let mut highlight_reconstruction_report = highlight_reconstruction.report;
+    let unrecoverable_highlight_indices = highlight_reconstruction.unrecoverable_sensor_indices;
+    if highlight_reconstruction_report.reconstructed_samples > 0
+        || highlight_reconstruction_report.partially_reconstructed_samples > 0
+    {
         log::debug!(
-            "Reconstructed RAW sensor highlights before demosaic: candidates={}, pixels={}, channels={}",
-            highlight_reconstruction_report.candidate_pixels,
-            highlight_reconstruction_report.reconstructed_pixels,
-            highlight_reconstruction_report.reconstructed_channels
+            "Reconstructed RAW sensor highlights before demosaic: clipped={}, reconstructed={}, partial={}, unrecoverable={}, confidence_peak={:.3}",
+            highlight_reconstruction_report.clipped_samples,
+            highlight_reconstruction_report.reconstructed_samples,
+            highlight_reconstruction_report.partially_reconstructed_samples,
+            highlight_reconstruction_report.unrecoverable_samples,
+            highlight_confidence_peak
         );
     }
 
@@ -1379,11 +1425,25 @@ fn develop_internal_from_source(
                 *p = linear_val.clamp(0.0, clamp_limit);
             });
         }
-        Intermediate::ThreeColor(pixels) => pixels.data.iter_mut().for_each(|p| {
-            p[0] *= rescale_factor;
-            p[1] *= rescale_factor;
-            p[2] *= rescale_factor;
-        }),
+        Intermediate::ThreeColor(pixels) => {
+            pixels.data.iter_mut().for_each(|p| {
+                p[0] *= rescale_factor;
+                p[1] *= rescale_factor;
+                p[2] *= rescale_factor;
+            });
+            if matches!(
+                highlight_mode,
+                HighlightReconstructionMode::Auto | HighlightReconstructionMode::Strong
+            ) {
+                apply_post_demosaic_chroma_fallback(
+                    &mut pixels.data,
+                    pixels.width,
+                    pixels.height,
+                    &unrecoverable_highlight_indices,
+                    &mut highlight_reconstruction_report,
+                );
+            }
+        }
         Intermediate::FourColor(pixels) => {
             pixels.data.iter_mut().for_each(|p| {
                 p.iter_mut().for_each(|c| {
@@ -1484,6 +1544,7 @@ fn develop_internal_from_source(
             processing_profile: profile,
             camera_profile,
             input_transform,
+            highlight_reconstruction: highlight_reconstruction_report,
             runtime: None,
             xtrans_hq: xtrans_hq_report,
         },
@@ -1772,7 +1833,7 @@ mod tests {
         }
         pixels[8 * width + 8] = 16_000;
 
-        let report = reconstruct_integer_cfa_highlights(
+        let report = reconstruct_integer_cfa_highlights_v1(
             &mut pixels,
             bayer_context_with_levels(
                 width,
@@ -1796,7 +1857,7 @@ mod tests {
         let mut pixels = bayer_pixels(width, height, 8_000);
         pixels[8 * width + 8] = 16_000;
 
-        let report = reconstruct_integer_cfa_highlights(
+        let report = reconstruct_integer_cfa_highlights_v1(
             &mut pixels,
             bayer_context_with_levels(
                 width,
@@ -1948,7 +2009,13 @@ mod tests {
         let mut raw_image = decoder
             .raw_image(&source, &RawDecodeParams::default(), false)
             .expect("decode private Bayer RAW for suppression proof");
-        let highlight_reconstruction_report = reconstruct_raw_sensor_highlights(&mut raw_image);
+        let highlight_reconstruction_report = reconstruct_raw_sensor_highlights(
+            &mut raw_image,
+            HighlightReconstructionMode::Strong,
+            || Ok(()),
+        )
+        .expect("run sensor highlight reconstruction proof")
+        .report;
         let (_, bayer_hq_report) =
             develop_bayer_hq_intermediate(&raw_image).expect("run Bayer HQ suppression proof path");
         let suppression_report = bayer_hq_report.artifact_suppression;
@@ -2002,7 +2069,7 @@ mod tests {
             .expect("write Bayer HQ TIFF");
 
         let report = serde_json::json!({
-            "issues": [3239, 3241, 3242],
+            "issues": [3239, 3241, 3242, 5410],
             "proofBoundary": "private_bayer_hq_runtime_output",
             "sourcePath": source_path,
             "dimensions": {
@@ -2026,11 +2093,15 @@ mod tests {
                     "adjustedPixelRatio": suppression_adjusted_ratio,
                 },
                 "highlightReconstruction": {
-                    "algorithm": "sensor_linear_same_phase_headroom_v1",
+                    "algorithm": highlight_reconstruction_report.algorithm_id,
+                    "implementationVersion": highlight_reconstruction_report.implementation_version,
                     "stage": "pre_demosaic_integer_cfa",
-                    "candidatePixels": highlight_reconstruction_report.candidate_pixels,
-                    "reconstructedPixels": highlight_reconstruction_report.reconstructed_pixels,
-                    "reconstructedChannels": highlight_reconstruction_report.reconstructed_channels,
+                    "clippedSamples": highlight_reconstruction_report.clipped_samples,
+                    "reconstructedSamples": highlight_reconstruction_report.reconstructed_samples,
+                    "partiallyReconstructedSamples": highlight_reconstruction_report.partially_reconstructed_samples,
+                    "unrecoverableSamples": highlight_reconstruction_report.unrecoverable_samples,
+                    "methodCounts": highlight_reconstruction_report.method_counts,
+                    "confidencePercentiles": highlight_reconstruction_report.confidence_percentiles,
                 },
             },
             "outputDiff": {
