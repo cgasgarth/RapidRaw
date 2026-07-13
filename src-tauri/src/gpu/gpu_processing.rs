@@ -209,6 +209,7 @@ pub struct GpuExecutionReceipt {
     pub graph_fingerprint: u64,
     pub stages: GpuStageFlags,
     pub blur_dispatch_count: u32,
+    pub flare_dispatch_count: u32,
     pub render_pass_count: u32,
     pub command_buffer_count: u32,
     pub queue_submit_count: u32,
@@ -1609,10 +1610,7 @@ impl GpuProcessor {
         };
         adjustments.blur_pass_flags = blur_pass_needs.flags();
         let mut blur_counters = BlurPassCounters::new(blur_pass_needs);
-        let mut flare_command_buffer = None;
-        if adjustments.global.flare_amount > 0.0 {
-            let mut encoder = device.create_command_encoder(&Default::default());
-
+        let mut flare_bind_groups = if adjustments.global.flare_amount > 0.0 {
             let aspect_ratio = if height > 0 {
                 width as f32 / height as f32
             } else {
@@ -1653,13 +1651,6 @@ impl GpuProcessor {
                 ],
             });
 
-            {
-                let mut cpass = encoder.begin_compute_pass(&Default::default());
-                cpass.set_pipeline(&self.flare_threshold_pipeline);
-                cpass.set_bind_group(0, &bg0, &[]);
-                cpass.dispatch_workgroups(FLARE_MAP_SIZE / 16, FLARE_MAP_SIZE / 16, 1);
-            }
-
             let bg0_ghosts = device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("Flare BG0 Ghosts"),
                 layout: &self.flare_bgl_0,
@@ -1698,16 +1689,10 @@ impl GpuProcessor {
                 ],
             });
 
-            {
-                let mut cpass = encoder.begin_compute_pass(&Default::default());
-                cpass.set_pipeline(&self.flare_ghosts_pipeline);
-                cpass.set_bind_group(0, &bg0_ghosts, &[]);
-                cpass.set_bind_group(1, &bg1, &[]);
-                cpass.dispatch_workgroups(FLARE_MAP_SIZE / 16, FLARE_MAP_SIZE / 16, 1);
-            }
-
-            flare_command_buffer = Some(encoder.finish());
-        }
+            Some((bg0, bg0_ghosts, bg1))
+        } else {
+            None
+        };
 
         const TILE_SIZE: u32 = 2048;
         let tile_overlap = graph.tile_halo;
@@ -1721,8 +1706,9 @@ impl GpuProcessor {
             }
         ];
         let mut cpu_encode_time = Duration::ZERO;
-        let mut command_buffer_count = u32::from(flare_command_buffer.is_some());
+        let mut command_buffer_count = 0_u32;
         let mut phase_dispatch_count = 0_u32;
+        let mut flare_dispatch_count = 0_u32;
 
         let start_tile_x = bounds.x / TILE_SIZE;
         let start_tile_y = bounds.y / TILE_SIZE;
@@ -1776,6 +1762,30 @@ impl GpuProcessor {
                     device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
                         label: Some("GPU render graph encoder"),
                     });
+                if let Some((threshold_bg, ghosts_bg, output_bg)) = flare_bind_groups.take() {
+                    {
+                        let mut compute_pass = main_encoder.begin_compute_pass(&Default::default());
+                        compute_pass.set_pipeline(&self.flare_threshold_pipeline);
+                        compute_pass.set_bind_group(0, &threshold_bg, &[]);
+                        compute_pass.dispatch_workgroups(
+                            FLARE_MAP_SIZE / 16,
+                            FLARE_MAP_SIZE / 16,
+                            1,
+                        );
+                    }
+                    {
+                        let mut compute_pass = main_encoder.begin_compute_pass(&Default::default());
+                        compute_pass.set_pipeline(&self.flare_ghosts_pipeline);
+                        compute_pass.set_bind_group(0, &ghosts_bg, &[]);
+                        compute_pass.set_bind_group(1, &output_bg, &[]);
+                        compute_pass.dispatch_workgroups(
+                            FLARE_MAP_SIZE / 16,
+                            FLARE_MAP_SIZE / 16,
+                            1,
+                        );
+                    }
+                    flare_dispatch_count += 2;
+                }
                 let mut run_blur = |family: BlurFamily,
                                     base_radius: f32,
                                     output_view: &wgpu::TextureView|
@@ -2171,17 +2181,13 @@ impl GpuProcessor {
                     );
                 }
 
-                // Use distinct command buffers for scene, view and display so
-                // storage-write -> sampled-read dependencies are explicit on
-                // every backend, including software Vulkan adapters.
-                let mut tile_command_buffers = vec![main_encoder.finish()];
+                // Keep the dependent scene -> view -> display graph in one
+                // command encoder. Wgpu can then track each storage-write ->
+                // sampled-read transition across compute-pass boundaries,
+                // including on software Vulkan adapters.
                 if let Some(view_bind_group) = view_bind_group.as_ref() {
-                    let mut encoder =
-                        device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                            label: Some("GPU view-phase encoder"),
-                        });
                     {
-                        let mut compute_pass = encoder.begin_compute_pass(&Default::default());
+                        let mut compute_pass = main_encoder.begin_compute_pass(&Default::default());
                         compute_pass.set_pipeline(&self.main_pipeline);
                         compute_pass.set_bind_group(0, view_bind_group, &[]);
                         compute_pass.dispatch_workgroups(
@@ -2190,15 +2196,10 @@ impl GpuProcessor {
                             1,
                         );
                     }
-                    tile_command_buffers.push(encoder.finish());
                 }
                 if let Some(display_bind_group) = display_bind_group.as_ref() {
-                    let mut encoder =
-                        device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                            label: Some("GPU display-phase encoder"),
-                        });
                     {
-                        let mut compute_pass = encoder.begin_compute_pass(&Default::default());
+                        let mut compute_pass = main_encoder.begin_compute_pass(&Default::default());
                         compute_pass.set_pipeline(&self.main_pipeline);
                         compute_pass.set_bind_group(0, display_bind_group, &[]);
                         compute_pass.dispatch_workgroups(
@@ -2208,7 +2209,7 @@ impl GpuProcessor {
                         );
                     }
                     if output_to_display {
-                        encoder.copy_texture_to_texture(
+                        main_encoder.copy_texture_to_texture(
                             wgpu::TexelCopyTextureInfo {
                                 texture: &self.tile_output_texture,
                                 mip_level: 0,
@@ -2236,23 +2237,11 @@ impl GpuProcessor {
                             },
                         );
                     }
-                    tile_command_buffers.push(encoder.finish());
                 }
-                let tile_command_buffer_count = tile_command_buffers.len() as u32;
-                // A single Queue::submit containing several command buffers did
-                // not make the storage-write -> sampled-read transition visible
-                // between phase buffers on software Vulkan. Ordered submits are
-                // still asynchronous, while giving wgpu an explicit submission
-                // boundary for each render-authoritative phase dependency.
-                for command_buffer in flare_command_buffer
-                    .take()
-                    .into_iter()
-                    .chain(tile_command_buffers)
-                {
-                    queue.submit(std::iter::once(command_buffer));
-                    blur_counters.record_command_buffer();
-                }
-                command_buffer_count += tile_command_buffer_count;
+                let tile_command_buffer = main_encoder.finish();
+                queue.submit(std::iter::once(tile_command_buffer));
+                blur_counters.record_command_buffer();
+                command_buffer_count += 1;
                 phase_dispatch_count += if split_scene_view_display { 3 } else { 1 };
                 cpu_encode_time += encode_started.elapsed();
 
@@ -2304,7 +2293,10 @@ impl GpuProcessor {
             graph_fingerprint: graph.fingerprint,
             stages: graph.flags,
             blur_dispatch_count: blur_counters.dispatches,
-            render_pass_count: blur_counters.dispatches + phase_dispatch_count,
+            flare_dispatch_count,
+            render_pass_count: blur_counters.dispatches
+                + flare_dispatch_count
+                + phase_dispatch_count,
             command_buffer_count,
             queue_submit_count: blur_counters.submissions,
             estimated_peak_resource_bytes: graph.estimated_peak_resource_bytes,
@@ -3025,8 +3017,8 @@ mod blur_pass_tests {
             .last_execution_receipt()
             .expect("v2 GPU execution publishes a runtime receipt");
         assert_eq!(receipt.phase_dispatch_count, 3);
-        assert_eq!(receipt.command_buffer_count, 3);
-        assert_eq!(receipt.queue_submit_count, 3);
+        assert_eq!(receipt.command_buffer_count, 1);
+        assert_eq!(receipt.queue_submit_count, 1);
         assert!(receipt.cache_hits >= 3, "receipt={receipt:?}");
         assert_eq!(receipt.domain_conversions.len(), 2);
         assert!(
@@ -3034,6 +3026,76 @@ mod blur_pass_tests {
                 .declared_clamps
                 .contains(&"final_output_quantization_only")
         );
+    }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
+    fn multi_tile_flare_prepass_is_encoded_once_with_first_scene_consumer() {
+        use image::{DynamicImage, ImageBuffer, Rgba};
+        use serde_json::json;
+        use tauri::Manager;
+
+        let _test_guard = acquire_gpu_test_lock();
+        let source = DynamicImage::ImageRgba32F(ImageBuffer::from_pixel(
+            2049,
+            1,
+            Rgba([0.8, 0.7, 0.6, 1.0]),
+        ));
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock Tauri app builds");
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state)
+            .expect("compute-only GPU context initializes");
+        let raw = json!({
+            "rawEngineEditGraphVersion": 2,
+            "flareAmount": 24,
+            "exposure": 30,
+            "whites": 18,
+            "highlights": -12
+        });
+        let plan = crate::render_plan::compile_render_plan(
+            &raw,
+            crate::render_plan::CompileRenderPlanContext {
+                revision: crate::render_plan::content_revision(&raw, 1, 2, 3),
+                is_raw: false,
+                tonemapper_override: Some(0),
+            },
+            None,
+        )
+        .unwrap();
+        let rendered = process_and_get_dynamic_image(
+            &context,
+            &state,
+            &source,
+            PreGpuImageIdentity::for_source(&source, "multi-tile-flare"),
+            RenderRequest {
+                adjustments: plan.adjustments,
+                mask_bitmaps: &[],
+                lut: None,
+                roi: None,
+                edit_graph: EditGraphExecutionAuthority::Compiled(plan.edit_graph),
+            },
+            "multi_tile_flare_prepass",
+        )
+        .unwrap();
+        assert_eq!(rendered.width(), 2049);
+        let receipt = state
+            .gpu_processor
+            .lock()
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .processor
+            .last_execution_receipt()
+            .unwrap();
+        assert_eq!(receipt.flare_dispatch_count, 2);
+        assert_eq!(receipt.blur_dispatch_count, 4);
+        assert_eq!(receipt.phase_dispatch_count, 6);
+        assert_eq!(receipt.command_buffer_count, 2);
+        assert_eq!(receipt.queue_submit_count, 2);
+        assert_eq!(receipt.render_pass_count, 12);
     }
 
     #[cfg(feature = "tauri-test")]
