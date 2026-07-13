@@ -16,7 +16,7 @@ use crate::image_processing::{
     RenderRequest, downscale_f32_image, get_or_init_gpu_context,
     process_and_get_dynamic_image_with_analytics, resolve_tonemapper_override_from_handle,
 };
-use crate::mask_generation::get_cached_or_generate_mask;
+use crate::mask_generation::get_cached_or_generate_preview_mask;
 use crate::preview_scheduler::{
     PreviewAbort, PreviewCancellation, PreviewCompletion, PreviewScheduler,
     PreviewSchedulingPolicy, PreviewStage,
@@ -353,7 +353,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         Vec::with_capacity(render_plan.masks.len());
     for def in render_plan.masks.iter() {
         cancellation_checkpoint(cancellation, PreviewStage::Masks)?;
-        if let Some(mask) = get_cached_or_generate_mask(
+        if let Some(mask) = get_cached_or_generate_preview_mask(
             &state,
             def,
             preview_width,
@@ -361,6 +361,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
             effective_scale,
             scaled_crop_offset,
             &adjustments_clone,
+            processing_image_ref,
         ) {
             mask_bitmaps.push(mask);
         }

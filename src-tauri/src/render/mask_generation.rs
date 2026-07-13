@@ -2059,6 +2059,32 @@ pub fn generate_mask_bitmap(
     crop_offset: (f32, f32),
     warped_image: Option<&DynamicImage>,
 ) -> Option<GrayImage> {
+    generate_mask_bitmap_in_space(
+        mask_def,
+        width,
+        height,
+        scale,
+        crop_offset,
+        warped_image,
+        WarpedImageSpace::Source,
+    )
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum WarpedImageSpace {
+    Source,
+    Preview,
+}
+
+fn generate_mask_bitmap_in_space(
+    mask_def: &MaskDefinition,
+    width: u32,
+    height: u32,
+    scale: f32,
+    crop_offset: (f32, f32),
+    warped_image: Option<&DynamicImage>,
+    warped_space: WarpedImageSpace,
+) -> Option<GrayImage> {
     if !mask_def.visible || mask_def.sub_masks.is_empty() {
         return None;
     }
@@ -2066,9 +2092,17 @@ pub fn generate_mask_bitmap(
     let mut final_mask = GrayImage::new(width, height);
 
     for sub_mask in &mask_def.sub_masks {
-        if let Some(mut sub_bitmap) =
+        let preview_aligned_range = warped_space == WarpedImageSpace::Preview
+            && matches!(
+                sub_mask.mask_type.as_str(),
+                "color_range" | "luminance_range"
+            );
+        let generated = if preview_aligned_range {
+            generate_sub_mask_bitmap(sub_mask, width, height, 1.0, (0.0, 0.0), warped_image)
+        } else {
             generate_sub_mask_bitmap(sub_mask, width, height, scale, crop_offset, warped_image)
-        {
+        };
+        if let Some(mut sub_bitmap) = generated {
             if sub_mask.invert {
                 for p in sub_bitmap.pixels_mut() {
                     p[0] = 255 - p[0];
@@ -2119,6 +2153,20 @@ pub fn generate_mask_bitmap(
     }
 
     Some(final_mask)
+}
+
+fn supports_preview_aligned_warped_image(mask_def: &MaskDefinition) -> bool {
+    mask_def.sub_masks.iter().all(|sub_mask| {
+        !sub_mask.visible
+            || matches!(
+                sub_mask.mask_type.as_str(),
+                "color_range" | "luminance_range"
+            )
+            || (!matches!(
+                sub_mask.mask_type.as_str(),
+                "color" | "luminance" | "color_range" | "luminance_range"
+            ) && !has_refinement_parameters(&sub_mask.parameters))
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -2200,6 +2248,55 @@ pub fn get_cached_or_generate_mask(
     crop_offset: (f32, f32),
     adjustments: &serde_json::Value,
 ) -> Option<GrayImage> {
+    get_cached_or_generate_mask_with_preview(
+        state,
+        def,
+        width,
+        height,
+        scale,
+        crop_offset,
+        adjustments,
+        None,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn get_cached_or_generate_preview_mask(
+    state: &tauri::State<AppState>,
+    def: &MaskDefinition,
+    width: u32,
+    height: u32,
+    scale: f32,
+    crop_offset: (f32, f32),
+    adjustments: &serde_json::Value,
+    preview_image: &DynamicImage,
+) -> Option<GrayImage> {
+    get_cached_or_generate_mask_with_preview(
+        state,
+        def,
+        width,
+        height,
+        scale,
+        crop_offset,
+        adjustments,
+        Some(preview_image),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn get_cached_or_generate_mask_with_preview(
+    state: &tauri::State<AppState>,
+    def: &MaskDefinition,
+    width: u32,
+    height: u32,
+    scale: f32,
+    crop_offset: (f32, f32),
+    adjustments: &serde_json::Value,
+    preview_image: Option<&DynamicImage>,
+) -> Option<GrayImage> {
+    let uses_preview_image = def.requires_warped_image()
+        && supports_preview_aligned_warped_image(def)
+        && preview_image.is_some();
     let mut hasher = DefaultHasher::new();
 
     let mut def_for_hash = def.clone();
@@ -2217,6 +2314,7 @@ pub fn get_cached_or_generate_mask(
             .unwrap_or_default()
             .hash(&mut hasher);
     }
+    uses_preview_image.hash(&mut hasher);
 
     let key = hasher.finish();
 
@@ -2226,16 +2324,28 @@ pub fn get_cached_or_generate_mask(
         }
     }
 
-    let warped_image =
-        resolve_warped_image_for_masks(state, adjustments, std::slice::from_ref(def));
-
-    let generated = generate_mask_bitmap(
+    let full_warped_image = if uses_preview_image {
+        None
+    } else {
+        resolve_warped_image_for_masks(state, adjustments, std::slice::from_ref(def))
+    };
+    let warped_image = if uses_preview_image {
+        preview_image
+    } else {
+        full_warped_image.as_deref()
+    };
+    let generated = generate_mask_bitmap_in_space(
         def,
         width,
         height,
         scale,
         crop_offset,
-        warped_image.as_deref(),
+        warped_image,
+        if uses_preview_image {
+            WarpedImageSpace::Preview
+        } else {
+            WarpedImageSpace::Source
+        },
     );
 
     if let Some(img) = &generated {
@@ -2250,6 +2360,50 @@ pub fn get_cached_or_generate_mask(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn preview_aligned_range_mask_uses_preview_pixels_without_source_space_remap() {
+        let definition = MaskDefinition {
+            id: "preview-range".into(),
+            name: "Preview range".into(),
+            visible: true,
+            invert: false,
+            blend_mode: "normal".into(),
+            opacity: 100.0,
+            adjustments: Value::Null,
+            sub_masks: vec![SubMask {
+                id: "range".into(),
+                mask_type: "luminance_range".into(),
+                visible: true,
+                invert: false,
+                opacity: 100.0,
+                mode: SubMaskMode::Additive,
+                parameters: serde_json::json!({
+                    "minLuma": 0.4,
+                    "maxLuma": 0.6,
+                    "feather": 0.1
+                }),
+            }],
+        };
+        let preview = DynamicImage::ImageRgba8(RgbaImage::from_fn(4, 2, |x, _| {
+            let value = if x == 2 { 128 } else { 16 };
+            Rgba([value, value, value, 255])
+        }));
+        let mask = generate_mask_bitmap_in_space(
+            &definition,
+            4,
+            2,
+            0.01,
+            (99.0, 77.0),
+            Some(&preview),
+            WarpedImageSpace::Preview,
+        )
+        .unwrap();
+
+        assert!(supports_preview_aligned_warped_image(&definition));
+        assert_eq!(mask.get_pixel(2, 0)[0], 255);
+        assert_eq!(mask.get_pixel(0, 0)[0], 0);
+    }
 
     #[test]
     fn mask_overlay_pixel_preserves_default_rubylith_contract() {

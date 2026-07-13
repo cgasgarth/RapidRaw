@@ -62,10 +62,9 @@ use std::time::Duration;
 
 use base64::{Engine as _, engine::general_purpose};
 use image::codecs::jpeg::JpegEncoder;
-use image::{DynamicImage, GenericImageView, ImageBuffer, Luma, Rgb32FImage, RgbImage, Rgba};
+use image::{DynamicImage, GenericImageView, ImageBuffer, Luma, RgbImage, Rgba};
 use imageproc::drawing::draw_line_segment_mut;
 use imageproc::edges::canny;
-use imageproc::geometric_transformations::{Border, Interpolation, warp_into_with};
 use imageproc::hough::{LineDetectionOptions, detect_lines};
 use rapidraw_codecs::JpegPreset;
 
@@ -289,6 +288,7 @@ pub struct PreviewGeometryReceipt {
     pub output_pixel_count: u64,
     pub full_resolution_transform_allocations: u32,
     pub direct_crop: bool,
+    pub tile_count: u32,
 }
 
 pub struct PreviewGeometryResult {
@@ -308,7 +308,9 @@ impl PreviewGeometryPipeline {
         if let Some(check) = request.cancellation {
             check()?;
         }
-        if let Some(result) = compute_direct_crop_preview(source, adjustments, preview_dim) {
+        if let Some(result) =
+            compute_direct_crop_preview(source, adjustments, preview_dim, request.cancellation)?
+        {
             if let Some(check) = request.cancellation {
                 check()?;
             }
@@ -378,6 +380,7 @@ impl PreviewGeometryPipeline {
                 output_pixel_count,
                 full_resolution_transform_allocations: 0,
                 direct_crop: false,
+                tile_count: 1,
             },
         })
     }
@@ -406,25 +409,26 @@ fn compute_direct_crop_preview(
     source: &DynamicImage,
     adjustments: &serde_json::Value,
     preview_dim: u32,
-) -> Option<PreviewGeometryResult> {
-    let crop = serde_json::from_value::<Crop>(adjustments[adjustment_fields::CROP].clone()).ok()?;
-    let has_patches = adjustments
-        .get(adjustment_fields::AI_PATCHES)
-        .and_then(serde_json::Value::as_array)
-        .is_some_and(|patches| !patches.is_empty());
+    cancellation: Option<&dyn Fn() -> Result<(), String>>,
+) -> Result<Option<PreviewGeometryResult>, String> {
+    let Ok(crop) = serde_json::from_value::<Crop>(adjustments[adjustment_fields::CROP].clone())
+    else {
+        return Ok(None);
+    };
     let rotation = adjustments[adjustment_fields::ROTATION]
         .as_f64()
         .unwrap_or(0.0);
     let orientation = adjustments[adjustment_fields::ORIENTATION_STEPS]
         .as_u64()
         .unwrap_or(0);
-    if has_patches
-        || !crate::geometry::is_geometry_identity(&crate::geometry::get_geometry_params_from_json(
-            adjustments,
-        ))
-    {
-        return None;
-    }
+    let patch_sampler = crate::patch_assets::prepare_preview_patch_sampler(
+        adjustments,
+        source.width(),
+        source.height(),
+    )
+    .map_err(|error| format!("Failed to prepare preview patches: {error}"))?;
+    let geometry = crate::geometry::get_geometry_params_from_json(adjustments);
+    let has_geometry = !crate::geometry::is_geometry_identity(&geometry);
 
     let (oriented_width, oriented_height) = if orientation % 2 == 1 {
         (source.height(), source.width())
@@ -434,11 +438,11 @@ fn compute_direct_crop_preview(
     let mut x = crop.x.round().max(0.0) as u32;
     let mut y = crop.y.round().max(0.0) as u32;
     if x >= oriented_width || y >= oriented_height {
-        return None;
+        return Ok(None);
     }
     let mut width = (crop.width.round().max(1.0) as u32).min(oriented_width - x);
     let mut height = (crop.height.round().max(1.0) as u32).min(oriented_height - y);
-    if rotation.rem_euclid(360.0).abs() > f64::EPSILON {
+    if rotation.rem_euclid(360.0).abs() > f64::EPSILON || has_geometry || patch_sampler.is_some() {
         return render_rotated_crop_preview(
             source,
             AffineCropPreviewPlan {
@@ -453,6 +457,9 @@ fn compute_direct_crop_preview(
                     .unwrap_or(false),
                 rotation_degrees: rotation as f32,
                 preview_dim,
+                geometry,
+                cancellation,
+                patch_sampler,
             },
         );
     }
@@ -500,7 +507,7 @@ fn compute_direct_crop_preview(
     };
     let effective_scale = preview.width() as f32 / width as f32;
     let output_pixel_count = u64::from(preview.width()) * u64::from(preview.height());
-    Some(PreviewGeometryResult {
+    Ok(Some(PreviewGeometryResult {
         image: preview,
         effective_scale,
         unscaled_crop_offset: (crop.x as f32, crop.y as f32),
@@ -510,11 +517,12 @@ fn compute_direct_crop_preview(
             output_pixel_count,
             full_resolution_transform_allocations: 0,
             direct_crop: true,
+            tile_count: 1,
         },
-    })
+    }))
 }
 
-struct AffineCropPreviewPlan {
+struct AffineCropPreviewPlan<'a> {
     crop: Crop,
     crop_bounds: (u32, u32, u32, u32),
     orientation: u8,
@@ -522,20 +530,19 @@ struct AffineCropPreviewPlan {
     flip_vertical: bool,
     rotation_degrees: f32,
     preview_dim: u32,
+    geometry: GeometryParams,
+    cancellation: Option<&'a dyn Fn() -> Result<(), String>>,
+    patch_sampler: Option<crate::patch_assets::PreviewPatchSampler>,
 }
 
 fn render_rotated_crop_preview(
     source: &DynamicImage,
-    plan: AffineCropPreviewPlan,
-) -> Option<PreviewGeometryResult> {
-    let DynamicImage::ImageRgb32F(source_rgb) = source else {
-        return None;
-    };
+    plan: AffineCropPreviewPlan<'_>,
+) -> Result<Option<PreviewGeometryResult>, String> {
     let (crop_x, crop_y, crop_width, crop_height) = plan.crop_bounds;
     let output_scale = (plan.preview_dim as f32 / crop_width.max(crop_height) as f32).min(1.0);
     let output_width = ((crop_width as f32 * output_scale).round() as u32).max(1);
     let output_height = ((crop_height as f32 * output_scale).round() as u32).max(1);
-    let mut output = Rgb32FImage::new(output_width, output_height);
     let (coarse_width, coarse_height) = if plan.orientation % 2 == 1 {
         (source.height(), source.width())
     } else {
@@ -548,9 +555,21 @@ fn render_rotated_crop_preview(
     let flip_horizontal = plan.flip_horizontal;
     let flip_vertical = plan.flip_vertical;
     let crop_offset = (plan.crop.x as f32, plan.crop.y as f32);
+    let patch_sampler = plan.patch_sampler;
+    let decorate_source = |source_x, source_y, pixel: &mut [f32]| {
+        if let Some(sampler) = patch_sampler.as_ref() {
+            sampler.blend_at(source_x, source_y, pixel);
+        }
+    };
+    let source_decorator = patch_sampler
+        .as_ref()
+        .map(|_| &decorate_source as &crate::geometry::SourceSampleDecorator<'_>);
 
-    warp_into_with(
-        source_rgb,
+    let output = crate::geometry::warp_image_geometry_mapped(
+        source,
+        plan.geometry,
+        output_width,
+        output_height,
         move |output_x, output_y| {
             let rotated_x = crop_x as f32 + output_x / output_scale;
             let rotated_y = crop_y as f32 + output_y / output_scale;
@@ -574,13 +593,12 @@ fn render_rotated_crop_preview(
                 _ => (coarse_x, coarse_y),
             }
         },
-        Interpolation::Bilinear,
-        Border::Constant(image::Rgb([0.0, 0.0, 0.0])),
-        &mut output,
-    );
+        source_decorator,
+        plan.cancellation,
+    )?;
     let output_pixel_count = u64::from(output_width) * u64::from(output_height);
-    Some(PreviewGeometryResult {
-        image: DynamicImage::ImageRgb32F(output),
+    Ok(Some(PreviewGeometryResult {
+        image: output,
         effective_scale: output_scale,
         unscaled_crop_offset: crop_offset,
         receipt: PreviewGeometryReceipt {
@@ -589,8 +607,9 @@ fn render_rotated_crop_preview(
             output_pixel_count,
             full_resolution_transform_allocations: 0,
             direct_crop: true,
+            tile_count: output_height.div_ceil(crate::geometry::PREVIEW_GEOMETRY_BAND_ROWS),
         },
-    })
+    }))
 }
 
 fn preview_geometry_source_scale(
@@ -4054,7 +4073,9 @@ mod tests {
         let adjustments = json!({
             "crop": {"x": 400.0, "y": 300.0, "width": 200.0, "height": 100.0},
         });
-        let result = compute_direct_crop_preview(&source, &adjustments, 100).unwrap();
+        let result = compute_direct_crop_preview(&source, &adjustments, 100, None)
+            .unwrap()
+            .unwrap();
         let preview = result.image;
 
         assert_eq!(preview.dimensions(), (100, 50));
@@ -4082,7 +4103,9 @@ mod tests {
         });
         let (full, _) = apply_all_transformations(&source, &adjustments);
         let reference = downscale_f32_image(&full, 50, 50).to_rgb32f();
-        let result = compute_direct_crop_preview(&source, &adjustments, 50).unwrap();
+        let result = compute_direct_crop_preview(&source, &adjustments, 50, None)
+            .unwrap()
+            .unwrap();
         let preview = result.image.to_rgb32f();
 
         assert_eq!(preview.dimensions(), reference.dimensions());
@@ -4109,7 +4132,9 @@ mod tests {
         });
         let (full, _) = apply_all_transformations(&source, &adjustments);
         let reference = downscale_f32_image(&full, 100, 100).to_rgb32f();
-        let result = compute_direct_crop_preview(&source, &adjustments, 100).unwrap();
+        let result = compute_direct_crop_preview(&source, &adjustments, 100, None)
+            .unwrap()
+            .unwrap();
         let preview = result.image.to_rgb32f();
 
         assert_eq!(preview.dimensions(), reference.dimensions());
@@ -4123,6 +4148,61 @@ mod tests {
             .sum::<f64>()
             / preview.as_raw().len() as f64;
         assert!(mean_error < 0.01, "rotated crop mean error {mean_error}");
+    }
+
+    #[test]
+    fn nonlinear_geometry_narrow_crop_samples_directly_into_preview() {
+        let source = DynamicImage::ImageRgb32F(image::ImageBuffer::from_fn(600, 400, |x, y| {
+            image::Rgb([x as f32 / 599.0, y as f32 / 399.0, (x + y) as f32 / 998.0])
+        }));
+        let adjustments = json!({
+            "transformVertical": 12.0,
+            "transformHorizontal": -7.0,
+            "transformDistortion": 4.0,
+            "rotation": -3.0,
+            "crop": {"x": 180.0, "y": 120.0, "width": 240.0, "height": 160.0},
+        });
+        let (full, _) = apply_all_transformations(&source, &adjustments);
+        let reference = downscale_f32_image(&full, 120, 120).to_rgb32f();
+        let result = compute_direct_crop_preview(&source, &adjustments, 120, None)
+            .unwrap()
+            .unwrap();
+        let preview = result.image.to_rgb32f();
+
+        assert_eq!(preview.dimensions(), reference.dimensions());
+        assert_eq!(result.receipt.working_pixel_count, 9_600);
+        assert_eq!(result.receipt.full_resolution_transform_allocations, 0);
+        let mean_error = preview
+            .as_raw()
+            .iter()
+            .zip(reference.as_raw())
+            .map(|(actual, expected)| (actual - expected).abs() as f64)
+            .sum::<f64>()
+            / preview.as_raw().len() as f64;
+        assert!(mean_error < 0.015, "nonlinear crop mean error {mean_error}");
+    }
+
+    #[test]
+    fn nonlinear_preview_cancellation_stops_between_fixed_output_bands() {
+        let source = DynamicImage::new_rgb32f(600, 400);
+        let adjustments = json!({
+            "transformDistortion": 4.0,
+            "crop": {"x": 180.0, "y": 120.0, "width": 240.0, "height": 240.0},
+        });
+        let checks = std::sync::atomic::AtomicUsize::new(0);
+        let cancellation = || {
+            if checks.fetch_add(1, Ordering::Relaxed) >= 2 {
+                Err("preview_cancelled:Geometry".to_string())
+            } else {
+                Ok(())
+            }
+        };
+        let error = compute_direct_crop_preview(&source, &adjustments, 128, Some(&cancellation))
+            .err()
+            .expect("third 32-row band checkpoint should cancel the preview");
+
+        assert_eq!(error, "preview_cancelled:Geometry");
+        assert_eq!(checks.load(Ordering::Relaxed), 3);
     }
 
     #[test]
@@ -4263,6 +4343,52 @@ mod tests {
         assert_eq!(preview.dimensions(), (100, 75));
         assert!((effective_scale - 0.25).abs() < 1e-6);
         assert!(center[0] > 0.99 && center[1] < 0.01 && center[2] < 0.01);
+    }
+
+    #[test]
+    fn narrow_crop_blends_source_anchored_patch_in_preview_space() {
+        let source = DynamicImage::ImageRgb32F(image::ImageBuffer::from_pixel(
+            400,
+            300,
+            image::Rgb([0.1, 0.2, 0.3]),
+        ));
+        let mask = GrayImage::from_fn(400, 300, |x, _| {
+            Luma([((x as f32 / 399.0) * 255.0).round() as u8])
+        });
+        let color = RgbImage::from_pixel(400, 300, image::Rgb([255, 0, 0]));
+        let adjustments = json!({
+            "rotation": 3.0,
+            "crop": {"x": 100.0, "y": 75.0, "width": 200.0, "height": 150.0},
+            "aiPatches": [{
+                "id": "mapped-preview-patch",
+                "revision": 1,
+                "visible": true,
+                "patchData": {
+                    "mask": encoded_preview_fixture(DynamicImage::ImageLuma8(mask)),
+                    "color": encoded_preview_fixture(DynamicImage::ImageRgb8(color)),
+                },
+                "subMasks": [],
+            }],
+        });
+        let patched = composite_patches_on_image(&source, &adjustments).unwrap();
+        let (full, _) = apply_all_transformations(patched, &adjustments);
+        let reference = downscale_f32_image(&full, 100, 100).to_rgb32f();
+        let result = compute_direct_crop_preview(&source, &adjustments, 100, None)
+            .unwrap()
+            .unwrap();
+        let preview = result.image.to_rgb32f();
+
+        assert_eq!(preview.dimensions(), reference.dimensions());
+        assert_eq!(result.receipt.working_pixel_count, 7_500);
+        assert_eq!(result.receipt.full_resolution_transform_allocations, 0);
+        let mean_error = preview
+            .as_raw()
+            .iter()
+            .zip(reference.as_raw())
+            .map(|(actual, expected)| (actual - expected).abs() as f64)
+            .sum::<f64>()
+            / preview.as_raw().len() as f64;
+        assert!(mean_error < 0.02, "mapped patch mean error {mean_error}");
     }
 
     fn write_test_lut(path: &std::path::Path, middle: f32) {
