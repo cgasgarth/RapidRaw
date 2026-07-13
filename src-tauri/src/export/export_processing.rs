@@ -1078,8 +1078,12 @@ pub(crate) fn process_image_for_export_pipeline_with_tonemapper_override(
     let render_inputs =
         prepare_export_render_inputs(path, js_adjustments, state, is_raw, tm_override, 0)?;
 
-    let detail_stage =
-        apply_pre_gpu_detail_stages(transformed_image, render_inputs.unique_hash, js_adjustments);
+    let detail_stage = apply_pre_gpu_detail_stages(
+        transformed_image,
+        render_inputs.unique_hash,
+        js_adjustments,
+        is_raw,
+    );
     let retouched_image = crate::retouch_render::apply_clone_retouch_layers(
         detail_stage.image.as_ref(),
         js_adjustments,

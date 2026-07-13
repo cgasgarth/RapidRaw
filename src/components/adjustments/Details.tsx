@@ -330,6 +330,63 @@ export default function DetailsPanel({
             value={adjustments.colorNoiseReduction}
             onDragStateChange={onDragStateChange}
           />
+          {!isForMask && (
+            <>
+              <AdjustmentSlider
+                density="compact"
+                label={t('adjustments.details.detail')}
+                max={100}
+                min={0}
+                onValueChange={(value) => {
+                  handleAdjustmentChange(DetailsAdjustment.DenoiseDetail, value);
+                }}
+                step={1}
+                value={adjustments.denoiseDetail}
+                onDragStateChange={onDragStateChange}
+                defaultValue={50}
+                fillOrigin="min"
+              />
+              <AdjustmentSlider
+                density="compact"
+                label={t('adjustments.details.naturalGrain')}
+                max={100}
+                min={0}
+                onValueChange={(value) => {
+                  handleAdjustmentChange(DetailsAdjustment.DenoiseNaturalGrain, value);
+                }}
+                step={1}
+                value={adjustments.denoiseNaturalGrain}
+                onDragStateChange={onDragStateChange}
+                fillOrigin="min"
+              />
+              <AdjustmentSlider
+                density="compact"
+                label={t('adjustments.details.contrastProtection')}
+                max={100}
+                min={0}
+                onValueChange={(value) => {
+                  handleAdjustmentChange(DetailsAdjustment.DenoiseContrastProtection, value);
+                }}
+                step={1}
+                value={adjustments.denoiseContrastProtection}
+                onDragStateChange={onDragStateChange}
+                defaultValue={50}
+                fillOrigin="min"
+              />
+              <AdjustmentSlider
+                density="compact"
+                label={t('adjustments.details.shadowBias')}
+                max={100}
+                min={-100}
+                onValueChange={(value) => {
+                  handleAdjustmentChange(DetailsAdjustment.DenoiseShadowBias, value);
+                }}
+                step={1}
+                value={adjustments.denoiseShadowBias}
+                onDragStateChange={onDragStateChange}
+              />
+            </>
+          )}
         </div>
       )}
 

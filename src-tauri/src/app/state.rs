@@ -249,7 +249,10 @@ pub struct AppState {
         Arc<Mutex<Option<crate::merge::super_resolution::job::AcceptedBurstSrRuntime>>>,
     pub burst_sr_job_results: crate::merge::super_resolution::job::BurstSrJobResults,
     pub panorama_result: Arc<Mutex<Option<PendingPanoramaResult>>>,
-    pub denoise_result: Arc<Mutex<Option<DynamicImage>>>,
+    pub denoise_artifacts:
+        Arc<crate::computational::denoise_artifact::EnhancedDenoiseArtifactStore>,
+    pub active_denoise_artifact:
+        Arc<Mutex<Option<Arc<crate::computational::denoise_artifact::EnhancedDenoiseArtifactV1>>>>,
     pub indexing_task_handle: Mutex<Option<JoinHandle<()>>>,
     pub cache_budget: Arc<CacheBudgetCoordinator>,
     pub lut_cache: MemoryLruCache<String, CachedLutPath>,
@@ -328,7 +331,10 @@ impl AppState {
             burst_sr_accepted_runtime: Arc::new(Mutex::new(None)),
             burst_sr_job_results: crate::merge::super_resolution::job::BurstSrJobResults::default(),
             panorama_result: Arc::new(Mutex::new(None)),
-            denoise_result: Arc::new(Mutex::new(None)),
+            denoise_artifacts: Arc::new(
+                crate::computational::denoise_artifact::EnhancedDenoiseArtifactStore::default(),
+            ),
+            active_denoise_artifact: Arc::new(Mutex::new(None)),
             indexing_task_handle: Mutex::new(None),
             cache_budget: Arc::clone(&cache_budget),
             lut_cache: MemoryLruCache::new(
