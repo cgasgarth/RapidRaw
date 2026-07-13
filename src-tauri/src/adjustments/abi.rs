@@ -169,6 +169,8 @@ pub struct GlobalAdjustments {
     pub edit_graph_version: f32,
     pub(crate) _pad_color2: f32,
     pub(crate) _pad_color3: f32,
+    pub(crate) _pad_color4: f32,
+    pub technical_white_balance: GpuMat3,
     pub sharpness: f32,
     pub luma_noise_reduction: f32,
     pub color_noise_reduction: f32,
@@ -198,6 +200,10 @@ pub struct GlobalAdjustments {
     pub(crate) _pad_agx1: f32,
     pub(crate) _pad_agx2: f32,
     pub(crate) _pad_agx3: f32,
+    /// Explicit Rust representation of WGSL's implicit 16-byte alignment before mat3x3.
+    pub(crate) _pad_wgsl_agx_align1: f32,
+    pub(crate) _pad_wgsl_agx_align2: f32,
+    pub(crate) _pad_wgsl_agx_align3: f32,
     pub agx_pipe_to_rendering_matrix: GpuMat3,
     pub agx_rendering_to_pipe_matrix: GpuMat3,
     pub rapid_view_parameters0: [f32; 4],
@@ -304,4 +310,24 @@ pub struct AllAdjustments {
     pub(crate) execution_phase: u32,
     pub(crate) source_width: u32,
     pub(crate) source_height: u32,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::mem::{offset_of, size_of};
+
+    #[test]
+    fn global_matrix_offsets_match_wgsl_storage_layout() {
+        assert_eq!(offset_of!(GlobalAdjustments, technical_white_balance), 64);
+        assert_eq!(
+            offset_of!(GlobalAdjustments, agx_pipe_to_rendering_matrix),
+            240
+        );
+        assert_eq!(
+            offset_of!(GlobalAdjustments, agx_rendering_to_pipe_matrix),
+            288
+        );
+        assert_eq!(size_of::<GlobalAdjustments>() % 16, 0);
+    }
 }

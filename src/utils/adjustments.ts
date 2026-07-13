@@ -1,6 +1,11 @@
 import type { Crop } from 'react-image-crop';
 import { Mask, type SubMask, SubMaskMode } from '../components/panel/right/layers/Masks';
 import type { LevelsSettings } from '../schemas/color/levelsSchemas';
+import {
+  INITIAL_TECHNICAL_WHITE_BALANCE,
+  type TechnicalWhiteBalance,
+  technicalWhiteBalanceSchema,
+} from './color/whiteBalance';
 import { toMaskParameterRecord } from './mask/maskParameterAccess';
 import type { RawProcessingModeOverride } from './rawProcessingModes';
 import {
@@ -300,8 +305,13 @@ export interface Adjustments {
   selectiveColorRangeControls: Record<SelectiveColorRangeKey, SelectiveColorRangeControl>;
   skinToneUniformity: SkinToneUniformitySettings;
   structure: number;
+  /** Legacy creative offsets. Preserved byte-for-byte for old sidecars. */
   temperature: number;
   tint: number;
+  creativeTemperature: number;
+  creativeTint: number;
+  whiteBalanceTechnical: TechnicalWhiteBalance;
+  whiteBalanceMigration: 'native_v1' | 'legacy_creative_temperature_tint_v1';
   toneMapper: 'agx' | 'basic' | 'rapidView';
   viewTransform: ViewTransformSettingsV1;
   toneCurve: ToneCurveId;
@@ -889,6 +899,10 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   structure: 0,
   temperature: 0,
   tint: 0,
+  creativeTemperature: 0,
+  creativeTint: 0,
+  whiteBalanceTechnical: structuredClone(INITIAL_TECHNICAL_WHITE_BALANCE),
+  whiteBalanceMigration: 'native_v1',
   toneMapper: 'rapidView',
   viewTransform: {
     chromaCompression: 0.25,
@@ -1004,6 +1018,9 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
       }) as AiPatch,
   );
 
+  const parsedTechnicalWhiteBalance = technicalWhiteBalanceSchema.safeParse(loadedAdjustments.whiteBalanceTechnical);
+  const isLegacyWhiteBalance = !parsedTechnicalWhiteBalance.success;
+
   return {
     ...INITIAL_ADJUSTMENTS,
     ...loadedAdjustments,
@@ -1013,6 +1030,16 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
     glowAmount: loadedAdjustments.glowAmount ?? INITIAL_ADJUSTMENTS.glowAmount,
     halationAmount: loadedAdjustments.halationAmount ?? INITIAL_ADJUSTMENTS.halationAmount,
     hue: loadedAdjustments.hue ?? INITIAL_ADJUSTMENTS.hue,
+    creativeTemperature: isLegacyWhiteBalance
+      ? (loadedAdjustments.temperature ?? INITIAL_ADJUSTMENTS.temperature)
+      : (loadedAdjustments.creativeTemperature ?? INITIAL_ADJUSTMENTS.creativeTemperature),
+    creativeTint: isLegacyWhiteBalance
+      ? (loadedAdjustments.tint ?? INITIAL_ADJUSTMENTS.tint)
+      : (loadedAdjustments.creativeTint ?? INITIAL_ADJUSTMENTS.creativeTint),
+    whiteBalanceTechnical: parsedTechnicalWhiteBalance.success
+      ? parsedTechnicalWhiteBalance.data
+      : structuredClone(INITIAL_TECHNICAL_WHITE_BALANCE),
+    whiteBalanceMigration: isLegacyWhiteBalance ? 'legacy_creative_temperature_tint_v1' : 'native_v1',
     lensCorrectionMode: loadedAdjustments.lensCorrectionMode || 'manual',
     lensMaker: loadedAdjustments.lensMaker ?? INITIAL_ADJUSTMENTS.lensMaker,
     lensModel: loadedAdjustments.lensModel ?? INITIAL_ADJUSTMENTS.lensModel,
@@ -1139,7 +1166,16 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
       label: 'modals.copyPaste.groups.profileTone',
       keys: [ColorAdjustment.CameraProfile, ColorAdjustment.ToneCurve, 'parametricCurve', 'curveMode'],
     },
-    { label: 'modals.copyPaste.groups.whiteBalance', keys: [ColorAdjustment.Temperature, ColorAdjustment.Tint] },
+    {
+      label: 'modals.copyPaste.groups.whiteBalance',
+      keys: [
+        'whiteBalanceTechnical',
+        'creativeTemperature',
+        'creativeTint',
+        ColorAdjustment.Temperature,
+        ColorAdjustment.Tint,
+      ],
+    },
     { label: 'modals.copyPaste.groups.presence', keys: [ColorAdjustment.Saturation, ColorAdjustment.Vibrance] },
     { label: 'modals.copyPaste.groups.hueShift', keys: [ColorAdjustment.Hue] },
     { label: 'modals.copyPaste.groups.colorBalanceRgb', keys: [ColorAdjustment.ColorBalanceRgb] },

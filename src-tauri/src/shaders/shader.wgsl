@@ -99,6 +99,8 @@ struct GlobalAdjustments {
     edit_graph_version: f32,
     _pad_color2: f32,
     _pad_color3: f32,
+    _pad_color4: f32,
+    technical_white_balance: mat3x3<f32>,
 
     sharpness: f32,
     luma_noise_reduction: f32,
@@ -1828,6 +1830,10 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     } else {
         initial_linear_rgb = color_from_texture;
     }
+    // Technical illuminant correction is the first scene-linear color node.
+    // Legacy temperature/tint remains a later creative operation and masks
+    // never mutate this matrix.
+    initial_linear_rgb = adjustments.global.technical_white_balance * initial_linear_rgb;
 
     var t_exposure = adjustments.global.exposure;
     var t_brightness = adjustments.global.brightness;
