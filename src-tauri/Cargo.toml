@@ -128,6 +128,22 @@ incremental = true
 [profile.dev.package."*"]
 opt-level = 3
 
+# Fast edit-to-test profile for workspace crates and focused CI partitions.
+[profile.rapid-dev-fast]
+inherits = "dev"
+opt-level = 0
+debug = 0
+incremental = true
+codegen-units = 256
+
+# Runtime-representative development profile for performance validation without release LTO cost.
+[profile.rapid-dev-perf]
+inherits = "dev"
+opt-level = 2
+debug = 1
+incremental = true
+codegen-units = 64
+
 [profile.release]
 codegen-units = 1
 lto = true

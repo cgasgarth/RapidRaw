@@ -695,6 +695,199 @@ pub fn warp_image_geometry(image: &DynamicImage, params: GeometryParams) -> Dyna
     DynamicImage::ImageRgb32F(out_img)
 }
 
+/// Samples arbitrary geometry-output coordinates directly into a bounded output image.
+/// This is the preview path counterpart to [`warp_image_geometry`]: callers map each preview
+/// pixel back into the full geometry canvas, while this function applies the authoritative
+/// perspective/lens/TCA/vignette mapping and samples the decoded source without allocating a
+/// full-size warped intermediate.
+pub const PREVIEW_GEOMETRY_BAND_ROWS: u32 = 32;
+pub type SourceSampleDecorator<'a> = dyn Fn(f32, f32, &mut [f32]) + Sync + 'a;
+
+pub fn warp_image_geometry_mapped<F>(
+    image: &DynamicImage,
+    params: GeometryParams,
+    output_width: u32,
+    output_height: u32,
+    output_to_geometry: F,
+    source_decorator: Option<&SourceSampleDecorator<'_>>,
+    cancellation: Option<&dyn Fn() -> Result<(), String>>,
+) -> Result<DynamicImage, String>
+where
+    F: Fn(f32, f32) -> (f32, f32) + Send + Sync,
+{
+    warp_image_geometry_mapped_with_band_rows(
+        image,
+        params,
+        (output_width, output_height),
+        output_to_geometry,
+        source_decorator,
+        cancellation,
+        PREVIEW_GEOMETRY_BAND_ROWS,
+    )
+}
+
+fn warp_image_geometry_mapped_with_band_rows<F>(
+    image: &DynamicImage,
+    params: GeometryParams,
+    output_size: (u32, u32),
+    output_to_geometry: F,
+    source_decorator: Option<&SourceSampleDecorator<'_>>,
+    cancellation: Option<&dyn Fn() -> Result<(), String>>,
+    band_rows: u32,
+) -> Result<DynamicImage, String>
+where
+    F: Fn(f32, f32) -> (f32, f32) + Send + Sync,
+{
+    let (output_width, output_height) = output_size;
+    let converted;
+    let src_img = if let DynamicImage::ImageRgb32F(source) = image {
+        source
+    } else {
+        converted = image.to_rgb32f();
+        &converted
+    };
+    let (width, height) = src_img.dimensions();
+    let mut out_buffer = vec![0.0f32; (output_width * output_height * 3) as usize];
+    let (forward_transform, cx, cy, half_diagonal) =
+        build_transform_matrices(&params, width as f32, height as f32);
+    let inv = forward_transform
+        .try_inverse()
+        .unwrap_or(NaMatrix3::identity());
+    let max_radius_sq_inv = 1.0 / ((cx * cx + cy * cy) as f64);
+    let hd = half_diagonal;
+    let k_distortion = (params.distortion as f64 / 100.0) * 2.5;
+    let lk1 = params.lens_dist_k1 as f64;
+    let lk2 = params.lens_dist_k2 as f64;
+    let lk3 = params.lens_dist_k3 as f64;
+    let lens_dist_amt = (params.lens_distortion_amount as f64) * 2.5;
+    let has_lens_correction = params.lens_distortion_enabled
+        && (lk1.abs() > 1e-6 || lk2.abs() > 1e-6 || lk3.abs() > 1e-6);
+    let is_ptlens = params.lens_model == 1;
+    let auto_crop_scale = if has_lens_correction || k_distortion.abs() > 1e-5 {
+        compute_lens_auto_crop_scale(&params, width as f32, height as f32) as f32
+    } else {
+        1.0
+    };
+    let vr = if (params.tca_vr - 1.0).abs() > 1e-5 {
+        params.tca_vr + (1.0 - params.tca_vr) * (1.0 - params.lens_tca_amount)
+    } else {
+        1.0
+    };
+    let vb = if (params.tca_vb - 1.0).abs() > 1e-5 {
+        params.tca_vb + (1.0 - params.tca_vb) * (1.0 - params.lens_tca_amount)
+    } else {
+        1.0
+    };
+    let has_tca = params.lens_tca_enabled && ((vr - 1.0).abs() > 1e-5 || (vb - 1.0).abs() > 1e-5);
+    let vk1 = params.vig_k1 as f64;
+    let vk2 = params.vig_k2 as f64;
+    let vk3 = params.vig_k3 as f64;
+    let lens_vig_amt = (params.lens_vignette_amount as f64) * 0.8;
+    let has_vignetting = params.lens_vignette_enabled
+        && (vk1.abs() > 1e-6 || vk2.abs() > 1e-6 || vk3.abs() > 1e-6)
+        && lens_vig_amt > 0.01;
+    let src_raw = src_img.as_raw();
+    let width_usize = width as usize;
+    let height_usize = height as usize;
+    let tca_ctx = TcaContext {
+        src_raw,
+        src_width: width_usize,
+        src_height: height_usize,
+        cx,
+        cy,
+    };
+
+    let band_rows = band_rows.max(1) as usize;
+    let row_stride = output_width as usize * 3;
+    for (band_index, band) in out_buffer.chunks_mut(row_stride * band_rows).enumerate() {
+        if let Some(check) = cancellation {
+            check()?;
+        }
+        let first_y = band_index * band_rows;
+        band.par_chunks_exact_mut(row_stride)
+            .enumerate()
+            .for_each(|(local_y, row)| {
+                let y = first_y + local_y;
+                for (x, pixel) in row.chunks_exact_mut(3).enumerate() {
+                    let (geometry_x, geometry_y) = output_to_geometry(x as f32, y as f32);
+                    let current_vec = inv * NaVector3::new(geometry_x, geometry_y, 1.0);
+                    if current_vec.z.abs() <= 1e-6 {
+                        continue;
+                    }
+                    let inv_z = 1.0 / current_vec.z;
+                    let mut src_x = current_vec.x * inv_z;
+                    let mut src_y = current_vec.y * inv_z;
+                    if auto_crop_scale > 1.0 {
+                        src_x = cx + (src_x - cx) / auto_crop_scale;
+                        src_y = cy + (src_y - cy) / auto_crop_scale;
+                    }
+                    if has_lens_correction {
+                        let dx = (src_x - cx) as f64;
+                        let dy = (src_y - cy) as f64;
+                        let ru = (dx * dx + dy * dy).sqrt();
+                        if ru > 1e-6 {
+                            let ru_norm = ru / hd;
+                            let ru_norm2 = ru_norm * ru_norm;
+                            let rd_norm = if is_ptlens {
+                                let d = 1.0 - lk1 - lk2 - lk3;
+                                ru_norm
+                                    * (lk1 * ru_norm2 * ru_norm
+                                        + lk2 * ru_norm2
+                                        + lk3 * ru_norm
+                                        + d)
+                            } else {
+                                ru_norm
+                                    * (1.0
+                                        + lk1 * ru_norm2
+                                        + lk2 * ru_norm2.powi(2)
+                                        + lk3 * ru_norm2.powi(3))
+                            };
+                            let effective_r_norm = ru_norm + (rd_norm - ru_norm) * lens_dist_amt;
+                            let scale = effective_r_norm / ru_norm;
+                            src_x = cx + (dx * scale) as f32;
+                            src_y = cy + (dy * scale) as f32;
+                        }
+                    }
+                    if k_distortion.abs() > 1e-5 {
+                        let dx = (src_x - cx) as f64;
+                        let dy = (src_y - cy) as f64;
+                        let r2_norm = (dx * dx + dy * dy) * max_radius_sq_inv;
+                        let factor = 1.0 + k_distortion * r2_norm;
+                        src_x = cx + (dx * factor) as f32;
+                        src_y = cy + (dy * factor) as f32;
+                    }
+                    if has_tca {
+                        interpolate_pixel_with_tca(&tca_ctx, src_x, src_y, vr, vb, pixel);
+                    } else {
+                        interpolate_pixel(src_raw, width_usize, height_usize, src_x, src_y, pixel);
+                    }
+                    if let Some(decorate) = source_decorator {
+                        decorate(src_x, src_y, pixel);
+                    }
+                    if has_vignetting {
+                        let dx = (src_x - cx) as f64;
+                        let dy = (src_y - cy) as f64;
+                        let ru_norm = (dx * dx + dy * dy).sqrt() / hd;
+                        let ru_norm2 = ru_norm * ru_norm;
+                        let v_factor =
+                            1.0 + vk1 * ru_norm2 + vk2 * ru_norm2.powi(2) + vk3 * ru_norm2.powi(3);
+                        if v_factor > 1e-6 {
+                            let correction_gain = 1.0 / v_factor;
+                            let final_gain = 1.0 + (correction_gain - 1.0) * lens_vig_amt;
+                            pixel[0] *= final_gain as f32;
+                            pixel[1] *= final_gain as f32;
+                            pixel[2] *= final_gain as f32;
+                        }
+                    }
+                }
+            });
+    }
+
+    Ok(DynamicImage::ImageRgb32F(
+        Rgb32FImage::from_vec(output_width, output_height, out_buffer).unwrap(),
+    ))
+}
+
 pub fn unwarp_image_geometry(warped_image: &DynamicImage, params: GeometryParams) -> DynamicImage {
     let src_img = warped_image.to_rgb32f();
     let (width, height) = src_img.dimensions();
@@ -967,4 +1160,42 @@ pub fn is_geometry_identity(params: &GeometryParams) -> bool {
         && dist_identity
         && tca_identity
         && vig_identity
+}
+
+#[cfg(test)]
+mod preview_geometry_tests {
+    use super::*;
+
+    #[test]
+    fn mapped_geometry_is_bitwise_independent_of_band_partition() {
+        let source = DynamicImage::ImageRgb32F(Rgb32FImage::from_fn(64, 48, |x, y| {
+            image::Rgb([x as f32 / 63.0, y as f32 / 47.0, 0.4])
+        }));
+        let params = GeometryParams {
+            distortion: 4.0,
+            vertical: 9.0,
+            horizontal: -5.0,
+            rotate: 1.5,
+            ..GeometryParams::default()
+        };
+        let render = |band_rows| {
+            warp_image_geometry_mapped_with_band_rows(
+                &source,
+                params,
+                (29, 17),
+                |x, y| (x * 1.5 + 7.0, y * 1.5 + 5.0),
+                None,
+                None,
+                band_rows,
+            )
+            .unwrap()
+            .to_rgb32f()
+        };
+
+        let one_row = render(1);
+        let seven_rows = render(7);
+        let production = render(PREVIEW_GEOMETRY_BAND_ROWS);
+        assert_eq!(one_row.as_raw(), seven_rows.as_raw());
+        assert_eq!(one_row.as_raw(), production.as_raw());
+    }
 }

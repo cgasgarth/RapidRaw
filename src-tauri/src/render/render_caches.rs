@@ -51,9 +51,6 @@ impl<'a> RenderCaches<'a> {
         if let Ok(mut warped_cache) = self.state.full_warped_cache.lock() {
             *warped_cache = None;
         }
-        if let Ok(mut transformed_cache) = self.state.full_transformed_cache.lock() {
-            *transformed_cache = None;
-        }
     }
 
     /// Drops only artifacts whose pixels/resources depend on the GPU device generation.

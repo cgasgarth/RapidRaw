@@ -9,6 +9,7 @@
   "scripts": {
     "qa": "bun scripts/qa/run.ts",
     "perf": "bun scripts/perf/run.ts",
+    "native-feedback": "bun scripts/native-feedback/run.ts",
     "dev": "vite",
     "build": "bun scripts/ci/run-compact-command.ts --label build -- vite build",
     "tauri": "tauri",
