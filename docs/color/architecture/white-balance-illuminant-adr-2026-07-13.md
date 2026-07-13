@@ -29,6 +29,20 @@ matrix, projects the observation between those responses in log chroma, then
 interpolates in reciprocal temperature. Invalid matrices or gains fail safe to
 the existing measured D65/single-matrix fallback and disclose low confidence.
 
+For explicit Auto, Kelvin/Tint, preset, and picker/chromaticity modes, the
+compiled `WhiteBalancePlanV1` is instead the sole interpolation authority. RAW
+decode receives the plan through adjustment-aware preview/export/thumbnail
+load paths, uses its exact xy/Duv rather than linearly interpolating endpoint
+chromaticities, and records the plan fingerprint in the camera-profile receipt.
+As Shot continues to resolve from the camera neutral because no user illuminant
+has replaced that metadata.
+
+Picker hover is a source-bound transient session: repeated samples replace the
+preview without writing history, stale image/preview completions are rejected,
+pointer leave or cancellation restores the deep-cloned baseline, and click
+commits exactly one history entry. Selecting Auto invokes the deterministic
+image analysis; it cannot relabel a previous Kelvin/Duv value as an estimate.
+
 ## Consequences
 
 - Temperature is bounded to 1667–25000 K and Duv to ±0.05.

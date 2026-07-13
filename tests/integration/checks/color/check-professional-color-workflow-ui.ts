@@ -23,6 +23,7 @@ type RenderedPanel = {
 };
 
 type AdjustmentUpdate = Partial<Adjustments> | ((previous: Adjustments) => Adjustments);
+let autoWhiteBalanceInvokeCount = 0;
 
 const appSettingsFixture = {
   exportPresets: [],
@@ -261,6 +262,12 @@ async function validateWhiteBalanceFoundation(container: Element) {
   assert.equal(whiteBalance.querySelector('[data-testid="color-white-balance-kelvin"]'), null);
   assert.equal(whiteBalance.dataset.whiteBalanceState, 'as-shot');
 
+  await changeSelect(mode, 'auto');
+  assert.equal(mode.value, 'auto');
+  assert.equal(autoWhiteBalanceInvokeCount, 1, 'Auto mode must invoke image analysis exactly once.');
+  assert.equal(normalizeText(whiteBalance.textContent).includes('4380 K'), true);
+  await click(reset);
+
   await click(picker);
   assert.equal(picker.getAttribute('aria-pressed'), 'true');
   assert.equal(picker.dataset.state, 'active');
@@ -417,6 +424,29 @@ async function createTestI18n() {
 
 function installDom() {
   const window = new Window({ url: 'http://localhost/color-inspector-coverage' });
+  Object.defineProperty(window, '__TAURI_INTERNALS__', {
+    configurable: true,
+    value: {
+      invoke: async (command: string) => {
+        assert.equal(command, 'calculate_auto_adjustments');
+        autoWhiteBalanceInvokeCount += 1;
+        return {
+          whiteBalanceTechnical: {
+            adaptation: 'cat16_v1',
+            confidence: 0.78,
+            contract: 'rapidraw.white_balance.v1',
+            duv: 0.008,
+            kelvin: 4380,
+            mode: 'auto',
+            sampleCount: 412,
+            source: 'auto',
+            x: 0.36,
+            y: 0.35,
+          },
+        };
+      },
+    },
+  });
   window.sessionStorage.clear();
   Object.defineProperty(globalThis, 'window', { configurable: true, value: window });
   Object.defineProperty(globalThis, 'document', { configurable: true, value: window.document });

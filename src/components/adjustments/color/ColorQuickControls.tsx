@@ -18,6 +18,7 @@ interface ColorQuickControlsProps extends ColorPanelGroupProps {
   isWbPickerActive: boolean;
   isWgpuEnabled: boolean;
   inputSemantics: 'raw_scene_linear' | 'rendered_scene_linear_approximation';
+  resolveAutoWhiteBalance?: () => void;
   toggleWbPicker?: () => void;
 }
 
@@ -28,6 +29,7 @@ export const ColorQuickControls = ({
   isWgpuEnabled,
   inputSemantics,
   onDragStateChange,
+  resolveAutoWhiteBalance,
   setAdjustments,
   toggleWbPicker,
 }: ColorQuickControlsProps) => {
@@ -187,13 +189,18 @@ export const ColorQuickControls = ({
               <select
                 className="h-6 rounded border border-editor-border bg-editor-panel px-1.5 text-xs text-text-primary"
                 data-testid="color-white-balance-mode"
-                onChange={(event) =>
+                onChange={(event) => {
+                  const mode = event.target.value as WhiteBalanceMode;
+                  if (mode === 'auto' && resolveAutoWhiteBalance) {
+                    resolveAutoWhiteBalance();
+                    return;
+                  }
                   updateTechnicalWhiteBalance(
-                    event.target.value as WhiteBalanceMode,
+                    mode,
                     adjustments.whiteBalanceTechnical.kelvin,
                     adjustments.whiteBalanceTechnical.duv,
-                  )
-                }
+                  );
+                }}
                 value={adjustments.whiteBalanceTechnical.mode}
               >
                 <option value="as_shot">{t('adjustments.color.asShot')}</option>

@@ -208,4 +208,18 @@ export const buildTechnicalWhiteBalancePreset = (
   });
 };
 
+export const technicalWhiteBalanceFromAutoAdjustments = (
+  payload: unknown,
+  inputSemantics: TechnicalWhiteBalance['inputSemantics'],
+): TechnicalWhiteBalance => {
+  if (typeof payload !== 'object' || payload === null || !('whiteBalanceTechnical' in payload)) {
+    throw new Error('auto_white_balance_missing_runtime_receipt');
+  }
+  const parsed = technicalWhiteBalanceSchema.safeParse(payload.whiteBalanceTechnical);
+  if (!parsed.success || parsed.data.mode !== 'auto' || parsed.data.source !== 'auto') {
+    throw new Error('auto_white_balance_invalid_runtime_receipt');
+  }
+  return technicalWhiteBalanceSchema.parse({ ...parsed.data, inputSemantics });
+};
+
 export const INITIAL_TECHNICAL_WHITE_BALANCE = buildTechnicalWhiteBalance('as_shot');

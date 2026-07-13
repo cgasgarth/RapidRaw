@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   buildTechnicalWhiteBalance,
   buildTechnicalWhiteBalancePreset,
+  technicalWhiteBalanceFromAutoAdjustments,
   technicalWhiteBalanceMatrix,
   WHITE_BALANCE_PRESETS,
 } from '../../../src/utils/color/whiteBalance';
@@ -95,6 +96,30 @@ describe('professional white balance contract', () => {
       mode: 'locked_reference',
       referenceSourceIdentity: 'source:reference.raw',
     });
+  });
+
+  test('accepts only truthful Auto analysis receipts and preserves source semantics', () => {
+    const auto = buildTechnicalWhiteBalance('auto', 4380, 0.008, 'auto');
+    const resolved = technicalWhiteBalanceFromAutoAdjustments(
+      { whiteBalanceTechnical: { ...auto, confidence: 0.72, sampleCount: 412 } },
+      'rendered_scene_linear_approximation',
+    );
+    expect(resolved).toMatchObject({
+      mode: 'auto',
+      source: 'auto',
+      confidence: 0.72,
+      sampleCount: 412,
+      inputSemantics: 'rendered_scene_linear_approximation',
+    });
+    expect(() =>
+      technicalWhiteBalanceFromAutoAdjustments(
+        { whiteBalanceTechnical: buildTechnicalWhiteBalance('kelvin_tint', 4380, 0.008) },
+        'raw_scene_linear',
+      ),
+    ).toThrow('auto_white_balance_invalid_runtime_receipt');
+    expect(() => technicalWhiteBalanceFromAutoAdjustments({}, 'raw_scene_linear')).toThrow(
+      'auto_white_balance_missing_runtime_receipt',
+    );
   });
 
   test('CAT16 materially lowers measured ColorChecker ΔE under tungsten and shade', () => {
