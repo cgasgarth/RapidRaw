@@ -3811,6 +3811,19 @@ mod blur_pass_tests {
                 }),
             ),
             (
+                "reference_match_preview_export_allow_list",
+                json!({
+                    "exposure": 18, "contrast": 9,
+                    "creativeTemperature": 12, "creativeTint": -7,
+                    "saturation": 11, "vibrance": 7,
+                    "whiteBalanceTechnical": {
+                        "mode": "as_shot",
+                        "kelvin": 6500.0,
+                        "duv": 0.0
+                    }
+                }),
+            ),
+            (
                 "tone_color_levels_stack",
                 json!({
                     "exposure": 18, "brightness": -8, "contrast": 9,

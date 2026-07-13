@@ -197,6 +197,11 @@ export default function Editor({
     isExportSoftProofEnabled,
   });
   const compare = useEditorStore((s) => s.compare);
+  const referenceMatchReferences = useEditorStore((s) => s.referenceMatchReferences);
+  const referenceCompareSource =
+    compare.source.kind === 'reference'
+      ? (referenceMatchReferences.find((reference) => reference.id === compare.source.identity) ?? null)
+      : null;
   const showOriginal = compare.isOriginalHeld || compare.mode === 'hold-original';
   const isSliderDragging = useEditorStore((s) => s.isSliderDragging);
   const zoom = useEditorStore((s) => s.zoom);
@@ -2190,7 +2195,8 @@ export default function Editor({
                 dispatchCompare({ type: 'reset-divider' });
               }}
               showOriginal={compare.isOriginalHeld}
-              transformedOriginalUrl={transformedOriginalUrl}
+              transformedOriginalUrl={referenceCompareSource?.renderUrl ?? transformedOriginalUrl}
+              comparisonLabel={referenceCompareSource?.label ?? null}
               uncroppedAdjustedPreviewUrl={uncroppedAdjustedPreviewUrl}
               updateSubMask={updateSubMaskLocal}
               isWbPickerActive={isWbPickerActive}

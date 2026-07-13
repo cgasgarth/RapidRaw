@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { MatchLookApplicationReceiptV1 } from '../../packages/rawengine-schema/src/referenceMatchRuntime';
 import type { ChannelConfig } from '../components/adjustments/Curves';
 import type { OverlayMode } from '../components/panel/right/color/CropPanel';
 import { ToolType } from '../components/panel/right/layers/Masks';
@@ -38,6 +39,7 @@ import {
 } from '../utils/editorCompare';
 import { DEFAULT_EDITOR_ZOOM_MODE, type EditorZoomMode } from '../utils/editorZoom';
 import { loadMaskOverlaySettingsPreference } from '../utils/mask/maskOverlayPreferences';
+import type { ReferenceMatchReference } from '../utils/referenceMatch';
 import { PANEL_SCOPES_HEIGHT } from '../utils/waveformSizing';
 import type { WhiteBalancePickerRuntimeReceipt } from '../utils/whiteBalancePicker';
 
@@ -159,6 +161,8 @@ interface EditorState {
   interactivePatch: InteractivePatch | null;
   previewQualityStatus: PreviewQualityStatus | null;
   compare: EditorCompareState;
+  referenceMatchReferences: ReferenceMatchReference[];
+  lastReferenceMatchApplicationReceipt: MatchLookApplicationReceiptV1 | null;
 
   // Analytics
   histogram: ChannelConfig | null;
@@ -224,6 +228,9 @@ interface EditorState {
   setEditor: (updater: Partial<EditorState> | ((state: EditorState) => Partial<EditorState>)) => void;
   applyAiEditCommand: (command: AiEditCommand) => AiEditSelection | null;
   dispatchCompare: (command: EditorCompareCommand) => void;
+  setReferenceMatchReferences: (
+    updater: ReferenceMatchReference[] | ((references: ReferenceMatchReference[]) => ReferenceMatchReference[]),
+  ) => void;
   setPresetApplication: (presetApplication: PresetApplication | null) => void;
   createHistoryCheckpoint: (label: string) => void;
   applyBasicToneCommand: (command: BasicToneCommandEnvelope) => void;
@@ -244,12 +251,16 @@ const shouldRevalidateGamutWarningOverlay = (update: Partial<EditorState>): bool
 
 const normalizeCompareStateUpdate = (state: EditorState, update: Partial<EditorState>): void => {
   if ('selectedImage' in update && update.selectedImage?.path !== state.selectedImage?.path) {
-    update.compare = {
-      ...DEFAULT_EDITOR_COMPARE_STATE,
-      source: { identity: update.selectedImage?.path ?? null, kind: 'original' },
-    };
+    const currentCompareSource = state.compare?.source ?? DEFAULT_EDITOR_COMPARE_STATE.source;
+    if (currentCompareSource.kind === 'original') {
+      update.compare = {
+        ...DEFAULT_EDITOR_COMPARE_STATE,
+        source: { identity: update.selectedImage?.path ?? null, kind: 'original' },
+      };
+    }
     update.transformedOriginalUrl = null;
     update.previewQualityStatus = null;
+    update.lastReferenceMatchApplicationReceipt = null;
   }
 };
 
@@ -344,6 +355,8 @@ export const useEditorStore = create<EditorState>((set) => ({
   navigatorPreviewArtifact: null,
   uncroppedAdjustedPreviewUrl: null,
   compare: DEFAULT_EDITOR_COMPARE_STATE,
+  referenceMatchReferences: [],
+  lastReferenceMatchApplicationReceipt: null,
   histogram: null,
   waveform: null,
   previewScopeStatus: null,
@@ -536,6 +549,11 @@ export const useEditorStore = create<EditorState>((set) => ({
   },
 
   dispatchCompare: (command) => set((state) => ({ compare: reduceEditorCompare(state.compare, command) })),
+
+  setReferenceMatchReferences: (updater) =>
+    set((state) => ({
+      referenceMatchReferences: typeof updater === 'function' ? updater(state.referenceMatchReferences) : updater,
+    })),
 
   setPresetApplication: (presetApplication) => set({ presetApplication }),
 

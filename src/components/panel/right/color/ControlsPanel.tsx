@@ -55,6 +55,7 @@ import BasicAdjustments from '../../../adjustments/Basic';
 import CurveGraph from '../../../adjustments/Curves';
 import DetailsPanel from '../../../adjustments/Details';
 import EffectsPanel from '../../../adjustments/Effects';
+import ReferenceMatchPanel from '../../../adjustments/ReferenceMatchPanel';
 import TransformLens from '../../../adjustments/TransformLens';
 import { OPTION_SEPARATOR, type Option, Panel } from '../../../ui/AppProperties';
 import CollapsibleSection, { type CollapsibleSectionHeaderAction } from '../../../ui/CollapsibleSection';
@@ -1239,6 +1240,8 @@ export default function Controls() {
       testId="adjustments-inspector"
     >
       <InspectorAnalyticsHeader testId="adjustments-analytics-header" />
+
+      <ReferenceMatchPanel />
 
       <div
         className="shrink-0 border-b border-editor-border bg-editor-panel px-2 py-1"

@@ -78,4 +78,26 @@ describe('editor before-after compare state', () => {
       transformedOriginalUrl: null,
     });
   });
+
+  test('keeps a pinned reference source across target navigation', () => {
+    const { dispatchCompare, setEditor } = useEditorStore.getState();
+    setEditor({ selectedImage: image('/photos/reference.ARW') });
+    dispatchCompare({
+      identity: '/photos/reference.ARW:render-7',
+      label: 'reference.ARW',
+      type: 'set-reference-source',
+    });
+    dispatchCompare({ mode: 'side-by-side', type: 'set-mode' });
+
+    setEditor({ selectedImage: image('/photos/target.ARW') });
+
+    expect(useEditorStore.getState().compare).toMatchObject({
+      mode: 'side-by-side',
+      source: {
+        identity: '/photos/reference.ARW:render-7',
+        kind: 'reference',
+        label: 'reference.ARW',
+      },
+    });
+  });
 });

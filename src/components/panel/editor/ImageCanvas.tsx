@@ -266,6 +266,7 @@ interface ImageCanvasProps {
   onCompareDividerReset?: () => void;
   showOriginal: boolean;
   transformedOriginalUrl: string | null;
+  comparisonLabel?: string | null;
   uncroppedAdjustedPreviewUrl: string | null;
   updateSubMask: (id: string | null, subMask: Partial<SubMask>) => void;
   interactivePatch?: InteractivePatch | null;
@@ -342,6 +343,7 @@ const ImageCanvas = memo(
     onCompareDividerReset = () => undefined,
     showOriginal,
     transformedOriginalUrl,
+    comparisonLabel = null,
     uncroppedAdjustedPreviewUrl,
     updateSubMask,
     isWbPickerActive = false,
@@ -2383,6 +2385,7 @@ const ImageCanvas = memo(
               canShowOriginalCompare={canShowOriginalCompare}
               compareDividerPosition={compareDividerPosition}
               compareLabelsVisible={compareLabelsVisible}
+              comparisonLabel={comparisonLabel}
               compareOrientation={compareOrientation}
               compareOverlayDisabled={compareOverlayDisabled}
               editedImageRect={imageRenderSize}
