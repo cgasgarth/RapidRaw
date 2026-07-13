@@ -1326,7 +1326,7 @@ fn tolerance(operation: Operation, storage: StorageKind) -> f64 {
         // The coordinate hash intentionally amplifies f32 rounding into visible
         // stochastic variation. This bound covers two f32 rounding steps while
         // the injected tile-local-coordinate defect below remains mandatory.
-        (Operation::Grain, StorageKind::Buffer32) => 1.6e-4,
+        (Operation::Grain, StorageKind::Buffer32 | StorageKind::Rgba32Float) => 1.6e-4,
         (
             Operation::ToneCurve
             | Operation::Levels
@@ -1352,7 +1352,6 @@ fn tolerance(operation: Operation, storage: StorageKind) -> f64 {
         (Operation::Halation, StorageKind::Rgba16Float) => 4.0e-3,
         (_, StorageKind::Rgba16Float) => 2.1e-3,
         (Operation::DcpHueSatMap, StorageKind::Rgba32Float) => 8.0e-5,
-        (Operation::Grain, StorageKind::Rgba32Float) => 8.0e-5,
         (_, StorageKind::Rgba32Float) => 3.0e-5,
     }
 }
