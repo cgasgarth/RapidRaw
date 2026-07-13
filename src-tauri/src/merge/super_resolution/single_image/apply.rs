@@ -1,22 +1,31 @@
 use std::io::Cursor;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+#[cfg(feature = "ai")]
+use std::path::PathBuf;
 
 use image::{DynamicImage, ImageFormat, Rgb32FImage};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::app_state::AppState;
-use crate::merge::atomic_derived_output::{
-    AtomicDerivedOutputReceipt, AtomicDerivedOutputTransaction, DerivedOutputManifest,
-};
+#[cfg(feature = "ai")]
+use crate::merge::atomic_derived_output::AtomicDerivedOutputTransaction;
+use crate::merge::atomic_derived_output::{AtomicDerivedOutputReceipt, DerivedOutputManifest};
+#[cfg(feature = "ai")]
 use crate::merge::computational_job::ComputationalMergeFamily;
 
+#[cfg(feature = "ai")]
 use super::inference::{OrtSwinIrRunner, run_tiled_x2, tile_count};
-use super::model::{MODEL_ID, MODEL_SHA256, verify_provisioned_model};
+#[cfg(feature = "ai")]
+use super::model::verify_provisioned_model;
+use super::model::{MODEL_ID, MODEL_SHA256};
+#[cfg(feature = "ai")]
 use super::preprocess::{
     apply_highlight_safe_residual, bicubic_scene_linear_x2, scene_linear_to_encoded_srgb,
 };
+#[cfg(feature = "ai")]
 use super::review::build_review;
+#[cfg(feature = "ai")]
 use super::{SingleImageX2PreviewRequest, current_frame};
 
 #[derive(Clone, Debug, Deserialize)]
@@ -58,119 +67,127 @@ pub(crate) async fn apply_request(
     request: SingleImageX2ApplyRequest,
     state: &AppState,
 ) -> Result<SingleImageX2ApplyReceipt, String> {
-    validate_request(&request)?;
-    let model_path = std::env::var_os("RAWENGINE_SWINIR_X2_MODEL_PATH")
-        .map(PathBuf::from)
-        .ok_or_else(|| "swinir_x2_disabled_weight_redistribution_unverified".to_string())?;
-    verify_provisioned_model(&model_path)?;
-    let preview_request = SingleImageX2PreviewRequest {
-        source_path: request.source_path.clone(),
-        graph_revision: request.graph_revision.clone(),
-        memory_budget_bytes: request.memory_budget_bytes,
-    };
-    let frame = current_frame(state, &preview_request)?;
-    if let Some(receipt) = find_committed_replay(&request)? {
-        return Ok(receipt);
+    #[cfg(not(feature = "ai"))]
+    {
+        let _ = (request, state);
+        Err("ai_super_resolution_unavailable:build_without_ai_feature".to_string())
     }
-    let source = frame.pixels.image().to_rgb32f();
-    let tiles = tile_count(source.width(), source.height(), request.memory_budget_bytes)?;
-    let total_units = tiles.saturating_add(3);
-    let job = state.computational_merge_jobs.begin(
-        ComputationalMergeFamily::SuperResolution,
-        "rendering",
-        total_units,
-        total_units,
-    )?;
-    let job_id = job.job_id.to_string();
-    let token = job.cancellation_token.clone();
-    let model_for_worker = model_path.clone();
-    let budget = request.memory_budget_bytes;
-    let rendered = tokio::task::spawn_blocking(move || {
-        let mut runner = OrtSwinIrRunner::open(&model_for_worker)?;
-        let encoded = scene_linear_to_encoded_srgb(&source);
-        let ai = run_tiled_x2(&encoded, budget, &token, &mut runner)?;
-        let baseline = bicubic_scene_linear_x2(&source);
-        let output = apply_highlight_safe_residual(&source, &baseline, &ai);
-        let review = build_review(&source, &baseline, &output, &ai, &model_for_worker)?;
-        Ok::<_, String>((baseline, output, review))
-    })
-    .await
-    .map_err(|error| format!("single_image_x2_apply_worker_failed:{error}"))?;
-    let (baseline, output, review) = match rendered {
-        Ok(value) => value,
-        Err(error) => {
-            let _ = state.computational_merge_jobs.fail(&job.job_id);
-            return Err(error);
+    #[cfg(feature = "ai")]
+    {
+        validate_request(&request)?;
+        let model_path = std::env::var_os("RAWENGINE_SWINIR_X2_MODEL_PATH")
+            .map(PathBuf::from)
+            .ok_or_else(|| "swinir_x2_disabled_weight_redistribution_unverified".to_string())?;
+        verify_provisioned_model(&model_path)?;
+        let preview_request = SingleImageX2PreviewRequest {
+            source_path: request.source_path.clone(),
+            graph_revision: request.graph_revision.clone(),
+            memory_budget_bytes: request.memory_budget_bytes,
+        };
+        let frame = current_frame(state, &preview_request)?;
+        if let Some(receipt) = find_committed_replay(&request)? {
+            return Ok(receipt);
         }
-    };
-    job.cancellation_token.checkpoint()?;
-    current_frame(state, &preview_request)?;
-    if review.decision != "preview_only_manual_review" {
-        let _ = state.computational_merge_jobs.fail(&job.job_id);
-        return Err("single_image_x2_review_blocked".to_string());
-    }
-    if review.output_hash != request.accepted_review_hash {
-        let _ = state.computational_merge_jobs.fail(&job.job_id);
-        return Err("single_image_x2_stale_review".to_string());
-    }
+        let source = frame.pixels.image().to_rgb32f();
+        let tiles = tile_count(source.width(), source.height(), request.memory_budget_bytes)?;
+        let total_units = tiles.saturating_add(3);
+        let job = state.computational_merge_jobs.begin(
+            ComputationalMergeFamily::SuperResolution,
+            "rendering",
+            total_units,
+            total_units,
+        )?;
+        let job_id = job.job_id.to_string();
+        let token = job.cancellation_token.clone();
+        let model_for_worker = model_path.clone();
+        let budget = request.memory_budget_bytes;
+        let rendered = tokio::task::spawn_blocking(move || {
+            let mut runner = OrtSwinIrRunner::open(&model_for_worker)?;
+            let encoded = scene_linear_to_encoded_srgb(&source);
+            let ai = run_tiled_x2(&encoded, budget, &token, &mut runner)?;
+            let baseline = bicubic_scene_linear_x2(&source);
+            let output = apply_highlight_safe_residual(&source, &baseline, &ai);
+            let review = build_review(&source, &baseline, &output, &ai, &model_for_worker)?;
+            Ok::<_, String>((baseline, output, review))
+        })
+        .await
+        .map_err(|error| format!("single_image_x2_apply_worker_failed:{error}"))?;
+        let (baseline, output, review) = match rendered {
+            Ok(value) => value,
+            Err(error) => {
+                let _ = state.computational_merge_jobs.fail(&job.job_id);
+                return Err(error);
+            }
+        };
+        job.cancellation_token.checkpoint()?;
+        current_frame(state, &preview_request)?;
+        if review.decision != "preview_only_manual_review" {
+            let _ = state.computational_merge_jobs.fail(&job.job_id);
+            return Err("single_image_x2_review_blocked".to_string());
+        }
+        if review.output_hash != request.accepted_review_hash {
+            let _ = state.computational_merge_jobs.fail(&job.job_id);
+            return Err("single_image_x2_stale_review".to_string());
+        }
 
-    let mut transaction = AtomicDerivedOutputTransaction::begin(
-        Path::new(&request.destination_directory),
-        &normalized_package_name(&request.requested_name),
-    )?;
-    let payload_hash = transaction.write_file("payload.tiff", &tiff_bytes(&output)?)?;
-    transaction.write_file("preview.png", &png_bytes(&output)?)?;
-    transaction.write_file("bicubic.png", &png_bytes(&baseline)?)?;
-    let provenance = serde_json::to_vec(&serde_json::json!({
-        "schemaVersion": 1,
-        "derivativeKind": "single_image_ai_sr",
-        "renderedRgb": true,
-        "sourceGraphRevision": request.graph_revision,
-        "sourceInputHash": review.input_hash,
-        "outputHash": review.output_hash,
-        "payloadHash": payload_hash,
-        "modelId": MODEL_ID,
-        "modelSha256": MODEL_SHA256,
-        "tilePolicyId": review.tile_policy_id,
-        "colorPolicyId": review.color_policy_id,
-        "acceptedReviewHash": request.accepted_review_hash,
-    }))
-    .map_err(|error| format!("single_image_x2_provenance_serialize_failed:{error}"))?;
-    transaction.write_file("provenance.json", &provenance)?;
-    let manifest = DerivedOutputManifest {
-        schema_version: 1,
-        family: "single_image_ai_sr".to_string(),
-        width: u64::from(output.width()),
-        height: u64::from(output.height()),
-        payload_path: "payload.tiff".to_string(),
-        preview_paths: vec!["preview.png".to_string(), "bicubic.png".to_string()],
-        map_paths: vec!["provenance.json".to_string()],
-        source_immutability_hashes: vec![review.input_hash.clone()],
-    };
-    transaction.stage_manifest(&manifest)?;
-    job.cancellation_token.checkpoint()?;
-    current_frame(state, &preview_request)?;
-    let package = transaction.commit(&manifest, |_| Ok(()))?;
-    let payload_path = Path::new(&package.final_package_path)
-        .join("payload.tiff")
-        .to_string_lossy()
-        .into_owned();
-    if !state.computational_merge_jobs.finish(&job.job_id)? {
-        return Err("single_image_x2_cancelled_before_registration".to_string());
+        let mut transaction = AtomicDerivedOutputTransaction::begin(
+            Path::new(&request.destination_directory),
+            &normalized_package_name(&request.requested_name),
+        )?;
+        let payload_hash = transaction.write_file("payload.tiff", &tiff_bytes(&output)?)?;
+        transaction.write_file("preview.png", &png_bytes(&output)?)?;
+        transaction.write_file("bicubic.png", &png_bytes(&baseline)?)?;
+        let provenance = serde_json::to_vec(&serde_json::json!({
+            "schemaVersion": 1,
+            "derivativeKind": "single_image_ai_sr",
+            "renderedRgb": true,
+            "sourceGraphRevision": request.graph_revision,
+            "sourceInputHash": review.input_hash,
+            "outputHash": review.output_hash,
+            "payloadHash": payload_hash,
+            "modelId": MODEL_ID,
+            "modelSha256": MODEL_SHA256,
+            "tilePolicyId": review.tile_policy_id,
+            "colorPolicyId": review.color_policy_id,
+            "acceptedReviewHash": request.accepted_review_hash,
+        }))
+        .map_err(|error| format!("single_image_x2_provenance_serialize_failed:{error}"))?;
+        transaction.write_file("provenance.json", &provenance)?;
+        let manifest = DerivedOutputManifest {
+            schema_version: 1,
+            family: "single_image_ai_sr".to_string(),
+            width: u64::from(output.width()),
+            height: u64::from(output.height()),
+            payload_path: "payload.tiff".to_string(),
+            preview_paths: vec!["preview.png".to_string(), "bicubic.png".to_string()],
+            map_paths: vec!["provenance.json".to_string()],
+            source_immutability_hashes: vec![review.input_hash.clone()],
+        };
+        transaction.stage_manifest(&manifest)?;
+        job.cancellation_token.checkpoint()?;
+        current_frame(state, &preview_request)?;
+        let package = transaction.commit(&manifest, |_| Ok(()))?;
+        let payload_path = Path::new(&package.final_package_path)
+            .join("payload.tiff")
+            .to_string_lossy()
+            .into_owned();
+        if !state.computational_merge_jobs.finish(&job.job_id)? {
+            return Err("single_image_x2_cancelled_before_registration".to_string());
+        }
+        Ok(SingleImageX2ApplyReceipt {
+            schema_version: 1,
+            job_id,
+            source_path: preview_request.source_path,
+            graph_revision: preview_request.graph_revision,
+            review_hash: review.output_hash,
+            model_id: MODEL_ID,
+            model_sha256: MODEL_SHA256,
+            width: output.width(),
+            height: output.height(),
+            payload_path,
+            package,
+        })
     }
-    Ok(SingleImageX2ApplyReceipt {
-        schema_version: 1,
-        job_id,
-        source_path: preview_request.source_path,
-        graph_revision: preview_request.graph_revision,
-        review_hash: review.output_hash,
-        model_id: MODEL_ID,
-        model_sha256: MODEL_SHA256,
-        width: output.width(),
-        height: output.height(),
-        payload_path,
-        package,
-    })
 }
 
 fn find_committed_replay(

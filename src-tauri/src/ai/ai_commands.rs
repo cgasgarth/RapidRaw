@@ -197,7 +197,7 @@ fn unwarp_sam_prompt(
 
 fn get_cached_or_generate_sam_embeddings(
     state: &tauri::State<'_, AppState>,
-    sam_encoder: &std::sync::Mutex<ort::session::Session>,
+    sam_encoder: &std::sync::Mutex<rapidraw_ai::ort::session::Session>,
     js_adjustments: &Value,
     path_hash: &str,
 ) -> Result<(ImageEmbeddings, Option<f64>), String> {
