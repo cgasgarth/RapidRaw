@@ -6,9 +6,15 @@ on:
       - '.github/workflows/performance.yml'
       - 'scripts/perf/**'
       - 'scripts/qa/**'
+      - 'src/components/modals/computational-merge/**'
+      - 'src/components/modals/navigation/ImportSettingsModal.tsx'
       - 'src/components/panel/MainLibrary.tsx'
       - 'src/components/panel/editor/**'
+      - 'src/components/panel/right/export/**'
+      - 'src/hooks/ai/useAiConnectorStatus.ts'
+      - 'src/hooks/library/useFileOperations.ts'
       - 'src/utils/adjustmentSnapshots.ts'
+      - 'src/validation/browserTauriHarness.mts'
       - 'tests/pure-ts/performance-lab*.test.ts'
   schedule:
     - cron: '17 8 * * 2'
@@ -44,6 +50,11 @@ jobs:
           - browser.editor-compare
           - browser.editor-crop
           - browser.library-open
+          - jobs.export-mixed-batch
+          - jobs.import-batch
+          - jobs.ai-capability-first-use-cold
+          - jobs.ai-capability-first-use-warm
+          - jobs.computational-hdr-merge
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -53,7 +64,7 @@ jobs:
       - uses: ./.github/actions/setup-bun-deps
 
       - name: Install Chromium for end-to-end scenarios
-        if: ${{ startsWith(matrix.scenario, 'browser.') }}
+        if: ${{ startsWith(matrix.scenario, 'browser.') || startsWith(matrix.scenario, 'jobs.') }}
         run: bunx playwright install --with-deps chromium
 
       - name: Run versioned end-to-end performance scenario
