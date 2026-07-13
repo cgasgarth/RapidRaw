@@ -120,6 +120,20 @@ console.log('start '+Date.now()); await Bun.sleep(180); console.log('end '+Date.
     expect(secondInterval.start).toBeLessThan(firstInterval.end);
     expect(thirdInterval.start).toBeGreaterThanOrEqual(Math.min(firstInterval.end, secondInterval.end));
   });
+
+  test('uses a portable lock primitive without requiring macOS shlock', async () => {
+    const root = await temporaryRoot();
+    const child = directLease(
+      root,
+      `const lease=await acquireResourceLease({resource:'native-heavy',label:'portable-lock'});
+console.log('portable-acquired');
+await lease.release();`,
+    );
+    await expectSuccessfulExit(child);
+    expect(await new Response(child.stdout).text()).toContain('portable-acquired');
+    expect(await Bun.file(join(root, 'native-heavy.lock')).exists()).toBeFalse();
+  });
+
   test('hands a released lease to the oldest waiter before an immediate reacquirer', async () => {
     const root = await temporaryRoot();
     const releaseFirst = join(root, 'release-first');

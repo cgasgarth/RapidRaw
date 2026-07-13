@@ -68,12 +68,33 @@ const replaceFile = async (path: string, contents: string): Promise<void> => {
   await rename(candidate, path);
 };
 
-const shlock = (path: string, pid: number): boolean =>
-  Bun.spawnSync(['/usr/bin/shlock', '-p', String(pid), '-f', path], { stderr: 'pipe', stdout: 'pipe' }).exitCode === 0;
+const lockPidPath = (path: string): string => join(path, 'pid');
+
+const readLockPid = async (path: string): Promise<number | null> => {
+  const value = await readFile(lockPidPath(path), 'utf8').catch(
+    async () => await readFile(path, 'utf8').catch(() => ''),
+  );
+  const pid = Number(value.trim());
+  return Number.isSafeInteger(pid) && pid > 0 ? pid : null;
+};
+
+const acquirePidLock = async (path: string, pid: number): Promise<boolean> => {
+  try {
+    await mkdir(path);
+    await writeFile(lockPidPath(path), `${pid}\n`, 'utf8');
+    return true;
+  } catch (error) {
+    const code = error instanceof Error && 'code' in error ? error.code : undefined;
+    if (code !== 'EEXIST') throw error;
+    const ownerPid = await readLockPid(path);
+    if (ownerPid === null || processIsAlive(ownerPid)) return false;
+    await rm(path, { force: true, recursive: true });
+    return await acquirePidLock(path, pid);
+  }
+};
 
 const releasePidLock = async (path: string, pid: number): Promise<void> => {
-  const currentPid = Number((await readFile(path, 'utf8').catch(() => '')).trim());
-  if (currentPid === pid) await rm(path, { force: true });
+  if ((await readLockPid(path)) === pid) await rm(path, { force: true, recursive: true });
 };
 
 const withQueueMutex = async <Result>(
@@ -81,7 +102,7 @@ const withQueueMutex = async <Result>(
   pollMs: number,
   operation: () => Promise<Result>,
 ): Promise<Result> => {
-  while (!shlock(path, process.pid)) await Bun.sleep(Math.min(pollMs, 25));
+  while (!(await acquirePidLock(path, process.pid))) await Bun.sleep(Math.min(pollMs, 25));
   try {
     return await operation();
   } finally {
@@ -174,7 +195,7 @@ export async function acquireResourceLease(options: ResourceLeaseOptions): Promi
             const ownerPath = ownerPaths[slot];
             if (!lockPath || !ownerPath) throw new Error(`missing resource slot ${slot}`);
             const priorOwner = await readOwner(ownerPath);
-            if (!shlock(lockPath, process.pid)) continue;
+            if (!(await acquirePidLock(lockPath, process.pid))) continue;
             await rm(waiter.path, { force: true });
             return { acquired: true, lockPath, ownerPath, priorOwner };
           }
@@ -201,15 +222,14 @@ export async function acquireResourceLease(options: ResourceLeaseOptions): Promi
           release: async () => {
             if (released) return;
             released = true;
-            const currentPid = Number((await readFile(lockPath, 'utf8').catch(() => '')).trim());
-            if (currentPid === owner.pid) {
+            if ((await readLockPid(lockPath)) === owner.pid) {
               await rm(ownerPath, { force: true });
               await releasePidLock(lockPath, owner.pid);
             }
           },
           updateOwnerPid: async (pid: number) => {
             owner = { ...owner, pid };
-            await replaceFile(lockPath, `${pid}\n`);
+            await replaceFile(lockPidPath(lockPath), `${pid}\n`);
             await replaceFile(ownerPath, `${JSON.stringify(owner)}\n`);
           },
         };
