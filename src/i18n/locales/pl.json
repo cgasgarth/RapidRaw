@@ -739,6 +739,7 @@
         "missingCachedReference": "",
         "newLayerDestination": "",
         "normalize": "",
+        "referencePreviewAlt": "",
         "replacedCachedReference": "",
         "residualSummary": "",
         "revealReferenceInLibrary": "",
@@ -748,6 +749,7 @@
         "technicalRole": "",
         "title": "",
         "unknownReferenceAvailability": "",
+        "virtualCopyState": "",
         "weight": ""
       },
       "scopedSections": {
