@@ -34,3 +34,32 @@ export const acceptReferenceMatchAdjustmentTransfer = ({
     transferMode,
   };
 };
+
+export const reconcileReferenceMatchReceiptsAfterEdit = (previous: Adjustments, next: Adjustments): Adjustments => {
+  let reconciled = next;
+  const globalReceipt = previous.referenceMatchApplicationReceipt;
+  if (
+    globalReceipt !== null &&
+    next.referenceMatchApplicationReceipt === globalReceipt &&
+    globalReceipt.appliedDiffs.some((diff) => previous[diff.key] !== next[diff.key])
+  ) {
+    reconciled = { ...reconciled, referenceMatchApplicationReceipt: null };
+  }
+
+  const previousLayers = new Map(previous.masks.map((layer) => [layer.id, layer]));
+  let reconciledMasks = reconciled.masks;
+  for (const [index, layer] of reconciled.masks.entries()) {
+    const previousLayer = previousLayers.get(layer.id);
+    if (previousLayer === undefined) continue;
+    const receipt = previousLayer.referenceMatchApplicationReceipt;
+    if (receipt === undefined || layer.referenceMatchApplicationReceipt !== receipt) continue;
+    const changed =
+      previousLayer.opacity !== layer.opacity ||
+      receipt.appliedDiffs.some((diff) => previousLayer.adjustments[diff.key] !== layer.adjustments[diff.key]);
+    if (!changed) continue;
+    if (reconciledMasks === reconciled.masks) reconciledMasks = [...reconciled.masks];
+    const { referenceMatchApplicationReceipt: _staleReceipt, ...layerWithoutReceipt } = layer;
+    reconciledMasks[index] = layerWithoutReceipt;
+  }
+  return reconciledMasks === reconciled.masks ? reconciled : { ...reconciled, masks: reconciledMasks };
+};
