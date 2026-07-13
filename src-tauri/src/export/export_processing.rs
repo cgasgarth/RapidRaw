@@ -962,8 +962,8 @@ pub(crate) fn prepare_export_masks<'a>(
 struct ExportRenderInputs {
     adjustments: AllAdjustments,
     lut: Option<Arc<crate::lut_processing::Lut>>,
+    pre_gpu_revision: u64,
     edit_graph: Arc<crate::edit_graph::CompiledEditGraph>,
-    unique_hash: u64,
 }
 
 fn export_execution_fingerprint(path: &str, adjustments: &Value) -> u64 {
@@ -1013,15 +1013,17 @@ fn prepare_export_render_inputs(
     .map_err(|error| error.to_string())?;
     let mut hasher = blake3::Hasher::new();
     hasher.update(path.as_bytes());
-    hasher.update(&plan.fingerprints.full.to_le_bytes());
-    let unique_hash = u64::from_le_bytes(hasher.finalize().as_bytes()[..8].try_into().unwrap())
-        .wrapping_add(hash_salt);
-
+    hasher.update(&plan.fingerprints.pre_gpu_base.to_le_bytes());
+    hasher.update(&plan.fingerprints.detail.to_le_bytes());
+    hasher.update(&plan.fingerprints.retouch.to_le_bytes());
+    hasher.update(&hash_salt.to_le_bytes());
+    let pre_gpu_revision =
+        u64::from_le_bytes(hasher.finalize().as_bytes()[..8].try_into().unwrap());
     Ok(ExportRenderInputs {
         adjustments: plan.adjustments,
         lut: plan.lut.clone(),
+        pre_gpu_revision,
         edit_graph: Arc::clone(&plan.edit_graph),
-        unique_hash,
     })
 }
 
@@ -1050,6 +1052,13 @@ pub(crate) fn process_image_for_export_pipeline(
     let (transformed_image, mask_bitmaps) =
         prepare_export_masks(base_image, &authoritative_adjustments, state);
     let tm_override = resolve_tonemapper_override_from_handle(app_handle, is_raw);
+    let settings = crate::load_settings_or_default(app_handle);
+    let effective_settings =
+        raw_processing_settings_for_adjustments(&settings, &authoritative_adjustments);
+    let source_revision = crate::render::artifact_identity::stable_hash(&(
+        crate::gpu_processing::PreGpuImageIdentity::source_revision(path),
+        crate::image_loader::raw_processing_profile_key(&effective_settings),
+    ));
     process_image_for_export_pipeline_with_tonemapper_override(
         path,
         transformed_image.as_ref(),
@@ -1057,6 +1066,7 @@ pub(crate) fn process_image_for_export_pipeline(
         context,
         state,
         is_raw,
+        source_revision,
         debug_tag,
         tm_override,
         &mask_bitmaps,
@@ -1071,6 +1081,7 @@ pub(crate) fn process_image_for_export_pipeline_with_tonemapper_override(
     context: &GpuContext,
     state: &tauri::State<AppState>,
     is_raw: bool,
+    source_revision: u64,
     debug_tag: &str,
     tm_override: Option<u32>,
     mask_bitmaps: &[GrayImage],
@@ -1080,7 +1091,7 @@ pub(crate) fn process_image_for_export_pipeline_with_tonemapper_override(
 
     let detail_stage = apply_pre_gpu_detail_stages(
         transformed_image,
-        render_inputs.unique_hash,
+        render_inputs.pre_gpu_revision,
         js_adjustments,
         is_raw,
     );
@@ -1094,7 +1105,12 @@ pub(crate) fn process_image_for_export_pipeline_with_tonemapper_override(
         context,
         state,
         retouched_image.as_ref(),
-        crate::gpu_processing::PreGpuImageIdentity::for_source(retouched_image.as_ref(), path),
+        crate::gpu_processing::PreGpuImageIdentity::for_stage(
+            retouched_image.as_ref(),
+            source_revision,
+            detail_stage.render_hash,
+            render_inputs.pre_gpu_revision,
+        ),
         RenderRequest {
             adjustments: render_inputs.adjustments,
             mask_bitmaps,
@@ -1448,6 +1464,13 @@ fn export_masks_for_image(
             .extension()
             .and_then(|s| s.to_str())
             .unwrap_or("jpg");
+        let pre_gpu_revision = crate::calculate_transform_hash(js_adjustments);
+        let settings = crate::load_settings_or_default(app_handle);
+        let effective_settings = raw_processing_settings_for_adjustments(&settings, js_adjustments);
+        let source_revision = crate::render::artifact_identity::stable_hash(&(
+            crate::gpu_processing::PreGpuImageIdentity::source_revision(source_path_str),
+            crate::image_loader::raw_processing_profile_key(&effective_settings),
+        ));
 
         for (i, _) in mask_bitmaps.iter().enumerate() {
             if cancellation_token.load(Ordering::SeqCst) {
@@ -1477,9 +1500,11 @@ fn export_masks_for_image(
                 context,
                 state,
                 transformed_image.as_ref(),
-                crate::gpu_processing::PreGpuImageIdentity::for_source(
+                crate::gpu_processing::PreGpuImageIdentity::for_stage(
                     transformed_image.as_ref(),
-                    source_path_str,
+                    source_revision,
+                    pre_gpu_revision,
+                    pre_gpu_revision,
                 ),
                 RenderRequest {
                     adjustments: render_inputs.adjustments,
@@ -1612,7 +1637,12 @@ fn export_adjustments_as_lut(
         context,
         state,
         &identity_image,
-        crate::gpu_processing::PreGpuImageIdentity::for_source(&identity_image, source_path_str),
+        crate::gpu_processing::PreGpuImageIdentity::for_stage(
+            &identity_image,
+            crate::gpu_processing::PreGpuImageIdentity::source_revision(source_path_str),
+            0,
+            0,
+        ),
         RenderRequest {
             adjustments: render_inputs.adjustments,
             mask_bitmaps: &[],
@@ -3389,9 +3419,11 @@ pub async fn estimate_export_sizes(
             &context,
             &state,
             &preview_image,
-            crate::gpu_processing::PreGpuImageIdentity::for_source(
+            crate::gpu_processing::PreGpuImageIdentity::for_stage(
                 &preview_image,
-                &source_path.to_string_lossy(),
+                loaded_image.artifact_source.source_fingerprint(),
+                render_inputs.pre_gpu_revision,
+                render_inputs.pre_gpu_revision,
             ),
             RenderRequest {
                 adjustments: render_inputs.adjustments,
@@ -3535,14 +3567,22 @@ pub async fn estimate_export_sizes(
             resolve_tonemapper_override_from_handle(&app_handle, is_raw),
             1,
         )?;
+        let source_revision = crate::render::artifact_identity::stable_hash(&(
+            crate::gpu_processing::PreGpuImageIdentity::source_revision(
+                &source_path.to_string_lossy(),
+            ),
+            crate::image_loader::raw_processing_profile_key(&effective_settings),
+        ));
 
         let processed_preview = process_and_get_dynamic_image(
             &context,
             &state,
             &preview_base,
-            crate::gpu_processing::PreGpuImageIdentity::for_source(
+            crate::gpu_processing::PreGpuImageIdentity::for_stage(
                 &preview_base,
-                &source_path.to_string_lossy(),
+                source_revision,
+                render_inputs.pre_gpu_revision,
+                render_inputs.pre_gpu_revision,
             ),
             RenderRequest {
                 adjustments: render_inputs.adjustments,
@@ -3786,6 +3826,7 @@ mod tests {
                 &context,
                 &state,
                 true,
+                crate::gpu_processing::PreGpuImageIdentity::source_revision(&source_path),
                 caller,
                 Some(0),
                 &[],

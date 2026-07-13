@@ -2,6 +2,8 @@ use std::borrow::Cow;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
+const WAVELET_RENDER_REVISION_ABI: u32 = 1;
+
 use image::DynamicImage;
 use serde_json::Value;
 
@@ -62,6 +64,7 @@ pub fn parse_wavelet_detail_render_controls(adjustments: &Value) -> WaveletDetai
 pub fn calculate_wavelet_detail_render_hash(base_hash: u64, adjustments: &Value) -> u64 {
     let controls = parse_wavelet_detail_render_controls(adjustments);
     let mut hasher = DefaultHasher::new();
+    WAVELET_RENDER_REVISION_ABI.hash(&mut hasher);
     base_hash.hash(&mut hasher);
     controls.enabled.hash(&mut hasher);
     controls.fine_amount.to_bits().hash(&mut hasher);

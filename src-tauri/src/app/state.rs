@@ -42,8 +42,8 @@ pub struct LoadedImage {
 
 #[derive(Clone)]
 pub struct CachedPreview {
-    pub image: Arc<DynamicImage>,
-    pub small_image: Arc<DynamicImage>,
+    pub image: crate::gpu_processing::RevisionedImage,
+    pub small_image: crate::gpu_processing::RevisionedImage,
     pub identity: crate::render::artifact_identity::RenderArtifactIdentity,
     pub scale: f32,
     pub unscaled_crop_offset: (f32, f32),
@@ -226,6 +226,7 @@ pub struct AppState {
     pub display_target_coordinator:
         Mutex<Option<Arc<crate::app::display_target::DisplayTargetCoordinator>>>,
     pub gpu_image_cache: Mutex<Option<GpuImageCache>>,
+    pub gpu_input_cache_counters: Mutex<crate::gpu_processing::GpuInputCacheCounters>,
     pub gpu_processor: Mutex<Option<GpuProcessorState>>,
     #[cfg(feature = "ai")]
     pub ai_model_registry: crate::ai::model_registry::AiModelRegistry,
@@ -302,6 +303,9 @@ impl AppState {
             gpu_context: Mutex::new(None),
             display_target_coordinator: Mutex::new(None),
             gpu_image_cache: Mutex::new(None),
+            gpu_input_cache_counters: Mutex::new(
+                crate::gpu_processing::GpuInputCacheCounters::default(),
+            ),
             gpu_processor: Mutex::new(None),
             #[cfg(feature = "ai")]
             ai_model_registry: crate::ai::model_registry::AiModelRegistry::new(1536 * 1024 * 1024),

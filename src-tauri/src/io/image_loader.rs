@@ -290,8 +290,7 @@ pub(crate) fn raw_processing_settings_for_adjustments(
     }
 }
 
-#[cfg(test)]
-fn raw_processing_profile_key(settings: &AppSettings) -> RawProcessingProfileKey {
+pub(crate) fn raw_processing_profile_key(settings: &AppSettings) -> RawProcessingProfileKey {
     raw_processing_profile_key_with_plans(settings, &RawTechnicalPlansV1::default())
 }
 

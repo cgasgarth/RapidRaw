@@ -1,10 +1,8 @@
 use memmap2::{Mmap, MmapOptions};
 use std::borrow::Cow;
-use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::fs;
-use std::hash::Hash;
 use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -1059,6 +1057,10 @@ fn generate_thumbnail_data_with_target(
         let settings = load_settings_or_default(app_handle);
         let target_res =
             target_resolution.unwrap_or_else(|| settings.thumbnail_resolution.unwrap_or(720));
+        let source_revision = crate::render::artifact_identity::stable_hash(&(
+            gpu_processing::PreGpuImageIdentity::source_revision(path_str),
+            image_loader::raw_processing_profile_key(&settings),
+        ));
 
         let tm_override = crate::image_processing::resolve_tonemapper_override(&settings, is_raw);
         let lut = meta.adjustments["lutPath"]
@@ -1081,6 +1083,8 @@ fn generate_thumbnail_data_with_target(
         )
         .map_err(|error| anyhow::anyhow!(error.to_string()))?;
         let geometry_hash = render_plan.fingerprints.geometry;
+        let geometry_cache_hash =
+            crate::render::artifact_identity::stable_hash(&(geometry_hash, source_revision));
         let crop_data = render_plan.crop;
 
         let cached_base: Option<(DynamicImage, f32)> = {
@@ -1098,7 +1102,7 @@ fn generate_thumbnail_data_with_target(
                     }
                 }
 
-                if *cached_hash == geometry_hash && sufficient_resolution {
+                if *cached_hash == geometry_cache_hash && sufficient_resolution {
                     Some((img.as_ref().clone(), *scale))
                 } else {
                     None
@@ -1111,7 +1115,6 @@ fn generate_thumbnail_data_with_target(
         let (processing_base, total_scale) = if let Some(hit) = cached_base {
             hit
         } else {
-            let settings = load_settings_or_default(app_handle);
             let mut raw_scale_factor = 1.0f32;
 
             let composite_image = if let Some(img) = preloaded_image {
@@ -1202,7 +1205,7 @@ fn generate_thumbnail_data_with_target(
 
             state.thumbnail_geometry_cache.insert(
                 path_str.to_string(),
-                Arc::new((geometry_hash, Arc::new(base.clone()), total_scale)),
+                Arc::new((geometry_cache_hash, Arc::new(base.clone()), total_scale)),
                 base.as_bytes().len() as u64,
             );
 
@@ -1253,14 +1256,16 @@ fn generate_thumbnail_data_with_target(
             })
             .collect();
 
-        let mut hasher = DefaultHasher::new();
-        path_str.hash(&mut hasher);
-        render_plan.fingerprints.full.hash(&mut hasher);
         if let Ok(processed_image) = gpu_processing::process_and_get_dynamic_image(
             context,
             &state,
             cropped_preview.as_ref(),
-            gpu_processing::PreGpuImageIdentity::for_source(cropped_preview.as_ref(), path_str),
+            gpu_processing::PreGpuImageIdentity::for_stage(
+                cropped_preview.as_ref(),
+                source_revision,
+                render_plan.fingerprints.pre_gpu_base,
+                render_plan.fingerprints.pre_gpu_base,
+            ),
             gpu_processing::RenderRequest {
                 adjustments: render_plan.adjustments,
                 mask_bitmaps: &mask_bitmaps,

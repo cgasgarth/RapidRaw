@@ -557,6 +557,7 @@ fn render(
         context,
         state,
         is_raw,
+        crate::gpu_processing::PreGpuImageIdentity::source_revision(source_path),
         debug_tag,
         tm_override,
         &mask_bitmaps,

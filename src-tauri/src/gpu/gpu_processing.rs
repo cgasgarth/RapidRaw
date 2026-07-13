@@ -29,6 +29,7 @@ use crate::render_caches::RenderCaches;
 use crate::{AppState, GpuImageCache};
 
 pub const PRE_GPU_PRECISION_ABI_RGBA16F_V1: u32 = 1;
+const PIXEL_BUFFER_REVISION_ABI_V1: u32 = 1;
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct GpuInputCacheCounters {
@@ -42,6 +43,13 @@ pub struct GpuInputCacheCounters {
     pub uploaded_bytes: u64,
     pub texture_allocations: u64,
     pub view_allocations: u64,
+    pub revision_verification_calls: u64,
+    pub revision_verification_bytes: u64,
+    pub revision_verification_micros: u64,
+    pub revision_disagreements: u64,
+    pub legacy_full_hash_calls: u64,
+    pub legacy_full_hash_bytes: u64,
+    pub pixel_revision_constructions: u64,
 }
 
 static INPUT_CACHE_HITS: AtomicU64 = AtomicU64::new(0);
@@ -67,78 +75,247 @@ pub fn gpu_input_cache_counters() -> GpuInputCacheCounters {
         uploaded_bytes: UPLOADED_BYTES.load(Ordering::Relaxed),
         texture_allocations: INPUT_TEXTURE_ALLOCATIONS.load(Ordering::Relaxed),
         view_allocations: INPUT_VIEW_ALLOCATIONS.load(Ordering::Relaxed),
+        revision_verification_calls: PIXEL_REVISION_VERIFY_CALLS.load(Ordering::Relaxed),
+        revision_verification_bytes: PIXEL_REVISION_VERIFY_BYTES.load(Ordering::Relaxed),
+        revision_verification_micros: PIXEL_REVISION_VERIFY_MICROS.load(Ordering::Relaxed),
+        revision_disagreements: PIXEL_REVISION_DISAGREEMENTS.load(Ordering::Relaxed),
+        legacy_full_hash_calls: 0,
+        legacy_full_hash_bytes: 0,
+        pixel_revision_constructions: PIXEL_REVISION_CONSTRUCTIONS.load(Ordering::Relaxed),
     }
 }
 
-#[cfg(all(test, feature = "tauri-test"))]
-pub fn reset_gpu_input_cache_counters() {
-    for counter in [
-        &INPUT_CACHE_HITS,
-        &INPUT_CACHE_MISSES,
-        &INPUT_IDENTITY_MISSES,
-        &INPUT_DIMENSION_MISSES,
-        &INPUT_DEVICE_MISSES,
-        &TO_RGBA_F16_CALLS,
-        &CONVERTED_BYTES,
-        &UPLOADED_BYTES,
-        &INPUT_TEXTURE_ALLOCATIONS,
-        &INPUT_VIEW_ALLOCATIONS,
-    ] {
-        counter.store(0, Ordering::Relaxed);
-    }
+#[cfg(test)]
+pub fn gpu_input_cache_counters_for_state(state: &AppState) -> GpuInputCacheCounters {
+    *state.gpu_input_cache_counters.lock().unwrap()
 }
 
-/// Identity of the finalized pixels uploaded to the GPU input texture.
-///
-/// `source_revision` distinguishes sessions/sources, while `stage_revision` names the
-/// geometry/resolution/detail/retouch pipeline which produced `base_image`. The pixel
-/// fingerprint is the correctness backstop: callers cannot accidentally reuse an upload
-/// when a pre-GPU stage changes without updating its revision scheme.
+fn update_state_gpu_input_cache_counters(
+    state: &AppState,
+    update: impl FnOnce(&mut GpuInputCacheCounters),
+) {
+    update(&mut state.gpu_input_cache_counters.lock().unwrap());
+}
+
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct PreGpuImageIdentity {
+pub struct PixelBufferRevision {
     pub source_revision: u64,
     pub stage_revision: u64,
-    pub pixel_fingerprint: u64,
+    pub construction_generation: u64,
+    pub content_generation: u64,
+    pub precision_abi: u32,
+    pub revision_abi: u32,
+}
+
+/// Published pre-GPU pixels. The image is only exposed through shared access, so changing its
+/// semantic content requires constructing another value with another revision.
+#[derive(Clone)]
+pub struct RevisionedImage {
+    image: Arc<DynamicImage>,
+    pixels: PixelBufferRevision,
+}
+
+impl RevisionedImage {
+    pub fn new(image: Arc<DynamicImage>, pixels: PixelBufferRevision) -> Self {
+        Self { image, pixels }
+    }
+
+    pub fn shared_image(&self) -> Arc<DynamicImage> {
+        Arc::clone(&self.image)
+    }
+
+    pub fn pixels(&self) -> PixelBufferRevision {
+        self.pixels
+    }
+}
+
+impl PixelBufferRevision {
+    pub fn combine_generations(generations: &[u64]) -> u64 {
+        stable_revision_hash(&generations)
+    }
+
+    pub fn constructed(
+        source_revision: u64,
+        stage_revision: u64,
+        content_generation: u64,
+        width: u32,
+        height: u32,
+        color: image::ColorType,
+    ) -> Self {
+        let construction_generation = stable_revision_hash(&(
+            source_revision,
+            stage_revision,
+            content_generation,
+            width,
+            height,
+            color,
+            PIXEL_BUFFER_REVISION_ABI_V1,
+        ));
+        PIXEL_REVISION_CONSTRUCTIONS.fetch_add(1, Ordering::Relaxed);
+        Self {
+            source_revision,
+            stage_revision,
+            construction_generation,
+            content_generation,
+            precision_abi: PRE_GPU_PRECISION_ABI_RGBA16F_V1,
+            revision_abi: PIXEL_BUFFER_REVISION_ABI_V1,
+        }
+    }
+
+    /// Derive a revision at the boundary where a semantic pixel transform publishes a new
+    /// immutable buffer. No-op stages must preserve `self` instead of calling this method.
+    pub fn transformed(
+        self,
+        stage_generation: u64,
+        content_generation: u64,
+        image: &DynamicImage,
+    ) -> Self {
+        Self::constructed(
+            self.source_revision,
+            stable_revision_hash(&[
+                self.construction_generation,
+                self.stage_revision,
+                stage_generation,
+            ]),
+            stable_revision_hash(&[
+                self.content_generation,
+                content_generation,
+                stage_generation,
+            ]),
+            image.width(),
+            image.height(),
+            image.color(),
+        )
+    }
+}
+
+/// O(1) identity of immutable finalized pixels uploaded to the GPU input texture.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct PreGpuImageIdentity {
+    pub pixels: PixelBufferRevision,
     pub width: u32,
     pub height: u32,
-    pub precision_abi: u32,
 }
 
 impl PreGpuImageIdentity {
     pub fn source_revision(source: &str) -> u64 {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
-
-        let mut hasher = DefaultHasher::new();
-        source.hash(&mut hasher);
-        hasher.finish()
+        crate::render::artifact_identity::source_fingerprint_for_path(source)
     }
 
+    #[cfg(test)]
+    pub fn for_test_source(base_image: &DynamicImage, source: &str) -> Self {
+        Self::for_stage(base_image, Self::source_revision(source), 0, 0)
+    }
+
+    #[cfg(test)]
     pub fn for_source(base_image: &DynamicImage, source: &str) -> Self {
-        Self::from_image(base_image, Self::source_revision(source), 0)
+        Self::for_test_source(base_image, source)
     }
 
-    pub fn from_image(
+    pub fn for_stage(
         base_image: &DynamicImage,
         source_revision: u64,
         stage_revision: u64,
+        content_generation: u64,
     ) -> Self {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
-
         let (width, height) = base_image.dimensions();
-        let mut hasher = DefaultHasher::new();
-        base_image.color().hash(&mut hasher);
-        base_image.as_bytes().hash(&mut hasher);
-        Self {
-            source_revision,
-            stage_revision,
-            pixel_fingerprint: hasher.finish(),
+        Self::from_revision(
+            base_image,
+            PixelBufferRevision::constructed(
+                source_revision,
+                stage_revision,
+                content_generation,
+                width,
+                height,
+                base_image.color(),
+            ),
+        )
+    }
+
+    pub fn from_revision(base_image: &DynamicImage, pixels: PixelBufferRevision) -> Self {
+        let (width, height) = base_image.dimensions();
+        let identity = Self {
+            pixels,
             width,
             height,
-            precision_abi: PRE_GPU_PRECISION_ABI_RGBA16F_V1,
+        };
+        verify_pixel_revision(base_image, identity);
+        identity
+    }
+}
+
+fn stable_revision_hash(value: &impl Hash) -> u64 {
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    value.hash(&mut hasher);
+    hasher.finish()
+}
+
+static PIXEL_REVISION_VERIFICATION: OnceLock<
+    Mutex<std::collections::HashMap<PixelBufferRevision, u64>>,
+> = OnceLock::new();
+static PIXEL_REVISION_VERIFY_MODE: OnceLock<String> = OnceLock::new();
+static PIXEL_REVISION_VERIFY_CALLS: AtomicU64 = AtomicU64::new(0);
+static PIXEL_REVISION_VERIFY_BYTES: AtomicU64 = AtomicU64::new(0);
+static PIXEL_REVISION_VERIFY_MICROS: AtomicU64 = AtomicU64::new(0);
+static PIXEL_REVISION_DISAGREEMENTS: AtomicU64 = AtomicU64::new(0);
+static PIXEL_REVISION_CONSTRUCTIONS: AtomicU64 = AtomicU64::new(0);
+
+fn verify_pixel_revision(image: &DynamicImage, identity: PreGpuImageIdentity) {
+    let mode = PIXEL_REVISION_VERIFY_MODE
+        .get_or_init(|| std::env::var("RAPIDRAW_PIXEL_REVISION_VERIFY").unwrap_or_default());
+    verify_pixel_revision_mode(image, identity, mode.as_str());
+}
+
+fn verify_pixel_revision_mode(
+    image: &DynamicImage,
+    identity: PreGpuImageIdentity,
+    mode: &str,
+) -> Option<u64> {
+    if mode.is_empty() || mode == "off" {
+        return None;
+    }
+    let started = Instant::now();
+    let bytes = image.as_bytes();
+    let (digest, bytes_read) = if mode == "sampled" {
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        let budget = bytes.len().min(4096);
+        if budget > 0 {
+            for index in [0, bytes.len() / 2, bytes.len() - 1]
+                .into_iter()
+                .take(budget.min(3))
+            {
+                bytes[index].hash(&mut hasher);
+            }
+            let mut sample = identity.pixels.construction_generation ^ 0x9e37_79b9_7f4a_7c15;
+            for _ in budget.min(3)..budget {
+                sample ^= sample << 13;
+                sample ^= sample >> 7;
+                sample ^= sample << 17;
+                bytes[sample as usize % bytes.len()].hash(&mut hasher);
+            }
+        }
+        (hasher.finish(), budget as u64)
+    } else {
+        (stable_revision_hash(&bytes), bytes.len() as u64)
+    };
+    PIXEL_REVISION_VERIFY_CALLS.fetch_add(1, Ordering::Relaxed);
+    PIXEL_REVISION_VERIFY_BYTES.fetch_add(bytes_read, Ordering::Relaxed);
+    PIXEL_REVISION_VERIFY_MICROS.fetch_add(started.elapsed().as_micros() as u64, Ordering::Relaxed);
+    if mode == "dual-run" || mode == "full" {
+        let previous = PIXEL_REVISION_VERIFICATION
+            .get_or_init(|| Mutex::new(std::collections::HashMap::new()))
+            .lock()
+            .unwrap()
+            .insert(identity.pixels, digest);
+        if mode == "dual-run" && previous.is_some_and(|previous| previous != digest) {
+            PIXEL_REVISION_DISAGREEMENTS.fetch_add(1, Ordering::Relaxed);
+            panic!(
+                "pixel revision contract disagreement for {:?}",
+                identity.pixels
+            );
         }
     }
+    Some(bytes_read)
 }
 
 #[cfg(all(test, feature = "tauri-test"))]
@@ -1440,9 +1617,9 @@ impl GpuProcessor {
             return;
         }
         let analysis_identity = HazeAnalysisIdentityV1::new(
-            identity.source_revision,
-            identity.pixel_fingerprint,
-            identity.stage_revision,
+            identity.pixels.source_revision,
+            identity.pixels.construction_generation,
+            identity.pixels.stage_revision,
             identity.width,
             identity.height,
         );
@@ -2438,12 +2615,16 @@ mod blur_pass_tests {
             processor_generation: 1,
             device_generation: 2,
             input_identity: PreGpuImageIdentity {
-                source_revision: 3,
-                stage_revision: 4,
-                pixel_fingerprint: 5,
+                pixels: PixelBufferRevision {
+                    source_revision: 3,
+                    stage_revision: 4,
+                    construction_generation: 5,
+                    content_generation: 6,
+                    precision_abi: PRE_GPU_PRECISION_ABI_RGBA16F_V1,
+                    revision_abi: PIXEL_BUFFER_REVISION_ABI_V1,
+                },
                 width: 1920,
                 height: 1080,
-                precision_abi: PRE_GPU_PRECISION_ABI_RGBA16F_V1,
             },
             input_width: 1920,
             input_height: 1080,
@@ -2676,28 +2857,249 @@ mod blur_pass_tests {
     }
 
     #[test]
-    fn pre_gpu_identity_tracks_source_stage_pixels_dimensions_and_precision() {
+    fn pre_gpu_identity_tracks_construction_revision_dimensions_and_precision() {
         use image::{ImageBuffer, Rgba};
 
         let image = DynamicImage::ImageRgba8(ImageBuffer::from_pixel(4, 3, Rgba([1, 2, 3, 4])));
-        let baseline = PreGpuImageIdentity::from_image(&image, 10, 20);
-        assert_eq!(baseline, PreGpuImageIdentity::from_image(&image, 10, 20));
-        assert_ne!(baseline, PreGpuImageIdentity::from_image(&image, 11, 20));
-        assert_ne!(baseline, PreGpuImageIdentity::from_image(&image, 10, 21));
+        let baseline = PreGpuImageIdentity::for_stage(&image, 10, 20, 30);
+        assert_eq!(baseline, PreGpuImageIdentity::for_stage(&image, 10, 20, 30));
+        assert_ne!(baseline, PreGpuImageIdentity::for_stage(&image, 11, 20, 30));
+        assert_ne!(baseline, PreGpuImageIdentity::for_stage(&image, 10, 21, 30));
+        assert_ne!(baseline, PreGpuImageIdentity::for_stage(&image, 10, 20, 31));
 
-        let changed_pixel =
-            DynamicImage::ImageRgba8(ImageBuffer::from_pixel(4, 3, Rgba([2, 2, 3, 4])));
         let changed_dimensions =
             DynamicImage::ImageRgba8(ImageBuffer::from_pixel(5, 3, Rgba([1, 2, 3, 4])));
         assert_ne!(
             baseline,
-            PreGpuImageIdentity::from_image(&changed_pixel, 10, 20)
+            PreGpuImageIdentity::for_stage(&changed_dimensions, 10, 20, 30)
         );
+        let changed_format =
+            DynamicImage::ImageRgba16(ImageBuffer::from_pixel(4, 3, Rgba([1_u16, 2, 3, 4])));
         assert_ne!(
             baseline,
-            PreGpuImageIdentity::from_image(&changed_dimensions, 10, 20)
+            PreGpuImageIdentity::for_stage(&changed_format, 10, 20, 30)
         );
-        assert_eq!(baseline.precision_abi, PRE_GPU_PRECISION_ABI_RGBA16F_V1);
+        assert_eq!(
+            baseline.pixels.precision_abi,
+            PRE_GPU_PRECISION_ABI_RGBA16F_V1
+        );
+    }
+
+    #[test]
+    fn published_revisioned_pixels_are_immutable_across_copy_on_write() {
+        use image::{ImageBuffer, Rgba};
+
+        let image = Arc::new(DynamicImage::ImageRgba8(ImageBuffer::from_pixel(
+            2,
+            2,
+            Rgba([1, 2, 3, 4]),
+        )));
+        let pixels = PixelBufferRevision::constructed(1, 2, 3, 2, 2, image.color());
+        let published = RevisionedImage::new(image, pixels);
+        let mut detached = published.shared_image();
+        Arc::make_mut(&mut detached)
+            .as_mut_rgba8()
+            .unwrap()
+            .put_pixel(0, 0, Rgba([9, 8, 7, 6]));
+
+        assert_eq!(
+            published.shared_image().to_rgba8().get_pixel(0, 0).0,
+            [1, 2, 3, 4]
+        );
+        assert_eq!(published.pixels(), pixels);
+        assert_ne!(detached.to_rgba8().get_pixel(0, 0).0, [1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn dual_run_verifier_detects_reused_revision_with_different_pixels() {
+        use image::{ImageBuffer, Rgba};
+
+        let first = DynamicImage::ImageRgba8(ImageBuffer::from_pixel(4, 3, Rgba([1, 2, 3, 4])));
+        let second = DynamicImage::ImageRgba8(ImageBuffer::from_pixel(4, 3, Rgba([9, 2, 3, 4])));
+        let identity = PreGpuImageIdentity::for_stage(&first, 91, 92, 93);
+        assert_eq!(
+            verify_pixel_revision_mode(&first, identity, "dual-run"),
+            Some(48)
+        );
+        let before = gpu_input_cache_counters().revision_disagreements;
+        assert!(
+            std::panic::catch_unwind(|| {
+                verify_pixel_revision_mode(&second, identity, "dual-run");
+            })
+            .is_err()
+        );
+        assert!(gpu_input_cache_counters().revision_disagreements > before);
+    }
+
+    #[test]
+    fn sampled_verifier_reads_a_bounded_sparse_subset() {
+        use image::{ImageBuffer, Rgba};
+
+        let image = DynamicImage::ImageRgba8(ImageBuffer::from_pixel(4096, 16, Rgba([1, 2, 3, 4])));
+        let identity = PreGpuImageIdentity::for_stage(&image, 81, 82, 83);
+        assert_eq!(
+            verify_pixel_revision_mode(&image, identity, "sampled"),
+            Some(4096)
+        );
+    }
+
+    #[test]
+    fn construction_identity_accepts_large_dimensions_without_pixel_storage() {
+        let mut last = None;
+        for stage in 0..1000 {
+            last = Some(PixelBufferRevision::constructed(
+                1,
+                stage,
+                stage,
+                11_648,
+                8_736,
+                image::ColorType::Rgba32F,
+            ));
+        }
+        assert_eq!(last.unwrap().stage_revision, 999);
+    }
+
+    #[test]
+    fn randomized_stage_sequences_never_alias_different_reference_pixels() {
+        let mut reference = std::collections::HashMap::new();
+        let mut seed = 0x1234_5678_9abc_def0_u64;
+        for _ in 0..512 {
+            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+            let source = seed;
+            seed = seed.rotate_left(17).wrapping_add(0x9e37_79b9);
+            let geometry = seed;
+            seed = seed.rotate_left(11).wrapping_add(0x85eb_ca6b);
+            let detail = seed;
+            seed = seed.rotate_left(7).wrapping_add(0xc2b2_ae35);
+            let retouch = seed;
+            let stage = PixelBufferRevision::combine_generations(&[geometry, detail]);
+            let content = PixelBufferRevision::combine_generations(&[retouch, detail]);
+            let revision = PixelBufferRevision::constructed(
+                source,
+                stage,
+                content,
+                64,
+                48,
+                image::ColorType::Rgba32F,
+            );
+            let reference_pixels = stable_revision_hash(&(source, geometry, detail, retouch));
+            assert!(
+                reference
+                    .insert(revision, reference_pixels)
+                    .is_none_or(|previous| previous == reference_pixels)
+            );
+
+            let gpu_only_exposure = seed as f32 / u64::MAX as f32;
+            assert!(gpu_only_exposure.is_finite());
+            let same_revision = PixelBufferRevision::constructed(
+                source,
+                stage,
+                content,
+                64,
+                48,
+                image::ColorType::Rgba32F,
+            );
+            assert_eq!(same_revision, revision);
+        }
+    }
+
+    #[test]
+    fn disabled_verifier_reads_zero_pixel_bytes() {
+        use image::{ImageBuffer, Rgba};
+
+        let image = DynamicImage::ImageRgba8(ImageBuffer::from_pixel(32, 24, Rgba([1, 2, 3, 4])));
+        for generation in 0..1000 {
+            let identity = PreGpuImageIdentity::for_stage(&image, 1, generation, generation);
+            assert_eq!(verify_pixel_revision_mode(&image, identity, "off"), None);
+        }
+    }
+
+    #[test]
+    fn state_scoped_input_counters_ignore_concurrent_unrelated_gpu_activity() {
+        let primary = Arc::new(AppState::new());
+        let unrelated = Arc::new(AppState::new());
+        let primary_worker = Arc::clone(&primary);
+        let unrelated_worker = Arc::clone(&unrelated);
+        let primary_thread = std::thread::spawn(move || {
+            for _ in 0..1_000 {
+                update_state_gpu_input_cache_counters(&primary_worker, |counters| {
+                    counters.hits += 1;
+                });
+            }
+        });
+        let unrelated_thread = std::thread::spawn(move || {
+            for _ in 0..2_000 {
+                update_state_gpu_input_cache_counters(&unrelated_worker, |counters| {
+                    counters.hits += 1;
+                    counters.to_rgba_f16_calls += 1;
+                });
+            }
+        });
+        primary_thread.join().unwrap();
+        unrelated_thread.join().unwrap();
+
+        let primary = gpu_input_cache_counters_for_state(&primary);
+        let unrelated = gpu_input_cache_counters_for_state(&unrelated);
+        assert_eq!(primary.hits, 1_000);
+        assert_eq!(primary.to_rgba_f16_calls, 0);
+        assert_eq!(unrelated.hits, 2_000);
+        assert_eq!(unrelated.to_rgba_f16_calls, 2_000);
+    }
+
+    #[test]
+    fn no_op_preserves_revision_and_semantic_transform_derives_a_new_one() {
+        use image::{ImageBuffer, Rgba};
+
+        let image = DynamicImage::ImageRgba8(ImageBuffer::from_pixel(4, 3, Rgba([1, 2, 3, 4])));
+        let original = PixelBufferRevision::constructed(10, 20, 30, 4, 3, image.color());
+        let no_op = original;
+        assert_eq!(no_op, original);
+
+        let transformed = original.transformed(40, 50, &image);
+        assert_ne!(transformed, original);
+        assert_eq!(transformed.source_revision, original.source_revision);
+        assert_ne!(transformed.stage_revision, original.stage_revision);
+        assert_ne!(transformed.content_generation, original.content_generation);
+    }
+
+    #[test]
+    #[ignore = "explicit large-buffer identity latency proof"]
+    fn construction_revision_latency_is_constant_across_preview_sizes() {
+        for (label, width, height) in [
+            ("1080p", 1920_u32, 1080_u32),
+            ("4k", 3840, 2160),
+            ("8k", 7680, 4320),
+            ("45mp", 8256, 5504),
+            ("100mp", 11_648, 8_736),
+        ] {
+            let bytes = vec![7_u8; width as usize * height as usize];
+            let full_started = Instant::now();
+            let full_digest = stable_revision_hash(&bytes);
+            let full_elapsed = full_started.elapsed();
+            let revision_started = Instant::now();
+            let mut revision = None;
+            for generation in 0..1000 {
+                revision = Some(PixelBufferRevision::constructed(
+                    1,
+                    generation,
+                    generation,
+                    width,
+                    height,
+                    image::ColorType::Rgba32F,
+                ));
+            }
+            let revision_elapsed = revision_started.elapsed();
+            assert_ne!(full_digest, 0);
+            assert_eq!(revision.unwrap().content_generation, 999);
+            assert!(
+                revision_elapsed < full_elapsed,
+                "1,000 O(1) revisions must beat one conservative one-byte-per-pixel full scan"
+            );
+            eprintln!(
+                "pixel identity benchmark {label}: bytes={} full_hash={full_elapsed:?} o1_1000={revision_elapsed:?}",
+                bytes.len()
+            );
+        }
     }
 
     #[test]
@@ -2827,7 +3229,10 @@ mod blur_pass_tests {
             },
             BlurSurfaceKey {
                 input_identity: PreGpuImageIdentity {
-                    stage_revision: 9,
+                    pixels: PixelBufferRevision {
+                        stage_revision: 9,
+                        ..key.input_identity.pixels
+                    },
                     ..key.input_identity
                 },
                 ..key
@@ -3616,7 +4021,7 @@ mod blur_pass_tests {
                     &context,
                     &state,
                     &source,
-                    PreGpuImageIdentity::for_source(&source, "blur_pass_parity"),
+                    PreGpuImageIdentity::for_test_source(&source, "blur_pass_parity"),
                     RenderRequest {
                         adjustments,
                         mask_bitmaps: &[],
@@ -3765,7 +4170,7 @@ mod blur_pass_tests {
                 &context,
                 &state,
                 &source,
-                PreGpuImageIdentity::for_source(&source, "rapid_view_parity"),
+                PreGpuImageIdentity::for_test_source(&source, "rapid_view_parity"),
                 RenderRequest {
                     adjustments,
                     mask_bitmaps: &[],
@@ -3933,12 +4338,11 @@ mod blur_pass_tests {
 
     #[cfg(feature = "tauri-test")]
     #[test]
-    fn one_hundred_warm_edits_reuse_input_upload_and_blur_surface() {
+    fn one_thousand_warm_edits_reuse_input_upload_and_blur_surface() {
         use image::{ImageBuffer, Rgba};
         use tauri::Manager;
 
         let _test_guard = acquire_gpu_test_lock();
-        reset_gpu_input_cache_counters();
         let source = DynamicImage::ImageRgba32F(ImageBuffer::from_pixel(
             16,
             16,
@@ -3951,12 +4355,15 @@ mod blur_pass_tests {
         let state = app.state::<AppState>();
         let context = get_or_init_compute_gpu_context_for_tests(&state)
             .expect("compute-only GPU context initializes");
-        let identity = PreGpuImageIdentity::for_source(&source, "exposure_reuse");
-        for index in 0..100 {
+        let identity = PreGpuImageIdentity::for_test_source(&source, "exposure_reuse");
+        let mut exposure_zero_reference = None;
+        let mut frame_times = Vec::with_capacity(1000);
+        for index in 0..1000 {
             let mut adjustments = AllAdjustments::default();
-            adjustments.global.exposure = index as f32 / 100.0;
+            adjustments.global.exposure = (index % 100) as f32 / 100.0;
             adjustments.global.clarity = 0.25;
-            process_and_get_dynamic_image(
+            let started = Instant::now();
+            let output = process_and_get_dynamic_image(
                 &context,
                 &state,
                 &source,
@@ -3971,14 +4378,24 @@ mod blur_pass_tests {
                 "exposure_reuse",
             )
             .expect("GPU render succeeds");
+            frame_times.push(started.elapsed());
+            if index == 0 {
+                exposure_zero_reference = Some(output.to_rgba16().into_raw());
+            } else if index == 900 {
+                assert_eq!(
+                    output.to_rgba16().into_raw(),
+                    *exposure_zero_reference.as_ref().unwrap(),
+                    "same GPU-only exposure after 900 cache hits changed output"
+                );
+            }
         }
 
-        let counters = gpu_input_cache_counters();
+        let counters = gpu_input_cache_counters_for_state(&state);
         assert_eq!(counters.to_rgba_f16_calls, 1);
         assert_eq!(counters.texture_allocations, 1);
         assert_eq!(counters.view_allocations, 1);
         assert_eq!(counters.misses, 1);
-        assert_eq!(counters.hits, 99);
+        assert_eq!(counters.hits, 999);
         assert_eq!(counters.uploaded_bytes, 16 * 16 * 8);
         let processor = state.gpu_processor.lock().unwrap();
         let blur = processor
@@ -3990,9 +4407,98 @@ mod blur_pass_tests {
             .unwrap()
             .totals;
         assert_eq!(blur.cache_misses, 1);
-        assert_eq!(blur.cache_hits, 99);
+        assert_eq!(blur.cache_hits, 999);
         assert_eq!(blur.dispatches, 2);
-        assert_eq!(blur.submissions, 100);
+        assert_eq!(blur.submissions, 1000);
+        let cold = frame_times[0];
+        frame_times[1..].sort_unstable();
+        let warm_median = frame_times[1 + frame_times[1..].len() / 2];
+        assert!(warm_median < cold);
+        eprintln!(
+            "immutable revision GPU proof: cold={cold:?} warm_median={warm_median:?} hits={}",
+            counters.hits
+        );
+    }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
+    fn private_raw_revision_reuses_gpu_upload_when_enabled() {
+        if std::env::var("RAWENGINE_RUN_PRIVATE_PIXEL_REVISION_GPU_PROOF").as_deref() != Ok("1") {
+            return;
+        }
+        use tauri::Manager;
+
+        let _test_guard = acquire_gpu_test_lock();
+        let source_path = std::env::var("RAWENGINE_PRIVATE_RAW_SOURCE")
+            .expect("RAWENGINE_PRIVATE_RAW_SOURCE must select a private RAW");
+        let bytes = std::fs::read(&source_path).expect("read private RAW bytes");
+        let decoded = crate::load_base_image_from_bytes(
+            &bytes,
+            &source_path,
+            false,
+            &crate::AppSettings::default(),
+            None,
+        )
+        .expect("decode private RAW");
+        let preview = crate::downscale_f32_image(&decoded, 256, 256);
+        let revision = PixelBufferRevision::constructed(
+            PreGpuImageIdentity::source_revision(&source_path),
+            stable_revision_hash(&("private-raw-preview", preview.dimensions())),
+            1,
+            preview.width(),
+            preview.height(),
+            preview.color(),
+        );
+        let identity = PreGpuImageIdentity::from_revision(&preview, revision);
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock Tauri app builds");
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state)
+            .expect("compute-only GPU context initializes");
+        let render = |exposure| {
+            let mut adjustments = AllAdjustments::default();
+            adjustments.global.exposure = exposure;
+            process_and_get_dynamic_image(
+                &context,
+                &state,
+                &preview,
+                identity,
+                RenderRequest {
+                    adjustments,
+                    mask_bitmaps: &[],
+                    lut: None,
+                    roi: None,
+                    edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
+                },
+                "private_raw_pixel_revision",
+            )
+            .expect("private RAW GPU render succeeds")
+        };
+        let first = render(0.0).to_rgba16().into_raw();
+        let changed = render(0.75).to_rgba16().into_raw();
+        let repeated = render(0.0).to_rgba16().into_raw();
+        let counters = gpu_input_cache_counters_for_state(&state);
+
+        assert_ne!(first, changed);
+        assert_eq!(first, repeated);
+        assert_eq!(counters.misses, 1);
+        assert_eq!(counters.hits, 2);
+        assert_eq!(counters.to_rgba_f16_calls, 1);
+        assert_eq!(counters.legacy_full_hash_calls, 0);
+        assert_eq!(counters.legacy_full_hash_bytes, 0);
+        assert_eq!(counters.revision_verification_bytes, 0);
+        eprintln!(
+            "private_raw_pixel_revision_gpu_proof decoded={}x{} preview={}x{} hits={} misses={} uploaded_bytes={}",
+            decoded.width(),
+            decoded.height(),
+            preview.width(),
+            preview.height(),
+            counters.hits,
+            counters.misses,
+            counters.uploaded_bytes,
+        );
     }
 
     #[cfg(feature = "tauri-test")]
@@ -4014,7 +4520,7 @@ mod blur_pass_tests {
         let state = app.state::<AppState>();
         let context = get_or_init_compute_gpu_context_for_tests(&state)
             .expect("compute-only GPU context initializes");
-        let identity = PreGpuImageIdentity::for_source(&source, "technical_white_balance");
+        let identity = PreGpuImageIdentity::for_test_source(&source, "technical_white_balance");
         let render = |adjustments| {
             process_and_get_unclamped_dynamic_image(
                 &context,
@@ -4094,7 +4600,7 @@ mod blur_pass_tests {
         let state = app.state::<AppState>();
         let context = get_or_init_compute_gpu_context_for_tests(&state)
             .expect("compute-only GPU context initializes");
-        let identity = PreGpuImageIdentity::for_source(&source, "resource_reuse");
+        let identity = PreGpuImageIdentity::for_test_source(&source, "resource_reuse");
         let render = |exposure| {
             let mut adjustments = AllAdjustments::default();
             adjustments.global.exposure = exposure;
@@ -4160,7 +4666,7 @@ mod blur_pass_tests {
         let state = app.state::<AppState>();
         let context = get_or_init_compute_gpu_context_for_tests(&state)
             .expect("compute-only GPU context initializes");
-        let identity = PreGpuImageIdentity::for_source(&source, "partial_mask_upload");
+        let identity = PreGpuImageIdentity::for_test_source(&source, "partial_mask_upload");
         let mut adjustments = AllAdjustments::default();
         adjustments.mask_count = 2;
         adjustments.mask_adjustments[0].exposure = 0.75;
@@ -4418,10 +4924,19 @@ fn process_and_get_dynamic_image_inner(
     if let Some(cache) = state.gpu_image_cache.lock().unwrap().as_ref() {
         if cache.device_generation != device_generation {
             INPUT_DEVICE_MISSES.fetch_add(1, Ordering::Relaxed);
+            update_state_gpu_input_cache_counters(state, |counters| {
+                counters.device_misses += 1;
+            });
         } else if cache.width != width || cache.height != height {
             INPUT_DIMENSION_MISSES.fetch_add(1, Ordering::Relaxed);
+            update_state_gpu_input_cache_counters(state, |counters| {
+                counters.dimension_misses += 1;
+            });
         } else if cache.pre_gpu_identity != pre_gpu_identity {
             INPUT_IDENTITY_MISSES.fetch_add(1, Ordering::Relaxed);
+            update_state_gpu_input_cache_counters(state, |counters| {
+                counters.identity_misses += 1;
+            });
         }
     }
     RenderCaches::new(state).clear_stale_gpu_image_cache(
@@ -4441,6 +4956,12 @@ fn process_and_get_dynamic_image_inner(
         let rgba32f_temporary_bytes = u64::from(width) * u64::from(height) * 4 * 4;
         CONVERTED_BYTES.fetch_add(rgba32f_temporary_bytes + upload_bytes, Ordering::Relaxed);
         UPLOADED_BYTES.fetch_add(upload_bytes, Ordering::Relaxed);
+        update_state_gpu_input_cache_counters(state, |counters| {
+            counters.misses += 1;
+            counters.to_rgba_f16_calls += 1;
+            counters.converted_bytes += rgba32f_temporary_bytes + upload_bytes;
+            counters.uploaded_bytes += upload_bytes;
+        });
         let texture_size = wgpu::Extent3d {
             width,
             height,
@@ -4464,6 +4985,10 @@ fn process_and_get_dynamic_image_inner(
         INPUT_TEXTURE_ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
         let texture_view = texture.create_view(&Default::default());
         INPUT_VIEW_ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
+        update_state_gpu_input_cache_counters(state, |counters| {
+            counters.texture_allocations += 1;
+            counters.view_allocations += 1;
+        });
 
         *cache_lock = Some(GpuImageCache {
             texture,
@@ -4475,6 +5000,9 @@ fn process_and_get_dynamic_image_inner(
         });
     } else {
         INPUT_CACHE_HITS.fetch_add(1, Ordering::Relaxed);
+        update_state_gpu_input_cache_counters(state, |counters| {
+            counters.hits += 1;
+        });
     }
     log::debug!("GPU input cache counters: {:?}", gpu_input_cache_counters());
 
