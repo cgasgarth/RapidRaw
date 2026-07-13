@@ -111,6 +111,24 @@ export const applyColorParityWhiteBalance = (
   );
 };
 
+export const applyColorParityTechnicalWhiteBalance = (
+  inputValue: ColorParityVec3,
+  matrixRows: ReadonlyArray<ReadonlyArray<number>>,
+): ColorParityVec3 => {
+  const input = colorParityVec3Schema.parse(inputValue);
+  if (
+    matrixRows.length !== 3 ||
+    matrixRows.some((row) => row.length !== 3 || row.some((value) => !Number.isFinite(value)))
+  ) {
+    throw new Error('technical_white_balance_matrix_invalid');
+  }
+  return makeVec3(
+    (matrixRows[0]?.[0] ?? 0) * input[0] + (matrixRows[0]?.[1] ?? 0) * input[1] + (matrixRows[0]?.[2] ?? 0) * input[2],
+    (matrixRows[1]?.[0] ?? 0) * input[0] + (matrixRows[1]?.[1] ?? 0) * input[1] + (matrixRows[1]?.[2] ?? 0) * input[2],
+    (matrixRows[2]?.[0] ?? 0) * input[0] + (matrixRows[2]?.[1] ?? 0) * input[1] + (matrixRows[2]?.[2] ?? 0) * input[2],
+  );
+};
+
 export const applyColorParityLegacyTonemap = (inputValue: ColorParityVec3): ColorParityVec3 => {
   const input = colorParityVec3Schema.parse(inputValue);
   const tonemap = (channel: number) => {
