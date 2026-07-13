@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { isolatedGitEnvironment } from '../../scripts/lib/ci/git-environment';
 import {
+  boundedToolIdentity,
   classifyProcessTermination,
   freezeValidationSnapshot,
   nodeCacheKey,
@@ -211,6 +212,12 @@ describe('affected validation DAG', () => {
     expect((await freezeValidationSnapshot(root)).identity).toBe(initial.identity);
     await writeFile(join(root, 'source.ts'), 'export const source = 2;\n');
     expect((await freezeValidationSnapshot(root)).identity).not.toBe(initial.identity);
+  });
+
+  test('toolchain identity fails closed within a bounded probe budget', () => {
+    const startedAt = performance.now();
+    expect(boundedToolIdentity('stalled', ['/bin/sh', '-c', 'sleep 30'], 25)).toBe('stalled:timeout:');
+    expect(performance.now() - startedAt).toBeLessThan(500);
   });
 
   test('shared producer artifact is generated once and reused by its consumer', async () => {
