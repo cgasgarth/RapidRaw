@@ -5,3 +5,4 @@ pub(crate) mod gpu_display;
 pub(crate) mod gpu_processing;
 pub(crate) mod gpu_readback;
 pub(crate) mod gpu_textures;
+pub(crate) mod pipeline_registry;

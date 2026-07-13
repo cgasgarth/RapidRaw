@@ -139,6 +139,10 @@ mod tests {
         {
             required_features |= wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES;
         }
+        if adapter.features().contains(wgpu::Features::PIPELINE_CACHE) {
+            required_features |= wgpu::Features::PIPELINE_CACHE;
+        }
+        let adapter_info = adapter.get_info();
         let limits = adapter.limits();
         let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
             label: Some("Color GPU Readback Probe Test Device"),
@@ -152,11 +156,21 @@ mod tests {
 
         let device = Arc::new(device);
         let queue = Arc::new(queue);
+        let pipeline_registry = crate::gpu::pipeline_registry::GpuPipelineRegistry::new(
+            1,
+            &device,
+            &adapter_info,
+            required_features,
+            &limits,
+            &std::env::temp_dir().join("rapidraw-color-probe-gpu-pipelines"),
+        );
+        pipeline_registry.start_core_warmup_async(Arc::clone(&device));
         Ok(GpuContext {
             generation: 1,
             device: Arc::clone(&device),
             queue: Arc::clone(&queue),
             limits,
+            pipeline_registry,
             presentation: Arc::new(crate::gpu_display::WgpuPresentationScheduler::new(
                 None, device, queue,
             )),

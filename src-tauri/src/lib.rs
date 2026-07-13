@@ -861,6 +861,18 @@ fn get_wgpu_presentation_report(
         .map(|context| context.presentation.report())
 }
 
+#[tauri::command]
+fn get_gpu_pipeline_report(
+    state: tauri::State<'_, AppState>,
+) -> Option<gpu::pipeline_registry::GpuPipelineReport> {
+    state
+        .gpu_context
+        .lock()
+        .unwrap()
+        .as_ref()
+        .map(|context| context.pipeline_registry.report())
+}
+
 fn start_analytics_worker(app_handle: tauri::AppHandle) {
     let state = app_handle.state::<AppState>();
     let scheduler = analytics_scheduler::AnalyticsScheduler::new();
@@ -3977,6 +3989,7 @@ pub fn run() {
             flush_wgpu_presentation,
             get_wgpu_presentation_report,
             app::display_target::get_display_target_report,
+            get_gpu_pipeline_report,
             android_integration::resolve_android_content_uri_name,
             cache_utils::clear_session_caches,
             cache_utils::clear_image_caches,

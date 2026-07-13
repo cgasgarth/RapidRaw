@@ -13,6 +13,8 @@ use half::f16;
 
 #[cfg(target_os = "windows")]
 use crate::display_profile::build_srgb_to_active_display_lut_for_app;
+#[cfg(target_os = "windows")]
+use crate::gpu::pipeline_registry::GpuPipelineRegistry;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
@@ -726,6 +728,7 @@ pub(crate) fn create_wgpu_display(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
     window: &tauri::WebviewWindow,
+    pipeline_registry: &Arc<GpuPipelineRegistry>,
 ) -> WgpuDisplay {
     let swapchain_caps = surface.get_capabilities(adapter);
     let swapchain_format = swapchain_caps
@@ -823,6 +826,7 @@ pub(crate) fn create_wgpu_display(
         immediate_size: 0,
     });
 
+    let pipeline_started = Instant::now();
     let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: Some("Display Pipeline"),
         layout: Some(&pipeline_layout),
@@ -849,8 +853,10 @@ pub(crate) fn create_wgpu_display(
         depth_stencil: None,
         multisample: wgpu::MultisampleState::default(),
         multiview_mask: NonZero::new(0),
-        cache: None,
+        cache: pipeline_registry.pipeline_cache(),
     });
+    pipeline_registry.record_pipeline_creation("Display Pipeline", pipeline_started.elapsed());
+    pipeline_registry.persist_after_pipeline_update();
 
     let transform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("Transform Buffer"),
