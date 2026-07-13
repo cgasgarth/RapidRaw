@@ -736,6 +736,9 @@ pub struct RenderRequest<'a> {
     pub mask_bitmaps: &'a [ImageBuffer<Luma<u8>, Vec<u8>>],
     pub lut: Option<Arc<Lut>>,
     pub roi: Option<Roi>,
+    /// Canonical plan contract. `None` is reserved for compatibility callers
+    /// that have not yet migrated to `CompiledRenderPlan`.
+    pub edit_graph: Option<Arc<crate::edit_graph::CompiledEditGraph>>,
 }
 
 struct InputTextureRef<'a> {
@@ -1514,6 +1517,11 @@ impl GpuProcessor {
             .map_or(&self.dummy_lut_view, |entry| &entry.view);
 
         let mut adjustments = request.adjustments;
+        if let Some(edit_graph) = request.edit_graph.as_deref() {
+            edit_graph
+                .validate_gpu_execution(request.lut.is_some(), request.mask_bitmaps.len())
+                .map_err(str::to_owned)?;
+        }
         let graph = compile_gpu_render_graph(
             &adjustments,
             request.lut.is_some(),
@@ -2394,6 +2402,68 @@ mod blur_pass_tests {
 
     #[cfg(feature = "tauri-test")]
     #[test]
+    fn compiled_edit_graph_contract_executes_on_the_real_gpu_path() {
+        use image::{DynamicImage, GenericImageView, ImageBuffer, Rgba};
+        use serde_json::json;
+        use tauri::Manager;
+
+        let _test_guard = GPU_TEST_LOCK.lock().unwrap();
+        let source = DynamicImage::ImageRgba32F(ImageBuffer::from_pixel(
+            8,
+            8,
+            Rgba([0.18, 0.24, 0.36, 1.0]),
+        ));
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock Tauri app builds");
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state)
+            .expect("compute-only GPU context initializes");
+        let adjustments = json!({"rawEngineEditGraphVersion": 1, "exposure": 35});
+        let revision = crate::render_plan::content_revision(&adjustments, 1, 2, 3);
+        let plan = crate::render_plan::compile_render_plan(
+            &adjustments,
+            crate::render_plan::CompileRenderPlanContext {
+                revision,
+                is_raw: false,
+                tonemapper_override: None,
+            },
+            None,
+        )
+        .expect("typed edit graph compiles");
+
+        let rendered = process_and_get_dynamic_image(
+            &context,
+            &state,
+            &source,
+            PreGpuImageIdentity::for_source(&source, "compiled_edit_graph_gpu"),
+            RenderRequest {
+                adjustments: plan.adjustments,
+                mask_bitmaps: &[],
+                lut: None,
+                roi: None,
+                edit_graph: Some(Arc::clone(&plan.edit_graph)),
+            },
+            "compiled_edit_graph_gpu",
+        )
+        .expect("real GPU executor accepts the compiled graph contract");
+
+        assert_eq!(rendered.dimensions(), source.dimensions());
+        assert_ne!(
+            rendered.to_rgba16().into_raw(),
+            source.to_rgba16().into_raw()
+        );
+        assert!(
+            plan.edit_graph
+                .receipt
+                .ordered_node_ids
+                .contains(&"legacy_gpu_scene_view_pass")
+        );
+    }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
     fn selective_blurs_match_the_always_blur_gpu_path() {
         use image::{DynamicImage, ImageBuffer, Rgba};
         use tauri::Manager;
@@ -2447,6 +2517,7 @@ mod blur_pass_tests {
                         mask_bitmaps: &[],
                         lut: None,
                         roi: None,
+                        edit_graph: None,
                     },
                     "blur_pass_parity",
                 )
@@ -2512,6 +2583,7 @@ mod blur_pass_tests {
                     mask_bitmaps: &[],
                     lut: None,
                     roi: None,
+                    edit_graph: None,
                 },
                 "exposure_reuse",
             )
@@ -2581,6 +2653,7 @@ mod blur_pass_tests {
                     mask_bitmaps: std::slice::from_ref(&mask),
                     lut: Some(lut.clone()),
                     roi: None,
+                    edit_graph: None,
                 },
                 "resource_reuse",
             )
@@ -2648,6 +2721,7 @@ mod blur_pass_tests {
                     mask_bitmaps: masks,
                     lut: None,
                     roi: None,
+                    edit_graph: None,
                 },
                 "partial_mask_upload",
             )

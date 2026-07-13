@@ -17,6 +17,7 @@ use serde_json::Value;
 
 use crate::adjustments::abi::AllAdjustments;
 use crate::adjustments::parse::get_all_adjustments_from_json_with_masks;
+use crate::edit_graph::{CompiledEditGraph, EditGraphCompileInputs};
 use crate::film_look_render::normalize_film_look_adjustments_for_render;
 use crate::geometry::{Crop, GeometryParams, get_geometry_params_from_json};
 use crate::lut_processing::Lut;
@@ -25,6 +26,18 @@ use crate::mask_generation::MaskDefinition;
 const PLAN_SCHEMA_VERSION: u32 = 1;
 const FINGERPRINT_VERSION: u32 = 1;
 const MAX_CACHED_PLANS: usize = 24;
+const DETAIL_FIELDS: &[&str] = &[
+    "sharpness",
+    "sharpnessThreshold",
+    "lumaNoiseReduction",
+    "colorNoiseReduction",
+    "clarity",
+    "dehaze",
+    "structure",
+    "centré",
+    "chromaticAberrationRedCyan",
+    "chromaticAberrationBlueYellow",
+];
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct RenderPlanRevision {
@@ -54,6 +67,7 @@ pub struct CompiledRenderPlan {
     pub crop: Option<Crop>,
     pub masks: Arc<[MaskDefinition]>,
     pub lut: Option<Arc<Lut>>,
+    pub edit_graph: Arc<CompiledEditGraph>,
     pub fingerprints: StageFingerprints,
     /// Compatibility input for transformation and patch executors not yet typed.
     pub effective_json: Arc<Value>,
@@ -187,6 +201,35 @@ pub fn compile_render_plan(
     }
     validate_finite(raw, "$")?;
     let effective = normalize_film_look_adjustments_for_render(raw).into_owned();
+    let pipeline_version = match effective.get("rawEngineEditGraphVersion") {
+        None => crate::edit_graph::LEGACY_PIPELINE_VERSION,
+        Some(Value::Number(version)) => {
+            u32::try_from(version.as_u64().ok_or_else(|| RenderPlanError {
+                code: "render_plan.invalid_edit_graph_version",
+                field: "rawEngineEditGraphVersion",
+                message: "edit graph version must be an unsigned integer".into(),
+            })?)
+            .map_err(|_| RenderPlanError {
+                code: "render_plan.invalid_edit_graph_version",
+                field: "rawEngineEditGraphVersion",
+                message: "edit graph version exceeds u32".into(),
+            })?
+        }
+        Some(_) => {
+            return Err(RenderPlanError {
+                code: "render_plan.invalid_edit_graph_version",
+                field: "rawEngineEditGraphVersion",
+                message: "edit graph version must be an unsigned integer".into(),
+            });
+        }
+    };
+    if pipeline_version != crate::edit_graph::LEGACY_PIPELINE_VERSION {
+        return Err(RenderPlanError {
+            code: "render_plan.unsupported_edit_graph_version",
+            field: "rawEngineEditGraphVersion",
+            message: format!("unsupported edit graph version {pipeline_version}"),
+        });
+    }
     let masks = match effective.get("masks") {
         Some(value) => {
             Vec::<MaskDefinition>::deserialize(value).map_err(|error| RenderPlanError {
@@ -224,7 +267,7 @@ pub fn compile_render_plan(
         &masks,
     );
     let geometry = get_geometry_params_from_json(&effective);
-    let fingerprints = fingerprints(
+    let mut fingerprints = fingerprints(
         context.revision.source_revision,
         &effective,
         &adjustments,
@@ -233,6 +276,46 @@ pub fn compile_render_plan(
         &masks,
         lut.as_deref(),
     );
+    let neutral_json = Value::Object(serde_json::Map::new());
+    let neutral_adjustments = get_all_adjustments_from_json_with_masks(
+        &neutral_json,
+        context.is_raw,
+        context.tonemapper_override,
+        &[],
+    );
+    let neutral_detail = hash_selected(&neutral_json, DETAIL_FIELDS);
+    let default_geometry = GeometryParams::default();
+    let has_geometry = geometry_bytes(&geometry, crop) != geometry_bytes(&default_geometry, None);
+    let has_retouch = effective
+        .get("aiPatches")
+        .and_then(Value::as_array)
+        .is_some_and(|patches| !patches.is_empty());
+    let edit_graph = Arc::new(CompiledEditGraph::compile(EditGraphCompileInputs {
+        pipeline_version,
+        source_fingerprint: fingerprints.source,
+        geometry_fingerprint: fingerprints.geometry,
+        retouch_fingerprint: fingerprints.retouch,
+        detail_fingerprint: fingerprints.detail,
+        color_fingerprint: fingerprints.color,
+        output_fingerprint: fingerprints.output,
+        adjustments: &adjustments,
+        neutral_adjustments: &neutral_adjustments,
+        has_geometry_or_retouch: has_geometry || has_retouch,
+        has_detail: fingerprints.detail != neutral_detail,
+        has_masks: !masks.is_empty(),
+        has_lut: lut.is_some(),
+        show_clipping: adjustments.global.show_clipping != 0,
+    }));
+    fingerprints.full = edit_graph.fingerprint;
+    log::debug!(
+        "compiled_edit_graph schema={} pipeline={} fingerprint={:016x} nodes={:?} omitted={:?} fused={:?}",
+        edit_graph.schema_version,
+        edit_graph.pipeline_version,
+        edit_graph.fingerprint,
+        edit_graph.nodes,
+        edit_graph.receipt.omitted_no_op_node_ids,
+        edit_graph.receipt.fused_gpu_groups,
+    );
     Ok(CompiledRenderPlan {
         revision: context.revision,
         adjustments,
@@ -240,6 +323,7 @@ pub fn compile_render_plan(
         crop,
         masks: masks.into(),
         lut,
+        edit_graph,
         fingerprints,
         effective_json: Arc::new(effective),
         compile_time: started.elapsed(),
@@ -282,21 +366,7 @@ fn fingerprints(
     ]);
     let masks_fingerprint = hash_json(effective.get("masks").unwrap_or(&Value::Null));
     let retouch = hash_json(effective.get("aiPatches").unwrap_or(&Value::Null));
-    let detail = hash_selected(
-        effective,
-        &[
-            "sharpness",
-            "sharpnessThreshold",
-            "lumaNoiseReduction",
-            "colorNoiseReduction",
-            "clarity",
-            "dehaze",
-            "structure",
-            "centré",
-            "chromaticAberrationRedCyan",
-            "chromaticAberrationBlueYellow",
-        ],
-    );
+    let detail = hash_selected(effective, DETAIL_FIELDS);
     let mut color_hasher = blake3::Hasher::new();
     color_hasher.update(b"color");
     color_hasher.update(&FINGERPRINT_VERSION.to_le_bytes());
@@ -540,6 +610,77 @@ mod tests {
         let clipping =
             compile_render_plan(&json!({"showClipping":true}), context(6), None).unwrap();
         assert_ne!(base.fingerprints.output, clipping.fingerprints.output);
+    }
+
+    #[test]
+    fn compiled_edit_graph_omits_neutral_nodes_and_executes_active_legacy_fusion() {
+        let neutral = compile_render_plan(&json!({}), context(70), None).unwrap();
+        assert_eq!(neutral.edit_graph.pipeline_version, 1);
+        assert_eq!(
+            neutral.edit_graph.receipt.input_domain.contract_id(),
+            "acescg_scene_linear_extended_v1"
+        );
+        assert_eq!(
+            neutral.edit_graph.receipt.ordered_node_ids.as_ref(),
+            [
+                "camera_input_boundary",
+                "legacy_gpu_scene_view_pass",
+                "render_transport"
+            ]
+        );
+
+        let active = compile_render_plan(
+            &json!({
+                "rawEngineEditGraphVersion": 1,
+                "exposure": 20,
+                "masks": [{
+                    "id":"m1", "name":"Local", "visible":true, "invert":false,
+                    "opacity":100, "blendMode":"normal", "adjustments":{"contrast":15},
+                    "subMasks":[]
+                }]
+            }),
+            context(71),
+            None,
+        )
+        .unwrap();
+        assert!(
+            active
+                .edit_graph
+                .receipt
+                .ordered_node_ids
+                .contains(&"legacy_gpu_scene_view_pass")
+        );
+        active
+            .edit_graph
+            .validate_gpu_execution(false, active.masks.len())
+            .unwrap();
+        assert_eq!(active.fingerprints.full, active.edit_graph.fingerprint);
+        assert_ne!(
+            neutral.edit_graph.fingerprint,
+            active.edit_graph.fingerprint
+        );
+    }
+
+    #[test]
+    fn persisted_edit_graph_version_defaults_to_legacy_and_fails_closed() {
+        let implicit = compile_render_plan(&json!({"exposure": 10}), context(72), None).unwrap();
+        let explicit = compile_render_plan(
+            &json!({"exposure": 10, "rawEngineEditGraphVersion": 1}),
+            context(73),
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            implicit.edit_graph.fingerprint,
+            explicit.edit_graph.fingerprint
+        );
+        assert_eq!(explicit.effective_json["rawEngineEditGraphVersion"], 1);
+
+        let error =
+            compile_render_plan(&json!({"rawEngineEditGraphVersion": 2}), context(74), None)
+                .err()
+                .unwrap();
+        assert_eq!(error.code, "render_plan.unsupported_edit_graph_version");
     }
 
     #[test]

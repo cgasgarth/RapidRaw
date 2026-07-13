@@ -1266,6 +1266,7 @@ fn generate_thumbnail_data_with_target(
                 mask_bitmaps: &mask_bitmaps,
                 lut: render_plan.lut.clone(),
                 roi: None,
+                edit_graph: Some(Arc::clone(&render_plan.edit_graph)),
             },
             "generate_thumbnail_data",
         ) {

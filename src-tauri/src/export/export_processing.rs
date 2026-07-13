@@ -964,6 +964,7 @@ pub(crate) fn prepare_export_masks<'a>(
 struct ExportRenderInputs {
     adjustments: AllAdjustments,
     lut: Option<Arc<crate::lut_processing::Lut>>,
+    edit_graph: Arc<crate::edit_graph::CompiledEditGraph>,
     unique_hash: u64,
 }
 
@@ -1018,6 +1019,7 @@ fn prepare_export_render_inputs(
     Ok(ExportRenderInputs {
         adjustments,
         lut: plan.lut.clone(),
+        edit_graph: Arc::clone(&plan.edit_graph),
         unique_hash,
     })
 }
@@ -1093,6 +1095,7 @@ pub(crate) fn process_image_for_export_pipeline_with_tonemapper_override(
             mask_bitmaps,
             lut: render_inputs.lut,
             roi: None,
+            edit_graph: Some(render_inputs.edit_graph),
         },
         debug_tag,
     )
@@ -1471,6 +1474,7 @@ fn export_masks_for_image(
                     mask_bitmaps: &single_bitmaps,
                     lut: lut.clone(),
                     roi: None,
+                    edit_graph: None,
                 },
                 "export_mask_image",
             )?;
@@ -1591,6 +1595,7 @@ fn export_adjustments_as_lut(
             mask_bitmaps: &[],
             lut,
             roi: None,
+            edit_graph: None,
         },
         "export_lut",
     )?;
@@ -3368,6 +3373,7 @@ pub async fn estimate_export_sizes(
                 mask_bitmaps: &mask_bitmaps,
                 lut: render_inputs.lut,
                 roi: None,
+                edit_graph: Some(render_inputs.edit_graph),
             },
             "estimate_export_size",
         )?;
@@ -3516,6 +3522,7 @@ pub async fn estimate_export_sizes(
                 mask_bitmaps: &mask_bitmaps,
                 lut: render_inputs.lut,
                 roi: None,
+                edit_graph: Some(render_inputs.edit_graph),
             },
             "estimate_batch_export_size",
         )?;
