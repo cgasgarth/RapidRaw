@@ -77,6 +77,7 @@ export enum Invokes {
   GetImageDimensions = 'get_image_dimensions',
   GetImageOpenDiagnostics = 'get_image_open_diagnostics',
   IsOriginalFileAvailable = 'is_original_file_available',
+  ResolveOriginalSourceIdentity = 'resolve_original_source_identity',
   GetFolderTree = 'get_folder_tree',
   GetFolderChildren = 'get_folder_children',
   GetFolderRefreshSnapshot = 'get_folder_refresh_snapshot',

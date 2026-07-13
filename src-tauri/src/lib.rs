@@ -782,6 +782,14 @@ fn is_original_file_available(path: String) -> bool {
 }
 
 #[tauri::command]
+fn resolve_original_source_identity(
+    path: String,
+) -> Result<crate::io::reference_source_identity::ReferenceSourceIdentity, String> {
+    let (source_path, _) = parse_virtual_path(&path);
+    crate::io::reference_source_identity::resolve_reference_source_identity(&source_path)
+}
+
+#[tauri::command]
 fn cancel_thumbnail_generation(
     state: tauri::State<AppState>,
     app_handle: tauri::AppHandle,
@@ -4044,6 +4052,7 @@ pub fn run() {
             get_image_dimensions,
             analyze_perspective_correction,
             is_original_file_available,
+            resolve_original_source_identity,
             frontend_ready,
             get_startup_trace,
             record_frontend_startup_phase,
