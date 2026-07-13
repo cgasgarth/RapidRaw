@@ -445,7 +445,6 @@ jobs:
         working-directory: src-tauri
         env:
           LEAF_CRATES: ${{ needs.native-feedback-classify.outputs.leaf_crates }}
-          RUSTFLAGS: -Cprefer-dynamic
         run: |
           jq -r '.[]' <<< "$LEAF_CRATES" | while read -r crate; do
             cargo test --locked --profile rapid-dev-fast -p "$crate"
@@ -485,8 +484,6 @@ jobs:
       - name: Test root native library
         if: needs.native-feedback-classify.outputs.core_required == 'true'
         working-directory: src-tauri
-        env:
-          RUSTFLAGS: -Cprefer-dynamic
         run: cargo test --locked --lib --profile rapid-dev-fast --no-default-features --features required-ci,tauri-test
 
       - name: Record core skip

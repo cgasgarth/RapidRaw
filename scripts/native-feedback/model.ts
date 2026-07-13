@@ -13,6 +13,16 @@ export const nativeFeedbackProfileSchema = z.object({
 
 export type NativeFeedbackProfile = z.infer<typeof nativeFeedbackProfileSchema>;
 
+export const resolveNativeFeedbackProfileForPlatform = (
+  profile: NativeFeedbackProfile,
+  platform: NodeJS.Platform,
+): NativeFeedbackProfile => ({
+  ...profile,
+  // The dynamic variant is benchmark-proven on macOS. Hosted Linux test
+  // binaries must stay self-contained so the harness can start reliably.
+  rustFlags: platform === 'darwin' ? profile.rustFlags : [],
+});
+
 export const nativeFeedbackProfiles: readonly NativeFeedbackProfile[] = [
   {
     id: 'dev-baseline',

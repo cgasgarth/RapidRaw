@@ -12,6 +12,7 @@ import {
   nativeFeedbackProfiles,
   nativeFeedbackReceiptSchema,
   nativeFeedbackSampleSchema,
+  resolveNativeFeedbackProfileForPlatform,
 } from './model';
 import { createNativeCiPartitionPlan } from './planner';
 import { writeNativeFeedbackReceipt } from './receipt-io';
@@ -27,7 +28,7 @@ const values = (flag: string): string[] =>
 const profile = (id: string | undefined): NativeFeedbackProfile => {
   const selected = nativeFeedbackProfiles.find((candidate) => candidate.id === id);
   if (selected === undefined) throw new Error(`Unknown native feedback profile: ${id ?? '<missing>'}`);
-  return selected;
+  return resolveNativeFeedbackProfileForPlatform(selected, process.platform);
 };
 
 if (args[0] === 'profiles') {

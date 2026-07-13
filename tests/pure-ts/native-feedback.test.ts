@@ -8,6 +8,7 @@ import {
   type NativeFeedbackProfile,
   type NativeFeedbackSample,
   nativeFeedbackProfiles,
+  resolveNativeFeedbackProfileForPlatform,
 } from '../../scripts/native-feedback/model';
 import { createNativeCiPartitionPlan } from '../../scripts/native-feedback/planner';
 import { writeNativeFeedbackReceipt } from '../../scripts/native-feedback/receipt-io';
@@ -33,6 +34,14 @@ const plannerIdentity = {
   rustc: identity.rustc,
   environment: 'darwin-arm64',
 };
+
+describe('native feedback platform profile', () => {
+  test('keeps prefer-dynamic on the measured macOS host but removes it from Linux executables', () => {
+    expect(resolveNativeFeedbackProfileForPlatform(fast, 'darwin').rustFlags).toEqual(['-Cprefer-dynamic']);
+    expect(resolveNativeFeedbackProfileForPlatform(fast, 'linux').rustFlags).toEqual([]);
+    expect(resolveNativeFeedbackProfileForPlatform(baselineProfile, 'darwin').rustFlags).toEqual([]);
+  });
+});
 
 describe('native feedback CI partition planner', () => {
   test('skips native work for unrelated commit changes', () => {
