@@ -168,6 +168,14 @@
       "preset": "Vorgabe",
       "previewMode": "",
       "profileTone": {
+        "browser": {
+          "builtIn": "Built-in",
+          "compatibleOnly": "Compatible with this camera",
+          "importDcp": "Import DCP…",
+          "noMatches": "No matching profiles",
+          "registryError": "Profile registry: {{errorCode}}",
+          "scanning": "Scanning profiles…"
+        },
         "cameraProfile": "Kameraprofil",
         "cameraProfiles": {
           "camera_landscape": "Landschaft",
@@ -1527,6 +1535,7 @@
         "status": {
           "fallback": "Fallback",
           "interpolated": "Interpolated",
+          "selected_dcp": "Selected DCP",
           "single_illuminant": "Single illuminant",
           "unavailable": "Unavailable"
         },

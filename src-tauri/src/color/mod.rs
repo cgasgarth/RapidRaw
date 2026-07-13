@@ -4,6 +4,7 @@ pub(crate) mod auto_adjust;
 #[cfg(test)]
 mod backend_differential_tests;
 pub(crate) mod camera_input_transform;
+pub(crate) mod camera_profile;
 #[cfg(test)]
 pub(crate) mod controlled_profiles;
 #[cfg(test)]

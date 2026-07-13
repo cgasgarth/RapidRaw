@@ -46,9 +46,8 @@ function validateUpload(value: Step, retention: number): void {
 }
 
 const baseline = workflow('lint.yml');
-const fast = job(baseline, 'color-lab-fast');
-if (!job(baseline, 'pr-ci-required').needs?.includes('color-lab-fast')) {
-  throw new Error('PR CI / required must depend on color-lab-fast');
+if (job(baseline, 'pr-ci-required').needs?.includes('color-lab-reference')) {
+  throw new Error('the standards lab must remain deferred from the four-minute PR gate');
 }
 const graphInputs = [
   'src-tauri/Cargo.toml',
@@ -59,34 +58,29 @@ const graphInputs = [
   'src-tauri/src/export',
   'src-tauri/crates/rapidraw-color-reference',
 ];
-includesAll(step(fast, 'Compute affected color graph identity').run, graphInputs, 'fast graph identity');
+const reference = job(workflow('main-long-validation.yml'), 'color-lab-reference');
+includesAll(step(reference, 'Compute color graph identity').run, graphInputs, 'color graph identity');
 includesAll(
-  step(fast, 'Restore content-addressed color lab cache').with?.key?.toString(),
+  step(reference, 'Restore content-addressed color lab cache').with?.key?.toString(),
   ['color-lab-v1-', 'graph_fingerprint'],
-  'fast cache key',
+  'color cache key',
 );
 includesAll(
-  step(fast, 'Execute affected color lab').run,
+  step(reference, 'Execute standards reference lab').run,
   [
+    'github.event_name }}" == "push"',
     'run --affected',
     '--cache "$RUNNER_TEMP/color-lab-cache"',
     '.tier == "fast"',
     '.cache == "miss" or .cache == "hit"',
     '.cache_identity.graph_fingerprint == $graph',
+    'run --full --no-cache',
+    '.tier == "full"',
+    '.cache == "bypassed"',
   ],
-  'fast color lab',
+  'main color lab',
 );
-validateUpload(step(fast, 'Upload affected color lab reports'), 14);
-
-const full = job(workflow('main-long-validation.yml'), 'color-lab-full');
-includesAll(full.if, ["github.event_name == 'schedule'", "github.event_name == 'workflow_dispatch'"], 'full trigger');
-includesAll(
-  step(full, 'Execute full color lab without cache').run,
-  ['run --full --no-cache', '.tier == "full"', '.cache == "bypassed"'],
-  'full color lab',
-);
-includesAll(step(full, 'Execute full color lab without cache').run, graphInputs, 'full graph identity');
-validateUpload(step(full, 'Upload full color lab reports'), 30);
+validateUpload(step(reference, 'Upload color lab reports'), 30);
 
 const hardwareWorkflow = workflow('color-lab-hardware.yml');
 if (

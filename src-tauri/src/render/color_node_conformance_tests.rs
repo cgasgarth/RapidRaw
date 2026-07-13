@@ -11,8 +11,8 @@ use super::render_plan::color_fingerprint_for_test;
 use crate::AppState;
 use crate::adjustments::abi::{AllAdjustments, GlobalAdjustments, MAX_MASKS, MaskAdjustments};
 use crate::gpu_processing::{
-    PreGpuImageIdentity, RenderRequest, Roi, get_or_init_compute_gpu_context_for_tests,
-    process_and_get_unclamped_dynamic_image,
+    EditGraphExecutionAuthority, PreGpuImageIdentity, RenderRequest, Roi,
+    get_or_init_compute_gpu_context_for_tests, process_and_get_unclamped_dynamic_image,
 };
 use crate::lut_processing::Lut;
 use crate::mixer_render::apply_native_color_mixer_adjustments;
@@ -339,6 +339,7 @@ fn production_cpu_and_wgpu_nodes_execute_identity_and_non_default_vectors() {
             mask_bitmaps: &[],
             lut: None,
             roi: None,
+            edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
         },
         "color_node_registry_identity",
     )
@@ -353,6 +354,7 @@ fn production_cpu_and_wgpu_nodes_execute_identity_and_non_default_vectors() {
             mask_bitmaps: &[],
             lut: None,
             roi: None,
+            edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
         },
         "color_node_registry_identity_repeat",
     )
@@ -397,6 +399,7 @@ fn production_cpu_and_wgpu_nodes_execute_identity_and_non_default_vectors() {
                         mask_bitmaps: masks,
                         lut,
                         roi: None,
+                        edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
                     },
                     contract.id,
                 )
@@ -473,6 +476,7 @@ fn production_wgpu_nodes_satisfy_metamorphic_color_properties() {
                 mask_bitmaps: masks,
                 lut: None,
                 roi,
+                edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
             },
             label,
         )
@@ -632,9 +636,11 @@ fn global_abi_coverage_tripwire(global: GlobalAdjustments) {
         tint,
         vibrance,
         hue,
-        _pad_color1,
+        edit_graph_version,
         _pad_color2,
         _pad_color3,
+        _pad_color4,
+        technical_white_balance,
         sharpness,
         luma_noise_reduction,
         color_noise_reduction,
@@ -664,8 +670,14 @@ fn global_abi_coverage_tripwire(global: GlobalAdjustments) {
         _pad_agx1,
         _pad_agx2,
         _pad_agx3,
+        _pad_wgsl_agx_align1,
+        _pad_wgsl_agx_align2,
+        _pad_wgsl_agx_align3,
         agx_pipe_to_rendering_matrix,
         agx_rendering_to_pipe_matrix,
+        rapid_view_parameters0,
+        rapid_view_parameters1,
+        rapid_view_parameters2,
         _pad_cg1,
         _pad_cg2,
         _pad_cg3,
@@ -714,9 +726,11 @@ fn global_abi_coverage_tripwire(global: GlobalAdjustments) {
         tint,
         vibrance,
         hue,
-        _pad_color1,
+        edit_graph_version,
         _pad_color2,
         _pad_color3,
+        _pad_color4,
+        technical_white_balance,
         sharpness,
         luma_noise_reduction,
         color_noise_reduction,
@@ -746,8 +760,14 @@ fn global_abi_coverage_tripwire(global: GlobalAdjustments) {
         _pad_agx1,
         _pad_agx2,
         _pad_agx3,
+        _pad_wgsl_agx_align1,
+        _pad_wgsl_agx_align2,
+        _pad_wgsl_agx_align3,
         agx_pipe_to_rendering_matrix,
         agx_rendering_to_pipe_matrix,
+        rapid_view_parameters0,
+        rapid_view_parameters1,
+        rapid_view_parameters2,
         _pad_cg1,
         _pad_cg2,
         _pad_cg3,
@@ -893,9 +913,9 @@ fn all_adjustments_abi_coverage_tripwire(all: AllAdjustments) {
         tile_offset_y,
         mask_atlas_cols,
         blur_pass_flags,
-        _pad_blur_flags1,
-        _pad_blur_flags2,
-        _pad_blur_flags3,
+        execution_phase,
+        source_width,
+        source_height,
     } = all;
     global_abi_coverage_tripwire(global);
     mask_abi_coverage_tripwire(mask_adjustments[0]);
@@ -906,8 +926,8 @@ fn all_adjustments_abi_coverage_tripwire(all: AllAdjustments) {
         tile_offset_y,
         mask_atlas_cols,
         blur_pass_flags,
-        _pad_blur_flags1,
-        _pad_blur_flags2,
-        _pad_blur_flags3,
+        execution_phase,
+        source_width,
+        source_height,
     );
 }

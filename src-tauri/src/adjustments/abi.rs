@@ -166,7 +166,7 @@ pub struct GlobalAdjustments {
     pub tint: f32,
     pub vibrance: f32,
     pub hue: f32,
-    pub(crate) _pad_color1: f32,
+    pub edit_graph_version: f32,
     pub(crate) _pad_color2: f32,
     pub(crate) _pad_color3: f32,
     pub(crate) _pad_color4: f32,
@@ -307,9 +307,9 @@ pub struct AllAdjustments {
     pub tile_offset_y: u32,
     pub mask_atlas_cols: u32,
     pub blur_pass_flags: u32,
-    pub(crate) _pad_blur_flags1: u32,
-    pub(crate) _pad_blur_flags2: u32,
-    pub(crate) _pad_blur_flags3: u32,
+    pub(crate) execution_phase: u32,
+    pub(crate) source_width: u32,
+    pub(crate) source_height: u32,
 }
 
 #[cfg(test)]

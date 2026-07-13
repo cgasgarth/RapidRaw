@@ -153,6 +153,7 @@ pub struct RawProcessingProfileKey {
     pub highlight_compression_bits: u32,
     pub color_nr_bits: u32,
     pub sharpening_bits: [u32; 4],
+    pub technical_plan_fingerprint: String,
     pub camera_profile_resolver_version: &'static str,
     pub reconstruction_version: &'static str,
     pub demosaic_plan_version: &'static str,
