@@ -726,6 +726,7 @@ pub(crate) fn create_wgpu_display(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
     window: &tauri::WebviewWindow,
+    pipeline_cache: Option<&wgpu::PipelineCache>,
 ) -> WgpuDisplay {
     let swapchain_caps = surface.get_capabilities(adapter);
     let swapchain_format = swapchain_caps
@@ -849,7 +850,7 @@ pub(crate) fn create_wgpu_display(
         depth_stencil: None,
         multisample: wgpu::MultisampleState::default(),
         multiview_mask: NonZero::new(0),
-        cache: None,
+        cache: pipeline_cache,
     });
 
     let transform_buffer = device.create_buffer(&wgpu::BufferDescriptor {

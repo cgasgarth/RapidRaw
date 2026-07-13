@@ -593,6 +593,7 @@ pub struct GpuContext {
     pub device: Arc<wgpu::Device>,
     pub queue: Arc<wgpu::Queue>,
     pub limits: wgpu::Limits,
+    pub pipeline_registry: Arc<crate::gpu::pipeline_registry::GpuPipelineRegistry>,
     pub presentation: Arc<WgpuPresentationScheduler>,
 }
 

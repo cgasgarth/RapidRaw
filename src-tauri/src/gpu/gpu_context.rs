@@ -1,12 +1,12 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-#[cfg(target_os = "windows")]
 use tauri::Manager;
 
 use crate::AppState;
 #[cfg(target_os = "windows")]
 use crate::app_settings;
+use crate::gpu::pipeline_registry::GpuPipelineRegistry;
 #[cfg(not(target_os = "windows"))]
 use crate::gpu_display::WgpuPresentationScheduler;
 #[cfg(target_os = "windows")]
@@ -95,7 +95,11 @@ pub fn get_or_init_gpu_context(
     {
         required_features |= wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES;
     }
+    if adapter.features().contains(wgpu::Features::PIPELINE_CACHE) {
+        required_features |= wgpu::Features::PIPELINE_CACHE;
+    }
 
+    let adapter_info = adapter.get_info();
     let limits = adapter.limits();
 
     let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
@@ -117,13 +121,35 @@ pub fn get_or_init_gpu_context(
         let _ = std::fs::remove_file(p);
     }
 
+    let generation = NEXT_DEVICE_GENERATION.fetch_add(1, Ordering::Relaxed);
+    let cache_root = _app_handle
+        .path()
+        .app_cache_dir()
+        .unwrap_or_else(|_| std::env::temp_dir().join("RapidRaw"))
+        .join("gpu-pipelines");
+    let pipeline_registry = GpuPipelineRegistry::new(
+        generation,
+        &device,
+        &adapter_info,
+        required_features,
+        &limits,
+        &cache_root,
+    );
+
     #[cfg(target_os = "windows")]
     let display_opt = surface_opt.map(|surface| {
         let window = app_handle
             .get_webview_window("main")
             .expect("main window should exist for WGPU display initialization");
 
-        create_wgpu_display(surface, &adapter, &device, &queue, &window)
+        create_wgpu_display(
+            surface,
+            &adapter,
+            &device,
+            &queue,
+            &window,
+            pipeline_registry.pipeline_cache(),
+        )
     });
 
     #[cfg(not(target_os = "windows"))]
@@ -131,13 +157,15 @@ pub fn get_or_init_gpu_context(
 
     let device = Arc::new(device);
     let queue = Arc::new(queue);
+    pipeline_registry.start_core_warmup_async(Arc::clone(&device));
     let presentation =
         WgpuPresentationScheduler::new(display_opt, Arc::clone(&device), Arc::clone(&queue));
     let new_context = GpuContext {
-        generation: NEXT_DEVICE_GENERATION.fetch_add(1, Ordering::Relaxed),
+        generation,
         device,
         queue,
         limits,
+        pipeline_registry,
         presentation: Arc::new(presentation),
     };
     *context_lock = Some(new_context.clone());
@@ -173,6 +201,10 @@ pub fn get_or_init_compute_gpu_context_for_tests(
     {
         required_features |= wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES;
     }
+    if adapter.features().contains(wgpu::Features::PIPELINE_CACHE) {
+        required_features |= wgpu::Features::PIPELINE_CACHE;
+    }
+    let adapter_info = adapter.get_info();
     let limits = adapter.limits();
     let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
         label: Some("Processing Device"),
@@ -186,11 +218,22 @@ pub fn get_or_init_compute_gpu_context_for_tests(
 
     let device = Arc::new(device);
     let queue = Arc::new(queue);
+    let generation = NEXT_DEVICE_GENERATION.fetch_add(1, Ordering::Relaxed);
+    let pipeline_registry = GpuPipelineRegistry::new(
+        generation,
+        &device,
+        &adapter_info,
+        required_features,
+        &limits,
+        &std::env::temp_dir().join("rapidraw-test-gpu-pipelines"),
+    );
+    pipeline_registry.start_core_warmup_async(Arc::clone(&device));
     let new_context = GpuContext {
-        generation: NEXT_DEVICE_GENERATION.fetch_add(1, Ordering::Relaxed),
+        generation,
         device: Arc::clone(&device),
         queue: Arc::clone(&queue),
         limits,
+        pipeline_registry,
         presentation: Arc::new(WgpuPresentationScheduler::new(None, device, queue)),
     };
     *context_lock = Some(new_context.clone());
