@@ -39,6 +39,16 @@
       #startup-shell main { display: grid; grid-template-rows: 52px 1fr; }
       #startup-shell header { border-bottom: 1px solid #272b34; padding: 17px 20px; }
       #startup-shell section { display: grid; place-items: center; color: #8e95a3; }
+      #startup-shell button {
+        background: #282d37;
+        border: 1px solid #3a404c;
+        border-radius: 7px;
+        color: #d9dce3;
+        cursor: pointer;
+        margin: 8px 4px 0;
+        padding: 8px 12px;
+      }
+      #startup-shell [role="alert"] { color: #f4b4b4; max-width: 420px; }
       html, body, #root { height: 100%; margin: 0; }
     </style>
   </head>
@@ -50,9 +60,18 @@
           <strong>RapidRAW</strong>
           <nav aria-label="Workspace"><span>Library</span><span>Albums</span><span>Folders</span></nav>
         </aside>
-        <main><header>Library</header><section>Loading your workspace…</section></main>
+        <main>
+          <header>Library</header>
+          <section>
+            <div id="startup-shell-content">
+              <p>Loading your workspace…</p>
+              <button id="startup-add-folder" type="button">Add Folder</button>
+              <button id="startup-settings" type="button">Settings</button>
+            </div>
+          </section>
+        </main>
       </div>
     </div>
-    <script type="module" src="/src/main.tsx"></script>
+    <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

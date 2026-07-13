@@ -44,6 +44,7 @@ export default defineConfig(async ({ command }) => ({
   envPrefix: ['VITE_', 'TAURI_ENV_*'],
   build: {
     cssMinify: 'esbuild',
+    manifest: true,
     minify: 'oxc',
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
     chunkSizeWarningLimit: getViteChunkSizeWarningLimitKb(),
@@ -65,8 +66,8 @@ function browserTauriHarnessDevPlugin(command) {
       ].join('\n');
 
       return html.replace(
-        '    <script type="module" src="/src/main.tsx"></script>',
-        [harnessScript, '    <script type="module" src="/src/main.tsx"></script>'].join('\n'),
+        '    <script type="module" src="/src/main.ts"></script>',
+        [harnessScript, '    <script type="module" src="/src/main.ts"></script>'].join('\n'),
       );
     },
   };

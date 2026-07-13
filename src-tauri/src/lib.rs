@@ -83,7 +83,9 @@ use crate::merge::focus_stack::{
 };
 use crate::merge::hdr::{ALIGNMENT_POLICY_ID, HdrAlignmentPlanResponse, build_alignment_plan};
 
-use crate::app::startup::{FrontendStartupPhase, NativeStartupPhase, record_frontend_phase};
+use crate::app::startup::{
+    FrontendStartupPhase, NativeStartupPhase, record_frontend_phase_with_followup,
+};
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 use crate::app::startup::{
     InitializationPriority, request_gpu_initialization, request_lens_initialization,
@@ -2983,8 +2985,25 @@ fn record_frontend_startup_phase(
     status: String,
     detail: Option<String>,
     state: tauri::State<'_, AppState>,
+    _app: tauri::AppHandle,
 ) -> Result<crate::app::startup::StartupTraceSnapshot, String> {
-    record_frontend_phase(&state.startup_trace, &trace_id, phase, &status, detail)
+    record_frontend_phase_with_followup(
+        &state.startup_trace,
+        &trace_id,
+        phase,
+        &status,
+        detail,
+        |_snapshot| {
+            #[cfg(feature = "validation-harness")]
+            if phase == FrontendStartupPhase::Interactive
+                && std::env::var("RAWENGINE_STARTUP_BENCHMARK_EDITOR_DEMAND").as_deref() == Ok("1")
+            {
+                image_open_session::promote_editor_initialization(&_app);
+                request_lens_initialization(_app.clone(), InitializationPriority::IdleWarm);
+                request_gpu_initialization(_app, InitializationPriority::IdleWarm);
+            }
+        },
+    )
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -3210,18 +3229,6 @@ pub fn run() {
                 // GPU, Lensfun, catalog, and optional services warm only after
                 // the bootstrap WebView shell has been exposed.
                 let idle_services = app.handle().clone();
-                #[cfg(feature = "validation-harness")]
-                if std::env::var("RAWENGINE_STARTUP_BENCHMARK_EDITOR_DEMAND").as_deref() == Ok("1") {
-                    image_open_session::promote_editor_initialization(&idle_services);
-                    request_lens_initialization(
-                        idle_services.clone(),
-                        InitializationPriority::IdleWarm,
-                    );
-                    request_gpu_initialization(
-                        idle_services.clone(),
-                        InitializationPriority::IdleWarm,
-                    );
-                }
                 tauri::async_runtime::spawn(async move {
                     tokio::time::sleep(Duration::from_millis(1_500)).await;
                     request_lens_initialization(

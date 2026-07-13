@@ -452,11 +452,24 @@ pub fn record_frontend_phase(
     Ok(trace.snapshot())
 }
 
+pub fn record_frontend_phase_with_followup(
+    trace: &StartupTrace,
+    trace_id: &str,
+    phase: FrontendStartupPhase,
+    status: &str,
+    detail: Option<String>,
+    followup: impl FnOnce(&StartupTraceSnapshot),
+) -> Result<StartupTraceSnapshot, String> {
+    let snapshot = record_frontend_phase(trace, trace_id, phase, status, detail)?;
+    followup(&snapshot);
+    Ok(snapshot)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
         FIRST_PAINT_BUDGET_MS, FrontendStartupPhase, NativeStartupPhase, StartupTrace,
-        mark_deferred_service_result, record_frontend_phase,
+        mark_deferred_service_result, record_frontend_phase, record_frontend_phase_with_followup,
     };
     use std::sync::Arc;
     use std::sync::atomic::{AtomicU64, Ordering};
@@ -692,6 +705,41 @@ mod tests {
         assert!(!service.request(super::InitializationPriority::EditorDemand));
         assert_eq!(service.snapshot().state, super::InitializationState::Ready);
         assert_eq!(service.snapshot().starts, 1);
+    }
+
+    #[test]
+    fn interactive_receipt_precedes_nonblocking_editor_demand_followup() {
+        let trace = StartupTrace::new();
+        let service = super::InitializationService::default();
+        let trace_id = trace.trace_id().to_string();
+
+        let returned = record_frontend_phase_with_followup(
+            &trace,
+            &trace_id,
+            FrontendStartupPhase::Interactive,
+            "ok",
+            Some("static-shell-handlers-and-ipc-ready".to_string()),
+            |snapshot| {
+                assert_eq!(
+                    snapshot.phases.last().map(|receipt| receipt.phase),
+                    Some(NativeStartupPhase::FrontendInteractive)
+                );
+                assert!(service.request(super::InitializationPriority::EditorDemand));
+                assert!(!service.request(super::InitializationPriority::IdleWarm));
+            },
+        )
+        .unwrap();
+
+        assert_eq!(
+            returned.phases.last().map(|receipt| receipt.phase),
+            Some(NativeStartupPhase::FrontendInteractive)
+        );
+        let warming = service.snapshot();
+        assert_eq!(warming.starts, 1);
+        assert_eq!(warming.promotions, 0);
+        assert_eq!(warming.state, super::InitializationState::Warming);
+        service.finish(&Ok(()));
+        assert_eq!(service.snapshot().state, super::InitializationState::Ready);
     }
 
     #[test]

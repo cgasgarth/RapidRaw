@@ -258,7 +258,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          if jq -r '.filename' .macos-smoke-files.ndjson | grep -Eq '^([.]github/workflows/(lint|main-long-validation)[.]yml|scripts/benchmarks/startup-native[.]ts|src-tauri/src/(app/startup|lib)[.]rs|src/hooks/app/useAppInitialization[.]ts|src/utils/startup/startupTraceReporter[.]ts|src/validation/browserTauriHarness[.]mts|tests/(integration/checks/check-browser-tauri-harness|pure-ts/app/startup-trace-reporter[.]test)[.]ts)$'; then
+          if jq -r '.filename' .macos-smoke-files.ndjson | grep -Eq '^([.]github/workflows/(lint|main-long-validation)[.]yml|index[.]html|scripts/benchmarks/startup-native[.]ts|src-tauri/src/(app/startup|lib)[.]rs|src/(main|mainApp)[.](ts|tsx)|src/hooks/app/useAppInitialization[.]ts|src/product/startupBootstrap[.]ts|src/utils/startup/startupTraceReporter[.]ts|src/validation/browserTauriHarness[.]mts|tests/(integration/checks/(check-browser-tauri-harness|check-startup-entry)|pure-ts/app/startup-(shell-handoff|trace-reporter)[.]test)[.](ts|tsx))$'; then
             echo 'required=true' >> "$GITHUB_OUTPUT"
           else
             echo 'required=false' >> "$GITHUB_OUTPUT"

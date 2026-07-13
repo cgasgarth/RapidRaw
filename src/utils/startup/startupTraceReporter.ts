@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { z } from 'zod';
+import { beginStaticStartup } from '../../product/startupBootstrap';
 import { Invokes } from '../../tauri/commands';
 
 const startupPhaseSchema = z.enum([
@@ -55,6 +56,7 @@ export interface FrontendStartupReporter {
 
 export const createFrontendStartupReporter = (
   invokeCommand: InvokeCommand = invoke as InvokeCommand,
+  establishedTraceId?: () => Promise<string>,
 ): FrontendStartupReporter => {
   let traceIdPromise: Promise<string> | null = null;
 
@@ -77,6 +79,7 @@ export const createFrontendStartupReporter = (
   };
 
   const start = (): Promise<string> => {
+    if (establishedTraceId) return (traceIdPromise ??= establishedTraceId());
     traceIdPromise ??= invokeCommand<void>(Invokes.FrontendReady)
       .then(() => invokeCommand<unknown>(Invokes.GetStartupTrace))
       .then((value) => startupTraceSnapshotSchema.parse(value))
@@ -100,4 +103,4 @@ export const createFrontendStartupReporter = (
   };
 };
 
-export const frontendStartupReporter = createFrontendStartupReporter();
+export const frontendStartupReporter = createFrontendStartupReporter(invoke as InvokeCommand, beginStaticStartup);

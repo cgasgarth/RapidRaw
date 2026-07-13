@@ -74,10 +74,14 @@ const assertTrace = (run: StartupRun): void => {
     throw new Error(`${kind}: minimal settings were not loaded between process start and frontend hydration`);
   }
   const visibleAt = phase(snapshot, 'windowVisible').elapsedMs;
+  const interactiveAt = phase(snapshot, 'frontendInteractive').elapsedMs;
   for (const deferred of snapshot.phases.filter((entry) =>
     ['gpuReady', 'libraryServicesReady'].includes(entry.phase),
   )) {
     if (deferred.elapsedMs < visibleAt) throw new Error(`${kind}: ${deferred.phase} ran before WindowVisible`);
+    if (deferred.elapsedMs < interactiveAt) {
+      throw new Error(`${kind}: ${deferred.phase} completion gated the interactive shell receipt`);
+    }
   }
 
   if (kind === 'degraded') {
