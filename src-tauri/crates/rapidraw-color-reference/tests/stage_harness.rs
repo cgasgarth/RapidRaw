@@ -220,6 +220,33 @@ fn d50_xyz_stage_produces_typed_lab_without_hidden_clamps() {
 }
 
 #[test]
+fn d50_lab_inverse_stage_round_trips_extended_xyz() {
+    let source = [-0.01, 0.02, 0.1];
+    let forward = execute_reference_stage(&request(
+        ReferenceOperation::XyzD50ToLabV1,
+        vec![StageSample::Rgb(source)],
+    ))
+    .unwrap();
+    let StageSample::Lab(lab) = forward.output[0] else {
+        panic!("forward CIE stage must emit Lab");
+    };
+    let inverse = execute_reference_stage(&request(
+        ReferenceOperation::LabToXyzD50V1,
+        vec![StageSample::Lab(lab)],
+    ))
+    .unwrap();
+    let StageSample::Rgb(round_trip) = inverse.output[0] else {
+        panic!("inverse CIE stage must emit XYZ");
+    };
+    for (actual, expected) in round_trip.into_iter().zip(source) {
+        assert!((actual - expected).abs() <= 2.0e-14);
+    }
+    assert_eq!(inverse.receipt.operation_id, "lab-to-xyz-d50.v1");
+    assert_eq!(inverse.receipt.input_domain, StageDomain::CieLab);
+    assert_eq!(inverse.receipt.output_domain, StageDomain::CieXyzD50);
+}
+
+#[test]
 fn every_declared_transform_dispatches_with_its_typed_domain() {
     let cases = [
         request(

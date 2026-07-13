@@ -65,6 +65,7 @@ pub enum ReferenceOperation {
     DeltaEItpV1,
     Rec2100NitsToICtCpV1,
     XyzD50ToLabV1,
+    LabToXyzD50V1,
 }
 
 impl ReferenceOperation {
@@ -82,6 +83,7 @@ impl ReferenceOperation {
             Self::DeltaEItpV1 => "delta-e-itp.v1",
             Self::Rec2100NitsToICtCpV1 => "rec2100-nits-to-ictcp.v1",
             Self::XyzD50ToLabV1 => "xyz-d50-to-lab.v1",
+            Self::LabToXyzD50V1 => "lab-to-xyz-d50.v1",
         }
     }
 
@@ -99,6 +101,7 @@ impl ReferenceOperation {
             Self::DeltaEItpV1 => (StageDomain::ICtCpPair, StageDomain::ScalarMetric),
             Self::Rec2100NitsToICtCpV1 => (StageDomain::LinearRec2100Absolute, StageDomain::ICtCp),
             Self::XyzD50ToLabV1 => (StageDomain::CieXyzD50, StageDomain::CieLab),
+            Self::LabToXyzD50V1 => (StageDomain::CieLab, StageDomain::CieXyzD50),
         }
     }
 }
@@ -363,6 +366,12 @@ fn dispatch(
             let white = crate::types::WhitePointXyz::new(0.96422, 1.0, 0.82521)?;
             let xyz = crate::types::CieXyz::new(xyz[0], xyz[1], xyz[2])?;
             Ok(StageSample::Lab(crate::perceptual::xyz_to_lab(xyz, white)?))
+        }
+        (ReferenceOperation::LabToXyzD50V1, StageSample::Lab(lab)) => {
+            let white = crate::types::WhitePointXyz::new(0.96422, 1.0, 0.82521)?;
+            Ok(StageSample::Rgb(
+                crate::perceptual::lab_to_xyz(lab, white)?.components(),
+            ))
         }
         _ => Err(ReferenceError::MismatchedSampleKind),
     }
