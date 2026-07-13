@@ -22,6 +22,10 @@ use crate::film_look_render::normalize_film_look_adjustments_for_render;
 use crate::geometry::{Crop, GeometryParams, get_geometry_params_from_json};
 use crate::lut_processing::Lut;
 use crate::mask_generation::MaskDefinition;
+use crate::tone::curves::{CompiledCurvePlanV1, CurveChannelMode, CurvePoint, compile_scene_curve};
+use crate::tone::output_curves::{
+    CompiledOutputCurvePlanV1, OutputCurvePoint, OutputCurveTargetV1, compile_output_curve,
+};
 
 const PLAN_SCHEMA_VERSION: u32 = 1;
 const FINGERPRINT_VERSION: u32 = 1;
@@ -102,6 +106,52 @@ pub struct RenderPlanError {
     pub message: String,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SceneCurveInputV1 {
+    middle_grey: f32,
+    channel_mode: SceneCurveChannelInput,
+    points: Vec<SceneCurvePointInput>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum SceneCurveChannelInput {
+    LuminancePreserving,
+    LinkedRgb,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SceneCurvePointInput {
+    x_ev: f32,
+    y_ev: f32,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct OutputCurveInputV1 {
+    domain: OutputCurveDomainInput,
+    target_identity: String,
+    sdr_reference_white_nits: f32,
+    peak_nits: f32,
+    points: Vec<OutputCurvePointInput>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum OutputCurveDomainInput {
+    ViewEncoded,
+    OutputEncoded,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct OutputCurvePointInput {
+    input: f32,
+    output: f32,
+}
+
 impl std::fmt::Display for RenderPlanError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}:{}: {}", self.code, self.field, self.message)
@@ -136,11 +186,13 @@ pub const FIELD_OWNERSHIP: &[(&str, RenderStage, &str)] = &[
     ("aiPatches", RenderStage::Retouch, "empty"),
     ("details section", RenderStage::Detail, "neutral"),
     ("basic/color/effects/curves", RenderStage::Color, "neutral"),
+    ("sceneCurveV1", RenderStage::Color, "identity/absent"),
     ("filmLook", RenderStage::Color, "disabled"),
     ("lutPath/lutIntensity", RenderStage::Color, "none/100"),
     ("showClipping", RenderStage::Output, "false"),
     ("toneMapper", RenderStage::Output, "basic"),
     ("viewTransform", RenderStage::Output, "Rapid View defaults"),
+    ("outputCurveV1", RenderStage::Output, "identity/absent"),
 ];
 
 #[derive(Default)]
@@ -294,6 +346,19 @@ pub fn compile_render_plan(
         &masks,
         lut.as_deref(),
     );
+    let (scene_curve, output_curve) = compile_typed_curves(&effective, pipeline_version)?;
+    if let Some(curve) = &scene_curve {
+        fingerprints.color = hash_parts(&[
+            &fingerprints.color.to_le_bytes(),
+            &curve.fingerprint.to_le_bytes(),
+        ]);
+    }
+    if let Some(curve) = &output_curve {
+        fingerprints.output = hash_parts(&[
+            &fingerprints.output.to_le_bytes(),
+            &curve.fingerprint.to_le_bytes(),
+        ]);
+    }
     let neutral_json = Value::Object(serde_json::Map::new());
     let mut neutral_adjustments = get_all_adjustments_from_json_with_masks(
         &neutral_json,
@@ -320,6 +385,8 @@ pub fn compile_render_plan(
         output_fingerprint: fingerprints.output,
         adjustments: &adjustments,
         neutral_adjustments: &neutral_adjustments,
+        scene_curve: scene_curve.as_ref(),
+        output_curve: output_curve.as_ref(),
         has_geometry_or_retouch: has_geometry || has_retouch,
         has_detail: fingerprints.detail != neutral_detail,
         has_masks: !masks.is_empty(),
@@ -340,6 +407,105 @@ pub fn compile_render_plan(
         effective_json: Arc::new(effective),
         compile_time: started.elapsed(),
     })
+}
+
+fn compile_typed_curves(
+    effective: &Value,
+    pipeline_version: u32,
+) -> Result<
+    (
+        Option<CompiledCurvePlanV1>,
+        Option<CompiledOutputCurvePlanV1>,
+    ),
+    RenderPlanError,
+> {
+    let scene_input = effective
+        .get("sceneCurveV1")
+        .filter(|value| !value.is_null())
+        .map(SceneCurveInputV1::deserialize)
+        .transpose()
+        .map_err(|error| RenderPlanError {
+            code: "render_plan.invalid_scene_curve",
+            field: "sceneCurveV1",
+            message: error.to_string(),
+        })?;
+    let output_input = effective
+        .get("outputCurveV1")
+        .filter(|value| !value.is_null())
+        .map(OutputCurveInputV1::deserialize)
+        .transpose()
+        .map_err(|error| RenderPlanError {
+            code: "render_plan.invalid_output_curve",
+            field: "outputCurveV1",
+            message: error.to_string(),
+        })?;
+    if pipeline_version != crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION
+        && (scene_input.is_some() || output_input.is_some())
+    {
+        return Err(RenderPlanError {
+            code: "render_plan.curve_requires_scene_pipeline",
+            field: "rawEngineEditGraphVersion",
+            message: "typed curves require the explicit scene-referred pipeline".to_string(),
+        });
+    }
+
+    let scene_curve = scene_input
+        .map(|input| {
+            let points = input
+                .points
+                .into_iter()
+                .map(|point| CurvePoint::new(point.x_ev, point.y_ev))
+                .collect::<Vec<_>>();
+            let channel_mode = match input.channel_mode {
+                SceneCurveChannelInput::LuminancePreserving => {
+                    CurveChannelMode::LuminancePreserving
+                }
+                SceneCurveChannelInput::LinkedRgb => CurveChannelMode::LinkedRgb,
+            };
+            compile_scene_curve(&points, input.middle_grey, channel_mode).map_err(|error| {
+                RenderPlanError {
+                    code: "render_plan.invalid_scene_curve",
+                    field: "sceneCurveV1",
+                    message: format!("{error:?}"),
+                }
+            })
+        })
+        .transpose()?;
+    let output_curve = output_input
+        .map(|input| {
+            if input.target_identity.is_empty() || input.target_identity.len() > 128 {
+                return Err(RenderPlanError {
+                    code: "render_plan.invalid_output_curve",
+                    field: "outputCurveV1.targetIdentity",
+                    message: "target identity must contain 1..=128 bytes".to_string(),
+                });
+            }
+            let target_fingerprint = hash_json(&Value::String(input.target_identity));
+            let target = match input.domain {
+                OutputCurveDomainInput::ViewEncoded => OutputCurveTargetV1::view_encoded(
+                    target_fingerprint,
+                    input.sdr_reference_white_nits,
+                    input.peak_nits,
+                ),
+                OutputCurveDomainInput::OutputEncoded => OutputCurveTargetV1::output_encoded(
+                    target_fingerprint,
+                    input.sdr_reference_white_nits,
+                    input.peak_nits,
+                ),
+            };
+            let points = input
+                .points
+                .into_iter()
+                .map(|point| OutputCurvePoint::new(point.input, point.output))
+                .collect::<Vec<_>>();
+            compile_output_curve(target, &points).map_err(|error| RenderPlanError {
+                code: "render_plan.invalid_output_curve",
+                field: "outputCurveV1",
+                message: format!("{error:?}"),
+            })
+        })
+        .transpose()?;
+    Ok((scene_curve, output_curve))
 }
 
 fn validate_perspective_analysis_currentness(
@@ -895,6 +1061,134 @@ mod tests {
             neutral.edit_graph.fingerprint,
             active.edit_graph.fingerprint
         );
+    }
+
+    #[test]
+    fn typed_curves_compile_at_scene_and_output_boundaries_and_render_pixels() {
+        use image::{DynamicImage, ImageBuffer, Rgba};
+
+        let scene_curve = json!({
+            "middleGrey": 0.18,
+            "channelMode": "luminance_preserving",
+            "points": [
+                {"xEv": -16.0, "yEv": -16.0},
+                {"xEv": 0.0, "yEv": 1.0},
+                {"xEv": 16.0, "yEv": 16.0}
+            ]
+        });
+        let output_curve = json!({
+            "domain": "output_encoded",
+            "targetIdentity": "output-profile-77",
+            "sdrReferenceWhiteNits": 203.0,
+            "peakNits": 1000.0,
+            "points": [
+                {"input": 0.0, "output": 0.0},
+                {"input": 1.0, "output": 0.7},
+                {"input": 4.0, "output": 3.2}
+            ]
+        });
+        let combined_json = json!({
+            "rawEngineEditGraphVersion": 2,
+            "sceneCurveV1": scene_curve,
+            "outputCurveV1": output_curve,
+        });
+        let combined = compile_render_plan(&combined_json, context(701), None).unwrap();
+        let ordered = combined.edit_graph.receipt.ordered_node_ids.as_ref();
+        let scene_index = ordered
+            .iter()
+            .position(|id| *id == "scene_curve_v1")
+            .unwrap();
+        let view_index = ordered
+            .iter()
+            .position(|id| *id == "scene_to_view_transform")
+            .unwrap();
+        let output_index = ordered
+            .iter()
+            .position(|id| *id == "output_curve_v1")
+            .unwrap();
+        let transport_index = ordered
+            .iter()
+            .position(|id| *id == "render_transport")
+            .unwrap();
+        assert!(scene_index < view_index);
+        assert!(view_index < output_index && output_index < transport_index);
+        assert!(combined.edit_graph.has_typed_curves());
+        assert!(combined.edit_graph.has_user_edits);
+        assert_eq!(combined.edit_graph.scene_curve().unwrap().middle_grey, 0.18);
+        assert_eq!(
+            combined.edit_graph.output_curve().unwrap().target.peak_nits,
+            1000.0
+        );
+
+        let neutral_json = json!({"rawEngineEditGraphVersion": 2});
+        let neutral = compile_render_plan(&neutral_json, context(702), None).unwrap();
+        let source = DynamicImage::ImageRgba32F(ImageBuffer::from_pixel(
+            2,
+            2,
+            Rgba([0.18, 0.18, 0.18, 0.75]),
+        ));
+        let render = |plan: &CompiledRenderPlan| {
+            crate::cpu_edit_graph::execute_cpu_edit_graph(
+                &source,
+                &plan.adjustments,
+                &[],
+                None,
+                &plan.edit_graph,
+            )
+            .unwrap()
+            .to_rgba32f()
+            .get_pixel(0, 0)
+            .0
+        };
+        let curved = render(&combined);
+        let baseline = render(&neutral);
+        assert_ne!(curved[..3], baseline[..3]);
+        assert_eq!(curved[3], baseline[3]);
+        assert!(curved.iter().all(|value| value.is_finite()));
+    }
+
+    #[test]
+    fn typed_curve_fingerprints_are_stage_local_and_legacy_process_rejects_them() {
+        let scene = json!({
+            "rawEngineEditGraphVersion": 2,
+            "sceneCurveV1": {
+                "middleGrey": 0.18,
+                "channelMode": "linked_rgb",
+                "points": [{"xEv": -16, "yEv": -16}, {"xEv": 16, "yEv": 16}]
+            }
+        });
+        let output = json!({
+            "rawEngineEditGraphVersion": 2,
+            "outputCurveV1": {
+                "domain": "view_encoded",
+                "targetIdentity": "rapid-view-default",
+                "sdrReferenceWhiteNits": 203,
+                "peakNits": 203,
+                "points": [{"input": 0, "output": 0}, {"input": 1, "output": 1}]
+            }
+        });
+        let neutral =
+            compile_render_plan(&json!({"rawEngineEditGraphVersion": 2}), context(710), None)
+                .unwrap();
+        let scene = compile_render_plan(&scene, context(711), None).unwrap();
+        let output = compile_render_plan(&output, context(712), None).unwrap();
+        assert_ne!(scene.fingerprints.color, neutral.fingerprints.color);
+        assert_eq!(scene.fingerprints.output, neutral.fingerprints.output);
+        assert_eq!(output.fingerprints.color, neutral.fingerprints.color);
+        assert_ne!(output.fingerprints.output, neutral.fingerprints.output);
+
+        let legacy = json!({
+            "rawEngineEditGraphVersion": 1,
+            "sceneCurveV1": {
+                "middleGrey": 0.18,
+                "channelMode": "linked_rgb",
+                "points": [{"xEv": -16, "yEv": -16}, {"xEv": 16, "yEv": 16}]
+            }
+        });
+        let error = compile_render_plan(&legacy, context(713), None)
+            .err()
+            .expect("legacy process rejects typed curve");
+        assert_eq!(error.code, "render_plan.curve_requires_scene_pipeline");
     }
 
     #[test]
