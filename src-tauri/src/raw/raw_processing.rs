@@ -21,6 +21,14 @@ use std::{
 };
 
 const CAMERA_PROFILE_RESOLVER_ALGORITHM_ID: &str = "dual_illuminant_mired_v1";
+#[cfg(test)]
+static RAW_DEVELOPMENT_INVOCATIONS: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(0);
+
+#[cfg(test)]
+pub(crate) fn raw_development_invocations() -> u64 {
+    RAW_DEVELOPMENT_INVOCATIONS.load(Ordering::SeqCst)
+}
 
 /// Sensor-domain decode used by computational RAW workflows before demosaic or rendering.
 /// Callers own calibration and must not treat this as a developed RGB image.
@@ -136,8 +144,32 @@ pub(crate) fn develop_raw_image_with_report(
     linear_mode: String,
     cancel_token: Option<(Arc<AtomicUsize>, usize)>,
 ) -> Result<(DynamicImage, RawDevelopmentReport)> {
+    #[cfg(test)]
+    RAW_DEVELOPMENT_INVOCATIONS.fetch_add(1, Ordering::SeqCst);
     let (developed_image, orientation, report) = develop_internal_with_options(
         file_bytes,
+        fast_demosaic,
+        profile,
+        highlight_compression,
+        linear_mode,
+        cancel_token,
+        RawDefectDevelopmentOptions::default(),
+    )?;
+    Ok((apply_orientation(developed_image, orientation), report))
+}
+
+pub(crate) fn develop_raw_source_with_report(
+    source: &RawSource,
+    fast_demosaic: bool,
+    profile: RawProcessingProfile,
+    highlight_compression: f32,
+    linear_mode: String,
+    cancel_token: Option<(Arc<AtomicUsize>, usize)>,
+) -> Result<(DynamicImage, RawDevelopmentReport)> {
+    #[cfg(test)]
+    RAW_DEVELOPMENT_INVOCATIONS.fetch_add(1, Ordering::SeqCst);
+    let (developed_image, orientation, report) = develop_internal_from_source(
+        source,
         fast_demosaic,
         profile,
         highlight_compression,
@@ -1146,6 +1178,27 @@ fn develop_internal_with_options(
     cancel_token: Option<(Arc<AtomicUsize>, usize)>,
     defect_options: RawDefectDevelopmentOptions,
 ) -> Result<(DynamicImage, Orientation, RawDevelopmentReport)> {
+    let source = RawSource::new_from_slice(file_bytes);
+    develop_internal_from_source(
+        &source,
+        fast_demosaic,
+        profile,
+        highlight_compression,
+        linear_mode,
+        cancel_token,
+        defect_options,
+    )
+}
+
+fn develop_internal_from_source(
+    source: &RawSource,
+    fast_demosaic: bool,
+    profile: RawProcessingProfile,
+    highlight_compression: f32,
+    linear_mode: String,
+    cancel_token: Option<(Arc<AtomicUsize>, usize)>,
+    defect_options: RawDefectDevelopmentOptions,
+) -> Result<(DynamicImage, Orientation, RawDevelopmentReport)> {
     let check_cancel = || -> Result<()> {
         if let Some((tracker, generation)) = &cancel_token
             && tracker.load(Ordering::SeqCst) != *generation
@@ -1157,13 +1210,12 @@ fn develop_internal_with_options(
 
     check_cancel()?;
 
-    let source = RawSource::new_from_slice(file_bytes);
-    let decoder = rawler::get_decoder(&source)?;
+    let decoder = rawler::get_decoder(source)?;
 
     check_cancel()?;
-    let mut raw_image: RawImage = decoder.raw_image(&source, &RawDecodeParams::default(), false)?;
+    let mut raw_image: RawImage = decoder.raw_image(source, &RawDecodeParams::default(), false)?;
 
-    let metadata = decoder.raw_metadata(&source, &RawDecodeParams::default())?;
+    let metadata = decoder.raw_metadata(source, &RawDecodeParams::default())?;
     let orientation = metadata
         .exif
         .orientation

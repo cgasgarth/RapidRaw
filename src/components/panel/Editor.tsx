@@ -169,11 +169,13 @@ export default function Editor({
   const setEditorLightsOutLevel = useUIStore((s) => s.setEditorLightsOutLevel);
   const isLoading = useLibraryStore((s) => s.isViewLoading);
   const selectedImage = useEditorStore((s) => s.selectedImage);
+  const imageSessionStatus = useEditorStore((s) => s.imageSession?.status ?? null);
   const adjustments = useEditorStore((s) => s.adjustments);
   const adjustmentGeometryRevision = useEditorStore((s) => s.adjustmentSnapshot.geometryRevision);
   const adjustmentsHistory = useEditorStore((s) => s.history);
   const adjustmentsHistoryIndex = useEditorStore((s) => s.historyIndex);
   const finalPreviewUrl = useEditorStore((s) => s.finalPreviewUrl);
+  const provisionalPreviewFrame = useEditorStore((s) => s.provisionalPreviewFrame);
   const uncroppedAdjustedPreviewUrl = useEditorStore((s) => s.uncroppedAdjustedPreviewUrl);
   const transformedOriginalUrl = useEditorStore((s) => s.transformedOriginalUrl);
   const interactivePatch = useEditorStore((s) => s.interactivePatch);
@@ -2068,6 +2070,7 @@ export default function Editor({
               exportSoftProofRecipeId={exportSoftProofRecipeId}
               exportSoftProofTransform={exportSoftProofTransform}
               finalPreviewUrl={finalPreviewUrl}
+              provisionalPreviewUrl={provisionalPreviewFrame?.url ?? null}
               gamutWarningOverlay={gamutWarningOverlay}
               handleCropComplete={handleCropComplete}
               handleCropStart={handleCropStart}
@@ -2137,6 +2140,20 @@ export default function Editor({
               viewerSampleGraphRevision={viewerSampleGraphRevision}
               onViewerSamplerStateChange={setViewerSamplerState}
             />
+            {provisionalPreviewFrame !== null && !selectedImage.isReady && (
+              <div
+                className="pointer-events-none absolute right-3 top-3 rounded bg-black/70 px-2 py-1 text-xs text-white"
+                data-testid="embedded-preview-provisional-badge"
+              >
+                {t(
+                  imageSessionStatus === 'failed'
+                    ? 'editor.provisionalCameraPreviewFailed'
+                    : provisionalPreviewFrame.receipt.quality === 'fastDeveloped'
+                      ? 'editor.provisionalLibraryPreview'
+                      : 'editor.provisionalCameraPreview',
+                )}
+              </div>
+            )}
             {activeObjectPromptState !== null && (
               <div className="pointer-events-none absolute inset-0" data-testid="object-prompt-canvas-overlay">
                 {activeObjectPromptState.pointPrompts.map((point, index) => (
