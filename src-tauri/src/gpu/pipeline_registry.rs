@@ -383,8 +383,12 @@ impl GpuPipelineRegistry {
 }
 
 fn shader_manifest_sha256() -> String {
+    pipeline_manifest_sha256(PIPELINE_MANIFEST)
+}
+
+fn pipeline_manifest_sha256(manifest: &[(&str, &str, &str, &str)]) -> String {
     let mut hasher = Sha256::new();
-    for (name, source, entry, layout) in PIPELINE_MANIFEST {
+    for (name, source, entry, layout) in manifest {
         for part in [
             name.as_bytes(),
             source.as_bytes(),
@@ -524,6 +528,51 @@ mod tests {
     }
 
     #[test]
+    fn cache_artifact_rewrite_is_atomic_and_latest_pair_is_valid() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("cache");
+        let expected = identity("shader-a");
+        persist_artifact(&path, &expected, b"first-cache").unwrap();
+        persist_artifact(&path, &expected, b"expanded-cache").unwrap();
+
+        assert_eq!(
+            load_validated_artifact(&path, &expected).unwrap(),
+            Some(b"expanded-cache".to_vec())
+        );
+        assert!(fs::read_dir(&path).unwrap().all(|entry| {
+            !entry
+                .unwrap()
+                .file_name()
+                .to_string_lossy()
+                .contains("tmp-")
+        }));
+    }
+
+    #[test]
+    fn oversized_metadata_is_rejected_before_artifact_allocation() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("cache");
+        fs::create_dir(&path).unwrap();
+        let expected = identity("shader-a");
+        let metadata = PipelineCacheMetadata {
+            schema_version: CACHE_SCHEMA_VERSION,
+            identity: expected.clone(),
+            artifact_sha256: sha256_hex(b"unused"),
+            artifact_bytes: MAX_CACHE_BYTES + 1,
+        };
+        fs::write(
+            path.join("metadata.json"),
+            serde_json::to_vec(&metadata).unwrap(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            load_validated_artifact(&path, &expected).unwrap_err(),
+            "pipeline cache exceeds size limit"
+        );
+    }
+
+    #[test]
     fn every_runtime_identity_dimension_invalidates_reuse() {
         let base = identity("shader-a");
         let mut variants = Vec::new();
@@ -588,6 +637,22 @@ mod tests {
             ]
         );
         assert_eq!(shader_manifest_sha256().len(), 64);
+    }
+
+    #[test]
+    fn shader_source_entry_and_layout_each_change_manifest_identity() {
+        let baseline = [("pipeline", "source-a", "entry-a", "layout-a")];
+        let variants = [
+            [("pipeline", "source-b", "entry-a", "layout-a")],
+            [("pipeline", "source-a", "entry-b", "layout-a")],
+            [("pipeline", "source-a", "entry-a", "layout-b")],
+        ];
+        let baseline_digest = pipeline_manifest_sha256(&baseline);
+        assert!(
+            variants
+                .iter()
+                .all(|variant| pipeline_manifest_sha256(variant) != baseline_digest)
+        );
     }
 
     #[test]

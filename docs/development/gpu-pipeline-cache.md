@@ -17,15 +17,20 @@ The `get_gpu_pipeline_report` command exposes the device generation, privacy-saf
 Identity, integrity, corruption fallback, privacy-safe paths, manifest coverage, and retention are normal Rust tests:
 
 ```sh
-cargo test --locked --manifest-path src-tauri/Cargo.toml -p RapidRAW pipeline_registry --features required-ci
+bun scripts/ci/run-resource-coordinated.ts --resource native-heavy \
+  --label gpu-pipeline-registry-tests -- cargo test --locked \
+  --manifest-path src-tauri/Cargo.toml -p RapidRAW pipeline_registry \
+  --features required-ci
 ```
 
-The native cold/warm proof uses real WGPU output, recreates the processor 30 times after the cold render, requires exact RGBA16 pixel equivalence, and requires the warm median to beat cold latency:
+The native cold/warm proof uses real WGPU output, recreates the processor 30 times after the cold render, requires exact RGBA16 pixel equivalence, and requires the warm median to beat cold latency. It also proves an ordinary render leaves both optional flare pipelines unconstructed, then demand-creates them on the first enabled flare render and verifies changed output:
 
 ```sh
-cargo test --locked --manifest-path src-tauri/Cargo.toml -p RapidRAW \
+bun scripts/ci/run-resource-coordinated.ts --resource native-heavy \
+  --label gpu-pipeline-cold-warm -- cargo test --locked \
+  --manifest-path src-tauri/Cargo.toml -p RapidRAW \
   cold_and_warm_pipeline_outputs_match_and_warm_creation_is_faster \
   --features required-ci,tauri-test -- --ignored --nocapture
 ```
 
-On a repeated Apple Metal validation run, WGPU correctly reported persistent-cache support as unavailable. Cold first render was 25.2 ms, the 30-run warm median was 8.3 ms (67% lower), output was pixel-identical, and diagnostics reported 6 ms of core warmup with 5 ms of foreground wait. An initial uncached driver run was also observed at 654.7 ms versus an 8.4 ms warm median; the repeated receipt is the maintained comparison because platform driver caches are outside application control.
+On a repeated Apple Metal validation run, WGPU correctly reported persistent-cache support as unavailable. Cold first render was 23.1 ms, the 30-run warm median was 7.8 ms (66% lower), output was pixel-identical, and diagnostics reported 5 ms of core warmup/foreground wait. The same run proved the optional flare pipelines were absent for ordinary output and appeared only after the enabled flare request. An initial uncached driver run was also observed at 654.7 ms versus an 8.4 ms warm median; the repeated receipt is the maintained comparison because platform driver caches are outside application control.
