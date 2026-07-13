@@ -3715,6 +3715,92 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "tauri-test")]
+    fn private_real_raw_v2_preview_export_and_legacy_delta_proof_when_enabled() {
+        if std::env::var("RAWENGINE_RUN_PRIVATE_EDIT_GRAPH_REAL_RAW_PROOF").as_deref() != Ok("1") {
+            return;
+        }
+        use crate::gpu_processing::get_or_init_compute_gpu_context_for_tests;
+        use serde_json::json;
+        use sha2::{Digest, Sha256};
+        use tauri::Manager;
+
+        let source_path = std::env::var("RAWENGINE_PRIVATE_RAW_SOURCE")
+            .expect("RAWENGINE_PRIVATE_RAW_SOURCE points to a private Alaska RAW");
+        let source_bytes = std::fs::read(&source_path).expect("private RAW bytes read");
+        let settings = crate::app_settings::AppSettings::default();
+        let base = crate::image_loader::load_base_image_from_bytes(
+            &source_bytes,
+            &source_path,
+            false,
+            &settings,
+            None,
+        )
+        .expect("production RAW loader decodes private source");
+        let app = tauri::test::mock_builder()
+            .manage(crate::AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock Tauri app builds");
+        let state = app.state::<crate::AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state)
+            .expect("real Metal compute context initializes");
+        let recipe = |version| {
+            json!({
+                "rawEngineEditGraphVersion": version,
+                "exposure": 16,
+                "contrast": 10,
+                "highlights": -14,
+                "vibrance": 9,
+                "channelMixer": {
+                    "enabled": true,
+                    "preserveLuminance": false,
+                    "red": { "red": 100, "green": 0, "blue": 0, "constant": 18 },
+                    "green": { "red": 0, "green": 100, "blue": 0, "constant": 0 },
+                    "blue": { "red": 0, "green": 0, "blue": 100, "constant": -12 }
+                }
+            })
+        };
+        let render = |adjustments: &serde_json::Value, caller: &str| {
+            super::process_image_for_export_pipeline_with_tonemapper_override(
+                &source_path,
+                &base,
+                adjustments,
+                &context,
+                &state,
+                true,
+                caller,
+                Some(0),
+                &[],
+            )
+            .expect("graph-authoritative real RAW render succeeds")
+        };
+        let v2_recipe = recipe(2);
+        let preview = render(&v2_recipe, "edit_graph_v2_private_raw_preview");
+        let export = render(&v2_recipe, "edit_graph_v2_private_raw_export");
+        let legacy = render(&recipe(1), "edit_graph_v1_private_raw_migration_baseline");
+        let preview_pixels = preview.to_rgba16().into_raw();
+        let export_pixels = export.to_rgba16().into_raw();
+        let legacy_pixels = legacy.to_rgba16().into_raw();
+        assert_eq!(preview.dimensions(), base.dimensions());
+        assert_eq!(preview_pixels, export_pixels);
+        assert_ne!(preview_pixels, legacy_pixels);
+        let changed = preview_pixels
+            .iter()
+            .zip(&legacy_pixels)
+            .filter(|(v2, v1)| v2 != v1)
+            .count();
+        assert!(changed > preview_pixels.len() / 100);
+        let digest = Sha256::digest(bytemuck::cast_slice::<u16, u8>(&preview_pixels));
+        println!(
+            "edit_graph_v2_private_raw_proof dimensions={}x{} migration_changed_channels={} preview_export_sha256={}",
+            preview.width(),
+            preview.height(),
+            changed,
+            hex::encode(digest)
+        );
+    }
+
+    #[test]
     fn cancellation_claimed_before_gpu_initialization_prevents_runnable_export_work() {
         let registry = Arc::new(Mutex::new(None));
         let job_identity =
