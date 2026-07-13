@@ -50,20 +50,13 @@ pub(crate) fn execute_cpu_edit_graph(
         return Err("edit_graph.cpu_reference_version_mismatch");
     }
     let global = &adjustments.global;
-    if global.sharpness != 0.0
-        || global.luma_noise_reduction != 0.0
-        || global.color_noise_reduction != 0.0
-        || global.clarity != 0.0
-        || global.dehaze != 0.0
-        || global.structure != 0.0
-        || global.centré != 0.0
-        || global.glow_amount != 0.0
-        || global.halation_amount != 0.0
-        || global.flare_amount != 0.0
-        || global.chromatic_aberration_red_cyan != 0.0
-        || global.chromatic_aberration_blue_yellow != 0.0
+    if global.flare_amount != 0.0
+        || adjustments.mask_adjustments
+            [..(adjustments.mask_count as usize).min(adjustments.mask_adjustments.len())]
+            .iter()
+            .any(|mask| mask.flare_amount != 0.0)
     {
-        return Err("edit_graph.cpu_reference_spatial_pending");
+        return Err("edit_graph.cpu_reference_flare_pending");
     }
 
     let preserve_extended = graph.pipeline_version >= 2;
@@ -86,33 +79,162 @@ pub(crate) fn execute_cpu_edit_graph(
         })
         .collect::<Vec<_>>();
     let scale = width.min(height) as f32 / 1080.0;
+    let active_masks = &adjustments.mask_adjustments
+        [..(adjustments.mask_count as usize).min(adjustments.mask_adjustments.len())];
     let tonal_active = global.contrast != 0.0
         || global.highlights != 0.0
         || global.shadows != 0.0
         || global.whites != 0.0
         || global.blacks != 0.0
-        || adjustments.mask_adjustments
-            [..(adjustments.mask_count as usize).min(adjustments.mask_adjustments.len())]
-            .iter()
-            .any(|mask| {
-                mask.contrast != 0.0
-                    || mask.highlights != 0.0
-                    || mask.shadows != 0.0
-                    || mask.whites != 0.0
-                    || mask.blacks != 0.0
-            });
+        || active_masks.iter().any(|mask| {
+            mask.contrast != 0.0
+                || mask.highlights != 0.0
+                || mask.shadows != 0.0
+                || mask.whites != 0.0
+                || mask.blacks != 0.0
+        });
     let tonal_blur = tonal_active
         .then(|| gaussian_blur(&input, width, height, (3.5 * scale).ceil().max(1.0) as u32));
+    let blur = |active: bool, radius: f32| {
+        active.then(|| {
+            gaussian_blur(
+                &input,
+                width,
+                height,
+                (radius * scale).ceil().max(1.0) as u32,
+            )
+        })
+    };
+    let sharpness_blur = blur(
+        global.sharpness != 0.0 || active_masks.iter().any(|mask| mask.sharpness.abs() > 0.001),
+        1.0,
+    );
+    let clarity_blur = blur(
+        global.clarity != 0.0
+            || global.centré != 0.0
+            || global.halation_amount > 0.0
+            || active_masks
+                .iter()
+                .any(|mask| mask.clarity != 0.0 || mask.halation_amount > 0.0),
+        8.0,
+    );
+    let structure_blur = blur(
+        global.structure != 0.0
+            || global.dehaze != 0.0
+            || global.glow_amount > 0.0
+            || active_masks
+                .iter()
+                .any(|mask| mask.structure != 0.0 || mask.dehaze != 0.0 || mask.glow_amount > 0.0),
+        40.0,
+    );
     let mut output = ImageBuffer::<Rgba<f32>, Vec<f32>>::new(width, height);
     for (x, y, target) in output.enumerate_pixels_mut() {
         let source_pixel = source.get_pixel(x, y).0;
         let index = (y * width + x) as usize;
         let effective = effective_adjustments(adjustments, mask_bitmaps, x, y);
-        let mut color = input[index];
+        let color_from_texture = apply_ca_correction(
+            &input,
+            x,
+            y,
+            width,
+            height,
+            global.chromatic_aberration_red_cyan,
+            global.chromatic_aberration_blue_yellow,
+        );
+        let mut color = color_from_texture;
         if adjustments.global.is_raw_image == 0 {
             color = srgb_to_linear(color);
         }
+        color = apply_noise_reduction(
+            color,
+            &input,
+            x,
+            y,
+            width,
+            height,
+            effective.luma_noise_reduction,
+            effective.color_noise_reduction,
+            scale.max(0.1),
+            adjustments.global.is_raw_image == 1,
+        );
+        let initial_linear = color;
+        let sharpness_surface = sharpness_blur
+            .as_ref()
+            .map_or(input[index], |blur| blur[index]);
+        color = apply_local_contrast(
+            color,
+            sharpness_surface,
+            global.sharpness,
+            adjustments.global.is_raw_image == 1,
+            0,
+            global.sharpness_threshold,
+        );
+        color += local_sharpness_delta(
+            initial_linear,
+            sharpness_surface,
+            adjustments,
+            mask_bitmaps,
+            x,
+            y,
+        );
+        let clarity_surface = clarity_blur
+            .as_ref()
+            .map_or(input[index], |blur| blur[index]);
+        let structure_surface = structure_blur
+            .as_ref()
+            .map_or(input[index], |blur| blur[index]);
+        color = apply_local_contrast(
+            color,
+            clarity_surface,
+            effective.clarity,
+            adjustments.global.is_raw_image == 1,
+            1,
+            0.0,
+        );
+        color = apply_local_contrast(
+            color,
+            structure_surface,
+            effective.structure,
+            adjustments.global.is_raw_image == 1,
+            1,
+            0.0,
+        );
+        color = apply_centre_local_contrast(
+            color,
+            global.centré,
+            x,
+            y,
+            width,
+            height,
+            clarity_surface,
+            adjustments.global.is_raw_image == 1,
+        );
         color *= 2.0_f32.powf(effective.exposure);
+        color = apply_glow_bloom(
+            color,
+            structure_surface,
+            effective.glow,
+            adjustments.global.is_raw_image == 1,
+            effective.exposure,
+            effective.brightness,
+            effective.whites,
+        );
+        color = apply_halation(
+            color,
+            clarity_surface,
+            effective.halation,
+            adjustments.global.is_raw_image == 1,
+            effective.exposure,
+            effective.brightness,
+            effective.whites,
+        );
+        color = apply_dehaze(
+            color,
+            structure_surface,
+            adjustments.global.is_raw_image == 1,
+            effective.dehaze,
+        );
+        color = apply_centre_tonal_and_color(color, global.centré, x, y, width, height);
         color = apply_white_balance(color, effective.temperature, effective.tint);
         color = apply_filmic_exposure(color, effective.brightness);
         let tonal = tonal_blur.as_ref().map_or(input[index], |blur| blur[index]);
@@ -302,6 +424,432 @@ fn gaussian_blur(source: &[Vec3], width: u32, height: u32, radius: u32) -> Vec<V
         }
     }
     vertical
+}
+
+fn apply_ca_correction(
+    input: &[Vec3],
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+    red_cyan: f32,
+    blue_yellow: f32,
+) -> Vec3 {
+    if red_cyan.abs() <= 0.000_001 && blue_yellow.abs() <= 0.000_001 {
+        return input[(y * width + x) as usize];
+    }
+    let center = glam::Vec2::new(width as f32, height as f32) * 0.5;
+    let position = glam::Vec2::new(x as f32, y as f32);
+    let radial = position - center;
+    let distance = radial.length();
+    if distance == 0.0 {
+        return input[(y * width + x) as usize];
+    }
+    let direction = radial / distance;
+    let sample = |shift: f32| {
+        let coordinate = position - direction * distance * shift;
+        (
+            coordinate.x.round().clamp(0.0, width as f32 - 1.0) as u32,
+            coordinate.y.round().clamp(0.0, height as f32 - 1.0) as u32,
+        )
+    };
+    let red = sample(red_cyan);
+    let blue = sample(blue_yellow);
+    Vec3::new(
+        input[(red.1 * width + red.0) as usize].x,
+        input[(y * width + x) as usize].y,
+        input[(blue.1 * width + blue.0) as usize].z,
+    )
+}
+
+fn apply_local_contrast(
+    color: Vec3,
+    blurred_input: Vec3,
+    amount: f32,
+    is_raw: bool,
+    mode: u32,
+    threshold: f32,
+) -> Vec3 {
+    if amount == 0.0 {
+        return color;
+    }
+    let blurred = if is_raw {
+        blurred_input
+    } else {
+        srgb_to_linear(blurred_input)
+    };
+    if amount < 0.0 {
+        return color.lerp(blurred, -amount * if mode == 0 { 0.5 } else { 1.0 });
+    }
+    let center_luma = get_luma(color);
+    let midtone_mask = smoothstep(0.0, if is_raw { 0.1 } else { 0.03 }, center_luma)
+        * (1.0 - smoothstep(0.9, 1.0, center_luma));
+    if midtone_mask < 0.001 {
+        return color;
+    }
+    let log_ratio = (center_luma.max(0.0001) / get_luma(blurred).max(0.0001)).log2();
+    let effective = if mode == 0 {
+        let edge = log_ratio.abs();
+        amount
+            * (1.0 - (edge / 3.0).clamp(0.0, 1.0).sqrt())
+            * smoothstep(threshold * 0.5, threshold * 1.5, edge)
+            * 0.8
+    } else {
+        amount
+    };
+    color.lerp(color * 2.0_f32.powf(log_ratio * effective), midtone_mask)
+}
+
+fn local_sharpness_delta(
+    initial: Vec3,
+    blurred: Vec3,
+    adjustments: &AllAdjustments,
+    masks: &[ImageBuffer<Luma<u8>, Vec<u8>>],
+    x: u32,
+    y: u32,
+) -> Vec3 {
+    let mut delta = Vec3::ZERO;
+    let count = (adjustments.mask_count as usize)
+        .min(masks.len())
+        .min(adjustments.mask_adjustments.len());
+    for (index, mask) in masks.iter().take(count).enumerate() {
+        let local = adjustments.mask_adjustments[index];
+        if local.sharpness.abs() <= 0.001 {
+            continue;
+        }
+        let result = apply_local_contrast(
+            initial,
+            blurred,
+            local.sharpness,
+            adjustments.global.is_raw_image == 1,
+            0,
+            local.sharpness_threshold,
+        );
+        delta += (result - initial) * mask_influence(mask, x, y);
+    }
+    delta
+}
+
+fn radial_centre_mask(x: u32, y: u32, width: u32, height: u32) -> f32 {
+    let centered =
+        glam::Vec2::new(x as f32 / width as f32, y as f32 / height as f32) * 2.0 - glam::Vec2::ONE;
+    let distance = (centered * glam::Vec2::new(1.0, height as f32 / width as f32)).length() * 0.5;
+    1.0 - smoothstep(0.025, 0.775, distance)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn apply_centre_local_contrast(
+    color: Vec3,
+    amount: f32,
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+    blurred: Vec3,
+    is_raw: bool,
+) -> Vec3 {
+    if amount == 0.0 {
+        return color;
+    }
+    let strength = amount * (2.0 * radial_centre_mask(x, y, width, height) - 1.0) * 0.9;
+    if strength.abs() > 0.001 {
+        apply_local_contrast(color, blurred, strength, is_raw, 1, 0.0)
+    } else {
+        color
+    }
+}
+
+fn apply_centre_tonal_and_color(
+    color: Vec3,
+    amount: f32,
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+) -> Vec3 {
+    if amount == 0.0 {
+        return color;
+    }
+    let center = radial_centre_mask(x, y, width, height);
+    let exposed = apply_filmic_exposure(color, center * amount * 0.5);
+    apply_creative_color(
+        exposed,
+        center * amount * 0.3 - (1.0 - center) * amount * 0.8,
+        center * amount * 0.4,
+    )
+}
+
+fn blur_to_linear(color: Vec3, is_raw: bool) -> Vec3 {
+    if is_raw { color } else { srgb_to_linear(color) }
+}
+
+fn apply_dehaze(color: Vec3, blurred: Vec3, is_raw: bool, amount: f32) -> Vec3 {
+    if amount == 0.0 {
+        return color;
+    }
+    let blurred = blur_to_linear(blurred, is_raw);
+    let atmosphere = Vec3::new(0.95, 0.97, 1.0);
+    if amount < 0.0 {
+        let dark = (blurred.min_element() - 0.02).max(0.0);
+        let depth = dark / (dark + 0.2);
+        return color.lerp(atmosphere, amount.abs() * 0.7 * (0.4 + 0.6 * depth));
+    }
+    let pixel_dark = color.min_element();
+    let regional_dark = blurred.min_element();
+    let edge =
+        (get_luma(color.max(Vec3::ZERO)).sqrt() - get_luma(blurred.max(Vec3::ZERO)).sqrt()).abs();
+    let spatial_dark = regional_dark + (pixel_dark - regional_dark) * smoothstep(0.02, 0.15, edge);
+    let safe_dark = (spatial_dark - 0.02).max(0.0);
+    let transmission = (1.0 - amount * (safe_dark / (safe_dark + 0.2)) * 0.85).max(0.15);
+    let mut recovered = (color - atmosphere) / transmission + atmosphere;
+    let recovered_luma = get_luma(recovered.max(Vec3::ZERO));
+    recovered += Vec3::splat(smoothstep(0.1, 0.0, recovered_luma) * (1.0 - transmission) * 0.15);
+    let final_luma = get_luma(recovered.max(Vec3::ZERO));
+    Vec3::splat(final_luma)
+        .lerp(recovered, 1.0 + (1.0 - transmission) * 0.5)
+        .max(Vec3::ZERO)
+}
+
+fn prepared_effect_blur(
+    blurred: Vec3,
+    is_raw: bool,
+    exposure: f32,
+    brightness: f32,
+    whites: f32,
+) -> Vec3 {
+    let input_space = blurred;
+    let mut linear = blur_to_linear(blurred, is_raw) * 2.0_f32.powf(exposure);
+    linear = apply_filmic_exposure(linear, brightness);
+    apply_tonal_adjustments(linear, input_space, 0.0, 0.0, whites, 0.0)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn apply_glow_bloom(
+    color: Vec3,
+    blurred: Vec3,
+    amount: f32,
+    is_raw: bool,
+    exposure: f32,
+    brightness: f32,
+    whites: f32,
+) -> Vec3 {
+    if amount <= 0.0 {
+        return color;
+    }
+    let linear = prepared_effect_blur(blurred, is_raw, exposure, brightness, whites);
+    let linear_luma = get_luma(linear.max(Vec3::ZERO));
+    let perceptual = if linear_luma <= 1.0 {
+        linear_luma.max(0.0).powf(1.0 / 2.2)
+    } else {
+        1.0 + (linear_luma - 1.0).powf(1.0 / 2.2)
+    };
+    let cutoff = 0.75 + (0.08 - 0.75) * amount.clamp(0.0, 1.0);
+    let cutoff_fade = smoothstep(cutoff, cutoff + 0.15, perceptual);
+    let intensity = smoothstep(0.0, 1.0, (perceptual - cutoff).max(0.0) / 5.5).powf(0.45);
+    let mut bloom = if linear_luma > 0.01 {
+        linear / linear_luma * Vec3::new(1.03, 1.0, 0.97)
+    } else {
+        Vec3::new(1.0, 0.99, 0.98)
+    };
+    bloom *=
+        intensity * linear_luma.powf(0.6) * cutoff_fade * smoothstep(0.0, 0.5, linear_luma).sqrt();
+    color + bloom * amount * 3.8 * (1.0 - smoothstep(1.0, 2.2, get_luma(color.max(Vec3::ZERO))))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn apply_halation(
+    color: Vec3,
+    blurred: Vec3,
+    amount: f32,
+    is_raw: bool,
+    exposure: f32,
+    brightness: f32,
+    whites: f32,
+) -> Vec3 {
+    if amount <= 0.0 {
+        return color;
+    }
+    let linear = prepared_effect_blur(blurred, is_raw, exposure, brightness, whites);
+    let linear_luma = get_luma(linear.max(Vec3::ZERO));
+    let perceptual = if linear_luma <= 1.0 {
+        linear_luma.max(0.0).powf(1.0 / 2.2)
+    } else {
+        1.0 + (linear_luma - 1.0).powf(1.0 / 2.2)
+    };
+    let cutoff = 0.85 + (0.1 - 0.85) * amount.clamp(0.0, 1.0);
+    if perceptual <= cutoff {
+        return color;
+    }
+    let mask = smoothstep(0.0, (1.5 - cutoff).max(0.1) * 0.6, perceptual - cutoff);
+    let tint =
+        Vec3::new(1.0, 0.32, 0.1).lerp(Vec3::new(1.0, 0.15, 0.03), smoothstep(0.0, 0.7, mask));
+    let luma = get_luma(color.max(Vec3::ZERO));
+    let affected = color.lerp(Vec3::splat(luma), mask * 0.12);
+    Vec3::splat(0.5).lerp(affected, 1.0 - mask * 0.06) + tint * mask * linear_luma * amount * 2.5
+}
+
+#[allow(clippy::too_many_arguments)]
+fn apply_noise_reduction(
+    center: Vec3,
+    input: &[Vec3],
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+    luma_amount: f32,
+    color_amount: f32,
+    scale: f32,
+    is_raw: bool,
+) -> Vec3 {
+    let luma_amount = luma_amount.clamp(0.0, 1.0);
+    let color_amount = color_amount.clamp(0.0, 1.0);
+    if luma_amount < 0.001 && color_amount < 0.001 {
+        return center;
+    }
+    let center_luma = get_luma(center.max(Vec3::ZERO));
+    let center_chroma = center - Vec3::splat(center_luma);
+    let resolution = scale.sqrt().clamp(0.5, 2.0);
+    let sample = |sample_x: i32, sample_y: i32| {
+        let color = input[(sample_y.clamp(0, height as i32 - 1) as u32 * width
+            + sample_x.clamp(0, width as i32 - 1) as u32) as usize];
+        if is_raw { color } else { srgb_to_linear(color) }
+    };
+    let mut new_luma = center_luma;
+    if luma_amount > 0.001 {
+        let curve = luma_amount.sqrt();
+        let stride = (1.0 + smoothstep(0.45, 0.95, luma_amount)) * resolution;
+        let extra = (stride - 1.0).clamp(0.0, 1.0);
+        let spatial = 1.0 + 0.5 * curve;
+        let spatial_normalizer = -1.0 / (2.0 * spatial * spatial).max(1.0e-6);
+        let jitter_x = (hash2(x as f32, y as f32) - 0.5) * 2.0 * extra;
+        let jitter_y = (hash2(x as f32 + 17.31, y as f32 + 71.13) - 0.5) * 2.0 * extra;
+        let mut lumas = [0.0_f32; 25];
+        let mut spatial_weights = [0.0_f32; 25];
+        lumas[0] = center_luma;
+        spatial_weights[0] = 1.0;
+        let mut minimum = center_luma;
+        let mut maximum = center_luma;
+        let mut index = 1;
+        for dy in -2_i32..=2 {
+            for dx in -2_i32..=2 {
+                if dx == 0 && dy == 0 {
+                    continue;
+                }
+                let grow = 1.0
+                    + extra
+                        * if dx.abs().max(dy.abs()) == 2 {
+                            1.0
+                        } else {
+                            0.5
+                        };
+                let sampled = sample(
+                    x as i32 + (dx as f32 * grow + jitter_x).round() as i32,
+                    y as i32 + (dy as f32 * grow + jitter_y).round() as i32,
+                );
+                let luma = get_luma(sampled.max(Vec3::ZERO));
+                lumas[index] = luma;
+                spatial_weights[index] = ((dx * dx + dy * dy) as f32 * spatial_normalizer).exp();
+                minimum = minimum.min(luma);
+                maximum = maximum.max(luma);
+                index += 1;
+            }
+        }
+        let edge_strength = smoothstep(0.04, 0.2, maximum - minimum);
+        let midpoint = (minimum + maximum) * 0.5;
+        let center_side = center_luma > midpoint;
+        let broad_tolerance = 0.025 + (0.075 - 0.025) * curve;
+        let edge_tolerance = 0.01 + (0.025 - 0.01) * curve;
+        let range_tolerance = broad_tolerance + (edge_tolerance - broad_tolerance) * edge_strength;
+        let mut gates = [0.0_f32; 25];
+        let mut sum = 0.0;
+        let mut weight_sum = 0.0;
+        for index in 0..25 {
+            let range_gate = 1.0
+                - smoothstep(
+                    range_tolerance * 0.6,
+                    range_tolerance,
+                    (lumas[index] - center_luma).abs(),
+                );
+            let side_gate = if (lumas[index] > midpoint) == center_side {
+                1.0
+            } else {
+                0.0
+            };
+            let weight =
+                spatial_weights[index] * range_gate * (1.0 + (side_gate - 1.0) * edge_strength);
+            gates[index] = weight;
+            sum += lumas[index] * weight;
+            weight_sum += weight;
+        }
+        let initial_mean = sum / weight_sum.max(1.0e-4);
+        let outlier_tolerance = 0.07 + (0.025 - 0.07) * edge_strength;
+        let mut robust_sum = 0.0;
+        let mut robust_weight = 0.0;
+        for index in 0..25 {
+            if gates[index] <= 0.0001 {
+                continue;
+            }
+            let ratio = (lumas[index] - initial_mean).abs() / outlier_tolerance;
+            let bisquare = (1.0 - ratio * ratio).max(0.0);
+            let weight = gates[index] * bisquare * bisquare;
+            robust_sum += lumas[index] * weight;
+            robust_weight += weight;
+        }
+        let robust = if robust_weight > 0.01 {
+            robust_sum / robust_weight.max(1.0e-6)
+        } else {
+            initial_mean
+        };
+        let strength = luma_amount * (1.0 + (0.6 - 1.0) * edge_strength);
+        new_luma = center_luma + (robust - center_luma) * strength;
+    }
+
+    let mut new_chroma = center_chroma;
+    if color_amount > 0.001 {
+        let center_red = center.x - center_luma;
+        let center_blue = center.z - center_luma;
+        let curve = color_amount.sqrt();
+        let stride = (2.0 + 1.5 * curve) * resolution;
+        let spatial = 2.0 + 1.5 * curve;
+        let spatial_normalizer = -1.0 / (2.0 * spatial * spatial).max(1.0e-6);
+        let luma_tolerance = 0.12 + (0.04 - 0.12) * curve;
+        let luma_normalizer = -1.0 / (2.0 * luma_tolerance * luma_tolerance).max(1.0e-6);
+        let chroma_tolerance = 0.2 + (0.08 - 0.2) * curve;
+        let chroma_normalizer = -1.0 / (2.0 * chroma_tolerance * chroma_tolerance).max(1.0e-6);
+        let jitter_x = (hash2(x as f32 + 43.7, y as f32 + 91.1) - 0.5) * stride * 0.5;
+        let jitter_y = (hash2(x as f32 + 73.3, y as f32 + 17.9) - 0.5) * stride * 0.5;
+        let mut red_sum = center_red;
+        let mut blue_sum = center_blue;
+        let mut weight_sum = 1.0;
+        for dy in -2_i32..=2 {
+            for dx in -2_i32..=2 {
+                if dx == 0 && dy == 0 {
+                    continue;
+                }
+                let sampled = sample(
+                    x as i32 + (dx as f32 * stride + jitter_x).round() as i32,
+                    y as i32 + (dy as f32 * stride + jitter_y).round() as i32,
+                );
+                let sampled_luma = get_luma(sampled.max(Vec3::ZERO));
+                let red = sampled.x - sampled_luma;
+                let blue = sampled.z - sampled_luma;
+                let spatial_weight = ((dx * dx + dy * dy) as f32 * spatial_normalizer).exp();
+                let luma_weight = ((sampled_luma - center_luma).powi(2) * luma_normalizer).exp();
+                let chroma_weight = (((red - center_red).powi(2) + (blue - center_blue).powi(2))
+                    * chroma_normalizer)
+                    .exp();
+                let weight = spatial_weight * luma_weight * chroma_weight;
+                red_sum += red * weight;
+                blue_sum += blue * weight;
+                weight_sum += weight;
+            }
+        }
+        let red = center_red + (red_sum / weight_sum.max(1.0e-6) - center_red) * color_amount;
+        let blue = center_blue + (blue_sum / weight_sum.max(1.0e-6) - center_blue) * color_amount;
+        let green = -(0.2126 * red + 0.0722 * blue) / 0.7152;
+        new_chroma = Vec3::new(red, green, blue);
+    }
+    Vec3::splat(new_luma) + new_chroma
 }
 
 fn mask_influence(mask: &ImageBuffer<Luma<u8>, Vec<u8>>, x: u32, y: u32) -> f32 {

@@ -2595,7 +2595,7 @@ mod blur_pass_tests {
 
     #[cfg(feature = "tauri-test")]
     #[test]
-    fn cpu_reference_matches_metal_for_nonspatial_global_local_and_lut_graph() {
+    fn cpu_reference_matches_metal_for_global_local_lut_and_spatial_graph() {
         use image::{DynamicImage, ImageBuffer, Luma, Rgba};
         use serde_json::json;
         use tauri::Manager;
@@ -2612,7 +2612,7 @@ mod blur_pass_tests {
         let mask = ImageBuffer::<Luma<u8>, Vec<u8>>::from_fn(8, 8, |x, _| {
             Luma([((x as f32 / 7.0) * 255.0).round() as u8])
         });
-        let raw = json!({
+        let mut raw = json!({
             "rawEngineEditGraphVersion": 2,
             "exposure": 18,
             "brightness": -8,
@@ -2639,10 +2639,25 @@ mod blur_pass_tests {
             "masks": [{
                 "id":"cpu-parity-mask", "name":"CPU parity", "visible":true,
                 "invert":false, "opacity":100, "blendMode":"normal",
-                "adjustments":{"exposure":9,"contrast":-6,"saturation":8},
+                "adjustments":{
+                    "exposure":9,"contrast":-6,"saturation":8,"sharpness":5,
+                    "clarity":-4,"structure":3,"dehaze":2,"glowAmount":2,"halationAmount":1
+                },
                 "subMasks":[]
             }]
         });
+        raw.as_object_mut().unwrap().extend(
+            json!({
+                "sharpness": 14, "sharpnessThreshold": 8,
+                "lumaNoiseReduction": 10, "colorNoiseReduction": 8,
+                "clarity": 9, "structure": 7, "dehaze": 6, "centré": 5,
+                "glowAmount": 4, "halationAmount": 3,
+                "chromaticAberrationRedCyan": 2, "chromaticAberrationBlueYellow": -2
+            })
+            .as_object()
+            .unwrap()
+            .clone(),
+        );
         let lut = Arc::new(Lut::compile(
             2,
             vec![
