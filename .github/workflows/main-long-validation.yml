@@ -8,11 +8,125 @@ on:
     - cron: '37 8 * * *'
   workflow_dispatch:
 
+concurrency:
+  group: main-long-${{ github.run_id }}
+  cancel-in-progress: false
+
 permissions:
   actions: read
   contents: read
 
 jobs:
+  frontend-full:
+    name: 'frontend: exhaustive closure'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup-bun-deps
+      - name: Run complete frontend, schema, bundle, and browser contracts
+        run: |
+          bun run lint
+          bun run format:check
+          bun run typecheck
+          bun run check:schema
+          bun run test:unit
+          bun run check:bundle
+          bunx i18next-cli lint
+          bunx i18next-cli extract --ci --dry-run
+          bunx knip --config knip.jsonc --dependencies --reporter compact
+          bun tests/integration/checks/check-script-extension-policy.ts
+          bun tests/integration/checks/check-unsafe-casts.ts
+          bun packages/rawengine-schema/scripts/check-edit-command-bus.ts
+          bun scripts/checks/ci/check-schema-contract-gate.ts
+          bun run check:docs
+          bun run check:browser-harness
+
+      - name: Run browser visual smoke
+        run: |
+          bunx playwright install chromium
+          bun scripts/proofs/capture-visual-smoke.ts --scenario empty-library
+
+      - name: Generate bundle analysis report
+        if: ${{ always() }}
+        run: |
+          bun scripts/ci/generate-vite-bundle-report.ts
+          bun scripts/ci/write-vite-bundle-step-summary.ts
+
+      - name: Upload bundle analysis report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: main-vite-bundle-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/bundle-report/**
+          retention-days: 14
+          if-no-files-found: error
+
+  workflow-contracts:
+    name: 'workflow: actionlint and pinned actions'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version: '1.25.3'
+          cache: true
+      - name: Validate workflow syntax and action supply chain
+        run: |
+          bun run check:actions
+          bun tests/integration/checks/check-github-action-pins.ts
+
+  native-capability-matrix:
+    name: 'native: full capability matrix'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup-bun-deps
+      - uses: ./.github/actions/install-tauri-linux-deps
+      - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+        with:
+          components: clippy,rustfmt
+          rustflags: ''
+          rust-src-dir: src-tauri
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: src-tauri
+          key: v1-${{ runner.os }}-${{ runner.arch }}-main-native-capabilities
+          cache-on-failure: true
+      - name: Validate all maintained native profiles and leaf features
+        run: |
+          bun tests/integration/checks/check-native-feature-leaves.ts
+          bun run check:native-profiles
+          cargo test --manifest-path src-tauri/Cargo.toml --locked -p rapidraw-computational
+          cargo test --manifest-path src-tauri/Cargo.toml --locked -p rapidraw-codecs --all-features
+
+  dependency-security-license:
+    name: 'dependencies: exhaustive security and licenses'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup-bun-deps
+      - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+        with:
+          rustflags: ''
+          rust-src-dir: src-tauri
+      - name: Install maintained Rust audit tools
+        run: |
+          cargo install cargo-audit --locked --version 0.22.2
+          cargo install cargo-deny --locked --version 0.19.8
+      - name: Run complete JavaScript and Rust security/license closure
+        run: |
+          bun audit --audit-level moderate
+          bun tests/integration/checks/check-rust-advisory-waivers.ts
+          cargo audit --manifest-path src-tauri/Cargo.toml --ignore RUSTSEC-2024-0429 --ignore RUSTSEC-2026-0194 --ignore RUSTSEC-2026-0195
+          cargo deny --manifest-path src-tauri/Cargo.toml check licenses
+
   rust-clippy:
     name: 'rust: clippy baseline Linux'
     runs-on: ubuntu-latest
@@ -38,7 +152,9 @@ jobs:
 
       - name: Clippy
         working-directory: src-tauri
-        run: cargo clippy --locked --all-targets --no-default-features --features required-ci -- -D warnings -W clippy::redundant_clone
+        run: |
+          cargo fmt --all -- --check
+          cargo clippy --locked --all-targets --no-default-features --features required-ci -- -D warnings -W clippy::redundant_clone
 
   rust-test:
     name: 'rust: tests Linux'
@@ -68,7 +184,6 @@ jobs:
 
   main-macos-app-build:
     name: macOS app no-bundle smoke
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
     runs-on: macos-14
     timeout-minutes: 90
     steps:
@@ -195,7 +310,7 @@ jobs:
   main-macos-startup-runtime:
     name: macOS app startup runtime
     needs: main-macos-app-build
-    if: ${{ always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && needs.main-macos-app-build.result == 'success' }}
+    if: ${{ always() && needs.main-macos-app-build.result == 'success' }}
     runs-on: macos-14
     timeout-minutes: 20
     steps:
