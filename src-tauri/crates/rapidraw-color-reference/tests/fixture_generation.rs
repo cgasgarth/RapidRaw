@@ -31,7 +31,7 @@ fn fixture_generation_is_bit_deterministic_and_manifests_are_complete() {
     let first = generate_fixture_packs().unwrap();
     let second = generate_fixture_packs().unwrap();
     assert_eq!(first, second);
-    assert_eq!(first.len(), 15);
+    assert_eq!(first.len(), 16);
     assert_eq!(
         first[0].manifest.content_hash.to_hex(),
         "dc6cde97ae4f9c2f18fbf114e894852cf70c654cd156559502eab7588b4bdf0a"
@@ -130,6 +130,21 @@ fn rec2100_hdr_fixture_covers_absolute_neutrals_primaries_and_mixed_color() {
     assert!(samples.iter().any(|sample| {
         sample.red != sample.green && sample.green != sample.blue && sample.blue != sample.red
     }));
+}
+
+#[test]
+fn d50_xyz_fixture_covers_reference_white_negative_and_over_range_values() {
+    let FixtureData::Rgb(samples) = fixture(FixtureId::D50XyzVectors).data else {
+        panic!("D50 XYZ fixture must contain tristimulus samples");
+    };
+    assert_eq!(samples.len(), 7);
+    assert!(
+        samples.iter().any(|sample| {
+            sample.red == 0.96422 && sample.green == 1.0 && sample.blue == 0.82521
+        })
+    );
+    assert!(samples.iter().any(|sample| sample.red < 0.0));
+    assert!(samples.iter().any(|sample| sample.green > 1.0));
 }
 
 #[test]

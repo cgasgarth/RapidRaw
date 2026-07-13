@@ -35,6 +35,7 @@ pub enum FixtureDomain {
     PqAbsoluteLuminance,
     HlgSceneLinear,
     Rec2100AbsoluteRgb,
+    CieXyzD50,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -47,6 +48,7 @@ pub enum FixtureUnits {
     AbsoluteNitsAndPqSignal,
     HlgSceneLinearAndSignal,
     AbsoluteNits,
+    RelativeTristimulus,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -81,6 +83,7 @@ pub enum FixtureId {
     PqRamp,
     HlgRamp,
     Rec2100HdrColors,
+    D50XyzVectors,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -324,6 +327,19 @@ pub fn generate_fixture_packs() -> Result<Vec<FixturePack>, ReferenceError> {
         },
         FixtureData::Rgb(hdr_colors),
     ));
+    let d50_xyz = d50_xyz_vectors();
+    packs.push(pack(
+        FixtureId::D50XyzVectors,
+        FixtureDomain::CieXyzD50,
+        FixtureUnits::RelativeTristimulus,
+        FixtureShape {
+            width: d50_xyz.len(),
+            height: 1,
+            channels: 3,
+            samples: d50_xyz.len(),
+        },
+        FixtureData::Rgb(d50_xyz),
+    ));
     Ok(packs)
 }
 
@@ -339,6 +355,20 @@ fn rec2100_hdr_colors() -> Vec<RgbSample> {
         [0.0, 1_000.0, 0.0],
         [0.0, 0.0, 1_000.0],
         [600.0, 120.0, 20.0],
+    ]
+    .map(|[red, green, blue]| RgbSample { red, green, blue })
+    .to_vec()
+}
+
+fn d50_xyz_vectors() -> Vec<RgbSample> {
+    [
+        [0.0, 0.0, 0.0],
+        [0.96422, 1.0, 0.82521],
+        [0.4360747, 0.2225045, 0.0139322],
+        [0.3850649, 0.7168786, 0.0971045],
+        [0.1430804, 0.0606169, 0.7141733],
+        [-0.01, 0.02, 0.1],
+        [1.8, 2.4, 0.6],
     ]
     .map(|[red, green, blue]| RgbSample { red, green, blue })
     .to_vec()
@@ -559,6 +589,7 @@ fn fixture_id_tag(id: FixtureId) -> u8 {
         FixtureId::PqRamp => 6,
         FixtureId::HlgRamp => 7,
         FixtureId::Rec2100HdrColors => 8,
+        FixtureId::D50XyzVectors => 9,
     }
 }
 

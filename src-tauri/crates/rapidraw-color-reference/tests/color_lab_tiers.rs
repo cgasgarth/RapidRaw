@@ -76,12 +76,17 @@ fn fast_selects_the_small_affected_pack_while_full_runs_every_fixture() {
             "pq-ramp"
         ]
     );
-    assert_eq!(full.fixtures.len(), 15);
-    assert_eq!(full.stages.len(), 9);
+    assert_eq!(full.fixtures.len(), 16);
+    assert_eq!(full.stages.len(), 10);
     assert!(
         full.stages
             .iter()
             .any(|stage| stage.operation_id == "rec2100-nits-to-ictcp.v1")
+    );
+    assert!(
+        full.stages
+            .iter()
+            .any(|stage| stage.operation_id == "xyz-d50-to-lab.v1")
     );
     assert!(full.observed_values.len() > fast.observed_values.len());
 }

@@ -445,6 +445,7 @@ fn fixture_name(id: FixtureId) -> String {
         FixtureId::PqRamp => "pq-ramp".to_owned(),
         FixtureId::HlgRamp => "hlg-ramp".to_owned(),
         FixtureId::Rec2100HdrColors => "rec2100-hdr-colors".to_owned(),
+        FixtureId::D50XyzVectors => "d50-xyz-vectors".to_owned(),
     }
 }
 
@@ -464,6 +465,7 @@ fn operation_for(id: FixtureId, data: &FixtureData) -> Option<ReferenceOperation
         (FixtureId::Rec2100HdrColors, FixtureData::Rgb(_)) => {
             Some(ReferenceOperation::Rec2100NitsToICtCpV1)
         }
+        (FixtureId::D50XyzVectors, FixtureData::Rgb(_)) => Some(ReferenceOperation::XyzD50ToLabV1),
         _ => None,
     }
 }
