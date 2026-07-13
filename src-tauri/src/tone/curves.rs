@@ -22,7 +22,15 @@ const AP1_LUMINANCE: [f32; 3] = [0.272_228_72, 0.674_081_74, 0.053_689_52];
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum CurveDomain {
     SceneLog2Ev,
+    ViewEncoded(ViewProcessId),
+    OutputEncoded(OutputProfileId),
 }
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct ViewProcessId(pub u64);
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct OutputProfileId(pub u64);
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[repr(u32)]
@@ -56,6 +64,21 @@ pub struct CurvePoint {
 impl CurvePoint {
     pub const fn new(x_ev: f32, y_ev: f32) -> Self {
         Self { x_ev, y_ev }
+    }
+}
+
+pub(super) trait MonotonePoint {
+    fn x(&self) -> f32;
+    fn y(&self) -> f32;
+}
+
+impl MonotonePoint for CurvePoint {
+    fn x(&self) -> f32 {
+        self.x_ev
+    }
+
+    fn y(&self) -> f32 {
+        self.y_ev
     }
 }
 
@@ -168,24 +191,7 @@ impl CompiledCurvePlanV1 {
         if !input_ev.is_finite() {
             return input_ev;
         }
-        let first = self.points[0];
-        if input_ev <= first.x_ev {
-            return first.y_ev + (input_ev - first.x_ev) * self.tangents[0];
-        }
-        let last_index = self.points.len() - 1;
-        let last = self.points[last_index];
-        if input_ev >= last.x_ev {
-            return last.y_ev + (input_ev - last.x_ev) * self.tangents[last_index];
-        }
-        let upper = self.points.partition_point(|point| point.x_ev < input_ev);
-        let lower = upper - 1;
-        hermite(
-            input_ev,
-            self.points[lower],
-            self.points[upper],
-            self.tangents[lower],
-            self.tangents[upper],
-        )
+        evaluate_monotone(&self.points, &self.tangents, input_ev)
     }
 
     pub fn evaluate_rgb(&self, rgb: [f32; 3]) -> [f32; 3] {
@@ -249,15 +255,15 @@ impl CompiledCurvePlanV1 {
     }
 }
 
-fn monotone_tangents(points: &[CurvePoint]) -> Vec<f32> {
+pub(super) fn monotone_tangents<P: MonotonePoint>(points: &[P]) -> Vec<f32> {
     let intervals = points
         .windows(2)
-        .map(|pair| pair[1].x_ev - pair[0].x_ev)
+        .map(|pair| pair[1].x() - pair[0].x())
         .collect::<Vec<_>>();
     let slopes = points
         .windows(2)
         .zip(&intervals)
-        .map(|(pair, interval)| (pair[1].y_ev - pair[0].y_ev) / interval)
+        .map(|(pair, interval)| (pair[1].y() - pair[0].y()) / interval)
         .collect::<Vec<_>>();
     if points.len() == 2 {
         let slope = slopes[0].clamp(0.0, MAX_EXTRAPOLATION_SLOPE);
@@ -305,14 +311,38 @@ fn endpoint_tangent(width: f32, adjacent_width: f32, slope: f32, adjacent_slope:
     }
 }
 
-fn hermite(input: f32, lower: CurvePoint, upper: CurvePoint, m0: f32, m1: f32) -> f32 {
-    let width = upper.x_ev - lower.x_ev;
-    let t = (input - lower.x_ev) / width;
+pub(super) fn evaluate_monotone<P: MonotonePoint>(
+    points: &[P],
+    tangents: &[f32],
+    input: f32,
+) -> f32 {
+    let first = &points[0];
+    if input <= first.x() {
+        return first.y() + (input - first.x()) * tangents[0];
+    }
+    let last_index = points.len() - 1;
+    let last = &points[last_index];
+    if input >= last.x() {
+        return last.y() + (input - last.x()) * tangents[last_index];
+    }
+    let upper = points.partition_point(|point| point.x() < input);
+    hermite(
+        input,
+        &points[upper - 1],
+        &points[upper],
+        tangents[upper - 1],
+        tangents[upper],
+    )
+}
+
+fn hermite<P: MonotonePoint>(input: f32, lower: &P, upper: &P, m0: f32, m1: f32) -> f32 {
+    let width = upper.x() - lower.x();
+    let t = (input - lower.x()) / width;
     let t2 = t * t;
     let t3 = t2 * t;
-    (2.0 * t3 - 3.0 * t2 + 1.0) * lower.y_ev
+    (2.0 * t3 - 3.0 * t2 + 1.0) * lower.y()
         + (t3 - 2.0 * t2 + t) * m0 * width
-        + (-2.0 * t3 + 3.0 * t2) * upper.y_ev
+        + (-2.0 * t3 + 3.0 * t2) * upper.y()
         + (t3 - t2) * m1 * width
 }
 
