@@ -1,0 +1,39 @@
+name: Validation DAG cache verification
+
+on:
+  schedule:
+    - cron: '17 7 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  full-no-cache:
+    name: 'validation: periodic full no-cache'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: ./.github/actions/setup-bun-deps
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: rust-validation-tools
+        with:
+          path: |
+            ~/.cargo/bin/cargo-audit
+            ~/.cargo/bin/cargo-deny
+          key: v1-${{ runner.os }}-${{ runner.arch }}-validation-rust-tools-audit-0.22.2-deny-0.19.8
+
+      - name: Install Rust validation tools
+        if: steps.rust-validation-tools.outputs.cache-hit != 'true'
+        run: |
+          cargo install cargo-audit --locked --version 0.22.2
+          cargo install cargo-deny --locked --version 0.19.8
+
+      - name: Replay selector benchmark and full-equivalence proof
+        run: bun run validate:benchmark
+
+      - name: Execute every non-release node without result reuse
+        run: bun run validate:full

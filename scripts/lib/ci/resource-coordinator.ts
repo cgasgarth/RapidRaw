@@ -15,6 +15,7 @@ export interface ResourceLeaseOptions {
   resource: string;
   timeoutMs?: number;
   pollMs?: number;
+  root?: string;
 }
 
 export interface ResourceLease {
@@ -36,8 +37,8 @@ const processIsAlive = (pid: number): boolean => {
   }
 };
 
-const coordinatorRoot = (): string => {
-  const override = Bun.env.RAWENGINE_RESOURCE_COORDINATOR_ROOT;
+const coordinatorRoot = (explicitRoot?: string): string => {
+  const override = explicitRoot ?? Bun.env.RAWENGINE_RESOURCE_COORDINATOR_ROOT;
   if (override) return resolve(override);
   const result = Bun.spawnSync(['git', 'rev-parse', '--path-format=absolute', '--git-common-dir'], {
     stderr: 'pipe',
@@ -65,7 +66,7 @@ const replaceFile = async (path: string, contents: string): Promise<void> => {
 export async function acquireResourceLease(options: ResourceLeaseOptions): Promise<ResourceLease> {
   const timeoutMs = options.timeoutMs ?? Number(Bun.env.RAWENGINE_RESOURCE_WAIT_TIMEOUT_MS ?? 30 * 60_000);
   const pollMs = options.pollMs ?? Number(Bun.env.RAWENGINE_RESOURCE_WAIT_POLL_MS ?? 250);
-  const root = coordinatorRoot();
+  const root = coordinatorRoot(options.root);
   const lockPath = join(root, `${options.resource}.lock`);
   const ownerPath = join(root, `${options.resource}.owner.json`);
   await mkdir(root, { recursive: true });
