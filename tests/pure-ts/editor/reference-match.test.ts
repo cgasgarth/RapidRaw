@@ -234,6 +234,7 @@ describe('color-managed reference matching', () => {
     const groups = new Set<ReferenceMatchGroup>(['tone']);
     const receipt = matchLookApplicationReceiptV1Schema.parse({
       appliedAt: '2026-07-13T12:00:00.000Z',
+      baseGraphFingerprint: fingerprintReferenceMatchValue('reference-layer-base-graph'),
       destination: 'adjustment-layer',
       enabledGroups: ['tone'],
       historyEntriesAdded: 1,

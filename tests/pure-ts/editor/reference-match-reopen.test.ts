@@ -5,6 +5,7 @@ import { INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../../../src/ut
 
 const receipt = matchLookApplicationReceiptV1Schema.parse({
   appliedAt: '2026-07-13T20:00:00.000Z',
+  baseGraphFingerprint: `fnv1a64:${'0'.repeat(16)}`,
   destination: 'global-adjustments',
   enabledGroups: ['color', 'tone'],
   historyEntriesAdded: 1,
@@ -30,4 +31,10 @@ test('reference match provenance round-trips through sidecar normalization and c
     referenceMatchApplicationReceipt: { ...receipt, historyEntriesAdded: 3 },
   });
   expect(corrupt.referenceMatchApplicationReceipt).toBeNull();
+  expect(
+    normalizeLoadedAdjustments({
+      ...INITIAL_ADJUSTMENTS,
+      referenceMatchApplicationReceipt: { ...receipt, baseGraphFingerprint: undefined },
+    }).referenceMatchApplicationReceipt,
+  ).toBeNull();
 });

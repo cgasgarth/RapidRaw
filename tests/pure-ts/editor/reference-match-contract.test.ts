@@ -40,6 +40,7 @@ describe('reference match runtime contracts', () => {
     expect(
       matchLookApplicationReceiptV1Schema.parse({
         appliedAt: '2026-07-13T19:00:00.000Z',
+        baseGraphFingerprint: fingerprint('0'),
         destination: 'global-adjustments',
         enabledGroups: ['tone'],
         historyEntriesAdded: 1,
@@ -90,6 +91,7 @@ describe('reference match runtime contracts', () => {
   test('requires destination-specific layer provenance', () => {
     const baseReceipt = {
       appliedAt: '2026-07-13T19:00:00.000Z',
+      baseGraphFingerprint: fingerprint('0'),
       enabledGroups: ['tone'],
       historyEntriesAdded: 1,
       impact: 50,
