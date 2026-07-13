@@ -200,6 +200,7 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
   await click(container, '[data-testid="reference-match-apply"]');
   expect(useEditorStore.getState().historyIndex).toBe(historyBeforeProposal + 1);
   expect(useEditorStore.getState().lastReferenceMatchApplicationReceipt).toMatchObject({
+    baseGraphFingerprint: expect.stringMatching(/^fnv1a64:/),
     destination: 'global-adjustments',
     effectiveReferences: [{ role: 'creative', weight: 1 }],
     historyEntriesAdded: 1,
@@ -207,6 +208,9 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
   });
   expect(useEditorStore.getState().adjustments.referenceMatchApplicationReceipt).toEqual(
     useEditorStore.getState().lastReferenceMatchApplicationReceipt,
+  );
+  expect(useEditorStore.getState().lastReferenceMatchApplicationReceipt?.baseGraphFingerprint).not.toBe(
+    useEditorStore.getState().lastReferenceMatchApplicationReceipt?.resultingGraphFingerprint,
   );
   expect(useEditorStore.getState().adjustments.exposure).not.toBe(INITIAL_ADJUSTMENTS.exposure);
   expect(useEditorStore.getState().adjustments.cameraProfile).toBe(INITIAL_ADJUSTMENTS.cameraProfile);
@@ -237,6 +241,7 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
     name: 'Reference Normalize',
     opacity: 100,
     referenceMatchApplicationReceipt: {
+      baseGraphFingerprint: expect.stringMatching(/^fnv1a64:/),
       destination: 'adjustment-layer',
       effectiveReferences: [{ role: 'creative', weight: 1 }],
       enabledGroups: ['tone'],

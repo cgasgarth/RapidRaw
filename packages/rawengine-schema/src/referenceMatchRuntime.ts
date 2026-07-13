@@ -131,6 +131,7 @@ export const matchLookProposalV1Schema = z
 export const matchLookApplicationReceiptV1Schema = z
   .object({
     appliedAt: z.string().datetime(),
+    baseGraphFingerprint: fingerprintSchema,
     destination: z.enum(['global-adjustments', 'adjustment-layer']),
     effectiveReferences: effectiveReferenceSetV1Schema,
     enabledGroups: z.array(referenceMatchGroupV1Schema).min(1),
