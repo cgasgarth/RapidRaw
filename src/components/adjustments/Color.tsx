@@ -266,6 +266,9 @@ export default function ColorPanel({
               isForMask={isForMask}
               isWbPickerActive={isWbPickerActive}
               isWgpuEnabled={isWgpuEnabled}
+              inputSemantics={
+                selectedImage?.rawDevelopmentReport ? 'raw_scene_linear' : 'rendered_scene_linear_approximation'
+              }
               onDragStateChange={onDragStateChange}
               setAdjustments={setAdjustments}
               {...(toggleWbPicker ? { toggleWbPicker } : {})}

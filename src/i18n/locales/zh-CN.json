@@ -204,6 +204,7 @@
       },
       "rangeCenter": "范围中心",
       "rangeWidth": "范围宽度",
+      "renderedWhiteBalanceLimit": "",
       "resetActiveRange": "Reset active range",
       "resetLocalColorBalance": "Reset local color balance",
       "resetWhiteBalanceAsShot": "Reset white balance to as shot",

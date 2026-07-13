@@ -66,7 +66,7 @@ import {
 } from '../../../utils/viewerSampler';
 import { resolveWgpuPreviewVisibility } from '../../../utils/wgpuPreviewHealth';
 import {
-  averageWhiteBalancePickerRgbaSample,
+  analyzeWhiteBalancePickerRgbaSample,
   buildWhiteBalancePickerAdjustmentCommand,
   type WhiteBalancePickerRuntimeReceipt,
 } from '../../../utils/whiteBalancePicker';
@@ -855,6 +855,8 @@ const ImageCanvas = memo(
     };
     const [viewerSampler, setViewerSampler] = useState(initialViewerSamplerState);
     const viewerSamplerRef = useRef(viewerSampler);
+    const whiteBalancePreviewIdentityRef = useRef(finalPreviewUrl);
+    whiteBalancePreviewIdentityRef.current = finalPreviewUrl;
     viewerSamplerRef.current = viewerSampler;
     const transitionViewerSamplerRef = useRef<
       (transition: (current: LocalViewerSamplerState) => LocalViewerSamplerState) => void
@@ -1118,11 +1120,12 @@ const ImageCanvas = memo(
 
           ctx.drawImage(img, startX, startY, sw, sh, 0, 0, sw, sh);
 
-          const averageRgb = averageWhiteBalancePickerRgbaSample(ctx.getImageData(0, 0, sw, sh).data);
-          if (!averageRgb) return;
+          const patch = analyzeWhiteBalancePickerRgbaSample(ctx.getImageData(0, 0, sw, sh).data);
+          if (!patch || whiteBalancePreviewIdentityRef.current !== finalPreviewUrl) return;
+          if (patch.rejectedClippedPixels / patch.patchPixelCount > 0.1 || patch.spatialVariance > 0.025) return;
 
           const command = buildWhiteBalancePickerAdjustmentCommand({
-            averageRgb,
+            ...patch,
             coordinates: {
               imageX: x,
               imageY: y,
@@ -1130,6 +1133,7 @@ const ImageCanvas = memo(
               previewPixelY: srcY,
             },
             currentAdjustments: adjustments,
+            currentPreviewIdentity: whiteBalancePreviewIdentityRef.current,
             previewIdentity: finalPreviewUrl,
             selectedImagePath: selectedImage.path,
           });

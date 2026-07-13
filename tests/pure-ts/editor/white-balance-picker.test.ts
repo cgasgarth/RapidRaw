@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 import { useEditorStore } from '../../../src/store/useEditorStore';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import {
+  analyzeWhiteBalancePickerRgbaSample,
   averageWhiteBalancePickerRgbaSample,
   buildWhiteBalancePickerAdjustmentCommand,
   calculateWhiteBalancePickerAdjustment,
@@ -68,6 +69,45 @@ describe('white balance picker runtime command path', () => {
     });
     expect(command.receipt.confidence).toBeGreaterThanOrEqual(0);
     expect(command.receipt.estimatedKelvin).toBeGreaterThanOrEqual(1667);
+  });
+
+  test('records patch statistics and rejects clipped, mixed, and stale samples', () => {
+    const uniform = analyzeWhiteBalancePickerRgbaSample(
+      new Uint8ClampedArray([120, 130, 140, 255, 122, 131, 139, 255, 121, 129, 141, 255]),
+    );
+    expect(uniform).not.toBeNull();
+    expect(uniform?.patchPixelCount).toBe(3);
+    expect(uniform?.spatialVariance).toBeLessThan(0.001);
+
+    const base = {
+      coordinates: { imageX: 1, imageY: 2, previewPixelX: 3, previewPixelY: 4 },
+      currentAdjustments: INITIAL_ADJUSTMENTS,
+      previewIdentity: 'preview:new',
+      selectedImagePath: '/tmp/source.raw',
+    };
+    expect(() =>
+      buildWhiteBalancePickerAdjustmentCommand({
+        ...base,
+        averageRgb: { red: 120, green: 130, blue: 140 },
+        currentPreviewIdentity: 'preview:old',
+      }),
+    ).toThrow('white_balance_picker_stale_preview');
+    expect(() =>
+      buildWhiteBalancePickerAdjustmentCommand({
+        ...base,
+        averageRgb: { red: 120, green: 130, blue: 140 },
+        patchPixelCount: 10,
+        rejectedClippedPixels: 2,
+      }),
+    ).toThrow('white_balance_picker_clipped_patch');
+    expect(() =>
+      buildWhiteBalancePickerAdjustmentCommand({
+        ...base,
+        averageRgb: { red: 120, green: 130, blue: 140 },
+        patchPixelCount: 121,
+        spatialVariance: 0.03,
+      }),
+    ).toThrow('white_balance_picker_non_uniform_patch');
   });
 
   test('commits one undoable picker adjustment and preserves receipt data for QA', () => {

@@ -1,7 +1,142 @@
 use anyhow::{Result, anyhow};
+use serde::{Deserialize, Serialize};
 
 pub(crate) const WHITE_BALANCE_CONTRACT: &str = "rapidraw.white_balance.v1";
 pub const D60_XY: [f64; 2] = [0.32168, 0.33767];
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum WhiteBalanceModeV1 {
+    AsShot,
+    Auto,
+    KelvinTint,
+    Chromaticity,
+    Preset,
+}
+
+#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum WhiteBalanceInputSemanticsV1 {
+    /// Camera-referred scene-linear RGB after the camera input transform.
+    #[default]
+    RawSceneLinear,
+    /// Scene-linear RGB decoded from a rendered (JPEG/TIFF/PNG) source. This is
+    /// useful but cannot reconstruct the camera illuminant removed in-camera.
+    RenderedSceneLinearApproximation,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct WhiteBalancePlanInputV1 {
+    pub mode: WhiteBalanceModeV1,
+    #[serde(default = "default_kelvin")]
+    pub kelvin: f64,
+    #[serde(default)]
+    pub duv: f64,
+    #[serde(default)]
+    pub x: Option<f64>,
+    #[serde(default)]
+    pub y: Option<f64>,
+    #[serde(default)]
+    pub input_semantics: WhiteBalanceInputSemanticsV1,
+    #[serde(default)]
+    pub camera_channel_gains: Option<[f64; 3]>,
+}
+
+fn default_kelvin() -> f64 {
+    6_504.0
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct WhiteBalancePlanV1 {
+    pub contract: &'static str,
+    pub algorithm: &'static str,
+    pub mode: WhiteBalanceModeV1,
+    pub implementation_version: u32,
+    pub input_semantics: WhiteBalanceInputSemanticsV1,
+    pub source_illuminant: IlluminantCoordinates,
+    pub destination_xy: [f64; 2],
+    pub camera_channel_gains: Option<[f64; 3]>,
+    pub adaptation: &'static str,
+    pub ap1_matrix: [[f32; 3]; 3],
+    pub limitation_codes: Vec<&'static str>,
+    pub fingerprint: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WhiteBalanceFingerprintV1 {
+    contract: &'static str,
+    algorithm: &'static str,
+    mode: WhiteBalanceModeV1,
+    implementation_version: u32,
+    input_semantics: WhiteBalanceInputSemanticsV1,
+    source_illuminant: IlluminantCoordinates,
+    destination_xy: [f64; 2],
+    camera_channel_gains: Option<[f64; 3]>,
+    adaptation: &'static str,
+    ap1_matrix: [[f32; 3]; 3],
+    limitation_codes: Vec<&'static str>,
+}
+
+pub(crate) fn compile_white_balance_plan(
+    input: WhiteBalancePlanInputV1,
+) -> Result<WhiteBalancePlanV1> {
+    let source_illuminant = match input.mode {
+        WhiteBalanceModeV1::AsShot => estimate_cct_duv_from_xy(D60_XY)?,
+        WhiteBalanceModeV1::Chromaticity => estimate_cct_duv_from_xy([
+            input
+                .x
+                .ok_or_else(|| anyhow!("white_balance_missing_chromaticity_x"))?,
+            input
+                .y
+                .ok_or_else(|| anyhow!("white_balance_missing_chromaticity_y"))?,
+        ])?,
+        WhiteBalanceModeV1::Auto | WhiteBalanceModeV1::KelvinTint | WhiteBalanceModeV1::Preset => {
+            cct_duv_to_coordinates(input.kelvin, input.duv)?
+        }
+    };
+    let ap1_matrix = if input.mode == WhiteBalanceModeV1::AsShot {
+        [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+    } else {
+        technical_ap1_matrix_from_xy(source_illuminant.xy)?
+    };
+    let limitation_codes = match input.input_semantics {
+        WhiteBalanceInputSemanticsV1::RawSceneLinear => Vec::new(),
+        WhiteBalanceInputSemanticsV1::RenderedSceneLinearApproximation => {
+            vec!["rendered_source_camera_illuminant_not_recoverable"]
+        }
+    };
+    let fingerprint_input = WhiteBalanceFingerprintV1 {
+        contract: WHITE_BALANCE_CONTRACT,
+        algorithm: "cat16_ap1_illuminant_v1",
+        mode: input.mode,
+        implementation_version: 1,
+        input_semantics: input.input_semantics,
+        source_illuminant,
+        destination_xy: D60_XY,
+        camera_channel_gains: input.camera_channel_gains,
+        adaptation: "cat16_v1",
+        ap1_matrix,
+        limitation_codes: limitation_codes.clone(),
+    };
+    let canonical = serde_json::to_vec(&fingerprint_input)?;
+    Ok(WhiteBalancePlanV1 {
+        contract: WHITE_BALANCE_CONTRACT,
+        algorithm: "cat16_ap1_illuminant_v1",
+        mode: input.mode,
+        implementation_version: 1,
+        input_semantics: input.input_semantics,
+        source_illuminant,
+        destination_xy: D60_XY,
+        camera_channel_gains: input.camera_channel_gains,
+        adaptation: "cat16_v1",
+        ap1_matrix,
+        limitation_codes,
+        fingerprint: format!("blake3:{}", blake3::hash(&canonical).to_hex()),
+    })
+}
 
 const CAT16: [[f64; 3]; 3] = [
     [0.401_288, 0.650_173, -0.051_461],
@@ -24,7 +159,8 @@ const AP1_TO_XYZ: [[f64; 3]; 3] = [
     [-0.005_574_65, 0.004_060_73, 1.010_339_10],
 ];
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct IlluminantCoordinates {
     pub xy: [f64; 2],
     pub uv1960: [f64; 2],
@@ -55,11 +191,6 @@ pub(crate) fn cct_duv_to_coordinates(cct_kelvin: f64, duv: f64) -> Result<Illumi
         cct_kelvin,
         duv,
     })
-}
-
-pub(crate) fn technical_ap1_matrix(cct_kelvin: f64, duv: f64) -> Result<[[f32; 3]; 3]> {
-    let source = cct_duv_to_coordinates(cct_kelvin, duv)?.xy;
-    technical_ap1_matrix_from_xy(source)
 }
 
 pub(crate) fn technical_ap1_matrix_from_xy(source: [f64; 2]) -> Result<[[f32; 3]; 3]> {
@@ -246,7 +377,7 @@ mod tests {
                 assert!(coordinates.xy.into_iter().all(f64::is_finite));
                 assert!((coordinates.duv - duv).abs() < 1e-12);
                 assert!(
-                    technical_ap1_matrix(cct, duv)
+                    technical_ap1_matrix_from_xy(coordinates.xy)
                         .unwrap()
                         .into_iter()
                         .flatten()
@@ -272,5 +403,47 @@ mod tests {
         assert!(cct_duv_to_coordinates(1_000.0, 0.0).is_err());
         assert!(cct_duv_to_coordinates(6_500.0, 0.2).is_err());
         assert!(neutral_chroma_from_wb([f32::NAN, 1.0, 1.0, 1.0]).is_none());
+    }
+
+    #[test]
+    fn compiled_plan_has_stable_fingerprint_and_explicit_input_semantics() {
+        let input = WhiteBalancePlanInputV1 {
+            mode: WhiteBalanceModeV1::KelvinTint,
+            kelvin: 5_500.0,
+            duv: 0.004,
+            x: None,
+            y: None,
+            input_semantics: WhiteBalanceInputSemanticsV1::RenderedSceneLinearApproximation,
+            camera_channel_gains: None,
+        };
+        let first = compile_white_balance_plan(input.clone()).unwrap();
+        let second = compile_white_balance_plan(input).unwrap();
+        assert_eq!(first.fingerprint, second.fingerprint);
+        assert!(first.fingerprint.starts_with("blake3:"));
+        assert_eq!(
+            first.limitation_codes,
+            vec!["rendered_source_camera_illuminant_not_recoverable"]
+        );
+        assert!(first.ap1_matrix.into_iter().flatten().all(f32::is_finite));
+    }
+
+    #[test]
+    fn as_shot_plan_is_an_identity_without_double_adaptation() {
+        let plan = compile_white_balance_plan(WhiteBalancePlanInputV1 {
+            mode: WhiteBalanceModeV1::AsShot,
+            kelvin: 2_856.0,
+            duv: 0.01,
+            x: None,
+            y: None,
+            input_semantics: WhiteBalanceInputSemanticsV1::RawSceneLinear,
+            camera_channel_gains: Some([2.0, 1.0, 1.5]),
+        })
+        .unwrap();
+        assert_eq!(
+            plan.ap1_matrix,
+            [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+        );
+        assert!(plan.limitation_codes.is_empty());
+        assert_eq!(plan.camera_channel_gains, Some([2.0, 1.0, 1.5]));
     }
 }

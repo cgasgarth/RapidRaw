@@ -2,7 +2,12 @@ import cx from 'clsx';
 import { Pipette, RotateCcw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ColorAdjustment, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
-import { buildTechnicalWhiteBalance, type WhiteBalanceMode } from '../../../utils/color/whiteBalance';
+import {
+  buildTechnicalWhiteBalance,
+  buildTechnicalWhiteBalancePreset,
+  WHITE_BALANCE_PRESETS,
+  type WhiteBalanceMode,
+} from '../../../utils/color/whiteBalance';
 import CompactInspectorSectionHeader from '../../ui/CompactInspectorSectionHeader';
 import { professionalInspectorDensityTokens } from '../../ui/inspectorTokens';
 import AdjustmentSlider from '../AdjustmentSlider';
@@ -12,6 +17,7 @@ interface ColorQuickControlsProps extends ColorPanelGroupProps {
   isForMask: boolean;
   isWbPickerActive: boolean;
   isWgpuEnabled: boolean;
+  inputSemantics: 'raw_scene_linear' | 'rendered_scene_linear_approximation';
   toggleWbPicker?: () => void;
 }
 
@@ -20,6 +26,7 @@ export const ColorQuickControls = ({
   isForMask,
   isWbPickerActive,
   isWgpuEnabled,
+  inputSemantics,
   onDragStateChange,
   setAdjustments,
   toggleWbPicker,
@@ -47,7 +54,10 @@ export const ColorQuickControls = ({
       ...(isForMask
         ? { temperature: INITIAL_ADJUSTMENTS.temperature, tint: INITIAL_ADJUSTMENTS.tint }
         : {
-            whiteBalanceTechnical: structuredClone(INITIAL_ADJUSTMENTS.whiteBalanceTechnical),
+            whiteBalanceTechnical: {
+              ...structuredClone(INITIAL_ADJUSTMENTS.whiteBalanceTechnical),
+              inputSemantics,
+            },
             creativeTemperature: INITIAL_ADJUSTMENTS.creativeTemperature,
             creativeTint: INITIAL_ADJUSTMENTS.creativeTint,
             whiteBalanceMigration: 'native_v1' as const,
@@ -63,6 +73,7 @@ export const ColorQuickControls = ({
         kelvin,
         duv,
         mode === 'preset' ? 'preset' : mode === 'auto' ? 'auto' : mode === 'as_shot' ? 'as_shot' : 'user',
+        inputSemantics,
       ),
       whiteBalanceMigration: 'native_v1',
     }));
@@ -196,6 +207,34 @@ export const ColorQuickControls = ({
             {adjustments.whiteBalanceTechnical.mode !== 'as_shot' &&
             adjustments.whiteBalanceTechnical.mode !== 'auto' ? (
               <>
+                {adjustments.whiteBalanceTechnical.mode === 'preset' ? (
+                  <label className="flex items-center justify-between gap-2 py-1 text-xs text-text-secondary">
+                    <span>{t('adjustments.color.preset', { defaultValue: 'Preset' })}</span>
+                    <select
+                      aria-label={t('adjustments.color.preset', { defaultValue: 'Preset' })}
+                      className="h-6 rounded border border-editor-border bg-editor-panel px-1.5 text-xs text-text-primary"
+                      data-testid="color-white-balance-preset"
+                      onChange={(event) =>
+                        setAdjustments((previous) => ({
+                          ...previous,
+                          whiteBalanceTechnical: buildTechnicalWhiteBalancePreset(
+                            event.target.value as (typeof WHITE_BALANCE_PRESETS)[number]['id'],
+                            previous.whiteBalanceTechnical.synchronization,
+                            inputSemantics,
+                          ),
+                          whiteBalanceMigration: 'native_v1',
+                        }))
+                      }
+                      value={adjustments.whiteBalanceTechnical.presetId ?? 'daylight'}
+                    >
+                      {WHITE_BALANCE_PRESETS.map((preset) => (
+                        <option key={preset.id} value={preset.id}>
+                          {preset.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
                 <label className="flex items-center justify-between gap-2 py-1 text-xs text-text-secondary">
                   <span>{t('adjustments.color.kelvin', { defaultValue: 'Kelvin' })}</span>
                   <input
@@ -235,6 +274,16 @@ export const ColorQuickControls = ({
                   onDragStateChange={onDragStateChange}
                 />
               </>
+            ) : null}
+            {inputSemantics === 'rendered_scene_linear_approximation' ? (
+              <p
+                className="py-0.5 text-[10px] leading-tight text-text-secondary"
+                data-testid="color-white-balance-rendered-limit"
+              >
+                {t('adjustments.color.renderedWhiteBalanceLimit', {
+                  defaultValue: 'Relative adaptation; rendered files cannot recover the original camera white balance.',
+                })}
+              </p>
             ) : null}
             <AdjustmentSlider
               defaultValue={0}

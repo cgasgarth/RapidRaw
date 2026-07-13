@@ -198,6 +198,7 @@
       },
       "rangeCenter": "",
       "rangeWidth": "",
+      "renderedWhiteBalanceLimit": "",
       "resetActiveRange": "",
       "resetLocalColorBalance": "Reset local color balance",
       "resetWhiteBalanceAsShot": "Reset white balance to as shot",

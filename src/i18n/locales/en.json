@@ -204,6 +204,7 @@
       },
       "rangeCenter": "Range center",
       "rangeWidth": "Range width",
+      "renderedWhiteBalanceLimit": "Relative adaptation; rendered files cannot recover the original camera white balance.",
       "resetActiveRange": "Reset active range",
       "resetLocalColorBalance": "Reset local color balance",
       "resetWhiteBalanceAsShot": "Reset white balance to as shot",

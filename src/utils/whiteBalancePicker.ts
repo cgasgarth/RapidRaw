@@ -47,6 +47,8 @@ export interface WhiteBalancePickerRuntimeReceipt {
   estimatedKelvin: number;
   estimatedXy: [number, number];
   patchPixelCount: number;
+  rejectedClippedPixels: number;
+  spatialVariance: number;
   previewIdentity: string;
   resultingTemperature: number;
   resultingTint: number;
@@ -64,7 +66,24 @@ export interface WhiteBalancePickerAdjustmentCommandInput {
   coordinates: WhiteBalancePickerSampleCoordinates;
   currentAdjustments: Adjustments;
   previewIdentity: string;
+  currentPreviewIdentity?: string;
+  patchPixelCount?: number;
+  rejectedClippedPixels?: number;
+  spatialVariance?: number;
   selectedImagePath: string;
+}
+
+export interface WhiteBalancePickerPatchSample {
+  averageRgb: z.infer<typeof whiteBalancePickerSampleSchema>;
+  patchPixelCount: number;
+  rejectedClippedPixels: number;
+  spatialVariance: number;
+}
+
+export class WhiteBalancePickerSampleError extends Error {
+  constructor(public readonly code: 'stale_preview' | 'clipped_patch' | 'non_uniform_patch') {
+    super(`white_balance_picker_${code}`);
+  }
 }
 
 export interface RgbPixel {
@@ -177,13 +196,44 @@ export const averageWhiteBalancePickerRgbaSample = (
   });
 };
 
+export const analyzeWhiteBalancePickerRgbaSample = (
+  data: Uint8ClampedArray | ArrayLike<number>,
+): WhiteBalancePickerPatchSample | null => {
+  const averageRgb = averageWhiteBalancePickerRgbaSample(data);
+  if (!averageRgb) return null;
+  const patchPixelCount = Math.floor(data.length / 4);
+  let rejectedClippedPixels = 0;
+  let squaredDistance = 0;
+  for (let i = 0; i + 2 < data.length; i += 4) {
+    const red = data[i] ?? 0;
+    const green = data[i + 1] ?? 0;
+    const blue = data[i + 2] ?? 0;
+    if (Math.min(red, green, blue) <= 1 || Math.max(red, green, blue) >= 254) rejectedClippedPixels += 1;
+    squaredDistance += (red - averageRgb.red) ** 2 + (green - averageRgb.green) ** 2 + (blue - averageRgb.blue) ** 2;
+  }
+  return {
+    averageRgb,
+    patchPixelCount,
+    rejectedClippedPixels,
+    spatialVariance: squaredDistance / Math.max(1, patchPixelCount * 3 * 255 ** 2),
+  };
+};
+
 export const buildWhiteBalancePickerAdjustmentCommand = ({
   averageRgb,
   coordinates,
   currentAdjustments,
+  patchPixelCount = 1,
   previewIdentity,
+  currentPreviewIdentity = previewIdentity,
+  rejectedClippedPixels = 0,
   selectedImagePath,
+  spatialVariance = 0,
 }: WhiteBalancePickerAdjustmentCommandInput): WhiteBalancePickerAdjustmentCommand => {
+  if (currentPreviewIdentity !== previewIdentity) throw new WhiteBalancePickerSampleError('stale_preview');
+  if (patchPixelCount <= 0 || rejectedClippedPixels / patchPixelCount > 0.1)
+    throw new WhiteBalancePickerSampleError('clipped_patch');
+  if (spatialVariance > 0.025) throw new WhiteBalancePickerSampleError('non_uniform_patch');
   const adjustment = calculateWhiteBalancePickerAdjustment({
     currentTemperature: currentAdjustments.temperature,
     currentTint: currentAdjustments.tint,
@@ -202,7 +252,7 @@ export const buildWhiteBalancePickerAdjustmentCommand = ({
       x: estimate.xy[0],
       y: estimate.xy[1],
       confidence: estimate.confidence,
-      sampleCount: 1,
+      sampleCount: patchPixelCount - rejectedClippedPixels,
     }),
     whiteBalanceMigration: 'native_v1' as const,
   };
@@ -219,11 +269,13 @@ export const buildWhiteBalancePickerAdjustmentCommand = ({
       estimatedDuv: estimate.duv,
       estimatedKelvin: estimate.kelvin,
       estimatedXy: estimate.xy,
-      patchPixelCount: 1,
+      patchPixelCount,
       previewIdentity,
+      rejectedClippedPixels,
       resultingTemperature: adjustment.temperature,
       resultingTint: adjustment.tint,
       selectedImagePath,
+      spatialVariance,
     },
   };
 };

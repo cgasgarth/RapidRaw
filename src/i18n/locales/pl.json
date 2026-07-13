@@ -204,6 +204,7 @@
       },
       "rangeCenter": "Środek zakresu",
       "rangeWidth": "Szerokość zakresu",
+      "renderedWhiteBalanceLimit": "",
       "resetActiveRange": "Reset active range",
       "resetLocalColorBalance": "Reset local color balance",
       "resetWhiteBalanceAsShot": "Reset white balance to as shot",

@@ -4,7 +4,7 @@ use crate::adjustments::abi::{
     GpuMat3, HslColor, LevelsSettings, MAX_MASKS, MaskAdjustments, Point,
 };
 use crate::adjustments::scales::SCALES;
-use crate::color::white_balance::{technical_ap1_matrix, technical_ap1_matrix_from_xy};
+use crate::color::white_balance::{WhiteBalancePlanInputV1, compile_white_balance_plan};
 use crate::image_processing::calculate_agx_matrices;
 use crate::mask_generation::MaskDefinition;
 use serde::Deserialize;
@@ -45,39 +45,15 @@ fn technical_white_balance_from_json(value: &JsonValue) -> GpuMat3 {
     else {
         return GpuMat3::default();
     };
-    let mode = settings
-        .get("mode")
-        .and_then(JsonValue::as_str)
-        .unwrap_or("as_shot");
-    let matrix = match mode {
-        "as_shot" => return GpuMat3::default(),
-        "chromaticity" => {
-            let x = settings
-                .get("x")
-                .and_then(JsonValue::as_f64)
-                .unwrap_or(f64::NAN);
-            let y = settings
-                .get("y")
-                .and_then(JsonValue::as_f64)
-                .unwrap_or(f64::NAN);
-            technical_ap1_matrix_from_xy([x, y])
-        }
-        "auto" | "kelvin_tint" | "preset" => {
-            let kelvin = settings
-                .get("kelvin")
-                .and_then(JsonValue::as_f64)
-                .unwrap_or(6_504.0);
-            let duv = settings
-                .get("duv")
-                .and_then(JsonValue::as_f64)
-                .unwrap_or(0.0);
-            technical_ap1_matrix(kelvin, duv)
-        }
-        _ => return GpuMat3::default(),
-    };
-    let Ok(rows) = matrix else {
+    let Ok(input) =
+        serde_json::from_value::<WhiteBalancePlanInputV1>(JsonValue::Object(settings.clone()))
+    else {
         return GpuMat3::default();
     };
+    let Ok(plan) = compile_white_balance_plan(input) else {
+        return GpuMat3::default();
+    };
+    let rows = plan.ap1_matrix;
     GpuMat3 {
         col0: [rows[0][0], rows[1][0], rows[2][0], 0.0],
         col1: [rows[0][1], rows[1][1], rows[2][1], 0.0],

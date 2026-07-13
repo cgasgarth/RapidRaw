@@ -12,6 +12,15 @@ export const technicalWhiteBalanceV1Schema = z
     source: z.enum(['as_shot', 'auto', 'picker', 'preset', 'user']),
     confidence: z.number().min(0).max(1).nullable(),
     sampleCount: z.number().int().nonnegative().nullable(),
+    inputSemantics: z.enum(['raw_scene_linear', 'rendered_scene_linear_approximation']).default('raw_scene_linear'),
+    presetId: z.enum(['tungsten', 'daylight', 'flash', 'cloudy', 'shade']).nullable().default(null),
+    synchronization: z
+      .object({
+        mode: z.enum(['per_image', 'locked_reference']),
+        referenceSourceIdentity: z.string().trim().min(1).nullable(),
+      })
+      .strict()
+      .default({ mode: 'per_image', referenceSourceIdentity: null }),
   })
   .strict()
   .refine(({ x, y }) => x + y < 1, { message: 'Chromaticity x+y must be below one.' });

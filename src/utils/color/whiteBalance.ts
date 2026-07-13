@@ -5,6 +5,20 @@ export const WHITE_BALANCE_ALGORITHM = 'cat16_ap1_illuminant_v1' as const;
 
 export const whiteBalanceModeSchema = z.enum(['as_shot', 'auto', 'kelvin_tint', 'chromaticity', 'preset']);
 export type WhiteBalanceMode = z.infer<typeof whiteBalanceModeSchema>;
+export const whiteBalancePresetIdSchema = z.enum(['tungsten', 'daylight', 'flash', 'cloudy', 'shade']);
+export type WhiteBalancePresetId = z.infer<typeof whiteBalancePresetIdSchema>;
+export const WHITE_BALANCE_PRESETS: ReadonlyArray<{
+  id: WhiteBalancePresetId;
+  label: string;
+  kelvin: number;
+  duv: number;
+}> = [
+  { id: 'tungsten', label: 'Tungsten', kelvin: 2856, duv: 0 },
+  { id: 'daylight', label: 'Daylight', kelvin: 5503, duv: 0 },
+  { id: 'flash', label: 'Flash', kelvin: 6000, duv: 0 },
+  { id: 'cloudy', label: 'Cloudy', kelvin: 6500, duv: 0 },
+  { id: 'shade', label: 'Shade', kelvin: 7500, duv: 0 },
+];
 
 export const technicalWhiteBalanceSchema = z
   .object({
@@ -18,6 +32,15 @@ export const technicalWhiteBalanceSchema = z
     source: z.enum(['as_shot', 'auto', 'picker', 'preset', 'user']),
     confidence: z.number().min(0).max(1).nullable(),
     sampleCount: z.number().int().nonnegative().nullable(),
+    inputSemantics: z.enum(['raw_scene_linear', 'rendered_scene_linear_approximation']).default('raw_scene_linear'),
+    presetId: whiteBalancePresetIdSchema.nullable().default(null),
+    synchronization: z
+      .object({
+        mode: z.enum(['per_image', 'locked_reference']),
+        referenceSourceIdentity: z.string().trim().min(1).nullable(),
+      })
+      .strict()
+      .default({ mode: 'per_image', referenceSourceIdentity: null }),
   })
   .strict()
   .refine(({ x, y }) => x + y < 1, { message: 'Chromaticity x+y must be below one' });
@@ -148,6 +171,7 @@ export const buildTechnicalWhiteBalance = (
   kelvin = 6504,
   duv = 0,
   source: TechnicalWhiteBalance['source'] = 'user',
+  inputSemantics: TechnicalWhiteBalance['inputSemantics'] = 'raw_scene_linear',
 ): TechnicalWhiteBalance => {
   const [x, y] = mode === 'as_shot' ? D60_XY : cctDuvToXy(kelvin, duv);
   return technicalWhiteBalanceSchema.parse({
@@ -161,6 +185,26 @@ export const buildTechnicalWhiteBalance = (
     source: mode === 'as_shot' ? 'as_shot' : source,
     confidence: null,
     sampleCount: null,
+    inputSemantics,
+    presetId: mode === 'preset' ? 'daylight' : null,
+    synchronization: { mode: 'per_image', referenceSourceIdentity: null },
+  });
+};
+
+export const buildTechnicalWhiteBalancePreset = (
+  presetId: WhiteBalancePresetId,
+  synchronization: TechnicalWhiteBalance['synchronization'] = {
+    mode: 'per_image',
+    referenceSourceIdentity: null,
+  },
+  inputSemantics: TechnicalWhiteBalance['inputSemantics'] = 'raw_scene_linear',
+): TechnicalWhiteBalance => {
+  const preset = WHITE_BALANCE_PRESETS.find(({ id }) => id === presetId);
+  if (!preset) throw new Error('white_balance_preset_not_found');
+  return technicalWhiteBalanceSchema.parse({
+    ...buildTechnicalWhiteBalance('preset', preset.kelvin, preset.duv, 'preset', inputSemantics),
+    presetId,
+    synchronization,
   });
 };
 
