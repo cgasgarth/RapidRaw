@@ -92,6 +92,7 @@ describe('performance lab runner', () => {
       'editor.preview-scheduling',
       'browser.editor-open',
       'browser.editor-compare',
+      'browser.editor-crop',
       'browser.library-open',
     ]);
     expect(performanceScenarios.every(({ version, measuredRuns }) => version > 0 && measuredRuns >= 5)).toBeTrue();

@@ -9,6 +9,7 @@ bun perf list
 bun perf run editor.preview-scheduling
 bun perf run browser.editor-open
 bun perf run browser.editor-compare
+bun perf run browser.editor-crop
 bun perf run browser.library-open
 bun perf run editor.preview-scheduling --baseline private-artifacts/perf/baseline.json
 bun perf baseline-add private-artifacts/perf/history.json private-artifacts/perf/baseline.json --actor reviewer-name --reason "reviewed stable local run" --signing-key private-artifacts/perf/reviewer-ed25519.pem
@@ -28,7 +29,7 @@ bun perf retention-plan --history private-artifacts/perf/history.json --index pr
 
 `editor.preview-scheduling` executes the adjustment-snapshot scheduling hot path directly. Setup is excluded, two warmups precede nine retained samples, and every retained run proves both control and instrumented dispatch sinks before it can be valid. It records control cost, light snapshot-instrumentation overhead, CPU time, resident memory, filesystem operations, and deterministic dispatch work separately, and invalidates a run above the documented 5 ms overhead ceiling. Receipts remain under ignored `private-artifacts/perf` unless `--output` selects another location.
 
-`browser.editor-open`, `browser.editor-compare`, and `browser.library-open` execute the repository-owned Playwright/Tauri browser scenarios end to end. The editor-open lane covers the progressive image-loading path through a visible editor terminal state. Each retained sample validates the terminal QA receipt before recording interaction latency separately from Vite/Chromium harness setup and explicit process-start work. One warmup precedes five measured runs. The performance workflow runs every registered scenario in independent lanes; the former readiness-only scaffold no longer counts as runtime coverage.
+`browser.editor-open`, `browser.editor-compare`, `browser.editor-crop`, and `browser.library-open` execute the repository-owned Playwright/Tauri browser scenarios end to end. The editor-open lane covers the progressive image-loading path through a visible editor terminal state, while the crop lane measures a geometry interaction and its committed terminal state. Each retained sample validates the terminal QA receipt before recording interaction latency separately from Vite/Chromium harness setup and explicit process-start work. One warmup precedes five measured runs. The performance workflow runs every registered scenario in independent lanes; the former readiness-only scaffold no longer counts as runtime coverage.
 
 Comparisons require the same scenario/version, fixture digest, cache mode, hardware class, and build profile. A latency gate regresses only when its p95 exceeds both relative and absolute thresholds. Raw samples, median, p90, p95, MAD, IQR, and a fixed-seed 2,000-resample bootstrap 95% median interval remain available for reproducible trend inspection.
 

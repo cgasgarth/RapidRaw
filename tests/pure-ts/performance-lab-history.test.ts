@@ -290,6 +290,10 @@ exit 1
         .scenarioIds,
     ).toEqual(['browser.editor-compare']);
     expect(
+      selectAffectedPerformanceScenarios(['src/components/panel/editor/CropPanel.tsx'], performanceScenarios)
+        .scenarioIds,
+    ).toEqual(['browser.editor-crop']);
+    expect(
       selectAffectedPerformanceScenarios(['src/utils/progressiveImageFrame.ts'], performanceScenarios).scenarioIds,
     ).toEqual(['browser.editor-open']);
     expect(
@@ -298,6 +302,7 @@ exit 1
     expect(selectAffectedPerformanceScenarios(['unknown/new-file.ts'], performanceScenarios)).toMatchObject({
       scenarioIds: [
         'browser.editor-compare',
+        'browser.editor-crop',
         'browser.editor-open',
         'browser.library-open',
         'editor.preview-scheduling',
