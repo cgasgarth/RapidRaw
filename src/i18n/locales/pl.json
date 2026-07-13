@@ -1883,6 +1883,9 @@
       "exit": "Exit preview mode",
       "label": "Preview only"
     },
+    "provisionalCameraPreview": "Podgląd aparatu — wywoływanie RAW",
+    "provisionalCameraPreviewFailed": "Podgląd aparatu — wywoływanie RAW nie powiodło się",
+    "provisionalLibraryPreview": "Podgląd biblioteki — wywoływanie RAW",
     "switcher": {
       "search": {
         "close": "Close panel search",
