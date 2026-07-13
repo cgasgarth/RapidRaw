@@ -96,10 +96,10 @@ struct GlobalAdjustments {
     tint: f32,
     vibrance: f32,
     hue: f32,
-    _pad_color1: f32,
-    _pad_color2: f32,
-    _pad_color3: f32,
-    _pad_color4: f32,
+    dehaze_atmosphere_r: f32,
+    dehaze_atmosphere_g: f32,
+    dehaze_atmosphere_b: f32,
+    dehaze_atmosphere_confidence: f32,
     technical_white_balance: mat3x3<f32>,
 
     sharpness: f32,
@@ -1093,7 +1093,14 @@ fn apply_centre_tonal_and_color(
     return processed_color;
 }
 
-fn apply_dehaze(color: vec3<f32>, blurred_color_input_space: vec3<f32>, is_raw: u32, amount: f32) -> vec3<f32> {
+fn apply_dehaze(
+    color: vec3<f32>,
+    blurred_color_input_space: vec3<f32>,
+    is_raw: u32,
+    amount: f32,
+    atmospheric_light: vec3<f32>,
+    atmosphere_confidence: f32,
+) -> vec3<f32> {
     if (amount == 0.0) { return color; }
 
     var blurred_linear: vec3<f32>;
@@ -1103,35 +1110,29 @@ fn apply_dehaze(color: vec3<f32>, blurred_color_input_space: vec3<f32>, is_raw: 
         blurred_linear = srgb_to_linear(blurred_color_input_space);
     }
 
-    let atmospheric_light = vec3<f32>(0.95, 0.97, 1.0);
+    let safe_atmosphere = max(atmospheric_light, vec3<f32>(0.01));
+    let pixel_dark = min(color.r / safe_atmosphere.r, min(color.g / safe_atmosphere.g, color.b / safe_atmosphere.b));
+    let regional_dark = min(
+        blurred_linear.r / safe_atmosphere.r,
+        min(blurred_linear.g / safe_atmosphere.g, blurred_linear.b / safe_atmosphere.b),
+    );
+    let pixel_luma = get_luma(max(color, vec3<f32>(0.0)));
+    let blurred_luma = get_luma(max(blurred_linear, vec3<f32>(0.0)));
+    let edge_diff = abs(sqrt(pixel_luma) - sqrt(blurred_luma));
+    let edge_weight = smoothstep(0.02, 0.15, edge_diff);
+    let guided_dark = mix(regional_dark, pixel_dark, edge_weight);
+    let transmission = clamp(1.0 - 0.95 * guided_dark, 0.08, 1.0);
+    let confidence_weight = mix(0.35, 1.0, clamp(atmosphere_confidence, 0.0, 1.0));
+    let strength = clamp(abs(amount) * 7.5, 0.0, 1.0) * confidence_weight;
+    let effective_transmission = mix(1.0, transmission, strength);
 
     if (amount > 0.0) {
-        let pixel_dark = min(color.r, min(color.g, color.b));
-        let regional_dark = min(blurred_linear.r, min(blurred_linear.g, blurred_linear.b));
-        let pixel_luma = get_luma(max(color, vec3<f32>(0.0)));
-        let blurred_luma = get_luma(max(blurred_linear, vec3<f32>(0.0)));
-        let edge_diff = abs(pow(pixel_luma, 0.5) - pow(blurred_luma, 0.5));
-        let halo_protection = smoothstep(0.02, 0.15, edge_diff);
-        let spatial_dark = mix(regional_dark, pixel_dark, halo_protection);
-        let safe_dark = max(spatial_dark - 0.02, 0.0);
-        let mapped_haze = safe_dark / (safe_dark + 0.2);
-        let t = max(1.0 - amount * mapped_haze * 0.85, 0.15);
-        var recovered = (color - atmospheric_light) / t + atmospheric_light;
-        let rec_luma = get_luma(max(recovered, vec3<f32>(0.0)));
-        let shadow_lift = smoothstep(0.1, 0.0, rec_luma) * (1.0 - t) * 0.15;
-        recovered += shadow_lift;
-        let haze_removed = 1.0 - t;
-        let sat_boost = haze_removed * 0.5;
-        let final_luma = get_luma(max(recovered, vec3<f32>(0.0)));
-        recovered = mix(vec3<f32>(final_luma), recovered, 1.0 + sat_boost);
-        return max(recovered, vec3<f32>(0.0));
-    } else {
-        let regional_dark = min(blurred_linear.r, min(blurred_linear.g, blurred_linear.b));
-        let safe_dark = max(regional_dark - 0.02, 0.0);
-        let mapped_depth = safe_dark / (safe_dark + 0.2);
-        let depth_factor = mix(0.4, 1.0, mapped_depth);
-        return mix(color, atmospheric_light, abs(amount) * 0.7 * depth_factor);
+        let recovered = (color - safe_atmosphere) / effective_transmission + safe_atmosphere;
+        let atmosphere_luma = get_luma(safe_atmosphere);
+        let highlight_protection = smoothstep(atmosphere_luma * 0.75, atmosphere_luma * 1.25, pixel_luma);
+        return mix(recovered, color, highlight_protection * 0.65);
     }
+    return color * effective_transmission + safe_atmosphere * (1.0 - effective_transmission);
 }
 
 fn apply_noise_reduction(
@@ -1927,7 +1928,19 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         processed_rgb += flare_color * t_flare * protection;
     }
 
-    var composite_rgb_linear = apply_dehaze(processed_rgb, structure_blurred, is_raw, t_dehaze);
+    let dehaze_atmosphere = vec3<f32>(
+        adjustments.global.dehaze_atmosphere_r,
+        adjustments.global.dehaze_atmosphere_g,
+        adjustments.global.dehaze_atmosphere_b,
+    );
+    var composite_rgb_linear = apply_dehaze(
+        processed_rgb,
+        structure_blurred,
+        is_raw,
+        t_dehaze,
+        dehaze_atmosphere,
+        adjustments.global.dehaze_atmosphere_confidence,
+    );
     composite_rgb_linear = apply_centre_tonal_and_color(composite_rgb_linear, adjustments.global.centre, absolute_coord_i);
     composite_rgb_linear = apply_white_balance(composite_rgb_linear, t_temperature, t_tint);
     composite_rgb_linear = apply_filmic_exposure(composite_rgb_linear, t_brightness);
