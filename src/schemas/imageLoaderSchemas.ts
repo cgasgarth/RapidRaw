@@ -120,6 +120,41 @@ export const rawDevelopmentReportSchema = z
     inputTransform: rawInputTransformReceiptV2Schema.nullable().optional(),
     demosaicAlgorithmId: z.string().trim().min(1).nullable().optional(),
     demosaicPath: rawDemosaicPathSchema,
+    highlightReconstruction: z
+      .object({
+        algorithmId: z.literal('sensor_linear_confidence_hierarchy_v2'),
+        cfaKind: z.enum(['bayer', 'x_trans', 'other_rgb', 'unsupported']),
+        clippedSamples: z.number().int().nonnegative(),
+        confidencePercentiles: z.tuple([
+          z.number().min(0).max(1),
+          z.number().min(0).max(1),
+          z.number().min(0).max(1),
+          z.number().min(0).max(1),
+          z.number().min(0).max(1),
+        ]),
+        implementationVersion: z.literal(2),
+        invalidSamples: z.number().int().nonnegative(),
+        largestClippedRegion: z.number().int().nonnegative(),
+        methodCounts: z.partialRecord(
+          z.enum([
+            'same_channel_spatial',
+            'cross_channel_ratio',
+            'color_line',
+            'region_propagation',
+            'post_demosaic_chroma',
+            'neutral_specular_fallback',
+          ]),
+          z.number().int().nonnegative(),
+        ),
+        mode: z.enum(['off', 'conservative', 'auto', 'strong']),
+        nearClippedSamples: z.number().int().nonnegative(),
+        partiallyReconstructedSamples: z.number().int().nonnegative(),
+        postDemosaicFallbackSamples: z.number().int().nonnegative(),
+        reconstructedSamples: z.number().int().nonnegative(),
+        unrecoverableSamples: z.number().int().nonnegative(),
+        warningCodes: z.array(z.string().trim().min(1)),
+      })
+      .strict(),
     processingProfile: rawProcessingProfileSchema,
     runtime: z
       .object({

@@ -108,7 +108,7 @@ enum DemosaicSharpeningPath {
 }
 
 const RAW_CACHE_CAMERA_PROFILE_RESOLVER_VERSION: &str = "dual_illuminant_mired_v2";
-const RAW_CACHE_RECONSTRUCTION_VERSION: &str = "raw_reconstruction_v4";
+const RAW_CACHE_RECONSTRUCTION_VERSION: &str = "raw_reconstruction_v5_highlight_v2";
 
 fn normalize_raw_processing_mode(mode: Option<&str>) -> &'static str {
     match mode {
@@ -1541,7 +1541,7 @@ mod tests {
         );
         assert_eq!(
             resolved_cache_key.reconstruction_version,
-            "raw_reconstruction_v4"
+            "raw_reconstruction_v5_highlight_v2"
         );
         assert_eq!(
             resolved_cache_key.highlight_compression_bits,
