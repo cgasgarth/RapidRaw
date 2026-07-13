@@ -48,7 +48,6 @@ const tree = runCargo([
   '-p',
   'RapidRAW',
   '--no-default-features',
-  '--offline',
   '--prefix',
   'none',
 ]);
