@@ -518,6 +518,8 @@ bun install --frozen-lockfile
 bun run start
 ```
 
+Contributors can use the supported [fast-dev and full native profiles](docs/development/native-profiles.md) to avoid compiling optional heavy capabilities during ordinary shell, library, editor, preview, and basic-export work.
+
 ## System Requirements
 
 RapidRAW is built to be lightweight and cross-platform. The minimum (tested) requirements are:

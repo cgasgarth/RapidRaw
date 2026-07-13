@@ -44,3 +44,6 @@ export const EXPORT_FILE_FORMATS = [
   { extensions: ['avif'], id: ExportFileFormatId.Avif, name: 'AVIF' },
   { extensions: ['cube'], id: ExportFileFormatId.Cube, name: 'CUBE LUT' },
 ] as const;
+
+export const isExportFormatAvailable = (format: ExportFileFormatId, advancedCodecs: boolean): boolean =>
+  advancedCodecs || (format !== ExportFileFormatId.Jxl && format !== ExportFileFormatId.Webp);

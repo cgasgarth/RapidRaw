@@ -31,6 +31,7 @@ import { EXPORT_LAST_USED_PRESET_ID } from '../../../../schemas/export/exportRec
 import { outputSharpeningSettingsSchema } from '../../../../schemas/outputSharpeningSchemas';
 import { emptyTauriResponseSchema } from '../../../../schemas/tauriResponseSchemas';
 import { useEditorStore } from '../../../../store/useEditorStore';
+import { useNativeCapabilityStore } from '../../../../store/useNativeCapabilityStore';
 import { Invokes } from '../../../../tauri/commands';
 import { thumbnailCache } from '../../../../thumbnails/thumbnailCacheInstance';
 import { useThumbnailCacheRevision } from '../../../../thumbnails/useThumbnail';
@@ -62,6 +63,7 @@ import {
   hasColorManagedTransform as hasExportColorManagedTransform,
   isSupportedColorProfileForFormat,
 } from '../../../../utils/export/exportColorCapabilityContracts';
+import { isExportFormatAvailable } from '../../../../utils/export/exportFormatIds';
 import {
   hasStaleOrOfflineSmartPreview,
   isResolvingStaleSmartPreviewExport,
@@ -303,6 +305,7 @@ export default function ExportPanel({
   onLinkedVariantImported,
 }: ExportPanelProps) {
   const { t } = useTranslation();
+  const nativeCapabilities = useNativeCapabilityStore((state) => state.manifest);
 
   const resizeModeOptions = useMemo(
     () => [
@@ -375,6 +378,19 @@ export default function ExportPanel({
     exportColorCapabilityCatalog,
     updateColorSelection,
   } = useExportSettings();
+  const availableFileFormats = useMemo(
+    () =>
+      nativeCapabilities === null
+        ? FILE_FORMATS
+        : FILE_FORMATS.filter((format) => isExportFormatAvailable(format.id, nativeCapabilities.advancedCodecs)),
+    [nativeCapabilities],
+  );
+
+  useEffect(() => {
+    if (!availableFileFormats.some((format) => format.id === fileFormat)) {
+      setFileFormat(FileFormats.Jpeg);
+    }
+  }, [availableFileFormats, fileFormat, setFileFormat]);
 
   const {
     adjustments,
@@ -1140,7 +1156,7 @@ export default function ExportPanel({
             }
           : null,
     };
-    const format = FILE_FORMATS.find((f: FileFormat) => f.id === fileFormat)?.extensions[0] || 'jpeg';
+    const format = availableFileFormats.find((f: FileFormat) => f.id === fileFormat)?.extensions[0] || 'jpeg';
     debouncedEstimateSize(pathsToExport, adjustments, selectedImage?.path, exportSettings, format);
     return () => {
       debouncedEstimateSize.cancel();
@@ -1149,6 +1165,7 @@ export default function ExportPanel({
     pathsToExport,
     adjustments,
     selectedImage?.path,
+    availableFileFormats,
     fileFormat,
     resolvedExportBlackPointCompensation,
     colorProfile,
@@ -1334,7 +1351,7 @@ export default function ExportPanel({
     return () => window.removeEventListener('keydown', handleCancellationShortcut);
   }, [handleCancel, isExporting]);
 
-  const selectedFileFormat = FILE_FORMATS.find((format) => format.id === fileFormat);
+  const selectedFileFormat = availableFileFormats.find((format) => format.id === fileFormat);
   const selectedColorProfileLabel =
     colorProfileOptions.find((option) => option.value === colorProfile)?.label ?? t('export.colorProfiles.srgb');
   const selectedRenderingIntentLabel =
@@ -1753,7 +1770,7 @@ export default function ExportPanel({
 
             <Section title={t('export.sections.fileSettings')}>
               <div className="grid grid-cols-3 gap-2">
-                {FILE_FORMATS.map((format: FileFormat) => (
+                {availableFileFormats.map((format: FileFormat) => (
                   <button
                     className={`px-2 py-1.5 rounded-md transition-colors ${fileFormat === format.id ? 'bg-accent' : 'bg-surface hover:bg-card-active'} disabled:opacity-50`}
                     disabled={isExporting}

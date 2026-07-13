@@ -73,6 +73,10 @@ use serde_json::Value;
 use tauri::{Emitter, Manager, ipc::Response};
 use tempfile::NamedTempFile;
 
+#[cfg(feature = "ai")]
+use crate::ai::ai_commands as build_ai_commands;
+#[cfg(not(feature = "ai"))]
+use crate::app::disabled_commands as build_ai_commands;
 use crate::formats::PNG_DATA_URL_PREFIX;
 use crate::gpu_display::{DisplayTransformState, PresentationSchedulerReport};
 use crate::hdr_artifact_sidecar::write_hdr_output_sidecar;
@@ -3425,20 +3429,21 @@ pub fn run() {
             cache_utils::clear_image_caches,
             app_settings::load_settings,
             app_settings::save_settings,
-            ai::ai_commands::generate_ai_subject_mask,
-            ai::ai_commands::generate_ai_object_mask_proposal,
-            ai::ai_commands::precompute_ai_subject_mask,
-            ai::ai_commands::generate_ai_foreground_mask,
-            ai::ai_commands::generate_ai_sky_mask,
-            ai::ai_commands::generate_ai_depth_mask,
-            ai::ai_commands::generate_ai_whole_person_mask,
-            ai::ai_commands::generate_ai_person_part_mask,
-            ai::ai_commands::get_ai_model_registry_report,
-            ai::ai_commands::cancel_ai_model_load,
-            ai::ai_commands::evict_ai_model_session,
-            ai::ai_commands::check_ai_connector_status,
-            ai::ai_commands::test_ai_connector_connection,
-            ai::ai_commands::invoke_generative_replace_with_mask_def,
+            app::capabilities::get_native_capabilities,
+            build_ai_commands::generate_ai_subject_mask,
+            build_ai_commands::generate_ai_object_mask_proposal,
+            build_ai_commands::precompute_ai_subject_mask,
+            build_ai_commands::generate_ai_foreground_mask,
+            build_ai_commands::generate_ai_sky_mask,
+            build_ai_commands::generate_ai_depth_mask,
+            build_ai_commands::generate_ai_whole_person_mask,
+            build_ai_commands::generate_ai_person_part_mask,
+            build_ai_commands::get_ai_model_registry_report,
+            build_ai_commands::cancel_ai_model_load,
+            build_ai_commands::evict_ai_model_session,
+            build_ai_commands::check_ai_connector_status,
+            build_ai_commands::test_ai_connector_connection,
+            build_ai_commands::invoke_generative_replace_with_mask_def,
             denoise_api::dry_run_denoise_controls,
             denoising::apply_denoising,
             denoising::batch_denoise_images,

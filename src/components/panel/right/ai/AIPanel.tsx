@@ -63,6 +63,7 @@ import {
 } from '../../../../schemas/ai/aiProviderSchemas';
 import { type CloudUsage, cloudUsageSchema } from '../../../../schemas/cloudUsageSchemas';
 import { useEditorStore } from '../../../../store/useEditorStore';
+import { useNativeCapabilityStore } from '../../../../store/useNativeCapabilityStore';
 import { useProcessStore } from '../../../../store/useProcessStore';
 import { useSettingsStore } from '../../../../store/useSettingsStore';
 import { useUIStore } from '../../../../store/useUIStore';
@@ -371,6 +372,7 @@ const ConnectionStatus = ({
 
 export function AIPanel() {
   const { t } = useTranslation();
+  const nativeCapabilities = useNativeCapabilityStore((state) => state.manifest);
   const activePatchContainerId = useEditorStore((s) => s.activeAiPatchContainerId);
   const activeSubMaskId = useEditorStore((s) => s.activeAiSubMaskId);
   const adjustments = useEditorStore((s) => s.adjustments);
@@ -412,7 +414,7 @@ export function AIPanel() {
   const isGenerativeAvailable = aiProviderRuntimeState.generativeEditAvailable;
 
   useEffect(() => {
-    if (aiProvider !== AiProviderId.Cloud || !isSignedIn || !isPro) return;
+    if (!nativeCapabilities?.ai || aiProvider !== AiProviderId.Cloud || !isSignedIn || !isPro) return;
 
     const fetchUsage = async () => {
       try {
@@ -432,7 +434,7 @@ export function AIPanel() {
     };
 
     void fetchUsage();
-  }, [aiProvider, isSignedIn, isPro, getToken]);
+  }, [aiProvider, getToken, isPro, isSignedIn, nativeCapabilities?.ai]);
 
   const setBrushSettings = useCallback(
     (updater: BrushSettingsUpdater) => {
@@ -1101,6 +1103,22 @@ export function AIPanel() {
       }
     }
   };
+
+  if (nativeCapabilities && !nativeCapabilities.ai) {
+    return (
+      <InspectorPanelFrame
+        icon={Wand2}
+        label={t('editor.ai.inpaintingTitle')}
+        notice={{ kind: 'empty', label: nativeCapabilities.buildProfile }}
+        status={{ label: nativeCapabilities.buildProfile, tone: 'neutral' }}
+        testId="inpaint-workspace-panel"
+      >
+        <UiText className="p-3" color={TextColors.secondary} variant={TextVariants.small}>
+          {t('editor.ai.inpaintingTitle')} · {nativeCapabilities.buildProfile}
+        </UiText>
+      </InspectorPanelFrame>
+    );
+  }
 
   return (
     <InspectorPanelFrame
