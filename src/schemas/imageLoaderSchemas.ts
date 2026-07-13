@@ -154,7 +154,8 @@ export const rawDevelopmentReportSchema = z
         unrecoverableSamples: z.number().int().nonnegative(),
         warningCodes: z.array(z.string().trim().min(1)),
       })
-      .strict(),
+      .strict()
+      .optional(),
     processingProfile: rawProcessingProfileSchema,
     runtime: z
       .object({
