@@ -236,6 +236,7 @@ export const readCacheRecord = async (
 const capacities: Record<ResourceClass, number> = {
   light: 4,
   'cpu-heavy': 2,
+  'suite-exclusive': 1,
   'native-heavy': 1,
   browser: 1,
   network: 1,
@@ -307,7 +308,9 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
     const dependencyKeys = node.dependencies.map((id) => completed.get(id)?.key ?? 'missing');
     const key = await nodeCacheKey(node, options.root, dependencyKeys, undefined, snapshot);
     const recordPath = join(cacheDirectory, `${node.id}-${key}.json`);
-    const coordinatedClass = ['cpu-heavy', 'native-heavy', 'browser', 'network'].includes(node.resourceClass);
+    const coordinatedClass = ['cpu-heavy', 'suite-exclusive', 'native-heavy', 'browser', 'network'].includes(
+      node.resourceClass,
+    );
     const classLease = coordinatedClass
       ? await acquireResourceLease({
           capacity: capacities[node.resourceClass],
