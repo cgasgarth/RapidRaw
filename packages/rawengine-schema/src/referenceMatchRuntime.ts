@@ -84,6 +84,14 @@ export const matchLookNodeDiffV1Schema = z
   })
   .strict();
 
+const appliedNodeDiffV1Schema = z
+  .object({
+    after: z.number().finite(),
+    before: z.number().finite(),
+    key: z.enum(['exposure', 'contrast', 'creativeTemperature', 'creativeTint', 'saturation', 'vibrance']),
+  })
+  .strict();
+
 const effectiveReferenceSetV1Schema = z
   .array(
     z
@@ -130,6 +138,7 @@ export const matchLookProposalV1Schema = z
 
 export const matchLookApplicationReceiptV1Schema = z
   .object({
+    appliedDiffs: z.array(appliedNodeDiffV1Schema).min(1).max(6),
     appliedAt: z.string().datetime(),
     baseGraphFingerprint: fingerprintSchema,
     destination: z.enum(['global-adjustments', 'adjustment-layer']),
@@ -145,6 +154,10 @@ export const matchLookApplicationReceiptV1Schema = z
   })
   .strict()
   .superRefine((receipt, context) => {
+    const keys = receipt.appliedDiffs.map((diff) => diff.key);
+    if (new Set(keys).size !== keys.length) {
+      context.addIssue({ code: 'custom', message: 'Applied node diffs must be unique.', path: ['appliedDiffs'] });
+    }
     if (receipt.destination === 'adjustment-layer' && receipt.layerId === undefined) {
       context.addIssue({ code: 'custom', message: 'Layer destination requires a layer ID.', path: ['layerId'] });
     }

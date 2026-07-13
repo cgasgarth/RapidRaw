@@ -43,6 +43,7 @@ import {
 } from '../../utils/interactivePreviewPatch';
 import { PreparedAdjustmentPayloadCache } from '../../utils/preparedAdjustmentPayloadCache';
 import { resolveReferenceMatchRenderAdjustments } from '../../utils/referenceMatch';
+import { acceptReferenceMatchAdjustmentTransfer } from '../../utils/referenceMatchTransfer';
 import { DISPLAY_TARGET_CHANGED_EVENT } from '../../utils/tauriEventNames';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import { debounce } from '../../utils/timing';
@@ -1040,13 +1041,17 @@ export function useImageProcessing(
             }
           }
           if (Object.keys(delta).length > 0) {
+            const acceptedDelta = acceptReferenceMatchAdjustmentTransfer({
+              adjustments: delta,
+              transferMode: 'batch-sync',
+            }).adjustments;
             otherPaths.forEach((p) => {
               globalImageCache.delete(p);
             });
             useProcessStore.getState().invalidateThumbnails(otherPaths);
             invokeWithSchema(
               Invokes.ApplyAdjustmentsToPaths,
-              { paths: otherPaths, adjustments: delta },
+              { paths: otherPaths, adjustments: acceptedDelta },
               emptyTauriResponseSchema,
             ).catch((err: unknown) => {
               console.error('Failed to apply adjustments to multi-selection:', err);
