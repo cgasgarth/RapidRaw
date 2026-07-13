@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { lstat, readFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
+import { z } from 'zod';
 
 export interface NativeQaIdentity {
   native: string;
@@ -8,6 +9,67 @@ export interface NativeQaIdentity {
   bundle: string;
   scenario: string;
   worktree: string;
+}
+
+const nativeQaDeploymentStageSchema = z.object({
+  requested: z.boolean(),
+  executed: z.boolean(),
+  avoidedByIdentity: z.boolean(),
+});
+
+export const nativeQaDeploymentReportSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    identity: z.object({
+      native: z.string().length(64),
+      frontend: z.string().length(64),
+      bundle: z.string().length(64),
+      scenario: z.string().length(64),
+      worktree: z.string().startsWith('/'),
+    }),
+    reason: z.string().min(1),
+    durationMs: z.number().int().nonnegative(),
+    completedAt: z.string().datetime(),
+    stages: z.object({
+      build: nativeQaDeploymentStageSchema,
+      copy: nativeQaDeploymentStageSchema,
+      sign: nativeQaDeploymentStageSchema,
+    }),
+  })
+  .strict();
+
+export function createNativeQaDeploymentReport(
+  identity: NativeQaIdentity,
+  deployment: ReturnType<typeof planNativeQaDeployment>,
+  options: { shouldBuild: boolean; durationMs: number; completedAt: string },
+): z.infer<typeof nativeQaDeploymentReportSchema> {
+  return nativeQaDeploymentReportSchema.parse({
+    schemaVersion: 1,
+    identity,
+    reason: deployment.reason,
+    durationMs: options.durationMs,
+    completedAt: options.completedAt,
+    stages: {
+      build: {
+        requested: options.shouldBuild,
+        executed: options.shouldBuild && deployment.build,
+        avoidedByIdentity: options.shouldBuild && !deployment.build,
+      },
+      copy: { requested: true, executed: deployment.copy, avoidedByIdentity: !deployment.copy },
+      sign: { requested: true, executed: deployment.sign, avoidedByIdentity: !deployment.sign },
+    },
+  });
+}
+
+export function assertNativeQaBuildAvailability(
+  deployment: ReturnType<typeof planNativeQaDeployment>,
+  shouldBuild: boolean,
+): void {
+  if (!shouldBuild && deployment.build) {
+    throw new Error(
+      `--no-build cannot satisfy native QA deployment reason ${deployment.reason}; rebuild before copying or launching.`,
+    );
+  }
 }
 
 const hashFiles = async (paths: readonly string[], salt: string): Promise<string> => {

@@ -5,13 +5,20 @@ import { chmod, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { processStartToken } from '../qa/identity';
 import { readLiveNativeQaControlRecord, readNativeQaControlRecord, requestNativeQaControl } from '../qa/native-control';
-import { computeNativeQaIdentity, type NativeQaIdentity, planNativeQaDeployment } from '../qa/native-identity';
+import {
+  assertNativeQaBuildAvailability,
+  computeNativeQaIdentity,
+  createNativeQaDeploymentReport,
+  type NativeQaIdentity,
+  planNativeQaDeployment,
+} from '../qa/native-identity';
 
 const sourceAppPath = 'src-tauri/target/debug/bundle/macos/RapidRAW.app';
 const qaAppPath = 'src-tauri/target/debug/bundle/macos/RawEngine QA Current.app';
 const qaAppName = 'RawEngine QA Current';
 const qaBundleIdentifier = 'dev.rawengine.RapidRAW.qa-current';
 const qaExecutablePath = `${qaAppPath}/Contents/MacOS/RapidRAW`;
+const startedAt = performance.now();
 const args = process.argv.slice(2);
 const shouldBuild = !args.includes('--no-build');
 const shouldLaunch = !args.includes('--no-launch');
@@ -21,11 +28,13 @@ const validationHarness = args.includes('--validation-harness');
 const buildFeatures = validationHarness ? 'required-ci,validation-harness' : 'required-ci';
 const identityPath = 'src-tauri/target/debug/bundle/macos/rawengine-qa-identity.json';
 const controlRecordPath = resolve('private-artifacts/qa/native-control.json');
+const deploymentReportPath = resolve('private-artifacts/qa/native-deployment.json');
 const identity = await computeNativeQaIdentity(buildFeatures);
 const previousIdentity = await readFile(identityPath, 'utf8')
   .then((value) => JSON.parse(value) as NativeQaIdentity)
   .catch(() => undefined);
 const deployment = planNativeQaDeployment(previousIdentity, identity, { clean, devServer });
+assertNativeQaBuildAvailability(deployment, shouldBuild);
 
 async function run(command: string, commandArgs: string[], label: string, allowedExitCodes = [0]): Promise<void> {
   const proc = Bun.spawn([command, ...commandArgs], {
@@ -166,6 +175,21 @@ if (shouldLaunch) {
   }
 }
 
+await mkdir(dirname(deploymentReportPath), { recursive: true });
+await writeFile(
+  deploymentReportPath,
+  `${JSON.stringify(
+    createNativeQaDeploymentReport(identity, deployment, {
+      shouldBuild,
+      durationMs: Math.round(performance.now() - startedAt),
+      completedAt: new Date().toISOString(),
+    }),
+    null,
+    2,
+  )}\n`,
+  { mode: 0o600 },
+);
+
 console.log(
-  `native qa app ok (${deployment.reason}; ${identity.native.slice(0, 12)}; ${qaAppName}; ${qaBundleIdentifier}; ${qaAppPath}; control=${shouldLaunch && validationHarness ? controlRecordPath : 'disabled'})`,
+  `native qa app ok (${deployment.reason}; ${identity.native.slice(0, 12)}; ${qaAppName}; ${qaBundleIdentifier}; ${qaAppPath}; control=${shouldLaunch && validationHarness ? controlRecordPath : 'disabled'}; report=${deploymentReportPath})`,
 );
