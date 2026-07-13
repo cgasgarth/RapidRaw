@@ -59,6 +59,78 @@ pub(crate) fn decode_raw_sensor_image(file_bytes: &[u8]) -> Result<RawSensorDeco
     })
 }
 
+/// Camera-linear RGB used only by measured chart calibration. This boundary
+/// applies sensor defect repair and the selected demosaic policy, but excludes
+/// white balance, camera characterization, creative edits, view, and output
+/// transforms so a fit cannot learn the current rendering recipe.
+pub(crate) struct CameraLinearCalibrationFrame {
+    pub camera_identity: String,
+    pub width: u32,
+    pub height: u32,
+    pub pixels: Vec<[f32; 3]>,
+}
+
+pub(crate) fn decode_raw_camera_linear_for_calibration(
+    file_bytes: &[u8],
+) -> Result<CameraLinearCalibrationFrame> {
+    let source = RawSource::new_from_slice(file_bytes);
+    let decoder = rawler::get_decoder(&source)?;
+    let params = RawDecodeParams::default();
+    let mut raw_image = decoder.raw_image(&source, &params, false)?;
+    anyhow::ensure!(
+        is_rgb_bayer_raw(&raw_image) || is_rgb_xtrans_raw(&raw_image),
+        "chart_calibration_unsupported_raw_layout"
+    );
+
+    let original_white_level = raw_image
+        .whitelevel
+        .0
+        .first()
+        .copied()
+        .unwrap_or(u16::MAX as u32) as f32;
+    let original_black_level = raw_image
+        .blacklevel
+        .levels
+        .first()
+        .map(|level| level.as_f32())
+        .unwrap_or(0.0);
+    repair_raw_sensor_defects(&mut raw_image, original_black_level, original_white_level);
+    for level in &mut raw_image.whitelevel.0 {
+        *level = u32::MAX;
+    }
+
+    let mut developer = RawDevelop::default();
+    developer.steps.retain(|step| {
+        !matches!(
+            step,
+            ProcessingStep::SRgb | ProcessingStep::Calibrate | ProcessingStep::WhiteBalance
+        )
+    });
+    let Intermediate::ThreeColor(mut pixels) = developer.develop_intermediate(&raw_image)? else {
+        return Err(anyhow!("chart_calibration_unsupported_pixel_domain"));
+    };
+    let denominator = (original_white_level - original_black_level).max(1.0);
+    let rescale_factor = (u32::MAX as f32 - original_black_level) / denominator;
+    for pixel in &mut pixels.data {
+        for channel in pixel {
+            *channel *= rescale_factor;
+        }
+    }
+    let dimensions = pixels.dim();
+    Ok(CameraLinearCalibrationFrame {
+        camera_identity: format!(
+            "{} {}",
+            raw_image.clean_make.trim(),
+            raw_image.clean_model.trim()
+        )
+        .trim()
+        .to_owned(),
+        width: dimensions.w as u32,
+        height: dimensions.h as u32,
+        pixels: pixels.data,
+    })
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RawProcessingProfile {

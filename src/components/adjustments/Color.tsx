@@ -278,6 +278,7 @@ export default function ColorPanel({
                 adjustments={adjustments}
                 appSettings={appSettings}
                 rawDevelopmentReport={selectedImage?.rawDevelopmentReport ?? null}
+                sourcePath={selectedImage?.path ?? null}
                 onDragStateChange={onDragStateChange}
                 setAdjustments={setAdjustments}
               />

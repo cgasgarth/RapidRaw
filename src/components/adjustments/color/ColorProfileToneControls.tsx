@@ -1,9 +1,14 @@
 import cx from 'clsx';
 import type { TFunction } from 'i18next';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCameraProfileRegistry } from '../../../hooks/editor/useCameraProfileRegistry';
-import type { CameraProfileId, ToneCurveId } from '../../../schemas/color/profileToneSchemas';
+import type { CalibrationFitReceipt } from '../../../schemas/color/chartCalibrationSchemas';
+import {
+  type CameraProfileId,
+  cameraProfileIdSchema,
+  type ToneCurveId,
+} from '../../../schemas/color/profileToneSchemas';
 import type { RawDevelopmentReport } from '../../../schemas/imageLoaderSchemas';
 import { TextVariants } from '../../../types/typography';
 import {
@@ -18,6 +23,7 @@ import CompactInspectorSectionHeader from '../../ui/CompactInspectorSectionHeade
 import { editorChromeTokens } from '../../ui/editorChromeTokens';
 import UiText from '../../ui/primitives/Text';
 import { CameraProfileBrowser } from './CameraProfileBrowser';
+import { ChartCalibrationModal } from './ChartCalibrationModal';
 import type { ColorPanelGroupProps } from './types';
 
 const TONE_CURVE_IDS = [
@@ -34,15 +40,19 @@ const parseToneCurveId = (value: string): ToneCurveId =>
 interface ColorProfileToneControlsProps extends ColorPanelGroupProps {
   adjustmentVisibility: Record<string, boolean>;
   rawDevelopmentReport?: RawDevelopmentReport | null;
+  sourcePath?: string | null;
 }
 
 export const ColorProfileToneControls = ({
   adjustmentVisibility,
   adjustments,
   rawDevelopmentReport = null,
+  sourcePath = null,
   setAdjustments,
 }: ColorProfileToneControlsProps) => {
   const { t } = useTranslation();
+  const [calibrationOpen, setCalibrationOpen] = useState(false);
+  const [firstCalibrationEndpoint, setFirstCalibrationEndpoint] = useState<CalibrationFitReceipt | null>(null);
   const profileRegistry = useCameraProfileRegistry(rawDevelopmentReport?.cameraProfile.cameraModel ?? null);
   const profileToneLabels = getProfileToneLabels(adjustments, t);
   const isModified =
@@ -182,6 +192,16 @@ export const ColorProfileToneControls = ({
               onSelect={handleCameraProfileChange}
               selected={adjustments.cameraProfile}
             />
+            {rawDevelopmentReport !== null && (
+              <button
+                className="col-start-2 mt-1 rounded border border-editor-border px-2 py-1 text-[10px] text-text-secondary hover:bg-white/5"
+                data-testid="open-chart-calibration"
+                onClick={() => setCalibrationOpen(true)}
+                type="button"
+              >
+                {t('adjustments.color.profileTone.calibration.open')}
+              </button>
+            )}
           </div>
         )}
         {adjustmentVisibility[ColorAdjustment.ToneCurve] !== false && (
@@ -206,6 +226,18 @@ export const ColorProfileToneControls = ({
           </label>
         )}
       </div>
+      <ChartCalibrationModal
+        firstEndpoint={firstCalibrationEndpoint}
+        onClose={() => setCalibrationOpen(false)}
+        onEndpointSaved={setFirstCalibrationEndpoint}
+        onPublished={(profileId) => {
+          const parsed = cameraProfileIdSchema.safeParse(profileId);
+          if (parsed.success) handleCameraProfileChange(parsed.data);
+          void profileRegistry.refresh();
+        }}
+        open={calibrationOpen}
+        sourcePath={sourcePath}
+      />
     </section>
   );
 };
