@@ -151,6 +151,28 @@ impl Default for GpuMat3 {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Pod, Zeroable)]
+#[repr(C)]
+pub struct ToneEqualizerGpuSettings {
+    pub bands0: [f32; 4],
+    pub bands1: [f32; 4],
+    pub bands2: [f32; 4],
+    pub params0: [f32; 4],
+    pub params1: [f32; 4],
+}
+
+impl Default for ToneEqualizerGpuSettings {
+    fn default() -> Self {
+        Self {
+            bands0: [0.0; 4],
+            bands1: [0.0; 4],
+            bands2: [0.0; 4],
+            params0: [0.0, 0.0, 16.0, 0.65],
+            params1: [2.0, 32.0, 0.0, 0.0],
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable, Default)]
 #[repr(C)]
 pub struct GlobalAdjustments {
@@ -237,6 +259,7 @@ pub struct GlobalAdjustments {
     pub halation_amount: f32,
     pub flare_amount: f32,
     pub sharpness_threshold: f32,
+    pub tone_equalizer: ToneEqualizerGpuSettings,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable, Default)]
@@ -287,6 +310,7 @@ pub struct MaskAdjustments {
     pub(crate) _pad_end5: f32,
     pub(crate) _pad_end6: f32,
     pub(crate) _pad_end7: f32,
+    pub tone_equalizer: ToneEqualizerGpuSettings,
 }
 
 pub const MAX_MASKS: usize = 32;

@@ -18,6 +18,28 @@
       "reset": "Сбросить",
       "shadowRolloff": "Спад теней",
       "shadows": "Тени",
+      "toneEqualizer": {
+        "analysisUnavailable": "Scene analysis unavailable",
+        "analyzing": "Analyzing scene…",
+        "autoPlace": "Auto Place",
+        "detailPreservation": "Detail preservation",
+        "edgeRefinement": "Edge refinement",
+        "enable": "Enable",
+        "histogram": "Scene exposure histogram",
+        "on": "On",
+        "pickerReceipt": "Zone {{band}} · {{ev}} EV",
+        "pickZone": "Pick zone",
+        "preview": {
+          "band": "Band",
+          "clip": "Clip",
+          "filter": "Filter",
+          "image": "Image",
+          "zones": "Zones"
+        },
+        "resetZones": "Reset zones",
+        "smoothingRadius": "Smoothing radius",
+        "title": "Tone Equalizer"
+      },
       "toneMapper": "Тональное отображение",
       "viewContrast": "Контраст отображения",
       "whites": "Светлые тона"

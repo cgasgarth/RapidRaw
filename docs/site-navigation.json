@@ -107,6 +107,10 @@
           "path": "docs/color/architecture/current-color-pipeline-audit-2026-06-15.md"
         },
         {
+          "title": "Scene-referred tone equalizer ADR",
+          "path": "docs/color/architecture/tone-equalizer-adr-2026-07-13.md"
+        },
+        {
           "title": "White balance picker validation",
           "path": "docs/color/runtime/white-balance-picker-validation-2026-06-14.md"
         },

@@ -40,6 +40,7 @@ generator before the release workflow needs one.
 - [Camera profile strategy ADR](color/architecture/camera-profile-strategy-adr-2026-06-14.md)
 - [Color pipeline design](color/architecture/color-pipeline-design-2026-06-14.md)
 - [Current color pipeline audit](color/architecture/current-color-pipeline-audit-2026-06-15.md)
+- [Scene-referred tone equalizer ADR](color/architecture/tone-equalizer-adr-2026-07-13.md)
 - [White balance picker validation](color/runtime/white-balance-picker-validation-2026-06-14.md)
 - [ColorChecker fixture manifest](color/fixtures/colorchecker-fixtures-2026-06-14.md)
 - [Selective color ranges](color/selective-color/selective-color-ranges-2026-06-14.md)

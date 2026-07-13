@@ -8,6 +8,7 @@ use image::{DynamicImage, ImageBuffer, Luma, Rgba};
 
 use crate::adjustments::abi::{
     AllAdjustments, ColorCalibrationSettings, ColorGradeSettings, HslColor, LevelsSettings, Point,
+    ToneEqualizerGpuSettings,
 };
 use crate::color::view_transform::{
     RAPID_VIEW_IMPLEMENTATION_VERSION, ViewColorStrategy, ViewTransformPlanV1, ViewTransformProcess,
@@ -15,6 +16,10 @@ use crate::color::view_transform::{
 use crate::edit_graph::CompiledEditGraph;
 use crate::lut_processing::Lut;
 use crate::mixer_render::{apply_black_white_mixer, apply_channel_mixer, apply_color_balance_rgb};
+use crate::tone::tone_equalizer::{
+    BasicToneMacros, ToneEqualizerPickerSampleV1, ToneEqualizerPlanV1, ToneEqualizerSettingsV1,
+    band_weights, edge_aware_exposure_ev, scene_luminance as tone_scene_luminance,
+};
 
 thread_local! {
     static SCENE_REFERRED_V2_LUMA: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
@@ -50,6 +55,7 @@ struct EffectiveAdjustments {
     glow: f32,
     halation: f32,
     flare: f32,
+    tone_equalizer: ToneEqualizerGpuSettings,
     hsl: [HslColor; 8],
 }
 
@@ -90,20 +96,15 @@ pub(crate) fn execute_cpu_edit_graph(
     let scale = width.min(height) as f32 / 1080.0;
     let active_masks = &adjustments.mask_adjustments
         [..(adjustments.mask_count as usize).min(adjustments.mask_adjustments.len())];
-    let tonal_active = global.contrast != 0.0
-        || global.highlights != 0.0
-        || global.shadows != 0.0
-        || global.whites != 0.0
-        || global.blacks != 0.0
-        || active_masks.iter().any(|mask| {
-            mask.contrast != 0.0
-                || mask.highlights != 0.0
-                || mask.shadows != 0.0
-                || mask.whites != 0.0
-                || mask.blacks != 0.0
-        });
-    let tonal_blur = tonal_active
-        .then(|| gaussian_blur(&input, width, height, (3.5 * scale).ceil().max(1.0) as u32));
+    let tonal_radius = tonal_blur_base_radius(adjustments);
+    let tonal_blur = tonal_radius.map(|radius| {
+        gaussian_blur(
+            &input,
+            width,
+            height,
+            (radius * scale).ceil().max(1.0) as u32,
+        )
+    });
     let blur = |active: bool, radius: f32| {
         active.then(|| {
             gaussian_blur(
@@ -138,6 +139,20 @@ pub(crate) fn execute_cpu_edit_graph(
     );
     let flare_map =
         (global.flare_amount > 0.0).then(|| build_flare_map(&input, width, height, adjustments));
+    let global_tone_plan = tone_equalizer_plan(effective_adjustments(adjustments, &[], 0, 0));
+    let local_tone_adjustments = adjustments
+        .mask_adjustments
+        .iter()
+        .take((adjustments.mask_count as usize).min(mask_bitmaps.len()))
+        .any(|local| {
+            local.brightness != 0.0
+                || local.contrast != 0.0
+                || local.highlights != 0.0
+                || local.shadows != 0.0
+                || local.whites != 0.0
+                || local.blacks != 0.0
+                || local.tone_equalizer.params0[0] > 0.5
+        });
     let mut output = ImageBuffer::<Rgba<f32>, Vec<f32>>::new(width, height);
     for (x, y, target) in output.enumerate_pixels_mut() {
         let source_pixel = source.get_pixel(x, y).0;
@@ -256,22 +271,39 @@ pub(crate) fn execute_cpu_edit_graph(
         );
         color = apply_centre_tonal_and_color(color, global.centré, x, y, width, height);
         color = apply_white_balance(color, effective.temperature, effective.tint);
-        color = apply_filmic_exposure(color, effective.brightness);
         let tonal = tonal_blur.as_ref().map_or(input[index], |blur| blur[index]);
         let tonal_linear = if adjustments.global.is_raw_image == 1 {
             tonal
         } else {
             srgb_to_linear(tonal)
         };
-        color = apply_tonal_adjustments(
-            color,
-            tonal_linear,
-            effective.contrast,
-            effective.shadows,
-            effective.whites,
-            effective.blacks,
-        );
-        color = apply_highlights_adjustment(color, effective.highlights);
+        if preserve_extended {
+            let local_tone_plan = local_tone_adjustments.then(|| tone_equalizer_plan(effective));
+            let tone_plan = local_tone_plan.as_ref().unwrap_or(&global_tone_plan);
+            let tone_source = if adjustments.global.is_raw_image == 1 {
+                input[index]
+            } else {
+                srgb_to_linear(input[index])
+            } * 2.0_f32.powf(global.exposure);
+            let guidance = tonal_linear * 2.0_f32.powf(global.exposure);
+            color = Vec3::from_array(tone_plan.apply_rgb(
+                color.to_array(),
+                tone_source.to_array(),
+                guidance.to_array(),
+                adjustments.global.rapid_view_parameters0[0],
+            ));
+        } else {
+            color = apply_filmic_exposure(color, effective.brightness);
+            color = apply_tonal_adjustments(
+                color,
+                tonal_linear,
+                effective.contrast,
+                effective.shadows,
+                effective.whites,
+                effective.blacks,
+            );
+            color = apply_highlights_adjustment(color, effective.highlights);
+        }
         color = apply_color_calibration(color, adjustments.global.color_calibration);
         color = apply_hsl_panel(color, effective.hsl);
         color = apply_hue_shift(color, effective.hue);
@@ -359,6 +391,80 @@ pub(crate) fn execute_cpu_edit_graph(
     Ok(DynamicImage::ImageRgba32F(output))
 }
 
+pub(crate) fn sample_tone_equalizer_coordinate(
+    base_image: &DynamicImage,
+    graph: &CompiledEditGraph,
+    normalized_x: f64,
+    normalized_y: f64,
+) -> Result<ToneEqualizerPickerSampleV1, &'static str> {
+    graph.validate_contract()?;
+    if !normalized_x.is_finite()
+        || !normalized_y.is_finite()
+        || !(0.0..=1.0).contains(&normalized_x)
+        || !(0.0..=1.0).contains(&normalized_y)
+    {
+        return Err("tone_equalizer.picker_invalid_point");
+    }
+    let adjustments = graph.shader_abi();
+    let global = &adjustments.global;
+    let source = base_image.to_rgba32f();
+    let (width, height) = source.dimensions();
+    if width == 0 || height == 0 {
+        return Err("tone_equalizer.picker_empty_source");
+    }
+    let input = source
+        .pixels()
+        .map(|pixel| {
+            Vec3::new(
+                round_f16(pixel[0]),
+                round_f16(pixel[1]),
+                round_f16(pixel[2]),
+            )
+        })
+        .collect::<Vec<_>>();
+    let radius = (global.tone_equalizer.params1[1].clamp(4.0, 64.0)
+        * (width.min(height) as f32 / 1080.0))
+        .ceil()
+        .max(1.0) as u32;
+    let x = (normalized_x * f64::from(width - 1)).round() as u32;
+    let y = (normalized_y * f64::from(height - 1)).round() as u32;
+    let index = (y * width + x) as usize;
+    let smoothed = gaussian_blur_at(&input, width, height, x, y, radius);
+    let to_linear = |rgb: Vec3| {
+        if global.is_raw_image == 1 {
+            rgb
+        } else {
+            srgb_to_linear(rgb)
+        }
+    };
+    let exposure_scale = 2.0_f32.powf(global.exposure);
+    let coordinate = to_linear(input[index]) * exposure_scale;
+    let guidance = to_linear(smoothed) * exposure_scale;
+    let middle_grey = global.rapid_view_parameters0[0].max(1.0e-8);
+    let exposure_ev = edge_aware_exposure_ev(
+        tone_scene_luminance(coordinate.to_array()),
+        tone_scene_luminance(guidance.to_array()),
+        middle_grey,
+        global.tone_equalizer.params0[3],
+        global.tone_equalizer.params1[0],
+    );
+    let contributing_weights = band_weights(
+        exposure_ev,
+        global.tone_equalizer.params0[1],
+        global.tone_equalizer.params0[2],
+    );
+    let primary_band = contributing_weights
+        .iter()
+        .enumerate()
+        .max_by(|left, right| left.1.total_cmp(right.1))
+        .map_or(4, |(index, _)| index as u32);
+    Ok(ToneEqualizerPickerSampleV1 {
+        exposure_ev,
+        contributing_weights,
+        primary_band,
+    })
+}
+
 fn effective_adjustments(
     adjustments: &AllAdjustments,
     masks: &[ImageBuffer<Luma<u8>, Vec<u8>>],
@@ -387,6 +493,7 @@ fn effective_adjustments(
         glow: global.glow_amount,
         halation: global.halation_amount,
         flare: global.flare_amount,
+        tone_equalizer: global.tone_equalizer,
         hsl: global.hsl,
     };
     let count = (adjustments.mask_count as usize)
@@ -418,6 +525,25 @@ fn effective_adjustments(
         effective.glow += local.glow_amount * influence;
         effective.halation += local.halation_amount * influence;
         effective.flare += local.flare_amount * influence;
+        if local.tone_equalizer.params0[0] > 0.5 {
+            effective.tone_equalizer.params0[0] = 1.0;
+            for channel in 0..4 {
+                effective.tone_equalizer.bands0[channel] +=
+                    local.tone_equalizer.bands0[channel] * influence;
+                effective.tone_equalizer.bands1[channel] +=
+                    local.tone_equalizer.bands1[channel] * influence;
+            }
+            effective.tone_equalizer.bands2[0] += local.tone_equalizer.bands2[0] * influence;
+            for parameter in 1..4 {
+                let current = effective.tone_equalizer.params0[parameter];
+                effective.tone_equalizer.params0[parameter] =
+                    current + (local.tone_equalizer.params0[parameter] - current) * influence;
+            }
+            let current_edge = effective.tone_equalizer.params1[0];
+            effective.tone_equalizer.params1[0] =
+                current_edge + (local.tone_equalizer.params1[0] - current_edge) * influence;
+            effective.tone_equalizer.params1[2] += local.tone_equalizer.params1[2] * influence;
+        }
         for hsl_index in 0..8 {
             effective.hsl[hsl_index].hue += local.hsl[hsl_index].hue * influence;
             effective.hsl[hsl_index].saturation += local.hsl[hsl_index].saturation * influence;
@@ -427,12 +553,86 @@ fn effective_adjustments(
     effective
 }
 
+fn tone_equalizer_plan(effective: EffectiveAdjustments) -> ToneEqualizerPlanV1 {
+    let gpu = effective.tone_equalizer;
+    ToneEqualizerPlanV1::compile(
+        ToneEqualizerSettingsV1 {
+            enabled: gpu.params0[0] > 0.5,
+            band_ev: [
+                gpu.bands0[0],
+                gpu.bands0[1],
+                gpu.bands0[2],
+                gpu.bands0[3],
+                gpu.bands1[0],
+                gpu.bands1[1],
+                gpu.bands1[2],
+                gpu.bands1[3],
+                gpu.bands2[0],
+            ],
+            pivot_ev: gpu.params0[1],
+            range_ev: gpu.params0[2],
+            detail_preservation: gpu.params0[3],
+            edge_refinement: gpu.params1[0],
+            smoothing_radius: gpu.params1[1],
+            mask_exposure_compensation: gpu.params1[2],
+            auto_placement: false,
+            selected_band: gpu.bands2[1].clamp(0.0, 8.0) as u32,
+            preview_mode: gpu.params1[3].max(0.0) as u32,
+        },
+        BasicToneMacros {
+            brightness: effective.brightness,
+            contrast: effective.contrast,
+            highlights: effective.highlights,
+            shadows: effective.shadows,
+            whites: effective.whites,
+            blacks: effective.blacks,
+        },
+    )
+}
+
 fn round_f16(value: f32) -> f32 {
     half::f16::from_f32(value).to_f32()
 }
 
 fn round_rgba16f_storage(value: f32) -> f32 {
     round_f16(value.clamp(-65_504.0, 65_504.0))
+}
+
+fn tonal_blur_base_radius(adjustments: &AllAdjustments) -> Option<f32> {
+    let global = &adjustments.global;
+    let graph_v2 = global.edit_graph_version >= 2.0;
+    let global_guided_active = global.contrast != 0.0
+        || global.highlights != 0.0
+        || global.shadows != 0.0
+        || global.whites != 0.0
+        || global.blacks != 0.0;
+    let global_v2_only_active =
+        graph_v2 && (global.brightness != 0.0 || global.tone_equalizer.params0[0] > 0.5);
+    let mut radius = (global_guided_active || global_v2_only_active).then_some(if graph_v2 {
+        global.tone_equalizer.params1[1].clamp(4.0, 64.0)
+    } else {
+        3.5
+    });
+
+    let mask_count = (adjustments.mask_count as usize).min(adjustments.mask_adjustments.len());
+    for mask in &adjustments.mask_adjustments[..mask_count] {
+        let local_guided_active = mask.contrast != 0.0
+            || mask.highlights != 0.0
+            || mask.shadows != 0.0
+            || mask.whites != 0.0
+            || mask.blacks != 0.0;
+        let local_v2_only_active =
+            graph_v2 && (mask.brightness != 0.0 || mask.tone_equalizer.params0[0] > 0.5);
+        if local_guided_active || local_v2_only_active {
+            let local_radius = if graph_v2 {
+                mask.tone_equalizer.params1[1].clamp(4.0, 64.0)
+            } else {
+                3.5
+            };
+            radius = Some(radius.map_or(local_radius, |current| current.max(local_radius)));
+        }
+    }
+    radius
 }
 
 fn gaussian_blur(source: &[Vec3], width: u32, height: u32, radius: u32) -> Vec<Vec3> {
@@ -466,6 +666,28 @@ fn gaussian_blur(source: &[Vec3], width: u32, height: u32, radius: u32) -> Vec<V
         }
     }
     vertical
+}
+
+fn gaussian_blur_at(source: &[Vec3], width: u32, height: u32, x: u32, y: u32, radius: u32) -> Vec3 {
+    let sigma = radius as f32 / 2.0;
+    let weights = (-(radius as i32)..=radius as i32)
+        .map(|offset| (-(offset as f32).powi(2) / (2.0 * sigma * sigma)).exp())
+        .collect::<Vec<_>>();
+    let total_weight: f32 = weights.iter().sum();
+    let mut color = Vec3::ZERO;
+    for (vertical_index, vertical_offset) in (-(radius as i32)..=radius as i32).enumerate() {
+        let sample_y = (y as i32 + vertical_offset).clamp(0, height as i32 - 1) as u32;
+        let mut horizontal = Vec3::ZERO;
+        for (horizontal_index, horizontal_offset) in (-(radius as i32)..=radius as i32).enumerate()
+        {
+            let sample_x = (x as i32 + horizontal_offset).clamp(0, width as i32 - 1) as u32;
+            horizontal += source[(sample_y * width + sample_x) as usize]
+                .clamp(Vec3::ZERO, Vec3::splat(65_504.0))
+                * weights[horizontal_index];
+        }
+        color += (horizontal / total_weight).map(round_f16) * weights[vertical_index];
+    }
+    (color / total_weight).map(round_f16)
 }
 
 fn apply_ca_correction(
@@ -2114,4 +2336,28 @@ fn hash2(x: f32, y: f32) -> f32 {
 fn smoothstep(edge0: f32, edge1: f32, value: f32) -> f32 {
     let t = ((value - edge0) / (edge1 - edge0)).clamp(0.0, 1.0);
     t * t * (3.0 - 2.0 * t)
+}
+
+#[cfg(test)]
+mod tone_equalizer_picker_tests {
+    use super::*;
+
+    #[test]
+    fn point_guidance_matches_the_full_cached_gaussian_surface() {
+        let width = 13;
+        let height = 9;
+        let source = (0..width * height)
+            .map(|index| {
+                let value = ((index * 17) % 101) as f32 / 100.0;
+                Vec3::new(value, value * 0.5, 1.0 - value)
+            })
+            .collect::<Vec<_>>();
+        let full = gaussian_blur(&source, width, height, 4);
+        for (x, y) in [(0, 0), (6, 4), (12, 8)] {
+            assert_eq!(
+                gaussian_blur_at(&source, width, height, x, y, 4),
+                full[(y * width + x) as usize]
+            );
+        }
+    }
 }

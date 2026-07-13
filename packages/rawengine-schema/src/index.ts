@@ -57,5 +57,6 @@ export * from './super-resolution/superResolutionReconstructionDiagnostics.js';
 export * from './super-resolution/superResolutionRuntimePlan.js';
 export * from './super-resolution/superResolutionSidecarProvenance.js';
 export * from './super-resolution/superResolutionSourceValidation.js';
+export * from './tone/toneEqualizerSchemas.js';
 export * from './toneColorSchemas.js';
 export * from './toolRegistry.js';

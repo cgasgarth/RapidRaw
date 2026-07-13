@@ -7,6 +7,7 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import BasicAdjustments from '../../../src/components/adjustments/Basic';
 import en from '../../../src/i18n/locales/en.json';
+import { useUIStore } from '../../../src/store/useUIStore';
 import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../../../src/utils/adjustments';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -14,6 +15,9 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 let renderedRoot: { container: HTMLDivElement; root: Root } | null = null;
 
 afterEach(() => {
+  act(() => {
+    useUIStore.setState({ toneEqualizerPickerActive: false, toneEqualizerPickerReceipt: null });
+  });
   if (renderedRoot !== null) {
     act(() => {
       renderedRoot?.root.unmount();
@@ -21,6 +25,48 @@ afterEach(() => {
     renderedRoot.container.remove();
     renderedRoot = null;
   }
+});
+
+test('tone equalizer advanced controls commit typed zone and preview settings', async () => {
+  const { container, getAdjustments } = await renderBasic();
+  await act(async () => {
+    getRequiredElement<HTMLButtonElement>(container, '[data-testid="tone-equalizer-advanced-toggle"]').click();
+    await flushPromises();
+  });
+
+  expect(container.querySelectorAll('[data-density="compact"][data-testid^="tone-equalizer-band-"]')).toHaveLength(9);
+  expect(container.querySelector('[data-testid="tone-equalizer-preview-modes"]')?.textContent).toBe(
+    'ImageZonesBandFilterClip',
+  );
+
+  const upperMiddle = getRequiredElement<HTMLInputElement>(
+    container,
+    '[data-testid="tone-equalizer-band-6"] input[type="range"]',
+  );
+  await act(async () => {
+    upperMiddle.value = '1.25';
+    upperMiddle.dispatchEvent(new window.Event('input', { bubbles: true }));
+    await flushPromises();
+  });
+  expect(getAdjustments().rawEngineEditGraphVersion).toBe(2);
+  expect(getAdjustments().toneEqualizer.enabled).toBe(true);
+  expect(getAdjustments().toneEqualizer.selectedBand).toBe(6);
+  expect(getAdjustments().toneEqualizer.bandEv[6]).toBe(1.25);
+
+  const previewButtons = container.querySelectorAll<HTMLButtonElement>(
+    '[data-testid="tone-equalizer-preview-modes"] button',
+  );
+  await act(async () => {
+    previewButtons[4]?.click();
+    await flushPromises();
+  });
+  expect(getAdjustments().toneEqualizer.previewMode).toBe(4);
+
+  await act(async () => {
+    getRequiredElement<HTMLButtonElement>(container, '[data-testid="tone-equalizer-picker"]').click();
+    await flushPromises();
+  });
+  expect(useUIStore.getState().toneEqualizerPickerActive).toBe(true);
 });
 
 test('Light controls use the canonical tonal order and stable aligned rows', async () => {

@@ -33,6 +33,7 @@ mod qa_control;
 mod raw;
 mod render;
 mod tagging;
+mod tone;
 mod window_customizer;
 
 pub(crate) use color::*;
@@ -859,6 +860,157 @@ fn get_wgpu_presentation_report(
         .unwrap()
         .as_ref()
         .map(|context| context.presentation.report())
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ToneEqualizerPlacementResponse {
+    source_identity: String,
+    source_fingerprint: String,
+    pivot_ev: f32,
+    range_ev: f32,
+    scene_black_ev: f32,
+    scene_white_ev: f32,
+    confidence: f32,
+    histogram: [u32; 32],
+}
+
+#[tauri::command]
+fn analyze_tone_equalizer_placement(
+    expected_source_identity: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<ToneEqualizerPlacementResponse, String> {
+    let (image, source_identity, source_fingerprint, is_raw) = {
+        let loaded = state.original_image.lock().unwrap();
+        let loaded = loaded.as_ref().ok_or("tone_equalizer.no_source")?;
+        if loaded.path != expected_source_identity {
+            return Err("tone_equalizer.stale_source".to_string());
+        }
+        (
+            Arc::clone(&loaded.image),
+            loaded.path.clone(),
+            loaded.artifact_source.source_fingerprint(),
+            loaded.is_raw,
+        )
+    };
+    let sample = image.thumbnail(256, 256);
+    let sample = if is_raw {
+        sample
+    } else {
+        apply_srgb_to_linear(sample)
+    }
+    .to_rgba32f();
+    let luminance = sample
+        .pixels()
+        .map(|pixel| crate::tone::tone_equalizer::scene_luminance([pixel[0], pixel[1], pixel[2]]))
+        .collect::<Vec<_>>();
+    let placement = crate::tone::tone_equalizer::auto_place_from_luminance(&luminance, 0.18)
+        .ok_or("tone_equalizer.insufficient_scene_samples")?;
+    let mut histogram = [0_u32; 32];
+    for value in luminance {
+        if !value.is_finite() || value <= 1.0e-8 {
+            continue;
+        }
+        let ev = (value / 0.18).log2();
+        let bin = (((ev + 12.0) / 24.0) * histogram.len() as f32)
+            .floor()
+            .clamp(0.0, (histogram.len() - 1) as f32) as usize;
+        histogram[bin] += 1;
+    }
+    let current_source = state.original_image.lock().unwrap().as_ref().map(|loaded| {
+        (
+            loaded.path.clone(),
+            loaded.artifact_source.source_fingerprint(),
+        )
+    });
+    if current_source != Some((source_identity.clone(), source_fingerprint)) {
+        return Err("tone_equalizer.stale_source".to_string());
+    }
+    Ok(ToneEqualizerPlacementResponse {
+        source_identity,
+        source_fingerprint: format!("{source_fingerprint:016x}"),
+        pivot_ev: placement.pivot_ev,
+        range_ev: placement.range_ev,
+        scene_black_ev: placement.scene_black_ev,
+        scene_white_ev: placement.scene_white_ev,
+        confidence: placement.confidence,
+        histogram,
+    })
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ToneEqualizerPickerRequest {
+    graph_revision: String,
+    source_identity: String,
+    normalized_image_point: ViewerSamplePoint,
+    js_adjustments: serde_json::Value,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ToneEqualizerPickerResponse {
+    source_identity: String,
+    source_fingerprint: String,
+    graph_fingerprint: String,
+    graph_revision: String,
+    exposure_ev: f32,
+    contributing_weights: [f32; crate::tone::tone_equalizer::TONE_EQ_BANDS],
+    primary_band: u32,
+}
+
+#[tauri::command]
+fn sample_tone_equalizer_picker(
+    request: ToneEqualizerPickerRequest,
+    state: tauri::State<'_, AppState>,
+) -> Result<ToneEqualizerPickerResponse, String> {
+    if request.graph_revision.trim().is_empty() {
+        return Err("tone_equalizer.picker_missing_graph_revision".to_string());
+    }
+    let loaded = state
+        .original_image
+        .lock()
+        .unwrap()
+        .clone()
+        .ok_or("tone_equalizer.no_source")?;
+    if loaded.path != request.source_identity {
+        return Err("tone_equalizer.stale_source".to_string());
+    }
+    let source_fingerprint = loaded.artifact_source.source_fingerprint();
+    let mut adjustments = request.js_adjustments;
+    hydrate_adjustments(&state, &mut adjustments);
+    let render_plan =
+        compile_consumer_render_plan(&adjustments, &loaded.path, loaded.is_raw, None, None)?;
+    let sample = crate::render::cpu_edit_graph::sample_tone_equalizer_coordinate(
+        loaded.image.as_ref(),
+        &render_plan.edit_graph,
+        request.normalized_image_point.x,
+        request.normalized_image_point.y,
+    )
+    .map_err(str::to_string)?;
+    let current_source = state
+        .original_image
+        .lock()
+        .unwrap()
+        .as_ref()
+        .map(|current| {
+            (
+                current.path.clone(),
+                current.artifact_source.source_fingerprint(),
+            )
+        });
+    if current_source != Some((request.source_identity.clone(), source_fingerprint)) {
+        return Err("tone_equalizer.stale_source".to_string());
+    }
+    Ok(ToneEqualizerPickerResponse {
+        source_identity: request.source_identity,
+        source_fingerprint: format!("{source_fingerprint:016x}"),
+        graph_fingerprint: format!("{:016x}", render_plan.edit_graph.fingerprint),
+        graph_revision: request.graph_revision,
+        exposure_ev: sample.exposure_ev,
+        contributing_weights: sample.contributing_weights,
+        primary_band: sample.primary_band,
+    })
 }
 
 fn start_analytics_worker(app_handle: tauri::AppHandle) {
@@ -3943,6 +4095,8 @@ pub fn run() {
             update_wgpu_transform,
             flush_wgpu_presentation,
             get_wgpu_presentation_report,
+            analyze_tone_equalizer_placement,
+            sample_tone_equalizer_picker,
             app::display_target::get_display_target_report,
             android_integration::resolve_android_content_uri_name,
             cache_utils::clear_session_caches,

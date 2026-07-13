@@ -82,6 +82,14 @@ export interface CollapsibleSectionsState {
   transformLens: boolean;
 }
 
+export interface ToneEqualizerPickerUiReceipt {
+  exposureEv: number;
+  graphRevision: string;
+  primaryBand: number;
+  sourceIdentity: string;
+  sourceFingerprint: string;
+}
+
 export const LAST_EDITING_RIGHT_PANEL_STORAGE_KEY = LEGACY_LAST_EDITING_RIGHT_PANEL_STORAGE_KEY;
 export { EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY };
 export const MAX_RECENT_RIGHT_PANELS = 5;
@@ -428,6 +436,8 @@ export interface UIState {
   slideDirection: number;
   collapsibleSectionsState: CollapsibleSectionsState;
   developPanelPinnedControlIds: string[];
+  toneEqualizerPickerActive: boolean;
+  toneEqualizerPickerReceipt: ToneEqualizerPickerUiReceipt | null;
 
   // Modals & Dialogs
   isCreateFolderModalOpen: boolean;
@@ -555,6 +565,8 @@ export const useUIStore = create<UIState>((set, get) => {
     slideDirection: 1,
     collapsibleSectionsState: createCollapsibleSectionsState(initialPreferences),
     developPanelPinnedControlIds: initialPreferences.rightInspector.pinnedControlIds,
+    toneEqualizerPickerActive: false,
+    toneEqualizerPickerReceipt: null,
 
     isCreateFolderModalOpen: false,
     isRenameFolderModalOpen: false,

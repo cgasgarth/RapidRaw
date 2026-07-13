@@ -83,6 +83,14 @@ struct BlackWhiteMixerSettings {
     _pad3: u32,
 }
 
+struct ToneEqualizerGpuSettings {
+    bands0: vec4<f32>,
+    bands1: vec4<f32>,
+    bands2: vec4<f32>,
+    params0: vec4<f32>,
+    params1: vec4<f32>,
+}
+
 struct GlobalAdjustments {
     exposure: f32,
     brightness: f32,
@@ -175,6 +183,7 @@ struct GlobalAdjustments {
     halation_amount: f32,
     flare_amount: f32,
     sharpness_threshold: f32,
+    tone_equalizer: ToneEqualizerGpuSettings,
 }
 
 struct MaskAdjustments {
@@ -227,6 +236,7 @@ struct MaskAdjustments {
     _pad_end5: f32,
     _pad_end6: f32,
     _pad_end7: f32,
+    tone_equalizer: ToneEqualizerGpuSettings,
 }
 
 struct AllAdjustments {
@@ -320,6 +330,148 @@ fn scene_luminance_coefficients() -> vec3<f32> {
 
 fn scene_luminance(c: vec3<f32>) -> f32 {
     return dot(c, scene_luminance_coefficients());
+}
+
+fn tone_equalizer_band(bands0: vec4<f32>, bands1: vec4<f32>, bands2: vec4<f32>, index: u32) -> f32 {
+    switch index {
+        case 0u: { return bands0.x; }
+        case 1u: { return bands0.y; }
+        case 2u: { return bands0.z; }
+        case 3u: { return bands0.w; }
+        case 4u: { return bands1.x; }
+        case 5u: { return bands1.y; }
+        case 6u: { return bands1.z; }
+        case 7u: { return bands1.w; }
+        default: { return bands2.x; }
+    }
+}
+
+fn tone_equalizer_macro_band(
+    index: u32,
+    brightness: f32,
+    contrast: f32,
+    highlights: f32,
+    shadows: f32,
+    whites: f32,
+    blacks: f32,
+) -> f32 {
+    var black_weight = 0.0;
+    var shadow_weight = 0.0;
+    var highlight_weight = 0.0;
+    var white_weight = 0.0;
+    var contrast_weight = 0.0;
+    var brightness_weight = 0.0;
+    switch index {
+        case 0u: { black_weight = 0.9; contrast_weight = -1.0; brightness_weight = 0.05; }
+        case 1u: { black_weight = 0.65; shadow_weight = 0.1; contrast_weight = -0.85; brightness_weight = 0.15; }
+        case 2u: { black_weight = 0.25; shadow_weight = 0.45; contrast_weight = -0.6; brightness_weight = 0.4; }
+        case 3u: { black_weight = 0.05; shadow_weight = 1.0; highlight_weight = 0.1; contrast_weight = -0.3; brightness_weight = 0.8; }
+        case 4u: { shadow_weight = 0.55; highlight_weight = 0.45; brightness_weight = 1.0; }
+        case 5u: { shadow_weight = 0.1; highlight_weight = 1.0; white_weight = 0.05; contrast_weight = 0.3; brightness_weight = 0.8; }
+        case 6u: { highlight_weight = 0.55; white_weight = 0.25; contrast_weight = 0.6; brightness_weight = 0.4; }
+        case 7u: { highlight_weight = 0.1; white_weight = 0.65; contrast_weight = 0.85; brightness_weight = 0.15; }
+        default: { white_weight = 0.9; contrast_weight = 1.0; brightness_weight = 0.05; }
+    }
+    return clamp(blacks, -1.0, 1.0) * black_weight * 2.0
+        + clamp(shadows, -1.0, 1.0) * shadow_weight * 2.0
+        + clamp(highlights, -1.0, 1.0) * highlight_weight * 2.0
+        + clamp(whites, -1.0, 1.0) * white_weight * 2.0
+        + clamp(contrast, -1.0, 1.0) * contrast_weight * 1.25
+        + clamp(brightness, -5.0, 5.0) * brightness_weight;
+}
+
+fn tone_equalizer_compensation(
+    exposure_ev: f32,
+    bands0: vec4<f32>,
+    bands1: vec4<f32>,
+    bands2: vec4<f32>,
+    params0: vec4<f32>,
+    params1: vec4<f32>,
+    brightness: f32,
+    contrast: f32,
+    highlights: f32,
+    shadows: f32,
+    whites: f32,
+    blacks: f32,
+) -> f32 {
+    let pivot = params0.y;
+    let scale = clamp(params0.z, 4.0, 24.0) / 16.0;
+    let sigma = max(2.0 * scale, 0.5);
+    let bounded_ev = clamp(exposure_ev, pivot - 8.0 * scale, pivot + 8.0 * scale);
+    var weighted = 0.0;
+    var total = 0.0;
+    for (var index = 0u; index < 9u; index = index + 1u) {
+        let center = pivot + (-8.0 + f32(index) * 2.0) * scale;
+        let distance = (bounded_ev - center) / sigma;
+        let weight = exp(-0.5 * distance * distance);
+        let advanced = select(0.0, tone_equalizer_band(bands0, bands1, bands2, index), params0.x > 0.5);
+        let macro_band = tone_equalizer_macro_band(index, brightness, contrast, highlights, shadows, whites, blacks);
+        weighted += clamp(advanced + macro_band, -4.0, 4.0) * weight;
+        total += weight;
+    }
+    return select(0.0, weighted / total, total > 0.0) + clamp(params1.z, -4.0, 4.0);
+}
+
+fn tone_equalizer_band_weight(exposure_ev: f32, selected_band: u32, params0: vec4<f32>) -> f32 {
+    let pivot = params0.y;
+    let scale = clamp(params0.z, 4.0, 24.0) / 16.0;
+    let sigma = max(2.0 * scale, 0.5);
+    let bounded_ev = clamp(exposure_ev, pivot - 8.0 * scale, pivot + 8.0 * scale);
+    var selected_weight = 0.0;
+    var total = 0.0;
+    for (var index = 0u; index < 9u; index = index + 1u) {
+        let center = pivot + (-8.0 + f32(index) * 2.0) * scale;
+        let distance = (bounded_ev - center) / sigma;
+        let weight = exp(-0.5 * distance * distance);
+        if (index == min(selected_band, 8u)) { selected_weight = weight; }
+        total += weight;
+    }
+    return select(0.0, selected_weight / total, total > 0.0);
+}
+
+fn apply_tone_equalizer(
+    color: vec3<f32>,
+    coordinate_color: vec3<f32>,
+    smoothed_color: vec3<f32>,
+    bands0: vec4<f32>,
+    bands1: vec4<f32>,
+    bands2: vec4<f32>,
+    params0: vec4<f32>,
+    params1: vec4<f32>,
+    brightness: f32,
+    contrast: f32,
+    highlights: f32,
+    shadows: f32,
+    whites: f32,
+    blacks: f32,
+) -> vec3<f32> {
+    let luminance = scene_luminance(coordinate_color);
+    if (luminance <= 1.0e-8) { return color; }
+    let middle_grey = max(adjustments.global.rapid_view_parameters0.x, 1.0e-8);
+    let source_ev = log2(max(luminance, 1.0e-8) / middle_grey);
+    let smoothed_ev = log2(max(scene_luminance(smoothed_color), 1.0e-8) / middle_grey);
+    let edge_delta = abs(source_ev - smoothed_ev);
+    let edge_weight = 1.0 - exp(-edge_delta * clamp(params1.x, 0.0, 8.0));
+    let detail = clamp(params0.w, 0.0, 1.0);
+    let source_weight = detail + edge_weight * (1.0 - detail);
+    let guidance_ev = mix(smoothed_ev, source_ev, source_weight);
+    let compensation = tone_equalizer_compensation(
+        guidance_ev, bands0, bands1, bands2, params0, params1,
+        brightness, contrast, highlights, shadows, whites, blacks,
+    );
+    return color * exp2(compensation);
+}
+
+fn tone_equalizer_false_color(exposure_ev: f32, pivot_ev: f32, range_ev: f32) -> vec3<f32> {
+    let normalized = clamp((exposure_ev - pivot_ev) / max(range_ev, 4.0) + 0.5, 0.0, 1.0);
+    let cold = vec3<f32>(0.05, 0.2, 1.0);
+    let middle = vec3<f32>(0.1, 0.9, 0.25);
+    let warm = vec3<f32>(1.0, 0.15, 0.03);
+    return select(
+        mix(cold, middle, normalized * 2.0),
+        mix(middle, warm, (normalized - 0.5) * 2.0),
+        normalized >= 0.5,
+    );
 }
 
 fn view_encoded_luma(c: vec3<f32>) -> f32 {
@@ -1850,6 +2002,17 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     var t_flare = adjustments.global.flare_amount;
     var t_sharpness = adjustments.global.sharpness;
     var t_hue = adjustments.global.hue;
+    let global_tone_enabled = adjustments.global.tone_equalizer.params0.x > 0.5;
+    var t_tone_bands0 = select(vec4<f32>(0.0), adjustments.global.tone_equalizer.bands0, global_tone_enabled);
+    var t_tone_bands1 = select(vec4<f32>(0.0), adjustments.global.tone_equalizer.bands1, global_tone_enabled);
+    var t_tone_bands2 = vec4<f32>(
+        select(0.0, adjustments.global.tone_equalizer.bands2.x, global_tone_enabled),
+        adjustments.global.tone_equalizer.bands2.y,
+        0.0,
+        0.0,
+    );
+    var t_tone_params0 = adjustments.global.tone_equalizer.params0;
+    var t_tone_params1 = adjustments.global.tone_equalizer.params1;
 
     var h0_h = adjustments.global.hsl[0].hue; var h0_s = adjustments.global.hsl[0].saturation; var h0_l = adjustments.global.hsl[0].luminance;
     var h1_h = adjustments.global.hsl[1].hue; var h1_s = adjustments.global.hsl[1].saturation; var h1_l = adjustments.global.hsl[1].luminance;
@@ -1889,6 +2052,21 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
             t_flare += m.flare_amount * influence;
             t_hue += m.hue * influence;
 
+            if (m.tone_equalizer.params0.x > 0.5) {
+                t_tone_bands0 += m.tone_equalizer.bands0 * influence;
+                t_tone_bands1 += m.tone_equalizer.bands1 * influence;
+                t_tone_bands2.x += m.tone_equalizer.bands2.x * influence;
+                let local_tone_shape = mix(t_tone_params0.yzw, m.tone_equalizer.params0.yzw, vec3<f32>(influence));
+                t_tone_params0 = vec4<f32>(t_tone_params0.x, local_tone_shape);
+                t_tone_params1.x = mix(t_tone_params1.x, m.tone_equalizer.params1.x, influence);
+                t_tone_params0.x = 1.0;
+                t_tone_params1.z += m.tone_equalizer.params1.z * influence;
+                if (m.tone_equalizer.params1.w > 0.5) {
+                    t_tone_bands2.y = m.tone_equalizer.bands2.y;
+                    t_tone_params1.w = m.tone_equalizer.params1.w;
+                }
+            }
+
             h0_h += m.hsl[0].hue * influence; h0_s += m.hsl[0].saturation * influence; h0_l += m.hsl[0].luminance * influence;
             h1_h += m.hsl[1].hue * influence; h1_s += m.hsl[1].saturation * influence; h1_l += m.hsl[1].luminance * influence;
             h2_h += m.hsl[2].hue * influence; h2_s += m.hsl[2].saturation * influence; h2_l += m.hsl[2].luminance * influence;
@@ -1908,6 +2086,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     );
 
     var composite_rgb_linear = initial_linear_rgb;
+    var tone_preview_rgb = vec3<f32>(-1.0);
     if (scene_input_phase) {
     initial_linear_rgb = apply_noise_reduction(
         initial_linear_rgb, absolute_coord_i,
@@ -1991,9 +2170,50 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     composite_rgb_linear = apply_dehaze(processed_rgb, structure_blurred, is_raw, t_dehaze);
     composite_rgb_linear = apply_centre_tonal_and_color(composite_rgb_linear, adjustments.global.centre, absolute_coord_i);
     composite_rgb_linear = apply_white_balance(composite_rgb_linear, t_temperature, t_tint);
-    composite_rgb_linear = apply_filmic_exposure(composite_rgb_linear, t_brightness);
-    composite_rgb_linear = apply_tonal_adjustments(composite_rgb_linear, tonal_blurred, is_raw, t_contrast, t_shadows, t_whites, t_blacks);
-    composite_rgb_linear = apply_highlights_adjustment(composite_rgb_linear, tonal_blurred, is_raw, t_highlights);
+    if (preserve_scene_extended) {
+        let tone_coordinate_source = apply_linear_exposure(initial_linear_rgb, adjustments.global.exposure);
+        let tone_guidance_linear = select(srgb_to_linear(tonal_blurred), tonal_blurred, is_raw == 1u);
+        let tone_guidance = apply_linear_exposure(tone_guidance_linear, adjustments.global.exposure);
+        composite_rgb_linear = apply_tone_equalizer(
+            composite_rgb_linear, tone_coordinate_source, tone_guidance,
+            t_tone_bands0, t_tone_bands1, t_tone_bands2,
+            t_tone_params0, t_tone_params1,
+            t_brightness, t_contrast, t_highlights, t_shadows, t_whites, t_blacks,
+        );
+        let tone_preview_mode = u32(max(t_tone_params1.w, 0.0));
+        if (tone_preview_mode > 0u) {
+            let middle_grey = max(adjustments.global.rapid_view_parameters0.x, 1.0e-8);
+            let source_ev = log2(max(scene_luminance(tone_coordinate_source), 1.0e-8) / middle_grey);
+            let smoothed_ev = log2(max(scene_luminance(tone_guidance), 1.0e-8) / middle_grey);
+            let edge_delta = abs(source_ev - smoothed_ev);
+            let edge_weight = 1.0 - exp(-edge_delta * clamp(t_tone_params1.x, 0.0, 8.0));
+            let source_weight = clamp(t_tone_params0.w, 0.0, 1.0)
+                + edge_weight * (1.0 - clamp(t_tone_params0.w, 0.0, 1.0));
+            let guidance_ev = mix(smoothed_ev, source_ev, source_weight);
+            if (tone_preview_mode == 1u) {
+                tone_preview_rgb = tone_equalizer_false_color(guidance_ev, t_tone_params0.y, t_tone_params0.z);
+            } else if (tone_preview_mode == 2u) {
+                let weight = tone_equalizer_band_weight(guidance_ev, u32(max(t_tone_bands2.y, 0.0)), t_tone_params0);
+                tone_preview_rgb = vec3<f32>(weight);
+            } else if (tone_preview_mode == 3u) {
+                let source_map = clamp((source_ev + 12.0) / 24.0, 0.0, 1.0);
+                let filtered_map = clamp((guidance_ev + 12.0) / 24.0, 0.0, 1.0);
+                tone_preview_rgb = vec3<f32>(source_map, filtered_map, clamp(abs(source_ev - guidance_ev) / 4.0, 0.0, 1.0));
+            } else {
+                let source_max = max(tone_coordinate_source.r, max(tone_coordinate_source.g, tone_coordinate_source.b));
+                let source_luma = scene_luminance(tone_coordinate_source);
+                tone_preview_rgb = select(
+                    select(vec3<f32>(0.12), vec3<f32>(0.05, 0.2, 1.0), source_luma <= 1.0e-8),
+                    vec3<f32>(1.0, 0.05, 0.02),
+                    source_max >= 1.0,
+                );
+            }
+        }
+    } else {
+        composite_rgb_linear = apply_filmic_exposure(composite_rgb_linear, t_brightness);
+        composite_rgb_linear = apply_tonal_adjustments(composite_rgb_linear, tonal_blurred, is_raw, t_contrast, t_shadows, t_whites, t_blacks);
+        composite_rgb_linear = apply_highlights_adjustment(composite_rgb_linear, tonal_blurred, is_raw, t_highlights);
+    }
     composite_rgb_linear = apply_color_calibration(composite_rgb_linear, adjustments.global.color_calibration);
     composite_rgb_linear = apply_hsl_panel(composite_rgb_linear, final_hsl, absolute_coord_i);
     composite_rgb_linear = apply_hue_shift(composite_rgb_linear, t_hue);
@@ -2044,6 +2264,10 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
             composite_rgb_linear = mix(composite_rgb_linear, vec3<f32>(1.0), v_amount * vignette_mask);
         }
     }
+    }
+
+    if (tone_preview_rgb.x >= 0.0) {
+        composite_rgb_linear = tone_preview_rgb;
     }
 
     if (adjustments.execution_phase == 1u) {
