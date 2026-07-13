@@ -455,6 +455,97 @@ pub fn composite_patches<'a>(
     Ok(Cow::Owned(DynamicImage::ImageRgba32F(output)))
 }
 
+pub struct PreviewPatchSampler {
+    patches: Vec<Arc<PreparedPatchAsset>>,
+}
+
+impl PreviewPatchSampler {
+    pub fn blend_at(&self, source_x: f32, source_y: f32, pixel: &mut [f32]) {
+        for patch in &self.patches {
+            let bounds = patch.bounds;
+            let local_x = source_x - bounds.x as f32;
+            let local_y = source_y - bounds.y as f32;
+            if local_x < 0.0
+                || local_y < 0.0
+                || local_x > bounds.width.saturating_sub(1) as f32
+                || local_y > bounds.height.saturating_sub(1) as f32
+            {
+                continue;
+            }
+            let x0 = local_x.floor() as u32;
+            let y0 = local_y.floor() as u32;
+            let x1 = (x0 + 1).min(bounds.width - 1);
+            let y1 = (y0 + 1).min(bounds.height - 1);
+            let wx = local_x - x0 as f32;
+            let wy = local_y - y0 as f32;
+            let bilinear = |p00: f32, p10: f32, p01: f32, p11: f32| {
+                let top = p00 + (p10 - p00) * wx;
+                let bottom = p01 + (p11 - p01) * wx;
+                top + (bottom - top) * wy
+            };
+            let mask_at = |x, y| patch.mask_u8.get_pixel(x, y)[0] as f32 / 255.0;
+            let alpha = bilinear(
+                mask_at(x0, y0),
+                mask_at(x1, y0),
+                mask_at(x0, y1),
+                mask_at(x1, y1),
+            );
+            if alpha <= 0.0 {
+                continue;
+            }
+            let color_at = |x, y, channel| patch.color_rgb32f.get_pixel(x, y)[channel];
+            let inverse = 1.0 - alpha;
+            for (channel, output) in pixel.iter_mut().take(3).enumerate() {
+                let color = bilinear(
+                    color_at(x0, y0, channel),
+                    color_at(x1, y0, channel),
+                    color_at(x0, y1, channel),
+                    color_at(x1, y1, channel),
+                );
+                *output = color * alpha + *output * inverse;
+            }
+        }
+    }
+}
+
+pub fn prepare_preview_patch_sampler(
+    adjustments: &Value,
+    width: u32,
+    height: u32,
+) -> Result<Option<PreviewPatchSampler>> {
+    let Some(patches) = adjustments.get("aiPatches").and_then(Value::as_array) else {
+        return Ok(None);
+    };
+    let mut prepared = Vec::new();
+    for patch in patches {
+        if !patch
+            .get("visible")
+            .and_then(Value::as_bool)
+            .unwrap_or(true)
+        {
+            continue;
+        }
+        let has_color = patch
+            .get("patchData")
+            .and_then(|data| data.get("color"))
+            .and_then(Value::as_str)
+            .is_some_and(|color| !color.is_empty());
+        if !has_color {
+            continue;
+        }
+        let key = patch_key(patch)?;
+        let source = cache().decoded(&key, patch)?;
+        if let Some(asset) = cache().prepared(source, width, height)? {
+            prepared.push(asset);
+        }
+    }
+    if prepared.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(PreviewPatchSampler { patches: prepared }))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;
