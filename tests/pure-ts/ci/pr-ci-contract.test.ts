@@ -2,8 +2,9 @@ import { describe, expect, test } from 'bun:test';
 import {
   PR_REQUIRED_BUDGET_SECONDS,
   PR_REQUIRED_JOBS,
+  parseWorkflowJobTimings,
   planPrValidation,
-  resolveWorkflowStartedEpoch,
+  requiredExecutionElapsedSeconds,
   verifyRequiredResults,
 } from '../../../scripts/ci/pr-ci-contract';
 
@@ -53,10 +54,68 @@ describe('four-minute PR CI contract', () => {
     });
   });
 
-  test('uses the Actions run_started_at epoch and rejects late or invalid substitutes', () => {
-    expect(resolveWorkflowStartedEpoch('100', 120)).toBe(100);
-    expect(() => resolveWorkflowStartedEpoch('121', 120)).toThrow('Actions run_started_at');
-    expect(() => resolveWorkflowStartedEpoch(undefined, 120)).toThrow('Actions run_started_at');
+  test('measures selected execution from plan start without charging aggregate queue delay', () => {
+    const jobs = parseWorkflowJobTimings({
+      jobs: [
+        {
+          completed_at: '2026-07-13T23:23:49.000Z',
+          name: 'validation: affected fast-lane plan',
+          started_at: '2026-07-13T23:23:31.000Z',
+        },
+        {
+          completed_at: '2026-07-13T23:24:54.000Z',
+          name: 'pr fast: affected native feedback',
+          started_at: '2026-07-13T23:24:05.000Z',
+        },
+        {
+          completed_at: null,
+          name: 'PR CI / required',
+          started_at: '2026-07-13T23:30:07.000Z',
+        },
+      ],
+    });
+    expect(
+      requiredExecutionElapsedSeconds(jobs, {
+        js: false,
+        frontend: false,
+        schema: false,
+        dependencies: false,
+        rust: true,
+        workflow: false,
+        docs: false,
+      }),
+    ).toBe(83);
+  });
+
+  test('fails closed on missing selected timings and preserves the 240-second execution budget', () => {
+    const selected = {
+      js: false,
+      frontend: false,
+      schema: false,
+      dependencies: false,
+      rust: true,
+      workflow: false,
+      docs: false,
+    };
+    const plan = {
+      completedAt: '2026-07-13T23:23:49.000Z',
+      name: 'validation: affected fast-lane plan',
+      startedAt: '2026-07-13T23:23:31.000Z',
+    };
+    expect(() => requiredExecutionElapsedSeconds([plan], selected)).toThrow('missing or incomplete');
+    const elapsed = requiredExecutionElapsedSeconds(
+      [
+        plan,
+        {
+          completedAt: '2026-07-13T23:27:32.000Z',
+          name: 'pr fast: affected native feedback',
+          startedAt: '2026-07-13T23:24:05.000Z',
+        },
+      ],
+      selected,
+    );
+    expect(elapsed).toBe(241);
+    expect(verifyRequiredResults({}, selected, elapsed)).toContain('required validation exceeded 240s (241s)');
   });
 
   test('blocks selected failures, unexpected skips, and budget overruns', () => {
