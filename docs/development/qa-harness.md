@@ -22,7 +22,7 @@ bun qa --list
 
 The registry lives in `scripts/qa/scenarios.ts`. Scenario order is not state: each implementation establishes its declared empty, library, or editor fixture itself. Shards sort IDs before partitioning so the same index and total always select the same scenarios.
 
-Receipts under `private-artifacts/qa/<run>/run.json` bind results to the Git SHA, dirty-worktree digest, worktree path, Bun lock/build identity, browser/platform, execution mode, seed, shard, durations, screenshots, and exact rerun command. `bun qa reproduce` validates the receipt, rejects another worktree's identity, and reruns failed scenarios (or the full recorded selection when all passed). Private artifacts are never committed.
+Receipts under `private-artifacts/qa/<run>/run.json` bind results to the Git SHA, dirty-worktree digest, worktree path, Bun lock/build identity, browser/platform, execution mode, seed, shard, durations, and exact rerun command. Failed browser scenarios retain a bounded server log, full-page PNG, Playwright trace, and video; passing scenarios discard trace/video capture. `bun qa reproduce` validates the receipt, rejects another worktree's identity, and reruns failed scenarios (or the full recorded selection when all passed). Private artifacts are never committed.
 
 The native QA launcher separately hashes native, frontend, bundle configuration, scenarios, features, and worktree identity. Scenario-only changes avoid rebuilding, copying, and signing. Frontend-only changes can reuse a validation-harness app with `--dev-server`; native, bundle, feature, or worktree changes force isolated deployment. `--clean` preserves full release-style proof.
 

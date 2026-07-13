@@ -1,5 +1,5 @@
 import { type ChildProcess, spawn } from 'node:child_process';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, rm } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { type Browser, chromium } from '@playwright/test';
 import { z } from 'zod';
@@ -57,7 +57,10 @@ export const browserJobResultSchema: z.ZodType<BrowserJobResult> = z.object({
       status: z.enum(['passed', 'failed']),
       durationMs: z.number().nonnegative(),
       error: z.string().optional(),
+      log: z.string().optional(),
       screenshot: z.string().optional(),
+      trace: z.string().optional(),
+      video: z.string().optional(),
       artifacts: z
         .array(
           z.object({
@@ -171,18 +174,23 @@ export function createBrowserLifecycleAdapter(
       );
       const results: QaScenarioResult[] = [];
       await mkdir(artifactRoot, { recursive: true });
+      const videoRoot = resolve(artifactRoot, 'video');
       for (const scenario of selected) {
         signal.throwIfAborted();
         validateScenarioCapabilities(scenario, new Set(['browser-tauri-harness']));
         const context = await session.browser.newContext({
           baseURL: session.baseUrl,
+          recordVideo: { dir: videoRoot, size: { height: 720, width: 1280 } },
           viewport: { height: 720, width: 1280 },
         });
         metrics.contextsCreated += 1;
+        await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
+        let tracingStopped = false;
         await installHarnessHtmlRoute(context, session.baseUrl);
         const abort = () => void context.close();
         signal.addEventListener('abort', abort, { once: true });
         const page = await context.newPage();
+        const video = page.video();
         const errors: string[] = [];
         page.on('pageerror', (error) => errors.push(error.message));
         page.on('console', (message) => {
@@ -193,6 +201,7 @@ export function createBrowserLifecycleAdapter(
         );
         const started = performance.now();
         const artifacts: QaArtifactRecord[] = [];
+        let result: QaScenarioResult | undefined;
         try {
           await withTimeout(
             scenario.run({
@@ -207,30 +216,47 @@ export function createBrowserLifecycleAdapter(
           );
           validateScenarioArtifacts(scenario, artifacts);
           if (errors.length > 0) throw new Error(`Browser errors:\n${errors.join('\n')}`);
-          results.push({
+          result = {
             id: scenario.id,
             status: 'passed',
             durationMs: Math.round(performance.now() - started),
             artifacts,
-          });
+          };
+          results.push(result);
         } catch (error) {
-          const screenshot = resolve(artifactRoot, `${scenario.id}-${Date.now()}.png`);
-          await page.screenshot({ path: screenshot, fullPage: true }).catch(() => undefined);
+          const screenshotPath = resolve(artifactRoot, `${scenario.id}-${Date.now()}.png`);
+          const screenshot = await page
+            .screenshot({ path: screenshotPath, fullPage: true })
+            .then(() => screenshotPath)
+            .catch(() => undefined);
+          const tracePath = resolve(artifactRoot, `${scenario.id}-${Date.now()}.zip`);
+          const trace = await context.tracing
+            .stop({ path: tracePath })
+            .then(() => tracePath)
+            .catch(() => undefined);
+          tracingStopped = true;
           const harnessCalls = await page
             .evaluate(() => JSON.stringify(Reflect.get(window, '__RAWENGINE_BROWSER_TAURI_HARNESS__') ?? null))
             .catch(() => undefined);
-          results.push({
+          result = {
             id: scenario.id,
             status: 'failed',
             durationMs: Math.round(performance.now() - started),
             error: `${error instanceof Error ? error.message : String(error)}\nHarness state: ${harnessCalls?.slice(-4_000) ?? 'unavailable'}`,
+            log: session.log,
             screenshot,
+            trace,
             artifacts,
-          });
+          };
+          results.push(result);
         } finally {
           signal.removeEventListener('abort', abort);
+          if (!tracingStopped) await context.tracing.stop().catch(() => undefined);
           await context.close();
           metrics.contextsClosed += 1;
+          const videoPath = await video?.path().catch(() => undefined);
+          if (result?.status === 'failed') result.video = videoPath;
+          else if (videoPath !== undefined) await rm(videoPath, { force: true });
         }
       }
       const liveContexts = session.browser.contexts().length;

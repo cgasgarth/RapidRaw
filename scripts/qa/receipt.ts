@@ -12,7 +12,10 @@ const scenarioResultSchema = z.object({
   status: z.enum(['passed', 'failed']),
   durationMs: z.number().int().nonnegative(),
   error: z.string().optional(),
+  log: z.string().optional(),
   screenshot: z.string().min(1).optional(),
+  trace: z.string().min(1).optional(),
+  video: z.string().min(1).optional(),
   artifacts: z.array(artifactSchema).optional(),
 });
 

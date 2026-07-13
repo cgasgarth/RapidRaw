@@ -45,7 +45,10 @@ export interface QaScenarioResult {
   status: 'passed' | 'failed';
   durationMs: number;
   error?: string | undefined;
+  log?: string | undefined;
   screenshot?: string | undefined;
+  trace?: string | undefined;
+  video?: string | undefined;
   artifacts?: QaArtifactRecord[] | undefined;
 }
 

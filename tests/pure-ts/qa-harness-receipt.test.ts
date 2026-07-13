@@ -30,7 +30,16 @@ const receipt = {
   runId: 'run-1',
   scenarios: [
     { durationMs: 10, id: 'browser.pass', status: 'passed' as const },
-    { durationMs: 12, error: 'failure', id: 'browser.fail', status: 'failed' as const },
+    {
+      durationMs: 12,
+      error: 'failure',
+      id: 'browser.fail',
+      log: 'vite log',
+      screenshot: '/tmp/failure.png',
+      status: 'failed' as const,
+      trace: '/tmp/failure.zip',
+      video: '/tmp/failure.webm',
+    },
   ],
   schemaVersion: 1 as const,
   seed: 42,
@@ -42,6 +51,12 @@ const receipt = {
 describe('QA harness reproduction receipt', () => {
   test('validates bounded identity, execution, shard, and scenario fields', () => {
     expect(qaRunReceiptSchema.parse(receipt).seed).toBe(42);
+    expect(qaRunReceiptSchema.parse(receipt).scenarios[1]).toMatchObject({
+      log: 'vite log',
+      screenshot: '/tmp/failure.png',
+      trace: '/tmp/failure.zip',
+      video: '/tmp/failure.webm',
+    });
     expect(() => qaRunReceiptSchema.parse({ ...receipt, seed: -1 })).toThrow();
     expect(() => qaRunReceiptSchema.parse({ ...receipt, shard: { index: 2, total: 2 } })).toThrow(
       'index must be less than total',
