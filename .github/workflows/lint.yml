@@ -20,6 +20,9 @@ jobs:
     timeout-minutes: 1
     outputs:
       js: ${{ steps.plan.outputs.js }}
+      frontend: ${{ steps.plan.outputs.frontend }}
+      schema: ${{ steps.plan.outputs.schema }}
+      dependencies: ${{ steps.plan.outputs.dependencies }}
       rust: ${{ steps.plan.outputs.rust }}
       workflow: ${{ steps.plan.outputs.workflow }}
       docs: ${{ steps.plan.outputs.docs }}
@@ -57,8 +60,8 @@ jobs:
           WORKFLOW_STARTED_EPOCH: ${{ steps.workflow-start.outputs.started_epoch }}
         run: bun scripts/ci/pr-ci-contract.ts --paths-file .pr-paths
 
-  fast-js:
-    name: 'pr fast: JavaScript and schema'
+  fast-lint:
+    name: 'pr fast: lint'
     needs: plan
     if: needs.plan.outputs.js == 'true'
     runs-on: ubuntu-latest
@@ -66,12 +69,107 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: ./.github/actions/setup-bun-deps
-      - name: Run bounded JavaScript, schema, and unit closure
+      - run: bun run lint
+
+  fast-typecheck:
+    name: 'pr fast: typecheck'
+    needs: plan
+    if: needs.plan.outputs.js == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup-bun-deps
+      - run: bun run typecheck
+
+  fast-schema:
+    name: 'pr fast: schema contracts'
+    needs: plan
+    if: needs.plan.outputs.schema == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup-bun-deps
+      - run: bun run check:schema
+
+  fast-unit:
+    name: 'pr fast: unit tests'
+    needs: plan
+    if: needs.plan.outputs.js == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup-bun-deps
+      - run: bun run test:unit
+
+  fast-format:
+    name: 'pr fast: format'
+    needs: plan
+    if: needs.plan.outputs.js == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup-bun-deps
+      - run: bun run format:check
+
+  fast-build-i18n:
+    name: 'pr fast: frontend build and i18n'
+    needs: plan
+    if: needs.plan.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup-bun-deps
+      - name: Build frontend and validate translations
         run: |
-          bun run lint
-          bun run typecheck
-          bun run check:schema
-          bun run test:unit
+          bun run check:bundle
+          bunx i18next-cli lint
+          bunx i18next-cli extract --ci --dry-run
+
+  fast-unsafe-unused:
+    name: 'pr fast: unsafe and unused dependency policy'
+    needs: plan
+    if: needs.plan.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup-bun-deps
+      - name: Check script, cast, and dependency policy
+        run: |
+          bun tests/integration/checks/check-script-extension-policy.ts
+          bun tests/integration/checks/check-unsafe-casts.ts
+          bunx knip --config knip.jsonc --dependencies --reporter compact
+
+  fast-visual:
+    name: 'pr fast: visual smoke'
+    needs: plan
+    if: needs.plan.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup-bun-deps
+      - name: Run browser visual smoke
+        run: |
+          bunx playwright install chromium
+          bun scripts/proofs/capture-visual-smoke.ts --scenario empty-library
+          bun tests/integration/checks/check-browser-tauri-harness.ts
+
+  fast-js-security:
+    name: 'pr fast: JavaScript audit'
+    needs: plan
+    if: needs.plan.outputs.dependencies == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup-bun-deps
+      - run: bun audit --audit-level moderate
 
   fast-rust:
     name: 'pr fast: affected native feedback'
@@ -129,7 +227,20 @@ jobs:
 
   pr-ci-required:
     name: PR CI / required
-    needs: [plan, fast-js, fast-rust, fast-workflow, fast-docs]
+    needs:
+      - plan
+      - fast-lint
+      - fast-typecheck
+      - fast-schema
+      - fast-unit
+      - fast-format
+      - fast-build-i18n
+      - fast-unsafe-unused
+      - fast-visual
+      - fast-js-security
+      - fast-rust
+      - fast-workflow
+      - fast-docs
     if: always() && github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 1
@@ -146,10 +257,21 @@ jobs:
           elapsed="$((now_epoch - STARTED_EPOCH))"
           failures="$(
             jq -r --argjson plan "$PLAN_JSON" '
-              ["js", "rust", "workflow", "docs"][] as $lane
-              | ("fast-" + $lane) as $job
-              | (.[$job].result // "missing") as $result
-              | ($plan.lanes[$lane] // true) as $selected
+              . as $needs
+              |
+              {
+                js: ["fast-lint", "fast-typecheck", "fast-unit", "fast-format"],
+                frontend: ["fast-build-i18n", "fast-unsafe-unused", "fast-visual"],
+                schema: ["fast-schema"],
+                dependencies: ["fast-js-security"],
+                rust: ["fast-rust"],
+                workflow: ["fast-workflow"],
+                docs: ["fast-docs"]
+              }
+              | to_entries[] as $lane
+              | $lane.value[] as $job
+              | ($needs[$job].result // "missing") as $result
+              | ($plan.lanes[$lane.key] // true) as $selected
               | select(($selected and $result != "success") or (($selected | not) and $result != "skipped"))
               | "\($job)=\($result)"
             ' <<< "$NEEDS_CONTEXT"

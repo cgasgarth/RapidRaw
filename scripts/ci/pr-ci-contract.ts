@@ -12,7 +12,17 @@ export const resolveWorkflowStartedEpoch = (value: string | undefined, nowEpoch:
   return parsed;
 };
 
-export type PrFastLane = 'js' | 'rust' | 'workflow' | 'docs';
+export type PrFastLane = 'js' | 'frontend' | 'schema' | 'dependencies' | 'rust' | 'workflow' | 'docs';
+
+export const PR_REQUIRED_JOBS: Readonly<Record<PrFastLane, readonly string[]>> = {
+  js: ['fast-lint', 'fast-typecheck', 'fast-unit', 'fast-format'],
+  frontend: ['fast-build-i18n', 'fast-unsafe-unused', 'fast-visual'],
+  schema: ['fast-schema'],
+  dependencies: ['fast-js-security'],
+  rust: ['fast-rust'],
+  workflow: ['fast-workflow'],
+  docs: ['fast-docs'],
+};
 
 export interface PrValidationPlan {
   lanes: Record<PrFastLane, boolean>;
@@ -36,6 +46,9 @@ export const planPrValidation = (paths: readonly string[]): PrValidationPlan => 
   return {
     lanes: {
       js: failClosed || dependencies || classes.has('frontend') || classes.has('schema') || classes.has('scripts'),
+      frontend: failClosed || dependencies || classes.has('frontend') || classes.has('schema'),
+      schema: failClosed || classes.has('schema') || classes.has('frontend'),
+      dependencies: failClosed || dependencies,
       rust: failClosed || dependencies || classes.has('rust'),
       workflow: failClosed || classes.has('workflows'),
       docs: failClosed || classes.has('docs'),
@@ -51,11 +64,12 @@ export const verifyRequiredResults = (
   elapsedSeconds: number,
 ): string[] => {
   const failures: string[] = [];
-  for (const lane of ['js', 'rust', 'workflow', 'docs'] as const) {
-    const result = results[`fast-${lane}`];
-    if (selected[lane] && result !== 'success') failures.push(`fast-${lane}=${result ?? 'missing'}`);
-    if (!selected[lane] && result !== 'skipped')
-      failures.push(`fast-${lane}=${result ?? 'missing'} (expected skipped)`);
+  for (const lane of ['js', 'frontend', 'schema', 'dependencies', 'rust', 'workflow', 'docs'] as const) {
+    for (const job of PR_REQUIRED_JOBS[lane]) {
+      const result = results[job];
+      if (selected[lane] && result !== 'success') failures.push(`${job}=${result ?? 'missing'}`);
+      if (!selected[lane] && result !== 'skipped') failures.push(`${job}=${result ?? 'missing'} (expected skipped)`);
+    }
   }
   if (!Number.isFinite(elapsedSeconds) || elapsedSeconds < 0) failures.push('invalid elapsed time');
   if (elapsedSeconds > PR_REQUIRED_BUDGET_SECONDS) {
