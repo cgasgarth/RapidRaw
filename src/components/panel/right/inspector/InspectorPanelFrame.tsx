@@ -58,7 +58,7 @@ export default function InspectorPanelFrame({
     <section
       aria-label={label}
       className={cx(
-        'flex min-w-0 flex-col bg-editor-panel text-text-primary',
+        'relative flex min-w-0 flex-col bg-editor-panel text-text-primary',
         variant === 'panel' ? 'h-full overflow-hidden' : 'overflow-visible',
       )}
       data-inspector-variant={variant}

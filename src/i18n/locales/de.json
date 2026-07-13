@@ -627,6 +627,29 @@
         "pasteSettings": "Einstellungen einfügen",
         "resetSectionSettings": "{{section}}-Einstellungen zurücksetzen"
       },
+      "autoEdit": {
+        "analyzing": "",
+        "apply": "",
+        "cancelLabel": "",
+        "description": "",
+        "groups": {
+          "atmosphere": "",
+          "color": "",
+          "detail": "",
+          "geometry": "",
+          "light": "",
+          "whiteBalance": ""
+        },
+        "groupsLabel": "",
+        "highConfidenceOnly": "",
+        "holdBefore": "",
+        "impact": "",
+        "impactLabel": "",
+        "resetProposal": "",
+        "reviewLabel": "",
+        "title": "",
+        "unavailable": ""
+      },
       "clippingWarning": {
         "action": "Endpunkte zurücksetzen",
         "title": "Clipping-Risiko"

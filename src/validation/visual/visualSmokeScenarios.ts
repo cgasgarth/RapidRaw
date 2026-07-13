@@ -1,5 +1,6 @@
 export const VISUAL_SMOKE_SCENARIO_IDS = {
   AdjustmentsPanelRetune: 'adjustments-panel-retune',
+  AutoEditReview: 'auto-edit-review',
   AgentChatUi: 'agent-chat-ui',
   AgentSelectedImageLiveSession: 'agent-selected-image-live-session',
   BrushMaskCanvasUi: 'brush-mask-canvas-ui',
@@ -85,6 +86,12 @@ export const VISUAL_SMOKE_SCENARIOS = [
     mode: VISUAL_SMOKE_SCENARIO_IDS.AdjustmentsPanelRetune,
     compactOutputFile: 'adjustments-panel-retune-compact.png',
     outputFile: 'adjustments-panel-retune.png',
+    sectionMinimum: 1,
+  },
+  {
+    marker: 'Auto Adjust',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.AutoEditReview,
+    outputFile: 'auto-edit-review.png',
     sectionMinimum: 1,
   },
   {

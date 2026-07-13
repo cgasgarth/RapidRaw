@@ -620,6 +620,29 @@
         "pasteSettings": "Pegar ajustes",
         "resetSectionSettings": "Restablecer ajustes de {{section}}"
       },
+      "autoEdit": {
+        "analyzing": "",
+        "apply": "",
+        "cancelLabel": "",
+        "description": "",
+        "groups": {
+          "atmosphere": "",
+          "color": "",
+          "detail": "",
+          "geometry": "",
+          "light": "",
+          "whiteBalance": ""
+        },
+        "groupsLabel": "",
+        "highConfidenceOnly": "",
+        "holdBefore": "",
+        "impact": "",
+        "impactLabel": "",
+        "resetProposal": "",
+        "reviewLabel": "",
+        "title": "",
+        "unavailable": ""
+      },
       "clippingWarning": {
         "action": "Restablecer extremos",
         "title": "Riesgo de recorte"

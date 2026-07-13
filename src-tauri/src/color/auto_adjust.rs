@@ -6,6 +6,10 @@ use crate::AppState;
 use crate::color::white_balance::{WHITE_BALANCE_CONTRACT, estimate_cct_duv_from_xy};
 use crate::image_processing::downscale_f32_image;
 
+/// Stable identifier for the pre-scene-referred RGB8 Auto process. This process remains
+/// callable for saved automation and batch compatibility; new editor Auto uses auto_edit_v1.
+pub const LEGACY_AUTO_ADJUST_PROCESS: &str = "legacy_auto_adjust_v1";
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AutoAdjustmentResults {
     pub exposure: f64,
@@ -396,6 +400,14 @@ pub fn calculate_auto_adjustments(
     Ok(auto_results_to_json(&results))
 }
 
+#[tauri::command]
+pub fn calculate_legacy_auto_adjustments_v1(
+    state: tauri::State<AppState>,
+) -> Result<serde_json::Value, String> {
+    log::trace!("auto_adjust_process={LEGACY_AUTO_ADJUST_PROCESS}");
+    calculate_auto_adjustments(state)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -441,6 +453,38 @@ mod tests {
             serde_json::json!(128)
         );
         assert_eq!(json["sectionVisibility"]["basic"], serde_json::json!(true));
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "exposure": 0.25,
+                "brightness": -0.1,
+                "contrast": 12.0,
+                "highlights": -8.0,
+                "shadows": 15.0,
+                "vibrance": 20.0,
+                "vignetteAmount": -5.0,
+                "clarity": 4.0,
+                "centré": 2.0,
+                "dehaze": 3.0,
+                "whiteBalanceTechnical": {
+                    "contract": "rapidraw.white_balance.v1",
+                    "mode": "auto",
+                    "kelvin": 6504.0,
+                    "duv": 0.0,
+                    "x": 0.31271,
+                    "y": 0.32902,
+                    "adaptation": "cat16_v1",
+                    "source": "auto",
+                    "confidence": 0.75,
+                    "sampleCount": 128
+                },
+                "whiteBalanceMigration": "native_v1",
+                "sectionVisibility": {"basic": true, "color": true, "effects": true},
+                "whites": 1.5,
+                "blacks": -1.0
+            })
+        );
+        assert_eq!(LEGACY_AUTO_ADJUST_PROCESS, "legacy_auto_adjust_v1");
     }
 
     #[test]
