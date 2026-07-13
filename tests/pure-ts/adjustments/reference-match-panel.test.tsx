@@ -108,6 +108,12 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
     targetPath: '/photos/target.ARW',
   });
   expect(useEditorStore.getState().referenceMatchPreview?.adjustments.exposure).not.toBe(initial.exposure);
+  expect(container.querySelector<HTMLButtonElement>('[data-testid="reference-match-apply-layer"]')?.disabled).toBe(
+    true,
+  );
+  expect(container.querySelector('[data-testid="reference-match-layer-abstention"]')?.textContent).toContain(
+    'creativeTemperature',
+  );
 
   await click(container, '[data-testid="reference-match-apply"]');
   expect(useEditorStore.getState().historyIndex).toBe(historyBeforeProposal + 1);
@@ -133,6 +139,29 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
     await flushPromises();
   });
   expect(useEditorStore.getState().adjustments.referenceMatchApplicationReceipt).toEqual(appliedReceipt);
+
+  const globalExposure = useEditorStore.getState().adjustments.exposure;
+  const historyBeforeLayer = useEditorStore.getState().historyIndex;
+  await click(container, '[data-testid="reference-match-normalize"]');
+  expect(container.querySelector<HTMLButtonElement>('[data-testid="reference-match-apply-layer"]')?.disabled).toBe(
+    false,
+  );
+  await click(container, '[data-testid="reference-match-apply-layer"]');
+  const layerState = useEditorStore.getState();
+  expect(layerState.historyIndex).toBe(historyBeforeLayer + 1);
+  expect(layerState.adjustments.exposure).toBe(globalExposure);
+  expect(layerState.adjustments.masks[0]).toMatchObject({
+    name: 'Reference Normalize',
+    opacity: 100,
+    referenceMatchApplicationReceipt: {
+      destination: 'adjustment-layer',
+      enabledGroups: ['tone'],
+      historyEntriesAdded: 1,
+      impact: 100,
+    },
+  });
+  expect(layerState.adjustments.masks[0]?.adjustments.exposure).not.toBe(0);
+  expect(layerState.activeMaskContainerId).toBe(layerState.adjustments.masks[0]?.id);
 });
 
 async function click(container: Element, selector: string) {

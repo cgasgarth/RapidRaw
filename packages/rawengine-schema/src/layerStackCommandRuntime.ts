@@ -15,6 +15,7 @@ import {
   layerMaskRemoveSourceV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
 } from './rawEngineSchemas.js';
+import { matchLookApplicationReceiptV1Schema } from './referenceMatchRuntime.js';
 
 const unsupportedLegacySubMaskSchema = z
   .looseObject({
@@ -42,6 +43,7 @@ export const layerStackSidecarLayerV1Schema = z
     maskIds: z.array(z.string().trim().min(1)),
     name: z.string().trim().min(1),
     opacity: z.number().min(0).max(1),
+    referenceMatchApplicationReceipt: matchLookApplicationReceiptV1Schema.optional(),
     retouchCloneSource: layerMaskCloneSourceV1Schema.optional(),
     retouchRemoveSource: layerMaskRemoveSourceV1Schema.optional(),
     subMasks: z.array(z.union([brushMaskV1Schema, unsupportedLegacySubMaskSchema])).optional(),
@@ -49,6 +51,13 @@ export const layerStackSidecarLayerV1Schema = z
   })
   .strict()
   .superRefine((layer, context) => {
+    if (layer.referenceMatchApplicationReceipt?.destination === 'global-adjustments') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Layer provenance must declare the adjustment-layer destination.',
+        path: ['referenceMatchApplicationReceipt', 'destination'],
+      });
+    }
     if (layer.retouchCloneSource !== undefined && layer.retouchRemoveSource !== undefined) {
       context.addIssue({
         code: 'custom',

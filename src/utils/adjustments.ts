@@ -533,6 +533,7 @@ export interface MaskContainer {
   layerGroupName?: string;
   name: string;
   opacity: number;
+  referenceMatchApplicationReceipt?: MatchLookApplicationReceiptV1;
   retouchCloneSource?: RetouchCloneSource;
   retouchRemoveSource?: RetouchRemoveSource;
   subMasks: Array<SubMask>;
@@ -1000,7 +1001,10 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
     const containerAdjustments = maskContainer.adjustments;
     const normalizedSubMasks = normalizeSubMasks(maskContainer.subMasks);
 
-    return {
+    const parsedLayerReferenceMatchReceipt = matchLookApplicationReceiptV1Schema.safeParse(
+      maskContainer.referenceMatchApplicationReceipt,
+    );
+    const normalizedMask: MaskContainer = {
       ...INITIAL_MASK_CONTAINER,
       ...maskContainer,
       id: maskContainer.id || crypto.randomUUID(),
@@ -1028,6 +1032,15 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
       },
       subMasks: normalizedSubMasks,
     };
+    if (
+      parsedLayerReferenceMatchReceipt.success &&
+      parsedLayerReferenceMatchReceipt.data.destination === 'adjustment-layer'
+    ) {
+      normalizedMask.referenceMatchApplicationReceipt = parsedLayerReferenceMatchReceipt.data;
+    } else {
+      delete normalizedMask.referenceMatchApplicationReceipt;
+    }
+    return normalizedMask;
   });
 
   const normalizedAiPatches = (loadedAdjustments.aiPatches || []).map(

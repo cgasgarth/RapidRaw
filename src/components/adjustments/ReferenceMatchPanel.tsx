@@ -8,8 +8,10 @@ import { useEditorActions } from '../../hooks/editor/useEditorActions';
 import { useEditorStore } from '../../store/useEditorStore';
 import {
   applyReferenceMatchProposal,
+  createReferenceMatchAdjustmentLayer,
   createReferenceMatchProposal,
   fingerprintReferenceMatchValue,
+  getReferenceMatchLayerCompatibility,
   type ReferenceMatchGroup,
   type ReferenceMatchProposal,
   summarizeReferenceHistogram,
@@ -58,6 +60,10 @@ export default function ReferenceMatchPanel() {
   );
   const canAnalyze = Boolean(
     targetSummary && selectedImage && references.some((reference) => reference.path !== selectedImage.path),
+  );
+  const layerCompatibility = useMemo(
+    () => (proposal ? getReferenceMatchLayerCompatibility(proposal, enabledGroups) : null),
+    [enabledGroups, proposal],
   );
 
   useEffect(() => {
@@ -121,16 +127,16 @@ export default function ReferenceMatchPanel() {
 
   const analyze = (mode: ReferenceMatchProposal['mode']) => {
     if (!targetSummary || !selectedImage) return;
-    setProposal(
-      createReferenceMatchProposal({
-        adjustments,
-        mode,
-        references: references.filter((reference) => reference.path !== selectedImage.path),
-        target: targetSummary,
-        targetProfile: adjustments.cameraProfile,
-        targetProofFingerprint: fingerprintReferenceMatchValue(`proof:${String(proofRevision)}`),
-      }),
-    );
+    const nextProposal = createReferenceMatchProposal({
+      adjustments,
+      mode,
+      references: references.filter((reference) => reference.path !== selectedImage.path),
+      target: targetSummary,
+      targetProfile: adjustments.cameraProfile,
+      targetProofFingerprint: fingerprintReferenceMatchValue(`proof:${String(proofRevision)}`),
+    });
+    setProposal(nextProposal);
+    setEnabledGroups(new Set(nextProposal?.diffs.map((diff) => diff.group) ?? []));
     setImpact(100);
   };
 
@@ -335,7 +341,20 @@ export default function ReferenceMatchPanel() {
               {warning}
             </div>
           ))}
-          <div className="grid grid-cols-2 gap-1">
+          {layerCompatibility && !layerCompatibility.supported && (
+            <div
+              className="text-[9px] text-editor-warning"
+              data-testid="reference-match-layer-abstention"
+              role="status"
+            >
+              {t('editor.adjustments.referenceMatch.layerUnsupported', {
+                defaultValue:
+                  'Layer apply unavailable for selected nodes: {{nodes}}. Disable those groups or apply globally.',
+                nodes: layerCompatibility.unsupportedKeys.join(', '),
+              })}
+            </div>
+          )}
+          <div className="grid grid-cols-3 gap-1">
             <button
               className="inline-flex items-center justify-center gap-1 rounded border border-editor-border px-2 py-1 text-[11px] text-text-secondary"
               onClick={() => setProposal(null)}
@@ -343,6 +362,55 @@ export default function ReferenceMatchPanel() {
             >
               <X size={11} />
               {t('editor.adjustments.referenceMatch.cancel', { defaultValue: 'Cancel' })}
+            </button>
+            <button
+              className="rounded border border-editor-focus-ring px-2 py-1 text-[11px] font-semibold text-text-primary disabled:opacity-40"
+              data-testid="reference-match-apply-layer"
+              disabled={
+                enabledGroups.size === 0 || proposal.diffs.length === 0 || layerCompatibility?.supported !== true
+              }
+              onClick={() => {
+                const current = useEditorStore.getState().adjustments;
+                const layerId = crypto.randomUUID();
+                const layerWithoutReceipt = createReferenceMatchAdjustmentLayer({
+                  enabledGroups,
+                  id: layerId,
+                  impact,
+                  name: proposal.mode === 'normalize' ? 'Reference Normalize' : 'Reference Match',
+                  proposal,
+                });
+                const receipt = matchLookApplicationReceiptV1Schema.parse({
+                  appliedAt: new Date().toISOString(),
+                  destination: 'adjustment-layer',
+                  enabledGroups: [...enabledGroups].sort(),
+                  historyEntriesAdded: 1,
+                  impact,
+                  layerId,
+                  proposalFingerprint: proposal.proposalFingerprint,
+                  resultingGraphFingerprint: fingerprintReferenceMatchValue(
+                    JSON.stringify({
+                      adjustments: layerWithoutReceipt.adjustments,
+                      opacity: layerWithoutReceipt.opacity,
+                    }),
+                  ),
+                  schemaVersion: 1,
+                  targetAnalysisFingerprint: proposal.targetAnalysisFingerprint,
+                });
+                const layer = createReferenceMatchAdjustmentLayer({
+                  enabledGroups,
+                  id: layerId,
+                  impact,
+                  name: layerWithoutReceipt.name,
+                  proposal,
+                  receipt,
+                });
+                setAdjustments({ masks: [layer, ...current.masks] });
+                setEditor({ activeMaskContainerId: layerId, lastReferenceMatchApplicationReceipt: receipt });
+                setProposal(null);
+              }}
+              type="button"
+            >
+              {t('editor.adjustments.referenceMatch.newLayerDestination', { defaultValue: 'New layer' })}
             </button>
             <button
               className="rounded bg-editor-accent px-2 py-1 text-[11px] font-semibold text-editor-accent-text disabled:opacity-40"

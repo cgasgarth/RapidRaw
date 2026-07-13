@@ -1,5 +1,11 @@
+import type { MatchLookApplicationReceiptV1 } from '../../packages/rawengine-schema/src/referenceMatchRuntime';
 import { matchLookProposalV1Schema } from '../../packages/rawengine-schema/src/referenceMatchRuntime';
-import type { Adjustments } from './adjustments';
+import {
+  type Adjustments,
+  DEFAULT_LAYER_BLEND_MODE,
+  INITIAL_MASK_ADJUSTMENTS,
+  type MaskContainer,
+} from './adjustments';
 
 export type ReferenceMatchMode = 'match-look' | 'normalize';
 export type ReferenceMatchGroup = 'color' | 'presence' | 'tone';
@@ -67,6 +73,63 @@ export interface ReferenceMatchPreviewCandidate {
   baseAdjustmentRevision: number;
   targetPath: string;
 }
+
+const REFERENCE_MATCH_LAYER_KEYS = new Set<ReferenceMatchAdjustmentKey>(['exposure', 'contrast', 'saturation']);
+
+export interface ReferenceMatchLayerCompatibility {
+  supported: boolean;
+  unsupportedKeys: ReferenceMatchAdjustmentKey[];
+}
+
+export const getReferenceMatchLayerCompatibility = (
+  proposal: ReferenceMatchProposal,
+  enabledGroups: ReadonlySet<ReferenceMatchGroup>,
+): ReferenceMatchLayerCompatibility => {
+  const unsupportedKeys = proposal.diffs
+    .filter((diff) => enabledGroups.has(diff.group) && !REFERENCE_MATCH_LAYER_KEYS.has(diff.key))
+    .map((diff) => diff.key);
+  return { supported: unsupportedKeys.length === 0, unsupportedKeys };
+};
+
+export const createReferenceMatchAdjustmentLayer = ({
+  enabledGroups,
+  id,
+  impact,
+  name,
+  proposal,
+  receipt,
+}: {
+  enabledGroups: ReadonlySet<ReferenceMatchGroup>;
+  id: string;
+  impact: number;
+  name: string;
+  proposal: ReferenceMatchProposal;
+  receipt?: MatchLookApplicationReceiptV1;
+}): MaskContainer => {
+  const compatibility = getReferenceMatchLayerCompatibility(proposal, enabledGroups);
+  if (!compatibility.supported) {
+    throw new Error(`Layer destination does not support: ${compatibility.unsupportedKeys.join(', ')}.`);
+  }
+  const amount = clamp(impact, 0, 100) / 100;
+  const adjustments = structuredClone(INITIAL_MASK_ADJUSTMENTS);
+  for (const diff of proposal.diffs) {
+    if (!enabledGroups.has(diff.group)) continue;
+    if (diff.key === 'exposure' || diff.key === 'contrast' || diff.key === 'saturation') {
+      adjustments[diff.key] = (diff.proposed - diff.current) * amount;
+    }
+  }
+  return {
+    adjustments,
+    blendMode: DEFAULT_LAYER_BLEND_MODE,
+    id,
+    invert: false,
+    name,
+    opacity: 100,
+    ...(receipt === undefined ? {} : { referenceMatchApplicationReceipt: receipt }),
+    subMasks: [],
+    visible: true,
+  };
+};
 
 interface HistogramChannel {
   data: number[] | undefined;

@@ -83,4 +83,34 @@ describe('reference match runtime contracts', () => {
       }).success,
     ).toBe(false);
   });
+
+  test('requires destination-specific layer provenance', () => {
+    const baseReceipt = {
+      appliedAt: '2026-07-13T19:00:00.000Z',
+      enabledGroups: ['tone'],
+      historyEntriesAdded: 1,
+      impact: 50,
+      proposalFingerprint: fingerprint('6'),
+      resultingGraphFingerprint: fingerprint('8'),
+      schemaVersion: 1,
+      targetAnalysisFingerprint: fingerprint('7'),
+    } as const;
+    expect(
+      matchLookApplicationReceiptV1Schema.safeParse({ ...baseReceipt, destination: 'adjustment-layer' }).success,
+    ).toBe(false);
+    expect(
+      matchLookApplicationReceiptV1Schema.safeParse({
+        ...baseReceipt,
+        destination: 'adjustment-layer',
+        layerId: 'reference-layer',
+      }).success,
+    ).toBe(true);
+    expect(
+      matchLookApplicationReceiptV1Schema.safeParse({
+        ...baseReceipt,
+        destination: 'global-adjustments',
+        layerId: 'reference-layer',
+      }).success,
+    ).toBe(false);
+  });
 });

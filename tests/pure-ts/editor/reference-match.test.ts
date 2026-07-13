@@ -1,11 +1,17 @@
 import { describe, expect, test } from 'bun:test';
-
+import { matchLookApplicationReceiptV1Schema } from '../../../packages/rawengine-schema/src/referenceMatchRuntime';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import {
+  buildLayerStackSidecarFromMasks,
+  materializeMasksFromLayerStackSidecar,
+} from '../../../src/utils/layers/layerStackCommandBridge';
 import {
   applyReferenceMatchProposal,
   combineReferenceSummaries,
+  createReferenceMatchAdjustmentLayer,
   createReferenceMatchProposal,
   fingerprintReferenceMatchValue,
+  getReferenceMatchLayerCompatibility,
   type ReferenceHistogramSummary,
   type ReferenceMatchReference,
   resolveReferenceMatchRenderAdjustments,
@@ -144,6 +150,79 @@ describe('color-managed reference matching', () => {
     expect(toneOnly.creativeTemperature).toBe(INITIAL_ADJUSTMENTS.creativeTemperature);
     expect(toneOnly.cameraProfile).toBe(INITIAL_ADJUSTMENTS.cameraProfile);
     expect(toneOnly.crop).toBe(INITIAL_ADJUSTMENTS.crop);
+  });
+
+  test('creates a compatible full-frame layer with Impact encoded in nodes and provenance surviving sidecar reopen', () => {
+    const proposal = createReferenceMatchProposal({
+      adjustments: INITIAL_ADJUSTMENTS,
+      mode: 'normalize',
+      references: [reference('normalized', 1, summary({ lumaMean: 0.7, lumaSpread: 0.22 }))],
+      target: summary({ lumaMean: 0.3, lumaSpread: 0.08 }),
+    });
+    if (!proposal) throw new Error('Expected proposal');
+    const groups = new Set<ReferenceMatchGroup>(['tone']);
+    const receipt = matchLookApplicationReceiptV1Schema.parse({
+      appliedAt: '2026-07-13T12:00:00.000Z',
+      destination: 'adjustment-layer',
+      enabledGroups: ['tone'],
+      historyEntriesAdded: 1,
+      impact: 40,
+      layerId: 'reference-layer',
+      proposalFingerprint: proposal.proposalFingerprint,
+      resultingGraphFingerprint: fingerprintReferenceMatchValue('reference-layer-graph'),
+      schemaVersion: 1,
+      targetAnalysisFingerprint: proposal.targetAnalysisFingerprint,
+    });
+    const layer = createReferenceMatchAdjustmentLayer({
+      enabledGroups: groups,
+      id: 'reference-layer',
+      impact: 40,
+      name: 'Reference Normalize',
+      proposal,
+      receipt,
+    });
+    const exposure = proposal.diffs.find((diff) => diff.key === 'exposure');
+    expect(layer.opacity).toBe(100);
+    expect(layer.adjustments.exposure).toBeCloseTo(((exposure?.proposed ?? 0) - (exposure?.current ?? 0)) * 0.4);
+
+    const sidecar = buildLayerStackSidecarFromMasks([layer], {
+      graphRevision: 'reference-match-layer-v1',
+      imagePath: '/photos/target.ARW',
+      operationId: 'persist-reference-match-layer',
+      sessionId: 'reference-match-test',
+    });
+    expect(sidecar.layers[0]?.referenceMatchApplicationReceipt).toEqual(receipt);
+    expect(materializeMasksFromLayerStackSidecar(sidecar)[0]?.referenceMatchApplicationReceipt).toEqual(receipt);
+  });
+
+  test('abstains from layer apply for unsupported selected nodes and keeps Impact updates bounded', () => {
+    const proposal = createReferenceMatchProposal({
+      adjustments: INITIAL_ADJUSTMENTS,
+      mode: 'match-look',
+      references: [reference('look', 1, summary({ blueMean: 0.2, lumaMean: 0.7, redMean: 0.75 }))],
+      target: summary({ blueMean: 0.5, lumaMean: 0.3, redMean: 0.25 }),
+    });
+    if (!proposal) throw new Error('Expected proposal');
+    const allGroups = new Set<ReferenceMatchGroup>(['color', 'presence', 'tone']);
+    expect(getReferenceMatchLayerCompatibility(proposal, allGroups)).toEqual({
+      supported: false,
+      unsupportedKeys: ['creativeTemperature', 'creativeTint', 'vibrance'],
+    });
+    expect(getReferenceMatchLayerCompatibility(proposal, new Set(['tone']))).toEqual({
+      supported: true,
+      unsupportedKeys: [],
+    });
+
+    const startedAt = performance.now();
+    for (let impact = 0; impact < 10_000; impact += 1) {
+      applyReferenceMatchProposal({
+        adjustments: INITIAL_ADJUSTMENTS,
+        enabledGroups: allGroups,
+        impact: impact % 101,
+        proposal,
+      });
+    }
+    expect(performance.now() - startedAt).toBeLessThan(750);
   });
 
   test('renders a preview only for its exact target and committed graph revision', () => {

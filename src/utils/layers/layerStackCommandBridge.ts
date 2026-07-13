@@ -189,6 +189,7 @@ const toSidecarLayer = (layer: MaskContainer): LayerStackSidecarLayerV1 => {
     maskIds: layer.subMasks.map((subMask) => subMask.id),
     name: layer.name,
     opacity: clampOpacityFraction(layer.opacity),
+    referenceMatchApplicationReceipt: layer.referenceMatchApplicationReceipt,
     retouchCloneSource: layer.retouchCloneSource,
     retouchRemoveSource: layer.retouchRemoveSource,
     subMasks: layer.subMasks.map(toPersistedSubMask),
@@ -548,6 +549,11 @@ function materializeMasksFromSidecar(
       subMasks: materializeSubMasksFromIds(layer.maskIds, availableSubMasks),
       visible: layer.visible,
     };
+    if (layer.referenceMatchApplicationReceipt !== undefined) {
+      materializedMask.referenceMatchApplicationReceipt = layer.referenceMatchApplicationReceipt;
+    } else {
+      delete materializedMask.referenceMatchApplicationReceipt;
+    }
     if (layer.retouchCloneSource !== undefined) {
       materializedMask.retouchCloneSource = layer.retouchCloneSource;
     } else {
