@@ -21,6 +21,7 @@ import { Trans, useTranslation } from 'react-i18next';
 import { useModalTransition } from '../../../hooks/ui/useModalTransition';
 import { usePreviewViewport } from '../../../hooks/viewport/usePreviewViewport';
 import { Invokes } from '../../../tauri/commands';
+import { type PreviewGeometryParams, requestPreviewGeometry } from '../../../tauri/previewGeometry';
 import { TextColors, TextVariants } from '../../../types/typography';
 import type { Adjustments } from '../../../utils/adjustments';
 import { parseExifMetadataNumber } from '../../../utils/metadataPanelContracts';
@@ -32,32 +33,6 @@ import InspectorSegmentedControl from '../../ui/primitives/InspectorSegmentedCon
 import Slider from '../../ui/primitives/Slider';
 import Switch from '../../ui/primitives/Switch';
 import UiText from '../../ui/primitives/Text';
-
-interface GeometryParams {
-  distortion: number;
-  vertical: number;
-  horizontal: number;
-  rotate: number;
-  aspect: number;
-  scale: number;
-  x_offset: number;
-  y_offset: number;
-  lens_distortion_amount: number;
-  lens_vignette_amount: number;
-  lens_tca_amount: number;
-  lens_dist_k1: number;
-  lens_dist_k2: number;
-  lens_dist_k3: number;
-  lens_model: number;
-  tca_vr: number;
-  tca_vb: number;
-  vig_k1: number;
-  vig_k2: number;
-  vig_k3: number;
-  lens_distortion_enabled: boolean;
-  lens_tca_enabled: boolean;
-  lens_vignette_enabled: boolean;
-}
 
 interface MyLens {
   maker: string;
@@ -297,7 +272,7 @@ export function LensCorrectionSession({
       throttle(async (currentParams: LensParams) => {
         const requestId = requestGate.current.begin('preview');
         try {
-          const fullParams: GeometryParams = {
+          const fullParams: PreviewGeometryParams = {
             distortion: currentAdjustments.transformDistortion,
             vertical: currentAdjustments.transformVertical,
             horizontal: currentAdjustments.transformHorizontal,
@@ -326,13 +301,14 @@ export function LensCorrectionSession({
             vig_k3: currentParams.lensDistortionParams?.vig_k3 ?? 0,
           };
 
-          const result: string = await invoke(Invokes.PreviewGeometryTransform, {
+          const result = await requestPreviewGeometry({
+            sourceIdentity: selectedImage?.path ?? 'no-image',
             params: fullParams,
-            jsAdjustments: currentAdjustments,
+            adjustments: currentAdjustments,
             showLines: false,
           });
           if (!requestGate.current.isCurrent('preview', requestId)) return;
-          setPreviewUrl(result);
+          setPreviewUrl(result.dataUrl);
         } catch (e) {
           if (!requestGate.current.isCurrent('preview', requestId)) return;
           console.error('Lens correction preview failed', e);
@@ -565,7 +541,7 @@ export function LensCorrectionSession({
     const requestId = requestGate.current.begin('compare');
     setIsCompareActive(active);
     if (active) {
-      const fullParams: GeometryParams = {
+      const fullParams: PreviewGeometryParams = {
         distortion: currentAdjustments.transformDistortion,
         vertical: currentAdjustments.transformVertical,
         horizontal: currentAdjustments.transformHorizontal,
@@ -594,14 +570,15 @@ export function LensCorrectionSession({
         vig_k3: currentAdjustments.lensDistortionParams?.vig_k3 ?? 0,
       };
 
-      void invoke<string>(Invokes.PreviewGeometryTransform, {
+      void requestPreviewGeometry({
+        sourceIdentity: selectedImage?.path ?? 'no-image',
         params: fullParams,
-        jsAdjustments: currentAdjustments,
+        adjustments: currentAdjustments,
         showLines: false,
       })
         .then((result) => {
           if (!requestGate.current.isCurrent('compare', requestId)) return;
-          setPreviewUrl(result);
+          setPreviewUrl(result.dataUrl);
         })
         .catch(console.error);
     } else {
