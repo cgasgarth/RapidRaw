@@ -14,6 +14,73 @@ pub(crate) const CHART_CALIBRATION_CONTRACT: &str = "rapidraw.chart_calibration.
 const SOLVER_VERSION: u32 = 1;
 const GENERATED_PROFILE_EXTENSION: &str = "rapidraw-profile.json";
 
+/// The domain in which chart samples were measured.  Calibration must never
+/// consume a display-rendered image: a view transform or output profile would
+/// make the generated profile depend on the current monitor/export target.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum CalibrationSamplingDomain {
+    #[default]
+    TechnicalLinearCameraRgb,
+    RenderedSrgb,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ChartCornerV1 {
+    pub x: f64,
+    pub y: f64,
+}
+
+/// Normalized source-space chart geometry.  Keeping corners in source
+/// coordinates makes sampling invariant to preview scaling, crop and view
+/// transform changes.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ChartGeometryV1 {
+    pub top_left: ChartCornerV1,
+    pub top_right: ChartCornerV1,
+    pub bottom_right: ChartCornerV1,
+    pub bottom_left: ChartCornerV1,
+    pub rows: u16,
+    pub columns: u16,
+    pub source_width: u32,
+    pub source_height: u32,
+    #[serde(default)]
+    pub detection_confidence: Option<f64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ChartGeometryStatus {
+    Accepted,
+    FailedGeometry,
+    FailedCaptureQuality,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ChartGeometryValidationV1 {
+    pub status: ChartGeometryStatus,
+    pub warnings: Vec<String>,
+    pub patch_count: u32,
+    pub normalized_area: f64,
+    pub source_revision: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SupportedChartDefinitionV1 {
+    pub id: String,
+    pub version: u32,
+    pub rows: u16,
+    pub columns: u16,
+    pub patch_count: u32,
+    pub reference_illuminant: String,
+    pub redistribution_notice: String,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum CalibrationPatchRole {
@@ -31,11 +98,21 @@ pub(crate) struct ChartPatchSampleV1 {
     pub neutral: bool,
     pub clipped_fraction: f64,
     pub valid_fraction: f64,
+    #[serde(default)]
+    pub spatial_gradient: f64,
+    #[serde(default = "default_focus_score")]
+    pub focus_score: f64,
+    #[serde(default)]
+    pub near_black_fraction: f64,
     #[serde(default = "unit_weight")]
     pub weight: f64,
 }
 
 fn unit_weight() -> f64 {
+    1.0
+}
+
+fn default_focus_score() -> f64 {
     1.0
 }
 
@@ -52,6 +129,10 @@ pub(crate) struct ChartCalibrationRequestV1 {
     pub illuminant_xy: [f64; 2],
     pub adaptation_method: String,
     pub reference_white_xyz: [f64; 3],
+    #[serde(default)]
+    pub sampling_domain: CalibrationSamplingDomain,
+    #[serde(default)]
+    pub geometry: Option<ChartGeometryV1>,
     pub samples: Vec<ChartPatchSampleV1>,
 }
 
@@ -97,6 +178,10 @@ pub(crate) struct CalibrationFitReceiptV1 {
     pub illuminant_code: u16,
     pub illuminant_xy: [f64; 2],
     pub adaptation_method: String,
+    #[serde(default)]
+    pub sampling_domain: CalibrationSamplingDomain,
+    #[serde(default)]
+    pub source_geometry: Option<ChartGeometryV1>,
     pub camera_to_xyz_matrix: [[f64; 3]; 3],
     pub xyz_to_camera_matrix: [[f64; 3]; 3],
     pub condition_number: f64,
@@ -106,6 +191,41 @@ pub(crate) struct CalibrationFitReceiptV1 {
     pub rejected_patch_ids: Vec<String>,
     pub quality_status: CalibrationQualityStatus,
     pub profile_sha256: String,
+}
+
+const SYNTHETIC_CHART_ID: &str = "synthetic-redistributable-12";
+const SYNTHETIC_CHART_VERSION: u32 = 1;
+const SYNTHETIC_CHART_ROWS: u16 = 3;
+const SYNTHETIC_CHART_COLUMNS: u16 = 4;
+
+/// The catalog intentionally starts with a small, redistributable fixture.
+/// Licensed commercial chart references can be added as versioned entries
+/// without accepting arbitrary user-provided labels as chart definitions.
+fn supported_chart_definition(
+    chart_id: &str,
+    chart_version: u32,
+) -> Result<SupportedChartDefinitionV1> {
+    ensure!(
+        chart_id == SYNTHETIC_CHART_ID && chart_version == SYNTHETIC_CHART_VERSION,
+        "chart_calibration_unsupported_chart_definition"
+    );
+    Ok(SupportedChartDefinitionV1 {
+        id: SYNTHETIC_CHART_ID.into(),
+        version: SYNTHETIC_CHART_VERSION,
+        rows: SYNTHETIC_CHART_ROWS,
+        columns: SYNTHETIC_CHART_COLUMNS,
+        patch_count: u32::from(SYNTHETIC_CHART_ROWS) * u32::from(SYNTHETIC_CHART_COLUMNS),
+        reference_illuminant: "CIE D50, 2° observer".into(),
+        redistribution_notice:
+            "RapidRaw synthetic fixture; replace with a licensed reference manifest for production charts".into(),
+    })
+}
+
+pub(crate) fn supported_chart_catalog() -> Vec<SupportedChartDefinitionV1> {
+    vec![
+        supported_chart_definition(SYNTHETIC_CHART_ID, SYNTHETIC_CHART_VERSION)
+            .expect("built-in chart definition must remain valid"),
+    ]
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -146,7 +266,11 @@ pub(crate) fn fit_chart_calibration(
         .samples
         .iter()
         .filter(|sample| {
-            let accepted = sample.valid_fraction >= 0.8 && sample.clipped_fraction <= 0.02;
+            let accepted = sample.valid_fraction >= 0.8
+                && sample.clipped_fraction <= 0.02
+                && sample.spatial_gradient <= 0.15
+                && sample.focus_score >= 0.35
+                && sample.near_black_fraction <= 0.1;
             if !accepted {
                 rejected_patch_ids.push(sample.patch_id.clone());
             }
@@ -227,6 +351,8 @@ pub(crate) fn fit_chart_calibration(
         illuminant_code: request.illuminant_code,
         illuminant_xy: request.illuminant_xy,
         adaptation_method: request.adaptation_method.clone(),
+        sampling_domain: request.sampling_domain,
+        source_geometry: request.geometry,
         camera_to_xyz_matrix: matrix_array,
         xyz_to_camera_matrix: inverse_array,
         condition_number,
@@ -410,6 +536,22 @@ pub(crate) async fn fit_and_publish_chart_calibration(
     .map_err(|error| error.to_string())?
 }
 
+#[tauri::command]
+pub(crate) fn list_supported_chart_definitions() -> Vec<SupportedChartDefinitionV1> {
+    supported_chart_catalog()
+}
+
+#[tauri::command]
+pub(crate) fn validate_chart_capture_geometry(
+    chart_id: String,
+    chart_version: u32,
+    geometry: ChartGeometryV1,
+    source_revision: String,
+) -> Result<ChartGeometryValidationV1, String> {
+    validate_chart_capture_geometry_request(&chart_id, chart_version, geometry, source_revision)
+        .map_err(|error| error.to_string())
+}
+
 fn validate_request(request: &ChartCalibrationRequestV1) -> Result<()> {
     ensure!(
         !request.profile_name.trim().is_empty(),
@@ -436,6 +578,24 @@ fn validate_request(request: &ChartCalibrationRequestV1) -> Result<()> {
         request.chart_version > 0,
         "chart_calibration_chart_version_invalid"
     );
+    let chart = supported_chart_definition(&request.chart_id, request.chart_version)?;
+    ensure!(
+        request.sampling_domain == CalibrationSamplingDomain::TechnicalLinearCameraRgb,
+        "chart_calibration_requires_technical_linear_camera_rgb"
+    );
+    if let Some(geometry) = request.geometry {
+        validate_chart_geometry(
+            &geometry,
+            chart.rows,
+            chart.columns,
+            &request.source_revision,
+        )?;
+    }
+    ensure!(
+        request.samples.len() == chart.patch_count as usize,
+        "chart_calibration_patch_count_mismatch"
+    );
+    let mut patch_ids = std::collections::BTreeSet::new();
     for value in request
         .illuminant_xy
         .into_iter()
@@ -452,6 +612,10 @@ fn validate_request(request: &ChartCalibrationRequestV1) -> Result<()> {
             "chart_calibration_patch_id_required"
         );
         ensure!(
+            patch_ids.insert(sample.patch_id.clone()),
+            "chart_calibration_duplicate_patch_id"
+        );
+        ensure!(
             sample
                 .camera_rgb
                 .into_iter()
@@ -463,11 +627,129 @@ fn validate_request(request: &ChartCalibrationRequestV1) -> Result<()> {
             sample.weight.is_finite()
                 && sample.weight > 0.0
                 && (0.0..=1.0).contains(&sample.clipped_fraction)
-                && (0.0..=1.0).contains(&sample.valid_fraction),
+                && (0.0..=1.0).contains(&sample.valid_fraction)
+                && (0.0..=1.0).contains(&sample.spatial_gradient)
+                && (0.0..=1.0).contains(&sample.focus_score)
+                && (0.0..=1.0).contains(&sample.near_black_fraction),
             "chart_calibration_invalid_sample_quality"
+        );
+        ensure!(
+            sample.spatial_gradient <= 0.25,
+            "chart_calibration_illumination_gradient_too_high"
+        );
+        ensure!(
+            sample.focus_score >= 0.1,
+            "chart_calibration_capture_out_of_focus"
+        );
+        ensure!(
+            sample.near_black_fraction <= 0.2,
+            "chart_calibration_black_level_contamination"
         );
     }
     Ok(())
+}
+
+fn validate_chart_geometry(
+    geometry: &ChartGeometryV1,
+    expected_rows: u16,
+    expected_columns: u16,
+    source_revision: &str,
+) -> Result<ChartGeometryValidationV1> {
+    ensure!(
+        geometry.source_width > 0 && geometry.source_height > 0,
+        "chart_calibration_source_dimensions_invalid"
+    );
+    ensure!(
+        geometry.rows == expected_rows && geometry.columns == expected_columns,
+        "chart_calibration_geometry_grid_mismatch"
+    );
+    let corners = [
+        geometry.top_left,
+        geometry.top_right,
+        geometry.bottom_right,
+        geometry.bottom_left,
+    ];
+    ensure!(
+        corners.iter().all(|corner| {
+            corner.x.is_finite()
+                && corner.y.is_finite()
+                && (0.0..=1.0).contains(&corner.x)
+                && (0.0..=1.0).contains(&corner.y)
+        }),
+        "chart_calibration_geometry_out_of_bounds"
+    );
+    let signed_area = corners
+        .iter()
+        .zip(corners.iter().cycle().skip(1))
+        .take(4)
+        .map(|(first, second)| first.x * second.y - second.x * first.y)
+        .sum::<f64>()
+        * 0.5;
+    let normalized_area = signed_area.abs();
+    ensure!(
+        signed_area > 0.0,
+        "chart_calibration_geometry_mirrored_or_reversed"
+    );
+    ensure!(
+        normalized_area >= 0.01,
+        "chart_calibration_geometry_area_too_small"
+    );
+    let edge_lengths = corners
+        .iter()
+        .zip(corners.iter().cycle().skip(1))
+        .take(4)
+        .map(|(first, second)| (first.x - second.x).hypot(first.y - second.y))
+        .collect::<Vec<_>>();
+    let shortest = edge_lengths.iter().copied().fold(f64::INFINITY, f64::min);
+    let longest = edge_lengths.iter().copied().fold(0.0, f64::max);
+    ensure!(
+        shortest > 0.0 && longest / shortest <= 4.0,
+        "chart_calibration_geometry_perspective_extreme"
+    );
+    if let Some(confidence) = geometry.detection_confidence {
+        ensure!(
+            confidence.is_finite() && (0.0..=1.0).contains(&confidence),
+            "chart_calibration_detection_confidence_invalid"
+        );
+    }
+    let mut warnings = Vec::new();
+    let boundary_margin_x = 1.0 / geometry.source_width as f64;
+    let boundary_margin_y = 1.0 / geometry.source_height as f64;
+    if corners.iter().any(|corner| {
+        corner.x <= boundary_margin_x
+            || corner.x >= 1.0 - boundary_margin_x
+            || corner.y <= boundary_margin_y
+            || corner.y >= 1.0 - boundary_margin_y
+    }) {
+        warnings.push("chart_near_source_boundary".into());
+    }
+    if geometry
+        .detection_confidence
+        .is_some_and(|confidence| confidence < 0.75)
+    {
+        warnings.push("chart_detection_confidence_low".into());
+    }
+    Ok(ChartGeometryValidationV1 {
+        status: if warnings.is_empty() {
+            ChartGeometryStatus::Accepted
+        } else {
+            ChartGeometryStatus::FailedCaptureQuality
+        },
+        warnings,
+        patch_count: u32::from(expected_rows) * u32::from(expected_columns),
+        normalized_area,
+        source_revision: source_revision.to_string(),
+    })
+}
+
+fn validate_chart_capture_geometry_request(
+    chart_id: &str,
+    chart_version: u32,
+    geometry: ChartGeometryV1,
+    source_revision: String,
+) -> Result<ChartGeometryValidationV1> {
+    let chart = supported_chart_definition(chart_id, chart_version)?;
+    validate_chart_geometry(&geometry, chart.rows, chart.columns, &source_revision)
 }
 
 fn robust_matrix_fit(samples: &[&ChartPatchSampleV1]) -> Result<(Matrix3<f64>, f64, Vec<f64>)> {
@@ -804,6 +1086,9 @@ mod tests {
                     neutral: matches!(index, 6..=8),
                     clipped_fraction: 0.0,
                     valid_fraction: 1.0,
+                    spatial_gradient: 0.0,
+                    focus_score: 1.0,
+                    near_black_fraction: 0.0,
                     weight: 1.0,
                 }
             })
@@ -819,6 +1104,18 @@ mod tests {
             illuminant_xy: [0.34567, 0.35850],
             adaptation_method: "bradford".into(),
             reference_white_xyz: [0.96422, 1.0, 0.82521],
+            sampling_domain: CalibrationSamplingDomain::TechnicalLinearCameraRgb,
+            geometry: Some(ChartGeometryV1 {
+                top_left: ChartCornerV1 { x: 0.2, y: 0.2 },
+                top_right: ChartCornerV1 { x: 0.8, y: 0.2 },
+                bottom_right: ChartCornerV1 { x: 0.8, y: 0.8 },
+                bottom_left: ChartCornerV1 { x: 0.2, y: 0.8 },
+                rows: SYNTHETIC_CHART_ROWS,
+                columns: SYNTHETIC_CHART_COLUMNS,
+                source_width: 4000,
+                source_height: 3000,
+                detection_confidence: Some(0.98),
+            }),
             samples,
         }
     }
@@ -989,5 +1286,79 @@ mod tests {
     fn ciede2000_matches_published_reference_pair() {
         let measured = delta_e00([50.0, 2.6772, -79.7751], [50.0, 0.0, -82.7485]);
         assert!((measured - 2.0425).abs() < 0.0001);
+    }
+
+    #[test]
+    fn catalog_and_geometry_validation_are_versioned_and_source_space_stable() {
+        let catalog = supported_chart_catalog();
+        assert_eq!(catalog.len(), 1);
+        assert_eq!(catalog[0].id, SYNTHETIC_CHART_ID);
+        assert_eq!(catalog[0].patch_count, 12);
+
+        let geometry = request(0.0).geometry.unwrap();
+        let report = validate_chart_capture_geometry_request(
+            SYNTHETIC_CHART_ID,
+            SYNTHETIC_CHART_VERSION,
+            geometry,
+            "raw:source-revision-1".into(),
+        )
+        .unwrap();
+        assert_eq!(report.status, ChartGeometryStatus::Accepted);
+        assert_eq!(report.patch_count, 12);
+        assert!((report.normalized_area - 0.36).abs() < 1e-12);
+        assert_eq!(report.source_revision, "raw:source-revision-1");
+
+        let mut mirrored = geometry;
+        mirrored.top_left = geometry.top_right;
+        mirrored.top_right = geometry.top_left;
+        assert!(
+            validate_chart_capture_geometry_request(
+                SYNTHETIC_CHART_ID,
+                SYNTHETIC_CHART_VERSION,
+                mirrored,
+                "raw:source-revision-1".into()
+            )
+            .unwrap_err()
+            .to_string()
+            .contains("mirrored")
+        );
+        assert!(
+            supported_chart_definition("arbitrary-chart", 1)
+                .unwrap_err()
+                .to_string()
+                .contains("unsupported_chart_definition")
+        );
+    }
+
+    #[test]
+    fn rendered_domain_is_rejected_before_solver_runs() {
+        let mut rendered = request(0.0);
+        rendered.sampling_domain = CalibrationSamplingDomain::RenderedSrgb;
+        assert!(
+            fit_chart_calibration(&rendered)
+                .unwrap_err()
+                .to_string()
+                .contains("technical_linear_camera_rgb")
+        );
+    }
+
+    #[test]
+    fn capture_quality_rejects_unsafe_patch_statistics() {
+        let mut blurred = request(0.0);
+        blurred.samples[3].focus_score = 0.05;
+        assert!(
+            fit_chart_calibration(&blurred)
+                .unwrap_err()
+                .to_string()
+                .contains("out_of_focus")
+        );
+        let mut gradient = request(0.0);
+        gradient.samples[4].spatial_gradient = 0.4;
+        assert!(
+            fit_chart_calibration(&gradient)
+                .unwrap_err()
+                .to_string()
+                .contains("illumination_gradient")
+        );
     }
 }
