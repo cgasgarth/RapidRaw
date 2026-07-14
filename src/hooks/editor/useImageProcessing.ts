@@ -18,7 +18,10 @@ import {
   type PreviewQualityStatus,
   type PreviewRoi,
 } from '../../utils/adaptivePreviewQuality';
-import { decideAdjustmentPersistence } from '../../utils/adjustmentPersistence';
+import {
+  decideAdjustmentPersistence,
+  scheduleAdjustmentPersistenceAfterInteraction,
+} from '../../utils/adjustmentPersistence';
 import type { AdjustmentSnapshot } from '../../utils/adjustmentSnapshots';
 import { type Adjustments, COPYABLE_ADJUSTMENT_KEYS } from '../../utils/adjustments';
 import { areAdjustmentsEqual } from '../../utils/adjustmentsSnapshot';
@@ -1223,60 +1226,58 @@ export function useImageProcessing(
     }
     if (persistence.action === 'unchanged') return;
 
-    if (persistIdleTimer.current) clearTimeout(persistIdleTimer.current);
+    persistIdleTimer.current = scheduleAdjustmentPersistenceAfterInteraction(
+      persistIdleTimer.current,
+      isSliderDragging,
+      () => {
+        if (useEditorStore.getState().imageSessionId !== imageSessionId) return;
+        const transaction =
+          lastEditApplicationReceipt &&
+          lastEditApplicationReceipt.imageSessionId ===
+            (useEditorStore.getState().imageSession?.id ?? `editor-image-session:${String(imageSessionId)}`) &&
+          lastEditApplicationReceipt.adjustmentRevision === adjustmentSnapshot.adjustmentRevision
+            ? buildEditTransactionPersistenceContext(lastEditApplicationReceipt, lastEditApplicationReceipt)
+            : undefined;
+        debouncedSave(selectedImage.path, adjustments, transaction);
+        useProcessStore.getState().invalidateThumbnails([selectedImage.path]);
 
-    if (isSliderDragging) {
-      return;
-    }
-
-    persistIdleTimer.current = setTimeout(() => {
-      if (useEditorStore.getState().imageSessionId !== imageSessionId) return;
-      const transaction =
-        lastEditApplicationReceipt &&
-        lastEditApplicationReceipt.imageSessionId ===
-          (useEditorStore.getState().imageSession?.id ?? `editor-image-session:${String(imageSessionId)}`) &&
-        lastEditApplicationReceipt.adjustmentRevision === adjustmentSnapshot.adjustmentRevision
-          ? buildEditTransactionPersistenceContext(lastEditApplicationReceipt, lastEditApplicationReceipt)
-          : undefined;
-      debouncedSave(selectedImage.path, adjustments, transaction);
-      useProcessStore.getState().invalidateThumbnails([selectedImage.path]);
-
-      const otherPaths = multiSelectedPaths.filter((p) => p !== selectedImage.path);
-      if (otherPaths.length > 0) {
-        const prev = prevAdjustmentsRef.current;
-        if (prev && prev.path === selectedImage.path) {
-          const delta: Record<string, unknown> = {};
-          const includedKeys = appSettings?.copyPasteSettings?.includedAdjustments || COPYABLE_ADJUSTMENT_KEYS;
-          for (const key of Object.keys(adjustments) as Array<keyof Adjustments>) {
-            if (includedKeys.includes(key as string)) {
-              const adjustmentValue: unknown = adjustments[key];
-              const previousAdjustmentValue: unknown = prev.adjustments[key];
-              if (JSON.stringify(adjustmentValue) !== JSON.stringify(previousAdjustmentValue)) {
-                delta[key] = adjustmentValue;
+        const otherPaths = multiSelectedPaths.filter((p) => p !== selectedImage.path);
+        if (otherPaths.length > 0) {
+          const prev = prevAdjustmentsRef.current;
+          if (prev && prev.path === selectedImage.path) {
+            const delta: Record<string, unknown> = {};
+            const includedKeys = appSettings?.copyPasteSettings?.includedAdjustments || COPYABLE_ADJUSTMENT_KEYS;
+            for (const key of Object.keys(adjustments) as Array<keyof Adjustments>) {
+              if (includedKeys.includes(key as string)) {
+                const adjustmentValue: unknown = adjustments[key];
+                const previousAdjustmentValue: unknown = prev.adjustments[key];
+                if (JSON.stringify(adjustmentValue) !== JSON.stringify(previousAdjustmentValue)) {
+                  delta[key] = adjustmentValue;
+                }
               }
             }
-          }
-          if (Object.keys(delta).length > 0) {
-            const acceptedDelta = acceptReferenceMatchAdjustmentTransfer({
-              adjustments: delta,
-              transferMode: 'batch-sync',
-            }).adjustments;
-            otherPaths.forEach((p) => {
-              globalImageCache.delete(p);
-            });
-            useProcessStore.getState().invalidateThumbnails(otherPaths);
-            invokeWithSchema(
-              Invokes.ApplyAdjustmentsToPaths,
-              { paths: otherPaths, adjustments: acceptedDelta },
-              emptyTauriResponseSchema,
-            ).catch((err: unknown) => {
-              console.error('Failed to apply adjustments to multi-selection:', err);
-            });
+            if (Object.keys(delta).length > 0) {
+              const acceptedDelta = acceptReferenceMatchAdjustmentTransfer({
+                adjustments: delta,
+                transferMode: 'batch-sync',
+              }).adjustments;
+              otherPaths.forEach((p) => {
+                globalImageCache.delete(p);
+              });
+              useProcessStore.getState().invalidateThumbnails(otherPaths);
+              invokeWithSchema(
+                Invokes.ApplyAdjustmentsToPaths,
+                { paths: otherPaths, adjustments: acceptedDelta },
+                emptyTauriResponseSchema,
+              ).catch((err: unknown) => {
+                console.error('Failed to apply adjustments to multi-selection:', err);
+              });
+            }
           }
         }
-      }
-      prevAdjustmentsRef.current = { path: selectedImage.path, adjustments };
-    }, 50);
+        prevAdjustmentsRef.current = { path: selectedImage.path, adjustments };
+      },
+    );
 
     return () => {
       if (persistIdleTimer.current) clearTimeout(persistIdleTimer.current);

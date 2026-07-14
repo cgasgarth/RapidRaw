@@ -2495,6 +2495,36 @@ export async function prepareScenario(page, mode) {
     return;
   }
 
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.FilmEmulationWorkspace) {
+    const proof = page.getByTestId('film-workspace-transaction-proof');
+    await page.getByRole('button', { name: 'Enable film emulation' }).click();
+    await expectDatasetValue(proof, 'adjustmentRevision', '1');
+    await expectDatasetValue(proof, 'historyIndex', '1');
+    await expectDatasetValue(proof, 'filmEnabled', 'true');
+    await expectDatasetValue(proof, 'changedKeys', 'filmEmulation');
+    await expectDatasetValue(proof, 'source', 'film-workspace');
+    await page.getByRole('button', { name: 'Enable film emulation' }).click();
+    await expectDatasetValue(proof, 'adjustmentRevision', '1');
+    await expectDatasetValue(proof, 'historyIndex', '1');
+    const mix = page.getByRole('slider', { name: 'Film mix' });
+    await mix.dispatchEvent('pointerdown');
+    await mix.fill('80');
+    await mix.fill('60');
+    await mix.dispatchEvent('pointerup');
+    await expectDatasetValue(proof, 'adjustmentRevision', '3');
+    await expectDatasetValue(proof, 'historyIndex', '2');
+    await expectDatasetValue(proof, 'changedKeys', 'filmLookStrength');
+    await page.getByRole('button', { name: 'Reset film emulation' }).click();
+    await expectDatasetValue(proof, 'adjustmentRevision', '4');
+    await expectDatasetValue(proof, 'historyIndex', '3');
+    await expectDatasetValue(proof, 'filmEnabled', 'false');
+    await expectDatasetValue(proof, 'exposure', '1.25');
+    await page.getByRole('button', { name: 'Reset film emulation' }).click();
+    await expectDatasetValue(proof, 'adjustmentRevision', '4');
+    await expectDatasetValue(proof, 'historyIndex', '3');
+    return;
+  }
+
   if (mode === VISUAL_SMOKE_SCENARIO_IDS.NegativeLabBatchColorWorkspace) {
     await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabWorkspace).waitFor({ timeout: 10_000 });
     const acquisitionHealth = page.getByTestId('negative-lab-acquisition-health');

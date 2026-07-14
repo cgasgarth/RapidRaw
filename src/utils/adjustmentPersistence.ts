@@ -19,3 +19,14 @@ export const decideAdjustmentPersistence = <T>(
   if (areEqual(previous.adjustments, adjustments)) return { action: 'unchanged', snapshot: previous };
   return { action: 'persist', snapshot };
 };
+
+export const scheduleAdjustmentPersistenceAfterInteraction = (
+  currentTimer: ReturnType<typeof setTimeout> | null,
+  isInteractionActive: boolean,
+  persist: () => void,
+  delayMs = 50,
+): ReturnType<typeof setTimeout> | null => {
+  if (currentTimer) clearTimeout(currentTimer);
+  if (isInteractionActive) return null;
+  return setTimeout(persist, delayMs);
+};

@@ -14,6 +14,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   DetailWorkspace: 'detail-workspace',
   EditorParityContract: 'editor-parity-contract',
   EmptyLibrary: 'empty-library',
+  FilmEmulationWorkspace: 'film-emulation-workspace',
   FilmLookBrowser: 'film-look-browser',
   FocusPrivateRawModalReview: 'focus-private-raw-modal-review',
   FocusPrivateRawUi: 'focus-private-raw-ui',
@@ -300,6 +301,12 @@ export const VISUAL_SMOKE_SCENARIOS = [
     mode: VISUAL_SMOKE_SCENARIO_IDS.NegativeLabRealRawPrivateReview,
     outputFile: 'negative-lab-real-raw-private-review.png',
     sectionMinimum: 1,
+  },
+  {
+    marker: 'Film Emulation',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.FilmEmulationWorkspace,
+    outputFile: 'film-emulation-workspace.png',
+    sectionMinimum: 2,
   },
   {
     marker: 'Film Looks',
