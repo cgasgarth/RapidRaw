@@ -514,6 +514,7 @@ fn run_raw_open_edit_export_proof_with_context(
         export_masks: false,
         output_sharpening: None,
         preserve_folders: false,
+        hdr_workflow: None,
     };
     let export_after_path = resolve_private_relative(&private_root, &export_after_relative)?;
     let export_receipt = save_image_with_metadata(
@@ -1897,6 +1898,7 @@ mod tests {
             export_masks: false,
             output_sharpening: None,
             preserve_folders: false,
+            hdr_workflow: None,
         };
         let receipt = save_image_with_metadata(
             &image,
@@ -2215,6 +2217,7 @@ mod tests {
             export_masks: false,
             output_sharpening: None,
             preserve_folders: false,
+            hdr_workflow: None,
         };
         let directory = tempfile::tempdir().expect("tempdir");
         let output = directory.path().join("synthetic-trace.tiff");

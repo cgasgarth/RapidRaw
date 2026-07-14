@@ -47,6 +47,18 @@ export interface ExportSettings {
   outputSharpening?: OutputSharpeningSettings | null | undefined;
   preserveFolders?: boolean | undefined;
   renderingIntent?: ExportRenderingIntent | undefined;
+  hdrWorkflow?: HdrExportWorkflowSettings | null | undefined;
+}
+
+export interface HdrExportWorkflowSettings {
+  sdrRendition: {
+    highlightCompression: number;
+    contrast: number;
+    shadowLift: number;
+    saturation: number;
+    targetWhiteNits: number;
+  };
+  target: 'sdr_companion_tiff16' | 'hdr_pq10' | 'hdr_hlg10';
 }
 
 export enum ExportColorProfile {
