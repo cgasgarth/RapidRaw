@@ -1540,7 +1540,7 @@ fn apply_scene_dehaze_v1(
     let edge_weight = smoothstep(0.02, 0.15, edge_diff);
     let guided_dark = mix(regional_dark, pixel_dark, edge_weight);
     let transmission = clamp(1.0 - 0.95 * guided_dark, 0.08, 1.0);
-    let confidence_weight = mix(0.35, 1.0, clamp(atmosphere_confidence, 0.0, 1.0));
+    let confidence_weight = clamp(atmosphere_confidence, 0.0, 1.0);
     let strength = clamp(abs(amount) * 7.5, 0.0, 1.0) * confidence_weight;
     let effective_transmission = mix(1.0, transmission, strength);
 

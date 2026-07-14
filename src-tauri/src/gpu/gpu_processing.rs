@@ -4324,11 +4324,40 @@ mod blur_pass_tests {
                 .any(|(before, after)| (before - after).abs() > 0.001)
         }));
 
+        let clear = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(32, 24, |x, y| {
+            let checker = if (x + y) % 2 == 0 { 0.0 } else { 1.0 };
+            Rgba([0.02 + checker * 0.7, 0.03 + checker * 0.15, 0.04, 1.0])
+        }));
+        let clear_identity = PreGpuImageIdentity::for_source(&clear, "dehaze_clear_air");
+        let render_clear = |amount| {
+            let mut adjustments = AllAdjustments::default();
+            adjustments.global.dehaze = amount;
+            adjustments.global.edit_graph_version = 2.0;
+            process_and_get_unclamped_dynamic_image(
+                &context,
+                &state,
+                &clear,
+                clear_identity,
+                RenderRequest {
+                    adjustments,
+                    mask_bitmaps: &[],
+                    lut: None,
+                    roi: None,
+                    edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
+                },
+                "dehaze_clear_air",
+            )
+            .expect("GPU clear-air render succeeds")
+            .to_rgba16()
+            .into_raw()
+        };
+        assert_eq!(render_clear(0.0), render_clear(0.12));
+
         let processor_guard = state.gpu_processor.lock().unwrap();
         let processor = &processor_guard.as_ref().unwrap().processor;
         assert_eq!(
             processor.dehaze_analysis_cache.lock().unwrap().counters(),
-            (1, 1)
+            (1, 2)
         );
     }
 
