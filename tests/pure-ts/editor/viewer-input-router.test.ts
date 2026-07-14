@@ -51,4 +51,19 @@ describe('viewer input router', () => {
     expect(transition.resolution?.owner).toBe('blocked');
     expect(transition.state.activePointerId).toBeNull();
   });
+
+  test('releases ownership when the browser reports lost pointer capture', () => {
+    let state = reduceViewerInputRouter(initialViewerInputRouterState(), {
+      type: 'pointerdown',
+      pointerId: 9,
+      input: input({ activeTool: 'brush' }),
+    }).state;
+
+    const transition = reduceViewerInputRouter(state, { type: 'lostpointercapture', pointerId: 9 });
+    expect(transition.ignored).toBe(false);
+    expect(transition.state).toEqual(initialViewerInputRouterState());
+
+    state = transition.state;
+    expect(reduceViewerInputRouter(state, { type: 'pointerup', pointerId: 9 }).ignored).toBe(true);
+  });
 });

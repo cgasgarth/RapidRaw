@@ -46,6 +46,7 @@ export function ViewerSurface({
   onPointerDown,
   onPointerMove,
   onPointerUp,
+  onLostPointerCapture,
   presentation,
   role,
   tabIndex,
@@ -80,6 +81,10 @@ export function ViewerSurface({
       onPointerUp={(event) => {
         dispatchPointerEvent(event, 'pointerup');
         onPointerUp?.(event);
+      }}
+      onLostPointerCapture={(event) => {
+        dispatchPointerEvent(event, 'lostpointercapture');
+        onLostPointerCapture?.(event);
       }}
       role={a11y.role}
       tabIndex={a11y.tabIndex}
