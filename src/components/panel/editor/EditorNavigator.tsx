@@ -293,6 +293,9 @@ function EditorNavigatorSession({ artifact, onZoomChange, transformControllerRef
       data-preview-graph={artifact?.graphIdentity ?? ''}
       data-preview-identity={identity}
       data-preview-session={artifact?.imageSessionId ?? ''}
+      data-transform-position-x={String(transform.positionX)}
+      data-transform-position-y={String(transform.positionY)}
+      data-transform-scale={String(transform.scale)}
       data-testid="editor-navigator"
     >
       {/* i18next-instrument-ignore */}
