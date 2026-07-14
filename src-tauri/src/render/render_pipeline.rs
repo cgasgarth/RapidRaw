@@ -7,6 +7,9 @@ use crate::adjustments::abi::AllAdjustments;
 use crate::deblur_render::{apply_deblur_stage, calculate_deblur_render_hash};
 use crate::denoise_cpu_reference::DenoiseSourceClass;
 use crate::denoise_render::{apply_denoise_stage_for_source, calculate_denoise_render_hash};
+use crate::grading_render::{
+    apply_perceptual_grading_stage, calculate_perceptual_grading_render_hash,
+};
 use crate::wavelet_render::{apply_wavelet_detail_stage, calculate_wavelet_detail_render_hash};
 
 pub(crate) struct PreGpuDetailStageResult<'a> {
@@ -38,15 +41,18 @@ pub(crate) fn apply_pre_gpu_detail_stages<'a>(
     let deblurred_image = apply_deblur_stage(denoised_image.as_ref(), adjustments);
     let deblur_render_hash = calculate_deblur_render_hash(denoise_render_hash, adjustments);
     let wavelet_image = apply_wavelet_detail_stage(deblurred_image.image.as_ref(), adjustments);
-    let render_hash = calculate_wavelet_detail_render_hash(deblur_render_hash, adjustments);
+    let wavelet_render_hash = calculate_wavelet_detail_render_hash(deblur_render_hash, adjustments);
+    let grading_image = apply_perceptual_grading_stage(wavelet_image.as_ref(), adjustments);
+    let render_hash = calculate_perceptual_grading_render_hash(wavelet_render_hash, adjustments);
 
     let stage_changed = matches!(denoised_image, Cow::Owned(_))
         || matches!(deblurred_image.image, Cow::Owned(_))
-        || matches!(wavelet_image, Cow::Owned(_));
+        || matches!(wavelet_image, Cow::Owned(_))
+        || matches!(grading_image, Cow::Owned(_));
 
     PreGpuDetailStageResult {
         image: if stage_changed {
-            Cow::Owned(wavelet_image.into_owned())
+            Cow::Owned(grading_image.into_owned())
         } else {
             Cow::Borrowed(image)
         },
@@ -124,6 +130,45 @@ mod tests {
         assert_ne!(
             image.to_rgb32f().into_raw(),
             enabled.image.as_ref().to_rgb32f().into_raw()
+        );
+    }
+
+    #[test]
+    fn perceptual_grading_runs_in_authoritative_pre_gpu_pipeline() {
+        let image = test_image();
+        let result = apply_pre_gpu_detail_stages(
+            &image,
+            42,
+            &json!({
+                "rawEngineEditGraphVersion": 2,
+                "perceptualGradingV1": {
+                    "shadows": {"hueDegrees": 220, "chroma": 0.15, "saturation": 0, "brilliance": 0, "luminanceEv": 0},
+                    "midtones": {"hueDegrees": 0, "chroma": 0, "saturation": 0.2, "brilliance": 0.1, "luminanceEv": 0},
+                    "highlights": {"hueDegrees": 45, "chroma": 0.1, "saturation": 0, "brilliance": 0, "luminanceEv": 0.2},
+                    "global": {"hueDegrees": 0, "chroma": 0, "saturation": 0, "brilliance": 0, "luminanceEv": 0},
+                    "shadowFulcrumEv": -2,
+                    "highlightFulcrumEv": 2,
+                    "falloff": 1,
+                    "balance": 0,
+                    "blending": 0.5,
+                    "perceptualModel": "oklab_d65_from_acescg_v1",
+                    "neutralProtection": 0.7,
+                    "skinProtection": 0.2
+                }
+            }),
+            true,
+        );
+
+        assert!(matches!(result.image, Cow::Owned(_)));
+        assert_ne!(result.render_hash, 42);
+        assert_ne!(result.image.to_rgb32f(), image.to_rgb32f());
+        assert!(
+            result
+                .image
+                .to_rgb32f()
+                .as_raw()
+                .iter()
+                .all(|channel| channel.is_finite())
         );
     }
 
