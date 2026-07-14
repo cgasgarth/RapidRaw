@@ -3,6 +3,7 @@ pub(crate) mod analytics_scheduler;
 pub(crate) mod artifact_identity;
 pub(crate) mod color_node_registry;
 pub(crate) mod cpu_edit_graph;
+pub(crate) mod cpu_nodes;
 pub(crate) mod culling;
 pub(crate) mod edit_graph;
 pub(crate) mod film_characteristic_curve;
