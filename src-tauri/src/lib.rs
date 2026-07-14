@@ -1553,6 +1553,10 @@ fn render_processed_export_soft_proof_preview(
     )?;
     let mut gpu_adjustments = render_plan.adjustments;
     render_pipeline::suppress_legacy_global_denoise(&mut gpu_adjustments);
+    render_pipeline::suppress_legacy_global_detail(
+        &mut gpu_adjustments,
+        detail_stage.owns_legacy_global_detail,
+    );
     process_and_get_dynamic_image(
         &context,
         state,
@@ -1721,6 +1725,10 @@ fn generate_uncropped_preview(
         );
         let mut gpu_adjustments = render_plan.adjustments;
         render_pipeline::suppress_legacy_global_denoise(&mut gpu_adjustments);
+        render_pipeline::suppress_legacy_global_detail(
+            &mut gpu_adjustments,
+            detail_stage.owns_legacy_global_detail,
+        );
         if let Ok(processed_image) = process_and_get_dynamic_image(
             &context,
             &state,
@@ -2645,6 +2653,10 @@ fn generate_preset_preview(
     );
     let mut gpu_adjustments = render_plan.adjustments;
     render_pipeline::suppress_legacy_global_denoise(&mut gpu_adjustments);
+    render_pipeline::suppress_legacy_global_detail(
+        &mut gpu_adjustments,
+        detail_stage.owns_legacy_global_detail,
+    );
     let processed_image = process_and_get_dynamic_image(
         &context,
         &state,
@@ -3556,6 +3568,10 @@ fn generate_preview_for_path(
     );
     let mut gpu_adjustments = render_plan.adjustments;
     render_pipeline::suppress_legacy_global_denoise(&mut gpu_adjustments);
+    render_pipeline::suppress_legacy_global_detail(
+        &mut gpu_adjustments,
+        detail_stage.owns_legacy_global_detail,
+    );
     let final_image = process_and_get_dynamic_image(
         &context,
         &state,

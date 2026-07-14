@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
-const WAVELET_RENDER_REVISION_ABI: u32 = 2;
+const WAVELET_RENDER_REVISION_ABI: u32 = 3;
 
 use image::DynamicImage;
 use serde_json::Value;
@@ -68,13 +68,13 @@ pub fn calculate_wavelet_detail_render_hash(base_hash: u64, adjustments: &Value)
     let mut hasher = DefaultHasher::new();
     WAVELET_RENDER_REVISION_ABI.hash(&mut hasher);
     base_hash.hash(&mut hasher);
-    if let Some(settings) = typed_multiscale_settings(adjustments) {
+    if let Some(settings) = resolved_multiscale_settings(adjustments) {
         "multiscale_detail_v1".hash(&mut hasher);
-        match serde_json::from_value::<MultiscaleDetailSettingsV1>(settings.clone()) {
+        match settings {
             Ok(settings) => serde_json::to_string(&settings)
                 .expect("multiscale detail settings serialize")
                 .hash(&mut hasher),
-            Err(_) => settings.to_string().hash(&mut hasher),
+            Err(raw) => raw.to_string().hash(&mut hasher),
         }
         return hasher.finish();
     }
@@ -93,9 +93,8 @@ pub fn apply_wavelet_detail_stage<'a>(
     image: &'a DynamicImage,
     adjustments: &Value,
 ) -> Cow<'a, DynamicImage> {
-    if let Some(settings) = typed_multiscale_settings(adjustments) {
-        let parsed = serde_json::from_value::<MultiscaleDetailSettingsV1>(settings.clone());
-        let Ok(settings) = parsed else {
+    if let Some(settings) = resolved_multiscale_settings(adjustments) {
+        let Ok(settings) = settings else {
             return Cow::Borrowed(image);
         };
         let Ok(plan) = MultiscaleDetailPlanV1::compile(settings, image.width(), image.height())
@@ -135,6 +134,72 @@ pub fn apply_wavelet_detail_stage<'a>(
         },
     );
     Cow::Owned(output)
+}
+
+pub fn multiscale_owns_legacy_global_detail(adjustments: &Value) -> bool {
+    resolved_multiscale_settings(adjustments).is_some()
+}
+
+fn resolved_multiscale_settings(
+    adjustments: &Value,
+) -> Option<Result<MultiscaleDetailSettingsV1, Value>> {
+    if let Some(settings) = typed_multiscale_settings(adjustments) {
+        return Some(
+            serde_json::from_value::<MultiscaleDetailSettingsV1>(settings.clone())
+                .map_err(|_| settings.clone()),
+        );
+    }
+    macro_multiscale_settings(adjustments).map(Ok)
+}
+
+fn macro_multiscale_settings(adjustments: &Value) -> Option<MultiscaleDetailSettingsV1> {
+    let graph_version = adjustments
+        .get("rawEngineEditGraphVersion")
+        .and_then(Value::as_u64)
+        .unwrap_or(1);
+    if graph_version < 2 {
+        return None;
+    }
+    let control = |key: &str| {
+        adjustments
+            .get(key)
+            .and_then(Value::as_f64)
+            .map(|value| (value as f32 / 100.0).clamp(-1.0, 1.0))
+            .unwrap_or(0.0)
+    };
+    let sharpness = control("sharpness");
+    let clarity = control("clarity");
+    let structure = control("structure");
+    if sharpness.abs() <= f32::EPSILON
+        && clarity.abs() <= f32::EPSILON
+        && structure.abs() <= f32::EPSILON
+    {
+        return None;
+    }
+    let sharpness_weights = [1.0, 0.72, 0.18, 0.0, 0.0];
+    let clarity_weights = [0.0, 0.08, 0.58, 0.82, 0.24];
+    let structure_weights = [0.0, 0.0, 0.12, 0.68, 1.0];
+    let thresholds = [0.004, 0.006, 0.01, 0.015, 0.025];
+    let bands = std::array::from_fn(|index| crate::detail::multiscale::DetailBandSettingsV1 {
+        edge_protection: 0.8 - index as f32 * 0.08,
+        gain: (sharpness * sharpness_weights[index]
+            + clarity * clarity_weights[index]
+            + structure * structure_weights[index])
+            .clamp(-2.0, 2.0),
+        noise_protection: 0.9 - index as f32 * 0.16,
+        threshold: thresholds[index],
+    });
+    Some(MultiscaleDetailSettingsV1 {
+        bands,
+        chroma_detail: 0.0,
+        halo_suppression: 0.78,
+        highlight_protection: 0.8,
+        overall_amount: 1.0,
+        process: crate::detail::multiscale::DetailProcessV1::AtrousLumaV1,
+        reference_scale_px: 2_048.0,
+        ringing_suppression: 0.8,
+        shadow_noise_protection: 0.85,
+    })
 }
 
 fn typed_multiscale_settings(adjustments: &Value) -> Option<&Value> {
@@ -310,6 +375,50 @@ mod tests {
 
         assert!(matches!(output, Cow::Borrowed(_)));
         assert_eq!(max_delta(&image, output.as_ref()), 0.0);
+    }
+
+    #[test]
+    fn graph_v2_user_controls_compile_to_distinct_scale_aware_bands() {
+        let sharpness = json!({"rawEngineEditGraphVersion": 2, "sharpness": 80});
+        let clarity = json!({"rawEngineEditGraphVersion": 2, "clarity": 80});
+        let structure = json!({"rawEngineEditGraphVersion": 2, "structure": 80});
+        let sharpness_plan = resolved_multiscale_settings(&sharpness).unwrap().unwrap();
+        let clarity_plan = resolved_multiscale_settings(&clarity).unwrap().unwrap();
+        let structure_plan = resolved_multiscale_settings(&structure).unwrap().unwrap();
+
+        assert!(sharpness_plan.bands[0].gain > sharpness_plan.bands[4].gain);
+        assert!(clarity_plan.bands[2].gain > clarity_plan.bands[0].gain);
+        assert!(structure_plan.bands[4].gain > structure_plan.bands[1].gain);
+        let preview = MultiscaleDetailPlanV1::compile(sharpness_plan.clone(), 1_024, 768).unwrap();
+        let export = MultiscaleDetailPlanV1::compile(sharpness_plan, 4_096, 3_072).unwrap();
+        assert_eq!(preview.effective_radii_px, [1, 2, 3, 4, 8]);
+        assert_eq!(export.effective_radii_px, [2, 4, 8, 16, 32]);
+    }
+
+    #[test]
+    fn graph_v2_user_controls_execute_real_pixels_and_legacy_graph_stays_unchanged() {
+        let image = synthetic_texture_image();
+        let modern = json!({
+            "rawEngineEditGraphVersion": 2,
+            "sharpness": 65,
+            "clarity": 40,
+            "structure": 25
+        });
+        let legacy = json!({
+            "rawEngineEditGraphVersion": 1,
+            "sharpness": 65,
+            "clarity": 40,
+            "structure": 25
+        });
+        let output = apply_wavelet_detail_stage(&image, &modern);
+        assert!(matches!(output, Cow::Owned(_)));
+        assert!(max_delta(&image, output.as_ref()) > 0.0001);
+        assert!(multiscale_owns_legacy_global_detail(&modern));
+        assert!(!multiscale_owns_legacy_global_detail(&legacy));
+        assert!(matches!(
+            apply_wavelet_detail_stage(&image, &legacy),
+            Cow::Borrowed(_)
+        ));
     }
 
     #[test]
